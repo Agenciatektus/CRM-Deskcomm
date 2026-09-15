@@ -84,7 +84,7 @@ prática que quase ninguém tem.
 
 | Lacuna | Impacto para a Tektus |
 |---|---|
-| **Nenhum billing/cobrança** | **Bloqueador de lançamento.** O cliente compra a assinatura e loga sozinho (§4) — sem cobrança, não há produto. Nem planos, nem gateway, nem suspensão por inadimplência. |
+| **Nenhum billing/cobrança** | Não bloqueia o primeiro cliente (Peterson, 15/09: o Dr. Paulo paga direto a ele, fora do sistema). Vira requisito quando a assinatura for self-serve (§4). |
 | **Branding é singleton** (`platform_branding.id = 1`) | White-label da *instalação* inteira, não por cliente. "Tektus CRM" sim; "CRM do Studio L" não. Aceitável no modelo escolhido. |
 | **WAHA é global por instalação** | `WAHA_API_BASE_URL` vem do `.env`. Existe `WAHA_BYO_ENCRYPTION_KEY` declarada em `lib/env.ts`, mas **sem implementação** — BYO-WAHA por tenant é intenção, não recurso. |
 | **Sem "conectar com a Verdash"** | A tela de conexão só oferece QR, Meta e parceiro. A aba nova é o trabalho da §3. |
@@ -328,11 +328,16 @@ O que **não** entra, e é uma economia relevante: `agencies`,
 "SaaS Mode" do GHL — que custa US$ 497/mês justamente por ser caro de construir e
 sustentar. Fora de escopo por decisão, não por falta de tempo.
 
-### O que essa decisão promove a requisito: billing
+### Cobrança: fora do produto até existir self-serve
 
-Se o cliente **compra a assinatura e loga na própria conta**, a cobrança deixa de
-ser observação e vira bloqueador de lançamento. E o CRM não tem nada disso: nem
-planos, nem assinatura, nem gateway, nem gate de acesso por pagamento.
+**Decisão do Peterson em 15/09:** o primeiro cliente (Dr. Paulo) **não** assina pelo
+CRM — paga direto a ele, e a Tektus só configura a conta. Isso tira o billing do
+caminho crítico do lançamento: dá para pôr o cliente para usar hoje, sem gateway
+nenhum.
+
+A cobrança volta a ser requisito no dia em que a assinatura for self-serve — o
+modelo descrito acima. O CRM não tem nada disso: nem planos, nem assinatura, nem
+gateway, nem gate de acesso por pagamento.
 
 Três caminhos, do mais barato ao mais caro:
 
@@ -540,7 +545,7 @@ morto por OOM no Coolify compartilhado.
 | `adminToken` global se usar a camada `/waha` do FZAP | Média | Adapter nativo com token por sessão (F3). |
 | Licença FZAP intermitente derruba mídia (`WAHA_MEGA`) | Média | Adapter nativo não depende do bundle WAHA. |
 | Webhook FZAP sem retentativa (evento perdido se >5s ou erro) | Média | Handler que só enfileira e responde 200 rápido — padrão que o CRM já usa. |
-| Sem billing, com assinatura self-serve | **Alta** | Cobrança fora do produto no começo; billing do Verdash depois. Sem isso não há lançamento. |
+| Sem billing | Baixa agora | 1º cliente paga fora do sistema (decisão 15/09). Sobe para Alta quando a assinatura virar self-serve. |
 | Token de máquina novo no Verdash (auth de envio) | **Alta** | Escopo de uma instância, revogável, revisão `@Cassio_SecRev` na F3. |
 | RAM da VPS30 | Média | VPS separada na F6. |
 | Rate limit ausente na superfície de auth | Baixa-Média | Conhecido pelo upstream (`threat-model.md` §T1); avaliar antes de expor à internet. |
