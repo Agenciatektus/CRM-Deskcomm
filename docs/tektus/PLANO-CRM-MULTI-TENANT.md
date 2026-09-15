@@ -27,13 +27,11 @@ O trabalho real é outro:
    handshake por código de pareamento — mais um provider `verdash` na camada de
    canais, que já tem 3. Isso cobre os dois cenários: instância própria do cliente
    ou a conexão que já existe no Verdash.
-3. **Resolver a cobrança.** Assinatura self-serve sem billing não fecha, e o CRM
-   não tem nada disso.
-4. **Decidir quem é dono de qual verdade** entre Verdash e CRM, para não criar
+3. **Decidir quem é dono de qual verdade** entre Verdash e CRM, para não criar
    dois funis concorrentes.
 
-Os itens 1, 2 e 4 rodam local. O 3 é decisão de produto antes de ser código —
-e o Verdash já resolveu esse problema uma vez.
+A cobrança **não** entra nesta lista: o primeiro cliente paga fora do sistema
+(§4). Ela volta quando a assinatura for self-serve.
 
 ---
 
