@@ -90,6 +90,63 @@ export async function fzapRequest<T = unknown>(
 }
 
 /**
+ * O JID de verdade de um telefone — perguntado ao WhatsApp, não deduzido.
+ *
+ * ─── Por que não dá para deduzir ────────────────────────────────────────────
+ *
+ * O nono dígito não é regra universal no Brasil. Ele existe para celular em
+ * boa parte do país, NÃO existe em fixo, e há linha antiga que o WhatsApp
+ * continua conhecendo sem ele. Some a isso o LID mode, em que o endereço nem
+ * é telefone. Qualquer regra que a gente escreva aqui vai estar errada para
+ * alguma faixa — e errada de um jeito que só aparece quando um atendente tenta
+ * responder e a mensagem não sai.
+ *
+ * `POST /user/check` aceita várias grafias de uma vez e responde quais estão no
+ * WhatsApp, com o JID de cada uma. Então em vez de decidir, perguntamos: manda
+ * as variantes (com e sem o nono dígito) e usa a que o servidor reconhecer.
+ *
+ * Isso só roda quando NÃO há thread conhecida — responder a quem já escreveu
+ * usa o endereço por onde a mensagem chegou, que é mais barato e mais certo.
+ *
+ * `null` quando nenhuma variante está no WhatsApp: aí quem chama decide, e o
+ * desfecho honesto é falhar dizendo que o número não tem WhatsApp, em vez de
+ * mandar para um endereço inventado e receber um erro que não explica nada.
+ */
+export async function resolverJidDoTelefone(
+  creds: VerdashCredentials,
+  variantes: string[],
+): Promise<string | null> {
+  const numeros = [...new Set(variantes.map((v) => v.replace(/\D/g, "")).filter((v) => v.length >= 8))];
+  if (numeros.length === 0) return null;
+
+  try {
+    const data = await fzapRequest<{
+      users?: Array<{ query?: string; isInWhatsapp?: boolean; jid?: string; lId?: string }>;
+    }>(creds, "/user/check", { method: "POST", body: { phone: numeros } });
+
+    const achado = (data?.users ?? []).find((u) => u?.isInWhatsapp && (u?.lId || u?.jid));
+    if (!achado) return null;
+
+    // O LID na frente do telefone, quando o servidor devolve os dois.
+    //
+    // Medido contra a instância real: perguntar por `5566984057837` (a grafia
+    // do cadastro, com o nono dígito) devolve
+    //   jid: 556684057837@s.whatsapp.net   ← o telefone de verdade, sem o 9
+    //   lId: 162379946016868@lid           ← o endereço nativo da conta
+    //
+    // Os dois estão certos, mas esta conta opera em LID mode — TODA conversa
+    // chega com `Chat` em `@lid` —, e foi tentando entregar num
+    // `@s.whatsapp.net` que o servidor respondeu `no LID found`. Preferir o LID
+    // é falar o idioma que a conta já está falando.
+    return achado.lId ?? achado.jid ?? null;
+  } catch {
+    // Consulta que falha não pode impedir o envio: quem chama segue com o
+    // telefone que tinha. Pior caso, volta ao comportamento anterior.
+    return null;
+  }
+}
+
+/**
  * Manda a mensagem — e decide por onde ela sai.
  *
  * ─── Os dois caminhos, e por que existem ────────────────────────────────────

@@ -42,7 +42,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FetchedMedia } from "@/lib/messaging/media/types";
 
-import { fzapFetchMedia, fzapRequest, verdashEnviar } from "../verdash/client";
+import { fzapFetchMedia, fzapRequest, resolverJidDoTelefone, verdashEnviar } from "../verdash/client";
+import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -225,7 +226,25 @@ export const verdashAdapter: ChannelAdapter = {
     // uma linha antiga é conhecida pelo WhatsApp sem ele — o envio morria com
     // `500 no LID found for 5566984057837@s.whatsapp.net`, com o contato certo
     // e o endereço errado.
-    const destino = envelope.providerConversationId?.trim() || envelope.to;
+    let destino = envelope.providerConversationId?.trim() || envelope.to;
+
+    // ─── Sem thread conhecida, PERGUNTE o endereço em vez de deduzi-lo ─────
+    //
+    // Este é o caso de uma conversa que o CRM inicia: não houve mensagem de
+    // entrada, então não há JID gravado, e o que sobra é o telefone do
+    // cadastro. Montar o JID a partir dele é apostar que aquela linha usa o
+    // nono dígito — e o nono dígito NÃO é regra universal no Brasil: não existe
+    // em fixo, não existe em toda faixa, e há linha antiga que o WhatsApp
+    // conhece sem ele.
+    //
+    // `resolverJidDoTelefone` manda as variantes e usa a que o servidor
+    // reconhece. Custa uma chamada, só na primeira mensagem de cada conversa —
+    // depois disso o eco grava a thread e este caminho não roda mais.
+    if (!envelope.providerConversationId && !destino.includes("@")) {
+      const resolvido = await resolverJidDoTelefone(creds, phoneLookupVariants(destino));
+      if (resolvido) destino = resolvido;
+    }
+
     const { rota, body } = corpoDoEnvio(envelope, destino);
 
     await envelope.beforeSend?.();
