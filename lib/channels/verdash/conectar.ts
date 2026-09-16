@@ -124,12 +124,39 @@ export async function validateVerdashToken(token: string): Promise<VerdashValida
   // ainda — instância criada e nunca pareada —, e isso não impede conectar: o
   // número aparece sozinho quando o pareamento acontecer.
   const digitos = (data.jid ?? "").split("@")[0]?.split(":")[0]?.replace(/\D/g, "") ?? "";
+  const telefone = digitos.length >= 8 ? `+${digitos}` : null;
+
+  // ─── Como o canal se chama NA TELA DO CLIENTE ───────────────────────────
+  //
+  // NÃO o nome da instância. Esse nome é interno nosso — na primeira conexão
+  // ele apareceu para o cliente como `tektus-dr-paulo-torres`, isto é, a tela
+  // do consultório mostrando a convenção de nomes da agência. Além de feio, é
+  // vazamento de vocabulário interno pela porta da frente.
+  //
+  // O rótulo certo é o nome que o WhatsApp já usa para aquela linha — o mesmo
+  // que o cliente vê quando alguém recebe mensagem dele. O número entra como
+  // segunda opção, e o nome da instância fica só como último recurso, para o
+  // caso de uma linha criada e ainda não pareada (que não tem nem perfil nem
+  // número).
+  let pushName: string | null = null;
+  try {
+    const perfil = await fzapRequest<{ pushName?: string }>(
+      { instanceName: "", token, baseUrl: verdashBaseUrl() },
+      "/user/profile/name",
+    );
+    pushName = typeof perfil?.pushName === "string" && perfil.pushName.trim().length > 0
+      ? perfil.pushName.trim()
+      : null;
+  } catch {
+    // Perfil é enfeite: a conexão não pode falhar porque o nome não veio.
+    pushName = null;
+  }
 
   return {
     ok: true,
     instanceName,
-    phoneNumber: digitos.length >= 8 ? `+${digitos}` : null,
-    displayName: instanceName,
+    phoneNumber: telefone,
+    displayName: pushName ?? telefone ?? instanceName,
     connected: Boolean(data.connected && data.loggedIn !== false),
   };
 }
