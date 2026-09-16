@@ -3595,6 +3595,42 @@ export const DICIONARIO: Traducoes = {
   "Canal conectado.": { es: "Canal conectado." },
   "Não foi possível conectar.": { es: "No se pudo conectar." },
   "provedor parceiro": { es: "proveedor asociado" },
+
+  // ─── Canal hospedado: o número que já está conectado em outro sistema ───
+  "Número já conectado": { es: "Número ya conectado" },
+  "sua plataforma": { es: "tu plataforma" },
+  "Usar o WhatsApp que já está na": { es: "Usar el WhatsApp que ya está en" },
+  "O mesmo número que você já usa, sem ler QR de novo e sem tirar nada do ar. As conversas passam a aparecer aqui, e o que você já tinha configurado na sua plataforma continua funcionando igual.": {
+    es: "El mismo número que ya usas, sin volver a leer el QR y sin dar de baja nada. Las conversaciones pasan a aparecer aquí, y lo que ya tenías configurado en tu plataforma sigue funcionando igual.",
+  },
+  "aguardando o número": { es: "esperando el número" },
+  "Token da instância": { es: "Token de la instancia" },
+  "gravado — preencha para trocar": { es: "guardado: complétalo para cambiarlo" },
+  "cole o token": { es: "pega el token" },
+  "É o token do SEU número, copiado do painel da sua plataforma. Ele vale só para essa linha — não dá acesso a nenhuma outra. Guardado cifrado, e não é mostrado de novo depois de gravado.": {
+    es: "Es el token de TU número, copiado del panel de tu plataforma. Vale solo para esa línea: no da acceso a ninguna otra. Se guarda cifrado y no se vuelve a mostrar.",
+  },
+  "O token é testado antes de ser gravado, e é dele que vem o nome do número — você não precisa digitá-lo.": {
+    es: "El token se prueba antes de guardarse, y de él sale el nombre del número: no necesitas escribirlo.",
+  },
+  "Conectado, mas o recebimento não foi ligado.": {
+    es: "Conectado, pero la recepción no quedó activada.",
+  },
+  "Tudo ligado": { es: "Todo conectado" },
+  "O CRM já avisou a": { es: "El CRM ya le avisó a" },
+  "para entregar as mensagens deste número aqui — você não precisa colar nada do outro lado. O que já estava configurado lá continua recebendo normalmente.": {
+    es: "para entregar aquí los mensajes de este número: no necesitas pegar nada del otro lado. Lo que ya estaba configurado allá sigue recibiendo con normalidad.",
+  },
+  "O número foi conectado e o CRM já consegue enviar, mas": {
+    es: "El número quedó conectado y el CRM ya puede enviar, pero",
+  },
+  "as respostas do cliente ainda não chegam aqui": {
+    es: "las respuestas del cliente todavía no llegan aquí",
+  },
+  ". Tente reconectar; se continuar, o motivo relatado foi:": {
+    es: ". Intenta reconectar; si sigue igual, el motivo informado fue:",
+  },
+  "sem detalhe": { es: "sin detalle" },
   "Conectar por": { es: "Conectar por" },
   "Um número oficial (WhatsApp Business) conectado através do seu provedor. As mensagens entram e saem pelo CRM, e os modelos aprovados são os mesmos da sua conta.": {
     es: "Un número oficial (WhatsApp Business) conectado a través de tu proveedor. Los mensajes entran y salen por el CRM, y las plantillas aprobadas son las mismas de tu cuenta.",

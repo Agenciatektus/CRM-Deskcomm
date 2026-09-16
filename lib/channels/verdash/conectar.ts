@@ -59,8 +59,15 @@ export const VERDASH_CHANNEL_LABEL = "Verdash";
  */
 const EVENTOS = ["Message", "AutomationMessage", "Connected", "Disconnected", "LoggedOut"];
 
-/** O header por onde o segredo do CRM viaja em cada entrega. */
-export const HEADER_DO_SEGREDO = "X-Deskcomm-Secret";
+/**
+ * O header por onde o segredo do CRM viaja em cada entrega.
+ *
+ * Nome NEUTRO de propósito: este CRM é white-label, e um header com a marca
+ * dentro seria marca fixada em código — a catraca de `tests/unit/branding.test.ts`
+ * cobra isso, e com razão. Aqui não há compatibilidade a preservar: o header
+ * nasce agora.
+ */
+export const HEADER_DO_SEGREDO = "X-Webhook-Secret";
 
 export type VerdashValidacao =
   | {

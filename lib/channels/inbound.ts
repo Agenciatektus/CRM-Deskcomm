@@ -222,7 +222,7 @@ async function verdashInbound(
     return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
   }
 
-  const apresentado = input.headers.get("x-deskcomm-secret");
+  const apresentado = input.headers.get("x-webhook-secret");
   if (!verifyVerdashToken(apresentado, input.secret)) {
     return { ok: false, code: "unauthorized", message: "bad_signature" };
   }
