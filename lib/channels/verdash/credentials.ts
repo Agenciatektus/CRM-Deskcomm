@@ -36,8 +36,26 @@ import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 export interface VerdashCredentials {
   /** `channel_sessions.verdash_instance_name` — o `sessionRef` deste canal. */
   instanceName: string;
-  /** Token DESTA instância. Nunca o admin token do servidor. */
+  /**
+   * A credencial. O que ela É depende do modo:
+   *
+   *  - modo DIRETO   → o token da instância no FZAP;
+   *  - modo PAREADO  → um token de máquina emitido pela Verdash, com escopo de
+   *                    uma instância, que só serve para pedir envio a ela.
+   *
+   * Em nenhum dos dois é o admin token do servidor, que abriria todas as
+   * instâncias de todos os clientes de uma vez.
+   */
   token: string;
+  /**
+   * Id do vínculo na Verdash. Presente = modo PAREADO.
+   *
+   * É o dado que decide por onde a mensagem sai, e por isso ele vem do BANCO e
+   * não de um palpite sobre o formato do token: os dois são hexadecimais, e
+   * adivinhar pelo tamanho quebraria em silêncio no dia em que um dos lados
+   * mudasse — mandando a mensagem pelo transporte errado.
+   */
+  vinculoId: string | null;
   baseUrl: string;
 }
 
@@ -55,6 +73,22 @@ export interface VerdashCredsLookup {
  * documenta em detalhe e que quebrou todo envio daquele canal. Ausente e vazia
  * têm de cair no mesmo lugar.
  */
+/**
+ * Base das FUNÇÕES da Verdash — de onde o CRM pede o pareamento e, no modo
+ * pareado, o envio.
+ *
+ * Mora aqui e não em `./conectar` para não fechar ciclo de import: `client.ts`
+ * precisa dela para enviar, e `conectar.ts` já importa `client.ts`.
+ *
+ * `||` com `trim()` pelo mesmo motivo de `verdashBaseUrl` logo abaixo: string
+ * vazia no `.env` tem de cair no default, senão a URL sai sem host.
+ */
+export function verdashFunctionsUrl(): string {
+  return (
+    process.env.VERDASH_FUNCTIONS_URL?.trim() || "https://supabase.verdash.com.br/functions/v1"
+  );
+}
+
 export function verdashBaseUrl(): string {
   return process.env.VERDASH_API_BASE_URL?.trim() || "https://fzap.verdash.com.br";
 }
@@ -83,7 +117,7 @@ export async function resolveVerdashCreds(
   const base = () =>
     admin
       .from("channel_sessions")
-      .select("verdash_instance_name, verdash_token_encrypted")
+      .select("verdash_instance_name, verdash_vinculo_id, verdash_token_encrypted")
       .eq("organization_id", organizationId)
       .eq("verdash_instance_name", instanceName);
   const { data, error } = await queryTolerantToMissingArchived(
@@ -109,6 +143,7 @@ export async function resolveVerdashCreds(
   return {
     instanceName: data.verdash_instance_name as string,
     token,
+    vinculoId: (data.verdash_vinculo_id as string) ?? null,
     baseUrl: verdashBaseUrl(),
   };
 }

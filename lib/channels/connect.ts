@@ -248,5 +248,6 @@ export {
   saveVerdashSession as saveHostedSession,
   validateVerdashToken as validateHostedToken,
   registrarWebhookNaVerdash as ligarRecebimentoHospedado,
+  trocarCodigoPorCredencial as trocarCodigoHospedado,
 } from "./verdash/conectar";
 export type { VerdashSession as HostedSession } from "./verdash/conectar";

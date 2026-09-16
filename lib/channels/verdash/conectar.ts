@@ -32,7 +32,7 @@ import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
 import { CHANNEL_PROVIDER_VERDASH } from "../capabilities";
 import { fzapRequest } from "./client";
-import { verdashBaseUrl } from "./credentials";
+import { verdashBaseUrl, verdashFunctionsUrl } from "./credentials";
 import type { ChannelProvider } from "../types";
 
 export const VERDASH_CHANNEL_PROVIDER: ChannelProvider = CHANNEL_PROVIDER_VERDASH;
@@ -101,7 +101,7 @@ export async function validateVerdashToken(token: string): Promise<VerdashValida
   };
   try {
     data = await fzapRequest(
-      { instanceName: "", token, baseUrl: verdashBaseUrl() },
+      { instanceName: "", token, vinculoId: null, baseUrl: verdashBaseUrl() },
       "/session/status",
     );
   } catch (err) {
@@ -141,7 +141,7 @@ export async function validateVerdashToken(token: string): Promise<VerdashValida
   let pushName: string | null = null;
   try {
     const perfil = await fzapRequest<{ pushName?: string }>(
-      { instanceName: "", token, baseUrl: verdashBaseUrl() },
+      { instanceName: "", token, vinculoId: null, baseUrl: verdashBaseUrl() },
       "/user/profile/name",
     );
     pushName = typeof perfil?.pushName === "string" && perfil.pushName.trim().length > 0
@@ -178,7 +178,7 @@ export async function registrarWebhookNaVerdash(input: {
   webhookUrl: string;
   segredo: string;
 }): Promise<{ ok: boolean; reason?: string }> {
-  const creds = { instanceName: "", token: input.token, baseUrl: verdashBaseUrl() };
+  const creds = { instanceName: "", token: input.token, vinculoId: null, baseUrl: verdashBaseUrl() };
 
   try {
     const existentes = await fzapRequest<Array<{ id?: string; url?: string }>>(creds, "/webhook");
@@ -213,9 +213,126 @@ export async function registrarWebhookNaVerdash(input: {
   }
 }
 
+export type TrocaDeCodigo =
+  | {
+      ok: true;
+      vinculoId: string;
+      instanceName: string;
+      token: string;
+      phoneNumber: string | null;
+      displayName: string;
+      connected: boolean;
+      recebimentoLigado: boolean;
+      recebimentoAviso: string | null;
+    }
+  | { ok: false; reason: string };
+
+/**
+ * Troca o CÓDIGO DE PAREAMENTO por uma credencial de máquina.
+ *
+ * ─── O que muda em relação a colar o token ──────────────────────────────────
+ *
+ * Colar o token da instância funciona e foi como o primeiro número entrou no
+ * ar. O custo é que aquele token é a chave da linha no servidor de WhatsApp:
+ * ele passa a viver aqui também, e cortar o acesso do CRM obriga a rotacioná-lo
+ * lá — derrubando junto o sistema que já usava aquele número.
+ *
+ * Com o código, quem responde é a Verdash: ela valida, queima o código, liga a
+ * entrada e devolve um token DELA, que vale para uma instância e morre quando
+ * alguém clicar em revogar. O cliente não vê token nenhum, e a tela de lá passa
+ * a saber quem está conectado.
+ *
+ * ─── Quem chama, e de onde ──────────────────────────────────────────────────
+ *
+ * O SERVIDOR do CRM — nunca o browser. É por isso que o segredo do webhook
+ * viaja neste corpo: ele nasce aqui, vai para lá, e volta em cada entrega como
+ * prova de que quem entrega é quem foi autorizado.
+ */
+export async function trocarCodigoPorCredencial(input: {
+  codigo: string;
+  webhookUrl: string;
+  segredo: string;
+  rotulo: string;
+}): Promise<TrocaDeCodigo> {
+  let res: Response;
+  try {
+    res = await fetch(`${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-vincular-instancia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        codigo: input.codigo,
+        webhook_url: input.webhookUrl,
+        webhook_secret: input.segredo,
+        rotulo: input.rotulo,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    return { ok: false, reason: "Não foi possível falar com a Verdash agora. Tente em instantes." };
+  }
+
+  const json = (await res.json().catch(() => null)) as
+    | { success?: boolean; error?: string; data?: Record<string, unknown> }
+    | null;
+
+  if (!res.ok || json?.success !== true || !json?.data) {
+    // A Verdash responde o MESMO erro para código inexistente, já usado e
+    // expirado — de propósito, para não dizer a quem tenta às cegas que
+    // acertou e chegou tarde. Aqui a mensagem vira algo que o operador entende.
+    const codigoErro = json?.error ?? "";
+    if (codigoErro.includes("codigo_invalido") || codigoErro.includes("expirado")) {
+      return {
+        ok: false,
+        reason: "Código inválido ou expirado. Gere outro na Verdash e cole aqui.",
+      };
+    }
+    if (codigoErro.includes("webhook_url")) {
+      // Este é erro de CONFIGURAÇÃO nossa, não do operador — e dizer "código
+      // inválido" mandaria ele gerar código novo a tarde inteira.
+      return {
+        ok: false,
+        reason: "A Verdash recusou o endereço deste CRM. Confira o endereço público da instalação.",
+      };
+    }
+    return { ok: false, reason: "A Verdash não aceitou este código." };
+  }
+
+  const d = json.data as {
+    vinculo_id?: string;
+    instancia_id?: string;
+    token?: string;
+    phone_number?: string | null;
+    display_name?: string | null;
+    status?: string | null;
+    recebimento_ligado?: boolean;
+    recebimento_aviso?: string | null;
+  };
+
+  if (!d.token || !d.vinculo_id) {
+    return { ok: false, reason: "A Verdash respondeu sem a credencial." };
+  }
+
+  const telefone = d.phone_number ?? null;
+  return {
+    ok: true,
+    vinculoId: d.vinculo_id,
+    // A instância é identificada pelo id que a Verdash deu: é o que endereça o
+    // envio de lá para cá, e o nome interno dela não interessa ao CRM.
+    instanceName: d.instancia_id ?? d.vinculo_id,
+    token: d.token,
+    phoneNumber: telefone,
+    displayName: d.display_name ?? telefone ?? "WhatsApp",
+    connected: d.status === "WORKING",
+    recebimentoLigado: d.recebimento_ligado !== false,
+    recebimentoAviso: d.recebimento_aviso ?? null,
+  };
+}
+
 export interface VerdashSession {
   id: string;
   instanceName: string | null;
+  /** Presente = conectado por código; o envio passa pela Verdash. */
+  vinculoId: string | null;
   phoneNumber: string | null;
   displayName: string | null;
   status: string | null;
@@ -225,13 +342,14 @@ export interface VerdashSession {
 }
 
 const COLUNAS =
-  "id, verdash_instance_name, phone_number, display_name, status, webhook_path_token, verdash_token_encrypted";
+  "id, verdash_instance_name, verdash_vinculo_id, phone_number, display_name, status, webhook_path_token, verdash_token_encrypted";
 
 function toVerdashSession(row: Record<string, unknown> | null): VerdashSession | null {
   if (!row) return null;
   return {
     id: row.id as string,
     instanceName: (row.verdash_instance_name as string) ?? null,
+    vinculoId: (row.verdash_vinculo_id as string) ?? null,
     phoneNumber: (row.phone_number as string) ?? null,
     displayName: (row.display_name as string) ?? null,
     status: (row.status as string) ?? null,
@@ -275,6 +393,8 @@ export async function saveVerdashSession(
     organizationId: string;
     existingId: string | null;
     instanceName: string;
+    /** Só no modo pareado. `null` mantém o canal no modo direto. */
+    vinculoId?: string | null;
     tokenEncrypted: string;
     webhookPathToken: string;
     webhookSecretEncrypted: string;
@@ -287,6 +407,7 @@ export async function saveVerdashSession(
     organization_id: input.organizationId,
     provider: VERDASH_CHANNEL_PROVIDER,
     verdash_instance_name: input.instanceName,
+    verdash_vinculo_id: input.vinculoId ?? null,
     verdash_token_encrypted: input.tokenEncrypted,
     webhook_path_token: input.webhookPathToken,
     webhook_secret_encrypted: input.webhookSecretEncrypted,

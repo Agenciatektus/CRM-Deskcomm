@@ -25,6 +25,7 @@
 import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
 
+import { verdashFunctionsUrl } from "./credentials";
 import type { VerdashCredentials } from "./credentials";
 
 /** O envelope que toda rota do FZAP devolve. */
@@ -86,6 +87,81 @@ export async function fzapRequest<T = unknown>(
   }
 
   return json?.data as T;
+}
+
+/**
+ * Manda a mensagem — e decide por onde ela sai.
+ *
+ * ─── Os dois caminhos, e por que existem ────────────────────────────────────
+ *
+ * PAREADO (`vinculoId` presente): pede o envio à Verdash, com um token de
+ * máquina que vale para uma instância. O token do servidor de WhatsApp nunca
+ * esteve aqui, revogar é um clique na tela de lá, e o número OFICIAL da Meta
+ * funciona pelo mesmo caminho — porque quem escolhe entre Cloud API e o
+ * servidor não-oficial é a Verdash, não o CRM.
+ *
+ * DIRETO (`vinculoId` nulo): fala com o servidor de WhatsApp usando o token da
+ * própria instância. É como o primeiro número entrou no ar, continua
+ * funcionando, e tem um salto a menos — mas carrega o token aqui dentro, com o
+ * custo que isso tem na hora de revogar.
+ *
+ * Quem chama não escolhe: a sessão é que sabe qual é o seu modo.
+ */
+export async function verdashEnviar(
+  creds: VerdashCredentials,
+  input: {
+    rota: string;
+    body: Record<string, unknown>;
+    /** Como o pedido fica quando quem transporta é a Verdash. */
+    pareado: { phone: string; tipo: string; texto?: string; mediaUrl?: string; filename?: string; replyTo?: string };
+  },
+): Promise<{ id?: string }> {
+  if (!creds.vinculoId) {
+    return fzapRequest<{ id?: string }>(creds, input.rota, { method: "POST", body: input.body });
+  }
+
+  const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-enviar-mensagem`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        // O token de máquina vai num header PRÓPRIO, não em `Authorization`:
+        // a função da Verdash não usa JWT, e misturar os dois faria o gateway
+        // dela tentar validar um token que não é dela.
+        "x-crm-token": creds.token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        phone: input.pareado.phone,
+        tipo: input.pareado.tipo,
+        ...(input.pareado.texto !== undefined ? { texto: input.pareado.texto } : {}),
+        ...(input.pareado.mediaUrl ? { media_url: input.pareado.mediaUrl } : {}),
+        ...(input.pareado.filename ? { filename: input.pareado.filename } : {}),
+        ...(input.pareado.replyTo ? { reply_to: input.pareado.replyTo } : {}),
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
+    throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
+  }
+
+  const json = (await res.json().catch(() => null)) as
+    | { success?: boolean; error?: string; detalhe?: string; data?: { message_id?: string } }
+    | null;
+
+  if (!res.ok || json?.success !== true) {
+    // 401 aqui é o caso que mais vai acontecer com o tempo: alguém revogou o
+    // acesso na Verdash. Nomear isso poupa uma investigação inteira.
+    if (res.status === 401) {
+      throw new Error("verdash_acesso_revogado: a Verdash não reconhece mais este CRM nesta linha.");
+    }
+    const detalhe = json?.detalhe ?? json?.error ?? res.statusText;
+    throw new Error(`verdash_request_failed: ${res.status} ${detalhe}`.trim());
+  }
+
+  return { id: json?.data?.message_id ?? undefined };
 }
 
 /**

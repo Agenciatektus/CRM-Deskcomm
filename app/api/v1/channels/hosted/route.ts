@@ -40,6 +40,7 @@ import {
   findHostedSession,
   ligarRecebimentoHospedado,
   saveHostedSession,
+  trocarCodigoHospedado,
   validateHostedToken,
 } from "@/lib/channels/connect";
 import { env } from "@/lib/env";
@@ -50,9 +51,30 @@ import { traduzir } from "@/lib/i18n/dicionario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const conectarSchema = z.object({
-  token: z.string().trim().min(8).max(500),
-});
+/**
+ * Dois caminhos, e o primeiro é o preferido.
+ *
+ * `codigo` — o cliente gera na plataforma dele e cola aqui. A credencial que
+ *   chega é de máquina, com escopo de um número, e quem revoga é a plataforma,
+ *   num clique. É o caminho que a tela mostra.
+ *
+ * `token` — o token da própria linha, colado à mão. Funciona, e foi como o
+ *   primeiro número entrou no ar, mas a credencial da linha passa a viver aqui
+ *   dentro: cortar o acesso obriga a rotacioná-la lá, derrubando junto o
+ *   sistema que já usava aquele número. Fica como alternativa declarada, não
+ *   como padrão.
+ *
+ * Um dos dois, nunca os dois — mandar ambos é sinal de chamador confuso, e
+ * escolher por ele esconderia o engano.
+ */
+const conectarSchema = z
+  .object({
+    codigo: z.string().trim().min(8).max(32).optional(),
+    token: z.string().trim().min(8).max(500).optional(),
+  })
+  .refine((v) => Boolean(v.codigo) !== Boolean(v.token), {
+    message: "informe o código de pareamento OU o token da instância",
+  });
 
 /**
  * Endereço público desta instalação — é para cá que o provedor vai entregar.
@@ -124,39 +146,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return fail("invalid_request", t("o token da instância é obrigatório"), 422, { requestId });
   }
-  const token = parsed.data.token;
-
-  // Valida ANTES de gravar: gravar primeiro e descobrir depois é o que faz o
-  // operador achar que conectou e só entender que não na primeira mensagem que
-  // não sai, com o cliente do outro lado esperando.
-  //
-  // O nome da instância vem da RESPOSTA, não do formulário — ver
-  // `validateHostedToken`.
-  const v = await validateHostedToken(token);
-  if (!v.ok) return fail("invalid_request", t(v.reason), 422, { requestId });
-
   const admin = createAdminClient();
-  const tokenCifrado = await encryptWebhookSecret(admin, token);
-  // Segredo do webhook: é o que autentica o que ENTRA. Aqui ele nunca é
-  // mostrado ao operador, porque quem o cola do outro lado é o próprio CRM.
-  const segredoWebhook = randomBytes(32).toString("hex");
-  const segredoCifrado = await encryptWebhookSecret(admin, segredoWebhook);
 
-  if (!tokenCifrado || !segredoCifrado) {
-    // Sem a GUC de cifra, gravar o token em claro seria pior que recusar — e
-    // este token abre o WhatsApp do cliente.
-    return fail(
-      "invalid_request",
-      t("cifra indisponível nesta instalação — o token não foi gravado"),
-      422,
-      { requestId },
-    );
-  }
-
-  const existente = await findHostedSession(admin, orgId);
+  const existenteAntes = await findHostedSession(admin, orgId);
   // Reconectar por cima de um canal excluído RESSUSCITA a linha, e o token de
   // caminho é preservado para não invalidar o webhook já registrado lá.
-  const pathToken = existente?.webhookPathToken ?? randomBytes(16).toString("hex");
+  const pathToken = existenteAntes?.webhookPathToken ?? randomBytes(16).toString("hex");
   const webhookUrl = urlDoWebhook(req, pathToken);
   if (!webhookUrl) {
     return fail(
@@ -169,9 +164,94 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // O segredo que autentica o que ENTRA. Nasce aqui nos dois caminhos: no
+  // pareado ele viaja para a plataforma, que o devolve em cada entrega; no
+  // direto, o próprio CRM o registra no servidor de WhatsApp.
+  const segredoWebhook = randomBytes(32).toString("hex");
+  const segredoCifrado = await encryptWebhookSecret(admin, segredoWebhook);
+
+  // ── Caminho 1: código de pareamento ──────────────────────────────────────
+  //
+  // Quem valida é a plataforma do cliente: ela conhece o código, sabe de qual
+  // número ele é, e é dela a decisão de autorizar. O CRM não vê token de linha
+  // nenhum — recebe uma credencial que só serve para pedir envio daquele
+  // número, e que morre quando alguém revogar lá.
+  if (parsed.data.codigo) {
+    const troca = await trocarCodigoHospedado({
+      codigo: parsed.data.codigo,
+      webhookUrl,
+      segredo: segredoWebhook,
+      rotulo: authz.org.name ?? "CRM",
+    });
+    if (!troca.ok) return fail("invalid_request", t(troca.reason), 422, { requestId });
+
+    const credCifrada = await encryptWebhookSecret(admin, troca.token);
+    if (!credCifrada || !segredoCifrado) {
+      return fail(
+        "invalid_request",
+        t("cifra indisponível nesta instalação — a credencial não foi gravada"),
+        422,
+        { requestId },
+      );
+    }
+
+    const { error: erroPareado } = await saveHostedSession(admin, {
+      organizationId: orgId,
+      existingId: existenteAntes?.id ?? null,
+      instanceName: troca.instanceName,
+      vinculoId: troca.vinculoId,
+      tokenEncrypted: credCifrada,
+      webhookPathToken: pathToken,
+      webhookSecretEncrypted: segredoCifrado,
+      phoneNumber: troca.phoneNumber,
+      displayName: troca.displayName,
+      connected: troca.connected,
+    });
+    if (erroPareado) return fail("internal_error", erroPareado, 500, { requestId });
+
+    return ok(
+      {
+        connected: true,
+        modo: "pareado",
+        instance_name: troca.instanceName,
+        phone_number: troca.phoneNumber,
+        display_name: troca.displayName,
+        status: troca.connected ? "WORKING" : "STARTING",
+        webhook_url: webhookUrl,
+        recebimento_ligado: troca.recebimentoLigado,
+        recebimento_erro: troca.recebimentoAviso,
+      },
+      { requestId },
+    );
+  }
+
+  // ── Caminho 2: token da instância, colado à mão ──────────────────────────
+  const token = parsed.data.token as string;
+
+  // Valida ANTES de gravar: gravar primeiro e descobrir depois é o que faz o
+  // operador achar que conectou e só entender que não na primeira mensagem que
+  // não sai, com o cliente do outro lado esperando.
+  //
+  // O nome da instância vem da RESPOSTA, não do formulário — ver
+  // `validateHostedToken`.
+  const v = await validateHostedToken(token);
+  if (!v.ok) return fail("invalid_request", t(v.reason), 422, { requestId });
+
+  const tokenCifrado = await encryptWebhookSecret(admin, token);
+  if (!tokenCifrado || !segredoCifrado) {
+    // Sem a GUC de cifra, gravar o token em claro seria pior que recusar — e
+    // este token abre o WhatsApp do cliente.
+    return fail(
+      "invalid_request",
+      t("cifra indisponível nesta instalação — o token não foi gravado"),
+      422,
+      { requestId },
+    );
+  }
+
   const { error } = await saveHostedSession(admin, {
     organizationId: orgId,
-    existingId: existente?.id ?? null,
+    existingId: existenteAntes?.id ?? null,
     instanceName: v.instanceName,
     tokenEncrypted: tokenCifrado,
     webhookPathToken: pathToken,
@@ -192,6 +272,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   return ok(
     {
       connected: true,
+      modo: "direto",
       instance_name: v.instanceName,
       phone_number: v.phoneNumber,
       display_name: v.displayName,

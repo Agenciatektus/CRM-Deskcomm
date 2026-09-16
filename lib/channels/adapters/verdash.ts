@@ -42,7 +42,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FetchedMedia } from "@/lib/messaging/media/types";
 
-import { fzapFetchMedia, fzapRequest } from "../verdash/client";
+import { fzapFetchMedia, fzapRequest, verdashEnviar } from "../verdash/client";
 import { resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -215,11 +215,21 @@ export const verdashAdapter: ChannelAdapter = {
     const { rota, body } = corpoDoEnvio(envelope, envelope.to);
 
     await envelope.beforeSend?.();
-    const data = await fzapRequest<{ id?: string; details?: string; timestamp?: number }>(
-      creds,
+    // Quem decide o transporte é a SESSÃO, não este método: canal conectado por
+    // código pede o envio à Verdash; canal conectado por token fala direto com
+    // o servidor de WhatsApp. Ver `verdashEnviar`.
+    const data = await verdashEnviar(creds, {
       rota,
-      { method: "POST", body },
-    );
+      body,
+      pareado: {
+        phone: envelope.to,
+        tipo: envelope.kind,
+        texto: envelope.body ?? envelope.media?.caption ?? undefined,
+        mediaUrl: envelope.media?.url,
+        filename: envelope.media?.filename ?? undefined,
+        replyTo: envelope.replyToExternalId ?? undefined,
+      },
+    });
 
     // O id do whatsmeow, o MESMO que volta no `Info.ID` do webhook — por isso
     // este canal não precisa de `echoExternalIds`: os dois lados falam a mesma

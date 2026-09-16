@@ -3598,6 +3598,25 @@ export const DICIONARIO: Traducoes = {
 
   // ─── Canal hospedado: o número que já está conectado em outro sistema ───
   "Número já conectado": { es: "Número ya conectado" },
+  "Código de conexão": { es: "Código de conexión" },
+  "Conectando…": { es: "Conectando…" },
+  "Na": { es: "En" },
+  "abra": { es: "abre" },
+  "Integrações › Conectar ao CRM": { es: "Integraciones › Conectar al CRM" },
+  ", escolha o número e gere o código. Ele vale uma vez e expira em 15 minutos.": {
+    es: ", elige el número y genera el código. Vale una sola vez y caduca en 15 minutos.",
+  },
+  "Você não precisa copiar senha nem token: o acesso fica registrado na sua plataforma, e você pode cortá-lo por lá quando quiser.": {
+    es: "No necesitas copiar contraseña ni token: el acceso queda registrado en tu plataforma, y puedes cortarlo desde allí cuando quieras.",
+  },
+  "Esconder": { es: "Ocultar" },
+  "Não tenho código — usar o token do número": {
+    es: "No tengo código: usar el token del número",
+  },
+  "Funciona, mas guarda aqui a chave do seu número: para cortar o acesso depois é preciso trocar essa chave na sua plataforma, o que derruba junto o que já usa aquele número. Prefira o código.": {
+    es: "Funciona, pero guarda aquí la llave de tu número: para cortar el acceso después hay que cambiar esa llave en tu plataforma, lo que también tumba lo que ya usa ese número. Prefiere el código.",
+  },
+  "Conectar com o token": { es: "Conectar con el token" },
   "sua plataforma": { es: "tu plataforma" },
   "Usar o WhatsApp que já está na": { es: "Usar el WhatsApp que ya está en" },
   "O mesmo número que você já usa, sem ler QR de novo e sem tirar nada do ar. As conversas passam a aparecer aqui, e o que você já tinha configurado na sua plataforma continua funcionando igual.": {

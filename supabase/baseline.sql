@@ -9388,7 +9388,11 @@ alter table public.channel_sessions
 -- abriria todas as instâncias do servidor de uma vez.
 alter table public.channel_sessions
   add column if not exists verdash_instance_name text,
-  add column if not exists verdash_token_encrypted bytea;
+  add column if not exists verdash_token_encrypted bytea,
+  -- migration 9003: presente = conectado por CÓDIGO DE PAREAMENTO, e o envio
+  -- passa pela Verdash com um token de máquina de escopo limitado; ausente =
+  -- envio direto ao FZAP com o token da própria instância.
+  add column if not exists verdash_vinculo_id text;
 
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_check;

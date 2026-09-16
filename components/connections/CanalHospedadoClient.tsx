@@ -57,7 +57,12 @@ interface Conectado {
 export function CanalHospedadoClient() {
   const t = useT();
   const [estado, setEstado] = useState<Estado | null>(null);
+  const [codigo, setCodigo] = useState("");
   const [token, setToken] = useState("");
+  // O caminho do token fica FECHADO por padrão. Ele funciona e continua aqui
+  // para quem já o usa, mas é o caminho que deixa a credencial da linha morar
+  // dentro do CRM — e um campo aberto na tela é um convite a usá-lo.
+  const [mostrarAvancado, setMostrarAvancado] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [recemConectado, setRecemConectado] = useState<Conectado | null>(null);
 
@@ -75,14 +80,16 @@ export function CanalHospedadoClient() {
     void carregar();
   }, []);
 
-  const conectar = async () => {
+  const conectar = async (via: "codigo" | "token") => {
     setSalvando(true);
     try {
-      const r = await apiClient.post<{ data: Conectado }>("/api/v1/channels/hosted", { token });
+      const corpo = via === "codigo" ? { codigo } : { token };
+      const r = await apiClient.post<{ data: Conectado }>("/api/v1/channels/hosted", corpo);
       setRecemConectado(r.data);
-      // O token sai da memória da tela assim que é gravado: ele não volta num
-      // GET, e deixá-lo no input só cria mais uma cópia de um segredo que abre
-      // o WhatsApp do cliente.
+      // O que foi digitado sai da memória da tela assim que é gravado: nada
+      // disso volta num GET, e deixar no input só cria mais uma cópia de um
+      // segredo que abre o WhatsApp do cliente.
+      setCodigo("");
       setToken("");
       if (r.data.recebimento_ligado) {
         toast.success(t("Canal conectado."));
@@ -134,33 +141,74 @@ export function CanalHospedadoClient() {
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="hosted-token">{t("Token da instância")}</Label>
+            <Label htmlFor="hosted-codigo">{t("Código de conexão")}</Label>
             <Input
-              id="hosted-token"
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder={
-                estado?.has_token ? t("gravado — preencha para trocar") : t("cole o token")
-              }
+              id="hosted-codigo"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+              placeholder="XK4P9T2MQW"
               autoComplete="off"
+              className="font-mono tracking-[0.15em]"
             />
             <p className="text-xs text-muted-foreground">
-              {t(
-                "É o token do SEU número, copiado do painel da sua plataforma. Ele vale só para essa linha — não dá acesso a nenhuma outra. Guardado cifrado, e não é mostrado de novo depois de gravado.",
-              )}
+              {t("Na")} {rotulo}, {t("abra")} <strong>{t("Integrações › Conectar ao CRM")}</strong>
+              {t(", escolha o número e gere o código. Ele vale uma vez e expira em 15 minutos.")}
             </p>
           </div>
 
           <div>
-            <Button onClick={conectar} disabled={salvando || token.length < 8}>
-              {salvando ? t("Verificando…") : conectado ? t("Reconectar") : t("Conectar")}
+            <Button onClick={() => conectar("codigo")} disabled={salvando || codigo.length < 8}>
+              {salvando ? t("Conectando…") : conectado ? t("Reconectar") : t("Conectar")}
             </Button>
             <p className="mt-1.5 text-xs text-muted-foreground">
               {t(
-                "O token é testado antes de ser gravado, e é dele que vem o nome do número — você não precisa digitá-lo.",
+                "Você não precisa copiar senha nem token: o acesso fica registrado na sua plataforma, e você pode cortá-lo por lá quando quiser.",
               )}
             </p>
+          </div>
+
+          {/* O caminho antigo, fechado por padrão e com o custo declarado. Ele
+              continua aqui porque há número conectado por ele — tirar agora
+              deixaria quem já usa sem caminho de reconexão. */}
+          <div className="border-t border-border pt-3">
+            <button
+              type="button"
+              onClick={() => setMostrarAvancado((v) => !v)}
+              className="text-xs text-muted-foreground underline underline-offset-2"
+            >
+              {mostrarAvancado ? t("Esconder") : t("Não tenho código — usar o token do número")}
+            </button>
+
+            {mostrarAvancado && (
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Label htmlFor="hosted-token">{t("Token da instância")}</Label>
+                <Input
+                  id="hosted-token"
+                  type="password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder={
+                    estado?.has_token ? t("gravado — preencha para trocar") : t("cole o token")
+                  }
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "Funciona, mas guarda aqui a chave do seu número: para cortar o acesso depois é preciso trocar essa chave na sua plataforma, o que derruba junto o que já usa aquele número. Prefira o código.",
+                  )}
+                </p>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => conectar("token")}
+                    disabled={salvando || token.length < 8}
+                  >
+                    {salvando ? t("Verificando…") : t("Conectar com o token")}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>
