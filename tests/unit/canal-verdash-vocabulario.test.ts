@@ -290,6 +290,42 @@ describe("leitura do webhook", () => {
   });
 });
 
+describe("a exceção da guarda de saída compara ORIGEM, não prefixo", () => {
+  // Achado do @Cassio_SecRev: `url.startsWith(baseUrl)` deixava passar três
+  // formas em que o hostname REAL é outro — e o fetch da mídia leva o token da
+  // instância no header. Os casos abaixo são os que ele mediu no parser.
+  const base = new URL("https://fzap.verdash.com.br");
+  const mesmaOrigem = (bruta: string): boolean => {
+    let alvo: URL;
+    try {
+      alvo = new URL(bruta);
+    } catch {
+      return false;
+    }
+    return alvo.origin === base.origin && alvo.username === "" && alvo.password === "";
+  };
+
+  it("a base de verdade continua dispensada da guarda", () => {
+    expect(mesmaOrigem("https://fzap.verdash.com.br/baixar/abc")).toBe(true);
+  });
+
+  it("userinfo NÃO engana: o host real é outro", () => {
+    expect(mesmaOrigem("https://fzap.verdash.com.br@evil.com/x")).toBe(false);
+    expect(mesmaOrigem("https://fzap.verdash.com.br:8081@169.254.169.254/latest/meta-data/")).toBe(
+      false,
+    );
+  });
+
+  it("sufixo de domínio NÃO engana", () => {
+    expect(mesmaOrigem("https://fzap.verdash.com.br.evil.com/x")).toBe(false);
+  });
+
+  it("porta e esquema diferentes são origem diferente", () => {
+    expect(mesmaOrigem("http://fzap.verdash.com.br/x")).toBe(false);
+    expect(mesmaOrigem("https://fzap.verdash.com.br:9999/x")).toBe(false);
+  });
+});
+
 describe("banco e TypeScript falam o mesmo vocabulário", () => {
   // O `pnpm test:db` prova isto contra um Postgres real; aqui é a leitura do
   // artefato que o self-hoster de fato aplica — o baseline, não as migrations.

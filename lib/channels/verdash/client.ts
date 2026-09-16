@@ -106,15 +106,41 @@ export async function fzapRequest<T = unknown>(
  * rede interna da VPS (é o certo: não sai para a internet), e a guarda recusa
  * faixa privada por construção. Dispensar só para o host que nós mesmos
  * configuramos no `.env` não abre o SSRF, porque esse host não vem do payload.
+ *
+ * ─── E a exceção precisa comparar ORIGEM, não prefixo de string ─────────────
+ *
+ * A primeira versão fazia `url.startsWith(creds.baseUrl)`, e isso é furado de
+ * três jeitos — medidos no parser de URL, não deduzidos:
+ *
+ *   https://fzap.verdash.com.br@evil.com/x        → hostname: evil.com
+ *   https://fzap.verdash.com.br:8081@169.254.169.254/  → hostname: 169.254.169.254
+ *   https://fzap.verdash.com.br.evil.com/x        → hostname: fzap.verdash.com.br.evil.com
+ *
+ * Os três passam pelo prefixo e pulam AS DUAS guardas. E o `fetch` abaixo manda
+ * `token: creds.token` — o token da instância — para o host que o payload
+ * escolheu. É exatamente o desfecho que o parágrafo acima descreve como o que
+ * esta função existe para impedir.
+ *
+ * `origin` compara esquema, host e porta de uma vez; o userinfo é recusado à
+ * parte, porque `new URL()` o guarda fora da origem.
  */
 export async function fzapFetchMedia(
   creds: VerdashCredentials,
   url: string,
 ): Promise<{ buffer: Buffer; mime: string }> {
-  const daPropriaBase = url.startsWith(creds.baseUrl.replace(/\/+$/, ""));
+  let alvo: URL;
+  let base: URL;
+  try {
+    alvo = new URL(url);
+    base = new URL(creds.baseUrl);
+  } catch {
+    throw new Error("verdash_media_url_invalida");
+  }
+  const daPropriaBase =
+    alvo.origin === base.origin && alvo.username === "" && alvo.password === "";
   if (!daPropriaBase) {
     assertSafeOutboundUrl(url);
-    await assertDestinoResolvidoSeguro(new URL(url).hostname);
+    await assertDestinoResolvidoSeguro(alvo.hostname);
   }
 
   const res = await fetch(url, {

@@ -63,15 +63,23 @@ const conectarSchema = z.object({
  * webhook seria registrado apontando para o nada — e, pior que no canal manual,
  * aqui ninguém veria a URL errada, porque quem a cola é o próprio CRM.
  */
-function urlDoWebhook(req: NextRequest, token: string): string {
+function urlDoWebhook(req: NextRequest, token: string): string | null {
   const configurada = env.NEXT_PUBLIC_APP_URL;
   const usavel = configurada && !configurada.includes("placeholder.invalid") ? configurada : null;
-  const base = (
-    usavel ??
-    req.headers.get("origin") ??
-    `${req.nextUrl.protocol}//${req.nextUrl.host}`
-  ).replace(/\/+$/, "");
-  return `${base}/api/v1/webhooks/channel/${token}`;
+  // SEM fallback para o header da requisição.
+  //
+  // A versão anterior caía em `req.headers.get("origin")` quando a variável era
+  // o placeholder — que é o caso da imagem genérica de self-host. Como esta URL
+  // é PERSISTIDA e vira entrega recorrente, um admin de organização mandando
+  // `Origin: https://evil.com` por curl fazia o provedor passar a entregar TODAS
+  // as mensagens daquele número, com o segredo do webhook junto, para o host que
+  // ele escolheu.
+  //
+  // Sem a variável configurada, o desfecho honesto é recusar: um canal que
+  // conecta apontando para o lugar errado é pior que um canal que não conecta e
+  // diz por quê.
+  if (!usavel) return null;
+  return `${usavel.replace(/\/+$/, "")}/api/v1/webhooks/channel/${token}`;
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -150,6 +158,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // caminho é preservado para não invalidar o webhook já registrado lá.
   const pathToken = existente?.webhookPathToken ?? randomBytes(16).toString("hex");
   const webhookUrl = urlDoWebhook(req, pathToken);
+  if (!webhookUrl) {
+    return fail(
+      "invalid_request",
+      t(
+        "esta instalação não sabe o próprio endereço público — configure NEXT_PUBLIC_APP_URL antes de conectar",
+      ),
+      422,
+      { requestId },
+    );
+  }
 
   const { error } = await saveHostedSession(admin, {
     organizationId: orgId,
