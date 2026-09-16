@@ -4,14 +4,31 @@
  * A leitura do payload é do módulo puro ao lado (`./webhook.ts`); aqui moram os
  * EFEITOS.
  *
- * ─── O que este canal NÃO precisa, e por quê ────────────────────────────────
+ * ─── Por que este canal TAMBÉM grava a thread ───────────────────────────────
  *
- * `provider_conversation_id`. O canal intermediado precisa dele porque lá o
- * endereço de envio é uma thread que o provider inventa — sem gravá-la, a
- * conversa aparece no inbox e o operador não consegue responder. Aqui o
- * endereço é o TELEFONE (ou o JID do grupo), que se deriva do contato como no
- * canal por QR. Gravar uma thread que ninguém vai usar seria carregar um campo
- * para nada.
+ * A primeira versão não gravava `provider_conversation_id`, com o argumento de
+ * que aqui o endereço é o telefone e se deriva do contato. **Estava errado, e o
+ * erro apareceu em produção no segundo dia.**
+ *
+ * Dois motivos, e o segundo é o que quebra de verdade:
+ *
+ * 1. Em LID mode (a Hidden Number Migration do WhatsApp), o chat NÃO é um
+ *    telefone: chega como `162379946016868@lid`. Reconstruir um telefone para
+ *    responder é inventar um endereço que o servidor não conhece.
+ *
+ * 2. O telefone que guardamos passa por `canonicalPhoneBR`, que escolhe a
+ *    variante MAIS LONGA — isto é, ACRESCENTA o nono dígito. É a convenção de
+ *    armazenamento do repo e está certa para o cadastro. Só que uma linha antiga
+ *    é conhecida pelo WhatsApp SEM o nono dígito, e aí o que gravamos deixa de
+ *    ser um endereço válido:
+ *
+ *      SenderAlt do webhook : 556684057837@s.whatsapp.net   (12 dígitos)
+ *      contato no CRM       : +5566984057837                (13, canônico)
+ *      envio                : 500 "no LID found for 5566984057837@s.whatsapp.net"
+ *
+ * O JID do chat não tem esses dois problemas: é o endereço que o próprio
+ * servidor usou para nos entregar a mensagem. Guardá-lo é guardar a resposta
+ * em vez de recalculá-la — e recalcular, aqui, dá errado.
  *
  * ─── Idempotência ───────────────────────────────────────────────────────────
  *
@@ -95,6 +112,17 @@ export async function ingestVerdashInbound(
   });
   if (convErr || !convData) return { status: "ignored", reason: "conversa_nao_resolvida" };
   const conversationId = convData as string;
+
+  // O ENDEREÇO DE RESPOSTA, guardado como o servidor o entregou.
+  //
+  // Escrito SEMPRE, sem condição de "só se mudou": em SQL `NULL <> 'valor'` é
+  // NULL, não TRUE, então um `neq` nunca alcançaria a conversa recém-criada —
+  // que é justamente a que precisa do campo. O canal irmão perdeu tempo com
+  // exatamente esse detalhe.
+  await admin
+    .from("conversations")
+    .update({ provider_conversation_id: msg.chat })
+    .eq("id", conversationId);
 
   const inserted = await insertMessage(admin, {
     organizationId: input.organizationId,

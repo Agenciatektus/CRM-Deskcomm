@@ -149,6 +149,46 @@ describe("endereçamento", () => {
   });
 });
 
+describe("o endereço de resposta é a THREAD, não o telefone recalculado", () => {
+  // Falha real em produção, 16/09: a atendente respondeu pelo CRM e tomou
+  //   500 "no LID found for 5566984057837@s.whatsapp.net from server"
+  // O contato estava certo; o ENDEREÇO é que era inventado. Duas causas somadas:
+  // o chat vinha em LID mode (`…@lid`, que não é telefone nenhum) e o telefone
+  // guardado passa por `canonicalPhoneBR`, que ACRESCENTA o nono dígito — e a
+  // linha dela é conhecida pelo WhatsApp sem ele.
+  const evento = (chat: string) => ({
+    type: "Message",
+    event: {
+      Info: {
+        ID: "3EB0XYZ",
+        Chat: chat,
+        Sender: chat,
+        SenderAlt: "556684057837@s.whatsapp.net",
+        PushName: "Luzimar",
+        IsFromMe: false,
+      },
+      Message: { conversation: "oi" },
+    },
+  });
+
+  it("o parser preserva o JID do chat como veio — inclusive em LID mode", () => {
+    const m = parseVerdashInbound(evento("162379946016868@lid"));
+    expect(m?.chat).toBe("162379946016868@lid");
+  });
+
+  it("em LID mode o telefone vem do SenderAlt, SEM o nono dígito inventado", () => {
+    const m = parseVerdashInbound(evento("162379946016868@lid"));
+    // 12 dígitos: é o número que o WhatsApp conhece. Quem acrescenta o nono é a
+    // canonicalização do cadastro, e ela não pode decidir endereço de envio.
+    expect(m?.identity.phone).toBe("+556684057837");
+  });
+
+  it("chat de telefone continua vindo inteiro", () => {
+    const m = parseVerdashInbound(evento("556684057837@s.whatsapp.net"));
+    expect(m?.chat).toBe("556684057837@s.whatsapp.net");
+  });
+});
+
 describe("autenticação do webhook", () => {
   it("aceita o segredo correto", () => {
     expect(verifyVerdashToken("a".repeat(32), "a".repeat(32))).toBe(true);

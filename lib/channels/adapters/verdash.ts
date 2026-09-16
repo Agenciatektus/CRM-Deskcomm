@@ -212,7 +212,21 @@ export const verdashAdapter: ChannelAdapter = {
       );
     }
 
-    const { rota, body } = corpoDoEnvio(envelope, envelope.to);
+    // ─── O ENDEREÇO: a thread primeiro, o telefone como reserva ───────────
+    //
+    // `providerConversationId` é o JID que o servidor usou para nos entregar a
+    // mensagem — `5566…@s.whatsapp.net` no modo antigo, `1623…@lid` em LID
+    // mode. É o endereço que sabidamente funciona, porque acabou de funcionar.
+    //
+    // O telefone derivado do contato fica como reserva, para a conversa que
+    // ainda não tem thread conhecida (um envio que o CRM inicia). E ele é
+    // reserva, não preferência, por um motivo medido em produção: o telefone
+    // guardado passa por `canonicalPhoneBR`, que ACRESCENTA o nono dígito, e
+    // uma linha antiga é conhecida pelo WhatsApp sem ele — o envio morria com
+    // `500 no LID found for 5566984057837@s.whatsapp.net`, com o contato certo
+    // e o endereço errado.
+    const destino = envelope.providerConversationId?.trim() || envelope.to;
+    const { rota, body } = corpoDoEnvio(envelope, destino);
 
     await envelope.beforeSend?.();
     // Quem decide o transporte é a SESSÃO, não este método: canal conectado por
@@ -222,7 +236,7 @@ export const verdashAdapter: ChannelAdapter = {
       rota,
       body,
       pareado: {
-        phone: envelope.to,
+        phone: destino,
         tipo: envelope.kind,
         texto: envelope.body ?? envelope.media?.caption ?? undefined,
         mediaUrl: envelope.media?.url,

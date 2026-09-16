@@ -3599,7 +3599,6 @@ export const DICIONARIO: Traducoes = {
   // ─── Canal hospedado: o número que já está conectado em outro sistema ───
   "Número já conectado": { es: "Número ya conectado" },
   "Código de conexão": { es: "Código de conexión" },
-  "Conectando…": { es: "Conectando…" },
   "Na": { es: "En" },
   "abra": { es: "abre" },
   "Integrações › Conectar ao CRM": { es: "Integraciones › Conectar al CRM" },
