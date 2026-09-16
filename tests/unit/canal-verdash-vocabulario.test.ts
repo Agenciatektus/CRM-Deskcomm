@@ -207,6 +207,27 @@ describe("leitura do webhook", () => {
     expect(parseVerdashInbound(base)?.direction).toBe("outbound");
   });
 
+  it("mensagem que SAIU não batiza o contato com o nome do dono da linha", () => {
+    // O `PushName` é de quem escreveu. Numa mensagem nossa, quem escreveu é o
+    // consultório — e usá-lo como nome do contato fez duas conversas de
+    // pacientes diferentes aparecerem no inbox como "Dr Paulo Torres", com o
+    // telefone certo e o nome de outra pessoa. Medido no primeiro número
+    // conectado, visto na tela, não nos testes.
+    const saida = evento({ conversation: "retorno agendado" });
+    saida.event.Info.IsFromMe = true;
+    saida.event.Info.PushName = "Dr Paulo Torres";
+    const m = parseVerdashInbound(saida);
+    expect(m?.direction).toBe("outbound");
+    expect(m?.identity.displayName).toBeNull();
+    // O telefone continua vindo: é ele que endereça, e está certo.
+    expect(m?.identity.phone).toBe("+556681276920");
+  });
+
+  it("mensagem que ENTROU usa o nome de quem escreveu", () => {
+    const m = parseVerdashInbound(evento({ conversation: "bom dia" }));
+    expect(m?.identity.displayName).toBe("Paciente");
+  });
+
   it("evento que não é mensagem devolve null, e isso NÃO é falha", () => {
     // Recibo e presença são a maioria do tráfego.
     expect(parseVerdashInbound({ type: "ReadReceipt", event: {} })).toBeNull();

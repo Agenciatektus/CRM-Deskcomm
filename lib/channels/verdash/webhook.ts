@@ -244,7 +244,19 @@ export function parseVerdashInbound(payload: unknown): VerdashInboundMessage | n
     identity: {
       phone: telefoneDoJid(autorJid) ?? telefoneDoJid(alt),
       lid: lidDoJid(autorJid) ?? lidDoJid(alt),
-      displayName: str(info.PushName),
+      // O `PushName` é o nome de quem ESCREVEU — e numa mensagem que SAIU quem
+      // escreveu é o dono da linha, não o contato. Usá-lo sem olhar a direção
+      // batiza o paciente com o nome do consultório.
+      //
+      // Não é hipótese: foi o que aconteceu no primeiro número conectado. Duas
+      // conversas de pacientes diferentes apareceram no inbox como "Dr Paulo
+      // Torres", porque a primeira mensagem que o CRM viu daquele contato foi
+      // uma resposta que o próprio consultório mandou. O telefone estava certo;
+      // o nome, de outra pessoa.
+      //
+      // `null` quando a mensagem é nossa: não saber o nome é o estado honesto, e
+      // ele se resolve sozinho na primeira mensagem que o contato mandar.
+      displayName: fromMe ? null : str(info.PushName),
     },
     isGroup,
     text: textoDe(message),
