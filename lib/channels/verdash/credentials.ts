@@ -90,7 +90,10 @@ export function verdashFunctionsUrl(): string {
 }
 
 export function verdashBaseUrl(): string {
-  return process.env.VERDASH_API_BASE_URL?.trim() || "https://fzap.verdash.com.br";
+  // `fzap2`, com o 2. O host sem número responde 503 — medido na VPS30 em
+  // 16/09. Fallback que aponta para servidor morto é pior que fallback nenhum,
+  // porque falha parecendo configurado, e só no dia em que a variável sumir.
+  return process.env.VERDASH_API_BASE_URL?.trim() || "https://fzap2.verdash.com.br";
 }
 
 /**
