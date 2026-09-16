@@ -14334,7 +14334,12 @@ alter table public.webhook_events_log
   drop constraint if exists webhook_events_log_provider_check;
 alter table public.webhook_events_log
   add constraint webhook_events_log_provider_check check (provider in (
-    'waha', 'nuvemshop', 'generic', 'meta_cloud', 'zernio'
+    -- 'verdash' (migration 9002) somado aqui — UM bloco só por constraint,
+    -- doutrina de baseline. Sem ele a rota de entrada arquiva NADA do canal
+    -- novo: a ingestão segue (o arquivo é best-effort de propósito) e o único
+    -- instrumento para investigar "o cliente respondeu e não chegou" fica
+    -- desligado, em silêncio, justo no canal mais novo.
+    'waha', 'nuvemshop', 'generic', 'meta_cloud', 'zernio', 'verdash'
   ));
 
 -- ---- a marca da instalação sai do .env e vai para o banco (migration 0155) ----
