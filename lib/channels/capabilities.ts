@@ -76,6 +76,36 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "limited",
     costPerMessage: true,
   },
+
+
+  /**
+   * O WhatsApp comum, por baixo — e por isso IGUAL ao canal por QR, linha por
+   * linha. Não é cópia por preguiça: os dois falam com o mesmo whatsmeow, e o
+   * que a matriz descreve é o que o WHATSAPP permite, não quem hospeda a
+   * conexão. Divergir aqui seria afirmar uma diferença que não existe.
+   *
+   * As duas que mais enganam quem vem do canal intermediado:
+   *
+   *  - `voiceNote: "server-convert"`. MEDIDO no OpenAPI do servidor: `ptt: true`
+   *    força a conversão para ogg/opus, gera a onda sonora e calcula a duração.
+   *    Declarar `opus-only` aqui faria quem prepara a mídia converter de novo,
+   *    do lado errado e sem precisar.
+   *  - `banRisk: true`. É a contrapartida de não haver WABA: ninguém aprova
+   *    template nem cobra por mensagem, e em troca o WhatsApp bane por padrão
+   *    de volume. Desarmar o anti-ban aqui poria em risco o número PRINCIPAL do
+   *    cliente — que é o mesmo que ele usa na Verdash, não um número de teste.
+   */
+  verdash: {
+    freeformOutsideWindow: true,
+    requiresTemplates: false,
+    // Sem WABA por trás: não existe definição aprovada para gerir.
+    canManageTemplates: false,
+    banRisk: true,
+    minIntervalMs: null,
+    voiceNote: "server-convert",
+    groups: "full",
+    costPerMessage: false,
+  },
 };
 
 /**
@@ -99,6 +129,8 @@ export const CHANNEL_PROVIDER_META: ChannelProvider = "meta_cloud";
 export const CHANNEL_PROVIDER_ZERNIO: ChannelProvider = "zernio";
 /** Chamada de voz WhatsApp (spec 18). Não transporta mensagem — ver abaixo. */
 export const CHANNEL_PROVIDER_WACALLS: ChannelProvider = "wacalls";
+/** WhatsApp já conectado na Verdash (FZAP), sem parear de novo. */
+export const CHANNEL_PROVIDER_VERDASH: ChannelProvider = "verdash";
 
 /**
  * Os providers por onde MENSAGEM entra e sai — a única lista que responde
@@ -119,6 +151,7 @@ export const PROVIDERS_DE_MENSAGEM = [
   "waha",
   "meta_cloud",
   "zernio",
+  "verdash",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**

@@ -9386,14 +9386,23 @@ alter table public.channel_sessions
   add column if not exists wacalls_jid text,
   add column if not exists wacalls_paired_at timestamptz;
 
+-- verdash (migration 9001, canal nativo Verdash/FZAP) — colunas do quinto
+-- provider. `verdash_token_encrypted` guarda o token DAQUELA instância, cifrado
+-- por fn_encrypt_oauth: o CRM nunca carrega o adminToken global do FZAP, que
+-- abriria todas as instâncias do servidor de uma vez.
+alter table public.channel_sessions
+  add column if not exists verdash_instance_name text,
+  add column if not exists verdash_token_encrypted bytea;
+
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_check;
 
 alter table public.channel_sessions
   add constraint channel_sessions_provider_check
-  -- 'wacalls' (migration 0233, chamada de voz) somado aqui — UM bloco só por
-  -- constraint, doutrina de baseline (não duplicar drop+add por migration).
-  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text]));
+  -- 'wacalls' (migration 0233, chamada de voz) e 'verdash' (migration 9001,
+  -- canal nativo Verdash/FZAP) somados aqui — UM bloco só por constraint,
+  -- doutrina de baseline (não duplicar drop+add por migration).
+  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'verdash'::text]));
 
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_ref_check;
@@ -9403,11 +9412,25 @@ alter table public.channel_sessions
     (provider = 'waha'       and waha_session_name    is not null) or
     (provider = 'meta_cloud' and meta_phone_number_id is not null) or
     (provider = 'zernio'     and zernio_account_id    is not null) or
-    (provider = 'wacalls'    and wacalls_session_id    is not null)
+    (provider = 'wacalls'    and wacalls_session_id    is not null) or
+    (provider = 'verdash'    and verdash_instance_name is not null)
   );
 
 comment on column public.channel_sessions.zernio_account_id is
   'Identificador da conta conectada NO INTERMEDIÁRIO (accountId), não o phone_number_id da Meta. É o que endereça envio e webhook. Espelhado em lib/channels/session-ref.ts.';
+
+comment on column public.channel_sessions.verdash_instance_name is
+  'Nome da instância na Verdash/FZAP que esta sessão representa (ex.: tektus-dr-paulo-torres). É o que endereça envio e webhook. Espelhado em lib/channels/session-ref.ts.';
+comment on column public.channel_sessions.verdash_token_encrypted is
+  'Token da instância, cifrado por fn_encrypt_oauth. Escopo: APENAS esta instância — nunca o adminToken global do FZAP.';
+
+-- Uma instância da Verdash pertence a UMA organização: sem isto, duas
+-- organizações do mesmo CRM reivindicariam a mesma instância e as mensagens de
+-- uma apareceriam na caixa da outra. Parcial em archived_at para que arquivar e
+-- reconectar continue possível.
+create unique index if not exists channel_sessions_verdash_instance_unique
+  on public.channel_sessions (verdash_instance_name)
+  where provider = 'verdash' and archived_at is null;
 
 -- ---- o que falta para o terceiro canal ENVIAR (migration 0132) ----
 -- Espelho idempotente da 0117. Racional completo no arquivo da migration.

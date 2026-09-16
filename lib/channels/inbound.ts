@@ -18,7 +18,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+import { CHANNEL_PROVIDER_VERDASH, CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
 import { sincronizarSaudeDaConexao } from "./health";
 import {
   atualizarEspelhoDoTemplate,
@@ -29,6 +29,8 @@ import {
 import { aplicarEdicaoZernio, ingestZernioInbound } from "./zernio/ingest";
 import { lerEnvelopeZernio } from "./zernio/envelope";
 import { parseZernioEdicao, verifyZernioSignature } from "./zernio/webhook";
+import { ingestVerdashInbound } from "./verdash/ingest";
+import { lerEnvelopeVerdash, verifyVerdashToken } from "./verdash/webhook";
 import type { ChannelProvider } from "./types";
 
 /** Curto demais para ser segredo — placeholder ou lixo de decrypt. */
@@ -70,7 +72,7 @@ export type InboundWebhookOutcome =
  * trabalho — e respondido sem nomear provider do lado de fora.
  */
 export function acceptsInboundWebhook(provider: string): boolean {
-  return provider === CHANNEL_PROVIDER_ZERNIO;
+  return provider === CHANNEL_PROVIDER_ZERNIO || provider === CHANNEL_PROVIDER_VERDASH;
 }
 
 export async function handleInboundWebhook(
@@ -82,6 +84,8 @@ export async function handleInboundWebhook(
   switch (provider) {
     case CHANNEL_PROVIDER_ZERNIO:
       return zernioInbound(admin, input);
+    case CHANNEL_PROVIDER_VERDASH:
+      return verdashInbound(admin, input);
     default:
       // Token de um canal que não entra por aqui. É configuração trocada, não
       // ataque — mas processar seria ler o payload com o parser errado.
@@ -192,6 +196,57 @@ async function zernioInbound(
     organizationId: input.session.organization_id,
     channelSessionId: input.session.id,
     payload,
+  });
+  return { ok: true, body: { ...r } };
+}
+
+/**
+ * ─── Como este canal se autentica ──────────────────────────────────────────
+ *
+ * O FZAP não assina o corpo — não há HMAC a verificar. O que ele tem, e que os
+ * outros não têm, é a possibilidade de carregar HEADERS ESCOLHIDOS POR NÓS em
+ * cada entrega: ao registrar o webhook, o CRM manda junto o mesmo
+ * `webhook_secret` que os outros canais já usam, e a verificação aqui é
+ * compará-lo em tempo constante.
+ *
+ * Fail-closed, sem a exceção que virou regra no canal por QR: lá, "não consegui
+ * verificar" virava "processa assim mesmo", e isso deixou toda instalação
+ * aceitando mensagem forjada de quem soubesse a URL. Aqui, sem segredo não se
+ * processa — a URL sozinha não basta.
+ */
+async function verdashInbound(
+  admin: SupabaseClient,
+  input: InboundWebhookInput,
+): Promise<InboundWebhookOutcome> {
+  if (!input.secret || input.secret.length < MIN_SECRET_LEN) {
+    return { ok: false, code: "unauthorized", message: "webhook_secret_unavailable" };
+  }
+
+  const apresentado = input.headers.get("x-deskcomm-secret");
+  if (!verifyVerdashToken(apresentado, input.secret)) {
+    return { ok: false, code: "unauthorized", message: "bad_signature" };
+  }
+
+  // O contrato do fio ANTES da leitura: sem isto, um campo que muda de tipo faz
+  // o parser devolver `null` e a rota responder 200 `evento_sem_interesse` —
+  // idêntico à resposta de um evento que de fato não interessa. A mensagem do
+  // cliente sumiria com carimbo de normalidade.
+  const leitura = lerEnvelopeVerdash(input.rawBody);
+  if (!leitura.ok) {
+    if (leitura.motivo === "json_invalido") {
+      return { ok: false, code: "invalid_json", message: "invalid_json" };
+    }
+    return {
+      ok: false,
+      code: "contrato_violado",
+      message: `payload fora do contrato do canal: ${leitura.campos.join(", ")}`,
+    };
+  }
+
+  const r = await ingestVerdashInbound(admin, {
+    organizationId: input.session.organization_id,
+    channelSessionId: input.session.id,
+    payload: leitura.envelope,
   });
   return { ok: true, body: { ...r } };
 }

@@ -223,3 +223,30 @@ export async function savePartnerSession(
 
   return { error: error?.message ?? null };
 }
+
+/**
+ * ─── A fachada NEUTRA do canal hospedado ───────────────────────────────────
+ *
+ * "Hospedado" = a conexão de WhatsApp não é mantida por este CRM. Ela já existe,
+ * viva, em outro sistema do cliente, e aqui a gente se pendura nela. É a
+ * diferença de natureza que o separa do canal por QR (conexão nossa) e do
+ * oficial (conexão da Meta).
+ *
+ * Os nomes abaixo são apelidos dos de `./verdash/conectar`, e existem por um
+ * motivo só: rota e tela não podem NOMEAR o provider (invariante 1 da doutrina,
+ * cobrado pelo `lint:channels`) — e um `import { findVerdashSession }` nomeia,
+ * mesmo que o corpo da função fique aqui dentro. O mesmo arranjo que
+ * `PARTNER_*` já usa, logo acima.
+ *
+ * No dia em que houver um segundo canal deste tipo, troca-se o lado direito
+ * destas linhas e nenhuma rota muda.
+ */
+export {
+  VERDASH_CHANNEL_LABEL as HOSTED_CHANNEL_LABEL,
+  VERDASH_CHANNEL_PROVIDER as HOSTED_CHANNEL_PROVIDER,
+  findVerdashSession as findHostedSession,
+  saveVerdashSession as saveHostedSession,
+  validateVerdashToken as validateHostedToken,
+  registrarWebhookNaVerdash as ligarRecebimentoHospedado,
+} from "./verdash/conectar";
+export type { VerdashSession as HostedSession } from "./verdash/conectar";

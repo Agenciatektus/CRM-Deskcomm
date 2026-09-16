@@ -41,6 +41,19 @@ tabelas que as migrations-stub `0001`–`0009` nunca criaram — medido: 21 apli
 O caminho de instalação suportado é o `supabase/baseline.sql`, que é o que o kit self-host
 aplica.
 
+## Nota — faixa `9xxx` reservada às migrations do fork (2026-09-16)
+
+O `NNNN` do nome é sequencial e **compartilhado com o upstream**: toda migration
+nova do `melgarafael/DeskcommCRM` consome o próximo número, e um fork que também
+numere na ponta colide a cada merge. Já custou uma renumeração (ver nota de
+2026-08-05).
+
+Migrations criadas **neste fork** usam a faixa `9001+`, que a sequência do
+upstream não alcança. O timestamp continua sendo escolhido no instante real da
+criação — ele é a PK de `supabase_migrations.schema_migrations` e precisa ser
+único, mas não precisa ordenar depois do upstream.
+
+
 ## Applied
 
 | Version | Name | Description |
@@ -294,3 +307,4 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 | `20260909190000` | `0232_nome_de_sessao_waha_cabe_no_teto_do_waha` | `fn_reserve_channel_connection` gerava `waha_session_name` de 69 chars (`org_<32>_<32>`); o WAHA latest-2026.7.2 valida `name` com @MaxLength(54) e todo `POST /api/sessions` de canal novo tomava 400 (`waha_create_400`). Prefixo da org encurta para 8 (`org_<8>_<32>` = 45), alinhado com a busca de canal de onboarding no mesmo corpo. Repara canais WAHA nunca pareados com nome fora do teto. Forward-fix da 0230. |
 | `20260911160000` | `0238_convites_de_time_persistidos` | `team_invites`: o convite pendente passa a existir no banco (antes era só token stateless + linha no aceite). Habilita a lista de convites na tela de Equipe, o aviso de e-mail não despachado e a REVOGAÇÃO de convite (o id da linha = invite_id do token; o aceite recusa convite revogado). Status é derivado. RLS `team_invites_select` (manager+) / `team_invites_write` (admin). Baseline idempotente com dedup antes do índice único. |
 | `20260911120000` | `0236_opt_in_de_chamada_de_voz` | A chamada de voz nasce DESLIGADA por organização (`org_voice_calls`), com quem aceitou o risco e quando. Ausência de linha é "desligado" — aplicar não liga nada para ninguém. Leitura org-flat, escrita de admin no banco. Baseline INSTALL/UPDATE idempotente. |
+| `20260916120000` | `9001_canal_verdash_vocabulario` | **Provider nativo `verdash`** — o CRM fala com a instância de WhatsApp que o cliente já tem na Verdash (FZAP) usando o token DAQUELA instância, não o `adminToken` global do servidor. `channel_sessions` ganha `verdash_instance_name` (identidade, espelhada em `lib/channels/session-ref.ts`) e `verdash_token_encrypted bytea` (cifrado por `fn_encrypt_oauth`, mesmo padrão de `zernio_token_encrypted`). Os dois CHECK são reescritos de forma **aditiva**, derivando a definição atual de `pg_get_constraintdef` em vez de reescrever a lista: assim a migration não precisa saber quantos providers existem (hoje quatro) nem apagar um que o upstream venha a acrescentar depois — o modo de falha que uma lista fixa tem num fork. Índice único parcial `(verdash_instance_name) where provider='verdash' and archived_at is null`: uma instância pertence a uma organização, senão as mensagens de uma apareceriam na caixa da outra. |

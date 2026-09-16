@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CanalOficialClient } from "./CanalOficialClient";
+import { CanalHospedadoClient } from "./CanalHospedadoClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
 import { CanalVozClient } from "./CanalVozClient";
 import { ConnectionsClient } from "./ConnectionsClient";
@@ -52,7 +53,9 @@ export function ConexoesShell({
         ? "parceiro"
         : abaParam === "voz"
           ? "voz"
-          : "numeros";
+          : abaParam === "hospedado"
+            ? "hospedado"
+            : "numeros";
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
 
   const irPara = (proximaAba: string, proximaSub?: string): void => {
@@ -79,6 +82,13 @@ export function ConexoesShell({
             estrito: o dia em que alguém escrever o nome do provider aqui DE VERDADE,
             ele reprova igual. */}
         <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>
+        {/* Primeira depois do QR, e antes das duas de API, porque é o caminho
+            mais curto para quem JÁ tem o WhatsApp funcionando em outro sistema:
+            não lê QR, não abre conta na Meta, não tira nada do ar. O rótulo diz
+            o que o usuário ganha ("já conectado"), não como funciona por
+            baixo — e a marca de quem hospeda aparece DENTRO, vinda do servidor,
+            porque a tela não pode nomear provider. */}
+        <TabsTrigger value="hospedado">{t("Número já conectado")}</TabsTrigger>
         <TabsTrigger value="oficial">{t("API Oficial (Meta)")}</TabsTrigger>
         {/* "Provedor parceiro" e não a marca: o rótulo da marca vem do servidor
             (`lib/channels/connect`), porque a tela não pode nomear provider — e
@@ -90,6 +100,10 @@ export function ConexoesShell({
 
       <TabsContent value="numeros" className="mt-0">
         <ConnectionsClient wahaConfigured={wahaConfigured} />
+      </TabsContent>
+
+      <TabsContent value="hospedado" className="mt-0">
+        <CanalHospedadoClient />
       </TabsContent>
 
       <TabsContent value="voz" className="mt-0">
