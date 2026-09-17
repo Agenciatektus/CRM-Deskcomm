@@ -125,7 +125,21 @@ export interface DadosDoPasso {
  * passo com a proposta pronta na tela; pedir que ela clique em "gerar sugestão"
  * primeiro seria cobrar um passo a mais para chegar ao mesmo lugar.
  */
-export async function dadosDoPasso(orgId: string, negocio: string): Promise<DadosDoPasso> {
+export async function dadosDoPasso(): Promise<DadosDoPasso> {
+  // A ORG VEM DA SESSÃO, NUNCA DE PARÂMETRO — e o motivo não é estilo.
+  //
+  // Todo export de um módulo "use server" ganha um Action ID próprio e passa a
+  // ser invocável por HTTP, por qualquer pessoa autenticada em QUALQUER
+  // organização. Não importa que só um Server Component importe esta função: o
+  // caminho existe do mesmo jeito. Enquanto a org chegava por parâmetro, quem
+  // soubesse o uuid de outro tenant lia o funil dele por aqui — e pior, a
+  // chamada decifrava a credencial de IA da vítima e gastava o saldo dela.
+  //
+  // `requireOnboardingCtx` é o mesmo portão que `aplicarQuadro` usa logo abaixo;
+  // a assimetria entre as duas metades é que abria o vão. Tirar os parâmetros,
+  // em vez de validá-los, é o que fecha a classe inteira: não sobra nada que o
+  // chamador controle. Ver LRN-20260822-009 (mesma classe, incidente anterior).
+  const { orgId, orgName: negocio } = await requireOnboardingCtx();
   const admin = createAdminClient();
   const atual = await carregarQuadroAtual(admin, orgId);
 
