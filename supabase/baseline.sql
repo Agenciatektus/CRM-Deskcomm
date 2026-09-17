@@ -9424,13 +9424,6 @@ comment on column public.channel_sessions.verdash_instance_name is
 comment on column public.channel_sessions.verdash_token_encrypted is
   'Token da instância, cifrado por fn_encrypt_oauth. Escopo: APENAS esta instância — nunca o adminToken global do FZAP.';
 
--- Uma instância da Verdash pertence a UMA organização: sem isto, duas
--- organizações do mesmo CRM reivindicariam a mesma instância e as mensagens de
--- uma apareceriam na caixa da outra. Parcial em archived_at para que arquivar e
--- reconectar continue possível.
-create unique index if not exists channel_sessions_verdash_instance_unique
-  on public.channel_sessions (verdash_instance_name)
-  where provider = 'verdash' and archived_at is null;
 
 -- ---- o que falta para o terceiro canal ENVIAR (migration 0132) ----
 -- Espelho idempotente da 0117. Racional completo no arquivo da migration.
@@ -26150,3 +26143,27 @@ drop trigger if exists trg_platform_meta_app_updated_at on public.platform_meta_
 create trigger trg_platform_meta_app_updated_at
   before update on public.platform_meta_app
   for each row execute function public.fn_set_updated_at();
+
+
+-- ---- uma instância da Verdash por organização (migration 9001) ----
+-- POR QUE ESTE BLOCO ESTÁ NO FIM DO ARQUIVO, e não junto do resto do
+-- vocabulário do canal `verdash` (apêndice da 0131, lá em cima):
+--
+-- o índice é PARCIAL em `archived_at`, e essa coluna só nasce no apêndice da
+-- migration 0106 — que neste arquivo vem DEPOIS da 0131. A ordem do baseline é
+-- histórica, não numérica, e isso não se percebe lendo: ler o apêndice 0131 dá
+-- a impressão de que a tabela já está completa.
+--
+-- Com o bloco lá em cima, o `install.sh` morria em
+-- `ERROR: column "archived_at" does not exist` e NENHUMA instalação nova
+-- subia. Produção não sentia, porque chegou por migrations incrementais, onde a
+-- 0106 roda antes da 9001 de verdade. Quem pagaria era o próximo cliente.
+--
+-- Ao mover qualquer coisa para cá, a regra é: apêndice que depende de coluna
+-- criada por OUTRO apêndice vai depois dele no arquivo, sempre — e na dúvida,
+-- no fim.
+create unique index if not exists channel_sessions_verdash_instance_unique
+  on public.channel_sessions (verdash_instance_name)
+  where provider = 'verdash' and archived_at is null;
+
+notify pgrst, 'reload schema';
