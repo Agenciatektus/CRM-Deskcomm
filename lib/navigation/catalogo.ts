@@ -193,7 +193,24 @@ export const NAV_CATALOG = [
     icon: "ListChecks",
     group: "crm",
     section: "O dia a dia da venda",
-    sidebar: true,
+    //
+    // ─── DIVERGÊNCIA TEKTUS (17/09/2026): desce para o hub ──────────────────
+    //
+    // Sai do sidebar para abrir a vaga de "Etapas do funil", promovida logo
+    // abaixo. A troca é de soma zero de propósito: o comentário de
+    // `navegacao-registry.test.ts` mede que o QUINTO destino de CRM faz o menu
+    // rolar 13px em 900px, e o e2e cobra a dobra. Promover sem rebaixar
+    // reabriria a corrida por pixel que o hub resolveu.
+    //
+    // Por que esta e não outra: `crm_tasks` tem ZERO linhas em TODAS as
+    // organizações desta instalação — medido em 17/09. A tela descrita acima
+    // como "uso diário" nunca foi usada por ninguém aqui, enquanto Etapas do
+    // funil é aberta a cada cliente que a agência implanta. O upstream acertou
+    // o critério (uso diário fica, montagem sai) e errou o dado para ESTA casa.
+    //
+    // Reversão: devolver `sidebar: true` aqui e tirar de pipelines. Se um dia
+    // as tarefas entrarem na rotina, é isso que se faz — e o número de linhas
+    // em `crm_tasks` é como se descobre.
   },
   {
     // ⚠️ Esta tela nasceu porque a FERRAMENTA já existia sem ela. O agente de IA
@@ -272,6 +289,26 @@ export const NAV_CATALOG = [
     // e escrever os motivos de perda é trabalho de montagem, feito uma vez e
     // revisitado por `manager` de vez em quando — enquanto Funis, Contatos e
     // Tarefas se abrem todo dia. É esse o corte que decide quem fica no menu.
+    //
+    // ─── DIVERGÊNCIA TEKTUS (17/09/2026), pedido do Peterson ────────────────
+    //
+    // Entra no menu. O corte acima está certo para quem ele descreve: o
+    // operador do cliente, que monta o funil uma vez e depois vive no Inbox.
+    // Ele não descreve quem opera ESTA instalação — uma agência que implanta um
+    // cliente novo a cada ciclo e, para ela, desenhar etapas e escrever motivos
+    // de perda é trabalho de toda semana, não de uma vez só.
+    //
+    // ⚠️ CUSTO ASSUMIDO, em duas partes. Primeira: é edição em arquivo do
+    // upstream, contra a política de fork do próprio projeto ("customização só
+    // em arquivo novo"), então conflita em todo merge. Não havia saída por
+    // configuração: `registry.ts:119` só deixa `destinos` promover destino de
+    // grupo SEM hub, e "crm" tem hub. Segunda: o comentário de densidade do
+    // Sidebar registra que o menu passou a rolar em 900px e que o hub foi a
+    // resposta — mais uma linha empurra na direção contrária, e
+    // `tests/e2e/navegacao.spec.ts:238` cobra exatamente isso. Se aquele teste
+    // reprovar, a correção é devolver OUTRO destino ao hub, nunca afrouxar o
+    // teste.
+    sidebar: true,
   },
 
   // ---- Agente de IA — montar, ensinar, acompanhar ----

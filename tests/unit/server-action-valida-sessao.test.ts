@@ -158,12 +158,20 @@ function coletarAcoes(): Acao[] {
     const re = /^export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(fonte)) !== null) {
-      const resto = fonte.slice(m.index + m[0].length);
+      // Destructuring com guarda em vez de `m[1]!`: sob
+      // `noUncheckedIndexedAccess` os grupos são `string | undefined`, e a
+      // asserção calaria o compilador sem dizer o que se assume. Se um dia o
+      // regex perder um grupo, aqui a ação é pulada em silêncio — e o primeiro
+      // teste do arquivo, que exige mais de 30 ações encontradas, é quem
+      // reprova.
+      const [inteiro, nome, assinatura] = m;
+      if (nome === undefined || assinatura === undefined) continue;
+      const resto = fonte.slice(m.index + inteiro.length);
       const prox = /^export\s/m.exec(resto);
       acoes.push({
         arquivo: rel,
-        nome: m[1],
-        assinatura: m[2],
+        nome,
+        assinatura,
         corpo: prox ? resto.slice(0, prox.index) : resto,
       });
     }

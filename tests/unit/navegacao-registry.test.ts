@@ -111,11 +111,18 @@ describe("sidebarGroups", () => {
     //
     // A lista é EXATA de propósito. `toContain` deixaria um sexto item entrar
     // calado no sidebar e reabrir a mesma corrida por pixel.
+    //
+    // ⚠️ TEKTUS 17/09/2026 — "/app/tasks" saiu, "/app/settings/tenant/pipelines"
+    // entrou. A troca é de SOMA ZERO, três destinos antes e três depois, porque
+    // é exatamente os 13px acima que ela não pode reabrir. `crm_tasks` tem zero
+    // linhas em TODAS as organizações desta instalação, enquanto Etapas do funil
+    // é aberta a cada cliente que a agência implanta. O racional inteiro está em
+    // `lib/navigation/catalogo.ts`, nos dois destinos.
     const crm = sidebarGroups(true, null).find((g) => g.group.id === "crm");
     expect(crm?.items.map((i) => i.href)).toEqual([
       "/app/kanban",
       "/app/contacts",
-      "/app/tasks",
+      "/app/settings/tenant/pipelines",
     ]);
     expect(NAV_GROUPS.find((g) => g.id === "crm")?.hub?.href).toBe("/app/crm");
   });
