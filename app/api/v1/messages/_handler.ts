@@ -29,7 +29,8 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
+  ondeResponder,
   resolveSessionRef,
   type ChannelSessionRef,
 } from "@/lib/channels";
@@ -592,14 +593,19 @@ export async function sendMessageHandler(
   // alcança o caso em que o embed não trouxe a sessão — impossível hoje
   // (`conversations.channel_session_id` é NOT NULL com FK ON DELETE RESTRICT),
   // e ainda assim mantido para não trocar o desfecho desse ramo defensivo.
-  const adapter = getAdapter(c.channel_sessions?.provider ?? DEFAULT_CHANNEL_PROVIDER);
-  const chatId = adapter.resolveRecipient({
+  // `getAdapterOpcional`: `null` para canal que RECEBE aqui e responde por outro lugar.
+  // Com `getAdapter`, o atendente que clicasse "enviar" numa conversa dessas recebia um
+  // `unknown_channel_provider` cru —
+  // erro de encanamento no lugar onde ele precisava de uma instrução. O ramo logo
+  // abaixo trata isso como os outros "não sai por aqui": `failed` com texto legível.
+  const adapter = getAdapterOpcional(c.channel_sessions?.provider ?? DEFAULT_CHANNEL_PROVIDER);
+  const chatId = adapter?.resolveRecipient({
     isGroup: c.is_group,
     groupChatId: c.group_chat_id,
     phoneNumber: c.contacts?.phone_number,
     waIdentity: c.contacts?.wa_identity,
     waLid: c.contacts?.wa_lid,
-  });
+  }) ?? null;
 
   // Releitura no sink: o operador pode ter fechado o canal enquanto o modelo
   // gerava a resposta. Envio humano não passa por esta restrição da IA.
@@ -608,7 +614,21 @@ export async function sendMessageHandler(
     channelSessionId: c.channel_session_id,
     contactPhoneNumber: c.contacts?.phone_number ?? "",
   }).catch(() => ({ permite: false, motivo: "pre_go_live_indisponivel" }));
-  if (acessoAtual && !acessoAtual.permite) {
+  if (!adapter) {
+    // Canal sem adapter local. `failed` e não `queued` pela mesma razão do canal
+    // arquivado: fila implica "vai sair quando der", e por aqui não vai sair nunca.
+    const { data: updated } = await supabase
+      .from("messages")
+      .update({
+        status: "failed",
+        error_code: "channel_send_elsewhere",
+        error_message: ondeResponder(c.channel_sessions?.provider ?? DEFAULT_CHANNEL_PROVIDER),
+      })
+      .eq("id", message.id)
+      .select(MSG_COLS)
+      .maybeSingle();
+    if (updated) message = updated as unknown as Message;
+  } else if (acessoAtual && !acessoAtual.permite) {
     const { data: updated, error } = await supabase.from("messages").update({
       status: "failed",
       error_code: acessoAtual.motivo === "pre_go_live_indisponivel" ? "pre_go_live_indisponivel" : "pre_go_live",

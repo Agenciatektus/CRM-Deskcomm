@@ -147,7 +147,18 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
   const baseline = readFileSync("supabase/baseline.sql", "utf8");
 
   it("o CHECK de provider do baseline conhece o canal novo", () => {
-    expect(baseline).toMatch(/channel_sessions_provider_check[\s\S]{0,300}'zernio'/);
+    // A asserção lê a LISTA da constraint, não uma janela de caracteres depois do nome.
+    //
+    // A versão anterior era `/channel_sessions_provider_check[\s\S]{0,300}'zernio'/`, e
+    // estava a 16 caracteres do limite: 284 de 300. Três comentários acrescentados entre
+    // o `add constraint` e o array — explicando por que o canal novo entra ali —
+    // empurraram `'zernio'` para 535 e o teste ficou vermelho com o banco CERTO.
+    //
+    // Um gate que reprova quando alguém documenta a linha ensina a não documentar. O que
+    // ele existe para provar é que o provider está na lista; é isso que ele passa a ler.
+    const check = baseline.slice(baseline.indexOf("channel_sessions_provider_check"));
+    const lista = check.slice(0, check.indexOf("]"));
+    expect(lista).toContain("'zernio'");
   });
 
   it("o CHECK de ref exige a coluna do canal novo", () => {

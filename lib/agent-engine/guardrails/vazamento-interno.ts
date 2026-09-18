@@ -52,7 +52,7 @@
  * resíduo de falso-positivo ACEITO — congelado, não escondido. Regressão reprova o CI.
  */
 import { TOOL_CATALOG, catalogEntry } from '@/lib/mcp/tools/catalog';
-import { CHANNEL_CAPABILITIES } from '@/lib/channels/capabilities';
+import { PROVIDERS_DE_NOME_INTERNO } from '@/lib/channels/capabilities';
 
 /** Categoria da regra que pegou o termo — vai ao trace (rótulo nosso, nunca o corpo). */
 export type CategoriaVazamento = 'snake_case' | 'tool' | 'papel' | 'arquitetura' | 'erro_cru';
@@ -133,8 +133,16 @@ const PALAVRAS_ARQUITETURA = [
  * logo acima: provider novo entra na cobertura sozinho, e a lista não envelhece
  * mentindo. `lib/channels/capabilities.ts` importa só tipos — não arrasta peso
  * para dentro deste módulo puro.
+ *
+ * ⚠️ E a derivação tem UMA subtração, que o primeiro canal de nome conhecido obrigou a
+ * existir. A lista já não é `Object.keys(CHANNEL_CAPABILITIES)`: é ela MENOS os
+ * providers cujo nome é marca que o cliente pronuncia. Enquanto todo provider tinha nome
+ * de encanamento, "nome de provider" e "palavra que o cliente não deve ver" eram a mesma
+ * coisa; o primeiro provider com nome de marca separou as duas, e o
+ * agente ficou impedido de dizer o nome do canal que o produto acabara de ganhar. A subtração mora em `lib/channels/` porque é
+ * lá que nome de provider pode ser escrito — e porque a pergunta é sobre o canal.
  */
-const PROVIDERES_DE_CANAL = Object.keys(CHANNEL_CAPABILITIES);
+const PROVIDERES_DE_CANAL = PROVIDERS_DE_NOME_INTERNO;
 
 /**
  * (C) PAPEL/PERMISSÃO — o vocabulário de controle de acesso. Nenhuma destas é palavra

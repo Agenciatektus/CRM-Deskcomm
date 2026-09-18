@@ -24,7 +24,7 @@ import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
-import { DEFAULT_CHANNEL_PROVIDER, getAdapter, type ChannelProvider } from "@/lib/channels";
+import { DEFAULT_CHANNEL_PROVIDER, getAdapterOpcional, type ChannelProvider } from "@/lib/channels";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -167,11 +167,14 @@ async function handle(req: NextRequest): Promise<Response> {
       // `pnpm lint:channels` reprova o build se acontecer (foi o que pegou a
       // primeira versão desta rota). Testar a PRESENÇA do método é como se
       // pergunta "este canal sabe fazer isso?" sem perguntar qual canal é.
-      const adapter = getAdapter(
+      // Opcional: canal conhecido sem adapter local é categoria, não falha — sai pelo
+      // mesmo caminho de quem não sabe buscar foto. Provider fora da matriz continua
+      // lançando, que é o barulho que se quer.
+      const adapter = getAdapterOpcional(
         (sessao as { provider?: ChannelProvider | null } | null)?.provider ??
           DEFAULT_CHANNEL_PROVIDER,
       );
-      if (!adapter.fetchProfilePictureUrl) {
+      if (!adapter?.fetchProfilePictureUrl) {
         await carimbar(null);
         semFoto++;
         continue;

@@ -15,7 +15,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
   resolveSessionRef,
   type ChannelProvider,
   type ChannelSessionRef,
@@ -100,11 +100,11 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
         .eq("id", msg.channel_session_id)
         .maybeSingle();
 
-      const adapter = getAdapter(
+      const adapter = getAdapterOpcional(
         ((sessao?.provider as string) ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider,
       );
       const sessionRef = sessao ? resolveSessionRef(sessao as unknown as ChannelSessionRef) : null;
-      if (!adapter.fetchInboundMedia || !sessionRef) {
+      if (!adapter?.fetchInboundMedia || !sessionRef) {
         // Canal sem mídia de entrada não é defeito: é estado normal. 404 diz a
         // verdade ("não há o que servir"); 502 acusaria uma falha inexistente.
         return fail("not_found", t("Mensagem sem mídia."), 404, { requestId });

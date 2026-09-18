@@ -33,7 +33,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
   resolveSessionRef,
   type ChannelSessionRef,
 } from "@/lib/channels";
@@ -85,10 +85,13 @@ export async function sinalizarDigitando(
   // uma ida à rede dentro do caminho de resposta ao cliente.
   if (!sessao || sessao.status !== SESSAO_SAUDAVEL) return;
 
-  const adapter = getAdapter(sessao.provider ?? DEFAULT_CHANNEL_PROVIDER);
+  // Opcional: canal sem adapter local não sinaliza digitação, e isso é categoria, não
+  // erro. Com `getAdapter` o throw vinha antes do guard, no caminho de resposta ao
+  // cliente — o pior lugar possível para uma exceção que não muda nada.
+  const adapter = getAdapterOpcional(sessao.provider ?? DEFAULT_CHANNEL_PROVIDER);
   // Testa a presença do método — nunca pergunta QUAL provider é (invariante 1
   // da doutrina de restrição de canal).
-  if (!adapter.signalTyping) return;
+  if (!adapter?.signalTyping) return;
 
   const recipient = adapter.resolveRecipient({
     isGroup: conversa.is_group,

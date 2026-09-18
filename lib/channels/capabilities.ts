@@ -244,6 +244,41 @@ export function canalConhecidoSemMensagem(provider: string | null | undefined): 
   return (PROVIDERS_SEM_MENSAGEM as readonly string[]).includes(provider ?? "");
 }
 
+/**
+ * Os providers cujo NOME é uma marca que o cliente pronuncia.
+ *
+ * ─── O QUE ISTO CONSERTA ────────────────────────────────────────────────────
+ *
+ * `lib/agent-engine/guardrails/vazamento-interno.ts` deriva a lista de vocabulário
+ * interno daqui — provider novo entra na cobertura sozinho, que é a decisão certa e
+ * está explicada lá. A premissa silenciosa era que nome de provider é nome de
+ * encanamento: `waha`, `meta_cloud`, `zernio`, `verdash` — nada que um cliente diga.
+ *
+ * `instagram` é o primeiro que quebra a premissa. Acrescentá-lo à matriz matriculou a
+ * palavra na blocklist, e o agente perdeu a capacidade de dizer o nome do canal que o
+ * CRM acabou de ganhar: "vi seu comentário no Instagram", "me chama no Direct",
+ * "instagram.com/loja" — tudo virava mensagem calada ou rodada extra de reescrita.
+ *
+ * A lista mora AQUI e não lá porque nome de provider só pode ser escrito em
+ * `lib/channels/` (doutrina `restricao-de-canal`, invariante 1) — e porque a pergunta
+ * "este nome é público?" é sobre o canal, não sobre o detector.
+ *
+ * Critério para entrar: o cliente reconhece e usa a palavra no dia a dia. Na dúvida,
+ * NÃO entre — deixar de fora só custa uma reescrita; entrar errado deixa vazar
+ * vocabulário interno de verdade.
+ */
+export const PROVIDERS_DE_MARCA_PUBLICA = [
+  "instagram",
+] as const satisfies readonly ChannelProvider[];
+
+/**
+ * Os nomes de provider que o cliente NÃO deve ver — a matriz menos as marcas públicas.
+ * É esta a lista que o detector de vazamento consome.
+ */
+export const PROVIDERS_DE_NOME_INTERNO: readonly string[] = Object.keys(
+  CHANNEL_CAPABILITIES,
+).filter((p) => !(PROVIDERS_DE_MARCA_PUBLICA as readonly string[]).includes(p));
+
 export function capabilitiesOf(provider: ChannelProvider): ChannelCapabilities {
   const caps = CHANNEL_CAPABILITIES[provider as ProviderDeMensagem];
   // Fail-closed: provider fora da matriz não herda o default do WAHA. O tipo

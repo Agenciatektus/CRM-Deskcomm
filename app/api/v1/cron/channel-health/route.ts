@@ -46,7 +46,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
   resolveSessionRef,
   canalConhecidoSemMensagem,
   type ChannelProvider,
@@ -131,9 +131,16 @@ async function handle(req: NextRequest): Promise<Response> {
       // antes de puxar a imagem nova — abortava `handle()` no meio do laço:
       // TODOS os tenants seguintes daquela rodada ficavam sem vigia, e o
       // operador via 500 no cron sem nenhuma pista de qual linha o derrubou.
-      const adapter = getAdapter((s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider);
+      // `getAdapterOpcional`: canal conhecido SEM adapter local — o que RECEBE
+      // aqui e é respondido por outro lugar — devolve `null` e sai por aqui, em silêncio — como a
+      // linha de voz sai acima. Com `getAdapter` ele lançava, e o erro por sessão a
+      // cada rodada ficava indistinguível do alarme de imagem desatualizada, que é
+      // justamente o sinal que o `catch` abaixo existe para preservar.
+      const adapter = getAdapterOpcional(
+        (s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider,
+      );
       const sessionRef = resolveSessionRef(s);
-      if (!adapter.checkHealth || !sessionRef) continue;
+      if (!adapter?.checkHealth || !sessionRef) continue;
 
       const saude = await adapter.checkHealth({
         organizationId: s.organization_id,

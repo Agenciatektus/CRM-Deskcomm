@@ -338,10 +338,18 @@ describe("o cron enxerga os três canais", () => {
     // lugar nenhum. Este caso existe para que o próximo canal não entre mudo.
     // A lista sai de `CHANNEL_CAPABILITIES`, que é a matriz declarada do seam:
     // canal novo entra ali por obrigação, então este caso o alcança sozinho.
-    const { getAdapter, CHANNEL_CAPABILITIES } = await import("@/lib/channels");
-    const mudos = Object.keys(CHANNEL_CAPABILITIES).filter(
-      (p) => typeof getAdapter(p as never).checkHealth !== "function",
+    const { getAdapterOpcional, CHANNEL_CAPABILITIES } = await import("@/lib/channels");
+    // `getAdapterOpcional` e não `getAdapter`: canal conhecido que não tem adapter
+    // local (o Instagram, que responde pelo Verdash) devolve `null` em vez de lançar.
+    // O caso continua cobrindo o que existe para cobrir — todo adapter REGISTRADO
+    // responde pela própria saúde —, e um provider fora da matriz segue lançando aqui,
+    // que é o barulho que se quer.
+    const adapters = Object.keys(CHANNEL_CAPABILITIES).map(
+      (p) => [p, getAdapterOpcional(p as never)] as const,
     );
+    const mudos = adapters
+      .filter(([, a]) => a && typeof a.checkHealth !== "function")
+      .map(([p]) => p);
     expect(mudos, `canais sem checkHealth: ${mudos.join(", ")}`).toEqual([]);
   });
 });
