@@ -193,24 +193,7 @@ export const NAV_CATALOG = [
     icon: "ListChecks",
     group: "crm",
     section: "O dia a dia da venda",
-    //
-    // ─── DIVERGÊNCIA TEKTUS (17/09/2026): desce para o hub ──────────────────
-    //
-    // Sai do sidebar para abrir a vaga de "Etapas do funil", promovida logo
-    // abaixo. A troca é de soma zero de propósito: o comentário de
-    // `navegacao-registry.test.ts` mede que o QUINTO destino de CRM faz o menu
-    // rolar 13px em 900px, e o e2e cobra a dobra. Promover sem rebaixar
-    // reabriria a corrida por pixel que o hub resolveu.
-    //
-    // Por que esta e não outra: `crm_tasks` tem ZERO linhas em TODAS as
-    // organizações desta instalação — medido em 17/09. A tela descrita acima
-    // como "uso diário" nunca foi usada por ninguém aqui, enquanto Etapas do
-    // funil é aberta a cada cliente que a agência implanta. O upstream acertou
-    // o critério (uso diário fica, montagem sai) e errou o dado para ESTA casa.
-    //
-    // Reversão: devolver `sidebar: true` aqui e tirar de pipelines. Se um dia
-    // as tarefas entrarem na rotina, é isso que se faz — e o número de linhas
-    // em `crm_tasks` é como se descobre.
+    sidebar: true,
   },
   {
     // ⚠️ Esta tela nasceu porque a FERRAMENTA já existia sem ela. O agente de IA

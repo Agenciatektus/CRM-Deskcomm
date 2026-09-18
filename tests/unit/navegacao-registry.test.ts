@@ -112,16 +112,19 @@ describe("sidebarGroups", () => {
     // A lista é EXATA de propósito. `toContain` deixaria um sexto item entrar
     // calado no sidebar e reabrir a mesma corrida por pixel.
     //
-    // ⚠️ TEKTUS 17/09/2026 — "/app/tasks" saiu, "/app/settings/tenant/pipelines"
-    // entrou. A troca é de SOMA ZERO, três destinos antes e três depois, porque
-    // é exatamente os 13px acima que ela não pode reabrir. `crm_tasks` tem zero
-    // linhas em TODAS as organizações desta instalação, enquanto Etapas do funil
-    // é aberta a cada cliente que a agência implanta. O racional inteiro está em
-    // `lib/navigation/catalogo.ts`, nos dois destinos.
+    // ⚠️ TEKTUS 18/09/2026 — "/app/settings/tenant/pipelines" ACRESCENTADO, e
+    // Tarefas fica. São quatro destinos, o que reabre de propósito os 13px que
+    // o comentário acima descreve: decisão do Peterson, que opera a instalação
+    // e disse que o menu já rola hoje e que isso não o incomoda.
+    //
+    // A dobra em 900px deixou de ser invariante DESTA instalação. O e2e
+    // `navegacao.spec.ts` que a cobra vai reprovar, e é esperado — quem mexer
+    // nele deve ajustar o e2e, não desfazer esta linha.
     const crm = sidebarGroups(true, null).find((g) => g.group.id === "crm");
     expect(crm?.items.map((i) => i.href)).toEqual([
       "/app/kanban",
       "/app/contacts",
+      "/app/tasks",
       "/app/settings/tenant/pipelines",
     ]);
     expect(NAV_GROUPS.find((g) => g.id === "crm")?.hub?.href).toBe("/app/crm");

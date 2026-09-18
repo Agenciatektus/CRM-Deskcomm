@@ -71,19 +71,18 @@ describe("Sidebar agrupado", () => {
     // O que este teste prende é a porta EXISTIR no grupo certo do sidebar; que
     // ela desemboca na tela é o e2e `navegacao.spec.ts` que percorre, clicando.
     //
-    // ⚠️ TEKTUS 17/09/2026 — O CAMINHO MUDOU DE NOVO, e a propriedade segue a
-    // mesma: Etapas do funil voltou ao menu, trocando de lugar com Tarefas, que
-    // desceu para o hub. A soma de destinos do grupo não mudou, então os 13px
-    // citados acima continuam onde estavam. O que este teste cobra agora é que
-    // a tela esteja no menu do CRM E que o hub siga existindo — porque o pecado
-    // original nunca foi a profundidade, foi estar em Configurações.
+    // ⚠️ TEKTUS 18/09/2026 — Etapas do funil voltou ao MENU, sem tirar nada.
+    // A propriedade que este teste prende nunca foi "não estar no sidebar": era
+    // "a porta é o CRM, nunca Configurações". Ela continua valendo, e agora com
+    // uma porta a mais — a direta. O hub segue existindo e segue listando a
+    // tela, porque hub é inventário, não sobra.
     const hub = screen.getByRole("link", { name: /Ver tudo em CRM/ });
     expect(hub).toHaveAttribute("href", "/app/crm");
     expect(screen.getByRole("link", { name: "Etapas do funil" })).toHaveAttribute(
       "href",
       "/app/settings/tenant/pipelines",
     );
-    expect(screen.queryByRole("link", { name: "Tarefas" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Tarefas" })).toHaveAttribute("href", "/app/tasks");
   });
 
   it("e os dois itens de funil não disputam o mesmo nome", () => {
