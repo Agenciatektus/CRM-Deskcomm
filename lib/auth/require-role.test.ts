@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "@/lib/auth/require-role";
-import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
+import { carregarUsuarioComMotivo, loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { audit } from "@/lib/audit";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthUser, Role } from "@/lib/auth/types";
@@ -19,6 +19,9 @@ vi.mock("@/lib/auth/server", () => ({
   // fator tem suíte própria em tests/unit/require-role-mfa.test.ts.
   mfaEmDivida: vi.fn(async () => false),
   loadAuthUser: vi.fn(),
+  // O gate usa esta: ela carrega o MOTIVO junto, para separar "nao esta logado" de
+  // "nao deu para perguntar" (rede/DNS) na mensagem devolvida.
+  carregarUsuarioComMotivo: vi.fn(),
   resolveActiveOrg: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -45,9 +48,14 @@ function authUserFixture(role: Role | null, platformAdmin = false): AuthUser {
 function session(role: Role | null, opts: { dbRole?: string | null; platformAdmin?: boolean } = {}) {
   const platformAdmin = opts.platformAdmin ?? false;
   const dbRole = opts.dbRole === undefined ? role : opts.dbRole;
-  vi.mocked(loadAuthUser).mockResolvedValue(
-    role || platformAdmin ? authUserFixture(role, platformAdmin) : null,
-  );
+  const usuario = role || platformAdmin ? authUserFixture(role, platformAdmin) : null;
+  vi.mocked(loadAuthUser).mockResolvedValue(usuario);
+  // O gate passou a ler o motivo junto. Sem sessão aqui é "sem_sessao" — o caminho de
+  // "infra" (rede/DNS) tem teste próprio em tests/unit/auth-rede-nao-e-sessao-expirada.
+  vi.mocked(carregarUsuarioComMotivo).mockResolvedValue({
+    user: usuario,
+    motivo: usuario ? "ok" : "sem_sessao",
+  });
   vi.mocked(resolveActiveOrg).mockResolvedValue(
     role ? { orgId: ORG_ID, name: "Org", role } : null,
   );
@@ -133,7 +141,7 @@ describe("requireRole — helper único (spec 13 §4)", () => {
 
     /** User membro de 2 orgs; org ativa = ORG_ID; role no banco varia por p_org. */
     function dualOrgSession(roleInActive: Role, roleInOther: Role | null) {
-      vi.mocked(loadAuthUser).mockResolvedValue({
+      const usuario = {
         ...authUserFixture(roleInActive),
         organizations: [
           { organization_id: ORG_ID, organization_name: "Org A", role: roleInActive },
@@ -141,7 +149,10 @@ describe("requireRole — helper único (spec 13 §4)", () => {
             ? [{ organization_id: OTHER_ORG, organization_name: "Org B", role: roleInOther }]
             : []),
         ],
-      });
+      };
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario);
+      // O gate lê o motivo junto com o usuário. Ver a nota em `session()`.
+      vi.mocked(carregarUsuarioComMotivo).mockResolvedValue({ user: usuario, motivo: "ok" });
       vi.mocked(resolveActiveOrg).mockResolvedValue({
         orgId: ORG_ID,
         name: "Org A",

@@ -105,12 +105,63 @@ export function ehSessaoAusente(error: { name?: string } | null | undefined): bo
   return error?.name === "AuthSessionMissingError";
 }
 
-export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
+/**
+ * Por que o usuário não foi identificado.
+ *
+ *   `ok`         — foi, e está em `user`
+ *   `sem_sessao` — não está logado. Estado normal, não incidente.
+ *   `infra`      — NÃO DEU PARA PERGUNTAR: rede, DNS, GoTrue fora do ar.
+ *
+ * A ação é a mesma nos dois últimos (recusar), e isso é deliberado: sem usuário
+ * confirmado, falhar fechado é o desfecho seguro. O que muda é o que se CONTA — e contar
+ * "faça login" para quem esbarrou no DNS o manda consertar o que não está quebrado.
+ */
+export type MotivoDeAuth = "ok" | "sem_sessao" | "infra";
+
+/** `AuthRetryableFetchError` é a classe que o supabase-js usa para rede e GoTrue fora. */
+function ehFalhaDeInfra(error: { name?: string; status?: number | null } | null): boolean {
+  if (!error) return false;
+  return error.name === "AuthRetryableFetchError" || error.status === 0;
+}
+
+const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motivo: MotivoDeAuth }> => {
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
     error,
   } = await supabase.auth.getUser();
+
+  // ─── UMA SEGUNDA TENTATIVA, SÓ PARA FALHA DE INFRA ────────────────────────
+  //
+  // Medido em produção em 18/09: a VPS30 falha de forma intermitente ao resolver
+  // `aws-0-eu-central-1.pooler.supabase.com` — 18 `EAI_AGAIN` em seis horas, sempre nesse
+  // host, com o DNS respondendo normalmente segundos antes e depois. O Peterson viu isso
+  // como "Auth required" na tela e foi investigar a conta do cliente, que não tinha nada.
+  //
+  // A janela é de segundos, então uma segunda tentativa resolve a maioria antes de virar
+  // erro visível. Não é retry cego: só acontece quando a classe do erro diz que a causa é
+  // transitória. Token ilegível ou sessão ausente não se conserta tentando de novo, e
+  // insistir ali só somaria latência ao caminho de quem simplesmente não está logado.
+  //
+  // Uma tentativa a mais, e não três: se o DNS estiver fora por mais de um segundo, o
+  // problema é operacional, e prender a requisição do usuário enquanto isso troca um erro
+  // honesto por uma tela pendurada.
+  if (ehFalhaDeInfra(error)) {
+    await new Promise((r) => setTimeout(r, 300));
+    const segunda = await supabase.auth.getUser();
+    user = segunda.data.user;
+    error = segunda.error;
+    if (!error) {
+      logger.warn("[auth] getUser falhou e a segunda tentativa deu certo", {
+        detalhe: "provavel intermitencia de DNS/rede ate o Supabase",
+      });
+    }
+  }
+
+  // Persistiu a falha de infra. Sai ANTES do log de erro logo abaixo? Não: o log continua
+  // valendo, e é ele que deixa o rastro para quem investigar. O que muda é o motivo viajar
+  // junto com o `null`, para o gate de rota poder dizer o que realmente houve.
+  const falhouPorInfra = ehFalhaDeInfra(error);
   // ⚠️ O `error` era DESCARTADO — nem chegava a ser desestruturado —, e aqui
   // `user: null` é tão ambíguo quanto o `data: null` que a query logo abaixo
   // trata com todo o cuidado: significa "não está logado" (estado normal) E
@@ -148,7 +199,7 @@ export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
       message: error.message,
     });
   }
-  if (!user) return null;
+  if (!user) return { user: null, motivo: falhouPorInfra ? "infra" : "sem_sessao" };
 
   // Platform admin e Org memberships consultados em paralelo no Supabase:
   // elimina round-trip sequencial a cada requisição.
@@ -236,16 +287,19 @@ export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
   const timezone = (user.user_metadata?.timezone as string | undefined) ?? null;
 
   return {
-    id: user.id,
-    email: user.email ?? "",
-    full_name: fullName,
-    avatar_url: avatarUrl,
-    is_platform_admin: !!paRow,
-    locale,
-    idioma,
-    timezone,
-    organizations: memberships,
-    support,
+    motivo: "ok",
+    user: {
+      id: user.id,
+      email: user.email ?? "",
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      is_platform_admin: !!paRow,
+      locale,
+      idioma,
+      timezone,
+      organizations: memberships,
+      support,
+    },
   };
 });
 
@@ -254,6 +308,23 @@ export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
  * Priority: cookie `active_org` (if member of) → first membership.
  * Returns null if user has zero memberships.
  */
+/**
+ * O usuário da requisição, ou `null`.
+ *
+ * Assinatura preservada de propósito: 33 pontos do código chamam esta função, e nenhum
+ * deles precisa saber POR QUE não há usuário — todos fazem a mesma coisa, que é recusar.
+ * Quem precisa do motivo (o gate de rota, para escolher a mensagem) chama
+ * `carregarUsuarioComMotivo`.
+ */
+export const loadAuthUser = cache(async (): Promise<AuthUser | null> => {
+  return (await carregarComMotivo()).user;
+});
+
+/** Para quem precisa DIZER o que houve, e não só recusar. Ver `MotivoDeAuth`. */
+export const carregarUsuarioComMotivo = cache(
+  async (): Promise<{ user: AuthUser | null; motivo: MotivoDeAuth }> => carregarComMotivo(),
+);
+
 export const resolveActiveOrg = cache(async (authUser: AuthUser): Promise<ActiveOrg | null> => {
   if (authUser.support) {
     if (authUser.support.status !== "active") redirect("/support-ended");
