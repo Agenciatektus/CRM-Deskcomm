@@ -9,7 +9,7 @@ import type { OutboundMedia } from "@/lib/waha/media-send";
 
 export type { OutboundMedia };
 
-export type ChannelProvider = "waha" | "meta_cloud" | "zernio" | "wacalls" | "verdash";
+export type ChannelProvider = "waha" | "meta_cloud" | "zernio" | "wacalls" | "verdash" | "instagram";
 
 /**
  * Os providers que transportam MENSAGEM — o subconjunto sobre o qual a matriz
@@ -49,8 +49,17 @@ export interface ChannelCapabilities {
   banRisk: boolean;
   /** Intervalo mínimo imposto PELA PLATAFORMA entre msgs ao mesmo destinatário (ms). */
   minIntervalMs: number | null;
-  /** 'server-convert' = o canal converte áudio; 'opus-only' = precisamos entregar ogg/opus. */
-  voiceNote: "server-convert" | "opus-only";
+  /**
+   * 'server-convert' = o canal converte áudio; 'opus-only' = precisamos entregar ogg/opus;
+   * 'none' = o canal NÃO aceita nota de voz.
+   *
+   * O terceiro valor entrou com o Instagram (F8). O tipo assumia que todo canal aceita
+   * áudio de alguma forma — verdade enquanto só havia WhatsApp. Sem ele, o Instagram
+   * precisaria mentir num dos dois valores existentes, e a tela mostraria o botão de
+   * gravar: o atendente falaria, apertaria enviar, e só então descobriria. O tipo é o
+   * lugar certo para essa verdade, porque é o que faz o compilador cobrar quem lê.
+   */
+  voiceNote: "server-convert" | "opus-only" | "none";
   groups: "full" | "limited" | "none";
   /** Mensagem entregue gera custo → decisões de envio precisam considerar orçamento. */
   costPerMessage: boolean;

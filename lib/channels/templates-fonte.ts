@@ -46,6 +46,10 @@ const FONTE: Record<ProviderDeMensagem, FonteDeTemplates | null> = {
   // Mesmo caso do canal por QR, e pela mesma razão: whatsmeow não tem WABA,
   // então não existe definição aprovada em lugar nenhum para listar.
   verdash: null,
+  // Não existe template aprovado no Instagram: fora da janela de 24h simplesmente não há
+  // como falar. `null` é a resposta honesta — oferecer "escolher um template" seria
+  // oferecer uma saída que não existe.
+  instagram: null,
 };
 
 /** `null` quando este canal não trabalha com definições aprovadas. */

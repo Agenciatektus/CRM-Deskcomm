@@ -17,6 +17,15 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
   meta_cloud: metaCloudAdapter,
   zernio: zernioAdapter,
   verdash: verdashAdapter,
+  /**
+   * `null` de propósito: o Instagram APARECE e RECEBE no CRM, mas o envio não sai daqui.
+   *
+   * Quem responde no Instagram é o Verdash — são três operações distintas (Direct,
+   * private reply e resposta pública) com uma trava de servidor que impede resposta
+   * pública em conta de saúde. Duplicar isso num adapter do CRM duplicaria a trava, e uma
+   * trava duplicada é uma trava que diverge na terceira cópia.
+   */
+  instagram: null,
 };
 
 /**

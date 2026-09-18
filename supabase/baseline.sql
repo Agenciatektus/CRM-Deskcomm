@@ -9402,7 +9402,10 @@ alter table public.channel_sessions
   -- 'wacalls' (migration 0233, chamada de voz) e 'verdash' (migration 9001,
   -- canal nativo Verdash/FZAP) somados aqui — UM bloco só por constraint,
   -- doutrina de baseline (não duplicar drop+add por migration).
-  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'verdash'::text]));
+  -- 'instagram' (migration 9004) somado aqui — UM bloco só por constraint, doutrina de
+  -- baseline. Provider próprio e não variante de 'verdash' porque as CAPACIDADES diferem:
+  -- sem áudio, sem documento, e comentário não tem "digitando".
+  check (provider = any (array['waha'::text, 'meta_cloud'::text, 'zernio'::text, 'wacalls'::text, 'verdash'::text, 'instagram'::text]));
 
 alter table public.channel_sessions
   drop constraint if exists channel_sessions_provider_ref_check;
@@ -9413,7 +9416,10 @@ alter table public.channel_sessions
     (provider = 'meta_cloud' and meta_phone_number_id is not null) or
     (provider = 'zernio'     and zernio_account_id    is not null) or
     (provider = 'wacalls'    and wacalls_session_id    is not null) or
-    (provider = 'verdash'    and verdash_instance_name is not null)
+    (provider = 'verdash'    and verdash_instance_name is not null) or
+    -- Instagram usa a MESMA coluna de endereçamento: o transporte passa pela Verdash, o
+    -- que muda é o canal, não o caminho.
+    (provider = 'instagram'  and verdash_instance_name is not null)
   );
 
 comment on column public.channel_sessions.zernio_account_id is
@@ -14336,7 +14342,10 @@ alter table public.webhook_events_log
     -- novo: a ingestão segue (o arquivo é best-effort de propósito) e o único
     -- instrumento para investigar "o cliente respondeu e não chegou" fica
     -- desligado, em silêncio, justo no canal mais novo.
-    'waha', 'nuvemshop', 'generic', 'meta_cloud', 'zernio', 'verdash'
+    -- 'instagram' (migration 9004) entra JUNTO com o das sessões, e não uma migration
+    -- depois: foi exatamente esse esquecimento que a 9002 teve de consertar, com 5 de 5
+    -- entregas recusadas em silêncio porque o arquivo é best-effort.
+    'waha', 'nuvemshop', 'generic', 'meta_cloud', 'zernio', 'verdash', 'instagram'
   ));
 
 -- ---- a marca da instalação sai do .env e vai para o banco (migration 0155) ----

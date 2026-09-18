@@ -22,6 +22,7 @@ const PROVIDERS = [
   "meta_cloud",
   "zernio",
   "verdash",
+  "instagram",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**

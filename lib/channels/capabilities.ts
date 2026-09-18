@@ -106,6 +106,43 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "full",
     costPerMessage: false,
   },
+
+  /**
+   * Instagram — Direct e comentário, roteados pela Verdash.
+   *
+   * O transporte é o mesmo do `verdash` (a Verdash fala com a Meta), mas as CAPACIDADES
+   * não são, e é por isso que ele é provider próprio em vez de uma variante:
+   *
+   *  - `freeformOutsideWindow: false`. O Instagram tem janela de 24h como o WhatsApp
+   *    oficial: fora dela a Meta recusa a mensagem. Declarar `true` aqui faria a tela
+   *    deixar o atendente escrever e só descobrir no envio — e o texto se perde.
+   *
+   *  - `requiresTemplates: false` mesmo com a janela. Não existe template aprovado no
+   *    Instagram: fora da janela simplesmente não há como falar, e oferecer "escolher um
+   *    template" seria oferecer uma saída que não existe.
+   *
+   *  - `voiceNote: "none"` e SEM documento. A API de mensagens do Instagram não aceita os
+   *    dois. Sem isto a tela mostra o botão de gravar áudio, o atendente grava, e o erro
+   *    aparece depois de ele já ter falado.
+   *
+   *  - `groups: "none"`. Não há grupo no Direct.
+   *
+   *  - `banRisk: false`. Não é o caso do FZAP: aqui existe app publicado, permissão
+   *    concedida pelo dono da conta, e a Meta corta por App Review, não por padrão de
+   *    volume. Armar o anti-ban atrasaria resposta sem reduzir risco nenhum.
+   *
+   *  - `costPerMessage: false`. A Meta não cobra por Direct de Instagram.
+   */
+  instagram: {
+    freeformOutsideWindow: false,
+    requiresTemplates: false,
+    canManageTemplates: false,
+    banRisk: false,
+    minIntervalMs: null,
+    voiceNote: "none",
+    groups: "none",
+    costPerMessage: false,
+  },
 };
 
 /**
@@ -131,6 +168,8 @@ export const CHANNEL_PROVIDER_ZERNIO: ChannelProvider = "zernio";
 export const CHANNEL_PROVIDER_WACALLS: ChannelProvider = "wacalls";
 /** WhatsApp já conectado na Verdash (FZAP), sem parear de novo. */
 export const CHANNEL_PROVIDER_VERDASH: ChannelProvider = "verdash";
+/** Instagram (Direct e comentário) roteado pela Verdash. */
+export const CHANNEL_PROVIDER_INSTAGRAM: ChannelProvider = "instagram";
 
 /**
  * Os providers por onde MENSAGEM entra e sai — a única lista que responde
@@ -152,6 +191,7 @@ export const PROVIDERS_DE_MENSAGEM = [
   "meta_cloud",
   "zernio",
   "verdash",
+  "instagram",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**
