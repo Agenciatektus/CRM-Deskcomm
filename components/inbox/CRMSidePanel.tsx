@@ -441,7 +441,9 @@ function CamposDoFunil({
         value={customFields}
         onChange={setCustomFields}
         mode="lead"
-        className="gap-3 md:grid-cols-1"
+        // Só o espaçamento: a coluna única agora é do próprio editor, que é onde
+        // ela sempre deveria ter morado.
+        className="gap-3"
       />
       <Button
         size="sm"

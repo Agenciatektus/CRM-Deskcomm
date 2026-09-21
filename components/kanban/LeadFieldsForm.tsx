@@ -135,7 +135,13 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
           <Textarea id="description" rows={3} {...form.register("description")} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        {/*
+          Uma coluna, pelo mesmo motivo dos campos customizados logo abaixo: este
+          formulario vive no dossie do lead, um painel de no maximo 448px. Dois
+          campos lado a lado ali deixam "Fechamento previsto" com o rotulo em duas
+          linhas e o seletor de data sem largura para o proprio conteudo.
+        */}
+        <div className="grid grid-cols-1 gap-3">
           <div className="space-y-2">
             <Label htmlFor="valueReais">{t("Valor (R$)")}</Label>
             <Input
