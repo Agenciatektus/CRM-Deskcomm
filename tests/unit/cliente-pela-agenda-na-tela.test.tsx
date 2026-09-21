@@ -111,7 +111,24 @@ describe("'Cliente desde' na ficha do contato", () => {
 
   it("desligada: a linha não aparece", () => {
     render(comQuery(<ContactDetailClient contactId="c-1" />));
-    expect(screen.getByText("Joana Prado")).toBeInTheDocument();
+    // O controle de vacuidade prende o ELEMENTO, não o texto: a ficha mostra o
+    // nome DUAS vezes de propósito — o `<h1>` do cabeçalho e um campo do card
+    // de visão geral —, então procurar por texto solto é ambíguo por
+    // construção. Só não era antes do PR #907 por acaso: `rotuloDoContato`
+    // preferia `display_name`, o `<h1>` saía "Joana", e a string procurada
+    // aqui ("Joana Prado", que é o `name`) casava apenas com o campo "Nome".
+    // Medido nos dois lados com esta mesma ficha: na v1.28.0, `h1="Joana"`,
+    // "Joana" x2 e "Joana Prado" x1; com o #907, `h1="Joana Prado"`, "Joana
+    // Prado" x2 e "Joana" x1. A repetição na TELA é a mesma — o título sempre
+    // espelha um dos dois campos —, o que mudou foi qual deles.
+    //
+    // A consulta também não crava QUAL nome vence: o que este arquivo vigia é
+    // "Clientes pela agenda", e amarrar aqui a precedência do #907 faria o
+    // teste reprovar por um assunto que não é o dele. O que o controle precisa
+    // provar segue provado — a ficha deste contato renderizou, logo o
+    // `queryByText` abaixo ser nulo significa que a linha não está lá, e não
+    // que a tela está vazia.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Joana");
     expect(screen.queryByText("Cliente desde")).toBeNull();
   });
 
@@ -120,6 +137,14 @@ describe("'Cliente desde' na ficha do contato", () => {
     render(comQuery(<ContactDetailClient contactId="c-1" />));
     expect(screen.getByText("Cliente desde")).toBeInTheDocument();
     expect(screen.getByText("12/03/2025")).toBeInTheDocument();
+  });
+});
+
+describe("nome do perfil do WhatsApp na ficha do contato", () => {
+  it("identifica o campo sem expor o rótulo técnico em inglês", () => {
+    render(comQuery(<ContactDetailClient contactId="c-1" />));
+    expect(screen.getByText("Nome · WhatsApp")).toBeInTheDocument();
+    expect(screen.queryByText("Display name")).toBeNull();
   });
 });
 
@@ -147,7 +172,7 @@ describe("funil de clientes na tela de Funis", () => {
   ];
 
   it("desligada: sem botão, sem selo 'Clientes', e o rodapé aponta onde ligar", () => {
-    render(comQuery(<FunisClient funis={FUNIS} podeGerenciar podeImportar />));
+    render(comQuery(<FunisClient funis={FUNIS} arquivados={[]} podeGerenciar podeImportar />));
     expect(screen.queryByTestId("clientes-f1")).toBeNull();
     expect(screen.queryByTestId("clientes-f2")).toBeNull();
     // "Clientes" é também o NOME do funil f2: o selo é o SEGUNDO texto igual.
@@ -160,7 +185,7 @@ describe("funil de clientes na tela de Funis", () => {
 
   it("ligada: botão em cada funil, selo no marcado, e o rodapé do roteamento", () => {
     ligada = true;
-    render(comQuery(<FunisClient funis={FUNIS} podeGerenciar podeImportar />));
+    render(comQuery(<FunisClient funis={FUNIS} arquivados={[]} podeGerenciar podeImportar />));
     expect(screen.getByTestId("clientes-f1")).toHaveTextContent("Funil de clientes");
     expect(screen.getByTestId("clientes-f2")).toHaveTextContent("Deixar de ser funil de clientes");
     expect(screen.getAllByText("Clientes")).toHaveLength(2);

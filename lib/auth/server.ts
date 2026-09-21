@@ -32,6 +32,7 @@ interface RawMembershipRow {
 interface OrgJoin {
   display_name: string;
   locale: string | null;
+  timezone: string | null;
 }
 
 /**
@@ -217,7 +218,7 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
       supabase
         .from("user_organizations")
         .select(
-          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale)",
+          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone)",
         )
         .eq("user_id", user.id)
         .is("revoked_at", null)
@@ -267,6 +268,7 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
       role: row.role as Role,
       interface_settings: lerInterface(row.interface_settings).settings,
       locale: org?.locale ?? null,
+      timezone: org?.timezone ?? null,
     };
   });
 
@@ -342,6 +344,7 @@ export const resolveActiveOrg = cache(async (authUser: AuthUser): Promise<Active
     name: ativo.organization_name,
     role: ativo.role,
     interface_settings: ativo.interface_settings,
+    timezone: ativo.timezone ?? null,
   };
 });
 
