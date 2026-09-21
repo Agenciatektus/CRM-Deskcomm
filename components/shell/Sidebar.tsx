@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, CaretDoubleLeft, CaretDoubleRight, CaretDown, Gear } from "@/lib/ui/icons";
+import { ArrowRight, CaretDoubleLeft, CaretDoubleRight, CaretDown, Gear, Kanban } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { toggleSidebar } from "@/app/actions/shell/toggleSidebar";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -13,6 +13,13 @@ import { LogotipoDoProduto, SimboloDoProduto } from "@/components/branding/Marca
 import { marcaEhADoProduto } from "@/lib/branding";
 import { useMarcaDaInstalacao } from "@/lib/branding/contexto";
 import { GRUPO_NO_RODAPE, sidebarGroups } from "@/lib/navigation/registry";
+import {
+  type FunilDoMenu,
+  hrefDoFunil,
+  mostrarNoDeFunis,
+  noDeFunisAtivo,
+  ROTULO_DO_NO_DE_FUNIS,
+} from "@/lib/navigation/funis-no-menu";
 
 const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
 
@@ -20,6 +27,14 @@ interface SidebarContentProps {
   collapsed: boolean;
   showCollapseControl?: boolean;
   onNavigate?: () => void;
+  /**
+   * Os funis da organizacao, para o no "Pipeline". Vem do layout (servidor):
+   * a rota que os lista exige `manager` e esta barra e vista por todo papel.
+   *
+   * Opcional porque o `MobileSidebar` monta o mesmo conteudo — sem funis, o no
+   * simplesmente nao aparece, e o caminho por "Funis" continua de pe.
+   */
+  funis?: readonly FunilDoMenu[];
 }
 
 /**
@@ -34,12 +49,18 @@ export function SidebarContent({
   collapsed,
   showCollapseControl = true,
   onNavigate,
+  funis = [],
 }: SidebarContentProps) {
   // A barra lateral aparece em TODA tela — traduzi-la aqui é o que faz a
   // escolha de idioma virar algo visível no primeiro clique.
   const t = useT();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  // O no comeca ABERTO quando se esta dentro de um funil — entrar num quadro pelo
+  // ⌘K nao pode fechar o ramo que contem a tela aberta. Fora dele, comeca fechado:
+  // sao quatro linhas a mais no menu, e a doutrina de densidade desta barra (o
+  // comentario do rodape) registra que ela ja rola em 900px.
+  const [funisAbertos, setFunisAbertos] = useState(false);
   const { user, activeOrg } = useAuth();
   const todos = sidebarGroups(
     user.is_platform_admin && !user.support,
@@ -282,6 +303,82 @@ export function SidebarContent({
                       </li>
                     );
                   })}
+
+                  {/*
+                    ── O NÓ "Pipeline" ────────────────────────────────────────
+                    Único item da barra que ABRE em vez de navegar: a rota do quadro é
+                    `/app/pipelines/[id]`, e `[id]` é uma linha do banco — não existe
+                    `/app/pipelines` sozinha para um destino fixo apontar.
+
+                    Entra só no grupo do CRM e só quando há funil. Um expansor que abre
+                    vazio promete conteúdo e entrega buraco; quem ainda não tem funil
+                    chega por "Funis", que é a tela que ensina a criar o primeiro.
+
+                    Na barra recolhida ele não aparece: sem texto, um chevron sozinho não
+                    diz o que abre, e o ícone do funil já está em "Funis" logo acima.
+                  */}
+                  {group.id === "crm" && !collapsed && mostrarNoDeFunis(funis) && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => setFunisAbertos((v) => !v)}
+                        aria-expanded={funisAbertos || noDeFunisAtivo(pathname)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
+                          noDeFunisAtivo(pathname)
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                        )}
+                      >
+                        <Kanban
+                          size={18}
+                          weight={noDeFunisAtivo(pathname) ? "fill" : "regular"}
+                          aria-hidden
+                        />
+                        <span className="truncate">{t(ROTULO_DO_NO_DE_FUNIS)}</span>
+                        <CaretDown
+                          size={14}
+                          className={cn(
+                            "ml-auto shrink-0 text-text-subtle transition-transform",
+                            !(funisAbertos || noDeFunisAtivo(pathname)) && "-rotate-90",
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+
+                      {(funisAbertos || noDeFunisAtivo(pathname)) && (
+                        <ul className="mt-1 space-y-1 border-l border-border pl-3 ml-4">
+                          {funis.map((funil) => {
+                            const href = hrefDoFunil(funil.id);
+                            const ativo = pathname === href;
+                            return (
+                              <li key={funil.id}>
+                                <Link
+                                  href={href}
+                                  aria-current={ativo ? "page" : undefined}
+                                  onClick={onNavigate}
+                                  className={cn(
+                                    "flex items-center rounded-md px-3 py-1 text-sm transition-colors",
+                                    ativo
+                                      ? "bg-accent text-accent-foreground"
+                                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                                  )}
+                                >
+                                  {/*
+                                    O nome do funil vem do banco e é escrito pelo cliente:
+                                    não passa por `t()`, que traduziria "Clientes" para
+                                    outro idioma como se fosse palavra da interface.
+                                  */}
+                                  <span className="truncate">{funil.name}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  )}
+
                   {group.hub && (
                     <li>
                       <Link
@@ -352,7 +449,7 @@ export function SidebarContent({
   );
 }
 
-export function Sidebar({ collapsed }: { collapsed: boolean }) {
+export function Sidebar({ collapsed, funis }: { collapsed: boolean; funis?: readonly FunilDoMenu[] }) {
   return (
     <aside
       className={cn(
@@ -379,7 +476,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         collapsed ? "w-16" : "w-60",
       )}
     >
-      <SidebarContent collapsed={collapsed} />
+      <SidebarContent collapsed={collapsed} funis={funis} />
     </aside>
   );
 }

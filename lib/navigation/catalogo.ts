@@ -373,25 +373,20 @@ export const NAV_CATALOG = [
     // revisitado por `manager` de vez em quando — enquanto Funis, Contatos e
     // Tarefas se abrem todo dia. É esse o corte que decide quem fica no menu.
     //
-    // ─── DIVERGÊNCIA TEKTUS (17/09/2026), pedido do Peterson ────────────────
     //
-    // Entra no menu. O corte acima está certo para quem ele descreve: o
-    // operador do cliente, que monta o funil uma vez e depois vive no Inbox.
-    // Ele não descreve quem opera ESTA instalação — uma agência que implanta um
-    // cliente novo a cada ciclo e, para ela, desenhar etapas e escrever motivos
-    // de perda é trabalho de toda semana, não de uma vez só.
+    // ─── A DIVERGÊNCIA TEKTUS SAIU DAQUI (21/09/2026) ──────────────────
     //
-    // ⚠️ CUSTO ASSUMIDO, em duas partes. Primeira: é edição em arquivo do
-    // upstream, contra a política de fork do próprio projeto ("customização só
-    // em arquivo novo"), então conflita em todo merge. Não havia saída por
-    // configuração: `registry.ts:119` só deixa `destinos` promover destino de
-    // grupo SEM hub, e "crm" tem hub. Segunda: o comentário de densidade do
-    // Sidebar registra que o menu passou a rolar em 900px e que o hub foi a
-    // resposta — mais uma linha empurra na direção contrária, e
-    // `tests/e2e/navegacao.spec.ts:238` cobra exatamente isso. Se aquele teste
-    // reprovar, a correção é devolver OUTRO destino ao hub, nunca afrouxar o
-    // teste.
-    sidebar: true,
+    // Em 17/09 esta tela ganhou `sidebar: true` por pedido do Peterson — e era a
+    // tela ERRADA. Ele pedia o QUADRO do funil (`/app/pipelines/<id>`), onde se
+    // trabalha; eu pus a de CONFIGURAÇÃO, onde se desenham as colunas. As duas
+    // falam de funil e só o verbo as separa — que é exatamente o que o
+    // comentário acima já tinha desambiguado uma vez, e eu confundi mesmo assim.
+    //
+    // O pedido virou o nó "Pipeline" do sidebar, em
+    // `lib/navigation/funis-no-menu.ts` — arquivo NOVO, que nunca conflita em
+    // merge. Este destino volta ao que o upstream escreveu, e o fork fica com
+    // uma divergência a menos justamente no arquivo que o upstream reescreveu
+    // na v1.41.0.
   },
 
   // ---- Agente de IA — montar, ensinar, acompanhar ----

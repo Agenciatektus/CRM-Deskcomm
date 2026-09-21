@@ -33,6 +33,8 @@ interface OrgJoin {
   display_name: string;
   locale: string | null;
   timezone: string | null;
+  /** `active` | `suspended` | ... — quem escolhe a organizacao ativa precisa dele. */
+  status: string | null;
 }
 
 /**
@@ -58,17 +60,61 @@ async function localeDaOrgAtiva(memberships: UserOrgMembership[]): Promise<strin
  * da organização ativa, o sorteio decide TAMBÉM em que língua o sistema abre.
  * As duas coisas andam juntas: não tire a ordenação de lá sem resolver isto.
  */
+/**
+ * Organizacao suspensa nao e destino padrao.
+ *
+ * ─── O DEFEITO, COM NOME E DATA ─────────────────────────────────────────────
+ *
+ * A escolha era `memberships[0]`: a organizacao mais antiga, ordenada por
+ * `accepted_at`. Se ELA estivesse suspensa, a pessoa entrava nela e ficava —
+ * sem tela, sem dado, e sem pista de que havia outras.
+ *
+ * Aconteceu de verdade em 21/09/2026: o dono da instalacao tinha quatro
+ * vinculos, todos `admin`, e o primeiro era um tenant suspenso em 15/09 com o
+ * motivo "tenant duplicata". Ele nao conseguia entrar na propria conta, e as
+ * outras tres organizacoes — ativas — estavam logo atras na mesma lista.
+ *
+ * Note o que NAO era o defeito: o vinculo dele com a organizacao suspensa e
+ * legitimo e continua valendo. O erro era ela ser o PADRAO.
+ *
+ * ─── E O COOKIE TAMBEM NAO SALVA UMA SUSPENSA ───────────────────────────────
+ *
+ * Se `active_org` apontar para uma organizacao suspensa, ele e ignorado e a
+ * escolha cai na primeira ativa. Sem isso, quem entrou uma vez na suspensa
+ * ficaria preso por um cookie que ele nao sabe que existe — e a suspensao
+ * aconteceria DEPOIS do cookie ser gravado, que e a ordem normal dos fatos.
+ *
+ * ─── QUANDO TODAS ESTAO SUSPENSAS ───────────────────────────────────────────
+ *
+ * Aí a primeira volta a ser a resposta, de proposito. A pessoa PRECISA entrar
+ * para ver a tela que diz que a conta esta suspensa; devolver `null` a mandaria
+ * para "voce nao pertence a nenhuma organizacao", que e mentira e manda
+ * investigar a coisa errada.
+ */
 function escolherMembroAtivo(
   memberships: UserOrgMembership[],
   cookieOrg: string | undefined,
 ): UserOrgMembership | null {
   if (memberships.length === 0) return null;
+
+  const deNoPe = memberships.filter((o) => o.status !== "suspended");
+  const candidatos = deNoPe.length > 0 ? deNoPe : memberships;
+
   if (cookieOrg) {
-    const achado = memberships.find((o) => o.organization_id === cookieOrg);
+    const achado = candidatos.find((o) => o.organization_id === cookieOrg);
     if (achado) return achado;
   }
-  return memberships[0] ?? null;
+  return candidatos[0] ?? null;
 }
+
+/**
+ * A mesma funcao, exposta para teste.
+ *
+ * Ela e privada de proposito — ninguem fora daqui deveria escolher organizacao
+ * ativa —, mas a decisao que ela toma custou um dia de acesso ao dono da
+ * instalacao, e decisao dessas se prende com teste, nao com cuidado.
+ */
+export const escolherMembroAtivoParaTeste = escolherMembroAtivo;
 
 /**
  * Loads the AuthUser for the current request. Returns null if unauthenticated.
@@ -218,7 +264,7 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
       supabase
         .from("user_organizations")
         .select(
-          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone)",
+          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone, status)",
         )
         .eq("user_id", user.id)
         .is("revoked_at", null)
@@ -269,6 +315,7 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
       interface_settings: lerInterface(row.interface_settings).settings,
       locale: org?.locale ?? null,
       timezone: org?.timezone ?? null,
+      status: org?.status ?? null,
     };
   });
 

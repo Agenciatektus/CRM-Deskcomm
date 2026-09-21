@@ -194,12 +194,38 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // ou seja: o painel é IRMÃO do `AppShell`, não filho dele. Um provedor por
   // dentro do `VoiceCallProvider` deixaria o painel de fora — ele declararia o
   // que ocupa e ninguém descontaria, que é exatamente o defeito da #1305.
+  // ── OS FUNIS DO MENU ──────────────────────────────────────────────────────
+  //
+  // Lidos AQUI, no servidor, e nao por um hook no sidebar: `GET /api/v1/pipelines`
+  // exige `manager` (ver `hooks/pipelines/usePipelines.ts`) e o sidebar e visto por
+  // todo papel. Um `agent` buscando de la levaria 403 e ficaria sem o no — o menu
+  // diria que ele nao tem funil, quando o que ele nao tem e permissao de configurar.
+  //
+  // Sem organizacao ativa (suporte navegando fora de um tenant), a lista e vazia e o
+  // no some. Falha de leitura tambem cai em vazio de proposito: o menu nao e lugar
+  // de mostrar erro de consulta, e o caminho por "Funis" continua de pe.
+  let funisDoMenu: Array<{ id: string; name: string }> = [];
+  if (activeOrg) {
+    const { data: linhasDeFunil } = await createAdminClient()
+      .from("crm_pipelines")
+      .select("id, name")
+      // Schema conferido em `information_schema` antes de escrever: a tabela tem
+      // `is_archived boolean`, e NAO `archived_at timestamptz` como as irmas dela.
+      // E o campo da sessao e `orgId`, nao `organization_id`.
+      .eq("organization_id", activeOrg.orgId)
+      .eq("is_archived", false)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+    funisDoMenu = linhasDeFunil ?? [];
+  }
+
   const shell = (
     <ProvedorDaOcupacaoDoRodape>
       <VoiceCallProvider>
         <AppShell
           sidebarCollapsed={collapsed}
           podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
+          funis={funisDoMenu}
         >
           {children}
         </AppShell>

@@ -139,7 +139,7 @@ function arvore({
 }): ReactElement {
   return (
     <ProvedorDaOcupacaoDoRodape>
-      <AppShell sidebarCollapsed={false} podeAtender={false}>
+      <AppShell sidebarCollapsed={false} podeAtender={false} funis={[]}>
         <Tela aoExcluir={aoExcluir} />
       </AppShell>
       {/* Irmão da casca, exatamente como o `VoiceCallProvider` monta o painel:

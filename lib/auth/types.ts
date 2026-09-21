@@ -69,6 +69,14 @@ export interface UserOrgMembership {
   organization_name: string;
   role: Role;
   /**
+   * `organizations.status`. Vem junto porque quem escolhe a organizacao ativa
+   * precisa saber se ela ainda esta de pe — e descobrir isso depois seria uma
+   * segunda ida ao banco para responder o que a primeira ja tinha em maos.
+   *
+   * Sem ele, a escolha caia na PRIMEIRA organizacao da lista, suspensa ou nao.
+   */
+  status?: string | null;
+  /**
    * Idioma padrão da organização (`organizations.locale`).
    *
    * Vem junto porque quem escolhe a organização ativa é a mesma função que

@@ -112,17 +112,18 @@ describe("sidebarGroups", () => {
     // A lista é EXATA de propósito. `toContain` deixaria um sexto item entrar
     // calado no sidebar e reabrir a mesma corrida por pixel.
     //
-    // ⚠️ TEKTUS 18/09/2026 — "/app/settings/tenant/pipelines" ACRESCENTADO, e
-    // Tarefas fica. São quatro destinos, o que reabre de propósito os 13px que
-    // o comentário acima descreve: decisão do Peterson, que opera a instalação
-    // e disse que o menu já rola hoje e que isso não o incomoda.
+    // ⚠️ TEKTUS 21/09/2026 — "/app/settings/tenant/pipelines" SAIU do menu, e
+    // com ela a divergência que o fork carregava neste arquivo do upstream.
     //
-    // A dobra em 900px deixou de ser invariante DESTA instalação. O e2e
-    // `navegacao.spec.ts` que a cobra vai reprovar, e é esperado — quem mexer
-    // nele deve ajustar o e2e, não desfazer esta linha.
+    // Ela tinha entrado em 18/09 como resposta ao pedido "o pipeline no menu" —
+    // e era a tela ERRADA: aquela CONFIGURA o funil (colunas, motivos de perda),
+    // e o pedido era o QUADRO, onde se trabalha. O menu agora tem o nó
+    // "Pipeline", que abre e lista os funis da organização, cada um levando a
+    // `/app/pipelines/<id>`. Ele vive em `lib/navigation/funis-no-menu.ts` e
+    // é desenhado pelo `Sidebar` — não é destino fixo, então não aparece aqui.
     //
-    // As exclusões que o upstream documenta logo abaixo continuam valendo: elas
-    // dizem o que NÃO entra, e nenhuma delas é o que o Peterson pediu.
+    // O nó não custa a densidade que a tela antiga custava: ele nasce fechado,
+    // e só abre quando alguém pede ou quando se está dentro de um funil.
 
     // Comandas NÃO entra: ela chegou pedindo a quarta linha, e o e2e mediu o
     // menu rolando em 1280×900 — a mesma corrida por pixel que o hub existe
@@ -140,7 +141,6 @@ describe("sidebarGroups", () => {
       "/app/kanban",
       "/app/contacts",
       "/app/tasks",
-      "/app/settings/tenant/pipelines",
       // "/app/calls" (telefonia por SIP) NÃO entra aqui, e a ausência é a
       // decisão: o módulo é OPCIONAL e nasce desligado (doc 27), então a porta
       // no sidebar custaria um item a TODA instalação — e o vigésimo item é o

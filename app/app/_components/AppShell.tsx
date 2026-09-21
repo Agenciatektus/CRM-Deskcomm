@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/shell/Sidebar";
+import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
@@ -21,10 +22,15 @@ interface AppShellProps {
    * 403 a cada minuto em nome de ninguém.
    */
   podeAtender: boolean;
+  /**
+   * Os funis da organizacao, para o no "Pipeline" do menu. Vem do layout, que e
+   * servidor: a rota que os lista exige `manager`, e o menu e visto por todo papel.
+   */
+  funis: readonly FunilDoMenu[];
   children: ReactNode;
 }
 
-export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellProps) {
+export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: AppShellProps) {
   useInboundMessageAlerts();
   useInboundCallAlerts();
   useCrmAlerts();
@@ -43,7 +49,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
     <div className="flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
       <div className="hidden md:block">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar collapsed={sidebarCollapsed} funis={funis} />
       </div>
       {/*
         `min-w-0` é o que permite a coluna de conteúdo ENCOLHER. Um flex item
