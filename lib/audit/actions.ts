@@ -556,6 +556,23 @@ export const AUDIT_ACTIONS = [
   // "Cliente pela agenda" ligada ou desligada (migration 0262). Ligar reescreve
   // etiquetas de toda a organização; metadata leva as contagens.
   "crm.cliente_pela_agenda_alterado",
+  // ─── DIVERGÊNCIA TEKTUS (18/09/2026) — curadoria de etiquetas (migration 9005) ──
+  //
+  // As cinco são auditadas, e não só as três destrutivas. Criar e arquivar não
+  // reescrevem registro nenhum, mas mudam o que o sistema SUGERE a quem atende:
+  // quando alguém perguntar por que a equipe parou de usar uma etiqueta, a
+  // resposta costuma ser "porque sumiu da lista", e sem a linha de auditoria não
+  // há como saber quem a tirou nem quando.
+  //
+  // `metadata.registros` leva quantos registros a operação reescreveu — zero em
+  // criar e arquivar, por construção. É o número que separa "curei o vocabulário"
+  // de "reescrevi 1121 contatos".
+  "tags.criada",
+  "tags.arquivada",
+  "tags.desarquivada",
+  "tags.renomeada",
+  "tags.mesclada",
+  "tags.apagada",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

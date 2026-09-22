@@ -614,6 +614,32 @@ export const NAV_CATALOG = [
     minRole: "admin",
   },
   {
+    // ─── DIVERGÊNCIA TEKTUS (18/09/2026) — arquivo do upstream, conflita no merge ──
+    //
+    // Curadoria do vocabulário de etiquetas (migration 9005). Mora em
+    // "Organização" e não em CRM porque a lista atravessa os dois domínios: as
+    // etiquetas de CONVERSA são do Atendimento e as de CONTATO são do CRM, e
+    // pendurá-la em qualquer um dos dois esconderia metade da tela de quem
+    // precisa da outra metade. Tampouco é seção de "Etapas do funil": aquela
+    // página é sobre UM funil, e etiqueta não pertence a funil nenhum.
+    //
+    // `manager` e não `admin`, embora três das cinco ações sejam de admin: o
+    // piso da porta é o da ação mais barata que a tela oferece. Com `admin`, o
+    // gerente que usa o campo livre todo dia não teria como acrescentar a
+    // palavra de que acabou de precisar, e pediria ao dono da empresa.
+    //
+    // SEM `sidebar`, como as outras entradas de "organizacao": este grupo tem
+    // hub, e se chega às telas dele por "Configurações".
+    href: "/app/settings/tenant/tags",
+    label: "Etiquetas",
+    description:
+      "As palavras que marcam conversas e contatos: quais o sistema sugere, quais juntar e quais tirar de circulação.",
+    icon: "Tag",
+    group: "organizacao",
+    section: "Sua empresa",
+    minRole: "manager",
+  },
+  {
     // Mora em Organização e não em Canais de propósito: o que se configura aqui
     // é a CONTA DE ANÚNCIOS da empresa — dinheiro e identidade comercial, ao lado
     // de billing e API tokens. Canais é por onde se FALA com o cliente, e os dois
