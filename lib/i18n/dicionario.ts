@@ -10816,6 +10816,74 @@ export const DICIONARIO: Traducoes = {
   "Esta conexão está desativada. Ative-a na lista para consultar os dados.": {
     es: "Esta conexión está desactivada. Actívala en la lista para consultar los datos.",
   },
+
+  // ─── Etiquetas: curadoria do vocabulário (migration 9005) ───────────────────
+  "As palavras que a equipe usa para marcar conversas e contatos. Aqui você escolhe quais o sistema sugere, junta as que viraram duas por engano e tira de circulação as que não usa mais.":
+    { es: "Las palabras que el equipo usa para marcar conversaciones y contactos. Aquí eliges cuáles sugiere el sistema, unes las que se volvieron dos por error y retiras de circulación las que ya no usas." },
+  "Você pode acrescentar etiquetas e tirá-las de circulação. Renomear, juntar e apagar mexem no histórico de conversas e contatos, e são de administrador.":
+    { es: "Puedes añadir etiquetas y retirarlas de circulación. Renombrar, unir y borrar tocan el historial de conversaciones y contactos, y son de administrador." },
+  "Marcam o atendimento: do que a pessoa falou, como terminou. Aparecem no painel da conversa e no filtro da caixa de entrada.":
+    { es: "Marcan la atención: de qué habló la persona, cómo terminó. Aparecen en el panel de la conversación y en el filtro de la bandeja de entrada." },
+  "Marcam a pessoa, e valem para todas as conversas dela. Aparecem na ficha do contato e na lista de contatos.":
+    { es: "Marcan a la persona, y valen para todas sus conversaciones. Aparecen en la ficha del contacto y en la lista de contactos." },
+  "Já existe uma etiqueta com esse nome. Para juntar as duas, use Mesclar — assim ninguém perde o histórico.":
+    { es: "Ya existe una etiqueta con ese nombre. Para unir las dos, usa Combinar; así nadie pierde el historial." },
+  "A etiqueta cliente é posta pelo sistema enquanto a regra Clientes pela agenda estiver ligada. Desligue-a em Tipos de agendamento para editá-la aqui.":
+    { es: "La etiqueta cliente la pone el sistema mientras la regla Clientes por la agenda esté activada. Desactívala en Tipos de cita para editarla aquí." },
+  "Essa ação é de administrador.": { es: "Esta acción es de administrador." },
+  "Entre novamente com o código do aplicativo para continuar.":
+    { es: "Vuelve a entrar con el código de la aplicación para continuar." },
+  "O vocabulário chegou ao limite de 50 etiquetas. Arquive alguma antes.":
+    { es: "El vocabulario llegó al límite de 50 etiquetas. Archiva alguna antes." },
+  "Esse nome não vale: use de 1 a 40 caracteres.":
+    { es: "Ese nombre no sirve: usa de 1 a 40 caracteres." },
+  "O acompanhamento de suporte é só de leitura.":
+    { es: "El acompañamiento de soporte es solo de lectura." },
+  "O banco estava ocupado. Tente de novo.":
+    { es: "La base de datos estaba ocupada. Inténtalo de nuevo." },
+  "Acrescentar etiqueta": { es: "Añadir etiqueta" },
+  "orçamento": { es: "presupuesto" },
+  "Etiqueta acrescentada.": { es: "Etiqueta añadida." },
+  "Acrescentar": { es: "Añadir" },
+  "Sugeridas pelo sistema": { es: "Sugeridas por el sistema" },
+  "São as que aparecem como sugestão para quem está atendendo.":
+    { es: "Son las que aparecen como sugerencia para quien está atendiendo." },
+  "Nenhuma ainda. Acrescente acima, ou promova uma das que já estão em uso.":
+    { es: "Ninguna todavía. Añade arriba, o promueve una de las que ya están en uso." },
+  "Novo nome para": { es: "Nuevo nombre para" },
+  "Renomeada em": { es: "Renombrada en" },
+  "Renomeada. Nenhum registro usava essa etiqueta.":
+    { es: "Renombrada. Ningún registro usaba esa etiqueta." },
+  "do sistema": { es: "del sistema" },
+  "Arquivada. Quem já tinha continua tendo.":
+    { es: "Archivada. Quien ya la tenía la sigue teniendo." },
+  "Apagar": { es: "Borrar" },
+  "Em uso, fora da lista": { es: "En uso, fuera de la lista" },
+  "Nasceram do campo livre de quem atende. É o que a equipe realmente escreve — promova as que valem a pena e junte as que são a mesma coisa escrita de dois jeitos.":
+    { es: "Nacieron del campo libre de quien atiende. Es lo que el equipo escribe de verdad: promueve las que valen la pena y une las que son lo mismo escrito de dos maneras." },
+  "Selecionar para mesclar": { es: "Seleccionar para combinar" },
+  "Promovida a sugestão.": { es: "Promovida a sugerencia." },
+  "Promover": { es: "Promover" },
+  "(a última marcada é a que fica)": { es: "(la última marcada es la que queda)" },
+  "Mesclar": { es: "Combinar" },
+  "Não são mais sugeridas. Quem já tinha continua tendo, e o filtro continua achando.":
+    { es: "Ya no se sugieren. Quien ya las tenía las sigue teniendo, y el filtro las sigue encontrando." },
+  "Voltou a ser sugerida.": { es: "Vuelve a sugerirse." },
+  "desarquivar": { es: "desarchivar" },
+  "Juntar em": { es: "Unir en" },
+  "passa a ser": { es: "pasa a ser" },
+  "Isto reescreve": { es: "Esto reescribe" },
+  "Não dá para desfazer.": { es: "No se puede deshacer." },
+  "Juntadas em": { es: "Unidas en" },
+  "A etiqueta sai da lista e de": { es: "La etiqueta sale de la lista y de" },
+  "Não dá para desfazer. Se você só quer parar de sugeri-la, arquive.":
+    { es: "No se puede deshacer. Si solo quieres dejar de sugerirla, archívala." },
+  "Nenhum registro usa essa etiqueta, então só a lista muda. Não dá para desfazer.":
+    { es: "Ningún registro usa esa etiqueta, así que solo cambia la lista. No se puede deshacer." },
+  "Apagada de": { es: "Borrada de" },
+  "Apagada da lista de sugestões.": { es: "Borrada de la lista de sugerencias." },
+  "Apagar mesmo assim": { es: "Borrar de todos modos" },
+  "sem uso": { es: "sin uso" },
 };
 
 /**
