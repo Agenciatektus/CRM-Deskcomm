@@ -11,11 +11,29 @@ const state = vi.hoisted(() => ({
   filters: [] as unknown[][],
   admin: vi.fn(),
 }));
+vi.mock("@/lib/auth/require-role", () => ({
+  // A rota passou a exigir PAPEL (`agent`), e nao apenas sessao: ela devolve o
+  // enriquecimento de prospeccao, que o banco esconde de `authenticated` de
+  // proposito. Este mock respeita `state.user` para o caso de 401 continuar
+  // sendo exercido de verdade, e fixa a organizacao ATIVA em `org-a` — que e o
+  // ponto do conserto: a organizacao vem da sessao, nunca da linha do contato.
+  requireRole: async () =>
+    state.user
+      ? { ok: true as const, user: { id: "user-a" }, org: { orgId: "org-a" } }
+      : {
+          ok: false as const,
+          response: new Response(JSON.stringify({ error: { code: "unauthenticated" } }), {
+            status: 401,
+            headers: { "content-type": "application/json" },
+          }),
+        },
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: {
       getUser: async () => ({ data: { user: state.user ? { id: "user-a" } : null }, error: null }),
     },
+    rpc: async () => ({ data: null, error: null }),
     from: (table: string) => {
       const q: Record<string, unknown> = {};
       for (const name of ["select", "eq", "order", "limit", "is", "not"]) q[name] = () => q;
