@@ -206,7 +206,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // de mostrar erro de consulta, e o caminho por "Funis" continua de pe.
   let funisDoMenu: Array<{ id: string; name: string }> = [];
   if (activeOrg) {
-    const { data: linhasDeFunil } = await createAdminClient()
+    const { data: linhasDeFunil, error: erroDosFunis } = await createAdminClient()
       .from("crm_pipelines")
       .select("id, name")
       // Schema conferido em `information_schema` antes de escrever: a tabela tem
@@ -216,6 +216,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq("is_archived", false)
       .order("position", { ascending: true })
       .order("created_at", { ascending: true });
+    // FALHA ALTO, e nao baixo. A primeira versao descartava o erro, e uma consulta que
+    // falhasse viraria "esta organizacao nao tem funil" — indistinguivel de nao ter mesmo,
+    // com o no "Pipeline" sumindo do menu sem que nada indicasse a causa.
+    //
+    // E o modo de falha que o proprio `lib/auth/server.ts` documenta ter custado seis
+    // diagnosticos errados, noutra consulta DESTE MESMO arquivo. Eu repeti o padrao a dez
+    // linhas de distancia do comentario que o descreve.
+    if (erroDosFunis) {
+      console.error("[layout] funis do menu nao carregaram:", erroDosFunis.message, {
+        org: activeOrg.orgId,
+      });
+    }
     funisDoMenu = linhasDeFunil ?? [];
   }
 
