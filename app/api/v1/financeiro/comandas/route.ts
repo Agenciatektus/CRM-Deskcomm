@@ -44,6 +44,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     .select(
       "id, number, status, contact_id, attendant_user_id, appointment_id, discount_cents, total_cents, currency, payment_method_id, notes, finalized_at, cancelled_at, reversed_at, created_at, sale_items(id, description, quantity, unit_price_cents, discount_cents, total_cents, commission_percent, attendant_user_id, event_type_id)",
     )
+    // Filtro EXPLÍCITO por organização. A RLS autoriza por VÍNCULO, não pela
+    // organização ativa: sem isto, quem tem vínculo em duas vê as comandas das
+    // duas na mesma lista, com a numeração de uma intercalada na da outra.
+    .eq("organization_id", authz.org.orgId)
     .order("number", { ascending: false })
     .limit(limite);
 

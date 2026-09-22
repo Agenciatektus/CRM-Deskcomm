@@ -23,6 +23,16 @@ import { createClient } from "@/lib/supabase/server";
  * `app/api/v1/ai/evolution/route.test.ts`, que assere sobre os pares de `.eq`.
  */
 
+vi.mock("@/lib/auth/require-role", () => ({
+  // A rota passou a exigir PAPEL (`agent`) e a tirar a organizacao da SESSAO,
+  // nunca da linha do contato. Este arquivo nao exercita o 401 — ele mede o
+  // filtro de funil arquivado —, entao a sessao e fixa e valida.
+  requireRole: async () => ({
+    ok: true as const,
+    user: { id: "user-a" },
+    org: { orgId: "org-1" }, // = ORG; literal porque vi.mock e hoisted
+  }),
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/users/nome-do-atendente", () => ({ nomesDosAtendentes: async () => new Map() }));
 

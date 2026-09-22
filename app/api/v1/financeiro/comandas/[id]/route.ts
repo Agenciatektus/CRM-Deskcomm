@@ -40,6 +40,9 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
       "id, number, status, contact_id, attendant_user_id, appointment_id, discount_cents, total_cents, currency, payment_method_id, notes, finalized_at, cancelled_at, cancel_reason, reversed_at, reverse_reason, created_at, sale_items(id, description, quantity, unit_price_cents, discount_cents, total_cents, commission_percent, attendant_user_id, event_type_id, created_at)",
     )
     .eq("id", id)
+    // A organização vem da SESSÃO. A RLS autoriza por vínculo, então sem isto
+    // uma comanda de outra organização da mesma pessoa abriria normalmente.
+    .eq("organization_id", authz.org.orgId)
     .maybeSingle();
 
   if (error) return fail("internal_error", error.message, 500, { requestId });
@@ -82,6 +85,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     .from("sales")
     .select("id, status, number")
     .eq("id", id)
+    .eq("organization_id", authz.org.orgId)
     .maybeSingle();
   if (!atual) return fail("not_found", "Comanda não encontrada.", 404, { requestId });
 
@@ -104,7 +108,11 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     mudanca.cancelled_at = new Date().toISOString();
   }
 
-  const { error } = await supabase.from("sales").update(mudanca).eq("id", id);
+  const { error } = await supabase
+    .from("sales")
+    .update(mudanca)
+    .eq("id", id)
+    .eq("organization_id", authz.org.orgId);
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   // ⚠️ NUNCA espalhe o corpo lido aqui. `lib/audit` grava `metadata` CRU em

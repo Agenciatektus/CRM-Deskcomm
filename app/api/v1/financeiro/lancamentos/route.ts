@@ -53,11 +53,16 @@ export async function GET(req: NextRequest): Promise<Response> {
   const status = url.searchParams.get("status");
 
   const supabase = await createClient();
+  // O filtro por organização é EXPLÍCITO, não delegado à RLS. A policy
+  // `tenant_isolation_*_all` autoriza por VÍNCULO — `fn_user_org_ids()` devolve
+  // TODAS as organizações da pessoa, não a organização ativa da sessão. Quem
+  // tem vínculo em duas veria as duas misturadas nesta lista, sem aviso.
   let q = supabase
     .from("financial_entries")
     .select(
       "id, account_id, account_plan_id, sale_id, direction, amount_cents, currency, description, entry_date, status, paid_at, origin, reverses_entry_id, created_at",
     )
+    .eq("organization_id", authz.org.orgId)
     .order("entry_date", { ascending: false })
     .limit(LIMITE_MAXIMO);
 

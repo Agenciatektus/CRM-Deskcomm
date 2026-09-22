@@ -63,6 +63,11 @@ export async function POST(req: NextRequest): Promise<Response> {
     .select(
       "id, title, contact_id, event_type_id, status, calendar_event_types(name, default_price_cents)",
     )
+    // Os ids vêm do CORPO da requisição — é entrada do cliente, e por isso a
+    // organização tem de vir da sessão e entrar como filtro. Sem isto, um id de
+    // outra organização (que a RLS autoriza por vínculo) é lido aqui e vira
+    // comanda DESTA organização carregando o contato e o título daquela.
+    .eq("organization_id", org)
     .in("id", lido.data.appointment_ids)
     .in("status", ["confirmed", "completed"]);
 

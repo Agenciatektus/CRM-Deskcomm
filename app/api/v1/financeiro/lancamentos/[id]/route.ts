@@ -55,6 +55,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     .from("financial_entries")
     .select("id, status, origin, amount_cents, direction")
     .eq("id", id)
+    // A organização vem da SESSÃO, nunca só do id da rota: a RLS autoriza por
+    // vínculo, então sem isto um id de outra organização da mesma pessoa seria
+    // encontrado aqui e alterado abaixo, com o papel medido na organização errada.
+    .eq("organization_id", authz.org.orgId)
     .maybeSingle();
   if (!atual) return fail("not_found", "Lançamento não encontrado.", 404, { requestId });
 
@@ -67,7 +71,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const { error } = await supabase
     .from("financial_entries")
     .update({ status: "paid", paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("organization_id", authz.org.orgId);
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   await audit({
@@ -96,6 +101,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx): Promise<Response> {
     .from("financial_entries")
     .select("id, status, origin, amount_cents")
     .eq("id", id)
+    .eq("organization_id", authz.org.orgId)
     .maybeSingle();
   if (!atual) return fail("not_found", "Lançamento não encontrado.", 404, { requestId });
 
@@ -116,7 +122,11 @@ export async function DELETE(_req: NextRequest, ctx: Ctx): Promise<Response> {
     );
   }
 
-  const { error } = await supabase.from("financial_entries").delete().eq("id", id);
+  const { error } = await supabase
+    .from("financial_entries")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", authz.org.orgId);
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   await audit({

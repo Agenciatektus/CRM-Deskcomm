@@ -65,7 +65,18 @@ function semComentarios(sql: string): string {
 
 function definicoes(texto: string): Map<string, { corpo: string; pos: number }> {
   const achadas = new Map<string, { corpo: string; pos: number }>();
-  const re = /create or replace function public\.(fn_[a-z_]+)\s*\(/gi;
+  // AS ASPAS SÃO OPCIONAIS EM TODO LUGAR. O `pg_dump` escreve
+  // `FUNCTION "public"."fn_x"(...)`; a mão humana escreve `function public.fn_x(`.
+  // A versão anterior desta regex exigia `public.` SEM aspas — e com isso
+  // `fn_lgpd_cascade_redact_contact`, reemitida dez vezes e sempre na forma do
+  // `pg_dump`, NUNCA entrou na varredura. Passou por este gate um defeito de
+  // LGPD: duas reemissões perderam o `transcript = null` do bloco de
+  // `voice_calls`, e a anonimização passou a devolver sucesso deixando a
+  // transcrição da chamada legível amarrada ao contato.
+  //
+  // Um gate que não enxerga a função mais sensível do produto é pior que gate
+  // nenhum, porque dá a impressão de cobertura. Aceite as duas grafias.
+  const re = /create or replace function\s+"?public"?\s*\.\s*"?(fn_[a-z_]+)"?\s*\(/gi;
   for (let m = re.exec(texto); m !== null; m = re.exec(texto)) {
     // O DELIMITADOR NÃO É SEMPRE `$$`. O baseline usa `$fn$ … $fn$` em algumas
     // funções, e procurar `$$;` fixo faz o corpo ser lido ALÉM do fim — foi

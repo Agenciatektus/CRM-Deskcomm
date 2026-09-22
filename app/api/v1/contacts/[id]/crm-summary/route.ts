@@ -32,6 +32,7 @@ import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
+import { requireRole } from "@/lib/auth/require-role";
 import { camposDoFunil, settingsDoEmbed } from "@/lib/leads/campos-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
@@ -79,17 +80,26 @@ export async function GET(
   const requestId = randomUUID();
   const { id: contactId } = await ctx.params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
-  if (authErr || !user) {
-    return fail("unauthenticated", "Auth required.", 401, { requestId });
-  }
+  // `requireRole` e nao `auth.getUser()`: esta rota devolve o enriquecimento de
+  // prospeccao, que o banco esconde de `authenticated` de proposito
+  // (`prospecting_candidates` e service-only desde a 0369). Sem o gate de papel,
+  // um `viewer` recebia pelo lado de ca o que a RLS nega pelo lado de la — e
+  // tambem pulavam as checagens de sessao de suporte encerrada e de MFA em
+  // divida, que so existem dentro de `requireRole`.
+  const authz = await requireRole("agent", { requestId, resource: "contacts" });
+  if (!authz.ok) return authz.response;
 
+  const supabase = await createClient();
+
+  // A ORGANIZACAO VEM DA SESSAO, nunca da linha do contato. A RLS de `contacts`
+  // autoriza por vinculo: quem tem vinculo em duas organizacoes abriria o
+  // contato da outra passando o id dele, e o `createAdminClient()` abaixo — que
+  // ignora RLS — leria o enriquecimento daquela organizacao com esse escopo.
   const { data: contactScope, error: scopeError } = await supabase.from("contacts")
-    .select("organization_id, is_anonymized").eq("id", contactId).maybeSingle();
+    .select("organization_id, is_anonymized")
+    .eq("id", contactId)
+    .eq("organization_id", authz.org.orgId)
+    .maybeSingle();
   if (scopeError) return fail("internal_error", scopeError.message, 500, { requestId });
   if (!contactScope) return fail("not_found", "Contato não encontrado.", 404, { requestId });
   // Candidates are worker-only. Authorize the contact through RLS first, then
@@ -99,7 +109,7 @@ export async function GET(
     try {
       const result = await createAdminClient().from("prospecting_candidates")
         .select("data, created_at")
-        .eq("organization_id", contactScope.organization_id).eq("contact_id", contactId)
+        .eq("organization_id", authz.org.orgId).eq("contact_id", contactId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (result.error) return { enrichment: null, enrichment_error: true };
       if (!result.data) return { enrichment: null, enrichment_error: false };
