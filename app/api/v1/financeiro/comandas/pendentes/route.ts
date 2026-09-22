@@ -49,6 +49,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     .select(
       "id, title, starts_at, contact_id, event_type_id, status, calendar_event_types(name, default_price_cents)",
     )
+    .eq("organization_id", authz.org.orgId)
     .in("status", ["confirmed", "completed"])
     .gte("starts_at", de)
     .lt("starts_at", agora.toISOString())
@@ -61,11 +62,19 @@ export async function GET(req: NextRequest): Promise<Response> {
   // Quais já têm comanda. Uma consulta só, e não uma por agendamento: a segunda
   // forma funciona em desenvolvimento e derruba a tela com trinta atendimentos.
   const ids = agendamentos.map((a) => a.id);
-  const { data: comandas } = await supabase
+  // O `error` é LIDO, e não descartado: sem isto, uma falha aqui devolve
+  // `comandas` vazio, `jaFaturados` vazio, e a tela oferece para faturar de novo
+  // atendimentos que JÁ têm comanda — cobrança em duplicidade servida como
+  // pendência. Falhar alto é o desfecho certo.
+  const { data: comandas, error: erroComandas } = await supabase
     .from("sales")
     .select("appointment_id")
+    .eq("organization_id", authz.org.orgId)
     .in("appointment_id", ids)
     .neq("status", "cancelled");
+  if (erroComandas) {
+    return fail("internal_error", erroComandas.message, 500, { requestId });
+  }
 
   const jaFaturados = new Set((comandas ?? []).map((c) => c.appointment_id as string));
 

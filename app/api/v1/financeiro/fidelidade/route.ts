@@ -69,6 +69,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     .from("loyalty_ledger")
     .select("id, points, reason, sale_id, created_at")
     .eq("contact_id", contactId)
+    // O saldo logo acima já é calculado por organização (`p_org`); o extrato
+    // precisa do mesmo recorte, senão os dois números discordam na tela para
+    // quem tem vínculo em mais de uma organização — e o extrato mostra pontos
+    // que o saldo não conta.
+    .eq("organization_id", authz.org.orgId)
     .order("created_at", { ascending: false })
     .limit(LIMITE_DO_EXTRATO);
   if (error) return fail("internal_error", error.message, 500, { requestId });

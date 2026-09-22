@@ -49,6 +49,9 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     .from("sales")
     .select("id, status, number")
     .eq("id", id)
+    // A comanda tem de ser DESTA organização: a RLS autoriza por vínculo, e sem
+    // este filtro um item entraria numa comanda de outra organização da pessoa.
+    .eq("organization_id", org)
     .maybeSingle();
   if (!comanda) return fail("not_found", "Comanda não encontrada.", 404, { requestId });
   if (comanda.status !== "open") {

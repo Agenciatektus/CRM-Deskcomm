@@ -23829,6 +23829,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -28617,6 +28623,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -29158,6 +29170,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -29863,6 +29881,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -30777,6 +30801,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -34101,6 +34131,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -34989,6 +35025,12 @@ begin
   -- `peer_phone` é NOT NULL, então recebe o rótulo, não `null`.
   update voice_calls set
     peer_phone = v_anon_label,
+    -- O QUE FOI DITO na chamada: quase sempre o nome da pessoa, falado em voz
+    -- alta, as vezes o endereco. A 0348 acrescentou esta linha e DUAS reemissoes
+    -- posteriores da funcao a perderam — `create or replace` faz a ultima
+    -- vencer. Sem ela a anonimizacao devolve sucesso e a transcricao continua
+    -- legivel amarrada ao contact_id. Ver migration 9008.
+    transcript = null,
     owner_user_id = null,
     created_by = null,
     updated_at = now()
@@ -36850,6 +36892,139 @@ do $f$ begin perform public.fn_conferir_modulos_instalados(); end $f$;
 create unique index if not exists channel_sessions_verdash_instance_unique
   on public.channel_sessions (verdash_instance_name)
   where provider = 'verdash' and archived_at is null;
+
+
+-- ---- isolamento do financeiro por COMANDO (migration 9007) ----
+--
+-- POR QUE ESTE BLOCO ESTA NO FIM: ele derruba e recria as policies das nove
+-- tabelas do financeiro, que sao criadas bem acima. Empurrar para junto delas
+-- por assunto funcionaria hoje e quebraria no dia em que uma tabela nova do
+-- modulo nascer depois deste ponto — a regra do arquivo e: apendice que depende
+-- de objeto criado por OUTRO apendice vem depois dele, e na duvida, no fim.
+--
+-- O DEFEITO QUE ISTO CONSERTA: a policy unica `FOR ALL` da 0351 checava papel
+-- so no `with check`, e no Postgres `SELECT` e `DELETE` sob `FOR ALL` consultam
+-- APENAS o `using`. Somado a `fn_user_org_ids()` devolver todas as organizacoes
+-- da pessoa (e nao a ativa da sessao), um DELETE com id de outra organizacao
+-- passava: o `requireRole` da rota media o papel na organizacao ativa e a
+-- policy liberava a linha da outra por vinculo.
+--
+-- Mover o papel para dentro do `using` unico consertaria o delete e tiraria a
+-- LEITURA do `viewer`, contra o desenho declarado da 0351. Por isso a policy
+-- unica virou quatro: ler exige vinculo, escrever e apagar exigem papel.
+do $$
+declare
+  t text;
+  papel text;
+  tabelas_e_papeis text[][] := array[
+    array['financial_accounts', 'manager'],
+    array['payment_methods',    'manager'],
+    array['account_plans',      'manager'],
+    array['sales',             'agent'],
+    array['sale_items',        'agent'],
+    array['commission_rules',  'agent'],
+    array['commissions',       'agent'],
+    array['financial_entries', 'agent'],
+    array['loyalty_ledger',    'agent']
+  ];
+  i integer;
+begin
+  for i in 1 .. array_length(tabelas_e_papeis, 1) loop
+    t := tabelas_e_papeis[i][1];
+    papel := tabelas_e_papeis[i][2];
+    if to_regclass('public.' || quote_ident(t)) is null then
+      continue;
+    end if;
+
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists tenant_isolation_%I_all on public.%I', t, t);
+    execute format('drop policy if exists tenant_isolation_%I_select on public.%I', t, t);
+    execute format('drop policy if exists tenant_isolation_%I_insert on public.%I', t, t);
+    execute format('drop policy if exists tenant_isolation_%I_update on public.%I', t, t);
+    execute format('drop policy if exists tenant_isolation_%I_delete on public.%I', t, t);
+
+    execute format($f$
+      create policy tenant_isolation_%I_select on public.%I
+        for select
+        using (organization_id in (select public.fn_user_org_ids())
+               or public.fn_is_platform_admin())
+    $f$, t, t);
+
+    execute format($f$
+      create policy tenant_isolation_%I_insert on public.%I
+        for insert
+        with check (
+          public.fn_is_platform_admin()
+          or (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, %L))
+        )
+    $f$, t, t, papel);
+
+    execute format($f$
+      create policy tenant_isolation_%I_update on public.%I
+        for update
+        using (
+          public.fn_is_platform_admin()
+          or (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, %L))
+        )
+        with check (
+          public.fn_is_platform_admin()
+          or (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, %L))
+        )
+    $f$, t, t, papel, papel);
+
+    execute format($f$
+      create policy tenant_isolation_%I_delete on public.%I
+        for delete
+        using (
+          public.fn_is_platform_admin()
+          or (organization_id in (select public.fn_user_org_ids())
+              and public.fn_role_at_least(organization_id, %L))
+        )
+    $f$, t, t, papel);
+
+    execute format('revoke all on public.%I from anon', t);
+  end loop;
+end $$;
+
+-- ---- o envelope de senha nao e de todo mundo (migration 9009) ----
+--
+-- `voip_trunk_settings` e `external_db_connections` revogavam so de `anon`. Mas
+-- o `ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES TO "authenticated"` la de
+-- cima neste arquivo faz toda tabela nova nascer concedida a `authenticated`
+-- tambem — e um `viewer` da organizacao lia `password_encrypted`,
+-- `password_iv` e `password_tag` por PostgREST, contra o que o cabecalho da
+-- propria 0349 declara ("so `password_last4` e exposto").
+--
+-- O padrao aqui e o mesmo de `ai_provider_credentials`: revogar o `select`
+-- inteiro e devolver `select` POR COLUNA. As views `_safe` sao
+-- `security_invoker` e continuam funcionando, porque leem o que permanece
+-- concedido.
+do $$
+begin
+  if to_regclass('public.voip_trunk_settings') is not null then
+    revoke select on public.voip_trunk_settings from authenticated, anon;
+    grant select (
+      organization_id, host, port, username, password_last4,
+      from_domain, endpoint_name, is_active, updated_by, created_at, updated_at
+    ) on public.voip_trunk_settings to authenticated;
+  end if;
+
+  if to_regclass('public.external_db_connections') is not null then
+    revoke select on public.external_db_connections from authenticated, anon;
+    grant select (
+      id, organization_id, label, host, port, database_name, username,
+      ssl_mode, enabled, last_tested_at, last_test_ok, last_test_error,
+      created_by, created_at, updated_at
+    ) on public.external_db_connections to authenticated;
+  end if;
+
+  if to_regclass('public.phone_numbers') is not null then
+    revoke all on public.phone_numbers from anon;
+  end if;
+end $$;
 
 
 notify pgrst, 'reload schema';
