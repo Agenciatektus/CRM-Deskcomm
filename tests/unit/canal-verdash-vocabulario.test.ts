@@ -400,7 +400,7 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
 
   it("a migration versionada existe junto do apêndice — clone atualiza pelas duas vias", () => {
     const mig = readFileSync(
-      "supabase/migrations/20260916120000_9001_canal_verdash_vocabulario.sql",
+      "supabase/migrations/20260916120001_9001_canal_verdash_vocabulario.sql",
       "utf8",
     );
     expect(mig).toContain("verdash_instance_name");
@@ -414,7 +414,7 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
     // Uma lista fixa aqui apagaria, no próximo merge, o provider que o upstream
     // tiver acrescentado — e o banco passaria a recusar as sessões dele.
     const mig = readFileSync(
-      "supabase/migrations/20260916120000_9001_canal_verdash_vocabulario.sql",
+      "supabase/migrations/20260916120001_9001_canal_verdash_vocabulario.sql",
       "utf8",
     );
     expect(mig).toContain("pg_get_constraintdef");

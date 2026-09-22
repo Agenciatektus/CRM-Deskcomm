@@ -63,9 +63,9 @@ describe("capabilities do canal intermediado", () => {
 
 describe("identificador da sessão", () => {
   it("resolve pelo id do INTERMEDIÁRIO, não pelo da Meta", () => {
-    expect(
-      resolveSessionRef({ provider: ZERNIO as "zernio", zernio_account_id: "acc_123" }),
-    ).toBe("acc_123");
+    expect(resolveSessionRef({ provider: ZERNIO as "zernio", zernio_account_id: "acc_123" })).toBe(
+      "acc_123",
+    );
   });
 
   it("a coluna entra no select — sem ela o ref volta indefinido em runtime", () => {
@@ -74,9 +74,7 @@ describe("identificador da sessão", () => {
 
   it("cada canal resolve pela SUA coluna — nenhum cai na do outro", () => {
     expect(resolveSessionRef({ provider: "waha", waha_session_name: "s1" })).toBe("s1");
-    expect(
-      resolveSessionRef({ provider: "meta_cloud", meta_phone_number_id: "pn1" }),
-    ).toBe("pn1");
+    expect(resolveSessionRef({ provider: "meta_cloud", meta_phone_number_id: "pn1" })).toBe("pn1");
   });
 });
 
@@ -147,11 +145,24 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
   const baseline = readFileSync("supabase/baseline.sql", "utf8");
 
   it("o CHECK de provider do baseline conhece o canal novo", () => {
-    expect(baseline).toMatch(/channel_sessions_provider_check[\s\S]{0,300}'zernio'/);
+    // A asserção lê a LISTA da constraint, não uma janela de caracteres depois do nome.
+    //
+    // A versão anterior era `/channel_sessions_provider_check[\s\S]{0,300}'zernio'/`, e
+    // estava a 16 caracteres do limite: 284 de 300. Três comentários acrescentados entre
+    // o `add constraint` e o array — explicando por que o canal novo entra ali —
+    // empurraram `'zernio'` para 535 e o teste ficou vermelho com o banco CERTO.
+    //
+    // Um gate que reprova quando alguém documenta a linha ensina a não documentar. O que
+    // ele existe para provar é que o provider está na lista; é isso que ele passa a ler.
+    const check = baseline.slice(baseline.indexOf("channel_sessions_provider_check"));
+    const lista = check.slice(0, check.indexOf("]"));
+    expect(lista).toContain("'zernio'");
   });
 
   it("o CHECK de ref exige a coluna do canal novo", () => {
-    expect(baseline).toMatch(/provider = 'zernio'\s+and zernio_account_id\s+is not null/);
+    expect(baseline).toMatch(
+      /provider (?:= 'zernio'|in \('zernio', 'zernio_social'\))\s+and zernio_account_id\s+is not null/,
+    );
   });
 
   it("os CHECKs são RECRIADOS, não protegidos por duplicate_object", () => {
@@ -164,7 +175,7 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
 
   it("a coluna nasce antes do CHECK que a referencia", () => {
     const col = baseline.indexOf("add column if not exists zernio_account_id");
-    const check = baseline.indexOf("provider = 'zernio'");
+    const check = baseline.search(/provider (?:= 'zernio'|in \('zernio', 'zernio_social'\))/);
     expect(col).toBeGreaterThan(-1);
     expect(col).toBeLessThan(check);
   });

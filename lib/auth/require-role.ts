@@ -20,7 +20,7 @@ import type { NextResponse } from "next/server";
 
 import { fail, type ApiError } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
-import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
+import { carregarUsuarioComMotivo, loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK, type ActiveOrg, type AuthUser, type Role } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +54,31 @@ export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promis
 
   const user = await loadAuthUser();
   if (!user) {
+    // Sem usuário confirmado, recusar continua sendo o desfecho certo — falhar fechado na
+    // AÇÃO é a regra. O que muda aqui é falhar fechado também na EXPLICAÇÃO.
+    //
+    // "Auth required." manda a pessoa relogar. Quando a causa é a rede até o Supabase
+    // (intermitência de DNS medida em produção, 18/09), relogar não resolve, e quem vê a
+    // mensagem vai procurar o problema na conta — foi exatamente o que aconteceu.
+    //
+    // 503 e não 401 porque a diferença importa para quem monitora: 401 em série parece
+    // ataque ou sessão quebrada; 503 em série é o que é, indisponibilidade.
+    // O motivo só se pergunta no caminho de falha, e por dois motivos. O caminho feliz
+    // não paga nada — que é a esmagadora maioria das requisições. E quem mocka
+    // `loadAuthUser` para devolver um usuário não precisa aprender uma função nova só
+    // porque o gate passou a explicar melhor o caso que aquele teste nem exercita.
+    const { motivo } = await carregarUsuarioComMotivo();
+    if (motivo === "infra") {
+      return {
+        ok: false,
+        response: fail(
+          "service_unavailable",
+          "Não consegui verificar sua sessão agora. Recarregue a página em alguns segundos.",
+          503,
+          { requestId },
+        ),
+      };
+    }
     return { ok: false, response: fail("unauthenticated", "Auth required.", 401, { requestId }) };
   }
   const t = (texto: string) => traduzir(texto, user.idioma);

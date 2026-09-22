@@ -30,12 +30,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
-import { CHANNEL_PROVIDER_VERDASH } from "../capabilities";
+import { CHANNEL_PROVIDER_INSTAGRAM, CHANNEL_PROVIDER_VERDASH } from "../capabilities";
 import { fzapRequest } from "./client";
 import { verdashBaseUrl, verdashFunctionsUrl } from "./credentials";
 import type { ChannelProvider } from "../types";
 
 export const VERDASH_CHANNEL_PROVIDER: ChannelProvider = CHANNEL_PROVIDER_VERDASH;
+
+/**
+ * Os canais que o pareamento da Verdash sabe conectar.
+ *
+ * O MESMO código de pareamento serve aos dois: o cliente cola um código, a Verdash
+ * devolve um token dela com escopo de uma instância, e o transporte passa por lá. O que
+ * muda é QUAL canal aquele vínculo cobre — e sem dizer isso, vincular seria tudo ou nada:
+ * ligar o WhatsApp ligaria o Instagram junto, e desligar um desligaria o outro.
+ *
+ * O provider é onde essa distinção mora porque é ele que `capabilitiesOf()` consulta.
+ * Guardar o canal noutro campo faria a tela ter que perguntar "qual canal é este?" —
+ * exatamente o que a camada de canais existe para evitar.
+ */
+export type CanalPareavel = typeof CHANNEL_PROVIDER_VERDASH | typeof CHANNEL_PROVIDER_INSTAGRAM;
+
+export const CANAL_PAREAVEL_PADRAO: CanalPareavel = CHANNEL_PROVIDER_VERDASH;
 
 /**
  * Como o canal se chama PARA O USUÁRIO.
@@ -363,13 +379,18 @@ function toVerdashSession(row: Record<string, unknown> | null): VerdashSession |
 export async function findVerdashSession(
   admin: SupabaseClient,
   organizationId: string,
+  /**
+   * Qual canal procurar. O default mantém intacto quem chamava antes de existirem dois —
+   * e quem chama sem dizer continua falando de WhatsApp, que é o que sempre foi.
+   */
+  canal: CanalPareavel = CANAL_PAREAVEL_PADRAO,
 ): Promise<VerdashSession | null> {
   const buscar = (colunas: string) =>
     admin
       .from("channel_sessions")
       .select(colunas)
       .eq("organization_id", organizationId)
-      .eq("provider", VERDASH_CHANNEL_PROVIDER)
+      .eq("provider", canal)
       .maybeSingle();
 
   const { data } = await queryTolerantToMissingArchived(
@@ -401,17 +422,30 @@ export async function saveVerdashSession(
     phoneNumber: string | null;
     displayName: string;
     connected: boolean;
+    /**
+     * Qual canal este vínculo cobre. Sem isto, vincular é tudo ou nada.
+     *
+     * Ausente = WhatsApp, que é o que todo chamador existente quis dizer antes de haver
+     * dois canais — o default preserva cada um deles sem precisar tocá-los.
+     */
+    canal?: CanalPareavel;
   },
 ): Promise<{ error: string | null }> {
   const linha = {
     organization_id: input.organizationId,
-    provider: VERDASH_CHANNEL_PROVIDER,
+    provider: input.canal ?? CANAL_PAREAVEL_PADRAO,
     verdash_instance_name: input.instanceName,
     verdash_vinculo_id: input.vinculoId ?? null,
     verdash_token_encrypted: input.tokenEncrypted,
     webhook_path_token: input.webhookPathToken,
     webhook_secret_encrypted: input.webhookSecretEncrypted,
-    phone_number: input.phoneNumber,
+    // O Instagram não tem telefone. A coluna é nullable e o unique
+    // (organization_id, phone_number) não colide em NULL, então várias contas de
+    // Instagram convivem — mas gravar um telefone aqui faria a sessão do Instagram
+    // disputar a unicidade com a do WhatsApp da mesma organização.
+    phone_number: (input.canal ?? CANAL_PAREAVEL_PADRAO) === CHANNEL_PROVIDER_INSTAGRAM
+      ? null
+      : input.phoneNumber,
     display_name: input.displayName,
     // O status é o que a Verdash ACABOU de dizer, não um otimismo. Uma
     // instância criada e ainda não pareada nasce `STARTING`, e a tela mostra

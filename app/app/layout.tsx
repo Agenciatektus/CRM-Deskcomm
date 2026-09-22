@@ -2,9 +2,10 @@ import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
-import { DEFAULT_VISIBILITY_MODE, type VisibilityMode } from "@/lib/auth/types";
+import { DEFAULT_VISIBILITY_MODE, roleAtLeast, type VisibilityMode } from "@/lib/auth/types";
 import { clientePelaAgendaLigado } from "@/lib/schemas/settings";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
+import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 import { AppShell } from "./_components/AppShell";
 import { EstiloDaMarcaDaOrganizacao } from "./_components/EstiloDaMarcaDaOrganizacao";
 import { MfaEnrollGate } from "@/components/auth/MfaEnrollGate";
@@ -20,6 +21,7 @@ import { ConexaoCaidaBanner } from "@/components/app/ConexaoCaidaBanner";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 import { listarConexoesCaidas, type ConexaoCaida } from "@/lib/channels/health";
 import { VoiceCallProvider } from "@/components/voice/VoiceCallContext";
+import { ProvedorDaOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -187,10 +189,60 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     expiresAt: user.support.expires_at, accessMode: user.support.access_mode,
   } : null;
 
+  // O CONTRATO DE OCUPAÇÃO DO RODAPÉ (issue #1305) envolve a casca E as peças de
+  // voz. O `VoiceCallProvider` desenha o painel de chamada DEPOIS dos children,
+  // ou seja: o painel é IRMÃO do `AppShell`, não filho dele. Um provedor por
+  // dentro do `VoiceCallProvider` deixaria o painel de fora — ele declararia o
+  // que ocupa e ninguém descontaria, que é exatamente o defeito da #1305.
+  // ── OS FUNIS DO MENU ──────────────────────────────────────────────────────
+  //
+  // Lidos AQUI, no servidor, e nao por um hook no sidebar: `GET /api/v1/pipelines`
+  // exige `manager` (ver `hooks/pipelines/usePipelines.ts`) e o sidebar e visto por
+  // todo papel. Um `agent` buscando de la levaria 403 e ficaria sem o no — o menu
+  // diria que ele nao tem funil, quando o que ele nao tem e permissao de configurar.
+  //
+  // Sem organizacao ativa (suporte navegando fora de um tenant), a lista e vazia e o
+  // no some. Falha de leitura tambem cai em vazio de proposito: o menu nao e lugar
+  // de mostrar erro de consulta, e o caminho por "Funis" continua de pe.
+  let funisDoMenu: Array<{ id: string; name: string }> = [];
+  if (activeOrg) {
+    const { data: linhasDeFunil, error: erroDosFunis } = await createAdminClient()
+      .from("crm_pipelines")
+      .select("id, name")
+      // Schema conferido em `information_schema` antes de escrever: a tabela tem
+      // `is_archived boolean`, e NAO `archived_at timestamptz` como as irmas dela.
+      // E o campo da sessao e `orgId`, nao `organization_id`.
+      .eq("organization_id", activeOrg.orgId)
+      .eq("is_archived", false)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+    // FALHA ALTO, e nao baixo. A primeira versao descartava o erro, e uma consulta que
+    // falhasse viraria "esta organizacao nao tem funil" — indistinguivel de nao ter mesmo,
+    // com o no "Pipeline" sumindo do menu sem que nada indicasse a causa.
+    //
+    // E o modo de falha que o proprio `lib/auth/server.ts` documenta ter custado seis
+    // diagnosticos errados, noutra consulta DESTE MESMO arquivo. Eu repeti o padrao a dez
+    // linhas de distancia do comentario que o descreve.
+    if (erroDosFunis) {
+      console.error("[layout] funis do menu nao carregaram:", erroDosFunis.message, {
+        org: activeOrg.orgId,
+      });
+    }
+    funisDoMenu = linhasDeFunil ?? [];
+  }
+
   const shell = (
-    <VoiceCallProvider>
-      <AppShell sidebarCollapsed={collapsed}>{children}</AppShell>
-    </VoiceCallProvider>
+    <ProvedorDaOcupacaoDoRodape>
+      <VoiceCallProvider>
+        <AppShell
+          sidebarCollapsed={collapsed}
+          podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
+          funis={funisDoMenu}
+        >
+          {children}
+        </AppShell>
+      </VoiceCallProvider>
+    </ProvedorDaOcupacaoDoRodape>
   );
 
   return (
@@ -199,6 +251,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // acoplamento com a autenticação que derrubou 32 casos.
     <IdiomaProvider locale={user.idioma}>
     <AuthProvider user={user} activeOrg={activeOrg}>
+      {/*
+        A COR DA ETIQUETA, uma leitura por tela.
+
+        O chip aparece em LISTA — uma fila de duzentas conversas desenha quatro
+        centenas deles — e todos consultam o mesmo mapa, montado uma vez aqui.
+        Um `useQuery` por chip seria o mesmo cache (o react-query deduplica a
+        rede), mas cada atualização acordaria todas as assinaturas.
+
+        Dentro do `AuthProvider` porque a leitura é da organização ativa, e FORA
+        do `AppShell` porque o gate de MFA substitui a casca: o mapa precisa
+        sobreviver ao portão, e não ser relido quando ele sai.
+      */}
+      <ProvedorDeCoresDasEtiquetas>
       <InterfaceRefresh userId={user.id} org={activeOrg} support={!!user.support} />
       {/*
         O MARCADOR da marca da organização — o elemento cuja existência define o
@@ -228,6 +293,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           shell
         )}
       </div>
+      </ProvedorDeCoresDasEtiquetas>
     </AuthProvider>
     </IdiomaProvider>
   );

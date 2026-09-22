@@ -14,7 +14,7 @@ import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
   resolveSessionRef,
   type ChannelProvider,
   type ChannelSessionRef,
@@ -93,11 +93,15 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
       .eq("id", msg.channel_session_id)
       .maybeSingle();
 
-    const adapter = getAdapter(
+    // Opcional, e a diferença é exatamente o que o comentário abaixo promete: com
+    // `getAdapter`, um canal sem adapter local lançava ANTES de chegar ao guard, caía
+    // no `catch` e a mídia virava `failed` — o defeito que não existe, acusado pelo
+    // caminho que o guard não alcançava.
+    const adapter = getAdapterOpcional(
       ((sessao?.provider as string) ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider,
     );
     const sessionRef = sessao ? resolveSessionRef(sessao as unknown as ChannelSessionRef) : null;
-    if (!adapter.fetchInboundMedia || !sessionRef) {
+    if (!adapter?.fetchInboundMedia || !sessionRef) {
       // Canal que não sabe baixar não é erro: é o estado normal de um canal sem
       // mídia de entrada. Marcar `failed` faria a Central acusar um defeito que
       // não existe.

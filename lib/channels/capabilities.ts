@@ -66,6 +66,16 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
   //
   // O detalhe que engana: mandar um template NÃO abre a janela. Só o cliente
   // abre, respondendo. Quem ler o 200 como "enviado" acha que funciona.
+  zernio_social: {
+    freeformOutsideWindow: false,
+    requiresTemplates: false,
+    canManageTemplates: false,
+    banRisk: false,
+    minIntervalMs: 1000,
+    voiceNote: "server-convert",
+    groups: "none",
+    costPerMessage: true,
+  },
   zernio: {
     freeformOutsideWindow: false,
     requiresTemplates: true,
@@ -106,6 +116,43 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "full",
     costPerMessage: false,
   },
+
+  /**
+   * Instagram — Direct e comentário, roteados pela Verdash.
+   *
+   * O transporte é o mesmo do `verdash` (a Verdash fala com a Meta), mas as CAPACIDADES
+   * não são, e é por isso que ele é provider próprio em vez de uma variante:
+   *
+   *  - `freeformOutsideWindow: false`. O Instagram tem janela de 24h como o WhatsApp
+   *    oficial: fora dela a Meta recusa a mensagem. Declarar `true` aqui faria a tela
+   *    deixar o atendente escrever e só descobrir no envio — e o texto se perde.
+   *
+   *  - `requiresTemplates: false` mesmo com a janela. Não existe template aprovado no
+   *    Instagram: fora da janela simplesmente não há como falar, e oferecer "escolher um
+   *    template" seria oferecer uma saída que não existe.
+   *
+   *  - `voiceNote: "none"` e SEM documento. A API de mensagens do Instagram não aceita os
+   *    dois. Sem isto a tela mostra o botão de gravar áudio, o atendente grava, e o erro
+   *    aparece depois de ele já ter falado.
+   *
+   *  - `groups: "none"`. Não há grupo no Direct.
+   *
+   *  - `banRisk: false`. Não é o caso do FZAP: aqui existe app publicado, permissão
+   *    concedida pelo dono da conta, e a Meta corta por App Review, não por padrão de
+   *    volume. Armar o anti-ban atrasaria resposta sem reduzir risco nenhum.
+   *
+   *  - `costPerMessage: false`. A Meta não cobra por Direct de Instagram.
+   */
+  instagram: {
+    freeformOutsideWindow: false,
+    requiresTemplates: false,
+    canManageTemplates: false,
+    banRisk: false,
+    minIntervalMs: null,
+    voiceNote: "none",
+    groups: "none",
+    costPerMessage: false,
+  },
 };
 
 /**
@@ -126,11 +173,14 @@ export const DEFAULT_CHANNEL_PROVIDER: ChannelProvider = "waha";
  */
 export const CHANNEL_PROVIDER_WAHA: ChannelProvider = "waha";
 export const CHANNEL_PROVIDER_META: ChannelProvider = "meta_cloud";
+export const CHANNEL_PROVIDER_SOCIAL: ChannelProvider = "zernio_social";
 export const CHANNEL_PROVIDER_ZERNIO: ChannelProvider = "zernio";
 /** Chamada de voz WhatsApp (spec 18). Não transporta mensagem — ver abaixo. */
 export const CHANNEL_PROVIDER_WACALLS: ChannelProvider = "wacalls";
 /** WhatsApp já conectado na Verdash (FZAP), sem parear de novo. */
 export const CHANNEL_PROVIDER_VERDASH: ChannelProvider = "verdash";
+/** Instagram (Direct e comentário) roteado pela Verdash. */
+export const CHANNEL_PROVIDER_INSTAGRAM: ChannelProvider = "instagram";
 
 /**
  * Os providers por onde MENSAGEM entra e sai — a única lista que responde
@@ -151,7 +201,9 @@ export const PROVIDERS_DE_MENSAGEM = [
   "waha",
   "meta_cloud",
   "zernio",
+  "zernio_social",
   "verdash",
+  "instagram",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**
@@ -203,6 +255,41 @@ void _todoProviderFoiClassificado;
 export function canalConhecidoSemMensagem(provider: string | null | undefined): boolean {
   return (PROVIDERS_SEM_MENSAGEM as readonly string[]).includes(provider ?? "");
 }
+
+/**
+ * Os providers cujo NOME é uma marca que o cliente pronuncia.
+ *
+ * ─── O QUE ISTO CONSERTA ────────────────────────────────────────────────────
+ *
+ * `lib/agent-engine/guardrails/vazamento-interno.ts` deriva a lista de vocabulário
+ * interno daqui — provider novo entra na cobertura sozinho, que é a decisão certa e
+ * está explicada lá. A premissa silenciosa era que nome de provider é nome de
+ * encanamento: `waha`, `meta_cloud`, `zernio`, `verdash` — nada que um cliente diga.
+ *
+ * `instagram` é o primeiro que quebra a premissa. Acrescentá-lo à matriz matriculou a
+ * palavra na blocklist, e o agente perdeu a capacidade de dizer o nome do canal que o
+ * CRM acabou de ganhar: "vi seu comentário no Instagram", "me chama no Direct",
+ * "instagram.com/loja" — tudo virava mensagem calada ou rodada extra de reescrita.
+ *
+ * A lista mora AQUI e não lá porque nome de provider só pode ser escrito em
+ * `lib/channels/` (doutrina `restricao-de-canal`, invariante 1) — e porque a pergunta
+ * "este nome é público?" é sobre o canal, não sobre o detector.
+ *
+ * Critério para entrar: o cliente reconhece e usa a palavra no dia a dia. Na dúvida,
+ * NÃO entre — deixar de fora só custa uma reescrita; entrar errado deixa vazar
+ * vocabulário interno de verdade.
+ */
+export const PROVIDERS_DE_MARCA_PUBLICA = [
+  "instagram",
+] as const satisfies readonly ChannelProvider[];
+
+/**
+ * Os nomes de provider que o cliente NÃO deve ver — a matriz menos as marcas públicas.
+ * É esta a lista que o detector de vazamento consome.
+ */
+export const PROVIDERS_DE_NOME_INTERNO: readonly string[] = Object.keys(
+  CHANNEL_CAPABILITIES,
+).filter((p) => !(PROVIDERS_DE_MARCA_PUBLICA as readonly string[]).includes(p));
 
 export function capabilitiesOf(provider: ChannelProvider): ChannelCapabilities {
   const caps = CHANNEL_CAPABILITIES[provider as ProviderDeMensagem];

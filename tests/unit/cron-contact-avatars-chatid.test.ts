@@ -31,7 +31,9 @@ vi.mock("@/lib/env", () => ({
 
 vi.mock("@/lib/channels", () => ({
   DEFAULT_CHANNEL_PROVIDER: "waha",
-  getAdapter: () => ({
+  // `getAdapterOpcional`: a rota passou a usar a porta que devolve `null` para canal
+  // conhecido sem adapter local, em vez da que lança.
+  getAdapterOpcional: () => ({
     fetchProfilePictureUrl: async (input: { recipient: string }) => {
       pedidos.push(input.recipient);
       return "https://cdn.exemplo.invalid/foto.jpg";

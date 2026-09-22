@@ -23,9 +23,24 @@
 import { describe, expect, it } from "vitest";
 
 import { detectarVazamentoInterno } from "@/lib/agent-engine/guardrails/vazamento-interno";
-import { CHANNEL_CAPABILITIES } from "@/lib/channels/capabilities";
+import {
+  PROVIDERS_DE_MARCA_PUBLICA,
+  PROVIDERS_DE_NOME_INTERNO,
+} from "@/lib/channels/capabilities";
 
-const PROVIDERS = Object.keys(CHANNEL_CAPABILITIES);
+/**
+ * A lista deixou de ser `Object.keys(CHANNEL_CAPABILITIES)` — é ela MENOS os providers
+ * cujo nome é marca que o cliente pronuncia. Enquanto todo provider se chamava `waha` ou
+ * `meta_cloud`, "nome de provider" e "palavra que o cliente não deve ver" eram a mesma
+ * coisa, e derivar da matriz inteira estava certo. O primeiro provider com nome de marca
+ * separou as duas: barrá-lo impediria o agente de dizer o nome do canal por onde o
+ * cliente acabou de escrever.
+ *
+ * O caso novo no fim do arquivo é o outro lado desta moeda, e é ele que impede a exceção
+ * de virar porta larga: marca pública tem de passar, e o vocabulário interno que
+ * costuma vir junto continua sendo barrado.
+ */
+const PROVIDERS = PROVIDERS_DE_NOME_INTERNO;
 
 describe("nome de provider de canal é vazamento", () => {
   /**
@@ -41,6 +56,33 @@ describe("nome de provider de canal é vazamento", () => {
     const r = detectarVazamentoInterno(`Não consegui enviar pelo ${p}, tente de novo.`);
     expect(r.achou, `o nome do provider chegou ao cliente`).toBe(true);
     expect(r.categorias).toContain("arquitetura");
+  });
+
+  it("a exceção de marca pública não está vazia nem cobre tudo", () => {
+    // Se alguém puser todo provider na exceção, o `it.each` acima vira vácuo e este
+    // arquivo volta a ser o verde silencioso que a sabotagem expôs.
+    expect(PROVIDERS_DE_MARCA_PUBLICA.length).toBeGreaterThanOrEqual(1);
+    expect(PROVIDERS.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each([...PROVIDERS_DE_MARCA_PUBLICA])("deixa passar a marca que o cliente diz: %s", (p) => {
+    for (const frase of [
+      `Vi sua mensagem no ${p}, obrigado por escrever!`,
+      `Me chama no ${p} que eu te respondo por lá.`,
+    ]) {
+      const r = detectarVazamentoInterno(frase);
+      expect(r.achou, `barrado por ${r.categorias.join(",")}: ${r.termos.join(", ")}`).toBe(false);
+    }
+  });
+
+  it("marca pública liberada não libera o vocabulário interno que vem junto", () => {
+    // A exceção é sobre UMA palavra, não sobre a frase. O que mais assusta aqui é o
+    // cenário em que a marca serve de carona para o resto.
+    const p = PROVIDERS_DE_MARCA_PUBLICA[0];
+    const r = detectarVazamentoInterno(
+      `O webhook do ${p} devolveu payload inválido no endpoint.`,
+    );
+    expect(r.achou).toBe(true);
   });
 
   /**

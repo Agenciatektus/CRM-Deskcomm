@@ -40,7 +40,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import {
   CHANNEL_SESSION_REF_COLUMNS,
   DEFAULT_CHANNEL_PROVIDER,
-  getAdapter,
+  getAdapterOpcional,
   resolveSessionRef,
   type ChannelProvider,
   type ChannelSessionRef,
@@ -164,8 +164,10 @@ async function handle(req: NextRequest): Promise<Response> {
 
     // Pergunta ao CANAL, não ao provider: quem sabe traduzir implementa o
     // método; quem não sabe simplesmente não o tem, e o cron segue adiante.
-    const adapter = getAdapter((s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider);
-    if (!adapter.resolvePhoneForIdentity || !c.wa_identity) {
+    const adapter = getAdapterOpcional(
+      (s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider,
+    );
+    if (!adapter?.resolvePhoneForIdentity || !c.wa_identity) {
       await carimbar(null);
       semCanal++;
       continue;
