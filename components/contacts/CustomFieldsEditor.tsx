@@ -54,7 +54,24 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
   }
 
   return (
-    <div className={cn("grid grid-cols-1 gap-4 md:grid-cols-2", className)}>
+    // ── UM CAMPO POR LINHA, E O `md:` ERA O DEFEITO ─────────────────────────
+    //
+    // Era `md:grid-cols-2`, e `md:` mede a largura da JANELA — nao a do container.
+    // Estes campos vivem em paineis estreitos: o dossie do lead tem
+    // `sm:max-w-md` (448px) e o painel do inbox e mais estreito ainda. Numa tela
+    // de 1400px o breakpoint disparava e dois campos se espremiam em ~200px cada,
+    // com o rotulo quebrando em duas linhas e o valor truncado.
+    //
+    // O `CRMSidePanel` ja contornava isso passando `md:grid-cols-1` por fora — um
+    // remendo por chamador, que so protegia quem lembrasse de passar. O dossie do
+    // kanban nao lembrava, e e onde o Peterson viu o defeito.
+    //
+    // Uma coluna sempre. Nome de campo que o cliente escreve e longo por natureza
+    // ("Data da primeira consulta", "Convenio"), e rotulo que quebra custa mais
+    // altura do que a segunda coluna economiza. Se um dia um container largo
+    // justificar duas colunas, o caminho e `@container` (Tailwind 4 tem), que
+    // mede o container de verdade — nunca o breakpoint de janela.
+    <div className={cn("grid grid-cols-1 gap-4", className)}>
       {fields.map((f) => {
         const v = value[f.key];
         const id = `cf-${f.key}`;
@@ -69,7 +86,7 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
         switch (f.type) {
           case "textarea":
             return (
-              <div key={f.key} className="space-y-2 md:col-span-2">
+              <div key={f.key} className="space-y-2">
                 {labelEl}
                 <Textarea
                   id={id}
@@ -160,7 +177,7 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
           }
           case "boolean":
             return (
-              <div key={f.key} className="flex items-center justify-between gap-4 md:col-span-2">
+              <div key={f.key} className="flex items-center justify-between gap-4">
                 {labelEl}
                 <Switch
                   id={id}

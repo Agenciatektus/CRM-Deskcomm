@@ -43,6 +43,7 @@ const FONTE: Record<ProviderDeMensagem, FonteDeTemplates | null> = {
   waha: null,
   meta_cloud: "oficial",
   zernio: "parceiro",
+  zernio_social: null,
   // Mesmo caso do canal por QR, e pela mesma razão: whatsmeow não tem WABA,
   // então não existe definição aprovada em lugar nenhum para listar.
   verdash: null,

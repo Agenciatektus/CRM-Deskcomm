@@ -9,7 +9,18 @@ import type { OutboundMedia } from "@/lib/waha/media-send";
 
 export type { OutboundMedia };
 
-export type ChannelProvider = "waha" | "meta_cloud" | "zernio" | "wacalls" | "verdash" | "instagram";
+// `zernio_social` e do upstream (Instagram/Facebook via Zernio, uma conta por org);
+// `verdash` e `instagram` sao nossos (a mesma linha que o cliente ja tem na Verdash, e o
+// Direct pela Meta). Os quatro convivem porque sao transportes distintos — a decisao de
+// qual a Tektus configura para o cliente e de produto, nao deste arquivo.
+export type ChannelProvider =
+  | "waha"
+  | "meta_cloud"
+  | "zernio"
+  | "zernio_social"
+  | "wacalls"
+  | "verdash"
+  | "instagram";
 
 /**
  * Os providers que transportam MENSAGEM — o subconjunto sobre o qual a matriz

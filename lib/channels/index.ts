@@ -5,6 +5,7 @@
 import { metaCloudAdapter } from "./adapters/meta-cloud";
 import { wahaAdapter } from "./adapters/waha";
 import { verdashAdapter } from "./adapters/verdash";
+import { socialAdapter } from "./social/adapter";
 import { zernioAdapter } from "./adapters/zernio";
 import type { ChannelAdapter, ChannelProvider, ProviderDeMensagem } from "./types";
 
@@ -16,6 +17,7 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
   waha: wahaAdapter,
   meta_cloud: metaCloudAdapter,
   zernio: zernioAdapter,
+  zernio_social: socialAdapter,
   verdash: verdashAdapter,
   /**
    * `null` de propósito: o Instagram APARECE e RECEBE no CRM, mas o envio não sai daqui.

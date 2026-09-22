@@ -1,17 +1,154 @@
 /**
- * Curadoria do vocabulário de etiquetas — o contrato TypeScript da migration 9005.
+ * Schemas do vocabulário de etiquetas (issue #852, fatia S4; cor: #1271, S6).
  *
- * ARQUIVO NOVO, e não um acréscimo a `lib/schemas/settings.ts`, porque aquele é
- * do upstream e a política de fork deste repo é "customização só em arquivo
- * novo": o que se escreve lá conflita em todo merge com `melgarafael/DeskcommCRM`,
- * que faz ~60 commits por dia.
+ * A etiqueta continua sendo `text[]` onde já está — automação, webhook
+ * (`lead.tag_added`) e MCP (`*.tags_changed`) falam em string há versões, e
+ * trocar por tabela com FK quebraria os três contratos. O que entra aqui é só a
+ * validação do que a TELA manda para a função de banco.
  *
- * `canonicalConversationTagsSchema` continua onde estava e não muda de forma —
- * a rota `GET /api/v1/conversation-tags` e o seletor do Inbox dependem dela, e
- * as quatro chaves desta feature são todas `array de text`, o mesmo formato.
+ * ── A cor entra neste arquivo, e não na tela ─────────────────────────────────
+ *
+ * A validação de forma (`#rrggbb`) precisa acontecer onde a rota pode recusar
+ * antes de chamar o banco: a função de operação também valida (`cor_invalida`,
+ * 22023), mas quem chega por RPC direta não passa por aqui — as duas camadas
+ * existem de propósito, e a de baixo é a que vale para o dado gravado.
  */
 import { z } from "zod";
 
+import { corDeEtiquetaValida, normalizarCorDeEtiqueta } from "@/lib/tags/cor-da-etiqueta";
+
+/**
+ * O teto é o mesmo do editor de etiquetas do Inbox (`conversationTagSchema`),
+ * de propósito: uma etiqueta que cabe no vocabulário mas não cabe no seletor
+ * seria um nome que a tela cria e não consegue oferecer.
+ */
+export const TAG_MAX = 60;
+
+/** Ações do vocabulário. Cada uma é uma operação atômica do banco. */
+export const ACOES_DE_VOCABULARIO = ["renomear", "juntar", "excluir", "definir_cor"] as const;
+export type AcaoDeVocabulario = (typeof ACOES_DE_VOCABULARIO)[number];
+
+export const tagSchema = z
+  .string({ error: "tag_obrigatoria" })
+  .trim()
+  .min(1, "tag_obrigatoria")
+  .max(TAG_MAX, "tag_longa_demais");
+
+/**
+ * A cor, na forma que o banco aceita: normalizada para `#rrggbb` minúsculo.
+ *
+ * `#ABC`, `#aabbcc` e `aabbcc` entram e saem iguais (`#aabbcc`): a régua é a
+ * mesma função que a LEITURA usa para tolerar o que já estiver gravado à mão.
+ * O que não entra é lixo (`nome-verde`, `#12345`), que gravaria e voltaria para
+ * a tela sem pintar nada.
+ *
+ * "Sem cor" é `cor: null`, não string vazia — quem limpa diz que está limpando.
+ */
+export const corDeEtiquetaSchema = z
+  .string({ error: "cor_invalida" })
+  .trim()
+  .refine((valor) => corDeEtiquetaValida(valor), { error: "cor_invalida" })
+  .transform((valor) => normalizarCorDeEtiqueta(valor) as string);
+
+/**
+ * `juntar` é o único caso em que a tag de origem e o destino podem coexistir com
+ * grafias diferentes ("vip" + "VIP" → "VIP"): a função de banco desduplica por
+ * nome canônico, então aqui só se exige que o destino exista e seja diferente.
+ */
+export const vocabularioDeTagsSchema = z
+  .object({
+    acao: z.enum(ACOES_DE_VOCABULARIO, {
+      error: "acao_invalida",
+    }),
+    tag: tagSchema,
+    destino: tagSchema.nullish(),
+    cor: corDeEtiquetaSchema.nullish(),
+  })
+  .superRefine((valor, ctx) => {
+    if (valor.acao === "definir_cor") {
+      // Presente-e-nula é pedido legítimo ("tirar a cor"); AUSENTE é erro de
+      // quem chamou: sem o campo não dá para distinguir "limpe" de "esqueci de
+      // mandar", e a operação diria que alterou quando não alterou nada.
+      if (valor.cor === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["cor"],
+          message: "cor_obrigatoria",
+        });
+      }
+      if (valor.destino != null) {
+        // `definir_cor` não renomeia: aceitar um destino aqui faria a tela
+        // prometer duas coisas e a função fazer uma.
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["destino"],
+          message: "destino_invalido_para_acao",
+        });
+      }
+      return;
+    }
+    if (valor.cor != null) {
+      // Renomear/juntar/excluir não falam de cor. Ignorar em silêncio deixaria a
+      // tela acreditar que mandou uma cor junto.
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cor"],
+        message: "cor_invalida_para_acao",
+      });
+      return;
+    }
+    if (valor.acao === "excluir") return;
+    if (!valor.destino) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["destino"],
+        message: "destino_obrigatorio",
+      });
+      return;
+    }
+    if (
+      valor.acao === "renomear" &&
+      valor.destino.toLowerCase() === valor.tag.toLowerCase()
+    ) {
+      // Renomear para o mesmo nome (mesmo com outra caixa) não é operação: a
+      // função de banco devolveria `alterou: false` e a tela diria "nada mudou"
+      // sem explicar por quê.
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["destino"],
+        message: "destino_igual_a_tag",
+      });
+    }
+  });
+
+export type VocabularioDeTagsInput = z.infer<typeof vocabularioDeTagsSchema>;
+
+/** Uma linha do vocabulário, como a função de leitura devolve. */
+export type LinhaDeVocabulario = {
+  tag: string;
+  uso_em_contatos: number;
+  uso_em_leads: number;
+  uso_em_conversas: number;
+  em_regras: number;
+  cor: string | null;
+  descricao: string | null;
+  no_vocabulario: boolean;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DUAS CURADORIAS DE ETIQUETA CONVIVEM AQUI, E ISSO E DECISAO PENDENTE
+//
+// O que esta ACIMA veio do upstream na v1.41.0 (#1271, "a etiqueta ganha cor").
+// O que vem ABAIXO e a curadoria que a Tektus construiu em paralelo, sem saber
+// que o upstream estava fazendo a mesma coisa.
+//
+// Os dois convivem porque nenhum NOME colide — conferido no merge, zero exports
+// em comum — e porque apagar um pela metade quebraria a tela que o usa. Qual dos
+// dois fica e decisao de produto: envolve escolher qual TELA sobrevive, nao qual
+// schema e mais bonito.
+//
+// Ate la, mexer aqui exige saber a qual dos dois mundos o seu schema pertence.
+// ═══════════════════════════════════════════════════════════════════════════
 import { conversationTagSchema } from "./messaging";
 
 /**
