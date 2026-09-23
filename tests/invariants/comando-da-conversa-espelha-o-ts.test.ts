@@ -277,20 +277,30 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
       -- coluna única e não confere organização.
       insert into contacts (id, organization_id, force_human, is_blocked)
         values ('${CT_B}', '${ORG_B}', true, true);
-      insert into conversations (id, organization_id, contact_id, channel_session_id, status)
-        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open');
+      insert into conversations (id, organization_id, contact_id, channel_session_id, status,
+                                 assigned_to_user_id)
+        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open', '${DONO}');
+      -- O DONO precisa de VINCULO com a org para a RLS de conversations o
+      -- deixar ler. No resto deste arquivo ele so aparece como alvo de
+      -- atribuicao, e sem user_organizations a leitura abaixo voltava VAZIA:
+      -- nem automatico, nem SUMIU, o que fazia o teste falhar sem dizer nada
+      -- sobre o left join. Pego pelo CI.
+      -- (sem crase neste comentario: ele vive dentro de um template literal)
+      insert into user_organizations (user_id, organization_id, role, accepted_at)
+        values ('${DONO}', '${ORG}', 'agent', now())
+        on conflict do nothing;
     `);
 
     const comoServico = sql(
       `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
     ).trim();
-    // Sem RLS o contato é alcançável, então as flags do contato VALEM — e aqui
-    // o valor certo é `aguardando`, não `humano`: a conversa é inserida SEM
-    // `assigned_to_user_id`, e a ordem de `fn_comando_da_conversa` é dono
-    // primeiro, encerrada depois, só então as travas. Eu tinha escrito
-    // `humano`; conferido no banco: sem dono dá `aguardando`, com dono dá
-    // `humano`. Controle positivo que espera o valor errado não é controle.
-    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
+    // Sem RLS o contato é alcançável, então as flags do contato VALEM. A
+    // conversa TEM dono (é o que dá ao DONO o direito de lê-la na segunda
+    // metade deste caso), e pela ordem de `fn_comando_da_conversa` — dono
+    // primeiro, encerrada depois, só então as travas — com dono e
+    // `force_human` o valor é `humano`. Conferido no banco: sem dono seria
+    // `aguardando`.
+    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("humano");
 
     // Agora com a RLS de verdade: o usuário não é membro da org B.
     //
@@ -321,6 +331,7 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
       delete from conversations where id = '${CONV}';
       delete from contacts where id = '${CT_B}';
       delete from organizations where id = '${ORG_B}';
+      delete from user_organizations where user_id = '${DONO}' and organization_id = '${ORG}';
     `);
   });
 
