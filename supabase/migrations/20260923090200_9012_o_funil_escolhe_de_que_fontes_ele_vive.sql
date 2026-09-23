@@ -33,12 +33,23 @@
 alter table public.crm_pipelines
   add column if not exists fontes text[] not null default array['whatsapp']::text[];
 
--- Backfill explícito. O `default` acima só vale para linha nova; quem já existe
--- precisa ser marcado, e é este comando que garante que ninguém perca o
--- WhatsApp no deploy.
-update public.crm_pipelines
-   set fontes = array['whatsapp']::text[]
- where fontes is null or cardinality(fontes) = 0;
+-- ─── POR QUE NAO HA `UPDATE` DE BACKFILL AQUI ──────────────────────────────
+-- A primeira versao desta migration tinha um
+--   `update ... set fontes = '{whatsapp}' where cardinality(fontes) = 0`
+-- e ele era duas coisas ruins ao mesmo tempo:
+--
+--   MORTO na primeira execucao — `add column ... not null default` ja preenche
+--   TODA linha existente na mesma operacao, entao nao sobra nada para o update
+--   encontrar;
+--
+--   NOCIVO na reaplicacao — e aqui esta o problema de verdade. O `update.sh`
+--   reaplica o `baseline.sql` INTEIRO a cada atualizacao. Um funil que o
+--   cliente deliberadamente deixou sem uma fonte voltaria a `{whatsapp}`
+--   sozinho, a cada update: configuracao do cliente revertida em silencio pelo
+--   proprio instalador, sem ninguem para relacionar uma coisa com a outra.
+--
+-- Quem garante que ninguem perde o WhatsApp no deploy e o `DEFAULT` da coluna,
+-- que roda uma vez e nao se repete. Levantado por @Cassio_SecRev (P2-10).
 
 do $$
 begin
@@ -53,7 +64,14 @@ begin
     alter table public.crm_pipelines
       add constraint crm_pipelines_fontes_conhecidas
       check (
-        fontes <@ array['whatsapp', 'instagram_direct', 'instagram_comentario']::text[]
+        -- `cardinality > 0` NAO e zelo: `'{}'::text[] <@ qualquer_array` e TRUE
+        -- em Postgres, porque o conjunto vazio esta contido em todos. Sem esta
+        -- metade, um funil com `fontes = '{}'` passa no CHECK e nao aceita
+        -- fonte nenhuma — e, pela regra desta feature, conversa de fonte nao
+        -- aceita NAO ENTRA. Seria atendimento interrompido em silencio, e a
+        -- unica rede contra isso do dia em que a tela de configuracao chegar.
+        cardinality(fontes) > 0
+        and fontes <@ array['whatsapp', 'instagram_direct', 'instagram_comentario']::text[]
       );
   end if;
 end $$;

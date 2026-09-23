@@ -71,8 +71,35 @@ export type LeituraDoEvento =
   /** O envelope veio quebrado. Isso é defeito, e quem investiga precisa saber. */
   | { ok: false; motivo: "contrato_violado"; detalhe: string };
 
+/** Corpo de mensagem: preserva o que a pessoa escreveu, espaços inclusive. */
 function texto(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v : null;
+}
+
+/**
+ * IDENTIFICADOR — e por que ele não pode ser o mesmo `texto()` acima.
+ *
+ * A primeira versão validava `v.trim() !== ""` e devolvia `v` SEM trimar. Para
+ * corpo de mensagem isso está certo: o espaço que a pessoa digitou é dela. Para
+ * identidade é um defeito com dois efeitos concretos, os dois silenciosos:
+ *
+ *   `" 178…"` ≠ `"178…"` para o índice único parcial da 9010 → a MESMA pessoa
+ *   vira dois contatos;
+ *
+ *   `" mid-1"` ≠ `"mid-1"` na chave de idempotência → e a fila da Verdash
+ *   REENTREGA por desenho, então a mensagem duplica na conversa do cliente.
+ *
+ * O teto de tamanho é a segunda metade: id da Meta tem dezenas de caracteres, e
+ * aceitar quilobytes aqui deixaria um payload hostil escrever lixo longo numa
+ * coluna indexada.
+ */
+const TETO_DO_IDENTIFICADOR = 255;
+
+function identificador(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const limpo = v.trim();
+  if (limpo === "" || limpo.length > TETO_DO_IDENTIFICADOR) return null;
+  return limpo;
 }
 
 function objeto(v: unknown): Record<string, unknown> | null {
@@ -82,16 +109,45 @@ function objeto(v: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * O `@`, normalizado para a forma que a busca usa.
+ *
+ * O índice da 9010 é sobre `lower(instagram_username)`. Gravar
+ * `"  @Peter Machado  "` como veio faz a busca por `peter` não achar ninguém —
+ * o dado está lá e a tela diz que não está, que é a pior combinação.
+ */
+function arroba(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const limpo = v.trim().replace(/^@+/, "").toLowerCase();
+  if (limpo === "" || limpo.length > TETO_DO_IDENTIFICADOR) return null;
+  return limpo;
+}
+
+/**
  * A Meta manda `timestamp` em MILISSEGUNDOS no messaging do Instagram.
  *
  * Tratar como segundos põe a mensagem em 1970 e ela some do topo do Inbox —
  * falha silenciosa, porque a linha existe e está gravada. Quando o campo não
  * vem ou não é número, o relógio do servidor é melhor que uma data errada.
  */
+/**
+ * Folga para relógio dessincronizado. A Meta e a nossa máquina não marcam a
+ * mesma hora ao milissegundo, e recusar por segundos de diferença jogaria
+ * mensagem legítima para o fim da fila do Inbox.
+ */
+const FOLGA_DE_RELOGIO_MS = 5 * 60_000;
+
 export function dataDoEvento(v: unknown, agora: string): string {
   if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return agora;
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? agora : d.toISOString();
+  if (Number.isNaN(d.getTime())) return agora;
+
+  // TETO NO FUTURO. A defesa contra o erro de unidade (segundos lidos como ms →
+  // 1970) já existia; o erro simétrico ficou aberto e é pior. O Inbox ordena por
+  // `last_message_at desc`: uma data em 5138 fixa a conversa no topo PARA
+  // SEMPRE, e nenhuma mensagem legítima a desloca. Não há como o atendente
+  // consertar isso pela tela.
+  if (d.getTime() > Date.parse(agora) + FOLGA_DE_RELOGIO_MS) return agora;
+  return d.toISOString();
 }
 
 export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEvento {
@@ -120,13 +176,19 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   // `garantirLeadDaConversa` para Direct e não chama para comentário.
   if (tipo === "comentario") return lerComentario(envelope, agora);
 
-  if (tipo !== "direct") return { ok: false, motivo: "ignorar", detalhe: `tipo não tratado: ${tipo}` };
+  if (tipo !== "direct") {
+    // O `tipo` é TRUNCADO e sem caractere de controle: ele vem de fora, e um
+    // valor com quebra de linha forjaria uma linha inteira de log se este texto
+    // for registrado como string solta.
+    const seguro = tipo.replace(/[\u0000-\u001f]/g, " ").slice(0, 64);
+    return { ok: false, motivo: "ignorar", detalhe: `tipo não tratado: ${seguro}` };
+  }
 
   const evento = objeto(envelope.evento);
   if (!evento) return { ok: false, motivo: "contrato_violado", detalhe: "`evento` ausente" };
 
   const remetente = objeto(evento.sender);
-  const igsid = texto(remetente?.id);
+  const igsid = identificador(remetente?.id);
   if (!igsid) return { ok: false, motivo: "contrato_violado", detalhe: "sem `sender.id`" };
 
   const mensagem = objeto(evento.message);
@@ -135,7 +197,7 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   // O id da Meta é a chave de idempotência. Sem ele não há como reconhecer a
   // reentrega, e a fila REENTREGA por desenho — melhor recusar e investigar que
   // gravar a mesma mensagem duas vezes na conversa do cliente.
-  const providerMessageId = texto(envelope.provider_message_id) ?? texto(mensagem.mid);
+  const providerMessageId = identificador(envelope.provider_message_id) ?? identificador(mensagem.mid);
   if (!providerMessageId) {
     return { ok: false, motivo: "contrato_violado", detalhe: "sem id de mensagem" };
   }
@@ -153,19 +215,22 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   // uma DM do nada" são conversas com temperatura diferente, e o atendente abre
   // as duas de jeitos diferentes.
   const respostaA = objeto(mensagem.reply_to);
-  const entrada: EntradaDoInstagram = respostaA?.story ? "story" : "direct";
+  // `objeto(...)` e não truthy: a Meta manda um OBJETO em `story`. Aceitar
+  // qualquer verdadeiro deixaria `story: "x"` de um payload forjado mudar a
+  // origem que a tela mostra ao atendente.
+  const entrada: EntradaDoInstagram = objeto(respostaA?.story) ? "story" : "direct";
 
   return {
     ok: true,
     mensagem: {
       igsid,
-      contaId: texto(objeto(evento.recipient)?.id),
+      contaId: identificador(objeto(evento.recipient)?.id),
       providerMessageId,
       texto: corpoTexto,
       temAnexo: anexos.length > 0,
       entrada,
       recebidaEm: dataDoEvento(evento.timestamp, agora),
-      adId: texto(envelope.ad_id),
+      adId: identificador(envelope.ad_id),
       // O Direct não traz o @: a Meta manda só o IGSID. Quem quiser exibir o @
       // busca no Graph depois — mentir um aqui seria pior que não ter.
       username: null,
@@ -191,12 +256,12 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
   if (!valor) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem `value`" };
 
   const de = objeto(valor.from);
-  const igsid = texto(de?.id);
+  const igsid = identificador(de?.id);
   if (!igsid) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem `from.id`" };
 
   // O id do comentário é a chave de idempotência E o alvo da resposta. Sem ele
   // não há como responder nem como reconhecer a reentrega.
-  const comentarioId = texto(valor.id) ?? texto(envelope.provider_message_id);
+  const comentarioId = identificador(valor.id) ?? identificador(envelope.provider_message_id);
   if (!comentarioId) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem id" };
 
   const corpoTexto = texto(valor.text);
@@ -216,10 +281,10 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
       temAnexo: false,
       entrada: "comentario",
       recebidaEm: dataDoEvento(valor.timestamp ?? evento?.timestamp, agora),
-      adId: texto(envelope.ad_id),
-      username: texto(de?.username),
+      adId: identificador(envelope.ad_id),
+      username: arroba(de?.username),
       conversa: "comentario",
-      mediaId: texto(objeto(valor.media)?.id),
+      mediaId: identificador(objeto(valor.media)?.id),
     },
   };
 }

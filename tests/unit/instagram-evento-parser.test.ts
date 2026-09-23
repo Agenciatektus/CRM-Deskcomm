@@ -176,6 +176,76 @@ describe("leitura do evento do Instagram", () => {
   });
 });
 
+// ─── Os defeitos que a curadoria do @Cassio_SecRev encontrou ───────────────
+//
+// Cada caso abaixo corresponde a um achado real, e o comentário diz o ataque
+// concreto — não a regra abstrata. Sem isso, a próxima refatoração "limpa" o
+// `trim()` achando que é ruído.
+describe("identidade não aceita espaço em branco (P1-1)", () => {
+  it("IGSID com espaço à frente NÃO vira um segundo contato da mesma pessoa", () => {
+    const e = direct();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, sender: { id: "  igsid-abc  " } } },
+      AGORA,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // O índice único da 9010 vê strings: `" igsid"` e `"igsid"` seriam duas
+    // pessoas diferentes para o banco, e a mesma para o mundo.
+    expect(r.mensagem.igsid).toBe("igsid-abc");
+  });
+
+  it("id de mensagem com espaço NÃO duplica a mensagem na conversa", () => {
+    // A fila da Verdash REENTREGA por desenho. Se `" mid-1"` e `"mid-1"` forem
+    // chaves distintas, a reentrega grava a mesma mensagem duas vezes.
+    const r = lerEventoDoInstagram({ ...direct(), provider_message_id: " mid-1 " }, AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.providerMessageId).toBe("mid-1");
+  });
+
+  it("identificador absurdamente longo é recusado, não gravado", () => {
+    const e = direct();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, sender: { id: "x".repeat(5000) } } },
+      AGORA,
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).toBe("contrato_violado");
+  });
+
+  it("o @ é normalizado, senão a busca não acha quem está lá (P2-6)", () => {
+    // O índice da 9010 é sobre `lower(instagram_username)`.
+    const e = comentario();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "  @Peter_Machado " } } } },
+      AGORA,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.username).toBe("peter_machado");
+  });
+});
+
+describe("payload forjado não muda o que a tela mostra (P2-4, P2-2)", () => {
+  it("`reply_to.story` só conta como story se for OBJETO, como a Meta manda", () => {
+    const r = lerEventoDoInstagram(direct({}, { reply_to: { story: "forjado" } }), AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.entrada).toBe("direct");
+  });
+
+  it("tipo com quebra de linha não forja linha de log", () => {
+    const forjado = ["a", "FATAL forjado"].join("\n");
+    const r = lerEventoDoInstagram({ tipo: forjado, evento: {} }, AGORA);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.detalhe).not.toContain("\n");
+    expect(r.detalhe.length).toBeLessThan(90);
+  });
+});
+
 describe("data do evento", () => {
   it("a Meta manda MILISSEGUNDOS", () => {
     expect(dataDoEvento(1_758_500_000_000, AGORA)).toBe("2025-09-22T00:13:20.000Z");
@@ -186,6 +256,19 @@ describe("data do evento", () => {
     expect(dataDoEvento(1_758_500_000, AGORA).startsWith("1970")).toBe(true);
     // Documentando o modo de falha: quem passar segundos VAI ver 1970 e tem de
     // corrigir na origem, não aqui — adivinhar a unidade esconderia o defeito.
+  });
+
+  it("data NO FUTURO é recusada — senão a conversa trava no topo do Inbox (P1-6)", () => {
+    // O Inbox ordena por `last_message_at desc`. Uma data em 5138 fixa a
+    // conversa em primeiro lugar PARA SEMPRE, e o atendente não tem como
+    // consertar pela tela.
+    expect(dataDoEvento(99_999_999_999_999, AGORA)).toBe(AGORA);
+    expect(dataDoEvento(8.64e15, AGORA)).toBe(AGORA);
+  });
+
+  it("mas tolera relógio levemente adiantado, que é normal entre máquinas", () => {
+    const doisMinutosAFrente = Date.parse(AGORA) + 2 * 60_000;
+    expect(dataDoEvento(doisMinutosAFrente, AGORA)).not.toBe(AGORA);
   });
 
   it("sem timestamp usa o relógio do servidor, não uma data inventada", () => {
