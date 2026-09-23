@@ -59,6 +59,38 @@ comment on column public.contacts.instagram_username is
 --  Vale como regra para a próxima coluna de identidade que alguém criar aqui.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- ─── Guarda das âncoras: EXATAMENTE uma, nunca "pelo menos uma" ────────────
+--
+-- `position(... ) = 0` prova que a âncora existe. Não prova que ela é única —
+-- e `replace()` no Postgres é replace-ALL. Se uma redefinição futura
+-- introduzir uma segunda ocorrência (a cascata de LGPD zera PII em várias
+-- tabelas: um segundo `phone_number = null,` é plausível), o patch é injetado
+-- nos DOIS lugares.
+--
+-- E aí vem a parte ruim: o validador de `plpgsql` faz checagem SINTÁTICA e não
+-- resolve nome de coluna, então o `create or replace` PASSA. A função só
+-- explode no dia em que alguém exercer um apagamento de LGPD de verdade.
+--
+-- Levantado por @Cassio_SecRev na segunda passada.
+create or replace function public.fn_9010_ancora_unica(p_def text, p_ancora text, p_onde text)
+returns void
+language plpgsql
+immutable
+set search_path = ''
+as $fn$
+declare
+  v_n integer;
+begin
+  v_n := (length(p_def) - length(replace(p_def, p_ancora, ''))) / length(p_ancora);
+  if v_n <> 1 then
+    raise exception
+      '9010: a ancora de % aparece % vez(es) na definicao vigente (esperado exatamente 1). A funcao mudou de forma — releia antes de remendar.',
+      p_onde, v_n;
+  end if;
+end $fn$;
+
+revoke execute on function public.fn_9010_ancora_unica(text, text, text) from public, anon, authenticated;
+
 -- ─── 2 · A fusão precisa HERDAR o IGSID ────────────────────────────────────
 --
 -- O comentário no topo desta migration dizia que o vencedor herda o IGSID da
@@ -94,9 +126,7 @@ begin
   end if;
 
   v_ancora := '  v_lid text;';
-  if position(v_ancora in v_def) = 0 then
-    raise exception '9010: nao achei a declaracao de v_lid em fn_mesclar_contatos — a funcao mudou de forma, releia antes de remendar';
-  end if;
+  perform public.fn_9010_ancora_unica(v_def, v_ancora, 'declaracao de v_lid em fn_mesclar_contatos');
 
   v_def := replace(
     v_def,
@@ -109,9 +139,7 @@ begin
   -- sobrar aqui é conflito com um TERCEIRO contato vivo — e nesse caso o
   -- vencedor simplesmente não herda, em vez de a fusão inteira falhar.
   v_ancora := '  select coalesce(array_agg(distinct t)';
-  if position(v_ancora in v_def) = 0 then
-    raise exception '9010: nao achei o bloco de tags em fn_mesclar_contatos — releia antes de remendar';
-  end if;
+  perform public.fn_9010_ancora_unica(v_def, v_ancora, 'bloco de tags em fn_mesclar_contatos');
 
   v_def := replace(
     v_def,
@@ -127,15 +155,17 @@ begin
     '     where o.organization_id = p_organization_id and o.is_merged_into is null' || chr(10) ||
     '       and o.id <> p_contato_principal and o.instagram_igsid = v_igsid' || chr(10) ||
     '  ) then v_igsid := null; end if;' || chr(10) ||
+    '  -- Abre a escotilha da trigger de identidade para ESTA transacao. Sem' || chr(10) ||
+    '  -- isto a heranca logo abaixo levanta 42501 e a fusao inteira aborta:' || chr(10) ||
+    '  -- SECURITY DEFINER troca o papel e NAO troca auth.uid().' || chr(10) ||
+    '  perform set_config(''deskcomm.identidade_de_instagram'', ''on'', true);' || chr(10) ||
     v_ancora
   );
 
   -- Escreve no vencedor. `coalesce` porque o principal MANDA: ele herda só o
   -- que não tinha, nunca sobrescreve o que o atendente digitou.
   v_ancora := '    phone_number = coalesce(phone_number, v_telefone),';
-  if position(v_ancora in v_def) = 0 then
-    raise exception '9010: nao achei o update do vencedor em fn_mesclar_contatos — releia antes de remendar';
-  end if;
+  perform public.fn_9010_ancora_unica(v_def, v_ancora, 'update do vencedor em fn_mesclar_contatos');
 
   v_def := replace(
     v_def,
@@ -143,6 +173,25 @@ begin
     v_ancora || chr(10) ||
     '    instagram_igsid = coalesce(instagram_igsid, v_igsid),' || chr(10) ||
     '    instagram_username = coalesce(instagram_username, v_username),'
+  );
+
+  -- FECHA a escotilha logo depois do uso.
+  --
+  -- `set_config(..., true)` e TRANSACAO-local, nao statement-local. Deixada
+  -- aberta, ela vale pelo resto da transacao — e qualquer escrita posterior no
+  -- mesmo request passaria pela trava. Medido no ensaio: sem este reset, um
+  -- `update contacts set instagram_igsid` logo apos a fusao era ACEITO.
+  --
+  -- A janela certa e a menor possivel: abre antes do update do vencedor, fecha
+  -- depois dele.
+  v_ancora := '  -- 7 · A fusão aparece na timeline';
+  perform public.fn_9010_ancora_unica(v_def, v_ancora, 'inicio do passo 7 em fn_mesclar_contatos');
+
+  v_def := replace(
+    v_def,
+    v_ancora,
+    '  perform set_config(''deskcomm.identidade_de_instagram'', ''off'', true);' || chr(10) ||
+    v_ancora
   );
 
   execute v_def;
@@ -180,10 +229,11 @@ begin
     return;
   end if;
 
-  if position(v_ancora in v_def) = 0 then
-    raise exception '9010: a ancora do apagamento mudou na cascata de LGPD — releia antes de remendar';
-  end if;
+  perform public.fn_9010_ancora_unica(v_def, v_ancora, 'apagamento na cascata de LGPD');
 
+  -- A cascata roda pelo ADMIN (`lib/lgpd/redact-cascade.ts`), então `auth.uid()`
+  -- é null lá dentro e a trigger de identidade já a deixa passar. Não precisa
+  -- de escotilha — e acrescentar uma que não é exercida seria guarda morta.
   execute replace(
     v_def,
     v_ancora,
@@ -210,16 +260,48 @@ end $mig$;
 -- já escrito em `fn_colunas_de_cliente_sao_do_sistema`: a lista de colunas
 -- concedidas envelhece em silêncio a cada coluna nova, e no dia em que alguém
 -- esquecer de acrescentá-la a tela para de salvar sem dizer por quê.
+-- SEM `security definer`, de propósito: o padrão-irmão que esta função copia
+-- (`fn_colunas_de_cliente_sao_do_sistema`) também não o tem. O corpo só lê
+-- `NEW`/`OLD` e levanta exceção — não toca tabela, não monta SQL dinâmico —,
+-- então o privilégio não compra nada e só ampliaria em silêncio o que uma
+-- edição futura desta função poderia fazer. Least privilege (@Cassio_SecRev).
 create or replace function public.fn_identidade_de_instagram_e_do_sistema()
 returns trigger
 language plpgsql
-security definer
 set search_path = ''
 as $fn$
 begin
   -- `auth.uid() is null` é a ingestão rodando com service role: ela PRECISA
   -- escrever, é ela quem descobre o IGSID. A trava é para sessão de gente.
   if auth.uid() is null then
+    return new;
+  end if;
+
+  -- ─── A ESCOTILHA, e por que ela NÃO é um buraco ──────────────────────────
+  --
+  -- `SECURITY DEFINER` troca o PAPEL e não troca `auth.uid()`: a GUC que o
+  -- PostgREST setou continua lá dentro. E `fn_mesclar_contatos` roda com o
+  -- cliente do USUÁRIO de propósito (está escrito na rota: é assim que
+  -- `auth.uid()` chega à função para ela reconferir o papel e assinar a
+  -- atividade na timeline).
+  --
+  -- Sem esta escotilha os dois consertos desta migration se anulam: a herança
+  -- do IGSID muda a coluna, esta trava levanta 42501, e A FUSÃO INTEIRA ABORTA
+  -- — exatamente e somente quando a herança teria efeito. Medido num Postgres
+  -- com o dump de produção: manager real, vencedor sem IGSID, perdedor com,
+  -- fusão recusada com a mensagem daqui de baixo.
+  --
+  -- A chave é de TRANSAÇÃO (`set_config(..., true)`) e não é alcançável de
+  -- fora: o PostgREST não envia SQL solto, e `set_config` mora em `pg_catalog`,
+  -- fora do schema exposto. É o mesmo mecanismo que
+  -- `fn_colunas_de_cliente_sao_do_sistema` já usa nesta base, pelo mesmo
+  -- motivo — e a lição dela é que não basta copiar a guarda: a escotilha é o
+  -- que faz o padrão funcionar.
+  --
+  -- A alternativa preguiçosa seria deixar `null -> valor` passar livre. Não
+  -- serve: é o ataque principal (um `viewer` grava IGSID num contato que ainda
+  -- não tem nenhum, e a próxima conversa daquela pessoa cola no contato dele).
+  if coalesce(current_setting('deskcomm.identidade_de_instagram', true), '') = 'on' then
     return new;
   end if;
 
@@ -235,9 +317,15 @@ end $fn$;
 revoke execute on function public.fn_identidade_de_instagram_e_do_sistema() from public, anon, authenticated;
 
 drop trigger if exists trg_identidade_de_instagram_e_do_sistema on public.contacts;
+-- `update of` + `when`: sem isto a trigger seria considerada em TODO update de
+-- `contacts` — inclusive no bump de `last_activity_at` a cada mensagem, que é o
+-- caminho mais quente do sistema. Com os dois filtros, ela nem é avaliada
+-- quando a coluna não está no `SET`. Não substitui a escotilha da GUC: a fusão
+-- passa pelos dois filtros e continuaria barrada sem ela.
 create trigger trg_identidade_de_instagram_e_do_sistema
-  before update on public.contacts
+  before update of instagram_igsid on public.contacts
   for each row
+  when (old.instagram_igsid is distinct from new.instagram_igsid)
   execute function public.fn_identidade_de_instagram_e_do_sistema();
 
 notify pgrst, 'reload schema';

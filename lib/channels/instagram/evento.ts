@@ -115,11 +115,22 @@ function objeto(v: unknown): Record<string, unknown> | null {
  * `"  @Peter Machado  "` como veio faz a busca por `peter` não achar ninguém —
  * o dado está lá e a tela diz que não está, que é a pior combinação.
  */
+/**
+ * Handle do Instagram: letras, números, ponto e sublinhado. Nada mais.
+ *
+ * A primeira versão só trimava e baixava a caixa, e com isso `"a
+b"` e
+ * `"peter machado"` — com espaço no MEIO — eram aceitos como `@`. Handle do
+ * Instagram não tem espaço nem quebra de linha: o que não casa com a forma não
+ * é um `@`, é lixo, e gravá-lo como se fosse suja a busca e a tela.
+ */
+const FORMA_DO_HANDLE = /^[a-z0-9._]+$/;
+
 function arroba(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const limpo = v.trim().replace(/^@+/, "").toLowerCase();
   if (limpo === "" || limpo.length > TETO_DO_IDENTIFICADOR) return null;
-  return limpo;
+  return FORMA_DO_HANDLE.test(limpo) ? limpo : null;
 }
 
 /**
@@ -141,12 +152,20 @@ export function dataDoEvento(v: unknown, agora: string): string {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return agora;
 
+  // O teto abaixo compara contra `agora`. Se `agora` vier malformado,
+  // `Date.parse` devolve NaN, `x > NaN` é FALSO, e a rede de segurança
+  // simplesmente não se aplica — medido: com `agora = "ontem"`, um timestamp
+  // de 5138 passava inteiro. Guarda que depende de outro input estar bem
+  // formado não é guarda.
+  const limite = Date.parse(agora);
+  if (!Number.isFinite(limite)) return new Date().toISOString();
+
   // TETO NO FUTURO. A defesa contra o erro de unidade (segundos lidos como ms →
   // 1970) já existia; o erro simétrico ficou aberto e é pior. O Inbox ordena por
   // `last_message_at desc`: uma data em 5138 fixa a conversa no topo PARA
   // SEMPRE, e nenhuma mensagem legítima a desloca. Não há como o atendente
   // consertar isso pela tela.
-  if (d.getTime() > Date.parse(agora) + FOLGA_DE_RELOGIO_MS) return agora;
+  if (d.getTime() > limite + FOLGA_DE_RELOGIO_MS) return agora;
   return d.toISOString();
 }
 

@@ -277,3 +277,43 @@ describe("data do evento", () => {
     expect(dataDoEvento(0, AGORA)).toBe(AGORA);
   });
 });
+
+describe("clamp de data não depende de `agora` estar bem formado (2a passada)", () => {
+  it("`agora` inválido não DESLIGA o teto — NaN faz toda comparação ser falsa", () => {
+    // Medido antes do conserto: com `agora = "ontem"`, um timestamp de 5138
+    // passava inteiro, porque `x > NaN` é falso e o teto simplesmente não se
+    // aplicava. Guarda que depende de outro input estar bom não é guarda.
+    const r = dataDoEvento(99_999_999_999_999, "ontem");
+    expect(r.startsWith("5138")).toBe(false);
+  });
+});
+
+describe("o @ só aceita a forma de um handle (2a passada)", () => {
+  it("espaço no MEIO não é handle do Instagram", () => {
+    const e = comentario();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "peter machado" } } } },
+      AGORA,
+    );
+    expect(r.ok && r.mensagem.username).toBeNull();
+  });
+
+  it("quebra de linha não vira @", () => {
+    const e = comentario();
+    const sujo = ["a", "b"].join("\n");
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: sujo } } } },
+      AGORA,
+    );
+    expect(r.ok && r.mensagem.username).toBeNull();
+  });
+
+  it("ponto e sublinhado são válidos — é o que o Instagram permite", () => {
+    const e = comentario();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "@Peter.Machado_01" } } } },
+      AGORA,
+    );
+    expect(r.ok && r.mensagem.username).toBe("peter.machado_01");
+  });
+});
