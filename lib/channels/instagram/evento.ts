@@ -148,24 +148,29 @@ function arroba(v: unknown): string | null {
 const FOLGA_DE_RELOGIO_MS = 5 * 60_000;
 
 export function dataDoEvento(v: unknown, agora: string): string {
-  if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return agora;
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return agora;
-
-  // O teto abaixo compara contra `agora`. Se `agora` vier malformado,
-  // `Date.parse` devolve NaN, `x > NaN` é FALSO, e a rede de segurança
-  // simplesmente não se aplica — medido: com `agora = "ontem"`, um timestamp
-  // de 5138 passava inteiro. Guarda que depende de outro input estar bem
-  // formado não é guarda.
+  // `agora` É VALIDADO NO TOPO, antes de qualquer saída.
+  //
+  // A primeira versão disto validava no MEIO da função, e o resultado foi uma
+  // função com dois comportamentos: o caminho do teto ficava protegido e os
+  // outros quatro devolviam a string crua — que vai direto para uma coluna
+  // `timestamptz`. Medido pelo @Cassio_SecRev: com `agora = "ontem"`, quatro
+  // das cinco saídas devolviam `"ontem"`.
+  //
+  // Validar uma vez, no topo, e usar o validado em TODO fallback devolve à
+  // função um comportamento só. O que se defende é o que se mediu.
   const limite = Date.parse(agora);
-  if (!Number.isFinite(limite)) return new Date().toISOString();
+  const base = Number.isFinite(limite) ? agora : new Date().toISOString();
+
+  if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return base;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return base;
 
   // TETO NO FUTURO. A defesa contra o erro de unidade (segundos lidos como ms →
   // 1970) já existia; o erro simétrico ficou aberto e é pior. O Inbox ordena por
   // `last_message_at desc`: uma data em 5138 fixa a conversa no topo PARA
   // SEMPRE, e nenhuma mensagem legítima a desloca. Não há como o atendente
   // consertar isso pela tela.
-  if (d.getTime() > limite + FOLGA_DE_RELOGIO_MS) return agora;
+  if (d.getTime() > Date.parse(base) + FOLGA_DE_RELOGIO_MS) return base;
   return d.toISOString();
 }
 

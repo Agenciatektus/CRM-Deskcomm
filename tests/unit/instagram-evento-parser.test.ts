@@ -317,3 +317,33 @@ describe("o @ só aceita a forma de um handle (2a passada)", () => {
     expect(r.ok && r.mensagem.username).toBe("peter.machado_01");
   });
 });
+
+describe("as CINCO saídas de dataDoEvento respeitam `agora` inválido", () => {
+  // O conserto anterior protegeu uma saída e deixou quatro devolvendo a string
+  // crua, que vai para uma coluna `timestamptz`. Uma função com dois
+  // comportamentos é pior que uma sem defesa: defende-se o que se mediu, e o
+  // que não se mediu passa. Cada `it` abaixo é uma das cinco.
+  const INVALIDO = "ontem";
+  const ehIso = (s: string) => /^\d{4}-\d{2}-\d{2}T/.test(s);
+
+  it("1) timestamp no futuro", () => {
+    expect(ehIso(dataDoEvento(99_999_999_999_999, INVALIDO))).toBe(true);
+  });
+  it("2) timestamp ausente", () => {
+    expect(ehIso(dataDoEvento(undefined, INVALIDO))).toBe(true);
+  });
+  it("3) timestamp não-numérico", () => {
+    expect(ehIso(dataDoEvento("amanhã", INVALIDO))).toBe(true);
+  });
+  it("4) timestamp zero", () => {
+    expect(ehIso(dataDoEvento(0, INVALIDO))).toBe(true);
+  });
+  it("5) acima do máximo do Date", () => {
+    expect(ehIso(dataDoEvento(8.7e15, INVALIDO))).toBe(true);
+  });
+
+  it("e com `agora` VÁLIDO nada muda — a folga de relógio continua valendo", () => {
+    expect(dataDoEvento(undefined, AGORA)).toBe(AGORA);
+    expect(dataDoEvento(Date.parse(AGORA) + 2 * 60_000, AGORA)).not.toBe(AGORA);
+  });
+});

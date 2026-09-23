@@ -75,14 +75,23 @@ comment on column public.contacts.instagram_username is
 create or replace function public.fn_9010_ancora_unica(p_def text, p_ancora text, p_onde text)
 returns void
 language plpgsql
-immutable
+-- `volatile` (o default) e nao `immutable`: IMMUTABLE promete ao planejador que
+-- a chamada pode ser avaliada cedo, cacheada ou dobrada como constante. Para
+-- uma GUARDA, "elidida" e a palavra que nunca se quer no contrato — mesmo que
+-- hoje nao morda (@Cassio_SecRev).
 set search_path = ''
 as $fn$
 declare
   v_n integer;
 begin
+  if p_def is null or p_ancora is null or p_ancora = '' then
+    raise exception '9010: guarda de ancora chamada sem definicao ou sem ancora (%)', p_onde;
+  end if;
   v_n := (length(p_def) - length(replace(p_def, p_ancora, ''))) / length(p_ancora);
-  if v_n <> 1 then
+  -- `is distinct from` e nao `<>`: com v_n NULL, `NULL <> 1` e NULL, o `if` e
+  -- falso e a GUARDA PASSA SEM LEVANTAR NADA. Guarda nao deve depender da
+  -- educacao do chamador.
+  if v_n is distinct from 1 then
     raise exception
       '9010: a ancora de % aparece % vez(es) na definicao vigente (esperado exatamente 1). A funcao mudou de forma — releia antes de remendar.',
       p_onde, v_n;
