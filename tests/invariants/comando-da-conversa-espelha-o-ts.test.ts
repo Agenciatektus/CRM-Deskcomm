@@ -293,23 +293,29 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
 
     // Agora com a RLS de verdade: o usuário não é membro da org B.
+    //
+    // MARCADOR em volta do valor, e busca na saída inteira — não
+    // `.split().pop()`. O CI pegou isto: a última linha de um script com
+    // `rollback;` é `ROLLBACK`, não o resultado do `select`, e a asserção
+    // comparava contra ela. Um teste que lê a linha errada falha (ou passa) sem
+    // relação com o produto.
     const comoUsuario = sql(`
       begin;
       select set_config('request.jwt.claims',
         json_build_object('sub','${DONO}','role','authenticated')::text, true);
       set local role authenticated;
-      select coalesce(public.comando_da_conversa(c), '(SUMIU)') from conversations c where c.id = '${CONV}';
+      select '<<' || coalesce(public.comando_da_conversa(c), 'SUMIU') || '>>'
+        from conversations c where c.id = '${CONV}';
       rollback;
-    `)
-      .split("\n")
-      .filter(Boolean)
-      .pop()!
-      .trim();
+    `);
 
-    // O que se cobra aqui NÃO é o valor do comando — é a conversa continuar
-    // existindo. Se o `left join` virar `join`, isto vem vazio.
-    expect(comoUsuario, "a conversa some quando o contato não é visível").not.toBe("(SUMIU)");
-    expect(comoUsuario, "sem contato visível, o comando degrada para o padrão").toBe("automatico");
+    // O que se cobra aqui NÃO é só o valor do comando — é a conversa continuar
+    // existindo. Se o `left join` virar `join`, a linha some e nenhum marcador
+    // aparece na saída.
+    expect(comoUsuario, "a conversa some quando o contato não é visível").not.toContain("<<SUMIU>>");
+    expect(comoUsuario, "sem contato visível, o comando degrada para o padrão").toContain(
+      "<<automatico>>",
+    );
 
     sql(`
       delete from conversations where id = '${CONV}';
