@@ -5343,18 +5343,46 @@ create or replace function public.fn_can_view_conversation(
 language sql stable security definer
 set search_path = public
 as $$
+  -- O PAPEL É RESOLVIDO UMA VEZ, não duas (migration 9014).
+  --
+  -- Esta função é o predicado da RLS de `conversations`: roda uma vez POR LINHA
+  -- em toda leitura do Inbox. A versão anterior chamava
+  -- `fn_user_role_in_org(p_org)` DUAS vezes na mesma expressão CASE, e cada
+  -- chamada dela executa `fn_support_context()` mais uma consulta a
+  -- `user_organizations`.
+  --
+  -- Medido na produção do cliente: 1.089 → 685 buffers (-37%). O tempo quase
+  -- não muda nesta base (78 → 73 ms); o ganho é de I/O lógico, que importa sob
+  -- CONCORRÊNCIA — menos páginas por requisição é menos contenção quando várias
+  -- pessoas abrem o Inbox ao mesmo tempo.
+  --
+  -- Equivalência provada em 72 casos: todo vínculo vivo × os três
+  -- `visibility_mode` × `assigned` nulo/próprio/de terceiro. Zero divergências.
+  --
+  -- Testado e DESCARTADO: resolver o `visibility_mode` no mesmo subselect dá
+  -- 697 buffers — empate. A leitura de `organizations` não era o gargalo.
+  --
+  -- ⚠️ `security definer` + `set search_path` FICAM. É verdade que função
+  -- `language sql` com cláusula SET nunca é inlineada, e que remover o SET
+  -- aceleraria — mas esta função decide QUEM VÊ QUAL CONVERSA, e sem o
+  -- `search_path` fixo fica aberta a sequestro de caminho.
   select case
     when public.fn_is_platform_admin() then true
-    when public.fn_user_role_in_org(p_org) is null then false
-    when public.fn_user_role_in_org(p_org) in ('viewer','manager','admin') then true
-    when p_assigned_to_user_id = auth.uid() then true
-    else case coalesce(
-           (select settings->>'visibility_mode' from public.organizations where id = p_org),
-           'own_and_unassigned')
-         when 'all' then true
-         when 'own_and_unassigned' then p_assigned_to_user_id is null
-         else false
-       end
+    else (
+      select case
+        when s.papel is null then false
+        when s.papel in ('viewer','manager','admin') then true
+        when p_assigned_to_user_id = auth.uid() then true
+        else case coalesce(
+               (select settings->>'visibility_mode' from public.organizations where id = p_org),
+               'own_and_unassigned')
+             when 'all' then true
+             when 'own_and_unassigned' then p_assigned_to_user_id is null
+             else false
+             end
+      end
+      from (select public.fn_user_role_in_org(p_org) as papel) s
+    )
   end;
 $$;
 
