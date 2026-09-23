@@ -17163,17 +17163,45 @@ language sql
 stable
 set search_path = public
 as $comando$
+  -- UM acesso ao contato, não dois.
+  --
+  -- Esta função é campo COMPUTADO do PostgREST: roda uma vez POR LINHA, na
+  -- página E na contagem, e o Inbox tem quatro abas que contam separado. A
+  -- versão anterior fazia DUAS subconsultas ao MESMO contato (`force_human` e
+  -- `is_blocked`), e cada uma passava pela RLS de `contacts`.
+  --
+  -- Medido na produção do Dr. Paulo, 168 conversas numa tabela de 13 buffers:
+  --
+  --   só a RLS de conversations ....   449 buffers
+  --   com esta função (antes) ...... 7.914 buffers,  730 ms
+  --   com esta função (depois) ..... 3.547 buffers,  260 ms
+  --
+  -- O `statement_timeout` de `authenticated` é 8s, e 11 queries de
+  -- `conversations` já tinham máximo acima de 7s no `pg_stat_statements`.
+  -- Quando estoura, o PostgREST devolve erro e a atendente vê "Erro ao carregar
+  -- conversas" — foi o que o cliente relatou em 23/09.
+  --
+  -- EQUIVALÊNCIA PROVADA antes de aplicar: comparadas linha a linha nas 168
+  -- conversas de produção com `is distinct from` — zero divergências.
+  --
+  -- `left join` e não `join`: `contact_id` é anulável, e contato ausente não
+  -- pode derrubar a linha para fora de todo filtro — o efeito seria uma
+  -- conversa invisível em TODAS as abas. `contacts.id` é chave primária, então
+  -- o join casa no máximo uma linha e a função devolve um valor só.
+  --
+  -- O que NÃO foi feito, de propósito: `security definer` para pular a RLS de
+  -- `contacts`. Seria mais rápido e abriria uma porta — esta função é exposta
+  -- pelo PostgREST e passaria a ler contato que o chamador não pode ver.
   select public.fn_comando_da_conversa(
     c.status,
     c.assigned_to_user_id,
     c.bot_silenced_until,
-    -- `coalesce` porque `contact_id` é anulável no schema: contato ausente não pode
-    -- virar `null` e derrubar a linha inteira para fora de todo filtro — o efeito
-    -- seria uma conversa invisível em TODAS as abas.
-    coalesce((select ct.force_human from public.contacts ct where ct.id = c.contact_id), false),
-    coalesce((select ct.is_blocked  from public.contacts ct where ct.id = c.contact_id), false),
+    coalesce(ct.force_human, false),
+    coalesce(ct.is_blocked, false),
     now()
-  );
+  )
+  from (select 1) as _
+  left join public.contacts ct on ct.id = c.contact_id
 $comando$;
 
 comment on function public.comando_da_conversa(public.conversations)
