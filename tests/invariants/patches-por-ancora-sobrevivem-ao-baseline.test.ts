@@ -30,11 +30,16 @@ import { describe, expect, it } from "vitest";
 
 import { sql } from "./gov-helpers";
 
-function definicao(nome: string): string {
+/**
+ * `pronargs` desambigua SOBRECARGA. Sem ele, com duas assinaturas o `-tA`
+ * concatena as duas definicoes e um `toContain` passa se QUALQUER uma tiver a
+ * string — teste verde com metade do produto quebrado.
+ */
+function definicao(nome: string, args: number): string {
   return sql(
     `select pg_get_functiondef(p.oid)
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.proname = '${nome}'`,
+      where n.nspname = 'public' and p.proname = '${nome}' and p.pronargs = ${args}`,
   );
 }
 
@@ -43,7 +48,7 @@ describe("os patches por âncora sobrevivem ao baseline", () => {
     // Sem isto: funde-se o contato do Instagram com o do WhatsApp, o IGSID fica
     // na lápide, e a próxima DM daquela pessoa não acha ninguém e CRIA UM
     // CONTATO NOVO — refazendo a duplicata que o operador acabou de desfazer.
-    const def = definicao("fn_mesclar_contatos");
+    const def = definicao("fn_mesclar_contatos", 3);
     expect(def, "a função de fusão sumiu do catálogo").toContain("fn_mesclar_contatos");
     expect(def, "a herança do IGSID foi revertida pela reaplicação do baseline").toContain(
       "instagram_igsid = coalesce",
@@ -56,7 +61,7 @@ describe("os patches por âncora sobrevivem ao baseline", () => {
   it("a fusão ABRE e FECHA a escotilha da trava de identidade", () => {
     // Abrir sem fechar deixa a trava desarmada pelo resto da transação — medido
     // no ensaio da PR #6, e é o defeito que o próprio conserto introduziu.
-    const def = definicao("fn_mesclar_contatos");
+    const def = definicao("fn_mesclar_contatos", 3);
     const aberturas = (def.match(/deskcomm\.identidade_de_instagram'*,\s*'*on/g) ?? []).length;
     const fechamentos = (def.match(/deskcomm\.identidade_de_instagram'*,\s*'*off/g) ?? []).length;
     expect(aberturas, "a escotilha não é aberta — a fusão vai abortar com 42501").toBeGreaterThan(0);
@@ -70,7 +75,7 @@ describe("os patches por âncora sobrevivem ao baseline", () => {
     // SUCESSO, os contadores fecham — e a linha segue carregando o `@` da
     // pessoa, que é identificador direto, e o id estável que a Meta emite para
     // ela. Falha silenciosa com recibo de conformidade por cima.
-    const def = definicao("fn_lgpd_cascade_redact_contact");
+    const def = definicao("fn_lgpd_cascade_redact_contact", 3);
     expect(def, "a cascata de LGPD sumiu do catálogo").toContain(
       "fn_lgpd_cascade_redact_contact",
     );
@@ -99,6 +104,24 @@ describe("os patches por âncora sobrevivem ao baseline", () => {
     expect(t, "a trigger perdeu o `update of` e voltou ao caminho quente").toMatch(
       /UPDATE OF instagram_igsid/i,
     );
-    expect(t, "a trigger perdeu a cláusula WHEN").toMatch(/WHEN/i);
+    // `/WHEN/` sozinho aceitaria `WHEN (true)`, que nao filtra nada.
+    expect(t, "a cláusula WHEN não filtra mais a coluna certa").toMatch(
+      /WHEN .*instagram_igsid/i,
+    );
+  });
+
+  it("a trava de identidade NÃO é security definer", () => {
+    // Foi decisão consciente da PR #6: o padrão-irmão
+    // (`fn_colunas_de_cliente_sao_do_sistema`) também não é, o corpo só lê
+    // NEW/OLD, e privilégio que não compra nada só amplia o que uma edição
+    // futura poderia fazer. Nada protegia essa decisão até aqui.
+    const prosecdef = sql(`
+      select p.prosecdef
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'fn_identidade_de_instagram_e_do_sistema'
+    `).trim();
+    expect(prosecdef, "a trigger virou security definer — privilégio que ela não precisa").toBe(
+      "f",
+    );
   });
 });

@@ -284,8 +284,13 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     const comoServico = sql(
       `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
     ).trim();
-    // Sem RLS o contato é alcançável, então as flags valem: `force_human` manda.
-    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("humano");
+    // Sem RLS o contato é alcançável, então as flags do contato VALEM — e aqui
+    // o valor certo é `aguardando`, não `humano`: a conversa é inserida SEM
+    // `assigned_to_user_id`, e a ordem de `fn_comando_da_conversa` é dono
+    // primeiro, encerrada depois, só então as travas. Eu tinha escrito
+    // `humano`; conferido no banco: sem dono dá `aguardando`, com dono dá
+    // `humano`. Controle positivo que espera o valor errado não é controle.
+    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
 
     // Agora com a RLS de verdade: o usuário não é membro da org B.
     const comoUsuario = sql(`
