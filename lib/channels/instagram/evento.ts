@@ -24,6 +24,13 @@
 /** De onde a conversa nasceu. Vai para a tela: o atendente precisa saber. */
 export type EntradaDoInstagram = "direct" | "story" | "comentario";
 
+/**
+ * O que a CONVERSA é, para o filtro do Inbox. `story` não entra aqui de
+ * propósito: resposta a story é Direct e cai na mesma conversa de DM — ver a
+ * nota na migration 9011.
+ */
+export type EntradaDaConversa = "direct" | "comentario";
+
 export interface MensagemDoInstagram {
   /** Id estável do par (conta, pessoa). É a IDENTIDADE — o @ muda, este não. */
   igsid: string;
@@ -39,6 +46,19 @@ export interface MensagemDoInstagram {
   recebidaEm: string;
   /** Quando o Direct nasceu de um anúncio. Alimenta a atribuição. */
   adId: string | null;
+  /**
+   * O @ de quem escreveu, quando o evento traz. O comentário traz; o Direct
+   * não. Serve para exibir e buscar — a identidade é sempre o IGSID.
+   */
+  username: string | null;
+  /** Em qual conversa isto cai. Comentário não se mistura com DM no Inbox. */
+  conversa: EntradaDaConversa;
+  /**
+   * Só em comentário: o post onde ele foi deixado. O atendente precisa saber a
+   * qual publicação a pergunta se refere — sem isso, "quanto custa?" sem
+   * contexto é impossível de responder.
+   */
+  mediaId: string | null;
 }
 
 export type LeituraDoEvento =
@@ -85,12 +105,20 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   // conversa a partir disso encheria o Inbox de conversas vazias.
   if (tipo === "leitura") return { ok: false, motivo: "ignorar", detalhe: "recibo de leitura" };
 
-  // Comentário é INTERAÇÃO PÚBLICA, e de propósito não vira conversa nem lead —
-  // a mesma regra que a Verdash já aplica do lado dela. Alguém que comenta
-  // "que lindo 😍" num post não pediu atendimento, e transformar isso em card no
-  // funil enche o Kanban de ruído que o vendedor tem de limpar à mão. Quem
-  // responde comentário responde pela Verdash, onde ele aparece como interação.
-  if (tipo === "comentario") return { ok: false, motivo: "ignorar", detalhe: "comentário é interação, não conversa" };
+  // ─── Comentário: APARECE no Inbox, mas NÃO vira lead ──────────────────────
+  //
+  // As duas metades são decisão de produto, e uma sem a outra estaria errada:
+  //
+  //   não vira lead  → quem comenta "que lindo 😍" não pediu atendimento, e
+  //                    virar card encheria o Kanban de ruído para o vendedor
+  //                    limpar à mão;
+  //   aparece no Inbox → alguém precisa responder, seja a pessoa ou a IA, e o
+  //                    que não aparece não é respondido.
+  //
+  // Isso só cabe porque conversa e lead são entidades SEPARADAS neste schema.
+  // Quem decide a segunda metade é a ingestão, que chama
+  // `garantirLeadDaConversa` para Direct e não chama para comentário.
+  if (tipo === "comentario") return lerComentario(envelope, agora);
 
   if (tipo !== "direct") return { ok: false, motivo: "ignorar", detalhe: `tipo não tratado: ${tipo}` };
 
@@ -138,6 +166,60 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
       entrada,
       recebidaEm: dataDoEvento(evento.timestamp, agora),
       adId: texto(envelope.ad_id),
+      // O Direct não traz o @: a Meta manda só o IGSID. Quem quiser exibir o @
+      // busca no Graph depois — mentir um aqui seria pior que não ter.
+      username: null,
+      conversa: "direct",
+      mediaId: null,
+    },
+  };
+}
+
+/**
+ * O comentário tem forma PRÓPRIA — `{ field, value }`, e não `sender`/`message`
+ * como o Direct. Escrever um parser só para os dois formatos faria uma função
+ * cheia de `if` perguntando de que tipo é o objeto que ela mesma acabou de
+ * receber tipado.
+ *
+ * Ele traz duas coisas que o Direct NÃO traz, e as duas importam:
+ *   `from.username` → o @, que no Direct só se descobre com uma chamada extra;
+ *   `value.id`      → o id do comentário, que é o que permite responder a ELE.
+ */
+function lerComentario(envelope: Record<string, unknown>, agora: string): LeituraDoEvento {
+  const evento = objeto(envelope.evento);
+  const valor = objeto(evento?.value);
+  if (!valor) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem `value`" };
+
+  const de = objeto(valor.from);
+  const igsid = texto(de?.id);
+  if (!igsid) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem `from.id`" };
+
+  // O id do comentário é a chave de idempotência E o alvo da resposta. Sem ele
+  // não há como responder nem como reconhecer a reentrega.
+  const comentarioId = texto(valor.id) ?? texto(envelope.provider_message_id);
+  if (!comentarioId) return { ok: false, motivo: "contrato_violado", detalhe: "comentário sem id" };
+
+  const corpoTexto = texto(valor.text);
+  if (!corpoTexto) {
+    // Comentário só com emoji ou só com menção chega sem `text`. Não há o que
+    // responder, e listá-lo gastaria a atenção do atendente à toa.
+    return { ok: false, motivo: "ignorar", detalhe: "comentário sem texto" };
+  }
+
+  return {
+    ok: true,
+    mensagem: {
+      igsid,
+      contaId: null,
+      providerMessageId: comentarioId,
+      texto: corpoTexto,
+      temAnexo: false,
+      entrada: "comentario",
+      recebidaEm: dataDoEvento(valor.timestamp ?? evento?.timestamp, agora),
+      adId: texto(envelope.ad_id),
+      username: texto(de?.username),
+      conversa: "comentario",
+      mediaId: texto(objeto(valor.media)?.id),
     },
   };
 }

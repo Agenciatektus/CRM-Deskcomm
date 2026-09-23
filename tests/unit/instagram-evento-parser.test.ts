@@ -31,6 +31,21 @@ const direct = (extra: Record<string, unknown> = {}, msg: Record<string, unknown
   },
 });
 
+const comentario = () => ({
+  tipo: "comentario",
+  provider_message_id: "18080636444704644",
+  ad_id: null,
+  evento: {
+    field: "comments",
+    value: {
+      id: "18080636444704644",
+      from: { id: "1742256533557115", username: "_petermachado" },
+      text: "Qual o preço e onde vejo mais modelos?",
+      media: { id: "17906857182477147", media_product_type: "FEED" },
+    } as Record<string, unknown>,
+  },
+});
+
 describe("leitura do evento do Instagram", () => {
   it("Direct com texto vira mensagem, com a identidade no IGSID", () => {
     const r = lerEventoDoInstagram(direct(), AGORA);
@@ -49,12 +64,57 @@ describe("leitura do evento do Instagram", () => {
     expect(r.mensagem.entrada).toBe("story");
   });
 
-  it("comentário NÃO vira conversa — é interação, e isso é decisão de produto", () => {
-    const r = lerEventoDoInstagram({ tipo: "comentario", evento: { field: "comments", value: {} } }, AGORA);
+  it("comentário VIRA conversa (para o Inbox), com o @ e o post junto", () => {
+    // A forma abaixo foi copiada de `instagram_eventos_recebidos` na produção
+    // da Verdash. O comentário traz duas coisas que o Direct não traz: o @ de
+    // quem escreveu e o id do post — sem o segundo, "quanto custa?" chega ao
+    // atendente sem dizer de qual publicação se trata.
+    const r = lerEventoDoInstagram(comentario(), AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.igsid).toBe("1742256533557115");
+    expect(r.mensagem.username).toBe("_petermachado");
+    expect(r.mensagem.texto).toBe("Qual o preço e onde vejo mais modelos?");
+    expect(r.mensagem.mediaId).toBe("17906857182477147");
+    // `providerMessageId` é o id do COMENTÁRIO: é ele que permite responder a
+    // este comentário, e não a outro.
+    expect(r.mensagem.providerMessageId).toBe("18080636444704644");
+  });
+
+  it("comentário cai numa conversa SEPARADA do Direct — é o que o filtro usa", () => {
+    // As duas metades da decisão: aparece no Inbox (por isso vira conversa) e
+    // não vira lead (por isso a conversa é de outro tipo, e a ingestão não
+    // chama `garantirLeadDaConversa` para ela).
+    const c = lerEventoDoInstagram(comentario(), AGORA);
+    const d = lerEventoDoInstagram(direct(), AGORA);
+    expect(c.ok && c.mensagem.conversa).toBe("comentario");
+    expect(d.ok && d.mensagem.conversa).toBe("direct");
+  });
+
+  it("comentário sem texto (só emoji) é ignorado — não há o que responder", () => {
+    const e = comentario();
+    const r = lerEventoDoInstagram(
+      { ...e, evento: { ...e.evento, value: { ...e.evento.value, text: undefined } } },
+      AGORA,
+    );
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    // `ignorar`, e não erro: a fila da Verdash reentrega o que não recebe 200.
     expect(r.motivo).toBe("ignorar");
+  });
+
+  it("comentário sem id é RECUSADO: sem ele não dá para responder nem deduplicar", () => {
+    const e = comentario();
+    const r = lerEventoDoInstagram(
+      {
+        ...e,
+        provider_message_id: undefined,
+        evento: { ...e.evento, value: { ...e.evento.value, id: undefined } },
+      },
+      AGORA,
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).toBe("contrato_violado");
   });
 
   it("recibo de leitura não cria conversa vazia", () => {
