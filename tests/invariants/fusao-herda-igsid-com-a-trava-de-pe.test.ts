@@ -113,10 +113,10 @@ describe("fusão de contatos com a trava de identidade de Instagram", () => {
       select set_config('request.jwt.claims',
         json_build_object('sub','${USER}','role','authenticated')::text, true);
       create temp table desfecho(t text) on commit drop;
-      -- GRANT explicito: a tabela nasce do `postgres` e o insert acontece como
-      -- `authenticated`. Sem isto o bloco falha com 'permission denied for
-      -- table desfecho' ANTES de chegar na trava — e o teste ficaria vermelho
-      -- pelo motivo errado, escondendo se a trava funciona ou nao.
+      -- GRANT explicito: a tabela nasce do postgres e o insert acontece como
+      -- authenticated. Sem isto o bloco falha com 'permission denied for table
+      -- desfecho' ANTES de chegar na trava, e o teste fica vermelho pelo motivo
+      -- errado, escondendo se a trava funciona ou nao.
       grant insert on desfecho to authenticated;
       set local role authenticated;
       select public.fn_mesclar_contatos('${ORG}', '${VENC}', array['${PERD}']::uuid[]) is not null;
