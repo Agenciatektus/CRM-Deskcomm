@@ -122,6 +122,89 @@ describe("eixo 5 — escopo de visualização", () => {
     ).toBe(0);
   });
 
+
+  // ─── Os ramos de `visibility_mode` que nunca tiveram rede ─────────────────
+  //
+  // `grep visibility_mode tests/` só devolvia 'own' e 'own_and_unassigned'. O
+  // ramo `when 'all' then true` — o MAIS PERMISSIVO da função que decide quem vê
+  // qual conversa — e o `else false` do valor desconhecido passavam sem
+  // cobertura. Levantado pelo @Cassio_SecRev; a migration 9014 os exercitou uma
+  // vez em 72 casos e jogou fora, e prova que não fica não protege ninguém.
+  //
+  // A org dedicada é reconfigurada dentro de cada caso e devolvida ao estado
+  // original no fim: sem isso um caso muda o mundo do seguinte, e a suíte passa
+  // a depender de ordem — que é outro jeito de ficar verde sem medir.
+
+  it("agent VÊ conversa de terceiro quando visibility_mode='all'", () => {
+    sql(`
+      update public.organizations
+         set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','all')
+       where id = '${OWN_ORG}';
+      update public.conversations set assigned_to_user_id = '${GOV_AGENT_B}'
+       where id = '${OWN_CONV_UNASSIGNED}';
+    `);
+    try {
+      // Atribuída a OUTRO agent, e mesmo assim visível: é o que 'all' promete.
+      expect(
+        countAs(
+          GOV_AGENT_A,
+          `select count(*) from public.conversations where id = '${OWN_CONV_UNASSIGNED}';`,
+        ),
+      ).toBe(1);
+    } finally {
+      sql(`
+        update public.conversations set assigned_to_user_id = null
+         where id = '${OWN_CONV_UNASSIGNED}';
+        update public.organizations
+           set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','own')
+         where id = '${OWN_ORG}';
+      `);
+    }
+  });
+
+  it("valor DESCONHECIDO de visibility_mode nega — falha fechada", () => {
+    // Um valor que o produto não conhece (erro de digitação, versão futura,
+    // escrita direta no banco) não pode abrir acesso. O `else false` existe
+    // para isto, e é o ramo que ninguém exercita de propósito.
+    sql(`
+      update public.organizations
+         set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','modo_que_nao_existe')
+       where id = '${OWN_ORG}';
+    `);
+    try {
+      expect(
+        countAs(
+          GOV_AGENT_A,
+          `select count(*) from public.conversations where id = '${OWN_CONV_UNASSIGNED}';`,
+        ),
+      ).toBe(0);
+    } finally {
+      sql(`
+        update public.organizations
+           set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','own')
+         where id = '${OWN_ORG}';
+      `);
+    }
+  });
+
+  it("usuário SEM vínculo não vê nada da organização", () => {
+    // `fn_user_role_in_org` devolve null e o primeiro ramo nega. É o caso mais
+    // básico da função e também não tinha teste: quem não é da casa não entra,
+    // independentemente de `visibility_mode`.
+    const FORA = "eeeeeeee-0000-4000-8000-0000000000f0";
+    sql(`
+      delete from public.user_organizations where user_id = '${FORA}';
+      insert into auth.users (id, email) values ('${FORA}', 'sem-vinculo@deskcomm.test')
+        on conflict (id) do nothing;
+    `);
+    expect(
+      countAs(FORA, `select count(*) from public.conversations where id = '${OWN_CONV_UNASSIGNED}';`),
+    ).toBe(0);
+    expect(
+      countAs(FORA, `select count(*) from public.conversations where id = '${GOV_CONV_UNASSIGNED}';`),
+    ).toBe(0);
+  });
+
   it("manager vê TODAS as conversas da org (org-wide read)", () => {
     expect(
       countAs(

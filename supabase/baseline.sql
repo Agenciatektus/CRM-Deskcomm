@@ -5352,9 +5352,13 @@ as $$
   -- `user_organizations`.
   --
   -- Medido na produção do cliente: 1.089 → 685 buffers (-37%). O tempo quase
-  -- não muda nesta base (78 → 73 ms); o ganho é de I/O lógico, que importa sob
-  -- CONCORRÊNCIA — menos páginas por requisição é menos contenção quando várias
-  -- pessoas abrem o Inbox ao mesmo tempo.
+  -- não muda nesta base (78 → 73 ms).
+  --
+  -- E O QUE JUSTIFICA MEXER NUMA FUNÇÃO DE SEGURANÇA NÃO É A PORCENTAGEM: é a
+  -- POSIÇÃO dela. Esta função é o predicado de RLS de `conversations` — roda uma
+  -- vez por linha, na página E na contagem, em quatro abas que contam separado.
+  -- O mesmo ganho numa função chamada uma vez por requisição não se pagaria.
+  -- Quem for repetir isto noutro lugar, meça a posição primeiro.
   --
   -- Equivalência provada em 72 casos: todo vínculo vivo × os três
   -- `visibility_mode` × `assigned` nulo/próprio/de terceiro. Zero divergências.

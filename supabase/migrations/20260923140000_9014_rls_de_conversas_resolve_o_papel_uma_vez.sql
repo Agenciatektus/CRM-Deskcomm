@@ -17,10 +17,19 @@
 --   antes ..... 1.089 buffers,  78 ms
 --   depois ....   685 buffers,  73 ms
 --
--- O ganho é de I/O lógico (-37%), não de relógio: o tempo praticamente não
--- muda nesta base. Buffer a menos importa sob CONCORRÊNCIA — menos páginas
--- tocadas por requisição é menos contenção quando várias pessoas abrem o
--- Inbox ao mesmo tempo, que é o cenário do cliente.
+-- O ganho e de I/O LOGICO, nao de relogio, e digo sem embelezar: nesta base o
+-- tempo quase nao muda.
+--
+-- E O QUE JUSTIFICA MEXER NUMA FUNCAO DE SEGURANCA NAO E A PORCENTAGEM: e a
+-- POSICAO dela. Esta funcao e o predicado de RLS de `conversations` — roda uma
+-- vez por linha, na pagina E na contagem, em quatro abas que contam separado.
+-- Menos 37% de paginas tocadas por requisicao e menos pressao de buffer pool e
+-- menos contencao quando varios atendentes abrem o Inbox no mesmo minuto, que e
+-- o cenario em que o `statement_timeout` de 8s estourou.
+--
+-- O MESMO ganho numa funcao chamada uma vez por requisicao NAO se pagaria: o
+-- risco de editar codigo que decide quem ve o que nao vale 37% de I/O num
+-- caminho frio. Quem for repetir isto noutro lugar, meca a posicao primeiro.
 --
 -- ─── EQUIVALÊNCIA PROVADA, e nos ramos que a amostra não cobre ────────────
 -- 72 casos: todo vínculo vivo × cada um dos três `visibility_mode` (incluindo
