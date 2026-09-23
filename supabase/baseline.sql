@@ -17184,14 +17184,37 @@ as $comando$
   -- EQUIVALÊNCIA PROVADA antes de aplicar: comparadas linha a linha nas 168
   -- conversas de produção com `is distinct from` — zero divergências.
   --
-  -- `left join` e não `join`: `contact_id` é anulável, e contato ausente não
-  -- pode derrubar a linha para fora de todo filtro — o efeito seria uma
-  -- conversa invisível em TODAS as abas. `contacts.id` é chave primária, então
-  -- o join casa no máximo uma linha e a função devolve um valor só.
+  -- `left join` e NÃO `join` — e o motivo não é o que o comentário anterior
+  -- dizia.
   --
-  -- O que NÃO foi feito, de propósito: `security definer` para pular a RLS de
-  -- `contacts`. Seria mais rápido e abriria uma porta — esta função é exposta
-  -- pelo PostgREST e passaria a ler contato que o chamador não pode ver.
+  -- A versão antiga desta função afirmava "`coalesce` porque `contact_id` é
+  -- anulável no schema", e eu repeti isso. É FALSO, e conferido no banco do
+  -- cliente: `contact_id` é `uuid NOT NULL` com FK `ON DELETE RESTRICT`, e
+  -- `contacts.id` é chave primária. Nunca é nulo e nunca fica órfão.
+  --
+  -- Isso importa porque o comentário é o motivo pelo qual o próximo mantenedor
+  -- vai MANTER o `left join`. Quem conferir o schema vê `NOT NULL`, conclui que
+  -- o comentário está velho, e "simplifica" para `join`. Motivo errado protege
+  -- código certo só até alguém verificar o motivo.
+  --
+  -- O MOTIVO REAL: o join pode não casar porque as duas tabelas têm predicados
+  -- de RLS INDEPENDENTES. `conversations_select` é
+  -- `fn_can_view_conversation(organization_id, assigned_to_user_id)` — security
+  -- definer, ciente de papel e de `visibility_mode`. `contacts` tem
+  -- `tenant_isolation_contacts_all`, que é `organization_id in
+  -- fn_user_org_ids()` e é cego a papel. Hoje os dois se alinham, mas não POR
+  -- CONSTRUÇÃO: o FK é de coluna única, não há FK composto ligando
+  -- `(organization_id, contact_id)`, então nada no schema impede uma conversa da
+  -- organização A apontar para um contato da B.
+  --
+  -- Nesse estado, `left join` degrada para o comando padrão e a conversa
+  -- continua aparecendo; `join` a faria SUMIR de todas as abas, em silêncio.
+  --
+  -- Uma diferença honesta em relação às duas subconsultas antigas: se
+  -- `contacts.id` deixasse de ser único, a versão antiga levantaria `21000 —
+  -- more than one row returned by a subquery`, e esta, por ser `language sql`
+  -- não-SRF, devolveria a primeira linha em silêncio. É inalcançável enquanto a
+  -- PK existir, mas é a única divergência possível e fica registrada.
   select public.fn_comando_da_conversa(
     c.status,
     c.assigned_to_user_id,
