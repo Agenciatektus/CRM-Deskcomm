@@ -235,6 +235,84 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     }
   });
 
+
+  it("B2 — quando o join NÃO casa, a conversa continua existindo", () => {
+    // ─── A metade do wrapper que nenhum teste cobria ─────────────────────────
+    //
+    // O bloco B exercita as 8 combinações de status/flags, e em TODAS o contato
+    // é visível. O `left join` do wrapper existe justamente para o caso oposto —
+    // e esse caso não tinha teste nenhum. Levantado pelo @Cassio_SecRev, e é
+    // irônico: o comentário deste arquivo diz que o wrapper "é onde mora o erro
+    // de copiar-colar mais provável", e era a outra metade dele que estava sem
+    // cobertura.
+    //
+    // POR QUE O JOIN PODE NÃO CASAR, já que `contact_id` é NOT NULL com FK:
+    // porque `conversations` e `contacts` têm predicados de RLS INDEPENDENTES.
+    // A conversa é autorizada por `fn_can_view_conversation` (ciente de papel e
+    // de `visibility_mode`); o contato, por `tenant_isolation_contacts_all`
+    // (`organization_id in fn_user_org_ids()`, cego a papel). O FK é de coluna
+    // única — não há FK composto alinhando `(organization_id, contact_id)` —,
+    // então nada no schema impede uma conversa da org A apontar para um contato
+    // da org B.
+    //
+    // Com `left join`, essa conversa degrada para o comando padrão e continua
+    // aparecendo. Com `join`, ela SUMIRIA de todas as abas, em silêncio — que é
+    // o pior modo de falha possível num Inbox.
+    //
+    // ⚠️ RODA COMO `authenticated`, não como `postgres`. Sem isso a RLS não se
+    // aplica, o contato de outra org fica visível, o join casa, e o teste passa
+    // PELO MOTIVO ERRADO — a armadilha gêmea do `42501` que quase me pegou na
+    // PR #6.
+    const ORG_B = "bbbbbbbb-0000-4000-8000-0000000000b1";
+    const CT_B = "bbbbbbbb-0000-4000-8000-0000000000c1";
+    const CONV = "bbbbbbbb-0000-4000-8000-0000000000e1";
+
+    sql(`
+      delete from conversations where id = '${CONV}';
+      delete from contacts where id = '${CT_B}';
+      delete from organizations where id = '${ORG_B}';
+      insert into organizations (id, slug, legal_name, display_name)
+        values ('${ORG_B}', 'outra-org-b2', 'Outra LTDA', 'Outra');
+      -- O contato é da org B; a conversa é da org A. O FK aceita: ele é de
+      -- coluna única e não confere organização.
+      insert into contacts (id, organization_id, force_human, is_blocked)
+        values ('${CT_B}', '${ORG_B}', true, true);
+      insert into conversations (id, organization_id, contact_id, channel_session_id, status)
+        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open');
+    `);
+
+    const comoServico = sql(
+      `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
+    ).trim();
+    // Sem RLS o contato é alcançável, então as flags valem: `force_human` manda.
+    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("humano");
+
+    // Agora com a RLS de verdade: o usuário não é membro da org B.
+    const comoUsuario = sql(`
+      begin;
+      select set_config('request.jwt.claims',
+        json_build_object('sub','${DONO}','role','authenticated')::text, true);
+      set local role authenticated;
+      select coalesce(public.comando_da_conversa(c), '(SUMIU)') from conversations c where c.id = '${CONV}';
+      rollback;
+    `)
+      .split("\n")
+      .filter(Boolean)
+      .pop()!
+      .trim();
+
+    // O que se cobra aqui NÃO é o valor do comando — é a conversa continuar
+    // existindo. Se o `left join` virar `join`, isto vem vazio.
+    expect(comoUsuario, "a conversa some quando o contato não é visível").not.toBe("(SUMIU)");
+    expect(comoUsuario, "sem contato visível, o comando degrada para o padrão").toBe("automatico");
+
+    sql(`
+      delete from conversations where id = '${CONV}';
+      delete from contacts where id = '${CT_B}';
+      delete from organizations where id = '${ORG_B}';
+    `);
+  });
+
   it("C — quem o banco chama de 'automatico', o MOTOR realmente atende", () => {
     // A e B provam que TS e SQL concordam ENTRE SI. Nada neles impede os dois de
     // estarem errados sobre o motor. Este bloco extrai o SQL do fonte de
