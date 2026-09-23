@@ -277,14 +277,20 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
       -- coluna única e não confere organização.
       insert into contacts (id, organization_id, force_human, is_blocked)
         values ('${CT_B}', '${ORG_B}', true, true);
+      -- SEM DONO, e isto e o CORACAO do caso. Ver a nota "por que a conversa
+      -- nao pode ter dono" logo abaixo das asseracoes.
       insert into conversations (id, organization_id, contact_id, channel_session_id, status,
                                  assigned_to_user_id)
-        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open', '${DONO}');
+        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open', null);
       -- O DONO precisa de VINCULO com a org para a RLS de conversations o
       -- deixar ler. No resto deste arquivo ele so aparece como alvo de
       -- atribuicao, e sem user_organizations a leitura abaixo voltava VAZIA:
       -- nem automatico, nem SUMIU, o que fazia o teste falhar sem dizer nada
       -- sobre o left join. Pego pelo CI.
+      -- Com papel 'agent' e a conversa SEM dono, quem autoriza a leitura e o
+      -- ramo 'own_and_unassigned' de fn_can_view_conversation (o padrao quando
+      -- a organizacao nao declara visibility_mode) — que e justamente um dos
+      -- ramos reescritos pela migration 9014.
       -- (sem crase neste comentario: ele vive dentro de um template literal)
       insert into user_organizations (user_id, organization_id, role, accepted_at)
         values ('${DONO}', '${ORG}', 'agent', now())
@@ -294,13 +300,10 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     const comoServico = sql(
       `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
     ).trim();
-    // Sem RLS o contato é alcançável, então as flags do contato VALEM. A
-    // conversa TEM dono (é o que dá ao DONO o direito de lê-la na segunda
-    // metade deste caso), e pela ordem de `fn_comando_da_conversa` — dono
-    // primeiro, encerrada depois, só então as travas — com dono e
-    // `force_human` o valor é `humano`. Conferido no banco: sem dono seria
-    // `aguardando`.
-    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("humano");
+    // Sem RLS o contato é alcançável, então as flags do contato VALEM: sem dono
+    // e com `force_human`, a ordem de `fn_comando_da_conversa` dá `aguardando`.
+    // Medido, não deduzido — pg17 com este baseline, 2026-09-23.
+    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
 
     // Agora com a RLS de verdade: o usuário não é membro da org B.
     //
@@ -319,13 +322,51 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
       rollback;
     `);
 
-    // O que se cobra aqui NÃO é só o valor do comando — é a conversa continuar
-    // existindo. Se o `left join` virar `join`, a linha some e nenhum marcador
-    // aparece na saída.
+    // ─── POR QUE A CONVERSA NÃO PODE TER DONO ──────────────────────────────
+    //
+    // A primeira versão deste caso atribuía a conversa ao DONO, e o CI a matou
+    // — com razão. `fn_comando_da_conversa` avalia o DONO ANTES das travas do
+    // contato, então uma conversa atribuída devolve `humano` quer o join case
+    // ou não. O caso media zero: o valor não dependia da coisa sob teste, e a
+    // única razão de ele ter passado antes foi a leitura voltar vazia (sem
+    // `user_organizations` a RLS recusava a conversa, e `not.toContain` passa
+    // vacuamente sobre string vazia).
+    //
+    // Sem dono, os dois mundos ficam DISTINGUÍVEIS — medido em pg17 com este
+    // baseline, 2026-09-23:
+    //
+    //   contato da org B, invisível .... <<automatico>>   (join não casou)
+    //   o MESMO contato na org A ....... <<aguardando>>   (join casou)
+    //
+    // É por isso que o controle positivo abaixo não é zelo: sem ele, um teste
+    // que só cobra `automatico` também fica verde se a linha inteira sumir de
+    // outro jeito, ou se o contato parar de existir.
     expect(comoUsuario, "a conversa some quando o contato não é visível").not.toContain("<<SUMIU>>");
     expect(comoUsuario, "sem contato visível, o comando degrada para o padrão").toContain(
       "<<automatico>>",
     );
+
+    // ─── CONTROLE POSITIVO ─────────────────────────────────────────────────
+    // O mesmo contato, agora na org A: o join CASA e as flags dele valem. Se
+    // esta asserção também devolvesse `automatico`, a de cima não estaria
+    // provando o join — estaria provando que o contato nunca é lido.
+    sql(`update contacts set organization_id = '${ORG}' where id = '${CT_B}';`);
+    const comContatoVisivel = sql(`
+      begin;
+      select set_config('request.jwt.claims',
+        json_build_object('sub','${DONO}','role','authenticated')::text, true);
+      set local role authenticated;
+      select '<<' || coalesce(public.comando_da_conversa(c), 'SUMIU') || '>>'
+        from conversations c where c.id = '${CONV}';
+      rollback;
+    `);
+    expect(comContatoVisivel, "com o contato visível as flags dele passam a valer").toContain(
+      "<<aguardando>>",
+    );
+    expect(comContatoVisivel, "o controle não pode repetir o valor degradado").not.toContain(
+      "<<automatico>>",
+    );
+    sql(`update contacts set organization_id = '${ORG_B}' where id = '${CT_B}';`);
 
     sql(`
       delete from conversations where id = '${CONV}';
