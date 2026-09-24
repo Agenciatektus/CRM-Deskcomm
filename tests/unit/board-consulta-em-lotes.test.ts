@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { IDS_POR_CONSULTA, consultarEmLotes, lotesDeIds } from "@/lib/supabase/lotes";
@@ -102,5 +104,25 @@ describe("consultarEmLotes", () => {
       return { data: lote.map((id) => ({ id })), error: null };
     });
     expect(maxEmVoo).toBe(1);
+  });
+});
+
+describe("a rota do quadro não pode ter `.in()` cru", () => {
+  it("todo `.in(` do board usa um lote", () => {
+    // Cerca de texto-fonte, no idioma que o repo já usa em
+    // `funil-filtro-de-tag-le-as-duas-caixas.test.ts`.
+    //
+    // Ela existe porque os DOIS defeitos desta correção caíram na integração,
+    // não no helper: primeiro eu converti quatro consultas e esqueci o
+    // `withScores` (que passa ids de LEAD, não de contato); depois converti a
+    // consulta e esqueci a linha de erro ao lado, e o build quebrou. Teste de
+    // unidade do helper não pega nenhum dos dois — esta cerca pega o primeiro,
+    // e o compilador pega o segundo.
+    const rota = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
+    const crus = [...rota.matchAll(/\.in\(\s*("[^"]+"|'[^']+')\s*,\s*([^)]+?)\s*\)/g)]
+      .map((m) => ({ coluna: m[1], argumento: (m[2] ?? "").trim() }))
+      .filter((c) => c.argumento !== "lote");
+
+    expect(crus).toEqual([]);
   });
 });

@@ -30,6 +30,15 @@
  * quebrar quando a instalação muda de gateway.
  */
 
+/**
+ * ⚠️ Já existiam DOIS outros helpers de lote neste repositório quando este
+ * nasceu, com constantes diferentes para o mesmo limite de URL:
+ * `lib/extensions/service.ts` (`IN_BATCH = 64`, em paralelo, deduplicando) e
+ * `lib/lgpd/cascata.ts` (`CONTATOS_POR_BLOCO = 100`). Três números para a mesma
+ * pergunta é convite para a próxima pessoa copiar o errado — se for unificar,
+ * este é o único dos três com a medição registrada.
+ */
+
 /** Ids por requisição. Ver a medição no cabeçalho antes de aumentar. */
 export const IDS_POR_CONSULTA = 150;
 
@@ -59,8 +68,13 @@ export async function consultarEmLotes<T>(
   ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   tamanho = IDS_POR_CONSULTA,
 ): Promise<{ data: T[]; error: string | null }> {
+  // Deduplica como o `readInBatches` das extensões já fazia: id repetido só
+  // engorda a URL, que é exatamente o recurso escasso aqui. Os chamadores da
+  // rota do quadro já deduplicam por conta própria, menos um — e fazer isto
+  // aqui vale para todo chamador futuro, de graça.
+  const unicos = [...new Set(ids)];
   const saida: T[] = [];
-  for (const lote of lotesDeIds(ids, tamanho)) {
+  for (const lote of lotesDeIds(unicos, tamanho)) {
     const { data, error } = await consulta(lote);
     if (error) return { data: [], error: error.message };
     if (data) saida.push(...data);

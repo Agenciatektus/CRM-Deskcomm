@@ -63,30 +63,42 @@ async function withOwnerAgents(
   ];
   if (agentIds.length === 0) return { leads, error: null };
 
-  const { data: agents, error: agentsErr } = await supabase
-    .from("ai_agents")
-    .select("id, name, published_version_id")
-    .eq("organization_id", organizationId)
-    .in("id", agentIds);
-  if (agentsErr) return { leads, error: agentsErr.message };
-
-  const agentRows = (agents ?? []) as Array<{
+  // Em lotes como as irmãs. Estes dois crescem com o número de AGENTES de IA da
+  // organização, não com o de leads, então não é este o caminho que derrubava o
+  // quadro da Lior — vão em lote porque `.in()` cru neste arquivo é o padrão que
+  // a próxima pessoa copia, e a cerca em `board-consulta-em-lotes.test.ts`
+  // reprova quem deixar um.
+  const { data: agents, error: agentsErr } = await consultarEmLotes<{
     id: string;
     name: string;
     published_version_id: string | null;
-  }>;
+  }>(agentIds, (lote) =>
+    supabase
+      .from("ai_agents")
+      .select("id, name, published_version_id")
+      .eq("organization_id", organizationId)
+      .in("id", lote),
+  );
+  if (agentsErr) return { leads, error: agentsErr };
+
+  const agentRows = agents;
 
   const publishedIds = agentRows
     .map((a) => a.published_version_id)
     .filter((v): v is string => !!v);
   const versionById = new Map<string, number>();
   if (publishedIds.length > 0) {
-    const { data: versions, error: versionsErr } = await supabase
-      .from("ai_agent_versions")
-      .select("id, version_number")
-      .eq("organization_id", organizationId)
-      .in("id", publishedIds);
-    if (versionsErr) return { leads, error: versionsErr.message };
+    const { data: versions, error: versionsErr } = await consultarEmLotes<{
+      id: string;
+      version_number: number;
+    }>(publishedIds, (lote) =>
+      supabase
+        .from("ai_agent_versions")
+        .select("id, version_number")
+        .eq("organization_id", organizationId)
+        .in("id", lote),
+    );
+    if (versionsErr) return { leads, error: versionsErr };
     for (const v of (versions ?? []) as Array<{ id: string; version_number: number }>) {
       versionById.set(v.id, v.version_number);
     }
@@ -308,8 +320,17 @@ async function withConversas(
       doContato.add(tag);
       marcadoresPorContato.set(row.contact_id, doContato);
     }
-    // Primeira vista vence: a consulta já veio ordenada por atividade.
-    if (porContato.has(row.contact_id)) continue;
+    // ESCOLHE a mais recente, em vez de confiar em "primeira vista vence".
+    //
+    // Antes isto dependia de a consulta chegar ordenada por `last_message_at`.
+    // Com a busca em lotes a ordenação passou a ser POR LOTE — hoje o resultado
+    // é o mesmo, porque `contactIds` é deduplicado e cada contato cai num lote
+    // só. Mas isso virou uma invariante silenciosa: quem trocasse a série por
+    // paralelo, ou concatenasse os lotes em outra ordem, faria todo card mostrar
+    // a mensagem mais ANTIGA do contato, com a suíte verde e sem erro nenhum.
+    // Comparar a data explicitamente faz a invariante deixar de existir.
+    const jaVisto = porContato.get(row.contact_id);
+    if (jaVisto && (jaVisto.last_message_at ?? "") >= (row.last_message_at ?? "")) continue;
     porContato.set(row.contact_id, {
       id: row.id,
       preview: row.last_message_preview,
@@ -375,7 +396,7 @@ async function withMarcadoresDoContato(
       .eq("organization_id", organizationId)
       .in("id", lote),
   );
-  if (error) return { leads: leadsDoQuadro, error: error.message };
+  if (error) return { leads: leadsDoQuadro, error };
 
   const linhas = (data ?? []) as Array<{ id: string; tags: string[] | null } & LinhaDoContatoNoQuadro>;
   const leads = anexarDadosDoContato(leadsDoQuadro, linhas);
