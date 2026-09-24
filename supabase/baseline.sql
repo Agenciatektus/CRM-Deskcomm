@@ -36710,6 +36710,53 @@ create index if not exists crm_pipelines_fontes_idx
 comment on column public.crm_pipelines.fontes is
   'De quais fontes este funil se alimenta. Fonte que não está em NENHUM funil da organização não gera lead nem conversa — o evento é arquivado e descartado.';
 
+-- ---- a conversa do Instagram nasce no canal certo (migration 9015) ----
+--
+-- `fn_upsert_wa_conversation` grava `channel` como 'whatsapp' LITERAL, e é a
+-- única porta atômica para criar conversa a partir de webhook. A ingestão do
+-- Instagram não podia usá-la: a conversa nasceria marcada como WhatsApp, e a
+-- mentira se espalharia para o ícone do Inbox, para `capabilitiesOf()` (que
+-- prometeria janela e mídia que o Instagram não tem) e para o filtro por canal.
+--
+-- Função NOVA em vez de generalizar a existente: acrescentar `p_canal` à irmã
+-- mudaria a assinatura de quem roda em produção para todo o WhatsApp, e o ganho
+-- seria ter uma função em vez de duas. Quando houver um terceiro canal, as duas
+-- viram uma — com o Instagram já estável.
+--
+-- Direct e comentário da MESMA pessoa na MESMA conta caem na MESMA conversa: o
+-- índice `uniq_conversations_1to1_per_contact_session` governa todo o WhatsApp
+-- em produção, e acrescentar a entrada a ele não é risco que a chegada do
+-- Instagram justifique. A informação não se perde — a coluna diz como a conversa
+-- NASCEU (é o que o filtro do Inbox lista) e cada mensagem carrega a própria
+-- entrada em `messages.metadata.instagram_entrada`, onde a 9011 disse que ela
+-- ficaria.
+--
+-- `do update set updated_at = now()` e NADA MAIS: sobrescrever `instagram_entrada`
+-- faria o primeiro comentário reescrever como "comentário" uma conversa nascida
+-- de Direct, e o filtro passaria a mentir sobre o histórico que ele lista.
+
+create or replace function public.fn_upsert_conversa_do_instagram(
+  p_org uuid, p_contact uuid, p_session uuid, p_entrada text
+) returns uuid language plpgsql security definer set search_path = public as $upsert_ig$
+declare v_id uuid;
+begin
+  insert into public.conversations (
+    organization_id, contact_id, channel_session_id, channel, status,
+    is_group, unread_count_for_assignee, metadata, instagram_entrada
+  )
+  values (p_org, p_contact, p_session, 'instagram', 'open', false, 0, '{}'::jsonb, p_entrada)
+  on conflict (organization_id, contact_id, channel_session_id) where is_group = false
+  do update set updated_at = now()
+  returning id into v_id;
+  return v_id;
+end; $upsert_ig$;
+
+-- Só `service_role`: quem chama é a ingestão de webhook. Sessão de usuário não
+-- tem o que fazer aqui — e se tivesse, criaria conversa em nome de contato que
+-- ela talvez nem possa ver.
+revoke all on function public.fn_upsert_conversa_do_instagram(uuid, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.fn_upsert_conversa_do_instagram(uuid, uuid, uuid, text) to service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

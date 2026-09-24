@@ -37,6 +37,16 @@ export function ConversaSlot({ conversa }: { conversa: Lead["conversa"] }) {
   const preview = conversa.preview?.trim();
   const temNaoLidas = conversa.unread > 0;
 
+  // POR ONDE o negócio chegou. Só aparece quando há valor: card de WhatsApp não
+  // ganha selo vazio, e é a ausência que mantém a linha legível nos outros.
+  //
+  // Importa para quem vai atender: quem mandou Direct escreveu no privado e
+  // espera resposta ali; quem veio de comentário deixou um recado público. A
+  // abordagem não é a mesma, e sem o selo o card não distingue as duas.
+  const entrada = conversa.instagram_entrada ?? null;
+  const rotuloEntrada =
+    entrada === "direct" ? t("Direct") : entrada === "comentario" ? t("Comentário") : null;
+
   return (
     <Link
       href={`/app/inbox?id=${conversa.id}`}
@@ -52,6 +62,11 @@ export function ConversaSlot({ conversa }: { conversa: Lead["conversa"] }) {
       title={t("Abrir esta conversa no Inbox")}
     >
       <ChatCircle size={12} weight="regular" className="shrink-0" aria-hidden />
+      {rotuloEntrada && (
+        <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] leading-4 text-text-muted">
+          {rotuloEntrada}
+        </span>
+      )}
       <span className="truncate">
         {preview || <span className="italic">{t("conversa sem mensagens")}</span>}
       </span>

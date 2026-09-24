@@ -35,6 +35,11 @@ export interface FunilEditavel {
    * coluna é nova: um objeto montado antes dela continua compilando.
    */
   is_client_pipeline?: boolean;
+  /**
+   * De que fontes este funil se alimenta. Opcional pelo mesmo motivo da linha
+   * acima: a coluna e nova, e um objeto montado antes dela continua compilando.
+   */
+  fontes?: string[];
   is_archived: boolean;
   /** Opcional porque NENHUMA regra daqui a usa — ela só existe para a tela. */
   description?: string | null;

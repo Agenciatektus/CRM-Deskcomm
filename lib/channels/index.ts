@@ -4,6 +4,7 @@
  */
 import { metaCloudAdapter } from "./adapters/meta-cloud";
 import { wahaAdapter } from "./adapters/waha";
+import { instagramAdapter } from "./adapters/instagram";
 import { verdashAdapter } from "./adapters/verdash";
 import { socialAdapter } from "./social/adapter";
 import { zernioAdapter } from "./adapters/zernio";
@@ -22,12 +23,15 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
   /**
    * `null` de propósito: o Instagram APARECE e RECEBE no CRM, mas o envio não sai daqui.
    *
-   * Quem responde no Instagram é o Verdash — são três operações distintas (Direct,
-   * private reply e resposta pública) com uma trava de servidor que impede resposta
-   * pública em conta de saúde. Duplicar isso num adapter do CRM duplicaria a trava, e uma
-   * trava duplicada é uma trava que diverge na terceira cópia.
+   * O Instagram RESPONDE pelo CRM desde que a plataforma passou a expor o envio
+   * ao vínculo pareado (`crm-enviar-instagram`).
+   *
+   * A trava de resposta pública continua UMA só, e continua no servidor da
+   * plataforma — que é o ponto: o adapter daqui usa apenas o Direct, e a
+   * operação perigosa nem é oferecida. Duplicar a trava é que criaria a
+   * terceira cópia que diverge.
    */
-  instagram: null,
+  instagram: instagramAdapter,
 };
 
 /**
@@ -81,7 +85,9 @@ export function getAdapterOpcional(provider: ChannelProvider): ChannelAdapter | 
  * (doutrina `restricao-de-canal`, invariante 1). O handler pede o texto e o grava.
  */
 const ONDE_RESPONDER: Partial<Record<ProviderDeMensagem, string>> = {
-  instagram: "Este canal é respondido pelo Verdash. Abra a conversa por lá para responder.",
+  // Vazio de propósito: todo canal de mensagem desta instalação responde pelo
+  // próprio Inbox. A tabela fica porque a pergunta continua valendo para o
+  // canal seguinte que entrar sem envio.
 };
 
 /** A instrução para o atendente, ou uma genérica quando o canal não declarou a sua. */

@@ -64,6 +64,20 @@ const bodySchema = z
      */
     is_client_pipeline: z.boolean().optional(),
     /**
+     * DE QUE FONTES este funil se alimenta.
+     *
+     * Governa a ENTRADA, não a exibição: fonte que não está em NENHUM funil da
+     * organização não gera lead nem conversa — o evento é arquivado e
+     * descartado. Por isso `min(1)`: um funil com lista vazia não aceita nada,
+     * e é exatamente o caso de atendimento interrompido em silêncio. O CHECK do
+     * banco cobra o mesmo (`cardinality(fontes) > 0`), e os dois existem porque
+     * a mensagem daqui o operador lê, a do banco não.
+     *
+     * Precisa estar declarado: o schema é `.strict()`, e campo desconhecido
+     * devolve 422 — sem esta linha, a tela salvaria e receberia erro.
+     */
+    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).optional(),
+    /**
      * TIRAR DO ARQUIVO (#979). `true` é aceito pelo schema e recusado pelo
      * handler, de propósito: quem manda `is_archived: true` quer arquivar, e
      * arquivar tem porta própria (`DELETE`) porque conta as dependências antes

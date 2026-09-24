@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RedesSociaisClient } from "./RedesSociaisClient";
 import { CanalOficialClient } from "./CanalOficialClient";
 import { CanalHospedadoClient } from "./CanalHospedadoClient";
+import { CanalInstagramClient } from "./CanalInstagramClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
 import { CanalVozClient } from "./CanalVozClient";
 import { ConnectionsClient } from "./ConnectionsClient";
@@ -61,6 +62,8 @@ export function ConexoesShell({
             ? "voz"
             : abaParam === "hospedado"
               ? "hospedado"
+              : abaParam === "instagram"
+                ? "instagram"
             : "numeros";
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
 
@@ -95,6 +98,12 @@ export function ConexoesShell({
             baixo — e a marca de quem hospeda aparece DENTRO, vinda do servidor,
             porque a tela não pode nomear provider. */}
         <TabsTrigger value="hospedado">{t("Número já conectado")}</TabsTrigger>
+        {/* Logo depois do número hospedado porque é o MESMO gesto: um código de
+            conexão, gerado na plataforma do cliente, e a entrega passa a vir
+            para cá. Aqui o rótulo é a REDE e não o provedor — quem atende
+            precisa ler "Instagram" para saber o que está ligando, e trocar quem
+            entrega não muda esta aba. */}
+        <TabsTrigger value="instagram">{t("Instagram")}</TabsTrigger>
         <TabsTrigger value="oficial">{t("API Oficial (Meta)")}</TabsTrigger>
         {/* "Provedor parceiro" e não a marca: o rótulo da marca vem do servidor
             (`lib/channels/connect`), porque a tela não pode nomear provider — e
@@ -124,6 +133,10 @@ export function ConexoesShell({
       <TabsContent value="sociais" className="mt-0"><RedesSociaisClient /></TabsContent>
       <TabsContent value="hospedado" className="mt-0">
         <CanalHospedadoClient />
+      </TabsContent>
+
+      <TabsContent value="instagram" className="mt-0">
+        <CanalInstagramClient />
       </TabsContent>
 
       <TabsContent value="voz" className="mt-0">

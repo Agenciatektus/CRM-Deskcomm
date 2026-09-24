@@ -16,7 +16,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "./archived";
-import { CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+import { CHANNEL_PROVIDER_INSTAGRAM, CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+// Importados ALÉM de reexportados: os apelidos de Instagram, no fim deste
+// arquivo, chamam as duas por dentro. Reexportar não traz para o escopo.
+import { findVerdashSession, saveVerdashSession } from "./verdash/conectar";
+import type { VerdashSession as InstagramSession } from "./verdash/conectar";
 import { zernioBaseUrl } from "./zernio/credentials";
 import type { ChannelProvider } from "./types";
 
@@ -251,3 +255,50 @@ export {
   trocarCodigoPorCredencial as trocarCodigoHospedado,
 } from "./verdash/conectar";
 export type { VerdashSession as HostedSession } from "./verdash/conectar";
+
+/**
+ * ─── O canal de INSTAGRAM, também pareado ──────────────────────────────────
+ *
+ * Mesma natureza do hospedado, e de propósito: o cliente cola UM código, e o
+ * transporte segue morando fora deste CRM. O que muda é qual canal aquele
+ * vínculo cobre — por isso `canal` é parâmetro em `conectar.ts`, e não dois
+ * arquivos quase iguais.
+ *
+ * ─── Por que "Instagram" pode aparecer na tela, e o transporte não ──────────
+ *
+ * A doutrina proíbe a tela saber QUEM ENTREGA, não a que REDE o cliente está
+ * conectando. São coisas diferentes: quem atende precisa ler "Instagram" para
+ * saber o que está ligando; se a entrega passa por um provedor ou outro é
+ * decisão de infraestrutura, e trocá-la não pode obrigar a mexer em tela.
+ *
+ * É o mesmo arranjo que o canal de redes sociais já usa — lá o provider é
+ * proibido e `instagram` é a plataforma, escolhida num select. O
+ * `lint:channels` concorda: a lista de nomes proibidos tem o transporte, não a
+ * rede.
+ */
+export const INSTAGRAM_CHANNEL_LABEL = "Instagram";
+
+/** A sessão de Instagram desta organização, se houver. */
+export async function findInstagramSession(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<InstagramSession | null> {
+  return findVerdashSession(admin, organizationId, CHANNEL_PROVIDER_INSTAGRAM);
+}
+
+/**
+ * Grava (ou ressuscita) a sessão de Instagram.
+ *
+ * `canal` fixo aqui dentro: deixá-lo na rota faria a rota escolher provider, e
+ * um esquecimento gravaria o vínculo como WhatsApp — que é pior que falhar,
+ * porque `capabilitiesOf()` passaria a prometer janela e mídia que o Instagram
+ * não tem.
+ */
+export async function saveInstagramSession(
+  admin: SupabaseClient,
+  input: Omit<Parameters<typeof saveVerdashSession>[1], "canal">,
+): Promise<{ error: string | null }> {
+  return saveVerdashSession(admin, { ...input, canal: CHANNEL_PROVIDER_INSTAGRAM });
+}
+
+export type { InstagramSession };

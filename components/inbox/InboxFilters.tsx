@@ -56,6 +56,8 @@ export interface InboxFiltersValue {
   search: string;
   onlyUnread: boolean;
   channel_session_id?: string;
+  /** De que ENTRADA do Instagram: `direct` | `comentario`. */
+  entrada?: string;
   tag?: string;
 }
 
@@ -123,6 +125,9 @@ export function InboxFilters({ value, onChange }: Props) {
     unread: value.onlyUnread,
     tag: value.tag,
     channel_session_id: value.channel_session_id,
+    // Sem isto o atendente filtra "só comentários" e lê nas abas o número de
+    // TODAS as conversas — badge maior que a lista, e nada dizendo por quê.
+    entrada: value.entrada,
   });
 
   const tabs = activeOrg
@@ -162,6 +167,17 @@ export function InboxFilters({ value, onChange }: Props) {
     !tagVocabulary.includes(value.tag);
   const mostrarSeletorDeTag =
     (tagVocabulary?.length ?? 0) > 0 || tagForaDoVocabulario;
+
+  // O seletor de ENTRADA só aparece quando há Instagram conectado — numa
+  // instalação só de WhatsApp ele seria uma caixa que nunca muda nada, ocupando
+  // a largura de 280 px que as outras duas já disputam.
+  //
+  // O `|| value.entrada != null` é a mesma proteção que o filtro de tag tem
+  // logo acima: sem ele, desconectar a conta faria o seletor sumir com o filtro
+  // AINDA APLICADO, e a lista ficaria num subconjunto sem nada na tela dizendo
+  // por quê nem como tirar.
+  const mostrarSeletorDeEntrada =
+    (channels?.some((c) => c.provider === "instagram") ?? false) || value.entrada != null;
 
   // O timer lê o valor MAIS RECENTE, não o do render em que foi agendado.
   //
@@ -243,7 +259,7 @@ export function InboxFilters({ value, onChange }: Props) {
           </button>
         </div>
 
-        {(showChannelSwitch || mostrarSeletorDeTag) && (
+        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeEntrada) && (
           <div className="flex gap-2">
             {showChannelSwitch && (
               <Select
@@ -320,6 +336,30 @@ export function InboxFilters({ value, onChange }: Props) {
                       </span>
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {mostrarSeletorDeEntrada && (
+              <Select
+                value={value.entrada ?? "all"}
+                onValueChange={(v) =>
+                  onChange({ ...value, entrada: v === "all" ? undefined : v })
+                }
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 min-w-0 flex-1 rounded-full border-transparent bg-surface-elevated px-3 text-xs shadow-none",
+                    value.entrada != null && "border-accent bg-accent-soft text-accent",
+                  )}
+                  aria-label={t("Filtrar por origem no Instagram")}
+                >
+                  <SelectValue placeholder={t("Direct e comentários")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("Direct e comentários")}</SelectItem>
+                  <SelectItem value="direct">{t("Só Direct")}</SelectItem>
+                  <SelectItem value="comentario">{t("Só comentários")}</SelectItem>
                 </SelectContent>
               </Select>
             )}
