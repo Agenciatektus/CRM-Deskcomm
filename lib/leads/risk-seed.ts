@@ -1,4 +1,5 @@
 import { protecaoAgendaSupabase } from "@/lib/agenda/protecao-followup";
+import { consultarEmLotes } from "@/lib/supabase/lotes";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { classifyRisk, resolveStageWindow, type RiskBucket } from "@/lib/leads/risk-radar";
@@ -132,14 +133,23 @@ async function coletaEClassifica(
   const contactIds = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c))];
   const followupPorContato = new Set<string>();
   if (contactIds.length > 0) {
-    const { data: jobs } = await admin
-      .from("cron_jobs")
-      .select("contact_id")
-      .eq("organization_id", organizationId)
-      .eq("kind", "at")
-      .eq("enabled", true)
-      .gt("next_run_at", now.toISOString())
-      .in("contact_id", contactIds);
+    // Em lotes: `contactIds` sai de TODOS os leads abertos da organização, sem
+    // teto. Na Lior são 1.097, e `.in()` com isso monta uma URL de 40 KB que o
+    // gateway recusa com 400 — o mesmo defeito que derrubava o quadro, só que
+    // aqui é caminho de background: falha em silêncio, sem tela para alguém
+    // reclamar. Ver `lib/supabase/lotes.ts`.
+    const { data: jobs } = await consultarEmLotes<{ contact_id: string }>(
+      contactIds,
+      (lote) =>
+        admin
+          .from("cron_jobs")
+          .select("contact_id")
+          .eq("organization_id", organizationId)
+          .eq("kind", "at")
+          .eq("enabled", true)
+          .gt("next_run_at", now.toISOString())
+          .in("contact_id", lote),
+    );
     for (const j of (jobs ?? []) as Array<{ contact_id: string }>) {
       followupPorContato.add(j.contact_id);
     }
