@@ -57,11 +57,21 @@ function semVinculo() {
 
 /** Guarda a URL chamada: é nela que o desvio se prova. */
 const urlsChamadas: string[] = [];
+/**
+ * E o `init`, que é onde mora a outra metade do contrato.
+ *
+ * Sem capturar isto, uma refatoração que movesse o token para a query string
+ * passaria em todos os casos verdes — e aí o segredo cairia no log de acesso da
+ * edge function e no do CDN, que é justamente o que o resto deste caminho
+ * protege com cuidado.
+ */
+const chamadas: Array<{ url: string; init: RequestInit | undefined }> = [];
 
 function respondeCom(body: unknown, init: { status?: number } = {}) {
   const status = init.status ?? 200;
-  return vi.fn(async (url: unknown) => {
+  return vi.fn(async (url: unknown, opts?: RequestInit) => {
     urlsChamadas.push(String(url));
+    chamadas.push({ url: String(url), init: opts });
     return {
       ok: status >= 200 && status < 300,
       status,
@@ -80,6 +90,7 @@ async function saude() {
 
 beforeEach(() => {
   urlsChamadas.length = 0;
+  chamadas.length = 0;
   creds.mockReset();
 });
 afterEach(() => {
@@ -102,6 +113,19 @@ describe("modo pareado", () => {
     // O ponto inteiro: o token de máquina não pode chegar ao FZAP.
     expect(urlsChamadas[0]).not.toContain("/session/status");
     expect(urlsChamadas[0]).not.toContain("fzap.interno");
+  });
+
+  it("o token vai no HEADER, e nunca na URL", async () => {
+    creds.mockResolvedValue(comVinculo());
+    globalThis.fetch = respondeCom({ success: true, data: { conectada: true } });
+
+    await saude();
+
+    const { url, init } = chamadas[0]!;
+    expect(init?.method).toBe("GET");
+    expect((init?.headers as Record<string, string>)["x-crm-token"]).toBe(comVinculo().token);
+    // Segredo em query string acaba em log de acesso — do runtime e do CDN.
+    expect(url).not.toContain(comVinculo().token);
   });
 
   it("instância reconectando é STARTING, não queda", async () => {
