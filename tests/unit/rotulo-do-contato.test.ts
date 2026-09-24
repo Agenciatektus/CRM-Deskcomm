@@ -216,6 +216,11 @@ describe("a sétima cópia não nasce", () => {
       motivo: "nome do CANAL conectado, na tela irmã da CanalParceiroClient",
     },
     {
+      arquivo: "components/connections/CanalInstagramClient.tsx",
+      trecho: 'estado?.display_name ?? t("Conta conectada")',
+      motivo: "o @ da CONTA de Instagram (channel_sessions), mesma tela irmã — nunca nome de pessoa",
+    },
+    {
       arquivo: "lib/channels/verdash/conectar.ts",
       trecho: 'displayName: d.display_name ?? telefone ?? "WhatsApp",',
       motivo: "nome da LINHA que a plataforma devolve ao parear; o fallback é o número dela",

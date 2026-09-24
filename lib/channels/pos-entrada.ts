@@ -109,6 +109,16 @@ export interface EntradaDeMensagem {
    * lendo o `event_log` meses depois, se saiba por onde a mensagem entrou.
    */
   origem: string;
+  /**
+   * O funil que a FONTE escolheu, quando o canal resolve isso antes de chegar
+   * aqui.
+   *
+   * Existe para o Instagram: o funil que recebe um Direct e o que declarou
+   * `instagram_direct` em `crm_pipelines.fontes`, e nao o `is_default`.
+   * Ausente -- que e o caso do WhatsApp -- nada muda: o nascimento do lead
+   * escolhe como sempre escolheu.
+   */
+  pipelineId?: string;
 }
 
 /**
@@ -280,6 +290,9 @@ async function abrirDemanda(admin: Admin, entrada: EntradaDeMensagem): Promise<v
       contactId: entrada.contactId,
       conversationId: entrada.conversationId,
       nomeDoContato: entrada.nomeDoContato,
+      // Repassado e nao resolvido aqui: quem sabe a fonte e o ingestor do
+      // canal. `undefined` no WhatsApp mantem o caminho de sempre.
+      pipelineId: entrada.pipelineId,
     });
 
     // Os DOIS desfechos viram log. Sem a linha do "não criou", o silêncio de
