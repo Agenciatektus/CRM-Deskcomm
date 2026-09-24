@@ -329,6 +329,14 @@ export const listConversationsQuerySchema = z.object({
    */
   unread: z.coerce.boolean().optional(),
   /**
+   * De que ENTRADA do Instagram a conversa veio.
+   *
+   * Os valores são os mesmos do CHECK de `conversations.instagram_entrada` —
+   * `story` não é um deles de propósito: resposta a story É um Direct e cai na
+   * mesma conversa de DM.
+   */
+  entrada: z.enum(["direct", "comentario"]).optional(),
+  /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
    * apareceria como erro na cara de quem digita (a rota recusa e o hook mostra).

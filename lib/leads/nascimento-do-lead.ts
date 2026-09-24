@@ -121,6 +121,21 @@ export interface DadosDoNascimento {
   nomeDoContato: string | null;
   /** Rotulo/source/motivo do canal de origem -- default preserva o WhatsApp. */
   origem?: OrigemDoNascimento;
+  /**
+   * O funil JA RESOLVIDO por quem chamou. Quando vem, manda.
+   *
+   * Existe para a regra de FONTE do Instagram: o funil que recebe um Direct e
+   * aquele que declarou `instagram_direct` em `crm_pipelines.fontes`, e nao o
+   * `is_default`. Deixar a escolha aqui dentro faria a fonte virar filtro de
+   * exibicao em vez de porta de entrada -- e a porta e o ponto.
+   *
+   * Vem opcional de proposito: sem ele, o comportamento do WhatsApp e o mesmo
+   * de sempre, incluindo o desvio para o funil de CLIENTES quando o contato ja
+   * foi atendido. Esse desvio nao se aplica a quem informa o funil: para o
+   * Instagram, quem governa e a fonte -- se o funil de clientes nao declarou
+   * aquela fonte, o lead nao tem o que fazer la.
+   */
+  pipelineId?: string;
 }
 
 /**
@@ -269,9 +284,24 @@ export async function garantirLeadDaConversa(
   // acontece quando o contato TEM a data — o caso comum (contato sem data) não
   // paga consulta a mais — e falha de leitura cai no funil de entrada, que é a
   // regra que o cabeçalho deste arquivo já declara.
+  // Calculado FORA do bloco de destino porque a timeline o usa depois: e ele
+  // que explica, no card, por que o lead nasceu naquele quadro.
   const ehCliente =
     contato?.first_service_at != null && (await lerClientePelaAgenda(db, organizationId));
-  const destino = await funilDeEntrada(db, organizationId, ehCliente);
+
+  const destino = await (async () => {
+    if (dados.pipelineId) {
+      // Quem resolveu o funil pela fonte ja consultou `crm_pipelines`; o que
+      // falta e a etapa de entrada dele. `primeiraEtapa` e a MESMA regra dos
+      // dois outros caminhos -- duplica-la aqui faria o lead de Instagram
+      // nascer numa etapa diferente do de WhatsApp no primeiro conserto.
+      const stageId = await primeiraEtapa(db, organizationId, dados.pipelineId);
+      return stageId
+        ? { pipelineId: dados.pipelineId, stageId }
+        : ({ erro: "sem_etapa" } as const);
+    }
+    return funilDeEntrada(db, organizationId, ehCliente);
+  })();
   if ("erro" in destino) return { criado: false, motivo: destino.erro };
 
   // 4 · o card.

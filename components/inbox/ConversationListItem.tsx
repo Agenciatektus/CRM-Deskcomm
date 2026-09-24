@@ -192,7 +192,19 @@ export function ConversationListItem({
   const canal = conversation.channel_sessions ?? null;
   const rotuloCanal = canal?.phone_number ?? canal?.display_name ?? null;
 
+  // POR ONDE entrou, que é diferente da REDE.
+  //
+  // O `ChannelLogo` sobre o avatar já diz "Instagram". Este selo diz se foi
+  // Direct ou comentário — e a distinção importa para quem responde: comentário
+  // é público e não pede atendimento, Direct é conversa privada.
+  //
+  // Só aparece quando há valor: conversa de WhatsApp não ganha selo vazio.
+  const entrada = conversation.instagram_entrada ?? null;
+  const rotuloEntrada =
+    entrada === "direct" ? t("Direct") : entrada === "comentario" ? t("Comentário") : null;
+
   const temSelos =
+    rotuloEntrada !== null ||
     visibleTags.length > 0 ||
     (mostrarAtendente && comando.quem === "humano") ||
     (mostrarCanal && rotuloCanal != null) ||
@@ -306,6 +318,15 @@ export function ConversationListItem({
             )}
             {mostrarAtendente && comando.quem === "humano" && (
               <OwnerBadge ownerKind="user" ownerName={comando.nome ?? t("Atendente")} compacto />
+            )}
+            {rotuloEntrada && (
+              <Badge
+                variant="outline"
+                className="h-4 gap-1 px-1.5 text-[10px] font-normal text-text-muted"
+                title={`${t("Entrou por")} ${rotuloEntrada}`}
+              >
+                {rotuloEntrada}
+              </Badge>
             )}
             {mostrarCanal && rotuloCanal && (
               <Badge

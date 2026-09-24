@@ -79,6 +79,8 @@ export interface Lead {
     preview: string | null;
     last_message_at: string | null;
     unread: number;
+    /** POR ONDE entrou no Instagram: `direct` | `comentario`. Null nos outros canais. */
+    instagram_entrada?: string | null;
   } | null;
   score?: {
     probability: number;

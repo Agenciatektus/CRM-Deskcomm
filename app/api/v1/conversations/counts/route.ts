@@ -51,6 +51,14 @@ export function filtrosAuxiliaresDaContagem(
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
+  // A ENTRADA do Instagram entra aqui porque é IGUALDADE numa coluna de
+  // `conversations`, que é exatamente o que esta lista sabe aplicar. Sem ela, o
+  // atendente filtraria "só comentários" e leria nas abas o número de TODAS as
+  // conversas — badge maior que a lista, sem nada dizendo por quê.
+  const entrada = sp.get("entrada");
+  if (entrada === "direct" || entrada === "comentario") {
+    filtros.push(["instagram_entrada", entrada]);
+  }
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
   // IGUALDADE numa coluna, é um `or=` sobre DUAS caixas — `conversations.tags`
   // e o campo calculado do contato. `conversations` não tem coluna `tag` (`tag`
