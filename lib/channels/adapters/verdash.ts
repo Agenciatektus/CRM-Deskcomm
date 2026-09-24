@@ -42,7 +42,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FetchedMedia } from "@/lib/messaging/media/types";
 
-import { fzapFetchMedia, fzapRequest, resolverJidDoTelefone, verdashEnviar } from "../verdash/client";
+import {
+  fzapFetchMedia,
+  fzapRequest,
+  resolverJidDoTelefone,
+  verdashEnviar,
+  verdashStatusPareado,
+} from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { resolveVerdashCreds } from "../verdash/credentials";
 import type {
@@ -391,6 +397,51 @@ export const verdashAdapter: ChannelAdapter = {
     });
     if (!creds) return { reachable: false, status: null, detail: "sem_credencial_para_a_sessao" };
 
+    // ── PAREADO: quem responde é a Verdash, dona da conexão ────────────────
+    //
+    // O token desta sessão vale para a API da Verdash, não para o servidor de
+    // WhatsApp. Mandá-lo ao FZAP — o que o ramo direto abaixo faz — ganha 401,
+    // e o 401 vira "conexão caída" numa linha que está saudável. O envio já se
+    // desvia assim há tempo (`verdashEnviar`); faltava a saúde.
+    if (creds.vinculoId) {
+      try {
+        const v = await verdashStatusPareado(creds);
+        // `reconectando` é o soluço de socket dentro da janela de debounce da
+        // Verdash. STARTING e não FAILED pelo mesmo motivo do ramo direto:
+        // tratar oscilação como queda faz aviso crítico a cada reconexão.
+        if (v.reconectando) {
+          return { reachable: true, status: "STARTING", detail: "reconectando_na_verdash" };
+        }
+        if (v.conectada) return { reachable: true, status: "WORKING", detail: null };
+        return { reachable: true, status: "FAILED", detail: "desconectada_na_verdash" };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "erro_desconhecido";
+        const st = /verdash_request_failed: (\d{3})/.exec(msg)?.[1];
+        // 401/403 aqui NÃO é token de instância: é o acesso deste CRM revogado
+        // na tela da Verdash. Desfecho igual (FAILED), nome diferente — quem
+        // for investigar precisa saber em qual das duas pontas mexer.
+        if (st === "401" || st === "403") {
+          return { reachable: true, status: "FAILED", detail: "acesso_revogado_na_verdash" };
+        }
+        // 404 aqui tem DUAS origens e elas pedem coisas opostas. Uma é a
+        // Verdash dizendo que a instância sumiu — desfecho conhecido. A outra
+        // é o roteador de funções dela respondendo que `crm-status-instancia`
+        // não existe, que é o estado de um CRM novo apontando para uma Verdash
+        // que ainda não subiu a função. Ler o segundo como "a instância parou"
+        // seria inventar um desfecho a partir de uma dependência ausente, e a
+        // tela mostraria "parou" numa conexão perfeita.
+        //
+        // Só o 404 que vem NOMEADO pela Verdash conta como instância sumida.
+        if (st === "404") {
+          return msg.includes("instancia_nao_encontrada")
+            ? { reachable: true, status: "STOPPED", detail: "instancia_nao_existe_mais" }
+            : { reachable: false, status: null, detail: "verdash_sem_endpoint_de_status" };
+        }
+        return { reachable: false, status: null, detail: msg.slice(0, 200) };
+      }
+    }
+
+    // ── DIRETO: o token é da instância, então pergunta-se ao FZAP ──────────
     let data: { connected?: boolean; loggedIn?: boolean } | undefined;
     try {
       data = await fzapRequest<{ connected?: boolean; loggedIn?: boolean }>(
