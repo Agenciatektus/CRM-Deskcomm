@@ -13,6 +13,7 @@
  * runs, same as every other authed query.
  */
 import { randomUUID } from "node:crypto";
+import { consultarEmLotes } from "@/lib/supabase/lotes";
 import { type NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
@@ -139,16 +140,17 @@ async function avisaAmbiguas(
 ): Promise<void> {
   if (ambiguas.length === 0) return;
 
-  const { data: jaAbertos } = await supabase
-    .from("agent_inbox_items")
-    .select("ref_id")
-    .eq("organization_id", organizationId)
-    .eq("kind", "next_action_ambiguous")
-    .eq("status", "open")
-    .in(
-      "ref_id",
-      ambiguas.map((a) => a.contact_id),
-    );
+  const { data: jaAbertos } = await consultarEmLotes<{ ref_id: string }>(
+    ambiguas.map((a) => a.contact_id),
+    (lote) =>
+      supabase
+        .from("agent_inbox_items")
+        .select("ref_id")
+        .eq("organization_id", organizationId)
+        .eq("kind", "next_action_ambiguous")
+        .eq("status", "open")
+        .in("ref_id", lote),
+  );
   const abertos = new Set(
     ((jaAbertos ?? []) as Array<{ ref_id: string }>).map((r) => r.ref_id),
   );
@@ -188,17 +190,28 @@ async function withScores(
 ): Promise<{ leads: Lead[]; error: string | null }> {
   if (leads.length === 0) return { leads, error: null };
 
-  const { data, error } = await supabase
-    .from("crm_lead_scores")
-    .select(
-      "lead_id, ai_probability, ai_probability_reason, ai_probability_band, ai_probability_evidence, ai_probability_at",
-    )
-    .eq("organization_id", organizationId)
-    .in(
-      "lead_id",
-      leads.map((l) => l.id),
-    );
-  if (error) return { leads, error: error.message };
+  // Em lotes pelo mesmo motivo das irmãs, e aqui a lista é a de LEADS: num
+  // quadro de mil e poucos cards, mandar todos os ids de uma vez monta a mesma
+  // URL de 40 KB que o gateway recusa.
+  const { data, error } = await consultarEmLotes<{
+    lead_id: string;
+    ai_probability: number | null;
+    ai_probability_reason: string | null;
+    ai_probability_band: string | null;
+    ai_probability_evidence: unknown;
+    ai_probability_at: string | null;
+  }>(
+    leads.map((l) => l.id),
+    (lote) =>
+      supabase
+        .from("crm_lead_scores")
+        .select(
+          "lead_id, ai_probability, ai_probability_reason, ai_probability_band, ai_probability_evidence, ai_probability_at",
+        )
+        .eq("organization_id", organizationId)
+        .in("lead_id", lote),
+  );
+  if (error) return { leads, error };
 
   const porLead = new Map<string, NonNullable<Lead["score"]>>();
   for (const row of (data ?? []) as Array<{
@@ -260,13 +273,24 @@ async function withConversas(
   const contactIds = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c))];
   if (contactIds.length === 0) return { leads, error: null };
 
-  const { data, error } = await supabase
-    .from("conversations")
-    .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags")
-    .eq("organization_id", organizationId)
-    .in("contact_id", contactIds)
-    .order("last_message_at", { ascending: false, nullsFirst: false });
-  if (error) return { leads, error: error.message };
+  // Em lotes: `.in()` vira query string, e mil contatos passam de 40 KB — o
+  // gateway recusa com 400 antes do Postgres ver a consulta. Ver `lotes.ts`.
+  const { data, error } = await consultarEmLotes<{
+    id: string;
+    contact_id: string | null;
+    last_message_preview: string | null;
+    last_message_at: string | null;
+    unread_count_for_assignee: number | null;
+    tags: string[] | null;
+  }>(contactIds, (lote) =>
+    supabase
+      .from("conversations")
+      .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags")
+      .eq("organization_id", organizationId)
+      .in("contact_id", lote)
+      .order("last_message_at", { ascending: false, nullsFirst: false }),
+  );
+  if (error) return { leads, error };
 
   const porContato = new Map<string, NonNullable<Lead["conversa"]>>();
   const marcadoresPorContato = new Map<string, Set<string>>();
@@ -337,11 +361,20 @@ async function withMarcadoresDoContato(
   ];
   if (contactIds.length === 0) return { leads: leadsDoQuadro, error: null };
 
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("id, tags, phone_number, email, custom_fields, is_anonymized")
-    .eq("organization_id", organizationId)
-    .in("id", contactIds);
+  const { data, error } = await consultarEmLotes<{
+    id: string;
+    tags: string[] | null;
+    phone_number: string | null;
+    email: string | null;
+    custom_fields: Record<string, unknown> | null;
+    is_anonymized: boolean | null;
+  }>(contactIds, (lote) =>
+    supabase
+      .from("contacts")
+      .select("id, tags, phone_number, email, custom_fields, is_anonymized")
+      .eq("organization_id", organizationId)
+      .in("id", lote),
+  );
   if (error) return { leads: leadsDoQuadro, error: error.message };
 
   const linhas = (data ?? []) as Array<{ id: string; tags: string[] | null } & LinhaDoContatoNoQuadro>;
@@ -374,25 +407,31 @@ async function withNextActions(
   ];
   if (contactIds.length === 0) return { leads, error: null };
 
+  // As duas em lotes, pelo mesmo motivo das irmãs: `.in()` com mil contatos
+  // monta uma URL que o gateway recusa com 400 antes de consultar nada.
   const [{ data: estados, error: estadosErr }, { data: candidatos, error: candErr }] =
     await Promise.all([
-      supabase
-        .from("lead_state")
-        .select("contact_id, next_action, next_action_seq, updated_at")
-        .eq("organization_id", organizationId)
-        .in("contact_id", contactIds)
-        .not("next_action", "is", null),
-      supabase
-        .from("crm_leads")
-        .select(
-          "id, organization_id, pipeline_id, status, last_activity_at, created_at, contact_id",
-        )
-        .eq("organization_id", organizationId)
-        .eq("status", "open")
-        .in("contact_id", contactIds),
+      consultarEmLotes<EstadoDoContato>(contactIds, (lote) =>
+        supabase
+          .from("lead_state")
+          .select("contact_id, next_action, next_action_seq, updated_at")
+          .eq("organization_id", organizationId)
+          .in("contact_id", lote)
+          .not("next_action", "is", null),
+      ),
+      consultarEmLotes<LeadCandidate & { contact_id: string | null }>(contactIds, (lote) =>
+        supabase
+          .from("crm_leads")
+          .select(
+            "id, organization_id, pipeline_id, status, last_activity_at, created_at, contact_id",
+          )
+          .eq("organization_id", organizationId)
+          .eq("status", "open")
+          .in("contact_id", lote),
+      ),
     ]);
-  if (estadosErr) return { leads, error: estadosErr.message };
-  if (candErr) return { leads, error: candErr.message };
+  if (estadosErr) return { leads, error: estadosErr };
+  if (candErr) return { leads, error: candErr };
   if (!estados || estados.length === 0) return { leads, error: null };
 
   const { porLead, ambiguas } = roteiaProximasAcoes(
