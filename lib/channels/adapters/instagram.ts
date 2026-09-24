@@ -172,9 +172,16 @@ export const instagramAdapter: ChannelAdapter = {
    * conta?** Isso é credencial gravada mais vínculo vivo, e é o que quebra na
    * prática — alguém revoga o acesso do CRM na plataforma e o canal fica mudo.
    *
-   * O que ela NÃO alcança é o estado do token da Meta. Não há endpoint de
-   * status para perguntar, e o canal irmão pode fazê-lo só porque o servidor de
-   * WhatsApp expõe `/session/status`.
+   * O que ela NÃO alcança é o estado do token da Meta.
+   *
+   * ⚠️ E NÃO adianta chamar `verdashStatusPareado` aqui, ainda que ela exista e
+   * responda a qualquer instância pareada. A régua dela é
+   * `conectada = provider === 'cloudapi' || status === 'connected'`, e o
+   * comentário que a acompanha diz o porquê: `cloudapi` não tem socket, então
+   * não cai, não reconecta e não desloga. **Instagram também não tem** — é
+   * OAuth contra a Graph, não uma sessão viva. Passá-lo por aquela régua
+   * devolveria `conectada: false` num canal que está funcionando, que é o mesmo
+   * alarme falso que a PR #11 acabou de consertar do outro lado.
    *
    * Essa limitação está no `detail` de propósito, e não escondida atrás de um
    * "WORKING" liso. Um `checkHealth` que afirma saúde que não mediu é pior que
