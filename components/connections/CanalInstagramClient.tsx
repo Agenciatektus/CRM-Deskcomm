@@ -40,7 +40,10 @@ import { ChannelAiAccess } from "./ChannelAiAccess";
 
 interface Estado {
   channel_session_id?: string | null;
+  /** A REDE: "Instagram". */
   label: string;
+  /** Onde o código é gerado — a plataforma, não a rede. */
+  plataforma?: string | null;
   connected: boolean;
   display_name: string | null;
   status: string | null;
@@ -97,7 +100,11 @@ export function CanalInstagramClient() {
     }
   };
 
-  const rotulo = estado?.label ?? t("sua plataforma");
+  // DOIS rótulos, e confundi-los foi o defeito: `label` é a REDE que se está
+  // conectando ("Instagram"), `plataforma` é onde o operador gera o código.
+  // Com um campo só, a tela dizia "Na Instagram, abra Integrações › Conectar ao
+  // CRM" — e mandava procurar no lugar errado.
+  const plataforma = estado?.plataforma ?? t("sua plataforma");
   const conectado = estado?.connected ?? false;
 
   return (
@@ -142,7 +149,8 @@ export function CanalInstagramClient() {
               className="font-mono tracking-[0.15em]"
             />
             <p className="text-xs text-muted-foreground">
-              {t("Na")} {rotulo}, {t("abra")} <strong>{t("Integrações › Conectar ao CRM")}</strong>
+              {t("Na")} {plataforma}, {t("abra")}{" "}
+              <strong>{t("Integrações › Conectar ao CRM")}</strong>
               {t(
                 ", escolha a conta de Instagram e gere o código. Ele vale uma vez e expira em 15 minutos.",
               )}
