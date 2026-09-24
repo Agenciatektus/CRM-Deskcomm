@@ -235,6 +235,147 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     }
   });
 
+
+  it("B2 — quando o join NÃO casa, a conversa continua existindo", () => {
+    // ─── A metade do wrapper que nenhum teste cobria ─────────────────────────
+    //
+    // O bloco B exercita as 8 combinações de status/flags, e em TODAS o contato
+    // é visível. O `left join` do wrapper existe justamente para o caso oposto —
+    // e esse caso não tinha teste nenhum. Levantado pelo @Cassio_SecRev, e é
+    // irônico: o comentário deste arquivo diz que o wrapper "é onde mora o erro
+    // de copiar-colar mais provável", e era a outra metade dele que estava sem
+    // cobertura.
+    //
+    // POR QUE O JOIN PODE NÃO CASAR, já que `contact_id` é NOT NULL com FK:
+    // porque `conversations` e `contacts` têm predicados de RLS INDEPENDENTES.
+    // A conversa é autorizada por `fn_can_view_conversation` (ciente de papel e
+    // de `visibility_mode`); o contato, por `tenant_isolation_contacts_all`
+    // (`organization_id in fn_user_org_ids()`, cego a papel). O FK é de coluna
+    // única — não há FK composto alinhando `(organization_id, contact_id)` —,
+    // então nada no schema impede uma conversa da org A apontar para um contato
+    // da org B.
+    //
+    // Com `left join`, essa conversa degrada para o comando padrão e continua
+    // aparecendo. Com `join`, ela SUMIRIA de todas as abas, em silêncio — que é
+    // o pior modo de falha possível num Inbox.
+    //
+    // ⚠️ RODA COMO `authenticated`, não como `postgres`. Sem isso a RLS não se
+    // aplica, o contato de outra org fica visível, o join casa, e o teste passa
+    // PELO MOTIVO ERRADO — a armadilha gêmea do `42501` que quase me pegou na
+    // PR #6.
+    const ORG_B = "bbbbbbbb-0000-4000-8000-0000000000b1";
+    const CT_B = "bbbbbbbb-0000-4000-8000-0000000000c1";
+    const CONV = "bbbbbbbb-0000-4000-8000-0000000000e1";
+
+    sql(`
+      delete from conversations where id = '${CONV}';
+      delete from contacts where id = '${CT_B}';
+      delete from organizations where id = '${ORG_B}';
+      insert into organizations (id, slug, legal_name, display_name)
+        values ('${ORG_B}', 'outra-org-b2', 'Outra LTDA', 'Outra');
+      -- O contato é da org B; a conversa é da org A. O FK aceita: ele é de
+      -- coluna única e não confere organização.
+      insert into contacts (id, organization_id, force_human, is_blocked)
+        values ('${CT_B}', '${ORG_B}', true, true);
+      -- SEM DONO, e isto e o CORACAO do caso. Ver a nota "por que a conversa
+      -- nao pode ter dono" logo abaixo das asseracoes.
+      insert into conversations (id, organization_id, contact_id, channel_session_id, status,
+                                 assigned_to_user_id)
+        values ('${CONV}', '${ORG}', '${CT_B}', '${ORG}', 'open', null);
+      -- O DONO precisa de VINCULO com a org para a RLS de conversations o
+      -- deixar ler. No resto deste arquivo ele so aparece como alvo de
+      -- atribuicao, e sem user_organizations a leitura abaixo voltava VAZIA:
+      -- nem automatico, nem SUMIU, o que fazia o teste falhar sem dizer nada
+      -- sobre o left join. Pego pelo CI.
+      -- Com papel 'agent' e a conversa SEM dono, quem autoriza a leitura e o
+      -- ramo 'own_and_unassigned' de fn_can_view_conversation (o padrao quando
+      -- a organizacao nao declara visibility_mode) — que e justamente um dos
+      -- ramos reescritos pela migration 9014.
+      -- (sem crase neste comentario: ele vive dentro de um template literal)
+      insert into user_organizations (user_id, organization_id, role, accepted_at)
+        values ('${DONO}', '${ORG}', 'agent', now())
+        on conflict do nothing;
+    `);
+
+    const comoServico = sql(
+      `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
+    ).trim();
+    // Sem RLS o contato é alcançável, então as flags do contato VALEM: sem dono
+    // e com `force_human`, a ordem de `fn_comando_da_conversa` dá `aguardando`.
+    // Medido, não deduzido — pg17 com este baseline, 2026-09-23.
+    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
+
+    // Agora com a RLS de verdade: o usuário não é membro da org B.
+    //
+    // MARCADOR em volta do valor, e busca na saída inteira — não
+    // `.split().pop()`. O CI pegou isto: a última linha de um script com
+    // `rollback;` é `ROLLBACK`, não o resultado do `select`, e a asserção
+    // comparava contra ela. Um teste que lê a linha errada falha (ou passa) sem
+    // relação com o produto.
+    const comoUsuario = sql(`
+      begin;
+      select set_config('request.jwt.claims',
+        json_build_object('sub','${DONO}','role','authenticated')::text, true);
+      set local role authenticated;
+      select '<<' || coalesce(public.comando_da_conversa(c), 'SUMIU') || '>>'
+        from conversations c where c.id = '${CONV}';
+      rollback;
+    `);
+
+    // ─── POR QUE A CONVERSA NÃO PODE TER DONO ──────────────────────────────
+    //
+    // A primeira versão deste caso atribuía a conversa ao DONO, e o CI a matou
+    // — com razão. `fn_comando_da_conversa` avalia o DONO ANTES das travas do
+    // contato, então uma conversa atribuída devolve `humano` quer o join case
+    // ou não. O caso media zero: o valor não dependia da coisa sob teste, e a
+    // única razão de ele ter passado antes foi a leitura voltar vazia (sem
+    // `user_organizations` a RLS recusava a conversa, e `not.toContain` passa
+    // vacuamente sobre string vazia).
+    //
+    // Sem dono, os dois mundos ficam DISTINGUÍVEIS — medido em pg17 com este
+    // baseline, 2026-09-23:
+    //
+    //   contato da org B, invisível .... <<automatico>>   (join não casou)
+    //   o MESMO contato na org A ....... <<aguardando>>   (join casou)
+    //
+    // É por isso que o controle positivo abaixo não é zelo: sem ele, um teste
+    // que só cobra `automatico` também fica verde se a linha inteira sumir de
+    // outro jeito, ou se o contato parar de existir.
+    expect(comoUsuario, "a conversa some quando o contato não é visível").not.toContain("<<SUMIU>>");
+    expect(comoUsuario, "sem contato visível, o comando degrada para o padrão").toContain(
+      "<<automatico>>",
+    );
+
+    // ─── CONTROLE POSITIVO ─────────────────────────────────────────────────
+    // O mesmo contato, agora na org A: o join CASA e as flags dele valem. Se
+    // esta asserção também devolvesse `automatico`, a de cima não estaria
+    // provando o join — estaria provando que o contato nunca é lido.
+    sql(`update contacts set organization_id = '${ORG}' where id = '${CT_B}';`);
+    const comContatoVisivel = sql(`
+      begin;
+      select set_config('request.jwt.claims',
+        json_build_object('sub','${DONO}','role','authenticated')::text, true);
+      set local role authenticated;
+      select '<<' || coalesce(public.comando_da_conversa(c), 'SUMIU') || '>>'
+        from conversations c where c.id = '${CONV}';
+      rollback;
+    `);
+    expect(comContatoVisivel, "com o contato visível as flags dele passam a valer").toContain(
+      "<<aguardando>>",
+    );
+    expect(comContatoVisivel, "o controle não pode repetir o valor degradado").not.toContain(
+      "<<automatico>>",
+    );
+    sql(`update contacts set organization_id = '${ORG_B}' where id = '${CT_B}';`);
+
+    sql(`
+      delete from conversations where id = '${CONV}';
+      delete from contacts where id = '${CT_B}';
+      delete from organizations where id = '${ORG_B}';
+      delete from user_organizations where user_id = '${DONO}' and organization_id = '${ORG}';
+    `);
+  });
+
   it("C — quem o banco chama de 'automatico', o MOTOR realmente atende", () => {
     // A e B provam que TS e SQL concordam ENTRE SI. Nada neles impede os dois de
     // estarem errados sobre o motor. Este bloco extrai o SQL do fonte de
