@@ -13,6 +13,7 @@
  * runs, same as every other authed query.
  */
 import { randomUUID } from "node:crypto";
+import { logger } from "@/lib/logger";
 import { buscarTodasAsPaginas, consultarEmLotes } from "@/lib/supabase/lotes";
 import { type NextRequest } from "next/server";
 
@@ -511,7 +512,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const [
     { data: pipeline, error: pipelineErr },
     { data: stages, error: stagesErr },
-    { data: leads, error: leadsErr },
+    { data: leads, error: leadsErr, truncado: leadsTruncados },
   ] = await Promise.all([
     supabase.from("crm_pipelines").select("*").eq("id", pipelineId).maybeSingle(),
     supabase
@@ -539,6 +540,19 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });
   if (stagesErr) return fail("internal_error", stagesErr.message, 500, { requestId });
   if (leadsErr) return fail("internal_error", leadsErr, 500, { requestId });
+  if (leadsTruncados) {
+    // O helper produz este sinal e até aqui ele era DESCARTADO — a mesma classe
+    // do defeito que esta rota acabou de consertar: aviso fabricado e jogado no
+    // chão, com a suíte carimbando de verde.
+    //
+    // Fica em log e não em erro: um quadro com 50 mil cards ainda serve mais ao
+    // operador que uma tela vazia. O que não pode é ninguém saber.
+    logger.warn("[board] quadro truncado pelo teto de páginas", {
+      pipelineId,
+      leadsCarregados: leads.length,
+      requestId,
+    });
+  }
   if (!pipeline) return fail("resource_not_found", t("Pipeline não encontrado."), 404, { requestId });
 
   const leadsWithOwner = await withOwnerAgents(
