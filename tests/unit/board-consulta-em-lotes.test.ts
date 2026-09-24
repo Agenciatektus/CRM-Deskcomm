@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   IDS_POR_CONSULTA,
+  LINHAS_POR_PAGINA,
   buscarTodasAsPaginas,
   consultarEmLotes,
   lotesDeIds,
@@ -184,6 +185,26 @@ describe("a rota do quadro não pode ter `.in()` cru", () => {
   });
 });
 
+describe("a folga contra o `max_rows` do servidor", () => {
+  it("a página é MENOR que o teto do PostgREST, e isso é lido do config", () => {
+    // Esta é a invariante que faz a condição de parada valer. `buscarTodasAsPaginas`
+    // para quando uma página volta menor que o pedido — e isso só PROVA fim de
+    // dados enquanto o nosso tamanho for menor que o corte do servidor. Com os
+    // dois iguais, uma página cortada no teto é indistinguível de uma página
+    // que acabou, e leads somem em silêncio.
+    //
+    // A primeira versão usava 1.000 contra um `max_rows` de 1.000. Funcionava
+    // por coincidência, e nenhum teste teria acusado se alguém baixasse o teto.
+    // Agora a coincidência virou asserção.
+    const config = readFileSync("supabase/config.toml", "utf8");
+    const m = /^\s*max_rows\s*=\s*(\d+)/m.exec(config);
+    expect(m, "não achei `max_rows` em supabase/config.toml").not.toBeNull();
+
+    const maxRows = Number(m![1]);
+    expect(LINHAS_POR_PAGINA).toBeLessThan(maxRows);
+  });
+});
+
 describe("buscarTodasAsPaginas", () => {
   /**
    * O PostgREST CORTA no `db-max-rows` e não avisa. Medido no gateway do CRM
@@ -211,6 +232,18 @@ describe("buscarTodasAsPaginas", () => {
     expect(new Set(data.map((l) => l.id)).size).toBe(1098);
   });
 
+  it("pedido MAIOR que a página não duplica linha na fronteira", async () => {
+    // O dublê anterior cortava em `min(ate+1, de+teto)` com `teto === tamanho`,
+    // então ele comia qualquer pedido maior que a página — e por isso o teste
+    // não enxergava o off-by-one que DUPLICA (`ate = de + tamanho`, pedindo 501).
+    // Com um servidor de teto FOLGADO, a duplicação aparece: o último lead de
+    // uma página voltaria como o primeiro da seguinte, e no Kanban isso vira
+    // card repetido e `key` duplicada no React.
+    const { data } = await buscarTodasAsPaginas(servidorQueCortaEm(1098, 5000));
+    expect(data).toHaveLength(1098);
+    expect(new Set(data.map((l) => l.id)).size).toBe(1098);
+  });
+
   it("página EXATAMENTE cheia não é confundida com o fim", async () => {
     // O caso que uma implementação ingênua erra: 2.000 linhas em páginas de
     // 1.000 dá uma segunda página cheia, e parar ali perderia o resto.
@@ -220,7 +253,7 @@ describe("buscarTodasAsPaginas", () => {
 
   it("base pequena resolve numa página só", async () => {
     const paginas: number[] = [];
-    await buscarTodasAsPaginas(async (de, ate) => {
+    await buscarTodasAsPaginas(async (de, _ate) => {
       paginas.push(de);
       return { data: Array.from({ length: 178 }, (_, i) => ({ id: `l${i}` })), error: null };
     });
