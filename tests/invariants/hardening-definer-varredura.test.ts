@@ -183,6 +183,16 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "e da org vizinha, com a configuração intacta depois das recusas.",
   },
   {
+    fn: "fn_definir_cadencias_pausadas(uuid,boolean)",
+    razao:
+      "app/api/v1/cadencias/pausa/route.ts chama por rpc com o createClient da SESSÃO " +
+      "(kill switch das cadências de prospecção, migration 9016); a própria função " +
+      "reconfere auth.uid(), manager da organização, suporte de escrita e MFA comprovado " +
+      "antes de gravar settings.cadencias_pausadas por merge. " +
+      "tests/invariants/cadencia-pausa-acl.test.ts prova o manager com fator provado e a " +
+      "negação de agent, viewer, sessão aal1, anon e manager da org vizinha.",
+  },
+  {
     fn: "fn_definir_cliente_pela_agenda(uuid,boolean)",
     razao:
       "app/actions/settings/definirClientePelaAgenda.ts chama com createClient da sessão; " +
