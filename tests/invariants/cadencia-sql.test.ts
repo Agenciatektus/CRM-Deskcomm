@@ -158,7 +158,7 @@ describe("base legal e etiqueta", () => {
     const stage = randomUUID();
     await pool.query(
       "insert into crm_pipelines (id, organization_id, name, slug) values ($1, $2, 'Funil', $3)",
-      [pipeline, o, `funil-${pipeline}`],
+      [pipeline, o, `f${pipeline.slice(0, 8)}`],
     );
     await pool.query(
       "insert into crm_stages (id, organization_id, pipeline_id, name, slug, position) values ($1,$2,$3,'Entrada','entrada',1)",
