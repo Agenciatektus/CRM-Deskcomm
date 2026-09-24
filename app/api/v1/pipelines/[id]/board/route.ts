@@ -262,7 +262,7 @@ async function withConversas(
 
   const { data, error } = await supabase
     .from("conversations")
-    .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags")
+    .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags, instagram_entrada")
     .eq("organization_id", organizationId)
     .in("contact_id", contactIds)
     .order("last_message_at", { ascending: false, nullsFirst: false });
@@ -277,6 +277,7 @@ async function withConversas(
     last_message_at: string | null;
     unread_count_for_assignee: number | null;
     tags: string[] | null;
+    instagram_entrada: string | null;
   }>) {
     // Os marcadores somam TODAS as conversas; a linha do card é só a mais recente.
     for (const tag of row.tags ?? []) {
@@ -291,6 +292,10 @@ async function withConversas(
       preview: row.last_message_preview,
       last_message_at: row.last_message_at,
       unread: row.unread_count_for_assignee ?? 0,
+      // O card mostra de onde veio. Sem isto, um lead nascido de Direct e um de
+      // WhatsApp ficam indistinguiveis no quadro — e a abordagem de quem vai
+      // atender depende disso.
+      instagram_entrada: row.instagram_entrada,
     });
   }
 

@@ -91,6 +91,7 @@ const SELECT_COLS = `
   snooze_until, created_at, updated_at,
   bot_silenced_until, last_handoff_at,
   comando_da_conversa,
+  instagram_entrada,
   contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human),
   channel_sessions:channel_session_id (phone_number, display_name, provider, social_platform:metadata->>social_platform)
 `;
@@ -224,6 +225,10 @@ export async function listConversationsHandler(
   // Este handler usa o admin client, que passa por cima da RLS: esse filtro é a Única
   // barreira. Consulta nova só para os não lidos nasceria sem barreira nenhuma.
   if (q.unread) query = query.gt("unread_count_for_assignee", 0);
+  // POR ONDE a conversa entrou. O Inbox lista CONVERSA, e por isso o filtro
+  // mora na coluna dela: varrer `messages.metadata` por linha faria o filtro
+  // ficar lento — e filtro lento é filtro que o atendente desliga.
+  if (q.entrada) query = query.eq("instagram_entrada", q.entrada);
 
   if (q.assigned_to === "me") {
     if (ctx.actor.type !== "user") {
