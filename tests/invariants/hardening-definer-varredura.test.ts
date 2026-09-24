@@ -190,7 +190,7 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "reconfere auth.uid(), manager da organização, suporte de escrita e MFA comprovado " +
       "antes de gravar settings.cadencias_pausadas por merge. " +
       "tests/invariants/cadencia-pausa-acl.test.ts prova o manager com fator provado e a " +
-      "negação de agent, viewer, sessão aal1, anon e manager da org vizinha.",
+      "negação de agent, viewer, anon, manager da org vizinha e de sessão aal1 de quem tem TOTP.",
   },
   {
     fn: "fn_definir_cliente_pela_agenda(uuid,boolean)",

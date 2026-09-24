@@ -72,17 +72,33 @@ describe("kill switch das cadências", () => {
     expect(await pausadas(a!.org)).toBe(false);
   });
 
-  it("recusa agent, viewer, sessão sem MFA, anon e manager de OUTRA org — sem mudar nada", async () => {
+  it("recusa agent, viewer, anon e manager de OUTRA org — sem mudar nada", async () => {
     const [a, b] = tenants;
-    const tentativas: Array<Promise<unknown>> = [
-      asRole("authenticated", a!.agent, q, [a!.org, true], "aal2"),
-      asRole("authenticated", a!.viewer, q, [a!.org, true], "aal2"),
-      asRole("authenticated", a!.manager, q, [a!.org, true], "aal1"),
-      asRole("anon", null, q, [a!.org, true]),
-      asRole("authenticated", b!.manager, q, [a!.org, true], "aal2"),
-    ];
-    for (const t of tentativas) await expect(t).rejects.toThrow();
+    // Em série: cada tentativa numa transação própria, e o estado conferido no fim.
+    await expect(asRole("authenticated", a!.agent, q, [a!.org, true], "aal2")).rejects.toThrow();
+    await expect(asRole("authenticated", a!.viewer, q, [a!.org, true], "aal2")).rejects.toThrow();
+    await expect(asRole("anon", null, q, [a!.org, true])).rejects.toThrow();
+    await expect(asRole("authenticated", b!.manager, q, [a!.org, true], "aal2")).rejects.toThrow();
     expect(await pausadas(a!.org)).toBe(false);
+  });
+
+  it("manager COM fator TOTP cadastrado precisa da sessão aal2 (aal1 é recusada)", async () => {
+    // `fn_session_mfa_proven` exige aal2 só de quem tem fator verificado — quem
+    // nunca cadastrou MFA passa em aal1, regra do produto inteiro. Com o fator:
+    const [a] = tenants;
+    const fator = randomUUID();
+    await pool.query(
+      "insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",
+      [fator, a!.manager],
+    );
+    try {
+      await expect(asRole("authenticated", a!.manager, q, [a!.org, true], "aal1")).rejects.toThrow(/mfa_required/);
+      expect(await pausadas(a!.org)).toBe(false);
+      // Controle: a MESMA pessoa em aal2 passa.
+      await asRole("authenticated", a!.manager, q, [a!.org, false], "aal2");
+    } finally {
+      await pool.query("delete from auth.mfa_factors where id=$1", [fator]);
+    }
   });
 
   it("grava por merge: as outras chaves de settings ficam", async () => {
