@@ -1,3 +1,4 @@
+import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
  * POST /api/v1/cadencias/:id/preview — como cada variante sai para um negócio de
  * amostra (manager+, quem edita a régua).
@@ -28,6 +29,10 @@ const corpoSchema = z.strictObject({
 });
 
 export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
+  // Só lê, mas é POST: a cerca de suporte vale para todo handler mutante por
+  // método, e o preview fica atrás do mesmo guarda que o editor que o chama.
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
   const requestId = randomUUID();
   const { id } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success) return fail("invalid_request", "id inválido.", 400, { requestId });

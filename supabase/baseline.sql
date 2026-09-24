@@ -36780,11 +36780,9 @@ grant execute on function public.fn_upsert_conversa_do_instagram(uuid, uuid, uui
 -- Aditiva e idempotente: colunas nullable, CHECK por conjunto (drop/add) e
 -- índices parciais. Sem backfill: pointer existente continua `followup`.
 
-alter table public.followup_flow_pointers
-  drop constraint if exists followup_flow_pointers_surface_check;
-alter table public.followup_flow_pointers
-  add constraint followup_flow_pointers_surface_check
-  check (surface in ('followup', 'crm_automation', 'cadence'));
+-- O CHECK de `surface` com 'cadence' mora no bloco da 0196 (uma constraint, um
+-- bloco — `tests/unit/baseline-constraint-reconstruida.test.ts`); a migration
+-- 9016 o reconstrói para quem aplica a migration solta.
 
 alter table public.followup_flow_pointers
   add column if not exists channel_session_id uuid
@@ -36811,11 +36809,6 @@ alter table public.followup_flow_pointers
       and jsonb_typeof(cadence_settings) = 'object'
     )
   );
-
-comment on column public.followup_flow_pointers.surface is
-  'Onde o fluxo aparece: followup = /app/ai/followups; crm_automation = CRM Automação; '
-  'cadence = cadência de prospecção do funil (migration 9016). '
-  'Vocabulário cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts.';
 
 create index if not exists followup_flow_pointers_cadencia_por_funil
   on public.followup_flow_pointers (organization_id, pipeline_id)
