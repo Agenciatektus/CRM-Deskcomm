@@ -12,7 +12,7 @@ import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtim
  * ─── O que é "auxiliar" ──────────────────────────────────────────────────────
  * A ABA não entra. Ela é a visão escolhida, já está destacada na barra de cima, e
  * nomeá-la aqui diria ao operador para "limpar" o lugar onde ele está. Entram os
- * quatro que ele ligou por cima da aba e pode esquecer que ligou.
+ * cinco que ele ligou por cima da aba e pode esquecer que ligou.
  *
  * As strings saem em português porque `t()` usa o português como chave. Elas
  * precisam existir em `lib/i18n/dicionario.ts`: o guardião do espanhol é cego a
@@ -24,5 +24,12 @@ export function filtrosAuxiliaresAtivos(filters: ConversationsFilters): string[]
   if (filters.search) ativos.push("Busca");
   if (filters.tag) ativos.push("Etiqueta");
   if (filters.channel_session_id) ativos.push("Canal");
+  // A ORIGEM do Instagram (Direct ou comentário). Sem esta linha o estado vazio
+  // dizia "Ativos: Canal" com DOIS filtros ligados — exatamente o defeito que o
+  // cabeçalho deste arquivo existe para impedir: a tela afirmando um estado que
+  // não é o do servidor. Filtro que some da lista é filtro que o operador não
+  // sabe que precisa desligar, e ele fica olhando uma caixa vazia sem entender
+  // o que a esvaziou.
+  if (filters.entrada) ativos.push("Origem");
   return ativos;
 }
