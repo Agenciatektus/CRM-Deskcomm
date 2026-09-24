@@ -108,21 +108,73 @@ describe("consultarEmLotes", () => {
 });
 
 describe("a rota do quadro não pode ter `.in()` cru", () => {
-  it("todo `.in(` do board usa um lote", () => {
-    // Cerca de texto-fonte, no idioma que o repo já usa em
-    // `funil-filtro-de-tag-le-as-duas-caixas.test.ts`.
-    //
-    // Ela existe porque os DOIS defeitos desta correção caíram na integração,
-    // não no helper: primeiro eu converti quatro consultas e esqueci o
-    // `withScores` (que passa ids de LEAD, não de contato); depois converti a
-    // consulta e esqueci a linha de erro ao lado, e o build quebrou. Teste de
-    // unidade do helper não pega nenhum dos dois — esta cerca pega o primeiro,
-    // e o compilador pega o segundo.
-    const rota = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
-    const crus = [...rota.matchAll(/\.in\(\s*("[^"]+"|'[^']+')\s*,\s*([^)]+?)\s*\)/g)]
-      .map((m) => ({ coluna: m[1], argumento: (m[2] ?? "").trim() }))
-      .filter((c) => c.argumento !== "lote");
+  /**
+   * Tira comentário antes de casar.
+   *
+   * Sem isto a cerca reprova código CORRETO: basta alguém documentar o defeito
+   * com o exemplo real ao lado —
+   *   `// ANTES: .in("contact_id", contactIds)` — e a suíte quebra. Num arquivo
+   * que explica tudo em prosa, isso é questão de tempo, e cerca que reprova o
+   * inocente é cerca que alguém apaga.
+   */
+  function semComentarios(fonte: string): string {
+    return fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  }
 
-    expect(crus).toEqual([]);
+  /**
+   * `,?` porque o prettier deste repo usa `trailingComma: "all"`: um `.in(`
+   * que passe de 100 colunas vira multi-linha com vírgula final, e sem isto a
+   * cerca leria `"lote,"` e reprovaria o certo.
+   */
+  const CHAMADA_IN = /\.in\(\s*("[^"]+"|'[^']+')\s*,\s*([^)]+?)\s*,?\s*\)/g;
+
+  function argumentosCrus(fonte: string) {
+    return [...semComentarios(fonte).matchAll(CHAMADA_IN)]
+      .map((m) => (m[2] ?? "").trim().replace(/,$/, ""))
+      .filter((arg) => arg !== "lote");
+  }
+
+  it("todo `.in(` do board usa um lote", () => {
+    // Os DOIS defeitos desta correção caíram na integração, não no helper:
+    // primeiro converti quatro consultas e esqueci o `withScores` (que passa
+    // ids de LEAD, não de contato); depois converti a consulta e esqueci a
+    // linha de erro ao lado, e o build quebrou. Teste de unidade do helper não
+    // pega nenhum dos dois — esta cerca pega o primeiro, o compilador o segundo.
+    const rota = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
+    expect(argumentosCrus(rota)).toEqual([]);
+  });
+
+  it("controle positivo: a cerca enxerga as chamadas do arquivo", () => {
+    // Cerca que não casa nada passa sempre. Sem este caso, apagar a regex por
+    // engano deixaria o teste verde e inútil.
+    const rota = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
+    const todas = [...semComentarios(rota).matchAll(CHAMADA_IN)];
+    expect(todas.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("não reprova `.in()` citado em comentário", () => {
+    const comExemploNaProsa = `
+      // ANTES (o defeito): mandava tudo de uma vez —
+      //   .in("contact_id", contactIds)
+      /* e em bloco também: .in("id", leadIds) */
+      await supabase.from("x").in("id", lote);
+    `;
+    expect(argumentosCrus(comExemploNaProsa)).toEqual([]);
+  });
+
+  it("não reprova `.in(` quebrado em várias linhas pelo prettier", () => {
+    const multiLinha = `
+      await supabase.from("x").in(
+        "contact_id",
+        lote,
+      );
+    `;
+    expect(argumentosCrus(multiLinha)).toEqual([]);
+  });
+
+  it("continua reprovando o `.in()` cru de verdade", () => {
+    expect(argumentosCrus(`await supabase.from("x").in("contact_id", contactIds);`)).toEqual([
+      "contactIds",
+    ]);
   });
 });
