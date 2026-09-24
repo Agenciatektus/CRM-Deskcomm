@@ -99,4 +99,25 @@ describe("o vazio por FILTRO não se disfarça de caixa vazia", () => {
     montar({} as ConversationsFilters, false);
     expect(screen.queryByRole("button", { name: /Carregar mais/i })).not.toBeInTheDocument();
   });
+  it("a ORIGEM do Instagram entra na lista de filtros ativos", () => {
+    // O print do primeiro uso real mostrou "Ativos: Canal" com DOIS filtros
+    // ligados — canal e "Só Direct". Filtro que some da lista é filtro que o
+    // operador não sabe que precisa desligar, e ele fica olhando uma caixa
+    // vazia sem entender o que a esvaziou.
+    expect(filtrosAuxiliaresAtivos({ entrada: "direct" })).toContain("Origem");
+    expect(filtrosAuxiliaresAtivos({ entrada: "comentario" })).toContain("Origem");
+  });
+
+  it("sem filtro de origem, a lista não inventa um", () => {
+    expect(filtrosAuxiliaresAtivos({})).not.toContain("Origem");
+  });
+
+  it("origem CONVIVE com os outros, sem apagá-los", () => {
+    const ativos = filtrosAuxiliaresAtivos({
+      entrada: "direct",
+      channel_session_id: "abc",
+      unread: true,
+    });
+    expect(ativos).toEqual(expect.arrayContaining(["Não lidos", "Canal", "Origem"]));
+  });
 });
