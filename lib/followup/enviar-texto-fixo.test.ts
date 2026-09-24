@@ -37,6 +37,9 @@ const JOB = {
 
 const statusUpdates: string[] = [];
 
+/** Filtros `.is()` pedidos ao stub — prova que a cadência sai JÁ na consulta. */
+const filtrosIs: Array<[string, string, unknown]> = [];
+
 /** Admin stub: job_queue (select pending / claim / status) + followup_enrollments. */
 function admin() {
   const make = (table: string) => {
@@ -46,6 +49,10 @@ function admin() {
       _upd: null as Record<string, unknown> | null,
       select: () => chain,
       eq: () => chain,
+      is: (coluna: string, valor: unknown) => {
+        filtrosIs.push([table, coluna, valor]);
+        return chain;
+      },
       lte: () => chain,
       in: () => chain,
       single: () => Promise.resolve({data:table==="send_ledger"?{id:"ledger-1"}:{settings:{}},error:null}),
@@ -113,4 +120,12 @@ it.each(["queued","failed"])("%s não conta envio nem avança o fluxo",async sta
  decidir.mockResolvedValue({permite:true});sendMessageHandler.mockResolvedValueOnce({id:"msg-1",status});
  expect(await enviarTextoFixoPendente(admin())).toBe(0);
  expect(completeTurnForEnrollment).not.toHaveBeenCalled();expect(statusUpdates).toContain("pending");
+});
+
+describe("cadência não sai pelo atalho inline", () => {
+  it("a consulta dos jobs pendentes já exclui passo de cadência (sem ocupar o limit(5))", async () => {
+    filtrosIs.length = 0;
+    await enviarTextoFixoPendente(admin() as never);
+    expect(filtrosIs).toContainEqual(["job_queue", "payload->cadencia", null]);
+  });
 });

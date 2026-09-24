@@ -509,6 +509,14 @@ export const MODOS_DA_ACAO: Record<ModoDaAcao, string> = {
   text: "Texto fixo",
   ai_message: "Mensagem escrita pela IA",
   template: "Modelo de mensagem pronto",
+  move_stage: "Mover para a etapa",
+  tag: "Etiqueta",
+};
+
+/** O que um passo de etiqueta da cadência faz com ela. */
+export const OPERACOES_DE_ETIQUETA: Record<"add" | "remove", string> = {
+  add: "Adicionar etiqueta",
+  remove: "Remover etiqueta",
 };
 
 // ─── nó final ────────────────────────────────────────────────────────────

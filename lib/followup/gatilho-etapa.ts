@@ -63,6 +63,8 @@ export interface PointerDeEtapa {
   organization_id: string;
   active_version_id: string;
   stage_id: string;
+  /** `cadence` segue pela porta da cadência (`lib/cadencia/inscrever.ts`). Ausente = follow-up. */
+  surface?: string;
 }
 
 /** Interface estreita de DB — mesma doutrina de `SilenceSweepDb`/`ReactivityAdminClient`:
@@ -118,12 +120,29 @@ export interface GatilhoEtapaSummary {
   skipped_stale_origin?: number;
   /** Negócio entrou na etapa mas não tem contato — não há a quem escrever. Contado, nunca calado. */
   sem_contato: number;
+  /** Cadências de prospecção: inscritos e recusados (o motivo vai no detail do handler). */
+  cadencia_inscritos?: number;
+  cadencia_recusas?: string[];
 }
 
 export interface GatilhoEtapaDeps {
   db: GatilhoEtapaDb;
   gateDb: FollowupGateDb;
   clock: () => Date;
+  /**
+   * Porta da CADÊNCIA (surface `cadence`). Ela não passa pelo gate do agente de
+   * IA — os freios dela são outros (teto do dia, só evento posterior à
+   * publicação, aptidão do contato) — e abre a conversa no número da cadência,
+   * em vez de herdar a do evento (lead frio não tem conversa nenhuma).
+   * Ausente: pointer de cadência não inscreve (conta como barrado).
+   */
+  inscreverNaCadencia?: (input: {
+    organizationId: string;
+    pointerId: string;
+    leadId: string;
+    eventId: string;
+    eventoEm: string;
+  }) => Promise<{ ok: true; enrollmentId: string } | { ok: false; motivo: string }>;
 }
 
 function textoOuNulo(v: unknown): string | null {
@@ -176,6 +195,28 @@ export async function aplicaGatilhoDeEtapa(
   }
 
   for (const pointer of armados) {
+    if (pointer.surface === "cadence") {
+      if (!deps.inscreverNaCadencia) {
+        summary.pointers_barrados_pelo_gate++;
+        continue;
+      }
+      const r = await deps.inscreverNaCadencia({
+        organizationId: row.organization_id,
+        pointerId: pointer.id,
+        leadId: negocioId,
+        eventId: row.id,
+        // Sem a data de emissão não dá para afirmar que o evento é velho: falha
+        // ABERTO, como pede o contrato do `EventRow`.
+        eventoEm: row.created_at ?? deps.clock().toISOString(),
+      });
+      if (r.ok) {
+        summary.enrolled++;
+        summary.cadencia_inscritos = (summary.cadencia_inscritos ?? 0) + 1;
+      } else {
+        summary.cadencia_recusas = [...(summary.cadencia_recusas ?? []), r.motivo];
+      }
+      continue;
+    }
     const agentId = await resolveAgentForAutomaticTrigger(deps.gateDb, row.organization_id, pointer.id);
     if (agentId === null) {
       summary.pointers_barrados_pelo_gate++;
@@ -236,7 +277,7 @@ export function createSupabaseGatilhoEtapaDb(admin: SupabaseClient): GatilhoEtap
     async carregaPointersDeEtapa(orgId) {
       const { data, error } = await admin
         .from("followup_flow_pointers")
-        .select("id, organization_id, active_version_id, trigger_config")
+        .select("id, organization_id, active_version_id, trigger_config, surface")
         .eq("organization_id", orgId)
         .eq("status", "active")
         .not("active_version_id", "is", null);
@@ -248,6 +289,7 @@ export function createSupabaseGatilhoEtapaDb(admin: SupabaseClient): GatilhoEtap
         organization_id: string;
         active_version_id: string | null;
         trigger_config: unknown;
+        surface?: string | null;
       }>) {
         if (!row.active_version_id) continue;
         // O parse é o MESMO schema do publish — um `trigger_config` que não
@@ -259,6 +301,7 @@ export function createSupabaseGatilhoEtapaDb(admin: SupabaseClient): GatilhoEtap
           organization_id: row.organization_id,
           active_version_id: row.active_version_id,
           stage_id: parsed.data.params.stage_id,
+          ...(row.surface ? { surface: row.surface } : {}),
         });
       }
       return pointers;

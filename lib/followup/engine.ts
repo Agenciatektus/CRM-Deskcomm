@@ -1,3 +1,6 @@
+import { aplicarEfeitoDaCadencia } from "@/lib/cadencia/efeitos";
+import { hashEstavel, renderizarMensagemDaCadencia } from "@/lib/cadencia/render";
+import { contextoDaCadencia, type ContextoDaCadencia } from "@/lib/cadencia/valores";
 import type { JobClaim } from "@/lib/agent-engine/queue/claim";
 import { assertAgendaEffectSupabase } from "@/lib/agenda/efeito";
 import { AgendaDeferredError } from "@/lib/agenda/protecao-followup";
@@ -35,6 +38,7 @@ import {
   resolveWaitPhase,
   selectEdge,
   ultimoDesfechoDe,
+  type EfeitoDeCrm,
   type EnrollmentEventRef,
   type EnrollmentOutcome,
   type EnrollmentRow,
@@ -85,6 +89,8 @@ export interface FollowupJobRequest {
     fixed_body?: string;
     /** action (mode 'template') — id em `message_templates`; o turno carrega o corpo e envia sem modelo. */
     template_id?: string;
+    /** Passo de cadência (9016): o turno relê a política pelo pointer — ver `followup-turn`. */
+    cadencia?: { pointer_id: string };
     volta_index?: number;
     volta_total?: number;
     /** ai_classify — Task 5.1: classes possíveis + dica opcional pro classificador. */
@@ -131,6 +137,18 @@ export interface AdminClient {
   updateEnrollment(id: string, orgId: string, patch: EnrollmentPatch): Promise<void>;
   loadFlowPointerName(orgId: string, pointerId: string): Promise<string | null>;
   insertDeadInboxItem(item: { organization_id: string; title: string; body: string; ref_id: string }): Promise<void>;
+  /**
+   * Aplica um passo de CRM da cadência (mover etapa, etiqueta). Opcional só
+   * para os adaptadores de teste que não exercitam cadência: grafo com passo de
+   * CRM e sem adaptador FALHA (`crm_effect_sem_adaptador`), nunca pula calado.
+   */
+  aplicarEfeitoDeCrm?(enrollment: EnrollmentRow, effect: EfeitoDeCrm): Promise<void>;
+  /**
+   * Contexto do passo de TEXTO quando o pointer é CADÊNCIA (`null` para follow-up
+   * comum). Opcional pelo mesmo motivo do efeito: adaptador de teste sem cadência
+   * não precisa implementar — e sem ele o texto sai como sempre saiu.
+   */
+  contextoDaCadencia?(enrollment: EnrollmentRow): Promise<ContextoDaCadencia | null>;
   /**
    * Régua de recuperação de falta esgotada sem resposta — abre um item na
    * Central referenciando o COMPROMISSO. Opcional: só a produção precisa; os
@@ -188,6 +206,8 @@ function eventTypeFor(result: NodeResult): string {
       return "action_recheck";
     case "complete":
       return "flow_completed";
+    case "crm_effect":
+      return "crm_effect_applied";
     // `dead`/`fail` never reach the event-insert (handled at the top of applyResult) — cases
     // present only for switch exhaustiveness, mirroring how `fail` is already listed here.
     case "dead":
@@ -218,6 +238,9 @@ function eventPayload(result: NodeResult): Record<string, unknown> {
       return { purpose: result.purpose, wake_status: result.wake_status };
     case "complete":
       return { outcome: result.outcome, cancel_reason: result.cancel_reason ?? null };
+    case "crm_effect":
+      // Só o QUE mudou (ids e rótulo da etiqueta) — nunca dado do cliente.
+      return { next_node_id: result.next_node_id, ...result.effect };
     case "dead":
       return { reason: result.reason };
     case "fail":
@@ -264,6 +287,41 @@ function turnPayloadExtras(
     return { waits: smartWaits };
   }
   return {};
+}
+
+type PassoDaCadencia =
+  | { ok: true; pointerId: string; texto: string; varianteIndex: number; textoHash: string }
+  | { ok: false; motivo: string };
+
+/**
+ * `null` = não é passo de texto de cadência (tudo segue como antes). Só ENVIO de
+ * texto é renderizado; os outros modos da ação e os outros nós passam direto.
+ */
+async function renderizarPassoDaCadencia(
+  db: AdminClient,
+  enrollment: EnrollmentRow,
+  node: FlowNode,
+  result: NodeResult,
+  events: EnrollmentEventRef[],
+): Promise<PassoDaCadencia | null> {
+  if (result.kind !== "enqueue_turn" || result.purpose !== "send_message") return null;
+  if (node.type !== "action" || node.config.mode !== "text" || !db.contextoDaCadencia) return null;
+  const contexto = await db.contextoDaCadencia(enrollment);
+  if (contexto === null) return null;
+  const variantes = [node.config.body, ...(node.config.variants ?? [])].map((v) => interpolarVolta(v, events));
+  const r = renderizarMensagemDaCadencia({
+    variantes,
+    semente: `${enrollment.id}:${node.id}`,
+    valores: contexto.valores,
+  });
+  if (!r.ok) return { ok: false, motivo: `${r.motivo}:${r.faltando.join(",")}`.slice(0, MAX_ERROR_LEN) };
+  return {
+    ok: true,
+    pointerId: contexto.pointerId,
+    texto: r.texto,
+    varianteIndex: r.varianteIndex,
+    textoHash: String(hashEstavel(r.texto)),
+  };
 }
 
 async function markDead(
@@ -329,7 +387,7 @@ async function applyHandlerFailure(
 }
 
 function tallyOutcome(result: NodeResult, summary: TickSummary): void {
-  if (result.kind === "advance" || result.kind === "complete") {
+  if (result.kind === "advance" || result.kind === "complete" || result.kind === "crm_effect") {
     summary.advanced++;
   } else if (result.kind === "wait" || result.kind === "enqueue_turn" || result.kind === "recheck") {
     summary.scheduled++;
@@ -340,7 +398,7 @@ async function applyResult(
   deps: TickDeps,
   enrollment: EnrollmentRow,
   node: FlowNode,
-  result: NodeResult,
+  resultDoNo: NodeResult,
   summary: TickSummary,
   smartWaits: EsperaAdaptativa[] = [],
   events: EnrollmentEventRef[] = [],
@@ -348,6 +406,16 @@ async function applyResult(
 ): Promise<void> {
   const { db, clock, enqueueJob } = deps;
   await db.assertServiceBoundary?.(enrollment);
+
+  // TEXTO DA CADÊNCIA: renderizado AQUI, uma vez, e congelado no job — o turno
+  // envia o que o preview mostrou. Variável sem valor (e sem fallback) ENCERRA a
+  // inscrição com o motivo: seguir para o próximo passo mandaria um "oi de novo"
+  // a quem nunca recebeu a apresentação.
+  let result = resultDoNo;
+  const cadencia = await renderizarPassoDaCadencia(db, enrollment, node, result, events);
+  if (cadencia?.ok === false) {
+    result = { kind: "complete", outcome: null, cancel_reason: cadencia.motivo };
+  }
 
   if (result.kind === "fail") {
     await applyHandlerFailure(deps, enrollment, result.error, summary);
@@ -364,13 +432,31 @@ async function applyResult(
   }
 
   const idemKey = `${node.id}:${enrollment.steps_taken}`;
+
+  // Efeito ANTES do evento: mover etapa e pôr/tirar etiqueta são idempotentes,
+  // então um retry reaplica sem dano. Na ordem inversa, uma queda entre o evento
+  // e o efeito faria o replay (evento já existe) pular o efeito para sempre.
+  if (result.kind === "crm_effect") {
+    if (!db.aplicarEfeitoDeCrm) {
+      await applyHandlerFailure(deps, enrollment, "crm_effect_sem_adaptador", summary);
+      return;
+    }
+    await db.assertServiceBoundary?.(enrollment);
+    await db.aplicarEfeitoDeCrm(enrollment, result.effect);
+  }
+
   const wantedType = eventTypeFor(result);
   const { inserted } = await db.insertEnrollmentEvent({
     organization_id: enrollment.organization_id,
     enrollment_id: enrollment.id,
     node_id: node.id,
     event_type: wantedType,
-    payload: eventPayload(result),
+    payload: {
+      ...eventPayload(result),
+      // Métrica A/B da variante: o ÍNDICE e o hash do texto — nunca o texto, que
+      // carrega nome e empresa do lead e sobreviveria à anonimização.
+      ...(cadencia?.ok ? { variante_index: cadencia.varianteIndex, texto_hash: cadencia.textoHash } : {}),
+    },
     idempotency_key: idemKey,
   });
   const isReplay = !inserted;
@@ -408,6 +494,7 @@ async function applyResult(
 
   switch (result.kind) {
     case "advance":
+    case "crm_effect":
       patch.current_node_id = result.next_node_id;
       patch.status = "active";
       patch.next_eval_at = result.next_eval_at.toISOString();
@@ -447,6 +534,7 @@ async function applyResult(
             purpose: result.purpose,
             ...turnPayloadExtras(node, smartWaits, events),
             ...(result.fixed_body ? { fixed_body: result.fixed_body } : {}),
+            ...(cadencia?.ok ? { fixed_body: cadencia.texto, cadencia: { pointer_id: cadencia.pointerId } } : {}),
           },
         });
       }
@@ -770,6 +858,12 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
   return {
     async assertServiceBoundary(enrollment) { if(!revisions.has(enrollment.id) && enrollment.revision!==undefined) revisions.set(enrollment.id,enrollment.revision); await assertServiceBoundarySupabase(admin, enrollment.service_boundary ?? null); },
     async assertAgenda(enrollment){await assertAgendaEffectSupabase(admin,{organizationId:enrollment.organization_id,contactId:enrollment.contact_id,enrollmentId:enrollment.id,nodeId:enrollment.current_node_id});},
+    async aplicarEfeitoDeCrm(enrollment, efeito) {
+      await aplicarEfeitoDaCadencia(admin, enrollment, efeito);
+    },
+    async contextoDaCadencia(enrollment) {
+      return contextoDaCadencia(admin, enrollment);
+    },
     async claimDueEnrollments(limit, leaseSeconds) {
       const { data, error } = await admin.rpc("fn_claim_due_followup_enrollments", {
         p_limit: limit,

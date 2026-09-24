@@ -10884,6 +10884,10 @@ export const DICIONARIO: Traducoes = {
   "Apagada da lista de sugestões.": { es: "Borrada de la lista de sugerencias." },
   "Apagar mesmo assim": { es: "Borrar de todos modos" },
   "sem uso": { es: "sin uso" },
+  // Passos de CRM da cadência de prospecção (`lib/followup/vocabulario.ts`).
+  "Mover para a etapa": { es: "Mover a la etapa" },
+  "Adicionar etiqueta": { es: "Añadir etiqueta" },
+  "Remover etiqueta": { es: "Quitar etiqueta" },
   // Conversa dentro do dossiê do negócio (Kanban) — `ConversaDoNegocio` e `PainelDaConversa`.
   "Seções do negócio": { es: "Secciones del negocio" },
   "Pelo número": { es: "Por el número" },
