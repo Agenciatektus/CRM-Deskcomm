@@ -15,7 +15,10 @@ export type ChannelSessionRef =
   | { provider: "waha"; waha_session_name: string }
   | { provider: "meta_cloud"; meta_phone_number_id: string }
   | { provider: "zernio" | "zernio_social"; zernio_account_id: string }
-  | { provider: "verdash"; verdash_instance_name: string };
+  // Os dois canais pareados pela mesma plataforma compartilham a coluna de
+  // endereçamento — é assim que o CHECK do banco os exige, e o que muda entre
+  // eles é o canal que o vínculo cobre, não onde a referência mora.
+  | { provider: "verdash" | "instagram"; verdash_instance_name: string };
 
 /**
  * Colunas que um `select` do PostgREST precisa trazer para `resolveSessionRef`
@@ -41,6 +44,12 @@ export function resolveSessionRef(session: ChannelSessionRef): string {
     // é como o FZAP endereça a linha, e é o que casa o webhook de volta com
     // esta sessão.
     case "verdash":
+      return session.verdash_instance_name;
+    // Instagram usa a MESMA coluna de endereçamento do canal irmão, e é assim
+    // que o CHECK `channel_sessions_provider_ref_check` a exige — os dois são
+    // pareados pela mesma plataforma, e o que muda é o canal que o vínculo
+    // cobre, não onde a referência mora.
+    case "instagram":
       return session.verdash_instance_name;
   }
 }

@@ -4,6 +4,14 @@
  */
 
 export interface Conversation {
+  /**
+   * POR ONDE a conversa entrou no Instagram: `direct` | `comentario`.
+   *
+   * Null nos outros canais, e tambem em conversa de Instagram anterior a esta
+   * coluna. `story` NAO e valor: resposta a story E um Direct e cai na mesma
+   * conversa de DM.
+   */
+  instagram_entrada?: string | null;
   id: string;
   organization_id: string;
   contact_id: string;

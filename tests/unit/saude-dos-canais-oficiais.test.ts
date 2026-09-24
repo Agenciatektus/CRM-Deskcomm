@@ -340,7 +340,9 @@ describe("o cron enxerga os três canais", () => {
     // canal novo entra ali por obrigação, então este caso o alcança sozinho.
     const { getAdapterOpcional, CHANNEL_CAPABILITIES } = await import("@/lib/channels");
     // `getAdapterOpcional` e não `getAdapter`: canal conhecido que não tem adapter
-    // local (o Instagram, que responde pelo Verdash) devolve `null` em vez de lançar.
+    // local devolve `null` em vez de lançar. (O Instagram TINHA esse estado e não
+    // tem mais — ele responde pelo próprio Inbox desde que a plataforma passou a
+    // expor o envio ao vínculo pareado.)
     // O caso continua cobrindo o que existe para cobrir — todo adapter REGISTRADO
     // responde pela própria saúde —, e um provider fora da matriz segue lançando aqui,
     // que é o barulho que se quer.

@@ -33,6 +33,7 @@ import {
   Trash,
 } from "@/lib/ui/icons";
 import { useArquivarFunil, useCriarFunil, useEditarFunil } from "@/hooks/pipelines/usePipelines";
+import { useChannelSessions } from "@/hooks/channels/useChannelSessions";
 
 export interface FunilDaLista {
   id: string;
@@ -42,6 +43,7 @@ export interface FunilDaLista {
   position: number;
   is_default: boolean;
   is_client_pipeline?: boolean;
+  fontes?: string[];
 }
 
 /**
@@ -51,6 +53,89 @@ export interface FunilDaLista {
  * qual fração de `position` isso vira. Subir uma casa é "passar a ficar depois de
  * quem estava DUAS casas acima" — daí o `i - 2`.
  */
+
+/**
+ * DE QUE FONTES este funil se alimenta.
+ *
+ * ─── Por que isto governa a ENTRADA, e nao a exibicao ───────────────────────
+ *
+ * Fonte que nao esta em NENHUM funil da organizacao nao entra: nem lead, nem
+ * conversa, nem Inbox. Um filtro de tela deixaria a conversa existir, o cliente
+ * pagando armazenamento, a IA vendo tudo e o contador de nao lidas subindo por
+ * algo que ninguem vai ler.
+ *
+ * ─── A ultima caixa nao se desmarca ─────────────────────────────────────────
+ *
+ * Funil sem fonte nenhuma nao aceita nada, e isso e atendimento interrompido em
+ * silencio. O CHECK do banco ja recusa (`cardinality(fontes) > 0`), mas chegar
+ * la significaria o operador levar um erro depois de clicar — a caixa fica
+ * desabilitada, com o motivo no title.
+ */
+function FontesDoFunil({
+  funil,
+  ocupado,
+  temInstagram,
+  aplicar,
+}: {
+  funil: { id: string; fontes?: string[] };
+  ocupado: boolean;
+  temInstagram: boolean;
+  aplicar: (id: string, patch: Record<string, unknown>) => void;
+}) {
+  const t = useT();
+  // `?? ["whatsapp"]` e o mesmo default da coluna: um banco que ainda nao
+  // aplicou a migration devolve `undefined`, e mostrar "nenhuma fonte" num
+  // funil que recebe WhatsApp seria mentir sobre o estado.
+  const atuais = funil.fontes ?? ["whatsapp"];
+
+  const opcoes: { valor: string; rotulo: string }[] = [
+    { valor: "whatsapp", rotulo: t("WhatsApp") },
+    ...(temInstagram
+      ? [
+          { valor: "instagram_direct", rotulo: t("Direct do Instagram") },
+          { valor: "instagram_comentario", rotulo: t("Comentários do Instagram") },
+        ]
+      : []),
+  ];
+  // Com uma opção só não há escolha a fazer — o controle seria uma caixa
+  // marcada que não se desmarca.
+  if (opcoes.length < 2) return null;
+
+  const alternar = (valor: string) => {
+    const proxima = atuais.includes(valor)
+      ? atuais.filter((f) => f !== valor)
+      : [...atuais, valor];
+    if (proxima.length === 0) return;
+    aplicar(funil.id, { fontes: proxima });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 pt-1">
+      <span className="text-xs text-muted-foreground">{t("Recebe de:")}</span>
+      {opcoes.map((o) => {
+        const marcada = atuais.includes(o.valor);
+        const ultima = marcada && atuais.length === 1;
+        return (
+          <label
+            key={o.valor}
+            className="flex items-center gap-1.5 text-xs"
+            title={ultima ? t("O funil precisa de pelo menos uma fonte.") : undefined}
+          >
+            <input
+              type="checkbox"
+              checked={marcada}
+              disabled={ocupado || ultima}
+              onChange={() => alternar(o.valor)}
+              data-testid={`fonte-${o.valor}-${funil.id}`}
+            />
+            {o.rotulo}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 export function vizinhoAoMover(
   funis: FunilDaLista[],
   i: number,
@@ -112,6 +197,15 @@ export function FunisClient({
    * ignora.
    */
   const clientesLigado = useActiveOrg()?.cliente_pela_agenda === true;
+  /**
+   * As caixas de fonte do Instagram so aparecem com uma conta conectada.
+   *
+   * Numa instalacao so de WhatsApp elas seriam duas caixas que nao mudam nada —
+   * e pior, marcaveis: alguem marcaria "Direct do Instagram" num funil, nada
+   * chegaria nunca, e a conclusao seria que o funil esta quebrado.
+   */
+  const { data: canais } = useChannelSessions();
+  const temInstagram = canais?.some((c) => c.provider === "instagram") ?? false;
   /**
    * ⚠️ A LISTA VEM DO SERVIDOR E É ATUALIZADA PELO CORPO DA RESPOSTA.
    *
@@ -615,6 +709,12 @@ export function FunisClient({
                           : t("Funil de clientes")}
                       </Button>
                     )}
+                    <FontesDoFunil
+                      funil={funil}
+                      ocupado={ocupado}
+                      temInstagram={temInstagram}
+                      aplicar={aplicar}
+                    />
                     <Button
                       variant="ghost"
                       size="sm"

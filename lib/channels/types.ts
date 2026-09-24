@@ -98,6 +98,14 @@ export interface RecipientInput {
    * `waIdentity.startsWith("lid:")` — justo o caso que a regra protege.
    */
   waLid?: string | null | undefined;
+  /**
+   * `contacts.instagram_igsid` — o id estavel do par (conta, pessoa) que a Meta
+   * emite. E o UNICO endereco possivel no Instagram: nao ha telefone, e o `@`
+   * a pessoa troca quando quer.
+   *
+   * Opcional porque os canais de WhatsApp nao o tem e nao o usam.
+   */
+  instagramIgsid?: string | null | undefined;
 }
 
 /** Contato compartilhado (vcard) — só `kind: "contact"`. */

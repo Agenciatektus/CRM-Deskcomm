@@ -20,7 +20,9 @@ import { CHANNEL_PROVIDER_SOCIAL } from "./capabilities";
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CHANNEL_PROVIDER_VERDASH, CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+import { CHANNEL_PROVIDER_VERDASH, CHANNEL_PROVIDER_ZERNIO,
+  CHANNEL_PROVIDER_INSTAGRAM,
+} from "./capabilities";
 import { sincronizarSaudeDaConexao } from "./health";
 import {
   atualizarEspelhoDoTemplate,
@@ -34,6 +36,8 @@ import { parseZernioEdicao, verifyZernioSignature } from "./zernio/webhook";
 import { ingestVerdashInbound } from "./verdash/ingest";
 import { lerEnvelopeVerdash, verifyVerdashToken } from "./verdash/webhook";
 import type { ChannelProvider } from "./types";
+import { instagramInbound } from "./instagram/ingest";
+import { verificarAssinaturaDoInstagram } from "./instagram/webhook";
 
 /** Curto demais para ser segredo — placeholder ou lixo de decrypt. */
 const MIN_SECRET_LEN = 16;
@@ -76,7 +80,8 @@ export type InboundWebhookOutcome =
 export function acceptsInboundWebhook(provider: string): boolean {
   return provider === CHANNEL_PROVIDER_ZERNIO ||
     provider === CHANNEL_PROVIDER_SOCIAL ||
-    provider === CHANNEL_PROVIDER_VERDASH;
+    provider === CHANNEL_PROVIDER_VERDASH ||
+    provider === CHANNEL_PROVIDER_INSTAGRAM;
 }
 
 /**
@@ -102,6 +107,17 @@ export function verifyInboundWebhookSignature(provider: string, raw: string, hea
   if (provider === CHANNEL_PROVIDER_VERDASH) {
     return verifyVerdashToken(headers.get("x-webhook-secret"), secret);
   }
+  // O canal de Instagram prova identidade por HMAC SHA-256 do CORPO, e NAO pelo
+  // segredo em claro do canal irmao — ainda que os dois venham da mesma
+  // plataforma. Sao fios diferentes: o do WhatsApp e o servidor de mensagens
+  // falando direto, o do Instagram e a fila de reenvio, que assina.
+  //
+  // Herdar a verificacao errada aqui daria 401 em TODA entrega de Instagram, e o
+  // sintoma seria "o cliente mandou Direct e nao chegou" — o modo de falha mais
+  // caro deste arquivo, tres camadas antes de quem sabe conferir.
+  if (provider === CHANNEL_PROVIDER_INSTAGRAM) {
+    return verificarAssinaturaDoInstagram(raw, headers.get("x-verdash-signature-256"), secret);
+  }
   return verifyZernioSignature(raw, headers.get("x-zernio-signature"), secret);
 }
 
@@ -123,6 +139,8 @@ export async function handleInboundWebhook(
       return zernioInbound(admin, input);
     case CHANNEL_PROVIDER_VERDASH:
       return verdashInbound(admin, input);
+    case CHANNEL_PROVIDER_INSTAGRAM:
+      return instagramInbound(admin, input);
     default:
       // Token de um canal que não entra por aqui. É configuração trocada, não
       // ataque — mas processar seria ler o payload com o parser errado.
