@@ -116,7 +116,9 @@ export async function resolverJidDoTelefone(
   creds: VerdashCredentials,
   variantes: string[],
 ): Promise<string | null> {
-  const numeros = [...new Set(variantes.map((v) => v.replace(/\D/g, "")).filter((v) => v.length >= 8))];
+  const numeros = [
+    ...new Set(variantes.map((v) => v.replace(/\D/g, "")).filter((v) => v.length >= 8)),
+  ];
   if (numeros.length === 0) return null;
 
   try {
@@ -147,6 +149,61 @@ export async function resolverJidDoTelefone(
 }
 
 /**
+ * A conexão pareada está de pé? Pergunta feita à VERDASH, não ao FZAP.
+ *
+ * ─── Por que existe uma função só para isto ─────────────────────────────────
+ *
+ * No modo pareado o token que guardamos é um token de MÁQUINA que a Verdash
+ * emitiu — ele vale para a API dela, e o servidor de WhatsApp nunca o viu.
+ * Entregá-lo ao FZAP, que é o que `fzapRequest` faz, ganha 401, e o 401 o
+ * adapter lê como "a credencial da instância foi recusada": a conexão aparece
+ * como caída na tela enquanto mensagem entra e sai normalmente. Foi o defeito
+ * medido no número do Felipe (Lior) em 24/09/2026 — alarme crítico numa linha
+ * saudável, que é o tipo de aviso que ensina o operador a ignorar a cor.
+ *
+ * Perguntar à Verdash também responde MELHOR: ela distingue o soluço de socket
+ * (rotina do whatsmeow, segundos) da queda de verdade, distinção que o
+ * `/session/status` do FZAP não faz.
+ *
+ * Lança com o mesmo vocabulário de `fzapRequest` (`verdash_unreachable`,
+ * `verdash_request_failed: <status>`) de propósito: o `checkHealth` classifica
+ * os dois modos pelo mesmo `catch`, e dois vocabulários fariam o ramo pareado
+ * cair no ramo "não sei" a cada recusa.
+ */
+export async function verdashStatusPareado(
+  creds: VerdashCredentials,
+): Promise<{ conectada?: boolean; reconectando?: boolean; status?: string }> {
+  const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-status-instancia`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { "x-crm-token": creds.token },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
+    throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
+  }
+
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    data?: { conectada?: boolean; reconectando?: boolean; status?: string };
+  } | null;
+
+  if (!res.ok || json?.success !== true) {
+    // Só o `error` nomeado da Verdash entra no texto, nunca o corpo cru — a
+    // mesma razão de `fzapRequest`: resposta de status carrega credencial.
+    const detalhe = json?.error ?? res.statusText ?? "";
+    throw new Error(`verdash_request_failed: ${res.status} ${detalhe}`.trim());
+  }
+
+  return json.data ?? {};
+}
+
+/**
  * Manda a mensagem — e decide por onde ela sai.
  *
  * ─── Os dois caminhos, e por que existem ────────────────────────────────────
@@ -170,7 +227,14 @@ export async function verdashEnviar(
     rota: string;
     body: Record<string, unknown>;
     /** Como o pedido fica quando quem transporta é a Verdash. */
-    pareado: { phone: string; tipo: string; texto?: string; mediaUrl?: string; filename?: string; replyTo?: string };
+    pareado: {
+      phone: string;
+      tipo: string;
+      texto?: string;
+      mediaUrl?: string;
+      filename?: string;
+      replyTo?: string;
+    };
   },
 ): Promise<{ id?: string }> {
   if (!creds.vinculoId) {
@@ -204,15 +268,20 @@ export async function verdashEnviar(
     throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
   }
 
-  const json = (await res.json().catch(() => null)) as
-    | { success?: boolean; error?: string; detalhe?: string; data?: { message_id?: string } }
-    | null;
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    detalhe?: string;
+    data?: { message_id?: string };
+  } | null;
 
   if (!res.ok || json?.success !== true) {
     // 401 aqui é o caso que mais vai acontecer com o tempo: alguém revogou o
     // acesso na Verdash. Nomear isso poupa uma investigação inteira.
     if (res.status === 401) {
-      throw new Error("verdash_acesso_revogado: a Verdash não reconhece mais este CRM nesta linha.");
+      throw new Error(
+        "verdash_acesso_revogado: a Verdash não reconhece mais este CRM nesta linha.",
+      );
     }
     const detalhe = json?.detalhe ?? json?.error ?? res.statusText;
     throw new Error(`verdash_request_failed: ${res.status} ${detalhe}`.trim());
@@ -269,8 +338,7 @@ export async function fzapFetchMedia(
   } catch {
     throw new Error("verdash_media_url_invalida");
   }
-  const daPropriaBase =
-    alvo.origin === base.origin && alvo.username === "" && alvo.password === "";
+  const daPropriaBase = alvo.origin === base.origin && alvo.username === "" && alvo.password === "";
   if (!daPropriaBase) {
     assertSafeOutboundUrl(url);
     await assertDestinoResolvidoSeguro(alvo.hostname);

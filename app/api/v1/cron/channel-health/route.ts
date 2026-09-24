@@ -152,12 +152,29 @@ async function handle(req: NextRequest): Promise<Response> {
       // gravar por cima com um erro de rede transitório trocaria informação boa
       // por ruído, e é o mesmo cuidado que a tela de conexões já toma.
       let statusFinal = s.status;
+      // A varredura ANOTA que perguntou, e não só quando a resposta muda.
+      //
+      // `last_health_check_at` é o que a tela de Conexões mostra como
+      // "Verificado <data>" — e até aqui só a abertura manual do canal o
+      // escrevia. Quem nunca abriu o canal na mão lia "Ainda não verificado"
+      // para sempre, com a varredura rodando de 5 em 5 minutos por trás. O
+      // operador então lê "ninguém está olhando isto", que é o oposto do que
+      // acontece, e a frase que deveria dar confiança tira.
+      //
+      // Só carimba quando REACHABLE: "verificado" tem que significar que
+      // houve resposta. Gravar a hora de uma pergunta que não chegou a ser
+      // respondida faria a tela afirmar vigilância que não existiu.
+      const patch: Record<string, unknown> = {};
+      if (saude.reachable) patch.last_health_check_at = new Date().toISOString();
       if (saude.reachable && saude.status && saude.status !== s.status) {
         statusFinal = saude.status;
-        const agora = new Date().toISOString();
+        patch.status = saude.status;
+        patch.last_status_change_at = new Date().toISOString();
+      }
+      if (Object.keys(patch).length > 0) {
         await admin
           .from("channel_sessions")
-          .update({ status: saude.status, last_status_change_at: agora })
+          .update(patch)
           .eq("id", s.id)
           .eq("organization_id", s.organization_id);
       }

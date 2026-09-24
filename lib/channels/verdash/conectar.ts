@@ -435,6 +435,13 @@ export async function saveVerdashSession(
     organization_id: input.organizationId,
     provider: input.canal ?? CANAL_PAREAVEL_PADRAO,
     verdash_instance_name: input.instanceName,
+    // O `?? null` NÃO é defensividade — é o que mantém modo e credencial
+    // coerentes. `verdash_vinculo_id` é o que faz `checkHealth` e
+    // `verdashEnviar` escolherem entre falar com a Verdash e falar com o
+    // servidor de WhatsApp, e o token ao lado é de um tipo ou de outro. Quem
+    // escrever um sem o outro recria o defeito de 24/09/2026: token de máquina
+    // entregue ao FZAP, 401, e a conexão declarada caída enquanto funciona.
+    // Este é o único escritor dos dois campos no repositório; mantenha assim.
     verdash_vinculo_id: input.vinculoId ?? null,
     verdash_token_encrypted: input.tokenEncrypted,
     webhook_path_token: input.webhookPathToken,
