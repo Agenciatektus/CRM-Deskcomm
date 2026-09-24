@@ -13,7 +13,7 @@
  * runs, same as every other authed query.
  */
 import { randomUUID } from "node:crypto";
-import { consultarEmLotes } from "@/lib/supabase/lotes";
+import { buscarTodasAsPaginas, consultarEmLotes } from "@/lib/supabase/lotes";
 import { type NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
@@ -520,23 +520,31 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
       .eq("pipeline_id", pipelineId)
       .eq("is_archived", false)
       .order("position"),
-    supabase
-      .from("crm_leads")
-      .select("*")
-      .eq("pipeline_id", pipelineId)
-      .neq("status", "archived")
-      .order("position_in_stage"),
+    // PAGINADA. Sem isto o PostgREST corta no `db-max-rows` e NÃO avisa: medido
+    // no funil da Lior, `content-range: 0-999/1098` — o quadro abriria com
+    // 1.000 dos 1.098 cards, parecendo completo. Faltar 98 leads em silêncio é
+    // pior que a tela de erro que esta rota acabou de deixar de mostrar.
+    buscarTodasAsPaginas<Lead>((de, ate) =>
+      supabase
+        .from("crm_leads")
+        .select("*")
+        .eq("pipeline_id", pipelineId)
+        .neq("status", "archived")
+        .order("position_in_stage")
+        .order("id")
+        .range(de, ate),
+    ),
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });
   if (stagesErr) return fail("internal_error", stagesErr.message, 500, { requestId });
-  if (leadsErr) return fail("internal_error", leadsErr.message, 500, { requestId });
+  if (leadsErr) return fail("internal_error", leadsErr, 500, { requestId });
   if (!pipeline) return fail("resource_not_found", t("Pipeline não encontrado."), 404, { requestId });
 
   const leadsWithOwner = await withOwnerAgents(
     supabase,
     (pipeline as Pipeline).organization_id,
-    (leads ?? []) as Lead[],
+    leads ?? [],
   );
   if (leadsWithOwner.error) {
     return fail("internal_error", leadsWithOwner.error, 500, { requestId });
