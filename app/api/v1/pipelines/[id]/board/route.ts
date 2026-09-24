@@ -14,6 +14,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { logger } from "@/lib/logger";
+import { fundirEnriquecimentos } from "@/lib/crm/fundir-enriquecimentos";
 import { buscarTodasAsPaginas, consultarEmLotes } from "@/lib/supabase/lotes";
 import { type NextRequest } from "next/server";
 
@@ -571,47 +572,38 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     .eq("is_default", true)
     .maybeSingle();
 
-  const leadsComAcao = await withNextActions(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsWithOwner.leads,
-    (pipelinePadrao as { id: string } | null)?.id ?? null,
-  );
-  if (leadsComAcao.error) {
-    return fail("internal_error", leadsComAcao.error, 500, { requestId });
-  }
+  // Os quatro enriquecimentos partem do MESMO quadro base e leem só `id` e
+  // `contact_id` — nenhum depende do resultado do outro. Ver o cabeçalho de
+  // `fundirEnriquecimentos` para a medição que motivou tirar isto da fila.
+  const quadroBase = leadsWithOwner.leads;
+  const [comAcao, comScore, comConversa, comMarcadores] = await Promise.all([
+    withNextActions(
+      supabase,
+      (pipeline as Pipeline).organization_id,
+      quadroBase,
+      (pipelinePadrao as { id: string } | null)?.id ?? null,
+    ),
+    withScores(supabase, (pipeline as Pipeline).organization_id, quadroBase),
+    withConversas(supabase, (pipeline as Pipeline).organization_id, quadroBase),
+    withMarcadoresDoContato(supabase, (pipeline as Pipeline).organization_id, quadroBase),
+  ]);
 
-  const leadsComScore = await withScores(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComAcao.leads,
-  );
-  if (leadsComScore.error) {
-    return fail("internal_error", leadsComScore.error, 500, { requestId });
-  }
-
-  const leadsComConversa = await withConversas(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComScore.leads,
-  );
-  if (leadsComConversa.error) {
-    return fail("internal_error", leadsComConversa.error, 500, { requestId });
-  }
-
-  const leadsComMarcadores = await withMarcadoresDoContato(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComConversa.leads,
-  );
-  if (leadsComMarcadores.error) {
-    return fail("internal_error", leadsComMarcadores.error, 500, { requestId });
+  // O primeiro erro derruba o quadro inteiro, como na cadeia anterior: meia tela
+  // de dados com os outros campos faltando é pior que erro, porque parece certa.
+  const falhou = [comAcao, comScore, comConversa, comMarcadores].find((r) => r.error);
+  if (falhou?.error) {
+    return fail("internal_error", falhou.error, 500, { requestId });
   }
 
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
     stages: (stages ?? []) as Stage[],
-    leads: leadsComMarcadores.leads,
+    leads: fundirEnriquecimentos(quadroBase, [
+      comAcao.leads,
+      comScore.leads,
+      comConversa.leads,
+      comMarcadores.leads,
+    ]),
   };
 
   return ok(board, { requestId });

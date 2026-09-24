@@ -260,9 +260,14 @@ describe("a fiação — quem usa a regra a chama", () => {
     expect(etapa, "anexarDadosDoContato não é chamada na etapa").toMatch(
       /anexarDadosDoContato\(\s*leadsDoQuadro,\s*linhas\s*\)/,
     );
-    // sem etapa nova na cadeia: `funil-filtro-de-tag-le-as-duas-caixas` e
-    // `kanban-atalho-conversa` vigiam withConversas → withMarcadoresDoContato → resposta
-    expect(rota).toMatch(/leads:\s*leadsComMarcadores\.leads/);
+    // A cadeia virou paralelo: os enriquecimentos rodam juntos e são fundidos no
+    // fim (`lib/crm/fundir-enriquecimentos.ts`), então a resposta não sai mais de
+    // `leadsComMarcadores.leads`. Quem vigia que a família dos marcadores chega
+    // de fato à resposta é a cerca irmã em `funil-filtro-de-tag-le-as-duas-caixas`,
+    // que deriva o nome da variável da própria fonte. Aqui basta prender que a
+    // resposta é montada pela fusão — se alguém devolver os leads crus, sem
+    // enriquecer, este teste reprova.
+    expect(rota).toMatch(/leads:\s*fundirEnriquecimentos\(/);
   });
 
   it("o card e o dossiê renderizam os componentes novos", () => {
