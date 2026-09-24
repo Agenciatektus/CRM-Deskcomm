@@ -135,6 +135,27 @@ describe("modo pareado", () => {
     });
   });
 
+  it("404 NOMEADO pela Verdash é instância sumida", async () => {
+    creds.mockResolvedValue(comVinculo());
+    globalThis.fetch = respondeCom({ error: "instancia_nao_encontrada" }, { status: 404 });
+
+    expect(await saude()).toMatchObject({ reachable: true, status: "STOPPED" });
+  });
+
+  it("404 do roteador — função ainda não publicada — é 'não sei', nunca 'parou'", async () => {
+    // O estado de um CRM novo contra uma Verdash que ainda não subiu a função.
+    // Ler isto como "a instância parou" mostraria queda numa conexão perfeita,
+    // a partir de uma dependência ausente e não de um fato da conexão.
+    creds.mockResolvedValue(comVinculo());
+    globalThis.fetch = respondeCom({ error: "Function not found" }, { status: 404 });
+
+    expect(await saude()).toMatchObject({
+      reachable: false,
+      status: null,
+      detail: "verdash_sem_endpoint_de_status",
+    });
+  });
+
   it("Verdash fora do ar é 'não sei', não 'caiu'", async () => {
     creds.mockResolvedValue(comVinculo());
     globalThis.fetch = vi.fn(async () => {

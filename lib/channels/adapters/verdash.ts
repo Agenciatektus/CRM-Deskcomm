@@ -423,8 +423,19 @@ export const verdashAdapter: ChannelAdapter = {
         if (st === "401" || st === "403") {
           return { reachable: true, status: "FAILED", detail: "acesso_revogado_na_verdash" };
         }
+        // 404 aqui tem DUAS origens e elas pedem coisas opostas. Uma é a
+        // Verdash dizendo que a instância sumiu — desfecho conhecido. A outra
+        // é o roteador de funções dela respondendo que `crm-status-instancia`
+        // não existe, que é o estado de um CRM novo apontando para uma Verdash
+        // que ainda não subiu a função. Ler o segundo como "a instância parou"
+        // seria inventar um desfecho a partir de uma dependência ausente, e a
+        // tela mostraria "parou" numa conexão perfeita.
+        //
+        // Só o 404 que vem NOMEADO pela Verdash conta como instância sumida.
         if (st === "404") {
-          return { reachable: true, status: "STOPPED", detail: "instancia_nao_existe_mais" };
+          return msg.includes("instancia_nao_encontrada")
+            ? { reachable: true, status: "STOPPED", detail: "instancia_nao_existe_mais" }
+            : { reachable: false, status: null, detail: "verdash_sem_endpoint_de_status" };
         }
         return { reachable: false, status: null, detail: msg.slice(0, 200) };
       }
