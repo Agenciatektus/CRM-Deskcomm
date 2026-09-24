@@ -10884,6 +10884,14 @@ export const DICIONARIO: Traducoes = {
   "Apagada da lista de sugestões.": { es: "Borrada de la lista de sugerencias." },
   "Apagar mesmo assim": { es: "Borrar de todos modos" },
   "sem uso": { es: "sin uso" },
+  // Conversa dentro do dossiê do negócio (Kanban) — `ConversaDoNegocio` e `PainelDaConversa`.
+  "Seções do negócio": { es: "Secciones del negocio" },
+  "Pelo número": { es: "Por el número" },
+  "Carregando a conversa…": { es: "Cargando la conversación…" },
+  "Não foi possível carregar a conversa.": { es: "No fue posible cargar la conversación." },
+  "Seu acesso é de leitura: você acompanha a conversa, mas não responde.": {
+    es: "Tu acceso es de solo lectura: sigues la conversación, pero no respondes.",
+  },
 };
 
 /**

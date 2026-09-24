@@ -72,20 +72,45 @@ describe("a porta para a conversa", () => {
 });
 
 describe("o elo que some sem barulho", () => {
-  it("o dossiê MONTA o bloco — o componente sozinho não abre porta nenhuma", () => {
-    // O defeito original não era o componente faltando: era o dossiê não o
-    // chamar. Um teste que só exercitasse `ConversaNoDossie` ficaria verde com
-    // a tela exatamente como o usuário a encontrou.
+  // O defeito original não era o componente faltando: era o dossiê não o
+  // chamar. Um teste que só exercitasse o componente ficaria verde com a tela
+  // exatamente como o usuário a encontrou.
+  //
+  // A porta evoluiu: o dossiê não aponta mais para a conversa — ele a MONTA,
+  // com o campo de resposta (`ConversaDoNegocio` → `PainelDaConversa`, a mesma
+  // peça do Inbox). O atalho para o Inbox continua, no cabeçalho da coluna.
+  it("o dossiê MONTA a conversa do negócio a partir de lead.conversa", () => {
     const fonte = readFileSync("components/kanban/LeadDossier.tsx", "utf8");
-    expect(fonte, "o dossiê não monta o bloco da conversa").toMatch(
-      /<ConversaNoDossie\s+conversa=\{lead\.conversa\}/,
+    expect(fonte, "o dossiê não lê o id da conversa do negócio").toMatch(
+      /lead\.conversa\?\.id/,
+    );
+    expect(fonte, "o dossiê não monta a coluna da conversa").toMatch(
+      /<ConversaDoNegocio\s+conversationId=\{conversaId\}/,
     );
   });
 
-  it("e o bloco vem ANTES da linha do tempo que anuncia o canal", () => {
-    // É a timeline que diz "Entrou pelo WhatsApp". A porta atrás do anúncio
-    // obrigaria a rolar para achar o que o próprio texto acabou de prometer.
+  it("e a porta vem ANTES da linha do tempo que anuncia o canal", () => {
+    // É a timeline que diz "Entrou pelo WhatsApp". No celular a porta é a aba
+    // Conversa, no topo; ela atrás do anúncio obrigaria a rolar para achar o
+    // que o próprio texto acabou de prometer.
     const fonte = readFileSync("components/kanban/LeadDossier.tsx", "utf8");
-    expect(fonte.indexOf("<ConversaNoDossie")).toBeLessThan(fonte.indexOf("<LeadTimeline"));
+    expect(fonte.indexOf('role="tablist"')).toBeGreaterThan(-1);
+    expect(fonte.indexOf('role="tablist"')).toBeLessThan(fonte.indexOf("<LeadTimeline"));
+  });
+
+  it("a coluna da conversa mantém o atalho para a conversa CERTA no Inbox", () => {
+    const fonte = readFileSync("components/kanban/ConversaDoNegocio.tsx", "utf8");
+    expect(fonte).toMatch(/href=\{`\/app\/inbox\?id=\$\{conversation\.id\}`\}/);
+  });
+
+  it("o dossiê usa a MESMA peça de conversa do Inbox, não uma cópia", () => {
+    // "Duas cópias do mesmo campo divergem" (ConversaSlot). A regra se cumpre
+    // por compartilhamento: um composer só, montado nas duas telas.
+    const inbox = readFileSync("components/inbox/InboxLayout.tsx", "utf8");
+    const dossie = readFileSync("components/kanban/ConversaDoNegocio.tsx", "utf8");
+    expect(inbox).toMatch(/<PainelDaConversa\b/);
+    expect(dossie).toMatch(/<PainelDaConversa\b/);
+    expect(inbox, "o Inbox voltou a montar o Composer por conta própria").not.toMatch(/<Composer\b/);
+    expect(dossie).not.toMatch(/<Composer\b/);
   });
 });
