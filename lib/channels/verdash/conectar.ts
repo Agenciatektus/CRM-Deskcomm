@@ -338,7 +338,22 @@ export async function trocarCodigoPorCredencial(input: {
     token: d.token,
     phoneNumber: telefone,
     displayName: d.display_name ?? telefone ?? "WhatsApp",
-    connected: d.status === "WORKING",
+    // ─── DOIS VOCABULÁRIOS, E O DA RESPOSTA É O DE LÁ ────────────────────
+    //
+    // `WORKING` é o vocabulário DESTE CRM (`channel_sessions.status`). A
+    // plataforma responde no dela: `connected`, minúsculo. Comparar com
+    // `"WORKING"` nunca casava, e todo canal recém-pareado nascia `STARTING`.
+    //
+    // Não quebrava nada — a varredura de saúde corrige em até 5 minutos —, mas
+    // nesses 5 minutos a tela mostra "STARTING" para quem acabou de conectar,
+    // e quem acabou de colar um código lê isso como "não deu certo". Medido em
+    // 24/09/2026 ao parear o Instagram do Portal da China.
+    //
+    // Os dois valores entram: `WORKING` porque é o que uma instalação que já
+    // traduz do lado de lá devolveria, e `connected` porque é o que a
+    // plataforma devolve hoje. Aceitar os dois é o que faz esta linha parar de
+    // depender de qual das duas pontas foi atualizada por último.
+    connected: d.status === "WORKING" || d.status === "connected",
     recebimentoLigado: d.recebimento_ligado !== false,
     recebimentoAviso: d.recebimento_aviso ?? null,
   };

@@ -42,6 +42,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { mfaEmDivida } from "@/lib/auth/server";
 import {
+  HOSTED_CHANNEL_LABEL,
   INSTAGRAM_CHANNEL_LABEL,
   findInstagramSession,
   saveInstagramSession,
@@ -94,6 +95,19 @@ export async function GET(): Promise<NextResponse> {
   return ok(
     {
       label: INSTAGRAM_CHANNEL_LABEL,
+      /**
+       * Onde o operador vai GERAR o código — que não é a mesma coisa que a rede
+       * que ele está conectando.
+       *
+       * Os dois vinham do mesmo campo e a tela dizia "Na Instagram, abra
+       * Integrações › Conectar ao CRM", mandando o operador procurar no lugar
+       * errado. A rede é o Instagram; quem emite o código é a plataforma, a
+       * mesma do canal hospedado.
+       *
+       * Vem do servidor, e não escrito na tela, porque nomear o provedor fora
+       * de `lib/channels/` é o que o `lint:channels` proíbe.
+       */
+      plataforma: HOSTED_CHANNEL_LABEL,
       connected: conectado,
       channel_session_id: conectado ? sessao.id : null,
       // O @ da conta, que é como o operador confere se ligou a certa.

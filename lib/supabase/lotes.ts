@@ -25,7 +25,7 @@
  * 150 ids são ~5,6 KB, menos de um quarto do limite medido. A folga existe
  * porque a URL carrega mais coisa além dos ids — a lista de `select`, os
  * filtros de organização, a ordenação — e porque o limite não é o mesmo em todo
- * gateway: o Supabase self-hosted do Verdash, no mesmo dia, recusou já em
+ * gateway: uma instalação self-hosted, no mesmo dia, recusou já em
  * 18,5 KB (com 414 em vez de 400). Um lote calibrado no limite de hoje volta a
  * quebrar quando a instalação muda de gateway.
  */
