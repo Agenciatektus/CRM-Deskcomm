@@ -49,7 +49,7 @@ import { loadReentryTemplate, pickReentryVariant } from './reentry-template';
 import {
   aptidaoDoContatoParaCadencia,
   carregarCadenciaDoEnvio,
-  conversaJaTeveEnvio,
+  inscricaoJaEnviou,
 } from '@/lib/cadencia/envio';
 import { comSaida } from '@/lib/prospecting/rodape-de-saida';
 import {
@@ -284,7 +284,18 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
     // depois, ou nunca. Só passos de ENVIO; classificar não fala com ninguém.
     let opcoesDaCadencia: OpcoesDaCadencia | undefined;
     if (payload.cadencia !== undefined && payload.purpose === 'send_message') {
-      const decisao = await prepararEnvioDaCadencia(pool, deps, job, clock, target, payload.cadencia.pointer_id);
+      if (payload.followup_enrollment_id === undefined) {
+        throw new Error('passo de cadência sem followup_enrollment_id no payload');
+      }
+      const decisao = await prepararEnvioDaCadencia(
+        pool,
+        deps,
+        job,
+        clock,
+        target,
+        payload.cadencia.pointer_id,
+        payload.followup_enrollment_id,
+      );
       if (decisao.kind === 'resolvido') {
         const complete = deps.completeFollowupTurn;
         if (!complete || payload.node_id === undefined || payload.followup_enrollment_id === undefined) {
@@ -418,7 +429,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
 export interface OpcoesDaCadencia {
   limiteDiario: number;
   espacamento: { minMs: number; maxMs: number };
-  /** 1ª mensagem da conversa: sai com o rodapé de saída (opt-out), não editável. */
+  /** 1ª mensagem DESTA inscrição: sai com o rodapé de saída (opt-out), não editável. */
   comRodape: boolean;
 }
 
@@ -448,6 +459,7 @@ async function prepararEnvioDaCadencia(
   clock: () => Date,
   target: ReentrySendTarget,
   pointerId: string,
+  enrollmentId: string,
 ): Promise<DecisaoDaCadencia> {
   const { tenantId, leadId } = target;
   const runLog = withFields(deps.log, { job_id: job.id, tenant_id: tenantId, lead_id: leadId, pointer_id: pointerId });
@@ -492,7 +504,7 @@ async function prepararEnvioDaCadencia(
         minMs: cadencia.settings.espacamento.min_s * 1000,
         maxMs: cadencia.settings.espacamento.max_s * 1000,
       },
-      comRodape: !(await conversaJaTeveEnvio(pool, tenantId, target.conversationId)),
+      comRodape: !(await inscricaoJaEnviou(pool, tenantId, enrollmentId)),
     },
   };
 }

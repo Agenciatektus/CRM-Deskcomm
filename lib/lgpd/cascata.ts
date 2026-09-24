@@ -250,6 +250,57 @@ export async function completarRedacaoDoContato(
     else tabelas.push("followup_enrollments");
   }
 
+  // ── Passo 5 — o TEXTO CONGELADO dos passos de cadência (migration 9016) ──
+  //
+  // O motor renderiza a mensagem da cadência (nome, empresa) uma vez e a congela
+  // no job (`payload.fixed_body`); o reagendamento copia o payload para um
+  // `cron_jobs`. Cancelar a inscrição (passo 4) não toca nenhum dos dois: o
+  // texto com os dados de quem pediu para ser esquecido ficaria no banco até a
+  // poda. Aqui: job pendente vira `done` (não sai), reagendamento é desligado,
+  // e o texto é retirado de TODOS — inclusive dos já enviados.
+  //
+  // Sem `fixed_body` um job de turno cairia no agente; por isso o pendente é
+  // FECHADO antes de perder o texto, nunca deixado para rodar vazio.
+  for (const tabela of ["job_queue", "cron_jobs"] as const) {
+    const { data: jobs, error: jobsErr } = await db
+      .from(tabela)
+      .select(tabela === "job_queue" ? "id, payload, status" : "id, payload, enabled")
+      .eq("organization_id", contato.organizationId)
+      .eq("contact_id", contato.id);
+    if (jobsErr) {
+      falhas.push(`${tabela} select: ${jobsErr.message}`);
+      continue;
+    }
+    let tocou = false;
+    const daCadencia = ((jobs ?? []) as Array<{
+      id: string;
+      payload: Record<string, unknown> | null;
+      status?: string;
+      enabled?: boolean;
+    }>).filter((j) => j.payload !== null && typeof j.payload === "object" && "cadencia" in j.payload);
+    for (const job of daCadencia) {
+      const jaLimpo = !("fixed_body" in (job.payload ?? {}));
+      const aberto = tabela === "job_queue" ? job.status === "pending" : job.enabled === true;
+      if (jaLimpo && !aberto) continue; // idempotente: a rodada seguinte não reescreve
+      const { fixed_body: _texto, ...semTexto } = job.payload ?? {};
+      const { error } = await db
+        .from(tabela)
+        .update({
+          payload: semTexto,
+          ...(tabela === "job_queue"
+            ? aberto
+              ? { status: "done", last_error: MOTIVO_CANCELAMENTO_POR_LGPD }
+              : {}
+            : { enabled: false }),
+        })
+        .eq("organization_id", contato.organizationId)
+        .eq("id", job.id);
+      if (error) falhas.push(`${tabela}: ${error.message}`);
+      else tocou = true;
+    }
+    if (tocou) tabelas.push(tabela);
+  }
+
   return { leadsRedigidas, atividadesRedigidas, tabelas, falhas };
 }
 

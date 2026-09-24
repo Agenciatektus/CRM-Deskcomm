@@ -10977,6 +10977,7 @@ export const DICIONARIO: Traducoes = {
   "contato sem telefone": { es: "contacto sin teléfono" },
   "passou do limite de inscrições de hoje": { es: "superó el límite de inscripciones de hoy" },
   "já está em outra régua": { es: "ya está en otra secuencia" },
+  "passou por esta cadência nos últimos 30 dias": { es: "pasó por esta cadencia en los últimos 30 días" },
   "não entram": { es: "no entran" },
   // Passos de CRM da cadência de prospecção (`lib/followup/vocabulario.ts`).
   "Mover para a etapa": { es: "Mover a la etapa" },

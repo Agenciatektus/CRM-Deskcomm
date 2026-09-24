@@ -308,6 +308,8 @@ export function createSupabaseGatilhoCasoDb(admin: SupabaseClient): GatilhoCasoD
         .select("id, organization_id, active_version_id, trigger_config")
         .eq("organization_id", orgId)
         .eq("status", "active")
+        // Cadência só inscreve pela própria porta (`lib/cadencia/inscrever.ts`).
+        .neq("surface", "cadence")
         .not("active_version_id", "is", null);
       if (error) throw new Error(error.message);
 

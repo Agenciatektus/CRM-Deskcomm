@@ -21,7 +21,8 @@ import {
   avaliarNegocio,
   carregarCadenciaParaInscricao,
   inscreverNegocio,
-  inscricoesDeHoje,
+  reservarInscricoes,
+  vagasDeHoje,
   type MotivoDeRecusa,
 } from "@/lib/cadencia/inscrever";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -88,8 +89,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
   const { cadencia } = carregada;
 
-  const jaHoje = await inscricoesDeHoje(admin, orgId, cadencia);
-  const cabemHoje = Math.max(0, cadencia.settings.max_inscricoes_dia - jaHoje);
+  const cabemHoje = await vagasDeHoje(admin, orgId, cadencia.id);
 
   const avaliacoes = await avaliarTodos(leadIds, 10, (leadId) => avaliarNegocio(admin, orgId, cadencia, leadId));
   const recusados: Array<{ lead_id: string; motivo: MotivoDeRecusa }> = [];
@@ -116,8 +116,14 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     );
   }
 
+  // A reserva é a AUTORIDADE do teto: se outro lote (ou o gatilho) levou vagas
+  // entre a prévia e agora, entra só o que foi concedido — o resto é recusado
+  // com o motivo, não enviado por cima do teto.
+  const concedidas = await reservarInscricoes(admin, orgId, cadencia.id, aptos.length);
+  for (const negocio of aptos.slice(concedidas)) recusados.push({ lead_id: negocio.leadId, motivo: "teto_do_dia" });
+
   const inscritos: string[] = [];
-  for (const negocio of aptos) {
+  for (const negocio of aptos.slice(0, concedidas)) {
     const r = await inscreverNegocio(admin, orgId, cadencia, negocio, {
       tipo: "manual",
       actorUserId: authz.user.id,

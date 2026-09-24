@@ -26,6 +26,7 @@ const MOTIVOS: Record<string, string> = {
   sem_telefone: "contato sem telefone",
   teto_do_dia: "passou do limite de inscrições de hoje",
   ja_em_outro_fluxo: "já está em outra régua",
+  ja_passou_pela_cadencia: "passou por esta cadência nos últimos 30 dias",
 };
 
 /**

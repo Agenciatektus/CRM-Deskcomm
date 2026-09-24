@@ -164,6 +164,29 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     });
   }
 
+  // Passo de CRM (mover etapa, etiqueta) só existe na cadência: é ela que sabe
+  // o funil e o negócio. Num follow-up comum ele falharia em produção, a cada
+  // inscrição — melhor recusar aqui, com alguém na tela para corrigir.
+  if (!ehCadencia) {
+    const passoDeCadencia = graph.nodes.find(
+      (n) => n.type === "action" && (n.config.mode === "move_stage" || n.config.mode === "tag"),
+    );
+    if (passoDeCadencia) {
+      return fail("validation_failed", t("Mover de etapa e etiqueta são passos de cadência."), 422, {
+        requestId,
+        details: {
+          errors: [
+            {
+              node_id: passoDeCadencia.id,
+              code: "passo_so_de_cadencia",
+              message: t("Mover de etapa e etiqueta são passos de cadência."),
+            },
+          ],
+        },
+      });
+    }
+  }
+
   if (ehCadencia) {
     const errosDaCadencia = await validarPublicacaoDaCadencia(admin, activeOrg.orgId, pointer, graph);
     if (errosDaCadencia.length > 0) {

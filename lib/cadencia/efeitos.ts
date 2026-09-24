@@ -61,6 +61,17 @@ export async function aplicarEfeitoDaCadencia(
     if (!etapa || etapa.pipeline_id !== pointer.pipeline_id) throw new Error("cadencia_etapa_fora_do_funil");
     if (etapa.is_lost) throw new Error("cadencia_etapa_de_perda_exige_motivo");
 
+    // Já está lá: não move. O replay de um passo (queda entre o efeito e o
+    // evento) não pode emitir um segundo `lead.stage_changed` — é ele que
+    // dispararia de novo o gatilho de etapa.
+    const { data: atual } = await admin
+      .from("crm_leads")
+      .select("stage_id")
+      .eq("organization_id", org)
+      .eq("id", leadId)
+      .maybeSingle();
+    if (atual?.stage_id === efeito.stage_id) return;
+
     await moveLeadHandler(
       admin as never,
       {

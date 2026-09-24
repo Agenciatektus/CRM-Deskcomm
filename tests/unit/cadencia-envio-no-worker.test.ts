@@ -99,11 +99,11 @@ function fakePool() {
   const query = vi.fn(async (sql: string): Promise<{ rows: Array<Record<string, unknown>>; rowCount?: number }> => {
     if (sql.includes("d.fechada_em::text")) return { rows: [{ ...boundary, status: "open", demanda_fechada_em: null }] };
     if (sql.includes("from followup_flow_pointers p")) return { rows: cenario.cadencia ? [cenario.cadencia] : [] };
+    if (sql.includes("event_type = 'action_sent'")) {
+      return { rows: [{ existe: cenario.jaTeveEnvio }] };
+    }
     if (sql.includes("select exists(")) return { rows: [{ existe: cenario.telefoneSuprimido }] };
     if (sql.includes("from contacts where organization_id")) return { rows: cenario.contato ? [cenario.contato] : [] };
-    if (sql.includes("select last_outbound_at from conversations")) {
-      return { rows: [{ last_outbound_at: cenario.jaTeveEnvio ? "2026-09-23T10:00:00Z" : null }] };
-    }
     if (/from conversations c/.test(sql)) {
       return { rows: [{ id: CONVERSA, channel_session_id: cenario.canalDaConversa, archived_at: null }] };
     }
@@ -187,7 +187,7 @@ describe("envio da cadência — o que chega à cadeia de guardrails", () => {
     expect(args.body.length).toBeGreaterThan("Oi Maria, tudo bem?".length); // rodapé de saída
   });
 
-  it("2ª mensagem da conversa sai SEM rodapé", async () => {
+  it("2ª mensagem DESTA inscrição sai SEM rodapé", async () => {
     cenario.jaTeveEnvio = true;
     await rodar();
     const args = chain.mock.calls[0]![0] as { body: string };

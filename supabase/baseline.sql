@@ -36920,6 +36920,67 @@ end; $cad_pausa$;
 revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon;
 grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to authenticated, service_role;
 
+-- VAGAS DE INSCRIÇÃO POR DIA, reservadas ATOMICAMENTE (P1-4 da revisão).
+-- Contar as inscrições de hoje e depois inserir deixava dois lotes simultâneos
+-- (ou um lote e o gatilho) estourarem o teto até o dobro. A reserva trava a
+-- cadência, lê o que já foi concedido NO DIA (fuso da organização) e concede o
+-- que cabe, numa transação só. Vaga reservada e não usada (inscrição recusada
+-- depois) conta contra o teto: erra para o lado de mandar MENOS.
+create table if not exists public.cadencia_inscricoes_do_dia (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  pointer_id uuid not null references public.followup_flow_pointers(id) on delete cascade,
+  dia date not null,
+  reservadas integer not null default 0 check (reservadas >= 0),
+  primary key (pointer_id, dia)
+);
+-- Só service_role (o motor e as rotas da cadência): RLS ligada e SEM policy.
+alter table public.cadencia_inscricoes_do_dia enable row level security;
+revoke all on table public.cadencia_inscricoes_do_dia from anon, authenticated;
+
+create or replace function public.fn_cadencia_reservar_inscricoes(p_org uuid, p_pointer uuid, p_n integer)
+returns integer language plpgsql security definer set search_path = public as $cad_vagas$
+declare v_max integer; v_tz text; v_dia date; v_ja integer; v_dar integer;
+begin
+  if p_n is null or p_n < 0 then raise exception 'cadencia_reserva_invalida' using errcode = '22023'; end if;
+  perform pg_advisory_xact_lock(hashtext('cadencia:' || p_pointer::text));
+  select (p.cadence_settings ->> 'max_inscricoes_dia')::integer,
+         coalesce(nullif(o.timezone, ''), 'America/Sao_Paulo')
+    into v_max, v_tz
+    from public.followup_flow_pointers p
+    join public.organizations o on o.id = p.organization_id
+   where p.organization_id = p_org and p.id = p_pointer and p.surface = 'cadence';
+  if v_max is null then return 0; end if;
+  v_dia := (now() at time zone v_tz)::date;
+  select reservadas into v_ja from public.cadencia_inscricoes_do_dia where pointer_id = p_pointer and dia = v_dia;
+  v_dar := greatest(0, least(p_n, v_max - coalesce(v_ja, 0)));
+  if v_dar > 0 then
+    insert into public.cadencia_inscricoes_do_dia (organization_id, pointer_id, dia, reservadas)
+    values (p_org, p_pointer, v_dia, v_dar)
+    on conflict (pointer_id, dia)
+    do update set reservadas = public.cadencia_inscricoes_do_dia.reservadas + excluded.reservadas;
+  end if;
+  return v_dar;
+end; $cad_vagas$;
+
+-- Leitura do que ainda cabe HOJE (a prévia da inscrição em lote). Não reserva.
+create or replace function public.fn_cadencia_vagas_de_hoje(p_org uuid, p_pointer uuid)
+returns integer language sql stable security definer set search_path = public as $cad_vagas_hoje$
+  select greatest(0, (p.cadence_settings ->> 'max_inscricoes_dia')::integer - coalesce((
+           select d.reservadas from public.cadencia_inscricoes_do_dia d
+            where d.pointer_id = p.id
+              and d.dia = (now() at time zone coalesce(nullif(o.timezone, ''), 'America/Sao_Paulo'))::date), 0))
+    from public.followup_flow_pointers p
+    join public.organizations o on o.id = p.organization_id
+   where p.organization_id = p_org and p.id = p_pointer and p.surface = 'cadence';
+$cad_vagas_hoje$;
+
+revoke all on function public.fn_cadencia_reservar_inscricoes(uuid, uuid, integer) from public, anon, authenticated;
+grant execute on function public.fn_cadencia_reservar_inscricoes(uuid, uuid, integer) to service_role;
+revoke all on function public.fn_cadencia_vagas_de_hoje(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.fn_cadencia_vagas_de_hoje(uuid, uuid) to service_role;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

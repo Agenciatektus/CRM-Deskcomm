@@ -111,4 +111,48 @@ describe("publicação da cadência", () => {
     const erros = await validarPublicacaoDaCadencia(adminFalso(bancoOk), "org", pointerOk, grafo("Oi {tudo bem|como vai"));
     expect(erros.map((e) => e.code)).toContain("cadencia_spintax_invalido");
   });
+
+  it("passo que a cadência não sabe enviar com a política dela é recusado (IA, modelo)", async () => {
+    const g = grafo("Oi", [
+      {
+        id: "ia",
+        type: "action",
+        label: "IA",
+        position: { x: 0, y: 2 },
+        config: { mode: "ai_message", prompt_hint: "escreva algo" },
+      },
+    ]);
+    const erros = await validarPublicacaoDaCadencia(adminFalso(bancoOk), "org", pointerOk, g);
+    expect(erros.find((e) => e.code === "cadencia_passo_nao_suportado")?.node_id).toBe("ia");
+  });
+
+  it("mover para a PRÓPRIA etapa do gatilho é recusado (laço de reinscrição)", async () => {
+    const erros = await validarPublicacaoDaCadencia(
+      adminFalso(bancoOk),
+      "org",
+      pointerOk,
+      grafo("Oi", [
+        { id: "mv", type: "action", label: "Mover", position: { x: 0, y: 2 }, config: { mode: "move_stage", stage_id: ETAPA } },
+      ]),
+    );
+    expect(erros.map((e) => e.code)).toContain("cadencia_move_para_o_gatilho");
+  });
+
+  it("variação acima de 1000 caracteres é recusada (nunca cortada calada)", async () => {
+    const erros = await validarPublicacaoDaCadencia(adminFalso(bancoOk), "org", pointerOk, grafo("a".repeat(1001)));
+    expect(erros.map((e) => e.code)).toContain("cadencia_texto_longo");
+  });
+
+  it("teto de inscrições acima do limite diário do número é recusado", async () => {
+    const erros = await validarPublicacaoDaCadencia(
+      adminFalso({
+        ...bancoOk,
+        channel_sessions: [{ id: "sessao-1", status: "WORKING", archived_at: null, daily_message_limit: 50 }],
+      }),
+      "org",
+      pointerOk,
+      grafo("Oi"),
+    );
+    expect(erros.map((e) => e.code)).toContain("cadencia_teto_acima_da_cota");
+  });
 });

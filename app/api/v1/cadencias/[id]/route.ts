@@ -18,6 +18,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { cadenceSettingsSchema } from "@/lib/cadencia/settings";
 import { triggerConfigSchema } from "@/lib/followup/api-schemas";
 import { flowGraphSchema } from "@/lib/followup/graph-schema";
@@ -103,7 +104,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const admin = createAdminClient();
   const { data: atual, error: atualErr } = await admin
     .from("followup_flow_pointers")
-    .select("id, status, channel_session_id")
+    .select("id, status, channel_session_id, pipeline_id")
     .eq("organization_id", orgId)
     .eq("id", id)
     .eq("surface", "cadence")
@@ -128,6 +129,16 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
       .is("archived_at", null)
       .maybeSingle();
     if (!sessao) return fail("not_found", t("Número não encontrado."), 404, { requestId });
+  }
+
+  if (mudancas.trigger_config !== undefined) {
+    const problema = await validarGatilhoDaCadencia(
+      admin,
+      orgId,
+      atual.pipeline_id as string | null,
+      mudancas.trigger_config,
+    );
+    if (problema) return fail("cadencia_gatilho_invalido", t(problema), 422, { requestId });
   }
 
   // Com a cadência NO AR, a política vale para o próximo envio: tem de estar

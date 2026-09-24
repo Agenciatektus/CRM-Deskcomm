@@ -1,4 +1,5 @@
 import type { Queryable } from "@/lib/agent-engine/queue/queue";
+import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { contactMayBeProspected } from "@/lib/prospecting/guard";
 import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
 
@@ -109,26 +110,35 @@ export async function aptidaoDoContatoParaCadencia(
     const { rows: suprimidos } = await db.query<{ existe: boolean }>(
       `select exists(
          select 1 from contacts d
-          where d.organization_id = $1 and d.id <> $2 and d.phone_number = $3
+          where d.organization_id = $1 and d.id <> $2 and d.phone_number = any($3::text[])
             and (coalesce(d.is_blocked, false) or coalesce(d.is_anonymized, false)
                  or coalesce(d.consent -> 'marketing' ->> 'declined_at', '') <> '')
        ) as existe`,
-      [organizationId, contactId, c.phone_number],
+      // Variantes com e sem o nono dígito: a mesma pessoa gravada de dois jeitos.
+      [organizationId, contactId, phoneLookupVariants(c.phone_number)],
     );
     if (suprimidos[0]?.existe) return { apto: false, motivo: "telefone_suprimido" };
   }
   return { apto: true, telefone: c.phone_number };
 }
 
-/** A conversa já teve alguma mensagem SAINDO? (a 1ª da cadência leva o rodapé de saída). */
-export async function conversaJaTeveEnvio(
+/**
+ * ESTA INSCRIÇÃO já mandou alguma mensagem? A 1ª mensagem da cadência leva o
+ * rodapé de saída — e a pergunta é sobre a RÉGUA, não sobre a conversa: um
+ * contato que já trocou mensagens com o número por outro motivo recebe a
+ * primeira abordagem da cadência também com o aviso de como sair.
+ */
+export async function inscricaoJaEnviou(
   db: Queryable,
   organizationId: string,
-  conversationId: string,
+  enrollmentId: string,
 ): Promise<boolean> {
-  const { rows } = await db.query<{ last_outbound_at: string | null }>(
-    `select last_outbound_at from conversations where organization_id = $1 and id = $2`,
-    [organizationId, conversationId],
+  const { rows } = await db.query<{ existe: boolean }>(
+    `select exists(
+       select 1 from followup_enrollment_events
+        where organization_id = $1 and enrollment_id = $2 and event_type = 'action_sent'
+     ) as existe`,
+    [organizationId, enrollmentId],
   );
-  return rows[0]?.last_outbound_at != null;
+  return rows[0]?.existe === true;
 }

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FlowGraph } from "@/lib/followup/graph-schema";
-import { VARIAVEIS_DA_CADENCIA, resolverSpintax, variaveisCitadas } from "./render";
+import { VARIANTE_TAMANHO_MAXIMO, VARIAVEIS_DA_CADENCIA, resolverSpintax, variaveisCitadas } from "./render";
 import { cadenceSettingsSchema } from "./settings";
 
 export interface ErroDePublicacaoDaCadencia {
@@ -49,7 +49,7 @@ export async function validarPublicacaoDaCadencia(
   } else {
     const { data: sessao, error } = await admin
       .from("channel_sessions")
-      .select("id, status, archived_at")
+      .select("id, status, archived_at, daily_message_limit")
       .eq("organization_id", organizationId)
       .eq("id", pointer.channel_session_id)
       .maybeSingle();
@@ -58,6 +58,34 @@ export async function validarPublicacaoDaCadencia(
       erro("cadencia_numero_inexistente", "O número escolhido não existe mais nesta organização.");
     } else if (sessao.status !== "WORKING") {
       erro("cadencia_numero_desconectado", "O número escolhido está desconectado. Reconecte antes de publicar.");
+    }
+    // Inscrever mais gente por dia do que o número manda por dia só cria conversa
+    // aberta esperando cota — a fila cresce e ninguém recebe.
+    const limite = (sessao?.daily_message_limit as number | null | undefined) ?? null;
+    if (settings.success && limite !== null && settings.data.max_inscricoes_dia > limite) {
+      erro(
+        "cadencia_teto_acima_da_cota",
+        `O limite de novas inscrições por dia (${settings.data.max_inscricoes_dia}) passa do limite diário do número (${limite}).`,
+      );
+    }
+  }
+
+  // LISTA POSITIVA do que uma cadência executa. Tudo que envia precisa passar
+  // pela política dela (cota, espaçamento, LGPD de prospecção, rodapé) — e o motor
+  // só a aplica ao passo de TEXTO. Classificação por IA, mensagem gerada por IA e
+  // modelo pronto sairiam sem nada disso: são recusados aqui.
+  for (const no of grafo.nodes) {
+    const permitido =
+      no.type === "trigger" ||
+      no.type === "wait" ||
+      no.type === "end" ||
+      (no.type === "action" && (no.config.mode === "text" || no.config.mode === "move_stage" || no.config.mode === "tag"));
+    if (!permitido) {
+      erro(
+        "cadencia_passo_nao_suportado",
+        "A cadência aceita mensagem de texto, espera, mover de etapa e etiqueta. Remova os outros passos.",
+        no.id,
+      );
     }
   }
 
@@ -95,10 +123,30 @@ export async function validarPublicacaoDaCadencia(
     }
   }
 
+  // "Mover para" a PRÓPRIA etapa do gatilho reinscreveria o lead ao terminar a
+  // régua — um laço limitado só pelo teto do dia.
+  const etapaDoGatilho = trigger?.kind === "stage_change" ? trigger.params?.stage_id : undefined;
+  for (const no of grafo.nodes) {
+    if (no.type === "action" && no.config.mode === "move_stage" && no.config.stage_id === etapaDoGatilho) {
+      erro(
+        "cadencia_move_para_o_gatilho",
+        "Um passo move o negócio para a mesma etapa que dispara a cadência: ele entraria de novo em laço.",
+        no.id,
+      );
+    }
+  }
+
   // Texto: variáveis do contrato e spintax bem formado — em TODAS as variantes.
   for (const no of grafo.nodes) {
     if (no.type !== "action" || no.config.mode !== "text") continue;
     for (const variante of [no.config.body, ...(no.config.variants ?? [])]) {
+      if (variante.length > VARIANTE_TAMANHO_MAXIMO) {
+        erro(
+          "cadencia_texto_longo",
+          `Cada variação pode ter até ${VARIANTE_TAMANHO_MAXIMO} caracteres.`,
+          no.id,
+        );
+      }
       const desconhecidas = variaveisCitadas(variante).filter(
         (v) => !(VARIAVEIS_DA_CADENCIA as readonly string[]).includes(v),
       );
