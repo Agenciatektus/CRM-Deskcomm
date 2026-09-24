@@ -119,13 +119,50 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
   // defeito original morava justamente num ponto de chamada (o filtro lia
   // `l.tags`). Cada caso abaixo prende UM elo, para a sabotagem de um só
   // reprovar exatamente o dele.
+  // A versão anterior desta cerca casava o NOME da variável
+  // (`leadsComMarcadores = await withMarcadoresDoContato(` e
+  // `leads: leadsComMarcadores.leads`). Funcionava enquanto a rota encadeava os
+  // enriquecimentos um no outro. Quando eles passaram a rodar em paralelo e a
+  // serem fundidos no fim (ver `lib/crm/fundir-enriquecimentos.ts`), a cerca
+  // reprovou código correto — o elo continuava lá, com outro nome.
+  //
+  // A garantia que interessa nunca foi o nome: é que `withMarcadoresDoContato`
+  // seja CHAMADA e que o resultado dela CHEGUE à resposta. É isso que está
+  // preso abaixo, derivando o nome da fonte em vez de exigir um fixo.
   it("a rota do quadro anexa os marcadores do contato e os devolve", () => {
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
-    expect(fonte, "withMarcadoresDoContato não é chamada na rota").toMatch(
-      /leadsComMarcadores\s*=\s*await withMarcadoresDoContato\(/,
-    );
-    expect(fonte, "o resultado de withMarcadoresDoContato não chega à resposta").toMatch(
-      /leads:\s*leadsComMarcadores\.leads/,
+
+    // Ancorado em `quadroBase` de propósito: o PRIMEIRO `Promise.all` do arquivo
+    // é o interno de `withNextActions` (estados + candidatos), e casar com ele
+    // faz a cerca ler os nomes errados — foi o que aconteceu na primeira versão
+    // desta reescrita, e a cerca reprovou por motivo inventado.
+    const daRota = fonte.slice(fonte.indexOf("const quadroBase"));
+    expect(daRota.length, "o bloco de enriquecimento da rota sumiu").toBeGreaterThan(0);
+
+    const destruct = /const\s*\[([^\]]+)\]\s*=\s*await Promise\.all\(/.exec(daRota);
+    expect(destruct, "as famílias de enriquecimento sumiram do Promise.all").not.toBeNull();
+
+    const nomes = destruct![1]!.split(",").map((s) => s.trim());
+    const ordemNaFonte = [
+      "withNextActions",
+      "withScores",
+      "withConversas",
+      "withMarcadoresDoContato",
+    ]
+      .map((f) => ({ f, i: daRota.indexOf(`${f}(`, destruct!.index) }))
+      .filter((x) => x.i > -1)
+      .sort((a, b) => a.i - b.i)
+      .map((x) => x.f);
+
+    const posicao = ordemNaFonte.indexOf("withMarcadoresDoContato");
+    expect(posicao, "withMarcadoresDoContato não é chamada na rota").toBeGreaterThan(-1);
+    const nomeDoResultado = nomes[posicao];
+    expect(nomeDoResultado, "a família dos marcadores não tem destino").toBeDefined();
+
+    const fusao = /leads:\s*fundirEnriquecimentos\(\s*\w+\s*,\s*\[([\s\S]*?)\]/.exec(daRota);
+    expect(fusao, "a resposta não é montada pela fusão dos enriquecimentos").not.toBeNull();
+    expect(fusao![1], "o resultado de withMarcadoresDoContato não chega à resposta").toContain(
+      `${nomeDoResultado}.leads`,
     );
   });
 
