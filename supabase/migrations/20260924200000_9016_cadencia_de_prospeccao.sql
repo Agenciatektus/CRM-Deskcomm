@@ -130,3 +130,36 @@ end; $cad_lia$;
 
 revoke all on function public.fn_cadencia_registrar_base_legal(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.fn_cadencia_registrar_base_legal(uuid, uuid, text) to service_role;
+
+-- KILL SWITCH de todas as cadências da organização (`settings.cadencias_pausadas`).
+-- O worker o lê ANTES de cada envio (`lib/cadencia/envio.ts`): pausado, o passo
+-- é ADIADO, não perdido. Mesmo guarda de `fn_definir_colegas_podem_mexer_na_agenda`:
+-- Gerente ou acima, suporte de escrita e MFA, conferidos pelo `auth.uid()` — pela
+-- sessão de um Gerente, um `update organizations` direto casaria zero linhas e
+-- devolveria sucesso. Grava por merge (`||`): as outras chaves de settings ficam.
+create or replace function public.fn_definir_cadencias_pausadas(p_org uuid, p_pausadas boolean)
+returns jsonb language plpgsql security definer set search_path = public as $cad_pausa$
+declare v_atual boolean; v_linhas int;
+begin
+  if p_pausadas is null then raise exception 'cadencias_pausadas_invalido' using errcode = '22023'; end if;
+  if auth.uid() is null
+     or not public.fn_role_at_least(p_org, 'manager')
+     or not public.fn_support_write_allowed(p_org) then
+    raise exception 'cadencias_pausadas_forbidden' using errcode = '42501';
+  end if;
+  if not public.fn_session_mfa_proven() then raise exception 'mfa_required' using errcode = '42501'; end if;
+  select coalesce((settings ->> 'cadencias_pausadas')::boolean, false) into v_atual
+    from public.organizations where id = p_org;
+  if v_atual is not distinct from p_pausadas then
+    return jsonb_build_object('pausadas', v_atual, 'mudou', false);
+  end if;
+  update public.organizations
+     set settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object('cadencias_pausadas', to_jsonb(p_pausadas))
+   where id = p_org;
+  get diagnostics v_linhas = row_count;
+  if v_linhas = 0 then raise exception 'cadencias_pausadas_sem_organizacao' using errcode = 'P0002'; end if;
+  return jsonb_build_object('pausadas', p_pausadas, 'mudou', true);
+end; $cad_pausa$;
+
+revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon;
+grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to authenticated, service_role;

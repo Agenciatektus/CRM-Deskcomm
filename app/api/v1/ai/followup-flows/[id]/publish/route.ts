@@ -20,6 +20,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { carregaEtapasCitadas } from "@/lib/followup/etapas-citadas";
 import { validateFlowForPublish } from "@/lib/followup/validate-publish";
+import { validarPublicacaoDaCadencia } from "@/lib/cadencia/validar-publicacao";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -48,7 +49,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const admin = createAdminClient();
   const { data: pointer, error: fetchErr } = await admin
     .from("followup_flow_pointers")
-    .select("id, draft_graph, trigger_config")
+    .select("id, draft_graph, trigger_config, surface, pipeline_id, channel_session_id, cadence_settings")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -74,6 +75,18 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     params?: { stage_id?: string };
   };
   const triggerKind = trigger.kind ?? "manual";
+  // Cadência: só os gatilhos que a PORTA da cadência implementa hoje
+  // (`lib/cadencia/inscrever.ts`). Silêncio/SLA passariam no conjunto acima e
+  // nunca inscreveriam ninguém por ela — fluxo morto com cara de vivo.
+  const ehCadencia = pointer.surface === "cadence";
+  if (ehCadencia && triggerKind !== "manual" && triggerKind !== "stage_change") {
+    return fail(
+      "trigger_kind_not_implemented",
+      t("Na cadência, use o gatilho Etapa do funil ou a inscrição manual."),
+      422,
+      { requestId },
+    );
+  }
   if (!KINDS_COM_MOTOR.has(triggerKind)) {
     return fail(
       "trigger_kind_not_implemented",
@@ -149,6 +162,16 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
       requestId,
       details: { errors: validation.errors },
     });
+  }
+
+  if (ehCadencia) {
+    const errosDaCadencia = await validarPublicacaoDaCadencia(admin, activeOrg.orgId, pointer, graph);
+    if (errosDaCadencia.length > 0) {
+      return fail("validation_failed", t("A cadência não pode ir ao ar ainda."), 422, {
+        requestId,
+        details: { errors: errosDaCadencia },
+      });
+    }
   }
 
   const result = await publishFollowupFlowVersion(admin, {
