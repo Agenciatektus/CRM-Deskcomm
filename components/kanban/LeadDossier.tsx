@@ -110,10 +110,25 @@ export function LeadDossier({
   const timeline = useLeadTimeline(open ? lead.id : null, lead.contact_id);
   const owner = resolveLeadOwner(lead, ownerNames);
   const score = lead.score ?? null;
-  const conversaId = lead.conversa?.id ?? null;
+  // O id é FIXADO na abertura. O board recalcula `lead.conversa` a cada
+  // refetch (a conversa mais recente do contato): com duas conversas — dois
+  // números, ou WhatsApp e Instagram —, uma mensagem na outra trocaria o painel
+  // no meio da digitação e levaria o rascunho embora. Só muda de "nenhuma" para
+  // "uma": o contato que escreve pela primeira vez com o dossiê aberto aparece.
+  // Ajuste de estado DURANTE o render (não em effect): o React refaz o render
+  // na hora, sem pintar o valor velho e sem render em cascata.
+  const [conversaId, setConversaId] = useState<string | null>(lead.conversa?.id ?? null);
+  const idDoBoard = lead.conversa?.id ?? null;
+  if (conversaId === null && idDoBoard !== null) setConversaId(idDoBoard);
   const [aba, setAba] = useState<Aba>("detalhes");
   const telaLarga = useTelaLarga();
   const conversaVisivel = open && conversaId !== null && (telaLarga || aba === "conversa");
+  // Monta a conversa na PRIMEIRA vez que ela fica visível e a mantém montada
+  // depois. Montar escondida (aba Detalhes no celular) fazia o `ChatThread`
+  // ancorar no fim de um elemento `display:none` — o que não rola nada, mas
+  // marca a âncora como feita: a aba abria no topo do histórico.
+  const [conversaJaVista, setConversaJaVista] = useState(false);
+  if (conversaVisivel && !conversaJaVista) setConversaJaVista(true);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -252,10 +267,11 @@ export function LeadDossier({
               aba === "conversa" ? "flex" : "hidden",
             )}
           >
-            {open && (
+            {open && conversaJaVista && (
               <ConversaDoNegocio
                 conversationId={conversaId}
                 visivel={conversaVisivel}
+                atividadeNoBoard={lead.conversa?.last_message_at ?? null}
               />
             )}
           </div>

@@ -1,7 +1,10 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useT } from "@/hooks/i18n/useT";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { isNotFound, useConversation } from "@/hooks/inbox/useConversation";
 import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
@@ -25,20 +28,42 @@ import { ArrowSquareOut, ChatCircle } from "@/lib/ui/icons";
  * Marcar como lida nesse estado zeraria o contador de não-lidas do atendente
  * sem ninguém ter lido — por isso `visivel` vem de quem sabe a aba e a largura,
  * e só ele libera o `mark-read` e a supressão de notificação.
+ *
+ * E aqui o `mark-read` só vale para quem é o DONO da conversa. O Kanban é tela
+ * de revisão: um gestor passando pelos cards não leu nada pelo atendente, e o
+ * `unread_count_for_assignee` é o contador DELE.
+ *
+ * ─── A conversa não tem realtime próprio aqui ───────────────────────────────
+ *
+ * No Inbox o objeto vem da lista com assinatura; aqui vem da busca única, que
+ * ninguém atualiza. Sem isto, o cliente escreve, a mensagem aparece no thread
+ * (que tem realtime), e o composer continua travado com "a janela fechou" —
+ * `last_inbound_at` velho. `atividadeNoBoard` é o `last_message_at` que o
+ * quadro (este sim ao vivo) recebe: quando ele muda, a conversa é relida.
  */
 export function ConversaDoNegocio({
   conversationId,
   visivel,
+  atividadeNoBoard,
 }: {
   conversationId: string;
   visivel: boolean;
+  atividadeNoBoard: string | null;
 }) {
   const t = useT();
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const conversa = useConversation(conversationId, true);
   const conversation = conversa.data ?? null;
 
+  useEffect(() => {
+    if (atividadeNoBoard === null) return;
+    void qc.invalidateQueries({ queryKey: ["conversation", conversationId] });
+  }, [atividadeNoBoard, conversationId, qc]);
+
+  const souODono = conversation?.assigned_to_user_id === user.id;
   useMarkAsRead(
-    visivel ? (conversation?.id ?? null) : null,
+    visivel && souODono ? (conversation?.id ?? null) : null,
     conversation?.unread_count_for_assignee ?? 0,
   );
 

@@ -129,10 +129,14 @@ describe("o que trava o campo — um mecanismo só", () => {
     expect(composerProps.at(-1)?.blockedReason).toMatch(/bloqueado/);
   });
 
-  it("acompanhamento de suporte somente leitura ganha do bloqueio do contato", () => {
+  it("acompanhamento de suporte somente leitura chega como viewer: sem campo", () => {
+    // `resolveActiveOrg` rebaixa o suporte read-only a `viewer`, então o gate
+    // `inbox.reply` é o que o cobre — não um segundo ramo no painel.
     suporte.readonly = true;
+    permissao.responder = false;
     render(<PainelDaConversa conversation={conversa()} />);
-    expect(composerProps.at(-1)?.blockedReason).toBe("Acompanhamento somente leitura");
+    expect(screen.queryByTestId("composer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("conversa-somente-leitura")).toBeInTheDocument();
   });
 
   it("conversa fechada chega ao composer como disabled", () => {

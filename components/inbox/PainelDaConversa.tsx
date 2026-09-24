@@ -2,7 +2,7 @@
 import { forwardRef, useEffect, useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
-import { useAuth, usePermission } from "@/hooks/auth/AuthProvider";
+import { usePermission } from "@/hooks/auth/AuthProvider";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
 import { estadoDaJanela, formatarDecorrido } from "@/lib/channels/janela";
@@ -22,7 +22,7 @@ import { RetentionNotice } from "./RetentionNotice";
  * divergem". Ela continua valendo — e é por isso que o dossiê NÃO ganhou um
  * segundo composer. Ganhou ESTE componente, o mesmo que o Inbox monta. As
  * decisões que moravam soltas no layout (a janela de 24h que fecha o texto
- * livre, o contato bloqueado ou anonimizado, o acompanhamento somente leitura,
+ * livre, o contato bloqueado ou anonimizado, quem só pode ler,
  * a mensagem escolhida para responder "em cima") agora moram aqui, e as duas
  * telas herdam a mesma correção no mesmo commit.
  *
@@ -52,9 +52,9 @@ export interface PainelDaConversaProps {
 export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps>(
   function PainelDaConversa({ conversation, onde = "inbox" }, composerRef) {
     const t = useT();
-    const { user } = useAuth();
+    // Acompanhamento de suporte somente leitura já chega aqui como `viewer`
+    // (`resolveActiveOrg` o rebaixa), então este gate também o cobre.
     const podeResponder = usePermission("inbox.reply");
-    const supportReadonly = user.support?.access_mode === "support_readonly";
 
     /**
      * A mensagem escolhida para responder "em cima". Quem ESCOLHE é a lista de
@@ -86,13 +86,11 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
             : `${t("A janela de 24h fechou há")} ${formatarDecorrido(janela.fechadaHaMs)}. ${t("Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.")}`
         : null;
 
-    const blockedReason = supportReadonly
-      ? "Acompanhamento somente leitura"
-      : conversation.contacts?.is_blocked
-        ? t("Contato bloqueado — envio de mensagens desabilitado.")
-        : conversation.contacts?.is_anonymized
-          ? t("Contato anonimizado — não é possível enviar mensagens.")
-          : null;
+    const blockedReason = conversation.contacts?.is_blocked
+      ? t("Contato bloqueado — envio de mensagens desabilitado.")
+      : conversation.contacts?.is_anonymized
+        ? t("Contato anonimizado — não é possível enviar mensagens.")
+        : null;
 
     return (
       <>
