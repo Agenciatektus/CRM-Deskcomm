@@ -126,7 +126,7 @@ export function PipelinePageClient({
                 aria-selected={modo === opcao.id}
                 onClick={() => trocarModo(opcao.id)}
                 className={cn(
-                  "h-8 rounded px-3 text-sm transition-colors",
+                  "h-8 rounded-sm px-3 text-sm transition-colors",
                   modo === opcao.id ? "bg-muted font-medium text-text" : "text-text-muted hover:text-text",
                 )}
               >

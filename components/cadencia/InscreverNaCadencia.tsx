@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
@@ -34,7 +35,14 @@ const MOTIVOS: Record<string, string> = {
  * por que os outros não, e só então o gestor confirma. A confirmação leva o
  * número que ele viu; se o servidor contar diferente, recusa e pede nova prévia.
  */
-export function InscreverNaCadencia({
+export function InscreverNaCadencia(props: { pipelineId: string; leadIds: string[]; onConcluido: () => void }) {
+  // Sem permissão, nada monta — nem as consultas: quem não inscreve (abaixo de
+  // manager, o piso da API) não precisa buscar a lista de cadências.
+  const podeInscrever = usePermission("pipeline.create");
+  return podeInscrever ? <BotaoEDialogo {...props} /> : null;
+}
+
+function BotaoEDialogo({
   pipelineId,
   leadIds,
   onConcluido,
@@ -44,21 +52,16 @@ export function InscreverNaCadencia({
   onConcluido: () => void;
 }) {
   const t = useT();
-  const podeInscrever = usePermission("pipeline.create"); // manager+, o piso da API
   const [aberto, setAberto] = useState(false);
   const [cadenciaId, setCadenciaId] = useState("");
   const [previa, setPrevia] = useState<PreviaDaInscricao | null>(null);
-  const [resultado, setResultado] = useState<string | null>(null);
   const { data: cadencias } = useCadencias(pipelineId);
   const { previa: pedirPrevia, confirmar } = useInscreverNaCadencia(pipelineId);
   const noAr = (cadencias ?? []).filter((c) => c.status === "active");
 
-  if (!podeInscrever) return null;
-
   const fechar = () => {
     setAberto(false);
     setPrevia(null);
-    setResultado(null);
   };
 
   const motivosAgrupados = previa
@@ -123,11 +126,6 @@ export function InscreverNaCadencia({
               ))}
             </div>
           )}
-          {resultado && (
-            <p className="text-sm" role="status">
-              {resultado}
-            </p>
-          )}
           {(pedirPrevia.isError || confirmar.isError) && (
             <p className="text-sm text-destructive" role="alert">
               {(pedirPrevia.error ?? confirmar.error) instanceof Error
@@ -157,8 +155,10 @@ export function InscreverNaCadencia({
                     { cadenciaId, leadIds, confirmCount: previa.entram_hoje },
                     {
                       onSuccess: (r) => {
-                        setResultado(`${r.inscritos} ${t("inscrito(s) na cadência.")}`);
-                        setPrevia(null);
+                        // Toast, e não texto no diálogo: `onConcluido` limpa a
+                        // seleção, a barra some e leva o diálogo junto.
+                        toast.success(`${r.inscritos} ${t("inscrito(s) na cadência.")}`);
+                        fechar();
                         onConcluido();
                       },
                     },
