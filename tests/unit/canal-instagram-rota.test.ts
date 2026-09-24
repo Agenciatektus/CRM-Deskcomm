@@ -38,6 +38,7 @@ vi.mock("@/lib/i18n/dicionario", () => ({ traduzir: (texto: string) => texto }))
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "https://crm.exemplo.test" } }));
 vi.mock("@/lib/channels/connect", () => ({
   INSTAGRAM_CHANNEL_LABEL: "Instagram",
+  HOSTED_CHANNEL_LABEL: "NomeDaPlataforma",
   findInstagramSession: vi.fn(async () => null),
   saveInstagramSession: vi.fn(async () => ({ error: null })),
   trocarCodigoHospedado: vi.fn(),
@@ -157,6 +158,21 @@ describe("conectar o Instagram", () => {
     // em silêncio esconderia o engano.
     expect((await conectar({ codigo: "XK4P9T2MQW", token: "abc" })).status).toBe(422);
     expect(trocarCodigoHospedado).not.toHaveBeenCalled();
+  });
+
+  it("o estado diz a REDE e a PLATAFORMA separadamente", async () => {
+    // Os dois vinham do mesmo campo, e a tela montava "Na Instagram, abra
+    // Integrações › Conectar ao CRM" — mandando o operador procurar o código
+    // dentro do próprio Instagram. A rede é o que ele conecta; a plataforma é
+    // quem emite o código.
+    comoAdmin();
+    vi.mocked(findInstagramSession).mockResolvedValue(null);
+    const { GET } = await import("@/app/api/v1/channels/instagram/route");
+    const corpo = (await (await GET()).json()) as { data: Record<string, unknown> };
+
+    expect(corpo.data.label, "a rede que se conecta").toBe("Instagram");
+    expect(corpo.data.plataforma, "onde o código é gerado").toBe("NomeDaPlataforma");
+    expect(corpo.data.plataforma).not.toBe(corpo.data.label);
   });
 
   it("quem não é dono da conta não conecta canal", async () => {
