@@ -81,3 +81,52 @@ export async function consultarEmLotes<T>(
   }
   return { data: saida, error: null };
 }
+
+/**
+ * Tamanho da página ao varrer uma tabela inteira.
+ *
+ * Abaixo do `db-max-rows` do PostgREST de propósito: ele CORTA em silêncio no
+ * teto dele e só denuncia no cabeçalho `Content-Range`, que ninguém lê.
+ * Medido no gateway do CRM em 24/09/2026, pedindo os leads do funil da Lior sem
+ * `Range` nenhum:
+ *
+ *   content-range: 0-999/1098   →  1.000 linhas no corpo, 98 sumiram
+ *
+ * Um quadro com 1.000 dos 1.098 cards abre normal e parece completo. É a mesma
+ * classe do 400 que esta família de helpers conserta, com a diferença de que
+ * este não dá erro nenhum — e por isso é pior.
+ */
+export const LINHAS_POR_PAGINA = 1000;
+
+/**
+ * Varre todas as páginas de uma consulta, em vez de aceitar o teto do servidor.
+ *
+ * `consulta` recebe o intervalo e devolve a fatia; a varredura para quando uma
+ * página volta menor que o pedido, que é o sinal de fim sem precisar de uma
+ * contagem à parte.
+ *
+ * Teto de segurança em `MAX_PAGINAS`: a alternativa a um teto é um laço que,
+ * diante de um servidor que ignore o `Range`, pede a mesma página para sempre.
+ */
+const MAX_PAGINAS = 50;
+
+export async function buscarTodasAsPaginas<T>(
+  consulta: (
+    de: number,
+    ate: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  tamanho = LINHAS_POR_PAGINA,
+): Promise<{ data: T[]; error: string | null; truncado: boolean }> {
+  const saida: T[] = [];
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+    const de = pagina * tamanho;
+    const { data, error } = await consulta(de, de + tamanho - 1);
+    if (error) return { data: [], error: error.message, truncado: false };
+    const fatia = data ?? [];
+    saida.push(...fatia);
+    if (fatia.length < tamanho) return { data: saida, error: null, truncado: false };
+  }
+  // Estourou o teto de páginas: devolve o que tem e DIZ que está incompleto, em
+  // vez de entregar uma lista truncada com cara de inteira.
+  return { data: saida, error: null, truncado: true };
+}

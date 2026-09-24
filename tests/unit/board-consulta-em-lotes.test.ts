@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { IDS_POR_CONSULTA, consultarEmLotes, lotesDeIds } from "@/lib/supabase/lotes";
+import {
+  IDS_POR_CONSULTA,
+  buscarTodasAsPaginas,
+  consultarEmLotes,
+  lotesDeIds,
+} from "@/lib/supabase/lotes";
 
 /**
  * O QUADRO DE UM CLIENTE GRANDE NÃO ABRIA, E A TELA DIZIA "Bad Request".
@@ -176,5 +181,71 @@ describe("a rota do quadro não pode ter `.in()` cru", () => {
     expect(argumentosCrus(`await supabase.from("x").in("contact_id", contactIds);`)).toEqual([
       "contactIds",
     ]);
+  });
+});
+
+describe("buscarTodasAsPaginas", () => {
+  /**
+   * O PostgREST CORTA no `db-max-rows` e não avisa. Medido no gateway do CRM
+   * pedindo os leads do funil da Lior sem `Range` nenhum:
+   *
+   *   content-range: 0-999/1098  →  1.000 linhas no corpo, 98 sumiram
+   *
+   * Um quadro com 1.000 dos 1.098 cards abre normal e parece completo. É pior
+   * que o 400 que o resto deste arquivo conserta, porque não dá erro nenhum.
+   */
+  function servidorQueCortaEm(total: number, teto = 1000) {
+    const linhas = Array.from({ length: total }, (_, i) => ({ id: `lead-${i}` }));
+    return async (de: number, ate: number) => ({
+      data: linhas.slice(de, Math.min(ate + 1, de + teto)),
+      error: null,
+    });
+  }
+
+  it("traz os 1.098 do funil da Lior, e não os 1.000 do teto", async () => {
+    const { data, error, truncado } = await buscarTodasAsPaginas(servidorQueCortaEm(1098));
+    expect(error).toBeNull();
+    expect(truncado).toBe(false);
+    expect(data).toHaveLength(1098);
+    // E sem repetir: página que se sobrepõe entregaria o mesmo lead duas vezes.
+    expect(new Set(data.map((l) => l.id)).size).toBe(1098);
+  });
+
+  it("página EXATAMENTE cheia não é confundida com o fim", async () => {
+    // O caso que uma implementação ingênua erra: 2.000 linhas em páginas de
+    // 1.000 dá uma segunda página cheia, e parar ali perderia o resto.
+    const { data } = await buscarTodasAsPaginas(servidorQueCortaEm(2000));
+    expect(data).toHaveLength(2000);
+  });
+
+  it("base pequena resolve numa página só", async () => {
+    const paginas: number[] = [];
+    await buscarTodasAsPaginas(async (de, ate) => {
+      paginas.push(de);
+      return { data: Array.from({ length: 178 }, (_, i) => ({ id: `l${i}` })), error: null };
+    });
+    expect(paginas).toEqual([0]);
+  });
+
+  it("erro numa página interrompe e não devolve meia lista", async () => {
+    const { data, error } = await buscarTodasAsPaginas(async (de) =>
+      de === 0
+        ? { data: Array.from({ length: 1000 }, (_, i) => ({ id: `a${i}` })), error: null }
+        : { data: null, error: { message: "Bad Request" } },
+    );
+    expect(error).toBe("Bad Request");
+    expect(data).toEqual([]);
+  });
+
+  it("servidor que ignora o Range não vira laço infinito — e DIZ que truncou", async () => {
+    // Sem teto, um servidor que devolvesse sempre a mesma página cheia
+    // prenderia a rota para sempre. Com teto, o risco vira "lista incompleta",
+    // e aí ela precisa se declarar incompleta em vez de parecer inteira.
+    const { data, truncado } = await buscarTodasAsPaginas(async () => ({
+      data: Array.from({ length: 1000 }, (_, i) => ({ id: `x${i}` })),
+      error: null,
+    }));
+    expect(truncado).toBe(true);
+    expect(data.length).toBeGreaterThan(0);
   });
 });

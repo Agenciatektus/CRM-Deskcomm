@@ -132,7 +132,12 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
   it("a consulta de conversas do quadro traz as `tags` e as devolve no card", () => {
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
     expect(fonte, "withConversas não seleciona `tags` das conversas").toMatch(
-      /from\("conversations"\)\s*\.select\("[^"]*\btags\b[^"]*"\)/,
+      // `\s*` depois de `.select(` porque o prettier quebra a chamada em varias
+      // linhas quando ela passa de 100 colunas — foi o que aconteceu ao por a
+      // consulta em lotes (PR #14) e ao acrescentar `instagram_entrada` (#10).
+      // A cerca continua exigindo o MESMO: que `tags` esteja no select das
+      // conversas. O que mudou e so tolerar a quebra de linha.
+      /from\("conversations"\)\s*\.select\(\s*"[^"]*\btags\b[^"]*"/,
     );
     expect(fonte, "o card não recebe `conversation_tags`").toContain("conversation_tags:");
   });
