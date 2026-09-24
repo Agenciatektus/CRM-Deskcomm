@@ -135,8 +135,16 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
       // `\s*` depois de `.select(` porque o prettier quebra a chamada em varias
       // linhas quando ela passa de 100 colunas — foi o que aconteceu ao por a
       // consulta em lotes (PR #14) e ao acrescentar `instagram_entrada` (#10).
-      // A cerca continua exigindo o MESMO: que `tags` esteja no select das
-      // conversas. O que mudou e so tolerar a quebra de linha.
+      // Mudaram DUAS coisas, nao uma: entrou a tolerancia a espaco depois do
+      // parentese, e o fecho da chamada deixou de ser exigido. O segundo era
+      // necessario: com a chamada quebrada pelo prettier, depois da aspa vem
+      // virgula e quebra de linha, entao exigir o fecho colado nunca casaria.
+      // E inocuo porque a ancora from("conversations") ja prende a consulta
+      // certa.
+      //
+      // Conferido que a cerca continua reprovando as QUATRO formas de tirar
+      // `tags` do select das conversas: removida, renomeada para outro campo,
+      // select trocado por `*`, e `tags` presente so no select de CONTACTS.
       /from\("conversations"\)\s*\.select\(\s*"[^"]*\btags\b[^"]*"/,
     );
     expect(fonte, "o card não recebe `conversation_tags`").toContain("conversation_tags:");

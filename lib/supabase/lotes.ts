@@ -85,8 +85,28 @@ export async function consultarEmLotes<T>(
 /**
  * Tamanho da página ao varrer uma tabela inteira.
  *
- * Abaixo do `db-max-rows` do PostgREST de propósito: ele CORTA em silêncio no
- * teto dele e só denuncia no cabeçalho `Content-Range`, que ninguém lê.
+ * Abaixo do `db-max-rows` do PostgREST **de propósito**, e a folga é a coisa
+ * mais importante deste arquivo: ele CORTA em silêncio no teto dele e só
+ * denuncia no cabeçalho `Content-Range`, que ninguém lê.
+ *
+ * A primeira versão disto usava 1.000 — exatamente o `max_rows = 1000` do
+ * `supabase/config.toml`. Funcionava, e funcionava por coincidência: a condição
+ * de parada abaixo é `fatia.length < tamanho`, e com os dois números IGUAIS uma
+ * página curta prova fim de dados só enquanto ninguém mexer em nenhum dos dois.
+ * Medido com dublês de servidor:
+ *
+ *   servidor corta em 1000 → 1.098 de 1.098, truncado=false   ✔
+ *   servidor corta em  500 →   500 de 1.098, truncado=false   ✘ 598 somem calados
+ *   servidor corta em  200 →   200 de 1.098, truncado=false   ✘
+ *
+ * Ou seja: baixar o `max_rows`, ou subir atrás de um gateway com teto próprio,
+ * traria o defeito de volta sem erro nenhum. O repositório já proibiu esse
+ * raciocínio por escrito em dois lugares — `catalogo-nao-corta-cego.test.ts`
+ * ("a truncagem não pode ser deduzida de `linhas.length === limite`: o corte é
+ * do SERVIDOR e o cliente não sabe qual é") e `lib/agenda/protecao-followup.ts`
+ * ("só página VAZIA prova que a leitura terminou").
+ *
+ * Com 500 contra um teto de 1.000, uma página curta volta a ser prova.
  * Medido no gateway do CRM em 24/09/2026, pedindo os leads do funil da Lior sem
  * `Range` nenhum:
  *
@@ -96,7 +116,7 @@ export async function consultarEmLotes<T>(
  * classe do 400 que esta família de helpers conserta, com a diferença de que
  * este não dá erro nenhum — e por isso é pior.
  */
-export const LINHAS_POR_PAGINA = 1000;
+export const LINHAS_POR_PAGINA = 500;
 
 /**
  * Varre todas as páginas de uma consulta, em vez de aceitar o teto do servidor.
