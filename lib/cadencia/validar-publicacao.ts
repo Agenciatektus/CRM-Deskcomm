@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { VARIANTE_TAMANHO_MAXIMO, VARIAVEIS_DA_CADENCIA, resolverSpintax, variaveisCitadas } from "./render";
+import { validarEtapasDeSaida } from "./gatilho";
 import { cadenceSettingsSchema } from "./settings";
 
 export interface ErroDePublicacaoDaCadencia {
@@ -43,6 +44,12 @@ export async function validarPublicacaoDaCadencia(
   }
 
   if (!pointer.pipeline_id) erro("cadencia_sem_funil", "A cadência precisa pertencer a um funil.");
+
+  const etapasDeSaida = settings.success ? (settings.data.saidas?.etapas ?? []) : [];
+  if (pointer.pipeline_id && etapasDeSaida.length > 0) {
+    const problema = await validarEtapasDeSaida(admin, organizationId, pointer.pipeline_id, etapasDeSaida);
+    if (problema) erro("cadencia_saida_invalida", problema);
+  }
 
   if (!pointer.channel_session_id) {
     erro("cadencia_sem_numero", "Escolha o número de WhatsApp pelo qual a cadência envia.");

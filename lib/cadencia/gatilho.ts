@@ -40,3 +40,32 @@ export async function validarGatilhoDaCadencia(
   if (data.is_lost) return "Etapa de perda não pode disparar uma cadência de prospecção.";
   return null;
 }
+
+/**
+ * As ETAPAS DE SAÍDA são do funil da cadência e estão ativas? Uma etapa de outro
+ * funil nunca seria alcançada pelo negócio inscrito — a saída pareceria
+ * configurada e nunca dispararia. Mesma forma de `validarGatilhoDaCadencia`:
+ * `null` quando está ok, ou a mensagem para a tela.
+ */
+export async function validarEtapasDeSaida(
+  db: SupabaseClient,
+  organizationId: string,
+  pipelineId: string | null,
+  etapas: readonly string[],
+): Promise<string | null> {
+  if (etapas.length === 0) return null;
+  if (!pipelineId) return "A cadência precisa pertencer a um funil.";
+  const { data, error } = await db
+    .from("crm_stages")
+    .select("id, pipeline_id, is_archived")
+    .eq("organization_id", organizationId)
+    .in("id", [...new Set(etapas)]);
+  if (error) throw new Error(error.message);
+  const porId = new Map((data ?? []).map((e) => [e.id as string, e]));
+  for (const id of etapas) {
+    const e = porId.get(id);
+    if (!e || e.pipeline_id !== pipelineId) return "Uma etapa de saída não é deste funil.";
+    if (e.is_archived) return "Uma etapa de saída está arquivada.";
+  }
+  return null;
+}
