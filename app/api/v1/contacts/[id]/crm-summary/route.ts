@@ -34,6 +34,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { camposDoFunil, settingsDoEmbed } from "@/lib/leads/campos-do-funil";
+import { motivosDoFunil } from "@/lib/leads/motivos-de-perda-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
@@ -46,7 +47,7 @@ export const dynamic = "force-dynamic";
  * arquivado no banco, antes do `limit(3)` — `pipeline_id` é NOT NULL.
  */
 const LEAD_COLS =
-  "id, title, status, value_cents, currency, updated_at, pipeline_id, custom_fields, crm_pipelines!inner(name, settings, is_archived), crm_stages(name)";
+  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, custom_fields, crm_pipelines!inner(name, settings, is_archived), crm_stages(name)";
 const ORDER_COLS = "id, external_id, status, total_cents, currency, created_at";
 /** Acompanha o que a timeline mostra — `reason` e `actor_kind` inclusive. */
 /**
@@ -169,6 +170,29 @@ export async function GET(
     return fail("internal_error", falha.message, 500, { requestId });
   }
 
+  // AS ETAPAS DO FUNIL DE CADA LEAD, para o painel trocar a etapa sem abrir o
+  // quadro. A leitura de etapas que existe (`agent-mapping`) é de manager; esta
+  // vai pelo MESMO cliente com RLS do resto da rota, então quem vê o lead vê as
+  // etapas do funil dele e nada além. Uma consulta só para os até 3 funis.
+  const funis = [...new Set((leads.data ?? []).map((l) => (l as { pipeline_id: string }).pipeline_id))];
+  const etapas = funis.length
+    ? await supabase
+        .from("crm_stages")
+        .select("id, pipeline_id, name, is_won, is_lost")
+        .in("pipeline_id", funis)
+        .eq("organization_id", contactScope.organization_id)
+        .eq("is_archived", false)
+        .order("position", { ascending: true })
+    : { data: [], error: null };
+  if (etapas.error) {
+    return fail("internal_error", etapas.error.message, 500, { requestId });
+  }
+  const etapasPorFunil = new Map<string, EtapaDoResumo[]>();
+  for (const e of (etapas.data ?? []) as Array<EtapaDoResumo & { pipeline_id: string }>) {
+    const { pipeline_id, ...etapa } = e;
+    etapasPorFunil.set(pipeline_id, [...(etapasPorFunil.get(pipeline_id) ?? []), etapa]);
+  }
+
   // QUEM agiu, e não só "uma pessoa". O lookup roda sobre os autores DISTINTOS
   // da janela (12 linhas, quase sempre 1 ou 2 pessoas), e degrada declarado
   // quando não há service role — a tela cai no rótulo genérico que ela já usava.
@@ -181,7 +205,9 @@ export async function GET(
   return ok(
     {
       ...enrichment,
-      leads: (leads.data ?? []).map((row) => comCamposDoFunil(row as Record<string, unknown>)),
+      leads: (leads.data ?? []).map((row) =>
+        comCamposDoFunil(row as Record<string, unknown>, etapasPorFunil),
+      ),
       orders: orders.data ?? [],
       activities: linhas.map((a) => ({
         ...a,
@@ -196,11 +222,21 @@ export async function GET(
   );
 }
 
-function comCamposDoFunil(row: Record<string, unknown>) {
+interface EtapaDoResumo {
+  id: string;
+  name: string;
+  is_won: boolean;
+  is_lost: boolean;
+}
+
+function comCamposDoFunil(row: Record<string, unknown>, etapasPorFunil: Map<string, EtapaDoResumo[]>) {
   const { crm_pipelines, crm_stages, ...lead } = row;
+  const settings = settingsDoEmbed(crm_pipelines);
   return {
     ...lead,
-    field_defs: camposDoFunil(settingsDoEmbed(crm_pipelines)),
+    etapas: etapasPorFunil.get(String(lead.pipeline_id)) ?? [],
+    motivos_de_perda: motivosDoFunil(settings),
+    field_defs: camposDoFunil(settings),
     funil_nome: nomeDoEmbed(crm_pipelines),
     etapa_nome: nomeDoEmbed(crm_stages),
   };

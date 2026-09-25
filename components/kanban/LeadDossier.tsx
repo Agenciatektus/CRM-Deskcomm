@@ -13,6 +13,7 @@ import { LeadFieldsForm } from "./LeadFieldsForm";
 import { ScoreSlot } from "./ScoreSlot";
 import { LeadTimeline } from "./LeadTimeline";
 import { OwnerBadge } from "./OwnerBadge";
+import { SeletorDeEtapa, type EtapaDoSeletor } from "./SeletorDeEtapa";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
 import type { CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,8 @@ interface Props {
   pipelineId: string;
   fieldDefs?: CustomFieldDef[];
   stageName: string;
+  /** Etapas ativas do funil: com elas o cabeçalho troca a etapa sem arrastar. */
+  etapas?: EtapaDoSeletor[];
   ownerNames?: Map<string, string | null>;
 }
 
@@ -102,6 +105,7 @@ export function LeadDossier({
   pipelineId,
   fieldDefs = [],
   stageName,
+  etapas,
   ownerNames,
 }: Props) {
   const tagDoIdioma = useTagDeIdioma();
@@ -188,7 +192,18 @@ export function LeadDossier({
           <span className="font-medium tabular-nums text-text">
             {formatBRL(lead.value_cents, lead.currency)}
           </span>
-          <span className="text-text-muted">{stageName}</span>
+          {etapas ? (
+            <SeletorDeEtapa
+              leadId={lead.id}
+              pipelineId={pipelineId}
+              stageId={lead.stage_id}
+              updatedAt={lead.updated_at}
+              aberto={lead.status === "open"}
+              etapas={etapas}
+            />
+          ) : (
+            <span className="text-text-muted">{stageName}</span>
+          )}
           <OwnerBadge
             ownerKind={owner.kind}
             ownerName={owner.name}

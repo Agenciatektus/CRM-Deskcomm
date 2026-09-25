@@ -238,7 +238,8 @@ describe("painel do inbox — demandas abertas", () => {
   });
 });
 
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+// `usePermission` entra com o seletor de etapa do painel; aqui o assunto é outro.
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }), usePermission: () => false }));
 
 
 describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo contexto", () => {
