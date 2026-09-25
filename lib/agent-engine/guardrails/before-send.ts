@@ -49,6 +49,7 @@ import { decidePacing } from '../pacing/engine';
 import type { PacingState } from '../pacing/engine';
 import type { PacingKnobs } from '../pacing/defaults';
 import { loadChannelKnobs, loadPacingState, recordSend } from '../pacing/store';
+import { decidirEspacamento } from '@/lib/cadencia/settings';
 import { decideSpinning } from '../spinning/engine';
 import type { RecentCopy } from '../spinning/engine';
 import { loadRecentCopies, loadSpinningKnobs, recordCopy } from '../spinning/store';
@@ -859,6 +860,17 @@ export interface RunBeforeSendArgs {
    * o cap. Ponto de injeção: quando o drain expuser o limite da sessão, passar aqui.
    */
   crmDailyLimit: number | null;
+  /**
+   * Intervalo entre envios AUTOMÁTICOS do número, sorteado em [minMs, maxMs] —
+   * só a cadência de prospecção passa (`cadence_settings.espacamento`).
+   *
+   * É avaliado AQUI, sob o `pg_advisory_xact_lock` do número, com o
+   * `lastSentAt` que o worker anterior acabou de efetivar. E NÃO vira `sleep`:
+   * dormir 2 minutos com o lock na mão travaria o número inteiro, inclusive a
+   * resposta da IA a quem acabou de escrever. Quem ainda não pode sair recebe
+   * veto `cadence_spacing` com `nextAllowedAt`, e o chamador reagenda o job.
+   */
+  espacamentoAutomatico?: { minMs: number; maxMs: number };
   now: Date;
   /** injeções de teste (jitter determinístico + espera sem relógio real). */
   rng?: () => number;
@@ -1120,6 +1132,29 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
       timezone: pacingCfg.knobs.timezone,
       numberActivatedAt: pacingCfg.numberActivatedAt,
     });
+    if (args.espacamentoAutomatico) {
+      const espaco = decidirEspacamento({
+        agora: args.now,
+        ultimoEnvio: pacingState.lastSentAt,
+        minMs: args.espacamentoAutomatico.minMs,
+        maxMs: args.espacamentoAutomatico.maxMs,
+        ...(args.rng !== undefined ? { rng: args.rng } : {}),
+      });
+      if (!espaco.permite) {
+        const trace: GateTraceEntry[] = [{ gate: 'pacing', verdict: 'veto', code: 'cadence_spacing' }];
+        emitTrace(args.log, args.channelSessionId, trace);
+        // Nada foi escrito: o rollback solta o lock para o próximo da fila.
+        await client.query('rollback');
+        return {
+          status: 'vetoed',
+          gate: 'pacing',
+          code: 'cadence_spacing',
+          message: 'intervalo entre envios automáticos do número ainda não passou; reagende',
+          nextAllowedAt: espaco.proximoEm,
+          trace,
+        };
+      }
+    }
     const spinningKnobs = await loadSpinningKnobs(
       client,
       args.tenantId,

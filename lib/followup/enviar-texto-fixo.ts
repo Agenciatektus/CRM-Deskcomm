@@ -51,6 +51,10 @@ export async function enviarTextoFixoPendente(
     .select("id, organization_id, contact_id, payload, attempts, max_attempts")
     .eq("kind", "followup_turn")
     .eq("status", "pending")
+    // Cadência fica de fora JÁ na consulta (ver o `continue` abaixo): filtrar só
+    // no laço deixaria o `limit(5)` ocupado por jobs de cadência e os follow-ups
+    // comuns atrás deles nunca seriam alcançados por este atalho.
+    .is("payload->cadencia", null)
     .lte("run_after",new Date().toISOString())
     .order("created_at", { ascending: true })
     .limit(5);
@@ -71,6 +75,11 @@ export async function enviarTextoFixoPendente(
     const nodeId = payload.node_id;
     const contactId = job.contact_id as string | null;
     if (typeof body !== "string" || !body || !enrollmentId || !nodeId || !contactId) continue;
+    // CADÊNCIA NÃO SAI POR AQUI. Este atalho não passa pela cadeia de guardrails
+    // (janela anti-ban, cota do número, espaçamento, LGPD de prospecção) — para
+    // um contato frio em volume, é exatamente o caminho que o anti-ban existe
+    // para impedir. O job fica para o worker (`followup-turn`), que a aplica.
+    if (payload.cadencia) continue;
     if (somenteContactIds && !somenteContactIds.includes(contactId)) continue;
 
     const { data: claimed, error: claimErr } = await admin

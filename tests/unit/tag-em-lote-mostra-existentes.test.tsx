@@ -23,6 +23,8 @@ vi.mock("@/hooks/kanban/useBulkAction", () => ({
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useUser: () => ({ id: "u-1" }),
   useActiveOrg: () => ({ orgId: "org-1", role: "agent" }),
+  // `agent` não inscreve em cadência (manager+): o botão da cadência não monta.
+  usePermission: () => false,
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
   useAssignableMembers: () => ({ data: [] }),

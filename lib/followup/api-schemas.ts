@@ -7,8 +7,11 @@
 import { z } from "zod";
 import { flowGraphSchema } from "./graph-schema";
 
-/** Vocabulário da coluna `surface` (0167). A UI não recorta mais por ela. */
-export const FOLLOWUP_FLOW_SURFACES = ["followup", "crm_automation"] as const;
+/**
+ * Vocabulário da coluna `surface` (0167; `cadence` na 9016). A lista de
+ * follow-ups da IA não recorta mais por ela; a cadência do funil, sim.
+ */
+export const FOLLOWUP_FLOW_SURFACES = ["followup", "crm_automation", "cadence"] as const;
 export type FollowupFlowSurface = (typeof FOLLOWUP_FLOW_SURFACES)[number];
 
 export const createFollowupFlowSchema = z.strictObject({

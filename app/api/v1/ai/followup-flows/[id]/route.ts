@@ -18,6 +18,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { patchFollowupFlowSchema } from "@/lib/followup/api-schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +117,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const supabase = await createClient();
   const { data: existing, error: fetchErr } = await supabase
     .from("followup_flow_pointers")
-    .select("id")
+    .select("id, surface, pipeline_id")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -124,6 +125,19 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
 
   const patch = parsed.data;
+
+  // Cadência editada por esta porta genérica passa pela MESMA regra de gatilho
+  // da tela do funil — senão bastava trocar de rota para armar um gatilho que a
+  // porta da cadência não implementa, com a cadência no ar.
+  if (existing.surface === "cadence" && patch.trigger_config !== undefined) {
+    const problema = await validarGatilhoDaCadencia(
+      supabase,
+      activeOrg.orgId,
+      (existing.pipeline_id as string | null) ?? null,
+      patch.trigger_config,
+    );
+    if (problema) return fail("cadencia_gatilho_invalido", t(problema), 422, { requestId });
+  }
   if (Object.keys(patch).length === 0) {
     const { data: unchanged, error: reloadErr } = await supabase
       .from("followup_flow_pointers")

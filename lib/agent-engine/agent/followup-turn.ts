@@ -47,6 +47,12 @@ import {
 import type { LeadStateRow } from './lead-state';
 import { loadReentryTemplate, pickReentryVariant } from './reentry-template';
 import {
+  aptidaoDoContatoParaCadencia,
+  carregarCadenciaDoEnvio,
+  inscricaoJaEnviou,
+} from '@/lib/cadencia/envio';
+import { comSaida } from '@/lib/prospecting/rodape-de-saida';
+import {
   classifyFollowupReply,
   planFollowupTiming,
   type EsperaParaPlanejar,
@@ -84,6 +90,13 @@ export const followupTurnPayloadSchema = z
     fixed_body: z.string().min(1).max(4000).optional(),
     /** action mode `template` — corpo em `message_templates`. */
     template_id: z.string().uuid().optional(),
+    /**
+     * Passo de CADÊNCIA de prospecção (migration 9016): o texto já vem
+     * renderizado (variante + spintax + variáveis) em `fixed_body`, e a política
+     * de envio (janela, espaçamento, cota do número) é relida da cadência pelo
+     * `pointer_id` — nunca confiada ao payload.
+     */
+    cadencia: z.strictObject({ pointer_id: z.string().uuid() }).optional(),
     volta_index: z.number().int().optional(),
     volta_total: z.number().int().optional(),
     classes: z.array(z.string()).optional(),
@@ -266,6 +279,41 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
 
     const clock = deps.clock ?? ((): Date => new Date());
 
+    // CADÊNCIA DE PROSPECÇÃO — antes de qualquer outra coisa: a política dela
+    // (pausa, janela própria, aptidão do contato) decide se este envio sai agora,
+    // depois, ou nunca. Só passos de ENVIO; classificar não fala com ninguém.
+    let opcoesDaCadencia: OpcoesDaCadencia | undefined;
+    if (payload.cadencia !== undefined && payload.purpose === 'send_message') {
+      if (payload.followup_enrollment_id === undefined) {
+        throw new Error('passo de cadência sem followup_enrollment_id no payload');
+      }
+      const decisao = await prepararEnvioDaCadencia(
+        pool,
+        deps,
+        job,
+        clock,
+        target,
+        payload.cadencia.pointer_id,
+        payload.followup_enrollment_id,
+      );
+      if (decisao.kind === 'resolvido') {
+        const complete = deps.completeFollowupTurn;
+        if (!complete || payload.node_id === undefined || payload.followup_enrollment_id === undefined) {
+          throw new Error('passo de cadência sem completeFollowupTurn/node_id/enrollment — o enrollment não saberia do desfecho');
+        }
+        await complete(pool, {
+          jobId: job.id,
+          jobClaim: claimOfJob(job),
+          organizationId: tenantId,
+          enrollmentId: payload.followup_enrollment_id,
+          nodeId: payload.node_id,
+          result: decisao.result,
+        });
+        return;
+      }
+      opcoesDaCadencia = decisao.opcoes;
+    }
+
     // #490 — a janela PRÓPRIA vale só para envio proativo dirigido por fluxo.
     // `classify` e `plan_timing` não falam com o cliente e podem rodar a qualquer
     // hora. Retornos prometidos via `schedule_followup` continuam fora deste
@@ -331,6 +379,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
     // caminhos legados abaixo (F3-03/F3-04 seguem intocados quando o campo falta).
     if (payload.followup_enrollment_id !== undefined) {
       await runFlowDrivenTurn(deps, job, pool, ctx, clock, target, {
+        cadencia: opcoesDaCadencia,
         enrollmentId: payload.followup_enrollment_id,
         nodeId: payload.node_id,
         purpose: payload.purpose,
@@ -376,6 +425,90 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
   };
 }
 
+/** O que o envio de um passo de cadência leva para a cadeia de guardrails. */
+export interface OpcoesDaCadencia {
+  limiteDiario: number;
+  espacamento: { minMs: number; maxMs: number };
+  /** 1ª mensagem DESTA inscrição: sai com o rodapé de saída (opt-out), não editável. */
+  comRodape: boolean;
+}
+
+type DecisaoDaCadencia =
+  | { kind: 'enviar'; opcoes: OpcoesDaCadencia }
+  | { kind: 'resolvido'; result: FollowupFlowTurnResult };
+
+/** Kill switch da organização: tenta de novo em 30 min, sem consumir o passo. */
+const PAUSA_DA_ORG_MS = 30 * 60_000;
+
+/**
+ * A POLÍTICA DA CADÊNCIA, relida na hora do envio.
+ *
+ * Ordem: cadência existe e está no ar → kill switch da organização → a conversa
+ * é no número da cadência → janela própria (dias e horário, no fuso da org) →
+ * o contato pode receber prospecção (opt-out, base legal, telefone suprimido).
+ * Só depois disso o texto chega à cadeia de guardrails — onde valem ainda a cota
+ * do número, o espaçamento sob lock e o gate LGPD de 1º toque.
+ *
+ * "Adiado" reagenda o job e avisa o enrollment (sem isso o dead-man da ação o
+ * mataria esperando); "pulado" fecha o passo com o motivo.
+ */
+async function prepararEnvioDaCadencia(
+  pool: pg.Pool,
+  deps: FollowupTurnDeps,
+  job: JobRow,
+  clock: () => Date,
+  target: ReentrySendTarget,
+  pointerId: string,
+  enrollmentId: string,
+): Promise<DecisaoDaCadencia> {
+  const { tenantId, leadId } = target;
+  const runLog = withFields(deps.log, { job_id: job.id, tenant_id: tenantId, lead_id: leadId, pointer_id: pointerId });
+  const adiar = async (ate: Date, motivo: string): Promise<DecisaoDaCadencia> => {
+    await rescheduleReentry(pool, { tenantId, leadId, jobId: job.id, at: ate, payload: job.payload });
+    runLog.info('passo de cadência adiado', { motivo, next_run_at: ate.toISOString() });
+    return { kind: 'resolvido', result: { kind: 'deferred', until: ate, reason: motivo } };
+  };
+  const pular = (motivo: string, texto: string): DecisaoDaCadencia => {
+    runLog.info('passo de cadência não enviado', { motivo });
+    return { kind: 'resolvido', result: { kind: 'skipped', reason: texto } };
+  };
+
+  const cadencia = await carregarCadenciaDoEnvio(pool, tenantId, pointerId);
+  if (cadencia === null || !cadencia.ativa) {
+    return pular('cadencia_indisponivel', 'A cadência foi desligada ou está incompleta.');
+  }
+  const agora = clock();
+  if (cadencia.pausadaNaOrg) {
+    return adiar(new Date(agora.getTime() + PAUSA_DA_ORG_MS), 'cadencias_pausadas');
+  }
+  if (target.channelSessionId !== cadencia.channelSessionId) {
+    // A conversa da inscrição é de outro número (o operador trocou o número da
+    // cadência depois). Mandar por aqui seria falar com o lead pelo chip errado.
+    return pular('numero_divergente', 'A conversa deste contato é de outro número.');
+  }
+
+  const fuso = await fusoDaOrganizacao(pool, tenantId, runLog);
+  const abertura = proximaAberturaDoFollowup({ send_window: cadencia.settings.janela }, fuso, agora);
+  if (abertura !== null) return adiar(abertura, 'cadence_send_window');
+
+  const aptidao = await aptidaoDoContatoParaCadencia(pool, tenantId, leadId);
+  if (!aptidao.apto) {
+    return pular(aptidao.motivo, 'O contato não pode receber prospecção (saída, bloqueio ou sem base legal).');
+  }
+
+  return {
+    kind: 'enviar',
+    opcoes: {
+      limiteDiario: cadencia.limiteDiario,
+      espacamento: {
+        minMs: cadencia.settings.espacamento.min_s * 1000,
+        maxMs: cadencia.settings.espacamento.max_s * 1000,
+      },
+      comRodape: !(await inscricaoJaEnviou(pool, tenantId, enrollmentId)),
+    },
+  };
+}
+
 /**
  * O que aconteceu com um envio sem LLM. `deferred` carrega o INSTANTE porque
  * quem recebe precisa dele: sem a data, "adiado" e "some" são a mesma coisa
@@ -408,6 +541,8 @@ async function runFlowDrivenTurn(
   clock: () => Date,
   target: ReentrySendTarget,
   input: {
+    /** Presente só em passo de cadência — ver `prepararEnvioDaCadencia`. */
+    cadencia?: OpcoesDaCadencia;
     enrollmentId: string;
     nodeId: string | undefined;
     purpose: 'send_message' | 'classify' | 'plan_timing' | undefined;
@@ -437,7 +572,7 @@ async function runFlowDrivenTurn(
     const body = await resolveFlowSendBody(pool, target.tenantId, input);
     if (body !== null) {
       // Texto do operador: sem camada semântica (ver o cabeçalho de sendFixedOutbound).
-      const desfecho = await sendFixedOutbound(deps, job, pool, ctx, clock, target, body, false);
+      const desfecho = await sendFixedOutbound(deps, job, pool, ctx, clock, target, body, false, input.cadencia);
       // TODO OS TRÊS DESFECHOS VOLTAM PARA O ENROLLMENT. O adiado era o que não
       // voltava, e o silêncio dele custava o enrollment inteiro: o motor ficava
       // rechecando um turno que ninguém ia fechar e, esgotado o orçamento do
@@ -630,6 +765,8 @@ async function sendFixedOutbound(
   body: string,
   /** `true` só na re-entrada por template — ver o cabeçalho. */
   comCamadaSemantica: boolean,
+  /** Passo de cadência: cota do número, espaçamento, LGPD de prospecção e rodapé. */
+  cadencia?: OpcoesDaCadencia,
 ): Promise<EnvioFixoDesfecho> {
   const { tenantId, leadId, channelSessionId, conversationId } = target;
   const runLog = withFields(deps.log, { job_id: job.id, tenant_id: tenantId, lead_id: leadId });
@@ -668,12 +805,15 @@ async function sendFixedOutbound(
     leadId,
     jobId: job.id,
     channelSessionId,
-    body,
+    body: cadencia?.comRodape ? comSaida(body) : body,
     optedOutThisTurn,
-    crmDailyLimit: null,
+    // Cadência: o teto do número vale (antes ia `null` e só o warm-up segurava).
+    crmDailyLimit: cadencia ? cadencia.limiteDiario : null,
+    ...(cadencia ? { espacamentoAutomatico: cadencia.espacamento } : {}),
     now: clock(),
     sleep: deps.sleep,
-    lgpd: context.lgpd,
+    // Cadência é contato FRIO: o gate LGPD de 1º toque de prospecção se arma.
+    lgpd: cadencia ? { ...context.lgpd, isProspecting: true } : context.lgpd,
     ...(deps.knobs.disclosureMode !== undefined ? { disclosureMode: deps.knobs.disclosureMode } : {}),
     ...(camadaSemanticaLigada
       ? {
@@ -691,7 +831,14 @@ async function sendFixedOutbound(
   });
 
   if (chain.status === 'vetoed') {
-    if (chain.code === 'outside_window' && chain.nextAllowedAt !== undefined) {
+    // Na cadência, estourar a cota do dia ou o intervalo entre envios NÃO é
+    // recusa: é "ainda não". Descartar aqui (o que o texto fixo comum faz) apagaria
+    // o passo da régua de quem só chegou tarde.
+    const adiavel =
+      chain.code === 'outside_window' ||
+      (cadencia !== undefined &&
+        (chain.code === 'daily_cap' || chain.code === 'warmup_cap' || chain.code === 'cadence_spacing'));
+    if (adiavel && chain.nextAllowedAt !== undefined) {
       await rescheduleReentry(pool, {
         tenantId,
         leadId,

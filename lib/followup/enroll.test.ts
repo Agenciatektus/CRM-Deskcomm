@@ -104,4 +104,29 @@ describe("enrollFollowupFlow", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("flow_not_active");
   });
+
+  it("recusa CADÊNCIA publicada — a porta dela é lib/cadencia/inscrever.ts", async () => {
+    // Esta função é chamada pela inscrição manual de follow-up e pela ação de
+    // automação, em volume: aceitar cadência aqui pulava teto do dia, prévia,
+    // base legal e a conversa no número da cadência.
+    const db = fakeDb({
+      id: POINTER,
+      organization_id: ORG,
+      status: "active",
+      active_version_id: VERSION,
+      surface: "cadence",
+    });
+    const result = await enrollFollowupFlow(db as never, {
+      organizationId: ORG,
+      pointerId: POINTER,
+      contactId: CONTACT,
+      actorUserId: null,
+      requestId: "r1",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("cadencia_use_a_tela_do_funil");
+      expect(result.status).toBe(422);
+    }
+  });
 });

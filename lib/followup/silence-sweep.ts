@@ -169,6 +169,8 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
         .from("followup_flow_pointers")
         .select("id, organization_id, active_version_id, trigger_config")
         .eq("status", "active")
+        // Cadência só inscreve pela própria porta (`lib/cadencia/inscrever.ts`).
+        .neq("surface", "cadence")
         .not("active_version_id", "is", null);
       if (error) throw new Error(error.message);
 
