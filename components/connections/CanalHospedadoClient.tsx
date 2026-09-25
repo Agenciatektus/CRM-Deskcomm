@@ -33,8 +33,20 @@ import { ChannelAiAccess } from "./ChannelAiAccess";
  * o motivo, em vez de um toast que some em três segundos.
  */
 
+/** Um número conectado. A organização pode ter vários (vendas, pós-venda, filial). */
+interface NumeroConectado {
+  channel_session_id: string;
+  instance_name: string | null;
+  phone_number: string | null;
+  display_name: string | null;
+  status: string | null;
+  has_token: boolean;
+}
+
 interface Estado {
   channel_session_id?: string | null;
+  /** Ausente em servidor anterior a esta versão — aí vale o número solto abaixo. */
+  sessions?: NumeroConectado[];
   label: string;
   connected: boolean;
   instance_name: string | null;
@@ -106,6 +118,20 @@ export function CanalHospedadoClient() {
 
   const rotulo = estado?.label ?? t("sua plataforma");
   const conectado = estado?.connected ?? false;
+  const numeros: NumeroConectado[] =
+    estado?.sessions ??
+    (conectado && estado?.channel_session_id
+      ? [
+          {
+            channel_session_id: estado.channel_session_id,
+            instance_name: estado.instance_name,
+            phone_number: estado.phone_number,
+            display_name: estado.display_name,
+            status: estado.status,
+            has_token: estado.has_token,
+          },
+        ]
+      : []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,16 +154,25 @@ export function CanalHospedadoClient() {
           )}
         </div>
 
-        {conectado && (
-          <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-            <p className="font-medium">{estado?.display_name ?? t("Número conectado")}</p>
-            <p className="text-xs text-muted-foreground">
-              {estado?.phone_number ?? t("aguardando o número")} · {estado?.status ?? "—"}
-            </p>
+        {numeros.map((n) => (
+          <div key={n.channel_session_id} className="flex flex-col gap-3">
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">{n.display_name ?? t("Número conectado")}</p>
+              <p className="text-xs text-muted-foreground">
+                {n.phone_number ?? t("aguardando o número")} · {n.status ?? "—"}
+              </p>
+            </div>
+            <ChannelAiAccess channelId={n.channel_session_id} />
           </div>
-        )}
+        ))}
 
-        {estado?.channel_session_id && <ChannelAiAccess channelId={estado.channel_session_id} />}
+        {numeros.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "Pode conectar mais de um número. O CRM reconhece cada número pelo código: se for um que já está aqui, ele é reconectado; se for outro, vira um canal novo.",
+            )}
+          </p>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
@@ -158,7 +193,11 @@ export function CanalHospedadoClient() {
 
           <div>
             <Button onClick={() => conectar("codigo")} disabled={salvando || codigo.length < 8}>
-              {salvando ? t("Conectando…") : conectado ? t("Reconectar") : t("Conectar")}
+              {salvando
+                ? t("Conectando…")
+                : numeros.length > 0
+                  ? t("Conectar outro número ou reconectar")
+                  : t("Conectar")}
             </Button>
             <p className="mt-1.5 text-xs text-muted-foreground">
               {t(
@@ -187,9 +226,7 @@ export function CanalHospedadoClient() {
                   type="password"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  placeholder={
-                    estado?.has_token ? t("gravado — preencha para trocar") : t("cole o token")
-                  }
+                  placeholder={t("cole o token")}
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">

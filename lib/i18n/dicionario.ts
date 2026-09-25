@@ -4233,6 +4233,18 @@ export const DICIONARIO: Traducoes = {
     es: "Funciona, pero guarda aquí la llave de tu número: para cortar el acceso después hay que cambiar esa llave en tu plataforma, lo que también tumba lo que ya usa ese número. Prefiere el código.",
   },
   "Conectar com o token": { es: "Conectar con el token" },
+  "Conectar outro número ou reconectar": { es: "Conectar otro número o reconectar" },
+  "Pode conectar mais de um número. O CRM reconhece cada número pelo código: se for um que já está aqui, ele é reconectado; se for outro, vira um canal novo.":
+    {
+      es: "Puedes conectar más de un número. El CRM reconoce cada número por el código: si es uno que ya está aquí, se reconecta; si es otro, se convierte en un canal nuevo.",
+    },
+  "este número já está conectado em outra organização deste CRM — desconecte lá antes de conectar aqui":
+    {
+      es: "este número ya está conectado en otra organización de este CRM — desconéctalo allí antes de conectarlo aquí",
+    },
+  "este número já é um canal desta organização — use a reconexão dele": {
+    es: "este número ya es un canal de esta organización — usa su reconexión",
+  },
   "sua plataforma": { es: "tu plataforma" },
   "Usar o WhatsApp que já está na": { es: "Usar el WhatsApp que ya está en" },
   "O mesmo número que você já usa, sem ler QR de novo e sem tirar nada do ar. As conversas passam a aparecer aqui, e o que você já tinha configurado na sua plataforma continua funcionando igual.": {

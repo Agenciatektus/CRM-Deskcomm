@@ -37,8 +37,11 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import {
   HOSTED_CHANNEL_LABEL,
-  findHostedSession,
+  escolherSessaoHospedada,
   ligarRecebimentoHospedado,
+  listHostedSessions,
+  numeroHospedadoEmOutraOrganizacao,
+  numeroHospedadoJaEhCanalDaOrganizacao,
   saveHostedSession,
   trocarCodigoHospedado,
   validateHostedToken,
@@ -104,6 +107,37 @@ function urlDoWebhook(req: NextRequest, token: string): string | null {
   return `${usavel.replace(/\/+$/, "")}/api/v1/webhooks/channel/${token}`;
 }
 
+/**
+ * A gravação falhou. O caso que a pessoa consegue resolver ganha motivo legível: o
+ * número já é canal de OUTRA organização desta instalação (uma instância pertence a
+ * um canal só). O resto segue como erro interno.
+ */
+function falhaAoGravar(
+  erro: string,
+  t: (texto: string) => string,
+  requestId: string,
+): NextResponse {
+  if (numeroHospedadoEmOutraOrganizacao(erro)) {
+    return fail(
+      "conflict",
+      t(
+        "este número já está conectado em outra organização deste CRM — desconecte lá antes de conectar aqui",
+      ),
+      409,
+      { requestId },
+    );
+  }
+  if (numeroHospedadoJaEhCanalDaOrganizacao(erro)) {
+    return fail(
+      "conflict",
+      t("este número já é um canal desta organização — use a reconexão dele"),
+      409,
+      { requestId },
+    );
+  }
+  return fail("internal_error", erro, 500, { requestId });
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const requestId = randomUUID();
   // Conectar um canal expõe a conta da empresa: é decisão de dono, não de quem
@@ -111,13 +145,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const authz = await requireRole("admin", { requestId, resource: "channels_hosted" });
   if (!authz.ok) return authz.response;
 
-  const sessao = await findHostedSession(createAdminClient(), authz.org.orgId);
-  const conectado = !!sessao && !sessao.archivedAt;
+  const ativas = (await listHostedSessions(createAdminClient(), authz.org.orgId)).filter(
+    (s) => !s.archivedAt,
+  );
+  const sessao = ativas[0] ?? null;
+  const conectado = !!sessao;
 
   return ok(
     {
       label: HOSTED_CHANNEL_LABEL,
       connected: conectado,
+      // Todos os números conectados. Os campos soltos abaixo continuam descrevendo o
+      // PRIMEIRO, para quem lia esta rota quando só cabia um.
+      sessions: ativas.map((s) => ({
+        channel_session_id: s.id,
+        instance_name: s.instanceName,
+        phone_number: s.phoneNumber,
+        display_name: s.displayName,
+        status: s.status,
+        has_token: s.hasToken,
+      })),
       channel_session_id: conectado ? sessao.id : null,
       instance_name: conectado ? sessao.instanceName : null,
       phone_number: conectado ? sessao.phoneNumber : null,
@@ -148,12 +195,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const admin = createAdminClient();
 
-  const existenteAntes = await findHostedSession(admin, orgId);
-  // Reconectar por cima de um canal excluído RESSUSCITA a linha, e o token de
-  // caminho é preservado para não invalidar o webhook já registrado lá.
-  const pathToken = existenteAntes?.webhookPathToken ?? randomBytes(16).toString("hex");
-  const webhookUrl = urlDoWebhook(req, pathToken);
-  if (!webhookUrl) {
+  // Os canais deste tipo que a organização JÁ tem. Qual deles é o número que está
+  // chegando só se sabe depois de validar o token ou trocar o código — decidir antes
+  // era o defeito: o segundo número sobrescrevia o primeiro (ver
+  // `escolherSessaoHospedada`).
+  const sessoes = await listHostedSessions(admin, orgId);
+
+  // O endereço público é pré-condição dos dois caminhos: sem ele nem vale a pena
+  // perguntar nada lá fora.
+  if (!urlDoWebhook(req, "sonda")) {
     return fail(
       "invalid_request",
       t(
@@ -177,6 +227,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // nenhum — recebe uma credencial que só serve para pedir envio daquele
   // número, e que morre quando alguém revogar lá.
   if (parsed.data.codigo) {
+    // Token de caminho NOVO: o número só é conhecido depois da troca, e a troca já
+    // precisa do endereço. Se for a reconexão de um número que já está aqui, a linha
+    // dele é atualizada e passa a este endereço — o antigo deixa de corresponder a
+    // canal nenhum, em vez de continuar entregando num canal que não é o dele.
+    const pathTokenPareado = randomBytes(16).toString("hex");
+    const webhookUrl = urlDoWebhook(req, pathTokenPareado) as string;
     const troca = await trocarCodigoHospedado({
       codigo: parsed.data.codigo,
       webhookUrl,
@@ -195,19 +251,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const existentePareado = escolherSessaoHospedada(sessoes, {
+      instanceName: troca.instanceName,
+      phoneNumber: troca.phoneNumber,
+    });
     const { error: erroPareado } = await saveHostedSession(admin, {
       organizationId: orgId,
-      existingId: existenteAntes?.id ?? null,
+      existingId: existentePareado?.id ?? null,
       instanceName: troca.instanceName,
       vinculoId: troca.vinculoId,
       tokenEncrypted: credCifrada,
-      webhookPathToken: pathToken,
+      webhookPathToken: pathTokenPareado,
       webhookSecretEncrypted: segredoCifrado,
       phoneNumber: troca.phoneNumber,
       displayName: troca.displayName,
       connected: troca.connected,
     });
-    if (erroPareado) return fail("internal_error", erroPareado, 500, { requestId });
+    if (erroPareado) return falhaAoGravar(erroPareado, t, requestId);
 
     return ok(
       {
@@ -249,9 +309,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Este número já é um canal daqui? Então é reconexão: mesma linha, mesmo endereço
+  // (o webhook que já está lá continua valendo). Senão, canal novo com endereço novo.
+  // Reconectar por cima de um canal excluído RESSUSCITA a linha.
+  const existente = escolherSessaoHospedada(sessoes, {
+    instanceName: v.instanceName,
+    phoneNumber: v.phoneNumber,
+  });
+  // Endereço novo também quando o canal existente estava no modo PAREADO: o vínculo
+  // da plataforma continua entregando no endereço antigo com o segredo antigo, e
+  // manter o endereço faria cada entrega dele ser recusada aqui para sempre.
+  const pathToken =
+    existente?.webhookPathToken && !existente.vinculoId
+      ? existente.webhookPathToken
+      : randomBytes(16).toString("hex");
+  const webhookUrl = urlDoWebhook(req, pathToken) as string;
+
   const { error } = await saveHostedSession(admin, {
     organizationId: orgId,
-    existingId: existenteAntes?.id ?? null,
+    existingId: existente?.id ?? null,
     instanceName: v.instanceName,
     tokenEncrypted: tokenCifrado,
     webhookPathToken: pathToken,
@@ -260,7 +336,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     displayName: v.displayName,
     connected: v.connected,
   });
-  if (error) return fail("internal_error", error, 500, { requestId });
+  if (error) return falhaAoGravar(error, t, requestId);
 
   // A volta, por último e de propósito: se o registro falhar, o canal já está
   // gravado e ENVIA — e a tela diz, com todas as letras, que a entrada não foi
