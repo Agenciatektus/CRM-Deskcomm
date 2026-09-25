@@ -5178,6 +5178,8 @@ export const DICIONARIO: Traducoes = {
   "Situação desconhecida": { es: "Situación desconocida" },
   "Número sem nome": { es: "Número sin nombre" },
   Etapa: { es: "Etapa" },
+  "Etapa alterada": { es: "Etapa cambiada" },
+  "Etapa do negócio": { es: "Etapa del negocio" },
   "Escolha o número": { es: "Elige el número" },
   Mensagem: { es: "Mensaje" },
   "Escolha o agente": { es: "Elige el agente" },

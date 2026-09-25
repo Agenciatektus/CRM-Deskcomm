@@ -273,6 +273,7 @@ export function KanbanBoard({
           stageName={
             data.stages.find((s) => s.id === leadDoDossie.stage_id)?.name ?? "—"
           }
+          etapas={data.stages.filter((s) => !s.is_archived)}
           ownerNames={ownerNames}
         />
       )}

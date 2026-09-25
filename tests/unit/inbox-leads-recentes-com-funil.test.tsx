@@ -46,7 +46,8 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+// `usePermission` entra com o seletor de etapa do painel; aqui o assunto é outro.
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }), usePermission: () => false }));
 
 function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
