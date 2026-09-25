@@ -76,7 +76,7 @@ const bodySchema = z
      * Precisa estar declarado: o schema é `.strict()`, e campo desconhecido
      * devolve 422 — sem esta linha, a tela salvaria e receberia erro.
      */
-    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).optional(),
+    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).max(3).optional(),
     /**
      * TIRAR DO ARQUIVO (#979). `true` é aceito pelo schema e recusado pelo
      * handler, de propósito: quem manda `is_archived: true` quer arquivar, e

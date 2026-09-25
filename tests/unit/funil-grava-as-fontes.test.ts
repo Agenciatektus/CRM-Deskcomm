@@ -30,7 +30,7 @@ import { NextRequest } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { PATCH } from "@/app/api/v1/pipelines/[id]/route";
-import { ORG_ID, PIPE, authOk, funilRow, makeDb } from "@/tests/helpers/stages-db-double";
+import { ORG_ID, OUTRA_ORG, PIPE, authOk, funilRow, makeDb } from "@/tests/helpers/stages-db-double";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
@@ -146,5 +146,71 @@ describe("o que a porta NÃO aceita", () => {
     const escrita = escritaNoFunil(db)!;
     expect(escrita.name).toBe("Só o nome");
     expect("fontes" in escrita, "a coluna não pode ser tocada sem pedido").toBe(false);
+  });
+});
+
+describe("as cercas que a auditoria pediu", () => {
+  it("`fontes` sobrevive ao MERGE com a troca de padrão", async () => {
+    // Eleger padrao pode exigir DOIS updates, e o patch do alvo e mesclado com o
+    // da troca: `{ ...updates[i].patch, ...patchDoAlvo }`. Nenhum outro teste
+    // exercita esse merge, entao qualquer um dos dois lados podia sumir dali com
+    // a suite inteira verde.
+    //
+    // O QUE ESTE TESTE PEGA, medido por controle negativo: descartar QUALQUER um
+    // dos dois lados do merge reprova aqui.
+    //
+    // O QUE ELE NAO PEGA, e vale estar escrito: INVERTER a ordem do spread passa
+    // verde. Nao e buraco do teste — hoje os dois conjuntos de chaves sao
+    // disjuntos (`is_default`/`is_client_pipeline` de um lado; `name`,
+    // `description`, `fontes`, `position` do outro), entao a ordem nao decide
+    // nada. Se um dia a mesma chave puder vir dos dois lados, e ESTE comentario
+    // que avisa que a ordem passa a importar e o teste precisa crescer.
+    const db = makeDb({
+      pipelines: [
+        funilRow({ id: PIPE, name: "Vendas" }),
+        funilRow({ id: "66666666-6666-4666-8666-666666666666", name: "Antigo", is_default: true }),
+      ],
+    });
+    vi.mocked(createClient).mockResolvedValue(db.client as never);
+
+    const r = await patch(PIPE, { is_default: true, fontes: ["whatsapp", "instagram_direct"] });
+    expect(r.status).toBe(200);
+
+    const noAlvo = db.escritas.find(
+      (e) => e.table === "crm_pipelines" && e.filtros.some(([c, v]) => c === "id" && v === PIPE),
+    );
+    const corpo = noAlvo!.patch as Record<string, unknown>;
+    expect(corpo.is_default, "a troca de padrão precisa continuar valendo").toBe(true);
+    expect(corpo.fontes, "as fontes não podem se perder no merge").toEqual([
+      "whatsapp",
+      "instagram_direct",
+    ]);
+  });
+
+  it("funil de OUTRA organização é 404, e nada é escrito", async () => {
+    // A escrita ja e filtrada por `organization_id`, mas a recusa acontece antes:
+    // a leitura e escopada, o funil alheio nao esta na lista, e a rota devolve o
+    // MESMO 404 de funil inexistente — sem confirmar que ele existe em algum
+    // lugar. Esta e a camada que faltava em teste.
+    const db = makeDb({
+      pipelineOrg: OUTRA_ORG,
+      pipelines: [funilRow({ id: PIPE, name: "Da outra org", organization_id: OUTRA_ORG })],
+    });
+    vi.mocked(createClient).mockResolvedValue(db.client as never);
+
+    const r = await patch(PIPE, { fontes: ["whatsapp", "instagram_direct"] });
+    expect(r.status).toBe(404);
+    expect(escritaNoFunil(db), "nem uma escrita pode sair de um 404").toBeUndefined();
+  });
+
+  it("array gigante é recusado no boundary, não deduplicado depois", async () => {
+    // Sao tres fontes no vocabulario; um array maior so pode ser repeticao. Sem
+    // `.max(3)` o zod valida elemento a elemento e o `Set` reduz a 1 no fim —
+    // trabalho proporcional ao que o cliente mandar, por uma escrita de 1 item.
+    const db = dbComOFunil();
+    const r = await patch(PIPE, { fontes: Array(5000).fill("whatsapp") });
+
+    expect(r.status).toBe(422);
+    expect(escritaNoFunil(db)).toBeUndefined();
   });
 });
