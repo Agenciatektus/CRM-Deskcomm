@@ -2,6 +2,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
  * GET   /api/v1/cadencias/:id — a cadência com rascunho, política e o grafo no ar.
  * PATCH /api/v1/cadencias/:id — edita rascunho, gatilho, política e número (manager+).
+ *   Na condução ("quando o lead responder"), trocar quem atende, o agente, a
+ *   instrução ou passar de assistido para automático exige ADMIN
+ *   (`lib/cadencia/conducao/alteracao.ts`); objetivo e etapa-alvo, manager.
  *
  * Publicar e desligar são as rotas de fluxo de sempre
  * (`/api/v1/ai/followup-flows/:id/publish|disable`), que para `surface='cadence'`
@@ -18,6 +21,9 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { alteracaoDaConducao, type AlteracaoDaConducao } from "@/lib/cadencia/conducao/alteracao";
+import { conducaoDe } from "@/lib/cadencia/conducao/settings";
+import { etapaDoGatilho, validarConducaoDoRascunho } from "@/lib/cadencia/conducao/validar";
 import { validarEtapasDeSaida, validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { MENSAGEM_ETIQUETA_ENTRA_E_SAI, etiquetaEntraESai } from "@/lib/cadencia/saidas";
 import { cadenceSettingsSchema } from "@/lib/cadencia/settings";
@@ -132,6 +138,33 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
     if (!sessao) return fail("not_found", t("Número não encontrado."), 404, { requestId });
   }
 
+  // CONDUÇÃO. Política salva SEM `conducao` mantém a que estava gravada: a
+  // tela (ou um cliente antigo) que não conhece o campo não pode desligar a IA
+  // nem trocar o agente por omissão.
+  let alteracao: AlteracaoDaConducao | null = null;
+  if (mudancas.cadence_settings) {
+    const conducaoGravada = (atual.cadence_settings as { conducao?: unknown } | null)?.conducao;
+    if (mudancas.cadence_settings.conducao === undefined && conducaoGravada !== undefined && conducaoGravada !== null) {
+      mudancas.cadence_settings = { ...mudancas.cadence_settings, conducao: conducaoGravada as never };
+    }
+    alteracao = alteracaoDaConducao(conducaoDe(atual.cadence_settings), conducaoDe(mudancas.cadence_settings));
+    if (alteracao.exigeAdmin) {
+      const adm = await requireRole("admin", { requestId, resource: "cadencias" });
+      if (!adm.ok) return adm.response;
+    }
+    const nova = mudancas.cadence_settings.conducao;
+    if (nova?.quem_atende === "ia" && alteracao.mudou) {
+      const problema = await validarConducaoDoRascunho(
+        admin,
+        orgId,
+        atual.pipeline_id as string | null,
+        nova,
+        etapaDoGatilho(mudancas.trigger_config ?? atual.trigger_config),
+      );
+      if (problema) return fail("cadencia_conducao_invalida", t(problema), 422, { requestId });
+    }
+  }
+
   if (mudancas.trigger_config !== undefined) {
     const problema = await validarGatilhoDaCadencia(
       admin,
@@ -189,7 +222,18 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
     resourceType: "followup_flow_pointer",
     resourceId: id,
     requestId,
-    metadata: { surface: "cadence", campos: Object.keys(mudancas) },
+    metadata: {
+      surface: "cadence",
+      campos: Object.keys(mudancas),
+      ...(alteracao?.mudou
+        ? {
+            conducao_alterada: true,
+            campos_da_conducao: alteracao.campos,
+            modo_de: alteracao.modoDe,
+            modo_para: alteracao.modoPara,
+          }
+        : {}),
+    },
   });
   return ok(salva, { requestId });
 }
