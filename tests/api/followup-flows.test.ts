@@ -80,6 +80,10 @@ function makeDb(pointers: Row[], versions: Row[], stages: Row[] = []) {
 
     function matches(row: Row): boolean {
       return filters.every(([k, v]) => {
+        if (k.startsWith("!")) {
+          const col = k.slice(1);
+          return (col === "surface" ? (row.surface ?? "followup") : row[col]) !== v;
+        }
         if (k === "surface") return (row.surface ?? "followup") === v;
         if (v instanceof Set) return v.has(row[k]);
         return row[k] === v;
@@ -176,6 +180,10 @@ function makeDb(pointers: Row[], versions: Row[], stages: Row[] = []) {
       },
       in(col: string, vals: unknown[]) {
         filters.push([col, new Set(vals)]);
+        return b;
+      },
+      neq(col: string, val: unknown) {
+        filters.push([`!${col}`, val]);
         return b;
       },
       order(col: string, opts?: { ascending?: boolean }) {

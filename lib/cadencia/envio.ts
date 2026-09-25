@@ -2,6 +2,7 @@ import type { Queryable } from "@/lib/agent-engine/queue/queue";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { contactMayBeProspected } from "@/lib/prospecting/guard";
 import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
+import { OUTCOME_DA_SAIDA, type FatosDaSaida, type MotivoDeSaida } from "./saidas";
 
 /**
  * O QUE O WORKER PRECISA SABER ANTES DE MANDAR UM PASSO DA CADÊNCIA.
@@ -141,4 +142,77 @@ export async function inscricaoJaEnviou(
     [organizationId, enrollmentId],
   );
   return rows[0]?.existe === true;
+}
+
+/**
+ * Os fatos que decidem a SAÍDA da régua, relidos do banco no instante do envio
+ * (ver `lib/cadencia/saidas.ts`). `null` quando a inscrição não é desta
+ * organização ou já não está viva — quem chama não tem o que encerrar.
+ */
+export async function fatosDaSaidaDaInscricao(
+  db: Queryable,
+  organizationId: string,
+  enrollmentId: string,
+): Promise<FatosDaSaida | null> {
+  const { rows } = await db.query<{
+    tem_lead: boolean;
+    stage_id: string | null;
+    status: string | null;
+    tags_lead: string[] | null;
+    tags_contato: string[] | null;
+    humano: boolean;
+  }>(
+    `select e.lead_id is not null and l.id is not null as tem_lead,
+            l.stage_id, l.status, l.tags as tags_lead, c.tags as tags_contato,
+            exists(
+              select 1
+                from conversations cv
+                join messages m on m.conversation_id = cv.id and m.organization_id = cv.organization_id
+               where cv.organization_id = e.organization_id
+                 and cv.contact_id = e.contact_id
+                 and m.direction = 'outbound'
+                 and m.sent_by_user_id is not null
+                 and m.created_at > e.started_at
+            ) as humano
+       from followup_enrollments e
+       join contacts c on c.id = e.contact_id and c.organization_id = e.organization_id
+       left join crm_leads l on l.id = e.lead_id and l.organization_id = e.organization_id
+      where e.organization_id = $1 and e.id = $2
+        and e.status in ('active','waiting_reply','dormente','paused_handoff','paused_manual')`,
+    [organizationId, enrollmentId],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    lead: r.tem_lead
+      ? { stage_id: r.stage_id as string, status: r.status as string, tags: r.tags_lead ?? [] }
+      : null,
+    tagsDoContato: r.tags_contato ?? [],
+    humanoFalouDepois: r.humano === true,
+  };
+}
+
+/**
+ * Encerra a inscrição pela saída. O update direto é seguro contra o motor: a
+ * trigger `trg_followup_revision` avança a `revision`, e a escrita atrasada de
+ * quem estava com a inscrição em mãos cai no CAS (`followup_stale`) em vez de
+ * ressuscitá-la. Idempotente: só encerra o que ainda está vivo.
+ */
+export async function encerrarInscricaoPorSaida(
+  db: Queryable,
+  organizationId: string,
+  enrollmentId: string,
+  motivo: MotivoDeSaida,
+): Promise<boolean> {
+  const { rows } = await db.query<{ id: string }>(
+    `update followup_enrollments
+        set status = 'cancelled', outcome = $3, cancel_reason = $4,
+            next_eval_at = null, claimed_until = null,
+            completed_at = now(), updated_at = now()
+      where organization_id = $1 and id = $2
+        and status in ('active','waiting_reply','dormente','paused_handoff','paused_manual')
+      returning id`,
+    [organizationId, enrollmentId, OUTCOME_DA_SAIDA[motivo], motivo],
+  );
+  return rows.length > 0;
 }

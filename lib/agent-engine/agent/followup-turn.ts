@@ -49,8 +49,11 @@ import { loadReentryTemplate, pickReentryVariant } from './reentry-template';
 import {
   aptidaoDoContatoParaCadencia,
   carregarCadenciaDoEnvio,
+  encerrarInscricaoPorSaida,
+  fatosDaSaidaDaInscricao,
   inscricaoJaEnviou,
 } from '@/lib/cadencia/envio';
+import { motivoDeSaida, saidasDe } from '@/lib/cadencia/saidas';
 import { comSaida } from '@/lib/prospecting/rodape-de-saida';
 import {
   classifyFollowupReply,
@@ -287,15 +290,23 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
       if (payload.followup_enrollment_id === undefined) {
         throw new Error('passo de cadência sem followup_enrollment_id no payload');
       }
-      const decisao = await prepararEnvioDaCadencia(
-        pool,
-        deps,
-        job,
-        clock,
-        target,
-        payload.cadencia.pointer_id,
-        payload.followup_enrollment_id,
-      );
+      // SEM TEXTO NÃO HÁ PASSO. A cascata de anonimização (LGPD) apaga o
+      // `fixed_body` dos jobs do contato; um job que estava rodando naquela hora
+      // pode voltar para a fila numa retentativa. Sem esta guarda ele cairia no
+      // turno dirigido por fluxo SEM texto fixo — que é o caminho que gera
+      // mensagem pela IA —, falando com quem acabou de ser anonimizado.
+      const decisao: DecisaoDaCadencia =
+        payload.fixed_body === undefined
+          ? { kind: 'resolvido', result: { kind: 'skipped', reason: 'Passo de cadência sem texto (removido pela LGPD).' } }
+          : await prepararEnvioDaCadencia(
+              pool,
+              deps,
+              job,
+              clock,
+              target,
+              payload.cadencia.pointer_id,
+              payload.followup_enrollment_id,
+            );
       if (decisao.kind === 'resolvido') {
         const complete = deps.completeFollowupTurn;
         if (!complete || payload.node_id === undefined || payload.followup_enrollment_id === undefined) {
@@ -428,7 +439,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
 /** O que o envio de um passo de cadência leva para a cadeia de guardrails. */
 export interface OpcoesDaCadencia {
   limiteDiario: number;
-  espacamento: { minMs: number; maxMs: number };
+  espacamento: { minMs: number; maxMs: number; semente: string };
   /** 1ª mensagem DESTA inscrição: sai com o rodapé de saída (opt-out), não editável. */
   comRodape: boolean;
 }
@@ -487,6 +498,18 @@ async function prepararEnvioDaCadencia(
     return pular('numero_divergente', 'A conversa deste contato é de outro número.');
   }
 
+  // SAÍDA ANTES DA JANELA: quem fechou o negócio, ganhou a etiqueta de saída ou
+  // foi assumido por uma pessoa não fica esperando a janela abrir para então
+  // ser pulado — a régua acaba aqui. O handler de eventos já encerra na hora;
+  // isto cobre o evento que chegou DEPOIS deste job ser enfileirado.
+  const fatos = await fatosDaSaidaDaInscricao(pool, tenantId, enrollmentId);
+  if (fatos === null) return pular('inscricao_encerrada', 'A inscrição já não está ativa.');
+  const saida = motivoDeSaida(saidasDe(cadencia.settings), fatos);
+  if (saida !== null) {
+    await encerrarInscricaoPorSaida(pool, tenantId, enrollmentId, saida);
+    return pular(saida, 'A cadência deste contato terminou (condição de saída).');
+  }
+
   const fuso = await fusoDaOrganizacao(pool, tenantId, runLog);
   const abertura = proximaAberturaDoFollowup({ send_window: cadencia.settings.janela }, fuso, agora);
   if (abertura !== null) return adiar(abertura, 'cadence_send_window');
@@ -503,6 +526,7 @@ async function prepararEnvioDaCadencia(
       espacamento: {
         minMs: cadencia.settings.espacamento.min_s * 1000,
         maxMs: cadencia.settings.espacamento.max_s * 1000,
+        semente: job.id,
       },
       comRodape: !(await inscricaoJaEnviou(pool, tenantId, enrollmentId)),
     },

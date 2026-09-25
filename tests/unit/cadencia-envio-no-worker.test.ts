@@ -67,6 +67,9 @@ interface Cenario {
   contato: Record<string, unknown> | null;
   telefoneSuprimido: boolean;
   jaTeveEnvio: boolean;
+  /** Linha de `fatosDaSaidaDaInscricao`; `null` = inscrição já encerrada. */
+  fatosDaSaida: Record<string, unknown> | null;
+  semTexto?: boolean;
 }
 
 function cenarioPadrao(): Cenario {
@@ -90,13 +93,22 @@ function cenarioPadrao(): Cenario {
     },
     telefoneSuprimido: false,
     jaTeveEnvio: false,
+    fatosDaSaida: { tem_lead: true, stage_id: "s-1", status: "open", tags_lead: [], tags_contato: [], humano: false },
   };
 }
+
+/** Encerramentos por saída que o worker gravou (update direto em followup_enrollments). */
+let encerramentos: unknown[][] = [];
 
 let cenario = cenarioPadrao();
 
 function fakePool() {
-  const query = vi.fn(async (sql: string): Promise<{ rows: Array<Record<string, unknown>>; rowCount?: number }> => {
+  const query = vi.fn(async (sql: string, params: unknown[] = []): Promise<{ rows: Array<Record<string, unknown>>; rowCount?: number }> => {
+    if (sql.includes("as tem_lead")) return { rows: cenario.fatosDaSaida ? [cenario.fatosDaSaida] : [] };
+    if (sql.includes("update followup_enrollments") && sql.includes("cancel_reason = $4")) {
+      encerramentos.push(params);
+      return { rows: [{ id: params[1] }] };
+    }
     if (sql.includes("d.fechada_em::text")) return { rows: [{ ...boundary, status: "open", demanda_fechada_em: null }] };
     if (sql.includes("from followup_flow_pointers p")) return { rows: cenario.cadencia ? [cenario.cadencia] : [] };
     if (sql.includes("event_type = 'action_sent'")) {
@@ -123,7 +135,7 @@ function job(): JobRow {
       followup_enrollment_id: "11111111-1111-4111-8111-111111111111",
       node_id: "a1",
       purpose: "send_message",
-      fixed_body: "Oi Maria, tudo bem?",
+      ...(cenario.semTexto ? {} : { fixed_body: "Oi Maria, tudo bem?" }),
       cadencia: { pointer_id: POINTER },
       service_boundary: boundary,
     },
@@ -146,6 +158,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   cenario = cenarioPadrao();
+  encerramentos = [];
   chain.mockReset();
   chain.mockImplementation(async () => ENVIADO as unknown as Record<string, unknown>);
   scheduleCronJob.mockClear();
@@ -181,7 +194,7 @@ describe("envio da cadência — o que chega à cadeia de guardrails", () => {
       body: string;
     };
     expect(args.crmDailyLimit).toBe(150);
-    expect(args.espacamentoAutomatico).toEqual({ minMs: 45_000, maxMs: 120_000 });
+    expect(args.espacamentoAutomatico).toEqual({ minMs: 45_000, maxMs: 120_000, semente: "job-1" });
     expect(args.lgpd.isProspecting).toBe(true);
     expect(args.body.startsWith("Oi Maria, tudo bem?")).toBe(true);
     expect(args.body.length).toBeGreaterThan("Oi Maria, tudo bem?".length); // rodapé de saída
@@ -247,6 +260,47 @@ describe("política da cadência antes da cadeia", () => {
 
   it("outro cadastro do MESMO telefone saiu → passo fechado", async () => {
     cenario.telefoneSuprimido = true;
+    const { resultado } = await rodar();
+    expect(resultado?.kind).toBe("skipped");
+    expect(chain).not.toHaveBeenCalled();
+  });
+});
+
+describe("condições de saída — reconferidas antes de cada envio", () => {
+  it("negócio ganho depois do job enfileirado: encerra a inscrição e NÃO envia", async () => {
+    cenario.fatosDaSaida = { ...cenario.fatosDaSaida!, status: "won" };
+    const { resultado } = await rodar();
+    expect(resultado?.kind).toBe("skipped");
+    expect(chain).not.toHaveBeenCalled();
+    expect(encerramentos).toHaveLength(1);
+    expect(encerramentos[0]).toEqual([ORG, "11111111-1111-4111-8111-111111111111", "converted", "saida_negocio_ganho"]);
+  });
+
+  it("uma pessoa do time falou com o lead depois da inscrição: encerra e não envia", async () => {
+    cenario.fatosDaSaida = { ...cenario.fatosDaSaida!, humano: true };
+    const { resultado } = await rodar();
+    expect(resultado?.kind).toBe("skipped");
+    expect(chain).not.toHaveBeenCalled();
+    expect((encerramentos[0] as unknown[])[3]).toBe("saida_humano_assumiu");
+  });
+
+  it("a saída vale mesmo FORA da janela: não espera abrir para então encerrar", async () => {
+    cenario.fatosDaSaida = { ...cenario.fatosDaSaida!, status: "lost" };
+    const { resultado } = await rodar(SABADO);
+    expect(resultado?.kind).toBe("skipped");
+    expect(encerramentos).toHaveLength(1);
+  });
+
+  it("inscrição que já não está viva: passo fechado, sem encerrar de novo", async () => {
+    cenario.fatosDaSaida = null;
+    const { resultado } = await rodar();
+    expect(resultado?.kind).toBe("skipped");
+    expect(encerramentos).toHaveLength(0);
+    expect(chain).not.toHaveBeenCalled();
+  });
+
+  it("job da cadência SEM texto (apagado pela LGPD) é pulado — nunca vira turno da IA", async () => {
+    cenario.semTexto = true;
     const { resultado } = await rodar();
     expect(resultado?.kind).toBe("skipped");
     expect(chain).not.toHaveBeenCalled();

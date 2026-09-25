@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { hashEstavel } from "./render";
+import { SAIDAS_PADRAO, saidasDaCadenciaSchema } from "./saidas";
+
 /**
  * CONFIGURAÇÃO DE UMA CADÊNCIA — `followup_flow_pointers.cadence_settings`.
  *
@@ -53,6 +56,8 @@ export const cadenceSettingsSchema = z.strictObject({
     }),
   legal_basis_ref: z.string().trim().min(3).max(200),
   max_inscricoes_dia: z.number().int().min(1).max(MAX_INSCRICOES_DIA_TETO),
+  /** Opcional: cadência gravada antes dele recebe `SAIDAS_PADRAO` (ver `saidasDe`). */
+  saidas: saidasDaCadenciaSchema.optional(),
 });
 
 export type CadenceSettings = z.infer<typeof cadenceSettingsSchema>;
@@ -62,6 +67,7 @@ export const CADENCE_SETTINGS_PADRAO: Omit<CadenceSettings, "legal_basis_ref"> =
   janela: { start: "08:00", end: "18:00", weekdays: [1, 2, 3, 4, 5] },
   espacamento: { min_s: 45, max_s: 120 },
   max_inscricoes_dia: 100,
+  saidas: SAIDAS_PADRAO,
 };
 
 /**
@@ -86,4 +92,16 @@ export function decidirEspacamento(input: {
   const decorrido = input.agora.getTime() - input.ultimoEnvio.getTime();
   if (decorrido >= alvoMs) return { permite: true };
   return { permite: false, proximoEm: new Date(input.ultimoEnvio.getTime() + alvoMs) };
+}
+
+/**
+ * Sorteio FIXO por semente (job da cadência). Sem ele, cada tentativa adiada
+ * sorteava um alvo novo: quem voltou em `ultimo + 50 s` podia tirar 110 s na
+ * volta e ser adiado de novo — o intervalo real deixava de ser [min, max] e
+ * virava o MÁXIMO de vários sorteios. Com a semente, o mesmo job tem o mesmo
+ * alvo em todas as voltas, e jobs diferentes continuam espalhados.
+ */
+export function rngDaSemente(semente: string): () => number {
+  const fracao = (hashEstavel(semente) % 1_000_000) / 1_000_000;
+  return () => fracao;
 }
