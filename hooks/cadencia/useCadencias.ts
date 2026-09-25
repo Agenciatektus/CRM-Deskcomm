@@ -10,7 +10,10 @@ export type PoliticaDaCadencia = Omit<CadenceSettings, "legal_basis_ref"> & { le
 
 export type GatilhoDaCadencia =
   | { kind: "manual"; cancel_on_reply?: boolean }
-  | { kind: "stage_change"; params: { stage_id: string }; cancel_on_reply?: boolean };
+  | { kind: "stage_change"; params: { stage_id: string }; cancel_on_reply?: boolean }
+  | { kind: "tag_added"; params: { tag: string }; cancel_on_reply?: boolean }
+  | { kind: "agent_sla"; params: { threshold_minutes: number }; cancel_on_reply?: boolean }
+  | { kind: "lead_idle"; params: { threshold_minutes: number }; cancel_on_reply?: boolean };
 
 export interface Cadencia {
   id: string;

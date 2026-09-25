@@ -22,6 +22,7 @@ import { grafoDaTimeline, timelineDoGrafo, type PassoDaCadencia } from "@/lib/ca
 import { ListaDePassos } from "./ListaDePassos";
 import { PoliticaDeEnvio } from "./PoliticaDeEnvio";
 import { SaidasDaCadenciaEditor } from "./SaidasDaCadencia";
+import { GatilhoDaCadenciaEditor } from "./GatilhoDaCadencia";
 import { SAIDAS_PADRAO } from "@/lib/cadencia/saidas";
 import { PreviewDaMensagem } from "./PreviewDaMensagem";
 
@@ -144,33 +145,7 @@ function Formulario({
           <Input id="cadencia-nome" maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cadencia-gatilho">{t("Quem entra na cadência")}</Label>
-          <select
-            id="cadencia-gatilho"
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-            value={gatilho.kind === "stage_change" ? gatilho.params.stage_id : ""}
-            onChange={(e) =>
-              setGatilho(
-                e.target.value
-                  ? { kind: "stage_change", params: { stage_id: e.target.value }, cancel_on_reply: true }
-                  : { kind: "manual", cancel_on_reply: true },
-              )
-            }
-          >
-            <option value="">{t("Só quem eu inscrever (seleção no Kanban)")}</option>
-            {etapas
-              .filter((e) => !e.is_lost)
-              .map((e) => (
-                <option key={e.id} value={e.id}>
-                  {t("Todo negócio que entrar em")} {e.name}
-                </option>
-              ))}
-          </select>
-          <p className="text-xs text-text-muted">
-            {t("A cadência para sozinha quando o lead responde. Só entra quem chegar à etapa depois de publicar.")}
-          </p>
-        </div>
+        <GatilhoDaCadenciaEditor gatilho={gatilho} onChange={setGatilho} etapas={etapas} />
 
         <div className="space-y-2">
           <span className="text-sm font-medium">{t("Passos")}</span>

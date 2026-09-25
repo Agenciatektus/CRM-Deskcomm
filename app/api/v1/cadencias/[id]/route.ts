@@ -19,6 +19,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { validarEtapasDeSaida, validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
+import { MENSAGEM_ETIQUETA_ENTRA_E_SAI, etiquetaEntraESai } from "@/lib/cadencia/saidas";
 import { cadenceSettingsSchema } from "@/lib/cadencia/settings";
 import { triggerConfigSchema } from "@/lib/followup/api-schemas";
 import { flowGraphSchema } from "@/lib/followup/graph-schema";
@@ -104,7 +105,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const admin = createAdminClient();
   const { data: atual, error: atualErr } = await admin
     .from("followup_flow_pointers")
-    .select("id, status, channel_session_id, pipeline_id")
+    .select("id, status, channel_session_id, pipeline_id, trigger_config, cadence_settings")
     .eq("organization_id", orgId)
     .eq("id", id)
     .eq("surface", "cadence")
@@ -139,6 +140,16 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
       mudancas.trigger_config,
     );
     if (problema) return fail("cadencia_gatilho_invalido", t(problema), 422, { requestId });
+  }
+
+  // Com os valores FINAIS (o que muda agora sobre o que já estava gravado).
+  if (
+    etiquetaEntraESai(
+      mudancas.trigger_config ?? atual.trigger_config,
+      mudancas.cadence_settings ?? atual.cadence_settings,
+    )
+  ) {
+    return fail("cadencia_etiqueta_entra_e_sai", t(MENSAGEM_ETIQUETA_ENTRA_E_SAI), 422, { requestId });
   }
 
   const etapasDeSaida = mudancas.cadence_settings?.saidas?.etapas ?? [];

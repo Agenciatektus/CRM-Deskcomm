@@ -101,3 +101,18 @@ export function motivoDeSaida(saidas: SaidasDaCadencia, fatos: FatosDaSaida): Mo
   if (saidas.humano_assumir && fatos.humanoFalouDepois) return "saida_humano_assumiu";
   return null;
 }
+
+/**
+ * A etiqueta que COLOCA na cadência também a TIRA? Então todo inscrito entra e
+ * sai no mesmo instante, e cada um gasta uma vaga do dia. Recusado na edição e
+ * na publicação.
+ */
+export function etiquetaEntraESai(trigger: unknown, settings: unknown): boolean {
+  const t = trigger as { kind?: string; params?: { tag?: unknown } } | null;
+  if (t?.kind !== "tag_added" || typeof t.params?.tag !== "string") return false;
+  const alvo = normalizarEtiqueta(t.params.tag);
+  return saidasDe(settings).etiquetas.some((e) => normalizarEtiqueta(e) === alvo);
+}
+
+export const MENSAGEM_ETIQUETA_ENTRA_E_SAI =
+  "A etiqueta que coloca o negócio na cadência também está nas condições de saída: ele entraria e sairia no mesmo instante.";

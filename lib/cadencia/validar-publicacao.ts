@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { VARIANTE_TAMANHO_MAXIMO, VARIAVEIS_DA_CADENCIA, resolverSpintax, variaveisCitadas } from "./render";
 import { validarEtapasDeSaida } from "./gatilho";
+import { MENSAGEM_ETIQUETA_ENTRA_E_SAI, etiquetaEntraESai } from "./saidas";
 import { cadenceSettingsSchema } from "./settings";
 
 export interface ErroDePublicacaoDaCadencia {
@@ -44,6 +45,10 @@ export async function validarPublicacaoDaCadencia(
   }
 
   if (!pointer.pipeline_id) erro("cadencia_sem_funil", "A cadência precisa pertencer a um funil.");
+
+  if (etiquetaEntraESai(pointer.trigger_config, pointer.cadence_settings)) {
+    erro("cadencia_etiqueta_entra_e_sai", MENSAGEM_ETIQUETA_ENTRA_E_SAI);
+  }
 
   const etapasDeSaida = settings.success ? (settings.data.saidas?.etapas ?? []) : [];
   if (pointer.pipeline_id && etapasDeSaida.length > 0) {

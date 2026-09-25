@@ -578,4 +578,8 @@ export const GATILHOS: Record<TipoDeGatilho, string> = {
   // clínica, não quem escreveu o schema.
   case_opened: "Quando o agente pede ajuda de um humano",
   conversation_end: "Fim da conversa",
+  // Só de cadência (ver `lib/cadencia/gatilho.ts`).
+  tag_added: "Etiqueta adicionada",
+  agent_sla: "Cliente sem resposta do time",
+  lead_idle: "Lead sem responder",
 };
