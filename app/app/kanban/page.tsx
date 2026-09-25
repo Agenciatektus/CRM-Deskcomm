@@ -37,7 +37,7 @@ export default async function KanbanPickerPage() {
   if (!activeOrg) redirect("/app");
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("crm_pipelines")
     // ─── UMA LISTA SÓ, COMPARTILHADA COM A ROTA ──────────────────────────
     //
@@ -61,6 +61,24 @@ export default async function KanbanPickerPage() {
     .select(COLUNAS_DO_FUNIL)
     .eq("organization_id", activeOrg.orgId)
     .order("position");
+
+  // ─── FALHA DE CONSULTA NÃO PODE VIRAR "NENHUM FUNIL" ──────────────────────
+  //
+  // `const { data }` sozinho descartava o `error`, e o `?? []` abaixo
+  // transformava qualquer falha em lista vazia: a tela dizia, com toda a calma,
+  // que a organização não tem funil nenhum. Quem visse isso concluiria que
+  // perdeu os funis.
+  //
+  // O caso concreto não é hipotético: num banco que ainda não aplicou a 9012, o
+  // PostgREST devolve 42703 para a coluna `fontes` e a consulta INTEIRA falha —
+  // não vem linha com o campo `undefined`, não vem linha nenhuma. Esta base já
+  // teve migration gerada e não aplicada.
+  //
+  // Estourar é o comportamento certo aqui: o error boundary do App Router mostra
+  // que algo quebrou, que é a verdade, em vez de uma lista vazia que mente.
+  if (error) {
+    throw new Error(`Não consegui carregar os funis: ${error.message}`);
+  }
 
   const todos = (data ?? []) as Array<FunilDaLista & { is_archived: boolean }>;
   const funis = todos.filter((f) => !f.is_archived);

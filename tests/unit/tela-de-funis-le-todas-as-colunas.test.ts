@@ -47,7 +47,16 @@ describe("a consulta traz tudo que a tela usa", () => {
     const bloco = fonte.match(/export interface FunilDaLista \{([^}]*)\}/);
     expect(bloco, "nao achei `FunilDaLista` — o tipo mudou de forma").toBeTruthy();
 
-    const propriedades = [...bloco![1]!.matchAll(/^\s*([a-z_]+)\??:/gm)].map((m) => m[1]!);
+    // `[a-z_][a-z0-9_]*` e nao `[a-z_]+`: a primeira versao pulava EM SILENCIO
+    // todo nome com digito, e o controle negativo mostrou que uma propriedade
+    // `fontes_v2` ausente da lista passava VERDE. Uma cerca que anuncia "toda
+    // propriedade" e cobre um subconjunto e o mesmo vicio que este PR conserta.
+    //
+    // camelCase fica de fora de proposito: coluna de Postgres nesta base e
+    // snake_case, e campo DERIVADO (calculado na tela, sem coluna por tras) nao
+    // deve ser exigido na lista do SELECT. Se um dia existir coluna camelCase,
+    // e este comentario que avisa que a regex precisa crescer.
+    const propriedades = [...bloco![1]!.matchAll(/^\s*([a-z_][a-z0-9_]*)\??:/gm)].map((m) => m[1]!);
     expect(propriedades.length, "esperava o tipo com varios campos").toBeGreaterThanOrEqual(6);
 
     for (const p of propriedades) {
@@ -68,7 +77,12 @@ describe("a consulta traz tudo que a tela usa", () => {
     expect(pagina, "a pagina precisa importar a lista da rota").toContain("COLUNAS_DO_FUNIL");
     expect(pagina).toContain(".select(COLUNAS_DO_FUNIL)");
 
-    // Nenhum `.select("...")` com string literal de colunas sobrando.
+    // Nenhum `.select("...")` com string literal sobrando.
+    //
+    // Isto tambem casaria um `.select("id", { count: "exact", head: true })`
+    // legitimo. Hoje a pagina tem um `.select` so, entao nao ha falso positivo
+    // — e se alguem acrescentar uma contagem aqui, prefiro que pare e leia esta
+    // mensagem a afrouxar a regra que impede as duas listas de voltarem.
     const literais = [...pagina.matchAll(/\.select\(\s*["'`]/g)];
     expect(
       literais.length,
