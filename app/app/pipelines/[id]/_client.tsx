@@ -24,10 +24,18 @@ import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { FilterBar } from "@/components/kanban/FilterBar";
 import { BulkActionBar } from "@/components/kanban/BulkActionBar";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { CadenciasDoPipeline } from "@/components/cadencia/CadenciasDoPipeline";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@/lib/ui/icons";
 import type { LeadFilters } from "@/lib/kanban/filters";
 import { applyFilters, filtersFromParams, filtersToParams } from "@/lib/kanban/filters";
+
+/** As duas vistas do funil; o rótulo passa por `t()` no render. */
+const MODOS_DO_FUNIL: ReadonlyArray<{ id: "kanban" | "cadencias"; rotulo: string }> = [
+  { id: "kanban", rotulo: "Kanban" },
+  { id: "cadencias", rotulo: "Cadências" },
+];
 
 export function PipelinePageClient({
   pipelineId,
@@ -50,6 +58,19 @@ export function PipelinePageClient({
     [router, pathname],
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // O MODO mora na URL (`?modo=cadencias`): dá para mandar o link da cadência
+  // do funil para alguém, e voltar do navegador devolve ao Kanban.
+  const modo = searchParams.get("modo") === "cadencias" ? "cadencias" : "kanban";
+  const trocarModo = useCallback(
+    (proximo: "kanban" | "cadencias") => {
+      const params = new URLSearchParams(searchParams);
+      if (proximo === "cadencias") params.set("modo", "cadencias");
+      else params.delete("modo");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
   const [newOpen, setNewOpen] = useState(false);
 
   const filteredLeads = data ? applyFilters(data.leads, filters) : [];
@@ -95,9 +116,30 @@ export function PipelinePageClient({
         <h1 className="min-w-0 truncate text-2xl font-semibold tracking-tight">
           {data?.pipeline.name ?? initialName}
         </h1>
-        <Button onClick={() => setNewOpen(true)} disabled={!data} className="shrink-0">
-          <Plus size={16} className="mr-2" /> {t("Novo Lead")}
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <div role="tablist" aria-label={t("Modo do funil")} className="flex rounded-md border border-border p-0.5">
+            {MODOS_DO_FUNIL.map((opcao) => (
+              <button
+                key={opcao.id}
+                type="button"
+                role="tab"
+                aria-selected={modo === opcao.id}
+                onClick={() => trocarModo(opcao.id)}
+                className={cn(
+                  "h-8 rounded-sm px-3 text-sm transition-colors",
+                  modo === opcao.id ? "bg-muted font-medium text-text" : "text-text-muted hover:text-text",
+                )}
+              >
+                {t(opcao.rotulo)}
+              </button>
+            ))}
+          </div>
+          {modo === "kanban" && (
+            <Button onClick={() => setNewOpen(true)} disabled={!data} className="shrink-0">
+              <Plus size={16} className="mr-2" /> {t("Novo Lead")}
+            </Button>
+          )}
+        </div>
       </header>
       {data && (
         <NewLeadDialog
@@ -107,6 +149,20 @@ export function PipelinePageClient({
           stages={data.stages}
         />
       )}
+      {modo === "cadencias" ? (
+        data ? (
+          <CadenciasDoPipeline
+            pipelineId={pipelineId}
+            etapas={data.stages}
+            leads={data.leads.map((l) => ({ id: l.id, title: l.title }))}
+          />
+        ) : (
+          <div className="flex flex-1 animate-pulse items-center justify-center text-muted-foreground">
+            {t("Carregando…")}
+          </div>
+        )
+      ) : (
+      <>
       <FilterBar filters={filters} onChange={setFilters} leads={data?.leads ?? []} />
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
@@ -136,6 +192,8 @@ export function PipelinePageClient({
         tagsExistentes={tagsDoQuadro}
         onClear={() => setSelectedIds([])}
       />
+      </>
+      )}
     </div>
   );
 }

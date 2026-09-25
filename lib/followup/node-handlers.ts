@@ -44,6 +44,8 @@ export interface EnrollmentRow {
   pointer_id: string;
   version_id: string;
   contact_id: string;
+  /** O NEGÓCIO da inscrição (migration 9016) — só a cadência o preenche. */
+  lead_id?: string | null;
   conversation_id: string | null;
   current_node_id: string;
   status: EnrollmentStatus;
@@ -107,9 +109,17 @@ export type NodeResult =
   | { kind: "recheck"; next_eval_at: Date }
   // action dead-man: the turn never completed after MAX_ACTION_RECHECKS — give up (engine routes to markDead).
   | { kind: "dead"; reason: string }
+  // Efeito de CRM da cadência (mover etapa, etiqueta): não fala com o cliente,
+  // então não vira turno — o motor aplica e segue pela aresta `always`.
+  | { kind: "crm_effect"; effect: EfeitoDeCrm; next_node_id: string; next_eval_at: Date }
   // outcome is nullable for the 'custom' end-node case (cancel_reason carries the note instead).
   | { kind: "complete"; outcome: EnrollmentOutcome | null; cancel_reason?: string }
   | { kind: "fail"; error: string };
+
+/** O que um passo de CRM da cadência pede para o motor aplicar. */
+export type EfeitoDeCrm =
+  | { tipo: "move_stage"; stage_id: string }
+  | { tipo: "tag"; op: "add" | "remove"; tag: string };
 
 /** Backoff ladder indexed by `attempts - 1` (clamped to the last slot) — 30s..1h. */
 export const BACKOFF_MS = [30_000, 60_000, 300_000, 900_000, 3_600_000] as const;
@@ -724,6 +734,18 @@ export function processNode(input: {
     }
 
     case "action": {
+      // Passo de CRM: aplica e segue. Idempotente por natureza (mover para a
+      // mesma etapa e pôr/tirar a mesma etiqueta de novo não mudam nada), então
+      // o replay de um tick não precisa da guarda de ocupação do envio abaixo.
+      if (node.config.mode === "move_stage" || node.config.mode === "tag") {
+        const edge = selectEdge(edges, node.id, { type: "always" });
+        if (!edge) return { kind: "fail", error: `action node "${node.id}" has no outbound edge` };
+        const effect: EfeitoDeCrm =
+          node.config.mode === "move_stage"
+            ? { tipo: "move_stage", stage_id: node.config.stage_id }
+            : { tipo: "tag", op: node.config.op, tag: node.config.tag };
+        return { kind: "crm_effect", effect, next_node_id: edge.target, next_eval_at: clock() };
+      }
       // At-most-once send: enqueue the turn EXACTLY ONCE per occupancy. First entry
       // (no prior occupancy event) enqueues; a recheck fired while the turn is still in
       // flight — completeTurnForEnrollment (turn-bridge) hasn't advanced the enrollment

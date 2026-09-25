@@ -1,11 +1,8 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
-import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
-import { estadoDaJanela, formatarDecorrido } from "@/lib/channels/janela";
-import { JanelaFechadaAviso } from "@/components/inbox/JanelaFechadaAviso";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useCloseConversation } from "@/hooks/inbox/useCloseConversation";
 import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
@@ -17,12 +14,10 @@ import {
 import { useConversation, isNotFound } from "@/hooks/inbox/useConversation";
 import { ConversationList } from "./ConversationList";
 import { InboxFilters, type InboxFiltersValue, type InboxTab } from "./InboxFilters";
-import { ChatThread } from "./ChatThread";
-import { Composer, type ComposerHandle } from "./Composer";
+import { type ComposerHandle } from "./Composer";
 import { ConversationHeader } from "./ConversationHeader";
-import { RetentionNotice } from "./RetentionNotice";
+import { PainelDaConversa } from "./PainelDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
-import type { Message as ConversationMensagem } from "@/lib/types/messaging";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
@@ -165,13 +160,6 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const [helpOpen, setHelpOpen] = useState(false);
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
-  /**
-   * A mensagem escolhida para responder "em cima".
-   *
-   * Mora aqui, e não no composer, porque quem ESCOLHE é a lista de mensagens e
-   * quem MOSTRA é o composer — são irmãos, e o estado comum é do pai.
-   */
-  const [respondendo, setRespondendo] = useState<ConversationMensagem | null>(null);
 
   /**
    * A ORG tem automático de pé? Sobe para cá porque agora é a ABA que precisa —
@@ -278,11 +266,11 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   // estado local, e o botão de voltar do navegador não desfaz a seleção. É a
   // limitação conhecida deste caminho; trocar por URL mudaria o deep-link de
   // conversa, que hoje entra por `initialSelectedId` vindo da rota.
+  // A citação ("responder em cima") mora no `PainelDaConversa`, montado com
+  // `key` da conversa: trocar de seleção o desmonta e zera a citação — sem isso
+  // a resposta sairia citando mensagem de outro cliente.
   const handleSelect = useCallback((id: string | null) => {
     setSelectedId(id);
-    // Sem isto, escolher "responder" numa conversa e trocar para outra levaria
-    // a citação junto — e a resposta sairia citando mensagem de outro cliente.
-    setRespondendo(null);
   }, []);
   const handleVisibleChange = useCallback((ids: string[]) => setVisibleIds(ids), []);
   const handleFocusReply = useCallback(() => composerRef.current?.focus(), []);
@@ -297,44 +285,6 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
     if (!selectedConversation) return;
     close.mutate({ conversation_id: selectedConversation.id });
   }, [close, selectedConversation]);
-
-  // A janela vence SOZINHA com a aba aberta. Sem este relógio, quem deixa o
-  // inbox aberto a tarde inteira seguiria com o composer liberado numa conversa
-  // que já venceu — e o bloqueio só apareceria no próximo recarregamento.
-  const [agoraJanela, setAgoraJanela] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setAgoraJanela(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
-
-  // A janela de 24h fecha o composer, e o motivo DIZ há quanto tempo fechou.
-  //
-  // Antes disto o texto livre saía, o CRM marcava `failed` e o operador via um
-  // `131047` — descobrindo a regra pelo erro, uma mensagem por vez. Barrar aqui
-  // é o pedido explícito do dono: se não dá para enviar, que não deixe tentar.
-  //
-  // Reusa o `blockedReason` que já existe (contato bloqueado/anonimizado) em vez
-  // de um segundo mecanismo de bloqueio: dois caminhos para desabilitar o mesmo
-  // composer divergem, e o segundo esquece de cobrir o áudio ou o anexo.
-  const janela = estadoDaJanela(
-    selectedConversation?.channel_sessions?.provider ?? null,
-    selectedConversation?.last_inbound_at ?? null,
-    agoraJanela,
-  );
-  const motivoDaJanela =
-    janela.tipo === "fechada"
-      ? fonteDeTemplates(selectedConversation?.channel_sessions?.provider) === null
-        ? t("Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.")
-        : janela.fechadaHaMs === null
-        ? t("O cliente ainda não escreveu — a janela de 24h nunca abriu. Só um modelo aprovado sai daqui.")
-        : `${t("A janela de 24h fechou há")} ${formatarDecorrido(janela.fechadaHaMs)}. ${t("Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.")}`
-      : null;
-
-  const blockedReason = selectedConversation?.contacts?.is_blocked
-    ? t("Contato bloqueado — envio de mensagens desabilitado.")
-    : selectedConversation?.contacts?.is_anonymized
-      ? t("Contato anonimizado — não é possível enviar mensagens.")
-      : null;
 
   // Altura da grade: a conta desconta TUDO que fica acima e abaixo dela.
   //   3.5rem            TopBar (`h-14`, em components/shell/TopBar.tsx)
@@ -490,39 +440,12 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         {selectedConversation ? (
           <>
             <ConversationHeader conversation={selectedConversation} />
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <ChatThread
-                conversationId={selectedConversation.id}
-                onResponder={setRespondendo}
-                // O cartão da passagem escolhe o gesto a partir de quem é o dono
-                // da conversa: sem dono convida a assumir, com outro dono diz
-                // quem atende. Sem estes dois campos ele cairia no estado mais
-                // conservador e ficaria mudo justamente para quem mais precisa.
-                dono={{
-                  userId: selectedConversation.assigned_to_user_id ?? null,
-                  nome: selectedConversation.assigned_to_user_name ?? null,
-                }}
-                contatoId={selectedConversation.contacts?.id ?? null}
-              />
-            </div>
-            <RetentionNotice conversationId={selectedConversation.id} />
-            {motivoDaJanela && (
-              <JanelaFechadaAviso
-                conversationId={selectedConversation.id}
-                provider={selectedConversation.channel_sessions?.provider ?? null}
-                motivo={motivoDaJanela}
-              />
-            )}
-            <Composer
+            {/* A conversa e o campo de resposta — a MESMA peça do dossiê do
+                negócio no Kanban. Ver `PainelDaConversa`. */}
+            <PainelDaConversa
+              key={selectedConversation.id}
               ref={composerRef}
-              conversationId={selectedConversation.id}
-              blockedReason={supportReadonly ? "Acompanhamento somente leitura" : blockedReason}
-              janelaFechada={motivoDaJanela}
-              disabled={selectedConversation.status === "closed"}
-              contactName={selectedConversation.contacts?.name ?? null}
-              respondendo={respondendo}
-              onCancelarResposta={() => setRespondendo(null)}
-              currentContactId={selectedConversation.contact_id}
+              conversation={selectedConversation}
             />
           </>
         ) : selectionNotFound ? (

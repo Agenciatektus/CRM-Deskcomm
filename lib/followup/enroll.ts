@@ -46,12 +46,26 @@ export async function enrollFollowupFlow(
 
   const { data: pointer, error: pointerErr } = await supabase
     .from("followup_flow_pointers")
-    .select("id, status, active_version_id")
+    .select("id, status, active_version_id, surface")
     .eq("organization_id", organizationId)
     .eq("id", pointerId)
     .maybeSingle();
   if (pointerErr) return { ok: false, code: "internal_error", message: pointerErr.message, status: 500 };
   if (!pointer) return { ok: false, code: "not_found", message: "Fluxo não encontrado.", status: 404 };
+
+  // CADÊNCIA NÃO ENTRA POR AQUI. A porta dela é `lib/cadencia/inscrever.ts`,
+  // que aplica o que esta não sabe: teto do dia, prévia com confirmação, base
+  // legal, conversa no número da cadência e corte por data de publicação. Esta
+  // função é chamada pela inscrição manual de follow-up e pela ação de automação
+  // (em volume) — deixá-la aceitar cadência era abrir uma segunda porta sem freio.
+  if (pointer.surface === "cadence") {
+    return {
+      ok: false,
+      code: "cadencia_use_a_tela_do_funil",
+      message: "Cadências de prospecção recebem inscrição pela tela do funil.",
+      status: 422,
+    };
+  }
 
   if (pointer.status !== "active" || !pointer.active_version_id) {
     return {

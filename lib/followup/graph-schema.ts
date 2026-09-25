@@ -232,6 +232,29 @@ export const actionConfigSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     mode: z.literal('text'),
     body: z.string().min(1).max(4000),
+    /**
+     * Variações do MESMO passo (cadência): `body` é a 1ª, estas são as demais.
+     * A escolha é determinística por enrollment+nó (`lib/cadencia/render.ts`),
+     * então o preview é o que sai. Cada uma aceita spintax `{a|b}` e as
+     * variáveis de `VARIAVEIS_DA_CADENCIA`. Opcional: grafo sem o campo parseia
+     * byte-idêntico ao de antes.
+     */
+    variants: z.array(z.string().min(1).max(1000)).min(1).max(9).optional(),
+  }),
+  /**
+   * Efeitos de CRM (cadência) — não falam com o cliente, então não viram turno:
+   * o motor aplica e segue. A etapa é conferida contra a organização e o
+   * pipeline da cadência na hora de aplicar; etapa de perda é recusada ali
+   * (ela exige motivo, e passo automático não tem motivo para dar).
+   */
+  z.strictObject({
+    mode: z.literal('move_stage'),
+    stage_id: z.string().uuid(),
+  }),
+  z.strictObject({
+    mode: z.literal('tag'),
+    op: z.enum(['add', 'remove']),
+    tag: z.string().trim().min(1).max(60),
   }),
   z.strictObject({
     mode: z.literal('ai_message'),

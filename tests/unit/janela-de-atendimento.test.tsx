@@ -147,10 +147,12 @@ describe("os elos que somem sem barulho", () => {
   });
 
   it("o composer é BLOQUEADO quando a janela fechou", () => {
+    // A decisão saiu do `InboxLayout` para o `PainelDaConversa` — a peça que o
+    // Inbox E o dossiê do Kanban montam. O elo tem de valer nas duas telas.
     // Pedido explícito do dono: se não dá para enviar, que não deixe tentar.
     // Reusa o `blockedReason` que já existe — um segundo mecanismo de bloqueio
     // divergiria, e o segundo esqueceria de cobrir o áudio ou o anexo.
-    const fonte = readFileSync("components/inbox/InboxLayout.tsx", "utf8");
+    const fonte = readFileSync("components/inbox/PainelDaConversa.tsx", "utf8");
     expect(fonte).toMatch(/motivoDaJanela/);
     // Por prop PRÓPRIA, não por `blockedReason`: a primeira versão passava por
     // ali e levava a nota interna junto, que nunca chega ao cliente.
@@ -162,7 +164,7 @@ describe("os elos que somem sem barulho", () => {
   it("e o bloqueio VENCE sozinho com a aba aberta", () => {
     // Sem relógio, quem deixa o inbox aberto a tarde inteira seguiria com o
     // composer liberado numa conversa que já venceu.
-    const fonte = readFileSync("components/inbox/InboxLayout.tsx", "utf8");
+    const fonte = readFileSync("components/inbox/PainelDaConversa.tsx", "utf8");
     expect(fonte).toMatch(/setAgoraJanela/);
     expect(fonte).toMatch(/setInterval/);
   });
@@ -182,7 +184,7 @@ describe("os elos que somem sem barulho", () => {
   it("barrar OFERECE a saída — o seletor de modelo aprovado", () => {
     // Barrar sem oferecer deixa o operador sem caminho: ele lê "só modelo
     // aprovado sai daqui" e não tem como mandar um.
-    const fonte = readFileSync("components/inbox/InboxLayout.tsx", "utf8");
+    const fonte = readFileSync("components/inbox/PainelDaConversa.tsx", "utf8");
     // A GUARDA junto com a tag: `{false && (` deixava a tag na linha seguinte e
     // o caso passava verde com a saída removida da tela.
     expect(fonte).toMatch(/\{motivoDaJanela && \(\s*\n\s*<JanelaFechadaAviso/);
