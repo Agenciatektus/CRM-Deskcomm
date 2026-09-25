@@ -28,8 +28,26 @@ import type { createClient } from "@/lib/supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** `position` entra: a reordenação calcula em cima dela. */
-const COLUNAS =
+/**
+ * As colunas de `crm_pipelines` que a TELA precisa — uma lista só, de propósito.
+ *
+ * `position` entra: a reordenação calcula em cima dela.
+ *
+ * ─── POR QUE ISTO É EXPORTADO ──────────────────────────────────────────────
+ *
+ * `app/app/kanban/page.tsx` fazia o próprio `.select(...)` com uma lista
+ * literal, e as duas divergiram: `fontes` estava aqui e faltava lá. O efeito
+ * era mudo e enganoso — o componente recebia `fontes: undefined`, caía no
+ * default `?? ["whatsapp"]` e desenhava a caixa desmarcada mesmo com o valor
+ * gravado no banco. Quem clicava via a caixa marcar (estado local) e voltar
+ * sozinha no primeiro refresh, sem erro nenhum.
+ *
+ * Não é a primeira vez: o comentário de `is_client_pipeline` naquele arquivo
+ * conta que ELA foi acrescentada pelo mesmo motivo, e o selo não aparecia até
+ * alguém notar. Duas listas de colunas para a mesma tela é o defeito; manter as
+ * duas em dia seria só adiá-lo.
+ */
+export const COLUNAS_DO_FUNIL =
   "id, name, slug, description, position, is_default, is_client_pipeline, is_archived, fontes";
 
 /**
@@ -41,7 +59,7 @@ const COLUNAS =
 export async function lerFunis(supabase: Supabase, orgId: string): Promise<FunilEditavel[]> {
   const { data, error } = await supabase
     .from("crm_pipelines")
-    .select(COLUNAS)
+    .select(COLUNAS_DO_FUNIL)
     .eq("organization_id", orgId)
     .order("position", { ascending: true });
   if (error) throw new Error(error.message);
