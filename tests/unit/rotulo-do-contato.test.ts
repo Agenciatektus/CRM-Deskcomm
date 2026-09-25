@@ -212,8 +212,8 @@ describe("a sétima cópia não nasce", () => {
     // pessoa. A tela é irmã da `CanalParceiroClient` acima e herdou o padrão dela.
     {
       arquivo: "components/connections/CanalHospedadoClient.tsx",
-      trecho: 'estado?.display_name ?? t("Número conectado")',
-      motivo: "nome do CANAL conectado, na tela irmã da CanalParceiroClient",
+      trecho: 'n.display_name ?? t("Número conectado")',
+      motivo: "nome do CANAL conectado (um por número), na tela irmã da CanalParceiroClient",
     },
     {
       arquivo: "components/connections/CanalInstagramClient.tsx",

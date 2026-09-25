@@ -36,7 +36,8 @@ function adminFalso() {
         },
         update(linha: Record<string, unknown>) {
           gravado.push(linha);
-          return { eq: () => Promise.resolve({ error: null }) };
+          // `.eq(id).eq(organization_id)`: o update filtra a organização também.
+          return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
         },
       };
     },

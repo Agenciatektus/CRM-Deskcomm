@@ -177,6 +177,60 @@ export async function validateVerdashToken(token: string): Promise<VerdashValida
   };
 }
 
+
+/**
+ * Quais webhooks da instância são DESTA instalação e devem sair antes do novo.
+ *
+ * "Desta instalação" = mesma origem (esquema + host + porta) que a URL nova e caminho
+ * de canal. Comparar a URL EXATA, como era antes, deixava para trás o webhook de uma
+ * conexão anterior com outro token de caminho — e foi assim que, em 25/09/2026, um
+ * número passou a entregar no canal de OUTRO número com o segredo velho: toda entrega
+ * recusada, 55 em vinte minutos, e as conversas dele sumindo do inbox.
+ *
+ * Seguro deixar sair qualquer webhook de canal desta origem porque uma instância
+ * pertence a UM canal por instalação (índice `channel_sessions_verdash_instance_unique`).
+ * O da Verdash e o de qualquer outro sistema têm outra origem ou outro caminho, e ficam.
+ *
+ * Comparação por `URL.origin`, nunca por prefixo de string: `https://crm.x@evil.com/…`
+ * e `https://crm.x.evil.com/…` passariam num `startsWith`.
+ */
+export function webhooksDestaInstalacao(
+  existentes: ReadonlyArray<{ id?: string; url?: string }>,
+  urlNova: string,
+): string[] {
+  let origem: string;
+  let caminhoDeCanal: string;
+  try {
+    const nova = new URL(urlNova);
+    origem = nova.origin;
+    // O prefixo sai da PRÓPRIA URL nova (tudo até o último `/`), e não de uma
+    // constante: instalação publicada num subcaminho (`https://host/crm/api/…`)
+    // continua casando consigo mesma.
+    caminhoDeCanal = nova.pathname.slice(0, nova.pathname.lastIndexOf("/") + 1);
+  } catch {
+    return [];
+  }
+  const ids: string[] = [];
+  for (const w of existentes) {
+    if (!w?.id || !w.url) continue;
+    let u: URL;
+    try {
+      u = new URL(w.url);
+    } catch {
+      continue;
+    }
+    if (u.username || u.password) continue;
+    // Prefixo que não é de webhook de canal (URL nova fora do padrão) não pode
+    // virar curinga do host inteiro: aí só a URL idêntica sai.
+    const prefixoConfiavel = caminhoDeCanal.endsWith("/webhooks/channel/");
+    const casa = prefixoConfiavel
+      ? u.origin === origem && u.pathname.startsWith(caminhoDeCanal)
+      : w.url === urlNova;
+    if (casa) ids.push(w.id);
+  }
+  return ids;
+}
+
 /**
  * Registra a volta: o webhook do CRM na instância do cliente.
  *
@@ -198,11 +252,8 @@ export async function registrarWebhookNaVerdash(input: {
 
   try {
     const existentes = await fzapRequest<Array<{ id?: string; url?: string }>>(creds, "/webhook");
-    for (const w of existentes ?? []) {
-      // Só o NOSSO. O da Verdash (e o de qualquer outro sistema) fica onde está.
-      if (w?.id && w?.url === input.webhookUrl) {
-        await fzapRequest(creds, `/webhook/${encodeURIComponent(w.id)}`, { method: "DELETE" });
-      }
+    for (const id of webhooksDestaInstalacao(existentes ?? [], input.webhookUrl)) {
+      await fzapRequest(creds, `/webhook/${encodeURIComponent(id)}`, { method: "DELETE" });
     }
   } catch {
     // Listar é conveniência: se falhar, seguimos e criamos. O pior caso é uma
@@ -400,19 +451,83 @@ export async function findVerdashSession(
    */
   canal: CanalPareavel = CANAL_PAREAVEL_PADRAO,
 ): Promise<VerdashSession | null> {
+  // A primeira, e não `.maybeSingle()`: com dois números na organização o
+  // `maybeSingle` devolve ERRO e `data` nulo — a tela dizia "não conectado" com dois
+  // canais no ar, e quem reconectava por cima ganhava um canal novo por engano.
+  const sessoes = await listVerdashSessions(admin, organizationId, canal);
+  return sessoes.find((s) => !s.archivedAt) ?? sessoes[0] ?? null;
+}
+
+/**
+ * TODAS as sessões deste canal na organização, a mais antiga primeiro.
+ *
+ * Uma organização pode ter vários números: a loja com o número de vendas e o do
+ * pós-venda, a clínica com um por unidade. Até 25/09/2026 a conexão supunha um só, e
+ * conectar o segundo SOBRESCREVIA o primeiro (ver `escolherSessaoDoNumero`).
+ */
+export async function listVerdashSessions(
+  admin: SupabaseClient,
+  organizationId: string,
+  canal: CanalPareavel = CANAL_PAREAVEL_PADRAO,
+): Promise<VerdashSession[]> {
   const buscar = (colunas: string) =>
     admin
       .from("channel_sessions")
       .select(colunas)
       .eq("organization_id", organizationId)
       .eq("provider", canal)
-      .maybeSingle();
+      .order("created_at", { ascending: true });
 
   const { data } = await queryTolerantToMissingArchived(
     () => buscar(`${COLUNAS}, ${ARCHIVED_AT}`),
     () => buscar(COLUNAS),
   );
-  return toVerdashSession(data as Record<string, unknown> | null);
+  const linhas = Array.isArray(data) ? (data as unknown as Record<string, unknown>[]) : [];
+  return linhas.map((l) => toVerdashSession(l)).filter((s): s is VerdashSession => s !== null);
+}
+
+/**
+ * Qual canal existente é ESTE número — ou nenhum, e aí o canal é novo.
+ *
+ * A pergunta só pode ser feita DEPOIS de saber de qual número o token (ou o código)
+ * é. Antes, a conexão escolhia "o canal desta organização" e atualizava aquele: o
+ * segundo número trocava token, telefone e segredo do primeiro, e o primeiro seguia
+ * entregando no mesmo endereço com o segredo antigo, recusado em toda mensagem.
+ *
+ * Pela instância primeiro, que é a identidade da linha. Pelo telefone depois: a
+ * instância recriada lá fora com outro nome é o MESMO número, e dois canais com o
+ * mesmo telefone violariam `channel_sessions_phone_per_org_unique`.
+ */
+export function escolherSessaoDoNumero(
+  sessoes: ReadonlyArray<VerdashSession>,
+  numero: { instanceName: string; phoneNumber: string | null },
+): VerdashSession | null {
+  // Ativa antes de arquivada: ressuscitar a arquivada com uma ativa do mesmo
+  // telefone ao lado bateria no índice parcial de telefone (500 cru na tela).
+  const ativasPrimeiro = [...sessoes].sort((a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt));
+  const pelaInstancia = ativasPrimeiro.find((s) => s.instanceName === numero.instanceName);
+  if (pelaInstancia) return pelaInstancia;
+  if (!numero.phoneNumber) return null;
+  return ativasPrimeiro.find((s) => s.phoneNumber === numero.phoneNumber) ?? null;
+}
+
+/**
+ * O número já está conectado em OUTRA organização desta instalação?
+ *
+ * É o que o índice `channel_sessions_verdash_instance_unique` recusa. O erro cru do
+ * banco virava 500 "duplicate key" na tela; a pessoa precisa ler o motivo.
+ */
+export function numeroEmOutraOrganizacao(erro: string | null): boolean {
+  return !!erro && erro.includes("channel_sessions_verdash_instance_unique");
+}
+
+/**
+ * O telefone já é um canal DESTA organização, por outra instância que a escolha não
+ * reconheceu (grafia do telefone diferente entre os dois modos de conexão, por
+ * exemplo). Recusado pelo índice `channel_sessions_phone_per_org_unique`.
+ */
+export function numeroJaEhCanalDaOrganizacao(erro: string | null): boolean {
+  return !!erro && erro.includes("channel_sessions_phone_per_org_unique");
 }
 
 /**
@@ -476,8 +591,15 @@ export async function saveVerdashSession(
     archived_at: null,
   };
 
+  // `organization_id` no UPDATE também: é service role, e o id sozinho confiaria em
+  // quem o escolheu. Hoje ele sai de uma lista já filtrada pela organização; a
+  // doutrina pede o filtro aqui do mesmo jeito.
   const { error } = input.existingId
-    ? await admin.from("channel_sessions").update(linha).eq("id", input.existingId)
+    ? await admin
+        .from("channel_sessions")
+        .update(linha)
+        .eq("id", input.existingId)
+        .eq("organization_id", input.organizationId)
     : await admin
         .from("channel_sessions")
         .insert({ ...linha, metadata: metadataInicialDoCanal() });
