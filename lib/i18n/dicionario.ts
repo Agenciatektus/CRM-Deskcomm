@@ -5179,6 +5179,7 @@ export const DICIONARIO: Traducoes = {
   "Número sem nome": { es: "Número sin nombre" },
   Etapa: { es: "Etapa" },
   "Etapa alterada": { es: "Etapa cambiada" },
+  "A etiqueta que coloca o negócio na cadência também está nas condições de saída: ele entraria e sairia no mesmo instante.": { es: "La etiqueta que pone el negocio en la cadencia también está en las condiciones de salida: entraría y saldría en el mismo instante." },
   "Negócio que entrar numa etapa": { es: "Negocio que entre en una etapa" },
   "Negócio ou contato que ganhar uma etiqueta": { es: "Negocio o contacto que reciba una etiqueta" },
   "Cliente sem resposta do time há um tempo": { es: "Cliente sin respuesta del equipo desde hace un tiempo" },

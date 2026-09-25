@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { inscreverPorGatilho, type ResultadoDaInscricao } from "./inscrever";
+import { carregarCadenciaParaInscricao, inscreverPorGatilho, type ResultadoDaInscricao } from "./inscrever";
 
 /**
  * GATILHOS DE TEMPO DA CADÊNCIA — a varredura que roda no tick do follow-up.
@@ -9,72 +9,38 @@ import { inscreverPorGatilho, type ResultadoDaInscricao } from "./inscrever";
  *     (`awaiting_since`, a mesma régua da Fila e da pílula "Aguardando há…");
  *   - `lead_idle`: nós falamos por último e o lead não responde há N minutos.
  *
- * ⚠️ QUEM ESTÁ ESPERANDO QUEM é decidido AQUI, no código, comparando
- * `last_inbound_at` com `last_outbound_at`: o PostgREST não compara duas colunas.
- * O banco só entrega os candidatos da JANELA de tempo; a condição que importa
- * é `quemEsperaQuem`, pura e testada.
+ * QUEM PODE ENTRAR é decidido no banco (`fn_cadencia_candidatas_de_tempo`,
+ * migration 9017): a janela de 24 h depois do limiar, quem espera quem, o
+ * negócio aberto do funil, e a exclusão de quem a porta recusaria de todo jeito
+ * (inscrição viva, mesma cadência em 30 dias, contato bloqueado/sem marketing).
  *
- * ⚠️ JANELA DE 24 h, NÃO "TODOS OS ATRASADOS". Uma conversa entra quando o
- * limiar passa e continua candidata por um dia — o tick é de minuto, então a
- * pega. Sem o teto, toda conversa esquecida há meses seria relida a cada minuto
- * para sempre (a porta a recusaria, mas o custo ficaria). E a porta também não
- * retroage: o instante da violação (`eventoEm`) tem de ser posterior à
- * publicação da cadência.
+ * ⚠️ POR QUE NÃO NO CÓDIGO. A versão anterior buscava a janela e decidia aqui.
+ * A varredura roda todo minuto: os MESMOS recusados voltavam a cada tick,
+ * ocupavam o limite e deixavam de fora quem violou o limiar depois (revisão
+ * @Cassio_SecRev, P1-1). O que o banco devolve agora é só quem entra.
+ *
+ * A porta (`inscreverPorGatilho`) continua sendo a autoridade: reconfere,
+ * reserva a vaga do dia e aplica a LGPD. Não retroage: `evento_em` (o instante
+ * da violação) tem de ser posterior à publicação.
  */
 
-export type TipoDeTempo = "agent_sla" | "lead_idle";
+export const MAX_CANDIDATAS_POR_CADENCIA = 50;
 
 export interface CadenciaDeTempo {
   id: string;
   organization_id: string;
-  pipeline_id: string;
-  channel_session_id: string;
-  tipo: TipoDeTempo;
-  limiar_min: number;
 }
 
-export interface ConversaCandidata {
-  id: string;
+export interface CandidataDeTempo {
+  conversation_id: string;
   contact_id: string;
-  last_inbound_at: string | null;
-  last_outbound_at: string | null;
-  awaiting_since: string | null;
-}
-
-export const JANELA_DE_CAPTURA_MS = 24 * 60 * 60_000;
-export const MAX_CONVERSAS_POR_CADENCIA = 50;
-const STATUS_EM_ATENDIMENTO = ["open", "pending", "claimed", "ai_handling"];
-
-const ms = (iso: string | null): number | null => (iso ? Date.parse(iso) : null);
-
-/**
- * A conversa VIOLOU o limiar deste tipo? Devolve o instante da violação
- * (`referência + limiar`), ou `null`.
- */
-export function quemEsperaQuem(
-  tipo: TipoDeTempo,
-  conversa: ConversaCandidata,
-  agora: Date,
-  limiarMin: number,
-): string | null {
-  const limiar = limiarMin * 60_000;
-  const entrou = ms(conversa.last_inbound_at);
-  const saiu = ms(conversa.last_outbound_at);
-  if (tipo === "agent_sla") {
-    // A bola está com o TIME: o cliente falou por último.
-    if (entrou === null || (saiu !== null && saiu >= entrou)) return null;
-    const desde = ms(conversa.awaiting_since) ?? entrou;
-    return agora.getTime() - desde >= limiar ? new Date(desde + limiar).toISOString() : null;
-  }
-  // lead_idle — a bola está com o LEAD: nós falamos por último.
-  if (saiu === null || (entrou !== null && entrou >= saiu)) return null;
-  return agora.getTime() - saiu >= limiar ? new Date(saiu + limiar).toISOString() : null;
+  lead_id: string;
+  evento_em: string;
 }
 
 export interface VarreduraDeTempoDb {
   cadenciasDeTempo(): Promise<CadenciaDeTempo[]>;
-  candidatas(c: CadenciaDeTempo, desde: string, ate: string): Promise<ConversaCandidata[]>;
-  negocioAbertoDoContato(orgId: string, contactId: string, pipelineId: string): Promise<string | null>;
+  candidatas(c: CadenciaDeTempo): Promise<CandidataDeTempo[]>;
 }
 
 export interface VarreduraDeTempoDeps {
@@ -87,7 +53,6 @@ export interface VarreduraDeTempoDeps {
     origem: "gatilho_tempo";
     conversationId: string;
   }) => Promise<ResultadoDaInscricao>;
-  clock: () => Date;
 }
 
 export interface ResumoDaVarreduraDeTempo {
@@ -99,30 +64,18 @@ export interface ResumoDaVarreduraDeTempo {
 
 export async function varrerGatilhosDeTempo(deps: VarreduraDeTempoDeps): Promise<ResumoDaVarreduraDeTempo> {
   const resumo: ResumoDaVarreduraDeTempo = { cadencias: 0, candidatas: 0, inscritos: 0, recusas: {} };
-  const agora = deps.clock();
   const cadencias = await deps.db.cadenciasDeTempo();
   resumo.cadencias = cadencias.length;
   for (const c of cadencias) {
-    const limiar = c.limiar_min * 60_000;
-    const ate = new Date(agora.getTime() - limiar).toISOString();
-    const desde = new Date(agora.getTime() - limiar - JANELA_DE_CAPTURA_MS).toISOString();
-    const conversas = await deps.db.candidatas(c, desde, ate);
-    for (const conversa of conversas) {
-      const eventoEm = quemEsperaQuem(c.tipo, conversa, agora, c.limiar_min);
-      if (!eventoEm) continue;
+    for (const k of await deps.db.candidatas(c)) {
       resumo.candidatas++;
-      const leadId = await deps.db.negocioAbertoDoContato(c.organization_id, conversa.contact_id, c.pipeline_id);
-      if (!leadId) {
-        resumo.recusas.sem_negocio_no_funil = (resumo.recusas.sem_negocio_no_funil ?? 0) + 1;
-        continue;
-      }
       const r = await deps.inscrever({
         organizationId: c.organization_id,
         pointerId: c.id,
-        leadId,
-        eventoEm,
+        leadId: k.lead_id,
+        eventoEm: k.evento_em,
         origem: "gatilho_tempo",
-        conversationId: conversa.id,
+        conversationId: k.conversation_id,
       });
       if (r.ok) resumo.inscritos++;
       else resumo.recusas[r.motivo] = (resumo.recusas[r.motivo] ?? 0) + 1;
@@ -136,66 +89,30 @@ export function createSupabaseVarreduraDeTempoDb(admin: SupabaseClient): Varredu
     async cadenciasDeTempo() {
       const { data, error } = await admin
         .from("followup_flow_pointers")
-        .select("id, organization_id, pipeline_id, channel_session_id, trigger_config")
+        .select("id, organization_id")
         .eq("surface", "cadence")
         .eq("status", "active")
         .in("trigger_config->>kind", ["agent_sla", "lead_idle"]);
       if (error) throw new Error(`cadencia_tempo_pointers: ${error.message}`);
-      return (data ?? []).flatMap((p) => {
-        const t = p.trigger_config as { kind?: string; params?: { threshold_minutes?: unknown } } | null;
-        const limiar = t?.params?.threshold_minutes;
-        if ((t?.kind !== "agent_sla" && t?.kind !== "lead_idle") || typeof limiar !== "number") return [];
-        if (!p.pipeline_id || !p.channel_session_id) return [];
-        return [
-          {
-            id: p.id as string,
-            organization_id: p.organization_id as string,
-            pipeline_id: p.pipeline_id as string,
-            channel_session_id: p.channel_session_id as string,
-            tipo: t.kind,
-            limiar_min: limiar,
-          },
-        ];
+      return (data ?? []).map((p) => ({ id: p.id as string, organization_id: p.organization_id as string }));
+    },
+    async candidatas(c) {
+      const { data, error } = await admin.rpc("fn_cadencia_candidatas_de_tempo", {
+        p_org: c.organization_id,
+        p_pointer: c.id,
+        p_limite: MAX_CANDIDATAS_POR_CADENCIA,
       });
-    },
-    async candidatas(c, desde, ate) {
-      const coluna = c.tipo === "agent_sla" ? "awaiting_since" : "last_outbound_at";
-      const { data, error } = await admin
-        .from("conversations")
-        .select("id, contact_id, last_inbound_at, last_outbound_at, awaiting_since")
-        .eq("organization_id", c.organization_id)
-        .eq("channel_session_id", c.channel_session_id)
-        .in("status", STATUS_EM_ATENDIMENTO)
-        .not("contact_id", "is", null)
-        .gte(coluna, desde)
-        .lte(coluna, ate)
-        .order(coluna, { ascending: true })
-        .limit(MAX_CONVERSAS_POR_CADENCIA);
-      if (error) throw new Error(`cadencia_tempo_conversas: ${error.message}`);
-      return (data ?? []) as ConversaCandidata[];
-    },
-    async negocioAbertoDoContato(orgId, contactId, pipelineId) {
-      const { data, error } = await admin
-        .from("crm_leads")
-        .select("id")
-        .eq("organization_id", orgId)
-        .eq("contact_id", contactId)
-        .eq("pipeline_id", pipelineId)
-        .eq("status", "open")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw new Error(`cadencia_tempo_negocio: ${error.message}`);
-      return (data?.id as string | undefined) ?? null;
+      if (error) throw new Error(`cadencia_tempo_candidatas: ${error.message}`);
+      return (data ?? []) as CandidataDeTempo[];
     },
   };
 }
 
-/** Adapter de produção: a porta única da cadência com o client de service role. */
+/** Adapter de produção: a porta única da cadência, com a cadência carregada UMA vez por varredura. */
 export function depsDaVarreduraDeTempo(admin: SupabaseClient): VarreduraDeTempoDeps {
+  const cache = new Map<string, Awaited<ReturnType<typeof carregarCadenciaParaInscricao>>>();
   return {
     db: createSupabaseVarreduraDeTempoDb(admin),
-    inscrever: (input) => inscreverPorGatilho(admin, input),
-    clock: () => new Date(),
+    inscrever: (input) => inscreverPorGatilho(admin, input, cache),
   };
 }

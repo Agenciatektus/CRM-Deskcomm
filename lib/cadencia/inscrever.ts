@@ -189,6 +189,20 @@ export async function avaliarNegocio(
   if (jaErr) throw new Error(`cadencia_repeticao: ${jaErr.message}`);
   if ((jaPassou ?? 0) > 0) return { ok: false, motivo: "ja_passou_pela_cadencia" };
 
+  // UM FLUXO VIVO POR CONTATO — conferido AQUI, antes da reserva de vaga do dia
+  // (e antes do dry-run da tela). Só em `inscreverNegocio` ele chegava tarde: a
+  // vaga já tinha sido gasta, e um contato preso noutro fluxo esgotava o teto
+  // da cadência sozinho, reavaliado a cada minuto pela varredura de tempo.
+  // A checagem de lá fica como rede (corrida entre as duas leituras).
+  const { count: vivas, error: vivasErr } = await admin
+    .from("followup_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", lead.contact_id as string)
+    .in("status", ["active", "waiting_reply", "paused_handoff", "paused_manual"]);
+  if (vivasErr) throw new Error(`cadencia_inscricao_viva: ${vivasErr.message}`);
+  if ((vivas ?? 0) > 0) return { ok: false, motivo: "ja_em_outro_fluxo" };
+
   const { data: c, error: cErr } = await admin
     .from("contacts")
     .select("id, phone_number, is_blocked, force_human, is_anonymized, is_merged_into, consent")
@@ -329,8 +343,19 @@ export async function inscreverPorGatilho(
     | { eventId: string; origem?: "gatilho_etapa" | "gatilho_etiqueta" }
     | { origem: "gatilho_tempo"; conversationId: string }
   ),
+  /**
+   * Cache da cadência carregada, por pointer, durante UMA varredura: sem ele,
+   * cada candidato recarregava a mesma cadência (3 consultas). Vale só pela
+   * duração de quem o criou — cadência desligada no meio da varredura ainda
+   * inscreve até o fim dela, e o worker a barra no envio.
+   */
+  cache?: Map<string, Awaited<ReturnType<typeof carregarCadenciaParaInscricao>>>,
 ): Promise<ResultadoDaInscricao> {
-  const carregada = await carregarCadenciaParaInscricao(admin, input.organizationId, input.pointerId);
+  let carregada = cache?.get(input.pointerId);
+  if (!carregada) {
+    carregada = await carregarCadenciaParaInscricao(admin, input.organizationId, input.pointerId);
+    cache?.set(input.pointerId, carregada);
+  }
   if ("motivo" in carregada) return { ok: false, motivo: carregada.motivo };
   const { cadencia } = carregada;
   if (Date.parse(input.eventoEm) < Date.parse(cadencia.publicadaEm)) {

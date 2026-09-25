@@ -145,7 +145,9 @@ async function handle(req: NextRequest): Promise<Response> {
   // Mesmo contrato do silence-sweep: falhar aqui não aborta o tick.
   try {
     const tempo = await varrerGatilhosDeTempo(depsDaVarreduraDeTempo(admin));
-    if (tempo.inscritos > 0) {
+    // Loga também as recusas (P2 do Cassio): recusa alta e persistente é sinal
+    // de régua mal configurada, e calada ela só aparece como "não inscreve ninguém".
+    if (tempo.candidatas > 0) {
       logger.info("[followup-flow-worker.cron] cadência por tempo", { ...tempo, requestId });
     }
   } catch (err) {
