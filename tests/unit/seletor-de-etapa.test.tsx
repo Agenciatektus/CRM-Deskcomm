@@ -37,8 +37,8 @@ vi.mock("@/components/ui/select", () => ({
   SelectTrigger: () => null,
   SelectValue: () => null,
   SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => (
-    <option value={value}>{children}</option>
+  SelectItem: ({ value, disabled, children }: { value: string; disabled?: boolean; children: React.ReactNode }) => (
+    <option value={value} disabled={disabled}>{children}</option>
   ),
 }));
 
@@ -116,5 +116,12 @@ describe("seletor de etapa", () => {
     montar({ aberto: false, stageId: "ganho" });
     expect(screen.queryByTestId("seletor-de-etapa")).toBeNull();
     expect(screen.getByTestId("etapa-somente-leitura").textContent).toBe("Ganho");
+  });
+
+  it("lead em etapa ARQUIVADA: o seletor mostra onde ele está, desabilitado, e não fica em branco", () => {
+    montar({ stageId: "etapa-velha" });
+    const atual = screen.getByRole("option", { name: "Etapa arquivada" }) as HTMLOptionElement;
+    expect(atual.disabled).toBe(true);
+    expect((screen.getByTestId("seletor-de-etapa") as HTMLSelectElement).value).toBe("etapa-velha");
   });
 });

@@ -5179,6 +5179,7 @@ export const DICIONARIO: Traducoes = {
   "Número sem nome": { es: "Número sin nombre" },
   Etapa: { es: "Etapa" },
   "Etapa alterada": { es: "Etapa cambiada" },
+  "Etapa arquivada": { es: "Etapa archivada" },
   "Etapa do negócio": { es: "Etapa del negocio" },
   "Escolha o número": { es: "Elige el número" },
   Mensagem: { es: "Mensaje" },

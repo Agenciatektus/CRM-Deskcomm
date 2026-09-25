@@ -114,6 +114,13 @@ export function SeletorDeEtapa({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          {/* Lead parado numa etapa ARQUIVADA: sem esta opção o seletor abre em
+              branco. Mostra onde ele está, sem oferecer voltar para lá. */}
+          {!atual && (
+            <SelectItem value={stageId} disabled className="text-xs">
+              {t("Etapa arquivada")}
+            </SelectItem>
+          )}
           {etapas.map((e) => (
             <SelectItem key={e.id} value={e.id} className="text-xs">
               {e.name}
