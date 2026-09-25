@@ -6,6 +6,7 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { COLUNAS_DO_FUNIL } from "@/app/api/v1/pipelines/_funis";
 import { FunisClient, type FunilDaLista } from "./_client";
 
 export const dynamic = "force-dynamic";
@@ -36,20 +37,48 @@ export default async function KanbanPickerPage() {
   if (!activeOrg) redirect("/app");
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("crm_pipelines")
-    // `is_client_pipeline` entra: sem ela o selo "Clientes" não aparecia ao
-    // carregar a página e o botão sempre oferecia "Funil de clientes", mesmo no
-    // funil já marcado — só o corpo de um PATCH trazia a coluna.
+    // ─── UMA LISTA SÓ, COMPARTILHADA COM A ROTA ──────────────────────────
     //
-    // ⚠️ `is_archived` DEIXOU DE SER FILTRO E VIROU COLUNA (#979). Antes a
-    // consulta cortava os arquivados no banco, e o resultado era um funil
-    // invisível e indestrutível: quem arquivou não tinha como ver, tirar do
-    // arquivo nem excluir o que arquivou. A separação passou para a partição
-    // abaixo — a lista de trabalho continua só com os vivos.
-    .select("id, name, slug, description, position, is_default, is_client_pipeline, is_archived")
+    // Aqui havia uma lista LITERAL de colunas, e ela divergiu da que a rota
+    // usa: `fontes` estava lá e faltava aqui. Como o componente faz
+    // `funil.fontes ?? ["whatsapp"]`, a coluna ausente virava o default — a
+    // caixa "Direct do Instagram" aparecia desmarcada mesmo com o valor
+    // gravado, e voltava sozinha no primeiro refresh depois do clique. Sem
+    // erro, sem log.
+    //
+    // O comentário que estava aqui contava que `is_client_pipeline` tinha sido
+    // acrescentada pelo MESMO motivo (o selo "Clientes" não aparecia ao
+    // carregar, só o corpo de um PATCH trazia a coluna). Duas vezes a mesma
+    // armadilha é desenho, não descuido: a lista agora é uma só.
+    //
+    // ⚠️ `is_archived` é COLUNA, não filtro (#979). Antes a consulta cortava os
+    // arquivados no banco, e o resultado era um funil invisível e
+    // indestrutível: quem arquivou não tinha como ver, tirar do arquivo nem
+    // excluir o que arquivou. A separação acontece abaixo, em memória — a lista
+    // de trabalho continua só com os vivos.
+    .select(COLUNAS_DO_FUNIL)
     .eq("organization_id", activeOrg.orgId)
     .order("position");
+
+  // ─── FALHA DE CONSULTA NÃO PODE VIRAR "NENHUM FUNIL" ──────────────────────
+  //
+  // `const { data }` sozinho descartava o `error`, e o `?? []` abaixo
+  // transformava qualquer falha em lista vazia: a tela dizia, com toda a calma,
+  // que a organização não tem funil nenhum. Quem visse isso concluiria que
+  // perdeu os funis.
+  //
+  // O caso concreto não é hipotético: num banco que ainda não aplicou a 9012, o
+  // PostgREST devolve 42703 para a coluna `fontes` e a consulta INTEIRA falha —
+  // não vem linha com o campo `undefined`, não vem linha nenhuma. Esta base já
+  // teve migration gerada e não aplicada.
+  //
+  // Estourar é o comportamento certo aqui: o error boundary do App Router mostra
+  // que algo quebrou, que é a verdade, em vez de uma lista vazia que mente.
+  if (error) {
+    throw new Error(`Não consegui carregar os funis: ${error.message}`);
+  }
 
   const todos = (data ?? []) as Array<FunilDaLista & { is_archived: boolean }>;
   const funis = todos.filter((f) => !f.is_archived);
