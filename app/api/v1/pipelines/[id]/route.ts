@@ -76,7 +76,7 @@ const bodySchema = z
      * Precisa estar declarado: o schema é `.strict()`, e campo desconhecido
      * devolve 422 — sem esta linha, a tela salvaria e receberia erro.
      */
-    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).optional(),
+    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).max(3).optional(),
     /**
      * TIRAR DO ARQUIVO (#979). `true` é aceito pelo schema e recusado pelo
      * handler, de propósito: quem manda `is_archived: true` quer arquivar, e
@@ -94,6 +94,19 @@ const bodySchema = z
 
 type PatchDoFunil = {
   name?: string;
+  /**
+   * De que fontes o funil se alimenta.
+   *
+   * Faltava aqui, e o efeito era mudo: `bodySchema` ACEITAVA `fontes`, então a
+   * requisição não levava 422, a rota respondia 200 — e o campo simplesmente não
+   * viajava no UPDATE. A tela recarregava do servidor, recebia o valor antigo, e a
+   * caixa que o operador acabara de marcar voltava sozinha, sem erro nenhum.
+   *
+   * Declarar no schema e esquecer de persistir é pior que não declarar: `.strict()`
+   * existe justamente para que campo desconhecido falhe alto, e aceitar o campo
+   * desliga essa proteção sem entregar o que ela prometia.
+   */
+  fontes?: string[];
   description?: string | null;
   position?: number;
   is_default?: boolean;
@@ -207,6 +220,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (pedido.description !== undefined) {
     patchDoAlvo.description = pedido.description?.trim() || null;
   }
+
+  // Update simples, como nome e descrição. O `bodySchema` já garantiu o vocabulário
+  // fechado e `min(1)`; o `Set` tira repetição, que o CHECK do banco não recusa e
+  // que apareceria na tela como a mesma fonte contada duas vezes.
+  if (pedido.fontes !== undefined) patchDoAlvo.fontes = [...new Set(pedido.fontes)];
 
   // Tirar do arquivo é update SIMPLES: nenhum índice a disputar (nem o de slug
   // nem o de padrão são parciais em `is_archived`, então o funil já ocupava o

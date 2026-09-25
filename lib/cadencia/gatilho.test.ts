@@ -33,4 +33,22 @@ describe("gatilho da cadência — só o que a porta dela implementa", () => {
     expect(await validarGatilhoDaCadencia(admin({ ...etapaOk, is_lost: true }), "org", FUNIL, gatilho)).not.toBeNull();
     expect(await validarGatilhoDaCadencia(admin(null), "org", FUNIL, gatilho)).not.toBeNull();
   });
+
+  it("etiqueta: exige o texto e o funil", async () => {
+    expect(await validarGatilhoDaCadencia(admin(null), "org", FUNIL, { kind: "tag_added", params: { tag: "Lista fria" } })).toBeNull();
+    expect(await validarGatilhoDaCadencia(admin(null), "org", FUNIL, { kind: "tag_added", params: { tag: "  " } })).not.toBeNull();
+    expect(await validarGatilhoDaCadencia(admin(null), "org", null, { kind: "tag_added", params: { tag: "x" } })).not.toBeNull();
+  });
+
+  it("tempo: atendente de 5 min a 7 dias; lead parado de 1 hora a 30 dias", async () => {
+    const v = (kind: string, threshold_minutes: number) =>
+      validarGatilhoDaCadencia(admin(null), "org", FUNIL, { kind, params: { threshold_minutes } });
+    expect(await v("agent_sla", 5)).toBeNull();
+    expect(await v("agent_sla", 4)).not.toBeNull();
+    expect(await v("agent_sla", 10_081)).not.toBeNull();
+    expect(await v("lead_idle", 60)).toBeNull();
+    expect(await v("lead_idle", 59)).not.toBeNull();
+    expect(await v("lead_idle", 43_201)).not.toBeNull();
+    expect(await v("lead_idle", 90.5)).not.toBeNull();
+  });
 });

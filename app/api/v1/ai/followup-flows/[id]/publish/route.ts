@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { carregaEtapasCitadas } from "@/lib/followup/etapas-citadas";
 import { validateFlowForPublish } from "@/lib/followup/validate-publish";
 import { validarPublicacaoDaCadencia } from "@/lib/cadencia/validar-publicacao";
+import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -79,15 +80,16 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   // (`lib/cadencia/inscrever.ts`). Silêncio/SLA passariam no conjunto acima e
   // nunca inscreveriam ninguém por ela — fluxo morto com cara de vivo.
   const ehCadencia = pointer.surface === "cadence";
-  if (ehCadencia && triggerKind !== "manual" && triggerKind !== "stage_change") {
-    return fail(
-      "trigger_kind_not_implemented",
-      t("Na cadência, use o gatilho Etapa do funil ou a inscrição manual."),
-      422,
-      { requestId },
+  if (ehCadencia) {
+    // A régua única do gatilho de cadência — a mesma das rotas que o gravam.
+    const problema = await validarGatilhoDaCadencia(
+      admin,
+      activeOrg.orgId,
+      (pointer.pipeline_id as string | null) ?? null,
+      pointer.trigger_config,
     );
-  }
-  if (!KINDS_COM_MOTOR.has(triggerKind)) {
+    if (problema) return fail("trigger_kind_not_implemented", t(problema), 422, { requestId });
+  } else if (!KINDS_COM_MOTOR.has(triggerKind)) {
     return fail(
       "trigger_kind_not_implemented",
       `O gatilho «${triggerKind}» não está disponível — use Etapa do funil, Silêncio ou Manual.`,
