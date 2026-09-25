@@ -23,6 +23,8 @@ import { validateFlowForPublish } from "@/lib/followup/validate-publish";
 import { validarPublicacaoDaCadencia } from "@/lib/cadencia/validar-publicacao";
 import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
+import { conducaoDe } from "@/lib/cadencia/conducao/settings";
+import { publicarVersaoDaCadencia } from "@/lib/cadencia/publicar";
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -199,12 +201,24 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     }
   }
 
-  const result = await publishFollowupFlowVersion(admin, {
-    orgId: activeOrg.orgId,
-    pointerId: id,
-    graph,
-    createdBy: user.id,
-  });
+  // Cadência: grafo + snapshot de quem atende quando o lead responde, na MESMA
+  // transação (`fn_cadencia_publicar_versao`). O runtime lê a condução da
+  // versão, nunca do rascunho.
+  const conducao = ehCadencia ? conducaoDe(pointer.cadence_settings) : null;
+  const result = conducao
+    ? await publicarVersaoDaCadencia(admin, {
+        orgId: activeOrg.orgId,
+        pointerId: id,
+        graph,
+        createdBy: user.id,
+        conducao,
+      })
+    : await publishFollowupFlowVersion(admin, {
+        orgId: activeOrg.orgId,
+        pointerId: id,
+        graph,
+        createdBy: user.id,
+      });
   if (!result.ok) {
     if (result.code === "pointer_not_found") {
       return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
@@ -231,7 +245,10 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     resourceType: "followup_flow_pointer",
     resourceId: id,
     requestId,
-    metadata: { version_id: result.version_id },
+    metadata: {
+      version_id: result.version_id,
+      ...(conducao ? { conducao: conducao.quem_atende, ...(conducao.quem_atende === "ia" ? { modo: conducao.modo } : {}) } : {}),
+    },
   });
 
   return ok(updatedPointer, { requestId });
