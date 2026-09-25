@@ -25,6 +25,7 @@ import { ConversationTagsEditor } from "./ConversationTagsEditor";
 import { ContactTagsEditor } from "./ContactTagsEditor";
 import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { SeletorDeEtapa, type EtapaDoSeletor } from "@/components/kanban/SeletorDeEtapa";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,10 @@ interface LeadRow {
   currency: string | null;
   updated_at: string;
   pipeline_id: string;
+  stage_id: string;
+  /** Etapas ativas do funil deste lead, na ordem do quadro (crm-summary). */
+  etapas?: EtapaDoSeletor[];
+  motivos_de_perda?: string[];
   custom_fields: Record<string, unknown> | null;
   field_defs: CustomFieldDef[];
   funil_nome: string | null;
@@ -391,6 +396,20 @@ function InboxLeadEditor({
           </p>
         </div>
       )}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-muted-foreground">{t("Etapa")}</span>
+        <SeletorDeEtapa
+          key={ativo.id}
+          leadId={ativo.id}
+          pipelineId={ativo.pipeline_id}
+          stageId={ativo.stage_id}
+          updatedAt={ativo.updated_at}
+          aberto={ativo.status === "open"}
+          etapas={ativo.etapas ?? []}
+          motivosDoFunil={ativo.motivos_de_perda}
+          onMovido={onSalvo}
+        />
+      </div>
       <CamposDoFunil
         key={ativo.id}
         leadId={ativo.id}

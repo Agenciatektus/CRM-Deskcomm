@@ -61,6 +61,7 @@ function bancoFalso(tabelas: Record<string, Linha[]>) {
     const chain = {
       select: (cols: string) => (selects.push(cols), trilha.push("select"), chain),
       eq: (col: string, val: unknown) => ((linhas = linhas.filter((l) => valor(l, col) === val)), trilha.push("eq"), chain),
+      in: (col: string, vals: unknown[]) => ((linhas = linhas.filter((l) => vals.includes(valor(l, col)))), chain),
       is: (col: string, val: unknown) => ((linhas = linhas.filter((l) => (valor(l, col) ?? null) === val)), chain),
       not: (col: string, _op: string, val: unknown) => ((linhas = linhas.filter((l) => (valor(l, col) ?? null) !== val)), chain),
       order: () => chain,
@@ -124,5 +125,30 @@ describe("crm-summary: leads recentes", () => {
     // arquivado veria a lista encolher em vez de completar.
     const trilha = banco.trilhas.crm_leads ?? [];
     expect(trilha.lastIndexOf("eq")).toBeLessThan(trilha.indexOf("limit"));
+  });
+
+  it("devolve as etapas ATIVAS do funil de cada lead, da organização, e o stage_id", async () => {
+    const banco = bancoFalso({
+      contacts: [{ id: CONTATO, organization_id: ORG }],
+      crm_leads: [lead("lead-ativo", { name: "GMN Advogados", is_archived: false }, "Novo")],
+      crm_stages: [
+        { id: "s-1", pipeline_id: "p-lead-ativo", organization_id: ORG, name: "Novo", is_won: false, is_lost: false, is_archived: false },
+        { id: "s-2", pipeline_id: "p-lead-ativo", organization_id: ORG, name: "Perdido", is_won: false, is_lost: true, is_archived: false },
+        { id: "s-velha", pipeline_id: "p-lead-ativo", organization_id: ORG, name: "Arquivada", is_won: false, is_lost: false, is_archived: true },
+        { id: "s-outro-funil", pipeline_id: "p-outro", organization_id: ORG, name: "X", is_won: false, is_lost: false, is_archived: false },
+        { id: "s-outra-org", pipeline_id: "p-lead-ativo", organization_id: "org-2", name: "Y", is_won: false, is_lost: false, is_archived: false },
+      ],
+    });
+    vi.mocked(createClient).mockResolvedValue(banco as never);
+
+    const { GET } = await import("@/app/api/v1/contacts/[id]/crm-summary/route");
+    const res = await GET(new NextRequest(`http://x/api/v1/contacts/${CONTATO}/crm-summary`), {
+      params: Promise.resolve({ id: CONTATO }),
+    });
+    const body = (await res.json()) as { data: { leads: Array<Linha & { etapas: Linha[] }> } };
+
+    expect(res.status).toBe(200);
+    expect(body.data.leads[0]!.etapas.map((e) => e.id)).toEqual(["s-1", "s-2"]);
+    expect(banco.selects.join("|")).toContain("stage_id");
   });
 });

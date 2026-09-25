@@ -35,6 +35,12 @@ interface LoseLeadDialogProps {
   onOpenChange: (open: boolean) => void;
   leadId: string;
   pipelineId: string;
+  /**
+   * Os motivos do funil, quando quem abre a janela não está dentro do quadro
+   * (o Inbox). Sem isto o cache do quadro está frio e a lista cai no padrão do
+   * produto em vez da do funil — ver `useMotivosDePerdaDoFunil`.
+   */
+  motivosDoFunil?: string[];
 }
 
 const MAX_LEN = 500;
@@ -44,6 +50,7 @@ export function LoseLeadDialog({
   onOpenChange,
   leadId,
   pipelineId,
+  motivosDoFunil,
 }: LoseLeadDialogProps) {
   const t = useT();
   const [reasonCode, setReasonCode] = useState<string>("");
@@ -52,7 +59,8 @@ export function LoseLeadDialog({
 
   // O funil deste card manda na lista: o que ele tem cadastrado substitui o
   // padrão do produto — ver lib/leads/motivos-de-perda-do-funil.ts.
-  const cadastrados = useMotivosDePerdaDoFunil(pipelineId);
+  const doQuadro = useMotivosDePerdaDoFunil(pipelineId);
+  const cadastrados = motivosDoFunil ?? doQuadro;
   const opcoes = useMemo(() => opcoesDeMotivoDePerda(cadastrados), [cadastrados]);
   const funilConfigurado = cadastrados.length > 0;
 
