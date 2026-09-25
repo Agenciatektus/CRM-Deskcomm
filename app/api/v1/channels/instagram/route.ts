@@ -44,7 +44,9 @@ import { mfaEmDivida } from "@/lib/auth/server";
 import {
   HOSTED_CHANNEL_LABEL,
   INSTAGRAM_CHANNEL_LABEL,
+  escolherSessaoHospedada,
   findInstagramSession,
+  listInstagramSessions,
   saveInstagramSession,
   trocarCodigoHospedado,
 } from "@/lib/channels/connect";
@@ -142,10 +144,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const admin = createAdminClient();
   const orgId = authz.org.orgId;
 
-  const existenteAntes = await findInstagramSession(admin, orgId);
-  // Reconectar por cima de um canal excluído RESSUSCITA a linha, e o token de
-  // caminho é preservado para não invalidar a entrega já registrada lá.
-  const pathToken = existenteAntes?.webhookPathToken ?? randomBytes(16).toString("hex");
+  // As contas que a organização JÁ tem. Qual delas é a que está chegando só se sabe
+  // depois da troca do código. Escolher "a conta desta organização" antes era o
+  // defeito: a segunda conta reescrevia a primeira mantendo o endereço dela, e a
+  // primeira seguia entregando ali com o segredo velho, tudo recusado.
+  const sessoes = await listInstagramSessions(admin, orgId);
+  // Endereço NOVO sempre: a troca precisa dele antes de sabermos a conta. Na
+  // reconexão, a linha existente passa a este endereço e o antigo deixa de casar
+  // com canal nenhum, em vez de entregar num canal que não é o dele.
+  const pathToken = randomBytes(16).toString("hex");
   const webhookUrl = urlDoWebhook(pathToken);
   if (!webhookUrl) {
     return fail(
@@ -183,9 +190,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Pela conta (instância) só: Instagram não tem telefone para casar.
+  const existente = escolherSessaoHospedada(sessoes, {
+    instanceName: troca.instanceName,
+    phoneNumber: null,
+  });
   const { error } = await saveInstagramSession(admin, {
     organizationId: orgId,
-    existingId: existenteAntes?.id ?? null,
+    existingId: existente?.id ?? null,
     instanceName: troca.instanceName,
     vinculoId: troca.vinculoId,
     tokenEncrypted: credCifrada,

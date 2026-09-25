@@ -177,8 +177,6 @@ export async function validateVerdashToken(token: string): Promise<VerdashValida
   };
 }
 
-/** O caminho de entrega de canal desta instalação — tudo que termina num webhook de canal. */
-const CAMINHO_DE_CANAL = "/api/v1/webhooks/channel/";
 
 /**
  * Quais webhooks da instância são DESTA instalação e devem sair antes do novo.
@@ -201,8 +199,14 @@ export function webhooksDestaInstalacao(
   urlNova: string,
 ): string[] {
   let origem: string;
+  let caminhoDeCanal: string;
   try {
-    origem = new URL(urlNova).origin;
+    const nova = new URL(urlNova);
+    origem = nova.origin;
+    // O prefixo sai da PRÓPRIA URL nova (tudo até o último `/`), e não de uma
+    // constante: instalação publicada num subcaminho (`https://host/crm/api/…`)
+    // continua casando consigo mesma.
+    caminhoDeCanal = nova.pathname.slice(0, nova.pathname.lastIndexOf("/") + 1);
   } catch {
     return [];
   }
@@ -216,7 +220,13 @@ export function webhooksDestaInstalacao(
       continue;
     }
     if (u.username || u.password) continue;
-    if (u.origin === origem && u.pathname.startsWith(CAMINHO_DE_CANAL)) ids.push(w.id);
+    // Prefixo que não é de webhook de canal (URL nova fora do padrão) não pode
+    // virar curinga do host inteiro: aí só a URL idêntica sai.
+    const prefixoConfiavel = caminhoDeCanal.endsWith("/webhooks/channel/");
+    const casa = prefixoConfiavel
+      ? u.origin === origem && u.pathname.startsWith(caminhoDeCanal)
+      : w.url === urlNova;
+    if (casa) ids.push(w.id);
   }
   return ids;
 }
@@ -492,10 +502,13 @@ export function escolherSessaoDoNumero(
   sessoes: ReadonlyArray<VerdashSession>,
   numero: { instanceName: string; phoneNumber: string | null },
 ): VerdashSession | null {
-  const pelaInstancia = sessoes.find((s) => s.instanceName === numero.instanceName);
+  // Ativa antes de arquivada: ressuscitar a arquivada com uma ativa do mesmo
+  // telefone ao lado bateria no índice parcial de telefone (500 cru na tela).
+  const ativasPrimeiro = [...sessoes].sort((a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt));
+  const pelaInstancia = ativasPrimeiro.find((s) => s.instanceName === numero.instanceName);
   if (pelaInstancia) return pelaInstancia;
   if (!numero.phoneNumber) return null;
-  return sessoes.find((s) => s.phoneNumber === numero.phoneNumber) ?? null;
+  return ativasPrimeiro.find((s) => s.phoneNumber === numero.phoneNumber) ?? null;
 }
 
 /**
@@ -506,6 +519,15 @@ export function escolherSessaoDoNumero(
  */
 export function numeroEmOutraOrganizacao(erro: string | null): boolean {
   return !!erro && erro.includes("channel_sessions_verdash_instance_unique");
+}
+
+/**
+ * O telefone já é um canal DESTA organização, por outra instância que a escolha não
+ * reconheceu (grafia do telefone diferente entre os dois modos de conexão, por
+ * exemplo). Recusado pelo índice `channel_sessions_phone_per_org_unique`.
+ */
+export function numeroJaEhCanalDaOrganizacao(erro: string | null): boolean {
+  return !!erro && erro.includes("channel_sessions_phone_per_org_unique");
 }
 
 /**
@@ -569,8 +591,15 @@ export async function saveVerdashSession(
     archived_at: null,
   };
 
+  // `organization_id` no UPDATE também: é service role, e o id sozinho confiaria em
+  // quem o escolheu. Hoje ele sai de uma lista já filtrada pela organização; a
+  // doutrina pede o filtro aqui do mesmo jeito.
   const { error } = input.existingId
-    ? await admin.from("channel_sessions").update(linha).eq("id", input.existingId)
+    ? await admin
+        .from("channel_sessions")
+        .update(linha)
+        .eq("id", input.existingId)
+        .eq("organization_id", input.organizationId)
     : await admin
         .from("channel_sessions")
         .insert({ ...linha, metadata: metadataInicialDoCanal() });

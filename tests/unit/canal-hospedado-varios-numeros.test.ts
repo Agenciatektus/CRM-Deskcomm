@@ -148,6 +148,43 @@ describe("reconectar o MESMO número", () => {
   });
 });
 
+describe("reconectar pelo token um número que estava PAREADO", () => {
+  it("troca de endereço: o vínculo da plataforma segue no antigo com o segredo antigo", async () => {
+    vi.mocked(listHostedSessions).mockResolvedValue([{ ...A, vinculoId: "vinculo-antigo" }]);
+    vi.mocked(validateHostedToken).mockResolvedValue({
+      ok: true,
+      instanceName: "inst-a",
+      phoneNumber: "+5513900000001",
+      displayName: "Loja A",
+      connected: true,
+    });
+
+    await POST(pedido({ token: "token-do-numero-a" }));
+    const g = gravado();
+    expect(g.existingId).toBe("canal-a");
+    expect(g.webhookPathToken).not.toBe("tok-a");
+  });
+});
+
+describe("telefone que já é canal desta organização por outra instância", () => {
+  it("responde 409 com motivo, e não 500", async () => {
+    vi.mocked(listHostedSessions).mockResolvedValue([]);
+    vi.mocked(validateHostedToken).mockResolvedValue({
+      ok: true,
+      instanceName: "inst-z",
+      phoneNumber: "+5513900000009",
+      displayName: "Z",
+      connected: true,
+    });
+    vi.mocked(saveHostedSession).mockResolvedValue({
+      error: 'duplicate key value violates unique constraint "channel_sessions_phone_per_org_unique"',
+    });
+
+    const r = await POST(pedido({ token: "token-do-numero-z" }));
+    expect(r.status).toBe(409);
+  });
+});
+
 describe("número que já é canal de OUTRA organização", () => {
   it("responde 409 com motivo, e não 500 'duplicate key'", async () => {
     vi.mocked(listHostedSessions).mockResolvedValue([]);

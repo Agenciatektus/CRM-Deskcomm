@@ -19,6 +19,7 @@ import {
   findVerdashSession,
   listVerdashSessions,
   numeroEmOutraOrganizacao,
+  numeroJaEhCanalDaOrganizacao,
   webhooksDestaInstalacao,
   type VerdashSession,
 } from "./conectar";
@@ -66,6 +67,19 @@ describe("escolherSessaoDoNumero — qual canal é este número", () => {
   it("sem telefone e sem instância conhecida, nada casa", () => {
     expect(escolherSessaoDoNumero([A, B], { instanceName: "outra", phoneNumber: null })).toBeNull();
   });
+
+  it("com uma arquivada e uma ativa do mesmo telefone, fica com a ATIVA", () => {
+    const velha = sessao({ id: "velha", instanceName: "inst-velha", phoneNumber: "+5513900000001", archivedAt: "2026-09-01T00:00:00Z" });
+    const ativa = sessao({ id: "ativa", instanceName: "inst-atual", phoneNumber: "+5513900000001" });
+    expect(
+      escolherSessaoDoNumero([velha, ativa], { instanceName: "inst-terceira", phoneNumber: "+5513900000001" })?.id,
+    ).toBe("ativa");
+  });
+
+  it("sem ativa, a arquivada do mesmo número é ressuscitada", () => {
+    const velha = sessao({ id: "velha", instanceName: "inst-a", archivedAt: "2026-09-01T00:00:00Z" });
+    expect(escolherSessaoDoNumero([velha], { instanceName: "inst-a", phoneNumber: null })?.id).toBe("velha");
+  });
 });
 
 describe("webhooksDestaInstalacao — o que sai antes de registrar o novo", () => {
@@ -106,6 +120,31 @@ describe("webhooksDestaInstalacao — o que sai antes de registrar o novo", () =
     expect(ids).toEqual([]);
   });
 
+  it("instalação publicada num subcaminho continua casando consigo mesma", () => {
+    const sub = "https://host.com/crm/api/v1/webhooks/channel/tok-novo";
+    const ids = webhooksDestaInstalacao(
+      [
+        { id: "mesma", url: sub },
+        { id: "velha", url: "https://host.com/crm/api/v1/webhooks/channel/tok-velho" },
+        { id: "outra-app", url: "https://host.com/outra/api/v1/webhooks/channel/x" },
+      ],
+      sub,
+    );
+    expect(ids).toEqual(["mesma", "velha"]);
+  });
+
+  it("URL nova fora do padrão de canal não vira curinga do host: só a idêntica sai", () => {
+    const estranha = "https://crm.exemplo.com/x";
+    const ids = webhooksDestaInstalacao(
+      [
+        { id: "igual", url: estranha },
+        { id: "qualquer", url: "https://crm.exemplo.com/outra-coisa" },
+      ],
+      estranha,
+    );
+    expect(ids).toEqual(["igual"]);
+  });
+
   it("entrada torta não derruba: sem id, sem url, url inválida", () => {
     expect(
       webhooksDestaInstalacao([{ url: nova }, { id: "x" }, { id: "y", url: "não é url" }], nova),
@@ -126,6 +165,17 @@ describe("numeroEmOutraOrganizacao", () => {
   it("outros erros não são confundidos com ele", () => {
     expect(numeroEmOutraOrganizacao("timeout")).toBe(false);
     expect(numeroEmOutraOrganizacao(null)).toBe(false);
+  });
+});
+
+describe("numeroJaEhCanalDaOrganizacao", () => {
+  it("reconhece a recusa do índice de telefone por organização", () => {
+    expect(
+      numeroJaEhCanalDaOrganizacao(
+        'duplicate key value violates unique constraint "channel_sessions_phone_per_org_unique"',
+      ),
+    ).toBe(true);
+    expect(numeroJaEhCanalDaOrganizacao("channel_sessions_verdash_instance_unique")).toBe(false);
   });
 });
 

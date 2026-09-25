@@ -41,6 +41,7 @@ import {
   ligarRecebimentoHospedado,
   listHostedSessions,
   numeroHospedadoEmOutraOrganizacao,
+  numeroHospedadoJaEhCanalDaOrganizacao,
   saveHostedSession,
   trocarCodigoHospedado,
   validateHostedToken,
@@ -122,6 +123,14 @@ function falhaAoGravar(
       t(
         "este número já está conectado em outra organização deste CRM — desconecte lá antes de conectar aqui",
       ),
+      409,
+      { requestId },
+    );
+  }
+  if (numeroHospedadoJaEhCanalDaOrganizacao(erro)) {
+    return fail(
+      "conflict",
+      t("este número já é um canal desta organização — use a reconexão dele"),
       409,
       { requestId },
     );
@@ -307,7 +316,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     instanceName: v.instanceName,
     phoneNumber: v.phoneNumber,
   });
-  const pathToken = existente?.webhookPathToken ?? randomBytes(16).toString("hex");
+  // Endereço novo também quando o canal existente estava no modo PAREADO: o vínculo
+  // da plataforma continua entregando no endereço antigo com o segredo antigo, e
+  // manter o endereço faria cada entrega dele ser recusada aqui para sempre.
+  const pathToken =
+    existente?.webhookPathToken && !existente.vinculoId
+      ? existente.webhookPathToken
+      : randomBytes(16).toString("hex");
   const webhookUrl = urlDoWebhook(req, pathToken) as string;
 
   const { error } = await saveHostedSession(admin, {

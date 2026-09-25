@@ -19,7 +19,7 @@ import { ARCHIVED_AT, queryTolerantToMissingArchived } from "./archived";
 import { CHANNEL_PROVIDER_INSTAGRAM, CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
 // Importados ALÉM de reexportados: os apelidos de Instagram, no fim deste
 // arquivo, chamam as duas por dentro. Reexportar não traz para o escopo.
-import { findVerdashSession, saveVerdashSession } from "./verdash/conectar";
+import { findVerdashSession, listVerdashSessions, saveVerdashSession } from "./verdash/conectar";
 import type { VerdashSession as InstagramSession } from "./verdash/conectar";
 import { zernioBaseUrl } from "./zernio/credentials";
 import type { ChannelProvider } from "./types";
@@ -252,6 +252,7 @@ export {
   listVerdashSessions as listHostedSessions,
   escolherSessaoDoNumero as escolherSessaoHospedada,
   numeroEmOutraOrganizacao as numeroHospedadoEmOutraOrganizacao,
+  numeroJaEhCanalDaOrganizacao as numeroHospedadoJaEhCanalDaOrganizacao,
   saveVerdashSession as saveHostedSession,
   validateVerdashToken as validateHostedToken,
   registrarWebhookNaVerdash as ligarRecebimentoHospedado,
@@ -287,6 +288,18 @@ export async function findInstagramSession(
   organizationId: string,
 ): Promise<InstagramSession | null> {
   return findVerdashSession(admin, organizationId, CHANNEL_PROVIDER_INSTAGRAM);
+}
+
+/**
+ * TODAS as contas de Instagram da organização. Conectar a segunda conta tem que
+ * saber quais já existem para não reescrever a primeira — o mesmo defeito do
+ * WhatsApp hospedado (25/09/2026), que aqui nenhum índice seguraria.
+ */
+export async function listInstagramSessions(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<InstagramSession[]> {
+  return listVerdashSessions(admin, organizationId, CHANNEL_PROVIDER_INSTAGRAM);
 }
 
 /**

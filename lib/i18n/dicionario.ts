@@ -4242,6 +4242,9 @@ export const DICIONARIO: Traducoes = {
     {
       es: "este número ya está conectado en otra organización de este CRM — desconéctalo allí antes de conectarlo aquí",
     },
+  "este número já é um canal desta organização — use a reconexão dele": {
+    es: "este número ya es un canal de esta organización — usa su reconexión",
+  },
   "sua plataforma": { es: "tu plataforma" },
   "Usar o WhatsApp que já está na": { es: "Usar el WhatsApp que ya está en" },
   "O mesmo número que você já usa, sem ler QR de novo e sem tirar nada do ar. As conversas passam a aparecer aqui, e o que você já tinha configurado na sua plataforma continua funcionando igual.": {

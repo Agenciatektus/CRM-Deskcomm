@@ -14,3 +14,6 @@ tela lista todos. Ao conectar, o CRM também remove da linha os endereços antig
 desta instalação que ainda estavam cadastrados lá, que eram a origem das entregas
 recusadas. Número que já é canal de outra organização desta instalação é recusado
 com o motivo escrito, em vez de um erro genérico.
+
+O mesmo vale para o Instagram: conectar uma segunda conta cria um canal novo em vez
+de reescrever a primeira.

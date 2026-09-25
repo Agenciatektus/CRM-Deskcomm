@@ -40,6 +40,9 @@ vi.mock("@/lib/channels/connect", () => ({
   INSTAGRAM_CHANNEL_LABEL: "Instagram",
   HOSTED_CHANNEL_LABEL: "NomeDaPlataforma",
   findInstagramSession: vi.fn(async () => null),
+  // A rota decide a conta DEPOIS da troca, entre as que a organização já tem.
+  listInstagramSessions: vi.fn(async () => []),
+  escolherSessaoHospedada: vi.fn(() => null),
   saveInstagramSession: vi.fn(async () => ({ error: null })),
   trocarCodigoHospedado: vi.fn(),
 }));
