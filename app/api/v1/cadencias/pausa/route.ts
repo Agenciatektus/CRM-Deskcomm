@@ -69,7 +69,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   const resultado = data as { pausadas: boolean; mudou: boolean };
   if (resultado.mudou) {
     void audit({
-      action: "followup_flow.updated",
+      // Ação própria: "o fluxo mudou" não diz que TODAS as réguas da
+      // organização pararam (ou voltaram) — e é isso que quem audita procura.
+      action: resultado.pausadas ? "cadencia.pausadas" : "cadencia.retomadas",
       actorUserId: authz.user.id,
       organizationId: authz.org.orgId,
       resourceType: "organization",

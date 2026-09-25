@@ -29,6 +29,10 @@ export async function GET(_req?: NextRequest): Promise<Response> {
     .from("followup_flow_pointers")
     .select(LIST_COLUMNS)
     .eq("organization_id", activeOrg.orgId)
+    // Cadência tem tela própria, no funil. Listada aqui, ela abria no editor
+    // genérico, que não conhece número, política nem saídas — e o PATCH de lá
+    // grava o grafo sem as validações dela.
+    .neq("surface", "cadence")
     .order("updated_at", { ascending: false });
   if (error) return fail("internal_error", error.message, 500, { requestId });
   return ok(data ?? [], { requestId });

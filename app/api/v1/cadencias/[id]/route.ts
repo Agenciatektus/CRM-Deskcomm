@@ -18,7 +18,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
-import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
+import { validarEtapasDeSaida, validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { cadenceSettingsSchema } from "@/lib/cadencia/settings";
 import { triggerConfigSchema } from "@/lib/followup/api-schemas";
 import { flowGraphSchema } from "@/lib/followup/graph-schema";
@@ -139,6 +139,12 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
       mudancas.trigger_config,
     );
     if (problema) return fail("cadencia_gatilho_invalido", t(problema), 422, { requestId });
+  }
+
+  const etapasDeSaida = mudancas.cadence_settings?.saidas?.etapas ?? [];
+  if (etapasDeSaida.length > 0) {
+    const problema = await validarEtapasDeSaida(admin, orgId, atual.pipeline_id as string | null, etapasDeSaida);
+    if (problema) return fail("cadencia_saida_invalida", t(problema), 422, { requestId });
   }
 
   // Com a cadência NO AR, a política vale para o próximo envio: tem de estar

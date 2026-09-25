@@ -49,7 +49,7 @@ import { decidePacing } from '../pacing/engine';
 import type { PacingState } from '../pacing/engine';
 import type { PacingKnobs } from '../pacing/defaults';
 import { loadChannelKnobs, loadPacingState, recordSend } from '../pacing/store';
-import { decidirEspacamento } from '@/lib/cadencia/settings';
+import { decidirEspacamento, rngDaSemente } from '@/lib/cadencia/settings';
 import { decideSpinning } from '../spinning/engine';
 import type { RecentCopy } from '../spinning/engine';
 import { loadRecentCopies, loadSpinningKnobs, recordCopy } from '../spinning/store';
@@ -870,7 +870,7 @@ export interface RunBeforeSendArgs {
    * resposta da IA a quem acabou de escrever. Quem ainda não pode sair recebe
    * veto `cadence_spacing` com `nextAllowedAt`, e o chamador reagenda o job.
    */
-  espacamentoAutomatico?: { minMs: number; maxMs: number };
+  espacamentoAutomatico?: { minMs: number; maxMs: number; semente?: string };
   now: Date;
   /** injeções de teste (jitter determinístico + espera sem relógio real). */
   rng?: () => number;
@@ -1138,7 +1138,11 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
         ultimoEnvio: pacingState.lastSentAt,
         minMs: args.espacamentoAutomatico.minMs,
         maxMs: args.espacamentoAutomatico.maxMs,
-        ...(args.rng !== undefined ? { rng: args.rng } : {}),
+        ...(args.rng !== undefined
+          ? { rng: args.rng }
+          : args.espacamentoAutomatico.semente
+            ? { rng: rngDaSemente(args.espacamentoAutomatico.semente) }
+            : {}),
       });
       if (!espaco.permite) {
         const trace: GateTraceEntry[] = [{ gate: 'pacing', verdict: 'veto', code: 'cadence_spacing' }];

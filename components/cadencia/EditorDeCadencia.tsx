@@ -21,6 +21,8 @@ import { CADENCE_SETTINGS_PADRAO } from "@/lib/cadencia/settings";
 import { grafoDaTimeline, timelineDoGrafo, type PassoDaCadencia } from "@/lib/cadencia/timeline";
 import { ListaDePassos } from "./ListaDePassos";
 import { PoliticaDeEnvio } from "./PoliticaDeEnvio";
+import { SaidasDaCadenciaEditor } from "./SaidasDaCadencia";
+import { SAIDAS_PADRAO } from "@/lib/cadencia/saidas";
 import { PreviewDaMensagem } from "./PreviewDaMensagem";
 
 interface Etapa {
@@ -222,6 +224,14 @@ function Formulario({
           onChangeNumero={setNumero}
           numeroTravado={noAr}
         />
+        <div className="space-y-2 border-t border-border pt-4">
+          <span className="text-sm font-medium">{t("Quando a cadência para")}</span>
+          <SaidasDaCadenciaEditor
+            saidas={politica.saidas ?? SAIDAS_PADRAO}
+            onChange={(saidas) => setPolitica({ ...politica, saidas })}
+            etapas={etapas.filter((e) => !e.is_lost)}
+          />
+        </div>
       </aside>
     </div>
   );
