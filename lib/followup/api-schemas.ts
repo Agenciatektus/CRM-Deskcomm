@@ -58,7 +58,30 @@ export const triggerConfigSchema = z.discriminatedUnion("kind", [
     params: z.strictObject({}),
     ...CANCEL_ON_REPLY,
   }),
+  // ── Gatilhos SÓ DE CADÊNCIA (ver `lib/cadencia/gatilho.ts`). Um fluxo comum que
+  // os usasse passaria no schema e nunca inscreveria ninguém: a publicação dele
+  // os recusa (`app/api/v1/ai/followup-flows/[id]/publish/route.ts`).
+  z.strictObject({
+    kind: z.literal("tag_added"),
+    params: z.strictObject({ tag: z.string().trim().min(1).max(60) }),
+    ...CANCEL_ON_REPLY,
+  }),
+  z.strictObject({
+    /** O cliente escreveu e ninguém do time respondeu há N minutos. */
+    kind: z.literal("agent_sla"),
+    params: z.strictObject({ threshold_minutes: z.number().int().min(5).max(10_080) }),
+    ...CANCEL_ON_REPLY,
+  }),
+  z.strictObject({
+    /** Mandamos a última mensagem e o lead não responde há N minutos. */
+    kind: z.literal("lead_idle"),
+    params: z.strictObject({ threshold_minutes: z.number().int().min(60).max(43_200) }),
+    ...CANCEL_ON_REPLY,
+  }),
 ]);
+
+/** Os gatilhos que só a cadência implementa — fluxo comum não os publica. */
+export const GATILHOS_SO_DE_CADENCIA = ["tag_added", "agent_sla", "lead_idle"] as const;
 export type TriggerConfig = z.infer<typeof triggerConfigSchema>;
 
 /**

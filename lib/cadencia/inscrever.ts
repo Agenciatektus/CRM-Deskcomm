@@ -54,7 +54,9 @@ export type ResultadoDaInscricao =
 
 export type OrigemDaInscricao =
   | { tipo: "manual"; actorUserId: string; requestId: string }
-  | { tipo: "gatilho_etapa"; eventId: string; eventoEm: string };
+  | { tipo: "gatilho_etapa" | "gatilho_etiqueta"; eventId: string; eventoEm: string }
+  /** Varredura de tempo (atendente sem responder / lead parado): não há evento, há a conversa. */
+  | { tipo: "gatilho_tempo"; conversationId: string; eventoEm: string };
 
 interface CadenciaCarregada {
   id: string;
@@ -288,7 +290,10 @@ export async function inscreverNegocio(
     payload: {
       lead_id: negocio.leadId,
       origem: origem.tipo,
-      ...(origem.tipo === "gatilho_etapa" ? { event_log_id: origem.eventId } : {}),
+      ...(origem.tipo === "gatilho_etapa" || origem.tipo === "gatilho_etiqueta"
+        ? { event_log_id: origem.eventId }
+        : {}),
+      ...(origem.tipo === "gatilho_tempo" ? { conversation_id: origem.conversationId } : {}),
     },
     idempotency_key: `cadencia-inscricao:${enrollmentId}`,
   });
@@ -315,7 +320,15 @@ export async function inscreverNegocio(
  */
 export async function inscreverPorGatilho(
   admin: SupabaseClient,
-  input: { organizationId: string; pointerId: string; leadId: string; eventId: string; eventoEm: string },
+  input: {
+    organizationId: string;
+    pointerId: string;
+    leadId: string;
+    eventoEm: string;
+  } & (
+    | { eventId: string; origem?: "gatilho_etapa" | "gatilho_etiqueta" }
+    | { origem: "gatilho_tempo"; conversationId: string }
+  ),
 ): Promise<ResultadoDaInscricao> {
   const carregada = await carregarCadenciaParaInscricao(admin, input.organizationId, input.pointerId);
   if ("motivo" in carregada) return { ok: false, motivo: carregada.motivo };
@@ -329,9 +342,9 @@ export async function inscreverPorGatilho(
   if ((await reservarInscricoes(admin, input.organizationId, cadencia.id, 1)) < 1) {
     return { ok: false, motivo: "teto_do_dia" };
   }
-  return inscreverNegocio(admin, input.organizationId, cadencia, avaliacao.negocio, {
-    tipo: "gatilho_etapa",
-    eventId: input.eventId,
-    eventoEm: input.eventoEm,
-  });
+  const origem: OrigemDaInscricao =
+    input.origem === "gatilho_tempo"
+      ? { tipo: "gatilho_tempo", conversationId: input.conversationId, eventoEm: input.eventoEm }
+      : { tipo: input.origem ?? "gatilho_etapa", eventId: input.eventId, eventoEm: input.eventoEm };
+  return inscreverNegocio(admin, input.organizationId, cadencia, avaliacao.negocio, origem);
 }

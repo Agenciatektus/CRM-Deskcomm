@@ -37,6 +37,7 @@ import { createSupabaseAdminClient, runFollowupTick, type FollowupJobRequest } f
 import { createSupabaseFollowupGateDb } from "@/lib/followup/agent-followup-gate";
 import { enviarTextoFixoPendente } from "@/lib/followup/enviar-texto-fixo";
 import { createSupabaseSilenceSweepDb, runSilenceSweep } from "@/lib/followup/silence-sweep";
+import { depsDaVarreduraDeTempo, varrerGatilhosDeTempo } from "@/lib/cadencia/varredura-de-tempo";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,18 @@ async function handle(req: NextRequest): Promise<Response> {
     // resultado de runFollowupTick, que rodou (e foi auditado) antes disto.
     const detail = err instanceof Error ? err.message : String(err);
     logger.error("[followup-flow-worker.cron] runSilenceSweep threw", { error: detail, requestId });
+  }
+
+  // Gatilhos de TEMPO da cadência (cliente sem resposta do time / lead parado).
+  // Mesmo contrato do silence-sweep: falhar aqui não aborta o tick.
+  try {
+    const tempo = await varrerGatilhosDeTempo(depsDaVarreduraDeTempo(admin));
+    if (tempo.inscritos > 0) {
+      logger.info("[followup-flow-worker.cron] cadência por tempo", { ...tempo, requestId });
+    }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.error("[followup-flow-worker.cron] varrerGatilhosDeTempo threw", { error: detail, requestId });
   }
 
   // ponytail: instalação sem `agent-worker` (relógio HTTP, cron puro) não tem

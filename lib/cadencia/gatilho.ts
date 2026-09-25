@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * O GATILHO DE UMA CADÊNCIA — só o que a porta dela implementa.
  *
- * `manual` (inscrição pela tela do funil) e `stage_change` (negócio entrou numa
- * etapa DO FUNIL DA CADÊNCIA). Qualquer outro — silêncio, caso aberto, fim de
+ * `manual` (inscrição pela tela do funil), `stage_change` (negócio entrou numa
+ * etapa DO FUNIL DA CADÊNCIA), `tag_added` (etiqueta posta no negócio ou no
+ * contato) e os dois de TEMPO (`agent_sla`, `lead_idle`, pela varredura). Qualquer outro — silêncio, caso aberto, fim de
  * conversa — passaria no schema genérico e nunca inscreveria ninguém pela porta
  * da cadência; e, pior, com a cadência NO AR, o gatilho é lido ao vivo.
  *
@@ -19,11 +20,30 @@ export async function validarGatilhoDaCadencia(
   pipelineId: string | null,
   trigger: unknown,
 ): Promise<string | null> {
-  const t = trigger as { kind?: string; params?: { stage_id?: string } } | null;
+  const t = trigger as {
+    kind?: string;
+    params?: { stage_id?: string; tag?: string; threshold_minutes?: number };
+  } | null;
   const kind = t?.kind ?? "manual";
   if (kind === "manual") return null;
+  if (kind === "tag_added") {
+    const tag = t?.params?.tag?.trim() ?? "";
+    if (!tag) return "Escreva a etiqueta que coloca o negócio na cadência.";
+    if (tag.length > 60) return "A etiqueta tem no máximo 60 caracteres.";
+    return pipelineId ? null : "A cadência precisa pertencer a um funil.";
+  }
+  if (kind === "agent_sla" || kind === "lead_idle") {
+    const minutos = t?.params?.threshold_minutes;
+    const [min, max] = kind === "agent_sla" ? [5, 10_080] : [60, 43_200];
+    if (typeof minutos !== "number" || !Number.isInteger(minutos) || minutos < min || minutos > max) {
+      return kind === "agent_sla"
+        ? "O tempo sem resposta do time vai de 5 minutos a 7 dias."
+        : "O tempo sem resposta do lead vai de 1 hora a 30 dias.";
+    }
+    return pipelineId ? null : "A cadência precisa pertencer a um funil.";
+  }
   if (kind !== "stage_change") {
-    return "Na cadência, use o gatilho Etapa do funil ou a inscrição manual.";
+    return "Na cadência, use etapa do funil, etiqueta, tempo sem resposta ou a inscrição manual.";
   }
   const stageId = t?.params?.stage_id;
   if (!stageId) return "Escolha a etapa do funil que dispara a cadência.";
