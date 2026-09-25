@@ -241,7 +241,7 @@ export async function inscreverNegocio(
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .eq("contact_id", negocio.contactId)
-    .in("status", ["active", "waiting_reply", "paused_handoff"]);
+    .in("status", ["active", "waiting_reply", "paused_handoff", "paused_manual"]);
   if (vivasErr) throw new Error(`cadencia_inscricao_viva: ${vivasErr.message}`);
   if ((vivas ?? 0) > 0) return { ok: false, motivo: "ja_em_outro_fluxo" };
 
