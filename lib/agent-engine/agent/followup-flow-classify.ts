@@ -55,9 +55,10 @@ export function parseFollowupClassification(text: string, classes: string[]): st
 }
 
 /**
- * Classifica a última resposta do lead em uma de `classes`. `candidateText` é
- * "a última inbound DEPOIS do último outbound", já resolvida pelo chamador — e
- * só existe chamada quando ela existe. Sem resposta não é classe: `no_reply` é
+ * Classifica a última resposta do lead em uma de `classes`. `candidateText` é a
+ * resposta do lead ao envio do fluxo, já resolvida pelo chamador
+ * (`respostaAoEnvioDoFluxo` em followup-turn.ts) — e só existe chamada quando
+ * ela existe. Sem resposta não é classe: `no_reply` é
  * decisão do motor quando a carência do nó vence (node-handlers.ts), nunca
  * deste turno, que rodaria segundos depois do envio. Saída não-parseável/fora
  * de `classes` → erro (o job re-tenta pela fila; nunca adivinha uma classe

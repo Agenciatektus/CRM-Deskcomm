@@ -8,9 +8,16 @@
  *
  * `no_reply` é decisão do MOTOR quando a carência vence
  * (`case "ai_classify"` em lib/followup/node-handlers.ts). O turno, sem o que
- * classificar, termina sem chamar o modelo e sem chamar a ponte. A prova contra
- * Postgres real, pelo motor inteiro, é
- * `tests/invariants/followup-classificar-espera-a-resposta.test.ts`; aqui fica o
+ * classificar, termina sem chamar o modelo e entrega à ponte só `awaiting_reply`
+ * (o rastro da espera no dossiê, sem concluir o passo).
+ *
+ * "O que classificar" é a resposta do lead ao ENVIO DO FLUXO, mesmo que o agente
+ * tenha respondido no meio — não "a inbound depois do último outbound de
+ * qualquer um", que perdia a resposta nesse caso.
+ *
+ * A prova contra Postgres real, pelo motor inteiro, é
+ * `tests/invariants/followup-classificar-espera-a-resposta.test.ts` e
+ * `tests/invariants/followup-classificar-ciclo-completo.test.ts`; aqui fica o
  * ramo do handler, que roda no `verify`.
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,9 +59,13 @@ const job = {
   created_at: new Date(),
 } as JobRow;
 
+/** Quando o passo de envio do fluxo fechou (`action_sent`); `null` = o fluxo ainda não mandou nada. */
+let envioFechadoEm: Date | null = null;
+
 const pool = {
   query: vi.fn(async (sql: string) => {
     if (sql.includes("d.fechada_em::text")) return { rows: [{ ...boundary, status: "open", demanda_fechada_em: null }] };
+    if (sql.includes("'action_sent'")) return { rows: [{ fechado_em: envioFechadoEm }] };
     if (/from conversations c/.test(sql)) return { rows: [{ channel_session_id: "canal-1", archived_at: null }] };
     return { rows: [] };
   }),
@@ -79,13 +90,14 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(() => {
+  envioFechadoEm = null;
   complete.mockClear();
   runModelCall.mockReset();
   getLeadContext.mockReset();
 });
 
 describe("followup_turn purpose=classify", () => {
-  it("sem inbound depois do último envio: termina sem chamar o modelo e SEM concluir o passo", async () => {
+  it("sem inbound depois do último envio: termina sem chamar o modelo e SEM concluir o passo — só o rastro da espera", async () => {
     getLeadContext.mockResolvedValue(
       contexto([{ direction: "inbound", body: "oi", sent_at: "2026-09-26T09:00:00-03:00" }, ENVIO]),
     );
@@ -95,7 +107,8 @@ describe("followup_turn purpose=classify", () => {
     // Não-vacuidade: o handler chegou ao ramo de classify (leu o contexto).
     expect(getLeadContext).toHaveBeenCalledTimes(1);
     expect(runModelCall).not.toHaveBeenCalled();
-    expect(complete).not.toHaveBeenCalled();
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith(pool, expect.objectContaining({ nodeId: "c1", result: { kind: "awaiting_reply" } }));
   });
 
   it("controle: com inbound depois do envio, classifica pelo modelo e conclui com a classe", async () => {
@@ -112,5 +125,65 @@ describe("followup_turn purpose=classify", () => {
       pool,
       expect.objectContaining({ nodeId: "c1", result: { kind: "classified", class: "quer" } }),
     );
+  });
+
+  /**
+   * O caso comum numa organização com agente ativo: o lead responde ao envio do
+   * fluxo e o AGENTE responde antes de o job de classificar rodar. A regra
+   * antiga ("a última inbound depois do último outbound de qualquer um") não
+   * achava candidato e o fluxo saía por "sem resposta" com o cliente tendo
+   * respondido.
+   */
+  const COM_O_AGENTE_NO_MEIO = [
+    { direction: "inbound" as const, body: "oi", sent_at: "2026-09-26T09:00:00-03:00" },
+    ENVIO,
+    { direction: "inbound" as const, body: "quero sim", sent_at: "2026-09-26T10:05:00-03:00" },
+    { direction: "outbound" as const, body: "Que ótimo! Já te mando.", sent_at: "2026-09-26T10:05:30-03:00" },
+  ];
+
+  it("o agente respondeu antes do job: classifica a resposta do lead ao ENVIO DO FLUXO", async () => {
+    envioFechadoEm = new Date("2026-09-26T10:00:00.400-03:00");
+    getLeadContext.mockResolvedValue(contexto(COM_O_AGENTE_NO_MEIO));
+    runModelCall.mockResolvedValue({ result: { text: '{"class": "quer"}' }, model: "m" });
+
+    await run(job, pool, { workerId: "w1" });
+
+    expect(runModelCall).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(runModelCall.mock.calls[0])).toContain("quero sim");
+    expect(complete).toHaveBeenCalledWith(pool, expect.objectContaining({ result: { kind: "classified", class: "quer" } }));
+  });
+
+  it("a resposta que chega no MESMO segundo em que o passo de envio fechou ainda é resposta", async () => {
+    // `sent_at` do contexto vem truncado no segundo: o que decide é a posição.
+    envioFechadoEm = new Date("2026-09-26T10:00:00.900-03:00");
+    getLeadContext.mockResolvedValue(
+      contexto([ENVIO, { direction: "inbound", body: "sim", sent_at: "2026-09-26T10:00:00-03:00" }]),
+    );
+    runModelCall.mockResolvedValue({ result: { text: '{"class": "quer"}' }, model: "m" });
+
+    await run(job, pool, { workerId: "w1" });
+
+    expect(complete).toHaveBeenCalledWith(pool, expect.objectContaining({ result: { kind: "classified", class: "quer" } }));
+  });
+
+  it("inbound sem texto depois do envio não vira pergunta vazia ao modelo", async () => {
+    envioFechadoEm = new Date("2026-09-26T10:00:00.400-03:00");
+    getLeadContext.mockResolvedValue(
+      contexto([ENVIO, { direction: "inbound", body: "  ", sent_at: "2026-09-26T10:05:00-03:00" }]),
+    );
+
+    await run(job, pool, { workerId: "w1" });
+
+    expect(runModelCall).not.toHaveBeenCalled();
+    expect(complete).toHaveBeenCalledWith(pool, expect.objectContaining({ result: { kind: "awaiting_reply" } }));
+  });
+
+  it("sem envio do fluxo antes do nó, vale a regra de antes (a inbound que ninguém respondeu)", async () => {
+    getLeadContext.mockResolvedValue(contexto(COM_O_AGENTE_NO_MEIO));
+
+    await run(job, pool, { workerId: "w1" });
+
+    expect(runModelCall).not.toHaveBeenCalled();
+    expect(complete).toHaveBeenCalledWith(pool, expect.objectContaining({ result: { kind: "awaiting_reply" } }));
   });
 });

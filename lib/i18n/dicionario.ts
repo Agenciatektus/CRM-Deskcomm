@@ -6872,6 +6872,8 @@ export const DICIONARIO: Traducoes = {
   },
   "Pediu ao agente para escrever a mensagem": { es: "Le pidió al agente que escribiera el mensaje" },
   "Pediu ao agente para interpretar a resposta": { es: "Le pidió al agente que interpretara la respuesta" },
+  "Esperando a resposta do cliente": { es: "Esperando la respuesta del cliente" },
+  "O cliente não respondeu dentro do prazo": { es: "El cliente no respondió dentro del plazo" },
   "Conferiu se a mensagem já tinha saído": { es: "Verificó si el mensaje ya había salido" },
   "Mensagem enviada": { es: "Mensaje enviado" },
   "Segurou o fluxo por causa de um retorno agendado": {
