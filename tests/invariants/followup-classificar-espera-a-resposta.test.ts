@@ -26,7 +26,8 @@ import { relogioAncoradoNoBanco } from "./followup-relogio";
  * vence") — é: o lead tem as 24 h para responder; só depois disso o fluxo segue
  * por "sem resposta".
  *
- * O caminho de produção, lido no código e MEDIDO aqui:
+ * O caminho de produção ATÉ O CONSERTO, lido no código e MEDIDO aqui na main
+ * 610142d21:
  *   1. a 1ª entrada no `ai_classify` devolve `enqueue_turn(classify)` na hora
  *      (`node-handlers.ts`, `case "ai_classify"`), e o motor enfileira o
  *      `followup_turn` SEM `run_after` — o worker o pega no poll seguinte;
@@ -48,9 +49,10 @@ import { relogioAncoradoNoBanco } from "./followup-relogio";
  * reivindicado da fila, a mensagem de saída é gravada como o envio a grava, e
  * a conclusão vai pela MESMA ponte que o worker chama.
  *
- * Quatro casos, e a catraca é o único `it.fails`:
+ * Quatro casos. A catraca nasceu `it.fails` e foi virada para `it` no conserto
+ * (o turno de classify sem resposta nova termina sem concluir o passo):
  *   - controle positivo (normal): o caminho inteiro roda sem exceção, com o
- *     enrollment posto no classificar PELO MOTOR. Existe porque `it.fails` é
+ *     enrollment posto no classificar PELO MOTOR. Existia porque `it.fails` é
  *     satisfeito por QUALQUER falha — fixture quebrada ou throw no handler
  *     deixariam a catraca verde pelo motivo errado; aqui eles reprovam alto;
  *   - a catraca: sem resposta, o job não consome a espera;
@@ -378,16 +380,16 @@ describe("classificar a resposta espera a resposta", () => {
   });
 
   /**
-   * ⛔ VERMELHO NA MAIN (610142d21) — por isso `it.fails`. Medido: depois do job,
-   * o enrollment está em `e_sem` (status `active`), com o evento
-   * `ai_classified {class: "no_reply"}` no nó `c1` — o lead teve os segundos
+   * Era VERMELHO NA MAIN (610142d21), e por isso nasceu `it.fails`. Medido: depois
+   * do job, o enrollment estava em `e_sem` (status `active`), com o evento
+   * `ai_classified {class: "no_reply"}` no nó `c1` — o lead tinha os segundos
    * entre o envio e o poll do worker para responder, não as 24 h do nó.
    *
-   * Quando o conserto entrar, esta catraca passa a reprovar com "Expected to
-   * fail, but passed": tire o `.fails`. O controle positivo acima garante que
-   * ela não está verde por fixture quebrada nem por exceção no caminho.
+   * Virada para `it` no conserto: sem resposta nova, o turno de classify termina
+   * sem concluir o passo, e quem roteia `no_reply` é o tick quando a carência
+   * vence (controle 2).
    */
-  it.fails("sem resposta do cliente, o job NÃO consome a espera: o enrollment segue no classificar, em waiting_reply, sem saída no_reply", async () => {
+  it("sem resposta do cliente, o job NÃO consome a espera: o enrollment segue no classificar, em waiting_reply, sem saída no_reply", async () => {
     const c = await cenarioAteOClassificar();
     const antes = Date.now();
 

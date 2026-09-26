@@ -509,12 +509,26 @@ async function runFlowDrivenTurn(
     if (!context.ok) {
       throw new Error(`turno de classificação do fluxo falhou em get_lead_context (${context.error.code})`);
     }
+    const candidateText = lastInboundSinceLastOutbound(context.context);
+    if (candidateText === null) {
+      // O lead ainda não respondeu ao último envio: não há o que classificar
+      // AGORA, e isso não é "sem resposta". O turno termina sem concluir o passo
+      // — o enrollment segue em `waiting_reply` com a carência inteira. Quem
+      // decide daqui é o motor: a resposta que chegar acorda o nó (reactivity →
+      // novo turno de classify) e a carência vencida roteia `no_reply` sem LLM
+      // (`case "ai_classify"` em lib/followup/node-handlers.ts). Concluir aqui
+      // com `no_reply` avançava o fluxo segundos depois do envio.
+      runLog.info('classificação adiada — o lead ainda não respondeu; o nó segue esperando a resposta ou a carência', {
+        node_id: nodeId,
+      });
+      return;
+    }
     const cls = await classifyFollowupReply(
       pool,
       deps.llmCfg,
       { tenantId: target.tenantId, leadId: target.leadId, jobId: job.id },
       {
-        candidateText: lastInboundSinceLastOutbound(context.context),
+        candidateText,
         classes,
         ...(input.hint !== undefined ? { hint: input.hint } : {}),
         ...(deps.knobs.followupAi?.model !== undefined ? { model: deps.knobs.followupAi.model } : {}),
