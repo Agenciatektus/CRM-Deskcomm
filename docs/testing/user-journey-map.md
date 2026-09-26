@@ -2998,3 +2998,57 @@ Port do #1130 (@vgamkt), PR 3 de 4. Spec: `tests/e2e/fluxo-de-atendimento.spec.t
 | J33.4 | Três mensagens pelo webhook do WAHA; a ficha mostra o roteiro «Concluído» com CPF e modelo (caixa medida por `boundingBox` e estilo computado) |
 
 **NÃO coberto por esta spec:** o turno do agente roda com o worker e o modelo de verdade — no CI não há nenhum dos dois, e a spec chama as mesmas funções do motor (`prepararRoteiroDoTurno`, `garantirPerguntaDoRoteiro`) com o validador devolvendo `indefinido`. A pergunta enviada ao cliente pelo WhatsApp e a leitura pelo validador de modelo ficam para a prova do PR 4.
+
+## J34 — Enviar e classificar a resposta: o cliente tem o prazo inteiro `[P1]` (2026-09-26)
+
+O fluxo mais natural do construtor: uma mensagem e, logo depois, o passo
+"Classificar resposta" com um prazo de espera. A tela promete que o cliente tem
+esse prazo para responder; só depois dele o fluxo segue por "Sem resposta".
+
+**Achado de origem (medido na `main` 610142d21):** o turno de classificar rodava
+segundos depois do envio, não via resposta e concluía `no_reply` sozinho — o
+fluxo saía por "Sem resposta" sem o prazo correr. Consertado em
+`lib/agent-engine/agent/followup-turn.ts`; a verificação cética do conserto
+achou três defeitos irmãos, consertados na mesma branch:
+
+1. **O desfecho sumia.** Com a saída "sem resposta" acontecendo só pela carência
+   vencida (tick do motor), o evento era `node_advanced` sem classe, e a
+   condição "Desfecho do passo anterior" (#527) lia `null` — o mesmo grafo e o
+   mesmo lead iam para `e_sim` na `main` e para `e_nao` depois do 1º conserto.
+   Agora o avanço grava `class: "no_reply"` e `ultimoDesfechoDe` o lê.
+2. **A resposta sumia quando o agente respondia primeiro.** O candidato era "a
+   última inbound depois do último outbound de QUALQUER um". Numa organização
+   com agente ativo, o agente responde na hora e o job de classificar sai no
+   tick seguinte: nenhum candidato, carência recomeçando, saída por "Sem
+   resposta" com o cliente tendo respondido. Agora é a resposta do lead ao
+   ENVIO DO FLUXO (o último outbound até o `action_sent`), pela posição no
+   histórico.
+3. **A espera parecia travamento.** O dossiê mostrava "Pediu ao agente para
+   interpretar a resposta" e mais nada por até o prazo inteiro. Agora o turno
+   que espera grava `classify_waiting`, lido como "Esperando a resposta do
+   cliente — se ele não responder até <hora>, o fluxo segue sem a resposta"; e a
+   saída pelo prazo vencido é lida como "O cliente não respondeu dentro do prazo".
+
+| # | Caso | Esperado | Resultado |
+|---|------|----------|-----------|
+| J34.1 | Sem resposta, o 1º job roda | o enrollment segue no classificar, em `waiting_reply`, com o prazo inteiro; job `done` em 1 tentativa; uma linha "Esperando a resposta do cliente" no dossiê | PASS no `test:db` (`followup-classificar-espera-a-resposta.test.ts`, catraca; `followup-classificar-ciclo-completo.test.ts`, caso D) |
+| J34.2 | A resposta chega DEPOIS do job vazio | reatividade (linha REAL de `event_log`) acorda o nó, o tick enfileira o 2º job sem forçar relógio, e ele classifica pela classe | PASS no `test:db` (ciclo completo, caso A) |
+| J34.3 | O lead responde e o AGENTE responde antes do job | a resposta do lead ao envio do fluxo é a classificada; o texto do agente não vai ao modelo | PASS no `test:db` (caso C) e em unit (`tests/unit/followup-classificar-sem-resposta.test.ts`) |
+| J34.4 | A resposta chega entre o envio e a 1ª entrada no classificar | o 1º job já classifica | PASS no `test:db` (caso E) |
+| J34.5 | Ninguém responde até o prazo vencer | o motor sai por "Sem resposta" sem chamar o modelo e grava o desfecho `no_reply` | PASS no `test:db` (caso B; controle 2 do arquivo irmão) |
+| J34.6 | Condição "Desfecho do passo anterior" depois de "Sem resposta" | `last_outcome = no_reply`; com a classe "não quer", a mesma condição vai para o outro ramo | PASS no `test:db` (ciclo completo, `describe` do #527) e em unit (`followup-desfecho-do-passo-anterior.test.ts`) |
+| J34.7 | O dossiê do enrollment pela TELA | as duas linhas novas aparecem em português | **NÃO PROVADO pela tela** — a rodada proibiu `next build`/servidor; a frase é provada pela mesma `descreveEvento` que a tela chama, sobre a linha REAL do banco (caso D/B), e em `lib/followup/eventos-legiveis.test.ts` |
+
+Sabotagens medidas (cada conserto desfeito, o teste fica vermelho, restaurado com
+`cp -p` e conferido com `cmp`): sem a classe no avanço, B e o desfecho reprovam
+(`e_nao` no lugar de `e_sim`); `ultimoDesfechoDe` lendo só `ai_classified`, o
+desfecho reprova; o candidato antigo, C reprova (e 3 casos em unit); a janela por
+horário em vez de posição, o caso do mesmo segundo reprova; sem o rastro, D
+reprova; o nó sem reenfileirar no despertar, A e C reprovam.
+
+**Fica declarado:** sem nenhum envio do fluxo antes do classificar (classificar
+logo depois do acionamento), vale a regra antiga — a inbound que ninguém
+respondeu; se a mensagem do fluxo saiu da janela do histórico (`historyLimit`),
+vale o horário, no segundo. Uma inbound sem texto acorda o nó, não é
+classificada, e a carência recomeça desse despertar (comportamento anterior do
+motor, não mexido aqui).
