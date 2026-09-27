@@ -284,6 +284,31 @@ describe("GET /api/v1/ai/runs", () => {
     expect(corpo.data.resumo.erros).toBe(1);
   });
 
+  /**
+   * A resposta ao follow-up (onda 4): as duas linhas que `lib/ai/decisao/followup.ts`
+   * grava — a medida e a falha que pede ação — com o nome do ponto, sem afirmar
+   * que o Jev decidiu nem a consequência de o follow-up travar (a saída foi a
+   * da IA de sempre). É a leitura que `tests/invariants/jev-followup-no-turno.test.ts`
+   * confere no banco.
+   */
+  it("a linha do Jev na resposta ao follow-up diz o nome do ponto, que ele só observou, e a falha dele não trava o follow-up", async () => {
+    const doFollowup = { purpose: "followup_classify", provider: "typesafe", model: "typesafe/jev-1.13.0", origem_da_escolha: "jev_observacao" };
+    linhas = [
+      linha(doFollowup),
+      linha({ ...doFollowup, status: "erro", error_code: "jev_sem_credito", http_status: 402, input_tokens: 0, output_tokens: 0, cost_cents: 0 }),
+    ];
+    const { corpo } = await pedir();
+    const [medida, falha] = corpo.data.execucoes;
+    expect(medida.pontoRotulo).toBe("Ler a resposta ao follow-up");
+    expect(medida.porQueEsteModelo).toBe(EXPLICACAO_DA_ORIGEM.jev_observacao);
+    expect(falha.pontoRotulo).toBe("Ler a resposta ao follow-up");
+    // Controle: o ponto TEM sintoma ("o follow-up trava") — e a falha do Jev não o causa.
+    expect(PONTO_POR_ID.get("followup_classify")?.sintomaDeFalha).toBeTruthy();
+    expect(falha.consequencia).toBeNull();
+    expect(falha.porQueEsteModelo).toBe(JEV_FALHOU_AO_LADO);
+    expect(falha.oQueFazer).toBe(O_QUE_FAZER_DO_JEV.jev_sem_credito);
+  });
+
   it("observação com a IA de sempre caída: a falha dela não afirma consequência que não houve", async () => {
     linhas = [linha({ status: "erro", error_code: "provedor_indisponivel", origem_da_escolha: "jev_cobriu" })];
     const { corpo } = await pedir();

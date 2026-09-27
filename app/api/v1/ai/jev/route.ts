@@ -21,11 +21,13 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * roteador de intenção ativo; `sem_atendente`, as de pedido numa empresa em que
  * o atendimento automático não roda em número nenhum (ninguém no ar sem pausa,
  * ou o atendimento com um sistema de fora) — o worker só as pergunta onde ele
- * roda.
+ * roda; `sem_fluxo`, a do follow-up numa empresa sem follow-up publicado com o
+ * passo "Classificar (IA)".
  *
  * PATCH liga, desliga, troca o modo do clima (`modo`, o nome da onda 1) e o
  * estado de uma tarefa (`tarefa` + `estado` — na em cascata, `decidindo` é o
- * "Avisar a equipe" da tela). Ligar manda cada mensagem que o cliente
+ * "Avisar a equipe" da tela; na que só observa, `decidindo` é recusado com
+ * `jev_tarefa_so_observa`). Ligar manda cada mensagem que o cliente
  * escreve, uma de cada vez e sem o resto da conversa, a um fornecedor nos EUA, então exige chave validada e, na primeira
  * vez, o aceite explícito do administrador (LGPD, D6), que fica gravado com
  * quem e quando. O interruptor mora em `organizations.settings.jev`
@@ -58,10 +60,12 @@ import {
   TAREFA_DO_CLIMA,
   TAREFAS_DO_JEV,
   tarefaEhNova,
+  algumFluxoQueClassifica,
   algumRoteadorQuePergunta,
   TAREFA_DA_MANIPULACAO,
   tarefaSemAtendente,
   tarefaSemCamada,
+  tarefaSemFluxo,
   tarefaSemRoteador,
   type SemAtendente,
 } from "@/lib/ai/decisao/tarefas";
@@ -145,6 +149,7 @@ function porTarefa(
   camadas: ReturnType<typeof camadasEfetivas>,
   temRoteadorQuePergunta: boolean,
   semAtendente: SemAtendente | null,
+  temFluxoQueClassifica: boolean,
 ) {
   return TAREFAS_DO_JEV.map((t) => ({
     id: t.id,
@@ -165,6 +170,9 @@ function porTarefa(
     // As de pedido, onde o atendimento automático não roda em número nenhum: o
     // worker nunca as pergunta, e "Só observa" com "percebeu 0" mentiria.
     sem_atendente: tarefaSemAtendente(t, semAtendente),
+    // A do follow-up sem follow-up publicado com o passo "Classificar (IA)":
+    // ninguém lê a resposta, e "observando" esperaria uma comparação que não vem.
+    sem_fluxo: tarefaSemFluxo(t, temFluxoQueClassifica),
   }));
 }
 
@@ -413,7 +421,7 @@ export async function GET(): Promise<Response> {
     }
   };
 
-  const [orgRes, credsRes, semana, comparadasRes, iaDeSempre, percebidasRes, observacoes, percebidos, camadasRes, roteadoresRes, haQuemAtenda] = await Promise.all([
+  const [orgRes, credsRes, semana, comparadasRes, iaDeSempre, percebidasRes, observacoes, percebidos, camadasRes, roteadoresRes, haQuemAtenda, fluxosRes] = await Promise.all([
     db.from("organizations").select("settings").eq("id", org.orgId).maybeSingle(),
     db
       .from("ai_provider_credentials")
@@ -460,6 +468,13 @@ export async function GET(): Promise<Response> {
       .eq("organization_id", org.orgId)
       .eq("is_active", true),
     lerQuemAtende(),
+    // Os follow-ups publicados, com o grafo da versão ativa: é nele que se vê o
+    // passo "Classificar (IA)" (`algumFluxoQueClassifica`).
+    db
+      .from("followup_flow_pointers")
+      .select("versao:followup_flow_versions!followup_flow_pointers_active_version_id_fkey(graph)")
+      .eq("organization_id", org.orgId)
+      .eq("status", "active"),
   ]);
 
   const erro =
@@ -471,7 +486,8 @@ export async function GET(): Promise<Response> {
     observacoes.erro ??
     percebidos.erro ??
     camadasRes.error?.message ??
-    roteadoresRes.error?.message;
+    roteadoresRes.error?.message ??
+    fluxosRes.error?.message;
   if (erro) return fail("query_failed", erro, 500, { requestId });
 
   const credenciais = credsRes.data ?? [];
@@ -521,6 +537,7 @@ export async function GET(): Promise<Response> {
         camadasEfetivas(camadasRes.data ?? []),
         algumRoteadorQuePergunta(roteadoresRes.data ?? []),
         semAtendente,
+        algumFluxoQueClassifica(fluxosRes.data ?? []),
       ),
       tem_ia_de_sempre: iaDeSempre !== null,
       numeros: {
@@ -594,6 +611,12 @@ export async function PATCH(req: NextRequest): Promise<Response> {
       : corpo.modo !== undefined
         ? { tarefa: TAREFA_DO_CLIMA.id, estado: ESTADO_DO_MODO[corpo.modo] }
         : null;
+  // A tarefa que só observa não tem o que decidir: aceitar o pedido gravaria um
+  // estado que o worker não obedece e que o cartão mostraria como "Só observa".
+  const soObserva = pedido ? TAREFAS_DO_JEV.find((x) => x.id === pedido.tarefa)?.soObserva : undefined;
+  if (pedido?.estado === "decidindo" && soObserva !== undefined) {
+    return fail("jev_tarefa_so_observa", t(soObserva), 422, { requestId });
+  }
   const estadoAnterior = pedido ? estadoGravadoDaTarefa(atual, pedido.tarefa) : undefined;
   if (pedido && pedido.estado !== estadoAnterior) mudanca.tarefas = { [pedido.tarefa]: pedido.estado };
   if (corpo.ligado === false && atual.ligado) mudanca.ligado = false;
