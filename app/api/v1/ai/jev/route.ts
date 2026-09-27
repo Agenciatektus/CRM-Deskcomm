@@ -22,7 +22,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * o atendimento automático não roda em número nenhum (ninguém no ar sem pausa,
  * ou o atendimento com um sistema de fora) — o worker só as pergunta onde ele
  * roda; `sem_fluxo`, a do follow-up numa empresa sem follow-up publicado com o
- * passo "Classificar (IA)".
+ * passo "Classificar (IA)" e sem inscrição andando numa versão que o tenha.
  *
  * PATCH liga, desliga, troca o modo do clima (`modo`, o nome da onda 1) e o
  * estado de uma tarefa (`tarefa` + `estado` — na em cascata, `decidindo` é o
@@ -62,6 +62,7 @@ import {
   tarefaEhNova,
   algumFluxoQueClassifica,
   algumRoteadorQuePergunta,
+  INSCRICAO_ENCERRADA,
   TAREFA_DA_MANIPULACAO,
   tarefaSemAtendente,
   tarefaSemCamada,
@@ -421,7 +422,7 @@ export async function GET(): Promise<Response> {
     }
   };
 
-  const [orgRes, credsRes, semana, comparadasRes, iaDeSempre, percebidasRes, observacoes, percebidos, camadasRes, roteadoresRes, haQuemAtenda, fluxosRes] = await Promise.all([
+  const [orgRes, credsRes, semana, comparadasRes, iaDeSempre, percebidasRes, observacoes, percebidos, camadasRes, roteadoresRes, haQuemAtenda, fluxosRes, versoesEmCursoRes] = await Promise.all([
     db.from("organizations").select("settings").eq("id", org.orgId).maybeSingle(),
     db
       .from("ai_provider_credentials")
@@ -475,6 +476,17 @@ export async function GET(): Promise<Response> {
       .select("versao:followup_flow_versions!followup_flow_pointers_active_version_id_fkey(graph)")
       .eq("organization_id", org.orgId)
       .eq("status", "active"),
+    // E as versões em que alguma inscrição ainda anda: o motor as leva ao passo
+    // mesmo com o follow-up desativado ou republicado sem ele — e cada resposta
+    // vai ao Jev. Sem elas, o cartão diria "Não roda" com dados saindo.
+    // ponytail: o `!inner` procura a inscrição viva por versão, sem índice em
+    // `version_id`; se pesar, um índice parcial nos status vivos.
+    db
+      .from("followup_flow_versions")
+      .select("graph, inscricoes:followup_enrollments!inner(id)")
+      .eq("organization_id", org.orgId)
+      .not("inscricoes.status", "in", INSCRICAO_ENCERRADA)
+      .limit(1, { referencedTable: "inscricoes" }),
   ]);
 
   const erro =
@@ -487,7 +499,8 @@ export async function GET(): Promise<Response> {
     percebidos.erro ??
     camadasRes.error?.message ??
     roteadoresRes.error?.message ??
-    fluxosRes.error?.message;
+    fluxosRes.error?.message ??
+    versoesEmCursoRes.error?.message;
   if (erro) return fail("query_failed", erro, 500, { requestId });
 
   const credenciais = credsRes.data ?? [];
@@ -537,7 +550,10 @@ export async function GET(): Promise<Response> {
         camadasEfetivas(camadasRes.data ?? []),
         algumRoteadorQuePergunta(roteadoresRes.data ?? []),
         semAtendente,
-        algumFluxoQueClassifica(fluxosRes.data ?? []),
+        algumFluxoQueClassifica([
+          ...(fluxosRes.data ?? []),
+          ...(versoesEmCursoRes.data ?? []).map((versao) => ({ versao })),
+        ]),
       ),
       tem_ia_de_sempre: iaDeSempre !== null,
       numeros: {

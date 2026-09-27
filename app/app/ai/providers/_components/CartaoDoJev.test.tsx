@@ -1429,7 +1429,7 @@ describe("CartaoDoJev — a tarefa do follow-up, que só observa", () => {
     const linha = screen.getByTestId("jev-tarefa-followup");
     expect(linha).toHaveTextContent("Só observa");
     expect(screen.getByTestId("jev-concordancia-followup")).toHaveTextContent(
-      "Nos últimos 30 dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em 3 de 4 respostas.",
+      "Nos últimos 30 dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em 3 de 4 mensagens.",
     );
     expect(screen.getByTestId("jev-concordancia-numeros-followup")).toHaveTextContent("3 de 4");
     expect(screen.getByTestId("jev-so-observa-followup")).toHaveTextContent(TAREFA_DO_FOLLOWUP.soObserva);
@@ -1519,7 +1519,13 @@ describe("CartaoDoJev — a tarefa do follow-up, que só observa", () => {
       }),
     );
     expect(screen.getByTestId("jev-ao-ligar-followup")).toHaveTextContent("(Não roda)");
-    expect(screen.getByTestId("jev-ao-ligar-sem-fluxo-followup")).toHaveTextContent(/nenhum follow-up publicado tem o passo/);
+    const semFluxoAoLigar = screen.getByTestId("jev-ao-ligar-sem-fluxo-followup");
+    expect(semFluxoAoLigar).toHaveTextContent(/nenhum follow-up publicado tem o passo “Classificar \(IA\)” com duas saídas ou mais/);
+    // O caminho para resolver, antes de ligar também — é a primeira impressão de quem ainda não publicou.
+    expect(within(semFluxoAoLigar).getByRole("link", { name: "Abrir os follow-ups" })).toHaveAttribute(
+      "href",
+      "/app/ai/followups",
+    );
     // O clima observa e pode decidir: a frase de sempre (controle).
     expect(screen.getByTestId("jev-ao-ligar")).toHaveTextContent(
       "Onde ele só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
@@ -1536,6 +1542,6 @@ describe("CartaoDoJev — a tarefa do follow-up, que só observa", () => {
     );
     expect(screen.getByTestId("jev-so-observa-followup")).toHaveTextContent(/^En esta versión, Jev solo observa esta tarea/);
     expect(screen.getByTestId("jev-sem-fluxo-followup_2")).toHaveTextContent(/^No se ejecuta ahora: ningún seguimiento publicado/);
-    expect(screen.getByTestId("jev-concordancia-followup")).toHaveTextContent(/pusieron la respuesta del cliente en la misma salida del flujo en 3 de 4 respuestas\./);
+    expect(screen.getByTestId("jev-concordancia-followup")).toHaveTextContent(/pusieron la respuesta del cliente en la misma salida del flujo en 3 de 4 mensajes\./);
   });
 });

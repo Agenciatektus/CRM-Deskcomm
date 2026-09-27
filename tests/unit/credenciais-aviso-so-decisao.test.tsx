@@ -30,6 +30,8 @@ const banco = vi.hoisted(() => ({
   roteadores: [] as unknown[],
   /** `followup_flow_pointers` publicados, com a versão ativa — sem o passo "Classificar (IA)", a tarefa do follow-up não roda. */
   fluxos: [] as unknown[],
+  /** `followup_flow_versions` com inscrição que ainda anda (`graph`) — o follow-up desativado segue mandando respostas ao Jev. */
+  versoesEmCurso: [] as unknown[],
 }));
 const api = vi.hoisted(() => ({ get: vi.fn(), patch: vi.fn(), post: vi.fn(), delete: vi.fn() }));
 
@@ -55,7 +57,9 @@ vi.mock("@/lib/supabase/server", () => ({
             ? banco.roteadores
             : tabela === "followup_flow_pointers"
               ? banco.fluxos
-              : [];
+              : tabela === "followup_flow_versions"
+                ? banco.versoesEmCurso
+                : [];
       const chain: Record<string, unknown> = {
         then: (ok: (v: unknown) => unknown, erro: (e: unknown) => unknown) =>
           Promise.resolve({ data: dados, error: null }).then(ok, erro),
@@ -65,7 +69,7 @@ vi.mock("@/lib/supabase/server", () => ({
           error: null,
         }),
       };
-      for (const m of ["select", "eq", "order", "in", "limit"]) chain[m] = () => chain;
+      for (const m of ["select", "eq", "order", "in", "limit", "not"]) chain[m] = () => chain;
       return chain;
     },
   }),
@@ -129,6 +133,7 @@ beforeEach(() => {
   banco.iaPrincipal = true;
   banco.roteadores = [];
   banco.fluxos = [];
+  banco.versoesEmCurso = [];
 });
 afterEach(() => {
   cleanup();
@@ -218,13 +223,21 @@ describe("tela de Credenciais — onde a chave do Jev trabalha", () => {
   it("a leitura da resposta ao follow-up só entra no \"Usada em\" com um follow-up publicado com o passo \"Classificar (IA)\"", async () => {
     ambiente([]);
     banco.settings = { jev: { ligado: true, modo: "observacao", aceite: ACEITE } };
-    const fluxo = (...tipos: string[]) => ({ versao: { graph: { nodes: tipos.map((type) => ({ type })) } } });
+    const grafo = (...tipos: string[]) => ({ graph: { nodes: tipos.map((type) => ({ type, config: { classes: ["quer", "não quer"] } })) } });
+    const fluxo = (...tipos: string[]) => ({ versao: grafo(...tipos) });
     banco.fluxos = [fluxo("trigger", "action", "end")];
     await abrir([JEV, ANTHROPIC]);
     expect(screen.getByTestId("credencial-usada-em")).not.toHaveTextContent("Ler a resposta ao follow-up");
 
     cleanup();
     banco.fluxos = [fluxo("trigger", "action", "ai_classify")];
+    await abrir([JEV, ANTHROPIC]);
+    expect(screen.getByTestId("credencial-usada-em")).toHaveTextContent("Ler a resposta ao follow-up");
+
+    // Nenhum publicado, mas uma inscrição andando numa versão com o passo: a chave trabalha nisso.
+    cleanup();
+    banco.fluxos = [];
+    banco.versoesEmCurso = [grafo("trigger", "action", "ai_classify")];
     await abrir([JEV, ANTHROPIC]);
     expect(screen.getByTestId("credencial-usada-em")).toHaveTextContent("Ler a resposta ao follow-up");
   });

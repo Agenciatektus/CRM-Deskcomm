@@ -283,7 +283,8 @@ export const TAREFA_DO_PEDIDO_PARA_PARAR = {
  * `novo`). Decidindo, a classe dele tomaria o lugar da dela — e é por isso que
  * nesta versão ela SÓ OBSERVA (`soObserva`): a classe move o cliente no fluxo,
  * e deixar o Jev movê-lo espera a concordância medida com respostas de verdade.
- * Só roda onde algum follow-up publicado tem o passo (`tarefaSemFluxo`).
+ * Só roda onde algum follow-up tem o passo, publicado ou com inscrição em
+ * andamento (`tarefaSemFluxo`).
  */
 export const TAREFA_DO_FOLLOWUP = {
   id: "followup",
@@ -296,7 +297,9 @@ export const TAREFA_DO_FOLLOWUP = {
   // A régua é a MESMA SAÍDA: a classe dele contra a da IA de sempre, ao pé da letra.
   concordancia: {
     antes: "dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em",
-    depois: "respostas.",
+    // "mensagens", como no "Ainda não há mensagens medidas" do mesmo lugar: a
+    // unidade não muda entre o cartão vazio e o com número.
+    depois: "mensagens.",
   },
   rotulo: "Ler a resposta ao follow-up",
   oQueFaz:
@@ -452,28 +455,69 @@ export function tarefaSemRoteador(tarefa: Pick<TarefaDoJev, "id">, temRoteadorQu
   return tarefa.id === TAREFA_DO_ROTEADOR.id && !temRoteadorQuePergunta;
 }
 
+/** O fornecedor aceita até 255 opções numa escolha — e na do follow-up não há "nenhuma". */
+export const SAIDAS_NO_MAXIMO = 255;
+
 /**
- * Das linhas de `followup_flow_pointers` publicados (`status = 'active'`), lidas
- * com a versão ativa embutida (`versao: { graph }`), alguma tem o passo
- * "Classificar (IA)" (`ai_classify`)? Só nele a IA de sempre lê a resposta ao
- * follow-up — e o Jev, ao lado dela.
+ * As saídas de um passo "Classificar (IA)" podem ser perguntadas ao Jev
+ * (`perguntaDoFollowup`, `./followup.ts`)? De 2 a `SAIDAS_NO_MAXIMO`, nenhuma
+ * em branco, nenhuma repetida. Com UMA saída não há escolha: a IA de sempre só
+ * pode devolver ela, o Jev também, e cada resposta seria uma concordância paga
+ * e vazia puxando o "X de Y" para 100%. Em branco ou repetida, a API recusaria
+ * a chamada inteira, e a recusa abriria o disjuntor da tarefa sem ninguém ter
+ * errado nada (a chave de um critério é o nome da saída — duas iguais seriam
+ * uma só).
+ */
+export function saidasCabemNaPergunta(classes: readonly unknown[]): boolean {
+  return (
+    classes.length >= 2 &&
+    classes.length <= SAIDAS_NO_MAXIMO &&
+    classes.every((c) => typeof c === "string" && c.trim() !== "") &&
+    new Set(classes).size === classes.length
+  );
+}
+
+/**
+ * Os status em que a inscrição já não anda (`followup_enrollments.status`), no
+ * formato do filtro `in` do PostgREST. Fora deles, o motor ainda pode levá-la ao
+ * passo "Classificar (IA)" da versão EM QUE ELA ESTÁ — que pode não ser a
+ * publicada, nem estar num fluxo ativo: desativar um follow-up não encerra as
+ * inscrições dele, e publicar outra versão não as muda de versão.
+ */
+export const INSCRICAO_ENCERRADA = "(completed,cancelled,dead)";
+
+/**
+ * Das versões lidas com o grafo (`{ versao: { graph } }`) — a ativa de cada
+ * follow-up publicado, e a de cada inscrição que ainda anda (fora de
+ * `INSCRICAO_ENCERRADA`) —, alguma tem o passo "Classificar (IA)" com saídas
+ * que o Jev pode ser perguntado (`saidasCabemNaPergunta`)? Só nele a IA de
+ * sempre escolhe a saída pela resposta ao follow-up — e o Jev, ao lado dela.
  */
 export function algumFluxoQueClassifica(fluxos: ReadonlyArray<{ versao?: unknown }>): boolean {
   return fluxos.some((f) => {
     const versao = f.versao as { graph?: { nodes?: unknown } } | null | undefined;
     const nos = versao?.graph?.nodes;
-    return Array.isArray(nos) && nos.some((n) => (n as { type?: unknown } | null)?.type === "ai_classify");
+    return (
+      Array.isArray(nos) &&
+      nos.some((n) => {
+        const no = n as { type?: unknown; config?: { classes?: unknown } } | null;
+        const classes: unknown = no?.type === "ai_classify" ? no.config?.classes : undefined;
+        return Array.isArray(classes) && saidasCabemNaPergunta(classes);
+      })
+    );
   });
 }
 
 /**
- * A tarefa do follow-up numa organização sem follow-up publicado com o passo
- * "Classificar (IA)": ninguém lê resposta ao follow-up, e "observando" diria
- * "Ainda não há mensagens medidas pelos dois" para sempre. `temFluxoQueClassifica`
- * é lido por quem chama (`algumFluxoQueClassifica`).
- * ponytail: vale o publicado AGORA; a inscrição que ainda corre numa versão
- * antiga (ou num fluxo pausado depois) segue classificando e gravando, e o
- * cartão diz "Não roda" até alguém publicar de novo.
+ * A tarefa do follow-up numa organização em que nenhum follow-up publicado tem
+ * o passo "Classificar (IA)" com duas saídas ou mais, e nenhuma inscrição que
+ * ainda anda está numa versão com ele: ninguém escolhe saída pela resposta ao
+ * follow-up, nada sai para o Jev, e "observando" diria "Ainda não há mensagens
+ * medidas pelos dois" para sempre. `temFluxoQueClassifica` é lido por quem chama
+ * (`algumFluxoQueClassifica`). As inscrições contam porque o motor não olha o
+ * estado do follow-up nem a versão publicada: afirmar "Não roda" enquanto elas
+ * mandam respostas ao Jev seria a frase tranquilizadora falsa, numa tela de
+ * transferência para fora do país.
  */
 export function tarefaSemFluxo(tarefa: Pick<TarefaDoJev, "id">, temFluxoQueClassifica: boolean): boolean {
   return tarefa.id === TAREFA_DO_FOLLOWUP.id && !temFluxoQueClassifica;

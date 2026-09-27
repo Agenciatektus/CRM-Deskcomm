@@ -71,6 +71,8 @@ interface Estado {
   roteadores: Linha[];
   /** `followup_flow_pointers`, com a versão ativa embutida (`versao: { graph }`). */
   fluxos: Linha[];
+  /** `followup_flow_versions` com inscrição que ainda anda — o que o `!inner` devolve (`graph`). */
+  versoesEmCurso: Linha[];
   consultas: Consulta[];
 }
 
@@ -103,7 +105,9 @@ function cliente(tipo: Consulta["cliente"]) {
                     ? estado.roteadores
                     : tabela === "followup_flow_pointers"
                       ? estado.fluxos
-                      : estado.mensagens;
+                      : tabela === "followup_flow_versions"
+                        ? estado.versoesEmCurso
+                        : estado.mensagens;
         const filtradas = base.filter((l) => c.eq.every(([col, v]) => !(col in l) || l[col] === v));
         return c.range ? filtradas.slice(c.range[0], c.range[1] + 1) : filtradas.slice(0, MAX_ROWS);
       };
@@ -198,6 +202,7 @@ beforeEach(() => {
     camadas: [],
     roteadores: [],
     fluxos: [],
+    versoesEmCurso: [],
     consultas: [],
   };
   vi.mocked(requireRole).mockImplementation(async (min) =>
@@ -827,7 +832,11 @@ describe("o Jev por tarefa na rota", () => {
    */
   it("GET: a do follow-up, sem follow-up publicado com o passo \"Classificar (IA)\", diz que não roda", async () => {
     estado.settings = { jev: { ligado: true, aceite: ACEITE_ANTIGO } };
-    const grafo = (...tipos: string[]) => ({ versao: { graph: { nodes: tipos.map((type, i) => ({ id: `n${i}`, type })) } } });
+    const grafo = (...tipos: string[]) => ({
+      versao: {
+        graph: { nodes: tipos.map((type, i) => ({ id: `n${i}`, type, config: { classes: ["quer", "não quer"] } })) },
+      },
+    });
     const semFluxo = async () =>
       (await ler()).corpo.data.por_tarefa.find((t: { id: string }) => t.id === "followup").sem_fluxo;
 
@@ -853,6 +862,39 @@ describe("o Jev por tarefa na rota", () => {
           c.cliente === "sessao" &&
           c.eq.some(([col, v]) => col === "organization_id" && v === ORG) &&
           c.eq.some(([col, v]) => col === "status" && v === "active"),
+      ),
+    ).toBe(true);
+  });
+
+  /**
+   * Desativar um follow-up não encerra as inscrições dele, e publicar outra
+   * versão não as muda de versão: o motor segue levando-as ao passo, e cada
+   * resposta vai ao Jev. "Não roda" ali seria a frase tranquilizadora falsa
+   * numa tela de transferência para fora do país.
+   */
+  it("GET: a do follow-up RODA enquanto houver inscrição andando numa versão com o passo, mesmo sem follow-up publicado", async () => {
+    estado.settings = { jev: { ligado: true, aceite: ACEITE_ANTIGO } };
+    const versao = (...tipos: string[]) => ({
+      graph: { nodes: tipos.map((type, i) => ({ id: `n${i}`, type, config: { classes: ["quer", "não quer"] } })) },
+    });
+    const semFluxo = async () =>
+      (await ler()).corpo.data.por_tarefa.find((t: { id: string }) => t.id === "followup").sem_fluxo;
+
+    // O follow-up foi desativado (nenhum publicado); a inscrição segue na versão com o passo.
+    estado.versoesEmCurso = [{ organization_id: ORG, ...versao("trigger", "action", "end") }];
+    expect(await semFluxo()).toBe(true);
+    estado.versoesEmCurso.push({ organization_id: ORG, ...versao("trigger", "action", "ai_classify") });
+    expect(await semFluxo()).toBe(false);
+
+    // A leitura é a da sessão, da organização dela, só das inscrições que ainda andam.
+    const lidas = estado.consultas.filter((c) => c.tabela === "followup_flow_versions");
+    expect(lidas.length, "a leitura das versões em curso (controle positivo)").toBeGreaterThan(0);
+    expect(
+      lidas.every(
+        (c) =>
+          c.cliente === "sessao" &&
+          c.eq.some(([col, v]) => col === "organization_id" && v === ORG) &&
+          c.nao.some(([col, v]) => col === "inscricoes.status" && v === "(completed,cancelled,dead)"),
       ),
     ).toBe(true);
   });

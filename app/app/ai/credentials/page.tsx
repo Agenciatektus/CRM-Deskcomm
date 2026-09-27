@@ -11,6 +11,7 @@ import {
   algumFluxoQueClassifica,
   algumRoteadorQuePergunta,
   estadoEfetivoDaTarefa,
+  INSCRICAO_ENCERRADA,
   TAREFAS_DO_JEV,
   tarefaSemCamada,
   tarefaSemFluxo,
@@ -91,16 +92,29 @@ export default async function CredentialsPage() {
         .eq("is_active", true)
     : { data: null, error: null };
   const temRoteadorQuePergunta = !erroDosRoteadores && algumRoteadorQuePergunta(roteadoresAtivos ?? []);
-  // O follow-up: sem um publicado com o passo "Classificar (IA)", ninguém lê a
-  // resposta do cliente. Leitura que falha: a tarefa sai da lista, idem.
-  const { data: fluxosPublicados, error: erroDosFluxos } = jevLigado
-    ? await supabase
-        .from("followup_flow_pointers")
-        .select("versao:followup_flow_versions!followup_flow_pointers_active_version_id_fkey(graph)")
-        .eq("organization_id", activeOrg.orgId)
-        .eq("status", "active")
-    : { data: null, error: null };
-  const temFluxoQueClassifica = !erroDosFluxos && algumFluxoQueClassifica(fluxosPublicados ?? []);
+  // O follow-up: sem um publicado com o passo "Classificar (IA)", nem uma
+  // inscrição andando numa versão com ele, ninguém lê a resposta do cliente — a
+  // mesma leitura da rota do cartão. Leitura que falha: a tarefa sai da lista, idem.
+  const [{ data: fluxosPublicados, error: erroDosPublicados }, { data: versoesEmCurso, error: erroDasEmCurso }] =
+    jevLigado
+      ? await Promise.all([
+          supabase
+            .from("followup_flow_pointers")
+            .select("versao:followup_flow_versions!followup_flow_pointers_active_version_id_fkey(graph)")
+            .eq("organization_id", activeOrg.orgId)
+            .eq("status", "active"),
+          supabase
+            .from("followup_flow_versions")
+            .select("graph, inscricoes:followup_enrollments!inner(id)")
+            .eq("organization_id", activeOrg.orgId)
+            .not("inscricoes.status", "in", INSCRICAO_ENCERRADA)
+            .limit(1, { referencedTable: "inscricoes" }),
+        ])
+      : [{ data: null, error: null }, { data: null, error: null }];
+  const erroDosFluxos = erroDosPublicados ?? erroDasEmCurso;
+  const temFluxoQueClassifica =
+    !erroDosFluxos &&
+    algumFluxoQueClassifica([...(fluxosPublicados ?? []), ...(versoesEmCurso ?? []).map((versao) => ({ versao }))]);
   if (erroDasCamadas || erroDosRoteadores || erroDosFluxos) {
     logger.warn("credenciais: o \"Usada em\" do Jev saiu sem conferir a camada, o roteador ou os follow-ups", {
       organization_id: activeOrg.orgId,

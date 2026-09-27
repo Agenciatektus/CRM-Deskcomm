@@ -12,13 +12,8 @@ import { readFileSync } from "node:fs";
 import type pg from "pg";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  consultarJevNoFollowup,
-  perguntaDoFollowup,
-  SAIDAS_NO_MAXIMO,
-  type EntradaDoFollowup,
-} from "@/lib/ai/decisao/followup";
-import { TAREFA_DO_FOLLOWUP } from "@/lib/ai/decisao/tarefas";
+import { consultarJevNoFollowup, perguntaDoFollowup, type EntradaDoFollowup } from "@/lib/ai/decisao/followup";
+import { SAIDAS_NO_MAXIMO, TAREFA_DO_FOLLOWUP } from "@/lib/ai/decisao/tarefas";
 import { DICIONARIO } from "@/lib/i18n/dicionario";
 
 const ADMIN = "22222222-2222-4222-8222-222222222222";
@@ -110,6 +105,8 @@ describe("perguntaDoFollowup — uma escolha entre as saídas do passo, de igual
 
   it.each([
     ["nenhuma saída", []],
+    // A IA de sempre só poderia devolver ela, e o Jev também: concordância certa, paga e vazia.
+    ["uma saída só", ["respondeu"]],
     ["uma saída em branco", ["quer", ""]],
     ["uma saída só de espaços", ["quer", "   "]],
     ["duas saídas iguais", ["quer", "quer"]],
@@ -248,7 +245,9 @@ describe("observar — o par e o custo, no mesmo comando, sem o texto do cliente
   it("o retry não conta em dobro: o índice único por mensagem, que só preenche o lado da IA quando faltava", async () => {
     const { sql } = await gravado("quer");
     expect(sql).toMatch(/on conflict \(organization_id, tarefa, message_id\) where message_id is not null/);
-    expect(sql).toMatch(/do update set rotulo_atual = excluded\.rotulo_atual\s+where o\.rotulo_atual is null/);
+    expect(sql).toMatch(
+      /do update set rotulo_atual = excluded\.rotulo_atual\s+where o\.rotulo_atual is null and o\.job_id is not distinct from excluded\.job_id/,
+    );
   });
 
   it("sem a saída da IA de sempre, a linha fica sem par (rótulo de hoje nulo)", async () => {

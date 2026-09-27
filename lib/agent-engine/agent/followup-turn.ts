@@ -646,8 +646,16 @@ async function runFlowDrivenTurn(
       jev.observar(null);
       throw erro;
     });
+    // O par só leva a saída DEPOIS de ela concluir o passo: se a conclusão cair,
+    // o retry classifica de novo — e pode escolher outra —, e o par tem de ser
+    // com a saída que moveu o fluxo, não com a desta tentativa.
+    // ponytail: a conclusão que o motor descarta calada (o nó já andou por
+    // outro job) ainda observa; o par que fica é o de quem gravou primeiro.
+    await complete(pool, { jobId:job.id,jobClaim:claimOfJob(job), organizationId: target.tenantId, enrollmentId, nodeId, result: { kind: 'classified', class: cls } }).catch((erro: unknown) => {
+      jev.observar(null);
+      throw erro;
+    });
     jev.observar(cls);
-    await complete(pool, { jobId:job.id,jobClaim:claimOfJob(job), organizationId: target.tenantId, enrollmentId, nodeId, result: { kind: 'classified', class: cls } });
     return;
   }
 

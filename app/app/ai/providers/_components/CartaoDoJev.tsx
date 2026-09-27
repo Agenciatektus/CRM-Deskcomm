@@ -690,7 +690,10 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
               {aoLigar !== "desligada" && tarefa.sem_fluxo === true && (
                 <span className="text-muted-foreground" data-testid={`jev-ao-ligar-sem-fluxo-${tarefa.id}`}>
                   {" "}
-                  {t("Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)”. O Jev só lê a resposta do cliente onde a sua IA de sempre já a lê — publique, em Follow-ups, um fluxo com esse passo.")}
+                  {t("Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.")}{" "}
+                  <Link className="underline underline-offset-4" href="/app/ai/followups">
+                    {t("Abrir os follow-ups")}
+                  </Link>
                 </span>
               )}
             </li>
@@ -919,7 +922,7 @@ function Ligado({
             {rodando && tarefa.estado !== "desligada" && tarefa.sem_fluxo === true && (
               <p className="text-sm text-muted-foreground" data-testid={`jev-sem-fluxo-${tarefa.id}`}>
                 {t(
-                  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)”. O Jev só lê a resposta do cliente onde a sua IA de sempre já a lê — publique, em Follow-ups, um fluxo com esse passo.",
+                  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.",
                 )}{" "}
                 <Link className="underline underline-offset-4" href="/app/ai/followups">
                   {t("Abrir os follow-ups")}

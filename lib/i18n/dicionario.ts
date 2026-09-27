@@ -3800,11 +3800,8 @@ export const DICIONARIO: Traducoes = {
   "dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em": {
     es: "días, Jev y tu IA de siempre pusieron la respuesta del cliente en la misma salida del flujo en",
   },
-  "respostas.": {
-    es: "respuestas.",
-  },
-  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)”. O Jev só lê a resposta do cliente onde a sua IA de sempre já a lê — publique, em Follow-ups, um fluxo com esse passo.": {
-    es: "No se ejecuta ahora: ningún seguimiento publicado tiene el paso “Clasificar (IA)”. Jev solo lee la respuesta del cliente donde tu IA de siempre ya la lee: publica, en Seguimientos, un flujo con ese paso.",
+  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.": {
+    es: "No se ejecuta ahora: ningún seguimiento publicado tiene el paso “Clasificar (IA)” con dos salidas o más. Jev solo lee la respuesta del cliente donde tu IA de siempre elige entre salidas: publica, en Seguimientos, un flujo con ese paso.",
   },
   "Abrir os follow-ups": {
     es: "Abrir los seguimientos",

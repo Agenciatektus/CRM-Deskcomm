@@ -41,28 +41,19 @@ import type { EstadoQuePergunta } from "./config";
 import { podeTentar, registrarFalha, registrarSucesso } from "./disjuntor";
 import { estadoDaTarefaNoPool, registrarFalhaQuePedeAcao } from "./pool";
 import { decidirNoPonto, type DependenciasDoPonto } from "./ponto";
-import { TAREFA_DO_FOLLOWUP } from "./tarefas";
-
-/** O fornecedor aceita até 255 opções numa escolha — e aqui não há "nenhuma". */
-export const SAIDAS_NO_MAXIMO = 255;
+import { saidasCabemNaPergunta, TAREFA_DO_FOLLOWUP } from "./tarefas";
 
 const INSTRUCAO =
   "Em qual destas saídas do fluxo de follow-up se encaixa a resposta do cliente à mensagem do follow-up? Ela decide por onde o fluxo segue.";
 
 /**
- * A pergunta, ou `null` quando as saídas não cabem no contrato do fornecedor:
- * nenhuma, mais de `SAIDAS_NO_MAXIMO`, uma em branco ou duas iguais (a chave de
- * um critério é o nome da saída — duas iguais seriam uma só, e a IA de sempre
- * teria uma opção que o Jev não tem). A API recusaria a chamada inteira, e a
- * recusa abriria o disjuntor da tarefa sem ninguém ter errado nada.
+ * A pergunta, ou `null` quando as saídas não cabem (`saidasCabemNaPergunta`):
+ * uma só (não há escolha — a concordância seria certa por construção), mais do
+ * que o fornecedor aceita, uma em branco ou duas iguais. É a MESMA regra que o
+ * cartão usa para dizer se a tarefa roda.
  */
 export function perguntaDoFollowup(classes: readonly string[], dica?: string): Pergunta | null {
-  const cabe =
-    classes.length >= 1 &&
-    classes.length <= SAIDAS_NO_MAXIMO &&
-    classes.every((c) => c.trim() !== "") &&
-    new Set(classes).size === classes.length;
-  if (!cabe) return null;
+  if (!saidasCabemNaPergunta(classes)) return null;
   const comDica = dica?.trim() ? `${INSTRUCAO} Dica de quem montou o fluxo: ${dica.trim()}` : INSTRUCAO;
   return { tipo: "choice", instrucao: comDica, criterios: Object.fromEntries(classes.map((c) => [c, null])) };
 }
@@ -168,10 +159,14 @@ async function perguntar(
  * Uma linha em `jev_observacoes` (o par) e uma em `llm_calls` (o custo, em
  * Execuções — R8), no MESMO comando: uma sem a outra contaria uma resposta que
  * não custou, ou um custo sem resposta. Sem texto do cliente em nenhuma das
- * duas. `classeDaIa` nula: a IA de sempre não classificou, o job vai ser
- * repetido, e a linha fica sem par (fora da concordância) — a repetição, que
- * esbarra no índice único, só preenche o lado que faltava. A resposta do Jev
- * que fica é sempre a primeira. Nunca lança.
+ * duas. `classeDaIa` nula: a IA de sempre não classificou (ou o passo não foi
+ * concluído com a dela), o job vai ser repetido, e a linha fica sem par (fora
+ * da concordância) — a repetição do MESMO job, que esbarra no índice único, só
+ * preenche o lado que faltava. Outro job sobre a mesma mensagem (outro passo
+ * "Classificar", outro fluxo do mesmo contato) não completa o par: ele
+ * perguntou entre OUTRAS saídas, e a classe dele contra a do Jev seria uma
+ * concordância que não mede nada. A resposta do Jev que fica é sempre a
+ * primeira. Nunca lança.
  */
 export async function registrarFollowupDoJev(
   pool: pg.Pool,
@@ -188,7 +183,7 @@ export async function registrarFollowupDoJev(
          values ($1, $9, $10, $11, $12, $3, $13, $14, $15, $16, $17, $8)
          on conflict (organization_id, tarefa, message_id) where message_id is not null
          do update set rotulo_atual = excluded.rotulo_atual
-          where o.rotulo_atual is null
+          where o.rotulo_atual is null and o.job_id is not distinct from excluded.job_id
        )
        insert into public.llm_calls
          (organization_id, contact_id, job_id, purpose, provider, model,

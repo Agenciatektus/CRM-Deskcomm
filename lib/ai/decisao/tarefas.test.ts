@@ -307,10 +307,22 @@ describe("a tarefa do follow-up", () => {
     expect(estadoEfetivoDaTarefa(ligado({ followup: { estado: "desligada" } }), TAREFA_DO_FOLLOWUP)).toBe("desligada");
   });
 
-  describe("algumFluxoQueClassifica — um follow-up publicado com o passo 'Classificar (IA)'", () => {
-    const com = (...tipos: unknown[]) => ({ versao: { graph: { nodes: tipos.map((type) => ({ type })) } } });
+  describe("algumFluxoQueClassifica — um follow-up com o passo 'Classificar (IA)' que o Jev pode ser perguntado", () => {
+    const DUAS = ["quer", "não quer"];
+    const no = (type: unknown, classes: unknown = DUAS) => (type === "ai_classify" ? { type, config: { classes } } : { type });
+    const com = (...tipos: unknown[]) => ({ versao: { graph: { nodes: tipos.map((type) => no(type)) } } });
     it("basta um passo num fluxo", () => {
       expect(algumFluxoQueClassifica([com("trigger", "action"), com("trigger", "ai_classify")])).toBe(true);
+    });
+    it("um passo com UMA saída só, ou com saídas que a pergunta recusa, não conta: o Jev nunca é perguntado ali", () => {
+      const soCom = (classes: unknown) => ({ versao: { graph: { nodes: [no("trigger"), no("ai_classify", classes)] } } });
+      expect(algumFluxoQueClassifica([soCom(["respondeu"])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom(["quer", "quer"])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom(["quer", " "])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom("quer,não quer")])).toBe(false);
+      expect(algumFluxoQueClassifica([{ versao: { graph: { nodes: [{ type: "ai_classify" }] } } }])).toBe(false);
+      // Controle: a mesma regra da pergunta (`perguntaDoFollowup`).
+      expect(algumFluxoQueClassifica([soCom(["respondeu"]), soCom(DUAS)])).toBe(true);
     });
     it("sem o passo, sem fluxo, ou com a versão ilegível, é não", () => {
       expect(algumFluxoQueClassifica([])).toBe(false);
