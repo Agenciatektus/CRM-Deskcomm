@@ -1432,7 +1432,7 @@
       "id": "e129",
       "from": "jevFollowup",
       "to": "jevObservacoes",
-      "label": "registrarFollowupDoJev: a saída dele × a da IA de sempre, amarrada a job_id e ao message_id da resposta (o retry não conta em dobro; sem a da IA, fica sem par e o retry a completa)"
+      "label": "registrarFollowupDoJev: a saída dele × a da IA de sempre, amarrada a job_id e ao message_id da resposta — a da IA só entra DEPOIS de concluir o passo (o retry não conta em dobro; sem ela, fica sem par e só a repetição do MESMO job a completa: outro passo ou fluxo sobre a mesma mensagem perguntou entre outras saídas)"
     },
     {
       "id": "e130",
