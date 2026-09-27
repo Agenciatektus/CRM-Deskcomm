@@ -203,6 +203,7 @@ describe("mapas de arquitetura — coerência interna", () => {
       "jevManipulacao",
       "jevObservacoes",
       "jevPedidos",
+      "jevFollowup",
     ]) {
       expect(grau(peca), `${peca} com menos de 2 arestas — é ilha pelo invariante 1`).toBeGreaterThanOrEqual(2);
     }
@@ -214,6 +215,10 @@ describe("mapas de arquitetura — coerência interna", () => {
     // O laço das tarefas em cascata (onda 3): os pedidos que o Jev percebe no
     // worker de clima são gravados em jev_observacoes, que volta ao cartão.
     expect(liga("jevPedidos", "jevObservacoes"), "os pedidos percebidos não chegam a jev_observacoes").toBe(true);
+    // O laço da resposta ao follow-up (onda 4): o estado da tarefa entra no
+    // turno do follow-up, e a observação dele vai a jev_observacoes, que volta ao cartão.
+    expect(liga("jevConfig", "jevFollowup"), "o estado da tarefa do follow-up não chega ao turno").toBe(true);
+    expect(liga("jevFollowup", "jevObservacoes"), "a resposta ao follow-up não chega a jev_observacoes").toBe(true);
   });
 
   it("o Jev está no mapa do turno, ao lado do roteador, com o laço de retorno", () => {
