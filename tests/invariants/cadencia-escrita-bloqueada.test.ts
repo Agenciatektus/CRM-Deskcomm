@@ -256,10 +256,15 @@ describe.each([
 });
 
 describe("controles", () => {
-  it("anon não altera a versão da cadência (a RLS nem deixa ver a linha)", async () => {
-    await expect(
-      como("anon", null, "update followup_flow_versions set cadence_conducao = '{}'::jsonb where id = $1", [f.cadVersion]),
-    ).resolves.toBeDefined(); // RLS: anon não enxerga a linha → 0 linhas, sem escrita
+  it("anon não altera a versão da cadência (recusado antes de tocar a linha)", async () => {
+    // O que importa é a linha INTACTA, não o jeito da recusa: medido no gate,
+    // anon nem chega a 0 linhas — a policy chama `fn_user_org_ids()`, que anon
+    // não executa, e o Postgres recusa com "permission denied for function".
+    await como("anon", null, "update followup_flow_versions set cadence_conducao = '{}'::jsonb where id = $1", [
+      f.cadVersion,
+    ]).catch((e: { code?: string }) => {
+      expect(e.code).toBe("42501");
+    });
     const r = await pool.query("select cadence_conducao from followup_flow_versions where id = $1", [f.cadVersion]);
     expect(r.rows[0].cadence_conducao).toEqual({ quem_atende: "atendente" });
   });
