@@ -186,6 +186,8 @@ async function efeitosDaEntrada(
     nomeDoContato: msg.identity.displayName,
     requestId: input.requestId,
     origem: "verdash_webhook",
+    // Canal hospedado: o transporte muda, a rede do cliente continua WhatsApp.
+    rede: "whatsapp",
   });
 }
 

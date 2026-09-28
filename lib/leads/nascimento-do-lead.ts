@@ -83,7 +83,17 @@ const ROTULO_DE_ANUNCIO: Record<string, string> = {
  * chamada de voz existir) -- os chamadores atuais nao precisam informar isto.
  */
 export interface OrigemDoNascimento {
-  /** Nome do canal para o fallback do titulo ("Novo contato pelo X"). */
+  /**
+   * Nome da REDE para o fallback do titulo ("Novo contato pelo X").
+   *
+   * Rede, e nao transporte: o nome que a pessoa reconheceria ("Instagram",
+   * "WhatsApp"), nunca o do intermediario que entregou a mensagem — a doutrina
+   * de restricao de canal proibe esse nome de sair de `lib/channels/`, e o
+   * `pnpm lint:channels` reprovou esta linha quando ela o citava.
+   * Quem entra pelo caminho de canal recebe isto de `origemDaRede`
+   * (`lib/channels/pos-entrada.ts`), que deriva do MESMO vocabulario do icone
+   * do Inbox — para as duas telas nao poderem discordar sobre a mesma conversa.
+   */
   rotulo: string;
   /** Valor de `crm_leads.source` quando nao ha atribuicao de anuncio. */
   source: string;
@@ -91,6 +101,21 @@ export interface OrigemDoNascimento {
   motivo: string;
 }
 
+/**
+ * ⚠️ NAO E "o canal de sempre" — e o que resta para quem nasce FORA de um canal.
+ *
+ * Este default ja significou "WhatsApp, unico canal que existe". Deixou de ser
+ * verdade quando o Instagram entrou, e ninguem reparou porque `origem` era
+ * opcional: `aplicarEfeitosPosEntrada` nunca a informou, e TODO canal caiu
+ * aqui. Medido na producao da Delicatto em 2026-09-25: um Direct de Instagram
+ * (`conversations.channel = 'instagram'`) abriu um card chamado "Novo contato
+ * pelo WhatsApp". Nada falhou — typecheck, testes e log ficaram verdes, porque
+ * um default silencioso e indistinguivel de uma escolha.
+ *
+ * Hoje o caminho de canal SEMPRE declara a rede (`EntradaDeMensagem.rede` e
+ * obrigatorio), entao isto so alcanca chamador que nao tem canal nenhum — e
+ * esse, quando existe, diz o que e: o agente de voz passa `origem` propria.
+ */
 const ORIGEM_PADRAO: OrigemDoNascimento = {
   rotulo: "WhatsApp",
   source: "whatsapp",
