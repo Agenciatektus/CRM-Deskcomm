@@ -21,8 +21,9 @@
  *
  * ─── O que fica no lugar ────────────────────────────────────────────────────
  *
- * Um marcador, não um buraco. `base64` vira `{ omitido: true, bytes: N }` — quem
- * investigar ainda sabe que havia mídia inline e de que tamanho era; `token`
+ * Um marcador, não um buraco. `base64` vira `{ omitido: true, caracteres: N }` —
+ * o tamanho do TEXTO base64 (os bytes da mídia são ~3/4 disso); quem investigar
+ * ainda sabe que havia mídia inline e de que tamanho era; `token`
  * vira `"[omitido]"` — sabe que o campo veio, sem ver o valor. A chave continua
  * existindo porque quem lista os CAMPOS recebidos (a tela de histórico) não
  * pode ver a lista mudar por causa disto.
@@ -64,7 +65,7 @@ export function enxugarParaArquivo(payload: Record<string, unknown>): {
   for (const chave of MIDIA_INLINE) {
     const v = out[chave];
     if (typeof v === "string" && v.length > 0) {
-      out[chave] = { omitido: true, bytes: v.length };
+      out[chave] = { omitido: true, caracteres: v.length };
       cortou = true;
     }
   }

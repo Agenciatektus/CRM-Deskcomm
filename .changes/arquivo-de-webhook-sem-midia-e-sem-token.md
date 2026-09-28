@@ -9,5 +9,7 @@ arquivo de webhooks recebidos, com o arquivo inteiro dentro. Em uma instalação
 chegou a ocupar quase todo o banco e o derrubou ao passar do limite do plano.
 
 Agora o arquivo guarda só o tamanho da mídia, no lugar do conteúdo, e deixa de
-guardar o token da instância que vinha junto no mesmo evento. As mensagens e os
-anexos continuam chegando ao inbox como antes: eles nunca foram lidos desse arquivo.
+guardar o token da instância que vinha junto no mesmo evento. O segredo que o
+WhatsApp manda no cabeçalho de cada entrega, para provar que ela é legítima, também
+deixa de ser arquivado. As mensagens e os anexos continuam chegando ao inbox como
+antes: eles nunca foram lidos desse arquivo.

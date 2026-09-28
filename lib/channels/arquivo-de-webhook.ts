@@ -38,15 +38,23 @@ import { logger } from "@/lib/logger";
 
 import { arquivoEnxuto } from "./enxugar-para-arquivo";
 
-/** Cabeçalhos que NUNCA entram no arquivo, por menor que seja a chance. */
-const PROIBIDOS = ["authorization", "cookie", "x-api-key"];
+/**
+ * Cabeçalhos que NUNCA entram no arquivo, por menor que seja a chance.
+ *
+ * `x-webhook-secret` é o SEGREDO COMPARTILHADO que um canal manda em claro e que
+ * `lib/channels/inbound.ts` compara direto (não é HMAC): arquivado, qualquer
+ * membro da org que lê o arquivo poderia forjar mensagem de entrada. `token` e
+ * `apikey` são credenciais que servidores de WhatsApp mandam por header.
+ */
+const PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey"];
 
 /**
  * Cabeçalhos sanitizados.
  *
- * A assinatura FICA: ela é o que permite reconferir depois se um payload
+ * Assinatura HMAC do corpo FICA: ela permite reconferir depois se um payload
  * recusado tinha mesmo assinatura errada, ou se o segredo é que estava errado —
- * e é assinatura, não credencial: não abre nada sozinha.
+ * e é derivada do corpo, não abre nada sozinha. Segredo compartilhado enviado em
+ * claro NÃO é assinatura: é a própria credencial, e entra em `PROIBIDOS`.
  */
 function cabecalhosSeguros(headers: Headers): Record<string, string> {
   const out: Record<string, string> = {};

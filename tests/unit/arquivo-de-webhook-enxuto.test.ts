@@ -33,7 +33,7 @@ describe("enxugarParaArquivo — função pura", () => {
     const grande = "A".repeat(2_000_000);
     const { payload, cortou } = enxugarParaArquivo(eventoDeMidia(grande));
     expect(cortou).toBe(true);
-    expect(payload.base64).toEqual({ omitido: true, bytes: 2_000_000 });
+    expect(payload.base64).toEqual({ omitido: true, caracteres: 2_000_000 });
     expect(JSON.stringify(payload).length, "a mídia continua no arquivo").toBeLessThan(1_000);
   });
 
@@ -95,7 +95,7 @@ describe("arquivoEnxuto — o par que vai para as colunas", () => {
     expect(r.rawBody).not.toContain("tok-da-instancia-secreto");
     expect(r.rawBody.length).toBeLessThan(1_000);
     expect(JSON.parse(r.rawBody)).toEqual(r.parsed);
-    expect(r.parsed?.base64).toEqual({ omitido: true, bytes: 500_000 });
+    expect(r.parsed?.base64).toEqual({ omitido: true, caracteres: 500_000 });
   });
 });
 
@@ -133,8 +133,25 @@ describe("o ponto de escrita grava a versão enxuta", () => {
     const linha = guardado.insert as { raw_body: string; payload_parsed: Record<string, unknown> };
     expect(linha.raw_body.length, "a mídia inline foi para o raw_body").toBeLessThan(1_000);
     expect(linha.raw_body).not.toContain("tok-da-instancia-secreto");
-    expect(linha.payload_parsed.base64).toEqual({ omitido: true, bytes: 300_000 });
+    expect(linha.payload_parsed.base64).toEqual({ omitido: true, caracteres: 300_000 });
     expect(linha.payload_parsed.token).toBe(TOKEN_OMITIDO);
     expect(linha.payload_parsed.downloadURL).toBe("https://midia.exemplo/arquivo.jpg");
+  });
+
+  it("o segredo compartilhado do header NÃO vai para o arquivo; o resto fica", async () => {
+    // `x-webhook-secret` é comparado direto (não é HMAC): arquivado, quem lê o
+    // arquivo pela org poderia forjar mensagem de entrada.
+    const { admin, guardado } = adminQueGuarda();
+    await abrirArquivoDoWebhook(admin, {
+      organizationId: "org-1",
+      channelSessionId: "sessao-1",
+      provider: "canal-de-teste",
+      rawBody: "{}",
+      headers: new Headers({ "x-webhook-secret": "s3gredo", "content-type": "application/json" }),
+    });
+    const cabecalhos = (guardado.insert as { headers: Record<string, string> }).headers;
+    expect(Object.keys(cabecalhos), "o segredo do header foi arquivado").not.toContain("x-webhook-secret");
+    expect(JSON.stringify(guardado.insert)).not.toContain("s3gredo");
+    expect(cabecalhos["content-type"]).toBe("application/json");
   });
 });
