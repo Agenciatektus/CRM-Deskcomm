@@ -29,7 +29,7 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 - **WhatsApp:** WAHA Plus, engine NOWEB
 - **Filas/eventos:** `event_log` table + workers (não usar Inngest/Trigger no MVP)
 - **Rate limit:** Upstash Redis sliding window
-- **AI:** Vercel AI Gateway (Anthropic primário; OpenAI backup pra embeddings); strings tipo `"anthropic/claude-sonnet-4-6"`
+- **AI:** Vercel AI Gateway (Anthropic primário; embeddings pela OpenAI ou, por escolha da organização, pelo Google — `lib/ai/embeddings/chave.ts`); strings tipo `"anthropic/claude-sonnet-4-6"`
 - **Validação:** Zod em todo input externo (request body, webhook payload, env)
 - **Observability:** Sentry com `beforeSend` sanitizado
 
