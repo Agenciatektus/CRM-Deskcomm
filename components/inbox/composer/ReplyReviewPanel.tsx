@@ -8,6 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/hooks/i18n/useT";
 import { sugestaoParaMostrar } from "@/lib/agent-engine/agent/sugestao-de-resposta";
+/**
+ * Propostas com rótulo legível. A de mover etapa NÃO é aplicada por clique: a
+ * pessoa move o card pelo painel do lead (decisão do assistido na cadência).
+ */
+const ROTULO_DA_PROPOSTA: Record<string, string> = {
+  crm_move_lead_stage: "Mover o negócio de etapa (confirme pelo painel do lead)",
+};
 type Draft = {
   id: string;
   revision: string;
@@ -145,7 +152,7 @@ export function ReplyReviewPanel({
               <p>{t("Abra a ação correspondente no CRM ou na agenda para confirmar.")}</p>
               <ul>
                 {draft.proposals.map((p, i) => (
-                  <li key={i}>{p.tool}</li>
+                  <li key={i}>{ROTULO_DA_PROPOSTA[p.tool] ? t(ROTULO_DA_PROPOSTA[p.tool]!) : p.tool}</li>
                 ))}
               </ul>
             </details>
