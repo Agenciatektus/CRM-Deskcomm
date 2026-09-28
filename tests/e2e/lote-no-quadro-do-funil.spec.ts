@@ -38,7 +38,7 @@ import { carregarEnvLocal } from "../../scripts/lib/env-de-teste";
 
 const CREDS_PATH = path.join(process.cwd(), ".e2e-creds.json");
 const EVIDENCIA =
-  process.env.E2E_EVIDENCIA ?? path.join(process.cwd(), ".superpowers/evidence/lote-no-funil");
+  process.env.E2E_EVIDENCIA ?? path.join(process.cwd(), "evidence/lote-no-funil");
 /** A prova do toque é citada na triagem do #911: mora em `evidence/`, versionada. */
 const EVIDENCIA_TOQUE =
   process.env.E2E_EVIDENCIA_TOQUE ?? path.join(process.cwd(), "evidence/excluir-card-no-toque");
