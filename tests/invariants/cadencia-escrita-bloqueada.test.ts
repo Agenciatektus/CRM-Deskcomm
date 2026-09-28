@@ -5,11 +5,19 @@
  * `authenticated` tem INSERT/UPDATE. Sem os triggers da 9020, um viewer gravava a
  * condução da IA na versão ativa, inseria inscrição de cadência ou mexia na
  * cadência direto pelo PostgREST. Aqui:
- *   - viewer e manager (via JWT) recebem 42501 COM a mensagem do trigger nos três
- *     casos — a mensagem distingue o trigger do 42501 da própria RLS;
+ *   - viewer e manager (via JWT) recebem 42501 COM a mensagem do trigger — a
+ *     mensagem distingue o trigger do 42501 da própria RLS:
+ *       · versões: QUALQUER escrita (cadência ou não — versão é histórico e só o
+ *         servidor publica);
+ *       · inscrição de cadência: INSERT, UPDATE (reativar, mover) e DELETE; só o
+ *         cancelamento de régua viva passa (a cascata LGPD roda pela sessão);
+ *       · ponteiro de cadência: criar, status, política, versão ativa, surface,
+ *         gatilho, política de handoff;
  *   - `service_role` passa;
- *   - CONTROLE: o fluxo comum (surface `followup`) continua gravável pelo mesmo
- *     usuário, e o que a rota genérica pode mudar numa cadência (nome) também.
+ *   - CONTROLE: o fluxo comum continua PUBLICÁVEL pelo caminho oficial
+ *     (`fn_publish_followup_flow_version` como service_role) e gravável pelo
+ *     manager no que não é versão (inscrição, status); o nome de uma cadência
+ *     também.
  */
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -110,6 +118,20 @@ beforeAll(async () => {
 });
 afterAll(() => pool.end());
 
+async function inscricaoDeCadencia(status: "active" | "cancelled"): Promise<string> {
+  return (
+    await pool.query(
+      `insert into followup_enrollments
+         (organization_id, pointer_id, version_id, contact_id, current_node_id, status, next_eval_at, completed_at)
+       values ($1,$2,$3,$4,'a1',$5,
+               case when $5 = 'active' then now() + interval '1 hour' end,
+               case when $5 = 'cancelled' then now() end)
+       returning id`,
+      [f.org, f.cadPointer, f.cadVersion, await contato(), status],
+    )
+  ).rows[0].id as string;
+}
+
 const inscricao = `insert into followup_enrollments
   (organization_id, pointer_id, version_id, contact_id, current_node_id, status, next_eval_at)
   values ($1,$2,$3,$4,'a1','active', now() + interval '1 hour') returning id`;
@@ -135,8 +157,60 @@ describe.each([
     );
   });
 
+  it("1b) nenhuma escrita de versão: graph da cadência, versão nova, versão comum, DELETE", async () => {
+    await recusa(
+      como("authenticated", user(), "update followup_flow_versions set graph = '{\"x\":1}'::jsonb where id = $1", [
+        f.cadVersion,
+      ]),
+    );
+    await recusa(
+      como(
+        "authenticated",
+        user(),
+        "insert into followup_flow_versions (organization_id, pointer_id, graph) values ($1,$2,'{}'::jsonb)",
+        [f.org, f.cadPointer],
+      ),
+    );
+    await recusa(
+      como("authenticated", user(), "update followup_flow_versions set graph = '{\"x\":1}'::jsonb where id = $1", [
+        f.comVersion,
+      ]),
+    );
+    await recusa(como("authenticated", user(), "delete from followup_flow_versions where id = $1", [f.comVersion]));
+  });
+
   it("2) não insere inscrição de cadência", async () => {
     await recusa(como("authenticated", user(), inscricao, [f.org, f.cadPointer, f.cadVersion, await contato()]));
+  });
+
+  it("2b) não reativa inscrição de cadência cancelada, não a move de nó, não a apaga", async () => {
+    const cancelada = await inscricaoDeCadencia("cancelled");
+    await recusa(
+      como(
+        "authenticated",
+        user(),
+        "update followup_enrollments set status = 'active', next_eval_at = now(), completed_at = null where id = $1",
+        [cancelada],
+      ),
+    );
+    const viva = await inscricaoDeCadencia("active");
+    await recusa(
+      como("authenticated", user(), "update followup_enrollments set current_node_id = 'b2' where id = $1", [viva]),
+    );
+    await recusa(como("authenticated", user(), "delete from followup_enrollments where id = $1", [viva]));
+  });
+
+  it("2c) EXCEÇÃO: cancelar uma régua viva de cadência passa (cascata LGPD pela sessão)", async () => {
+    const viva = await inscricaoDeCadencia("active");
+    const r = await como(
+      "authenticated",
+      user(),
+      `update followup_enrollments
+          set status = 'cancelled', cancel_reason = 'lgpd', completed_at = now(), next_eval_at = null, claimed_until = null
+        where id = $1 returning id`,
+      [viva],
+    );
+    expect(r.rows).toHaveLength(1);
   });
 
   it("3) não cria cadência nem muda status/política/versão ativa dela", async () => {
@@ -161,6 +235,19 @@ describe.each([
       como(
         "authenticated",
         user(),
+        `update followup_flow_pointers set trigger_config = '{"kind":"manual","cancel_on_reply":false}'::jsonb where id = $1`,
+        [f.cadPointer],
+      ),
+    );
+    await recusa(
+      como("authenticated", user(), "update followup_flow_pointers set handoff_policy = 'allow' where id = $1", [
+        f.cadPointer,
+      ]),
+    );
+    await recusa(
+      como(
+        "authenticated",
+        user(),
         "insert into followup_flow_pointers (organization_id, name, surface) values ($1,$2,'cadence')",
         [f.org, `forjada-${randomUUID()}`],
       ),
@@ -177,28 +264,57 @@ describe("controles", () => {
     expect(r.rows[0].cadence_conducao).toEqual({ quem_atende: "atendente" });
   });
 
-  it("service_role passa nos três", async () => {
+  it("service_role passa em todos", async () => {
     await como("service_role", null, "update followup_flow_versions set cadence_conducao = $2 where id = $1", [
       f.cadVersion,
       { quem_atende: "atendente" },
     ]);
+    await como("service_role", null, "update followup_flow_versions set graph = '{}'::jsonb where id = $1", [f.cadVersion]);
+    const cancelada = await inscricaoDeCadencia("cancelled");
+    await como(
+      "service_role",
+      null,
+      "update followup_enrollments set status = 'active', next_eval_at = now() + interval '1 hour', completed_at = null where id = $1",
+      [cancelada],
+    );
+    await como(
+      "service_role",
+      null,
+      `update followup_flow_pointers set trigger_config = '{"kind":"manual","cancel_on_reply":true}'::jsonb where id = $1`,
+      [f.cadPointer],
+    );
     await como("service_role", null, inscricao, [f.org, f.cadPointer, f.cadVersion, await contato()]);
     await como("service_role", null, "update followup_flow_pointers set cadence_settings = '{}'::jsonb where id = $1", [
       f.cadPointer,
     ]);
   });
 
-  it("fluxo COMUM continua gravável pelo manager (inscrição, status, versão)", async () => {
+  it("fluxo COMUM continua gravável pelo manager no que não é versão (inscrição, status, gatilho)", async () => {
     const r = await como("authenticated", f.manager, inscricao, [f.org, f.comPointer, f.comVersion, await contato()]);
     expect(r.rows).toHaveLength(1);
+    await como("authenticated", f.manager, "update followup_enrollments set current_node_id = 'b2' where id = $1", [
+      r.rows[0].id,
+    ]);
     await como("authenticated", f.manager, "update followup_flow_pointers set status = 'disabled' where id = $1", [
       f.comPointer,
     ]);
-    await como("authenticated", f.manager, "update followup_flow_versions set graph = '{\"a\":1}'::jsonb where id = $1", [
-      f.comVersion,
+    await como("authenticated", f.manager, "update followup_flow_pointers set handoff_policy = 'cancel' where id = $1", [
+      f.comPointer,
     ]);
-    const p = await pool.query("select status from followup_flow_pointers where id = $1", [f.comPointer]);
-    expect(p.rows[0].status).toBe("disabled");
+    const p = await pool.query("select status, handoff_policy from followup_flow_pointers where id = $1", [f.comPointer]);
+    expect(p.rows[0]).toEqual({ status: "disabled", handoff_policy: "cancel" });
+  });
+
+  it("fluxo COMUM continua PUBLICÁVEL pelo caminho oficial (fn_publish_followup_flow_version como service_role)", async () => {
+    const r = await como(
+      "service_role",
+      null,
+      "select fn_publish_followup_flow_version($1,$2,'{}'::jsonb,null) as v",
+      [f.org, f.comPointer],
+    );
+    const v = r.rows[0].v as string;
+    const p = await pool.query("select active_version_id from followup_flow_pointers where id = $1", [f.comPointer]);
+    expect(p.rows[0].active_version_id).toBe(v);
   });
 
   it("numa cadência, o nome (o que a rota genérica muda) continua gravável", async () => {

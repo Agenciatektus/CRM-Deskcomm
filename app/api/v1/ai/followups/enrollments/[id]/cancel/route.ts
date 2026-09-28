@@ -17,6 +17,7 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const supabase = await createClient();
   const { data: existing, error: fetchErr } = await supabase
     .from("followup_enrollments")
-    .select("id, status, current_node_id")
+    .select("id, status, current_node_id, pointer_id")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -58,7 +59,16 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return fail("already_terminal", t("Enrollment já está encerrado."), 409, { requestId });
   }
 
-  const { data: updated, error: updErr } = await supabase
+  // Inscrição de CADÊNCIA só se escreve pelo servidor (migration 9020). Papel e
+  // organização já conferidos; o ponteiro é lido pela sessão (RLS).
+  const { data: ponteiro } = await supabase
+    .from("followup_flow_pointers")
+    .select("surface")
+    .eq("id", existing.pointer_id)
+    .eq("organization_id", activeOrg.orgId)
+    .maybeSingle();
+  const escritor = (ponteiro as { surface?: string } | null)?.surface === "cadence" ? createAdminClient() : supabase;
+  const { data: updated, error: updErr } = await escritor
     .from("followup_enrollments")
     .update({
       status: "cancelled",

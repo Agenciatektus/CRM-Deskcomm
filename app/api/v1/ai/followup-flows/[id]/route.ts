@@ -154,7 +154,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const update: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
 
-  const { data: updated, error: updErr } = await supabase
+  // Cadência só se escreve pelo servidor (migration 9020: gatilho e política de
+  // handoff dela recusam a sessão). Papel, organização e a regra de gatilho da
+  // cadência já foram conferidos acima.
+  const escritor = existing.surface === "cadence" ? createAdminClient() : supabase;
+  const { data: updated, error: updErr } = await escritor
     .from("followup_flow_pointers")
     .update(update)
     .eq("id", id)
@@ -208,10 +212,12 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
-  // Cadência só se escreve pelo servidor (migration 9020): soltar a versão ativa
-  // dela pela sessão é 42501. O papel (manager) e a organização já foram
-  // conferidos acima, e toda escrita abaixo filtra por organization_id.
-  const supabase = existing.surface === "cadence" ? createAdminClient() : sessao;
+  // Escrita pelo client de SERVIÇO, para qualquer fluxo: a migration 9020
+  // fecha toda escrita de versão pela sessão (versão é histórico; publicar já
+  // era só servidor), e numa cadência também inscrição e ponteiro. O papel
+  // (manager) e a organização já foram conferidos acima, e toda escrita abaixo
+  // filtra por organization_id.
+  const supabase = createAdminClient();
 
   // Enrollment referencia version_id; pointer referencia active_version_id.
   // Soltar o relógio nessa ordem evita 23503 no Postgres.
