@@ -57,6 +57,11 @@ import type { EnrollmentPatch } from "./engine";
 import { triggerConfigSchema } from "./api-schemas";
 import type { EnrollmentOutcome, EnrollmentStatus } from "./node-handlers";
 import { idsDoContatoEGemeos } from "@/lib/channels/contato-por-telefone";
+import {
+  createSupabaseCadenciaRespostaDb,
+  reagirNaCadencia,
+  type CadenciaRespostaDb,
+} from "@/lib/cadencia/resposta";
 
 /** Grace pós-resume (spec §4: "grace configurável, default 30min, knob"). */
 export const RESUME_GRACE_MS = 30 * 60_000;
@@ -92,7 +97,20 @@ export interface LiveEnrollmentRef {
   handoff_policy: "pause" | "cancel" | "allow";
   /** jsonb bruto do pointer — parseado defensivamente aqui (safeParse, default false). */
   trigger_config: unknown;
+  /**
+   * `followup_flow_pointers.surface`. Só `cadence` muda algo: a resposta vai
+   * para `lib/cadencia/resposta.ts` em vez do `cancel_on_reply`. Ausente = fluxo
+   * comum (os fakes antigos dos testes não o preenchem).
+   */
+  surface?: string;
 }
+
+/**
+ * Status de inscrição de CADÊNCIA que a resposta encerra. Inclui o `dormente`:
+ * na cadência a espera longa não é imune à resposta — o lead falou, a régua
+ * acaba. `paused_handoff` fica de fora: uma pessoa já está na conversa.
+ */
+const STATUS_DA_CADENCIA_QUE_A_RESPOSTA_ENCERRA: readonly EnrollmentStatus[] = ["active", "waiting_reply", "dormente"];
 
 /** Interface estreita de DB (mesma doutrina de `AdminClient`/`TurnBridgeAdminClient`
  *  — reactivity não usa claim/loadFlowGraph/loadLeadFacts/insertDeadInboxItem, então
@@ -135,6 +153,12 @@ export interface ReactivityAdminClient {
    * não é exprimível pelo client. Daí a leitura explícita.
    */
   agoraNoBanco(): Promise<string>;
+  /**
+   * A transição da cadência quando o lead responde (`lib/cadencia/resposta.ts`).
+   * Opcional para os fakes antigos: sem ele, a inscrição de cadência segue o
+   * caminho comum (`cancel_on_reply`), que é o comportamento anterior.
+   */
+  cadencia?: CadenciaRespostaDb;
 }
 
 export interface ReactivitySummary {
@@ -238,13 +262,26 @@ async function reactToInbound(
     return { matched: true, reacted };
   }
 
+  // CADÊNCIA: a resposta passa pela transição atômica (IA assume ou pessoa
+  // atende). Só a inscrição de cadência; todo o resto segue abaixo, intacto.
+  let reacted = 0;
+  const daCadencia = new Set<string>();
+  if (db.cadencia !== undefined) {
+    const entregues = new Set<string>();
+    for (const e of live) {
+      if (e.surface !== "cadence") continue;
+      daCadencia.add(e.id);
+      if (!STATUS_DA_CADENCIA_QUE_A_RESPOSTA_ENCERRA.includes(e.status)) continue;
+      if (await reagirNaCadencia(db.cadencia, row, e.id, entregues)) reacted++;
+    }
+  }
+
   // Daqui para baixo o dormente sai de cena: os dois filtros abaixo pegam
   // `waiting_reply` e `active`, e ele não é nenhum dos dois. É assim que a
   // espera imune sobrevive — não por um `if` de imunidade, mas por não estar
   // no conjunto que reage.
-  const waitingReply = live.filter((e) => e.status === "waiting_reply");
-  const esperaAtiva = live.filter((e) => e.status === "active");
-  let reacted = 0;
+  const waitingReply = live.filter((e) => e.status === "waiting_reply" && !daCadencia.has(e.id));
+  const esperaAtiva = live.filter((e) => e.status === "active" && !daCadencia.has(e.id));
   for (const e of waitingReply) {
     if (parseCancelOnReply(e.trigger_config)) {
       const key = `reactivity:${row.id}:${e.id}:reactivity_replied`;
@@ -431,6 +468,7 @@ export async function applyReactivityEvent(
 
 export function createSupabaseReactivityClient(admin: SupabaseClient): ReactivityAdminClient {
   return {
+    cadencia: createSupabaseCadenciaRespostaDb(admin),
     async loadConversationContactId(orgId, conversationId) {
       const { data, error } = await admin
         .from("conversations")
@@ -465,7 +503,7 @@ export function createSupabaseReactivityClient(admin: SupabaseClient): Reactivit
       const pointerIds = [...new Set(enrollments.map((e) => e.pointer_id))];
       const { data: pointers, error: pErr } = await admin
         .from("followup_flow_pointers")
-        .select("id, handoff_policy, trigger_config")
+        .select("id, handoff_policy, trigger_config, surface")
         .eq("organization_id", orgId)
         .in("id", pointerIds);
       if (pErr) throw new Error(pErr.message);
@@ -481,6 +519,7 @@ export function createSupabaseReactivityClient(admin: SupabaseClient): Reactivit
           pointer_id: e.pointer_id,
           handoff_policy: (p?.handoff_policy as LiveEnrollmentRef["handoff_policy"]) ?? "pause",
           trigger_config: p?.trigger_config ?? null,
+          surface: (p as { surface?: string | null } | undefined)?.surface ?? undefined,
         };
       });
     },
