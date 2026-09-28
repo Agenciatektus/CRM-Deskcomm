@@ -68,7 +68,13 @@ export type HandoffReason =
    * a MESMA constante que o engine grava: dois caminhos param a IA pelo mesmo
    * motivo, e duas grafias fariam quem filtra por uma achar metade das conversas.
    */
-  | "orcamento_de_ia";
+  | "orcamento_de_ia"
+  /** O lead respondeu à cadência e ela manda uma pessoa atender (migration 9019). */
+  | "cadencia_lead_respondeu"
+  /** A IA da cadência levou o negócio até a etapa-alvo e passa o bastão. */
+  | "objetivo_atingido"
+  /** A IA da cadência parou de conduzir (teto de turnos, agente indisponível). */
+  | "cadencia_ia_encerrou";
 
 export interface TriggerHandoffInput {
   serviceBoundary?: ServiceBoundary;
@@ -98,6 +104,15 @@ export interface TriggerHandoffInput {
   motivoTexto?: string | null;
   leadId?: string | null;
   metadata?: Record<string, unknown>;
+  /**
+   * Avisar o lead de que uma pessoa vai assumir. Padrão `true`. Só o handoff por
+   * `objetivo_atingido` da cadência manda `false`: a IA já disse ao lead, pela
+   * instrução do objetivo, que alguém da equipe dará sequência — o aviso
+   * automático repetiria a mesma coisa.
+   */
+  avisarLead?: boolean;
+  /** Título do item NOVO da Central. Padrão: "Atendimento automático parou — assumir a conversa". */
+  tituloDaCentral?: string;
 }
 
 export interface TriggerHandoffResult {
@@ -129,6 +144,9 @@ const MOTIVO_DA_PASSAGEM = {
   legal_mention: "legal_mention",
   refund_mention: "refund_mention",
   orcamento_de_ia: "orcamento_de_ia",
+  cadencia_lead_respondeu: "cadencia_lead_respondeu",
+  objetivo_atingido: "objetivo_atingido",
+  cadencia_ia_encerrou: "cadencia_ia_encerrou",
 } satisfies Record<HandoffReason, MotivoDaPassagem>;
 
 function motivoDaPassagem(reason: HandoffReason): MotivoDaPassagem {
@@ -254,8 +272,10 @@ export async function triggerHandoff(
     // (conversa órfã, que a UI não mostra) seguimos sem avisar: o handoff é mais
     // importante que o aviso, e a falta vira linha no item da Central abaixo.
     const contactId = (convNow as unknown as { contact_id?: string | null }).contact_id ?? null;
-    const aviso =
-      contactId === null
+    const aviso: DesfechoDoAvisoDoCrm =
+      input.avisarLead === false
+        ? { avisado: false, porque: "aviso_dispensado_pelo_chamador" }
+        : contactId === null
         ? { avisado: false, porque: "conversa_sem_contato" }
         : await avisarLeadDoCrm(admin, {
             organizationId: input.organizationId,
@@ -294,6 +314,12 @@ export async function triggerHandoff(
       });
       return { triggered: false, reason: "orchestrator_error" };
     }
+
+    // Step 1.5 — a condução da cadência (se houver) acaba aqui. Uma pessoa
+    // assumiu: a IA da cadência não pode continuar falando nem manter a
+    // autorização `cadencia:<pointer>` do contato. CAS no banco — no-op quando
+    // já encerrada (o handoff por objetivo encerra antes de chamar).
+    await encerrarConducaoDaConversa(admin, input.organizationId, input.conversationId);
 
     // Step 2 — timeline activity (best-effort; missing leadId is OK).
     if (input.leadId) {
@@ -440,7 +466,7 @@ export async function triggerHandoff(
         origem: input.origem,
         motivoCodigo: motivoDaPassagem(input.reason),
         briefing,
-        aviso: desfechoDaPassagem(aviso),
+        aviso: input.avisarLead === false ? null : desfechoDaPassagem(aviso),
       });
       if (!gravou.gravada) {
         logger.warn("[handoff-orchestrator] passagem não registrada", {
@@ -465,7 +491,7 @@ export async function triggerHandoff(
         const corpo = corpoCurtoDoAviso(
           {
             motivoCodigo: motivoDaPassagem(input.reason),
-            aviso: desfechoDaPassagem(aviso),
+            aviso: input.avisarLead === false ? null : desfechoDaPassagem(aviso),
           },
           (texto) => traduzir(texto, idiomaDaOrg),
         );
@@ -491,7 +517,7 @@ export async function triggerHandoff(
               organization_id: input.organizationId,
               kind: "handoff",
               severity: "critical",
-              title: "Atendimento automático parou — assumir a conversa",
+              title: input.tituloDaCentral ?? "Atendimento automático parou — assumir a conversa",
               body: corpo,
               ref_kind: "conversation",
               ref_id: input.conversationId,
@@ -578,5 +604,41 @@ async function falasPendentes(
       .reverse();
   } catch {
     return [];
+  }
+}
+
+/**
+ * Encerra a condução VIVA da cadência nesta conversa (motivo `handoff`).
+ * Best-effort: o handoff é mais importante que o encerramento, e a condução
+ * de uma conversa silenciada não fala de qualquer jeito (o turno checa
+ * `isLeadInHandoff` antes de tudo). Nunca lança.
+ */
+async function encerrarConducaoDaConversa(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  conversationId: string,
+): Promise<void> {
+  try {
+    const { data, error } = await admin
+      .from("cadencia_conducoes" as never)
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("conversation_id", conversationId)
+      .is("encerrada_em", null)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const conducao = data as { id: string } | null;
+    if (conducao === null) return;
+    const { error: rpcErr } = await admin.rpc("fn_cadencia_encerrar_conducao" as never, {
+      p_org: organizationId,
+      p_conducao: conducao.id,
+      p_motivo: "handoff",
+    } as never);
+    if (rpcErr) throw new Error(rpcErr.message);
+  } catch (err) {
+    logger.warn("[handoff-orchestrator] condução da cadência não encerrada", {
+      conversation_id: conversationId,
+      error: err instanceof Error ? err.message.slice(0, 160) : "erro",
+    });
   }
 }

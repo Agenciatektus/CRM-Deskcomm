@@ -71,6 +71,8 @@ export const ORIGENS_DA_PASSAGEM = [
   "legado_teto",
   "mcp_externo",
   "runtime_nativo",
+  /** A cadência de prospecção (migration 9019): o lead respondeu, ou a IA dela terminou. */
+  "cadencia",
 ] as const;
 export type OrigemDaPassagem = (typeof ORIGENS_DA_PASSAGEM)[number];
 
@@ -90,6 +92,11 @@ export const MOTIVOS_DA_PASSAGEM = [
   "legal_mention",
   "refund_mention",
   "caso_escalado",
+  // Os três da cadência (migration 9019). `objetivo_atingido` é o bom desfecho:
+  // a IA levou o negócio até a etapa-alvo e passa o bastão.
+  "cadencia_lead_respondeu",
+  "objetivo_atingido",
+  "cadencia_ia_encerrou",
 ] as const;
 export type MotivoDaPassagem = (typeof MOTIVOS_DA_PASSAGEM)[number];
 
@@ -134,6 +141,9 @@ export const FRASE_DO_MOTIVO = {
   legal_mention: "A conversa tocou em assunto jurídico",
   refund_mention: "A conversa tocou em reembolso",
   caso_escalado: "Uma pessoa da equipe escalou um atendimento",
+  cadencia_lead_respondeu: "O lead respondeu à cadência de prospecção",
+  objetivo_atingido: "A IA levou o negócio até a etapa definida na cadência",
+  cadencia_ia_encerrou: "A IA da cadência parou de conduzir a conversa",
 } satisfies Record<MotivoDaPassagem, string>;
 
 /** A frase em português de cada motivo de o cliente NÃO ter sido avisado. */

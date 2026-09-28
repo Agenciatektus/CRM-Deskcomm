@@ -29552,13 +29552,14 @@ create table if not exists public.passagens_de_atendimento (
                      'pedido_explicito','opt_out_provavel','ferramenta_do_modelo',
                      'teto_de_gasto','caso_escalado','sentimento','legado_pedido',
                      'legado_juridico','legado_etapa','legado_confianca','legado_teto',
-                     'mcp_externo','runtime_nativo')),
+                     'mcp_externo','runtime_nativo','cadencia')),
   -- POR QUE saiu do automático. É o que vira FRASE na tela — o código nunca
   -- aparece para uma pessoa (`lib/escalacao/passagem.ts` → `FRASE_DO_MOTIVO`).
   motivo_codigo    text not null check (motivo_codigo in (
                      'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
                      'low_confidence','critical_stage','legal_mention','refund_mention',
-                     'caso_escalado')),
+                     'caso_escalado','cadencia_lead_respondeu','objetivo_atingido',
+                     'cadencia_ia_encerrou')),
 
   -- ─── OS QUATRO NOMES QUE O GATE DE LGPD LÊ (ver o cabeçalho) ─────────────
   --   title   ← "o que o cliente quer", em uma linha (é o título do cartão)
@@ -29642,7 +29643,9 @@ alter table public.passagens_de_atendimento
     'pedido_explicito','opt_out_provavel','ferramenta_do_modelo',
     'teto_de_gasto','caso_escalado','sentimento','legado_pedido',
     'legado_juridico','legado_etapa','legado_confianca','legado_teto',
-    'mcp_externo','runtime_nativo'));
+    'mcp_externo','runtime_nativo',
+    -- 'cadencia' entra pela migration 9019 (bloco único, #159).
+    'cadencia'));
 
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_motivo_codigo_check;
@@ -29651,7 +29654,9 @@ alter table public.passagens_de_atendimento
   check (motivo_codigo in (
     'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
     'low_confidence','critical_stage','legal_mention','refund_mention',
-    'caso_escalado'));
+    'caso_escalado',
+    -- Os três da cadência entram pela migration 9019 (bloco único, #159).
+    'cadencia_lead_respondeu','objetivo_atingido','cadencia_ia_encerrou'));
 
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_aviso_motivo_codigo_check;
