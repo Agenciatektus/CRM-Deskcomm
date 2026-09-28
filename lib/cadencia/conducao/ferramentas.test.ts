@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RECUSA_FORA_DA_CONDUCAO, restringirAConducao } from "./ferramentas";
-import { filtrarRawTools } from "./presets";
+import { CHAVES_CONFERIDAS, RECUSA_FORA_DA_CONDUCAO, restringirAConducao } from "./ferramentas";
+import { filtrarRawTools, PRESET_TOOLS } from "./presets";
 
 const ALVO = { leadId: "lead-1", contactId: "ct-1", conversationId: "cv-1" };
 
@@ -71,5 +71,88 @@ describe("restringirAConducao — anti-IDOR", () => {
     };
     const final = restringirAConducao(filtrarRawTools(tools, "qualificar"), ALVO);
     expect(Object.keys(final).sort()).toEqual(["crm_move_lead_stage", "send_message"]);
+  });
+});
+
+describe("par polimórfico target_kind/target_id (crm_manage_tags)", () => {
+  it.each([
+    ["lead", "lead-1"],
+    ["contact", "ct-1"],
+    ["conversation", "cv-1"],
+  ])("%s da própria condução passa", async (kind, id) => {
+    const f = ferramenta();
+    const t = restringirAConducao({ crm_manage_tags: f.tool }, ALVO);
+    await t.crm_manage_tags!.execute!({ target_kind: kind, target_id: id, add: ["x"] } as never, {} as never);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["lead", "lead-2"],
+    ["contact", "ct-2"],
+    ["conversation", "cv-2"],
+    ["lead", "ct-1"],
+    ["organization", "lead-1"],
+    [undefined, "lead-1"],
+  ])("kind=%s id=%s é recusado", async (kind, id) => {
+    const f = ferramenta();
+    const t = restringirAConducao({ crm_manage_tags: f.tool }, ALVO);
+    await expect(
+      t.crm_manage_tags!.execute!({ target_kind: kind, target_id: id, add: ["x"] } as never, {} as never),
+    ).resolves.toEqual(RECUSA_FORA_DA_CONDUCAO);
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("crm_list_appointments só com o contato da condução", () => {
+  it("sem contact_id (agenda do dia da equipe) → recusa; com outro → recusa; com o da condução → passa", async () => {
+    const f = ferramenta();
+    const t = restringirAConducao({ crm_list_appointments: f.tool }, ALVO);
+    await expect(t.crm_list_appointments!.execute!({ dia: "2026-09-28" } as never, {} as never)).resolves.toEqual(
+      RECUSA_FORA_DA_CONDUCAO,
+    );
+    await expect(t.crm_list_appointments!.execute!({ contact_id: "ct-2" } as never, {} as never)).resolves.toEqual(
+      RECUSA_FORA_DA_CONDUCAO,
+    );
+    await t.crm_list_appointments!.execute!({ contact_id: "ct-1", dia: "2026-09-28" } as never, {} as never);
+    expect(f.execute).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * COBERTURA: toda chave de id de toda ferramenta dos presets ou é conferida
+ * pelo wrapper, ou está declarada aqui como id que NÃO aponta para pessoa,
+ * negócio, conversa ou compromisso. Ferramenta nova no preset com chave nova
+ * reprova até alguém decidir de que lado ela fica.
+ */
+const IDS_QUE_NAO_SAO_DE_PESSOA: Record<string, string> = {
+  to_stage_id: "etapa de destino do funil (configuração); o escopo de funil restringe ao da cadência",
+  owner_agent_id: "responsável da equipe pelo negócio, não o cliente",
+  owner_user_id: "atendente da equipe; crm_list_appointments exige o contact_id da condução",
+  pipeline_id: "funil (configuração); o escopo de funil do agente já restringe ao da cadência",
+};
+
+describe("cobertura do anti-IDOR sobre o inputSchema das ferramentas dos presets", () => {
+  it("toda chave *_id / target_kind está coberta ou declarada", async () => {
+    const { getToolByName } = await import("@/lib/mcp/tools");
+    const nomes = [...new Set(Object.values(PRESET_TOOLS).flatMap((p) => [...p.mcp]))];
+    expect(nomes.length, "controle: os presets listam ferramentas").toBeGreaterThan(5);
+    const conferidas = new Set<string>([...CHAVES_CONFERIDAS, "target_kind"]);
+    const soltas: string[] = [];
+    const usadas = new Set<string>();
+    let vistas = 0;
+    for (const nome of nomes) {
+      const tool = getToolByName(nome);
+      expect(tool, `ferramenta do preset fora do registro: ${nome}`).toBeDefined();
+      for (const chave of Object.keys((tool!.inputSchema ?? {}) as Record<string, unknown>)) {
+        if (!chave.endsWith("_id") && chave !== "target_kind") continue;
+        vistas++;
+        usadas.add(chave);
+        if (!conferidas.has(chave) && IDS_QUE_NAO_SAO_DE_PESSOA[chave] === undefined) soltas.push(`${nome}.${chave}`);
+      }
+    }
+    expect(vistas, "controle positivo: a varredura enxerga chaves de id").toBeGreaterThan(3);
+    expect(soltas).toEqual([]);
+    // A declaração não sobrevive à chave que a motivou.
+    expect(Object.keys(IDS_QUE_NAO_SAO_DE_PESSOA).filter((k) => !usadas.has(k))).toEqual([]);
   });
 });

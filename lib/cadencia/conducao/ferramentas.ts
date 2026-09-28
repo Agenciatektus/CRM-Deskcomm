@@ -6,7 +6,9 @@
  * `contact_id` ou `conversation_id` é recusada quando o valor não é o da condução
  * — em LEITURA também: ver o negócio de outra pessoa já é vazamento, e o modelo
  * pode ter lido um id de outro lead numa mensagem manipulada. `appointment_id` é
- * conferido no banco (o compromisso tem de ser do contato da condução).
+ * conferido no banco (o compromisso tem de ser do contato da condução). O par
+ * `target_kind`/`target_id` (`crm_manage_tags`) vale só com o tipo certo, e a
+ * listagem da agenda (`crm_list_appointments`) só roda com o contato da condução.
  *
  * Chamada sem nenhum desses campos passa: as ferramentas do motor agem sobre o
  * lead do job por construção, e as de agenda sem id (listar horários livres) não
@@ -36,18 +38,54 @@ function valor(args: unknown, chave: string): unknown {
   return (args as Record<string, unknown>)[chave];
 }
 
+/**
+ * As chaves de id que o wrapper confere — a lista que o teste de cobertura
+ * (`ferramentas.test.ts`) cruza com o `inputSchema` de TODA ferramenta dos
+ * presets: ferramenta nova com outra chave de pessoa/negócio/conversa reprova
+ * lá, em vez de reabrir o buraco em silêncio.
+ */
+export const CHAVES_CONFERIDAS = ["lead_id", "contact_id", "conversation_id", "appointment_id", "target_id"] as const;
+
+/**
+ * Ferramentas de LISTAGEM que sem filtro alcançam outras pessoas: na condução
+ * elas só rodam com o `contact_id` da condução (a agenda de um dia inteiro da
+ * equipe traria compromissos de outros clientes).
+ */
+export const EXIGEM_O_CONTATO_DA_CONDUCAO: ReadonlySet<string> = new Set(["crm_list_appointments"]);
+
+function presente(v: unknown): boolean {
+  return v !== undefined && v !== null;
+}
+
 /** `true` quando a chamada aponta para alguém que não é o da condução. */
-export async function apontaParaOutro(args: unknown, alvo: AlvoDaConducao): Promise<boolean> {
+export async function apontaParaOutro(args: unknown, alvo: AlvoDaConducao, ferramenta?: string): Promise<boolean> {
   const lead = valor(args, "lead_id");
-  if (lead !== undefined && lead !== null && lead !== alvo.leadId) return true;
+  if (presente(lead) && lead !== alvo.leadId) return true;
   const contato = valor(args, "contact_id");
-  if (contato !== undefined && contato !== null && contato !== alvo.contactId) return true;
+  if (presente(contato) && contato !== alvo.contactId) return true;
   const conversa = valor(args, "conversation_id");
-  if (conversa !== undefined && conversa !== null && conversa !== alvo.conversationId) return true;
+  if (presente(conversa) && conversa !== alvo.conversationId) return true;
   const agendamento = valor(args, "appointment_id");
-  if (agendamento !== undefined && agendamento !== null) {
+  if (presente(agendamento)) {
     if (typeof agendamento !== "string" || alvo.agendamentoEhDaConducao === undefined) return true;
     if (!(await alvo.agendamentoEhDaConducao(agendamento))) return true;
+  }
+  // Par polimórfico (`crm_manage_tags`): o id só vale junto com o tipo dele.
+  const alvoId = valor(args, "target_id");
+  const alvoKind = valor(args, "target_kind");
+  if (presente(alvoId) || presente(alvoKind)) {
+    const esperado =
+      alvoKind === "lead"
+        ? alvo.leadId
+        : alvoKind === "contact"
+          ? alvo.contactId
+          : alvoKind === "conversation"
+            ? alvo.conversationId
+            : undefined;
+    if (esperado === undefined || esperado === null || alvoId !== esperado) return true;
+  }
+  if (ferramenta !== undefined && EXIGEM_O_CONTATO_DA_CONDUCAO.has(ferramenta) && contato !== alvo.contactId) {
+    return true;
   }
   return false;
 }
@@ -71,7 +109,7 @@ export function restringirAConducao<T extends ComExecute>(
     saida[nome] = {
       ...tool,
       execute: (async (...a: unknown[]) => {
-        if (await apontaParaOutro(a[0], alvo)) return RECUSA_FORA_DA_CONDUCAO;
+        if (await apontaParaOutro(a[0], alvo, nome)) return RECUSA_FORA_DA_CONDUCAO;
         return executar(...a);
       }) as unknown as T["execute"],
     };
