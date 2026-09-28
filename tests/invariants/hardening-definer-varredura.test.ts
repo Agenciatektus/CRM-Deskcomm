@@ -66,6 +66,88 @@ const ANON_PERMITIDO: readonly Excecao[] = [];
  * chamada com o client de sessão do usuário, nunca com o de service role.
  */
 const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
+  // ─── curadoria do vocabulário de etiquetas (migration 9005) ───────────────
+  {
+    fn: "fn_tags_criar(uuid,text,text)",
+    razao:
+      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
+      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
+      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
+      "executa. Definer porque a única policy de escrita de `organizations` é de " +
+      "platform admin: pela sessão de um admin de tenant, um " +
+      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
+      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
+      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
+      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
+      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `manager`: " +
+      "acrescentar palavra ao vocabulário é reversível e não escreve em conversa " +
+      "nem contato nenhum. ",
+  },
+  {
+    fn: "fn_tags_arquivar(uuid,text,text,boolean)",
+    razao:
+      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
+      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
+      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
+      "executa. Definer porque a única policy de escrita de `organizations` é de " +
+      "platform admin: pela sessão de um admin de tenant, um " +
+      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
+      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
+      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
+      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
+      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `manager` pelo " +
+      "mesmo motivo de `fn_tags_criar`: arquivar tira a etiqueta das sugestões e " +
+      "não toca registro nenhum — quem já a tem continua tendo, e o filtro " +
+      "continua encontrando. ",
+  },
+  {
+    fn: "fn_tags_renomear(uuid,text,text,text)",
+    razao:
+      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
+      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
+      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
+      "executa. Definer porque a única policy de escrita de `organizations` é de " +
+      "platform admin: pela sessão de um admin de tenant, um " +
+      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
+      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
+      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
+      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
+      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`, e não " +
+      "`manager`: renomear reescreve `tags` em massa nas conversas ou nos " +
+      "contatos da organização e não tem desfazer — a mesma régua que faz " +
+      "`fn_definir_cliente_pela_agenda` ser admin. ",
+  },
+  {
+    fn: "fn_tags_mesclar(uuid,text,text[],text)",
+    razao:
+      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
+      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
+      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
+      "executa. Definer porque a única policy de escrita de `organizations` é de " +
+      "platform admin: pela sessão de um admin de tenant, um " +
+      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
+      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
+      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
+      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
+      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: funde " +
+      "variantes reescrevendo `tags` em massa, sem desfazer. ",
+  },
+  {
+    fn: "fn_tags_apagar(uuid,text,text)",
+    razao:
+      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
+      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
+      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
+      "executa. Definer porque a única policy de escrita de `organizations` é de " +
+      "platform admin: pela sessão de um admin de tenant, um " +
+      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
+      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
+      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
+      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
+      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: é a única " +
+      "das cinco que destrói dado — tira a etiqueta do vocabulário E de todo " +
+      "registro que a usa. ",
+  },
   {
     fn: "fn_finalizar_comanda(uuid,uuid,uuid,integer)",
     razao:
@@ -122,11 +204,13 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   },
   {
     fn: "fn_set_channel_routing(uuid,uuid,uuid[],boolean)",
-    razao: "PATCH app/api/v1/settings/routing/channels/route.ts usa createClient da sessão; RPC exige manager, suporte de escrita, MFA e canal/membros da org na mesma transação. tests/invariants/channel-routing.test.ts prova viewer, tenants A/B, membro revogado, policy vazia e MFA platform aal1/aal2.",
+    razao:
+      "PATCH app/api/v1/settings/routing/channels/route.ts usa createClient da sessão; RPC exige manager, suporte de escrita, MFA e canal/membros da org na mesma transação. tests/invariants/channel-routing.test.ts prova viewer, tenants A/B, membro revogado, policy vazia e MFA platform aal1/aal2.",
   },
   {
     fn: "fn_reserve_channel_connection(uuid,uuid,text,text,boolean)",
-    razao: "lib/channels/connect-waha.ts recebe createClient das rotas channel-sessions e onboarding/whatsapp/session; RPC exige admin, suporte e MFA, cria identidade org-owned com recibo privado. tests/invariants/channel-routing.test.ts prova lease/replay/ACL do recibo e MFA platform aal1/aal2.",
+    razao:
+      "lib/channels/connect-waha.ts recebe createClient das rotas channel-sessions e onboarding/whatsapp/session; RPC exige admin, suporte e MFA, cria identidade org-owned com recibo privado. tests/invariants/channel-routing.test.ts prova lease/replay/ACL do recibo e MFA platform aal1/aal2.",
   },
   {
     fn: "fn_google_selection(uuid,jsonb,uuid[],uuid)",
