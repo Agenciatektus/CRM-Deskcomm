@@ -21,6 +21,7 @@ import { enqueueJob } from '../../queue/queue';
 import { avisoDeEventoMorto, IA_QUE_NAO_RESPONDEU } from '@/lib/event-log/aviso-de-evento-morto';
 import { TIPOS_DERIVAVEIS, DERIVACAO_TERMINADA } from '@/lib/messaging/media/derivable';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
+import { passarConversaDaCadenciaParaHumano } from '@/lib/cadencia/conducao/turno';
 
 const DRAIN_CONSUMER = 'agent-engine';
 
@@ -93,7 +94,7 @@ export async function drainTick(pool: pg.Pool, knobs: DrainKnobs, log: Logger): 
   for (const event of events) {
     try {
       const desfecho = await processEvent(pool, event, knobs, log);
-      if (desfecho === 'adiar') {
+      if (desfecho !== 'processado') {
         // Adiar NÃO é falha: volta a pending com uma espera curta e não gasta
         // o orçamento de tentativas (que existe para erro de verdade).
         await pool.query(
@@ -101,7 +102,7 @@ export async function drainTick(pool: pg.Pool, knobs: DrainKnobs, log: Logger): 
            set status = 'pending', attempts = greatest(attempts - 1, 0),
                next_attempt_at = now() + make_interval(secs => $2 / 1000.0), updated_at = now()
            where id = $1`,
-          [event.id, ESPERA_DERIVACAO_MS],
+          [event.id, desfecho.esperaMs],
         );
         continue;
       }
@@ -193,7 +194,16 @@ const ESPERA_DERIVACAO_MS = 4_000;
  */
 const TETO_ESPERA_DERIVACAO_MS = 120_000;
 
-type DesfechoEvento = 'processado' | 'adiar';
+/**
+ * O lead respondeu à CADÊNCIA e a transição (IA assume ou pessoa atende) ainda
+ * não aconteceu: o dreno inline da reatividade roda na request do webhook e
+ * normalmente chega antes; se não chegou, o despacho espera em vez de pular.
+ */
+const ESPERA_TRANSICAO_DA_CADENCIA_MS = 15_000;
+/** Teto dessa espera: depois dele o próprio dreno faz a transição (mesma função, idempotente). */
+export const TETO_TRANSICAO_DA_CADENCIA_MS = 5 * 60_000;
+
+type DesfechoEvento = 'processado' | { kind: 'adiar'; esperaMs: number };
 
 async function processEvent(
   pool: pg.Pool,
@@ -232,6 +242,14 @@ async function processEvent(
     log.info('drain: conversa de grupo ou inexistente — evento pulado', { event_id: event.id });
     return 'processado';
   }
+
+  // CADÊNCIA. Com condução viva, o agente é o DELA (não o da sessão): o portão
+  // de capacidade abaixo não se aplica. Com régua viva sem condução, a resposta
+  // ainda não passou pela transição — espera (ver ESPERA_TRANSICAO_DA_CADENCIA_MS).
+  // Sem cadência nenhuma, nada muda.
+  const cadencia = await transicaoDaCadencia(pool, event, p, log);
+  if (cadencia === 'processado' || typeof cadencia === 'object') return cadencia;
+  const conducaoViva = cadencia === 'conducao';
 
   // Ninguém para atender: NÃO gastar. Sem agente publicado para esta sessão e
   // sem roteador que possa resolver alguém, o turno seguia assim mesmo e caía
@@ -300,7 +318,7 @@ async function processEvent(
     [event.organization_id, p.channel_session_id],
   );
   const cap = capacidade[0];
-  if (cap !== undefined && !cap.tem_agente && !cap.tem_roteador) {
+  if (!conducaoViva && cap !== undefined && !cap.tem_agente && !cap.tem_roteador) {
     log.info('drain: nenhum agente publicado para a sessão — turno pulado (sem gasto)', {
       event_id: event.id,
       channel_session_id: p.channel_session_id,
@@ -416,7 +434,7 @@ async function processEvent(
         tipo: msg.type,
         esperando_ha_ms: esperandoHa,
       });
-      return 'adiar';
+      return { kind: 'adiar', esperaMs: ESPERA_DERIVACAO_MS };
     }
     log.warn('drain: derivação não concluiu no teto — seguindo sem o texto', {
       event_id: event.id,
@@ -473,6 +491,81 @@ async function processEvent(
   });
   log.info('drain: job de turno enfileirado', { event_id: event.id, job_id: job.id, deduped });
   return 'processado';
+}
+
+/**
+ * A resposta à cadência já virou condução, ainda vai virar, ou não há cadência.
+ *
+ *   - `'conducao'`: condução viva nesta conversa → segue, sem portão de capacidade;
+ *   - `'sem_cadencia'`: nada de cadência → segue como sempre;
+ *   - `{ kind:'adiar' }`: régua viva sem condução, dentro do teto → espera;
+ *   - `'processado'`: passou do teto e a cadência manda uma pessoa → handoff feito.
+ *
+ * Passado o teto, a transição é feita AQUI, pela mesma função da reatividade
+ * (`fn_cadencia_lead_respondeu`, idempotente): quem chegar primeiro produz o
+ * mesmo estado. Nunca silêncio: ou a IA assume, ou uma pessoa é chamada.
+ */
+async function transicaoDaCadencia(
+  pool: pg.Pool,
+  event: EventRow,
+  p: { conversation_id: string; contact_id: string },
+  log: Logger,
+): Promise<'conducao' | 'sem_cadencia' | 'processado' | { kind: 'adiar'; esperaMs: number }> {
+  const { rows } = await pool.query<{ conducao_id: string | null; reguas: string[] | null }>(
+    `select
+       (select c.id from cadencia_conducoes c
+         where c.organization_id = $1 and c.conversation_id = $2
+           and c.encerrada_em is null and c.expira_em > now()
+         limit 1) as conducao_id,
+       (select array_agg(e.id order by e.started_at) from followup_enrollments e
+          join followup_flow_pointers fp on fp.id = e.pointer_id and fp.organization_id = e.organization_id
+         where e.organization_id = $1 and e.contact_id = $3 and fp.surface = 'cadence'
+           and e.status in ('active','waiting_reply','dormente')) as reguas`,
+    [event.organization_id, p.conversation_id, p.contact_id],
+  );
+  const r = rows[0];
+  if (r?.conducao_id) return 'conducao';
+  const reguas = r?.reguas ?? [];
+  if (reguas.length === 0) return 'sem_cadencia';
+
+  const esperandoHa = Date.now() - new Date(event.created_at).getTime();
+  if (esperandoHa < TETO_TRANSICAO_DA_CADENCIA_MS) {
+    log.info('drain: lead respondeu à cadência — esperando a transição', {
+      event_id: event.id,
+      esperando_ha_ms: esperandoHa,
+    });
+    return { kind: 'adiar', esperaMs: ESPERA_TRANSICAO_DA_CADENCIA_MS };
+  }
+
+  let ia = false;
+  let atendente = false;
+  for (const enrollmentId of reguas) {
+    const { rows: fn } = await pool.query<{ r: { ja_encerrada?: boolean; modo?: string; conversation_id?: string | null } }>(
+      `select fn_cadencia_lead_respondeu($1, $2, $3) as r`,
+      [event.organization_id, enrollmentId, event.id],
+    );
+    const resp = fn[0]?.r;
+    if (resp === undefined || resp.ja_encerrada) continue;
+    if (resp.modo === 'ia' && resp.conversation_id === p.conversation_id) ia = true;
+    else if (resp.modo === 'atendente') atendente = true;
+  }
+  log.warn('drain: transição da cadência feita pelo dreno depois do teto de espera', {
+    event_id: event.id,
+    ia,
+    atendente,
+  });
+  if (ia) return 'conducao';
+  if (atendente) {
+    await passarConversaDaCadenciaParaHumano(
+      pool,
+      { organizationId: event.organization_id, contactId: p.contact_id, conversationId: p.conversation_id },
+      { codigo: 'cadencia_lead_respondeu', texto: 'Lead respondeu à cadência' },
+      log,
+    );
+    return 'processado';
+  }
+  // Tudo já estava encerrado por outro caminho: segue o fluxo normal.
+  return 'sem_cadencia';
 }
 
 /** Loop do drain — polling com backoff adaptativo (ocioso = tick mais lento). */

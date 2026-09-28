@@ -75,6 +75,9 @@ const FONTES = [
   "lib/agent-engine/agent/human-handoff.ts",
   "lib/ai/handoff/orchestrator.ts",
   "app/api/v1/ai/cases/[id]/reply/route.ts",
+  // A condução da cadência passa para humano no teto de turnos e com o agente
+  // indisponível; o turno avisa antes e o desfecho chega por `avisoAoLead`.
+  "lib/cadencia/conducao/turno.ts",
 ] as const;
 
 /**

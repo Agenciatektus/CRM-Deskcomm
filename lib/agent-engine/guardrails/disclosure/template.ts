@@ -85,7 +85,26 @@ export async function loadDisclosureTemplate(db: Queryable, tenantId: string): P
  * contam: um 'queued'/'failed' não alcançou o lead, então a próxima tentativa ainda é a
  * primeira e leva o disclosure. organization_id/contact_id de fonte confiável (row do job — regra dura nº 1).
  */
-export async function countPriorAcceptedSends(db: Queryable, tenantId: string, leadId: string): Promise<number> {
+export async function countPriorAcceptedSends(
+  db: Queryable,
+  tenantId: string,
+  leadId: string,
+  /**
+   * Conta só envios a partir deste instante. A condução da cadência passa a
+   * abertura dela (`cadencia_conducoes.aberta_em`): as mensagens da régua já
+   * estão no ledger como `accepted`, e sem o recorte a 1ª fala da IA nunca
+   * levaria o disclosure. Ausente = o histórico inteiro, como sempre.
+   */
+  desde?: Date,
+): Promise<number> {
+  if (desde !== undefined) {
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from send_ledger
+       where organization_id = $1 and contact_id = $2 and status = 'accepted' and created_at >= $3`,
+      [tenantId, leadId, desde],
+    );
+    return rows[0]?.n ?? 0;
+  }
   const { rows } = await db.query<{ n: number }>(
     `select count(*)::int as n from send_ledger
      where organization_id = $1 and contact_id = $2 and status = 'accepted'`,

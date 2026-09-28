@@ -202,6 +202,26 @@ export async function performHumanHandoff(
     [ids.tenantId, ids.conversationId, SILENCE_INFINITY, opts.reason],
   );
 
+  // (b2) A condução da cadência (se houver) acaba aqui: uma pessoa assumiu, a IA
+  // da cadência não fala mais e a autorização `cadencia:<pointer>` do contato é
+  // revogada. CAS no banco (`fn_cadencia_encerrar_conducao`, migration 9018) —
+  // no-op quando já encerrada (teto de turnos e agente indisponível encerram
+  // antes de chamar, com o motivo deles). Best-effort: o handoff já aconteceu, e
+  // a condução de uma conversa silenciada não fala de qualquer jeito.
+  try {
+    await guardServiceEffect();
+    await db.query(
+      `select fn_cadencia_encerrar_conducao($1, c.id, 'handoff')
+         from cadencia_conducoes c
+        where c.organization_id = $1 and c.conversation_id = $2 and c.encerrada_em is null`,
+      [ids.tenantId, ids.conversationId],
+    );
+  } catch (err) {
+    opts.log.warn('handoff: condução da cadência não encerrada', {
+      error: err instanceof Error ? err.message.slice(0, 160) : 'erro desconhecido',
+    });
+  }
+
   // (c) Cancela os crons PENDENTES do lead (follow-ups agendados — F3-01/02). Idempotente,
   // via o cancel compartilhado (mesma garantia que o opt-out irrevogável usa — F4-07).
   await guardServiceEffect();

@@ -48,6 +48,15 @@ export function createApprovedReplyHandler(
           [job.organization_id, job.contact_id, policy.channel_session_id],
         );
         if (!rows[0]) throw new StaleServiceBoundaryError();
+        // Condução da cadência viva nesta conversa: o disclosure conta o "1º
+        // outbound" a partir da abertura dela (a régua já está no ledger).
+        const { rows: conducao } = await pool.query<{ aberta_em: Date }>(
+          `select aberta_em from cadencia_conducoes
+            where organization_id = $1 and conversation_id = $2 and encerrada_em is null
+            limit 1`,
+          [job.organization_id, policy.conversation_id],
+        );
+        const disclosureDesde = conducao[0]?.aberta_em;
         const channel =
           deps.channel?.(pool) ??
           createRuntimeSendChannel(pool, { ...deps.crmCfg, agentActorId: policy.agent_id });
@@ -65,6 +74,7 @@ export function createApprovedReplyHandler(
           crmDailyLimit: rows[0].daily_message_limit,
           now: new Date(),
           lgpd: deriveLgpdFromContact(rows[0], false),
+          ...(disclosureDesde instanceof Date ? { disclosureDesde } : {}),
           sleep: deps.sleep,
           send: async (body) => {
             await assertApprovedReplyPg(pool, context);

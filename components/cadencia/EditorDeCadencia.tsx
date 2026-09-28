@@ -24,7 +24,13 @@ import { PoliticaDeEnvio } from "./PoliticaDeEnvio";
 import { SaidasDaCadenciaEditor } from "./SaidasDaCadencia";
 import { GatilhoDaCadenciaEditor } from "./GatilhoDaCadencia";
 import { SAIDAS_PADRAO } from "@/lib/cadencia/saidas";
+import { CONDUCAO_PADRAO } from "@/lib/cadencia/conducao/settings";
+import { ConducaoDaResposta } from "./ConducaoDaResposta";
 import { PreviewDaMensagem } from "./PreviewDaMensagem";
+
+/** O 403 do PATCH traz o papel mínimo em texto técnico; a tela diz o que muda. */
+const MSG_SO_ADMIN =
+  "Só um administrador pode mudar o agente, a instrução, quem atende ou passar a IA para automático.";
 
 interface Etapa {
   id: string;
@@ -131,6 +137,7 @@ function Formulario({
     } catch (err) {
       const lista = err instanceof ApiError ? (err.details?.errors as ErroDePublicacao[] | undefined) : undefined;
       if (lista && lista.length > 0) setErros(lista);
+      else if (err instanceof ApiError && err.code === "forbidden_role") setAviso(t(MSG_SO_ADMIN));
       else setAviso(err instanceof Error ? err.message : t("Não foi possível salvar."));
     }
   };
@@ -205,6 +212,15 @@ function Formulario({
             saidas={politica.saidas ?? SAIDAS_PADRAO}
             onChange={(saidas) => setPolitica({ ...politica, saidas })}
             etapas={etapas.filter((e) => !e.is_lost)}
+          />
+        </div>
+        <div className="space-y-2 border-t border-border pt-4">
+          <span className="text-sm font-medium">{t("Quando o lead responder")}</span>
+          <ConducaoDaResposta
+            conducao={politica.conducao ?? CONDUCAO_PADRAO}
+            onChange={(conducao) => setPolitica({ ...politica, conducao })}
+            etapas={etapas}
+            etapaDoGatilho={gatilho.kind === "stage_change" ? gatilho.params.stage_id : null}
           />
         </div>
       </aside>
