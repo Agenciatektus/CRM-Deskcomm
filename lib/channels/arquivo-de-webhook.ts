@@ -26,12 +26,17 @@
  * Não interpreta o payload. `event_type` e `external_id` ficam nulos de
  * propósito: lê-los exigiria saber o formato de cada canal, e essa é a decisão
  * que o seam existe para manter longe da rota. O `payload_parsed` guarda o JSON
- * inteiro — quem investigar lê `payload_parsed->>'event'` e tem a mesma
- * resposta, sem que ninguém precise ensinar o formato a este arquivo.
+ * — quem investigar lê `payload_parsed->>'event'` e tem a mesma resposta, sem
+ * que ninguém precise ensinar o formato a este arquivo. A exceção é o que não é
+ * dado a investigar: mídia inline (`base64`) e credencial (`token`) saem antes
+ * da escrita, trocadas por um marcador (`./enxugar-para-arquivo.ts`). Foi a
+ * mídia inline que encheu o banco em 28/09/2026.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
+
+import { arquivoEnxuto } from "./enxugar-para-arquivo";
 
 /** Cabeçalhos que NUNCA entram no arquivo, por menor que seja a chance. */
 const PROIBIDOS = ["authorization", "cookie", "x-api-key"];
@@ -67,17 +72,12 @@ export async function abrirArquivoDoWebhook(
     headers: Headers;
   },
 ): Promise<string | null> {
-  let parsed: Record<string, unknown> | null = null;
-  try {
-    const v = JSON.parse(entrada.rawBody) as unknown;
-    // Só objeto vai para a coluna `jsonb`: um payload que seja lista ou escalar
-    // é legítimo em JSON e não cabe no formato desta coluna.
-    parsed = v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
-  } catch {
-    // Corpo que não é JSON é EXATAMENTE o que se quer arquivar: é o caso que
-    // ninguém consegue reproduzir depois. `raw_body` guarda ele inteiro.
-    parsed = null;
-  }
+  // Enxuto ANTES de gravar: sem a mídia inline e sem o token da instância. A
+  // ingestão não lê daqui — ela usa o corpo da requisição —, então cortar aqui
+  // não tira nada de quem processa a mensagem. Ver `./enxugar-para-arquivo.ts`.
+  // Corpo que não é JSON (ou é lista/escalar) sai intacto, com `parsed` nulo:
+  // é exatamente o caso que ninguém consegue reproduzir depois.
+  const { rawBody, parsed } = arquivoEnxuto(entrada.rawBody);
 
   try {
     const { data, error } = await admin
@@ -90,7 +90,7 @@ export async function abrirArquivoDoWebhook(
         provider: entrada.provider,
         http_method: "POST",
         headers: cabecalhosSeguros(entrada.headers),
-        raw_body: entrada.rawBody,
+        raw_body: rawBody,
         payload_parsed: parsed,
         status: "received",
         attempts: 0,
