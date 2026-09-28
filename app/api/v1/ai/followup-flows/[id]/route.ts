@@ -16,6 +16,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { patchFollowupFlowSchema } from "@/lib/followup/api-schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
@@ -198,15 +199,19 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
 
-  const supabase = await createClient();
-  const { data: existing, error: fetchErr } = await supabase
+  const sessao = await createClient();
+  const { data: existing, error: fetchErr } = await sessao
     .from("followup_flow_pointers")
-    .select("id")
+    .select("id, surface")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
+  // Cadência só se escreve pelo servidor (migration 9020): soltar a versão ativa
+  // dela pela sessão é 42501. O papel (manager) e a organização já foram
+  // conferidos acima, e toda escrita abaixo filtra por organization_id.
+  const supabase = existing.surface === "cadence" ? createAdminClient() : sessao;
 
   // Enrollment referencia version_id; pointer referencia active_version_id.
   // Soltar o relógio nessa ordem evita 23503 no Postgres.

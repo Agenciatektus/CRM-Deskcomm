@@ -10,6 +10,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const supabase = await createClient();
   const { data: existing, error: fetchErr } = await supabase
     .from("followup_flow_pointers")
-    .select("id, status")
+    .select("id, status, surface")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -47,7 +48,10 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return ok({ id, status: "disabled" }, { requestId });
   }
 
-  const { data: updated, error: updErr } = await supabase
+  // Cadência só se escreve pelo servidor (migration 9020: a sessão recebe 42501
+  // ao mudar o status de uma cadência). O papel já foi conferido acima.
+  const escritor = existing.surface === "cadence" ? createAdminClient() : supabase;
+  const { data: updated, error: updErr } = await escritor
     .from("followup_flow_pointers")
     .update({ status: "disabled", updated_at: new Date().toISOString() })
     .eq("id", id)

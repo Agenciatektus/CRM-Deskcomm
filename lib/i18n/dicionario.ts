@@ -7966,6 +7966,7 @@ export const DICIONARIO: Traducoes = {
   "Falha ao salvar o teto diário.": { es: "Fallo al guardar el tope diario." },
   "Faltam nome, idioma ou conteúdo.": { es: "Faltan nombre, idioma o contenido." },
   "Fluxo não encontrado.": { es: "Flujo no encontrado." },
+  "Cadência não volta versão. Ajuste e publique de novo pela tela da cadência.": { es: "La cadencia no vuelve a una versión anterior. Ajústela y publíquela de nuevo desde la pantalla de la cadencia." },
   "Fluxo não tem rascunho pronto para publicar.": { es: "El flujo no tiene un borrador listo para publicar." },
   "Fluxo reprovado na validação de publish.": { es: "El flujo fue rechazado en la validación de publish." },
   "Follow-up não encontrado.": { es: "Follow-up no encontrado." },
