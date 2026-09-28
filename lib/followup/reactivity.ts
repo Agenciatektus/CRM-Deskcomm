@@ -88,9 +88,16 @@ export const LIVE_STATUSES: readonly EnrollmentStatus[] = ["active", "waiting_re
  */
 const STATUS_ALCANCADOS_PELO_OPT_OUT: readonly EnrollmentStatus[] = [...LIVE_STATUSES, "dormente"];
 
+/**
+ * O status como o BANCO o conhece. `paused_manual` existe na coluna (pausa feita
+ * por uma pessoa) mas não no `EnrollmentStatus` do motor, que nunca o produz;
+ * aqui ele aparece só na leitura das inscrições de cadência.
+ */
+export type StatusLidoDaInscricao = EnrollmentStatus | "paused_manual";
+
 export interface LiveEnrollmentRef {
   id: string;
-  status: EnrollmentStatus;
+  status: StatusLidoDaInscricao;
   current_node_id: string;
   steps_taken: number;
   pointer_id: string;
@@ -106,11 +113,22 @@ export interface LiveEnrollmentRef {
 }
 
 /**
- * Status de inscrição de CADÊNCIA que a resposta encerra. Inclui o `dormente`:
- * na cadência a espera longa não é imune à resposta — o lead falou, a régua
- * acaba. `paused_handoff` fica de fora: uma pessoa já está na conversa.
+ * Status de inscrição de CADÊNCIA que a resposta passa pela TRANSIÇÃO (IA
+ * assume ou pessoa atende). Inclui o `dormente`: na cadência a espera longa não
+ * é imune à resposta — o lead falou, a régua acaba.
  */
-const STATUS_DA_CADENCIA_QUE_A_RESPOSTA_ENCERRA: readonly EnrollmentStatus[] = ["active", "waiting_reply", "dormente"];
+const STATUS_DA_CADENCIA_QUE_A_RESPOSTA_ENCERRA: readonly StatusLidoDaInscricao[] = ["active", "waiting_reply", "dormente"];
+
+/**
+ * Status de cadência PAUSADA (uma pessoa já está na conversa, ou alguém pausou
+ * à mão). A resposta do lead só CANCELA a régua (`outcome='replied'`): sem novo
+ * handoff e sem abrir condução — já há gente cuidando. Sem isto a régua pausada
+ * sobrevivia à resposta e voltava a mandar mensagem quando a pausa acabasse.
+ */
+const STATUS_DA_CADENCIA_PAUSADA: readonly StatusLidoDaInscricao[] = ["paused_handoff", "paused_manual"];
+
+/** O que a reação ao inbound carrega: o opt-out mais o `paused_manual` (só a cadência o usa). */
+const STATUS_CARREGADOS_NO_INBOUND: readonly StatusLidoDaInscricao[] = [...STATUS_ALCANCADOS_PELO_OPT_OUT, "paused_manual"];
 
 /** Interface estreita de DB (mesma doutrina de `AdminClient`/`TurnBridgeAdminClient`
  *  — reactivity não usa claim/loadFlowGraph/loadLeadFacts/insertDeadInboxItem, então
@@ -127,7 +145,7 @@ export interface ReactivityAdminClient {
   loadLiveEnrollmentsForContact(
     orgId: string,
     contactId: string,
-    statuses?: readonly EnrollmentStatus[],
+    statuses?: readonly StatusLidoDaInscricao[],
   ): Promise<LiveEnrollmentRef[]>;
   insertEnrollmentEvent(event: {
     organization_id: string;
@@ -248,11 +266,16 @@ async function reactToInbound(
   // Carrega JÁ com o dormente: o ramo de opt-out abaixo precisa alcançá-lo, e
   // uma segunda consulta só para o caso bloqueado pagaria uma ida ao banco em
   // toda mensagem recebida da instalação para servir a minoria.
-  const live = await db.loadLiveEnrollmentsForContact(
+  //
+  // `paused_manual` entra na leitura só por causa da cadência (a resposta
+  // encerra a régua pausada à mão); o follow-up comum pausado à mão segue
+  // intocado — ele é filtrado fora do opt-out logo abaixo, como era.
+  const carregadas = await db.loadLiveEnrollmentsForContact(
     row.organization_id,
     contactId,
-    STATUS_ALCANCADOS_PELO_OPT_OUT,
+    STATUS_CARREGADOS_NO_INBOUND,
   );
+  const live = carregadas.filter((e) => e.status !== "paused_manual" || e.surface === "cadence");
 
   if (isBlocked) {
     // STOP/opt-out (a regex já rodou em lib/waha/ingest.ts e setou is_blocked
@@ -271,6 +294,20 @@ async function reactToInbound(
     for (const e of live) {
       if (e.surface !== "cadence") continue;
       daCadencia.add(e.id);
+      if (STATUS_DA_CADENCIA_PAUSADA.includes(e.status)) {
+        const key = `reactivity:${row.id}:${e.id}:cadencia_respondeu_pausada`;
+        const applied = await applyStep(
+          db,
+          row.organization_id,
+          e,
+          key,
+          "cadencia_lead_respondeu",
+          { modo: "pausada", prior_status: e.status },
+          cancelPatch(clock, "replied", "lead_respondeu:pausada"),
+        );
+        if (applied) reacted++;
+        continue;
+      }
       if (!STATUS_DA_CADENCIA_QUE_A_RESPOSTA_ENCERRA.includes(e.status)) continue;
       if (await reagirNaCadencia(db.cadencia, row, e.id, entregues)) reacted++;
     }
@@ -513,7 +550,7 @@ export function createSupabaseReactivityClient(admin: SupabaseClient): Reactivit
         const p = byPointer.get(e.pointer_id);
         return {
           id: e.id,
-          status: e.status as EnrollmentStatus,
+          status: e.status as StatusLidoDaInscricao,
           current_node_id: e.current_node_id,
           steps_taken: e.steps_taken,
           pointer_id: e.pointer_id,

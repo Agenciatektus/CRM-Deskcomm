@@ -154,18 +154,32 @@ describe("reatividade — inscrição de cadência", () => {
     expect(ia.entregas).toEqual([]);
   });
 
-  it("dormente da cadência TAMBÉM é encerrado; paused_handoff não", async () => {
+  it("dormente da cadência TAMBÉM passa pela transição", async () => {
     const cad = fakeCadencia({ "enr-1": { ja_encerrada: false, modo: "ia" } });
     await applyReactivityEvent(montarDb([inscricao({ surface: "cadence", status: "dormente" })], cad.db).db, relogio, inbound);
     expect(cad.chamadas).toHaveLength(1);
+  });
 
-    const pausada = fakeCadencia({});
-    await applyReactivityEvent(
-      montarDb([inscricao({ surface: "cadence", status: "paused_handoff" })], pausada.db).db,
-      relogio,
-      inbound,
-    );
-    expect(pausada.chamadas).toEqual([]);
+  it.each(["paused_handoff", "paused_manual"] as const)(
+    "cadência %s: só CANCELA (replied), sem transição, sem handoff e sem condução",
+    async (status) => {
+      const cad = fakeCadencia({});
+      const { db, patches, eventos } = montarDb([inscricao({ surface: "cadence", status })], cad.db);
+      const s = await applyReactivityEvent(db, relogio, inbound);
+      expect(cad.chamadas).toEqual([]);
+      expect(cad.entregas).toEqual([]);
+      expect(patches).toHaveLength(1);
+      expect(patches[0]?.patch).toMatchObject({ status: "cancelled", outcome: "replied", cancel_reason: "lead_respondeu:pausada" });
+      expect(eventos).toEqual(["enr-1:cadencia_lead_respondeu"]);
+      expect(s.reacted).toBe(1);
+    },
+  );
+
+  it("follow-up COMUM pausado à mão continua intocado pela resposta (controle)", async () => {
+    const cad = fakeCadencia({});
+    const { db, patches } = montarDb([inscricao({ surface: "followup", status: "paused_manual" })], cad.db);
+    await applyReactivityEvent(db, relogio, inbound);
+    expect(patches).toEqual([]);
   });
 
   it("follow-up comum (surface followup) segue intacto: cancel_on_reply cancela como antes", async () => {
