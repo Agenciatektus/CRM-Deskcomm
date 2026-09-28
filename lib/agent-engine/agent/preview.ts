@@ -22,6 +22,7 @@ import { DEFAULT_CHANNEL_PROVIDER } from '@/lib/channels/capabilities';
 import { getToolByName } from '@/lib/mcp/tools';
 import type { Logger } from '../obs/logger';
 import type { Citation } from '@/lib/ai/citations/types';
+import type { ConducaoViva } from '@/lib/cadencia/conducao/turno';
 
 export interface TurnPreview {
   kind: 'sandbox' | 'assisted';
@@ -37,6 +38,12 @@ export interface TurnPreview {
   channelId: string | null;
   gateContext?: GateContext;
   result: PreviewResult;
+  /**
+   * Condução ASSISTIDA da cadência: o rascunho segue a mesma allowlist, o mesmo
+   * anti-IDOR e o mesmo bloco de objetivo do turno automático, e o disclosure
+   * conta a partir de `aberta_em`.
+   */
+  conducao?: ConducaoViva;
 }
 export interface PreviewResult {
   checkpoint?: unknown;
@@ -74,6 +81,10 @@ export async function previewGateContext(
   const promise = await loadPromiseTable(db, org),
     disclosure = await loadDisclosureTemplate(db, org);
   const first = p.contactId ? (await countPriorAcceptedSends(db, org, p.contactId)) === 0 : true;
+  const firstDoDisclosure =
+    p.contactId && p.conducao
+      ? (await countPriorAcceptedSends(db, org, p.contactId, p.conducao.aberta_em)) === 0
+      : first;
   let lastInbound: Date | null = null;
   if (p.contactId && channel) {
     const { rows } = await db.query<{ last_inbound_at: Date | null }>(
@@ -109,7 +120,7 @@ export async function previewGateContext(
     },
     promise: { table: promise?.table ?? null },
     semanticPromise: null,
-    disclosure: { template: disclosure?.body ?? null, isFirstOutbound: first, mode: 'inject' },
+    disclosure: { template: disclosure?.body ?? null, isFirstOutbound: firstDoDisclosure, mode: 'inject' },
     lgpd: { ...p.context.lgpd, isFirstOutbound: first },
     casesEnabled: p.agent.casesEnabled,
     hasOpenCase:

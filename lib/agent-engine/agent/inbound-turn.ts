@@ -124,7 +124,7 @@ import {
   catalogoEntregueAoOperador,
 } from './entrega-de-capacidade';
 import { composeSystemPrompt, loadOrgMemory, renderOrgMemory } from './org-memory';
-import { matchesHandoffKeyword } from './agent-config';
+import { loadPublishedAgentConfigById, matchesHandoffKeyword } from './agent-config';
 import { msAteAJanelaAbrir } from './janela-de-atendimento';
 import { janelaDeEnvioAberta, proximaAberturaDaJanela } from '../pacing/engine';
 import { loadChannelKnobs } from '../pacing/store';
@@ -180,6 +180,19 @@ import { camadaLigada, lerCamadasDaOrg } from '../guardrails/camadas-da-org';
 import { fusoDaOrganizacao } from './fuso-da-org';
 import { renderAgora } from '@/lib/tempo/agora';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
+import { MAX_TURNOS_POR_CONDUCAO } from '@/lib/cadencia/conducao/settings';
+import { filtrarRawTools } from '@/lib/cadencia/conducao/presets';
+import { restringirAConducao } from '@/lib/cadencia/conducao/ferramentas';
+import {
+  avisarEquipeDoRascunho,
+  blocoDaConducao,
+  conducaoVivaDaConversa,
+  contarTurno,
+  encerrarConducaoEPassarParaHumano,
+  nomeDaEtapa,
+  restringirConfigAConducao,
+  type ConducaoViva,
+} from '@/lib/cadencia/conducao/turno';
 
 /**
  * Superfície ESTÁTICA das tools do agente (description + inputSchema) — parte do
@@ -1663,6 +1676,13 @@ export interface AgentTurnInput {
     /** ferramentas que saíram para o Operador — o prompt não pode citá-las. */
     entregues?: readonly string[];
   }) => string;
+  /**
+   * A conversa está sob CONDUÇÃO da cadência (automática). Lida da conversa por
+   * `createInboundTurnHandler` — nunca do payload. Com ela: allowlist do objetivo
+   * nos dois pontos, anti-IDOR, funil só o da cadência, bloco do objetivo no
+   * sufixo, contador de turnos e disclosure contado desde a abertura.
+   */
+  conducao?: ConducaoViva;
 }
 
 /**
@@ -2008,6 +2028,14 @@ async function executarTurnoDoAgente(
         inbound: liveJob().kind === 'inbound_turn',
       }, { log: runLog });
   const agentConfig = routed.config;
+  if (!preview && input.conducao && agentConfig?.operationMode === 'assisted') {
+    // Defensivo: o handler só manda condução AUTOMÁTICA para cá com agente
+    // automático. Rascunho aqui sairia sem a condução — não gera nada.
+    runLog.warn('condução automática com agente assistido — turno não executado', {
+      conducao_id: input.conducao.id,
+    });
+    return;
+  }
   if (!preview && agentConfig?.operationMode === 'assisted' && job?.kind === 'inbound_turn') {
     const { generateReplyDraft } = await import('./reply-drafts');
     await generateReplyDraft(pool, deps, {
@@ -2070,6 +2098,29 @@ async function executarTurnoDoAgente(
       throw new JobSettledError(
         'fora do horário de funcionamento — job reagendado para a abertura da janela',
       );
+    }
+  }
+
+  // CONDUÇÃO DA CADÊNCIA: cada turno conta. Depois dos adiamentos (janela
+  // anti-ban e horário do agente), para o job reagendado não contar duas vezes.
+  // Passou do teto, a IA para e uma pessoa assume.
+  if (!preview && input.conducao) {
+    const turnos = await contarTurno(pool, tenantId, input.conducao.id);
+    if (turnos === null) {
+      runLog.info('condução da cadência encerrada no meio-tempo — turno não executado', {
+        conducao_id: input.conducao.id,
+      });
+      return;
+    }
+    if (turnos > MAX_TURNOS_POR_CONDUCAO) {
+      await encerrarConducaoEPassarParaHumano(
+        pool,
+        input.conducao,
+        'teto_de_turnos',
+        runLog,
+        avisoAoLeadDoTurno(deps, pool, liveJob(), input.channelSessionId, input.conversationId, runLog),
+      );
+      return;
     }
   }
 
@@ -2918,6 +2969,7 @@ async function executarTurnoDoAgente(
             now: clock(),
             sleep: deps.sleep,
             lgpd,
+            ...(input.conducao ? { disclosureDesde: input.conducao.aberta_em } : {}),
             casesEnabled: agentConfig?.casesEnabled ?? false,
             hasOpenCase,
             openedCaseThisTurn,
@@ -3610,13 +3662,19 @@ async function executarTurnoDoAgente(
           ferramentasDoOperador: agentConfig.operatorToolIds,
           ferramentasDoConversador: agentConfig.toolIds,
         });
-        const configDoTurno =
+        const configSemOperador =
           catalogoEntregue.length === 0
             ? agentConfig
             : {
                 ...agentConfig,
                 toolIds: agentConfig.toolIds.filter((t) => !catalogoEntregue.includes(t)),
               };
+        // Ponto 1 da allowlist da condução: ferramentas ∩ objetivo, funis ∩ o da
+        // cadência. Idempotente com a restrição que o handler já aplicou.
+        const conducaoDoTurno = input.conducao ?? preview?.conducao;
+        const configDoTurno = conducaoDoTurno
+          ? restringirConfigAConducao(configSemOperador, conducaoDoTurno)
+          : configSemOperador;
         if (catalogoEntregue.length > 0) {
           runLog.info('capacidades de catálogo entregues ao operador', {
             entregues: catalogoEntregue,
@@ -3690,6 +3748,33 @@ async function executarTurnoDoAgente(
     if (entregues.length > 0) {
       runLog.info('capacidades entregues ao operador — fora do turno do conversador', {
         entregues,
+      });
+    }
+
+    // Ponto 2 da allowlist da condução + anti-IDOR, ANTES da política de preview
+    // (no assistido o rascunho vê exatamente o que o automático veria). Fica só
+    // o que o objetivo permite, e toda ferramenta recusa ids de outra pessoa.
+    const conducaoDasTools = input.conducao ?? preview?.conducao;
+    if (conducaoDasTools) {
+      const alvo = conducaoDasTools;
+      const filtradas = restringirAConducao(filtrarRawTools(rawTools, alvo.preset), {
+        leadId: alvo.lead_id,
+        contactId: alvo.contact_id,
+        conversationId: alvo.conversation_id,
+        agendamentoEhDaConducao: async (appointmentId) => {
+          const { rows } = await pool.query<{ ok: boolean }>(
+            `select true as ok from calendar_appointments
+              where organization_id = $1 and id = $2 and contact_id = $3`,
+            [tenantId, appointmentId, alvo.contact_id],
+          );
+          return rows.length > 0;
+        },
+      });
+      for (const nome of Object.keys(rawTools)) delete rawTools[nome];
+      Object.assign(rawTools, filtradas);
+      runLog.info('ferramentas restritas à condução da cadência', {
+        conducao_id: alvo.id,
+        ferramentas: Object.keys(rawTools),
       });
     }
 
@@ -3860,8 +3945,18 @@ async function executarTurnoDoAgente(
     // ponto só cobre os três — e alcança de carona a chamada de fechamento, que
     // reusa `openingTextOnly` e é onde nasce o `prazo` ISO da declaração.
     const agoraBlock = renderAgora(clock(), fusoDaOrg);
+    // O objetivo da condução da cadência vai no SUFIXO por lead, nunca no
+    // `system`: muda por conversa e invalidaria o prefixo cacheável da org.
+    const conducaoDoPrompt = input.conducao ?? preview?.conducao;
+    const conducaoBlock = conducaoDoPrompt
+      ? blocoDaConducao(
+          conducaoDoPrompt,
+          await nomeDaEtapa(pool, tenantId, conducaoDoPrompt.etapa_alvo_id),
+        )
+      : '';
     const openingSuffixes = [
       agoraBlock,
+      conducaoBlock,
       matchedSkillsBlock,
       stageHintBlock,
       splitHint,
@@ -4346,6 +4441,204 @@ export async function runAgentPreview(
 }
 
 /**
+ * O aviso ao lead de que uma pessoa vai assumir, para as saídas da condução da
+ * cadência (teto de turnos, agente indisponível). Mesmo emissor e mesmo canal
+ * da escolta do orçamento; chamado ANTES da passagem.
+ */
+function avisoAoLeadDoTurno(
+  deps: InboundTurnDeps,
+  pool: pg.Pool,
+  job: JobRow,
+  channelSessionId: string,
+  conversationId: string,
+  log: Logger,
+): () => Promise<DesfechoDoAviso> {
+  return () =>
+    avisarLeadLendoOContato(
+      pool,
+      {
+        tenantId: job.organization_id,
+        leadId: job.contact_id ?? '',
+        conversationId,
+        channelSessionId,
+        jobId: job.id,
+      },
+      {
+        motivo: 'outro',
+        channel: (deps.channel ?? ((p: pg.Pool) => new WahaChannelAdapter(p, deps.crmCfg)))(pool),
+        now: deps.clock?.() ?? new Date(),
+        log,
+        ...(deps.knobs.disclosureMode !== undefined ? { disclosureMode: deps.knobs.disclosureMode } : {}),
+        ...(deps.sleep !== undefined ? { sleep: deps.sleep } : {}),
+      },
+    );
+}
+
+/** A abertura padrão do turno inbound (sem bloco temporal). */
+const aberturaInbound: AgentTurnInput['buildOpening'] = ({
+  previous,
+  leadState,
+  context,
+  notesIndexBlock,
+  projeta,
+  entregues,
+  compromissosBlock,
+  currentInboundText,
+}) =>
+  buildOpeningMessage(
+    previous,
+    leadState,
+    context,
+    notesIndexBlock,
+    projeta,
+    entregues,
+    compromissosBlock,
+    currentInboundText,
+  );
+
+/**
+ * As guardas do RASCUNHO (modo assistido). `true` = pode gerar.
+ *
+ * O GATE VALE TAMBÉM NO ASSISTIDO, e é aqui que ele precisa estar.
+ *
+ * O drain desliga a checagem antes de enfileirar quando a org tem agente
+ * assistido publicado no canal (`canAssist`, drain.ts) — de propósito: o
+ * rascunho é o produto do modo assistido, e barrar no drain o mataria. Só
+ * que o ramo assistido devolve ANTES de `runAgentTurn`, onde moram as duas
+ * guardas (isLeadInHandoff + decidirElegibilidadeDaConversa). Resultado
+ * medido: conversa com dono humano (`assignee_kind`), com `force_human`
+ * ou com o bot silenciado (`bot_silenced_until`) recebia rascunho assim
+ * mesmo — o gêmeo do fluxo automático não alcança este caminho.
+ *
+ * Fica no ramo, não antes dele: o caminho automático já refaz as duas
+ * checagens em `runAgentTurn`, e antecipá-las custaria duas queries por
+ * turno sem mudar nenhum desfecho.
+ */
+async function podeGerarRascunho(
+  deps: InboundTurnDeps,
+  pool: pg.Pool,
+  job: JobRow,
+  contactId: string,
+  conversationId: string,
+): Promise<boolean> {
+  if (await isLeadInHandoff(pool, job.organization_id, contactId)) {
+    deps.log.info('rascunho pulado — lead em handoff humano (bot silenciado)', {
+      job_id: job.id,
+      conversation_id: conversationId,
+    });
+    return false;
+  }
+  try {
+    const elegib = await decidirElegibilidadeDaConversa(pool, {
+      organizationId: job.organization_id,
+      conversationId,
+      agora: new Date(),
+      ttlMs: deps.knobs.allowlistTtlMs ?? ALLOWLIST_TTL_MS_PADRAO,
+    });
+    if (elegib !== null && !elegib.permite) {
+      deps.log.info('rascunho pulado — conversa não elegível para IA', {
+        job_id: job.id,
+        conversation_id: conversationId,
+        motivo: elegib.motivo,
+      });
+      return false;
+    }
+  } catch (err) {
+    // Degrada ABERTO, igual ao gêmeo de `runAgentTurn`: falha da consulta
+    // não pode calar um assistido cuja conversa está liberada. Quem barra
+    // de verdade — handoff — já rodou acima e falha fechado.
+    deps.log.warn('checagem de elegibilidade falhou — seguindo para o rascunho', {
+      job_id: job.id,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
+    });
+  }
+  return true;
+}
+
+/**
+ * O turno de uma conversa sob CONDUÇÃO da cadência. O agente é o da condução
+ * (sem roteador, sem sticky), com as ferramentas e o funil restritos ao
+ * objetivo. Agente despublicado, pausado ou (no automático) passado a
+ * assistido: a condução acaba e uma pessoa assume — nunca o agente genérico.
+ */
+async function turnoDaConducao(
+  deps: InboundTurnDeps,
+  job: JobRow,
+  pool: pg.Pool,
+  ctx: { workerId: string },
+  payload: z.infer<typeof inboundTurnPayloadSchema>,
+  contactId: string,
+  conducao: ConducaoViva,
+): Promise<void> {
+  const log = withFields(deps.log, { job_id: job.id, conducao_id: conducao.id });
+  if (await isLeadInHandoff(pool, job.organization_id, contactId)) {
+    log.info('turno da condução pulado — lead em handoff humano');
+    return;
+  }
+  const cfg = await loadPublishedAgentConfigById(pool, job.organization_id, conducao.agent_id);
+  if (
+    cfg === null ||
+    cfg.pausedAt ||
+    (conducao.modo === 'automatico' && cfg.operationMode === 'assisted')
+  ) {
+    await encerrarConducaoEPassarParaHumano(
+      pool,
+      conducao,
+      'agente_indisponivel',
+      log,
+      avisoAoLeadDoTurno(deps, pool, job, payload.channel_session_id, payload.conversation_id, log),
+    );
+    return;
+  }
+  const config = restringirConfigAConducao(cfg, conducao);
+  const resolvedAgent: TurnAgentResolution = {
+    config,
+    routerId: null,
+    intentName: null,
+    confidence: null,
+    outcome: 'conducao',
+  };
+
+  if (conducao.modo === 'assistido') {
+    if (!(await podeGerarRascunho(deps, pool, job, contactId, payload.conversation_id))) return;
+    // Cada rascunho gasta LLM e CONTA como turno, `failed` inclusive.
+    const turnos = await contarTurno(pool, job.organization_id, conducao.id);
+    if (turnos === null) return;
+    if (turnos > MAX_TURNOS_POR_CONDUCAO) {
+      await encerrarConducaoEPassarParaHumano(
+        pool,
+        conducao,
+        'teto_de_turnos',
+        log,
+        avisoAoLeadDoTurno(deps, pool, job, payload.channel_session_id, payload.conversation_id, log),
+      );
+      return;
+    }
+    const { generateReplyDraft } = await import('./reply-drafts');
+    const rascunho = await generateReplyDraft(pool, deps, {
+      organizationId: job.organization_id,
+      conversationId: payload.conversation_id,
+      contactId,
+      channelId: payload.channel_session_id,
+      boundary: currentExecutionBoundary() ?? undefined,
+      agent: config,
+      conducao,
+    });
+    if (rascunho?.status === 'pending') await avisarEquipeDoRascunho(pool, conducao, log);
+    return;
+  }
+
+  await runAgentTurn(deps, job, pool, ctx, {
+    resolvedAgent,
+    conducao,
+    channelSessionId: payload.channel_session_id,
+    conversationId: payload.conversation_id,
+    inboundMessageId: payload.inbound_message_id,
+    buildOpening: aberturaInbound,
+  });
+}
+
+/**
  * Handler de `inbound_turn` para o registry do daemon (main.ts): o lead mandou uma
  * mensagem. Ids de envio vêm do payload do drain (fonte confiável — F2-05); a
  * abertura é o ritual padrão, sem bloco temporal.
@@ -4354,6 +4647,13 @@ export function createInboundTurnHandler(deps: InboundTurnDeps) {
   return async (job: JobRow, pool: pg.Pool, ctx: { workerId: string }): Promise<void> => {
     const payload = inboundTurnPayloadSchema.parse(job.payload);
     if (!job.contact_id) throw new Error('reply_without_contact');
+    // CONDUÇÃO DA CADÊNCIA: lida pela conversa, nunca pelo payload. Viva, ela
+    // fixa o agente e o caminho; sem ela, nada muda.
+    const conducao = await conducaoVivaDaConversa(pool, job.organization_id, payload.conversation_id);
+    if (conducao !== null) {
+      await turnoDaConducao(deps, job, pool, ctx, payload, job.contact_id, conducao);
+      return;
+    }
     const resolvedAgent = await resolveConversationTurn(pool, deps.llmCfg, {
       tenantId: job.organization_id,
       leadId: job.contact_id,
@@ -4364,51 +4664,7 @@ export function createInboundTurnHandler(deps: InboundTurnDeps) {
     }, { log: deps.log });
     const operationAgent = resolvedAgent.config;
     if (operationAgent?.operationMode === 'assisted') {
-      // O GATE VALE TAMBÉM NO ASSISTIDO, e é aqui que ele precisa estar.
-      //
-      // O drain desliga a checagem antes de enfileirar quando a org tem agente
-      // assistido publicado no canal (`canAssist`, drain.ts) — de propósito: o
-      // rascunho é o produto do modo assistido, e barrar no drain o mataria. Só
-      // que este ramo devolve ANTES de `runAgentTurn`, onde moram as duas
-      // guardas (isLeadInHandoff + decidirElegibilidadeDaConversa). Resultado
-      // medido: conversa com dono humano (`assignee_kind`), com `force_human`
-      // ou com o bot silenciado (`bot_silenced_until`) recebia rascunho assim
-      // mesmo — o gêmeo do fluxo automático não alcança este caminho.
-      //
-      // Fica no ramo, não antes dele: o caminho automático já refaz as duas
-      // checagens em `runAgentTurn`, e antecipá-las custaria duas queries por
-      // turno sem mudar nenhum desfecho.
-      if (await isLeadInHandoff(pool, job.organization_id, job.contact_id)) {
-        deps.log.info('rascunho pulado — lead em handoff humano (bot silenciado)', {
-          job_id: job.id,
-          conversation_id: payload.conversation_id,
-        });
-        return;
-      }
-      try {
-        const elegib = await decidirElegibilidadeDaConversa(pool, {
-          organizationId: job.organization_id,
-          conversationId: payload.conversation_id,
-          agora: new Date(),
-          ttlMs: deps.knobs.allowlistTtlMs ?? ALLOWLIST_TTL_MS_PADRAO,
-        });
-        if (elegib !== null && !elegib.permite) {
-          deps.log.info('rascunho pulado — conversa não elegível para IA', {
-            job_id: job.id,
-            conversation_id: payload.conversation_id,
-            motivo: elegib.motivo,
-          });
-          return;
-        }
-      } catch (err) {
-        // Degrada ABERTO, igual ao gêmeo de `runAgentTurn`: falha da consulta
-        // não pode calar um assistido cuja conversa está liberada. Quem barra
-        // de verdade — handoff — já rodou acima e falha fechado.
-        deps.log.warn('checagem de elegibilidade falhou — seguindo para o rascunho', {
-          job_id: job.id,
-          error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
-        });
-      }
+      if (!(await podeGerarRascunho(deps, pool, job, job.contact_id, payload.conversation_id))) return;
       const { generateReplyDraft } = await import('./reply-drafts');
       if (!job.contact_id) throw new Error('reply_without_contact');
       await generateReplyDraft(pool, deps, {
@@ -4427,26 +4683,7 @@ export function createInboundTurnHandler(deps: InboundTurnDeps) {
       channelSessionId: payload.channel_session_id,
       conversationId: payload.conversation_id,
       inboundMessageId: payload.inbound_message_id,
-      buildOpening: ({
-        previous,
-        leadState,
-        context,
-        notesIndexBlock,
-        projeta,
-        entregues,
-        compromissosBlock,
-        currentInboundText,
-      }) =>
-        buildOpeningMessage(
-          previous,
-          leadState,
-          context,
-          notesIndexBlock,
-          projeta,
-          entregues,
-          compromissosBlock,
-          currentInboundText,
-        ),
+      buildOpening: aberturaInbound,
     });
   };
 }

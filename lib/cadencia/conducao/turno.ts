@@ -8,6 +8,7 @@
  */
 import type pg from "pg";
 
+import type { DesfechoDoAviso } from "@/lib/agent-engine/agent/aviso-de-escalacao";
 import { performHumanHandoff } from "@/lib/agent-engine/agent/human-handoff";
 import { insertInboxItem } from "@/lib/agent-engine/db/repository";
 import type { Logger } from "@/lib/agent-engine/obs/logger";
@@ -167,17 +168,31 @@ async function checkpointDuravel(db: Queryable, organizationId: string, contactI
 }
 
 /**
+ * Quem pode avisar o lead ANTES da passagem (o turno, que tem canal e job).
+ * Ausente = ninguém avisa, e a passagem diz isso (`avisado: false`) — é o caso
+ * do dreno, que não tem canal.
+ */
+export type AvisarLeadAntes = () => Promise<DesfechoDoAviso>;
+
+const SEM_AVISO: DesfechoDoAviso = { avisado: false, porque: "sem_canal_para_avisar" };
+
+/**
  * Passa a conversa da cadência para uma pessoa pelo motor do agente
  * (`performHumanHandoff`: silencia o bot, grava a passagem, abre o item da
  * Central). Usado pelo turno (teto, agente indisponível) e pelo dreno (lead
  * respondeu e a transição só aconteceu depois do teto de espera).
+ *
+ * O aviso ao lead vem ANTES da passagem (depois dela, `force_human` já armou o
+ * gate e o aviso não sai) — `tests/unit/handoff-avisa-o-lead.test.ts`.
  */
 export async function passarConversaDaCadenciaParaHumano(
   pool: pg.Pool,
   alvo: { organizationId: string; contactId: string; conversationId: string },
   motivo: { codigo: Extract<MotivoDaPassagem, "cadencia_lead_respondeu" | "cadencia_ia_encerrou">; texto: string },
   log: Logger,
+  avisarLead?: AvisarLeadAntes,
 ): Promise<void> {
+  const avisoAoLead = avisarLead !== undefined ? await avisarLead() : SEM_AVISO;
   const briefing = montarBriefingDaPassagem({
     checkpoint: await checkpointDuravel(pool, alvo.organizationId, alvo.contactId),
     motivo: { codigo: motivo.codigo, texto: motivo.texto },
@@ -193,6 +208,7 @@ export async function passarConversaDaCadenciaParaHumano(
           ? "Lead respondeu à cadência — assumir a conversa"
           : "A IA da cadência parou — assumir a conversa",
       passagem: { origem: "cadencia", motivoCodigo: motivo.codigo, briefing },
+      avisoAoLead,
       log,
     },
   );
@@ -208,6 +224,7 @@ export async function encerrarConducaoEPassarParaHumano(
   conducao: Pick<ConducaoViva, "id" | "organization_id" | "contact_id" | "conversation_id" | "pointer_id">,
   motivo: MotivoDeEncerramentoNoTurno,
   log: Logger,
+  avisarLead?: AvisarLeadAntes,
 ): Promise<void> {
   await pool.query(`select fn_cadencia_encerrar_conducao($1, $2, $3)`, [
     conducao.organization_id,
@@ -231,6 +248,7 @@ export async function encerrarConducaoEPassarParaHumano(
       texto: `A IA da cadência${nome !== null ? ` «${nome}»` : ""} parou: ${porque}.`,
     },
     log,
+    avisarLead,
   );
   log.info("condução da cadência encerrada no turno — conversa passada para uma pessoa", {
     conducao_id: conducao.id,

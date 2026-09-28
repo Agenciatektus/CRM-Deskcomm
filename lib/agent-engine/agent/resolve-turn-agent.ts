@@ -73,7 +73,20 @@ export interface TurnAgentResolution {
   routerId: string | null;
   intentName: string | null;
   confidence: number | null;
-  outcome: 'no_router' | 'classified' | 'sticky' | 'reclassified' | 'fallback' | 'no_match' | 'classifier_failed';
+  /**
+   * `conducao`: a conversa está sob condução da cadência (`cadencia_conducoes`) e
+   * o agente é o DELA — sem roteador e sem sticky (quem monta é
+   * `createInboundTurnHandler`, não `resolveTurnAgent`).
+   */
+  outcome:
+    | 'no_router'
+    | 'classified'
+    | 'sticky'
+    | 'reclassified'
+    | 'fallback'
+    | 'no_match'
+    | 'classifier_failed'
+    | 'conducao';
 }
 
 export interface ResolveTurnAgentDeps {
