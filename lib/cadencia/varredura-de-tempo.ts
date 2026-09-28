@@ -25,6 +25,8 @@ import { carregarCadenciaParaInscricao, inscreverPorGatilho, type ResultadoDaIns
  */
 
 export const MAX_CANDIDATAS_POR_CADENCIA = 50;
+/** Teto de conduções expiradas encerradas por tick (o resto fica para o minuto seguinte). */
+export const MAX_CONDUCOES_EXPIRADAS_POR_TICK = 200;
 
 export interface CadenciaDeTempo {
   id: string;
@@ -41,6 +43,14 @@ export interface CandidataDeTempo {
 export interface VarreduraDeTempoDb {
   cadenciasDeTempo(): Promise<CadenciaDeTempo[]>;
   candidatas(c: CadenciaDeTempo): Promise<CandidataDeTempo[]>;
+  /**
+   * Conduções da IA da cadência vivas com `expira_em` vencido (14 dias). Opcional
+   * para os fakes antigos. Sem handoff: 14 dias sem o lead responder não pedem
+   * uma pessoa, e a conversa volta ao fluxo normal.
+   */
+  conducoesExpiradas?(limite: number): Promise<Array<{ id: string; organization_id: string }>>;
+  /** `fn_cadencia_encerrar_conducao(org, id, 'expirou')` — CAS, `true` só para quem encerrou. */
+  encerrarConducaoExpirada?(organizationId: string, conducaoId: string): Promise<boolean>;
 }
 
 export interface VarreduraDeTempoDeps {
@@ -60,10 +70,23 @@ export interface ResumoDaVarreduraDeTempo {
   candidatas: number;
   inscritos: number;
   recusas: Record<string, number>;
+  /** Conduções da IA encerradas por expiração neste tick. */
+  conducoesExpiradas: number;
 }
 
 export async function varrerGatilhosDeTempo(deps: VarreduraDeTempoDeps): Promise<ResumoDaVarreduraDeTempo> {
-  const resumo: ResumoDaVarreduraDeTempo = { cadencias: 0, candidatas: 0, inscritos: 0, recusas: {} };
+  const resumo: ResumoDaVarreduraDeTempo = {
+    cadencias: 0,
+    candidatas: 0,
+    inscritos: 0,
+    recusas: {},
+    conducoesExpiradas: 0,
+  };
+  if (deps.db.conducoesExpiradas !== undefined && deps.db.encerrarConducaoExpirada !== undefined) {
+    for (const c of await deps.db.conducoesExpiradas(MAX_CONDUCOES_EXPIRADAS_POR_TICK)) {
+      if (await deps.db.encerrarConducaoExpirada(c.organization_id, c.id)) resumo.conducoesExpiradas++;
+    }
+  }
   const cadencias = await deps.db.cadenciasDeTempo();
   resumo.cadencias = cadencias.length;
   for (const c of cadencias) {
@@ -104,6 +127,25 @@ export function createSupabaseVarreduraDeTempoDb(admin: SupabaseClient): Varredu
       });
       if (error) throw new Error(`cadencia_tempo_candidatas: ${error.message}`);
       return (data ?? []) as CandidataDeTempo[];
+    },
+    async conducoesExpiradas(limite) {
+      const { data, error } = await admin
+        .from("cadencia_conducoes" as never)
+        .select("id, organization_id")
+        .is("encerrada_em", null)
+        .lte("expira_em", new Date().toISOString())
+        .limit(limite);
+      if (error) throw new Error(`cadencia_conducoes_expiradas: ${error.message}`);
+      return (data ?? []) as unknown as Array<{ id: string; organization_id: string }>;
+    },
+    async encerrarConducaoExpirada(organizationId, conducaoId) {
+      const { data, error } = await admin.rpc("fn_cadencia_encerrar_conducao" as never, {
+        p_org: organizationId,
+        p_conducao: conducaoId,
+        p_motivo: "expirou",
+      } as never);
+      if (error) throw new Error(`cadencia_conducao_expirar: ${error.message}`);
+      return data === true;
     },
   };
 }

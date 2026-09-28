@@ -113,6 +113,14 @@ export interface TriggerHandoffInput {
   avisarLead?: boolean;
   /** Título do item NOVO da Central. Padrão: "Atendimento automático parou — assumir a conversa". */
   tituloDaCentral?: string;
+  /**
+   * Passar mesmo quando o ÚNICO "não" do gate de elegibilidade é o allowlist do
+   * canal (contato sem autorização de IA). Só a cadência usa: o lead respondeu a
+   * uma mensagem NOSSA (ou a condução acabou de revogar a autorização dela), e
+   * a conversa tem de chegar a uma pessoa. Os outros "não" (pessoa já na
+   * conversa, silêncio, force_human) continuam valendo.
+   */
+  ignorarGateDeAllowlist?: boolean;
 }
 
 export interface TriggerHandoffResult {
@@ -248,7 +256,11 @@ export async function triggerHandoff(
         agora: new Date(),
         ttlMs: ttlDaAutorizacaoMs(process.env),
       });
-      if (elegib !== null && !elegib.permite) {
+      if (
+        elegib !== null &&
+        !elegib.permite &&
+        !(input.ignorarGateDeAllowlist === true && elegib.bloqueioPorAllowlist)
+      ) {
         return { triggered: false, reason: `nao_elegivel:${elegib.motivo}` };
       }
     } catch (err) {

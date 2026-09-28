@@ -130,13 +130,6 @@ export async function reagirNaCadencia(
 // Adapter supabase-js (service role) — usado pela reatividade em produção.
 // ---------------------------------------------------------------------------
 
-/** Motivos do gate de elegibilidade que são do ALLOWLIST (e não de uma pessoa já estar na conversa). */
-const BLOQUEIO_POR_ALLOWLIST = new Set([
-  "nao_elegivel:sem_autorizacao",
-  "nao_elegivel:autorizacao_expirada",
-  "nao_elegivel:fora_da_lista_de_teste",
-]);
-
 function comoTexto(v: unknown): string | null {
   return typeof v === "string" && v !== "" ? v : null;
 }
@@ -204,6 +197,9 @@ export function createSupabaseCadenciaRespostaDb(admin: SupabaseClient): Cadenci
         origem: "cadencia",
         motivoTexto,
         tituloDaCentral: "Lead respondeu à cadência — assumir a conversa",
+        // O lead respondeu a uma mensagem nossa: o allowlist de IA do canal não
+        // pode impedir que uma PESSOA atenda.
+        ignorarGateDeAllowlist: true,
         metadata: {
           pointer_id: entrega.pointerId,
           enrollment_id: entrega.enrollmentId,
@@ -220,38 +216,14 @@ export function createSupabaseCadenciaRespostaDb(admin: SupabaseClient): Cadenci
       } as never);
       if (rotErr) throw new Error(`fn_request_channel_routing: ${rotErr.message}`);
 
-      if (resultado.triggered) return;
-      // O gate de ALLOWLIST do canal barra o handoff (a IA nunca poderia estar
-      // atendendo esta conversa), mas o lead respondeu e alguém tem de ver:
-      // abre o item da Central sem avisar o lead. Os outros "não" (pessoa já
-      // na conversa, silêncio, 5s de idempotência) não pedem nada.
-      logger.info("[cadencia] entrega ao atendente sem handoff", {
-        conversation_id: entrega.conversationId,
-        reason: resultado.reason,
-      });
-      if (!BLOQUEIO_POR_ALLOWLIST.has(resultado.reason)) return;
-      const { data: aberto, error: selErr } = await admin
-        .from("agent_inbox_items")
-        .select("id")
-        .eq("organization_id", entrega.organizationId)
-        .eq("kind", "handoff")
-        .eq("ref_kind", "conversation")
-        .eq("ref_id", entrega.conversationId)
-        .eq("status", "open")
-        .limit(1)
-        .maybeSingle();
-      if (selErr) throw new Error(selErr.message);
-      if (aberto) return;
-      const { error: insErr } = await admin.from("agent_inbox_items").insert({
-        organization_id: entrega.organizationId,
-        kind: "handoff",
-        severity: "warning",
-        title: "Lead respondeu à cadência — assumir a conversa",
-        body: `${motivoTexto}. Abra a conversa para responder.`,
-        ref_kind: "conversation",
-        ref_id: entrega.conversationId,
-      });
-      if (insErr) throw new Error(insErr.message);
+      if (!resultado.triggered) {
+        // Os "não" que sobram (pessoa já na conversa, silêncio, 5s de
+        // idempotência) não pedem nada além do roteamento acima.
+        logger.info("[cadencia] entrega ao atendente sem handoff", {
+          conversation_id: entrega.conversationId,
+          reason: resultado.reason,
+        });
+      }
     },
   };
 }
