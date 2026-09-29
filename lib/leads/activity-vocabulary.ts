@@ -166,7 +166,16 @@ export type ActivityType =
    * quem abre o card no destino precisa ler. O outro lado da troca é a
    * `demand_closed` da origem, com a razão "Levado para o funil X".
    */
-  | "moved_from_pipeline";
+  | "moved_from_pipeline"
+  /**
+   * "Criar card em outro funil" (ação de automação `create_lead_in_pipeline`):
+   * o PAR das duas pontas. Diferente de `moved_from_pipeline`, aqui a origem
+   * NÃO fecha — o card de Vendas continua ganho e o de Pós-venda nasce ao lado.
+   * `created_from_pipeline` vai no card novo; `spawned_in_pipeline`, no de
+   * origem, para quem abre o negócio ganho saber que a história continuou.
+   */
+  | "created_from_pipeline"
+  | "spawned_in_pipeline";
 
 export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   lead_created: "Entrou pelo WhatsApp",
@@ -267,6 +276,8 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   // ter mudado de contato sem ninguém tê-lo movido.
   contacts_merged: "Contatos duplicados juntados",
   moved_from_pipeline: "Veio de outro funil",
+  created_from_pipeline: "Criado a partir de outro funil",
+  spawned_in_pipeline: "Card criado em outro funil",
 };
 
 /** Quando o tipo é legado/desconhecido, a linha ainda é honesta — sem jargão. */

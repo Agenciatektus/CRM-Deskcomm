@@ -65,6 +65,21 @@ export const conditionSchema = z.object({
 
 export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("create_or_move_lead"), config: z.object({ pipeline_id: z.string().uuid(), stage_id: z.string().uuid() }) }),
+  /**
+   * "Criar card em outro funil": nasce um card NOVO no funil escolhido para o
+   * mesmo contato, e o card do evento fica como está (ex.: Vendas → Pós-venda
+   * quando o pedido entra em "Pago"). As duas cópias são opt-in: valor e dono
+   * do card de origem só vão para o novo quando a regra pede.
+   */
+  z.object({
+    type: z.literal("create_lead_in_pipeline"),
+    config: z.object({
+      pipeline_id: z.string().uuid(),
+      stage_id: z.string().uuid(),
+      copiar_valor: z.boolean().optional(),
+      copiar_dono: z.boolean().optional(),
+    }),
+  }),
   z.object({ type: z.literal("send_whatsapp_message"), config: z.object({ channel_session_id: z.string().uuid(), template: z.string().min(1).max(2000) }) }),
   z.object({ type: z.literal("add_tag"), config: z.object({ tags: z.array(z.string().min(1).max(60)).min(1).max(10) }) }),
   z.object({ type: z.literal("assign_owner"), config: z.object({ user_id: z.string().uuid() }) }),
