@@ -258,7 +258,10 @@ describe("fn_cadencia_lead_respondeu", () => {
     ]);
     const r = await responder(c);
     expect(r).toMatchObject({ modo: "ia", modo_conducao: "assistido" });
-    expect((await conducoesVivas(c))[0].modo).toBe("assistido");
+    // `[0]!` e nao `[0]`: com `noUncheckedIndexedAccess` o indice devolve
+    // `T | undefined`. A linha anterior ja garante que ha uma conducao viva, e o
+    // `!` diz isso ao compilador em vez de deixar o typecheck vermelho.
+    expect((await conducoesVivas(c))[0]!.modo).toBe("assistido");
   });
 
   it("idempotente: a segunda chamada devolve ja_encerrada e não abre outra condução", async () => {
