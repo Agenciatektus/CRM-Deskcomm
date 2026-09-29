@@ -7901,16 +7901,16 @@ grep -aE "passed|failed|flaky" /tmp/e2e-susp.log | tail -3
 ls evidence/suspensao-administrativa/
 ```
 
-Esperado: `exit=0`, `1 passed` e os cinco arquivos `central-apos-reativar.png`, `hub-admin.png`, `hub-atendente.png`, `hub-pedido-lgpd.png`, `leitura-recusada.png`. Abra `hub-admin.png` e `central-apos-reativar.png` e confira que a tela diz o que a spec afirma.
+Esperado: `exit=0`, `1 passed` e os cinco arquivos `central-apos-reativar`, `hub-admin`, `hub-atendente`, `hub-pedido-lgpd`, `leitura-recusada`. Abra `hub-admin` e `central-apos-reativar` e confira que a tela diz o que a spec afirma.
 
 - [ ] **Passo 6: citar a evidência** — na J37, logo depois do parágrafo **Não coberto pela tela:**:
 
 ```markdown
-**Evidência:** `evidence/suspensao-administrativa/leitura-recusada.png`,
-`evidence/suspensao-administrativa/hub-admin.png`,
-`evidence/suspensao-administrativa/hub-pedido-lgpd.png`,
-`evidence/suspensao-administrativa/hub-atendente.png`,
-`evidence/suspensao-administrativa/central-apos-reativar.png`.
+**Evidência** (PNG em `evidence/suspensao-administrativa/`): `leitura-recusada`,
+`hub-admin`,
+`hub-pedido-lgpd`,
+`hub-atendente`,
+`central-apos-reativar`.
 ```
 
 `pnpm exec vitest run tests/unit/evidencia-citada.test.ts tests/unit/evidencia-no-caminho-versionado.test.ts` → passam.
