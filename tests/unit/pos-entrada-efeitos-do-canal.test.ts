@@ -140,6 +140,10 @@ const ENTRADA: EntradaDeMensagem = {
   nomeDoContato: "Cliente",
   requestId: "req-1",
   origem: "canal_de_teste",
+  // A REDE é obrigatória de propósito — ver
+  // `tests/unit/o-card-cita-a-rede-de-onde-veio.test.ts`. Aqui ela é só
+  // cenário: os casos deste arquivo medem ORDEM e opt-out, não rótulo.
+  rede: "whatsapp",
 };
 
 async function rodar(over: Partial<EntradaDeMensagem> = {}) {

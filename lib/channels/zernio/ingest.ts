@@ -39,6 +39,8 @@ import {
 } from "@/lib/escalacao/numero-interno-de-aviso";
 
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
+import { channelBrand } from "../presentation";
+import { SOCIAL_PROVIDER } from "../social/catalog";
 
 import { parseZernioInbound, type ZernioIdentity, type ZernioInboundMessage } from "./webhook";
 
@@ -305,7 +307,17 @@ export async function ingestZernioInbound(
  */
 async function efeitosDaEntrada(
   admin: SupabaseClient,
-  input: { organizationId: string; channelSessionId: string; requestId?: string },
+  input: {
+    organizationId: string;
+    channelSessionId: string;
+    requestId?: string;
+    /**
+     * Presente só no caminho social. É o que distingue as DUAS redes que este
+     * mesmo ingest serve: sem ele a mensagem veio do WhatsApp intermediado;
+     * com ele, da rede que a conta conectada atende.
+     */
+    socialMessage?: SocialMessage;
+  },
   msg: ZernioInboundMessage,
   contactId: string,
   conversationId: string,
@@ -335,6 +347,15 @@ async function efeitosDaEntrada(
     nomeDoContato: msg.identity.displayName,
     requestId: input.requestId,
     origem: "zernio_webhook",
+    // O MESMO provider vira redes diferentes conforme a plataforma da conta —
+    // é a razão de `channelBrand` existir, e por isso aqui não há literal.
+    // Sem `socialMessage` o caminho é o WhatsApp intermediado.
+    rede: input.socialMessage
+      ? channelBrand({
+          provider: SOCIAL_PROVIDER,
+          social_platform: input.socialMessage.platform,
+        })
+      : "whatsapp",
   });
 }
 

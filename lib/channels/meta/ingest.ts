@@ -294,6 +294,8 @@ export async function ingestMetaInbound(
     texto: e.text ?? null,
     nomeDoContato: e.profileName ?? null,
     origem: "meta_webhook",
+    // A API oficial da Meta entrega WhatsApp — a rede, não o transporte.
+    rede: "whatsapp",
   });
 
   return {

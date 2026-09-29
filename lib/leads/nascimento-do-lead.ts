@@ -83,7 +83,17 @@ const ROTULO_DE_ANUNCIO: Record<string, string> = {
  * chamada de voz existir) -- os chamadores atuais nao precisam informar isto.
  */
 export interface OrigemDoNascimento {
-  /** Nome do canal para o fallback do titulo ("Novo contato pelo X"). */
+  /**
+   * Nome da REDE para o fallback do titulo ("Novo contato pelo X").
+   *
+   * Rede, e nao transporte: o nome que a pessoa reconheceria ("Instagram",
+   * "WhatsApp"), nunca o do intermediario que entregou a mensagem — a doutrina
+   * de restricao de canal proibe esse nome de sair de `lib/channels/`, e o
+   * `pnpm lint:channels` reprovou esta linha quando ela o citava.
+   * Quem entra pelo caminho de canal recebe isto de `origemDaRede`
+   * (`lib/channels/pos-entrada.ts`), que deriva do MESMO vocabulario do icone
+   * do Inbox — para as duas telas nao poderem discordar sobre a mesma conversa.
+   */
   rotulo: string;
   /** Valor de `crm_leads.source` quando nao ha atribuicao de anuncio. */
   source: string;
@@ -91,11 +101,6 @@ export interface OrigemDoNascimento {
   motivo: string;
 }
 
-const ORIGEM_PADRAO: OrigemDoNascimento = {
-  rotulo: "WhatsApp",
-  source: "whatsapp",
-  motivo: "primeira mensagem recebida no WhatsApp",
-};
 
 /**
  * Por que um lead NÃO nasceu. Cada motivo é registrado — silêncio não distingue
@@ -120,7 +125,23 @@ export interface DadosDoNascimento {
   /** nome do contato, para o título do card. */
   nomeDoContato: string | null;
   /** Rotulo/source/motivo do canal de origem -- default preserva o WhatsApp. */
-  origem?: OrigemDoNascimento;
+  /**
+   * De onde o lead nasceu — OBRIGATORIO, e e o ponto.
+   *
+   * Isto era opcional, com um default que dizia "WhatsApp". Era verdade quando
+   * o WhatsApp era o unico canal; virou mentira quando o Instagram entrou, e
+   * ninguem reparou, porque `aplicarEfeitosPosEntrada` nunca informava o campo
+   * e TODO canal caia no default. Medido na producao da Delicatto em
+   * 2026-09-25: um Direct de Instagram abriu um card "Novo contato pelo
+   * WhatsApp". Typecheck, testes e log ficaram verdes o tempo todo — um default
+   * silencioso e indistinguivel de uma escolha.
+   *
+   * Exigir em vez de aceitar `undefined` e o que impede a repeticao: um
+   * chamador novo que esqueca a origem NAO COMPILA. Quem entra por canal usa
+   * `origemDaRede` (`lib/channels/pos-entrada.ts`); quem nao tem canal diz o
+   * que e (o agente de voz passa `voip`).
+   */
+  origem: OrigemDoNascimento;
   /**
    * O funil JA RESOLVIDO por quem chamou. Quando vem, manda.
    *
@@ -241,7 +262,7 @@ export async function garantirLeadDaConversa(
   dados: DadosDoNascimento,
 ): Promise<NascimentoDoLead> {
   const { organizationId, contactId, conversationId } = dados;
-  const origem = dados.origem ?? ORIGEM_PADRAO;
+  const origem = dados.origem;
 
   // 1 · quem pediu para sair não vira oportunidade. O gate de envio já respeita
   // o opt-out; abrir um card para essa pessoa seria a mesma desatenção num

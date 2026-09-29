@@ -100,6 +100,9 @@ describe("três mensagens seguidas do mesmo contato", () => {
               contactId: contato,
               conversationId: CONVERSA,
               nomeDoContato: nome,
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
             }),
           ),
         );
