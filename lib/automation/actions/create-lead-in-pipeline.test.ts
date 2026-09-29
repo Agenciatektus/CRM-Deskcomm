@@ -10,7 +10,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
 import { getAction } from "@/lib/automation/actions";
 import "@/lib/automation/actions/create-lead-in-pipeline";
-import { chaveDoCard } from "@/lib/automation/actions/create-lead-in-pipeline";
+import { chaveDoCard, ehViolacaoDaChave } from "@/lib/automation/actions/create-lead-in-pipeline";
+import { ApiError } from "@/lib/api/types";
 import type { ActionCtx } from "@/lib/automation/types";
 import {
   ORG_ID,
@@ -76,6 +77,20 @@ function banco(opts: { leads?: LeadRow[]; posOrg?: string; stages?: ReturnType<t
     leads: opts.leads ?? [cardDeVendas()],
   });
 }
+
+/** Membros da org e agentes — tabelas que o dublê não semeia pelo `makeDb`. */
+function comEquipe(
+  db: ReturnType<typeof makeDb>,
+  membros: Array<Record<string, unknown>>,
+  agentes: Array<Record<string, unknown>> = [],
+): ReturnType<typeof makeDb> {
+  const tabelas = db.tabelas as unknown as Record<string, unknown[]>;
+  tabelas.user_organizations = membros;
+  tabelas.ai_agents = agentes;
+  return db;
+}
+
+const DONO_ATIVO = { organization_id: ORG_ID, user_id: DONO, role: "agent", revoked_at: null };
 
 function ctxDoLead(db: ReturnType<typeof makeDb>, leadId = "venda-1", eventId = "evento-1"): ActionCtx {
   return {
@@ -146,8 +161,8 @@ describe("create_lead_in_pipeline — nasce no destino, a origem fica intocada",
   });
 
   it("com copiar_valor e copiar_dono, valor/moeda e dono vêm da origem (owner_kind coerente)", async () => {
-    const db = banco();
-    await executa(ctxDoLead(db), { pipeline_id: POS, stage_id: "p-envio", copiar_valor: true, copiar_dono: true });
+    const db = comEquipe(banco(), [DONO_ATIVO]);
+    const r = await executa(ctxDoLead(db), { pipeline_id: POS, stage_id: "p-envio", copiar_valor: true, copiar_dono: true });
 
     expect(novos(db)[0]).toMatchObject({
       value_cents: 25_990,
@@ -156,6 +171,7 @@ describe("create_lead_in_pipeline — nasce no destino, a origem fica intocada",
       owner_agent_id: null,
       owner_kind: "user",
     });
+    expect(r.detail).not.toHaveProperty("reason");
   });
 
   it("grava a história nas DUAS timelines", async () => {
@@ -194,6 +210,69 @@ describe("create_lead_in_pipeline — nasce no destino, a origem fica intocada",
     const args = emitido![1] as { p_event_type: string; p_metadata: Record<string, unknown> };
     expect(args.p_event_type).toBe("lead.created");
     expect(args.p_metadata.request_id).toBe("rule:regra-pos-venda");
+  });
+});
+
+describe("create_lead_in_pipeline — copiar_dono só copia quem ainda atende (P2-2)", () => {
+  const CFG = { pipeline_id: POS, stage_id: "p-envio", copiar_dono: true };
+  const AGENTE = "77777777-7777-4777-8777-777777777777";
+
+  it.each([
+    ["revogado da organização", [{ ...DONO_ATIVO, revoked_at: "2026-09-01T00:00:00Z" }]],
+    ["só visualiza (viewer)", [{ ...DONO_ATIVO, role: "viewer" }]],
+    ["membro de OUTRA organização", [{ ...DONO_ATIVO, organization_id: OUTRA_ORG }]],
+    ["sem vínculo nenhum", []],
+  ])("dono %s: o card nasce SEM dono, com o motivo no detalhe", async (_nome, membros) => {
+    const db = comEquipe(banco(), membros as Array<Record<string, unknown>>);
+    const r = await executa(ctxDoLead(db), CFG);
+
+    expect(r.status).toBe("success");
+    expect(r.detail).toMatchObject({ reason: "dono_inativo_nao_copiado", origem: "venda-1" });
+    expect(novos(db)).toHaveLength(1);
+    expect(novos(db)[0]).toMatchObject({ owner_user_id: null, owner_agent_id: null, owner_kind: null });
+  });
+
+  it("a consulta de membro falha: card nasce sem dono, motivo indeterminado (não 'inativo')", async () => {
+    const db = comEquipe(banco(), [DONO_ATIVO]);
+    const from = db.client.from;
+    db.client.from = ((tabela: string) => {
+      if (tabela !== "user_organizations") return from(tabela);
+      const falhando = {
+        select: () => falhando,
+        eq: () => falhando,
+        is: () => falhando,
+        maybeSingle: async () => ({ data: null, error: { code: "08006", message: "connection failure" } }),
+      };
+      return falhando;
+    }) as typeof db.client.from;
+    const r = await executa(ctxDoLead(db), CFG);
+
+    expect(r.detail).toMatchObject({ reason: "dono_indeterminado_nao_copiado" });
+    expect(novos(db)[0]).toMatchObject({ owner_user_id: null, owner_kind: null });
+  });
+
+  it("dono AGENTE arquivado: card nasce sem dono (a criação não cai no 422 do handler)", async () => {
+    const db = comEquipe(
+      banco({ leads: [cardDeVendas({ owner_user_id: null, owner_agent_id: AGENTE, owner_kind: "ai" })] }),
+      [],
+      [{ id: AGENTE, organization_id: ORG_ID, archived_at: "2026-09-01T00:00:00Z" }],
+    );
+    const r = await executa(ctxDoLead(db), CFG);
+
+    expect(r.status).toBe("success");
+    expect(r.detail).toMatchObject({ reason: "dono_inativo_nao_copiado" });
+    expect(novos(db)[0]).toMatchObject({ owner_agent_id: null, owner_kind: null });
+  });
+
+  it("dono AGENTE ativo: é copiado com owner_kind='ai'", async () => {
+    const db = comEquipe(
+      banco({ leads: [cardDeVendas({ owner_user_id: null, owner_agent_id: AGENTE, owner_kind: "ai" })] }),
+      [],
+      [{ id: AGENTE, organization_id: ORG_ID, archived_at: null }],
+    );
+    await executa(ctxDoLead(db), CFG);
+
+    expect(novos(db)[0]).toMatchObject({ owner_agent_id: AGENTE, owner_user_id: null, owner_kind: "ai" });
   });
 });
 
@@ -277,6 +356,8 @@ describe("create_lead_in_pipeline — idempotência", () => {
           external_id: chave,
           status: "open",
         });
+        // O formato REAL do PostgREST para o 23505 deste índice; o
+        // createLeadHandler o embrulha em ApiError(500) levando a mensagem.
         return { code: "23505", message: 'duplicate key value violates unique constraint "uniq_crm_leads_org_source_external"' };
       },
     });
@@ -287,6 +368,49 @@ describe("create_lead_in_pipeline — idempotência", () => {
       status: "success",
       detail: { reason: "card_ja_criado", lead_id: "pos-concorrente" },
     });
+  });
+
+  it("erro NÃO-23505 no INSERT, mesmo com card da chave aparecendo: FALHA, não vira card_ja_criado (P2-3)", async () => {
+    const chave = chaveDoCard({ leadId: "venda-1" }, POS);
+    const db2 = makeDb({
+      pipelines: [funilRow({ id: PIPE, name: "Vendas" }), funilRow({ id: POS, name: "Pós-venda" })],
+      stages: [VENDAS_NOVO, VENDAS_PAGO, POS_ENVIO],
+      leads: [cardDeVendas()],
+      writeError: (_n, tabela) => {
+        if (tabela !== "crm_leads") return null;
+        db2.tabelas.crm_leads.push({
+          id: "pos-outro",
+          organization_id: ORG_ID,
+          pipeline_id: POS,
+          source: "automation",
+          external_id: chave,
+          status: "open",
+        });
+        return {
+          code: "23514",
+          message: 'new row for relation "crm_leads" violates check constraint "crm_leads_currency_iso"',
+        };
+      },
+    });
+    const r = await executa(ctxDoLead(db2), { pipeline_id: POS, stage_id: "p-envio" });
+
+    expect(r.status).toBe("failed");
+    expect(r.error).toContain("crm_leads_currency_iso");
+    expect(r.detail).toBeUndefined();
+  });
+
+  it("ehViolacaoDaChave: reconhece o formato do handler e o do PostgREST cru; recusa o resto", () => {
+    const msg = 'duplicate key value violates unique constraint "uniq_crm_leads_org_source_external"';
+    expect(ehViolacaoDaChave(new ApiError(500, "internal_error", undefined, "rule:x", msg))).toBe(true);
+    expect(ehViolacaoDaChave({ code: "23505", message: msg })).toBe(true);
+    expect(ehViolacaoDaChave({ code: "23505", message: "duplicate", details: "Key ... " + msg })).toBe(true);
+    // 23505 de OUTRA constraint não é a corrida desta chave.
+    expect(
+      ehViolacaoDaChave({ code: "23505", message: 'duplicate key value violates unique constraint "crm_leads_pkey"' }),
+    ).toBe(false);
+    expect(ehViolacaoDaChave(new ApiError(500, "internal_error", undefined, "rule:x", "fetch failed"))).toBe(false);
+    expect(ehViolacaoDaChave(new ApiError(422, "validation_failed", undefined, "rule:x"))).toBe(false);
+    expect(ehViolacaoDaChave(null)).toBe(false);
   });
 });
 

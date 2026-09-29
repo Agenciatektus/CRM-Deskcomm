@@ -108,6 +108,10 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
     "Esta automação já tinha criado o card no funil de destino para este negócio — não foi criado outro.",
   contato_ja_tem_card_aberto:
     "O contato já tem um card aberto no funil de destino, então não foi criado outro.",
+  dono_inativo_nao_copiado:
+    "O card foi criado sem responsável: quem era o dono do card de origem não atende mais nesta equipe (saiu, foi removido ou só visualiza).",
+  dono_indeterminado_nao_copiado:
+    "O card foi criado sem responsável: não deu para confirmar na hora se o dono do card de origem ainda atende (falha de rede ou banco). Escolha o responsável no card.",
   lead_de_origem_nao_encontrado:
     "O card que disparou a regra não foi encontrado nesta organização (pode ter sido apagado).",
   destino_e_o_mesmo_funil:

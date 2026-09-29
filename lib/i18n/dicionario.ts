@@ -3929,6 +3929,8 @@ export const DICIONARIO: Traducoes = {
   "Copiar o valor do card de origem": { es: "Copiar el valor de la tarjeta de origen" },
   "Manter o mesmo responsável": { es: "Mantener el mismo responsable" },
   "O card que disparou a regra continua onde está. Se o contato já tem um card aberto nesse funil, nenhum outro é criado.": { es: "La tarjeta que disparó la regla sigue donde está. Si el contacto ya tiene una tarjeta abierta en ese embudo, no se crea otra." },
+  "O card foi criado sem responsável: quem era o dono do card de origem não atende mais nesta equipe (saiu, foi removido ou só visualiza).": { es: "La tarjeta se creó sin responsable: quien era el dueño de la tarjeta de origen ya no atiende en este equipo (salió, fue removido o solo visualiza)." },
+  "O card foi criado sem responsável: não deu para confirmar na hora se o dono do card de origem ainda atende (falha de rede ou banco). Escolha o responsável no card.": { es: "La tarjeta se creó sin responsable: no se pudo confirmar en ese momento si el dueño de la tarjeta de origen todavía atiende (falla de red o de base de datos). Elige el responsable en la tarjeta." },
   "Criado a partir de outro funil": { es: "Creada a partir de otro embudo" },
   "Card criado em outro funil": { es: "Tarjeta creada en otro embudo" },
   "Esta automação já tinha criado o card no funil de destino para este negócio — não foi criado outro.": { es: "Esta automatización ya había creado la tarjeta en el embudo de destino para este negocio — no se creó otra." },

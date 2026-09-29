@@ -35,7 +35,11 @@
  *     que o contato não tenha card aberto lá (a checagem abaixo).
  *
  * Antes da chave, uma checagem de negócio: se o contato já tem card ABERTO no
- * funil de destino, nada nasce — não importa quem criou aquele card.
+ * funil de destino, nada nasce — não importa quem criou aquele card. Essa
+ * checagem é ler-e-depois-escrever, sem garantia no banco (duas regras
+ * diferentes podem passar por ela ao mesmo tempo); a garantia que o banco dá é
+ * SÓ a da chave. E a chave `lead:<id>:<funil>` faz um gatilho recorrente sobre
+ * o mesmo card (etapa, tag, data) criar no máximo UMA vez por funil de destino.
  *
  * Nos dois casos de "já existe" o resultado é `success` com `reason`, e não
  * `skipped`: o agregador do motor (`engine.ts`) conta `skipped` junto de
@@ -191,9 +195,8 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       origem?.title?.trim() ||
       (contato ? (nomeDoContato(contato) ?? contato.phone_number ?? null) : null) ||
       "Card da automação";
-    const dono: { owner_user_id?: string; owner_agent_id?: string } = {};
-    if (copiarDono && origem?.owner_user_id) dono.owner_user_id = origem.owner_user_id;
-    else if (copiarDono && origem?.owner_agent_id) dono.owner_agent_id = origem.owner_agent_id;
+    const { dono, naoCopiado } =
+      copiarDono && origem ? await donoQuePodeSerCopiado(ctx, origem) : { dono: {}, naoCopiado: null };
 
     let criado: Record<string, unknown>;
     try {
@@ -219,7 +222,10 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     } catch (err) {
       // Corrida: outro processamento do mesmo evento criou o card entre a
       // checagem e o INSERT, e o índice único recusou este. O card existe —
-      // é o desfecho certo, não uma falha.
+      // é o desfecho certo, não uma falha. SÓ para a violação da chave: um
+      // erro qualquer depois de um card com a mesma chave aparecer (ele pode
+      // ter nascido de outro jeito) não pode ser mascarado como sucesso.
+      if (!ehViolacaoDaChave(err)) throw err;
       const vencedor = await cardDaChave(ctx, externalId);
       if (vencedor) {
         return { type: TYPE, status: "success", detail: { reason: "card_ja_criado", lead_id: vencedor } };
@@ -235,14 +241,94 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       pipelineDestinoId: pipelineId,
     });
 
-    return {
-      type: TYPE,
-      status: "success",
-      detail: { created: String(criado.id), ...(origem ? { origem: origem.id } : {}) },
-    };
+    const criadoId = String(criado.id);
+    const origemId = origem ? { origem: origem.id } : {};
+    // O card nasceu; o dono só não foi junto. É sucesso — mas quem montou a
+    // regra precisa ler POR QUE o card novo está sem responsável.
+    if (naoCopiado === "dono_inativo_nao_copiado") {
+      return {
+        type: TYPE,
+        status: "success",
+        detail: { created: criadoId, ...origemId, reason: "dono_inativo_nao_copiado" },
+      };
+    }
+    if (naoCopiado === "dono_indeterminado_nao_copiado") {
+      return {
+        type: TYPE,
+        status: "success",
+        detail: { created: criadoId, ...origemId, reason: "dono_indeterminado_nao_copiado" },
+      };
+    }
+    return { type: TYPE, status: "success", detail: { created: criadoId, ...origemId } };
   } catch (err) {
     return { type: TYPE, status: "failed", error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * O erro é a recusa do índice único da chave natural?
+ *
+ * O `createLeadHandler` não propaga o `code` do PostgREST: ele lança
+ * `ApiError(500, "internal_error", …, insErr.message)`, então o 23505 chega só
+ * na MENSAGEM ("duplicate key value violates unique constraint
+ * \"uniq_crm_leads_org_source_external\""). O NOME DO ÍNDICE é o sinal: um
+ * 23505 de outra constraint (ou qualquer outro erro) não é esta corrida. Se um
+ * dia o handler propagar o erro do PostgREST cru, o nome segue em `message` ou
+ * em `details`, e o teste cobre os dois formatos.
+ */
+export function ehViolacaoDaChave(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { message?: unknown; details?: unknown };
+  return [e.message, e.details].some(
+    (campo) => typeof campo === "string" && campo.includes("uniq_crm_leads_org_source_external"),
+  );
+}
+
+type MotivoDoDono = "dono_inativo_nao_copiado" | "dono_indeterminado_nao_copiado";
+
+/**
+ * O dono da origem só vai para o card novo se AINDA pode atender.
+ *
+ * Mesma régua do `assign_owner` (`user_organizations` da org, `revoked_at is
+ * null`, papel acima de viewer): um card de Vendas ganho há meses pode ter
+ * dono que saiu da equipe, e copiá-lo poria o Pós-venda nas mãos de quem não
+ * tem mais acesso. Dono agente: o agente precisa existir na org e não estar
+ * arquivado (é a mesma conferência que o `createLeadHandler` faria — só que lá
+ * ela derrubaria a criação inteira).
+ *
+ * Nos dois casos o card nasce SEM dono em vez de a ação falhar: o card é o que
+ * a regra existe para entregar, e o responsável se escolhe depois na tela.
+ */
+async function donoQuePodeSerCopiado(
+  ctx: ActionCtx,
+  origem: Origem,
+): Promise<{ dono: { owner_user_id?: string; owner_agent_id?: string }; naoCopiado: MotivoDoDono | null }> {
+  if (origem.owner_user_id) {
+    const { data, error } = await ctx.admin
+      .from("user_organizations")
+      .select("user_id, role")
+      .eq("organization_id", ctx.organizationId)
+      .eq("user_id", origem.owner_user_id)
+      .is("revoked_at", null)
+      .maybeSingle();
+    if (error) return { dono: {}, naoCopiado: "dono_indeterminado_nao_copiado" };
+    const membro = data as { role?: string } | null;
+    if (!membro || membro.role === "viewer") return { dono: {}, naoCopiado: "dono_inativo_nao_copiado" };
+    return { dono: { owner_user_id: origem.owner_user_id }, naoCopiado: null };
+  }
+  if (origem.owner_agent_id) {
+    const { data, error } = await ctx.admin
+      .from("ai_agents")
+      .select("id")
+      .eq("organization_id", ctx.organizationId)
+      .eq("id", origem.owner_agent_id)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (error) return { dono: {}, naoCopiado: "dono_indeterminado_nao_copiado" };
+    if (!data) return { dono: {}, naoCopiado: "dono_inativo_nao_copiado" };
+    return { dono: { owner_agent_id: origem.owner_agent_id }, naoCopiado: null };
+  }
+  return { dono: {}, naoCopiado: null };
 }
 
 /** O card que esta chave já criou (qualquer status), se houver. */
