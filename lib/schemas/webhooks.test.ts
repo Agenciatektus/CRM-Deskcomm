@@ -62,10 +62,30 @@ describe("createAutomationRuleSchema", () => {
       { type: "assign_owner", config: { user_id: UUID } },
       { type: "call_webhook", config: { url: "https://example.com/hook" } },
       { type: "start_message_flow", config: { flow_pointer_id: UUID } },
+      { type: "create_lead_in_pipeline", config: { pipeline_id: UUID, stage_id: UUID2 } },
+      {
+        type: "create_lead_in_pipeline",
+        config: { pipeline_id: UUID, stage_id: UUID2, copiar_valor: true, copiar_dono: false },
+      },
     ];
     for (const action of actionCases) {
       const r = createAutomationRuleSchema.safeParse({ ...base, actions: [action] });
       expect(r.success).toBe(true);
+    }
+  });
+
+  it("create_lead_in_pipeline: funil e etapa precisam ser uuid, e as cópias precisam ser booleanas", () => {
+    const base = { name: "Pago → Pós-venda", trigger_event: "lead.stage_changed" as const, conditions: [] };
+    for (const config of [
+      { pipeline_id: UUID },
+      { pipeline_id: "vendas", stage_id: UUID2 },
+      { pipeline_id: UUID, stage_id: UUID2, copiar_valor: "sim" },
+    ]) {
+      const r = createAutomationRuleSchema.safeParse({
+        ...base,
+        actions: [{ type: "create_lead_in_pipeline", config }],
+      });
+      expect(r.success, JSON.stringify(config)).toBe(false);
     }
   });
 
