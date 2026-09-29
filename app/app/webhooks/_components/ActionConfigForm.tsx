@@ -22,8 +22,14 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import type { FollowupFlowPointerRow } from "@/hooks/followup/useFollowupFlows";
 
+import {
+  CreateLeadInPipelineForm,
+  type CreateLeadInPipelineConfig,
+} from "./CreateLeadInPipelineForm";
+
 export type ActionItem =
   | { type: "create_or_move_lead"; config: { pipeline_id: string; stage_id: string } }
+  | { type: "create_lead_in_pipeline"; config: CreateLeadInPipelineConfig }
   | { type: "send_whatsapp_message"; config: { channel_session_id: string; template: string } }
   | {
       type: "send_ai_message";
@@ -38,6 +44,8 @@ export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
   switch (type) {
     case "create_or_move_lead":
       return { type, config: { pipeline_id: "", stage_id: "" } };
+    case "create_lead_in_pipeline":
+      return { type, config: { pipeline_id: "", stage_id: "", copiar_valor: false, copiar_dono: false } };
     case "send_whatsapp_message":
       return { type, config: { channel_session_id: "", template: "" } };
     case "send_ai_message":
@@ -433,6 +441,13 @@ export function ActionConfigForm({
     case "create_or_move_lead":
       return (
         <CreateOrMoveLeadForm
+          config={action.config}
+          onChange={(config) => onChange({ type: action.type, config })}
+        />
+      );
+    case "create_lead_in_pipeline":
+      return (
+        <CreateLeadInPipelineForm
           config={action.config}
           onChange={(config) => onChange({ type: action.type, config })}
         />

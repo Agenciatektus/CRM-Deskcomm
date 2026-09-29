@@ -61,12 +61,23 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const supabase = await createClient();
   const { data: pointer, error: fetchErr } = await supabase
     .from("followup_flow_pointers")
-    .select("id")
+    .select("id, surface")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!pointer) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
+  // Cadência não volta versão: a versão carrega a condução da IA (agente,
+  // instrução), cuja troca exige admin e validação de publicação. Ela se
+  // REPUBLICA pela tela (migration 9020 também recusa pela sessão).
+  if (pointer.surface === "cadence") {
+    return fail(
+      "cadencia_sem_rollback",
+      t("Cadência não volta versão. Ajuste e publique de novo pela tela da cadência."),
+      422,
+      { requestId },
+    );
+  }
 
   const { data: version, error: versionErr } = await supabase
     .from("followup_flow_versions")

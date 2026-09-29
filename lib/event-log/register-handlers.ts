@@ -18,6 +18,7 @@ import { followupGatilhoEtapaHandler } from "@/lib/followup/gatilho-etapa.handle
 import { followupGatilhoCasoHandler } from "@/lib/followup/gatilho-caso.handler";
 import { cadenciaSaidasHandler } from "@/lib/cadencia/saidas.handler";
 import { cadenciaGatilhoEtiquetaHandler } from "@/lib/cadencia/gatilho-etiqueta.handler";
+import { cadenciaObjetivoHandler } from "@/lib/cadencia/objetivo.handler";
 import { mediaPersistHandler } from "@/workers/media-persist-worker.handler";
 import { mediaDeriveHandler } from "@/workers/media-derive-worker.handler";
 import { webPushInboundHandler } from "@/lib/notifications/push.handler";
@@ -43,6 +44,9 @@ export function ensureHandlersRegistered(): void {
   registerHandler(followupGatilhoCasoHandler);
   registerHandler(cadenciaSaidasHandler);
   registerHandler(cadenciaGatilhoEtiquetaHandler);
+  // Independente do de saídas: aquele encerra a INSCRIÇÃO, este a CONDUÇÃO da IA
+  // (lead na etapa-alvo ou ganho). No mesmo evento os dois agem sem conflito.
+  registerHandler(cadenciaObjetivoHandler);
   registerHandler(followupGatilhoPresencaHandler);
   registerHandler(mediaPersistHandler);
   registerHandler(mediaDeriveHandler);

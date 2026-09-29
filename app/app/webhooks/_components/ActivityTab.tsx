@@ -102,6 +102,26 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   no_target: "O evento que disparou a regra não trouxe um lead nem um contato para etiquetar.",
   no_lead_or_contact: "O evento que disparou a regra não trouxe um lead para criar ou mover.",
   cross_pipeline_move_not_allowed: "Mover um lead para outro funil está desligado nesta organização.",
+  // "Criar card em outro funil" (create_lead_in_pipeline). Os dois primeiros
+  // não são falha: o card já existia, e a regra não cria um segundo.
+  card_ja_criado:
+    "Esta automação já tinha criado o card no funil de destino para este negócio — não foi criado outro.",
+  contato_ja_tem_card_aberto:
+    "O contato já tem um card aberto no funil de destino, então não foi criado outro.",
+  dono_inativo_nao_copiado:
+    "O card foi criado sem responsável: quem era o dono do card de origem não atende mais nesta equipe (saiu, foi removido ou só visualiza).",
+  dono_indeterminado_nao_copiado:
+    "O card foi criado sem responsável: não deu para confirmar na hora se o dono do card de origem ainda atende (falha de rede ou banco). Escolha o responsável no card.",
+  lead_de_origem_nao_encontrado:
+    "O card que disparou a regra não foi encontrado nesta organização (pode ter sido apagado).",
+  destino_e_o_mesmo_funil:
+    "O funil de destino é o mesmo do card que disparou a regra. Escolha outro funil na automação.",
+  funil_de_destino_indisponivel:
+    "O funil de destino não existe mais ou foi arquivado. Abra a automação e escolha outro funil.",
+  etapa_de_destino_invalida:
+    "A etapa escolhida não pertence ao funil de destino ou foi arquivada. Abra a automação e escolha outra etapa.",
+  etapa_de_destino_de_fechamento:
+    "A etapa escolhida é de ganho ou de perda, e um card novo não pode nascer fechado. Escolha uma etapa aberta.",
   flow_not_active:
     "O funil escolhido não está ativo, então a inscrição não foi feita. Ative o funil ou escolha outro na automação.",
   live_enrollment_exists: "O contato já está em um funil ativo — esta ação não inscreve duas vezes.",

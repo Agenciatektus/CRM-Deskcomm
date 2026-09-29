@@ -86,4 +86,33 @@ describe("triggerHandoff · gate de elegibilidade", () => {
     expect(avisarLeadDoCrm).toHaveBeenCalledOnce();
     expect(r.triggered).toBe(true);
   });
+
+  it("cadência: ignorarGateDeAllowlist passa pelo 'não' do ALLOWLIST (o lead respondeu a uma mensagem nossa)", async () => {
+    decidir.mockResolvedValue({ permite: false, motivo: "sem_autorizacao", bloqueioPorAllowlist: true });
+    const r = await triggerHandoff({
+      conversationId: CONV, organizationId: ORG, reason: "cadencia_lead_respondeu", origem: "cadencia",
+      ignorarGateDeAllowlist: true,
+    });
+    expect(r.triggered).toBe(true);
+    expect(avisarLeadDoCrm).toHaveBeenCalledOnce();
+  });
+
+  it("cadência: ignorarGateDeAllowlist NÃO passa por cima de pessoa já na conversa / silêncio", async () => {
+    decidir.mockResolvedValue({ permite: false, motivo: "conversa_de_humano", bloqueioPorAllowlist: false });
+    const r = await triggerHandoff({
+      conversationId: CONV, organizationId: ORG, reason: "cadencia_lead_respondeu", origem: "cadencia",
+      ignorarGateDeAllowlist: true,
+    });
+    expect(r.triggered).toBe(false);
+    expect(avisarLeadDoCrm).not.toHaveBeenCalled();
+  });
+
+  it("objetivo atingido: avisarLead=false não manda o aviso automático", async () => {
+    decidir.mockResolvedValue({ permite: true, motivo: "autorizado", bloqueioPorAllowlist: false });
+    const r = await triggerHandoff({
+      conversationId: CONV, organizationId: ORG, reason: "objetivo_atingido", origem: "cadencia", avisarLead: false,
+    });
+    expect(r.triggered).toBe(true);
+    expect(avisarLeadDoCrm).not.toHaveBeenCalled();
+  });
 });

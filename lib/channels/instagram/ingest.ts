@@ -273,6 +273,10 @@ export async function instagramInbound(
       texto: msg.texto,
       nomeDoContato: msg.username ? `@${msg.username}` : null,
       origem: "instagram_webhook",
+      // A REDE, que é o que o card do funil escreve. Literal porque este
+      // ingest serve uma rede só — `origem` acima é o transporte, e foi
+      // confundir os dois que fez o Direct virar "Novo contato pelo WhatsApp".
+      rede: "instagram",
       // O funil veio da FONTE, e não do `is_default`.
       pipelineId,
     });

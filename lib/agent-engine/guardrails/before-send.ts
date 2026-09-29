@@ -897,6 +897,14 @@ export interface RunBeforeSendArgs {
    */
   lgpd?: LgpdInput;
   /**
+   * Conduções da cadência: o disclosure conta o "1º outbound" só a partir da
+   * abertura da condução (`aberta_em`) — as mensagens da régua já estão no
+   * ledger. SÓ o disclosure: o gate LGPD segue contando o histórico inteiro
+   * (a régua já foi o 1º toque, com a base legal da inscrição). Ausente = igual
+   * a antes.
+   */
+  disclosureDesde?: Date;
+  /**
    * Guardrail anti-alucinação de casos humanos (spec 15 §10.2, Wave 4) — ver `GateContext`.
    * TODOS ausentes (default) = `casesEnabled` false → `casePromiseGate` no-op, retrocompatível
    * com todo caller de `runBeforeSend` que não conhece casos (o guardrail existente F4-01/02).
@@ -1188,6 +1196,10 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
       disclosure !== null || args.lgpd !== undefined
         ? (await countPriorAcceptedSends(client, args.tenantId, args.leadId)) === 0
         : false;
+    const isFirstOutboundDoDisclosure =
+      disclosure !== null && args.disclosureDesde !== undefined
+        ? (await countPriorAcceptedSends(client, args.tenantId, args.leadId, args.disclosureDesde)) === 0
+        : isFirstOutbound;
 
     const lastInboundAt = await readLastInboundAt(
       client,
@@ -1218,7 +1230,7 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
       disclosure: {
         template: disclosure?.body ?? null,
         ...(disclosure?.versionId !== undefined ? { versionId: disclosure.versionId } : {}),
-        isFirstOutbound,
+        isFirstOutbound: isFirstOutboundDoDisclosure,
         mode: args.disclosureMode ?? 'inject',
       },
       lgpd: args.lgpd !== undefined ? { ...args.lgpd, isFirstOutbound } : null,

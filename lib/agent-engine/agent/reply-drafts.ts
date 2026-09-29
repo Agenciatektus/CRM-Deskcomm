@@ -7,6 +7,7 @@ import { fusoDaOrganizacao } from "./fuso-da-org";
 import { latestCheckpoint, runAgentPreview, type InboundTurnDeps } from "./inbound-turn";
 import { newPreviewResult } from "./preview";
 import type { ServiceBoundary } from "@/lib/atendimento/fronteira";
+import type { ConducaoViva } from "@/lib/cadencia/conducao/turno";
 import { parseServiceBoundary, assertCurrentServiceBoundary } from "@/lib/atendimento/fronteira";
 import {
   readCurrentServiceBoundary,
@@ -35,6 +36,8 @@ export async function generateReplyDraft(
     channelId: string;
     boundary?: ServiceBoundary;
     agent?: PublishedAgentConfig;
+    /** Condução assistida da cadência: repassada ao preview (allowlist, bloco, disclosure). */
+    conducao?: ConducaoViva;
   },
 ) {
   const agent =
@@ -100,6 +103,7 @@ export async function generateReplyDraft(
         contactId: input.contactId,
         channelId: input.channelId,
         result,
+        ...(input.conducao !== undefined ? { conducao: input.conducao } : {}),
       });
       const body = result.candidates.map((c) => c.body).join("\n\n");
       const { rows: finished } = await pool.query(

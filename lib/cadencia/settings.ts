@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CONDUCAO_PADRAO, conducaoDaCadenciaSchema } from "./conducao/settings";
 import { hashEstavel } from "./render";
 import { SAIDAS_PADRAO, saidasDaCadenciaSchema } from "./saidas";
 
@@ -18,7 +19,10 @@ import { SAIDAS_PADRAO, saidasDaCadenciaSchema } from "./saidas";
  *   - `legal_basis_ref` → base legal (LIA) do contato frio; sem ela a
  *     publicação é recusada (gate LGPD de prospecção);
  *   - `max_inscricoes_dia` → freio de volume no lugar do "interruptor" do
- *     agente de IA, que a cadência não exige.
+ *     agente de IA, que a cadência não exige;
+ *   - `conducao` → quem atende quando o lead responde (pessoa ou agente de IA,
+ *     ver `lib/cadencia/conducao/settings.ts`). Diferente do resto, ela só vale
+ *     depois de REPUBLICAR: o snapshot vai para a versão publicada.
  */
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -58,6 +62,8 @@ export const cadenceSettingsSchema = z.strictObject({
   max_inscricoes_dia: z.number().int().min(1).max(MAX_INSCRICOES_DIA_TETO),
   /** Opcional: cadência gravada antes dele recebe `SAIDAS_PADRAO` (ver `saidasDe`). */
   saidas: saidasDaCadenciaSchema.optional(),
+  /** Opcional: cadência gravada antes dele é atendida por uma pessoa (ver `conducaoDe`). */
+  conducao: conducaoDaCadenciaSchema.optional(),
 });
 
 export type CadenceSettings = z.infer<typeof cadenceSettingsSchema>;
@@ -68,6 +74,7 @@ export const CADENCE_SETTINGS_PADRAO: Omit<CadenceSettings, "legal_basis_ref"> =
   espacamento: { min_s: 45, max_s: 120 },
   max_inscricoes_dia: 100,
   saidas: SAIDAS_PADRAO,
+  conducao: CONDUCAO_PADRAO,
 };
 
 /**

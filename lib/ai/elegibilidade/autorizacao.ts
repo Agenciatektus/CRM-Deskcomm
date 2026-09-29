@@ -19,6 +19,13 @@ export type MotivoDeAutorizacao =
   | `respondi:${string}`
   | `campanha:${string}`
   | `automacao:${string}`
+  /**
+   * A cadência de prospecção cujo lead respondeu e cuja IA assumiu
+   * (`cadencia:<pointer_id>`). Gravada e revogada SÓ pelas funções SQL
+   * `fn_cadencia_lead_respondeu`/`fn_cadencia_encerrar_conducao` (migration
+   * 9018), atômicas com a condução — o tipo aqui documenta o vocabulário.
+   */
+  | `cadencia:${string}`
   | "retomada_manual";
 
 /**

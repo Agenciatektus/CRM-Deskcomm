@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { VARIANTE_TAMANHO_MAXIMO, VARIAVEIS_DA_CADENCIA, resolverSpintax, variaveisCitadas } from "./render";
+import { validarConducaoDaCadencia } from "./conducao/validar";
 import { validarEtapasDeSaida } from "./gatilho";
 import { MENSAGEM_ETIQUETA_ENTRA_E_SAI, etiquetaEntraESai } from "./saidas";
 import { cadenceSettingsSchema } from "./settings";
@@ -174,6 +175,10 @@ export async function validarPublicacaoDaCadencia(
       }
     }
   }
+
+  // Quem atende quando o lead responde: com IA, agente, funil, objetivo,
+  // etapa-alvo e orçamento têm de estar em ordem antes de ir ao ar.
+  erros.push(...(await validarConducaoDaCadencia(admin, organizationId, pointer)));
 
   return erros;
 }

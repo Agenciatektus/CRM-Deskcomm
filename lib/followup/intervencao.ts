@@ -279,7 +279,18 @@ async function aplicaPatchComGuarda(
   patch: Patch,
   agoraIso: string,
 ): Promise<{ ok: true } | FalhaDaIntervencao> {
-  const { data, error } = await deps.supabase
+  // Inscrição de CADÊNCIA só se escreve pelo servidor (migration 9020: a sessão
+  // recebe 42501). Papel e organização foram conferidos pela rota; o ponteiro é
+  // lido pela sessão (RLS da organização).
+  const { data: ponteiro } = await deps.supabase
+    .from("followup_flow_pointers")
+    .select("surface")
+    .eq("organization_id", deps.orgId)
+    .eq("id", alvo.pointer_id)
+    .maybeSingle();
+  const escritor =
+    (ponteiro as { surface?: string } | null)?.surface === "cadence" ? deps.admin : deps.supabase;
+  const { data, error } = await escritor
     .from("followup_enrollments")
     .update(patch)
     .eq("id", alvo.id)
