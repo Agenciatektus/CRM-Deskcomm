@@ -37590,6 +37590,26 @@ create index if not exists idx_event_log_poda
   on public.event_log (created_at)
   where status in ('done', 'dead');
 
+-- Os índices do OUTRO lado das FKs — as duas tabelas já existem no corpo do dump,
+-- bem acima daqui, então o lugar é este.
+--
+-- `automation_rule_runs.event_id` e `appointment_recovery_receipts.source_event_id`
+-- são `on delete set null`: a cada linha que a poda apaga, o Postgres roda
+-- `update <referenciadora> set <coluna> = null where <coluna> = $1` — sem índice,
+-- seq scan na tabela inteira, POR LINHA apagada, mil por lote.
+--
+-- O modo de falha é a poda EMUDECER, que é o defeito que a 9021 existe para
+-- consertar: `automation_rule_runs` cresce sem poda nenhuma, e na ordem de 100 mil
+-- linhas o lote estoura o `statement_timeout` de 8 s do `authenticator` — a função
+-- lança, o cron audita `falhou: true` todo dia, e o `event_log` volta a crescer com
+-- o painel no verde. Latente hoje (as duas tabelas têm 0 linhas em 29/09/2026), e
+-- é por isso que o índice nasce de graça agora. O racional inteiro está no
+-- cabeçalho da migration.
+create index if not exists idx_automation_rule_runs_event_id
+  on public.automation_rule_runs (event_id) where event_id is not null;
+create index if not exists idx_appointment_recovery_receipts_source_event
+  on public.appointment_recovery_receipts (source_event_id) where source_event_id is not null;
+
 create or replace function public.fn_podar_event_log(
   p_retencao_dias int default null,
   p_limite int default null

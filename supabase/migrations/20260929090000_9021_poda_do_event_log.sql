@@ -60,7 +60,7 @@
 --
 -- ═══ O EFEITO EM CASCATA, DECLARADO ═══
 --
--- Três tabelas apontam para `event_log`, e duas delas não perdem nada:
+-- Três FKs apontam para `event_log`, e duas delas não perdem nada:
 -- `automation_rule_runs.event_id` e
 -- `appointment_recovery_receipts.source_event_id` são `on delete set null` — o
 -- histórico FICA, só perde o ponteiro. O botão "Reenviar" de um run antigo já
@@ -70,6 +70,18 @@
 -- `event_service_origins.event_id` é `on delete cascade`, e a própria 0223
 -- escreveu no cabeçalho dela que "retenção acompanha event_log" — é recibo do
 -- evento, não sobrevive a ele por definição.
+--
+-- Há uma QUARTA referência, e ela NÃO é FK: a cadeia
+-- `payload->'service_origin'->>'event_id'`. `lib/atendimento/origem-automacao.ts`
+-- grava `{ kind: "event", event_id: ctx.event.id }` e `fn_service_event_origin`
+-- segue a cadeia daí, com `raise exception 'service_event_not_found'` se a raiz
+-- sumiu. Nenhum gatilho de integridade referencial vê esse ponteiro, então o
+-- Postgres não o protege — quem o protege é o predicado de status desta poda.
+-- Um evento só é podado `done`/`dead`, e um `pending` referenciado por essa
+-- cadeia não chega aos 120 dias sem que o dreno tenha parado ANTES; dreno parado
+-- por quatro meses é incidente maior e visível por si (a fila cresce na tela),
+-- muito antes de virar `service_event_not_found`. Na medição de 29/09/2026 são 0
+-- eventos com `kind = 'event'` nessa cadeia.
 --
 -- O aviso `event_dead` da Central NÃO aponta para a linha (o dreno grava
 -- `ref_kind` nulo, ver `lib/event-log/aviso-do-laco.ts`), então não há aqui o
@@ -116,6 +128,36 @@
 create index if not exists idx_event_log_poda
   on public.event_log (created_at)
   where status in ('done', 'dead');
+
+-- Os índices do OUTRO lado das FKs. O `on delete set null` é cobrado por linha
+-- APAGADA aqui, não por linha referenciadora.
+--
+-- Para cada linha que esta poda remove, o Postgres executa o gatilho de
+-- integridade referencial de cada tabela que aponta para ela — um
+-- `update <referenciadora> set <coluna> = null where <coluna> = $1`. Sem índice
+-- na coluna referenciadora esse UPDATE é seq scan na tabela inteira, e é POR
+-- LINHA apagada: mil por lote. `event_service_origins.event_id` já está coberto
+-- porque é o começo da PK dela; as duas de baixo não estavam.
+--
+-- O modo de falha não é "fica lento": é a poda EMUDECER, que é exatamente o
+-- defeito que esta migration existe para consertar. `automation_rule_runs` ganha
+-- uma linha por disparo de regra de automação e não tem poda nenhuma, então
+-- cresce sem teto. Quando ela chegar à ordem de 100 mil linhas, o lote estoura o
+-- `statement_timeout` de 8 s do `authenticator`, a função lança, e o cron
+-- `data-retention` passa a auditar `falhou: true` todo dia enquanto o `event_log`
+-- volta a crescer sem teto — com o painel no verde, que é o pior lugar para uma
+-- pane morar.
+--
+-- Na medição de 29/09/2026 as duas tabelas têm 0 linhas, então o custo é LATENTE
+-- e o índice nasce de graça. É agora que ele é barato: criar índice depois que a
+-- tabela cresceu é que vira janela de travamento de escrita.
+--
+-- Parcial em `is not null` porque só a linha que APONTA para um evento é visitada
+-- pelo gatilho da FK, e `set null` só faz esse conjunto encolher.
+create index if not exists idx_automation_rule_runs_event_id
+  on public.automation_rule_runs (event_id) where event_id is not null;
+create index if not exists idx_appointment_recovery_receipts_source_event
+  on public.appointment_recovery_receipts (source_event_id) where source_event_id is not null;
 
 create or replace function public.fn_podar_event_log(
   p_retencao_dias int default null,
