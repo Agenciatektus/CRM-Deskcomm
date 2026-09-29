@@ -748,6 +748,10 @@ async function handleInbound(
     nomeDoContato: notifyNameOf(p),
     requestId,
     origem: "waha_webhook",
+    // O canal por QR é WhatsApp: `origem` acima diz por qual transporte a
+    // mensagem entrou, `rede` diz o que o cliente abriu no celular. É o segundo
+    // que o card do funil escreve.
+    rede: "whatsapp",
   });
 
   // ── POR QUE NÃO SE EMITE `message.received` AQUI ────────────────────────────

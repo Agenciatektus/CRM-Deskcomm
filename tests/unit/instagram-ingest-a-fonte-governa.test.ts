@@ -196,6 +196,13 @@ describe("Direct vira lead, comentário não", () => {
     expect(efeitos.pipelineId, "o funil tem de vir da fonte, não do is_default").toBe(
       FUNIL_DA_FONTE,
     );
+
+    // E ele declara a REDE certa. Sem esta linha havia um ponto cego: o teste
+    // do rótulo injeta a rede que quer e ficaria verde mesmo se ESTE ingest
+    // passasse `"whatsapp"` — o typecheck só cobra que o campo exista, não que
+    // o valor seja o desta rede. Um card de Direct voltaria a dizer WhatsApp
+    // com a suíte inteira verde, que é exatamente como o defeito nasceu.
+    expect(efeitos.rede, "o ingest do Instagram precisa dizer que é Instagram").toBe("instagram");
   });
 
   it("o comentário APARECE no Inbox e NÃO vira lead", async () => {

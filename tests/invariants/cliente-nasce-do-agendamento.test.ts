@@ -1140,6 +1140,9 @@ describe("o funil de clientes", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Antiga",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado, `esperava criar, veio ${JSON.stringify(r)}`).toBe(true);
@@ -1168,6 +1171,9 @@ describe("o funil de clientes", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Congelada",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado, `esperava criar, veio ${JSON.stringify(r)}`).toBe(true);
@@ -1185,6 +1191,9 @@ describe("o funil de clientes", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Nova",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado).toBe(true);

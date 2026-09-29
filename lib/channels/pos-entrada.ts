@@ -39,7 +39,8 @@
  * dentro, com log, e o seguinte roda mesmo assim.
  */
 import { audit } from "@/lib/audit";
-import { garantirLeadDaConversa } from "@/lib/leads/nascimento-do-lead";
+import { garantirLeadDaConversa, type OrigemDoNascimento } from "@/lib/leads/nascimento-do-lead";
+import { CHANNEL_BRAND_LABEL, type ChannelBrand } from "./presentation";
 import {
   ehAPrimeiraMensagemDoContato,
   estamparOrigemDaPagina,
@@ -119,6 +120,47 @@ export interface EntradaDeMensagem {
    * escolhe como sempre escolheu.
    */
   pipelineId?: string;
+  /**
+   * A REDE por onde a pessoa escreveu — `whatsapp`, `instagram`, `messenger`.
+   *
+   * ⚠️ OBRIGATÓRIO, e é o ponto. O campo `origem` logo acima existia e NÃO
+   * servia: ele carrega o transporte (`waha_webhook`, `instagram_webhook`) e
+   * está declarado como "não é decisão". O nascimento do lead precisava da
+   * rede, não achou nenhuma, e caía num default silencioso de WhatsApp — um
+   * Direct de Instagram abria um card chamado "Novo contato pelo WhatsApp".
+   *
+   * Exigir em vez de aceitar `undefined` é o que impede a repetição: um ingest
+   * novo que esqueça a rede não compila, em vez de herdar o canal mais comum.
+   * Quem tem o provider na mão resolve com `channelBrand`; quem serve uma rede
+   * só escreve o literal — os dois moram em `lib/channels/`, que é a fronteira
+   * autorizada a nomear transporte.
+   */
+  rede: ChannelBrand;
+}
+
+/**
+ * De onde o lead nasceu, dito com o nome que a pessoa reconheceria.
+ *
+ * O `rotulo` vira o título do card quando não há nome cadastrado
+ * ("Novo contato pelo Instagram"), o `source` vai para `crm_leads.source` e o
+ * `motivo` é a linha da timeline que explica por que o card apareceu.
+ *
+ * Derivado de `CHANNEL_BRAND_LABEL` em vez de redigitado: o card do funil e o
+ * ícone do Inbox descrevem a MESMA conversa, e foi a segunda lista que os fez
+ * discordar.
+ */
+export function origemDaRede(rede: ChannelBrand): OrigemDoNascimento {
+  const nome = CHANNEL_BRAND_LABEL[rede];
+  return {
+    rotulo: nome,
+    source: rede,
+    // "no canal" em caixa baixa: a frase da timeline é prosa, e "recebida no
+    // Canal" leria como se existisse uma rede chamada Canal.
+    motivo:
+      rede === "unknown"
+        ? "primeira mensagem recebida no canal"
+        : `primeira mensagem recebida no ${nome}`,
+  };
 }
 
 /**
@@ -293,6 +335,10 @@ async function abrirDemanda(admin: Admin, entrada: EntradaDeMensagem): Promise<v
       // Repassado e nao resolvido aqui: quem sabe a fonte e o ingestor do
       // canal. `undefined` no WhatsApp mantem o caminho de sempre.
       pipelineId: entrada.pipelineId,
+      // A rede declarada pelo ingest, e não o default de `garantirLeadDaConversa`.
+      // Esta linha é o conserto: sem ela o parâmetro chegava `undefined` e TODO
+      // canal — Instagram inclusive — nascia rotulado como WhatsApp.
+      origem: origemDaRede(entrada.rede),
     });
 
     // Os DOIS desfechos viram log. Sem a linha do "não criou", o silêncio de

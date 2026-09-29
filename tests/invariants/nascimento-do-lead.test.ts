@@ -122,6 +122,9 @@ describe("o lead NASCE", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Joana da Silva",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado, `esperava criar, veio ${JSON.stringify(r)}`).toBe(true);
@@ -169,6 +172,9 @@ describe("o lead NASCE", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Registro Silva",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
     expect(r.criado).toBe(true);
     if (!r.criado) return;
@@ -208,6 +214,9 @@ describe("o lead NASCE", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: null, // a mensagem veio sem nome
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
     expect(r.criado).toBe(true);
     if (!r.criado) return;
@@ -228,6 +237,9 @@ describe("o lead NASCE", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Contato 543134@lid",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
     expect(r.criado).toBe(true);
     if (!r.criado) return;
@@ -246,6 +258,9 @@ describe("o lead NASCE", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "   ",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
     expect(r.criado).toBe(true);
     if (!r.criado) return;
@@ -265,6 +280,7 @@ describe("UM lead por DEMANDA, não um por mensagem", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Repetido Souza",
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     };
 
     const primeira = await garantirLeadDaConversa(db, dados);
@@ -289,6 +305,7 @@ describe("UM lead por DEMANDA, não um por mensagem", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Voltou Pereira",
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     };
 
     const primeira = await garantirLeadDaConversa(db, dados);
@@ -326,6 +343,9 @@ describe("quando o lead NÃO nasce — e cada recusa diz por quê", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Saiu Lima",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado).toBe(false);
@@ -349,6 +369,9 @@ describe("quando o lead NÃO nasce — e cada recusa diz por quê", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Órfão Costa",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado).toBe(false);
@@ -372,6 +395,9 @@ describe("quando o lead NÃO nasce — e cada recusa diz por quê", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Sem Etapa Dias",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado).toBe(false);
@@ -391,6 +417,9 @@ describe("a etapa de entrada nunca é uma etapa de fechamento", () => {
       contactId: contato,
       conversationId: CONVERSA,
       nomeDoContato: "Torto Alves",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
     });
 
     expect(r.criado, `esperava criar, veio ${JSON.stringify(r)}`).toBe(true);
@@ -431,6 +460,9 @@ describe("três mensagens seguidas NÃO viram três negócios", () => {
           contactId: contato,
           conversationId: CONVERSA,
           nomeDoContato: "Ana Simultânea",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
         }),
       ),
     );
@@ -458,6 +490,9 @@ describe("três mensagens seguidas NÃO viram três negócios", () => {
           contactId: contato,
           conversationId: CONVERSA,
           nomeDoContato: "Bia Simultânea",
+      // A origem e OBRIGATORIA desde que o default "WhatsApp" foi removido:
+      // um chamador que a esqueca nao compila. Aqui ela e cenario.
+      origem: { rotulo: "WhatsApp", source: "whatsapp", motivo: "primeira mensagem recebida no WhatsApp" },
         }),
       ),
     );
