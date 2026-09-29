@@ -3,7 +3,7 @@
 - **Status:** aceito em 2026-09-29 pelo dono do produto, junto com o desenho e as decisões D-1…D-14 dele
 - **Data:** 2026-09-29
 - **Contexto medido em:** `9b63075bf` (topo de `origin/main` em 29/09/2026); o peso das tabelas, num Postgres 17 descartável no mesmo dia
-- **Lei que muda quando aceita:** [`docs/doctrine/operacao-de-agentes.md`](../doctrine/operacao-de-agentes.md) — §0, a brecha "Faturamento e planos" da §3 e as proibições 2 e 3 da §4 — e, **só para este caso**, a condição 2 da [ADR-0002](0002-tabelas-de-modulo-num-banco-so.md)
+- **Lei que muda quando aceita:** [`docs/doctrine/operacao-de-agentes.md`](../doctrine/operacao-de-agentes.md) — §0, §1, a brecha "Faturamento e planos" da §3 e as proibições 2 e 3 da §4 — e, **só para este caso**, a condição 2 da [ADR-0002](0002-tabelas-de-modulo-num-banco-so.md)
 - **Desenho que a detalha:** [`docs/superpowers/specs/2026-09-29-cobranca-do-revendedor-design.md`](../superpowers/specs/2026-09-29-cobranca-do-revendedor-design.md)
 
 ---
@@ -31,7 +31,7 @@ Três fatos moldam a decisão:
 
 | Fato | Onde foi medido |
 |---|---|
-| A suspensão de empresa que existe hoje troca `organizations.status` e mais nada: a IA, as automações e os envios da empresa suspensa não leem esse status | o `update` de status em `app/api/v1/admin/tenants/[id]/suspend/route.ts`; os pontos de corte que faltam estão enumerados na §4 do desenho |
+| A suspensão de empresa que existe hoje troca `organizations.status` (com data, motivo e autor) e nada mais corta: a IA, as automações e o envio de mensagens não leem esse status. As exceções que já o leem, como a rodada de campanhas, estão enumeradas junto com os pontos de corte que faltam | o `update` de status em `app/api/v1/admin/tenants/[id]/suspend/route.ts`; §4 do desenho |
 | As travas que um plano precisa — pessoas, números conectados, teste grátis na criação da empresa — têm de morar em tabelas do núcleo: `user_organizations`, `channel_sessions`, `organizations` | §2.6 e §5 do desenho |
 | A VPS de quem instala não compila código: ela baixa imagem pronta, e o `update.sh` regrava a imagem a cada atualização | `hostgator-setup-kit/update.sh`; [doutrina de packaging](../doctrine/packaging.md) |
 
@@ -68,8 +68,9 @@ eixo 2.
   e só o valor `ligado` a liga (falha fechada).
 - Com a chave desligada, **nada do que existe muda**: as rotas da cobrança respondem 404, a tela do
   dono some do menu, nenhum limite vale, o cron sai sem auditar, e o formulário de nova empresa, o
-  rótulo de plano, a tela de cobrança da empresa e o menu seguem idênticos. Quem opera uma empresa
-  só vê um interruptor a mais.
+  rótulo de plano, a tela de cobrança da empresa e o menu seguem idênticos. Quem administra a
+  instalação vê só um interruptor a mais em `/admin/sistema`; quem opera uma empresa não vê
+  diferença nenhuma.
 - As duas tabelas da cobrança (planos e assinaturas) nascem vazias no banco de **toda**
   instalação, inclusive de quem nunca liga a chave. O peso está medido na seção seguinte.
 
@@ -200,4 +201,4 @@ capacidade que queira o mesmo caminho precisa de decisão própria, com o peso m
 recomendação. O aceite não implementa nada. A ordem de construção está na §14 do desenho: a
 suspensão que suspende; planos e limites; contrato, Stripe e régua; Asaas; o guia de instalação no
 Coolify; o material para revendedores. Para ver o que já chegou à `main`:
-`git log --oneline origin/main -- lib/cobranca lib/organizacao`.
+`git log --oneline origin/main -- lib/cobranca lib/organizacao/operante.ts`.

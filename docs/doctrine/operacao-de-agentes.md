@@ -48,9 +48,10 @@ e ele nunca é sabotado — a mesma regra de ouro que já vale para a parceria d
 **Invariante 3.** Nenhum serviço de produção constrói na máquina do cliente, e a atualização
 nunca exige edição manual de arquivo. Vale integralmente a lei de [`packaging.md`](./packaging.md).
 
-**Consequência prática:** cobrar por licença ou por assento **contraria** a promessa MIT escrita
-em `VISION.md` e exigiria reescrever a identidade do projeto. Cobrar pela operação não exige nada
-disso.
+**Consequência prática:** o projeto — mantenedor ou operador de agentes — cobrar por licença ou por
+assento **contraria** a promessa MIT escrita em `VISION.md` e exigiria reescrever a identidade do
+projeto. O dono de uma instalação que cobra as empresas dela é outro eixo
+([ADR-0004](../adr/0004-cobranca-do-revendedor.md)). Cobrar pela operação não exige nada disso.
 
 ---
 
@@ -119,10 +120,10 @@ fecha quando alguma responder "sim". Duas classes de linha respondem "não" e n�
   [ADR-0004](../adr/0004-cobranca-do-revendedor.md)) — o dono da instalação cobrando as empresas
   que atende, com plano fixo. Não medem nem faturam operação de agentes.
 
-A régua anterior contava zero por dois motivos, e nenhum deles era "não existe": ela só via
-`public.x` sem aspas — o trecho do dump, escrito `"public"."x"`, ficava fora — e só casava nomes em
-inglês. As tabelas `cobranca_*` passariam por ela invisíveis, e o zero seguiria lido como "a brecha
-está aberta" pelo motivo errado.
+A régua anterior devolvia zero, e hoje esse zero é verdadeiro — mas por sorte: ela só via
+`public.x` sem aspas (o trecho do dump, escrito `"public"."x"`, ficava fora) e só casava nomes em
+inglês. As tabelas `cobranca_*` passariam por ela invisíveis pelo nome, e o zero seguiria lido como
+"a brecha está aberta" pelo motivo errado.
 
 ---
 
