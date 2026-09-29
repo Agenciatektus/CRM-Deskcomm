@@ -57,7 +57,13 @@ describe("leitura e contador", () => {
   });
 
   it("amarra organização e conversa na leitura", async () => {
-    const query = vi.fn(async () => ({ rows: [{ id: "c-1", expirada: false, modo: "automatico" }] }));
+    // Os parametros sao DECLARADOS de proposito: `vi.fn(async () => ...)` sem
+    // eles faz o TS inferir `calls` como tupla VAZIA, e a asserção logo abaixo
+    // (`calls[0]?.[1]`) vira erro de tipo — funciona em runtime e reprova no
+    // `pnpm typecheck`, que inclui os testes.
+    const query = vi.fn(async (_sql: string, _params?: unknown[]) => ({
+      rows: [{ id: "c-1", expirada: false, modo: "automatico" }],
+    }));
     const r = await conducaoVivaDaConversa({ query } as never, "org", "cv");
     expect(r?.id).toBe("c-1");
     expect(r).not.toHaveProperty("expirada");
@@ -65,7 +71,7 @@ describe("leitura e contador", () => {
   });
 
   it("contarTurno devolve null quando a condução já acabou", async () => {
-    const query = vi.fn(async () => ({ rows: [] }));
+    const query = vi.fn(async (_sql: string, _params?: unknown[]) => ({ rows: [] }));
     expect(await contarTurno({ query } as never, "org", "c-1")).toBeNull();
     expect(query.mock.calls[0]?.[0]).toContain("encerrada_em is null");
   });
