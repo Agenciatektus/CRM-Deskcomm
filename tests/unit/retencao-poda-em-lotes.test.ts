@@ -16,6 +16,8 @@ import {
   RETENCAO_CONVERSA_DO_CASO_DIAS_PADRAO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PADRAO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PISO,
+  RETENCAO_EVENT_LOG_DIAS_PADRAO,
+  RETENCAO_EVENT_LOG_DIAS_PISO,
   RETENCAO_FILA_DIAS_PADRAO,
   RETENCAO_PASSAGEM_DIAS_PADRAO,
   RETENCAO_FILA_DIAS_PISO,
@@ -185,6 +187,28 @@ describe("podarHistorico — o laço de lotes", () => {
     expect(r.avisos).toHaveLength(2);
   });
 
+  it("o knob do BUS de eventos: padrão intocado, e piso que não é o da fila", async () => {
+    // O piso do bus (90) protege uma coisa que nenhum dos outros protege: a
+    // JANELA DAS TELAS. As telas de IA leem `event_log` direto por `created_at`,
+    // com no máximo 90 dias, e um piso menor faria o operador apertado de espaço
+    // apagar o próprio gráfico ao mexer no knob. Medir o número aqui é o que
+    // impede alguém de "padronizar" os pisos em 7, como o da fila, sem perceber.
+    const { db, chamadas } = bancoQueDevolve({ fila: [0], auditoria: [0] });
+    await podarHistorico(db, {});
+    const doBus = chamadas.filter((c) => c.nome === "fn_podar_event_log");
+    expect(doBus, "a poda do bus não foi chamada — a oitava não entrou no laço").toHaveLength(1);
+    expect(doBus[0]?.dias).toBe(RETENCAO_EVENT_LOG_DIAS_PADRAO);
+
+    const abaixo = bancoQueDevolve({ fila: [0], auditoria: [0] });
+    const r = await podarHistorico(abaixo.db, { EVENT_LOG_RETENTION_DAYS: "30" });
+    expect(
+      abaixo.chamadas.find((c) => c.nome === "fn_podar_event_log")?.dias,
+      "30 dias passou inteiro — o knob de espaço virou apagador de gráfico",
+    ).toBe(RETENCAO_EVENT_LOG_DIAS_PISO);
+    expect(r.avisos.join(" ")).toContain("EVENT_LOG_RETENTION_DAYS");
+    expect(r.retencao_event_log_dias).toBe(RETENCAO_EVENT_LOG_DIAS_PISO);
+  });
+
   it("erro do banco sobe — a poda não engole falha em silêncio", async () => {
     const db: PodaDb = {
       async rpc() {
@@ -226,6 +250,11 @@ describe("houveEfeito — as duas direções", () => {
     lotes_avisos_de_caso: 0,
     avisos_de_caso_tem_resto: false,
     retencao_aviso_de_caso_dias: RETENCAO_AVISO_DE_CASO_DIAS_PADRAO,
+    // Oitava poda (migration 9021): o bus interno de eventos.
+    eventos_apagados: 0,
+    lotes_eventos: 0,
+    eventos_tem_resto: false,
+    retencao_event_log_dias: RETENCAO_EVENT_LOG_DIAS_PADRAO,
     avisos: [] as string[],
   };
 
@@ -267,6 +296,13 @@ describe("houveEfeito — as duas direções", () => {
     // As seis anteriores já mostram que esquecer o predicado é o modo de falha
     // natural aqui — e ele é mudo: a rodada apaga e não deixa registro.
     expect(houveEfeito({ ...base, avisos_de_caso_apagados: 1 })).toBe(true);
+  });
+
+  it("...e apagou evento do bus → TAMBÉM audita (migration 9021)", () => {
+    // A oitava poda entra em `houveEfeito` no MESMO commit em que entra no laço.
+    // As sete anteriores já mostram que esquecer o predicado é o modo de falha
+    // natural aqui — e ele é mudo: a rodada apaga e não deixa registro.
+    expect(houveEfeito({ ...base, eventos_apagados: 1 })).toBe(true);
   });
 
   it("...e apagou espelho da agenda → TAMBÉM audita (migration 0187)", () => {

@@ -37564,6 +37564,71 @@ create trigger trg_cadencia_guarda_ponteiro
   before insert or update on public.followup_flow_pointers
   for each row execute function public.fn_cadencia_guarda_ponteiro();
 
+-- ---- poda do bus de eventos: função (migration 9021) ----
+--
+-- Antes da varredura de anon, como toda função nova do apêndice.
+--
+-- `event_log` era a maior tabela SEM PODA do banco na medição de 29/09/2026
+-- (13 MB de 77, 16.094 linhas), dois dias depois de o mesmo banco ter batido a
+-- cota de 500 MB do Supabase free e entrado em `default_transaction_read_only`
+-- — dois dias de cliente sem sistema e 36–37% dos webhooks de WhatsApp
+-- recusados. O racional inteiro está no cabeçalho da migration.
+--
+-- Só `done` e `dead` saem. `pending` é trabalho que ainda vai sair e
+-- `processing` está com um dreno agora (ou órfão, e `lib/routing/worker.ts` o
+-- devolve para `pending`): nenhum dos dois é apagado em idade nenhuma. O corte
+-- é por `created_at` e nunca por `updated_at`, que o dreno reescreve a cada
+-- tentativa — medir idade por coluna que alguém atualiza faz a linha
+-- rejuvenescer.
+--
+-- O piso de 90 dias mora no CORPO da função e tem dono: é `MAX_RANGE_DAYS`, a
+-- janela máxima das telas de IA que leem esta tabela por `created_at`
+-- (`app/api/v1/ai/usage` e `app/api/v1/ai/evolution`). Sem ele, o knob de
+-- espaço viraria apagador de gráfico. O default é 120 para o dia mais antigo
+-- dessa janela nunca cair no meio da poda diária.
+create index if not exists idx_event_log_poda
+  on public.event_log (created_at)
+  where status in ('done', 'dead');
+
+create or replace function public.fn_podar_event_log(
+  p_retencao_dias int default null,
+  p_limite int default null
+) returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_dias int := greatest(coalesce(p_retencao_dias, 120), 90);
+  v_limite int := least(greatest(coalesce(p_limite, 1000), 1), 10000);
+  v_apagados int;
+begin
+  with vencidos as (
+    select e.id
+      from public.event_log e
+     where e.status in ('done', 'dead')
+       and e.created_at < now() - make_interval(days => v_dias)
+     order by e.created_at
+     limit v_limite
+  )
+  delete from public.event_log e
+   using vencidos v
+   where e.id = v.id;
+  get diagnostics v_apagados = row_count;
+  return v_apagados;
+end;
+$$;
+
+revoke execute on function public.fn_podar_event_log(int, int)
+  from public, anon, authenticated;
+grant execute on function public.fn_podar_event_log(int, int) to service_role;
+
+comment on table public.event_log is
+  'Bus interno do CRM. Triggers e ServerActions inserem aqui via emit_event(). Workers consomem. '
+  'Retenção default de 120 dias para linhas done/dead, podadas por public.fn_podar_event_log '
+  '(piso de 90 dias, que é a janela máxima das telas de IA) a partir do cron '
+  'app/api/v1/cron/data-retention. pending e processing nunca são apagados.';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

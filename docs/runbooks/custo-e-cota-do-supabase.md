@@ -118,6 +118,7 @@ Ambas são opcionais e vivem no `.env`; os defaults funcionam sem editar nada.
 |---|---|---|
 | `JOB_QUEUE_RETENTION_DAYS` | `90` | Idade a partir da qual um job **terminal** (`done`/`failed`/`dead`) é apagado. Piso de **7** dias. |
 | `AUDIT_LOG_RETENTION_DAYS` | `1825` (5 anos) | Idade a partir da qual uma linha de auditoria é expurgada. Piso de **90** dias. |
+| `EVENT_LOG_RETENTION_DAYS` | `120` | Idade a partir da qual uma linha **`done`/`dead`** do bus interno (`event_log`) é apagada. Piso de **90** dias. |
 
 O que a poda da fila **nunca** toca: job `pending` (trabalho que ainda vai sair)
 e `running` (com um worker agora), qualquer que seja a idade; e job `dead` cujo
@@ -132,6 +133,14 @@ O piso do audit não é sugestão de estilo: ele mora **dentro** de
 `fn_expurgar_auditoria_vencida`, então nem quem tem a chave de serviço apaga
 rastro com menos de 90 dias por esse caminho. A função não aceita organização,
 ator, ação nem id — só idade.
+
+A poda do bus (`event_log`, migration 9021) **nunca** toca `pending` (trabalho
+que ainda vai sair) nem `processing` (com um dreno agora, ou órfão de um que
+morreu — `lib/routing/worker.ts` o devolve para `pending`), qualquer que seja a
+idade. O piso de 90 dias dela também mora dentro da função, e protege uma coisa
+diferente: 90 é a janela máxima das telas de IA, que leem `event_log` direto por
+`created_at`. Diminuir esse knob abaixo do piso apagaria o gráfico junto com o
+espaço, e por isso não é possível — nem por `psql`.
 
 Depois de mudar qualquer uma das duas:
 

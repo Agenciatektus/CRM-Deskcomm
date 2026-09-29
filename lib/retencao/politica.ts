@@ -165,6 +165,46 @@ export const RETENCAO_AVISO_DE_CASO_DIAS_PADRAO = 180;
  */
 export const RETENCAO_AVISO_DE_CASO_DIAS_PISO = 30;
 
+/**
+ * 120 dias para o BUS DE EVENTOS (`event_log`, migration 9021).
+ *
+ * A tabela não é arquivo: é fila. A linha existe para ser consumida, e depois de
+ * consumida (`done`) ou desistida (`dead`) ela é resíduo — mas resíduo que
+ * ALGUÉM AINDA LÊ por um tempo, e é isso que fixa o número.
+ *
+ * As telas de IA leem `event_log` direto, por `created_at`, com janela máxima de
+ * 90 dias (`MAX_RANGE_DAYS` em `app/api/v1/ai/usage/route.ts` e
+ * `app/api/v1/ai/evolution/route.ts`; `operator-metrics` olha 30). 120 e não 90
+ * porque 90 seria a BORDA da janela: com os dois números iguais, o dia mais
+ * antigo do gráfico cairia no meio da poda diária e a última barra encolheria ao
+ * longo do dia. Um mês de folga acaba com a borda.
+ *
+ * Por que não 5 anos como a auditoria: `api_audit_log` responde "quem fez o quê"
+ * a um terceiro (regra L-10). `event_log` responde "este trabalho saiu?", e essa
+ * pergunta morre junto com o efeito — que já está gravado na entidade de
+ * negócio, não no evento que o pediu.
+ */
+export const RETENCAO_EVENT_LOG_DIAS_PADRAO = 120;
+/**
+ * Piso do bus: 90 dias — e aqui o piso protege uma TELA, não um rastro legal.
+ *
+ * Os 90 dias da auditoria existem para o knob não virar apagador de rastro
+ * recente. Este existe para o knob não virar apagador de GRÁFICO: sem ele, o
+ * operador apertado de espaço digitaria `EVENT_LOG_RETENTION_DAYS=30` e o painel
+ * de IA emagreceria sem uma palavra de explicação — o pior formato de defeito,
+ * porque o número menor continua parecendo um número.
+ *
+ * O piso mora DENTRO de `fn_podar_event_log` (`greatest(...)` no corpo), o que o
+ * faz valer para qualquer chamador, inclusive um `psql` na mão; a cópia aqui
+ * serve para o operador ver no log que o valor dele foi elevado, em vez de
+ * descobrir pela ausência de efeito.
+ *
+ * ⚠️ O piso NÃO é a única proteção desta tabela, e a outra é mais forte: a
+ * função só apaga `done` e `dead`. `pending` é trabalho que ainda vai sair e
+ * `processing` está com um dreno agora — nenhum dos dois sai em idade nenhuma.
+ */
+export const RETENCAO_EVENT_LOG_DIAS_PISO = 90;
+
 export interface RetencaoInterpretada {
   /** Dias a pedir ao banco. Nunca abaixo do piso, nunca `NaN`. */
   readonly dias: number;

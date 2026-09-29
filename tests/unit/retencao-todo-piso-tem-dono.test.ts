@@ -58,6 +58,13 @@ const DONO_NO_SQL: Record<string, string> = {
   // BAIXO da lista (30), e isso é decisão escrita em `politica.ts`: o que ele
   // protege é o incidente em apuração, não rastro legal.
   AVISO_DE_CASO: "fn_expurgar_avisos_de_caso_vencidos",
+  // migration 9021 — o bus interno de eventos. Mesma lição: entra aqui no MESMO
+  // commit da migration. O piso dele é o único da lista que protege uma TELA e
+  // não um rastro: 90 é `MAX_RANGE_DAYS`, a janela máxima das telas de IA que
+  // leem `event_log` direto por `created_at`. E o piso também não é a única
+  // proteção — a função só apaga `done`/`dead` —, mas é o que esta lista sabe
+  // medir; o resto é `tests/invariants/retencao-do-event-log.test.ts`.
+  EVENT_LOG: "fn_podar_event_log",
 };
 
 /**
