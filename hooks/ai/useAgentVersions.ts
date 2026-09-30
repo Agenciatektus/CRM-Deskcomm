@@ -23,6 +23,7 @@ export interface AgentVersionRow {
   history_token_window: number;
   handoff_keywords: string[];
   handoff_tool_enabled: boolean;
+  proposal_ai_draft_enabled: boolean;
   cases_enabled: boolean;
   operator_enabled: boolean;
   operator_model: string | null;
@@ -31,6 +32,7 @@ export interface AgentVersionRow {
   knowledge_source_ids: string[];
   split_messages: boolean;
   split_max_chars: number;
+  inbound_debounce_ms: number | null;
   followup: {
     enabled: boolean;
     flow_pointer_ids: string[];

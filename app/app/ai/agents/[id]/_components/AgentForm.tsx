@@ -180,9 +180,12 @@ interface FormState {
   history_token_window: number;
   handoff_keywords: string[];
   handoff_tool_enabled: boolean;
+  proposal_ai_draft_enabled: boolean;
   cases_enabled: boolean;
   split_messages: boolean;
   split_max_chars: number;
+  /** Janela de rajada (ms) do agente. `null` = usa a env da instalação. */
+  inbound_debounce_ms: number | null;
   followup: FollowupValue;
   // Papel OPERADOR (spec 16 §3.2) — o que mexe no sistema depois da conversa.
   operator_enabled: boolean;
@@ -279,9 +282,11 @@ export function buildState(args: {
       "pessoa real",
     ],
     handoff_tool_enabled: version?.handoff_tool_enabled ?? true,
+    proposal_ai_draft_enabled: version?.proposal_ai_draft_enabled ?? true,
     cases_enabled: version?.cases_enabled ?? false,
     split_messages: version?.split_messages ?? false,
     split_max_chars: version?.split_max_chars ?? 600,
+    inbound_debounce_ms: version?.inbound_debounce_ms ?? null,
     followup: version?.followup
       ? {
           ...DEFAULT_FOLLOWUP,
@@ -341,9 +346,11 @@ function toVersionPayload(s: FormState) {
     history_token_window: s.history_token_window,
     handoff_keywords: s.handoff_keywords,
     handoff_tool_enabled: s.handoff_tool_enabled,
+    proposal_ai_draft_enabled: s.proposal_ai_draft_enabled,
     cases_enabled: s.cases_enabled,
     split_messages: s.split_messages,
     split_max_chars: s.split_max_chars,
+    inbound_debounce_ms: s.inbound_debounce_ms,
     followup: s.followup,
     operator_enabled: s.operator_enabled,
     // "" (não escolheu) → null (herda o do Conversador). São o mesmo conceito em
@@ -1057,6 +1064,42 @@ export function AgentForm(props: Props) {
                   disabled={disabled}
                 />
               </div>
+              <div className="col-span-2 space-y-1">
+                <Label htmlFor="inbound_debounce_ms">
+                  {t("Esperar antes de responder (segundos)")}
+                </Label>
+                <Input
+                  id="inbound_debounce_ms"
+                  type="number"
+                  min={0}
+                  max={60}
+                  step={1}
+                  placeholder={t("Vazio = padrão da instalação")}
+                  value={
+                    form.inbound_debounce_ms === null
+                      ? ""
+                      : String(Math.round(form.inbound_debounce_ms / 1000))
+                  }
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    // Vazio = usa a env da instalação (campo null). A UI fala em
+                    // SEGUNDOS; o banco e o worker falam em ms (conversão aqui,
+                    // num ponto só). Teto de 60s no campo espelha o do worker.
+                    patch({
+                      inbound_debounce_ms:
+                        raw === ""
+                          ? null
+                          : Math.round(Math.max(0, Math.min(60, Number(raw))) * 1000),
+                    });
+                  }}
+                  disabled={disabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "Mensagens do mesmo contato dentro desse tempo viram uma resposta só. Vazio usa a janela padrão da instalação (máximo 60 segundos).",
+                  )}
+                </p>
+              </div>
             </div>
           </Card>
         </div>
@@ -1233,6 +1276,22 @@ export function AgentForm(props: Props) {
                 "Diferente de passar a conversa: aqui o agente continua atendendo. Quando esbarra em algo que só uma pessoa resolve — aprovar um desconto, por exemplo — ele abre um pedido interno e retoma assim que for respondido.",
               )}
             </p>
+          </Card>
+
+          {/* Propostas comerciais */}
+          <Card className="space-y-3 p-4">
+            <h3 className="text-sm font-medium">{t("Propostas comerciais")}</h3>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="proposal_ai_draft_enabled"
+                checked={form.proposal_ai_draft_enabled}
+                onCheckedChange={(v) => patch({ proposal_ai_draft_enabled: v })}
+                disabled={disabled}
+              />
+              <Label htmlFor="proposal_ai_draft_enabled">
+                {t("Deixar o agente rascunhar uma proposta quando o cliente pedir orçamento")}
+              </Label>
+            </div>
           </Card>
 
           {/* Follow-up */}

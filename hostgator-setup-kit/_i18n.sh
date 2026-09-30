@@ -33,8 +33,12 @@ _I18N_TABELA=0
 if [ $((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1])) -ge "${I18N_BASH_MINIMO:-404}" ]; then
 _I18N_TABELA=1
 declare -A _ES=(
-  ["Este servidor usa arquitetura '{1}', mas as imagens publicadas do DeskcommCRM hoje são linux/amd64."]="Este servidor usa arquitectura '{1}', pero las imágenes publicadas de DeskcommCRM hoy son linux/amd64."
-  ["  Use uma VPS x86_64/amd64. Repetir o download não resolve; ARM64 só será suportado quando houver imagens multi-arquitetura."]="  Usa una VPS x86_64/amd64. Repetir la descarga no soluciona nada; ARM64 solo se admitirá cuando existan imágenes multiarquitectura."
+  ["Este servidor usa arquitetura '{1}', mas o DeskcommCRM não publica imagens para ela (linux/amd64 e linux/arm64 estão disponíveis)."]="Este servidor usa arquitectura '{1}', pero DeskcommCRM no publica imágenes para ella (linux/amd64 y linux/arm64 están disponibles)."
+  ["  Use uma VPS x86_64/amd64 ou ARM64/aarch64. Repetir o download não resolve."]="  Usa una VPS x86_64/amd64 o ARM64/aarch64. Repetir la descarga no soluciona nada."
+  ["Este servidor usa arquitetura '{1}', e as imagens publicadas do DeskcommCRM são linux/amd64 e linux/arm64."]="Este servidor usa arquitectura '{1}', y las imágenes publicadas de DeskcommCRM son linux/amd64 y linux/arm64."
+  ["  (WAHA trocado para a variante oficial ARM64: {1})"]="  (WAHA cambiado a la variante oficial ARM64: {1})"
+  ["Como esta instalação JÁ EXISTE, sigo em frente: as imagens da versão alvo serão construídas nesta própria VPS."]="Como esta instalación YA EXISTE, sigo adelante: las imágenes de la versión destino se construirán en esta misma VPS."
+  ["Leva de 15 a 25 minutos. Uma instalação NOVA exige x86_64/amd64 ou ARM64/aarch64 com imagens publicadas."]="Tarda de 15 a 25 minutos. Una instalación NUEVA requiere x86_64/amd64 o ARM64/aarch64 con imágenes publicadas."
   ["  (rede '{1}' criada — é por ela que o Traefik alcança o CRM)"]="  (red '{1}' creada: por ella Traefik llega al CRM)"
   ["A rede Docker '{1}' (a do Nginx Proxy Manager) não existe.
 Rode 'docker network ls', identifique a rede do seu NPM (Settings > a que o
@@ -116,6 +120,8 @@ sin eso un contenedor de compose común no puede entrar en ella."
   ["apaga a configuração digitada"]="borra la configuración ingresada"
   ["derruba o que subiu"]="derriba lo que se levantó"
   ["começa de novo"]="empieza de nuevo"
+  ["apaga o marcador desta instalação"]="borra el marcador de esta instalación"
+  ["⚠ Não consegui gravar o marcador desta instalação (arquivo .deskcomm-instalado). O CRM está no ar; numa arquitetura sem imagens publicadas, a atualização pode pedir uma VPS suportada até o marcador existir."]="⚠ No pude escribir el marcador de esta instalación (archivo .deskcomm-instalado). El CRM está en línea; en una arquitectura sin imágenes publicadas, la actualización puede pedir una VPS compatible hasta que exista el marcador."
   ["Se o schema chegou a ser aplicado e você quer o banco limpo de novo,"]="Si el esquema llegó a aplicarse y quieres la base de datos limpia de nuevo,"
   ["abra o Supabase > SQL Editor e rode (ATENÇÃO: apaga todos os dados):"]="abre Supabase > SQL Editor y ejecuta (ATENCIÓN: borra todos los datos):"
 
@@ -280,7 +286,7 @@ y, si de verdad es un Traefik, pon REVERSE_PROXY=traefik en el .env y vuelve a e
   ["Chave da OpenRouter — a IA que atende (openrouter.ai/keys; Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)"]="Clave de OpenRouter — la IA que atiende (openrouter.ai/keys; Enter la salta: puedes registrarla después desde la pantalla, en IA › Credenciales)"
   ["Chave da OpenAI — a IA que atende (platform.openai.com/api-keys; Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)"]="Clave de OpenAI — la IA que atiende (platform.openai.com/api-keys; Enter la salta: puedes registrarla después desde la pantalla, en IA › Credenciales)"
   ["Chave da Anthropic — a IA que atende (console.anthropic.com; Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)"]="Clave de Anthropic — la IA que atiende (console.anthropic.com; Enter la salta: puedes registrarla después desde la pantalla, en IA › Credenciales)"
-  ["Chave da OpenAI — só para ouvir áudios e usar a base de conhecimento (Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)"]="Clave de OpenAI — solo para escuchar audios y usar la base de conocimiento (Enter la salta: puedes registrarla después desde la pantalla, en IA › Credenciales)"
+  ["Chave da OpenAI — para ouvir áudios; a base de conhecimento aceita OpenRouter (Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)"]="Clave de OpenAI — para escuchar audios; la base de conocimiento acepta OpenRouter (Enter la salta: puedes registrarla después desde la pantalla, en IA › Credenciales)"
   ["E-mail do primeiro admin (dono)"]="Correo del primer admin (dueño)"
   ["Senha do primeiro admin (mínimo 8 caracteres)"]="Contraseña del primer admin (mínimo 8 caracteres)"
   ["Nome que aparece na interface (Enter para o padrão)"]="Nombre que aparece en la interfaz (Enter para el predeterminado)"

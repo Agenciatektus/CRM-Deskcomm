@@ -1,10 +1,10 @@
 /**
- * O AVISO DO JEV NA CENTRAL FECHA SOZINHO, E É UM SÓ (migration 0433, partes 2
+ * O AVISO DO JEV NA CENTRAL FECHA SOZINHO, E É UM SÓ (migration 0500, partes 2
  * e 3 — o conserto da revisão da onda 3).
  *
  * O CHECK dos dois kinds e o fechamento quando uma pessoa assume ou a conversa
  * é encerrada estão em `jev-aviso-na-central.test.ts` (quem fecha é
- * `trg_fechar_avisos_do_jev_da_conversa`, o gatilho próprio da 0433; assumir
+ * `trg_fechar_avisos_do_jev_da_conversa`, o gatilho próprio da 0500; assumir
  * fecha só o de falar com uma pessoa). Aqui, o que só um Postgres real prova
  * do resto:
  *
@@ -189,7 +189,7 @@ describe("um aviso do Jev por conversa e pedido, no banco", () => {
    */
   it("com repetidos no banco, a migration deduplica (fica o aberto) e cria o índice", () => {
     limpar();
-    const migration = readFileSync("supabase/migrations/20260926210000_0433_avisos_do_jev_na_central.sql", "utf8");
+    const migration = readFileSync("supabase/migrations/20260930170000_0500_avisos_do_jev_na_central.sql", "utf8");
     const ini = migration.indexOf("delete from public.agent_inbox_items a");
     const fim = migration.indexOf("-- 3. O AVISO FECHA");
     expect(ini, "o trecho da deduplicação mudou de forma — atualize o caso").toBeGreaterThan(0);

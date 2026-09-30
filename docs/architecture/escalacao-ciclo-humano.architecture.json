@@ -344,7 +344,7 @@
       "col": 3,
       "type": "lib",
       "label": "lib/ai/handoff/aviso-ao-lead.ts",
-      "sublabel": "o mesmo texto pelo sendMessageHandler (mundo supabase-js)"
+      "sublabel": "o mesmo texto pelo sendMessageHandler (mundo supabase-js) — só se a IA falou na conversa (ou a passagem veio do MCP externo), um por 24 h sem contar aviso failed"
     },
     {
       "id": "orquestrador",
@@ -393,6 +393,14 @@
       "type": "lib",
       "label": "lib/escalacao/aviso-ao-suporte.ts",
       "sublabel": "consome ai.case_opened/closed — nunca devolve error, nunca dorme"
+    },
+    {
+      "id": "casoNaCentral",
+      "lane": "motor",
+      "col": 5,
+      "type": "lib",
+      "label": "lib/escalacao/caso-na-central.handler.ts",
+      "sublabel": "o caso que espera uma pessoa entra no sino na abertura; sai quando fecha"
     },
     {
       "id": "avisoSuporteTexto",
@@ -1382,60 +1390,78 @@
     },
     {
       "id": "e121",
+      "from": "casos",
+      "to": "casoNaCentral",
+      "label": "ai.case_opened / ai.case_closed pelo event_log (o mesmo trigger da 0148)"
+    },
+    {
+      "id": "e122",
+      "from": "casoNaCentral",
+      "to": "central",
+      "label": "abre kind='other' → agent_case com texto genérico; resolve quando o caso fecha"
+    },
+    {
+      "id": "e123",
+      "from": "central",
+      "to": "chamados",
+      "label": "o botão do aviso abre /app/ai/cases?caso=<id> — a pessoa responde o caso"
+    },
+    {
+      "id": "e124",
       "from": "sentimento",
       "to": "jevPedidos",
       "label": "a mesma mensagem, com a regra de hoje rodada e os fatos do turno lidos (o portão do dreno para o número, elegibilidade, contato bloqueado ou com uma pessoa em outra conversa, grupo)"
     },
     {
-      "id": "e122",
+      "id": "e125",
       "from": "jevPedidos",
       "to": "jev",
       "label": "observarPedidos: só as perguntas que a regra não pegou, numa chamada só, a mensagem sem o histórico, por scrubMessage"
     },
     {
-      "id": "e123",
+      "id": "e126",
       "from": "jevPedidos",
       "to": "jevObservacoes",
       "label": "uma linha por pergunta: tarefa humano/opt_out, sim/não pelo corte, rótulo de hoje 'nao' por construção"
     },
     {
-      "id": "e124",
+      "id": "e127",
       "from": "jevPedidos",
       "to": "jevLlmCalls",
       "label": "linha typesafe purpose jev_pedidos (jev_observacao; jev em 'Avisar a equipe') — o nome dela em Execuções é 'Perceber pedidos do cliente'"
     },
     {
-      "id": "e125",
+      "id": "e128",
       "from": "jevPedidos",
       "to": "central",
-      "label": "'Avisar a equipe' (0433): kind jev_pedido_de_humano / jev_parar_de_receber, ref_kind conversation, warn — o corpo NÃO leva a frase do cliente: a Central entrega body a qualquer agent"
+      "label": "'Avisar a equipe' (0500): kind jev_pedido_de_humano / jev_parar_de_receber, ref_kind conversation, warn — o corpo NÃO leva a frase do cliente: a Central entrega body a qualquer agent"
     },
     {
-      "id": "e126",
+      "id": "e129",
       "from": "atribuir",
       "to": "central",
-      "label": "trg_fechar_avisos_do_jev_da_conversa (0433): encerrada, os dois avisos do Jev daquela conversa fecham; com uma pessoa (assumida, ou passada por qualquer caminho: last_handoff_at, robô calado), só o de falar com uma pessoa — o de parar de receber pede à equipe assumir E pedir o PARAR, e segue aberto; trg_fechar_aviso_do_jev_ao_bloquear: o contato bloqueado fecha o de parar de receber (o laço de retorno dele)"
+      "label": "trg_fechar_avisos_do_jev_da_conversa (0500): encerrada, os dois avisos do Jev daquela conversa fecham; com uma pessoa (assumida, ou passada por qualquer caminho: last_handoff_at, robô calado), só o de falar com uma pessoa — o de parar de receber pede à equipe assumir E pedir o PARAR, e segue aberto; trg_fechar_aviso_do_jev_ao_bloquear: o contato bloqueado fecha o de parar de receber (o laço de retorno dele)"
     },
     {
-      "id": "e127",
+      "id": "e130",
       "from": "jevConfig",
       "to": "jevFollowup",
       "label": "o turno do follow-up lê o estado da tarefa followup (interruptor, aceite, tarefas.followup) pelo pg.Pool — um 'decidindo' gravado vale observando"
     },
     {
-      "id": "e128",
+      "id": "e131",
       "from": "jevFollowup",
       "to": "jev",
       "label": "consultarJevNoFollowup: a resposta do cliente ao envio do fluxo, sozinha, e as saídas + a dica do passo (texto da empresa)"
     },
     {
-      "id": "e129",
+      "id": "e132",
       "from": "jevFollowup",
       "to": "jevObservacoes",
       "label": "registrarFollowupDoJev: a saída dele × a da IA de sempre, amarrada a job_id e ao message_id da resposta — a da IA só entra DEPOIS de concluir o passo (o retry não conta em dobro; sem ela, fica sem par e só a repetição do MESMO job a completa: outro passo ou fluxo sobre a mesma mensagem perguntou entre outras saídas)"
     },
     {
-      "id": "e130",
+      "id": "e133",
       "from": "jevFollowup",
       "to": "jevLlmCalls",
       "label": "linha typesafe purpose followup_classify, origem jev_observacao — no mesmo comando da observação"
