@@ -22,12 +22,17 @@
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as GetLeadContext from "@/lib/agent-engine/edge/crm/get-lead-context";
 import type { JobRow } from "@/lib/agent-engine/queue/queue";
 
 const getLeadContext = vi.fn();
 const runModelCall = vi.fn();
 
-vi.mock("@/lib/agent-engine/edge/crm/get-lead-context", () => ({ getLeadContext }));
+// Só o contexto é dublê: a leitura do que o cliente digitou (o que vai ao Jev) é a de produção.
+vi.mock("@/lib/agent-engine/edge/crm/get-lead-context", async (original) => ({
+  ...(await original<typeof GetLeadContext>()),
+  getLeadContext,
+}));
 vi.mock("@/lib/agent-engine/edge/llm/run-model-call", () => ({ runModelCall }));
 
 const ORG = "org-1";

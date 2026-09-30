@@ -146,7 +146,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       //  - `jev_cobriu`: a IA de sempre caiu em observação, mas a nota do Jev
       //    já estava na mão e decidiu;
       //  - `jev_observacao`: o Jev falhou numa tarefa do turno (a manipulação,
-      //    o roteador) — o turno seguiu como sem ele;
+      //    o roteador, a resposta ao follow-up) — o turno seguiu como sem ele;
       //  - `reserva_do_jev` numa linha de erro: o roteador decidindo, e a IA de
       //    sempre escolheu o agente no lugar do Jev.
       // A falha do Jev com origem `jev` é a do clima sem reserva: aí é real.

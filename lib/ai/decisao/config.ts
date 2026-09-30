@@ -68,6 +68,7 @@ const tarefasSchema = z.object({
   roteador: tarefaGravadaSchema.optional().catch(tarefaIlegivel),
   humano: tarefaGravadaSchema.optional().catch(tarefaIlegivel),
   opt_out: tarefaGravadaSchema.optional().catch(tarefaIlegivel),
+  followup: tarefaGravadaSchema.optional().catch(tarefaIlegivel),
 });
 
 export const idDaTarefaSchema = tarefasSchema.keyof();

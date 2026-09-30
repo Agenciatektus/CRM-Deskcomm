@@ -24,7 +24,12 @@ import type pg from 'pg';
 
 import { withFields } from '../obs/logger';
 import type { JobRow } from '../queue/queue';
-import { getLeadContext, type LeadContext } from '../edge/crm/get-lead-context';
+import {
+  getLeadContext,
+  textoDoClienteNaUltimaMensagem,
+  type LeadContext,
+  type LeadContextMessage,
+} from '../edge/crm/get-lead-context';
 import { WahaChannelAdapter } from '../edge/channel/waha-adapter';
 import { applySendOutcome } from '../edge/crm/send-message';
 import { runBeforeSend } from '../guardrails/before-send';
@@ -57,6 +62,7 @@ import {
   type EsperaParaPlanejar,
   type PropostaDeEsperaBruta,
 } from './followup-flow-classify';
+import { consultarJevNoFollowup } from '@/lib/ai/decisao/followup';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -233,7 +239,7 @@ function lastInboundOf(context: LeadContext): { body: string; sentAt: string } |
  * desde a última vez que falamos" vira `null` (onda 5: o classify SÓ tem algo
  * pra classificar quando o lead respondeu DEPOIS do nosso último envio).
  */
-function lastInboundSinceLastOutbound(context: LeadContext): string | null {
+function lastInboundSinceLastOutbound(context: LeadContext): LeadContextMessage | null {
   let lastOutboundAt: number | null = null;
   for (const m of context.messages) {
     if (m.direction === 'outbound') lastOutboundAt = Date.parse(m.sent_at);
@@ -242,7 +248,7 @@ function lastInboundSinceLastOutbound(context: LeadContext): string | null {
     const m = context.messages[i]!;
     if (m.direction === 'inbound') {
       const at = Date.parse(m.sent_at);
-      return lastOutboundAt === null || at > lastOutboundAt ? m.body : null;
+      return lastOutboundAt === null || at > lastOutboundAt ? m : null;
     }
   }
   return null;
@@ -283,14 +289,41 @@ async function envioDoFluxoFechadoEm(pool: pg.Pool, orgId: string, enrollmentId:
  * vale o horário, no segundo — a resposta que chegou entre o envio e o
  * fechamento do passo fica de fora só nesse caso.
  */
-function respostaAoEnvioDoFluxo(context: LeadContext, envioFechadoEm: Date): string | null {
+function respostaAoEnvioDoFluxo(context: LeadContext, envioFechadoEm: Date): LeadContextMessage | null {
   const limite = envioFechadoEm.getTime();
   const envio = context.messages.findLastIndex((m) => m.direction === 'outbound' && Date.parse(m.sent_at) <= limite);
   const piso = Math.floor(limite / 1000) * 1000;
   const resposta = context.messages
     .slice(envio + 1)
     .findLast((m) => m.direction === 'inbound' && m.body.trim() !== '' && (envio >= 0 || Date.parse(m.sent_at) >= piso));
-  return resposta?.body ?? null;
+  return resposta ?? null;
+}
+
+/**
+ * O id, em `messages`, da resposta que o contexto escolheu — o contexto não o
+ * carrega (ele vai inteiro ao modelo, e um id por mensagem seria ruído pago).
+ * Pela conversa do contexto, pelo texto e pelo segundo em que chegou: o
+ * `sent_at` do contexto vem truncado no segundo (`isoLocalComOffset`). Duas
+ * respostas iguais no mesmo segundo são a mesma resposta para quem compara, e a
+ * ordem é a do histórico (`sent_at desc, id desc`). `null` quando não acha — a
+ * única mensagem que não cabe no orçamento sai do contexto cortada ao meio.
+ */
+async function idDaResposta(
+  pool: pg.Pool,
+  orgId: string,
+  conversationId: string | null,
+  resposta: LeadContextMessage,
+): Promise<string | null> {
+  if (conversationId === null) return null;
+  const { rows } = await pool.query<{ id: string }>(
+    `select id from messages
+      where organization_id = $1 and conversation_id = $2 and direction = 'inbound' and body = $3
+        and sent_at >= $4::timestamptz and sent_at < $4::timestamptz + interval '1 second'
+      order by sent_at desc, id desc
+      limit 1`,
+    [orgId, conversationId, resposta.body, resposta.sent_at],
+  );
+  return rows[0]?.id ?? null;
 }
 
 /**
@@ -559,11 +592,11 @@ async function runFlowDrivenTurn(
     const envioFechadoEm = await envioDoFluxoFechadoEm(pool, target.tenantId, enrollmentId);
     // Sem envio do fluxo antes deste nó, vale a regra de antes: a última inbound
     // que ninguém respondeu ainda.
-    const candidateText =
+    const resposta =
       envioFechadoEm === null
         ? lastInboundSinceLastOutbound(context.context)
         : respostaAoEnvioDoFluxo(context.context, envioFechadoEm);
-    if (candidateText === null) {
+    if (resposta === null) {
       // O lead ainda não respondeu ao envio do fluxo: não há o que classificar
       // AGORA, e isso não é "sem resposta". O turno não conclui o passo — o
       // enrollment segue em `waiting_reply` com a carência inteira; só deixa o
@@ -578,19 +611,51 @@ async function runFlowDrivenTurn(
       await complete(pool, { jobId: job.id, jobClaim: claimOfJob(job), organizationId: target.tenantId, enrollmentId, nodeId, result: { kind: 'awaiting_reply' } });
       return;
     }
+    // O Jev lê a MESMA resposta, ao mesmo tempo, e só observa: a saída que move
+    // o fluxo é sempre a da IA de sempre, e ninguém espera por ele. Vai só o que
+    // o cliente digitou — resposta em mídia (transcrição, texto lido) não sai.
+    const conversaDaResposta = context.context.conversation_id;
+    const jev = consultarJevNoFollowup(
+      pool,
+      {
+        organizationId: target.tenantId,
+        contactId: target.leadId,
+        jobId: job.id,
+        conversationId: conversaDaResposta,
+        mensagem: textoDoClienteNaUltimaMensagem([resposta]),
+        classes,
+        ...(input.hint !== undefined ? { dica: input.hint } : {}),
+        idDaMensagem: () => idDaResposta(pool, target.tenantId, conversaDaResposta, resposta),
+      },
+      deps.jev,
+    );
     const cls = await classifyFollowupReply(
       pool,
       deps.llmCfg,
       { tenantId: target.tenantId, leadId: target.leadId, jobId: job.id },
       {
-        candidateText,
+        candidateText: resposta.body,
         classes,
         ...(input.hint !== undefined ? { hint: input.hint } : {}),
         ...(deps.knobs.followupAi?.model !== undefined ? { model: deps.knobs.followupAi.model } : {}),
       },
       { ...(deps.registry !== undefined ? { registry: deps.registry } : {}), log: runLog },
-    );
-    await complete(pool, { jobId:job.id,jobClaim:claimOfJob(job), organizationId: target.tenantId, enrollmentId, nodeId, result: { kind: 'classified', class: cls } });
+    ).catch((erro: unknown) => {
+      // Sem a saída dela o job vai ser repetido: o Jev fica sem par agora, e a
+      // repetição completa o par (`registrarFollowupDoJev`).
+      jev.observar(null);
+      throw erro;
+    });
+    // O par só leva a saída DEPOIS de ela concluir o passo: se a conclusão cair,
+    // o retry classifica de novo — e pode escolher outra —, e o par tem de ser
+    // com a saída que moveu o fluxo, não com a desta tentativa.
+    // ponytail: a conclusão que o motor descarta calada (o nó já andou por
+    // outro job) ainda observa; o par que fica é o de quem gravou primeiro.
+    await complete(pool, { jobId:job.id,jobClaim:claimOfJob(job), organizationId: target.tenantId, enrollmentId, nodeId, result: { kind: 'classified', class: cls } }).catch((erro: unknown) => {
+      jev.observar(null);
+      throw erro;
+    });
+    jev.observar(cls);
     return;
   }
 

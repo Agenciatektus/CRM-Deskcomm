@@ -625,6 +625,14 @@
       "type": "service",
       "label": "worker de clima: os pedidos do cliente (lib/ai/decisao/pedidos.ts + workers/ai-sentiment-worker.pedidos.ts)",
       "sublabel": "chamada própria, em paralelo à do clima — só onde a regra de hoje (pedido explícito de pessoa, palavras de passagem de quem pode atender, descadastro pedido ou provável) disse não e o turno do agente rodaria (o portão do dreno, haQuemAtendaASessao); corte 0,9; em 'Avisar a equipe' abre UM aviso por conversa e pedido (índice único), depois de saber o que o clima fez; nunca passa a conversa, bloqueia ou cala"
+    },
+    {
+      "id": "jevFollowup",
+      "lane": "motor",
+      "col": 8,
+      "type": "service",
+      "label": "followup-turn: o passo 'Classificar (IA)' do follow-up (lib/ai/decisao/followup.ts)",
+      "sublabel": "só com resposta ao envio do fluxo: a mesma pergunta da IA de sempre (followup_classify), em paralelo — as saídas do passo como opções, sem 'nenhuma', só o texto digitado pelo cliente por scrubMessage (mídia não sai); SÓ OBSERVA nesta versão: a saída que move o fluxo é sempre a da IA de sempre, e ninguém espera por ele"
     }
   ],
   "edges": [
@@ -1433,6 +1441,30 @@
       "from": "atribuir",
       "to": "central",
       "label": "trg_fechar_avisos_do_jev_da_conversa (0500): encerrada, os dois avisos do Jev daquela conversa fecham; com uma pessoa (assumida, ou passada por qualquer caminho: last_handoff_at, robô calado), só o de falar com uma pessoa — o de parar de receber pede à equipe assumir E pedir o PARAR, e segue aberto; trg_fechar_aviso_do_jev_ao_bloquear: o contato bloqueado fecha o de parar de receber (o laço de retorno dele)"
+    },
+    {
+      "id": "e130",
+      "from": "jevConfig",
+      "to": "jevFollowup",
+      "label": "o turno do follow-up lê o estado da tarefa followup (interruptor, aceite, tarefas.followup) pelo pg.Pool — um 'decidindo' gravado vale observando"
+    },
+    {
+      "id": "e131",
+      "from": "jevFollowup",
+      "to": "jev",
+      "label": "consultarJevNoFollowup: a resposta do cliente ao envio do fluxo, sozinha, e as saídas + a dica do passo (texto da empresa)"
+    },
+    {
+      "id": "e132",
+      "from": "jevFollowup",
+      "to": "jevObservacoes",
+      "label": "registrarFollowupDoJev: a saída dele × a da IA de sempre, amarrada a job_id e ao message_id da resposta — a da IA só entra DEPOIS de concluir o passo (o retry não conta em dobro; sem ela, fica sem par e só a repetição do MESMO job a completa: outro passo ou fluxo sobre a mesma mensagem perguntou entre outras saídas)"
+    },
+    {
+      "id": "e133",
+      "from": "jevFollowup",
+      "to": "jevLlmCalls",
+      "label": "linha typesafe purpose followup_classify, origem jev_observacao — no mesmo comando da observação"
     }
   ],
   "cards": [

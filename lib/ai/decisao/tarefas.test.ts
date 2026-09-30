@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { idDaTarefaSchema, lerConfigDoJev, type ConfigDoJev } from "@/lib/ai/decisao/config";
 import {
+  algumFluxoQueClassifica,
   algumRoteadorQuePergunta,
   estadoAoLigar,
   estadoEfetivoDaTarefa,
@@ -24,6 +25,10 @@ import {
   rotuloDaChamadaDoJev,
   TAREFA_DO_PEDIDO_DE_HUMANO,
   TAREFA_DO_PEDIDO_PARA_PARAR,
+  TAREFA_DO_FOLLOWUP,
+  tarefaPodeDecidir,
+  tarefaSemFluxo,
+  type TarefaDoJev,
 } from "@/lib/ai/decisao/tarefas";
 import { CONFERENCIA_DE_ENTRADA, CONFERENCIAS_DE_SAIDA } from "@/lib/ai/guardrails/lista-de-conferencia";
 import { PONTOS_DE_IA } from "@/lib/ai/pontos/registro";
@@ -256,5 +261,81 @@ describe("o roteador que o Jev pode perguntar", () => {
   it("só a tarefa do roteador depende dele", () => {
     expect(tarefaSemRoteador(TAREFA_DO_ROTEADOR, false)).toBe(true);
     expect(tarefaSemRoteador(TAREFA_DO_CLIMA, false)).toBe(false);
+  });
+});
+
+/**
+ * A resposta ao follow-up (onda 4): mora no ponto `followup_classify`, é uma
+ * escolha entre as saídas do passo, e SÓ OBSERVA nesta versão — a saída dela
+ * move o cliente no fluxo. Nenhum caminho a põe decidindo: o cartão não
+ * oferece o botão, a rota recusa (`route.test.ts`), e um `decidindo` gravado
+ * por outra versão vale observando.
+ */
+describe("a tarefa do follow-up", () => {
+  const ligado = (tarefas?: unknown) => config({ ligado: true, aceite: ACEITE, ...(tarefas ? { tarefas } : {}) });
+
+  it("mora no ponto do classificador de sempre, escolhe entre as saídas, cada mensagem sozinha, e só observa", () => {
+    expect(TAREFA_DO_FOLLOWUP).toMatchObject({
+      id: "followup",
+      ponto: "followup_classify",
+      primitiva: "choice",
+      alcance: "mensagem",
+      familia: "substitui",
+    });
+    const comoTarefa: TarefaDoJev = TAREFA_DO_FOLLOWUP;
+    expect(comoTarefa.aoDecidir).toBeUndefined();
+    expect(comoTarefa.aoConfirmarDecidir).toBeUndefined();
+    expect(comoTarefa.aoDecidirNoPonto).toBeUndefined();
+    expect(rotuloDaChamadaDoJev("followup_classify")).toBe(TAREFA_DO_FOLLOWUP.rotulo);
+  });
+
+  it("tarefaPodeDecidir: só a do follow-up não pode", () => {
+    expect(TAREFAS_DO_JEV.filter((t) => !tarefaPodeDecidir(t)).map((t) => t.id)).toEqual([TAREFA_DO_FOLLOWUP.id]);
+  });
+
+  it("nasce observando para quem já tem o Jev ligado (R7), com o selo Nova", () => {
+    expect(estadoEfetivoDaTarefa(ligado(), TAREFA_DO_FOLLOWUP)).toBe("observando");
+    expect(tarefaEhNova(ligado(), TAREFA_DO_FOLLOWUP)).toBe(true);
+  });
+
+  it("um `decidindo` gravado (por uma versão que deixe decidir, revertida) vale observando — e nas outras, decidindo (controle)", () => {
+    const c = ligado({ followup: { estado: "decidindo" }, roteador: { estado: "decidindo" } });
+    expect(estadoEfetivoDaTarefa(c, TAREFA_DO_FOLLOWUP)).toBe("observando");
+    expect(estadoAoLigar({ ...c, ligado: false }, TAREFA_DO_FOLLOWUP)).toBe("observando");
+    expect(estadoEfetivoDaTarefa(c, TAREFA_DO_ROTEADOR)).toBe("decidindo");
+    // E pausada continua pausada.
+    expect(estadoEfetivoDaTarefa(ligado({ followup: { estado: "desligada" } }), TAREFA_DO_FOLLOWUP)).toBe("desligada");
+  });
+
+  describe("algumFluxoQueClassifica — um follow-up com o passo 'Classificar (IA)' que o Jev pode ser perguntado", () => {
+    const DUAS = ["quer", "não quer"];
+    const no = (type: unknown, classes: unknown = DUAS) => (type === "ai_classify" ? { type, config: { classes } } : { type });
+    const com = (...tipos: unknown[]) => ({ versao: { graph: { nodes: tipos.map((type) => no(type)) } } });
+    it("basta um passo num fluxo", () => {
+      expect(algumFluxoQueClassifica([com("trigger", "action"), com("trigger", "ai_classify")])).toBe(true);
+    });
+    it("um passo com UMA saída só, ou com saídas que a pergunta recusa, não conta: o Jev nunca é perguntado ali", () => {
+      const soCom = (classes: unknown) => ({ versao: { graph: { nodes: [no("trigger"), no("ai_classify", classes)] } } });
+      expect(algumFluxoQueClassifica([soCom(["respondeu"])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom(["quer", "quer"])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom(["quer", " "])])).toBe(false);
+      expect(algumFluxoQueClassifica([soCom("quer,não quer")])).toBe(false);
+      expect(algumFluxoQueClassifica([{ versao: { graph: { nodes: [{ type: "ai_classify" }] } } }])).toBe(false);
+      // Controle: a mesma regra da pergunta (`perguntaDoFollowup`).
+      expect(algumFluxoQueClassifica([soCom(["respondeu"]), soCom(DUAS)])).toBe(true);
+    });
+    it("sem o passo, sem fluxo, ou com a versão ilegível, é não", () => {
+      expect(algumFluxoQueClassifica([])).toBe(false);
+      expect(algumFluxoQueClassifica([com("trigger", "match_reply", "end")])).toBe(false);
+      expect(
+        algumFluxoQueClassifica([{ versao: null }, { versao: { graph: null } }, { versao: { graph: { nodes: "x" } } }, {}]),
+      ).toBe(false);
+      expect(algumFluxoQueClassifica([com(null, 7)])).toBe(false);
+    });
+    it("só a tarefa do follow-up depende dele", () => {
+      expect(tarefaSemFluxo(TAREFA_DO_FOLLOWUP, false)).toBe(true);
+      expect(tarefaSemFluxo(TAREFA_DO_FOLLOWUP, true)).toBe(false);
+      expect(TAREFAS_DO_JEV.filter((t) => tarefaSemFluxo(t, false)).map((t) => t.id)).toEqual([TAREFA_DO_FOLLOWUP.id]);
+    });
   });
 });

@@ -3740,8 +3740,8 @@ export const DICIONARIO: Traducoes = {
   "Ler a resposta ao follow-up": {
     es: "Leer la respuesta al seguimiento",
   },
-  "Entende se o cliente aceitou, recusou ou pediu para falar depois, e encaminha o fluxo conforme isso.": {
-    es: "Entiende si el cliente aceptó, rechazó o pidió hablar más tarde, y dirige el flujo en consecuencia.",
+  "Lê a resposta do cliente à mensagem do follow-up e diz em qual das saídas que você criou no fluxo ela se encaixa — o fluxo segue por essa saída.": {
+    es: "Lee la respuesta del cliente al mensaje del seguimiento y dice en cuál de las salidas que creaste en el flujo encaja: el flujo sigue por esa salida.",
   },
   "O follow-up trava no mesmo passo: o cliente respondeu, mas o fluxo não segue para lugar nenhum.": {
     es: "El seguimiento se traba en el mismo paso: el cliente respondió, pero el flujo no avanza a ningún lado.",
@@ -4226,6 +4226,40 @@ export const DICIONARIO: Traducoes = {
     es: "días, Jev y tu IA de siempre llevarían al cliente al mismo agente en",
   },
   "Só o Jev daria o alerta forte em": { es: "Solo Jev daría la alerta fuerte en" },
+  // A tarefa do Jev na resposta ao follow-up (lib/ai/decisao/tarefas.ts, CartaoDoJev.tsx).
+  "Lê a resposta do cliente à mensagem do follow-up, sozinha, e diz em qual das saídas que você criou no fluxo ela se encaixa.": {
+    es: "Lee la respuesta del cliente al mensaje del seguimiento, por separado, y dice en cuál de las salidas que creaste en el flujo encaja.",
+  },
+  "Nesta versão, o Jev só observa esta tarefa: quem escolhe a saída do fluxo é sempre a sua IA de sempre, e não há como deixar o Jev decidir. A saída escolhida muda o caminho do cliente no fluxo, então primeiro se mede, com respostas de verdade, o quanto os dois concordam.": {
+    es: "En esta versión, Jev solo observa esta tarea: quien elige la salida del flujo es siempre tu IA de siempre, y no hay forma de dejar que Jev decida. La salida elegida cambia el camino del cliente en el flujo, así que primero se mide, con respuestas reales, cuánto coinciden los dos.",
+  },
+  "dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em": {
+    es: "días, Jev y tu IA de siempre pusieron la respuesta del cliente en la misma salida del flujo en",
+  },
+  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.": {
+    es: "No se ejecuta ahora: ningún seguimiento publicado tiene el paso “Clasificar (IA)” con dos salidas o más. Jev solo lee la respuesta del cliente donde tu IA de siempre elige entre salidas: publica, en Seguimientos, un flujo con ese paso.",
+  },
+  "Abrir os follow-ups": {
+    es: "Abrir los seguimientos",
+  },
+  "Começou sozinha, só observando: nada muda para o cliente.": {
+    es: "Empezó por su cuenta, solo observando: nada cambia para el cliente.",
+  },
+  "Observando — a sua IA de sempre decide, e o Jev só é comparado com ela.": {
+    es: "Observando: tu IA de siempre decide, y Jev solo se compara con ella.",
+  },
+  "Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele conta as mensagens em que a regra de hoje não reconheceu o pedido, e avisa a equipe.": {
+    es: "Observando: donde Jev compara, tu IA de siempre decide, y él solo se compara con ella. En los pedidos del cliente, cuenta los mensajes en los que la regla de hoy no reconoció el pedido y avisa al equipo.",
+  },
+  "Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele só conta as mensagens em que a regra de hoje não reconheceu o pedido.": {
+    es: "Observando: donde Jev compara, tu IA de siempre decide, y él solo se compara con ella. En los pedidos del cliente, solo cuenta los mensajes en los que la regla de hoy no reconoció el pedido.",
+  },
+  "Onde ele decide, vale a escolha que você fez antes de desligá-lo; onde só observa, a sua IA de sempre continua decidindo.": {
+    es: "Donde decide, vale la elección que hiciste antes de desactivarlo; donde solo observa, tu IA de siempre sigue decidiendo.",
+  },
+  "Onde ele só observa, a sua IA de sempre continua decidindo.": {
+    es: "Donde solo observa, tu IA de siempre sigue decidiendo.",
+  },
   "delas — é o que muda se você deixar o Jev decidir.": { es: "de ellos: es lo que cambia si dejas que Jev decida." },
   // As tarefas em cascata do Jev: os pedidos do cliente (lib/ai/decisao/tarefas.ts, CartaoDoJev.tsx).
   "Perceber pedido para falar com uma pessoa": {
@@ -7859,8 +7893,8 @@ export const DICIONARIO: Traducoes = {
   "o provedor de inteligência artificial contratado pelo operador, que recebe o trecho da conversa necessário para gerar a resposta ou avaliar a conversa;": {
     es: "el proveedor de inteligencia artificial contratado por el operador, que recibe el fragmento de la conversación necesario para generar la respuesta o evaluar la conversación;",
   },
-  "quando o operador liga o Jev (desligado por padrão), a TypeSafe AI, nos Estados Unidos, que recebe cada mensagem do cliente, sozinha e já sem CPF, telefone e e-mail, para avaliar se ele está irritado, se a mensagem tenta manipular o atendimento automático, a qual área da empresa ela se destina e se ela pede para falar com uma pessoa ou para parar de receber mensagens;": {
-    es: "cuando el operador activa Jev (desactivado por defecto), TypeSafe AI, en Estados Unidos, que recibe cada mensaje del cliente, por separado y ya sin CPF, teléfono ni correo, para evaluar si está molesto, si el mensaje intenta manipular la atención automática, a qué área de la empresa se dirige y si pide hablar con una persona o dejar de recibir mensajes;",
+  "quando o operador liga o Jev (desligado por padrão), a TypeSafe AI, nos Estados Unidos, que recebe cada mensagem do cliente, sozinha e já sem CPF, telefone e e-mail, para avaliar se ele está irritado, se a mensagem tenta manipular o atendimento automático, a qual área da empresa ela se destina, se ela pede para falar com uma pessoa ou para parar de receber mensagens e, quando ela responde a um follow-up, em qual das saídas do fluxo ela se encaixa;": {
+    es: "cuando el operador activa Jev (desactivado por defecto), TypeSafe AI, en Estados Unidos, que recibe cada mensaje del cliente, por separado y ya sin CPF, teléfono ni correo, para evaluar si está molesto, si el mensaje intenta manipular la atención automática, a qué área de la empresa se dirige, si pide hablar con una persona o dejar de recibir mensajes y, cuando responde a un seguimiento, en cuál de las salidas del flujo encaja;",
   },
   "o provedor de infraestrutura onde o servidor está hospedado.": {
     es: "el proveedor de infraestructura donde el servidor está alojado.",

@@ -14,6 +14,8 @@
  *     FECHADA: o aceite é o que a empresa consentiu mandar para fora do país.
  *  3. Estado gravado para a tarefa ⇒ ele. Gravado e ilegível já chega aqui
  *     como `desligada` (`./config.ts`): ilegível nunca é "ninguém escolheu".
+ *     Na tarefa que só observa (`soObserva`), um `decidindo` gravado vale
+ *     `observando`: é o que o worker desta versão faz com ele.
  *  4. O clima sem estado gravado ⇒ o `modo` da onda 1.
  *  5. Tarefa nova, sem estado gravado, que cabe no aceite de "cada mensagem,
  *     sozinha" ⇒ observando (DEC-012 #3): observar não muda nada para o
@@ -39,20 +41,6 @@ interface ComumDaTarefa {
   /** O que sai para o fornecedor. Maior que o aceite ⇒ desligada. */
   alcance: Alcance;
   /**
-   * O que muda quando ela DECIDE, dito ao leigo no cartão do Jev. É por tarefa,
-   * e não pela família: o clima e o roteador são os dois `substitui`, e a IA de
-   * sempre é chamada só quando o Jev falha num, e a cada mensagem no outro. Uma
-   * frase por família fez o roteador herdar a do clima.
-   */
-  aoDecidir: string;
-  /**
-   * O que o diálogo de "Deixar o Jev decidir" (na cascata, "Avisar a equipe")
-   * diz ANTES do clique valer: o efeito concreto em produção, na língua de quem
-   * não é engenheiro. Um clique sem explicação mudava o atendimento de todas as
-   * mensagens seguintes.
-   */
-  aoConfirmarDecidir: string;
-  /**
    * A camada de segurança que ela ACOMPANHA, quando há uma: desligada para a
    * organização, o turno não pergunta nem à IA de sempre nem ao Jev, e a tarefa
    * não roda qualquer que seja o estado dela (`tarefaSemCamada`).
@@ -74,6 +62,40 @@ interface ComumDaTarefa {
  * modelo para citar, e a frase não existe.
  */
 type OndeMora = { ponto: string; aoDecidirNoPonto: string } | { ponto?: undefined; aoDecidirNoPonto?: undefined };
+
+/** A tarefa que pode decidir — e o que decidir muda nela. */
+interface PodeDecidir {
+  /**
+   * O que muda quando ela DECIDE, dito ao leigo no cartão do Jev. É por tarefa,
+   * e não pela família: o clima e o roteador são os dois `substitui`, e a IA de
+   * sempre é chamada só quando o Jev falha num, e a cada mensagem no outro. Uma
+   * frase por família fez o roteador herdar a do clima.
+   */
+  aoDecidir: string;
+  /**
+   * O que o diálogo de "Deixar o Jev decidir" (na cascata, "Avisar a equipe")
+   * diz ANTES do clique valer: o efeito concreto em produção, na língua de quem
+   * não é engenheiro. Um clique sem explicação mudava o atendimento de todas as
+   * mensagens seguintes.
+   */
+  aoConfirmarDecidir: string;
+  soObserva?: undefined;
+}
+
+/**
+ * A tarefa que, nesta versão, SÓ OBSERVA: o cartão não oferece "Deixar o Jev
+ * decidir", a rota recusa `decidindo` (`jev_tarefa_so_observa`) e o estado
+ * efetivo nunca é `decidindo` (`estadoEfetivoDaTarefa`). `soObserva` é o
+ * porquê, dito ao leigo no cartão e na recusa da rota. Sem frase de decidir:
+ * uma frase que ninguém pode ver é frase que ninguém confere.
+ */
+interface SoObserva {
+  ponto: string;
+  soObserva: string;
+  aoDecidir?: undefined;
+  aoConfirmarDecidir?: undefined;
+  aoDecidirNoPonto?: undefined;
+}
 
 /**
  * Como ela convive com o que já existe, e o que o cartão mostra enquanto ela
@@ -103,7 +125,7 @@ type ComoConvive =
     }
   | { familia: "cascata"; percebidos: { nenhuma: string; uma: string; varias: string }; concordancia?: undefined };
 
-export type TarefaDoJev = ComumDaTarefa & OndeMora & ComoConvive;
+export type TarefaDoJev = ComumDaTarefa & ((PodeDecidir & OndeMora) | SoObserva) & ComoConvive;
 
 /**
  * O clima: a única tarefa da onda 1, e a única cujo estado também se chama
@@ -251,13 +273,55 @@ export const TAREFA_DO_PEDIDO_PARA_PARAR = {
     "Lê a mensagem do cliente, sozinha, quando a regra de hoje não viu nela um pedido para parar de receber mensagens — e conta as mensagens com esse pedido que ela não reconheceu. Quem bloqueia o contato é só a regra de hoje, quando o próprio cliente manda PARAR.",
 } as const satisfies TarefaDoJev;
 
+/**
+ * A resposta ao follow-up (`./followup.ts`): em qual das saídas do nó
+ * "Classificar (IA)" do fluxo a resposta do cliente se encaixa — as classes que
+ * a empresa criou, a mesma pergunta da IA de sempre (`followup_classify`). É
+ * `substitui` porque é a única família que cabe: a classe é uma só (não há
+ * sinal para SOMAR), a IA de sempre responde toda resposta (não há regra de
+ * hoje que diga não antes, como na cascata) e já existe quem decide (não é
+ * `novo`). Decidindo, a classe dele tomaria o lugar da dela — e é por isso que
+ * nesta versão ela SÓ OBSERVA (`soObserva`): a classe move o cliente no fluxo,
+ * e deixar o Jev movê-lo espera a concordância medida com respostas de verdade.
+ * Só roda onde algum follow-up tem o passo, publicado ou com inscrição em
+ * andamento (`tarefaSemFluxo`).
+ */
+export const TAREFA_DO_FOLLOWUP = {
+  id: "followup",
+  ponto: "followup_classify",
+  primitiva: "choice",
+  alcance: "mensagem",
+  familia: "substitui",
+  soObserva:
+    "Nesta versão, o Jev só observa esta tarefa: quem escolhe a saída do fluxo é sempre a sua IA de sempre, e não há como deixar o Jev decidir. A saída escolhida muda o caminho do cliente no fluxo, então primeiro se mede, com respostas de verdade, o quanto os dois concordam.",
+  // A régua é a MESMA SAÍDA: a classe dele contra a da IA de sempre, ao pé da letra.
+  concordancia: {
+    antes: "dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em",
+    // "mensagens", como no "Ainda não há mensagens medidas" do mesmo lugar: a
+    // unidade não muda entre o cartão vazio e o com número.
+    depois: "mensagens.",
+  },
+  rotulo: "Ler a resposta ao follow-up",
+  oQueFaz:
+    "Lê a resposta do cliente à mensagem do follow-up, sozinha, e diz em qual das saídas que você criou no fluxo ela se encaixa.",
+} as const satisfies TarefaDoJev;
+
 export const TAREFAS_DO_JEV: readonly TarefaDoJev[] = [
   TAREFA_DO_CLIMA,
   TAREFA_DA_MANIPULACAO,
   TAREFA_DO_ROTEADOR,
   TAREFA_DO_PEDIDO_DE_HUMANO,
   TAREFA_DO_PEDIDO_PARA_PARAR,
+  TAREFA_DO_FOLLOWUP,
 ];
+
+/**
+ * A tarefa pode deixar o Jev decidir (na cascata, avisar a equipe)? A que só
+ * observa, não: o cartão não oferece o botão, e a rota recusa `decidindo`.
+ */
+export function tarefaPodeDecidir(tarefa: Pick<TarefaDoJev, "soObserva">): boolean {
+  return tarefa.soObserva === undefined;
+}
 
 /**
  * A chamada que pergunta os dois pedidos (`./pedidos.ts`) precisa de um
@@ -309,14 +373,17 @@ export function estadoGravadoDaTarefa(config: ConfigDoJev, id: string): EstadoDa
  * também para a tarefa que ainda não existe — é assim que o teste prova o
  * item 5 antes de haver uma segunda tarefa.
  */
-type TarefaNaRegra = Pick<TarefaDoJev, "alcance"> & { id: string };
+type TarefaNaRegra = Pick<TarefaDoJev, "alcance"> & { id: string; soObserva?: string };
 
 /** Itens 2 a 5 do cabeçalho, com o Jev ligado sob o aceite `aceito`. */
 function estadoSobOAceite(config: ConfigDoJev, tarefa: TarefaNaRegra, aceito: Alcance): EstadoDaTarefa {
   if (ALCANCES.indexOf(tarefa.alcance) > ALCANCES.indexOf(aceito)) return "desligada";
-  return (
-    estadoGravadoDaTarefa(config, tarefa.id) ?? (tarefa.alcance === "mensagem" ? "observando" : "desligada")
-  );
+  const gravado = estadoGravadoDaTarefa(config, tarefa.id);
+  // Um `decidindo` que outra versão gravou (uma que deixe decidir, revertida)
+  // vale aqui o que o worker DESTA faz com ele: observar. Sem isto o cartão
+  // diria "Decide" numa tarefa em que ninguém lê a resposta do Jev.
+  if (gravado === "decidindo" && tarefa.soObserva !== undefined) return "observando";
+  return gravado ?? (tarefa.alcance === "mensagem" ? "observando" : "desligada");
 }
 
 /** O estado que vale agora — ver o cabeçalho. */
@@ -386,6 +453,74 @@ export function algumRoteadorQuePergunta(roteadores: ReadonlyArray<{ intencoes?:
  */
 export function tarefaSemRoteador(tarefa: Pick<TarefaDoJev, "id">, temRoteadorQuePergunta: boolean): boolean {
   return tarefa.id === TAREFA_DO_ROTEADOR.id && !temRoteadorQuePergunta;
+}
+
+/** O fornecedor aceita até 255 opções numa escolha — e na do follow-up não há "nenhuma". */
+export const SAIDAS_NO_MAXIMO = 255;
+
+/**
+ * As saídas de um passo "Classificar (IA)" podem ser perguntadas ao Jev
+ * (`perguntaDoFollowup`, `./followup.ts`)? De 2 a `SAIDAS_NO_MAXIMO`, nenhuma
+ * em branco, nenhuma repetida. Com UMA saída não há escolha: a IA de sempre só
+ * pode devolver ela, o Jev também, e cada resposta seria uma concordância paga
+ * e vazia puxando o "X de Y" para 100%. Em branco ou repetida, a API recusaria
+ * a chamada inteira, e a recusa abriria o disjuntor da tarefa sem ninguém ter
+ * errado nada (a chave de um critério é o nome da saída — duas iguais seriam
+ * uma só).
+ */
+export function saidasCabemNaPergunta(classes: readonly unknown[]): boolean {
+  return (
+    classes.length >= 2 &&
+    classes.length <= SAIDAS_NO_MAXIMO &&
+    classes.every((c) => typeof c === "string" && c.trim() !== "") &&
+    new Set(classes).size === classes.length
+  );
+}
+
+/**
+ * Os status em que a inscrição já não anda (`followup_enrollments.status`), no
+ * formato do filtro `in` do PostgREST. Fora deles, o motor ainda pode levá-la ao
+ * passo "Classificar (IA)" da versão EM QUE ELA ESTÁ — que pode não ser a
+ * publicada, nem estar num fluxo ativo: desativar um follow-up não encerra as
+ * inscrições dele, e publicar outra versão não as muda de versão.
+ */
+export const INSCRICAO_ENCERRADA = "(completed,cancelled,dead)";
+
+/**
+ * Das versões lidas com o grafo (`{ versao: { graph } }`) — a ativa de cada
+ * follow-up publicado, e a de cada inscrição que ainda anda (fora de
+ * `INSCRICAO_ENCERRADA`) —, alguma tem o passo "Classificar (IA)" com saídas
+ * que o Jev pode ser perguntado (`saidasCabemNaPergunta`)? Só nele a IA de
+ * sempre escolhe a saída pela resposta ao follow-up — e o Jev, ao lado dela.
+ */
+export function algumFluxoQueClassifica(fluxos: ReadonlyArray<{ versao?: unknown }>): boolean {
+  return fluxos.some((f) => {
+    const versao = f.versao as { graph?: { nodes?: unknown } } | null | undefined;
+    const nos = versao?.graph?.nodes;
+    return (
+      Array.isArray(nos) &&
+      nos.some((n) => {
+        const no = n as { type?: unknown; config?: { classes?: unknown } } | null;
+        const classes: unknown = no?.type === "ai_classify" ? no.config?.classes : undefined;
+        return Array.isArray(classes) && saidasCabemNaPergunta(classes);
+      })
+    );
+  });
+}
+
+/**
+ * A tarefa do follow-up numa organização em que nenhum follow-up publicado tem
+ * o passo "Classificar (IA)" com duas saídas ou mais, e nenhuma inscrição que
+ * ainda anda está numa versão com ele: ninguém escolhe saída pela resposta ao
+ * follow-up, nada sai para o Jev, e "observando" diria "Ainda não há mensagens
+ * medidas pelos dois" para sempre. `temFluxoQueClassifica` é lido por quem chama
+ * (`algumFluxoQueClassifica`). As inscrições contam porque o motor não olha o
+ * estado do follow-up nem a versão publicada: afirmar "Não roda" enquanto elas
+ * mandam respostas ao Jev seria a frase tranquilizadora falsa, numa tela de
+ * transferência para fora do país.
+ */
+export function tarefaSemFluxo(tarefa: Pick<TarefaDoJev, "id">, temFluxoQueClassifica: boolean): boolean {
+  return tarefa.id === TAREFA_DO_FOLLOWUP.id && !temFluxoQueClassifica;
 }
 
 /**

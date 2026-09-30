@@ -14,6 +14,7 @@ import {
   TAREFA_DO_PEDIDO_DE_HUMANO,
   TAREFA_DO_PEDIDO_PARA_PARAR,
   TAREFA_DO_ROTEADOR,
+  TAREFA_DO_FOLLOWUP,
 } from "@/lib/ai/decisao/tarefas";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 
@@ -1391,5 +1392,156 @@ describe("CartaoDoJev — sem a IA de sempre, as tarefas seguem com a linha dela
     expect(cartao()).toHaveAttribute("data-estado", "em_pausa");
     expect(cartao()).not.toHaveTextContent(/todas as tarefas pausadas/);
     expect(cartao()).toHaveTextContent(/nenhuma tarefa está rodando agora/);
+  });
+});
+
+/**
+ * A resposta ao follow-up SÓ OBSERVA nesta versão: a saída dela move o cliente
+ * no fluxo. O cartão mostra a concordância (a mesma saída, em respostas), diz
+ * por que não há "Deixar o Jev decidir" — e não oferece o botão —, e diz "Não
+ * roda" onde nenhum follow-up publicado tem o passo "Classificar (IA)".
+ */
+describe("CartaoDoJev — a tarefa do follow-up, que só observa", () => {
+  const CLIMA = { id: "clima", ponto: "sentiment_classify", rotulo: "Medir o clima da conversa", oQueFaz: "Mede.", novo: false } as const;
+  const FOLLOWUP = {
+    id: "followup",
+    ponto: "followup_classify",
+    rotulo: TAREFA_DO_FOLLOWUP.rotulo,
+    oQueFaz: TAREFA_DO_FOLLOWUP.oQueFaz,
+    estado: "observando",
+    novo: true,
+    sem_fluxo: false,
+    observacao: { dias: 30, comparadas: 4, concordaram: 3 },
+  } as const;
+  const HUMANO = {
+    id: "humano",
+    ponto: null,
+    rotulo: TAREFA_DO_PEDIDO_DE_HUMANO.rotulo,
+    oQueFaz: TAREFA_DO_PEDIDO_DE_HUMANO.oQueFaz,
+    estado: "observando",
+    novo: false,
+    sem_atendente: null,
+    percebidos: { dias: 30, mensagens: 0, conversas: [] as Array<{ href: string; em: string }> },
+  } as const;
+
+  it("observando: a concordância é a mesma saída, diz por que não há o botão, e só as saídas de quem não a quer", () => {
+    montar(dados({ config: { ligado: true, modo: "observacao" }, por_tarefa: [{ ...CLIMA, estado: "observando" }, FOLLOWUP] }));
+    const linha = screen.getByTestId("jev-tarefa-followup");
+    expect(linha).toHaveTextContent("Só observa");
+    expect(screen.getByTestId("jev-concordancia-followup")).toHaveTextContent(
+      "Nos últimos 30 dias, o Jev e a sua IA de sempre puseram a resposta do cliente na mesma saída do fluxo em 3 de 4 mensagens.",
+    );
+    expect(screen.getByTestId("jev-concordancia-numeros-followup")).toHaveTextContent("3 de 4");
+    expect(screen.getByTestId("jev-so-observa-followup")).toHaveTextContent(TAREFA_DO_FOLLOWUP.soObserva);
+    // "Nova" sem prometer o botão que ela não tem.
+    expect(screen.getByTestId("jev-nova-followup")).toHaveTextContent("Começou sozinha, só observando: nada muda para o cliente.");
+    expect(screen.getByTestId("jev-nova-followup")).not.toHaveTextContent(/decidir/);
+    expect(within(linha).queryByRole("button", { name: "Deixar o Jev decidir" })).toBeNull();
+    expect(within(linha).getByRole("button", { name: "Manter só observando" })).toBeInTheDocument();
+    expect(within(linha).getByRole("button", { name: "Pausar esta tarefa" })).toBeInTheDocument();
+    // O clima segue oferecendo decidir, e a frase do cartão fala dele (controle).
+    expect(within(screen.getByTestId("jev-tarefa-clima")).getByRole("button", { name: "Deixar o Jev decidir" })).toBeInTheDocument();
+    expect(screen.getByTestId("jev-tarefas").previousElementSibling).toHaveTextContent(
+      "Observando — a sua IA de sempre ainda decide. Compare os dois antes de deixar o Jev decidir.",
+    );
+    // No cartão do ponto: o Jev observa, o modelo decide.
+    expect(jevNoPonto(dados({ config: { ligado: true }, por_tarefa: [FOLLOWUP] }), "followup_classify")).toBe("observacao");
+  });
+
+  it("só ela compara: a frase do cartão não promete deixar o Jev decidir", () => {
+    montar(dados({ config: { ligado: true, modo: "observacao" }, por_tarefa: [{ ...CLIMA, estado: "desligada" }, FOLLOWUP] }));
+    const frase = screen.getByTestId("jev-tarefas").previousElementSibling;
+    expect(frase).toHaveTextContent("Observando — a sua IA de sempre decide, e o Jev só é comparado com ela.");
+    expect(frase).not.toHaveTextContent(/deixar o Jev decidir/);
+  });
+
+  it.each([
+    [
+      "observando",
+      "Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele só conta as mensagens em que a regra de hoje não reconheceu o pedido.",
+    ],
+    [
+      "decidindo",
+      "Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele conta as mensagens em que a regra de hoje não reconheceu o pedido, e avisa a equipe.",
+    ],
+  ] as const)("ela e um pedido %s: a frase diz o que cada uma faz, sem o botão que não há", (estadoDoPedido, esperada) => {
+    montar(
+      dados({
+        config: { ligado: true, modo: "observacao" },
+        por_tarefa: [{ ...CLIMA, estado: "desligada" }, FOLLOWUP, { ...HUMANO, estado: estadoDoPedido }],
+      }),
+    );
+    expect(screen.getByTestId("jev-tarefas").previousElementSibling).toHaveTextContent(esperada);
+  });
+
+  it("sem follow-up publicado com o passo: diz que não roda e aponta onde publicar, sem comparação nem o porquê de só observar", () => {
+    montar(
+      dados({
+        config: { ligado: true, modo: "observacao" },
+        por_tarefa: [{ ...CLIMA, estado: "observando" }, { ...FOLLOWUP, sem_fluxo: true, observacao: { dias: 30, comparadas: 0, concordaram: 0 } }],
+      }),
+    );
+    const linha = screen.getByTestId("jev-tarefa-followup");
+    expect(linha).toHaveTextContent("Não roda");
+    expect(linha).not.toHaveTextContent("Só observa");
+    const semFluxo = screen.getByTestId("jev-sem-fluxo-followup");
+    expect(semFluxo).toHaveTextContent("nenhum follow-up publicado tem o passo “Classificar (IA)”");
+    expect(within(semFluxo).getByRole("link", { name: "Abrir os follow-ups" })).toHaveAttribute("href", "/app/ai/followups");
+    expect(screen.queryByTestId("jev-concordancia-followup")).toBeNull();
+    expect(screen.queryByTestId("jev-so-observa-followup")).toBeNull();
+    expect(screen.queryByTestId("jev-nova-followup")).toBeNull();
+    expect(within(linha).getByRole("button", { name: "Pausar esta tarefa" })).toBeInTheDocument();
+    expect(jevNoPonto(dados({ config: { ligado: true }, por_tarefa: [{ ...FOLLOWUP, sem_fluxo: true }] }), "followup_classify")).toBeNull();
+  });
+
+  it("antes de ligar: sem follow-up que classifique, diz que não roda e por quê — e a frase não promete decidir", () => {
+    montar(
+      dados({
+        por_tarefa: [
+          { ...CLIMA, estado: "desligada", ao_ligar: "desligada" },
+          { ...FOLLOWUP, estado: "desligada", ao_ligar: "observando", novo: false },
+        ],
+      }),
+    );
+    expect(screen.getByTestId("jev-ao-ligar-followup")).toHaveTextContent("(Só observa)");
+    expect(screen.queryByTestId("jev-ao-ligar-sem-fluxo-followup")).toBeNull();
+    expect(screen.getByTestId("jev-ao-ligar").textContent?.replace(/\s+/g, " ").trim()).toBe(
+      "Onde ele só observa, a sua IA de sempre continua decidindo. As tarefas pausadas continuam assim: depois de ligar o Jev, religue-as na lista que aparece aqui.",
+    );
+
+    cleanup();
+    montar(
+      dados({
+        por_tarefa: [
+          { ...CLIMA, estado: "desligada", ao_ligar: "observando" },
+          { ...FOLLOWUP, estado: "desligada", ao_ligar: "observando", novo: false, sem_fluxo: true },
+        ],
+      }),
+    );
+    expect(screen.getByTestId("jev-ao-ligar-followup")).toHaveTextContent("(Não roda)");
+    const semFluxoAoLigar = screen.getByTestId("jev-ao-ligar-sem-fluxo-followup");
+    expect(semFluxoAoLigar).toHaveTextContent(/nenhum follow-up publicado tem o passo “Classificar \(IA\)” com duas saídas ou mais/);
+    // O caminho para resolver, antes de ligar também — é a primeira impressão de quem ainda não publicou.
+    expect(within(semFluxoAoLigar).getByRole("link", { name: "Abrir os follow-ups" })).toHaveAttribute(
+      "href",
+      "/app/ai/followups",
+    );
+    // O clima observa e pode decidir: a frase de sempre (controle).
+    expect(screen.getByTestId("jev-ao-ligar")).toHaveTextContent(
+      "Onde ele só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
+    );
+  });
+
+  it("em espanhol, o porquê de só observar e o 'Não roda' saem em frase inteira", () => {
+    montar(
+      dados({
+        config: { ligado: true, modo: "observacao" },
+        por_tarefa: [{ ...CLIMA, estado: "observando" }, FOLLOWUP, { ...FOLLOWUP, id: "followup_2", ponto: null, sem_fluxo: true }],
+      }),
+      { idioma: "es" },
+    );
+    expect(screen.getByTestId("jev-so-observa-followup")).toHaveTextContent(/^En esta versión, Jev solo observa esta tarea/);
+    expect(screen.getByTestId("jev-sem-fluxo-followup_2")).toHaveTextContent(/^No se ejecuta ahora: ningún seguimiento publicado/);
+    expect(screen.getByTestId("jev-concordancia-followup")).toHaveTextContent(/pusieron la respuesta del cliente en la misma salida del flujo en 3 de 4 mensajes\./);
   });
 });

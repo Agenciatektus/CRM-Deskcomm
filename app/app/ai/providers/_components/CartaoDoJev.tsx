@@ -40,7 +40,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { descreverErroDeValidacao } from "@/lib/ai/credenciais/erro-de-validacao";
 import type { EstadoDaTarefa } from "@/lib/ai/decisao/config";
 import { PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
-import { TAREFA_DO_CLIMA, TAREFAS_DO_JEV } from "@/lib/ai/decisao/tarefas";
+import { TAREFA_DO_CLIMA, TAREFAS_DO_JEV, tarefaPodeDecidir } from "@/lib/ai/decisao/tarefas";
 import { O_QUE_FAZER_DO_JEV } from "@/lib/ai/decisao/textos";
 
 /** O corpo de `GET /api/v1/ai/jev` (`app/api/v1/ai/jev/route.ts`). */
@@ -130,11 +130,20 @@ export interface TarefaNoCartao {
    * fora. O worker só as pergunta onde ele roda. Ausente na imagem anterior.
    */
   sem_atendente?: "externo" | "ninguem_no_ar" | null;
+  /**
+   * A do follow-up numa empresa sem follow-up publicado com o passo
+   * "Classificar (IA)": ninguém lê a resposta do cliente, e ela não tem o que
+   * comparar. Ausente na imagem anterior.
+   */
+  sem_fluxo?: boolean;
 }
 
-/** Algo fora do Jev a impede de rodar em qualquer estado — a camada, o roteador, ou quem atende. */
+/** Algo fora do Jev a impede de rodar em qualquer estado — a camada, o roteador, quem atende ou o fluxo. */
 const parada = (t: TarefaNoCartao) =>
-  t.sem_camada === true || t.sem_roteador === true || (t.sem_atendente !== undefined && t.sem_atendente !== null);
+  t.sem_camada === true ||
+  t.sem_roteador === true ||
+  t.sem_fluxo === true ||
+  (t.sem_atendente !== undefined && t.sem_atendente !== null);
 
 /** A tarefa pode rodar agora — não está desligada nem parada. */
 const roda = (t: TarefaNoCartao) => t.estado !== "desligada" && !parada(t);
@@ -241,6 +250,16 @@ const doRegistro = (tarefaId: string) => TAREFAS_DO_JEV.find((x) => x.id === tar
 const avisaAEquipe = (tarefaId: string) => doRegistro(tarefaId)?.familia === "cascata";
 
 /**
+ * A tarefa oferece "Deixar o Jev decidir" (ou "Avisar a equipe")? A que só
+ * observa nesta versão, não — e a rota recusaria o pedido. Uma tarefa que esta
+ * página não conhece (de uma versão mais nova) segue com o botão, como antes.
+ */
+const podeDecidir = (tarefaId: string) => {
+  const registro = doRegistro(tarefaId);
+  return registro === undefined || tarefaPodeDecidir(registro);
+};
+
+/**
  * A tarefa DECIDE algo no lugar do mecanismo de hoje. A em cascata, avisando a
  * equipe, não: o cliente não sente nada, e o estado do cartão inteiro (selo,
  * frase, texto de antes de ligar) a conta como quem não decide. Só a linha
@@ -254,11 +273,15 @@ const decide = (t: TarefaNoCartao) => t.estado === "decidindo" && !avisaAEquipe(
  * não reconheceu (e, em "Avisar a equipe", abrem aviso). A frase do cartão não
  * pode falar de comparar nem da "sua IA de sempre" quando só estas rodam.
  */
-function oQueRoda(d: DadosDoJev): { comparam: number; cascata: number; avisando: boolean } {
+function oQueRoda(d: DadosDoJev): { comparam: number; daParaDeixarDecidir: boolean; cascata: number; avisando: boolean } {
   const rodando = tarefasDoCartao(d).filter(roda);
   const cascata = rodando.filter((t) => avisaAEquipe(t.id));
+  const comparam = rodando.filter((t) => !avisaAEquipe(t.id));
   return {
-    comparam: rodando.length - cascata.length,
+    comparam: comparam.length,
+    // Com todas as que comparam só observando sem como decidir (a do
+    // follow-up), "antes de deixar o Jev decidir" prometeria um botão que não há.
+    daParaDeixarDecidir: comparam.some((t) => podeDecidir(t.id)),
     cascata: cascata.length,
     avisando: cascata.some((t) => t.estado === "decidindo"),
   };
@@ -271,6 +294,12 @@ function fraseObservando(d: DadosDoJev, t: (texto: string) => string): string {
     return r.avisando
       ? t("Observando — o Jev conta as mensagens em que o cliente faz um pedido que a regra de hoje não reconheceu, e avisa a equipe na Central. Ele não decide nada no atendimento.")
       : t("Observando — o Jev só conta as mensagens em que o cliente faz um pedido que a regra de hoje não reconheceu. Nada muda no atendimento.");
+  }
+  if (!r.daParaDeixarDecidir) {
+    if (r.cascata === 0) return t("Observando — a sua IA de sempre decide, e o Jev só é comparado com ela.");
+    return r.avisando
+      ? t("Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele conta as mensagens em que a regra de hoje não reconheceu o pedido, e avisa a equipe.")
+      : t("Observando — onde o Jev compara, a sua IA de sempre decide, e ele só é comparado com ela. Nos pedidos do cliente, ele só conta as mensagens em que a regra de hoje não reconheceu o pedido.");
   }
   if (r.cascata === 0) return t("Observando — a sua IA de sempre ainda decide. Compare os dois antes de deixar o Jev decidir.");
   return r.avisando
@@ -613,6 +642,10 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
   const comparam = vaoRodar.filter(({ tarefa }) => !avisaAEquipe(tarefa.id));
   const pedidos = vaoRodar.filter(({ tarefa }) => avisaAEquipe(tarefa.id));
   const algumaDecide = comparam.some(({ aoLigar }) => aoLigar === "decidindo");
+  // As que vão só observar são todas das que não decidem nesta versão (a do
+  // follow-up): "antes de deixar o Jev decidir" prometeria um botão que não há.
+  const observam = comparam.filter(({ aoLigar }) => aoLigar === "observando");
+  const observamSemPoderDecidir = observam.length > 0 && observam.every(({ tarefa }) => !podeDecidir(tarefa.id));
   const algumaPausada = tarefas.some(({ aoLigar }) => aoLigar === "desligada");
 
   return (
@@ -654,6 +687,15 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
                   {t("Não roda agora: quem conduz as conversas desta empresa é um sistema de fora. O Jev só é perguntado onde um atendente automático daqui responderia.")}
                 </span>
               )}
+              {aoLigar !== "desligada" && tarefa.sem_fluxo === true && (
+                <span className="text-muted-foreground" data-testid={`jev-ao-ligar-sem-fluxo-${tarefa.id}`}>
+                  {" "}
+                  {t("Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.")}{" "}
+                  <Link className="underline underline-offset-4" href="/app/ai/followups">
+                    {t("Abrir os follow-ups")}
+                  </Link>
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -665,12 +707,18 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
             : comparam.length === 0
               ? null
               : algumaDecide
-                ? t(
-                    "Onde ele decide, vale a escolha que você fez antes de desligá-lo; onde só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
-                  )
-                : t(
-                    "Onde ele só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
-                  )}{" "}
+                ? observamSemPoderDecidir
+                  ? t(
+                      "Onde ele decide, vale a escolha que você fez antes de desligá-lo; onde só observa, a sua IA de sempre continua decidindo.",
+                    )
+                  : t(
+                      "Onde ele decide, vale a escolha que você fez antes de desligá-lo; onde só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
+                    )
+                : observamSemPoderDecidir
+                  ? t("Onde ele só observa, a sua IA de sempre continua decidindo.")
+                  : t(
+                      "Onde ele só observa, a sua IA de sempre continua decidindo, e você compara os dois antes de deixar o Jev decidir.",
+                    )}{" "}
           {pedidos.length > 0 &&
             (pedidos.some(({ aoLigar }) => aoLigar === "decidindo")
               ? t(
@@ -841,7 +889,9 @@ function Ligado({
               <p className="text-sm text-muted-foreground" data-testid={`jev-nova-${tarefa.id}`}>
                 {avisa
                   ? t("Começou sozinha, só observando: nada muda até você pedir para o Jev avisar a equipe.")
-                  : t("Começou sozinha, só observando: nada muda para o cliente até você deixar o Jev decidir.")}
+                  : podeDecidir(tarefa.id)
+                    ? t("Começou sozinha, só observando: nada muda para o cliente até você deixar o Jev decidir.")
+                    : t("Começou sozinha, só observando: nada muda para o cliente.")}
               </p>
             )}
 
@@ -869,6 +919,16 @@ function Ligado({
                 </Link>
               </p>
             )}
+            {rodando && tarefa.estado !== "desligada" && tarefa.sem_fluxo === true && (
+              <p className="text-sm text-muted-foreground" data-testid={`jev-sem-fluxo-${tarefa.id}`}>
+                {t(
+                  "Não roda agora: nenhum follow-up publicado tem o passo “Classificar (IA)” com duas saídas ou mais. O Jev só lê a resposta do cliente onde a sua IA de sempre escolhe entre saídas — publique, em Follow-ups, um fluxo com esse passo.",
+                )}{" "}
+                <Link className="underline underline-offset-4" href="/app/ai/followups">
+                  {t("Abrir os follow-ups")}
+                </Link>
+              </p>
+            )}
             {/* As de pedido só são perguntadas onde o atendimento automático
                 responderia: sem ele em número nenhum, "Só observa" com "nenhuma
                 mensagem" seria para sempre. */}
@@ -887,6 +947,13 @@ function Ligado({
                 {t(
                   "Não roda agora: quem conduz as conversas desta empresa é um sistema de fora. O Jev só é perguntado onde um atendente automático daqui responderia.",
                 )}
+              </p>
+            )}
+
+            {/* Sem o botão, o porquê: a tarefa que só observa nesta versão. */}
+            {rodando && roda(tarefa) && registro?.soObserva !== undefined && (
+              <p className="text-sm text-muted-foreground" data-testid={`jev-so-observa-${tarefa.id}`}>
+                {t(registro.soObserva)}
               </p>
             )}
 
@@ -922,7 +989,7 @@ function Ligado({
               <div className="flex flex-wrap items-center gap-3">
                 {/* Parada pela camada ou sem roteador, não há o que comparar antes
                     de decidir; e o clima sem a IA de sempre já decide sozinho. */}
-                {tarefa.estado === "observando" && !parada(tarefa) && !climaSozinho && (
+                {tarefa.estado === "observando" && !parada(tarefa) && !climaSozinho && podeDecidir(tarefa.id) && (
                   <Button
                     size="sm"
                     disabled={enviando}
