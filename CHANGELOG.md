@@ -40,9 +40,11 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
   estava travado por esse erro basta rodar a atualização de novo: ela completa sem
   ação manual no banco.
 
-  Contribuição de @webtecnica (#2008).
+  Contribuição de @webtecnica (#2008); reportado e investigado no banco por @aerosuiteapp (#1998).
 
 - **O agente respeita os funis autorizados ao atualizar a etapa de um negócio** Ao confirmar uma etapa durante a conversa, o agente agora passa ao espelho do CRM os funis autorizados em sua versão publicada. Um agente sem acesso ao funil não move mais o cartão, inclusive quando retoma um caso interno; agentes com o funil autorizado continuam podendo atualizar a etapa. O estado da conversa e a resposta ao cliente seguem seu fluxo normal.
+
+  Contribuição de @arodalves (#2006).
 
 ## [1.67.0] — 2026-09-30
 
