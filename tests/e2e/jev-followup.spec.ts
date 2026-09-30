@@ -284,7 +284,7 @@ test.describe("Jev — a resposta ao follow-up, pela tela", () => {
 
     await test.step("sem follow-up com Classificar: 'Não roda', o porquê e a porta para Follow-ups", async () => {
       await esperarNaoRoda();
-      await page.screenshot({ path: ".superpowers/evidence/jev/followup-nao-roda.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/followup-nao-roda.png", fullPage: true });
     });
 
     await test.step("controle: um Classificar de UMA saída publicado não tira a tarefa do 'Não roda'", async () => {
@@ -308,7 +308,7 @@ test.describe("Jev — a resposta ao follow-up, pela tela", () => {
       await expect(cartao.getByTestId("jev-concordancia-followup")).toHaveText(CONCORDANCIA_VAZIA);
       await expect(linha.getByRole("button", { name: "Pausar esta tarefa" })).toBeVisible();
       await expect(linha.getByRole("button", { name: "Deixar o Jev decidir" })).toHaveCount(0);
-      await page.screenshot({ path: ".superpowers/evidence/jev/followup-so-observa.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/followup-so-observa.png", fullPage: true });
     });
   });
 });
