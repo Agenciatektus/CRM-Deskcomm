@@ -7978,7 +7978,8 @@ $seed$;
 -- `duplicate key ... ai_pricing_pkey`. O `not exists` abaixo não resolve: os
 -- duplicados estão dentro do MESMO select. `distinct on` devolve UMA linha por
 -- model_id, e o `order by m.model_id, m.input_price_per_million_cents asc`
--- escolhe deterministicamente o provedor de MENOR preço quando houver empate.
+-- escolhe o provedor de MENOR preço de entrada; empate por saída e depois por
+-- provedor, para a escolha ser determinística.
 insert into public.ai_pricing (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
 select distinct on (m.model_id)
   m.model_id,
@@ -7993,7 +7994,7 @@ where m.deprecated_at is null
     select 1 from public.ai_pricing p
     where p.model = m.model_id and p.superseded_at is null
   )
-order by m.model_id, m.input_price_per_million_cents asc;
+order by m.model_id, m.input_price_per_million_cents asc, m.output_price_per_million_cents asc, m.provider asc;
 
 -- Embedding do RAG — não vive em ai_models.
 insert into public.ai_pricing (model, embedding_cents_per_million_tokens, notes)
