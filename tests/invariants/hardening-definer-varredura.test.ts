@@ -81,7 +81,10 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
       "`resolveActiveOrg`, nunca do corpo da requisição. Piso `manager`: " +
       "acrescentar palavra ao vocabulário é reversível e não escreve em conversa " +
-      "nem contato nenhum. ",
+      "nem contato nenhum. tests/invariants/tags-curadoria-acl.test.ts prova com " +
+      "JWT real: viewer e agent recusados, manager aceito, admin de OUTRA " +
+      "organização recusado sem tocar o vocabulário de casa, service_role " +
+      "recusado por `auth.uid()` nulo e anon sem EXECUTE. ",
   },
   {
     fn: "fn_tags_arquivar(uuid,text,text,boolean)",
@@ -98,7 +101,10 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "`resolveActiveOrg`, nunca do corpo da requisição. Piso `manager` pelo " +
       "mesmo motivo de `fn_tags_criar`: arquivar tira a etiqueta das sugestões e " +
       "não toca registro nenhum — quem já a tem continua tendo, e o filtro " +
-      "continua encontrando. ",
+      "continua encontrando. tests/invariants/tags-curadoria-acl.test.ts prova com " +
+      "JWT real: viewer e agent recusados, manager aceito (arquiva e o vocabulário " +
+      "perde a palavra), admin de OUTRA organização recusado, service_role recusado " +
+      "por `auth.uid()` nulo e anon sem EXECUTE. ",
   },
   {
     fn: "fn_tags_renomear(uuid,text,text,text)",
@@ -115,7 +121,10 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`, e não " +
       "`manager`: renomear reescreve `tags` em massa nas conversas ou nos " +
       "contatos da organização e não tem desfazer — a mesma régua que faz " +
-      "`fn_definir_cliente_pela_agenda` ser admin. ",
+      "`fn_definir_cliente_pela_agenda` ser admin. " +
+      "tests/invariants/tags-curadoria-acl.test.ts prova com JWT real que o piso é " +
+      "mesmo admin: manager é RECUSADO aqui e aceito em `fn_tags_criar`, no mesmo " +
+      "arquivo — mais viewer/agent, admin de outra organização, service_role e anon. ",
   },
   {
     fn: "fn_tags_mesclar(uuid,text,text[],text)",
@@ -130,7 +139,10 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
       "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
       "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: funde " +
-      "variantes reescrevendo `tags` em massa, sem desfazer. ",
+      "variantes reescrevendo `tags` em massa, sem desfazer. " +
+      "tests/invariants/tags-curadoria-acl.test.ts prova com JWT real que o piso é " +
+      "mesmo admin: manager é RECUSADO aqui e aceito em `fn_tags_criar`, no mesmo " +
+      "arquivo — mais viewer/agent, admin de outra organização, service_role e anon. ",
   },
   {
     fn: "fn_tags_apagar(uuid,text,text)",
@@ -146,7 +158,10 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
       "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: é a única " +
       "das cinco que destrói dado — tira a etiqueta do vocabulário E de todo " +
-      "registro que a usa. ",
+      "registro que a usa. tests/invariants/tags-curadoria-acl.test.ts prova com " +
+      "JWT real que o piso é mesmo admin: manager é RECUSADO aqui e aceito em " +
+      "`fn_tags_criar`, no mesmo arquivo — mais viewer/agent, admin de outra " +
+      "organização, service_role e anon. ",
   },
   {
     fn: "fn_finalizar_comanda(uuid,uuid,uuid,integer)",
