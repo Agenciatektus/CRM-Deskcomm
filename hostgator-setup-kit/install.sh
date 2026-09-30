@@ -166,6 +166,7 @@ show_recovery() {
   printf '\n%s\n\n' "$(t "Como voltar atrás e recomeçar do zero:")"
   printf '  %s\n' "cd ${dir}"
   printf '  %s\n' "rm -f .env                                    # $(t "apaga a configuração digitada")"
+  printf '  %s\n' "rm -f ${MARCA_INSTALACAO_NOME:-.deskcomm-instalado}          # $(t "apaga o marcador desta instalação")"
   printf '  %s\n' "docker compose $(dc_files) down -v          # $(t "derruba o que subiu")"
   printf '  %s\n' "bash ${KIT_DIR:-hostgator-setup-kit}/install.sh   # $(t "começa de novo")"
   printf '\n%s\n' "$(t "Se o schema chegou a ser aplicado e você quer o banco limpo de novo,")"
@@ -1213,15 +1214,15 @@ case "$AI_PROVIDER" in
 esac
 
 # A chave da OpenAI é pedida À PARTE quando ela NÃO é o provedor de conversa,
-# porque dois pontos do sistema dependem dela mesmo assim: ouvir áudio (o
-# Whisper é da OpenAI) e indexar a base de conhecimento. Sem esta linha, quem
+# porque ouvir áudio ainda depende dela (o Whisper é da OpenAI). A base de
+# conhecimento também aceita a chave OpenRouter, com o mesmo modelo fixo. Sem esta linha, quem
 # escolhe OpenRouter instala achando que está completo e descobre semanas depois
 # que o agente nunca ouviu um áudio — que é exatamente o defeito já visto em
 # produção, com a chave certa no .env e indo para o endpoint errado.
 if [ "$AI_PROVIDER" = "openai" ]; then
   CAMPO_OPENAI_EXTRA=""
 else
-  CAMPO_OPENAI_EXTRA="OPENAI_API_KEY|Chave da OpenAI — só para ouvir áudios e usar a base de conhecimento (Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)||v_openai|secret|opcional"
+  CAMPO_OPENAI_EXTRA="OPENAI_API_KEY|Chave da OpenAI — para ouvir áudios; a base de conhecimento aceita OpenRouter (Enter pula: dá para cadastrar depois pela tela, em IA › Credenciais)||v_openai|secret|opcional"
 fi
 
 # ── A versão que esta instalação vai rodar ───────────────────────────────────
@@ -1780,12 +1781,9 @@ esac
   printf '# Sem isto o número segue pareado no volume e MUDO até alguém abrir a tela\n'
   printf '# e clicar Reconectar — nada entra nem sai nesse meio-tempo.\n'
   envq WHATSAPP_RESTART_ALL_SESSIONS "${WHATSAPP_RESTART_ALL_SESSIONS:-True}"
-  # PINADA. Sem a tag, `devlikeapro/waha` é `:latest`, e esta linha gravava isso
-  # no .env de todo cliente — por cima do default pinado do compose, que então
-  # nunca chegava a ninguém. O `dc pull` de cada update entregava qualquer versão
-  # que o upstream tivesse publicado, sem ninguém ter testado.
-  # `latest-2026.7.2` é o mesmo digest de `latest` hoje (65e593e30bb7…).
-  envq WAHA_IMAGE "${WAHA_IMAGE:-devlikeapro/waha:latest-2026.7.2}"
+  # WAHA publica variantes x86 e ARM separadas para NOWEB. O padrão acompanha
+  # uname -m; uma WAHA_IMAGE escolhida pelo operador continua prevalecendo.
+  envq WAHA_IMAGE "${WAHA_IMAGE:-$(imagem_waha_padrao_para_host)}"
   envq WAHA_DEFAULT_ENGINE "${WAHA_DEFAULT_ENGINE:-NOWEB}"
   envq UPSTASH_REDIS_REST_URL "http://srh:80"
   envq UPSTASH_REDIS_REST_TOKEN "$UPSTASH_REDIS_REST_TOKEN"
@@ -2272,6 +2270,27 @@ marcar_segredo_do_cron_como_novo
 setup_event_log_drain_cron
 setup_update_agent_cron
 
+# ── O marcador que diz que esta instalação EXISTE (#1778) ───────────────────
+# A guarda de arquitetura (#1042, contornada pelo #1266) precisa distinguir
+# "instalação nova" de "instalação que já está no ar", e ela não pode usar
+# "tem compose e tem `.env`" como prova: o `.env` chega pronto numa instalação
+# NOVA (copiado, gerado por automação, ou deixado por um `--yes` que parou no
+# meio), e com esse critério uma VPS numa arquitetura sem imagens publicadas
+# começava a instalação construindo as imagens na própria VPS — o que a guarda
+# existe para impedir.
+#
+# O marcador vai aqui, e não antes, porque só a partir daqui é verdade que a
+# instalação EXISTE: os contêineres subiram e o app respondeu. Gravar antes
+# deixaria o arquivo afirmando uma instalação que pode não ter acontecido — e
+# a próxima rodada da guarda confiaria numa instalação que não está no ar.
+# `|| true` porque a ausência do marcador não pode derrubar uma instalação
+# cujos contêineres já estão no ar: no pior caso a guarda cai no sinal do
+# contêiner, que é o mesmo que ela usava para quem instalou numa versão
+# anterior.
+if [ "${APP_SAUDAVEL:-0}" = 1 ]; then
+  marcar_instalacao_feita "$VERSAO_ALVO" || c_ylw "$(t "⚠ Não consegui gravar o marcador desta instalação (arquivo .deskcomm-instalado). O CRM está no ar; numa arquitetura sem imagens publicadas, a atualização pode pedir uma VPS suportada até o marcador existir.")"
+fi
+
 # ── Final ───────────────────────────────────────────────────────────────────
 # O app não confirmou que está de pé: dizer "Instalação concluída!" aqui seria
 # mentir na única tela que a pessoa vai ler inteira. Ela recebe o estado real e
@@ -2367,7 +2386,7 @@ $(telemetria_no_banner)
     $(t "backup:")        bash hostgator-setup-kit/backup.sh
     $(t "trocar config:") bash hostgator-setup-kit/install.sh
                    $(t "(mostra tudo o que você respondeu e deixa corrigir por número)")
-    $(t "recomeçar:")     docker compose $(dc_files) down -v && rm -f .env
+    $(t "recomeçar:")     docker compose $(dc_files) down -v && rm -f .env ${MARCA_INSTALACAO_NOME:-.deskcomm-instalado}
                    $(t "(derruba tudo; depois rode o install.sh de novo)")
 
 DONE
