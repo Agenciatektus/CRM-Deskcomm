@@ -8,6 +8,41 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+## [1.69.0] — 2026-09-30
+
+### Adicionado
+
+- **O Jev passa a ler, só observando, a resposta do cliente ao follow-up e comparar a saída que ele escolheria com a da sua IA** O Jev ganha a tarefa **Ler a resposta ao follow-up**. Num fluxo de follow-up com o passo **"Classificar (IA)"**, a sua IA de sempre lê a resposta do cliente à mensagem do fluxo e escolhe por qual das saídas que você criou no passo o fluxo segue. Com o Jev ligado, ele responde a mesma pergunta, entre as mesmas saídas e ao mesmo tempo, recebendo só o que o cliente digitou na resposta — sem CPF, telefone e e-mail — e as saídas e a dica que você escreveu no passo. Resposta em áudio, imagem ou documento não é enviada ao Jev.
+
+  Nesta versão a tarefa **só observa**: quem escolhe a saída do fluxo é sempre a sua IA de sempre, e o follow-up não espera pelo Jev. O cartão do Jev, em **IA › Provedores**, mostra em quantas mensagens dos últimos 30 dias os dois puseram a resposta do cliente na mesma saída, e diz por que não há o botão "Deixar o Jev decidir" nela: a saída escolhida muda o caminho do cliente no fluxo, e primeiro se mede, com respostas de verdade, o quanto os dois concordam. Passos "Classificar (IA)" com uma saída só não são enviados ao Jev: sem escolha, os dois concordariam sempre. Onde nenhum follow-up publicado tem o passo com duas saídas ou mais — e nenhum cliente ainda está andando num fluxo que o tenha, mesmo desativado —, o cartão mostra a tarefa como **"Não roda"**, com o motivo e o link para **Follow-ups**, antes e depois de ligar o Jev. Em **IA › Execuções**, a chamada aparece como **"Ler a resposta ao follow-up"**, marcada como observação.
+
+  **Quem já tem o Jev ligado** vê a tarefa com o selo **"Nova"**, já observando: ela usa o mesmo dado que você já autorizou — cada mensagem, sozinha. Isso é uma chamada a mais ao Jev a cada vez que a sua IA de sempre lê uma resposta digitada pelo cliente (uma fração de centavo de dólar, cobrada na sua conta da TypeSafe). Para não usar, clique em **"Pausar esta tarefa"** no cartão. A política de privacidade passa a listar essa finalidade. Nada precisa ser editado para atualizar.
+
+  Se a instalação voltar para uma versão anterior, a tarefa deixa de rodar e o estado dela fica guardado.
+
+### Corrigido
+
+- **O passo "Classificar resposta" dos fluxos de follow-up espera o cliente responder** Num fluxo que manda uma mensagem e em seguida classifica a resposta com a IA, o
+  passo de classificar seguia pela saída "Sem resposta" poucos segundos depois do
+  envio, sem dar ao cliente o tempo de espera configurado no passo (15 minutos
+  por padrão, ou o prazo que você escolheu). O cliente que respondia dentro desse
+  prazo já tinha sido tratado como quem não respondeu.
+
+  Agora o passo espera o prazo inteiro:
+
+  - se o cliente responder dentro dele, a resposta dele à mensagem do fluxo é
+    classificada e o fluxo segue pelo caminho da classe — inclusive quando o
+    agente ou alguém da equipe já respondeu ao cliente antes;
+  - se o prazo acabar sem resposta, o fluxo segue por "Sem resposta", e uma
+    condição "Desfecho do passo anterior" logo depois enxerga esse desfecho;
+  - enquanto espera, a história do follow-up mostra "Esperando a resposta do
+    cliente" com a hora limite, em vez de parecer parada.
+
+  Não é preciso fazer nada para receber a correção. Quem colocou um passo
+  "Aguardar" antes do "Classificar resposta" para contornar o problema vai ver os
+  dois tempos somados (a espera do "Aguardar" e depois o prazo do classificar);
+  se a espera extra não faz mais sentido, basta tirar o "Aguardar" do fluxo.
+
 ## [1.68.0] — 2026-09-30
 
 ### Adicionado
@@ -9699,7 +9734,8 @@ Primeira versão marcada do DeskcommCRM. O projeto vinha sendo desenvolvido publ
 
 - **Node 22 é obrigatório para desenvolvimento.** A suíte de invariantes instancia o cliente do Supabase, que exige o `WebSocket` global — nativo apenas a partir do Node 22. Isso não afeta quem apenas hospeda: a VPS roda a imagem pronta.
 
-[Não lançado]: https://github.com/melgarafael/DeskcommCRM/compare/v1.68.0...HEAD
+[Não lançado]: https://github.com/melgarafael/DeskcommCRM/compare/v1.69.0...HEAD
+[1.69.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.68.0...v1.69.0
 [1.68.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.67.0...v1.68.0
 [1.67.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.66.1...v1.67.0
 [1.66.1]: https://github.com/melgarafael/DeskcommCRM/compare/v1.66.0...v1.66.1
