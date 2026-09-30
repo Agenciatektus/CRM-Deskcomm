@@ -118,6 +118,7 @@ Ambas são opcionais e vivem no `.env`; os defaults funcionam sem editar nada.
 |---|---|---|
 | `JOB_QUEUE_RETENTION_DAYS` | `90` | Idade a partir da qual um job **terminal** (`done`/`failed`/`dead`) é apagado. Piso de **7** dias. |
 | `AUDIT_LOG_RETENTION_DAYS` | `1825` (5 anos) | Idade a partir da qual uma linha de auditoria é expurgada. Piso de **90** dias. |
+| `EVENT_LOG_RETENTION_DAYS` | `120` | Idade a partir da qual uma linha **`done`/`dead`** do bus interno (`event_log`) é apagada. Piso de **90** dias. |
 
 O que a poda da fila **nunca** toca: job `pending` (trabalho que ainda vai sair)
 e `running` (com um worker agora), qualquer que seja a idade; e job `dead` cujo
@@ -132,6 +133,27 @@ O piso do audit não é sugestão de estilo: ele mora **dentro** de
 `fn_expurgar_auditoria_vencida`, então nem quem tem a chave de serviço apaga
 rastro com menos de 90 dias por esse caminho. A função não aceita organização,
 ator, ação nem id — só idade.
+
+A poda do bus (`event_log`, migration 9021) **nunca** toca `pending` (trabalho
+que ainda vai sair) nem `processing` (com um dreno agora, ou órfão de um que
+morreu — `lib/routing/worker.ts` o devolve para `pending`), qualquer que seja a
+idade. O piso de 90 dias dela também mora dentro da função, e protege uma coisa
+diferente: 90 é a janela máxima das telas de IA, que leem `event_log` direto por
+`created_at`. Diminuir esse knob abaixo do piso apagaria o gráfico junto com o
+espaço, e por isso não é possível — nem por `psql`.
+
+**Onde o bus estabiliza, e por que o patamar não é desprezível.** A poda para o
+crescimento; ela não encolhe a tabela até o irrelevante. Medido na instalação que
+motivou a 9021: **16.484 linhas em 15 dias**, ou cerca de **1.100 linhas/dia**,
+ocupando **14 MB** contando os índices — cerca de **890 bytes por linha**. Em
+regime estável, com o default de 120 dias, a tabela para de crescer em torno de
+**130 mil linhas e 110–115 MB**. Com o piso de 90 dias, em torno de **85 MB**.
+
+São ~23% de uma cota de 500 MB parados no bus interno, no default. É esse o número
+que decide o knob: descer `EVENT_LOG_RETENTION_DAYS` de 120 para 90 devolve da
+ordem de 25–30 MB e nada além disso — se a instalação está apertada na cota, o
+resto do espaço tem de sair de outra tabela — e é o ranking do começo da seção 4
+que diz qual.
 
 Depois de mudar qualquer uma das duas:
 

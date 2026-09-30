@@ -64,6 +64,8 @@ import {
   RETENCAO_CONVERSA_DO_CASO_DIAS_PISO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PADRAO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PISO,
+  RETENCAO_EVENT_LOG_DIAS_PADRAO,
+  RETENCAO_EVENT_LOG_DIAS_PISO,
   RETENCAO_FILA_DIAS_PADRAO,
   RETENCAO_FILA_DIAS_PISO,
   RETENCAO_PASSAGEM_DIAS_PADRAO,
@@ -120,12 +122,17 @@ export interface ResultadoDaRetencao {
   avisos_de_caso_apagados: number;
   lotes_avisos_de_caso: number;
   avisos_de_caso_tem_resto: boolean;
+  /** O bus interno de eventos (migration 9021). */
+  eventos_apagados: number;
+  lotes_eventos: number;
+  eventos_tem_resto: boolean;
   retencao_fila_dias: number;
   retencao_auditoria_dias: number;
   retencao_espelho_dias: number;
   retencao_conversa_do_caso_dias: number;
   retencao_passagem_dias: number;
   retencao_aviso_de_caso_dias: number;
+  retencao_event_log_dias: number;
   /** Avisos de configuração — nunca ausentes em silêncio quando existem. */
   avisos: string[];
 }
@@ -140,7 +147,8 @@ export interface PodaDb {
       | "fn_expurgar_nonces_de_oauth"
       | "fn_expurgar_conversa_do_caso_vencida"
       | "fn_expurgar_passagens_vencidas"
-      | "fn_expurgar_avisos_de_caso_vencidos",
+      | "fn_expurgar_avisos_de_caso_vencidos"
+      | "fn_podar_event_log",
     args: { p_retencao_dias: number; p_limite: number },
   ): Promise<{ data: number | null; error: { message: string } | null }>;
 }
@@ -154,7 +162,8 @@ async function drenar(
     | "fn_expurgar_nonces_de_oauth"
     | "fn_expurgar_conversa_do_caso_vencida"
     | "fn_expurgar_passagens_vencidas"
-    | "fn_expurgar_avisos_de_caso_vencidos",
+    | "fn_expurgar_avisos_de_caso_vencidos"
+    | "fn_podar_event_log",
   dias: number,
 ): Promise<{ apagadas: number; lotes: number; temResto: boolean }> {
   let apagadas = 0;
@@ -189,6 +198,7 @@ export async function podarHistorico(
     CASE_CHAT_RETENTION_DAYS?: string;
     PASSAGEM_RETENTION_DAYS?: string;
     CASE_ALERT_RETENTION_DAYS?: string;
+    EVENT_LOG_RETENTION_DAYS?: string;
   },
 ): Promise<ResultadoDaRetencao> {
   const fila = interpretarRetencao(ambiente.JOB_QUEUE_RETENTION_DAYS, {
@@ -226,6 +236,12 @@ export async function podarHistorico(
     piso: RETENCAO_AVISO_DE_CASO_DIAS_PISO,
   });
 
+  const eventLog = interpretarRetencao(ambiente.EVENT_LOG_RETENTION_DAYS, {
+    chave: "EVENT_LOG_RETENTION_DAYS",
+    padrao: RETENCAO_EVENT_LOG_DIAS_PADRAO,
+    piso: RETENCAO_EVENT_LOG_DIAS_PISO,
+  });
+
   const jobs = await drenar(db, "fn_podar_fila_de_jobs", fila.dias);
   const linhas = await drenar(db, "fn_expurgar_auditoria_vencida", auditoria.dias);
   const eventos = await drenar(db, "fn_expurgar_espelho_da_agenda", espelho.dias);
@@ -249,6 +265,22 @@ export async function podarHistorico(
   // poda aqui é volume de operação — e é a poda de horizonte mais curto das
   // sete, porque a única pergunta que a linha responde é de semanas.
   const avisosDeCaso = await drenar(db, "fn_expurgar_avisos_de_caso_vencidos", avisoDeCaso.dias);
+  // Oitava poda: o BUS interno de eventos (migration 9021) — a tabela que a
+  // medição de 29/09/2026 encontrou como a maior SEM DONO (13 MB de 77). Ela
+  // entra no MESMO tique, e não num cron novo, pela razão já escrita no bloco da
+  // captação de webhook: rota nova pede linha nova no `entrypoint.sh` do
+  // scheduler, e linha que alguém precisa lembrar de escrever é o defeito que
+  // custou meses ao risk-watcher, ao routing-worker e à própria poda do arquivo
+  // de webhooks — que existia em código, nunca tinha sido agendada, e foi o que
+  // deixou o banco do cliente em read-only por dois dias.
+  //
+  // `eventosDoBus` e não `eventos`: o espelho da agenda, lá em cima, já usa esse
+  // nome. Um segundo `eventos` aqui não seria ambiguidade de leitura, seria
+  // redeclaração — e o compilador pegou na primeira tentativa desta linha.
+  //
+  // Os dois cortes que protegem trabalho (`pending`/`processing` nunca saem) e o
+  // piso de 90 dias moram DENTRO da função, onde valem para qualquer chamador.
+  const eventosDoBus = await drenar(db, "fn_podar_event_log", eventLog.dias);
 
   return {
     jobs_apagados: jobs.apagadas,
@@ -258,24 +290,28 @@ export async function podarHistorico(
     conversa_do_caso_apagada: conversas.apagadas,
     passagens_apagadas: passagens.apagadas,
     avisos_de_caso_apagados: avisosDeCaso.apagadas,
+    eventos_apagados: eventosDoBus.apagadas,
     lotes_fila: jobs.lotes,
     lotes_auditoria: linhas.lotes,
     lotes_espelho: eventos.lotes,
     lotes_conversa_do_caso: conversas.lotes,
     lotes_passagens: passagens.lotes,
     lotes_avisos_de_caso: avisosDeCaso.lotes,
+    lotes_eventos: eventosDoBus.lotes,
     fila_tem_resto: jobs.temResto,
     auditoria_tem_resto: linhas.temResto,
     espelho_tem_resto: eventos.temResto,
     conversa_do_caso_tem_resto: conversas.temResto,
     passagens_tem_resto: passagens.temResto,
     avisos_de_caso_tem_resto: avisosDeCaso.temResto,
+    eventos_tem_resto: eventosDoBus.temResto,
     retencao_fila_dias: fila.dias,
     retencao_auditoria_dias: auditoria.dias,
     retencao_espelho_dias: espelho.dias,
     retencao_conversa_do_caso_dias: conversaDoCaso.dias,
     retencao_passagem_dias: passagem.dias,
     retencao_aviso_de_caso_dias: avisoDeCaso.dias,
+    retencao_event_log_dias: eventLog.dias,
     avisos: [
       fila.aviso,
       auditoria.aviso,
@@ -283,6 +319,7 @@ export async function podarHistorico(
       conversaDoCaso.aviso,
       passagem.aviso,
       avisoDeCaso.aviso,
+      eventLog.aviso,
     ].filter((a): a is string => a !== null),
   };
 }
@@ -315,7 +352,11 @@ export function houveEfeito(resultado: ResultadoDaRetencao): boolean {
     // A sétima, pela MESMA razão: uma rodada que só apagou registro de entrega
     // de aviso vencido apagaria linhas e não deixaria registro — e o CLAUDE.md
     // manda auditar QUANDO HÁ EFEITO, nunca parar de auditar.
-    resultado.avisos_de_caso_apagados > 0
+    resultado.avisos_de_caso_apagados > 0 ||
+    // A oitava, pela MESMA razão das sete acima: uma rodada que só podou o bus
+    // de eventos apagaria linhas e não deixaria registro — e o CLAUDE.md manda
+    // auditar QUANDO HÁ EFEITO, nunca parar de auditar.
+    resultado.eventos_apagados > 0
   );
 }
 
@@ -351,6 +392,7 @@ async function handle(req: NextRequest): Promise<Response> {
       CASE_CHAT_RETENTION_DAYS: env.CASE_CHAT_RETENTION_DAYS,
       PASSAGEM_RETENTION_DAYS: env.PASSAGEM_RETENTION_DAYS,
       CASE_ALERT_RETENTION_DAYS: env.CASE_ALERT_RETENTION_DAYS,
+      EVENT_LOG_RETENTION_DAYS: env.EVENT_LOG_RETENTION_DAYS,
     });
     // ── A cascata de anonimização que ficou pela metade ──────────────────
     //
