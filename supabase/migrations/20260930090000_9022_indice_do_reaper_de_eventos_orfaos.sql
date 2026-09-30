@@ -1,0 +1,76 @@
+-- 9022 — O REAPER DO DRENO GANHA ÍNDICE. O COMENTÁRIO DIZIA "INDEXADO"; NÃO ERA.
+--
+-- ═══ O DEFEITO, MEDIDO EM PRODUÇÃO ═══
+--
+-- `lib/agent-engine/edge/crm/drain.ts` (linhas 64-71) abre cada tick do dreno com
+-- um "reaper": um UPDATE que devolve para `pending` os eventos que ficaram presos
+-- em `processing` — órfãos de um consumidor que morreu no meio. Ele roda ~3,5
+-- vezes por minuto, e o comentário em cima dele dizia "barato (update indexado)".
+--
+-- Não era. A condição — `event_type = 'ai_agent.dispatch_requested'`, `status =
+-- 'processing'`, `updated_at` mais velho que o timeout — não casava com índice
+-- nenhum de `event_log`. Os parciais de status cobrem os OUTROS três:
+-- `event_log_pending_idx` (`'pending'`), `event_log_dead_idx` (`'dead'`) e
+-- `idx_event_log_poda` (`done`/`dead`, da 9021). Os totais —
+-- `event_log_org_type_idx`, `event_log_entity_idx`, `event_log_consumed_by_gin` —
+-- começam por coluna que o reaper não filtra (`organization_id`, `entity_kind`)
+-- ou indexam o array `consumed_by`, que é o ÚLTIMO predicado a restringir. E
+-- `event_log_routing_active_unique`, o único que menciona `processing`, é parcial
+-- em `event_type = 'conversation.routing_requested'` — outro tipo de evento, logo
+-- fora de alcance. Então cada execução do reaper fazia **varredura sequencial na
+-- `event_log` inteira** — 18.227 linhas na medição de 30/09/2026 —, 3,5 vezes por
+-- minuto, para mexer em 21 linhas.
+--
+-- No pico de 30/09/2026 uma execução do reaper levou **23,4 segundos**, segurando
+-- CPU e locks enquanto as consultas dos atendentes eram canceladas aos 8 segundos
+-- (`statement_timeout` do `authenticator`). O custo de um caminho quente sem
+-- índice não fica no caminho quente: ele sai pelo lado, na tela de quem está
+-- atendendo.
+--
+-- ═══ O QUE O ÍNDICE FEZ, NA MESMA CONSULTA ═══
+--
+--     plano .............. Seq Scan  →  Index Scan
+--     blocos lidos ....... 1.395     →  1
+--     tempo .............. ~9 ms     →  0,036 ms
+--
+-- Depois de criado em produção, 24 varreduras (`idx_scan`) nos primeiros 5
+-- minutos: está em uso, não é índice de enfeite.
+--
+-- ═══ POR QUE PARCIAL, E POR QUE NESTA ORDEM DE COLUNAS ═══
+--
+-- Parcial em `status = 'processing'` porque é exatamente o conjunto que o reaper
+-- visita, e ele é minúsculo: 21 linhas qualificavam na medição, e o índice inteiro
+-- ocupa **16 kB**. Um índice total em `(event_type, updated_at)` cobriria as
+-- 18.227 linhas para servir a 21, e ainda seria pago em toda escrita de
+-- `event_log` — que é a tabela que todo gatilho do CRM escreve. A cláusula
+-- `where` também mantém `status` fora das colunas do índice: ele já é constante
+-- dentro do predicado.
+--
+-- `event_type` primeiro e `updated_at` depois porque o reaper compara `event_type`
+-- por igualdade e `updated_at` por faixa. Igualdade antes de faixa é o que permite
+-- ao Postgres descer a árvore até o ponto certo e varrer em ordem dali; o inverso
+-- obrigaria a ler toda a faixa de tempo e filtrar por tipo depois. `consumed_by`
+-- não entra: é array, testado com `= any(...)`, e o conjunto que sobra depois dos
+-- dois primeiros predicados já é da ordem de dezenas.
+--
+-- ═══ SEM `CONCURRENTLY` AQUI, E ISSO É DELIBERADO ═══
+--
+-- Em produção ele foi aplicado à mão, em 30/09/2026, com `create index
+-- concurrently` — a tabela estava em uso e uma criação bloqueante teria travado a
+-- escrita de todo gatilho do CRM. Na migration versionada a forma é a simples,
+-- porque **migration roda dentro de transação e `CREATE INDEX CONCURRENTLY` aborta
+-- dentro de uma**. O `if not exists` casa por NOME, então no banco onde ele já
+-- existe esta linha é no-op; em clone novo, a tabela nasce pequena e o bloqueio é
+-- instantâneo.
+--
+-- O nome segue a família que já está no dump (`event_log_pending_idx`,
+-- `event_log_dead_idx`) e não o prefixo `idx_` da 9021, de propósito: é o mesmo
+-- nome que foi criado à mão em produção, e nome diferente aqui faria o `if not
+-- exists` criar um SEGUNDO índice com a mesma definição no banco que já tem o
+-- primeiro.
+--
+-- Idempotente: `create index if not exists`. Nenhuma constraint, nenhum dado
+-- tocado, nenhuma função nova (por isso não há varredura de `anon` a fazer).
+create index if not exists event_log_reaper_idx
+  on public.event_log (event_type, updated_at)
+  where status = 'processing';

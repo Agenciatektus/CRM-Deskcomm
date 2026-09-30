@@ -37610,6 +37610,35 @@ create index if not exists idx_automation_rule_runs_event_id
 create index if not exists idx_appointment_recovery_receipts_source_event
   on public.appointment_recovery_receipts (source_event_id) where source_event_id is not null;
 
+-- ---- índice do reaper do dreno (migration 9022) ----
+--
+-- Aqui, junto dos outros índices de `event_log`: a tabela nasce no corpo do dump,
+-- muito acima, e este bloco continua ANTES da varredura de anon — como todo
+-- apêndice. Nenhuma função nova, então não há o que a varredura reabra.
+--
+-- O reaper do dreno (`lib/agent-engine/edge/crm/drain.ts`, linhas 64-71) devolve
+-- para `pending` os eventos presos em `processing` — órfãos de um consumidor que
+-- morreu no meio — e roda ~3,5 vezes por minuto. A condição dele não casava com
+-- índice nenhum: os parciais de status cobrem `pending`, `dead` e `done`/`dead`,
+-- e o único que menciona `processing` (`event_log_routing_active_unique`) é
+-- parcial em outro `event_type`. Cada execução varria a `event_log` INTEIRA —
+-- 18.227 linhas na medição de 30/09/2026 — para mexer em 21.
+--
+-- Medido em produção no pico de 30/09/2026: uma execução do reaper levou 23,4
+-- segundos, segurando CPU e locks enquanto as consultas dos atendentes eram
+-- canceladas aos 8 segundos. Na mesma consulta, depois do índice: Seq Scan →
+-- Index Scan, 1.395 blocos lidos → 1, ~9 ms → 0,036 ms.
+--
+-- Parcial em `status = 'processing'` porque é exatamente o conjunto visitado (21
+-- linhas; o índice ocupa 16 kB), e `event_type` antes de `updated_at` porque é
+-- igualdade antes de faixa. Sem `CONCURRENTLY`, igual à migration: em produção
+-- ele já foi criado à mão com `concurrently`, e `if not exists` — que casa por
+-- NOME — torna esta linha no-op lá; em clone novo a tabela nasce pequena e o
+-- bloqueio é instantâneo. O racional inteiro está no cabeçalho da migration.
+create index if not exists event_log_reaper_idx
+  on public.event_log (event_type, updated_at)
+  where status = 'processing';
+
 create or replace function public.fn_podar_event_log(
   p_retencao_dias int default null,
   p_limite int default null
