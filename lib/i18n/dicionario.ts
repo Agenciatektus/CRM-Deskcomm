@@ -1722,6 +1722,11 @@ export const DICIONARIO: Traducoes = {
   "Volume de texto por atendimento": { es: "Volumen de texto por atención" },
   "Custo máximo por atendimento (centavos)": { es: "Costo máximo por atención (centavos)" },
   "Mensagens anteriores que ele lê": { es: "Mensajes anteriores que lee" },
+  "Esperar antes de responder (segundos)": { es: "Esperar antes de responder (segundos)" },
+  "Mensagens do mesmo contato dentro desse tempo viram uma resposta só. Vazio usa a janela padrão da instalação (máximo 60 segundos).": {
+    es: "Los mensajes del mismo contacto dentro de este tiempo se convierten en una sola respuesta. Vacío usa la ventana predeterminada de la instalación (máximo 60 segundos).",
+  },
+  "Vazio = padrão da instalação": { es: "Vacío = predeterminado de la instalación" },
   "Tamanho máximo desse histórico": { es: "Tamaño máximo de ese historial" },
   "As instruções dele": { es: "Sus instrucciones" },
   "Estilo de resposta": { es: "Estilo de respuesta" },
@@ -3433,8 +3438,11 @@ export const DICIONARIO: Traducoes = {
   "Seu sistema usa inteligência artificial em": { es: "Tu sistema usa inteligencia artificial en" },
   "Skills da IA": { es: "Skills de la IA" },
   "Skills instaladas": { es: "Skills instaladas" },
-  "Há uma versão nova desta skill no catálogo. Ao adotar, ela passa a ser a ativa; a versão atual continua no Histórico de versões e pode ser restaurada.": {
-    es: "Hay una versión nueva de esta skill en el catálogo. Al adoptarla pasa a ser la activa; la versión actual queda en el Historial de versiones y se puede restaurar.",
+  "Se você adotar a versão do catálogo, muda:": { es: "Si adoptas la versión del catálogo, cambia:" },
+  "Palavras-chave de ativação": { es: "Palabras clave de activación" },
+  "Procedimento (corpo)": { es: "Procedimiento (cuerpo)" },
+  "Há uma versão nova desta skill no catálogo. Se você editou esta cópia, suas alterações ficam só no Histórico de versões: ao adotar, a versão nova do catálogo passa a ser a ativa. Confira antes de adotar.": {
+    es: "Hay una versión nueva de esta skill en el catálogo. Si editaste esta copia, tus cambios quedan solo en el Historial de versiones: al adoptarla, la versión nueva del catálogo pasa a ser la activa. Revisa antes de adoptar.",
   },
   "Adotar versão nova": { es: "Adoptar versión nueva" },
   "Adotando…": { es: "Adoptando…" },
@@ -5230,12 +5238,18 @@ export const DICIONARIO: Traducoes = {
   "dia(s) de uso. Enquanto esse número for menor que o teto diário, é ELE que limita, e mexer no teto diário não muda nada.": {
     es: "día(s) de uso. Mientras ese número sea menor que el tope diario, es ÉL quien limita, y cambiar el tope diario no cambia nada.",
   },
-  "Janela de envio (horário local)": { es: "Ventana de envío (horario local)" },
+  "Janela de resposta (horário local)": { es: "Ventana de respuesta (horario local)" },
+  "Janela de disparo (horário local)": { es: "Ventana de envíos proactivos (horario local)" },
+  "Hora de início da janela de resposta": { es: "Hora de inicio de la ventana de respuesta" },
+  "Hora de fim da janela de resposta": { es: "Hora de fin de la ventana de respuesta" },
   "Hora de início da janela": { es: "Hora de inicio de la ventana" },
   "h até": { es: "h hasta" },
   "Hora de fim da janela": { es: "Hora de fin de la ventana" },
-  "O assistente só envia mensagens dentro desta janela. Fora dela, a resposta fica agendada para a próxima abertura — você vê o motivo na conversa.": {
-    es: "El asistente solo envía mensajes dentro de esta ventana. Fuera de ella, la respuesta queda programada para cuando se abra de nuevo, y el motivo aparece en la conversación.",
+  "Quando o cliente escreve, o agente responde nesta janela. Em branco, segue a janela de disparo. Use 0 e 24 para responder a qualquer hora — o teto diário e o intervalo entre envios continuam valendo.": {
+    es: "Cuando el cliente escribe, el agente responde dentro de esta ventana. En blanco, sigue la ventana de envíos proactivos. Usa 0 y 24 para responder a cualquier hora: el tope diario y el intervalo entre envíos siguen valiendo.",
+  },
+  "Disparos em massa, prospecção e mensagens que retomam conversa parada só saem nesta janela. Fora dela, o envio fica agendado para a próxima abertura — você vê o motivo na conversa.": {
+    es: "Los envíos masivos, la prospección y los mensajes que retoman una conversación detenida solo salen dentro de esta ventana. Fuera de ella, el envío queda programado para cuando se abra de nuevo, y el motivo aparece en la conversación.",
   },
   "Enviar aos domingos": { es: "Enviar los domingos" },
   "Ligado por padrão: quem escreve no domingo espera resposta no domingo. Desligue se você faz prospecção ativa e prefere não incomodar no fim de semana.": {
@@ -5249,6 +5263,20 @@ export const DICIONARIO: Traducoes = {
   "Variação aleatória máxima em segundos": { es: "Variación aleatoria máxima en segundos" },
   "Intervalo mínimo entre mensagens do mesmo número, mais uma variação aleatória — ritmo cravado parece robô para o WhatsApp.": {
     es: "Intervalo mínimo entre mensajes del mismo número, más una variación aleatoria. Un ritmo siempre igual hace que WhatsApp lo detecte como un robot.",
+  },
+  "Atraso humano antes da primeira resposta (ms)": {
+    es: "Retraso humano antes de la primera respuesta (ms)",
+  },
+  "Ver a notificação": { es: "Ver la notificación" },
+  "Mínimo": { es: "Mínimo" },
+  "Máximo": { es: "Máximo" },
+  "Tempo para ver a notificação em ms": { es: "Tiempo para ver la notificación en ms" },
+  "Por caractere": { es: "Por carácter" },
+  "Milissegundos por caractere da resposta": { es: "Milisegundos por carácter de la respuesta" },
+  "Atraso humano mínimo em ms": { es: "Retraso humano mínimo en ms" },
+  "Atraso humano máximo em ms": { es: "Retraso humano máximo en ms" },
+  "Quanto o agente \"pensa\" antes de mandar a primeira resposta (ver a notificação + digitação por caractere, limitado entre o mínimo e o máximo). Campo vazio usa o padrão — rápido demais parece robô; lento demais parece que caiu. Não mexe no intervalo entre mensagens.": {
+    es: "Cuánto \"piensa\" el agente antes de enviar la primera respuesta (ver la notificación + escritura por carácter, limitado entre un mínimo y un máximo). Campo vacío usa el estándar: demasiado rápido parece robot; demasiado lento parece que se cayó. No cambia el intervalo entre mensajes.",
   },
   "Teto diário de envios": { es: "Tope diario de envíos" },
   "sem teto definido": { es: "sin tope definido" },
@@ -13426,7 +13454,7 @@ export const DICIONARIO: Traducoes = {
   "Acesso da IA por número": { es: "Acceso de la IA por número" },
   "Em cada número, a IA atende todo mundo, só números de teste, ninguém, ou só quem veio de uma origem.": { es: "En cada número, la IA atiende a todos, solo a números de prueba, a nadie, o solo a quien vino de un origen." },
   "Proteção de envio por número": { es: "Protección de envío por número" },
-  "Janela, ritmo, teto diário, envio aos domingos e aquecimento de cada número.": { es: "Horario, ritmo, tope diario, envío los domingos y calentamiento de cada número." },
+  "Janelas de resposta e de disparo, ritmo, teto diário, envio aos domingos e aquecimento de cada número.": { es: "Horarios de respuesta y de envíos proactivos, ritmo, tope diario, envío los domingos y calentamiento de cada número." },
   "Grupos na caixa de entrada": { es: "Grupos en la bandeja de entrada" },
   "Em cada número, escolhe quais grupos do WhatsApp aparecem nas conversas.": { es: "En cada número, elige qué grupos de WhatsApp aparecen en las conversaciones." },
   "Verificação em duas etapas obrigatória": { es: "Verificación en dos pasos obligatoria" },
