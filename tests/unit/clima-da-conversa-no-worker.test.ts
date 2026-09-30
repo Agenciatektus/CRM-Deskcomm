@@ -1173,7 +1173,12 @@ describe("os pedidos do cliente no worker de clima", () => {
     const cenario = jevLigado("decide");
     const { banco } = await rodar(cenario, comAgenteNoAr(cenario, over));
     expect(perguntasDosPedidos()).toEqual([]);
-    expect(doClima(), "o clima segue medindo (controle)").toHaveLength(1);
+    // Sem NENHUM agente no ar na empresa (o único pausado, despublicado ou
+    // arquivado), o worker inteiro sai antes do clima (#1936,
+    // `nenhum_agente_no_ar`): não há controle a medir. Nos outros casos há um
+    // agente no ar, e o clima segue medindo.
+    const semAgenteNoAr = "agente" in over;
+    expect(doClima(), "o clima segue medindo (controle)").toHaveLength(semAgenteNoAr ? 0 : 1);
     expect(banco.jev_observacoes ?? []).toEqual([]);
   });
 

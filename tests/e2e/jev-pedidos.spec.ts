@@ -399,7 +399,7 @@ test.describe("Jev — os pedidos do cliente, pela tela", () => {
       await expect(cartao.getByTestId("jev-percebidos-opt_out")).toContainText(
         "ainda não percebeu nenhuma mensagem pedindo para parar de receber mensagens",
       );
-      await page.screenshot({ path: ".superpowers/evidence/jev/cartao-pedidos-percebidos.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/cartao-pedidos-percebidos.png", fullPage: true });
       return id;
     });
 
@@ -527,7 +527,7 @@ test.describe("Jev — os pedidos do cliente, pela tela", () => {
       // A Central é lida pela empresa inteira: o que o cliente escreveu fica na conversa.
       await expect(item).not.toContainText("robô");
       await expect(item.getByRole("link", { name: "Abrir a conversa" })).toHaveAttribute("href", `/app/inbox/${avisada}`);
-      await page.screenshot({ path: ".superpowers/evidence/jev/central-aviso-do-pedido.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/central-aviso-do-pedido.png", fullPage: true });
     });
 
     await test.step("a conversa avisada segue como a observada: sem dono, sem silêncio, sem bloqueio", async () => {
@@ -604,7 +604,7 @@ test.describe("Jev — os pedidos do cliente, pela tela", () => {
       // A Central é lida pela empresa inteira: o que o cliente escreveu fica na conversa.
       await expect(item).not.toContainText("cadastro");
       await expect(item.getByRole("link", { name: "Abrir a conversa" })).toHaveAttribute("href", `/app/inbox/${id}`);
-      await page.screenshot({ path: ".superpowers/evidence/jev/central-aviso-de-parar-de-receber.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/central-aviso-de-parar-de-receber.png", fullPage: true });
 
       // Só o aviso de parar: o dublê disse que ela não pede uma pessoa. E o Jev não bloqueou.
       const { data: avisos, error: avisosErr } = await admin
@@ -633,7 +633,7 @@ test.describe("Jev — os pedidos do cliente, pela tela", () => {
       await expect(cartao.getByTestId("jev-percebidos-humano")).toContainText(
         "Nos últimos 30 dias, o Jev percebeu 2 mensagens pedindo para falar com uma pessoa em que a regra de hoje não reconheceu o pedido.",
       );
-      await page.screenshot({ path: ".superpowers/evidence/jev/cartao-mensagens-percebidas.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/cartao-mensagens-percebidas.png", fullPage: true });
     });
 
     await test.step("assumir a conversa pela tela NÃO fecha o aviso de parar de receber — falta o PARAR", async () => {
@@ -657,7 +657,7 @@ test.describe("Jev — os pedidos do cliente, pela tela", () => {
         .eq("organization_id", orgId)
         .eq("ref_id", quemSai);
       expect(avisos).toEqual([{ kind: "jev_parar_de_receber", status: "open" }]);
-      await page.screenshot({ path: ".superpowers/evidence/jev/central-parar-segue-depois-de-assumir.png", fullPage: true });
+      await page.screenshot({ path: "evidence/jev/central-parar-segue-depois-de-assumir.png", fullPage: true });
     });
   });
 });
