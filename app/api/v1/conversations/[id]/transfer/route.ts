@@ -20,6 +20,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { transferConversationSchema, validateRequest } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { adotarLeadsDoContato } from "@/lib/routing/worker";
 import type { Conversation } from "@/lib/types/messaging";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -97,6 +98,12 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
 
   const conv = row as unknown as Conversation;
+
+  // Mesma regra do rodízio e do claim: o lead vai junto só se estiver aberto e
+  // sem dono. Lead que já tem dono NÃO troca de mão numa transferência de conversa.
+  if (isServiceRoleConfigured()) {
+    await adotarLeadsDoContato(createAdminClient(), orgId, conv.contact_id, input.to_user_id);
+  }
 
   await audit({
     action: "conversation.transferred",

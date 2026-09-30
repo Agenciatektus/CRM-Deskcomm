@@ -17,7 +17,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
-import { audit } from "@/lib/audit";
+import { audit, isServiceRoleConfigured } from "@/lib/audit";
+import { adotarLeadsDoContato } from "@/lib/routing/worker";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarTrocaDeComando } from "@/lib/inbox/atividade-de-comando";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -80,6 +82,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
 
   const conv = row as unknown as Conversation;
+
+  // O lead acompanha a conversa com a MESMA regra do rodízio: só lead aberto e
+  // sem dono. Sem isto, assumir à mão deixava o funil inteiro sem responsável
+  // (medido no Dr. Paulo em 30/09: 0 de 200 leads com dono em 10 dias).
+  if (isServiceRoleConfigured()) {
+    await adotarLeadsDoContato(createAdminClient(), authz.org.orgId, conv.contact_id, user.id);
+  }
 
   await audit({
     action: "conversation.claimed",
