@@ -1,0 +1,236 @@
+name: upstream-sync
+
+# ── Sync com o upstream (melgarafael/DeskcommCRM), sem nunca mergear sozinho ─────
+#
+# Todo dia mede a distância entre a nossa `dev` e o upstream e reescreve UMA issue
+# aberta com o rótulo `upstream-sync` (scripts/upstream-sync/relatorio.sh). A seção
+# que importa no relatório é a INTERSEÇÃO: migration do upstream que redefine
+# CHECK/função/policy/type que uma 9xxx nossa também define. Isso não dá conflito
+# textual — o upstream recria o objeto sem a nossa parte e o baseline perde o fork
+# em silêncio (0387 × 9001/9004/9006, 0394 × 9016, cascata LGPD × 9008).
+#
+# Com `abrir_pr: true` (só no disparo manual) ele também tenta montar o PR:
+#   - conflito textual → comenta a lista na issue e para (sem PR);
+#   - sem conflito → branch `sync/upstream-<ref>-<sha>`, merge, `pnpm test:unit` em
+#     `dev` e no merge, comparação das falhas (vermelho novo × consertados), teste
+#     de vocabulário do fork se existir, e PR **draft** para `dev`.
+#
+# POR QUE OS TESTES RODAM AQUI, e não no ci.yml do PR: PR aberto e push feitos com
+# o GITHUB_TOKEN NÃO disparam outros workflows (regra do GitHub contra laço). O
+# PR draft nasce sem check nenhum; a medição que ele carrega é a deste job.
+#
+# POR QUE O SCHEDULE PODE NÃO RODAR: `on: schedule` só dispara a partir da branch
+# PADRÃO do repositório (hoje `tektus/main`). Enquanto este arquivo morar só em
+# `dev`, o diário não acontece; o `workflow_dispatch` funciona escolhendo a ref.
+#
+# LIMITE CONHECIDO: o GITHUB_TOKEN não pode empurrar commit que altera
+# `.github/workflows/*` (falta o escopo `workflows`, que ele não tem). Se o merge
+# do upstream mexe em workflow, o job mede os testes do mesmo jeito, comenta o
+# resultado na issue e NÃO empurra — o merge vai ter de ser feito à mão.
+#
+# Nunca mergeia, nunca toca `master`. Ações de terceiros: só as que o ci.yml usa.
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: 'Ref do upstream (ex.: upstream/main ou uma tag v1.69.0)'
+        type: string
+        default: upstream/main
+      abrir_pr:
+        description: 'Montar a branch de merge, rodar os testes e abrir PR draft para dev'
+        type: boolean
+        default: false
+
+# contents: write → empurrar a branch sync/upstream-*; pull-requests: write → abrir
+# o PR draft; issues: write → criar/reescrever a issue e o rótulo `upstream-sync`.
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+# Um por vez, e o segundo espera (nunca cancela uma medição no meio).
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    # Duas rodadas inteiras de `pnpm test:unit` (dev e merge) cabem com folga.
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Obrigatório: com o remote `upstream` no clone, o gh escolheria o repositório
+      # do upstream como base para issue/PR. Fixa o nosso.
+      GH_REPO: ${{ github.repository }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'upstream/main' }}
+      ABRIR_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.abrir_pr }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Buscar o upstream (com tags)
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
+          # --force: tag do upstream com o mesmo nome de uma nossa sobrescreve só
+          # NESTE runner (nenhuma tag é empurrada daqui).
+          git fetch --force --tags upstream '+refs/heads/*:refs/remotes/upstream/*'
+          if ! git rev-parse --verify -q "${UPSTREAM_REF}^{commit}" >/dev/null; then
+            echo "::error::ref do upstream inexistente: ${UPSTREAM_REF}"
+            exit 1
+          fi
+
+      - name: Relatório e conflitos textuais
+        id: rel
+        run: |
+          set -euo pipefail
+          bash scripts/upstream-sync/relatorio.sh origin/dev "$UPSTREAM_REF" > "$RUNNER_TEMP/relatorio.md"
+          printf '\n---\nRodada: %s\n' "$RUN_URL" >> "$RUNNER_TEMP/relatorio.md"
+          cat "$RUNNER_TEMP/relatorio.md" >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          git merge-tree --write-tree --name-only --no-messages origin/dev "$UPSTREAM_REF" > "$RUNNER_TEMP/merge-tree.txt"
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "conflito=nao" >> "$GITHUB_OUTPUT" ;;
+            1) echo "conflito=sim" >> "$GITHUB_OUTPUT"
+               tail -n +2 "$RUNNER_TEMP/merge-tree.txt" | sed '/^$/d' > "$RUNNER_TEMP/conflitos.txt" ;;
+            *) echo "::error::git merge-tree saiu com $code"; exit 1 ;;
+          esac
+
+      - name: Reescrever a issue upstream-sync
+        id: issue
+        run: |
+          set -euo pipefail
+          gh label create upstream-sync --color 5319e7 \
+            --description "Sync com o upstream melgarafael/DeskcommCRM" --force
+          # Limite do corpo de issue no GitHub: 65536 caracteres.
+          head -c 60000 "$RUNNER_TEMP/relatorio.md" > "$RUNNER_TEMP/corpo.md"
+          n="$(gh issue list --label upstream-sync --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [ -z "$n" ]; then
+            url="$(gh issue create --title "Sync com o upstream (DeskcommCRM)" --label upstream-sync --body-file "$RUNNER_TEMP/corpo.md")"
+            n="${url##*/}"
+          else
+            gh issue edit "$n" --body-file "$RUNNER_TEMP/corpo.md"
+          fi
+          echo "numero=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Conflito textual — comentar e parar
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'sim'
+        env:
+          ISSUE: ${{ steps.issue.outputs.numero }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Pedido de PR com \`$UPSTREAM_REF\` **não montado**: o merge tem conflito textual em $(wc -l < "$RUNNER_TEMP/conflitos.txt") arquivo(s)."
+            echo
+            echo '```'
+            head -c 50000 "$RUNNER_TEMP/conflitos.txt"
+            echo '```'
+            echo
+            echo "Rodada: $RUN_URL"
+          } > "$RUNNER_TEMP/comentario.md"
+          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/comentario.md"
+
+      - uses: ./.github/actions/preparar-node
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        timeout-minutes: 5
+
+      - name: Testes em dev (antes)
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        # O vermelho aqui é DADO, não falha do job: quem decide é a comparação.
+        run: pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/antes.json" || true
+
+      - name: Montar a branch de merge
+        id: merge
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        run: |
+          set -euo pipefail
+          curto="$(printf '%s' "${UPSTREAM_REF#upstream/}" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
+          branch="sync/upstream-${curto}-$(git rev-parse --short=8 "$UPSTREAM_REF")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git merge --no-ff --no-edit "$UPSTREAM_REF"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if git diff --quiet origin/dev HEAD -- .github/workflows; then
+            echo "mexe_em_workflow=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "mexe_em_workflow=sim" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Testes no merge (depois)
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        run: |
+          set -uo pipefail
+          if ! pnpm install --frozen-lockfile; then
+            echo "::error::pnpm install --frozen-lockfile falhou na árvore mergeada"
+            exit 1
+          fi
+          pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/depois.json" || true
+
+      - name: Comparar falhas e vocabulário do fork
+        id: cmp
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        run: |
+          set -uo pipefail
+          bash scripts/upstream-sync/comparar-falhas.sh "$RUNNER_TEMP/antes.json" "$RUNNER_TEMP/depois.json" > "$RUNNER_TEMP/comparacao.md"
+          echo "comparacao=$?" >> "$GITHUB_OUTPUT"
+          voc=tests/unit/vocabulario-do-fork-sobrevive-no-baseline.test.ts
+          {
+            echo
+            echo "## Vocabulário do fork no baseline"
+            echo
+            if [ -f "$voc" ]; then
+              if pnpm exec vitest run "$voc" > "$RUNNER_TEMP/voc.log" 2>&1; then
+                echo "Verde: \`$voc\`."
+              else
+                echo "**VERMELHO**: \`$voc\`. Fim do log:"
+                echo; echo '```'; tail -40 "$RUNNER_TEMP/voc.log"; echo '```'
+              fi
+            else
+              echo "NÃO MEDIDO: \`$voc\` não existe nesta árvore."
+            fi
+          } >> "$RUNNER_TEMP/comparacao.md"
+          cat "$RUNNER_TEMP/comparacao.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Empurrar e abrir PR draft para dev
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        env:
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          MEXE_EM_WORKFLOW: ${{ steps.merge.outputs.mexe_em_workflow }}
+          ISSUE: ${{ steps.issue.outputs.numero }}
+        run: |
+          set -euo pipefail
+          # Sem pipe para o head: com pipefail, o SIGPIPE do cat derrubaria o passo.
+          { cat "$RUNNER_TEMP/relatorio.md"; echo; cat "$RUNNER_TEMP/comparacao.md"; } > "$RUNNER_TEMP/pr-inteiro.md"
+          head -c 60000 "$RUNNER_TEMP/pr-inteiro.md" > "$RUNNER_TEMP/pr.md"
+          if [ "$MEXE_EM_WORKFLOW" = "sim" ]; then
+            {
+              echo "Merge com \`$UPSTREAM_REF\` montado e medido, mas **não empurrado**: ele altera \`.github/workflows/*\` e o GITHUB_TOKEN não pode empurrar isso. Fazer o merge à mão."
+              echo
+              head -c 55000 "$RUNNER_TEMP/comparacao.md"
+            } > "$RUNNER_TEMP/comentario.md"
+            gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/comentario.md"
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            gh issue comment "$ISSUE" --body "A branch \`$BRANCH\` já existe no origin; nada empurrado. Rodada: $RUN_URL"
+            exit 0
+          fi
+          git push -u origin "$BRANCH"
+          gh pr create --draft --base dev --head "$BRANCH" \
+            --title "chore(sync): merge do upstream ${UPSTREAM_REF}" --body-file "$RUNNER_TEMP/pr.md"
+
+      - name: Vermelho novo reprova a rodada
+        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao' && steps.cmp.outputs.comparacao != '0'
+        run: |
+          echo "::error::o merge com o upstream tem teste vermelho novo (ou não foi medido) — ver o resumo da rodada"
+          exit 1

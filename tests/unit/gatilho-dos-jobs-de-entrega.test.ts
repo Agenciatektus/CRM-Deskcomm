@@ -230,6 +230,13 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
   },
 
   // --- e o que legitimamente tem interruptor -----------------------------------
+  "upstream-sync.yml::sincronizar": {
+    condicao: null,
+    efeito:
+      "Este job reescreve a issue `upstream-sync` com a distância e a INTERSEÇÃO de migrations " +
+      "(upstream × nossas 9xxx). Desligá-lo deixa a issue congelada no último relatório, e a " +
+      "próxima curadoria lê uma lista velha achando que é a de hoje.",
+  },
   "acolhida.yml::acolher": {
     condicao:
       "github.repository_owner == 'melgarafael' && " +
