@@ -36,6 +36,7 @@ const JOB = {
 };
 
 const statusUpdates: string[] = [];
+const filtrosRunAfter: { op: string; col: string; v: string }[] = [];
 
 /** Filtros `.is()` pedidos ao stub — prova que a cadência sai JÁ na consulta. */
 const filtrosIs: Array<[string, string, unknown]> = [];
@@ -53,7 +54,8 @@ function admin() {
         filtrosIs.push([table, coluna, valor]);
         return chain;
       },
-      lte: () => chain,
+      lte: (col: string, v: string) => (filtrosRunAfter.push({ op: "lte", col, v }), chain),
+      lt: (col: string, v: string) => (filtrosRunAfter.push({ op: "lt", col, v }), chain),
       in: () => chain,
       single: () => Promise.resolve({data:table==="send_ledger"?{id:"ledger-1"}:{settings:{}},error:null}),
       insert: () => chain,
@@ -89,6 +91,7 @@ function admin() {
 beforeEach(() => {
   vi.clearAllMocks();
   statusUpdates.length = 0;
+  filtrosRunAfter.length = 0;
 });
 
 describe("enviarTextoFixoPendente · gate de elegibilidade", () => {
@@ -128,4 +131,20 @@ describe("cadência não sai pelo atalho inline", () => {
     await enviarTextoFixoPendente(admin() as never);
     expect(filtrosIs).toContainEqual(["job_queue", "payload->cadencia", null]);
   });
+});
+
+// O banco grava run_after em µs; o JS lê o relógio em ms. Job gravado com
+// run_after=now() há menos de 1 ms (ex.: ...00.000500Z com o JS em ...00.000Z)
+// está vencido, e o filtro não pode escondê-lo: o corte é o FIM do ms corrente.
+it("filtro de vencimento cobre o milissegundo corrente inteiro (run_after em µs)", async () => {
+  vi.useFakeTimers({ now: new Date("2026-09-26T10:04:46.558Z"), toFake: ["Date"] });
+  try {
+    decidir.mockResolvedValue({ permite: true });
+    await enviarTextoFixoPendente(admin());
+  } finally {
+    vi.useRealTimers();
+  }
+  const run = filtrosRunAfter.filter((f) => f.col === "run_after");
+  expect(run.length).toBeGreaterThanOrEqual(2); // seleção e reivindicação
+  for (const f of run) expect(f).toEqual({ op: "lt", col: "run_after", v: "2026-09-26T10:04:46.559Z" });
 });

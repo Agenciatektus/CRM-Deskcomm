@@ -10,7 +10,9 @@ import type { Message as ConversationMensagem } from "@/lib/types/messaging";
 import { ChatThread } from "./ChatThread";
 import { Composer, type ComposerHandle } from "./Composer";
 import { JanelaFechadaAviso } from "./JanelaFechadaAviso";
+import { NumeroForaDoAr } from "./NumeroForaDoAr";
 import { RetentionNotice } from "./RetentionNotice";
+import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 
 /**
  * A CONVERSA COM O CAMPO DE RESPOSTA — uma peça só, usada no Inbox e no dossiê
@@ -47,10 +49,22 @@ export interface PainelDaConversaProps {
    * linha do tempo como registro, e o espaço vertical ali é mais disputado).
    */
   onde?: "inbox" | "dossie";
+  /** Busca dentro da conversa (#1793): o termo realça as mensagens carregadas. */
+  searchTerm?: string;
+  /**
+   * Abre outra conversa do mesmo contato (aviso de número fora do ar). Só o
+   * Inbox navega entre conversas; sem este callback o aviso não é montado.
+   */
+  onAbrirConversa?: (id: string) => void;
+  /** Rascunho sugerido por integração (issue #1611) — `null` é o caso comum. */
+  rascunho?: AvisoDeRascunho | null;
 }
 
 export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps>(
-  function PainelDaConversa({ conversation, onde = "inbox" }, composerRef) {
+  function PainelDaConversa(
+    { conversation, onde = "inbox", searchTerm = "", onAbrirConversa, rascunho = null },
+    composerRef,
+  ) {
     const t = useT();
     // Acompanhamento de suporte somente leitura já chega aqui como `viewer`
     // (`resolveActiveOrg` o rebaixa), então este gate também o cobre.
@@ -97,6 +111,8 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
         <div className="min-h-0 flex-1 overflow-hidden">
           <ChatThread
             conversationId={conversation.id}
+            searchTerm={searchTerm}
+            provider={provider}
             onResponder={podeResponder ? setRespondendo : undefined}
             // O cartão da passagem escolhe o gesto a partir de quem é o dono da
             // conversa: sem dono convida a assumir, com outro dono diz quem
@@ -109,6 +125,16 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
           />
         </div>
         {onde === "inbox" && <RetentionNotice conversationId={conversation.id} />}
+        {onAbrirConversa && conversation.contacts?.id && (
+          <NumeroForaDoAr
+            key={`numero:${conversation.id}`}
+            conversationId={conversation.id}
+            channelSessionId={conversation.channel_session_id}
+            contactId={conversation.contacts.id}
+            contactPhone={conversation.contacts.phone_number ?? null}
+            onAbrirConversa={onAbrirConversa}
+          />
+        )}
         {podeResponder ? (
           <>
             {motivoDaJanela && (
@@ -119,6 +145,9 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
               />
             )}
             <Composer
+              // Trocar a chave quando o rascunho sai REMONTA o composer: o texto
+              // nasce de `useState(initialDraft)`, e só a prop mudar não o limparia.
+              key={rascunho ? `rascunho:${rascunho.conversationId}` : "composer"}
               ref={composerRef}
               conversationId={conversation.id}
               blockedReason={blockedReason}
@@ -128,6 +157,8 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
               respondendo={respondendo}
               onCancelarResposta={() => setRespondendo(null)}
               currentContactId={conversation.contact_id}
+              rascunho={rascunho}
+              initialDraft={rascunho?.leitura.estado === "sugerido" ? rascunho.leitura.texto : ""}
             />
           </>
         ) : (

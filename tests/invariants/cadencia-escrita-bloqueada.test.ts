@@ -66,14 +66,26 @@ async function contato(): Promise<string> {
   return id;
 }
 
+/**
+ * Recusada = nada foi escrito. Desde a subida para o upstream v1.69 há DUAS
+ * camadas, e qualquer uma delas basta:
+ *  - a guarda da cadência (9020/9024): exceção 42501 com a nossa mensagem;
+ *  - a RLS POR OPERAÇÃO do upstream (0489/0490): UPDATE/DELETE fora do papel
+ *    não ENXERGA a linha (0 linhas, sem erro) e INSERT fora do papel bate no
+ *    `with check` (42501 "row-level security").
+ * O que não pode é a escrita PASSAR: linha afetada sem erro reprova.
+ */
 async function recusa(p: Promise<unknown>) {
-  const erro = (await p.then(
-    () => null,
-    (e: unknown) => e,
-  )) as { code?: string; message?: string } | null;
-  expect(erro, "a escrita deveria ter sido recusada").not.toBeNull();
-  expect(erro!.code).toBe("42501");
-  expect(erro!.message).toMatch(MENSAGEM);
+  const desfecho = (await p.then(
+    (r) => ({ r: r as { rowCount: number | null } }),
+    (e: unknown) => ({ e: e as { code?: string; message?: string } }),
+  )) as { r?: { rowCount: number | null }; e?: { code?: string; message?: string } };
+  if (desfecho.e) {
+    expect(desfecho.e.code, String(desfecho.e.message)).toBe("42501");
+    expect(desfecho.e.message).toMatch(new RegExp(`${MENSAGEM.source}|row-level security`));
+    return;
+  }
+  expect(desfecho.r!.rowCount ?? 0, "a escrita deveria ter sido recusada, e passou").toBe(0);
 }
 
 beforeAll(async () => {
@@ -176,7 +188,10 @@ describe.each([
         f.comVersion,
       ]),
     );
-    await recusa(como("authenticated", user(), "delete from followup_flow_versions where id = $1", [f.comVersion]));
+    // A cadência não se apaga pela sessão. (O DELETE de versão COMUM pelo
+    // manager é decisão do upstream v1.69 — é como a rota apaga o fluxo — e a
+    // prova dele mora em followup-trilha-e-versoes-rls-por-operacao.)
+    await recusa(como("authenticated", user(), "delete from followup_flow_versions where id = $1", [f.cadVersion]));
   });
 
   it("2) não insere inscrição de cadência", async () => {
@@ -202,6 +217,10 @@ describe.each([
 
   it("2c) EXCEÇÃO: cancelar uma régua viva de cadência passa (cascata LGPD pela sessão)", async () => {
     const viva = await inscricaoDeCadencia("active");
+    // Quem ESCREVE inscrição é manager+ desde a RLS por operação do upstream
+    // (0489): para o viewer o UPDATE não enxerga a linha. A exceção da guarda
+    // da cadência vale para quem a RLS deixa escrever.
+    const esperado = _papel === "viewer" ? 0 : 1;
     const r = await como(
       "authenticated",
       user(),
@@ -210,7 +229,7 @@ describe.each([
         where id = $1 returning id`,
       [viva],
     );
-    expect(r.rows).toHaveLength(1);
+    expect(r.rows).toHaveLength(esperado);
   });
 
   it("3) não cria cadência nem muda status/política/versão ativa dela", async () => {

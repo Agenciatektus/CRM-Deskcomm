@@ -24,7 +24,7 @@ import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 export const dynamic = "force-dynamic";
 
 const DETAIL_COLUMNS =
-  "id, name, status, active_version_id, draft_graph, handoff_policy, trigger_config, created_at, updated_at";
+  "id, name, status, active_version_id, draft_graph, handoff_policy, trigger_config, surface, created_at, updated_at";
 
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -169,6 +169,16 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (updErr || !updated) {
     if (updErr?.code === "23505") {
       return fail("conflict", t("Já existe um fluxo com este nome."), 409, { requestId });
+    }
+    // O banco recusa gatilho de relógio em roteiro de atendimento (0394,
+    // `followup_flow_pointers_roteiro_so_manual`): ele começa na conversa.
+    if (updErr?.code === "23514") {
+      return fail(
+        "validation_failed",
+        t("Roteiro de atendimento começa por palavra-gatilho ou pelo roteador, não por gatilho de follow-up."),
+        422,
+        { requestId },
+      );
     }
     return fail("internal_error", updErr?.message ?? "followup_flow_update_failed", 500, {
       requestId,

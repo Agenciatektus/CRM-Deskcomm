@@ -4,6 +4,8 @@ import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useEffect, useRef, useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
+import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
+import { ROLE_RANK } from "@/lib/auth/types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useLeadTimeline } from "@/hooks/leads/useLeadTimeline";
 import type { Lead } from "@/lib/types/leads";
@@ -12,9 +14,11 @@ import { ConversaDoNegocio } from "./ConversaDoNegocio";
 import { LeadFieldsForm } from "./LeadFieldsForm";
 import { ScoreSlot } from "./ScoreSlot";
 import { LeadTimeline } from "./LeadTimeline";
+import { PropostasDoNegocio } from "./PropostasDoNegocio";
 import { OwnerBadge } from "./OwnerBadge";
 import { SeletorDeEtapa, type EtapaDoSeletor } from "./SeletorDeEtapa";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
+import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
 import type { CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { cn } from "@/lib/utils";
 
@@ -30,17 +34,10 @@ interface Props {
   ownerNames?: Map<string, string | null>;
 }
 
-function formatBRL(cents: number | null, currency: string | null): string {
+function formatValor(cents: number | null, currency: string | null): string {
+  // Mesma régua e mesmo locale do card e do total da coluna (`formatValorDoNegocio`).
   if (cents === null) return "—";
-  try {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: currency ?? "BRL",
-      maximumFractionDigits: 0,
-    }).format(cents / 100);
-  } catch {
-    return `R$ ${(cents / 100).toFixed(0)}`;
-  }
+  return formatValorDoNegocio(cents, currency ?? MOEDA_PADRAO, { semCentavos: true });
 }
 
 /**
@@ -133,6 +130,13 @@ export function LeadDossier({
   // marca a âncora como feita: a aba abria no topo do histórico.
   const [conversaJaVista, setConversaJaVista] = useState(false);
   if (conversaVisivel && !conversaJaVista) setConversaJaVista(true);
+  // N1 — o atalho "Nova proposta" é manager+ (mesmo gate do envio, mesma
+  // régua do BulkActionBar). O dossiê não tinha nenhuma checagem de papel;
+  // esta é a primeira, no padrão já estabelecido do kanban.
+  const user = useUser();
+  const activeOrg = useActiveOrg();
+  const podeCriarProposta =
+    user.is_platform_admin || (activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager) || false;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -190,7 +194,7 @@ export function LeadDossier({
         {/* ① cabeçalho vivo */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border pb-3 text-xs">
           <span className="font-medium tabular-nums text-text">
-            {formatBRL(lead.value_cents, lead.currency)}
+            {formatValor(lead.value_cents, lead.currency)}
           </span>
           {etapas ? (
             <SeletorDeEtapa
@@ -273,6 +277,14 @@ export function LeadDossier({
           </h3>
           <LeadFieldsForm lead={lead} pipelineId={pipelineId} fieldDefs={fieldDefs} />
         </div>
+
+        {/* N1 — seção "Propostas", depois de "Dados do negócio". Some sozinha
+            (null) quando a capacidade está desligada — ver PropostasDoNegocio. */}
+        <PropostasDoNegocio
+          leadId={lead.id}
+          pipelineId={pipelineId}
+          podeCriar={podeCriarProposta}
+        />
         </div>
 
         {conversaId && (

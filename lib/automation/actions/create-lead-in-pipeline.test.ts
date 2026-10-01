@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const adminRpc = vi.hoisted(() => vi.fn(async (_fn: string, _args: unknown) => ({ data: null, error: null })));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc: adminRpc }) }));
+// O handler de criação (upstream v1.69) confere o responsável com o cliente
+// ADMIN (`user_organizations`): o dublê do admin lê as tabelas do MESMO banco
+// falso do caso, que `ctxDoLead` registra aqui.
+const adminDb = vi.hoisted(() => ({ atual: null as null | { from: (t: string) => unknown } }));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({ rpc: adminRpc, from: (t: string) => adminDb.atual!.from(t) }),
+}));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 // O dublê importa `createClient`/`requireRole` de verdade (ver o cabeçalho de
 // `create-or-move-lead.test.ts`): sem estes mocks, o boot do módulo valida env.
@@ -68,7 +74,7 @@ function cardDeVendas(over: Record<string, unknown> = {}): LeadRow {
 }
 
 function banco(opts: { leads?: LeadRow[]; posOrg?: string; stages?: ReturnType<typeof etapa>[] } = {}) {
-  return makeDb({
+  const db = makeDb({
     pipelines: [
       funilRow({ id: PIPE, name: "Vendas" }),
       funilRow({ id: POS, name: "Pós-venda", organization_id: opts.posOrg ?? ORG_ID }),
@@ -76,6 +82,10 @@ function banco(opts: { leads?: LeadRow[]; posOrg?: string; stages?: ReturnType<t
     stages: opts.stages ?? [VENDAS_NOVO, VENDAS_PAGO, POS_ENVIO, POS_ENTREGUE, POS_TROCA_CANCELADA],
     leads: opts.leads ?? [cardDeVendas()],
   });
+  // O handler de criação confere que o contato é DA organização (0403, upstream):
+  // sem a linha, o dublê respondia 404 a todo card novo.
+  (db.tabelas as unknown as Record<string, unknown[]>).contacts = [{ id: CONTATO, organization_id: ORG_ID }];
+  return db;
 }
 
 /** Membros da org e agentes — tabelas que o dublê não semeia pelo `makeDb`. */
@@ -93,6 +103,7 @@ function comEquipe(
 const DONO_ATIVO = { organization_id: ORG_ID, user_id: DONO, role: "agent", revoked_at: null };
 
 function ctxDoLead(db: ReturnType<typeof makeDb>, leadId = "venda-1", eventId = "evento-1"): ActionCtx {
+  adminDb.atual = db.client as unknown as { from: (t: string) => unknown };
   return {
     admin: db.client as unknown as ActionCtx["admin"],
     organizationId: ORG_ID,
@@ -361,6 +372,7 @@ describe("create_lead_in_pipeline — idempotência", () => {
         return { code: "23505", message: 'duplicate key value violates unique constraint "uniq_crm_leads_org_source_external"' };
       },
     });
+    (db2.tabelas as unknown as Record<string, unknown[]>).contacts = [{ id: CONTATO, organization_id: ORG_ID }];
     const r = await executa(ctxDoLead(db2), { pipeline_id: POS, stage_id: "p-envio" });
 
     expect(r).toEqual({
@@ -392,6 +404,7 @@ describe("create_lead_in_pipeline — idempotência", () => {
         };
       },
     });
+    (db2.tabelas as unknown as Record<string, unknown[]>).contacts = [{ id: CONTATO, organization_id: ORG_ID }];
     const r = await executa(ctxDoLead(db2), { pipeline_id: POS, stage_id: "p-envio" });
 
     expect(r.status).toBe("failed");

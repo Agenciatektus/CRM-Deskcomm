@@ -40,13 +40,19 @@ describe("capabilities do canal hospedado", () => {
       voiceNote: "server-convert",
       groups: "full",
       costPerMessage: false,
+      // A plataforma permite editar/apagar para todos, mas o adapter do canal
+      // hospedado ainda não implementa `editMessage`: prometer na tela seria
+      // oferecer um botão que o envio recusa (capability nova do upstream v1.69).
+      alteraMensagemEnviada: false,
     });
   });
 
   it("é igual ao canal por QR porque é o MESMO WhatsApp por baixo, não por cópia", () => {
     // Capability descreve o que a plataforma permite, não quem hospeda a
     // conexão. Divergir aqui afirmaria uma diferença que não existe.
-    expect(capabilitiesOf(VERDASH)).toEqual(CHANNEL_CAPABILITIES.waha);
+    // Única diferença declarada: `alteraMensagemEnviada` (ver o caso acima) —
+    // é do ADAPTER, não da plataforma, e some quando o adapter implementar a edição.
+    expect({ ...capabilitiesOf(VERDASH), alteraMensagemEnviada: true }).toEqual(CHANNEL_CAPABILITIES.waha);
   });
 
   it("banRisk continua ARMADO — e aqui o número em risco é o principal do cliente", () => {
@@ -389,7 +395,8 @@ describe("banco e TypeScript falam o mesmo vocabulário", () => {
 
   it("a coluna nasce antes do CHECK que a referencia", () => {
     const col = baseline.indexOf("add column if not exists verdash_instance_name");
-    const check = baseline.indexOf("provider = 'verdash'");
+    // A ÚLTIMA (e única) reconstrução do CHECK de ref — é ela que referencia a coluna.
+    const check = baseline.lastIndexOf("add constraint channel_sessions_provider_ref_check");
     expect(col).toBeGreaterThan(-1);
     expect(col).toBeLessThan(check);
   });

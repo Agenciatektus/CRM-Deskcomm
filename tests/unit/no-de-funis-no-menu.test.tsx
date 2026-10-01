@@ -37,6 +37,10 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => caminho,
 }));
+// Os contadores da fila e de casos (upstream v1.69) leem do react-query; este teste mede o nó
+// do funil, não a fila.
+vi.mock("@/components/shell/ContadorDaFila", () => ({ ContadorDaFila: () => null }));
+vi.mock("@/components/shell/ContadorDeCasos", () => ({ ContadorDeCasos: () => null }));
 vi.mock("@/components/connections/ConnectionHealthDot", () => ({
   ConnectionHealthDot: () => null,
 }));

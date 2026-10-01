@@ -19,6 +19,7 @@ export function channelBrand(
     case "waha":
     case "meta_cloud":
     case "zernio":
+    case "datafy":
     case "wacalls":
     // O canal hospedado é WhatsApp como qualquer outro: o que muda é quem
     // mantém a conexão, e isso é transporte — não identidade de rede. Sem esta
