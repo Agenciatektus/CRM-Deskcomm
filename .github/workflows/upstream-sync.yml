@@ -144,9 +144,14 @@ jobs:
           # O comparador vem de `dev`: copiado ANTES do merge mudar a árvore.
           cp scripts/upstream-sync/comparar-falhas.sh "$RUNNER_TEMP/comparar-falhas.sh"
 
+      # Sem cache NENHUM: este job roda código do upstream, e o post step do cache
+      # salvaria ~/.npm/store tocados por ele no escopo de `dev`, restaurado por
+      # todo PR depois. Vigiado por tests/unit/upstream-sync-medir-nao-salva-cache.test.ts.
       - uses: ./.github/actions/preparar-node
         if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
         timeout-minutes: 5
+        with:
+          cache: 'false'
 
       - name: Testes em dev (antes)
         if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
