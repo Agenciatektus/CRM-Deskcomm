@@ -45,6 +45,7 @@
  * FZAP não guarda o arquivo.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DUPLICADA_PELA_LEITURA, mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
 
 import { logger } from "@/lib/logger";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
@@ -334,7 +335,11 @@ async function insertMessage(
   const { msg } = input;
   const anexo = msg.attachments[0];
 
-  const { data, error } = await admin
+  // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+  // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
+  const { data, error } = (await mensagemJaRecebida(admin, input.organizationId, msg.externalId))
+    ? DUPLICADA_PELA_LEITURA
+    : await admin
     .from("messages")
     .insert({
       organization_id: input.organizationId,

@@ -40,6 +40,7 @@
  * contínuo.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DUPLICADA_PELA_LEITURA, mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
 
 import { lerEventoDoInstagram, type MensagemDoInstagram } from "./evento";
 import { fonteDaEntrada, funilQueAceita } from "@/lib/leads/fontes-do-funil";
@@ -141,8 +142,12 @@ async function inserirMensagem(
     msg: MensagemDoInstagram;
   },
 ): Promise<string | "duplicate"> {
+  // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+  // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
   const { msg } = input;
-  const { data, error } = await admin
+  const { data, error } = (await mensagemJaRecebida(admin, input.organizationId, msg.providerMessageId))
+    ? DUPLICADA_PELA_LEITURA
+    : await admin
     .from("messages")
     .insert({
       organization_id: input.organizationId,

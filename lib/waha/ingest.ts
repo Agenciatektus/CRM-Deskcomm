@@ -33,6 +33,7 @@ import { extrairEEstamparAtribuicaoGoogle } from "@/lib/plataformas-de-anuncio/g
 import { extrairAtribuicaoWaha } from "@/lib/waha/atribuicao-de-anuncio";
 import { criarIngestDeGrupoDb, gravarMensagemDeGrupo } from "@/lib/grupos/ingest";
 import type { RemetenteDeGrupo } from "@/lib/messaging/remetente-de-grupo";
+import { DUPLICADA_PELA_LEITURA, mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { ackToStatus } from "@/lib/types/messaging";
 import type { WahaEnvelope, WahaPayload } from "@/lib/waha/envelope";
@@ -807,7 +808,15 @@ async function handleInbound(
   if (!conversationId) return;
 
   const now = new Date().toISOString();
-  const { data: insertedMessage, error: insertErr } = await admin
+  // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+  // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
+  const { data: insertedMessage, error: insertErr } = (await mensagemJaRecebida(
+    admin as unknown as SupabaseClient,
+    session.organization_id,
+    p.id,
+  ))
+    ? DUPLICADA_PELA_LEITURA
+    : await admin
     .from("messages")
     .insert({
       organization_id: session.organization_id,
