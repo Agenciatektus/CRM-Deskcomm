@@ -11,7 +11,7 @@ import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
 import { visaoEmVigor } from "@/lib/ai/pontos/capacidade-em-vigor";
 import { resolveOrgLlmConfig, type LlmEdgeConfig } from "@/lib/agent-engine/edge/llm/credentials";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
-import { createPool } from "@/lib/agent-engine/db/pool";
+import { createPool, nomeDaAplicacao } from "@/lib/agent-engine/db/pool";
 import { env } from "@/lib/env";
 import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
@@ -39,7 +39,10 @@ const DRAIN_MAX_ATTEMPTS = 5; // espelho de lib/event-log/drain.ts
 // não na construção.
 let _pool: pg.Pool | null = null;
 function derivePool(): pg.Pool {
-  if (!_pool) _pool = createPool(process.env.SUPABASE_DB_URL ?? "");
+  if (!_pool)
+    _pool = createPool(process.env.SUPABASE_DB_URL ?? "", undefined, {
+      applicationName: nomeDaAplicacao("app-media-derive"),
+    });
   return _pool;
 }
 

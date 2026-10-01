@@ -7,13 +7,13 @@
  */
 import type pg from 'pg';
 
-import { createPool } from './pool';
+import { createPool, nomeDaAplicacao } from './pool';
 
 let _pool: pg.Pool | null = null;
 
 export function getRequestPool(): pg.Pool {
   const url = process.env.SUPABASE_DB_URL;
   if (!url) throw new Error('SUPABASE_DB_URL ausente — rascunho da IA indisponível');
-  if (!_pool) _pool = createPool(url);
+  if (!_pool) _pool = createPool(url, undefined, { applicationName: nomeDaAplicacao('app-request') });
   return _pool;
 }
