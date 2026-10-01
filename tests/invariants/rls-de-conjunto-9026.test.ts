@@ -37,7 +37,9 @@ const SESS_A = id(21);
 const SESS_B = id(22);
 const C1 = id(31); // A, atribuída a AG_DONO, aberta
 const C2 = id(32); // A, sem dono
-const C3 = id(33); // A, atribuída a REVOGADO, ENCERRADA (a revogação não a desatribui)
+// A, atribuída a REVOGADO e ENCERRADA: a revogação só desatribui conversa viva
+// (fn_routing_member_revoked), então é a encerrada que guarda o dono revogado.
+const C3 = id(33);
 const CB = id(34); // B
 const L1 = id(41);
 const L2 = id(42);
@@ -69,13 +71,16 @@ insert into contacts(id,organization_id,display_name) values
 insert into conversations(id,organization_id,contact_id,channel_session_id,status,assigned_to_user_id) values
  ('${C1}','${ORG_A}','${id(51)}','${SESS_A}','claimed','${AG_DONO}'),
  ('${C2}','${ORG_A}','${id(52)}','${SESS_A}','open',null),
- ('${C3}','${ORG_A}','${id(53)}','${SESS_A}','closed','${REVOGADO}'),
+ ('${C3}','${ORG_A}','${id(53)}','${SESS_A}','claimed','${REVOGADO}'),
  ('${CB}','${ORG_B}','${id(54)}','${SESS_B}','open',null);
 insert into messages(id,organization_id,conversation_id,channel_session_id,contact_id,type,direction,body) values
  ('${id(61)}','${ORG_A}','${C1}','${SESS_A}','${id(51)}','text','inbound','r9026 m1'),
  ('${id(62)}','${ORG_A}','${C2}','${SESS_A}','${id(52)}','text','inbound','r9026 m2'),
  ('${id(63)}','${ORG_A}','${C3}','${SESS_A}','${id(53)}','text','inbound','r9026 m3'),
  ('${id(64)}','${ORG_B}','${CB}','${SESS_B}','${id(54)}','text','inbound','r9026 mb');
+-- Encerra C3 DEPOIS das mensagens: inbound em conversa encerrada a reabre, e a
+-- reabertura desatribui (fn_service_stamp_status).
+update conversations set status = 'closed' where id = '${C3}';
 insert into crm_pipelines(id,organization_id,name,slug) values
  ('${id(71)}','${ORG_A}','R9026','r9026'),('${id(72)}','${ORG_B}','R9026','r9026');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position) values
