@@ -2,7 +2,14 @@
 
 
 SET statement_timeout = 0;
-SET lock_timeout = 0;
+-- Prazo de trava da APLICAÇÃO (migration 9025). O `pg_dump` emite `lock_timeout = 0`
+-- (esperar para sempre), e esta linha vence qualquer PGOPTIONS de quem chama: com 0,
+-- a DDL que disputa lock com o app no ar entra na FILA e trava toda consulta atrás
+-- dela (5 deadlocks no redeploy de 01/10/2026). Com 3 s ela desiste com
+-- "lock timeout", que `reaplicar_baseline` (hostgator-setup-kit/_common.sh) já
+-- classifica como disputa e cura reaplicando o arquivo, que é idempotente.
+-- Vigiado por tests/unit/baseline-aplica-com-prazo-de-trava.test.ts.
+SET lock_timeout = '3s';
 SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
@@ -2583,11 +2590,9 @@ CREATE INDEX IF NOT EXISTS "conversations_usable_rag_idx" ON "public"."conversat
 
 
 
-CREATE INDEX IF NOT EXISTS "event_log_consumed_by_gin" ON "public"."event_log" USING "gin" ("consumed_by");
-
-
-
-CREATE INDEX IF NOT EXISTS "event_log_dead_idx" ON "public"."event_log" USING "btree" ("organization_id", "created_at" DESC) WHERE ("status" = 'dead'::"text");
+-- `event_log_consumed_by_gin` e `event_log_dead_idx` saíram daqui (migration 9025):
+-- zero leituras em produção, custo em toda escrita da `event_log`. O apêndice
+-- os derruba onde ainda existem. Não recriar sem uma consulta que os use.
 
 
 
@@ -46840,6 +46845,61 @@ drop trigger if exists trg_followup_mesma_organizacao on public.followup_flow_ve
 create trigger trg_followup_mesma_organizacao
   before insert or update of organization_id, pointer_id on public.followup_flow_versions
   for each row execute function public.fn_followup_mesma_organizacao();
+
+-- ---- fila queued com índice, event_log sem índice morto, guarda do gateway sem subtransação (migration 9025) ----
+-- Três peças, racional inteiro no cabeçalho da migration:
+-- (1) `idx_messages_queued_created` serve às duas consultas do resgate de `queued`
+--     (session-reconciler.ts), que faziam Seq Scan em `messages` a cada tique. Sem
+--     `CONCURRENTLY`, igual à 9022: em produção ele é criado à mão com
+--     `concurrently` antes do deploy e o `if not exists`, que casa por NOME, vira
+--     no-op; em clone novo a tabela nasce pequena.
+-- (2) `event_log_consumed_by_gin` e `event_log_dead_idx` saíram do corpo do dump
+--     (0 scans; nenhum código usa `@>`/`&&` em consumed_by nem lê `dead` por
+--     organização). Aqui eles caem onde ainda existem.
+-- (3) a guarda do `pgrst.db_pre_request` perde o bloco `exception` (subtransação
+--     em TODA requisição): o `sb-request-id` sai do texto por regex, sem cast de
+--     JSON, então não sobra erro a capturar. Não usa `pg_input_is_valid` (pg16):
+--     o piso é pg15. Esta é a ÚLTIMA definição da função no arquivo.
+create index if not exists idx_messages_queued_created
+  on public.messages (created_at)
+  where status = 'queued';
+
+drop index if exists public.event_log_consumed_by_gin;
+drop index if exists public.event_log_dead_idx;
+
+create or replace function public.fn_pgrst_recusar_replay_do_gateway()
+returns void
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  rid text;
+  aceito_ha interval;
+begin
+  -- Só UUIDv7 (versão 7 no 3º grupo) carrega instante; qualquer outra coisa —
+  -- cabeçalho ausente, vazio, fora de JSON, id de outro formato — passa.
+  rid := substring(
+    coalesce(current_setting('request.headers', true), '')
+    from '"sb-request-id"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12})"'
+  );
+  if rid is null then
+    return;
+  end if;
+  aceito_ha := now() - to_timestamp((('x' || replace(left(rid, 13), '-', ''))::bit(48)::bigint) / 1000.0);
+  if aceito_ha > interval '5 minutes' then
+    raise exception 'gateway_replay'
+      using errcode = 'PT409',
+            detail  = format('sb-request-id %s foi aceito pelo gateway há %s', rid, aceito_ha),
+            hint    = 'A requisição original já expirou; esta é uma reexecução do gateway de uma resposta 5xx antiga.';
+  end if;
+end;
+$$;
+
+revoke all on function public.fn_pgrst_recusar_replay_do_gateway() from public, anon;
+grant execute on function public.fn_pgrst_recusar_replay_do_gateway() to anon, authenticated, service_role;
+
+notify pgrst, 'reload config';
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

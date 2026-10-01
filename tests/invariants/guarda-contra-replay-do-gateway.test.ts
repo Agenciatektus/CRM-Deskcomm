@@ -101,3 +101,60 @@ describe("0237 — guarda contra replay do gateway do Supabase", () => {
     expect(sqlstateDaGuarda("isto não é json")).toBe("SQLSTATE=00000");
   });
 });
+
+/**
+ * 9025 — a guarda deixa de ter bloco `exception` (subtransação em TODA
+ * requisição do PostgREST) e lê o `sb-request-id` por regex, sem cast de JSON.
+ * Os casos acima continuam valendo; estes cobrem o que a troca de mecanismo
+ * poderia quebrar.
+ */
+describe("9025 — guarda sem subtransação", () => {
+  it("o corpo instalado não tem bloco exception nem cast de JSON", () => {
+    const fonte = sql(`
+      select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'fn_pgrst_recusar_replay_do_gateway';
+    `);
+    expect(fonte).toContain("sb-request-id");
+    expect(fonte).not.toMatch(/\bexception\s+when\b/i);
+    expect(fonte).not.toMatch(/::\s*jsonb?\b/i);
+  });
+
+  it("cabeçalho vazio passa", () => {
+    expect(sqlstateDaGuarda("")).toBe("SQLSTATE=00000");
+  });
+
+  it("JSON que não é objeto, ou id que não é texto, passa", () => {
+    expect(sqlstateDaGuarda("[1, 2, 3]")).toBe("SQLSTATE=00000");
+    expect(sqlstateDaGuarda('"sb-request-id"')).toBe("SQLSTATE=00000");
+    expect(sqlstateDaGuarda(JSON.stringify({ "sb-request-id": 12345 }))).toBe("SQLSTATE=00000");
+  });
+
+  it("JSON truncado com um UUIDv7 velho no meio não derruba nem recusa por engano", () => {
+    expect(sqlstateDaGuarda(`{"sb-request-id": "${uuidv7(6 * 60 * 1000)}`)).toBe("SQLSTATE=00000");
+  });
+
+  it("a chave forjada DENTRO do valor de outro cabeçalho não vira 409", () => {
+    const forjado = JSON.stringify({ "x-forjado": `"sb-request-id":"${uuidv7(6 * 60 * 1000)}"` });
+    expect(sqlstateDaGuarda(forjado)).toBe("SQLSTATE=00000");
+  });
+
+  it("UUIDv7 velho no meio de outros cabeçalhos ainda recebe PT409", () => {
+    const h = JSON.stringify({ accept: "*/*", "sb-request-id": uuidv7(6 * 60 * 1000), "user-agent": "x" });
+    expect(sqlstateDaGuarda(h)).toBe("SQLSTATE=PT409");
+  });
+});
+
+describe("9025 — índices da fila e da event_log", () => {
+  it("idx_messages_queued_created existe, parcial em status = 'queued'", () => {
+    const def = sql(`select pg_get_indexdef('public.idx_messages_queued_created'::regclass);`).trim();
+    expect(def).toMatch(/ON public\.messages USING btree \(created_at\) WHERE \(status = 'queued'::text\)/);
+  });
+
+  it("os dois índices sem leitor da event_log não existem", () => {
+    const n = sql(`
+      select count(*) from pg_class c join pg_namespace s on s.oid = c.relnamespace
+       where s.nspname = 'public' and c.relname in ('event_log_consumed_by_gin', 'event_log_dead_idx');
+    `).trim();
+    expect(n).toBe("0");
+  });
+});
