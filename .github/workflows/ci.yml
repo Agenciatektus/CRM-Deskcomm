@@ -570,6 +570,18 @@ jobs:
       # Uma variável, os dois scripts: `scripts/test-db.sh` e
       # `scripts/test-update-com-dados.sh` leem esta para escolher a imagem.
       TEST_DB_IMAGE: pgvector/pgvector:pg${{ matrix.pg }}
+      # FORK (Tektus): as duas releases do upstream cuja conferência do kit roda
+      # aqui, cada TAG ao lado do SHA do COMMIT que ela tem de apontar
+      # (`git rev-parse <tag>^{commit}`). O script executa um trecho do
+      # update.sh dessas tags; tag pode ser movida, e o SHA fixo impede que
+      # código não revisado rode no executor próprio. AO SUBIR DE RELEASE,
+      # TROCAR OS DOIS JUNTOS (tag e SHA), conferindo com
+      # `git ls-remote --tags https://github.com/melgarafael/DeskcommCRM.git '<tag>*'`
+      # (o SHA certo é o da linha `^{}`, a tag é anotada).
+      KIT_RELEASE_TAG: v1.69.0
+      KIT_RELEASE_COMMIT: e8e2912178031d321caf0912b270ee06bd2c36c7
+      KIT_FIXA_TAG: v1.63.0
+      KIT_FIXA_COMMIT: 0fd9bda24fac7430dbb240e87c35cc9fd7ce7633
     steps:
       - uses: actions/checkout@v7
 
@@ -587,10 +599,21 @@ jobs:
       # rodam) e a v1.63.0 fixa do próprio script. A conferência continua
       # rodando as TRÊS versões do update.sh (deste checkout, da release e da
       # v1.63.0) — só a pergunta "qual é a última release" é respondida à mão.
-      # Ao subir o fork para outra release do upstream, troque as duas linhas.
+      # Tag e SHA moram no `env` do job (acima), lado a lado. Depois do fetch, o
+      # commit de cada tag é CONFERIDO: divergiu, aborta antes de qualquer
+      # trecho do update.sh rodar.
       - name: Tags do upstream para a conferência do kit (fork sem releases)
         run: |
-          git fetch -q --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git "+refs/tags/v1.69.0:refs/tags/v1.69.0" "+refs/tags/v1.63.0:refs/tags/v1.63.0"
+          git fetch -q --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git "+refs/tags/${KIT_RELEASE_TAG}:refs/tags/${KIT_RELEASE_TAG}" "+refs/tags/${KIT_FIXA_TAG}:refs/tags/${KIT_FIXA_TAG}"
+          for par in "${KIT_RELEASE_TAG}=${KIT_RELEASE_COMMIT}" "${KIT_FIXA_TAG}=${KIT_FIXA_COMMIT}"; do
+            tag="${par%%=*}"; esperado="${par#*=}"
+            obtido="$(git rev-parse "refs/tags/${tag}^{commit}")"
+            if [ "$obtido" != "$esperado" ]; then
+              echo "::error::A tag ${tag} do upstream aponta para ${obtido}, e o fixado é ${esperado}. Tag movida: NÃO rodo o update.sh dela. Confira o upstream e, se for legítimo, troque tag e SHA juntos no env do invariants-majors."
+              exit 1
+            fi
+            echo "tag ${tag} conferida: ${obtido}"
+          done
 
       - name: RLS isolation + governance invariants (pg${{ matrix.pg }})
         # O token é só para `gh release view`: o test:db confere o update.sh da
@@ -598,8 +621,8 @@ jobs:
         # consultas/hora por IP — o executor próprio é um IP só.
         env:
           GH_TOKEN: ${{ github.token }}
-          # Fork sem releases: ver o passo acima.
-          CONFERENCIA_KIT_RELEASE: v1.69.0
+          # Fork sem releases: ver o passo acima e o env do job.
+          CONFERENCIA_KIT_RELEASE: ${{ env.KIT_RELEASE_TAG }}
         run: pnpm test:db
 
       # O `update.sh` do cliente roda sobre um banco COM DADOS, e nenhum gate
