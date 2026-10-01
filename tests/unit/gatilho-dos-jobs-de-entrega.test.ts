@@ -230,6 +230,19 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
   },
 
   // --- e o que legitimamente tem interruptor -----------------------------------
+  "upstream-sync.yml::medir": {
+    condicao: null,
+    efeito:
+      "Este job mede a distância e a INTERSEÇÃO de migrations (upstream × nossas 9xxx), só com " +
+      "`contents: read`. Desligá-lo deixa o `publicar` sem o que publicar: a issue `upstream-sync` " +
+      "congela no último relatório e a curadoria lê uma lista velha achando que é a de hoje.",
+  },
+  "upstream-sync.yml::publicar": {
+    condicao: null,
+    efeito:
+      "Este job reescreve a issue `upstream-sync` com o relatório do `medir` (e, no disparo " +
+      "manual, empurra a branch e abre o PR draft). Desligá-lo faz a medição rodar e ninguém ver.",
+  },
   "acolhida.yml::acolher": {
     condicao:
       "github.repository_owner == 'melgarafael' && " +
