@@ -52,6 +52,17 @@ export async function enrollFollowupFlow(
     .maybeSingle();
   if (pointerErr) return { ok: false, code: "internal_error", message: pointerErr.message, status: 500 };
   if (!pointer) return { ok: false, code: "not_found", message: "Fluxo não encontrado.", status: 404 };
+  // Roteiro de atendimento não se inscreve pelo relógio: ele começa no turno do
+  // agente (palavra-gatilho ou roteador). O banco recusaria a linha
+  // (`trg_enrollment_superficie_coerente`); aqui a recusa vira mensagem legível.
+  if (pointer.surface === "atendimento") {
+    return {
+      ok: false,
+      code: "flow_not_enrollable",
+      message: "Roteiro de atendimento começa na conversa, não por inscrição.",
+      status: 422,
+    };
+  }
 
   // CADÊNCIA NÃO ENTRA POR AQUI. A porta dela é `lib/cadencia/inscrever.ts`,
   // que aplica o que esta não sabe: teto do dia, prévia com confirmação, base

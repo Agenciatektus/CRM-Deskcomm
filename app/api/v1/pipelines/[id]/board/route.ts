@@ -27,6 +27,7 @@ import {
 } from "@/lib/leads/next-action";
 import type { LeadCandidate } from "@/lib/leads/active-lead";
 import { anexarDadosDoContato, type LinhaDoContatoNoQuadro } from "@/lib/kanban/dados-do-contato";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { createClient } from "@/lib/supabase/server";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
@@ -153,7 +154,7 @@ async function avisaAmbiguas(
 ): Promise<void> {
   if (ambiguas.length === 0) return;
 
-  const { data: jaAbertos } = await consultarEmLotes<{ ref_id: string }>(
+  const { data: jaAbertos } = await buscaEmLotes(
     ambiguas.map((a) => a.contact_id),
     (lote) =>
       supabase
@@ -203,17 +204,7 @@ async function withScores(
 ): Promise<{ leads: Lead[]; error: string | null }> {
   if (leads.length === 0) return { leads, error: null };
 
-  // Em lotes pelo mesmo motivo das irmãs, e aqui a lista é a de LEADS: num
-  // quadro de mil e poucos cards, mandar todos os ids de uma vez monta a mesma
-  // URL de 40 KB que o gateway recusa.
-  const { data, error } = await consultarEmLotes<{
-    lead_id: string;
-    ai_probability: number | null;
-    ai_probability_reason: string | null;
-    ai_probability_band: string | null;
-    ai_probability_evidence: unknown;
-    ai_probability_at: string | null;
-  }>(
+  const { data, error } = await buscaEmLotes(
     leads.map((l) => l.id),
     (lote) =>
       supabase
@@ -224,7 +215,7 @@ async function withScores(
         .eq("organization_id", organizationId)
         .in("lead_id", lote),
   );
-  if (error) return { leads, error };
+  if (error) return { leads, error: error.message };
 
   const porLead = new Map<string, NonNullable<Lead["score"]>>();
   for (const row of (data ?? []) as Array<{
@@ -286,22 +277,13 @@ async function withConversas(
   const contactIds = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c))];
   if (contactIds.length === 0) return { leads, error: null };
 
-  // Em lotes: `.in()` vira query string, e mil contatos passam de 40 KB — o
-  // gateway recusa com 400 antes do Postgres ver a consulta. Ver `lotes.ts`.
+  // Em lotes, e a ordem continua valendo para o que importa: as conversas de um
+  // contato caem todas no mesmo lote, e é DENTRO do contato que "a primeira vista
+  // vence" lê a ordem.
   //
-  // `instagram_entrada` veio da sessão do Instagram (#10) enquanto esta
-  // correção estava aberta, e entra aqui junto: o card mostra de onde o lead
-  // veio, e perder essa coluna no merge deixaria Direct e WhatsApp
-  // indistinguíveis no quadro.
-  const { data, error } = await consultarEmLotes<{
-    id: string;
-    contact_id: string | null;
-    last_message_preview: string | null;
-    last_message_at: string | null;
-    unread_count_for_assignee: number | null;
-    tags: string[] | null;
-    instagram_entrada: string | null;
-  }>(contactIds, (lote) =>
+  // `instagram_entrada` (fork, #10): o card mostra de onde o lead veio, e perder
+  // essa coluna deixaria Direct e WhatsApp indistinguíveis no quadro.
+  const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("conversations")
       .select(
@@ -311,7 +293,7 @@ async function withConversas(
       .in("contact_id", lote)
       .order("last_message_at", { ascending: false, nullsFirst: false }),
   );
-  if (error) return { leads, error };
+  if (error) return { leads, error: error.message };
 
   const porContato = new Map<string, NonNullable<Lead["conversa"]>>();
   const marcadoresPorContato = new Map<string, Set<string>>();
@@ -396,21 +378,14 @@ async function withMarcadoresDoContato(
   ];
   if (contactIds.length === 0) return { leads: leadsDoQuadro, error: null };
 
-  const { data, error } = await consultarEmLotes<{
-    id: string;
-    tags: string[] | null;
-    phone_number: string | null;
-    email: string | null;
-    custom_fields: Record<string, unknown> | null;
-    is_anonymized: boolean | null;
-  }>(contactIds, (lote) =>
+  const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("contacts")
       .select("id, tags, phone_number, email, custom_fields, is_anonymized")
       .eq("organization_id", organizationId)
       .in("id", lote),
   );
-  if (error) return { leads: leadsDoQuadro, error };
+  if (error) return { leads: leadsDoQuadro, error: error.message };
 
   const linhas = (data ?? []) as Array<{ id: string; tags: string[] | null } & LinhaDoContatoNoQuadro>;
   const leads = anexarDadosDoContato(leadsDoQuadro, linhas);
@@ -446,7 +421,7 @@ async function withNextActions(
   // monta uma URL que o gateway recusa com 400 antes de consultar nada.
   const [{ data: estados, error: estadosErr }, { data: candidatos, error: candErr }] =
     await Promise.all([
-      consultarEmLotes<EstadoDoContato>(contactIds, (lote) =>
+      buscaEmLotes(contactIds, (lote) =>
         supabase
           .from("lead_state")
           .select("contact_id, next_action, next_action_seq, updated_at")
@@ -454,7 +429,7 @@ async function withNextActions(
           .in("contact_id", lote)
           .not("next_action", "is", null),
       ),
-      consultarEmLotes<LeadCandidate & { contact_id: string | null }>(contactIds, (lote) =>
+      buscaEmLotes(contactIds, (lote) =>
         supabase
           .from("crm_leads")
           .select(
@@ -465,8 +440,8 @@ async function withNextActions(
           .in("contact_id", lote),
       ),
     ]);
-  if (estadosErr) return { leads, error: estadosErr };
-  if (candErr) return { leads, error: candErr };
+  if (estadosErr) return { leads, error: estadosErr.message };
+  if (candErr) return { leads, error: candErr.message };
   if (!estados || estados.length === 0) return { leads, error: null };
 
   const { porLead, ambiguas } = roteiaProximasAcoes(

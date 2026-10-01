@@ -26,16 +26,20 @@ function banco(linhas: Linha[]) {
     from(tabela: string) {
       const construir = (modo: "select" | "update", patch: Record<string, unknown>) => {
         const filtros: Array<[string, unknown]> = [];
+        // `not(col, "is", null)`: o passo de transcrição da mídia (0497, upstream).
+        const negados: Array<[string, unknown]> = [];
         let dentro: [string, string[]] | null = null;
         const q: Record<string, unknown> = {
           eq: (c: string, v: unknown) => (filtros.push([c, v]), q),
           in: (c: string, v: string[]) => ((dentro = [c, v]), q),
+          not: (c: string, _op: string, v: unknown) => (negados.push([c, v]), q),
           limit: () => q,
           then: (r: (v: unknown) => unknown) => {
             const achadas = linhas.filter(
               (l) =>
                 l.id.split(":")[0] === tabela &&
                 filtros.every(([c, v]) => l[c] === v) &&
+                negados.every(([c, v]) => (l[c] ?? null) !== v) &&
                 (!dentro || dentro[1].includes(String(l[dentro[0]]))),
             );
             if (modo === "update") {

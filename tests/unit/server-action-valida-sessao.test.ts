@@ -68,6 +68,15 @@ const PORTOES = [
 const SEM_PORTAO_COM_MOTIVO: Record<string, string> = {
   // As ações de autenticação não podem exigir sessão: são elas que a criam.
   "app/actions/auth/signInWithPassword.ts::signInWithPassword": "cria a sessão",
+  // Upstream v1.69: a metade de IDA do OAuth do Google — cria a sessão, como a de senha.
+  "app/actions/auth/signInWithGoogle.ts::signInWithGoogle": "cria a sessão (início do OAuth)",
+  // Upstream v1.69: o portão existe, num helper do MESMO arquivo — `autorizar()` é a
+  // primeira linha das duas e chama `loadAuthUser` + `resolveActiveOrg` (admin, MFA e
+  // escrita de suporte). A varredura só enxerga chamada direta; conferido à mão.
+  "app/actions/settings/acoesDeConversaoGoogle.ts::listarAcoesDeConversaoGoogle":
+    "portão em autorizar(false), primeira linha — loadAuthUser + resolveActiveOrg",
+  "app/actions/settings/acoesDeConversaoGoogle.ts::criarAcaoDeConversaoGoogle":
+    "portão em autorizar(true), primeira linha — loadAuthUser + resolveActiveOrg",
   "app/actions/auth/signUp.ts::signUp": "cria a conta",
   "app/actions/auth/signOut.ts::signOut": "encerra a sessão; sem sessão é no-op",
   "app/actions/auth/requestPasswordReset.ts::requestPasswordReset": "fluxo de recuperação, por e-mail",
