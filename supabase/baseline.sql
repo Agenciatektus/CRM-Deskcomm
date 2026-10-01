@@ -5417,11 +5417,10 @@ revoke execute on function public.fn_can_view_conversation(uuid, uuid) from anon
 grant execute on function public.fn_can_view_conversation(uuid, uuid)
   to authenticated, service_role;
 
-drop policy if exists "conversations_select" on public.conversations;
-create policy "conversations_select" on public.conversations
-  for select using (
-    public.fn_can_view_conversation(organization_id, assigned_to_user_id)
-  );
+-- `conversations_select` NÃO é mais instalada aqui: a definição final é a de
+-- conjunto, no bloco da migration 9026 (mais abaixo). Reinstalar a versão por
+-- linha aqui faria o update.sh trocar a policy duas vezes a cada passada
+-- (tests/unit/baseline-nao-constroi-o-que-derruba.test.ts).
 
 drop policy if exists "conversations_agent_write" on public.conversations;
 drop policy if exists "conversations_agent_insert" on public.conversations;
@@ -5602,15 +5601,12 @@ grant execute on function public.fn_can_view_lead(uuid, uuid)
   to authenticated, service_role;
 
 drop policy if exists "tenant_isolation_crm_leads_all" on public.crm_leads;
-drop policy if exists "crm_leads_select" on public.crm_leads;
 drop policy if exists "crm_leads_insert" on public.crm_leads;
 drop policy if exists "crm_leads_update" on public.crm_leads;
 drop policy if exists "crm_leads_delete" on public.crm_leads;
 
-create policy "crm_leads_select" on public.crm_leads
-  for select using (
-    public.fn_can_view_lead(organization_id, owner_user_id)
-  );
+-- `crm_leads_select` NÃO é mais instalada aqui: a definição final é a de
+-- conjunto, no bloco da migration 9026 (mais abaixo).
 
 create policy "crm_leads_insert" on public.crm_leads
   for insert with check (
@@ -6289,13 +6285,10 @@ create policy "crm_lead_links_delete" on public.crm_lead_links
 -- team=org:read a manager). Antes: só admin org-wide, manager caía no self-read
 -- e GET /api/v1/team devolvia 1 linha. Self-read preservado p/ todos; WRITE
 -- inalterado (insert/update/delete = admin). Idempotente e auto-curativo.
-drop policy if exists "user_orgs_select" on public.user_organizations;
-create policy "user_orgs_select" on public.user_organizations
-  for select using (
-    (user_id = auth.uid())
-    or public.fn_role_at_least(organization_id, 'manager')
-    or public.fn_is_platform_admin()
-  );
+-- A definição final de `user_orgs_select` (o mesmo critério: self-read OU
+-- manager+ OU platform admin) mora no bloco da migration 9026, mais abaixo, em
+-- forma de conjunto. Reinstalar aqui a versão por linha faria o update.sh trocar
+-- a policy duas vezes a cada passada.
 
 -- ============================================================================
 -- Dumps do Supabase zeram o search_path (set_config('search_path','',false));
@@ -46739,15 +46732,17 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 -- ---- RLS de conjunto: conversations, crm_leads e user_organizations (migration 9026) ----
 --
 -- Substitui o predicado POR LINHA das policies de SELECT (fn_can_view_conversation
--- da 0035/9014, fn_can_view_lead da 0036, fn_role_at_least da 0044 — todas
--- recriadas mais acima neste arquivo) por um semi-join com o conjunto de
+-- da 0035/9014, fn_can_view_lead da 0036, fn_role_at_least da 0044) por um semi-join com o conjunto de
 -- `fn_escopo_orgs()`, calculado uma vez por consulta. Mesmo resultado, ordens de
 -- grandeza mais barato (motivo, medição e rollback no cabeçalho da migration).
 -- O ramo "próprio" (assigned_to_user_id / owner_user_id = auth.uid()) só vale
 -- com vínculo ATIVO: ex-membro ainda atribuído lê zero.
 --
--- POR QUE AQUI: depois dos blocos que criam as policies antigas (senão elas
--- voltariam por cima no update.sh) e ANTES da VARREDURA anon (cria função).
+-- POR QUE AQUI: os blocos das 0035/0036/0044, lá em cima, deixaram de instalar
+-- estas três policies (versão intermediária reinstalada a cada update é o que
+-- tests/unit/baseline-nao-constroi-o-que-derruba.test.ts proíbe); esta é a
+-- única definição no apêndice. Fica ANTES da VARREDURA anon porque cria função,
+-- e longe do fim do apêndice para não disputar linha com outros blocos.
 -- Prova: tests/invariants/rls-de-conjunto-9026.test.ts.
 create or replace function public.fn_escopo_orgs()
 returns table (organization_id uuid, papel text, modo text)
