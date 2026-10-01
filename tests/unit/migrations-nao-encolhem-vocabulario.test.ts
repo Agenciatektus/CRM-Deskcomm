@@ -65,6 +65,31 @@ const DIR_MIGRATIONS = path.join(process.cwd(), "supabase", "migrations");
  * dado existente faz o `update.sh` de um clone quebrar no meio.
  */
 const REMOCOES_DELIBERADAS: Record<string, { valores: string[]; porque: string }> = {
+  "20260922164700_0387_canal_datafy.sql::channel_sessions_provider_check": {
+    valores: ["instagram", "verdash"],
+    porque:
+      "O ENCONTRO do fork com o upstream v1.69.0, a mesma classe da 0312×0292 abaixo. " +
+      "A 0387 do upstream (canal Datafy) reconstrói a lista a partir do estado que ELE vê, " +
+      "sem `verdash`/`instagram` — que só existem no fork (9001/9004, reafirmados pela 9006, " +
+      "que roda ANTES dela). Editar a 0387 é proibido (migration do upstream). A forward-fix é " +
+      "a 9023 (`o_upstream_169_apagou_nosso_vocabulario`), que reafirma a UNIÃO com lista " +
+      "literal: o estado FINAL da cadeia tem os dois de volta, ao lado de `datafy`.",
+  },
+  "20260922164700_0387_canal_datafy.sql::webhook_events_log_provider_check": {
+    valores: ["instagram", "verdash"],
+    porque:
+      "Mesmo encontro da linha acima, no arquivo de webhooks: sem os dois valores a rota de " +
+      "entrada deixaria de ARQUIVAR o webhook do canal do fork (best-effort, em silêncio). " +
+      "Forward-fix na 9023, com a união literal.",
+  },
+  "20260924200001_9016_cadencia_de_prospeccao.sql::followup_flow_pointers_surface_check": {
+    valores: ["atendimento"],
+    porque:
+      "Aqui o apagador foi o FORK: a 9016 (cadência) foi escrita sobre a v1.41, antes de a " +
+      "0394 do upstream acrescentar `atendimento`; na cadeia unida ela roda depois da 0394 e " +
+      "reconstrói sem o valor. Migration aplicada não se edita; a 9023 reafirma a UNIÃO " +
+      "(`followup`, `crm_automation`, `atendimento`, `cadence`).",
+  },
   "20260918231000_0312_aviso_de_followup_sem_agente.sql::agent_inbox_items_kind_check": {
     valores: ["aviso_de_caso_nao_entregue"],
     porque:
