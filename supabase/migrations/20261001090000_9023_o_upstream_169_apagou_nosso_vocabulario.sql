@@ -14,9 +14,10 @@
 --     upstream não poderia ser gravado por quem aplica a cadeia.
 --
 --  3. `fn_lgpd_cascade_redact_contact`: a 0497 do upstream (30/09) reemitiu a
---     função a partir de um corpo sem o `transcript = null` da nossa 9008 — o
---     titular pede o apagamento, a rota devolve sucesso e a transcrição da
---     chamada continua legível amarrada ao `contact_id`.
+--     função a partir de um corpo sem o `transcript = null` da nossa 9008 e sem
+--     o apagamento da identidade de Instagram da 9010 (que entrava por âncora) —
+--     o titular pede o apagamento, a rota devolve sucesso e a transcrição da
+--     chamada e o `@` do Instagram continuam legíveis amarrados ao `contact_id`.
 --
 -- Por que LISTA LITERAL e não aditiva (`pg_get_constraintdef`): os gates
 -- (`check-do-baseline-nao-diverge-da-cadeia`, `vocabulario-do-fork-sobrevive-
@@ -24,8 +25,8 @@
 -- invisível para eles e vira falso vermelho (ver LRN-20260921-001). Se a
 -- próxima release do upstream trouxer valor novo, o gate reprova antes do deploy.
 --
--- A função parte do corpo da ÚLTIMA versão do upstream (0497), com UMA linha a
--- mais (a da 9008), e a ACL igual à da 0497.
+-- A função parte do corpo da ÚLTIMA versão do upstream (0497), com as linhas do
+-- fork a mais (a da 9008 e as duas da 9010), e a ACL igual à da 0497.
 --
 -- Alargamento puro nos CHECKs: toda linha que passava pela lista anterior passa
 -- por esta, então não há backfill antes do ADD.
@@ -116,6 +117,10 @@ begin
     display_name = v_anon_label,
     email = null,
     phone_number = null,
+    -- A identidade de Instagram do fork (9010 aplicava por âncora; a 0497 a
+    -- reemitiu sem ela): o `@` e o id estável que a Meta emite para a pessoa.
+    instagram_igsid = null,
+    instagram_username = null,
     cpf_encrypted = null,
     cpf_hash = null,
     birthdate = null,

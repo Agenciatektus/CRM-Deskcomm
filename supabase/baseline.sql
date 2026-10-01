@@ -46280,8 +46280,9 @@ comment on table public.event_log is
 -- ---- a anonimização volta a apagar a transcrição da chamada (migration 9023) ----
 --
 -- A 0497 do upstream, mais acima, reemitiu `fn_lgpd_cascade_redact_contact`
--- sem o `transcript = null` da nossa 9008. Esta é a ÚLTIMA definição da função
--- no arquivo (e na cadeia), com o corpo da 0497 e UMA linha a mais. Fica ANTES
+-- sem o `transcript = null` da nossa 9008 e sem o apagamento da identidade de
+-- Instagram da 9010. Esta é a ÚLTIMA definição da função no arquivo (e na
+-- cadeia), com o corpo da 0497 e as linhas do fork a mais. Fica ANTES
 -- da varredura de anon, como toda função do apêndice.
 --
 -- A outra metade da 9023 (os quatro CHECKs: providers 'verdash'/'instagram' ao
@@ -46336,6 +46337,10 @@ begin
     display_name = v_anon_label,
     email = null,
     phone_number = null,
+    -- A identidade de Instagram do fork (9010 aplicava por âncora; a 0497 a
+    -- reemitiu sem ela): o `@` e o id estável que a Meta emite para a pessoa.
+    instagram_igsid = null,
+    instagram_username = null,
     cpf_encrypted = null,
     cpf_hash = null,
     birthdate = null,
@@ -46730,6 +46735,75 @@ $$;
 
 revoke all on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) from public, anon, authenticated;
 grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) to service_role;
+
+-- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
+--
+-- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO
+-- das 0489/0490 do upstream: fluxo comum passa a ser decidido pela RLS do
+-- upstream; a cadência continua escrita só pelo servidor. Motivo completo no
+-- cabeçalho da migration. Antes da varredura de anon, como toda função.
+create or replace function public.fn_cadencia_guarda_versao()
+returns trigger language plpgsql security invoker set search_path = public as $cad_gv$
+begin
+  if current_user in ('authenticated', 'anon')
+     and exists (
+       select 1 from followup_flow_pointers p
+        where p.surface = 'cadence'
+          and p.id in (
+            case when tg_op = 'DELETE' then old.pointer_id else new.pointer_id end,
+            case when tg_op = 'UPDATE' then old.pointer_id end
+          )
+     ) then
+    raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$cad_gv$;
+revoke all on function public.fn_cadencia_guarda_versao() from public, anon, authenticated;
+
+create or replace function public.fn_cadencia_guarda_inscricao()
+returns trigger language plpgsql security invoker set search_path = public as $cad_gi$
+declare
+  v_cadencia boolean;
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+  if tg_op = 'INSERT' then
+    if exists (
+      select 1 from followup_flow_pointers p
+       where p.id = new.pointer_id and p.surface = 'cadence'
+    ) then
+      raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  select exists (
+           select 1 from followup_flow_pointers p
+            where p.id = old.pointer_id and p.surface = 'cadence'
+         )
+      or (tg_op = 'UPDATE' and exists (
+           select 1 from followup_flow_pointers p
+            where p.id = new.pointer_id and p.surface = 'cadence'
+         ))
+    into v_cadencia;
+  if not v_cadencia then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+  if tg_op = 'UPDATE'
+     and new.status = 'cancelled'
+     and old.status in ('active', 'waiting_reply', 'dormente', 'paused_handoff', 'paused_manual')
+     and new.pointer_id = old.pointer_id
+     and new.version_id = old.version_id
+     and new.organization_id = old.organization_id
+     and new.contact_id = old.contact_id
+     and new.current_node_id = old.current_node_id then
+    return new;
+  end if;
+  raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+end;
+$cad_gi$;
+revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, authenticated;
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
