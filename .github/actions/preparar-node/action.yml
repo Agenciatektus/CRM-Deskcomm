@@ -59,6 +59,19 @@ description: >-
 # ci.yml não expõe segredo e o token é `contents: read`.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# CACHE DESLIGADO (`cache: 'false'`): nem restaura nem salva — nem ~/.npm nem o
+# store do pnpm. Existe para o job `medir` do upstream-sync.yml, que roda
+# `pnpm install` e testes com código do UPSTREAM: o post step do cache salvaria
+# um ~/.npm/store tocado por código alheio no escopo de `dev`, e todo PR para
+# `dev` (inclusive no executor próprio) o restauraria. Parecer do @Davi_DevSecOps
+# na PR #54. O default ('true') mantém o comportamento de todos os outros usos.
+# Vigiado por tests/unit/upstream-sync-medir-nao-salva-cache.test.ts.
+inputs:
+  cache:
+    description: "'true' (padrão) restaura e salva o cache; 'false' não toca em cache nenhum"
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -75,6 +88,7 @@ runs:
         echo "versao=$versao" >> "$GITHUB_OUTPUT"
 
     - name: Cache do npm (é o que tira o registry do caminho crítico)
+      if: inputs.cache == 'true'
       uses: actions/cache@v4
       with:
         path: ~/.npm
@@ -91,7 +105,8 @@ runs:
         # 22 como o `.nvmrc` e o `engines` (>=22). Verificar numa versão que o
         # produto não suporta esconde quebra ou inventa falha.
         node-version: 22
-        cache: pnpm
+        # String vazia = setup-node sem cache (nem restore nem save do store).
+        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
 
     - shell: bash
       run: pnpm install --frozen-lockfile
