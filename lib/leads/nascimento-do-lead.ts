@@ -407,15 +407,25 @@ export async function garantirLeadDaConversa(
   // 23/09, lead nascido às 06:36 sem dono. A regra é a mesma do rodízio
   // (`adotarLeadsDoContato`): só lead aberto e sem dono humano nem de IA.
   // Best-effort: falhar aqui não pode impedir o lead de nascer.
-  const { data: conversa } = await db
+  // `contact_id` no filtro: um par (contato, conversa) trocado não pode herdar o
+  // dono da conversa de outra pessoa.
+  const { data: conversa, error: erroConversa } = await db
     .from("conversations")
     .select("assigned_to_user_id")
     .eq("organization_id", organizationId)
     .eq("id", conversationId)
+    .eq("contact_id", contactId)
     .maybeSingle();
+  if (erroConversa) {
+    logger.warn("nascimento-do-lead: dono da conversa não lido", {
+      organization_id: organizationId,
+      lead_id: novoId as string,
+      error: erroConversa.message.slice(0, 120),
+    });
+  }
   const donoDaConversa = (conversa?.assigned_to_user_id as string | null | undefined) ?? null;
   if (donoDaConversa) {
-    await adotarLeadsDoContato(db as never, organizationId, contactId, donoDaConversa);
+    await adotarLeadsDoContato(db, organizationId, contactId, donoDaConversa);
   }
 
   // 5 · o registro, pelo EMISSOR CANÔNICO — não por insert cru.

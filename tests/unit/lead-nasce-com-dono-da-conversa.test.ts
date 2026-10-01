@@ -42,6 +42,7 @@ interface Update {
 
 function banco(opts: { donoDaConversa: string | null; novoLead: string | null }) {
   const updates: Update[] = [];
+  const leiturasFeitas: Array<{ tabela: string; filtros: Record<string, unknown> }> = [];
   const leituras: Record<string, unknown> = {
     contacts: { is_blocked: false, display_name: "Maria", name: null, phone_number: "+5566999999999" },
     crm_leads: null, // não há lead aberto: o nascimento segue
@@ -75,7 +76,10 @@ function banco(opts: { donoDaConversa: string | null; novoLead: string | null })
           }
           return q;
         },
-        maybeSingle: async () => ({ data: leituras[tabela] ?? null, error: null }),
+        maybeSingle: async () => {
+          leiturasFeitas.push({ tabela, filtros });
+          return { data: leituras[tabela] ?? null, error: null };
+        },
       };
       return q;
     },
@@ -85,7 +89,7 @@ function banco(opts: { donoDaConversa: string | null; novoLead: string | null })
         : { data: null, error: null };
     },
   };
-  return { db, updates };
+  return { db, updates, leiturasFeitas };
 }
 
 const DADOS = {
@@ -112,6 +116,17 @@ describe("lead que nasce numa conversa que já tem dono", () => {
     expect(u!.filtros["eq:status"]).toBe("open");
     expect(u!.filtros["is:owner_user_id"], "lead com dono não pode trocar de mão").toBe(null);
     expect(u!.filtros["is:owner_agent_id"], "lead da IA não pode ser arrancado").toBe(null);
+  });
+
+  it("o dono só é lido da conversa CERTA: mesma org, mesma conversa, mesmo contato", async () => {
+    const { db, leiturasFeitas } = banco({ donoDaConversa: DESIREE, novoLead: "lead-novo" });
+    await garantirLeadDaConversa(db as never, DADOS);
+    const leitura = leiturasFeitas.find((l) => l.tabela === "conversations");
+    expect(leitura, "o dono da conversa nem foi lido").toBeDefined();
+    // Service role bypassa RLS: sem estes filtros a leitura acha a conversa de outra org.
+    expect(leitura!.filtros["eq:organization_id"]).toBe(ORG);
+    expect(leitura!.filtros["eq:id"]).toBe(CONVERSA);
+    expect(leitura!.filtros["eq:contact_id"], "par trocado herdaria dono alheio").toBe(CONTATO);
   });
 
   it("conversa sem dono → lead nasce sem dono (o rodízio ou o Assumir adotam depois)", async () => {
