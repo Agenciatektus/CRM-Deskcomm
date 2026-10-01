@@ -15,6 +15,9 @@
 #   5. conflito textual em supabase/baseline.sql é denunciado.
 #   6. comparar-falhas: vermelho novo reprova (exit 1) e nomeia o teste; sem vermelho novo
 #      passa; JSON ausente é NÃO MEDIDO (exit 2), nunca verde.
+#   7. comparar-falhas: teste que passava e SUMIU (arquivo apagado) ou virou skip reprova
+#      (exit 1) mesmo sem nenhuma falha nova — não medido não é verde.
+#   8. view recriada pelo upstream cruza com a nossa.
 set -uo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -61,6 +64,7 @@ SQL
 cat > "$r/$M/20260203000000_0391_funcao.sql" <<'SQL'
 create or replace function public.fn_x(p uuid)
 returns void language sql as $$ select 1 $$;
+create or replace view public.vw_y as select 1;
 SQL
 printf 'create table a (id bigint);\n' > "$r/supabase/baseline.sql"
 git -C "$r" add -A; git -C "$r" commit -qm "upstream"
@@ -72,6 +76,7 @@ alter table channel_sessions drop constraint if exists channel_sessions_provider
 alter table channel_sessions add constraint "channel_sessions_provider_check"
   check (provider in ('meta', 'verdash'));
 CREATE OR REPLACE FUNCTION fn_x(p uuid) RETURNS void LANGUAGE sql AS $$ select 2 $$;
+CREATE VIEW vw_y AS SELECT 2;
 SQL
 printf 'create table a (id text);\n' > "$r/supabase/baseline.sql"
 git -C "$r" add -A; git -C "$r" commit -qm "nosso"
@@ -87,7 +92,10 @@ assert_not_contains "$intersecao" "outra_constraint" "controle negativo: outra_c
 assert_not_contains "$intersecao" "0390_so_outra" "nome citado só em comentário não vira redefinição"
 assert_contains "$intersecao" '| 20260203000000_0391_funcao | function `fn_x` | 20260115000000_9001_canal_nosso |' \
   "função recriada pelo upstream aparece contra a nossa"
-assert_contains "$saida" "| Migrations novas do upstream | 3 |" "conta as 3 migrations novas"
+assert_contains "$saida" "| Migrations novas ou alteradas do upstream | 3 |" "conta as 3 migrations novas"
+
+assert_contains "$intersecao" '| 20260203000000_0391_funcao | view `vw_y` | 20260115000000_9001_canal_nosso |' \
+  "8. view recriada pelo upstream aparece contra a nossa"
 
 echo "5. conflito textual"
 assert_contains "$saida" "supabase/baseline.sql" "o conflito no baseline é listado"
@@ -108,6 +116,20 @@ s="$(cd "$TMP" && bash "$COMPARAR" antes.json antes.json)"; c=$?
 assert_exit "$c" 0 "sem vermelho novo, passa"
 s="$(cd "$TMP" && bash "$COMPARAR" antes.json nao-existe.json)"; c=$?
 assert_exit "$c" 2 "JSON ausente é NÃO MEDIDO (exit 2)"
+
+echo "7. comparar-falhas: teste que sumiu ou virou skip"
+cat > "$TMP/antes2.json" <<'JSON'
+{"testResults":[{"name":"t/a.test.ts","status":"passed","assertionResults":[{"fullName":"x","status":"passed"},{"fullName":"w","status":"passed"}]},{"name":"t/b.test.ts","status":"passed","assertionResults":[{"fullName":"z","status":"passed"}]}]}
+JSON
+cat > "$TMP/depois2.json" <<'JSON'
+{"testResults":[{"name":"t/a.test.ts","status":"passed","assertionResults":[{"fullName":"x","status":"passed"},{"fullName":"w","status":"skipped"}]}]}
+JSON
+s="$(cd "$TMP" && bash "$COMPARAR" antes2.json depois2.json)"; c=$?
+assert_exit "$c" 1 "teste que sumiu/virou skip reprova, sem nenhuma falha nova"
+sumidos="$(sed -n '/### Sumiram ou viraram skip/,/### Consertados/p' <<<"$s")"
+assert_contains "$sumidos" '`t/b.test.ts › z`' "lista o teste do arquivo apagado"
+assert_contains "$sumidos" '`t/a.test.ts › w`' "lista o teste que virou skip"
+assert_contains "$(sed -n '/### Vermelho novo/,/### Sumiram/p' <<<"$s")" "_nenhum_" "e não o chama de vermelho novo"
 
 echo
 if [ "$falhas" = 0 ]; then echo "upstream-sync-intersecao: $casos casos, todos verdes"; exit 0

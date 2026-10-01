@@ -16,7 +16,10 @@
 #
 # Extração por grep/sed, de propósito simples: comentários `--` saem, o arquivo vira uma
 # linha só (pega definição quebrada em várias linhas), tudo em minúsculas, sem `public.`.
-# Não pega SQL dinâmico (EXECUTE format(...)) nem nomes montados em string.
+# Cobre constraint, function, policy (nome@tabela), type e view. NÃO cobre trigger,
+# índice, SQL dinâmico (EXECUTE format(...)) nem nome montado em string.
+# Migrations do upstream consideradas: ADICIONADAS e MODIFICADAS desde o merge-base
+# (--diff-filter=AM); numa modificada, a extração lê o arquivo inteiro do upstream.
 set -euo pipefail
 
 if [ $# -ne 2 ]; then
@@ -45,6 +48,8 @@ extrair_objetos() {
       | sed -E 's/^.* //; s/^public\.//; s/^/function\t/' || true
     grep -oE '(create|drop|alter) type (if exists )?(public\.)?[a-z0-9_]+' <<<"$sem_aspas" \
       | sed -E 's/^.* //; s/^public\.//; s/^/type\t/' || true
+    grep -oE '(create (or replace )?|drop |alter )view (if exists )?(public\.)?[a-z0-9_]+' <<<"$sem_aspas" \
+      | sed -E 's/^.* //; s/^public\.//; s/^/view\t/' || true
   } | sort -u
 }
 
@@ -53,8 +58,14 @@ MB_DESC="$(git describe --tags "$MB" 2>/dev/null || echo 'sem tag alcançável')
 ULTIMA_TAG="$(git describe --tags --abbrev=0 "$UP" 2>/dev/null || echo 'nenhuma')"
 A_FRENTE="$(git rev-list --count "$BASE..$UP")"
 ATRAS="$(git rev-list --count "$UP..$BASE")"
-STAT="$(git diff --shortstat "$MB" "$UP" || true)"
-mapfile -t NOVAS < <(git diff --name-only --diff-filter=A "$MB" "$UP" -- "$DIR_MIG" | grep -E '\.sql$' | sort || true)
+# Sem `|| true` no git e sem process substitution: falha real do git tem de derrubar o
+# relatório (set -e), nunca virar "0 migrations / nenhum objeto em comum".
+STAT="$(git diff --shortstat "$MB" "$UP")"
+ALTERADAS="$(git diff --name-only --diff-filter=AM "$MB" "$UP" -- "$DIR_MIG")"
+NOVAS=()
+while IFS= read -r f; do
+  case "$f" in *.sql) NOVAS+=("$f") ;; esac
+done <<<"$ALTERADAS"
 
 echo "# Sync com o upstream: \`$UP\` → \`$BASE\`"
 echo
@@ -70,7 +81,7 @@ echo "| merge-base | \`$(git rev-parse --short=12 "$MB")\` ($MB_DESC) |"
 echo "| \`$UP\` | \`$(git rev-parse --short=12 "$UP")\` |"
 echo "| Tag mais recente do upstream | $ULTIMA_TAG |"
 echo "| Arquivos/linhas (merge-base → upstream) | ${STAT:- nada} |"
-echo "| Migrations novas do upstream | ${#NOVAS[@]} |"
+echo "| Migrations novas ou alteradas do upstream | ${#NOVAS[@]} |"
 echo
 
 echo "## Conflitos textuais (git merge-tree)"
@@ -121,7 +132,7 @@ for f in ${NOVAS[@]+"${NOVAS[@]}"}; do
       ' <(printf '%s\n' "$NOSSOS") <(printf '%s\n' "$objs"))"
   [ -n "$m" ] && LINHAS+="$m"$'\n'
 done
-echo "Cruzou ${#NOVAS[@]} migration(s) nova(s) do upstream com $N_NOSSAS nossa(s) 9xxx."
+echo "Cruzou ${#NOVAS[@]} migration(s) nova(s) ou alterada(s) do upstream com $N_NOSSAS nossa(s) 9xxx."
 echo
 if [ -z "$LINHAS" ]; then
   echo "Nenhum objeto em comum."

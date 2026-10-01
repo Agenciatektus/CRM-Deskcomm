@@ -64,13 +64,14 @@ const ESCRITA_JUSTIFICADA: Record<string, string> = {
     "comenta a acolhida no PR de fork; é o ÚNICO escopo do workflow (o bloco zera o resto), " +
     "e o job não faz checkout nem usa action nenhuma — ver tests/unit/acolhida-nao-toca-no-fork.test.ts",
   "upstream-sync.yml::contents: write":
-    "empurra a branch `sync/upstream-*` com o merge do upstream (só no disparo manual com " +
-    "abrir_pr); nunca mergeia, nunca toca master — ver o cabeçalho do workflow",
+    "só no job `publicar`, que NÃO executa nada da árvore do upstream: empurra a branch " +
+    "`sync/upstream-*` refazendo o merge medido (tree conferido); o `medir`, que roda o código " +
+    "do upstream, tem só `contents: read` e o topo é `permissions: {}`",
   "upstream-sync.yml::pull-requests: write":
-    "abre o PR DRAFT da branch `sync/upstream-*` para `dev`; nunca mergeia",
+    "só no job `publicar`: abre o PR DRAFT da branch `sync/upstream-*` para `dev`; nunca mergeia",
   "upstream-sync.yml::issues: write":
-    "reescreve a issue rotulada `upstream-sync` com o relatório diário (e cria o rótulo); " +
-    "é por ela que a curadoria do sync lê a interseção de migrations",
+    "só no job `publicar`: reescreve a issue rotulada `upstream-sync` com o relatório diário " +
+    "(e cria o rótulo); é por ela que a curadoria do sync lê a interseção de migrations",
 };
 
 interface Workflow {

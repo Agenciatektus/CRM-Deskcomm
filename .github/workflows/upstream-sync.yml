@@ -5,19 +5,38 @@ name: upstream-sync
 # Todo dia mede a distância entre a nossa `dev` e o upstream e reescreve UMA issue
 # aberta com o rótulo `upstream-sync` (scripts/upstream-sync/relatorio.sh). A seção
 # que importa no relatório é a INTERSEÇÃO: migration do upstream que redefine
-# CHECK/função/policy/type que uma 9xxx nossa também define. Isso não dá conflito
-# textual — o upstream recria o objeto sem a nossa parte e o baseline perde o fork
-# em silêncio (0387 × 9001/9004/9006, 0394 × 9016, cascata LGPD × 9008).
+# CHECK/função/policy/type/view que uma 9xxx nossa também define. Isso não dá
+# conflito textual — o upstream recria o objeto sem a nossa parte e o baseline
+# perde o fork em silêncio (0387 × 9001/9004/9006, 0394 × 9016, cascata LGPD × 9008).
 #
 # Com `abrir_pr: true` (só no disparo manual) ele também tenta montar o PR:
 #   - conflito textual → comenta a lista na issue e para (sem PR);
-#   - sem conflito → branch `sync/upstream-<ref>-<sha>`, merge, `pnpm test:unit` em
-#     `dev` e no merge, comparação das falhas (vermelho novo × consertados), teste
-#     de vocabulário do fork se existir, e PR **draft** para `dev`.
+#   - sem conflito → merge, `pnpm test:unit` em `dev` e no merge, comparação
+#     (vermelho novo, sumiram/viraram skip, consertados), teste de vocabulário do
+#     fork se existir, e PR **draft** para `dev`.
+#
+# ── DOIS JOBS, PORQUE O MERGE EXECUTA CÓDIGO DO UPSTREAM ─────────────────────────
+#
+# `pnpm install` (lifecycle scripts) e `pnpm test:unit` na árvore mergeada rodam
+# código que veio do upstream. `dev` e `master` não têm proteção de branch: um
+# token com escrita ao alcance desse código empurraria direto para `master`, que é
+# a fonte de produção do CRM (parecer do @Davi_DevSecOps na PR #54). Então:
+#
+#   medir    → `contents: read`, checkout com `persist-credentials: false`, SEM
+#              GH_TOKEN. Executa tudo e publica relatório/JSONs como artifact.
+#              Os SHAs medidos e o tree do merge saem como OUTPUT de um passo que
+#              roda ANTES de qualquer código do upstream — passo posterior não
+#              consegue reescrever o output de outro passo.
+#   publicar → a única escrita (contents/pull-requests/issues). NÃO executa nada da
+#              árvore do upstream: sem pnpm, sem script. Só git e gh. Refaz o merge
+#              dos MESMOS dois SHAs, confere que o tree bate com o medido (senão
+#              aborta), empurra a branch e escreve issue/PR. O texto do artifact
+#              (relatório, comparação) é dado: vai para corpo de issue/PR via
+#              --body-file, nunca é executado.
 #
 # POR QUE OS TESTES RODAM AQUI, e não no ci.yml do PR: PR aberto e push feitos com
 # o GITHUB_TOKEN NÃO disparam outros workflows (regra do GitHub contra laço). O
-# PR draft nasce sem check nenhum; a medição que ele carrega é a deste job.
+# PR draft nasce sem check nenhum; a medição que ele carrega é a do job `medir`.
 #
 # POR QUE O SCHEDULE PODE NÃO RODAR: `on: schedule` só dispara a partir da branch
 # PADRÃO do repositório (hoje `tektus/main`). Enquanto este arquivo morar só em
@@ -25,10 +44,11 @@ name: upstream-sync
 #
 # LIMITE CONHECIDO: o GITHUB_TOKEN não pode empurrar commit que altera
 # `.github/workflows/*` (falta o escopo `workflows`, que ele não tem). Se o merge
-# do upstream mexe em workflow, o job mede os testes do mesmo jeito, comenta o
-# resultado na issue e NÃO empurra — o merge vai ter de ser feito à mão.
+# do upstream mexe em workflow, o `publicar` comenta a medição na issue e NÃO
+# empurra — o merge vai ter de ser feito à mão.
 #
-# Nunca mergeia, nunca toca `master`. Ações de terceiros: só as que o ci.yml usa.
+# Nunca mergeia PR, nunca toca `master`. Ações de terceiros: só as que o repo usa
+# (download-artifact na tag major oficial: o repo ainda não o usava).
 
 on:
   schedule:
@@ -40,149 +60,125 @@ on:
         type: string
         default: upstream/main
       abrir_pr:
-        description: 'Montar a branch de merge, rodar os testes e abrir PR draft para dev'
+        description: 'Montar o merge, rodar os testes e abrir PR draft para dev'
         type: boolean
         default: false
 
-# contents: write → empurrar a branch sync/upstream-*; pull-requests: write → abrir
-# o PR draft; issues: write → criar/reescrever a issue e o rótulo `upstream-sync`.
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+# Nada no topo: cada job declara o seu. Job novo nasce sem privilégio.
+permissions: {}
 
 # Um por vez, e o segundo espera (nunca cancela uma medição no meio).
 concurrency:
   group: upstream-sync
   cancel-in-progress: false
 
+env:
+  UPSTREAM_URL: https://github.com/melgarafael/DeskcommCRM.git
+  UPSTREAM_REF: ${{ inputs.upstream_ref || 'upstream/main' }}
+  ABRIR_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.abrir_pr }}
+
 jobs:
-  sincronizar:
+  medir:
     runs-on: ubuntu-latest
     # Duas rodadas inteiras de `pnpm test:unit` (dev e merge) cabem com folga.
     timeout-minutes: 150
-    env:
-      GH_TOKEN: ${{ github.token }}
-      # Obrigatório: com o remote `upstream` no clone, o gh escolheria o repositório
-      # do upstream como base para issue/PR. Fixa o nosso.
-      GH_REPO: ${{ github.repository }}
-      UPSTREAM_REF: ${{ inputs.upstream_ref || 'upstream/main' }}
-      ABRIR_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.abrir_pr }}
-      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      dev_sha: ${{ steps.shas.outputs.dev_sha }}
+      up_sha: ${{ steps.shas.outputs.up_sha }}
+      tree: ${{ steps.shas.outputs.tree }}
+      conflito: ${{ steps.shas.outputs.conflito }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: dev
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Buscar o upstream (com tags)
+      - name: Validar a ref e buscar o upstream (com tags)
         run: |
           set -euo pipefail
-          git remote add upstream https://github.com/melgarafael/DeskcommCRM.git
-          # --force: tag do upstream com o mesmo nome de uma nossa sobrescreve só
-          # NESTE runner (nenhuma tag é empurrada daqui).
-          git fetch --force --tags upstream '+refs/heads/*:refs/remotes/upstream/*'
-          if ! git rev-parse --verify -q "${UPSTREAM_REF}^{commit}" >/dev/null; then
-            echo "::error::ref do upstream inexistente: ${UPSTREAM_REF}"
+          if ! [[ "$UPSTREAM_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$UPSTREAM_REF" == -* ]]; then
+            echo "::error::upstream_ref recusada (só [A-Za-z0-9._/-], sem '-' no início): $UPSTREAM_REF"
             exit 1
           fi
+          git remote add upstream "$UPSTREAM_URL"
+          # --force: tag do upstream com o mesmo nome de uma nossa sobrescreve só
+          # NESTE runner (nenhuma tag é empurrada).
+          git fetch --force --tags upstream '+refs/heads/*:refs/remotes/upstream/*'
+          git rev-parse --verify -q "${UPSTREAM_REF}^{commit}" >/dev/null || {
+            echo "::error::ref do upstream inexistente: ${UPSTREAM_REF}"; exit 1; }
 
-      - name: Relatório e conflitos textuais
-        id: rel
+      # ANTES de qualquer código do upstream: estes outputs são o contrato com o
+      # `publicar`, e nenhum passo posterior consegue reescrevê-los.
+      - name: Fixar os SHAs medidos e o tree do merge
+        id: shas
         run: |
           set -euo pipefail
-          bash scripts/upstream-sync/relatorio.sh origin/dev "$UPSTREAM_REF" > "$RUNNER_TEMP/relatorio.md"
-          printf '\n---\nRodada: %s\n' "$RUN_URL" >> "$RUNNER_TEMP/relatorio.md"
-          cat "$RUNNER_TEMP/relatorio.md" >> "$GITHUB_STEP_SUMMARY"
+          dev_sha="$(git rev-parse HEAD)"
+          up_sha="$(git rev-parse "${UPSTREAM_REF}^{commit}")"
+          mkdir -p "$RUNNER_TEMP/sync"
           set +e
-          git merge-tree --write-tree --name-only --no-messages origin/dev "$UPSTREAM_REF" > "$RUNNER_TEMP/merge-tree.txt"
+          git merge-tree --write-tree --name-only --no-messages "$dev_sha" "$up_sha" > "$RUNNER_TEMP/sync/merge-tree.txt"
           code=$?
           set -e
           case "$code" in
-            0) echo "conflito=nao" >> "$GITHUB_OUTPUT" ;;
-            1) echo "conflito=sim" >> "$GITHUB_OUTPUT"
-               tail -n +2 "$RUNNER_TEMP/merge-tree.txt" | sed '/^$/d' > "$RUNNER_TEMP/conflitos.txt" ;;
+            0) conflito=nao; tree="$(head -1 "$RUNNER_TEMP/sync/merge-tree.txt")" ;;
+            1) conflito=sim; tree=""
+               tail -n +2 "$RUNNER_TEMP/sync/merge-tree.txt" | sed '/^$/d' > "$RUNNER_TEMP/sync/conflitos.txt" ;;
             *) echo "::error::git merge-tree saiu com $code"; exit 1 ;;
           esac
-
-      - name: Reescrever a issue upstream-sync
-        id: issue
-        run: |
-          set -euo pipefail
-          gh label create upstream-sync --color 5319e7 \
-            --description "Sync com o upstream melgarafael/DeskcommCRM" --force
-          # Limite do corpo de issue no GitHub: 65536 caracteres.
-          head -c 60000 "$RUNNER_TEMP/relatorio.md" > "$RUNNER_TEMP/corpo.md"
-          n="$(gh issue list --label upstream-sync --state open --limit 1 --json number --jq '.[0].number // empty')"
-          if [ -z "$n" ]; then
-            url="$(gh issue create --title "Sync com o upstream (DeskcommCRM)" --label upstream-sync --body-file "$RUNNER_TEMP/corpo.md")"
-            n="${url##*/}"
-          else
-            gh issue edit "$n" --body-file "$RUNNER_TEMP/corpo.md"
-          fi
-          echo "numero=$n" >> "$GITHUB_OUTPUT"
-
-      - name: Conflito textual — comentar e parar
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'sim'
-        env:
-          ISSUE: ${{ steps.issue.outputs.numero }}
-        run: |
-          set -euo pipefail
           {
-            echo "Pedido de PR com \`$UPSTREAM_REF\` **não montado**: o merge tem conflito textual em $(wc -l < "$RUNNER_TEMP/conflitos.txt") arquivo(s)."
-            echo
-            echo '```'
-            head -c 50000 "$RUNNER_TEMP/conflitos.txt"
-            echo '```'
-            echo
-            echo "Rodada: $RUN_URL"
-          } > "$RUNNER_TEMP/comentario.md"
-          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/comentario.md"
+            echo "dev_sha=$dev_sha"
+            echo "up_sha=$up_sha"
+            echo "tree=$tree"
+            echo "conflito=$conflito"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Relatório
+        run: |
+          set -euo pipefail
+          bash scripts/upstream-sync/relatorio.sh origin/dev "$UPSTREAM_REF" > "$RUNNER_TEMP/sync/relatorio.md"
+          cat "$RUNNER_TEMP/sync/relatorio.md" >> "$GITHUB_STEP_SUMMARY"
+          # O comparador vem de `dev`: copiado ANTES do merge mudar a árvore.
+          cp scripts/upstream-sync/comparar-falhas.sh "$RUNNER_TEMP/comparar-falhas.sh"
 
       - uses: ./.github/actions/preparar-node
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
         timeout-minutes: 5
 
       - name: Testes em dev (antes)
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
         # O vermelho aqui é DADO, não falha do job: quem decide é a comparação.
-        run: pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/antes.json" || true
+        run: pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/sync/antes.json" || true
 
-      - name: Montar a branch de merge
-        id: merge
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+      - name: Merge local (sem credencial nenhuma no clone)
+        if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
+        env:
+          UP_SHA: ${{ steps.shas.outputs.up_sha }}
+          TREE: ${{ steps.shas.outputs.tree }}
         run: |
           set -euo pipefail
-          curto="$(printf '%s' "${UPSTREAM_REF#upstream/}" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
-          branch="sync/upstream-${curto}-$(git rev-parse --short=8 "$UPSTREAM_REF")"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git merge --no-ff --no-edit "$UPSTREAM_REF"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          if git diff --quiet origin/dev HEAD -- .github/workflows; then
-            echo "mexe_em_workflow=nao" >> "$GITHUB_OUTPUT"
-          else
-            echo "mexe_em_workflow=sim" >> "$GITHUB_OUTPUT"
-          fi
+          git -c user.name=medir -c user.email=medir@invalid merge --no-ff --no-edit "$UP_SHA"
+          [ "$(git rev-parse 'HEAD^{tree}')" = "$TREE" ] || { echo "::error::tree do merge difere do merge-tree"; exit 1; }
 
-      - name: Testes no merge (depois)
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+      - name: Testes no merge (depois) — código do upstream roda daqui em diante
+        if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
         run: |
           set -uo pipefail
           if ! pnpm install --frozen-lockfile; then
             echo "::error::pnpm install --frozen-lockfile falhou na árvore mergeada"
             exit 1
           fi
-          pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/depois.json" || true
+          pnpm test:unit --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/sync/depois.json" || true
 
       - name: Comparar falhas e vocabulário do fork
-        id: cmp
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+        if: env.ABRIR_PR == 'true' && steps.shas.outputs.conflito == 'nao'
         run: |
           set -uo pipefail
-          bash scripts/upstream-sync/comparar-falhas.sh "$RUNNER_TEMP/antes.json" "$RUNNER_TEMP/depois.json" > "$RUNNER_TEMP/comparacao.md"
-          echo "comparacao=$?" >> "$GITHUB_OUTPUT"
+          bash "$RUNNER_TEMP/comparar-falhas.sh" "$RUNNER_TEMP/sync/antes.json" "$RUNNER_TEMP/sync/depois.json" > "$RUNNER_TEMP/sync/comparacao.md"
+          echo "$?" > "$RUNNER_TEMP/sync/comparacao.exit"
           voc=tests/unit/vocabulario-do-fork-sobrevive-no-baseline.test.ts
           {
             echo
@@ -198,39 +194,143 @@ jobs:
             else
               echo "NÃO MEDIDO: \`$voc\` não existe nesta árvore."
             fi
-          } >> "$RUNNER_TEMP/comparacao.md"
-          cat "$RUNNER_TEMP/comparacao.md" >> "$GITHUB_STEP_SUMMARY"
+          } >> "$RUNNER_TEMP/sync/comparacao.md"
+          cat "$RUNNER_TEMP/sync/comparacao.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Empurrar e abrir PR draft para dev
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync
+          path: ${{ runner.temp }}/sync
+          retention-days: 14
+
+  publicar:
+    needs: medir
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A única escrita do workflow, e este job não executa nada da árvore do upstream.
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Obrigatório: com o remote `upstream` no clone, o gh escolheria o repositório
+      # do upstream como base para issue/PR. Fixa o nosso.
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      DEV_SHA: ${{ needs.medir.outputs.dev_sha }}
+      UP_SHA: ${{ needs.medir.outputs.up_sha }}
+      TREE: ${{ needs.medir.outputs.tree }}
+      CONFLITO: ${{ needs.medir.outputs.conflito }}
+    steps:
+      # Checkout de `dev`. Nada do merge é executado aqui, nem script de `dev`:
+      # só git e gh.
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: upstream-sync
+          path: ${{ runner.temp }}/sync
+
+      - name: Conferir o contrato do medir
+        run: |
+          set -euo pipefail
+          [[ "$DEV_SHA" =~ ^[0-9a-f]{40}$ && "$UP_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::SHAs do medir inválidos"; exit 1; }
+          [[ "$CONFLITO" == sim || ( "$CONFLITO" == nao && "$TREE" =~ ^[0-9a-f]{40}$ ) ]] || {
+            echo "::error::conflito/tree do medir inválidos"; exit 1; }
+          printf '\n---\nMedido: dev `%s` × upstream `%s`. Rodada: %s\n' "$DEV_SHA" "$UP_SHA" "$RUN_URL" \
+            >> "$RUNNER_TEMP/sync/relatorio.md"
+
+      - name: Reescrever a issue upstream-sync
+        id: issue
+        run: |
+          set -euo pipefail
+          gh label create upstream-sync --color 5319e7 \
+            --description "Sync com o upstream melgarafael/DeskcommCRM" --force
+          # Limite do corpo de issue no GitHub: 65536 caracteres.
+          head -c 60000 "$RUNNER_TEMP/sync/relatorio.md" > "$RUNNER_TEMP/corpo.md"
+          n="$(gh issue list --label upstream-sync --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [ -z "$n" ]; then
+            url="$(gh issue create --title "Sync com o upstream (DeskcommCRM)" --label upstream-sync --body-file "$RUNNER_TEMP/corpo.md")"
+            n="${url##*/}"
+          else
+            gh issue edit "$n" --body-file "$RUNNER_TEMP/corpo.md"
+          fi
+          echo "numero=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Conflito textual — comentar e parar
+        if: env.ABRIR_PR == 'true' && env.CONFLITO == 'sim'
         env:
-          BRANCH: ${{ steps.merge.outputs.branch }}
-          MEXE_EM_WORKFLOW: ${{ steps.merge.outputs.mexe_em_workflow }}
           ISSUE: ${{ steps.issue.outputs.numero }}
         run: |
           set -euo pipefail
+          {
+            echo "Pedido de PR com \`$UPSTREAM_REF\` (\`$UP_SHA\`) **não montado**: o merge tem conflito textual em $(wc -l < "$RUNNER_TEMP/sync/conflitos.txt") arquivo(s)."
+            echo
+            echo '```'
+            head -c 50000 "$RUNNER_TEMP/sync/conflitos.txt"
+            echo '```'
+            echo
+            echo "Rodada: $RUN_URL"
+          } > "$RUNNER_TEMP/comentario.md"
+          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/comentario.md"
+
+      - name: Refazer o merge medido, empurrar e abrir PR draft para dev
+        if: env.ABRIR_PR == 'true' && env.CONFLITO == 'nao'
+        env:
+          ISSUE: ${{ steps.issue.outputs.numero }}
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$DEV_SHA" ] || {
+            echo "::error::dev andou entre medir e publicar ($DEV_SHA → $(git rev-parse HEAD)); a medição não vale para o dev de agora"; exit 1; }
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch --no-tags upstream '+refs/heads/*:refs/remotes/upstream/*'
+          # Tag ou commit fora das branches: busca o SHA direto (o GitHub serve por SHA).
+          git cat-file -e "${UP_SHA}^{commit}" 2>/dev/null || git fetch --no-tags upstream "$UP_SHA"
+          git cat-file -e "${UP_SHA}^{commit}" || { echo "::error::$UP_SHA não veio do upstream"; exit 1; }
+
+          curto="$(printf '%s' "${UPSTREAM_REF#upstream/}" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-40)"
+          branch="sync/upstream-${curto}-${UP_SHA:0:8}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git merge --no-ff --no-edit "$UP_SHA"
+          if [ "$(git rev-parse 'HEAD^{tree}')" != "$TREE" ]; then
+            echo "::error::o tree do merge refeito ($(git rev-parse 'HEAD^{tree}')) não é o medido ($TREE); abortado"
+            exit 1
+          fi
+
           # Sem pipe para o head: com pipefail, o SIGPIPE do cat derrubaria o passo.
-          { cat "$RUNNER_TEMP/relatorio.md"; echo; cat "$RUNNER_TEMP/comparacao.md"; } > "$RUNNER_TEMP/pr-inteiro.md"
+          { cat "$RUNNER_TEMP/sync/relatorio.md"; echo; cat "$RUNNER_TEMP/sync/comparacao.md"; } > "$RUNNER_TEMP/pr-inteiro.md"
           head -c 60000 "$RUNNER_TEMP/pr-inteiro.md" > "$RUNNER_TEMP/pr.md"
-          if [ "$MEXE_EM_WORKFLOW" = "sim" ]; then
+
+          if ! git diff --quiet "$DEV_SHA" HEAD -- .github/workflows; then
             {
-              echo "Merge com \`$UPSTREAM_REF\` montado e medido, mas **não empurrado**: ele altera \`.github/workflows/*\` e o GITHUB_TOKEN não pode empurrar isso. Fazer o merge à mão."
+              echo "Merge com \`$UPSTREAM_REF\` (\`$UP_SHA\`) medido, mas **não empurrado**: ele altera \`.github/workflows/*\` e o GITHUB_TOKEN não pode empurrar isso. Fazer o merge à mão."
               echo
-              head -c 55000 "$RUNNER_TEMP/comparacao.md"
+              head -c 55000 "$RUNNER_TEMP/sync/comparacao.md"
             } > "$RUNNER_TEMP/comentario.md"
             gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/comentario.md"
             exit 0
           fi
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
-            gh issue comment "$ISSUE" --body "A branch \`$BRANCH\` já existe no origin; nada empurrado. Rodada: $RUN_URL"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            gh issue comment "$ISSUE" --body "A branch \`$branch\` já existe no origin; nada empurrado. Rodada: $RUN_URL"
             exit 0
           fi
-          git push -u origin "$BRANCH"
-          gh pr create --draft --base dev --head "$BRANCH" \
+          git push -u origin "$branch"
+          gh pr create --draft --base dev --head "$branch" \
             --title "chore(sync): merge do upstream ${UPSTREAM_REF}" --body-file "$RUNNER_TEMP/pr.md"
 
-      - name: Vermelho novo reprova a rodada
-        if: env.ABRIR_PR == 'true' && steps.rel.outputs.conflito == 'nao' && steps.cmp.outputs.comparacao != '0'
+      - name: Vermelho novo ou teste sumido reprova a rodada
+        if: env.ABRIR_PR == 'true' && env.CONFLITO == 'nao'
         run: |
-          echo "::error::o merge com o upstream tem teste vermelho novo (ou não foi medido) — ver o resumo da rodada"
-          exit 1
+          set -euo pipefail
+          code="$(cat "$RUNNER_TEMP/sync/comparacao.exit" 2>/dev/null || echo ausente)"
+          if [ "$code" != "0" ]; then
+            echo "::error::comparação saiu com '$code' (vermelho novo, teste sumido ou não medido) — ver o resumo da rodada"
+            exit 1
+          fi
