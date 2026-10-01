@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -23,11 +23,12 @@ import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
+import { CaretLeft, ChatCircle, IdentificationCard, MagnifyingGlass, X } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
+import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
@@ -117,9 +118,11 @@ function parseFilterParam(v: string | null): InboxTab {
 
 interface InboxLayoutProps {
   initialSelectedId?: string | null;
+  /** Rascunho sugerido por integração (issue #1611) — `null` é o caso comum. */
+  rascunho?: AvisoDeRascunho | null;
 }
 
-export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {}) {
+export function InboxLayout({ initialSelectedId = null, rascunho = null }: InboxLayoutProps = {}) {
   const t = useT();
   const { activeOrg, user } = useAuth();
   const supportReadonly = user.support?.access_mode === "support_readonly";
@@ -129,11 +132,13 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tab = parseFilterParam(searchParams.get("filter"));
+  const idNaUrl = searchParams.get("id");
 
   // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
     search: "",
     onlyUnread: false,
+    onlyGroups: false,
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -152,14 +157,43 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
   // limpá-la junto a tiraria do lugar sem ela ter pedido.
   const limparFiltrosAuxiliares = useCallback(() => {
-    setFilterValue({ tab, search: "", onlyUnread: false });
+    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false });
   }, [tab, setFilterValue]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? idNaUrl);
+  const ultimoIdNaUrl = useRef(idNaUrl);
   const [visibleIds, setVisibleIds] = useState<string[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
+  /**
+   * A busca dentro da conversa (#1793) pertence à CONVERSA em que foi aberta.
+   * Guardar o id junto fecha a busca em qualquer troca — clique, atalho j/k,
+   * voltar do navegador — sem que cada caminho precise lembrar de limpá-la.
+   */
+  const [busca, setBusca] = useState<{ conversaId: string; termo: string } | null>(null);
+  const buscaAberta = busca !== null && busca.conversaId === selectedId;
+  const botaoBuscaRef = useRef<HTMLButtonElement | null>(null);
+  const fecharBusca = useCallback(() => {
+    setBusca(null);
+    botaoBuscaRef.current?.focus();
+  }, []);
+  /**
+   * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
+   * está aberta: sair dela — clique, atalho ou voltar do navegador — o descarta
+   * de vez. Sem isto o texto escrito para um cliente ficava no campo do próximo,
+   * já sem a faixa de origem. Ajuste de estado durante o render, o padrão do
+   * React para "estado que depende de outro estado".
+   */
+  const [rascunhoVivo, setRascunhoVivo] = useState(rascunho);
+  if (rascunhoVivo && selectedId !== rascunhoVivo.conversationId) setRascunhoVivo(null);
+
+  useEffect(() => {
+    if (ultimoIdNaUrl.current === idNaUrl) return;
+    ultimoIdNaUrl.current = idNaUrl;
+    // O histórico do navegador também troca a conversa, sem carregar a página inteira.
+    setSelectedId(idNaUrl);
+  }, [idNaUrl]);
 
   /**
    * A ORG tem automático de pé? Sobe para cá porque agora é a ABA que precisa —
@@ -187,7 +221,9 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       channel_session_id: filterValue.channel_session_id,
       entrada: filterValue.entrada,
       tag: filterValue.tag,
+      tagMode: filterValue.tagMode,
       unread: filterValue.onlyUnread || undefined,
+      is_group: filterValue.onlyGroups || undefined,
     }),
     [
       filterValue.tab,
@@ -196,7 +232,9 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       filterValue.channel_session_id,
       filterValue.entrada,
       filterValue.tag,
+      filterValue.tagMode,
       filterValue.onlyUnread,
+      filterValue.onlyGroups,
     ],
   );
 
@@ -262,16 +300,22 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   // É um SUPERCONJUNTO do `handleSelect` do upstream — o tipo dele não aceita
   // `null`, e sem isso o botão de voltar não teria o que chamar.
   //
-  // A seleção NÃO vive na URL (só o `?filter=` vive) — então este voltar é
-  // estado local, e o botão de voltar do navegador não desfaz a seleção. É a
-  // limitação conhecida deste caminho; trocar por URL mudaria o deep-link de
-  // conversa, que hoje entra por `initialSelectedId` vindo da rota.
   // A citação ("responder em cima") mora no `PainelDaConversa`, montado com
   // `key` da conversa: trocar de seleção o desmonta e zera a citação — sem isso
   // a resposta sairia citando mensagem de outro cliente.
   const handleSelect = useCallback((id: string | null) => {
+    if (id === selectedId) return;
     setSelectedId(id);
-  }, []);
+    // ?id= é o formato já usado pelos atalhos do CRM. A History API mantém a
+    // seleção instantânea sem pedir um novo Server Component a cada clique.
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) params.set("id", id);
+    else params.delete("id");
+    // O ?rascunho= é da conversa que ficou para trás (ver `rascunhoVivo`).
+    params.delete("rascunho");
+    const query = params.toString();
+    window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
+  }, [selectedId, searchParams, pathname]);
   const handleVisibleChange = useCallback((ids: string[]) => setVisibleIds(ids), []);
   const handleFocusReply = useCallback(() => composerRef.current?.focus(), []);
   const handleClaim = useCallback(() => {
@@ -399,7 +443,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       */}
       <div
         className={cn(
-          "h-full min-h-0 flex-col md:flex",
+          "h-full min-h-0 min-w-0 flex-col md:flex",
           colunas.conversa,
         )}
       >
@@ -439,13 +483,59 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         )}
         {selectedConversation ? (
           <>
-            <ConversationHeader conversation={selectedConversation} />
+            {/* `key`: trocar de conversa desmonta a confirmação de Fechar/Arquivar
+                aberta — senão o clique de dentro agiria sobre a conversa nova. */}
+            <ConversationHeader
+              key={selectedConversation.id}
+              conversation={selectedConversation}
+              onAbrirConversa={handleSelect}
+              onBuscar={() =>
+                buscaAberta
+                  ? fecharBusca()
+                  : setBusca({ conversaId: selectedConversation.id, termo: "" })
+              }
+              buscaAberta={buscaAberta}
+              botaoBuscaRef={botaoBuscaRef}
+            />
+            {buscaAberta && (
+              <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
+                <MagnifyingGlass size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                <input
+                  type="search"
+                  autoFocus
+                  className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-hidden placeholder:text-muted-foreground"
+                  aria-label={t("Buscar nas mensagens carregadas")}
+                  placeholder={t("Buscar nas mensagens carregadas")}
+                  value={busca.termo}
+                  onChange={(e) => setBusca({ conversaId: busca.conversaId, termo: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") fecharBusca();
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-11 shrink-0 px-0 lg:w-8"
+                  aria-label={t("Fechar busca")}
+                  onClick={fecharBusca}
+                >
+                  <X size={16} aria-hidden />
+                </Button>
+              </div>
+            )}
             {/* A conversa e o campo de resposta — a MESMA peça do dossiê do
                 negócio no Kanban. Ver `PainelDaConversa`. */}
             <PainelDaConversa
-              key={selectedConversation.id}
+              // Prefixo: o `ConversationHeader` irmão usa o id puro como chave, e
+              // duas chaves iguais no mesmo fragmento duplicam o cabeçalho.
+              key={`painel:${selectedConversation.id}`}
               ref={composerRef}
               conversation={selectedConversation}
+              searchTerm={buscaAberta ? busca.termo : ""}
+              onAbrirConversa={handleSelect}
+              // O aviso é DA conversa da URL: trocar de conversa dentro da inbox
+              // não pode deixar um texto sugerido no campo de outra pessoa.
+              rascunho={rascunhoVivo}
             />
           </>
         ) : selectionNotFound ? (
@@ -461,7 +551,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 xl:block">
+      <div className="hidden h-full min-h-0 min-w-0 xl:block">
         <CRMSidePanel conversation={selectedConversation} />
       </div>
 

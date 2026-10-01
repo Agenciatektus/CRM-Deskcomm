@@ -175,7 +175,21 @@ export type ActivityType =
    * origem, para quem abre o negócio ganho saber que a história continuou.
    */
   | "created_from_pipeline"
-  | "spawned_in_pipeline";
+  | "spawned_in_pipeline"
+  | "proposal_drafted"
+  | "proposal_sent"
+  | "proposal_accepted"
+  | "proposal_declined"
+  | "proposal_expired"
+  | "proposal_value_changed"
+  /**
+   * N2 — o envio tentou agendar o follow-up automático e NÃO conseguiu por um
+   * motivo que não é "já existe retorno" (esse tem atividade própria, a do
+   * retorno que já serve). Sem esta linha, "a proposta foi enviada e nenhum
+   * retorno veio" seria indistinguível de "o retorno está a caminho" — e é
+   * justamente no silêncio que a demanda morre. O PORQUÊ vai no `reason`.
+   */
+  | "proposal_followup_skipped";
 
 export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   lead_created: "Entrou pelo WhatsApp",
@@ -278,6 +292,13 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   moved_from_pipeline: "Veio de outro funil",
   created_from_pipeline: "Criado a partir de outro funil",
   spawned_in_pipeline: "Card criado em outro funil",
+  proposal_drafted: "Rascunho de proposta criado",
+  proposal_sent: "Proposta enviada",
+  proposal_accepted: "Proposta aceita",
+  proposal_declined: "Proposta recusada",
+  proposal_expired: "Proposta venceu sem decisão",
+  proposal_value_changed: "Valor do negócio atualizado pela proposta",
+  proposal_followup_skipped: "Follow-up automático não agendado",
 };
 
 /** Quando o tipo é legado/desconhecido, a linha ainda é honesta — sem jargão. */

@@ -46,7 +46,10 @@ function montar(pointers: PointerDeEtapa[]) {
       return "ct-1";
     },
     async carregaNoDeGatilho() {
-      return "t";
+      // Contrato do upstream v1.69: o nó de gatilho e se o grafo PEDE agente
+      // (nó que chama modelo). `true` mantém o controle abaixo — follow-up comum
+      // que precisa de agente continua consultando o gate.
+      return { id: "t", pedeAgente: true };
     },
     async insereEnrollment(input) {
       insercoesDeFollowup.push(input);

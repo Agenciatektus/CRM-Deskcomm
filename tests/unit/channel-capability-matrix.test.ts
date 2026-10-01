@@ -24,6 +24,7 @@ const PROVIDERS = [
   "zernio_social",
   "verdash",
   "instagram",
+  "datafy",
 ] as const satisfies readonly ProviderDeMensagem[];
 
 /**
@@ -46,6 +47,7 @@ const CAPABILITIES = [
   "voiceNote",
   "groups",
   "costPerMessage",
+  "alteraMensagemEnviada",
 ] as const;
 
 describe("matriz capability × provider é exaustiva", () => {

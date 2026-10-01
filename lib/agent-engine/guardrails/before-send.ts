@@ -126,6 +126,20 @@ export interface GateContext {
     state: PacingState;
     crmDailyLimit: number | null;
     rng?: () => number;
+    /**
+     * Este envio é RESPOSTA a uma mensagem recebida, ou disparo/retomada?
+     *
+     * ⚠️ OMITIDO = disparo (janela `window*`, 7h-22h). É o default que mantém
+     * todo chamador que não conhece a 0495 no comportamento antigo, e é a
+     * direção segura: quem esquece o campo continua preso ao horário comercial
+     * em vez de abrir o número às 3h.
+     *
+     * O `inbound_turn` (cliente escreveu) e o `case_reply_turn` passam `true` e leem
+     * `resposta*`. O disparo em massa NÃO passa por este gate — ele usa
+     * `decidePacing` direto (`lib/prospecting/worker.ts`) — então o valor aqui
+     * só distingue resposta de retomada por follow-up.
+     */
+    resposta?: boolean;
   };
   spinning: {
     knobs: SpinningKnobs;
@@ -517,6 +531,40 @@ const AGENDA_STALL_PATTERN =
   /\b(vou|estou|iremos|vamos)\b[^.!?\n]{0,10}\b(verificando|verificar|confirmando|confirmar|consultando|consultar|organizando|organizar)\b(?:[^.!?\n]{0,80}\b(?:hor[aá]rios?|agenda|disponibilidade|agendamento|marca[çc][aã]o|encaixe|vagas?)\b|\s+(?:[oa]s?\s+)?(?:meu\s+|minha\s+|seu\s+|sua\s+|nosso\s+|nossa\s+|teu\s+|tua\s+)?(?:atendimento|consulta|sess[aã]?o)\b)/i;
 
 /**
+ * A janela de 10 chars entre "vou" e o verbo de checagem não alcança a
+ * construção medida "vou chamar a responsável pra ver os horários": o
+ * verbo útil é "ver", e ele vem depois da pessoa. Sem isto o gate passa
+ * e o modelo encerra o turno sem crm_find_free_slots. Continua exigindo
+ * substantivo de agenda. `\bver\b` não casa "verificar".
+ *
+ * "Ver" é verbo comum demais para a janela larga dos outros padrões, e este gate
+ * não tem fail-safe: o veto se repete até o modelo chamar a ferramenta ou mudar a
+ * frase. A primeira versão (80 caracteres antes do "ver", 40 depois) vetou 9 de 12
+ * frases que não prometem consultar agenda, e 9 de 10 num segundo conjunto escrito
+ * antes de testar o corte. Três cortes, cada um nomeando a família que ele tira:
+ *
+ * - quem vê é o CLIENTE: `voce`/`vc`/`ce`/`tu` perto do "ver" ("pra você ver a
+ *   agenda do evento", "ver o que você precisa: agendamento…");
+ * - "a ver" não é verbo de checagem ("nada a ver com o seu agendamento", "te
+ *   ajudar a ver horários"), nem "ver" seguido de `:`/`;`/`,` ("vamos ver: horário
+ *   de funcionamento é…");
+ * - o substantivo vem logo depois (≤25: "ver se tem vaga", "ver quais horários"),
+ *   não uma oração inteira adiante ("ver se faz sentido marcar um horário").
+ *
+ * Nos mesmos dois conjuntos, com este corte: 1 de 12 e 1 de 10, e 10 de 12
+ * promessas vetadas (a versão larga: 11 de 12). O que ficou de fora dos dois lados
+ * está em `tests/unit/gate-agenda-stall.test.ts`. As frases são escritas, não
+ * tráfego de produção.
+ */
+const PRONOME_DO_CLIENTE = String.raw`\b(?:voce|vc|ce|tu)\b`;
+const AGENDA_STALL_VER_PATTERN = new RegExp(
+  String.raw`\b(vou|estou|iremos|vamos)\b(?:(?!${PRONOME_DO_CLIENTE})[^.!?\n]){0,50}` +
+    String.raw`(?<!\ba )\bver\b(?!\s*[:;,])(?:(?!${PRONOME_DO_CLIENTE})[^.!?\n]){0,25}` +
+    String.raw`\b(hor[aá]rios?|agenda|disponibilidade|agendamento|marca[çc][aã]o|encaixe|vagas?)\b`,
+  'i',
+);
+
+/**
  * Padrão irmão do `AGENDA_STALL_PATTERN`, mas para a outra metade do mesmo defeito: não
  * uma PROMESSA de checar ("vou verificar"), e sim uma AFIRMAÇÃO de fato já consumado
  * ("está confirmado/agendado/marcado/certinho") — o texto exato do incidente original
@@ -583,7 +631,8 @@ export const agendaStallGate: Gate = {
     if (ctx.agenda === undefined || !ctx.agenda.active) return { pass: true };
     if (ctx.agenda.toolCalledThisTurn) return { pass: true };
     const bodySemAcento = semAcento(ctx.body);
-    const stall = AGENDA_STALL_PATTERN.test(bodySemAcento);
+    const stall =
+      AGENDA_STALL_PATTERN.test(bodySemAcento) || AGENDA_STALL_VER_PATTERN.test(bodySemAcento);
     const confirmedSemChecar = AGENDA_CONFIRMED_PATTERN.test(bodySemAcento);
     if (!stall && !confirmedSemChecar) return { pass: true };
     return {
@@ -662,6 +711,7 @@ export const pacingGate: Gate = {
       state: ctx.pacing.state,
       crmDailyLimit: ctx.pacing.crmDailyLimit,
       banRisk,
+      resposta: ctx.pacing.resposta,
       rng: ctx.pacing.rng,
     });
     if (!decision.allow) {
@@ -871,6 +921,12 @@ export interface RunBeforeSendArgs {
    * veto `cadence_spacing` com `nextAllowedAt`, e o chamador reagenda o job.
    */
   espacamentoAutomatico?: { minMs: number; maxMs: number; semente?: string };
+  /**
+   * Este envio é RESPOSTA a uma mensagem recebida (janela `resposta*`, 0495) ou
+   * disparo/retomada (janela `window*`)? OMITIDO = disparo — o default que deixa
+   * todo chamador anterior à 0495 no comportamento antigo.
+   */
+  resposta?: boolean;
   now: Date;
   /** injeções de teste (jitter determinístico + espera sem relógio real). */
   rng?: () => number;
@@ -1219,6 +1275,7 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
         state: pacingState,
         crmDailyLimit: args.crmDailyLimit,
         rng: args.rng,
+        ...(args.resposta !== undefined ? { resposta: args.resposta } : {}),
       },
       spinning: { knobs: spinningKnobs, window },
       ...(args.enforceSpinning === false ? { spinningEnforced: false as const } : {}),

@@ -2,6 +2,7 @@
  * A porta de entrada do seam. Feature nenhuma importa `lib/waha/*` direto —
  * pede o adapter do provider da conversa e o descritor de capabilities.
  */
+import { datafyAdapter } from "./adapters/datafy";
 import { metaCloudAdapter } from "./adapters/meta-cloud";
 import { wahaAdapter } from "./adapters/waha";
 import { instagramAdapter } from "./adapters/instagram";
@@ -32,6 +33,7 @@ const ADAPTERS: Record<ProviderDeMensagem, ChannelAdapter | null> = {
    * terceira cópia que diverge.
    */
   instagram: instagramAdapter,
+  datafy: datafyAdapter,
 };
 
 /**
