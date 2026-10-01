@@ -52,6 +52,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { marcaDaOrigem, origemDeCampanhaDaConversa } from "@/lib/campanhas/origem-do-lead";
 
 import { logger } from "@/lib/logger";
+import { adotarLeadsDoContato } from "@/lib/routing/worker";
 
 import { lerClientePelaAgenda } from "@/lib/contacts/cliente-pela-agenda";
 import { ehIdentificadorTecnico, rotuloDoContato, SEM_NOME } from "@/lib/contacts/rotulo-do-contato";
@@ -456,6 +457,36 @@ export async function garantirLeadDaConversa(
     return { criado: false, motivo: "ja_existe" };
   }
   const lead = { id: novoId as string };
+
+  // 4b · o lead nasce com o dono que a conversa JÁ tem.
+  //
+  // O rodízio e o "Assumir" só passam o dono ao lead no momento em que ATRIBUEM a
+  // conversa. Quando a conversa já tinha dono e o lead nasce depois (o paciente
+  // volta a escrever numa conversa antiga), nada atribuía de novo e o card ficava
+  // sem responsável. Medido no Dr. Paulo em 01/10/2026: conversa assumida em
+  // 23/09, lead nascido às 06:36 sem dono. A regra é a mesma do rodízio
+  // (`adotarLeadsDoContato`): só lead aberto e sem dono humano nem de IA.
+  // Best-effort: falhar aqui não pode impedir o lead de nascer.
+  // `contact_id` no filtro: um par (contato, conversa) trocado não pode herdar o
+  // dono da conversa de outra pessoa.
+  const { data: conversa, error: erroConversa } = await db
+    .from("conversations")
+    .select("assigned_to_user_id")
+    .eq("organization_id", organizationId)
+    .eq("id", conversationId)
+    .eq("contact_id", contactId)
+    .maybeSingle();
+  if (erroConversa) {
+    logger.warn("nascimento-do-lead: dono da conversa não lido", {
+      organization_id: organizationId,
+      lead_id: novoId as string,
+      error: erroConversa.message.slice(0, 120),
+    });
+  }
+  const donoDaConversa = (conversa?.assigned_to_user_id as string | null | undefined) ?? null;
+  if (donoDaConversa) {
+    await adotarLeadsDoContato(db, organizationId, contactId, donoDaConversa);
+  }
 
   // 5 · o registro, pelo EMISSOR CANÔNICO — não por insert cru.
   //
