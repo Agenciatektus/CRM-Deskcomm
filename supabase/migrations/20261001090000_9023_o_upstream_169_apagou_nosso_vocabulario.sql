@@ -117,7 +117,7 @@ begin
     display_name = v_anon_label,
     email = null,
     phone_number = null,
-    -- A identidade de Instagram do fork (9010 aplicava por âncora; a 0497 a
+    -- A identidade de Instagram do fork (9010 aplicava por âncora, e a 0497 a
     -- reemitiu sem ela): o `@` e o id estável que a Meta emite para a pessoa.
     instagram_igsid = null,
     instagram_username = null,
