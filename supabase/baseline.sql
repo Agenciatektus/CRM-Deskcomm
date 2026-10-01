@@ -46740,8 +46740,10 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 --
 -- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO
 -- das 0489/0490 do upstream: fluxo comum passa a ser decidido pela RLS do
--- upstream; a cadência continua escrita só pelo servidor. Motivo completo no
--- cabeçalho da migration. Antes da varredura de anon, como toda função.
+-- upstream; a cadência continua escrita só pelo servidor. E acrescenta a
+-- conferência de ORGANIZAÇÃO que a RLS não faz: inscrição e versão só apontam
+-- para ponteiro (e versão) da própria org, para qualquer papel. Motivo completo
+-- no cabeçalho da migration. Antes da varredura de anon, como toda função.
 create or replace function public.fn_cadencia_guarda_versao()
 returns trigger language plpgsql security invoker set search_path = public as $cad_gv$
 begin
@@ -46804,6 +46806,40 @@ begin
 end;
 $cad_gi$;
 revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, authenticated;
+
+create or replace function public.fn_followup_mesma_organizacao()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $fmo$
+begin
+  if new.pointer_id is not null and not exists (
+    select 1 from public.followup_flow_pointers p
+     where p.id = new.pointer_id and p.organization_id = new.organization_id
+  ) then
+    raise exception 'followup_fora_da_organizacao: o fluxo % não é da organização desta linha', new.pointer_id
+      using errcode = '42501';
+  end if;
+  if tg_table_name = 'followup_enrollments' then
+    if new.version_id is not null and not exists (
+      select 1 from public.followup_flow_versions v
+       where v.id = new.version_id and v.organization_id = new.organization_id
+    ) then
+      raise exception 'followup_fora_da_organizacao: a versão % não é da organização desta inscrição', new.version_id
+        using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$fmo$;
+revoke all on function public.fn_followup_mesma_organizacao() from public, anon, authenticated;
+
+drop trigger if exists trg_followup_mesma_organizacao on public.followup_enrollments;
+create trigger trg_followup_mesma_organizacao
+  before insert or update of organization_id, pointer_id, version_id on public.followup_enrollments
+  for each row execute function public.fn_followup_mesma_organizacao();
+
+drop trigger if exists trg_followup_mesma_organizacao on public.followup_flow_versions;
+create trigger trg_followup_mesma_organizacao
+  before insert or update of organization_id, pointer_id on public.followup_flow_versions
+  for each row execute function public.fn_followup_mesma_organizacao();
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
