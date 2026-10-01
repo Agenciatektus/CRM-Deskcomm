@@ -46736,6 +46736,98 @@ $$;
 revoke all on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) from public, anon, authenticated;
 grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) to service_role;
 
+-- ---- RLS de conjunto: conversations, crm_leads e user_organizations (migration 9026) ----
+--
+-- Substitui o predicado POR LINHA das policies de SELECT (fn_can_view_conversation
+-- da 0035/9014, fn_can_view_lead da 0036, fn_role_at_least da 0044 — todas
+-- recriadas mais acima neste arquivo) por um semi-join com o conjunto de
+-- `fn_escopo_orgs()`, calculado uma vez por consulta. Mesmo resultado, ordens de
+-- grandeza mais barato (motivo, medição e rollback no cabeçalho da migration).
+-- O ramo "próprio" (assigned_to_user_id / owner_user_id = auth.uid()) só vale
+-- com vínculo ATIVO: ex-membro ainda atribuído lê zero.
+--
+-- POR QUE AQUI: depois dos blocos que criam as policies antigas (senão elas
+-- voltariam por cima no update.sh) e ANTES da VARREDURA anon (cria função).
+-- Prova: tests/invariants/rls-de-conjunto-9026.test.ts.
+create or replace function public.fn_escopo_orgs()
+returns table (organization_id uuid, papel text, modo text)
+language sql stable security definer
+set search_path = public
+as $$
+  with sup as (
+    select (s.j->>'organization_id')::uuid as org,
+           case when s.j->>'access_mode' = 'full' then 'admin' else 'viewer' end as papel
+      from (select public.fn_support_context() as j) s
+     where s.j->>'status' = 'active'
+  )
+  select uo.organization_id,
+         coalesce(sup.papel, uo.role),
+         coalesce(o.settings->>'visibility_mode', 'own_and_unassigned')
+    from public.user_organizations uo
+    join public.organizations o on o.id = uo.organization_id
+    left join sup on sup.org = uo.organization_id
+   where uo.user_id = auth.uid()
+     and uo.revoked_at is null
+  union
+  select sup.org, sup.papel, 'all'
+    from sup
+   where not exists (
+     select 1 from public.user_organizations uo
+      where uo.user_id = auth.uid()
+        and uo.organization_id = sup.org
+        and uo.revoked_at is null
+   );
+$$;
+
+revoke all on function public.fn_escopo_orgs() from public, anon;
+grant execute on function public.fn_escopo_orgs() to authenticated, service_role;
+
+drop policy if exists "conversations_select" on public.conversations;
+create policy "conversations_select" on public.conversations
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (
+      select e.organization_id from public.fn_escopo_orgs() e
+       where e.papel in ('viewer', 'manager', 'admin')
+          or (e.papel = 'agent' and e.modo = 'all'))
+    or (assigned_to_user_id = (select auth.uid())
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel = 'agent'))
+    or (assigned_to_user_id is null
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+  );
+
+drop policy if exists "crm_leads_select" on public.crm_leads;
+create policy "crm_leads_select" on public.crm_leads
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (
+      select e.organization_id from public.fn_escopo_orgs() e
+       where e.papel in ('viewer', 'manager', 'admin')
+          or (e.papel = 'agent' and e.modo = 'all'))
+    or (owner_user_id = (select auth.uid())
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel = 'agent'))
+    or (owner_user_id is null
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+  );
+
+drop policy if exists "user_orgs_select" on public.user_organizations;
+create policy "user_orgs_select" on public.user_organizations
+  for select using (
+    user_id = (select auth.uid())
+    or organization_id in (
+      select e.organization_id from public.fn_escopo_orgs() e
+       where e.papel in ('manager', 'admin'))
+    or (select public.fn_is_platform_admin())
+  );
+
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --
 -- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO
