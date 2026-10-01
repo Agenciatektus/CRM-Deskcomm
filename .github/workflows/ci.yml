@@ -578,12 +578,28 @@ jobs:
         # aceita `timeout-minutes`. Razão e medições: o cabeçalho da action.
         timeout-minutes: 5
 
+      # FORK (Tektus): este repositório NÃO publica release, então o
+      # `scripts/conferir-isolamento-do-kit.sh` não acha "a última release"
+      # (`gh release view` e `/releases/latest` voltam vazios) e aborta com FATAL
+      # antes do vitest — a prova de RLS nunca rodava. O fork também não tem as
+      # tags do upstream no `origin`. As duas versões que a conferência usa vêm
+      # do upstream PÚBLICO: a release de onde este fork subiu (a que as VPS
+      # rodam) e a v1.63.0 fixa do próprio script. A conferência continua
+      # rodando as TRÊS versões do update.sh (deste checkout, da release e da
+      # v1.63.0) — só a pergunta "qual é a última release" é respondida à mão.
+      # Ao subir o fork para outra release do upstream, troque as duas linhas.
+      - name: Tags do upstream para a conferência do kit (fork sem releases)
+        run: |
+          git fetch -q --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git "+refs/tags/v1.69.0:refs/tags/v1.69.0" "+refs/tags/v1.63.0:refs/tags/v1.63.0"
+
       - name: RLS isolation + governance invariants (pg${{ matrix.pg }})
         # O token é só para `gh release view`: o test:db confere o update.sh da
         # última release publicada (issue #1909), e a API anônima tem teto de 60
         # consultas/hora por IP — o executor próprio é um IP só.
         env:
           GH_TOKEN: ${{ github.token }}
+          # Fork sem releases: ver o passo acima.
+          CONFERENCIA_KIT_RELEASE: v1.69.0
         run: pnpm test:db
 
       # O `update.sh` do cliente roda sobre um banco COM DADOS, e nenhum gate
