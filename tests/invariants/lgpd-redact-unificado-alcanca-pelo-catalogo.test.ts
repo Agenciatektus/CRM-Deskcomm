@@ -263,6 +263,10 @@ const DECISOES: Record<string, Decisao> = {
     razao: "0494 (#1964): a LINHA e o estágio ficam (é o estado do negócio), mas next_action (texto) e qualification (jsonb) — texto livre que cita a pessoa — são zerados na virada de is_anonymized pelo gatilho fn_redigir_conversas_ao_anonimizar (a porta da 0391 que a app já usava em lib/lgpd/cascata.ts passo 7).",
   },
   // ── manter: a linha e o conteúdo ficam, por decisão ───────────────────────
+  cadencia_conducoes: {
+    decidida: "manter",
+    razao: "Fork (9018): a condução da cadência pela IA — ids (conversa, contato, lead, ponteiro, versão, agente, funil, etapa-alvo), modo/preset/motivo de vocabulário fechado, contador de turnos e datas. O único texto, `instrucao`, é a instrução do OPERADOR copiada da configuração da cadência (`conf->>'instrucao'`), igual para todo lead daquela cadência — não é dado da pessoa. O que a IA escreveu para ela mora em messages, que a cascata já redige.",
+  },
   before_send_traces: {
     decidida: "manter",
     razao: "Traço de decisão do gate de envio (vetoed_gate/vetoed_code) para auditoria de POR QUE a mensagem não saiu; é código de vocabulário, não o conteúdo enviado — o corpo mora em messages.",

@@ -311,10 +311,15 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     const comoServico = sql(
       `select public.comando_da_conversa(c) from conversations c where c.id = '${CONV}'`,
     ).trim();
-    // Sem RLS o contato é alcançável, então as flags do contato VALEM: sem dono
-    // e com `force_human`, a ordem de `fn_comando_da_conversa` dá `aguardando`.
-    // Medido, não deduzido — pg17 com este baseline, 2026-09-23.
-    expect(comoServico, "sem RLS o contato é lido e as flags valem").toBe("aguardando");
+    // Desde a 0404/0482 do upstream (subida para a v1.69), `comando_da_conversa`
+    // é SECURITY DEFINER e lê o contato SÓ da organização da conversa
+    // (`ct.organization_id = $1.organization_id`). O contato de OUTRA org não é
+    // lido nem sem RLS: o isolamento saiu da policy e foi para o corpo da função,
+    // que é mais forte. Antes (9013), como serviço o join casava e dava
+    // `aguardando`; agora dá `automatico` nos dois mundos, e o controle positivo
+    // abaixo (o MESMO contato movido para a org A → `aguardando`) continua
+    // provando que o contato é lido quando é da org certa.
+    expect(comoServico, "nem sem RLS o contato de outra org é lido").toBe("automatico");
 
     // Agora com a RLS de verdade: o usuário não é membro da org B.
     //

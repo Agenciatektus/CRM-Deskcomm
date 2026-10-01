@@ -312,9 +312,31 @@ describe("fn_cadencia_lead_respondeu", () => {
   });
 
   it("inscrição de follow-up comum (não cadência) não é encontrada", async () => {
+    // A superfície é imutável desde a v1.69 do upstream (trigger de superfície):
+    // o fluxo comum nasce comum, em vez de ser convertido a partir da cadência.
     const c = await cenario();
-    await pool.query("update followup_flow_pointers set surface='followup' where id=$1", [c.pointer]);
-    await expect(responder(c)).rejects.toMatchObject({ code: "P0002" });
+    await pool.query("update followup_enrollments set status='cancelled' where id=$1", [c.enrollment]);
+    const comum = (
+      await pool.query(
+        "insert into followup_flow_pointers (organization_id, name, surface) values ($1,$2,'followup') returning id",
+        [c.org, `com-${randomUUID()}`],
+      )
+    ).rows[0].id as string;
+    const versaoComum = (
+      await pool.query(
+        "insert into followup_flow_versions (organization_id, pointer_id, graph) values ($1,$2,'{}'::jsonb) returning id",
+        [c.org, comum],
+      )
+    ).rows[0].id as string;
+    const inscricaoComum = (
+      await pool.query(
+        `insert into followup_enrollments
+           (organization_id, pointer_id, version_id, contact_id, lead_id, conversation_id, current_node_id, status, next_eval_at)
+         values ($1,$2,$3,$4,$5,$6,'a1','active', now() + interval '1 hour') returning id`,
+        [c.org, comum, versaoComum, c.contact, c.lead, c.conversation],
+      )
+    ).rows[0].id as string;
+    await expect(responder(c, inscricaoComum)).rejects.toMatchObject({ code: "P0002" });
   });
 
   it("outra organização não alcança a inscrição", async () => {
@@ -472,12 +494,18 @@ describe("fn_cadencia_publicar_versao", () => {
   });
 
   it("pointer que não é cadência → pointer_not_found, e nada é publicado", async () => {
+    // Superfície imutável (v1.69): o ponteiro comum nasce comum.
     const c = await cenario();
-    await pool.query("update followup_flow_pointers set surface='followup' where id=$1", [c.pointer]);
+    const comum = (
+      await pool.query(
+        "insert into followup_flow_pointers (organization_id, name, surface) values ($1,$2,'followup') returning id",
+        [c.org, `com-${randomUUID()}`],
+      )
+    ).rows[0].id as string;
     await expect(
-      pool.query("select public.fn_cadencia_publicar_versao($1,$2,'{}'::jsonb,null,null)", [c.org, c.pointer]),
+      pool.query("select public.fn_cadencia_publicar_versao($1,$2,'{}'::jsonb,null,null)", [c.org, comum]),
     ).rejects.toThrow(/pointer_not_found/);
-    const p = (await pool.query("select status from followup_flow_pointers where id=$1", [c.pointer])).rows[0];
+    const p = (await pool.query("select status from followup_flow_pointers where id=$1", [comum])).rows[0];
     expect(p.status).toBe("draft");
   });
 
