@@ -46777,51 +46777,62 @@ $$;
 revoke all on function public.fn_escopo_orgs() from public, anon;
 grant execute on function public.fn_escopo_orgs() to authenticated, service_role;
 
-drop policy if exists "conversations_select" on public.conversations;
-create policy "conversations_select" on public.conversations
-  for select using (
-    (select public.fn_is_platform_admin())
-    or organization_id in (
-      select e.organization_id from public.fn_escopo_orgs() e
-       where e.papel in ('viewer', 'manager', 'admin')
-          or (e.papel = 'agent' and e.modo = 'all'))
-    or (assigned_to_user_id = (select auth.uid())
-        and organization_id in (
-          select e.organization_id from public.fn_escopo_orgs() e
-           where e.papel = 'agent'))
-    or (assigned_to_user_id is null
-        and organization_id in (
-          select e.organization_id from public.fn_escopo_orgs() e
-           where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
-  );
+-- Cada par drop/create vai num `do` próprio: o baseline roda em autocommit
+-- (psql -f, sem --single-transaction) e com lock_timeout curto. Se o create
+-- caísse em lock timeout depois do drop, a tabela ficaria sem policy de SELECT
+-- (deny-all) até a próxima passada. Dentro do `do`, o par é uma instrução só:
+-- a troca acontece inteira ou não acontece, e a policy anterior fica de pé.
+do $rls9026$ begin
+  drop policy if exists "conversations_select" on public.conversations;
+  create policy "conversations_select" on public.conversations
+    for select using (
+      (select public.fn_is_platform_admin())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('viewer', 'manager', 'admin')
+            or (e.papel = 'agent' and e.modo = 'all'))
+      or (assigned_to_user_id = (select auth.uid())
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent'))
+      or (assigned_to_user_id is null
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+    );
+end $rls9026$;
 
-drop policy if exists "crm_leads_select" on public.crm_leads;
-create policy "crm_leads_select" on public.crm_leads
-  for select using (
-    (select public.fn_is_platform_admin())
-    or organization_id in (
-      select e.organization_id from public.fn_escopo_orgs() e
-       where e.papel in ('viewer', 'manager', 'admin')
-          or (e.papel = 'agent' and e.modo = 'all'))
-    or (owner_user_id = (select auth.uid())
-        and organization_id in (
-          select e.organization_id from public.fn_escopo_orgs() e
-           where e.papel = 'agent'))
-    or (owner_user_id is null
-        and organization_id in (
-          select e.organization_id from public.fn_escopo_orgs() e
-           where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
-  );
+do $rls9026$ begin
+  drop policy if exists "crm_leads_select" on public.crm_leads;
+  create policy "crm_leads_select" on public.crm_leads
+    for select using (
+      (select public.fn_is_platform_admin())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('viewer', 'manager', 'admin')
+            or (e.papel = 'agent' and e.modo = 'all'))
+      or (owner_user_id = (select auth.uid())
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent'))
+      or (owner_user_id is null
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+    );
+end $rls9026$;
 
-drop policy if exists "user_orgs_select" on public.user_organizations;
-create policy "user_orgs_select" on public.user_organizations
-  for select using (
-    user_id = (select auth.uid())
-    or organization_id in (
-      select e.organization_id from public.fn_escopo_orgs() e
-       where e.papel in ('manager', 'admin'))
-    or (select public.fn_is_platform_admin())
-  );
+do $rls9026$ begin
+  drop policy if exists "user_orgs_select" on public.user_organizations;
+  create policy "user_orgs_select" on public.user_organizations
+    for select using (
+      user_id = (select auth.uid())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('manager', 'admin'))
+      or (select public.fn_is_platform_admin())
+    );
+end $rls9026$;
 
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --
