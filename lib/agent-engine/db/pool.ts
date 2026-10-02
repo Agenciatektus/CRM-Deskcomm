@@ -75,7 +75,7 @@ export function nomeDaAplicacao(papel: string): string {
  * - idle_in_transaction 25 min: o maior trecho OCIOSO da transação do envio é o
  *   sono do pacing, `throttle_ms + jitter`, e os dois knobs vão até
  *   `KNOB_BOUNDS.intervalMaxMs` (10 min cada) = 20 min. Mais 5 min de folga
- *   para LLM + envio HTTP (WAHA corta em 15 s).
+ *   para LLM + envio HTTP (o adapter de envio corta em 15 s).
  * - lock 30 min: quem espera o lock do número espera a transação inteira de quem
  *   o segura, que morre no teto de ociosa acima; 30 min cobre esse teto com
  *   folga sem virar espera infinita.
