@@ -220,8 +220,8 @@ export async function setupProspectingAgent(
   try {
     // Os locks abaixo são de SESSÃO e atravessam a publicação HTTP: quem chega
     // depois espera o tempo do publish, que passa fácil dos 5 s de lock_timeout
-    // (e dos 30 s de statement_timeout) do pool. Suspende só nesta conexão; o
-    // finally restaura antes de devolvê-la.
+    // (e dos 30 s de statement_timeout) do pool. Troca pelos prazos de espera
+    // longa (com teto) só nesta conexão; o finally restaura antes de devolvê-la.
     await semPrazoNaSessao(db);
     semPrazo = true;
     // Keep the channel reservation across the canonical publish HTTP call.

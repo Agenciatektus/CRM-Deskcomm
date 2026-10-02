@@ -28,8 +28,8 @@ import { createLogger } from '../obs/logger';
  *
  * Quem PRECISA de espera longa por desenho (lock consultivo que serializa o envio
  * do número com throttle de até minutos, ou a reserva do canal que atravessa a
- * publicação HTTP) suspende os prazos explicitamente: `semPrazoNaTransacao` /
- * `semPrazoNaSessao` + `restaurarPrazosDaSessao`. O padrão é ter teto.
+ * publicação HTTP) troca pelos prazos de espera longa, que também têm teto:
+ * `semPrazoNaTransacao` / `semPrazoNaSessao` + `restaurarPrazosDaSessao`.
  */
 export const PRAZOS_DA_SESSAO = {
   statement_timeout: '30s',
@@ -67,27 +67,73 @@ export function nomeDaAplicacao(papel: string): string {
 }
 
 /**
- * Suspende os três prazos SÓ nesta transação (`set_config(..., true)` = SET
- * LOCAL). Chamar logo depois do `begin`, antes do lock que pode esperar.
+ * Prazos de quem espera POR DESENHO. Generosos, mas com teto: zerar tudo deixava
+ * um processo pendurado (a chamada ao LLM não tem teto próprio) segurando a
+ * conexão e o lock do número para sempre, com os outros workers esperando sem
+ * limite.
+ *
+ * - idle_in_transaction 25 min: o maior trecho OCIOSO da transação do envio é o
+ *   sono do pacing, `throttle_ms + jitter`, e os dois knobs vão até
+ *   `KNOB_BOUNDS.intervalMaxMs` (10 min cada) = 20 min. Mais 5 min de folga
+ *   para LLM + envio HTTP (WAHA corta em 15 s).
+ * - lock 30 min: quem espera o lock do número espera a transação inteira de quem
+ *   o segura, que morre no teto de ociosa acima; 30 min cobre esse teto com
+ *   folga sem virar espera infinita.
+ * - statement 0: o lock é a única instrução longa e já tem o teto acima.
+ */
+export const PRAZOS_DA_ESPERA_LONGA = {
+  statement_timeout: '0',
+  idle_in_transaction_session_timeout: '25min',
+  lock_timeout: '30min',
+} as const;
+
+/**
+ * Clients de pool em modo TRANSACTION do pooler (porta 6543 / pgbouncer=true):
+ * ali o backend é trocado a cada transação, e SET de sessão vazaria para a
+ * sessão de outro cliente. Para estes, nada de SET de sessão.
+ */
+const clientesSemSessaoPropria = new WeakSet<object>();
+
+/** URL que aponta para o pooler em modo transaction (Supavisor 6543 ou pgbouncer=true). */
+export function ehPoolerEmModoTransacao(databaseUrl: string): boolean {
+  try {
+    const u = new URL(databaseUrl);
+    return u.port === '6543' || u.searchParams.get('pgbouncer') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Troca os prazos SÓ nesta transação (`set_config(..., true)` = SET LOCAL, seguro
+ * também em modo transaction) pelos de espera longa. Chamar logo depois do
+ * `begin`, antes do lock que pode esperar.
  */
 export async function semPrazoNaTransacao(client: pg.ClientBase): Promise<void> {
+  const p = PRAZOS_DA_ESPERA_LONGA;
   await client.query(
-    `select set_config('lock_timeout', '0', true),
-            set_config('statement_timeout', '0', true),
-            set_config('idle_in_transaction_session_timeout', '0', true)`,
+    `select set_config('lock_timeout', '${p.lock_timeout}', true),
+            set_config('statement_timeout', '${p.statement_timeout}', true),
+            set_config('idle_in_transaction_session_timeout', '${p.idle_in_transaction_session_timeout}', true)`,
   );
 }
 
-/** Suspende os prazos na SESSÃO (lock consultivo fora de transação). */
+/**
+ * Prazos de espera longa na SESSÃO (lock consultivo fora de transação). No-op em
+ * modo transaction do pooler: ali o SET cairia na sessão de outro cliente.
+ */
 export async function semPrazoNaSessao(client: pg.ClientBase): Promise<void> {
+  if (clientesSemSessaoPropria.has(client)) return;
+  const p = PRAZOS_DA_ESPERA_LONGA;
   await client.query(
-    `select set_config('lock_timeout', '0', false),
-            set_config('statement_timeout', '0', false)`,
+    `select set_config('lock_timeout', '${p.lock_timeout}', false),
+            set_config('statement_timeout', '${p.statement_timeout}', false)`,
   );
 }
 
-/** Volta aos prazos padrão antes de devolver o client ao pool. */
+/** Volta aos prazos padrão antes de devolver o client ao pool (no-op em modo transaction). */
 export async function restaurarPrazosDaSessao(client: pg.ClientBase): Promise<void> {
+  if (clientesSemSessaoPropria.has(client)) return;
   await client.query(SQL_PRAZOS_DA_SESSAO);
 }
 
@@ -118,8 +164,23 @@ export function createPool(
       const error = (err.message.split('\n', 1)[0] ?? '').slice(0, 300);
       createLogger().error('pool: conexão caiu — recria no próximo uso', { error });
     });
+  // Os prazos são SET de SESSÃO: só valem com o pooler em modo session (5432).
+  // Em modo transaction (6543) o SET vazaria para o backend de outro cliente —
+  // então não aplica, e grita no log: a instalação está fora do desenho.
+  const modoTransacao = ehPoolerEmModoTransacao(databaseUrl);
+  if (modoTransacao) {
+    createLogger().error(
+      'pool: SUPABASE_DB_URL aponta para o pooler em modo transaction (porta 6543/pgbouncer=true); ' +
+        'prazos de sessão NÃO aplicados — use a porta 5432 (modo session)',
+      { application_name: opts.applicationName ?? nomeDaAplicacao('pool') },
+    );
+  }
   pool.on('connect', (client) => {
     client.on('error', handler);
+    if (modoTransacao) {
+      clientesSemSessaoPropria.add(client);
+      return;
+    }
     // Enfileirado ANTES da 1ª query de quem pediu a conexão (o pg executa em
     // ordem por client). Falhar aqui não derruba nada: a conexão segue com os
     // defaults do papel e a falha vai para o log.
