@@ -237,11 +237,17 @@ export async function runEventLogDrainLoop(
     try {
       const resumo = await deps.drainEventLog(deps.admin, { limit: knobs.batchSize });
       espera = proximaEspera(resumo, knobs);
-      // O batimento só sai de tick que TERMINOU: ele afirma "estou drenando",
-      // não "estou vivo". Tick que lança não bate, e o cron assume quando o
-      // último batimento envelhecer.
+      // O batimento só sai de tick que TERMINOU E VIU A FILA: ele afirma
+      // "estou drenando", não "estou vivo". Tick que lança, ou que devolve
+      // `erro` (select falhou, nenhum handler), não bate — e o cron assume
+      // quando o último batimento envelhecer.
+      if (resumo.erro) {
+        log.error('event-log drain: tick sem visão da fila — sem batimento', {
+          error: resumo.erro.slice(0, 300),
+        });
+      }
       const agora = Date.now();
-      if (deps.batimento && batimentoEstaNaVez(ultimoBatimentoMs, agora)) {
+      if (!resumo.erro && deps.batimento && batimentoEstaNaVez(ultimoBatimentoMs, agora)) {
         ultimoBatimentoMs = agora;
         void registrarBatimento(deps.batimento, agora);
       }
