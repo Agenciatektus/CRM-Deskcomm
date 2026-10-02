@@ -24,12 +24,15 @@
  * 45s é menor que UM tick de cron. Com dois saltos, perder a janela não é azar,
  * é aritmética. Este laço tira o cron do caminho crítico.
  *
- * ─── Por que o cron continua ─────────────────────────────────────────────────
+ * ─── Por que o cron continua, e quando ele entra ─────────────────────────────
  *
- * Ele vira rede de segurança: worker fora do ar não pode significar event_log
- * parado. Rodar os dois em paralelo é seguro porque `drainEventLog` reivindica
- * cada linha com um claim otimista (`update … where id = $1 and status =
- * 'pending'`) e pula o que outra instância já pegou — ver `drain.ts`.
+ * Ele é rede de segurança: worker fora do ar não pode significar event_log
+ * parado. Mas não drena mais em paralelo com um worker saudável: depois de cada
+ * tick que terminou, este laço grava um batimento no Redis
+ * (`batimento-do-laco.ts`), e o cron só drena quando o batimento está velho.
+ * Se os dois coincidirem (batimento perdido, Redis fora), continua seguro:
+ * `drainEventLog` reivindica cada linha com um claim otimista (`update … where
+ * id = $1 and status = 'pending'`) e pula o que outra instância já pegou.
  *
  * ─── Por que os imports são dinâmicos ────────────────────────────────────────
  *
@@ -45,6 +48,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Logger } from '@/lib/agent-engine/obs/logger';
 import { sincronizarAvisoDoLacoDeEventLog } from '@/lib/event-log/aviso-do-laco';
+import {
+  batimentoEstaNaVez,
+  criarArmazemDoBatimento,
+  registrarBatimento,
+  type ArmazemDoBatimento,
+} from '@/lib/event-log/batimento-do-laco';
 // `import type` e nunca import de valor: em runtime esta linha desaparece, e é
 // isso que mantém a cadeia que termina em `@/lib/env` fora do boot do worker.
 import type { DrainSummary } from '@/lib/event-log/drain';
@@ -66,6 +75,8 @@ type DrainFn = (admin: SupabaseClient, opts?: { limit?: number }) => Promise<Dra
 interface Deps {
   drainEventLog: DrainFn;
   admin: SupabaseClient;
+  /** `null` = sem Redis utilizável: o laço não bate e o cron drena junto, como antes. */
+  batimento?: ArmazemDoBatimento | null;
 }
 
 /**
@@ -138,7 +149,14 @@ export async function carregarDepsDoLaco(log: Logger): Promise<Deps | null> {
     const { ensureHandlersRegistered } = await import('@/lib/event-log/register-handlers');
     ensureHandlersRegistered();
 
-    const deps: Deps = { drainEventLog, admin: adminParaAviso };
+    const batimento = criarArmazemDoBatimento();
+    if (!batimento) {
+      log.warn(
+        'event-log drain: sem Redis para o batimento — o cron event-log-drain segue drenando em paralelo',
+        {},
+      );
+    }
+    const deps: Deps = { drainEventLog, admin: adminParaAviso, batimento };
     // A prontidão sai ANTES de resolver o aviso antigo: ela depende só das deps,
     // e o round-trip até a Central não pode deixar o /healthz dizendo
     // `carregado:false` com o laço já montado.
@@ -204,10 +222,13 @@ export async function runEventLogDrainLoop(
   knobs: EventLogDrainKnobs,
   log: Logger,
   signal: AbortSignal,
+  // Injetável só para teste; em produção as deps vêm de `carregarDepsDoLaco`.
+  depsInjetadas?: Deps,
 ): Promise<void> {
-  const deps = await carregarDepsDoLaco(log);
+  const deps = depsInjetadas ?? (await carregarDepsDoLaco(log));
   if (!deps) return;
 
+  let ultimoBatimentoMs: number | null = null;
   while (!signal.aborted) {
     // Tick que EXPLODE não pode acelerar o laço: sem resumo, vale a espera
     // ociosa. Um banco fora do ar lançaria a cada iteração, e o ritmo rápido
@@ -216,6 +237,14 @@ export async function runEventLogDrainLoop(
     try {
       const resumo = await deps.drainEventLog(deps.admin, { limit: knobs.batchSize });
       espera = proximaEspera(resumo, knobs);
+      // O batimento só sai de tick que TERMINOU: ele afirma "estou drenando",
+      // não "estou vivo". Tick que lança não bate, e o cron assume quando o
+      // último batimento envelhecer.
+      const agora = Date.now();
+      if (deps.batimento && batimentoEstaNaVez(ultimoBatimentoMs, agora)) {
+        ultimoBatimentoMs = agora;
+        void registrarBatimento(deps.batimento, agora);
+      }
       if (resumo.done + resumo.retried + resumo.failed + resumo.dead > 0) {
         log.info('event-log drain: tick', { ...resumo });
       }
