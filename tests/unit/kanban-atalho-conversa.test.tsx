@@ -117,26 +117,54 @@ describe("o elo que some sem barulho", () => {
     // ninguém testou.
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
     expect(fonte, "falta withConversas").toContain("withConversas");
-    expect(fonte, "withConversas não foi chamada").toMatch(
-      /leadsComConversa\s*=\s*await withConversas/,
-    );
+
     // Chamar e não USAR o resultado é o defeito de verdade: a função roda, o
     // custo se paga, e a resposta sai sem a conversa. A primeira versão deste
-    // caso só olhava a chamada e o sabote passou.
+    // caso só olhava a chamada e o sabote passou. É essa garantia que continua
+    // presa abaixo — mudou só a forma da rota, não o que interessa.
     //
-    // A resposta não sai mais direto de `withConversas`: a cadeia é
-    // withConversas → withMarcadoresDoContato → resposta. Exigir o texto
-    // `leads: leadsComConversa.leads` reprovava quem acrescentava uma etapa
-    // CERTA depois dela; o que importa é o resultado dela alimentar a próxima,
-    // e a resposta sair da última.
-    expect(
-      fonte,
-      "o resultado de withConversas não alimenta withMarcadoresDoContato (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/withMarcadoresDoContato\(\s*supabase,[\s\S]*?leadsComConversa\.leads/);
-    expect(
-      fonte,
-      "a resposta não sai da última etapa (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/leads:\s*leadsComMarcadores\.leads/);
+    // ANTES a rota encadeava: withConversas → withMarcadoresDoContato → resposta,
+    // e este caso casava os NOMES das variáveis. As famílias agora rodam em
+    // paralelo e são fundidas no fim (`lib/crm/fundir-enriquecimentos.ts`), então
+    // já não existe "a próxima etapa" para alimentar: o que prova que o custo de
+    // `withConversas` não foi jogado fora é o resultado dela estar entre os
+    // fundidos. O nome é derivado da fonte, para esta cerca não voltar a reprovar
+    // código correto só porque alguém renomeou uma variável.
+    //
+    // A derivação está repetida em `funil-filtro-de-tag-le-as-duas-caixas`. Não
+    // foi extraída para um módulo comum de propósito: `ehCerca` (vitest.cercas)
+    // desclassifica arquivo com import relativo, e um helper compartilhado tiraria
+    // estas guardas da seleção rápida do `pnpm cercas`.
+    const daRota = fonte.slice(fonte.indexOf("const quadroBase"));
+    expect(daRota.length, "o bloco de enriquecimento da rota sumiu").toBeGreaterThan(0);
+
+    // Ancorado em `quadroBase`: o PRIMEIRO `Promise.all` do arquivo é o interno
+    // de `withNextActions`, e casar com ele faz esta cerca ler nomes errados.
+    const destruct = /const\s*\[([^\]]+)\]\s*=\s*await Promise\.all\(/.exec(daRota);
+    expect(destruct, "as famílias de enriquecimento sumiram do Promise.all").not.toBeNull();
+
+    const nomes = destruct![1]!.split(",").map((s) => s.trim());
+    const ordemNaFonte = [
+      "withNextActions",
+      "withScores",
+      "withConversas",
+      "withMarcadoresDoContato",
+    ]
+      .map((f) => ({ f, i: daRota.indexOf(`${f}(`, destruct!.index) }))
+      .filter((x) => x.i > -1)
+      .sort((a, b) => a.i - b.i)
+      .map((x) => x.f);
+
+    const posicao = ordemNaFonte.indexOf("withConversas");
+    expect(posicao, "withConversas não foi chamada").toBeGreaterThan(-1);
+    const nomeDoResultado = nomes[posicao];
+    expect(nomeDoResultado, "a família das conversas não tem destino").toBeDefined();
+
+    const fusao = /leads:\s*fundirEnriquecimentos\(\s*\w+\s*,\s*\[([\s\S]*?)\]/.exec(daRota);
+    expect(fusao, "a resposta não é montada pela fusão dos enriquecimentos").not.toBeNull();
+    expect(fusao![1], "o resultado de withConversas não chega à resposta").toContain(
+      `${nomeDoResultado}.leads`,
+    );
   });
 
   it("a mais RECENTE por contato — não a primeira que o banco devolver", () => {
