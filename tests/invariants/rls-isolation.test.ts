@@ -559,6 +559,11 @@ beforeAll(() => {
         insert into public.import_rows (organization_id, batch_id, row_number, raw_data)
           values (v_org, v_lote, 2, '{"nome": "RLS invariant"}'::jsonb)
           on conflict (batch_id, row_number) do nothing;
+        -- migration 9026 (Tektus): o módulo que o dono do servidor liberou para
+        -- a empresa. Escrita só pelo service role; o seed roda como superuser.
+        insert into public.modulos_liberados_por_empresa (organization_id, modulo)
+          values (v_org, 'prospeccao')
+          on conflict (organization_id, modulo) do nothing;
       end loop;
     end
     $seed$;
@@ -724,6 +729,11 @@ export const TABLES = [
   "company_people",
   "import_batches",
   "import_rows",
+  // migration 9026 (Tektus) — o que o dono do servidor liberou para cada
+  // empresa. Vazar a linha só revela o nome do módulo, mas a prova entra aqui
+  // no MESMO commit da migration, como a nota acima exige. A escrita negada a
+  // `authenticated` (só SELECT concedido) foi medida em Postgres 17 na PR.
+  "modulos_liberados_por_empresa",
 ] as const;
 
 describe("RLS tenant isolation (fn_user_org_ids pattern)", () => {
