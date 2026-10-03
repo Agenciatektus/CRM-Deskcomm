@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -15,6 +15,24 @@ import { sugestaoParaMostrar } from "@/lib/agent-engine/agent/sugestao-de-respos
 const ROTULO_DA_PROPOSTA: Record<string, string> = {
   crm_move_lead_stage: "Mover o negócio de etapa (confirme pelo painel do lead)",
 };
+/**
+ * Quando perguntar de novo pela sugestão.
+ *
+ * Antes: a cada 4 s, sempre, com a conversa aberta (15 pedidos por minuto
+ * parada). A sugestão nasce por causa de uma MENSAGEM (o turno de entrada a
+ * gera em segundo plano) e vira `stale` quando chega mensagem nova; então:
+ * - mensagem nova nesta conversa (o realtime de mensagens refaz
+ *   `["messages", id]`) pergunta na hora e liga a pergunta rápida por
+ *   `JANELA_ACORDADA_MS`, o tempo de a sugestão terminar de ser gerada;
+ * - sugestão em `generating` mantém a pergunta rápida até ela sair;
+ * - fora disso, uma pergunta por minuto, de rede de segurança. Com a aba
+ *   escondida o react-query não pergunta (`refetchIntervalInBackground` é
+ *   `false` por padrão).
+ */
+const RAPIDO_MS = 4_000;
+const SEGURANCA_MS = 60_000;
+const JANELA_ACORDADA_MS = 90_000;
+
 type Draft = {
   id: string;
   revision: string;
@@ -34,13 +52,33 @@ export function ReplyReviewPanel({
   const t = useT(),
     qc = useQueryClient(),
     key = ["reply-drafts", conversationId];
+  const [acordada, setAcordada] = useState(false);
+  useEffect(() => {
+    let dormir: ReturnType<typeof setTimeout> | undefined;
+    const parar = qc.getQueryCache().subscribe((ev) => {
+      if (ev.type !== "updated" || ev.action.type !== "success") return;
+      const [raiz, id] = ev.query.queryKey;
+      if (raiz !== "messages" || id !== conversationId) return;
+      setAcordada(true);
+      clearTimeout(dormir);
+      dormir = setTimeout(() => setAcordada(false), JANELA_ACORDADA_MS);
+      void qc.invalidateQueries({ queryKey: ["reply-drafts", conversationId] });
+    });
+    return () => {
+      parar();
+      clearTimeout(dormir);
+    };
+  }, [qc, conversationId]);
   const query = useQuery({
     queryKey: key,
     queryFn: () =>
       apiClient.get<{ data: { drafts: Draft[] } }>(
         `/api/v1/conversations/${conversationId}/draft-reply`,
       ),
-    refetchInterval: 4000,
+    refetchInterval: (q) => {
+      const gerando = q.state.data?.data.drafts.some((d) => d.status === "generating");
+      return gerando || acordada ? RAPIDO_MS : SEGURANCA_MS;
+    },
     retry: false,
   });
   const [edits, setEdits] = useState<Record<string, string>>({}),
