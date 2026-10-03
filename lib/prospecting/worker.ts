@@ -1,3 +1,4 @@
+import { moduloDaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { audit } from "@/lib/audit";
 import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -343,6 +344,9 @@ export async function tickProspecting(pool: pg.Pool, admin: SupabaseClient) {
   let processed = 0;
   for (const { organization_id: org } of organizations) {
     if (Date.now() >= deadline) break;
+    // Revogar a liberação (9026) para a campanha que já estava rodando: sem isso
+    // a tela sumiria e o WhatsApp continuaria disparando.
+    if (!(await moduloDaEmpresa(admin, org, "prospeccao"))) continue;
     try {
       await withProspectingLock(pool, org, async (db) => {
         await db.query(

@@ -1,3 +1,4 @@
+import { seModuloFechadoParaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { randomUUID } from "node:crypto";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
@@ -35,6 +36,8 @@ export async function GET() {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "prospecting" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   try {
     const db = getRequestPool();
     const org = auth.org.orgId;
@@ -88,6 +91,8 @@ export async function POST(req: Request) {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "prospecting" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   const parsed = prospectingInputSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
     return fail(

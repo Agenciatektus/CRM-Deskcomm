@@ -431,6 +431,10 @@ export const AUDIT_ACTIONS = [
   // as empresas deste servidor podiam ligar um banco de outro sistema?" só tem
   // resposta aqui.
   "platform.modulo_updated",
+  // Tektus (9026): um módulo opcional liberado ou revogado para UMA empresa em
+  // `/admin/tenants/[id]/recursos`. Revogar apaga a linha, então quem liberou e
+  // quando só fica aqui.
+  "platform.modulo_liberado",
   // A lista de endereços da rede INTERNA que a instalação pode alcançar
   // (`platform_settings.internal_destinations`, migration 0324, decisão 22-d).
   // Auditável pela mesma razão da linha acima e com alcance maior: cada entrada
