@@ -220,10 +220,20 @@ describe("0150 — a dívida de RBAC não cresce", () => {
       select coalesce(string_agg(distinct tablename, ','), '') from pg_policies
        where schemaname = 'public'
          and tablename in (${corrigidas.map((t) => `'${t}'`).join(",")})
-         and cmd = 'ALL'
+         and cmd in ('ALL', 'INSERT', 'UPDATE', 'DELETE')
+         and permissive = 'PERMISSIVE'
          and (coalesce(qual, '') || coalesce(with_check, '')) not like '%role_at_least%';
     `);
     expect(semRole.trim()).toBe("");
+    // A 9028 trocou a `for all` de channel_sessions por insert/update/delete: a
+    // régua olha todo comando de escrita, e exige que a tabela TENHA escrita
+    // (sem isso, uma tabela sem policy de escrita passaria aqui por vacuidade).
+    const semEscrita = sql(`
+      select coalesce(string_agg(t, ',' order by t), '') from unnest(array[${corrigidas.map((t) => `'${t}'`).join(",")}]) t
+       where not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = t
+                           and p.cmd in ('ALL', 'INSERT', 'UPDATE', 'DELETE') and p.permissive = 'PERMISSIVE');
+    `);
+    expect(semEscrita.trim()).toBe("");
   });
 
   it("nenhuma tabela NOVA entra com policy ALL só-tenancy", () => {
