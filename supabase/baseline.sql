@@ -4194,11 +4194,8 @@ END IF; END $baseline_guard$;
 
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'orgs_write_platform_admin' AND polrelid = '"public"."organizations"'::regclass) THEN
-CREATE POLICY "orgs_write_platform_admin" ON "public"."organizations" USING ("public"."fn_is_platform_admin"()) WITH CHECK ("public"."fn_is_platform_admin"());
-END IF; END $baseline_guard$;
+-- `orgs_write_platform_admin` (for all) deixou de existir na 9028: virou
+-- orgs_insert/update/delete_platform_admin; a definição final mora no bloco da migration 9028, no apêndice.
 
 
 
@@ -5033,26 +5030,9 @@ grant execute on function public.fn_mark_conversation_message(uuid, text, text, 
 -- org-flat, escrita agent+ FOR ALL) fazia cada update.sh reabri-la até a 0035.
 
 drop policy if exists "tenant_isolation_crm_pipelines_all" on public.crm_pipelines;
-drop policy if exists "crm_pipelines_select" on public.crm_pipelines;
-drop policy if exists "crm_pipelines_manager_write" on public.crm_pipelines;
-
-create policy "crm_pipelines_select" on public.crm_pipelines
-  for select using (
-    (organization_id in (select public.fn_user_org_ids()))
-    or public.fn_is_platform_admin()
-  );
-
-create policy "crm_pipelines_manager_write" on public.crm_pipelines
-  using (
-    public.fn_is_platform_admin()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'manager'))
-  )
-  with check (
-    public.fn_is_platform_admin()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'manager'))
-  );
+-- `crm_pipelines_select` e a escrita de crm_pipelines (manager+, por comando
+-- desde a 9028): a definição final mora no bloco da migration 9028, no apêndice. Reinstalar aqui a versão
+-- anterior faria cada update.sh trocar as policies duas vezes.
 
 drop policy if exists "tenant_isolation_crm_stages_all" on public.crm_stages;
 drop policy if exists "crm_stages_select" on public.crm_stages;
@@ -5456,19 +5436,11 @@ create policy "conversations_agent_delete" on public.conversations
   );
 
 drop policy if exists "messages_tenant_isolation_all" on public.messages;
-drop policy if exists "messages_select" on public.messages;
 drop policy if exists "messages_insert" on public.messages;
 drop policy if exists "messages_update" on public.messages;
 drop policy if exists "messages_delete" on public.messages;
 
-create policy "messages_select" on public.messages
-  for select using (
-    public.fn_is_platform_admin()
-    or exists (
-      select 1 from public.conversations c
-      where c.id = messages.conversation_id
-    )
-  );
+-- `messages_select` (herda o escopo da conversa): a definição final mora no bloco da migration 9028, no apêndice.
 
 create policy "messages_insert" on public.messages
   for insert with check (
@@ -12484,23 +12456,8 @@ notify pgrst, 'reload schema';
 -- ---- canais ----
 drop policy if exists channel_sessions_tenant_isolation_all on public.channel_sessions;
 
-drop policy if exists channel_sessions_tenant_select on public.channel_sessions;
-create policy channel_sessions_tenant_select on public.channel_sessions
-  for select using (
-    organization_id in (select public.fn_user_org_ids()) or public.fn_is_platform_admin()
-  );
-
-drop policy if exists channel_sessions_tenant_write on public.channel_sessions;
-create policy channel_sessions_tenant_write on public.channel_sessions
-  for all using (
-    (organization_id in (select public.fn_user_org_ids())
-      and public.fn_role_at_least(organization_id, 'admin'))
-    or public.fn_is_platform_admin()
-  ) with check (
-    (organization_id in (select public.fn_user_org_ids())
-      and public.fn_role_at_least(organization_id, 'admin'))
-    or public.fn_is_platform_admin()
-  );
+-- O par de channel_sessions (SELECT só-tenancy + escrita admin+, por comando
+-- desde a 9028): a definição final mora no bloco da migration 9028, no apêndice.
 
 -- ---- agentes de IA ----
 drop policy if exists tenant_isolation_ai_agents_all on public.ai_agents;
@@ -46839,6 +46796,194 @@ do $rls9027$ begin
     );
 end $rls9027$;
 
+-- ---- RLS por comando na caixa de entrada e na conversa (migration 9028) ----
+--
+-- A `for all` de escrita de channel_sessions, crm_pipelines, conversation_notes
+-- e organizations vira insert/update/delete com o MESMO texto: uma `for all`
+-- vale também no SELECT, e a leitura pagava por linha o `fn_role_at_least` da
+-- escrita. Como o predicado de escrita já está contido no de leitura nas
+-- quatro, quem lê não muda. Nas policies de LEITURA, `fn_is_platform_admin()`
+-- vira `(select …)` (uma vez por consulta, não por linha). Motivo, medição,
+-- por que `comando_da_conversa` não vira inlineável e rollback ficam no
+-- cabeçalho da migration.
+--
+-- POR QUE AQUI: os blocos antigos (0030, 0035, 0150, 0478 e o corpo do dump)
+-- deixaram de instalar estas policies, e esta é a única definição. Cada tabela
+-- num `do` próprio: o baseline roda em autocommit com lock_timeout curto, e
+-- dentro do `do` a troca da tabela é uma instrução só, inteira ou nada.
+-- Prova: tests/invariants/rls-por-comando-9028.test.ts.
+
+-- channel_sessions
+do $rls9028$ begin
+  drop policy if exists channel_sessions_tenant_select on public.channel_sessions;
+  create policy channel_sessions_tenant_select on public.channel_sessions
+    for select using (
+      organization_id in (select public.fn_user_org_ids())
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists channel_sessions_tenant_write on public.channel_sessions;
+  drop policy if exists channel_sessions_tenant_insert on public.channel_sessions;
+  create policy channel_sessions_tenant_insert on public.channel_sessions
+    for insert with check (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists channel_sessions_tenant_update on public.channel_sessions;
+  create policy channel_sessions_tenant_update on public.channel_sessions
+    for update using (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    ) with check (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists channel_sessions_tenant_delete on public.channel_sessions;
+  create policy channel_sessions_tenant_delete on public.channel_sessions
+    for delete using (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+end $rls9028$;
+
+-- crm_pipelines
+do $rls9028$ begin
+  drop policy if exists "crm_pipelines_select" on public.crm_pipelines;
+  create policy "crm_pipelines_select" on public.crm_pipelines
+    for select using (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "crm_pipelines_manager_write" on public.crm_pipelines;
+  drop policy if exists "crm_pipelines_manager_insert" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_insert" on public.crm_pipelines
+    for insert with check (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+  drop policy if exists "crm_pipelines_manager_update" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_update" on public.crm_pipelines
+    for update using (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    ) with check (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+  drop policy if exists "crm_pipelines_manager_delete" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_delete" on public.crm_pipelines
+    for delete using (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+end $rls9028$;
+
+-- conversation_notes
+do $rls9028$ begin
+  drop policy if exists "conversation_notes_select_platform_admin" on public.conversation_notes;
+  create policy "conversation_notes_select_platform_admin" on public.conversation_notes
+    for select using ((select public.fn_is_platform_admin()));
+  drop policy if exists "conversation_notes_write" on public.conversation_notes;
+  drop policy if exists "conversation_notes_insert" on public.conversation_notes;
+  create policy "conversation_notes_insert" on public.conversation_notes
+    for insert with check (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+  drop policy if exists "conversation_notes_update" on public.conversation_notes;
+  create policy "conversation_notes_update" on public.conversation_notes
+    for update using (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    ) with check (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+  drop policy if exists "conversation_notes_delete" on public.conversation_notes;
+  create policy "conversation_notes_delete" on public.conversation_notes
+    for delete using (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+end $rls9028$;
+
+-- organizations
+do $rls9028$ begin
+  drop policy if exists "orgs_select" on public.organizations;
+  create policy "orgs_select" on public.organizations
+    for select using (
+      (id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "orgs_write_platform_admin" on public.organizations;
+  drop policy if exists "orgs_insert_platform_admin" on public.organizations;
+  create policy "orgs_insert_platform_admin" on public.organizations
+    for insert with check (public.fn_is_platform_admin());
+  drop policy if exists "orgs_update_platform_admin" on public.organizations;
+  create policy "orgs_update_platform_admin" on public.organizations
+    for update using (public.fn_is_platform_admin()) with check (public.fn_is_platform_admin());
+  drop policy if exists "orgs_delete_platform_admin" on public.organizations;
+  create policy "orgs_delete_platform_admin" on public.organizations
+    for delete using (public.fn_is_platform_admin());
+end $rls9028$;
+
+-- contacts (continua for all: leitura e escrita são a mesma regra)
+do $rls9028$ begin
+  drop policy if exists "tenant_isolation_contacts_all" on public.contacts;
+  create policy "tenant_isolation_contacts_all" on public.contacts
+    using (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    ) with check (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+end $rls9028$;
+
+-- messages (só a leitura; insert/update/delete não mudam)
+do $rls9028$ begin
+  drop policy if exists "messages_select" on public.messages;
+  create policy "messages_select" on public.messages
+    for select using (
+      (select public.fn_is_platform_admin())
+      or exists (
+        select 1 from public.conversations c
+        where c.id = messages.conversation_id
+      )
+    );
+end $rls9028$;
+
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --
 -- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO
@@ -48176,38 +48321,10 @@ create policy "conversation_notes_select" on public.conversation_notes
     )
   );
 
--- ⚠️ A política de ESCRITA precisa da MESMA condição: policies são OR e
--- `conversation_notes_write` é `for all`, que concede SELECT junto — sem isto
--- a policy nova de SELECT é anulada. O teste `F2: ... não lê a nota` pegou
--- exatamente isso (devolveu 1 em vez de 0) antes do conserto.
-drop policy if exists "conversation_notes_write" on public.conversation_notes;
-create policy "conversation_notes_write" on public.conversation_notes
-  for all using (
-    organization_id in (select public.fn_user_org_ids())
-    and public.fn_role_at_least(organization_id, 'agent')
-    and exists (
-      select 1 from public.conversations c
-      where c.organization_id = conversation_notes.organization_id
-        and c.id = conversation_notes.conversation_id
-        and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
-    )
-  )
-  with check (
-    organization_id in (select public.fn_user_org_ids())
-    and public.fn_role_at_least(organization_id, 'agent')
-    and exists (
-      select 1 from public.conversations c
-      where c.organization_id = conversation_notes.organization_id
-        and c.id = conversation_notes.conversation_id
-        and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
-    )
-  );
-
--- O ramo `or fn_is_platform_admin()` da política antiga vira policy própria:
--- o admin de plataforma não é membro de organização nenhuma por definição.
-drop policy if exists "conversation_notes_select_platform_admin" on public.conversation_notes;
-create policy "conversation_notes_select_platform_admin" on public.conversation_notes
-  for select using (public.fn_is_platform_admin());
+-- ⚠️ A política de ESCRITA precisa da MESMA condição: policies são OR e uma
+-- `for all` concede SELECT junto. Desde a 9028 a escrita é por comando
+-- (conversation_notes_insert/update/delete, mesma condição), e o ramo de admin
+-- de plataforma é `conversation_notes_select_platform_admin`; a definição final mora no bloco da migration 9028, no apêndice.
 -- ---- busca humana na telemetria: author_kind (migration 0484) ----
 -- 0484 — a busca HUMANA do acervo entra na telemetria (F2 da #1869).
 -- `knowledge_searches` só recebia o caminho do agente; o grafico de
