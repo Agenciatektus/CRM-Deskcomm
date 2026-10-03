@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { audit } from "@/lib/audit";
+import { semPrazoNaTransacao } from "@/lib/agent-engine/db/pool";
 import { AgentSetupError, setupAgentId, setupProposalHash } from "./agent-setup";
 import {
   agentProposalSchema,
@@ -98,6 +99,9 @@ export async function mutateAgentSession(
   let result: AgentSessionResponse;
   try {
     await db.query("begin");
+    // O mesmo lock é segurado pelo setup do agente durante a publicação HTTP
+    // (agent-setup.ts): esperar mais que o lock_timeout padrão é o esperado.
+    await semPrazoNaTransacao(db);
     await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [
       agentSessionLock(actor.orgId, campaignId),
     ]);

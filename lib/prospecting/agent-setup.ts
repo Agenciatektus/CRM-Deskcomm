@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { audit } from "@/lib/audit";
 import { createMcpAgentDraft } from "@/lib/ai/agents/create-draft";
+import { restaurarPrazosDaSessao, semPrazoNaSessao } from "@/lib/agent-engine/db/pool";
 import { publishAgentVersion } from "@/lib/ai/agents/publish";
 import { escolherModeloDoProvedor } from "@/lib/ai/agents/escolher-modelo";
 import { capacidadesPadraoDoOnboarding } from "@/lib/ai/agents/capacidades-padrao";
@@ -215,7 +216,14 @@ export async function setupProspectingAgent(
   let saved = false;
   const locked: string[] = [];
   let createdNow = false;
+  let semPrazo = false;
   try {
+    // Os locks abaixo são de SESSÃO e atravessam a publicação HTTP: quem chega
+    // depois espera o tempo do publish, que passa fácil dos 5 s de lock_timeout
+    // (e dos 30 s de statement_timeout) do pool. Troca pelos prazos de espera
+    // longa (com teto) só nesta conexão; o finally restaura antes de devolvê-la.
+    await semPrazoNaSessao(db);
+    semPrazo = true;
     // Keep the channel reservation across the canonical publish HTTP call.
     // Otherwise two distinct requests can each publish a paused incumbent and
     // then prevent one another from completing. Fixed order: channel, request.
@@ -525,6 +533,13 @@ export async function setupProspectingAgent(
       } catch {
         destroy = true;
         break;
+      }
+    }
+    if (semPrazo && !destroy) {
+      try {
+        await restaurarPrazosDaSessao(db);
+      } catch {
+        destroy = true;
       }
     }
     db.release(destroy);

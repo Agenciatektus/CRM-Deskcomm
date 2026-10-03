@@ -10,6 +10,7 @@
  * provedor, monta a `EntradaDeGrupo` e não sabe mais nada de grupo daqui para baixo.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DUPLICADA_PELA_LEITURA, mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
 
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
 import { logger } from "@/lib/logger";
@@ -219,7 +220,16 @@ export function criarIngestDeGrupoDb(admin: SupabaseClient): IngestDeGrupoDb {
     },
 
     async inserirMensagem(row) {
-      const { data, error } = await admin.from("messages").insert(row).select("id").maybeSingle();
+      // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+      // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
+      const jaRecebida = await mensagemJaRecebida(
+        admin,
+        row.organization_id as string,
+        row.external_id as string | null | undefined,
+      );
+      const { data, error } = jaRecebida
+        ? DUPLICADA_PELA_LEITURA
+        : await admin.from("messages").insert(row).select("id").maybeSingle();
       if (error) {
         if ((error as { code?: string }).code === "23505") return "duplicada";
         throw error;

@@ -84,7 +84,7 @@ import { createOperatorTurnHandler } from "@/lib/agent-engine/agent/operator-tur
 import { completeTurnForEnrollment, createPgAdminClient } from "@/lib/followup/turn-bridge";
 import { seedPlatformPlaybook } from "@/lib/agent-engine/agent/playbook-seed";
 import { runCronLoop } from "@/lib/agent-engine/cron/scheduler";
-import { createPool } from "@/lib/agent-engine/db/pool";
+import { createPool, nomeDaAplicacao } from "@/lib/agent-engine/db/pool";
 import {
   carregarComportamentoPorPool,
   pisoDoComportamentoDoMotor,
@@ -268,8 +268,10 @@ export async function startWorker(
   handlers: Map<JobKind, JobHandler>,
   log: Logger = createLogger(),
 ): Promise<void> {
-  const pool = createPool(env.SUPABASE_DB_URL, (err) =>
-    log.error("pool: conexão caiu — recria no próximo uso", { error: errMsg(err) }),
+  const pool = createPool(
+    env.SUPABASE_DB_URL,
+    (err) => log.error("pool: conexão caiu — recria no próximo uso", { error: errMsg(err) }),
+    { applicationName: nomeDaAplicacao("worker") },
   );
   const workerId = `agent-engine-${hostname()}-${process.pid}`;
 

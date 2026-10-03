@@ -22,6 +22,7 @@
  *    mesma mensagem aparece N vezes no inbox depois de qualquer instabilidade.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DUPLICADA_PELA_LEITURA, mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
 
 import { audit } from "@/lib/audit";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
@@ -229,7 +230,11 @@ export async function ingestMetaInbound(
     return { status: "failed", reason: `conversa: ${erroConversa?.message ?? "sem id"}` };
   }
 
-  const { data: inserida, error: erroInsert } = await admin
+  // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+  // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
+  const { data: inserida, error: erroInsert } = (await mensagemJaRecebida(admin, orgId, e.externalId))
+    ? DUPLICADA_PELA_LEITURA
+    : await admin
     .from("messages")
     .insert({
       organization_id: orgId,
@@ -407,7 +412,11 @@ export async function ingestMetaEcho(
     return { status: "failed", reason: `conversa: ${erroConversa?.message ?? "sem id"}` };
   }
 
-  const { data: inserida, error: erroInsert } = await admin
+  // Reentrega: lê antes do INSERT. A constraint é deferida e o 23505 só subia no
+  // COMMIT, depois dos triggers. Mesmo desfecho do 23505 (lib/messaging/mensagem-ja-recebida.ts).
+  const { data: inserida, error: erroInsert } = (await mensagemJaRecebida(admin, orgId, e.externalId))
+    ? DUPLICADA_PELA_LEITURA
+    : await admin
     .from("messages")
     .insert({
       organization_id: orgId,

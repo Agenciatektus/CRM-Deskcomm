@@ -42,6 +42,7 @@ import { assertMeetingDeliveryPg, type MeetingDeliveryContext } from '@/lib/agen
 import type pg from 'pg';
 import type { ChannelSendResult } from '../channel-adapter';
 
+import { semPrazoNaTransacao } from '../db/pool';
 import type { Logger } from '../obs/logger';
 import { emitVetoActivity } from '@/lib/leads/veto-activity';
 import type { Queryable } from '../queue/queue';
@@ -1134,6 +1135,13 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
         : null;
 
     await client.query('begin');
+    // Esta transação é LONGA por desenho: segura o lock do número durante o
+    // throttle do pacing (até minutos), a camada semântica (LLM) e o envio HTTP.
+    // Os prazos padrão do pool (lock 5 s, ociosa 60 s, statement 30 s) a
+    // matariam no meio — com o envio já feito e o recordSend perdido. Por isso
+    // ela, e só ela, os troca pelos de espera longa, que ainda têm teto
+    // (PRAZOS_DA_ESPERA_LONGA; SET LOCAL: some no commit/rollback).
+    await semPrazoNaTransacao(client);
     // Serialização por número: dois workers no MESMO channel_session esperam a vez.
     await client.query('select pg_advisory_xact_lock(hashtext($1))', [args.channelSessionId]);
 

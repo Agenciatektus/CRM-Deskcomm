@@ -56,6 +56,12 @@ function chain(tabela: string, op: string, payload?: unknown): Record<string, un
           if (tabela === "contacts" && op === "select") {
             return async () => ({ data: null, error: null });
           }
+          // Dedup antes do INSERT (`mensagemJaRecebida`): o banco do dublê não
+          // tem mensagem nenhuma, então a leitura não acha a linha. Quem mede a
+          // reentrega é o `insertErro` (23505), como sempre.
+          if (tabela === "messages" && op === "select") {
+            return async () => ({ data: null, error: null });
+          }
           return async () =>
             insertErro ? { data: null, error: insertErro } : { data: { id: "msg-1" }, error: null };
         }

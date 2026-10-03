@@ -10,13 +10,16 @@
  * criado no primeiro uso (nunca no import do módulo), compartilhado pelas duas rotas
  * para não abrir dois pools redundantes contra o mesmo Postgres.
  */
-import { createPool } from '@/lib/agent-engine/db/pool';
+import { createPool, nomeDaAplicacao } from '@/lib/agent-engine/db/pool';
 import { env } from '@/lib/env';
 import type pg from 'pg';
 
 let pool: pg.Pool | undefined;
 
 export function getSkillsPool(): pg.Pool {
-  if (!pool) pool = createPool(env.SUPABASE_DB_URL);
+  if (!pool)
+    pool = createPool(env.SUPABASE_DB_URL, undefined, {
+      applicationName: nomeDaAplicacao('app-skills'),
+    });
   return pool;
 }
