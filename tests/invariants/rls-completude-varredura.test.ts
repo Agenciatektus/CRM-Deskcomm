@@ -322,6 +322,8 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "UPDATE, DELETE nem TRUNCATE para anon, authenticated ou PUBLIC. O " +
       "isolamento é medido num sentido só (org de teste → outra). Migration 0482.",
   },
+  { tabela: "cadencia_conducoes", razao: "tests/invariants/cadencia-conducao-sql.test.ts — tabela exclusiva do servidor: `revoke all` de anon e authenticated no baseline, has_table_privilege(authenticated, SELECT) = false e leitura com JWT de agent da própria organização recusada com 42501." },
+  { tabela: "cadencia_inscricoes_do_dia", razao: "tests/invariants/cadencia-sql.test.ts — tabela exclusiva do servidor (vagas do dia): `revoke all` de anon e authenticated no baseline e has_table_privilege(authenticated, SELECT) = false; só as RPCs service-only reservam vagas. Prova por ACL, não por contagem cruzada: sem privilégio nenhum, authenticated não lê nem a própria organização." },
 ];
 
 /**
