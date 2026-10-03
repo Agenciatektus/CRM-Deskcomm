@@ -4,6 +4,7 @@ import { apiClient } from "@/lib/api/client";
 import { randomId } from "@/lib/random-id";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Message } from "@/lib/types/messaging";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface SendArgs {
   conversation_id: string;
@@ -127,7 +128,7 @@ export function useSendMessage() {
     },
     onSettled: (_data, _err, args) => {
       qc.invalidateQueries({ queryKey: ["messages", args.conversation_id] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
     },
   });
 }

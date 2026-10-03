@@ -5,6 +5,7 @@ import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 import type { Message } from "@/lib/types/messaging";
 
 interface MessagesResponse {
@@ -54,10 +55,18 @@ export function useMessagesRealtime(conversationId: string | null) {
     refetchOnWindowFocus: true,
   });
 
-  const onChange = useCallback(() => {
-    if (conversationId) qc.invalidateQueries({ queryKey: ["messages", conversationId] });
-    qc.invalidateQueries({ queryKey: ["conversations"] });
-  }, [qc, conversationId]);
+  // Mensagem nova ou apagada pode mexer na prévia e na ordem da lista; o tique
+  // de entregue/lido (UPDATE) não mexe em lista nenhuma. A lista é refeita só
+  // onde a conversa aparece (o canal de conversas cuida de onde ela entra).
+  const onChange = useCallback(
+    (payload: unknown) => {
+      if (!conversationId) return;
+      void qc.invalidateQueries({ queryKey: ["messages", conversationId] });
+      const evento = (payload as { eventType?: string } | null)?.eventType;
+      if (evento !== "UPDATE") invalidarListasDaConversa(qc, conversationId);
+    },
+    [qc, conversationId],
+  );
 
   const { status: realtimeStatus, ultimaEntrega } = useRealtimeChannel({
     name: conversationId ? `messages-${conversationId}` : "messages-disabled",

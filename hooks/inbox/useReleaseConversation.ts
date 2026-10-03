@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Conversation } from "@/lib/types/messaging";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface ReleaseArgs {
   conversation_id: string;
@@ -18,12 +19,12 @@ export function useReleaseConversation() {
         {},
       ),
     onError: (err, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       showApiError(err);
     },
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
     },
   });

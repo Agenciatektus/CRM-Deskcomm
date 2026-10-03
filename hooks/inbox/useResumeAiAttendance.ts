@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface ResumeArgs {
   conversation_id: string;
@@ -39,7 +40,7 @@ export function useResumeAiAttendance() {
       ),
     onError: (err) => showApiError(err),
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       // Irmão do par: `usePauseAiAttendance` já invalidava a contagem, e devolver
       // a conversa ao automático muda o mesmo número — só que para o outro lado.

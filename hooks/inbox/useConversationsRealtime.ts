@@ -5,6 +5,7 @@ import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { agendarRefazer, aplicarMudancaDaConversa } from "@/hooks/inbox/cacheDasConversas";
 import {
   type ModoDeEtiqueta,
   marcadoresEscolhidos,
@@ -176,9 +177,25 @@ export function useConversationsRealtime(
     refetchOnWindowFocus: true,
   });
 
-  const onChange = useCallback(() => {
-    qc.invalidateQueries({ queryKey: ["conversations"] });
-  }, [qc]);
+  // Evento de UMA conversa: corrige a linha no lugar e refaz só a lista em que
+  // a ordem ou a pertença pode ter mudado (ver hooks/inbox/cacheDasConversas.ts).
+  // Evento sem a linha (formato inesperado) cai no comportamento antigo.
+  const onChange = useCallback(
+    (payload: unknown) => {
+      const p = payload as {
+        eventType?: "INSERT" | "UPDATE" | "DELETE";
+        new?: Record<string, unknown>;
+        old?: Record<string, unknown>;
+      };
+      const linha = p.eventType === "DELETE" ? p.old : p.new;
+      if (!p.eventType || typeof linha?.id !== "string") {
+        void qc.invalidateQueries({ queryKey: ["conversations"] });
+        return;
+      }
+      agendarRefazer(qc, aplicarMudancaDaConversa(qc, linha as { id: string }, p.eventType));
+    },
+    [qc],
+  );
 
   // G4-01 (visibility_mode): a subscription postgres_changes HERDA a RLS de
   // SELECT de `conversations` — o Supabase Realtime avalia as policies do usuário
