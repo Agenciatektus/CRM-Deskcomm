@@ -25,7 +25,7 @@ import {
   type CategoriaDeConversao,
   type RegraDeConversaoGoogle,
 } from "@/lib/conversoes/regras-google";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 import { CriarAcaoNoGoogle } from "./_criarAcaoGoogle";

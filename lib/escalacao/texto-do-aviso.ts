@@ -53,8 +53,8 @@ import type { Idioma } from "@/lib/i18n/idiomas";
 
 import { TETOS_DO_TEXTO_DO_LEAD, sanitizarTextoDoLead } from "./sanitizar-texto-do-lead";
 
-/** O rótulo que a cascata de LGPD grava no nome do contato anonimizado. */
-export const ROTULO_DE_ANONIMIZADO = "Cliente Anonimizado";
+import { ROTULO_DE_ANONIMIZADO } from "./rotulo-de-anonimizado";
+export { ROTULO_DE_ANONIMIZADO };
 
 export interface AvisoDeCaso {
   /** O nome da marca já resolvido por `marcaDaSaida(orgId)`. */

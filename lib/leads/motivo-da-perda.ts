@@ -67,7 +67,8 @@ import { CANONICAL_LOST_REASONS } from "@/lib/schemas/leads";
  * ⚠️ Exigir motivo também na troca de funil é decisão do dono do produto, não
  * um ajuste de consistência: hoje a troca funciona sem perguntar.
  */
-export const MOTIVO_DA_TRANSFERENCIA = "moved_to_another_pipeline";
+import { MOTIVO_DA_TRANSFERENCIA } from "./motivo-da-transferencia";
+export { MOTIVO_DA_TRANSFERENCIA };
 
 /** O motivo com que a troca de funil encerra a ORIGEM. */
 export const MOTIVO_PADRAO_DA_TROCA = MOTIVO_DA_TRANSFERENCIA;

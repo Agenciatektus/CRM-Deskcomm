@@ -1,7 +1,7 @@
 "use client";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, Suspense, use, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-import { traduzir } from "./dicionario";
+import { carregarDicionario, dicionarioPronto, traduzir } from "./traducao";
 import { normalizarIdioma, IDIOMA_PADRAO, type Idioma } from "./idiomas";
 
 /**
@@ -58,6 +58,35 @@ export function idiomaAtual(): Idioma {
   return idiomaFora;
 }
 
+/**
+ * A promessa que a árvore espera, uma só por página e que NUNCA rejeita: se o
+ * dicionário não chegar (rede caiu), a tela abre em português em vez de cair
+ * num error boundary. `use()` exige a mesma promessa entre renders.
+ */
+let espera: Promise<void> | null = null;
+function esperarDicionario(): Promise<void> {
+  espera ??= carregarDicionario().catch(() => {});
+  return espera;
+}
+
+/** Só para teste: volta ao estado de quem acabou de abrir a página. */
+export function esquecerEspera(): void {
+  espera = null;
+}
+
+/**
+ * Segura a árvore até o dicionário do idioma chegar.
+ *
+ * Na HIDRATAÇÃO de quem fala espanhol, o HTML veio traduzido do servidor (lá o
+ * dicionário é síncrono). Suspender aqui faz o React manter esse HTML na tela
+ * e só hidratar quando o dicionário chega: sem piscar português e sem
+ * divergência de hidratação. Em português nada é baixado e nada suspende.
+ */
+function EsperaDoDicionario({ idioma, children }: { idioma: Idioma; children: React.ReactNode }) {
+  if (!dicionarioPronto(idioma)) use(esperarDicionario());
+  return children;
+}
+
 export function IdiomaProvider({
   locale,
   children,
@@ -68,9 +97,24 @@ export function IdiomaProvider({
   const doServidor = normalizarIdioma(locale);
   const [idioma, setIdioma] = useState<Idioma>(doServidor);
 
+  // Trocar para um idioma cujo dicionário ainda não chegou espera o download
+  // ANTES de trocar o estado: a tela segue no idioma atual até lá, em vez de
+  // sumir no fallback do Suspense.
+  // `pedido` guarda o último idioma pedido: um download que termina depois de
+  // outra troca não pode pintar o idioma velho por cima.
+  const pedido = useRef<Idioma>(doServidor);
+  const aplicar = useCallback((novo: Idioma) => {
+    pedido.current = novo;
+    if (dicionarioPronto(novo)) setIdioma(novo);
+    else
+      void esperarDicionario().then(() => {
+        if (pedido.current === novo) setIdioma(novo);
+      });
+  }, []);
+
   useEffect(() => {
-    setIdioma(doServidor);
-  }, [doServidor]);
+    aplicar(doServidor);
+  }, [doServidor, aplicar]);
 
   // O espelho de fora da árvore segue o idioma EM VIGOR, não o do servidor:
   // quem troca no seletor vê o toast de erro já no idioma novo, sem esperar o
@@ -84,8 +128,14 @@ export function IdiomaProvider({
     };
   }, [idioma]);
 
-  const valor = useMemo(() => ({ idioma, aplicar: setIdioma }), [idioma]);
-  return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
+  const valor = useMemo(() => ({ idioma, aplicar }), [idioma, aplicar]);
+  return (
+    <Ctx.Provider value={valor}>
+      <Suspense fallback={null}>
+        <EsperaDoDicionario idioma={idioma}>{children}</EsperaDoDicionario>
+      </Suspense>
+    </Ctx.Provider>
+  );
 }
 
 /** `t("Assumir")` → "Asumir" para quem escolheu espanhol. */

@@ -119,3 +119,14 @@ describe("o tipo do arquivo vem dos bytes", () => {
     expect(farejarAudio(bytes("hola"))).toBeNull();
   });
 });
+
+describe("o começo do título do aviso de etapa, literal no navegador", () => {
+  it("é exatamente o que o dicionário dá em cada idioma servido", async () => {
+    const { INICIO_DO_TITULO, INICIO_DO_TITULO_POR_IDIOMA } = await import("@/lib/leads/aviso-de-etapa-marca");
+    const { traduzir } = await import("@/lib/i18n/dicionario");
+    for (const idioma of IDIOMAS) {
+      expect(INICIO_DO_TITULO_POR_IDIOMA[idioma], idioma).toBe(traduzir(INICIO_DO_TITULO, idioma));
+      expect(ehAvisoDeEtapa({ kind: "other", ref_kind: "lead", title: tituloDoAvisoDeEtapa("X", idioma) })).toBe(true);
+    }
+  });
+});

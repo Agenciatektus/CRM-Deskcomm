@@ -23,7 +23,7 @@
  *
  * Módulo sem banco: roda no navegador (a campainha) e no servidor (a rota).
  */
-import { ehAvisoDeEtapa } from "@/lib/leads/aviso-de-etapa";
+import { ehAvisoDeEtapa } from "@/lib/leads/aviso-de-etapa-marca";
 
 import type { SoundId } from "./sounds";
 
