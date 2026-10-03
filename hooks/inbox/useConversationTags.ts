@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Conversation } from "@/lib/types/messaging";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface UpdateTagsArgs {
   conversation_id: string;
@@ -18,12 +19,12 @@ export function useUpdateConversationTags() {
         `/api/v1/conversations/${args.conversation_id}`,
         { tags: args.tags },
       ),
-    onError: (err) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+    onError: (err, args) => {
+      invalidarListasDaConversa(qc, args.conversation_id);
       showApiError(err);
     },
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       // Gravar tag é o que ALIMENTA o vocabulário (`staleTime` de 5 min): sem
       // reler, o marcador recém-criado não aparece no filtro do Inbox nem nas

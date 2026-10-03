@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { criarAcaoDeConversaoGoogle } from "@/app/actions/settings/acoesDeConversaoGoogle";
 import { Button } from "@/components/ui/button";
 import type { CategoriaDeConversao } from "@/lib/conversoes/regras-google";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 export function CriarAcaoNoGoogle({

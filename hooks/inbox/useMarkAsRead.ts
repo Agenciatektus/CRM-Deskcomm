@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 const DEBOUNCE_MS = 1500;
 
@@ -20,7 +21,7 @@ export function useMarkAsRead(conversationId: string | null, unread: number) {
     mutationFn: (id: string) =>
       apiClient.post<{ data: unknown }>(`/api/v1/conversations/${id}/mark-read`, {}),
     onSuccess: (_data, id) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, id);
       qc.invalidateQueries({ queryKey: ["conversation", id] });
       // O contador do topo vive em `["conversation-counts", orgId, sufixo]`
       // (useConversationCounts). O casamento por prefixo do react-query compara

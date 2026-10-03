@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import { idiomaAtual } from "@/lib/i18n/IdiomaProvider";
 import { emitNotification } from "./emit";
 import type { NotifyKind } from "./kinds";

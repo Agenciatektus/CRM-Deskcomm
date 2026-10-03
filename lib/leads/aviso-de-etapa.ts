@@ -12,10 +12,9 @@
  * gravado. Quem abre o aviso vê o negócio com a permissão que tem.
  */
 import { traduzir } from "@/lib/i18n/dicionario";
-import { IDIOMAS, type Idioma } from "@/lib/i18n/idiomas";
+import type { Idioma } from "@/lib/i18n/idiomas";
 
-/** A chave do dicionário do começo do título. */
-const INICIO_DO_TITULO = "Negócio entrou em";
+import { INICIO_DO_TITULO } from "./aviso-de-etapa-marca";
 
 export function tituloDoAvisoDeEtapa(etapa: string, idioma: Idioma): string {
   return `${traduzir(INICIO_DO_TITULO, idioma)} «${etapa}»`;
@@ -28,24 +27,4 @@ export function corpoDoAvisoDeEtapa(idioma: Idioma): string {
   );
 }
 
-/**
- * É o aviso de etapa? Pelo KIND, pela REFERÊNCIA e pelo COMEÇO do título.
- *
- * ⚠️ `kind = 'other'` com `ref_kind = 'lead'` NÃO basta, e a primeira versão
- * desta regra caía exatamente aí: o espelho de etapa que o assistente não
- * conseguiu gravar (`abreAvisoDoEspelhoRecusado`, em
- * `lib/agent-engine/edge/crm/move-lead-stage.ts`) também nasce `other`
- * apontando para um negócio — e um defeito de funil tocaria o som de "entrou
- * na etapa". O aviso não tem coluna de origem; o título, montado por
- * `tituloDoAvisoDeEtapa`, é a marca. Confere em TODO idioma servido: a
- * organização pode ter mudado de idioma depois de o aviso nascer.
- */
-export function ehAvisoDeEtapa(aviso: {
-  kind: string;
-  ref_kind: string | null;
-  title?: string | null;
-}): boolean {
-  if (aviso.kind !== "other" || aviso.ref_kind !== "lead") return false;
-  const titulo = aviso.title ?? "";
-  return IDIOMAS.some((idioma) => titulo.startsWith(`${traduzir(INICIO_DO_TITULO, idioma)} «`));
-}
+export { ehAvisoDeEtapa } from "./aviso-de-etapa-marca";

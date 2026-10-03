@@ -20,7 +20,7 @@
 
 import { CANONICAL_LOST_REASONS, categoriaPadraoDoMotivo } from "@/lib/schemas/leads";
 import { pipelineConfigPatchSchema } from "@/lib/schemas/settings";
-import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
+import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-transferencia";
 
 /** O valor canônico de "outro": a saída de quem não acha o motivo na lista. */
 export const OUTRO = "other";

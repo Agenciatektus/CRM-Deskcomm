@@ -52,7 +52,7 @@ import {
   type OrigemDaPassagem,
   type TentativaDaPassagem,
 } from "./passagem";
-import { ROTULO_DE_ANONIMIZADO } from "./texto-do-aviso";
+import { ROTULO_DE_ANONIMIZADO } from "./rotulo-de-anonimizado";
 
 /** A linha como a rota da conversa a devolve. As chaves são as colunas. */
 export interface PassagemDaConversa {

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { CampoEditavel, Origem } from "@/components/admin/CampoDaInstalacao";
 import { Card } from "@/components/ui/card";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { MotivoDeDiagnostico } from "@/lib/instalacao/catalogo";
 
