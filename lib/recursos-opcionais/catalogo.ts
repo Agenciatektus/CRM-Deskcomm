@@ -116,6 +116,9 @@ const TEXTO_DO_MODULO: Record<ModuloOpcional, { nome: string; oQueFaz: string }>
   honorarios: {
     nome: "Honorários",
     oQueFaz: "Contratos de honorários com parcelas e o controle do que já foi pago.",
+  },  prospeccao: {
+    nome: "Prospecção no Google Maps",
+    oQueFaz: "Busca empresas no Google Maps pela conta Apify da empresa e aborda com IA, só nas empresas liberadas.",
   },
 };
 

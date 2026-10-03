@@ -48607,4 +48607,22 @@ begin
 end $$;
 
 
+-- ---- modulos liberados por empresa (migration 9026) ----
+-- O dono do servidor libera modulo opcional empresa por empresa. Escrita so
+-- pelo service role; membro da org le. Ver o cabecalho da 9026.
+create table if not exists public.modulos_liberados_por_empresa (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  modulo text not null check (modulo ~ '^[a-z][a-z0-9_]{1,39}$'),
+  liberado_por uuid references auth.users(id) on delete set null,
+  liberado_em timestamptz not null default now(),
+  primary key (organization_id, modulo)
+);
+alter table public.modulos_liberados_por_empresa enable row level security;
+drop policy if exists modulos_liberados_select on public.modulos_liberados_por_empresa;
+create policy modulos_liberados_select on public.modulos_liberados_por_empresa
+  for select using (organization_id in (select public.fn_user_org_ids()));
+revoke all on table public.modulos_liberados_por_empresa from anon, authenticated;
+grant select on table public.modulos_liberados_por_empresa to authenticated;
+grant all on table public.modulos_liberados_por_empresa to service_role;
+
 notify pgrst, 'reload schema';

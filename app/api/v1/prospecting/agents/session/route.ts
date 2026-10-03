@@ -1,3 +1,5 @@
+import { seModuloFechadoParaEmpresa } from "@/lib/organizacao/modulos-liberados";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/require-role";
@@ -25,6 +27,8 @@ export async function GET(req: Request) {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "prospecting" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   const campaign = z.string().uuid().safeParse(new URL(req.url).searchParams.get("campaign_id"));
   if (!campaign.success)
     return fail("validation_failed", "Escolha uma campanha válida.", 422, { requestId, headers });
@@ -44,6 +48,8 @@ export async function PATCH(req: Request) {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "prospecting" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   const parsed = agentSessionPatchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
     return fail("validation_failed", "Confira a conversa e a configuração antes de salvar.", 422, {

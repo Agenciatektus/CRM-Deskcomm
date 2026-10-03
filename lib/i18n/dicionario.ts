@@ -76,6 +76,16 @@ export const DICIONARIO: Traducoes = {
   "conflitos": {"es": "conflictos"},
   "Empresas e pessoas (venda para empresas)": {"es": "Empresas y personas (venta a empresas)"},
   "Ligado, cada empresa ganha no CRM o cadastro de Empresas (razão social e CNPJ, com os dados públicos preenchidos pela BrasilAPI), as Pessoas que decidem dentro delas, com vários telefones, e a importação de planilha CSV ou Excel. Consultar um CNPJ manda o número para a BrasilAPI. Desligado, as telas e o menu somem.": {"es": "Activado, cada empresa gana en el CRM el registro de Empresas (razón social y CNPJ, con los datos públicos completados por BrasilAPI), las Personas que deciden dentro de ellas, con varios teléfonos, y la importación de planillas CSV o Excel. Consultar un CNPJ envía el número a BrasilAPI. Desactivado, las pantallas y el menú desaparecen."},
+  // ─── TEKTUS: MÓDULOS LIBERADOS POR EMPRESA (9026) ───
+  "Não consegui ler as liberações agora. Recarregue antes de mudar qualquer coisa.": { es: "No pude leer las habilitaciones ahora. Recargue antes de cambiar cualquier cosa." },
+  "Recursos": { es: "Recursos" },
+  "Prospecção no Google Maps": { es: "Prospección en Google Maps" },
+  "Ligado, as empresas que você liberar em Tenants › Recursos buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.": { es: "Activado, las empresas que usted habilite en Tenants › Recursos buscan empresas en Google Maps con su propia clave de Apify y conducen abordajes graduales con IA. Una empresa sin habilitación no ve la pantalla, y su campaña se detiene." },
+  "Busca empresas no Google Maps pela conta Apify da empresa e aborda com IA, só nas empresas liberadas.": { es: "Busca empresas en Google Maps con la cuenta de Apify de la empresa y las aborda con IA, solo en las empresas habilitadas." },
+  "A empresa busca empresas no Google Maps com a própria chave da Apify e conduz abordagens graduais com IA. Revogar esconde a tela e para a campanha em andamento.": { es: "La empresa busca empresas en Google Maps con su propia clave de Apify y conduce abordajes graduales con IA. Revocar oculta la pantalla y detiene la campaña en curso." },
+  "Recursos liberados": { es: "Recursos habilitados" },
+  "Módulos que só aparecem para as empresas que você liberar. Sem liberação, a empresa não vê a tela nem o menu.": { es: "Módulos que solo aparecen para las empresas que usted habilite. Sin habilitación, la empresa no ve la pantalla ni el menú." },
+  "Desligado no servidor: a liberação fica guardada e vale quando o módulo for ligado em Sistema.": { es: "Desactivado en el servidor: la habilitación queda guardada y vale cuando el módulo se active en Sistema." },
   // ─── BUSCA DENTRO DA CONVERSA (extraída do PR #1793) ───
   "Resultados nas mensagens carregadas": { es: "Resultados en los mensajes cargados" },
   "Buscar nesta conversa": { es: "Buscar en esta conversación" },

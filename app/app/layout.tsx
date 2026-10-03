@@ -14,7 +14,7 @@ import { marcaDaInstalacao } from "@/lib/branding/instalacao";
 import { resolverMarcaDaOrganizacao } from "@/lib/branding/organizacao";
 import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { modulosLigados } from "@/lib/instalacao/modulos";
+import { modulosDaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { capacidadesLigadas } from "@/lib/organizacao/capacidades";
 import {
   ImpersonateBanner,
@@ -103,8 +103,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         user.id,
         activeOrg.orgId,
       ),
-      // Da INSTALAÇÃO: decide se a porta de um módulo opcional entra no menu.
-      modulosLigados(admin),
+      // Da INSTALAÇÃO, recortado pelo que o dono liberou para ESTA empresa (9026):
+      // decide se a porta de um módulo opcional entra no menu.
+      modulosDaEmpresa(admin, activeOrg.orgId),
     ]);
 
     const orgRow = orgRes.data;

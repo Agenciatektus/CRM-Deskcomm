@@ -143,6 +143,7 @@ export const NAV_CATALOG = [
     icon: "Funnel",
     group: "crm",
     minRole: "admin",
+    modulo: "prospeccao",
     section: "O dia a dia da venda",
   },
   // ---- Atendimento — onde o operador passa o dia ----

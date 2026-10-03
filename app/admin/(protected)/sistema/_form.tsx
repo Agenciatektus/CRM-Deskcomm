@@ -215,6 +215,12 @@ const MODULOS_NA_TELA: ReadonlyArray<{ modulo: ModuloPorFlag; id: string; rotulo
     rotulo: "Empresas e pessoas (venda para empresas)",
     descricao:
       "Ligado, cada empresa ganha no CRM o cadastro de Empresas (razão social e CNPJ, com os dados públicos preenchidos pela BrasilAPI), as Pessoas que decidem dentro delas, com vários telefones, e a importação de planilha CSV ou Excel. Consultar um CNPJ manda o número para a BrasilAPI. Desligado, as telas e o menu somem.",
+  },  {
+    modulo: "prospeccao",
+    id: "modulo-prospeccao",
+    rotulo: "Prospecção no Google Maps",
+    descricao:
+      "Ligado, as empresas que você liberar em Tenants › Recursos buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.",
   },
 ];
 

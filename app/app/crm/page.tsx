@@ -5,7 +5,7 @@ import { loadCrmExtensions } from "@/lib/extensions/service";
 import { logger } from "@/lib/logger";
 import type { ExtensionGuideView } from "@/lib/extensions/view";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { modulosLigados } from "@/lib/instalacao/modulos";
+import { modulosDaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { capacidadesDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -62,7 +62,7 @@ export default async function CrmHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
-      modulosLigados={await modulosLigados(createAdminClient())}
+      modulosLigados={await modulosDaEmpresa(createAdminClient(), activeOrg?.orgId ?? null)}
       title={traduzir("CRM", idioma)}
       subtitle={traduzir(
         "Onde a venda acontece — e o que você define uma vez para ela funcionar.",

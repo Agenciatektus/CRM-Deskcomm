@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { modulosLigados } from "@/lib/instalacao/modulos";
+import { modulosDaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function AnaliseHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
-      modulosLigados={await modulosLigados(createAdminClient())}
+      modulosLigados={await modulosDaEmpresa(createAdminClient(), activeOrg?.orgId ?? null)}
       title={traduzir("Análise", idioma)}
       subtitle={traduzir(
         "Como o negócio foi no período — e o histórico para quando alguém perguntar por quê.",
