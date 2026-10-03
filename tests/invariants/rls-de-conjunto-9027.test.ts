@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./gov-helpers";
 
 /**
- * Migration 9026 — RLS de CONJUNTO em conversations, crm_leads e
+ * Migration 9027 — RLS de CONJUNTO em conversations, crm_leads e
  * user_organizations (`fn_escopo_orgs()` + semi-join), no lugar do predicado
  * POR LINHA (`fn_can_view_conversation`/`fn_can_view_lead`/`fn_role_at_least`).
  *
@@ -49,13 +49,13 @@ const LB = id(44);
 const seed = `
 begin;
 insert into auth.users(id,email) values
- ('${VIEWER}','r9026-viewer@invariant.test'),('${AG_DONO}','r9026-dono@invariant.test'),
- ('${AG_OUTRO}','r9026-outro@invariant.test'),('${MANAGER}','r9026-manager@invariant.test'),
- ('${REVOGADO}','r9026-revogado@invariant.test'),('${SUPORTE}','r9026-suporte@invariant.test'),
- ('${VIZINHO}','r9026-vizinho@invariant.test');
+ ('${VIEWER}','r9027-viewer@invariant.test'),('${AG_DONO}','r9027-dono@invariant.test'),
+ ('${AG_OUTRO}','r9027-outro@invariant.test'),('${MANAGER}','r9027-manager@invariant.test'),
+ ('${REVOGADO}','r9027-revogado@invariant.test'),('${SUPORTE}','r9027-suporte@invariant.test'),
+ ('${VIZINHO}','r9027-vizinho@invariant.test');
 insert into auth.sessions(id,user_id,aal) values('${SESSAO}','${SUPORTE}','aal1');
 insert into organizations(id,slug,display_name,legal_name) values
- ('${ORG_A}','r9026-a','R9026 A','R9026 A'),('${ORG_B}','r9026-b','R9026 B','R9026 B');
+ ('${ORG_A}','r9027-a','R9027 A','R9027 A'),('${ORG_B}','r9027-b','R9027 B','R9027 B');
 insert into user_organizations(organization_id,user_id,role,accepted_at) values
  ('${ORG_A}','${VIEWER}','viewer',now()),('${ORG_A}','${AG_DONO}','agent',now()),
  ('${ORG_A}','${AG_OUTRO}','agent',now()),('${ORG_A}','${MANAGER}','manager',now()),
@@ -64,32 +64,32 @@ insert into user_organizations(organization_id,user_id,role,accepted_at) values
 insert into platform_admins(user_id,granted_by,scope,mfa_required,reason)
  values('${SUPORTE}','${SUPORTE}','full',false,'Local test');
 insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values
- ('${SESS_A}','${ORG_A}','r9026-a','\\x00'::bytea),('${SESS_B}','${ORG_B}','r9026-b','\\x00'::bytea);
+ ('${SESS_A}','${ORG_A}','r9027-a','\\x00'::bytea),('${SESS_B}','${ORG_B}','r9027-b','\\x00'::bytea);
 insert into contacts(id,organization_id,display_name) values
- ('${id(51)}','${ORG_A}','R9026 Contato 1'),('${id(52)}','${ORG_A}','R9026 Contato 2'),
- ('${id(53)}','${ORG_A}','R9026 Contato 3'),('${id(54)}','${ORG_B}','R9026 Contato B');
+ ('${id(51)}','${ORG_A}','R9027 Contato 1'),('${id(52)}','${ORG_A}','R9027 Contato 2'),
+ ('${id(53)}','${ORG_A}','R9027 Contato 3'),('${id(54)}','${ORG_B}','R9027 Contato B');
 insert into conversations(id,organization_id,contact_id,channel_session_id,status,assigned_to_user_id) values
  ('${C1}','${ORG_A}','${id(51)}','${SESS_A}','claimed','${AG_DONO}'),
  ('${C2}','${ORG_A}','${id(52)}','${SESS_A}','open',null),
  ('${C3}','${ORG_A}','${id(53)}','${SESS_A}','claimed','${REVOGADO}'),
  ('${CB}','${ORG_B}','${id(54)}','${SESS_B}','open',null);
 insert into messages(id,organization_id,conversation_id,channel_session_id,contact_id,type,direction,body) values
- ('${id(61)}','${ORG_A}','${C1}','${SESS_A}','${id(51)}','text','inbound','r9026 m1'),
- ('${id(62)}','${ORG_A}','${C2}','${SESS_A}','${id(52)}','text','inbound','r9026 m2'),
- ('${id(63)}','${ORG_A}','${C3}','${SESS_A}','${id(53)}','text','inbound','r9026 m3'),
- ('${id(64)}','${ORG_B}','${CB}','${SESS_B}','${id(54)}','text','inbound','r9026 mb');
+ ('${id(61)}','${ORG_A}','${C1}','${SESS_A}','${id(51)}','text','inbound','r9027 m1'),
+ ('${id(62)}','${ORG_A}','${C2}','${SESS_A}','${id(52)}','text','inbound','r9027 m2'),
+ ('${id(63)}','${ORG_A}','${C3}','${SESS_A}','${id(53)}','text','inbound','r9027 m3'),
+ ('${id(64)}','${ORG_B}','${CB}','${SESS_B}','${id(54)}','text','inbound','r9027 mb');
 -- Encerra C3 DEPOIS das mensagens: inbound em conversa encerrada a reabre, e a
 -- reabertura desatribui (fn_service_stamp_status).
 update conversations set status = 'closed' where id = '${C3}';
 insert into crm_pipelines(id,organization_id,name,slug) values
- ('${id(71)}','${ORG_A}','R9026','r9026'),('${id(72)}','${ORG_B}','R9026','r9026');
+ ('${id(71)}','${ORG_A}','R9027','r9027'),('${id(72)}','${ORG_B}','R9027','r9027');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position) values
  ('${id(73)}','${ORG_A}','${id(71)}','Novo','novo',1000),('${id(74)}','${ORG_B}','${id(72)}','Novo','novo',1000);
 insert into crm_leads(id,organization_id,pipeline_id,stage_id,title,owner_user_id) values
- ('${L1}','${ORG_A}','${id(71)}','${id(73)}','r9026 l1','${AG_DONO}'),
- ('${L2}','${ORG_A}','${id(71)}','${id(73)}','r9026 l2',null),
- ('${L3}','${ORG_A}','${id(71)}','${id(73)}','r9026 l3','${REVOGADO}'),
- ('${LB}','${ORG_B}','${id(72)}','${id(74)}','r9026 lb',null);
+ ('${L1}','${ORG_A}','${id(71)}','${id(73)}','r9027 l1','${AG_DONO}'),
+ ('${L2}','${ORG_A}','${id(71)}','${id(73)}','r9027 l2',null),
+ ('${L3}','${ORG_A}','${id(71)}','${id(73)}','r9027 l3','${REVOGADO}'),
+ ('${LB}','${ORG_B}','${id(72)}','${id(74)}','r9027 lb',null);
 `;
 
 function prove(body: string) {
@@ -137,9 +137,9 @@ function le(tabela: Tabela, esperado: number, rotulo: string, user: string, sess
   const tag = `${rotulo} / ${tabela}`;
   return `
 ${como(user, session)}
-select set_config('r9026.antigo', (${ANTIGO[tabela]})::text, true);
+select set_config('r9027.antigo', (${ANTIGO[tabela]})::text, true);
 set local role authenticated;
-do $t$ declare v bigint; a bigint := current_setting('r9026.antigo')::bigint; begin
+do $t$ declare v bigint; a bigint := current_setting('r9027.antigo')::bigint; begin
   execute ${lit(NOVO[tabela])} into v;
   if v is distinct from ${esperado} then raise exception '%: policy nova leu %, esperado ${esperado}', ${lit(tag)}, v; end if;
   if v is distinct from a then raise exception '%: policy nova leu %, predicado antigo %', ${lit(tag)}, v, a; end if;
@@ -147,7 +147,7 @@ end $t$;
 reset role;`;
 }
 
-describe("9026 — RLS de conjunto: forma da função", () => {
+describe("9027 — RLS de conjunto: forma da função", () => {
   it("fn_escopo_orgs é stable, security definer, search_path fixo, sem argumento e fechada a anon/public", () => {
     const out = sql(`
       select p.provolatile = 's', p.prosecdef, coalesce(array_to_string(p.proconfig, ','), '') like '%search_path=public%',
@@ -169,7 +169,7 @@ describe("9026 — RLS de conjunto: forma da função", () => {
   });
 });
 
-describe("9026 — (a) agent com visibility_mode='all'", () => {
+describe("9027 — (a) agent com visibility_mode='all'", () => {
   it("lê conversations, messages e crm_leads da org inteira, e nada da vizinha", () =>
     prove(`${modo("all")}
       ${le("conversations", 3, "agent all", AG_OUTRO)}
@@ -189,7 +189,7 @@ describe("9026 — (a) agent com visibility_mode='all'", () => {
       ${le("messages", 1, "dono own", AG_DONO)}`));
 });
 
-describe("9026 — (b) sessão de suporte", () => {
+describe("9027 — (b) sessão de suporte", () => {
   const inicia = (m: "full" | "support_readonly") =>
     `reset role; select fn_start_support('${SUPORTE}','${SESSAO}','${ORG_A}','${ORG_B}','${m}',3600);`;
 
@@ -226,7 +226,7 @@ describe("9026 — (b) sessão de suporte", () => {
         raise exception 'fn_escopo_orgs deu a org A sem sessão de suporte'; end if; end $t$;`));
 });
 
-describe("9026 — (c) membro revogado ainda atribuído lê zero", () => {
+describe("9027 — (c) membro revogado ainda atribuído lê zero", () => {
   it("antes da revogação lê o que é dele; depois, zero em conversations, messages e crm_leads", () =>
     prove(`${modo("own")}
       ${le("conversations", 1, "revogado ANTES", REVOGADO)}
@@ -248,7 +248,7 @@ describe("9026 — (c) membro revogado ainda atribuído lê zero", () => {
       ${le("crm_leads", 0, "revogado DEPOIS (own_and_unassigned)", REVOGADO)}`));
 });
 
-describe("9026 — (d) viewer", () => {
+describe("9027 — (d) viewer", () => {
   it("lê conversations, messages e crm_leads da org inteira em qualquer modo, e só a própria linha do roster", () =>
     prove(`${modo("own")}
       ${le("conversations", 3, "viewer own", VIEWER)}
@@ -257,7 +257,7 @@ describe("9026 — (d) viewer", () => {
       ${le("user_organizations", 1, "viewer", VIEWER)}`));
 });
 
-describe("9026 — equivalência nos demais papéis e isolamento entre tenants", () => {
+describe("9027 — equivalência nos demais papéis e isolamento entre tenants", () => {
   it("manager lê a org inteira e o roster inteiro de A", () =>
     prove(`${modo("own")}
       ${le("conversations", 3, "manager", MANAGER)}
