@@ -29,10 +29,11 @@ const VIEWER = id(11);
 const AG_DONO = id(12); // agent dono de c1/l1
 const AG_OUTRO = id(13); // agent sem nada atribuído (mede o modo)
 const MANAGER = id(14);
-const REVOGADO = id(15); // agent atribuído a c3/l3, revogado no caso (c)
+const REVOGADO = id(15); // agent atribuído a c3/l3 em A (revogado no caso c) e agent ativo em B
 const SUPORTE = id(16); // platform admin, membro só de B, entra em A por suporte
 const SESSAO = id(17);
 const VIZINHO = id(18); // agent só de B
+const MISTO = id(19); // agent em A + manager em B: prova o par papel×org do conjunto
 const SESS_A = id(21);
 const SESS_B = id(22);
 const C1 = id(31); // A, atribuída a AG_DONO, aberta
@@ -52,7 +53,7 @@ insert into auth.users(id,email) values
  ('${VIEWER}','r9027-viewer@invariant.test'),('${AG_DONO}','r9027-dono@invariant.test'),
  ('${AG_OUTRO}','r9027-outro@invariant.test'),('${MANAGER}','r9027-manager@invariant.test'),
  ('${REVOGADO}','r9027-revogado@invariant.test'),('${SUPORTE}','r9027-suporte@invariant.test'),
- ('${VIZINHO}','r9027-vizinho@invariant.test');
+ ('${VIZINHO}','r9027-vizinho@invariant.test'),('${MISTO}','r9027-misto@invariant.test');
 insert into auth.sessions(id,user_id,aal) values('${SESSAO}','${SUPORTE}','aal1');
 insert into organizations(id,slug,display_name,legal_name) values
  ('${ORG_A}','r9027-a','R9027 A','R9027 A'),('${ORG_B}','r9027-b','R9027 B','R9027 B');
@@ -60,7 +61,9 @@ insert into user_organizations(organization_id,user_id,role,accepted_at) values
  ('${ORG_A}','${VIEWER}','viewer',now()),('${ORG_A}','${AG_DONO}','agent',now()),
  ('${ORG_A}','${AG_OUTRO}','agent',now()),('${ORG_A}','${MANAGER}','manager',now()),
  ('${ORG_A}','${REVOGADO}','agent',now()),
- ('${ORG_B}','${SUPORTE}','admin',now()),('${ORG_B}','${VIZINHO}','agent',now());
+ ('${ORG_B}','${SUPORTE}','admin',now()),('${ORG_B}','${VIZINHO}','agent',now()),
+ ('${ORG_B}','${REVOGADO}','agent',now()),
+ ('${ORG_A}','${MISTO}','agent',now()),('${ORG_B}','${MISTO}','manager',now());
 insert into platform_admins(user_id,granted_by,scope,mfa_required,reason)
  values('${SUPORTE}','${SUPORTE}','full',false,'Local test');
 insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values
@@ -108,6 +111,10 @@ const modo = (m: string | null) =>
   `reset role; update organizations set settings = ${
     m === null ? "coalesce(settings,'{}'::jsonb) - 'visibility_mode'" : `coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','${m}')`
   } where id = '${ORG_A}';`;
+
+/** O mesmo, na org B. */
+const modoB = (m: string) =>
+  `reset role; update organizations set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('visibility_mode','${m}') where id = '${ORG_B}';`;
 
 const NAS_DUAS = `organization_id in ('${ORG_A}','${ORG_B}')`;
 
@@ -189,6 +196,13 @@ describe("9027 — (a) agent com visibility_mode='all'", () => {
       ${le("messages", 1, "dono own", AG_DONO)}`));
 });
 
+// O ator de suporte é SEMPRE platform admin (`fn_start_support` exige
+// `platform_admins`), e `(select fn_is_platform_admin())` decide a leitura
+// antes do conjunto. Então as CONTAGENS deste bloco saem iguais com ou sem o
+// ramo de suporte de `fn_escopo_orgs()`, e não o provam. Quem prova o ramo são
+// os `do` que consultam `fn_escopo_orgs()` DIRETO (org de suporte presente, com
+// o papel do modo; ausente sem sessão). Isso basta enquanto suporte implicar
+// platform admin: nessas três policies o ramo de suporte não muda nada.
 describe("9027 — (b) sessão de suporte", () => {
   const inicia = (m: "full" | "support_readonly") =>
     `reset role; select fn_start_support('${SUPORTE}','${SESSAO}','${ORG_A}','${ORG_B}','${m}',3600);`;
@@ -212,13 +226,13 @@ describe("9027 — (b) sessão de suporte", () => {
       do $t$ begin if not exists (select 1 from public.fn_escopo_orgs() e
          where e.organization_id = '${ORG_A}' and e.papel in ('manager','admin')) then
         raise exception 'full: o ramo de papel de user_orgs_select não alcança a org'; end if; end $t$;
-      ${le("user_organizations", 7, "suporte full", SUPORTE, SESSAO)}
+      ${le("user_organizations", 10, "suporte full", SUPORTE, SESSAO)}
       reset role; select fn_end_support('${SUPORTE}','${SESSAO}');
       ${inicia("support_readonly")} ${como(SUPORTE, SESSAO)}
       do $t$ begin if exists (select 1 from public.fn_escopo_orgs() e
          where e.organization_id = '${ORG_A}' and e.papel in ('manager','admin')) then
         raise exception 'readonly: o ramo de papel de user_orgs_select alcança a org'; end if; end $t$;
-      ${le("user_organizations", 7, "suporte readonly", SUPORTE, SESSAO)}`));
+      ${le("user_organizations", 10, "suporte readonly", SUPORTE, SESSAO)}`));
 
   it("controle: sem sessão de suporte, o ramo de papel não dá a org A a quem é só de B", () =>
     prove(`${como(SUPORTE)}
@@ -227,8 +241,11 @@ describe("9027 — (b) sessão de suporte", () => {
 });
 
 describe("9027 — (c) membro revogado ainda atribuído lê zero", () => {
+  // O REVOGADO continua agent ATIVO em B (modo own, nada atribuído a ele lá):
+  // um ramo próprio que aceitasse "é agent em ALGUMA org", sem casar a org da
+  // linha, deixaria o ex-membro de A ler o que segue atribuído a ele em A.
   it("antes da revogação lê o que é dele; depois, zero em conversations, messages e crm_leads", () =>
-    prove(`${modo("own")}
+    prove(`${modo("own")} ${modoB("own")}
       ${le("conversations", 1, "revogado ANTES", REVOGADO)}
       ${le("messages", 1, "revogado ANTES", REVOGADO)}
       ${le("crm_leads", 1, "revogado ANTES", REVOGADO)}
@@ -262,14 +279,23 @@ describe("9027 — equivalência nos demais papéis e isolamento entre tenants",
     prove(`${modo("own")}
       ${le("conversations", 3, "manager", MANAGER)}
       ${le("crm_leads", 3, "manager", MANAGER)}
-      ${le("user_organizations", 5, "manager", MANAGER)}`));
+      ${le("user_organizations", 6, "manager", MANAGER)}`));
 
-  it("agent de B não lê nada de A, em nenhum modo de A", () =>
-    prove(`${modo("all")}
+  // B em 'all': o agent de B entra pelo PRIMEIRO ramo (agent+all), e é ele
+  // que tem de casar a org. Sem o filtro por org nesse ramo, o vizinho leria A.
+  it("agent de B com B em 'all' não lê nada de A", () =>
+    prove(`${modo("all")} ${modoB("all")}
       ${le("conversations", 1, "vizinho", VIZINHO)}
       ${le("messages", 1, "vizinho", VIZINHO)}
       ${le("crm_leads", 1, "vizinho", VIZINHO)}
       ${le("user_organizations", 1, "vizinho", VIZINHO)}`));
+
+  it("misto (agent own em A, manager em B): o papel vale na org dele, não na outra", () =>
+    prove(`${modo("own")}
+      ${le("conversations", 1, "misto", MISTO)}
+      ${le("messages", 1, "misto", MISTO)}
+      ${le("crm_leads", 1, "misto", MISTO)}
+      ${le("user_organizations", 5, "misto", MISTO)}`));
 
   it("sem JWT (auth.uid() nulo) lê zero", () =>
     prove(`reset role; select set_config('request.jwt.claims', '', true); set local role authenticated;
