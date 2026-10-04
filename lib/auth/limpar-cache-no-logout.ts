@@ -15,7 +15,7 @@
  */
 import type { NextRequest, NextResponse } from "next/server";
 
-export const COOKIE_LIMPAR_CACHE = "deskcomm-limpar-cache";
+export const COOKIE_LIMPAR_CACHE = "limpar-cache-http";
 export const CABECALHO_LIMPAR_CACHE = '"cache"';
 
 type CookieStoreGravavel = {
