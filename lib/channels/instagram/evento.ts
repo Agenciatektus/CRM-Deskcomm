@@ -57,8 +57,17 @@ export interface MensagemDoInstagram {
   /**
    * O @ de quem escreveu, quando o evento traz. O comentário traz; o Direct
    * não. Serve para exibir e buscar — a identidade é sempre o IGSID.
+   *
+   * No Direct ele vem do `perfil` que o Verdash anexa ao reencaminhar (a Meta
+   * manda só o IGSID; o Verdash consulta o perfil com o token da conta).
    */
   username: string | null;
+  /**
+   * O nome do perfil ("Maria Souza"), quando o Verdash conseguiu ler. Opcional
+   * por desenho: conta sem nome no perfil, ou consulta que falhou, chega `null`
+   * e o `@` vira o rótulo.
+   */
+  nome: string | null;
   /** Em qual conversa isto cai. Comentário não se mistura com DM no Inbox. */
   conversa: EntradaDaConversa;
   /**
@@ -133,6 +142,18 @@ b"` e
  * é um `@`, é lixo, e gravá-lo como se fosse suja a busca e a tela.
  */
 const FORMA_DO_HANDLE = /^[a-z0-9._]+$/;
+
+/**
+ * Nome de perfil vindo de fora: trimado, sem caractere de controle e com teto.
+ * O teto existe porque o valor vai para o título do card e para o prompt da IA;
+ * um perfil com 5 mil caracteres não é nome, é carga.
+ */
+const TETO_DO_NOME = 120;
+function nomeDePerfil(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const limpo = v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return limpo === "" ? null : limpo.slice(0, TETO_DO_NOME);
+}
 
 function arroba(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -264,9 +285,12 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
       entrada,
       recebidaEm: dataDoEvento(evento.timestamp, agora),
       adId: identificador(envelope.ad_id),
-      // O Direct não traz o @: a Meta manda só o IGSID. Quem quiser exibir o @
-      // busca no Graph depois — mentir um aqui seria pior que não ter.
-      username: null,
+      // O Direct da Meta não traz o @ nem o nome: só o IGSID. Era por isso que
+      // todo lead de Direct nascia "Sem nome" no Inbox e "Novo contato pelo
+      // Instagram" no quadro. O Verdash agora consulta o perfil e anexa
+      // `perfil: { nome, username }` ao reencaminhar; sem ele, segue `null`.
+      username: arroba(objeto(envelope.perfil)?.username),
+      nome: nomeDePerfil(objeto(envelope.perfil)?.nome),
       conversa: "direct",
       mediaId: null,
     },
@@ -317,6 +341,7 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
       recebidaEm: dataDoEvento(valor.timestamp ?? evento?.timestamp, agora),
       adId: identificador(envelope.ad_id),
       username: arroba(de?.username),
+      nome: null,
       conversa: "comentario",
       mediaId: identificador(objeto(valor.media)?.id),
     },
