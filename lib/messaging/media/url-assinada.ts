@@ -103,17 +103,31 @@ export async function assinarMidias(
 }
 
 /**
- * Anexa `media_signed_url` às mensagens com mídia persistida. As mensagens TÊM de
+ * Anexa `media_signed_url` (e `media_thumb_signed_url`, quando a imagem tem
+ * miniatura — migration 9033) às mensagens com mídia persistida. Original e
+ * miniatura vão na MESMA chamada em lote. As mensagens TÊM de
  * vir de uma consulta já autorizada (cliente de sessão, RLS, organização): esta
  * função não lê nada do banco, só assina o caminho que a linha já trazia.
  */
 export async function anexarUrlsDeMidia<
-  M extends { media_storage_path: string | null },
->(admin: SupabaseClient, mensagens: M[], agoraMs: number = Date.now()): Promise<Array<M & { media_signed_url: string | null }>> {
-  const caminhos = mensagens.map((m) => m.media_storage_path).filter((c): c is string => !!c);
+  M extends { media_storage_path: string | null; media_thumb_path?: string | null },
+>(
+  admin: SupabaseClient,
+  mensagens: M[],
+  agoraMs: number = Date.now(),
+): Promise<Array<M & { media_signed_url: string | null; media_thumb_signed_url: string | null }>> {
+  const caminhos = mensagens
+    .flatMap((m) => [m.media_storage_path, m.media_thumb_path ?? null])
+    .filter((c): c is string => !!c);
   const urls = caminhos.length > 0 ? await assinarMidias(admin, caminhos, agoraMs) : new Map<string, string>();
   return mensagens.map((m) => ({
     ...m,
     media_signed_url: m.media_storage_path ? (urls.get(m.media_storage_path) ?? null) : null,
+    // A miniatura só vale com a original: sem a original assinada, nada de
+    // mostrar a miniatura de um arquivo que a tela não consegue abrir.
+    media_thumb_signed_url:
+      m.media_storage_path && m.media_thumb_path && urls.has(m.media_storage_path)
+        ? (urls.get(m.media_thumb_path) ?? null)
+        : null,
   }));
 }

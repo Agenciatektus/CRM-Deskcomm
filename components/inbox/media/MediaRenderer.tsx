@@ -26,7 +26,15 @@ export function MediaRenderer({ message }: { message: Message }) {
   const srcReserva = src ? mediaSrc(message.id) : undefined;
   switch (message.type) {
     case "image":
-      return <ImageMedia messageId={message.id} alt={t("Imagem recebida")} src={src} srcReserva={srcReserva} />;
+      return (
+        <ImageMedia
+          messageId={message.id}
+          alt={t("Imagem recebida")}
+          src={src}
+          srcReserva={srcReserva}
+          srcMiniatura={message.media_thumb_signed_url ?? undefined}
+        />
+      );
     case "sticker":
       return <StickerMedia messageId={message.id} src={src} srcReserva={srcReserva} />;
     case "audio":

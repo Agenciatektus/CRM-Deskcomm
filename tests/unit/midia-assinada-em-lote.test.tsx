@@ -278,6 +278,26 @@ describe("URL vencida (aba aberta além da validade) cai na rota, uma vez", () =
   });
 });
 
+describe("miniatura (9033): a bolha mostra a pequena, o clique abre a original", () => {
+  it("com miniatura: bolha = miniatura; ampliação = original pela rota", async () => {
+    const [m] = await abrirConversa("conv-b");
+    const comMiniatura = { ...m!, media_thumb_signed_url: "https://storage.teste/sign/mini.webp?t=1" };
+    const { container, findByRole } = render(<MediaRenderer message={comMiniatura} />);
+    const bolha = container.querySelector("img")!;
+    expect(bolha.getAttribute("src")).toBe("https://storage.teste/sign/mini.webp?t=1");
+    fireEvent.load(bolha);
+    fireEvent.click(container.querySelector("button")!);
+    const dialogo = await findByRole("dialog");
+    expect(dialogo.querySelector("img")!.getAttribute("src")).toBe(`/api/v1/messages/${m!.id}/media`);
+  });
+
+  it("sem miniatura (mídia antiga): a bolha segue com a original, como antes", async () => {
+    const [m] = await abrirConversa("conv-b");
+    const { container } = render(<MediaRenderer message={{ ...m!, media_thumb_signed_url: null }} />);
+    expect(container.querySelector("img")!.getAttribute("src")).toBe(m!.media_signed_url);
+  });
+});
+
 describe("autorização: o lote não abre o que a rota individual fecha", () => {
   it("usuário da org B pedindo a conversa da org A: nada volta e nada da A é assinado", async () => {
     const msgs = await abrirConversa("conv-a");
