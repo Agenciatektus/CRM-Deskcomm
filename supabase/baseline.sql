@@ -39517,8 +39517,15 @@ begin
        and (
          split_part(o.name, '/', 2) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
          or split_part(o.name, '/', 2) = 'avatars'
+         -- Miniatura da imagem (9033): `org/miniaturas/<conversa>/…`. Conta como
+         -- referência o `media_thumb_path`, e não a pasta inteira ignorada:
+         -- miniatura sem ponteiro (upload sem a linha gravada) é órfã como
+         -- qualquer outra (P2-3 do @Cassio_SecRev na #75).
+         or (split_part(o.name, '/', 2) = 'miniaturas'
+             and split_part(o.name, '/', 3) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
        )
        and not exists (select 1 from public.messages m where m.media_storage_path = o.name)
+       and not exists (select 1 from public.messages m where m.media_thumb_path = o.name)
        and not exists (select 1 from public.contacts c where c.avatar_storage_path = o.name)
        -- Só linha EM CURSO segura o caminho (`pending`, ou `failed` que ainda
        -- é o registro de uma remoção não feita). Linha `deleted`/`skipped`
@@ -47286,6 +47293,171 @@ revoke all on function public.fn_pgrst_recusar_replay_do_gateway() from public, 
 grant execute on function public.fn_pgrst_recusar_replay_do_gateway() to anon, authenticated, service_role;
 
 notify pgrst, 'reload config';
+
+-- ---- a imagem ganha MINIATURA, e ela sai junto com a original (migration 9033) ----
+--
+-- `messages.media_thumb_path` (webp, lado maior 512 px, em
+-- {org}/miniaturas/{conversa}/{mensagem}.webp), o CHECK de que o caminho fica na
+-- pasta da organização da linha, e as triggers que põem a miniatura na fila de
+-- remoção quando a original sai (UPDATE de media_storage_path: LGPD e poda;
+-- DELETE da linha), a guarda de que só o servidor grava esses caminhos e o
+-- varredor contando a miniatura como referência. Ver o cabeçalho da migration. Idempotente: coluna e CHECK
+-- com guarda, função `create or replace`, trigger só se faltar.
+-- Prova: tests/invariants/miniatura-sai-com-a-original.test.ts.
+alter table public.messages add column if not exists media_thumb_path text;
+
+comment on column public.messages.media_thumb_path is
+  'Miniatura webp (lado maior 512 px) da imagem, no bucket whatsapp-media, em {org}/miniaturas/{conversa}/{mensagem}.webp. Null = sem miniatura: a tela usa a original. Sai junto com a original (trg_miniatura_sai_com_a_original_*). Migration 9033.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'messages_media_thumb_path_da_org'
+       and conrelid = 'public.messages'::regclass
+  ) then
+    alter table public.messages
+      add constraint messages_media_thumb_path_da_org
+      check (media_thumb_path is null or media_thumb_path like organization_id::text || '/%')
+      not valid;
+  end if;
+end $$;
+
+-- ## A ORIGINAL também fica na pasta da organização (P2-B do @Cassio_SecRev na #75)
+--
+-- `media_storage_path` nunca teve CHECK: um INSERT direto pela PostgREST podia
+-- apontar a mensagem para um objeto de OUTRA organização, e a rota de mídia o
+-- assinaria. Conferidos todos os caminhos que gravam a coluna — worker
+-- (`storagePathFor`), envio de anexo (`isMediaPathOwnedBy`), foto de catálogo
+-- (`{tenant}/{conversa}/catalogo-…`), PDF de proposta (`{org}/{proposta}.pdf`) —
+-- e todos já começam com a organização; ingestão de canal (Instagram, Meta,
+-- WAHA) não grava a coluna (o worker grava). `NOT VALID`: não varre a tabela;
+-- vale para toda escrita a partir daqui. Atenção: linha ANTIGA fora do prefixo
+-- passaria a recusar qualquer UPDATE nela — conferir antes do deploy com
+-- `select count(*) from messages where media_storage_path is not null
+--    and media_storage_path not like organization_id::text || '/%';` (esperado 0).
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'messages_media_storage_path_da_org'
+       and conrelid = 'public.messages'::regclass
+  ) then
+    alter table public.messages
+      add constraint messages_media_storage_path_da_org
+      check (media_storage_path is null or media_storage_path like organization_id::text || '/%')
+      not valid;
+  end if;
+end $$;
+
+create or replace function public.fn_miniatura_sai_com_a_original()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Organização sendo apagada: a fila não aceita linha dela (FK), e o arquivo
+  -- da organização apagada não é varrido por ninguém — igual à original.
+  if exists (select 1 from public.organizations o where o.id = old.organization_id) then
+    insert into public.storage_redaction_queue (organization_id, bucket, object_path)
+    values (old.organization_id, 'whatsapp-media', old.media_thumb_path)
+    on conflict (bucket, object_path) do update
+      set status = 'pending',
+          attempts = 0,
+          enqueued_at = now(),
+          processed_at = null,
+          error_message = null
+      -- Linha em curso (a da LGPD, com o request_id do pedido) fica como está.
+      where storage_redaction_queue.status in ('deleted', 'skipped');
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  new.media_thumb_path := null;
+  return new;
+end;
+$$;
+
+revoke all on function public.fn_miniatura_sai_com_a_original() from public, anon, authenticated;
+
+-- Só cria a trigger que falta: reaplicar o baseline não toma lock de
+-- `messages` (a lição da 9032 com `create or replace trigger`).
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_miniatura_sai_com_a_original_upd'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_miniatura_sai_com_a_original_upd
+      before update of media_storage_path on public.messages
+      for each row
+      when (old.media_thumb_path is not null
+            and new.media_storage_path is distinct from old.media_storage_path)
+      execute function public.fn_miniatura_sai_com_a_original();
+  end if;
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_miniatura_sai_com_a_original_del'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_miniatura_sai_com_a_original_del
+      before delete on public.messages
+      for each row
+      when (old.media_thumb_path is not null)
+      execute function public.fn_miniatura_sai_com_a_original();
+  end if;
+end $$;
+
+-- ## Só o servidor grava o caminho da mídia (P2-2 do @Cassio_SecRev na #75)
+--
+-- `messages_update` só exige tenancy. Sem esta guarda, um VIEWER apontaria
+-- `media_thumb_path` para qualquer objeto da organização (o CHECK só exige a
+-- pasta da org) e, ao mexer em `media_storage_path` ou apagar a linha, faria a
+-- trigger definer acima enfileirar a EXCLUSÃO desse objeto. Quem grava esses
+-- caminhos é o worker e as rotas com o cliente admin (service_role); a sessão
+-- do navegador (`authenticated`) nunca. O INSERT da sessão continua podendo
+-- trazer `media_storage_path` (o anexo que o atendente envia), mas não miniatura.
+-- Função SECURITY INVOKER de propósito: `current_user` tem de ser quem chamou.
+-- Função definer do próprio banco (a cascata LGPD, a poda) roda como o dono e
+-- passa. Por trigger, e não por GRANT de coluna: revogar o UPDATE da tabela e
+-- conceder coluna a coluna mexeria em toda escrita de `messages` da sessão.
+create or replace function public.fn_midia_so_pelo_servidor()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.media_thumb_path is not null then
+      raise exception 'media_thumb_path só é gravado pelo servidor'
+        using errcode = '42501';
+    end if;
+  elsif new.media_thumb_path is distinct from old.media_thumb_path
+     or new.media_storage_path is distinct from old.media_storage_path then
+    raise exception 'o caminho da mídia (media_storage_path/media_thumb_path) só é alterado pelo servidor'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_midia_so_pelo_servidor'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_midia_so_pelo_servidor
+      before insert or update of media_thumb_path, media_storage_path on public.messages
+      for each row
+      execute function public.fn_midia_so_pelo_servidor();
+  end if;
+end $$;
+-- O passo 2 de `fn_enfileirar_midia_vencida` (contar `media_thumb_path` como
+-- referência, P2-3) foi editado NO LUGAR, no bloco da 0432/0434/0435 acima.
+
+notify pgrst, 'reload schema';
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

@@ -200,6 +200,38 @@ export async function cascadeRedactContact(args: CascadeArgs): Promise<CascadeRe
     }
   }
 
+  // MINIATURA DA IMAGEM (migration 9033) — ANTES da RPC, com o `request_id`.
+  //
+  // A trigger `trg_miniatura_sai_com_a_original_upd` já põe a miniatura na fila
+  // quando a RPC zera `media_storage_path` — mas a trigger não conhece o pedido
+  // LGPD e a linha nasceria sem `request_id`, que é o registro de que a mídia
+  // DO TITULAR saiu do bucket (e a linha sem pedido é expurgada em 90 dias).
+  // Enfileirada aqui primeiro, a linha da trigger cai no conflito e preserva
+  // esta. Falha FECHADA, pelo mesmo motivo do avatar e da nota.
+  if (idsDasConversas.length > 0) {
+    const { data: miniaturas, error: miniaturasErro } = await admin
+      .from("messages")
+      .select("media_thumb_path")
+      .eq("organization_id", args.organizationId)
+      .in("conversation_id", idsDasConversas)
+      .not("media_thumb_path", "is", null);
+    if (miniaturasErro) {
+      throw new Error(`[lgpd-redact-cascade] miniaturas da conversa não lidas: ${miniaturasErro.message}`);
+    }
+    for (const linha of miniaturas ?? []) {
+      const caminho = (linha as { media_thumb_path?: string | null }).media_thumb_path;
+      // Só arquivo DESTA organização (o CHECK da 9033 já garante; aqui é a
+      // segunda trava, a mesma regra do PDF da proposta na RPC).
+      if (!caminho || !caminho.startsWith(`${args.organizationId}/`)) continue;
+      await enfileirarMidiaNaFila(admin, {
+        organizationId: args.organizationId,
+        requestId: args.requestId,
+        bucket: "whatsapp-media",
+        objectPath: caminho,
+      });
+    }
+  }
+
   const { data, error } = await admin.rpc("fn_lgpd_cascade_redact_contact" as never, {
     p_organization_id: args.organizationId,
     p_contact_id: args.contactId,

@@ -19,6 +19,7 @@ import {
   type ChannelProvider,
   type ChannelSessionRef,
 } from "@/lib/channels";
+import { caminhoDaMiniatura, gerarMiniatura } from "@/lib/messaging/media/miniatura";
 import { storagePathFor } from "@/lib/messaging/media/types";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -65,13 +66,27 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   if (!msg?.media_url) return { consumer_key, status: "skipped", detail: "no media_url" };
   if (msg.media_storage_path) return { consumer_key, status: "skipped", detail: "already stored" };
 
-  const markStatus = async (media_status: "stored" | "failed", patch: Record<string, unknown> = {}) => {
-    const { error: updErr } = await admin
+  /**
+   * Grava o estado SÓ se a linha ainda é a que foi lida (compare-and-set, P2-1
+   * do @Cassio_SecRev na #75): mesmo `media_url` e ainda sem arquivo. A
+   * anonimização (LGPD) zera `media_url` e a mídia; se ela rodou durante o
+   * download, gravar por cima traria de volta o arquivo do titular. Devolve
+   * quantas linhas mudaram — 0 é "a linha mudou, não grave nada".
+   */
+  const markStatus = async (
+    media_status: "stored" | "failed",
+    patch: Record<string, unknown> = {},
+  ): Promise<number> => {
+    const { data: mudadas, error: updErr } = await admin
       .from("messages")
       .update({ metadata: { ...(msg.metadata ?? {}), media_status }, ...patch })
       .eq("id", msg.id)
-      .eq("organization_id", msg.organization_id);
+      .eq("organization_id", msg.organization_id)
+      .eq("media_url", msg.media_url as string)
+      .is("media_storage_path", null)
+      .select("id");
     if (updErr) throw new Error(`message update failed: ${updErr.message}`);
+    return (mudadas ?? []).length;
   };
 
   const isLastAttempt = row.attempts >= DRAIN_MAX_ATTEMPTS - 1;
@@ -138,11 +153,54 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     return { consumer_key, status: "error", detail: uploadErr.message };
   }
 
-  await markStatus("stored", {
+  // MINIATURA (migration 9033): a lista mostra a imagem a ~256 px, e baixar a
+  // original para isso é desperdício. Falha aqui NÃO derruba a persistência:
+  // sem miniatura a tela usa a original, e o retroativo cobre depois.
+  const miniaturaPath = await salvarMiniatura(admin, msg, media.buffer, media.mime);
+
+  const gravadas = await markStatus("stored", {
     media_storage_path: path,
     media_size_bytes: media.buffer.byteLength,
     media_mime: media.mime,
+    ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
   });
+  if (gravadas === 0) {
+    // A linha mudou durante o download: anonimizada, apagada, ou OUTRA execução
+    // deste mesmo evento já gravou (o drain reenfileira evento parado em
+    // `processing` > 10 min, e o caminho é determinístico — as duas sobem no
+    // MESMO objeto). Por isso se RELÊ a linha e só sai o que ela não aponta:
+    // apagar às cegas tiraria do bucket a mídia que a outra execução acabou de
+    // referenciar (P2-A do @Cassio_SecRev na #75). Na corrida com a LGPD a
+    // linha não aponta para nada, e os dois objetos saem.
+    const { data: atual, error: releituraErr } = await admin
+      .from("messages")
+      .select("media_storage_path, media_thumb_path")
+      .eq("id", msg.id)
+      .eq("organization_id", msg.organization_id)
+      .maybeSingle();
+    if (releituraErr) {
+      // Sem saber o que a linha aponta, apagar é o lado caro de errar: o objeto
+      // fica, e o varredor de órfãos o leva se ninguém o referenciar.
+      return { consumer_key, status: "error", detail: `releitura falhou: ${releituraErr.message}` };
+    }
+    const referenciados = new Set(
+      [atual?.media_storage_path, (atual as { media_thumb_path?: string | null } | null)?.media_thumb_path].filter(
+        (c): c is string => !!c,
+      ),
+    );
+    const recemSubidos = (miniaturaPath ? [path, miniaturaPath] : [path]).filter((c) => !referenciados.has(c));
+    if (recemSubidos.length === 0) {
+      return { consumer_key, status: "skipped", detail: "outra_execucao_ja_gravou" };
+    }
+    const { error: removeErr } = await admin.storage.from("whatsapp-media").remove(recemSubidos);
+    if (removeErr) {
+      logger.error("[media-persist] objetos sem dono não removidos", {
+        message_id: msg.id,
+        detail: removeErr.message,
+      });
+    }
+    return { consumer_key, status: "skipped", detail: "linha_mudou_durante_o_download" };
+  }
 
   // Grupo nunca é derivado: a IA não serve grupos, e derivar custaria visão/
   // transcrição PAGA sem consumidor nenhum do outro lado — ninguém leria "o
@@ -185,4 +243,39 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   }
 
   return { consumer_key, status: "ok" };
+}
+
+/**
+ * Gera e grava a miniatura da imagem. Devolve o caminho, ou `null` quando não há
+ * miniatura (tipo sem miniatura, imagem já pequena, `sharp` ausente, falha de
+ * upload) — e nesse caso a tela usa a original.
+ */
+async function salvarMiniatura(
+  admin: ReturnType<typeof createAdminClient>,
+  msg: Pick<MessageMediaRow, "id" | "organization_id" | "conversation_id">,
+  original: Uint8Array,
+  mime: string,
+): Promise<string | null> {
+  try {
+    const miniatura = await gerarMiniatura(original, mime);
+    if (!miniatura) return null;
+    const caminho = caminhoDaMiniatura(msg.organization_id, msg.conversation_id, msg.id);
+    const { error } = await admin.storage
+      .from("whatsapp-media")
+      .upload(caminho, miniatura, { contentType: "image/webp", upsert: true });
+    if (error) {
+      logger.warn("[media-persist] miniatura não subiu (a tela usa a original)", {
+        message_id: msg.id,
+        detail: error.message,
+      });
+      return null;
+    }
+    return caminho;
+  } catch (err) {
+    logger.warn("[media-persist] miniatura não gerada (a tela usa a original)", {
+      message_id: msg.id,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }

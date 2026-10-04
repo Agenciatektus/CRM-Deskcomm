@@ -142,6 +142,9 @@ describe("loadAuthUser — falha de permissão não vira 'sem organização'", (
         // `null`, e não um padrão inventado no meio do caminho.
         currency: null,
         country: null,
+        // A situação da empresa (ativa/suspensa) entra pela mesma carona e
+        // segue o mesmo contrato: sem a coluna na consulta, `null`.
+        status: null,
         interface_settings: { preset: "completa" },
       },
     ]);

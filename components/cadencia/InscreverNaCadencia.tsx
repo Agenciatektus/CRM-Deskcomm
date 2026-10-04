@@ -6,6 +6,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useCadencias, useInscreverNaCadencia, type PreviaDaInscricao } from "@/hooks/cadencia/useCadencias";
 import { Button } from "@/components/ui/button";
+import { FRASE_DA_RECUSA } from "@/lib/cadencia/frase-da-recusa";
 import {
   Dialog,
   DialogContent,
@@ -14,20 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-/** Por que um negócio não entrou — o mesmo vocabulário de `lib/cadencia/inscrever.ts`. */
-const MOTIVOS: Record<string, string> = {
-  negocio_fora_do_funil: "não é deste funil",
-  negocio_fechado: "negócio já fechado",
-  negocio_sem_contato: "negócio sem contato",
-  contato_indisponivel: "contato indisponível",
-  contato_bloqueado_ou_optout: "contato bloqueado ou pediu para sair",
-  telefone_suprimido: "telefone pediu para sair em outro cadastro",
-  sem_telefone: "contato sem telefone",
-  teto_do_dia: "passou do limite de inscrições de hoje",
-  ja_em_outro_fluxo: "já está em outra régua",
-  ja_passou_pela_cadencia: "passou por esta cadência nos últimos 30 dias",
-};
 
 /**
  * "INSCREVER NA CADÊNCIA" — a ação em lote do Kanban.
@@ -122,7 +109,7 @@ function BotaoEDialogo({
               </p>
               {motivosAgrupados.map(([motivo, n]) => (
                 <p key={motivo} className="text-text-muted">
-                  {n} {t(MOTIVOS[motivo] ?? "não entram")}
+                  {n} {t(FRASE_DA_RECUSA[motivo] ?? "não entram")}
                 </p>
               ))}
             </div>

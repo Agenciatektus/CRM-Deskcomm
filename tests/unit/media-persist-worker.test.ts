@@ -54,7 +54,14 @@ vi.mock("@/lib/supabase/admin", () => ({
       },
       update: (patch: Record<string, unknown>) => {
         updateEqMock(patch);
-        return { eq: () => ({ eq: async () => ({ error: null }) }) };
+        // Compare-and-set (P2-1 da #75): `.eq().eq().eq().is().select()` e a
+        // contagem de linhas que mudaram — aqui, a linha ainda é a lida.
+        const cas: Record<string, unknown> = {
+          eq: () => cas,
+          is: () => cas,
+          select: async () => ({ data: [{ id: messageRow.id }], error: null }),
+        };
+        return cas;
       },
     }),
     storage: { from: () => ({ upload: uploadMock }) },
