@@ -22,20 +22,38 @@ const AG_A = id(13);
 const PA = id(14);
 const CT = id(21);
 const DEM = id(31);
+const AG_AB = id(15); // agent em A e em B
+const VW_AB = id(16); // viewer em A e em B
+const SA = id(41);
+const CONV = id(42);
+const MSG = id(43);
+const PIPE = id(44);
+const STAGE = id(45);
+const LEAD = id(46);
 
 const seed = `
 begin;
 insert into auth.users(id,email) values
  ('${MIX}','o9030-mix@invariant.test'),('${VW_A}','o9030-vw@invariant.test'),
- ('${AG_A}','o9030-ag@invariant.test'),('${PA}','o9030-pa@invariant.test');
+ ('${AG_A}','o9030-ag@invariant.test'),('${PA}','o9030-pa@invariant.test'),
+ ('${AG_AB}','o9031-agab@invariant.test'),('${VW_AB}','o9031-vwab@invariant.test');
 insert into organizations(id,slug,display_name,legal_name) values
  ('${ORG_A}','o9030-a','O9030 A','O9030 A'),('${ORG_B}','o9030-b','O9030 B','O9030 B');
 insert into user_organizations(organization_id,user_id,role,accepted_at) values
  ('${ORG_A}','${MIX}','agent',now()),('${ORG_B}','${MIX}','manager',now()),
- ('${ORG_A}','${VW_A}','viewer',now()),('${ORG_A}','${AG_A}','agent',now());
+ ('${ORG_A}','${VW_A}','viewer',now()),('${ORG_A}','${AG_A}','agent',now()),
+ ('${ORG_A}','${AG_AB}','agent',now()),('${ORG_B}','${AG_AB}','agent',now()),
+ ('${ORG_A}','${VW_AB}','viewer',now()),('${ORG_B}','${VW_AB}','viewer',now());
 insert into platform_admins(user_id,granted_by,scope,mfa_required,reason) values('${PA}','${PA}','full',false,'Local test');
 insert into contacts(id,organization_id,display_name) values ('${CT}','${ORG_A}','O9030 Contato');
 insert into demandas(id,organization_id,contact_id) values ('${DEM}','${ORG_A}','${CT}');
+insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values ('${SA}','${ORG_A}','o9031-a','\\x00'::bytea);
+insert into conversations(id,organization_id,contact_id,channel_session_id,status) values ('${CONV}','${ORG_A}','${CT}','${SA}','open');
+insert into messages(id,organization_id,conversation_id,channel_session_id,contact_id,type,direction,body)
+  values ('${MSG}','${ORG_A}','${CONV}','${SA}','${CT}','text','inbound','o9031 m');
+insert into crm_pipelines(id,organization_id,name,slug) values ('${PIPE}','${ORG_A}','O9031','o9031');
+insert into crm_stages(id,organization_id,pipeline_id,name,slug,position) values ('${STAGE}','${ORG_A}','${PIPE}','Novo','novo',1000);
+insert into crm_leads(id,organization_id,pipeline_id,stage_id,title) values ('${LEAD}','${ORG_A}','${PIPE}','${STAGE}','o9031 lead');
 `;
 
 const como = (user: string) =>
@@ -63,7 +81,12 @@ rollback;`);
 }
 
 const MOVE_CONTATO = `update public.contacts set organization_id = '${ORG_B}' where id = '${CT}';`;
-const SEM_TRIGGER = `drop trigger trg_organizacao_nao_muda on public.contacts; drop trigger trg_organizacao_nao_muda on public.demandas;`;
+const SEM_TRIGGER = ["contacts", "demandas", "conversations", "messages", "crm_leads"]
+  .map((t) => `drop trigger trg_organizacao_nao_muda on public.${t};`)
+  .join(" ");
+const MOVE_CONVERSA = `update public.conversations set organization_id = '${ORG_B}' where id = '${CONV}';`;
+const MOVE_MENSAGEM = `update public.messages set organization_id = '${ORG_B}' where id = '${MSG}';`;
+const MOVE_LEAD = `update public.crm_leads set organization_id = '${ORG_B}' where id = '${LEAD}';`;
 
 describe("9030: a linha não troca de organização", () => {
   it("quem tem vínculo em A e em B não move o contato de A para B (42501)", () => {
@@ -96,23 +119,37 @@ describe("9030: a linha não troca de organização", () => {
     ).toBe("n=1");
   });
 
-  it("toda tabela com organization_id e for all só de tenancy tem a trigger", () => {
+  it("toda tabela de public com organization_id tem a trigger (9031)", () => {
+    // A 9030 cobria só as tabelas cuja for all exigia apenas tenancy; papel nas
+    // DUAS organizações também movia linha (P1 do Cassio na #69). A regra agora
+    // não depende de policy: tabela nova com organization_id sem a trigger
+    // reprova aqui.
     const semTrigger = sql(`
-      select coalesce(string_agg(distinct p.tablename, ',' order by p.tablename), '')
-        from pg_policies p
-        join information_schema.columns c
-          on c.table_schema = 'public' and c.table_name = p.tablename and c.column_name = 'organization_id'
-       where p.schemaname = 'public' and p.cmd = 'ALL' and p.permissive = 'PERMISSIVE'
-         and (coalesce(p.qual, '') || coalesce(p.with_check, '')) not like '%role_at_least%'
-         -- a regra decide pela organização (fora: \`incidents\`, que é só do platform admin)
-         and (coalesce(p.qual, '') || coalesce(p.with_check, '')) like '%organization_id%'
+      select coalesce(string_agg(c.relname, ',' order by c.relname), '')
+        from pg_class c
+        join pg_attribute a on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
+       where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p')
          and not exists (
            select 1 from pg_trigger t
-            where t.tgrelid = format('public.%I', p.tablename)::regclass
-              and t.tgname = 'trg_organizacao_nao_muda' and not t.tgisinternal);`);
+            where t.tgrelid = c.oid and t.tgname = 'trg_organizacao_nao_muda' and not t.tgisinternal);`);
     expect(semTrigger).toBe("");
     const comTrigger = sql(`select count(*) from pg_trigger where tgname = 'trg_organizacao_nao_muda' and not tgisinternal;`);
-    expect(Number(comTrigger)).toBeGreaterThanOrEqual(52);
+    expect(Number(comTrigger)).toBeGreaterThan(52);
+  });
+
+  it("agent de A+B não move a conversa, viewer de A+B não move a mensagem, e o lead não muda de org (42501)", () => {
+    expect(tenta(como(AG_AB), MOVE_CONVERSA)).toBe("42501");
+    expect(tenta(como(VW_AB), MOVE_MENSAGEM)).toBe("42501");
+    expect(tenta(como(MIX), MOVE_LEAD)).toBe("42501");
+  });
+
+  it("CONTROLE: sem a trigger a RLS sozinha deixava mover os três", () => {
+    expect(tenta(`${SEM_TRIGGER}
+${como(AG_AB)}`, MOVE_CONVERSA)).toBe("n=1");
+    expect(tenta(`${SEM_TRIGGER}
+${como(VW_AB)}`, MOVE_MENSAGEM)).toBe("n=1");
+    expect(tenta(`${SEM_TRIGGER}
+${como(MIX)}`, MOVE_LEAD)).toBe("n=1");
   });
 });
 
@@ -134,5 +171,36 @@ describe("9030: contato só é escrito por agent+", () => {
       tenta(como(AG_A), `insert into public.contacts(organization_id,display_name) values ('${ORG_A}','O9030 do agent');`),
     ).toBe("n=1");
     expect(tenta(como(PA), `update public.contacts set display_name = 'y' where id = '${CT}';`)).toBe("n=1");
+  });
+});
+
+describe("9031: a atividade do negócio move o relógio de quem a registrou", () => {
+  const ATIVIDADE = `insert into public.crm_lead_activities(organization_id,lead_id,source_module,type,actor_kind)
+    values ('${ORG_A}','${LEAD}','crm','note','user');`;
+  const relogio = (prefixo: string) => {
+    const out = sql(`${seed}
+${prefixo}
+${como(VW_A)}
+${ATIVIDADE}
+reset role;
+select 'r=' || coalesce(last_activity_at::text, 'nulo') from public.crm_leads where id = '${LEAD}';
+rollback;`);
+    return out.split("\n").map((l) => l.trim()).find((l) => l.startsWith("r="))?.slice(2);
+  };
+
+  it("nota registrada por um viewer carimba last_activity_at do negócio", () => {
+    expect(relogio("")).not.toBe("nulo");
+  });
+
+  it("CONTROLE: com a função invoker de antes, o relógio não andava (em silêncio)", () => {
+    expect(relogio("alter function public.fn_update_last_activity_at() security invoker;")).toBe("nulo");
+  });
+
+  it("a função é definer, com search_path fixo e sem EXECUTE para anon/authenticated", () => {
+    const out = sql(`
+      select p.prosecdef, coalesce(array_to_string(p.proconfig, ','), '') like '%search_path=%',
+             has_function_privilege('anon', p.oid, 'EXECUTE'), has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        from pg_proc p where p.oid = 'public.fn_update_last_activity_at()'::regprocedure;`);
+    expect(out).toBe("t|t|f|f");
   });
 });
