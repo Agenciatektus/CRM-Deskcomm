@@ -16,15 +16,19 @@ import { VideoMedia } from "./VideoMedia";
 export function MediaRenderer({ message }: { message: Message }) {
   const t = useT();
   const isOutbound = message.direction === "outbound";
+  // A URL assinada que a lista entregou em lote: sem ela, cada mídia faria a
+  // própria ida a /messages/{id}/media ao montar. O documento continua na rota:
+  // ele só baixa no clique, que pode vir horas depois, com a URL já vencida.
+  const src = message.media_signed_url ?? undefined;
   switch (message.type) {
     case "image":
-      return <ImageMedia messageId={message.id} alt={t("Imagem recebida")} />;
+      return <ImageMedia messageId={message.id} alt={t("Imagem recebida")} src={src} />;
     case "sticker":
-      return <StickerMedia messageId={message.id} />;
+      return <StickerMedia messageId={message.id} src={src} />;
     case "audio":
-      return <AudioPlayer messageId={message.id} isOutbound={isOutbound} />;
+      return <AudioPlayer messageId={message.id} isOutbound={isOutbound} src={src} />;
     case "video":
-      return <VideoMedia messageId={message.id} />;
+      return <VideoMedia messageId={message.id} src={src} />;
     case "contact":
       return null;
     default:

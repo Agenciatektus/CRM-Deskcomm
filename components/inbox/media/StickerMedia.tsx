@@ -8,7 +8,7 @@ import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
 
 /** Figurinha: inline, sem bolha — como no WhatsApp. */
-export function StickerMedia({ messageId }: { messageId: string }) {
+export function StickerMedia({ messageId, src }: { messageId: string; src?: string }) {
   const t = useT();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   if (state === "error") return <MediaUnavailable kind="Figurinha" className="h-40 w-40" />;
@@ -16,7 +16,7 @@ export function StickerMedia({ messageId }: { messageId: string }) {
     <div className="relative h-40 w-40">
       {state === "loading" && <Skeleton className="absolute inset-0 h-full w-full rounded-lg" />}
       <img
-        src={mediaSrc(messageId)}
+        src={src ?? mediaSrc(messageId)}
         alt={t("Figurinha")}
         loading="lazy"
         onLoad={() => setState("ready")}
