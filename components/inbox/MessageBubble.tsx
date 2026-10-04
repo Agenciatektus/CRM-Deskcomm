@@ -17,6 +17,7 @@ import type { Message } from "@/lib/types/messaging";
 import { lerRemetenteDeGrupo, rotuloDoRemetente } from "@/lib/messaging/remetente-de-grupo";
 import { CitationButton } from "@/components/ai/CitationButton";
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
+import { MediaUnavailable } from "@/components/inbox/media/MediaUnavailable";
 import { ContactCard } from "@/components/inbox/media/ContactCard";
 import { LocationCard } from "@/components/inbox/media/LocationCard";
 import { localizacaoDaMensagem } from "@/lib/messaging/localizacao";
@@ -100,6 +101,9 @@ export function MessageBubble({
   const time = format(new Date(message.sent_at), "HH:mm", { locale: localeDaData });
   const isFailed = message.status === "failed";
   const hasMedia = Boolean(message.media_url || message.media_storage_path);
+  // Anexo que chegou SEM ponteiro guardado (as mensagens do Instagram de antes
+  // da #13 da auditoria): a tela mostrava nada. Agora diz que expirou.
+  const anexoSemArquivo = !hasMedia && message.metadata?.instagram_tem_anexo === true;
   const isContact = message.type === "contact";
   // Pino com coordenadas: o cartão substitui o corpo, que é só o mesmo link em texto.
   const localizacao = localizacaoDaMensagem(message);
@@ -375,6 +379,12 @@ export function MessageBubble({
             {hasMedia && (
               <div className={cn(message.body && "mb-1")}>
                 <MediaRenderer message={message} />
+              </div>
+            )}
+
+            {anexoSemArquivo && (
+              <div className={cn(message.body && "mb-1")}>
+                <MediaUnavailable kind="Anexo" expirada />
               </div>
             )}
 

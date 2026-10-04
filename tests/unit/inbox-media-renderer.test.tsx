@@ -67,3 +67,27 @@ describe("MessageBubble com mídia", () => {
     expect(screen.queryByAltText("Imagem recebida")).not.toBeInTheDocument();
   });
 });
+
+describe("mídia expirada (#13 da auditoria): diz que expirou em vez de nada", () => {
+  it("anexo antigo do Instagram, sem arquivo e sem ponteiro: a bolha mostra 'Mídia expirada'", () => {
+    render(
+      <MessageBubble
+        message={msg({ type: "text", body: null, media_url: null, metadata: { instagram_tem_anexo: true } })}
+      />,
+    );
+    expect(screen.getByText("Mídia expirada")).toBeInTheDocument();
+  });
+
+  it("o worker desistiu (media_status failed): 'Mídia expirada', sem pedir a rota", () => {
+    const { container } = render(
+      <MediaRenderer message={msg({ type: "image", metadata: { media_status: "failed" } })} />,
+    );
+    expect(screen.getByText("Mídia expirada")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("CONTROLE: texto comum não ganha aviso de mídia", () => {
+    render(<MessageBubble message={msg({ type: "text", body: "oi", media_url: null })} />);
+    expect(screen.queryByText("Mídia expirada")).not.toBeInTheDocument();
+  });
+});

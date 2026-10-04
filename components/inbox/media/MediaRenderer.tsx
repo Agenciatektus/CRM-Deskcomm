@@ -6,6 +6,7 @@ import { AudioPlayer } from "./AudioPlayer";
 import { DocumentCard } from "./DocumentCard";
 import { ImageMedia } from "./ImageMedia";
 import { StickerMedia } from "./StickerMedia";
+import { MediaUnavailable } from "./MediaUnavailable";
 import { VideoMedia } from "./VideoMedia";
 import { mediaSrc } from "./media-utils";
 
@@ -17,6 +18,11 @@ import { mediaSrc } from "./media-utils";
 export function MediaRenderer({ message }: { message: Message }) {
   const t = useT();
   const isOutbound = message.direction === "outbound";
+  // O worker desistiu (o ponteiro do canal venceu antes do download): diz isso
+  // e NÃO pede a rota — ela tentaria o mesmo ponteiro morto a cada render.
+  if (!message.media_storage_path && message.metadata?.media_status === "failed") {
+    return <MediaUnavailable kind="Mídia" expirada className="h-24 w-56" />;
+  }
   // A URL assinada que a lista entregou em lote: sem ela, cada mídia faria a
   // própria ida a /messages/{id}/media ao montar. O documento continua na rota:
   // ele só baixa no clique, que pode vir horas depois, com a URL já vencida.

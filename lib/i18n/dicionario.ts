@@ -6971,6 +6971,10 @@ export const DICIONARIO: Traducoes = {
 
   // ─── Inbox: mídia (áudio, imagem, figurinha, vídeo, documento) ───
   "Mídia indisponível": { es: "Contenido no disponible" },
+  // O ponteiro do canal venceu antes de o CRM guardar o arquivo (#13).
+  "Mídia expirada": { es: "Contenido caducado" },
+  // `kind` do aviso de mídia (lido pelo leitor de tela) quando o tipo não é conhecido.
+  Anexo: { es: "Adjunto" },
   Áudio: { es: "Audio" },
   Imagem: { es: "Imagen" },
   Figurinha: { es: "Sticker" },
