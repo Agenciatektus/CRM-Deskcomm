@@ -366,7 +366,14 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     // O mesmo contato, agora na org A: o join CASA e as flags dele valem. Se
     // esta asserção também devolvesse `automatico`, a de cima não estaria
     // provando o join — estaria provando que o contato nunca é lido.
-    sql(`update contacts set organization_id = '${ORG}' where id = '${CT_B}';`);
+    // Mover o contato de organização é FIXTURE deste caso, não fluxo do produto:
+    // desde a 9030 a trigger trg_organizacao_nao_muda recusa a troca para todo
+    // papel, então ela sai do caminho só nesta transação.
+    sql(`begin;
+      alter table contacts disable trigger trg_organizacao_nao_muda;
+      update contacts set organization_id = '${ORG}' where id = '${CT_B}';
+      alter table contacts enable trigger trg_organizacao_nao_muda;
+      commit;`);
     const comContatoVisivel = sql(`
       begin;
       select set_config('request.jwt.claims',
@@ -382,7 +389,14 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     expect(comContatoVisivel, "o controle não pode repetir o valor degradado").not.toContain(
       "<<automatico>>",
     );
-    sql(`update contacts set organization_id = '${ORG_B}' where id = '${CT_B}';`);
+    // Mover o contato de organização é FIXTURE deste caso, não fluxo do produto:
+    // desde a 9030 a trigger trg_organizacao_nao_muda recusa a troca para todo
+    // papel, então ela sai do caminho só nesta transação.
+    sql(`begin;
+      alter table contacts disable trigger trg_organizacao_nao_muda;
+      update contacts set organization_id = '${ORG_B}' where id = '${CT_B}';
+      alter table contacts enable trigger trg_organizacao_nao_muda;
+      commit;`);
 
     sql(`
       delete from conversations where id = '${CONV}';

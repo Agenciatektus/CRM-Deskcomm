@@ -4275,11 +4275,9 @@ END IF; END $baseline_guard$;
 
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'tenant_isolation_contacts_all' AND polrelid = '"public"."contacts"'::regclass) THEN
-CREATE POLICY "tenant_isolation_contacts_all" ON "public"."contacts" USING ((("organization_id" IN ( SELECT "public"."fn_user_org_ids"() AS "fn_user_org_ids")) OR "public"."fn_is_platform_admin"())) WITH CHECK ((("organization_id" IN ( SELECT "public"."fn_user_org_ids"() AS "fn_user_org_ids")) OR "public"."fn_is_platform_admin"()));
-END IF; END $baseline_guard$;
+-- `tenant_isolation_contacts_all` (for all) deixou de existir na 9030: virou
+-- contacts_select + insert/update/delete com papel; a definição mora no bloco
+-- da migration 9030, no apêndice.
 
 
 
@@ -46958,18 +46956,8 @@ do $rls9028$ begin
     for delete using (public.fn_is_platform_admin());
 end $rls9028$;
 
--- contacts (continua for all: leitura e escrita são a mesma regra)
-do $rls9028$ begin
-  drop policy if exists "tenant_isolation_contacts_all" on public.contacts;
-  create policy "tenant_isolation_contacts_all" on public.contacts
-    using (
-      (organization_id in (select public.fn_user_org_ids()))
-      or (select public.fn_is_platform_admin())
-    ) with check (
-      (organization_id in (select public.fn_user_org_ids()))
-      or (select public.fn_is_platform_admin())
-    );
-end $rls9028$;
+-- contacts: a leitura (com platform admin uma vez por consulta) e a escrita por
+-- papel moram no bloco da migration 9030, logo abaixo.
 
 -- messages (só a leitura; insert/update/delete não mudam)
 do $rls9028$ begin
@@ -47052,6 +47040,95 @@ grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uu
 
 notify pgrst, 'reload schema';
 
+
+-- ---- a linha não troca de organização; contato escrito só por agent+ (migration 9030) ----
+--
+-- Trigger BEFORE UPDATE OF organization_id (42501, qualquer papel) nas 52
+-- tabelas cuja for all só exige tenancy: quem tem vínculo em duas organizações
+-- movia linha de uma para a outra. E contacts troca a for all por SELECT +
+-- escrita com papel agent. Motivo, fluxos conferidos e rollback no cabeçalho da
+-- migration. As quatro policies de contacts num `do` só: troca atômica sob
+-- autocommit, a policy anterior fica de pé se algo falhar.
+-- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+create or replace function public.fn_organizacao_da_linha_nao_muda()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.organization_id is distinct from old.organization_id then
+    raise exception 'a linha de % não muda de organização', tg_table_name
+      using errcode = '42501',
+            hint = 'Mover dado entre organizações não é uma operação do produto. Crie a linha na organização de destino.';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fn_organizacao_da_linha_nao_muda() from public, anon, authenticated;
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'agent_inbox_items', 'ai_agent_runs', 'ai_invocations', 'ai_router_decisions',
+    'before_send_traces', 'channel_knobs', 'channel_session_health', 'channel_session_warmup',
+    'contact_field_proposals', 'contacts', 'crm_lead_reactivations', 'crm_lead_risk_states',
+    'crm_lead_scores', 'cron_jobs', 'demanda_conversas', 'demandas',
+    'disclosure_template_pointers', 'disclosure_template_versions', 'flywheel_distiller_proposals',
+    'flywheel_judge_verdicts', 'idempotency_keys', 'job_queue', 'judge_alignment_pool',
+    'knowledge_searches', 'lead_checkpoints', 'lead_notes', 'lead_state', 'lead_state_transitions',
+    'llm_calls', 'meta_templates', 'metrics', 'nuvemshop_products', 'orders',
+    'org_memory_entries', 'org_memory_pointers', 'org_memory_versions', 'outbound_copies',
+    'pacing_ledger', 'phone_numbers', 'playbook_pointers', 'playbook_versions',
+    'promise_table_pointers', 'promise_table_versions', 'reentry_knob_pointers',
+    'reentry_knob_versions', 'reentry_template_pointers', 'reentry_template_versions',
+    'send_ledger', 'skill_activations', 'skill_pointers', 'skill_versions',
+    'storage_redaction_queue'
+  ] loop
+    if to_regclass('public.' || t) is not null then
+      execute format(
+        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
+        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t);
+    end if;
+  end loop;
+end $$;
+
+do $rls9030$ begin
+  drop policy if exists "tenant_isolation_contacts_all" on public.contacts;
+  drop policy if exists "contacts_select" on public.contacts;
+  create policy "contacts_select" on public.contacts
+    for select using (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "contacts_insert" on public.contacts;
+  create policy "contacts_insert" on public.contacts
+    for insert with check (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists "contacts_update" on public.contacts;
+  create policy "contacts_update" on public.contacts
+    for update using (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    ) with check (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists "contacts_delete" on public.contacts;
+  create policy "contacts_delete" on public.contacts
+    for delete using (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+end $rls9030$;
 
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --

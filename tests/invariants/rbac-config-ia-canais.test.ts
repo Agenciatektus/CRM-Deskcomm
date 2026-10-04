@@ -182,7 +182,7 @@ const DIVIDA_RBAC_CONHECIDA = new Set([
   "agent_cases", "agent_inbox_items", "ai_agent_runs",
   "ai_invocations", "ai_router_decisions",
   "before_send_traces", "channel_knobs", "channel_session_health", "channel_session_warmup",
-  "contact_field_proposals", "contacts", "crm_lead_reactivations", "crm_lead_risk_states",
+  "contact_field_proposals", "crm_lead_reactivations", "crm_lead_risk_states",
   "crm_lead_scores", "cron_jobs", "demanda_conversas", "demandas",
   "disclosure_template_pointers", "disclosure_template_versions",
   "flywheel_distiller_proposals", "flywheel_judge_verdicts",
@@ -215,6 +215,9 @@ describe("0150 — a dívida de RBAC não cresce", () => {
       // A trilha e as versões de follow-up saíram da dívida na 0490 (#1915): o
       // par de casos está em followup-trilha-e-versoes-rls-por-operacao.test.ts.
       "followup_enrollment_events", "followup_flow_versions",
+      // contacts saiu da dívida na 9030: escrita agent+ (o par de casos está em
+      // organizacao-nao-muda-9030.test.ts, viewer barrado e agent passando).
+      "contacts",
     ];
     const semRole = sql(`
       select coalesce(string_agg(distinct tablename, ','), '') from pg_policies
