@@ -70,6 +70,15 @@ const nextConfig: NextConfig = {
       "./node_modules/.pnpm/@napi-rs+canvas-*/node_modules/@napi-rs/*/*.node",
       // pdfjs-dist em si (ver comentário acima).
       "./node_modules/.pnpm/pdfjs-dist@*/node_modules/pdfjs-dist/**",
+      // sharp (miniatura da imagem, migration 9033): o mesmo defeito do canvas —
+      // o binário da plataforma é `require()` computado em runtime e o tracer
+      // não o segue. Mesmo cuidado com o symlink: o padrão aponta para o
+      // CONTEÚDO de cada pacote `@img/sharp-linux*` / `@img/sharp-libvips-linux*`,
+      // nunca para o `@img/` que os agrega (onde o pnpm põe o symlink da libvips).
+      // Sem isto, a miniatura simplesmente não é gerada no drain do app (o
+      // worker, com node_modules completo, gera) — nada quebra, só falta.
+      "./node_modules/.pnpm/@img+sharp-linux*/node_modules/@img/sharp-linux*/**",
+      "./node_modules/.pnpm/@img+sharp-libvips-linux*/node_modules/@img/sharp-libvips-linux*/**",
     ],
   },
   reactStrictMode: true,

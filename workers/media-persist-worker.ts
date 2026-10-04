@@ -19,6 +19,7 @@ import {
   type ChannelProvider,
   type ChannelSessionRef,
 } from "@/lib/channels";
+import { caminhoDaMiniatura, gerarMiniatura } from "@/lib/messaging/media/miniatura";
 import { storagePathFor } from "@/lib/messaging/media/types";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -138,10 +139,16 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     return { consumer_key, status: "error", detail: uploadErr.message };
   }
 
+  // MINIATURA (migration 9033): a lista mostra a imagem a ~256 px, e baixar a
+  // original para isso é desperdício. Falha aqui NÃO derruba a persistência:
+  // sem miniatura a tela usa a original, e o retroativo cobre depois.
+  const miniaturaPath = await salvarMiniatura(admin, msg, media.buffer, media.mime);
+
   await markStatus("stored", {
     media_storage_path: path,
     media_size_bytes: media.buffer.byteLength,
     media_mime: media.mime,
+    ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
   });
 
   // Grupo nunca é derivado: a IA não serve grupos, e derivar custaria visão/
@@ -185,4 +192,39 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   }
 
   return { consumer_key, status: "ok" };
+}
+
+/**
+ * Gera e grava a miniatura da imagem. Devolve o caminho, ou `null` quando não há
+ * miniatura (tipo sem miniatura, imagem já pequena, `sharp` ausente, falha de
+ * upload) — e nesse caso a tela usa a original.
+ */
+async function salvarMiniatura(
+  admin: ReturnType<typeof createAdminClient>,
+  msg: Pick<MessageMediaRow, "id" | "organization_id" | "conversation_id">,
+  original: Uint8Array,
+  mime: string,
+): Promise<string | null> {
+  try {
+    const miniatura = await gerarMiniatura(original, mime);
+    if (!miniatura) return null;
+    const caminho = caminhoDaMiniatura(msg.organization_id, msg.conversation_id, msg.id);
+    const { error } = await admin.storage
+      .from("whatsapp-media")
+      .upload(caminho, miniatura, { contentType: "image/webp", upsert: true });
+    if (error) {
+      logger.warn("[media-persist] miniatura não subiu (a tela usa a original)", {
+        message_id: msg.id,
+        detail: error.message,
+      });
+      return null;
+    }
+    return caminho;
+  } catch (err) {
+    logger.warn("[media-persist] miniatura não gerada (a tela usa a original)", {
+      message_id: msg.id,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
