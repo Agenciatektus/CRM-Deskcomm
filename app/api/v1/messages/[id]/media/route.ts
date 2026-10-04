@@ -2,7 +2,7 @@
 /**
  * GET /api/v1/messages/[id]/media — acesso autenticado à mídia da mensagem.
  * Persistida → 302 pra signed URL do bucket whatsapp-media, ESTÁVEL por bloco
- * de 1h e com `Cache-Control: private` até o bloco virar (ver
+ * de 30 min e com `Cache-Control: private` até o bloco virar (ver
  * `lib/messaging/media/url-assinada.ts`). A lista de mensagens já entrega essa
  * URL junto da mensagem; esta rota fica para quem não a recebeu.
  * Ainda não persistida (janela até o worker rodar) → proxy dos bytes do WAHA.

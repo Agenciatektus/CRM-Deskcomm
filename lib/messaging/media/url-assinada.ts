@@ -29,7 +29,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const BUCKET_DA_MIDIA = "whatsapp-media";
-export const BLOCO_S = 3600;
+/**
+ * 30 min: a URL vive entre 30 e 60 min (parecer do @Cassio_SecRev na #74, P2-3).
+ * URL assinada é credencial ao portador; quanto menor a vida, menor o estrago de
+ * um vazamento. O custo é reassinar a cada meia hora, numa chamada em lote.
+ */
+export const BLOCO_S = 1800;
 /** Teto do cache: passou disso, recomeça (o bloco seguinte recomeçaria de qualquer jeito). */
 const TETO_DO_CACHE = 20_000;
 
