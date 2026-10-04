@@ -73,7 +73,7 @@ beforeEach(() => {
     { id: "m3", organization_id: "org-a", conversation_id: "c1", contact_id: "k1", channel_session_id: "s1", external_id: "mid-3", sent_at: "2026-09-28T10:00:00Z", metadata: { instagram_tem_anexo: true }, media_url: null },
   ];
   arquivo = {
-    "mid-1": { tipo: "direct", evento: { message: { attachments: [{ type: "image", payload: { url: CDN("1") } }, { type: "video", payload: { url: CDN("2") } }] } } },
+    "mid-1": { tipo: "direct", evento: { message: { attachments: [{ type: "image", payload: { url: CDN("1") } }, { type: "ig_reel", payload: { reel_video_id: "r1", title: "t", url: CDN("2") } }] } } },
     "mid-2": { tipo: "direct", evento: { message: { attachments: [{ type: "story_mention", payload: { url: CDN("vencido") } }] } } },
     // mid-3: o payload saiu do arquivo (retenção)
   };
@@ -84,25 +84,29 @@ beforeEach(() => {
 
 describe("recuperação das mensagens antigas do Instagram", () => {
   it("lê os anexos do payload arquivado", () => {
-    expect(anexosDoArquivo(arquivo["mid-1"]).map((a) => a.tipoNaMeta)).toEqual(["image", "video"]);
-    expect(anexosDoArquivo(null)).toEqual([]);
+    expect(anexosDoArquivo(arquivo["mid-1"]).midias.map((a) => a.tipoNaMeta)).toEqual(["image", "ig_reel"]);
+    expect(anexosDoArquivo(null)).toEqual({ midias: [], links: [], temporaria: false });
   });
 
   it("SIMULA por padrão: mede o que responde e o que venceu, sem gravar nada", async () => {
     const r = await recuperarMidiaDoInstagram(admin() as never, { aplicar: false, max: 100, baixar, log: () => {} });
-    expect(r).toMatchObject({ mensagens: 3, semPayload: 1, anexos: 3, respondem: 2, vencidos: 1, recuperadas: 0 });
-    expect(r.porTipo).toEqual({ image: 1, video: 1, story_mention: 1 });
+    // Só o 1º arquivo de cada mensagem é testado (é a única mídia que a linha guarda).
+    expect(r).toMatchObject({ mensagens: 3, semPayload: 1, anexos: 3, respondem: 1, vencidos: 1, recuperadas: 0 });
+    expect(r.porTipo).toEqual({ image: 1, ig_reel: 1, story_mention: 1 });
     expect(updates).toEqual([]);
     expect(inserts).toEqual([]);
     expect(eventos).toEqual([]);
   });
 
-  it("--aplicar: devolve o ponteiro, cria a linha do anexo extra e pede a persistência; vencido fica", async () => {
+  it("--aplicar: só UPDATE na linha existente (extra no metadata), NENHUM insert; vencido fica", async () => {
     const r = await recuperarMidiaDoInstagram(admin() as never, { aplicar: true, max: 100, baixar, log: () => {} });
     expect(r.recuperadas).toBe(1);
     expect(updates).toEqual([expect.objectContaining({ media_url: CDN("1"), type: "image" })]);
-    expect(inserts).toEqual([expect.objectContaining({ external_id: "mid-1:anexo:1", media_url: CDN("2"), type: "video" })]);
-    expect(eventos.map((e) => e.p_entity_id)).toEqual(["m1", "extra-0"]);
+    expect((updates[0]!.metadata as Record<string, unknown>).instagram_anexos_extras).toEqual([
+      { tipo: "ig_reel", url: CDN("2") },
+    ]);
+    expect(inserts).toEqual([]);
+    expect(eventos.map((e) => e.p_entity_id)).toEqual(["m1"]);
     expect(mensagens.find((m) => m.id === "m2")!.media_url).toBeNull();
   });
 
