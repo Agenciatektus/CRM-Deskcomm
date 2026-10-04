@@ -33,3 +33,13 @@ export function mimeExibivel(mime: string | null | undefined): boolean {
 export function mimeSeguroParaGuardar(mime: string | null | undefined): string {
   return mimeExibivel(mime) ? base(mime) : MIME_GENERICO;
 }
+
+/**
+ * O mime DECLARADO, para a coluna `media_mime` (o rótulo "DOCX", "XLSX" da
+ * tela): só o tipo base, sem parâmetro, com forma de mime e teto de tamanho.
+ * Nunca decide exibição — quem decide é `mimeExibivel(mimeSeguroParaGuardar(…))`.
+ */
+export function mimeDeclaradoParaRotulo(mime: string | null | undefined): string {
+  const m = base(mime);
+  return /^[a-z0-9][a-z0-9.+-]{0,63}\/[a-z0-9][a-z0-9.+-]{0,127}$/.test(m) ? m : MIME_GENERICO;
+}

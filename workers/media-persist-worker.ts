@@ -20,7 +20,7 @@ import {
   type ChannelSessionRef,
 } from "@/lib/channels";
 import { caminhoDaMiniatura, gerarMiniatura } from "@/lib/messaging/media/miniatura";
-import { mimeSeguroParaGuardar } from "@/lib/messaging/media/mime-seguro";
+import { mimeDeclaradoParaRotulo, mimeSeguroParaGuardar } from "@/lib/messaging/media/mime-seguro";
 import { storagePathFor } from "@/lib/messaging/media/types";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -168,7 +168,11 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   const gravadas = await markStatus("stored", {
     media_storage_path: path,
     media_size_bytes: media.buffer.byteLength,
-    media_mime: mimeGuardado,
+    // A COLUNA guarda o mime declarado (só o tipo base, curto): é o rótulo do
+    // arquivo na tela ("DOCX"). O OBJETO no storage leva o seguro, e a rota e a
+    // lista decidem exibir x baixar pelo seguro, recalculado da coluna — nunca
+    // pela coluna crua (P2-3 do Cassio na #83).
+    media_mime: mimeDeclaradoParaRotulo(media.mime),
     ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
     // O canal não sabia o tipo (story, post, reel compartilhado): quem decide é
     // o mime do que de fato chegou. Sem isto, um vídeo apareceria como imagem
