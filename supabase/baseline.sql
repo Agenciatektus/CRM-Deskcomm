@@ -4450,8 +4450,8 @@ GRANT ALL ON FUNCTION "public"."fn_update_budget_consumption"() TO "service_role
 
 
 
-GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "anon";
-GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "authenticated";
+-- (fn_update_last_activity_at: os GRANT a anon e authenticated sairam na 9031; a função virou
+-- security definer de gatilho e é revogada no bloco da 0235. Só o service_role fica.)
 GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "service_role";
 
 
@@ -24247,6 +24247,12 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 create or replace function public.fn_update_last_activity_at()
   returns trigger
   language plpgsql
+  -- SECURITY DEFINER desde a 9031 (P2-1 do Cassio na #69): como invoker, o
+  -- UPDATE abaixo passava pela RLS de quem inseriu a atividade, e para um
+  -- viewer (ou agent que não enxerga o negócio) o relógio não andava, em
+  -- silêncio. O escopo é o mínimo: só last_activity_at, só da linha
+  -- referenciada E da mesma organização da atividade.
+  security definer
   set search_path to 'public', 'pg_temp'
 as $function$
 begin
@@ -24274,15 +24280,18 @@ begin
 
   update public.crm_leads
      set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
-   where id = new.lead_id;
+   where id = new.lead_id
+     and organization_id = new.organization_id;
 
   if new.contact_id is not null then
     update public.contacts
        set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
-     where id = new.contact_id;
+     where id = new.contact_id
+       and organization_id = new.organization_id;
   end if;
   return new;
 end$function$;
+revoke all on function public.fn_update_last_activity_at() from public, anon, authenticated;
 -- ─── 6. trabalho ao telefone conta como trabalho ────────────────────────────
 create or replace function public.fn_attendant_metrics(
   p_org uuid,
@@ -48987,3 +48996,31 @@ grant select on table public.modulos_liberados_por_empresa to authenticated;
 grant all on table public.modulos_liberados_por_empresa to service_role;
 
 notify pgrst, 'reload schema';
+
+-- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
+--
+-- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
+-- tenancy; o P1 do Cassio mostrou que papel nas DUAS organizações também move
+-- linha (messages, conversations, crm_leads…). Aqui: toda tabela de public com
+-- organization_id, lida do catálogo. Fica no FIM do arquivo de propósito: o
+-- laço tem de ver também as tabelas que os blocos acima (módulos reaplicados,
+-- apêndice) criaram. Idempotente (create or replace trigger).
+-- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+do $$
+declare
+  t text;
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_attribute a
+        on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
+     where c.relnamespace = 'public'::regnamespace
+       and c.relkind in ('r', 'p')
+     order by c.relname
+  loop
+    execute format(
+      'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
+      'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t);
+  end loop;
+end $$;
