@@ -131,7 +131,11 @@ describe("9030: a linha não troca de organização", () => {
        where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p')
          and not exists (
            select 1 from pg_trigger t
-            where t.tgrelid = c.oid and t.tgname = 'trg_organizacao_nao_muda' and not t.tgisinternal);`);
+            where t.tgrelid = c.oid and t.tgname = 'trg_organizacao_nao_muda' and not t.tgisinternal
+              -- presente E valendo (9032, P2-1 do Cassio na #71): desabilitada ou
+              -- com WHEN não protege nada
+              and t.tgenabled in ('O', 'A') and t.tgqual is null
+              and t.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure);`);
     expect(semTrigger).toBe("");
     const comTrigger = sql(`select count(*) from pg_trigger where tgname = 'trg_organizacao_nao_muda' and not tgisinternal;`);
     expect(Number(comTrigger)).toBeGreaterThan(52);

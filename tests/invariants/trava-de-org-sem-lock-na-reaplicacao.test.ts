@@ -88,4 +88,16 @@ create or replace trigger trg_organizacao_nao_muda before update of organization
     ).toBe("fn_organizacao_da_linha_nao_muda");
     sql(`drop function public.t9032_outra();`);
   });
+
+  it("trigger DESABILITADA ou com WHEN não conta como presente: o bloco a refaz valendo", () => {
+    sql(`alter table public.lead_notes disable trigger trg_organizacao_nao_muda;`);
+    sql(`create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.demandas
+  for each row when (false) execute function public.fn_organizacao_da_linha_nao_muda();`);
+    sql(BLOCO);
+    expect(
+      sql(`select string_agg(c.relname || ':' || t.tgenabled::text || ':' || (t.tgqual is null)::text, ',' order by c.relname)
+             from pg_trigger t join pg_class c on c.oid = t.tgrelid
+            where t.tgname = 'trg_organizacao_nao_muda' and c.relname in ('demandas', 'lead_notes');`),
+    ).toBe("demandas:O:true,lead_notes:O:true");
+  });
 });
