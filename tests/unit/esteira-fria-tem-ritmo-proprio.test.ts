@@ -5,6 +5,7 @@ import path from "node:path";
 import { PACING_DEFAULTS } from "@/lib/agent-engine/pacing/defaults";
 import { warmupCapFor } from "@/lib/agent-engine/pacing/engine";
 import {
+  TETO_DIARIO_POR_NUMERO,
   FATOR_DA_ESTEIRA_FRIA,
   proximoEnvioDaEsteiraFria,
   tetoDiarioDaEsteiraFria,
@@ -120,6 +121,14 @@ describe("o worker usa os dois — módulo perfeito e desligado não conserta na
   it("consulta o teto da esteira fria antes de enviar", () => {
     expect(worker).toMatch(/tetoDiarioDaEsteiraFria\(/);
     expect(worker).toMatch(/count\.total >= tetoFrio/);
+  });
+
+  it("conta por NÚMERO, somando as campanhas que saem por ele — 20 por dia", () => {
+    expect(TETO_DIARIO_POR_NUMERO).toBe(20);
+    expect(worker).toMatch(/count\.numero >= TETO_DIARIO_POR_NUMERO/);
+    expect(worker, "a contagem precisa filtrar pelo número da campanha").toMatch(
+      /\(k\.config->>'channel_session_id'\)::uuid=\$3::uuid/,
+    );
   });
 
   it("agenda o próximo envio COM jitter, e não mais com o intervalo cru", () => {

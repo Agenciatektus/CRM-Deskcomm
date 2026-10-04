@@ -169,7 +169,10 @@ describe("gradual outreach", () => {
   it.each([
     { campaign: 10, total: 10 },
     { campaign: 1, total: 50 },
-  ])("stops at campaign or organization limit %j", async (counts) => {
+    // 20 por número somando campanhas (decisão de 02/10): esta campanha mandou 2,
+    // a vizinha no mesmo número mandou 18.
+    { campaign: 2, total: 20, numero: 20, retry_numero: new Date() },
+  ])("stops at campaign, organization or per-number limit %j", async (counts) => {
     await sendNextCandidate(
       {} as never,
       database({ ...counts, retry_at: new Date(), last_attempt: null }) as never,

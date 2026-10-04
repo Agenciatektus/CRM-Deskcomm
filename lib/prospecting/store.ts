@@ -17,6 +17,7 @@ import {
   type SearchInput,
   type Prospect,
 } from "./schema";
+import { completarRedesPeloSite } from "./enriquecer-pelo-site";
 import {
   ProspectingError,
   providerRequest,
@@ -173,12 +174,14 @@ export async function synchronizeSearch(db: pg.PoolClient, admin: SupabaseClient
   const dataset = run.defaultDatasetId ?? c.dataset_id;
   if (!dataset) throw new ProspectingError("Busca concluída sem resultado disponível.");
   const items = await readResults(key, dataset, c.search.limit);
+  const prospects = items.map(normalizeProspect).filter((p): p is Prospect => p !== null);
+  // As redes que o Apify não achou, lidas do site — ANTES do `begin`: abrir até
+  // 100 sites com a transação aberta seguraria o lock por minutos.
+  if (c.search.enrich) await completarRedesPeloSite(prospects);
   let inserted = 0;
   await db.query("begin");
   try {
-    for (const item of items) {
-      const p = normalizeProspect(item);
-      if (!p) continue;
+    for (const p of prospects) {
       const result = await db.query(
         "insert into prospecting_candidates(organization_id,campaign_id,place_id,phone,data) values($1,$2,$3,$4,$5) on conflict do nothing",
         [c.organization_id, c.id, p.key, p.phone, p],

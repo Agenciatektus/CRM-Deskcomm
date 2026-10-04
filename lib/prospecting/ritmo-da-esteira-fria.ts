@@ -42,6 +42,15 @@ import { warmupCapFor } from "@/lib/agent-engine/pacing/engine";
 export const FATOR_DA_ESTEIRA_FRIA = 4;
 
 /**
+ * Teto de PRIMEIRAS abordagens por NÚMERO em 24 h, somando todas as campanhas
+ * que saem por ele (decisão do Peterson, 02/10/2026: "20 por dia por número").
+ * O limite da campanha (`daily_limit`) e o da organização (50) continuam
+ * valendo; este fecha o buraco de duas campanhas no mesmo número somarem 40.
+ * Depois do warm-up, é ele que segura o número, e não só quem opera.
+ */
+export const TETO_DIARIO_POR_NUMERO = 20;
+
+/**
  * Quantas abordagens frias este número pode fazer hoje.
  *
  * `null` = o warm-up terminou e este módulo não impõe teto.
