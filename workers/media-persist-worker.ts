@@ -165,10 +165,33 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
   });
   if (gravadas === 0) {
-    // A linha mudou durante o download (anonimizada, apagada, ou outra rodada já
-    // gravou). Os objetos que acabaram de subir não têm dono: saem agora, em vez
-    // de ficarem no bucket com o dado de quem pediu para ser esquecido.
-    const recemSubidos = miniaturaPath ? [path, miniaturaPath] : [path];
+    // A linha mudou durante o download: anonimizada, apagada, ou OUTRA execução
+    // deste mesmo evento já gravou (o drain reenfileira evento parado em
+    // `processing` > 10 min, e o caminho é determinístico — as duas sobem no
+    // MESMO objeto). Por isso se RELÊ a linha e só sai o que ela não aponta:
+    // apagar às cegas tiraria do bucket a mídia que a outra execução acabou de
+    // referenciar (P2-A do @Cassio_SecRev na #75). Na corrida com a LGPD a
+    // linha não aponta para nada, e os dois objetos saem.
+    const { data: atual, error: releituraErr } = await admin
+      .from("messages")
+      .select("media_storage_path, media_thumb_path")
+      .eq("id", msg.id)
+      .eq("organization_id", msg.organization_id)
+      .maybeSingle();
+    if (releituraErr) {
+      // Sem saber o que a linha aponta, apagar é o lado caro de errar: o objeto
+      // fica, e o varredor de órfãos o leva se ninguém o referenciar.
+      return { consumer_key, status: "error", detail: `releitura falhou: ${releituraErr.message}` };
+    }
+    const referenciados = new Set(
+      [atual?.media_storage_path, (atual as { media_thumb_path?: string | null } | null)?.media_thumb_path].filter(
+        (c): c is string => !!c,
+      ),
+    );
+    const recemSubidos = (miniaturaPath ? [path, miniaturaPath] : [path]).filter((c) => !referenciados.has(c));
+    if (recemSubidos.length === 0) {
+      return { consumer_key, status: "skipped", detail: "outra_execucao_ja_gravou" };
+    }
     const { error: removeErr } = await admin.storage.from("whatsapp-media").remove(recemSubidos);
     if (removeErr) {
       logger.error("[media-persist] objetos sem dono não removidos", {

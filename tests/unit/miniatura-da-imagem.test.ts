@@ -35,6 +35,12 @@ const estado = vi.hoisted(() => ({
   bytesDaMidia: Buffer.alloc(0) as Buffer,
   miniaturasDoContato: [] as Array<{ media_thumb_path: string }>,
   linhaRedigida: false,
+  /** Banco com compare-and-set de verdade sobre `mensagem` (duas execuções). */
+  casReal: false,
+  /** Barreira: segura o download até as DUAS execuções terem lido a linha. */
+  chegadas: 0,
+  soltarDownloads: null as null | (() => void),
+  barreira: null as null | Promise<void>,
   removidos: [] as string[],
 }));
 
@@ -43,7 +49,14 @@ vi.mock("@/lib/channels", () => ({
   CHANNEL_SESSION_REF_COLUMNS: "waha_session_name",
   DEFAULT_CHANNEL_PROVIDER: "waha",
   getAdapterOpcional: () => ({
-    fetchInboundMedia: async () => ({ buffer: estado.bytesDaMidia, mime: "image/jpeg" }),
+    fetchInboundMedia: async () => {
+      estado.chegadas += 1;
+      if (estado.barreira) {
+        if (estado.chegadas >= 2) estado.soltarDownloads?.();
+        await estado.barreira;
+      }
+      return { buffer: estado.bytesDaMidia, mime: "image/jpeg" };
+    },
   }),
   resolveSessionRef: () => ({ wahaSessionName: "s" }),
 }));
@@ -61,7 +74,11 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (tabela: string) => ({
       ...encadeado(() => {
         if (tabela === "messages") {
-          return { data: estado.miniaturasDoContato.length ? estado.miniaturasDoContato : estado.mensagem, error: null };
+          // Cópia: cada leitura é um retrato da linha naquele instante.
+          return {
+            data: estado.miniaturasDoContato.length ? estado.miniaturasDoContato : { ...estado.mensagem },
+            error: null,
+          };
         }
         if (tabela === "channel_sessions") return { data: { provider: "waha", waha_session_name: "s" }, error: null };
         if (tabela === "conversations") return { data: [{ id: "conv-a" }], error: null };
@@ -72,7 +89,15 @@ vi.mock("@/lib/supabase/admin", () => ({
         estado.patches.push(patch);
         // A corrida (P2-1): a anonimização rodou durante o download e o
         // compare-and-set não acha a linha — zero linhas mudam.
-        return encadeado(() => ({ data: estado.linhaRedigida ? [] : [{ id: "msg-b" }], error: null }));
+        return encadeado(() => {
+          if (estado.casReal) {
+            // Compare-and-set: só grava se a linha ainda está sem arquivo.
+            if (estado.mensagem.media_storage_path !== null) return { data: [], error: null };
+            Object.assign(estado.mensagem, patch);
+            return { data: [{ id: "msg-b" }], error: null };
+          }
+          return { data: estado.linhaRedigida ? [] : [{ id: "msg-b" }], error: null };
+        });
       },
       upsert: (linha: Record<string, unknown>) => {
         estado.fila.push(linha);
@@ -144,6 +169,11 @@ beforeEach(() => {
   estado.bytesDaMidia = fotoDeCelular;
   estado.miniaturasDoContato = [];
   estado.linhaRedigida = false;
+  estado.casReal = false;
+  estado.chegadas = 0;
+  estado.barreira = null;
+  estado.soltarDownloads = null;
+  (estado.mensagem as Record<string, unknown>).media_thumb_path = null;
   estado.removidos = [];
   esquecerUrlsAssinadas();
 });
@@ -266,6 +296,30 @@ describe("CORRIDA com a anonimização (P2-1 da #75)", () => {
     } as never);
     expect(r.status).toBe("skipped");
     expect(estado.removidos).toEqual(["org-b/conv-b/msg-b.jpg", "org-b/miniaturas/conv-b/msg-b.webp"]);
+  });
+
+  it("P2-A: DUAS execuções do mesmo evento, intercaladas — a mídia final continua no bucket", async () => {
+    estado.casReal = true;
+    estado.barreira = new Promise<void>((soltar) => (estado.soltarDownloads = soltar));
+    const evento = {
+      id: "ev",
+      organization_id: "org-b",
+      event_type: "media.persist_requested",
+      entity_kind: "message",
+      entity_id: "msg-b",
+      payload: { message_id: "msg-b" },
+      metadata: {},
+      consumed_by: [],
+      attempts: 0,
+    } as never;
+    const resultados = await Promise.all([persistMessageMedia(evento), persistMessageMedia(evento)]);
+    // As duas leram a linha vazia e subiram no MESMO caminho; uma gravou.
+    expect(estado.chegadas).toBe(2);
+    expect(resultados.map((r) => r.status).sort()).toEqual(["ok", "skipped"]);
+    expect(estado.mensagem.media_storage_path).toBe("org-b/conv-b/msg-b.jpg");
+    expect((estado.mensagem as Record<string, unknown>).media_thumb_path).toBe("org-b/miniaturas/conv-b/msg-b.webp");
+    // A perdedora NÃO apaga o que a vencedora referenciou.
+    expect(estado.removidos).toEqual([]);
   });
 
   it("CONTROLE: sem corrida, nada é removido", async () => {
