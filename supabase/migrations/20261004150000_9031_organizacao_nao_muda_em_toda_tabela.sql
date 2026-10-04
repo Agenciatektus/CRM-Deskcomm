@@ -67,7 +67,7 @@ create or replace function public.fn_organizacao_da_linha_nao_muda()
 returns trigger
 language plpgsql
 set search_path = public
-as $
+as $$
 begin
   -- A ÚNICA troca aceita é para NULL vinda de dentro de outro gatilho, que é
   -- como o Postgres executa um FK `on delete set null` (9031): apagar a
@@ -84,7 +84,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.fn_organizacao_da_linha_nao_muda() from public, anon, authenticated;
 
