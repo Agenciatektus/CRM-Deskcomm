@@ -91,3 +91,54 @@ describe("mídia expirada (#13 da auditoria): diz que expirou em vez de nada", (
     expect(screen.queryByText("Mídia expirada")).not.toBeInTheDocument();
   });
 });
+
+describe("Instagram (#13): permalink, anexos extras e mídia temporária", () => {
+  it("permalink de post vira 'Ver no Instagram' (só instagram.com; link de fora é ignorado)", () => {
+    render(
+      <MessageBubble
+        message={msg({
+          type: "text",
+          body: null,
+          media_url: null,
+          metadata: {
+            instagram_links: [
+              { tipoNaMeta: "ig_post", url: "https://www.instagram.com/p/FICTICIO/", titulo: "legenda" },
+              { tipoNaMeta: "ig_post", url: "https://phishing.example/p/x", titulo: "golpe" },
+            ],
+          },
+        })}
+      />,
+    );
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "https://www.instagram.com/p/FICTICIO/");
+    expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("anexos extras: avisa que a mensagem tinha mais anexos", () => {
+    render(
+      <MessageBubble
+        message={msg({
+          type: "image",
+          metadata: { instagram_anexos_extras: [{ tipo: "ig_reel", url: "https://lookaside.fbsbx.com/x" }] },
+        })}
+      />,
+    );
+    expect(screen.getByText("Esta mensagem tinha mais anexos no Instagram.")).toBeInTheDocument();
+  });
+
+  it("mídia temporária: diz que o CRM não guarda (e não 'expirada')", () => {
+    render(
+      <MessageBubble
+        message={msg({
+          type: "text",
+          body: null,
+          media_url: null,
+          metadata: { instagram_tem_anexo: true, instagram_anexo_temporario: true },
+        })}
+      />,
+    );
+    expect(screen.getByText("Mídia temporária: o CRM não guarda")).toBeInTheDocument();
+    expect(screen.queryByText("Mídia expirada")).not.toBeInTheDocument();
+  });
+});

@@ -6975,6 +6975,9 @@ export const DICIONARIO: Traducoes = {
   "Mídia expirada": { es: "Contenido caducado" },
   // `kind` do aviso de mídia (lido pelo leitor de tela) quando o tipo não é conhecido.
   Anexo: { es: "Adjunto" },
+  "Mídia temporária: o CRM não guarda": { es: "Contenido temporal: el CRM no lo guarda" },
+  "Esta mensagem tinha mais anexos no Instagram.": { es: "Este mensaje tenía más adjuntos en Instagram." },
+  "Ver no Instagram": { es: "Ver en Instagram" },
   Áudio: { es: "Audio" },
   Imagem: { es: "Imagen" },
   Figurinha: { es: "Sticker" },

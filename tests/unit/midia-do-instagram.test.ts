@@ -48,38 +48,64 @@ function envelope(attachments: unknown[], extra: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * As CHAVES reais vistas em produção (50 payloads, `webhook_events_log`,
+ * 04/10/2026); ids, assinaturas e títulos aqui são fictícios.
+ */
+const PERMALINK = (id: string) => `https://www.instagram.com/p/FICTICIO${id}/`;
 const PAYLOADS = {
   imagem: { type: "image", payload: { url: CDN("100") } },
-  video: { type: "video", payload: { url: CDN("200") } },
   audio: { type: "audio", payload: { url: CDN("300") } },
-  arquivo: { type: "file", payload: { url: CDN("400") } },
   mencaoEmStory: { type: "story_mention", payload: { url: CDN("500") } },
-  compartilhamento: { type: "share", payload: { url: CDN("600") } },
+  post: { type: "ig_post", payload: { ig_post_media_id: "1790000000000600", title: "legenda", url: CDN("600") } },
+  postPermalink: {
+    type: "ig_post",
+    payload: { ig_post_media_id: "1790000000000601", title: "legenda do post", url: PERMALINK("601") },
+  },
   reel: { type: "ig_reel", payload: { reel_video_id: "1790000000000700", title: "legenda", url: CDN("700") } },
+  story: { type: "ig_story", payload: { story_media_id: "1790000000000800", story_media_url: CDN("800") } },
+  template: { type: "template", payload: { generic: { elements: [{ title: "Cartão" }] } } },
+  temporaria: { type: "ephemeral", payload: {} },
 };
 
-describe("o parser lê o anexo de cada tipo", () => {
+describe("o parser lê os tipos REAIS com as chaves reais", () => {
   it.each([
     ["imagem", "image", "image"],
-    ["video", "video", "video"],
     ["audio", "audio", "audio"],
-    ["arquivo", "file", "document"],
     ["mencaoEmStory", "story_mention", null],
-    ["compartilhamento", "share", null],
+    ["post", "ig_post", null],
     ["reel", "ig_reel", null],
-  ] as const)("%s → tipo na Meta %s, tipo da linha %s", (nome, tipoNaMeta, tipoDaMensagem) => {
-    const [a] = lerAnexos([PAYLOADS[nome]]);
-    expect(a).toEqual({ tipoNaMeta, url: PAYLOADS[nome].payload.url, tipoDaMensagem });
+  ] as const)("%s → arquivo do CDN (tipo na Meta %s, tipo da linha %s)", (nome, tipoNaMeta, tipoDaMensagem) => {
+    const lidos = lerAnexos([PAYLOADS[nome]]);
+    expect(lidos.midias).toEqual([{ tipoNaMeta, url: PAYLOADS[nome].payload.url, tipoDaMensagem }]);
+    expect(lidos.links).toEqual([]);
   });
 
-  it("anexo sem url, url http ou lixo é descartado (a tela mostra o aviso de anexo)", () => {
+  it("ig_story: o arquivo vem em `story_media_url`, não em `url`", () => {
+    expect(lerAnexos([PAYLOADS.story]).midias).toEqual([
+      { tipoNaMeta: "ig_story", url: CDN("800"), tipoDaMensagem: null },
+    ]);
+  });
+
+  it("permalink de www.instagram.com é LINK (página), nunca arquivo a baixar", () => {
+    const lidos = lerAnexos([PAYLOADS.postPermalink]);
+    expect(lidos.midias).toEqual([]);
+    expect(lidos.links).toEqual([{ tipoNaMeta: "ig_post", url: PERMALINK("601"), titulo: "legenda do post" }]);
+  });
+
+  it("template/generic não é mídia; ephemeral é marcado e NÃO é baixado", () => {
+    expect(lerAnexos([PAYLOADS.template])).toEqual({ midias: [], links: [], temporaria: false });
+    expect(lerAnexos([PAYLOADS.temporaria])).toEqual({ midias: [], links: [], temporaria: true });
+  });
+
+  it("anexo sem url, url http ou lixo é descartado", () => {
     expect(
       lerAnexos([
         { type: "image" },
         { type: "image", payload: { url: "http://lookaside.fbsbx.com/x" } },
         { type: "image", payload: { url: "nao-e-url" } },
         "lixo",
-      ]),
+      ]).midias,
     ).toEqual([]);
   });
 
@@ -91,7 +117,7 @@ describe("o parser lê o anexo de cada tipo", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.mensagem.entrada).toBe("story");
-    expect(r.mensagem.anexos).toHaveLength(1);
+    expect(r.mensagem.anexos.midias).toHaveLength(1);
   });
 });
 
@@ -140,37 +166,67 @@ async function ingerir(corpo: unknown, admin: never, org = "org-b") {
   } as never);
 }
 
-describe("o ingest grava o anexo e pede a persistência", () => {
-  it("imagem + vídeo: duas linhas com media_url, na org da sessão, e dois pedidos ao worker", async () => {
+describe("o ingest: UMA linha inbound por mensagem do cliente", () => {
+  it("3 anexos: UMA linha (o 1º em media_url), os outros 2 no metadata, UM pedido ao worker", async () => {
     const { inserts, eventos, admin } = fazerAdmin();
-    const r = await ingerir(envelope([PAYLOADS.imagem, PAYLOADS.video], { text: "olha" }), admin);
+    const r = await ingerir(envelope([PAYLOADS.imagem, PAYLOADS.reel, PAYLOADS.story], { text: "olha" }), admin);
     expect(r.ok).toBe(true);
-    expect(inserts.map((l) => [l.type, l.media_url, l.external_id, l.body])).toEqual([
-      ["image", CDN("100"), "aWdfZAFICTICIO", "olha"],
-      ["video", CDN("200"), "aWdfZAFICTICIO:anexo:1", null],
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]).toMatchObject({
+      type: "image",
+      media_url: CDN("100"),
+      external_id: "aWdfZAFICTICIO",
+      body: "olha",
+      direction: "inbound",
+      organization_id: "org-b",
+      conversation_id: "conversa-b",
+    });
+    expect((inserts[0]!.metadata as Record<string, unknown>).instagram_anexos_extras).toEqual([
+      { tipo: "ig_reel", url: CDN("700") },
+      { tipo: "ig_story", url: CDN("800") },
     ]);
-    expect(inserts.every((l) => l.organization_id === "org-b" && l.conversation_id === "conversa-b")).toBe(true);
     expect(eventos.map((e) => [e.p_event_type, e.p_entity_id, e.p_organization_id])).toEqual([
       ["media.persist_requested", "msg-0", "org-b"],
-      ["media.persist_requested", "msg-1", "org-b"],
     ]);
   });
 
-  it("menção em story: nasce 'image' com tipo_pelo_mime, e o worker corrige pelo mime", async () => {
+  it("ig_story sozinho: nasce 'image' com tipo_pelo_mime, e o worker corrige pelo mime", async () => {
     const { inserts, admin } = fazerAdmin();
-    await ingerir(envelope([PAYLOADS.mencaoEmStory]), admin);
+    await ingerir(envelope([PAYLOADS.story]), admin);
     expect(inserts[0]!.type).toBe("image");
-    expect(inserts[0]!.metadata).toMatchObject({ instagram_anexo_tipo: "story_mention", tipo_pelo_mime: true });
+    expect(inserts[0]!.media_url).toBe(CDN("800"));
+    expect(inserts[0]!.metadata).toMatchObject({ instagram_anexo_tipo: "ig_story", tipo_pelo_mime: true });
     expect(tipoPeloMime("video/mp4")).toBe("video");
     expect(tipoPeloMime("image/jpeg")).toBe("image");
     expect(tipoPeloMime("audio/mp4")).toBe("audio");
     expect(tipoPeloMime("application/pdf")).toBe("document");
   });
 
+  it("post só com permalink: linha 'text' com o link, SEM pedido ao worker e sem 'tem anexo'", async () => {
+    const { inserts, eventos, admin } = fazerAdmin();
+    await ingerir(envelope([PAYLOADS.postPermalink]), admin);
+    expect(inserts[0]).toMatchObject({ type: "text" });
+    expect(inserts[0]!.media_url).toBeUndefined();
+    const meta = inserts[0]!.metadata as Record<string, unknown>;
+    expect(meta.instagram_links).toEqual([{ tipoNaMeta: "ig_post", url: PERMALINK("601"), titulo: "legenda do post" }]);
+    expect(meta.instagram_tem_anexo).toBeUndefined();
+    expect(eventos).toEqual([]);
+  });
+
+  it("template: nada de mídia nem pedido; ephemeral: marcado temporário, sem download", async () => {
+    const a = fazerAdmin();
+    await ingerir(envelope([PAYLOADS.template], { text: "oi" }), a.admin);
+    expect(a.eventos).toEqual([]);
+    expect(a.inserts[0]!.metadata).not.toHaveProperty("instagram_tem_anexo");
+    const b = fazerAdmin();
+    await ingerir(envelope([PAYLOADS.temporaria]), b.admin);
+    expect(b.eventos).toEqual([]);
+    expect(b.inserts[0]!.metadata).toMatchObject({ instagram_tem_anexo: true, instagram_anexo_temporario: true });
+  });
+
   it("CONTROLE: Direct só de texto continua uma linha 'text', sem pedido ao worker", async () => {
     const { inserts, eventos, admin } = fazerAdmin();
-    const corpo = envelope([], { text: "oi" });
-    await ingerir(corpo, admin);
+    await ingerir(envelope([], { text: "oi" }), admin);
     expect(inserts.map((l) => l.type)).toEqual(["text"]);
     expect(eventos).toEqual([]);
   });
