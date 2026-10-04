@@ -24247,15 +24247,17 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 create or replace function public.fn_update_last_activity_at()
   returns trigger
   language plpgsql
-  -- SECURITY DEFINER desde a 9031 (P2-1 do Cassio na #69): como invoker, o
-  -- UPDATE abaixo passava pela RLS de quem inseriu a atividade, e para um
-  -- viewer (ou agent que não enxerga o negócio) o relógio não andava, em
-  -- silêncio. O escopo é o mínimo: só last_activity_at, só da linha
-  -- referenciada E da mesma organização da atividade.
   security definer
   set search_path to 'public', 'pg_temp'
 as $function$
 begin
+  -- SECURITY DEFINER desde a 9031 (P2-1 do Cassio na #69): como invoker, o
+  -- UPDATE abaixo passava pela RLS de quem inseriu a atividade, e para um
+  -- viewer (ou agent que não enxerga o negócio) o relógio não andava, em
+  -- silêncio. O escopo é o mínimo: só last_activity_at, só da linha
+  -- referenciada E da mesma organização da atividade. E nunca no futuro (9032,
+  -- P2-2 do Cassio na #70): performed_at vem de quem registra, e um carimbo
+  -- adiante deixaria o negócio "em dia" até lá.
   -- LISTA POSITIVA: só isto conta como "alguém tocou este negócio". Tipo que
   -- não está aqui NÃO quebra o silêncio — inclusive tipo que ainda não existe.
   -- Ver o cabeçalho da 0079 antes de acrescentar linha nesta lista.
@@ -24279,13 +24281,13 @@ begin
   end if;
 
   update public.crm_leads
-     set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
+     set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), least(new.performed_at, now()))
    where id = new.lead_id
      and organization_id = new.organization_id;
 
   if new.contact_id is not null then
     update public.contacts
-       set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
+       set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), least(new.performed_at, now()))
      where id = new.contact_id
        and organization_id = new.organization_id;
   end if;
@@ -36771,7 +36773,7 @@ begin
       add constraint campaign_recipients_channel_org_fk
       foreign key (organization_id, channel_session_id)
       references public.channel_sessions (organization_id, id)
-      on delete set null;
+      on delete set null (channel_session_id);
   end if;
 end $$;
 
@@ -36882,21 +36884,21 @@ begin
       add constraint campaigns_pipeline_org_fk
       foreign key (organization_id, pipeline_id)
       references public.crm_pipelines (organization_id, id)
-      on delete set null;
+      on delete set null (pipeline_id);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'campaigns_stage_org_fk') then
     alter table public.campaigns
       add constraint campaigns_stage_org_fk
       foreign key (organization_id, stage_id)
       references public.crm_stages (organization_id, id)
-      on delete set null;
+      on delete set null (stage_id);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'campaigns_agent_org_fk') then
     alter table public.campaigns
       add constraint campaigns_agent_org_fk
       foreign key (organization_id, agent_id)
       references public.ai_agents (organization_id, id)
-      on delete set null;
+      on delete set null (agent_id);
   end if;
 end $$;
 
@@ -47065,15 +47067,17 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  -- A ÚNICA troca aceita é para NULL vinda de dentro de outro gatilho, que é
-  -- como o Postgres executa um FK `on delete set null` (9031): apagar a
-  -- organização zera `api_audit_log.organization_id`; apagar canal, funil,
-  -- etapa ou agente zera `organization_id` de `campaigns`/`campaign_recipients`
-  -- (FK composto sem lista de colunas). Isso não move a linha para outra
-  -- organização. UPDATE direto, de qualquer papel, para NULL ou para outra org,
-  -- continua recusado.
+  -- A ÚNICA troca aceita é para NULL, vinda de dentro de outro gatilho (é como
+  -- o Postgres executa um FK `on delete set null`), e SÓ em `api_audit_log`:
+  -- apagar a organização zera a coluna da trilha (9031). Lista explícita desde a
+  -- 9032 (P2-1 do Cassio na #70): em `skill_versions`/`skill_pointers`, por
+  -- exemplo, organização NULL é o catálogo GLOBAL, e uma cascata qualquer não
+  -- pode transformar dado de uma organização em dado de todas. UPDATE direto, de
+  -- qualquer papel, para NULL ou para outra org, continua recusado.
   if new.organization_id is distinct from old.organization_id
-     and not (new.organization_id is null and pg_trigger_depth() > 1) then
+     and not (new.organization_id is null
+              and pg_trigger_depth() > 1
+              and tg_table_name in ('api_audit_log')) then
     raise exception 'a linha de % não muda de organização', tg_table_name
       using errcode = '42501',
             hint = 'Mover dado entre organizações não é uma operação do produto. Crie a linha na organização de destino.';
@@ -47084,33 +47088,9 @@ $$;
 
 revoke all on function public.fn_organizacao_da_linha_nao_muda() from public, anon, authenticated;
 
-do $$
-declare
-  t text;
-begin
-  foreach t in array array[
-    'agent_inbox_items', 'ai_agent_runs', 'ai_invocations', 'ai_router_decisions',
-    'before_send_traces', 'channel_knobs', 'channel_session_health', 'channel_session_warmup',
-    'contact_field_proposals', 'contacts', 'crm_lead_reactivations', 'crm_lead_risk_states',
-    'crm_lead_scores', 'cron_jobs', 'demanda_conversas', 'demandas',
-    'disclosure_template_pointers', 'disclosure_template_versions', 'flywheel_distiller_proposals',
-    'flywheel_judge_verdicts', 'idempotency_keys', 'job_queue', 'judge_alignment_pool',
-    'knowledge_searches', 'lead_checkpoints', 'lead_notes', 'lead_state', 'lead_state_transitions',
-    'llm_calls', 'meta_templates', 'metrics', 'nuvemshop_products', 'orders',
-    'org_memory_entries', 'org_memory_pointers', 'org_memory_versions', 'outbound_copies',
-    'pacing_ledger', 'phone_numbers', 'playbook_pointers', 'playbook_versions',
-    'promise_table_pointers', 'promise_table_versions', 'reentry_knob_pointers',
-    'reentry_knob_versions', 'reentry_template_pointers', 'reentry_template_versions',
-    'send_ledger', 'skill_activations', 'skill_pointers', 'skill_versions',
-    'storage_redaction_queue'
-  ] loop
-    if to_regclass('public.' || t) is not null then
-      execute format(
-        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
-        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t);
-    end if;
-  end loop;
-end $$;
+-- O laço que punha trg_organizacao_nao_muda nas 52 tabelas da 9030 saiu daqui
+-- na 9032: o do FIM do arquivo (9031) cobre todas as tabelas com
+-- organization_id, pula as que já têm a trigger e solta o lock tabela a tabela.
 
 do $rls9030$ begin
   drop policy if exists "tenant_isolation_contacts_all" on public.contacts;
@@ -49005,6 +48985,41 @@ grant all on table public.modulos_liberados_por_empresa to service_role;
 
 notify pgrst, 'reload schema';
 
+-- ---- campanha: apagar canal, funil, etapa ou agente zera SÓ a referência (migration 9032) ----
+--
+-- Os FKs compostos (organization_id, x) de campaigns e campaign_recipients eram
+-- `on delete set null` SEM lista de colunas: apagar a linha referenciada zerava
+-- também organization_id, que é NOT NULL, e o DELETE do canal/funil/etapa/agente
+-- usado por uma campanha falhava com 23502. Com `set null (x)` só a referência
+-- zera e a campanha continua na organização dela. Os blocos de origem (acima)
+-- já criam com a lista; aqui o banco que tem a versão antiga é corrigido, uma
+-- vez só (a condição é `confdelsetcols is null`; reaplicar não toca em nada).
+do $$
+declare
+  fk record;
+begin
+  for fk in
+    select * from (values
+      ('campaign_recipients', 'campaign_recipients_channel_org_fk', 'channel_session_id', 'channel_sessions'),
+      ('campaigns', 'campaigns_pipeline_org_fk', 'pipeline_id', 'crm_pipelines'),
+      ('campaigns', 'campaigns_stage_org_fk', 'stage_id', 'crm_stages'),
+      ('campaigns', 'campaigns_agent_org_fk', 'agent_id', 'ai_agents')
+    ) v(tabela, nome, coluna, alvo)
+  loop
+    if exists (
+      select 1 from pg_constraint
+       where conname = fk.nome
+         and conrelid = format('public.%I', fk.tabela)::regclass
+         and confdelsetcols is null
+    ) then
+      execute format(
+        'alter table public.%I drop constraint %I, add constraint %I foreign key (organization_id, %I) '
+        'references public.%I (organization_id, id) on delete set null (%I)',
+        fk.tabela, fk.nome, fk.nome, fk.coluna, fk.alvo, fk.coluna);
+    end if;
+  end loop;
+end $$;
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
@@ -49014,9 +49029,21 @@ notify pgrst, 'reload schema';
 -- laço tem de ver também as tabelas que os blocos acima (módulos reaplicados,
 -- apêndice) criaram. Idempotente (create or replace trigger).
 -- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+-- 9032 (P2-3 do Cassio na #70): o laço PULA a tabela que já tem a trigger
+-- certa (mesmo nome, mesma função, BEFORE UPDATE OF organization_id FOR EACH
+-- ROW). Reaplicar o baseline sobre um banco que já tem as triggers não toma
+-- lock nenhum dessas tabelas. Na PRIMEIRA aplicação, cada CREATE TRIGGER (que
+-- pega SHARE ROW EXCLUSIVE) é seguido de COMMIT: o lock da tabela sai antes da
+-- próxima, em vez de 169 locks acumulados até o fim do bloco. O COMMIT dentro
+-- do DO funciona porque o baseline roda em autocommit (psql -f, sem -1). Tabela
+-- em disputa (lock_timeout) fica para depois, e no fim o bloco levanta 55P03:
+-- reaplicar_baseline trata isso como disputa e roda de novo, e a próxima
+-- passada só cria as que faltam. Nenhuma janela inconsistente: cada tabela ou
+-- já está protegida ou segue como antes da trava.
 do $$
 declare
-  t text;
+  t record;
+  em_disputa text[] := '{}';
 begin
   for t in
     select c.relname
@@ -49025,10 +49052,29 @@ begin
         on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
      where c.relnamespace = 'public'::regnamespace
        and c.relkind in ('r', 'p')
+       and not exists (
+         select 1 from pg_trigger g
+          where g.tgrelid = c.oid
+            and g.tgname = 'trg_organizacao_nao_muda'
+            and not g.tgisinternal
+            and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
+            and g.tgtype = 19                       -- ROW | BEFORE | UPDATE
+            and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
+       )
      order by c.relname
   loop
-    execute format(
-      'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
-      'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t);
+    begin
+      execute format(
+        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
+        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t.relname);
+    exception when lock_not_available then
+      em_disputa := em_disputa || t.relname::text;
+    end;
+    commit;
   end loop;
+  if cardinality(em_disputa) > 0 then
+    raise exception 'trg_organizacao_nao_muda: % tabela(s) em disputa de lock, ficam para a próxima passada: %',
+      cardinality(em_disputa), em_disputa
+      using errcode = '55P03';
+  end if;
 end $$;
