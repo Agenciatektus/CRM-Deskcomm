@@ -124,10 +124,18 @@ const TABELA_CRIADA_POR_ULTIMO = `
      -- seguem medidas pelo catálogo acima (as três travas presentes); só não
      -- servem de cobaia aqui. (Achado com a 0448, a primeira tabela assim a ser
      -- a última criada.)
+     --
+     -- O caminho também serve quando a policy aceita platform admin: o ator da
+     -- semente É platform admin (fn_start_support exige), então
+     -- "... or fn_is_platform_admin()" passa para ele e a recusa continua sendo
+     -- só da trava. (Achado com a 9030: contacts, a cobaia de sempre, passou a
+     -- exigir papel agent OU platform admin na escrita.)
      and exists (select 1 from pg_policy p
                   where p.polrelid = alvo.oid and p.polpermissive and p.polcmd in ('a', '*')
-                    and coalesce(pg_get_expr(p.polwithcheck, p.polrelid), pg_get_expr(p.polqual, p.polrelid), '')
-                        not like '%fn_role_at_least(%')
+                    and (coalesce(pg_get_expr(p.polwithcheck, p.polrelid), pg_get_expr(p.polqual, p.polrelid), '')
+                           not like '%fn_role_at_least(%'
+                         or coalesce(pg_get_expr(p.polwithcheck, p.polrelid), pg_get_expr(p.polqual, p.polrelid), '')
+                           like '%fn_is_platform_admin()%'))
    order by alvo.oid desc
    limit 1;`;
 
