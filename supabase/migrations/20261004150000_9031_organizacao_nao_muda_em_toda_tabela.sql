@@ -46,11 +46,47 @@
 -- para os tipos da lista positiva da 0079. `fn_validate_activity_lead_org` já
 -- garante que a atividade e o negócio são da mesma organização.
 --
+-- ## FK `on delete set null` (achado na CI desta PR)
+--
+-- Com a trigger em toda tabela, apagar uma organização quebrava: o FK de
+-- `api_audit_log.organization_id` é `on delete set null`, e o Postgres executa
+-- essa ação como um UPDATE vindo de outro gatilho. O mesmo vale para
+-- `campaigns` e `campaign_recipients` (FK composto (organization_id, x) com
+-- `set null` SEM lista de colunas: apagar canal, funil, etapa ou agente zera a
+-- organização da linha, comportamento que já existia). A função passa a aceitar
+-- só a troca para NULL feita de dentro de outro gatilho (`pg_trigger_depth() >
+-- 1`); UPDATE direto continua recusado.
+--
 -- Rollback: reverter o PR; no banco, recriar a função sem `security definer` e
 -- sem o filtro de organização (corpo da 0235) e `drop trigger
 -- trg_organizacao_nao_muda` nas tabelas que não estão na lista da 9030.
 
 set local lock_timeout = '3s';
+
+create or replace function public.fn_organizacao_da_linha_nao_muda()
+returns trigger
+language plpgsql
+set search_path = public
+as $
+begin
+  -- A ÚNICA troca aceita é para NULL vinda de dentro de outro gatilho, que é
+  -- como o Postgres executa um FK `on delete set null` (9031): apagar a
+  -- organização zera `api_audit_log.organization_id`; apagar canal, funil,
+  -- etapa ou agente zera `organization_id` de `campaigns`/`campaign_recipients`
+  -- (FK composto sem lista de colunas). Isso não move a linha para outra
+  -- organização. UPDATE direto, de qualquer papel, para NULL ou para outra org,
+  -- continua recusado.
+  if new.organization_id is distinct from old.organization_id
+     and not (new.organization_id is null and pg_trigger_depth() > 1) then
+    raise exception 'a linha de % não muda de organização', tg_table_name
+      using errcode = '42501',
+            hint = 'Mover dado entre organizações não é uma operação do produto. Crie a linha na organização de destino.';
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function public.fn_organizacao_da_linha_nao_muda() from public, anon, authenticated;
 
 do $$
 declare

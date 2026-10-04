@@ -47065,7 +47065,15 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  if new.organization_id is distinct from old.organization_id then
+  -- A ÚNICA troca aceita é para NULL vinda de dentro de outro gatilho, que é
+  -- como o Postgres executa um FK `on delete set null` (9031): apagar a
+  -- organização zera `api_audit_log.organization_id`; apagar canal, funil,
+  -- etapa ou agente zera `organization_id` de `campaigns`/`campaign_recipients`
+  -- (FK composto sem lista de colunas). Isso não move a linha para outra
+  -- organização. UPDATE direto, de qualquer papel, para NULL ou para outra org,
+  -- continua recusado.
+  if new.organization_id is distinct from old.organization_id
+     and not (new.organization_id is null and pg_trigger_depth() > 1) then
     raise exception 'a linha de % não muda de organização', tg_table_name
       using errcode = '42501',
             hint = 'Mover dado entre organizações não é uma operação do produto. Crie a linha na organização de destino.';

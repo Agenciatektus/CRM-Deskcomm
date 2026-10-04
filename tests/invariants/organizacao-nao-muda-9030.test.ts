@@ -174,6 +174,30 @@ describe("9030: contato só é escrito por agent+", () => {
   });
 });
 
+describe("9031: FK on delete set null continua funcionando", () => {
+  it("apagar a organização zera api_audit_log.organization_id (o FK roda dentro de outro gatilho)", () => {
+    const out = sql(`${seed}
+insert into public.api_audit_log(organization_id, action) values ('${ORG_B}', 'o9031.teste');
+delete from public.organizations where id = '${ORG_B}';
+select 'nulos=' || count(*) from public.api_audit_log where action = 'o9031.teste' and organization_id is null;
+rollback;`);
+    expect(out).toContain("nulos=1");
+  });
+
+  it("UPDATE direto para NULL continua recusado, até como service_role", () => {
+    expect(
+      tenta(
+        "reset role; set local role service_role;",
+        `update public.contacts set organization_id = null where id = '${CT}';`,
+      ),
+    ).not.toMatch(/^n=/);
+    const audit = `insert into public.api_audit_log(organization_id, action) values ('${ORG_A}', 'o9031.direto');`;
+    expect(
+      tenta(`${audit}\nreset role; set local role service_role;`, `update public.api_audit_log set organization_id = null where action = 'o9031.direto';`),
+    ).toBe("42501");
+  });
+});
+
 describe("9031: a atividade do negócio move o relógio de quem a registrou", () => {
   const ATIVIDADE = `insert into public.crm_lead_activities(organization_id,lead_id,source_module,type,actor_kind)
     values ('${ORG_A}','${LEAD}','crm','note','user');`;
