@@ -193,4 +193,7 @@ describe("painel do inbox — o botão diz o que faz (issue #908)", () => {
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: { support: null } }),
   useActiveOrg: () => ({ currency: "BRL", country: null }),
+  // O painel ganhou o seletor de etapa (#28), que pergunta a permissão de mover
+  // o card. Não é o que este arquivo mede: sem permissão ele fica só leitura.
+  usePermission: () => false,
 }));
