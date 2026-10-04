@@ -49020,6 +49020,93 @@ begin
   end loop;
 end $$;
 
+-- ---- a imagem ganha MINIATURA, e ela sai junto com a original (migration 9033) ----
+--
+-- `messages.media_thumb_path` (webp, lado maior 512 px, em
+-- {org}/miniaturas/{conversa}/{mensagem}.webp), o CHECK de que o caminho fica na
+-- pasta da organização da linha, e as triggers que põem a miniatura na fila de
+-- remoção quando a original sai (UPDATE de media_storage_path: LGPD e poda;
+-- DELETE da linha). Ver o cabeçalho da migration. Idempotente: coluna e CHECK
+-- com guarda, função `create or replace`, trigger só se faltar.
+-- Prova: tests/invariants/miniatura-sai-com-a-original.test.ts.
+alter table public.messages add column if not exists media_thumb_path text;
+
+comment on column public.messages.media_thumb_path is
+  'Miniatura webp (lado maior 512 px) da imagem, no bucket whatsapp-media, em {org}/miniaturas/{conversa}/{mensagem}.webp. Null = sem miniatura: a tela usa a original. Sai junto com a original (trg_miniatura_sai_com_a_original_*). Migration 9033.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'messages_media_thumb_path_da_org'
+       and conrelid = 'public.messages'::regclass
+  ) then
+    alter table public.messages
+      add constraint messages_media_thumb_path_da_org
+      check (media_thumb_path is null or media_thumb_path like organization_id::text || '/%')
+      not valid;
+  end if;
+end $$;
+
+create or replace function public.fn_miniatura_sai_com_a_original()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Organização sendo apagada: a fila não aceita linha dela (FK), e o arquivo
+  -- da organização apagada não é varrido por ninguém — igual à original.
+  if exists (select 1 from public.organizations o where o.id = old.organization_id) then
+    insert into public.storage_redaction_queue (organization_id, bucket, object_path)
+    values (old.organization_id, 'whatsapp-media', old.media_thumb_path)
+    on conflict (bucket, object_path) do update
+      set status = 'pending',
+          attempts = 0,
+          enqueued_at = now(),
+          processed_at = null,
+          error_message = null
+      -- Linha em curso (a da LGPD, com o request_id do pedido) fica como está.
+      where storage_redaction_queue.status in ('deleted', 'skipped');
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  new.media_thumb_path := null;
+  return new;
+end;
+$$;
+
+revoke all on function public.fn_miniatura_sai_com_a_original() from public, anon, authenticated;
+
+-- Só cria a trigger que falta: reaplicar o baseline não toma lock de
+-- `messages` (a lição da 9032 com `create or replace trigger`).
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_miniatura_sai_com_a_original_upd'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_miniatura_sai_com_a_original_upd
+      before update of media_storage_path on public.messages
+      for each row
+      when (old.media_thumb_path is not null
+            and new.media_storage_path is distinct from old.media_storage_path)
+      execute function public.fn_miniatura_sai_com_a_original();
+  end if;
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_miniatura_sai_com_a_original_del'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_miniatura_sai_com_a_original_del
+      before delete on public.messages
+      for each row
+      when (old.media_thumb_path is not null)
+      execute function public.fn_miniatura_sai_com_a_original();
+  end if;
+end $$;
+
+notify pgrst, 'reload schema';
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
