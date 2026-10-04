@@ -351,9 +351,12 @@ describe("9028: antes = depois, por papel e tabela", () => {
     expect(v.get("mix:crm_pipelines:upd")).toBe("n=2");
     expect(v.get("mix:crm_pipelines:ins_a")).toBe("42501");
     expect(v.get("mix:crm_pipelines:ins_b")).toBe("n=1");
-    // mudar a linha de organização: o admin de A não leva o canal para B (WITH CHECK)
+    // mudar a linha de organização: o admin de A não leva o canal para B (WITH
+    // CHECK), e desde a 9031 nem o platform admin leva (trg_organizacao_nao_muda
+    // em toda tabela com organization_id; antes da 9031 era n=2)
     expect(v.get("adm_a:channel_sessions:upd_move")).toBe("42501");
-    expect(v.get("pa:channel_sessions:upd_move")).toBe("n=2");
+    expect(v.get("pa:channel_sessions:upd_move")).toBe("42501");
+    expect(v.get("pa:crm_pipelines:upd_move")).toBe("42501");
     // sem vínculo e sem JWT: nada
     expect(v.get("out:contacts:sel")).toBe("0");
     expect(v.get("sem_jwt:messages:sel")).toBe("0");
