@@ -3,13 +3,37 @@
  * as duas coisas que importam: achar o perfil certo, e NUNCA alcançar a rede
  * interna, nem por redirect.
  */
+import type * as DnsPromises from "node:dns/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/automation/outbound-ip", () => ({
-  assertDestinoResolvidoSeguro: vi.fn(async (host: string) => {
-    if (host === "interno.exemplo" || host === "169.254.169.254") throw new Error("unsafe_url:private_ip");
-  }),
+// O DNS é o único dublê: o julgamento do IP (`ipEhEspecial`) é o de verdade.
+const { DNS } = vi.hoisted(() => ({
+  DNS: {
+    "padaria.exemplo": ["93.184.216.34"],
+    "interno.exemplo": ["172.18.0.5"], // como `crm-supabase-db` na rede do compose
+    "lento.exemplo": "pendura",
+  } as Record<string, string[] | "pendura">,
 }));
+vi.mock("node:dns/promises", async (importOriginal) => {
+  const real = await importOriginal<typeof DnsPromises>();
+  class Resolver {
+    private cancelado: Array<() => void> = [];
+    cancel() {
+      this.cancelado.forEach((f) => f());
+    }
+    async resolve4(host: string) {
+      const r = DNS[host];
+      if (r === "pendura")
+        return new Promise<string[]>((_, rej) => this.cancelado.push(() => rej(new Error("ECANCELLED"))));
+      if (!r) throw new Error("ENOTFOUND");
+      return r;
+    }
+    async resolve6() {
+      return [];
+    }
+  }
+  return { ...real, default: { ...real, Resolver }, Resolver };
+});
 
 import {
   completarRedesPeloSite,
@@ -40,6 +64,11 @@ describe("o que o regex reconhece", () => {
       facebook: "https://facebook.com/padariadobairro",
       linkedin: "https://br.linkedin.com/company/padaria-do-bairro",
     });
+  });
+
+  it("handle gigante é descartado: não derruba o painel do Inbox (max 500)", () => {
+    const html = `<a href="https://instagram.com/${"a".repeat(600)}">x</a><a href="https://instagram.com/certo">y</a>`;
+    expect(redesDoHtml(html).instagram).toBe("https://instagram.com/certo");
   });
 
   it("só procura a rede que o Apify não trouxe", () => {
@@ -117,6 +146,18 @@ describe("SSRF: a rede interna nunca é alcançada", () => {
       .mockResolvedValueOnce(new Response(HTML, { status: 200, headers: { "content-type": "text/html" } }));
     expect(await lerPaginaPublica("https://padaria.exemplo/")).toContain("padariadobairro");
     expect(fetchMock.mock.calls[1]?.[0]).toBe("https://padaria.exemplo/inicio");
+  });
+
+  it("DNS que nunca responde não segura o site além do prazo", async () => {
+    const t0 = Date.now();
+    expect(await lerPaginaPublica("https://lento.exemplo/", { timeoutMs: 300, maxBytes: 100, maxSaltos: 3 })).toBe("");
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("nome que o DNS não conhece é recusado (falha fechada)", async () => {
+    expect(await lerPaginaPublica("https://nao-existe.exemplo/")).toBe("");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("corta o corpo no teto de bytes e ignora o que não é HTML", async () => {

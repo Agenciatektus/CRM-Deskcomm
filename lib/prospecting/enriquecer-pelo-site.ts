@@ -11,14 +11,30 @@
  * privada, HTTPS em produção) e a do DNS (`assertDestinoResolvidoSeguro`: o IP
  * de verdade). Redirect é seguido À MÃO, até 3 saltos, revalidando cada um:
  * `redirect: "follow"` levaria um site público para `http://169.254.169.254`
- * sem passar pela guarda. A janela residual de DNS-rebinding é a declarada em
- * `outbound-ip.ts`.
+ * sem passar pela guarda.
+ *
+ * O DNS é resolvido AQUI, por c-ares (`dns/promises.Resolver`, 2 s, uma
+ * tentativa, cancelado pelo prazo do site), e não pelo `lookup` da guarda da
+ * automação: `lookup` usa o threadpool do libuv (4 threads, compartilhado com
+ * todo `fetch`, `fs` e crypto do Next), e um site com DNS que não responde
+ * prenderia uma thread por ~10 s. O julgamento do IP continua sendo o mesmo
+ * (`ipEhEspecial`). P1-A do @Cassio_SecRev na #78.
+ *
+ * A janela de DNS-rebinding entre esta resolução e a do `fetch` existe; o que a
+ * neutraliza é o HTTPS com certificado válido (serviço interno não fala TLS com
+ * o nome do atacante). Isso DEPENDE de `NODE_ENV=production` no processo que
+ * roda isto (o Dockerfile do app fixa; o `Dockerfile.worker` NÃO): mover o cron
+ * da prospecção para o worker sem fixar o ambiente reabre o http.
  *
  * Nunca lança e nunca segura a busca: site que falha, demora ou recusa fica
  * sem enriquecer. Roda FORA da transação que grava os candidatos.
  */
-import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
+import { Resolver } from "node:dns/promises";
+import { isIP } from "node:net";
+
+import { ipEhEspecial } from "@/lib/automation/outbound-ip";
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
+import { logger } from "@/lib/logger";
 import type { Prospect } from "./schema";
 
 const REDES = {
@@ -37,6 +53,13 @@ const NAO_E_PERFIL = new Set([
 ]);
 
 const TETO_DE_REDES = 15; // o mesmo de `prospectEnrichmentSchema.socials`
+/**
+ * Nenhuma das três redes aceita handle perto disto. Sem teto, um site hostil
+ * grava uma URL de 600 caracteres, o `prospectEnrichmentSchema` (max 500)
+ * recusa a linha inteira e o Inbox perde o painel de enriquecimento do lead.
+ * P1-B do @Cassio_SecRev na #78.
+ */
+const TETO_DO_HANDLE = 100;
 
 export interface LimitesDoSite {
   timeoutMs: number;
@@ -63,9 +86,9 @@ export function redesDoHtml(html: string): Partial<Record<Rede, string>> {
     const global = new RegExp(REDES[rede].source, "gi");
     for (const m of html.matchAll(global)) {
       const handle = (m[1] ?? "").toLowerCase();
-      if (NAO_E_PERFIL.has(handle)) continue;
+      if (handle.length > TETO_DO_HANDLE || NAO_E_PERFIL.has(handle)) continue;
       if (rede === "facebook" && (/^\d+$/.test(handle) || handle.length < 3)) continue;
-      achadas[rede] = m[0].replace(/["'\\/]+$/, "");
+      achadas[rede] = m[0];
       break;
     }
   }
@@ -85,6 +108,34 @@ export function urlDoSite(website: string | null): string | null {
   }
 }
 
+/**
+ * O IP de verdade do host, julgado pela mesma régua da automação. Lança
+ * `unsafe_url:*` como `assertDestinoResolvidoSeguro`. Falha fechada: sem
+ * resposta do DNS, recusa (inclusive nomes que só existem no /etc/hosts, que o
+ * c-ares não lê, o caso de `host.docker.internal`).
+ */
+export async function julgarHost(hostname: string, prazo: AbortSignal): Promise<void> {
+  if (isIP(hostname)) {
+    if (ipEhEspecial(hostname)) throw new Error("unsafe_url:private_ip");
+    return;
+  }
+  const resolver = new Resolver({ timeout: 2000, tries: 1 });
+  const cancelar = () => resolver.cancel();
+  prazo.addEventListener("abort", cancelar, { once: true });
+  try {
+    const [v4, v6] = await Promise.all([
+      resolver.resolve4(hostname).catch(() => [] as string[]),
+      resolver.resolve6(hostname).catch(() => [] as string[]),
+    ]);
+    if (prazo.aborted) throw new Error("unsafe_url:timeout");
+    const enderecos = [...v4, ...v6];
+    if (enderecos.length === 0) throw new Error("unsafe_url:dns_failed");
+    if (enderecos.some(ipEhEspecial)) throw new Error("unsafe_url:private_ip");
+  } finally {
+    prazo.removeEventListener("abort", cancelar);
+  }
+}
+
 /** GET de uma página pública, revalidando cada salto. "" em qualquer recusa ou falha. */
 export async function lerPaginaPublica(url: string, limites: LimitesDoSite = LIMITES_PADRAO): Promise<string> {
   let atual = url;
@@ -94,7 +145,7 @@ export async function lerPaginaPublica(url: string, limites: LimitesDoSite = LIM
   for (let salto = 0; salto <= limites.maxSaltos; salto++) {
     try {
       assertSafeOutboundUrl(atual);
-      await assertDestinoResolvidoSeguro(new URL(atual).hostname);
+      await julgarHost(new URL(atual).hostname, prazo);
       const resposta = await fetch(atual, {
         method: "GET",
         redirect: "manual",
@@ -114,7 +165,18 @@ export async function lerPaginaPublica(url: string, limites: LimitesDoSite = LIM
         return "";
       }
       return await lerAteOTeto(resposta, limites.maxBytes);
-    } catch {
+    } catch (erro) {
+      // Recusa da GUARDA é sinal de ataque (site do Maps apontando para a rede
+      // interna) e não pode ser indistinguível de "site fora do ar". Hostname de
+      // empresa não é PII. P2-A do @Cassio_SecRev na #78.
+      const motivo = erro instanceof Error ? erro.message : "";
+      if (motivo.startsWith("unsafe_url:") && motivo !== "unsafe_url:dns_failed") {
+        logger.warn("[prospecting.enrich] site recusado pela guarda", {
+          hostname: URL.canParse(atual) ? new URL(atual).hostname : null,
+          motivo,
+          salto,
+        });
+      }
       return "";
     }
   }

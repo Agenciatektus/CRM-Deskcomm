@@ -127,7 +127,7 @@ describe("o worker usa os dois — módulo perfeito e desligado não conserta na
     expect(TETO_DIARIO_POR_NUMERO).toBe(20);
     expect(worker).toMatch(/count\.numero >= TETO_DIARIO_POR_NUMERO/);
     expect(worker, "a contagem precisa filtrar pelo número da campanha").toMatch(
-      /config->>'channel_session_id'=\$3/,
+      /\(k\.config->>'channel_session_id'\)::uuid=\$3::uuid/,
     );
   });
 
