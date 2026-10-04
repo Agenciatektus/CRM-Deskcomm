@@ -4,7 +4,7 @@ import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { toast } from "sonner";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import { idiomaAtual } from "@/lib/i18n/IdiomaProvider";
 
 /**

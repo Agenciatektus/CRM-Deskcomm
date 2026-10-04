@@ -363,10 +363,17 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     );
 
     // ─── CONTROLE POSITIVO ─────────────────────────────────────────────────
-    // O mesmo contato, agora na org A: o join CASA e as flags dele valem. Se
-    // esta asserção também devolvesse `automatico`, a de cima não estaria
-    // provando o join — estaria provando que o contato nunca é lido.
-    sql(`update contacts set organization_id = '${ORG}' where id = '${CT_B}';`);
+    // Um contato com as MESMAS travas, agora na org A, e a conversa apontando
+    // para ele: o join CASA e as flags valem. Se esta asserção também devolvesse
+    // `automatico`, a de cima não estaria provando o join, estaria provando que
+    // o contato nunca é lido. (Antes o MESMO contato era movido de org; desde a
+    // 9030 nenhuma linha troca de organização, então o controle usa um contato
+    // nascido na org certa.)
+    const CT_A = "bbbbbbbb-0000-4000-8000-0000000000c2";
+    sql(`
+      insert into contacts (id, organization_id, force_human, is_blocked)
+        values ('${CT_A}', '${ORG}', true, true);
+      update conversations set contact_id = '${CT_A}' where id = '${CONV}';`);
     const comContatoVisivel = sql(`
       begin;
       select set_config('request.jwt.claims',
@@ -382,11 +389,10 @@ describe("comando da conversa: o banco espelha o TypeScript", () => {
     expect(comContatoVisivel, "o controle não pode repetir o valor degradado").not.toContain(
       "<<automatico>>",
     );
-    sql(`update contacts set organization_id = '${ORG_B}' where id = '${CT_B}';`);
 
     sql(`
       delete from conversations where id = '${CONV}';
-      delete from contacts where id = '${CT_B}';
+      delete from contacts where id in ('${CT_B}', '${CT_A}');
       delete from organizations where id = '${ORG_B}';
       delete from user_organizations where user_id = '${DONO}' and organization_id = '${ORG}';
     `);

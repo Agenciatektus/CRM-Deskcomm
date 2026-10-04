@@ -2,7 +2,7 @@
 
 import { toast } from "sonner";
 import { useT } from "@/hooks/i18n/useT";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import { idiomaAtual } from "@/lib/i18n/IdiomaProvider";
 import { ApiError } from "@/lib/api/types";
 

@@ -165,3 +165,18 @@ if (typeof document !== "undefined") {
     await new Promise((resolver) => setTimeout(resolver, 0));
   });
 }
+
+/**
+ * O dicionário de idiomas já carregado, como no SERVIDOR.
+ *
+ * `lib/i18n/traducao.ts` só carrega o dicionário sozinho onde não há `window`;
+ * no jsdom há, e lá ele esperaria o `import()` sob demanda que o navegador faz.
+ * Os testes de tela medem o texto traduzido, não o download: registrar aqui
+ * deixa cada um no estado "dicionário pronto". O caminho do download é provado
+ * à parte, em `tests/unit/dicionario-sob-demanda.test.tsx`, que o esquece antes.
+ */
+{
+  const { DICIONARIO } = await import("@/lib/i18n/dicionario");
+  const { registrarDicionario } = await import("@/lib/i18n/traducao");
+  registrarDicionario(DICIONARIO);
+}

@@ -297,5 +297,32 @@ rodar
 check "erro que retentativa não cura: uma passada só" e_igual "$(passadas)" 1
 check "  e silêncio — nada do antigo '0 0 1' literal" e_igual "$(cat "$WORK/rodada.txt" 2>/dev/null)" ""
 
+echo "── 11. A trava de organização em disputa de lock (9032) faz nova passada"
+# O bloco do fim do baseline termina com raise 55P03 quando uma tabela ficou de
+# fora por lock. O psql NÃO imprime o SQLSTATE: o que reaplicar_baseline vê é o
+# TEXTO, e só faz nova passada se ele casar com BASELINE_ERROS_DE_DISPUTA. A
+# mensagem é lida do baseline.sql (não copiada), para o teste seguir o arquivo.
+MSG_TRAVA="$(grep -oE "raise exception 'lock timeout: trg_organizacao_nao_muda[^']*'" "$RAIZ/supabase/baseline.sql"   | sed -E "s/^raise exception '//; s/'$//; s/%/2/; s/%/{contacts,messages}/")"
+check "a mensagem da trava existe no baseline e começa com o que a regex reconhece" contem "$MSG_TRAVA" "^lock timeout: trg_organizacao_nao_muda"
+novo_caso trava-de-org-disputa
+roteiro 1 "$BENIGNO
+psql:/b.sql:49090: ERROR:  $MSG_TRAVA
+CONTEXT:  PL/pgSQL function inline_code_block line 41 at RAISE"
+roteiro 2 "$BENIGNO"
+rodar
+check "a mensagem nova dispara a nova passada" e_igual "$(passadas)" 2
+check "  e a rodada fecha" e_igual "$(rc)" 0
+
+# CONTROLE NEGATIVO: a mensagem da primeira versão da 9032 não casava com a regex,
+# e a atualização parava na 1ª passada com "avisos NÃO esperados".
+novo_caso trava-de-org-mensagem-antiga
+roteiro 1 "$BENIGNO
+psql:/b.sql:49090: ERROR:  trg_organizacao_nao_muda: 2 tabela(s) em disputa de lock, ficam para a próxima passada: {contacts,messages}
+CONTEXT:  PL/pgSQL function inline_code_block line 41 at RAISE"
+roteiro 2 "$BENIGNO"
+rodar
+check "CONTROLE: a mensagem antiga NÃO disparava nova passada" e_igual "$(passadas)" 1
+check "  e virava aviso inesperado" contem "$(inesperado)" "em disputa de lock"
+
 if [ "$FAILS" -gt 0 ]; then printf '\n%d falha(s)\n' "$FAILS"; exit 1; fi
 printf '\ntudo verde\n'

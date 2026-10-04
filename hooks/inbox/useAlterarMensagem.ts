@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 /** Recarrega o fio após o canal confirmar, sem fingir sucesso antes da resposta. */
 export function useAlterarMensagem(conversationId: string | null) {
@@ -15,7 +16,7 @@ export function useAlterarMensagem(conversationId: string | null) {
       apiClient.patch(`/api/v1/messages/${id}`, { text }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages", conversationId] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (conversationId) invalidarListasDaConversa(qc, conversationId);
       toast.success(t("Mensagem editada."));
     },
     onError: showApiError,
@@ -24,7 +25,7 @@ export function useAlterarMensagem(conversationId: string | null) {
     mutationFn: (id: string) => apiClient.delete(`/api/v1/messages/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages", conversationId] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (conversationId) invalidarListasDaConversa(qc, conversationId);
       toast.success(t("Mensagem apagada para todos."));
     },
     onError: showApiError,
@@ -33,7 +34,7 @@ export function useAlterarMensagem(conversationId: string | null) {
     mutationFn: (id: string) => apiClient.post(`/api/v1/messages/${id}/hide`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages", conversationId] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (conversationId) invalidarListasDaConversa(qc, conversationId);
       toast.success(t("Mensagem ocultada no CRM."));
     },
     onError: showApiError,
@@ -42,7 +43,7 @@ export function useAlterarMensagem(conversationId: string | null) {
     mutationFn: (id: string) => apiClient.delete(`/api/v1/messages/${id}/hide`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages", conversationId] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (conversationId) invalidarListasDaConversa(qc, conversationId);
       toast.success(t("Mensagem restaurada no CRM."));
     },
     onError: showApiError,

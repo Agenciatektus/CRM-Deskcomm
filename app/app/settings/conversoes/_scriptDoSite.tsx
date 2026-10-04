@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { copyToClipboard } from "@/lib/clipboard";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { EstadoDaCaptura } from "@/lib/plataformas-de-anuncio/landing-config";
 

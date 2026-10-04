@@ -2,6 +2,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface SnoozeArgs {
   conversation_id: string;
@@ -16,7 +17,7 @@ export function useSnoozeConversation() {
   const qc = useQueryClient();
 
   const invalidate = (conversationId: string) => {
-    qc.invalidateQueries({ queryKey: ["conversations"] });
+    invalidarListasDaConversa(qc, conversationId);
     qc.invalidateQueries({ queryKey: ["conversation", conversationId] });
   };
 

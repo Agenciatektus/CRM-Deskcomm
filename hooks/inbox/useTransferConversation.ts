@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { useT } from "@/hooks/i18n/useT";
 import type { Conversation } from "@/lib/types/messaging";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface TransferArgs {
   conversation_id: string;
@@ -24,12 +25,12 @@ export function useTransferConversation() {
         { to_user_id: args.to_user_id, ...(args.reason ? { reason: args.reason } : {}) },
       ),
     onError: (err, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       showApiError(err);
     },
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       toast.success(t("Conversa transferida."));
     },

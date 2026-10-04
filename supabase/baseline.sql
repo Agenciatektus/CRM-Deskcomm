@@ -4194,11 +4194,8 @@ END IF; END $baseline_guard$;
 
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'orgs_write_platform_admin' AND polrelid = '"public"."organizations"'::regclass) THEN
-CREATE POLICY "orgs_write_platform_admin" ON "public"."organizations" USING ("public"."fn_is_platform_admin"()) WITH CHECK ("public"."fn_is_platform_admin"());
-END IF; END $baseline_guard$;
+-- `orgs_write_platform_admin` (for all) deixou de existir na 9028: virou
+-- orgs_insert/update/delete_platform_admin; a definição final mora no bloco da migration 9028, no apêndice.
 
 
 
@@ -4278,11 +4275,9 @@ END IF; END $baseline_guard$;
 
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'tenant_isolation_contacts_all' AND polrelid = '"public"."contacts"'::regclass) THEN
-CREATE POLICY "tenant_isolation_contacts_all" ON "public"."contacts" USING ((("organization_id" IN ( SELECT "public"."fn_user_org_ids"() AS "fn_user_org_ids")) OR "public"."fn_is_platform_admin"())) WITH CHECK ((("organization_id" IN ( SELECT "public"."fn_user_org_ids"() AS "fn_user_org_ids")) OR "public"."fn_is_platform_admin"()));
-END IF; END $baseline_guard$;
+-- `tenant_isolation_contacts_all` (for all) deixou de existir na 9030: virou
+-- contacts_select + insert/update/delete com papel; a definição mora no bloco
+-- da migration 9030, no apêndice.
 
 
 
@@ -4455,8 +4450,8 @@ GRANT ALL ON FUNCTION "public"."fn_update_budget_consumption"() TO "service_role
 
 
 
-GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "anon";
-GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "authenticated";
+-- (fn_update_last_activity_at: os GRANT a anon e authenticated sairam na 9031; a função virou
+-- security definer de gatilho e é revogada no bloco da 0235. Só o service_role fica.)
 GRANT ALL ON FUNCTION "public"."fn_update_last_activity_at"() TO "service_role";
 
 
@@ -5033,26 +5028,9 @@ grant execute on function public.fn_mark_conversation_message(uuid, text, text, 
 -- org-flat, escrita agent+ FOR ALL) fazia cada update.sh reabri-la até a 0035.
 
 drop policy if exists "tenant_isolation_crm_pipelines_all" on public.crm_pipelines;
-drop policy if exists "crm_pipelines_select" on public.crm_pipelines;
-drop policy if exists "crm_pipelines_manager_write" on public.crm_pipelines;
-
-create policy "crm_pipelines_select" on public.crm_pipelines
-  for select using (
-    (organization_id in (select public.fn_user_org_ids()))
-    or public.fn_is_platform_admin()
-  );
-
-create policy "crm_pipelines_manager_write" on public.crm_pipelines
-  using (
-    public.fn_is_platform_admin()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'manager'))
-  )
-  with check (
-    public.fn_is_platform_admin()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'manager'))
-  );
+-- `crm_pipelines_select` e a escrita de crm_pipelines (manager+, por comando
+-- desde a 9028): a definição final mora no bloco da migration 9028, no apêndice. Reinstalar aqui a versão
+-- anterior faria cada update.sh trocar as policies duas vezes.
 
 drop policy if exists "tenant_isolation_crm_stages_all" on public.crm_stages;
 drop policy if exists "crm_stages_select" on public.crm_stages;
@@ -5422,11 +5400,10 @@ revoke execute on function public.fn_can_view_conversation(uuid, uuid) from anon
 grant execute on function public.fn_can_view_conversation(uuid, uuid)
   to authenticated, service_role;
 
-drop policy if exists "conversations_select" on public.conversations;
-create policy "conversations_select" on public.conversations
-  for select using (
-    public.fn_can_view_conversation(organization_id, assigned_to_user_id)
-  );
+-- `conversations_select` NÃO é mais instalada aqui: a definição final é a de
+-- conjunto, no bloco da migration 9027 (mais abaixo). Reinstalar a versão por
+-- linha aqui faria o update.sh trocar a policy duas vezes a cada passada
+-- (tests/unit/baseline-nao-constroi-o-que-derruba.test.ts).
 
 drop policy if exists "conversations_agent_write" on public.conversations;
 drop policy if exists "conversations_agent_insert" on public.conversations;
@@ -5457,19 +5434,11 @@ create policy "conversations_agent_delete" on public.conversations
   );
 
 drop policy if exists "messages_tenant_isolation_all" on public.messages;
-drop policy if exists "messages_select" on public.messages;
 drop policy if exists "messages_insert" on public.messages;
 drop policy if exists "messages_update" on public.messages;
 drop policy if exists "messages_delete" on public.messages;
 
-create policy "messages_select" on public.messages
-  for select using (
-    public.fn_is_platform_admin()
-    or exists (
-      select 1 from public.conversations c
-      where c.id = messages.conversation_id
-    )
-  );
+-- `messages_select` (herda o escopo da conversa): a definição final mora no bloco da migration 9028, no apêndice.
 
 create policy "messages_insert" on public.messages
   for insert with check (
@@ -5607,15 +5576,12 @@ grant execute on function public.fn_can_view_lead(uuid, uuid)
   to authenticated, service_role;
 
 drop policy if exists "tenant_isolation_crm_leads_all" on public.crm_leads;
-drop policy if exists "crm_leads_select" on public.crm_leads;
 drop policy if exists "crm_leads_insert" on public.crm_leads;
 drop policy if exists "crm_leads_update" on public.crm_leads;
 drop policy if exists "crm_leads_delete" on public.crm_leads;
 
-create policy "crm_leads_select" on public.crm_leads
-  for select using (
-    public.fn_can_view_lead(organization_id, owner_user_id)
-  );
+-- `crm_leads_select` NÃO é mais instalada aqui: a definição final é a de
+-- conjunto, no bloco da migration 9027 (mais abaixo).
 
 create policy "crm_leads_insert" on public.crm_leads
   for insert with check (
@@ -6294,13 +6260,10 @@ create policy "crm_lead_links_delete" on public.crm_lead_links
 -- team=org:read a manager). Antes: só admin org-wide, manager caía no self-read
 -- e GET /api/v1/team devolvia 1 linha. Self-read preservado p/ todos; WRITE
 -- inalterado (insert/update/delete = admin). Idempotente e auto-curativo.
-drop policy if exists "user_orgs_select" on public.user_organizations;
-create policy "user_orgs_select" on public.user_organizations
-  for select using (
-    (user_id = auth.uid())
-    or public.fn_role_at_least(organization_id, 'manager')
-    or public.fn_is_platform_admin()
-  );
+-- A definição final de `user_orgs_select` (o mesmo critério: self-read OU
+-- manager+ OU platform admin) mora no bloco da migration 9027, mais abaixo, em
+-- forma de conjunto. Reinstalar aqui a versão por linha faria o update.sh trocar
+-- a policy duas vezes a cada passada.
 
 -- ============================================================================
 -- Dumps do Supabase zeram o search_path (set_config('search_path','',false));
@@ -12491,23 +12454,8 @@ notify pgrst, 'reload schema';
 -- ---- canais ----
 drop policy if exists channel_sessions_tenant_isolation_all on public.channel_sessions;
 
-drop policy if exists channel_sessions_tenant_select on public.channel_sessions;
-create policy channel_sessions_tenant_select on public.channel_sessions
-  for select using (
-    organization_id in (select public.fn_user_org_ids()) or public.fn_is_platform_admin()
-  );
-
-drop policy if exists channel_sessions_tenant_write on public.channel_sessions;
-create policy channel_sessions_tenant_write on public.channel_sessions
-  for all using (
-    (organization_id in (select public.fn_user_org_ids())
-      and public.fn_role_at_least(organization_id, 'admin'))
-    or public.fn_is_platform_admin()
-  ) with check (
-    (organization_id in (select public.fn_user_org_ids())
-      and public.fn_role_at_least(organization_id, 'admin'))
-    or public.fn_is_platform_admin()
-  );
+-- O par de channel_sessions (SELECT só-tenancy + escrita admin+, por comando
+-- desde a 9028): a definição final mora no bloco da migration 9028, no apêndice.
 
 -- ---- agentes de IA ----
 drop policy if exists tenant_isolation_ai_agents_all on public.ai_agents;
@@ -24299,9 +24247,17 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 create or replace function public.fn_update_last_activity_at()
   returns trigger
   language plpgsql
+  security definer
   set search_path to 'public', 'pg_temp'
 as $function$
 begin
+  -- SECURITY DEFINER desde a 9031 (P2-1 do Cassio na #69): como invoker, o
+  -- UPDATE abaixo passava pela RLS de quem inseriu a atividade, e para um
+  -- viewer (ou agent que não enxerga o negócio) o relógio não andava, em
+  -- silêncio. O escopo é o mínimo: só last_activity_at, só da linha
+  -- referenciada E da mesma organização da atividade. E nunca no futuro (9032,
+  -- P2-2 do Cassio na #70): performed_at vem de quem registra, e um carimbo
+  -- adiante deixaria o negócio "em dia" até lá.
   -- LISTA POSITIVA: só isto conta como "alguém tocou este negócio". Tipo que
   -- não está aqui NÃO quebra o silêncio — inclusive tipo que ainda não existe.
   -- Ver o cabeçalho da 0079 antes de acrescentar linha nesta lista.
@@ -24325,16 +24281,19 @@ begin
   end if;
 
   update public.crm_leads
-     set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
-   where id = new.lead_id;
+     set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), least(new.performed_at, now()))
+   where id = new.lead_id
+     and organization_id = new.organization_id;
 
   if new.contact_id is not null then
     update public.contacts
-       set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), new.performed_at)
-     where id = new.contact_id;
+       set last_activity_at = greatest(coalesce(last_activity_at, '-infinity'::timestamptz), least(new.performed_at, now()))
+     where id = new.contact_id
+       and organization_id = new.organization_id;
   end if;
   return new;
 end$function$;
+revoke all on function public.fn_update_last_activity_at() from public, anon, authenticated;
 -- ─── 6. trabalho ao telefone conta como trabalho ────────────────────────────
 create or replace function public.fn_attendant_metrics(
   p_org uuid,
@@ -36814,7 +36773,7 @@ begin
       add constraint campaign_recipients_channel_org_fk
       foreign key (organization_id, channel_session_id)
       references public.channel_sessions (organization_id, id)
-      on delete set null;
+      on delete set null (channel_session_id);
   end if;
 end $$;
 
@@ -36925,21 +36884,21 @@ begin
       add constraint campaigns_pipeline_org_fk
       foreign key (organization_id, pipeline_id)
       references public.crm_pipelines (organization_id, id)
-      on delete set null;
+      on delete set null (pipeline_id);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'campaigns_stage_org_fk') then
     alter table public.campaigns
       add constraint campaigns_stage_org_fk
       foreign key (organization_id, stage_id)
       references public.crm_stages (organization_id, id)
-      on delete set null;
+      on delete set null (stage_id);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'campaigns_agent_org_fk') then
     alter table public.campaigns
       add constraint campaigns_agent_org_fk
       foreign key (organization_id, agent_id)
       references public.ai_agents (organization_id, id)
-      on delete set null;
+      on delete set null (agent_id);
   end if;
 end $$;
 
@@ -46741,6 +46700,433 @@ $$;
 revoke all on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) from public, anon, authenticated;
 grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) to service_role;
 
+-- ---- RLS de conjunto: conversations, crm_leads e user_organizations (migration 9027) ----
+--
+-- Substitui o predicado POR LINHA das policies de SELECT (fn_can_view_conversation
+-- da 0035/9014, fn_can_view_lead da 0036, fn_role_at_least da 0044) por um semi-join com o conjunto de
+-- `fn_escopo_orgs()`, calculado uma vez por consulta. Mesmo resultado, ordens de
+-- grandeza mais barato (motivo, medição e rollback no cabeçalho da migration).
+-- O ramo "próprio" (assigned_to_user_id / owner_user_id = auth.uid()) só vale
+-- com vínculo ATIVO: ex-membro ainda atribuído lê zero.
+--
+-- POR QUE AQUI: os blocos das 0035/0036/0044, lá em cima, deixaram de instalar
+-- estas três policies (versão intermediária reinstalada a cada update é o que
+-- tests/unit/baseline-nao-constroi-o-que-derruba.test.ts proíbe); esta é a
+-- única definição no apêndice. Fica ANTES da VARREDURA anon porque cria função,
+-- e longe do fim do apêndice para não disputar linha com outros blocos.
+-- Prova: tests/invariants/rls-de-conjunto-9027.test.ts.
+create or replace function public.fn_escopo_orgs()
+returns table (organization_id uuid, papel text, modo text)
+language sql stable security definer
+set search_path = public
+as $$
+  with sup as (
+    select (s.j->>'organization_id')::uuid as org,
+           case when s.j->>'access_mode' = 'full' then 'admin' else 'viewer' end as papel
+      from (select public.fn_support_context() as j) s
+     where s.j->>'status' = 'active'
+  )
+  select uo.organization_id,
+         coalesce(sup.papel, uo.role),
+         coalesce(o.settings->>'visibility_mode', 'own_and_unassigned')
+    from public.user_organizations uo
+    join public.organizations o on o.id = uo.organization_id
+    left join sup on sup.org = uo.organization_id
+   where uo.user_id = auth.uid()
+     and uo.revoked_at is null
+  union
+  select sup.org, sup.papel, 'all'
+    from sup
+   where not exists (
+     select 1 from public.user_organizations uo
+      where uo.user_id = auth.uid()
+        and uo.organization_id = sup.org
+        and uo.revoked_at is null
+   );
+$$;
+
+revoke all on function public.fn_escopo_orgs() from public, anon;
+grant execute on function public.fn_escopo_orgs() to authenticated, service_role;
+
+-- Cada par drop/create vai num `do` próprio: o baseline roda em autocommit
+-- (psql -f, sem --single-transaction) e com lock_timeout curto. Se o create
+-- caísse em lock timeout depois do drop, a tabela ficaria sem policy de SELECT
+-- (deny-all) até a próxima passada. Dentro do `do`, o par é uma instrução só:
+-- a troca acontece inteira ou não acontece, e a policy anterior fica de pé.
+do $rls9027$ begin
+  drop policy if exists "conversations_select" on public.conversations;
+  create policy "conversations_select" on public.conversations
+    for select using (
+      (select public.fn_is_platform_admin())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('viewer', 'manager', 'admin')
+            or (e.papel = 'agent' and e.modo = 'all'))
+      or (assigned_to_user_id = (select auth.uid())
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent'))
+      or (assigned_to_user_id is null
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+    );
+end $rls9027$;
+
+do $rls9027$ begin
+  drop policy if exists "crm_leads_select" on public.crm_leads;
+  create policy "crm_leads_select" on public.crm_leads
+    for select using (
+      (select public.fn_is_platform_admin())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('viewer', 'manager', 'admin')
+            or (e.papel = 'agent' and e.modo = 'all'))
+      or (owner_user_id = (select auth.uid())
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent'))
+      or (owner_user_id is null
+          and organization_id in (
+            select e.organization_id from public.fn_escopo_orgs() e
+             where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+    );
+end $rls9027$;
+
+do $rls9027$ begin
+  drop policy if exists "user_orgs_select" on public.user_organizations;
+  create policy "user_orgs_select" on public.user_organizations
+    for select using (
+      user_id = (select auth.uid())
+      or organization_id in (
+        select e.organization_id from public.fn_escopo_orgs() e
+         where e.papel in ('manager', 'admin'))
+      or (select public.fn_is_platform_admin())
+    );
+end $rls9027$;
+
+-- ---- RLS por comando na caixa de entrada e na conversa (migration 9028) ----
+--
+-- A `for all` de escrita de channel_sessions, crm_pipelines, conversation_notes
+-- e organizations vira insert/update/delete com o MESMO texto: uma `for all`
+-- vale também no SELECT, e a leitura pagava por linha o `fn_role_at_least` da
+-- escrita. Como o predicado de escrita já está contido no de leitura nas
+-- quatro, quem lê não muda. Nas policies de LEITURA, `fn_is_platform_admin()`
+-- vira `(select …)` (uma vez por consulta, não por linha). Motivo, medição,
+-- por que `comando_da_conversa` não vira inlineável e rollback ficam no
+-- cabeçalho da migration.
+--
+-- POR QUE AQUI: os blocos antigos (0030, 0035, 0150, 0478 e o corpo do dump)
+-- deixaram de instalar estas policies, e esta é a única definição. Cada tabela
+-- num `do` próprio: o baseline roda em autocommit com lock_timeout curto, e
+-- dentro do `do` a troca da tabela é uma instrução só, inteira ou nada.
+-- Prova: tests/invariants/rls-por-comando-9028.test.ts.
+
+-- channel_sessions
+do $rls9028$ begin
+  drop policy if exists channel_sessions_tenant_select on public.channel_sessions;
+  create policy channel_sessions_tenant_select on public.channel_sessions
+    for select using (
+      organization_id in (select public.fn_user_org_ids())
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists channel_sessions_tenant_write on public.channel_sessions;
+  drop policy if exists channel_sessions_tenant_insert on public.channel_sessions;
+  create policy channel_sessions_tenant_insert on public.channel_sessions
+    for insert with check (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists channel_sessions_tenant_update on public.channel_sessions;
+  create policy channel_sessions_tenant_update on public.channel_sessions
+    for update using (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    ) with check (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists channel_sessions_tenant_delete on public.channel_sessions;
+  create policy channel_sessions_tenant_delete on public.channel_sessions
+    for delete using (
+      (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+      or public.fn_is_platform_admin()
+    );
+end $rls9028$;
+
+-- crm_pipelines
+do $rls9028$ begin
+  drop policy if exists "crm_pipelines_select" on public.crm_pipelines;
+  create policy "crm_pipelines_select" on public.crm_pipelines
+    for select using (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "crm_pipelines_manager_write" on public.crm_pipelines;
+  drop policy if exists "crm_pipelines_manager_insert" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_insert" on public.crm_pipelines
+    for insert with check (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+  drop policy if exists "crm_pipelines_manager_update" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_update" on public.crm_pipelines
+    for update using (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    ) with check (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+  drop policy if exists "crm_pipelines_manager_delete" on public.crm_pipelines;
+  create policy "crm_pipelines_manager_delete" on public.crm_pipelines
+    for delete using (
+      public.fn_is_platform_admin()
+      or ((organization_id in (select public.fn_user_org_ids()))
+          and public.fn_role_at_least(organization_id, 'manager'))
+    );
+end $rls9028$;
+
+-- conversation_notes
+do $rls9028$ begin
+  drop policy if exists "conversation_notes_select_platform_admin" on public.conversation_notes;
+  create policy "conversation_notes_select_platform_admin" on public.conversation_notes
+    for select using ((select public.fn_is_platform_admin()));
+  drop policy if exists "conversation_notes_write" on public.conversation_notes;
+  drop policy if exists "conversation_notes_insert" on public.conversation_notes;
+  create policy "conversation_notes_insert" on public.conversation_notes
+    for insert with check (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+  drop policy if exists "conversation_notes_update" on public.conversation_notes;
+  create policy "conversation_notes_update" on public.conversation_notes
+    for update using (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    ) with check (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+  drop policy if exists "conversation_notes_delete" on public.conversation_notes;
+  create policy "conversation_notes_delete" on public.conversation_notes
+    for delete using (
+      organization_id in (select public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'agent')
+      and exists (
+        select 1 from public.conversations c
+        where c.organization_id = conversation_notes.organization_id
+          and c.id = conversation_notes.conversation_id
+          and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
+      )
+    );
+end $rls9028$;
+
+-- organizations
+do $rls9028$ begin
+  drop policy if exists "orgs_select" on public.organizations;
+  create policy "orgs_select" on public.organizations
+    for select using (
+      (id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "orgs_write_platform_admin" on public.organizations;
+  drop policy if exists "orgs_insert_platform_admin" on public.organizations;
+  create policy "orgs_insert_platform_admin" on public.organizations
+    for insert with check (public.fn_is_platform_admin());
+  drop policy if exists "orgs_update_platform_admin" on public.organizations;
+  create policy "orgs_update_platform_admin" on public.organizations
+    for update using (public.fn_is_platform_admin()) with check (public.fn_is_platform_admin());
+  drop policy if exists "orgs_delete_platform_admin" on public.organizations;
+  create policy "orgs_delete_platform_admin" on public.organizations
+    for delete using (public.fn_is_platform_admin());
+end $rls9028$;
+
+-- contacts: a leitura (com platform admin uma vez por consulta) e a escrita por
+-- papel moram no bloco da migration 9030, logo abaixo.
+
+-- messages (só a leitura; insert/update/delete não mudam)
+do $rls9028$ begin
+  drop policy if exists "messages_select" on public.messages;
+  create policy "messages_select" on public.messages
+    for select using (
+      (select public.fn_is_platform_admin())
+      or exists (
+        select 1 from public.conversations c
+        where c.id = messages.conversation_id
+      )
+    );
+end $rls9028$;
+
+-- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
+--
+-- Uma varredura de conversations devolve as seis contagens das abas
+-- (count(*) filter), no lugar de seis count(*) da rota. SECURITY INVOKER: a RLS
+-- vale para quem chama. Motivo, medição e rollback no cabeçalho da migration.
+-- Antes da VARREDURA anon, como toda função nova do apêndice; a revogação de
+-- anon é explícita porque a varredura só alcança security definer.
+-- Prova: tests/invariants/contagens-da-caixa-9029.test.ts.
+create or replace function public.fn_contagens_da_caixa(
+  p_organizacao uuid,
+  p_comandos_da_fila text[],
+  p_terminais text[],
+  p_canal uuid default null,
+  p_entrada text default null,
+  p_so_nao_lidas boolean default false,
+  p_marcadores text[] default null,
+  p_modo text default 'e'
+)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with base as materialized (
+    select c.status,
+           c.assigned_to_user_id,
+           public.fn_comando_da_conversa(
+             c.status, c.assigned_to_user_id, c.bot_silenced_until,
+             coalesce(ct.force_human, false), coalesce(ct.is_blocked, false),
+             now(), coalesce(c.is_group, false)
+           ) as comando
+      from public.conversations c
+      left join public.contacts ct
+        on ct.id = c.contact_id and ct.organization_id = c.organization_id
+     where c.organization_id = p_organizacao
+       and (p_canal is null or c.channel_session_id = p_canal)
+       and (p_entrada is null or c.instagram_entrada = p_entrada)
+       and (not coalesce(p_so_nao_lidas, false) or c.unread_count_for_assignee > 0)
+       and (
+         coalesce(cardinality(p_marcadores), 0) = 0
+         or case
+              when p_modo = 'ou' and cardinality(p_marcadores) > 1
+                then c.tags && p_marcadores or ct.tags && p_marcadores
+              else c.tags @> p_marcadores or ct.tags @> p_marcadores
+            end
+       )
+  )
+  select jsonb_build_object(
+    'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
+    'automatico', count(*) filter (where comando = 'automatico'),
+    'mine',       count(*) filter (where assigned_to_user_id = (select auth.uid())
+                                     and not (status::text = any (p_terminais))),
+    'all',        count(*),
+    'closed',     count(*) filter (where status::text = 'closed'),
+    'archived',   count(*) filter (where status::text = 'archived')
+  )
+  from base;
+$$;
+
+comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) is
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro.';
+
+revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) from public, anon;
+grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+
+-- ---- a linha não troca de organização; contato escrito só por agent+ (migration 9030) ----
+--
+-- Trigger BEFORE UPDATE OF organization_id (42501, qualquer papel) nas 52
+-- tabelas cuja for all só exige tenancy: quem tem vínculo em duas organizações
+-- movia linha de uma para a outra. E contacts troca a for all por SELECT +
+-- escrita com papel agent. Motivo, fluxos conferidos e rollback no cabeçalho da
+-- migration. As quatro policies de contacts num `do` só: troca atômica sob
+-- autocommit, a policy anterior fica de pé se algo falhar.
+-- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+create or replace function public.fn_organizacao_da_linha_nao_muda()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  -- A ÚNICA troca aceita é para NULL, vinda de dentro de outro gatilho (é como
+  -- o Postgres executa um FK `on delete set null`), e SÓ em `api_audit_log`:
+  -- apagar a organização zera a coluna da trilha (9031). Lista explícita desde a
+  -- 9032 (P2-1 do Cassio na #70): em `skill_versions`/`skill_pointers`, por
+  -- exemplo, organização NULL é o catálogo GLOBAL, e uma cascata qualquer não
+  -- pode transformar dado de uma organização em dado de todas. UPDATE direto, de
+  -- qualquer papel, para NULL ou para outra org, continua recusado.
+  if new.organization_id is distinct from old.organization_id
+     and not (new.organization_id is null
+              and pg_trigger_depth() > 1
+              and tg_table_name in ('api_audit_log')) then
+    raise exception 'a linha de % não muda de organização', tg_table_name
+      using errcode = '42501',
+            hint = 'Mover dado entre organizações não é uma operação do produto. Crie a linha na organização de destino.';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fn_organizacao_da_linha_nao_muda() from public, anon, authenticated;
+
+-- O laço que punha trg_organizacao_nao_muda nas 52 tabelas da 9030 saiu daqui
+-- na 9032: o do FIM do arquivo (9031) cobre todas as tabelas com
+-- organization_id, pula as que já têm a trigger e solta o lock tabela a tabela.
+
+do $rls9030$ begin
+  drop policy if exists "tenant_isolation_contacts_all" on public.contacts;
+  drop policy if exists "contacts_select" on public.contacts;
+  create policy "contacts_select" on public.contacts
+    for select using (
+      (organization_id in (select public.fn_user_org_ids()))
+      or (select public.fn_is_platform_admin())
+    );
+  drop policy if exists "contacts_insert" on public.contacts;
+  create policy "contacts_insert" on public.contacts
+    for insert with check (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists "contacts_update" on public.contacts;
+  create policy "contacts_update" on public.contacts
+    for update using (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    ) with check (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+  drop policy if exists "contacts_delete" on public.contacts;
+  create policy "contacts_delete" on public.contacts
+    for delete using (
+      ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent'))
+      or public.fn_is_platform_admin()
+    );
+end $rls9030$;
+
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --
 -- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO
@@ -48078,38 +48464,10 @@ create policy "conversation_notes_select" on public.conversation_notes
     )
   );
 
--- ⚠️ A política de ESCRITA precisa da MESMA condição: policies são OR e
--- `conversation_notes_write` é `for all`, que concede SELECT junto — sem isto
--- a policy nova de SELECT é anulada. O teste `F2: ... não lê a nota` pegou
--- exatamente isso (devolveu 1 em vez de 0) antes do conserto.
-drop policy if exists "conversation_notes_write" on public.conversation_notes;
-create policy "conversation_notes_write" on public.conversation_notes
-  for all using (
-    organization_id in (select public.fn_user_org_ids())
-    and public.fn_role_at_least(organization_id, 'agent')
-    and exists (
-      select 1 from public.conversations c
-      where c.organization_id = conversation_notes.organization_id
-        and c.id = conversation_notes.conversation_id
-        and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
-    )
-  )
-  with check (
-    organization_id in (select public.fn_user_org_ids())
-    and public.fn_role_at_least(organization_id, 'agent')
-    and exists (
-      select 1 from public.conversations c
-      where c.organization_id = conversation_notes.organization_id
-        and c.id = conversation_notes.conversation_id
-        and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
-    )
-  );
-
--- O ramo `or fn_is_platform_admin()` da política antiga vira policy própria:
--- o admin de plataforma não é membro de organização nenhuma por definição.
-drop policy if exists "conversation_notes_select_platform_admin" on public.conversation_notes;
-create policy "conversation_notes_select_platform_admin" on public.conversation_notes
-  for select using (public.fn_is_platform_admin());
+-- ⚠️ A política de ESCRITA precisa da MESMA condição: policies são OR e uma
+-- `for all` concede SELECT junto. Desde a 9028 a escrita é por comando
+-- (conversation_notes_insert/update/delete, mesma condição), e o ramo de admin
+-- de plataforma é `conversation_notes_select_platform_admin`; a definição final mora no bloco da migration 9028, no apêndice.
 -- ---- busca humana na telemetria: author_kind (migration 0484) ----
 -- 0484 — a busca HUMANA do acervo entra na telemetria (F2 da #1869).
 -- `knowledge_searches` só recebia o caminho do agente; o grafico de
@@ -48607,4 +48965,122 @@ begin
 end $$;
 
 
+-- ---- modulos liberados por empresa (migration 9026) ----
+-- O dono do servidor libera modulo opcional empresa por empresa. Escrita so
+-- pelo service role; membro da org le. Ver o cabecalho da 9026.
+create table if not exists public.modulos_liberados_por_empresa (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  modulo text not null check (modulo ~ '^[a-z][a-z0-9_]{1,39}$'),
+  liberado_por uuid references auth.users(id) on delete set null,
+  liberado_em timestamptz not null default now(),
+  primary key (organization_id, modulo)
+);
+alter table public.modulos_liberados_por_empresa enable row level security;
+drop policy if exists modulos_liberados_select on public.modulos_liberados_por_empresa;
+create policy modulos_liberados_select on public.modulos_liberados_por_empresa
+  for select using (organization_id in (select public.fn_user_org_ids()));
+revoke all on table public.modulos_liberados_por_empresa from anon, authenticated;
+grant select on table public.modulos_liberados_por_empresa to authenticated;
+grant all on table public.modulos_liberados_por_empresa to service_role;
+
 notify pgrst, 'reload schema';
+
+-- ---- campanha: apagar canal, funil, etapa ou agente zera SÓ a referência (migration 9032) ----
+--
+-- Os FKs compostos (organization_id, x) de campaigns e campaign_recipients eram
+-- `on delete set null` SEM lista de colunas: apagar a linha referenciada zerava
+-- também organization_id, que é NOT NULL, e o DELETE do canal/funil/etapa/agente
+-- usado por uma campanha falhava com 23502. Com `set null (x)` só a referência
+-- zera e a campanha continua na organização dela. Os blocos de origem (acima)
+-- já criam com a lista; aqui o banco que tem a versão antiga é corrigido, uma
+-- vez só (a condição é `confdelsetcols is null`; reaplicar não toca em nada).
+do $$
+declare
+  fk record;
+begin
+  for fk in
+    select * from (values
+      ('campaign_recipients', 'campaign_recipients_channel_org_fk', 'channel_session_id', 'channel_sessions'),
+      ('campaigns', 'campaigns_pipeline_org_fk', 'pipeline_id', 'crm_pipelines'),
+      ('campaigns', 'campaigns_stage_org_fk', 'stage_id', 'crm_stages'),
+      ('campaigns', 'campaigns_agent_org_fk', 'agent_id', 'ai_agents')
+    ) v(tabela, nome, coluna, alvo)
+  loop
+    if exists (
+      select 1 from pg_constraint
+       where conname = fk.nome
+         and conrelid = format('public.%I', fk.tabela)::regclass
+         and confdelsetcols is null
+    ) then
+      execute format(
+        'alter table public.%I drop constraint %I, add constraint %I foreign key (organization_id, %I) '
+        'references public.%I (organization_id, id) on delete set null (%I)',
+        fk.tabela, fk.nome, fk.nome, fk.coluna, fk.alvo, fk.coluna);
+    end if;
+  end loop;
+end $$;
+
+-- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
+--
+-- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
+-- tenancy; o P1 do Cassio mostrou que papel nas DUAS organizações também move
+-- linha (messages, conversations, crm_leads…). Aqui: toda tabela de public com
+-- organization_id, lida do catálogo. Fica no FIM do arquivo de propósito: o
+-- laço tem de ver também as tabelas que os blocos acima (módulos reaplicados,
+-- apêndice) criaram. Idempotente (create or replace trigger).
+-- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+-- 9032 (P2-3 do Cassio na #70): o laço PULA a tabela que já tem a trigger
+-- certa (mesmo nome, mesma função, BEFORE UPDATE OF organization_id FOR EACH
+-- ROW). Reaplicar o baseline sobre um banco que já tem as triggers não toma
+-- lock nenhum dessas tabelas. Na PRIMEIRA aplicação, cada CREATE TRIGGER (que
+-- pega SHARE ROW EXCLUSIVE) é seguido de COMMIT: o lock da tabela sai antes da
+-- próxima, em vez de 169 locks acumulados até o fim do bloco. O COMMIT dentro
+-- do DO funciona porque o baseline roda em autocommit (psql -f, sem -1). Tabela
+-- em disputa (lock_timeout) fica para depois, e no fim o bloco levanta 55P03:
+-- reaplicar_baseline trata isso como disputa e roda de novo, e a próxima
+-- passada só cria as que faltam. Nenhuma janela inconsistente: cada tabela ou
+-- já está protegida ou segue como antes da trava.
+do $$
+declare
+  t record;
+  em_disputa text[] := '{}';
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_attribute a
+        on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
+     where c.relnamespace = 'public'::regnamespace
+       and c.relkind in ('r', 'p')
+       and not exists (
+         select 1 from pg_trigger g
+          where g.tgrelid = c.oid
+            and g.tgname = 'trg_organizacao_nao_muda'
+            and not g.tgisinternal
+            and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
+            and g.tgenabled in ('O', 'A')              -- desabilitada não protege nada
+            and g.tgqual is null                     -- nem com WHEN que a restrinja
+            and g.tgtype = 19                       -- ROW | BEFORE | UPDATE
+            and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
+       )
+     order by c.relname
+  loop
+    begin
+      execute format(
+        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
+        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t.relname);
+    exception when lock_not_available then
+      em_disputa := em_disputa || t.relname::text;
+    end;
+    commit;
+  end loop;
+  if cardinality(em_disputa) > 0 then
+    -- A mensagem COMEÇA com "lock timeout" de propósito: o psql não imprime o
+    -- SQLSTATE, e é o texto que BASELINE_ERROS_DE_DISPUTA (hostgator-setup-kit/
+    -- _common.sh) reconhece para reaplicar_baseline fazer nova passada. Prova:
+    -- tests/shell/baseline-reaplica-apos-disputa.test.sh.
+    raise exception 'lock timeout: trg_organizacao_nao_muda ficou de fora em % tabela(s) em disputa, a próxima passada cria: %',
+      cardinality(em_disputa), em_disputa
+      using errcode = '55P03';
+  end if;
+end $$;

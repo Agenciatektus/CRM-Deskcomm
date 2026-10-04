@@ -1,7 +1,8 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
+import { esquecerConversaSemAcesso } from "./cacheDasConversas";
 import type { ConversationWithContact } from "./useConversationsRealtime";
 
 /**
@@ -11,6 +12,7 @@ import type { ConversationWithContact } from "./useConversationsRealtime";
  * evita re-tentar o 404.
  */
 export function useConversation(id: string | null, enabled: boolean) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["conversation", id],
     enabled: enabled && !!id,
@@ -18,7 +20,13 @@ export function useConversation(id: string | null, enabled: boolean) {
     queryFn: () =>
       apiClient
         .get<{ data: ConversationWithContact }>(`/api/v1/conversations/${id}`)
-        .then((r) => r.data),
+        .then(
+          (r) => r.data,
+          (erro: unknown) => {
+            if (id) esquecerConversaSemAcesso(qc, id, erro);
+            throw erro;
+          },
+        ),
   });
 }
 

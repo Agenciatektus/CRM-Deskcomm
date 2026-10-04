@@ -53,6 +53,7 @@ export const MODULOS_OPCIONAIS = [
   "propostas",
   "crm_b2b",
   "honorarios",
+  "prospeccao",
 ] as const;
 export type ModuloOpcional = (typeof MODULOS_OPCIONAIS)[number];
 
@@ -72,6 +73,7 @@ export const MODULOS_OPCIONAIS_POR_FLAG = [
   "fluxos_atendimento",
   "propostas",
   "crm_b2b",
+  "prospeccao",
 ] as const satisfies readonly ModuloOpcional[];
 
 /** A linha de cada módulo por FLAG em `platform_config`. O formato é o da CHECK da 0341.
@@ -91,6 +93,10 @@ export const CHAVE_DO_MODULO: Record<(typeof MODULOS_OPCIONAIS_POR_FLAG)[number]
   // metade B2B do #1621. A maior parte de quem usa vende para pessoas; quem
   // vende para empresas liga. Desligado, as telas e as rotas somem (404).
   crm_b2b: "MODULO_CRM_B2B",
+  // Tektus: a Prospecção (`/app/prospecting`, busca no Google Maps pela Apify e
+  // abordagem gradual com IA). Além desta chave, o dono do servidor libera
+  // empresa por empresa (`lib/organizacao/modulos-liberados.ts`, 9026).
+  prospeccao: "MODULO_PROSPECCAO",
 };
 
 const LIGADO = "ligado";

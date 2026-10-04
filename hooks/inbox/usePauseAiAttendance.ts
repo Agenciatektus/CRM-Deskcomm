@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface PauseArgs {
   conversation_id: string;
@@ -35,7 +36,7 @@ export function usePauseAiAttendance() {
       ),
     onError: (err) => showApiError(err),
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       qc.invalidateQueries({ queryKey: ["conversation-counts"] });
     },

@@ -1,3 +1,5 @@
+import { seModuloFechadoParaEmpresa } from "@/lib/organizacao/modulos-liberados";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
@@ -17,6 +19,8 @@ export async function POST(req: Request) {
   if (support) return support;
   const auth = await requireRole("admin", { requestId, resource: "prospecting" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   const parsed = agentChatInputSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
     return fail("validation_failed", "Confira a mensagem e o tamanho da conversa.", 422, {

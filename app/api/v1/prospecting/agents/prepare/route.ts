@@ -1,3 +1,4 @@
+import { seModuloFechadoParaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { randomUUID } from "node:crypto";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
@@ -15,6 +16,8 @@ export async function POST(req: Request) {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "ai_agents" });
   if (!auth.ok) return auth.response;
+  const fechado = await seModuloFechadoParaEmpresa(createAdminClient(), auth.org.orgId, "prospeccao", requestId);
+  if (fechado) return fechado;
   const parsed = prospectingAgentSetupSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)
     return fail("validation_failed", "Complete o resumo para testar o agente.", 422, { requestId });

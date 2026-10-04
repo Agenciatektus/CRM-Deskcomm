@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Conversation } from "@/lib/types/messaging";
+import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface CloseArgs {
   conversation_id: string;
@@ -19,12 +20,12 @@ export function useCloseConversation() {
         { expected_revision: args.expected_revision },
       ),
     onError: (err, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
       showApiError(err);
     },
     onSuccess: (_data, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
     },
   });
@@ -51,7 +52,7 @@ export function useArchiveConversation() {
     // servidor que vale, não o que estava no cache.
     onError: showApiError,
     onSettled: (_data, _error, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
     },
   });
@@ -67,7 +68,7 @@ export function useReopenConversation() {
     ),
     onError: showApiError,
     onSettled: (_data, _error, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      invalidarListasDaConversa(qc, args.conversation_id);
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
     },
   });

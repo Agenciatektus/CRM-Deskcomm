@@ -1037,7 +1037,7 @@ describe("as três colunas são do sistema", () => {
     ["client_tag_by_system", "update contacts set client_tag_by_system = $2 where id = $1", "removed"],
   ] as const;
 
-  it("I36 · viewer, agent e admin da PRÓPRIA organização: 42501 nas três, e o valor não muda", async () => {
+  it("I36 · viewer não alcança a linha (9030); agent e admin da PRÓPRIA organização: 42501 nas três; o valor não muda", async () => {
     // A CLASSE É PRÉ-EXISTENTE (um viewer já reescreve `tags` e `name`), e esta
     // entrega ACRESCENTA a ela a coluna que decide roteamento e o carimbo de
     // uma-vez-só. Medido antes da guarda, no mesmo banco: `set local role
@@ -1062,7 +1062,12 @@ describe("as três colunas são do sistema", () => {
         ["admin", ADMIN_A],
       ] as const) {
         const r = await tentarComoUsuario(uid, sql, [contato, forjado]);
-        expect(r, `${quem} gravou ${coluna}`).toBe("42501:colunas_de_cliente_sao_do_sistema");
+        // Desde a 9030 o viewer não escreve em `contacts` por RLS (escrita é
+        // agent+): o UPDATE dele não alcança a linha e volta sem erro, ANTES de
+        // chegar à guarda. O que o caso cobra dele é o valor não mudar, medido
+        // logo abaixo.
+        const esperado = quem === "viewer" ? "passou" : "42501:colunas_de_cliente_sao_do_sistema";
+        expect(r, `${quem} gravou ${coluna}`).toBe(esperado);
       }
     }
 
@@ -1072,13 +1077,20 @@ describe("as três colunas são do sistema", () => {
 
     // CONTROLE POSITIVO, na mesma sessão e na mesma linha: o que é da equipe
     // continua da equipe. Sem ele, um `revoke` largo demais em `contacts`
-    // deixaria este caso verde quebrando a tela de Contatos inteira.
+    // deixaria este caso verde quebrando a tela de Contatos inteira. Com o
+    // AGENT (desde a 9030 é o papel mínimo de escrita em contato), e conferindo
+    // que o nome mudou: "passou" sozinho também é o que um UPDATE de 0 linhas dá.
     expect(
-      await tentarComoUsuario(VIEWER_A, "update contacts set display_name = $2 where id = $1", [
+      await tentarComoUsuario(AGENT_A, "update contacts set display_name = $2 where id = $1", [
         contato,
-        "renomeado pelo viewer",
+        "renomeado pelo agent",
       ]),
     ).toBe("passou");
+    const { rows: renomeado } = await pool.query<{ display_name: string }>(
+      "select display_name from contacts where id = $1",
+      [contato],
+    );
+    expect(renomeado[0]?.display_name, "o agent renomeou de fato").toBe("renomeado pelo agent");
     expect((await lerContato(contato)).tags, "e a etiqueta segue lá").toContain(TAG_DE_CLIENTE);
   });
 

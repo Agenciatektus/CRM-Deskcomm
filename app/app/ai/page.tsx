@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { modulosLigados } from "@/lib/instalacao/modulos";
+import { modulosDaEmpresa } from "@/lib/organizacao/modulos-liberados";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function AiHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
-      modulosLigados={await modulosLigados(createAdminClient())}
+      modulosLigados={await modulosDaEmpresa(createAdminClient(), activeOrg?.orgId ?? null)}
       title={traduzir("Agente de IA", idioma)}
       subtitle={traduzir(
         "Tudo que define quem atende por você — e como acompanhar o que ele faz.",
