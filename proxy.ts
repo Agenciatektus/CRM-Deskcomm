@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
 import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
 import { isPublicPath } from "@/lib/auth/public-paths";
+import { aplicarLimpezaDeCache } from "@/lib/auth/limpar-cache-no-logout";
 import {
   verifyImpersonateCookieEdge,
   IMPERSONATE_COOKIE_NAME_EDGE,
@@ -18,6 +19,9 @@ export async function proxy(request: NextRequest) {
   // Inject X-Request-Id for downstream correlation (audit log, error wrappers).
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   response.headers.set("x-request-id", requestId);
+  // Logout recente: esta resposta limpa o cache HTTP do navegador (o 302 da
+  // mídia é `private, max-age`). Ver `lib/auth/limpar-cache-no-logout.ts`.
+  aplicarLimpezaDeCache(request, response);
 
   const { pathname, search } = request.nextUrl;
   // Recupera retornos de OAuth social já emitidos antes da landing pública existir.
