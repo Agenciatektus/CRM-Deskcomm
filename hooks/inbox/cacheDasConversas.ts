@@ -183,3 +183,14 @@ export function invalidarListasDaConversa(qc: QueryClient, conversationId: strin
   void qc.invalidateQueries({ queryKey: [RAIZ], refetchType: "none" });
   agendarRefazer(qc, listasComAConversa(qc, conversationId));
 }
+
+/**
+ * A conversa deixou de ser desta pessoa (404/403 ao abrir): sai das listas em
+ * cache, como um DELETE. Sem isto, quem perdeu a conversa para outra pessoa a
+ * via na lista até o próximo refetch, e cada clique dava "não encontrada".
+ */
+export function esquecerConversaSemAcesso(qc: QueryClient, conversationId: string, erro: unknown): void {
+  const status = (erro as { status?: unknown } | null)?.status;
+  if (status !== 404 && status !== 403) return;
+  aplicarMudancaDaConversa(qc, { id: conversationId }, "DELETE");
+}
