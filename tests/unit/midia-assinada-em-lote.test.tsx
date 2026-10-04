@@ -13,7 +13,7 @@
  *    mesmo cenário com um banco que ignora filtro e RLS e prova que o detector
  *    acusa o vazamento — sem ele, um detector cego passaria verde.
  */
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +25,12 @@ const estado = vi.hoisted(() => ({
   conversasVisiveis: new Set<string>(["conv-b"]),
   /** Banco "sem RLS e sem filtro": o controle negativo. */
   semProtecao: false,
+  /**
+   * RLS PERMISSIVA: devolve linha de qualquer org, mas os `.eq()` do código
+   * continuam valendo. Isola a segunda camada (o filtro de `organization_id`):
+   * com ela, o caso só passa por causa do filtro (parecer do Cassio, P2-1).
+   */
+  rlsPermissiva: false,
   assinados: [] as string[][],
   chamadasDeAssinatura: 0,
 }));
@@ -95,7 +101,7 @@ function consulta(linhas: Linha[]) {
   return q;
 }
 function visiveisPelaRls(): Linha[] {
-  if (estado.semProtecao) return MENSAGENS;
+  if (estado.semProtecao || estado.rlsPermissiva) return MENSAGENS;
   return MENSAGENS.filter(
     (m) =>
       estado.orgsDoUsuario.includes(m.organization_id as string) &&
@@ -171,6 +177,7 @@ beforeEach(() => {
   estado.orgsDoUsuario = ["org-b"];
   estado.conversasVisiveis = new Set(["conv-b"]);
   estado.semProtecao = false;
+  estado.rlsPermissiva = false;
   estado.assinados = [];
   estado.chamadasDeAssinatura = 0;
 });
@@ -180,7 +187,7 @@ describe("URL estável por bloco", () => {
     const admin = createAdminClient();
     const inicio = Date.UTC(2026, 9, 4, 10, 5, 0);
     const a = await assinarMidias(admin, ["p/1.jpg"], inicio);
-    const b = await assinarMidias(admin, ["p/1.jpg"], inicio + 40 * 60_000);
+    const b = await assinarMidias(admin, ["p/1.jpg"], inicio + 20 * 60_000);
     expect(b.get("p/1.jpg")).toBe(a.get("p/1.jpg"));
     expect(estado.chamadasDeAssinatura).toBe(1);
   });
@@ -258,6 +265,19 @@ describe("lote: abrir a conversa assina a página numa chamada", () => {
   });
 });
 
+describe("URL vencida (aba aberta além da validade) cai na rota, uma vez", () => {
+  it("o erro da URL assinada troca para a rota; o erro da rota mostra 'indisponível'", async () => {
+    const [m] = await abrirConversa("conv-b");
+    const { container } = render(<MediaRenderer message={m!} />);
+    const img = () => container.querySelector("img");
+    expect(img()!.getAttribute("src")).toBe(m!.media_signed_url);
+    fireEvent.error(img()!);
+    expect(img()!.getAttribute("src")).toBe(`/api/v1/messages/${m!.id}/media`);
+    fireEvent.error(img()!);
+    expect(img()).toBeNull();
+  });
+});
+
 describe("autorização: o lote não abre o que a rota individual fecha", () => {
   it("usuário da org B pedindo a conversa da org A: nada volta e nada da A é assinado", async () => {
     const msgs = await abrirConversa("conv-a");
@@ -282,6 +302,24 @@ describe("autorização: o lote não abre o que a rota individual fecha", () => 
   it("conversa da própria org SEM acesso (RLS) → nada volta, nada é assinado", async () => {
     const msgs = await abrirConversa("conv-b-alheia");
     expect(msgs).toEqual([]);
+    expect(estado.chamadasDeAssinatura).toBe(0);
+  });
+
+  it("RLS PERMISSIVA, org ativa A, mídia da B pela LISTA: só o filtro de organização barra", async () => {
+    estado.rlsPermissiva = true;
+    estado.orgAtiva = "org-a";
+    const msgs = await abrirConversa("conv-b");
+    expect(msgs).toEqual([]);
+    expect(estado.assinados.flat().filter((c) => c.startsWith("org-b/"))).toEqual([]);
+  });
+
+  it("RLS PERMISSIVA, org ativa A, mídia da B pela ROTA individual: 404, só pelo filtro de organização", async () => {
+    estado.rlsPermissiva = true;
+    estado.orgAtiva = "org-a";
+    const res = await midiaIndividual(new NextRequest("http://crm.teste/api/v1/messages/b-1/media"), {
+      params: Promise.resolve({ id: "b-1" }),
+    });
+    expect(res.status).toBe(404);
     expect(estado.chamadasDeAssinatura).toBe(0);
   });
 
