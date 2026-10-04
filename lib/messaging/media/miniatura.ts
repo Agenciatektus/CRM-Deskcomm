@@ -30,12 +30,34 @@ export function mimeTemMiniatura(mime: string | null | undefined): boolean {
   return MIMES_COM_MINIATURA.has(base);
 }
 
+/**
+ * Teto de pixels da imagem de ENTRADA (P1 do @Cassio_SecRev na #75).
+ *
+ * Uma "bomba de descompressão" — PNG de 16384×16384 com poucos KB — decodifica
+ * para ~1 GB. Sem teto, o processo morre por falta de memória ANTES de marcar a
+ * mídia, o evento volta à fila e morre de novo: laço que para a mídia de TODAS
+ * as organizações. 40 Mpx cobre com folga a foto de celular (12–50 Mpx hoje
+ * chegam reduzidas pelo WhatsApp a ~2–4 Mpx) e recusa a bomba. Acima do teto
+ * não há miniatura; a ORIGINAL continua salva (o teto é só para decodificar).
+ */
+export const LIMITE_DE_PIXELS_DA_ENTRADA = 40_000_000;
+
 type Sharp = typeof SharpPadrao;
 let sharpCarregado: Promise<Sharp | null> | null = null;
 
-/** `sharp` sob demanda, e sem derrubar quem chama se o binário nativo faltar. */
+/**
+ * `sharp` sob demanda, e sem derrubar quem chama se o binário nativo faltar.
+ * Uma thread e sem cache: o worker processa uma mídia por vez, e o cache de
+ * operações do libvips só segura memória entre mídias que não se repetem.
+ */
 function carregarSharp(): Promise<Sharp | null> {
-  sharpCarregado ??= import("sharp").then((m) => m.default).catch(() => null);
+  sharpCarregado ??= import("sharp")
+    .then((m) => {
+      m.default.concurrency(1);
+      m.default.cache(false);
+      return m.default;
+    })
+    .catch(() => null);
   return sharpCarregado;
 }
 
@@ -46,7 +68,11 @@ export async function gerarMiniatura(
   if (!mimeTemMiniatura(mime)) return null;
   const sharp = await carregarSharp();
   if (!sharp) return null;
-  const miniatura = await sharp(original, { failOn: "none" })
+  // Lê só o CABEÇALHO (não decodifica): a bomba é recusada aqui, pelo tamanho
+  // declarado, antes de qualquer pixel ir para a memória.
+  const { width = 0, height = 0 } = await sharp(original, { limitInputPixels: false }).metadata();
+  if (width * height > LIMITE_DE_PIXELS_DA_ENTRADA) return null;
+  const miniatura = await sharp(original, { failOn: "none", limitInputPixels: LIMITE_DE_PIXELS_DA_ENTRADA })
     // Respeita a orientação EXIF da foto do celular antes de reduzir.
     .rotate()
     .resize({

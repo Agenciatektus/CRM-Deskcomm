@@ -66,13 +66,27 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   if (!msg?.media_url) return { consumer_key, status: "skipped", detail: "no media_url" };
   if (msg.media_storage_path) return { consumer_key, status: "skipped", detail: "already stored" };
 
-  const markStatus = async (media_status: "stored" | "failed", patch: Record<string, unknown> = {}) => {
-    const { error: updErr } = await admin
+  /**
+   * Grava o estado SÓ se a linha ainda é a que foi lida (compare-and-set, P2-1
+   * do @Cassio_SecRev na #75): mesmo `media_url` e ainda sem arquivo. A
+   * anonimização (LGPD) zera `media_url` e a mídia; se ela rodou durante o
+   * download, gravar por cima traria de volta o arquivo do titular. Devolve
+   * quantas linhas mudaram — 0 é "a linha mudou, não grave nada".
+   */
+  const markStatus = async (
+    media_status: "stored" | "failed",
+    patch: Record<string, unknown> = {},
+  ): Promise<number> => {
+    const { data: mudadas, error: updErr } = await admin
       .from("messages")
       .update({ metadata: { ...(msg.metadata ?? {}), media_status }, ...patch })
       .eq("id", msg.id)
-      .eq("organization_id", msg.organization_id);
+      .eq("organization_id", msg.organization_id)
+      .eq("media_url", msg.media_url as string)
+      .is("media_storage_path", null)
+      .select("id");
     if (updErr) throw new Error(`message update failed: ${updErr.message}`);
+    return (mudadas ?? []).length;
   };
 
   const isLastAttempt = row.attempts >= DRAIN_MAX_ATTEMPTS - 1;
@@ -144,12 +158,26 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   // sem miniatura a tela usa a original, e o retroativo cobre depois.
   const miniaturaPath = await salvarMiniatura(admin, msg, media.buffer, media.mime);
 
-  await markStatus("stored", {
+  const gravadas = await markStatus("stored", {
     media_storage_path: path,
     media_size_bytes: media.buffer.byteLength,
     media_mime: media.mime,
     ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
   });
+  if (gravadas === 0) {
+    // A linha mudou durante o download (anonimizada, apagada, ou outra rodada já
+    // gravou). Os objetos que acabaram de subir não têm dono: saem agora, em vez
+    // de ficarem no bucket com o dado de quem pediu para ser esquecido.
+    const recemSubidos = miniaturaPath ? [path, miniaturaPath] : [path];
+    const { error: removeErr } = await admin.storage.from("whatsapp-media").remove(recemSubidos);
+    if (removeErr) {
+      logger.error("[media-persist] objetos sem dono não removidos", {
+        message_id: msg.id,
+        detail: removeErr.message,
+      });
+    }
+    return { consumer_key, status: "skipped", detail: "linha_mudou_durante_o_download" };
+  }
 
   // Grupo nunca é derivado: a IA não serve grupos, e derivar custaria visão/
   // transcrição PAGA sem consumidor nenhum do outro lado — ninguém leria "o

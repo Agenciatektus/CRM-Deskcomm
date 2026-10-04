@@ -12,6 +12,8 @@
  * O que é do BANCO (triggers, CHECK, RPC real) está em
  * `tests/invariants/miniatura-sai-com-a-original.test.ts`.
  */
+import { crc32, deflateSync } from "node:zlib";
+
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,6 +34,8 @@ const estado = vi.hoisted(() => ({
   },
   bytesDaMidia: Buffer.alloc(0) as Buffer,
   miniaturasDoContato: [] as Array<{ media_thumb_path: string }>,
+  linhaRedigida: false,
+  removidos: [] as string[],
 }));
 
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -46,7 +50,7 @@ vi.mock("@/lib/channels", () => ({
 
 function encadeado(resultado: () => unknown) {
   const q: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "in", "not", "order", "limit"]) q[m] = () => q;
+  for (const m of ["select", "eq", "in", "not", "is", "order", "limit"]) q[m] = () => q;
   q.maybeSingle = async () => resultado();
   q.then = (ok: (v: unknown) => unknown) => ok(resultado());
   return q;
@@ -66,7 +70,9 @@ vi.mock("@/lib/supabase/admin", () => ({
       }),
       update: (patch: Record<string, unknown>) => {
         estado.patches.push(patch);
-        return encadeado(() => ({ error: null }));
+        // A corrida (P2-1): a anonimização rodou durante o download e o
+        // compare-and-set não acha a linha — zero linhas mudam.
+        return encadeado(() => ({ data: estado.linhaRedigida ? [] : [{ id: "msg-b" }], error: null }));
       },
       upsert: (linha: Record<string, unknown>) => {
         estado.fila.push(linha);
@@ -77,6 +83,10 @@ vi.mock("@/lib/supabase/admin", () => ({
       from: () => ({
         upload: async (caminho: string, dados: Uint8Array, opcoes: { contentType: string }) => {
           estado.uploads.push({ caminho, bytes: dados.byteLength, tipo: opcoes.contentType });
+          return { error: null };
+        },
+        remove: async (caminhos: string[]) => {
+          estado.removidos.push(...caminhos);
           return { error: null };
         },
         createSignedUrls: async (caminhos: string[]) => {
@@ -92,6 +102,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { cascadeRedactContact } from "@/lib/lgpd/redact-cascade";
 import {
   LADO_MAIOR_DA_MINIATURA_PX,
+  LIMITE_DE_PIXELS_DA_ENTRADA,
   caminhoDaMiniatura,
   gerarMiniatura,
 } from "@/lib/messaging/media/miniatura";
@@ -132,6 +143,8 @@ beforeEach(() => {
   estado.mensagem.media_storage_path = null;
   estado.bytesDaMidia = fotoDeCelular;
   estado.miniaturasDoContato = [];
+  estado.linhaRedigida = false;
+  estado.removidos = [];
   esquecerUrlsAssinadas();
 });
 
@@ -166,6 +179,108 @@ describe("a miniatura", () => {
 
   it("o caminho fica sempre na pasta da organização", () => {
     expect(caminhoDaMiniatura("org-b", "conv-b", "msg-b")).toBe("org-b/miniaturas/conv-b/msg-b.webp");
+  });
+});
+
+/**
+ * BOMBA DE DESCOMPRESSÃO: PNG 20000×20000 (400 Mpx) de cinza 1 bit, toda zero.
+ * Em bytes é pequena (~50 KB); decodificada, passa de 400 MB. Montada à mão
+ * (IHDR + IDAT comprimido + IEND) para não precisar decodificar nada para criá-la.
+ */
+function pngBomba(lado: number): Buffer {
+  const pedaco = (tipo: string, dados: Buffer) => {
+    const tamanho = Buffer.alloc(4);
+    tamanho.writeUInt32BE(dados.length);
+    const corpo = Buffer.concat([Buffer.from(tipo, "ascii"), dados]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(corpo) >>> 0);
+    return Buffer.concat([tamanho, corpo, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(lado, 0);
+  ihdr.writeUInt32BE(lado, 4);
+  ihdr[8] = 1; // 1 bit por pixel
+  ihdr[9] = 0; // cinza
+  const linha = 1 + Math.ceil(lado / 8); // byte de filtro + pixels
+  const idat = deflateSync(Buffer.alloc(linha * lado), { level: 9 });
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pedaco("IHDR", ihdr),
+    pedaco("IDAT", idat),
+    pedaco("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+describe("BOMBA de descompressão (P1 da #75): sem miniatura, e nada cai", () => {
+  it("PNG 20000×20000 de poucos KB: gerarMiniatura devolve null pelo teto, sem decodificar", async () => {
+    const bomba = pngBomba(20_000);
+    const meta = await sharp(bomba, { limitInputPixels: false }).metadata();
+    // Controle da AMOSTRA: é mesmo uma imagem de 400 Mpx, pequena em bytes.
+    expect(meta.width! * meta.height!).toBeGreaterThan(LIMITE_DE_PIXELS_DA_ENTRADA);
+    expect(bomba.byteLength).toBeLessThan(200_000);
+    const memoriaAntes = process.memoryUsage().rss;
+    const inicio = Date.now();
+    expect(await gerarMiniatura(bomba, "image/png")).toBeNull();
+    // Recusada pelo cabeçalho: rápido, e sem os ~400 MB da decodificação.
+    expect(Date.now() - inicio).toBeLessThan(2_000);
+    expect(process.memoryUsage().rss - memoriaAntes).toBeLessThan(200 * 1024 * 1024);
+  });
+
+  it("CONTROLE: a foto normal continua gerando miniatura", async () => {
+    expect(await gerarMiniatura(fotoDeCelular, "image/jpeg")).not.toBeNull();
+  });
+
+  it("a ORIGINAL da bomba é salva do mesmo jeito: o teto é só para a miniatura", async () => {
+    estado.bytesDaMidia = pngBomba(20_000);
+    const r = await persistMessageMedia({
+      id: "ev",
+      organization_id: "org-b",
+      event_type: "media.persist_requested",
+      entity_kind: "message",
+      entity_id: "msg-b",
+      payload: { message_id: "msg-b" },
+      metadata: {},
+      consumed_by: [],
+      attempts: 0,
+    } as never);
+    expect(r.status).toBe("ok");
+    expect(estado.uploads.map((u) => u.caminho)).toEqual(["org-b/conv-b/msg-b.jpg"]);
+    expect(estado.patches.at(-1)).toMatchObject({ media_storage_path: "org-b/conv-b/msg-b.jpg" });
+    expect(estado.patches.at(-1)).not.toHaveProperty("media_thumb_path");
+  });
+});
+
+describe("CORRIDA com a anonimização (P2-1 da #75)", () => {
+  it("a LGPD redigiu a linha durante o download: nada é gravado e os objetos recém-subidos saem", async () => {
+    estado.linhaRedigida = true;
+    const r = await persistMessageMedia({
+      id: "ev",
+      organization_id: "org-b",
+      event_type: "media.persist_requested",
+      entity_kind: "message",
+      entity_id: "msg-b",
+      payload: { message_id: "msg-b" },
+      metadata: {},
+      consumed_by: [],
+      attempts: 0,
+    } as never);
+    expect(r.status).toBe("skipped");
+    expect(estado.removidos).toEqual(["org-b/conv-b/msg-b.jpg", "org-b/miniaturas/conv-b/msg-b.webp"]);
+  });
+
+  it("CONTROLE: sem corrida, nada é removido", async () => {
+    await persistMessageMedia({
+      id: "ev",
+      organization_id: "org-b",
+      event_type: "media.persist_requested",
+      entity_kind: "message",
+      entity_id: "msg-b",
+      payload: { message_id: "msg-b" },
+      metadata: {},
+      consumed_by: [],
+      attempts: 0,
+    } as never);
+    expect(estado.removidos).toEqual([]);
   });
 });
 
