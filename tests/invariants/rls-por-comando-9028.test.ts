@@ -236,6 +236,10 @@ drop policy if exists "conversation_notes_delete" on public.conversation_notes;
 drop policy if exists "orgs_insert_platform_admin" on public.organizations;
 drop policy if exists "orgs_update_platform_admin" on public.organizations;
 drop policy if exists "orgs_delete_platform_admin" on public.organizations;
+drop policy if exists "contacts_select" on public.contacts;
+drop policy if exists "contacts_insert" on public.contacts;
+drop policy if exists "contacts_update" on public.contacts;
+drop policy if exists "contacts_delete" on public.contacts;
 `;
 
 /** Mede com as policies do banco ("novo"), troca por `outra` e mede de novo; devolve as diferenças. */
@@ -285,9 +289,16 @@ describe("9028: forma", () => {
         from pg_policies
        where schemaname = 'public'
          and policyname in ('channel_sessions_tenant_select','crm_pipelines_select','conversation_notes_select_platform_admin',
-                            'messages_select','orgs_select','tenant_isolation_contacts_all')
+                            'messages_select','orgs_select','contacts_select')
          and qual !~ '\\(\\s*SELECT fn_is_platform_admin\\(\\) AS fn_is_platform_admin\\)';`);
     expect(solto).toBe("");
+    // A régua acima só vale se as seis existem (a de contacts virou contacts_select na 9030).
+    const existem = sql(`
+      select count(*) from pg_policies
+       where schemaname = 'public'
+         and policyname in ('channel_sessions_tenant_select','crm_pipelines_select','conversation_notes_select_platform_admin',
+                            'messages_select','orgs_select','contacts_select');`);
+    expect(existem).toBe("6");
   });
 
   it("a escrita por comando tem o MESMO texto nos três comandos (e o do WITH CHECK do update é igual ao USING)", () => {
@@ -308,7 +319,16 @@ describe("9028: forma", () => {
 
 describe("9028: antes = depois, por papel e tabela", () => {
   it("as policies novas e as antigas dão o MESMO vetor de leitura e escrita para todo ator", () => {
-    expect(diferencas(ANTIGAS)).toEqual([]);
+    // A ÚNICA diferença é a que a 9030 introduziu de propósito: contacts deixou
+    // de aceitar escrita de viewer (as antigas aqui são as de antes da 9028, e a
+    // trigger da 9030, que vale nas duas fases, recusa o upd_move). Qualquer
+    // outra linha neste diff é regressão.
+    expect(diferencas(ANTIGAS)).toEqual([
+      "vw_a:contacts:del novo=n=0 outro=n=1",
+      "vw_a:contacts:ins_a novo=42501 outro=n=1",
+      "vw_a:contacts:upd novo=n=0 outro=n=4",
+      "vw_a:contacts:upd_move novo=n=0 outro=42501",
+    ]);
   });
 
   it("âncoras escritas à mão: o vetor mede alguma coisa (isolamento, papel, revogado, suporte)", () => {
