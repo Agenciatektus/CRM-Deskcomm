@@ -20,6 +20,7 @@ import {
   type ChannelSessionRef,
 } from "@/lib/channels";
 import { caminhoDaMiniatura, gerarMiniatura } from "@/lib/messaging/media/miniatura";
+import { mimeSeguroParaGuardar } from "@/lib/messaging/media/mime-seguro";
 import { storagePathFor } from "@/lib/messaging/media/types";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -138,10 +139,16 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     return { consumer_key, status: "error", detail };
   }
 
+  // O mime que se GUARDA não é o que o CDN declarou às cegas (P2-3 do Cassio
+  // na #79): fora de imagem (sem SVG), áudio, vídeo e PDF, vira
+  // `application/octet-stream` — um `text/html` ou SVG guardado como veio
+  // abriria como página no navegador do atendente. A extensão do caminho segue
+  // o declarado (o rótulo "DOCX" da tela); o tipo servido, o seguro.
+  const mimeGuardado = mimeSeguroParaGuardar(media.mime);
   const path = storagePathFor(msg.organization_id, msg.conversation_id, msg.id, media.mime);
   const { error: uploadErr } = await admin.storage
     .from("whatsapp-media")
-    .upload(path, media.buffer, { contentType: media.mime, upsert: true });
+    .upload(path, media.buffer, { contentType: mimeGuardado, upsert: true });
   if (uploadErr) {
     if (isLastAttempt) {
       logger.error("[media-persist] upload failed permanently", {
@@ -156,17 +163,17 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
   // MINIATURA (migration 9033): a lista mostra a imagem a ~256 px, e baixar a
   // original para isso é desperdício. Falha aqui NÃO derruba a persistência:
   // sem miniatura a tela usa a original, e o retroativo cobre depois.
-  const miniaturaPath = await salvarMiniatura(admin, msg, media.buffer, media.mime);
+  const miniaturaPath = await salvarMiniatura(admin, msg, media.buffer, mimeGuardado);
 
   const gravadas = await markStatus("stored", {
     media_storage_path: path,
     media_size_bytes: media.buffer.byteLength,
-    media_mime: media.mime,
+    media_mime: mimeGuardado,
     ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
     // O canal não sabia o tipo (story, post, reel compartilhado): quem decide é
     // o mime do que de fato chegou. Sem isto, um vídeo apareceria como imagem
     // quebrada.
-    ...(msg.metadata?.tipo_pelo_mime === true ? { type: tipoPeloMime(media.mime) } : {}),
+    ...(msg.metadata?.tipo_pelo_mime === true ? { type: tipoPeloMime(mimeGuardado) } : {}),
   });
   if (gravadas === 0) {
     // A linha mudou durante o download: anonimizada, apagada, ou OUTRA execução

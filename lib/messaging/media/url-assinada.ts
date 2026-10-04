@@ -71,6 +71,7 @@ export async function assinarMidias(
   admin: SupabaseClient,
   caminhos: readonly string[],
   agoraMs: number = Date.now(),
+  opcoes: { download?: boolean } = {},
 ): Promise<Map<string, string>> {
   const bloco = blocoDe(agoraMs);
   if (bloco !== blocoDoCache || cache.size > TETO_DO_CACHE) {
@@ -78,10 +79,13 @@ export async function assinarMidias(
     blocoDoCache = bloco;
   }
 
+  // A URL de download (`Content-Disposition: attachment`) é OUTRA URL do mesmo
+  // caminho: chave própria no cache, para uma não servir no lugar da outra.
+  const chave = (caminho: string) => (opcoes.download ? `dl:${caminho}` : caminho);
   const resultado = new Map<string, string>();
   const faltam: string[] = [];
   for (const caminho of new Set(caminhos)) {
-    const entrada = cache.get(caminho);
+    const entrada = cache.get(chave(caminho));
     if (entrada && entrada.bloco === bloco) resultado.set(caminho, entrada.url);
     else faltam.push(caminho);
   }
@@ -89,14 +93,14 @@ export async function assinarMidias(
 
   const { data, error } = await admin.storage
     .from(BUCKET_DA_MIDIA)
-    .createSignedUrls(faltam, validadeDaAssinaturaS(agoraMs));
+    .createSignedUrls(faltam, validadeDaAssinaturaS(agoraMs), opcoes.download ? { download: true } : undefined);
   if (error || !data) {
     console.error("[media] createSignedUrls falhou", error?.message ?? "sem dados");
     return resultado;
   }
   for (const item of data) {
     if (item.error || !item.signedUrl || !item.path) continue;
-    cache.set(item.path, { bloco, url: item.signedUrl });
+    cache.set(chave(item.path), { bloco, url: item.signedUrl });
     resultado.set(item.path, item.signedUrl);
   }
   return resultado;

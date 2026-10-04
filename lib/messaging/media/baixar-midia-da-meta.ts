@@ -15,8 +15,11 @@
  *     para `169.254.169.254` ou para um serviço do compose para aqui.
  *  4. Teto de bytes: pelo `content-length` declarado E contando o que chega
  *     (o cabeçalho pode mentir ou faltar).
+ *  5. A conexão vai no IP que a conferência devolveu (`fetchComDestinoFixado`):
+ *     sem segunda resolução de nome, sem janela de DNS rebinding. E só a porta
+ *     443 — porta fora do padrão em host da Meta não é CDN, é sondagem.
  */
-import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
+import { assertDestinoResolvidoSeguro, fetchComDestinoFixado } from "@/lib/automation/outbound-ip";
 
 export const HOSTS_DE_MIDIA_DA_META = [".fbsbx.com", ".fbcdn.net", ".cdninstagram.com"] as const;
 /** 50 MB: vídeo do Direct cabe com folga; acima disso não é anexo de conversa. */
@@ -33,6 +36,7 @@ export interface OpcoesDoDownload {
 
 export function hostDaMetaPermitido(url: URL): boolean {
   if (url.protocol !== "https:") return false;
+  if (url.port !== "" && url.port !== "443") return false;
   const host = url.hostname.toLowerCase();
   return HOSTS_DE_MIDIA_DA_META.some((sufixo) => host === sufixo.slice(1) || host.endsWith(sufixo));
 }
@@ -63,7 +67,10 @@ export async function baixarMidiaDaMeta(
   urlBruta: string,
   opcoes: OpcoesDoDownload = {},
 ): Promise<{ buffer: Buffer; mime: string }> {
-  const fetchImpl = opcoes.fetchImpl ?? fetch;
+  const fetchImpl =
+    opcoes.fetchImpl ??
+    ((u: string, init?: RequestInit) =>
+      fetchComDestinoFixado(u, { signal: init?.signal ?? undefined }, { portasPermitidas: [443] }));
   const conferirDestino = opcoes.conferirDestino ?? assertDestinoResolvidoSeguro;
   const teto = opcoes.tetoBytes ?? TETO_DE_BYTES_DA_MIDIA;
 
