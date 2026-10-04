@@ -27,7 +27,7 @@
  * resposta pública quando a conta não a habilitou. Esta escolha é sobre o que o
  * Inbox OFERECE.
  *
- * ─── SEM MÍDIA, E DIZENDO POR QUÊ ──────────────────────────────────────────
+ * ─── SEM MÍDIA NO ENVIO, E DIZENDO POR QUÊ ─────────────────────────────────
  *
  * Mídia no Instagram exige URL pública com regras próprias por tipo. Recusar
  * com um motivo legível é melhor que tentar e devolver um erro da Meta que
@@ -40,6 +40,7 @@ import type {
   OutboundEnvelope,
   RecipientInput,
 } from "../types";
+import { baixarMidiaDaMeta } from "@/lib/messaging/media/baixar-midia-da-meta";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveVerdashCreds, verdashFunctionsUrl } from "../verdash/credentials";
 
@@ -77,6 +78,17 @@ export const instagramAdapter: ChannelAdapter = {
    */
   isConfigured(): boolean {
     return true;
+  },
+
+  /**
+   * O anexo RECEBIDO no Direct (#13 da auditoria). A `url` é o ponteiro
+   * assinado da Meta que veio no payload; não precisa de credencial, mas vem de
+   * FORA — por isso só sai por `baixarMidiaDaMeta` (allowlist de host da Meta,
+   * IP resolvido conferido, redirecionamento validado a cada salto, teto de
+   * bytes). O `sessionRef` não entra: o ponteiro já é a autorização.
+   */
+  async fetchInboundMedia(input) {
+    return baixarMidiaDaMeta(input.url, { hintMime: input.hintMime });
   },
 
   codes: {

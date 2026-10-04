@@ -163,6 +163,10 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     media_size_bytes: media.buffer.byteLength,
     media_mime: media.mime,
     ...(miniaturaPath ? { media_thumb_path: miniaturaPath } : {}),
+    // O canal não sabia o tipo (story, post, reel compartilhado): quem decide é
+    // o mime do que de fato chegou. Sem isto, um vídeo apareceria como imagem
+    // quebrada.
+    ...(msg.metadata?.tipo_pelo_mime === true ? { type: tipoPeloMime(media.mime) } : {}),
   });
   if (gravadas === 0) {
     // A linha mudou durante o download: anonimizada, apagada, ou OUTRA execução
@@ -278,4 +282,13 @@ async function salvarMiniatura(
     });
     return null;
   }
+}
+
+/** O tipo da linha pelo mime do download — o vocabulário do CHECK de `messages.type`. */
+export function tipoPeloMime(mime: string): "image" | "video" | "audio" | "document" {
+  const base = mime.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (base.startsWith("image/")) return "image";
+  if (base.startsWith("video/")) return "video";
+  if (base.startsWith("audio/")) return "audio";
+  return "document";
 }

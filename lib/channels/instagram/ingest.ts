@@ -46,6 +46,7 @@ import { fonteDaEntrada, funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { marcarConversaComMensagem } from "../marcar-conversa";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
+import { logger } from "@/lib/logger";
 
 /**
  * O contato do Instagram é ancorado no IGSID.
@@ -130,8 +131,14 @@ async function upsertContatoDoInstagram(
  * plataforma reentrega o que não recebeu 200, então a MESMA mensagem chega mais
  * de uma vez por desenho — tratar isso como erro faria a rota devolver 500 e a
  * fila reentregar de novo, para sempre.
+ *
+ * ANEXOS (#13 da auditoria): uma linha por anexo, como no WhatsApp — a tabela
+ * guarda UMA mídia por mensagem. A primeira leva o `mid` da Meta e o texto; as
+ * seguintes, `<mid>:anexo:<n>`. Todas num INSERT só: ou entram todas, ou a
+ * reentrega bate na unique e nada duplica. Cada linha nasce com `media_url` (o
+ * ponteiro assinado) e o worker baixa os bytes enquanto ele vale.
  */
-async function inserirMensagem(
+async function inserirMensagens(
   admin: SupabaseClient,
   input: {
     organizationId: string;
@@ -140,46 +147,91 @@ async function inserirMensagem(
     channelSessionId: string;
     msg: MensagemDoInstagram;
   },
-): Promise<string | "duplicate"> {
+): Promise<string[] | "duplicate"> {
   const { msg } = input;
-  const { data, error } = await admin
-    .from("messages")
-    .insert({
-      organization_id: input.organizationId,
-      conversation_id: input.conversationId,
-      contact_id: input.contactId,
-      channel_session_id: input.channelSessionId,
-      external_id: msg.providerMessageId,
-      direction: "inbound",
-      // Nasceu de FORA do CRM. O default da coluna é `'crm'` e ele mentiria
-      // aqui: as funções de fricção contam só `external_device`, e o filtro de
-      // eco do próprio envio depende deste valor.
-      sent_via: "external_device",
-      status: "delivered",
-      // Anexo do Instagram é ponteiro com validade curta e o CRM ainda não
-      // busca os bytes — `image` prometeria uma miniatura que não carrega.
-      // `text` com corpo nulo é honesto: a tela mostra o selo de anexo.
-      type: "text",
-      body: msg.texto,
-      sent_at: msg.recebidaEm,
-      // POR ONDE esta MENSAGEM entrou. A conversa guarda como ela NASCEU; aqui
-      // fica o de cada linha, que é o que distingue o comentário da DM dentro
-      // de um mesmo fio.
-      metadata: {
-        instagram_entrada: msg.entrada,
-        ...(msg.temAnexo ? { instagram_tem_anexo: true } : {}),
-        ...(msg.mediaId ? { instagram_media_id: msg.mediaId } : {}),
-        ...(msg.adId ? { instagram_ad_id: msg.adId } : {}),
-      },
-    })
-    .select("id")
-    .maybeSingle();
+  const base = {
+    organization_id: input.organizationId,
+    conversation_id: input.conversationId,
+    contact_id: input.contactId,
+    channel_session_id: input.channelSessionId,
+    direction: "inbound",
+    // Nasceu de FORA do CRM. O default da coluna é `'crm'` e ele mentiria
+    // aqui: as funções de fricção contam só `external_device`, e o filtro de
+    // eco do próprio envio depende deste valor.
+    sent_via: "external_device",
+    status: "delivered",
+    sent_at: msg.recebidaEm,
+  };
+  // POR ONDE esta MENSAGEM entrou. A conversa guarda como ela NASCEU; aqui
+  // fica o de cada linha, que é o que distingue o comentário da DM dentro
+  // de um mesmo fio.
+  const metadataBase = {
+    instagram_entrada: msg.entrada,
+    ...(msg.temAnexo ? { instagram_tem_anexo: true } : {}),
+    ...(msg.mediaId ? { instagram_media_id: msg.mediaId } : {}),
+    ...(msg.adId ? { instagram_ad_id: msg.adId } : {}),
+  };
+
+  const linhas =
+    msg.anexos.length === 0
+      ? [
+          {
+            ...base,
+            external_id: msg.providerMessageId,
+            // Sem ponteiro utilizável (anexo sem `url`, ou sem anexo): `text`
+            // com corpo nulo é honesto, e a tela mostra o aviso de anexo.
+            type: "text",
+            body: msg.texto,
+            metadata: metadataBase,
+          },
+        ]
+      : msg.anexos.map((anexo, i) => ({
+          ...base,
+          external_id: i === 0 ? msg.providerMessageId : `${msg.providerMessageId}:anexo:${i}`,
+          // Story, post e reel não dizem se são foto ou vídeo: nasce `image` e o
+          // worker corrige pelo mime do download (`tipo_pelo_mime`).
+          type: anexo.tipoDaMensagem ?? "image",
+          body: i === 0 ? msg.texto : null,
+          media_url: anexo.url,
+          metadata: {
+            ...metadataBase,
+            instagram_anexo_tipo: anexo.tipoNaMeta,
+            ...(anexo.tipoDaMensagem ? {} : { tipo_pelo_mime: true }),
+          },
+        }));
+
+  const { data, error } = await admin.from("messages").insert(linhas).select("id");
 
   if (error?.code === "23505") return "duplicate";
-  if (error || !data) {
+  const ids = ((data ?? []) as Array<{ id: string }>).map((l) => l.id);
+  if (error || ids.length === 0) {
     throw new Error(`instagram_ingest_insert_failed: ${error?.message ?? "sem id"}`);
   }
-  return (data as { id: string }).id;
+  return ids;
+}
+
+/**
+ * Pede a persistência dos bytes — o MESMO evento e payload dos canais irmãos;
+ * o consumidor é um só (`workers/media-persist-worker.ts`). Best-effort: a
+ * mensagem já está gravada, e derrubar a ingestão faria a fila reentregar tudo.
+ */
+async function pedirPersistenciaDaMidia(
+  admin: SupabaseClient,
+  organizationId: string,
+  conversationId: string,
+  messageId: string,
+): Promise<void> {
+  const { error } = await admin.rpc("emit_event" as never, {
+    p_event_type: "media.persist_requested",
+    p_entity_kind: "message",
+    p_entity_id: messageId,
+    p_payload: { message_id: messageId, conversation_id: conversationId },
+    p_metadata: { source: "instagram_webhook" },
+    p_organization_id: organizationId,
+  } as never);
+  if (error) {
+    logger.warn("[instagram] emit media.persist_requested falhou", { messageId, detail: error.message });
+  }
 }
 
 export async function instagramInbound(
@@ -233,14 +285,18 @@ export async function instagramInbound(
   if (convErr || !convId) return { ok: true, body: { status: "ignored", reason: "conversa_nao_resolvida" } };
   const conversationId = convId as string;
 
-  const messageId = await inserirMensagem(admin, {
+  const ids = await inserirMensagens(admin, {
     organizationId,
     conversationId,
     contactId,
     channelSessionId,
     msg,
   });
-  if (messageId === "duplicate") return { ok: true, body: { status: "duplicate", conversationId } };
+  if (ids === "duplicate") return { ok: true, body: { status: "duplicate", conversationId } };
+  const messageId = ids[0]!;
+  if (msg.anexos.length > 0) {
+    for (const id of ids) await pedirPersistenciaDaMidia(admin, organizationId, conversationId, id);
+  }
 
   // Carimba a conversa. Não é cosmético: `last_inbound_at` é a fonte da janela,
   // e sem esta chamada o selo diria "o cliente nunca escreveu" numa conversa em

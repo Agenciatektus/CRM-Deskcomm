@@ -72,11 +72,15 @@ function fazerAdmin(opcoes: { contatoExistente?: string } = {}) {
   const admin = {
     from: (tabela: string) => ({
       ...consulta(tabela),
-      insert: (payload: Record<string, unknown>) => {
-        escritas.push({ tabela, op: "insert", payload });
+      insert: (payload: Record<string, unknown> | Record<string, unknown>[]) => {
+        // As mensagens entram num INSERT de várias linhas (uma por anexo, #13).
+        const linhas = Array.isArray(payload) ? payload : [payload];
+        for (const linha of linhas) escritas.push({ tabela, op: "insert", payload: linha });
+        const ids = linhas.map((_, i) => ({ id: i === 0 ? `${tabela}-novo` : `${tabela}-novo-${i}` }));
         return {
           select: () => ({
-            maybeSingle: async () => ({ data: { id: `${tabela}-novo` }, error: null }),
+            maybeSingle: async () => ({ data: ids[0], error: null }),
+            then: (ok: (r: unknown) => unknown) => ok({ data: ids, error: null }),
           }),
         };
       },
