@@ -14,7 +14,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { lastLine, sql } from "./gov-helpers";
+import { lastLine, sql, writeCountAs } from "./gov-helpers";
 
 const ORG = "90330000-0000-4000-8000-000000000001";
 const ORG_B = "90330000-0000-4000-8000-0000000000b1";
@@ -132,6 +132,70 @@ describe("retenção e remoção", () => {
   it("CONTROLE: mensagem sem miniatura não põe nada a mais na fila", () => {
     sql(`update messages set media_storage_path = null where id = '${MSG_SEM_MINI}';`);
     expect(conta(`select count(*) from storage_redaction_queue where organization_id = '${ORG}'`)).toBe(0);
+  });
+});
+
+describe("varredor de órfãos conta a miniatura como referência (P2-3 da #75)", () => {
+  it("miniatura SEM ponteiro é órfã e sai; a em uso fica", () => {
+    const ORFA = `${ORG}/miniaturas/${CONVERSA}/sem-dono.webp`;
+    sql(objeto(ORFA, 5));
+    sql(`select public.fn_enfileirar_midia_vencida(500);`);
+    expect(
+      conta(`select count(*) from storage_redaction_queue where object_path = '${ORFA}'`),
+    ).toBe(1);
+    expect(naFila(MINIATURA_OUTRA)).toBe(0);
+  });
+});
+
+const VIEWER = "90330000-0000-4000-8000-0000000000e1";
+const AGENTE = "90330000-0000-4000-8000-0000000000e2";
+
+describe("só o servidor grava o caminho da mídia (P2-2 da #75)", () => {
+  beforeEach(() => {
+    sql(`
+      insert into auth.users (id, email) values
+        ('${VIEWER}', 'miniatura-9033-viewer@invariant.test'),
+        ('${AGENTE}', 'miniatura-9033-agent@invariant.test')
+        on conflict do nothing;
+      delete from public.user_organizations where user_id in ('${VIEWER}', '${AGENTE}');
+      insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
+        ('${VIEWER}', '${ORG}', 'viewer', now()),
+        ('${AGENTE}', '${ORG}', 'agent', now());
+      update conversations set assigned_to_user_id = '${AGENTE}' where id = '${OUTRA_CONVERSA}';
+    `);
+  });
+
+  for (const [papel, usuario] of [
+    ["viewer", VIEWER],
+    ["agent", AGENTE],
+  ] as const) {
+    it(`${papel}: CONTROLE — enxerga e altera a linha (o RLS deixa)`, () => {
+      expect(writeCountAs(usuario, `update messages set body = 'x' where id = '${MSG_OUTRA}'`)).toBe(1);
+    });
+
+    it(`${papel}: não aponta media_thumb_path para outro objeto da org`, () => {
+      expect(() =>
+        writeCountAs(usuario, `update messages set media_thumb_path = '${ORIGINAL}' where id = '${MSG_OUTRA}'`),
+      ).toThrow(/pelo servidor/);
+      expect(miniaturaDa(MSG_OUTRA)).toBe(MINIATURA_OUTRA);
+    });
+
+    it(`${papel}: não mexe em media_storage_path para disparar a exclusão da miniatura`, () => {
+      expect(() =>
+        writeCountAs(usuario, `update messages set media_storage_path = null where id = '${MSG_OUTRA}'`),
+      ).toThrow(/pelo servidor/);
+      expect(naFila(MINIATURA_OUTRA)).toBe(0);
+    });
+  }
+
+  it("worker (service_role) grava a miniatura", () => {
+    const saida = sql(`
+      set role service_role;
+      update messages set media_thumb_path = '${ORG}/miniaturas/${OUTRA_CONVERSA}/nova.webp' where id = '${MSG_OUTRA}';
+      reset role;
+      select media_thumb_path from messages where id = '${MSG_OUTRA}';
+    `);
+    expect(lastLine(saida)).toBe(`${ORG}/miniaturas/${OUTRA_CONVERSA}/nova.webp`);
   });
 });
 

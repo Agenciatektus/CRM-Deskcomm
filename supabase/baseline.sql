@@ -39517,8 +39517,15 @@ begin
        and (
          split_part(o.name, '/', 2) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
          or split_part(o.name, '/', 2) = 'avatars'
+         -- Miniatura da imagem (9033): `org/miniaturas/<conversa>/…`. Conta como
+         -- referência o `media_thumb_path`, e não a pasta inteira ignorada:
+         -- miniatura sem ponteiro (upload sem a linha gravada) é órfã como
+         -- qualquer outra (P2-3 do @Cassio_SecRev na #75).
+         or (split_part(o.name, '/', 2) = 'miniaturas'
+             and split_part(o.name, '/', 3) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
        )
        and not exists (select 1 from public.messages m where m.media_storage_path = o.name)
+       and not exists (select 1 from public.messages m where m.media_thumb_path = o.name)
        and not exists (select 1 from public.contacts c where c.avatar_storage_path = o.name)
        -- Só linha EM CURSO segura o caminho (`pending`, ou `failed` que ainda
        -- é o registro de uma remoção não feita). Linha `deleted`/`skipped`
@@ -47293,7 +47300,8 @@ notify pgrst, 'reload config';
 -- {org}/miniaturas/{conversa}/{mensagem}.webp), o CHECK de que o caminho fica na
 -- pasta da organização da linha, e as triggers que põem a miniatura na fila de
 -- remoção quando a original sai (UPDATE de media_storage_path: LGPD e poda;
--- DELETE da linha). Ver o cabeçalho da migration. Idempotente: coluna e CHECK
+-- DELETE da linha), a guarda de que só o servidor grava esses caminhos e o
+-- varredor contando a miniatura como referência. Ver o cabeçalho da migration. Idempotente: coluna e CHECK
 -- com guarda, função `create or replace`, trigger só se faltar.
 -- Prova: tests/invariants/miniatura-sai-com-a-original.test.ts.
 alter table public.messages add column if not exists media_thumb_path text;
@@ -47371,6 +47379,56 @@ begin
       execute function public.fn_miniatura_sai_com_a_original();
   end if;
 end $$;
+
+-- ## Só o servidor grava o caminho da mídia (P2-2 do @Cassio_SecRev na #75)
+--
+-- `messages_update` só exige tenancy. Sem esta guarda, um VIEWER apontaria
+-- `media_thumb_path` para qualquer objeto da organização (o CHECK só exige a
+-- pasta da org) e, ao mexer em `media_storage_path` ou apagar a linha, faria a
+-- trigger definer acima enfileirar a EXCLUSÃO desse objeto. Quem grava esses
+-- caminhos é o worker e as rotas com o cliente admin (service_role); a sessão
+-- do navegador (`authenticated`) nunca. O INSERT da sessão continua podendo
+-- trazer `media_storage_path` (o anexo que o atendente envia), mas não miniatura.
+-- Função SECURITY INVOKER de propósito: `current_user` tem de ser quem chamou.
+-- Função definer do próprio banco (a cascata LGPD, a poda) roda como o dono e
+-- passa. Por trigger, e não por GRANT de coluna: revogar o UPDATE da tabela e
+-- conceder coluna a coluna mexeria em toda escrita de `messages` da sessão.
+create or replace function public.fn_midia_so_pelo_servidor()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.media_thumb_path is not null then
+      raise exception 'media_thumb_path só é gravado pelo servidor'
+        using errcode = '42501';
+    end if;
+  elsif new.media_thumb_path is distinct from old.media_thumb_path
+     or new.media_storage_path is distinct from old.media_storage_path then
+    raise exception 'o caminho da mídia (media_storage_path/media_thumb_path) só é alterado pelo servidor'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+                  where tgname = 'trg_midia_so_pelo_servidor'
+                    and tgrelid = 'public.messages'::regclass) then
+    create trigger trg_midia_so_pelo_servidor
+      before insert or update of media_thumb_path, media_storage_path on public.messages
+      for each row
+      execute function public.fn_midia_so_pelo_servidor();
+  end if;
+end $$;
+-- O passo 2 de `fn_enfileirar_midia_vencida` (contar `media_thumb_path` como
+-- referência, P2-3) foi editado NO LUGAR, no bloco da 0432/0434/0435 acima.
 
 notify pgrst, 'reload schema';
 
