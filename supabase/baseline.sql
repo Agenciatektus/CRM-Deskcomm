@@ -46984,6 +46984,75 @@ do $rls9028$ begin
     );
 end $rls9028$;
 
+-- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
+--
+-- Uma varredura de conversations devolve as seis contagens das abas
+-- (count(*) filter), no lugar de seis count(*) da rota. SECURITY INVOKER: a RLS
+-- vale para quem chama. Motivo, medição e rollback no cabeçalho da migration.
+-- Antes da VARREDURA anon, como toda função nova do apêndice; a revogação de
+-- anon é explícita porque a varredura só alcança security definer.
+-- Prova: tests/invariants/contagens-da-caixa-9029.test.ts.
+create or replace function public.fn_contagens_da_caixa(
+  p_organizacao uuid,
+  p_comandos_da_fila text[],
+  p_terminais text[],
+  p_canal uuid default null,
+  p_entrada text default null,
+  p_so_nao_lidas boolean default false,
+  p_marcadores text[] default null,
+  p_modo text default 'e'
+)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with base as materialized (
+    select c.status,
+           c.assigned_to_user_id,
+           public.fn_comando_da_conversa(
+             c.status, c.assigned_to_user_id, c.bot_silenced_until,
+             coalesce(ct.force_human, false), coalesce(ct.is_blocked, false),
+             now(), coalesce(c.is_group, false)
+           ) as comando
+      from public.conversations c
+      left join public.contacts ct
+        on ct.id = c.contact_id and ct.organization_id = c.organization_id
+     where c.organization_id = p_organizacao
+       and (p_canal is null or c.channel_session_id = p_canal)
+       and (p_entrada is null or c.instagram_entrada = p_entrada)
+       and (not coalesce(p_so_nao_lidas, false) or c.unread_count_for_assignee > 0)
+       and (
+         coalesce(cardinality(p_marcadores), 0) = 0
+         or case
+              when p_modo = 'ou' and cardinality(p_marcadores) > 1
+                then c.tags && p_marcadores or ct.tags && p_marcadores
+              else c.tags @> p_marcadores or ct.tags @> p_marcadores
+            end
+       )
+  )
+  select jsonb_build_object(
+    'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
+    'automatico', count(*) filter (where comando = 'automatico'),
+    'mine',       count(*) filter (where assigned_to_user_id = (select auth.uid())
+                                     and not (status::text = any (p_terminais))),
+    'all',        count(*),
+    'closed',     count(*) filter (where status::text = 'closed'),
+    'archived',   count(*) filter (where status::text = 'archived')
+  )
+  from base;
+$$;
+
+comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) is
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro.';
+
+revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) from public, anon;
+grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+
 -- ---- as guardas da cadência valem só para a cadência (migration 9024) ----
 --
 -- Redefine as guardas da 9020 (bloco acima) depois das policies POR OPERAÇÃO

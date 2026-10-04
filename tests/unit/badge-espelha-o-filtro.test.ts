@@ -24,6 +24,8 @@ const sp = (s: string) => new URLSearchParams(s);
 const CONTAGEM = "app/api/v1/conversations/counts/route.ts";
 const LISTA = "app/api/v1/conversations/_handler.ts";
 const REGUA = "lib/inbox/marcador-da-conversa.ts";
+/** Desde a 9029 as seis contagens saem de UMA função do banco. */
+const FUNCAO = "supabase/migrations/20261004090000_9029_contagens_da_caixa_numa_consulta.sql";
 
 /** O predicado do marcador escrito à mão — o que só a régua pode escrever. */
 const PREDICADO_A_MAO = /tags\.cs\.|tags_do_contato\.cs\./;
@@ -124,7 +126,26 @@ describe("o marcador da contagem é o da lista — uma régua só", () => {
     expect(ors).toEqual([]);
   });
 
-  it.each([CONTAGEM, LISTA])("%s consome a régua", (caminho) => {
+  it("a contagem limpa as etiquetas pela MESMA régua da lista e manda o modo E/OU", () => {
+    // A contagem não monta `or=` (chama a função do banco), mas as etiquetas que
+    // ela manda passam pela mesma limpeza da lista, e o E/OU vai junto. A
+    // equivalência do predicado SQL com o `or=` da lista é provada no banco, por
+    // filtro e por papel: tests/invariants/contagens-da-caixa-9029.test.ts.
+    const src = readFileSync(CONTAGEM, "utf8");
+    expect(src).toContain("marcadoresEscolhidos(");
+    expect(src).toContain("modoDeEtiqueta(");
+    expect(src).toMatch(/p_marcadores:\s*marcadores/);
+    expect(src).toMatch(/p_modo:\s*modo/);
+    const sqlDaFuncao = readFileSync(FUNCAO, "utf8");
+    expect(sqlDaFuncao, "modo E (e etiqueta única) é `cs` nas duas caixas").toMatch(
+      /c\.tags @> p_marcadores or ct\.tags @> p_marcadores/,
+    );
+    expect(sqlDaFuncao, "modo OU é `ov` nas duas caixas").toMatch(
+      /c\.tags && p_marcadores or ct\.tags && p_marcadores/,
+    );
+  });
+
+  it.each([LISTA])("%s consome a régua", (caminho) => {
     // ⚠️ `aplicarMarcadores` (o PLURAL) desde #1274: quem lista e quem conta
     // precisam aplicar a MESMA função, e a plural é a que sabe o E/OU e o caso
     // de uma etiqueta só. Se a cerca aceitasse as duas, uma rota que voltasse
@@ -160,53 +181,57 @@ describe("o marcador da contagem é o da lista — uma régua só", () => {
 /**
  * ⭐ A GUARDA QUE TORNA A SABOTAGEM POSSÍVEL.
  *
- * Os filtros são aplicados DENTRO de `countExact()`, então toda contagem os herda
- * por construção. Isso é melhor que um teste — mas some no dia em que alguém
- * montar uma contagem por fora da fábrica, que é a única forma de o defeito
- * voltar. É isso que este caso vigia.
+ * Até a 9029 os filtros eram aplicados dentro de `countExact()`, e toda contagem
+ * os herdava por construção. Agora é ainda mais estreito: as seis contagens saem
+ * de UMA chamada a `fn_contagens_da_caixa`, que aplica a organização e os
+ * filtros numa única cláusula `where` para todas. Este bloco vigia que a rota
+ * não volte a montar contagem por fora e que nenhum filtro deixe de ir para a
+ * função.
  */
-describe("nenhuma contagem é montada por fora da fábrica", () => {
+describe("as contagens saem de UMA chamada, com todos os filtros", () => {
   const fonte = readFileSync("app/api/v1/conversations/counts/route.ts", "utf8");
+  const sqlDaFuncao = readFileSync(FUNCAO, "utf8");
 
-  it("toda contagem sai de `countExact()`", () => {
-    const dentroDoPromiseAll = fonte.slice(
-      fonte.indexOf("await Promise.all(["),
-      fonte.indexOf("]);", fonte.indexOf("await Promise.all([")),
-    );
-    expect(dentroDoPromiseAll).not.toBe("");
-    const linhasDeContagem = dentroDoPromiseAll
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.startsWith("supabase") || l.includes('.from("conversations")'));
+  it("uma chamada à função, e nenhuma contagem montada direto em conversations", () => {
+    expect(fonte.match(/\.rpc\(\s*"fn_contagens_da_caixa"/g) ?? []).toHaveLength(1);
     expect(
-      linhasDeContagem,
-      "contagem montada direto no supabase, por fora de countExact() — ela não herda nem a organização nem os filtros",
-    ).toEqual([]);
+      fonte,
+      "contagem montada direto no supabase: ela não herda nem a organização nem os filtros",
+    ).not.toContain('.from("conversations")');
   });
 
-  it("a fábrica aplica os auxiliares E o não-lidas", () => {
-    const fabrica = fonte.slice(
-      fonte.indexOf("const countExact = () =>"),
-      fonte.indexOf("await Promise.all(["),
-    );
-    expect(fabrica).toContain("organization_id");
-    expect(fabrica, "os filtros auxiliares não entram na fábrica").toContain("auxiliares");
-    expect(fabrica, "o filtro de não lidas não entra na fábrica").toContain("soNaoLidas");
+  it("a rota manda a organização, os auxiliares, o não-lidas, a fila e os terminais", () => {
+    for (const parametro of [
+      /p_organizacao:\s*org/,
+      /p_canal:\s*auxiliares\.get\("channel_session_id"\)/,
+      /p_entrada:\s*auxiliares\.get\("instagram_entrada"\)/,
+      /p_so_nao_lidas:\s*soNaoLidas/,
+      /p_comandos_da_fila:\s*comandosDaFila\(/,
+      /p_terminais:\s*\[\.\.\.CONVERSATION_TERMINAL_STATUSES\]/,
+    ]) {
+      expect(fonte).toMatch(parametro);
+    }
   });
 
-  it("a fábrica aplica a régua do marcador (#1223)", () => {
-    // O defeito morava aqui: a fábrica pedia `.eq("tag", valor)`. Sem esta linha,
-    // a contagem ignora o marcador em silêncio — e o badge passa a contar o que a
-    // aba não mostra, que é o defeito que este arquivo existe para pegar.
-    const fabrica = fonte.slice(
-      fonte.indexOf("const countExact = () =>"),
-      fonte.indexOf("await Promise.all(["),
+  it("a função aplica cada filtro a TODAS as contagens (o where da base), o marcador inclusive (#1223)", () => {
+    const base = sqlDaFuncao.slice(
+      sqlDaFuncao.indexOf("with base as"),
+      sqlDaFuncao.indexOf("select jsonb_build_object("),
     );
-    expect(fabrica, "o marcador não entra na fábrica").toContain("aplicarMarcadores(");
+    for (const predicado of [
+      "c.organization_id = p_organizacao",
+      "c.channel_session_id = p_canal",
+      "c.instagram_entrada = p_entrada",
+      "c.unread_count_for_assignee > 0",
+      "p_marcadores",
+    ]) {
+      expect(base, predicado).toContain(predicado);
+    }
   });
 
   it("a aba Fechadas TEM contagem — o concorrente mostra 8067 e nós mostrávamos nada", () => {
-    expect(fonte).toContain("closed: closed.count");
+    expect(fonte).toContain("closed: contagem.closed");
+    expect(sqlDaFuncao).toMatch(/'closed',\s+count\(\*\) filter \(where status::text = 'closed'\)/);
   });
 
   it("o comentário não cita arquivo de teste que não existe", () => {

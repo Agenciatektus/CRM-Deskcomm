@@ -5,7 +5,7 @@ import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
-import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
+import { esquecerConversaSemAcesso, invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 import type { Message } from "@/lib/types/messaging";
 
 interface MessagesResponse {
@@ -33,6 +33,9 @@ export function useMessagesRealtime(conversationId: string | null) {
           `/api/v1/conversations/${conversationId}/messages?${qs.toString()}`,
         );
       } catch (err) {
+        // Abrir a conversa e receber 404/403 é a prova de que ela não é mais
+        // desta pessoa (reatribuída por outro, por exemplo): sai da lista agora.
+        esquecerConversaSemAcesso(qc, conversationId, err);
         showApiError(err);
         throw err;
       }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   agendarRefazer,
   aplicarMudancaDaConversa,
+  esquecerConversaSemAcesso,
   invalidarListasDaConversa,
 } from "@/hooks/inbox/cacheDasConversas";
 
@@ -114,5 +115,21 @@ describe("invalidarListasDaConversa (depois de um botão)", () => {
     vi.advanceTimersByTime(300);
     const refeitas = espia.mock.calls.slice(1).map((c) => JSON.stringify((c[0] as { queryKey: unknown }).queryKey));
     expect(refeitas).toEqual([JSON.stringify(TODAS)]);
+  });
+});
+
+describe("esquecerConversaSemAcesso (P2-1 do Cassio na #67)", () => {
+  it("404/403 ao abrir: a conversa sai das listas na hora, sem esperar o refetch", () => {
+    esquecerConversaSemAcesso(qc, "c1", { status: 404 });
+    expect(itens(FILA).map((c) => c.id)).toEqual(["c2"]);
+    esquecerConversaSemAcesso(qc, "c2", { status: 403 });
+    expect(itens(FILA).map((c) => c.id)).toEqual([]);
+    expect(itens(TODAS).map((c) => c.id)).toEqual(["c9"]);
+  });
+
+  it("outro erro (500, rede) não tira nada: a conversa pode ainda ser dela", () => {
+    esquecerConversaSemAcesso(qc, "c1", { status: 500 });
+    esquecerConversaSemAcesso(qc, "c1", new Error("rede"));
+    expect(itens(FILA).map((c) => c.id)).toEqual(["c1", "c2"]);
   });
 });

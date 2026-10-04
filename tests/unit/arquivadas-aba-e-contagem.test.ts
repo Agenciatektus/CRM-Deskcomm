@@ -95,14 +95,15 @@ describe("aba Arquivadas — rótulo e badge", () => {
 
 describe("contagem de arquivadas", () => {
   it("a rota counts filtra archived separadamente de closed", () => {
-    const rota = fonte("app/api/v1/conversations/counts/route.ts");
-    expect(rota).toMatch(/\.eq\("status",\s*"archived"\)/);
-    expect(rota).toMatch(/\.eq\("status",\s*"closed"\)/);
+    // Desde a 9029 as contagens saem de fn_contagens_da_caixa: cada aba é um filtro próprio.
+    const funcao = fonte("supabase/migrations/20261004090000_9029_contagens_da_caixa_numa_consulta.sql");
+    expect(funcao).toMatch(/'archived',\s+count\(\*\) filter \(where status::text = 'archived'\)/);
+    expect(funcao).toMatch(/'closed',\s+count\(\*\) filter \(where status::text = 'closed'\)/);
   });
 
   it("devolve a chave archived no corpo", () => {
     const rota = fonte("app/api/v1/conversations/counts/route.ts");
-    expect(rota).toMatch(/archived:\s*archived\.count/);
+    expect(rota).toMatch(/archived:\s*contagem\.archived/);
   });
 });
 

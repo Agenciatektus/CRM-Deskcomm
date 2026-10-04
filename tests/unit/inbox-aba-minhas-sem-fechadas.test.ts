@@ -179,8 +179,15 @@ describe("contador de Minhas", () => {
     const { readFileSync } = await import("node:fs");
     const fonte = readFileSync("app/api/v1/conversations/counts/route.ts", "utf8");
 
-    expect(fonte).toContain("CONVERSATION_TERMINAL_STATUSES");
-    expect(fonte).toMatch(/assigned_to_user_id[\s\S]{0,200}not\(\s*"status"\s*,\s*"in"/);
+    expect(fonte).toMatch(/p_terminais:\s*\[\.\.\.CONVERSATION_TERMINAL_STATUSES\]/);
+    // Desde a 9029 o predicado mora na função do banco, que recebe os terminais por parâmetro.
+    const funcao = readFileSync(
+      "supabase/migrations/20261004090000_9029_contagens_da_caixa_numa_consulta.sql",
+      "utf8",
+    );
+    expect(funcao).toMatch(
+      /assigned_to_user_id = \(select auth\.uid\(\)\)\s+and not \(status::text = any \(p_terminais\)\)/,
+    );
   });
 });
 

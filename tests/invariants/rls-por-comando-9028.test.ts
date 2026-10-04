@@ -154,6 +154,11 @@ function mede(fase: string, ator: string) {
     tenta(fase, k("crm_pipelines:ins_b"), `insert into public.crm_pipelines(organization_id,name,slug) values ('${ORG_B}','R9028 n','r9028-n');`),
     tenta(fase, k("organizations:upd"), `update public.organizations set display_name = display_name where id in ('${ORG_A}','${ORG_B}','${ORG_F}');`),
     tenta(fase, k("organizations:del"), `delete from public.organizations where id = '${ORG_F}';`),
+    // UPDATE que MUDA a organização da linha (de A para B): o WITH CHECK do
+    // update tem de valer igual antes e depois (P2 do Cassio na #66).
+    ...["channel_sessions", "contacts", "conversation_notes", "crm_pipelines"].map((t) =>
+      tenta(fase, k(`${t}:upd_move`), `update public.${t} set organization_id = '${ORG_B}' where organization_id = '${ORG_A}';`),
+    ),
     tenta(fase, k("organizations:ins"), `insert into public.organizations(slug,display_name,legal_name) values ('r9028-nova','R9028 N','R9028 N');`),
   ];
   return `${linhas.join("\n")}\ndo $m$ declare n bigint; begin ${escrita.join("\n")} end $m$;`;
@@ -247,8 +252,8 @@ select 'linhas=' || count(*) from pg_temp.r9028 where fase = 'novo';
 rollback;`);
   const linhas = out.split("\n").map((l) => l.trim()).filter(Boolean);
   const total = linhas.find((l) => l.startsWith("linhas="));
-  // 11 atores × 25 medidas: se o vetor encolher, a comparação vira vazia por construção.
-  expect(total).toBe(`linhas=${11 * 25}`);
+  // 11 atores × 29 medidas: se o vetor encolher, a comparação vira vazia por construção.
+  expect(total).toBe(`linhas=${11 * 29}`);
   const diffs = linhas.filter((l) => !l.startsWith("linhas=") && /novo=/.test(l));
   return diffs.join(";").split(";").filter(Boolean);
 }
@@ -326,6 +331,9 @@ describe("9028: antes = depois, por papel e tabela", () => {
     expect(v.get("mix:crm_pipelines:upd")).toBe("n=2");
     expect(v.get("mix:crm_pipelines:ins_a")).toBe("42501");
     expect(v.get("mix:crm_pipelines:ins_b")).toBe("n=1");
+    // mudar a linha de organização: o admin de A não leva o canal para B (WITH CHECK)
+    expect(v.get("adm_a:channel_sessions:upd_move")).toBe("42501");
+    expect(v.get("pa:channel_sessions:upd_move")).toBe("n=2");
     // sem vínculo e sem JWT: nada
     expect(v.get("out:contacts:sel")).toBe("0");
     expect(v.get("sem_jwt:messages:sel")).toBe("0");
