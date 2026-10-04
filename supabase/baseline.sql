@@ -49058,6 +49058,8 @@ begin
             and g.tgname = 'trg_organizacao_nao_muda'
             and not g.tgisinternal
             and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
+            and g.tgenabled in ('O', 'A')              -- desabilitada não protege nada
+            and g.tgqual is null                     -- nem com WHEN que a restrinja
             and g.tgtype = 19                       -- ROW | BEFORE | UPDATE
             and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
        )
@@ -49073,7 +49075,11 @@ begin
     commit;
   end loop;
   if cardinality(em_disputa) > 0 then
-    raise exception 'trg_organizacao_nao_muda: % tabela(s) em disputa de lock, ficam para a próxima passada: %',
+    -- A mensagem COMEÇA com "lock timeout" de propósito: o psql não imprime o
+    -- SQLSTATE, e é o texto que BASELINE_ERROS_DE_DISPUTA (hostgator-setup-kit/
+    -- _common.sh) reconhece para reaplicar_baseline fazer nova passada. Prova:
+    -- tests/shell/baseline-reaplica-apos-disputa.test.sh.
+    raise exception 'lock timeout: trg_organizacao_nao_muda ficou de fora em % tabela(s) em disputa, a próxima passada cria: %',
       cardinality(em_disputa), em_disputa
       using errcode = '55P03';
   end if;

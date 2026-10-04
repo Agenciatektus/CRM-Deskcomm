@@ -163,6 +163,8 @@ begin
             and g.tgname = 'trg_organizacao_nao_muda'
             and not g.tgisinternal
             and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
+            and g.tgenabled in ('O', 'A')              -- desabilitada não protege nada
+            and g.tgqual is null                     -- nem com WHEN que a restrinja
             and g.tgtype = 19
             and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
        )
