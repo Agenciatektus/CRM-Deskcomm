@@ -253,7 +253,16 @@ export async function fetchComDestinoFixado(
   return new Promise<Response>((resolve, reject) => {
     const req = fazer(
       url,
-      { method: pedido.method ?? "GET", headers: pedido.headers, lookup: lookupFixado, signal: pedido.signal },
+      {
+        method: pedido.method ?? "GET",
+        headers: pedido.headers,
+        lookup: lookupFixado,
+        signal: pedido.signal,
+        // Sem pool: cada pedido tem o próprio socket, que fecha ao fim da
+        // resposta. O `lookup` fixado é por pedido — reaproveitar um socket do
+        // pool de outro destino seria pular a conferência.
+        agent: false,
+      },
       (res: IncomingMessage) => {
         const headers = new Headers();
         for (const [nome, valor] of Object.entries(res.headers)) {

@@ -402,6 +402,10 @@ export async function executeCallWebhook(
             signal: AbortSignal.timeout(TIMEOUT_MS),
           });
       lastStatus = res.status;
+      // O corpo da resposta não interessa, mas NÃO lê-lo deixa o socket preso
+      // (keep-alive, ou um receptor que manda corpo sem fim) — um por
+      // tentativa. Cancelar o corpo fecha a conexão (P2-1 do Cassio na #83).
+      await res.body?.cancel().catch(() => {});
       if (res.ok) {
         return {
           type: "call_webhook",
