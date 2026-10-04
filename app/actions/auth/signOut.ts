@@ -3,6 +3,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { audit } from "@/lib/audit";
+import { marcarLimpezaDeCache } from "@/lib/auth/limpar-cache-no-logout";
+import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
@@ -16,6 +18,9 @@ export async function signOut(): Promise<void> {
   // Clear active_org cookie too.
   const store = await cookies();
   store.delete("active_org");
+  // O cache HTTP de quem saiu (o 302 da mídia é `private, max-age`) é limpo na
+  // próxima resposta do proxy: `Clear-Site-Data: "cache"`.
+  marcarLimpezaDeCache(store, cookieSecure());
 
   if (user) {
     await audit({

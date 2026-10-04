@@ -6,21 +6,33 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
+import { useFonteComReserva } from "./useFonteComReserva";
 
 /** Figurinha: inline, sem bolha — como no WhatsApp. */
-export function StickerMedia({ messageId }: { messageId: string }) {
+export function StickerMedia({
+  messageId,
+  src,
+  srcReserva,
+}: {
+  messageId: string;
+  src?: string;
+  srcReserva?: string;
+}) {
   const t = useT();
+  const { fonte, tentarReserva } = useFonteComReserva(src ?? mediaSrc(messageId), srcReserva);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   if (state === "error") return <MediaUnavailable kind="Figurinha" className="h-40 w-40" />;
   return (
     <div className="relative h-40 w-40">
       {state === "loading" && <Skeleton className="absolute inset-0 h-full w-full rounded-lg" />}
       <img
-        src={mediaSrc(messageId)}
+        src={fonte}
         alt={t("Figurinha")}
         loading="lazy"
         onLoad={() => setState("ready")}
-        onError={() => setState("error")}
+        onError={() => {
+          if (!tentarReserva()) setState("error");
+        }}
         className="h-40 w-40 object-contain"
       />
     </div>

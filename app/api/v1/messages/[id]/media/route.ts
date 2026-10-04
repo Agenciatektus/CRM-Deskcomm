@@ -1,7 +1,10 @@
 // app/api/v1/messages/[id]/media/route.ts
 /**
  * GET /api/v1/messages/[id]/media — acesso autenticado à mídia da mensagem.
- * Persistida → 302 pra signed URL (TTL 1h) do bucket whatsapp-media.
+ * Persistida → 302 pra signed URL do bucket whatsapp-media, ESTÁVEL por bloco
+ * de 30 min e com `Cache-Control: private` até o bloco virar (ver
+ * `lib/messaging/media/url-assinada.ts`). A lista de mensagens já entrega essa
+ * URL junto da mensagem; esta rota fica para quem não a recebeu.
  * Ainda não persistida (janela até o worker rodar) → proxy dos bytes do WAHA.
  * A URL desta rota é usada diretamente como src de <img>/<video>/<audio>
  * (cookie de sessão vai junto por ser same-origin; RLS decide o acesso).
@@ -20,12 +23,11 @@ import {
   type ChannelProvider,
   type ChannelSessionRef,
 } from "@/lib/channels";
+import { assinarMidias, segundosAteVirarOBloco } from "@/lib/messaging/media/url-assinada";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-const SIGNED_URL_TTL_S = 3600;
 
 interface RouteCtx {
   params: Promise<{ id: string }>;
@@ -66,17 +68,19 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
 
   if (msg.media_storage_path) {
-    const admin = createAdminClient();
-    const { data: signed, error: signErr } = await admin.storage
-      .from("whatsapp-media")
-      .createSignedUrl(msg.media_storage_path, SIGNED_URL_TTL_S);
-    if (!signErr && signed?.signedUrl) {
-      const response = NextResponse.redirect(signed.signedUrl, 302);
+    const agora = Date.now();
+    const urls = await assinarMidias(createAdminClient(), [msg.media_storage_path], agora);
+    const assinada = urls.get(msg.media_storage_path);
+    if (assinada) {
+      const response = NextResponse.redirect(assinada, 302);
       response.headers.set("X-Request-Id", requestId);
+      // `private`: dado de cliente, só o navegador de quem pediu guarda; nunca
+      // borda nem cache compartilhado. `max-age` termina quando o bloco vira, e
+      // a URL vale um bloco inteiro além disso. `Vary: Cookie` impede que outra
+      // sessão no mesmo navegador reaproveite o redirecionamento.
+      response.headers.set("Cache-Control", `private, max-age=${segundosAteVirarOBloco(agora)}`);
+      response.headers.set("Vary", "Cookie");
       return response;
-    }
-    if (signErr) {
-      console.error("[messages.media] createSignedUrl failed", signErr.message);
     }
   }
 

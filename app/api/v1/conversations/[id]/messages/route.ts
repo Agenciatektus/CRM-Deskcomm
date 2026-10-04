@@ -9,7 +9,9 @@ import { ApiError } from "@/lib/api/types";
 import { fail, ok } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { anexarUrlsDeMidia } from "@/lib/messaging/media/url-assinada";
 import { listMessagesQuerySchema } from "@/lib/schemas";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 import { listMessagesHandler } from "@/app/api/v1/messages/_handler";
@@ -64,7 +66,11 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
       conversationId,
       qsParsed.data,
     );
-    return ok(messages, { requestId, meta: { cursor, has_more } });
+    // A mídia da página vai assinada em LOTE, junto da mensagem: sem isto, cada
+    // foto/áudio fazia a própria ida a /messages/{id}/media. Só assina o que a
+    // consulta acima devolveu — ela é a autorização (sessão, RLS, organização).
+    const comMidia = await anexarUrlsDeMidia(createAdminClient(), messages);
+    return ok(comMidia, { requestId, meta: { cursor, has_more } });
   } catch (err) {
     if (err instanceof ApiError) {
       return fail(err.code, err.message, err.status, { requestId });

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
+import { useFonteComReserva } from "./useFonteComReserva";
 
 interface Props {
   messageId: string;
@@ -18,14 +19,16 @@ interface Props {
    * o caminho é o de sempre (`/api/v1/messages/{id}/media`).
    */
   src?: string;
+  /** Para onde ir se `src` falhar (a URL assinada venceu): ver `useFonteComReserva`. */
+  srcReserva?: string;
 }
 
 /** Miniatura na bolha + lightbox (Dialog) no clique. Padrão WhatsApp Web. */
-export function ImageMedia({ messageId, alt, src: fonte }: Props) {
+export function ImageMedia({ messageId, alt, src: fonte, srcReserva }: Props) {
   const t = useT();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [open, setOpen] = useState(false);
-  const src = fonte ?? mediaSrc(messageId);
+  const { fonte: src, tentarReserva } = useFonteComReserva(fonte ?? mediaSrc(messageId), srcReserva);
 
   if (state === "error")
     return (
@@ -48,7 +51,16 @@ export function ImageMedia({ messageId, alt, src: fonte }: Props) {
         )}
       >
         {state === "loading" && <Skeleton className="absolute inset-0 h-full w-full" />}
-        <img src={src} alt={alt} loading="lazy" onLoad={() => setState("ready")} onError={() => setState("error")} className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          onLoad={() => setState("ready")}
+          onError={() => {
+            if (!tentarReserva()) setState("error");
+          }}
+          className="h-full w-full object-cover"
+        />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl border-none bg-transparent p-0 shadow-none">
