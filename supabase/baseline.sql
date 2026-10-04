@@ -47323,6 +47323,33 @@ begin
   end if;
 end $$;
 
+-- ## A ORIGINAL também fica na pasta da organização (P2-B do @Cassio_SecRev na #75)
+--
+-- `media_storage_path` nunca teve CHECK: um INSERT direto pela PostgREST podia
+-- apontar a mensagem para um objeto de OUTRA organização, e a rota de mídia o
+-- assinaria. Conferidos todos os caminhos que gravam a coluna — worker
+-- (`storagePathFor`), envio de anexo (`isMediaPathOwnedBy`), foto de catálogo
+-- (`{tenant}/{conversa}/catalogo-…`), PDF de proposta (`{org}/{proposta}.pdf`) —
+-- e todos já começam com a organização; ingestão de canal (Instagram, Meta,
+-- WAHA) não grava a coluna (o worker grava). `NOT VALID`: não varre a tabela;
+-- vale para toda escrita a partir daqui. Atenção: linha ANTIGA fora do prefixo
+-- passaria a recusar qualquer UPDATE nela — conferir antes do deploy com
+-- `select count(*) from messages where media_storage_path is not null
+--    and media_storage_path not like organization_id::text || '/%';` (esperado 0).
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'messages_media_storage_path_da_org'
+       and conrelid = 'public.messages'::regclass
+  ) then
+    alter table public.messages
+      add constraint messages_media_storage_path_da_org
+      check (media_storage_path is null or media_storage_path like organization_id::text || '/%')
+      not valid;
+  end if;
+end $$;
+
 create or replace function public.fn_miniatura_sai_com_a_original()
 returns trigger
 language plpgsql

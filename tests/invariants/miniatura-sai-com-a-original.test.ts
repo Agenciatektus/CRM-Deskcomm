@@ -199,6 +199,34 @@ describe("só o servidor grava o caminho da mídia (P2-2 da #75)", () => {
   });
 });
 
+describe("isolamento: a ORIGINAL também fica na pasta da organização (P2-B da #75)", () => {
+  const inserirOriginal = (id: string, caminho: string) => `
+    create temp table if not exists resultado_original (v text);
+    delete from resultado_original;
+    do $$
+    begin
+      insert into messages (id, organization_id, conversation_id, channel_session_id, contact_id,
+                            type, direction, status, sent_via, sent_at, media_storage_path)
+        values ('${id}', '${ORG}', '${CONVERSA}', '${SESSAO}', '${CONTATO}',
+                'image', 'inbound', 'delivered', 'external_device', now(), '${caminho}');
+      insert into resultado_original values ('ACEITOU');
+    exception when check_violation then
+      insert into resultado_original values ('RECUSOU');
+    end $$;
+    select v from resultado_original;
+  `;
+
+  it("INSERT apontando a original para a pasta de OUTRA org é recusado", () => {
+    const saida = sql(inserirOriginal("90330000-0000-4000-8000-0000000000d1", `${ORG_B}/qualquer/foto.jpg`));
+    expect(lastLine(saida)).toBe("RECUSOU");
+  });
+
+  it("CONTROLE: a original na pasta da própria org é aceita", () => {
+    const saida = sql(inserirOriginal("90330000-0000-4000-8000-0000000000d2", `${ORG}/${CONVERSA}/foto.jpg`));
+    expect(lastLine(saida)).toBe("ACEITOU");
+  });
+});
+
 describe("isolamento: a miniatura fica na pasta da organização da linha", () => {
   it("org B não grava miniatura apontando para a pasta da org A", () => {
     const saida = sql(`
