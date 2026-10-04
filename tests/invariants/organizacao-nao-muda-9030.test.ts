@@ -228,3 +228,91 @@ rollback;`);
     expect(out).toBe("t|t|f|f");
   });
 });
+
+describe("9032: a exceção da cascata vale só em api_audit_log", () => {
+  // Uma trigger de teste (criada e desfeita na transação) faz, de DENTRO de outro
+  // gatilho, o mesmo UPDATE para NULL que um FK `on delete set null` faria.
+  const cascata = (alvo: string) => `
+create function public.t9032_anula() returns trigger language plpgsql as $f$
+begin
+  update public.${alvo} set organization_id = null where organization_id = old.organization_id;
+  return old;
+end $f$;
+create trigger t9032_anula after delete on public.demandas for each row execute function public.t9032_anula();`;
+
+  it("em skill_versions (org NULL = catálogo global) a cascata é recusada (42501)", () => {
+    expect(
+      tenta(
+        `${cascata("skill_versions")}
+insert into public.skill_versions(organization_id, name, description, body) values ('${ORG_A}', 'o9032', 'd', 'b');`,
+        `delete from public.demandas where id = '${DEM}';`,
+      ),
+    ).toBe("42501");
+  });
+
+  it("CONTROLE: a mesma cascata em api_audit_log passa", () => {
+    expect(
+      tenta(
+        `${cascata("api_audit_log")}
+insert into public.api_audit_log(organization_id, action) values ('${ORG_A}', 'o9032');`,
+        `delete from public.demandas where id = '${DEM}';`,
+      ),
+    ).toBe("n=1");
+  });
+});
+
+describe("9032: campanha perde só a referência quando o canal ou o funil some", () => {
+  const SB2 = id(51);
+  const CAMP = id(52);
+  const REC = id(53);
+  const campanha = `
+insert into public.channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values ('${SB2}','${ORG_A}','o9032-a2','\\x00'::bytea);
+insert into public.campaigns(id,organization_id,name,channel_session_id,base_legal,pipeline_id) values ('${CAMP}','${ORG_A}','o9032','${SA}','consent','${PIPE}');
+insert into public.campaign_recipients(id,organization_id,campaign_id,contact_id,channel_session_id) values ('${REC}','${ORG_A}','${CAMP}','${CT}','${SB2}');`;
+
+  function depoisDe(apagar: string, leitura: string): string {
+    const out = sql(`${seed}
+${campanha}
+${apagar}
+select 'r=' || (${leitura});
+rollback;`);
+    return out.split("\n").map((l) => l.trim()).find((l) => l.startsWith("r="))?.slice(2) ?? out;
+  }
+
+  it("apagar o canal usado pelo destinatário zera só channel_session_id; a org fica", () => {
+    expect(
+      depoisDe(
+        `delete from public.channel_sessions where id = '${SB2}';`,
+        `select coalesce(channel_session_id::text,'nulo') || '|' || organization_id from public.campaign_recipients where id = '${REC}'`,
+      ),
+    ).toBe(`nulo|${ORG_A}`);
+  });
+
+  it("apagar o funil da campanha zera só pipeline_id; a org fica", () => {
+    expect(
+      depoisDe(
+        `delete from public.crm_leads where pipeline_id = '${PIPE}'; delete from public.crm_pipelines where id = '${PIPE}';`,
+        `select coalesce(pipeline_id::text,'nulo') || '|' || organization_id from public.campaigns where id = '${CAMP}'`,
+      ),
+    ).toBe(`nulo|${ORG_A}`);
+  });
+
+  it("os quatro FKs têm a lista de colunas", () => {
+    expect(
+      sql(`select count(*) from pg_constraint
+            where conname in ('campaign_recipients_channel_org_fk','campaigns_pipeline_org_fk','campaigns_stage_org_fk','campaigns_agent_org_fk')
+              and cardinality(confdelsetcols) = 1;`),
+    ).toBe("4");
+  });
+});
+
+describe("9032: o relógio da atividade nunca vai para o futuro", () => {
+  it("performed_at daqui a 10 dias carimba no máximo agora", () => {
+    const out = sql(`${seed}
+insert into public.crm_lead_activities(organization_id,lead_id,source_module,type,actor_kind,performed_at)
+  values ('${ORG_A}','${LEAD}','crm','note','user', now() + interval '10 days');
+select 'r=' || (last_activity_at <= now())::text from public.crm_leads where id = '${LEAD}';
+rollback;`);
+    expect(out).toContain("r=true");
+  });
+});
