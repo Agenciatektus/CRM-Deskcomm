@@ -7,6 +7,7 @@ import { DocumentCard } from "./DocumentCard";
 import { ImageMedia } from "./ImageMedia";
 import { StickerMedia } from "./StickerMedia";
 import { VideoMedia } from "./VideoMedia";
+import { mediaSrc } from "./media-utils";
 
 /**
  * Dispatcher de mídia por message.type (Onda 1). Tipo com mídia mas sem
@@ -20,15 +21,18 @@ export function MediaRenderer({ message }: { message: Message }) {
   // própria ida a /messages/{id}/media ao montar. O documento continua na rota:
   // ele só baixa no clique, que pode vir horas depois, com a URL já vencida.
   const src = message.media_signed_url ?? undefined;
+  // Se a URL assinada vencer (aba aberta além da validade), a mídia tenta a rota
+  // uma vez, que assina de novo, em vez de dizer "indisponível".
+  const srcReserva = src ? mediaSrc(message.id) : undefined;
   switch (message.type) {
     case "image":
-      return <ImageMedia messageId={message.id} alt={t("Imagem recebida")} src={src} />;
+      return <ImageMedia messageId={message.id} alt={t("Imagem recebida")} src={src} srcReserva={srcReserva} />;
     case "sticker":
-      return <StickerMedia messageId={message.id} src={src} />;
+      return <StickerMedia messageId={message.id} src={src} srcReserva={srcReserva} />;
     case "audio":
-      return <AudioPlayer messageId={message.id} isOutbound={isOutbound} src={src} />;
+      return <AudioPlayer messageId={message.id} isOutbound={isOutbound} src={src} srcReserva={srcReserva} />;
     case "video":
-      return <VideoMedia messageId={message.id} src={src} />;
+      return <VideoMedia messageId={message.id} src={src} srcReserva={srcReserva} />;
     case "contact":
       return null;
     default:

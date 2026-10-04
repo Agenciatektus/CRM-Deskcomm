@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
+import { useFonteComReserva } from "./useFonteComReserva";
 
 const RATES = [1, 1.5, 2] as const;
 
@@ -22,10 +23,12 @@ interface Props {
   isOutbound: boolean;
   /** Fonte alternativa para mídia de NOTA interna (#1863, F3) — ver ImageMedia. */
   src?: string;
+  /** Para onde ir se `src` falhar (a URL assinada venceu): ver `useFonteComReserva`. */
+  srcReserva?: string;
 }
 
 /** Player de voz estilo WhatsApp: play/pause, progresso seekável, tempo, 1x/1.5x/2x. */
-export function AudioPlayer({ messageId, isOutbound, src }: Props) {
+export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
   const t = useT();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -33,6 +36,7 @@ export function AudioPlayer({ messageId, isOutbound, src }: Props) {
   const [current, setCurrent] = useState(0);
   const [rateIdx, setRateIdx] = useState(0);
   const [failed, setFailed] = useState(false);
+  const { fonte, tentarReserva } = useFonteComReserva(src ?? mediaSrc(messageId), srcReserva);
 
   useEffect(() => {
     const el = audioRef.current;
@@ -40,18 +44,15 @@ export function AudioPlayer({ messageId, isOutbound, src }: Props) {
     const onTime = () => setCurrent(el.currentTime);
     const onMeta = () => setDuration(el.duration);
     const onEnded = () => setPlaying(false);
-    const onError = () => setFailed(true);
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("loadedmetadata", onMeta);
     el.addEventListener("durationchange", onMeta);
     el.addEventListener("ended", onEnded);
-    el.addEventListener("error", onError);
     return () => {
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("durationchange", onMeta);
       el.removeEventListener("ended", onEnded);
-      el.removeEventListener("error", onError);
     };
   }, []);
 
@@ -85,7 +86,14 @@ export function AudioPlayer({ messageId, isOutbound, src }: Props) {
 
   return (
     <div className="flex w-60 items-center gap-2 py-1">
-      <audio ref={audioRef} src={src ?? mediaSrc(messageId)} preload="metadata" />
+      <audio
+        ref={audioRef}
+        src={fonte}
+        preload="metadata"
+        onError={() => {
+          if (!tentarReserva()) setFailed(true);
+        }}
+      />
       <button
         type="button"
         aria-label={playing ? t("Pausar áudio") : t("Reproduzir áudio")}
