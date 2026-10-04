@@ -67,6 +67,48 @@ import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
  * escotilha de GUC aqui: ela existe para a fusão de contatos, que precisa
  * escrever a coluna de dentro de uma sessão de usuário.
  */
+/**
+ * Como a pessoa se chama: o nome do perfil, senão o `@`. `null` só quando o
+ * Verdash não conseguiu ler o perfil — aí a próxima mensagem tenta de novo.
+ */
+function rotuloDoPerfil(msg: MensagemDoInstagram): string | null {
+  return msg.nome ?? (msg.username ? `@${msg.username}` : null);
+}
+
+/** O título que `nascimento-do-lead` dá ao card quando não sabe o nome. */
+const TITULO_SEM_NOME = "Novo contato pelo Instagram";
+
+/**
+ * Contato que nasceu sem nome (antes do Verdash anexar o perfil, ou numa
+ * consulta que falhou) ganha o nome na próxima mensagem — e o card dele deixa
+ * de se chamar "Novo contato pelo Instagram".
+ *
+ * Os dois `update` só tocam o que está VAZIO ou com o título genérico: nome
+ * editado à mão e card renomeado pelo vendedor não são sobrescritos.
+ * Best-effort: falhar aqui não pode derrubar a mensagem do cliente.
+ */
+async function completarNomeQueFaltava(
+  admin: SupabaseClient,
+  organizationId: string,
+  contactId: string,
+  msg: MensagemDoInstagram,
+): Promise<void> {
+  const nome = rotuloDoPerfil(msg);
+  if (!nome) return;
+  const { error } = await admin
+    .from("contacts")
+    .update({ name: nome, ...(msg.nome ? { display_name: msg.nome } : {}) })
+    .eq("id", contactId)
+    .is("name", null);
+  if (error) return;
+  await admin
+    .from("crm_leads")
+    .update({ title: nome })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("title", TITULO_SEM_NOME);
+}
+
 async function upsertContatoDoInstagram(
   admin: SupabaseClient,
   organizationId: string,
@@ -84,13 +126,12 @@ async function upsertContatoDoInstagram(
     // `is null` no filtro seria errado aqui: o handle novo é mais verdadeiro
     // que o antigo, ao contrário do telefone, que alguém pode ter corrigido na
     // tela.
+    const id = existente.data.id as string;
     if (msg.username) {
-      await admin
-        .from("contacts")
-        .update({ instagram_username: msg.username })
-        .eq("id", existente.data.id as string);
+      await admin.from("contacts").update({ instagram_username: msg.username }).eq("id", id);
     }
-    return existente.data.id as string;
+    await completarNomeQueFaltava(admin, organizationId, id, msg);
+    return id;
   }
 
   const criado = await admin
@@ -99,9 +140,10 @@ async function upsertContatoDoInstagram(
       organization_id: organizationId,
       instagram_igsid: msg.igsid,
       instagram_username: msg.username,
-      // O `@` é o melhor nome que o Instagram dá: o Direct não manda nome
-      // nenhum, e um contato sem rótulo apareceria como "Sem nome" na lista.
-      name: msg.username ? `@${msg.username}` : null,
+      name: rotuloDoPerfil(msg),
+      // O que o CANAL informou, como o `pushName` do WhatsApp. `name` é a
+      // coluna que gente edita; as duas nascem iguais e só `name` muda depois.
+      display_name: msg.nome,
     })
     .select("id")
     .maybeSingle();
@@ -271,7 +313,7 @@ export async function instagramInbound(
       messageId,
       channelSessionId,
       texto: msg.texto,
-      nomeDoContato: msg.username ? `@${msg.username}` : null,
+      nomeDoContato: rotuloDoPerfil(msg),
       origem: "instagram_webhook",
       // A REDE, que é o que o card do funil escreve. Literal porque este
       // ingest serve uma rede só — `origem` acima é o transporte, e foi
