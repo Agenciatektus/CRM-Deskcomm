@@ -48,6 +48,57 @@ import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
 
 /**
+ * Como a pessoa se chama: o nome do perfil, senão o `@`. `null` só quando o
+ * Verdash não conseguiu ler o perfil — aí a próxima mensagem tenta de novo.
+ */
+function rotuloDoPerfil(msg: MensagemDoInstagram): string | null {
+  return msg.nome ?? (msg.username ? `@${msg.username}` : null);
+}
+
+/** O título que `nascimento-do-lead` dá ao card quando não sabe o nome. */
+const TITULO_SEM_NOME = "Novo contato pelo Instagram";
+
+/**
+ * Contato que nasceu sem nome (antes do Verdash anexar o perfil, ou numa
+ * consulta que falhou) ganha o nome na próxima mensagem — e o card dele deixa
+ * de se chamar "Novo contato pelo Instagram".
+ *
+ * Os dois `update` só tocam o que está VAZIO ou com o título genérico: nome
+ * editado à mão e card renomeado pelo vendedor não são sobrescritos. O card só
+ * é renomeado se o CONTATO acabou de ganhar este nome — senão o card levaria o
+ * nome do perfil e o contato outro, dado à mão.
+ *
+ * Contato anonimizado (LGPD) nunca é tocado: o passo 1 da anonimização zera
+ * `name` e mantém o IGSID até a cascata, e sem a guarda o `is null` abaixo
+ * devolveria o nome real a quem pediu para ser esquecido.
+ * Best-effort: falhar aqui não pode derrubar a mensagem do cliente.
+ */
+async function completarNomeQueFaltava(
+  admin: SupabaseClient,
+  organizationId: string,
+  contactId: string,
+  msg: MensagemDoInstagram,
+): Promise<void> {
+  const nome = rotuloDoPerfil(msg);
+  if (!nome) return;
+  const { data: preenchido, error } = await admin
+    .from("contacts")
+    .update({ name: nome, ...(msg.nome ? { display_name: msg.nome } : {}) })
+    .eq("id", contactId)
+    .eq("organization_id", organizationId)
+    .eq("is_anonymized", false)
+    .is("name", null)
+    .select("id");
+  if (error || !preenchido?.length) return;
+  await admin
+    .from("crm_leads")
+    .update({ title: nome })
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("title", TITULO_SEM_NOME);
+}
+
+/**
  * O contato do Instagram é ancorado no IGSID.
  *
  * NÃO reusa `fn_upsert_wa_contact`: aquela RPC ancora em telefone ou no id
@@ -67,48 +118,6 @@ import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
  * escotilha de GUC aqui: ela existe para a fusão de contatos, que precisa
  * escrever a coluna de dentro de uma sessão de usuário.
  */
-/**
- * Como a pessoa se chama: o nome do perfil, senão o `@`. `null` só quando o
- * Verdash não conseguiu ler o perfil — aí a próxima mensagem tenta de novo.
- */
-function rotuloDoPerfil(msg: MensagemDoInstagram): string | null {
-  return msg.nome ?? (msg.username ? `@${msg.username}` : null);
-}
-
-/** O título que `nascimento-do-lead` dá ao card quando não sabe o nome. */
-const TITULO_SEM_NOME = "Novo contato pelo Instagram";
-
-/**
- * Contato que nasceu sem nome (antes do Verdash anexar o perfil, ou numa
- * consulta que falhou) ganha o nome na próxima mensagem — e o card dele deixa
- * de se chamar "Novo contato pelo Instagram".
- *
- * Os dois `update` só tocam o que está VAZIO ou com o título genérico: nome
- * editado à mão e card renomeado pelo vendedor não são sobrescritos.
- * Best-effort: falhar aqui não pode derrubar a mensagem do cliente.
- */
-async function completarNomeQueFaltava(
-  admin: SupabaseClient,
-  organizationId: string,
-  contactId: string,
-  msg: MensagemDoInstagram,
-): Promise<void> {
-  const nome = rotuloDoPerfil(msg);
-  if (!nome) return;
-  const { error } = await admin
-    .from("contacts")
-    .update({ name: nome, ...(msg.nome ? { display_name: msg.nome } : {}) })
-    .eq("id", contactId)
-    .is("name", null);
-  if (error) return;
-  await admin
-    .from("crm_leads")
-    .update({ title: nome })
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-    .eq("title", TITULO_SEM_NOME);
-}
-
 async function upsertContatoDoInstagram(
   admin: SupabaseClient,
   organizationId: string,
@@ -116,19 +125,26 @@ async function upsertContatoDoInstagram(
 ): Promise<string | null> {
   const existente = await admin
     .from("contacts")
-    .select("id")
+    .select("id, is_anonymized")
     .eq("organization_id", organizationId)
     .eq("instagram_igsid", msg.igsid)
     .is("is_merged_into", null)
     .maybeSingle();
   if (existente.data) {
+    const id = existente.data.id as string;
+    // Anonimizado (LGPD): a mensagem entra, mas o cadastro não ganha de volta
+    // nem @ nem nome. Ver `completarNomeQueFaltava`.
+    if (existente.data.is_anonymized) return id;
     // O `@` muda quando a pessoa quer, então ele é atualizado; o IGSID, não.
     // `is null` no filtro seria errado aqui: o handle novo é mais verdadeiro
     // que o antigo, ao contrário do telefone, que alguém pode ter corrigido na
     // tela.
-    const id = existente.data.id as string;
     if (msg.username) {
-      await admin.from("contacts").update({ instagram_username: msg.username }).eq("id", id);
+      await admin
+        .from("contacts")
+        .update({ instagram_username: msg.username })
+        .eq("id", id)
+        .eq("organization_id", organizationId);
     }
     await completarNomeQueFaltava(admin, organizationId, id, msg);
     return id;
