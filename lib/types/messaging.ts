@@ -106,6 +106,13 @@ export interface Message {
    * envio): a tela cai na rota `/api/v1/messages/{id}/media`.
    */
   media_signed_url?: string | null;
+  /**
+   * Miniatura webp da imagem (migration 9033), no bucket `whatsapp-media`, na
+   * pasta da organização. Null = sem miniatura: a tela usa a original.
+   */
+  media_thumb_path?: string | null;
+  /** A miniatura assinada no mesmo lote de `media_signed_url`. */
+  media_thumb_signed_url?: string | null;
   // Espelha o CHECK do banco (messages_sent_via_check): 'crm', 'external_device',
   // 'automation', 'ai', 'user', 'system'. O tipo listava só três e o TypeScript
   // aceitava os demais só porque o dado vem do Supabase sem cast — a tela então
