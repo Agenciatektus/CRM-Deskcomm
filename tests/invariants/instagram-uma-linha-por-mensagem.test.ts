@@ -24,17 +24,22 @@ const CONTATO = "91300000-0000-4000-8000-000000000002";
 const SESSAO = "91300000-0000-4000-8000-000000000003";
 const CONVERSA = "91300000-0000-4000-8000-000000000004";
 const ANTIGA = "91300000-0000-4000-8000-000000000010";
+const CONTATO_2 = "91300000-0000-4000-8000-000000000012";
+const CONVERSA_2 = "91300000-0000-4000-8000-000000000014";
 
 const conta = (q: string) => Number(lastLine(sql(q)));
-const revisao = () => conta(`select reply_context_revision from conversations where id = '${CONVERSA}'`);
+const revisao = (conversa = CONVERSA) =>
+  conta(`select reply_context_revision from conversations where id = '${conversa}'`);
 const demandas = () => conta(`select count(*) from demandas where organization_id = '${ORG}'`);
-const carimbadas = () =>
-  conta(`select count(*) from messages where conversation_id = '${CONVERSA}' and service_revision is not null`);
+const demandasDe = (contato: string) =>
+  conta(`select count(*) from demandas where organization_id = '${ORG}' and contact_id = '${contato}'`);
+const carimbadas = (conversa = CONVERSA) =>
+  conta(`select count(*) from messages where conversation_id = '${conversa}' and service_revision is not null`);
 
-function inbound(id: string, externo: string, extra = ""): string {
+function inbound(id: string, externo: string, conversa = CONVERSA, contato = CONTATO, extra = ""): string {
   return `insert into messages (id, organization_id, conversation_id, channel_session_id, contact_id,
                                 external_id, type, direction, status, sent_via, sent_at, media_url, metadata)
-          values ('${id}', '${ORG}', '${CONVERSA}', '${SESSAO}', '${CONTATO}', '${externo}', 'image', 'inbound',
+          values ('${id}', '${ORG}', '${conversa}', '${SESSAO}', '${contato}', '${externo}', 'image', 'inbound',
                   'delivered', 'external_device', now(), 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1',
                   '{"instagram_entrada":"direct","instagram_tem_anexo":true${extra}}'::jsonb);`;
 }
@@ -61,29 +66,43 @@ beforeEach(() => {
 });
 
 describe("uma mensagem do cliente com 3 anexos", () => {
-  it("a forma do ingest (UMA linha, extras no metadata) dispara 1 vez: revisão +1, 1 demanda, 1 carimbo", () => {
-    const antes = revisao();
+  // A revisão não sobe SÓ pelo trigger de inbound: abrir a demanda também mexe
+  // na conversa (`trg_reply_conversation_revision`). Por isso a medida é
+  // RELATIVA: a mesma mensagem nas duas formas, em duas conversas iguais.
+  it("forma do ingest (UMA linha) = 1 disparo; uma linha por anexo = 3 (2 a mais)", () => {
+    sql(`
+      insert into contacts (id, organization_id, name, phone_number)
+        values ('${CONTATO_2}', '${ORG}', 'Cliente 2', '+5511900009131');
+      insert into conversations (id, organization_id, contact_id, channel_session_id, status, is_group)
+        values ('${CONVERSA_2}', '${ORG}', '${CONTATO_2}', '${SESSAO}', 'open', false);
+    `);
+    const antesA = revisao(CONVERSA);
+    const antesB = revisao(CONVERSA_2);
+
+    // A: o que o ingest grava — 1º anexo em media_url, os outros no metadata.
     sql(
       inbound(
         "91300000-0000-4000-8000-000000000020",
         "mid-tres-anexos",
+        CONVERSA,
+        CONTATO,
         `,"instagram_anexos_extras":[{"tipo":"ig_reel","url":"https://lookaside.fbsbx.com/x2"},{"tipo":"ig_story","url":"https://lookaside.fbsbx.com/x3"}]`,
       ),
     );
-    expect(revisao() - antes).toBe(1);
-    expect(demandas()).toBe(1);
-    expect(carimbadas()).toBe(1);
-  });
-
-  it("CONTRASTE: uma linha por anexo dispararia 3 vezes (revisão +3, 3 carimbos)", () => {
-    const antes = revisao();
+    // B (contraste): uma linha por anexo.
     sql(`
-      ${inbound("91300000-0000-4000-8000-000000000031", "mid-x")}
-      ${inbound("91300000-0000-4000-8000-000000000032", "mid-x:anexo:1")}
-      ${inbound("91300000-0000-4000-8000-000000000033", "mid-x:anexo:2")}
+      ${inbound("91300000-0000-4000-8000-000000000031", "mid-x", CONVERSA_2, CONTATO_2)}
+      ${inbound("91300000-0000-4000-8000-000000000032", "mid-x:anexo:1", CONVERSA_2, CONTATO_2)}
+      ${inbound("91300000-0000-4000-8000-000000000033", "mid-x:anexo:2", CONVERSA_2, CONTATO_2)}
     `);
-    expect(revisao() - antes).toBe(3);
-    expect(carimbadas()).toBe(3);
+
+    // fn_service_inbound processou (carimbou) 1 linha em A e 3 em B.
+    expect(carimbadas(CONVERSA)).toBe(1);
+    expect(carimbadas(CONVERSA_2)).toBe(3);
+    // Cada linha inbound extra é UMA subida a mais do relógio da resposta da IA.
+    expect(revisao(CONVERSA_2) - antesB - (revisao(CONVERSA) - antesA)).toBe(2);
+    // Uma demanda por contato nas duas formas.
+    expect(demandasDe(CONTATO)).toBe(1);
   });
 });
 
