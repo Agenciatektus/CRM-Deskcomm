@@ -14010,6 +14010,44 @@ export const DICIONARIO: Traducoes = {
   "Não dá para ver daqui": { es: "No se puede ver desde aquí" },
   "Ajustar": { es: "Ajustar" },
   "Tudo o que se liga e desliga, se está ligado e onde se ajusta.": { es: "Todo lo que se activa y desactiva, si está activado y dónde se ajusta." },
+  // ─── Instagram como canal (#10) e fontes do funil (#37) ────────────────────
+  // Telas: components/connections/CanalInstagramClient.tsx, ConexoesShell.tsx,
+  // components/inbox/{ConversationListItem,InboxFilters}.tsx e
+  // app/app/kanban/_client.tsx. As marcas (WhatsApp, Instagram, Direct) passam
+  // por t() nessas telas e por isso precisam de entrada — idêntica, porque marca
+  // não muda de idioma (mesmo critério de "Kanban").
+  WhatsApp: { es: "WhatsApp" },
+  Instagram: { es: "Instagram" },
+  Direct: { es: "Direct" },
+  "Direct do Instagram": { es: "Direct de Instagram" },
+  "Comentários do Instagram": { es: "Comentarios de Instagram" },
+  "Recebe de:": { es: "Recibe de:" },
+  "O funil precisa de pelo menos uma fonte.": { es: "El embudo necesita al menos una fuente." },
+  "Instagram conectado.": { es: "Instagram conectado." },
+  "Receber o Direct do Instagram aqui": { es: "Recibir aquí el Direct de Instagram" },
+  "As mensagens que chegam no Direct do seu perfil passam a aparecer no atendimento, junto do WhatsApp. Quem já responde pelo aplicativo continua podendo responder por lá.": {
+    es: "Los mensajes que llegan al Direct de tu perfil empiezan a aparecer en la atención, junto con WhatsApp. Quien ya responde desde la aplicación puede seguir respondiendo desde allí.",
+  },
+  ", escolha a conta de Instagram e gere o código. Ele vale uma vez e expira em 15 minutos.": {
+    es: ", elige la cuenta de Instagram y genera el código. Sirve una sola vez y caduca en 15 minutos.",
+  },
+  "Você não cola senha nem token: o acesso fica registrado na sua plataforma, e você pode cortá-lo por lá quando quiser.": {
+    es: "No pegas contraseña ni token: el acceso queda registrado en tu plataforma y puedes revocarlo desde allí cuando quieras.",
+  },
+  "O Direct desta conta já vem para o atendimento. Você não precisa configurar nada do outro lado.": {
+    es: "El Direct de esta cuenta ya llega a la atención. No necesitas configurar nada del otro lado.",
+  },
+  "A conta foi conectada, mas": { es: "La cuenta se conectó, pero" },
+  "as mensagens do Direct ainda não chegam aqui": { es: "los mensajes del Direct todavía no llegan aquí" },
+  Comentário: { es: "Comentario" },
+  "Filtrar por origem no Instagram": { es: "Filtrar por origen en Instagram" },
+  "Direct e comentários": { es: "Direct y comentarios" },
+  "Só Direct": { es: "Solo Direct" },
+  "Só comentários": { es: "Solo comentarios" },
+  // O nó "Pipeline" do menu (lib/navigation/funis-no-menu.ts, lido por chave
+  // dinâmica). Fica "Pipeline": é o termo que CRM em espanhol usa para o quadro,
+  // e "Embudos" já é o rótulo de "Funis", o item vizinho do mesmo menu.
+  Pipeline: { es: "Pipeline" },
 };
 
 /**

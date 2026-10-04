@@ -76,13 +76,28 @@ vi.mock("@/lib/branding/organizacao", () => ({
  * O `admin.from("organizations")…maybeSingle()` do layout, encurtado a uma
  * organização já onboardada e ativa — qualquer outro estado dispara `redirect`,
  * e o que está sob medição aqui é o caminho normal.
+ *
+ * `crm_pipelines` é a leitura dos funis do nó "Pipeline" do menu
+ * (`.eq().eq().order().order()`); aqui ela devolve lista vazia, porque o menu
+ * não é o que este arquivo mede.
  */
+const funisDoMenuVazios = {
+  select: () => funisDoMenuVazios,
+  eq: () => funisDoMenuVazios,
+  order: () => funisDoMenuVazios,
+  then: (resolver: (r: { data: unknown[]; error: null }) => unknown) => resolver({ data: [], error: null }),
+};
 Object.assign(adminClient, {
-  from: () => ({
-    select: () => ({
-      eq: () => ({ maybeSingle: async () => ({ data: { onboarded_at: "2026-01-01", status: "active", settings: null } }) }),
-    }),
-  }),
+  from: (tabela: string) =>
+    tabela === "crm_pipelines"
+      ? funisDoMenuVazios
+      : {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { onboarded_at: "2026-01-01", status: "active", settings: null } }),
+            }),
+          }),
+        },
 });
 
 function achar(no: ReactNode, alvo: unknown): ReactElement | null {
