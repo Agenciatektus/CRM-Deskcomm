@@ -21,6 +21,8 @@
  * servir faria a reentrega durar para sempre.
  */
 
+import { lerAnexos, type AnexosLidos } from "./anexos";
+
 /** De onde a conversa nasceu. Vai para a tela: o atendente precisa saber. */
 export type EntradaDoInstagram = "direct" | "story" | "comentario";
 
@@ -41,6 +43,12 @@ export interface MensagemDoInstagram {
   texto: string | null;
   /** `true` quando veio mídia sem texto: a tela precisa dizer algo ao atendente. */
   temAnexo: boolean;
+  /**
+   * Os anexos lidos: arquivos a baixar, permalinks e se veio mídia temporária.
+   * O ingest grava UMA linha e pede a persistência do primeiro arquivo — a URL
+   * vence, então quem baixa é o worker, logo. Ver `./anexos.ts`.
+   */
+  anexos: AnexosLidos;
   entrada: EntradaDoInstagram;
   /** ISO-8601. A Meta manda milissegundos. */
   recebidaEm: string;
@@ -252,6 +260,7 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
       providerMessageId,
       texto: corpoTexto,
       temAnexo: anexos.length > 0,
+      anexos: lerAnexos(anexos),
       entrada,
       recebidaEm: dataDoEvento(evento.timestamp, agora),
       adId: identificador(envelope.ad_id),
@@ -303,6 +312,7 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
       providerMessageId: comentarioId,
       texto: corpoTexto,
       temAnexo: false,
+      anexos: { midias: [], links: [], temporaria: false },
       entrada: "comentario",
       recebidaEm: dataDoEvento(valor.timestamp ?? evento?.timestamp, agora),
       adId: identificador(envelope.ad_id),

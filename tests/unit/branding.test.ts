@@ -804,6 +804,19 @@ type CategoriaDeHost =
 type EntradaDeHost = { categoria: CategoriaDeHost; motivo: string };
 
 const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
+  // ── permalink do Instagram (#13 da auditoria) ──
+  // O anexo de post/reel chega como página em `www.instagram.com`, não arquivo:
+  // a ingestão o reconhece para NÃO baixá-lo como mídia, e a tela só aceita link
+  // desse host (o metadata vem de fora; link arbitrário viraria phishing).
+  "instagram.com": {
+    categoria: "PLATAFORMA",
+    motivo:
+      "host do permalink de post/reel aceito na entrada (`lib/channels/instagram/anexos.ts`) e único aceito no link \"Ver no Instagram\" da tela — validação, não destino de chamada.",
+  },
+  "www.instagram.com": {
+    categoria: "PLATAFORMA",
+    motivo: "a mesma regra do `instagram.com`, com o `www` que a Meta manda nos payloads de produção.",
+  },
   // ── canal hospedado (Tektus): os dois são DEFAULT de variável de ambiente ──
   //
   // `lib/channels/verdash/credentials.ts` lê `VERDASH_API_BASE_URL` e
@@ -1159,6 +1172,11 @@ describe("catraca de host de terceiro no código que embarca", () => {
       // CONSOLE — o link "Onde pegar a chave" da tela de Credenciais.
       "console.typesafe.ai",
       "deskcomm.app",
+      // Decisão escrita (#13 da auditoria): permalink de post/reel do Instagram.
+      // Mesma natureza do `wa.me`/`maps.google.com`: o produto NÃO baixa nem
+      // fala com o host — a ingestão o reconhece justamente para não baixar a
+      // página como mídia, e quem abre o link é o atendente.
+      "instagram.com",
       // Link que abre o pino que o CLIENTE mandou (`lib/messaging/localizacao.ts`).
       // Mesma natureza do `wa.me` abaixo: o produto não fala com o host, quem
       // abre é o celular do atendente. Crescimento escrito, como a regra pede.
@@ -1181,6 +1199,8 @@ describe("catraca de host de terceiro no código que embarca", () => {
       // aqui, e não em FORNECEDOR, porque o produto NÃO fala com esse host: quem
       // abre o link é o visitante do site. Crescimento escrito, como a regra pede.
       "wa.me",
+      // O mesmo permalink, com o `www` que a Meta manda nos payloads reais.
+      "www.instagram.com",
     ]);
   });
 
