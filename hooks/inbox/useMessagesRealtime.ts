@@ -6,6 +6,7 @@ import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { esquecerConversaSemAcesso, invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
+import { aplicarEventoNaThread } from "@/hooks/inbox/cacheDaThread";
 import type { Message } from "@/lib/types/messaging";
 
 interface MessagesResponse {
@@ -13,7 +14,11 @@ interface MessagesResponse {
   meta?: { cursor?: string | null; has_more?: boolean };
 }
 
-export function useMessagesRealtime(conversationId: string | null) {
+/**
+ * `orgId` é a organização ATIVA: sem ela nenhum payload entra no cache (o
+ * evento vira refetch). Opcional só para não obrigar telas antigas a passá-la.
+ */
+export function useMessagesRealtime(conversationId: string | null, orgId: string | null = null) {
   const qc = useQueryClient();
   const queryKey = useMemo(() => ["messages", conversationId] as const, [conversationId]);
 
@@ -58,17 +63,22 @@ export function useMessagesRealtime(conversationId: string | null) {
     refetchOnWindowFocus: true,
   });
 
-  // Mensagem nova ou apagada pode mexer na prévia e na ordem da lista; o tique
-  // de entregue/lido (UPDATE) não mexe em lista nenhuma. A lista é refeita só
-  // onde a conversa aparece (o canal de conversas cuida de onde ela entra).
+  // O evento entra DIRETO no cache da thread (ver hooks/inbox/cacheDaThread.ts);
+  // o refetch é reserva. Mensagem nova ou apagada pode mexer na prévia e na
+  // ordem da lista; o tique de entregue/lido (UPDATE) não mexe em lista
+  // nenhuma. A lista é refeita só onde a conversa aparece.
   const onChange = useCallback(
     (payload: unknown) => {
       if (!conversationId) return;
-      void qc.invalidateQueries({ queryKey: ["messages", conversationId] });
+      const desfecho = aplicarEventoNaThread(qc, conversationId, orgId, payload);
+      if (desfecho === "ignorado") return;
+      if (desfecho === "refazer") {
+        void qc.invalidateQueries({ queryKey: ["messages", conversationId], exact: true });
+      }
       const evento = (payload as { eventType?: string } | null)?.eventType;
       if (evento !== "UPDATE") invalidarListasDaConversa(qc, conversationId);
     },
-    [qc, conversationId],
+    [qc, conversationId, orgId],
   );
 
   const { status: realtimeStatus, ultimaEntrega } = useRealtimeChannel({

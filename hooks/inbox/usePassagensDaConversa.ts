@@ -1,9 +1,9 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
-import { usePermission } from "@/hooks/auth/AuthProvider";
+import { useActiveOrg, usePermission } from "@/hooks/auth/AuthProvider";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { apiClient } from "@/lib/api/client";
 import type { PassagemDaConversa } from "@/lib/escalacao/cartao-da-passagem";
@@ -56,16 +56,23 @@ export function usePassagensDaConversa(conversationId: string | null): PassagemD
     if (conversationId) qc.invalidateQueries({ queryKey: ["passagens", conversationId] });
   }, [qc, conversationId]);
 
+  // O canal é o das conversas da ORGANIZAÇÃO — exatamente o que a lista do
+  // inbox (`useConversationsRealtime`) já mantém aberto. No inbox isto deixa de
+  // ser um canal a mais por conversa aberta; o recorte (UPDATE desta conversa)
+  // é local. Sem organização ativa, o canal estreito de antes.
+  const orgId = useActiveOrg()?.orgId ?? null;
+  const filtroLocal = useMemo(
+    () => (conversationId ? { eventos: ["UPDATE"] as const, campos: { id: conversationId } } : undefined),
+    [conversationId],
+  );
   useRealtimeChannel({
     name: conversationId ? `conversation-passagens-${conversationId}` : "conversation-passagens-disabled",
     postgresChanges: conversationId
-      ? {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversations",
-          filter: `id=eq.${conversationId}`,
-        }
+      ? orgId
+        ? { event: "*", schema: "public", table: "conversations", filter: `organization_id=eq.${orgId}` }
+        : { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversationId}` }
       : undefined,
+    filtroLocal,
     onChange,
     enabled: !!conversationId && podeConsultar,
   });
