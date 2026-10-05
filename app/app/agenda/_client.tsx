@@ -487,7 +487,7 @@ export function AgendaClient({
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{t("Agenda")}</h1>
           <p className="text-sm text-muted-foreground">
-            {t("O que está marcado, com quem, e quem atende — seu e da equipe.")}
+            {t("O que está marcado, com quem, e quem atende (seu e da equipe).")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
