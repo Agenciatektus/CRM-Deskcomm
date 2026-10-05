@@ -121,6 +121,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         409,
         { requestId },
       );
+    // 9038 (7): a função passou a chamar `fn_tags_guarda`, que recusa sessão sem
+    // o segundo fator com `tags_mfa_required` (também 42501).
+    if (error.code === "42501" && /tags_mfa_required/.test(error.message ?? ""))
+      return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
     if (error.code === "42501")
       return fail("forbidden", "Esta sessão não pode mudar as etiquetas da organização.", 403, { requestId });
     if (error.code === "22023")

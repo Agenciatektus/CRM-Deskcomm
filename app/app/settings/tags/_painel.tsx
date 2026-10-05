@@ -136,8 +136,15 @@ export function PainelDeTags({
   const [ocupado, setOcupado] = useState(false);
 
   const destinos = useMemo(
-    () => tags.filter((linha) => linha.tag.toLowerCase() !== alvo?.tag.toLowerCase()),
-    [tags, alvo],
+    () =>
+      tags.filter(
+        (linha) =>
+          linha.tag.toLowerCase() !== alvo?.tag.toLowerCase() &&
+          // 9038: `cliente` reservada também não é destino de junção.
+          !reservada(linha.tag),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `reservada` deriva de `sugestoes`
+    [tags, alvo, sugestoes],
   );
 
   function abrir(linha: LinhaDeVocabulario, qual: AcaoDeVocabulario) {

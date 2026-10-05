@@ -37,13 +37,13 @@ interface Listas {
   crm?: Record<string, unknown>;
 }
 
-async function como(user: string, sql: string, valores: unknown[] = []) {
+async function como(user: string, sql: string, valores: unknown[] = [], aal = "aal2") {
   const client = await pool.connect();
   try {
     await client.query("begin");
     await client.query("set local role authenticated");
     await client.query("select set_config('request.jwt.claims',$1,true)", [
-      JSON.stringify({ sub: user, role: "authenticated", aal: "aal2" }),
+      JSON.stringify({ sub: user, role: "authenticated", aal }),
     ]);
     const r = await client.query(sql, valores);
     await client.query("commit");
@@ -264,6 +264,29 @@ describe("9038 — a etiqueta cliente reservada", () => {
 });
 
 describe("9038 — quem pode chamar", () => {
+  it("(7) gerente com segundo fator cadastrado precisa da sessão aal2: aal1 é recusada e nada muda", async () => {
+    // Parecer do Cassio (P1): MFA era conferido só na rota, e a RPC é
+    // alcançável direto pelo PostgREST. Agora a guarda da 9005 roda aqui.
+    await definirSettings({ canonical_conversation_tags: ["mfa"] });
+    const fator = randomUUID();
+    await pool.query(
+      "insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",
+      [fator, manager],
+    );
+    try {
+      await expect(
+        como(manager, "select public.fn_vocabulario_de_tags_operar($1,'renomear','mfa','mfa2') as r", [org], "aal1"),
+      ).rejects.toThrow(/tags_mfa_required/);
+      expect((await settings()).canonical_conversation_tags).toEqual(["mfa"]);
+
+      // Controle: a MESMA pessoa, na MESMA operação, em aal2 passa.
+      await como(manager, "select public.fn_vocabulario_de_tags_operar($1,'renomear','mfa','mfa2') as r", [org], "aal2");
+      expect((await settings()).canonical_conversation_tags).toEqual(["mfa2"]);
+    } finally {
+      await pool.query("delete from auth.mfa_factors where id=$1", [fator]);
+    }
+  });
+
   it("manager renomeia (papel decidido para a tela unificada) e viewer é recusado", async () => {
     await definirSettings({ canonical_conversation_tags: ["x"] });
 

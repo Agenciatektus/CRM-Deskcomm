@@ -26610,6 +26610,11 @@ begin
   if p_org is null or not public.fn_role_at_least(p_org, 'manager') then
     raise exception using errcode = '42501', message = 'insufficient_role';
   end if;
+  -- 9038 (7): a MESMA guarda das escritas da 9005 — sessão de suporte em modo
+  -- leitura e MFA provado nesta sessão (e `auth.uid()` presente). O papel acima
+  -- continua respondendo `insufficient_role`, como sempre; a guarda acrescenta
+  -- o que só a rota conferia, e a RPC é alcançável direto pelo PostgREST.
+  perform public.fn_tags_guarda(p_org, 'manager');
 
   if p_acao is null or p_acao not in ('renomear', 'juntar', 'excluir', 'definir_cor') then
     raise exception using errcode = '22023', message = 'acao_invalida';
@@ -26659,10 +26664,11 @@ begin
   -- `destino` nulo nesta ação, a semente seria APAGADA. Daí o `return` cedo:
   -- nesta ação, só o vocabulário curado muda.
   if v_so_cor then
-    -- 9038 (3): `for update` — ver o cabeçalho da migration.
+    -- 9038 (3): trava da curadoria e da linha — ver o cabeçalho da migration.
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text, 9005));
     select coalesce(o.settings, '{}'::jsonb) into v_settings
     from public.organizations o where o.id = p_org
-    for update;
+    for no key update;
     if v_settings is null then
       v_settings := '{}'::jsonb;
     end if;
@@ -26770,6 +26776,21 @@ begin
     p_org, 'contato', array_remove(array[lower(v_tag), lower(nullif(v_destino, ''))], null)
   );
 
+  -- 9038 (3): a ordem de travas é 262 compartilhada (reserva, só quando envolve
+  -- `cliente`) → advisory 9005 (a mesma de criar/arquivar) → linha da
+  -- organização → contatos, leads, conversas. `settings` é lido UMA vez, aqui,
+  -- antes dos laços. `for no key update` e não `for update`: não bloqueia os
+  -- INSERTs com FK para `organizations` (mensagens, event_log) enquanto a
+  -- operação termina.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text, 9005));
+  select coalesce(o.settings, '{}'::jsonb) into v_settings
+  from public.organizations o where o.id = p_org
+  for no key update;
+
+  if v_settings is null then
+    v_settings := '{}'::jsonb;
+  end if;
+
   -- (a) contatos
   for v_id in
     with alvo as (
@@ -26846,14 +26867,7 @@ begin
   -- apagar `add_tag` de um agente em produção é decisão de outra tela. Aqui a
   -- lista da regra só é reescrita quando o nome muda ou quando ele sai.
   --
-  -- 9038 (3): `for update` — ver o cabeçalho da migration.
-  select coalesce(o.settings, '{}'::jsonb) into v_settings
-  from public.organizations o where o.id = p_org
-  for update;
-
-  if v_settings is null then
-    v_settings := '{}'::jsonb;
-  end if;
+  -- 9038 (3): `v_settings` já foi lido (e a linha travada) antes dos laços.
 
   if not v_remover then
     with alvo as (

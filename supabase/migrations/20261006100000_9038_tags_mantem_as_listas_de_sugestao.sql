@@ -49,26 +49,21 @@
 -- com `tags_etiqueta_do_sistema` (42501). Definir cor não passa por ela: cor
 -- não mexe na presença de etiqueta em contato nenhum.
 --
--- ─── (3) A LEITURA DE `settings` TRAVA A LINHA DA ORGANIZAÇÃO ───────────────
+-- ─── (3) A LEITURA DE `settings` TRAVA, NA ORDEM CERTA ─────────────────────
 --
 -- A 0336 lia `organizations.settings` sem trava e gravava o objeto INTEIRO no
--- fim. Uma escrita concorrente em outra chave (roteamento, marca, uma sugestão
--- criada pela `fn_tags_criar` no mesmo segundo) entre a leitura e a gravação era
--- perdida. As duas leituras passam a `for update`: quem chegar depois espera.
--- Ordem de travas: 262 compartilhada (reserva) → linha da organização →
--- contatos, leads, conversas. A `fn_tags_criar` toma 9005 → linha da
--- organização; a `fn_definir_cliente_pela_agenda` toma 262 exclusiva → linhas.
--- Não há ciclo.
---
--- ─── (5) EXCLUIR UMA ETIQUETA APAGAVA O VOCABULÁRIO INTEIRO ─────────────────
---
--- Defeito da 0336, achado pelo invariante desta migration: no ramo de excluir,
--- o `case` de `settings.tags` e da lista de sugestão começava por
--- `when v_remover then null`, sem casar o nome. Toda entrada virava nula e era
--- descartada: excluir `teste` levava junto TODAS as cores escolhidas e TODAS as
--- sugestões de conversa da organização, com a tela dizendo "Etiqueta removida".
--- Agora só a entrada da etiqueta excluída sai. Estendido às quatro listas sem
--- este conserto, o defeito apagaria também as sugestões de contato.
+-- fim: uma escrita concorrente em outra chave (roteamento, marca, uma sugestão
+-- criada pela `fn_tags_criar` no mesmo segundo) era perdida. Agora a função
+-- toma a advisory 9005 (a mesma de criar/arquivar, que gravam as listas de
+-- sugestão sob ela) e lê `settings` UMA vez, com `for no key update`, ANTES de
+-- tocar contatos, leads e conversas. Ordem: 262 compartilhada (reserva, só
+-- quando envolve `cliente`) → 9005 → linha da organização → linhas. A
+-- `fn_definir_cliente_pela_agenda` toma 262 exclusiva → organização → contatos:
+-- as duas pegam a organização antes dos contatos, então não há ciclo. `for no
+-- key update` não bloqueia INSERT com FK para `organizations`. (Parecer do
+-- @Cassio_SecRev: a primeira versão travava a organização DEPOIS dos laços,
+-- com risco de deadlock, e sem a 9005 deixava `fn_tags_criar` desfazer um
+-- renomear numa lista.)
 --
 -- ─── (6) ⛔ EXCLUIR UMA ETIQUETA APAGAVA TODAS AS ETIQUETAS DO REGISTRO ─────
 --
@@ -81,6 +76,16 @@
 -- a regra `add_tag`. Achado pelo invariante desta migration (a `cliente` sumia
 -- ao excluir `vip`). Não há como recuperar o que exclusões passadas apagaram:
 -- `tags` não tem histórico.
+--
+-- ─── (7) A GUARDA DA 9005 TAMBÉM AQUI: MFA E SUPORTE EM LEITURA ───────────
+--
+-- Parecer do @Cassio_SecRev (P1): com (4), esta função vira o ÚNICO caminho de
+-- renomear, juntar e excluir, e o portão dela era só `fn_role_at_least`. MFA e
+-- sessão de suporte em modo leitura eram conferidos só na rota, e a RPC é
+-- alcançável direto pelo PostgREST com o JWT da sessão. Agora ela chama
+-- `fn_tags_guarda(p_org, 'manager')` logo depois do papel (definer chamando
+-- definer; o revoke de `authenticated` na guarda não atrapalha). O erro de
+-- papel continua `insufficient_role`.
 --
 -- ─── (4) TRÊS FUNÇÕES DA 9005 PERDEM O CHAMADOR, E SAEM DA SESSÃO ───────────
 --
@@ -192,6 +197,11 @@ begin
   if p_org is null or not public.fn_role_at_least(p_org, 'manager') then
     raise exception using errcode = '42501', message = 'insufficient_role';
   end if;
+  -- 9038 (7): a MESMA guarda das escritas da 9005 — sessão de suporte em modo
+  -- leitura e MFA provado nesta sessão (e `auth.uid()` presente). O papel acima
+  -- continua respondendo `insufficient_role`, como sempre; a guarda acrescenta
+  -- o que só a rota conferia, e a RPC é alcançável direto pelo PostgREST.
+  perform public.fn_tags_guarda(p_org, 'manager');
 
   if p_acao is null or p_acao not in ('renomear', 'juntar', 'excluir', 'definir_cor') then
     raise exception using errcode = '22023', message = 'acao_invalida';
@@ -241,10 +251,11 @@ begin
   -- `destino` nulo nesta ação, a semente seria APAGADA. Daí o `return` cedo:
   -- nesta ação, só o vocabulário curado muda.
   if v_so_cor then
-    -- 9038 (3): `for update` — ver o cabeçalho da migration.
+    -- 9038 (3): trava da curadoria e da linha — ver o cabeçalho da migration.
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text, 9005));
     select coalesce(o.settings, '{}'::jsonb) into v_settings
     from public.organizations o where o.id = p_org
-    for update;
+    for no key update;
     if v_settings is null then
       v_settings := '{}'::jsonb;
     end if;
@@ -352,6 +363,21 @@ begin
     p_org, 'contato', array_remove(array[lower(v_tag), lower(nullif(v_destino, ''))], null)
   );
 
+  -- 9038 (3): a ordem de travas é 262 compartilhada (reserva, só quando envolve
+  -- `cliente`) → advisory 9005 (a mesma de criar/arquivar) → linha da
+  -- organização → contatos, leads, conversas. `settings` é lido UMA vez, aqui,
+  -- antes dos laços. `for no key update` e não `for update`: não bloqueia os
+  -- INSERTs com FK para `organizations` (mensagens, event_log) enquanto a
+  -- operação termina.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_org::text, 9005));
+  select coalesce(o.settings, '{}'::jsonb) into v_settings
+  from public.organizations o where o.id = p_org
+  for no key update;
+
+  if v_settings is null then
+    v_settings := '{}'::jsonb;
+  end if;
+
   -- (a) contatos
   for v_id in
     with alvo as (
@@ -428,14 +454,7 @@ begin
   -- apagar `add_tag` de um agente em produção é decisão de outra tela. Aqui a
   -- lista da regra só é reescrita quando o nome muda ou quando ele sai.
   --
-  -- 9038 (3): `for update` — ver o cabeçalho da migration.
-  select coalesce(o.settings, '{}'::jsonb) into v_settings
-  from public.organizations o where o.id = p_org
-  for update;
-
-  if v_settings is null then
-    v_settings := '{}'::jsonb;
-  end if;
+  -- 9038 (3): `v_settings` já foi lido (e a linha travada) antes dos laços.
 
   if not v_remover then
     with alvo as (
