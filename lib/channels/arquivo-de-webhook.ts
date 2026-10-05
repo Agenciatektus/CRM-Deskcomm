@@ -37,7 +37,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
 
-import { arquivoEnxuto, cabecalhosParaArquivo } from "./enxugar-para-arquivo";
+import { cabecalhosParaArquivo } from "./cabecalhos-para-arquivo";
+import { arquivoEnxuto } from "./enxugar-para-arquivo";
 
 /**
  * Abre a linha do arquivo. Devolve o id para o fechamento, ou `null` quando não

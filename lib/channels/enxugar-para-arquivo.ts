@@ -54,6 +54,8 @@
  */
 import { createHash } from "node:crypto";
 
+import { credencialPeloValor, valorEhCredencial } from "./credencial-pelo-valor";
+
 /** String acima disto vira marcador, qualquer que seja a chave. */
 export const TETO_DE_TEXTO = 4096;
 /** O corpo enxuto inteiro acima disto vira marcador. */
@@ -90,12 +92,13 @@ const PEDACOS_DE_SEGREDO = [
 const PEDACO_DE_MIDIA = "base64";
 
 /**
- * Parâmetro de URL cujo valor é credencial. `signature` fica DE FORA de
+ * Parâmetro de URL cujo valor é credencial (`key=`, `sig=`, `auth=` e `code=`
+ * entraram na revisão do @Cassio_SecRev na #98). `signature` fica DE FORA de
  * propósito: a URL de anexo da Meta (`lookaside.fbsbx.com/...&signature=`) é
  * relida do arquivo por `scripts/midia-do-instagram-retroativa.ts`.
  */
 const PARAMETRO_DE_SEGREDO =
-  /([?&;](?:access_token|refresh_token|id_token|token|apikey|api_key|secret|password)=)[^&#\s"']+/gi;
+  /([?&;](?:access_token|refresh_token|id_token|token|apikey|api_key|key|secret|password|sig|auth|code)=)[^&#\s"']+/gi;
 
 function normalizarChave(chave: string): string {
   return chave.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -117,7 +120,7 @@ export interface MarcadorDeOmissao {
   sha256: string;
 }
 
-function sha256(texto: string): string {
+export function sha256(texto: string): string {
   return createHash("sha256").update(texto).digest("hex");
 }
 
@@ -131,7 +134,7 @@ interface Passada {
 }
 
 /** URL com credencial na query perde o valor; o resto fica. */
-function semCredencialNaUrl(texto: string, p: Passada): string {
+export function semCredencialNaUrl(texto: string, p: Passada): string {
   if (!texto.includes("=")) return texto;
   const limpo = texto.replace(PARAMETRO_DE_SEGREDO, `$1${TOKEN_OMITIDO}`);
   if (limpo !== texto) p.cortou = true;
@@ -146,6 +149,10 @@ function semCredencialNaUrl(texto: string, p: Passada): string {
  * objetos — por isso é aberto e passado pela mesma regra.
  */
 function enxugarTexto(texto: string, p: Passada, profundidade: number): unknown {
+  if (valorEhCredencial(texto)) {
+    p.cortou = true;
+    return TOKEN_OMITIDO;
+  }
   if (texto.length > TETO_DE_TEXTO) {
     p.cortou = true;
     return marcador("tamanho", texto);
@@ -172,7 +179,10 @@ function enxugarObjeto(v: Record<string, unknown>, p: Passada, profundidade: num
   const sub: Passada = { cortou: false };
   const out: Record<string, unknown> = {};
   for (const [chave, valor] of Object.entries(v)) {
-    if (chaveSensivel(chave) && valor !== null && valor !== undefined && valor !== "") {
+    if (
+      (chaveSensivel(chave) && valor !== null && valor !== undefined && valor !== "") ||
+      credencialPeloValor(chave, valor)
+    ) {
       out[chave] = TOKEN_OMITIDO;
       sub.cortou = true;
     } else if (chaveDeMidia(chave) && typeof valor === "string" && valor.length > 0) {
@@ -235,7 +245,7 @@ function formularioEnxuto(texto: string): string {
   const p: Passada = { cortou: false };
   const out = new URLSearchParams();
   for (const [chave, valor] of new URLSearchParams(texto)) {
-    if (chaveSensivel(chave) && valor !== "") {
+    if ((chaveSensivel(chave) && valor !== "") || credencialPeloValor(chave, valor)) {
       out.append(chave, TOKEN_OMITIDO);
       p.cortou = true;
     } else if (chaveDeMidia(chave) && valor !== "") {
@@ -295,35 +305,4 @@ export function arquivoEnxuto(rawBody: string): ArquivoEnxuto {
   }
 
   return { rawBody: texto, parsed: ehObjeto ? (payload as Record<string, unknown>) : null };
-}
-
-/**
- * Cabeçalhos que NUNCA entram no arquivo, por nome exato. Além destes, sai todo
- * cabeçalho cujo nome tenha pedaço de credencial (`chaveSensivel`).
- *
- * `x-webhook-secret` é o SEGREDO COMPARTILHADO que um canal manda em claro e que
- * `lib/channels/inbound.ts` compara direto (não é HMAC): arquivado, qualquer
- * membro da org que lê o arquivo poderia forjar mensagem de entrada. `token` e
- * `apikey` são credenciais que servidores de WhatsApp mandam por header.
- */
-const CABECALHOS_PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey"];
-
-/**
- * Cabeçalhos sanitizados.
- *
- * Assinatura HMAC do corpo FICA (`x-hub-signature-256` e afins): permite
- * reconferir depois se a recusa foi de assinatura ou de segredo, e é derivada
- * do corpo, não abre nada sozinha. Valor acima do teto vira marcador.
- */
-export function cabecalhosParaArquivo(headers: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  headers.forEach((valor, chave) => {
-    const k = chave.toLowerCase();
-    if (CABECALHOS_PROIBIDOS.includes(k) || chaveSensivel(k)) return;
-    out[chave] =
-      valor.length > TETO_DE_TEXTO
-        ? `[omitido: ${valor.length} caracteres, sha256 ${sha256(valor)}]`
-        : semCredencialNaUrl(valor, { cortou: false });
-  });
-  return out;
 }
