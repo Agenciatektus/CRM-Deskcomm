@@ -30,7 +30,7 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
-import type { LinhaDeVocabulario } from "@/lib/schemas/tags";
+import { inventarioDeTagsSchema, type LinhaDeVocabulario } from "@/lib/schemas/tags";
 import { createClient } from "@/lib/supabase/server";
 
 import { PainelDeTags } from "./_painel";
@@ -61,9 +61,21 @@ export default async function TagsPage() {
   // organização vem da RLS e do `p_org` da sessão. Ler com o admin client aqui
   // mostraria o vocabulário de qualquer tenant se alguém trocasse o id.
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("fn_vocabulario_de_tags", {
-    p_org: activeOrg.orgId,
-  });
+  // ─── DIVERGÊNCIA TEKTUS (9038): as duas leituras, em paralelo ────────────
+  // Desde a 9038 esta é a única tela de etiquetas, e ela mostra também as
+  // SUGESTÕES da curadoria do fork (`fn_tags_inventario`, migration 9005,
+  // `security invoker` como a de cima). Pelo MESMO client de sessão, pelo mesmo
+  // motivo do comentário acima.
+  const [vocabulario, inventario] = await Promise.all([
+    supabase.rpc("fn_vocabulario_de_tags", { p_org: activeOrg.orgId }),
+    supabase.rpc("fn_tags_inventario", { p_org: activeOrg.orgId }),
+  ]);
+  const { data } = vocabulario;
+  // A falha de QUALQUER das duas vira o aviso de erro: mostrar a lista sem as
+  // sugestões faria toda etiqueta parecer "fora das sugestões", e o operador
+  // promoveria de novo o que já estava sugerido.
+  const error = vocabulario.error ?? inventario.error;
+  const sugestoes = error ? null : inventarioDeTagsSchema.parse(inventario.data ?? {});
 
   const idioma = user.idioma;
   const t = (texto: string) => traduzir(texto, idioma);
@@ -74,7 +86,7 @@ export default async function TagsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">{t("Tags")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           {t(
-            "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Renomear ou juntar corrige também as regras de agente que escrevem a etiqueta, na mesma operação.",
+            "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Acrescente novas, escolha quais são sugeridas para quem atende em conversas e contatos, e arrume as que existem: renomear ou juntar corrige também as regras de agente e as sugestões, na mesma operação.",
           )}
         </p>
       </header>
@@ -86,7 +98,11 @@ export default async function TagsPage() {
           {t("Não foi possível carregar as etiquetas agora. Recarregue a página.")}
         </div>
       ) : (
-        <PainelDeTags tags={(data ?? []) as LinhaDeVocabulario[]} idioma={idioma} />
+        <PainelDeTags
+          tags={(data ?? []) as LinhaDeVocabulario[]}
+          idioma={idioma}
+          sugestoes={sugestoes}
+        />
       )}
     </div>
   );

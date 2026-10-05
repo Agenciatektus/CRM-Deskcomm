@@ -1,7 +1,16 @@
 "use server";
 
 /**
- * CURADORIA DO VOCABULÁRIO DE ETIQUETAS — as cinco escritas da migration 9005.
+ * CURADORIA DO VOCABULÁRIO DE ETIQUETAS — as escritas de SUGESTÃO (migration 9005).
+ *
+ * ⚠️ DESDE A 9038 SÃO DUAS, e não cinco. A tela de Etiquetas saiu do menu e a de
+ * Tags (`app/app/settings/tags`) passou a ser a única tela de etiquetas. Lá,
+ * renomear, juntar e excluir saem por `fn_vocabulario_de_tags_operar` (rota
+ * `POST /api/v1/tags/vocabulario`, papel `manager`, decisão do Peterson em
+ * 05/10/2026), que desde a 9038 mantém também as listas de sugestão. Ficam aqui
+ * só as duas que mexem nas SUGESTÕES: criar (acrescentar ou promover) e
+ * arquivar/desarquivar. As funções SQL de renomear, mesclar e apagar da 9005
+ * continuam no banco, sem chamador.
  *
  * ⚠️ PELO CLIENT DA SESSÃO, e nunca `.from("organizations").update(...)`: a
  * única policy de escrita de `organizations` é de platform admin, e o UPDATE de
@@ -18,17 +27,10 @@
  * O `organization_id` vem de `resolveActiveOrg`, NUNCA de argumento — Server
  * Action é endpoint público, e o tipo do parâmetro não chega ao servidor.
  *
- * ─── OS DOIS PAPÉIS ─────────────────────────────────────────────────────────
+ * ─── O PAPEL ────────────────────────────────────────────────────────────────
  *
  * manager ... criar, arquivar. Não tocam conversa nem contato; o custo de um
  *             clique errado é uma sugestão a mais na lista.
- * admin ..... renomear, mesclar, apagar. As três reescrevem `tags` em massa e
- *             nenhuma tem desfazer.
- *
- * É a régua que a casa já aplicou duas vezes: `fn_agenda_settings` é manager
- * porque é configuração reversível que não reescreve dado;
- * `fn_definir_cliente_pela_agenda` é admin porque "ligar reescreve as etiquetas
- * de todo contato com histórico, e desligar não desfaz".
  */
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -58,9 +60,9 @@ const corpoSchema = z.object({
 type Sessao = { userId: string; orgId: string };
 
 /**
- * O preâmbulo das cinco, escrito uma vez.
+ * O preâmbulo das ações, escrito uma vez.
  *
- * Repetido cinco vezes, é a quinta cópia que esquece o `supportWriteError` — e
+ * Repetido em cada ação, é a cópia seguinte que esquece o `supportWriteError` — e
  * uma sessão de acompanhamento de suporte passaria a escrever no vocabulário do
  * cliente, que é justamente o que aquele modo promete não fazer.
  *
@@ -97,7 +99,7 @@ function ehErro(s: Sessao | { erro: RespostaDeCuradoria }): s is { erro: Respost
  * para o atendente no próximo recarregamento completo do app.
  */
 function recarregar() {
-  revalidatePath("/app/settings/tenant/tags");
+  revalidatePath("/app/settings/tags");
   revalidatePath("/app", "layout");
 }
 
@@ -181,51 +183,4 @@ export async function arquivarTag(
     { p_escopo: alvo.escopo, p_tag: alvo.tag, p_arquivar: flag.data },
     flag.data ? "tags.arquivada" : "tags.desarquivada",
   );
-}
-
-// ─── admin ──────────────────────────────────────────────────────────────────
-
-export async function renomearTag(
-  escopo: unknown,
-  de: unknown,
-  para: unknown,
-): Promise<RespostaDeCuradoria> {
-  const alvo = lerAlvo(escopo, de);
-  const destino = nomeDeTagSchema.safeParse(para);
-  if (!alvo || !destino.success) return { ok: false, erro: "nome_invalido" };
-  const s = await abrirSessao(await loadAuthUser(), "admin");
-  if (ehErro(s)) return s.erro;
-  return chamar(
-    s,
-    "fn_tags_renomear",
-    { p_escopo: alvo.escopo, p_de: alvo.tag, p_para: destino.data },
-    "tags.renomeada",
-  );
-}
-
-export async function mesclarTags(
-  escopo: unknown,
-  origens: unknown,
-  destino: unknown,
-): Promise<RespostaDeCuradoria> {
-  const e = escopoDeTagSchema.safeParse(escopo);
-  const o = z.array(nomeDeTagSchema).min(1).max(50).safeParse(origens);
-  const d = nomeDeTagSchema.safeParse(destino);
-  if (!e.success || !o.success || !d.success) return { ok: false, erro: "nome_invalido" };
-  const s = await abrirSessao(await loadAuthUser(), "admin");
-  if (ehErro(s)) return s.erro;
-  return chamar(
-    s,
-    "fn_tags_mesclar",
-    { p_escopo: e.data, p_origens: o.data, p_destino: d.data },
-    "tags.mesclada",
-  );
-}
-
-export async function apagarTag(escopo: unknown, tag: unknown): Promise<RespostaDeCuradoria> {
-  const alvo = lerAlvo(escopo, tag);
-  if (!alvo) return { ok: false, erro: "nome_invalido" };
-  const s = await abrirSessao(await loadAuthUser(), "admin");
-  if (ehErro(s)) return s.erro;
-  return chamar(s, "fn_tags_apagar", { p_escopo: alvo.escopo, p_tag: alvo.tag }, "tags.apagada");
 }

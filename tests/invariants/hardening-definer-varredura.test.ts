@@ -107,63 +107,6 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "por `auth.uid()` nulo e anon sem EXECUTE. ",
   },
   {
-    fn: "fn_tags_renomear(uuid,text,text,text)",
-    razao:
-      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
-      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
-      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
-      "executa. Definer porque a única policy de escrita de `organizations` é de " +
-      "platform admin: pela sessão de um admin de tenant, um " +
-      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
-      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
-      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
-      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
-      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`, e não " +
-      "`manager`: renomear reescreve `tags` em massa nas conversas ou nos " +
-      "contatos da organização e não tem desfazer — a mesma régua que faz " +
-      "`fn_definir_cliente_pela_agenda` ser admin. " +
-      "tests/invariants/tags-curadoria-acl.test.ts prova com JWT real que o piso é " +
-      "mesmo admin: manager é RECUSADO aqui e aceito em `fn_tags_criar`, no mesmo " +
-      "arquivo — mais viewer/agent, admin de outra organização, service_role e anon. ",
-  },
-  {
-    fn: "fn_tags_mesclar(uuid,text,text[],text)",
-    razao:
-      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
-      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
-      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
-      "executa. Definer porque a única policy de escrita de `organizations` é de " +
-      "platform admin: pela sessão de um admin de tenant, um " +
-      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
-      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
-      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
-      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
-      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: funde " +
-      "variantes reescrevendo `tags` em massa, sem desfazer. " +
-      "tests/invariants/tags-curadoria-acl.test.ts prova com JWT real que o piso é " +
-      "mesmo admin: manager é RECUSADO aqui e aceito em `fn_tags_criar`, no mesmo " +
-      "arquivo — mais viewer/agent, admin de outra organização, service_role e anon. ",
-  },
-  {
-    fn: "fn_tags_apagar(uuid,text,text)",
-    razao:
-      "app/actions/settings/curarTags.ts usa createClient da SESSÃO, e aqui não é " +
-      "preferência: a função começa por `fn_tags_guarda`, que recusa com " +
-      "`tags_forbidden` quando `auth.uid()` é nulo — com a service key ela não " +
-      "executa. Definer porque a única policy de escrita de `organizations` é de " +
-      "platform admin: pela sessão de um admin de tenant, um " +
-      "`.from('organizations').update(...)` casa ZERO linhas e devolve SUCESSO, e " +
-      'a tela diria "salvo" sobre coisa nenhuma. A guarda de tenant é a da casa — ' +
-      "`fn_role_at_least(p_org, …)` + `fn_support_write_allowed` + " +
-      "`fn_session_mfa_proven`, antes de qualquer escrita — e `p_org` vem de " +
-      "`resolveActiveOrg`, nunca do corpo da requisição. Piso `admin`: é a única " +
-      "das cinco que destrói dado — tira a etiqueta do vocabulário E de todo " +
-      "registro que a usa. tests/invariants/tags-curadoria-acl.test.ts prova com " +
-      "JWT real que o piso é mesmo admin: manager é RECUSADO aqui e aceito em " +
-      "`fn_tags_criar`, no mesmo arquivo — mais viewer/agent, admin de outra " +
-      "organização, service_role e anon. ",
-  },
-  {
     fn: "fn_honorarios_parcela_pagar(uuid,uuid,uuid,uuid)",
     razao:
       "POST app/api/v1/honorarios/parcelas/[id]/pagar/route.ts usa createClient da " +

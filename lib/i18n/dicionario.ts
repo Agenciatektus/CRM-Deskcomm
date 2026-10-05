@@ -12018,8 +12018,8 @@ export const DICIONARIO: Traducoes = {
   // inteira caía no português em plena tela traduzida (o conferidor de chaves
   // só enxerga o que já está escrito, e a tela é nova). Vocabulário herdado do
   // resto do dicionário — `funil` é `embudo`, `Inbox` continua `Inbox`.
-  "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Renomear ou juntar corrige também as regras de agente que escrevem a etiqueta, na mesma operação.": {
-    es: "Las etiquetas que usan los agentes, el Inbox y el embudo en esta organización. Renombrar o unir corrige también las reglas de agente que escriben la etiqueta, en la misma operación.",
+  "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Acrescente novas, escolha quais são sugeridas para quem atende em conversas e contatos, e arrume as que existem: renomear ou juntar corrige também as regras de agente e as sugestões, na mesma operação.": {
+    es: "Las etiquetas que usan los agentes, el Inbox y el embudo en esta organización. Añade nuevas, elige cuáles se sugieren a quien atiende en conversaciones y contactos, y ordena las que existen: renombrar o unir corrige también las reglas de agente y las sugerencias, en la misma operación.",
   },
   "Não foi possível carregar as etiquetas agora. Recarregue a página.": {
     es: "No se pudieron cargar las etiquetas ahora. Recarga la página.",
@@ -12852,6 +12852,20 @@ export const DICIONARIO: Traducoes = {
   "O banco estava ocupado. Tente de novo.":
     { es: "La base de datos estaba ocupada. Inténtalo de nuevo." },
   "Acrescentar etiqueta": { es: "Añadir etiqueta" },
+  // ─── Tags: as sugestões vindas da curadoria (migration 9038) ────────────────
+  "Sugestão": { es: "Sugerencia" },
+  "Sugerir em conversas": { es: "Sugerir en conversaciones" },
+  "Sugerir em contatos": { es: "Sugerir en contactos" },
+  "Escolha onde ela aparece como sugestão para quem atende.":
+    { es: "Elige dónde aparece como sugerencia para quien atiende." },
+  "Sugerida para quem atende. Clique para arquivar.":
+    { es: "Sugerida a quien atiende. Haz clic para archivarla." },
+  "Arquivada: não é mais sugerida. Clique para voltar a sugerir.":
+    { es: "Archivada: ya no se sugiere. Haz clic para volver a sugerirla." },
+  "Fora das sugestões. Clique para sugerir.":
+    { es: "Fuera de las sugerencias. Haz clic para sugerirla." },
+  "Já existe uma etiqueta com esse nome. Para unir as duas, use Juntar na linha dela.":
+    { es: "Ya existe una etiqueta con ese nombre. Para unir las dos, usa Juntar en su fila." },
   "orçamento": { es: "presupuesto" },
   "Etiqueta acrescentada.": { es: "Etiqueta añadida." },
   "Acrescentar": { es: "Añadir" },
@@ -13572,8 +13586,8 @@ export const DICIONARIO: Traducoes = {
     es: "Busca empresas y contáctalas de forma gradual con ayuda de la IA.",
   },
   Dinheiro: { es: "Dinero" },
-  "O vocabulário de etiquetas da empresa: onde cada uma é usada e como renomear, juntar ou excluir.": {
-    es: "El vocabulario de etiquetas de la empresa: dónde se usa cada una y cómo renombrarla, unirla o eliminarla.",
+  "As etiquetas da empresa: acrescentar, escolher quais são sugeridas em conversas e contatos, renomear, juntar, arquivar e excluir.": {
+    es: "Las etiquetas de la empresa: añadir, elegir cuáles se sugieren en conversaciones y contactos, renombrar, unir, archivar y eliminar.",
   },
   "Credenciais do provedor SIP para chamadas de voz por IA.": {
     es: "Credenciales del proveedor SIP para las llamadas de voz con IA.",
