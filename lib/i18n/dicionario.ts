@@ -42,7 +42,7 @@ export const DICIONARIO: Traducoes = {
   "Atualizado": {"es": "Actualizado"},
   "Buscar por nome ou CNPJ": {"es": "Buscar por nombre o CNPJ"},
   "Buscar por nome ou e-mail": {"es": "Buscar por nombre o correo"},
-  "Cadastro B2B — razão social, CNPJ e decisores.": {"es": "Registro B2B: razón social, CNPJ y decisores."},
+  "Cadastro B2B: razão social, CNPJ e decisores.": {"es": "Registro B2B: razón social, CNPJ y decisores."},
   "Cadastro B2B com CNPJ e enriquecimento via BrasilAPI.": {"es": "Registro B2B con CNPJ y datos completados por BrasilAPI."},
   "Cidade/UF": {"es": "Ciudad/Estado"},
   "Conflitos": {"es": "Conflictos"},
@@ -1436,7 +1436,7 @@ export const DICIONARIO: Traducoes = {
   "Montar o agente": { es: "Configurar el agente" },
   "Ensinar o agente": { es: "Enseñar al agente" },
   "Acompanhar o agente": { es: "Supervisar al agente" },
-  "Tudo que define quem atende por você — e como acompanhar o que ele faz.": {
+  "Tudo que define quem atende por você, e como acompanhar o que ele faz.": {
     es: "Todo lo que define quién atiende por ti, y cómo dar seguimiento a lo que hace.",
   },
   "Quem atende por você: instruções, modelo, ferramentas e publicação.": {
@@ -1478,7 +1478,7 @@ export const DICIONARIO: Traducoes = {
   "Melhorias que a IA sugere para si mesma, esperando sua decisão.": {
     es: "Mejoras que la IA sugiere para sí misma y que esperan tu decisión.",
   },
-  "O que a IA fez — e, quando falhou, o que aconteceu e o que fazer.": {
+  "O que a IA fez e, quando falhou, o que aconteceu e o que fazer.": {
     es: "Lo que hizo la IA y, cuando falló, qué ocurrió y qué hacer.",
   },
   "Uso e orçamento": { es: "Uso y presupuesto" },
@@ -1492,7 +1492,7 @@ export const DICIONARIO: Traducoes = {
   // abre todo dia fica no sidebar, o que se define uma vez fica só no hub.
   "O dia a dia da venda": { es: "El día a día de la venta" },
   "Preparar a venda": { es: "Preparar la venta" },
-  "Onde a venda acontece — e o que você define uma vez para ela funcionar.": {
+  "Onde a venda acontece, e o que você define uma vez para ela funcionar.": {
     es: "Donde ocurre la venta — y lo que defines una vez para que funcione.",
   },
 
@@ -1502,7 +1502,7 @@ export const DICIONARIO: Traducoes = {
   // toda semana fica no sidebar, o que se visita de propósito fica só no hub.
   "Os números do período": { es: "Los números del período" },
   "O histórico que se consulta": { es: "El historial que se consulta" },
-  "Como o negócio foi no período — e o histórico para quando alguém perguntar por quê.": {
+  "Como o negócio foi no período, e o histórico para quando alguém perguntar por quê.": {
     es: "Cómo le fue al negocio en el período y el historial para cuando alguien pregunte por qué.",
   },
 
@@ -8829,7 +8829,7 @@ export const DICIONARIO: Traducoes = {
   //
   // Terminologia herdada do passe anterior, de propósito: atendente→agente,
   // funil→embudo, agendamento→cita, negócio→negocio, demanda→demanda.
-  "O que está marcado, com quem, e quem atende — seu e da equipe.": { es: "Qué citas hay, con quién y quién las atiende: las tuyas y las del equipo." },
+  "O que está marcado, com quem, e quem atende (seu e da equipe).": { es: "Qué citas hay, con quién y quién las atiende: las tuyas y las del equipo." },
   "Cadastre um tipo de agendamento para começar": { es: "Registra un tipo de cita para empezar" },
   "Período anterior": { es: "Período anterior" },
   "Próximo período": { es: "Período siguiente" },
@@ -10640,7 +10640,7 @@ export const DICIONARIO: Traducoes = {
   "O que ficou combinado, com prazo. Tarefa presa a um negócio aparece na linha do tempo dele.": {
     es: "Lo que quedó acordado, con plazo. Una tarea vinculada a un negocio aparece en su línea de tiempo.",
   },
-  "O que ficou combinado, com prazo — e o que já venceu sem ninguém fazer.": {
+  "O que ficou combinado, com prazo, e o que já venceu sem ninguém fazer.": {
     es: "Lo que quedó acordado, con plazo, y lo que ya venció sin que nadie lo hiciera.",
   },
   "Em aberto": { es: "Abiertas" },
@@ -11701,12 +11701,12 @@ export const DICIONARIO: Traducoes = {
   "O catálogo da loja, com o preço que o atendente de IA responde.": { es: "El catálogo de la tienda, con el precio que responde el agente de IA." },
   "O que se pode marcar, quanto dura, onde acontece e quem atende.": { es: "Qué se puede programar, cuánto dura, dónde se realiza y quién atiende." },
   "Quanto custou cada resultado das campanhas que trazem gente para cá.": { es: "Cuánto costó cada resultado de las campañas que traen gente aquí." },
-  "Quem esfriou e ainda está aberto — o que corre risco de morrer sem resposta.": { es: "Quiénes se enfriaron y siguen abiertos: lo que corre el riesgo de perderse sin respuesta." },
-  "Quem fez o quê, quando — o histórico que não se apaga.": { es: "Quién hizo qué y cuándo: el historial que no se borra." },
+  "Quem esfriou e ainda está aberto: o que corre risco de morrer sem resposta.": { es: "Quiénes se enfriaron y siguen abiertos: lo que corre el riesgo de perderse sin respuesta." },
+  "Quem fez o quê e quando. O histórico que não se apaga.": { es: "Quién hizo qué y cuándo: el historial que no se borra." },
   "Relatório do que a equipe e os agentes fizeram no período: quanto, quem e de que tipo.": { es: "Informe de lo que el equipo y los agentes hicieron en el período: cuánto, quién y de qué tipo." },
   "Scripts salvos para responder mais rápido, seus ou da equipe.": { es: "Scripts guardados para responder más rápido, tuyos o del equipo." },
   "Se o agente está melhorando, onde ele erra e o que falta ensinar.": { es: "Si el agente está mejorando, dónde se equivoca y qué falta enseñar." },
-  "Seus funis de venda — clique em um para abrir o quadro de clientes.": { es: "Tus embudos de venta. Haz clic en uno para abrir el tablero de clientes." },
+  "Seus funis de venda. Clique em um para abrir o quadro de clientes.": { es: "Tus embudos de venta. Haz clic en uno para abrir el tablero de clientes." },
   "Seus números de WhatsApp: por QR ou canal oficial da Meta, com saúde, reconexão e templates.": { es: "Tus números de WhatsApp: por QR o canal oficial de Meta, con salud, reconexión y plantillas." },
   "Agendamento criado.": { es: "Cita creada." },
   "Agendamento remarcado.": { es: "Cita reprogramada." },
@@ -13649,7 +13649,7 @@ export const DICIONARIO: Traducoes = {
   "Vencida": {"es": "Vencida"},
   "Fechar a venda": {"es": "Cerrar la venta"},
   "Configure a validade padrão e condições para propostas comerciais.": {"es": "Configure la validez predeterminada y las condiciones para propuestas comerciales."},
-  "Rascunhe, revise e envie propostas comerciais — do orçamento ao aceite.": {"es": "Redacta, revisa y envía propuestas comerciales — del presupuesto a la aceptación."},
+  "Rascunhe, revise e envie propostas comerciais, do orçamento ao aceite.": {"es": "Redacta, revisa y envía propuestas comerciales — del presupuesto a la aceptación."},
   "A proposta mudou desde que você abriu. Recarregue antes de editar.": {"es": "La propuesta cambió desde que la abriste. Recarga antes de editar."},
   "Título da proposta": {"es": "Título de la propuesta"},
   "Condições": {"es": "Condiciones"},
