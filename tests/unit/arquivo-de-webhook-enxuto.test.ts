@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { abrirArquivoDoWebhook } from "@/lib/channels/arquivo-de-webhook";
+import { cabecalhosParaArquivo } from "@/lib/channels/cabecalhos-para-arquivo";
 import {
   arquivoEnxuto,
-  cabecalhosParaArquivo,
   enxugarParaArquivo,
   TETO_DE_TEXTO,
   TOKEN_OMITIDO,
@@ -110,15 +110,15 @@ describe("arquivoEnxuto — nenhum formato vaza", () => {
 
   it("o marcador de mídia guarda tamanho e sha256, não o conteúdo", () => {
     const r = arquivoEnxuto(JSON.stringify(itemDeAlbum));
-    expect(r.parsed?.base64).toMatchObject({ omitido: true, motivo: "midia", caracteres: MIDIA.length });
-    expect((r.parsed?.base64 as { sha256: string }).sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.parsed?.base64).toBe(`[omitido:midia:${MIDIA.length}c:sha=${(r.parsed?.base64 as string).slice(-17, -1)}]`);
+    expect(r.parsed?.base64).toMatch(/^\[omitido:midia:\d+c:sha=[0-9a-f]{16}\]$/);
     expect(r.parsed?.token).toBe(TOKEN_OMITIDO);
     expect(r.parsed?.album).toEqual({ albumId: "ALB-1", role: "item" });
   });
 
   it("string longa sem nome de mídia vira marcador de tamanho", () => {
     const r = arquivoEnxuto(JSON.stringify({ a: { b: "x".repeat(TETO_DE_TEXTO + 1) } }));
-    expect((r.parsed?.a as { b: unknown }).b).toMatchObject({ omitido: true, motivo: "tamanho" });
+    expect((r.parsed?.a as { b: unknown }).b).toMatch(/^\[omitido:tamanho:4097c:sha=[0-9a-f]{16}\]$/);
   });
 
   it("o resto do payload fica como veio (downloadURL, tipo, evento)", () => {
@@ -157,7 +157,7 @@ describe("arquivoEnxuto — nenhum formato vaza", () => {
     const muitas = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`k${i}`, "y".repeat(4000)]));
     const r = arquivoEnxuto(JSON.stringify(muitas));
     expect(r.rawBody.length).toBeLessThan(64 * 1024);
-    expect(r.parsed).toMatchObject({ omitido: true, motivo: "tamanho" });
+    expect(r.parsed?.omitido).toMatch(/^\[omitido:tamanho:/);
   });
 
   it("lista e escalar continuam com payload_parsed nulo", () => {
@@ -184,7 +184,7 @@ describe("cabeçalhos", () => {
     );
     expect(vazou(JSON.stringify(h))).toEqual([]);
     expect(Object.keys(h).sort()).toEqual(["content-type", "x-grande", "x-hub-signature-256"]);
-    expect(h["x-grande"]).toMatch(/^\[omitido: \d+ caracteres, sha256 [0-9a-f]{64}\]$/);
+    expect(h["x-grande"]).toMatch(/^\[omitido:tamanho:\d+c:sha=[0-9a-f]{16}\]$/);
   });
 });
 
@@ -220,4 +220,77 @@ describe("o ponto de escrita grava a versão enxuta", () => {
       expect(vazou(JSON.stringify(guardado.insert))).toEqual([]);
     });
   }
+});
+
+describe("P2 do Cassio na #98: credencial reconhecida pelo VALOR", () => {
+  const JWT_FALSO = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJhLWZhbHNh";
+  const SESSAO = "9f8e7d6c5b4a39281706f5e4d3c2b1a0";
+  const CHAVE = "Zm9vYmFyLWNoYXZlLWxvbmdhLTEyMzQ1";
+
+  // Os falsos negativos da regra só-por-nome: cada um passava pela #98.
+  const FALSOS_NEGATIVOS: Record<string, Record<string, unknown>> = {
+    "auth com Bearer": { auth: `Bearer ${TOKEN}` },
+    "jwt": { jwt: JWT_FALSO },
+    "JWT em chave qualquer": { data: { valor: JWT_FALSO } },
+    "Bearer em chave qualquer": { meta: { header: `Bearer ${TOKEN}` } },
+    "session de alta entropia": { session: SESSAO },
+    "sessionId": { sessionId: SESSAO },
+    "pwd": { pwd: "hunter2!" },
+    "pass": { user: { pass: "correcthorse" } },
+    "key": { key: CHAVE },
+    "x-auth": { "x-auth": CHAVE },
+  };
+
+  for (const [nome, payload] of Object.entries(FALSOS_NEGATIVOS)) {
+    it(`${nome}: o valor sai`, () => {
+      const cru = JSON.stringify(payload);
+      const segredo = cru.match(/Bearer [^"]+|eyJ[^"]+|9f8e[^"]+|hunter2!|correcthorse|Zm9v[^"]+/)![0];
+      const r = arquivoEnxuto(cru);
+      expect(r.rawBody).not.toContain(segredo);
+      expect(JSON.stringify(r.parsed)).not.toContain(segredo);
+      expect(r.rawBody).toContain(TOKEN_OMITIDO);
+    });
+  }
+
+  it("o que NÃO é credencial fica: id de mensagem, sessão do WAHA, texto com 'Bearer'", () => {
+    const p = {
+      event: { Info: { ID: "3EB0C7A1B2C3D4E5F6A7B8C9" }, Key: { ID: "3EB0C7A1B2C3D4E5F6A7B8C9" } },
+      session: "default",
+      text: "Bearer of good news, chegou o pedido",
+      keyword: "promoção",
+      passageiros: 3,
+    };
+    const cru = JSON.stringify(p);
+    expect(arquivoEnxuto(cru).rawBody).toBe(cru);
+  });
+
+  it("URL: key=, sig=, auth= e code= mascarados; signature= da Meta fica", () => {
+    const urls = {
+      a: "https://x.exemplo/f?key=AAAA1111&sig=BBBB2222&auth=CCCC3333&code=DDDD4444&ok=1",
+      meta: "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=1&signature=abc",
+    };
+    const r = arquivoEnxuto(JSON.stringify(urls));
+    for (const v of ["AAAA1111", "BBBB2222", "CCCC3333", "DDDD4444"]) expect(r.rawBody).not.toContain(v);
+    expect(r.rawBody).toContain("ok=1");
+    expect(r.rawBody).toContain("signature=abc");
+  });
+
+  it("header com nome inócuo e valor de credencial sai", () => {
+    const h = cabecalhosParaArquivo(new Headers({ "x-auth": CHAVE, "x-sessao": `Bearer ${TOKEN}`, "x-ok": "1" }));
+    expect(Object.keys(h)).toEqual(["x-ok"]);
+  });
+});
+
+describe("o marcador nunca deixa o valor maior do que era", () => {
+  it("base64 minúsculo fica; o marcador só entra onde encolhe", () => {
+    const cru = JSON.stringify({ base64: "QUJD", type: "x" });
+    expect(arquivoEnxuto(cru).rawBody).toBe(cru);
+  });
+
+  it("todo valor substituído por marcador era maior que o marcador", () => {
+    for (const tamanho of [65, 100, 4097, 50_000]) {
+      const cru = JSON.stringify({ base64: "A".repeat(tamanho) });
+      expect(arquivoEnxuto(cru).rawBody.length, `base64 de ${tamanho}`).toBeLessThan(cru.length);
+    }
+  });
 });

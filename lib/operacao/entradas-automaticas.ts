@@ -330,7 +330,7 @@ export async function recebimentosDaEntrada(
   }));
 }
 
-function chavesDo(payload: unknown): string[] {
+export function chavesDo(payload: unknown): string[] {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
   return Object.keys(payload as Record<string, unknown>);
 }
