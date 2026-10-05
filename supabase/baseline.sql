@@ -49209,7 +49209,10 @@ begin
     select 1 from pg_policy
      where polname = 'webhook_events_log_tenant_read'
        and polrelid = 'public.webhook_events_log'::regclass
-       and pg_get_expr(polqual, polrelid) like '%fn_role_at_least%manager%'
+       and (pg_get_expr(polqual, polrelid) like '%fn_role_at_least%manager%'
+            -- 9036: a forma de conjunto (bloco logo abaixo) também já tem o
+            -- gate; sem isto cada deploy desfaria a 9036 e a refaria em seguida.
+            or pg_get_expr(polqual, polrelid) like '%fn_escopo_orgs%manager%')
   ) then
     drop policy if exists "webhook_events_log_tenant_read" on public.webhook_events_log;
     create policy "webhook_events_log_tenant_read" on public.webhook_events_log
@@ -49236,6 +49239,40 @@ grant select (
 drop policy if exists support_write_insert on public.webhook_events_log;
 drop policy if exists support_write_update on public.webhook_events_log;
 drop policy if exists support_write_delete on public.webhook_events_log;
+
+notify pgrst, 'reload schema';
+
+-- ---- o arquivo de webhook pergunta o papel uma vez por consulta (migration 9036) ----
+--
+-- A policy da 9035 chamava `fn_role_at_least(organization_id, 'manager')` POR
+-- LINHA (definer, nunca inlineada): contagem como manager passou de 2 min em
+-- produção. Aqui: predicado de conjunto, padrão da 9027 — `organization_id in
+-- (fn_escopo_orgs() com papel manager/admin)` —, com a MESMA semântica
+-- (manager+, papel efetivo com suporte ativo, vínculo revogado fora, platform
+-- admin). Ver o cabeçalho da 9036.
+-- Idempotente: só recria se a policy ainda não estiver na forma de conjunto
+-- (reaplicação não toma lock da tabela). drop/create num `do` só: em lock
+-- timeout a policy anterior fica de pé.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policy
+     where polname = 'webhook_events_log_tenant_read'
+       and polrelid = 'public.webhook_events_log'::regclass
+       and pg_get_expr(polqual, polrelid) like '%fn_escopo_orgs%manager%'
+       and pg_get_expr(polqual, polrelid) not like '%fn_role_at_least%'
+  ) then
+    drop policy if exists "webhook_events_log_tenant_read" on public.webhook_events_log;
+    create policy "webhook_events_log_tenant_read" on public.webhook_events_log
+      for select
+      using (
+        (select public.fn_is_platform_admin())
+        or organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel in ('manager', 'admin'))
+      );
+  end if;
+end $$;
 
 notify pgrst, 'reload schema';
 
