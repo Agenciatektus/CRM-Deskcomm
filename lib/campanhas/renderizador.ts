@@ -27,6 +27,14 @@
  * fechado de resolvedores.
  */
 
+import {
+  VARIANTE_TAMANHO_MAXIMO,
+  escolherVariante,
+  geradorDe,
+  resolverSpintax,
+  spintaxValido,
+} from "@/lib/texto/variacao";
+
 import { horaNoFuso } from "./relogio";
 
 /** As variáveis que existem. Oferecer uma que não resolve é prometer dado que não há. */
@@ -125,4 +133,91 @@ export function saudacaoDaHora(agora: Date, fuso: string): string {
   if (hora < 12) return "Bom dia";
   if (hora < 18) return "Boa tarde";
   return "Boa noite";
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * VARIAÇÕES DA MESMA ABORDAGEM
+ *
+ * ═══ Por que variação, e por que determinística ═══
+ *
+ * Quinhentas pessoas recebendo o MESMO texto, do mesmo número, na mesma tarde, é
+ * o padrão que o WhatsApp mede. As variações quebram o padrão sem mentir sobre o
+ * conteúdo: são textos que o operador escreveu, não geração automática.
+ *
+ * A escolha é por PESSOA (semente = `contact_id`), não por sorteio a cada
+ * passada. Duas consequências, e as duas são o ponto:
+ *   * a prévia mostra o que vai sair, porque é a mesma conta;
+ *   * repreparar a campanha dá a MESMA variação à mesma pessoa — quem reabre a
+ *     lista não vê o texto de todo mundo trocar de lugar sem motivo.
+ *
+ * ═══ A lista efetiva é `[message_body, ...message_variants]` ═══
+ *
+ * O corpo principal continua sendo o `message_body`, com o CHECK de não-vazio e
+ * o teto de 4.096 do banco. As variações são EXTRAS. Campanha que nunca abriu
+ * esta seção tem lista de um item e se comporta exatamente como antes —
+ * `escolherVariante` devolve 0 para total 1, sem hash nenhum.
+ *
+ * ═══ Spintax é do TEXTO, variável é da PESSOA ═══
+ *
+ * `{a|b}` quebrado (chave sem fechar, aninhado demais) não é "falta um dado
+ * deste contato": é a campanha que não pode sair, e tratá-lo como exclusão
+ * individual pintaria a lista inteira de `variavel_ausente` — motivo errado na
+ * tela do operador. Por isso `spintaxDasVariantes` existe separado e é cobrado
+ * ANTES da preparação (`lib/campanhas/acoes.ts`, `preparacao.ts`).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Quantas variações EXTRAS cabem além do corpo principal. */
+export const MAX_VARIACOES_EXTRAS = 5;
+
+export { VARIANTE_TAMANHO_MAXIMO };
+
+/**
+ * A lista efetiva de variantes. Extra em branco é DESCARTADA: a tela deixa abrir
+ * uma aba vazia, e uma variante vazia escolhida por hash mandaria mensagem sem
+ * texto para um quinto da lista.
+ */
+export function variantesDaCampanha(
+  corpo: string | null | undefined,
+  extras: readonly (string | null)[] | null | undefined,
+): string[] {
+  const alternativas = (extras ?? [])
+    .map((v) => (v ?? "").trim())
+    .filter((v) => v !== "")
+    .slice(0, MAX_VARIACOES_EXTRAS);
+  return [corpo ?? "", ...alternativas];
+}
+
+export interface VariacaoRenderizada extends TextoRenderizado {
+  /** Qual variante saiu — vai para `campaign_recipients.variables.variante_index`. */
+  varianteIndex: number;
+}
+
+/**
+ * Escolhe a variante desta pessoa, gira o spintax e troca as variáveis — nesta
+ * ordem, para que valor de cadastro nunca seja reinterpretado como template.
+ *
+ * `semente` é o `contact_id`. Spintax inválido NÃO é mascarado aqui: o texto
+ * bruto segue para a troca de variáveis (a prévia mostra as chaves como o
+ * operador as escreveu) e quem barra o envio é a cobrança de
+ * `spintaxDasVariantes` na preparação.
+ */
+export function renderizarVariacao(entrada: {
+  variantes: readonly string[];
+  semente: string;
+  valores: ValoresDoDestinatario;
+  quando?: { agora: Date; fuso: string };
+}): VariacaoRenderizada {
+  const lista = entrada.variantes.length > 0 ? entrada.variantes : [""];
+  const varianteIndex = escolherVariante(entrada.semente, lista.length);
+  const bruta = lista[varianteIndex] ?? "";
+  // Sem `slice` no teto: o corpo principal aceita 4.096 no banco, e cortar aqui
+  // mutilaria em silêncio a campanha longa que já existe. O teto de 1.000 é das
+  // variações EXTRAS e é cobrado onde elas entram (Zod + CHECK da 9034).
+  const girada = resolverSpintax(bruta, geradorDe(`spintax:${entrada.semente}`));
+  return { ...renderizar(girada ?? bruta, entrada.valores, entrada.quando), varianteIndex };
+}
+
+/** Índices (na lista efetiva) das variantes cujo `{a|b}` não resolve. Vazio = pode. */
+export function spintaxDasVariantes(variantes: readonly string[]): number[] {
+  return variantes.map((v, i) => (spintaxValido(v) ? -1 : i)).filter((i) => i >= 0);
 }

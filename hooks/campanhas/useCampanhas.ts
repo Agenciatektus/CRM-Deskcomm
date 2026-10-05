@@ -38,6 +38,8 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   agent_id?: string | null;
   description: string | null;
   message_body: string | null;
+  /** As variações EXTRAS (migration 9034). Vazio = campanha de um texto só. */
+  message_variants?: string[] | null;
   base_legal: string;
   lia_ref: string | null;
   audience_filter: Record<string, unknown>;
@@ -181,6 +183,7 @@ export function usePreviaDaAudiencia() {
     mutationFn: async (corpo: {
       audience_filter: Record<string, unknown>;
       message_body: string;
+      message_variants?: string[];
       campaign_id?: string;
     }) => (await apiClient.post<{ data: PreviaDaAudiencia }>("/api/v1/campaigns/preview", corpo)).data,
     onError: (err) => showApiError(err),

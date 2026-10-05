@@ -53,6 +53,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       organizationId: authz.org.orgId,
       filtro: parsed.data.audience_filter,
       corpo: parsed.data.message_body,
+      variacoes: parsed.data.message_variants,
       agora: new Date(),
       campanhaId: parsed.data.campaign_id,
     });

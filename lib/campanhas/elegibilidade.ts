@@ -68,6 +68,11 @@ export interface LinhaClassificada {
   motivo: MotivoDeExclusao | null;
   /** O texto final — só existe para quem é elegível. */
   corpo: string | null;
+  /**
+   * Qual variação da mensagem esta pessoa recebeu (0 = o `message_body`).
+   * `null` em quem foi excluído: não há texto, então não há variante.
+   */
+  varianteIndex: number | null;
 }
 
 export interface ContextoDaClassificacao {
@@ -82,8 +87,16 @@ export interface ContextoDaClassificacao {
   suprimidos: ReadonlySet<string>;
   /** O hash de um endereço — injetado para esta função continuar pura. */
   hashDoEndereco: (endereco: string) => string;
-  /** Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura. */
-  renderizar: (c: CandidatoDaAudiencia) => { texto: string; faltando: string[] };
+  /**
+   * Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura.
+   * `varianteIndex` é opcional porque quem não tem variação (um teste, uma
+   * chamada antiga) não precisa inventar um índice.
+   */
+  renderizar: (c: CandidatoDaAudiencia) => {
+    texto: string;
+    faltando: string[];
+    varianteIndex?: number;
+  };
 }
 
 /**
@@ -115,7 +128,7 @@ export function classificarAudiencia(
 
   for (const candidato of candidatos) {
     const excluir = (motivo: MotivoDeExclusao): void => {
-      saida.push({ candidato, elegivel: false, motivo, corpo: null });
+      saida.push({ candidato, elegivel: false, motivo, corpo: null, varianteIndex: null });
     };
 
     if (ctx.excluidosAMao.has(candidato.contactId)) {
@@ -140,14 +153,20 @@ export function classificarAudiencia(
       excluir("duplicado");
       continue;
     }
-    const { texto, faltando } = ctx.renderizar(candidato);
+    const { texto, faltando, varianteIndex } = ctx.renderizar(candidato);
     if (faltando.length > 0) {
       excluir("variavel_ausente");
       continue;
     }
 
     enderecosVistos.add(endereco);
-    saida.push({ candidato, elegivel: true, motivo: null, corpo: texto });
+    saida.push({
+      candidato,
+      elegivel: true,
+      motivo: null,
+      corpo: texto,
+      varianteIndex: varianteIndex ?? 0,
+    });
   }
 
   return saida;

@@ -13405,6 +13405,9 @@ export const DICIONARIO: Traducoes = {
   },
   "Ver quantas pessoas": { es: "Ver cuántas personas" },
   "Você pode usar:": { es: "Puedes usar:" },
+  "Use {a|b} para alternar palavras. Cada contato recebe sempre a mesma variação.": {
+    es: "Usa {a|b} para alternar palabras. Cada contacto recibe siempre la misma variación.",
+  },
   "Máximo por hora": { es: "Máximo por hora" },
   "Ritmo salvo.": { es: "Ritmo guardado." },
   "Salvar ritmo": { es: "Guardar ritmo" },

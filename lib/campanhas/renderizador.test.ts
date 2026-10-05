@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { renderizar, saudacaoDaHora, variaveisUsadas } from "./renderizador";
+import {
+  MAX_VARIACOES_EXTRAS,
+  renderizar,
+  renderizarVariacao,
+  saudacaoDaHora,
+  spintaxDasVariantes,
+  variantesDaCampanha,
+  variaveisUsadas,
+} from "./renderizador";
 
 const FUSO = "America/Sao_Paulo";
 /** 15h em São Paulo (UTC-3). */
@@ -76,5 +84,121 @@ describe("renderizador da campanha", () => {
   it("não executa nada: chave com sintaxe de caminho não atravessa propriedade", () => {
     const r = renderizar("{{constructor.name}} {{__proto__}}", { nome: "Ana" });
     expect(r.texto).toBe("{{constructor.name}} {{__proto__}}");
+  });
+});
+
+describe("variações da campanha", () => {
+  /** A lista efetiva, como a preparação a monta. */
+  const lista = (corpo: string, ...extras: string[]) => variantesDaCampanha(corpo, extras);
+
+  it("a lista efetiva é [message_body, ...message_variants], e extra em branco cai fora", () => {
+    expect(variantesDaCampanha("Oi", ["A", "   ", "B", null])).toEqual(["Oi", "A", "B"]);
+    // Corpo nulo não some da lista: ele é a variante 0 e o gate de conteúdo é
+    // que recusa campanha sem texto — aqui não se inventa lista vazia.
+    expect(variantesDaCampanha(null, null)).toEqual([""]);
+  });
+
+  it("extra além do teto é descartada, não aceita em silêncio", () => {
+    const seis = ["a", "b", "c", "d", "e", "f"];
+    expect(variantesDaCampanha("corpo", seis)).toHaveLength(1 + MAX_VARIACOES_EXTRAS);
+  });
+
+  it("a MESMA pessoa recebe a MESMA variação, sempre (repreparar não troca o texto)", () => {
+    const entrada = {
+      variantes: lista("Oi {{primeiro_nome}}, tudo bem?", "Olá {{primeiro_nome}}!", "E aí {{primeiro_nome}}?"),
+      semente: "11111111-1111-4111-8111-111111111111",
+      valores: { nome: "Ana Souza" },
+    };
+    const a = renderizarVariacao(entrada);
+    const b = renderizarVariacao(entrada);
+    expect(a).toEqual(b);
+    expect(a.varianteIndex).toBeGreaterThanOrEqual(0);
+    expect(a.varianteIndex).toBeLessThan(3);
+  });
+
+  it("sementes diferentes espalham pelas três variantes — não caem todas na primeira", () => {
+    const variantes = lista("um", "dois", "tres");
+    const vistos = new Set<number>();
+    for (let i = 0; i < 300; i += 1) {
+      vistos.add(renderizarVariacao({ variantes, semente: `contato-${i}`, valores: { nome: "Ana" } }).varianteIndex);
+    }
+    expect(vistos).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("campanha SEM variações continua exatamente como antes: índice 0 e o mesmo texto", () => {
+    const corpo = "Olá {{nome}}, {{saudacao}}!";
+    const r = renderizarVariacao({
+      variantes: variantesDaCampanha(corpo, []),
+      semente: "qualquer-contato",
+      valores: { nome: "Ana Souza" },
+    });
+    expect(r.varianteIndex).toBe(0);
+    // Byte-a-byte o que `renderizar` já devolvia — inclusive a saudação literal.
+    expect(r.texto).toBe(renderizar(corpo, { nome: "Ana Souza" }).texto);
+    expect(r.texto).toBe("Olá Ana Souza, {{saudacao}}!");
+  });
+
+  it("spintax ANINHADO resolve, e sempre para o mesmo lado na mesma semente", () => {
+    const variantes = ["{Oi|{Olá|{Bom te ver|E aí}}} {{primeiro_nome}}"];
+    const r = renderizarVariacao({ variantes, semente: "c-7", valores: { nome: "Ana Souza" } });
+    expect(r.texto).toMatch(/^(Oi|Olá|Bom te ver|E aí) Ana$/);
+    expect(renderizarVariacao({ variantes, semente: "c-7", valores: { nome: "Ana Souza" } }).texto).toBe(
+      r.texto,
+    );
+  });
+
+  it("a variável atravessa o spintax INTACTA — valor de cadastro não vira template", () => {
+    // O nome tem `{a|b}` dentro: ele é DADO, e a passada de spintax já terminou
+    // quando ele entra. Sai literal, nunca sorteado.
+    const r = renderizarVariacao({
+      variantes: ["{Oi|Olá} {{nome}}"],
+      semente: "c-1",
+      valores: { nome: "{Ana|Bia} Souza" },
+    });
+    expect(r.texto).toContain("{Ana|Bia} Souza");
+  });
+
+  it("spintax INVÁLIDO não é mascarado: o gate acusa e o texto sai como foi escrito", () => {
+    const quebradas = ["ok {a|b}", "chave {sem fechar", "fecha} sem abrir", "{a|{b|{c|{d|e}}}}"];
+    // Índices 1, 2 e 3: chave aberta sem fechar, fechamento sem abertura e
+    // aninhamento acima do teto.
+    expect(spintaxDasVariantes(quebradas)).toEqual([1, 2, 3]);
+    expect(spintaxDasVariantes(variantesDaCampanha("Oi {{nome}}", ["{a|b}"]))).toEqual([]);
+
+    const r = renderizarVariacao({
+      variantes: ["Oi {{nome}}, {promoção sem fechar"],
+      semente: "c-1",
+      valores: { nome: "Ana" },
+    });
+    // O texto cru atravessa (a prévia mostra o que o operador digitou); quem
+    // impede o envio é `spintaxDasVariantes`, chamado na preparação.
+    expect(r.texto).toBe("Oi Ana, {promoção sem fechar");
+  });
+
+  it("variável SEM valor é reportada como faltando, com o literal preservado", () => {
+    const r = renderizarVariacao({
+      variantes: lista("Oi {{primeiro_nome}}", "{Olá|Oi} {{nome}}, tudo bem?"),
+      semente: "sem-nome",
+      valores: { nome: "   " },
+    });
+    // Qualquer das duas variantes usa o nome: as duas têm de acusar a falta, e
+    // é isso que vira `variavel_ausente` na lista — nunca "Oi , tudo bem?".
+    expect(r.faltando.length).toBeGreaterThan(0);
+    expect(r.texto).toMatch(/\{\{(primeiro_)?nome\}\}/);
+  });
+
+  it("a saudação segue sendo do ENVIO: a variação escolhida mantém o token congelado", () => {
+    const variantes = lista("{{saudacao}}, {{primeiro_nome}}!", "{{saudacao}}! Aqui é a equipe.");
+    const preparado = renderizarVariacao({
+      variantes,
+      semente: "c-42",
+      valores: { nome: "Ana Souza" },
+    });
+    expect(preparado.texto).toContain("{{saudacao}}");
+    // E o envio, que roda sobre o corpo CONGELADO, resolve a saudação sem
+    // reinterpretar spintax nenhum.
+    expect(renderizar(preparado.texto, { nome: "Ana Souza" }, { agora: MANHA, fuso: FUSO }).texto).toContain(
+      "Bom dia",
+    );
   });
 });
