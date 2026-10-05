@@ -33,6 +33,8 @@ const estado = vi.hoisted(() => ({
     metadata: {},
   },
   bytesDaMidia: Buffer.alloc(0) as Buffer,
+  /** O `content-type` que o CDN/canal declarou no download. */
+  mimeDaMidia: "image/jpeg",
   miniaturasDoContato: [] as Array<{ media_thumb_path: string }>,
   linhaRedigida: false,
   /** Banco com compare-and-set de verdade sobre `mensagem` (duas execuções). */
@@ -55,7 +57,7 @@ vi.mock("@/lib/channels", () => ({
         if (estado.chegadas >= 2) estado.soltarDownloads?.();
         await estado.barreira;
       }
-      return { buffer: estado.bytesDaMidia, mime: "image/jpeg" };
+      return { buffer: estado.bytesDaMidia, mime: estado.mimeDaMidia };
     },
   }),
   resolveSessionRef: () => ({ wahaSessionName: "s" }),
@@ -169,6 +171,7 @@ beforeEach(() => {
   estado.bytesDaMidia = fotoDeCelular;
   estado.miniaturasDoContato = [];
   estado.linhaRedigida = false;
+  estado.mimeDaMidia = "image/jpeg";
   estado.casReal = false;
   estado.chegadas = 0;
   estado.barreira = null;
@@ -390,6 +393,7 @@ describe("a lista assina a miniatura no mesmo lote", () => {
       id: `m${n}`,
       media_storage_path: `org-b/conv-b/m${n}.jpg`,
       media_thumb_path: `org-b/miniaturas/conv-b/m${n}.webp`,
+      media_mime: "image/jpeg",
     }));
     const r = await anexarUrlsDeMidia(createAdminClient() as never, msgs);
     expect(estado.assinaturas).toHaveLength(1);
@@ -400,7 +404,7 @@ describe("a lista assina a miniatura no mesmo lote", () => {
 
   it("mensagem antiga sem miniatura: só a original, e a tela segue com ela", async () => {
     const r = await anexarUrlsDeMidia(createAdminClient() as never, [
-      { id: "m", media_storage_path: "org-b/conv-b/m.jpg", media_thumb_path: null },
+      { id: "m", media_storage_path: "org-b/conv-b/m.jpg", media_thumb_path: null, media_mime: "image/jpeg" },
     ]);
     expect(r[0]!.media_thumb_signed_url).toBeNull();
     expect(r[0]!.media_signed_url).toContain("conv-b/m.jpg");
@@ -423,5 +427,47 @@ describe("LGPD: a anonimização enfileira a miniatura com o pedido", () => {
         object_path: "org-a/miniaturas/conv-a/m1.webp",
       }),
     ]);
+  });
+});
+
+describe("mime declarado pelo CDN não é confiado (P2-3 da #79)", () => {
+  const evento = {
+    id: "ev",
+    organization_id: "org-b",
+    event_type: "media.persist_requested",
+    entity_kind: "message",
+    entity_id: "msg-b",
+    payload: { message_id: "msg-b" },
+    metadata: {},
+    consumed_by: [],
+    attempts: 0,
+  } as never;
+
+  it.each([
+    ["text/html", "<html><script>alert(1)</script></html>"],
+    ["image/svg+xml", '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+    ["application/x-msdownload", "MZ"],
+  ])("%s: o OBJETO vai como application/octet-stream, sem miniatura; a coluna guarda o declarado", async (mime, corpo) => {
+    estado.mimeDaMidia = mime;
+    estado.bytesDaMidia = Buffer.from(corpo);
+    const r = await persistMessageMedia(evento);
+    expect(r.status).toBe("ok");
+    expect(estado.uploads).toHaveLength(1);
+    expect(estado.uploads[0]!.tipo).toBe("application/octet-stream");
+    // A coluna é o RÓTULO da tela; quem decide exibir é o seguro (ver a rota).
+    expect(estado.patches.at(-1)).toMatchObject({ media_mime: mime });
+    expect(estado.patches.at(-1)).not.toHaveProperty("media_thumb_path");
+  });
+
+  it("CONTROLE: imagem, PDF e áudio guardam o mime declarado", async () => {
+    for (const mime of ["image/jpeg", "application/pdf", "audio/ogg"]) {
+      estado.uploads = [];
+      estado.patches = [];
+      estado.mimeDaMidia = mime;
+      estado.bytesDaMidia = mime === "image/jpeg" ? fotoDeCelular : Buffer.from("conteudo");
+      await persistMessageMedia(evento);
+      expect(estado.uploads[0]!.tipo).toBe(mime);
+      expect(estado.patches.at(-1)).toMatchObject({ media_mime: mime });
+    }
   });
 });

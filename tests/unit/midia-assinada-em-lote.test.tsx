@@ -32,6 +32,8 @@ const estado = vi.hoisted(() => ({
    */
   rlsPermissiva: false,
   assinados: [] as string[][],
+  /** Para cada assinatura: pediu `Content-Disposition: attachment`? */
+  downloads: [] as boolean[],
   chamadasDeAssinatura: 0,
 }));
 
@@ -119,9 +121,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     storage: {
       from: () => ({
-        createSignedUrls: async (caminhos: string[], validade: number) => {
+        createSignedUrls: async (caminhos: string[], validade: number, opcoes?: { download?: boolean }) => {
           estado.chamadasDeAssinatura += 1;
           estado.assinados.push([...caminhos]);
+          estado.downloads.push(opcoes?.download === true);
           return {
             data: caminhos.map((c) => ({
               path: c,
@@ -179,6 +182,7 @@ beforeEach(() => {
   estado.semProtecao = false;
   estado.rlsPermissiva = false;
   estado.assinados = [];
+  estado.downloads = [];
   estado.chamadasDeAssinatura = 0;
 });
 
@@ -347,5 +351,28 @@ describe("autorização: o lote não abre o que a rota individual fecha", () => 
     estado.semProtecao = true;
     const msgs = await abrirConversa("conv-a");
     expect(vazamentosDaOrgA(msgs).length).toBeGreaterThan(0);
+  });
+});
+
+describe("rota individual: o que a tela não exibe sai como DOWNLOAD (P2-3 da #79)", () => {
+  it.each([
+    ["text/html", true],
+    ["image/svg+xml", true],
+    ["application/octet-stream", true],
+    ["image/jpeg", false],
+    ["application/pdf", false],
+  ])("media_mime %s → download %s", async (mime, download) => {
+    const m = MENSAGENS.find((l) => l.id === "b-2")!;
+    const antes = m.media_mime;
+    m.media_mime = mime;
+    try {
+      const res = await midiaIndividual(new NextRequest("http://crm.teste/api/v1/messages/b-2/media"), {
+        params: Promise.resolve({ id: "b-2" }),
+      });
+      expect(res.status).toBe(302);
+      expect(estado.downloads).toEqual([download]);
+    } finally {
+      m.media_mime = antes;
+    }
   });
 });

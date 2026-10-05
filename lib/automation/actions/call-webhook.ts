@@ -24,7 +24,7 @@ import { createHash, createHmac } from "node:crypto";
 import { z } from "zod";
 import { registerAction } from "@/lib/automation/actions";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
-import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
+import { assertDestinoResolvidoSeguro, fetchComDestinoFixado } from "@/lib/automation/outbound-ip";
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 
@@ -383,14 +383,29 @@ export async function executeCallWebhook(
       // segue redirect, e uma URL de tenant que passou no guard anti-SSRF pode
       // 302 pra um endpoint interno (ex.: http://169.254.169.254/...). Um 3xx
       // vira falha comum (conta pro retry), nunca é seguido.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: headersDaTentativa,
-        body,
-        redirect: "manual",
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      // Com a conferência ligada, a conexão vai no IP que ELA conferiu
+      // (`fetchComDestinoFixado`): o host do webhook é arbitrário, e conferir o
+      // nome e deixar o `fetch` resolver de novo é DNS rebinding para a rede
+      // interna. Nenhum dos dois caminhos segue redirecionamento.
+      const res = opts.skipUrlCheck
+        ? await fetch(url, {
+            method: "POST",
+            headers: headersDaTentativa,
+            body,
+            redirect: "manual",
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+          })
+        : await fetchComDestinoFixado(url, {
+            method: "POST",
+            headers: headersDaTentativa,
+            body,
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+          });
       lastStatus = res.status;
+      // O corpo da resposta não interessa, mas NÃO lê-lo deixa o socket preso
+      // (keep-alive, ou um receptor que manda corpo sem fim) — um por
+      // tentativa. Cancelar o corpo fecha a conexão (P2-1 do Cassio na #83).
+      await res.body?.cancel().catch(() => {});
       if (res.ok) {
         return {
           type: "call_webhook",

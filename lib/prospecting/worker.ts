@@ -14,6 +14,7 @@ import { llmEdgeConfigFromEnv } from "@/lib/agent-engine/edge/llm/credentials";
 import { assertServiceBoundarySupabase } from "@/lib/atendimento/origem";
 import { comSaida } from "./rodape-de-saida";
 import {
+  TETO_DIARIO_POR_NUMERO,
   proximoEnvioDaEsteiraFria,
   tetoDiarioDaEsteiraFria,
 } from "./ritmo-da-esteira-fria";
@@ -83,14 +84,20 @@ export async function sendNextCandidate(
     return;
   }
   // Count attempts, including failures/unknown delivery: a timeout must not release quota.
+  // O número da campanha é comparado como TEXTO, não com `::uuid`: um
+  // `channel_session_id` que não seja uuid no config de UMA campanha derrubava
+  // esta consulta (cast inválido) e parava a prospecção da organização inteira
+  // (nit do @Cassio_SecRev na revisão da #78).
   const { rows: counts } = await db.query<{
     campaign: number;
     total: number;
+    numero: number;
     retry_at: Date | null;
+    retry_numero: Date | null;
     last_attempt: Date | null;
   }>(
-    "select count(*) filter(where campaign_id=$2)::int as campaign,count(*)::int as total,max(attempted_at) as last_attempt,min(attempted_at)+interval '24 hours' as retry_at from prospecting_candidates where organization_id=$1 and attempted_at>now()-interval '24 hours'",
-    [c.organization_id, c.id],
+    "select count(*) filter(where p.campaign_id=$2)::int as campaign,count(*)::int as total,count(*) filter(where lower(k.config->>'channel_session_id')=lower($3::text))::int as numero,max(p.attempted_at) as last_attempt,min(p.attempted_at)+interval '24 hours' as retry_at,min(p.attempted_at) filter(where lower(k.config->>'channel_session_id')=lower($3::text))+interval '24 hours' as retry_numero from prospecting_candidates p join prospecting_campaigns k on k.organization_id=p.organization_id and k.id=p.campaign_id where p.organization_id=$1 and p.attempted_at>now()-interval '24 hours'",
+    [c.organization_id, c.id, cfg.channel_session_id],
   );
   const count = counts[0]!;
   // O TETO DO WARM-UP DESTA ESTEIRA. Os degraus da casa (20 no primeiro dia)
@@ -106,6 +113,14 @@ export async function sendNextCandidate(
     await db.query(
       "update prospecting_campaigns set next_send_at=$3 where organization_id=$1 and id=$2",
       [c.organization_id, c.id, count.retry_at],
+    );
+    return;
+  }
+  // Teto por NÚMERO, somando as campanhas que saem por ele (ver a constante).
+  if (count.numero >= TETO_DIARIO_POR_NUMERO) {
+    await db.query(
+      "update prospecting_campaigns set next_send_at=$3 where organization_id=$1 and id=$2",
+      [c.organization_id, c.id, count.retry_numero],
     );
     return;
   }

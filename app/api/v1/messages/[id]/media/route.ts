@@ -23,6 +23,7 @@ import {
   type ChannelProvider,
   type ChannelSessionRef,
 } from "@/lib/channels";
+import { mimeExibivel, mimeSeguroParaGuardar } from "@/lib/messaging/media/mime-seguro";
 import { assinarMidias, segundosAteVirarOBloco } from "@/lib/messaging/media/url-assinada";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -69,7 +70,13 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   if (msg.media_storage_path) {
     const agora = Date.now();
-    const urls = await assinarMidias(createAdminClient(), [msg.media_storage_path], agora);
+    // O que a tela não exibe (documento, e todo mime fora de imagem sem SVG,
+    // áudio, vídeo e PDF) sai como DOWNLOAD (`Content-Disposition: attachment`):
+    // um HTML ou SVG guardado antes do P2-3 não abre como página.
+    const urls = await assinarMidias(createAdminClient(), [msg.media_storage_path], agora, {
+      // Pelo mime SEGURO (a coluna guarda o declarado, para o rótulo).
+      download: !mimeExibivel(mimeSeguroParaGuardar(msg.media_mime)),
+    });
     const assinada = urls.get(msg.media_storage_path);
     if (assinada) {
       const response = NextResponse.redirect(assinada, 302);
@@ -120,10 +127,15 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
         url: msg.media_url,
         hintMime: msg.media_mime,
       });
+      const exibivel = mimeExibivel(mimeSeguroParaGuardar(media.mime));
       return new Response(new Uint8Array(media.buffer), {
         status: 200,
         headers: {
-          "Content-Type": media.mime,
+          // O mime declarado pelo canal só vale se a tela o exibe; o resto sai
+          // genérico, baixado, e sem o navegador adivinhar o tipo.
+          "Content-Type": mimeSeguroParaGuardar(media.mime),
+          ...(exibivel ? {} : { "Content-Disposition": "attachment" }),
+          "X-Content-Type-Options": "nosniff",
           "Cache-Control": "private, max-age=60",
           "X-Request-Id": requestId,
         },

@@ -17,6 +17,7 @@ import type { Message } from "@/lib/types/messaging";
 import { lerRemetenteDeGrupo, rotuloDoRemetente } from "@/lib/messaging/remetente-de-grupo";
 import { CitationButton } from "@/components/ai/CitationButton";
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
+import { MediaUnavailable } from "@/components/inbox/media/MediaUnavailable";
 import { ContactCard } from "@/components/inbox/media/ContactCard";
 import { LocationCard } from "@/components/inbox/media/LocationCard";
 import { localizacaoDaMensagem } from "@/lib/messaging/localizacao";
@@ -100,6 +101,13 @@ export function MessageBubble({
   const time = format(new Date(message.sent_at), "HH:mm", { locale: localeDaData });
   const isFailed = message.status === "failed";
   const hasMedia = Boolean(message.media_url || message.media_storage_path);
+  // Anexo que chegou SEM ponteiro guardado (as mensagens do Instagram de antes
+  // da #13 da auditoria): a tela mostrava nada. Agora diz que expirou.
+  const anexoSemArquivo = !hasMedia && message.metadata?.instagram_tem_anexo === true;
+  const anexoTemporario = message.metadata?.instagram_anexo_temporario === true;
+  const linksDoInstagram = linksDoInstagramDe(message.metadata);
+  const temAnexosExtras = Array.isArray(message.metadata?.instagram_anexos_extras)
+    && (message.metadata.instagram_anexos_extras as unknown[]).length > 0;
   const isContact = message.type === "contact";
   // Pino com coordenadas: o cartão substitui o corpo, que é só o mesmo link em texto.
   const localizacao = localizacaoDaMensagem(message);
@@ -378,6 +386,32 @@ export function MessageBubble({
               </div>
             )}
 
+            {anexoSemArquivo && (
+              <div className={cn(message.body && "mb-1")}>
+                {anexoTemporario ? (
+                  <p className="text-xs italic opacity-70">{t("Mídia temporária: o CRM não guarda")}</p>
+                ) : (
+                  <MediaUnavailable kind="Anexo" expirada />
+                )}
+              </div>
+            )}
+
+            {temAnexosExtras && (
+              <p className="mb-1 text-xs italic opacity-70">{t("Esta mensagem tinha mais anexos no Instagram.")}</p>
+            )}
+
+            {linksDoInstagram.map((link) => (
+              <a
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-1 block text-xs underline underline-offset-2"
+              >
+                {link.titulo ? `${t("Ver no Instagram")}: ${link.titulo}` : t("Ver no Instagram")}
+              </a>
+            ))}
+
             {isContact && !hasMedia && (
               <div className={cn(message.body && isContact && "mb-1")}>
                 <ContactCard message={message} />
@@ -467,4 +501,27 @@ export function MessageBubble({
       </AlertDialog>
     </div>
   );
+}
+
+/**
+ * Permalinks de post/reel que a ingestão do Instagram guardou no metadata.
+ * Só `https://(www.)instagram.com`: o metadata é dado de fora, e um link
+ * arbitrário aqui viraria phishing na tela do atendente.
+ */
+function linksDoInstagramDe(metadata: Record<string, unknown> | null | undefined): Array<{ url: string; titulo: string | null }> {
+  const brutos = metadata?.instagram_links;
+  if (!Array.isArray(brutos)) return [];
+  const links: Array<{ url: string; titulo: string | null }> = [];
+  for (const b of brutos.slice(0, 10)) {
+    const url = typeof (b as { url?: unknown })?.url === "string" ? (b as { url: string }).url : "";
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "https:" || !["instagram.com", "www.instagram.com"].includes(u.hostname)) continue;
+    } catch {
+      continue;
+    }
+    const titulo = (b as { titulo?: unknown }).titulo;
+    links.push({ url, titulo: typeof titulo === "string" ? titulo.slice(0, 120) : null });
+  }
+  return links;
 }
