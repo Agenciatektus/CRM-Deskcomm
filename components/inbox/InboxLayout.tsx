@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useCloseConversation } from "@/hooks/inbox/useCloseConversation";
@@ -128,7 +128,6 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const supportReadonly = user.support?.access_mode === "support_readonly";
   const orgId = activeOrg?.orgId ?? null;
 
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tab = parseFilterParam(searchParams.get("filter"));
@@ -146,12 +145,17 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       if (next.tab !== tab) {
         const params = new URLSearchParams(searchParams);
         params.set("filter", next.tab);
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        // History API, e não `router.replace`: o replace do router pede um
+        // novo payload RSC ao servidor (uma ida e volta inteira, ~200 ms do
+        // Brasil) para uma página cujo servidor nem lê `?filter=`. O Next
+        // sincroniza `useSearchParams` com `replaceState`, então a aba muda na
+        // hora e o link continua compartilhável com o filtro.
+        window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
       }
       const { tab: _t, ...rest } = next;
       setAux(rest);
     },
-    [tab, searchParams, router, pathname],
+    [tab, searchParams, pathname],
   );
 
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
