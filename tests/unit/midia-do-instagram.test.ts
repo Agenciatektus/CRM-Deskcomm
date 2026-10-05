@@ -312,6 +312,19 @@ describe("o download não vira SSRF", () => {
     expect([...r.buffer]).toEqual([1, 2, 3]);
   });
 
+  it("manda User-Agent: sem ele o lookaside responde 302 para www.facebook.com (medido em produção)", async () => {
+    const vistos: Array<string | undefined> = [];
+    const impl = (async (_u: string, init?: RequestInit) => {
+      const ua = (init?.headers as Record<string, string> | undefined)?.["User-Agent"];
+      vistos.push(ua);
+      if (!ua) return new Response(null, { status: 302, headers: { location: "https://www.facebook.com/" } });
+      return new Response(new Uint8Array([9]), { status: 206, headers: { "content-type": "image/jpeg" } });
+    }) as unknown as typeof fetch;
+    const r = await baixarMidiaDaMeta(CDN("100"), { fetchImpl: impl, conferirDestino: destinoOk });
+    expect(r.mime).toBe("image/jpeg");
+    expect(vistos).toEqual(["crm-media-fetch/1.0"]);
+  });
+
   it("redirecionamento em laço para no teto", async () => {
     const { impl } = fetchFalso({
       [CDN("100")]: () => new Response(null, { status: 302, headers: { location: CDN("100") } }),
