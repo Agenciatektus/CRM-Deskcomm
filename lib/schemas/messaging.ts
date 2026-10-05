@@ -6,6 +6,7 @@
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
 import { z } from "zod";
+import { ApiError } from "@/lib/api/types";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
 import {
   MAXIMO_DE_ETIQUETAS_NO_FILTRO,
@@ -71,6 +72,67 @@ export const messageStatusSchema = z.enum([
   "failed",
 ]);
 
+/**
+ * O `metadata` que o CLIENTE manda no envio — lista PERMITIDA, não aberta.
+ *
+ * O handler grava `input.metadata` inteiro na linha de `messages`, e várias
+ * chaves dessa coluna são do PRÓPRIO sistema: `_optimistic` faz a bolha real
+ * ser tratada como otimista no cache de todo mundo, `crm_hidden_at` desenha
+ * "Mensagem ocultada no CRM", `sent_on_behalf`/`ai_actor_id` dizem quem enviou,
+ * `idempotency_key` reconcilia o retry do agente. Aceitar qualquer chave era
+ * deixar o cliente forjar qualquer uma delas (P2 do @Cassio_SecRev na #103).
+ *
+ * Fica só o que a tela envia de fato:
+ *  - `client_id` — correlação da bolha otimista (`useSendMessage`), no formato
+ *    do temp id;
+ *  - `shared_contact_id` / `shared_contact` — o cartão de contato do composer.
+ * Chave desconhecida ou fora do formato é DESCARTADA (não recusa o envio: o
+ * envio legítimo não depende dela, e recusar quebraria integração que hoje
+ * manda lixo inofensivo). Quem envia por dentro do servidor (agente, lembrete
+ * de agenda, proposta) chama o handler sem passar por este schema.
+ *
+ * Tamanho: o metadata BRUTO acima de 8 KB é recusado com 413, antes de
+ * qualquer filtro. Cortar seria pior: um cartão truncado vira outro contato, e
+ * o corte é silencioso. Depois do filtro o tamanho já é limitado pelos tetos
+ * de cada campo; o 413 existe para o corpo gigante nem ser percorrido.
+ */
+export const METADATA_DO_CLIENTE_MAX_BYTES = 8 * 1024;
+const CLIENT_ID = /^temp-[A-Za-z0-9_-]{1,64}$/;
+
+export function metadataPermitida(bruta: Record<string, unknown>): Record<string, unknown> {
+  const saida: Record<string, unknown> = {};
+  if (typeof bruta.client_id === "string" && CLIENT_ID.test(bruta.client_id)) {
+    saida.client_id = bruta.client_id;
+  }
+  if (z.string().uuid().safeParse(bruta.shared_contact_id).success) {
+    saida.shared_contact_id = bruta.shared_contact_id;
+  }
+  const sc = bruta.shared_contact;
+  if (sc && typeof sc === "object" && !Array.isArray(sc)) {
+    const { name, phone_number } = sc as Record<string, unknown>;
+    if (typeof phone_number === "string" && phone_number.length <= 40) {
+      saida.shared_contact = {
+        phone_number,
+        ...(typeof name === "string" ? { name: name.slice(0, 200) } : {}),
+      };
+    }
+  }
+  return saida;
+}
+
+const metadataDoClienteSchema = z.preprocess((v) => {
+  if (v !== undefined && new TextEncoder().encode(JSON.stringify(v) ?? "").length > METADATA_DO_CLIENTE_MAX_BYTES) {
+    throw new ApiError(
+      413,
+      "payload_too_large",
+      { limite_bytes: METADATA_DO_CLIENTE_MAX_BYTES },
+      crypto.randomUUID(),
+      "metadata passa de 8 KB.",
+    );
+  }
+  return v;
+}, z.record(z.string(), z.unknown()).transform(metadataPermitida).optional());
+
 export const sendMessageSchema = z
   .object({
     conversation_id: z.string().uuid(),
@@ -80,7 +142,7 @@ export const sendMessageSchema = z
     media_storage_path: z.string().min(1).max(500).optional(),
     media_mime: z.string().optional(),
     media_size_bytes: z.number().int().positive().optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
+    metadata: metadataDoClienteSchema,
     /** Só em `type: "template"`. Nome exato aprovado na Meta. */
     template_name: z.string().min(1).max(512).optional(),
     /** Só em `type: "template"`. `pt_BR` e `pt` são templates DISTINTOS. */
