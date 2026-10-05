@@ -107,6 +107,14 @@ type ClienteDeServidor = Awaited<ReturnType<typeof clienteDeServidor>>;
 type RespostaDoGetUser = Awaited<ReturnType<ClienteDeServidor["auth"]["getUser"]>>;
 const getUserDaRequisicao = new WeakMap<object, Promise<RespostaDoGetUser>>();
 
+function congelarFundo<T>(valor: T): T {
+  if (valor && typeof valor === "object" && !Object.isFrozen(valor)) {
+    Object.freeze(valor);
+    for (const filho of Object.values(valor)) congelarFundo(filho);
+  }
+  return valor;
+}
+
 function lembrarGetUserDaRequisicao(cliente: ClienteDeServidor, requisicao: object): ClienteDeServidor {
   const original = cliente.auth.getUser.bind(cliente.auth);
   const memorizado = (jwt?: string): Promise<RespostaDoGetUser> => {
@@ -115,10 +123,15 @@ function lembrarGetUserDaRequisicao(cliente: ClienteDeServidor, requisicao: obje
     if (emVoo) return emVoo;
     const pergunta: Promise<RespostaDoGetUser> = original().then(
       (resposta) => {
-        if (resposta.error && getUserDaRequisicao.get(requisicao) === pergunta) {
-          getUserDaRequisicao.delete(requisicao);
+        if (resposta.error) {
+          if (getUserDaRequisicao.get(requisicao) === pergunta) getUserDaRequisicao.delete(requisicao);
+          return resposta;
         }
-        return resposta;
+        // A MESMA resposta vai para todo chamador desta requisição: quem
+        // mexesse no `user` (num `user_metadata`, por exemplo) mudaria o que a
+        // checagem seguinte — `loadAuthUser`, `audit()` — lê. Congelada, a
+        // mutação falha alto em vez de vazar de um consumidor para outro.
+        return congelarFundo(resposta);
       },
       (erro: unknown) => {
         if (getUserDaRequisicao.get(requisicao) === pergunta) getUserDaRequisicao.delete(requisicao);

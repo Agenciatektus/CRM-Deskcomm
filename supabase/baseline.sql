@@ -49192,7 +49192,7 @@ begin
   end loop;
 end $$;
 
--- ---- o arquivo de webhook é lido só por manager+, e sem o corpo (migration 9035) ----
+-- ---- o arquivo de webhook é lido só por manager+, e sem o corpo (migrations 9035 e 9036) ----
 --
 -- A policy original (lá em cima) era org-flat sem papel, e `authenticated`
 -- tinha SELECT na tabela inteira: um `viewer` lia `raw_body`, `headers` e
@@ -49200,23 +49200,33 @@ end $$;
 -- só por manager+ (ou platform admin), nenhum privilégio de tabela para anon e
 -- authenticated (TRUNCATE incluído), e SELECT por coluna só do metadado. O
 -- conteúdo fica para o service role. Ver o cabeçalho da 9035.
--- Idempotente: a policy só é recriada se ainda não tiver o gate de papel (sem
--- lock da tabela na reaplicação); revoke/grant reaplicam o mesmo estado, e o
--- GRANT de tabela lá de cima é desfeito aqui, abaixo dele.
+-- 9036: o gate de papel é predicado de CONJUNTO (padrão da 9027) —
+-- `organization_id in (fn_escopo_orgs() com papel manager/admin)` —, e não
+-- `fn_role_at_least(organization_id, 'manager')` por linha, que levava a
+-- contagem como manager a mais de 2 min em produção. Mesma semântica; ver o
+-- cabeçalho da 9036. A forma por linha da 9035 não é instalada aqui nem como
+-- passo intermediário: o banco que ainda a tem cai no `if` e troca direto.
+-- Idempotente: a policy só é recriada se ainda não estiver na forma de
+-- conjunto (sem lock da tabela na reaplicação); drop/create no mesmo `do` (em
+-- lock timeout a anterior fica de pé); revoke/grant reaplicam o mesmo estado,
+-- e o GRANT de tabela lá de cima é desfeito aqui, abaixo dele.
 do $$
 begin
   if not exists (
     select 1 from pg_policy
      where polname = 'webhook_events_log_tenant_read'
        and polrelid = 'public.webhook_events_log'::regclass
-       and pg_get_expr(polqual, polrelid) like '%fn_role_at_least%manager%'
+       and pg_get_expr(polqual, polrelid) like '%fn_escopo_orgs%manager%'
+       and pg_get_expr(polqual, polrelid) not like '%fn_role_at_least%'
   ) then
     drop policy if exists "webhook_events_log_tenant_read" on public.webhook_events_log;
     create policy "webhook_events_log_tenant_read" on public.webhook_events_log
       for select
       using (
         (select public.fn_is_platform_admin())
-        or (organization_id is not null and public.fn_role_at_least(organization_id, 'manager'))
+        or organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel in ('manager', 'admin'))
       );
   end if;
 end $$;

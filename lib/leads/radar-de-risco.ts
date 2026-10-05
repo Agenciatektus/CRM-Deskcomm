@@ -18,6 +18,8 @@ import type { Role } from "@/lib/auth/types";
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeDoContato, type ContatoNomeavel } from "@/lib/contacts/rotulo-do-contato";
+import { logger } from "@/lib/logger";
+import { consultarEmLotes } from "@/lib/supabase/lotes";
 
 import {
   classifyRisk,
@@ -225,37 +227,71 @@ export async function carregaRadarDeRisco(
   const nameByContact = new Map<string, string | null>();
 
   if (contactIds.length > 0) {
+    // EM LOTES (`consultarEmLotes`), e o erro DERRUBA o radar. A lista de
+    // contatos vai na querystring do PostgREST: ~37 bytes por uuid, e o
+    // gateway do CRM recusa a URL por volta de 24 KB (medição em
+    // `lib/supabase/lotes.ts`). Antes, as três leituras iam numa consulta só e
+    // o `error` era ignorado: numa base grande o 400 virava `data: null`, ou
+    // seja, nenhum retorno em voo, nenhuma conversa, nenhum nome — e o radar
+    // respondia com cara de completo. Pior: sem follow-up lido, todo lead "em
+    // voo" passava por esfriado. Erro aqui é falha explícita, nunca "sem risco".
     const [followups, convs, contacts] = await Promise.all([
-      admin
-        .from("cron_jobs")
-        .select("contact_id, next_run_at")
-        .eq("organization_id", organizationId)
-        .eq("kind", "at")
-        .eq("enabled", true)
-        .gt("next_run_at", nowIso)
-        .in("contact_id", contactIds),
-      admin
-        .from("conversations")
-        .select("id, contact_id, assignee_kind")
-        .eq("organization_id", organizationId)
-        .in("contact_id", contactIds),
-      admin
-        .from("contacts")
-        .select("id, name, display_name")
-        .eq("organization_id", organizationId)
-        .in("id", contactIds),
+      consultarEmLotes<{ contact_id: string; next_run_at: string }>(contactIds, (lote) =>
+        admin
+          .from("cron_jobs")
+          .select("contact_id, next_run_at")
+          .eq("organization_id", organizationId)
+          .eq("kind", "at")
+          .eq("enabled", true)
+          .gt("next_run_at", nowIso)
+          .in("contact_id", lote),
+      ),
+      consultarEmLotes<{ id: string; contact_id: string; assignee_kind: "user" | "ai" | null }>(
+        contactIds,
+        (lote) =>
+          admin
+            .from("conversations")
+            .select("id, contact_id, assignee_kind")
+            .eq("organization_id", organizationId)
+            .in("contact_id", lote),
+      ),
+      consultarEmLotes<{ id: string; name: string | null; display_name: string | null }>(
+        contactIds,
+        (lote) =>
+          admin
+            .from("contacts")
+            .select("id, name, display_name")
+            .eq("organization_id", organizationId)
+            .in("id", lote),
+      ),
     ]);
+    const falhas = (
+      [
+        ["cron_jobs", followups.error],
+        ["conversations", convs.error],
+        ["contacts", contacts.error],
+      ] as const
+    ).filter(([, erro]) => erro !== null);
+    if (falhas.length > 0) {
+      // UM registro por leitura, com a contagem que explica o tamanho do pedido
+      // — não um por contato (ver `avisarIndisponivel` na agenda).
+      logger.error("[radar] leitura por contato falhou; radar abortado", {
+        contatos: contactIds.length,
+        falhas: falhas.map(([tabela, erro]) => `${tabela}: ${erro}`),
+      });
+      throw new Error(`radar_contatos_failed: ${falhas.map(([tabela]) => tabela).join(",")}`);
+    }
 
-    for (const f of followups.data ?? []) {
+    for (const f of followups.data) {
       const prev = followupByContact.get(f.contact_id);
       if (!prev || f.next_run_at < prev) followupByContact.set(f.contact_id, f.next_run_at);
     }
-    for (const c of convs.data ?? []) {
+    for (const c of convs.data) {
       if (!convByContact.has(c.contact_id)) {
         convByContact.set(c.contact_id, { id: c.id, assignee_kind: c.assignee_kind ?? null });
       }
     }
-    for (const p of contacts.data ?? []) {
+    for (const p of contacts.data) {
       nameByContact.set(p.id, nomeDoContato(p));
     }
   }

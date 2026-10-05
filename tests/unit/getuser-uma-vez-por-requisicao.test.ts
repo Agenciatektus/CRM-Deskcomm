@@ -139,4 +139,16 @@ describe("getUser uma vez por requisição", () => {
     await c.auth.getUser("outro-token");
     expect(estado.chamadasGetUser).toBe(2);
   });
+
+  it("a resposta compartilhada vem congelada: um chamador não muda o user do outro", async () => {
+    const c = await createClient();
+    const a = await c.auth.getUser();
+    const b = await c.auth.getUser();
+    expect(Object.isFrozen(a.data.user)).toBe(true);
+    expect(Object.isFrozen((a.data.user as { user_metadata: object }).user_metadata)).toBe(true);
+    expect(() => {
+      (a.data.user as { user_metadata: Record<string, unknown> }).user_metadata.role = "owner";
+    }).toThrow(TypeError);
+    expect((b.data.user as { user_metadata: Record<string, unknown> }).user_metadata.role).toBeUndefined();
+  });
 });
