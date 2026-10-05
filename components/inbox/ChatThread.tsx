@@ -4,11 +4,13 @@ import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
 import { useEffect, useMemo, useRef } from "react";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { useT } from "@/hooks/i18n/useT";
 import { format, isToday, isYesterday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageBubble } from "./MessageBubble";
+import { LinhaDaMensagem, type AcoesDoFio } from "./fio/LinhaDaMensagem";
+import { indiceDoDiaAtivo, montarLinhas, type LinhaDoFio } from "./fio/linhas";
 import { NoteCard } from "./NoteCard";
 import { PassagemCard } from "./PassagemCard";
 import { useMessagesRealtime } from "@/hooks/inbox/useMessagesRealtime";
@@ -142,14 +144,6 @@ export function ChatThread({
       ),
     [messages, termo],
   );
-  // Só o TERMO leva à ocorrência. Depender do conjunto de resultados faria cada
-  // mensagem nova do tempo real arrancar quem lê de volta à primeira ocorrência.
-  useEffect(() => {
-    if (termo)
-      scrollerRef.current
-        ?.querySelector('[data-search-match="true"]')
-        ?.scrollIntoView({ block: "nearest" });
-  }, [termo]);
   /**
    * As mensagens por id, para resolver a CITADA sem ir ao servidor.
    *
@@ -176,6 +170,105 @@ export function ChatThread({
   );
 
   const paginas = q.data?.pages.length ?? 0;
+
+  /**
+   * OS GESTOS DA BOLHA COM IDENTIDADE ESTÁVEL.
+   *
+   * As bolhas são memoizadas (`LinhaDaMensagem`). Se cada render do fio criasse
+   * `onEditar={() => …}` novo por bolha, o `memo` nunca acertaria e a chegada de
+   * UMA mensagem re-renderizaria todas as já montadas. O ref guarda a versão
+   * mais nova das mutações; o objeto de ações nasce uma vez e lê do ref.
+   */
+  const gestos = useRef({ editar, apagar, ocultar, restaurar, onResponder });
+  gestos.current = { editar, apagar, ocultar, restaurar, onResponder };
+  const acoes: AcoesDoFio = useMemo(
+    () => ({
+      responder: (m) => gestos.current.onResponder?.(m),
+      editar: (id, text) => gestos.current.editar.mutateAsync({ id, text }).then(() => undefined),
+      apagar: (id) => gestos.current.apagar.mutateAsync(id).then(() => undefined),
+      ocultar: (id) => gestos.current.ocultar.mutateAsync(id).then(() => undefined),
+      restaurar: (id) => gestos.current.restaurar.mutateAsync(id).then(() => undefined),
+    }),
+    [],
+  );
+
+  /**
+   * O FIO É VIRTUALIZADO: só as linhas na tela (mais uma margem) existem no DOM.
+   *
+   * Conversa longa montava TODAS as bolhas — com 2.000 mensagens eram 2.000
+   * árvores de bolha, cada uma com seu timer de minuto. Agora são as visíveis +
+   * `overscan` (medido em `tests/unit/fio-virtualizado.test.tsx`).
+   *
+   * `anchorTo: "end"` é o modo de chat do virtualizador: quando linhas entram
+   * ACIMA (o "Carregar mais antigas") ele reancora a leitura pela chave da linha
+   * que estava no topo — a posição não pula —, e quando uma bolha da base muda
+   * de altura (imagem que carregou, edição) com a leitura no fim, ela continua
+   * no fim. Seguir a mensagem NOVA continua sendo decisão do efeito de
+   * ancoragem abaixo (`followOnAppend` desligado), com as guardas de sempre.
+   */
+  const linhas: LinhaDoFio[] = useMemo(
+    () => montarLinhas(items, Boolean(q.hasNextPage)),
+    [items, q.hasNextPage],
+  );
+  const diaAtivo = useRef(-1);
+  const virtualizer = useVirtualizer({
+    count: linhas.length,
+    getScrollElement: () => scrollerRef.current,
+    getItemKey: (i) => linhas[i]!.key,
+    // Só o chute inicial: cada linha é medida de verdade ao montar.
+    estimateSize: (i) => (linhas[i]!.tipo === "item" ? 72 : 28),
+    overscan: 8,
+    // O `py-2` que o rolador tinha vira margem do próprio virtualizador, para
+    // as posições baterem com a altura total.
+    paddingStart: 8,
+    paddingEnd: 8,
+    anchorTo: "end",
+    // React 19 avisa quando o virtualizador força `flushSync` dentro do commit
+    // (medição no ref). Sem ele a atualização vai no lote normal do React.
+    useFlushSync: false,
+    // O rótulo do dia que vale para o topo da tela fica sempre montado, para
+    // poder grudar no topo como o `sticky` de antes (ver o render).
+    rangeExtractor: (range) => {
+      diaAtivo.current = indiceDoDiaAtivo(linhas, range.startIndex);
+      const indices = defaultRangeExtractor(range);
+      if (diaAtivo.current >= 0 && !indices.includes(diaAtivo.current)) {
+        indices.unshift(diaAtivo.current);
+      }
+      return indices;
+    },
+  });
+
+  // Só o TERMO leva à ocorrência. Depender do conjunto de resultados faria cada
+  // mensagem nova do tempo real arrancar quem lê de volta à primeira ocorrência.
+  //
+  // Com o fio virtualizado a primeira ocorrência pode não estar montada: aí o
+  // virtualizador rola até a LINHA dela (que então monta), em vez de procurar no
+  // DOM uma bolha que não existe. O pedido fica PENDENTE até a bolha montar
+  // (inclusive na primeira pintura, quando o virtualizador ainda não mediu a
+  // tela), e só então leva a bolha ao campo de visão, como antes.
+  const buscaPendente = useRef(false);
+  useEffect(() => {
+    buscaPendente.current = Boolean(termo);
+  }, [termo]);
+  useEffect(() => {
+    if (!buscaPendente.current) return;
+    const alvo = linhas.findIndex(
+      (l) => l.tipo === "item" && l.item.kind === "message" && resultados.has(l.item.data.id),
+    );
+    if (alvo < 0) {
+      buscaPendente.current = false;
+      return;
+    }
+    const el = scrollerRef.current?.querySelector(
+      `[data-index="${alvo}"] [data-search-match="true"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ block: "nearest" });
+      buscaPendente.current = false;
+    } else if (virtualizer.getVirtualItems().length > 0) {
+      virtualizer.scrollToIndex(alvo, { align: "center" });
+    }
+  });
 
   // Conversa nova: a contagem de páginas recomeça, senão a primeira carga da
   // próxima conversa seria confundida com um "carregar mais antigas".
@@ -313,15 +406,90 @@ export function ChatThread({
     );
   }
 
-  // Group by day for separators (usa o timestamp do item — sent_at pra mensagem, created_at pra nota).
-  const groups: { key: string; date: Date; items: ThreadItem[] }[] = [];
-  for (const item of items) {
-    const d = new Date(item.ts);
-    const key = format(d, "yyyy-MM-dd");
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) last.items.push(item);
-    else groups.push({ key, date: d, items: [item] });
-  }
+  const rotuloDoDia = (data: Date) => (
+    <div className="flex justify-center py-1">
+      <span className="rounded-full bg-background/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur">
+        {dayLabel(data, t, localeDaData)}
+      </span>
+    </div>
+  );
+
+  const conteudoDaLinha = (linha: LinhaDoFio) => {
+    if (linha.tipo === "mais")
+      return (
+        <div className="flex justify-center py-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => q.fetchNextPage()}
+            disabled={q.isFetchingNextPage}
+          >
+            {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais antigas")}
+          </Button>
+        </div>
+      );
+    if (linha.tipo === "dia") return rotuloDoDia(linha.data);
+    const item = linha.item;
+    // `pt-1` é o `space-y-1` que separava os itens de cada dia.
+    return (
+      <div className="pt-1">
+        {item.kind === "passagem" ? (
+          <PassagemCard
+            cartao={item.data}
+            contatoId={contatoId ?? null}
+            assumindo={claim.isPending}
+            // O MESMO gesto do cabeçalho — uma rota, um efeito. Uma
+            // segunda maneira de assumir seria uma segunda chance de os
+            // dois caminhos divergirem sobre o que "assumir" faz.
+            onAssumir={() =>
+              conversationId &&
+              claim.mutate({
+                conversation_id: conversationId,
+                expected_assignee: dono?.userId ?? null,
+              })
+            }
+          />
+        ) : item.kind === "note" ? (
+          <NoteCard
+            note={item.data}
+            // Só o autor ou manager+ vê o excluir — o backend barra o resto (403),
+            // então não mostramos um botão que daria erro.
+            onDelete={
+              item.data.created_by_user_id === currentUser.id || canManage
+                ? () => deleteNote.mutate(item.data.id)
+                : undefined
+            }
+          />
+        ) : (
+          <LinhaDaMensagem
+            message={item.data}
+            searchMatch={resultados.has(item.data.id)}
+            debugCitations={Boolean(debugCitations)}
+            temResponder={Boolean(onResponder)}
+            // A citada sai da MESMA lista já carregada: buscar no servidor
+            // por cada citação faria uma consulta por bolha. Quando a
+            // citada é antiga demais e ficou fora da página, o fio some —
+            // que é melhor que segurar a conversa esperando.
+            citada={porId.get(item.data.reply_to_message_id ?? "") ?? null}
+            // Sem isto o balão diz "Você" em toda mensagem digitada no
+            // CRM — inclusive nas do colega, porque `sent_via='user'` só
+            // registra que um humano digitou, nunca qual.
+            viewerUserId={currentUser.id}
+            podeAlterar={canalAlteraEnviada && item.data.sent_by_user_id === currentUser.id}
+            podeModerar={canManage && item.data.direction === "inbound"}
+            acoes={acoes}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const virtuais = virtualizer.getVirtualItems();
+  // O rótulo do dia do topo GRUDA quando a linha dele já passou do topo — o
+  // mesmo `sticky top-0` de antes. Ele é renderizado no fluxo (no início do
+  // contêiner), não posicionado: é o que deixa o `sticky` funcionar.
+  const ativo = virtuais.find((v) => v.index === diaAtivo.current);
+  const grudado = ativo != null && ativo.start < (virtualizer.scrollOffset ?? 0);
 
   return (
     <div {...sinalDoCanal} className="flex h-full min-w-0 flex-col">
@@ -330,91 +498,27 @@ export function ChatThread({
           {t("Resultados nas mensagens carregadas")}: {resultados.size}
         </div>
       )}
-      <div ref={scrollerRef} className="min-w-0 flex-1 overflow-y-auto py-2">
-        {q.hasNextPage && (
-          <div className="flex justify-center py-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => q.fetchNextPage()}
-              disabled={q.isFetchingNextPage}
-            >
-              {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais antigas")}
-            </Button>
-          </div>
-        )}
-
-        {groups.map((g) => (
-          <div key={g.key} className="space-y-1">
-            <div className="sticky top-0 z-10 flex justify-center py-1">
-              <span className="rounded-full bg-background/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur">
-                {dayLabel(g.date, t, localeDaData)}
-              </span>
-            </div>
-            {g.items.map((item) =>
-              item.kind === "passagem" ? (
-                <PassagemCard
-                  key={`passagem-${item.data.id}`}
-                  cartao={item.data}
-                  contatoId={contatoId ?? null}
-                  assumindo={claim.isPending}
-                  // O MESMO gesto do cabeçalho — uma rota, um efeito. Uma
-                  // segunda maneira de assumir seria uma segunda chance de os
-                  // dois caminhos divergirem sobre o que "assumir" faz.
-                  onAssumir={() =>
-                    conversationId &&
-                    claim.mutate({
-                      conversation_id: conversationId,
-                      expected_assignee: dono?.userId ?? null,
-                    })
-                  }
-                />
-              ) : item.kind === "note" ? (
-                <NoteCard
-                  key={`note-${item.data.id}`}
-                  note={item.data}
-                  // Só o autor ou manager+ vê o excluir — o backend barra o resto (403),
-                  // então não mostramos um botão que daria erro.
-                  onDelete={
-                    item.data.created_by_user_id === currentUser.id || canManage
-                      ? () => deleteNote.mutate(item.data.id)
-                      : undefined
-                  }
-                />
-              ) : (
-                <MessageBubble
-                  key={`msg-${item.data.id}`}
-                  message={item.data}
-                  searchMatch={resultados.has(item.data.id)}
-                  debugCitations={debugCitations}
-                  onResponder={onResponder}
-                  // A citada sai da MESMA lista já carregada: buscar no servidor
-                  // por cada citação faria uma consulta por bolha. Quando a
-                  // citada é antiga demais e ficou fora da página, o fio some —
-                  // que é melhor que segurar a conversa esperando.
-                  citada={porId.get(item.data.reply_to_message_id ?? "") ?? null}
-                  // Sem isto o balão diz "Você" em toda mensagem digitada no
-                  // CRM — inclusive nas do colega, porque `sent_via='user'` só
-                  // registra que um humano digitou, nunca qual.
-                  viewerUserId={currentUser.id}
-                  onEditar={canalAlteraEnviada && item.data.sent_by_user_id === currentUser.id
-                    ? (text) => editar.mutateAsync({ id: item.data.id, text }).then(() => undefined)
-                    : undefined}
-                  onApagar={canalAlteraEnviada && item.data.sent_by_user_id === currentUser.id
-                    ? () => apagar.mutateAsync(item.data.id).then(() => undefined)
-                    : undefined}
-                  onOcultar={canManage && item.data.direction === "inbound"
-                    ? () => ocultar.mutateAsync(item.data.id).then(() => undefined)
-                    : undefined}
-                  onRestaurar={canManage && item.data.direction === "inbound"
-                    ? () => restaurar.mutateAsync(item.data.id).then(() => undefined)
-                    : undefined}
-                />
-              ),
-            )}
-          </div>
-        ))}
-
+      {/* `overflow-anchor: none`: quem segura a posição ao entrar conteúdo acima é
+          o virtualizador (`anchorTo: "end"`); a ancoragem do navegador por cima
+          dele compensaria duas vezes. */}
+      <div ref={scrollerRef} className="min-w-0 flex-1 overflow-y-auto [overflow-anchor:none]">
+        <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+          {virtuais.map((v) => {
+            const linha = linhas[v.index]!;
+            const fixo = grudado && v.index === diaAtivo.current;
+            return (
+              <div
+                key={v.key}
+                data-index={v.index}
+                ref={virtualizer.measureElement}
+                className={fixo ? "sticky top-0 z-10 w-full" : "absolute left-0 top-0 w-full"}
+                style={fixo ? undefined : { transform: `translateY(${v.start}px)` }}
+              >
+                {conteudoDaLinha(linha)}
+              </div>
+            );
+          })}
+        </div>
         <div ref={bottomRef} />
       </div>
     </div>

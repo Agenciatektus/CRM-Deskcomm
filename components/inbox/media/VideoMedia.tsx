@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
+import { useAoAparecer } from "./useAoAparecer";
 import { useFonteComReserva } from "./useFonteComReserva";
 
 /**
@@ -24,18 +25,20 @@ export function VideoMedia({
   const [ready, setReady] = useState(false);
   const { fonte, tentarReserva } = useFonteComReserva(src ?? mediaSrc(messageId), srcReserva);
   const [failed, setFailed] = useState(false);
+  // Sem `src` até chegar perto da tela: o vídeo não pede rede antes disso.
+  const { ref, visivel } = useAoAparecer<HTMLDivElement>();
 
   return (
-    <div className="relative w-full max-w-sm aspect-video overflow-hidden rounded-lg bg-black/5">
+    <div ref={ref} className="relative w-full max-w-sm aspect-video overflow-hidden rounded-lg bg-black/5">
       {failed ? (
         <MediaUnavailable kind="Vídeo" className="h-full w-full" />
       ) : (
         <>
           {!ready && <Skeleton className="absolute inset-0 h-full w-full" />}
           <video
-            src={fonte}
+            src={visivel ? fonte : undefined}
             controls
-            preload="metadata"
+            preload={visivel ? "metadata" : "none"}
             onLoadedMetadata={() => setReady(true)}
             onError={() => {
               if (!tentarReserva()) setFailed(true);
