@@ -74,7 +74,8 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     // áudio, vídeo e PDF) sai como DOWNLOAD (`Content-Disposition: attachment`):
     // um HTML ou SVG guardado antes do P2-3 não abre como página.
     const urls = await assinarMidias(createAdminClient(), [msg.media_storage_path], agora, {
-      download: !mimeExibivel(msg.media_mime),
+      // Pelo mime SEGURO (a coluna guarda o declarado, para o rótulo).
+      download: !mimeExibivel(mimeSeguroParaGuardar(msg.media_mime)),
     });
     const assinada = urls.get(msg.media_storage_path);
     if (assinada) {
@@ -126,7 +127,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
         url: msg.media_url,
         hintMime: msg.media_mime,
       });
-      const exibivel = mimeExibivel(media.mime);
+      const exibivel = mimeExibivel(mimeSeguroParaGuardar(media.mime));
       return new Response(new Uint8Array(media.buffer), {
         status: 200,
         headers: {

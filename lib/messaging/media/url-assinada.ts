@@ -28,6 +28,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mimeExibivel, mimeSeguroParaGuardar } from "./mime-seguro";
+
 export const BUCKET_DA_MIDIA = "whatsapp-media";
 /**
  * 30 min: a URL vive entre 30 e 60 min (parecer do @Cassio_SecRev na #74, P2-3).
@@ -114,24 +116,39 @@ export async function assinarMidias(
  * função não lê nada do banco, só assina o caminho que a linha já trazia.
  */
 export async function anexarUrlsDeMidia<
-  M extends { media_storage_path: string | null; media_thumb_path?: string | null },
+  M extends { media_storage_path: string | null; media_thumb_path?: string | null; media_mime?: string | null },
 >(
   admin: SupabaseClient,
   mensagens: M[],
   agoraMs: number = Date.now(),
 ): Promise<Array<M & { media_signed_url: string | null; media_thumb_signed_url: string | null }>> {
-  const caminhos = mensagens
-    .flatMap((m) => [m.media_storage_path, m.media_thumb_path ?? null])
+  // O que a tela não exibe (HTML, SVG, documento — decidido pelo mime SEGURO)
+  // é assinado como DOWNLOAD, como na rota individual (P2-2 do Cassio na #83).
+  // Um SVG antigo guardado como veio abriria inline pela URL da lista.
+  const baixar = (m: M) => !mimeExibivel(mimeSeguroParaGuardar(m.media_mime));
+  const inline = mensagens
+    .flatMap((m) => [baixar(m) ? null : m.media_storage_path, m.media_thumb_path ?? null])
     .filter((c): c is string => !!c);
-  const urls = caminhos.length > 0 ? await assinarMidias(admin, caminhos, agoraMs) : new Map<string, string>();
-  return mensagens.map((m) => ({
-    ...m,
-    media_signed_url: m.media_storage_path ? (urls.get(m.media_storage_path) ?? null) : null,
-    // A miniatura só vale com a original: sem a original assinada, nada de
-    // mostrar a miniatura de um arquivo que a tela não consegue abrir.
-    media_thumb_signed_url:
-      m.media_storage_path && m.media_thumb_path && urls.has(m.media_storage_path)
-        ? (urls.get(m.media_thumb_path) ?? null)
-        : null,
-  }));
+  const paraBaixar = mensagens
+    .filter((m) => baixar(m))
+    .map((m) => m.media_storage_path)
+    .filter((c): c is string => !!c);
+  const [urls, urlsDeDownload] = await Promise.all([
+    inline.length > 0 ? assinarMidias(admin, inline, agoraMs) : Promise.resolve(new Map<string, string>()),
+    paraBaixar.length > 0
+      ? assinarMidias(admin, paraBaixar, agoraMs, { download: true })
+      : Promise.resolve(new Map<string, string>()),
+  ]);
+  return mensagens.map((m) => {
+    const original = m.media_storage_path
+      ? ((baixar(m) ? urlsDeDownload : urls).get(m.media_storage_path) ?? null)
+      : null;
+    return {
+      ...m,
+      media_signed_url: original,
+      // A miniatura só vale com a original: sem a original assinada, nada de
+      // mostrar a miniatura de um arquivo que a tela não consegue abrir.
+      media_thumb_signed_url: original && m.media_thumb_path ? (urls.get(m.media_thumb_path) ?? null) : null,
+    };
+  });
 }
