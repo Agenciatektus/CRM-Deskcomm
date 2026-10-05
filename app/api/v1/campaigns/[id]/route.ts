@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 const COLUNAS =
   "id, name, description, status, channel_session_id, message_body, message_variants, " +
-  "base_legal, lia_ref, " +
+  "passos, followup_pointer_id, base_legal, lia_ref, " +
   "audience_filter, audience_version, content_version, snapshot_total, snapshot_eligible, " +
   "snapshot_excluded, scheduled_at, prepared_at, started_at, paused_at, completed_at, " +
   "cancelled_at, failure_code, intervalo_segundos, janela_inicio_hora, janela_fim_hora, " +
@@ -146,6 +146,12 @@ export async function PATCH(
     "description",
     "message_body",
     "message_variants",
+    // Os passos são CONTEÚDO (caem fora de `CAMPOS_DE_RITMO`), então só mudam
+    // em rascunho: a régua no ar foi publicada a partir desta lista, e trocá-la
+    // com a campanha andando deixaria o grafo que executa divergindo da lista
+    // que a tela mostra — divergência da pior espécie, porque a tela continua
+    // certa de si. Para mexer, volta-se ao rascunho, e preparar republica.
+    "passos",
     "audience_filter",
     "intervalo_segundos",
     "janela_inicio_hora",
@@ -169,6 +175,10 @@ export async function PATCH(
   const variacoesMudaram =
     entrada.message_variants !== undefined &&
     JSON.stringify(entrada.message_variants) !== JSON.stringify(campanha.message_variants ?? []);
+  // Os passos NÃO sobem a `content_version`: ela identifica o texto CONGELADO
+  // em `campaign_recipients.rendered_body`, que é só a 1ª mensagem. Subi-la
+  // aqui marcaria a lista preparada como desatualizada por causa de uma régua
+  // que nem foi publicada ainda — e a publicação é no preparar.
   if (
     (entrada.message_body !== undefined && entrada.message_body !== campanha.message_body) ||
     variacoesMudaram

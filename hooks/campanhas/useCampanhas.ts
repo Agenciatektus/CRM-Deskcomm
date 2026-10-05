@@ -12,6 +12,7 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
 import type { ContagemDaCampanha, TaxasDaCampanha } from "@/lib/campanhas/metricas";
 import type { StatusDaCampanha } from "@/lib/campanhas/tipos";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 
 export interface CampanhaDaLista {
   id: string;
@@ -40,6 +41,10 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   message_body: string | null;
   /** As variações EXTRAS (migration 9034). Vazio = campanha de um texto só. */
   message_variants?: string[] | null;
+  /** A régua do 2º toque em diante (migration 9037). Vazia = uma mensagem só. */
+  passos?: PassoDaRegua[] | null;
+  /** O pointer de follow-up publicado para esta campanha (9037). */
+  followup_pointer_id?: string | null;
   base_legal: string;
   lia_ref: string | null;
   audience_filter: Record<string, unknown>;

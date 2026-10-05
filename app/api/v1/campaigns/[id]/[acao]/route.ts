@@ -92,13 +92,13 @@ export async function POST(
 
   switch (acao) {
     case "preparar": {
-      desfecho = await prepararAcao(admin, campanha, agora);
+      desfecho = await prepararAcao(admin, campanha, agora, authz.user.id);
       acaoAuditada = "campaign.prepared";
       break;
     }
     case "iniciar":
     case "retomar": {
-      const r = await iniciarAcao(admin, campanha, agora);
+      const r = await iniciarAcao(admin, campanha, agora, authz.user.id);
       desfecho = r;
       acaoAuditada = r.ok && r.retomada ? "campaign.resumed" : "campaign.started";
       break;

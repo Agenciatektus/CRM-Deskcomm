@@ -8,11 +8,15 @@ import { serviceForEvent } from "@/lib/atendimento/origem";
  *   - `app/api/v1/leads/_handler.ts` — cadastro manual, API, importação, webhook
  *   - `lib/leads/nascimento-do-lead.ts` — a conversa que abre o primeiro card
  *
- * Importação de planilha NÃO inscreve: ela também passa por
+ * CRIAÇÃO EM LOTE NÃO INSCREVE: a importação de planilha também passa por
  * `createLeadHandler`, e 400 linhas com telefone viravam 400 mensagens
  * proativas de uma vez — o disparo em massa que a doutrina anti-banimento
- * existe para impedir, sem que a tela do gatilho mencionasse planilha. O
- * evento chega marcado (`metadata.via`) e conta `vindos_de_planilha`, nunca cala.
+ * existe para impedir, sem que a tela do gatilho mencionasse planilha. A
+ * campanha com passos (9037) entrou na mesma lista, e por um motivo pior: ela
+ * cria um card por pessoa ABORDADA, e a pessoa acabou de receber a mensagem da
+ * campanha — uma segunda, de outro fluxo, no mesmo minuto. O evento chega
+ * marcado (`metadata.via`, ver `lib/leads/criacao-em-lote.ts`) e conta
+ * `criados_em_lote`, nunca cala.
  *
  * `contact_id` não vem no payload do cadastro; resolve-se pelo negócio.
  * Sem contato não há a quem escrever — conta `sem_contato`, nunca cala.
@@ -24,9 +28,10 @@ import { serviceForEvent } from "@/lib/atendimento/origem";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { EventRow } from "@/lib/event-log/dispatcher";
-import { ORIGEM_DA_PLANILHA } from "@/lib/leads/planilha";
+import { criacaoEmLote } from "@/lib/leads/criacao-em-lote";
 import { flowGraphSchema } from "./graph-schema";
 import { triggerConfigSchema } from "./api-schemas";
+import { foraDosGatilhosGenericos } from "./superficies";
 import {
   decidirAgenteDoEnrollmentAutomatico,
   noDeGatilhoDoGrafo,
@@ -75,7 +80,8 @@ export interface GatilhoLeadSummary {
   skipped_existing: number;
   skipped_stale_origin?: number;
   sem_contato: number;
-  vindos_de_planilha: number;
+  /** Cards que nasceram em lote (planilha, campanha): marcados, nunca inscritos. */
+  criados_em_lote: number;
 }
 
 export interface GatilhoLeadDeps {
@@ -96,7 +102,7 @@ function vazio(): GatilhoLeadSummary {
     enrolled: 0,
     skipped_existing: 0,
     sem_contato: 0,
-    vindos_de_planilha: 0,
+    criados_em_lote: 0,
   };
 }
 
@@ -116,8 +122,8 @@ export async function aplicaGatilhoDeLead(
   summary.pointers_armados = armados.length;
   if (armados.length === 0) return summary;
 
-  if (row.metadata?.via === ORIGEM_DA_PLANILHA) {
-    summary.vindos_de_planilha = armados.length;
+  if (criacaoEmLote(row.metadata?.via)) {
+    summary.criados_em_lote = armados.length;
     return summary;
   }
 
@@ -194,7 +200,10 @@ export function createSupabaseGatilhoLeadDb(admin: SupabaseClient): GatilhoLeadD
       }>) {
         // Roteiro de atendimento (0394) é do turno, nunca do relógio: o banco
         // já o prende em gatilho manual, e este corte é a segunda porta.
-        if (!row.active_version_id || row.surface === "atendimento") continue;
+        // Régua de prospecção (cadência 9016, campanha 9037) tem porta própria:
+        // sem este corte ela escapava por aqui, e uma camada só é o modo de
+        // falhar que `lib/followup/superficies.ts` descreve.
+        if (!row.active_version_id || foraDosGatilhosGenericos(row.surface)) continue;
         const parsed = triggerConfigSchema.safeParse(row.trigger_config);
         if (!parsed.success || parsed.data.kind !== "lead_created") continue;
         pointers.push({
