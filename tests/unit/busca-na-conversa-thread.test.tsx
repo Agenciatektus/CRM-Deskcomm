@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Message } from "@/lib/types/messaging";
+import { simularLayoutDoFio } from "@/tests/helpers/layout-do-fio";
 
 /**
  * BUSCA DENTRO DA CONVERSA, NAS MENSAGENS JÁ CARREGADAS (extraída do PR #1793).
@@ -83,6 +84,8 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 );
 const rolar = vi.fn();
 const original = Element.prototype.scrollIntoView;
+// O fio é virtualizado: sem layout o jsdom não monta linha nenhuma.
+let layout: ReturnType<typeof simularLayoutDoFio>;
 
 /** Os corpos das bolhas marcadas pela busca, em ordem. */
 function marcadas(container: HTMLElement): string[] {
@@ -97,6 +100,7 @@ describe("ChatThread: busca nas mensagens carregadas", () => {
     rolar.mockClear();
     get.mockClear();
     Element.prototype.scrollIntoView = rolar;
+    layout = simularLayoutDoFio();
     estado.mensagens = [
       msg("m-1", "Qual o valor do BOLETO?"),
       msg("m-2", "Bom dia"),
@@ -107,6 +111,7 @@ describe("ChatThread: busca nas mensagens carregadas", () => {
   });
   afterEach(() => {
     Element.prototype.scrollIntoView = original;
+    layout.desfazer();
   });
 
   it("marca só as bolhas visíveis que contêm o termo, sem diferenciar maiúsculas", () => {

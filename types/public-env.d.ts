@@ -10,6 +10,7 @@ interface PublicEnv {
   NEXT_PUBLIC_SUPABASE_URL?: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   SENTRY_DSN?: string;
+  SENTRY_TRACES_SAMPLE_RATE?: string;
   /**
    * Marca da instalação (white-label), já RESOLVIDA — banco acima, arquivo de
    * instalação embaixo. Os nomes das chaves são os do `.env` por herança, mas o

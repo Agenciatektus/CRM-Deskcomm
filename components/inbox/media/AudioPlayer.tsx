@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
+import { useAoAparecer } from "./useAoAparecer";
 import { useFonteComReserva } from "./useFonteComReserva";
 
 const RATES = [1, 1.5, 2] as const;
@@ -37,6 +38,14 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
   const [rateIdx, setRateIdx] = useState(0);
   const [failed, setFailed] = useState(false);
   const { fonte, tentarReserva } = useFonteComReserva(src ?? mediaSrc(messageId), srcReserva);
+  // Sem `src` até chegar perto da tela: o áudio não pede rede antes disso.
+  const { ref: caixaRef, visivel, carregar } = useAoAparecer<HTMLDivElement>();
+  const tocarAoCarregar = useRef(false);
+  useEffect(() => {
+    if (!visivel || !tocarAoCarregar.current) return;
+    tocarAoCarregar.current = false;
+    void audioRef.current?.play();
+  }, [visivel]);
 
   useEffect(() => {
     const el = audioRef.current;
@@ -67,6 +76,11 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
     if (playing) {
       el.pause();
       setPlaying(false);
+    } else if (!visivel) {
+      // Clique antes de a mídia ter carregado: põe o `src` e toca em seguida.
+      tocarAoCarregar.current = true;
+      carregar();
+      setPlaying(true);
     } else {
       void el.play();
       setPlaying(true);
@@ -85,11 +99,11 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
   };
 
   return (
-    <div className="flex w-60 items-center gap-2 py-1">
+    <div ref={caixaRef} className="flex w-60 items-center gap-2 py-1">
       <audio
         ref={audioRef}
-        src={fonte}
-        preload="metadata"
+        src={visivel ? fonte : undefined}
+        preload={visivel ? "metadata" : "none"}
         onError={() => {
           if (!tentarReserva()) setFailed(true);
         }}

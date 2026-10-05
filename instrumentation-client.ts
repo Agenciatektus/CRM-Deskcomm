@@ -5,6 +5,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { resolveSentryDsn, isCommunityDsn, integracoesDoCliente } from "./lib/sentry/dsn";
 import { opcoesDePrivacidade } from "./lib/sentry/privacidade";
+import { AMOSTRAGEM_DE_REPLAY, taxaDeTraces } from "./lib/sentry/amostragem";
 
 const sentryDsn = resolveSentryDsn(
   typeof window !== "undefined" ? window.__PUBLIC_ENV__?.SENTRY_DSN : undefined,
@@ -23,14 +24,15 @@ Sentry.init({
     Sentry.replayIntegration(),
   ],
 
-  // No Sentry da comunidade, só erro (issue #100): sem trace, sem replay de
-  // sessão e sem sessão de release health (ver integracoesDoCliente). O replay DE
-  // ERRO continua, porque é o que explica o stack trace — e o replayIntegration()
-  // sem argumentos já aplica maskAllText/blockAllMedia.
-  tracesSampleRate: community ? 0 : 1,
-
-  replaysSessionSampleRate: community ? 0 : 0.1,
-  replaysOnErrorSampleRate: 1.0,
+  // No Sentry da comunidade, só erro (issue #100): sem trace e sem sessão de
+  // release health (ver integracoesDoCliente). Em qualquer Sentry, replay SÓ DE
+  // ERRO — é o que explica o stack trace — e o replayIntegration() sem
+  // argumentos já aplica maskAllText/blockAllMedia. Ver lib/sentry/amostragem.ts.
+  tracesSampleRate: taxaDeTraces(
+    typeof window !== "undefined" ? window.__PUBLIC_ENV__?.SENTRY_TRACES_SAMPLE_RATE : undefined,
+    community,
+  ),
+  ...AMOSTRAGEM_DE_REPLAY,
 
   // Coleta restrita + scrub, num ponto só (Sentry 11 coleta amplo por default).
   ...opcoesDePrivacidade,

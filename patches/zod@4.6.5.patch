@@ -1,0 +1,52 @@
+diff --git a/v4/classic/external.js b/v4/classic/external.js
+index 435be167fc6c2c2276f9c0236526b22b2eed3f05..0a6292c4670da390b2868124b3bc779b9ff4677c 100644
+--- a/v4/classic/external.js
++++ b/v4/classic/external.js
+@@ -10,7 +10,7 @@ export { fromJSONSchema } from "./from-json-schema.js";
+ export { deepPartial } from "./deep-partial.js";
+ // Types and values both, from one module — re-exporting the types from core would collide.
+ export { input, output } from "./in-out.js";
+-export * as locales from "../locales/index.js";
++export * as locales from "../locales/essenciais.js";
+ // iso must be exported from top-level https://github.com/colinhacks/zod/issues/4491
+ export { ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration } from "./iso.js";
+ export * as iso from "./iso.js";
+diff --git a/v4/core/index.js b/v4/core/index.js
+index f5bc49efd057a69b43ee57658cf1ad2a53d457ac..87d25043c9fe1d80d4b9f35fa3ab91bca5135324 100644
+--- a/v4/core/index.js
++++ b/v4/core/index.js
+@@ -8,7 +8,7 @@ export * from "./versions.js";
+ export * as util from "./util.js";
+ export { toZod } from "./util.js";
+ export * as regexes from "./regexes.js";
+-export * as locales from "../locales/index.js";
++export * as locales from "../locales/essenciais.js";
+ export * from "./registries.js";
+ export * from "./doc.js";
+ export * from "./compile.js";
+diff --git a/v4/locales/essenciais.js b/v4/locales/essenciais.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..933633daf54747a37621d6053fe3cb31466dd8db
+--- /dev/null
++++ b/v4/locales/essenciais.js
+@@ -0,0 +1,7 @@
++// Patch do DeskcommCRM (patches/zod@4.6.5.patch): só os idiomas que o produto
++// usa. O índice completo (`./index.js`, ~50 idiomas) ia inteiro para o bundle do
++// navegador, porque o Turbopack não descarta o namespace `z.locales`. Para
++// voltar a ter outro idioma, acrescente a linha dele aqui.
++export { default as en } from "./en.js";
++export { default as pt } from "./pt.js";
++export { default as es } from "./es.js";
+diff --git a/v4/mini/external.js b/v4/mini/external.js
+index 9a3f8ea998f2aeb539a3aabbe0bc90352f939641..86fc580565b2ecdbe1480429fe87c57045298682 100644
+--- a/v4/mini/external.js
++++ b/v4/mini/external.js
+@@ -6,7 +6,7 @@ export { deepPartial } from "./deep-partial.js";
+ export { input, output } from "./in-out.js";
+ export { globalRegistry, registry, config, memoizer, $output, $input, $brand, clone, regexes, treeifyError, prettifyError, formatError, flattenError, TimePrecision, util, NEVER, INVALID, toZod, compile, withParser, ZodCompileAsyncError, ZodCompileUnsupportedError, getDiscriminatedOption, } from "../core/index.js";
+ export { toJSONSchema } from "../core/json-schema-processors.js";
+-export * as locales from "../locales/index.js";
++export * as locales from "../locales/essenciais.js";
+ /** A special constant with type `never` */
+ // export const NEVER = {} as never;
+ // iso
