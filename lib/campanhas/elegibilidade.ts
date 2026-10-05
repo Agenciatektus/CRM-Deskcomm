@@ -68,6 +68,11 @@ export interface LinhaClassificada {
   motivo: MotivoDeExclusao | null;
   /** O texto final — só existe para quem é elegível. */
   corpo: string | null;
+  /**
+   * Qual variação da mensagem esta pessoa recebeu (0 = o `message_body`).
+   * `null` em quem foi excluído: não há texto, então não há variante.
+   */
+  varianteIndex: number | null;
 }
 
 export interface ContextoDaClassificacao {
@@ -82,8 +87,23 @@ export interface ContextoDaClassificacao {
   suprimidos: ReadonlySet<string>;
   /** O hash de um endereço — injetado para esta função continuar pura. */
   hashDoEndereco: (endereco: string) => string;
-  /** Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura. */
-  renderizar: (c: CandidatoDaAudiencia) => { texto: string; faltando: string[] };
+  /**
+   * Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura.
+   * `varianteIndex` é opcional porque quem não tem variação (um teste, uma
+   * chamada antiga) não precisa inventar um índice.
+   */
+  renderizar: (c: CandidatoDaAudiencia) => {
+    texto: string;
+    faltando: string[];
+    /**
+     * O texto resolveu para NADA. Opcional para não quebrar chamada antiga, e
+     * tratado como exclusão própria (`texto_vazio`): `faltando` fica vazio
+     * nesse caso — `{Olá|}` é spintax válido e não usa variável nenhuma —,
+     * então sem este sinal a pessoa passava como elegível com corpo em branco.
+     */
+    vazio?: boolean;
+    varianteIndex?: number;
+  };
 }
 
 /**
@@ -115,7 +135,7 @@ export function classificarAudiencia(
 
   for (const candidato of candidatos) {
     const excluir = (motivo: MotivoDeExclusao): void => {
-      saida.push({ candidato, elegivel: false, motivo, corpo: null });
+      saida.push({ candidato, elegivel: false, motivo, corpo: null, varianteIndex: null });
     };
 
     if (ctx.excluidosAMao.has(candidato.contactId)) {
@@ -140,14 +160,28 @@ export function classificarAudiencia(
       excluir("duplicado");
       continue;
     }
-    const { texto, faltando } = ctx.renderizar(candidato);
+    const { texto, faltando, vazio, varianteIndex } = ctx.renderizar(candidato);
     if (faltando.length > 0) {
       excluir("variavel_ausente");
       continue;
     }
+    // Depois de `faltando`, e com motivo próprio: aqui não falta dado do
+    // contato — o texto é que resolveu para nada. Sem esta guarda, mensagem em
+    // branco é congelada no snapshot e sai pelo WhatsApp como sai qualquer
+    // outra, que é pior do que não mandar.
+    if (vazio === true || texto.trim() === "") {
+      excluir("texto_vazio");
+      continue;
+    }
 
     enderecosVistos.add(endereco);
-    saida.push({ candidato, elegivel: true, motivo: null, corpo: texto });
+    saida.push({
+      candidato,
+      elegivel: true,
+      motivo: null,
+      corpo: texto,
+      varianteIndex: varianteIndex ?? 0,
+    });
   }
 
   return saida;

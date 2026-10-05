@@ -45,7 +45,7 @@ import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
-import { renderizar } from "./renderizador";
+import { renderizarVariacao, resolverSaudacao, variantesDaCampanha } from "./renderizador";
 import { escolherNumero, poolDaCampanha, type NumeroDisponivel } from "./rodizio";
 import { podeMandarAgora, proximaTentativa, type RitmoDaCampanha } from "./ritmo";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -81,6 +81,7 @@ interface CampanhaRow {
   channel_session_id: string;
   name: string;
   message_body: string | null;
+  message_variants: string[] | null;
   content_version: number;
   intervalo_segundos: number | null;
   janela_inicio_hora: number | null;
@@ -90,7 +91,7 @@ interface CampanhaRow {
 }
 
 const COLUNAS_DA_CAMPANHA =
-  "id, organization_id, channel_session_id, name, message_body, content_version, " +
+  "id, organization_id, channel_session_id, name, message_body, message_variants, content_version, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
 
 export async function rodarUmaRodadaDeCampanha(
@@ -399,12 +400,41 @@ async function rodarUmaCampanha(
   // de ser a do instante em que a mensagem SAI, no fuso do canal. Montá-la na
   // preparação produziria "bom dia" numa mensagem enviada à tarde — foi o
   // defeito do primeiro piloto.
-  const congelado = alvo.rendered_body ?? campanha.message_body ?? "";
-  const corpo = renderizar(
-    congelado,
-    { nome: nomeDoContato(contato) },
-    { agora, fuso: knobs.timezone },
-  ).texto;
+  // O congelado JÁ teve a variante escolhida e o spintax resolvido na
+  // preparação; aqui só a saudação falta. O fallback (linha sem corpo
+  // congelado, que a preparação não produz para elegível) passa pelo motor de
+  // variação de propósito: sem ele, um `{a|b}` do corpo principal sairia com as
+  // chaves no WhatsApp do cliente.
+  let congelado = alvo.rendered_body;
+  if (congelado === null || congelado === undefined) {
+    const refeito = renderizarVariacao({
+      variantes: variantesDaCampanha(campanha.message_body, campanha.message_variants),
+      semente: alvo.contact_id,
+      valores: { nome: nomeDoContato(contato) },
+    });
+    // O instrumento ligado no ÚNICO ponto onde texto vira mensagem. Este
+    // caminho é morto hoje (a preparação grava `rendered_body` para todo
+    // elegível), mas se um dia não for, o custo é mandar `{{nome}}` literal —
+    // ou nada — para um lojista. Falha fechada, com o motivo visível na lista.
+    if (refeito.faltando.length > 0 || refeito.vazio) {
+      const porque = refeito.vazio ? "texto_vazio" : "variavel_ausente";
+      await admin
+        .from("campaign_recipients")
+        .update({
+          status: "skipped",
+          eligibility_status: "excluded",
+          exclusion_reason: porque,
+        })
+        .eq("id", alvo.id)
+        .eq("status", "pending");
+      return { enviadas: 0, pulados: 1, concluidas: 0, detalhe: `pulado:${porque}` };
+    }
+    congelado = refeito.texto;
+  }
+  // Só a saudação, com regex dedicada: o corpo congelado JÁ tem o nome do
+  // contato dentro, e reler tudo como template faria um cadastro chamado
+  // `Loja {{saudacao}}` virar `Loja Boa tarde` no envio.
+  const corpo = resolverSaudacao(congelado, { agora, fuso: knobs.timezone });
 
   try {
     const boundary = await beginServiceAtOrigin(
