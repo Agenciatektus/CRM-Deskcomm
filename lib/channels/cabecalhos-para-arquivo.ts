@@ -4,7 +4,7 @@
  * nomes e valores de header.
  */
 import { credencialPeloValor } from "./credencial-pelo-valor";
-import { chaveSensivel, semCredencialNaUrl, sha256, TETO_DE_TEXTO } from "./enxugar-para-arquivo";
+import { chaveSensivel, marcador, semCredencialNaUrl, TETO_DE_TEXTO } from "./enxugar-para-arquivo";
 
 /**
  * Cabeçalhos que NUNCA entram no arquivo, por nome exato. Além destes, sai todo
@@ -31,7 +31,7 @@ export function cabecalhosParaArquivo(headers: Headers): Record<string, string> 
     if (CABECALHOS_PROIBIDOS.includes(k) || chaveSensivel(k) || credencialPeloValor(k, valor)) return;
     out[chave] =
       valor.length > TETO_DE_TEXTO
-        ? `[omitido: ${valor.length} caracteres, sha256 ${sha256(valor)}]`
+        ? marcador("tamanho", valor)
         : semCredencialNaUrl(valor, { cortou: false });
   });
   return out;

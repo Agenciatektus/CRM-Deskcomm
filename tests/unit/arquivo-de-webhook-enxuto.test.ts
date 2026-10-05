@@ -110,15 +110,15 @@ describe("arquivoEnxuto — nenhum formato vaza", () => {
 
   it("o marcador de mídia guarda tamanho e sha256, não o conteúdo", () => {
     const r = arquivoEnxuto(JSON.stringify(itemDeAlbum));
-    expect(r.parsed?.base64).toMatchObject({ omitido: true, motivo: "midia", caracteres: MIDIA.length });
-    expect((r.parsed?.base64 as { sha256: string }).sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.parsed?.base64).toBe(`[omitido:midia:${MIDIA.length}c:sha=${(r.parsed?.base64 as string).slice(-17, -1)}]`);
+    expect(r.parsed?.base64).toMatch(/^\[omitido:midia:\d+c:sha=[0-9a-f]{16}\]$/);
     expect(r.parsed?.token).toBe(TOKEN_OMITIDO);
     expect(r.parsed?.album).toEqual({ albumId: "ALB-1", role: "item" });
   });
 
   it("string longa sem nome de mídia vira marcador de tamanho", () => {
     const r = arquivoEnxuto(JSON.stringify({ a: { b: "x".repeat(TETO_DE_TEXTO + 1) } }));
-    expect((r.parsed?.a as { b: unknown }).b).toMatchObject({ omitido: true, motivo: "tamanho" });
+    expect((r.parsed?.a as { b: unknown }).b).toMatch(/^\[omitido:tamanho:4097c:sha=[0-9a-f]{16}\]$/);
   });
 
   it("o resto do payload fica como veio (downloadURL, tipo, evento)", () => {
@@ -157,7 +157,7 @@ describe("arquivoEnxuto — nenhum formato vaza", () => {
     const muitas = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`k${i}`, "y".repeat(4000)]));
     const r = arquivoEnxuto(JSON.stringify(muitas));
     expect(r.rawBody.length).toBeLessThan(64 * 1024);
-    expect(r.parsed).toMatchObject({ omitido: true, motivo: "tamanho" });
+    expect(r.parsed?.omitido).toMatch(/^\[omitido:tamanho:/);
   });
 
   it("lista e escalar continuam com payload_parsed nulo", () => {
@@ -184,7 +184,7 @@ describe("cabeçalhos", () => {
     );
     expect(vazou(JSON.stringify(h))).toEqual([]);
     expect(Object.keys(h).sort()).toEqual(["content-type", "x-grande", "x-hub-signature-256"]);
-    expect(h["x-grande"]).toMatch(/^\[omitido: \d+ caracteres, sha256 [0-9a-f]{64}\]$/);
+    expect(h["x-grande"]).toMatch(/^\[omitido:tamanho:\d+c:sha=[0-9a-f]{16}\]$/);
   });
 });
 
@@ -278,5 +278,19 @@ describe("P2 do Cassio na #98: credencial reconhecida pelo VALOR", () => {
   it("header com nome inócuo e valor de credencial sai", () => {
     const h = cabecalhosParaArquivo(new Headers({ "x-auth": CHAVE, "x-sessao": `Bearer ${TOKEN}`, "x-ok": "1" }));
     expect(Object.keys(h)).toEqual(["x-ok"]);
+  });
+});
+
+describe("o marcador nunca deixa o valor maior do que era", () => {
+  it("base64 minúsculo fica; o marcador só entra onde encolhe", () => {
+    const cru = JSON.stringify({ base64: "QUJD", type: "x" });
+    expect(arquivoEnxuto(cru).rawBody).toBe(cru);
+  });
+
+  it("todo valor substituído por marcador era maior que o marcador", () => {
+    for (const tamanho of [65, 100, 4097, 50_000]) {
+      const cru = JSON.stringify({ base64: "A".repeat(tamanho) });
+      expect(arquivoEnxuto(cru).rawBody.length, `base64 de ${tamanho}`).toBeLessThan(cru.length);
+    }
   });
 });
