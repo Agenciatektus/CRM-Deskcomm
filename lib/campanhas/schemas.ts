@@ -8,6 +8,7 @@ import { z } from "zod";
 import { spintaxValido } from "@/lib/texto/variacao";
 
 import { filtroDeAudienciaSchema } from "./audiencia";
+import { passosDaCampanhaSchema } from "./passos";
 import { MAX_VARIACOES_EXTRAS, VARIANTE_TAMANHO_MAXIMO } from "./renderizador";
 
 /**
@@ -64,6 +65,15 @@ const baseDaCampanha = {
    */
   channel_session_ids: z.array(z.string().uuid()).max(10).optional(),
   /**
+   * A RÉGUA do 2º toque em diante (migration 9037). Vazia = campanha de uma
+   * mensagem só, que é o comportamento de toda campanha existente. O funil
+   * passa a ser exigido quando há passos, e isso é conferido no gate de
+   * `faltaParaEnviar` (preparar, iniciar, agendar e testar) — não aqui: um
+   * rascunho pode ter os passos antes de o operador escolher o funil, e barrar
+   * o SALVAR o prenderia num texto que não dá para corrigir sem apagar.
+   */
+  passos: passosDaCampanhaSchema.optional(),
+  /**
    * Onde o card de quem responde nasce, e quem atende (migration 0378).
    * `null` devolve a decisão ao número, que é o comportamento de sempre.
    */
@@ -107,6 +117,7 @@ export const editarCampanhaSchema = z
     base_legal: baseDaCampanha.base_legal.optional(),
     lia_ref: baseDaCampanha.lia_ref,
     audience_filter: filtroDeAudienciaSchema.optional(),
+    passos: baseDaCampanha.passos,
     channel_session_ids: baseDaCampanha.channel_session_ids,
     pipeline_id: baseDaCampanha.pipeline_id,
     stage_id: baseDaCampanha.stage_id,

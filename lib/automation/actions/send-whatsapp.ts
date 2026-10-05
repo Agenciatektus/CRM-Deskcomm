@@ -73,4 +73,11 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
   }
 }
 
-registerAction({ type: "send_whatsapp_message", postponeUntil, execute });
+registerAction({
+  type: "send_whatsapp_message",
+  // MANDA mensagem para o cliente: o motor a PULA em criação de card em lote
+  // (planilha, campanha com passos). Ver `ActionExecutor.falaComOCliente`.
+  falaComOCliente: true,
+  postponeUntil,
+  execute,
+});

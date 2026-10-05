@@ -66,4 +66,10 @@ export async function executeStartMessageFlow(
   };
 }
 
-registerAction({ type: TYPE, execute: executeStartMessageFlow });
+registerAction({
+  type: TYPE,
+  // MANDA mensagem para o cliente: o motor a PULA em criação de card em lote
+  // (planilha, campanha com passos). Ver `ActionExecutor.falaComOCliente`.
+  falaComOCliente: true,
+  execute: executeStartMessageFlow,
+});

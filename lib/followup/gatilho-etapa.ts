@@ -50,6 +50,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { flowGraphSchema } from "./graph-schema";
 import { triggerConfigSchema } from "./api-schemas";
+import { foraDosGatilhosGenericos } from "./superficies";
 import {
   decidirAgenteDoEnrollmentAutomatico,
   noDeGatilhoDoGrafo,
@@ -301,7 +302,10 @@ export function createSupabaseGatilhoEtapaDb(admin: SupabaseClient): GatilhoEtap
       }>) {
         // Roteiro de atendimento (0394) é do turno, nunca do relógio: o banco
         // já o prende em gatilho manual, e este corte é a segunda porta.
-        if (!row.active_version_id || row.surface === "atendimento") continue;
+        // Régua de prospecção (cadência 9016, campanha 9037) tem porta própria:
+        // sem este corte ela escapava por aqui, e uma camada só é o modo de
+        // falhar que `lib/followup/superficies.ts` descreve.
+        if (!row.active_version_id || foraDosGatilhosGenericos(row.surface)) continue;
         // O parse é o MESMO schema do publish — um `trigger_config` que não
         // passa nele não arma nada, em vez de armar torto.
         const parsed = triggerConfigSchema.safeParse(row.trigger_config);

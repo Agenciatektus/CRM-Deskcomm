@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
+import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 import {
   useAgentesPublicados,
   useEtapas,
@@ -49,6 +51,8 @@ export function NovaCampanha() {
   const [limite, setLimite] = useState("100");
   // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
   const [variantes, setVariantes] = useState<string[]>([""]);
+  // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
+  const [passos, setPassos] = useState<PassoDaRegua[]>([]);
   const texto = variantes[0] ?? "";
   const variacoesExtras = useMemo(
     () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
@@ -115,6 +119,7 @@ export function NovaCampanha() {
       pipeline_id: funil || null,
       stage_id: etapa || null,
       agent_id: agente || null,
+      passos,
     });
     router.push(`/app/campaigns/${criada.id}`);
   }
@@ -355,6 +360,21 @@ export function NovaCampanha() {
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
         <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Passos depois da primeira mensagem")}</h2>
+        <PassosDaCampanha
+          passos={passos}
+          onChange={setPassos}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
+          // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
+          // frase do aviso fica sem número em vez de chutar um.
+          quantosCards={previa.data?.elegiveis ?? null}
+          tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
+        />
       </Card>
 
       <Card className="space-y-4 p-4">

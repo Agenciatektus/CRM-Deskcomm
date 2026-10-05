@@ -56,6 +56,7 @@ import type { EventRow } from "@/lib/event-log/dispatcher";
 import { inboundEhDestaPergunta } from "@/lib/followup/aplicar-inbound";
 import type { EnrollmentPatch } from "./engine";
 import { triggerConfigSchema } from "./api-schemas";
+import { ehProspeccao } from "./superficies";
 import type { EnrollmentOutcome, EnrollmentStatus } from "./node-handlers";
 import { idsDoContatoEGemeos } from "@/lib/channels/contato-por-telefone";
 import {
@@ -279,7 +280,12 @@ async function reactToInbound(
     contactId,
     STATUS_CARREGADOS_NO_INBOUND,
   );
-  const live = carregadas.filter((e) => e.status !== "paused_manual" || e.surface === "cadence");
+  // `paused_manual` entra na leitura por causa da prospecção: a resposta encerra
+  // a régua pausada à mão. Valia só para `cadence` por literal, e a régua de
+  // CAMPANHA (9037) ficava de fora: a inscrição pausada à mão não era encerrada
+  // quando a pessoa respondia, e ao retomar a régua voltava a falar com quem já
+  // tinha respondido. O follow-up comum pausado à mão segue intocado.
+  const live = carregadas.filter((e) => e.status !== "paused_manual" || ehProspeccao(e.surface));
 
   if (isBlocked) {
     // STOP/opt-out (a regex já rodou em lib/waha/ingest.ts e setou is_blocked

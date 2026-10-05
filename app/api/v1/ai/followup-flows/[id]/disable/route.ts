@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const dynamic = "force-dynamic";
 
@@ -44,13 +45,29 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
 
+  // ⚠️ RÉGUA DE CAMPANHA NÃO SE DESLIGA POR AQUI, e a recusa é o conserto de um
+  // desfecho pior que o 42501 do banco: com o pointer `disabled`, o worker PULA
+  // cada passo e o motor AVANÇA — o inscrito corre a régua inteira em tiques,
+  // calado, e quem retomar a campanha o encontra no fim sem ter recebido nada.
+  // Quem para a régua de uma campanha é a própria campanha (`Cancelar`, que
+  // encerra as inscrições em `encerrarReguaDaCampanha`).
+  if (existing.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha se para na tela da campanha, em Cancelar."),
+      422,
+      { requestId },
+    );
+  }
+
   if (existing.status === "disabled") {
     return ok({ id, status: "disabled" }, { requestId });
   }
 
-  // Cadência só se escreve pelo servidor (migration 9020: a sessão recebe 42501
-  // ao mudar o status de uma cadência). O papel já foi conferido acima.
-  const escritor = existing.surface === "cadence" ? createAdminClient() : supabase;
+  // Régua de prospecção só se escreve pelo servidor (9020/9037: a sessão recebe
+  // 42501 ao mudar o status de uma cadência OU da régua de uma campanha). O
+  // papel já foi conferido acima.
+  const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;
   const { data: updated, error: updErr } = await escritor
     .from("followup_flow_pointers")
     .update({ status: "disabled", updated_at: new Date().toISOString() })

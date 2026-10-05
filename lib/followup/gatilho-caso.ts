@@ -56,6 +56,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { flowGraphSchema } from "./graph-schema";
 import { triggerConfigSchema } from "./api-schemas";
+import { foraDosGatilhosGenericos } from "./superficies";
 import {
   decidirAgenteDoEnrollmentAutomatico,
   noDeGatilhoDoGrafo,
@@ -331,8 +332,9 @@ export function createSupabaseGatilhoCasoDb(admin: SupabaseClient): GatilhoCasoD
         // Roteiro de atendimento (0394) é do turno, nunca do relógio: o banco
         // já o prende em gatilho manual, e este corte é a segunda porta.
         // Cadência (fork, 9016) só inscreve pela própria porta
-        // (`lib/cadencia/inscrever.ts`) — mesmo corte, no mesmo lugar.
-        if (!row.active_version_id || row.surface === "atendimento" || row.surface === "cadence") continue;
+        // (`lib/cadencia/inscrever.ts`) e a régua de campanha (9037) só pelo
+        // envio da 1ª mensagem — mesmo corte, no mesmo lugar.
+        if (!row.active_version_id || foraDosGatilhosGenericos(row.surface)) continue;
         // Mesmo schema do publish: `trigger_config` que não passa nele não arma
         // nada, em vez de armar torto.
         const parsed = triggerConfigSchema.safeParse(row.trigger_config);

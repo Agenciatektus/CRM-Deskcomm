@@ -33,6 +33,65 @@ export async function validarPublicacaoDaCadencia(
   },
   grafo: FlowGraph,
 ): Promise<ErroDePublicacaoDaCadencia[]> {
+  const erros = await validarReguaDeProspeccao(admin, organizationId, pointer, grafo, "cadence");
+
+  // Quem atende quando o lead responde: com IA, agente, funil, objetivo,
+  // etapa-alvo e orçamento têm de estar em ordem antes de ir ao ar. É a ÚNICA
+  // parte que não vale para a régua de campanha — ela não tem condução; quem
+  // atende quem responde a uma campanha é `campaigns.agent_id`/`stage_id`.
+  erros.push(...(await validarConducaoDaCadencia(admin, organizationId, pointer)));
+
+  return erros;
+}
+
+/**
+ * O QUE VALE PARA AS DUAS RÉGUAS DE PROSPECÇÃO — cadência e campanha (9037).
+ *
+ * Extraída porque a régua da campanha ia ao ar SEM nada disto:
+ * `publicarReguaDaCampanha` chamava `publishFollowupFlowVersion` direto, que é
+ * só o wrapper da RPC e não valida. O `problemaNosPassos` da campanha cobria
+ * funil, mensagem não vazia, spintax e ids — e deixava passar o que mata a
+ * régua em silêncio:
+ *
+ *   - VARIÁVEL FORA DO VOCABULÁRIO. É o caso provável, não o teórico: a 1ª
+ *     mensagem da campanha aceita `{{saudacao}}` e o passo NÃO (o vocabulário
+ *     dos passos é o da cadência). O operador escreve `{{saudacao}}` no passo 2
+ *     porque acabou de usar na primeira, o motor pula o passo e a lista inteira
+ *     fica sem o 2º toque, sem erro em lugar nenhum.
+ *   - ETAPA ÓRFÃ. Trocar o funil no rascunho deixa o `stage_id` do passo
+ *     apontando para outro funil; `lib/cadencia/efeitos.ts` lança e a régua de
+ *     TODOS morre no backoff.
+ *   - etapa arquivada, etapa de perda, passo que o motor não executa.
+ *
+ * ═══ As duas diferenças entre as superfícies, e por que ═══
+ *
+ * 1. NÚMERO DESCONECTADO não reprova a campanha. A cadência fala por UM número;
+ *    a campanha faz rodízio (migration 0377) e a régua aceita o pool inteiro
+ *    (`lib/cadencia/envio.ts`). Reprovar a preparação porque o número PRINCIPAL
+ *    está fora do ar neste segundo impediria de preparar uma campanha cujos
+ *    outros números funcionam — e preparar nunca exigiu número conectado. O
+ *    número que não EXISTE (ou foi arquivado) reprova nas duas: ali não há o que
+ *    reconectar.
+ * 2. TETO DE INSCRIÇÕES vs COTA DO NÚMERO não reprova a campanha. Na cadência a
+ *    inscrição em lote abre conversa ANTES de enviar, então inscrever mais gente
+ *    por dia do que o número manda deixa conversa vazia na fila. Na campanha a
+ *    inscrição é 1:1 com uma mensagem que ACABOU de sair — o número já cobrou a
+ *    cota dele antes de qualquer inscrição existir, e o teto não pode criar
+ *    fila nenhuma.
+ */
+export async function validarReguaDeProspeccao(
+  admin: SupabaseClient,
+  organizationId: string,
+  pointer: {
+    pipeline_id: string | null;
+    channel_session_id: string | null;
+    cadence_settings: unknown;
+    trigger_config: unknown;
+  },
+  grafo: FlowGraph,
+  superficie: "cadence" | "campaign",
+): Promise<ErroDePublicacaoDaCadencia[]> {
+  const ehCampanha = superficie === "campaign";
   const erros: ErroDePublicacaoDaCadencia[] = [];
   const erro = (code: string, message: string, node_id: string | null = null) =>
     erros.push({ node_id, code, message });
@@ -69,13 +128,13 @@ export async function validarPublicacaoDaCadencia(
     if (error) throw new Error(error.message);
     if (!sessao || sessao.archived_at) {
       erro("cadencia_numero_inexistente", "O número escolhido não existe mais nesta organização.");
-    } else if (sessao.status !== "WORKING") {
+    } else if (sessao.status !== "WORKING" && !ehCampanha) {
       erro("cadencia_numero_desconectado", "O número escolhido está desconectado. Reconecte antes de publicar.");
     }
     // Inscrever mais gente por dia do que o número manda por dia só cria conversa
     // aberta esperando cota — a fila cresce e ninguém recebe.
     const limite = (sessao?.daily_message_limit as number | null | undefined) ?? null;
-    if (settings.success && limite !== null && settings.data.max_inscricoes_dia > limite) {
+    if (!ehCampanha && settings.success && limite !== null && settings.data.max_inscricoes_dia > limite) {
       erro(
         "cadencia_teto_acima_da_cota",
         `O limite de novas inscrições por dia (${settings.data.max_inscricoes_dia}) passa do limite diário do número (${limite}).`,
@@ -175,10 +234,6 @@ export async function validarPublicacaoDaCadencia(
       }
     }
   }
-
-  // Quem atende quando o lead responde: com IA, agente, funil, objetivo,
-  // etapa-alvo e orçamento têm de estar em ordem antes de ir ao ar.
-  erros.push(...(await validarConducaoDaCadencia(admin, organizationId, pointer)));
 
   return erros;
 }
