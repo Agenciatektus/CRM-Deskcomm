@@ -32,12 +32,27 @@ interface MessagesPage {
   meta?: { cursor?: string | null; has_more?: boolean };
 }
 
+/**
+ * O id da bolha otimista viaja no envio como `metadata.client_id` e volta na
+ * linha real (o handler grava `input.metadata` na mensagem). É ele que diz QUAL
+ * bolha otimista a mensagem do tempo real substitui: comparar só texto e tipo
+ * trocava a errada quando a mesma frase saía duas vezes seguidas
+ * (`hooks/inbox/cacheDaThread.ts`).
+ *
+ * `onMutate` roda antes de `mutationFn` com o MESMO objeto de variáveis; o
+ * WeakMap leva o id de um para o outro sem mexer nos argumentos de quem chama.
+ */
+const idDoEnvio = new WeakMap<SendArgs, string>();
+
 export function useSendMessage() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: SendArgs) =>
-      apiClient.post<{ data: Message }>("/api/v1/messages", input),
+    mutationFn: async (input: SendArgs) => {
+      const clientId = idDoEnvio.get(input);
+      const corpo = clientId ? { ...input, metadata: { ...(input.metadata ?? {}), client_id: clientId } } : input;
+      return apiClient.post<{ data: Message }>("/api/v1/messages", corpo);
+    },
     onMutate: async (args) => {
       if (args.media_storage_path || args.media_url || args.type === "contact") return {};
 
@@ -45,6 +60,7 @@ export function useSendMessage() {
       await qc.cancelQueries({ queryKey });
 
       const tempId = `temp-${randomId()}`;
+      idDoEnvio.set(args, tempId);
       const tempMsg: Message = {
         id: tempId,
         organization_id: "",
@@ -69,7 +85,7 @@ export function useSendMessage() {
         sent_at: new Date().toISOString(),
         delivered_at: null,
         read_at: null,
-        metadata: { _optimistic: true },
+        metadata: { _optimistic: true, client_id: tempId },
         // Mensagem que acaba de sair não foi editada nem apagada — mas os
         // campos precisam existir: sem eles o otimista não é do mesmo tipo do
         // que volta do servidor, e a bolha passaria a renderizar dois formatos.
