@@ -46,6 +46,42 @@ const comentario = () => ({
   },
 });
 
+describe("Direct com o perfil que o Verdash anexa", () => {
+  // A Meta manda só o IGSID no Direct. Sem o `perfil`, todo lead de Direct
+  // nascia "Sem nome" no Inbox e "Novo contato pelo Instagram" no quadro.
+  it("lê nome e @ do perfil", () => {
+    const r = lerEventoDoInstagram(
+      { ...direct(), perfil: { nome: "  Maria   Souza ", username: "@Maria.Souza" } },
+      AGORA,
+    );
+    expect(r.ok && r.mensagem.nome).toBe("Maria Souza");
+    expect(r.ok && r.mensagem.username).toBe("maria.souza");
+  });
+
+  it("sem perfil continua lendo a mensagem, com nome e @ nulos", () => {
+    const r = lerEventoDoInstagram(direct(), AGORA);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.mensagem.nome).toBeNull();
+    expect(r.ok && r.mensagem.username).toBeNull();
+  });
+
+  it("perfil malformado não derruba a mensagem", () => {
+    const r = lerEventoDoInstagram({ ...direct(), perfil: "x" }, AGORA);
+    expect(r.ok && r.mensagem.nome).toBeNull();
+    const r2 = lerEventoDoInstagram({ ...direct(), perfil: { nome: 42, username: "com espaço" } }, AGORA);
+    expect(r2.ok && r2.mensagem.nome).toBeNull();
+    expect(r2.ok && r2.mensagem.username).toBeNull();
+  });
+
+  it("nome tem controle removido e teto de tamanho", () => {
+    const r = lerEventoDoInstagram({ ...direct(), perfil: { nome: "Ana\nLinha\u0000" + "x".repeat(500) } }, AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.nome).not.toMatch(/[\u0000-\u001f]/);
+    expect(r.mensagem.nome!.length).toBeLessThanOrEqual(120);
+  });
+});
+
 describe("leitura do evento do Instagram", () => {
   it("Direct com texto vira mensagem, com a identidade no IGSID", () => {
     const r = lerEventoDoInstagram(direct(), AGORA);
