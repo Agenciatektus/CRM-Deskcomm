@@ -2,6 +2,28 @@
 --
 -- 9034 — A CAMPANHA GANHA VARIAÇÕES DE MENSAGEM (e o spintax `{a|b}`)
 --
+-- ## ANTES DO DEPLOY: contar o corpo legado que passa a ser lido como sintaxe
+--
+-- Esta mudança faz `{` e `}` deixarem de ser caracteres comuns no
+-- `message_body` e virarem sintaxe. Campanha escrita antes dela pode conter
+-- chave sem essa intenção, e o efeito se divide em dois:
+--
+--   "Horario {09h as 18h}"   -> vira "Horario 09h as 18h": as chaves somem, em
+--                               SILENCIO, e o cliente recebe texto diferente
+--   "Oi {nome}, tudo bem? :}" -> BLOQUEADO na preparacao com erro de spintax.
+--                               Fail-closed, mas trava envio que ontem saia
+--
+-- Rode ANTES de aplicar, e decida caso a caso se vier linha:
+--
+--   select id, name, status, message_body
+--   from public.campaigns
+--   where message_body ~ '[{}]';
+--
+-- Medido na instalacao da Tektus em 05/10/2026: 1 campanha no total, 1 com
+-- chave -- e a chave e `{{primeiro_nome}}`, variavel legitima, nao spintax.
+-- Zero campanhas em risco. Numa instalacao com historico o resultado pode ser
+-- outro: a contagem e obrigatoria, nao ilustrativa.
+--
 -- ## Por quê
 --
 -- Quinhentas pessoas recebendo o texto IDÊNTICO, do mesmo número, na mesma

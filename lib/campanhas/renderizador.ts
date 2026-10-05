@@ -54,7 +54,17 @@ export interface ValoresDoDestinatario {
   nome: string | null;
 }
 
-const TOKEN = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+/**
+ * `{{variavel}}` e `{{variavel|texto se faltar}}`.
+ *
+ * O `|` entrou por PARIDADE com a cadência (`lib/cadencia/render.ts`), e a razão
+ * é o operador, não a simetria: ele aprende `{{primeiro_nome|tudo bem}}` lá e
+ * escreve o mesmo aqui. Enquanto o pipe não era lido, `{{nome|lojista}}` não
+ * casava este TOKEN — logo não entrava em `faltando` NEM em `desconhecidas` — e
+ * saía LITERAL no WhatsApp, sem nada avisando. A caixa nova ainda ensina `{a|b}`
+ * logo ao lado, o que torna o engano provável em vez de teórico.
+ */
+const TOKEN = /\{\{\s*([a-zA-Z0-9_]+)\s*(?:\|([^}]*))?\}\}/g;
 
 export interface TextoRenderizado {
   texto: string;
@@ -62,6 +72,12 @@ export interface TextoRenderizado {
   faltando: VariavelDaCampanha[];
   /** Tokens que não são variáveis conhecidas — ficam literais, como no Inbox. */
   desconhecidas: string[];
+  /**
+   * O texto ficou VAZIO depois de renderizar — `{Olá|}` cai aqui na metade das
+   * sementes. Quem chama trata como falta e pula a pessoa: mensagem em branco
+   * sai do mesmo jeito pelo WhatsApp e é pior que não mandar nada.
+   */
+  vazio: boolean;
 }
 
 export function renderizar(
@@ -73,16 +89,20 @@ export function renderizar(
   const faltando = new Set<VariavelDaCampanha>();
   const desconhecidas = new Set<string>();
 
-  const texto = template.replace(TOKEN, (literal, bruto: string) => {
+  const texto = template.replace(TOKEN, (literal, bruto: string, fallback?: string) => {
     const chave = bruto.toLowerCase();
+    // O fallback cobre a falta ANTES de ela virar exclusão: quem escreveu
+    // `{{primeiro_nome|tudo bem}}` já disse o que quer no lugar do nome.
+    const semValor = (variavel: VariavelDaCampanha) =>
+      fallback !== undefined ? fallback.trim() : marcarFalta(faltando, variavel, literal);
     switch (chave) {
       case "nome": {
-        if (nome === "") return marcarFalta(faltando, "nome", literal);
+        if (nome === "") return semValor("nome");
         return nome;
       }
       case "primeiro_nome": {
         const primeiro = nome.split(/\s+/)[0] ?? "";
-        if (primeiro === "") return marcarFalta(faltando, "primeiro_nome", literal);
+        if (primeiro === "") return semValor("primeiro_nome");
         return primeiro;
       }
       case "saudacao": {
@@ -98,7 +118,18 @@ export function renderizar(
     }
   });
 
-  return { texto, faltando: [...faltando], desconhecidas: [...desconhecidas] };
+  // GUARD DE NÃO-VAZIO — paridade com `lib/cadencia/render.ts`, que já o tinha
+  // e que a extração do motor deixou de fora. Medido pelo @Cassio_SecRev: com
+  // `{Olá|}` (um pipe sobrando), 139 de 300 sementes rendiam string vazia, o
+  // `rendered_body` era congelado em branco e o envio seguia — nenhuma das
+  // quatro camadas de validação via, porque o texto É spintax válido e nenhuma
+  // variável faltou.
+  return {
+    texto,
+    faltando: [...faltando],
+    desconhecidas: [...desconhecidas],
+    vazio: texto.trim() === "",
+  };
 }
 
 function marcarFalta(
@@ -108,6 +139,24 @@ function marcarFalta(
 ): string {
   destino.add(variavel);
   return literal;
+}
+
+/**
+ * A ÚLTIMA passada sobre o corpo já congelado: troca só `{{saudacao}}`.
+ *
+ * Existe porque o despacho precisa da saudação da hora do ENVIO, e o corpo que
+ * ele tem na mão já passou pelo render na preparação — com o nome do contato
+ * dentro. Rodar `renderizar` inteiro de novo ali relê esse texto como template,
+ * e um cadastro chamado `Loja {{saudacao}}` virava `Loja Boa tarde` no WhatsApp:
+ * dado de cliente executado como comando, que é exatamente o que a ordem
+ * "spintax antes das variáveis" existe para impedir no resto do caminho.
+ *
+ * Com regex dedicada, nada mais do corpo é reinterpretado.
+ */
+export function resolverSaudacao(congelado: string, quando: { agora: Date; fuso: string }): string {
+  return congelado.replace(/\{\{\s*saudacao\s*(?:\|[^}]*)?\}\}/gi, () =>
+    saudacaoDaHora(quando.agora, quando.fuso),
+  );
 }
 
 /** Quais variáveis um texto usa — para a tela avisar antes, não depois. */

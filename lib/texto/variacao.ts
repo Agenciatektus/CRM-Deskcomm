@@ -126,5 +126,53 @@ export function resolverSpintax(texto: string, rng: () => number): string | null
  * a lista toda com o motivo errado na tela.
  */
 export function spintaxValido(texto: string): boolean {
-  return resolverSpintax(texto, () => 0) !== null;
+  return resolverSpintax(texto, () => 0) !== null && !temAlternativaVazia(texto);
+}
+
+/**
+ * Tem grupo com alternativa VAZIA — `{a|}`, `{|a}`, `{a||b}`, `{}`?
+ *
+ * Isso é sempre typo, nunca intenção: ninguém escreve "metade das pessoas
+ * recebe esta palavra e metade não recebe nada". E é typo CARO, porque o texto
+ * continua sendo spintax válido — `resolverSpintax` devolve string, o render
+ * não acusa falta de variável, e a mensagem sai mutilada ou em branco para a
+ * fração das sementes que cai no lado vazio. Medido num `{Olá|Oi|}`: 89 de 300
+ * pessoas recebiam a frase sem a saudação.
+ *
+ * Recusar na validação é o conserto barato — o operador vê o erro na tela, com
+ * a campanha ainda em rascunho, em vez de descobrir pelo que chegou ao cliente.
+ * O guard de não-vazio do render continua existindo como última linha, para o
+ * texto que entrou por outro caminho.
+ */
+export function temAlternativaVazia(texto: string): boolean {
+  let pos = 0;
+  let profundidade = 0;
+  let desdeOSeparador = "";
+  while (pos < texto.length) {
+    const ch = texto[pos]!;
+    if (ch === "{" && texto[pos + 1] === "{") {
+      // Variável, não grupo: `{{nome}}` passa inteiro e conta como conteúdo.
+      const fim = texto.indexOf("}}", pos + 2);
+      if (fim === -1) return false;
+      desdeOSeparador += texto.slice(pos, fim + 2);
+      pos = fim + 2;
+      continue;
+    }
+    if (ch === "{") {
+      profundidade += 1;
+      desdeOSeparador = "";
+      pos += 1;
+      continue;
+    }
+    if ((ch === "|" || ch === "}") && profundidade > 0) {
+      if (desdeOSeparador.trim() === "") return true;
+      desdeOSeparador = "";
+      if (ch === "}") profundidade -= 1;
+      pos += 1;
+      continue;
+    }
+    desdeOSeparador += ch;
+    pos += 1;
+  }
+  return false;
 }

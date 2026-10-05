@@ -45,7 +45,7 @@ import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
-import { renderizar, renderizarVariacao, variantesDaCampanha } from "./renderizador";
+import { renderizarVariacao, resolverSaudacao, variantesDaCampanha } from "./renderizador";
 import { escolherNumero, poolDaCampanha, type NumeroDisponivel } from "./rodizio";
 import { podeMandarAgora, proximaTentativa, type RitmoDaCampanha } from "./ritmo";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -405,18 +405,36 @@ async function rodarUmaCampanha(
   // congelado, que a preparação não produz para elegível) passa pelo motor de
   // variação de propósito: sem ele, um `{a|b}` do corpo principal sairia com as
   // chaves no WhatsApp do cliente.
-  const congelado =
-    alvo.rendered_body ??
-    renderizarVariacao({
+  let congelado = alvo.rendered_body;
+  if (congelado === null || congelado === undefined) {
+    const refeito = renderizarVariacao({
       variantes: variantesDaCampanha(campanha.message_body, campanha.message_variants),
       semente: alvo.contact_id,
       valores: { nome: nomeDoContato(contato) },
-    }).texto;
-  const corpo = renderizar(
-    congelado,
-    { nome: nomeDoContato(contato) },
-    { agora, fuso: knobs.timezone },
-  ).texto;
+    });
+    // O instrumento ligado no ÚNICO ponto onde texto vira mensagem. Este
+    // caminho é morto hoje (a preparação grava `rendered_body` para todo
+    // elegível), mas se um dia não for, o custo é mandar `{{nome}}` literal —
+    // ou nada — para um lojista. Falha fechada, com o motivo visível na lista.
+    if (refeito.faltando.length > 0 || refeito.vazio) {
+      const porque = refeito.vazio ? "texto_vazio" : "variavel_ausente";
+      await admin
+        .from("campaign_recipients")
+        .update({
+          status: "skipped",
+          eligibility_status: "excluded",
+          exclusion_reason: porque,
+        })
+        .eq("id", alvo.id)
+        .eq("status", "pending");
+      return { enviadas: 0, pulados: 1, concluidas: 0, detalhe: `pulado:${porque}` };
+    }
+    congelado = refeito.texto;
+  }
+  // Só a saudação, com regex dedicada: o corpo congelado JÁ tem o nome do
+  // contato dentro, e reler tudo como template faria um cadastro chamado
+  // `Loja {{saudacao}}` virar `Loja Boa tarde` no envio.
+  const corpo = resolverSaudacao(congelado, { agora, fuso: knobs.timezone });
 
   try {
     const boundary = await beginServiceAtOrigin(

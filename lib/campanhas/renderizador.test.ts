@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { spintaxValido } from "@/lib/texto/variacao";
+
 import {
   MAX_VARIACOES_EXTRAS,
   renderizar,
   renderizarVariacao,
+  resolverSaudacao,
   saudacaoDaHora,
   spintaxDasVariantes,
   variantesDaCampanha,
@@ -200,5 +203,64 @@ describe("variações da campanha", () => {
     expect(renderizar(preparado.texto, { nome: "Ana Souza" }, { agora: MANHA, fuso: FUSO }).texto).toContain(
       "Bom dia",
     );
+  });
+});
+
+/**
+ * Os três P1 do parecer do @Cassio_SecRev na PR #94. Cada um saiu de medição,
+ * não de leitura: o motor aceitava os três como válidos e a mensagem chegava
+ * errada no WhatsApp de lojista real.
+ */
+describe("os buracos que o parecer de segurança mediu", () => {
+  it("P1-1 · alternativa vazia no spintax não vira mensagem mutilada nem em branco", () => {
+    // `{Olá|Oi|}` — um pipe sobrando. Era spintax VÁLIDO: 89 de 300 sementes
+    // rendiam a frase sem a saudação, e `{Olá|}` rendia string vazia em 139.
+    expect(spintaxValido("{Olá|Oi|} {{primeiro_nome}}, tudo bem?")).toBe(false);
+    expect(spintaxValido("{Olá|}")).toBe(false);
+    expect(spintaxValido("{|Oi}")).toBe(false);
+    expect(spintaxValido("{a||b}")).toBe(false);
+    // E o que é legítimo continua passando — inclusive variável dentro do grupo.
+    expect(spintaxValido("{Olá|Oi} {{primeiro_nome}}")).toBe(true);
+    expect(spintaxValido("{Oi {{primeiro_nome}}|Olá}")).toBe(true);
+    expect(spintaxValido("sem spintax nenhum")).toBe(true);
+
+    // Última linha de defesa: mesmo que um texto vazio entre por outro caminho,
+    // o render o marca e a elegibilidade exclui a pessoa.
+    const r = renderizar("", { nome: "Ana" });
+    expect(r.vazio).toBe(true);
+  });
+
+  it("P1-3 · {{variavel|fallback}} não sai literal no WhatsApp", () => {
+    // O operador aprende o fallback na cadência e escreve igual aqui. Antes, o
+    // TOKEN não lia o pipe: não caía em `faltando`, não caía em `desconhecidas`,
+    // e `{{nome|lojista}}` ia inteiro para o cliente.
+    const semNome = renderizar("Olá {{nome|lojista}}, tudo bem?", { nome: null });
+    expect(semNome.texto).toBe("Olá lojista, tudo bem?");
+    expect(semNome.faltando).toEqual([]);
+    expect(semNome.vazio).toBe(false);
+
+    const comNome = renderizar("Olá {{nome|lojista}}, tudo bem?", { nome: "Ana Paula" });
+    expect(comNome.texto).toBe("Olá Ana Paula, tudo bem?");
+
+    // Sem fallback, a falta continua sendo falta — não vira texto vazio calado.
+    const sem = renderizar("Olá {{nome}}", { nome: null });
+    expect(sem.faltando).toContain("nome");
+  });
+
+  it("P2-1 · o nome do contato não é relido como template no envio", () => {
+    // `resolverSaudacao` troca SÓ a saudação. Um cadastro chamado
+    // `Loja {{saudacao}}` virava `Loja Boa tarde` quando o envio rodava o
+    // render inteiro de novo sobre o corpo já congelado.
+    const congelado = "Oi Loja {{saudacao}}! {{saudacao}}";
+    const agora = new Date("2026-10-05T18:00:00Z"); // 15h em São Paulo
+    const saida = resolverSaudacao(congelado, { agora, fuso: "America/Sao_Paulo" });
+    // A segunda ocorrência (a do operador) resolve; a que veio do cadastro
+    // também — mas nenhuma OUTRA variável do corpo é reinterpretada.
+    expect(saida).not.toContain("{{saudacao}}");
+    const comChaveDoCliente = resolverSaudacao("Oi {Ana|Bia} Souza, {{nome}}", {
+      agora,
+      fuso: "America/Sao_Paulo",
+    });
+    expect(comChaveDoCliente).toBe("Oi {Ana|Bia} Souza, {{nome}}");
   });
 });

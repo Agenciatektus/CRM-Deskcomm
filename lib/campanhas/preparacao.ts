@@ -125,7 +125,9 @@ async function classificar(
         semente: c.contactId,
         valores: { nome: c.nome },
       });
-      return { texto: r.texto, faltando: r.faltando, varianteIndex: r.varianteIndex };
+      // `vazio` sobe junto: texto que resolveu para nada não pode virar
+      // `rendered_body` em branco e seguir para o envio.
+      return { texto: r.texto, faltando: r.faltando, vazio: r.vazio, varianteIndex: r.varianteIndex };
     },
   });
 }
