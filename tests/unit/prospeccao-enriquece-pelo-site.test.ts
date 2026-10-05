@@ -35,6 +35,15 @@ vi.mock("node:dns/promises", async (importOriginal) => {
   return { ...real, default: { ...real, Resolver }, Resolver };
 });
 
+// A conexão fixada no IP conferido (`fetchComDestinoFixado`) delega aqui ao
+// `fetch` dublê: este arquivo mede o laço de redirect e as guardas de antes da
+// conexão. A conexão fixada contra rebinding tem arquivo próprio
+// (`prospeccao-site-rebinding.test.ts`).
+vi.mock("@/lib/automation/outbound-ip", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchComDestinoFixado: (url: string, pedido: RequestInit) => globalThis.fetch(url, pedido),
+}));
+
 import {
   completarRedesPeloSite,
   lerPaginaPublica,
@@ -129,7 +138,6 @@ describe("SSRF: a rede interna nunca é alcançada", () => {
     );
     expect(await lerPaginaPublica("https://padaria.exemplo/")).toBe("");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
   });
 
   it("redirect para hostname que resolve interno também é recusado", async () => {

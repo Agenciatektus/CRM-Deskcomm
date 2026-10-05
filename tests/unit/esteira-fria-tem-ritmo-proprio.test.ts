@@ -126,9 +126,12 @@ describe("o worker usa os dois — módulo perfeito e desligado não conserta na
   it("conta por NÚMERO, somando as campanhas que saem por ele — 20 por dia", () => {
     expect(TETO_DIARIO_POR_NUMERO).toBe(20);
     expect(worker).toMatch(/count\.numero >= TETO_DIARIO_POR_NUMERO/);
+    // Comparado como TEXTO (não `::uuid`): um config com id inválido derrubava a
+    // consulta da organização inteira (nit do Cassio na revisão da #78).
     expect(worker, "a contagem precisa filtrar pelo número da campanha").toMatch(
-      /\(k\.config->>'channel_session_id'\)::uuid=\$3::uuid/,
+      /lower\(k\.config->>'channel_session_id'\)=lower\(\$3::text\)/,
     );
+    expect(worker).not.toMatch(/'channel_session_id'\)::uuid/);
   });
 
   it("agenda o próximo envio COM jitter, e não mais com o intervalo cru", () => {

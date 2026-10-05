@@ -84,6 +84,10 @@ export async function sendNextCandidate(
     return;
   }
   // Count attempts, including failures/unknown delivery: a timeout must not release quota.
+  // O número da campanha é comparado como TEXTO, não com `::uuid`: um
+  // `channel_session_id` que não seja uuid no config de UMA campanha derrubava
+  // esta consulta (cast inválido) e parava a prospecção da organização inteira
+  // (nit do @Cassio_SecRev na revisão da #78).
   const { rows: counts } = await db.query<{
     campaign: number;
     total: number;
@@ -92,7 +96,7 @@ export async function sendNextCandidate(
     retry_numero: Date | null;
     last_attempt: Date | null;
   }>(
-    "select count(*) filter(where p.campaign_id=$2)::int as campaign,count(*)::int as total,count(*) filter(where (k.config->>'channel_session_id')::uuid=$3::uuid)::int as numero,max(p.attempted_at) as last_attempt,min(p.attempted_at)+interval '24 hours' as retry_at,min(p.attempted_at) filter(where (k.config->>'channel_session_id')::uuid=$3::uuid)+interval '24 hours' as retry_numero from prospecting_candidates p join prospecting_campaigns k on k.organization_id=p.organization_id and k.id=p.campaign_id where p.organization_id=$1 and p.attempted_at>now()-interval '24 hours'",
+    "select count(*) filter(where p.campaign_id=$2)::int as campaign,count(*)::int as total,count(*) filter(where lower(k.config->>'channel_session_id')=lower($3::text))::int as numero,max(p.attempted_at) as last_attempt,min(p.attempted_at)+interval '24 hours' as retry_at,min(p.attempted_at) filter(where lower(k.config->>'channel_session_id')=lower($3::text))+interval '24 hours' as retry_numero from prospecting_candidates p join prospecting_campaigns k on k.organization_id=p.organization_id and k.id=p.campaign_id where p.organization_id=$1 and p.attempted_at>now()-interval '24 hours'",
     [c.organization_id, c.id, cfg.channel_session_id],
   );
   const count = counts[0]!;
