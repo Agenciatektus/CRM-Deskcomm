@@ -1,7 +1,7 @@
 "use client";
-import { usePermission } from "@/hooks/auth/AuthProvider";
+import { useActiveOrg, usePermission } from "@/hooks/auth/AuthProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -33,6 +33,16 @@ export function useConversationNotes(conversationId: string | null) {
     if (conversationId) qc.invalidateQueries({ queryKey: ["notes", conversationId] });
   }, [qc, conversationId]);
 
+  // O canal é o das notas da ORGANIZAÇÃO, o mesmo que o aviso de menção
+  // (`useCrmAlerts`) já mantém aberto em toda tela: um canal a menos por
+  // conversa aberta. O recorte para ESTA conversa é local; DELETE (que sob RLS
+  // só traz o id) passa, e custa no máximo um refetch das notas.
+  // Sem organização ativa, o canal estreito de antes.
+  const orgId = useActiveOrg()?.orgId ?? null;
+  const filtroLocal = useMemo(
+    () => (conversationId ? { campos: { conversation_id: conversationId } } : undefined),
+    [conversationId],
+  );
   useRealtimeChannel({
     name: conversationId ? `conversation-notes-${conversationId}` : "conversation-notes-disabled",
     postgresChanges: conversationId
@@ -40,9 +50,10 @@ export function useConversationNotes(conversationId: string | null) {
           event: "*",
           schema: "public",
           table: "conversation_notes",
-          filter: `conversation_id=eq.${conversationId}`,
+          filter: orgId ? `organization_id=eq.${orgId}` : `conversation_id=eq.${conversationId}`,
         }
       : undefined,
+    filtroLocal,
     onChange,
     enabled: !!conversationId && podeConsultar,
   });

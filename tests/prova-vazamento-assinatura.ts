@@ -52,6 +52,7 @@ async function main(): Promise<void> {
   carimbar([
     "tests/prova-vazamento-assinatura.ts",
     "hooks/realtime/useRealtimeChannel.ts",
+    "hooks/realtime/canaisCompartilhados.ts",
     "app/app/inbox",
   ]);
 

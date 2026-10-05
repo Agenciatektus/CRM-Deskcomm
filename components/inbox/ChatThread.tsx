@@ -91,7 +91,8 @@ export function ChatThread({
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
-  const q = useMessagesRealtime(conversationId);
+  const activeOrg = useActiveOrg();
+  const q = useMessagesRealtime(conversationId, activeOrg?.orgId ?? null);
   const notes = useConversationNotes(conversationId);
   const passagens = usePassagensDaConversa(conversationId);
   const claim = useClaimConversation();
@@ -106,7 +107,6 @@ export function ChatThread({
    * pode valer, porque ninguém rolou nada ainda. Ver o efeito abaixo.
    */
   const jaAncorou = useRef(false);
-  const activeOrg = useActiveOrg();
   const currentUser = useUser();
   const deleteNote = useDeleteNote(conversationId ?? "");
   const { editar, apagar, ocultar, restaurar } = useAlterarMensagem(conversationId);
