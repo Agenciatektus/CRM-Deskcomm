@@ -160,7 +160,7 @@ export const NAV_CATALOG = [
   {
     href: "/app/radar",
     label: "Radar",
-    description: "Quem esfriou e ainda está aberto — o que corre risco de morrer sem resposta.",
+    description: "Quem esfriou e ainda está aberto: o que corre risco de morrer sem resposta.",
     icon: "ClockCountdown",
     group: "atendimento",
     sidebar: true,
@@ -180,7 +180,7 @@ export const NAV_CATALOG = [
     // aponta para `/app/team?aba=atendimento`.
     href: "/app/agenda",
     label: "Agenda",
-    description: "O que está marcado, com quem, e quem atende — seu e da equipe.",
+    description: "O que está marcado, com quem, e quem atende (seu e da equipe).",
     icon: "CalendarBlank",
     group: "atendimento",
     sidebar: true,
@@ -211,7 +211,7 @@ export const NAV_CATALOG = [
     // sistema; "funil de vendas" é palavra de quem vende.
     href: "/app/kanban",
     label: "Funis",
-    description: "Seus funis de venda — clique em um para abrir o quadro de clientes.",
+    description: "Seus funis de venda. Clique em um para abrir o quadro de clientes.",
     icon: "Kanban",
     group: "crm",
     section: "O dia a dia da venda",
@@ -243,7 +243,7 @@ export const NAV_CATALOG = [
   {
     href: "/app/companies",
     label: "Empresas",
-    description: "Cadastro B2B — razão social, CNPJ e decisores.",
+    description: "Cadastro B2B: razão social, CNPJ e decisores.",
     icon: "Buildings",
     group: "crm",
     section: "O dia a dia da venda",
@@ -272,7 +272,7 @@ export const NAV_CATALOG = [
     // pela rota, com `requireRole("agent")`.
     href: "/app/tasks",
     label: "Tarefas",
-    description: "O que ficou combinado, com prazo — e o que já venceu sem ninguém fazer.",
+    description: "O que ficou combinado, com prazo, e o que já venceu sem ninguém fazer.",
     icon: "ListChecks",
     group: "crm",
     section: "O dia a dia da venda",
@@ -353,7 +353,7 @@ export const NAV_CATALOG = [
   {
     href: "/app/proposals",
     label: "Propostas",
-    description: "Rascunhe, revise e envie propostas comerciais — do orçamento ao aceite.",
+    description: "Rascunhe, revise e envie propostas comerciais, do orçamento ao aceite.",
     icon: "FileText",
     group: "crm",
     section: "Fechar a venda",
@@ -665,7 +665,7 @@ export const NAV_CATALOG = [
     // — llm_calls só registrava sucesso.
     href: "/app/ai/runs",
     label: "Execuções",
-    description: "O que a IA fez — e, quando falhou, o que aconteceu e o que fazer.",
+    description: "O que a IA fez e, quando falhou, o que aconteceu e o que fazer.",
     icon: "ListChecks",
     group: "ia",
     section: "Acompanhar o agente",
@@ -836,7 +836,7 @@ export const NAV_CATALOG = [
   {
     href: "/app/audit",
     label: "Audit Log",
-    description: "Quem fez o quê, quando — o histórico que não se apaga.",
+    description: "Quem fez o quê e quando. O histórico que não se apaga.",
     icon: "ClockCounterClockwise",
     group: "analise",
     section: "O histórico que se consulta",

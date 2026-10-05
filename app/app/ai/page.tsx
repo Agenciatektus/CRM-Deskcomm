@@ -33,7 +33,7 @@ export default async function AiHubPage() {
       modulosLigados={await modulosDaEmpresa(createAdminClient(), activeOrg?.orgId ?? null)}
       title={traduzir("Agente de IA", idioma)}
       subtitle={traduzir(
-        "Tudo que define quem atende por você — e como acompanhar o que ele faz.",
+        "Tudo que define quem atende por você, e como acompanhar o que ele faz.",
         idioma,
       )}
       locale={idioma}
