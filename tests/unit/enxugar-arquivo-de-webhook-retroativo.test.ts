@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type ClienteSql,
+  lerOpcoes,
   limparArquivoDeWebhook,
   linhaEnxuta,
   SQL_VARREDURA,
@@ -193,5 +194,27 @@ describe("limparArquivoDeWebhook", () => {
     const r = await limparArquivoDeWebhook(db, { ...BASE, aplicar: false, max: 10 });
     expect(r.varridas).toBe(10);
     expect(r.cursor).toMatch(/\|00000000-/);
+  });
+});
+
+describe("P1 do Cassio na #98: nunca o provider waha", () => {
+  it("o CLI recusa --provider waha (qualquer caixa)", () => {
+    expect(() => lerOpcoes(["--provider", "waha"])).toThrow(/recusado/);
+    expect(() => lerOpcoes(["--provider", " WAHA "])).toThrow(/recusado/);
+    expect(lerOpcoes([]).provider).toBe("verdash");
+  });
+
+  it("a função recusa waha ANTES de qualquer consulta, mesmo em simulação", async () => {
+    const { db, consultas } = bancoFalso(amostra());
+    await expect(limparArquivoDeWebhook(db, { ...BASE, provider: "waha", aplicar: true })).rejects.toThrow(/recusado/);
+    expect(consultas, "consultou o banco antes de recusar").toEqual([]);
+  });
+
+  it("o cron de replay ainda relê waha (se mudar, revisar a recusa)", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const fonte = fs.readFileSync(path.resolve(__dirname, "../../lib/channels/reprocessar-arquivo-de-webhook.ts"), "utf8");
+    expect(fonte).toMatch(/\.eq\("provider", "waha"\)/);
+    expect(fonte).toMatch(/payload_parsed/);
   });
 });

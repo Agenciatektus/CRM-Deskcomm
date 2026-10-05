@@ -3,10 +3,16 @@
  * das linhas que JÁ estão gravadas em `webhook_events_log`.
  *
  * O conserto do caminho de gravação (`lib/channels/enxugar-para-arquivo.ts`) só
- * vale daqui para a frente. Medido em 05/10/2026: 7.291 linhas do provider
- * `verdash` com o token da instância em claro e 15 com a mídia inteira (até
- * 10 MB cada, 150 MB no total). Este script passa essas linhas pela MESMA regra
- * do arquivador — um só lugar decide o que é segredo e o que é peso.
+ * vale daqui para a frente. Medido em 05/10/2026: 15 linhas do provider
+ * `verdash` com a mídia inteira (até 10 MB cada, 150 MB no total); o token já
+ * saía como `"[omitido]"`. Este script passa as linhas pela MESMA regra do
+ * arquivador — um só lugar decide o que é segredo e o que é peso.
+ *
+ * ⛔ NUNCA o provider `waha`. O cron `webhook-replay`
+ * (`lib/channels/reprocessar-arquivo-de-webhook.ts`) relê o `payload_parsed`
+ * das linhas `waha` com erro transitório e as REINGERE: enxugar essas linhas
+ * (teto de 4 KB, chave sensível) trocaria o texto da mensagem do cliente por um
+ * marcador. O script recusa `--provider waha` — no CLI e na função.
  *
  * Seguro para produção, de propósito (o incidente de 28/09 ensinou cada item):
  *  - SIMULA por padrão. Só grava com `--aplicar`.
@@ -30,14 +36,10 @@
  *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts                       # simula
  *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --aplicar --max 200
  *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --aplicar --depois-de '<cursor>'
- *   --provider waha   (padrão: verdash)
+ *   --provider <nome> (padrão: verdash; `waha` é recusado)
  */
-import {
-  arquivoEnxuto,
-  cabecalhosParaArquivo,
-  enxugarParaArquivo,
-  TETO_DE_TEXTO,
-} from "../lib/channels/enxugar-para-arquivo";
+import { cabecalhosParaArquivo } from "../lib/channels/cabecalhos-para-arquivo";
+import { arquivoEnxuto, enxugarParaArquivo, TETO_DE_TEXTO } from "../lib/channels/enxugar-para-arquivo";
 
 export interface ClienteSql {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[]; rowCount?: number | null }>;
@@ -177,10 +179,25 @@ async function gravarLote(
   return { gravadas, puladas };
 }
 
+/**
+ * Providers cujo arquivo é RELIDO para reingestão: enxugar quebraria o replay.
+ * Ver `reprocessarArquivoDeWebhooks` (`.eq("provider", "waha")`).
+ */
+export const PROVIDERS_RECUSADOS = ["waha"] as const;
+
+export function conferirProvider(provider: string): void {
+  if ((PROVIDERS_RECUSADOS as readonly string[]).includes(provider.trim().toLowerCase())) {
+    throw new Error(
+      `--provider ${provider} recusado: o cron webhook-replay reingere o payload_parsed dessas linhas, e enxugar trocaria a mensagem por marcador.`,
+    );
+  }
+}
+
 export async function limparArquivoDeWebhook(
   db: ClienteSql,
   opcoes: OpcoesDaLimpeza,
 ): Promise<ResultadoDaLimpeza> {
+  conferirProvider(opcoes.provider);
   const log = opcoes.log ?? ((l: string) => console.info(l));
   const dormir = opcoes.dormir ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const r: ResultadoDaLimpeza = {
@@ -243,7 +260,12 @@ export async function limparArquivoDeWebhook(
   return r;
 }
 
-function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
+function provedorConferido(p: string): string {
+  conferirProvider(p);
+  return p;
+}
+
+export function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
   const valor = (nome: string) => {
     const i = argv.indexOf(nome);
     return i >= 0 ? argv[i + 1] : undefined;
@@ -257,7 +279,7 @@ function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
   const [receivedAt, id] = depois ? depois.split("|") : [];
   return {
     aplicar: argv.includes("--aplicar"),
-    provider: valor("--provider") ?? "verdash",
+    provider: provedorConferido(valor("--provider") ?? "verdash"),
     lote: Math.min(numero("--lote", 10), 50),
     max: numero("--max", 500),
     pausaMs: numero("--pausa-ms", 3000),
