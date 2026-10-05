@@ -85,7 +85,8 @@ export const messageStatusSchema = z.enum([
  * Fica só o que a tela envia de fato:
  *  - `client_id` — correlação da bolha otimista (`useSendMessage`), no formato
  *    do temp id;
- *  - `shared_contact_id` / `shared_contact` — o cartão de contato do composer.
+ *  - `shared_contact_id` / `shared_contact` — o cartão de contato do composer
+ *    (nome acima de 200 caracteres é recusado com 422: cortar mudaria o cartão).
  * Chave desconhecida ou fora do formato é DESCARTADA (não recusa o envio: o
  * envio legítimo não depende dela, e recusar quebraria integração que hoje
  * manda lixo inofensivo). Quem envia por dentro do servidor (agente, lembrete
@@ -113,15 +114,30 @@ export function metadataPermitida(bruta: Record<string, unknown>): Record<string
     if (typeof phone_number === "string" && phone_number.length <= 40) {
       saida.shared_contact = {
         phone_number,
-        ...(typeof name === "string" ? { name: name.slice(0, 200) } : {}),
+        ...(typeof name === "string" ? { name } : {}),
       };
     }
   }
   return saida;
 }
 
+/** Teto do nome no cartão de contato. Acima disso é RECUSADO (422), não cortado. */
+export const NOME_DO_CARTAO_MAX = 200;
+
+function tamanhoEmBytes(v: unknown): number {
+  // Aninhamento extremo estoura a pilha do `JSON.stringify` (RangeError):
+  // conta como grande demais (413), não como erro interno (500).
+  try {
+    return new TextEncoder().encode(JSON.stringify(v) ?? "").length;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
 const metadataDoClienteSchema = z.preprocess((v) => {
-  if (v !== undefined && new TextEncoder().encode(JSON.stringify(v) ?? "").length > METADATA_DO_CLIENTE_MAX_BYTES) {
+  if (v !== undefined && tamanhoEmBytes(v) > METADATA_DO_CLIENTE_MAX_BYTES) {
+    // O request id de verdade é posto por `validateRequest`, que relança com o
+    // da requisição; este só vale para quem chamar o schema direto.
     throw new ApiError(
       413,
       "payload_too_large",
@@ -131,7 +147,20 @@ const metadataDoClienteSchema = z.preprocess((v) => {
     );
   }
   return v;
-}, z.record(z.string(), z.unknown()).transform(metadataPermitida).optional());
+}, z
+  .record(z.string(), z.unknown())
+  .superRefine((m, ctx) => {
+    const sc = m.shared_contact as { name?: unknown } | undefined;
+    if (sc && typeof sc === "object" && typeof sc.name === "string" && sc.name.length > NOME_DO_CARTAO_MAX) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["shared_contact", "name"],
+        message: `nome do contato passa de ${NOME_DO_CARTAO_MAX} caracteres`,
+      });
+    }
+  })
+  .transform(metadataPermitida)
+  .optional());
 
 export const sendMessageSchema = z
   .object({

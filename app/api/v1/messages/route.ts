@@ -38,6 +38,8 @@ export const dynamic = "force-dynamic";
  * envio nenhum.
  */
 const ENDPOINT = "POST /api/v1/messages";
+/** Teto do corpo bruto do envio (ver a chamada de `validateRequest`). */
+const CORPO_DO_ENVIO_MAX_BYTES = 64 * 1024;
 /** Escopo que o token precisa para enviar `on_behalf_of_user_id` (#1613, item C). */
 const SCOPE_EM_NOME_DE = "messages:on_behalf";
 /** Papel mínimo de quem é apontado "em nome de": atendente ou acima. */
@@ -66,7 +68,10 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   let input;
   try {
-    input = await validateRequest(sendMessageSchema, req);
+    // Teto do corpo BRUTO antes do parse: o maior envio legítimo (4.096
+    // caracteres de texto, que em escapes `\uXXXX` chegam a ~24 KB, mais 8 KB
+    // de metadata e os campos de modelo) cabe com folga em 64 KB.
+    input = await validateRequest(sendMessageSchema, req, { maxBytes: CORPO_DO_ENVIO_MAX_BYTES, requestId });
   } catch (err) {
     if (err instanceof ApiError) {
       return fail(err.code, err.message, err.status, {
