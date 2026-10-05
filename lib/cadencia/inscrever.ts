@@ -31,7 +31,7 @@ import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
  * inscrição em lote é limitada ao teto do dia: as conversas vazias duram só até
  * a régua chegar nelas.
  *
- * ═══ A CAMPANHA entra pela mesma porta (migration 9035) ═══
+ * ═══ A CAMPANHA entra pela mesma porta (migration 9037) ═══
  *
  * A campanha com passos publica uma régua própria (`surface='campaign'`,
  * `lib/campanhas/regua.ts`) e inscreve o destinatário quando a 1ª mensagem SAI.
@@ -81,7 +81,7 @@ export type OrigemDaInscricao =
   | { tipo: "gatilho_etapa" | "gatilho_etiqueta"; eventId: string; eventoEm: string }
   /** Varredura de tempo (atendente sem responder / lead parado): não há evento, há a conversa. */
   | { tipo: "gatilho_tempo"; conversationId: string; eventoEm: string }
-  /** 1ª mensagem da campanha entregue (migration 9035): a régua começa no 2º toque. */
+  /** 1ª mensagem da campanha entregue (migration 9037): a régua começa no 2º toque. */
   | { tipo: "campanha"; campanhaId: string; destinatarioId: string };
 
 interface CadenciaCarregada {
@@ -137,7 +137,25 @@ export async function carregarCadenciaParaInscricao(
       .maybeSingle(),
     admin.from("organizations").select("timezone").eq("id", organizationId).maybeSingle(),
   ]);
-  if (!sessao || sessao.archived_at || sessao.status !== "WORKING") return { motivo: "numero_desconectado" };
+  // NÚMERO INEXISTENTE OU ARQUIVADO recusa nas duas superfícies: ali não há o
+  // que reconectar.
+  if (!sessao || sessao.archived_at) return { motivo: "numero_desconectado" };
+  // DESCONECTADO recusa a cadência, que fala por UM número. A campanha faz
+  // rodízio: basta ALGUM número do pool estar no ar, porque a 1ª mensagem saiu
+  // por um deles e é nele que a conversa do inscrito nasceu.
+  //
+  // Sem isto, o afrouxamento que a publicação já tinha ficava pela metade e não
+  // entregava o que prometia: campanha com três números e o PRINCIPAL fora do
+  // ar passava a poder ser preparada, mandava a abordagem por um secundário — e
+  // TODOS levavam `numero_desconectado` aqui. A régua ficava vazia enquanto o
+  // principal estivesse fora. Mono-chip num lugar e multi-chip noutro é a raiz
+  // da issue #106, e os dois lados fecham juntos.
+  if (sessao.status !== "WORKING") {
+    const temOutroNoAr =
+      p.surface === "campaign" &&
+      (await algumNumeroDaCampanhaNoAr(admin, organizationId, p.id as string));
+    if (!temOutroNoAr) return { motivo: "numero_desconectado" };
+  }
   if (!versao) return { motivo: "cadencia_indisponivel" };
   const grafo = flowGraphSchema.safeParse(versao.graph);
   const gatilho = grafo.success ? grafo.data.nodes.find((n) => n.type === "trigger") : undefined;
@@ -155,6 +173,46 @@ export async function carregarCadenciaParaInscricao(
       fuso: ((org?.timezone as string | null | undefined) ?? "America/Sao_Paulo") || "America/Sao_Paulo",
     },
   };
+}
+
+/**
+ * Algum número do POOL desta campanha está no ar?
+ *
+ * O pool é o do rodízio (migration 0377), lido pelo pointer — a mesma ligação
+ * que `lib/cadencia/envio.ts` faz para decidir por quais números a régua pode
+ * falar. Falha de consulta devolve `false`: sem conseguir provar que há número
+ * no ar, a recusa é a resposta conservadora (o destinatário já recebeu a 1ª
+ * mensagem; o que se perde é o 2º toque, não a abordagem).
+ */
+async function algumNumeroDaCampanhaNoAr(
+  admin: SupabaseClient,
+  organizationId: string,
+  pointerId: string,
+): Promise<boolean> {
+  const { data: campanha, error } = await admin
+    .from("campaigns")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("followup_pointer_id", pointerId)
+    .maybeSingle();
+  if (error || !campanha) return false;
+  const { data: extras, error: poolErr } = await admin
+    .from("campaign_channel_sessions")
+    .select("channel_session_id")
+    .eq("organization_id", organizationId)
+    .eq("campaign_id", (campanha as { id: string }).id);
+  if (poolErr) return false;
+  const ids = (extras ?? []).map((l) => (l as { channel_session_id: string }).channel_session_id);
+  if (ids.length === 0) return false;
+  const { count, error: sessErr } = await admin
+    .from("channel_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .in("id", ids)
+    .eq("status", "WORKING")
+    .is("archived_at", null);
+  if (sessErr) return false;
+  return (count ?? 0) > 0;
 }
 
 /** Quantas inscrições ainda cabem HOJE nesta cadência (só leitura — a prévia). */
@@ -462,7 +520,7 @@ export async function inscreverPorGatilho(
 
 /**
  * Inscrição do destinatário da CAMPANHA na régua dela, DEPOIS de a 1ª mensagem
- * ter saído (migration 9035).
+ * ter saído (migration 9037).
  *
  * Herda desta porta, sem copiar nada: régua publicada com número conectado,
  * anti-laço de 30 dias (por CONTATO), um fluxo vivo por contato, veto por

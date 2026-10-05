@@ -2,7 +2,7 @@
 
 import { ListaDePassos } from "@/components/cadencia/ListaDePassos";
 import { useT } from "@/hooks/i18n/useT";
-import { MAX_INSCRICOES_DIA_TETO } from "@/lib/cadencia/settings";
+import { tetoDeEnvioComRegua } from "@/lib/campanhas/regua-politica";
 import { MS_POR_HORA, type PassoDaRegua } from "@/lib/regua/timeline";
 
 interface Etapa {
@@ -49,12 +49,13 @@ export function PassosDaCampanha({
   tetoPorDia?: number | null;
 }) {
   const t = useT();
-  // QUANTOS ENTRAM HOJE. A régua tem teto de inscrições por dia, e ele é
-  // derivado do teto diário da campanha — sem teto próprio, vale o máximo da
-  // política (500). Uma lista maior que isso NÃO entra inteira hoje: o resto
-  // recebe a 1ª mensagem e espera o dia virar para entrar na régua. Dizer
-  // "2000 cards" sem dizer isso era a tela prometendo o que o motor não faz.
-  const entramPorDia = Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, tetoPorDia ?? MAX_INSCRICOES_DIA_TETO));
+  // QUANTOS POR DIA. Com passos, este número é o teto dos DOIS lados: a régua
+  // aceita tantas entradas por dia, e a campanha passa a não mandar mais que
+  // isso (`tetoDeEnvioComRegua`). A frase antiga dizia que o resto "entra na
+  // régua nos dias seguintes" — e não entrava: a inscrição é tentada uma vez,
+  // logo depois do envio, e quem já recebeu nunca é relido. Aviso
+  // tranquilizador e errado é pior que silêncio.
+  const entramPorDia = tetoDeEnvioComRegua(tetoPorDia);
   const passaDoTeto = quantosCards !== null && quantosCards > entramPorDia;
   return (
     <div className="space-y-3">
@@ -89,9 +90,9 @@ export function PassosDaCampanha({
           {passaDoTeto && (
             <>
               {" "}
-              {t("A régua aceita")} <strong>{entramPorDia}</strong>{" "}
+              {t("Com passos, a campanha manda no máximo")} <strong>{entramPorDia}</strong>{" "}
               {t(
-                "entradas por dia, então a lista não entra inteira hoje: o resto recebe a primeira mensagem e entra na régua nos dias seguintes.",
+                "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.",
               )}
             </>
           )}

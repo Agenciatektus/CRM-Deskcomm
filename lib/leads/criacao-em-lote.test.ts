@@ -3,7 +3,7 @@
  *
  * O que este teste protege: um valor novo na lista é o que impede N mensagens
  * proativas de saírem de uma vez. A planilha já estava na lista; a campanha com
- * passos (9035) entrou, e o custo de esquecer é o gatilho MANDANDO — ele não
+ * passos (9037) entrou, e o custo de esquecer é o gatilho MANDANDO — ele não
  * reclama, não falha, e ninguém descobre pela tela.
  */
 import { describe, expect, it } from "vitest";

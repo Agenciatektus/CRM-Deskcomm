@@ -282,7 +282,7 @@ async function reactToInbound(
   );
   // `paused_manual` entra na leitura por causa da prospecção: a resposta encerra
   // a régua pausada à mão. Valia só para `cadence` por literal, e a régua de
-  // CAMPANHA (9035) ficava de fora: a inscrição pausada à mão não era encerrada
+  // CAMPANHA (9037) ficava de fora: a inscrição pausada à mão não era encerrada
   // quando a pessoa respondia, e ao retomar a régua voltava a falar com quem já
   // tinha respondido. O follow-up comum pausado à mão segue intocado.
   const live = carregadas.filter((e) => e.status !== "paused_manual" || ehProspeccao(e.surface));

@@ -13,7 +13,7 @@ import { OUTCOME_DA_SAIDA, type FatosDaSaida, type MotivoDeSaida } from "./saida
  * próximo envio, não para a próxima inscrição.
  *
  * Serve as DUAS superfícies de prospecção: a cadência do funil (`cadence`) e os
- * passos da campanha (`campaign`, migration 9035). O kill switch
+ * passos da campanha (`campaign`, migration 9037). O kill switch
  * `cadencias_pausadas` vale para as duas de propósito: ele é o freio de
  * emergência da prospecção automática da organização, e uma campanha com régua
  * é exatamente isso.

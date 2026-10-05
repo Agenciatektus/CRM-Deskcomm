@@ -40,11 +40,11 @@ export interface CampanhaCarregada {
   message_variants: string[] | null;
   base_legal: string;
   lia_ref: string | null;
-  /** Onde o card de quem responde nasce (0378) — e, com passos, o funil da régua (9035). */
+  /** Onde o card de quem responde nasce (0378) — e, com passos, o funil da régua (9037). */
   pipeline_id: string | null;
-  /** A régua do 2º toque em diante (9035). Vazia = campanha de uma mensagem só. */
+  /** A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só. */
   passos: unknown;
-  /** O pointer de follow-up publicado para esta campanha (9035). */
+  /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id: string | null;
   audience_filter: unknown;
   audience_version: number;

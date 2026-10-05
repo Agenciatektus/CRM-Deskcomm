@@ -6,7 +6,7 @@
  * A cadência de prospecção não tem motor próprio: ela é "um pointer de
  * follow-up com `surface='cadence'`" (`app/api/v1/cadencias/route.ts`), e
  * `lib/regua/timeline.ts` é só a ponte lista → grafo linear. A campanha faz o
- * MESMO caminho, com `surface='campaign'` (migration 9035): o que ela publica
+ * MESMO caminho, com `surface='campaign'` (migration 9037): o que ela publica
  * aqui é executado pelo motor de follow-up, com o claim, o CAS por `revision`,
  * a janela de envio, o espaçamento sob lock do número e o cancelamento na
  * resposta que já existem — e que já foram revisados.
@@ -133,8 +133,12 @@ export async function publicarReguaDaCampanha(
   // name)` e a campanha ficava impossível de preparar por causa do primeiro erro
   // de digitação. `criarPointer` ainda trata o 23505 reusando o que achar, para
   // o órfão de uma versão anterior não travar nada.
-  const pointerId = c.followup_pointer_id ?? (await criarPointer(admin, c));
-  if (!pointerId) return { ok: false, mensagem: "Não foi possível criar a régua desta campanha." };
+  let pointerId = c.followup_pointer_id;
+  if (!pointerId) {
+    const criado = await criarPointer(admin, c);
+    if ("erro" in criado) return { ok: false, mensagem: criado.erro };
+    pointerId = criado.id;
+  }
 
   // A política, o número e o funil ANTES de publicar: o CHECK
   // `followup_flow_pointers_cadencia_completa` recusa pointer de prospecção
@@ -179,7 +183,14 @@ export async function publicarReguaDaCampanha(
   return { ok: true, pointerId };
 }
 
-async function criarPointer(admin: SupabaseClient, c: CampanhaComRegua): Promise<string | null> {
+/**
+ * Cria (ou reusa) o pointer da régua. `{ erro }` quando não dá, com a frase que
+ * o operador lê — "não foi possível" sem o motivo é o erro que ninguém conserta.
+ */
+async function criarPointer(
+  admin: SupabaseClient,
+  c: CampanhaComRegua,
+): Promise<{ id: string } | { erro: string }> {
   const { data, error } = await admin
     .from("followup_flow_pointers")
     .insert({
@@ -193,25 +204,40 @@ async function criarPointer(admin: SupabaseClient, c: CampanhaComRegua): Promise
     })
     .select("id")
     .single();
-  if (!error && data) return (data as { id: string }).id;
+  if (!error && data) return { id: (data as { id: string }).id };
 
-  // 23505 = já existe fluxo com este nome. O nome é determinístico (leva o
-  // prefixo do id da campanha), então o dono é esta campanha: é o pointer órfão
-  // de uma tentativa que não chegou a publicar. Reusar é o certo — criar nome
-  // novo deixaria dois pointers da mesma campanha, e falhar travaria a campanha
-  // para sempre por causa de uma tentativa antiga.
+  // 23505 = já existe fluxo com este nome, e o nome é determinístico (leva o
+  // prefixo do id da campanha). Duas possibilidades, e a diferença importa:
+  //
+  //   * pointer de CAMPANHA: é o órfão de uma tentativa que não chegou a
+  //     publicar. Reusar é o certo — nome novo deixaria dois pointers da mesma
+  //     campanha, e falhar travaria a campanha por causa de uma tentativa
+  //     antiga.
+  //   * fluxo COMUM com esse nome: o editor genérico aceita qualquer nome,
+  //     inclusive «Campanha · X (abcd1234)». Aqui não há o que reusar, e a
+  //     recusa precisa DIZER o que fazer: "não foi possível criar a régua" manda
+  //     o operador procurar um defeito nosso para um conflito que ele resolve em
+  //     dez segundos renomeando o outro fluxo. O levantamento pré-deploy cobriu
+  //     o dado de hoje; este caminho é o de amanhã.
   if (error?.code === "23505") {
     const { data: existente } = await admin
       .from("followup_flow_pointers")
-      .select("id")
+      .select("id, surface")
       .eq("organization_id", c.organization_id)
       .eq("name", nomeDaRegua(c))
-      .eq("surface", "campaign")
       .maybeSingle();
-    if (existente) return (existente as { id: string }).id;
+    const achado = existente as { id: string; surface: string } | null;
+    if (achado?.surface === "campaign") return { id: achado.id };
+    if (achado) {
+      return {
+        erro:
+          `Já existe um fluxo de follow-up chamado "${nomeDaRegua(c)}", e a régua desta campanha ` +
+          "precisa desse nome. Renomeie aquele fluxo (ou esta campanha) e prepare de novo.",
+      };
+    }
   }
   logger.warn("[campanha] criação da régua falhou", { campanha: c.id, motivo: error?.message });
-  return null;
+  return { erro: "Não foi possível criar a régua desta campanha. O motivo está no log do servidor." };
 }
 
 /** Desliga a régua: o worker passa a PULAR os passos (`cadencia_indisponivel`). */

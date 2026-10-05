@@ -67,6 +67,7 @@ import { originFromAutomationEvent } from "@/lib/atendimento/origem-automacao";
 import { registerAction } from "@/lib/automation/actions";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
+import { viaHerdada } from "@/lib/leads/criacao-em-lote";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
 
@@ -218,7 +219,14 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
             ...(origem ? { lead_id: origem.id, pipeline_id: origem.pipeline_id } : {}),
           },
         },
-      });
+        // A MARCA DE LOTE do evento de origem viaja com o card que esta ação
+        // cria. Sem ela, a cadeia dava a volta: a campanha cria 500 cards em
+        // lote, o motor pula as ações que FALAM, roda esta — e os 500
+        // `lead.created` novos saem sem marca, com `requestId = 'rule:…'` que o
+        // gatilho de follow-up não olha. Resultado: 500 mensagens proativas no
+        // mesmo minuto da abordagem, pelo salto seguinte da cadeia.
+        ...viaHerdada(ctx.event.metadata),
+      } as Parameters<typeof createLeadHandler>[2]);
     } catch (err) {
       // Corrida: outro processamento do mesmo evento criou o card entre a
       // checagem e o INSERT, e o índice único recusou este. O card existe —

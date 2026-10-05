@@ -8,7 +8,7 @@
  * follow-up (o mesmo claim com SKIP LOCKED, o mesmo CAS por `revision`, a mesma
  * reação à resposta). A cadência é "um pointer de follow-up com
  * `surface='cadence'`"; a campanha passa a ser um pointer com
- * `surface='campaign'` (migration 9035). Nada aqui agenda, envia ou espera —
+ * `surface='campaign'` (migration 9037). Nada aqui agenda, envia ou espera —
  * este módulo só valida a lista e a entrega ao conversor.
  *
  * ═══ Por que a PRIMEIRA mensagem não é um passo ═══
@@ -118,7 +118,7 @@ export function problemaNosPassos(
 ): string | null {
   if (passos.length === 0) return null;
   // FUNIL OBRIGATÓRIO A PARTIR DAQUI, e só a partir daqui. Com passos, a
-  // inscrição ABRE o card de cada pessoa abordada (migration 9035), e é nesse
+  // inscrição ABRE o card de cada pessoa abordada (migration 9037), e é nesse
   // card que "mover de etapa" e "etiqueta" agem; sem `pipeline_id` não há onde
   // o card nascer, e o passo falharia no envio, longe de quem o consertaria.
   // Campanha sem passos segue sem funil, como sempre, e sem criar card nenhum.

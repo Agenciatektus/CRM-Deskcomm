@@ -63,7 +63,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   }
 
   // Inscrição de RÉGUA DE PROSPECÇÃO (cadência ou campanha) só se escreve pelo
-  // servidor (9020/9035), com a exceção de CANCELAR — que é exatamente o que
+  // servidor (9020/9037), com a exceção de CANCELAR — que é exatamente o que
   // esta rota faz, e por isso ela passa pelo cliente admin. Papel e organização
   // já conferidos; o ponteiro é lido pela sessão (RLS).
   const { data: ponteiro } = await supabase

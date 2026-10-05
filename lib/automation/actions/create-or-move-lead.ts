@@ -22,6 +22,7 @@ import {
   type OrigemParaClonar,
 } from "@/lib/leads/clonar-para-funil";
 import { encerraDemanda } from "@/lib/leads/encerramento";
+import { viaHerdada } from "@/lib/leads/criacao-em-lote";
 import { motivoDaPerdaDaOrigem } from "@/lib/leads/motivo-da-perda";
 
 async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
@@ -103,6 +104,13 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
         title: nomeDoContato(contact) ?? contact.phone_number ?? "Lead da automação",
         contact_id: contact.id,
         source: "automation",
+        // A MARCA DE LOTE do evento de origem viaja com o card que esta ação
+        // cria. Sem ela, a cadeia dava a volta: a campanha cria 500 cards em
+        // lote, o motor pula as ações que FALAM, roda esta — e os 500
+        // `lead.created` novos saem sem marca, com `requestId = 'rule:…'` que o
+        // gatilho de follow-up não olha. Resultado: 500 mensagens proativas no
+        // mesmo minuto da abordagem, pelo salto seguinte da cadeia.
+        ...viaHerdada(ctx.event.metadata),
       } as Parameters<typeof createLeadHandler>[2]);
       publicaNoContexto(ctx, created, contact.id);
       return { type: "create_or_move_lead", status: "success", detail: { created: String(created.id) } };
@@ -221,7 +229,12 @@ async function transfereParaOFunil(
   if (perdaErr) return { ok: false, error: perdaErr.message };
   if (!etapaDePerda) return { ok: false, error: "origem_sem_etapa_de_perda" };
 
-  const clone = await createLeadHandler(ctx.admin, handlerCtx, montaPayloadDoClone(origem, destino.etapa));
+  const clone = await createLeadHandler(ctx.admin, handlerCtx, {
+    ...montaPayloadDoClone(origem, destino.etapa),
+    // A marca de lote também viaja no CLONE: ele é um `lead.created` como
+    // qualquer outro, e o gatilho de follow-up não distingue a origem dele.
+    ...viaHerdada(ctx.event.metadata),
+  } as Parameters<typeof createLeadHandler>[2]);
 
   await encerraDemanda(ctx.admin, handlerCtx, {
     leadId: origem.id,

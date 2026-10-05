@@ -5,7 +5,7 @@
  * `followup_flow_pointers.surface` vale hoje cinco coisas
  * (`FOLLOWUP_FLOW_SURFACES`, em `api-schemas.ts`), e duas delas são réguas de
  * prospecção que compartilham a MESMA máquina: `cadence` (migration 9016, a
- * cadência do funil) e `campaign` (migration 9035, os passos da campanha).
+ * cadência do funil) e `campaign` (migration 9037, os passos da campanha).
  *
  * Existe porque a alternativa é `surface === 'cadence' || surface === 'campaign'`
  * espalhado por dez arquivos — e uma superfície nova de prospecção exigiria
@@ -14,10 +14,17 @@
  * de falhar mais caro desta parte do produto.
  *
  * ⚠️ O que NÃO entra aqui: as decisões que são da CADÊNCIA e não da prospecção
- * em geral — a condução da resposta (`lib/agent-engine/edge/crm/drain.ts`), as
- * condições de saída configuráveis (`lib/cadencia/saidas.handler.ts`) e os
- * gatilhos de etiqueta e de tempo. A campanha não as tem, e incluí-la neles
- * mudaria comportamento que ninguém pediu.
+ * em geral — a condução da resposta (`lib/agent-engine/edge/crm/drain.ts`) e os
+ * gatilhos de etiqueta e de tempo, que são portas de ENTRADA só dela. A campanha
+ * não as tem, e incluí-la neles mudaria comportamento que ninguém pediu.
+ *
+ * ⚠️ E `lib/cadencia/saidas.handler.ts` ESTAVA nesta lista de exclusões, por um
+ * motivo que venceu: com `saidas.ao_fechar` desligado na régua de campanha, ele
+ * não teria o que fazer ali. Ligado o `ao_fechar` (o card passou a nascer na
+ * abordagem), a exclusão virou costura: a régua só descobria o negócio fechado
+ * no próximo ENVIO, e o passo de CRM não passa pela reconferência do envio.
+ * Agora ele usa as duas superfícies. Exclusão que depende de uma premissa some
+ * quando a premissa some — e esta sumiu num commit que não falava dela.
  */
 
 /** As duas superfícies que rodam uma régua de prospecção com `cadence_settings`. */

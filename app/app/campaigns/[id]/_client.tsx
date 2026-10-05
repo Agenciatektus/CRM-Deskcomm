@@ -384,7 +384,7 @@ function DestinoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
 }
 
 /**
- * A RÉGUA: o que acontece depois da primeira mensagem (migration 9035).
+ * A RÉGUA: o que acontece depois da primeira mensagem (migration 9037).
  *
  * Só aparece quando a campanha tem passos. Em branco, ela manda uma mensagem e
  * acaba — que é o comportamento de toda campanha até esta fatia —, e um card

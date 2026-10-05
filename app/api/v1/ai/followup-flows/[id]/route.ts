@@ -167,7 +167,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const update: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
 
-  // Régua de prospecção só se escreve pelo servidor (9020/9035: gatilho e
+  // Régua de prospecção só se escreve pelo servidor (9020/9037: gatilho e
   // política de handoff dela recusam a sessão). Papel, organização e a regra de
   // gatilho da cadência já foram conferidos acima.
   const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;

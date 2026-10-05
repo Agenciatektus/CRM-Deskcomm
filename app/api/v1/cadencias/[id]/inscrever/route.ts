@@ -95,7 +95,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const recusados: Array<{ lead_id: string; motivo: MotivoDeRecusa }> = [];
   // `leadId` não-nulo: esta porta é a da CADÊNCIA, que exige negócio ABERTO no
   // funil — `avaliarNegocio` só devolve `ok` com negócio. O tipo o traz anulável
-  // porque a régua da campanha (9035) inscreve sem negócio, e o `??` abaixo
+  // porque a régua da campanha (9037) inscreve sem negócio, e o `??` abaixo
   // mantém a promessa no compilador sem cast: o id avaliado é o mesmo.
   const aptos: Array<{ leadId: string; contactId: string }> = [];
   avaliacoes.forEach((a, i) => {

@@ -1,5 +1,5 @@
 /**
- * A ORDEM da inscrição na régua da campanha (migration 9035).
+ * A ORDEM da inscrição na régua da campanha (migration 9037).
  *
  * O que estes testes protegem: o card do funil nasce DEPOIS de todos os freios.
  * Criar antes seria abrir card no CRM do cliente para quem a inscrição recusa no

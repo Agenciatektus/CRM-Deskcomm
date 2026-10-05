@@ -302,7 +302,7 @@ export function createSupabaseGatilhoEtapaDb(admin: SupabaseClient): GatilhoEtap
       }>) {
         // Roteiro de atendimento (0394) é do turno, nunca do relógio: o banco
         // já o prende em gatilho manual, e este corte é a segunda porta.
-        // Régua de prospecção (cadência 9016, campanha 9035) tem porta própria:
+        // Régua de prospecção (cadência 9016, campanha 9037) tem porta própria:
         // sem este corte ela escapava por aqui, e uma camada só é o modo de
         // falhar que `lib/followup/superficies.ts` descreve.
         if (!row.active_version_id || foraDosGatilhosGenericos(row.surface)) continue;

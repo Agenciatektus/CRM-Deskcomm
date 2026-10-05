@@ -15030,7 +15030,7 @@ alter table public.followup_flow_pointers
 alter table public.followup_flow_pointers
   drop constraint if exists followup_flow_pointers_surface_check;
 
--- ⚠️ O CONJUNTO JÁ INCLUI 'cadence' (9016) E 'campaign' (9035). Este bloco é
+-- ⚠️ O CONJUNTO JÁ INCLUI 'cadence' (9016) E 'campaign' (9037). Este bloco é
 -- reaplicado em todo update: com o conjunto antigo, a 2ª aplicação num banco
 -- que já tem cadência (ou régua de campanha) falharia no ADD CONSTRAINT e
 -- derrubaria o update inteiro.
@@ -15038,9 +15038,9 @@ alter table public.followup_flow_pointers
   add constraint followup_flow_pointers_surface_check
   check (surface in ('followup', 'crm_automation', 'atendimento', 'cadence', 'campaign'));
 -- 'atendimento' entrou na migration 0394 (roteiro de perguntas no turno, #1130);
--- 'cadence' na 9016 (fork, cadência de prospecção); 'campaign' na 9035 (fork,
+-- 'cadence' na 9016 (fork, cadência de prospecção); 'campaign' na 9037 (fork,
 -- os passos de uma campanha, do 2º toque em diante). Bloco ÚNICO desta
--- constraint: nem a 0394, nem a 9023 (que refaz a união na cadeia), nem a 9035
+-- constraint: nem a 0394, nem a 9023 (que refaz a união na cadeia), nem a 9037
 -- a reconstroem no apêndice — cobrado por
 -- tests/unit/baseline-constraint-reconstruida.test.ts, porque dois blocos
 -- deixariam a tabela sem constraint entre o drop de um e o add do outro.
@@ -15049,7 +15049,7 @@ comment on column public.followup_flow_pointers.surface is
   'Onde o fluxo aparece: followup = /app/ai/followups; crm_automation = CRM Automação; '
   'atendimento = roteiro de perguntas conduzido no turno do agente (módulo opcional, 0394); '
   'cadence = cadência de prospecção do funil (migration 9016); '
-  'campaign = os passos de uma campanha, do 2º toque em diante (migration 9035). '
+  'campaign = os passos de uma campanha, do 2º toque em diante (migration 9037). '
   'Vocabulário cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts.';
 
 -- ---- inscrição Web Push (migrations 0197 e 0199) ----
@@ -45376,10 +45376,10 @@ alter table public.followup_flow_pointers
 -- Régua de prospecção PUBLICADA tem número, funil e política. Rascunho pode
 -- nascer vazio (a tela preenche aos poucos); o que não pode é ir ao ar sem eles.
 --
--- ⚠️ O PREDICADO JÁ COBRE 'campaign' (migration 9035), pelo mesmo motivo que
+-- ⚠️ O PREDICADO JÁ COBRE 'campaign' (migration 9037), pelo mesmo motivo que
 -- cobre 'cadence': `move_stage` precisa do funil, a conversa precisa do número
 -- e `lib/cadencia/envio.ts` recusa enviar sem a política. Bloco ÚNICO desta
--- constraint — a 9035 não a reconstrói no apêndice (cobrado por
+-- constraint — a 9037 não a reconstrói no apêndice (cobrado por
 -- tests/unit/baseline-constraint-reconstruida.test.ts).
 alter table public.followup_flow_pointers
   drop constraint if exists followup_flow_pointers_cadencia_completa;
@@ -47516,7 +47516,7 @@ end $$;
 comment on column public.campaigns.message_variants is
   'Variações EXTRAS da abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é determinística pelo contact_id (lib/texto/variacao.ts). Vazio = campanha de um texto só. Até 5, 1.000 chars cada (campaigns_variacoes_validas). Migration 9034.';
 
--- ---- a campanha ganha PASSOS, na régua de follow-up (migration 9035) ----
+-- ---- a campanha ganha PASSOS, na régua de follow-up (migration 9037) ----
 --
 -- `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e
 -- `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de
@@ -47555,7 +47555,7 @@ comment on column public.campaigns.message_variants is
 -- que são, cada um, o bloco ÚNICO da sua constraint. Um segundo drop+add aqui
 -- deixaria a tabela sem constraint entre o drop deste bloco e o add do outro
 -- numa reaplicação, e `tests/unit/baseline-constraint-reconstruida.test.ts`
--- reprova exatamente isso. A migration 9035, que roda em transação sobre um
+-- reprova exatamente isso. A migration 9037, que roda em transação sobre um
 -- banco já migrado, faz o drop+add normalmente.
 
 create or replace function public.fn_passos_da_campanha_validos(p_passos jsonb)
@@ -47600,7 +47600,7 @@ comment on column public.campaigns.passos is
   'A régua da campanha do 2º toque em diante: lista de {id, tipo} (mensagem | espera | '
   'mover_etapa | etiqueta), convertida em grafo linear por lib/regua/timeline.ts e publicada '
   'no pointer de followup_pointer_id. Vazia = campanha de uma mensagem só, idêntica ao '
-  'comportamento anterior à 9035. Até 20 passos (campaigns_passos_validos).';
+  'comportamento anterior à 9037. Até 20 passos (campaigns_passos_validos).';
 
 alter table public.campaigns
   add column if not exists followup_pointer_id uuid;
@@ -47622,7 +47622,7 @@ end $$;
 
 comment on column public.campaigns.followup_pointer_id is
   'A régua publicada desta campanha (followup_flow_pointers com surface=campaign). NULL = '
-  'campanha sem passos, ou que nunca foi preparada depois de ganhá-los. Migration 9035.';
+  'campanha sem passos, ou que nunca foi preparada depois de ganhá-los. Migration 9037.';
 
 create index if not exists campaigns_followup_pointer_id
   on public.campaigns (organization_id, followup_pointer_id)

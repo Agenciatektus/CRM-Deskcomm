@@ -12,7 +12,7 @@ import { serviceForEvent } from "@/lib/atendimento/origem";
  * `createLeadHandler`, e 400 linhas com telefone viravam 400 mensagens
  * proativas de uma vez — o disparo em massa que a doutrina anti-banimento
  * existe para impedir, sem que a tela do gatilho mencionasse planilha. A
- * campanha com passos (9035) entrou na mesma lista, e por um motivo pior: ela
+ * campanha com passos (9037) entrou na mesma lista, e por um motivo pior: ela
  * cria um card por pessoa ABORDADA, e a pessoa acabou de receber a mensagem da
  * campanha — uma segunda, de outro fluxo, no mesmo minuto. O evento chega
  * marcado (`metadata.via`, ver `lib/leads/criacao-em-lote.ts`) e conta
@@ -200,7 +200,7 @@ export function createSupabaseGatilhoLeadDb(admin: SupabaseClient): GatilhoLeadD
       }>) {
         // Roteiro de atendimento (0394) é do turno, nunca do relógio: o banco
         // já o prende em gatilho manual, e este corte é a segunda porta.
-        // Régua de prospecção (cadência 9016, campanha 9035) tem porta própria:
+        // Régua de prospecção (cadência 9016, campanha 9037) tem porta própria:
         // sem este corte ela escapava por aqui, e uma camada só é o modo de
         // falhar que `lib/followup/superficies.ts` descreve.
         if (!row.active_version_id || foraDosGatilhosGenericos(row.surface)) continue;

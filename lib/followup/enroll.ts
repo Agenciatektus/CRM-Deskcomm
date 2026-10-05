@@ -70,7 +70,7 @@ export async function enrollFollowupFlow(
   // legal, conversa no número da régua e corte por data de publicação. Esta
   // função é chamada pela inscrição manual de follow-up e pela ação de automação
   // (em volume) — deixá-la aceitar prospecção era abrir uma segunda porta sem
-  // freio. A régua da CAMPANHA (9035) é ainda mais estreita: quem inscreve nela
+  // freio. A régua da CAMPANHA (9037) é ainda mais estreita: quem inscreve nela
   // é o envio da 1ª mensagem, e só ele.
   if (ehProspeccao(pointer.surface)) {
     return {

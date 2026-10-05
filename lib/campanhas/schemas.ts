@@ -65,7 +65,7 @@ const baseDaCampanha = {
    */
   channel_session_ids: z.array(z.string().uuid()).max(10).optional(),
   /**
-   * A RÉGUA do 2º toque em diante (migration 9035). Vazia = campanha de uma
+   * A RÉGUA do 2º toque em diante (migration 9037). Vazia = campanha de uma
    * mensagem só, que é o comportamento de toda campanha existente. O funil
    * passa a ser exigido quando há passos, e isso é conferido no gate de
    * `faltaParaEnviar` (preparar, iniciar, agendar e testar) — não aqui: um

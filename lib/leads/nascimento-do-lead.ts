@@ -262,7 +262,7 @@ export async function funilDeEntrada(
  * queria — e o silêncio faria os cards dela aparecerem noutro lugar.
  */
 /**
- * Funil e etapa de um card de CAMPANHA. Exportada (9035) porque agora dois
+ * Funil e etapa de um card de CAMPANHA. Exportada (9037) porque agora dois
  * momentos a perguntam: a ABORDAGEM, quando a campanha com passos cria o card
  * de quem acabou de receber a 1ª mensagem, e a RESPOSTA, por aqui. Ter de ser a
  * MESMA função é o ponto: com duas regras, o card nasceria numa etapa na

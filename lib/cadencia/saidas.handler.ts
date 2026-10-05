@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { OUTCOME_DA_SAIDA, motivoDeSaida, saidasDe, type MotivoDeSaida } from "./saidas";
+import { SUPERFICIES_DE_PROSPECCAO } from "@/lib/followup/superficies";
 
 /**
  * SAÍDA DA CADÊNCIA NA HORA DO FATO.
@@ -97,7 +98,14 @@ export function createSupabaseSaidasDb(admin: SupabaseClient): SaidasDb {
         .from("followup_enrollments")
         .select("id, lead_id, contact_id, followup_flow_pointers!inner(surface, cadence_settings)")
         .eq("organization_id", orgId)
-        .eq("followup_flow_pointers.surface", "cadence")
+        // AS DUAS superfícies de prospecção. Valia só para `cadence`, e a régua
+        // de campanha só descobria o negócio fechado no próximo ENVIO — que é
+        // rede para a mensagem, não para o passo de CRM: `mover_etapa` e
+        // `etiqueta` não passam por `prepararEnvioDaCadencia` (ele é gated em
+        // `purpose === 'send_message'`). Entre o vendedor marcar o negócio como
+        // perdido e o próximo passo de mensagem, a régua ainda mexia no card de
+        // um negócio encerrado.
+        .in("followup_flow_pointers.surface", SUPERFICIES_DE_PROSPECCAO)
         .in("status", STATUS_VIVOS);
       q = "leadId" in alvo ? q.eq("lead_id", alvo.leadId) : q.eq("contact_id", alvo.contactId);
       const { data, error } = await q;

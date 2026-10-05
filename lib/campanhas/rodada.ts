@@ -43,6 +43,7 @@ import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engin
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
 import { inscreverContatoNaRegua, type MotivoDeRecusa } from "@/lib/cadencia/inscrever";
 import { garantirCardDaAbordagem } from "./card-da-abordagem";
+import { tetoDeEnvioComRegua } from "./regua-politica";
 import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
@@ -65,11 +66,18 @@ export interface ResultadoDaRodada {
   /**
    * Quem RECEBEU a 1ª mensagem e NÃO entrou na régua, por motivo.
    *
-   * Existe porque o rastro anterior era uma linha de log por destinatário, e
-   * log por linha ninguém lê: numa campanha de 2.000 sem teto próprio, 1.500
-   * pessoas recebem a abordagem e ficam sem o 2º toque (teto de inscrições por
-   * dia), e isso aparecia só como 1.500 `logger.info` perdidos. Agregado, a
-   * rodada responde "quantos ficaram fora, e por quê" numa linha.
+   * ⚠️ NÃO é agregação de volume, e o comentário anterior afirmava que era.
+   * `rodarUmaCampanha` processa UM destinatário por chamada (`.limit(1)`) e roda
+   * uma vez por campanha por rodada, então isto soma no máximo 1 por campanha
+   * por rodada — a mesma contagem do `logger.info` que havia antes.
+   *
+   * O ganho é OUTRO, e é o que importa: o motivo entra em `total.detalhe`, que é
+   * o que a rota do cron devolve e o que fica registrado da rodada. Antes, o
+   * único rastro de "esta pessoa recebeu a abordagem e ficou sem a régua" era
+   * uma linha de log, e log ninguém lê. Agora o desfecho da rodada o carrega.
+   *
+   * Contagem de verdade (por campanha, por dia) pediria tabela, e tabela nova
+   * não entra nesta branch.
    */
   foraDaRegua: Partial<Record<MotivoDeRecusa, number>>;
   detalhe: string;
@@ -101,9 +109,9 @@ interface CampanhaRow {
   janela_fim_hora: number | null;
   teto_diario: number | null;
   teto_horario: number | null;
-  /** A régua publicada desta campanha (9035). `null` = campanha de uma mensagem só. */
+  /** A régua publicada desta campanha (9037). `null` = campanha de uma mensagem só. */
   followup_pointer_id: string | null;
-  /** Onde o card de quem foi abordado nasce (0378 + 9035). */
+  /** Onde o card de quem foi abordado nasce (0378 + 9037). */
   pipeline_id: string | null;
   stage_id: string | null;
 }
@@ -178,9 +186,9 @@ export async function rodarUmaRodadaDeCampanha(
 
   total.detalhe = detalhes.join(" ") || "nada_a_fazer";
 
-  // UMA linha por rodada, e só quando houve recusa: é o rastro que substitui o
-  // `logger.info` por destinatário. O motivo que importa é `teto_do_dia` — ele
-  // diz que gente recebeu a abordagem e ficou sem o 2º toque até o dia virar.
+  // Uma linha por rodada, e só quando houve recusa. O que ela acrescenta ao log
+  // antigo não é volume (ver `foraDaRegua`): é o motivo chegar ao `detalhe` da
+  // rodada, que é rastro do cron e não só log.
   const forasDaRodada = Object.entries(total.foraDaRegua);
   if (forasDaRodada.length > 0) {
     logger.info("[campanha] destinatários fora da régua nesta rodada", {
@@ -343,7 +351,15 @@ async function rodarUmaCampanha(
     intervaloSegundos: campanha.intervalo_segundos,
     janelaInicioHora: campanha.janela_inicio_hora,
     janelaFimHora: campanha.janela_fim_hora,
-    tetoDiario: campanha.teto_diario,
+    // COM RÉGUA, o teto do dia é o que a régua absorve. A inscrição é tentada
+    // uma vez só, logo depois do envio (`campaign_recipients` só é relido com
+    // `status='pending'`), então mandar mais do que a régua aceita no dia não
+    // atrasa o 2º toque dessas pessoas: elimina. Ver `tetoDeEnvioComRegua`.
+    // Sem régua, o teto é exatamente o que o operador escreveu.
+    tetoDiario:
+      campanha.followup_pointer_id === null
+        ? campanha.teto_diario
+        : tetoDeEnvioComRegua(campanha.teto_diario),
     tetoHorario: campanha.teto_horario,
   };
   const numeros = await numerosDaCampanha(admin, campanha);
@@ -538,7 +554,7 @@ async function rodarUmaCampanha(
       .eq("id", alvo.id)
       .eq("status", "sending");
 
-    // ─── A RÉGUA: o 2º toque em diante (migration 9035) ───
+    // ─── A RÉGUA: o 2º toque em diante (migration 9037) ───
     //
     // AQUI, e não na preparação: a inscrição marca "esta pessoa recebeu a
     // abordagem", e inscrever na preparação prometeria passos a quem a lista

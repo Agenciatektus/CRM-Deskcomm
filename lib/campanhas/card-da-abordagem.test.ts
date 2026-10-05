@@ -1,5 +1,5 @@
 /**
- * O card de quem foi abordado (migration 9035).
+ * O card de quem foi abordado (migration 9037).
  *
  * O que estes testes protegem: a IDEMPOTÊNCIA e a falha fechada. Uma campanha de
  * 500 pessoas chama esta função 500 vezes, e repreparar, retomar ou repetir a

@@ -59,6 +59,36 @@ function emHoraCheia(hora: number): string {
  * aperta mais nada no caminho normal, e segura o anormal (repreparação, rodada
  * repetida) sem precisar de número novo na tela.
  */
+/**
+ * O TETO DE ENVIO POR DIA de uma campanha COM passos.
+ *
+ * ═══ Por que o teto da régua passa a valer no ENVIO ═══
+ *
+ * A régua aceita no máximo `max_inscricoes_dia` entradas por dia, e a inscrição
+ * é tentada UMA vez, logo depois do envio: `campaign_recipients` só é relido com
+ * `status = 'pending'`, e quem já está `sent` nunca volta. Então, com o envio
+ * solto e a inscrição limitada, uma campanha de 2.000 sem teto próprio mandava a
+ * abordagem para 2.000 pessoas e dava a régua a 500 — as outras 1.500 ficavam
+ * sem o 2º toque PARA SEMPRE, não "no dia seguinte". E a tela afirmava o
+ * contrário, que é pior que não dizer nada.
+ *
+ * Com passos, portanto, a campanha não manda mais do que a régua absorve no
+ * mesmo dia. Os dois números são o mesmo (`max_inscricoes_dia`), contados em
+ * lugares diferentes: o envio é cobrado antes de sair, a vaga é reservada
+ * depois. Ninguém perde mensagem — a campanha só leva mais dias, e mandar
+ * devagar é o que a prospecção fria quer de todo jeito.
+ *
+ * ⚠️ O QUE MUDA NUMA CAMPANHA JÁ PREPARADA: nada na lista e nada no texto. Uma
+ * campanha com passos, sem `teto_diario` e com mais de 500 elegíveis passa a
+ * mandar 500 por dia em vez de tudo o que o ritmo permitisse — ela termina mais
+ * tarde, e todo mundo que receber vai ter régua. Campanha SEM passos não passa
+ * por aqui: `teto_diario` continua sendo exatamente o que o operador escreveu,
+ * ou nenhum teto.
+ */
+export function tetoDeEnvioComRegua(tetoDiario: number | null): number {
+  return Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, tetoDiario ?? MAX_INSCRICOES_DIA_TETO));
+}
+
 export function politicaDaRegua(c: CampanhaComRegua): CadenceSettings {
   const inicio = c.janela_inicio_hora;
   const fim = c.janela_fim_hora;
@@ -84,10 +114,10 @@ export function politicaDaRegua(c: CampanhaComRegua): CadenceSettings {
         ? CADENCE_SETTINGS_PADRAO.espacamento
         : { min_s: espacamentoS, max_s: espacamentoS },
     legal_basis_ref: baseLegalDaRegua(c),
-    max_inscricoes_dia:
-      c.teto_diario === null
-        ? MAX_INSCRICOES_DIA_TETO
-        : Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, c.teto_diario)),
+    // O MESMO número que o envio passa a respeitar (`tetoDeEnvioComRegua`):
+    // uma fonte só, senão a campanha manda mais do que a régua absorve e a
+    // diferença some sem rastro.
+    max_inscricoes_dia: tetoDeEnvioComRegua(c.teto_diario),
     // ⚠️ `ao_fechar: true`, igual à cadência, e a HISTÓRIA deste campo importa:
     // ele esteve desligado enquanto o card da campanha nascia só na resposta.
     // Naquele desenho `motivoDeSaida` lia "sem negócio" como negócio REMOVIDO e

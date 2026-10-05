@@ -45,7 +45,7 @@ export async function validarPublicacaoDaCadencia(
 }
 
 /**
- * O QUE VALE PARA AS DUAS RÉGUAS DE PROSPECÇÃO — cadência e campanha (9035).
+ * O QUE VALE PARA AS DUAS RÉGUAS DE PROSPECÇÃO — cadência e campanha (9037).
  *
  * Extraída porque a régua da campanha ia ao ar SEM nada disto:
  * `publicarReguaDaCampanha` chamava `publishFollowupFlowVersion` direto, que é

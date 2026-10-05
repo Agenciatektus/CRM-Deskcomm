@@ -41,9 +41,9 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   message_body: string | null;
   /** As variações EXTRAS (migration 9034). Vazio = campanha de um texto só. */
   message_variants?: string[] | null;
-  /** A régua do 2º toque em diante (migration 9035). Vazia = uma mensagem só. */
+  /** A régua do 2º toque em diante (migration 9037). Vazia = uma mensagem só. */
   passos?: PassoDaRegua[] | null;
-  /** O pointer de follow-up publicado para esta campanha (9035). */
+  /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id?: string | null;
   base_legal: string;
   lia_ref: string | null;

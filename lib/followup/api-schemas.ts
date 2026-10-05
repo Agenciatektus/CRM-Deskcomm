@@ -11,7 +11,7 @@ import { MAX_THRESHOLD_MINUTES, MIN_THRESHOLD_MINUTES } from "./gap-de-retorno";
 /**
  * Vocabulário da coluna `surface` (0167; `atendimento` na 0394 — roteiro de
  * perguntas conduzido no turno, módulo opcional `fluxos_atendimento`; `cadence`
- * na 9016, do fork — a cadência de prospecção do funil; `campaign` na 9035, do
+ * na 9016, do fork — a cadência de prospecção do funil; `campaign` na 9037, do
  * fork — os passos de uma campanha, do 2º toque em diante). O CHECK do banco
  * espelha esta tupla (forward-fix 9023 refaz a união depois da 0394).
  *

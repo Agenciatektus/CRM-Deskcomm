@@ -71,7 +71,7 @@ export interface FatosDaSaida {
    *   - nasceu SEM negócio: não há nada a concluir sobre negócio, e encerrar por
    *     "removido" mataria a régua de quem nunca teve card.
    *
-   * O segundo caso existe por causa da régua de campanha (9035): quando
+   * O segundo caso existe por causa da régua de campanha (9037): quando
    * `abrirNegocio` não consegue criar o card (funil sem etapa de entrada, falha
    * de banco), a inscrição nasce sem `lead_id` e a régua tem de seguir, porque
    * ela é o 2º toque de quem já recebeu o 1º.

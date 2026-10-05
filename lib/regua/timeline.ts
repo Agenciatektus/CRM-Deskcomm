@@ -10,7 +10,7 @@ import type { FlowEdge, FlowGraph, FlowNode } from "@/lib/followup/graph-schema"
  * ─── Por que mora fora de `lib/cadencia/` ───────────────────────────────────
  *
  * Nasceu em `lib/cadencia/timeline.ts`, e saiu de lá quando a CAMPANHA ganhou
- * passos (migration 9035): as duas features montam a mesma lista e publicam o
+ * passos (migration 9037): as duas features montam a mesma lista e publicam o
  * mesmo grafo linear no mesmo motor de follow-up. Deixar a ponte dentro da
  * cadência faria a campanha importar a cadência para escolher um nó de espera —
  * ou, pior, manter uma cópia. Cópia de conversor determinístico é o

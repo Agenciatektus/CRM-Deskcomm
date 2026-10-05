@@ -51,7 +51,7 @@ export function EditarCampanha({ id }: { id: string }) {
   const [limite, setLimite] = useState("100");
   // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
   const [variantes, setVariantes] = useState<string[]>([""]);
-  // A régua do 2º toque em diante (9035). Vazia = campanha de uma mensagem só.
+  // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
   const [passos, setPassos] = useState<PassoDaRegua[]>([]);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");

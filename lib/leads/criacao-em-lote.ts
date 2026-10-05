@@ -10,7 +10,7 @@
  * mesmo minuto — o disparo em massa que a doutrina anti-banimento existe para
  * impedir. A importação já chegava marcada por isso (`metadata.via`).
  *
- * A campanha com passos (migration 9035) abre o MESMO buraco, e maior: ela cria
+ * A campanha com passos (migration 9037) abre o MESMO buraco, e maior: ela cria
  * um card por pessoa abordada, e a campanha típica aborda centenas. Pior que a
  * planilha, porque a pessoa acabou de receber a abordagem da campanha — uma
  * segunda mensagem, de outro fluxo, no mesmo minuto, é a cara do robô.
@@ -38,4 +38,34 @@ export const ORIGENS_DE_CRIACAO_EM_LOTE: readonly string[] = [ORIGEM_DA_PLANILHA
 /** Este `lead.created` nasceu de uma criação em lote? */
 export function criacaoEmLote(via: unknown): boolean {
   return typeof via === "string" && ORIGENS_DE_CRIACAO_EM_LOTE.includes(via);
+}
+
+/**
+ * A marca de lote do evento de ORIGEM, pronta para a ação de automação
+ * propagar ao card que ela cria.
+ *
+ * ═══ Por que propagar, e não pôr guarda de `rule:` no gatilho ═══
+ *
+ * `lead.created` em lote chega marcado, e o motor de regras pula as ações que
+ * FALAM. Mas ele EXECUTA `create_lead_in_pipeline` e `create_or_move_lead` — e
+ * elas criam um `lead.created` NOVO, com `requestId = 'rule:<id>'` e sem marca.
+ * O prefixo `rule:` protege o motor de automação de si mesmo; o gatilho de
+ * follow-up "Lead criado" não olha `rule:` nenhum. Cadeia completa:
+ *
+ *   campanha cria 500 cards em lote
+ *     → o motor pula as ações que falam  ✓
+ *     → o motor roda "crie card em Vendas"
+ *       → 500 `lead.created` SEM marca
+ *         → o gatilho de follow-up não pula  ✗  500 mensagens proativas
+ *
+ * Guarda de `rule:` no gatilho taparia ESTE salto. Propagar a marca preserva o
+ * fato — "esta linha nasceu de uma criação em lote" — ao longo da cadeia
+ * inteira, inclusive dos saltos que ninguém desenhou ainda.
+ *
+ * Propaga SÓ as origens de lote: um `via` qualquer do evento de origem não vira
+ * marca de lote por carona.
+ */
+export function viaHerdada(metadata: unknown): { via?: string } {
+  const via = (metadata as { via?: unknown } | null | undefined)?.via;
+  return criacaoEmLote(via) ? { via: via as string } : {};
 }

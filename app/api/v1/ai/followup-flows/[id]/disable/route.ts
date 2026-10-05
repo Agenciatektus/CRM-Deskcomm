@@ -64,7 +64,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return ok({ id, status: "disabled" }, { requestId });
   }
 
-  // Régua de prospecção só se escreve pelo servidor (9020/9035: a sessão recebe
+  // Régua de prospecção só se escreve pelo servidor (9020/9037: a sessão recebe
   // 42501 ao mudar o status de uma cadência OU da régua de uma campanha). O
   // papel já foi conferido acima.
   const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;

@@ -142,7 +142,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       base_legal: entrada.base_legal,
       lia_ref: entrada.lia_ref ?? null,
       audience_filter: entrada.audience_filter ?? FILTRO_VAZIO,
-      // Vazio, e não `null`: a coluna é `not null default '[]'` (9035), e
+      // Vazio, e não `null`: a coluna é `not null default '[]'` (9037), e
       // campanha de uma mensagem só é o caso comum.
       passos: entrada.passos ?? [],
       intervalo_segundos: entrada.intervalo_segundos ?? null,

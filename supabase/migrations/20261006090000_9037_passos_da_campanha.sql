@@ -1,6 +1,6 @@
--- manifest: 9035 — a campanha ganha PASSOS (espera, mensagem adicional, mover de etapa, etiquetar) sem motor novo: `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de follow-up com `surface='campaign'` — a mesma máquina da cadência (9016). Por quê: hoje a campanha manda UMA mensagem e acaba, e quem não responde na primeira nunca é tocado de novo; escrever um segundo motor de espera/retomada seria a terceira régua do produto. As guardas de escrita da cadência (9020/9024), o teto de inscrições por dia e as vagas do dia passam a valer para as DUAS superfícies de prospecção. A inscrição ABRE o card no funil da campanha (decisão do dono, 05/10/2026): sem negócio, os passos "mover de etapa" e "etiquetar" não têm em que agir, e eles existem para quem NÃO respondeu. Negócio aberto do contato nesse funil é reusado; campanha SEM passos não cria card nenhum.
+-- manifest: 9037 — a campanha ganha PASSOS (espera, mensagem adicional, mover de etapa, etiquetar) sem motor novo: `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de follow-up com `surface='campaign'` — a mesma máquina da cadência (9016). Por quê: hoje a campanha manda UMA mensagem e acaba, e quem não responde na primeira nunca é tocado de novo; escrever um segundo motor de espera/retomada seria a terceira régua do produto. As guardas de escrita da cadência (9020/9024), o teto de inscrições por dia e as vagas do dia passam a valer para as DUAS superfícies de prospecção. A inscrição ABRE o card no funil da campanha (decisão do dono, 05/10/2026): sem negócio, os passos "mover de etapa" e "etiquetar" não têm em que agir, e eles existem para quem NÃO respondeu. Negócio aberto do contato nesse funil é reusado; campanha SEM passos não cria card nenhum.
 --
--- 9035 — A CAMPANHA GANHA PASSOS (e nenhum motor novo)
+-- 9037 — A CAMPANHA GANHA PASSOS (e nenhum motor novo)
 --
 -- ## ANTES DO DEPLOY: contar o nome que a régua vai querer usar
 --
@@ -65,7 +65,7 @@
 -- pessoas.
 --
 -- Campanha SEM passos não chega a nada disso: não publica régua, não inscreve e
--- não cria card. Segue idêntica ao comportamento anterior à 9035.
+-- não cria card. Segue idêntica ao comportamento anterior à 9037.
 --
 -- ## Por que a 1ª mensagem NÃO é um passo
 --
@@ -129,7 +129,7 @@ alter table public.followup_flow_pointers
 comment on column public.followup_flow_pointers.surface is
   'Onde o fluxo aparece: followup = /app/ai/followups; crm_automation = CRM Automação; '
   'atendimento = roteiro conduzido no turno (0394); cadence = cadência de prospecção do funil '
-  '(9016); campaign = os passos de uma campanha, do 2º toque em diante (9035). '
+  '(9016); campaign = os passos de uma campanha, do 2º toque em diante (9037). '
   'Vocabulário cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts '
   '(par: lib/followup/api-schemas.ts → FOLLOWUP_FLOW_SURFACES).';
 
@@ -204,7 +204,7 @@ comment on column public.campaigns.passos is
   'A régua da campanha do 2º toque em diante: lista de {id, tipo} (mensagem | espera | '
   'mover_etapa | etiqueta), convertida em grafo linear por lib/regua/timeline.ts e publicada '
   'no pointer de followup_pointer_id. Vazia = campanha de uma mensagem só, idêntica ao '
-  'comportamento anterior à 9035. Até 20 passos (campaigns_passos_validos).';
+  'comportamento anterior à 9037. Até 20 passos (campaigns_passos_validos).';
 
 alter table public.campaigns
   add column if not exists followup_pointer_id uuid;
@@ -226,7 +226,7 @@ end $$;
 
 comment on column public.campaigns.followup_pointer_id is
   'A régua publicada desta campanha (followup_flow_pointers com surface=campaign). NULL = '
-  'campanha sem passos, ou que nunca foi preparada depois de ganhá-los. Migration 9035.';
+  'campanha sem passos, ou que nunca foi preparada depois de ganhá-los. Migration 9037.';
 
 -- `lib/cadencia/envio.ts` vai do POINTER para a campanha (para achar o pool de
 -- números do rodízio) a cada passo enviado: sem índice, isso é varredura de
