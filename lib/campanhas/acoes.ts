@@ -22,7 +22,9 @@ import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
 
 import { baseLegalValida, motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { ehStatusDaCampanha, podeTransitar } from "./maquina-de-estados";
+import { passosGuardados, problemaNosPassos } from "./passos";
 import { prepararCampanha } from "./preparacao";
+import { encerrarReguaDaCampanha, publicarReguaDaCampanha } from "./regua";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { StatusDaCampanha } from "./tipos";
@@ -38,6 +40,12 @@ export interface CampanhaCarregada {
   message_variants: string[] | null;
   base_legal: string;
   lia_ref: string | null;
+  /** Onde o card de quem responde nasce (0378) — e, com passos, o funil da régua (9035). */
+  pipeline_id: string | null;
+  /** A régua do 2º toque em diante (9035). Vazia = campanha de uma mensagem só. */
+  passos: unknown;
+  /** O pointer de follow-up publicado para esta campanha (9035). */
+  followup_pointer_id: string | null;
   audience_filter: unknown;
   audience_version: number;
   content_version: number;
@@ -55,7 +63,7 @@ export type Desfecho<T = unknown> = ({ ok: true } & T) | Recusa;
 
 const COLUNAS =
   "id, organization_id, name, status, channel_session_id, message_body, message_variants, " +
-  "base_legal, lia_ref, " +
+  "base_legal, lia_ref, pipeline_id, passos, followup_pointer_id, " +
   "audience_filter, audience_version, content_version, scheduled_at, description, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
 
@@ -121,6 +129,14 @@ function faltaParaEnviar(c: CampanhaCarregada): Recusa | null {
       status: 422,
     };
   }
+  // OS PASSOS, no MESMO gate do texto e da base legal. Deixar a conferência
+  // para a publicação da régua faria a campanha entrar em `preparing`, gravar a
+  // lista de destinatários inteira e só então descobrir que falta o funil — três
+  // escritas para dizer o que se sabia antes da primeira.
+  const dosPassos = problemaNosPassos(passosGuardados(c.passos), { pipelineId: c.pipeline_id });
+  if (dosPassos) {
+    return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: dosPassos, status: 422 };
+  }
   if (!baseLegalValida({ baseLegal: c.base_legal, liaRef: c.lia_ref })) {
     return {
       ok: false,
@@ -148,6 +164,7 @@ export async function prepararAcao(
   admin: SupabaseClient,
   c: CampanhaCarregada,
   agora: Date,
+  autorId: string,
 ): Promise<Desfecho<{ resumo: { total: number; elegiveis: number; excluidos: number } }>> {
   const recusa = recusaDeTransicao(c.status, "preparing") ?? faltaParaEnviar(c);
   if (recusa) return recusa;
@@ -158,6 +175,18 @@ export async function prepararAcao(
       mensagem: "Esta campanha já enviou mensagens; refazer a lista mudaria o que já foi dito.",
       status: 409,
     };
+  }
+
+  // A RÉGUA VAI AO AR ANTES DA LISTA, e isso é deliberado: a inscrição acontece
+  // quando a 1ª mensagem sai, e a 1ª mensagem pode sair no minuto seguinte ao
+  // Iniciar. Publicar depois deixaria uma janela em que os primeiros
+  // destinatários recebem a abordagem e não entram em régua nenhuma — e eles são
+  // justamente quem o operador olha para decidir se a campanha está funcionando.
+  // Falha aqui NÃO entra em `preparing`: a campanha fica no rascunho, com o
+  // motivo na tela.
+  const regua = await publicarReguaDaCampanha(admin, { campanha: c, autorId });
+  if (!regua.ok) {
+    return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: regua.mensagem, status: 422 };
   }
 
   // Compare-and-set: dois cliques simultâneos, e só um entra em `preparing`.
@@ -245,6 +274,7 @@ export async function iniciarAcao(
   admin: SupabaseClient,
   c: CampanhaCarregada,
   agora: Date,
+  autorId: string,
 ): Promise<Desfecho<{ retomada: boolean }>> {
   const recusa = recusaDeTransicao(c.status, "running") ?? faltaParaEnviar(c);
   if (recusa) return recusa;
@@ -261,6 +291,15 @@ export async function iniciarAcao(
       mensagem: "Nenhum destinatário elegível. Prepare a campanha antes de iniciar.",
       status: 422,
     };
+  }
+
+  // Republica: o RITMO se edita com a campanha em pé (tela de detalhe), e o
+  // ritmo é a política da régua. Sem isto, quem desacelerou uma campanha em
+  // andamento desacelerava só a 1ª mensagem — os passos seguiriam no ritmo
+  // antigo, que é exatamente o que o operador tentou conter.
+  const regua = await publicarReguaDaCampanha(admin, { campanha: c, autorId });
+  if (!regua.ok) {
+    return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: regua.mensagem, status: 422 };
   }
 
   const retomada = c.status === "paused";
@@ -321,6 +360,14 @@ export async function pausarAcao(
   if ((data ?? []).length === 0) return conflitoDeCorrida();
   // Quem já estava `sending` NÃO é desfeito: a mensagem pode estar na borda
   // externa neste instante, e prometer cancelamento do que já saiu é mentir.
+  //
+  // A RÉGUA SEGUE, e isso é escolha: pausar para de ABORDAR gente nova, e quem
+  // já foi abordado continua recebendo os passos que a campanha prometeu a ele.
+  // Desligar o pointer aqui seria pior que não fazer nada: com a régua
+  // desligada o worker PULA cada passo e o motor avança, então os inscritos
+  // correriam a régua inteira em tiques — e um "retomar" depois os encontraria
+  // no fim, sem nunca terem recebido nada. Quem quer parar tudo cancela, e o
+  // cancelamento encerra as inscrições (`encerrarReguaDaCampanha`).
   return { ok: true };
 }
 
@@ -347,6 +394,13 @@ export async function cancelarAcao(
     .eq("campaign_id", c.id)
     .in("status", ["pending", "queued"])
     .select("id");
+
+  // Quem JÁ recebeu a 1ª mensagem está na régua, e a régua não é destinatário
+  // pendente: cancelar a campanha sem encerrá-la deixaria os passos seguintes
+  // saindo por dias depois do cancelamento. É o oposto do que o botão promete.
+  if (c.followup_pointer_id) {
+    await encerrarReguaDaCampanha(admin, c.organization_id, c.followup_pointer_id, agora);
+  }
   return { ok: true, cancelados: (cancelados ?? []).length };
 }
 
@@ -366,6 +420,15 @@ export async function duplicarAcao(
       message_variants: c.message_variants ?? [],
       base_legal: c.base_legal,
       lia_ref: c.lia_ref,
+      // Os passos vão; a RÉGUA não. O `followup_pointer_id` é de uma campanha
+      // específica — herdá-lo faria a cópia publicar por cima da régua do
+      // original, e os inscritos dele passariam a seguir os passos da cópia.
+      passos: passosGuardados(c.passos),
+      // O funil vem junto porque os passos o EXIGEM: sem ele, a cópia de uma
+      // campanha com régua nasceria impossível de preparar, e o operador leria
+      // "escolha o funil" numa tela que ele não mexeu. `stage_id` e `agent_id`
+      // seguem fora, como antes — mudá-los é assunto de outra fatia.
+      pipeline_id: c.pipeline_id,
       audience_filter: c.audience_filter,
       intervalo_segundos: c.intervalo_segundos,
       janela_inicio_hora: c.janela_inicio_hora,

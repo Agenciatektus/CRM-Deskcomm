@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 const COLUNAS_DA_LISTA =
   "id, name, status, channel_session_id, snapshot_total, snapshot_eligible, snapshot_excluded, " +
   "scheduled_at, started_at, completed_at, cancelled_at, created_at, created_by, " +
-  "pipeline_id, stage_id, agent_id";
+  "pipeline_id, stage_id, agent_id, passos";
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
@@ -142,6 +142,9 @@ export async function POST(req: NextRequest): Promise<Response> {
       base_legal: entrada.base_legal,
       lia_ref: entrada.lia_ref ?? null,
       audience_filter: entrada.audience_filter ?? FILTRO_VAZIO,
+      // Vazio, e não `null`: a coluna é `not null default '[]'` (9035), e
+      // campanha de uma mensagem só é o caso comum.
+      passos: entrada.passos ?? [],
       intervalo_segundos: entrada.intervalo_segundos ?? null,
       janela_inicio_hora: entrada.janela_inicio_hora ?? null,
       janela_fim_hora: entrada.janela_fim_hora ?? null,

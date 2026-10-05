@@ -41,6 +41,7 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { decidePacing, dayStartInTz } from "@/lib/agent-engine/pacing/engine";
 import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engine/pacing/store";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
+import { inscreverContatoNaRegua } from "@/lib/cadencia/inscrever";
 import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
@@ -88,11 +89,14 @@ interface CampanhaRow {
   janela_fim_hora: number | null;
   teto_diario: number | null;
   teto_horario: number | null;
+  /** A régua publicada desta campanha (9035). `null` = campanha de uma mensagem só. */
+  followup_pointer_id: string | null;
 }
 
 const COLUNAS_DA_CAMPANHA =
   "id, organization_id, channel_session_id, name, message_body, message_variants, content_version, " +
-  "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
+  "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario, " +
+  "followup_pointer_id";
 
 export async function rodarUmaRodadaDeCampanha(
   admin: SupabaseClient,
@@ -494,6 +498,49 @@ async function rodarUmaCampanha(
       })
       .eq("id", alvo.id)
       .eq("status", "sending");
+
+    // ─── A RÉGUA: o 2º toque em diante (migration 9035) ───
+    //
+    // AQUI, e não na preparação: a inscrição marca "esta pessoa recebeu a
+    // abordagem", e inscrever na preparação prometeria passos a quem a lista
+    // ainda pode pular (veto revalidado, ritmo, número fora do ar). Só quem
+    // recebeu de fato entra.
+    //
+    // A fronteira do envio vai junto: a conversa já está aberta, e um segundo
+    // `beginServiceAtOrigin` a REABRIRIA — disparando roteamento para a equipe
+    // por causa de um passo que só sai amanhã.
+    //
+    // ⚠️ NUNCA derruba o envio. A mensagem já saiu e o destinatário já está
+    // `sent`; transformar uma recusa de inscrição em falha de envio diria que a
+    // pessoa não recebeu o que recebeu. Recusa vira linha de log com o motivo.
+    if (!falhou && campanha.followup_pointer_id) {
+      try {
+        const inscricao = await inscreverContatoNaRegua(admin, {
+          organizationId: campanha.organization_id,
+          pointerId: campanha.followup_pointer_id,
+          contactId: alvo.contact_id,
+          // O card de quem responde nasce NA RESPOSTA: no 1º toque quase nunca
+          // há negócio. O passo de CRM resolve o negócio na hora de aplicá-lo
+          // (`lib/cadencia/efeitos.ts`), que é quando ele já existe.
+          leadId: null,
+          fronteira: boundary,
+          origem: { tipo: "campanha", campanhaId: campanha.id, destinatarioId: alvo.id },
+        });
+        if (!inscricao.ok) {
+          logger.info("[campanha] destinatário não entrou na régua", {
+            campanha: campanha.id,
+            destinatario: alvo.id,
+            motivo: inscricao.motivo,
+          });
+        }
+      } catch (err) {
+        logger.warn("[campanha] inscrição na régua falhou", {
+          campanha: campanha.id,
+          destinatario: alvo.id,
+          motivo: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     return {
       enviadas: falhou ? 0 : 1,

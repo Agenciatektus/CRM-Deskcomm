@@ -21,6 +21,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { rollbackFollowupFlowSchema } from "@/lib/followup/api-schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const dynamic = "force-dynamic";
 
@@ -67,13 +68,20 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!pointer) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
-  // Cadência não volta versão: a versão carrega a condução da IA (agente,
-  // instrução), cuja troca exige admin e validação de publicação. Ela se
-  // REPUBLICA pela tela (migration 9020 também recusa pela sessão).
-  if (pointer.surface === "cadence") {
+  // Régua de prospecção não volta versão. Na cadência, a versão carrega a
+  // condução da IA (agente, instrução), cuja troca exige admin e validação de
+  // publicação; na régua de campanha, a versão é derivada de `campaigns.passos`
+  // e voltá-la deixaria o grafo no ar divergindo da lista que a tela mostra — a
+  // pior espécie de divergência, porque a tela continua certa de si. As duas se
+  // REPUBLICAM (9020 também recusa a escrita pela sessão).
+  if (ehProspeccao(pointer.surface)) {
     return fail(
       "cadencia_sem_rollback",
-      t("Cadência não volta versão. Ajuste e publique de novo pela tela da cadência."),
+      t(
+        pointer.surface === "campaign"
+          ? "A régua de uma campanha não volta versão. Ajuste os passos e prepare a campanha de novo."
+          : "Cadência não volta versão. Ajuste e publique de novo pela tela da cadência.",
+      ),
       422,
       { requestId },
     );

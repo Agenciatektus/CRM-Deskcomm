@@ -93,11 +93,16 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const avaliacoes = await avaliarTodos(leadIds, 10, (leadId) => avaliarNegocio(admin, orgId, cadencia, leadId));
   const recusados: Array<{ lead_id: string; motivo: MotivoDeRecusa }> = [];
+  // `leadId` não-nulo: esta porta é a da CADÊNCIA, que exige negócio ABERTO no
+  // funil — `avaliarNegocio` só devolve `ok` com negócio. O tipo o traz anulável
+  // porque a régua da campanha (9035) inscreve sem negócio, e o `??` abaixo
+  // mantém a promessa no compilador sem cast: o id avaliado é o mesmo.
   const aptos: Array<{ leadId: string; contactId: string }> = [];
   avaliacoes.forEach((a, i) => {
     if (!a.ok) recusados.push({ lead_id: leadIds[i]!, motivo: a.motivo });
-    else if (aptos.length < cabemHoje) aptos.push(a.negocio);
-    else recusados.push({ lead_id: leadIds[i]!, motivo: "teto_do_dia" });
+    else if (aptos.length < cabemHoje) {
+      aptos.push({ leadId: a.negocio.leadId ?? leadIds[i]!, contactId: a.negocio.contactId });
+    } else recusados.push({ lead_id: leadIds[i]!, motivo: "teto_do_dia" });
   });
 
   if (parsed.data.dry_run === true) {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { EnrollmentRow } from "@/lib/followup/node-handlers";
+import { ehProspeccao } from "@/lib/followup/superficies";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 import { primeiroNome, type ValoresDaCadencia } from "./render";
 
@@ -10,8 +11,13 @@ export interface ContextoDaCadencia {
 }
 
 /**
- * O contexto de um passo de TEXTO da cadência: `null` quando o pointer não é
- * cadência (follow-up comum segue exatamente como antes).
+ * O contexto de um passo de TEXTO de uma régua de prospecção: `null` quando o
+ * pointer não é régua (follow-up comum segue exatamente como antes).
+ *
+ * Vale para as DUAS superfícies de prospecção. Deixar a campanha fora daqui
+ * faria o passo dela sair com `{{primeiro_nome}}` LITERAL no WhatsApp do
+ * cliente: o render recebe um mapa de valores vazio e não tem como saber que
+ * devia ter um.
  */
 export async function contextoDaCadencia(
   admin: SupabaseClient,
@@ -25,7 +31,7 @@ export async function contextoDaCadencia(
     .eq("id", enrollment.pointer_id)
     .maybeSingle();
   if (pointerErr) throw new Error(`cadencia_contexto: ${pointerErr.message}`);
-  if (!pointer || pointer.surface !== "cadence") return null;
+  if (!pointer || !ehProspeccao(pointer.surface)) return null;
   const valores = await valoresDoNegocio(admin, org, {
     pipelineId: pointer.pipeline_id as string,
     contactId: enrollment.contact_id,

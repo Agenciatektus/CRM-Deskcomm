@@ -86,16 +86,33 @@ export const OUTCOME_DA_SAIDA: Record<MotivoDeSaida, "converted" | "handoff" | n
 /**
  * A régua deve parar? Devolve o PRIMEIRO motivo, na ordem do mais forte para o
  * mais fraco: o negócio fechado é fato, a etiqueta é marcação.
+ *
+ * ⚠️ SEM NEGÓCIO não é o fim da avaliação. A versão anterior saía da função na
+ * primeira linha quando `lead === null`, e com `ao_fechar` desligado isso
+ * devolvia `null` sem NUNCA olhar se uma pessoa tinha assumido a conversa ou se
+ * o CONTATO tinha etiqueta de saída — dois fatos que não dependem de negócio
+ * nenhum. Na cadência o caso era raro (negócio apagado numa régua com
+ * `ao_fechar` desligado); na régua de uma CAMPANHA (9035) ele é o caso NORMAL,
+ * porque ali o card só nasce quando a pessoa responde. O freio mais forte da
+ * régua — "um humano assumiu, pare de falar sozinho" — ficava inerte
+ * exatamente onde mais importa.
+ *
+ * A ordem dos desfechos que já existiam não mudou: com negócio, as mesmas
+ * perguntas na mesma sequência; sem negócio e com `ao_fechar` ligado, o mesmo
+ * `saida_negocio_removido`.
  */
 export function motivoDeSaida(saidas: SaidasDaCadencia, fatos: FatosDaSaida): MotivoDeSaida | null {
   const { lead } = fatos;
-  if (lead === null) return saidas.ao_fechar ? "saida_negocio_removido" : null;
-  if (saidas.ao_fechar && lead.status === "won") return "saida_negocio_ganho";
-  if (saidas.ao_fechar && lead.status === "lost") return "saida_negocio_perdido";
-  if (saidas.etapas.includes(lead.stage_id)) return "saida_etapa";
+  if (lead !== null) {
+    if (saidas.ao_fechar && lead.status === "won") return "saida_negocio_ganho";
+    if (saidas.ao_fechar && lead.status === "lost") return "saida_negocio_perdido";
+    if (saidas.etapas.includes(lead.stage_id)) return "saida_etapa";
+  } else if (saidas.ao_fechar) {
+    return "saida_negocio_removido";
+  }
   if (saidas.etiquetas.length > 0) {
     const alvo = new Set(saidas.etiquetas.map(normalizarEtiqueta));
-    const tem = [...lead.tags, ...fatos.tagsDoContato].some((t) => alvo.has(normalizarEtiqueta(t)));
+    const tem = [...(lead?.tags ?? []), ...fatos.tagsDoContato].some((t) => alvo.has(normalizarEtiqueta(t)));
     if (tem) return "saida_etiqueta";
   }
   if (saidas.humano_assumir && fatos.humanoFalouDepois) return "saida_humano_assumiu";

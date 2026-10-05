@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ServiceBoundary } from "@/lib/atendimento/fronteira";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
 import { audit } from "@/lib/audit";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { flowGraphSchema } from "@/lib/followup/graph-schema";
+import { SUPERFICIES_DE_PROSPECCAO } from "@/lib/followup/superficies";
 import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
 
 /**
@@ -28,6 +30,25 @@ import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
  * só para quem AUTORIZA o atendimento — nunca para job/tick/retry. Por isso a
  * inscrição em lote é limitada ao teto do dia: as conversas vazias duram só até
  * a régua chegar nelas.
+ *
+ * ═══ A CAMPANHA entra pela mesma porta (migration 9035) ═══
+ *
+ * A campanha com passos publica uma régua própria (`surface='campaign'`,
+ * `lib/campanhas/regua.ts`) e inscreve o destinatário quando a 1ª mensagem SAI.
+ * Ela usa `inscreverContatoNaRegua`, logo abaixo, para herdar exatamente os
+ * freios desta porta — anti-laço, teto do dia, veto por bloqueio/anonimização/
+ * recusa, supressão por telefone e gravação de base legal. Duas diferenças, e
+ * só duas:
+ *
+ *   1. NÃO abre conversa: a campanha já abriu no envio, e um segundo
+ *      `beginServiceAtOrigin` reabriria a conversa e dispararia roteamento para
+ *      a equipe por causa de um passo que ainda nem existe. A fronteira já
+ *      aberta entra por parâmetro.
+ *   2. NÃO exige negócio: na campanha o card nasce quando a pessoa RESPONDE,
+ *      então a inscrição pode nascer sem `lead_id`. O passo de CRM resolve o
+ *      negócio na hora de aplicá-lo (`lib/cadencia/efeitos.ts`), que é quando o
+ *      card já existe. O anti-laço, que na cadência é por NEGÓCIO, aqui é por
+ *      CONTATO — sem negócio não há o que comparar.
  */
 
 export type MotivoDeRecusa =
@@ -56,7 +77,9 @@ export type OrigemDaInscricao =
   | { tipo: "manual"; actorUserId: string; requestId: string }
   | { tipo: "gatilho_etapa" | "gatilho_etiqueta"; eventId: string; eventoEm: string }
   /** Varredura de tempo (atendente sem responder / lead parado): não há evento, há a conversa. */
-  | { tipo: "gatilho_tempo"; conversationId: string; eventoEm: string };
+  | { tipo: "gatilho_tempo"; conversationId: string; eventoEm: string }
+  /** 1ª mensagem da campanha entregue (migration 9035): a régua começa no 2º toque. */
+  | { tipo: "campanha"; campanhaId: string; destinatarioId: string };
 
 interface CadenciaCarregada {
   id: string;
@@ -69,7 +92,15 @@ interface CadenciaCarregada {
   fuso: string;
 }
 
-/** Carrega e valida a cadência (publicada, número conectado). `null` = não inscreve. */
+/**
+ * Carrega e valida a régua de prospecção (publicada, número conectado).
+ * `motivo` = não inscreve.
+ *
+ * Serve as DUAS superfícies de prospecção (`SUPERFICIES_DE_PROSPECCAO`): a
+ * cadência do funil e a régua da campanha. Tudo que ela confere vale para as
+ * duas — pointer publicado, versão ativa com nó de gatilho, número conectado,
+ * funil e política completa.
+ */
 export async function carregarCadenciaParaInscricao(
   admin: SupabaseClient,
   organizationId: string,
@@ -82,7 +113,7 @@ export async function carregarCadenciaParaInscricao(
     .eq("id", pointerId)
     .maybeSingle();
   if (error) throw new Error(`cadencia_inscricao: ${error.message}`);
-  if (!p || p.surface !== "cadence" || p.status !== "active" || !p.active_version_id) {
+  if (!p || !SUPERFICIES_DE_PROSPECCAO.includes(p.surface as never) || p.status !== "active" || !p.active_version_id) {
     return { motivo: "cadencia_indisponivel" };
   }
   const settings = cadenceSettingsSchema.safeParse(p.cadence_settings);
@@ -153,42 +184,53 @@ export async function reservarInscricoes(
 }
 
 interface NegocioElegivel {
-  leadId: string;
+  /** `null` na régua da campanha: o card nasce quando a pessoa responde. */
+  leadId: string | null;
   contactId: string;
 }
 
-/** Negócio + contato aptos para ESTA cadência. Não escreve nada — é o dry-run. */
-export async function avaliarNegocio(
+/**
+ * ESTE alvo já passou por ESTA régua na janela anti-laço?
+ *
+ * Por NEGÓCIO na cadência, por CONTATO na campanha. A diferença não é estética:
+ * sem ela, a cadência passaria a barrar o segundo negócio do mesmo contato
+ * (mudança de comportamento que ninguém pediu), e a campanha não teria nada para
+ * comparar (não há negócio no momento da inscrição).
+ */
+export async function jaPassouPelaRegua(
   admin: SupabaseClient,
   organizationId: string,
-  cadencia: Pick<CadenciaCarregada, "pipelineId" | "id">,
-  leadId: string,
-): Promise<{ ok: true; negocio: NegocioElegivel } | { ok: false; motivo: MotivoDeRecusa }> {
-  const { data: lead, error } = await admin
-    .from("crm_leads")
-    .select("id, pipeline_id, status, contact_id")
-    .eq("organization_id", organizationId)
-    .eq("id", leadId)
-    .maybeSingle();
-  if (error) throw new Error(`cadencia_negocio: ${error.message}`);
-  if (!lead || lead.pipeline_id !== cadencia.pipelineId) return { ok: false, motivo: "negocio_fora_do_funil" };
-  if (lead.status !== "open") return { ok: false, motivo: "negocio_fechado" };
-  if (!lead.contact_id) return { ok: false, motivo: "negocio_sem_contato" };
-
-  // O MESMO negócio não volta à MESMA cadência dentro da janela: sem isto, uma
-  // régua que termina levando o lead de volta à etapa-gatilho (por outro passo,
-  // ou por alguém arrastando o card) o reinscreveria todo dia.
+  pointerId: string,
+  alvo: { leadId: string } | { contactId: string },
+): Promise<boolean> {
   const desde = new Date(Date.now() - DIAS_SEM_REPETIR_A_CADENCIA * 86_400_000).toISOString();
-  const { count: jaPassou, error: jaErr } = await admin
+  let q = admin
     .from("followup_enrollments")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("pointer_id", cadencia.id)
-    .eq("lead_id", leadId)
+    .eq("pointer_id", pointerId)
     .gte("started_at", desde);
-  if (jaErr) throw new Error(`cadencia_repeticao: ${jaErr.message}`);
-  if ((jaPassou ?? 0) > 0) return { ok: false, motivo: "ja_passou_pela_cadencia" };
+  q = "leadId" in alvo ? q.eq("lead_id", alvo.leadId) : q.eq("contact_id", alvo.contactId);
+  const { count, error } = await q;
+  if (error) throw new Error(`cadencia_repeticao: ${error.message}`);
+  return (count ?? 0) > 0;
+}
 
+/**
+ * O CONTATO está apto para prospecção AGORA? Não escreve nada.
+ *
+ * Saiu de dentro de `avaliarNegocio` quando a campanha passou a inscrever sem
+ * negócio: estes três freios — um fluxo vivo por contato, o veto por
+ * bloqueio/trava humana/anonimização/recusa de marketing, e a supressão pelo
+ * TELEFONE (incluindo gêmeos do mesmo número) — não dependem de negócio nenhum,
+ * e copiá-los para o lado da campanha seria duplicar exatamente a parte que o
+ * Cassio exigiu que existisse em UM lugar só.
+ */
+export async function avaliarContato(
+  admin: SupabaseClient,
+  organizationId: string,
+  contactId: string,
+): Promise<{ ok: true } | { ok: false; motivo: MotivoDeRecusa }> {
   // UM FLUXO VIVO POR CONTATO — conferido AQUI, antes da reserva de vaga do dia
   // (e antes do dry-run da tela). Só em `inscreverNegocio` ele chegava tarde: a
   // vaga já tinha sido gasta, e um contato preso noutro fluxo esgotava o teto
@@ -198,7 +240,7 @@ export async function avaliarNegocio(
     .from("followup_enrollments")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("contact_id", lead.contact_id as string)
+    .eq("contact_id", contactId)
     .in("status", ["active", "waiting_reply", "paused_handoff", "paused_manual"]);
   if (vivasErr) throw new Error(`cadencia_inscricao_viva: ${vivasErr.message}`);
   if ((vivas ?? 0) > 0) return { ok: false, motivo: "ja_em_outro_fluxo" };
@@ -207,7 +249,7 @@ export async function avaliarNegocio(
     .from("contacts")
     .select("id, phone_number, is_blocked, force_human, is_anonymized, is_merged_into, consent")
     .eq("organization_id", organizationId)
-    .eq("id", lead.contact_id as string)
+    .eq("id", contactId)
     .maybeSingle();
   if (cErr) throw new Error(`cadencia_contato: ${cErr.message}`);
   if (!c || c.is_anonymized || c.is_merged_into) return { ok: false, motivo: "contato_indisponivel" };
@@ -234,12 +276,47 @@ export async function avaliarNegocio(
   });
   if (suprimido) return { ok: false, motivo: "telefone_suprimido" };
 
+  return { ok: true };
+}
+
+/** Negócio + contato aptos para ESTA cadência. Não escreve nada — é o dry-run. */
+export async function avaliarNegocio(
+  admin: SupabaseClient,
+  organizationId: string,
+  cadencia: Pick<CadenciaCarregada, "pipelineId" | "id">,
+  leadId: string,
+): Promise<{ ok: true; negocio: NegocioElegivel } | { ok: false; motivo: MotivoDeRecusa }> {
+  const { data: lead, error } = await admin
+    .from("crm_leads")
+    .select("id, pipeline_id, status, contact_id")
+    .eq("organization_id", organizationId)
+    .eq("id", leadId)
+    .maybeSingle();
+  if (error) throw new Error(`cadencia_negocio: ${error.message}`);
+  if (!lead || lead.pipeline_id !== cadencia.pipelineId) return { ok: false, motivo: "negocio_fora_do_funil" };
+  if (lead.status !== "open") return { ok: false, motivo: "negocio_fechado" };
+  if (!lead.contact_id) return { ok: false, motivo: "negocio_sem_contato" };
+
+  // O MESMO negócio não volta à MESMA cadência dentro da janela: sem isto, uma
+  // régua que termina levando o lead de volta à etapa-gatilho (por outro passo,
+  // ou por alguém arrastando o card) o reinscreveria todo dia.
+  if (await jaPassouPelaRegua(admin, organizationId, cadencia.id, { leadId })) {
+    return { ok: false, motivo: "ja_passou_pela_cadencia" };
+  }
+
+  const doContato = await avaliarContato(admin, organizationId, lead.contact_id as string);
+  if (!doContato.ok) return doContato;
+
   return { ok: true, negocio: { leadId: lead.id as string, contactId: lead.contact_id as string } };
 }
 
 /**
- * Inscreve UM negócio. Quem chama já carregou a cadência e JÁ RESERVOU a vaga
- * do dia (`reservarInscricoes`).
+ * Inscreve UM alvo. Quem chama já carregou a régua e JÁ RESERVOU a vaga do dia
+ * (`reservarInscricoes`).
+ *
+ * `fronteiraJaAberta` é o caminho da CAMPANHA: a conversa dela nasceu no envio
+ * da 1ª mensagem, e abrir (ou REABRIR) de novo aqui disparia roteamento para a
+ * equipe por causa de um passo que ainda não existe.
  */
 export async function inscreverNegocio(
   admin: SupabaseClient,
@@ -247,6 +324,7 @@ export async function inscreverNegocio(
   cadencia: CadenciaCarregada,
   negocio: NegocioElegivel,
   origem: OrigemDaInscricao,
+  fronteiraJaAberta?: ServiceBoundary,
 ): Promise<ResultadoDaInscricao> {
   // ANTES de abrir a conversa: contato já numa régua viva não entra — e abrir
   // (ou REABRIR) a conversa dele à toa dispararia roteamento para a equipe.
@@ -261,7 +339,9 @@ export async function inscreverNegocio(
   if (vivasErr) throw new Error(`cadencia_inscricao_viva: ${vivasErr.message}`);
   if ((vivas ?? 0) > 0) return { ok: false, motivo: "ja_em_outro_fluxo" };
 
-  const fronteira = await beginServiceAtOrigin(admin, organizationId, negocio.contactId, cadencia.channelSessionId);
+  const fronteira =
+    fronteiraJaAberta ??
+    (await beginServiceAtOrigin(admin, organizationId, negocio.contactId, cadencia.channelSessionId));
 
   const { data: criado, error: insErr } = await admin
     .from("followup_enrollments")
@@ -308,6 +388,9 @@ export async function inscreverNegocio(
         ? { event_log_id: origem.eventId }
         : {}),
       ...(origem.tipo === "gatilho_tempo" ? { conversation_id: origem.conversationId } : {}),
+      ...(origem.tipo === "campanha"
+        ? { campaign_id: origem.campanhaId, campaign_recipient_id: origem.destinatarioId }
+        : {}),
     },
     idempotency_key: `cadencia-inscricao:${enrollmentId}`,
   });
@@ -372,4 +455,62 @@ export async function inscreverPorGatilho(
       ? { tipo: "gatilho_tempo", conversationId: input.conversationId, eventoEm: input.eventoEm }
       : { tipo: input.origem ?? "gatilho_etapa", eventId: input.eventId, eventoEm: input.eventoEm };
   return inscreverNegocio(admin, input.organizationId, cadencia, avaliacao.negocio, origem);
+}
+
+/**
+ * Inscrição do destinatário da CAMPANHA na régua dela, DEPOIS de a 1ª mensagem
+ * ter saído (migration 9035).
+ *
+ * Herda desta porta, sem copiar nada: régua publicada com número conectado,
+ * anti-laço de 30 dias (por CONTATO), um fluxo vivo por contato, veto por
+ * bloqueio/trava humana/anonimização/recusa de marketing, supressão pelo
+ * telefone (com gêmeos do mesmo número), teto de inscrições por dia e gravação
+ * da base legal.
+ *
+ * As duas diferenças, escritas no cabeçalho do arquivo: não abre conversa (a
+ * fronteira do envio entra por parâmetro) e não exige negócio.
+ *
+ * ⚠️ NÃO confere `publicadaEm`: o corte "nada retroativo" existe para o gatilho
+ * de etapa, onde publicar poderia inscrever o estoque inteiro da etapa de uma
+ * vez. Aqui cada inscrição corresponde a UMA mensagem que esta campanha acabou
+ * de mandar; não há estoque para varrer.
+ *
+ * Nunca lança por recusa — recusa é desfecho normal, e o destinatário já
+ * recebeu a 1ª mensagem de qualquer forma.
+ */
+export async function inscreverContatoNaRegua(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string;
+    pointerId: string;
+    contactId: string;
+    /** O negócio quando já existe (raro no 1º toque). `null` = o passo de CRM o resolve depois. */
+    leadId?: string | null;
+    /** A conversa que o envio da campanha abriu. Sem ela, abriria uma segunda. */
+    fronteira: ServiceBoundary;
+    origem: Extract<OrigemDaInscricao, { tipo: "campanha" }>;
+  },
+): Promise<ResultadoDaInscricao> {
+  const carregada = await carregarCadenciaParaInscricao(admin, input.organizationId, input.pointerId);
+  if ("motivo" in carregada) return { ok: false, motivo: carregada.motivo };
+  const { cadencia } = carregada;
+
+  if (await jaPassouPelaRegua(admin, input.organizationId, cadencia.id, { contactId: input.contactId })) {
+    return { ok: false, motivo: "ja_passou_pela_cadencia" };
+  }
+  const doContato = await avaliarContato(admin, input.organizationId, input.contactId);
+  if (!doContato.ok) return doContato;
+
+  // Reserva DEPOIS da avaliação: contato recusado não gasta vaga do dia.
+  if ((await reservarInscricoes(admin, input.organizationId, cadencia.id, 1)) < 1) {
+    return { ok: false, motivo: "teto_do_dia" };
+  }
+  return inscreverNegocio(
+    admin,
+    input.organizationId,
+    cadencia,
+    { leadId: input.leadId ?? null, contactId: input.contactId },
+    input.origem,
+    input.fronteira,
+  );
 }

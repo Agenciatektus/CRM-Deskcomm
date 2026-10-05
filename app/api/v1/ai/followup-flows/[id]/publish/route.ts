@@ -111,6 +111,20 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   // Cadência: só os gatilhos que a PORTA da cadência implementa hoje
   // (`lib/cadencia/inscrever.ts`). Silêncio/SLA passariam no conjunto acima e
   // nunca inscreveriam ninguém por ela — fluxo morto com cara de vivo.
+  // A régua de uma campanha não se publica por aqui: ela é DERIVADA de
+  // `campaigns.passos` e publicada pelo servidor ao preparar a campanha
+  // (`lib/campanhas/regua.ts`). Publicar o `draft_graph` dela por esta porta
+  // poria no ar um grafo que o próximo "preparar" sobrescreve — e, entre as
+  // duas coisas, a tela da campanha mostraria passos que não são os que rodam.
+  if (pointer.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha vai ao ar quando a campanha é preparada, com os passos dela."),
+      422,
+      { requestId },
+    );
+  }
+
   const ehCadencia = pointer.surface === "cadence";
   if (ehCadencia) {
     // A régua única do gatilho de cadência — a mesma das rotas que o gravam.

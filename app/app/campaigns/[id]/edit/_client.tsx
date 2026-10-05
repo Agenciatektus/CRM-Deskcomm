@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
+import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
 
 export function EditarCampanha({ id }: { id: string }) {
@@ -49,6 +51,8 @@ export function EditarCampanha({ id }: { id: string }) {
   const [limite, setLimite] = useState("100");
   // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
   const [variantes, setVariantes] = useState<string[]>([""]);
+  // A régua do 2º toque em diante (9035). Vazia = campanha de uma mensagem só.
+  const [passos, setPassos] = useState<PassoDaRegua[]>([]);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
@@ -73,6 +77,7 @@ export function EditarCampanha({ id }: { id: string }) {
     setSemInteracao(f.sem_interacao_ha_dias == null ? "" : String(f.sem_interacao_ha_dias));
     setLimite(f.limite == null ? "100" : String(f.limite));
     setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
+    setPassos(c.passos ?? []);
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
@@ -342,6 +347,16 @@ export function EditarCampanha({ id }: { id: string }) {
         <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
       </Card>
 
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Passos depois da primeira mensagem")}</h2>
+        <PassosDaCampanha
+          passos={passos}
+          onChange={setPassos}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+        />
+      </Card>
+
       <div className="flex items-center justify-end gap-2">
         <Button variant="outline" onClick={() => router.push(`/app/campaigns/${id}`)}>
           {t("Cancelar")}
@@ -360,6 +375,7 @@ export function EditarCampanha({ id }: { id: string }) {
               pipeline_id: funil || null,
               stage_id: etapa || null,
               agent_id: agente || null,
+              passos,
             });
             router.push(`/app/campaigns/${id}`);
           }}

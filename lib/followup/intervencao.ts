@@ -42,6 +42,7 @@ import { flowGraphSchema, type FlowEdge, type FlowNode } from "./graph-schema";
 import { carregaEtapasCitadas, nomesDasEtapas } from "./etapas-citadas";
 import { rotuloDaAresta } from "./eventos-legiveis";
 import type { NomesDeValor } from "./vocabulario";
+import { ehProspeccao } from "./superficies";
 
 /** Estados em que o enrollment tem relógio: são os únicos que o motor reclama. */
 export const STATUS_COM_RELOGIO = ["active", "waiting_reply"] as const;
@@ -288,8 +289,9 @@ async function aplicaPatchComGuarda(
     .eq("organization_id", deps.orgId)
     .eq("id", alvo.pointer_id)
     .maybeSingle();
-  const escritor =
-    (ponteiro as { surface?: string } | null)?.surface === "cadence" ? deps.admin : deps.supabase;
+  const escritor = ehProspeccao((ponteiro as { surface?: string } | null)?.surface)
+    ? deps.admin
+    : deps.supabase;
   const { data, error } = await escritor
     .from("followup_enrollments")
     .update(patch)

@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moduloLigado } from "@/lib/instalacao/modulos";
 import { createFollowupFlowSchema } from "@/lib/followup/api-schemas";
+import { SUPERFICIES_DE_PROSPECCAO, ehProspeccao } from "@/lib/followup/superficies";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -41,10 +42,12 @@ export async function GET(req?: NextRequest): Promise<Response> {
     .eq("organization_id", activeOrg.orgId);
   const { data, error } = await (querRoteiros
     ? base.eq("surface", "atendimento")
-    : // Cadência tem tela própria, no funil. Listada aqui, ela abria no editor
-      // genérico, que não conhece número, política nem saídas — e o PATCH de lá
-      // grava o grafo sem as validações dela.
-      base.neq("surface", "atendimento").neq("surface", "cadence")
+    : // Cadência tem tela própria, no funil, e a régua de campanha é da tela da
+      // campanha. Listadas aqui, abriam no editor genérico, que não conhece
+      // número, política nem saídas — e o PATCH de lá grava o grafo sem as
+      // validações delas. A régua de campanha nem nome de fluxo tem: o nome é
+      // «Campanha · …», e ela nasce e morre com a campanha.
+      base.not("surface", "in", `(atendimento,${SUPERFICIES_DE_PROSPECCAO.join(",")})`)
   ).order("updated_at", { ascending: false });
   if (error) return fail("internal_error", error.message, 500, { requestId });
   return ok(data ?? [], { requestId });
@@ -73,6 +76,20 @@ export async function POST(req: NextRequest): Promise<Response> {
       requestId,
       details: parsed.error.flatten(),
     });
+  }
+
+  // Régua de prospecção não nasce por esta porta: a cadência nasce em
+  // `/api/v1/cadencias` (com funil, número e política) e a da campanha é criada
+  // pelo servidor ao preparar a campanha. O banco já recusaria
+  // (`trg_cadencia_guarda_ponteiro`, 42501, porque o insert é pela sessão); aqui
+  // a recusa vira frase em vez de erro interno.
+  if (ehProspeccao(parsed.data.surface)) {
+    return fail(
+      "validation_failed",
+      t("Cadência se cria na tela do funil, e a régua de uma campanha, na tela da campanha."),
+      422,
+      { requestId },
+    );
   }
 
   // Roteiro de atendimento é módulo opcional da instalação (doc 64): desligado,

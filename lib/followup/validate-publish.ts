@@ -155,6 +155,14 @@ export const NOS_DA_SUPERFICIE: Record<FollowupFlowSurface, readonly NodeType[]>
   // (`lib/cadencia/validar-publicacao.ts`) cobra o resto. `internal_task` fica
   // de fora até a cadência saber o que fazer com ele.
   cadence: ['trigger', 'wait', 'condition', 'ai_classify', 'match_reply', 'repeat', 'action', 'end'],
+  // A régua de uma CAMPANHA (9035) é publicada pelo servidor a partir de
+  // `campaigns.passos`, e a lista do operador só produz quatro coisas: espera,
+  // envio de texto, mover de etapa e etiquetar (as três últimas são `action`).
+  // A paleta é menor que a da cadência de propósito: oferecer `ai_classify` ou
+  // `match_reply` aqui prometeria ramificação que a lista não sabe representar
+  // — `timelineDoGrafo` devolve `null` para grafo com ramo, e a tela da campanha
+  // não tem editor avançado para onde mandar o operador.
+  campaign: ['trigger', 'wait', 'action', 'end'],
 };
 
 /**

@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
+import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ import {
   type AcaoDeCampanha,
   type CampanhaDetalhada,
 } from "@/hooks/campanhas/useCampanhas";
-import { useAgentesPublicados, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
+import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useContactList } from "@/hooks/contacts/useContactList";
 import { useT } from "@/hooks/i18n/useT";
@@ -210,6 +211,8 @@ export function DetalheDaCampanha({ id }: { id: string }) {
 
       <DestinoDaCampanha campanha={c} />
 
+      <ReguaDaCampanha campanha={c} />
+
       <NumerosDaCampanha campanha={c} />
 
       <RitmoDaCampanha campanha={c} />
@@ -376,6 +379,35 @@ function DestinoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           {t("Quem atende a resposta")}: <strong>{agente?.name ?? t("agente indisponível")}</strong>
         </p>
       )}
+    </Card>
+  );
+}
+
+/**
+ * A RÉGUA: o que acontece depois da primeira mensagem (migration 9035).
+ *
+ * Só aparece quando a campanha tem passos. Em branco, ela manda uma mensagem e
+ * acaba — que é o comportamento de toda campanha até esta fatia —, e um card
+ * dizendo "sem passos" seria ruído numa tela que já tem muita informação.
+ *
+ * Leitura só: editar é na tela de edição, com a campanha em rascunho. Mas a
+ * pergunta "por que esta pessoa recebeu três mensagens?" se faz com a campanha
+ * ANDANDO, quando a edição está fechada — então a régua que está no ar precisa
+ * estar visível aqui.
+ */
+function ReguaDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
+  const t = useT();
+  const etapas = useEtapas(campanha.pipeline_id ?? null);
+  const passos = campanha.passos ?? [];
+  if (passos.length === 0) return null;
+
+  return (
+    <Card className="space-y-2 p-4">
+      <h2 className="font-medium">{t("Depois da primeira mensagem")}</h2>
+      <ResumoDosPassos passos={passos} etapas={etapas.data ?? []} />
+      <p className="text-xs text-muted-foreground">
+        {t("Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.")}
+      </p>
     </Card>
   );
 }

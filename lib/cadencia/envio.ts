@@ -5,21 +5,36 @@ import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
 import { OUTCOME_DA_SAIDA, type FatosDaSaida, type MotivoDeSaida } from "./saidas";
 
 /**
- * O QUE O WORKER PRECISA SABER ANTES DE MANDAR UM PASSO DA CADÊNCIA.
+ * O QUE O WORKER PRECISA SABER ANTES DE MANDAR UM PASSO DA RÉGUA.
  *
  * Tudo relido NA HORA do envio, do banco, com a organização do JOB (fonte
  * confiável) — nunca do payload. Pausar a cadência, pausar todas as cadências
  * da organização (kill switch) ou o contato pedir para sair valem para o
  * próximo envio, não para a próxima inscrição.
+ *
+ * Serve as DUAS superfícies de prospecção: a cadência do funil (`cadence`) e os
+ * passos da campanha (`campaign`, migration 9035). O kill switch
+ * `cadencias_pausadas` vale para as duas de propósito: ele é o freio de
+ * emergência da prospecção automática da organização, e uma campanha com régua
+ * é exatamente isso.
  */
 export interface CadenciaDoEnvio {
   pointerId: string;
-  /** O número da cadência. A conversa do job TEM de ser neste número. */
+  /** O número principal da régua. */
   channelSessionId: string;
+  /**
+   * Os números por onde esta régua pode falar. Na cadência é um só; na campanha
+   * é o POOL do rodízio (migration 0377), porque a 1ª mensagem pode ter saído
+   * por um número secundário e a conversa do inscrito nasceu nele. Sem isto, o
+   * passo 2 de quem foi atendido pelo número secundário seria pulado para
+   * sempre com "a conversa deste contato é de outro número" — uma campanha com
+   * rodízio e passos entregaria a régua só a uma fração da lista.
+   */
+  numerosPermitidos: string[];
   settings: CadenceSettings;
   /** `channel_sessions.daily_message_limit` — o teto que passa a valer na cadeia. */
   limiteDiario: number;
-  /** Cadência publicada (`active`)? Rascunho/desligada não envia. */
+  /** Régua publicada (`active`)? Rascunho/desligada não envia. */
   ativa: boolean;
   /** Kill switch da organização: `organizations.settings.cadencias_pausadas`. */
   pausadaNaOrg: boolean;
@@ -37,15 +52,23 @@ export async function carregarCadenciaDoEnvio(
     cadence_settings: unknown;
     daily_message_limit: number | null;
     pausada: boolean | null;
+    numeros_da_campanha: string[] | null;
   }>(
     `select p.id, p.status, p.channel_session_id, p.cadence_settings,
             cs.daily_message_limit,
-            coalesce((o.settings ->> 'cadencias_pausadas')::boolean, false) as pausada
+            coalesce((o.settings ->> 'cadencias_pausadas')::boolean, false) as pausada,
+            case when p.surface = 'campaign' then (
+              select array_agg(ccs.channel_session_id)
+                from campaigns ca
+                join campaign_channel_sessions ccs
+                  on ccs.campaign_id = ca.id and ccs.organization_id = ca.organization_id
+               where ca.organization_id = p.organization_id and ca.followup_pointer_id = p.id
+            ) end as numeros_da_campanha
        from followup_flow_pointers p
        join organizations o on o.id = p.organization_id
        left join channel_sessions cs
          on cs.id = p.channel_session_id and cs.organization_id = p.organization_id
-      where p.organization_id = $1 and p.id = $2 and p.surface = 'cadence'
+      where p.organization_id = $1 and p.id = $2 and p.surface in ('cadence', 'campaign')
       limit 1`,
     [organizationId, pointerId],
   );
@@ -56,6 +79,7 @@ export async function carregarCadenciaDoEnvio(
   return {
     pointerId: row.id,
     channelSessionId: row.channel_session_id,
+    numerosPermitidos: [...new Set([row.channel_session_id, ...(row.numeros_da_campanha ?? [])])],
     settings: settings.data,
     limiteDiario: row.daily_message_limit ?? 0,
     ativa: row.status === "active",

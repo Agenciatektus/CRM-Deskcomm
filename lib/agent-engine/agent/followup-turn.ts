@@ -580,9 +580,11 @@ async function prepararEnvioDaCadencia(
   if (cadencia.pausadaNaOrg) {
     return adiar(new Date(agora.getTime() + PAUSA_DA_ORG_MS), 'cadencias_pausadas');
   }
-  if (target.channelSessionId !== cadencia.channelSessionId) {
+  if (!cadencia.numerosPermitidos.includes(target.channelSessionId)) {
     // A conversa da inscrição é de outro número (o operador trocou o número da
     // cadência depois). Mandar por aqui seria falar com o lead pelo chip errado.
+    // Na campanha, `numerosPermitidos` é o POOL do rodízio: a 1ª mensagem pode
+    // ter saído por um secundário, e a conversa do inscrito nasceu nele.
     return pular('numero_divergente', 'A conversa deste contato é de outro número.');
   }
 

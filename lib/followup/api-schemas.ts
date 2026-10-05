@@ -11,10 +11,24 @@ import { MAX_THRESHOLD_MINUTES, MIN_THRESHOLD_MINUTES } from "./gap-de-retorno";
 /**
  * Vocabulário da coluna `surface` (0167; `atendimento` na 0394 — roteiro de
  * perguntas conduzido no turno, módulo opcional `fluxos_atendimento`; `cadence`
- * na 9016, do fork — a cadência de prospecção do funil). O CHECK do banco
+ * na 9016, do fork — a cadência de prospecção do funil; `campaign` na 9035, do
+ * fork — os passos de uma campanha, do 2º toque em diante). O CHECK do banco
  * espelha esta tupla (forward-fix 9023 refaz a união depois da 0394).
+ *
+ * ⚠️ `cadence` e `campaign` NÃO se criam nem se editam por esta API: as duas
+ * têm porta própria (`/api/v1/cadencias` e a tela da campanha). Elas estão na
+ * tupla porque o CHECK do banco a espelha, e o invariante
+ * `vocabulario-banco-x-typescript` reprova divergência — não porque o editor
+ * genérico as aceite. Quem decide "isto é régua de prospecção?" é
+ * `lib/followup/superficies.ts`.
  */
-export const FOLLOWUP_FLOW_SURFACES = ["followup", "crm_automation", "atendimento", "cadence"] as const;
+export const FOLLOWUP_FLOW_SURFACES = [
+  "followup",
+  "crm_automation",
+  "atendimento",
+  "cadence",
+  "campaign",
+] as const;
 export type FollowupFlowSurface = (typeof FOLLOWUP_FLOW_SURFACES)[number];
 
 export const createFollowupFlowSchema = z.strictObject({
