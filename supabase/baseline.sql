@@ -47459,6 +47459,52 @@ end $$;
 
 notify pgrst, 'reload schema';
 
+-- ---- a campanha ganha VARIAÇÕES de mensagem, com spintax {a|b} (migration 9034) ----
+--
+-- `campaigns.message_variants` (text[], default '{}'): as variações EXTRAS da
+-- abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é
+-- determinística pelo contact_id (lib/texto/variacao.ts, o mesmo motor da
+-- cadência), então campanha existente — lista de um item — não muda de
+-- comportamento. Teto por elemento e cardinalidade numa função `immutable`,
+-- porque `check` não aceita subconsulta (mesmo molde da 0329). Ver o cabeçalho
+-- da migration. Idempotente: função com `create or replace`, coluna com
+-- `if not exists`, CHECK com guarda em pg_constraint (nunca `drop`+`add`, que
+-- deixaria a tabela sem a constraint se o update morresse no meio).
+create or replace function public.fn_variacoes_da_campanha_validas(p_variacoes text[])
+returns boolean
+language sql
+immutable
+as $$
+  select p_variacoes is not null
+     and coalesce(cardinality(p_variacoes), 0) <= 5
+     and coalesce((
+       select bool_and(t.v is not null and length(t.v) <= 1000)
+       from unnest(p_variacoes) as t(v)
+     ), true);
+$$;
+
+revoke execute on function public.fn_variacoes_da_campanha_validas(text[]) from public, anon;
+grant execute on function public.fn_variacoes_da_campanha_validas(text[]) to authenticated, service_role;
+
+alter table public.campaigns
+  add column if not exists message_variants text[] not null default '{}'::text[];
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_variacoes_validas'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_variacoes_validas
+      check (public.fn_variacoes_da_campanha_validas(message_variants));
+  end if;
+end $$;
+
+comment on column public.campaigns.message_variants is
+  'Variações EXTRAS da abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é determinística pelo contact_id (lib/texto/variacao.ts). Vazio = campanha de um texto só. Até 5, 1.000 chars cada (campaigns_variacoes_validas). Migration 9034.';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -49191,53 +49237,6 @@ begin
     end if;
   end loop;
 end $$;
-
--- ---- a campanha ganha VARIAÇÕES de mensagem, com spintax {a|b} (migration 9034) ----
---
--- `campaigns.message_variants` (text[], default '{}'): as variações EXTRAS da
--- abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é
--- determinística pelo contact_id (lib/texto/variacao.ts, o mesmo motor da
--- cadência), então campanha existente — lista de um item — não muda de
--- comportamento. Teto por elemento e cardinalidade numa função `immutable`,
--- porque `check` não aceita subconsulta (mesmo molde da 0329). Ver o cabeçalho
--- da migration. Idempotente: função com `create or replace`, coluna com
--- `if not exists`, CHECK com guarda em pg_constraint (nunca `drop`+`add`, que
--- deixaria a tabela sem a constraint se o update morresse no meio).
-create or replace function public.fn_variacoes_da_campanha_validas(p_variacoes text[])
-returns boolean
-language sql
-immutable
-as $$
-  select p_variacoes is not null
-     and coalesce(cardinality(p_variacoes), 0) <= 5
-     and coalesce((
-       select bool_and(t.v is not null and length(t.v) <= 1000)
-       from unnest(p_variacoes) as t(v)
-     ), true);
-$$;
-
-revoke execute on function public.fn_variacoes_da_campanha_validas(text[]) from public, anon;
-grant execute on function public.fn_variacoes_da_campanha_validas(text[]) to authenticated, service_role;
-
-alter table public.campaigns
-  add column if not exists message_variants text[] not null default '{}'::text[];
-
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conname = 'campaigns_variacoes_validas'
-       and conrelid = 'public.campaigns'::regclass
-  ) then
-    alter table public.campaigns
-      add constraint campaigns_variacoes_validas
-      check (public.fn_variacoes_da_campanha_validas(message_variants));
-  end if;
-end $$;
-
-comment on column public.campaigns.message_variants is
-  'Variações EXTRAS da abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é determinística pelo contact_id (lib/texto/variacao.ts). Vazio = campanha de um texto só. Até 5, 1.000 chars cada (campaigns_variacoes_validas). Migration 9034.';
-
 
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
