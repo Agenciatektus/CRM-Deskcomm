@@ -60,6 +60,16 @@
 -- organização; a `fn_definir_cliente_pela_agenda` toma 262 exclusiva → linhas.
 -- Não há ciclo.
 --
+-- ─── (5) EXCLUIR UMA ETIQUETA APAGAVA O VOCABULÁRIO INTEIRO ─────────────────
+--
+-- Defeito da 0336, achado pelo invariante desta migration: no ramo de excluir,
+-- o `case` de `settings.tags` e da lista de sugestão começava por
+-- `when v_remover then null`, sem casar o nome. Toda entrada virava nula e era
+-- descartada: excluir `teste` levava junto TODAS as cores escolhidas e TODAS as
+-- sugestões de conversa da organização, com a tela dizendo "Etiqueta removida".
+-- Agora só a entrada da etiqueta excluída sai. Estendido às quatro listas sem
+-- este conserto, o defeito apagaria também as sugestões de contato.
+--
 -- ─── (4) TRÊS FUNÇÕES DA 9005 PERDEM O CHAMADOR, E SAEM DA SESSÃO ───────────
 --
 -- `fn_tags_renomear`, `fn_tags_mesclar` e `fn_tags_apagar` eram chamadas pelas
@@ -425,6 +435,11 @@ begin
   end if;
 
   -- (e) o vocabulário da organização, nos lugares onde ele mora.
+  --
+  -- 9038 (5): no EXCLUIR, só a entrada da etiqueta excluída vira nula. A 0336
+  -- escrevia `when v_remover then null` sem casar o nome, e excluir UMA etiqueta
+  -- esvaziava `settings.tags` inteiro (todas as cores) e todas as sugestões de
+  -- conversa da organização. Medido no invariante desta migration.
   -- Mesma guarda do ramo de renomear: `settings.tags` malformado não pode
   -- derrubar a cor (a leitura tolera; a escrita agora também).
   v_antes := case
@@ -444,13 +459,13 @@ begin
         select distinct on (lower(x.chave)) x.valor, x.ord
         from (
           select case
-                   when v_remover then null
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
                    when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
                      then v_destino
                    else btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))
                  end as chave,
                  case
-                   when v_remover then null
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
                    when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
                      then jsonb_set(
                             case when jsonb_typeof(e.valor) = 'string' then jsonb_build_object('tag', e.valor #>> '{}')
@@ -498,7 +513,7 @@ begin
           select distinct on (lower(y.valor)) y.valor, y.ord
           from (
             select case
-                     when v_remover then null
+                     when v_remover and lower(btrim(s.valor #>> '{}')) = lower(v_tag) then null
                      when lower(btrim(s.valor #>> '{}')) = lower(v_tag) then v_destino
                      else btrim(s.valor #>> '{}')
                    end as valor,

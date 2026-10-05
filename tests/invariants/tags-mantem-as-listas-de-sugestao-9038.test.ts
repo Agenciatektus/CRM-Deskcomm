@@ -101,7 +101,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await pool.query("update contacts set tags='{}' where id=$1", [contato]);
+  await pool.query("update contacts set tags='{}', client_tag_by_system=null where id=$1", [contato]);
 });
 
 afterAll(() => pool.end());
@@ -146,8 +146,11 @@ describe("9038 — as quatro listas de sugestão", () => {
     expect(await tagsDoContato()).toEqual(["premium"]);
   });
 
-  it("excluir tira a etiqueta das quatro listas", async () => {
+  it("excluir tira SÓ a etiqueta excluída das quatro listas e do vocabulário curado", async () => {
+    // O defeito (5) da 0336: `when v_remover then null` sem casar o nome
+    // esvaziava `settings.tags` (todas as cores) e as sugestões de conversa.
     await definirSettings({
+      tags: [{ tag: "teste", cor: "#e54d2e" }, { tag: "reclamação", cor: "#ffb224" }],
       canonical_conversation_tags: ["teste", "duvida"],
       archived_conversation_tags: ["teste"],
       canonical_contact_tags: ["teste"],
@@ -161,6 +164,8 @@ describe("9038 — as quatro listas de sugestão", () => {
     expect(s.archived_conversation_tags).toEqual([]);
     expect(s.canonical_contact_tags).toEqual([]);
     expect(s.archived_contact_tags).toEqual([]);
+    // A cor de OUTRA etiqueta sobrevive.
+    expect(s.tags).toEqual([{ tag: "reclamação", cor: "#ffb224" }]);
   });
 
   it("lista que a organização nunca teve continua sem existir", async () => {
@@ -208,13 +213,22 @@ describe("9038 — a etiqueta cliente reservada", () => {
     // Controle do defeito do nulo: no excluir não há destino, e `'cliente' = any`
     // de uma lista com nulo é NULO. Sem o `array_remove`, a reserva recusaria
     // a exclusão de qualquer etiqueta nesta organização.
+    //
+    // A `cliente` do contato é a que o SISTEMA pôs (`client_tag_by_system =
+    // 'added'`), o estado real com a regra ligada — o mesmo da medição da 9005.
+    // Sem o dono gravado, o gatilho da 0262 recalcula a etiqueta por conta
+    // própria e o teste mediria o gatilho, não esta função.
     await definirSettings({ crm: { cliente_pela_agenda: true }, canonical_contact_tags: ["vip"] });
-    await pool.query("update contacts set tags=array['cliente','vip'] where id=$1", [contato]);
+    await pool.query(
+      "update contacts set tags=array['cliente','vip'], client_tag_by_system='added' where id=$1",
+      [contato],
+    );
 
     const r = await operar("excluir", "vip", null);
 
     expect((r.rows[0].r as { contatos: number }).contatos).toBe(1);
     expect(await tagsDoContato()).toEqual(["cliente"]);
+    expect((await settings()).canonical_contact_tags).toEqual([]);
   });
 
   it("com a regra LIGADA, definir a cor de cliente é permitido (cor não mexe na presença)", async () => {
