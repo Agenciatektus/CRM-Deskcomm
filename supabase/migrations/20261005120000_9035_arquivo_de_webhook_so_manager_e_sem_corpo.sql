@@ -63,4 +63,11 @@ grant select (
   archived_at
 ) on table public.webhook_events_log to authenticated;
 
+-- Sem INSERT/UPDATE/DELETE para `authenticated`, a tabela vira "só do servidor"
+-- no contrato das travas do suporte (0274): ZERO policies `support_write_*`. A
+-- tabela deixou de ser gravável pela sessão, então as travas saem.
+drop policy if exists support_write_insert on public.webhook_events_log;
+drop policy if exists support_write_update on public.webhook_events_log;
+drop policy if exists support_write_delete on public.webhook_events_log;
+
 notify pgrst, 'reload schema';

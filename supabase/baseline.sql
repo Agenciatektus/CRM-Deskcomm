@@ -49228,6 +49228,15 @@ grant select (
   status, attempts, error_message, processed_at, received_at, archived_at
 ) on table public.webhook_events_log to authenticated;
 
+-- Sem INSERT/UPDATE/DELETE para `authenticated`, a tabela vira "só do servidor"
+-- no contrato das travas do suporte (0274): ZERO policies `support_write_*`. A
+-- última chamada de `fn_aplicar_travas_de_suporte()` fica ACIMA deste apêndice,
+-- então as travas que ela pôs aqui saem aqui mesmo (uma e duas aplicações do
+-- baseline chegam ao mesmo conjunto).
+drop policy if exists support_write_insert on public.webhook_events_log;
+drop policy if exists support_write_update on public.webhook_events_log;
+drop policy if exists support_write_delete on public.webhook_events_log;
+
 notify pgrst, 'reload schema';
 
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
