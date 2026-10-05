@@ -26553,7 +26553,9 @@ as $$
     select distinct on (lower(s.tag)) s.tag, s.ord
     from (
       select case
-               when p_remover then null
+               -- 9038 (6): só a etiqueta excluída vira nula. Sem casar o nome, o
+               -- excluir apagava TODAS as etiquetas do registro (ver a 9038).
+               when p_remover and lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then null
                when lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then btrim(p_para)
                else btrim(e.valor)
              end as tag,

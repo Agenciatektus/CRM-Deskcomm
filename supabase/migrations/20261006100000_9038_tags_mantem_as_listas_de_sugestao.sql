@@ -70,6 +70,18 @@
 -- Agora só a entrada da etiqueta excluída sai. Estendido às quatro listas sem
 -- este conserto, o defeito apagaria também as sugestões de contato.
 --
+-- ─── (6) ⛔ EXCLUIR UMA ETIQUETA APAGAVA TODAS AS ETIQUETAS DO REGISTRO ─────
+--
+-- O mesmo defeito do (5), mais grave e em `fn_tags_normalizar` (0264), que
+-- reescreve `tags` de contatos, leads e conversas: o `case` começava por
+-- `when p_remover then null` sem casar o nome. Excluir `vip` de um contato com
+-- {cliente, vip, inadimplente} deixava o contato SEM ETIQUETA NENHUMA, em todo
+-- registro que tivesse `vip`, e a tela contava esses registros como "etiqueta
+-- removida de N registros". O teste do upstream (`tags-vocabulario`) só olhava
+-- a regra `add_tag`. Achado pelo invariante desta migration (a `cliente` sumia
+-- ao excluir `vip`). Não há como recuperar o que exclusões passadas apagaram:
+-- `tags` não tem histórico.
+--
 -- ─── (4) TRÊS FUNÇÕES DA 9005 PERDEM O CHAMADOR, E SAEM DA SESSÃO ───────────
 --
 -- `fn_tags_renomear`, `fn_tags_mesclar` e `fn_tags_apagar` eram chamadas pelas
@@ -88,6 +100,53 @@
 -- `tests/invariants/hardening-definer-varredura.test.ts`.
 --
 -- Prova: `tests/invariants/tags-mantem-as-listas-de-sugestao-9038.test.ts`.
+
+-- 9038 (6): `fn_tags_normalizar` reemitida a partir da 0264, só com o conserto
+-- do excluir. ACL igual à da 0264.
+create or replace function public.fn_tags_normalizar(
+  p_tags text[],
+  p_de text,
+  p_para text,
+  p_remover boolean
+)
+returns text[]
+language sql
+immutable
+security invoker
+set search_path = public
+as $$
+  -- `distinct on` pela chave canônica DO RESULTADO, e não da entrada.
+  --
+  -- ⚠️ Deduplicar pela entrada parece a mesma coisa e não é: no `juntar`, os dois
+  -- nomes têm chaves DIFERENTES por definição (é o que os torna duas etiquetas),
+  -- e depois da substituição viram o MESMO nome. Medido num Postgres real:
+  -- `{VIP, obra}` juntando `obra` em `VIP` devolvia `{VIP, VIP}` — a etiqueta
+  -- duplicada no array, e `fn_vocabulario_de_tags` conta OCORRÊNCIAS, então o
+  -- registro passava a pesar 2 na própria tela que deveria arrumá-lo. O caso
+  -- `{vip, VIP}` do teste passava por acidente: ali as duas chaves já eram
+  -- iguais ANTES da substituição.
+  select coalesce(array_agg(n.tag order by n.ord), '{}'::text[])
+  from (
+    select distinct on (lower(s.tag)) s.tag, s.ord
+    from (
+      select case
+               -- 9038 (6): só a etiqueta excluída vira nula. Sem casar o nome, o
+               -- excluir apagava TODAS as etiquetas do registro (ver a 9038).
+               when p_remover and lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then null
+               when lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then btrim(p_para)
+               else btrim(e.valor)
+             end as tag,
+             e.ord
+      from unnest(coalesce(p_tags, '{}'::text[])) with ordinality as e(valor, ord)
+      where btrim(coalesce(e.valor, '')) <> ''
+    ) s
+    where s.tag is not null and s.tag <> ''
+    order by lower(s.tag), s.ord
+  ) as n;
+$$;
+
+revoke execute on function public.fn_tags_normalizar(text[], text, text, boolean) from public, anon;
+grant  execute on function public.fn_tags_normalizar(text[], text, text, boolean) to authenticated, service_role;
 
 create or replace function public.fn_vocabulario_de_tags_operar(
   p_org uuid,
