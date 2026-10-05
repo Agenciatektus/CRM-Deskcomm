@@ -31,7 +31,11 @@ import { describe, expect, it } from "vitest";
  * tinha, e pela qual o cabeçalho dele já pagou.
  */
 
-const FONTE = readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8");
+// O ciclo de vida do canal mora em `canaisCompartilhados.ts` desde que os hooks
+// passaram a compartilhar um canal por tópico; o hook só assina e entrega.
+const FONTE =
+  readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8") +
+  readFileSync("hooks/realtime/canaisCompartilhados.ts", "utf8");
 
 describe("o canal volta sozinho", () => {
   it("uma falha AGENDA nova tentativa — antes só anotava o estado", () => {

@@ -28,6 +28,8 @@ function sides(payload: unknown): {
   };
 }
 
+const SO_INSERT = { eventos: ["INSERT"] } as const;
+
 export function useCrmAlerts(): void {
   const orgId = useActiveOrg()?.orgId ?? null;
   const user = useUser();
@@ -121,11 +123,15 @@ export function useCrmAlerts(): void {
     enabled: !!orgId,
   });
 
+  // `*` e não INSERT: é o tópico que as notas da conversa aberta também usam
+  // (`useConversationNotes`), e assim os dois dividem UM canal. O aviso de
+  // menção continua só no INSERT, pelo `filtroLocal`.
   useRealtimeChannel({
     name: orgId ? `alerts-notes-${orgId}` : "alerts-notes-disabled",
+    filtroLocal: SO_INSERT,
     postgresChanges: orgId
       ? {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "conversation_notes",
           filter: `organization_id=eq.${orgId}`,

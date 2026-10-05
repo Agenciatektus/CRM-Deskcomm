@@ -316,6 +316,9 @@ export async function recebimentosDaEntrada(
   const { data, error } = await deps.supabase
     .from("webhook_events_log")
     .select("id, received_at, valid_signature, payload_parsed, status")
+    // Service role não passa por RLS: o token da fonte sozinho não é cerca de
+    // tenant. A organização vai explícita, como em toda leitura deste módulo.
+    .eq("organization_id", deps.organizationId)
     .eq("webhook_path_token", fonte.path_token)
     .order("received_at", { ascending: false })
     .limit(input.limite);
@@ -330,7 +333,7 @@ export async function recebimentosDaEntrada(
   }));
 }
 
-function chavesDo(payload: unknown): string[] {
+export function chavesDo(payload: unknown): string[] {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
   return Object.keys(payload as Record<string, unknown>);
 }

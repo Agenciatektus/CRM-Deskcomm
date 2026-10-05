@@ -47,6 +47,8 @@ async function callerName(contactId: string | null, fromNumber: string): Promise
  * no servidor (o supabase-js realtime não compõe bem dois filtros de
  * igualdade na mesma assinatura), então o filtro de provider é no cliente.
  */
+const SO_INSERT = { eventos: ["INSERT"] } as const;
+
 export function useInboundCallAlerts(): void {
   const orgId = useActiveOrg()?.orgId ?? null;
   const podeVer = usePermission("calls.view");
@@ -75,11 +77,15 @@ export function useInboundCallAlerts(): void {
     })();
   }, []);
 
+  // Mesmo tópico do painel de chamada (`useVoiceCallSession`: `*` em
+  // `voice_calls` da organização): declarar `*` aqui faz os dois usarem UM canal
+  // só, e o recorte para INSERT fica no `filtroLocal`. Ver canaisCompartilhados.
   useRealtimeChannel({
     name: orgId ? `alerts-calls-${orgId}` : "alerts-calls-disabled",
+    filtroLocal: SO_INSERT,
     postgresChanges: orgId
       ? {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "voice_calls",
           filter: `organization_id=eq.${orgId}`,

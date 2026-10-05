@@ -49238,6 +49238,63 @@ begin
   end loop;
 end $$;
 
+-- ---- o arquivo de webhook é lido só por manager+, e sem o corpo (migrations 9035 e 9036) ----
+--
+-- A policy original (lá em cima) era org-flat sem papel, e `authenticated`
+-- tinha SELECT na tabela inteira: um `viewer` lia `raw_body`, `headers` e
+-- `payload_parsed` de toda entrega da organização pelo PostgREST. Aqui: leitura
+-- só por manager+ (ou platform admin), nenhum privilégio de tabela para anon e
+-- authenticated (TRUNCATE incluído), e SELECT por coluna só do metadado. O
+-- conteúdo fica para o service role. Ver o cabeçalho da 9035.
+-- 9036: o gate de papel é predicado de CONJUNTO (padrão da 9027) —
+-- `organization_id in (fn_escopo_orgs() com papel manager/admin)` —, e não
+-- `fn_role_at_least(organization_id, 'manager')` por linha, que levava a
+-- contagem como manager a mais de 2 min em produção. Mesma semântica; ver o
+-- cabeçalho da 9036. A forma por linha da 9035 não é instalada aqui nem como
+-- passo intermediário: o banco que ainda a tem cai no `if` e troca direto.
+-- Idempotente: a policy só é recriada se ainda não estiver na forma de
+-- conjunto (sem lock da tabela na reaplicação); drop/create no mesmo `do` (em
+-- lock timeout a anterior fica de pé); revoke/grant reaplicam o mesmo estado,
+-- e o GRANT de tabela lá de cima é desfeito aqui, abaixo dele.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policy
+     where polname = 'webhook_events_log_tenant_read'
+       and polrelid = 'public.webhook_events_log'::regclass
+       and pg_get_expr(polqual, polrelid) like '%fn_escopo_orgs%manager%'
+       and pg_get_expr(polqual, polrelid) not like '%fn_role_at_least%'
+  ) then
+    drop policy if exists "webhook_events_log_tenant_read" on public.webhook_events_log;
+    create policy "webhook_events_log_tenant_read" on public.webhook_events_log
+      for select
+      using (
+        (select public.fn_is_platform_admin())
+        or organization_id in (
+          select e.organization_id from public.fn_escopo_orgs() e
+           where e.papel in ('manager', 'admin'))
+      );
+  end if;
+end $$;
+
+revoke all on table public.webhook_events_log from anon, authenticated;
+grant select (
+  id, organization_id, channel_session_id, provider, webhook_path_token,
+  http_method, signature_header, valid_signature, event_type, external_id,
+  status, attempts, error_message, processed_at, received_at, archived_at
+) on table public.webhook_events_log to authenticated;
+
+-- Sem INSERT/UPDATE/DELETE para `authenticated`, a tabela vira "só do servidor"
+-- no contrato das travas do suporte (0274): ZERO policies `support_write_*`. A
+-- última chamada de `fn_aplicar_travas_de_suporte()` fica ACIMA deste apêndice,
+-- então as travas que ela pôs aqui saem aqui mesmo (uma e duas aplicações do
+-- baseline chegam ao mesmo conjunto).
+drop policy if exists support_write_insert on public.webhook_events_log;
+drop policy if exists support_write_update on public.webhook_events_log;
+drop policy if exists support_write_delete on public.webhook_events_log;
+
+notify pgrst, 'reload schema';
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia

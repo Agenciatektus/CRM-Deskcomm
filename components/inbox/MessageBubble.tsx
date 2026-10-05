@@ -49,6 +49,11 @@ interface Props {
   onApagar?: () => Promise<void>;
   onOcultar?: () => Promise<void>;
   onRestaurar?: () => Promise<void>;
+  /**
+   * Onde guardar o rascunho da edição fora da bolha (o fio virtualizado
+   * desmonta a bolha que sai da tela). Sem ele, o rascunho vive só no estado.
+   */
+  rascunho?: { ler: () => string | null; gravar: (texto: string | null) => void };
 }
 
 function AckIndicator({ status, t }: { status: string; t: (texto: string) => string }) {
@@ -75,9 +80,15 @@ export function MessageBubble({
   onApagar,
   onOcultar,
   onRestaurar,
+  rascunho,
 }: Props) {
-  const [editando, setEditando] = useState(false);
-  const [texto, setTexto] = useState(message.body ?? "");
+  // Bolha que volta à tela com edição em curso reabre o editor com o rascunho.
+  const [rascunhoInicial] = useState(() => rascunho?.ler() ?? null);
+  const [editando, setEditando] = useState(rascunhoInicial !== null);
+  const [texto, setTexto] = useState(rascunhoInicial ?? message.body ?? "");
+  // Remontar com o editor aberto NÃO rola até ele: a pessoa está rolando o fio,
+  // e puxá-la de volta para a bolha seria o contrário do que ela pediu.
+  const restaurouEdicao = useRef(rascunhoInicial !== null);
   const [apagando, setApagando] = useState(false);
   const [ocultando, setOcultando] = useState(false);
   const [ocupado, setOcupado] = useState(false);
@@ -91,6 +102,10 @@ export function MessageBubble({
   }, []);
   useEffect(() => {
     if (!editando) return;
+    if (restaurouEdicao.current) {
+      restaurouEdicao.current = false;
+      return;
+    }
     // O editor aumenta a altura da última bolha; sem rolar o fio, os botões
     // ficam escondidos atrás da área de resposta até a pessoa usar o mouse.
     editorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "nearest" });
@@ -198,7 +213,7 @@ export function MessageBubble({
     // impede duas chamadas ao WhatsApp para a mesma edição.
     salvandoEdicao.current = true;
     setOcupado(true);
-    try { await onEditar(novoTexto); setEditando(false); }
+    try { await onEditar(novoTexto); setEditando(false); rascunho?.gravar(null); }
     catch { /* O hook mostra o erro; manter o texto para nova tentativa. */ }
     finally { salvandoEdicao.current = false; setOcupado(false); }
   }
@@ -267,6 +282,7 @@ export function MessageBubble({
                   abrindoEdicao.current = true;
                   setTexto(message.body ?? "");
                   setEditando(true);
+                  rascunho?.gravar(message.body ?? "");
                 }}>
                   <PencilSimple size={16} aria-hidden />{t("Editar mensagem")}
                 </DropdownMenuItem>
@@ -347,7 +363,10 @@ export function MessageBubble({
             <textarea
               aria-label={t("Editar mensagem")}
               value={texto}
-              onChange={(event) => setTexto(event.target.value)}
+              onChange={(event) => {
+                setTexto(event.target.value);
+                rascunho?.gravar(event.target.value);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
@@ -358,7 +377,10 @@ export function MessageBubble({
               className="min-h-20 w-full rounded-md border border-border bg-background p-2 text-foreground"
             />
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" disabled={ocupado} onClick={() => setEditando(false)}>{t("Cancelar")}</Button>
+              <Button size="sm" variant="ghost" disabled={ocupado} onClick={() => {
+                setEditando(false);
+                rascunho?.gravar(null);
+              }}>{t("Cancelar")}</Button>
               <Button size="sm" disabled={ocupado || !texto.trim()} onClick={() => void salvarEdicao()}>{t("Salvar")}</Button>
             </div>
           </div>

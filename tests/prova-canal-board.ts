@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     // dizer "todas limpas" enquanto a RÉGUA muda debaixo do resultado.
     "tests/prova-canal-board.ts",
     "hooks/realtime/useRealtimeChannel.ts",
+    "hooks/realtime/canaisCompartilhados.ts",
     "hooks/kanban/useBoard.ts",
     "app/api/v1/auth/realtime-token/route.ts",
   ]);

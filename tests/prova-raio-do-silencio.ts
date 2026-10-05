@@ -186,6 +186,7 @@ async function main(): Promise<void> {
   carimbar([
     "tests/prova-raio-do-silencio.ts",
     "hooks/realtime/useRealtimeChannel.ts",
+    "hooks/realtime/canaisCompartilhados.ts",
     "hooks/kanban/useBoard.ts",
     "hooks/leads/useLeadTimeline.ts",
     "hooks/inbox/useConversationsRealtime.ts",

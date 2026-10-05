@@ -19,6 +19,9 @@ patchedDependencies:
   '@react-pdf/hyphenate':
     hash: 7zbg3hcwdkwwiwo2qqqwdmolwi
     path: patches/@react-pdf__hyphenate.patch
+  zod@4.6.5:
+    hash: 3uhntwfwxktxrfgc4nntonsrcy
+    path: patches/zod@4.6.5.patch
 
 importers:
 
@@ -26,13 +29,13 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^4.0.16
-        version: 4.0.16(zod@4.6.5)
+        version: 4.0.16(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@ai-sdk/google':
         specifier: ^4.0.18
-        version: 4.0.18(zod@4.6.5)
+        version: 4.0.18(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@ai-sdk/openai':
         specifier: ^4.0.73
-        version: 4.0.78(zod@4.6.5)
+        version: 4.0.78(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@emoji-mart/data':
         specifier: ^1.2.1
         version: 1.2.1
@@ -44,10 +47,10 @@ importers:
         version: 18.0.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@hookform/resolvers':
         specifier: ^5.9.1
-        version: 5.9.1(@sinclair/typebox@0.27.12)(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5)
+        version: 5.9.1(@sinclair/typebox@0.27.12)(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.1
-        version: 1.30.1(zod@4.6.5)
+        version: 1.30.1(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -119,7 +122,7 @@ importers:
         version: 12.11.6(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(immer@11.1.15)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       ai:
         specifier: ^7.0.112
-        version: 7.0.116(zod@4.6.5)
+        version: 7.0.116(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -203,7 +206,7 @@ importers:
         version: 8.21.3
       zod:
         specifier: ^4.6.5
-        version: 4.6.5
+        version: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
     devDependencies:
       '@axe-core/playwright':
         specifier: ^4.13.0
@@ -5704,47 +5707,47 @@ snapshots:
 
   '@adobe/css-tools@4.5.0': {}
 
-  '@ai-sdk/anthropic@4.0.16(zod@4.6.5)':
+  '@ai-sdk/anthropic@4.0.16(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.11(zod@4.6.5)
-      zod: 4.6.5
+      '@ai-sdk/provider-utils': 5.0.11(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  '@ai-sdk/gateway@4.0.94(zod@4.6.5)':
+  '@ai-sdk/gateway@4.0.94(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5)
+      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@vercel/oidc': 3.2.0
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  '@ai-sdk/google@4.0.18(zod@4.6.5)':
+  '@ai-sdk/google@4.0.18(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.11(zod@4.6.5)
-      zod: 4.6.5
+      '@ai-sdk/provider-utils': 5.0.11(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  '@ai-sdk/openai@4.0.78(zod@4.6.5)':
+  '@ai-sdk/openai@4.0.78(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5)
-      zod: 4.6.5
+      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  '@ai-sdk/provider-utils@5.0.11(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.11(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  '@ai-sdk/provider-utils@5.0.49(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.49(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@ai-sdk/provider': 4.0.18
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
       undici: 7.29.1
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
   '@ai-sdk/provider@4.0.18':
     dependencies:
@@ -6106,7 +6109,7 @@ snapshots:
     dependencies:
       hono: 4.13.8
 
-  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.27.12)(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5)':
+  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.27.12)(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.88.0(react@19.3.0)
@@ -6115,7 +6118,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       ajv: 8.20.0
       ajv-formats: 2.1.1(ajv@8.20.0)
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -6315,7 +6318,7 @@ snapshots:
       '@solid-primitives/utils': 6.4.1(solid-js@1.9.15)
       solid-js: 1.9.15
 
-  '@modelcontextprotocol/sdk@1.30.1(zod@4.6.5)':
+  '@modelcontextprotocol/sdk@1.30.1(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))':
     dependencies:
       '@hono/node-server': 2.0.12(hono@4.13.8)
       ajv: 8.20.0
@@ -6332,8 +6335,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.6.5
-      zod-to-json-schema: 3.25.2(zod@4.6.5)
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
+      zod-to-json-schema: 3.25.2(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
     transitivePeerDependencies:
       - supports-color
 
@@ -8094,12 +8097,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.116(zod@4.6.5):
+  ai@7.0.116(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)):
     dependencies:
-      '@ai-sdk/gateway': 4.0.94(zod@4.6.5)
+      '@ai-sdk/gateway': 4.0.94(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5)
-      zod: 4.6.5
+      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
   ajv-formats@2.1.1(ajv@8.20.0):
     optionalDependencies:
@@ -8870,8 +8873,8 @@ snapshots:
       '@babel/parser': 7.29.7
       eslint: 10.11.0(jiti@2.7.0)
       hermes-parser: 0.25.1
-      zod: 4.6.5
-      zod-validation-error: 4.0.2(zod@4.6.5)
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
+      zod-validation-error: 4.0.2(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy))
     transitivePeerDependencies:
       - supports-color
 
@@ -11171,15 +11174,15 @@ snapshots:
 
   yoga-layout@3.2.1: {}
 
-  zod-to-json-schema@3.25.2(zod@4.6.5):
+  zod-to-json-schema@3.25.2(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)):
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  zod-validation-error@4.0.2(zod@4.6.5):
+  zod-validation-error@4.0.2(zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)):
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy)
 
-  zod@4.6.5: {}
+  zod@4.6.5(patch_hash=3uhntwfwxktxrfgc4nntonsrcy): {}
 
   zustand@4.5.7(@types/react@19.3.0)(immer@11.1.15)(react@19.3.0):
     dependencies:

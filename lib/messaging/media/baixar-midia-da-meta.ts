@@ -25,6 +25,7 @@ export const HOSTS_DE_MIDIA_DA_META = [".fbsbx.com", ".fbcdn.net", ".cdninstagra
 /** 50 MB: vídeo do Direct cabe com folga; acima disso não é anexo de conversa. */
 export const TETO_DE_BYTES_DA_MIDIA = 50 * 1024 * 1024;
 export const MAX_REDIRECIONAMENTOS = 3;
+export const USER_AGENT_DO_DOWNLOAD = "crm-media-fetch/1.0";
 
 export interface OpcoesDoDownload {
   hintMime?: string | null;
@@ -70,7 +71,11 @@ export async function baixarMidiaDaMeta(
   const fetchImpl =
     opcoes.fetchImpl ??
     ((u: string, init?: RequestInit) =>
-      fetchComDestinoFixado(u, { signal: init?.signal ?? undefined }, { portasPermitidas: [443] }));
+      fetchComDestinoFixado(
+        u,
+        { signal: init?.signal ?? undefined, headers: init?.headers as Record<string, string> | undefined },
+        { portasPermitidas: [443] },
+      ));
   const conferirDestino = opcoes.conferirDestino ?? assertDestinoResolvidoSeguro;
   const teto = opcoes.tetoBytes ?? TETO_DE_BYTES_DA_MIDIA;
 
@@ -87,9 +92,13 @@ export async function baixarMidiaDaMeta(
     }
     await conferirDestino(url.hostname);
 
+    // Sem User-Agent o lookaside.fbsbx.com responde 302 para www.facebook.com
+    // (medido em produção em 04/10/2026; com qualquer UA, inclusive "node", vem 206
+    // com a mídia). O node:http da conexão fixada não manda UA nenhum.
     const res = await fetchImpl(url.toString(), {
       redirect: "manual",
       signal: AbortSignal.timeout(30_000),
+      headers: { "User-Agent": USER_AGENT_DO_DOWNLOAD },
     });
 
     if (res.status >= 300 && res.status < 400) {

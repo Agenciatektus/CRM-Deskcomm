@@ -72,7 +72,11 @@ describe("última borda de efeito do follow-up", () => {
     await expect(
       withAgendaEffect({ query } as never, { organizationId: "org", contactId: "c" }, vi.fn()),
     ).rejects.toMatchObject({ protection: { motivo: "leitura_indisponivel", adiar: true } });
-    expect(warning).toHaveBeenCalledWith("[agenda] proteção indisponível; cobrança adiada");
+    // O diagnóstico agora diz O QUE falhou e quantos contatos foram adiados.
+    expect(warning).toHaveBeenCalledWith("[agenda] proteção indisponível; cobrança adiada", {
+      contatos: 1,
+      erro: "database unavailable",
+    });
     warning.mockRestore();
   });
   it.each([{ rows: [] }, { rows: [{ status: "vetoed" }] }])(
