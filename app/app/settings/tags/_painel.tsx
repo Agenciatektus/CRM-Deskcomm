@@ -54,7 +54,11 @@ import { cn } from "@/lib/utils";
 import { PALETA_DE_ETIQUETAS } from "@/lib/tags/cor-da-etiqueta";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
-import type { AcaoDeVocabulario, LinhaDeVocabulario } from "@/lib/schemas/tags";
+import type { AcaoDeVocabulario, InventarioDeTags, LinhaDeVocabulario } from "@/lib/schemas/tags";
+// ─── DIVERGÊNCIA TEKTUS (9038) — as sugestões da curadoria do fork ──────────
+// O comportamento mora em `_sugestoes.tsx` (arquivo do fork); aqui ficam só a
+// coluna, o bloco de acrescentar e a trava da etiqueta `cliente`.
+import { AcrescentarEtiqueta, BotoesDeSugestao, unirComSugestoes } from "./_sugestoes";
 
 /**
  * O TETO DA LISTA, e por que ele é declarado aqui.
@@ -100,10 +104,29 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
   unauthenticated: "Sua sessão expirou. Entre de novo.",
   mfa_required: "Confirme o segundo fator para mudar as etiquetas.",
   forbidden_tenant: "Você não está em nenhuma organização ativa.",
+  // 9038: a etiqueta `cliente` reservada pela regra da agenda.
+  etiqueta_do_sistema:
+    "A etiqueta cliente é posta pelo sistema enquanto a regra Clientes pela agenda estiver ligada. Desligue-a em Tipos de agendamento para editá-la aqui.",
 };
 
-export function PainelDeTags({ tags, idioma }: { tags: LinhaDeVocabulario[]; idioma: Idioma }) {
+export function PainelDeTags({
+  tags: tagsDoVocabulario,
+  idioma,
+  sugestoes = null,
+}: {
+  tags: LinhaDeVocabulario[];
+  idioma: Idioma;
+  /** 9038: o inventário de sugestões da 9005 (`fn_tags_inventario`). */
+  sugestoes?: InventarioDeTags | null;
+}) {
   const t = (texto: string) => traduzir(texto, idioma);
+  // 9038: as sugestões sem uso entram na lista (ver `unirComSugestoes`).
+  const tags = useMemo(() => unirComSugestoes(tagsDoVocabulario, sugestoes), [tagsDoVocabulario, sugestoes]);
+  // 9038: `cliente` reservada pela regra da agenda não oferece renomear, juntar
+  // nem excluir — o servidor recusaria (`fn_tags_reserva`), e botão que só
+  // devolve erro é promessa falsa. Cor e sugestão continuam valendo.
+  const reservada = (tag: string) =>
+    !!sugestoes?.cliente_pela_agenda && tag.trim().toLowerCase() === "cliente";
   const router = useRouter();
   const queryClient = useQueryClient();
   const [alvo, setAlvo] = useState<LinhaDeVocabulario | null>(null);
@@ -192,17 +215,21 @@ export function PainelDeTags({ tags, idioma }: { tags: LinhaDeVocabulario[]; idi
 
   if (tags.length === 0) {
     return (
-      <Card className="p-6 text-sm text-muted-foreground">
-        {t(
-          "Nenhuma etiqueta nesta organização ainda. Elas aparecem aqui conforme os agentes, o Inbox e o funil usarem.",
-        )}
-      </Card>
+      <div className="flex flex-col gap-4">
+        <AcrescentarEtiqueta idioma={idioma} />
+        <Card className="p-6 text-sm text-muted-foreground">
+          {t(
+            "Nenhuma etiqueta nesta organização ainda. Elas aparecem aqui conforme os agentes, o Inbox e o funil usarem.",
+          )}
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="overflow-hidden">
+      <AcrescentarEtiqueta idioma={idioma} />
+      <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">{t("Etiquetas da organização e onde são usadas")}</caption>
           <thead className="bg-muted/50 text-left">
@@ -212,6 +239,7 @@ export function PainelDeTags({ tags, idioma }: { tags: LinhaDeVocabulario[]; idi
               <th className="p-3 font-medium">{t("Leads")}</th>
               <th className="p-3 font-medium">{t("Conversas")}</th>
               <th className="p-3 font-medium">{t("Regras de agente")}</th>
+              {sugestoes && <th className="p-3 font-medium">{t("Sugestão")}</th>}
               <th className="p-3 font-medium">{t("Ações")}</th>
             </tr>
           </thead>
@@ -244,19 +272,37 @@ export function PainelDeTags({ tags, idioma }: { tags: LinhaDeVocabulario[]; idi
                     <span className="text-muted-foreground">0</span>
                   )}
                 </td>
+                {sugestoes && (
+                  <td className="p-3">
+                    <BotoesDeSugestao tag={linha.tag} inventario={sugestoes} idioma={idioma} />
+                  </td>
+                )}
                 <td className="flex flex-wrap gap-2 p-3">
                   <Button size="sm" variant="outline" onClick={() => abrir(linha, "definir_cor")}>
                     {t("Cor")}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => abrir(linha, "renomear")}>
-                    {t("Renomear")}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => abrir(linha, "juntar")}>
-                    {t("Juntar")}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => abrir(linha, "excluir")}>
-                    {t("Excluir")}
-                  </Button>
+                  {reservada(linha.tag) ? (
+                    <span
+                      className="self-center rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                      title={t(
+                        "A etiqueta cliente é posta pelo sistema enquanto a regra Clientes pela agenda estiver ligada. Desligue-a em Tipos de agendamento para editá-la aqui.",
+                      )}
+                    >
+                      {t("do sistema")}
+                    </span>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => abrir(linha, "renomear")}>
+                        {t("Renomear")}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => abrir(linha, "juntar")}>
+                        {t("Juntar")}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => abrir(linha, "excluir")}>
+                        {t("Excluir")}
+                      </Button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

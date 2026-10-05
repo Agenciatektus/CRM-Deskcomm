@@ -26568,6 +26568,7 @@ $$;
 
 -- ─── 3. a operação: tudo numa transação, regra do agente incluída ────────────
 
+-- (corpo reemitido pela migration 9038: as quatro listas de sugestão, a reserva de `cliente` e `for update`)
 create or replace function public.fn_vocabulario_de_tags_operar(
   p_org uuid,
   p_acao text,
@@ -26601,6 +26602,11 @@ declare
   v_antes jsonb;
   v_depois jsonb;
   v_definido boolean := false;
+  -- 9038: as quatro listas de sugestão (0244/9005) e os dois escopos.
+  v_chave text;
+  v_escopo text;
+  v_sugeridas jsonb;
+  v_arquivadas jsonb;
 begin
   -- Portão de papel ANTES de qualquer escrita. Definer com p_org vindo da rota:
   -- é esta linha que separa o tenant de quem chama.
@@ -26651,13 +26657,15 @@ begin
   -- o que reescrever em contatos, leads nem conversas — e os laços abaixo, se
   -- rodassem, custariam uma varredura das três tabelas para devolver zero.
   --
-  -- O bloco de `canonical_conversation_tags` (mais abaixo) é pior que inútil
-  -- aqui: ele troca o nome da semente por `v_destino` e descarta o que sobra
-  -- vazio — com `destino` nulo nesta ação, a semente seria APAGADA. Daí o
-  -- `return` cedo: nesta ação, só o vocabulário curado muda.
+  -- O bloco das listas de sugestão (mais abaixo) é pior que inútil aqui: ele
+  -- troca o nome da semente por `v_destino` e descarta o que sobra vazio — com
+  -- `destino` nulo nesta ação, a semente seria APAGADA. Daí o `return` cedo:
+  -- nesta ação, só o vocabulário curado muda.
   if v_so_cor then
+    -- 9038 (3): `for update` — ver o cabeçalho da migration.
     select coalesce(o.settings, '{}'::jsonb) into v_settings
-    from public.organizations o where o.id = p_org;
+    from public.organizations o where o.id = p_org
+    for update;
     if v_settings is null then
       v_settings := '{}'::jsonb;
     end if;
@@ -26754,6 +26762,17 @@ begin
     );
   end if;
 
+  -- 9038 (2): a etiqueta `cliente` de CONTATO, com a regra da agenda ligada, não
+  -- é renomeada, juntada (como origem ou destino) nem excluída por aqui. A
+  -- reserva é a da 9005 e compara em minúsculas, a régua de `fn_tags_normalizar`.
+  --
+  -- ⚠️ `array_remove(..., null)`: no excluir não há destino, e `'cliente' = any`
+  -- de uma lista com nulo dá NULO, não falso. A reserva leria "talvez seja
+  -- cliente" e recusaria a exclusão de QUALQUER etiqueta com a regra ligada.
+  perform public.fn_tags_reserva(
+    p_org, 'contato', array_remove(array[lower(v_tag), lower(nullif(v_destino, ''))], null)
+  );
+
   -- (a) contatos
   for v_id in
     with alvo as (
@@ -26829,8 +26848,11 @@ begin
   -- regras a escrevem (o número volta no jsonb e a tela pede confirmação), mas
   -- apagar `add_tag` de um agente em produção é decisão de outra tela. Aqui a
   -- lista da regra só é reescrita quando o nome muda ou quando ele sai.
+  --
+  -- 9038 (3): `for update` — ver o cabeçalho da migration.
   select coalesce(o.settings, '{}'::jsonb) into v_settings
-  from public.organizations o where o.id = p_org;
+  from public.organizations o where o.id = p_org
+  for update;
 
   if v_settings is null then
     v_settings := '{}'::jsonb;
@@ -26892,7 +26914,7 @@ begin
       and lower(btrim(e.valor #>> '{}')) = lower(v_tag);
   end if;
 
-  -- (e) o vocabulário da organização, nos dois lugares onde ele mora.
+  -- (e) o vocabulário da organização, nos lugares onde ele mora.
   -- Mesma guarda do ramo de renomear: `settings.tags` malformado não pode
   -- derrubar a cor (a leitura tolera; a escrita agora também).
   v_antes := case
@@ -26943,34 +26965,79 @@ begin
     v_definido := true;
   end if;
 
-  v_antes := coalesce(v_settings -> 'canonical_conversation_tags', '[]'::jsonb);
-  v_depois := coalesce(
-    (
-      select jsonb_agg(semente.valor order by semente.ord)
-      from (
-        -- Dedupe pela chave DEPOIS da substituição, como acima.
-        select distinct on (lower(y.valor)) y.valor, y.ord
+  -- 9038 (1): as QUATRO listas de sugestão passam pela substituição que a 0336
+  -- fazia só em `canonical_conversation_tags`. Cada uma é `array de text`
+  -- (formato da 0244, mantido pela 9005); lista que não é lista é lista vazia,
+  -- a mesma tolerância de `settings.tags` acima.
+  foreach v_chave in array array[
+    'canonical_conversation_tags',
+    'archived_conversation_tags',
+    'canonical_contact_tags',
+    'archived_contact_tags'
+  ]
+  loop
+    v_antes := case
+      when jsonb_typeof(v_settings -> v_chave) = 'array' then v_settings -> v_chave
+      else '[]'::jsonb
+    end;
+    v_depois := coalesce(
+      (
+        select jsonb_agg(semente.valor order by semente.ord)
         from (
-          select case
-                   when v_remover then null
-                   when lower(btrim(s.valor #>> '{}')) = lower(v_tag) then v_destino
-                   else btrim(s.valor #>> '{}')
-                 end as valor,
-                 s.ord
-          from jsonb_array_elements(v_antes) with ordinality as s(valor, ord)
-          where btrim(s.valor #>> '{}') <> ''
-        ) y
-        where coalesce(y.valor, '') <> ''
-        order by lower(y.valor), y.ord
-      ) as semente
-      where semente.valor is not null
-    ),
-    '[]'::jsonb
-  );
-  if v_depois <> v_antes then
-    v_settings := jsonb_set(v_settings, '{canonical_conversation_tags}', v_depois);
-    v_definido := true;
-  end if;
+          -- Dedupe pela chave DEPOIS da substituição, como acima.
+          select distinct on (lower(y.valor)) y.valor, y.ord
+          from (
+            select case
+                     when v_remover then null
+                     when lower(btrim(s.valor #>> '{}')) = lower(v_tag) then v_destino
+                     else btrim(s.valor #>> '{}')
+                   end as valor,
+                   s.ord
+            from jsonb_array_elements(v_antes) with ordinality as s(valor, ord)
+            where btrim(s.valor #>> '{}') <> ''
+          ) y
+          where coalesce(y.valor, '') <> ''
+          order by lower(y.valor), y.ord
+        ) as semente
+        where semente.valor is not null
+      ),
+      '[]'::jsonb
+    );
+    -- Só grava a chave que existia ou que mudou: organização que nunca teve a
+    -- lista continua sem ela, em vez de ganhar quatro `[]` a cada operação.
+    if v_depois <> v_antes and (v_settings ? v_chave or v_depois <> '[]'::jsonb) then
+      v_settings := jsonb_set(v_settings, array[v_chave], v_depois);
+      v_definido := true;
+    end if;
+  end loop;
+
+  -- 9038 (1): sugerida vence arquivada no mesmo escopo — ver o cabeçalho.
+  foreach v_escopo in array array['conversation', 'contact']
+  loop
+    v_sugeridas := case
+      when jsonb_typeof(v_settings -> ('canonical_' || v_escopo || '_tags')) = 'array'
+      then v_settings -> ('canonical_' || v_escopo || '_tags') else '[]'::jsonb
+    end;
+    v_arquivadas := case
+      when jsonb_typeof(v_settings -> ('archived_' || v_escopo || '_tags')) = 'array'
+      then v_settings -> ('archived_' || v_escopo || '_tags') else '[]'::jsonb
+    end;
+    v_depois := coalesce(
+      (
+        select jsonb_agg(a.valor order by a.ord)
+        from jsonb_array_elements(v_arquivadas) with ordinality as a(valor, ord)
+        where not exists (
+          select 1 from jsonb_array_elements(v_sugeridas) as c(valor)
+          where lower(btrim(c.valor #>> '{}')) = lower(btrim(a.valor #>> '{}'))
+        )
+      ),
+      '[]'::jsonb
+    );
+    if v_depois <> v_arquivadas then
+      v_settings := jsonb_set(v_settings, array['archived_' || v_escopo || '_tags'], v_depois);
+      v_definido := true;
+    end if;
+  end loop;
 
   if v_definido then
     update public.organizations o
@@ -44610,7 +44677,9 @@ comment on function public.fn_tags_renomear(uuid, text, text, text) is
   'contador e confirmação próprios.';
 
 revoke execute on function public.fn_tags_renomear(uuid, text, text, text) from public, anon;
-grant  execute on function public.fn_tags_renomear(uuid, text, text, text) to authenticated, service_role;
+-- 9038: sem chamador pela sessão desde que a tela de Etiquetas saiu; só service_role.
+grant  execute on function public.fn_tags_renomear(uuid, text, text, text) to service_role;
+revoke execute on function public.fn_tags_renomear(uuid, text, text, text) from authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- MESCLAR — a operação sem a qual o vocabulário degrada sozinho.
@@ -44717,7 +44786,9 @@ comment on function public.fn_tags_mesclar(uuid, text, text[], text) is
   'Funde variantes numa etiqueta só, no vocabulário e nos registros (migration 9005). admin+. Quem já tinha origem e destino não fica com duplicata; o destino vira canônico mesmo tendo nascido do campo livre do Inbox, que é o caminho normal da curadoria.';
 
 revoke execute on function public.fn_tags_mesclar(uuid, text, text[], text) from public, anon;
-grant  execute on function public.fn_tags_mesclar(uuid, text, text[], text) to authenticated, service_role;
+-- 9038: sem chamador pela sessão desde que a tela de Etiquetas saiu; só service_role.
+grant  execute on function public.fn_tags_mesclar(uuid, text, text[], text) to service_role;
+revoke execute on function public.fn_tags_mesclar(uuid, text, text[], text) from authenticated;
 
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -44789,7 +44860,9 @@ comment on function public.fn_tags_apagar(uuid, text, text) is
   'Apaga a etiqueta do vocabulário E de todo registro que a usa (migration 9005). admin+, sem desfazer. Devolve quantos registros perderam a etiqueta, medido no instante da escrita: o inventário dá a previsão, esta função dá o fato.';
 
 revoke execute on function public.fn_tags_apagar(uuid, text, text) from public, anon;
-grant  execute on function public.fn_tags_apagar(uuid, text, text) to authenticated, service_role;
+-- 9038: sem chamador pela sessão desde que a tela de Etiquetas saiu; só service_role.
+grant  execute on function public.fn_tags_apagar(uuid, text, text) to service_role;
+revoke execute on function public.fn_tags_apagar(uuid, text, text) from authenticated;
 
 -- ---- contato tem identidade de Instagram (migration 9010) ----
 --
