@@ -1,47 +1,69 @@
 /**
- * Limpeza RETROATIVA do arquivo de webhook: tira token/segredo e mídia inteira
- * das linhas que JÁ estão gravadas em `webhook_events_log`.
+ * Limpeza RETROATIVA do arquivo de webhook: tira mídia inteira (e o que mais a
+ * regra do arquivador omite) das linhas que JÁ estão em `webhook_events_log`.
  *
  * O conserto do caminho de gravação (`lib/channels/enxugar-para-arquivo.ts`) só
- * vale daqui para a frente. Medido em 05/10/2026: 7.291 linhas do provider
- * `verdash` com o token da instância em claro e 15 com a mídia inteira (até
- * 10 MB cada, 150 MB no total). Este script passa essas linhas pela MESMA regra
- * do arquivador — um só lugar decide o que é segredo e o que é peso.
+ * vale daqui para a frente. Medido em 05/10/2026: 15 linhas do provider
+ * `verdash` com a mídia inteira (até 10 MB cada, 150 MB no total); o token já
+ * saía como `"[omitido]"`. Este script passa as linhas pela MESMA regra do
+ * arquivador — um só lugar decide o que é segredo e o que é peso.
  *
- * Seguro para produção, de propósito (o incidente de 28/09 ensinou cada item):
+ * ⛔ NUNCA o provider `waha`. O cron `webhook-replay`
+ * (`lib/channels/reprocessar-arquivo-de-webhook.ts`) relê o `payload_parsed`
+ * das linhas `waha` com erro transitório e as REINGERE: enxugar essas linhas
+ * trocaria o texto da mensagem do cliente por um marcador. O script recusa
+ * `--provider waha` — no CLI e na função.
+ *
+ * ─── Caminho padrão: `--so-grandes` ─────────────────────────────────────────
+ *
+ * O que libera espaço é a linha com mídia inteira (> 4 KB armazenados). As
+ * linhas PEQUENAS que ainda têm algo a omitir (`mediaKey`/`messageSecret` do
+ * protobuf do WhatsApp, gravados antes da #98) somam pouco, e a retenção D+7
+ * (`lib/channels/retencao-do-arquivo.ts`, cron vivo) zera `raw_body`,
+ * `payload_parsed` e `headers` delas sozinha: as de até 05/10 somem até 12/10.
+ * Reescrevê-las só gera TOAST novo e autovacuum. Sem `--so-grandes` elas também
+ * entram, e só se encolherem.
+ *
+ * Seguro para produção, de propósito (cada item custou um incidente):
  *  - SIMULA por padrão. Só grava com `--aplicar`.
- *  - DECIDE PELO TAMANHO, sem destostar: a varredura lê só `pg_column_size` de
- *    cada coluna. Linha grande (> `TETO_DE_TEXTO`) é candidata sem abrir o
- *    valor; linha pequena mora inline na página (não tem TOAST) e é lida para
- *    procurar o token. Na SIMULAÇÃO a linha grande nunca é aberta.
- *  - Lotes pequenos (`--lote`, padrão 10, teto 50) com pausa entre eles
- *    (`--pausa-ms`, padrão 3000) e teto por rodada (`--max`, padrão 500).
- *    UPDATE em massa reescreve TOAST e dispara autovacuum; foi isso que
- *    derrubou o banco pela segunda vez em 28/09.
- *  - `statement_timeout` (padrão 15 s) MENOR que o timeout do cliente (padrão
- *    30 s): timeout só do cliente deixa a consulta órfã no servidor segurando as
- *    linhas, e os lotes seguintes morrem em `lock_timeout`.
- *  - IDEMPOTENTE e sem corrida: o UPDATE exige que o tamanho das colunas seja o
- *    MESMO lido na varredura. Se a retenção ou o cron mexeu na linha no meio, ela
- *    é pulada. Rodar de novo não refaz nada (linha limpa sai igual da regra).
- *  - Retoma: `--depois-de '<received_at>|<id>'` com o cursor que a rodada imprime.
+ *  - DECIDE PELO TAMANHO, sem destostar: a varredura lê só `pg_column_size`.
+ *    Na SIMULAÇÃO a linha grande nunca é aberta (e por isso não é medida).
+ *  - NUNCA CRESCE UMA LINHA. A 1ª versão, rodada em produção em 05/10/2026,
+ *    gravou 500 linhas e levou 2,4 MB a 4,0 MB (+63%): `pg_column_size` mede o
+ *    valor ARMAZENADO (comprimido), a linha reescrita ficava abaixo do limiar
+ *    de compressão, e o marcador era um objeto com sha de 64 caracteres. Agora
+ *    o marcador é uma string curta, cada linha nova é MEDIDA pelo Postgres
+ *    antes (sem compressão: um teto) e só é gravada se for menor que a
+ *    armazenada — e o próprio UPDATE repete a condição. Quem cresceria é pulada
+ *    e contada em `puladasPorCrescer`.
+ *  - Lotes pequenos (`--lote`, padrão 10, teto 50), pausa (`--pausa-ms`, padrão
+ *    3000) e teto por rodada (`--max`, padrão 500).
+ *  - `statement_timeout` (padrão 15 s) dentro da transação, MENOR que o timeout
+ *    do cliente (2×): timeout só do cliente deixa consulta órfã segurando linha.
+ *  - Sem corrida: o UPDATE exige os mesmos tamanhos lidos na varredura
+ *    (`puladasPorCorrida`). Rodar de novo não refaz nada.
+ *  - Retoma: `--depois-de '<received_at>|<id>'` com o cursor impresso.
  *
- * Uso (com túnel para o Postgres do CRM, `SUPABASE_DB_URL` apontando para ele):
- *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts                       # simula
- *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --aplicar --max 200
- *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --aplicar --depois-de '<cursor>'
- *   --provider waha   (padrão: verdash)
+ * Uso (túnel para o Postgres do CRM, `SUPABASE_DB_URL` apontando para ele):
+ *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --so-grandes            # simula
+ *   pnpm exec tsx scripts/enxugar-arquivo-de-webhook-retroativo.ts --so-grandes --aplicar --max 200
+ *   … --depois-de '<cursor>'   --provider <nome> (padrão verdash; waha é recusado)
  */
 import {
-  arquivoEnxuto,
-  cabecalhosParaArquivo,
-  enxugarParaArquivo,
-  TETO_DE_TEXTO,
-} from "../lib/channels/enxugar-para-arquivo";
+  antesDe,
+  type ClienteSql,
+  ehGrande,
+  lerConteudo,
+  type LinhaNova,
+  linhaEnxuta,
+  parametros,
+  SQL_GRAVAR,
+  SQL_MEDIR,
+  SQL_VARREDURA,
+  type Tamanhos,
+} from "./lib/enxugar-arquivo-de-webhook-sql";
 
-export interface ClienteSql {
-  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[]; rowCount?: number | null }>;
-}
+export { linhaEnxuta, SQL_GRAVAR, SQL_MEDIR, SQL_VARREDURA, type ClienteSql };
 
 export interface OpcoesDaLimpeza {
   aplicar: boolean;
@@ -50,6 +72,8 @@ export interface OpcoesDaLimpeza {
   max: number;
   pausaMs: number;
   statementTimeoutMs: number;
+  /** Só linhas com alguma coluna > 4 KB armazenada (mídia inteira). */
+  soGrandes?: boolean;
   depoisDe?: { receivedAt: string; id: string };
   log?: (linha: string) => void;
   dormir?: (ms: number) => Promise<void>;
@@ -58,133 +82,107 @@ export interface OpcoesDaLimpeza {
 export interface ResultadoDaLimpeza {
   varridas: number;
   grandes: number;
-  comSegredo: number;
+  /** Pequenas que ainda tinham algo a omitir (0 com `--so-grandes`). */
+  pequenasComSegredo: number;
+  /** Gravadas (com `--aplicar`) ou que seriam (simulação: só as medidas). */
   gravadas: number;
-  puladas: number;
+  /** A reescrita não encolheria a linha: pulada. */
+  puladasPorCrescer: number;
+  /** A linha mudou entre a varredura e o UPDATE (retenção, cron): pulada. */
+  puladasPorCorrida: number;
+  /** Tamanho armazenado ANTES, só das gravadas. */
   bytesAntes: number;
+  /** Tamanho DEPOIS (teto, sem compressão), só das gravadas. */
   bytesDepois: number;
+  bytesEconomizados: number;
   cursor: string | null;
 }
 
-interface Tamanhos {
-  id: string;
-  received_at: string;
-  tam_raw: number | null;
-  tam_parsed: number | null;
-  tam_headers: number | null;
+interface Item {
+  t: Tamanhos;
+  nova: LinhaNova;
+  depois?: number;
 }
-
-interface Conteudo {
-  id: string;
-  raw_body: string | null;
-  payload_parsed: unknown;
-  headers: Record<string, string> | null;
-}
-
-/** A varredura NÃO seleciona o conteúdo: só tamanhos, para não destostar. */
-export const SQL_VARREDURA = `
-select id, received_at::text as received_at,
-       pg_column_size(raw_body) as tam_raw,
-       pg_column_size(payload_parsed) as tam_parsed,
-       pg_column_size(headers) as tam_headers
-  from public.webhook_events_log
- where provider = $1
-   and (received_at, id) > ($2::timestamptz, $3::uuid)
- order by received_at, id
- limit $4`;
-
-const SQL_CONTEUDO = `
-select id, raw_body, payload_parsed, headers
-  from public.webhook_events_log
- where id = any($1::uuid[])`;
-
-const SQL_GRAVAR = `
-update public.webhook_events_log
-   set raw_body = $2, payload_parsed = $3::jsonb, headers = $4::jsonb
- where id = $1
-   and pg_column_size(raw_body) is not distinct from $5
-   and pg_column_size(payload_parsed) is not distinct from $6
-   and pg_column_size(headers) is not distinct from $7`;
 
 const CURSOR_INICIAL = { receivedAt: "-infinity", id: "00000000-0000-0000-0000-000000000000" };
 
-function ehGrande(t: Tamanhos): boolean {
-  return [t.tam_raw, t.tam_parsed, t.tam_headers].some((n) => (n ?? 0) > TETO_DE_TEXTO);
-}
+/**
+ * Providers cujo arquivo é RELIDO para reingestão: enxugar quebraria o replay.
+ * Ver `reprocessarArquivoDeWebhooks` (`.eq("provider", "waha")`).
+ */
+export const PROVIDERS_RECUSADOS = ["waha"] as const;
 
-function headersEnxutos(h: Record<string, string> | null): Record<string, string> | null {
-  if (!h || typeof h !== "object") return h;
-  try {
-    return cabecalhosParaArquivo(new Headers(h));
-  } catch {
-    // Nome de header inválido para a API `Headers`: decide chave a chave.
-    const { payload } = enxugarParaArquivo(h);
-    return payload;
+export function conferirProvider(provider: string): void {
+  if ((PROVIDERS_RECUSADOS as readonly string[]).includes(provider.trim().toLowerCase())) {
+    throw new Error(
+      `--provider ${provider} recusado: o cron webhook-replay reingere o payload_parsed dessas linhas, e enxugar trocaria a mensagem por marcador.`,
+    );
   }
 }
 
-/** A linha como ela fica depois da regra; `null` se nada muda. */
-export function linhaEnxuta(c: Conteudo): Omit<Conteudo, "id"> | null {
-  const raw = c.raw_body === null ? null : arquivoEnxuto(c.raw_body).rawBody;
-  const parsed = c.payload_parsed === null ? null : enxugarParaArquivo(c.payload_parsed).payload;
-  const headers = headersEnxutos(c.headers);
-  const mudou =
-    raw !== c.raw_body ||
-    JSON.stringify(parsed) !== JSON.stringify(c.payload_parsed) ||
-    JSON.stringify(headers) !== JSON.stringify(c.headers);
-  return mudou ? { raw_body: raw, payload_parsed: parsed, headers } : null;
+/** Mede o tamanho novo de cada item numa consulta só e separa quem encolhe. */
+async function quemEncolhe(db: ClienteSql, itens: Item[]): Promise<{ encolhem: Item[]; crescem: number }> {
+  if (itens.length === 0) return { encolhem: [], crescem: 0 };
+  const ps = itens.map((i) => parametros(i.nova));
+  const { rows } = await db.query<{ depois: number }>(SQL_MEDIR, [
+    ps.map((p) => p[0]),
+    ps.map((p) => p[1]),
+    ps.map((p) => p[2]),
+  ]);
+  const encolhem: Item[] = [];
+  let crescem = 0;
+  itens.forEach((item, k) => {
+    const depois = Number(rows[k]?.depois ?? Number.POSITIVE_INFINITY);
+    if (depois < antesDe(item.t)) encolhem.push({ ...item, depois });
+    else crescem++;
+  });
+  return { encolhem, crescem };
 }
 
-function tamanhoDe(c: Omit<Conteudo, "id">): number {
-  return (c.raw_body?.length ?? 0) + JSON.stringify(c.payload_parsed ?? null).length + JSON.stringify(c.headers ?? null).length;
-}
-
-async function lerConteudo(db: ClienteSql, ids: string[]): Promise<Map<string, Conteudo>> {
-  if (ids.length === 0) return new Map();
-  const { rows } = await db.query<Conteudo>(SQL_CONTEUDO, [ids]);
-  return new Map(rows.map((r) => [r.id, r]));
-}
-
-async function gravarLote(
-  db: ClienteSql,
-  itens: Array<{ t: Tamanhos; nova: Omit<Conteudo, "id"> }>,
-  statementTimeoutMs: number,
-): Promise<{ gravadas: number; puladas: number }> {
-  let gravadas = 0;
-  let puladas = 0;
+async function gravarLote(db: ClienteSql, itens: Item[], statementTimeoutMs: number): Promise<Item[]> {
+  const gravados: Item[] = [];
   await db.query("begin");
   try {
     await db.query(`set local statement_timeout = ${Math.floor(statementTimeoutMs)}`);
     await db.query("set local lock_timeout = 2000");
-    for (const { t, nova } of itens) {
-      const r = await db.query(SQL_GRAVAR, [
-        t.id,
-        nova.raw_body,
-        nova.payload_parsed === null ? null : JSON.stringify(nova.payload_parsed),
-        nova.headers === null ? null : JSON.stringify(nova.headers),
-        t.tam_raw,
-        t.tam_parsed,
-        t.tam_headers,
-      ]);
-      if ((r.rowCount ?? 0) > 0) gravadas++;
-      else puladas++;
+    for (const item of itens) {
+      const { t, nova } = item;
+      const r = await db.query(SQL_GRAVAR, [t.id, ...parametros(nova), t.tam_raw, t.tam_parsed, t.tam_headers]);
+      if ((r.rowCount ?? 0) > 0) gravados.push(item);
     }
     await db.query("commit");
   } catch (err) {
     await db.query("rollback").catch(() => undefined);
     throw err;
   }
-  return { gravadas, puladas };
+  return gravados;
 }
 
-export async function limparArquivoDeWebhook(
-  db: ClienteSql,
-  opcoes: OpcoesDaLimpeza,
-): Promise<ResultadoDaLimpeza> {
+async function candidatosDoLote(db: ClienteSql, rows: Tamanhos[], opcoes: OpcoesDaLimpeza) {
+  const grandes = rows.filter(ehGrande);
+  const pequenas = opcoes.soGrandes ? [] : rows.filter((t) => !ehGrande(t));
+  // Pequena mora inline: ler é barato. Grande só é aberta para GRAVAR.
+  const abrir = opcoes.aplicar ? [...pequenas, ...grandes] : pequenas;
+  const conteudo = await lerConteudo(db, abrir.map((t) => t.id));
+  const itens: Item[] = [];
+  let pequenasComSegredo = 0;
+  for (const t of abrir) {
+    const c = conteudo.get(t.id);
+    const nova = c ? linhaEnxuta(c) : null;
+    if (!nova) continue;
+    if (!ehGrande(t)) pequenasComSegredo++;
+    itens.push({ t, nova });
+  }
+  return { grandes: grandes.length, pequenasComSegredo, itens };
+}
+
+export async function limparArquivoDeWebhook(db: ClienteSql, opcoes: OpcoesDaLimpeza): Promise<ResultadoDaLimpeza> {
+  conferirProvider(opcoes.provider);
   const log = opcoes.log ?? ((l: string) => console.info(l));
   const dormir = opcoes.dormir ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const r: ResultadoDaLimpeza = {
-    varridas: 0, grandes: 0, comSegredo: 0, gravadas: 0, puladas: 0, bytesAntes: 0, bytesDepois: 0, cursor: null,
+    varridas: 0, grandes: 0, pequenasComSegredo: 0, gravadas: 0, puladasPorCrescer: 0, puladasPorCorrida: 0,
+    bytesAntes: 0, bytesDepois: 0, bytesEconomizados: 0, cursor: null,
   };
   let cursor = opcoes.depoisDe ?? CURSOR_INICIAL;
   const lote = Math.max(1, Math.min(opcoes.lote, 50));
@@ -201,41 +199,27 @@ export async function limparArquivoDeWebhook(
     cursor = { receivedAt: ultima.received_at, id: ultima.id };
     r.cursor = `${cursor.receivedAt}|${cursor.id}`;
 
-    const grandes = rows.filter(ehGrande);
-    const pequenas = rows.filter((t) => !ehGrande(t));
-    r.grandes += grandes.length;
-    for (const t of grandes) r.bytesAntes += (t.tam_raw ?? 0) + (t.tam_parsed ?? 0) + (t.tam_headers ?? 0);
+    const c = await candidatosDoLote(db, rows, opcoes);
+    r.grandes += c.grandes;
+    r.pequenasComSegredo += c.pequenasComSegredo;
 
-    // Pequena mora inline: ler é barato. Grande só é aberta para GRAVAR.
-    const aGravar: Array<{ t: Tamanhos; nova: Omit<Conteudo, "id"> }> = [];
-    const conteudoPequeno = await lerConteudo(db, pequenas.map((t) => t.id));
-    for (const t of pequenas) {
-      const c = conteudoPequeno.get(t.id);
-      const nova = c ? linhaEnxuta(c) : null;
-      if (!nova) continue;
-      r.comSegredo++;
-      aGravar.push({ t, nova });
-    }
-    const pequenasComSegredo = aGravar.length;
-
+    const { encolhem, crescem } = await quemEncolhe(db, c.itens);
+    r.puladasPorCrescer += crescem;
+    let efetivos = encolhem;
     if (opcoes.aplicar) {
-      const conteudoGrande = await lerConteudo(db, grandes.map((t) => t.id));
-      for (const t of grandes) {
-        const c = conteudoGrande.get(t.id);
-        const nova = c ? linhaEnxuta(c) : null;
-        if (nova) aGravar.push({ t, nova });
-      }
-      if (aGravar.length > 0) {
-        const g = await gravarLote(db, aGravar, opcoes.statementTimeoutMs);
-        r.gravadas += g.gravadas;
-        r.puladas += g.puladas;
-        for (const { nova } of aGravar) r.bytesDepois += tamanhoDe(nova);
-      }
+      efetivos = encolhem.length > 0 ? await gravarLote(db, encolhem, opcoes.statementTimeoutMs) : [];
+      r.puladasPorCorrida += encolhem.length - efetivos.length;
     }
+    for (const item of efetivos) {
+      r.gravadas++;
+      r.bytesAntes += antesDe(item.t);
+      r.bytesDepois += item.depois ?? 0;
+    }
+    r.bytesEconomizados = r.bytesAntes - r.bytesDepois;
 
     log(
-      `lote: ${rows.length} varridas, ${grandes.length} grandes, ${pequenasComSegredo} pequenas com segredo` +
-        (opcoes.aplicar ? `, ${r.gravadas} gravadas até agora` : "") + ` — cursor ${r.cursor}`,
+      `lote: ${rows.length} varridas, ${c.grandes} grandes, ${c.itens.length} a enxugar, ${crescem} pulariam por crescer — ` +
+        `${opcoes.aplicar ? "gravadas" : "simuladas"} ${r.gravadas}, ${r.bytesEconomizados} bytes economizados — cursor ${r.cursor}`,
     );
     if (rows.length < lote) break;
     await dormir(opcoes.pausaMs);
@@ -243,7 +227,7 @@ export async function limparArquivoDeWebhook(
   return r;
 }
 
-function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
+export function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
   const valor = (nome: string) => {
     const i = argv.indexOf(nome);
     return i >= 0 ? argv[i + 1] : undefined;
@@ -253,11 +237,14 @@ function lerOpcoes(argv: string[]): OpcoesDaLimpeza {
     if (!Number.isFinite(v) || v <= 0) throw new Error(`${nome} precisa ser número positivo`);
     return v;
   };
+  const provider = valor("--provider") ?? "verdash";
+  conferirProvider(provider);
   const depois = valor("--depois-de");
   const [receivedAt, id] = depois ? depois.split("|") : [];
   return {
     aplicar: argv.includes("--aplicar"),
-    provider: valor("--provider") ?? "verdash",
+    soGrandes: argv.includes("--so-grandes"),
+    provider,
     lote: Math.min(numero("--lote", 10), 50),
     max: numero("--max", 500),
     pausaMs: numero("--pausa-ms", 3000),
@@ -270,14 +257,18 @@ async function principal(): Promise<void> {
   const opcoes = lerOpcoes(process.argv.slice(2));
   const url = process.env.SUPABASE_DB_URL;
   if (!url) throw new Error("SUPABASE_DB_URL ausente: o script fala direto com o Postgres (statement_timeout).");
-  // Timeout do CLIENTE sempre maior que o do servidor: quem cancela é o banco.
-  const queryTimeout = opcoes.statementTimeoutMs * 2;
   const pg = (await import("pg")).default;
-  const client = new pg.Client({ connectionString: url, query_timeout: queryTimeout, application_name: "enxugar-arquivo-retroativo" });
+  // Timeout do CLIENTE sempre maior que o do servidor: quem cancela é o banco.
+  const client = new pg.Client({
+    connectionString: url,
+    query_timeout: opcoes.statementTimeoutMs * 2,
+    application_name: "enxugar-arquivo-retroativo",
+  });
   await client.connect();
   console.info(
     `${opcoes.aplicar ? "APLICANDO" : "SIMULAÇÃO (use --aplicar para gravar)"} — provider=${opcoes.provider} ` +
-      `lote=${opcoes.lote} max=${opcoes.max} pausa=${opcoes.pausaMs}ms statement_timeout=${opcoes.statementTimeoutMs}ms`,
+      `${opcoes.soGrandes ? "so-grandes " : ""}lote=${opcoes.lote} max=${opcoes.max} pausa=${opcoes.pausaMs}ms ` +
+      `statement_timeout=${opcoes.statementTimeoutMs}ms`,
   );
   try {
     const r = await limparArquivoDeWebhook(client as unknown as ClienteSql, opcoes);

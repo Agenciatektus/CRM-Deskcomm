@@ -28,8 +28,9 @@ export interface WebhookSourceEvent {
   id: string;
   created_at: string;
   valid_signature: boolean | null;
-  payload_parsed: unknown;
   status: string;
+  /** Só os NOMES dos campos que vieram; os valores não saem do servidor (9035). */
+  campos_recebidos: string[];
 }
 
 export interface CreateWebhookSourceInput {

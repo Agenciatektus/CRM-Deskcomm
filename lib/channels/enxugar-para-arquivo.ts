@@ -33,12 +33,18 @@
  *
  * ─── O que fica no lugar ────────────────────────────────────────────────────
  *
- * Um marcador, não um buraco: `{ omitido: true, motivo, caracteres, sha256 }`
+ * Um marcador, não um buraco: `"[omitido:midia:123456c:sha=0123456789abcdef]"`
  * para peso (quem investiga sabe que havia algo, de que tamanho, e consegue
  * casar o hash com o arquivo guardado no Storage), `"[omitido]"` para segredo
  * (sabe que o campo veio, sem ver o valor — e sem hash, que permitiria
  * correlacionar a credencial). A CHAVE continua existindo porque quem lista os
  * campos recebidos (a tela de histórico) não pode ver a lista mudar por isso.
+ *
+ * O marcador é uma STRING CURTA, não um objeto: medido em produção em
+ * 05/10/2026, o objeto `{omitido, motivo, caracteres, sha256}` (sha de 64
+ * caracteres) deixava a linha reescrita MAIOR que a original comprimida —
+ * 500 linhas, 2,4 MB → 4,0 MB. Prefixo de 16 hex do sha256 basta para casar
+ * com o arquivo no Storage.
  *
  * ─── O que NÃO muda ─────────────────────────────────────────────────────────
  *
@@ -54,10 +60,17 @@
  */
 import { createHash } from "node:crypto";
 
+import { credencialPeloValor, valorEhCredencial } from "./credencial-pelo-valor";
+
 /** String acima disto vira marcador, qualquer que seja a chave. */
 export const TETO_DE_TEXTO = 4096;
 /** O corpo enxuto inteiro acima disto vira marcador. */
 export const TETO_DO_CORPO = 256 * 1024;
+/**
+ * Base64 até este tamanho fica: o marcador (~45 caracteres) não pode ser maior
+ * que o que ele substitui — a linha reescrita tem de encolher, nunca crescer.
+ */
+const TETO_DE_MIDIA_MINUSCULA = 64;
 /** Aninhamento além disto não é payload legítimo de webhook. */
 const PROFUNDIDADE_MAXIMA = 32;
 
@@ -90,12 +103,13 @@ const PEDACOS_DE_SEGREDO = [
 const PEDACO_DE_MIDIA = "base64";
 
 /**
- * Parâmetro de URL cujo valor é credencial. `signature` fica DE FORA de
+ * Parâmetro de URL cujo valor é credencial (`key=`, `sig=`, `auth=` e `code=`
+ * entraram na revisão do @Cassio_SecRev na #98). `signature` fica DE FORA de
  * propósito: a URL de anexo da Meta (`lookaside.fbsbx.com/...&signature=`) é
  * relida do arquivo por `scripts/midia-do-instagram-retroativa.ts`.
  */
 const PARAMETRO_DE_SEGREDO =
-  /([?&;](?:access_token|refresh_token|id_token|token|apikey|api_key|secret|password)=)[^&#\s"']+/gi;
+  /([?&;](?:access_token|refresh_token|id_token|token|apikey|api_key|key|secret|password|sig|auth|code)=)[^&#\s"']+/gi;
 
 function normalizarChave(chave: string): string {
   return chave.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -110,19 +124,15 @@ function chaveDeMidia(chave: string): boolean {
   return normalizarChave(chave).includes(PEDACO_DE_MIDIA);
 }
 
-export interface MarcadorDeOmissao {
-  omitido: true;
-  motivo: "midia" | "tamanho" | "profundidade";
-  caracteres: number;
-  sha256: string;
-}
+export type MotivoDaOmissao = "midia" | "tamanho" | "profundidade";
 
-function sha256(texto: string): string {
+export function sha256(texto: string): string {
   return createHash("sha256").update(texto).digest("hex");
 }
 
-function marcador(motivo: MarcadorDeOmissao["motivo"], texto: string): MarcadorDeOmissao {
-  return { omitido: true, motivo, caracteres: texto.length, sha256: sha256(texto) };
+/** `[omitido:midia:123456c:sha=0123456789abcdef]` — curto de propósito. */
+export function marcador(motivo: MotivoDaOmissao, texto: string): string {
+  return `[omitido:${motivo}:${texto.length}c:sha=${sha256(texto).slice(0, 16)}]`;
 }
 
 /** Estado de uma passada: se algo foi cortado. */
@@ -131,7 +141,7 @@ interface Passada {
 }
 
 /** URL com credencial na query perde o valor; o resto fica. */
-function semCredencialNaUrl(texto: string, p: Passada): string {
+export function semCredencialNaUrl(texto: string, p: Passada): string {
   if (!texto.includes("=")) return texto;
   const limpo = texto.replace(PARAMETRO_DE_SEGREDO, `$1${TOKEN_OMITIDO}`);
   if (limpo !== texto) p.cortou = true;
@@ -146,6 +156,10 @@ function semCredencialNaUrl(texto: string, p: Passada): string {
  * objetos — por isso é aberto e passado pela mesma regra.
  */
 function enxugarTexto(texto: string, p: Passada, profundidade: number): unknown {
+  if (valorEhCredencial(texto)) {
+    p.cortou = true;
+    return TOKEN_OMITIDO;
+  }
   if (texto.length > TETO_DE_TEXTO) {
     p.cortou = true;
     return marcador("tamanho", texto);
@@ -172,10 +186,13 @@ function enxugarObjeto(v: Record<string, unknown>, p: Passada, profundidade: num
   const sub: Passada = { cortou: false };
   const out: Record<string, unknown> = {};
   for (const [chave, valor] of Object.entries(v)) {
-    if (chaveSensivel(chave) && valor !== null && valor !== undefined && valor !== "") {
+    if (
+      (chaveSensivel(chave) && valor !== null && valor !== undefined && valor !== "") ||
+      credencialPeloValor(chave, valor)
+    ) {
       out[chave] = TOKEN_OMITIDO;
       sub.cortou = true;
-    } else if (chaveDeMidia(chave) && typeof valor === "string" && valor.length > 0) {
+    } else if (chaveDeMidia(chave) && typeof valor === "string" && valor.length > TETO_DE_MIDIA_MINUSCULA) {
       out[chave] = marcador("midia", valor);
       sub.cortou = true;
     } else {
@@ -221,8 +238,7 @@ export interface ArquivoEnxuto {
 
 function cortarNoTeto(texto: string, original: string, teto: number): string {
   if (texto.length <= teto) return texto;
-  const m = marcador("tamanho", original);
-  return `${texto.slice(0, TETO_DE_TEXTO)}…[omitido: ${m.caracteres} caracteres, sha256 ${m.sha256}]`;
+  return `${texto.slice(0, TETO_DE_TEXTO)}…${marcador("tamanho", original)}`;
 }
 
 /** `a=1&b=2`, sem espaço nem chave/colchete na frente: parece formulário. */
@@ -235,11 +251,11 @@ function formularioEnxuto(texto: string): string {
   const p: Passada = { cortou: false };
   const out = new URLSearchParams();
   for (const [chave, valor] of new URLSearchParams(texto)) {
-    if (chaveSensivel(chave) && valor !== "") {
+    if ((chaveSensivel(chave) && valor !== "") || credencialPeloValor(chave, valor)) {
       out.append(chave, TOKEN_OMITIDO);
       p.cortou = true;
     } else if (chaveDeMidia(chave) && valor !== "") {
-      out.append(chave, JSON.stringify(marcador("midia", valor)));
+      out.append(chave, marcador("midia", valor));
       p.cortou = true;
     } else {
       const limpo = enxugarTexto(valor, p, 1);
@@ -260,7 +276,7 @@ function textoEnxuto(texto: string): string {
   const limpo = semCredencialNaUrl(
     texto
       .replace(SEGREDO_EM_TEXTO, `$1${TOKEN_OMITIDO}$2`)
-      .replace(TRECHO_BASE64, (m) => `[omitido: ${m.length} caracteres, sha256 ${sha256(m)}]`),
+      .replace(TRECHO_BASE64, (m) => marcador("midia", m)),
     { cortou: false },
   );
   return cortarNoTeto(limpo, texto, TETO_DE_TEXTO);
@@ -290,40 +306,9 @@ export function arquivoEnxuto(rawBody: string): ArquivoEnxuto {
 
   if (texto.length > TETO_DO_CORPO) {
     const chaves = ehObjeto ? Object.keys(payload as Record<string, unknown>) : [];
-    const resumo = { ...marcador("tamanho", texto), chaves };
+    const resumo = { omitido: marcador("tamanho", texto), chaves };
     return { rawBody: JSON.stringify(resumo), parsed: resumo as unknown as Record<string, unknown> };
   }
 
   return { rawBody: texto, parsed: ehObjeto ? (payload as Record<string, unknown>) : null };
-}
-
-/**
- * Cabeçalhos que NUNCA entram no arquivo, por nome exato. Além destes, sai todo
- * cabeçalho cujo nome tenha pedaço de credencial (`chaveSensivel`).
- *
- * `x-webhook-secret` é o SEGREDO COMPARTILHADO que um canal manda em claro e que
- * `lib/channels/inbound.ts` compara direto (não é HMAC): arquivado, qualquer
- * membro da org que lê o arquivo poderia forjar mensagem de entrada. `token` e
- * `apikey` são credenciais que servidores de WhatsApp mandam por header.
- */
-const CABECALHOS_PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey"];
-
-/**
- * Cabeçalhos sanitizados.
- *
- * Assinatura HMAC do corpo FICA (`x-hub-signature-256` e afins): permite
- * reconferir depois se a recusa foi de assinatura ou de segredo, e é derivada
- * do corpo, não abre nada sozinha. Valor acima do teto vira marcador.
- */
-export function cabecalhosParaArquivo(headers: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  headers.forEach((valor, chave) => {
-    const k = chave.toLowerCase();
-    if (CABECALHOS_PROIBIDOS.includes(k) || chaveSensivel(k)) return;
-    out[chave] =
-      valor.length > TETO_DE_TEXTO
-        ? `[omitido: ${valor.length} caracteres, sha256 ${sha256(valor)}]`
-        : semCredencialNaUrl(valor, { cortou: false });
-  });
-  return out;
 }
