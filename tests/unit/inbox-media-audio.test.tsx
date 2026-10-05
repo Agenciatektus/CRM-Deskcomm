@@ -23,11 +23,21 @@ describe("AudioPlayer", () => {
     expect(screen.getByRole("button", { name: /velocidade/i })).toHaveTextContent("1x");
   });
 
-  it("alterna play/pause", () => {
+  it("alterna play/pause", async () => {
     render(<AudioPlayer messageId="m3" isOutbound={false} />);
     const btn = screen.getByRole("button", { name: /reproduzir/i });
     fireEvent.click(btn);
-    expect(screen.getByRole("button", { name: /pausar/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /pausar/i })).toBeInTheDocument();
+  });
+
+  it("play() recusado: o botão continua em Reproduzir, nunca em Pausar", async () => {
+    const play = window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>;
+    play.mockRejectedValueOnce(new DOMException("bloqueado", "NotAllowedError"));
+    render(<AudioPlayer messageId="m3" isOutbound={false} />);
+    fireEvent.click(screen.getByRole("button", { name: /reproduzir/i }));
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: /pausar/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /reproduzir/i })).toBeInTheDocument();
   });
 
   it("cicla a velocidade 1x → 1.5x → 2x → 1x", () => {

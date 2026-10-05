@@ -179,6 +179,9 @@ export function ChatThread({
    * UMA mensagem re-renderizaria todas as já montadas. O ref guarda a versão
    * mais nova das mutações; o objeto de ações nasce uma vez e lê do ref.
    */
+  // Rascunho da edição por id: sobrevive à bolha sair da tela (e desmontar).
+  // Ref, não estado: digitar não pode re-renderizar o fio inteiro.
+  const rascunhos = useRef(new Map<string, string>());
   const gestos = useRef({ editar, apagar, ocultar, restaurar, onResponder });
   gestos.current = { editar, apagar, ocultar, restaurar, onResponder };
   const acoes: AcoesDoFio = useMemo(
@@ -188,6 +191,11 @@ export function ChatThread({
       apagar: (id) => gestos.current.apagar.mutateAsync(id).then(() => undefined),
       ocultar: (id) => gestos.current.ocultar.mutateAsync(id).then(() => undefined),
       restaurar: (id) => gestos.current.restaurar.mutateAsync(id).then(() => undefined),
+      lerRascunho: (id) => rascunhos.current.get(id) ?? null,
+      gravarRascunho: (id, texto) => {
+        if (texto === null) rascunhos.current.delete(id);
+        else rascunhos.current.set(id, texto);
+      },
     }),
     [],
   );
@@ -246,9 +254,18 @@ export function ChatThread({
   // DOM uma bolha que não existe. O pedido fica PENDENTE até a bolha montar
   // (inclusive na primeira pintura, quando o virtualizador ainda não mediu a
   // tela), e só então leva a bolha ao campo de visão, como antes.
+  //
+  // O `scrollToIndex` sai UMA vez por ocorrência (`rolouAte` guarda a chave da
+  // linha já pedida). O efeito roda a cada render enquanto a bolha não monta, e
+  // a rolagem da própria pessoa também re-renderiza: pedir de novo a cada
+  // passada prendia a tela na ocorrência, e quem tentasse rolar era puxado de
+  // volta (P2 do Cassio na #95). Ocorrência nova (outro termo, ou a primeira
+  // passou a ser outra linha) pede de novo.
   const buscaPendente = useRef(false);
+  const rolouAte = useRef<string | null>(null);
   useEffect(() => {
     buscaPendente.current = Boolean(termo);
+    rolouAte.current = null;
   }, [termo]);
   useEffect(() => {
     if (!buscaPendente.current) return;
@@ -265,7 +282,8 @@ export function ChatThread({
     if (el) {
       el.scrollIntoView({ block: "nearest" });
       buscaPendente.current = false;
-    } else if (virtualizer.getVirtualItems().length > 0) {
+    } else if (virtualizer.getVirtualItems().length > 0 && rolouAte.current !== linhas[alvo]!.key) {
+      rolouAte.current = linhas[alvo]!.key;
       virtualizer.scrollToIndex(alvo, { align: "center" });
     }
   });
@@ -275,6 +293,7 @@ export function ChatThread({
   useEffect(() => {
     paginasVistas.current = 0;
     jaAncorou.current = false;
+    rascunhos.current.clear();
   }, [conversationId]);
 
   // Rola ao fim na primeira carga e quando chega mensagem/nota nova — mas NÃO

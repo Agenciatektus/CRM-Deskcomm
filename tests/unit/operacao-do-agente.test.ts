@@ -232,6 +232,7 @@ describe("o que a leitura NÃO devolve", () => {
     (db.tabelas as unknown as Record<string, unknown[]>).webhook_events_log = [
       {
         id: "ev1",
+        organization_id: ORG_ID,
         webhook_path_token: "tok",
         received_at: "2026-08-04T10:00:00Z",
         valid_signature: true,
@@ -246,6 +247,22 @@ describe("o que a leitura NÃO devolve", () => {
     const serializado = JSON.stringify(evento);
     expect(serializado).not.toContain("Joana");
     expect(serializado).not.toContain("999998888");
+  });
+
+  it("recebimento filtra a organização além do token (service role não tem RLS)", async () => {
+    const db = makeDb({
+      webhookSources: [
+        { id: "w1", organization_id: ORG_ID, name: "Site", path_token: "tok", secret_encrypted: null },
+      ],
+    });
+    (db.tabelas as unknown as Record<string, unknown[]>).webhook_events_log = [
+      { id: "meu", organization_id: ORG_ID, webhook_path_token: "tok", received_at: "2026-08-04T10:00:00Z", valid_signature: true, status: "ok", payload_parsed: { a: 1 } },
+      { id: "alheio", organization_id: OUTRA_ORG, webhook_path_token: "tok", received_at: "2026-08-04T11:00:00Z", valid_signature: true, status: "ok", payload_parsed: { b: 1 } },
+    ];
+
+    const eventos = await recebimentosDaEntrada(deps(db), { id: "w1", limite: 20 });
+
+    expect(eventos.map((e) => e.id)).toEqual(["meu"]);
   });
 
   it("time sai com papel e user_id, sem e-mail nem nome", async () => {

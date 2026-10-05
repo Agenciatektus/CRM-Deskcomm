@@ -41,10 +41,22 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
   // Sem `src` até chegar perto da tela: o áudio não pede rede antes disso.
   const { ref: caixaRef, visivel, carregar } = useAoAparecer<HTMLDivElement>();
   const tocarAoCarregar = useRef(false);
+  /**
+   * "Tocando" só DEPOIS de o `play()` resolver. Marcar antes deixava o botão em
+   * "Pausar" quando o play falhava (autoplay bloqueado, mídia que não decodifica,
+   * src que expirou): a pessoa via o áudio "tocando" em silêncio, e o próximo
+   * clique pausava o que nunca tocou.
+   */
+  const tocar = (el: HTMLAudioElement) => {
+    Promise.resolve(el.play()).then(
+      () => setPlaying(true),
+      () => setPlaying(false),
+    );
+  };
   useEffect(() => {
     if (!visivel || !tocarAoCarregar.current) return;
     tocarAoCarregar.current = false;
-    void audioRef.current?.play();
+    if (audioRef.current) tocar(audioRef.current);
   }, [visivel]);
 
   useEffect(() => {
@@ -80,10 +92,8 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
       // Clique antes de a mídia ter carregado: põe o `src` e toca em seguida.
       tocarAoCarregar.current = true;
       carregar();
-      setPlaying(true);
     } else {
-      void el.play();
-      setPlaying(true);
+      tocar(el);
     }
   };
 

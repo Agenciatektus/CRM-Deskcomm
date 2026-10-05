@@ -18,6 +18,13 @@ export interface AcoesDoFio {
   apagar: (id: string) => Promise<void>;
   ocultar: (id: string) => Promise<void>;
   restaurar: (id: string) => Promise<void>;
+  /**
+   * Rascunho da edição, por id da mensagem. Mora no fio, não na bolha: o fio
+   * é virtualizado e a bolha que sai da tela desmonta — com o estado dentro
+   * dela, quem rolava para conferir algo perdia o que estava digitando.
+   */
+  lerRascunho: (id: string) => string | null;
+  gravarRascunho: (id: string, texto: string | null) => void;
 }
 
 interface Props {
@@ -63,6 +70,11 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
       citada={citada}
       viewerUserId={viewerUserId}
       onEditar={podeAlterar ? (text) => acoes.editar(id, text) : undefined}
+      rascunho={
+        podeAlterar
+          ? { ler: () => acoes.lerRascunho(id), gravar: (texto) => acoes.gravarRascunho(id, texto) }
+          : undefined
+      }
       onApagar={podeAlterar ? () => acoes.apagar(id) : undefined}
       onOcultar={podeModerar ? () => acoes.ocultar(id) : undefined}
       onRestaurar={podeModerar ? () => acoes.restaurar(id) : undefined}
