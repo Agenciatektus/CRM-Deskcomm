@@ -120,6 +120,15 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "por ACERTO ali.",
   },
   {
+    tabela: "webhook_events_log",
+    razao:
+      "tests/invariants/arquivo-de-webhook-so-manager-9035.test.ts prova " +
+      "isolamento cross-tenant, o gate de papel (viewer e agent não leem) e " +
+      "que nenhuma sessão lê raw_body/headers/payload_parsed (42501), com " +
+      "controle negativo. Fora de TABLES pelo mesmo motivo de " +
+      "webhook_lead_captures: a policy exige `manager` (9035).",
+  },
+  {
     tabela: "meta_templates",
     razao:
       "tests/invariants/meta-templates-rls.test.ts (\"membro da org B NÃO vê " +
@@ -411,7 +420,6 @@ const DEBITO_CONHECIDO: readonly Excecao[] = [
   "skill_versions",
   "storage_redaction_queue",
   "tenant_integrations",
-  "webhook_events_log",
 ].map((tabela) => ({ tabela, razao: RAZAO_DEBITO_CONHECIDO }));
 
 interface TabelaOrg {

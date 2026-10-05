@@ -49192,6 +49192,44 @@ begin
   end loop;
 end $$;
 
+-- ---- o arquivo de webhook é lido só por manager+, e sem o corpo (migration 9035) ----
+--
+-- A policy original (lá em cima) era org-flat sem papel, e `authenticated`
+-- tinha SELECT na tabela inteira: um `viewer` lia `raw_body`, `headers` e
+-- `payload_parsed` de toda entrega da organização pelo PostgREST. Aqui: leitura
+-- só por manager+ (ou platform admin), nenhum privilégio de tabela para anon e
+-- authenticated (TRUNCATE incluído), e SELECT por coluna só do metadado. O
+-- conteúdo fica para o service role. Ver o cabeçalho da 9035.
+-- Idempotente: a policy só é recriada se ainda não tiver o gate de papel (sem
+-- lock da tabela na reaplicação); revoke/grant reaplicam o mesmo estado, e o
+-- GRANT de tabela lá de cima é desfeito aqui, abaixo dele.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policy
+     where polname = 'webhook_events_log_tenant_read'
+       and polrelid = 'public.webhook_events_log'::regclass
+       and pg_get_expr(polqual, polrelid) like '%fn_role_at_least%manager%'
+  ) then
+    drop policy if exists "webhook_events_log_tenant_read" on public.webhook_events_log;
+    create policy "webhook_events_log_tenant_read" on public.webhook_events_log
+      for select
+      using (
+        (select public.fn_is_platform_admin())
+        or (organization_id is not null and public.fn_role_at_least(organization_id, 'manager'))
+      );
+  end if;
+end $$;
+
+revoke all on table public.webhook_events_log from anon, authenticated;
+grant select (
+  id, organization_id, channel_session_id, provider, webhook_path_token,
+  http_method, signature_header, valid_signature, event_type, external_id,
+  status, attempts, error_message, processed_at, received_at, archived_at
+) on table public.webhook_events_log to authenticated;
+
+notify pgrst, 'reload schema';
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
