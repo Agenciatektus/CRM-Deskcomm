@@ -1,6 +1,12 @@
 /**
  * CURADORIA DE ETIQUETAS (migration 9005) — quem pode chamar cada uma das cinco.
  *
+ * ⚠️ DESDE A 9038: criar e arquivar continuam chamadas pela sessão (tela de
+ * Tags). Renomear, mesclar e apagar perderam o chamador — a tela de Tags faz as
+ * três por `fn_vocabulario_de_tags_operar` — e foram REVOGADAS de
+ * `authenticated`: função sem chamador pela sessão não fica exposta à sessão
+ * (LRN-20260928-003). O último bloco deste arquivo prova a revogação.
+ *
  * As cinco escritas (`fn_tags_criar`, `fn_tags_arquivar`, `fn_tags_renomear`,
  * `fn_tags_mesclar`, `fn_tags_apagar`) são executáveis por `authenticated` DE
  * PROPÓSITO: a server action chama pela sessão de quem clicou, e é a própria
@@ -71,24 +77,6 @@ const ESCRITAS: readonly Escrita[] = [
     nome: "fn_tags_arquivar",
     piso: "manager",
     sql: "select public.fn_tags_arquivar($1,'conversa',$2,true) as r",
-    valores: (org, etiqueta) => [org, etiqueta],
-  },
-  {
-    nome: "fn_tags_renomear",
-    piso: "admin",
-    sql: "select public.fn_tags_renomear($1,'conversa',$2,$3) as r",
-    valores: (org, etiqueta) => [org, etiqueta, `${etiqueta}-b`],
-  },
-  {
-    nome: "fn_tags_mesclar",
-    piso: "admin",
-    sql: "select public.fn_tags_mesclar($1,'conversa',array[$2::text],$3) as r",
-    valores: (org, etiqueta) => [org, etiqueta, `${etiqueta}-d`],
-  },
-  {
-    nome: "fn_tags_apagar",
-    piso: "admin",
-    sql: "select public.fn_tags_apagar($1,'conversa',$2) as r",
     valores: (org, etiqueta) => [org, etiqueta],
   },
 ];
@@ -170,24 +158,6 @@ describe("9005 — curadoria de etiquetas: quem pode chamar", () => {
       ).rejects.toThrow(/tags_forbidden/);
     }
   });
-
-  it.each(ESCRITAS.filter((e) => e.piso === "admin"))(
-    "manager é recusado em $nome (piso admin)",
-    async (escrita) => {
-      // As três destrutivas reescrevem `tags` em massa e não têm desfazer — por
-      // isso o piso delas é admin e não manager, e a diferença tem de ser
-      // MEDIDA: um `fn_tags_guarda(p_org, 'manager')` copiado por engano numa
-      // delas passaria despercebido pela varredura de catálogo.
-      await expect(
-        chamar(
-          "authenticated",
-          casa.manager,
-          escrita.sql,
-          escrita.valores(casa.org, "acl-destrutiva"),
-        ),
-      ).rejects.toThrow(/tags_forbidden/);
-    },
-  );
 
   it("manager cria e arquiva na própria organização (controle positivo do piso)", async () => {
     // Sem este caso, uma guarda que recusasse SEMPRE deixaria os dois casos
@@ -300,6 +270,26 @@ describe("9005 — curadoria de etiquetas: quem pode chamar", () => {
       [fn],
     );
     expect(rows[0]).toEqual({ auth: false, anon: false });
+  });
+
+  it.each([
+    "public.fn_tags_renomear(uuid,text,text,text)",
+    "public.fn_tags_mesclar(uuid,text,text[],text)",
+    "public.fn_tags_apagar(uuid,text,text)",
+  ])("9038: %s perdeu o chamador e não é executável por authenticated nem por anon", async (fn) => {
+    const { rows } = await pool.query(
+      "select has_function_privilege('authenticated',$1,'execute') as auth, has_function_privilege('anon',$1,'execute') as anon",
+      [fn],
+    );
+    expect(rows[0]).toEqual({ auth: false, anon: false });
+  });
+
+  it("9038: nem o admin da própria organização alcança renomear pela sessão", async () => {
+    // O catálogo acima diz o grant; isto diz o comportamento. Com o admin de
+    // casa, o caso em que a função ACEITARIA se ainda fosse alcançável.
+    await expect(
+      chamar("authenticated", casa.admin, "select public.fn_tags_renomear($1,'conversa','a','b') as r", [casa.org]),
+    ).rejects.toThrow(/permission denied for function/);
   });
 
   it("a guarda não é alcançável pela sessão — nem para ser sondada", async () => {

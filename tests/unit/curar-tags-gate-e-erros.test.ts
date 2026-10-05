@@ -1,16 +1,20 @@
 /**
  * AS SERVER ACTIONS DE CURADORIA — o gate de papel e a tradução de recusa.
  *
+ * Desde a 9038 são duas: criar (acrescentar ou promover uma sugestão) e
+ * arquivar/desarquivar. Renomear, juntar e excluir saem pela rota de Tags
+ * (`fn_vocabulario_de_tags_operar`) e são cobertos por
+ * `tests/invariants/tags-mantem-as-listas-de-sugestao-9038.test.ts`.
+ *
  * Server Action é endpoint público: o tipo do parâmetro não chega ao servidor, e
  * o `organization_id` NUNCA pode vir de argumento. Os testes aqui medem as três
  * propriedades que mantêm isso verdadeiro:
  *
- *  1. o piso de papel de cada uma das cinco — e que o par manager/admin é o que
- *     está escrito, não o que a tela mostra;
+ *  1. o piso de papel (manager);
  *  2. que a organização enviada à RPC é a de `resolveActiveOrg`, sempre;
  *  3. que cada recusa do banco vira um código que a tela sabe explicar — um
- *     `falha` genérico faria o operador tentar de novo para sempre contra uma
- *     etiqueta reservada.
+ *     `falha` genérico faria o operador tentar de novo para sempre contra o
+ *     limite da lista.
  *
  * O gate de verdade está no corpo da função SQL (provado em psql). Estas actions
  * são a segunda tranca, e existem para não chamar a RPC à toa.
@@ -33,13 +37,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc }) })
 
 const ORG_DA_SESSAO = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
-import {
-  apagarTag,
-  arquivarTag,
-  criarTag,
-  mesclarTags,
-  renomearTag,
-} from "@/app/actions/settings/curarTags";
+import * as acoes from "@/app/actions/settings/curarTags";
+import { arquivarTag, criarTag } from "@/app/actions/settings/curarTags";
 
 function sessaoComPapel(role: string) {
   loadAuthUser.mockResolvedValue({ id: "user-1", support: null, idioma: "pt-BR" });
@@ -56,33 +55,13 @@ describe("o piso de papel de cada ação", () => {
     sessaoComPapel("manager");
     expect((await criarTag("conversa", "orçamento")).ok).toBe(true);
     expect((await arquivarTag("conversa", "troca", true)).ok).toBe(true);
-  });
-
-  it("manager NÃO renomeia, não mescla e não apaga", async () => {
-    // As três reescrevem `tags` em massa e nenhuma tem desfazer — a mesma régua
-    // que faz `fn_definir_cliente_pela_agenda` ser admin.
-    sessaoComPapel("manager");
-    for (const r of [
-      await renomearTag("conversa", "troca", "devolução"),
-      await mesclarTags("conversa", ["urgentr"], "urgente"),
-      await apagarTag("conversa", "troca"),
-    ]) {
-      expect(r).toEqual({ ok: false, erro: "sem_permissao" });
-    }
-    // E a RPC nem chegou a ser chamada.
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("admin faz as cinco", async () => {
-    sessaoComPapel("admin");
-    expect((await renomearTag("conversa", "troca", "devolução")).ok).toBe(true);
-    expect((await mesclarTags("conversa", ["urgentr"], "urgente")).ok).toBe(true);
-    expect((await apagarTag("conversa", "troca")).ok).toBe(true);
+    expect((await arquivarTag("contato", "troca", false)).ok).toBe(true);
   });
 
   it("agent não faz nenhuma", async () => {
     sessaoComPapel("agent");
     expect((await criarTag("conversa", "x")).ok).toBe(false);
+    expect((await arquivarTag("conversa", "x", true)).ok).toBe(false);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -91,45 +70,48 @@ describe("o piso de papel de cada ação", () => {
     expect(await criarTag("conversa", "x")).toEqual({ ok: false, erro: "sessao" });
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it("renomear, mesclar e apagar não existem mais como Server Action (9038)", () => {
+    // Um segundo caminho para as mesmas operações, com papel diferente do da
+    // tela de Tags, faria a regra de quem pode o quê depender de qual botão foi
+    // apertado.
+    expect(Object.keys(acoes).sort()).toEqual(["arquivarTag", "criarTag"]);
+  });
 });
 
 describe("a organização vem da sessão, nunca do argumento", () => {
-  it("nenhuma das cinco aceita organização por parâmetro", async () => {
-    sessaoComPapel("admin");
+  it("nenhuma das duas aceita organização por parâmetro", async () => {
+    sessaoComPapel("manager");
     await criarTag("conversa", "x");
-    await renomearTag("conversa", "a", "b");
-    await mesclarTags("conversa", ["a"], "b");
-    await apagarTag("conversa", "a");
     await arquivarTag("conversa", "a", true);
-    expect(rpc.mock.calls.length).toBe(5);
+    expect(rpc.mock.calls.length).toBe(2);
     for (const chamada of rpc.mock.calls) {
       expect((chamada[1] as { p_org: string }).p_org).toBe(ORG_DA_SESSAO);
     }
-    // A assinatura em si já impede: nenhuma das cinco tem um parâmetro de org.
+    // A assinatura em si já impede: nenhuma das duas tem um parâmetro de org.
     expect(criarTag.length).toBe(2);
-    expect(apagarTag.length).toBe(2);
-    expect(renomearTag.length).toBe(3);
+    expect(arquivarTag.length).toBe(3);
   });
 });
 
 describe("a entrada é validada no servidor", () => {
   it("escopo inventado é recusado antes de qualquer chamada", async () => {
-    sessaoComPapel("admin");
+    sessaoComPapel("manager");
     expect(await criarTag("crm_leads", "x")).toEqual({ ok: false, erro: "nome_invalido" });
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("nome vazio, longo demais ou de outro tipo é recusado", async () => {
-    sessaoComPapel("admin");
+    sessaoComPapel("manager");
     expect((await criarTag("conversa", "")).ok).toBe(false);
     expect((await criarTag("conversa", "x".repeat(41))).ok).toBe(false);
     expect((await criarTag("conversa", { tag: "x" })).ok).toBe(false);
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("mesclar exige ao menos uma origem", async () => {
-    sessaoComPapel("admin");
-    expect((await mesclarTags("conversa", [], "urgente")).ok).toBe(false);
+  it("arquivar exige o booleano", async () => {
+    sessaoComPapel("manager");
+    expect((await arquivarTag("conversa", "x", "sim")).ok).toBe(false);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -137,7 +119,7 @@ describe("a entrada é validada no servidor", () => {
     // Sem isto a curadoria gravaria `Urgente` como canônica, e o editor do
     // Inbox (que compara em minúsculas) nunca casaria a sugestão com o que o
     // atendente digita: a etiqueta apareceria na lista e não funcionaria.
-    sessaoComPapel("admin");
+    sessaoComPapel("manager");
     await criarTag("conversa", "  URGENTE  ");
     expect((rpc.mock.calls[0]?.[1] as { p_tag: string }).p_tag).toBe("urgente");
   });
@@ -145,8 +127,6 @@ describe("a entrada é validada no servidor", () => {
 
 describe("cada recusa do banco vira um código que a tela sabe explicar", () => {
   const casos: Array<[string, string, string]> = [
-    ["tags_etiqueta_do_sistema", "42501", "etiqueta_do_sistema"],
-    ["tags_destino_ja_existe", "23505", "destino_ja_existe"],
     ["tags_mfa_required", "42501", "mfa"],
     ["tags_forbidden", "42501", "sem_permissao"],
     ["tags_limite", "23514", "limite"],
@@ -156,25 +136,15 @@ describe("cada recusa do banco vira um código que a tela sabe explicar", () => 
   ];
 
   it.each(casos)("%s -> %s", async (message, code, esperado) => {
-    sessaoComPapel("admin");
+    sessaoComPapel("manager");
     rpc.mockResolvedValue({ data: null, error: { code, message } });
-    const r = await apagarTag("contato", "cliente");
+    const r = await criarTag("contato", "vip");
     expect(r).toEqual({ ok: false, erro: esperado });
   });
 
   it("um corpo que não é o contrato vira falha, não sucesso silencioso", async () => {
-    sessaoComPapel("admin");
+    sessaoComPapel("manager");
     rpc.mockResolvedValue({ data: { inesperado: true }, error: null });
-    expect(await apagarTag("conversa", "troca")).toEqual({ ok: false, erro: "falha" });
-  });
-});
-
-describe("o número que volta é o do banco", () => {
-  it("a contagem de registros atravessa até a tela", async () => {
-    // A tela mostra "Apagada de 312 conversas". Se a action devolvesse zero
-    // fixo, o operador leria que nada aconteceu logo depois de destruir 312.
-    sessaoComPapel("admin");
-    rpc.mockResolvedValue({ data: { mudou: true, registros: 312 }, error: null });
-    expect(await apagarTag("conversa", "troca")).toMatchObject({ ok: true, registros: 312 });
+    expect(await arquivarTag("conversa", "troca", true)).toEqual({ ok: false, erro: "falha" });
   });
 });
