@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+const nadaAssinar = () => () => {};
 
 /**
  * A mídia só pede rede quando chega PERTO da tela (ou quando alguém clica).
@@ -15,9 +17,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 export function useAoAparecer<T extends Element>(margem = "200px") {
   const ref = useRef<T | null>(null);
-  const [visivel, setVisivel] = useState(
-    () => typeof window !== "undefined" && typeof IntersectionObserver === "undefined",
+  const [apareceu, setVisivel] = useState(false);
+  // Sem observador o navegador não tem como avisar: carrega na hora. Lido por
+  // `useSyncExternalStore` (servidor diz `false`) para não divergir na hidratação.
+  const semObservador = useSyncExternalStore(
+    nadaAssinar,
+    () => typeof IntersectionObserver === "undefined",
+    () => false,
   );
+  const visivel = apareceu || semObservador;
 
   useEffect(() => {
     if (visivel) return;
