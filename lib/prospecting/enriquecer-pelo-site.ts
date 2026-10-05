@@ -20,11 +20,19 @@
  * prenderia uma thread por ~10 s. O julgamento do IP continua sendo o mesmo
  * (`ipEhEspecial`). P1-A do @Cassio_SecRev na #78.
  *
- * A janela de DNS-rebinding entre esta resolução e a do `fetch` existe; o que a
- * neutraliza é o HTTPS com certificado válido (serviço interno não fala TLS com
- * o nome do atacante). Isso DEPENDE de `NODE_ENV=production` no processo que
- * roda isto (o Dockerfile do app fixa; o `Dockerfile.worker` NÃO): mover o cron
- * da prospecção para o worker sem fixar o ambiente reabre o http.
+ * DNS REBINDING (P1 do @Cassio_SecRev, revisão da #78): conferir o nome e
+ * depois deixar o `fetch` resolver de novo dava ao atacante (o dono do site do
+ * Maps) uma segunda resposta de DNS — pública na conferência, interna na
+ * conexão: SSRF cego contra a rede do servidor. A conexão agora sai por
+ * `fetchComDestinoFixado`: o nome é resolvido DENTRO do `lookup` da própria
+ * conexão (pelo mesmo c-ares de 2 s), todos os endereços são julgados e o socket
+ * vai no conferido. A conferência de antes (`julgarHost`) fica como recusa
+ * rápida, sem abrir conexão.
+ *
+ * SÓ HTTPS NA 443, em qualquer ambiente. Antes, http era recusado só com
+ * `NODE_ENV=production` (e o `Dockerfile.worker` não fixa o ambiente). Site
+ * que redireciona para http ou para outra porta fica sem enriquecer — o
+ * enriquecimento é melhor-esforço, e site comercial atende em https/443.
  *
  * Nunca lança e nunca segura a busca: site que falha, demora ou recusa fica
  * sem enriquecer. Roda FORA da transação que grava os candidatos.
@@ -32,7 +40,7 @@
 import { Resolver } from "node:dns/promises";
 import { isIP } from "node:net";
 
-import { ipEhEspecial } from "@/lib/automation/outbound-ip";
+import { fetchComDestinoFixado, ipEhEspecial } from "@/lib/automation/outbound-ip";
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
 import { logger } from "@/lib/logger";
 import type { Prospect } from "./schema";
@@ -119,6 +127,19 @@ export async function julgarHost(hostname: string, prazo: AbortSignal): Promise<
     if (ipEhEspecial(hostname)) throw new Error("unsafe_url:private_ip");
     return;
   }
+  const enderecos = await resolverPeloCares(hostname, prazo);
+  if (enderecos.some((e) => ipEhEspecial(e.address))) throw new Error("unsafe_url:private_ip");
+}
+
+/**
+ * Os endereços do host pelo c-ares (2 s, uma tentativa, cancelado pelo prazo).
+ * É o `resolver` da conexão fixada: a MESMA resposta que é julgada é a usada
+ * pelo socket. Falha fechada: sem resposta, `unsafe_url:dns_failed`.
+ */
+export async function resolverPeloCares(
+  hostname: string,
+  prazo: AbortSignal,
+): Promise<Array<{ address: string; family: number }>> {
   const resolver = new Resolver({ timeout: 2000, tries: 1 });
   const cancelar = () => resolver.cancel();
   prazo.addEventListener("abort", cancelar, { once: true });
@@ -128,9 +149,12 @@ export async function julgarHost(hostname: string, prazo: AbortSignal): Promise<
       resolver.resolve6(hostname).catch(() => [] as string[]),
     ]);
     if (prazo.aborted) throw new Error("unsafe_url:timeout");
-    const enderecos = [...v4, ...v6];
+    const enderecos = [
+      ...v4.map((address) => ({ address, family: 4 })),
+      ...v6.map((address) => ({ address, family: 6 })),
+    ];
     if (enderecos.length === 0) throw new Error("unsafe_url:dns_failed");
-    if (enderecos.some(ipEhEspecial)) throw new Error("unsafe_url:private_ip");
+    return enderecos;
   } finally {
     prazo.removeEventListener("abort", cancelar);
   }
@@ -145,14 +169,19 @@ export async function lerPaginaPublica(url: string, limites: LimitesDoSite = LIM
   for (let salto = 0; salto <= limites.maxSaltos; salto++) {
     try {
       assertSafeOutboundUrl(atual);
-      await julgarHost(new URL(atual).hostname, prazo);
-      const resposta = await fetch(atual, {
-        method: "GET",
-        redirect: "manual",
-        cache: "no-store",
-        headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 (compatible; VerdashCRM/1.0)" },
-        signal: prazo,
-      });
+      const alvo = new URL(atual);
+      if (alvo.protocol !== "https:") throw new Error("unsafe_url:https_required");
+      await julgarHost(alvo.hostname, prazo);
+      // A conexão vai no IP que o lookup DELA conferiu — ver o cabeçalho.
+      const resposta = await fetchComDestinoFixado(
+        atual,
+        {
+          method: "GET",
+          headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 (compatible; VerdashCRM/1.0)" },
+          signal: prazo,
+        },
+        { resolver: (host) => resolverPeloCares(host, prazo), portasPermitidas: [443] },
+      );
       if (resposta.status >= 300 && resposta.status < 400) {
         const destino = resposta.headers.get("location");
         await resposta.body?.cancel();
