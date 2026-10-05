@@ -69,7 +69,10 @@ describe("o token que o socket do Realtime usa", () => {
   it("o hook do canal NÃO autentica por conta própria — fonte única", () => {
     // Duas fontes de token foi exatamente o defeito. Se o hook voltar a chamar
     // setAuth, a que vence é a callback e a outra vira mentira no código.
-    const hook = soCodigo(readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8"));
+    const hook = soCodigo(
+      readFileSync("hooks/realtime/useRealtimeChannel.ts", "utf8") +
+        readFileSync("hooks/realtime/canaisCompartilhados.ts", "utf8"),
+    );
     expect(hook, "o hook voltou a chamar setAuth").not.toMatch(/\.setAuth\(/);
     expect(hook, "o hook voltou a buscar token por conta própria").not.toMatch(
       /realtime-token/,

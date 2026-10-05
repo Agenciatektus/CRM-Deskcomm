@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
-import { createClient, prepareRealtimeAuthentication } from "@/lib/supabase/browser";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
-export type RealtimeStatus =
-  | "connecting"
-  | "subscribed"
-  | "channel_error"
-  | "timed_out"
-  | "closed";
+import { assinarCanal, chaveDoCanal, type RealtimeStatus } from "./canaisCompartilhados";
+
+export type { RealtimeStatus };
+
+/** O pedaço do tópico que este hook quer — ver `passaNoFiltroLocal`. */
+export interface FiltroLocal {
+  eventos?: ReadonlyArray<"INSERT" | "UPDATE" | "DELETE">;
+  /** Campo → valor exigido na linha (`new`, ou `old` no DELETE). */
+  campos?: Readonly<Record<string, string>>;
+}
 
 export interface UseRealtimeChannelOpts {
   name: string;
@@ -21,6 +23,12 @@ export interface UseRealtimeChannelOpts {
   broadcast?: { event: string };
   onChange: (payload: unknown) => void;
   enabled?: boolean;
+  /**
+   * Recorte local sobre um tópico mais largo, para COMPARTILHAR o canal que
+   * outro hook já mantém (ver `passaNoFiltroLocal`). Não muda o que o servidor
+   * manda — muda o que chega a este `onChange`.
+   */
+  filtroLocal?: FiltroLocal;
 }
 
 /**
@@ -68,7 +76,7 @@ export function useRealtimeChannel(opts: UseRealtimeChannelOpts): {
    */
   ultimaEntrega: RefObject<number | null>;
 } {
-  const { name, postgresChanges, broadcast, onChange, enabled = true } = opts;
+  const { name, postgresChanges, broadcast, onChange, enabled = true, filtroLocal } = opts;
 
   // ref makes onChange identity-stable so changing handler doesn't re-subscribe
   const onChangeRef = useRef(onChange);
@@ -93,148 +101,65 @@ export function useRealtimeChannel(opts: UseRealtimeChannelOpts): {
 
   const [status, setStatus] = useState<RealtimeStatus>(enabled ? "connecting" : "closed");
 
-  // React 19 strict mode mounts effects twice in dev. If two consumers ever
-  // share the same logical channel name (or the same component re-mounts),
-  // Supabase reuses the existing channel object — calling `.on()` after the
-  // prior `.subscribe()` errors out. Append a stable per-instance suffix so
-  // every hook call owns its own channel topology.
+  // O sufixo por instância só vale para canal NÃO compartilhável (broadcast):
+  // ali o nome é o tópico e cada hook continua com o seu. Canal de
+  // `postgres_changes` é compartilhado por topologia (ver canaisCompartilhados).
   const instanceId = useId();
+
+  const filtroLocalRef = useRef(filtroLocal);
+  useEffect(() => {
+    filtroLocalRef.current = filtroLocal;
+  }, [filtroLocal]);
 
   useEffect(() => {
     if (!enabled) {
       setStatus("closed");
       return;
     }
-    const supabase = createClient();
-    const channelName = `${name}::${instanceId}`;
-
-    const handler = (payload: unknown) => {
-      // Carimba ANTES de entregar: se o consumidor lançar, a entrega ainda
-      // aconteceu — e o refetch de segurança precisa saber disso para não
-      // acusar o canal de ter perdido o que ele trouxe.
-      ultimaEntrega.current = Date.now();
-      onChangeRef.current(payload);
-    };
-
-    // `active` guarda o canal VIGENTE. Cada tentativa cria um objeto novo, e a
-    // comparação `active !== novo` nos callbacks descarta o que sobrou de uma
-    // tentativa anterior — sem ela, um canal velho que responde tarde
-    // sobrescreveria o estado do canal que já está de pé.
-    let active: RealtimeChannel | null = null;
-    let cancelado = false;
-    let tentativas = 0;
-    let retomada: ReturnType<typeof setTimeout> | null = null;
     setStatus("connecting");
-
-    /**
-     * Monta o canal do zero e assina.
-     *
-     * DO ZERO, e não `subscribe()` de novo no mesmo objeto: um canal que entrou
-     * em erro não volta — o socket já derrubou a topologia dele, e reassinar o
-     * mesmo objeto devolve SUBSCRIBED sem nunca mais entregar. Morte silenciosa,
-     * a mesma classe de defeito que a memo de auth já tinha aqui.
-     */
-    const agendarRetomada = () => {
-      if (cancelado) return;
-      const espera = Math.min(30_000, 1_000 * 2 ** tentativas);
-      tentativas++;
-      if (retomada) clearTimeout(retomada);
-      retomada = setTimeout(() => {
-        if (cancelado) return;
-        // `active` é SOLTO antes de remover, e a ordem é o conserto. Num canal
-        // que ainda não entrou, `removeChannel` chama o callback do `subscribe`
-        // com CLOSED ANTES de retornar (medido no realtime-js 2.112.3 instalado:
-        // `joining | cb:CLOSED | depois-da-chamada`). Com `active` ainda
-        // apontando o canal velho, esse CLOSED passava pela guarda
-        // `active !== novo` e armava OUTRA retomada — um timer órfão que, 2^n s
-        // depois, derrubava o canal que já tinha voltado saudável, numa janela
-        // em que eventos se perdem e nenhum "reassinado" é emitido.
-        const velho = active;
-        active = null;
-        if (velho) supabase.removeChannel(velho);
-        montar();
-      }, espera);
-    };
-    const montar = async () => {
-      if (cancelado) return;
-      try {
-        await prepareRealtimeAuthentication();
-      } catch {
-        if (cancelado) return;
-        setStatus("channel_error");
-        agendarRetomada();
-        return;
-      }
-      if (cancelado) return;
-
-      let novo: RealtimeChannel = supabase.channel(`${channelName}#${tentativas}`);
-      if (postgresChanges) {
-        novo = novo.on(
-          "postgres_changes",
-          {
-            event: postgresChanges.event,
-            schema: postgresChanges.schema ?? "public",
-            table: postgresChanges.table,
-            ...(postgresChanges.filter ? { filter: postgresChanges.filter } : {}),
-          },
-          handler,
-        );
-      }
-      if (broadcast) novo = novo.on("broadcast", { event: broadcast.event }, handler);
-      active = novo;
-
-      // Bootstrap concluído antes do primeiro join; a callback do client mantém
-      // a renovação. Nenhum canal anônimo nasce enquanto o token está em voo.
-      novo.subscribe((s) => {
-        if (cancelado || active !== novo) return;
-        // s is one of "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED"
-        const map: Record<string, RealtimeStatus> = {
-          SUBSCRIBED: "subscribed",
-          CHANNEL_ERROR: "channel_error",
-          TIMED_OUT: "timed_out",
-          CLOSED: "closed",
-        };
-        setStatus(map[s] ?? "connecting");
-
-        if (s === "SUBSCRIBED") {
-          // Voltou depois de ter caído. O que aconteceu enquanto ele estava
-          // morto NÃO vai chegar — o Realtime não guarda nada para entregar
-          // depois. Uma entrega sintética força quem escuta a buscar de novo,
-          // e é ela que fecha o buraco de verdade: sem isso o canal volta a
-          // funcionar para o PRÓXIMO evento e a tela segue sem o anterior.
-          if (tentativas > 0) {
-            tentativas = 0;
-            handler({ tipo: "reassinado" });
-          }
-          return;
-        }
-
-        if (s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
-          // Antes daqui não havia NADA: o estado era anotado e o canal ficava
-          // morto até a pessoa recarregar a página. Foi o sintoma relatado —
-          // "às vezes preciso atualizar para a mensagem aparecer".
-          //
-          // Recuo exponencial com teto de 30s: reconectar em rajada contra um
-          // socket que caiu por sobrecarga piora a sobrecarga, e o teto evita
-          // que uma queda longa deixe a espera em minutos.
-          agendarRetomada();
-        }
-      });
-    };
-
-    montar();
-
-    return () => {
-      cancelado = true;
-      if (retomada) clearTimeout(retomada);
-      if (active) {
-        supabase.removeChannel(active);
-        active = null;
-      }
-    };
-    // intentionally omit onChange (ref); only re-subscribe when channel topology changes
+    const topologia = { postgresChanges, broadcast };
+    const { chave, nomeBase, compartilhado } = chaveDoCanal(name, topologia, instanceId);
+    return assinarCanal(chave, nomeBase, compartilhado, topologia, {
+      entregar: (payload) => {
+        if (!passaNoFiltroLocal(filtroLocalRef.current, payload)) return;
+        // Carimba ANTES de entregar: se o consumidor lançar, a entrega ainda
+        // aconteceu — e o refetch de segurança precisa saber disso para não
+        // acusar o canal de ter perdido o que ele trouxe.
+        ultimaEntrega.current = Date.now();
+        onChangeRef.current(payload);
+      },
+      aoMudarStatus: setStatus,
+    });
+    // intentionally omit onChange/filtroLocal (refs); only re-subscribe when channel topology changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, enabled, instanceId, postgresChanges?.event, postgresChanges?.table, postgresChanges?.filter, postgresChanges?.schema, broadcast?.event]);
 
   return { status, ultimaEntrega };
+}
+
+/**
+ * O recorte do assinante sobre um canal mais largo que ele.
+ *
+ * Existe para que hooks que olham um PEDAÇO de um tópico (a nota de UMA
+ * conversa, o UPDATE de UMA conversa) usem o canal da organização que outro
+ * hook já mantém aberto, em vez de abrir mais um.
+ *
+ * Na dúvida, ENTREGA: campo ausente no registro (o DELETE sob RLS só traz a
+ * chave primária) não é motivo para descartar. O pior caso é um refetch a
+ * mais; descartar seria perder evento. A entrega sintética ("reassinado") não
+ * tem `eventType` e passa sempre — ela é o aviso de que algo pode ter faltado.
+ */
+export function passaNoFiltroLocal(filtro: FiltroLocal | undefined, payload: unknown): boolean {
+  if (!filtro) return true;
+  const p = payload as { eventType?: string; new?: Record<string, unknown>; old?: Record<string, unknown> } | null;
+  const evento = p?.eventType;
+  if (!evento) return true;
+  if (filtro.eventos && !filtro.eventos.includes(evento as never)) return false;
+  if (filtro.campos) {
+    const linha = evento === "DELETE" ? p?.old : p?.new;
+    for (const [campo, valor] of Object.entries(filtro.campos)) {
+      if (linha && campo in linha && String(linha[campo]) !== valor) return false;
+    }
+  }
+  return true;
 }
