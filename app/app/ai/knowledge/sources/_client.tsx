@@ -7,6 +7,7 @@ import { Plus, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
+import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import {
   chaveQueryKey,
   sourcesQueryKey,
@@ -57,10 +58,19 @@ export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
   // sessão é httpOnly) — recebe "ok" e nunca entrega. Aqui o efeito era a lista
   // não atualizar sozinha quando o worker terminava de preparar o material, que
   // é justamente o momento em que a pessoa está olhando para a tela.
+  //
+  // Com o filtro da organização: sem ele o servidor avaliava a RLS de TODO
+  // evento da tabela, de todas as organizações, para cada aba aberta aqui
+  // (item 14 da auditoria — `realtime.list_changes` era 35% do banco). Sem
+  // organização ativa, não assina.
+  const orgId = useActiveOrg()?.orgId ?? null;
   useRealtimeChannel({
     name: "acervo-de-conhecimento",
-    postgresChanges: { event: "*", schema: "public", table: "ai_knowledge_sources" },
+    postgresChanges: orgId
+      ? { event: "*", schema: "public", table: "ai_knowledge_sources", filter: `organization_id=eq.${orgId}` }
+      : undefined,
     onChange: recarregar,
+    enabled: !!orgId,
   });
 
   const lista = (sources ?? []).filter((s) => s.status !== "archived");
