@@ -168,6 +168,19 @@ describe("9038 — as quatro listas de sugestão", () => {
     expect(s.tags).toEqual([{ tag: "reclamação", cor: "#ffb224" }]);
   });
 
+  it("excluir tira SÓ a etiqueta excluída de cada registro, e as outras ficam", async () => {
+    // O defeito (6) da 0264: `fn_tags_normalizar` anulava TODAS as etiquetas do
+    // registro no excluir. Um contato com {inadimplente, vip, whatsapp} ficava
+    // sem etiqueta nenhuma ao excluir `vip`.
+    await definirSettings({});
+    await pool.query("update contacts set tags=array['inadimplente','vip','whatsapp'] where id=$1", [contato]);
+
+    const r = await operar("excluir", "vip", null);
+
+    expect((r.rows[0].r as { contatos: number }).contatos).toBe(1);
+    expect(await tagsDoContato()).toEqual(["inadimplente", "whatsapp"]);
+  });
+
   it("lista que a organização nunca teve continua sem existir", async () => {
     await definirSettings({ canonical_conversation_tags: ["a"] });
 
