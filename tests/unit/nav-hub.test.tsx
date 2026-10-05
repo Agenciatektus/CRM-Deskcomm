@@ -179,7 +179,7 @@ describe("NavHub", () => {
         isPlatformAdmin
         role={null}
         title="Agente de IA"
-        subtitle="Tudo que define quem atende por você — e como acompanhar o que ele faz."
+        subtitle="Tudo que define quem atende por você, e como acompanhar o que ele faz."
         locale="es"
       />,
     );
