@@ -54,5 +54,12 @@ export function useAdminInbox(filters: AdminInboxFilters = {}) {
     getNextPageParam: (last) =>
       last.meta?.has_more && last.meta.cursor ? last.meta.cursor : undefined,
     staleTime: 10_000,
+    // Atualiza por POLLING, não por realtime. A lista é do platform admin e
+    // cruza todas as organizações: a assinatura de `messages` sem filtro (o
+    // antigo `useAdminInboxRealtime`) fazia o servidor avaliar a RLS de toda
+    // mensagem de todos os tenants para esta aba, e cada INSERT em qualquer
+    // tenant refazia a lista. Uma tela de suporte não precisa de latência de
+    // segundo; 15 s, e só com a aba visível (padrão do react-query).
+    refetchInterval: 15_000,
   });
 }

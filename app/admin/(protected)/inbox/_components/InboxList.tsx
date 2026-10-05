@@ -6,7 +6,6 @@ import type { Locale } from "date-fns";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminInbox, type AdminConversationRow } from "@/hooks/useAdminInbox";
-import { useAdminInboxRealtime } from "@/hooks/useAdminInboxRealtime";
 import { TenantBadge } from "@/components/admin/inbox/TenantBadge";
 import { Input } from "@/components/ui/input";
 import {
@@ -81,8 +80,7 @@ export function InboxList() {
 
   const debouncedSearch = useDebounced(rawSearch, 300);
 
-  // Realtime: invalidates ["admin", "inbox"] on message INSERT
-  useAdminInboxRealtime();
+  // Sem realtime: a lista atualiza por polling (`useAdminInbox`, 15 s).
 
   const filters = useMemo(
     () => ({
