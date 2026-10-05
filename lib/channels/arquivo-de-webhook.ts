@@ -28,42 +28,16 @@
  * que o seam existe para manter longe da rota. O `payload_parsed` guarda o JSON
  * — quem investigar lê `payload_parsed->>'event'` e tem a mesma resposta, sem
  * que ninguém precise ensinar o formato a este arquivo. A exceção é o que não é
- * dado a investigar: mídia inline (`base64`) e credencial (`token`) saem antes
- * da escrita, trocadas por um marcador (`./enxugar-para-arquivo.ts`). Foi a
- * mídia inline que encheu o banco em 28/09/2026.
+ * dado a investigar: mídia inline, string acima do teto e credencial (no corpo
+ * E nos cabeçalhos, em qualquer profundidade e formato) saem antes da escrita,
+ * trocadas por um marcador (`./enxugar-para-arquivo.ts`). Foi a mídia inline
+ * que encheu o banco em 28/09/2026; token em claro medido de novo em 05/10/2026.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
 
-import { arquivoEnxuto } from "./enxugar-para-arquivo";
-
-/**
- * Cabeçalhos que NUNCA entram no arquivo, por menor que seja a chance.
- *
- * `x-webhook-secret` é o SEGREDO COMPARTILHADO que um canal manda em claro e que
- * `lib/channels/inbound.ts` compara direto (não é HMAC): arquivado, qualquer
- * membro da org que lê o arquivo poderia forjar mensagem de entrada. `token` e
- * `apikey` são credenciais que servidores de WhatsApp mandam por header.
- */
-const PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey"];
-
-/**
- * Cabeçalhos sanitizados.
- *
- * Assinatura HMAC do corpo FICA: ela permite reconferir depois se um payload
- * recusado tinha mesmo assinatura errada, ou se o segredo é que estava errado —
- * e é derivada do corpo, não abre nada sozinha. Segredo compartilhado enviado em
- * claro NÃO é assinatura: é a própria credencial, e entra em `PROIBIDOS`.
- */
-function cabecalhosSeguros(headers: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  headers.forEach((valor, chave) => {
-    if (PROIBIDOS.includes(chave.toLowerCase())) return;
-    out[chave] = valor;
-  });
-  return out;
-}
+import { arquivoEnxuto, cabecalhosParaArquivo } from "./enxugar-para-arquivo";
 
 /**
  * Abre a linha do arquivo. Devolve o id para o fechamento, ou `null` quando não
@@ -97,7 +71,7 @@ export async function abrirArquivoDoWebhook(
         // o `lint:channels` reprova quem tenta.
         provider: entrada.provider,
         http_method: "POST",
-        headers: cabecalhosSeguros(entrada.headers),
+        headers: cabecalhosParaArquivo(entrada.headers),
         raw_body: rawBody,
         payload_parsed: parsed,
         status: "received",
