@@ -36,6 +36,24 @@ export interface ActionCtx {
 
 export interface ActionExecutor {
   type: string;
+  /**
+   * Esta ação MANDA mensagem para o cliente (WhatsApp, IA, ou inscrição num
+   * fluxo que manda)?
+   *
+   * Existe por causa da criação de card em LOTE (`lib/leads/criacao-em-lote.ts`):
+   * importar planilha e iniciar campanha com passos emitem um `lead.created` por
+   * linha, e uma regra "quando entrar lead novo → mandar WhatsApp" virava N
+   * mensagens no mesmo minuto — na campanha, para quem acabou de receber a
+   * abordagem dela. O motor pula SÓ estas ações nesse caso; etiquetar, atribuir
+   * dono e criar tarefa continuam rodando, porque não falam com ninguém e são
+   * justamente o que se quer de uma importação.
+   *
+   * Ausente = `false`. Quem esquecer de declarar numa ação nova que fala é pego
+   * por `tests/unit/acao-que-fala-se-declara.test.ts`, que confere contra os
+   * imports de envio do próprio arquivo — o modo de falhar aqui é caro e
+   * silencioso: o motor não reclama, ele MANDA.
+   */
+  falaComOCliente?: boolean;
   /** Pré-checagem opcional: se retornar um ISO timestamp, o EVENTO INTEIRO é
    *  adiado para essa hora ANTES de qualquer ação executar (all-or-nothing —
    *  evita reexecução parcial no retry). Usada pelo throttle do WhatsApp. */

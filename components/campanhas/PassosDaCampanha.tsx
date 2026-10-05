@@ -2,6 +2,7 @@
 
 import { ListaDePassos } from "@/components/cadencia/ListaDePassos";
 import { useT } from "@/hooks/i18n/useT";
+import { MAX_INSCRICOES_DIA_TETO } from "@/lib/cadencia/settings";
 import { MS_POR_HORA, type PassoDaRegua } from "@/lib/regua/timeline";
 
 interface Etapa {
@@ -31,6 +32,7 @@ export function PassosDaCampanha({
   etapas,
   temFunil,
   quantosCards = null,
+  tetoPorDia = null,
 }: {
   passos: PassoDaRegua[];
   onChange: (passos: PassoDaRegua[]) => void;
@@ -43,8 +45,17 @@ export function PassosDaCampanha({
    * fica correta e vaga; com ele o operador decide antes, que é o ponto.
    */
   quantosCards?: number | null;
+  /** `teto_diario` da campanha (`null` = sem teto próprio). */
+  tetoPorDia?: number | null;
 }) {
   const t = useT();
+  // QUANTOS ENTRAM HOJE. A régua tem teto de inscrições por dia, e ele é
+  // derivado do teto diário da campanha — sem teto próprio, vale o máximo da
+  // política (500). Uma lista maior que isso NÃO entra inteira hoje: o resto
+  // recebe a 1ª mensagem e espera o dia virar para entrar na régua. Dizer
+  // "2000 cards" sem dizer isso era a tela prometendo o que o motor não faz.
+  const entramPorDia = Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, tetoPorDia ?? MAX_INSCRICOES_DIA_TETO));
+  const passaDoTeto = quantosCards !== null && quantosCards > entramPorDia;
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -75,6 +86,15 @@ export function PassosDaCampanha({
           </strong>
           {". "}
           {t("Quem já tem negócio aberto nesse funil não ganha card novo.")}
+          {passaDoTeto && (
+            <>
+              {" "}
+              {t("A régua aceita")} <strong>{entramPorDia}</strong>{" "}
+              {t(
+                "entradas por dia, então a lista não entra inteira hoje: o resto recebe a primeira mensagem e entra na régua nos dias seguintes.",
+              )}
+            </>
+          )}
         </p>
       )}
       <ListaDePassos passos={passos} onChange={onChange} etapas={etapas} />

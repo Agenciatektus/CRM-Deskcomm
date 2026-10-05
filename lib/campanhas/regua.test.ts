@@ -73,23 +73,49 @@ describe("politicaDaRegua", () => {
     expect(politicaDaRegua(base).legal_basis_ref).toContain(base.id.slice(0, 8));
   });
 
-  it("ao_fechar DESLIGADO: sem isso a régua morre no 1º passo de quem não tem card", () => {
+  it("NEGÓCIO PERDIDO encerra a régua — `ao_fechar` ligado, como na cadência", () => {
+    // O cenário que o desligamento deixava passar: o vendedor fala com a pessoa
+    // por fora, ela diz que não quer, ele marca o negócio como perdido — e os
+    // passos 2, 3 e 4 continuavam saindo. `cancel_on_reply` não pega (ela não
+    // respondeu no canal) e `humano_assumir` só pega se alguém falou NO canal.
     const p = politicaDaRegua(base);
-    expect(p.saidas?.ao_fechar).toBe(false);
+    expect(p.saidas?.ao_fechar).toBe(true);
     expect(p.saidas?.humano_assumir).toBe(true);
-    // A prova do motivo, pela função que decide a saída: na campanha o card só
-    // nasce quando a pessoa responde, então `lead: null` é o caso NORMAL.
-    const semCard = { lead: null, tagsDoContato: [], humanoFalouDepois: false };
-    expect(motivoDeSaida(saidasDe(p), semCard)).toBeNull();
-    // Com o padrão da cadência (`ao_fechar: true`), o mesmo fato encerraria a
-    // régua dizendo que o negócio foi removido — de quem nunca teve negócio.
-    expect(motivoDeSaida(saidasDe({ saidas: undefined }), semCard)).toBe("saida_negocio_removido");
+    const comCard = (status: string) => ({
+      lead: { stage_id: "etapa-1", status, tags: [] },
+      nasceuComNegocio: true,
+      tagsDoContato: [],
+      humanoFalouDepois: false,
+    });
+    expect(motivoDeSaida(saidasDe(p), comCard("lost"))).toBe("saida_negocio_perdido");
+    expect(motivoDeSaida(saidasDe(p), comCard("won"))).toBe("saida_negocio_ganho");
+    expect(motivoDeSaida(saidasDe(p), comCard("open"))).toBeNull();
+  });
+
+  it("régua cujo card NÃO deu para criar segue viva, apesar do `ao_fechar`", () => {
+    // É o que `nasceuComNegocio` existe para separar: sem ele, ligar `ao_fechar`
+    // encerraria por "negócio removido" a régua de quem nunca teve card — e essa
+    // pessoa já recebeu a 1ª mensagem.
+    const p = politicaDaRegua(base);
+    expect(
+      motivoDeSaida(saidasDe(p), {
+        lead: null,
+        nasceuComNegocio: false,
+        tagsDoContato: [],
+        humanoFalouDepois: false,
+      }),
+    ).toBeNull();
   });
 
   it("uma pessoa assumir a conversa ainda encerra a régua", () => {
     const p = politicaDaRegua(base);
     expect(
-      motivoDeSaida(saidasDe(p), { lead: null, tagsDoContato: [], humanoFalouDepois: true }),
+      motivoDeSaida(saidasDe(p), {
+        lead: null,
+        nasceuComNegocio: false,
+        tagsDoContato: [],
+        humanoFalouDepois: true,
+      }),
     ).toBe("saida_humano_assumiu");
   });
 });

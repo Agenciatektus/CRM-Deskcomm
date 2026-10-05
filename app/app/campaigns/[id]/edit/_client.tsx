@@ -358,6 +358,7 @@ export function EditarCampanha({ id }: { id: string }) {
           // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
           // frase do aviso fica sem número em vez de chutar um.
           quantosCards={previa.data?.elegiveis ?? null}
+          tetoPorDia={c.teto_diario ?? null}
         />
       </Card>
 

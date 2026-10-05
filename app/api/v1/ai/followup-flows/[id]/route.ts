@@ -235,6 +235,20 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
+  // ⚠️ RÉGUA DE CAMPANHA NÃO SE APAGA POR AQUI. O DELETE abaixo leva as
+  // `followup_enrollments` em massa, e nelas está a PROVENIÊNCIA de cada
+  // inscrição (por que esta pessoa recebeu o 2º toque, com que base legal, de
+  // qual campanha e de qual destinatário). Apagar isso pela porta genérica
+  // perde o rastro que a prospecção fria precisa ter para ser respondida. A
+  // campanha é apagada pela tela dela, que sabe o que encerrar antes.
+  if (existing.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha pertence à campanha: apague a campanha, não o fluxo."),
+      422,
+      { requestId },
+    );
+  }
   // Escrita pelo client de SERVIÇO, para qualquer fluxo: a migration 9020
   // fecha toda escrita de versão pela sessão (versão é histórico; publicar já
   // era só servidor), e numa cadência também inscrição e ponteiro. O papel

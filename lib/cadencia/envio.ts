@@ -179,6 +179,7 @@ export async function fatosDaSaidaDaInscricao(
   enrollmentId: string,
 ): Promise<FatosDaSaida | null> {
   const { rows } = await db.query<{
+    nasceu_com_negocio: boolean;
     tem_lead: boolean;
     stage_id: string | null;
     status: string | null;
@@ -186,7 +187,8 @@ export async function fatosDaSaidaDaInscricao(
     tags_contato: string[] | null;
     humano: boolean;
   }>(
-    `select e.lead_id is not null and l.id is not null as tem_lead,
+    `select e.lead_id is not null as nasceu_com_negocio,
+            e.lead_id is not null and l.id is not null as tem_lead,
             l.stage_id, l.status, l.tags as tags_lead, c.tags as tags_contato,
             exists(
               select 1
@@ -211,6 +213,9 @@ export async function fatosDaSaidaDaInscricao(
     lead: r.tem_lead
       ? { stage_id: r.stage_id as string, status: r.status as string, tags: r.tags_lead ?? [] }
       : null,
+    // `lead_id` preenchido com a linha ausente = negócio APAGADO. Sem `lead_id`
+    // = inscrição que nunca teve negócio (régua de campanha cujo card não deu).
+    nasceuComNegocio: r.nasceu_com_negocio === true,
     tagsDoContato: r.tags_contato ?? [],
     humanoFalouDepois: r.humano === true,
   };

@@ -30,6 +30,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { validarReguaDeProspeccao } from "@/lib/cadencia/validar-publicacao";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
 import { logger } from "@/lib/logger";
 
@@ -69,6 +70,23 @@ export async function publicarReguaDaCampanha(
   if (passos.length === 0) {
     if (c.followup_pointer_id) {
       await desligarReguaDaCampanha(admin, c.organization_id, c.followup_pointer_id);
+      // E a campanha SOLTA o ponteiro. Deixá-lo apontando para um pointer
+      // desligado fazia a rodada consultar a régua a cada envio, levar
+      // `cadencia_indisponivel` e contar um fora-da-régua por destinatário —
+      // ruído por rodada, para sempre, numa campanha que simplesmente não tem
+      // passos. O pointer desligado fica no histórico de fluxos, que é onde
+      // histórico mora.
+      const { error } = await admin
+        .from("campaigns")
+        .update({ followup_pointer_id: null })
+        .eq("organization_id", c.organization_id)
+        .eq("id", c.id);
+      if (error) {
+        logger.warn("[campanha] não foi possível soltar a régua da campanha", {
+          campanha: c.id,
+          motivo: error.message,
+        });
+      }
     }
     return { ok: true, pointerId: null };
   }
@@ -76,10 +94,47 @@ export async function publicarReguaDaCampanha(
   const problema = problemaNosPassos(passos, { pipelineId: c.pipeline_id });
   if (problema) return { ok: false, mensagem: problema };
 
+  const grafo = grafoDaRegua(passos);
+  const politica = politicaDaRegua(c);
+
+  // ═══ A MESMA VALIDAÇÃO DE PUBLICAÇÃO DA CADÊNCIA ═══
+  //
+  // `publishFollowupFlowVersion` é só o wrapper da RPC: ele não valida nada.
+  // Sem esta chamada, a régua da campanha ia ao ar com o que `problemaNosPassos`
+  // não sabe ver — e o que ele não vê é justamente o que mata a régua CALADA:
+  // `{{saudacao}}` num passo (vocabulário da 1ª mensagem, não dos passos) faz o
+  // motor pular o passo para a lista inteira; etapa que ficou órfã ao trocar o
+  // funil do rascunho faz `efeitos.ts` matar a régua de todos no backoff.
+  //
+  // Roda ANTES de mexer no pointer: régua recusada não deixa `cadence_settings`
+  // nem `draft_graph` novos gravados num pointer que continua no ar com a
+  // versão anterior.
+  const problemasDaPublicacao = await validarReguaDeProspeccao(
+    admin,
+    c.organization_id,
+    {
+      pipeline_id: c.pipeline_id,
+      channel_session_id: c.channel_session_id,
+      cadence_settings: politica,
+      trigger_config: { kind: "manual", cancel_on_reply: true },
+    },
+    grafo,
+    "campaign",
+  );
+  if (problemasDaPublicacao.length > 0) {
+    // A PRIMEIRA mensagem, não todas: o operador conserta uma e prepara de novo,
+    // e uma lista de seis frases numa única linha de erro não é lida.
+    return { ok: false, mensagem: problemasDaPublicacao[0]!.message };
+  }
+
+  // O pointer nasce DEPOIS da validação, e isso é consequência dela: criar antes
+  // deixava um pointer órfão a cada tentativa recusada — e, como o nome é
+  // determinístico, a tentativa seguinte batia no `unique (organization_id,
+  // name)` e a campanha ficava impossível de preparar por causa do primeiro erro
+  // de digitação. `criarPointer` ainda trata o 23505 reusando o que achar, para
+  // o órfão de uma versão anterior não travar nada.
   const pointerId = c.followup_pointer_id ?? (await criarPointer(admin, c));
   if (!pointerId) return { ok: false, mensagem: "Não foi possível criar a régua desta campanha." };
-
-  const grafo = grafoDaRegua(passos);
 
   // A política, o número e o funil ANTES de publicar: o CHECK
   // `followup_flow_pointers_cadencia_completa` recusa pointer de prospecção
@@ -89,7 +144,7 @@ export async function publicarReguaDaCampanha(
     .update({
       channel_session_id: c.channel_session_id,
       pipeline_id: c.pipeline_id,
-      cadence_settings: politicaDaRegua(c),
+      cadence_settings: politica,
       // A régua PARA na resposta, pelo caminho comum de
       // `lib/followup/reactivity.ts`. Continuar insistindo com quem respondeu é
       // o comportamento que queima o número — e, numa campanha, apaga a única
@@ -138,11 +193,25 @@ async function criarPointer(admin: SupabaseClient, c: CampanhaComRegua): Promise
     })
     .select("id")
     .single();
-  if (error || !data) {
-    logger.warn("[campanha] criação da régua falhou", { campanha: c.id, motivo: error?.message });
-    return null;
+  if (!error && data) return (data as { id: string }).id;
+
+  // 23505 = já existe fluxo com este nome. O nome é determinístico (leva o
+  // prefixo do id da campanha), então o dono é esta campanha: é o pointer órfão
+  // de uma tentativa que não chegou a publicar. Reusar é o certo — criar nome
+  // novo deixaria dois pointers da mesma campanha, e falhar travaria a campanha
+  // para sempre por causa de uma tentativa antiga.
+  if (error?.code === "23505") {
+    const { data: existente } = await admin
+      .from("followup_flow_pointers")
+      .select("id")
+      .eq("organization_id", c.organization_id)
+      .eq("name", nomeDaRegua(c))
+      .eq("surface", "campaign")
+      .maybeSingle();
+    if (existente) return (existente as { id: string }).id;
   }
-  return (data as { id: string }).id;
+  logger.warn("[campanha] criação da régua falhou", { campanha: c.id, motivo: error?.message });
+  return null;
 }
 
 /** Desliga a régua: o worker passa a PULAR os passos (`cadencia_indisponivel`). */

@@ -75,6 +75,9 @@ export async function aplicarSaidasDaCadencia(db: SaidasDb, row: EventRow): Prom
     if (e.lead_id === null) continue;
     const motivo = motivoDeSaida(saidasDe(e.cadence_settings), {
       lead,
+      // O `continue` acima já tirou quem não tem `lead_id`: aqui a inscrição
+      // sempre nasceu com negócio, então `lead: null` é negócio APAGADO.
+      nasceuComNegocio: true,
       tagsDoContato: await db.tagsDoContato(row.organization_id, e.contact_id),
       humanoFalouDepois: false,
     });

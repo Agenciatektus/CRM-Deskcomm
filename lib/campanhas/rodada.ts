@@ -41,7 +41,7 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { decidePacing, dayStartInTz } from "@/lib/agent-engine/pacing/engine";
 import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engine/pacing/store";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
-import { inscreverContatoNaRegua } from "@/lib/cadencia/inscrever";
+import { inscreverContatoNaRegua, type MotivoDeRecusa } from "@/lib/cadencia/inscrever";
 import { garantirCardDaAbordagem } from "./card-da-abordagem";
 import { logger } from "@/lib/logger";
 
@@ -62,6 +62,16 @@ export interface ResultadoDaRodada {
   concluidas: number;
   /** Campanhas agendadas que viraram `running` porque a hora chegou. */
   promovidas: number;
+  /**
+   * Quem RECEBEU a 1ª mensagem e NÃO entrou na régua, por motivo.
+   *
+   * Existe porque o rastro anterior era uma linha de log por destinatário, e
+   * log por linha ninguém lê: numa campanha de 2.000 sem teto próprio, 1.500
+   * pessoas recebem a abordagem e ficam sem o 2º toque (teto de inscrições por
+   * dia), e isso aparecia só como 1.500 `logger.info` perdidos. Agregado, a
+   * rodada responde "quantos ficaram fora, e por quê" numa linha.
+   */
+  foraDaRegua: Partial<Record<MotivoDeRecusa, number>>;
   detalhe: string;
 }
 
@@ -70,6 +80,7 @@ const VAZIA: ResultadoDaRodada = {
   pulados: 0,
   concluidas: 0,
   promovidas: 0,
+  foraDaRegua: {},
   detalhe: "nada_a_fazer",
 };
 
@@ -133,7 +144,7 @@ export async function rodarUmaRodadaDeCampanha(
   }
 
   const numerosAtendidos = new Set<string>();
-  const total: ResultadoDaRodada = { ...VAZIA, promovidas, detalhe: "" };
+  const total: ResultadoDaRodada = { ...VAZIA, promovidas, foraDaRegua: {}, detalhe: "" };
   const detalhes: string[] = [];
 
   for (const campanha of emExecucao) {
@@ -147,6 +158,9 @@ export async function rodarUmaRodadaDeCampanha(
       total.enviadas += r.enviadas;
       total.pulados += r.pulados;
       total.concluidas += r.concluidas;
+      if (r.foraDaRegua) {
+        total.foraDaRegua[r.foraDaRegua] = (total.foraDaRegua[r.foraDaRegua] ?? 0) + 1;
+      }
       detalhes.push(`${campanha.id.slice(0, 8)}:${r.detalhe}`);
       // Só ocupa o número quem de fato enviou: campanha parada por ritmo não
       // pode impedir a campanha seguinte do mesmo número de ser avaliada... mas
@@ -163,6 +177,18 @@ export async function rodarUmaRodadaDeCampanha(
   }
 
   total.detalhe = detalhes.join(" ") || "nada_a_fazer";
+
+  // UMA linha por rodada, e só quando houve recusa: é o rastro que substitui o
+  // `logger.info` por destinatário. O motivo que importa é `teto_do_dia` — ele
+  // diz que gente recebeu a abordagem e ficou sem o 2º toque até o dia virar.
+  const forasDaRodada = Object.entries(total.foraDaRegua);
+  if (forasDaRodada.length > 0) {
+    logger.info("[campanha] destinatários fora da régua nesta rodada", {
+      por_motivo: total.foraDaRegua,
+      total: forasDaRodada.reduce((soma, [, n]) => soma + n, 0),
+    });
+    total.detalhe += ` fora_da_regua:${forasDaRodada.map(([m, n]) => `${m}=${n}`).join(",")}`;
+  }
   return total;
 }
 
@@ -208,7 +234,16 @@ async function rodarUmaCampanha(
   admin: SupabaseClient,
   campanha: CampanhaRow,
   agora: Date,
-): Promise<{ enviadas: number; pulados: number; concluidas: number; detalhe: string }> {
+): Promise<{
+  enviadas: number;
+  pulados: number;
+  concluidas: number;
+  detalhe: string;
+  /** Recebeu a 1ª mensagem e não entrou na régua. A rodada agrega. */
+  foraDaRegua?: MotivoDeRecusa;
+}> {
+  let foraDaRegua: MotivoDeRecusa | undefined;
+
   const { data: fila } = await admin
     .from("campaign_recipients")
     .select(
@@ -548,14 +583,12 @@ async function rodarUmaCampanha(
           fronteira: boundary,
           origem: { tipo: "campanha", campanhaId: campanha.id, destinatarioId: alvo.id },
         });
-        if (!inscricao.ok) {
-          logger.info("[campanha] destinatário não entrou na régua", {
-            campanha: campanha.id,
-            destinatario: alvo.id,
-            motivo: inscricao.motivo,
-          });
-        }
+        // O motivo SOBE para a rodada agregar; uma linha de log por
+        // destinatário era rastro que ninguém lê (ver `foraDaRegua`).
+        if (!inscricao.ok) foraDaRegua = inscricao.motivo;
       } catch (err) {
+        // Erro DURO (não recusa) continua com log próprio: ele é raro, e o
+        // texto real dele é a única pista de um defeito.
         logger.warn("[campanha] inscrição na régua falhou", {
           campanha: campanha.id,
           destinatario: alvo.id,
@@ -569,6 +602,7 @@ async function rodarUmaCampanha(
       pulados: 0,
       concluidas: 0,
       detalhe: `enviado:${status ?? "?"}:${escolha.motivo}`,
+      foraDaRegua,
     };
   } catch (err) {
     const motivoErro = err instanceof Error ? err.message : String(err);

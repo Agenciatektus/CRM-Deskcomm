@@ -88,16 +88,17 @@ export function politicaDaRegua(c: CampanhaComRegua): CadenceSettings {
       c.teto_diario === null
         ? MAX_INSCRICOES_DIA_TETO
         : Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, c.teto_diario)),
-    // ⚠️ `ao_fechar: false` é DELIBERADO, e é a única diferença de política
-    // entre a régua da campanha e a da cadência. `motivoDeSaida` trata
-    // "nenhum negócio no funil" como negócio REMOVIDO quando `ao_fechar` está
-    // ligado — e na campanha o card só nasce quando a pessoa RESPONDE. Com o
-    // padrão, toda régua morreria no primeiro passo, com o motivo "o negócio
-    // foi fechado", de quem nunca teve negócio. E o caso que o `ao_fechar`
-    // existe para cobrir já está coberto duas vezes: quem responde sai pelo
-    // `cancel_on_reply`, e quem é assumido por uma pessoa sai pelo
-    // `humano_assumir`, que fica LIGADO.
-    saidas: { etiquetas: [], etapas: [], ao_fechar: false, humano_assumir: true },
+    // ⚠️ `ao_fechar: true`, igual à cadência, e a HISTÓRIA deste campo importa:
+    // ele esteve desligado enquanto o card da campanha nascia só na resposta.
+    // Naquele desenho `motivoDeSaida` lia "sem negócio" como negócio REMOVIDO e
+    // matava toda régua no primeiro passo. Com o card nascendo na ABORDAGEM a
+    // premissa caiu, e mantê-lo desligado deixaria a régua falando com quem o
+    // vendedor JÁ marcou como perdido por fora do WhatsApp: `cancel_on_reply`
+    // não pega (a pessoa não respondeu no canal) e `humano_assumir` só pega se
+    // alguém falou NO canal. Quem separa os dois significados de "sem negócio"
+    // agora é `FatosDaSaida.nasceuComNegocio`, e não o desligamento deste campo:
+    // a régua cujo card não deu para criar segue viva.
+    saidas: { etiquetas: [], etapas: [], ao_fechar: true, humano_assumir: true },
   };
 }
 

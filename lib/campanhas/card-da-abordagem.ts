@@ -130,11 +130,6 @@ export async function garantirCardDaAbordagem(
         organization_id: org,
         actor: { type: "webhook_source", id: `campaign:${campanha.id}` },
         requestId: entrada.requestId,
-        // CRIAÇÃO EM LOTE: sem esta marca, o gatilho "Lead criado" mandaria uma
-        // mensagem proativa por card — centenas, no mesmo minuto em que a
-        // campanha acabou de falar com essas pessoas. Ver
-        // `lib/leads/criacao-em-lote.ts`.
-        via: ORIGEM_CAMPANHA,
       } as Parameters<typeof createLeadHandler>[1],
       {
         pipeline_id: destino.pipelineId,
@@ -157,6 +152,17 @@ export async function garantirCardDaAbordagem(
           campaign_recipient_id: entrada.destinatarioId,
           nasceu_na: "abordagem",
         },
+        // ⚠️ CRIAÇÃO EM LOTE, e vai no INPUT — `createLeadHandler` lê
+        // `input.via`, não `ctx.via`. Esta marca esteve no objeto errado, e o
+        // cast `as never` do ctx a engoliu sem um ruído: a cascata ficava
+        // DESTAMPADA (gatilho "Lead criado" e motor de regras mandando uma
+        // mensagem por card) com o código parecendo resolvido. Quem cobre a
+        // ligação agora é `card-da-abordagem.test.ts`, que confere o argumento.
+        //
+        // Sem ela: centenas de mensagens proativas, no mesmo minuto em que a
+        // campanha acabou de falar com essas mesmas pessoas. Ver
+        // `lib/leads/criacao-em-lote.ts`.
+        via: ORIGEM_CAMPANHA,
       } as Parameters<typeof createLeadHandler>[2],
     );
 

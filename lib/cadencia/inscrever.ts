@@ -44,11 +44,14 @@ import { cadenceSettingsSchema, type CadenceSettings } from "./settings";
  *      `beginServiceAtOrigin` reabriria a conversa e dispararia roteamento para
  *      a equipe por causa de um passo que ainda nem existe. A fronteira já
  *      aberta entra por parâmetro.
- *   2. NÃO exige negócio: na campanha o card nasce quando a pessoa RESPONDE,
- *      então a inscrição pode nascer sem `lead_id`. O passo de CRM resolve o
- *      negócio na hora de aplicá-lo (`lib/cadencia/efeitos.ts`), que é quando o
- *      card já existe. O anti-laço, que na cadência é por NEGÓCIO, aqui é por
- *      CONTATO — sem negócio não há o que comparar.
+ *   2. NÃO exige negócio PRONTO: ela ABRE o card, pelo `abrirNegocio`, depois
+ *      dos freios (`lib/campanhas/card-da-abordagem.ts`). A cadência recebe o
+ *      negócio escolhido na tela do funil; a campanha abre o dela, porque ali o
+ *      card não existia antes da abordagem. Quando a abertura não dá (funil sem
+ *      etapa de entrada, falha de banco), a inscrição nasce sem `lead_id` e a
+ *      régua roda assim: ela é o 2º toque de quem já recebeu o 1º. O anti-laço,
+ *      que na cadência é por NEGÓCIO, aqui é por CONTATO — o negócio é criado
+ *      por esta inscrição, então comparar por ele não pegaria repetição nenhuma.
  */
 
 export type MotivoDeRecusa =
@@ -184,7 +187,7 @@ export async function reservarInscricoes(
 }
 
 interface NegocioElegivel {
-  /** `null` na régua da campanha: o card nasce quando a pessoa responde. */
+  /** `null` quando a régua da campanha não conseguiu abrir o card (ver `abrirNegocio`). */
   leadId: string | null;
   contactId: string;
 }

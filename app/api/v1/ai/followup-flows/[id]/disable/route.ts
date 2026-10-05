@@ -45,6 +45,21 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
 
+  // ⚠️ RÉGUA DE CAMPANHA NÃO SE DESLIGA POR AQUI, e a recusa é o conserto de um
+  // desfecho pior que o 42501 do banco: com o pointer `disabled`, o worker PULA
+  // cada passo e o motor AVANÇA — o inscrito corre a régua inteira em tiques,
+  // calado, e quem retomar a campanha o encontra no fim sem ter recebido nada.
+  // Quem para a régua de uma campanha é a própria campanha (`Cancelar`, que
+  // encerra as inscrições em `encerrarReguaDaCampanha`).
+  if (existing.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha se para na tela da campanha, em Cancelar."),
+      422,
+      { requestId },
+    );
+  }
+
   if (existing.status === "disabled") {
     return ok({ id, status: "disabled" }, { requestId });
   }
