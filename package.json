@@ -153,7 +153,8 @@
       "browserslist": "^4.28.8"
     },
     "patchedDependencies": {
-      "@react-pdf/hyphenate": "patches/@react-pdf__hyphenate.patch"
+      "@react-pdf/hyphenate": "patches/@react-pdf__hyphenate.patch",
+      "zod@4.6.5": "patches/zod@4.6.5.patch"
     }
   }
 }

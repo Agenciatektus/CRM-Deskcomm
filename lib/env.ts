@@ -326,6 +326,8 @@ const schema = z.object({
 
   // Sentry
   SENTRY_DSN: z.string().optional().default(""),
+  // Fração de traces (0 a 1). Vazio ou inválido = padrão de lib/sentry/amostragem.ts.
+  SENTRY_TRACES_SAMPLE_RATE: z.string().optional().default(""),
 
   /**
    * Resend — o transporte de TODO e-mail transacional (convite, LGPD, alarme).

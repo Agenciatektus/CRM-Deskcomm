@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Queryable } from "@/lib/agent-engine/queue/queue";
 import { agendaSettingsSchema } from "@/lib/schemas/settings";
 import { logger } from "@/lib/logger";
+import { lotesDeIds } from "@/lib/supabase/lotes";
 
 export interface CompromissoProtetor {
   id: string;
@@ -57,8 +58,13 @@ export function protecaoDaAgenda(
     reavaliar_em: null,
   };
 }
+/**
+ * O registro da falha é feito UMA vez por leitura, por quem chama (ver
+ * `avisarIndisponivel`): esta função monta o resultado de CADA contato, e logar
+ * aqui escrevia uma linha por contato — 1.097 por rodada do observador de risco
+ * na Lior, 11,5 mil linhas em 2 h, todas iguais e sem dizer o que falhou.
+ */
 function indisponivel(agora: Date): ProtecaoAgenda {
-  logger.warn("[agenda] proteção indisponível; cobrança adiada");
   return {
     adiar: true,
     motivo: "leitura_indisponivel",
@@ -66,6 +72,23 @@ function indisponivel(agora: Date): ProtecaoAgenda {
     reavaliar_em: new Date(agora.getTime() + 60_000).toISOString(),
   };
 }
+function avisarIndisponivel(erro: unknown, contatos: number): void {
+  logger.warn("[agenda] proteção indisponível; cobrança adiada", {
+    contatos,
+    erro: erro instanceof Error ? erro.message : ((erro as { message?: string })?.message ?? String(erro)),
+  });
+}
+
+/**
+ * A leitura vai em LOTES de contatos.
+ *
+ * `.in("contact_id", contatos)` vira query string: com os 1.097 contatos de
+ * negócio aberto da Lior (o observador de risco e o radar pedem todos de uma
+ * vez) a URL passava de 40 KB e o gateway respondia 400. A função devolvia
+ * "indisponível" para todos, o radar abortava, e a rodada seguinte, 15 minutos
+ * depois, repetia o mesmo 400 — para sempre. Com lotes de `IDS_POR_CONSULTA`
+ * (medição em `lib/supabase/lotes.ts`) cada URL fica em ~6 KB.
+ */
 export async function protecaoAgendaSupabase(
   db: SupabaseClient,
   org: string,
@@ -75,26 +98,28 @@ export async function protecaoAgendaSupabase(
   if (!contatos.length) return new Map();
   try {
     const appointments: CompromissoProtetor[] = [];
-    let after: string | undefined;
-    // Keyset estável: uma resposta bem-sucedida pode ter sido truncada pelo
-    // max_rows do PostgREST. Só página VAZIA prova que a leitura terminou.
-    for (;;) {
-      let query = db
-        .from("calendar_appointments")
-        .select("id,contact_id,revision,starts_at,ends_at,status")
-        .eq("organization_id", org)
-        .in("contact_id", contatos)
-        .in("status", ["pending", "confirmed"])
-        .order("id", { ascending: true })
-        .limit(500);
-      if (after) query = query.gt("id", after);
-      const page = await query;
-      if (page.error) throw page.error;
-      if (!page.data?.length) break;
-      const last = page.data[page.data.length - 1]!.id;
-      if (after && last <= after) throw new Error("agenda_page_did_not_advance");
-      appointments.push(...page.data);
-      after = last;
+    for (const lote of lotesDeIds([...new Set(contatos)])) {
+      let after: string | undefined;
+      // Keyset estável: uma resposta bem-sucedida pode ter sido truncada pelo
+      // max_rows do PostgREST. Só página VAZIA prova que a leitura terminou.
+      for (;;) {
+        let query = db
+          .from("calendar_appointments")
+          .select("id,contact_id,revision,starts_at,ends_at,status")
+          .eq("organization_id", org)
+          .in("contact_id", lote)
+          .in("status", ["pending", "confirmed"])
+          .order("id", { ascending: true })
+          .limit(500);
+        if (after) query = query.gt("id", after);
+        const page = await query;
+        if (page.error) throw page.error;
+        if (!page.data?.length) break;
+        const last = page.data[page.data.length - 1]!.id;
+        if (after && last <= after) throw new Error("agenda_page_did_not_advance");
+        appointments.push(...page.data);
+        after = last;
+      }
     }
     const organization = await db.from("organizations").select("settings").eq("id", org).single();
     if (organization.error) throw organization.error;
@@ -108,7 +133,8 @@ export async function protecaoAgendaSupabase(
         ),
       ]),
     );
-  } catch {
+  } catch (erro) {
+    avisarIndisponivel(erro, contatos.length);
     return new Map(contatos.map((id) => [id, indisponivel(agora)]));
   }
 }
@@ -131,7 +157,8 @@ export async function protecaoAgendaPg(
     ]);
     if (!organization.rows[0]) throw new Error("agenda_org_missing");
     return protecaoDaAgenda(appointments.rows, organization.rows[0].settings?.agenda, agora);
-  } catch {
+  } catch (erro) {
+    avisarIndisponivel(erro, 1);
     return indisponivel(agora);
   }
 }
