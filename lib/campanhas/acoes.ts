@@ -24,7 +24,7 @@ import { baseLegalValida, motivoParaExcluir, recusouMarketing } from "./elegibil
 import { ehStatusDaCampanha, podeTransitar } from "./maquina-de-estados";
 import { prepararCampanha } from "./preparacao";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
-import { renderizar } from "./renderizador";
+import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { StatusDaCampanha } from "./tipos";
 
 export interface CampanhaCarregada {
@@ -34,6 +34,8 @@ export interface CampanhaCarregada {
   status: StatusDaCampanha;
   channel_session_id: string;
   message_body: string | null;
+  /** As variações EXTRAS (migration 9034). Vazio = campanha de um texto só. */
+  message_variants: string[] | null;
   base_legal: string;
   lia_ref: string | null;
   audience_filter: unknown;
@@ -52,7 +54,8 @@ export type Recusa = { ok: false; codigo: ApiErrorCode; mensagem: string; status
 export type Desfecho<T = unknown> = ({ ok: true } & T) | Recusa;
 
 const COLUNAS =
-  "id, organization_id, name, status, channel_session_id, message_body, base_legal, lia_ref, " +
+  "id, organization_id, name, status, channel_session_id, message_body, message_variants, " +
+  "base_legal, lia_ref, " +
   "audience_filter, audience_version, content_version, scheduled_at, description, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
 
@@ -99,6 +102,22 @@ function faltaParaEnviar(c: CampanhaCarregada): Recusa | null {
       ok: false,
       codigo: "campanha_conteudo_invalido",
       mensagem: "Escreva a mensagem antes de preparar a campanha.",
+      status: 422,
+    };
+  }
+  // O {a|b} é conferido AQUI, antes de qualquer transição de estado: deixar
+  // para a preparação faria a campanha entrar em `preparing`, voltar para
+  // rascunho e devolver o erro — três escritas para dizer o que se sabia antes
+  // da primeira. E o teste de envio passa pelo mesmo motor, então ele também
+  // precisa do texto resolvível.
+  const quebradas = spintaxDasVariantes(variantesDaCampanha(c.message_body, c.message_variants));
+  if (quebradas.length > 0) {
+    return {
+      ok: false,
+      codigo: "campanha_conteudo_invalido",
+      mensagem:
+        `Variação ${quebradas.map((i) => i + 1).join(", ")}: o {a|b} não fecha. ` +
+        "Confira as chaves antes de enviar.",
       status: 422,
     };
   }
@@ -163,6 +182,7 @@ export async function prepararAcao(
       organizationId: c.organization_id,
       filtro: c.audience_filter,
       corpo: c.message_body ?? "",
+      variacoes: c.message_variants ?? [],
       contentVersion: c.content_version,
       agora,
     });
@@ -343,6 +363,7 @@ export async function duplicarAcao(
       description: c.description,
       channel_session_id: c.channel_session_id,
       message_body: c.message_body,
+      message_variants: c.message_variants ?? [],
       base_legal: c.base_legal,
       lia_ref: c.lia_ref,
       audience_filter: c.audience_filter,
@@ -429,11 +450,15 @@ export async function testarAcao(
     };
   }
 
-  const render = renderizar(
-    c.message_body ?? "",
-    { nome: nomeDoContato(linha) },
-    { agora, fuso },
-  );
+  // O teste passa pelo MESMO motor de variação, com a mesma semente do envio
+  // real (`contact_id`): o operador vê no celular a variante que AQUELE contato
+  // receberia, não uma sexta versão que a campanha nunca manda.
+  const render = renderizarVariacao({
+    variantes: variantesDaCampanha(c.message_body, c.message_variants),
+    semente: linha.id,
+    valores: { nome: nomeDoContato(linha) },
+    quando: { agora, fuso },
+  });
   if (render.faltando.length > 0) {
     return {
       ok: false,

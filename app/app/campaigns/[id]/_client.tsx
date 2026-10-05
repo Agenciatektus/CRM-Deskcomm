@@ -217,6 +217,17 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       <Card className="space-y-2 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
         <p className="whitespace-pre-wrap text-sm">{c.message_body}</p>
+        {/* As variações EXTRAS (9034): a lista preparada tem texto DIFERENTE por
+            pessoa, e mostrar só o corpo principal aqui faria a tela afirmar que
+            todo mundo recebeu aquele. Leitura só — editar é na tela de edição. */}
+        {(c.message_variants ?? []).map((v, i) => (
+          <div key={i} className="border-l-2 border-border pl-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("Variação")} {i + 2}
+            </p>
+            <p className="whitespace-pre-wrap text-sm">{v}</p>
+          </div>
+        ))}
         <p className="text-xs text-muted-foreground">
           {t("Base legal")}: {c.base_legal === "consent" ? t("consentimento") : t("interesse legítimo")}
           {c.lia_ref ? ` (${c.lia_ref})` : ""}

@@ -71,6 +71,7 @@ export const MOTIVOS_DE_EXCLUSAO = [
   "excluido_manualmente",
   "duplicado",
   "variavel_ausente",
+  "texto_vazio",
   "ja_em_campanha",
   "suprimido",
 ] as const;
@@ -87,6 +88,11 @@ export const TEXTO_DA_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   excluido_manualmente: "Excluído à mão desta campanha",
   duplicado: "Mesmo telefone de outro contato da lista",
   variavel_ausente: "Falta um dado que a mensagem usa",
+  // Separado de `variavel_ausente` porque a causa é outra e o conserto também:
+  // ali falta dado do contato, aqui o TEXTO da variação resolveu para nada
+  // (um `{Olá|}` com pipe sobrando rende vazio em metade das sementes). Dizer
+  // "falta um dado" mandaria o operador procurar no cadastro, que está certo.
+  texto_vazio: "A variação sorteada para esta pessoa ficou sem texto",
   ja_em_campanha: "Já está em outra campanha ainda não concluída",
   suprimido: "Está na lista de exclusão de campanhas",
 };

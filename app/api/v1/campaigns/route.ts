@@ -136,6 +136,9 @@ export async function POST(req: NextRequest): Promise<Response> {
       description: entrada.description ?? null,
       channel_session_id: entrada.channel_session_id,
       message_body: entrada.message_body ?? null,
+      // Vazio, e não `null`: a coluna é `not null default '{}'` (9034) e a
+      // campanha de um texto só é o caso comum.
+      message_variants: entrada.message_variants ?? [],
       base_legal: entrada.base_legal,
       lia_ref: entrada.lia_ref ?? null,
       audience_filter: entrada.audience_filter ?? FILTRO_VAZIO,

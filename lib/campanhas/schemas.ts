@@ -5,7 +5,32 @@
  */
 import { z } from "zod";
 
+import { spintaxValido } from "@/lib/texto/variacao";
+
 import { filtroDeAudienciaSchema } from "./audiencia";
+import { MAX_VARIACOES_EXTRAS, VARIANTE_TAMANHO_MAXIMO } from "./renderizador";
+
+/**
+ * As variações EXTRAS da abordagem (migration 9034). O corpo principal segue em
+ * `message_body`, com o teto de 4.096 dele — a lista efetiva é
+ * `[message_body, ...message_variants]`.
+ *
+ * O `{a|b}` é conferido AQUI, e só nas EXTRAS: o campo é novo, então nenhuma
+ * campanha existente é barrada por ele. Um `message_body` legado com chave
+ * desbalanceada continua podendo ser SALVO (barrá-lo deixaria o operador preso
+ * num rascunho que não dá para corrigir sem apagar); quem o barra é o gate de
+ * `faltaParaEnviar`, antes de qualquer envio, com o número da variação no texto
+ * do erro.
+ */
+const variacaoDaMensagem = z
+  .string()
+  .trim()
+  .max(VARIANTE_TAMANHO_MAXIMO)
+  .refine(spintaxValido, {
+    message: "O {a|b} desta variação não fecha — confira as chaves.",
+  });
+
+const variacoesDaMensagem = z.array(variacaoDaMensagem).max(MAX_VARIACOES_EXTRAS);
 
 /**
  * O ritmo próprio. Todos opcionais e anuláveis: `null` devolve a decisão ao
@@ -28,6 +53,7 @@ const baseDaCampanha = {
   description: z.string().trim().max(4000).nullable().optional(),
   channel_session_id: z.string().uuid(),
   message_body: z.string().trim().max(4096).nullable().optional(),
+  message_variants: variacoesDaMensagem.optional(),
   base_legal: z.enum(["consent", "legitimate_interest"]),
   lia_ref: z.string().trim().max(120).nullable().optional(),
   audience_filter: filtroDeAudienciaSchema.optional(),
@@ -77,6 +103,7 @@ export const editarCampanhaSchema = z
     description: baseDaCampanha.description,
     channel_session_id: baseDaCampanha.channel_session_id.optional(),
     message_body: baseDaCampanha.message_body,
+    message_variants: baseDaCampanha.message_variants,
     base_legal: baseDaCampanha.base_legal.optional(),
     lia_ref: baseDaCampanha.lia_ref,
     audience_filter: filtroDeAudienciaSchema.optional(),
@@ -90,6 +117,8 @@ export const editarCampanhaSchema = z
 export const previaSchema = z.object({
   audience_filter: filtroDeAudienciaSchema,
   message_body: z.string().max(4096).default(""),
+  /** As variações EXTRAS que a tela está editando — a prévia conta com elas. */
+  message_variants: z.array(z.string().max(VARIANTE_TAMANHO_MAXIMO)).max(MAX_VARIACOES_EXTRAS).default([]),
   campaign_id: z.string().uuid().optional(),
 });
 

@@ -41,7 +41,7 @@ import {
   contarExclusoes,
   type CandidatoDaAudiencia,
 } from "./elegibilidade";
-import { renderizar } from "./renderizador";
+import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { MotivoDeExclusao } from "./tipos";
 
 export interface ResumoDoSnapshot {
@@ -66,6 +66,8 @@ export async function preverAudiencia(
     organizationId: string;
     filtro: FiltroDeAudiencia;
     corpo: string;
+    /** As variações EXTRAS (o corpo é a primeira variante). */
+    variacoes?: readonly string[];
     agora: Date;
     /** Campanha a ignorar na conta de "já em campanha" (a que está sendo editada). */
     campanhaId?: string;
@@ -90,6 +92,7 @@ async function classificar(
     organizationId: string;
     filtro: FiltroDeAudiencia;
     corpo: string;
+    variacoes?: readonly string[];
     agora: Date;
     campanhaId?: string;
   },
@@ -105,6 +108,7 @@ async function classificar(
     entrada.campanhaId,
   );
   const suprimidos = await hashesExcluidos(admin, entrada.organizationId);
+  const variantes = variantesDaCampanha(entrada.corpo, entrada.variacoes);
   return classificarAudiencia(candidatos, {
     excluidosAMao: new Set(entrada.filtro.excluir_contatos),
     jaEmCampanha,
@@ -112,9 +116,18 @@ async function classificar(
     hashDoEndereco,
     // A saudação NÃO é resolvida aqui: ela é da hora do envio. O token fica no
     // corpo congelado e o despacho o troca — ver `rodada.ts`.
+    // A variante sai do `contact_id`: a MESMA pessoa recebe a MESMA variação,
+    // inclusive ao repreparar. Semente por campanha faria a lista trocar de
+    // texto a cada clique em Preparar, sem nada ter mudado.
     renderizar: (c: CandidatoDaAudiencia) => {
-      const r = renderizar(entrada.corpo, { nome: c.nome });
-      return { texto: r.texto, faltando: r.faltando };
+      const r = renderizarVariacao({
+        variantes,
+        semente: c.contactId,
+        valores: { nome: c.nome },
+      });
+      // `vazio` sobe junto: texto que resolveu para nada não pode virar
+      // `rendered_body` em branco e seguir para o envio.
+      return { texto: r.texto, faltando: r.faltando, vazio: r.vazio, varianteIndex: r.varianteIndex };
     },
   });
 }
@@ -130,6 +143,7 @@ export async function prepararCampanha(
     organizationId: string;
     filtro: unknown;
     corpo: string;
+    variacoes?: readonly string[];
     contentVersion: number;
     agora: Date;
   },
@@ -139,10 +153,23 @@ export async function prepararCampanha(
     throw new Error(`Filtro de audiência inválido: ${filtro.error.issues[0]?.message ?? "sem critério"}`);
   }
 
+  // Spintax quebrado barra a CAMPANHA, antes de gravar linha nenhuma. Deixá-lo
+  // passar daria uma lista inteira marcada `variavel_ausente` — motivo errado
+  // na tela, e o operador procurando o dado que falta num texto que, na
+  // verdade, tem uma chave sem fechar.
+  const quebradas = spintaxDasVariantes(variantesDaCampanha(entrada.corpo, entrada.variacoes));
+  if (quebradas.length > 0) {
+    throw new Error(
+      `Variação ${quebradas.map((i) => i + 1).join(", ")}: o {a|b} não fecha. ` +
+        "Confira as chaves antes de preparar.",
+    );
+  }
+
   const linhas = await classificar(admin, {
     organizationId: entrada.organizationId,
     filtro: filtro.data,
     corpo: entrada.corpo,
+    variacoes: entrada.variacoes,
     agora: entrada.agora,
     campanhaId: entrada.campanhaId,
   });
@@ -169,7 +196,10 @@ export async function prepararCampanha(
     exclusion_reason: l.motivo,
     rendered_body: l.corpo,
     content_version: entrada.contentVersion,
-    variables: { nome: l.candidato.nome },
+    // `variante_index` fica no snapshot para a tela poder dizer QUAL texto esta
+    // pessoa recebeu — sem ele, uma campanha de cinco variações mostra cinco
+    // corpos diferentes e nenhuma forma de agrupá-los.
+    variables: { nome: l.candidato.nome, variante_index: l.varianteIndex ?? 0 },
     cancelled_at: null,
     created_at: agoraIso,
   }));

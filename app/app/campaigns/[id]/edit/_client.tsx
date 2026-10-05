@@ -20,17 +20,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
-import { DESCRICAO_DA_VARIAVEL, VARIAVEIS_DA_CAMPANHA } from "@/lib/campanhas/renderizador";
 
 export function EditarCampanha({ id }: { id: string }) {
   const t = useT();
@@ -48,7 +47,8 @@ export function EditarCampanha({ id }: { id: string }) {
   const [semTags, setSemTags] = useState("");
   const [semInteracao, setSemInteracao] = useState("");
   const [limite, setLimite] = useState("100");
-  const [texto, setTexto] = useState("");
+  // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
+  const [variantes, setVariantes] = useState<string[]>([""]);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
@@ -72,12 +72,18 @@ export function EditarCampanha({ id }: { id: string }) {
     setSemTags(juntar(f.sem_tags));
     setSemInteracao(f.sem_interacao_ha_dias == null ? "" : String(f.sem_interacao_ha_dias));
     setLimite(f.limite == null ? "100" : String(f.limite));
-    setTexto(c.message_body ?? "");
+    setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
     setCarregado(true);
   }, [campanha.data, carregado]);
+
+  const texto = variantes[0] ?? "";
+  const extras = useMemo(
+    () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
+    [variantes],
+  );
 
   const filtro = useMemo(
     () => ({
@@ -248,7 +254,14 @@ export function EditarCampanha({ id }: { id: string }) {
             type="button"
             variant="outline"
             disabled={!temCriterio || previa.isPending}
-            onClick={() => previa.mutate({ audience_filter: filtro, message_body: texto, campaign_id: id })}
+            onClick={() =>
+              previa.mutate({
+                audience_filter: filtro,
+                message_body: texto,
+                message_variants: extras,
+                campaign_id: id,
+              })
+            }
           >
             {previa.isPending ? t("Contando…") : t("Ver quantas pessoas")}
           </Button>
@@ -326,26 +339,7 @@ export function EditarCampanha({ id }: { id: string }) {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
-        <Textarea
-          rows={6}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          aria-label={t("Texto da mensagem")}
-        />
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {VARIAVEIS_DA_CAMPANHA.map((v) => (
-            <li key={v}>
-              <button
-                type="button"
-                className="rounded-md bg-surface-elevated px-1 font-mono text-xs"
-                onClick={() => setTexto((atual) => `${atual}{{${v}}}`)}
-              >
-                {`{{${v}}}`}
-              </button>{" "}
-              — {t(DESCRICAO_DA_VARIAVEL[v])}
-            </li>
-          ))}
-        </ul>
+        <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
       </Card>
 
       <div className="flex items-center justify-end gap-2">
@@ -359,6 +353,7 @@ export function EditarCampanha({ id }: { id: string }) {
               name: nome.trim(),
               channel_session_id: canal,
               message_body: texto.trim(),
+              message_variants: extras,
               base_legal: baseLegal,
               lia_ref: liaRef.trim() || null,
               audience_filter: filtro,

@@ -25,7 +25,8 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const COLUNAS =
-  "id, name, description, status, channel_session_id, message_body, base_legal, lia_ref, " +
+  "id, name, description, status, channel_session_id, message_body, message_variants, " +
+  "base_legal, lia_ref, " +
   "audience_filter, audience_version, content_version, snapshot_total, snapshot_eligible, " +
   "snapshot_excluded, scheduled_at, prepared_at, started_at, paused_at, completed_at, " +
   "cancelled_at, failure_code, intervalo_segundos, janela_inicio_hora, janela_fim_hora, " +
@@ -144,6 +145,7 @@ export async function PATCH(
     "name",
     "description",
     "message_body",
+    "message_variants",
     "audience_filter",
     "intervalo_segundos",
     "janela_inicio_hora",
@@ -161,7 +163,16 @@ export async function PATCH(
   if (entrada.lia_ref !== undefined) mudanca.lia_ref = entrada.lia_ref;
   // Mexer no TEXTO sobe a versão do conteúdo: é ela que o destinatário carrega,
   // e é por ela que se sabe se a mensagem preparada é a mensagem de hoje.
-  if (entrada.message_body !== undefined && entrada.message_body !== campanha.message_body) {
+  // Mexer nas VARIAÇÕES também sobe a versão: elas são conteúdo tanto quanto o
+  // corpo, e sem isto a lista preparada com três textos passaria por preparada
+  // com cinco.
+  const variacoesMudaram =
+    entrada.message_variants !== undefined &&
+    JSON.stringify(entrada.message_variants) !== JSON.stringify(campanha.message_variants ?? []);
+  if (
+    (entrada.message_body !== undefined && entrada.message_body !== campanha.message_body) ||
+    variacoesMudaram
+  ) {
     mudanca.content_version = campanha.content_version + 1;
   }
 

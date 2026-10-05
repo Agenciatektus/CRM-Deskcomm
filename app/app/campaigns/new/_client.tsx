@@ -18,11 +18,11 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
@@ -31,7 +31,6 @@ import {
   useEtapas,
   useFunis,
 } from "@/hooks/campanhas/useDestinoDaCampanha";
-import { VARIAVEIS_DA_CAMPANHA, DESCRICAO_DA_VARIAVEL } from "@/lib/campanhas/renderizador";
 
 export function NovaCampanha() {
   const t = useT();
@@ -48,7 +47,13 @@ export function NovaCampanha() {
   const [semTags, setSemTags] = useState("");
   const [semInteracao, setSemInteracao] = useState("");
   const [limite, setLimite] = useState("100");
-  const [texto, setTexto] = useState("");
+  // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
+  const [variantes, setVariantes] = useState<string[]>([""]);
+  const texto = variantes[0] ?? "";
+  const variacoesExtras = useMemo(
+    () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
+    [variantes],
+  );
   const [intervalo, setIntervalo] = useState("");
   const [janelaInicio, setJanelaInicio] = useState("");
   const [janelaFim, setJanelaFim] = useState("");
@@ -97,6 +102,7 @@ export function NovaCampanha() {
       name: nome.trim(),
       channel_session_id: canal,
       message_body: texto.trim(),
+      message_variants: variacoesExtras,
       base_legal: baseLegal,
       lia_ref: liaRef.trim() || null,
       audience_filter: filtro,
@@ -317,7 +323,11 @@ export function NovaCampanha() {
             variant="outline"
             disabled={!temCriterio || previa.isPending}
             onClick={() =>
-              previa.mutate({ audience_filter: filtro, message_body: texto })
+              previa.mutate({
+                audience_filter: filtro,
+                message_body: texto,
+                message_variants: variacoesExtras,
+              })
             }
           >
             {previa.isPending ? t("Contando…") : t("Ver quantas pessoas")}
@@ -344,35 +354,7 @@ export function NovaCampanha() {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
-        <Textarea
-          rows={6}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder={t("Escreva como você falaria com uma pessoa só.")}
-          aria-label={t("Texto da mensagem")}
-        />
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>{t("Você pode usar:")}</p>
-          <ul className="space-y-1">
-            {VARIAVEIS_DA_CAMPANHA.map((v) => (
-              <li key={v}>
-                <button
-                  type="button"
-                  className="rounded-md bg-surface-elevated px-1 font-mono text-xs"
-                  onClick={() => setTexto((atual) => `${atual}{{${v}}}`)}
-                >
-                  {`{{${v}}}`}
-                </button>{" "}
-                — {t(DESCRICAO_DA_VARIAVEL[v])}
-              </li>
-            ))}
-          </ul>
-          <p>
-            {t(
-              "Quem não tiver o dado que a mensagem usa fica de fora, com o motivo na lista — mensagem com buraco não sai.",
-            )}
-          </p>
-        </div>
+        <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
       </Card>
 
       <Card className="space-y-4 p-4">
