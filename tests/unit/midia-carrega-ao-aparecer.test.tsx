@@ -70,7 +70,7 @@ describe("AudioPlayer: carrega ao aparecer", () => {
     expect(audio.getAttribute("preload")).toBe("metadata");
   });
 
-  it("clicar em tocar antes de aparecer carrega e toca", () => {
+  it("clicar em tocar antes de aparecer carrega e toca", async () => {
     const { container } = render(<AudioPlayer messageId="m1" isOutbound={false} />);
     const audio = container.querySelector("audio")!;
     const play = window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>;
@@ -79,7 +79,29 @@ describe("AudioPlayer: carrega ao aparecer", () => {
     fireEvent.click(screen.getByRole("button", { name: /reproduzir/i }));
     expect(audio.getAttribute("src")).toBe("/api/v1/messages/m1/media");
     expect(play).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("button", { name: /pausar/i })).toBeInTheDocument();
+  });
+
+  it("clicado antes de carregar: só marca 'tocando' depois que o play() resolve", async () => {
+    render(<AudioPlayer messageId="m1" isOutbound={false} />);
+    const play = window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>;
+    let soltar!: () => void;
+    let recusar!: (e: unknown) => void;
+    play.mockImplementationOnce(() => new Promise<void>((ok) => (soltar = ok)));
+
+    fireEvent.click(screen.getByRole("button", { name: /reproduzir/i }));
+    // O play() ainda não resolveu: o botão não pode dizer "Pausar".
+    expect(screen.queryByRole("button", { name: /pausar/i })).toBeNull();
+    await act(async () => soltar());
     expect(screen.getByRole("button", { name: /pausar/i })).toBeInTheDocument();
+
+    // E se o play() falha, o botão volta/fica em Reproduzir.
+    fireEvent.click(screen.getByRole("button", { name: /pausar/i }));
+    play.mockImplementationOnce(() => new Promise<void>((_, ko) => (recusar = ko)));
+    fireEvent.click(screen.getByRole("button", { name: /reproduzir/i }));
+    expect(screen.queryByRole("button", { name: /pausar/i })).toBeNull();
+    await act(async () => recusar(new DOMException("falhou", "NotSupportedError")));
+    expect(screen.queryByRole("button", { name: /pausar/i })).toBeNull();
   });
 });
 

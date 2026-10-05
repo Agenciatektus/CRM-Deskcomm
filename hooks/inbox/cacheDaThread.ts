@@ -116,6 +116,35 @@ function inserir(thread: Thread, msg: Message): Thread {
   return { ...thread, pages };
 }
 
+type MetaDoEnvio = { _optimistic?: boolean; client_id?: unknown } | null;
+
+/**
+ * Qual bolha otimista esta mensagem real substitui.
+ *
+ * Pelo id de correlação, quando a linha o traz: o `metadata.client_id` que o
+ * `useSendMessage` mandou no POST é o id da própria bolha otimista. Com ele,
+ * duas mensagens iguais enviadas em sequência não se confundem — e uma linha
+ * com `client_id` que não é de nenhuma bolha desta aba (o mesmo texto enviado
+ * de outra aba) não leva a bolha de ninguém.
+ *
+ * Sem `client_id` (envio que não passou pelo otimista, ou servidor antigo):
+ * mesmo texto e tipo, e a MAIS ANTIGA primeiro — a ordem de envio, que é a
+ * ordem em que as linhas reais nascem.
+ */
+function otimistaDaLinha(msgs: Message[], linha: Linha): Message | undefined {
+  const otimistas = msgs.filter((m) => (m.metadata as MetaDoEnvio)?._optimistic === true);
+  const clientId = (linha.metadata as MetaDoEnvio)?.client_id;
+  if (typeof clientId === "string" && clientId !== "") {
+    return otimistas.find((m) => (m.metadata as MetaDoEnvio)?.client_id === clientId);
+  }
+  return otimistas
+    .filter((m) => m.body === linha.body && m.type === linha.type)
+    .reduce<Message | undefined>(
+      (velha, m) => (velha === undefined || Date.parse(m.created_at) < Date.parse(velha.created_at) ? m : velha),
+      undefined,
+    );
+}
+
 /**
  * Aplica no cache da thread `["messages", conversationId]` um evento do canal.
  * Não refaz nada sozinha: devolve `refazer` e quem chama decide.
@@ -176,12 +205,7 @@ export function aplicarEventoNaThread(
     // A bolha otimista do envio (`useSendMessage`) é substituída pela real,
     // senão a mesma frase aparece duas vezes até o POST responder.
     if (linha.direction === "outbound") {
-      const otimista = todas(base).find(
-        (m) =>
-          (m.metadata as { _optimistic?: boolean } | null)?._optimistic === true &&
-          m.body === linha.body &&
-          m.type === linha.type,
-      );
+      const otimista = otimistaDaLinha(todas(base), linha);
       if (otimista) base = trocarMensagem(base, otimista.id, () => null);
     }
     return inserir(base, linha as unknown as Message);
