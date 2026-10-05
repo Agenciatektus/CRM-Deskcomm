@@ -30,12 +30,19 @@ export function PassosDaCampanha({
   onChange,
   etapas,
   temFunil,
+  quantosCards = null,
 }: {
   passos: PassoDaRegua[];
   onChange: (passos: PassoDaRegua[]) => void;
   etapas: Etapa[];
   /** Sem funil escolhido, "mover de etapa" e "etiqueta" não têm card em que agir. */
   temFunil: boolean;
+  /**
+   * Quantas pessoas a lista pega, quando a tela já sabe (a prévia da audiência).
+   * Vira o NÚMERO de cards que iniciar a campanha vai criar. Sem ele a frase
+   * fica correta e vaga; com ele o operador decide antes, que é o ponto.
+   */
+  quantosCards?: number | null;
 }) {
   const t = useT();
   return (
@@ -48,19 +55,26 @@ export function PassosDaCampanha({
       {!temFunil && passos.length > 0 && (
         <p className="text-sm text-error-fg">
           {t(
-            "Escolha o funil em «Quem responder» antes de preparar: mover de etapa e etiquetar agem sobre o card do negócio.",
+            "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.",
           )}
         </p>
       )}
-      {/* ⚠️ Dito na tela porque é a armadilha desta feature: numa campanha o card
-          nasce quando a pessoa RESPONDE, e os passos existem para alcançar quem
-          NÃO respondeu. Passo de CRM para quem não tem card não tem o que mover,
-          e descobrir isso pelo erro na fila de follow-up é descobrir tarde. */}
-      {passos.some((p) => p.tipo === "mover_etapa" || p.tipo === "etiqueta") && (
+      {/* ⚠️ Dito na tela porque é a consequência que o operador NÃO adivinha:
+          com passos, a campanha põe no funil todo mundo que ela abordar, não só
+          quem responder. Numa lista de 500 isso são 500 cards, e descobrir pelo
+          quadro cheio é descobrir tarde. */}
+      {passos.length > 0 && (
         <p className="text-sm text-warning-fg">
           {t(
-            "Mover de etapa e etiquetar valem para quem JÁ tem card no funil, e numa campanha o card nasce quando a pessoa responde. Para quem nunca respondeu, esses passos não encontram card e a régua dele para ali.",
-          )}
+            "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:",
+          )}{" "}
+          <strong>
+            {quantosCards === null
+              ? t("um card por pessoa da lista")
+              : `${quantosCards} ${t("cards, um por pessoa da lista")}`}
+          </strong>
+          {". "}
+          {t("Quem já tem negócio aberto nesse funil não ganha card novo.")}
         </p>
       )}
       <ListaDePassos passos={passos} onChange={onChange} etapas={etapas} />

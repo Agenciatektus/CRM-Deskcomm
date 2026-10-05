@@ -412,6 +412,15 @@ export async function createLeadHandler(
      */
     via_planilha?: boolean;
     /**
+     * Interno — a MESMA marca de `via_planilha`, agora dizível por nome
+     * (migration 9035). Criação em LOTE tem de chegar marcada ao
+     * `lead.created`, senão o gatilho "Lead criado" manda uma mensagem
+     * proativa por card: a planilha já tinha esse buraco tampado, e a campanha
+     * com passos abriria o mesmo (500 cards de uma vez). Valores em
+     * `lib/leads/criacao-em-lote.ts`. Não vem do corpo da requisição.
+     */
+    via?: string;
+    /**
      * Interno (clone para outro funil, pela tela ou pela automação). O dono veio
      * do negócio de ORIGEM, não de quem pediu: se ele não pode mais ser dono
      * (desligado, virou viewer, agente arquivado), o clone nasce sem dono e a
@@ -583,7 +592,9 @@ export async function createLeadHandler(
       p_metadata: {
         request_id: ctx.requestId,
         ...a.metadataActor,
-        ...(input.via_planilha ? { via: ORIGEM_DA_PLANILHA } : {}),
+        // `via_planilha` continua valendo (é o que a importação passa) e
+        // ganha precedência sobre `via`: quem manda os dois está importando.
+        ...(input.via_planilha ? { via: ORIGEM_DA_PLANILHA } : input.via ? { via: input.via } : {}),
       },
       p_organization_id: ctx.organization_id,
     })

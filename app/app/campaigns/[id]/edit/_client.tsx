@@ -354,6 +354,10 @@ export function EditarCampanha({ id }: { id: string }) {
           onChange={setPassos}
           etapas={etapas.data ?? []}
           temFunil={!!funil}
+          // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
+          // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
+          // frase do aviso fica sem número em vez de chutar um.
+          quantosCards={previa.data?.elegiveis ?? null}
         />
       </Card>
 

@@ -261,7 +261,16 @@ export async function funilDeEntrada(
  * melhor que cair calado no funil do número, porque a campanha DISSE onde
  * queria — e o silêncio faria os cards dela aparecerem noutro lugar.
  */
-async function destinoDaCampanha(
+/**
+ * Funil e etapa de um card de CAMPANHA. Exportada (9035) porque agora dois
+ * momentos a perguntam: a ABORDAGEM, quando a campanha com passos cria o card
+ * de quem acabou de receber a 1ª mensagem, e a RESPOSTA, por aqui. Ter de ser a
+ * MESMA função é o ponto: com duas regras, o card nasceria numa etapa na
+ * abordagem e a resposta tentaria criá-lo noutra — e como já existe card
+ * aberto, a segunda regra ficaria sem efeito, calada, até alguém perguntar por
+ * que o quadro não bate com a tela da campanha.
+ */
+export async function destinoDaCampanha(
   db: SupabaseClient,
   organizationId: string,
   pipelineId: string,

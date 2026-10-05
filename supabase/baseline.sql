@@ -47526,6 +47526,17 @@ comment on column public.campaigns.message_variants is
 -- Racional completo (incluindo por que a lista mora na campanha e o grafo no
 -- pointer) no cabeçalho da migration.
 --
+-- ⚠️ A INSCRIÇÃO ABRE O CARD NO FUNIL (decisão do dono, 05/10/2026). Campanha
+-- COM passos põe no funil escolhido todo mundo que ela abordar, não só quem
+-- responder: sem card, os passos "mover de etapa" e "etiquetar" não têm negócio
+-- em que agir, falham e matam a inscrição no backoff — e eles existem
+-- justamente para alcançar quem NÃO respondeu. Negócio já aberto do contato
+-- naquele funil é REUSADO. Campanha SEM passos não publica régua, não inscreve
+-- e não cria card nenhum: segue idêntica ao comportamento anterior, com o card
+-- nascendo na resposta. O `lead.created` desses cards vai marcado como criação
+-- em LOTE (`lib/leads/criacao-em-lote.ts`), senão o gatilho "Lead criado"
+-- mandaria uma mensagem proativa por card, no mesmo minuto da abordagem.
+--
 -- As três guardas de escrita da cadência (9020, estreitadas pela 9024) e as duas
 -- funções de vaga do dia (9016) passam a valer para as DUAS superfícies de
 -- prospecção: sem isso, um manager escreveria a régua da campanha direto pela

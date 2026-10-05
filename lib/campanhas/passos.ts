@@ -117,14 +117,15 @@ export function problemaNosPassos(
   contexto: { pipelineId: string | null },
 ): string | null {
   if (passos.length === 0) return null;
-  // FUNIL OBRIGATÓRIO A PARTIR DAQUI, e só a partir daqui. "Mover de etapa" e
-  // "etiqueta" agem sobre o NEGÓCIO no funil da régua, e um pointer sem
-  // `pipeline_id` faz o passo falhar no envio — longe de quem poderia
-  // consertá-lo. Campanha sem passos segue sem funil, como sempre.
+  // FUNIL OBRIGATÓRIO A PARTIR DAQUI, e só a partir daqui. Com passos, a
+  // inscrição ABRE o card de cada pessoa abordada (migration 9035), e é nesse
+  // card que "mover de etapa" e "etiqueta" agem; sem `pipeline_id` não há onde
+  // o card nascer, e o passo falharia no envio, longe de quem o consertaria.
+  // Campanha sem passos segue sem funil, como sempre, e sem criar card nenhum.
   if (!contexto.pipelineId) {
     return (
-      "Escolha o funil da campanha antes de usar passos: mover de etapa e etiquetar agem " +
-      "sobre o card do negócio, e sem funil não há card."
+      "Escolha o funil da campanha antes de usar passos: com passos, cada pessoa abordada " +
+      "vira card no funil, e sem funil não há onde o card nascer."
     );
   }
   for (const [i, passo] of passos.entries()) {

@@ -42,6 +42,7 @@ import { decidePacing, dayStartInTz } from "@/lib/agent-engine/pacing/engine";
 import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engine/pacing/store";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
 import { inscreverContatoNaRegua } from "@/lib/cadencia/inscrever";
+import { garantirCardDaAbordagem } from "./card-da-abordagem";
 import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
@@ -91,12 +92,15 @@ interface CampanhaRow {
   teto_horario: number | null;
   /** A régua publicada desta campanha (9035). `null` = campanha de uma mensagem só. */
   followup_pointer_id: string | null;
+  /** Onde o card de quem foi abordado nasce (0378 + 9035). */
+  pipeline_id: string | null;
+  stage_id: string | null;
 }
 
 const COLUNAS_DA_CAMPANHA =
   "id, organization_id, channel_session_id, name, message_body, message_variants, content_version, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario, " +
-  "followup_pointer_id";
+  "followup_pointer_id, pipeline_id, stage_id";
 
 export async function rodarUmaRodadaDeCampanha(
   admin: SupabaseClient,
@@ -519,10 +523,28 @@ async function rodarUmaCampanha(
           organizationId: campanha.organization_id,
           pointerId: campanha.followup_pointer_id,
           contactId: alvo.contact_id,
-          // O card de quem responde nasce NA RESPOSTA: no 1º toque quase nunca
-          // há negócio. O passo de CRM resolve o negócio na hora de aplicá-lo
-          // (`lib/cadencia/efeitos.ts`), que é quando ele já existe.
-          leadId: null,
+          // O CARD NASCE AQUI, na abordagem (decisão do dono, 05/10/2026), e não
+          // só quando a pessoa responde: os passos de CRM da régua agem sobre o
+          // negócio, e a régua existe para alcançar quem NÃO respondeu. Sem
+          // card, "mover de etapa" e "etiquetar" falhavam e matavam a inscrição
+          // no backoff — a régua dessa pessoa parava ali, calada.
+          //
+          // Em CALLBACK porque a ordem é o ponto: a porta da régua o chama
+          // depois dos vetos e da reserva da vaga do dia, nunca antes. Ver
+          // `lib/campanhas/card-da-abordagem.ts`.
+          abrirNegocio: () =>
+            garantirCardDaAbordagem(admin, {
+              campanha: {
+                id: campanha.id,
+                organization_id: campanha.organization_id,
+                name: campanha.name,
+                pipeline_id: campanha.pipeline_id,
+                stage_id: campanha.stage_id,
+              },
+              contactId: alvo.contact_id,
+              destinatarioId: alvo.id,
+              requestId: `campaign:${campanha.id}:${alvo.id}`,
+            }),
           fronteira: boundary,
           origem: { tipo: "campanha", campanhaId: campanha.id, destinatarioId: alvo.id },
         });

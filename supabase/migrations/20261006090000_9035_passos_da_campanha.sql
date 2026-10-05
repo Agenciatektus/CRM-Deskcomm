@@ -1,4 +1,4 @@
--- manifest: 9035 — a campanha ganha PASSOS (espera, mensagem adicional, mover de etapa, etiquetar) sem motor novo: `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de follow-up com `surface='campaign'` — a mesma máquina da cadência (9016). Por quê: hoje a campanha manda UMA mensagem e acaba, e quem não responde na primeira nunca é tocado de novo; escrever um segundo motor de espera/retomada seria a terceira régua do produto. As guardas de escrita da cadência (9020/9024), o teto de inscrições por dia e as vagas do dia passam a valer para as DUAS superfícies de prospecção.
+-- manifest: 9035 — a campanha ganha PASSOS (espera, mensagem adicional, mover de etapa, etiquetar) sem motor novo: `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de follow-up com `surface='campaign'` — a mesma máquina da cadência (9016). Por quê: hoje a campanha manda UMA mensagem e acaba, e quem não responde na primeira nunca é tocado de novo; escrever um segundo motor de espera/retomada seria a terceira régua do produto. As guardas de escrita da cadência (9020/9024), o teto de inscrições por dia e as vagas do dia passam a valer para as DUAS superfícies de prospecção. A inscrição ABRE o card no funil da campanha (decisão do dono, 05/10/2026): sem negócio, os passos "mover de etapa" e "etiquetar" não têm em que agir, e eles existem para quem NÃO respondeu. Negócio aberto do contato nesse funil é reusado; campanha SEM passos não cria card nenhum.
 --
 -- 9035 — A CAMPANHA GANHA PASSOS (e nenhum motor novo)
 --
@@ -37,6 +37,36 @@
 -- campanha) e, pela experiência das duas primeiras, o lugar onde cada conserto
 -- precisa ser feito duas vezes — e é feito uma.
 --
+-- ## A inscrição ABRE O CARD no funil (decisão do dono, 05/10/2026)
+--
+-- Campanha COM passos põe no funil escolhido todo mundo que ela abordar, não só
+-- quem responder. O motivo é que sem card os passos "mover de etapa" e
+-- "etiquetar" não têm negócio em que agir: eles falham, entram em backoff e
+-- matam a inscrição — e existem justamente para alcançar quem NÃO respondeu.
+-- O custo é aceito e explícito: uma campanha de 500 pessoas cria 500 cards.
+--
+-- Quem abre o card é `lib/campanhas/card-da-abordagem.ts`, chamado de dentro de
+-- `inscreverContatoNaRegua` DEPOIS de todos os freios (anti-laço, bloqueio,
+-- anonimização, recusa de marketing, supressão por telefone, teto do dia).
+-- Negócio já ABERTO do contato naquele funil é reusado, nunca duplicado:
+-- repreparar, retomar ou repetir a rodada não criam um segundo card. Funil e
+-- etapa saem de `destinoDaCampanha` (`lib/leads/nascimento-do-lead.ts`), a
+-- MESMA função que a resposta usa — com duas regras, o card nasceria numa etapa
+-- na abordagem e a resposta o quereria noutra, sem efeito e calada.
+--
+-- O card nasce com `source = 'campanha'` e o `source_metadata` da campanha (a
+-- marca COMPARTILHADA com o card que nasce da resposta), mais
+-- `campaign_recipient_id` e `nasceu_na = 'abordagem'`: sem isso, a lista
+-- inteira entraria no funil como lead que chegou sozinho e a métrica de origem
+-- passaria a mentir. E o `lead.created` vai marcado como criação em LOTE
+-- (`lib/leads/criacao-em-lote.ts`, onde a importação de planilha já estava),
+-- senão o gatilho de follow-up "Lead criado" mandaria uma mensagem proativa por
+-- card — centenas, no mesmo minuto em que a campanha acabou de falar com essas
+-- pessoas.
+--
+-- Campanha SEM passos não chega a nada disso: não publica régua, não inscreve e
+-- não cria card. Segue idêntica ao comportamento anterior à 9035.
+--
 -- ## Por que a 1ª mensagem NÃO é um passo
 --
 -- Ela continua sendo o `rendered_body` congelado na preparação e enviado pelo
@@ -44,7 +74,8 @@
 -- por destinatário, o texto exato antes de apertar Iniciar. Transformá-la no
 -- primeiro nó do grafo jogaria a prévia fora para ganhar simetria. Então a
 -- lista de `passos` é o 2º toque em diante, e o destinatário é INSCRITO na
--- régua quando a 1ª mensagem sai com sucesso (`lib/campanhas/rodada.ts`).
+-- régua (e ganha o card no funil) quando a 1ª mensagem sai com sucesso
+-- (`lib/campanhas/rodada.ts`).
 --
 -- ## Por que a lista mora na CAMPANHA, e o grafo no pointer
 --

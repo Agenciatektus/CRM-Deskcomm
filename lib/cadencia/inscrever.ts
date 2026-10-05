@@ -468,7 +468,8 @@ export async function inscreverPorGatilho(
  * da base legal.
  *
  * As duas diferenças, escritas no cabeçalho do arquivo: não abre conversa (a
- * fronteira do envio entra por parâmetro) e não exige negócio.
+ * fronteira do envio entra por parâmetro) e não exige negócio PRONTO — ela o
+ * abre, por `abrirNegocio`, depois dos freios.
  *
  * ⚠️ NÃO confere `publicadaEm`: o corte "nada retroativo" existe para o gatilho
  * de etapa, onde publicar poderia inscrever o estoque inteiro da etapa de uma
@@ -484,8 +485,24 @@ export async function inscreverContatoNaRegua(
     organizationId: string;
     pointerId: string;
     contactId: string;
-    /** O negócio quando já existe (raro no 1º toque). `null` = o passo de CRM o resolve depois. */
+    /** O negócio quando quem chama já o tem em mãos. Senão, `abrirNegocio`. */
     leadId?: string | null;
+    /**
+     * ABRE (ou reusa) o card do contato no funil, e devolve o id — ou `null`
+     * quando não deu, que não é recusa de inscrição: a régua roda sem negócio e
+     * só os passos de CRM ficam sem objeto.
+     *
+     * Entra como CALLBACK, e não como código aqui dentro, por duas razões. A
+     * primeira é de dependência: quem sabe em que funil e com que marca de
+     * origem o card nasce é a campanha (`lib/campanhas/card-da-abordagem.ts`),
+     * e a porta da cadência não deve conhecer campanha. A segunda é de ORDEM, e
+     * é a que importa: ela é chamada aqui, depois do anti-laço, do veto por
+     * bloqueio/anonimização/recusa, da supressão por telefone E da reserva da
+     * vaga do dia. Card criado antes disso seria card aberto para quem a
+     * inscrição recusa no passo seguinte — lixo no funil, e lixo com o nome de
+     * quem pediu para não receber.
+     */
+    abrirNegocio?: () => Promise<string | null>;
     /** A conversa que o envio da campanha abriu. Sem ela, abriria uma segunda. */
     fronteira: ServiceBoundary;
     origem: Extract<OrigemDaInscricao, { tipo: "campanha" }>;
@@ -505,11 +522,15 @@ export async function inscreverContatoNaRegua(
   if ((await reservarInscricoes(admin, input.organizationId, cadencia.id, 1)) < 1) {
     return { ok: false, motivo: "teto_do_dia" };
   }
+
+  // TODOS os freios já disseram sim. Só agora o card existe.
+  const leadId = input.leadId ?? (input.abrirNegocio ? await input.abrirNegocio() : null);
+
   return inscreverNegocio(
     admin,
     input.organizationId,
     cadencia,
-    { leadId: input.leadId ?? null, contactId: input.contactId },
+    { leadId, contactId: input.contactId },
     input.origem,
     input.fronteira,
   );
