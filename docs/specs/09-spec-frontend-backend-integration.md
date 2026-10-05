@@ -441,7 +441,7 @@ Tabela canônica de **todos** os canais Supabase Realtime usados no app. Adicion
 | `/app/inbox/[id]` | `conv-{conv_id}-typing` | broadcast | n/a | `useTypingIndicator(convId, userId)` | unmount + clearTimeouts |
 | `/app/pipelines/[id]` | `pipeline-{pipeline_id}-leads` | `crm_leads` | `pipeline_id=eq.{pipeline_id}` | `useBoard(pipelineId, filters)` | unmount |
 | Layout autenticado | `org-{org_id}-presence` | broadcast/presence | n/a | `usePresence(orgId)` | logout / org switch |
-| `/admin/inbox` | `admin-conversations-{platform_admin_id}` | `conversations` (cross-tenant via SECURITY DEFINER view) | n/a | `useAdminInboxRealtime(filters)` | unmount |
+| `/admin/inbox` | — (sem realtime) | `conversations` (cross-tenant) | n/a | polling de 15 s em `useAdminInbox` (a assinatura de `messages` sem filtro de org saiu: RLS de todo evento de todos os tenants por aba) | unmount |
 | `/app/integrations/whatsapp` | `org-{org_id}-channel-sessions` | `channel_sessions` | `org_id=eq.{org_id}` | `useChannelSessions(orgId)` | unmount |
 | `/app/integrations/whatsapp/[id]/qr` | `org-{org_id}-channel-session-qr` | `channel_sessions` | `id=eq.{id}` | `useQRPolling(sessionId)` | qr scaneado / unmount |
 | `/app/contacts/[id]/timeline` | `contact-{contact_id}-activities` | `crm_lead_activities` | `contact_id=eq.{contact_id}` | `useTimelineRealtime(contactId)` | unmount |

@@ -441,11 +441,12 @@ export function useVoiceCallSession(remoteAudioRef: RefObject<HTMLAudioElement |
 
   useRealtimeChannel({
     name: "voice-calls",
-    postgresChanges: {
-      event: "*",
-      table: "voice_calls",
-      filter: orgId ? `organization_id=eq.${orgId}` : undefined,
-    },
+    // Sem organização não há topologia: nunca uma assinatura de `voice_calls`
+    // sem filtro (o `enabled` já segurava, mas a topologia sem filtro é a que
+    // a varredura de `realtime-sempre-com-filtro` recusa).
+    postgresChanges: orgId
+      ? { event: "*", table: "voice_calls", filter: `organization_id=eq.${orgId}` }
+      : undefined,
     onChange: onRealtimeChange,
     enabled: !!orgId,
   });
