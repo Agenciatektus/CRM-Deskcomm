@@ -56,8 +56,13 @@ const U = {
   plataforma: "eeeeeeee-1111-4000-8000-000000000007",
   misto: "eeeeeeee-1111-4000-8000-000000000008",
 } as const;
-const LINHAS_A = 3000;
-const LINHAS_B = 500;
+// Pequeno de propósito: a policy ANTIGA (controle) custa ~4-5 ms por linha
+// avaliada (medido no CI: 3.501 linhas → 14,8 s por contagem) e a prova de
+// equivalência roda oito identidades contra ela.
+const LINHAS_A = 600;
+const LINHAS_B = 100;
+/** Os casos que rodam a policy antiga, por linha, precisam de mais que 30 s. */
+const LENTO = 180_000;
 
 const POLICY_9035 = `
   drop policy "webhook_events_log_tenant_read" on public.webhook_events_log;
@@ -164,7 +169,7 @@ describe("9036: mesmas linhas antes e depois, por identidade", () => {
       misto: `0/${LINHAS_B}/0`,
     });
     expect(depois).toEqual(antes);
-  });
+  }, LENTO);
 });
 
 describe("9036: o papel é perguntado uma vez por consulta, não por linha", () => {
@@ -172,7 +177,7 @@ describe("9036: o papel é perguntado uma vez por consulta, não por linha", () 
     const r = chamadas(true);
     expect(r.linhas).toBe(LINHAS_A);
     expect(r.roleAtLeast).toBeGreaterThanOrEqual(LINHAS_A);
-  });
+  }, LENTO);
 
   it("na policy da 9036, fn_role_at_least não roda e fn_escopo_orgs roda uma vez", () => {
     const r = chamadas(false);
@@ -191,5 +196,5 @@ describe("9036: o papel é perguntado uma vez por consulta, não por linha", () 
     expect(depois).not.toMatch(/fn_role_at_least/);
     expect(depois).toMatch(/fn_escopo_orgs/);
     expect(depois).toMatch(/SubPlan|Semi Join|InitPlan/);
-  });
+  }, LENTO);
 });
