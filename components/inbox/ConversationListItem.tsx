@@ -12,6 +12,8 @@ import type { ConversationWithContact } from "@/hooks/inbox/useConversationsReal
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
+import { BotaoMaisAcoes } from "./menu/BotaoMaisAcoes";
+import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
 import { initials, relativeTime } from "./item/tempo-da-linha";
 
@@ -52,6 +54,14 @@ interface Props {
   automaticoDaOrg?: boolean;
   /** Quem está logado. Por prop pelo mesmo motivo do `automaticoDaOrg`. */
   meuUserId?: string | null;
+  /**
+   * Abre o menu de contexto da conversa (fase 3.6). Ausente = linha sem menu,
+   * do jeito de antes: quem renderiza o item fora da lista não ganha um "…"
+   * que não abre nada.
+   */
+  onAbrirMenu?: AbrirMenu;
+  /** O menu está aberto NESTA linha: o "…" fica visível enquanto isso. */
+  menuAberto?: boolean;
 }
 
 /**
@@ -83,6 +93,8 @@ export function ConversationListItem({
   mostrarAutomatico = true,
   automaticoDaOrg,
   meuUserId,
+  onAbrirMenu,
+  menuAberto,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -135,12 +147,15 @@ export function ConversationListItem({
   const canal = conversation.channel_sessions ?? null;
   const rotuloCanal = canal?.phone_number ?? canal?.display_name ?? null;
 
-  return (
+  const gatilhos = gatilhosDoMenu(conversation.id, onAbrirMenu, !!menuAberto);
+
+  const linha = (
     <button
       type="button"
       data-conversation-id={conversation.id}
       data-nao-lida={naoLida ? "true" : undefined}
       onClick={() => onSelect(conversation.id)}
+      {...gatilhos}
       className={cn(
         "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-2.5 text-left transition-colors hover:bg-surface-elevated",
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
@@ -247,5 +262,19 @@ export function ConversationListItem({
         />
       </div>
     </button>
+  );
+
+  if (!onAbrirMenu) return linha;
+
+  // Um <button> não pode morar dentro de outro: o "…" é IRMÃO da linha.
+  return (
+    <div className="group/linha relative" data-menu-aberto={menuAberto ? "true" : undefined}>
+      {linha}
+      <BotaoMaisAcoes
+        nome={displayName}
+        aberto={!!menuAberto}
+        onAbrir={(el) => onAbrirMenu(conversation.id, el, el)}
+      />
+    </div>
   );
 }

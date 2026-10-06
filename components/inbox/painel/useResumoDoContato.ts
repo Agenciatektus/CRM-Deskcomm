@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiClient } from "@/lib/api/client";
+import { ouvirMudancaNoCrmDoContato } from "@/lib/inbox/releitura-do-contato";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 
 import type {
@@ -127,6 +128,15 @@ export function useResumoDoContato(conversation: ConversationWithContact | null)
   // gravado volta do servidor em vez de ser remendado no cliente. Escrita que
   // só parece ter dado certo é o defeito que esta tela inteira combate.
   const recarregar = useCallback(() => setTentativa((n) => n + 1), []);
+
+  // Gravação no negócio feita FORA do painel (o menu de contexto da lista):
+  // relê pelo mesmo caminho, só se o aviso for deste contato.
+  useEffect(
+    () => ouvirMudancaNoCrmDoContato((id) => {
+      if (id === contactId) recarregar();
+    }),
+    [contactId, recarregar],
+  );
 
   // `erro` PRIMEIRO: as listas voltam a `null` quando a leitura falha, e sem
   // esta guarda o painel mostraria esqueleto para sempre em vez da falha.
