@@ -21,7 +21,7 @@ import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
  */
 
 const CONTACT = "c0000000-0000-4000-8000-000000000001";
-const CHAVE = "deskcomm.inbox.painel.aba";
+const CHAVE = "inbox.painel.aba";
 
 const auth = vi.hoisted(() => ({
   user: { id: "u-1", support: null as null | { access_mode: string } },

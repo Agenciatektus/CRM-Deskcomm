@@ -5,7 +5,7 @@ import { useCallback, useSyncExternalStore } from "react";
 export const ABAS_DO_PAINEL = ["resumo", "negocios", "empresa", "atividade"] as const;
 export type AbaDoPainel = (typeof ABAS_DO_PAINEL)[number];
 
-const CHAVE = "deskcomm.inbox.painel.aba";
+const CHAVE = "inbox.painel.aba";
 const PADRAO: AbaDoPainel = "resumo";
 
 const ouvintes = new Set<() => void>();
