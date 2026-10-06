@@ -9,6 +9,7 @@ import {
   formatarDecorrido,
   formatarRestante,
   LIMIAR_URGENTE_MS,
+  WINDOW_MS,
 } from "@/lib/channels/janela";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +40,15 @@ import { cn } from "@/lib/utils";
 export function JanelaSelo({
   provider,
   lastInboundAt,
+  comBarra = false,
 }: {
   provider: string | null | undefined;
   lastInboundAt: string | null;
+  /**
+   * A faixa de status do cabeçalho (visual v2) mostra também uma barra do que
+   * resta das 24h: a proporção se lê de relance, o número pede leitura.
+   */
+  comBarra?: boolean;
 }) {
   const t = useT();
   // O relógio do servidor não serve: o que importa é quanto falta AGORA, na
@@ -67,9 +74,9 @@ export function JanelaSelo({
     return (
       <Badge
         variant="outline"
-        className="h-4 border-amber-400 px-1.5 text-[10px] text-amber-700 dark:border-amber-700 dark:text-amber-300"
+        className="h-4 border-warning px-1.5 text-[10px] text-warning-fg"
         title={usaModelos ? t(
-          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.",
+          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui: a plataforma recusa texto livre.",
         ) : t("Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.")}
       >
         {quanto} · {usaModelos ? t("só modelo") : t("aguardando o cliente")}
@@ -78,16 +85,36 @@ export function JanelaSelo({
   }
 
   const urgente = estado.restanteMs <= LIMIAR_URGENTE_MS;
-  return (
+  const selo = (
     <Badge
       variant="outline"
       className={cn(
         "h-4 px-1.5 text-[10px]",
-        urgente && "border-amber-400 text-amber-700 dark:border-amber-700 dark:text-amber-300",
+        urgente && "border-warning text-warning-fg",
       )}
       title={usaModelos ? t("Tempo restante para escrever texto livre. Depois disso, só modelo aprovado.") : t("Tempo restante para responder. Uma nova mensagem do cliente reabre a janela.")}
     >
       {t("Janela")} {formatarRestante(estado.restanteMs)}
     </Badge>
+  );
+  if (!comBarra) return selo;
+  const pct = Math.max(0, Math.min(100, (estado.restanteMs / WINDOW_MS) * 100));
+  return (
+    <span className="inline-flex items-center gap-2">
+      {selo}
+      <span
+        className="h-1.5 w-14 overflow-hidden rounded-full bg-border"
+        role="meter"
+        aria-label={t("Tempo restante da janela de 24h")}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+      >
+        <span
+          className={cn("block h-full rounded-full", urgente ? "bg-warning" : "bg-success")}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </span>
   );
 }

@@ -6813,8 +6813,8 @@ export const DICIONARIO: Traducoes = {
   "Você passa a responder esta conversa e o atendimento automático para aqui.": {
     es: "Desde ahora tú respondes esta conversación y la atención automática se detiene aquí.",
   },
-  "Religa o atendimento automático para este cliente — vale para todas as conversas dele.": {
-    es: "Reactiva la atención automática para este cliente — vale para todas sus conversaciones.",
+  "Religa o atendimento automático para este cliente, em todas as conversas dele.": {
+    es: "Reactiva la atención automática para este cliente, en todas sus conversaciones.",
   },
   "Devolve esta conversa ao atendimento automático.": {
     es: "Devuelve esta conversación a la atención automática.",
@@ -6932,7 +6932,7 @@ export const DICIONARIO: Traducoes = {
   "O cliente nunca escreveu": { es: "El cliente nunca escribió" },
   "Janela fechada há": { es: "Ventana cerrada hace" },
   "só modelo": { es: "solo plantilla" },
-  "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.": {
+  "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui: a plataforma recusa texto livre.": {
     es: "Pasaron 24h desde el último mensaje del cliente. Desde aquí solo se puede enviar una plantilla aprobada: la plataforma rechaza el texto libre.",
   },
   "Tempo restante para escrever texto livre. Depois disso, só modelo aprovado.": {
@@ -14163,6 +14163,24 @@ export const DICIONARIO: Traducoes = {
   "Nome, telefone ou última mensagem": { es: "Nombre, teléfono o último mensaje" },
   "mensagens não lidas": { es: "mensajes no leídos" },
   ativos: { es: "activos" },
+  // Cabeçalho do chat, visual v2 (fase 3.2)
+  "Lembrar depois": { es: "Recordar después" },
+  "Me lembrar desta conversa": { es: "Recordarme esta conversación" },
+  Amanhã: { es: "Mañana" },
+  "Em 1 semana": { es: "En 1 semana" },
+  "Escolher data e hora": { es: "Elegir fecha y hora" },
+  "Lembrar neste horário": { es: "Recordar a esta hora" },
+  "Buscar atendente": { es: "Buscar agente" },
+  "Continuar por outro número": { es: "Continuar por otro número" },
+  "Mais ações": { es: "Más acciones" },
+  "Tempo restante da janela de 24h": { es: "Tiempo restante de la ventana de 24h" },
+  "Esperando agora": { es: "Esperando ahora" },
+  "Lembrete:": { es: "Recordatorio:" },
+  "Comentário no Instagram": { es: "Comentario en Instagram" },
+  "Mostrar ou ocultar detalhes do lead": { es: "Mostrar u ocultar detalles del lead" },
+  "Detalhes do lead": { es: "Detalles del lead" },
+  "Lembrete ativo:": { es: "Recordatorio activo:" },
+  "Escolha um horário no futuro, em até 90 dias.": { es: "Elige un horario en el futuro, dentro de 90 días." },
 };
 
 /**
