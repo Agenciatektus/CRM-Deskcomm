@@ -21,9 +21,10 @@ import { sendMessageHandler } from "@/app/api/v1/messages/_handler";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
 
 import { baseLegalValida, motivoParaExcluir, recusouMarketing } from "./elegibilidade";
+import { ehEntradaContinua, problemaNaEntradaContinua } from "./entrada-continua";
 import { ehStatusDaCampanha, podeTransitar } from "./maquina-de-estados";
 import { passosGuardados, problemaNosPassos } from "./passos";
-import { prepararCampanha } from "./preparacao";
+import { prepararCampanha, resumoDaEtapaDeEntrada } from "./preparacao";
 import { encerrarReguaDaCampanha, publicarReguaDaCampanha } from "./regua";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
@@ -46,6 +47,14 @@ export interface CampanhaCarregada {
   passos: unknown;
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id: string | null;
+  /**
+   * O modo de público (migration 9038). `false` = LISTA (o snapshot congelado,
+   * default e comportamento de toda campanha anterior a ela); `true` =
+   * CONTÍNUO, e quem entra em `entrada_etapa_id` é abordado. Racional em
+   * `lib/campanhas/entrada-continua.ts`.
+   */
+  entrada_continua: boolean;
+  entrada_etapa_id: string | null;
   audience_filter: unknown;
   audience_version: number;
   content_version: number;
@@ -64,6 +73,7 @@ export type Desfecho<T = unknown> = ({ ok: true } & T) | Recusa;
 const COLUNAS =
   "id, organization_id, name, status, channel_session_id, message_body, message_variants, " +
   "base_legal, lia_ref, pipeline_id, passos, followup_pointer_id, " +
+  "entrada_continua, entrada_etapa_id, " +
   "audience_filter, audience_version, content_version, scheduled_at, description, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
 
@@ -137,6 +147,18 @@ function faltaParaEnviar(c: CampanhaCarregada): Recusa | null {
   if (dosPassos) {
     return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: dosPassos, status: 422 };
   }
+  // A ENTRADA CONTÍNUA (9038), no MESMO gate — e por isso ela vale para
+  // preparar, iniciar, agendar e testar de uma vez. Campanha em modo lista sai
+  // daqui sem mudança nenhuma: `problemaNaEntradaContinua` devolve `null` na
+  // primeira linha quando a flag está desligada.
+  //
+  // Aqui é também onde a campanha contínua que PERDEU a etapa (alguém a apagou,
+  // e a FK da 9038 anulou a referência) é barrada: ela já havia parado de
+  // abordar — o gatilho não casa etapa nula — e a próxima ação diz por quê.
+  const daEntrada = problemaNaEntradaContinua(c);
+  if (daEntrada) {
+    return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: daEntrada, status: 422 };
+  }
   if (!baseLegalValida({ baseLegal: c.base_legal, liaRef: c.lia_ref })) {
     return {
       ok: false,
@@ -206,6 +228,52 @@ export async function prepararAcao(
   }
 
   try {
+    // ═══ MODO CONTÍNUO: preparar é CONFERIR, não montar lista (9038) ═══
+    //
+    // Nenhuma linha de `campaign_recipients` nasce aqui. O público desta
+    // campanha são as pessoas que ENTRAREM na etapa depois do Iniciar, e
+    // gravá-las agora seria abordar o estoque — justamente o que o corte
+    // "nada retroativo" do gatilho existe para impedir.
+    //
+    // O que preparar faz, e é o que preserva a revisão da 1ª mensagem num modo
+    // que não tem "antes": roda a PRÉVIA sobre a etapa escolhida com o MESMO
+    // renderizador do envio, grava a contagem no snapshot (a tela a mostra
+    // rotulada como "estão nesta etapa hoje", nunca como fila) e deixa a
+    // campanha em `ready`. De `ready` nada sai sozinho: o clique em Iniciar é
+    // que arma o gatilho.
+    //
+    // ⚠️ ETAPA VAZIA NÃO RECUSA, ao contrário do modo lista. Armar a campanha
+    // numa etapa que ainda não tem ninguém é o caso de uso principal (etapa
+    // nova, funil novo): recusar aqui barraria exatamente quem a feature serve.
+    // O que a prévia dá nesse caso é o número honesto — zero —, e o texto segue
+    // conferido pelo gate acima e pelo envio de teste.
+    if (ehEntradaContinua(c)) {
+      // A etapa é do FUNIL desta campanha? A FK composta da 9038 já garante a
+      // organização; o funil não, e a incoerência seria silenciosa e torta: o
+      // gatilho casa só pela etapa (abordaria gente), e a prévia filtra funil E
+      // etapa (mostraria zero). Tela dizendo "ninguém" com mensagem saindo é a
+      // pior combinação possível.
+      const forasDoFunil = await etapaForaDoFunil(admin, c);
+      if (forasDoFunil) {
+        await voltarAoRascunho(admin, c.id, "etapa_fora_do_funil");
+        return forasDoFunil;
+      }
+      const previa = await resumoDaEtapaDeEntrada(admin, { campanha: c, agora });
+      await admin
+        .from("campaigns")
+        .update({
+          status: "ready",
+          prepared_at: agora.toISOString(),
+          snapshot_total: previa.total,
+          snapshot_eligible: previa.elegiveis,
+          snapshot_excluded: previa.excluidos,
+          audience_version: c.audience_version + 1,
+        })
+        .eq("id", c.id)
+        .eq("status", "preparing");
+      return { ok: true, resumo: previa };
+    }
+
     const resumo = await prepararCampanha(admin, {
       campanhaId: c.id,
       organizationId: c.organization_id,
@@ -262,6 +330,34 @@ export async function prepararAcao(
   }
 }
 
+/**
+ * A etapa de entrada contínua pertence ao funil da campanha? `null` = sim.
+ *
+ * Lida com o `organization_id` da campanha, nunca com um id vindo de corpo de
+ * requisição — a mesma regra de toda consulta deste módulo.
+ */
+async function etapaForaDoFunil(
+  admin: SupabaseClient,
+  c: CampanhaCarregada,
+): Promise<Recusa | null> {
+  const { data } = await admin
+    .from("crm_stages")
+    .select("id, pipeline_id")
+    .eq("organization_id", c.organization_id)
+    .eq("id", c.entrada_etapa_id as string)
+    .maybeSingle();
+  const etapa = data as { pipeline_id: string | null } | null;
+  if (etapa && etapa.pipeline_id === c.pipeline_id) return null;
+  return {
+    ok: false,
+    codigo: "campanha_conteudo_invalido",
+    mensagem:
+      "A etapa que inicia a abordagem não é do funil escolhido nesta campanha. " +
+      "Escolha uma etapa do mesmo funil.",
+    status: 422,
+  };
+}
+
 async function voltarAoRascunho(admin: SupabaseClient, id: string, codigo: string): Promise<void> {
   await admin
     .from("campaigns")
@@ -279,18 +375,26 @@ export async function iniciarAcao(
   const recusa = recusaDeTransicao(c.status, "running") ?? faltaParaEnviar(c);
   if (recusa) return recusa;
 
-  const { count } = await admin
-    .from("campaign_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("campaign_id", c.id)
-    .eq("eligibility_status", "eligible");
-  if ((count ?? 0) === 0) {
-    return {
-      ok: false,
-      codigo: "campanha_sem_elegiveis",
-      mensagem: "Nenhum destinatário elegível. Prepare a campanha antes de iniciar.",
-      status: 422,
-    };
+  // ⚠️ O GATE DE "TEM GENTE NA LISTA" NÃO SE APLICA AO MODO CONTÍNUO (9038): ali
+  // a lista está vazia por desenho, e exigir destinatário antes de iniciar
+  // tornaria o modo impossível de ligar. O que o substitui é o gate de
+  // `faltaParaEnviar` acima, que já exigiu funil, etapa, teto do dia e janela —
+  // e esses quatro são, no contínuo, o equivalente de "sei para quem vou falar e
+  // quanto por dia".
+  if (!ehEntradaContinua(c)) {
+    const { count } = await admin
+      .from("campaign_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", c.id)
+      .eq("eligibility_status", "eligible");
+    if ((count ?? 0) === 0) {
+      return {
+        ok: false,
+        codigo: "campanha_sem_elegiveis",
+        mensagem: "Nenhum destinatário elegível. Prepare a campanha antes de iniciar.",
+        status: 422,
+      };
+    }
   }
 
   // Republica: o RITMO se edita com a campanha em pé (tela de detalhe), e o
@@ -429,6 +533,14 @@ export async function duplicarAcao(
       // "escolha o funil" numa tela que ele não mexeu. `stage_id` e `agent_id`
       // seguem fora, como antes — mudá-los é assunto de outra fatia.
       pipeline_id: c.pipeline_id,
+      // O MODO DE PÚBLICO vai junto (9038): duplicar uma campanha contínua para
+      // trocar o texto é o caminho oficial de editar a mensagem dela (conteúdo
+      // só muda em rascunho, e a máquina de estados não leva de `running` nem de
+      // `paused` de volta para `draft`). A cópia nasce em RASCUNHO, com o
+      // gatilho desarmado até alguém preparar e iniciar — herdar o modo não
+      // aborda ninguém por si.
+      entrada_continua: c.entrada_continua,
+      entrada_etapa_id: c.entrada_etapa_id,
       audience_filter: c.audience_filter,
       intervalo_segundos: c.intervalo_segundos,
       janela_inicio_hora: c.janela_inicio_hora,

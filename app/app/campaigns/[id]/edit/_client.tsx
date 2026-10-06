@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
+import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
 import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -56,6 +57,9 @@ export function EditarCampanha({ id }: { id: string }) {
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
+  // O MODO DE PÚBLICO (9038). Carregado do rascunho; só muda por escolha.
+  const [continua, setContinua] = useState(false);
+  const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
   const [carregado, setCarregado] = useState(false);
 
   const funis = useFunis();
@@ -81,6 +85,8 @@ export function EditarCampanha({ id }: { id: string }) {
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
+    setContinua(c.entrada_continua === true);
+    setEtapaDeEntrada(c.entrada_etapa_id ?? "");
     setCarregado(true);
   }, [campanha.data, carregado]);
 
@@ -150,7 +156,9 @@ export function EditarCampanha({ id }: { id: string }) {
     nome.trim() !== "" &&
     canal !== "" &&
     texto.trim() !== "" &&
-    temCriterio &&
+    // No modo CONTÍNUO o público é a etapa, e o recorte de contatos não é usado:
+    // exigir critério ali prenderia o operador num filtro que a campanha ignora.
+    (continua || temCriterio) &&
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   return (
@@ -214,6 +222,21 @@ export function EditarCampanha({ id }: { id: string }) {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Público")}</h2>
+        <EntradaDaCampanha
+          continua={continua}
+          onContinuaChange={setContinua}
+          etapaId={etapaDeEntrada}
+          onEtapaChange={setEtapaDeEntrada}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          tetoPorDia={c.teto_diario ?? null}
+          janelaInicio={c.janela_inicio_hora ?? null}
+          janelaFim={c.janela_fim_hora ?? null}
+        />
+        {/* O recorte de contatos só existe no modo LISTA: no contínuo o público
+            é a etapa, e deixar o filtro à vista sugeriria que ele também vale. */}
+        {!continua && (
+        <>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="e-com-tags">{t("Com alguma destas etiquetas")}</Label>
@@ -277,6 +300,8 @@ export function EditarCampanha({ id }: { id: string }) {
             </p>
           )}
         </div>
+        </>
+        )}
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -357,7 +382,7 @@ export function EditarCampanha({ id }: { id: string }) {
           // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
           // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
           // frase do aviso fica sem número em vez de chutar um.
-          quantosCards={previa.data?.elegiveis ?? null}
+          quantosCards={continua ? null : (previa.data?.elegiveis ?? null)}
           tetoPorDia={c.teto_diario ?? null}
         />
       </Card>
@@ -381,6 +406,8 @@ export function EditarCampanha({ id }: { id: string }) {
               stage_id: etapa || null,
               agent_id: agente || null,
               passos,
+              entrada_continua: continua,
+              entrada_etapa_id: continua ? etapaDeEntrada || null : null,
             });
             router.push(`/app/campaigns/${id}`);
           }}

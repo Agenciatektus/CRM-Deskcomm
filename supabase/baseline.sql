@@ -47764,6 +47764,121 @@ revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, 
 
 notify pgrst, 'reload schema';
 
+-- ---- quem entra na campanha: o modo CONTÍNUO por etapa (migration 9038) ----
+--
+-- `campaigns.entrada_continua` (boolean, default false) e
+-- `campaigns.entrada_etapa_id` (FK composta para `crm_stages`) dão à campanha um
+-- SEGUNDO modo de público: quem CAI na etapa escolhida é abordado, sem o
+-- operador montar lista. O modo LISTA continua o default e intacto — toda
+-- campanha existente nasce com a flag falsa e se comporta exatamente como antes.
+--
+-- Sem motor novo: o gatilho é o MESMO evento `lead.stage_changed` que
+-- `lib/followup/gatilho-etapa.ts` já consome, com consumidor próprio no
+-- dispatcher do `event_log` (idempotência de graça pelo `consumed_by[]`), e o
+-- que ele faz é inserir UMA linha em `campaign_recipients` com o `rendered_body`
+-- já congelado. Daí para frente o `campaign-worker` é bit a bit o caminho da
+-- lista: veto por pessoa revalidado, lista de exclusão, ritmo, rodízio de
+-- números e inscrição na régua (9037). O anti-repetição vem de graça do
+-- `campaign_recipients_contato_unico` que existe desde a 0375: card arrastado
+-- dez vezes para a etapa rende UMA abordagem.
+--
+-- ⚠️ O ESTADO MORA EM `campaigns`, NÃO NO `trigger_config` DO POINTER. Campanha
+-- contínua não precisa de passos, e sem passos não existe pointer (a 9037 até
+-- SOLTA o `followup_pointer_id`): o modo moraria num objeto que desaparece
+-- quando o operador limpa os passos, e a campanha seguiria `running` sem abordar
+-- ninguém, sem erro em tela. E o `trigger_config` do pointer descreve como se
+-- entra na RÉGUA, onde se entra de um jeito só (a 1ª mensagem saiu): escrever
+-- `stage_change` ali armaria uma SEGUNDA porta para o mesmo pointer, que é o
+-- modo de falha de `lib/followup/superficies.ts`.
+--
+-- ⚠️ TETO DIÁRIO E JANELA SÃO CONSTRAINT no modo contínuo, não configuração. No
+-- modo lista o volume do dia é limitado por algo que um humano olhou (o recorte
+-- tem `limite`, e o operador leu o número antes de apertar). No contínuo não há
+-- lista, não há número para olhar e não há o instante "antes de apertar": o teto
+-- é a única coisa que limita quantos estranhos recebem mensagem por dia, e a
+-- janela a única que impede que recebam às três da manhã.
+-- Rascunho é EXCETUADO (`status = 'draft'`), como o pointer não-`active` em
+-- `followup_flow_pointers_cadencia_completa`: sem isso, marcar o modo antes de
+-- digitar o teto daria 23514 no SALVAR e prenderia o operador num rascunho
+-- impossível de corrigir. A contenção morde na saída do rascunho.
+--
+-- ⚠️ FUNIL E ETAPA FICAM FORA DO CHECK, de propósito. As FKs são
+-- `on delete set null (coluna)` pelo P2-3 do @Cassio_SecRev na 9032; um CHECK
+-- que os exigisse faria o DELETE do funil ou da etapa falhar com 23514 —
+-- reintroduzindo por outro caminho o defeito que a 9032 consertou. Quem os exige
+-- é o gate de `lib/campanhas/acoes.ts`, e a falha é FECHADA: sem etapa o gatilho
+-- não casa nada (compara `entrada_etapa_id = to_stage_id`, e nulo não casa).
+--
+-- Idempotente: colunas com `if not exists`, CHECK e FK com guarda em
+-- `pg_constraint`, índice com `if not exists`. Nenhuma função nova, então este
+-- bloco não precisaria vir antes da VARREDURA anon — vem por ordem de leitura,
+-- ao lado do bloco da 9037, de que ele é a continuação.
+
+alter table public.campaigns
+  add column if not exists entrada_continua boolean not null default false;
+
+comment on column public.campaigns.entrada_continua is
+  'false (default) = modo LISTA: o público é o snapshot congelado na preparação, como em toda '
+  'campanha anterior à 9038. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
+  'abordado por esta campanha, uma linha de campaign_recipients por chegada, pelo gatilho '
+  'lib/campanhas/entrada-por-etapa.ts. O modo é escolha explícita do operador e SOBREVIVE ao '
+  'DELETE da etapa (que só anula entrada_etapa_id): campanha contínua sem etapa para de '
+  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9038.';
+
+alter table public.campaigns
+  add column if not exists entrada_etapa_id uuid;
+
+comment on column public.campaigns.entrada_etapa_id is
+  'A etapa do funil que arma a entrada contínua (crm_stages). Lida só quando entrada_continua; '
+  'NULL com o modo ligado = a etapa foi apagada, e o gatilho não casa nada (falha fechada). '
+  'Não é a mesma coisa que stage_id, que é onde o CARD de quem foi abordado nasce (0378/9037): '
+  'aqui é de onde a pessoa VEM. Migration 9038.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_entrada_etapa_org_fk'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_entrada_etapa_org_fk
+      foreign key (organization_id, entrada_etapa_id)
+      references public.crm_stages (organization_id, id)
+      on delete set null (entrada_etapa_id);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_entrada_continua_contida'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_entrada_continua_contida
+      check (
+        not entrada_continua
+        or status = 'draft'
+        or (
+          teto_diario is not null
+          and janela_inicio_hora is not null
+          and janela_fim_hora is not null
+        )
+      );
+  end if;
+end $$;
+
+-- Toda mudança de etapa do CRM pergunta "alguma campanha contínua está armada
+-- nesta etapa?". Sem índice, isso é varredura de `campaigns` a cada card
+-- arrastado. Parcial pela flag: o índice só carrega as poucas contínuas.
+create index if not exists campaigns_entrada_por_etapa
+  on public.campaigns (organization_id, entrada_etapa_id)
+  where entrada_continua and entrada_etapa_id is not null;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

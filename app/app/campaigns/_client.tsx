@@ -106,10 +106,18 @@ export function ListaDeCampanhas() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{c.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {c.snapshot_eligible > 0
-                      ? `${c.snapshot_eligible} ${t("contatos na lista")}`
-                      : t("lista ainda não preparada")}
-                    {c.snapshot_excluded > 0 ? ` · ${c.snapshot_excluded} ${t("fora")}` : ""}
+                    {/* CAMPANHA CONTÍNUA (9038) não tem lista, e "lista ainda
+                        não preparada" numa campanha que está abordando gente é
+                        afirmação falsa — a mais perigosa desta tela, porque
+                        convida a preparar de novo. */}
+                    {c.entrada_continua === true
+                      ? t("contínua, por etapa do funil")
+                      : c.snapshot_eligible > 0
+                        ? `${c.snapshot_eligible} ${t("contatos na lista")}`
+                        : t("lista ainda não preparada")}
+                    {c.entrada_continua !== true && c.snapshot_excluded > 0
+                      ? ` · ${c.snapshot_excluded} ${t("fora")}`
+                      : ""}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

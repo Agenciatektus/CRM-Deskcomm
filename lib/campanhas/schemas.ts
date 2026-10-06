@@ -74,6 +74,20 @@ const baseDaCampanha = {
    */
   passos: passosDaCampanhaSchema.optional(),
   /**
+   * O MODO DE PÚBLICO (migration 9038). Ausente ou `false` = LISTA, o snapshot
+   * congelado, que é o padrão e o comportamento de toda campanha existente.
+   * `true` = CONTÍNUO: quem entra na etapa de `entrada_etapa_id` é abordado.
+   *
+   * O que o modo contínuo EXIGE (funil, etapa, teto do dia e janela de horário)
+   * não é conferido aqui, pelo MESMO motivo dos `passos` logo acima: um rascunho
+   * pode ter o modo marcado antes de o operador digitar o teto, e barrar o
+   * SALVAR o prenderia num rascunho que não dá para corrigir sem apagar. Quem
+   * confere é `problemaNaEntradaContinua`, chamado pelas rotas de criação e
+   * edição e pelo gate de `faltaParaEnviar` (preparar, iniciar, agendar, testar).
+   */
+  entrada_continua: z.boolean().optional(),
+  entrada_etapa_id: z.string().uuid().nullable().optional(),
+  /**
    * Onde o card de quem responde nasce, e quem atende (migration 0378).
    * `null` devolve a decisão ao número, que é o comportamento de sempre.
    */
@@ -118,6 +132,8 @@ export const editarCampanhaSchema = z
     lia_ref: baseDaCampanha.lia_ref,
     audience_filter: filtroDeAudienciaSchema.optional(),
     passos: baseDaCampanha.passos,
+    entrada_continua: baseDaCampanha.entrada_continua,
+    entrada_etapa_id: baseDaCampanha.entrada_etapa_id,
     channel_session_ids: baseDaCampanha.channel_session_ids,
     pipeline_id: baseDaCampanha.pipeline_id,
     stage_id: baseDaCampanha.stage_id,

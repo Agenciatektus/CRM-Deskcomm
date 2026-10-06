@@ -75,6 +75,9 @@ export function DetalheDaCampanha({ id }: { id: string }) {
   const c = campanha.data;
   const m = metricas.data;
   const linhas = destinatarios.data?.pages.flatMap((p) => p.data) ?? [];
+  // O MODO DE PÚBLICO (9038). Muda o que esta tela pode AFIRMAR: no contínuo não
+  // há lista, não há porcentagem de fila e não há conclusão automática.
+  const continua = c.entrada_continua === true;
 
   // As ações que cabem NO ESTADO — a mesma tabela da máquina de estados do
   // servidor, que é quem recusa de verdade. Aqui é só para não oferecer o
@@ -145,7 +148,14 @@ export function DetalheDaCampanha({ id }: { id: string }) {
         <Card className="space-y-3 border-warning-fg p-4">
           <p className="text-sm">
             {confirmando === "iniciar"
-              ? `${t("Começar a enviar para")} ${c.snapshot_eligible} ${c.snapshot_eligible === 1 ? t("pessoa?") : t("pessoas?")} ${t("O envio segue o ritmo do número e pode levar horas.")}`
+              ? // No modo CONTÍNUO não há número para confirmar: a campanha fica
+                // de pé e aborda quem chegar. Repetir "enviar para N pessoas"
+                // ali seria afirmar que a lista é a fila — e `snapshot_eligible`
+                // é, no contínuo, só quantos estavam na etapa quando o operador
+                // preparou.
+                continua
+                ? `${t("A campanha passa a abordar quem entrar na etapa escolhida, até")} ${c.teto_diario ?? 0} ${t("por dia, dentro do horário configurado. Quem já está na etapa hoje não é abordado. Para parar, use Pausar ou Cancelar.")}`
+                : `${t("Começar a enviar para")} ${c.snapshot_eligible} ${c.snapshot_eligible === 1 ? t("pessoa?") : t("pessoas?")} ${t("O envio segue o ritmo do número e pode levar horas.")}`
               : t("Cancelar é definitivo: quem ainda não recebeu não recebe mais, e a campanha não volta a rodar.")}
           </p>
           <div className="flex gap-2">
@@ -177,13 +187,41 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Numero titulo={t("Na lista")} valor={c.snapshot_eligible} />
+        {/* NO MODO CONTÍNUO "Na lista" não existe: o público não é uma lista, e
+            `snapshot_eligible` é só quantos estavam na etapa quando o operador
+            preparou. O número no lugar dele é quantas pessoas a campanha JÁ VIU
+            entrar na etapa — `contagem.total`, que inclui quem foi vetado. O
+            rótulo diz exatamente isso: chamá-lo de "abordadas" contaria como
+            abordado quem a campanha recusou, e a tela passaria a mentir sobre
+            quantas mensagens saíram (quem saiu está em "Enviadas", ao lado). */}
+        <Numero
+          titulo={continua ? t("Entraram na etapa") : t("Na lista")}
+          valor={continua ? (m?.contagem.total ?? 0) : c.snapshot_eligible}
+        />
         <Numero titulo={t("Enviadas")} valor={m?.contagem.enviados ?? 0} />
         <Numero titulo={t("Entregues")} valor={m?.contagem.entregues ?? 0} />
         <Numero titulo={t("Responderam")} valor={m?.contagem.responderam ?? 0} />
       </div>
 
-      {m && (
+      {/* A BARRA DE PROGRESSO NÃO VALE NO CONTÍNUO: fila sem fim não tem
+          porcentagem, e "100%" num público que continua chegando se lê como
+          "terminou" — o oposto do que está acontecendo. No lugar dela, os
+          números que fazem sentido num público que não acaba. */}
+      {m && continua && (
+        <Card className="space-y-2 p-4">
+          <h2 className="font-medium">{t("Andamento")}</h2>
+          <p className="text-sm text-muted-foreground">
+            {m.contagem.pendentes} {t("na fila agora")} · {m.contagem.falharam} {t("falharam")} ·{" "}
+            {m.contagem.optOut} {t("pediram para parar")} · {m.contagem.excluidos}{" "}
+            {t("entraram na etapa e ficaram de fora")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("Campanha contínua não conclui sozinha: ela fica de pé esperando a próxima pessoa entrar na etapa. Para encerrar, use Pausar ou Cancelar.")}
+          </p>
+        </Card>
+      )}
+
+      {m && !continua && (
         <Card className="space-y-2 p-4">
           <div className="flex items-baseline justify-between">
             <h2 className="font-medium">{t("Progresso")}</h2>
@@ -208,6 +246,8 @@ export function DetalheDaCampanha({ id }: { id: string }) {
           </p>
         </Card>
       )}
+
+      <EntradaDestaCampanha campanha={c} />
 
       <DestinoDaCampanha campanha={c} />
 
@@ -379,6 +419,56 @@ function DestinoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           {t("Quem atende a resposta")}: <strong>{agente?.name ?? t("agente indisponível")}</strong>
         </p>
       )}
+    </Card>
+  );
+}
+
+/**
+ * QUEM ENTRA NESTA CAMPANHA (migration 9038).
+ *
+ * Só aparece no modo CONTÍNUO. No modo lista a resposta já está na tela, no
+ * número "Na lista" e na própria lista de destinatários; um card dizendo "o
+ * público é a lista" seria ruído.
+ *
+ * Aqui ele é necessário porque o público não está em lugar nenhum da tela: é uma
+ * regra ("quem entrar nesta etapa"), e sem ela escrita a campanha parece estar
+ * abordando gente sem motivo. É também onde a contenção fica visível — teto do
+ * dia e horário —, porque num modo sem revisão de lista eles são o que o
+ * operador precisa reler quando estranhar o volume.
+ */
+function EntradaDestaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
+  const t = useT();
+  const etapas = useEtapas(campanha.pipeline_id ?? null);
+  if (campanha.entrada_continua !== true) return null;
+  const etapa = (etapas.data ?? []).find((e) => e.id === campanha.entrada_etapa_id);
+
+  return (
+    <Card className="space-y-2 p-4">
+      <h2 className="font-medium">{t("Quem entra nesta campanha")}</h2>
+      {campanha.entrada_etapa_id ? (
+        <p className="text-sm">
+          {t("Quem entrar na etapa")} <strong>{etapa?.name ?? campanha.entrada_etapa_id.slice(0, 8)}</strong>{" "}
+          {t("é abordado, a partir do momento em que a campanha foi iniciada.")}
+        </p>
+      ) : (
+        // Etapa nula com o modo ligado = alguém apagou a etapa, e a FK da 9038
+        // anulou a referência. A campanha PAROU de abordar (o gatilho não casa
+        // etapa nula) e precisa dizer isso: silêncio aqui se leria como
+        // "está funcionando".
+        <p className="text-sm text-warning-fg">
+          {t("A etapa que iniciava a abordagem não existe mais, então esta campanha parou de abordar. Duplique-a e escolha outra etapa.")}
+        </p>
+      )}
+      <p className="text-sm text-muted-foreground">
+        {t("No máximo")} <strong>{campanha.teto_diario ?? 0}</strong> {t("por dia")}
+        {campanha.janela_inicio_hora !== null && campanha.janela_fim_hora !== null
+          ? `, ${t("das")} ${campanha.janela_inicio_hora}h ${t("às")} ${campanha.janela_fim_hora}h`
+          : ""}
+        . {t("A pessoa recebe uma vez só, mesmo que o card entre e saia da etapa várias vezes.")}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {t("Quem já estava na etapa quando a campanha foi preparada não é abordado: para falar com esses, use uma campanha de lista fixa com recorte por etapa.")}
+      </p>
     </Card>
   );
 }

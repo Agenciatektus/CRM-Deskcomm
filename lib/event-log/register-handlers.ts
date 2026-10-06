@@ -16,6 +16,7 @@ import { lgpdRedactHandler } from "@/workers/lgpd-redact-worker.handler";
 import { automationRulesHandler } from "@/lib/automation/engine.handler";
 import { followupReactivityHandler } from "@/lib/followup/reactivity.handler";
 import { campanhaRespostaHandler } from "@/lib/campanhas/resposta.handler";
+import { campanhaEntradaPorEtapaHandler } from "@/lib/campanhas/entrada-por-etapa.handler";
 import { followupGatilhoEtapaHandler } from "@/lib/followup/gatilho-etapa.handler";
 import { followupGatilhoLeadHandler } from "@/lib/followup/gatilho-lead.handler";
 import { followupGatilhoCasoHandler } from "@/lib/followup/gatilho-caso.handler";
@@ -56,6 +57,13 @@ export function ensureHandlersRegistered(): void {
   registerHandler(lgpdRedactHandler);
   registerHandler(automationRulesHandler);
   registerHandler(followupGatilhoEtapaHandler);
+  // Vizinho do gatilho de etapa, e pelo mesmo critério: escrita curta no banco
+  // (uma linha em `campaign_recipients`), sem rede de terceiro. Quem MANDA a
+  // mensagem é o `campaign-worker`, no cron — aqui só se decide que a pessoa
+  // entra na campanha contínua (migration 9038). Chave própria no
+  // `consumed_by[]`: uma falha nossa não marca o evento como consumido pelo
+  // gatilho de follow-up, nem o contrário.
+  registerHandler(campanhaEntradaPorEtapaHandler);
   // Escrita curta no banco (um item na Central), vizinha do gatilho de etapa
   // que consome o mesmo evento.
   registerHandler(avisoDeEtapaHandler);

@@ -18,6 +18,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,9 @@ export function NovaCampanha() {
   const [agente, setAgente] = useState("");
   const [funilDoPublico, setFunilDoPublico] = useState("");
   const [etapaDoPublico, setEtapaDoPublico] = useState("");
+  // O MODO DE PÚBLICO (9038). Nasce em LISTA, e nada aqui o liga sozinho.
+  const [continua, setContinua] = useState(false);
+  const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
 
   const funis = useFunis();
   const etapas = useEtapas(funil || null);
@@ -98,7 +102,11 @@ export function NovaCampanha() {
     nome.trim() !== "" &&
     canal !== "" &&
     texto.trim() !== "" &&
-    temCriterio &&
+    // No modo CONTÍNUO o público é a etapa, e o recorte de contatos não é usado:
+    // exigir critério ali prenderia o operador num filtro que a campanha ignora.
+    // O que o contínuo exige (funil, etapa, teto, janela) é cobrado no Preparar,
+    // porque um RASCUNHO pode estar incompleto — a mesma regra dos passos.
+    (continua || temCriterio) &&
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   async function salvar() {
@@ -120,6 +128,8 @@ export function NovaCampanha() {
       stage_id: etapa || null,
       agent_id: agente || null,
       passos,
+      entrada_continua: continua,
+      entrada_etapa_id: continua ? etapaDeEntrada || null : null,
     });
     router.push(`/app/campaigns/${criada.id}`);
   }
@@ -242,6 +252,22 @@ export function NovaCampanha() {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Público")}</h2>
+        <EntradaDaCampanha
+          continua={continua}
+          onContinuaChange={setContinua}
+          etapaId={etapaDeEntrada}
+          onEtapaChange={setEtapaDeEntrada}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
+          janelaInicio={janelaInicio === "" ? null : Number(janelaInicio)}
+          janelaFim={janelaFim === "" ? null : Number(janelaFim)}
+        />
+        {/* O recorte de contatos só existe no modo LISTA: no contínuo o público
+            é a etapa, e deixar o filtro à vista sugeriria que ele também vale —
+            tela que oferece controle sem efeito é tela que ensina errado. */}
+        {!continua && (
+        <>
         <p className="text-sm text-muted-foreground">
           {t("Escolha pelo menos um critério — uma lista sem recorte ninguém confere antes de apertar.")}
         </p>
@@ -355,6 +381,8 @@ export function NovaCampanha() {
             ))}
           </ul>
         )}
+        </>
+        )}
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -371,8 +399,10 @@ export function NovaCampanha() {
           temFunil={!!funil}
           // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
           // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
-          // frase do aviso fica sem número em vez de chutar um.
-          quantosCards={previa.data?.elegiveis ?? null}
+          // frase do aviso fica sem número em vez de chutar um. No modo
+          // CONTÍNUO não há número possível — a campanha aborda quem chegar, e
+          // quantos chegarão não se sabe hoje.
+          quantosCards={continua ? null : (previa.data?.elegiveis ?? null)}
           tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
         />
       </Card>

@@ -34,6 +34,18 @@ const PERMITIDO: Record<StatusDaCampanha, readonly StatusDaCampanha[]> = {
   // pessoa recebeu (o guarda de "já enviou" é do chamador, que vê os envios).
   ready: ["draft", "scheduled", "running", "cancelled"],
   scheduled: ["running", "paused", "cancelled"],
+  // ⚠️ `completed` é INALCANÇÁVEL para a campanha de ENTRADA CONTÍNUA (migration
+  // 9038), e a tabela não muda por isso. A transição continua existindo porque
+  // quem a dispara é a rodada, ao ver a fila vazia — e na contínua fila vazia é
+  // o estado NORMAL, não o fim: ela passa a maior parte do tempo assim, entre
+  // uma chegada na etapa e a próxima. Quem recusa é `rodarUmaCampanha`, que
+  // devolve `aguardando_gatilho` em vez de concluir. Modelar isso como transição
+  // proibida aqui exigiria que a máquina soubesse do modo de público, e ela é
+  // pura de propósito: o que ela guarda é a ORDEM dos estados, não quem os pede.
+  //
+  // A consequência que a tela carrega: para a campanha contínua "acabou" se
+  // escreve `cancelled` — o único terminal que ela alcança —, e `completed`
+  // segue significando exatamente o que sempre significou (a lista terminou).
   running: ["paused", "completed", "cancelled", "failed"],
   paused: ["running", "scheduled", "cancelled"],
   // Terminais de verdade: nada sai daqui. Para mandar de novo, duplica-se.

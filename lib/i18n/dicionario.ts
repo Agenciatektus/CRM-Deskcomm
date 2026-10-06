@@ -13384,6 +13384,88 @@ export const DICIONARIO: Traducoes = {
   "Preparar lista": { es: "Preparar lista" },
   "Progresso do envio": { es: "Progreso del envío" },
   "Público": { es: "Público" },
+  // ── Campanha: os PASSOS (9037) e a ENTRADA CONTÍNUA (9038) ──
+  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
+  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
+  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
+    es: "Quien responde sale de la secuencia al instante. Los pasos siguientes valen para quien quedó en silencio.",
+  },
+  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
+    es: "El primer mensaje es el de arriba, y sale para toda la lista. Los pasos de abajo ocurren después de él, para quien NO respondió. Quien responde sale de la secuencia al instante.",
+  },
+  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
+    es: "Elija el embudo en «Quién responde» antes de preparar: con pasos, cada persona abordada se convierte en tarjeta, y una tarjeta necesita embudo.",
+  },
+  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
+    es: "Con pasos, cada persona abordada se convierte en tarjeta en el embudo elegido, ya en el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Es lo que hace que mover de etapa y etiquetar funcionen, y es también lo que llena el tablero:",
+  },
+  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
+  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
+  "Quem já tem negócio aberto nesse funil não ganha card novo.": {
+    es: "Quien ya tiene un negocio abierto en ese embudo no recibe una tarjeta nueva.",
+  },
+  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
+  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
+    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar, y todos los que reciban tendrán los pasos.",
+  },
+  "etapa removida": { es: "etapa eliminada" },
+  "variações": { es: "variaciones" },
+  "Mover para": { es: "Mover a" },
+  "Quem entra nesta campanha": { es: "Quién entra en esta campaña" },
+  "Lista fixa": { es: "Lista fija" },
+  "O recorte acima vira uma lista. Você confere quantas pessoas são e o texto antes de iniciar, e depois disso a lista não muda.": {
+    es: "El recorte de arriba se convierte en una lista. Usted verifica cuántas personas son y el texto antes de iniciar, y después de eso la lista no cambia.",
+  },
+  "Contínua, por etapa do funil": { es: "Continua, por etapa del embudo" },
+  "contínua, por etapa do funil": { es: "continua, por etapa del embudo" },
+  "A campanha fica de pé e aborda quem entrar na etapa escolhida, a partir do momento em que você iniciar. Quem já está na etapa hoje não é abordado.": {
+    es: "La campaña se queda en pie y aborda a quien entre en la etapa elegida, a partir del momento en que usted la inicie. Quien ya está en la etapa hoy no es abordado.",
+  },
+  "Abordar quem entrar na etapa": { es: "Abordar a quien entre en la etapa" },
+  "Escolha primeiro o funil, em “Quem responder”. A etapa é dele.": {
+    es: "Elija primero el embudo, en “Quién responde”. La etapa es de él.",
+  },
+  "A pessoa recebe uma vez só: se o card entrar e sair da etapa várias vezes, a abordagem não repete. Quem respondeu, quem pediu para parar e quem está em outra campanha ainda em andamento ficam de fora.": {
+    es: "La persona recibe una sola vez: si la tarjeta entra y sale de la etapa varias veces, el abordaje no se repite. Quien respondió, quien pidió parar y quien está en otra campaña todavía en curso quedan fuera.",
+  },
+  "Preencha o máximo por dia e o horário de envio, em “Ritmo desta campanha”. Sem lista para conferir antes de apertar, são eles que limitam quantas pessoas a campanha aborda por dia e impedem que a abordagem saia de madrugada.": {
+    es: "Complete el máximo por día y el horario de envío, en “Ritmo de esta campaña”. Sin lista que revisar antes de pulsar, son ellos los que limitan a cuántas personas aborda la campaña por día e impiden que el abordaje salga de madrugada.",
+  },
+  "Preencha o máximo por dia, em “Ritmo desta campanha”. Sem lista para conferir antes de apertar, é ele que limita quantas pessoas novas a campanha aborda por dia.": {
+    es: "Complete el máximo por día, en “Ritmo de esta campaña”. Sin lista que revisar antes de pulsar, es él el que limita a cuántas personas nuevas aborda la campaña por día.",
+  },
+  "Preencha o horário de envio, em “Ritmo desta campanha”. O gatilho dispara a qualquer hora, e sem janela a abordagem sai de madrugada.": {
+    es: "Complete el horario de envío, en “Ritmo de esta campaña”. El disparador se activa a cualquier hora, y sin ventana el abordaje sale de madrugada.",
+  },
+  "A campanha passa a abordar quem entrar na etapa escolhida, até": {
+    es: "La campaña pasa a abordar a quien entre en la etapa elegida, hasta",
+  },
+  "por dia, dentro do horário configurado. Quem já está na etapa hoje não é abordado. Para parar, use Pausar ou Cancelar.": {
+    es: "por día, dentro del horario configurado. Quien ya está en la etapa hoy no es abordado. Para parar, use Pausar o Cancelar.",
+  },
+  "Entraram na etapa": { es: "Entraron en la etapa" },
+  "Andamento": { es: "Avance" },
+  "na fila agora": { es: "en la fila ahora" },
+  "entraram na etapa e ficaram de fora": { es: "entraron en la etapa y quedaron fuera" },
+  "Campanha contínua não conclui sozinha: ela fica de pé esperando a próxima pessoa entrar na etapa. Para encerrar, use Pausar ou Cancelar.": {
+    es: "Una campaña continua no concluye sola: se queda en pie esperando a que la próxima persona entre en la etapa. Para cerrarla, use Pausar o Cancelar.",
+  },
+  "Quem entrar na etapa": { es: "Quien entre en la etapa" },
+  "é abordado, a partir do momento em que a campanha foi iniciada.": {
+    es: "es abordado, a partir del momento en que la campaña fue iniciada.",
+  },
+  "A etapa que iniciava a abordagem não existe mais, então esta campanha parou de abordar. Duplique-a e escolha outra etapa.": {
+    es: "La etapa que iniciaba el abordaje ya no existe, por eso esta campaña dejó de abordar. Duplíquela y elija otra etapa.",
+  },
+  "No máximo": { es: "Como máximo" },
+  "por dia": { es: "por día" },
+  "das": { es: "de las" },
+  "A pessoa recebe uma vez só, mesmo que o card entre e saia da etapa várias vezes.": {
+    es: "La persona recibe una sola vez, aunque la tarjeta entre y salga de la etapa varias veces.",
+  },
+  "Quem já estava na etapa quando a campanha foi preparada não é abordado: para falar com esses, use uma campanha de lista fixa com recorte por etapa.": {
+    es: "Quien ya estaba en la etapa cuando la campaña fue preparada no es abordado: para hablar con esos, use una campaña de lista fija con recorte por etapa.",
+  },
   "Quem está na lista": { es: "Quién está en la lista" },
   "Quem não tiver o dado que a mensagem usa fica de fora, com o motivo na lista — mensagem com buraco não sai.": {
     es: "Quien no tenga el dato que el mensaje usa queda fuera, con el motivo en la lista — un mensaje con hueco no sale.",
