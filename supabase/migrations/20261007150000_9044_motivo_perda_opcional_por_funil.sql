@@ -17,18 +17,18 @@ declare
 begin
   if new.status = 'lost' then
     select
-      coalesce(p.settings->'lost_reason_required' <> 'false'::jsonb, true),
+      coalesce(settings->'lost_reason_required' <> 'false'::jsonb, true),
       coalesce(
         array(
           select case when jsonb_typeof(e) = 'object'
                       then nullif(e ->> 'label', '')
                       else nullif(e #>> '{}', '') end
-            from jsonb_array_elements(p.settings->'lost_reasons') as t(e)
+            from jsonb_array_elements(settings->'lost_reasons') as t(e)
         ), '{}'::text[]
       )
       into v_required, v_pipeline_extra
       from public.crm_pipelines
-     where p.id = new.pipeline_id;
+     where id = new.pipeline_id;
 
     if new.lost_reason is null or length(btrim(new.lost_reason)) = 0 then
       if v_required then
