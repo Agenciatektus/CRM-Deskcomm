@@ -68,13 +68,19 @@ describe("Direct com o perfil que o Verdash anexa", () => {
   it("perfil malformado não derruba a mensagem", () => {
     const r = lerEventoDoInstagram({ ...direct(), perfil: "x" }, AGORA);
     expect(r.ok && r.mensagem.nome).toBeNull();
-    const r2 = lerEventoDoInstagram({ ...direct(), perfil: { nome: 42, username: "com espaço" } }, AGORA);
+    const r2 = lerEventoDoInstagram(
+      { ...direct(), perfil: { nome: 42, username: "com espaço" } },
+      AGORA,
+    );
     expect(r2.ok && r2.mensagem.nome).toBeNull();
     expect(r2.ok && r2.mensagem.username).toBeNull();
   });
 
   it("nome tem controle removido e teto de tamanho", () => {
-    const r = lerEventoDoInstagram({ ...direct(), perfil: { nome: "Ana\nLinha\u0000" + "x".repeat(500) } }, AGORA);
+    const r = lerEventoDoInstagram(
+      { ...direct(), perfil: { nome: "Ana\nLinha\u0000" + "x".repeat(500) } },
+      AGORA,
+    );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.mensagem.nome).not.toMatch(/[\u0000-\u001f]/);
@@ -255,7 +261,13 @@ describe("identidade não aceita espaço em branco (P1-1)", () => {
     // O índice da 9010 é sobre `lower(instagram_username)`.
     const e = comentario();
     const r = lerEventoDoInstagram(
-      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "  @Peter_Machado " } } } },
+      {
+        ...e,
+        evento: {
+          ...e.evento,
+          value: { ...e.evento.value, from: { id: "1", username: "  @Peter_Machado " } },
+        },
+      },
       AGORA,
     );
     expect(r.ok).toBe(true);
@@ -328,7 +340,13 @@ describe("o @ só aceita a forma de um handle (2a passada)", () => {
   it("espaço no MEIO não é handle do Instagram", () => {
     const e = comentario();
     const r = lerEventoDoInstagram(
-      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "peter machado" } } } },
+      {
+        ...e,
+        evento: {
+          ...e.evento,
+          value: { ...e.evento.value, from: { id: "1", username: "peter machado" } },
+        },
+      },
       AGORA,
     );
     expect(r.ok && r.mensagem.username).toBeNull();
@@ -338,7 +356,10 @@ describe("o @ só aceita a forma de um handle (2a passada)", () => {
     const e = comentario();
     const sujo = ["a", "b"].join("\n");
     const r = lerEventoDoInstagram(
-      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: sujo } } } },
+      {
+        ...e,
+        evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: sujo } } },
+      },
       AGORA,
     );
     expect(r.ok && r.mensagem.username).toBeNull();
@@ -347,7 +368,13 @@ describe("o @ só aceita a forma de um handle (2a passada)", () => {
   it("ponto e sublinhado são válidos — é o que o Instagram permite", () => {
     const e = comentario();
     const r = lerEventoDoInstagram(
-      { ...e, evento: { ...e.evento, value: { ...e.evento.value, from: { id: "1", username: "@Peter.Machado_01" } } } },
+      {
+        ...e,
+        evento: {
+          ...e.evento,
+          value: { ...e.evento.value, from: { id: "1", username: "@Peter.Machado_01" } },
+        },
+      },
       AGORA,
     );
     expect(r.ok && r.mensagem.username).toBe("peter.machado_01");
@@ -381,5 +408,26 @@ describe("as CINCO saídas de dataDoEvento respeitam `agora` inválido", () => {
   it("e com `agora` VÁLIDO nada muda — a folga de relógio continua valendo", () => {
     expect(dataDoEvento(undefined, AGORA)).toBe(AGORA);
     expect(dataDoEvento(Date.parse(AGORA) + 2 * 60_000, AGORA)).not.toBe(AGORA);
+  });
+});
+
+describe("resposta enviada pela própria conta", () => {
+  it("usa o destinatário como contato e grava a direção outbound", () => {
+    const r = lerEventoDoInstagram(
+      direct({ sender: { id: "conta-1" }, recipient: { id: "igsid-abc" } }, { is_echo: true }),
+      AGORA,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem).toMatchObject({
+      igsid: "igsid-abc",
+      contaId: "conta-1",
+      direction: "outbound",
+    });
+  });
+  it("recusa eco sem destinatário em vez de criar contato da própria conta", () => {
+    expect(
+      lerEventoDoInstagram(direct({ recipient: undefined }, { is_echo: true }), AGORA),
+    ).toMatchObject({ ok: false, motivo: "contrato_violado" });
   });
 });

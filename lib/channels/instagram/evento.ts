@@ -34,6 +34,7 @@ export type EntradaDoInstagram = "direct" | "story" | "comentario";
 export type EntradaDaConversa = "direct" | "comentario";
 
 export interface MensagemDoInstagram {
+  direction: "inbound" | "outbound";
   /** Id estável do par (conta, pessoa). É a IDENTIDADE — o @ muda, este não. */
   igsid: string;
   /** A conta da agência/cliente que recebeu. */
@@ -151,7 +152,10 @@ const FORMA_DO_HANDLE = /^[a-z0-9._]+$/;
 const TETO_DO_NOME = 120;
 function nomeDePerfil(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  const limpo = v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  const limpo = v
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return limpo === "" ? null : limpo.slice(0, TETO_DO_NOME);
 }
 
@@ -240,9 +244,15 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   const evento = objeto(envelope.evento);
   if (!evento) return { ok: false, motivo: "contrato_violado", detalhe: "`evento` ausente" };
 
-  const remetente = objeto(evento.sender);
+  const saida = objeto(evento.message)?.is_echo === true;
+  const remetente = objeto(saida ? evento.recipient : evento.sender);
   const igsid = identificador(remetente?.id);
-  if (!igsid) return { ok: false, motivo: "contrato_violado", detalhe: "sem `sender.id`" };
+  if (!igsid)
+    return {
+      ok: false,
+      motivo: "contrato_violado",
+      detalhe: saida ? "sem `recipient.id`" : "sem `sender.id`",
+    };
 
   const mensagem = objeto(evento.message);
   if (!mensagem) return { ok: false, motivo: "contrato_violado", detalhe: "sem `message`" };
@@ -250,7 +260,8 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   // O id da Meta é a chave de idempotência. Sem ele não há como reconhecer a
   // reentrega, e a fila REENTREGA por desenho — melhor recusar e investigar que
   // gravar a mesma mensagem duas vezes na conversa do cliente.
-  const providerMessageId = identificador(envelope.provider_message_id) ?? identificador(mensagem.mid);
+  const providerMessageId =
+    identificador(envelope.provider_message_id) ?? identificador(mensagem.mid);
   if (!providerMessageId) {
     return { ok: false, motivo: "contrato_violado", detalhe: "sem id de mensagem" };
   }
@@ -276,8 +287,9 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   return {
     ok: true,
     mensagem: {
+      direction: saida ? "outbound" : "inbound",
       igsid,
-      contaId: identificador(objeto(evento.recipient)?.id),
+      contaId: identificador(objeto(saida ? evento.sender : evento.recipient)?.id),
       providerMessageId,
       texto: corpoTexto,
       temAnexo: anexos.length > 0,
@@ -331,6 +343,7 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
   return {
     ok: true,
     mensagem: {
+      direction: "inbound",
       igsid,
       contaId: null,
       providerMessageId: comentarioId,

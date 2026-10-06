@@ -1,3 +1,4 @@
+import { fotoDoContatoPareado } from "../verdash/client";
 /**
  * Adapter do canal Verdash — o WhatsApp que o cliente JÁ TEM conectado na
  * Verdash, falando com o CRM sem parear um segundo aparelho.
@@ -319,12 +320,17 @@ export const verdashAdapter: ChannelAdapter = {
       instanceName: input.sessionRef,
     });
     if (!creds) return null;
+    if (creds.vinculoId) return fotoDoContatoPareado(creds, input.recipient);
     try {
-      const data = await fzapRequest<{ url?: string }>(creds, "/user/avatar", {
-        method: "POST",
-        body: { phone: input.recipient, preview: false },
-      });
-      return data?.url ?? null;
+      const data = await fzapRequest<{ url?: string; publicDownloadUrl?: string }>(
+        creds,
+        "/user/avatar",
+        {
+          method: "POST",
+          body: { phone: input.recipient, preview: false },
+        },
+      );
+      return data?.publicDownloadUrl ?? data?.url ?? null;
     } catch {
       return null;
     }
