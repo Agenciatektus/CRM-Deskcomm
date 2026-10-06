@@ -67,10 +67,10 @@ describe("quais filtros a tela nomeia", () => {
 
   it("os quatro auxiliares entram, e só quando ligados", () => {
     expect(filtrosAuxiliaresAtivos({} as ConversationsFilters)).toEqual([]);
-    expect(filtrosAuxiliaresAtivos({ unread: true } as ConversationsFilters)).toEqual(["Não lidos"]);
+    expect(filtrosAuxiliaresAtivos({ unread: true } as ConversationsFilters)).toEqual(["Só não lidas"]);
     expect(
       filtrosAuxiliaresAtivos({ unread: true, tag: "urgente" } as ConversationsFilters),
-    ).toEqual(["Não lidos", "Etiqueta"]);
+    ).toEqual(["Só não lidas", "Etiqueta"]);
   });
 });
 
@@ -84,7 +84,7 @@ describe("o vazio por FILTRO não se disfarça de caixa vazia", () => {
     montar({ unread: true } as ConversationsFilters);
     expect(screen.queryByText(/Sem conversas por aqui/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Nenhuma conversa com esses filtros/i)).toBeInTheDocument();
-    expect(screen.getByText(/Não lidos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Só não lidas/i)).toBeInTheDocument();
   });
 
   it("⭐ COM filtro, sem resultado e com próxima página: o 'Carregar mais' CONTINUA lá", () => {
@@ -98,5 +98,43 @@ describe("o vazio por FILTRO não se disfarça de caixa vazia", () => {
     // Sem este caso, desenhar o botão SEMPRE passaria no de cima.
     montar({} as ConversationsFilters, false);
     expect(screen.queryByRole("button", { name: /Carregar mais/i })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Visual v2, fase 3.1: o vazio por AUSÊNCIA diz o que ele significa NA ABA. A
+ * Fila vazia é boa notícia, e o texto genérico ("quando chegarem mensagens…")
+ * fazia o atendente achar que o canal tinha caído. A aba sai dos MESMOS filtros
+ * que foram ao servidor (`abaDosFiltros`), não de uma prop paralela.
+ */
+describe("o vazio por ausência fala a língua da aba", () => {
+  it("Fila vazia: ninguém esperando", () => {
+    montar({ comando: ["aguardando"] } as ConversationsFilters);
+    expect(screen.getByText("Fila vazia")).toBeInTheDocument();
+    expect(screen.queryByText(/Sem conversas por aqui/i)).not.toBeInTheDocument();
+  });
+
+  it("Arquivadas vazia: nada arquivado", () => {
+    montar({ status: "archived" } as ConversationsFilters);
+    expect(screen.getByText("Nada arquivado")).toBeInTheDocument();
+  });
+
+  it("Só comentários ligado e lista vazia: vazio por FILTRO, não Fila vazia", () => {
+    montar({ comando: ["aguardando"], entrada: "comentario" } as ConversationsFilters);
+    expect(screen.queryByText("Fila vazia")).not.toBeInTheDocument();
+    expect(screen.getByText(/Nenhuma conversa com esses filtros/i)).toBeInTheDocument();
+    expect(screen.getByText(/Só comentários/)).toBeInTheDocument();
+    expect(filtrosAuxiliaresAtivos({ entrada: "direct" } as ConversationsFilters)).toEqual(["Só Direct"]);
+  });
+
+  it("Minhas vazia: nenhuma conversa com você", () => {
+    montar({ assigned_to: "me", exclude_finished: true } as ConversationsFilters);
+    expect(screen.getByText("Nenhuma conversa com você")).toBeInTheDocument();
+  });
+
+  it("CONTROLE: com filtro auxiliar, vale o vazio por FILTRO, não o da aba", () => {
+    montar({ comando: ["aguardando"], unread: true } as ConversationsFilters);
+    expect(screen.queryByText("Fila vazia")).not.toBeInTheDocument();
+    expect(screen.getByText(/Nenhuma conversa com esses filtros/i)).toBeInTheDocument();
   });
 });

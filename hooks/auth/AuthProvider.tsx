@@ -96,6 +96,19 @@ export function useAuth(): AuthCtx {
   return ctx;
 }
 
+/**
+ * A sessão, ou `null` fora do provider.
+ *
+ * Para componente de LISTA que só ENFEITA com a sessão (o "Você" na pílula de
+ * dono do Inbox) e que também é renderizado isolado, em teste ou em tela sem
+ * provider. Lá, lançar derrubaria a lista inteira por causa de um rótulo; a
+ * falta da sessão só tira o enfeite. Guard de permissão NUNCA usa este: quem
+ * decide acesso continua no `useAuth`, que falha alto.
+ */
+export function useAuthOpcional(): AuthCtx | null {
+  return useContext(Ctx);
+}
+
 export function useUser(): AuthUser {
   return useAuth().user;
 }
