@@ -270,3 +270,132 @@ insert into campaign_recipients(organization_id,campaign_id,contact_id,status,el
     ).toBe("23505");
   });
 });
+
+/**
+ * O VETO "JÁ EM CAMPANHA" É POR TEMPO, E SÃO DOIS CRITÉRIOS.
+ *
+ * A régua do dono (06/10/2026) é "faz quanto tempo que falei com essa pessoa", e
+ * falar é a mensagem ter SAÍDO. Os dois critérios do veto medem coisas diferentes,
+ * e as duas voltas erradas desta fatia vieram de confundi-los:
+ *
+ *   (1) PASSADO: `sent_at` na janela. Independe do estado da campanha.
+ *   (2) PRESENTE: linha na fila ativa de campanha NÃO TERMINAL.
+ *
+ * Aqui se prova a SEMÂNTICA, que o teste de unidade não alcança (lá se prova que
+ * as duas consultas existem e perguntam coisas diferentes). O predicado é escrito
+ * em SQL igual ao que `lib/campanhas/consulta-de-audiencia.ts` e
+ * `lib/campanhas/entrada-por-etapa.db.ts` montam — mesma forma, para a prova ser
+ * da regra e não de uma reimplementação dela.
+ */
+describe("9038: o veto por tempo conta quem recebeu, e quem está a caminho", () => {
+  const CAMP_B = id(8);
+  const JANELA = "30 days";
+  /** O único predicado, nos dois ramos, para UM contato. */
+  const vetado = (contato: string) => `select 'r=' || (
+    exists (
+      select 1 from campaign_recipients r
+       where r.organization_id = '${ORG}' and r.contact_id = '${contato}'
+         and r.campaign_id <> '${CAMP}'
+         and r.eligibility_status = 'eligible'
+         and r.sent_at >= now() - interval '${JANELA}'
+    ) or exists (
+      select 1 from campaign_recipients r
+       join campaigns c on c.id = r.campaign_id
+       where r.organization_id = '${ORG}' and r.contact_id = '${contato}'
+         and r.campaign_id <> '${CAMP}'
+         and r.eligibility_status = 'eligible'
+         and r.status in ('pending','queued','sending')
+         and c.status not in ('completed','cancelled')
+    ))::text;`;
+
+  /** Uma segunda campanha, no estado pedido, para hospedar a linha do contato. */
+  const outra = (status: string) =>
+    `insert into campaigns(id,organization_id,name,channel_session_id,base_legal,status)
+       values ('${CAMP_B}','${ORG}','e9038-b','${SESSAO}','consent','${status}');`;
+
+  function veto(script: string, contato: string): string {
+    try {
+      const out = sql(`${seed}${script}
+${vetado(contato)}
+rollback;`);
+      return out.split("\n").map((l) => l.trim()).find((l) => l.startsWith("r="))?.slice(2) ?? out;
+    } catch (err) {
+      return err instanceof Error ? err.message.slice(0, 200) : String(err);
+    }
+  }
+
+  it("RECEBEU e a campanha foi CANCELADA depois: continua vetado dentro dos 30 dias", () => {
+    // O erro que a primeira volta cometeu: com `status <> 'cancelled'` no
+    // predicado, esta pessoa voltava a ser abordável no dia seguinte ao
+    // cancelamento — justamente o que a janela de 30 dias existe para impedir.
+    // Cancelar a campanha não desfaz a mensagem que ela leu.
+    expect(
+      veto(
+        `${outra("cancelled")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status,sent_at)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','cancelled','eligible', now() - interval '3 days');`,
+        CONTATO_A,
+      ),
+    ).toBe("true");
+  });
+
+  it("RECEBEU há mais de 30 dias: liberado — o veto tem de terminar", () => {
+    // O controle do caso de cima: sem ele, um predicado que vetasse "qualquer
+    // `sent_at`" passaria igual, e o veto voltaria a ser para sempre.
+    expect(
+      veto(
+        `${outra("completed")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status,sent_at)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','sent','eligible', now() - interval '31 days');`,
+        CONTATO_A,
+      ),
+    ).toBe("false");
+  });
+
+  it("está PENDING em campanha viva: vetado mesmo SEM `sent_at`", () => {
+    // O ramo do presente. Ele existe para duas campanhas não mandarem o primeiro
+    // contato para a mesma pessoa na mesma semana, de números possivelmente
+    // diferentes — e aí ninguém recebeu nada ainda.
+    expect(
+      veto(
+        `${outra("running")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','pending','eligible');`,
+        CONTATO_A,
+      ),
+    ).toBe("true");
+  });
+
+  it("estava PENDING numa campanha CANCELADA, sem nunca receber: liberado", () => {
+    // É o caso que o recorte `status <> 'cancelled'` tentava cobrir à mão. Com os
+    // dois critérios separados ele sai por si: não tem `sent_at` (ramo 1) e a
+    // campanha é terminal (ramo 2). Nenhum predicado precisa olhar `cancelled`.
+    expect(
+      veto(
+        `${outra("cancelled")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','cancelled','eligible');`,
+        CONTATO_A,
+      ),
+    ).toBe("false");
+  });
+
+  it("linha EXCLUÍDA não veta: ela não recebeu nada", () => {
+    // P2-1 do @Cassio_SecRev. A entrada contínua grava uma linha `skipped` por
+    // contato que cruza a etapa e é vetado; contá-las faria a contínua
+    // esterilizar o modo lista do tenant — numa etapa de entrada de funil, é a
+    // base quase inteira.
+    expect(
+      veto(
+        `${outra("running")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status,exclusion_reason)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','skipped','excluded','opt_out');`,
+        CONTATO_A,
+      ),
+    ).toBe("false");
+  });
+
+  it("contato sem linha nenhuma não é vetado", () => {
+    expect(veto(outra("running"), CONTATO_B)).toBe("false");
+  });
+});

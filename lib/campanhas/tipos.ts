@@ -57,6 +57,23 @@ export const TERMINAIS_DE_DESPACHO: ReadonlySet<StatusDoDestinatario> = new Set(
 ]);
 
 /**
+ * Os estados em que a campanha AINDA VAI falar com esta pessoa — a fila ativa.
+ *
+ * DERIVADO de `TERMINAIS_DE_DESPACHO`, e não uma segunda lista: o complemento é
+ * exatamente "o que o despacho ainda pega". Escrever
+ * `['pending','queued','sending']` à mão criaria duas verdades sobre a mesma
+ * fronteira, e a que ninguém lembrasse de atualizar seria a que decide se uma
+ * pessoa recebe duas abordagens.
+ *
+ * Quem o usa: o veto "já em campanha" (`contatosJaEmCampanha` e
+ * `estaEmOutraCampanha`), para duas campanhas não mandarem o primeiro contato
+ * para a mesma pessoa na mesma semana.
+ */
+export const NA_FILA_DE_DESPACHO: readonly StatusDoDestinatario[] = STATUS_DO_DESTINATARIO.filter(
+  (s) => !TERMINAIS_DE_DESPACHO.has(s),
+);
+
+/**
  * Por que alguém do recorte não vai receber.
  *
  * Código, não frase: a frase é traduzida na borda (`TEXTO_DA_EXCLUSAO`), e

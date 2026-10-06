@@ -19,12 +19,57 @@ import { logger } from "@/lib/logger";
 
 import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
 
+import { STATUS_TERMINAIS } from "./maquina-de-estados";
+import { NA_FILA_DE_DESPACHO } from "./tipos";
+
 import { recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
 import type { CampanhaArmada, ContatoDoAlvo, EntradaPorEtapaDb } from "./entrada-por-etapa.tipos";
 
 const COLUNAS_DA_ARMADA =
   "id, organization_id, message_body, message_variants, content_version, teto_diario, started_at";
+
+/**
+ * ═══ DOIS CRITÉRIOS, E NÃO UM — é a confusão entre eles que já errou duas vezes ═══
+ *
+ * O veto "já em campanha" responde a DUAS perguntas diferentes, e colapsar as
+ * duas num predicado é o que produziu os dois erros desta fatia:
+ *
+ *   (1) PASSADO — "falei com essa pessoa nos últimos N dias?". O fato medido é a
+ *       mensagem ter SAÍDO: `sent_at`. Independe do estado da campanha, e é por
+ *       isso que campanha CANCELADA que já falou continua contando — cancelar
+ *       não desfaz a mensagem que a pessoa leu.
+ *
+ *   (2) PRESENTE — "alguma campanha está a caminho dela agora?". Aqui o fato é
+ *       ter linha na FILA ATIVA (`NA_FILA_DE_DESPACHO`) de uma campanha NÃO
+ *       TERMINAL. Não é sobre o passado: existe para duas campanhas não mandarem
+ *       o primeiro contato para a mesma pessoa na mesma semana, de números
+ *       possivelmente diferentes. Aqui o estado da campanha importa, e quem
+ *       responde "ainda vai falar?" é `STATUS_TERMINAIS`, derivado da máquina de
+ *       estados.
+ *
+ * As duas voltas erradas, para quem for mexer:
+ *
+ *   • "linha em campanha VIVA" media (2) e era usado como se medisse (1). Caiu
+ *     porque a campanha de entrada contínua nunca conclui: todo contato que ela
+ *     tocasse ficaria vetado de toda campanha futura, para sempre.
+ *   • "`eligibility_status = 'eligible'` nos últimos 30 dias, menos `cancelled`"
+ *     tentou medir (1) com o dado de (2). Erra nas DUAS direções: veta quem está
+ *     `pending` e nunca recebeu nada, e LIBERA quem recebeu e depois teve a
+ *     campanha cancelada — exatamente o caso que a janela de 30 dias existe para
+ *     impedir.
+ *
+ * Com (1) e (2) separados, "cancelada antes de falar" sai do veto por si: não tem
+ * `sent_at` e não tem linha viva. Nenhum predicado precisa olhar `cancelled`.
+ *
+ * ⚠️ `eligibility_status = 'eligible'` fica nos DOIS ramos, e nos dois é
+ * redundante hoje: `sent_at` só é escrito por `rodada.ts` depois de um envio, e
+ * linha excluída nasce `skipped`, fora da fila ativa. Fica porque a redundância
+ * aqui custa zero e a alternativa seria um predicado de SEGURANÇA apoiado num
+ * invariante que mora em outro arquivo — e invariante distante é o que um
+ * refactor quebra sem nada ficar vermelho. Redundância em veto se explicita, não
+ * se remove.
+ */
 
 /**
  * O começo da janela em que ter sido abordado ainda veta uma campanha nova.
@@ -164,42 +209,40 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
     },
 
     async estaEmOutraCampanha(orgId, contactId, excetoCampanhaId) {
-      // ═══ O VETO OLHA A DATA DA LINHA, NÃO O ESTADO DA CAMPANHA ═══
-      //
-      // Decisão do dono (06/10/2026). Antes o veto era "tem linha em campanha
-      // VIVA", e a campanha contínua nunca conclui: todo contato que ela tocasse
-      // ficaria excluído de qualquer campanha futura para sempre. Agora a régua é
-      // uma só, e é a MESMA do anti-laço da régua de prospecção
-      // (`DIAS_SEM_REPETIR_A_CADENCIA`), então o produto passa a ter uma resposta
-      // única para "faz quanto tempo que falei com essa pessoa?".
-      //
-      // ═══ E só conta quem é ELEGÍVEL (P2-1 do @Cassio_SecRev) ═══
-      //
-      // A entrada contínua grava linha `skipped` para TODO contato que cruza a
-      // etapa e é vetado — bloqueado, sem telefone, que recusou marketing. Sem
-      // este filtro o veto alcançava quem foi apenas vetado, e numa etapa de
-      // entrada de funil isso é a base quase inteira: a campanha contínua
-      // esterilizaria o modo lista do tenant. O veto existe para não queimar quem
-      // RECEBEU, e excluído não recebeu nada.
-      //
-      // `cancelled` sai pelo mesmo raciocínio: a campanha foi cancelada antes de
-      // falar com essa pessoa, então ela não foi abordada.
-      const { count, error } = await admin
+      const desde = desdeDaJanelaDeRepeticao().toISOString();
+
+      // (1) RECEBEU na janela. `gte` sobre `sent_at` já descarta quem não recebeu:
+      // NULL não passa num `>=`.
+      const { data: recebeu, error: erroRecebeu } = await admin
         .from("campaign_recipients")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("organization_id", orgId)
         .eq("contact_id", contactId)
-        .eq("eligibility_status", "eligible")
-        .neq("status", "cancelled")
         .neq("campaign_id", excetoCampanhaId)
-        .gte("created_at", desdeDaJanelaDeRepeticao().toISOString());
-      // Sem o `.in("campaign_id", ids)` de antes, de propósito (P2-2): a lista de
-      // campanhas vivas cresce sem teto porque a contínua nunca conclui, e em
-      // ~150 campanhas a URL do PostgREST passa de 8 KB e volta 400/414 — o
-      // alistamento pararia, com um aviso genérico de evento morto como único
-      // recibo. O predicado agora é todo do lado do servidor.
-      if (error) throw new Error(`campanha_entrada_comprometido: ${error.message}`);
-      return (count ?? 0) > 0;
+        .eq("eligibility_status", "eligible")
+        .gte("sent_at", desde)
+        .limit(1);
+      if (erroRecebeu) throw new Error(`campanha_entrada_abordado: ${erroRecebeu.message}`);
+      if ((recebeu ?? []).length > 0) return true;
+
+      // (2) ESTÁ NA FILA de campanha que ainda vai falar. Pelo embed `!inner`, e
+      // não por uma lista de ids: a lista de campanhas não terminais cresce com o
+      // tempo (a contínua nunca conclui) e em algumas centenas a URL do PostgREST
+      // estoura — o mesmo P2-2 que tirou o `.in()` daqui. O predicado de status é
+      // de tamanho FIXO (dois valores), então a URL não cresce. Mesmo padrão de
+      // `lib/cadencia/saidas.handler.ts` e de `lib/leads/radar-de-risco.ts`.
+      const { data: naFila, error: erroFila } = await admin
+        .from("campaign_recipients")
+        .select("id, campaigns!inner(status)")
+        .eq("organization_id", orgId)
+        .eq("contact_id", contactId)
+        .neq("campaign_id", excetoCampanhaId)
+        .eq("eligibility_status", "eligible")
+        .in("status", NA_FILA_DE_DESPACHO as unknown as string[])
+        .not("campaigns.status", "in", `(${STATUS_TERMINAIS.join(",")})`)
+        .limit(1);
+      if (erroFila) throw new Error(`campanha_entrada_na_fila: ${erroFila.message}`);
+      return (naFila ?? []).length > 0;
     },
 
     async estaSuprimido(orgId, endereco) {

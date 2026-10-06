@@ -86,6 +86,18 @@ export function ehTerminal(status: StatusDaCampanha): boolean {
   return PERMITIDO[status].length === 0;
 }
 
+/**
+ * Os estados TERMINAIS, como lista — para quem precisa do conjunto e não da
+ * pergunta (um predicado de consulta ao banco, por exemplo).
+ *
+ * DERIVADO de `PERMITIDO` por `ehTerminal`, nunca digitado: a tabela acima é a
+ * autoridade, e uma segunda lista de terminais divergiria no primeiro estado
+ * novo. Hoje são `completed` e `cancelled` — `failed` NÃO é terminal, ele volta
+ * a rascunho para conserto, e essa é justamente a distinção que uma lista escrita
+ * à mão erra.
+ */
+export const STATUS_TERMINAIS: readonly StatusDaCampanha[] = STATUS_DA_CAMPANHA.filter(ehTerminal);
+
 /** Só para teste e para a tela: o que sai de cada estado. */
 export function destinosDe(status: StatusDaCampanha): readonly StatusDaCampanha[] {
   return PERMITIDO[status];

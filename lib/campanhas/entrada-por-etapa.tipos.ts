@@ -75,14 +75,18 @@ export interface EntradaPorEtapaDb {
    */
   ehEtapaDeFechamento(orgId: string, stageId: string): Promise<boolean>;
   /**
-   * Este contato já foi ABORDADO por outra campanha da organização na janela de
-   * `DIAS_SEM_REPETIR_A_CADENCIA`?
+   * Outra campanha da organização JÁ ABORDOU este contato, ou está A CAMINHO de
+   * abordar?
    *
-   * Por TEMPO e não por estado da campanha (decisão do dono, 06/10/2026): a
-   * contínua nunca conclui, e "tem linha em campanha viva" a faria excluir todo
-   * contato que tocasse de toda campanha futura, para sempre. E conta só quem é
-   * ELEGÍVEL: este gatilho grava linha também para o vetado, e vetado não
-   * recebeu nada.
+   * DOIS critérios, num OU (decisão do dono, 06/10/2026):
+   *   (1) recebeu nos últimos `DIAS_SEM_REPETIR_A_CADENCIA` dias (`sent_at`),
+   *       independente do estado da campanha — cancelar não desfaz a mensagem;
+   *   (2) tem linha na fila ativa de uma campanha NÃO TERMINAL, que é o que
+   *       impede duas campanhas de mandarem o primeiro contato na mesma semana.
+   *
+   * Linha EXCLUÍDA não conta em nenhum dos dois: este gatilho grava linha
+   * também para o vetado, e vetado não recebeu nada. Doutrina completa (e as
+   * duas voltas erradas que a produziram) em `entrada-por-etapa.db.ts`.
    */
   estaEmOutraCampanha(orgId: string, contactId: string, excetoCampanhaId: string): Promise<boolean>;
   /** O telefone está na lista de exclusão da operação (migration 0376)? */

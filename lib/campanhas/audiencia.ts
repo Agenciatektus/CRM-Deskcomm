@@ -32,15 +32,19 @@ import { z } from "zod";
  *
  * Ela listava os estados em que uma campanha "ainda pretende falar com a lista
  * dela", e servia a UMA coisa: o veto "já em campanha" de `contatosJaEmCampanha`.
- * Esse veto passou a olhar a DATA DA LINHA, e não o estado da campanha (decisão
- * do dono, 06/10/2026) — porque a campanha de entrada contínua nunca conclui, e
- * pelo critério antigo ela excluiria de qualquer campanha futura, para sempre,
- * todo contato que tocasse.
+ * Esse veto virou DOIS critérios (decisão do dono, 06/10/2026): quem RECEBEU nos
+ * últimos 30 dias, que não olha estado de campanha nenhum, e quem está na FILA
+ * ATIVA de uma campanha que ainda vai falar, que olha.
+ *
+ * O problema dela nunca foi listar estados — era ser a lista de SEIS estados
+ * usada como se respondesse "ainda vai falar?", quando a autoridade sobre isso é
+ * a máquina de estados. O critério (2) pergunta pelo complemento, derivado de
+ * lá: `STATUS_TERMINAIS` (`lib/campanhas/maquina-de-estados.ts`). Duas listas de
+ * estados divergem no primeiro estado novo, e a que ninguém lembrasse de
+ * atualizar seria a que decide se uma pessoa recebe duas abordagens.
  *
  * Deixar a constante de pé sem consumidor convidaria a ressuscitar a regra
- * antiga. Quem precisar de "a campanha ainda vai falar?" leia a máquina de
- * estados (`lib/campanhas/maquina-de-estados.ts`, `ehTerminal`), que é a
- * autoridade sobre estado.
+ * antiga, com o nome que ela tinha.
  */
 
 export const filtroDeAudienciaSchema = z

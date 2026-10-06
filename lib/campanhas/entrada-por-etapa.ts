@@ -232,11 +232,12 @@ export async function alistarPorEtapa(
       await excluir("suprimido");
       continue;
     }
-    // Já abordado por outra campanha nos últimos 30 dias não entra: além de
-    // queimar o contato, a segunda mensagem não mede a segunda copy — mede
-    // alguém que já foi abordado. A janela é a MESMA do anti-laço da régua
-    // (`DIAS_SEM_REPETIR_A_CADENCIA`), e quem conta só conta ELEGÍVEL: linha
-    // excluída não recebeu nada (ver `entrada-por-etapa.db.ts`).
+    // Quem outra campanha JÁ ABORDOU, ou está A CAMINHO de abordar, não entra:
+    // além de queimar o contato, a segunda mensagem não mede a segunda copy —
+    // mede alguém que já foi abordado. São dois critérios (recebeu na janela de
+    // `DIAS_SEM_REPETIR_A_CADENCIA`, OU está na fila ativa de campanha não
+    // terminal) e a doutrina de por que não são um está em
+    // `entrada-por-etapa.db.ts`. Linha excluída não conta: não recebeu nada.
     if (await deps.db.estaEmOutraCampanha(row.organization_id, contato.contactId, campanha.id)) {
       await excluir("ja_em_campanha");
       continue;

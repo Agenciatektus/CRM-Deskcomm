@@ -129,12 +129,21 @@ export interface ContextoDaClassificacao {
  * ⚠⚠ A RÉGUA MUDOU NA 9038, e o que estava escrito aqui até então era "o veto
  * termina quando a campanha termina". Terminou de valer: a campanha de entrada
  * CONTÍNUA nunca conclui, e por aquele critério ela excluiria de toda campanha
- * futura, para sempre, cada contato que tocasse. Agora o veto olha a DATA DA
- * LINHA — `DIAS_SEM_REPETIR_A_CADENCIA`, a mesma janela do anti-laço da régua de
- * prospecção — e conta só quem é ELEGÍVEL, porque a preparação e o gatilho
- * gravam linha também para o EXCLUÍdo, e excluído não recebeu nada. Quem monta o
- * conjunto é `contatosJaEmCampanha` (`consulta-de-audiencia.ts`); aqui só se
- * aplica o que ele entregou.
+ * futura, para sempre, cada contato que tocasse.
+ *
+ * São DOIS critérios agora, e eles medem coisas diferentes:
+ *
+ *   (1) PASSADO — RECEBEU nos últimos `DIAS_SEM_REPETIR_A_CADENCIA` dias
+ *       (`sent_at`, a mesma janela do anti-laço da régua de prospecção).
+ *       Independe do estado da campanha: cancelar não desfaz a mensagem lida.
+ *   (2) PRESENTE — está na FILA ATIVA de uma campanha que ainda vai falar. É o
+ *       que impede duas campanhas de mandarem o primeiro contato para a mesma
+ *       pessoa na mesma semana, e só aqui o estado da campanha importa.
+ *
+ * Linha EXCLUÍDA não conta em nenhum dos dois: a preparação e o gatilho gravam
+ * linha também para quem foi vetado, e vetado não recebeu nada. Quem monta o
+ * conjunto é `contatosJaEmCampanha` (`consulta-de-audiencia.ts`), com a doutrina
+ * completa; aqui só se aplica o que ele entregou.
  */
 export function classificarAudiencia(
   candidatos: readonly CandidatoDaAudiencia[],
