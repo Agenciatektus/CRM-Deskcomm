@@ -29,10 +29,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // No escuro, o gradiente `--gradient-primary` (app/globals.css) por cima da
+        // cor: parte do `accent` da marca em vigor e só se afasta do texto, então
+        // nenhum ponto dele tem contraste menor que o par que a régua valida. No
+        // hover o gradiente sai e fica o `accent-hover` chapado, como já era.
         primary:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:hover:bg-none",
         default:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:hover:bg-none",
         secondary:
           "bg-surface-elevated text-text border border-border hover:border-accent hover:text-accent",
         outline:

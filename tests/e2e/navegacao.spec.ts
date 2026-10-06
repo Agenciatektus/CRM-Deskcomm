@@ -50,6 +50,15 @@ async function loginAdmin(page: Page): Promise<void> {
 }
 
 const sidebar = (page: Page) => page.getByRole("navigation", { name: "Navegação principal" });
+/**
+ * Visual v2: a barra do desktop tem um TRILHO com um botão por grupo e uma
+ * coluna ("Navegação principal") com as telas do grupo escolhido, que começa
+ * sendo o da rota. Para chegar a uma tela de outro grupo, clica-se no grupo antes.
+ */
+const trilho = (page: Page) => page.getByRole("navigation", { name: "Grupos da navegação" });
+async function abrirGrupo(page: Page, nome: string): Promise<void> {
+  await trilho(page).getByRole("button", { name: nome, exact: true }).click();
+}
 
 async function expectSemOverflowHorizontal(page: Page, contexto: string): Promise<void> {
   const m = await page.evaluate(() => ({
@@ -87,16 +96,10 @@ test.describe("navegação agrupada", () => {
   test("o sidebar tem hierarquia: grupos na ordem de uso", async ({ page }) => {
     await loginAdmin(page);
 
-    // Organização não aparece como título aqui: seu hub (Configurações) vive no
-    // rodapé fixo — ver o teste de dobra abaixo.
-    const titulos = sidebar(page).getByRole("heading");
-    await expect(titulos).toHaveText([
-      "Atendimento",
-      "CRM",
-      "Agente",
-      "Canais",
-      "Análise",
-    ]);
+    // Organização não aparece no trilho: seu hub (Configurações) é o link
+    // "Ajustes" do rodapé fixo — ver o teste do rodapé abaixo.
+    const grupos = trilho(page).getByRole("button");
+    await expect(grupos).toHaveText(["Atendimento", "CRM", "Agentes", "Canais", "Análise"]);
 
     await page.screenshot({
       path: path.join(EVIDENCE, "nav-sidebar-agrupado.png"),
@@ -121,6 +124,7 @@ test.describe("navegação agrupada", () => {
     // agora mora atrás de "Ver tudo em CRM". Este teste percorre o caminho
     // INTEIRO em vez de checar um link: hub → tela. Que a porta existe no grupo
     // certo do sidebar é o unitário `sidebar-grupos` que prende.
+    await abrirGrupo(page, "CRM");
     await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
     await page.waitForURL(/\/app\/crm$/);
     await expect(page.getByRole("heading", { name: "O dia a dia da venda" })).toBeVisible();
@@ -133,13 +137,17 @@ test.describe("navegação agrupada", () => {
     await expect(page.getByRole("heading", { name: "Etapas do funil", level: 1 })).toBeVisible();
   });
 
-  test("e Produtos, que saiu do menu, continua alcançável pelo mesmo hub", async ({ page }) => {
+  test("e Produtos continua alcançável pelo mesmo hub", async ({ page }) => {
     // Tirar do sidebar não pode virar tela órfã: DoD 14 cobra porta, e a porta
-    // passou a ser o hub. Sem este caso, o item "some do menu" ficaria provado
-    // e o "continua alcançável" ficaria só escrito no comentário.
+    // passou a ser o hub.
+    //
+    // ⚠️ VISUAL V2: a coluna do CRM mostra o inventário do grupo (o mesmo do
+    // hub), então Produtos voltou a ter linha própria NELA. O caminho pelo hub
+    // continua sendo percorrido aqui, porque o hub segue sendo porta.
     await loginAdmin(page);
 
-    await expect(sidebar(page).getByRole("link", { name: "Produtos" })).toHaveCount(0);
+    await abrirGrupo(page, "CRM");
+    await expect(sidebar(page).getByRole("link", { name: "Produtos" })).toBeVisible();
 
     await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
     await page.waitForURL(/\/app\/crm$/);
@@ -149,6 +157,7 @@ test.describe("navegação agrupada", () => {
 
   test("e a lista de funis é o item vizinho, com nome próprio", async ({ page }) => {
     await loginAdmin(page);
+    await abrirGrupo(page, "CRM");
     await sidebar(page).getByRole("link", { name: "Funis", exact: true }).click();
     await page.waitForURL(/\/app\/kanban/);
     await expect(page.getByRole("heading", { name: "Funis", level: 1 })).toBeVisible();
@@ -157,6 +166,7 @@ test.describe("navegação agrupada", () => {
   test("chega em Conhecimento, que só existia atrás das abas de IA", async ({ page }) => {
     await loginAdmin(page);
 
+    await abrirGrupo(page, "Agentes");
     await sidebar(page).getByRole("link", { name: "Ver tudo em IA" }).click();
     await page.waitForURL(/\/app\/ai$/);
 
@@ -179,6 +189,7 @@ test.describe("navegação agrupada", () => {
   test("chega ao canal oficial pelo grupo Canais, não por Configurações", async ({ page }) => {
     await loginAdmin(page);
 
+    await abrirGrupo(page, "Canais");
     await sidebar(page).getByRole("link", { name: "Conexões" }).click();
     await page.waitForURL(/\/app\/connections/);
     await expect(page.getByRole("tab", { name: /oficial/i })).toBeVisible();
@@ -218,24 +229,32 @@ test.describe("navegação agrupada", () => {
    * "20 itens que não cabem" seria recriar o problema em outra forma.
    *
    * Medido por ferramenta, nunca a olho.
+   *
+   * ⚠️ VISUAL V2: com duas colunas, "o menu" são DUAS áreas. O trilho tem de
+   * mostrar todos os grupos sem rolar (grupo abaixo da dobra é indistinguível de
+   * grupo que não existe), e a coluna de CADA grupo tem de caber em 900px.
    */
-  test("nenhum grupo fica fora da dobra, e em 900px o menu não rola", async ({ page }) => {
+  test("nenhum grupo fica fora da dobra, e em 900px nenhuma coluna rola", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await loginAdmin(page);
 
-    const m = await page.evaluate(() => {
-      const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
-      const r = nav.getBoundingClientRect();
-      return {
-        rola: nav.scrollHeight > Math.round(r.height) + 1,
-        titulosFora: [...nav.querySelectorAll("h2")].filter(
-          (h) => h.getBoundingClientRect().bottom > r.bottom,
-        ).length,
-      };
+    const trilhoRola = await page.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Grupos da navegação"]')!;
+      return nav.scrollHeight > Math.round(nav.getBoundingClientRect().height) + 1;
     });
+    expect(trilhoRola, "o trilho de grupos tem de caber sem scroll").toBe(false);
 
-    expect(m.titulosFora, "grupo inteiro invisível é o problema que viemos resolver").toBe(0);
-    expect(m.rola, "em 900px o menu inteiro tem de caber sem scroll").toBe(false);
+    for (const grupo of ["Atendimento", "CRM", "Agentes", "Canais", "Análise"]) {
+      await abrirGrupo(page, grupo);
+      await expect(sidebar(page).getByRole("heading", { name: grupo })).toBeVisible();
+      const rola = await page.evaluate(() => {
+        // A área que rola é o filho da <nav> logo abaixo do título.
+        const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
+        const area = nav.querySelector("h2 + div") ?? nav;
+        return area.scrollHeight > Math.round(area.getBoundingClientRect().height) + 1;
+      });
+      expect(rola, `em 900px a coluna de ${grupo} tem de caber sem scroll`).toBe(false);
+    }
   });
 
   test.describe("mobile", () => {
@@ -271,15 +290,21 @@ test.describe("navegação agrupada", () => {
     await page.setViewportSize({ width: 1280, height: 768 });
     await loginAdmin(page);
 
-    const config = page.getByRole("link", { name: "Configurações" });
+    // No trilho de 72px o rótulo é curto: "Ajustes", com o mesmo destino.
+    const config = page.getByRole("link", { name: "Ajustes", exact: true });
     await expect(config).toBeVisible();
+    await expect(config).toHaveAttribute("href", "/app/settings");
 
     const dentroDaNav = await page.evaluate(() => {
-      const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
+      const navs = [
+        ...document.querySelectorAll(
+          'nav[aria-label="Navegação principal"], nav[aria-label="Grupos da navegação"]',
+        ),
+      ];
       const link = [...document.querySelectorAll("a")].find(
-        (a) => a.textContent?.trim() === "Configurações",
+        (a) => a.textContent?.trim() === "Ajustes",
       );
-      return nav.contains(link!);
+      return navs.some((nav) => nav.contains(link!));
     });
     expect(dentroDaNav, "Configurações não pode depender de scroll para aparecer").toBe(false);
   });
@@ -287,8 +312,8 @@ test.describe("navegação agrupada", () => {
   test("um agent não vê o cabeçalho de um grupo que a permissão esvaziou", async ({ page }) => {
     await login(page, creds.users.agent!.email);
 
-    // CANAIS é todo manager+/admin: o título não pode sobrar sozinho.
-    await expect(sidebar(page).getByRole("heading", { name: "Canais" })).toHaveCount(0);
-    await expect(sidebar(page).getByRole("heading", { name: "Atendimento" })).toBeVisible();
+    // CANAIS é todo manager+/admin: o grupo não pode sobrar sozinho no trilho.
+    await expect(trilho(page).getByRole("button", { name: "Canais" })).toHaveCount(0);
+    await expect(trilho(page).getByRole("button", { name: "Atendimento" })).toBeVisible();
   });
 });

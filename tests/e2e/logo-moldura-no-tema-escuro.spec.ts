@@ -50,7 +50,7 @@
  * O #659 toca três telas, e consertar uma só devolveria o defeito nas outras
  * duas. As três são medidas aqui:
  *
- *   1. a barra lateral do app   (`components/shell/Sidebar.tsx`)   — casos 1,2,5,6
+ *   1. a barra lateral do app   (`components/shell/MarcaDaBarra.tsx`) — casos 1,2,5,6
  *   2. a tela de entrada        (`app/(public)/layout.tsx`)        — caso 3
  *   3. a PRÉVIA da tela de marca(`components/branding/CampoDeLogo.tsx`) — caso 4
  *
@@ -358,9 +358,15 @@ function anotar(nome: string, dado: unknown): void {
   fs.writeFileSync(evidencia(nome), JSON.stringify(dado, null, 2) + "\n", "utf8");
 }
 
-/** O cabeçalho da barra lateral: o primeiro filho do `<aside>` (`h-14`, `border-b`). */
+/**
+ * O cabeçalho da barra lateral: a caixa da marca no topo do trilho (`h-14`).
+ *
+ * Visual v2: o primeiro filho do `<aside>` virou a barra INTEIRA (trilho e
+ * coluna), e medir aquilo compararia a altura da tela. A caixa da marca tem
+ * marcador próprio para esta medida não depender da ordem dos filhos.
+ */
 function cabecalhoDaBarra(page: Page): Locator {
-  return page.locator("aside > div").first();
+  return page.locator("aside [data-marca-da-barra]").first();
 }
 
 async function medirCaixa(alvo: Locator): Promise<Caixa> {

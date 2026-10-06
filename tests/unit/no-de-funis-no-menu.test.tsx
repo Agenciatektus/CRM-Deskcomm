@@ -56,6 +56,15 @@ const FUNIS = [
   { id: "3f584ca3-0000-4000-8000-000000000000", name: "Pedidos" },
 ];
 
+/**
+ * Na barra de duas colunas (visual v2), a coluna mostra UM grupo por vez: o da
+ * rota. Fora de um funil (aqui, `/app/inbox`), o nó só aparece depois de pedir o
+ * grupo do CRM no trilho, que é o caminho real de quem procura o quadro.
+ */
+async function abrirOCrm() {
+  await userEvent.click(screen.getByRole("button", { name: "CRM" }));
+}
+
 function comoPapel(role: ActiveOrg["role"]) {
   authRef.user = { is_platform_admin: false };
   authRef.activeOrg = { orgId: "org-1", name: "Org", role };
@@ -72,6 +81,7 @@ describe('o nó "Pipeline" no menu', () => {
     // motivos de perda; `/app/pipelines/<id>` é onde os clientes estão.
     comoPapel("admin");
     render(<Sidebar collapsed={false} funis={FUNIS} />);
+    await abrirOCrm();
 
     await userEvent.click(screen.getByRole("button", { name: /Pipeline/ }));
 
@@ -86,6 +96,7 @@ describe('o nó "Pipeline" no menu', () => {
     // 900px, e dois funis abertos são duas linhas a mais em toda tela.
     comoPapel("admin");
     render(<Sidebar collapsed={false} funis={FUNIS} />);
+    await abrirOCrm();
 
     expect(screen.queryByRole("link", { name: "Clientes" })).toBeNull();
 
@@ -108,11 +119,12 @@ describe('o nó "Pipeline" no menu', () => {
     );
   });
 
-  it("some quando a organização não tem funil", () => {
+  it("some quando a organização não tem funil", async () => {
     // Expansor que abre vazio promete conteúdo e entrega buraco. Quem ainda não
     // tem funil chega por "Funis", que é a tela que ensina a criar o primeiro.
     comoPapel("admin");
     render(<Sidebar collapsed={false} funis={[]} />);
+    await abrirOCrm();
 
     expect(screen.queryByRole("button", { name: /Pipeline/ })).toBeNull();
     // E a porta que ensina continua lá.
@@ -131,8 +143,9 @@ describe('o nó "Pipeline" no menu', () => {
   });
 
   it("não aparece na barra recolhida", async () => {
-    // Sem texto, um chevron sozinho não diz o que abre — e o ícone do funil já
-    // está em "Funis", logo acima. Dois ícones iguais em sequência viram ruído.
+    // Recolhida, a barra é só o trilho: o nó não aparece até alguém abrir o grupo
+    // do CRM (a sobreposição tem texto, e aí o nó vem com rótulo). Sem texto, um
+    // chevron sozinho não diria o que abre.
     comoPapel("admin");
     render(<Sidebar collapsed={true} funis={FUNIS} />);
 
