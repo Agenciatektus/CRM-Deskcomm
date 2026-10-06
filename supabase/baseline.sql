@@ -10150,6 +10150,11 @@ alter table public.agent_inbox_items
     -- lista pelas razões de sempre (#159; a janela do `midia-nao-lida.test.ts`).
     'jev_pedido_de_humano',
     'jev_parar_de_receber',
+    -- (migration 9043) A tarefa chegou na hora: o cron `task-due-reminder`
+    -- avisa o RESPONSÁVEL (Central + push só para ele). Kind próprio, e não
+    -- `other`, porque o rótulo de `other` é "Aviso do assistente" — falso para
+    -- uma tarefa que uma pessoa marcou. NESTA lista pelas razões de sempre (#159).
+    'task_due',
     'other'
   ));
 
@@ -40290,6 +40295,25 @@ alter table public.crm_tasks
   add column if not exists source_kind text;
 comment on column public.crm_tasks.source_kind is
   'De onde a tarefa nasceu (ex.: promised_proposal). NULL = criada à mão. Vocabulário aberto — TypeScript, sem CHECK.';
+
+-- ---- o responsável é avisado na hora da tarefa (migration 9043) ----
+--
+-- `crm_tasks.reminded_at`: quando o cron `task-due-reminder` avisou o
+-- responsável (Central de avisos + push do navegador). Nula = ainda não avisou;
+-- reagendar (PATCH com `due_date`) zera. O cron reivindica cada tarefa com
+-- UPDATE condicional em `reminded_at is null`, então duas réplicas nunca avisam
+-- duas vezes. O índice parcial cobre exatamente a varredura de cada minuto. O
+-- kind `task_due` entrou no bloco ÚNICO de `agent_inbox_items_kind_check` (o da
+-- 0105), não aqui. Racional inteiro no cabeçalho da migration. Idempotente.
+alter table public.crm_tasks
+  add column if not exists reminded_at timestamptz;
+comment on column public.crm_tasks.reminded_at is
+  'Quando o responsável foi avisado do prazo (Central + push, cron task-due-reminder). NULL = ainda não avisou. Reagendar (PATCH due_date) zera. Migration 9043.';
+create index if not exists crm_tasks_a_avisar_idx
+  on public.crm_tasks (due_date)
+  where reminded_at is null
+    and due_date is not null
+    and status in ('pending', 'in_progress');
 
 -- ---- a proposta não aponta para outra organização (migration 0465) ----
 create or replace function public.fn_verificar_org_da_proposta()

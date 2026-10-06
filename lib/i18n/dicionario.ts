@@ -14208,6 +14208,15 @@ export const DICIONARIO: Traducoes = {
   "Detalhes do lead": { es: "Detalles del lead" },
   "Lembrete ativo:": { es: "Recordatorio activo:" },
   "Escolha um horário no futuro, em até 90 dias.": { es: "Elige un horario en el futuro, dentro de 90 días." },
+
+  // ---- aviso na hora da tarefa (migration 9043, lib/tarefas/aviso-de-tarefa.ts) ----
+  "O responsável recebe o aviso na hora marcada.": { es: "El responsable recibe el aviso a la hora indicada." },
+  "Hora da tarefa": { es: "Hora de la tarea" },
+  "Hora da tarefa:": { es: "Hora de la tarea:" },
+  "Chegou a hora de uma tarefa": { es: "Llegó la hora de una tarea" },
+  "Abra a conversa ou o negócio e faça o que a tarefa pede. Conclua a tarefa em Tarefas quando terminar.": {
+    es: "Abre la conversación o el negocio y haz lo que pide la tarea. Complétala en Tareas cuando termines.",
+  },
 };
 
 /**

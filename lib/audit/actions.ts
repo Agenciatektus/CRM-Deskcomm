@@ -695,6 +695,8 @@ export const AUDIT_ACTIONS = [
   "crm_task.created",
   "crm_task.updated",
   "crm_task.deleted",
+  // A rodada do cron `task-due-reminder` que avisou alguém (migration 9043).
+  "crm_task.aviso_enviado",
 
   // A proposta comercial. Rascunho, edição, ajuste pelo assistente, envio e
   // decisão do cliente — cada um muda o que o negócio vale ou o que foi
