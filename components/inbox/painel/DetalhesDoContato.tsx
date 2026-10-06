@@ -8,6 +8,7 @@ import { useContact } from "@/hooks/contacts/useContact";
 import { useUpdateContact } from "@/hooks/contacts/useUpdateContact";
 import { useT } from "@/hooks/i18n/useT";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import type { ContactPatch } from "@/lib/schemas/contacts";
 import { PencilSimple, UserCircle } from "@/lib/ui/icons";
 
@@ -57,7 +58,14 @@ export const DetalhesDoContato = forwardRef<HTMLElement, Props>(function Detalhe
 
   const dados = contato.data?.data;
   const atual = (c: Campo): string => {
-    if (c === "display_name") return dados?.display_name ?? dados?.name ?? nomeDaConversa ?? "";
+    if (c === "display_name") {
+      // O campo edita o apelido GUARDADO. Sem apelido, o ponto de partida é o nome
+      // de gente pela regra única (`nomeDoContato`), nunca uma cadeia montada aqui:
+      // `tests/unit/rotulo-do-contato.test.ts` reprova a sétima cópia dela.
+      const guardado = typeof dados?.display_name === "string" ? dados.display_name.trim() : "";
+      if (guardado !== "") return guardado;
+      return nomeDoContato(dados) ?? nomeDaConversa ?? "";
+    }
     return (dados?.[c] as string | null | undefined) ?? "";
   };
   const podeEditar = !leitura && !anonimizado && !!contactId;
