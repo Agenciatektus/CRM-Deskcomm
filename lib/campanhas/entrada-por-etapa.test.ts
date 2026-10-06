@@ -415,6 +415,26 @@ describe("entrada por etapa: o card que VOLTA de ganho ou de perda", () => {
     const r = await alistarPorEtapa(deps(db), evento());
     expect(r.alistados).toBe(0);
     expect(r.ja_foi_fechado).toBe(1);
+    // VIRA LINHA, e é o ponto: num modo de público sem lista, a linha `skipped`
+    // com o motivo é o único lugar onde o operador vê o veto comendo a base —
+    // antes dela o rastro era um número no `detail` do event_log.
+    expect(gravadas).toHaveLength(1);
+    expect(gravadas[0]!.status).toBe("skipped");
+    expect(gravadas[0]!.exclusion_reason).toBe("negocio_ja_fechado");
+    // Sem corpo e sem telefone, como toda linha excluída.
+    expect(gravadas[0]!.rendered_body).toBeNull();
+    expect(gravadas[0]!.recipient_address).toBeNull();
+  });
+
+  it("evento ANTERIOR ao Iniciar não grava a exclusão — o corte vem antes", async () => {
+    // O veto desceu para dentro do laço para poder gravar linha; gravar ANTES do
+    // corte de `started_at` registraria exclusão numa campanha que nem começou.
+    const { db, gravadas } = fakeDb({
+      negocio: { contactId: CONTATO, aberto: true, jaFoiFechado: true },
+    });
+    const r = await alistarPorEtapa(deps(db), evento({ created_at: ANTES }));
+    expect(r.ja_foi_fechado).toBe(0);
+    expect(r.anterior_ao_inicio).toBe(1);
     expect(gravadas).toHaveLength(0);
   });
 

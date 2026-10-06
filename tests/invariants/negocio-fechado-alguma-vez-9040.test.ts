@@ -186,3 +186,74 @@ ${mover(outraAberta)}`,
     ).toBe("nulo");
   });
 });
+
+/**
+ * OS TRÊS SINAIS DE "JÁ FOI FECHADO", EM SQL.
+ *
+ * `lib/campanhas/entrada-por-etapa.db.ts` compõe um OU de três colunas, e o teste
+ * de unidade prova a composição em TypeScript. O que ele não alcança é que as
+ * três colunas EXISTAM e signifiquem o que a aplicação presume, e é isso que se
+ * mede aqui — em particular o terceiro, `retomado_de_lead_id`, que vem da 0425 e
+ * é o único sinal do funil `novo_negocio`, onde nada reabre: nasce um card NOVO
+ * apontando para o encerrado, sem herdar `lost_reason` nem a coluna da 9040
+ * (`CAMPOS_COPIAVEIS_NA_RETOMADA` não os copia).
+ *
+ * O predicado é escrito na mesma forma que o adapter monta, para a prova ser da
+ * regra e não de uma reimplementação dela.
+ */
+describe("9040: os três sinais que o veto da campanha contínua lê", () => {
+  const CLONE = id(10);
+  const vetado = (qual: string) => `coalesce((
+    select (l.fechado_alguma_vez_em is not null)
+        or (l.lost_reason is not null and length(l.lost_reason) > 0)
+        or (l.retomado_de_lead_id is not null)
+      from crm_leads l where l.id = '${qual}'
+  ), false)::text`;
+
+  it("CLONE de negócio encerrado (funil `novo_negocio`) é vetado, sem marca nenhuma", () => {
+    // O cenário inteiro: cliente ganho em março, funil em `novo_negocio`; em
+    // outubro o operador clica Retomar e nasce ESTE card, aberto, numa etapa
+    // aberta, sem `fechado_alguma_vez_em` e sem `lost_reason`. Antes do terceiro
+    // sinal ele passava por todos os vetos e recebia a copy de primeiro contato —
+    // e não como lacuna histórica: para sempre, em todo funil nesse modo.
+    expect(
+      leitura(
+        `${mover(GANHO)}
+insert into crm_leads(id,organization_id,pipeline_id,stage_id,title,source,retomado_de_lead_id)
+  values ('${CLONE}','${ORG}','${PIPE}','${ABERTA}','f9040 clone','retomada','${LEAD}');`,
+        `status || '|' || coalesce(fechado_alguma_vez_em::text,'nulo') || '|' ` +
+          `|| coalesce(lost_reason,'nulo') || '|' || ${vetado(CLONE)}`,
+        CLONE,
+      ),
+    ).toBe(`open|nulo|nulo|true`);
+  });
+
+  it("CONTROLE: card novo SEM origem encerrada não é vetado", () => {
+    // Sem ele, o caso de cima não distinguiria "o sinal funciona" de "o predicado
+    // veta todo mundo". `clonar-para-funil.ts` só grava `retomado_de_lead_id` quando a
+    // origem NÃO estava aberta, então card comum nasce com ele nulo.
+    expect(
+      leitura(
+        `insert into crm_leads(id,organization_id,pipeline_id,stage_id,title)
+           values ('${id(11)}','${ORG}','${PIPE}','${ABERTA}','f9040 comum');`,
+        vetado(id(11)),
+        id(11),
+      ),
+    ).toBe("false");
+  });
+
+  it("o negócio ganho e REABERTO no mesmo registro também é vetado", () => {
+    // O outro modo (`mesmo_registro`, o default), pelo primeiro sinal. Os dois
+    // casos juntos cobrem os dois modos de reabertura do produto.
+    expect(leitura(`${mover(GANHO)}
+${mover(ABERTA)}`, vetado(LEAD))).toBe("true");
+  });
+
+  it("a FK da 0425 existe — o terceiro sinal não é coluna solta", () => {
+    expect(
+      sql(`select count(*) from pg_constraint
+            where conname = 'fk_crm_leads_retomado_de_lead'
+              and conrelid = 'public.crm_leads'::regclass;`),
+    ).toBe("1");
+  });
+});

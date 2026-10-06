@@ -14,6 +14,12 @@
 --          count(*) filter (where status = 'open'
 --                             and lost_reason is not null
 --                             and length(lost_reason) > 0)             as reabertos_que_a_perda_pega,
+--          count(*) filter (where status = 'open'
+--                             and retomado_de_lead_id is not null)     as retomados_que_a_0425_pega,
+--          count(*) filter (where status = 'open'
+--                             and (lost_reason is null or length(lost_reason) = 0)
+--                             and retomado_de_lead_id is null
+--                             and closed_at is null)                   as abertos_sem_sinal_nenhum,
 --          count(*)                                                    as total
 --     from public.crm_leads;
 --
@@ -21,9 +27,33 @@
 -- (nenhuma hoje, porque a 9039 ainda não foi usada em produção). `sem_closed_at`
 -- é quanto do backfill cai no `updated_at` em vez da data real do fechamento —
 -- aproximação declarada, nunca inventada: a coluna diz "foi fechado em algum
--- momento até aqui", e é só isso que o veto pergunta. `reabertos_que_a_perda_pega`
--- é o pedaço do passado que o backfill NÃO alcança e que `lost_reason` cobre
--- mesmo assim.
+-- momento até aqui", e é só isso que o veto pergunta.
+--
+-- As três últimas medem O QUE FICA DE FORA, que é a pergunta que importa num veto:
+-- `reabertos_que_a_perda_pega` é o passado que `lost_reason` cobre sem backfill;
+-- `retomados_que_a_0425_pega` é o que `retomado_de_lead_id` cobre (funil
+-- `novo_negocio`, e também retroativo, porque a 0425 é muito anterior a esta
+-- migration); e `abertos_sem_sinal_nenhum` é o teto do RESÍDUO — negócios abertos
+-- sem sinal algum. Dentro dele está a lacuna real: quem foi GANHO e reaberto em
+-- `mesmo_registro` antes desta migration. Não dá para separá-la do prospect que
+-- nunca fechou (é exatamente a memória que não existe), e por isso o número é um
+-- TETO e não uma medida. Quem ler um teto grande e quiser agir: use o modo LISTA
+-- naquele funil até os negócios novos acumularem a marca.
+--
+-- ⚠️ O BACKFILL TOCA `updated_at` (P2-9). Ele é um UPDATE comum e dispara
+-- `trg_crm_leads_updated_at`, então:
+--
+--   * "última modificação" de TODO negócio fechado passa a ser o instante do
+--     deploy. É ruído no dossiê, não perda de dado: `closed_at` segue intacto, e
+--     é ele que data o fechamento;
+--   * toda aba já aberta com um card fechado na tela leva 409 de edição
+--     concorrente no PRIMEIRO arrasto depois do deploy, porque o `updated_at` que
+--     o navegador tem na mão envelheceu. Recarregar resolve, e a segunda tentativa
+--     passa.
+--
+-- Recomendação: aplicar FORA do horário comercial. Nada aqui exige janela de
+-- manutenção — o custo é um 409 que o operador nem associa ao deploy, e é por
+-- isso que ele está escrito aqui em vez de descoberto no suporte.
 --
 -- ## O buraco, com o código do banco na mão
 --

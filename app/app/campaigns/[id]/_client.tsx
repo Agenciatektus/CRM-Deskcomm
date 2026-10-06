@@ -215,6 +215,23 @@ export function DetalheDaCampanha({ id }: { id: string }) {
             {m.contagem.optOut} {t("pediram para parar")} · {m.contagem.excluidos}{" "}
             {t("entraram na etapa e ficaram de fora")}
           </p>
+          {/* O DETALHAMENTO POR MOTIVO, e ele é o único lugar onde o operador vê o
+              veto comendo a base. No modo lista o número vinha da prévia, antes de
+              apertar; aqui não há "antes", e "ficaram de fora: 312" sem o motivo
+              não diz se o problema é opt-out, telefone faltando ou negócio já
+              fechado — três causas com três consertos diferentes. O único rastro
+              antes disto era um número no `detail` do event_log, que ninguém abre. */}
+          {Object.keys(m.contagem.porMotivoDaExclusao ?? {}).length > 0 && (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {Object.entries(m.contagem.porMotivoDaExclusao ?? {})
+                .sort((a, b) => b[1] - a[1])
+                .map(([motivo, quantos]) => (
+                  <li key={motivo}>
+                    {quantos} — {t(rotuloDoMotivo(motivo))}
+                  </li>
+                ))}
+            </ul>
+          )}
           <p className="text-xs text-muted-foreground">
             {t("Campanha contínua não conclui sozinha: ela fica de pé esperando a próxima pessoa entrar na etapa. Para encerrar, use Pausar ou Cancelar.")}
           </p>

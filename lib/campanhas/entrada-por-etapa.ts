@@ -193,23 +193,6 @@ export async function alistarPorEtapa(
     resumo.sem_alvo = armadas.length;
     return resumo;
   }
-  // ═══ O NEGÓCIO JÁ FOI FECHADO ALGUMA VEZ — o salto de DOIS arrastos ═══
-  //
-  // O veto de origem acima fecha UM arrasto («Ganho» → etapa armada). Não fecha
-  // dois, e dois é triagem normal: «Ganho» → «Novo lead» (aquele veto pega, mas
-  // `fn_crm_lead_close_on_stage` APAGA `closed_at` e `lost_from_stage_id` no mesmo
-  // UPDATE) e depois «Novo lead» → etapa armada, onde a origem é aberta, o status
-  // é `open` e nada no negócio lembra que ele fechou.
-  //
-  // Quem lembra é `fechado_alguma_vez_em` (migration 9040) mais `lost_reason`,
-  // que sobrevive à reabertura desde sempre — ver `carregaNegocio`. O veto não
-  // expira: um negócio que já foi ganho é um CLIENTE, e campanha contínua é
-  // abordagem de primeiro contato. Quem quiser falar com clientes usa o modo
-  // LISTA, que o operador revisa pessoa por pessoa.
-  if (negocio.jaFoiFechado) {
-    resumo.ja_foi_fechado = armadas.length;
-    return resumo;
-  }
   const contato = await deps.db.carregaContato(row.organization_id, negocio.contactId);
   if (!contato) {
     resumo.sem_alvo = armadas.length;
@@ -252,6 +235,38 @@ export async function alistarPorEtapa(
       });
       resumo.excluidos[motivo] = (resumo.excluidos[motivo] ?? 0) + 1;
     };
+
+    // ═══ O NEGÓCIO JÁ FOI FECHADO ALGUMA VEZ — o salto de DOIS arrastos ═══
+    //
+    // O veto de origem, lá em cima, fecha UM arrasto («Ganho» → etapa armada).
+    // Não fecha dois, e dois é triagem normal: «Ganho» → «Novo lead» (aquele
+    // veto pega, mas `fn_crm_lead_close_on_stage` APAGA `closed_at` e
+    // `lost_from_stage_id` no mesmo UPDATE) e depois «Novo lead» → etapa armada,
+    // onde a origem é aberta, o status é `open` e nada no negócio lembra do
+    // fechamento. E no funil `novo_negocio` nem reabertura existe: nasce um card
+    // NOVO sem herdar marca nenhuma. Os TRÊS sinais que respondem a isso estão em
+    // `carregaNegocio`.
+    //
+    // ⚠️ VIRA LINHA, e isso é o ponto. Antes ele só contava e voltava, e num modo
+    // de público SEM LISTA o operador não tinha outro jeito de ver o veto comendo
+    // a base — o único rastro era um número no `detail` do `event_log`, que
+    // ninguém abre. Como linha `skipped`, ela aparece na contagem de "ficaram de
+    // fora", com o motivo por pessoa, pela mesma doutrina da preparação. Por isso
+    // o veto desceu para DENTRO do laço: linha é por campanha, e escrevê-la antes
+    // do corte de `started_at` registraria exclusão numa campanha que nem começou.
+    //
+    // O veto NÃO EXPIRA, e vale para ganho E para perda. Ganho: quem comprou é
+    // cliente, e campanha contínua é primeiro contato. Perda: é o mesmo
+    // argumento do veto de origem logo acima — quem disse não em março não quer
+    // a abordagem fria de outubro, e arrastar (ou retomar) o card é triagem
+    // interna, não consentimento. Em nenhum dos dois casos o sinal distingue
+    // ganho de perda, e nem precisa: a resposta é a mesma. Quem quiser falar com
+    // essas pessoas usa o modo LISTA, que o operador revisa pessoa por pessoa.
+    if (negocio.jaFoiFechado) {
+      await excluir("negocio_ja_fechado");
+      resumo.ja_foi_fechado++;
+      continue;
+    }
 
     // ─── Os vetos por PESSOA, os mesmos da preparação ───
     const pessoal = motivoParaExcluir(contato);

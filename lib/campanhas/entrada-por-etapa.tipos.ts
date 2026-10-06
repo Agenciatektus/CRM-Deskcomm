@@ -76,10 +76,26 @@ export interface EntradaPorEtapaDb {
      * armada, onde a origem é aberta, o status é `open` e nada na linha lembra
      * do fechamento.
      *
-     * Vem de `crm_leads.fechado_alguma_vez_em` (migration 9040, que o gatilho
-     * preenche e a reabertura não limpa) OU de `lost_reason`, que sobrevive à
-     * reabertura desde sempre e por isso cobra também a PERDA histórica, que
-     * nenhum backfill alcança.
+     * TRÊS sinais, porque o produto fecha negócio de dois jeitos:
+     *   • `crm_leads.fechado_alguma_vez_em` (9040), que o gatilho preenche e a
+     *     reabertura não limpa — o caso do funil `mesmo_registro`, que é o
+     *     default;
+     *   • `lost_reason`, que sobrevive à reabertura desde sempre e por isso
+     *     cobra também a PERDA histórica, que nenhum backfill alcança;
+     *   • `retomado_de_lead_id` (migration 0425), para o funil `novo_negocio`.
+     *
+     * ⚠⚠ O TERCEIRO NÃO É ZELO. Num funil `settings.reabertura = 'novo_negocio'`
+     * (`lib/leads/reabertura.ts`, issue #1538) o produto NÃO reabre nada: ele CRIA
+     * um negócio novo apontando para o encerrado, e `CAMPOS_COPIAVEIS_NA_RETOMADA`
+     * não copia `lost_reason` nem a coluna da 9040. O card novo nasce com os dois
+     * primeiros sinais NULOS, e sem este terceiro o cliente que comprou em março,
+     * retomado em outubro, recebe a copy de primeiro contato — e isso não seria
+     * lacuna histórica, seria permanente.
+     *
+     * `clonar-para-funil.ts` só grava `retomado_de_lead_id` quando a origem NÃO
+     * estava aberta (`origem.status !== 'open'`), então o sinal significa
+     * exatamente "este card nasceu de um negócio encerrado". E como a 0425 é muito
+     * anterior à 9040, ele cobre também o PASSADO dessa classe, sem backfill.
      */
     jaFoiFechado: boolean;
   } | null>;

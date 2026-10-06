@@ -47936,8 +47936,16 @@ comment on column public.crm_leads.fechado_alguma_vez_em is
 -- Quem está fechado AGORA já foi fechado. `closed_at` quando existe (é a data
 -- real), `updated_at` como piso quando não — aproximação declarada, e o veto só
 -- pergunta "já foi fechado?", nunca quando. Quem REABRIU antes desta migration
--- não tem como ser recuperado: a perda desses segue coberta por `lost_reason`, e o
--- ganho fica de fora, conscientemente.
+-- não tem como ser recuperado: a perda desses segue coberta por `lost_reason`, o
+-- funil `novo_negocio` por `retomado_de_lead_id` (0425, que é muito anterior), e o
+-- GANHO reaberto em `mesmo_registro` fica de fora, conscientemente.
+--
+-- ⚠️ Este UPDATE dispara `trg_crm_leads_updated_at`: "última modificação" de todo
+-- negócio fechado vira o instante da aplicação, e aba já aberta com card fechado
+-- leva um 409 de edição concorrente no primeiro arrasto (recarregar resolve).
+-- `closed_at` segue intacto e é ele que data o fechamento. Racional e a
+-- recomendação de aplicar fora do horário comercial estão no cabeçalho da
+-- migration 9040.
 update public.crm_leads
    set fechado_alguma_vez_em = coalesce(closed_at, updated_at)
  where status in ('won', 'lost')

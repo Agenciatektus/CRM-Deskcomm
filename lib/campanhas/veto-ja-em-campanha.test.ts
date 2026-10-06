@@ -1,4 +1,8 @@
 /**
+ * OS VETOS DO ADAPTER — o de "já em campanha" (dois critérios) e o de "este
+ * negócio já fechou" (três sinais). Os dois têm a mesma forma de errar: um
+ * predicado que parece cobrir e não cobre.
+ *
  * O VETO "JÁ EM CAMPANHA" SÃO DOIS CRITÉRIOS, E A PROVA É QUE ELES NÃO SE MISTURAM.
  *
  * Duas voltas erradas nesta fatia vieram de colapsar os dois num predicado só:
@@ -113,6 +117,98 @@ describe("estaEmOutraCampanha: os dois critérios não se misturam", () => {
       // de `entrada-por-etapa.db.ts`.
       expect(c.filtros).toContainEqual(["eq", "eligibility_status", "eligible"]);
     }
+  });
+});
+
+/**
+ * `carregaNegocio` compõe TRÊS sinais num OU, e cada um existe por um motivo
+ * diferente. O teste da decisão (`entrada-por-etapa.test.ts`) recebe
+ * `jaFoiFechado` já resolvido, então a composição só se prova aqui.
+ */
+describe("carregaNegocio: os três sinais de \"já foi fechado\"", () => {
+  const LEAD = { contact_id: "c-1", status: "open" } as const;
+
+  async function jaFoiFechado(extra: Record<string, unknown>): Promise<boolean> {
+    const client = {
+      from: () => {
+        const e: Record<string, unknown> = {};
+        for (const m of ["select", "eq"]) e[m] = () => e;
+        e.maybeSingle = () =>
+          Promise.resolve({
+            data: {
+              ...LEAD,
+              fechado_alguma_vez_em: null,
+              lost_reason: null,
+              retomado_de_lead_id: null,
+              ...extra,
+            },
+            error: null,
+          });
+        return e;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    const r = await createSupabaseEntradaPorEtapaDb(client).carregaNegocio("org-1", "lead-1");
+    return r!.jaFoiFechado;
+  }
+
+  it("negócio sem sinal nenhum: pode ser abordado", () => {
+    // O controle positivo: sem ele um `jaFoiFechado` que devolvesse sempre
+    // `true` passaria nos três casos abaixo e vetaria a base inteira.
+    return expect(jaFoiFechado({})).resolves.toBe(false);
+  });
+
+  it("`fechado_alguma_vez_em` veta — o funil `mesmo_registro` (9040)", () => {
+    return expect(jaFoiFechado({ fechado_alguma_vez_em: "2026-03-01T00:00:00Z" })).resolves.toBe(
+      true,
+    );
+  });
+
+  it("`lost_reason` veta — a PERDA histórica, que nenhum backfill alcança", () => {
+    // Ele sobrevive à reabertura desde sempre (o CHECK só o exige com
+    // `status='lost'` e nenhum caminho o limpa).
+    return expect(jaFoiFechado({ lost_reason: "price" })).resolves.toBe(true);
+  });
+
+  it("`lost_reason` em BRANCO não veta", () => {
+    // `''` e `'   '` existem em dado legado; um teste de `!== null` os trataria
+    // como perda e vetaria prospect legítimo.
+    return expect(jaFoiFechado({ lost_reason: "   " })).resolves.toBe(false);
+  });
+
+  it("`retomado_de_lead_id` veta — o funil `novo_negocio`, que era PERMANENTE", () => {
+    // Num funil `settings.reabertura = 'novo_negocio'` nada reabre: nasce um card
+    // NOVO apontando para o encerrado, e `CAMPOS_COPIAVEIS_NA_RETOMADA` não copia
+    // `lost_reason` nem a coluna da 9040. Sem este sinal, o cliente que comprou
+    // em março e foi retomado em outubro receberia a copy de primeiro contato —
+    // e não como lacuna histórica, mas para sempre.
+    return expect(jaFoiFechado({ retomado_de_lead_id: "lead-antigo" })).resolves.toBe(true);
+  });
+
+  it("o negócio ABERTO continua sendo reportado como aberto", () => {
+    // `aberto` e `jaFoiFechado` são perguntas diferentes, e o caso perigoso é
+    // justamente o negócio ABERTO que já fechou antes.
+    const client = {
+      from: () => {
+        const e: Record<string, unknown> = {};
+        for (const m of ["select", "eq"]) e[m] = () => e;
+        e.maybeSingle = () =>
+          Promise.resolve({
+            data: {
+              ...LEAD,
+              fechado_alguma_vez_em: "2026-03-01T00:00:00Z",
+              lost_reason: null,
+              retomado_de_lead_id: null,
+            },
+            error: null,
+          });
+        return e;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return expect(
+      createSupabaseEntradaPorEtapaDb(client).carregaNegocio("org-1", "lead-1"),
+    ).resolves.toEqual({ contactId: "c-1", aberto: true, jaFoiFechado: true });
   });
 });
 

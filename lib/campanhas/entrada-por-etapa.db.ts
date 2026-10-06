@@ -175,7 +175,7 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
       // armada na etapa (o corte precoce de `alistarPorEtapa` roda antes desta).
       const { data, error } = await admin
         .from("crm_leads")
-        .select("contact_id, status, fechado_alguma_vez_em, lost_reason")
+        .select("contact_id, status, fechado_alguma_vez_em, lost_reason, retomado_de_lead_id")
         .eq("organization_id", orgId)
         .eq("id", leadId)
         .maybeSingle();
@@ -186,21 +186,33 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
         status: string | null;
         fechado_alguma_vez_em: string | null;
         lost_reason: string | null;
+        retomado_de_lead_id: string | null;
       };
       return {
         contactId: linha.contact_id,
         aberto: linha.status === "open",
-        // DOIS sinais, porque cobrem janelas diferentes:
-        //   • `fechado_alguma_vez_em` (9040) é o fato completo, mas só existe
-        //     para fechamentos a partir daquela migration (o backfill alcança
-        //     quem está fechado HOJE, nunca quem já reabriu antes dela);
+        // TRÊS sinais, porque cobrem janelas e MODOS diferentes:
+        //   • `fechado_alguma_vez_em` (9040) é o fato completo no funil
+        //     `mesmo_registro` (o default), mas só para fechamentos a partir
+        //     daquela migration (o backfill alcança quem está fechado HOJE, nunca
+        //     quem já reabriu antes dela);
         //   • `lost_reason` sobrevive à reabertura desde sempre (o CHECK só o
-        //     exige quando `status='lost'`, e nenhum caminho o limpa), então ele
-        //     cobre a PERDA histórica que o backfill não alcança.
-        // O ganho histórico de quem JÁ reabriu fica de fora, conscientemente:
-        // `won_reason` é opcional e `event_log` é podado em 120 dias.
+        //     exige quando `status='lost'` e nenhum caminho o limpa), então cobre
+        //     a PERDA histórica que o backfill não alcança;
+        //   • `retomado_de_lead_id` (0425) é o funil `novo_negocio`, onde nada
+        //     reabre: nasce um card NOVO apontando para o encerrado, sem herdar
+        //     `lost_reason` nem a coluna da 9040 (`CAMPOS_COPIAVEIS_NA_RETOMADA`).
+        //     Sem ele, esse funil ficaria DESCOBERTO para sempre — não é lacuna
+        //     histórica, é permanente. E como a 0425 é muito anterior à 9040, ele
+        //     cobre também o passado dessa classe.
+        //
+        // O que sobra de fora, conscientemente: o GANHO de quem reabriu em
+        // `mesmo_registro` ANTES da 9040 (`won_reason` é opcional e o `event_log`
+        // é podado em 120 dias). O bloco ANTES DO DEPLOY da 9040 mede esse resíduo.
         jaFoiFechado:
-          linha.fechado_alguma_vez_em !== null || (linha.lost_reason ?? "").trim() !== "",
+          linha.fechado_alguma_vez_em !== null ||
+          (linha.lost_reason ?? "").trim() !== "" ||
+          linha.retomado_de_lead_id !== null,
       };
     },
 

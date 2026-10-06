@@ -91,6 +91,16 @@ export const MOTIVOS_DE_EXCLUSAO = [
   "texto_vazio",
   "ja_em_campanha",
   "suprimido",
+  /**
+   * O NEGÓCIO desta pessoa já foi fechado (ganho ou perdido) alguma vez
+   * (migration 9040). Só a entrada CONTÍNUA o produz: no modo lista o recorte é
+   * de contatos e não de negócios.
+   *
+   * Vira LINHA, e não silêncio, porque num modo de público sem lista é o único
+   * jeito de o operador ver o veto comendo a base — antes dele o rastro era um
+   * número no `detail` do `event_log`, que ninguém abre.
+   */
+  "negocio_ja_fechado",
 ] as const;
 
 export type MotivoDeExclusao = (typeof MOTIVOS_DE_EXCLUSAO)[number];
@@ -112,4 +122,5 @@ export const TEXTO_DA_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   texto_vazio: "A variação sorteada para esta pessoa ficou sem texto",
   ja_em_campanha: "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar",
   suprimido: "Está na lista de exclusão de campanhas",
+  negocio_ja_fechado: "Já comprou ou já foi perdido antes (não é primeiro contato)",
 };

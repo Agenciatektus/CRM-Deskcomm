@@ -13380,6 +13380,9 @@ export const DICIONARIO: Traducoes = {
     es: "Otra campaña ya habló con esta persona en los últimos 30 días, o va a hablar",
   },
   "Está na lista de exclusão de campanhas": { es: "Está en la lista de exclusión de campañas" },
+  "Já comprou ou já foi perdido antes (não é primeiro contato)": {
+    es: "Ya compró o ya se perdió antes (no es primer contacto)",
+  },
   "Parar de enviar às (hora)": { es: "Dejar de enviar a las (hora)" },
   "pediram para parar": { es: "pidieron parar" },
   "pessoas? O envio segue o ritmo do número e pode levar horas.": {

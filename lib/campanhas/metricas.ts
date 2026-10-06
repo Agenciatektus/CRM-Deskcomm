@@ -25,6 +25,8 @@
  * número só.
  */
 
+import type { MotivoDeExclusao } from "./tipos";
+
 export interface ContagemDaCampanha {
   /** Linhas do snapshot, elegíveis ou não. */
   total: number;
@@ -45,6 +47,20 @@ export interface ContagemDaCampanha {
   falharam: number;
   cancelados: number;
   optOut: number;
+
+  /**
+   * Quantos ficaram de fora, POR MOTIVO.
+   *
+   * Existe para a campanha de entrada CONTÍNUA (9039): ali não há lista para o
+   * operador conferir, então "ficaram de fora: 312" sem o detalhamento não diz
+   * se o veto que está comendo a base é opt-out, telefone faltando ou negócio
+   * já fechado — e são três problemas com três consertos diferentes. No modo
+   * lista o número já vinha da prévia, antes de apertar.
+   *
+   * Opcional porque a rota pode ser chamada por cliente antigo; `{}` lê igual a
+   * "nenhuma exclusão", que é o estado comum.
+   */
+  porMotivoDaExclusao?: Partial<Record<MotivoDeExclusao, number>>;
 }
 
 export interface TaxasDaCampanha {
