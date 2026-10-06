@@ -146,7 +146,7 @@ export function TransferirPopover({ conversationId, devolver, numero }: Props) {
                 onClick={() => setDestino(m.user_id)}
               >
                 <span
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-semibold text-accent-fg"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-semibold text-accent-foreground"
                   aria-hidden
                 >
                   {iniciais(nome)}

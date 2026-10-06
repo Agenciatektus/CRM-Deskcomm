@@ -94,7 +94,7 @@ export function FaixaDeStatus({
               type="button"
               // 24px visíveis e 32px de toque (o `before` estende a área): o X de
               // 20px era um alvo pequeno demais para o dedo e para quem treme.
-              className="relative -mr-1.5 ml-0.5 grid h-6 w-6 place-items-center rounded before:absolute before:-inset-1 before:content-[''] hover:bg-border disabled:opacity-50"
+              className="relative -mr-1.5 ml-0.5 grid h-6 w-6 place-items-center rounded-md before:absolute before:-inset-1 before:content-[''] hover:bg-border disabled:opacity-50"
               aria-label={t("Cancelar lembrete")}
               title={t("Cancelar lembrete")}
               disabled={cancel.isPending}

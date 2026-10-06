@@ -101,7 +101,7 @@ export function SeletorDeDataHora({ valor, onEscolher, agora = new Date() }: {
                 "h-8 rounded-md text-xs tabular-nums hover:bg-surface-elevated disabled:cursor-not-allowed disabled:text-text-subtle disabled:line-through",
                 d.getMonth() !== mes.getMonth() && "text-text-muted",
                 mesmoDia(d, agora) && "font-semibold text-accent ring-1 ring-inset ring-accent",
-                marcado && "bg-accent font-semibold text-accent-fg ring-0 hover:bg-accent",
+                marcado && "bg-accent font-semibold text-accent-foreground ring-0 hover:bg-accent",
               )}
             >
               {d.getDate()}
@@ -122,7 +122,7 @@ export function SeletorDeDataHora({ valor, onEscolher, agora = new Date() }: {
               onClick={() => { setOutro(""); aplica(dia, [h, m]); }}
               className={cn(
                 "h-7 rounded-full border border-border text-xs tabular-nums hover:border-border-strong disabled:cursor-not-allowed disabled:border-dashed disabled:opacity-40",
-                marcado && "border-accent bg-accent text-accent-fg",
+                marcado && "border-accent bg-accent text-accent-foreground",
               )}
             >
               {dois(h)}:{dois(m)}
