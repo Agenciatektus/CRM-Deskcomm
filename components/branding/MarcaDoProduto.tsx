@@ -27,8 +27,8 @@ type Props = {
 };
 
 const SIMBOLO_CLARO_ESCURO = "fill-[#506d48] dark:fill-[#82a077]";
-const NOME_CLARO_ESCURO = "fill-[#1c1a16] dark:fill-[#f5f4ef]";
-const SUFIXO_CLARO_ESCURO = "fill-[#5d594f] dark:fill-[#8e8b7f]";
+const NOME_CLARO_ESCURO = "fill-[#171d26] dark:fill-[#f8f8f8]";
+const SUFIXO_CLARO_ESCURO = "fill-[#474d58] dark:fill-[#a1a5aa]";
 
 // As classes acima repetem os hexes de `CORES_DA_MARCA` porque o Tailwind só
 // gera utilitário para valor LITERAL no fonte. Quem impede os dois de divergirem
