@@ -25,6 +25,8 @@ interface MoveToOtherPipelineDialogProps {
   onOpenChange: (open: boolean) => void;
   leadId: string;
   pipelineId: string;
+  /** Chamado só quando o clone GRAVOU (o Cancelar também fecha a janela). */
+  aoConcluir?: () => void;
 }
 
 /**
@@ -42,6 +44,7 @@ export function MoveToOtherPipelineDialog({
   onOpenChange,
   leadId,
   pipelineId,
+  aoConcluir,
 }: MoveToOtherPipelineDialogProps) {
   const t = useT();
   const [targetPipelineId, setTargetPipelineId] = useState("");
@@ -56,6 +59,7 @@ export function MoveToOtherPipelineDialog({
       await mutation.mutateAsync({ leadId, targetPipelineId });
       setTargetPipelineId("");
       onOpenChange(false);
+      aoConcluir?.();
     } catch {
       // error already toasted
     }

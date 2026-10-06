@@ -174,7 +174,11 @@ test("fechar canal preserva demanda, desfecho explícito e nova entrada volta à
     // longo — se ele quebrar a fileira ou sumir, é aqui que aparece. Cabe nesta
     // spec, e não numa nova, porque o painel já está montado neste ponto: spec
     // nova custaria mais um login e mais um seed ao relógio do CI.
+    // Desde o painel em abas (visual v2, 3.3) o botão mora na aba Negócios; a
+    // volta ao Resumo é o que o resto desta spec lê (demandas e memória).
+    await page.getByRole("tab", { name: "Negócios" }).click();
     await expect(page.getByRole("button", { name: "Novo Lead", exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Resumo" }).click();
     // Fechar não é mais `window.confirm()` (bloqueado em iframe, ignora o
     // tema) — é o `AlertDialog` da casa. O botão que abre e o que confirma
     // têm o MESMO rótulo "Fechar"; o segundo clique escopado ao

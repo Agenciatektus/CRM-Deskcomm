@@ -312,6 +312,8 @@ test.describe("perguntar ao acervo no painel da conversa", () => {
     await page.goto(`/app/inbox?id=${conversaA}&filter=all`);
     await expect(bolhas(page)).toHaveCount(MENSAGENS_A.length, { timeout: 30_000 });
 
+    // O Acervo mora na aba Negócios desde o painel em abas (visual v2, 3.3).
+    await page.getByRole("tab", { name: "Negócios" }).click();
     const caixa = page.getByTestId("inbox-acervo");
     await caixa.scrollIntoViewIfNeeded();
     await expect(caixa).toBeVisible();

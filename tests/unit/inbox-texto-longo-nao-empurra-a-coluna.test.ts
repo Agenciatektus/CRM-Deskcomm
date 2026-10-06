@@ -33,7 +33,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const PAINEL = "components/inbox/CRMSidePanel.tsx";
+// O bloco de fatos saiu do CRMSidePanel para a peça da Memória quando o painel
+// ganhou abas (visual v2, 3.3). A régua segue a LINHA, onde quer que ela more.
+const PAINEL = "components/inbox/painel/MemoriaDoContato.tsx";
 const LAYOUT = "components/inbox/InboxLayout.tsx";
 const PASTA_INBOX = "components/inbox";
 

@@ -48,8 +48,11 @@ export const dynamic = "force-dynamic";
  */
 // `stage_id` e as `etapas` do funil alimentam o seletor de etapa do painel: mover
 // o negócio (ex.: "Pedido confirmado") direto da conversa, sem ir ao quadro.
+// `owner_user_id`/`owner_agent_id` e `lost_reason` alimentam as ações do negócio
+// no painel (visual v2, 3.4): trocar o responsável precisa saber quem é o atual,
+// para o "Desfazer" devolver a ele; o negócio perdido mostra o motivo.
 const LEAD_COLS =
-  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, custom_fields, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
+  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, custom_fields, owner_user_id, owner_agent_id, lost_reason, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
 const ORDER_COLS = "id, external_id, status, total_cents, currency, created_at";
 /** Acompanha o que a timeline mostra — `reason` e `actor_kind` inclusive. */
 /**

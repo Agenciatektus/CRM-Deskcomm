@@ -39,7 +39,12 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+// `usePermission` entrou com as abas (visual v2): o painel lê a permissão de
+// gravar. Com `true` o botão fica habilitado, como para quem atende.
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({ user: { id: "u-1", support: null } }),
+  usePermission: () => true,
+}));
 
 beforeEach(() => {
   get.mockReset();

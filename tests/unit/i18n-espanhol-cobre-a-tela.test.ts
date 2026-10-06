@@ -1082,11 +1082,6 @@ const DADO_DO_OPERADOR_CONGELADO: { arquivo: string; expressao: string; motivo: 
       "parâmetro message do callback invalidateContext (linha 146), frase de erro repassada por quem o chama",
   },
   {
-    arquivo: "components/inbox/CRMSidePanel.tsx",
-    expressao: "vazio",
-    motivo: "prop vazio do estado sem lista (linha 283): texto de tela passado pelo componente pai",
-  },
-  {
     arquivo: "components/inbox/media/MediaUnavailable.tsx",
     expressao: "kind",
     motivo:

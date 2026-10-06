@@ -22,6 +22,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,13 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
 
   const supabase = await createClient();
 
+  // Vínculo trocado no PATCH passa pela MESMA régua da criação: a FK não passa
+  // por RLS, e sem isto bastava editar a tarefa para apontá-la a outra org.
+  const recusa = await recusaDeVinculoDaTarefa(supabase, authz.org.orgId, parsed.data, t);
+  if (recusa) {
+    return fail("validation_failed", recusa.mensagem, 422, { requestId, details: { campo: recusa.campo } });
+  }
+
   // A situação ANTES da edição decide se esta é a vez em que a tarefa fechou.
   // Sem ler antes, marcar "concluída" duas vezes emitiria duas linhas na
   // timeline do negócio — e a segunda seria mentira.
@@ -91,6 +99,8 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
     if (error.code === "PGRST116") {
       return fail("not_found", t("Tarefa não encontrada."), 404, { requestId });
     }
+    // 23503 = uuid que não existe em organização nenhuma (outra org já foi
+    // recusada acima, porque a FK aceitaria).
     if (error.code === "23503") {
       return fail("validation_failed", t("O negócio ou contato vinculado não existe."), 422, {
         requestId,
