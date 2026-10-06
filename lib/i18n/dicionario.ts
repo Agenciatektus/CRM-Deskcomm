@@ -392,6 +392,17 @@ export const DICIONARIO: Traducoes = {
   "O texto sugerido expirou. A conversa abriu sem ele.": {
     es: "El texto sugerido expiró. La conversación se abrió sin él.",
   },
+  // ─── VISUAL V2, FASE 3.5: BALÕES DO FIO E COMPOSER ───
+  // O divisor de não lidas no fio, a faixa de quem atende acima da caixa e a
+  // dica de teclado que saiu do `title` do campo para ficar à vista.
+  "Novas mensagens": { es: "Mensajes nuevos" },
+  "A IA está atendendo.": { es: "La IA está atendiendo." },
+  "Ao assumir, o automático para.": { es: "Al asumir, el automático se detiene." },
+  "Ninguém assumiu esta conversa.": { es: "Nadie asumió esta conversación." },
+  "Assumir a conversa": { es: "Asumir la conversación" },
+  "Puxar para mim": { es: "Tomarla yo" },
+  "Enter envia, Shift+Enter quebra linha": { es: "Enter envía, Shift+Enter agrega un salto de línea" },
+  "Enter salva a nota, Shift+Enter quebra linha": { es: "Enter guarda la nota, Shift+Enter agrega un salto de línea" },
   // As mensagens de erro das rotas .../drafts e .../drafts/consume.
   "Conversa inválida.": { es: "Conversación inválida." },
   "Origem do rascunho inválida.": { es: "Origen del borrador inválido." },

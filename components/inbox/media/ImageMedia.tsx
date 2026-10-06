@@ -40,7 +40,7 @@ export function ImageMedia({ messageId, alt, src: fonte, srcReserva, srcMiniatur
 
   if (state === "error")
     return (
-      <div className="w-64 max-w-full aspect-[4/3]">
+      <div className="w-72 max-w-full aspect-[4/3]">
         <MediaUnavailable kind="Imagem" className="h-full w-full" />
       </div>
     );
@@ -54,7 +54,7 @@ export function ImageMedia({ messageId, alt, src: fonte, srcReserva, srcMiniatur
         disabled={state !== "ready"}
         aria-disabled={state !== "ready"}
         className={cn(
-          "relative block w-64 max-w-full aspect-[4/3] overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-ring",
+          "relative block w-72 max-w-full aspect-[4/3] overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-ring",
           state === "ready" ? "cursor-zoom-in" : "cursor-not-allowed opacity-50",
         )}
       >
