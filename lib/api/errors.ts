@@ -35,6 +35,12 @@ export const ApiErrorCodes = {
   forbidden_tenant: "forbidden_tenant",
   lgpd_anonymization_irreversible: "lgpd_anonymization_irreversible",
 
+  // ⚠️ ETIQUETAS (9038) — a etiqueta `cliente` reservada pela regra Clientes pela
+  // agenda. Código próprio, e não `forbidden`: o 42501 da `fn_tags_reserva` não é
+  // falta de papel, e responder "forbidden" mandaria o gerente pedir um acesso
+  // que ele já tem. Quem recebe é a tela de Tags (`POST /api/v1/tags/vocabulario`).
+  etiqueta_do_sistema: "etiqueta_do_sistema",
+
   // 404
   not_found: "not_found",
 

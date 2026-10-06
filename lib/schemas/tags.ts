@@ -136,18 +136,19 @@ export type LinhaDeVocabulario = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DUAS CURADORIAS DE ETIQUETA CONVIVEM AQUI, E ISSO E DECISAO PENDENTE
+// DUAS CURADORIAS DE ETIQUETA, UMA TELA SÓ (decisão do Peterson, 05/10/2026)
 //
 // O que esta ACIMA veio do upstream na v1.41.0 (#1271, "a etiqueta ganha cor").
-// O que vem ABAIXO e a curadoria que a Tektus construiu em paralelo, sem saber
-// que o upstream estava fazendo a mesma coisa.
+// O que vem ABAIXO é a curadoria que a Tektus construiu em paralelo (9005), sem
+// saber que o upstream estava fazendo a mesma coisa.
 //
-// Os dois convivem porque nenhum NOME colide — conferido no merge, zero exports
-// em comum — e porque apagar um pela metade quebraria a tela que o usa. Qual dos
-// dois fica e decisao de produto: envolve escolher qual TELA sobrevive, nao qual
-// schema e mais bonito.
-//
-// Ate la, mexer aqui exige saber a qual dos dois mundos o seu schema pertence.
+// A decisão que este bloco dizia pendente foi tomada na 9038: a TELA que fica é a
+// de Tags (`app/app/settings/tags`). Ela usa os dois mundos: a operação do
+// upstream (`fn_vocabulario_de_tags_operar`) para renomear, juntar, excluir e
+// cor, e as sugestões da 9005 (`fn_tags_inventario`, `criarTag`, `arquivarTag`)
+// para acrescentar, promover e arquivar. A tela de Etiquetas saiu do menu e o
+// endereço antigo redireciona. Os schemas continuam os dois, porque os dois
+// corpos de RPC continuam existindo.
 // ═══════════════════════════════════════════════════════════════════════════
 import { conversationTagSchema } from "./messaging";
 

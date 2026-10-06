@@ -60,7 +60,7 @@ describe("extrairRegua — os pares saem do globals.css, nunca de lista à mão"
     expect(REGUA.rampaDoProduto).toHaveLength(11);
     expect(REGUA.rampaDoProduto[6]).toBe("#506d48");
     expect(REGUA.claro.neutros).toHaveLength(11);
-    expect(REGUA.escuro.neutros[9]).toBe("#161510");
+    expect(REGUA.escuro.neutros[9]).toBe("#0d0e11");
     expect(REGUA.claro.base.map((b) => b.chave)).toEqual([
       "--color-bg",
       "--color-surface",
@@ -69,8 +69,9 @@ describe("extrairRegua — os pares saem do globals.css, nunca de lista à mão"
   });
 
   it("alcança o anel de foco, que mora em @layer base e uma lista à mão perderia", () => {
-    // ESTE é o par do relato: `accent-600` contra bg dá 5,51 e passaria qualquer gate
-    // ingênuo, mas quem pinta o anel é `accent-500` — e ele dá 3,79. Uma régua que só
+    // ESTE é o par do relato: `accent-600` contra bg dá 5,12 (5,51 no greige antigo) e
+    // passaria qualquer gate ingênuo, mas quem pinta o anel é `accent-500` — e ele dá
+    // 3,53 (3,79 no greige). Uma régua que só
     // olhasse o stop da semente deixaria o anel pousar em ~2,07 com o gate verde.
     const foco = REGUA.claro.papeis.find((p) => p.token.includes(":focus-visible"));
     expect(foco, "o anel de foco sumiu da régua").toBeDefined();
@@ -119,9 +120,9 @@ describe("extrairRegua — os pares saem do globals.css, nunca de lista à mão"
     const razao = (papel: string, superficie: string) =>
       pares.find((p) => p.papel === papel && p.superficie === superficie)?.razao ?? 0;
 
-    expect(razao("--color-accent", "--color-bg")).toBeCloseTo(5.51, 2);
-    expect(razao(":focus-visible/outline", "--color-bg")).toBeCloseTo(3.79, 2);
-    expect(razao(":focus-visible/outline", "--color-surface-elevated")).toBeCloseTo(3.6, 2);
+    expect(razao("--color-accent", "--color-bg")).toBeCloseTo(5.117, 2);
+    expect(razao(":focus-visible/outline", "--color-bg")).toBeCloseTo(3.526, 2);
+    expect(razao(":focus-visible/outline", "--color-surface-elevated")).toBeCloseTo(3.72, 2);
   });
 
   it("a Sage inteira, como está no CSS, cabe nos pisos", () => {
@@ -407,13 +408,15 @@ describe("marca acromática — o accent do produto permanece", () => {
         separacaoDoNeutro(regua, tema.grauDoAccent, tema.accent),
       ).toBeGreaterThanOrEqual(PISO_DE_SEPARACAO_DO_NEUTRO);
     }
-    // Os números exatos, fixados: 0,0681 no claro (accent-600 × neutral-600) e 0,1994 no
-    // escuro (accent-400 × neutral-400). São eles que mostram por que o piso do briefing
-    // (8, na convenção ×100 — ou seja 0,08 aqui) não podia ser aceito sem medir: ele
-    // reprovaria o controle positivo do próprio produto no tema claro.
-    expect(separacaoDoNeutro(REGUA.claro, marca.claro.grauDoAccent, marca.claro.accent)).toBeCloseTo(0.0681, 4);
-    expect(separacaoDoNeutro(REGUA.escuro, marca.escuro.grauDoAccent, marca.escuro.accent)).toBeCloseTo(0.1994, 4);
-    expect(separacaoDoNeutro(REGUA.claro, marca.claro.grauDoAccent, marca.claro.accent)).toBeLessThan(0.08);
+    // Os números exatos, fixados: 0,1144 no claro (accent-600 × neutral-600) e 0,1410 no
+    // escuro (accent-400 × neutral-400). Com o neutro greige antigo o claro dava 0,0681, e
+    // por isso o piso do briefing (8, na convenção ×100 — ou seja 0,08 aqui) não podia ser
+    // aceito sem medir: reprovaria o controle positivo do próprio produto. O neutro frio do
+    // visual v2 (matiz 255) afastou o cinza da Sage e o claro passou a folgar desse piso;
+    // a guarda abaixo registra isso e reprova se um neutro novo voltar a encostar.
+    expect(separacaoDoNeutro(REGUA.claro, marca.claro.grauDoAccent, marca.claro.accent)).toBeCloseTo(0.1144, 4);
+    expect(separacaoDoNeutro(REGUA.escuro, marca.escuro.grauDoAccent, marca.escuro.accent)).toBeCloseTo(0.141, 4);
+    expect(separacaoDoNeutro(REGUA.claro, marca.claro.grauDoAccent, marca.claro.accent)).toBeGreaterThan(0.08);
 
     // Controle negativo: um accent cinza reprovaria as duas guardas. Sem esta linha, os
     // pisos acima poderiam ser satisfeitos por qualquer coisa.
