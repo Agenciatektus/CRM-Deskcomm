@@ -1549,6 +1549,10 @@ export const DICIONARIO: Traducoes = {
   "Navegação principal": { es: "Navegación principal" },
   "Expandir sidebar": { es: "Expandir barra lateral" },
   "Recolher sidebar": { es: "Contraer barra lateral" },
+  // Barra em duas colunas e trilha do cabeçalho (visual v2, fase 2).
+  "Grupos da navegação": { es: "Grupos de navegación" },
+  Ajustes: { es: "Ajustes" },
+  "Onde você está": { es: "Dónde estás" },
   Versão: { es: "Versión" },
   versão: { es: "versión" },
   "Nova versão": { es: "Nueva versión" },

@@ -331,7 +331,7 @@ interface LogoNaTela {
  *
  * ⚠️ Quem prova o download é `naturalWidth`, e NÃO a altura na tela — o contrário
  * do que esta spec afirmou. A barra lateral fixa a altura
- * por CSS (`h-7` em `components/shell/Sidebar.tsx`); a fachada limita o tamanho
+ * por CSS (`h-8` no trilho, `components/shell/MarcaDaBarra.tsx`); a fachada limita o tamanho
  * sem ampliar arquivos pequenos (`app/(public)/layout.tsx`). Altura renderizada
  * não comprova o download. MEDIDO em chromium, dois `<img>` sob `height: 1.75rem`
  * (o `h-7`), um com PNG válido e outro apontando para um endereço morto:

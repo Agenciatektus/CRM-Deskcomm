@@ -426,6 +426,54 @@
   --agenda-pessoa-8: #cc77b1;
 }
 
+/* ── Gradiente do botão primário (só no tema escuro) ──────────────────────
+   O protótipo escuro pinta o botão principal com gradiente. Ele sai da marca
+   EM VIGOR, e não de um hex: com white-label, a instalação e a organização
+   trocam a rampa, e um gradiente fixo na Sage pintaria o botão de todo
+   revendedor com a cor do produto.
+
+   A REGRA QUE O DESENHO GARANTE: nenhum ponto do gradiente tem contraste com o
+   texto menor que o do próprio `--color-accent`, que é o par que a régua valida
+   (`--color-accent-fg` é CALCULADO contra ele, lib/branding/contraste.ts).
+
+   Por isso a segunda ponta NÃO é `--color-accent-hover` nem uma parada fixa:
+   o hover tem `contra: null` na régua (nunca é medido contra o texto), e uma
+   parada fixa não acompanha o deslocamento que a régua aplica à rampa da marca.
+   A ponta é o próprio accent misturado 30% com o extremo OPOSTO ao texto:
+   branco puro quando o texto é escuro, preto puro quando é branco. Misturar em
+   sRGB na direção do branco só sobe cada canal, e a luminância sobe junto (e
+   vice-versa para o preto), então a razão de contraste só pode crescer.
+   O extremo sai do próprio `--color-accent-fg`: `round(255 - canal, 255)`
+   arredonda o inverso de cada canal para 0 ou 255.
+
+   Medido (tests/unit/botao-primario-gradiente.test.ts refaz a conta):
+     Sage padrão, texto #161510: 6,31:1 no accent (#82a077) e 9,10:1 na ponta.
+     31 marcas das fixtures de contraste, nos dois temas: a ponta nunca fica
+     abaixo do accent.
+
+   Navegador sem sintaxe de cor relativa descarta o valor, o gradiente vira
+   `none` e fica o `bg-accent` chapado, que é o botão de antes.
+
+   Seletor `[data-theme="dark"] body`, e não o bloco `[data-theme="dark"]`:
+     - custom property com `var()` é resolvida ONDE é declarada. No `<html>`
+       ela congelaria a marca da instalação, e a marca da organização (que o
+       CSS injetado declara no `<body>`, `lib/branding/css.ts`) não chegaria ao
+       botão. No `<body>` ela já enxerga as duas.
+     - o bloco `[data-theme="dark"] {` tem espelho obrigatório no
+       `[data-theme="light"]` (tests/unit/branding-tema-claro-escopavel.test.ts)
+       e é lido pela régua de contraste; este token é só do escuro e não é cor. */
+[data-theme="dark"] body {
+  --gradient-primary-oposto: rgb(
+    from var(--color-accent-fg) round(calc(255 - r), 255) round(calc(255 - g), 255)
+      round(calc(255 - b), 255)
+  );
+  --gradient-primary: linear-gradient(
+    135deg,
+    var(--color-accent),
+    color-mix(in srgb, var(--color-accent) 70%, var(--gradient-primary-oposto))
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Ponte token → utilitário (o que era `theme.extend` no `tailwind.config.ts`).
 
