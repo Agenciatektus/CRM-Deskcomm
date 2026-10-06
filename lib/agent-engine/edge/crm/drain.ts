@@ -55,6 +55,11 @@ export interface DrainKnobs {
   /** Evento 'processing' órfão volta a 'pending' após isto. */
   reapTimeoutMs: number;
   /**
+   * De quanto em quanto tempo o laço roda o reaper. Ausente = 60 s
+   * (`REAPER_INTERVALO_PADRAO_MS`). Ver `reaperEstaNaVez`.
+   */
+  reapIntervalMs?: number;
+  /**
    * Janela de validade da autorização de IA de um contato (gate 'allowlist').
    * Só consultada em canal com `metadata.ai_gate = 'allowlist'`. Ausente nos
    * testes que não exercitam o gate — o default de 21 dias em ms é aplicado.
@@ -65,17 +70,87 @@ export interface DrainKnobs {
 /** Default de `allowlistTtlMs` (21 dias) para testes que omitem o knob. */
 const ALLOWLIST_TTL_MS_PADRAO = 21 * 24 * 60 * 60 * 1000;
 
-/** Um tick do drain: claima um lote de eventos e os transforma em jobs. */
-export async function drainTick(pool: pg.Pool, knobs: DrainKnobs, log: Logger): Promise<number> {
-  // Reaper de eventos órfãos — barato (update indexado), roda a cada tick.
-  await pool.query(
+/** Teto de órfãos devolvidos por rodada do reaper. */
+export const REAPER_LOTE = 100;
+
+/** Ritmo padrão do reaper: uma rodada por minuto, não uma por tick. */
+export const REAPER_INTERVALO_PADRAO_MS = 60_000;
+
+/**
+ * O REAPER DOS DESPACHOS ÓRFÃOS — e por que ele pula linha travada.
+ *
+ * Antes era um `update … where status = 'processing' and updated_at < …` sem
+ * teto e sem `skip locked`, rodando em TODO tick do laço (a cada 2 s com
+ * trabalho, 15 s ocioso). Medido em produção (plano Postgres-Elite de
+ * 2026-10-01, item 6): 301 esperas de lock e 40 `lock timeout` por dia ligados
+ * a ele, com média de 823 ms e máximo de 111 s para um plano de 4 blocos — o
+ * tempo era ESPERA, não trabalho. Um update multilinha sem `skip locked` fica na
+ * fila de qualquer linha que outra transação esteja segurando (o próprio laço
+ * fechando um evento, o dreno de handlers, a poda) e segura as que já pegou
+ * enquanto espera.
+ *
+ * Agora: o `select … for update skip locked limit N` escolhe só linhas livres,
+ * o `update` age sobre elas e nada mais. Linha travada fica para a próxima
+ * rodada — um órfão de 5 min que espera mais 1 min não muda nada, um tick
+ * preso atrás de lock muda tudo. E o laço chama isto no máximo 1×/min
+ * (`reaperEstaNaVez`), não em todo tick.
+ *
+ * `order by updated_at` casa com `event_log_reaper_idx` (event_type,
+ * updated_at) where status = 'processing'.
+ */
+export async function reaparDespachosOrfaos(
+  pool: pg.Pool,
+  reapTimeoutMs: number,
+  limite: number = REAPER_LOTE,
+): Promise<number> {
+  const { rowCount } = await pool.query(
     `update event_log set status = 'pending', updated_at = now()
-     where event_type = 'ai_agent.dispatch_requested'
-       and status = 'processing'
-       and $1 = any(consumed_by)
-       and updated_at < now() - make_interval(secs => $2 / 1000.0)`,
-    [DRAIN_CONSUMER, knobs.reapTimeoutMs],
+     where id in (
+       select id from event_log
+       where event_type = 'ai_agent.dispatch_requested'
+         and status = 'processing'
+         and $1 = any(consumed_by)
+         and updated_at < now() - make_interval(secs => $2 / 1000.0)
+       order by updated_at
+       limit $3
+       for update skip locked
+     )`,
+    [DRAIN_CONSUMER, reapTimeoutMs, limite],
   );
+  return rowCount ?? 0;
+}
+
+/**
+ * A regra de ritmo do reaper, sem relógio: roda na primeira volta do laço
+ * (`ultimaRodadaMs === null`, que é o caso do boot depois de um crash — quando
+ * há órfão de verdade) e depois só quando o intervalo venceu.
+ */
+export function reaperEstaNaVez(
+  ultimaRodadaMs: number | null,
+  agoraMs: number,
+  intervaloMs: number = REAPER_INTERVALO_PADRAO_MS,
+): boolean {
+  if (ultimaRodadaMs === null) return true;
+  return agoraMs - ultimaRodadaMs >= intervaloMs;
+}
+
+/**
+ * Um tick do drain: claima um lote de eventos e os transforma em jobs.
+ *
+ * `opts.reap` decide se o tick roda o reaper antes do claim. O padrão (`true`)
+ * mantém quem chama o tick avulso (testes, `scripts/e2e-elegibilidade-helpers`)
+ * com o comportamento de sempre; o `runDrainLoop` passa `false` fora da vez.
+ */
+export async function drainTick(
+  pool: pg.Pool,
+  knobs: DrainKnobs,
+  log: Logger,
+  opts: { reap?: boolean } = {},
+): Promise<number> {
+  if (opts.reap ?? true) {
+    const devolvidos = await reaparDespachosOrfaos(pool, knobs.reapTimeoutMs);
+    if (devolvidos > 0) log.warn('drain: despachos órfãos devolvidos à fila', { devolvidos });
+  }
 
   const { rows: events } = await pool.query<EventRow>(
     `update event_log e
@@ -615,10 +690,17 @@ export async function runDrainLoop(
   log: Logger,
   signal: AbortSignal,
 ): Promise<void> {
+  let ultimoReaperMs: number | null = null;
   while (!signal.aborted) {
     let drained = 0;
     try {
-      drained = await drainTick(pool, knobs, log);
+      const agora = Date.now();
+      const reap = reaperEstaNaVez(ultimoReaperMs, agora, knobs.reapIntervalMs);
+      // Marca ANTES do tick: reaper que falha não pode virar reaper em todo
+      // tick — banco fora do ar já paga a espera ociosa, não precisa de mais
+      // uma consulta por volta.
+      if (reap) ultimoReaperMs = agora;
+      drained = await drainTick(pool, knobs, log, { reap });
     } catch (err) {
       log.error('drain: tick falhou', {
         error: (err instanceof Error ? err.message : String(err)).slice(0, 300),

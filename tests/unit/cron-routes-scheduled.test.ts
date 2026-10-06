@@ -31,6 +31,16 @@ const DIR_CRON = join(RAIZ, "app", "api", "v1", "cron");
 // "o que roda" mudou de arquivo.
 const CRONTAB = join(RAIZ, "docker", "scheduler", "entrypoint.sh");
 
+/**
+ * Rotas que existem SEM agendamento, de propósito. Cada uma tem de provar, no
+ * teste abaixo, que é no-op — senão a exceção vira o buraco que esta cerca fecha.
+ *
+ * `agent-dispatcher`: no-op desde a Fase 0 (o dreno do worker é o único
+ * consumidor de `ai_agent.dispatch_requested`). A rota fica para não quebrar o
+ * cron de self-hoster antigo; agendá-la aqui só gastava um curl por minuto.
+ */
+const ROTAS_SEM_AGENDA_NO_OP = ["agent-dispatcher"];
+
 /** As rotas que existem, lidas do disco — não de uma lista mantida à mão. */
 function rotasNoCodigo(): string[] {
   return readdirSync(DIR_CRON, { withFileTypes: true })
@@ -56,13 +66,23 @@ describe("rotas de cron × agendamento no self-host", () => {
   });
 
   it("toda rota de cron do código está agendada no scheduler", () => {
-    const naoAgendadas = rotasNoCodigo().filter((r) => !rotasAgendadas().includes(r));
+    const naoAgendadas = rotasNoCodigo().filter(
+      (r) => !rotasAgendadas().includes(r) && !ROTAS_SEM_AGENDA_NO_OP.includes(r),
+    );
     expect(
       naoAgendadas,
       `Rota(s) de cron sem linha no crontab de docker/scheduler/entrypoint.sh: ` +
         `${naoAgendadas.join(", ")}. Num self-host elas NUNCA rodam, e a feature não dá erro — ` +
         `só não acontece. Adicione a linha (ou apague a rota, se ela morreu).`,
     ).toEqual([]);
+  });
+
+  it.each(ROTAS_SEM_AGENDA_NO_OP)("a exceção %s é mesmo no-op (e não está agendada)", (rota) => {
+    const fonte = readFileSync(join(DIR_CRON, rota, "route.ts"), "utf8");
+    expect(fonte).toContain("deprecated: true");
+    // Nada de banco: rota no-op que consulta alguma coisa não é no-op.
+    expect(fonte).not.toMatch(/createAdminClient|from\(|\.rpc\(/);
+    expect(rotasAgendadas()).not.toContain(rota);
   });
 
   it("todo agendamento aponta para uma rota que existe", () => {

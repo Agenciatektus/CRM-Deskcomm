@@ -27,6 +27,18 @@ export interface DrainSummary {
    * `tests/unit/event-log-drain-loop.test.ts`) não precisa mudar.
    */
   pulados?: string[];
+  /**
+   * Presente quando o tick NÃO conseguiu ver a fila: select do lote ou dos
+   * presos falhou, ou nenhum handler registrado. Um resumo zerado sem `erro`
+   * significa "a fila estava vazia"; com `erro`, "não sei". O laço do worker
+   * só grava o batimento sem `erro` — senão um worker cego (URL/chave erradas,
+   * PostgREST inalcançável da rede dele, handlers que não registraram) bateria
+   * "fresco" e calaria o cron com o event_log parado (P1 do Cassio na #61).
+   *
+   * Opcional e ausente no caminho saudável: o resumo que o cron e os scripts
+   * devolvem não muda quando nada falha.
+   */
+  erro?: string;
   scanned: number;
   done: number;
   retried: number;
@@ -149,7 +161,10 @@ export async function drainEventLog(
   };
 
   const handledTypes = [...new Set(getRegisteredHandlers().flatMap((h) => h.events))];
-  if (!handledTypes.length) return summary;
+  if (!handledTypes.length) {
+    summary.erro = "nenhum handler registrado";
+    return summary;
+  }
 
   const nowIso = new Date().toISOString();
 
@@ -175,7 +190,7 @@ export async function drainEventLog(
   // `trg_event_log_touch` (BEFORE UPDATE) o reescreve em toda atualização, então
   // a linha carrega o instante do CLAIM enquanto o handler não volta.
   const limiteDePresos = new Date(Date.now() - PROCESSING_STALE_MS).toISOString();
-  const { data: presos } = await admin
+  const { data: presos, error: erroDosPresos } = await admin
     .from("event_log")
     .select("id, organization_id, event_type, attempts")
     .eq("status", "processing")
@@ -214,6 +229,12 @@ export async function drainEventLog(
   // Um por um, com o guarda `status = 'processing'`: duas instâncias do dreno
   // (o laço do worker e o cron do app) podem ler a mesma linha presa, e só a
   // primeira a tocar incrementa — a segunda encontra `pending` e não faz nada.
+  if (erroDosPresos) {
+    // Segue para o lote (pode ser falha só desta consulta), mas o tick fica
+    // marcado: quem não vê os presos não pode afirmar que está drenando.
+    summary.erro = `select de presos falhou: ${erroDosPresos.message}`;
+    logger.error("[event-log.drain] select de presos falhou", { error: erroDosPresos.message });
+  }
   let reclamados = 0;
   for (const preso of presos ?? []) {
     const attempts = preso.attempts + 1;
@@ -264,6 +285,7 @@ export async function drainEventLog(
 
   if (error) {
     logger.error("[event-log.drain] select failed", { error: error.message });
+    summary.erro = `select do lote falhou: ${error.message}`;
 
     return summary;
   }
