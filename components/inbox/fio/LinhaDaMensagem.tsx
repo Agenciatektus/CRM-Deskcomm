@@ -38,6 +38,8 @@ interface Props {
   podeAlterar: boolean;
   /** Manager+ numa mensagem recebida (ocultar/restaurar). */
   podeModerar: boolean;
+  /** Abre um bloco de falas do mesmo autor (`iniciaBloco`): nome e respiro em cima. */
+  inicioDoBloco: boolean;
   acoes: AcoesDoFio;
 }
 
@@ -58,6 +60,7 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
   temResponder,
   podeAlterar,
   podeModerar,
+  inicioDoBloco,
   acoes,
 }: Props) {
   const id = message.id;
@@ -78,6 +81,7 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
       onApagar={podeAlterar ? () => acoes.apagar(id) : undefined}
       onOcultar={podeModerar ? () => acoes.ocultar(id) : undefined}
       onRestaurar={podeModerar ? () => acoes.restaurar(id) : undefined}
+      inicioDoBloco={inicioDoBloco}
     />
   );
 });

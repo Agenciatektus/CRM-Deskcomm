@@ -190,7 +190,13 @@ describe("os elos que somem sem barulho", () => {
   });
 
   it("a bolha DIZ que foi editada, e esconde o texto da apagada", () => {
-    const fonte = readFileSync("components/inbox/MessageBubble.tsx", "utf8");
+    // A bolha foi dividida (fase 3.5): quem lê `revoked_at` é `MessageBubble`,
+    // quem escreve "apagada" é o corpo, e quem diz "editada" é a meta.
+    const fonte = [
+      "components/inbox/MessageBubble.tsx",
+      "components/inbox/bolha/CorpoDaBolha.tsx",
+      "components/inbox/bolha/MetaDaBolha.tsx",
+    ].map((arquivo) => readFileSync(arquivo, "utf8")).join("\n");
     expect(fonte).toMatch(/revoked_at/);
     expect(fonte).toMatch(/Esta mensagem foi apagada/);
     expect(fonte).toMatch(/editada/);

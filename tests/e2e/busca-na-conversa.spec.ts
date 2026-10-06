@@ -133,7 +133,9 @@ function medirBolhas(page: Page): Promise<BolhaMedida[]> {
       const anel = partes.find((p) => /\s0px 0px 0px 4px$/.test(p));
       return {
         texto: el.textContent ?? "",
-        marcada: el.parentElement?.getAttribute("data-search-match") === "true",
+        // A marca mora na LINHA da mensagem; desde o visual v2 (fase 3.5) a
+        // bolha fica dentro de uma pilha (nome + bolha), então não é o pai.
+        marcada: el.closest('[data-search-match="true"]') !== null,
         anel: anel ? anel.replace(/\s+0px 0px 0px 4px$/, "") : null,
         fundo: cs.backgroundColor,
         boxShadow: cs.boxShadow,

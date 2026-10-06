@@ -53,8 +53,11 @@ import { describe, expect, it } from "vitest";
 
 const RAIZ = process.cwd();
 
-/** Onde o rótulo é decidido. */
-const COMPONENTE = path.join(RAIZ, "components", "inbox", "MessageBubble.tsx");
+/**
+ * Onde o rótulo é decidido. Desde a divisão da bolha (visual v2, fase 3.5) é
+ * `rotuloDaAutoria`, fora de `MessageBubble.tsx`, que só o consome.
+ */
+const COMPONENTE = path.join(RAIZ, "components", "inbox", "bolha", "autoria.ts");
 
 /**
  * Onde a coluna pode ser ESCRITA. `tests/` fora de propósito: um fixture pode
