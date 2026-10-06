@@ -50,7 +50,8 @@ export function ConversationList({
   const t = useT();
   // Quem está logado, para a pílula de dono dizer "Você". Opcional porque a
   // lista também é renderizada sem provider (testes); sem sessão, sai o nome.
-  const meuUserId = useAuthOpcional()?.user.id ?? null;
+  const sessao = useAuthOpcional();
+  const meuUserId = sessao?.user.id ?? null;
   // A aba é DERIVADA do mesmo objeto que foi ao servidor, pela mesma razão de
   // `filtrosAuxiliaresAtivos`: o texto do vazio não pode falar de uma aba
   // diferente da que a consulta aplicou.
@@ -205,13 +206,18 @@ export function ConversationList({
           </div>
         )}
       </div>
-      <MenuDaConversa
-        alvo={menu.alvo}
-        conversation={menu.alvo ? (items.find((i) => i.id === menu.alvo?.id) ?? null) : null}
-        onFechar={menu.fechar}
-        meuUserId={meuUserId}
-        automaticoDaOrg={automaticoDaOrg.data}
-      />
+      {/* O menu decide permissão por `useAuth`, que exige o provider. Em produção
+          a lista sempre está dentro dele; quem a desenha sem sessão (testes da
+          lista, vitrines) fica sem menu, em vez de a lista inteira cair. */}
+      {sessao && (
+        <MenuDaConversa
+          alvo={menu.alvo}
+          conversation={menu.alvo ? (items.find((i) => i.id === menu.alvo?.id) ?? null) : null}
+          onFechar={menu.fechar}
+          meuUserId={meuUserId}
+          automaticoDaOrg={automaticoDaOrg.data}
+        />
+      )}
     </div>
   );
 }
