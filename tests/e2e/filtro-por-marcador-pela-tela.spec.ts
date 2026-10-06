@@ -84,6 +84,16 @@ async function conversaDe(nome: string): Promise<{ contato: string; conversa: st
 const itemDaLista = (page: Page, conversaId: string) =>
   page.locator(`button[data-conversation-id="${conversaId}"]`);
 
+/**
+ * Visual v2: o seletor de etiqueta mora no popover de "Filtros". O Esc que fecha
+ * o menu de etiquetas fecha só a camada de cima, e o popover pode continuar
+ * aberto; por isso abre-se só quando o seletor não está à vista.
+ */
+async function abreOsFiltros(page: Page): Promise<void> {
+  if (await page.getByRole("button", { name: "Filtrar por tag" }).isVisible()) return;
+  await page.getByRole("button", { name: /^Filtros/ }).click();
+}
+
 /** Marca pelo campo de um dos editores e espera o PATCH voltar 200. */
 async function marcar(page: Page, campo: string, rota: string, tag: string): Promise<void> {
   const resposta = page.waitForResponse(
@@ -218,6 +228,7 @@ test.describe("filtro por marcador, pela tela", () => {
 
     // 3. O seletor oferece a UNIÃO dos dois vocabulários.
     const seletor = page.getByRole("button", { name: "Filtrar por tag" });
+    await abreOsFiltros(page);
     await seletor.click();
     await expect(page.getByRole("menuitemcheckbox", { name: tagDaConversa, exact: true })).toBeVisible({
       timeout: 30_000,
@@ -277,6 +288,7 @@ test.describe("filtro por marcador, pela tela", () => {
     // 5. O marcador da CONVERSA acha a outra — e só ela.
     // Com várias etiquetas o padrão é E na MESMA caixa: marcar a da conversa
     // sem desmarcar a do contato zeraria a lista. Troca-se, como antes.
+    await abreOsFiltros(page);
     await seletor.click();
     await page.getByRole("menuitemcheckbox", { name: tagDoContato, exact: true }).click();
     await page.getByRole("menuitemcheckbox", { name: tagDaConversa, exact: true }).click();
@@ -389,6 +401,7 @@ test.describe("filtro por marcador, pela tela", () => {
 
     // 3. O seletor oferece a UNIÃO dos dois vocabulários.
     const seletor = page.getByRole("button", { name: "Filtrar por tag" });
+    await abreOsFiltros(page);
     await seletor.click();
     await expect(page.getByRole("menuitemcheckbox", { name: tagDaConversa, exact: true })).toBeVisible({
       timeout: 30_000,
@@ -453,6 +466,7 @@ test.describe("filtro por marcador, pela tela", () => {
     // 5. O marcador da CONVERSA acha a outra — e só ela.
     // Com várias etiquetas o padrão é E na MESMA caixa: marcar a da conversa
     // sem desmarcar a do contato zeraria a lista. Troca-se, como antes.
+    await abreOsFiltros(page);
     await seletor.click();
     await page.getByRole("menuitemcheckbox", { name: tagDoContato, exact: true }).click();
     await page.getByRole("menuitemcheckbox", { name: tagDaConversa, exact: true }).click();

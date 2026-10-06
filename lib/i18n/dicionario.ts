@@ -14134,6 +14134,35 @@ export const DICIONARIO: Traducoes = {
   "Próximo passo nas tarefas do contato": { es: "Próximo paso en las tareas del contacto" },
   "O responsável mudou de novo depois da sua troca. Nada foi desfeito.": { es: "El responsable cambió de nuevo después de tu cambio. No se deshizo nada." },
   "Não consegui conferir o responsável atual. Nada foi desfeito.": { es: "No pude verificar el responsable actual. No se deshizo nada." },
+  // ─── Inbox: lista de conversas (visual v2, fase 3.1) ───
+  "Fila vazia": { es: "Fila vacía" },
+  "Ninguém esperando atendimento agora. Quem precisar de uma pessoa aparece aqui.": {
+    es: "Nadie esperando atención ahora. Quien necesite a una persona aparece aquí.",
+  },
+  "Nenhuma conversa com você": { es: "Ninguna conversación contigo" },
+  "As conversas que você assumir aparecem aqui. Veja a Fila para pegar a próxima.": {
+    es: "Las conversaciones que asumas aparecen aquí. Mira la Fila para tomar la próxima.",
+  },
+  "Nada com o automático agora": { es: "Nada con el automático ahora" },
+  "Conversas que o atendimento automático está conduzindo aparecem aqui.": {
+    es: "Las conversaciones que la atención automática está llevando aparecen aquí.",
+  },
+  "Nenhuma conversa fechada": { es: "Ninguna conversación cerrada" },
+  "Atendimentos encerrados ficam guardados aqui.": { es: "Las atenciones finalizadas quedan guardadas aquí." },
+  "Nada arquivado": { es: "Nada archivado" },
+  "Conversas arquivadas saem da fila de trabalho e ficam aqui, sem serem apagadas.": {
+    es: "Las conversaciones archivadas salen de la fila de trabajo y quedan aquí, sin borrarse.",
+  },
+  Mais: { es: "Más" },
+  Filtros: { es: "Filtros" },
+  "Só não lidas": { es: "Solo no leídas" },
+  "Só grupos": { es: "Solo grupos" },
+  "Entrada no Instagram": { es: "Entrada en Instagram" },
+  "Filtros ativos": { es: "Filtros activos" },
+  "Remover filtro": { es: "Quitar filtro" },
+  "Nome, telefone ou última mensagem": { es: "Nombre, teléfono o último mensaje" },
+  "mensagens não lidas": { es: "mensajes no leídos" },
+  ativos: { es: "activos" },
 };
 
 /**

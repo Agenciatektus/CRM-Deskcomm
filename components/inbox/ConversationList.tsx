@@ -10,7 +10,9 @@ import { useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
 import { ConversationListItem } from "./ConversationListItem";
-import { EmptyInbox } from "@/components/empty";
+import { VazioDaAba } from "./VazioDaAba";
+import { abaDosFiltros } from "@/lib/inbox/aba-dos-filtros";
+import { useAuthOpcional } from "@/hooks/auth/AuthProvider";
 import { EmptyPorFiltro } from "./EmptyPorFiltro";
 import { filtrosAuxiliaresAtivos } from "@/lib/inbox/filtros-ativos";
 import type {
@@ -44,6 +46,13 @@ export function ConversationList({
   onLimparFiltros,
 }: Props) {
   const t = useT();
+  // Quem está logado, para a pílula de dono dizer "Você". Opcional porque a
+  // lista também é renderizada sem provider (testes); sem sessão, sai o nome.
+  const meuUserId = useAuthOpcional()?.user.id ?? null;
+  // A aba é DERIVADA do mesmo objeto que foi ao servidor, pela mesma razão de
+  // `filtrosAuxiliaresAtivos`: o texto do vazio não pode falar de uma aba
+  // diferente da que a consulta aplicou.
+  const tab = abaDosFiltros(filters);
   // Só mostra POR ONDE a conversa entrou quando há mais de um número. Com um
   // só, o rótulo seria a mesma palavra em toda linha — ruído que ensina o olho
   // a ignorar a área onde vivem os avisos que importam.
@@ -89,13 +98,15 @@ export function ConversationList({
    *
    * O `filters.comando` entrou junto com as abas novas: sem ele, a Fila voltaria
    * a repetir o mesmo selo de atendente em cada uma das linhas.
+   *
+   * Visual v2: a pílula passou a dizer também "Sem dono" e "Automático", então
+   * "sem dono" conta como um dono distinto. Uma página com um atendente e o
+   * resto sem ninguém DISCRIMINA, e antes o selo sumia justamente nela.
    */
   const mostrarAtendente = useMemo(() => {
     if (filters.assigned_to) return false;
     if (filters.comando && !filters.comando.includes("humano")) return false;
-    const donos = new Set(
-      items.map((i) => i.assigned_to_user_id).filter((id): id is string => Boolean(id)),
-    );
+    const donos = new Set(items.map((i) => i.assigned_to_user_id ?? "sem-dono"));
     return donos.size > 1;
   }, [filters.assigned_to, filters.comando, items]);
 
@@ -146,7 +157,7 @@ export function ConversationList({
   if (items.length === 0 && filtrosAtivos.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <EmptyInbox />
+        <VazioDaAba tab={tab} />
       </div>
     );
   }
@@ -170,6 +181,7 @@ export function ConversationList({
             mostrarAtendente={mostrarAtendente}
             mostrarAutomatico={mostrarAutomatico}
             automaticoDaOrg={automaticoDaOrg.data}
+            meuUserId={meuUserId}
           />
         ))}
         {q.hasNextPage && (

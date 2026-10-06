@@ -20,10 +20,18 @@ import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtim
  */
 export function filtrosAuxiliaresAtivos(filters: ConversationsFilters): string[] {
   const ativos: string[] = [];
-  if (filters.unread) ativos.push("Não lidos");
+  // Os MESMOS rótulos do popover e dos chips (visual v2): o vazio por filtro
+  // nomear "Não lidos" enquanto o chip diz "Só não lidas" faria o operador
+  // procurar dois filtros onde existe um.
+  if (filters.unread) ativos.push("Só não lidas");
   if (filters.search) ativos.push("Busca");
   if (filters.tag) ativos.push("Etiqueta");
   if (filters.channel_session_id) ativos.push("Canal");
-  if (filters.is_group) ativos.push("Grupos");
+  if (filters.is_group) ativos.push("Só grupos");
+  // A ENTRADA do Instagram também é auxiliar: sem ela, "Só comentários" ligado
+  // com lista vazia caía no vazio da ABA ("Fila vazia"), afirmando ausência
+  // onde há um filtro escondendo tudo, e sem oferecer o "Limpar filtros".
+  if (filters.entrada === "comentario") ativos.push("Só comentários");
+  else if (filters.entrada) ativos.push("Só Direct");
   return ativos;
 }
