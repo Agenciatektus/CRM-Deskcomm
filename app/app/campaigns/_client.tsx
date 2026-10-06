@@ -106,7 +106,7 @@ export function ListaDeCampanhas() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{c.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {/* CAMPANHA CONTÍNUA (9038) não tem lista, e "lista ainda
+                    {/* CAMPANHA CONTÍNUA (9039) não tem lista, e "lista ainda
                         não preparada" numa campanha que está abordando gente é
                         afirmação falsa — a mais perigosa desta tela, porque
                         convida a preparar de novo. */}

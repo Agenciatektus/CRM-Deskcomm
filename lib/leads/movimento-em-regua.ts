@@ -5,7 +5,7 @@
  *
  * O passo `mover_etapa` de uma régua de prospecção (cadência 9016, campanha
  * 9037) move o card pelo `moveLeadHandler`, que emite `lead.stage_changed` como
- * qualquer movimento humano. Com a entrada contínua da campanha (9038), uma
+ * qualquer movimento humano. Com a entrada contínua da campanha (9039), uma
  * régua que mova para a etapa em que a campanha está armada fecha um LAÇO:
  *
  *   abordagem → passo move o card → `lead.stage_changed` → alistamento →

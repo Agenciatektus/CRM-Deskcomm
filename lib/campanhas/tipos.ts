@@ -110,6 +110,6 @@ export const TEXTO_DA_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   // (um `{Olá|}` com pipe sobrando rende vazio em metade das sementes). Dizer
   // "falta um dado" mandaria o operador procurar no cadastro, que está certo.
   texto_vazio: "A variação sorteada para esta pessoa ficou sem texto",
-  ja_em_campanha: "Já está em outra campanha ainda não concluída",
+  ja_em_campanha: "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar",
   suprimido: "Está na lista de exclusão de campanhas",
 };

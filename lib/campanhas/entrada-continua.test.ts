@@ -8,7 +8,7 @@ import {
 } from "./entrada-continua";
 
 /**
- * O gate do modo CONTÍNUO (migration 9038).
+ * O gate do modo CONTÍNUO (migration 9039).
  *
  * Duas coisas se cobram aqui, e a primeira é a que mais importa: campanha em
  * modo LISTA não é afetada por NADA deste módulo. O resto é a contenção — teto
@@ -50,7 +50,7 @@ describe("entrada contínua: a contenção é exigida", () => {
 
   it("sem etapa, recusa — e a frase diz que a etapa pode ter sido apagada", () => {
     // Não é só configuração incompleta: é o estado em que a campanha cai quando
-    // alguém apaga a etapa (a FK da 9038 é `on delete set null`). A frase tem de
+    // alguém apaga a etapa (a FK da 9039 é `on delete set null`). A frase tem de
     // explicar o silêncio, senão o operador procura um defeito nosso.
     const r = problemaNaEntradaContinua({ ...CONTINUA, entrada_etapa_id: null });
     expect(r).toMatch(/etapa/i);

@@ -1,6 +1,6 @@
--- manifest: 9038 — a campanha ganha um SEGUNDO modo de público: entrada CONTÍNUA por etapa do funil. `campaigns.entrada_continua` (boolean, default false) e `campaigns.entrada_etapa_id` (FK composta para `crm_stages`, `on delete set null (entrada_etapa_id)` pelo P2-3 da 9032) dizem que quem CAI na etapa escolhida é abordado por esta campanha, sem o operador montar lista. Por quê: o único modo de público era a lista fixa do snapshot, que responde "fale com estas 300 pessoas" e não responde "fale com quem chegar aqui a partir de agora" — e o funil novo chega um por vez, não em lote. Sem motor novo: o gatilho é o MESMO evento `lead.stage_changed` que `lib/followup/gatilho-etapa.ts` já consome (consumidor próprio no dispatcher, idempotência de graça pelo `consumed_by[]`), e o que o gatilho faz é inserir UMA linha em `campaign_recipients` — daí para frente o `campaign-worker` é bit a bit o mesmo caminho da lista: veto revalidado, lista de exclusão, ritmo, rodízio de números e inscrição na régua. `campaign_recipients_contato_unico` (que já existia) é o anti-repetição: card arrastado dez vezes para a etapa vira uma abordagem. O modo lista continua o DEFAULT e intacto (`entrada_continua = false` em toda campanha existente). O CHECK `campaigns_entrada_continua_contida` exige teto diário e janela de horário quando o modo é contínuo (rascunho excetuado por `status = 'draft'`, como o pointer não-`active` da 9016: sem isso, marcar o modo antes de digitar o teto daria 23514 no SALVAR e prenderia o operador num rascunho impossível de corrigir): na lista o volume é limitado pelo recorte que o operador conferiu, no contínuo não há recorte nem conferência, então o teto e a janela deixam de ser configuração e passam a ser a contenção — e contenção é constraint. Funil e etapa NÃO entram no CHECK de propósito (a FK os anula quando o funil ou a etapa é apagado, e um CHECK que os exigisse faria esse DELETE falhar com 23502/23514, que é exatamente o defeito que a 9032 consertou): quem os exige é o gate de `lib/campanhas/acoes.ts`, que recusa preparar, iniciar e agendar sem eles, e o gatilho, que nunca casa etapa nula.
+-- manifest: 9039 — a campanha ganha um SEGUNDO modo de público: entrada CONTÍNUA por etapa do funil. `campaigns.entrada_continua` (boolean, default false) e `campaigns.entrada_etapa_id` (FK composta para `crm_stages`, `on delete set null (entrada_etapa_id)` pelo P2-3 da 9032) dizem que quem CAI na etapa escolhida é abordado por esta campanha, sem o operador montar lista. Por quê: o único modo de público era a lista fixa do snapshot, que responde "fale com estas 300 pessoas" e não responde "fale com quem chegar aqui a partir de agora" — e o funil novo chega um por vez, não em lote. Sem motor novo: o gatilho é o MESMO evento `lead.stage_changed` que `lib/followup/gatilho-etapa.ts` já consome (consumidor próprio no dispatcher, idempotência de graça pelo `consumed_by[]`), e o que o gatilho faz é inserir UMA linha em `campaign_recipients` — daí para frente o `campaign-worker` é bit a bit o mesmo caminho da lista: veto revalidado, lista de exclusão, ritmo, rodízio de números e inscrição na régua. `campaign_recipients_contato_unico` (que já existia) é o anti-repetição: card arrastado dez vezes para a etapa vira uma abordagem. O modo lista continua o DEFAULT e intacto (`entrada_continua = false` em toda campanha existente). O CHECK `campaigns_entrada_continua_contida` exige teto diário e janela de horário quando o modo é contínuo (rascunho excetuado por `status = 'draft'`, como o pointer não-`active` da 9016: sem isso, marcar o modo antes de digitar o teto daria 23514 no SALVAR e prenderia o operador num rascunho impossível de corrigir): na lista o volume é limitado pelo recorte que o operador conferiu, no contínuo não há recorte nem conferência, então o teto e a janela deixam de ser configuração e passam a ser a contenção — e contenção é constraint. Funil e etapa NÃO entram no CHECK de propósito (a FK os anula quando o funil ou a etapa é apagado, e um CHECK que os exigisse faria esse DELETE falhar com 23502/23514, que é exatamente o defeito que a 9032 consertou): quem os exige é o gate de `lib/campanhas/acoes.ts`, que recusa preparar, iniciar e agendar sem eles, e o gatilho, que nunca casa etapa nula.
 --
--- 9038 — QUEM ENTRA NA CAMPANHA: O MODO CONTÍNUO POR ETAPA
+-- 9039 — QUEM ENTRA NA CAMPANHA: O MODO CONTÍNUO POR ETAPA
 --
 -- ## ANTES DO DEPLOY
 --
@@ -131,11 +131,11 @@ alter table public.campaigns
 
 comment on column public.campaigns.entrada_continua is
   'false (default) = modo LISTA: o público é o snapshot congelado na preparação, como em toda '
-  'campanha anterior à 9038. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
+  'campanha anterior à 9039. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
   'abordado por esta campanha, uma linha de campaign_recipients por chegada, pelo gatilho '
   'lib/campanhas/entrada-por-etapa.ts. O modo é escolha explícita do operador e SOBREVIVE ao '
   'DELETE da etapa (que só anula entrada_etapa_id): campanha contínua sem etapa para de '
-  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9038.';
+  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9039.';
 
 alter table public.campaigns
   add column if not exists entrada_etapa_id uuid;
@@ -144,7 +144,7 @@ comment on column public.campaigns.entrada_etapa_id is
   'A etapa do funil que arma a entrada contínua (crm_stages). Lida só quando entrada_continua; '
   'NULL com o modo ligado = a etapa foi apagada, e o gatilho não casa nada (falha fechada). '
   'Não é a mesma coisa que stage_id, que é onde o CARD de quem foi abordado nasce (0378/9037): '
-  'aqui é de onde a pessoa VEM. Migration 9038.';
+  'aqui é de onde a pessoa VEM. Migration 9039.';
 
 do $$
 begin

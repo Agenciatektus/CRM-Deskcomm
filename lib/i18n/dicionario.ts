@@ -13373,7 +13373,12 @@ export const DICIONARIO: Traducoes = {
   "Excluído à mão desta campanha": { es: "Excluido manualmente de esta campaña" },
   "Mesmo telefone de outro contato da lista": { es: "Mismo teléfono que otro contacto de la lista" },
   "Falta um dado que a mensagem usa": { es: "Falta un dato que usa el mensaje" },
-  "Já está em outra campanha ainda não concluída": { es: "Ya está en otra campaña que todavía no termina" },
+  // A frase antiga ("Já está em outra campanha ainda não concluída") saiu na 9039:
+  // o veto passou a pegar também quem recebeu de campanha já concluída ou
+  // cancelada, e o operador procuraria na tela uma campanha que não existe mais.
+  "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar": {
+    es: "Otra campaña ya habló con esta persona en los últimos 30 días, o va a hablar",
+  },
   "Está na lista de exclusão de campanhas": { es: "Está en la lista de exclusión de campañas" },
   "Parar de enviar às (hora)": { es: "Dejar de enviar a las (hora)" },
   "pediram para parar": { es: "pidieron parar" },
@@ -13384,7 +13389,7 @@ export const DICIONARIO: Traducoes = {
   "Preparar lista": { es: "Preparar lista" },
   "Progresso do envio": { es: "Progreso del envío" },
   "Público": { es: "Público" },
-  // ── Campanha: os PASSOS (9037) e a ENTRADA CONTÍNUA (9038) ──
+  // ── Campanha: os PASSOS (9037) e a ENTRADA CONTÍNUA (9039) ──
   "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
   "Depois da primeira mensagem": { es: "Después del primer mensaje" },
   "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {

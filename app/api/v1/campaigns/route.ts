@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 const COLUNAS_DA_LISTA =
   "id, name, status, channel_session_id, snapshot_total, snapshot_eligible, snapshot_excluded, " +
   "scheduled_at, started_at, completed_at, cancelled_at, created_at, created_by, " +
-  // `entrada_continua` vai na LISTA (9038) porque "Na lista: 0" numa campanha
+  // `entrada_continua` vai na LISTA (9039) porque "Na lista: 0" numa campanha
   // contínua se lê como campanha quebrada: sem o modo, a tela não tem como
   // explicar o zero.
   "pipeline_id, stage_id, agent_id, passos, entrada_continua";
@@ -148,11 +148,11 @@ export async function POST(req: NextRequest): Promise<Response> {
       // Vazio, e não `null`: a coluna é `not null default '[]'` (9037), e
       // campanha de uma mensagem só é o caso comum.
       passos: entrada.passos ?? [],
-      // O MODO DE PÚBLICO (migration 9038). `false` por omissão: campanha criada
+      // O MODO DE PÚBLICO (migration 9039). `false` por omissão: campanha criada
       // por quem não abriu essa seção nasce em modo LISTA, idêntica ao que
       // sempre foi. O que o modo contínuo exige (funil, etapa, teto do dia,
       // janela) NÃO é cobrado aqui — a campanha nasce em RASCUNHO, e rascunho
-      // pode estar incompleto; o CHECK da 9038 excetua `draft` pelo mesmo
+      // pode estar incompleto; o CHECK da 9039 excetua `draft` pelo mesmo
       // motivo. Quem cobra é o gate de `faltaParaEnviar`, no Preparar.
       entrada_continua: entrada.entrada_continua ?? false,
       entrada_etapa_id: entrada.entrada_etapa_id ?? null,

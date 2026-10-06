@@ -11,7 +11,7 @@ interface Etapa {
 }
 
 /**
- * QUEM ENTRA NA CAMPANHA — a escolha entre os dois modos de público (9038).
+ * QUEM ENTRA NA CAMPANHA — a escolha entre os dois modos de público (9039).
  *
  * ═══ Por que a escolha é explícita, e a lista é o padrão ═══
  *

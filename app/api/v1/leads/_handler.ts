@@ -870,7 +870,7 @@ export interface MoveLeadAdminInput {
   won_reason?: string | null;
   /**
    * COMO este movimento nasceu, para quem reage ao `lead.stage_changed` poder
-   * decidir se reage (migration 9038). Vai para `metadata.via` do evento, e
+   * decidir se reage (migration 9039). Vai para `metadata.via` do evento, e
    * nunca para coluna nenhuma de `crm_leads` — a mesma separação de `input.via`
    * em `createLeadHandler`: `source` diz de onde o NEGÓCIO veio, `metadata.via`
    * diz COMO a linha mudou, e só quem decide reagir o lê.

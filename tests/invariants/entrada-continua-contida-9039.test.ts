@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./gov-helpers";
 
 /**
- * Migration 9038: A CONTENÇÃO DA ENTRADA CONTÍNUA EXISTE NO BANCO.
+ * Migration 9039: A CONTENÇÃO DA ENTRADA CONTÍNUA EXISTE NO BANCO.
  *
  * ## Por que este invariante é obrigatório, e não zelo
  *
@@ -45,7 +45,7 @@ import { sql } from "./gov-helpers";
  * Tudo em transação desfeita (`rollback`), como as irmãs. Zero PII.
  */
 
-const id = (n: number) => `90380000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const id = (n: number) => `90390000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 const ORG = id(1);
 const SESSAO = id(2);
@@ -58,34 +58,45 @@ const CAMP = id(7);
 const seed = `
 begin;
 insert into organizations(id,slug,display_name,legal_name)
-  values ('${ORG}','e9038','E9038','E9038');
+  values ('${ORG}','e9039','E9039','E9039');
 insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted)
-  values ('${SESSAO}','${ORG}','e9038-a','\\x00'::bytea);
+  values ('${SESSAO}','${ORG}','e9039-a','\\x00'::bytea);
 insert into crm_pipelines(id,organization_id,name,slug)
-  values ('${PIPE}','${ORG}','E9038','e9038');
+  values ('${PIPE}','${ORG}','E9039','e9039');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position)
   values ('${ETAPA}','${ORG}','${PIPE}','Novo','novo',1000);
 insert into contacts(id,organization_id,display_name)
-  values ('${CONTATO_A}','${ORG}','E9038 Um'),('${CONTATO_B}','${ORG}','E9038 Dois');
+  values ('${CONTATO_A}','${ORG}','E9039 Um'),('${CONTATO_B}','${ORG}','E9039 Dois');
 `;
 
 /** As colunas comuns de uma campanha contínua; o chamador completa o resto. */
 function campanha(extras: string): string {
   return `insert into campaigns(id,organization_id,name,channel_session_id,base_legal,pipeline_id,entrada_continua,entrada_etapa_id,${extras.split("=>")[0]})
-  values ('${CAMP}','${ORG}','e9038','${SESSAO}','consent','${PIPE}',true,'${ETAPA}',${extras.split("=>")[1]});`;
+  values ('${CAMP}','${ORG}','e9039','${SESSAO}','consent','${PIPE}',true,'${ETAPA}',${extras.split("=>")[1]});`;
 }
 
 /**
  * Roda o script e devolve o SQLSTATE quando o Postgres recusa, ou a leitura
  * marcada com `r=` quando passa.
  *
- * Erro vem do stderr do psql, que o `execFileSync` joga na exceção: o padrão de
- * `organizacao-nao-muda-9030.test.ts`.
+ * ⚠️ A LEITURA ENTRA SEM PARÊNTESES, e a primeira versão errou aqui: ela montava
+ * `select 'r=' || (${leitura});`, e toda `leitura` traz `from … where …`. Dentro
+ * de parênteses o parser do Postgres quer EXPRESSÃO, não cláusula `from`, então os
+ * cinco casos que passam `leitura` morriam em erro de sintaxe — e eram justamente
+ * os controles positivos e o caso da FK. Falha ruidosa (o `catch` devolvia o texto
+ * do erro, nenhum caso ficou verde à toa), mas o invariante não provava nada.
+ *
+ * Erro vem do STDERR do psql. `execFileSync` o anexa à `message`, mas ele chega
+ * também em `err.stderr`, e lemos os dois: é o padrão de
+ * `arquivo-de-webhook-so-manager-9035.test.ts` (`e.stderr ?? e.message`). A
+ * primeira versão atribuía este padrão à `organizacao-nao-muda-9030.test.ts`, que
+ * faz outra coisa: lá o SQLSTATE é capturado num bloco plpgsql e guardado em temp
+ * table. Citar precedente errado é o que faz o próximo copiar o padrão frágil.
  */
 function tenta(script: string, leitura?: string): string {
   try {
     const out = sql(`${seed}${script}
-${leitura ? `select 'r=' || (${leitura});` : "select 'r=ok';"}
+${leitura ? `select 'r=' || ${leitura};` : "select 'r=ok';"}
 rollback;`);
     return out
       .split("\n")
@@ -93,7 +104,8 @@ rollback;`);
       .find((l) => l.startsWith("r="))
       ?.slice(2) ?? out;
   } catch (err) {
-    const texto = err instanceof Error ? `${err.message}` : String(err);
+    const e = err as { stderr?: string | Buffer; message?: string };
+    const texto = String(e.stderr ?? e.message ?? err);
     const m = /SQLSTATE[: ]+([0-9A-Z]{5})/.exec(texto) ?? /\((\d{5})\)/.exec(texto);
     if (m) return m[1]!;
     // O psql não imprime o SQLSTATE por padrão; o nome da constraint identifica
@@ -106,7 +118,7 @@ rollback;`);
   }
 }
 
-describe("9038: a contenção do modo contínuo é cobrada pelo banco", () => {
+describe("9039: a contenção do modo contínuo é cobrada pelo banco", () => {
   it("a constraint existe, e é CHECK em campaigns", () => {
     // Sem este caso, todos os outros passariam num banco SEM a constraint pelo
     // motivo errado (o INSERT simplesmente não falharia, e "não falhou" é o que
@@ -189,18 +201,18 @@ update campaigns set status = 'preparing' where id = '${CAMP}';`,
   it("campanha em modo LISTA com tudo em branco passa em qualquer estado", () => {
     // O limite que a fatia não podia violar: campanha existente não muda de
     // comportamento. `entrada_continua = false` torna o CHECK vacuamente
-    // verdadeiro, e é o default de toda linha anterior à 9038.
+    // verdadeiro, e é o default de toda linha anterior à 9039.
     expect(
       tenta(
         `insert into campaigns(id,organization_id,name,channel_session_id,base_legal,status,teto_diario,janela_inicio_hora,janela_fim_hora)
-  values ('${CAMP}','${ORG}','e9038-lista','${SESSAO}','consent','running',null,null,null);`,
+  values ('${CAMP}','${ORG}','e9039-lista','${SESSAO}','consent','running',null,null,null);`,
         `(entrada_continua)::text from campaigns where id = '${CAMP}'`,
       ),
     ).toBe("false");
   });
 });
 
-describe("9038: apagar a etapa de entrada não derruba a campanha", () => {
+describe("9039: apagar a etapa de entrada não derruba a campanha", () => {
   it("DELETE da etapa anula entrada_etapa_id e mantém a organização", () => {
     // A regressão que a 9032 consertou (FK `set null` sem lista de colunas
     // zerava `organization_id`, NOT NULL, e o DELETE morria com 23502) e que um
@@ -236,7 +248,7 @@ delete from crm_stages where id = '${ETAPA}';`,
   });
 });
 
-describe("9038: linha de exclusão sem telefone não disputa unicidade", () => {
+describe("9039: linha de exclusão sem telefone não disputa unicidade", () => {
   it("duas linhas skipped com recipient_address NULO coexistem", () => {
     // A entrada contínua grava uma linha EXCLUÍDA por contato que cruza a etapa
     // e é vetado — e ela nasce sem telefone de propósito (PII sem finalidade não
@@ -287,9 +299,22 @@ insert into campaign_recipients(organization_id,campaign_id,contact_id,status,el
  * `lib/campanhas/entrada-por-etapa.db.ts` montam — mesma forma, para a prova ser
  * da regra e não de uma reimplementação dela.
  */
-describe("9038: o veto por tempo conta quem recebeu, e quem está a caminho", () => {
+describe("9039: o veto por tempo conta quem recebeu, e quem está a caminho", () => {
   const CAMP_B = id(8);
   const JANELA = "30 days";
+  /**
+   * ⚠️ OS DOIS LITERAIS ABAIXO SÃO DIGITADOS À MÃO, e isso contraria a doutrina de
+   * DERIVAR as listas que o mesmo commit instituiu (`NA_FILA_DE_DESPACHO` e
+   * `STATUS_TERMINAIS`). Em invariante de banco é inevitável: o predicado tem de
+   * ser SQL, e importá-lo do TypeScript faria o teste provar o próprio
+   * TypeScript em vez do banco.
+   *
+   * O que fecha a brecha é o cruzamento, e ele NÃO mora aqui: mora em
+   * `lib/campanhas/veto-ja-em-campanha.test.ts`, que afirma que
+   * `NA_FILA_DE_DESPACHO` é exatamente pending/queued/sending e que
+   * `STATUS_TERMINAIS` é exatamente completed/cancelled — com `failed` FORA. Se
+   * uma das listas mudar, aquele teste reprova e manda consertar estes literais.
+   */
   /** O único predicado, nos dois ramos, para UM contato. */
   const vetado = (contato: string) => `select 'r=' || (
     exists (
@@ -311,7 +336,7 @@ describe("9038: o veto por tempo conta quem recebeu, e quem está a caminho", ()
   /** Uma segunda campanha, no estado pedido, para hospedar a linha do contato. */
   const outra = (status: string) =>
     `insert into campaigns(id,organization_id,name,channel_session_id,base_legal,status)
-       values ('${CAMP_B}','${ORG}','e9038-b','${SESSAO}','consent','${status}');`;
+       values ('${CAMP_B}','${ORG}','e9039-b','${SESSAO}','consent','${status}');`;
 
   function veto(script: string, contato: string): string {
     try {
@@ -393,6 +418,38 @@ insert into campaign_recipients(organization_id,campaign_id,contact_id,status,el
         CONTATO_A,
       ),
     ).toBe("false");
+  });
+
+  it("PENDING em campanha TERMINAL: liberado — o controle do predicado de status", () => {
+    // Sem este caso, apagar `c.status not in (…)` do predicado não reprovava
+    // nada: o único caso de campanha terminal usava `r.status='cancelled'`, que
+    // já sai pela fila ativa. É precisamente o predicado cuja tradução pelo
+    // PostgREST não foi provada, e sem controle ele poderia ser inerte sem que
+    // ninguém soubesse.
+    expect(
+      veto(
+        `${outra("completed")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','pending','eligible');`,
+        CONTATO_A,
+      ),
+    ).toBe("false");
+  });
+
+  it("PENDING em campanha FAILED: VETADO — `failed` não é terminal", () => {
+    // A distinção que uma lista de terminais escrita à mão erra, e por isso
+    // `STATUS_TERMINAIS` é derivada de `PERMITIDO` por `ehTerminal`: `failed`
+    // volta a RASCUNHO para conserto (`PERMITIDO.failed = ['draft']`), então a
+    // campanha ainda vai falar com quem está na fila dela. Tratá-la como terminal
+    // liberaria essa pessoa para outra campanha, e as duas abordariam.
+    expect(
+      veto(
+        `${outra("failed")}
+insert into campaign_recipients(organization_id,campaign_id,contact_id,status,eligibility_status)
+  values ('${ORG}','${CAMP_B}','${CONTATO_A}','pending','eligible');`,
+        CONTATO_A,
+      ),
+    ).toBe("true");
   });
 
   it("contato sem linha nenhuma não é vetado", () => {

@@ -70,7 +70,7 @@ export function NovaCampanha() {
   const [agente, setAgente] = useState("");
   const [funilDoPublico, setFunilDoPublico] = useState("");
   const [etapaDoPublico, setEtapaDoPublico] = useState("");
-  // O MODO DE PÚBLICO (9038). Nasce em LISTA, e nada aqui o liga sozinho.
+  // O MODO DE PÚBLICO (9039). Nasce em LISTA, e nada aqui o liga sozinho.
   const [continua, setContinua] = useState(false);
   const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
 

@@ -1,5 +1,5 @@
 /**
- * O VOCABULÁRIO do gatilho de entrada contínua (migration 9038) — tipos e a
+ * O VOCABULÁRIO do gatilho de entrada contínua (migration 9039) — tipos e a
  * porta estreita de banco, num arquivo só.
  *
  * Separado de `entrada-por-etapa.ts` pela regra de 300 linhas do repo: lá mora a
@@ -62,7 +62,27 @@ export interface EntradaPorEtapaDb {
   carregaNegocio(
     orgId: string,
     leadId: string,
-  ): Promise<{ contactId: string | null; aberto: boolean } | null>;
+  ): Promise<{
+    contactId: string | null;
+    aberto: boolean;
+    /**
+     * Este negócio JÁ FOI fechado alguma vez (ganho ou perdido), mesmo que
+     * esteja aberto agora?
+     *
+     * ⚠⚠ O veto por `from_stage_id` fecha o salto de UM arrasto. Este campo
+     * fecha o de DOIS, que é triagem normal de operador: «Ganho» → «Novo lead»
+     * (vetado, mas `fn_crm_lead_close_on_stage` APAGA `closed_at` e
+     * `lost_from_stage_id` nesse mesmo UPDATE) e depois «Novo lead» → etapa
+     * armada, onde a origem é aberta, o status é `open` e nada na linha lembra
+     * do fechamento.
+     *
+     * Vem de `crm_leads.fechado_alguma_vez_em` (migration 9040, que o gatilho
+     * preenche e a reabertura não limpa) OU de `lost_reason`, que sobrevive à
+     * reabertura desde sempre e por isso cobra também a PERDA histórica, que
+     * nenhum backfill alcança.
+     */
+    jaFoiFechado: boolean;
+  } | null>;
   carregaContato(orgId: string, contactId: string): Promise<ContatoDoAlvo | null>;
   /**
    * Esta etapa fecha o negócio (`is_won` ou `is_lost`)?
@@ -124,13 +144,20 @@ export interface ResumoDaEntradaPorEtapa {
    */
   veio_de_fechamento: number;
   /**
+   * O negócio JÁ FOI fechado alguma vez, mesmo estando aberto agora (migration
+   * 9040). Separado de `veio_de_fechamento` porque o sinal é outro: aquele é a
+   * etapa de ORIGEM deste movimento, este é a história do negócio — e é ele que
+   * pega a reabertura feita em dois arrastos.
+   */
+  ja_foi_fechado: number;
+  /**
    * O movimento foi feito pelo passo `mover_etapa` da própria régua, e não por
    * uma pessoa. Reagir a ele fecharia o laço abordagem → passo → abordagem.
    */
   passo_de_regua: number;
   /**
    * Campanha contínua SEM teto do dia: não alista. Estado inalcançável pelo
-   * produto (o CHECK da 9038 o recusa), contado porque a alternativa é alistar
+   * produto (o CHECK da 9039 o recusa), contado porque a alternativa é alistar
    * sem conta se o CHECK não existir.
    */
   sem_teto: number;

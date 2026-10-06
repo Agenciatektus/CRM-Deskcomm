@@ -29,7 +29,7 @@ export interface CampanhaDaLista {
   created_at: string;
   created_by: string | null;
   /**
-   * O MODO DE PÚBLICO (migration 9038). Ausente/`false` = LISTA; `true` =
+   * O MODO DE PÚBLICO (migration 9039). Ausente/`false` = LISTA; `true` =
    * CONTÍNUO, quem entra na etapa de entrada é abordado. Vem já na LISTA porque
    * "Na lista: 0" numa campanha contínua se lê como campanha quebrada — sem o
    * modo, a tela não tem como explicar o zero.
@@ -52,7 +52,7 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   passos?: PassoDaRegua[] | null;
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id?: string | null;
-  /** A etapa que inicia a abordagem no modo contínuo (9038). */
+  /** A etapa que inicia a abordagem no modo contínuo (9039). */
   entrada_etapa_id?: string | null;
   base_legal: string;
   lia_ref: string | null;

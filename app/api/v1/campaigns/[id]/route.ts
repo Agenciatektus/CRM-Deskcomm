@@ -153,7 +153,7 @@ export async function PATCH(
     // que a tela mostra — divergência da pior espécie, porque a tela continua
     // certa de si. Para mexer, volta-se ao rascunho, e preparar republica.
     "passos",
-    // O MODO DE PÚBLICO é CONTEÚDO (migration 9038), não ritmo: trocar a etapa
+    // O MODO DE PÚBLICO é CONTEÚDO (migration 9039), não ritmo: trocar a etapa
     // que inicia a abordagem com a campanha andando mudaria para QUEM ela fala,
     // e é exatamente essa escolha que o operador revisou antes de iniciar. Fica
     // preso ao rascunho, como o texto e os passos.

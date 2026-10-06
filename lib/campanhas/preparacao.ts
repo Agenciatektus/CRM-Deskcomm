@@ -222,7 +222,7 @@ export async function prepararCampanha(
 }
 
 /**
- * A PRÉVIA da campanha CONTÍNUA (migration 9038): quem está na etapa de entrada
+ * A PRÉVIA da campanha CONTÍNUA (migration 9039): quem está na etapa de entrada
  * HOJE, e o que cada um receberia.
  *
  * Não grava nada — e é por isso que ela existe. No modo contínuo não há o

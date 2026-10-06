@@ -35,7 +35,7 @@ const PERMITIDO: Record<StatusDaCampanha, readonly StatusDaCampanha[]> = {
   ready: ["draft", "scheduled", "running", "cancelled"],
   scheduled: ["running", "paused", "cancelled"],
   // ⚠️ `completed` é INALCANÇÁVEL para a campanha de ENTRADA CONTÍNUA (migration
-  // 9038), e a tabela não muda por isso. A transição continua existindo porque
+  // 9039), e a tabela não muda por isso. A transição continua existindo porque
   // quem a dispara é a rodada, ao ver a fila vazia — e na contínua fila vazia é
   // o estado NORMAL, não o fim: ela passa a maior parte do tempo assim, entre
   // uma chegada na etapa e a próxima. Quem recusa é `rodarUmaCampanha`, que

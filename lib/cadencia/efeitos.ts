@@ -84,7 +84,7 @@ export async function aplicarEfeitoDaCadencia(
       {
         to_stage_id: efeito.stage_id,
         reason: "Passo da cadência de prospecção",
-        // A MARCA DE PASSO DE RÉGUA (9038). Sem ela, uma régua que mova o card
+        // A MARCA DE PASSO DE RÉGUA (9039). Sem ela, uma régua que mova o card
         // para a etapa em que uma campanha contínua está armada fecha o laço
         // abordagem → passo → alistamento → abordagem. Vale para as DUAS
         // superfícies de prospecção, porque este efeito serve a cadência e a

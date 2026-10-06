@@ -63,6 +63,7 @@ function detalhe(r: ResumoDaEntradaPorEtapa): string {
     `armadas=${r.campanhas_armadas} alistados=${r.alistados} ja_na_campanha=${r.ja_na_campanha} ` +
     `teto_do_dia=${r.teto_do_dia} sem_teto=${r.sem_teto} anterior_ao_inicio=${r.anterior_ao_inicio} ` +
     `sem_alvo=${r.sem_alvo} veio_de_fechamento=${r.veio_de_fechamento} ` +
+    `ja_foi_fechado=${r.ja_foi_fechado} ` +
     `passo_de_regua=${r.passo_de_regua}` +
     (excluidos ? ` excluidos:${excluidos}` : "")
   );

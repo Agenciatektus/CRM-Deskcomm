@@ -85,6 +85,7 @@ function vazio(): ResumoDaEntradaPorEtapa {
     anterior_ao_inicio: 0,
     sem_alvo: 0,
     veio_de_fechamento: 0,
+    ja_foi_fechado: 0,
     passo_de_regua: 0,
     sem_teto: 0,
     excluidos: {},
@@ -132,6 +133,20 @@ export async function alistarPorEtapa(
   // A marca vem no metadado do evento, no mesmo padrão da criação em lote da
   // 9037 (`lib/leads/criacao-em-lote.ts`): quem move declara a origem, e quem
   // reage decide. Ver `lib/leads/movimento-em-regua.ts`.
+  //
+  // ⚠️ E ELE DESARMA O GATILHO INTEIRO, não só o laço. O corte é aqui, ANTES de
+  // `carregaCampanhasArmadas`, então NENHUMA campanha contínua reage a movimento
+  // de régua — inclusive uma campanha B armada numa etapa para onde a régua de
+  // uma campanha A (ou de uma cadência) empurra o card DE PROPÓSITO. Nesse
+  // desenho, o operador espera que B aborde, e B não aborda. Nada na tela conta
+  // isso: o rastro é `passo_de_regua=1` no `detail` do evento.
+  //
+  // Aceito para este merge (o @Cassio_SecRev concordou): é falha FECHADA, e
+  // distinguir "régua que fecha laço com a própria campanha" de "régua que
+  // alimenta outra" pediria comparar a campanha do pointer com a campanha armada,
+  // o que é decisão de produto e não de implementação. Quem reabrir isto: o corte
+  // teria de descer para dentro do laço, por campanha, pulando só quando o
+  // pointer que moveu o card for o da PRÓPRIA campanha armada.
   if (movimentoDeRegua((row.metadata as Record<string, unknown> | null)?.via)) {
     resumo.passo_de_regua = 1;
     return resumo;
@@ -176,6 +191,23 @@ export async function alistarPorEtapa(
   // Pega a direção aberto → fechado; a VOLTA é vetada no bloco acima.
   if (!negocio || !negocio.contactId || !negocio.aberto) {
     resumo.sem_alvo = armadas.length;
+    return resumo;
+  }
+  // ═══ O NEGÓCIO JÁ FOI FECHADO ALGUMA VEZ — o salto de DOIS arrastos ═══
+  //
+  // O veto de origem acima fecha UM arrasto («Ganho» → etapa armada). Não fecha
+  // dois, e dois é triagem normal: «Ganho» → «Novo lead» (aquele veto pega, mas
+  // `fn_crm_lead_close_on_stage` APAGA `closed_at` e `lost_from_stage_id` no mesmo
+  // UPDATE) e depois «Novo lead» → etapa armada, onde a origem é aberta, o status
+  // é `open` e nada no negócio lembra que ele fechou.
+  //
+  // Quem lembra é `fechado_alguma_vez_em` (migration 9040) mais `lost_reason`,
+  // que sobrevive à reabertura desde sempre — ver `carregaNegocio`. O veto não
+  // expira: um negócio que já foi ganho é um CLIENTE, e campanha contínua é
+  // abordagem de primeiro contato. Quem quiser falar com clientes usa o modo
+  // LISTA, que o operador revisa pessoa por pessoa.
+  if (negocio.jaFoiFechado) {
+    resumo.ja_foi_fechado = armadas.length;
     return resumo;
   }
   const contato = await deps.db.carregaContato(row.organization_id, negocio.contactId);

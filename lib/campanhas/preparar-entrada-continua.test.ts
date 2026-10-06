@@ -146,7 +146,13 @@ describe("preparar em modo contínuo", () => {
 
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(r.mensagem).toContain("deadlock detected");
+    // Código PRÓPRIO: `campanha_sem_audiencia` descreveria "o recorte não achou
+    // ninguém" e mandaria o operador mexer no filtro, que não tem nada com isto.
+    expect(r.codigo).toBe("campanha_fila_nao_limpa");
+    // E a mensagem do PostgREST NÃO vai para o recibo (doutrina do P2-3): a
+    // resposta da API é lida em tela e pode ecoar o valor que o banco recusou. O
+    // texto real vai para o log do servidor.
+    expect(r.mensagem).not.toContain("deadlock detected");
     // E a campanha não fica presa em `preparing`: quem tentou preparar precisa
     // poder tentar de novo.
     const voltas = ops.filter((o) => o.tabela === "campaigns" && o.verbo === "update");

@@ -5,7 +5,7 @@
  * ═══ Os dois modos, e por que a lista continua o padrão ═══
  *
  * LISTA (`entrada_continua = false`, o default e o comportamento de toda
- * campanha anterior à 9038): o recorte vira `campaign_recipients` na preparação,
+ * campanha anterior à 9039): o recorte vira `campaign_recipients` na preparação,
  * o operador CONFERE o número e o texto, e depois disso a lista não muda mais. É
  * o que torna a abordagem auditável — "por que esta pessoa recebeu?" tem resposta
  * porque o recorte de ontem continua existindo.
@@ -51,7 +51,7 @@
  * de apertar". O teto diário é a ÚNICA coisa que limita quantos estranhos
  * recebem mensagem por dia, e a janela a única que impede que recebam às três da
  * manhã. Isso não é configuração: é a contenção do recurso, e por isso ela é
- * cobrada aqui, na rota de edição E num CHECK do banco (migration 9038).
+ * cobrada aqui, na rota de edição E num CHECK do banco (migration 9039).
  */
 import { FILTRO_VAZIO, type FiltroDeAudiencia } from "./audiencia";
 
@@ -94,7 +94,7 @@ export function problemaNaEntradaContinua(c: EntradaDaCampanha): string | null {
     return "Escolha o funil da entrada contínua antes de preparar a campanha.";
   }
   // Etapa nula com o modo ligado não é só configuração incompleta: é também o
-  // estado em que a campanha CAI quando alguém apaga a etapa (a FK da 9038 é
+  // estado em que a campanha CAI quando alguém apaga a etapa (a FK da 9039 é
   // `on delete set null`). Nos dois casos a resposta é a mesma, e ela é segura —
   // o gatilho compara `entrada_etapa_id = to_stage_id` e nulo não casa nada,
   // então a campanha para de abordar em vez de abordar errado.

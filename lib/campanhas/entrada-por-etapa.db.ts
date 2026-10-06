@@ -62,13 +62,25 @@ const COLUNAS_DA_ARMADA =
  * Com (1) e (2) separados, "cancelada antes de falar" sai do veto por si: não tem
  * `sent_at` e não tem linha viva. Nenhum predicado precisa olhar `cancelled`.
  *
- * ⚠️ `eligibility_status = 'eligible'` fica nos DOIS ramos, e nos dois é
- * redundante hoje: `sent_at` só é escrito por `rodada.ts` depois de um envio, e
- * linha excluída nasce `skipped`, fora da fila ativa. Fica porque a redundância
- * aqui custa zero e a alternativa seria um predicado de SEGURANÇA apoiado num
- * invariante que mora em outro arquivo — e invariante distante é o que um
- * refactor quebra sem nada ficar vermelho. Redundância em veto se explicita, não
- * se remove.
+ * ⚠️ `eligibility_status = 'eligible'` fica nos DOIS ramos. É quase sempre
+ * redundância — `sent_at` só é escrito por `rodada.ts` depois de um envio, e linha
+ * excluída nasce `skipped`, fora da fila ativa — mas NÃO é inerte, e o comentário
+ * anterior afirmava que era. Existe UM caminho que torna `eligible = false` uma
+ * linha que JÁ RECEBEU: `fecharPorOptOut` (`lib/campanhas/resposta.ts`) alcança
+ * `sent`/`delivered`/`read`/`replied` e marca `excluded` com motivo `opt_out`.
+ * Logo existe linha com `sent_at` na janela e `eligible = false`, e o ramo (1)
+ * NÃO a veta.
+ *
+ * Sem dano hoje, e o motivo é preciso: aquele caminho só roda quando
+ * `contacts.is_blocked`, e bloqueio é veto mais forte — `motivoParaExcluir` barra
+ * a pessoa antes de qualquer veto de campanha. O dia em que alguém separar
+ * "bloqueado" de "recusou marketing" (hoje o mesmo gate), isso vira fail-open
+ * CALADO: a pessoa recebeu, pediu para parar de um jeito que não bloqueia, e volta
+ * a ser abordável no dia seguinte.
+ *
+ * Fica, então, por duas razões e nenhuma delas é "não muda nada": custa zero, e
+ * tirá-lo apoiaria um predicado de SEGURANÇA num invariante que mora em outro
+ * arquivo. Quem mexer no gate de bloqueio tem de voltar aqui.
  */
 
 /**
@@ -115,7 +127,7 @@ async function leEtapaDeFechamento(
   }
   const etapa = data as { is_won: boolean | null; is_lost: boolean | null } | null;
   // Etapa que não existe mais também não libera: ela não tem como ser afirmada
-  // aberta, e a FK da 9038 já tira a campanha do ar nesse caso.
+  // aberta, e a FK da 9039 já tira a campanha do ar nesse caso.
   if (!etapa) return true;
   return etapa.is_won === true || etapa.is_lost === true;
 }
@@ -128,7 +140,7 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
     async carregaCampanhasArmadas(orgId, etapaId) {
       // `status = 'running'` e não "viva": `paused` não aborda gente nova (é o
       // que o botão promete) e `scheduled` ainda não começou. O índice parcial
-      // da 9038 cobre `(organization_id, entrada_etapa_id) where
+      // da 9039 cobre `(organization_id, entrada_etapa_id) where
       // entrada_continua`, que é o predicado desta consulta.
       const { data, error } = await admin
         .from("campaigns")
@@ -158,16 +170,38 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
     ehEtapaDeFechamento,
 
     async carregaNegocio(orgId, leadId) {
+      // As duas marcas DURÁVEIS de fechamento vêm na MESMA consulta que a 9039 já
+      // fazia: nenhum round-trip novo, e nenhuma consulta antes de haver campanha
+      // armada na etapa (o corte precoce de `alistarPorEtapa` roda antes desta).
       const { data, error } = await admin
         .from("crm_leads")
-        .select("contact_id, status")
+        .select("contact_id, status, fechado_alguma_vez_em, lost_reason")
         .eq("organization_id", orgId)
         .eq("id", leadId)
         .maybeSingle();
       if (error) throw new Error(`campanha_entrada_negocio: ${error.message}`);
       if (!data) return null;
-      const linha = data as { contact_id: string | null; status: string | null };
-      return { contactId: linha.contact_id, aberto: linha.status === "open" };
+      const linha = data as {
+        contact_id: string | null;
+        status: string | null;
+        fechado_alguma_vez_em: string | null;
+        lost_reason: string | null;
+      };
+      return {
+        contactId: linha.contact_id,
+        aberto: linha.status === "open",
+        // DOIS sinais, porque cobrem janelas diferentes:
+        //   • `fechado_alguma_vez_em` (9040) é o fato completo, mas só existe
+        //     para fechamentos a partir daquela migration (o backfill alcança
+        //     quem está fechado HOJE, nunca quem já reabriu antes dela);
+        //   • `lost_reason` sobrevive à reabertura desde sempre (o CHECK só o
+        //     exige quando `status='lost'`, e nenhum caminho o limpa), então ele
+        //     cobre a PERDA histórica que o backfill não alcança.
+        // O ganho histórico de quem JÁ reabriu fica de fora, conscientemente:
+        // `won_reason` é opcional e `event_log` é podado em 120 dias.
+        jaFoiFechado:
+          linha.fechado_alguma_vez_em !== null || (linha.lost_reason ?? "").trim() !== "",
+      };
     },
 
     async carregaContato(orgId, contactId) {

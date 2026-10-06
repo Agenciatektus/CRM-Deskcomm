@@ -60,7 +60,7 @@ export function ensureHandlersRegistered(): void {
   // Vizinho do gatilho de etapa, e pelo mesmo critério: escrita curta no banco
   // (uma linha em `campaign_recipients`), sem rede de terceiro. Quem MANDA a
   // mensagem é o `campaign-worker`, no cron — aqui só se decide que a pessoa
-  // entra na campanha contínua (migration 9038). Chave própria no
+  // entra na campanha contínua (migration 9039). Chave própria no
   // `consumed_by[]`: uma falha nossa não marca o evento como consumido pelo
   // gatilho de follow-up, nem o contrário.
   registerHandler(campanhaEntradaPorEtapaHandler);

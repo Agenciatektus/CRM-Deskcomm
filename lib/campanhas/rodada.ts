@@ -115,7 +115,7 @@ interface CampanhaRow {
   pipeline_id: string | null;
   stage_id: string | null;
   /**
-   * Modo de público CONTÍNUO (migration 9038). Aqui ela serve a UMA decisão: a
+   * Modo de público CONTÍNUO (migration 9039). Aqui ela serve a UMA decisão: a
    * campanha contínua não CONCLUI por fila vazia. Ver o bloco em
    * `rodarUmaCampanha`.
    */
@@ -281,7 +281,7 @@ async function rodarUmaCampanha(
       .in("status", ["pending", "queued", "sending"]);
     if ((count ?? 0) > 0) return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: "aguardando" };
 
-    // ═══ A CAMPANHA CONTÍNUA NÃO CONCLUI POR FILA VAZIA (migration 9038) ═══
+    // ═══ A CAMPANHA CONTÍNUA NÃO CONCLUI POR FILA VAZIA (migration 9039) ═══
     //
     // Na campanha de lista, fila vazia significa "acabou": a lista era finita,
     // foi inteira despachada, e `completed` é a verdade. Na contínua, fila vazia

@@ -74,7 +74,7 @@ const baseDaCampanha = {
    */
   passos: passosDaCampanhaSchema.optional(),
   /**
-   * O MODO DE PÚBLICO (migration 9038). Ausente ou `false` = LISTA, o snapshot
+   * O MODO DE PÚBLICO (migration 9039). Ausente ou `false` = LISTA, o snapshot
    * congelado, que é o padrão e o comportamento de toda campanha existente.
    * `true` = CONTÍNUO: quem entra na etapa de `entrada_etapa_id` é abordado.
    *

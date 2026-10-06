@@ -13,7 +13,7 @@
  * O que estes casos prendem é a SEPARAÇÃO: o ramo do passado não pode olhar o
  * estado da campanha, e o ramo do presente não pode olhar `sent_at`. A semântica
  * ("recebeu em campanha cancelada continua vetado") é provada contra Postgres
- * real em `tests/invariants/entrada-continua-contida-9038.test.ts` — aqui se
+ * real em `tests/invariants/entrada-continua-contida-9039.test.ts` — aqui se
  * prova que as duas consultas existem e perguntam coisas diferentes.
  */
 import { describe, expect, it } from "vitest";

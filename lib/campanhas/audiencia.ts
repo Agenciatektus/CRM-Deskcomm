@@ -28,10 +28,14 @@
 import { z } from "zod";
 
 /**
- * ⚠️ `CAMPANHAS_VIVAS` FOI REMOVIDA na 9038, e o vazio aqui é deliberado.
+ * ⚠️ `CAMPANHAS_VIVAS` FOI REMOVIDA na 9039, e o vazio aqui é deliberado.
  *
  * Ela listava os estados em que uma campanha "ainda pretende falar com a lista
- * dela", e servia a UMA coisa: o veto "já em campanha" de `contatosJaEmCampanha`.
+ * dela", e servia ao veto "já em campanha" nos DOIS lugares em que ele existe:
+ * `contatosJaEmCampanha` (`consulta-de-audiencia.ts`, o conjunto do modo lista) e
+ * `estaEmOutraCampanha` (`entrada-por-etapa.db.ts`, a pergunta por contato do
+ * gatilho contínuo). Os dois saíram dela no mesmo commit — nenhum ficou
+ * pendente.
  * Esse veto virou DOIS critérios (decisão do dono, 06/10/2026): quem RECEBEU nos
  * últimos 30 dias, que não olha estado de campanha nenhum, e quem está na FILA
  * ATIVA de uma campanha que ainda vai falar, que olha.

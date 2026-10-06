@@ -168,9 +168,16 @@ begin
   if v_is_won then
     new.status := 'won';
     new.closed_at := coalesce(new.closed_at, now());
+    -- 9040: a memória que a reabertura NÃO apaga. `coalesce` guarda o PRIMEIRO
+    -- fechamento — fechar, reabrir e fechar de novo não reescreve a data. É a
+    -- única coisa que diz "este negócio já fechou" depois de reaberto, e é o que
+    -- impede a entrada contínua da campanha (9039) de abordar quem já comprou
+    -- com a copy de primeiro contato.
+    new.fechado_alguma_vez_em := coalesce(new.fechado_alguma_vez_em, now());
   elsif v_is_lost then
     new.status := 'lost';
     new.closed_at := coalesce(new.closed_at, now());
+    new.fechado_alguma_vez_em := coalesce(new.fechado_alguma_vez_em, now());
     -- #1537: DE QUEM ERA a etapa que este negócio deixou — a perda sem a
     -- etapa de origem não diz em que momento o funil vazou. Só na transição:
     -- um card já perdido arrastado entre etapas de perda mantém a origem
@@ -188,6 +195,10 @@ begin
       -- #1537: reabriu — a origem da perda passada não pertence a um negócio
       -- que voltou a ser aberto. Se morrer de novo, nasce a nova origem.
       new.lost_from_stage_id := null;
+      -- ⚠️ 9040: `fechado_alguma_vez_em` NÃO entra nesta limpeza, de propósito.
+      -- As duas linhas acima são justamente o que apaga a memória do fechamento,
+      -- e era por isso que um cliente ganho reaberto em DOIS arrastos passava por
+      -- todos os vetos da campanha contínua. Limpá-la devolve o buraco.
     end if;
   end if;
   return new;
@@ -47764,7 +47775,7 @@ revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, 
 
 notify pgrst, 'reload schema';
 
--- ---- quem entra na campanha: o modo CONTÍNUO por etapa (migration 9038) ----
+-- ---- quem entra na campanha: o modo CONTÍNUO por etapa (migration 9039) ----
 --
 -- `campaigns.entrada_continua` (boolean, default false) e
 -- `campaigns.entrada_etapa_id` (FK composta para `crm_stages`) dão à campanha um
@@ -47819,11 +47830,11 @@ alter table public.campaigns
 
 comment on column public.campaigns.entrada_continua is
   'false (default) = modo LISTA: o público é o snapshot congelado na preparação, como em toda '
-  'campanha anterior à 9038. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
+  'campanha anterior à 9039. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
   'abordado por esta campanha, uma linha de campaign_recipients por chegada, pelo gatilho '
   'lib/campanhas/entrada-por-etapa.ts. O modo é escolha explícita do operador e SOBREVIVE ao '
   'DELETE da etapa (que só anula entrada_etapa_id): campanha contínua sem etapa para de '
-  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9038.';
+  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9039.';
 
 alter table public.campaigns
   add column if not exists entrada_etapa_id uuid;
@@ -47832,7 +47843,7 @@ comment on column public.campaigns.entrada_etapa_id is
   'A etapa do funil que arma a entrada contínua (crm_stages). Lida só quando entrada_continua; '
   'NULL com o modo ligado = a etapa foi apagada, e o gatilho não casa nada (falha fechada). '
   'Não é a mesma coisa que stage_id, que é onde o CARD de quem foi abordado nasce (0378/9037): '
-  'aqui é de onde a pessoa VEM. Migration 9038.';
+  'aqui é de onde a pessoa VEM. Migration 9039.';
 
 do $$
 begin
@@ -47876,6 +47887,61 @@ end $$;
 create index if not exists campaigns_entrada_por_etapa
   on public.campaigns (organization_id, entrada_etapa_id)
   where entrada_continua and entrada_etapa_id is not null;
+
+notify pgrst, 'reload schema';
+
+-- ---- a memória de que o negócio já foi fechado (migration 9040) ----
+--
+-- `crm_leads.fechado_alguma_vez_em` guarda QUANDO o negócio foi fechado pela
+-- primeira vez, e o gatilho `fn_crm_lead_close_on_stage` — redefinido acima, no
+-- corpo que o banco usa, igual ao que a 0426 fez com ele — passa a preenchê-la na
+-- transição para ganho ou perda, sem NUNCA limpá-la na reabertura.
+--
+-- O buraco que isto tampa: o próprio gatilho apaga `closed_at` e
+-- `lost_from_stage_id` quando reabre o negócio, e depois disso ele é
+-- indistinguível de um que nunca fechou. O veto por `from_stage_id` da 9039 fecha
+-- o salto de UM arrasto («Ganho» → etapa armada); não fecha o de DOIS («Ganho» →
+-- «Novo lead», depois «Novo lead» → etapa armada), que é triagem normal — no
+-- segundo evento a etapa de origem é aberta, o status já é `open` e nada na linha
+-- lembra do fechamento. Resultado: um cliente que comprou em março recebendo a
+-- copy de PRIMEIRO contato em outubro.
+--
+-- Por que coluna e não `event_log`: `fn_podar_event_log` (9021) apaga `done`/`dead`
+-- em 120 dias (piso de 90), então o `lead.won` de março não existe em outubro — um
+-- veto apoiado nele funcionaria nos testes e nos primeiros meses e passaria a
+-- falhar sozinho, em silêncio, justamente nos clientes mais antigos.
+--
+-- `lost_reason` sobrevive à reabertura (o CHECK só o exige quando `status='lost'`
+-- e ninguém o limpa) e cobre a PERDA, inclusive a histórica, que nenhum backfill
+-- alcança. `won_reason` é opcional, e por isso não serve para o ganho.
+--
+-- Sem CHECK (um CHECK que exigisse a coluna faria o DELETE de etapa ou funil
+-- falhar, pela lição da 9032) e sem índice novo: a leitura é pela PK do negócio,
+-- dentro da consulta que a 9039 já fazia.
+--
+-- Idempotente: coluna com `if not exists`, backfill com
+-- `where fechado_alguma_vez_em is null` (reaplicar não reescreve data nenhuma).
+
+alter table public.crm_leads
+  add column if not exists fechado_alguma_vez_em timestamptz;
+
+comment on column public.crm_leads.fechado_alguma_vez_em is
+  'QUANDO este negócio foi fechado (ganho ou perdido) pela PRIMEIRA vez. Preenchida por '
+  'fn_crm_lead_close_on_stage e NUNCA limpa na reabertura — é a única memória de que o '
+  'negócio já fechou, porque o mesmo gatilho apaga closed_at e lost_from_stage_id ao reabrir. '
+  'Quem está fechado AGORA se lê em status; esta coluna responde "já foi fechado alguma vez?". '
+  'Lida pela entrada contínua da campanha (9039), para não abordar quem já comprou com a copy '
+  'de primeiro contato. Migration 9040.';
+
+-- Quem está fechado AGORA já foi fechado. `closed_at` quando existe (é a data
+-- real), `updated_at` como piso quando não — aproximação declarada, e o veto só
+-- pergunta "já foi fechado?", nunca quando. Quem REABRIU antes desta migration
+-- não tem como ser recuperado: a perda desses segue coberta por `lost_reason`, e o
+-- ganho fica de fora, conscientemente.
+update public.crm_leads
+   set fechado_alguma_vez_em = coalesce(closed_at, updated_at)
+ where status in ('won', 'lost')
+   and fechado_alguma_vez_em is null;
 
 notify pgrst, 'reload schema';
 

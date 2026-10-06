@@ -126,7 +126,7 @@ export interface ContextoDaClassificacao {
  * falar de novo com quem já se falou, que é o oposto do que um CRM serve para
  * fazer.
  *
- * ⚠⚠ A RÉGUA MUDOU NA 9038, e o que estava escrito aqui até então era "o veto
+ * ⚠⚠ A RÉGUA MUDOU NA 9039, e o que estava escrito aqui até então era "o veto
  * termina quando a campanha termina". Terminou de valer: a campanha de entrada
  * CONTÍNUA nunca conclui, e por aquele critério ela excluiria de toda campanha
  * futura, para sempre, cada contato que tocasse.

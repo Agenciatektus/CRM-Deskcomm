@@ -57,7 +57,7 @@ export function EditarCampanha({ id }: { id: string }) {
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
-  // O MODO DE PÚBLICO (9038). Carregado do rascunho; só muda por escolha.
+  // O MODO DE PÚBLICO (9039). Carregado do rascunho; só muda por escolha.
   const [continua, setContinua] = useState(false);
   const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
   const [carregado, setCarregado] = useState(false);

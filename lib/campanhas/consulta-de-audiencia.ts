@@ -159,7 +159,7 @@ export async function buscarCandidatos(
  * ═══ As duas voltas erradas, registradas para quem for mexer ═══
  *
  * • "linha em campanha VIVA" media (2) e era usado como se medisse (1). Caiu com
- *   a 9038: a campanha de entrada contínua nunca conclui, então por aquele
+ *   a 9039: a campanha de entrada contínua nunca conclui, então por aquele
  *   critério todo contato que ela tocasse ficaria vetado de qualquer campanha
  *   futura, para sempre — ela esterilizaria o modo lista do tenant.
  * • "elegível nos últimos 30 dias, menos `cancelled`" tentou medir (1) com o
@@ -170,16 +170,34 @@ export async function buscarCandidatos(
  * Com os dois separados, "cancelada antes de falar" sai do veto por si: não tem
  * `sent_at` e não tem linha viva. Nenhum predicado olha `cancelled`.
  *
- * ⚠️ `eligibility_status = 'eligible'` fica nos dois ramos e nos dois é redundante
- * hoje (`sent_at` só é escrito depois de um envio; linha excluída nasce `skipped`,
- * fora da fila ativa). Fica porque custa zero e a alternativa seria apoiar um
- * predicado de SEGURANÇA num invariante que mora em outro arquivo.
+ * ⚠️ `eligibility_status = 'eligible'` fica nos dois ramos, e NÃO é inerte — o
+ * comentário anterior afirmava que era. `fecharPorOptOut`
+ * (`lib/campanhas/resposta.ts`) marca `excluded` linhas que JÁ RECEBERAM
+ * (`sent`/`delivered`/`read`/`replied`), então existe linha com `sent_at` na
+ * janela e `eligible = false`, que o ramo (1) não veta. Hoje sem dano: aquele
+ * caminho só roda com `contacts.is_blocked`, e bloqueio é veto mais forte. Vira
+ * fail-open calado no dia em que alguém separar "bloqueado" de "recusou
+ * marketing". Racional completo em `entrada-por-etapa.db.ts`.
  *
- * ⚠️ LIMITE CONHECIDO, anterior a esta mudança: o PostgREST trunca a resposta no
- * `max_rows` da instalação, e um conjunto truncado veta MENOS gente do que devia —
- * em silêncio. A janela de 30 dias estreitou muito a exposição (antes eram todos
- * os destinatários de todas as campanhas vivas), mas não a eliminou. O conserto
- * é paginação ou RPC, e não entra nesta fatia.
+ * ⚠️ LIMITE CONHECIDO, anterior a esta mudança: 1.000 LINHAS POR RAMO.
+ *
+ * `max_rows = 1000` (`supabase/config.toml`) trunca a resposta do PostgREST sem
+ * erro nenhum, e conjunto truncado veta MENOS gente do que devia — em silêncio.
+ * O gatilho é concreto: um tenant que tenha enviado mais de 1.000 abordagens em
+ * 30 dias, alcançável em semanas com teto diário alto (o teto da régua sozinho
+ * permite 500/dia). A janela de 30 dias estreitou muito a exposição — antes eram
+ * TODOS os destinatários de todas as campanhas vivas —, mas não a eliminou.
+ *
+ * ⚠️ E o conserto mais curto NÃO É PAGINAÇÃO. `rodada.ts` revalida bloqueio,
+ * anonimização, opt-out e supressão imediatamente antes de cada envio, mas NÃO
+ * revalida "já em campanha" — então o truncamento atravessa o snapshot e chega ao
+ * envio. Uma chamada de `estaEmOutraCampanha` por destinatário na rodada fecha as
+ * duas coisas de uma vez: o truncamento E o snapshot velho (lista preparada em
+ * segunda, despachada em quinta, com a pessoa abordada por outra campanha na
+ * quarta). É ponto por destinatário, sem conjunto, logo sem `max_rows`.
+ *
+ * Fora desta fatia de propósito: mexer no caminho de envio exige o olhar do
+ * @Cassio_SecRev sobre a rodada inteira, e o que esta fatia entrega é quem ENTRA.
  */
 export async function contatosJaEmCampanha(
   admin: SupabaseClient,

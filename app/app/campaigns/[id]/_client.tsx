@@ -75,7 +75,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
   const c = campanha.data;
   const m = metricas.data;
   const linhas = destinatarios.data?.pages.flatMap((p) => p.data) ?? [];
-  // O MODO DE PÚBLICO (9038). Muda o que esta tela pode AFIRMAR: no contínuo não
+  // O MODO DE PÚBLICO (9039). Muda o que esta tela pode AFIRMAR: no contínuo não
   // há lista, não há porcentagem de fila e não há conclusão automática.
   const continua = c.entrada_continua === true;
 
@@ -447,7 +447,7 @@ function DestinoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
 }
 
 /**
- * QUEM ENTRA NESTA CAMPANHA (migration 9038).
+ * QUEM ENTRA NESTA CAMPANHA (migration 9039).
  *
  * Só aparece no modo CONTÍNUO. No modo lista a resposta já está na tela, no
  * número "Na lista" e na própria lista de destinatários; um card dizendo "o
@@ -474,7 +474,7 @@ function EntradaDestaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           {t("é abordado, a partir do momento em que a campanha foi iniciada.")}
         </p>
       ) : (
-        // Etapa nula com o modo ligado = alguém apagou a etapa, e a FK da 9038
+        // Etapa nula com o modo ligado = alguém apagou a etapa, e a FK da 9039
         // anulou a referência. A campanha PAROU de abordar (o gatilho não casa
         // etapa nula) e precisa dizer isso: silêncio aqui se leria como
         // "está funcionando".

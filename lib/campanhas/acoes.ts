@@ -19,6 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ApiErrorCode } from "@/lib/api/errors";
 import { sendMessageHandler } from "@/app/api/v1/messages/_handler";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
+import { logger } from "@/lib/logger";
 
 import { baseLegalValida, motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { ehEntradaContinua, problemaNaEntradaContinua } from "./entrada-continua";
@@ -48,7 +49,7 @@ export interface CampanhaCarregada {
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id: string | null;
   /**
-   * O modo de público (migration 9038). `false` = LISTA (o snapshot congelado,
+   * O modo de público (migration 9039). `false` = LISTA (o snapshot congelado,
    * default e comportamento de toda campanha anterior a ela); `true` =
    * CONTÍNUO, e quem entra em `entrada_etapa_id` é abordado. Racional em
    * `lib/campanhas/entrada-continua.ts`.
@@ -147,13 +148,13 @@ function faltaParaEnviar(c: CampanhaCarregada): Recusa | null {
   if (dosPassos) {
     return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: dosPassos, status: 422 };
   }
-  // A ENTRADA CONTÍNUA (9038), no MESMO gate — e por isso ela vale para
+  // A ENTRADA CONTÍNUA (9039), no MESMO gate — e por isso ela vale para
   // preparar, iniciar, agendar e testar de uma vez. Campanha em modo lista sai
   // daqui sem mudança nenhuma: `problemaNaEntradaContinua` devolve `null` na
   // primeira linha quando a flag está desligada.
   //
   // Aqui é também onde a campanha contínua que PERDEU a etapa (alguém a apagou,
-  // e a FK da 9038 anulou a referência) é barrada: ela já havia parado de
+  // e a FK da 9039 anulou a referência) é barrada: ela já havia parado de
   // abordar — o gatilho não casa etapa nula — e a próxima ação diz por quê.
   const daEntrada = problemaNaEntradaContinua(c);
   if (daEntrada) {
@@ -228,7 +229,7 @@ export async function prepararAcao(
   }
 
   try {
-    // ═══ MODO CONTÍNUO: preparar é CONFERIR e ZERAR, não montar lista (9038) ═══
+    // ═══ MODO CONTÍNUO: preparar é CONFERIR e ZERAR, não montar lista (9039) ═══
     //
     // Nenhuma linha de `campaign_recipients` NASCE aqui. O público desta
     // campanha são as pessoas que ENTRAREM na etapa depois do Iniciar, e
@@ -250,7 +251,7 @@ export async function prepararAcao(
     // O que a prévia dá nesse caso é o número honesto — zero —, e o texto segue
     // conferido pelo gate acima e pelo envio de teste.
     if (ehEntradaContinua(c)) {
-      // A etapa é do FUNIL desta campanha? A FK composta da 9038 já garante a
+      // A etapa é do FUNIL desta campanha? A FK composta da 9039 já garante a
       // organização; o funil não, e a incoerência seria silenciosa e torta: o
       // gatilho casa só pela etapa (abordaria gente), e a prévia filtra funil E
       // etapa (mostraria zero). Tela dizendo "ninguém" com mensagem saindo é a
@@ -292,11 +293,27 @@ export async function prepararAcao(
         .eq("campaign_id", c.id);
       if (erroDaLimpeza) {
         // Falha dura: seguir com resto de fila no banco é o cenário acima.
+        //
+        // ⚠️ A MENSAGEM DO POSTGREST NÃO VAI PARA O RECIBO. É a mesma doutrina que
+        // o P2-3 do @Cassio_SecRev aplicou em `entrada-por-etapa.db.ts`, e ela
+        // valia aqui também: a resposta da API é lida em tela e pode ecoar o
+        // valor que o banco recusou. O texto real vai para o log do servidor,
+        // que é onde se investiga; o `failure_code` da campanha (gravado por
+        // `voltarAoRascunho`) é o rastro que fica na linha.
+        logger.warn("[campanha] limpeza da fila falhou ao preparar em modo contínuo", {
+          campanha: c.id,
+          motivo: erroDaLimpeza.message,
+        });
         await voltarAoRascunho(admin, c.id, "limpeza_da_fila");
         return {
           ok: false,
-          codigo: "campanha_sem_audiencia",
-          mensagem: `Não foi possível limpar a fila desta campanha: ${erroDaLimpeza.message}`,
+          // Código PRÓPRIO: `campanha_sem_audiencia` descreve "o recorte não
+          // achou ninguém" e mandaria o operador mexer no filtro, que não tem
+          // nada com isto.
+          codigo: "campanha_fila_nao_limpa",
+          mensagem:
+            "Não foi possível limpar a fila desta campanha antes de prepará-la. " +
+            "Tente de novo; se repetir, o motivo está no log do servidor.",
           status: 422,
         };
       }
@@ -418,7 +435,7 @@ export async function iniciarAcao(
   const recusa = recusaDeTransicao(c.status, "running") ?? faltaParaEnviar(c);
   if (recusa) return recusa;
 
-  // ⚠️ O GATE DE "TEM GENTE NA LISTA" NÃO SE APLICA AO MODO CONTÍNUO (9038): ali
+  // ⚠️ O GATE DE "TEM GENTE NA LISTA" NÃO SE APLICA AO MODO CONTÍNUO (9039): ali
   // a lista está vazia por desenho, e exigir destinatário antes de iniciar
   // tornaria o modo impossível de ligar. O que o substitui é o gate de
   // `faltaParaEnviar` acima, que já exigiu funil, etapa, teto do dia e janela —
@@ -581,7 +598,7 @@ export async function duplicarAcao(
       // "escolha o funil" numa tela que ele não mexeu. `stage_id` e `agent_id`
       // seguem fora, como antes — mudá-los é assunto de outra fatia.
       pipeline_id: c.pipeline_id,
-      // O MODO DE PÚBLICO vai junto (9038): duplicar uma campanha contínua para
+      // O MODO DE PÚBLICO vai junto (9039): duplicar uma campanha contínua para
       // trocar o texto é o caminho oficial de editar a mensagem dela (conteúdo
       // só muda em rascunho, e a máquina de estados não leva de `running` nem de
       // `paused` de volta para `draft`). A cópia nasce em RASCUNHO, com o

@@ -13,7 +13,7 @@ import {
 } from "./entrada-por-etapa";
 
 /**
- * O GATILHO DA CAMPANHA CONTÍNUA (migration 9038) — contra um DB de mentira,
+ * O GATILHO DA CAMPANHA CONTÍNUA (migration 9039) — contra um DB de mentira,
  * porque a decisão é o que importa.
  *
  * O que se cobra aqui é, em ordem de custo de errar:
@@ -82,7 +82,7 @@ interface Cenario {
   armadas?: CampanhaArmada[];
   /** `true` = a etapa (de origem ou de destino) fecha o negócio. */
   etapaDeFechamento?: boolean;
-  negocio?: { contactId: string | null; aberto: boolean } | null;
+  negocio?: { contactId: string | null; aberto: boolean; jaFoiFechado?: boolean } | null;
   alvo?: ContatoDoAlvo | null;
   emOutraCampanha?: boolean;
   suprimido?: boolean;
@@ -97,7 +97,9 @@ function fakeDb(c: Cenario = {}): { db: EntradaPorEtapaDb; gravadas: LinhaDoAlis
     carregaCampanhasArmadas: async () => c.armadas ?? [campanha()],
     ehEtapaDeFechamento: async () => c.etapaDeFechamento ?? false,
     carregaNegocio: async () =>
-      c.negocio === undefined ? { contactId: CONTATO, aberto: true } : c.negocio,
+      c.negocio === undefined
+        ? { contactId: CONTATO, aberto: true, jaFoiFechado: false }
+        : c.negocio && { ...c.negocio, jaFoiFechado: c.negocio.jaFoiFechado === true },
     carregaContato: async () => (c.alvo === undefined ? contato() : c.alvo),
     estaEmOutraCampanha: async () => c.emOutraCampanha ?? false,
     estaSuprimido: async () => c.suprimido ?? false,
@@ -183,7 +185,7 @@ describe("entrada por etapa: quem NÃO é abordado", () => {
         ...db,
         carregaNegocio: async () => {
           perguntouDoNegocio = true;
-          return { contactId: CONTATO, aberto: true };
+          return { contactId: CONTATO, aberto: true, jaFoiFechado: false };
         },
       }),
       evento(),
@@ -384,7 +386,7 @@ describe("entrada por etapa: o card que VOLTA de ganho ou de perda", () => {
         },
         carregaNegocio: async () => {
           perguntouDoNegocio = true;
-          return { contactId: CONTATO, aberto: true };
+          return { contactId: CONTATO, aberto: true, jaFoiFechado: false };
         },
       }),
       evento({ payload: { to_stage_id: ETAPA, from_stage_id: "etapa-de-ganho" } }),
@@ -397,6 +399,44 @@ describe("entrada por etapa: o card que VOLTA de ganho ou de perda", () => {
     const { db } = fakeDb();
     const r = await alistarPorEtapa(deps(db), evento({ payload: { to_stage_id: ETAPA } }));
     expect(r.veio_de_fechamento).toBe(0);
+    expect(r.alistados).toBe(1);
+  });
+
+  it("O SALTO DE DOIS ARRASTOS: negócio reaberto e re-triado não é abordado", async () => {
+    // P1-2 da segunda passada do @Cassio_SecRev, e é o furo que o veto de origem
+    // NÃO cobria. «Ganho» → «Novo lead» é vetado por aquele, mas
+    // `fn_crm_lead_close_on_stage` apaga `closed_at` e `lost_from_stage_id` no
+    // mesmo UPDATE — então o arrasto seguinte, «Novo lead» → etapa armada, chega
+    // com origem ABERTA, status `open` e nenhuma memória do fechamento. Quem
+    // lembra é `fechado_alguma_vez_em` (9040) ou `lost_reason`.
+    const { db, gravadas } = fakeDb({
+      negocio: { contactId: CONTATO, aberto: true, jaFoiFechado: true },
+    });
+    const r = await alistarPorEtapa(deps(db), evento());
+    expect(r.alistados).toBe(0);
+    expect(r.ja_foi_fechado).toBe(1);
+    expect(gravadas).toHaveLength(0);
+  });
+
+  it("o veto da história NÃO expira: quem já foi ganho é cliente, não prospect", async () => {
+    // O contador é separado de `veio_de_fechamento` de propósito: os sinais são
+    // diferentes (etapa de ORIGEM deste movimento × história do negócio), e
+    // confundi-los esconderia qual dos dois pegou.
+    const { db } = fakeDb({
+      negocio: { contactId: CONTATO, aberto: true, jaFoiFechado: true },
+    });
+    const r = await alistarPorEtapa(deps(db), evento({ payload: { to_stage_id: ETAPA } }));
+    expect(r.veio_de_fechamento).toBe(0);
+    expect(r.ja_foi_fechado).toBe(1);
+  });
+
+  it("negócio que nunca fechou segue sendo abordado", async () => {
+    // O controle: sem ele, um veto escrito como `!== false` reprovaria tudo.
+    const { db } = fakeDb({
+      negocio: { contactId: CONTATO, aberto: true, jaFoiFechado: false },
+    });
+    const r = await alistarPorEtapa(deps(db), evento());
+    expect(r.ja_foi_fechado).toBe(0);
     expect(r.alistados).toBe(1);
   });
 });
