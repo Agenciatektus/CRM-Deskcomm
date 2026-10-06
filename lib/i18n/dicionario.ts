@@ -13444,6 +13444,13 @@ export const DICIONARIO: Traducoes = {
     es: "por día, dentro del horario configurado. Quien ya está en la etapa hoy no es abordado. Para parar, use Pausar o Cancelar.",
   },
   "Entraram na etapa": { es: "Entraron en la etapa" },
+  "Quem já entrou": { es: "Quién ya entró" },
+  "Quem ficou de fora não é avaliado de novo nesta campanha, mesmo que o motivo deixe de valer (um telefone que faltava e foi preenchido, por exemplo). Para dar outra chance a essas pessoas, duplique a campanha.": {
+    es: "Quien quedó fuera no se vuelve a evaluar en esta campaña, aunque el motivo deje de valer (un teléfono que faltaba y se completó, por ejemplo). Para darles otra oportunidad, duplique la campaña.",
+  },
+  "Ninguém entrou na etapa desde que a campanha começou. Ela segue de pé, esperando.": {
+    es: "Nadie entró en la etapa desde que la campaña comenzó. Sigue en pie, esperando.",
+  },
   "Andamento": { es: "Avance" },
   "na fila agora": { es: "en la fila ahora" },
   "entraram na etapa e ficaram de fora": { es: "entraron en la etapa y quedaron fuera" },

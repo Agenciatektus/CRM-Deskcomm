@@ -228,12 +228,14 @@ export async function prepararAcao(
   }
 
   try {
-    // ═══ MODO CONTÍNUO: preparar é CONFERIR, não montar lista (9038) ═══
+    // ═══ MODO CONTÍNUO: preparar é CONFERIR e ZERAR, não montar lista (9038) ═══
     //
-    // Nenhuma linha de `campaign_recipients` nasce aqui. O público desta
+    // Nenhuma linha de `campaign_recipients` NASCE aqui. O público desta
     // campanha são as pessoas que ENTRAREM na etapa depois do Iniciar, e
     // gravá-las agora seria abordar o estoque — justamente o que o corte
-    // "nada retroativo" do gatilho existe para impedir.
+    // "nada retroativo" do gatilho existe para impedir. Mas a fila é APAGADA
+    // (ver o bloco do `delete` abaixo): não montar lista não é o mesmo que
+    // deixar de pé a lista que outra preparação montou.
     //
     // O que preparar faz, e é o que preserva a revisão da 1ª mensagem num modo
     // que não tem "antes": roda a PRÉVIA sobre a etapa escolhida com o MESMO
@@ -258,6 +260,47 @@ export async function prepararAcao(
         await voltarAoRascunho(admin, c.id, "etapa_fora_do_funil");
         return forasDoFunil;
       }
+
+      // ═══ A FILA É APAGADA AQUI, e isto é um P0 do @Cassio_SecRev ═══
+      //
+      // O invariante que esta fatia inteira assume é: a fila é o que a ÚLTIMA
+      // preparação montou, e a última preparação é o que o operador conferiu. No
+      // modo lista quem o sustenta é o `delete` com que `prepararCampanha`
+      // começa. O ramo contínuo não monta lista nenhuma — e, por não montar,
+      // tinha deixado de apagar; o gate `campanha_sem_elegiveis` do Iniciar
+      // também está desligado aqui (ali ele impediria o modo de existir). As
+      // duas únicas coisas que garantiam o invariante, desligadas na mesma
+      // fatia.
+      //
+      // O caminho que isso abria, medido no código: uma preparação de lista de
+      // 5.000 que falha no lote 7 cai em `voltarAoRascunho` e deixa ~3.000
+      // linhas `pending`, com o `rendered_body` do texto ANTIGO. O operador
+      // desiste da lista, marca entrada contínua, prepara e Inicia. O worker
+      // despacha as 3.000 mensagens descartadas, no texto que o operador já
+      // havia trocado — e `rodada.ts` NUNCA compara
+      // `campaign_recipients.content_version` com `campaigns.content_version`
+      // (ela só carimba a da campanha no metadado da mensagem), então nada
+      // nota a divergência.
+      //
+      // Apagar não apaga histórico: `jaEnviou`, logo acima, já recusou preparar
+      // qualquer campanha de que tenha saído mensagem. O que morre aqui é
+      // exclusivamente fila que nunca foi despachada.
+      const { error: erroDaLimpeza } = await admin
+        .from("campaign_recipients")
+        .delete()
+        .eq("organization_id", c.organization_id)
+        .eq("campaign_id", c.id);
+      if (erroDaLimpeza) {
+        // Falha dura: seguir com resto de fila no banco é o cenário acima.
+        await voltarAoRascunho(admin, c.id, "limpeza_da_fila");
+        return {
+          ok: false,
+          codigo: "campanha_sem_audiencia",
+          mensagem: `Não foi possível limpar a fila desta campanha: ${erroDaLimpeza.message}`,
+          status: 422,
+        };
+      }
+
       const previa = await resumoDaEtapaDeEntrada(admin, { campanha: c, agora });
       await admin
         .from("campaigns")
@@ -381,6 +424,11 @@ export async function iniciarAcao(
   // `faltaParaEnviar` acima, que já exigiu funil, etapa, teto do dia e janela —
   // e esses quatro são, no contínuo, o equivalente de "sei para quem vou falar e
   // quanto por dia".
+  //
+  // ⚠️ E o que impede este desligamento de virar envio em massa é o `delete` do
+  // ramo contínuo de `prepararAcao`: com ele, chegar em `ready` significa fila
+  // VAZIA, e não "fila que ninguém mediu". Quem mexer num dos dois tem de ler o
+  // outro — eles são a mesma garantia, em dois lugares.
   if (!ehEntradaContinua(c)) {
     const { count } = await admin
       .from("campaign_recipients")

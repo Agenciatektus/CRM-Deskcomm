@@ -17,7 +17,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
 
-import { CAMPANHAS_VIVAS } from "./audiencia";
+import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
+
 import { recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
 import type { CampanhaArmada, ContatoDoAlvo, EntradaPorEtapaDb } from "./entrada-por-etapa.tipos";
@@ -25,7 +26,59 @@ import type { CampanhaArmada, ContatoDoAlvo, EntradaPorEtapaDb } from "./entrada
 const COLUNAS_DA_ARMADA =
   "id, organization_id, message_body, message_variants, content_version, teto_diario, started_at";
 
+/**
+ * O começo da janela em que ter sido abordado ainda veta uma campanha nova.
+ *
+ * A constante é a do anti-laço da régua de prospecção
+ * (`DIAS_SEM_REPETIR_A_CADENCIA`), importada e não redigitada: um `30` solto
+ * aqui seria a segunda definição da mesma política, e o dia em que uma mudasse
+ * a outra ficaria mentindo em silêncio.
+ */
+export function desdeDaJanelaDeRepeticao(agora: Date = new Date()): Date {
+  return new Date(agora.getTime() - DIAS_SEM_REPETIR_A_CADENCIA * 86_400_000);
+}
+
+/**
+ * Esta etapa fecha o negócio? Função NOMEADA no módulo, e não método chamado por
+ * `this`: `carregaCampanhasArmadas` também a usa, e um `this.` ali quebraria
+ * calado no dia em que alguém desestruturasse a porta
+ * (`const { carregaCampanhasArmadas } = db`) — com o resultado de a etapa de
+ * fechamento deixar de ser recusada, que é o oposto do que ela existe para fazer.
+ *
+ * FALHA NÃO LIBERA: sem conseguir provar que a etapa é aberta, trata como
+ * fechamento. O erro barato aqui é não abordar; o caro é abordar quem comprou com
+ * a copy de primeiro contato.
+ */
+async function leEtapaDeFechamento(
+  admin: SupabaseClient,
+  orgId: string,
+  stageId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("crm_stages")
+    .select("is_won, is_lost")
+    .eq("organization_id", orgId)
+    .eq("id", stageId)
+    .maybeSingle();
+  if (error) {
+    logger.warn("[campanha] etapa do gatilho ilegível; tratando como fechamento", {
+      organizacao: orgId,
+      etapa: stageId,
+      motivo: error.message,
+    });
+    return true;
+  }
+  const etapa = data as { is_won: boolean | null; is_lost: boolean | null } | null;
+  // Etapa que não existe mais também não libera: ela não tem como ser afirmada
+  // aberta, e a FK da 9038 já tira a campanha do ar nesse caso.
+  if (!etapa) return true;
+  return etapa.is_won === true || etapa.is_lost === true;
+}
+
 export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaPorEtapaDb {
+  const ehEtapaDeFechamento = (orgId: string, stageId: string) =>
+    leEtapaDeFechamento(admin, orgId, stageId);
+
   return {
     async carregaCampanhasArmadas(orgId, etapaId) {
       // `status = 'running'` e não "viva": `paused` não aborda gente nova (é o
@@ -40,8 +93,24 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
         .eq("entrada_etapa_id", etapaId)
         .eq("status", "running");
       if (error) throw new Error(`campanha_entrada_armadas: ${error.message}`);
-      return (data ?? []) as unknown as CampanhaArmada[];
+      const armadas = (data ?? []) as unknown as CampanhaArmada[];
+      if (armadas.length === 0) return armadas;
+
+      // ═══ ETAPA DE FECHAMENTO NÃO ARMA NADA (P1-2 do @Cassio_SecRev) ═══
+      //
+      // O `<select>` da tela já esconde `is_won`/`is_lost`, e UI não é controle:
+      // o tenant pode marcar `is_won` numa etapa DEPOIS de a campanha ter sido
+      // armada nela, e dali em diante toda venda ganha viraria uma abordagem de
+      // primeiro contato. O comentário do componente diz que ele é "a segunda
+      // porta, não a única" — esta é a primeira.
+      //
+      // Depois da consulta das campanhas, e não antes: no caminho comum (nenhuma
+      // campanha armada) não se paga consulta nenhuma, que é o que o corte
+      // precoce de `alistarPorEtapa` protege.
+      return (await ehEtapaDeFechamento(orgId, etapaId)) ? [] : armadas;
     },
+
+    ehEtapaDeFechamento,
 
     async carregaNegocio(orgId, leadId) {
       const { data, error } = await admin
@@ -95,26 +164,41 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
     },
 
     async estaEmOutraCampanha(orgId, contactId, excetoCampanhaId) {
-      // Consulta por CONTATO, e não o `Set` de `contatosJaEmCampanha`: aquele
-      // carrega todos os destinatários de todas as campanhas vivas da
-      // organização, o que é certo para classificar uma lista de 500 de uma vez
-      // e errado para responder sobre UMA pessoa a cada card arrastado.
-      const { data: vivas, error } = await admin
-        .from("campaigns")
-        .select("id")
-        .eq("organization_id", orgId)
-        .in("status", CAMPANHAS_VIVAS as unknown as string[])
-        .neq("id", excetoCampanhaId);
-      if (error) throw new Error(`campanha_entrada_vivas: ${error.message}`);
-      const ids = (vivas ?? []).map((c) => (c as { id: string }).id);
-      if (ids.length === 0) return false;
-      const { count, error: erroDest } = await admin
+      // ═══ O VETO OLHA A DATA DA LINHA, NÃO O ESTADO DA CAMPANHA ═══
+      //
+      // Decisão do dono (06/10/2026). Antes o veto era "tem linha em campanha
+      // VIVA", e a campanha contínua nunca conclui: todo contato que ela tocasse
+      // ficaria excluído de qualquer campanha futura para sempre. Agora a régua é
+      // uma só, e é a MESMA do anti-laço da régua de prospecção
+      // (`DIAS_SEM_REPETIR_A_CADENCIA`), então o produto passa a ter uma resposta
+      // única para "faz quanto tempo que falei com essa pessoa?".
+      //
+      // ═══ E só conta quem é ELEGÍVEL (P2-1 do @Cassio_SecRev) ═══
+      //
+      // A entrada contínua grava linha `skipped` para TODO contato que cruza a
+      // etapa e é vetado — bloqueado, sem telefone, que recusou marketing. Sem
+      // este filtro o veto alcançava quem foi apenas vetado, e numa etapa de
+      // entrada de funil isso é a base quase inteira: a campanha contínua
+      // esterilizaria o modo lista do tenant. O veto existe para não queimar quem
+      // RECEBEU, e excluído não recebeu nada.
+      //
+      // `cancelled` sai pelo mesmo raciocínio: a campanha foi cancelada antes de
+      // falar com essa pessoa, então ela não foi abordada.
+      const { count, error } = await admin
         .from("campaign_recipients")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", orgId)
         .eq("contact_id", contactId)
-        .in("campaign_id", ids);
-      if (erroDest) throw new Error(`campanha_entrada_comprometido: ${erroDest.message}`);
+        .eq("eligibility_status", "eligible")
+        .neq("status", "cancelled")
+        .neq("campaign_id", excetoCampanhaId)
+        .gte("created_at", desdeDaJanelaDeRepeticao().toISOString());
+      // Sem o `.in("campaign_id", ids)` de antes, de propósito (P2-2): a lista de
+      // campanhas vivas cresce sem teto porque a contínua nunca conclui, e em
+      // ~150 campanhas a URL do PostgREST passa de 8 KB e volta 400/414 — o
+      // alistamento pararia, com um aviso genérico de evento morto como único
+      // recibo. O predicado agora é todo do lado do servidor.
+      if (error) throw new Error(`campanha_entrada_comprometido: ${error.message}`);
       return (count ?? 0) > 0;
     },
 
@@ -153,7 +237,20 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
       // que entra e sai da etapa.
       if (error) {
         if (error.code === "23505") return false;
-        throw new Error(`campanha_entrada_alistamento: ${error.message}`);
+        // ⚠️ A MENSAGEM DO POSTGREST NÃO SOBE (P2-3 do @Cassio_SecRev). Ela vira o
+        // `detail` do handler e desce para `event_log.last_error`, que fica no
+        // banco e aparece em tela de diagnóstico — e o INSERT que falhou carrega
+        // `recipient_address`, cujo comentário de coluna diz, com estas palavras,
+        // que ele "nunca sai em log". Erro de constraint ou de tipo costuma ecoar
+        // o valor recusado. Para o recibo vai o CÓDIGO; o texto real vai para o
+        // log do servidor, que é onde se investiga.
+        logger.warn("[campanha] alistamento por etapa falhou", {
+          campanha: linha.campaign_id,
+          contato: linha.contact_id,
+          codigo: error.code ?? "sem_codigo",
+          motivo: error.message,
+        });
+        throw new Error(`campanha_entrada_alistamento:${error.code ?? "sem_codigo"}`);
       }
       return true;
     },

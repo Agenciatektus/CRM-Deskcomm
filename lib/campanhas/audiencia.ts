@@ -27,15 +27,21 @@
  */
 import { z } from "zod";
 
-/** Estados em que uma campanha ainda pretende falar com a lista dela. */
-export const CAMPANHAS_VIVAS = [
-  "draft",
-  "preparing",
-  "ready",
-  "scheduled",
-  "running",
-  "paused",
-] as const;
+/**
+ * ⚠️ `CAMPANHAS_VIVAS` FOI REMOVIDA na 9038, e o vazio aqui é deliberado.
+ *
+ * Ela listava os estados em que uma campanha "ainda pretende falar com a lista
+ * dela", e servia a UMA coisa: o veto "já em campanha" de `contatosJaEmCampanha`.
+ * Esse veto passou a olhar a DATA DA LINHA, e não o estado da campanha (decisão
+ * do dono, 06/10/2026) — porque a campanha de entrada contínua nunca conclui, e
+ * pelo critério antigo ela excluiria de qualquer campanha futura, para sempre,
+ * todo contato que tocasse.
+ *
+ * Deixar a constante de pé sem consumidor convidaria a ressuscitar a regra
+ * antiga. Quem precisar de "a campanha ainda vai falar?" leia a máquina de
+ * estados (`lib/campanhas/maquina-de-estados.ts`, `ehTerminal`), que é a
+ * autoridade sobre estado.
+ */
 
 export const filtroDeAudienciaSchema = z
   .strictObject({

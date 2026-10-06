@@ -64,7 +64,26 @@ export interface EntradaPorEtapaDb {
     leadId: string,
   ): Promise<{ contactId: string | null; aberto: boolean } | null>;
   carregaContato(orgId: string, contactId: string): Promise<ContatoDoAlvo | null>;
-  /** Este contato já está comprometido com OUTRA campanha viva da organização? */
+  /**
+   * Esta etapa fecha o negócio (`is_won` ou `is_lost`)?
+   *
+   * Lida para a etapa de ORIGEM do movimento, que é quem denuncia o card
+   * voltando de «Ganho» ou de «Perdido» — na volta o negócio é REABERTO por
+   * `fn_crm_lead_close_on_stage`, então o estado do negócio não conta a história.
+   * Falha de leitura NÃO libera: quem não consegue provar que a origem é aberta
+   * trata como fechamento, porque o erro barato aqui é não abordar.
+   */
+  ehEtapaDeFechamento(orgId: string, stageId: string): Promise<boolean>;
+  /**
+   * Este contato já foi ABORDADO por outra campanha da organização na janela de
+   * `DIAS_SEM_REPETIR_A_CADENCIA`?
+   *
+   * Por TEMPO e não por estado da campanha (decisão do dono, 06/10/2026): a
+   * contínua nunca conclui, e "tem linha em campanha viva" a faria excluir todo
+   * contato que tocasse de toda campanha futura, para sempre. E conta só quem é
+   * ELEGÍVEL: este gatilho grava linha também para o vetado, e vetado não
+   * recebeu nada.
+   */
   estaEmOutraCampanha(orgId: string, contactId: string, excetoCampanhaId: string): Promise<boolean>;
   /** O telefone está na lista de exclusão da operação (migration 0376)? */
   estaSuprimido(orgId: string, endereco: string): Promise<boolean>;
@@ -94,6 +113,23 @@ export interface ResumoDaEntradaPorEtapa {
   anterior_ao_inicio: number;
   /** O negócio não tem contato, ou não está mais aberto. */
   sem_alvo: number;
+  /**
+   * O card VOLTOU de uma etapa de ganho ou de perda (P1-2 do @Cassio_SecRev).
+   * `fn_crm_lead_close_on_stage` reabre o negócio nessa volta, então o veto de
+   * "negócio fechado" não o pega: quem o pega é a etapa de ORIGEM.
+   */
+  veio_de_fechamento: number;
+  /**
+   * O movimento foi feito pelo passo `mover_etapa` da própria régua, e não por
+   * uma pessoa. Reagir a ele fecharia o laço abordagem → passo → abordagem.
+   */
+  passo_de_regua: number;
+  /**
+   * Campanha contínua SEM teto do dia: não alista. Estado inalcançável pelo
+   * produto (o CHECK da 9038 o recusa), contado porque a alternativa é alistar
+   * sem conta se o CHECK não existir.
+   */
+  sem_teto: number;
   /** Entrou na etapa e virou linha EXCLUÍDA, por motivo. */
   excluidos: Partial<Record<MotivoDeExclusao, number>>;
 }

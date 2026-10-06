@@ -279,7 +279,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
 
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium">{t("Quem está na lista")}</h2>
+          <h2 className="font-medium">{continua ? t("Quem já entrou") : t("Quem está na lista")}</h2>
           <select
             className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
             value={filtroDeStatus}
@@ -297,9 +297,32 @@ export function DetalheDaCampanha({ id }: { id: string }) {
           </select>
         </div>
 
-        {c.snapshot_total === 0 ? (
+        {/* O VETO NÃO É REAVALIADO, e o operador vai supor o contrário (pedido do
+            @Cassio_SecRev). Quem entra na etapa e é vetado vira linha com o
+            motivo, e a unicidade `(campaign_id, contact_id)` impede que a mesma
+            pessoa volte a ser avaliada nesta campanha: quem entrou sem telefone
+            e depois ganhou um não é abordado por ela. É o lado certo para errar
+            (erra para NÃO mandar) e é também o que impede o card que vai e volta
+            de render uma tentativa por arrasto — mas é surpreendente, e surpresa
+            que a tela não conta o operador descobre do pior jeito. */}
+        {continua && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "Quem ficou de fora não é avaliado de novo nesta campanha, mesmo que o motivo deixe de valer (um telefone que faltava e foi preenchido, por exemplo). Para dar outra chance a essas pessoas, duplique a campanha.",
+            )}
+          </p>
+        )}
+
+        {!continua && c.snapshot_total === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("A lista ainda não foi montada. Use Preparar para ver quem entra.")}
+          </p>
+        ) : continua && linhas.length === 0 ? (
+          // Fila vazia é o estado NORMAL da contínua, entre uma chegada e a
+          // próxima: "a lista ainda não foi montada" ali manda o operador preparar
+          // de novo uma campanha que está funcionando.
+          <p className="text-sm text-muted-foreground">
+            {t("Ninguém entrou na etapa desde que a campanha começou. Ela segue de pé, esperando.")}
           </p>
         ) : (
           <div className="divide-y divide-border">

@@ -50,6 +50,8 @@ import { dayStartInTz } from "@/lib/agent-engine/pacing/engine";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { EVENTO_DE_ETAPA } from "@/lib/followup/gatilho-etapa";
 
+import { movimentoDeRegua } from "@/lib/leads/movimento-em-regua";
+
 import { motivoParaExcluir } from "./elegibilidade";
 import type {
   ContatoDoAlvo,
@@ -82,6 +84,9 @@ function vazio(): ResumoDaEntradaPorEtapa {
     teto_do_dia: 0,
     anterior_ao_inicio: 0,
     sem_alvo: 0,
+    veio_de_fechamento: 0,
+    passo_de_regua: 0,
+    sem_teto: 0,
     excluidos: {},
   };
 }
@@ -111,6 +116,27 @@ export async function alistarPorEtapa(
   if (!etapaDestino || !negocioId) return resumo;
   resumo.matched = true;
 
+  // ═══ O MOVIMENTO FEITO PELA PRÓPRIA RÉGUA NÃO REALIMENTA O GATILHO ═══
+  //
+  // O passo `mover_etapa` da fatia 2 move o card pelo `moveLeadHandler`, que
+  // emite `lead.stage_changed` como qualquer outro movimento. Uma régua que
+  // mova para a etapa em que a campanha está armada fecha um LAÇO: abordagem →
+  // passo → evento → alistamento → abordagem.
+  //
+  // Ele terminava hoje, mas por dois EFEITOS COLATERAIS e não por desenho: o
+  // `campaign_recipients_contato_unico` da mesma campanha, e o veto "já em
+  // campanha" lendo linha excluída (que o P2-1 do @Cassio_SecRev acaba de
+  // estreitar, justamente). Depender de efeito colateral para não disparar em
+  // massa é depender de algo que o próximo conserto apaga sem saber.
+  //
+  // A marca vem no metadado do evento, no mesmo padrão da criação em lote da
+  // 9037 (`lib/leads/criacao-em-lote.ts`): quem move declara a origem, e quem
+  // reage decide. Ver `lib/leads/movimento-em-regua.ts`.
+  if (movimentoDeRegua((row.metadata as Record<string, unknown> | null)?.via)) {
+    resumo.passo_de_regua = 1;
+    return resumo;
+  }
+
   const armadas = await deps.db.carregaCampanhasArmadas(row.organization_id, etapaDestino);
   resumo.campanhas_armadas = armadas.length;
   // Sai ANTES de consultar o negócio: a esmagadora maioria das mudanças de
@@ -118,11 +144,36 @@ export async function alistarPorEtapa(
   // arrastado seria custo puro no caminho quente do CRM.
   if (armadas.length === 0) return resumo;
 
+  // ═══ QUEM VEM DE GANHO OU DE PERDA NÃO É ABORDADO (P1-2 do @Cassio_SecRev) ═══
+  //
+  // O veto `aberto` logo abaixo funciona na direção aberto → fechado. Ele NÃO
+  // cobre a volta, e a volta é o caso perigoso: `fn_crm_lead_close_on_stage`
+  // (baseline.sql) REABRE o negócio quando `old.status in ('won','lost')` e a
+  // etapa nova não fecha — põe `status = 'open'` no mesmo UPDATE que emite o
+  // evento. Então o cliente que comprou em março, cujo card alguém arrasta de
+  // «Ganho» para «Novo lead» em outubro, chega aqui com `aberto = true` e passa
+  // por todos os vetos.
+  //
+  // O dano é exatamente o que o comentário do veto abaixo diz estar impedindo:
+  // um cliente que já comprou recebendo a mensagem de PRIMEIRO contato. E a
+  // informação que falta já vem no payload — `from_stage_id`, o mesmo campo que
+  // a proveniência grava.
+  //
+  // Vale para GANHO e para PERDA: quem disse não em março também não quer a
+  // abordagem fria de outubro, e arrastar o card de volta é triagem interna, não
+  // consentimento.
+  const etapaDeOrigem = textoOuNulo(row.payload.from_stage_id);
+  if (etapaDeOrigem && (await deps.db.ehEtapaDeFechamento(row.organization_id, etapaDeOrigem))) {
+    resumo.veio_de_fechamento = armadas.length;
+    return resumo;
+  }
+
   const negocio = await deps.db.carregaNegocio(row.organization_id, negocioId);
   // NEGÓCIO FECHADO não entra, e isto não é zelo: a etapa de um funil também
   // guarda card ganho e perdido quando alguém o arrasta de volta, e abordar com
   // a copy de primeiro contato quem já comprou — ou quem já disse não — é o erro
   // que não se desfaz. É o mesmo veto `negocio_fechado` da porta da cadência.
+  // Pega a direção aberto → fechado; a VOLTA é vetada no bloco acima.
   if (!negocio || !negocio.contactId || !negocio.aberto) {
     resumo.sem_alvo = armadas.length;
     return resumo;
@@ -181,9 +232,11 @@ export async function alistarPorEtapa(
       await excluir("suprimido");
       continue;
     }
-    // Comprometido com outra campanha viva não entra: além de queimar o contato,
-    // a segunda mensagem não mede a segunda copy — mede alguém que já foi
-    // abordado. O veto termina quando a outra campanha termina (`CAMPANHAS_VIVAS`).
+    // Já abordado por outra campanha nos últimos 30 dias não entra: além de
+    // queimar o contato, a segunda mensagem não mede a segunda copy — mede
+    // alguém que já foi abordado. A janela é a MESMA do anti-laço da régua
+    // (`DIAS_SEM_REPETIR_A_CADENCIA`), e quem conta só conta ELEGÍVEL: linha
+    // excluída não recebeu nada (ver `entrada-por-etapa.db.ts`).
     if (await deps.db.estaEmOutraCampanha(row.organization_id, contato.contactId, campanha.id)) {
       await excluir("ja_em_campanha");
       continue;
@@ -202,17 +255,29 @@ export async function alistarPorEtapa(
     // instante podem passar juntas e estourar o teto em uma ou duas linhas. O
     // teto duro dos ENVIOS continua sendo `podeMandarAgora`, que conta `sent_at`
     // — e é ele que decide quantas mensagens saem.
-    if (campanha.teto_diario !== null) {
-      const fuso = await deps.db.fusoDaOrganizacao(row.organization_id);
-      const jaHoje = await deps.db.alistadosDesde(
-        row.organization_id,
-        campanha.id,
-        dayStartInTz(new Date(eventoEm), fuso),
-      );
-      if (jaHoje >= campanha.teto_diario) {
-        resumo.teto_do_dia++;
-        continue;
-      }
+    //
+    // ⚠️ TETO NULO NÃO ALISTA (P1-1 do @Cassio_SecRev). A primeira versão deixava
+    // o nulo cair fora do `if` e alistava sem conta — falha ABERTA, no lugar em
+    // que ela custa mais caro. O estado é inalcançável pelo produto (o CHECK
+    // `campaigns_entrada_continua_contida` o recusa fora do rascunho), mas o
+    // CHECK é a defesa ÚNICA e mora no banco: numa VPS cujo baseline não foi
+    // reaplicado, ou depois de alguém derrubar a constraint num conserto manual,
+    // o comportamento não seria "para de abordar" — seria "aborda sem teto, para
+    // sempre". Contenção que aceita branco não é contenção, e é o que o
+    // cabeçalho deste arquivo promete.
+    if (campanha.teto_diario === null) {
+      resumo.sem_teto++;
+      continue;
+    }
+    const fuso = await deps.db.fusoDaOrganizacao(row.organization_id);
+    const jaHoje = await deps.db.alistadosDesde(
+      row.organization_id,
+      campanha.id,
+      dayStartInTz(new Date(eventoEm), fuso),
+    );
+    if (jaHoje >= campanha.teto_diario) {
+      resumo.teto_do_dia++;
+      continue;
     }
 
     // ─── O texto, congelado AQUI (como na preparação) ───

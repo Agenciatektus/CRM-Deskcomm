@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EventRow } from "@/lib/event-log/dispatcher";
+import { ORIGEM_DO_PASSO_DE_REGUA } from "@/lib/leads/movimento-em-regua";
 
 import {
   EVENTO_DE_ETAPA,
@@ -79,6 +80,8 @@ function contato(parcial: Partial<ContatoDoAlvo> = {}): ContatoDoAlvo {
 
 interface Cenario {
   armadas?: CampanhaArmada[];
+  /** `true` = a etapa (de origem ou de destino) fecha o negócio. */
+  etapaDeFechamento?: boolean;
   negocio?: { contactId: string | null; aberto: boolean } | null;
   alvo?: ContatoDoAlvo | null;
   emOutraCampanha?: boolean;
@@ -92,6 +95,7 @@ function fakeDb(c: Cenario = {}): { db: EntradaPorEtapaDb; gravadas: LinhaDoAlis
   const gravadas: LinhaDoAlistamento[] = [];
   const db: EntradaPorEtapaDb = {
     carregaCampanhasArmadas: async () => c.armadas ?? [campanha()],
+    ehEtapaDeFechamento: async () => c.etapaDeFechamento ?? false,
     carregaNegocio: async () =>
       c.negocio === undefined ? { contactId: CONTATO, aberto: true } : c.negocio,
     carregaContato: async () => (c.alvo === undefined ? contato() : c.alvo),
@@ -317,11 +321,116 @@ describe("entrada por etapa: o teto do dia é contenção, não enfeite", () => 
     expect(perguntouDoTeto).toBe(false);
   });
 
-  it("campanha sem teto (lista legada que ligou o modo à mão) não consulta o dia", async () => {
-    // O CHECK da 9038 impede esse estado fora do rascunho; aqui o que se cobra é
-    // que o código não trate `null` como zero e pare de abordar em silêncio.
-    const { db } = fakeDb({ armadas: [campanha({ teto_diario: null })], jaHoje: 9999 });
+  it("TETO NULO NÃO ALISTA — contenção que aceita branco não é contenção", async () => {
+    // P1-1 do @Cassio_SecRev. A primeira versão deixava o nulo cair fora do `if`
+    // e alistava sem conta: falha ABERTA no lugar mais caro. O estado é
+    // inalcançável pelo produto (o CHECK `campaigns_entrada_continua_contida` o
+    // recusa fora do rascunho), mas o CHECK é defesa Única e mora no banco — numa
+    // VPS cujo baseline não foi reaplicado, ou depois de alguém derrubar a
+    // constraint num conserto manual, "aborda sem teto, para sempre" seria o
+    // comportamento.
+    const { db, gravadas } = fakeDb({ armadas: [campanha({ teto_diario: null })] });
     const r = await alistarPorEtapa(deps(db), evento());
+    expect(r.alistados).toBe(0);
+    expect(r.sem_teto).toBe(1);
+    expect(gravadas).toHaveLength(0);
+  });
+
+  it("com teto nulo não consulta o dia nem o fuso — recusa antes", async () => {
+    let perguntou = false;
+    const { db } = fakeDb({ armadas: [campanha({ teto_diario: null })] });
+    const r = await alistarPorEtapa(
+      deps({
+        ...db,
+        alistadosDesde: async () => {
+          perguntou = true;
+          return 0;
+        },
+      }),
+      evento(),
+    );
+    expect(r.sem_teto).toBe(1);
+    expect(perguntou).toBe(false);
+  });
+});
+
+describe("entrada por etapa: o card que VOLTA de ganho ou de perda", () => {
+  it("vindo de etapa de fechamento, ninguém é abordado e nada é gravado", async () => {
+    // P1-2 do @Cassio_SecRev, e é o furo que o veto `aberto` NÃO cobria:
+    // `fn_crm_lead_close_on_stage` REABRE o negócio quando `old.status in
+    // ('won','lost')` e a etapa nova não fecha. O cliente que comprou em março,
+    // cujo card alguém arrasta de «Ganho» para «Novo lead» em outubro, chega
+    // aqui com `aberto = true` e passaria por todos os vetos — recebendo a
+    // mensagem de PRIMEIRO contato.
+    const { db, gravadas } = fakeDb({ etapaDeFechamento: true });
+    const r = await alistarPorEtapa(deps(db), evento());
+    expect(r.alistados).toBe(0);
+    expect(r.veio_de_fechamento).toBe(1);
+    expect(gravadas).toHaveLength(0);
+  });
+
+  it("o veto lê a etapa de ORIGEM, e sai antes de consultar o negócio", async () => {
+    // Ler o negócio não ajudaria: ele já foi reaberto pelo gatilho do banco no
+    // mesmo UPDATE que emitiu o evento.
+    let perguntouDoNegocio = false;
+    const { db } = fakeDb({ etapaDeFechamento: true });
+    const etapasLidas: string[] = [];
+    await alistarPorEtapa(
+      deps({
+        ...db,
+        ehEtapaDeFechamento: async (_org, stageId) => {
+          etapasLidas.push(stageId);
+          return true;
+        },
+        carregaNegocio: async () => {
+          perguntouDoNegocio = true;
+          return { contactId: CONTATO, aberto: true };
+        },
+      }),
+      evento({ payload: { to_stage_id: ETAPA, from_stage_id: "etapa-de-ganho" } }),
+    );
+    expect(etapasLidas).toEqual(["etapa-de-ganho"]);
+    expect(perguntouDoNegocio).toBe(false);
+  });
+
+  it("sem etapa de origem (card novo, primeira etapa) o veto não se aplica", async () => {
+    const { db } = fakeDb();
+    const r = await alistarPorEtapa(deps(db), evento({ payload: { to_stage_id: ETAPA } }));
+    expect(r.veio_de_fechamento).toBe(0);
+    expect(r.alistados).toBe(1);
+  });
+});
+
+describe("entrada por etapa: o movimento da própria régua não realimenta o gatilho", () => {
+  it("evento marcado como passo de régua é ignorado, sem tocar o banco", async () => {
+    // P2-4. O passo `mover_etapa` da fatia 2 move o card pelo `moveLeadHandler`,
+    // que emite `lead.stage_changed` como qualquer movimento. Uma régua que mova
+    // para a etapa armada fechava o laço abordagem → passo → alistamento →
+    // abordagem, e ele só terminava por EFEITO COLATERAL (o unique da campanha e
+    // o veto "já em campanha" lendo linha excluída — que o P2-1 estreitou).
+    let consultou = false;
+    const { db, gravadas } = fakeDb();
+    const r = await alistarPorEtapa(
+      deps({
+        ...db,
+        carregaCampanhasArmadas: async () => {
+          consultou = true;
+          return [campanha()];
+        },
+      }),
+      evento({ metadata: { via: ORIGEM_DO_PASSO_DE_REGUA } }),
+    );
+    expect(r.matched).toBe(true);
+    expect(r.passo_de_regua).toBe(1);
+    expect(r.alistados).toBe(0);
+    expect(gravadas).toHaveLength(0);
+    expect(consultou, "sai antes de consultar campanha armada").toBe(false);
+  });
+
+  it("movimento humano (sem marca) segue alistando", async () => {
+    const { db } = fakeDb();
+    const r = await alistarPorEtapa(deps(db), evento({ metadata: { request_id: "req-1" } }));
+    expect(r.passo_de_regua).toBe(0);
     expect(r.alistados).toBe(1);
   });
 });

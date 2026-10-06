@@ -13,7 +13,9 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CAMPANHAS_VIVAS, limiteDeSilencio, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
+import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
+
+import { limiteDeSilencio, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { recusouMarketing, type CandidatoDaAudiencia } from "./elegibilidade";
 
@@ -133,34 +135,57 @@ export async function buscarCandidatos(
 
 
 /**
- * Quem já está em campanha VIVA desta organização.
+ * Quem JÁ FOI ABORDADO por outra campanha nos últimos
+ * `DIAS_SEM_REPETIR_A_CADENCIA` dias.
  *
  * Opcionalmente ignora uma campanha (a que está sendo preparada): sem isso, uma
  * preparação repetida excluiria como "já em campanha" os destinatários que ela
  * mesma gravou na tentativa anterior.
+ *
+ * ═══ A RÉGUA MUDOU: a DATA DA LINHA, não o estado da campanha ═══
+ *
+ * Decisão do dono (06/10/2026), junto com a entrada contínua (9038). Antes, o
+ * veto era "tem linha em campanha de status VIVO", e o comentário de
+ * `classificarAudiencia` explicava por quê: bloquear por campanha CONCLUÍDA
+ * impediria para sempre falar de novo com quem já se falou.
+ *
+ * A campanha contínua quebra essa lógica, porque ela nunca conclui. Pelo critério
+ * antigo, todo contato que uma contínua tocasse ficaria excluído de qualquer
+ * campanha futura enquanto ela estivesse de pé — isto é, para sempre. A régua
+ * passa a ser o TEMPO, e é a mesma do anti-laço da régua de prospecção
+ * (`jaPassouPelaRegua`, em `lib/cadencia/inscrever.ts`), para o produto ter uma
+ * resposta só para "faz quanto tempo que falei com essa pessoa?".
+ *
+ * ═══ E só conta quem é ELEGÍVEL (P2-1 do @Cassio_SecRev) ═══
+ *
+ * A preparação grava linha também para o EXCLUÍDO (é o que responde "por que
+ * essa pessoa não recebeu?"), e a entrada contínua grava uma por contato que
+ * cruza a etapa e é vetado. Contar essas linhas fazia o veto alcançar quem foi
+ * apenas VETADO — bloqueado, sem telefone, que recusou marketing —, e numa etapa
+ * de entrada de funil isso é a base quase inteira. O veto existe para não queimar
+ * quem RECEBEU; excluído não recebeu nada. `cancelled` sai pelo mesmo motivo: a
+ * campanha foi cancelada antes de falar com essa pessoa.
+ *
+ * Sem o `.in("campaign_id", ids)` de antes: a lista de campanhas vivas cresce sem
+ * teto (a contínua nunca conclui) e a URL do PostgREST estoura em algumas
+ * centenas. Todo o predicado é do lado do servidor agora.
  */
 export async function contatosJaEmCampanha(
   admin: SupabaseClient,
   organizationId: string,
   exceto?: string,
 ): Promise<Set<string>> {
-  let vivas = admin
-    .from("campaigns")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", CAMPANHAS_VIVAS);
-  if (exceto) vivas = vivas.neq("id", exceto);
-  const { data: campanhas, error } = await vivas;
-  if (error) throw new Error(`audiência: campanhas vivas — ${error.message}`);
-  const ids = (campanhas ?? []).map((c) => (c as { id: string }).id);
-  if (ids.length === 0) return new Set();
-
-  const { data, error: erroDest } = await admin
+  const desde = new Date(Date.now() - DIAS_SEM_REPETIR_A_CADENCIA * 86_400_000);
+  let consulta = admin
     .from("campaign_recipients")
     .select("contact_id")
     .eq("organization_id", organizationId)
-    .in("campaign_id", ids);
-  if (erroDest) throw new Error(`audiência: comprometidos — ${erroDest.message}`);
+    .eq("eligibility_status", "eligible")
+    .neq("status", "cancelled")
+    .gte("created_at", desde.toISOString());
+  if (exceto) consulta = consulta.neq("campaign_id", exceto);
+  const { data, error } = await consulta;
+  if (error) throw new Error(`audiência: comprometidos — ${error.message}`);
   return new Set((data ?? []).map((r) => (r as { contact_id: string }).contact_id));
 }
 

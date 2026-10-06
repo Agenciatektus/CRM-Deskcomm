@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
 import { logger } from "@/lib/logger";
+import { ORIGEM_DO_PASSO_DE_REGUA } from "@/lib/leads/movimento-em-regua";
 import type { EfeitoDeCrm, EnrollmentRow } from "@/lib/followup/node-handlers";
 
 /**
@@ -80,7 +81,16 @@ export async function aplicarEfeitoDaCadencia(
         requestId: `cadencia:${enrollment.id}:${enrollment.current_node_id}`,
       },
       leadId,
-      { to_stage_id: efeito.stage_id, reason: "Passo da cadência de prospecção" },
+      {
+        to_stage_id: efeito.stage_id,
+        reason: "Passo da cadência de prospecção",
+        // A MARCA DE PASSO DE RÉGUA (9038). Sem ela, uma régua que mova o card
+        // para a etapa em que uma campanha contínua está armada fecha o laço
+        // abordagem → passo → alistamento → abordagem. Vale para as DUAS
+        // superfícies de prospecção, porque este efeito serve a cadência e a
+        // campanha. Ver `lib/leads/movimento-em-regua.ts`.
+        via: ORIGEM_DO_PASSO_DE_REGUA,
+      },
     );
     return;
   }
