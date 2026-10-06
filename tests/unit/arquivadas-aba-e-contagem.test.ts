@@ -109,9 +109,14 @@ describe("contagem de arquivadas", () => {
 
 describe("o botão de arquivar", () => {
   it("oferece arquivar com confirmação e some quando já está arquivada", () => {
+    // Desde o visual v2 o cabeçalho é dividido: a condição mora nele, o item no
+    // menu "Mais" e a confirmação num componente próprio. Os três juntos são o
+    // botão de arquivar.
     const header = fonte("components/inbox/ConversationHeader.tsx");
-    expect(header).toContain('t("Arquivar")');
-    expect(header).toContain('t("Arquivar esta conversa?")');
+    const mais = fonte("components/inbox/cabecalho/MaisAcoes.tsx");
+    const confirmacao = fonte("components/inbox/cabecalho/ConfirmacoesDaConversa.tsx");
+    expect(mais).toContain('t("Arquivar")');
+    expect(confirmacao).toContain('t("Arquivar esta conversa?")');
     expect(header).toMatch(/status !== "archived"/);
   });
 

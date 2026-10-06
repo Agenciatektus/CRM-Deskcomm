@@ -9,12 +9,12 @@ import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
 
 /**
  * A BUSCA DENTRO DA CONVERSA (#1795, extraída do #1793) — pela tela, como o
- * atendente faz: lupa no cabeçalho, digita, vê as bolhas marcadas e o contador,
+ * atendente faz: "Mais ações" no cabeçalho, digita, vê as bolhas marcadas e o contador,
  * Esc fecha, troca de conversa.
  *
  * Os testes de unidade do PR provam a lógica com a `MessageBubble` real, mas
  * não provam que o anel APARECE no CSS que o build entrega (a classe existe e
- * o Tailwind pode não gerá-la), nem que a lupa cabe na barra. Por isso a marca
+ * o Tailwind pode não gerá-la). Por isso a marca
  * é medida por `getComputedStyle` — o `box-shadow` que o `ring-2 ring-offset-2`
  * produz —, nunca pela presença da classe.
  *
@@ -172,7 +172,7 @@ test.afterAll(async () => {
 test.describe("busca dentro da conversa", () => {
   test.describe.configure({ timeout: 180_000 });
 
-  test("marca as bolhas certas, Esc devolve o foco à lupa, e a busca não vaza para outra conversa", async ({
+  test("marca as bolhas certas, Esc devolve o foco ao menu, e a busca não vaza para outra conversa", async ({
     page,
   }) => {
     const [conversaA, conversaB] = conversas as [string, string];
@@ -182,47 +182,19 @@ test.describe("busca dentro da conversa", () => {
     await page.goto(`/app/inbox?id=${conversaA}&filter=all`);
     await expect(bolhas(page)).toHaveCount(MENSAGENS_A.length, { timeout: 30_000 });
 
-    // ── abrir a busca pela lupa
-    const lupa = page.getByRole("button", { name: "Buscar nesta conversa" });
-    await expect(lupa).toHaveAttribute("aria-expanded", "false");
-    // A lupa acrescenta ~38px à barra. A barra PODE quebrar (ver o comentário
-    // dela no ConversationHeader); a pergunta é se é a LUPA que a faz quebrar.
-    // Por isso mede as fileiras com a lupa e, contrafactual, com ela fora do
-    // fluxo (`display: none`, restaurado logo em seguida).
-    const barra = await lupa.evaluate((b) => {
-      const fileiras = () => {
-        // Só filho com caixa: um filho sem tamanho (portal, span vazio) tem
-        // top 0 e inventaria uma fileira.
-        const caixas = [...(b.parentElement?.children ?? [])]
-          .map((c) => c.getBoundingClientRect())
-          .filter((r) => r.width > 0 && r.height > 0)
-          .sort((x, y) => x.top - y.top);
-        let n = 0;
-        let fundo = -Infinity;
-        for (const r of caixas) {
-          if (r.top >= fundo) n += 1;
-          fundo = Math.max(r.top >= fundo ? r.bottom : fundo, r.bottom);
-        }
-        return n;
-      };
-      const comLupa = fileiras();
-      const display = b.style.display;
-      b.style.display = "none";
-      const semLupa = fileiras();
-      b.style.display = display;
-      return { viewport: window.innerWidth, comLupa, semLupa };
-    });
-    console.info(`busca-na-conversa · fileiras da barra de ações: ${JSON.stringify(barra)}`);
-    // soft: o resto da jornada roda e é medido mesmo se a lupa quebrar a barra.
-    expect
-      .soft(barra.comLupa, "a lupa fez a barra de ações ganhar uma fileira em 1280px")
-      .toBe(barra.semLupa);
-
-    await lupa.click();
+    // ── abrir a busca pelo menu "Mais ações" do cabeçalho (visual v2, fase
+    // 3.2). A lupa saiu da barra: a medida de "a lupa faz a barra quebrar"
+    // perdeu o objeto, porque o item do menu não ocupa largura nenhuma.
+    const mais = page.getByRole("button", { name: "Mais ações", exact: true });
+    const itemBuscar = page.getByRole("menuitem", { name: "Buscar nesta conversa" });
+    const abrirBusca = async () => {
+      await mais.click();
+      await itemBuscar.click();
+    };
+    await abrirBusca();
     const campo = page.getByRole("searchbox", { name: "Buscar nas mensagens carregadas" });
     await expect(campo).toBeVisible();
     await expect(campo, "o campo abre com o foco").toBeFocused();
-    await expect(lupa).toHaveAttribute("aria-expanded", "true");
 
     // ── digitar o termo: contador e marca
     await campo.fill(TERMO);
@@ -256,16 +228,15 @@ test.describe("busca dentro da conversa", () => {
     fs.mkdirSync(EVIDENCE, { recursive: true });
     await page.screenshot({ path: path.join(EVIDENCE, "1-duas-bolhas-marcadas.png") });
 
-    // ── Esc fecha e devolve o foco à lupa
+    // ── Esc fecha e devolve o foco ao gatilho do menu
     await campo.press("Escape");
     await expect(campo).toHaveCount(0);
     await expect(contador).toHaveCount(0);
     await expect(page.locator('[data-search-match="true"]')).toHaveCount(0);
-    await expect(lupa, "o Esc devolve o foco à lupa").toBeFocused();
-    await expect(lupa).toHaveAttribute("aria-expanded", "false");
+    await expect(mais, "o Esc devolve o foco ao menu de onde a busca saiu").toBeFocused();
 
     // ── reabrir com o termo, trocar de conversa PELA LISTA (sem recarregar)
-    await lupa.click();
+    await abrirBusca();
     await campo.fill(TERMO);
     await expect(page.locator('[data-search-match="true"]')).toHaveCount(2);
 
@@ -282,12 +253,10 @@ test.describe("busca dentro da conversa", () => {
       page.locator('[data-search-match="true"]'),
       "a conversa B tem o termo e ganhou a marca da busca feita em A",
     ).toHaveCount(0);
-    const lupaB = page.getByRole("button", { name: "Buscar nesta conversa" });
-    await expect(lupaB).toHaveAttribute("aria-expanded", "false");
     await page.screenshot({ path: path.join(EVIDENCE, "2-outra-conversa-sem-busca.png") });
 
     // Abrir a busca em B começa vazia: o termo de A não veio junto.
-    await lupaB.click();
+    await abrirBusca();
     await expect(campo).toHaveValue("");
   });
 });

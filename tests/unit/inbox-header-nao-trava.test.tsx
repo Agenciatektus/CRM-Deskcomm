@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { ConversationHeader } from "@/components/inbox/ConversationHeader";
@@ -84,25 +85,21 @@ function renderHeader(conv = conversation) {
   );
 }
 
-// A barra é quem segura os botões, não um índice fixo: desde o #1625 o
-// `children[1]` do header é a coluna que empilha a barra e o selo do automático.
+// A barra é achada pelo testid, não por índice: o visual v2 (fase 3.2) tirou o
+// selo do automático da coluna das ações e o levou para a faixa de status.
 function barraDeAcoes() {
-  const barra = screen.getByText("Transferir").closest("button")?.parentElement;
+  const barra = screen.getByTestId("acoes-da-conversa");
   expect(barra, "a barra de ações não renderizou").toBeTruthy();
-  return barra as HTMLElement;
+  return barra;
 }
 
 describe("header do inbox — não trava a largura da tela", () => {
   it("a barra de ações NÃO é shrink-0 — era isso que impunha o piso de 707px", () => {
-    const { container } = renderHeader();
-    const header = container.firstElementChild as HTMLElement;
+    renderHeader();
     // Guarda de vacuidade: sem header renderizado, todas as asserções abaixo
     // passariam por não haver o que verificar.
-    expect(header, "o header não renderizou").toBeTruthy();
-
-    const coluna = header.children[1] as HTMLElement;
-    expect(coluna, "a coluna de ações não renderizou").toBeTruthy();
-    for (const el of [coluna, barraDeAcoes()]) {
+    expect(screen.getByTestId("cabecalho-da-conversa"), "o header não renderizou").toBeTruthy();
+    for (const el of [barraDeAcoes()]) {
       expect(
         el.className.split(/\s+/),
         "`shrink-0` de volta na barra de ações: o header volta a travar em 707px e o painel de CRM sai da tela em 1280px",
@@ -112,8 +109,8 @@ describe("header do inbox — não trava a largura da tela", () => {
   });
 
   it("o header pode reorganizar em vez de esconder ação", () => {
-    const { container } = renderHeader();
-    const header = container.firstElementChild as HTMLElement;
+    renderHeader();
+    const header = screen.getByTestId("cabecalho-da-conversa");
     const acoes = barraDeAcoes();
     // As duas pontas: o container quebra E a barra quebra internamente. Só uma
     // das duas não basta — sem a de dentro, a barra desce inteira e continua
@@ -123,12 +120,16 @@ describe("header do inbox — não trava a largura da tela", () => {
     expect(acoes.className).toContain("min-w-0");
   });
 
-  it("as ações continuam TODAS no header — reorganizar não é esconder", () => {
+  it("as ações do fluxo de atendimento continuam À VISTA no header", () => {
     renderHeader();
-    // Se um dia alguém "resolver" o aperto colapsando ações num menu, este caso
-    // reprova. Esconder ação de quem atende é pior que uma segunda linha.
-    for (const rotulo of ["Assumir", "Transferir", "Fechar"]) {
-      expect(screen.getByText(rotulo), `a ação "${rotulo}" sumiu do header`).toBeTruthy();
+    // O visual v2 criou o menu "Mais", mas só para o que é leitura ou exceção
+    // (buscar, pausar, arquivar, ver contato). Se alguém "resolver" o aperto
+    // levando Assumir, Transferir ou Fechar para dentro dele, este caso reprova:
+    // esconder ação de quem atende é pior que uma segunda linha.
+    const barra = barraDeAcoes();
+    for (const rotulo of ["Assumir", "Transferir conversa", "Lembrar depois", "Fechar conversa"]) {
+      const botao = screen.getByRole("button", { name: rotulo });
+      expect(barra.contains(botao), `a ação "${rotulo}" sumiu da barra`).toBe(true);
     }
   });
 
@@ -152,20 +153,23 @@ describe("header do inbox — não trava a largura da tela", () => {
     const linhaDoNome = screen.getByRole("heading", { name: "Fulana" }).parentElement as HTMLElement;
     expect(linhaDoNome.contains(selo), "o selo voltou para a linha do nome").toBe(false);
 
-    for (const rotulo of ["Liberar", "Devolver ao automático", "Transferir", "Lembrar", "Fechar", "Arquivar"]) {
+    for (const rotulo of ["Liberar", "Devolver ao automático", "Transferir conversa", "Lembrar depois", "Fechar conversa"]) {
       const botao = screen.getByRole("button", { name: rotulo });
       expect(barra.contains(botao), `a ação "${rotulo}" saiu da barra`).toBe(true);
     }
-    expect(screen.queryByRole("button", { name: "Mais ações" }), "ação de quem atende escondida num menu").toBeNull();
+    // Arquivar foi para o "Mais" (visual v2): continua a um clique, dentro da barra.
+    const mais = screen.getByRole("button", { name: "Mais ações" });
+    expect(barra.contains(mais), "o menu Mais saiu da barra").toBe(true);
   });
 
-  it('"Ver contato" existe no DOM e só se cala onde há outra porta', () => {
+  it('"Ver contato" existe no DOM e só se cala onde há outra porta', async () => {
     renderHeader();
-    // Ele NÃO sai do markup: some por CSS a partir de `xl`, exatamente a largura
-    // em que o painel lateral entra na tela com um "Ver contato" próprio. A
-    // distinção importa — remover do DOM tiraria a ação de quem usa 1024px, que
-    // é onde o painel não existe e esta é a única porta para o contato.
-    const link = screen.getByText("Ver contato").closest("a, button") as HTMLElement;
+    // Mora no menu "Mais" desde o visual v2, e continua NO markup: some por CSS a
+    // partir de `xl`, a largura em que o painel lateral entra na tela com um "Ver
+    // contato" próprio. Remover do DOM tiraria a ação de quem usa 1024px, onde o
+    // painel não existe e esta é a única porta para o contato.
+    await userEvent.setup().click(screen.getByRole("button", { name: "Mais ações" }));
+    const link = (await screen.findByText("Ver contato")).closest("a, button") as HTMLElement;
     expect(link, "o link para o contato sumiu do markup").toBeTruthy();
     const classes = `${link.className} ${link.parentElement?.className ?? ""}`;
     expect(

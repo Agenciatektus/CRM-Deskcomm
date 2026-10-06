@@ -180,10 +180,10 @@ test("fechar canal preserva demanda, desfecho explícito e nova entrada volta à
     await expect(page.getByRole("button", { name: "Novo Lead", exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Resumo" }).click();
     // Fechar não é mais `window.confirm()` (bloqueado em iframe, ignora o
-    // tema) — é o `AlertDialog` da casa. O botão que abre e o que confirma
-    // têm o MESMO rótulo "Fechar"; o segundo clique escopado ao
-    // `alertdialog` é o que desambigua.
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    // tema) — é o `AlertDialog` da casa. Desde o visual v2 o ícone do
+    // cabeçalho se chama "Fechar conversa"; o "Fechar" de dentro do
+    // `alertdialog` é o que confirma.
+    await page.getByRole("button", { name: "Fechar conversa", exact: true }).click();
     await page
       .getByRole("alertdialog")
       .getByRole("button", { name: "Fechar", exact: true })
@@ -242,7 +242,7 @@ test("fechar canal preserva demanda, desfecho explícito e nova entrada volta à
     const box = await page.getByTestId("inbox-demandas").boundingBox();
     expect(box?.width).toBeGreaterThan(150);
     await page.screenshot({ path: `${evidence}/task4-reaberto-respondido.png`, fullPage: true });
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    await page.getByRole("button", { name: "Fechar conversa", exact: true }).click();
     await page
       .getByRole("alertdialog")
       .getByRole("button", { name: "Fechar", exact: true })
