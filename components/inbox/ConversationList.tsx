@@ -10,6 +10,8 @@ import { useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
 import { ConversationListItem } from "./ConversationListItem";
+import { MenuDaConversa } from "./menu/MenuDaConversa";
+import { useMenuDaConversa } from "./menu/useMenuDaConversa";
 import { VazioDaAba } from "./VazioDaAba";
 import { abaDosFiltros } from "@/lib/inbox/aba-dos-filtros";
 import { useAuthOpcional } from "@/hooks/auth/AuthProvider";
@@ -71,6 +73,8 @@ export function ConversationList({
   // Uma leitura por lista, compartilhada por todas as linhas (react-query dedupa
   // com o cabeçalho, que faz a mesma pergunta).
   const automaticoDaOrg = useAutomaticoAtivo();
+  // O menu de contexto (fase 3.6): um por lista, aberto na linha do alvo.
+  const menu = useMenuDaConversa();
 
   // Sem filtro de cliente: TODO filtro é parâmetro do schema e roda no banco.
   // `clientFilter` era o mecanismo que permitia um filtro existir fora do contrato
@@ -164,7 +168,9 @@ export function ConversationList({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
+      {/* Rolar a lista fecha o menu: ancorado num ponto fixo, ele ficaria
+          apontando para a linha errada. */}
+      <div className="flex-1 overflow-y-auto" onScroll={menu.alvo ? menu.fechar : undefined}>
         {/* Vazio por FILTRO: fica DENTRO do return, nunca como `return` precoce —
             e por isso o bloco do `hasNextPage` abaixo continua sendo alcancado. */}
         {items.length === 0 && filtrosAtivos.length > 0 && (
@@ -182,6 +188,8 @@ export function ConversationList({
             mostrarAutomatico={mostrarAutomatico}
             automaticoDaOrg={automaticoDaOrg.data}
             meuUserId={meuUserId}
+            onAbrirMenu={menu.abrir}
+            menuAberto={menu.alvo?.id === c.id}
           />
         ))}
         {q.hasNextPage && (
@@ -197,6 +205,13 @@ export function ConversationList({
           </div>
         )}
       </div>
+      <MenuDaConversa
+        alvo={menu.alvo}
+        conversation={menu.alvo ? (items.find((i) => i.id === menu.alvo?.id) ?? null) : null}
+        onFechar={menu.fechar}
+        meuUserId={meuUserId}
+        automaticoDaOrg={automaticoDaOrg.data}
+      />
     </div>
   );
 }

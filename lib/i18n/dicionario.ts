@@ -86,6 +86,22 @@ export const DICIONARIO: Traducoes = {
   "Recursos liberados": { es: "Recursos habilitados" },
   "Módulos que só aparecem para as empresas que você liberar. Sem liberação, a empresa não vê a tela nem o menu.": { es: "Módulos que solo aparecen para las empresas que usted habilite. Sin habilitación, la empresa no ve la pantalla ni el menú." },
   "Desligado no servidor: a liberação fica guardada e vale quando o módulo for ligado em Sistema.": { es: "Desactivado en el servidor: la habilitación queda guardada y vale cuando el módulo se active en Sistema." },
+  // ─── INBOX: MENU DE CONTEXTO DA CONVERSA NA LISTA (visual v2, fase 3.6) ───
+  "Abrir ficha do contato": { es: "Abrir ficha del contacto" },
+  "Ações da conversa com": { es: "Acciones de la conversación con" },
+  "Encerrada": { es: "Cerrada" },
+  "Este contato não tem negócio": { es: "Este contacto no tiene negocio" },
+  "Funil e etapa": { es: "Embudo y etapa" },
+  "Lembrete marcado.": { es: "Recordatorio programado." },
+  "Levar para outro funil…": { es: "Llevar a otro embudo…" },
+  "Limite de 20 etiquetas por conversa.": { es: "Límite de 20 etiquetas por conversación." },
+  "Nenhuma etiqueta criada ainda": { es: "Todavía no hay etiquetas creadas" },
+  "Ninguém disponível para receber": { es: "No hay nadie disponible para recibir" },
+  "Não foi possível copiar o telefone.": { es: "No se pudo copiar el teléfono." },
+  "Não foi possível ler o funil.": { es: "No se pudo leer el embudo." },
+  "Quem recebe passa a responder esta conversa.": { es: "Quien recibe pasa a responder esta conversación." },
+  "Sem atendente": { es: "Sin agente" },
+
   // ─── BUSCA DENTRO DA CONVERSA (extraída do PR #1793) ───
   "Resultados nas mensagens carregadas": { es: "Resultados en los mensajes cargados" },
   "Buscar nesta conversa": { es: "Buscar en esta conversación" },
