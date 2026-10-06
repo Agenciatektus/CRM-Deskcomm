@@ -27,7 +27,7 @@ begin
         ), '{}'::text[]
       )
       into v_required, v_pipeline_extra
-      from public.crm_pipelines p
+      from public.crm_pipelines
      where p.id = new.pipeline_id;
 
     if new.lost_reason is null or length(btrim(new.lost_reason)) = 0 then
