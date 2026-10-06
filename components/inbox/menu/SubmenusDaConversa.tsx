@@ -19,7 +19,7 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useConversationTagVocabulary, useUpdateConversationTags } from "@/hooks/inbox/useConversationTags";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useSnoozeConversation } from "@/hooks/inbox/useSnoozeConversation";
-import { alternarEtiqueta } from "@/lib/inbox/menu-da-conversa";
+import { deltaDaEtiqueta } from "@/lib/inbox/menu-da-conversa";
 import { opcoesDoLembrete } from "@/lib/inbox/opcoes-do-lembrete";
 import { Clock, Tag, UsersThree } from "@/lib/ui/icons";
 
@@ -41,7 +41,7 @@ const ROTULO_DO_PAPEL: Record<string, string> = {
  *   - Lembrar depois → `useSnoozeConversation` (`POST`/`DELETE /snooze`), com as
  *     MESMAS opções do cabeçalho (`opcoesDoLembrete`, instante calculado no fuso
  *     de quem clica); "Escolher data e hora" fica só no cabeçalho;
- *   - Etiquetas → `useUpdateConversationTags` (`PATCH` com a lista inteira).
+ *   - Etiquetas → `useUpdateConversationTags` (`PATCH` só com o delta, 9044).
  */
 
 export function SubmenuTransferir({ conversation, meuUserId, onEscolher }: {
@@ -159,12 +159,12 @@ export function SubmenuEtiquetas({ conversation }: { conversation: ConversationW
   const opcoes = [...atuais, ...(vocabulario.data ?? []).filter((v) => !atuais.includes(v))];
 
   function alternar(tag: string) {
-    const proximas = alternarEtiqueta(atuais, tag);
-    if (proximas === null) {
+    const delta = deltaDaEtiqueta(atuais, tag);
+    if (delta === null) {
       toast.error(t("Limite de 20 etiquetas por conversa."));
       return;
     }
-    gravar.mutate({ conversation_id: conversation.id, tags: proximas });
+    gravar.mutate({ conversation_id: conversation.id, ...delta });
   }
 
   return (
@@ -186,9 +186,9 @@ export function SubmenuEtiquetas({ conversation }: { conversation: ConversationW
               key={tag}
               checked={atuais.includes(tag)}
               disabled={gravar.isPending}
-              // Fecha ao marcar: a lista vem da conversa, que só muda quando o
-              // servidor responde. Deixar aberto e marcar duas seguidas faria a
-              // segunda gravar em cima da lista velha e desmarcar a primeira.
+              // Fecha ao marcar: a marca vem da conversa, que só muda quando o
+              // servidor responde. Desde a 9044 o clique manda só o delta, então
+              // nada se perde; fechar evita mostrar a marca velha.
               onCheckedChange={() => alternar(tag)}
               className="h-[34px] gap-2 rounded-lg text-[13.5px] focus:bg-surface-elevated focus:text-text"
             >

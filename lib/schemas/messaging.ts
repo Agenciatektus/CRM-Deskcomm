@@ -260,15 +260,38 @@ export const conversationTagsSchema = z
 
 export type ConversationTags = z.infer<typeof conversationTagsSchema>;
 
-/** G3-05: PATCH /conversations/[id] aceita status e/ou tags (ao menos um). */
+/** 9044: um lado do delta — 1..20 tags, normalizadas e deduplicadas. */
+const conversationTagsDeltaSchema = conversationTagsSchema.refine((t) => t.length > 0);
+
+/**
+ * G3-05 + 9044: PATCH /conversations/[id] aceita status e/ou etiquetas. As
+ * etiquetas vão por DELTA (`tags_adicionar`/`tags_remover`, aplicado sobre o
+ * valor atual no banco) ou, por compatibilidade, pela lista inteira (`tags`),
+ * que regrava e perde mudança concorrente. Os dois formatos juntos são recusados.
+ */
 export const patchConversationSchema = z
   .object({
     status: conversationStatusSchema.optional(),
     expected_revision: z.number().int().positive().optional(),
     tags: conversationTagsSchema.optional(),
+    tags_adicionar: conversationTagsDeltaSchema.optional(),
+    tags_remover: conversationTagsDeltaSchema.optional(),
   })
-  .refine((d) => d.status !== undefined || d.tags !== undefined, {
-    message: "Informe status ou tags.",
+  .refine(
+    (d) =>
+      d.status !== undefined ||
+      d.tags !== undefined ||
+      d.tags_adicionar !== undefined ||
+      d.tags_remover !== undefined,
+    { message: "Informe status ou tags." },
+  )
+  .refine((d) => d.tags === undefined || (d.tags_adicionar === undefined && d.tags_remover === undefined), {
+    message: "Use tags ou tags_adicionar/tags_remover, não os dois.",
+    path: ["tags"],
+  })
+  .refine((d) => !(d.tags_adicionar ?? []).some((t) => (d.tags_remover ?? []).includes(t)), {
+    message: "A mesma tag não pode ser adicionada e removida.",
+    path: ["tags_remover"],
   });
 
 export type PatchConversationInput = z.infer<typeof patchConversationSchema>;

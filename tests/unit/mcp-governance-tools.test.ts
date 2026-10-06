@@ -217,15 +217,40 @@ describe("crm_manage_tags", () => {
       ? { data: { id: CONV, tags }, error: null }
       : { data: null, error: null };
 
-  it("add/remove normaliza (lowercase) e persiste; audit action por kind", async () => {
-    const cap = makeCap();
+  it("conversation: manda SÓ o delta normalizado para a porta de serviço (9044), sem regravar", async () => {
+    const cap = makeCap({ rpcResult: { data: ["b", "vip"], error: null } });
     const res = (await crmManageTags.handler(
       { target_kind: "conversation", target_id: CONV, add: ["VIP"], remove: ["a"] },
       makeCtx(withTags("conversations", ["a", "b"]), cap),
     )) as { tags: string[] };
 
-    expect(res.tags.sort()).toEqual(["b", "vip"]);
-    expect(cap.updates).toContainEqual({ table: "conversations", values: { tags: ["b", "vip"] } });
+    expect(cap.rpc).toEqual([
+      {
+        fn: "fn_conversa_tags_alterar_servico",
+        args: { p_org: ORG, p_conversa: CONV, p_adicionar: ["vip"], p_remover: ["a"] },
+      },
+    ]);
+    expect(cap.updates).toEqual([]);
+    expect(res.tags).toEqual(["b", "vip"]);
+  });
+
+  it("conversation: remover vence acrescentar, como no caminho antigo", async () => {
+    const cap = makeCap({ rpcResult: { data: [], error: null } });
+    await crmManageTags.handler(
+      { target_kind: "conversation", target_id: CONV, add: ["vip", "novo"], remove: ["VIP"] },
+      makeCtx(withTags("conversations", []), cap),
+    );
+    expect(cap.rpc[0]?.args).toMatchObject({ p_adicionar: ["novo"], p_remover: ["vip"] });
+  });
+
+  it("conversation de outra org (P0002 do banco) ⇒ target_not_found", async () => {
+    const cap = makeCap({ rpcResult: { data: null, error: { code: "P0002", message: "conversa_nao_encontrada" } } });
+    await expect(
+      crmManageTags.handler(
+        { target_kind: "conversation", target_id: CONV, add: ["x"], remove: undefined },
+        makeCtx(withTags("conversations", []), cap),
+      ),
+    ).rejects.toThrow(/target_not_found/);
   });
 
   it("contact: usa tabela contacts", async () => {
@@ -261,8 +286,8 @@ describe("crm_manage_tags", () => {
     ).rejects.toThrow();
   });
 
-  it("> 20 tags rejeitada", async () => {
-    const cap = makeCap();
+  it("> 20 tags rejeitada (o teto da conversa é do banco: 23514)", async () => {
+    const cap = makeCap({ rpcResult: { data: null, error: { code: "23514", message: "tags_limite" } } });
     const existing = Array.from({ length: 20 }, (_, i) => `t${i}`);
     await expect(
       crmManageTags.handler(

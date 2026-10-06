@@ -103,8 +103,16 @@ export function regrasDoMenu({
 /** Mesmo teto e mesma normalização do editor de tags (espelham o Zod do PATCH). */
 export const MAXIMO_DE_ETIQUETAS = 20;
 
-export function alternarEtiqueta(atuais: string[], tag: string): string[] | null {
-  if (atuais.includes(tag)) return atuais.filter((t) => t !== tag);
+/**
+ * 9044: marcar/desmarcar vira um DELTA, nunca a lista inteira. O banco aplica
+ * sobre o valor atual, então a etiqueta que outra pessoa pôs no meio fica.
+ * `null` quando acrescentar passaria do teto (o banco também recusa).
+ */
+export function deltaDaEtiqueta(
+  atuais: string[],
+  tag: string,
+): { adicionar: string[] } | { remover: string[] } | null {
+  if (atuais.includes(tag)) return { remover: [tag] };
   if (atuais.length >= MAXIMO_DE_ETIQUETAS) return null;
-  return [...atuais, tag];
+  return { adicionar: [tag] };
 }
