@@ -20,7 +20,7 @@ export function corpoDoDelta(args: UpdateTagsArgs): { tags_adicionar?: string[];
 }
 
 /**
- * G3-05 + 9044: acrescenta/remove tags de uma conversa por DELTA; refaz o inbox.
+ * G3-05 + 9045: acrescenta/remove tags de uma conversa por DELTA; refaz o inbox.
  * Só viaja o que mudou, e o banco aplica sobre o valor atual: a etiqueta que
  * outra pessoa (ou a IA) pôs no meio não se perde, como acontecia mandando a
  * lista inteira que a tela tinha carregado.

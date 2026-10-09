@@ -260,11 +260,11 @@ export const conversationTagsSchema = z
 
 export type ConversationTags = z.infer<typeof conversationTagsSchema>;
 
-/** 9044: um lado do delta — 1..20 tags, normalizadas e deduplicadas. */
+/** 9045: um lado do delta — 1..20 tags, normalizadas e deduplicadas. */
 const conversationTagsDeltaSchema = conversationTagsSchema.refine((t) => t.length > 0);
 
 /**
- * G3-05 + 9044: PATCH /conversations/[id] aceita status e/ou etiquetas. As
+ * G3-05 + 9045: PATCH /conversations/[id] aceita status e/ou etiquetas. As
  * etiquetas vão por DELTA (`tags_adicionar`/`tags_remover`, aplicado sobre o
  * valor atual no banco) ou, por compatibilidade, pela lista inteira (`tags`),
  * que regrava e perde mudança concorrente. Os dois formatos juntos são recusados.

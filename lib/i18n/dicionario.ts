@@ -14208,7 +14208,7 @@ export const DICIONARIO: Traducoes = {
   "Detalhes do lead": { es: "Detalles del lead" },
   "Lembrete ativo:": { es: "Recordatorio activo:" },
   "Escolha um horário no futuro, em até 90 dias.": { es: "Elige un horario en el futuro, dentro de 90 días." },
-  // ─── Etiquetas da conversa por delta (migration 9044) ───
+  // ─── Etiquetas da conversa por delta (migration 9045) ───
   "A etiqueta cliente é do sistema enquanto a regra Clientes pela agenda estiver ligada.": {
     es: "La etiqueta cliente es del sistema mientras la regla Clientes por la agenda esté activada.",
   },

@@ -79,7 +79,7 @@ describe("regrasDoMenu", () => {
   });
 });
 
-describe("deltaDaEtiqueta (9044: só o que mudou, nunca a lista inteira)", () => {
+describe("deltaDaEtiqueta (9045: só o que mudou, nunca a lista inteira)", () => {
   it("tira a que tem, põe a que falta — e não carrega as outras", () => {
     expect(deltaDaEtiqueta(["a", "b"], "a")).toEqual({ remover: ["a"] });
     expect(deltaDaEtiqueta(["a"], "b")).toEqual({ adicionar: ["b"] });

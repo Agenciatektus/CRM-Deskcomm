@@ -217,7 +217,7 @@ describe("crm_manage_tags", () => {
       ? { data: { id: CONV, tags }, error: null }
       : { data: null, error: null };
 
-  it("conversation: manda SÓ o delta normalizado para a porta de serviço (9044), sem regravar", async () => {
+  it("conversation: manda SÓ o delta normalizado para a porta de serviço (9045), sem regravar", async () => {
     const cap = makeCap({ rpcResult: { data: ["b", "vip"], error: null } });
     const res = (await crmManageTags.handler(
       { target_kind: "conversation", target_id: CONV, add: ["VIP"], remove: ["a"] },

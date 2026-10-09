@@ -106,7 +106,7 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "perde a palavra), admin de OUTRA organização recusado, service_role recusado " +
       "por `auth.uid()` nulo e anon sem EXECUTE. ",
   },
-  // ─── etiquetas da conversa por delta (migration 9044) ─────────────────────
+  // ─── etiquetas da conversa por delta (migration 9045) ─────────────────────
   {
     fn: "fn_conversa_tags_alterar(uuid,uuid,text[],text[])",
     razao:
@@ -117,7 +117,7 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "guarda de MFA lê `auth.mfa_factors`, que a sessão não lê; a visibilidade " +
       "que a RLS daria é o predicado da policy `conversations_select` repetido no " +
       "`where`. `p_org` vem de `requireRole`, nunca do corpo. " +
-      "tests/invariants/tags-da-conversa-por-delta-9044.test.ts prova com JWT real: " +
+      "tests/invariants/tags-da-conversa-por-delta-9045.test.ts prova com JWT real: " +
       "outra organização e suporte em leitura recusados, atendente fora do escopo " +
       "sem efeito, service_role e anon sem EXECUTE.",
   },

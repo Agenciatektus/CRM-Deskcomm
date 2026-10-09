@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 9044 — as etiquetas da conversa mudam por DELTA (acrescentar/remover), e não
+-- 9045 — as etiquetas da conversa mudam por DELTA (acrescentar/remover), e não
 -- por regravação da lista inteira
 -- ════════════════════════════════════════════════════════════════════════════
 --
@@ -82,7 +82,7 @@
 -- * `fn_conversa_tags_gravar` e `fn_conversa_tags_aplicar`: ninguém de fora;
 --   quem as executa é o dono, de dentro das duas portas.
 --
--- Prova: `tests/invariants/tags-da-conversa-por-delta-9044.test.ts`.
+-- Prova: `tests/invariants/tags-da-conversa-por-delta-9045.test.ts`.
 -- Rollback: reverter o PR (rota e MCP voltam a gravar a lista) e `drop
 -- function` das quatro; nenhuma tabela muda.
 

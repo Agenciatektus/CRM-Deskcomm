@@ -500,7 +500,7 @@ export async function patchConversationHandler(
     if (statusError) throw new ApiError(statusError.code === "40001" ? 409 : statusError.code === "P0002" ? 404 : 500,
       statusError.code === "40001" ? "conflict" : statusError.code === "P0002" ? "not_found" : "internal_error", undefined, ctx.requestId, statusError.message);
   }
-  // 9044: o delta vai pela função do banco, sobre o valor atual; `tags` inteiro
+  // 9045: o delta vai pela função do banco, sobre o valor atual; `tags` inteiro
   // continua aceito por compatibilidade e regrava a lista (quem grava por último vence).
   const delta = deltaDoPedido(input);
   if (delta) await alterarEtiquetasDaConversa(supabase, ctx, conversationId, delta);

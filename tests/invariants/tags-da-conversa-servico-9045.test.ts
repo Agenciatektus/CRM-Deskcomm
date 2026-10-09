@@ -1,5 +1,5 @@
 /**
- * 9044 — a porta de SERVIÇO das etiquetas da conversa:
+ * 9045 — a porta de SERVIÇO das etiquetas da conversa:
  * `fn_conversa_tags_alterar_servico` (revisão do @Cassio_SecRev, P2).
  *
  * A `crm_manage_tags` (MCP, client de service role) lia, montava no app e
@@ -10,7 +10,7 @@
  *     duas etiquetas, e a IA de fato esperou a trava;
  *   - o núcleo não é executável direto por ninguém.
  * O resto (normalização, remoção só do pedido, teto, guardas da sessão) é de
- * `tags-da-conversa-por-delta-9044.test.ts`.
+ * `tags-da-conversa-por-delta-9045.test.ts`.
  */
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -82,7 +82,7 @@ async function conversa(tags: string[]): Promise<string> {
 beforeAll(async () => {
   for (const o of [org, vizinha]) {
     await pool.query(
-      "insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'9044s','9044s')",
+      "insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'9045s','9045s')",
       [o],
     );
   }
@@ -107,14 +107,14 @@ beforeAll(async () => {
   ).rows[0].id;
   contato = randomUUID();
   await pool.query(
-    "insert into contacts(id,organization_id,name,display_name,tags) values($1,$2,'9044s','9044s','{}')",
+    "insert into contacts(id,organization_id,name,display_name,tags) values($1,$2,'9045s','9045s','{}')",
     [contato, org],
   );
 });
 
 afterAll(() => pool.end());
 
-describe("9044 — porta de serviço das etiquetas da conversa", () => {
+describe("9045 — porta de serviço das etiquetas da conversa", () => {
   it("porta de serviço: authenticated e anon não executam; service_role aplica na própria org", async () => {
     const id = await conversa(["vip"]);
     await expect(servico("authenticated", manager, id, ["x"])).rejects.toThrow(

@@ -1,5 +1,5 @@
 /**
- * Etiquetas da conversa por DELTA (migration 9044).
+ * Etiquetas da conversa por DELTA (migration 9045).
  *
  * O PATCH gravava a lista inteira que a tela tinha carregado, e quem gravava por
  * último vencia: a etiqueta que outra pessoa (ou a IA, por `crm_manage_tags`)

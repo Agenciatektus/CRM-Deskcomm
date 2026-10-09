@@ -41,7 +41,7 @@ const ROTULO_DO_PAPEL: Record<string, string> = {
  *   - Lembrar depois → `useSnoozeConversation` (`POST`/`DELETE /snooze`), com as
  *     MESMAS opções do cabeçalho (`opcoesDoLembrete`, instante calculado no fuso
  *     de quem clica); "Escolher data e hora" fica só no cabeçalho;
- *   - Etiquetas → `useUpdateConversationTags` (`PATCH` só com o delta, 9044).
+ *   - Etiquetas → `useUpdateConversationTags` (`PATCH` só com o delta, 9045).
  */
 
 export function SubmenuTransferir({ conversation, meuUserId, onEscolher }: {
@@ -187,7 +187,7 @@ export function SubmenuEtiquetas({ conversation }: { conversation: ConversationW
               checked={atuais.includes(tag)}
               disabled={gravar.isPending}
               // Fecha ao marcar: a marca vem da conversa, que só muda quando o
-              // servidor responde. Desde a 9044 o clique manda só o delta, então
+              // servidor responde. Desde a 9045 o clique manda só o delta, então
               // nada se perde; fechar evita mostrar a marca velha.
               onCheckedChange={() => alternar(tag)}
               className="h-[34px] gap-2 rounded-lg text-[13.5px] focus:bg-surface-elevated focus:text-text"

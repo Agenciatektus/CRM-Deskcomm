@@ -190,7 +190,7 @@ export const crmManageTags: McpToolDefinition<typeof tagsInputShape> = {
       throw new Error("informe ao menos uma tag em add ou remove");
     }
 
-    // 9044: na CONVERSA, o delta vai para o banco, que aplica sobre o valor atual
+    // 9045: na CONVERSA, o delta vai para o banco, que aplica sobre o valor atual
     // com a linha travada. Ler-montar-regravar aqui perdia a etiqueta que um
     // humano pôs no meio (revisão do @Cassio_SecRev, P2). Contato e lead seguem
     // o caminho antigo.

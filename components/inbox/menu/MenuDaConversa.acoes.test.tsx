@@ -99,7 +99,7 @@ describe("cada item chama a rota que o cabeçalho chama", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it("Etiquetas → PATCH só com o delta (9044), nunca a lista inteira", async () => {
+  it("Etiquetas → PATCH só com o delta (9045), nunca a lista inteira", async () => {
     await abrir({ tags: ["retorno"] });
     fireEvent.keyDown(item(/Etiquetas/), { key: "ArrowRight" });
     const sub = await screen.findByRole("menu", { name: "Etiquetas" });

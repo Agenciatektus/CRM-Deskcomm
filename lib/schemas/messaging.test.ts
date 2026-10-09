@@ -172,7 +172,7 @@ describe("patchConversationSchema (G3-05)", () => {
   });
 });
 
-describe("patchConversationSchema — etiquetas por delta (9044)", () => {
+describe("patchConversationSchema — etiquetas por delta (9045)", () => {
   const ok = (corpo: unknown) => patchConversationSchema.safeParse(corpo);
 
   it("aceita só acrescentar, só remover, ou os dois, normalizando", () => {

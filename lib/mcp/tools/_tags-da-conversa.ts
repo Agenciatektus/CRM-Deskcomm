@@ -1,7 +1,7 @@
 import type { McpContext } from "../types";
 
 /**
- * 9044: a conversa muda pela porta de SERVIÇO (`fn_conversa_tags_alterar_servico`,
+ * 9045: a conversa muda pela porta de SERVIÇO (`fn_conversa_tags_alterar_servico`,
  * só service_role), com a org do ctx. Remover vence acrescentar, como no caminho
  * antigo (que filtrava a remoção depois de juntar); o banco recusaria os dois lados.
  */

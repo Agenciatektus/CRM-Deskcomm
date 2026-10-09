@@ -1,5 +1,5 @@
 /**
- * ETIQUETAS DA CONVERSA POR DELTA (migration 9044) — a rota e as duas telas.
+ * ETIQUETAS DA CONVERSA POR DELTA (migration 9045) — a rota e as duas telas.
  *
  * O PATCH gravava a lista inteira que a tela tinha carregado, e quem gravava por
  * último vencia (achado do @Cassio_SecRev). Aqui se mede o lado TypeScript:
@@ -9,7 +9,7 @@
  *   - o erro da função vira o código certo da API;
  *   - o editor manda só o delta, e o hook monta o corpo só com o lado preenchido.
  * O efeito no banco (concorrência, remoção só do pedido, guardas) é do invariante
- * `tests/invariants/tags-da-conversa-por-delta-9044.test.ts`.
+ * `tests/invariants/tags-da-conversa-por-delta-9045.test.ts`.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

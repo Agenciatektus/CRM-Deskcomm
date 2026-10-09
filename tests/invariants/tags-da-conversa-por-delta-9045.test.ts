@@ -1,5 +1,5 @@
 /**
- * 9044 — ETIQUETAS DA CONVERSA POR DELTA: `fn_conversa_tags_alterar`.
+ * 9045 — ETIQUETAS DA CONVERSA POR DELTA: `fn_conversa_tags_alterar`.
  *
  * O PATCH da conversa gravava a lista inteira e quem gravava por último vencia
  * (achado do @Cassio_SecRev). A função aplica acrescentar/remover sobre o valor
@@ -21,7 +21,7 @@
  *      impede tirar de uma lista legada;
  *
  * A porta de SERVIÇO (`crm_manage_tags`) está em
- * `tags-da-conversa-servico-9044.test.ts`.
+ * `tags-da-conversa-servico-9045.test.ts`.
  */
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -102,7 +102,7 @@ async function conversa(tags: string[], dono: string | null = null): Promise<str
 beforeAll(async () => {
   for (const o of [org, vizinha]) {
     await pool.query(
-      "insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'9044','9044')",
+      "insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'9045','9045')",
       [o],
     );
   }
@@ -130,13 +130,13 @@ beforeAll(async () => {
   ).rows[0].id;
   contato = randomUUID();
   await pool.query(
-    "insert into contacts(id,organization_id,name,display_name,tags) values($1,$2,'9044','9044','{}')",
+    "insert into contacts(id,organization_id,name,display_name,tags) values($1,$2,'9045','9045','{}')",
     [contato, org],
   );
   // Suporte de plataforma SEM vínculo com a organização, começando em leitura.
   await pool.query("insert into auth.sessions(id,user_id,aal) values($1,$2,'aal1')", [sessaoDeSuporte, u.suporte]);
   await pool.query(
-    "insert into platform_admins(user_id,granted_by,scope,mfa_required,reason) values($1,$1,'full',false,'9044') on conflict(user_id) do update set scope='full',revoked_at=null,mfa_required=false",
+    "insert into platform_admins(user_id,granted_by,scope,mfa_required,reason) values($1,$1,'full',false,'9045') on conflict(user_id) do update set scope='full',revoked_at=null,mfa_required=false",
     [u.suporte],
   );
   await pool.query(
@@ -147,7 +147,7 @@ beforeAll(async () => {
 
 afterAll(() => pool.end());
 
-describe("9044 — etiquetas da conversa por delta", () => {
+describe("9045 — etiquetas da conversa por delta", () => {
   it("duas alterações concorrentes de etiquetas diferentes preservam as duas", async () => {
     const id = await conversa(["base"]);
     const a = await abrir({ user: u.manager });

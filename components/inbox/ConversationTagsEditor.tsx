@@ -24,7 +24,7 @@ export function ConversationTagsEditor({ conversationId, orgId, tags }: Props) {
   const mutation = useUpdateConversationTags();
   const { data: vocabulary } = useConversationTagVocabulary(orgId);
 
-  // 9044: manda só o DELTA; o banco aplica sobre o valor atual, então a tag
+  // 9045: manda só o DELTA; o banco aplica sobre o valor atual, então a tag
   // que outra pessoa (ou a IA) pôs no meio não some. Normalização espelha o Zod
   // do PATCH (trim+lowercase).
   function add(raw: string) {
