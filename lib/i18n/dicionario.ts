@@ -5337,6 +5337,13 @@ export const DICIONARIO: Traducoes = {
     {
       es: "La regla usa un tipo de acción que esta instalación no tiene (puede que se haya retirado en una actualización). Abre la automatización y elige otra acción.",
     },
+  // `criacao_em_lote` do mapa MOTIVO_DA_PARADA. A entrada é manual porque a
+  // cerca de i18n não enxerga `t()` dinâmico: sem ela a frase ficaria em
+  // português na tela em espanhol, e nenhum gate acusaria.
+  "Este card nasceu de uma criação em lote (importação de planilha ou campanha), e as ações que falam com o cliente ficam de fora nessas levas, para a mesma regra não virar centenas de mensagens no mesmo minuto. As outras ações da regra rodaram normalmente.":
+    {
+      es: "Esta ficha nació de una creación en lote (importación de planilla o campaña), y las acciones que hablan con el cliente quedan fuera en esas tandas, para que la misma regla no se convierta en cientos de mensajes en el mismo minuto. Las demás acciones de la regla sí se ejecutaron.",
+    },
   "Título do lead": { es: "Título del lead" },
   "Nome do lead": { es: "Nombre del lead" },
   "Tags do lead": { es: "Etiquetas del lead" },
