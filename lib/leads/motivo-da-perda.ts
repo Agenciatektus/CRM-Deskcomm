@@ -118,6 +118,14 @@ export type VereditoDoMotivoDaPerda =
       mensagem: string;
     };
 
+/** Ausência mantém a regra histórica; só `false` explícito torna o motivo opcional. */
+export function motivoDaPerdaObrigatorio(settingsDoFunil: unknown): boolean {
+  return (
+    (settingsDoFunil as { lost_reason_required?: unknown } | null | undefined)
+      ?.lost_reason_required !== false
+  );
+}
+
 /** Esta etapa fecha o negócio como PERDA? (Coluna do banco, nunca o nome da etapa.) */
 export function etapaDePerda(etapa: EtapaDeDestino | null | undefined): boolean {
   return etapa?.is_lost === true;
@@ -136,6 +144,8 @@ export function decideMotivoDaPerda(input: {
   motivo?: string | null;
   /** O motivo que o negócio já tem gravado (card que já está na etapa de perda). */
   motivoAtual?: string | null;
+  /** Configuração crua do funil; `lost_reason_required: false` libera a ausência. */
+  settingsDoFunil?: unknown;
   idioma?: Idioma | null;
 }): VereditoDoMotivoDaPerda {
   if (!etapaDePerda(input.etapaDeDestino)) return { ok: true, patch: {} };
@@ -145,6 +155,8 @@ export function decideMotivoDaPerda(input: {
 
   const atual = (input.motivoAtual ?? "").trim();
   if (atual.length > 0) return { ok: true, patch: {} };
+
+  if (!motivoDaPerdaObrigatorio(input.settingsDoFunil)) return { ok: true, patch: {} };
 
   return {
     ok: false,

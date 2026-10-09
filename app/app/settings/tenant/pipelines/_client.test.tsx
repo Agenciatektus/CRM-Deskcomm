@@ -109,6 +109,23 @@ describe("um campo multiselect já gravado", () => {
   });
 });
 
+describe("obrigatoriedade do motivo de perda", () => {
+  it("salva false quando o administrador desliga a exigência", async () => {
+    vi.mocked(updatePipelineConfig).mockClear();
+    render(<PipelinesClient pipelines={[FUNIL]} podeEditarConfig />);
+
+    const controle = screen.getByRole("checkbox", {
+      name: /Exigir motivo de perda ao fechar como perdido/i,
+    });
+    expect(controle).toBeChecked();
+    fireEvent.click(controle);
+    fireEvent.click(screen.getByRole("button", { name: /Salvar vocabulário e campos/i }));
+
+    await vi.waitFor(() => expect(updatePipelineConfig).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(updatePipelineConfig).mock.calls[0]?.[1].lost_reason_required).toBe(false);
+  });
+});
+
 /**
  * Um funil cujo único campo é uma lista fechada AINDA SEM opções — o estado de
  * quem acabou de criar o campo e vai digitar a primeira. Os testes de digitação

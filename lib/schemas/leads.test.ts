@@ -34,14 +34,14 @@ describe("moveLeadSchema", () => {
 });
 
 describe("loseLeadSchema", () => {
-  it("requires lost_reason", () => {
+  it("aceita ausência para o servidor aplicar a configuração do funil", () => {
     const r = loseLeadSchema.safeParse({});
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
-  it("rejects empty lost_reason", () => {
+  it("aceita vazio como ausência para a decisão de domínio", () => {
     const r = loseLeadSchema.safeParse({ lost_reason: "" });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
   it("accepts a non-empty reason", () => {

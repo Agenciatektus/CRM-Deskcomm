@@ -39,9 +39,10 @@ interface Props {
  * concluir e reagendar é `agent`+. Em `leitura` a tarefa aparece sem botões e o
  * formulário não é oferecido, que é o estado honesto para quem só observa.
  *
- * ⚠️ O CRM NÃO avisa ninguém no horário: não existe cron nem worker que leia
- * `crm_tasks.due_date` (o `agenda-reminder` é dos compromissos da Agenda). Por
- * isso a tela promete só o que acontece: a tarefa entra na lista de Tarefas.
+ * Na hora do prazo o responsável é avisado no sino (Central de avisos) e por
+ * push do navegador: o cron `task-due-reminder` lê `crm_tasks.due_date`
+ * (`lib/tarefas/aviso-de-tarefa.ts`, migration 9043). É isso que a tela promete
+ * no formulário — e só isso: nada vai ao cliente.
  */
 export const ProximoPasso = forwardRef<HTMLElement, Props>(function ProximoPasso(
   { contactId, leadId, conversationId, usuarioId, leitura },

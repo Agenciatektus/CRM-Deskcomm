@@ -1495,7 +1495,6 @@ CREATE TABLE IF NOT EXISTS "public"."crm_leads" (
     "created_by_user_id" "uuid",
     CONSTRAINT "crm_leads_closed_at_consistency" CHECK (((("status" = 'open'::"text") AND ("closed_at" IS NULL)) OR (("status" = ANY (ARRAY['won'::"text", 'lost'::"text"])) AND ("closed_at" IS NOT NULL)))),
     CONSTRAINT "crm_leads_currency_iso" CHECK ((("currency" IS NULL) OR ("currency" ~ '^[A-Z]{3}$'::"text"))),
-    CONSTRAINT "crm_leads_lost_reason_required" CHECK ((("status" <> 'lost'::"text") OR (("lost_reason" IS NOT NULL) AND ("length"("lost_reason") > 0)))),
     CONSTRAINT "crm_leads_status_enum" CHECK (("status" = ANY (ARRAY['open'::"text", 'won'::"text", 'lost'::"text"])))
 );
 
@@ -3064,7 +3063,7 @@ CREATE OR REPLACE TRIGGER "trg_validate_activity_lead_org" BEFORE INSERT ON "pub
 
 
 
-CREATE OR REPLACE TRIGGER "trg_validate_lost_reason_required" BEFORE INSERT OR UPDATE OF "status", "lost_reason" ON "public"."crm_leads" FOR EACH ROW EXECUTE FUNCTION "public"."fn_validate_lost_reason_required"();
+CREATE OR REPLACE TRIGGER "trg_validate_lost_reason_required" BEFORE INSERT OR UPDATE OF "status", "lost_reason", "stage_id", "pipeline_id" ON "public"."crm_leads" FOR EACH ROW EXECUTE FUNCTION "public"."fn_validate_lost_reason_required"();
 
 
 
@@ -4477,9 +4476,9 @@ GRANT ALL ON FUNCTION "public"."fn_validate_activity_lead_org"() TO "service_rol
 
 
 
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "anon";
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() FROM "public", "anon";
+GRANT EXECUTE ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "service_role";
 
 
 
@@ -10150,6 +10149,11 @@ alter table public.agent_inbox_items
     -- lista pelas razões de sempre (#159; a janela do `midia-nao-lida.test.ts`).
     'jev_pedido_de_humano',
     'jev_parar_de_receber',
+    -- (migration 9043) A tarefa chegou na hora: o cron `task-due-reminder`
+    -- avisa o RESPONSÁVEL (Central + push só para ele). Kind próprio, e não
+    -- `other`, porque o rótulo de `other` é "Aviso do assistente" — falso para
+    -- uma tarefa que uma pessoa marcou. NESTA lista pelas razões de sempre (#159).
+    'task_due',
     'other'
   ));
 
@@ -27241,26 +27245,33 @@ declare
   v_canonical text[] := array['requested_by_customer','price','no_response','product_unavailable',
                               'cancelled_by_store','cancelled_by_customer','payment_failed','other',
                               'moved_to_another_pipeline'];
-  v_pipeline_extra text[];
+  v_pipeline_extra text[] := '{}'::text[];
+  v_required boolean := true;
 begin
   if new.status = 'lost' then
-    if new.lost_reason is null or length(new.lost_reason) = 0 then
-      raise exception 'lost_reason_required' using errcode = '22023';
-    end if;
-
     -- #1537: `settings.lost_reasons` aceita texto puro E `{ label, categoria }`.
     -- O que o trigger compara é o RÓTULO nos dois formatos: `jsonb_array_elements_text`
     -- de um objeto devolveria o JSON inteiro e recusaria com 22023 um motivo que
     -- a própria tela acabou de oferecer. `#>> '{}'` desembrulha o string.
-    select coalesce(
-      array(
-        select case when jsonb_typeof(e) = 'object'
-                    then nullif(e ->> 'label', '')
-                    else nullif(e #>> '{}', '') end
-          from jsonb_array_elements(settings->'lost_reasons') as t(e)
-      ), '{}'::text[]
-    ) into v_pipeline_extra
-    from public.crm_pipelines where id = new.pipeline_id;
+    select
+      coalesce(settings->'lost_reason_required' <> 'false'::jsonb, true),
+      coalesce(
+        array(
+          select case when jsonb_typeof(e) = 'object'
+                      then nullif(e ->> 'label', '')
+                      else nullif(e #>> '{}', '') end
+            from jsonb_array_elements(settings->'lost_reasons') as t(e)
+        ), '{}'::text[]
+      )
+      into v_required, v_pipeline_extra
+      from public.crm_pipelines where id = new.pipeline_id;
+
+    if new.lost_reason is null or length(btrim(new.lost_reason)) = 0 then
+      if v_required then
+        raise exception 'lost_reason_required' using errcode = '22023';
+      end if;
+      return new;
+    end if;
 
     if not (new.lost_reason = any (v_canonical) or new.lost_reason = any (v_pipeline_extra)) then
       raise exception 'lost_reason_invalid: %', new.lost_reason using errcode = '22023';
@@ -40290,6 +40301,25 @@ alter table public.crm_tasks
   add column if not exists source_kind text;
 comment on column public.crm_tasks.source_kind is
   'De onde a tarefa nasceu (ex.: promised_proposal). NULL = criada à mão. Vocabulário aberto — TypeScript, sem CHECK.';
+
+-- ---- o responsável é avisado na hora da tarefa (migration 9043) ----
+--
+-- `crm_tasks.reminded_at`: quando o cron `task-due-reminder` avisou o
+-- responsável (Central de avisos + push do navegador). Nula = ainda não avisou;
+-- reagendar (PATCH com `due_date`) zera. O cron reivindica cada tarefa com
+-- UPDATE condicional em `reminded_at is null`, então duas réplicas nunca avisam
+-- duas vezes. O índice parcial cobre exatamente a varredura de cada minuto. O
+-- kind `task_due` entrou no bloco ÚNICO de `agent_inbox_items_kind_check` (o da
+-- 0105), não aqui. Racional inteiro no cabeçalho da migration. Idempotente.
+alter table public.crm_tasks
+  add column if not exists reminded_at timestamptz;
+comment on column public.crm_tasks.reminded_at is
+  'Quando o responsável foi avisado do prazo (Central + push, cron task-due-reminder). NULL = ainda não avisou. Reagendar (PATCH due_date) zera. Migration 9043.';
+create index if not exists crm_tasks_a_avisar_idx
+  on public.crm_tasks (due_date)
+  where reminded_at is null
+    and due_date is not null
+    and status in ('pending', 'in_progress');
 
 -- ---- a proposta não aponta para outra organização (migration 0465) ----
 create or replace function public.fn_verificar_org_da_proposta()

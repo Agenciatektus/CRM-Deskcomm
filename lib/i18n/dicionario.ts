@@ -14228,6 +14228,42 @@ export const DICIONARIO: Traducoes = {
   "Nenhuma mensagem sai mais para este contato, nem da IA nem de campanhas. Só um admin desbloqueia.": {
     es: "No se enviarán más mensajes a este contacto, ni de la IA ni de campañas. Solo un admin puede desbloquearlo.",
   },
+
+  // ---- aviso na hora da tarefa (migration 9043, lib/tarefas/aviso-de-tarefa.ts) ----
+  "O responsável recebe o aviso na hora marcada.": { es: "El responsable recibe el aviso a la hora indicada." },
+  "Hora da tarefa": { es: "Hora de la tarea" },
+  "Hora da tarefa:": { es: "Hora de la tarea:" },
+  "Chegou a hora de uma tarefa": { es: "Llegó la hora de una tarea" },
+  "Abra a conversa ou o negócio e faça o que a tarefa pede. Conclua a tarefa em Tarefas quando terminar.": {
+    es: "Abre la conversación o el negocio y haz lo que pide la tarea. Complétala en Tareas cuando termines.",
+  },
+
+  // ---- passos de campanha ----
+  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
+  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
+    es: "Quien responde sale de la secuencia de inmediato. Los pasos siguientes aplican a quien quedó en silencio.",
+  },
+  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
+  "Exigir motivo de perda ao fechar como perdido": { es: "Exigir motivo de pérdida al cerrar como perdido" },
+  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
+    es: "El primer mensaje es el de arriba y se envía a toda la lista. Los pasos siguientes ocurren para quien NO respondió. Quien responde sale de la secuencia de inmediato.",
+  },
+  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
+    es: "Elige el embudo en «Quién responde» antes de preparar: con pasos, cada persona contactada se convierte en una tarjeta y toda tarjeta necesita un embudo.",
+  },
+  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
+    es: "Con pasos, cada persona contactada se convierte en una tarjeta en el embudo elegido desde el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Así funcionan mover de etapa y etiquetar, y también se llena el tablero:",
+  },
+  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
+  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
+  "Quem já tem negócio aberto nesse funil não ganha card novo.": { es: "Quien ya tiene un negocio abierto en este embudo no recibe una tarjeta nueva." },
+  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
+  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
+    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar y todos los que reciban tendrán los pasos.",
+  },
+  "etapa removida": { es: "etapa eliminada" },
+  "variações": { es: "variaciones" },
+  "Mover para": { es: "Mover a" },
 };
 
 /**

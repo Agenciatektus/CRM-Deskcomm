@@ -32,7 +32,10 @@ import {
   settingsDoFunil,
   validaCamposExigidos,
 } from "@/lib/leads/campos-exigidos";
-import { recusaDeMotivoDaPerdaPeloBanco } from "@/lib/leads/motivo-da-perda";
+import {
+  decideMotivoDaPerda,
+  recusaDeMotivoDaPerdaPeloBanco,
+} from "@/lib/leads/motivo-da-perda";
 
 /** Como a demanda terminou. Não há terceira: encerrar é ganhar ou perder. */
 export type DesfechoDaDemanda = "won" | "lost";
@@ -210,6 +213,24 @@ export async function encerraDemanda(
       recusa.mensagem,
     );
   }
+  if (input.desfecho === "lost") {
+    const vereditoDaPerda = decideMotivoDaPerda({
+      etapaDeDestino: { ...stage, is_lost: true },
+      motivo: input.motivo,
+      motivoAtual: (lead as { lost_reason?: string | null }).lost_reason ?? null,
+      settingsDoFunil: settings,
+      idioma: ctx.idioma,
+    });
+    if (!vereditoDaPerda.ok) {
+      throw new ApiError(
+        422,
+        vereditoDaPerda.codigo,
+        undefined,
+        ctx.requestId,
+        vereditoDaPerda.mensagem,
+      );
+    }
+  }
   // Sem lista cadastrada o motivo de ganho é texto livre; com lista, só o que
   // está nela passa — quem aplica é o servidor, porque para o GANHO não há
   // trigger no banco (a CHECK da perda é `crm_leads_lost_reason_required`).
@@ -239,7 +260,9 @@ export async function encerraDemanda(
     position_in_stage: nextPosition,
     updated_at: new Date().toISOString(),
   };
-  if (input.desfecho === "lost") patch.lost_reason = input.motivo;
+  if (input.desfecho === "lost" && input.motivo?.trim()) {
+    patch.lost_reason = input.motivo.trim();
+  }
   // O ganho espelha a perda na MESMA escrita: `won_reason` só entra quando há
   // motivo (a coluna é nullable e sem CHECK — a obrigatoriedade é do funil,
   // decidida acima, nunca do banco).
