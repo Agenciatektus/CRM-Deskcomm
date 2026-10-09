@@ -360,3 +360,19 @@ export async function fzapFetchMedia(
   const mime = res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
   return { buffer, mime };
 }
+
+/** Foto com token de máquina: o segredo do FZAP/Instagram permanece na plataforma. */
+export async function fotoDoContatoPareado(
+  creds: VerdashCredentials,
+  recipient: string,
+): Promise<string | null> {
+  const resp = await fetch(`${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-foto-perfil`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-crm-token": creds.token },
+    body: JSON.stringify({ destinatario: recipient }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok || data?.success !== true) throw new Error("contact_profile_unavailable");
+  return typeof data?.data?.url === "string" ? data.data.url : null;
+}

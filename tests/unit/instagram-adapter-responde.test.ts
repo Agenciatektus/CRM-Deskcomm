@@ -1,3 +1,4 @@
+import type * as Credenciais from "@/lib/channels/verdash/credentials";
 // ─── O adapter que responde no Instagram ───────────────────────────────────
 //
 // Três coisas aqui produzem estrago silencioso se saírem erradas:
@@ -21,7 +22,7 @@ import { instagramAdapter } from "@/lib/channels/adapters/instagram";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({})) }));
 vi.mock("@/lib/channels/verdash/credentials", async (real) => ({
-  ...(await real<typeof import("@/lib/channels/verdash/credentials")>()),
+  ...(await real<typeof Credenciais>()),
   resolveVerdashCreds: vi.fn(),
 }));
 
@@ -164,4 +165,22 @@ describe("o envio", () => {
     await expect(instagramAdapter.send(envelope())).rejects.toThrow("instagram_not_configured");
     expect(fetchFalso).not.toHaveBeenCalled();
   });
+});
+
+it("busca foto com o token do vínculo, sem enviá-lo ao FZAP", async () => {
+  const buscar = vi.fn(async () =>
+    respostaHttp({ success: true, data: { url: "https://cdninstagram.com/foto.jpg" } }),
+  );
+  vi.stubGlobal("fetch", buscar);
+  expect(
+    await instagramAdapter.fetchProfilePictureUrl!({
+      organizationId: "org-1",
+      sessionRef: "conta-ig",
+      recipient: "17841400000000001",
+    }),
+  ).toBe("https://cdninstagram.com/foto.jpg");
+  const [url, init] = buscar.mock.calls[0]! as unknown as [string, RequestInit];
+  expect(url).toContain("/crm-foto-perfil");
+  expect(new Headers(init.headers).get("x-crm-token")).toBe(CREDS_PAREADAS.token);
+  expect(JSON.parse(init.body as string)).toEqual({ destinatario: "17841400000000001" });
 });
