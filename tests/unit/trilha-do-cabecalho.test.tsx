@@ -21,6 +21,7 @@ vi.mock("@/components/shell/MobileSidebar", () => ({ MobileSidebar: () => null }
 vi.mock("@/components/shell/TenantSwitcher", () => ({ TenantSwitcher: () => null }));
 vi.mock("@/components/shell/UserMenu", () => ({ UserMenu: () => null }));
 vi.mock("@/components/shell/SearchTrigger", () => ({ SearchTrigger: () => null }));
+vi.mock("@/components/shell/BotaoDeDisponibilidade", () => ({ BotaoDeDisponibilidade: () => null }));
 
 afterEach(() => {
   caminho = "/app/inbox";
@@ -36,7 +37,7 @@ describe("a trilha do cabeçalho", () => {
     expect(nav).not.toBeNull();
     const itens = within(nav!).getAllByRole("listitem").map((li) => li.textContent?.trim());
     // O separador "›" é aria-hidden: o leitor de tela ouve só grupo e página.
-    expect(itens).toEqual(["Atendimento", "Inbox"]);
+    expect(itens).toEqual(["Conversas", "Inbox"]);
     expect(within(nav!).getByText("Inbox")).toHaveAttribute("aria-current", "page");
   });
 

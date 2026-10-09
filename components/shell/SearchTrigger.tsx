@@ -1,14 +1,34 @@
 "use client";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { MagnifyingGlass } from "@/lib/ui/icons";
-import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 
+/**
+ * Mac mostra ⌘K; o resto, Ctrl K. Lido por `useSyncExternalStore` com um retrato
+ * de servidor fixo ("Ctrl K"): ler `navigator` direto no render faria o HTML do
+ * servidor e o da primeira pintura discordarem (erro de hidratação), e um
+ * `setState` dentro de efeito pintaria a tecla errada por um quadro.
+ */
+const semAssinatura = () => () => {};
+function ehMac(): boolean {
+  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+}
+
+/**
+ * O gatilho da busca no topo, nas medidas do `.search-trigger` do protótipo:
+ * campo largo (até 440px), 36px de altura, fundo `surface` com borda.
+ *
+ * O texto NÃO é "Buscar contato, conversa ou lead" (o do protótipo): a paleta
+ * hoje busca só as TELAS do produto (ver `CommandPalette`), e prometer contato
+ * ou lead seria um campo que não acha o que diz achar. Quando a paleta ganhar
+ * essas fontes, o texto acompanha.
+ */
 export function SearchTrigger() {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const mac = useSyncExternalStore(semAssinatura, ehMac, () => false);
 
   // `enableOnFormTags`: o atalho precisa funcionar com o cursor dentro do
   // composer do inbox, que é onde o operador passa o dia.
@@ -16,16 +36,21 @@ export function SearchTrigger() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2 text-muted-foreground"
+      <button
+        type="button"
         onClick={() => setOpen(true)}
+        aria-label={t("Buscar telas e funções")}
+        aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
+        className="flex h-9 w-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface text-sm text-text-subtle transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:w-full md:max-w-[440px] md:justify-start md:pr-2 md:pl-3"
       >
-        <MagnifyingGlass size={14} aria-hidden />
-        <span className="hidden md:inline">{t("Buscar...")}</span>
-        <kbd className="ml-2 hidden md:inline rounded-md border bg-muted px-1.5 py-0.5 text-[10px]">⌘K</kbd>
-      </Button>
+        <MagnifyingGlass size={15} className="shrink-0" aria-hidden />
+        <span className="hidden min-w-0 flex-1 truncate text-left md:inline">
+          {t("Buscar telas e funções")}
+        </span>
+        <kbd className="hidden shrink-0 rounded-md border border-border bg-surface-elevated px-1.5 py-0.5 font-sans text-[11px] text-text-muted md:inline">
+          {mac ? "⌘K" : "Ctrl K"}
+        </kbd>
+      </button>
       <CommandPalette open={open} onOpenChange={setOpen} />
     </>
   );

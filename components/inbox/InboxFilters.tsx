@@ -227,7 +227,7 @@ export function InboxFilters({ value, onChange }: Props) {
   }, [searchInput]);
 
   return (
-    <div className="flex flex-col gap-2.5 border-b border-border bg-background px-3.5 pb-2.5 pt-3.5">
+    <div className="flex flex-col gap-2.5 border-b border-border bg-surface px-3.5 pb-2.5 pt-3.5">
       <div className="flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-elevated pl-3 pr-1 transition-colors focus-within:border-accent focus-within:bg-background focus-within:ring-2 focus-within:ring-accent-soft">
         <MagnifyingGlass size={15} weight="regular" className="shrink-0 text-text-subtle" aria-hidden />
         {/* "última mensagem", e não só "mensagem": a busca alcança apenas

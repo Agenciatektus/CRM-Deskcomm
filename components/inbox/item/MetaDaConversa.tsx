@@ -13,9 +13,17 @@ import { cn } from "@/lib/utils";
 
 import { waitingLabel } from "./tempo-da-linha";
 
-/** A pílula do visual v2: mesma altura para espera, dono e selos. */
+/**
+ * A pílula do visual v2: mesma altura para espera, dono e selos. 22px e 12px
+ * semibold são as medidas do `.pill` do protótipo; com 20px/11px o dono e a
+ * espera sumiam ao lado do nome, que é justamente o que se lê primeiro.
+ */
 const PILULA =
-  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[11px] font-medium";
+  "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold";
+/** A etiqueta como chip com CONTORNO (o `.tag` do protótipo): arredondada, para não
+ *  se confundir com a pílula de dono/espera, que é retangular. */
+const CHIP_DA_ETIQUETA =
+  "h-[22px] rounded-full border border-border bg-surface px-2 text-xs font-normal text-text-muted";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -48,7 +56,7 @@ function donoDaConversa(
       return {
         rotulo:
           meuUserId && comando.userId === meuUserId ? t("Você") : (comando.nome ?? t("Atendente")),
-        classe: "border-border bg-surface-elevated text-text-muted",
+        classe: "border-border bg-surface text-text-muted",
       };
     case "automatico":
       return { rotulo: t("Automático"), classe: "border-transparent bg-accent-soft text-accent" };
@@ -107,11 +115,11 @@ export function MetaDaConversa({
   if (!temAlgo) return null;
 
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
       {naFila && (
         <>
           <span
-            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-soft px-1 text-[10px] font-medium tabular-nums text-accent"
+            className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent-soft px-1 text-[11px] font-semibold tabular-nums text-accent"
             aria-label={`${t("Posição")} ${queuePosition} ${t("na fila")}`}
           >
             {queuePosition}º
@@ -132,9 +140,9 @@ export function MetaDaConversa({
       )}
       {dono && <span className={cn(PILULA, dono.classe)}>{dono.rotulo}</span>}
       {visibleTags.map((tag) => (
-        <ChipDeEtiqueta key={tag} tag={tag} className="h-5 px-1.5 text-[11px]" />
+        <ChipDeEtiqueta key={tag} tag={tag} className={CHIP_DA_ETIQUETA} />
       ))}
-      {overflow > 0 && <span className="text-[11px] text-text-muted">+{overflow}</span>}
+      {overflow > 0 && <span className="text-xs text-text-muted">+{overflow}</span>}
       {rotuloEntrada && (
         <Badge
           variant="outline"

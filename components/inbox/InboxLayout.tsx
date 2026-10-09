@@ -368,14 +368,16 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // Duas faixas em vez de uma: compacta onde aperta, generosa onde há espaço.
   // Em 1280 isso dá 424px de conversa em vez de 372 — 54px de folga sobre o
   // piso do composer (370px), em vez dos 2px que a versão de uma faixa só
-  // deixava. Margem de 2px não é margem, é sorte.
+  // deixava. Margem de 2px não é margem, é sorte. Acima de 1680px o painel do
+  // lead vai a 400px (o do protótipo v2); o grid é um CARD (borda, cantos,
+  // `surface`) destacado da moldura, como o `.work` do protótipo.
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
       className={cn(
-        "grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr]",
+        "grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface md:grid-cols-[300px_1fr]",
         ferramentas.painelLead
-          ? "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]"
+          ? "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_360px] min-[1680px]:grid-cols-[300px_1fr_400px]"
           : "xl:grid-cols-[272px_1fr] 2xl:grid-cols-[300px_1fr]",
       )}
       /*

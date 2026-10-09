@@ -13,6 +13,8 @@ import { usePeekDoTrilho } from "@/components/shell/usePeekDoTrilho";
 import { VersionFooter } from "@/components/shell/VersionFooter";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
+import type { Idioma } from "@/lib/i18n/idiomas";
+import { useIdioma } from "@/lib/i18n/IdiomaProvider";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import {
   GRUPO_NO_RODAPE,
@@ -49,8 +51,30 @@ const ICONE_DO_GRUPO: Record<Exclude<NavGroupId, "organizacao">, PhosphorIcon> =
   analise: ChartBar,
 };
 
+/**
+ * Rótulo CURTO de um grupo, só no trilho de 72px e só no idioma em que a
+ * tradução normal não cabe. "Conversas" vira "Conversaciones" em espanhol, que
+ * no trilho sairia "Conversa…"; ali usamos "Chats". No título da coluna e na
+ * trilha do cabeçalho, que têm espaço, vale a tradução de sempre.
+ *
+ * Mapa aqui, e não um "Conversas" com outra tradução no dicionário: a chave do
+ * dicionário é o texto em português, uma só para o produto inteiro, e trocá-la
+ * mudaria cabeçalhos de tabela que dizem "Conversas" em outro sentido. Mora
+ * nesta barra pelo mesmo motivo do `ICONE_DO_GRUPO`: é desenho dela.
+ */
+const ROTULO_CURTO_NO_TRILHO: Partial<Record<NavGroupId, Partial<Record<Idioma, string>>>> = {
+  atendimento: { es: "Chats" },
+};
+
+/**
+ * O botão do trilho nas medidas do `.rail-btn` do protótipo: até 64px de largura
+ * (`max-w-full` encolhe para o que a coluna de 72px deixa) e rótulo 10.5px
+ * semibold com tracking levemente fechado. Com 56px e `px-1` o rótulo tinha 48px
+ * e "Atendimento" saía "Atendi…"; e a soma botão + padding da coluna passava da
+ * largura, o que desenhava uma barra horizontal embaixo do trilho.
+ */
 const BOTAO_DO_TRILHO =
-  "relative flex w-14 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10.5px] leading-none font-semibold transition-colors";
+  "relative flex min-h-14 w-16 max-w-full flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5 text-[10.5px] leading-[1.1] font-semibold tracking-[-0.01em] transition-colors";
 const BOTAO_MARCADO = "bg-card text-foreground ring-1 ring-border";
 const BOTAO_SOLTO = "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
 
@@ -78,6 +102,7 @@ export function BarraEmDuasColunas({
   marca: ReactNode;
 }) {
   const t = useT();
+  const idioma = useIdioma();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const { user, activeOrg } = useAuth();
@@ -140,7 +165,10 @@ export function BarraEmDuasColunas({
         </div>
         <nav
           aria-label={t("Grupos da navegação")}
-          className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-2"
+          // `overflow-x-hidden` + `scrollbar-none`: com só `overflow-y-auto` o eixo
+          // x vira `auto` junto, e qualquer pixel a mais desenhava a barra de
+          // rolagem horizontal embaixo do trilho. A rolagem vertical continua.
+          className="scrollbar-none flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden px-1 py-2"
         >
           {noTrilho.map(({ group, items }) => {
             const Icone = ICONE_DO_GRUPO[group.id as keyof typeof ICONE_DO_GRUPO];
@@ -170,7 +198,9 @@ export function BarraEmDuasColunas({
                   className={cn(daRotaAtual && "text-primary")}
                   aria-hidden
                 />
-                <span className="max-w-full truncate">{t(group.label)}</span>
+                <span className="max-w-full truncate">
+                  {ROTULO_CURTO_NO_TRILHO[group.id]?.[idioma] ?? t(group.label)}
+                </span>
                 {telas.some((d) => d.contador === "fila") && <ContadorDaFila compacto />}
                 {telas.some((d) => d.contador === "casos") && <ContadorDeCasos compacto />}
                 {telas.some((d) => d.healthDot) && (
@@ -180,7 +210,7 @@ export function BarraEmDuasColunas({
             );
           })}
         </nav>
-        <div className="flex w-full flex-col items-center gap-1 border-t px-2 py-2">
+        <div className="flex w-full flex-col items-center gap-1 border-t px-1 py-2">
           {rodape?.hub && (
             <Link
               href={rodape.hub.href}

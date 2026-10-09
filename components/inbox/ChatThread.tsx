@@ -266,7 +266,7 @@ export function ChatThread({ conversationId, provider, onResponder, dono, contat
   const grudado = ativo != null && ativo.start < (virtualizer.scrollOffset ?? 0);
 
   return (
-    <div {...sinalDoCanal} className="flex h-full min-w-0 flex-col bg-bg">
+    <div {...sinalDoCanal} className="fundo-do-fio flex h-full min-w-0 flex-col">
       {termo && (
         <div className="px-4 py-1 text-xs text-muted-foreground" role="status">
           {t("Resultados nas mensagens carregadas")}: {resultados.size}
@@ -275,7 +275,7 @@ export function ChatThread({ conversationId, provider, onResponder, dono, contat
       {/* `overflow-anchor: none`: quem segura a posição ao entrar conteúdo acima é
           o virtualizador (`anchorTo: "end"`); a ancoragem do navegador por cima
           dele compensaria duas vezes. */}
-      <div ref={scrollerRef} className="min-w-0 flex-1 overflow-y-auto [overflow-anchor:none]">
+      <div ref={scrollerRef} className="trama-do-fio min-w-0 flex-1 overflow-y-auto [overflow-anchor:none]">
         <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
           {virtuais.map((v) => {
             const fixo = grudado && v.index === diaAtivo.current;

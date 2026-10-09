@@ -7,6 +7,7 @@ import { destinoDaRota } from "@/lib/navigation/rota-atual";
 
 import { AlertsBell } from "./AlertsBell";
 import { AvisoDePropostaEmDestaque } from "./AvisoDePropostaEmDestaque";
+import { BotaoDeDisponibilidade } from "./BotaoDeDisponibilidade";
 import { MobileSidebar } from "./MobileSidebar";
 import { TenantSwitcher } from "./TenantSwitcher";
 import { UserMenu } from "./UserMenu";
@@ -51,10 +52,13 @@ export function TopBar() {
         <TenantSwitcher />
         <TrilhaDaRota />
       </div>
-      <div className="flex min-w-0 flex-1 justify-center md:max-w-md">
+      {/* A busca ocupa o meio e cresce até os 440px do protótipo (o limite mora
+          no próprio gatilho); o `flex-1` aqui só reserva o espaço. */}
+      <div className="flex min-w-0 flex-1 justify-center">
         <SearchTrigger />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <BotaoDeDisponibilidade />
         <AlertsBell />
         <AvisoDePropostaEmDestaque />
         <UserMenu />

@@ -214,6 +214,27 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato · cor por pessoa (6 pares) -------------------
+   * Fundo claro + texto escuro do mesmo matiz, os `--av1..--av6` do protótipo
+   * da Inbox v2 convertidos de oklch para hex (a régua de contraste e os testes
+   * de tema leem hex). Contraste medido do texto sobre o fundo: 7,6:1 a 8,4:1
+   * nos dois temas (tests/unit/cor-do-avatar.test.ts refaz a conta).
+   * NÃO usa a accent: ela é a marca do revendedor e deixaria todo avatar da
+   * lista com a mesma cor. Qual par cada contato recebe sai de um hash estável
+   * do id (lib/inbox/cor-do-avatar.ts).
+   */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00484c;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -324,6 +345,19 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato (espelho do :root, mesma razão da agenda) ---- */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00484c;
 }
 
 [data-theme="dark"] {
@@ -424,6 +458,19 @@
   --agenda-pessoa-6: #6c97e7;
   --agenda-pessoa-7: #be9ef6;
   --agenda-pessoa-8: #cc77b1;
+  /* ---- Avatar do contato (escuro: fundo escuro, texto claro do matiz) -- */
+  --color-avatar-1: #5d2d2a;
+  --color-avatar-1-fg: #fed2cd;
+  --color-avatar-2: #4f3815;
+  --color-avatar-2-fg: #f3dab2;
+  --color-avatar-3: #194430;
+  --color-avatar-3-fg: #c2e9d3;
+  --color-avatar-4: #1c4159;
+  --color-avatar-4-fg: #c4e4f4;
+  --color-avatar-5: #43345c;
+  --color-avatar-5-fg: #e3d7fb;
+  --color-avatar-6: #134245;
+  --color-avatar-6-fg: #c0e7e8;
 }
 
 /* ── Gradiente do botão primário (só no tema escuro) ──────────────────────
@@ -555,6 +602,20 @@
   --color-info-bg: var(--color-info-bg);
   --color-info-fg: var(--color-info-fg);
 
+  /* Avatar do contato: fundo e texto de cada par (ver o :root). */
+  --color-avatar-1: var(--color-avatar-1);
+  --color-avatar-1-fg: var(--color-avatar-1-fg);
+  --color-avatar-2: var(--color-avatar-2);
+  --color-avatar-2-fg: var(--color-avatar-2-fg);
+  --color-avatar-3: var(--color-avatar-3);
+  --color-avatar-3-fg: var(--color-avatar-3-fg);
+  --color-avatar-4: var(--color-avatar-4);
+  --color-avatar-4-fg: var(--color-avatar-4-fg);
+  --color-avatar-5: var(--color-avatar-5);
+  --color-avatar-5-fg: var(--color-avatar-5-fg);
+  --color-avatar-6: var(--color-avatar-6);
+  --color-avatar-6-fg: var(--color-avatar-6-fg);
+
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
      parada 500 fixa e NÃO para `--ring` (que muda no escuro). Mantido igual de
@@ -639,6 +700,18 @@
 }
 @utility duration-slow {
   transition-duration: var(--duration-slow);
+}
+
+/* Rolagem sem barra visível. Para faixas que PODEM transbordar só em telas
+   estreitas (o trilho de grupos, as abas do painel do lead): a barra fina de
+   rolagem horizontal aparecia embaixo delas mesmo quando sobravam poucos px,
+   e virava um risco cinza no meio da moldura. A rolagem continua funcionando
+   (roda, toque, teclado); só o desenho da barra some. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 
@@ -1011,4 +1084,37 @@
     transition: none;
     transform: none;
   }
+}
+
+/* ---- Fundo do fio de mensagens (Inbox v2) -------------------------------
+   O protótipo escuro pinta a área da conversa com um brilho da marca no topo
+   e uma trama de pontos. Os dois saem de TOKEN, nunca de hex: o brilho mistura
+   a `--color-accent` em vigor (a marca do revendedor, injetada em runtime) e os
+   pontos misturam a cor do texto do tema, então claro e escuro saem do mesmo
+   bloco e nenhum revendedor herda a cor do produto.
+
+   Discreto de propósito: 10% de accent e 6% de texto. A bolha tem fundo
+   próprio, então a legibilidade da mensagem não depende deste fundo.
+
+   A trama mora no ELEMENTO QUE ROLA (`background-attachment: local`), e não
+   no container: assim os pontos andam junto com as mensagens virtualizadas em
+   vez de ficarem parados atrás delas, o que pareceria vidro sujo. */
+.fundo-do-fio {
+  background:
+    radial-gradient(
+      ellipse 80% 42% at 50% -12%,
+      color-mix(in srgb, var(--color-accent) 10%, transparent),
+      transparent 62%
+    ),
+    var(--color-bg);
+}
+
+.trama-do-fio {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 18px 18px;
+  background-attachment: local;
 }

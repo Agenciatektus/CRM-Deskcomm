@@ -201,7 +201,7 @@ describe("painel do lead — modo leitura", () => {
     renderPainel();
     await screen.findByTestId("demanda-sem-proximo-passo");
 
-    expect(screen.getByRole("button", { name: "Tags do contato" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Etiqueta do contato" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Encerrar demanda" })).toBeNull();
     expect(screen.queryByTestId("marcar-proximo-passo")).toBeNull();
     expect(await screen.findByText("Criar e concluir tarefas fica com quem atende.")).toBeTruthy();
