@@ -14244,6 +14244,17 @@ export const DICIONARIO: Traducoes = {
   "etapa removida": { es: "etapa eliminada" },
   "variações": { es: "variaciones" },
   "Mover para": { es: "Mover a" },
+
+  // ─── Obs do contato (9041) e transcrição do áudio na bolha ───
+  "Sem observações.": { es: "Sin observaciones." },
+  "Escreva o que a equipe precisa saber sobre este contato.": {
+    es: "Escribe lo que el equipo necesita saber sobre este contacto.",
+  },
+  "Observações salvas.": { es: "Observaciones guardadas." },
+  "Caracteres usados": { es: "Caracteres usados" },
+  Transcrição: { es: "Transcripción" },
+  "Mostrar transcrição": { es: "Mostrar transcripción" },
+  "Ocultar transcrição": { es: "Ocultar transcripción" },
 };
 
 /**

@@ -47888,6 +47888,92 @@ revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, 
 
 notify pgrst, 'reload schema';
 
+-- ---- o contato ganha OBSERVAÇÕES, e a anonimização as apaga (migration 9041) ----
+--
+-- `contacts.observacoes` (text, nula), o CHECK de até 4000 caracteres e sem
+-- texto só de espaços (`NOT VALID`: a coluna nasce vazia; vale para toda escrita
+-- daqui em diante) e a trigger que a apaga quando `is_anonymized` vira true, no
+-- desenho de `trg_contacts_anonimizado_limpa_custom_fields` (0211, acima). RLS e
+-- grants de `contacts` não mudam (policies por comando da 9030). Ver o cabeçalho
+-- da migration. Idempotente: coluna e CHECK com guarda, função
+-- `create or replace`, trigger com `drop if exists`.
+-- Prova: tests/invariants/obs-do-contato-9041.test.ts.
+alter table public.contacts add column if not exists observacoes text;
+
+comment on column public.contacts.observacoes is
+  'Observações livres da equipe sobre o contato (até 4000 caracteres; null = sem observação). Escrita pelo PATCH /api/v1/contacts/[id], agent+; o audit guarda só que mudou. Apagada na anonimização (trg_contacts_anonimizado_limpa_observacoes). Migration 9041.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'contacts_observacoes_tamanho'
+       and conrelid = 'public.contacts'::regclass
+  ) then
+    alter table public.contacts
+      add constraint contacts_observacoes_tamanho
+      check (observacoes is null or (char_length(observacoes) <= 4000 and btrim(observacoes) <> ''))
+      not valid;
+  end if;
+end $$;
+
+create or replace function public.fn_contato_anonimizado_limpa_observacoes()
+  returns trigger
+  language plpgsql
+  set search_path = public, pg_temp
+as $$
+begin
+  -- Anonimização é irreversível (L-04): não há o que preservar aqui.
+  new.observacoes := null;
+  return new;
+end$$;
+
+revoke all on function public.fn_contato_anonimizado_limpa_observacoes() from public, anon, authenticated;
+
+drop trigger if exists trg_contacts_anonimizado_limpa_observacoes on public.contacts;
+create trigger trg_contacts_anonimizado_limpa_observacoes
+  before update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized = true and coalesce(old.is_anonymized, false) = false)
+  execute function public.fn_contato_anonimizado_limpa_observacoes();
+
+-- Fusão de contatos: o principal mantém a PRÓPRIA observação e, só quando não
+-- tem nenhuma, herda a do absorvido (sem concatenar). Por trigger no FATO
+-- (`is_merged_into` saiu de null), e não reescrevendo `fn_mesclar_contatos`
+-- (300 linhas, remendada por âncora na 9010): qualquer porta que mescle herda.
+-- Com vários absorvidos, o primeiro que o UPDATE da fusão alcança e tem
+-- observação vence; os demais encontram o principal já preenchido.
+-- O absorvido fica SEM observação, herdada ou não (P2 do @Cassio_SecRev): a
+-- anonimização do principal não alcança as lápides (`is_merged_into`), então
+-- uma cópia ali sobreviveria ao "esquecer" do titular. BEFORE para zerar a
+-- própria linha sem um segundo UPDATE.
+create or replace function public.fn_fusao_herda_observacoes()
+  returns trigger
+  language plpgsql
+  set search_path = public, pg_temp
+as $$
+begin
+  update public.contacts c
+     set observacoes = new.observacoes
+   where c.id = new.is_merged_into
+     and c.organization_id = new.organization_id
+     and c.observacoes is null
+     and c.is_anonymized = false;
+  new.observacoes := null;
+  return new;
+end$$;
+
+revoke all on function public.fn_fusao_herda_observacoes() from public, anon, authenticated;
+
+drop trigger if exists trg_contacts_fusao_herda_observacoes on public.contacts;
+create trigger trg_contacts_fusao_herda_observacoes
+  before update of is_merged_into on public.contacts
+  for each row
+  when (old.is_merged_into is null and new.is_merged_into is not null and new.observacoes is not null)
+  execute function public.fn_fusao_herda_observacoes();
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

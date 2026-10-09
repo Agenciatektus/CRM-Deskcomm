@@ -35,6 +35,12 @@ type SB = SupabaseClient;
 
 const SELECT_COLS =
   "id, organization_id, name, display_name, email, email_normalized, phone_number, cpf_hash, birthdate, is_blocked, blocked_reason, is_anonymized, anonymized_at, is_merged_into, merged_at, consent, tags, source, source_metadata, custom_fields, created_at, updated_at, last_activity_at, first_service_at";
+/**
+ * A FICHA (GET de um, PATCH) leva também as observações (9041). A LISTA não:
+ * até 4000 caracteres por contato, vezes 100 por página, para um campo que a
+ * lista não mostra.
+ */
+const SELECT_COLS_DA_FICHA = `${SELECT_COLS}, observacoes`;
 
 interface CursorPayload {
   sort: string | null;
@@ -347,7 +353,7 @@ export async function getContactHandler(
 ): Promise<GetContactResult> {
   const { data, error } = await supabase
     .from("contacts")
-    .select(SELECT_COLS)
+    .select(SELECT_COLS_DA_FICHA)
     .eq("id", input.contactId)
     .eq("organization_id", ctx.organization_id)
     .maybeSingle();
@@ -607,6 +613,9 @@ export async function patchContactHandler(
   // aqui tornaria IMPOSSÍVEL apagar um campo pela tela, porque a chave removida
   // voltaria do estado anterior a cada gravação.
   if (input.custom_fields !== undefined) patch.custom_fields = input.custom_fields;
+  // Observações (9041): o schema já fez trim e trocou vazio por null. O texto NÃO
+  // vai para o audit nem para o evento — só o nome do campo, em `fields`.
+  if (input.observacoes !== undefined) patch.observacoes = input.observacoes;
   if (input.consent !== undefined) {
     // MERGE por finalidade, nunca substituição.
     //
@@ -650,7 +659,7 @@ export async function patchContactHandler(
     .update(patch)
     .eq("organization_id", ctx.organization_id)
     .eq("id", contactId)
-    .select(SELECT_COLS)
+    .select(SELECT_COLS_DA_FICHA)
     .maybeSingle();
 
   if (updErr) {

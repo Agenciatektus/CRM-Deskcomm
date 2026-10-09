@@ -10,6 +10,7 @@ import { ConversationTagsEditor } from "../ConversationTagsEditor";
 import { Demandas } from "./Demandas";
 import { DetalhesDoContato } from "./DetalhesDoContato";
 import { MemoriaDoContato } from "./MemoriaDoContato";
+import { ObservacoesDoContato } from "./ObservacoesDoContato";
 import { ProximoPasso } from "./ProximoPasso";
 import type { DesfechoDraft } from "./tipos";
 import type { ResumoDoContato } from "./useResumoDoContato";
@@ -25,12 +26,13 @@ interface Props {
   setDesfechoDraft: Dispatch<SetStateAction<DesfechoDraft | null>>;
   refProximoPasso: RefObject<HTMLElement | null>;
   refDetalhes: RefObject<HTMLElement | null>;
+  refObservacoes: RefObject<HTMLElement | null>;
 }
 
 /**
  * A aba Resumo, que abre por padrão: o que fazer agora (próximo passo), quem é
- * a pessoa (detalhes), o que ainda não acabou (demandas) e o que se sabe dela
- * (memória, roteiros).
+ * a pessoa (detalhes e observações da equipe), o que ainda não acabou
+ * (demandas) e o que se sabe dela (memória, roteiros).
  *
  * A ordem é a do atendimento, não a do banco. A demanda continua ANTES do
  * negócio (doutrina cap. 5): agora ela está na primeira aba e o negócio na
@@ -38,7 +40,7 @@ interface Props {
  */
 export function AbaResumo({
   conversation, resumo, displayName, usuarioId, leitura, leadEmFocoId,
-  desfechoDraft, setDesfechoDraft, refProximoPasso, refDetalhes,
+  desfechoDraft, setDesfechoDraft, refProximoPasso, refDetalhes, refObservacoes,
 }: Props) {
   const contact = conversation.contacts ?? null;
   return (
@@ -57,6 +59,13 @@ export function AbaResumo({
         contactId={resumo.contactId}
         nomeDaConversa={displayName}
         telefone={contact?.phone_number ?? null}
+        anonimizado={!!contact?.is_anonymized}
+        leitura={leitura}
+      />
+      <Separator />
+      <ObservacoesDoContato
+        ref={refObservacoes}
+        contactId={resumo.contactId}
         anonimizado={!!contact?.is_anonymized}
         leitura={leitura}
       />
