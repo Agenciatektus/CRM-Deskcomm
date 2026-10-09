@@ -22,6 +22,10 @@ interface Props {
   onClaim: () => void;
   onClose: () => void;
   onToggleHelp: () => void;
+  /** 9042: "u" marca a conversa selecionada como não lida (para quem aperta). */
+  onMarkUnread?: () => void;
+  /** 9042: "p" fixa ou desafixa a conversa selecionada (para quem aperta). */
+  onTogglePin?: () => void;
   enabled?: boolean;
 }
 
@@ -33,6 +37,8 @@ export function InboxKeyboardShortcuts({
   onClaim,
   onClose,
   onToggleHelp,
+  onMarkUnread,
+  onTogglePin,
   enabled = true,
 }: Props) {
   const t = useT();
@@ -69,6 +75,8 @@ export function InboxKeyboardShortcuts({
     { enabled: ativo, preventDefault: true },
   );
   useHotkeys("shift+/", () => onToggleHelp(), { enabled: ativo, preventDefault: true });
+  useHotkeys("u", () => onMarkUnread?.(), { enabled: ativo && !!onMarkUnread, preventDefault: true }, [onMarkUnread]);
+  useHotkeys("p", () => onTogglePin?.(), { enabled: ativo && !!onTogglePin, preventDefault: true }, [onTogglePin]);
 
   return (
     <AlertDialog open={confirmFecharOpen} onOpenChange={setConfirmFecharOpen}>

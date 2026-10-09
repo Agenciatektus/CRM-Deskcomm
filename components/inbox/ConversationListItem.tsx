@@ -15,6 +15,8 @@ import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { BotaoMaisAcoes } from "./menu/BotaoMaisAcoes";
 import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
+import { IconesPessoais } from "./item/IconesPessoais";
+import { naoLidasDaConversa } from "@/lib/inbox/estado-por-atendente";
 import { initials, relativeTime } from "./item/tempo-da-linha";
 
 interface Props {
@@ -118,8 +120,10 @@ export function ConversationListItem({
    */
   const horaDaOrdem = naFila ? esperaDaConversa(conversation) : conversation.last_message_at;
   const time = relativeTime(horaDaOrdem, localeDaData);
-  const unread = conversation.unread_count_for_assignee ?? 0;
+  // 9042: a marca "não lida" de quem está logado conta como 1 quando o contador zerou.
+  const unread = naoLidasDaConversa(conversation);
   const naoLida = unread > 0;
+  const soMarcada = naoLida && !(conversation.unread_count_for_assignee ?? 0);
 
   /**
    * Quem manda, pela MESMA regra do cabeçalho. `status === 'ai_handling'` era um
@@ -215,6 +219,7 @@ export function ConversationListItem({
               </Badge>
             )}
           </span>
+          <IconesPessoais pinned={conversation.pinned} mutedUntil={conversation.muted_until} />
           <span
             className={cn(
               "shrink-0 text-xs tabular-nums",
@@ -244,9 +249,9 @@ export function ConversationListItem({
           {naoLida && (
             <span
               className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
-              aria-label={`${unread} ${t("mensagens não lidas")}`}
+              aria-label={soMarcada ? t("Marcada como não lida") : `${unread} ${t("mensagens não lidas")}`}
             >
-              {unread}
+              {soMarcada ? "" : unread}
             </span>
           )}
         </div>

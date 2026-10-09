@@ -14208,6 +14208,26 @@ export const DICIONARIO: Traducoes = {
   "Detalhes do lead": { es: "Detalles del lead" },
   "Lembrete ativo:": { es: "Recordatorio activo:" },
   "Escolha um horário no futuro, em até 90 dias.": { es: "Elige un horario en el futuro, dentro de 90 días." },
+  // ─── Estado da conversa POR ATENDENTE (migration 9042, frente B do redesign) ───
+  Fixar: { es: "Fijar" },
+  Desafixar: { es: "Desfijar" },
+  Fixada: { es: "Fijada" },
+  Silenciar: { es: "Silenciar" },
+  Silenciada: { es: "Silenciada" },
+  "Reativar som": { es: "Reactivar sonido" },
+  "Por 8 horas": { es: "Por 8 horas" },
+  "Por 1 semana": { es: "Por 1 semana" },
+  "Marcar como não lida": { es: "Marcar como no leída" },
+  "Marcada como não lida": { es: "Marcada como no leída" },
+  "Fixar ou desafixar a conversa": { es: "Fijar o desfijar la conversación" },
+  "Não foi possível salvar a preferência.": { es: "No se pudo guardar la preferencia." },
+  "Você já fixou o máximo de conversas:": { es: "Ya fijaste el máximo de conversaciones:" },
+  Bloquear: { es: "Bloquear" },
+  "Bloquear contato": { es: "Bloquear contacto" },
+  "Não foi possível bloquear o contato.": { es: "No se pudo bloquear el contacto." },
+  "Nenhuma mensagem sai mais para este contato, nem da IA nem de campanhas. Só um admin desbloqueia.": {
+    es: "No se enviarán más mensajes a este contacto, ni de la IA ni de campañas. Solo un admin puede desbloquearlo.",
+  },
   // ─── Etiquetas da conversa por delta (migration 9045) ───
   "A etiqueta cliente é do sistema enquanto a regra Clientes pela agenda estiver ligada.": {
     es: "La etiqueta cliente es del sistema mientras la regla Clientes por la agenda esté activada.",

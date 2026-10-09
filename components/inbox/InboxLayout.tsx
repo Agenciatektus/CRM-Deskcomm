@@ -21,6 +21,7 @@ import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
 import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
+import { useAtalhosPessoais } from "@/hooks/inbox/useAtalhosPessoais";
 
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
@@ -290,7 +291,9 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   useMarkAsRead(
     selectedConversation?.id ?? null,
     selectedConversation?.unread_count_for_assignee ?? 0,
+    selectedConversation?.marked_unread ?? false,
   );
+  const atalhosPessoais = useAtalhosPessoais(selectedConversation, supportReadonly);
 
   // Aceita `null`: é o VOLTAR do celular, que limpa a seleção e devolve a lista.
   // É um SUPERCONJUNTO do `handleSelect` do upstream — o tipo dele não aceita
@@ -546,6 +549,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         onClaim={supportReadonly ? () => {} : handleClaim}
         onClose={supportReadonly ? () => {} : handleClose}
         onToggleHelp={() => setHelpOpen((v) => !v)}
+        {...atalhosPessoais}
       />
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

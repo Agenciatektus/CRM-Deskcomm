@@ -19,12 +19,14 @@ import { useArchiveConversation, useCloseConversation } from "@/hooks/inbox/useC
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
 
+import { DialogoDeBloquear } from "./DialogoDeBloquear";
 import { DialogoDeTransferir } from "./DialogoDeTransferir";
 import { chaveDoResumoDoMenu, type DialogoDoFunil } from "./SubmenuDoFunil";
 
 export type DialogoDoMenu =
   | { tipo: "fechar" | "arquivar"; conversation: ConversationWithContact }
   | { tipo: "transferir"; conversationId: string; destino: { userId: string; nome: string } }
+  | { tipo: "bloquear"; contactId: string; nome: string }
   | (DialogoDoFunil & { contactId: string });
 
 /**
@@ -52,6 +54,10 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
 
   if (dialogo.tipo === "transferir") {
     return <DialogoDeTransferir conversationId={dialogo.conversationId} destino={dialogo.destino} onFechar={onFechar} />;
+  }
+
+  if (dialogo.tipo === "bloquear") {
+    return <DialogoDeBloquear contactId={dialogo.contactId} nome={dialogo.nome} onFechar={onFechar} />;
   }
 
   if ("lead" in dialogo) {

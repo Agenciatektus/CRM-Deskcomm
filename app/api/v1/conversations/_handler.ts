@@ -71,13 +71,13 @@ const ORCAMENTO_DE_IDS_NA_URL = 5_000;
  * aparece porque a busca por conteúdo (`last_message_preview`) continua rodando
  * ao lado, sem depender desta lista.
  */
-function idsQueCabemNaURL(ids: string[]): string[] {
+export function idsQueCabemNaURL(ids: string[], orcamento: number = ORCAMENTO_DE_IDS_NA_URL): string[] {
   const cabem: string[] = [];
   let bytes = 0;
   for (const id of ids) {
     // +1 pela vírgula que separa; o último sobra do lado seguro.
     const custo = id.length + 1;
-    if (bytes + custo > ORCAMENTO_DE_IDS_NA_URL) break;
+    if (bytes + custo > orcamento) break;
     cabem.push(id);
     bytes += custo;
   }
@@ -148,11 +148,43 @@ export interface ListConversationsResult {
   has_more: boolean;
 }
 
+/**
+ * Recortes que só a borda HTTP conhece (estado por atendente, migration 9042).
+ * As tools MCP não passam nada e a lista sai como sempre. Os ids viajam na URL
+ * do PostgREST: quem chama já os corta (fixadas têm teto, marcadas também).
+ */
+export interface RecorteDaLista {
+  /** Só estas conversas (as fixadas, buscadas à parte para irem ao topo). */
+  somenteIds?: string[];
+  /** Fora estas (as fixadas, que já vieram no topo). */
+  excetoIds?: string[];
+  /** Com "Não lidas", conta também estas (marcadas pela pessoa). */
+  naoLidasExtras?: string[];
+}
+
 export async function listConversationsHandler(
   supabase: SB,
   ctx: HandlerCtx,
   q: ListConversationsQuery,
+  recorte: RecorteDaLista = {},
 ): Promise<ListConversationsResult> {
+  // 9042 (revisão do Cassio, P2): os ids PESSOAIS (fixadas, marcadas) viajam na
+  // MESMA URL que os ids da busca, e saem do MESMO orçamento de bytes. Primeiro
+  // os pessoais (cortados no que couber), depois a busca fica com o resto: a
+  // URL nunca passa do muro do gateway, em vez de virar 414 → 500.
+  let orcamentoRestante = ORCAMENTO_DE_IDS_NA_URL;
+  const caber = (ids: string[] | undefined) => {
+    if (!ids) return undefined;
+    const cabem = idsQueCabemNaURL(ids, orcamentoRestante);
+    orcamentoRestante -= cabem.reduce((n, id) => n + id.length + 1, 0);
+    return cabem;
+  };
+  const recorteNoOrcamento: RecorteDaLista = {
+    somenteIds: caber(recorte.somenteIds),
+    excetoIds: caber(recorte.excetoIds),
+    // Só pesam na URL quando o filtro "Não lidas" as usa.
+    naoLidasExtras: q.unread ? caber(recorte.naoLidasExtras) : undefined,
+  };
   // Fila: ordena por TEMPO DE ESPERA — quem espera há mais tempo primeiro. A
   // régua é `awaiting_since` = a mensagem do cliente MAIS ANTIGA sem resposta
   // (não `last_inbound_at`, que é reescrito a cada mensagem dele e fazia quem
@@ -237,7 +269,17 @@ export async function listConversationsHandler(
   // ⛔ Compõe sobre `query`, que JÁ tem `.eq("organization_id", ctx.organization_id)`.
   // Este handler usa o admin client, que passa por cima da RLS: esse filtro é a Única
   // barreira. Consulta nova só para os não lidos nasceria sem barreira nenhuma.
-  if (q.unread) query = query.gt("unread_count_for_assignee", 0);
+  if (q.unread) {
+    const extras = recorteNoOrcamento.naoLidasExtras ?? [];
+    query =
+      extras.length > 0
+        ? query.or(`unread_count_for_assignee.gt.0,id.in.(${extras.join(",")})`)
+        : query.gt("unread_count_for_assignee", 0);
+  }
+  if (recorteNoOrcamento.somenteIds) query = query.in("id", recorteNoOrcamento.somenteIds);
+  if (recorteNoOrcamento.excetoIds && recorteNoOrcamento.excetoIds.length > 0) {
+    query = query.not("id", "in", `(${recorteNoOrcamento.excetoIds.join(",")})`);
+  }
   // POR ONDE a conversa entrou. O Inbox lista CONVERSA, e por isso o filtro
   // mora na coluna dela: varrer `messages.metadata` por linha faria o filtro
   // ficar lento — e filtro lento é filtro que o atendente desliga.
@@ -363,6 +405,7 @@ export async function listConversationsHandler(
 
     const ids = idsQueCabemNaURL(
       (contatos ?? []).map((c) => (c as { id: string }).id),
+      orcamentoRestante,
     );
     if (ids.length > 0) {
       query = query.or(

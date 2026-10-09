@@ -47125,6 +47125,93 @@ do $rls9028$ begin
     );
 end $rls9028$;
 
+-- ---- fixar, silenciar e marcar como não lida valem POR ATENDENTE (migration 9042) ----
+--
+-- Uma linha por (conversa, pessoa); cada um lê e grava só as próprias linhas, só
+-- em organização de que é membro ativo e só em conversa que enxerga. Viewer
+-- grava (preferência pessoal); suporte somente leitura não: as travas
+-- `support_write_*` desta tabela vêm da chamada de `fn_aplicar_travas_de_suporte()`
+-- mais abaixo, que alcança toda tabela gravável por `authenticated`.
+--
+-- POR QUE AQUI, antes do bloco da 9029 e não no fim: o bloco da 9029, logo
+-- abaixo, define `fn_contagens_da_caixa`, que desde a 9042 lê esta tabela, e
+-- função `language sql` valida o corpo ao ser criada. Tabela depois da função
+-- quebraria o install (relation does not exist). Ver o cabeçalho da 9042.
+-- Idempotente: create if not exists, policies em drop/create, grants reaplicam.
+create table if not exists public.conversation_user_state (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  pinned_at timestamptz,
+  muted_until timestamptz,
+  marked_unread_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (conversation_id, user_id)
+);
+
+comment on table public.conversation_user_state is
+  'Preferências de CADA pessoa sobre uma conversa (migration 9042): fixar, silenciar e marcar como não lida. Uma linha por (conversa, pessoa); sem linha = nada. Cada um lê e grava só as próprias linhas.';
+
+-- A lista pergunta "quais conversas EU fixei nesta organização".
+create index if not exists conversation_user_state_lista_idx
+  on public.conversation_user_state (user_id, organization_id, pinned_at);
+
+alter table public.conversation_user_state enable row level security;
+
+drop policy if exists conversation_user_state_select on public.conversation_user_state;
+create policy conversation_user_state_select on public.conversation_user_state
+  for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  );
+
+drop policy if exists conversation_user_state_insert on public.conversation_user_state;
+create policy conversation_user_state_insert on public.conversation_user_state
+  for insert to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+    and exists (
+      select 1 from public.conversations c
+       where c.id = conversation_user_state.conversation_id
+         and c.organization_id = conversation_user_state.organization_id
+    )
+  );
+
+drop policy if exists conversation_user_state_update on public.conversation_user_state;
+create policy conversation_user_state_update on public.conversation_user_state
+  for update to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  )
+  with check (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+    and exists (
+      select 1 from public.conversations c
+       where c.id = conversation_user_state.conversation_id
+         and c.organization_id = conversation_user_state.organization_id
+    )
+  );
+
+drop policy if exists conversation_user_state_delete on public.conversation_user_state;
+create policy conversation_user_state_delete on public.conversation_user_state
+  for delete to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  );
+
+revoke all on table public.conversation_user_state from anon, authenticated;
+grant select, insert, update, delete on table public.conversation_user_state to authenticated;
+grant all on table public.conversation_user_state to service_role;
+
+-- A trava de organização (9031) desta tabela vem do laço do FIM do arquivo,
+-- que alcança toda tabela com organization_id; a função dela nasce abaixo.
+
+
 -- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
 --
 -- Uma varredura de conversations devolve as seis contagens das abas
@@ -47163,7 +47250,17 @@ as $$
      where c.organization_id = p_organizacao
        and (p_canal is null or c.channel_session_id = p_canal)
        and (p_entrada is null or c.instagram_entrada = p_entrada)
-       and (not coalesce(p_so_nao_lidas, false) or c.unread_count_for_assignee > 0)
+       and (
+         not coalesce(p_so_nao_lidas, false)
+         or c.unread_count_for_assignee > 0
+         -- 9042: a conversa que ESTA pessoa marcou como não lida.
+         or exists (
+           select 1 from public.conversation_user_state s
+            where s.conversation_id = c.id
+              and s.user_id = (select auth.uid())
+              and s.marked_unread_at is not null
+         )
+       )
        and (
          coalesce(cardinality(p_marcadores), 0) = 0
          or case
@@ -47186,7 +47283,7 @@ as $$
 $$;
 
 comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro.';
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida.';
 
 revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) from public, anon;
 grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) to authenticated, service_role;

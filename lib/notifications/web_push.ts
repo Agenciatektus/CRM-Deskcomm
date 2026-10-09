@@ -1,5 +1,6 @@
 import webpush from "web-push";
 
+import { usuariosQueSilenciaram } from "@/lib/inbox/estado-por-atendente.servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
@@ -11,7 +12,18 @@ export type PushSubRow = {
   endpoint: string;
   p256dh: string;
   auth: string;
+  /** Dono da inscrição. Opcional: inscrição antiga pode não ter. */
+  user_id?: string | null;
 };
+
+/** Opções do envio para a organização. */
+export interface OpcoesDoPush {
+  /**
+   * A conversa da mensagem (migration 9042): quem a SILENCIOU não recebe.
+   * Falha na leitura do silêncio não cala ninguém (o aviso sai como antes).
+   */
+  conversationId?: string | null;
+}
 
 type AdminLike = {
   from: (table: string) => {
@@ -32,15 +44,32 @@ export async function enviarPushDaOrg(
   organizationId: string,
   payload: PushPayload,
   admin: AdminLike = createAdminClient() as unknown as AdminLike,
+  opcoes: OpcoesDoPush = {},
 ): Promise<{ sent: number; gone: number }> {
   if (!vapidPronto()) return { sent: 0, gone: 0 };
 
-  const { data, error } = await store(admin).select("id, endpoint, p256dh, auth").eq("organization_id", organizationId);
+  const { data, error } = await store(admin)
+    .select("id, endpoint, p256dh, auth, user_id")
+    .eq("organization_id", organizationId);
   if (error) {
     logger.warn("push_subscriptions_list_failed", { detail: error.message });
     return { sent: 0, gone: 0 };
   }
-  const rows = data ?? [];
+  // O MESMO client injetado (revisão do Cassio): sem abrir outro service role.
+  // Qualquer falha, inclusive síncrona, não cala ninguém.
+  let exceto: Set<string> | undefined;
+  if (opcoes.conversationId) {
+    try {
+      exceto = await usuariosQueSilenciaram(
+        admin as unknown as Parameters<typeof usuariosQueSilenciaram>[0],
+        organizationId,
+        opcoes.conversationId,
+      );
+    } catch {
+      exceto = undefined;
+    }
+  }
+  const rows = (data ?? []).filter((r) => !exceto || !r.user_id || !exceto.has(r.user_id));
   if (rows.length === 0) return { sent: 0, gone: 0 };
 
   webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());
