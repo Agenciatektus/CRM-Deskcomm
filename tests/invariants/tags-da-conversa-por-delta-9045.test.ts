@@ -217,7 +217,10 @@ describe("9045 — etiquetas da conversa por delta", () => {
       expect(await alterar({ user: u.agenteA }, id, ["cliente"])).toEqual(["vip", "cliente"]);
       expect(await alterar({ user: u.agenteA }, id, [], ["cliente"])).toEqual(["vip"]);
       // E o contato (onde a posse de `cliente` mora) não foi tocado.
-      const { rows } = await pool.query("select tags, client_tag_by_system from contacts where id=$1", [contato]);
+      const { rows } = await pool.query(
+        "select tags, client_tag_by_system from contacts where id = (select contact_id from conversations where id=$1)",
+        [id],
+      );
       expect(rows[0]).toEqual({ tags: [], client_tag_by_system: null });
     } finally {
       await pool.query("update organizations set settings = settings - 'crm' where id=$1", [org]);
