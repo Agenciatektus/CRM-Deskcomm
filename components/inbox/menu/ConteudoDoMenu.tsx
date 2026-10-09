@@ -37,6 +37,7 @@ import {
 
 import type { DialogoDoMenu } from "./DialogosDoMenu";
 import { CLASSE_DO_ITEM, CLASSE_DO_MENU, CLASSE_DO_PRINCIPAL } from "./estilo";
+import { ItensPessoais } from "./ItensPessoais";
 import { SubmenuDoFunil } from "./SubmenuDoFunil";
 import { SubmenuEtiquetas, SubmenuLembrar, SubmenuTransferir } from "./SubmenusDaConversa";
 import type { AlvoDoMenu } from "./useMenuDaConversa";
@@ -45,6 +46,8 @@ interface Props {
   alvo: AlvoDoMenu;
   conversation: ConversationWithContact;
   leitura: boolean;
+  /** Os itens por atendente (9042) têm régua própria: ver `ItensPessoais`. */
+  pessoais?: { podePreferir: boolean; podeBloquear: boolean };
   meuUserId: string | null;
   automaticoDaOrg?: boolean;
   onFechar: () => void;
@@ -60,6 +63,7 @@ export function ConteudoDoMenu({
   alvo,
   conversation,
   leitura,
+  pessoais,
   meuUserId,
   automaticoDaOrg,
   onFechar,
@@ -210,6 +214,15 @@ export function ConteudoDoMenu({
           </DropdownMenuItem>
         )}
 
+        {pessoais && (
+          <ItensPessoais
+            conversation={conversation}
+            nome={nome}
+            podePreferir={pessoais.podePreferir}
+            podeBloquear={pessoais.podeBloquear}
+            onBloquear={(contato) => abrirDialogo({ tipo: "bloquear", ...contato })}
+          />
+        )}
         {(regras.fechar || regras.reabrir || regras.arquivar) && <DropdownMenuSeparator />}
         {regras.fechar && (
           <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => abrirDialogo({ tipo: "fechar", conversation })}>
