@@ -98,6 +98,7 @@ export function resolveDestinoDoAgente(
   estagios: EstagioCandidato[],
   passo: string,
   estagioAtualId: string,
+  settingsDoFunil?: unknown,
 ): DestinoDoAgente {
   const alvo = estagios.find((e) => !e.is_archived && e.agent_stage_hint === passo);
   if (!alvo) return { move: false, motivo: "sem_mapeamento", passo };
@@ -105,7 +106,7 @@ export function resolveDestinoDoAgente(
   // A decisão é a MESMA função do arrasto e do lote (issue #917) — sem motivo e
   // SEM `motivoAtual`: o agente não manda motivo, e o que está na linha é o da
   // perda anterior de um negócio reaberto (ver `perda_sem_motivo` acima).
-  const veredito = decideMotivoDaPerda({ etapaDeDestino: alvo });
+  const veredito = decideMotivoDaPerda({ etapaDeDestino: alvo, settingsDoFunil });
   if (!veredito.ok) return { move: false, motivo: "perda_sem_motivo", passo };
   return { move: true, stageId: alvo.id, stageName: alvo.name };
 }
@@ -300,10 +301,12 @@ export async function sincronizaEstagioDoAgente(
     return { moveu: false, motivo: "indisponivel", leadId: lead.id, detalhe: erroStages.message };
   }
 
+  const settings = await settingsDoFunil(admin, lead.pipeline_id);
   const destino = resolveDestinoDoAgente(
     (stageRows ?? []) as EstagioCandidato[],
     input.passo,
     lead.stage_id,
+    settings,
   );
   if (!destino.move) return { moveu: false, motivo: destino.motivo, leadId: lead.id };
 
@@ -321,7 +324,6 @@ export async function sincronizaEstagioDoAgente(
   // transforma em item de inbox acionável. `settingsDoFunil` é fail-open por
   // decisão escrita em `campos-exigidos.ts`: leitura indisponível = nada exigido,
   // como em todo o resto.
-  const settings = await settingsDoFunil(admin, lead.pipeline_id);
   const etapasCandidatas = (stageRows ?? []) as Array<{
     id: string;
     is_lost?: boolean | null;
