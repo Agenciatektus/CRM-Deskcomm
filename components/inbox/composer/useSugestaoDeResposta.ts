@@ -51,6 +51,12 @@ export interface Aviso {
  * o mesmo estado pedem UMA fonte, senão o chip diria "Preparando…" enquanto o
  * painel achava que nada foi pedido.
  */
+/** 503 da PRÓPRIA rota ("unavailable": ambiente sem o banco do motor de IA). Um
+ * 503 passageiro do proxy num deploy não tem esse código e não para a sugestão. */
+function indisponivel(erro: unknown): boolean {
+  return erro instanceof ApiError && erro.status === 503 && erro.code === "unavailable";
+}
+
 export function useSugestaoDeResposta(
   conversationId: string,
   // `false` no modo Nota: a sugestão é mensagem para o cliente, e o painel
@@ -71,7 +77,7 @@ export function useSugestaoDeResposta(
       if (raiz !== "messages" || id !== conversationId) return;
       // Indisponível (503) não acorda: cada mensagem nova voltaria a perguntar.
       const atual = qc.getQueryState(["reply-drafts", conversationId]);
-      if (atual?.error instanceof ApiError && atual.error.status === 503) return;
+      if (indisponivel(atual?.error)) return;
       setAcordada(true);
       clearTimeout(dormir);
       dormir = setTimeout(() => setAcordada(false), JANELA_ACORDADA_MS);
@@ -90,7 +96,9 @@ export function useSugestaoDeResposta(
     refetchInterval: (q) => {
       // Rascunho indisponível (503: o ambiente não tem o banco do motor de IA)
       // não volta sozinho a cada poucos segundos: para de perguntar.
-      if (q.state.error instanceof ApiError && q.state.error.status === 503) return false;
+      if (indisponivel(q.state.error)) return false;
+      // Qualquer outro erro (ex.: pool que caiu de fato, 500) cai para o ritmo lento.
+      if (q.state.error) return SEGURANCA_MS;
       const gerando = q.state.data?.data.drafts.some((d) => d.status === "generating");
       return gerando || acordada ? RAPIDO_MS : SEGURANCA_MS;
     },
