@@ -172,6 +172,44 @@ describe("patchConversationSchema (G3-05)", () => {
   });
 });
 
+describe("patchConversationSchema — etiquetas por delta (9045)", () => {
+  const ok = (corpo: unknown) => patchConversationSchema.safeParse(corpo);
+
+  it("aceita só acrescentar, só remover, ou os dois, normalizando", () => {
+    const r = ok({ tags_adicionar: [" VIP ", "vip"], tags_remover: ["Frio"] });
+    expect(r.success).toBe(true);
+    expect(r.data).toMatchObject({ tags_adicionar: ["vip"], tags_remover: ["frio"] });
+    expect(ok({ tags_adicionar: ["vip"] }).success).toBe(true);
+    expect(ok({ tags_remover: ["vip"] }).success).toBe(true);
+  });
+
+  it("o formato antigo { tags } continua aceito (compatibilidade)", () => {
+    expect(ok({ tags: ["vip"] }).success).toBe(true);
+    expect(ok({ tags: [] }).success).toBe(true);
+  });
+
+  it("recusa misturar a lista inteira com o delta", () => {
+    expect(ok({ tags: ["vip"], tags_adicionar: ["novo"] }).success).toBe(false);
+    expect(ok({ tags: ["vip"], tags_remover: ["vip"] }).success).toBe(false);
+  });
+
+  it("recusa a mesma etiqueta nos dois lados", () => {
+    expect(ok({ tags_adicionar: ["vip"], tags_remover: ["VIP"] }).success).toBe(false);
+  });
+
+  it("limites: lado vazio, mais de 20, mais de 40 caracteres, etiqueta em branco", () => {
+    expect(ok({ tags_adicionar: [] }).success).toBe(false);
+    expect(ok({ tags_remover: [] }).success).toBe(false);
+    const vinteEUma = Array.from({ length: 21 }, (_, i) => `t${i}`);
+    expect(ok({ tags_adicionar: vinteEUma }).success).toBe(false);
+    expect(ok({ tags_remover: vinteEUma }).success).toBe(false);
+    expect(ok({ tags_adicionar: vinteEUma.slice(0, 20) }).success).toBe(true);
+    expect(ok({ tags_adicionar: ["a".repeat(41)] }).success).toBe(false);
+    expect(ok({ tags_adicionar: ["a".repeat(40)] }).success).toBe(true);
+    expect(ok({ tags_adicionar: ["   "] }).success).toBe(false);
+  });
+});
+
 describe("openConversationWithContactSchema", () => {
   const session = "11111111-1111-4111-8111-111111111111";
 
