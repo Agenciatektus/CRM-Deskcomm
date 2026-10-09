@@ -33,6 +33,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,11 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const supabase = await createClient();
+  const recusa = await recusaDeVinculoDaTarefa(supabase, authz.org.orgId, parsed.data, t);
+  if (recusa) {
+    return fail("validation_failed", recusa.mensagem, 422, { requestId, details: { campo: recusa.campo } });
+  }
+
   const { data, error } = await supabase
     .from("crm_tasks")
     .insert({
@@ -138,8 +144,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     .single();
 
   if (error) {
-    // 23503 = lead ou contato de outra organização (ou apagado no meio). A
-    // recusa nomeia o campo porque quem lê é quem escolheu na tela.
+    // 23503 = o uuid não existe em organização NENHUMA (ou foi apagado entre a
+    // checagem acima e o INSERT). Outra organização NÃO cai aqui: a FK não passa
+    // por RLS e aceitaria, por isso `recusaDeVinculoDaTarefa` vem antes.
     if (error.code === "23503") {
       return fail("validation_failed", t("O negócio ou contato vinculado não existe."), 422, {
         requestId,

@@ -22,6 +22,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -69,19 +70,39 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
 
   const supabase = await createClient();
 
+  // Vínculo trocado no PATCH passa pela MESMA régua da criação: a FK não passa
+  // por RLS, e sem isto bastava editar a tarefa para apontá-la a outra org.
+  const recusa = await recusaDeVinculoDaTarefa(supabase, authz.org.orgId, parsed.data, t);
+  if (recusa) {
+    return fail("validation_failed", recusa.mensagem, 422, { requestId, details: { campo: recusa.campo } });
+  }
+
   // A situação ANTES da edição decide se esta é a vez em que a tarefa fechou.
   // Sem ler antes, marcar "concluída" duas vezes emitiria duas linhas na
   // timeline do negócio — e a segunda seria mentira.
   const { data: antes } = await supabase
     .from("crm_tasks")
-    .select("status")
+    .select("status, due_date")
     .eq("id", id)
     .eq("organization_id", authz.org.orgId)
     .maybeSingle();
 
+  // REAGENDAR RE-ARMA O AVISO (migration 9043): o cron `task-due-reminder`
+  // só avisa tarefa com `reminded_at` nula. Sem zerar aqui, a tarefa que já
+  // apitou uma vez ficaria muda no prazo novo. Só quando o prazo MUDOU de
+  // fato (instante comparado por getTime; nulo↔valor conta): reenviar o mesmo
+  // prazo num PATCH de título faria a tarefa já avisada apitar de novo.
+  // `reminded_at` não está no schema do corpo: só esta linha o escreve, e só
+  // para nulo.
+  const instante = (v: string | null | undefined) => (v ? new Date(v).getTime() : null);
+  const prazoMudou =
+    "due_date" in parsed.data &&
+    instante(parsed.data.due_date) !== instante((antes as { due_date?: string | null } | null)?.due_date);
+  const mudancas = prazoMudou ? { ...parsed.data, reminded_at: null } : parsed.data;
+
   const { data, error } = await supabase
     .from("crm_tasks")
-    .update(parsed.data)
+    .update(mudancas)
     .eq("id", id)
     .eq("organization_id", authz.org.orgId)
     .select(COLUNAS)
@@ -91,6 +112,8 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
     if (error.code === "PGRST116") {
       return fail("not_found", t("Tarefa não encontrada."), 404, { requestId });
     }
+    // 23503 = uuid que não existe em organização nenhuma (outra org já foi
+    // recusada acima, porque a FK aceitaria).
     if (error.code === "23503") {
       return fail("validation_failed", t("O negócio ou contato vinculado não existe."), 422, {
         requestId,

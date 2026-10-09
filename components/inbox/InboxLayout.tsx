@@ -17,13 +17,16 @@ import { InboxFilters, type InboxFiltersValue, type InboxTab } from "./InboxFilt
 import { type ComposerHandle } from "./Composer";
 import { ConversationHeader } from "./ConversationHeader";
 import { PainelDaConversa } from "./PainelDaConversa";
+import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
+import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
+import { useAtalhosPessoais } from "@/hooks/inbox/useAtalhosPessoais";
 
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard, MagnifyingGlass, X } from "@/lib/ui/icons";
+import { CaretLeft, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -170,18 +173,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const [helpOpen, setHelpOpen] = useState(false);
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
-  /**
-   * A busca dentro da conversa (#1793) pertence à CONVERSA em que foi aberta.
-   * Guardar o id junto fecha a busca em qualquer troca — clique, atalho j/k,
-   * voltar do navegador — sem que cada caminho precise lembrar de limpá-la.
-   */
-  const [busca, setBusca] = useState<{ conversaId: string; termo: string } | null>(null);
-  const buscaAberta = busca !== null && busca.conversaId === selectedId;
-  const botaoBuscaRef = useRef<HTMLButtonElement | null>(null);
-  const fecharBusca = useCallback(() => {
-    setBusca(null);
-    botaoBuscaRef.current?.focus();
-  }, []);
+  // Busca nas mensagens (#1793) e coluna do lead: ver `useFerramentasDaConversa`.
+  const ferramentas = useFerramentasDaConversa(selectedId);
   /**
    * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
    * está aberta: sair dela — clique, atalho ou voltar do navegador — o descarta
@@ -298,7 +291,9 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   useMarkAsRead(
     selectedConversation?.id ?? null,
     selectedConversation?.unread_count_for_assignee ?? 0,
+    selectedConversation?.marked_unread ?? false,
   );
+  const atalhosPessoais = useAtalhosPessoais(selectedConversation, supportReadonly);
 
   // Aceita `null`: é o VOLTAR do celular, que limpa a seleção e devolve a lista.
   // É um SUPERCONJUNTO do `handleSelect` do upstream — o tipo dele não aceita
@@ -373,11 +368,18 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // Duas faixas em vez de uma: compacta onde aperta, generosa onde há espaço.
   // Em 1280 isso dá 424px de conversa em vez de 372 — 54px de folga sobre o
   // piso do composer (370px), em vez dos 2px que a versão de uma faixa só
-  // deixava. Margem de 2px não é margem, é sorte.
+  // deixava. Margem de 2px não é margem, é sorte. Acima de 1680px o painel do
+  // lead vai a 400px (o do protótipo v2); o grid é um CARD (borda, cantos,
+  // `surface`) destacado da moldura, como o `.work` do protótipo.
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
-      className="grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]"
+      className={cn(
+        "grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface md:grid-cols-[300px_1fr]",
+        ferramentas.painelLead
+          ? "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_360px] min-[1680px]:grid-cols-[300px_1fr_400px]"
+          : "xl:grid-cols-[272px_1fr] 2xl:grid-cols-[300px_1fr]",
+      )}
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
        * já publica (`LeadDossier`), e pela mesma razão: quando a entrega morre,
@@ -493,39 +495,19 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               key={selectedConversation.id}
               conversation={selectedConversation}
               onAbrirConversa={handleSelect}
-              onBuscar={() =>
-                buscaAberta
-                  ? fecharBusca()
-                  : setBusca({ conversaId: selectedConversation.id, termo: "" })
-              }
-              buscaAberta={buscaAberta}
-              botaoBuscaRef={botaoBuscaRef}
+              onBuscar={() => ferramentas.alternarBusca(selectedConversation.id)}
+              buscaAberta={ferramentas.buscaAberta}
+              botaoBuscaRef={ferramentas.botaoBuscaRef}
+              painelAberto={ferramentas.painelLead}
+              onAlternarPainel={ferramentas.alternarPainel}
+              onAbrirFicha={() => setFichaAberta(true)}
             />
-            {buscaAberta && (
-              <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
-                <MagnifyingGlass size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                <input
-                  type="search"
-                  autoFocus
-                  className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-hidden placeholder:text-muted-foreground"
-                  aria-label={t("Buscar nas mensagens carregadas")}
-                  placeholder={t("Buscar nas mensagens carregadas")}
-                  value={busca.termo}
-                  onChange={(e) => setBusca({ conversaId: busca.conversaId, termo: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") fecharBusca();
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-11 shrink-0 px-0 lg:w-8"
-                  aria-label={t("Fechar busca")}
-                  onClick={fecharBusca}
-                >
-                  <X size={16} aria-hidden />
-                </Button>
-              </div>
+            {ferramentas.buscaAberta && (
+              <CampoDeBuscaNaConversa
+                termo={ferramentas.termoDaBusca}
+                onTermo={ferramentas.mudarTermo}
+                onFechar={ferramentas.fecharBusca}
+              />
             )}
             {/* A conversa e o campo de resposta — a MESMA peça do dossiê do
                 negócio no Kanban. Ver `PainelDaConversa`. */}
@@ -535,7 +517,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               key={`painel:${selectedConversation.id}`}
               ref={composerRef}
               conversation={selectedConversation}
-              searchTerm={buscaAberta ? busca.termo : ""}
+              searchTerm={ferramentas.termoDaBusca}
               onAbrirConversa={handleSelect}
               // O aviso é DA conversa da URL: trocar de conversa dentro da inbox
               // não pode deixar um texto sugerido no campo de outra pessoa.
@@ -555,9 +537,11 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block">
-        <CRMSidePanel conversation={selectedConversation} />
-      </div>
+      {ferramentas.painelLead && (
+        <div className="hidden h-full min-h-0 min-w-0 xl:block">
+          <CRMSidePanel conversation={selectedConversation} />
+        </div>
+      )}
 
       <InboxKeyboardShortcuts
         visibleIds={visibleIds}
@@ -567,6 +551,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         onClaim={supportReadonly ? () => {} : handleClaim}
         onClose={supportReadonly ? () => {} : handleClose}
         onToggleHelp={() => setHelpOpen((v) => !v)}
+        {...atalhosPessoais}
       />
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

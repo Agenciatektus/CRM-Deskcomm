@@ -97,6 +97,8 @@ let layout: ReturnType<typeof simularLayoutDoFio>;
 const original = Element.prototype.scrollIntoView;
 const rolar = vi.fn();
 
+/** Quem lê é o dono (`useUser` devolve u-1): só para ele a contagem vale. */
+const DONO = { userId: "u-1", nome: null };
 const rolador = (c: HTMLElement) => c.querySelector<HTMLElement>(".overflow-y-auto")!;
 const bolhas = (c: HTMLElement) => c.querySelectorAll('[data-testid="message-bubble"]');
 /** O id da primeira mensagem cuja linha começa na tela, e onde ela está na janela. */
@@ -225,5 +227,62 @@ describe("ChatThread virtualizado", () => {
     const achada = container.querySelector('[data-search-match="true"]');
     expect(achada?.textContent).toContain("segue o BOLETO");
     expect((rolar.mock.contexts as Element[]).includes(achada!)).toBe(true);
+  });
+  it("não lidas: o divisor de novas monta na janela e a leitura continua ancorada no fim", async () => {
+    estado.paginas = [faixa(1, 2000)];
+    const { container, rerender } = render(<ChatThread conversationId="c-1" naoLidas={3} dono={DONO} />, { wrapper });
+    await act(async () => {});
+    const sc = rolador(container);
+    const divisor = container.querySelector('[data-testid="divisor-novas"]');
+    expect(divisor).not.toBeNull();
+    // As 3 últimas RECEBIDAS são as ímpares 1995, 1997 e 1999: o divisor fica
+    // logo antes da 1995, e a última mensagem segue montada, no fim.
+    const linhaDoDivisor = Number(divisor!.closest("[data-index]")!.getAttribute("data-index"));
+    const proxima = container.querySelector(`[data-index="${linhaDoDivisor + 1}"]`);
+    expect(proxima?.textContent).toContain("mensagem 1995");
+    expect(container.textContent).toContain("mensagem 2000");
+    expect(sc.scrollTop).toBe(layout.maximo(sc));
+
+    // Abrir marca como lida e a contagem viva zera: o divisor NÃO some com ela.
+    rerender(<ChatThread conversationId="c-1" naoLidas={0} dono={DONO} />);
+    await act(async () => {});
+    expect(container.querySelector('[data-testid="divisor-novas"]')).not.toBeNull();
+
+    // Chega uma recebida com a conversa aberta (2001 é ímpar): o divisor NÃO
+    // desce. Antes ele era recalculado e passava a abrir em 1997.
+    estado.paginas = [faixa(1, 2001)];
+    rerender(<ChatThread conversationId="c-1" naoLidas={0} dono={DONO} />);
+    await act(async () => {});
+    const depois = container.querySelector('[data-testid="divisor-novas"]')!;
+    const indice = Number(depois.closest("[data-index]")!.getAttribute("data-index"));
+    expect(container.querySelector(`[data-index="${indice + 1}"]`)?.textContent).toContain("mensagem 1995");
+  });
+
+  it("gestor só lendo (o dono é outra pessoa): a contagem não é dele, e não há divisor", async () => {
+    estado.paginas = [faixa(1, 2000)];
+    const { container } = render(
+      <ChatThread conversationId="c-1" naoLidas={3} dono={{ userId: "outra", nome: "Rita" }} />,
+      { wrapper },
+    );
+    await act(async () => {});
+    expect(container.querySelector('[data-testid="divisor-novas"]')).toBeNull();
+  });
+
+  it("muitas não lidas: a abertura leva a leitura ao divisor, não ao fim", async () => {
+    estado.paginas = [faixa(1, 2000)];
+    const { container } = render(<ChatThread conversationId="c-1" naoLidas={200} dono={DONO} />, { wrapper });
+    await act(async () => {});
+    await act(async () => {});
+    // 200 recebidas = 400 linhas acima do fim: sem rolar até ele, o divisor
+    // ficaria fora da janela (e desmontado pelo virtualizador).
+    expect(container.querySelector('[data-testid="divisor-novas"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("mensagem 2000");
+  });
+
+  it("sem não lidas não há divisor", async () => {
+    estado.paginas = [faixa(1, 2000)];
+    const { container } = render(<ChatThread conversationId="c-1" />, { wrapper });
+    await act(async () => {});
+    expect(container.querySelector('[data-testid="divisor-novas"]')).toBeNull();
   });
 });

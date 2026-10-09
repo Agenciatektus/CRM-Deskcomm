@@ -10,13 +10,24 @@ import { useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
 import { ConversationListItem } from "./ConversationListItem";
-import { EmptyInbox } from "@/components/empty";
+import { MenuDaConversa } from "./menu/MenuDaConversa";
+import { useMenuDaConversa } from "./menu/useMenuDaConversa";
+import { VazioDaAba } from "./VazioDaAba";
+import { abaDosFiltros } from "@/lib/inbox/aba-dos-filtros";
+import { useAuthOpcional } from "@/hooks/auth/AuthProvider";
 import { EmptyPorFiltro } from "./EmptyPorFiltro";
 import { filtrosAuxiliaresAtivos } from "@/lib/inbox/filtros-ativos";
 import type {
   ConversationsFilters,
   ConversationWithContact,
 } from "@/hooks/inbox/useConversationsRealtime";
+
+/** O rótulo do cabeçalho de seção por aba. Ausente = "Abertas". */
+const ROTULO_DA_SECAO: Partial<Record<ReturnType<typeof abaDosFiltros>, string>> = {
+  all: "Todas",
+  closed: "Fechadas",
+  archived: "Arquivadas",
+};
 
 interface ListResponse {
   data: ConversationWithContact[];
@@ -44,6 +55,14 @@ export function ConversationList({
   onLimparFiltros,
 }: Props) {
   const t = useT();
+  // Quem está logado, para a pílula de dono dizer "Você". Opcional porque a
+  // lista também é renderizada sem provider (testes); sem sessão, sai o nome.
+  const sessao = useAuthOpcional();
+  const meuUserId = sessao?.user.id ?? null;
+  // A aba é DERIVADA do mesmo objeto que foi ao servidor, pela mesma razão de
+  // `filtrosAuxiliaresAtivos`: o texto do vazio não pode falar de uma aba
+  // diferente da que a consulta aplicou.
+  const tab = abaDosFiltros(filters);
   // Só mostra POR ONDE a conversa entrou quando há mais de um número. Com um
   // só, o rótulo seria a mesma palavra em toda linha — ruído que ensina o olho
   // a ignorar a área onde vivem os avisos que importam.
@@ -62,6 +81,8 @@ export function ConversationList({
   // Uma leitura por lista, compartilhada por todas as linhas (react-query dedupa
   // com o cabeçalho, que faz a mesma pergunta).
   const automaticoDaOrg = useAutomaticoAtivo();
+  // O menu de contexto (fase 3.6): um por lista, aberto na linha do alvo.
+  const menu = useMenuDaConversa();
 
   // Sem filtro de cliente: TODO filtro é parâmetro do schema e roda no banco.
   // `clientFilter` era o mecanismo que permitia um filtro existir fora do contrato
@@ -89,13 +110,15 @@ export function ConversationList({
    *
    * O `filters.comando` entrou junto com as abas novas: sem ele, a Fila voltaria
    * a repetir o mesmo selo de atendente em cada uma das linhas.
+   *
+   * Visual v2: a pílula passou a dizer também "Sem dono" e "Automático", então
+   * "sem dono" conta como um dono distinto. Uma página com um atendente e o
+   * resto sem ninguém DISCRIMINA, e antes o selo sumia justamente nela.
    */
   const mostrarAtendente = useMemo(() => {
     if (filters.assigned_to) return false;
     if (filters.comando && !filters.comando.includes("humano")) return false;
-    const donos = new Set(
-      items.map((i) => i.assigned_to_user_id).filter((id): id is string => Boolean(id)),
-    );
+    const donos = new Set(items.map((i) => i.assigned_to_user_id ?? "sem-dono"));
     return donos.size > 1;
   }, [filters.assigned_to, filters.comando, items]);
 
@@ -146,18 +169,37 @@ export function ConversationList({
   if (items.length === 0 && filtrosAtivos.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <EmptyInbox />
+        <VazioDaAba tab={tab} />
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
+      {/* Rolar a lista fecha o menu: ancorado num ponto fixo, ele ficaria
+          apontando para a linha errada. */}
+      <div className="flex-1 overflow-y-auto" onScroll={menu.alvo ? menu.fechar : undefined}>
         {/* Vazio por FILTRO: fica DENTRO do return, nunca como `return` precoce —
             e por isso o bloco do `hasNextPage` abaixo continua sendo alcancado. */}
         {items.length === 0 && filtrosAtivos.length > 0 && (
           <EmptyPorFiltro filtros={filtrosAtivos} onLimpar={onLimparFiltros} />
+        )}
+        {items.length > 0 && (
+          // O `.conv-section` do protótipo ("Abertas  8"). O rótulo diz o que a
+          // aba REALMENTE lista: "Todas" inclui fechadas, então não vira
+          // "Abertas". O número é o que está carregado, com "+" quando há página
+          // seguinte: o total exato é o badge da aba, e repetir uma contagem de
+          // outra fonte aqui poderia discordar dele.
+          <div
+            className="flex items-center justify-between px-4 pb-1 pt-3 text-xs font-semibold text-text-subtle"
+            data-testid="secao-da-lista"
+          >
+            <span>{t(ROTULO_DA_SECAO[tab] ?? "Abertas")}</span>
+            <span className="tabular-nums">
+              {items.length}
+              {q.hasNextPage ? "+" : ""}
+            </span>
+          </div>
         )}
         {items.map((c, i) => (
           <ConversationListItem
@@ -170,6 +212,9 @@ export function ConversationList({
             mostrarAtendente={mostrarAtendente}
             mostrarAutomatico={mostrarAutomatico}
             automaticoDaOrg={automaticoDaOrg.data}
+            meuUserId={meuUserId}
+            onAbrirMenu={menu.abrir}
+            menuAberto={menu.alvo?.id === c.id}
           />
         ))}
         {q.hasNextPage && (
@@ -185,6 +230,18 @@ export function ConversationList({
           </div>
         )}
       </div>
+      {/* O menu decide permissão por `useAuth`, que exige o provider. Em produção
+          a lista sempre está dentro dele; quem a desenha sem sessão (testes da
+          lista, vitrines) fica sem menu, em vez de a lista inteira cair. */}
+      {sessao && (
+        <MenuDaConversa
+          alvo={menu.alvo}
+          conversation={menu.alvo ? (items.find((i) => i.id === menu.alvo?.id) ?? null) : null}
+          onFechar={menu.fechar}
+          meuUserId={meuUserId}
+          automaticoDaOrg={automaticoDaOrg.data}
+        />
+      )}
     </div>
   );
 }

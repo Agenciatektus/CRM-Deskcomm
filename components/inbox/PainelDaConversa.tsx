@@ -122,6 +122,8 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
               nome: conversation.assigned_to_user_name ?? null,
             }}
             contatoId={conversation.contacts?.id ?? null}
+            // O divisor "Novas mensagens" sai desta contagem, lida na abertura.
+            naoLidas={conversation.unread_count_for_assignee ?? 0}
           />
         </div>
         {onde === "inbox" && <RetentionNotice conversationId={conversation.id} />}
@@ -159,15 +161,22 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
               currentContactId={conversation.contact_id}
               rascunho={rascunho}
               initialDraft={rascunho?.leitura.estado === "sugerido" ? rascunho.leitura.texto : ""}
+              // Quem atende decide a faixa acima da caixa: a IA atendendo
+              // (com Assumir) ou ninguém (com Puxar para mim).
+              conversa={conversation}
             />
           </>
         ) : (
-          <p
-            className="border-t border-border px-4 py-3 text-center text-xs text-text-muted"
-            data-testid="conversa-somente-leitura"
-          >
-            {t("Seu acesso é de leitura: você acompanha a conversa, mas não responde.")}
-          </p>
+          // Modo leitura: no lugar do composer, a mesma faixa do visual novo,
+          // sem caixa e sem gesto, porque o servidor recusaria qualquer envio.
+          <div className="bg-bg px-4 pb-3.5 pt-2.5">
+            <p
+              className="rounded-2xl border border-border bg-surface px-3.5 py-3 text-center text-sm text-text-muted"
+              data-testid="conversa-somente-leitura"
+            >
+              {t("Seu acesso é de leitura: você acompanha a conversa, mas não responde.")}
+            </p>
+          </div>
         )}
       </>
     );

@@ -195,6 +195,9 @@ test.describe("Lote 12 — painel do contato no Inbox", () => {
     registra(`#944 · GET /crm-summary = ${rr.status()}`);
 
     // ── #909: o rótulo do botão é o TÍTULO do diálogo que ele abre ─────────
+    // "Novo Lead" e os negócios moram na aba Negócios desde o painel em abas
+    // (visual v2, 3.3).
+    await page.getByRole("tab", { name: "Negócios" }).click();
     const botao = page.getByRole("button", { name: "Novo Lead" });
     await expect(botao).toBeVisible({ timeout: 30_000 });
     registra(`#909 · rótulo do botão = "${await botao.innerText()}"`);
@@ -249,7 +252,7 @@ test.describe("Lote 12 — painel do contato no Inbox", () => {
     await abreConversa(page, conversaId);
     await expect(page.getByText(`Cliente L12 ${SUFIXO}`).first()).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("button", { name: "Tags do contato", exact: true }).click();
+    await page.getByRole("button", { name: "Etiqueta do contato", exact: true }).click();
     const rt = await respostaTags;
     const corpoTags = await rt.text();
     registra(`L12.G2.1 · GET /api/v1/contact-tags = ${rt.status()} · corpo = ${corpoTags.slice(0, 400)}`);

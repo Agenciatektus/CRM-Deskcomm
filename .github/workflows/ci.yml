@@ -229,22 +229,17 @@ jobs:
         if: matrix.parte == 3
         run: pnpm cercas
 
+      # O tsc do projeto inteiro passou do teto padrão do heap do Node. Medido em
+      # 06/10/2026 com --extendedDiagnostics: a dev usa 4,24 GB, e uma PR que
+      # acrescentou 2% (4,34 GB) morreu com "heap out of memory" (exit 134) sem
+      # erro de tipo nenhum. 6 GB dá folga sem passar da RAM do runner.
       - name: Typecheck
         if: matrix.parte == 1
-        # O teto de heap mora no script `typecheck` do package.json (via
-        # `node --max-old-space-size`, e nao NODE_OPTIONS, que nao se escreve
-        # igual em cmd, PowerShell e sh). O grafo de tipos da arvore inteira
-        # passou do heap padrao do Node: medido cold em 4,6 GB contra os ~4 GB
-        # uteis do default, e `origin/dev` SOZINHA ja morria com exit 134 — sem
-        # mensagem de teste, so `Ineffective mark-compacts near heap limit`.
-        #
-        # Cuidado ao medir: o tsconfig tem `incremental`, e com o buildinfo
-        # quente o mesmo comando mede 1,27 s e 51 mil tipos contra 91 s e 1,66
-        # MILHAO cold. "Passou aqui" nao prova nada sem apagar o buildinfo; o CI
-        # roda sempre cold, e foi so por isso que ele viu primeiro.
-        #
-        # O `Orcamento de tempo` deste job vigia a suite crescendo no RELOGIO, e
-        # nao ha equivalente para MEMORIA: o proximo aviso vai ser outro 134.
+        # O script `typecheck` do package.json carrega o MESMO teto (via
+        # `node --max-old-space-size`, que vale no Windows também, onde
+        # NODE_OPTIONS não se escreve igual). Trocar aqui pede trocar lá.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm typecheck
 
       # Na parte 2, não na 1: o porquê e a conta estão no cabeçalho do job.

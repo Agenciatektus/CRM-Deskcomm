@@ -18,6 +18,9 @@ const BINDINGS: { keys: string; description: string }[] = [
   { keys: "Shift + Enter", description: "Quebrar linha sem enviar" },
   { keys: "a", description: "Assumir conversa" },
   { keys: "e", description: "Fechar conversa" },
+  // Estado POR ATENDENTE (9042): valem só para quem aperta.
+  { keys: "u", description: "Marcar como não lida" },
+  { keys: "p", description: "Fixar ou desafixar a conversa" },
   { keys: "?", description: "Mostrar atalhos" },
 ];
 

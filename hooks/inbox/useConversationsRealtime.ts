@@ -67,6 +67,13 @@ export type ConversationWithContact = Conversation & {
    * responsável": o dono é o `assigned_to_user_id`, o nome é a cortesia.
    */
   assigned_to_user_name?: string | null;
+  /**
+   * Estado DE QUEM ESTÁ LOGADO (migration 9042), acrescentado pela rota da
+   * lista. Opcionais: resposta em cache de antes, ou fora da lista.
+   */
+  pinned?: boolean;
+  muted_until?: string | null;
+  marked_unread?: boolean;
 };
 
 /** O vocabulário de LEITURA (7), que inclui os dois estados que só o motor escreve. */

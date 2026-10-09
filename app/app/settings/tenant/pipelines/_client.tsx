@@ -219,6 +219,9 @@ function PipelineEditor({
   const [lost, setLost] = useState(v.lost ?? "Perdido");
   const [reasonsText, setReasonsText] = useState(readLostReasons(pipeline.settings).join(", "));
   const [wonReasonsText, setWonReasonsText] = useState(readWonReasons(pipeline.settings).join(", "));
+  const [lostRequired, setLostRequired] = useState(
+    (pipeline.settings as { lost_reason_required?: unknown } | null)?.lost_reason_required !== false,
+  );
   const [categorias, setCategorias] = useState<Record<string, string>>(() =>
     readCategorias(pipeline.settings),
   );
@@ -284,6 +287,7 @@ function PipelineEditor({
       vocabulary: { lead, deal, won, lost },
       fields: ok,
       lost_reasons: motivosComCategoria,
+      lost_reason_required: lostRequired,
       won_reasons: wonReasons,
       won_reason_required: wonRequired,
       reabertura: retomaComoNovo ? "novo_negocio" : "mesmo_registro",
@@ -370,6 +374,14 @@ function PipelineEditor({
             </div>
           );
         })}
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={lostRequired}
+            onChange={(e) => setLostRequired(e.target.checked)}
+          />
+          {t("Exigir motivo de perda ao fechar como perdido")}
+        </label>
       </div>
 
       <div className="space-y-1">

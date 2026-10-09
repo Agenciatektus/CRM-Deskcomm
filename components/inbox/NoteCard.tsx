@@ -69,39 +69,61 @@ interface Props {
   onDelete?: () => void;
 }
 
-/** Onda 5.2: nota interna inline no thread — nunca vai ao cliente, destaque âmbar (token `warning`). */
+/**
+ * Onda 5.2: nota interna inline no thread — nunca vai ao cliente.
+ *
+ * Visual v2 (fase 3.5): ela fica do NOSSO lado do fio (é o time falando), com
+ * borda tracejada no tom de aviso, a mesma linguagem da caixa do composer em
+ * "Nota interna". Quem escreveu e o "só o time vê" vão acima da bolha, como o
+ * nome das mensagens; a hora fica dentro, no canto, como em toda bolha.
+ */
 export function NoteCard({ note, onDelete }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
   const time = format(new Date(note.created_at), "HH:mm", { locale: localeDaData });
 
   return (
-    <div className="group flex w-full min-w-0 justify-center px-4 py-1">
-      <div className="max-w-[85%] min-w-0 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm text-warning-fg shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold opacity-80">
-            <NoteIcon size={12} weight="fill" aria-hidden />
-            <span>{note.created_by_name ?? t("Alguém")}</span>
-            <span aria-hidden>·</span>
-            <span>{t("Nota interna · só o time vê")}</span>
-          </div>
+    <div className="group flex w-full min-w-0 justify-end px-4 pt-3">
+      <div className="flex min-w-0 max-w-[min(80%,36rem)] flex-col items-end">
+        <p className="mx-2 mb-1 flex items-center gap-1.5 text-xs font-semibold text-warning-fg">
+          <NoteIcon size={12} weight="fill" aria-hidden />
+          <span>{note.created_by_name ?? t("Alguém")}</span>
+          <span aria-hidden>·</span>
+          <span>{t("Nota interna · só o time vê")}</span>
+        </p>
+        <div
+          data-testid="nota-interna"
+          className="relative min-w-0 max-w-full rounded-2xl rounded-br-md border border-dashed border-warning/60 bg-warning-bg px-3 py-1.5 text-sm leading-normal text-text"
+        >
           {onDelete && (
             <button
               type="button"
               onClick={onDelete}
-              className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+              // Visível onde não há hover (toque) e no foco do teclado; com mouse,
+              // aparece ao passar por cima, sem disputar a leitura da nota.
+              className="absolute right-1 top-1 grid size-6 place-items-center rounded-full border border-border bg-surface text-text-muted shadow-xs transition-opacity hover:text-destructive [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
               aria-label={t("Excluir nota")}
             >
               <Trash size={12} weight="bold" />
             </button>
           )}
+          <NoteMedia note={note} />
+          {/* Nota só de anexo (imagem colada sem legenda) chega com `body` vazio:
+              renderizar o `<p>` assim mesmo deixaria um parágrafo fantasma de
+              altura nula entre o arquivo e a hora. Com texto, a hora flutua no
+              fim da última linha (espaçador invisível), como nas mensagens. */}
+          {note.body ? (
+            <>
+              <p className="whitespace-pre-wrap wrap-anywhere">
+                {note.body}
+                <span aria-hidden className="inline-block h-px w-10 align-baseline" />
+              </p>
+              <span className="absolute bottom-1.5 right-2.5 text-[0.6875rem] leading-none text-text-subtle">{time}</span>
+            </>
+          ) : (
+            <div className="mt-1 text-right text-[0.6875rem] leading-none text-text-subtle">{time}</div>
+          )}
         </div>
-        <NoteMedia note={note} />
-        {/* Nota só de anexo (imagem colada sem legenda) chega com `body` vazio:
-            renderizar o `<p>` assim mesmo deixaria um parágrafo fantasma de
-            altura nula entre o arquivo e a hora. */}
-        {note.body && <p className="mt-1 whitespace-pre-wrap wrap-anywhere leading-snug">{note.body}</p>}
-        <div className="mt-1 text-right text-[10px] opacity-70">{time}</div>
       </div>
     </div>
   );

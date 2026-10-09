@@ -498,10 +498,10 @@ test("marca Meet, copia link, autoriza em atendimento humano e entrega novamente
     expect(oldJob[0]).toMatchObject({ id: firstJob, organization_id: f.org, contact_id: f.contact, kind: "transactional_delivery", status: "done" });
     await page.goto(`/app/inbox/${f.conversation}`);
     // Fechar não é mais `window.confirm()` (bloqueado em iframe, ignora o
-    // tema) — é o `AlertDialog` da casa. O botão que abre e o que confirma
-    // têm o MESMO rótulo "Fechar"; o segundo clique escopado ao
-    // `alertdialog` é o que desambigua.
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
+    // tema) — é o `AlertDialog` da casa. Desde o visual v2 o ícone do
+    // cabeçalho se chama "Fechar conversa"; o "Fechar" de dentro do
+    // `alertdialog` é o que confirma.
+    await page.getByRole("button", { name: "Fechar conversa", exact: true }).click();
     await page
       .getByRole("alertdialog")
       .getByRole("button", { name: "Fechar", exact: true })

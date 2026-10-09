@@ -86,6 +86,22 @@ export const DICIONARIO: Traducoes = {
   "Recursos liberados": { es: "Recursos habilitados" },
   "Módulos que só aparecem para as empresas que você liberar. Sem liberação, a empresa não vê a tela nem o menu.": { es: "Módulos que solo aparecen para las empresas que usted habilite. Sin habilitación, la empresa no ve la pantalla ni el menú." },
   "Desligado no servidor: a liberação fica guardada e vale quando o módulo for ligado em Sistema.": { es: "Desactivado en el servidor: la habilitación queda guardada y vale cuando el módulo se active en Sistema." },
+  // ─── INBOX: MENU DE CONTEXTO DA CONVERSA NA LISTA (visual v2, fase 3.6) ───
+  "Abrir ficha do contato": { es: "Abrir ficha del contacto" },
+  "Ações da conversa com": { es: "Acciones de la conversación con" },
+  "Encerrada": { es: "Cerrada" },
+  "Este contato não tem negócio": { es: "Este contacto no tiene negocio" },
+  "Funil e etapa": { es: "Embudo y etapa" },
+  "Lembrete marcado.": { es: "Recordatorio programado." },
+  "Levar para outro funil…": { es: "Llevar a otro embudo…" },
+  "Limite de 20 etiquetas por conversa.": { es: "Límite de 20 etiquetas por conversación." },
+  "Nenhuma etiqueta criada ainda": { es: "Todavía no hay etiquetas creadas" },
+  "Ninguém disponível para receber": { es: "No hay nadie disponible para recibir" },
+  "Não foi possível copiar o telefone.": { es: "No se pudo copiar el teléfono." },
+  "Não foi possível ler o funil.": { es: "No se pudo leer el embudo." },
+  "Quem recebe passa a responder esta conversa.": { es: "Quien recibe pasa a responder esta conversación." },
+  "Sem atendente": { es: "Sin agente" },
+
   // ─── BUSCA DENTRO DA CONVERSA (extraída do PR #1793) ───
   "Resultados nas mensagens carregadas": { es: "Resultados en los mensajes cargados" },
   "Buscar nesta conversa": { es: "Buscar en esta conversación" },
@@ -392,6 +408,17 @@ export const DICIONARIO: Traducoes = {
   "O texto sugerido expirou. A conversa abriu sem ele.": {
     es: "El texto sugerido expiró. La conversación se abrió sin él.",
   },
+  // ─── VISUAL V2, FASE 3.5: BALÕES DO FIO E COMPOSER ───
+  // O divisor de não lidas no fio, a faixa de quem atende acima da caixa e a
+  // dica de teclado que saiu do `title` do campo para ficar à vista.
+  "Novas mensagens": { es: "Mensajes nuevos" },
+  "A IA está atendendo.": { es: "La IA está atendiendo." },
+  "Ao assumir, o automático para.": { es: "Al asumir, el automático se detiene." },
+  "Ninguém assumiu esta conversa.": { es: "Nadie asumió esta conversación." },
+  "Assumir a conversa": { es: "Asumir la conversación" },
+  "Puxar para mim": { es: "Tomarla yo" },
+  "Enter envia, Shift+Enter quebra linha": { es: "Enter envía, Shift+Enter agrega un salto de línea" },
+  "Enter salva a nota, Shift+Enter quebra linha": { es: "Enter guarda la nota, Shift+Enter agrega un salto de línea" },
   // As mensagens de erro das rotas .../drafts e .../drafts/consume.
   "Conversa inválida.": { es: "Conversación inválida." },
   "Origem do rascunho inválida.": { es: "Origen del borrador inválido." },
@@ -1549,6 +1576,10 @@ export const DICIONARIO: Traducoes = {
   "Navegação principal": { es: "Navegación principal" },
   "Expandir sidebar": { es: "Expandir barra lateral" },
   "Recolher sidebar": { es: "Contraer barra lateral" },
+  // Barra em duas colunas e trilha do cabeçalho (visual v2, fase 2).
+  "Grupos da navegação": { es: "Grupos de navegación" },
+  Ajustes: { es: "Ajustes" },
+  "Onde você está": { es: "Dónde estás" },
   Versão: { es: "Versión" },
   versão: { es: "versión" },
   "Nova versão": { es: "Nueva versión" },
@@ -6816,8 +6847,8 @@ export const DICIONARIO: Traducoes = {
   "Você passa a responder esta conversa e o atendimento automático para aqui.": {
     es: "Desde ahora tú respondes esta conversación y la atención automática se detiene aquí.",
   },
-  "Religa o atendimento automático para este cliente — vale para todas as conversas dele.": {
-    es: "Reactiva la atención automática para este cliente — vale para todas sus conversaciones.",
+  "Religa o atendimento automático para este cliente, em todas as conversas dele.": {
+    es: "Reactiva la atención automática para este cliente, en todas sus conversaciones.",
   },
   "Devolve esta conversa ao atendimento automático.": {
     es: "Devuelve esta conversación a la atención automática.",
@@ -6935,7 +6966,7 @@ export const DICIONARIO: Traducoes = {
   "O cliente nunca escreveu": { es: "El cliente nunca escribió" },
   "Janela fechada há": { es: "Ventana cerrada hace" },
   "só modelo": { es: "solo plantilla" },
-  "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.": {
+  "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui: a plataforma recusa texto livre.": {
     es: "Pasaron 24h desde el último mensaje del cliente. Desde aquí solo se puede enviar una plantilla aprobada: la plataforma rechaza el texto libre.",
   },
   "Tempo restante para escrever texto livre. Depois disso, só modelo aprovado.": {
@@ -13414,32 +13445,6 @@ export const DICIONARIO: Traducoes = {
   "Progresso do envio": { es: "Progreso del envío" },
   "Público": { es: "Público" },
   // ── Campanha: os PASSOS (9037) e a ENTRADA CONTÍNUA (9039) ──
-  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
-  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
-  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
-    es: "Quien responde sale de la secuencia al instante. Los pasos siguientes valen para quien quedó en silencio.",
-  },
-  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
-    es: "El primer mensaje es el de arriba, y sale para toda la lista. Los pasos de abajo ocurren después de él, para quien NO respondió. Quien responde sale de la secuencia al instante.",
-  },
-  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
-    es: "Elija el embudo en «Quién responde» antes de preparar: con pasos, cada persona abordada se convierte en tarjeta, y una tarjeta necesita embudo.",
-  },
-  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
-    es: "Con pasos, cada persona abordada se convierte en tarjeta en el embudo elegido, ya en el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Es lo que hace que mover de etapa y etiquetar funcionen, y es también lo que llena el tablero:",
-  },
-  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
-  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
-  "Quem já tem negócio aberto nesse funil não ganha card novo.": {
-    es: "Quien ya tiene un negocio abierto en ese embudo no recibe una tarjeta nueva.",
-  },
-  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
-  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
-    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar, y todos los que reciban tendrán los pasos.",
-  },
-  "etapa removida": { es: "etapa eliminada" },
-  "variações": { es: "variaciones" },
-  "Mover para": { es: "Mover a" },
   "Quem entra nesta campanha": { es: "Quién entra en esta campaña" },
   "Lista fixa": { es: "Lista fija" },
   "O recorte acima vira uma lista. Você confere quantas pessoas são e o texto antes de iniciar, e depois disso a lista não muda.": {
@@ -14176,6 +14181,202 @@ export const DICIONARIO: Traducoes = {
   // dinâmica). Fica "Pipeline": é o termo que CRM em espanhol usa para o quadro,
   // e "Embudos" já é o rótulo de "Funis", o item vizinho do mesmo menu.
   Pipeline: { es: "Pipeline" },
+  // ─── PAINEL DO LEAD NA INBOX EM ABAS (visual v2, fases 3.3 e 3.4) ───
+  "Seções do lead": { es: "Secciones del lead" },
+  "Copiar telefone": { es: "Copiar teléfono" },
+  "Telefone copiado.": { es: "Teléfono copiado." },
+  "Não consegui copiar. Selecione o número e copie à mão.": { es: "No pude copiar. Selecciona el número y cópialo a mano." },
+  "Detalhes do contato": { es: "Datos del contacto" },
+  Obs: { es: "Notas" },
+  "Em breve": { es: "Próximamente" },
+  "Contato atualizado.": { es: "Contacto actualizado." },
+  "Não informado": { es: "Sin informar" },
+  "Negócio ganho": { es: "Negocio ganado" },
+  "Outro funil": { es: "Otro embudo" },
+  "Marcar este negócio como ganho?": { es: "¿Marcar este negocio como ganado?" },
+  "O negócio sai das etapas abertas e conta como venda no funil.": { es: "El negocio sale de las etapas abiertas y cuenta como venta en el embudo." },
+  "Reabrir como negócio novo?": { es: "¿Reabrir como negocio nuevo?" },
+  "Cria um negócio novo com o mesmo contato e guarda a ligação com este. O negócio encerrado fica como está, com o motivo dele.": {
+    es: "Crea un negocio nuevo con el mismo contacto y guarda el vínculo con este. El negocio cerrado queda como está, con su motivo.",
+  },
+  "Negócio marcado como ganho.": { es: "Negocio marcado como ganado." },
+  "Negócio retomado como novo.": { es: "Negocio retomado como nuevo." },
+  "Responsável alterado.": { es: "Responsable cambiado." },
+  "Responsável pelo negócio": { es: "Responsable del negocio" },
+  "Membro da equipe": { es: "Miembro del equipo" },
+  Desfazer: { es: "Deshacer" },
+  "Ex.: ligar para confirmar o horário": { es: "Ej.: llamar para confirmar el horario" },
+  "Ligar para o cliente": { es: "Llamar al cliente" },
+  "Mandar orçamento": { es: "Enviar presupuesto" },
+  "Confirmar consulta": { es: "Confirmar consulta" },
+  "Cobrar retorno": { es: "Pedir respuesta" },
+  "Criar tarefa": { es: "Crear tarea" },
+  "Entra na lista de Tarefas.": { es: "Entra en la lista de Tareas." },
+  "Próximo passo criado.": { es: "Próximo paso creado." },
+  "Tarefa concluída.": { es: "Tarea finalizada." },
+  "Prazo atualizado.": { es: "Plazo actualizado." },
+  "Não consegui ler as tarefas.": { es: "No pude leer las tareas." },
+  "Concluir tarefa": { es: "Finalizar tarea" },
+  Atrasada: { es: "Atrasada" },
+  "Outras tarefas abertas": { es: "Otras tareas abiertas" },
+  Reagendar: { es: "Reprogramar" },
+  "Abrir em Tarefas": { es: "Abrir en Tareas" },
+  "Novo prazo": { es: "Nuevo plazo" },
+  "Salvar novo prazo": { es: "Guardar nuevo plazo" },
+  "Sem próximo passo": { es: "Sin próximo paso" },
+  "Criar e concluir tarefas fica com quem atende.": { es: "Crear y finalizar tareas queda a cargo de quien atiende." },
+  "Hoje 18:00": { es: "Hoy 18:00" },
+  "Amanhã 9:00": { es: "Mañana 9:00" },
+  "Em 3 dias 9:00": { es: "En 3 días 9:00" },
+  "Escolher data": { es: "Elegir fecha" },
+  "Escolher data e horário": { es: "Elegir fecha y horario" },
+  "Use o formato hh:mm.": { es: "Usa el formato hh:mm." },
+  "Escolha o dia e o horário.": { es: "Elige el día y el horario." },
+  "O negócio vinculado não existe nesta organização.": { es: "El negocio vinculado no existe en esta organización." },
+  "O contato vinculado não existe nesta organização.": { es: "El contacto vinculado no existe en esta organización." },
+  "O responsável não é membro desta organização.": { es: "El responsable no es miembro de esta organización." },
+  "Combinado antes": { es: "Acordado antes" },
+  "Próximo passo nas tarefas do contato": { es: "Próximo paso en las tareas del contacto" },
+  "O responsável mudou de novo depois da sua troca. Nada foi desfeito.": { es: "El responsable cambió de nuevo después de tu cambio. No se deshizo nada." },
+  "Não consegui conferir o responsável atual. Nada foi desfeito.": { es: "No pude verificar el responsable actual. No se deshizo nada." },
+  // ─── Inbox: lista de conversas (visual v2, fase 3.1) ───
+  "Fila vazia": { es: "Fila vacía" },
+  "Ninguém esperando atendimento agora. Quem precisar de uma pessoa aparece aqui.": {
+    es: "Nadie esperando atención ahora. Quien necesite a una persona aparece aquí.",
+  },
+  "Nenhuma conversa com você": { es: "Ninguna conversación contigo" },
+  "As conversas que você assumir aparecem aqui. Veja a Fila para pegar a próxima.": {
+    es: "Las conversaciones que asumas aparecen aquí. Mira la Fila para tomar la próxima.",
+  },
+  "Nada com o automático agora": { es: "Nada con el automático ahora" },
+  "Conversas que o atendimento automático está conduzindo aparecem aqui.": {
+    es: "Las conversaciones que la atención automática está llevando aparecen aquí.",
+  },
+  "Nenhuma conversa fechada": { es: "Ninguna conversación cerrada" },
+  "Atendimentos encerrados ficam guardados aqui.": { es: "Las atenciones finalizadas quedan guardadas aquí." },
+  "Nada arquivado": { es: "Nada archivado" },
+  "Conversas arquivadas saem da fila de trabalho e ficam aqui, sem serem apagadas.": {
+    es: "Las conversaciones archivadas salen de la fila de trabajo y quedan aquí, sin borrarse.",
+  },
+  Mais: { es: "Más" },
+  Filtros: { es: "Filtros" },
+  "Só não lidas": { es: "Solo no leídas" },
+  "Só grupos": { es: "Solo grupos" },
+  "Entrada no Instagram": { es: "Entrada en Instagram" },
+  "Filtros ativos": { es: "Filtros activos" },
+  "Remover filtro": { es: "Quitar filtro" },
+  "Nome, telefone ou última mensagem": { es: "Nombre, teléfono o último mensaje" },
+  "mensagens não lidas": { es: "mensajes no leídos" },
+  ativos: { es: "activos" },
+  // Cabeçalho do chat, visual v2 (fase 3.2)
+  "Lembrar depois": { es: "Recordar después" },
+  "Me lembrar desta conversa": { es: "Recordarme esta conversación" },
+  Amanhã: { es: "Mañana" },
+  "Em 1 semana": { es: "En 1 semana" },
+  "Escolher data e hora": { es: "Elegir fecha y hora" },
+  "Lembrar neste horário": { es: "Recordar a esta hora" },
+  "Buscar atendente": { es: "Buscar agente" },
+  "Continuar por outro número": { es: "Continuar por otro número" },
+  "Mais ações": { es: "Más acciones" },
+  "Tempo restante da janela de 24h": { es: "Tiempo restante de la ventana de 24h" },
+  "Esperando agora": { es: "Esperando ahora" },
+  "Lembrete:": { es: "Recordatorio:" },
+  "Comentário no Instagram": { es: "Comentario en Instagram" },
+  "Mostrar ou ocultar detalhes do lead": { es: "Mostrar u ocultar detalles del lead" },
+  "Detalhes do lead": { es: "Detalles del lead" },
+  "Lembrete ativo:": { es: "Recordatorio activo:" },
+  "Escolha um horário no futuro, em até 90 dias.": { es: "Elige un horario en el futuro, dentro de 90 días." },
+  // ─── Estado da conversa POR ATENDENTE (migration 9042, frente B do redesign) ───
+  Fixar: { es: "Fijar" },
+  Desafixar: { es: "Desfijar" },
+  Fixada: { es: "Fijada" },
+  Silenciar: { es: "Silenciar" },
+  Silenciada: { es: "Silenciada" },
+  "Reativar som": { es: "Reactivar sonido" },
+  "Por 8 horas": { es: "Por 8 horas" },
+  "Por 1 semana": { es: "Por 1 semana" },
+  "Marcar como não lida": { es: "Marcar como no leída" },
+  "Marcada como não lida": { es: "Marcada como no leída" },
+  "Fixar ou desafixar a conversa": { es: "Fijar o desfijar la conversación" },
+  "Não foi possível salvar a preferência.": { es: "No se pudo guardar la preferencia." },
+  "Você já fixou o máximo de conversas:": { es: "Ya fijaste el máximo de conversaciones:" },
+  Bloquear: { es: "Bloquear" },
+  "Bloquear contato": { es: "Bloquear contacto" },
+  "Não foi possível bloquear o contato.": { es: "No se pudo bloquear el contacto." },
+  "Nenhuma mensagem sai mais para este contato, nem da IA nem de campanhas. Só um admin desbloqueia.": {
+    es: "No se enviarán más mensajes a este contacto, ni de la IA ni de campañas. Solo un admin puede desbloquearlo.",
+  },
+  // ─── Etiquetas da conversa por delta (migration 9045) ───
+  "A etiqueta cliente é do sistema enquanto a regra Clientes pela agenda estiver ligada.": {
+    es: "La etiqueta cliente es del sistema mientras la regla Clientes por la agenda esté activada.",
+  },
+  "Esta sessão não pode mudar as etiquetas desta conversa.": {
+    es: "Esta sesión no puede cambiar las etiquetas de esta conversación.",
+  },
+  "Confira as etiquetas.": { es: "Revisa las etiquetas." },
+  "Não foi possível alterar as etiquetas.": { es: "No fue posible cambiar las etiquetas." },
+
+  // ---- aviso na hora da tarefa (migration 9043, lib/tarefas/aviso-de-tarefa.ts) ----
+  "O responsável recebe o aviso na hora marcada.": { es: "El responsable recibe el aviso a la hora indicada." },
+  "Hora da tarefa": { es: "Hora de la tarea" },
+  "Hora da tarefa:": { es: "Hora de la tarea:" },
+  "Chegou a hora de uma tarefa": { es: "Llegó la hora de una tarea" },
+  "Abra a conversa ou o negócio e faça o que a tarefa pede. Conclua a tarefa em Tarefas quando terminar.": {
+    es: "Abre la conversación o el negocio y haz lo que pide la tarea. Complétala en Tareas cuando termines.",
+  },
+
+  // ---- passos de campanha ----
+  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
+  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
+    es: "Quien responde sale de la secuencia de inmediato. Los pasos siguientes aplican a quien quedó en silencio.",
+  },
+  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
+  "Exigir motivo de perda ao fechar como perdido": { es: "Exigir motivo de pérdida al cerrar como perdido" },
+  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
+    es: "El primer mensaje es el de arriba y se envía a toda la lista. Los pasos siguientes ocurren para quien NO respondió. Quien responde sale de la secuencia de inmediato.",
+  },
+  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
+    es: "Elige el embudo en «Quién responde» antes de preparar: con pasos, cada persona contactada se convierte en una tarjeta y toda tarjeta necesita un embudo.",
+  },
+  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
+    es: "Con pasos, cada persona contactada se convierte en una tarjeta en el embudo elegido desde el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Así funcionan mover de etapa y etiquetar, y también se llena el tablero:",
+  },
+  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
+  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
+  "Quem já tem negócio aberto nesse funil não ganha card novo.": { es: "Quien ya tiene un negocio abierto en este embudo no recibe una tarjeta nueva." },
+  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
+  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
+    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar y todos los que reciban tendrán los pasos.",
+  },
+  "etapa removida": { es: "etapa eliminada" },
+  "variações": { es: "variaciones" },
+  "Mover para": { es: "Mover a" },
+
+  // ─── Obs do contato (9041) e transcrição do áudio na bolha ───
+  "Sem observações.": { es: "Sin observaciones." },
+  "Escreva o que a equipe precisa saber sobre este contato.": {
+    es: "Escribe lo que el equipo necesita saber sobre este contacto.",
+  },
+  "Observações salvas.": { es: "Observaciones guardadas." },
+  "Caracteres usados": { es: "Caracteres usados" },
+  Transcrição: { es: "Transcripción" },
+  "Mostrar transcrição": { es: "Mostrar transcripción" },
+  "Ocultar transcrição": { es: "Ocultar transcripción" },
+  // ─── Visual v2 polido (topo, painel do lead, disponibilidade) ───
+  "Buscar telas e funções": { es: "Buscar pantallas y funciones" },
+  "Indisponível": { es: "No disponible" },
+  "Clique para ficar disponível": { es: "Haz clic para quedar disponible" },
+  "Clique para ficar indisponível": { es: "Haz clic para quedar no disponible" },
+  "Nenhuma tarefa marcada": { es: "Ninguna tarea programada" },
+  // ─── Visual v2, segunda passada (lista, faixa, painel, topo) ───
+  Abertas: { es: "Abiertas" },
+  "Janela 24h:": { es: "Ventana 24h:" },
+  "Sem próximo passo. Lead sem tarefa some do radar da equipe.": {
+    es: "Sin próximo paso. Un lead sin tarea desaparece del radar del equipo.",
+  },
+  Próximo: { es: "Próximo" },
+  "aguardando resposta": { es: "esperando respuesta" },
+  "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
 };
 
 /**

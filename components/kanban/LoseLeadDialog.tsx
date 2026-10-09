@@ -28,6 +28,12 @@ interface LoseLeadDialogProps {
    * produto em vez da do funil — ver `useMotivosDePerdaDoFunil`.
    */
   motivosDoFunil?: string[];
+  /**
+   * Chamado só quando a perda GRAVOU. `onOpenChange(false)` vem também do
+   * Cancelar, e quem precisa reler depois de gravar (o painel da Inbox) não
+   * consegue distinguir os dois só por ele.
+   */
+  aoConcluir?: () => void;
 }
 
 const MAX_LEN = 500;
@@ -38,6 +44,7 @@ export function LoseLeadDialog({
   leadId,
   pipelineId,
   motivosDoFunil,
+  aoConcluir,
 }: LoseLeadDialogProps) {
   const t = useT();
   const [reasonCode, setReasonCode] = useState<string>("");
@@ -100,6 +107,7 @@ export function LoseLeadDialog({
       setReasonCode("");
       setOtherText("");
       onOpenChange(false);
+      aoConcluir?.();
     } catch {
       // error already toasted
     }

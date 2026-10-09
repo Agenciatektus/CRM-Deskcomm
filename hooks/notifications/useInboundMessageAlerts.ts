@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
+import { silenciadaNoCache } from "@/hooks/inbox/estadoNoCache";
 import { getOpenConversationId } from "@/hooks/notifications/OpenConversationContext";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -110,6 +112,15 @@ async function contactIdFromRow(
 
 export function useInboundMessageAlerts(): void {
   const orgId = useActiveOrg()?.orgId ?? null;
+  // 9042: quem silenciou a conversa não é avisado. A resposta mora nas listas
+  // em cache (o realtime de `messages` não sabe o estado de cada pessoa). O
+  // contexto, e não `useQueryClient`, porque sem provedor o aviso segue como
+  // antes em vez de quebrar. O push do servidor filtra pelo banco.
+  const qc = useContext(QueryClientContext);
+  const qcRef = useRef(qc);
+  useEffect(() => {
+    qcRef.current = qc;
+  }, [qc]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -132,6 +143,7 @@ export function useInboundMessageAlerts(): void {
     ) {
       return;
     }
+    if (conversationId && qcRef.current && silenciadaNoCache(qcRef.current, conversationId)) return;
     void (async () => {
       const contactId = await contactIdFromRow(row, conversationId);
       const bits = contactId

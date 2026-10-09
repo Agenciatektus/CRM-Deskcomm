@@ -87,9 +87,12 @@ export interface NavMetadata {
  * mesma conversa para a sexta tela.
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: "atendimento", label: "Atendimento" },
+  // Rótulo "Conversas" e não "Atendimento": no trilho de 72px a palavra longa
+  // saía cortada ("Atendi…"). O id continua `atendimento` porque é chave de
+  // rota, de preferência salva e de teste; só o texto de tela mudou.
+  { id: "atendimento", label: "Conversas" },
   { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
-  { id: "ia", label: "Agente", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
+  { id: "ia", label: "Agentes", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
   { id: "canais", label: "Canais" },
   { id: "analise", label: "Análise", hub: { href: "/app/analise", label: "Ver tudo em Análise" } },
   {

@@ -41,7 +41,7 @@ test.describe("a Agenda como o dono do produto a usa", () => {
 
   test("chego na Agenda CLICANDO no menu, não digitando a URL", async () => {
     await page.goto("/app");
-    // O item vive no grupo "Atendimento", junto do Inbox — decisão registrada
+    // O item vive no grupo "Conversas" (id `atendimento`), junto do Inbox — decisão registrada
     // no `registry.ts`: a Agenda é onde o dia acontece, não onde se configura.
     const item = page.getByRole("link", { name: "Agenda", exact: true }).first();
     await expect(item).toBeVisible({ timeout: ESPERA });

@@ -8,8 +8,13 @@
  *
  * Esta spec dirige a TELA: abre a conversa, usa o seletor "Etapa do funil" do
  * bloco "Leads recentes" e prova no banco que o negócio mudou de etapa pelo MESMO
- * caminho do quadro (atividade `stage_changed` gravada). Etapa de perda não é
- * oferecida — ela pede motivo, e esse diálogo mora no quadro.
+ * caminho do quadro (atividade `stage_changed` gravada).
+ *
+ * Atualizada com o painel em abas (visual v2, 3.3): o seletor mora na aba
+ * Negócios. E alinhada ao seletor do FORK (`SeletorDeEtapa`), que é o que a tela
+ * desenha desde a v1.69: ele move por `/api/v1/leads/:id/move` (não pelo
+ * `/bulk` do upstream) e OFERECE a etapa de perda, que abre a janela que exige o
+ * motivo (guardado em tests/unit/etapa-pela-conversa.test.tsx).
  */
 import { randomInt, randomUUID } from "node:crypto";
 
@@ -114,6 +119,7 @@ test.describe("Etapa do negócio pela conversa", () => {
     await abreConversa(page, conversaId);
     await expect(page.getByText(`Cliente Etapa ${SUFIXO}`).first()).toBeVisible({ timeout: 60_000 });
 
+    await page.getByRole("tab", { name: "Negócios" }).click();
     const bloco = page.locator('[data-testid="inbox-etapa-do-negocio"]');
     await expect(bloco).toBeVisible({ timeout: 30_000 });
     const seletor = bloco.getByTestId("inbox-etapa-select");
@@ -123,15 +129,15 @@ test.describe("Etapa do negócio pela conversa", () => {
     await seletor.click();
     const opcoes = page.getByRole("option");
     await expect(opcoes.filter({ hasText: "Pedido confirmado" })).toBeVisible();
-    // Perda pede motivo: fica no quadro, não aqui.
-    await expect(opcoes.filter({ hasText: "Cancelado" })).toHaveCount(0);
+    // Perda é oferecida, mas não move: abre a janela que pede o motivo.
+    await expect(opcoes.filter({ hasText: "Cancelado" })).toHaveCount(1);
     registra(`etapa · opções = ${JSON.stringify(await opcoes.allInnerTexts())}`);
     await captura(page, "etapa-02-opcoes");
 
-    const resposta = page.waitForResponse((r) => r.url().includes("/api/v1/leads/bulk") && r.request().method() === "POST");
+    const resposta = page.waitForResponse((r) => r.url().includes(`/api/v1/leads/${leadId}/move`) && r.request().method() === "POST");
     await opcoes.filter({ hasText: "Pedido confirmado" }).click();
     const r = await resposta;
-    registra(`etapa · POST /api/v1/leads/bulk = ${r.status()}`);
+    registra(`etapa · POST /api/v1/leads/:id/move = ${r.status()}`);
     expect(r.status()).toBe(200);
 
     await expect

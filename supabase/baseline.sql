@@ -1506,7 +1506,6 @@ CREATE TABLE IF NOT EXISTS "public"."crm_leads" (
     "created_by_user_id" "uuid",
     CONSTRAINT "crm_leads_closed_at_consistency" CHECK (((("status" = 'open'::"text") AND ("closed_at" IS NULL)) OR (("status" = ANY (ARRAY['won'::"text", 'lost'::"text"])) AND ("closed_at" IS NOT NULL)))),
     CONSTRAINT "crm_leads_currency_iso" CHECK ((("currency" IS NULL) OR ("currency" ~ '^[A-Z]{3}$'::"text"))),
-    CONSTRAINT "crm_leads_lost_reason_required" CHECK ((("status" <> 'lost'::"text") OR (("lost_reason" IS NOT NULL) AND ("length"("lost_reason") > 0)))),
     CONSTRAINT "crm_leads_status_enum" CHECK (("status" = ANY (ARRAY['open'::"text", 'won'::"text", 'lost'::"text"])))
 );
 
@@ -3075,7 +3074,7 @@ CREATE OR REPLACE TRIGGER "trg_validate_activity_lead_org" BEFORE INSERT ON "pub
 
 
 
-CREATE OR REPLACE TRIGGER "trg_validate_lost_reason_required" BEFORE INSERT OR UPDATE OF "status", "lost_reason" ON "public"."crm_leads" FOR EACH ROW EXECUTE FUNCTION "public"."fn_validate_lost_reason_required"();
+CREATE OR REPLACE TRIGGER "trg_validate_lost_reason_required" BEFORE INSERT OR UPDATE OF "status", "lost_reason", "stage_id", "pipeline_id" ON "public"."crm_leads" FOR EACH ROW EXECUTE FUNCTION "public"."fn_validate_lost_reason_required"();
 
 
 
@@ -4488,9 +4487,9 @@ GRANT ALL ON FUNCTION "public"."fn_validate_activity_lead_org"() TO "service_rol
 
 
 
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "anon";
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."fn_validate_lost_reason_required"() FROM "public", "anon";
+GRANT EXECUTE ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."fn_validate_lost_reason_required"() TO "service_role";
 
 
 
@@ -10161,6 +10160,11 @@ alter table public.agent_inbox_items
     -- lista pelas razões de sempre (#159; a janela do `midia-nao-lida.test.ts`).
     'jev_pedido_de_humano',
     'jev_parar_de_receber',
+    -- (migration 9043) A tarefa chegou na hora: o cron `task-due-reminder`
+    -- avisa o RESPONSÁVEL (Central + push só para ele). Kind próprio, e não
+    -- `other`, porque o rótulo de `other` é "Aviso do assistente" — falso para
+    -- uma tarefa que uma pessoa marcou. NESTA lista pelas razões de sempre (#159).
+    'task_due',
     'other'
   ));
 
@@ -27252,26 +27256,33 @@ declare
   v_canonical text[] := array['requested_by_customer','price','no_response','product_unavailable',
                               'cancelled_by_store','cancelled_by_customer','payment_failed','other',
                               'moved_to_another_pipeline'];
-  v_pipeline_extra text[];
+  v_pipeline_extra text[] := '{}'::text[];
+  v_required boolean := true;
 begin
   if new.status = 'lost' then
-    if new.lost_reason is null or length(new.lost_reason) = 0 then
-      raise exception 'lost_reason_required' using errcode = '22023';
-    end if;
-
     -- #1537: `settings.lost_reasons` aceita texto puro E `{ label, categoria }`.
     -- O que o trigger compara é o RÓTULO nos dois formatos: `jsonb_array_elements_text`
     -- de um objeto devolveria o JSON inteiro e recusaria com 22023 um motivo que
     -- a própria tela acabou de oferecer. `#>> '{}'` desembrulha o string.
-    select coalesce(
-      array(
-        select case when jsonb_typeof(e) = 'object'
-                    then nullif(e ->> 'label', '')
-                    else nullif(e #>> '{}', '') end
-          from jsonb_array_elements(settings->'lost_reasons') as t(e)
-      ), '{}'::text[]
-    ) into v_pipeline_extra
-    from public.crm_pipelines where id = new.pipeline_id;
+    select
+      coalesce(settings->'lost_reason_required' <> 'false'::jsonb, true),
+      coalesce(
+        array(
+          select case when jsonb_typeof(e) = 'object'
+                      then nullif(e ->> 'label', '')
+                      else nullif(e #>> '{}', '') end
+            from jsonb_array_elements(settings->'lost_reasons') as t(e)
+        ), '{}'::text[]
+      )
+      into v_required, v_pipeline_extra
+      from public.crm_pipelines where id = new.pipeline_id;
+
+    if new.lost_reason is null or length(btrim(new.lost_reason)) = 0 then
+      if v_required then
+        raise exception 'lost_reason_required' using errcode = '22023';
+      end if;
+      return new;
+    end if;
 
     if not (new.lost_reason = any (v_canonical) or new.lost_reason = any (v_pipeline_extra)) then
       raise exception 'lost_reason_invalid: %', new.lost_reason using errcode = '22023';
@@ -40302,6 +40313,25 @@ alter table public.crm_tasks
 comment on column public.crm_tasks.source_kind is
   'De onde a tarefa nasceu (ex.: promised_proposal). NULL = criada à mão. Vocabulário aberto — TypeScript, sem CHECK.';
 
+-- ---- o responsável é avisado na hora da tarefa (migration 9043) ----
+--
+-- `crm_tasks.reminded_at`: quando o cron `task-due-reminder` avisou o
+-- responsável (Central de avisos + push do navegador). Nula = ainda não avisou;
+-- reagendar (PATCH com `due_date`) zera. O cron reivindica cada tarefa com
+-- UPDATE condicional em `reminded_at is null`, então duas réplicas nunca avisam
+-- duas vezes. O índice parcial cobre exatamente a varredura de cada minuto. O
+-- kind `task_due` entrou no bloco ÚNICO de `agent_inbox_items_kind_check` (o da
+-- 0105), não aqui. Racional inteiro no cabeçalho da migration. Idempotente.
+alter table public.crm_tasks
+  add column if not exists reminded_at timestamptz;
+comment on column public.crm_tasks.reminded_at is
+  'Quando o responsável foi avisado do prazo (Central + push, cron task-due-reminder). NULL = ainda não avisou. Reagendar (PATCH due_date) zera. Migration 9043.';
+create index if not exists crm_tasks_a_avisar_idx
+  on public.crm_tasks (due_date)
+  where reminded_at is null
+    and due_date is not null
+    and status in ('pending', 'in_progress');
+
 -- ---- a proposta não aponta para outra organização (migration 0465) ----
 create or replace function public.fn_verificar_org_da_proposta()
 returns trigger
@@ -47106,6 +47136,93 @@ do $rls9028$ begin
     );
 end $rls9028$;
 
+-- ---- fixar, silenciar e marcar como não lida valem POR ATENDENTE (migration 9042) ----
+--
+-- Uma linha por (conversa, pessoa); cada um lê e grava só as próprias linhas, só
+-- em organização de que é membro ativo e só em conversa que enxerga. Viewer
+-- grava (preferência pessoal); suporte somente leitura não: as travas
+-- `support_write_*` desta tabela vêm da chamada de `fn_aplicar_travas_de_suporte()`
+-- mais abaixo, que alcança toda tabela gravável por `authenticated`.
+--
+-- POR QUE AQUI, antes do bloco da 9029 e não no fim: o bloco da 9029, logo
+-- abaixo, define `fn_contagens_da_caixa`, que desde a 9042 lê esta tabela, e
+-- função `language sql` valida o corpo ao ser criada. Tabela depois da função
+-- quebraria o install (relation does not exist). Ver o cabeçalho da 9042.
+-- Idempotente: create if not exists, policies em drop/create, grants reaplicam.
+create table if not exists public.conversation_user_state (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  pinned_at timestamptz,
+  muted_until timestamptz,
+  marked_unread_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (conversation_id, user_id)
+);
+
+comment on table public.conversation_user_state is
+  'Preferências de CADA pessoa sobre uma conversa (migration 9042): fixar, silenciar e marcar como não lida. Uma linha por (conversa, pessoa); sem linha = nada. Cada um lê e grava só as próprias linhas.';
+
+-- A lista pergunta "quais conversas EU fixei nesta organização".
+create index if not exists conversation_user_state_lista_idx
+  on public.conversation_user_state (user_id, organization_id, pinned_at);
+
+alter table public.conversation_user_state enable row level security;
+
+drop policy if exists conversation_user_state_select on public.conversation_user_state;
+create policy conversation_user_state_select on public.conversation_user_state
+  for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  );
+
+drop policy if exists conversation_user_state_insert on public.conversation_user_state;
+create policy conversation_user_state_insert on public.conversation_user_state
+  for insert to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+    and exists (
+      select 1 from public.conversations c
+       where c.id = conversation_user_state.conversation_id
+         and c.organization_id = conversation_user_state.organization_id
+    )
+  );
+
+drop policy if exists conversation_user_state_update on public.conversation_user_state;
+create policy conversation_user_state_update on public.conversation_user_state
+  for update to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  )
+  with check (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+    and exists (
+      select 1 from public.conversations c
+       where c.id = conversation_user_state.conversation_id
+         and c.organization_id = conversation_user_state.organization_id
+    )
+  );
+
+drop policy if exists conversation_user_state_delete on public.conversation_user_state;
+create policy conversation_user_state_delete on public.conversation_user_state
+  for delete to authenticated
+  using (
+    user_id = (select auth.uid())
+    and organization_id in (select public.fn_user_org_ids())
+  );
+
+revoke all on table public.conversation_user_state from anon, authenticated;
+grant select, insert, update, delete on table public.conversation_user_state to authenticated;
+grant all on table public.conversation_user_state to service_role;
+
+-- A trava de organização (9031) desta tabela vem do laço do FIM do arquivo,
+-- que alcança toda tabela com organization_id; a função dela nasce abaixo.
+
+
 -- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
 --
 -- Uma varredura de conversations devolve as seis contagens das abas
@@ -47144,7 +47261,17 @@ as $$
      where c.organization_id = p_organizacao
        and (p_canal is null or c.channel_session_id = p_canal)
        and (p_entrada is null or c.instagram_entrada = p_entrada)
-       and (not coalesce(p_so_nao_lidas, false) or c.unread_count_for_assignee > 0)
+       and (
+         not coalesce(p_so_nao_lidas, false)
+         or c.unread_count_for_assignee > 0
+         -- 9042: a conversa que ESTA pessoa marcou como não lida.
+         or exists (
+           select 1 from public.conversation_user_state s
+            where s.conversation_id = c.id
+              and s.user_id = (select auth.uid())
+              and s.marked_unread_at is not null
+         )
+       )
        and (
          coalesce(cardinality(p_marcadores), 0) = 0
          or case
@@ -47167,7 +47294,7 @@ as $$
 $$;
 
 comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro.';
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida.';
 
 revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) from public, anon;
 grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) to authenticated, service_role;
@@ -48044,6 +48171,263 @@ update public.crm_leads
    set fechado_alguma_vez_em = coalesce(closed_at, updated_at)
  where status in ('won', 'lost')
    and fechado_alguma_vez_em is null;
+
+-- ---- etiquetas da conversa por delta (migration 9045) ----
+--
+-- O PATCH da conversa e a `crm_manage_tags` gravavam a lista inteira de
+-- etiquetas e quem gravava por último vencia (achado do @Cassio_SecRev). As duas
+-- portas (sessão e serviço) aplicam acrescentar/remover sobre o valor ATUAL,
+-- com a linha travada, pelo mesmo núcleo. Cabeçalho completo na migration.
+-- Prova: tests/invariants/tags-da-conversa-por-delta-9045.test.ts.
+create or replace function public.fn_conversa_tags_aplicar(
+  p_tags text[],
+  p_adicionar text[],
+  p_remover text[]
+)
+returns text[]
+language sql
+immutable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select coalesce(array_agg(n.tag order by n.ord), '{}'::text[])
+  from (
+    select distinct on (s.tag) s.tag, s.ord
+    from (
+      select lower(btrim(e.valor)) as tag, e.ord
+      from unnest(coalesce(p_tags, '{}'::text[]) || coalesce(p_adicionar, '{}'::text[]))
+           with ordinality as e(valor, ord)
+      where btrim(coalesce(e.valor, '')) <> ''
+    ) s
+    -- Só sai o que CASA com a remoção (LRN da 9038). `array_remove(..., null)`:
+    -- um nulo em `= any` daria NULO e derrubaria a linha toda.
+    where not (s.tag = any (array_remove(
+      array(select lower(btrim(r)) from unnest(coalesce(p_remover, '{}'::text[])) as r),
+      null)))
+    order by s.tag, s.ord
+  ) as n;
+$$;
+
+revoke execute on function public.fn_conversa_tags_aplicar(text[], text[], text[]) from public, anon, authenticated;
+
+-- O NÚCLEO das duas portas. Invoker e revogado de todos: só roda de dentro das
+-- duas definers abaixo, como o dono.
+create or replace function public.fn_conversa_tags_gravar(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[],
+  p_remover text[],
+  p_da_sessao boolean
+)
+returns text[]
+language plpgsql
+volatile
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_add    text[];
+  v_rem    text[];
+  v_cru    text[];
+  v_antes  text[];
+  v_depois text[];
+begin
+  v_add := array(select distinct lower(btrim(x)) from unnest(coalesce(p_adicionar, '{}'::text[])) as x
+                  where btrim(coalesce(x, '')) <> '');
+  v_rem := array(select distinct lower(btrim(x)) from unnest(coalesce(p_remover, '{}'::text[])) as x
+                  where btrim(coalesce(x, '')) <> '');
+
+  if cardinality(v_add) + cardinality(v_rem) = 0
+     or cardinality(v_add) > 20 or cardinality(v_rem) > 20
+     or exists (select 1 from unnest(v_add || v_rem) as t where length(t) > 40)
+     or v_add && v_rem then
+    raise exception 'tags_delta_invalido' using errcode = '22023';
+  end if;
+
+  perform public.fn_tags_reserva(p_org, 'conversa', v_add || v_rem);
+
+  -- A trava da linha é o que serializa duas alterações concorrentes. Pela
+  -- sessão, o `where` de visibilidade é o da policy `conversations_select`
+  -- (9027), menos os ramos de platform admin e viewer, que a guarda já recusou.
+  -- Pelo serviço, só a organização.
+  select c.tags into v_cru
+    from public.conversations c
+   where c.id = p_conversa
+     and c.organization_id = p_org
+     and (
+       not p_da_sessao
+       or c.organization_id in (
+         select e.organization_id from public.fn_escopo_orgs() e
+          where e.papel in ('manager', 'admin') or (e.papel = 'agent' and e.modo = 'all'))
+       or (c.assigned_to_user_id = auth.uid()
+           and c.organization_id in (
+             select e.organization_id from public.fn_escopo_orgs() e where e.papel = 'agent'))
+       or (c.assigned_to_user_id is null
+           and c.organization_id in (
+             select e.organization_id from public.fn_escopo_orgs() e
+              where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+     )
+   for no key update;
+  if not found then
+    raise exception 'conversa_nao_encontrada' using errcode = 'P0002';
+  end if;
+
+  -- O teto compara com a lista atual JÁ normalizada: a crua de uma conversa
+  -- legada pode ter `VIP` e `vip`, que viram uma etiqueta só.
+  v_antes  := public.fn_conversa_tags_aplicar(v_cru, '{}'::text[], '{}'::text[]);
+  v_depois := public.fn_conversa_tags_aplicar(v_antes, v_add, v_rem);
+  if cardinality(v_depois) > 20 and cardinality(v_depois) > cardinality(v_antes) then
+    raise exception 'tags_limite' using errcode = '23514';
+  end if;
+
+  if v_depois is distinct from coalesce(v_cru, '{}'::text[]) then
+    -- Calculado de novo sobre `c.tags` dentro do UPDATE: com a linha travada é o
+    -- mesmo valor, e o UPDATE nunca grava uma lista lida antes.
+    update public.conversations c
+       set tags = public.fn_conversa_tags_aplicar(c.tags, v_add, v_rem)
+     where c.id = p_conversa
+       and c.organization_id = p_org
+    returning c.tags into v_depois;
+  end if;
+
+  return v_depois;
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_gravar(uuid, uuid, text[], text[], boolean)
+  from public, anon, authenticated, service_role;
+
+-- Porta da SESSÃO (PATCH da conversa).
+create or replace function public.fn_conversa_tags_alterar(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[] default '{}'::text[],
+  p_remover text[] default '{}'::text[]
+)
+returns text[]
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public.fn_tags_guarda(p_org, 'agent');
+  return public.fn_conversa_tags_gravar(p_org, p_conversa, p_adicionar, p_remover, true);
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_alterar(uuid, uuid, text[], text[]) from public, anon, service_role;
+grant  execute on function public.fn_conversa_tags_alterar(uuid, uuid, text[], text[]) to authenticated;
+
+-- Porta do SERVIÇO (`crm_manage_tags`, MCP com client de service role).
+create or replace function public.fn_conversa_tags_alterar_servico(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[] default '{}'::text[],
+  p_remover text[] default '{}'::text[]
+)
+returns text[]
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_org is null or p_conversa is null then
+    raise exception 'conversa_nao_encontrada' using errcode = 'P0002';
+  end if;
+  -- A conversa tem de ser de `p_org`: o núcleo filtra por organização e recusa
+  -- com P0002 a de outra, sem tocar nela.
+  return public.fn_conversa_tags_gravar(p_org, p_conversa, p_adicionar, p_remover, false);
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_alterar_servico(uuid, uuid, text[], text[]) from public, anon, authenticated;
+grant  execute on function public.fn_conversa_tags_alterar_servico(uuid, uuid, text[], text[]) to service_role;
+
+-- ---- o contato ganha OBSERVAÇÕES, e a anonimização as apaga (migration 9041) ----
+--
+-- `contacts.observacoes` (text, nula), o CHECK de até 4000 caracteres e sem
+-- texto só de espaços (`NOT VALID`: a coluna nasce vazia; vale para toda escrita
+-- daqui em diante) e a trigger que a apaga quando `is_anonymized` vira true, no
+-- desenho de `trg_contacts_anonimizado_limpa_custom_fields` (0211, acima). RLS e
+-- grants de `contacts` não mudam (policies por comando da 9030). Ver o cabeçalho
+-- da migration. Idempotente: coluna e CHECK com guarda, função
+-- `create or replace`, trigger com `drop if exists`.
+-- Prova: tests/invariants/obs-do-contato-9041.test.ts.
+alter table public.contacts add column if not exists observacoes text;
+
+comment on column public.contacts.observacoes is
+  'Observações livres da equipe sobre o contato (até 4000 caracteres; null = sem observação). Escrita pelo PATCH /api/v1/contacts/[id], agent+; o audit guarda só que mudou. Apagada na anonimização (trg_contacts_anonimizado_limpa_observacoes). Migration 9041.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'contacts_observacoes_tamanho'
+       and conrelid = 'public.contacts'::regclass
+  ) then
+    alter table public.contacts
+      add constraint contacts_observacoes_tamanho
+      check (observacoes is null or (char_length(observacoes) <= 4000 and btrim(observacoes) <> ''))
+      not valid;
+  end if;
+end $$;
+
+create or replace function public.fn_contato_anonimizado_limpa_observacoes()
+  returns trigger
+  language plpgsql
+  set search_path = public, pg_temp
+as $$
+begin
+  -- Anonimização é irreversível (L-04): não há o que preservar aqui.
+  new.observacoes := null;
+  return new;
+end$$;
+
+revoke all on function public.fn_contato_anonimizado_limpa_observacoes() from public, anon, authenticated;
+
+drop trigger if exists trg_contacts_anonimizado_limpa_observacoes on public.contacts;
+create trigger trg_contacts_anonimizado_limpa_observacoes
+  before update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized = true and coalesce(old.is_anonymized, false) = false)
+  execute function public.fn_contato_anonimizado_limpa_observacoes();
+
+-- Fusão de contatos: o principal mantém a PRÓPRIA observação e, só quando não
+-- tem nenhuma, herda a do absorvido (sem concatenar). Por trigger no FATO
+-- (`is_merged_into` saiu de null), e não reescrevendo `fn_mesclar_contatos`
+-- (300 linhas, remendada por âncora na 9010): qualquer porta que mescle herda.
+-- Com vários absorvidos, o primeiro que o UPDATE da fusão alcança e tem
+-- observação vence; os demais encontram o principal já preenchido.
+-- O absorvido fica SEM observação, herdada ou não (P2 do @Cassio_SecRev): a
+-- anonimização do principal não alcança as lápides (`is_merged_into`), então
+-- uma cópia ali sobreviveria ao "esquecer" do titular. BEFORE para zerar a
+-- própria linha sem um segundo UPDATE.
+create or replace function public.fn_fusao_herda_observacoes()
+  returns trigger
+  language plpgsql
+  set search_path = public, pg_temp
+as $$
+begin
+  update public.contacts c
+     set observacoes = new.observacoes
+   where c.id = new.is_merged_into
+     and c.organization_id = new.organization_id
+     and c.observacoes is null
+     and c.is_anonymized = false;
+  new.observacoes := null;
+  return new;
+end$$;
+
+revoke all on function public.fn_fusao_herda_observacoes() from public, anon, authenticated;
+
+drop trigger if exists trg_contacts_fusao_herda_observacoes on public.contacts;
+create trigger trg_contacts_fusao_herda_observacoes
+  before update of is_merged_into on public.contacts
+  for each row
+  when (old.is_merged_into is null and new.is_merged_into is not null and new.observacoes is not null)
+  execute function public.fn_fusao_herda_observacoes();
 
 notify pgrst, 'reload schema';
 

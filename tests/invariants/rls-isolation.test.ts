@@ -564,6 +564,13 @@ beforeAll(() => {
         insert into public.modulos_liberados_por_empresa (organization_id, modulo)
           values (v_org, 'prospeccao')
           on conflict (organization_id, modulo) do nothing;
+        -- migration 9042 (Tektus): a preferência PESSOAL do usuário semeado da
+        -- org (fixar). A linha é dele, então ele é o controle positivo.
+        insert into public.conversation_user_state (organization_id, conversation_id, user_id, pinned_at)
+          values (v_org, v_conv,
+                  case when v_org = '${ORG_A}'::uuid then '${USER_A}'::uuid else '${USER_B}'::uuid end,
+                  now())
+          on conflict (conversation_id, user_id) do nothing;
       end loop;
     end
     $seed$;
@@ -734,6 +741,10 @@ export const TABLES = [
   // no MESMO commit da migration, como a nota acima exige. A escrita negada a
   // `authenticated` (só SELECT concedido) foi medida em Postgres 17 na PR.
   "modulos_liberados_por_empresa",
+  // migration 9042 (Tektus) — fixar/silenciar/não lida POR ATENDENTE. A linha
+  // semeada é do próprio usuário de cada org; ler a do vizinho (e a do colega
+  // da mesma org) é medido em tests/invariants/estado-por-atendente-9042.test.ts.
+  "conversation_user_state",
 ] as const;
 
 describe("RLS tenant isolation (fn_user_org_ids pattern)", () => {

@@ -171,6 +171,11 @@ describe("pipelineConfigPatchSchema — reabertura (#1538)", () => {
 });
 
 describe("pipelineConfigPatchSchema — motivos de perda com categoria (#1537)", () => {
+  it("aceita ligar e desligar a obrigatoriedade do motivo", () => {
+    expect(pipelineConfigPatchSchema.safeParse({ lost_reason_required: true }).success).toBe(true);
+    expect(pipelineConfigPatchSchema.safeParse({ lost_reason_required: false }).success).toBe(true);
+  });
+
   it("continua aceitando lost_reasons só de texto — nenhum funil migra dado", () => {
     const r = pipelineConfigPatchSchema.safeParse({ lost_reasons: ["Preço", "Sem perfil"] });
     expect(r.success).toBe(true);

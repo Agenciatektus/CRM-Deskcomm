@@ -370,6 +370,15 @@ export const AUDIT_ACTIONS = [
   // ficava invisível (o ERP sugeriu, o atendente decidiu).
   "conversation.draft_created",
   "conversation.draft_used",
+  // ─── DIVERGÊNCIA TEKTUS — estado da conversa POR ATENDENTE (migration 9042) ──
+  // Preferências pessoais (fixar, silenciar, marcar como não lida). Auditadas
+  // como toda mutação da API; o metadata leva só o campo que mudou.
+  "conversation.pinned",
+  "conversation.unpinned",
+  "conversation.muted",
+  "conversation.unmuted",
+  "conversation.marked_unread",
+  "conversation.unmarked_unread",
   "ai.case_replied",
   // O agente participando do chamado — separado de `ai.case_replied` (a pessoa
   // respondendo) porque juntar os dois apagaria justamente quem agiu.
@@ -695,6 +704,8 @@ export const AUDIT_ACTIONS = [
   "crm_task.created",
   "crm_task.updated",
   "crm_task.deleted",
+  // A rodada do cron `task-due-reminder` que avisou alguém (migration 9043).
+  "crm_task.aviso_enviado",
 
   // A proposta comercial. Rascunho, edição, ajuste pelo assistente, envio e
   // decisão do cliente — cada um muda o que o negócio vale ou o que foi

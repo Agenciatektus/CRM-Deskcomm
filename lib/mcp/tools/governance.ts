@@ -16,6 +16,7 @@ import { audit } from "@/lib/audit";
 import { normalizarTags } from "@/lib/contacts/tag-normalizada";
 import { conversationTagSchema, conversationTagsSchema } from "@/lib/schemas/messaging";
 import { getQueueStatus } from "@/lib/routing/queue";
+import { alterarTagsDaConversaPeloServico } from "./_tags-da-conversa";
 import type { McpContext } from "../types";
 import type { McpToolDefinition } from "../types";
 
@@ -187,6 +188,32 @@ export const crmManageTags: McpToolDefinition<typeof tagsInputShape> = {
     const removeTags = new Set((input.remove ?? []).map((t) => conversationTagSchema.parse(t)));
     if (addTags.length === 0 && removeTags.size === 0) {
       throw new Error("informe ao menos uma tag em add ou remove");
+    }
+
+    // 9045: na CONVERSA, o delta vai para o banco, que aplica sobre o valor atual
+    // com a linha travada. Ler-montar-regravar aqui perdia a etiqueta que um
+    // humano pôs no meio (revisão do @Cassio_SecRev, P2). Contato e lead seguem
+    // o caminho antigo.
+    if (input.target_kind === "conversation") {
+      const nextTags = await alterarTagsDaConversaPeloServico(ctx, input.target_id, addTags, removeTags);
+      const a = actorAudit(ctx);
+      await audit({
+        action: TAG_AUDIT_ACTION.conversation,
+        actorUserId: a.actorUserId,
+        actorApiTokenId: ctx.apiTokenId,
+        organizationId: ctx.organizationId,
+        resourceType: "conversation",
+        resourceId: input.target_id,
+        requestId: ctx.requestId,
+        metadata: {
+          ...a.metadataActor,
+          tags_adicionar: addTags.filter((t) => !removeTags.has(t)),
+          tags_remover: [...removeTags],
+          tags: nextTags,
+          via: "mcp",
+        },
+      });
+      return { target_kind: input.target_kind, target_id: input.target_id, tags: nextTags };
     }
 
     const table = TAG_TARGET_TABLE[input.target_kind];

@@ -24,40 +24,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MessageBubble } from "./MessageBubble";
-import type { Message } from "@/lib/types/messaging";
-
-function msg(over: Partial<Message> = {}): Message {
-  return {
-    id: "m1",
-    organization_id: "org1",
-    conversation_id: "c1",
-    channel_session_id: "s1",
-    contact_id: "ct1",
-    external_id: null,
-    type: "text",
-    direction: "outbound",
-    status: "sent",
-    ack: null,
-    error_code: null,
-    error_message: null,
-    body: "corpo da mensagem",
-    media_url: null,
-    media_mime: null,
-    media_size_bytes: null,
-    media_storage_path: null,
-    sent_via: "user",
-    sent_by_user_id: null,
-    sent_at: "2026-09-08T12:00:00.000Z",
-    delivered_at: null,
-    read_at: null,
-    metadata: {},
-    edited_at: null,
-    revoked_at: null,
-    reply_to_message_id: null,
-    created_at: "2026-09-08T12:00:00.000Z",
-    ...over,
-  };
-}
+import { msg } from "./__fixtures__/mensagem";
 
 describe("MessageBubble — ações sobre mensagem própria", () => {
   it("edita texto recente e confirma a exclusão para todos", async () => {
@@ -135,7 +102,10 @@ describe("MessageBubble — ações sobre mensagem própria", () => {
     expect(screen.getByText("Esta mensagem foi apagada")).toBeInTheDocument();
     expect(screen.getByText("valor combinado")).toBeInTheDocument();
     expect(screen.getByText("Visível só aqui no CRM")).toBeInTheDocument();
-    expect(screen.getByTestId("message-bubble").className).toContain("opacity-70");
+    // A apagada é uma FORMA (contorno tracejado, sem fundo), não uma bolha
+    // esmaecida: o `opacity-70` de antes apagava também a cópia interna.
+    expect(screen.getByTestId("message-bubble")).toHaveAttribute("data-tom", "apagada");
+    expect(screen.getByTestId("message-bubble").className).toContain("border-dashed");
     rerender(<MessageBubble message={msg({ direction: "inbound", revoked_at: "2026-09-24T11:00:00Z", body: "texto do cliente" })} />);
     expect(screen.queryByText("texto do cliente")).not.toBeInTheDocument();
   });
@@ -282,99 +252,5 @@ describe("MessageBubble — rótulo de origem", () => {
       />,
     );
     expect(screen.getByText("Fulano")).toBeInTheDocument();
-  });
-});
-
-describe("MessageBubble — contenção de layout e quebra de palavras (#1451)", () => {
-  it("texto longo sem espaços (ex: chave Pix) tem quebra forçada wrap-anywhere e bolha tem min-w-0", () => {
-    const pixLongo =
-      "00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890520400005303986540510.005802BR5913TESTE TESTE6008BRASILIA62070503***6304ABCD";
-    const { container } = render(<MessageBubble message={msg({ body: pixLongo })} />);
-
-    const p = screen.getByText(pixLongo);
-    expect(p).toBeInTheDocument();
-    expect(p.className).toContain("wrap-anywhere");
-    // O Tailwind 4 gera `.break-words` (overflow-wrap: break-word) DEPOIS da
-    // classe arbitrária `[overflow-wrap:anywhere]`, com a mesma especificidade:
-    // juntas, vence o break-word e a quebra forçada fica sem efeito.
-    expect(p.className).not.toContain("break-words");
-
-    const bolha = p.closest(".max-w-\\[75\\%\\]");
-    expect(bolha).not.toBeNull();
-    expect(bolha?.className).toContain("min-w-0");
-
-    const linha = container.firstElementChild as HTMLElement;
-    expect(linha.className).toContain("min-w-0");
-  });
-});
-describe("pino compartilhado pelo cliente", () => {
-  it("vira cartão que abre o mapa, no lugar do link cru", () => {
-    render(
-      <MessageBubble
-        message={msg({
-          direction: "inbound",
-          sent_via: "external_device",
-          type: "location",
-          body: "📍 https://maps.google.com/?q=-25.33,-57.54",
-          metadata: { location: { latitude: -25.33, longitude: -57.54 } },
-        })}
-      />,
-    );
-    const link = screen.getByRole("link", { name: /Abrir no mapa/ });
-    expect(link.getAttribute("href")).toBe("https://maps.google.com/?q=-25.33,-57.54");
-    expect(link.getAttribute("target")).toBe("_blank");
-    expect(screen.queryByText("📍 https://maps.google.com/?q=-25.33,-57.54")).toBeNull();
-  });
-
-  it("sem coordenadas, o corpo aparece como sempre", () => {
-    render(<MessageBubble message={msg({ direction: "inbound", type: "location", body: "📍 Location" })} />);
-    expect(screen.getByText("📍 Location")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /Abrir no mapa/ })).toBeNull();
-  });
-});
-
-/**
- * O remetente de GRUPO, acima do balão recebido.
- *
- * `metadata.group_sender` só é lido por `lerRemetenteDeGrupo`
- * (`lib/messaging/remetente-de-grupo.ts`, Task 2) — este arquivo não conhece o
- * formato bruto, só o resultado da leitura. Sem o nome de quem mandou, uma
- * conversa de grupo lida no CRM mostra toda mensagem como se fosse da mesma
- * pessoa, e é exatamente o WhatsApp que não faz essa confusão.
- */
-describe("MessageBubble — remetente de grupo", () => {
-  it("mensagem de grupo mostra quem mandou acima do balão", () => {
-    render(
-      <MessageBubble
-        message={msg({
-          direction: "inbound",
-          body: "bom dia",
-          metadata: { group_sender: { name: "Maria", phone: "+5521999990000", lid: null } },
-        })}
-      />,
-    );
-    expect(screen.getByText("Maria · +5521999990000")).toBeInTheDocument();
-  });
-
-  it("mensagem individual não mostra remetente", () => {
-    render(
-      <MessageBubble message={msg({ direction: "inbound", body: "bom dia", metadata: {} })} />,
-    );
-    expect(screen.queryByText(/·/)).toBeNull();
-  });
-
-  it("mensagem outbound não mostra remetente de grupo mesmo com metadata presente", () => {
-    // `lerRemetenteDeGrupo` só é chamado para `inbound` no componente — uma
-    // mensagem que ESTE CRM mandou não tem "quem mandou" a descobrir.
-    render(
-      <MessageBubble
-        message={msg({
-          direction: "outbound",
-          body: "bom dia",
-          metadata: { group_sender: { name: "Maria", phone: "+5521999990000", lid: null } },
-        })}
-      />,
-    );
-    expect(screen.queryByText("Maria · +5521999990000")).toBeNull();
   });
 });

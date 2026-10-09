@@ -1,13 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/client";
-import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/hooks/i18n/useT";
-import { sugestaoParaMostrar } from "@/lib/agent-engine/agent/sugestao-de-resposta";
+
+import { useSugestaoDeResposta, type SugestaoDeResposta } from "./useSugestaoDeResposta";
+
 /**
  * Propostas com rótulo legível. A de mover etapa NÃO é aplicada por clique: a
  * pessoa move o card pelo painel do lead (decisão do assistido na cadência).
@@ -15,171 +13,76 @@ import { sugestaoParaMostrar } from "@/lib/agent-engine/agent/sugestao-de-respos
 const ROTULO_DA_PROPOSTA: Record<string, string> = {
   crm_move_lead_stage: "Mover o negócio de etapa (confirme pelo painel do lead)",
 };
-/**
- * Quando perguntar de novo pela sugestão.
- *
- * Antes: a cada 4 s, sempre, com a conversa aberta (15 pedidos por minuto
- * parada). A sugestão nasce por causa de uma MENSAGEM (o turno de entrada a
- * gera em segundo plano) e vira `stale` quando chega mensagem nova; então:
- * - mensagem nova nesta conversa (o realtime de mensagens refaz
- *   `["messages", id]`) pergunta na hora e liga a pergunta rápida por
- *   `JANELA_ACORDADA_MS`, o tempo de a sugestão terminar de ser gerada;
- * - sugestão em `generating` mantém a pergunta rápida até ela sair;
- * - fora disso, uma pergunta por minuto, de rede de segurança. Com a aba
- *   escondida o react-query não pergunta (`refetchIntervalInBackground` é
- *   `false` por padrão).
- */
-const RAPIDO_MS = 4_000;
-const SEGURANCA_MS = 60_000;
-const JANELA_ACORDADA_MS = 90_000;
 
-type Draft = {
-  id: string;
-  revision: string;
-  status: string;
-  original_body: string | null;
-  edited_body: string | null;
-  error_code: string | null;
-  proposals: Array<{ tool: string; arguments: unknown }>;
+const STATUSES: Record<string, string> = {
+  generating: "Preparando sugestão…",
+  pending: "Sugestão para revisar",
+  approved: "Resposta aprovada: aguardando envio",
+  sending: "Enviando resposta aprovada…",
+  sent: "Resposta aprovada enviada",
+  dismissed: "Sugestão rejeitada",
+  stale: "Sugestão obsoleta: a conversa mudou",
+  failed: "Não foi possível concluir a sugestão ou o envio",
 };
+
+/**
+ * O painel de revisão da sugestão do agente.
+ *
+ * Dois jeitos de montar, de propósito:
+ * - com `sugestao` (o composer): o estado vem de fora e o gatilho "Sugerir
+ *   resposta" é o chip da barra, então o painel só ocupa espaço quando há algo
+ *   para revisar ou um aviso a dar. Antes ele era uma caixa fixa acima de toda
+ *   resposta, mesmo vazia;
+ * - só com `conversationId` (uso isolado e testes): o painel tem estado próprio
+ *   e mostra o próprio botão, como sempre mostrou.
+ */
 export function ReplyReviewPanel({
   conversationId,
   disabled,
+  sugestao,
 }: {
-  conversationId: string;
+  conversationId?: string;
   disabled?: boolean;
+  sugestao?: SugestaoDeResposta;
 }) {
-  const t = useT(),
-    qc = useQueryClient(),
-    key = ["reply-drafts", conversationId];
-  const [acordada, setAcordada] = useState(false);
-  useEffect(() => {
-    let dormir: ReturnType<typeof setTimeout> | undefined;
-    const parar = qc.getQueryCache().subscribe((ev) => {
-      if (ev.type !== "updated" || ev.action.type !== "success") return;
-      const [raiz, id] = ev.query.queryKey;
-      if (raiz !== "messages" || id !== conversationId) return;
-      setAcordada(true);
-      clearTimeout(dormir);
-      dormir = setTimeout(() => setAcordada(false), JANELA_ACORDADA_MS);
-      void qc.invalidateQueries({ queryKey: ["reply-drafts", conversationId] });
-    });
-    return () => {
-      parar();
-      clearTimeout(dormir);
-    };
-  }, [qc, conversationId]);
-  const query = useQuery({
-    queryKey: key,
-    queryFn: () =>
-      apiClient.get<{ data: { drafts: Draft[] } }>(
-        `/api/v1/conversations/${conversationId}/draft-reply`,
-      ),
-    refetchInterval: (q) => {
-      const gerando = q.state.data?.data.drafts.some((d) => d.status === "generating");
-      return gerando || acordada ? RAPIDO_MS : SEGURANCA_MS;
-    },
-    retry: false,
-  });
-  const [edits, setEdits] = useState<Record<string, string>>({}),
-    [feedback, setFeedback] = useState(""),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState<{
-      draftId: string;
-      message: string;
-      kind: "success" | "error";
-    } | null>(null);
-  // Antes: `drafts[0]`, o mais recente, QUALQUER que fosse o estado dele — então
-  // uma sugestão rejeitada ficava na tela para sempre, sem botão de fechar.
-  const draft = sugestaoParaMostrar(query.data?.data.drafts);
-  const body = draft ? (edits[draft.id] ?? draft.edited_body ?? draft.original_body ?? "") : "";
-  async function generate() {
-    setNotice(null);
-    setBusy(true);
-    try {
-      await apiClient.post(`/api/v1/conversations/${conversationId}/draft-reply`, {});
-      await qc.invalidateQueries({ queryKey: key });
-    } catch (e) {
-      showApiError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function decide(action: "approve" | "reject") {
-    if (!draft) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      await apiClient.post(`/api/v1/ai/replies/${draft.id}`, {
-        action,
-        revision: draft.revision,
-        body,
-        feedback,
-      });
-      setNotice({
-        draftId: draft.id,
-        kind: "success",
-        message:
-          action === "approve"
-            ? t("Resposta aprovada. Acompanhe o envio aqui.")
-            : t("Sugestão rejeitada. O feedback será usado na próxima sugestão."),
-      });
-      await qc.invalidateQueries({ queryKey: key });
-    } catch (e) {
-      showApiError(e);
-      setNotice({
-        draftId: draft.id,
-        kind: "error",
-        message: t(
-          "Sua edição foi preservada. Confira se a conversa mudou antes de aprovar novamente.",
-        ),
-      });
-      await qc.invalidateQueries({ queryKey: key });
-    } finally {
-      setBusy(false);
-    }
-  }
-  const statuses: Record<string, string> = {
-    generating: "Preparando sugestão…",
-    pending: "Sugestão para revisar",
-    approved: "Resposta aprovada: aguardando envio",
-    sending: "Enviando resposta aprovada…",
-    sent: "Resposta aprovada enviada",
-    dismissed: "Sugestão rejeitada",
-    stale: "Sugestão obsoleta: a conversa mudou",
-    failed: "Não foi possível concluir a sugestão ou o envio",
-  };
+  if (sugestao) return <Painel s={sugestao} disabled={disabled} comBotao={false} />;
+  return <PainelProprio conversationId={conversationId ?? ""} disabled={disabled} />;
+}
+
+function PainelProprio({ conversationId, disabled }: { conversationId: string; disabled?: boolean }) {
+  const s = useSugestaoDeResposta(conversationId);
+  return <Painel s={s} disabled={disabled} comBotao />;
+}
+
+function Painel({ s, disabled, comBotao }: { s: SugestaoDeResposta; disabled?: boolean; comBotao: boolean }) {
+  const t = useT();
+  const { draft, body, notice, busy } = s;
+  if (!comBotao && !draft && !notice) return null;
   return (
     <section
-      className="mb-3 space-y-2 rounded-md border bg-muted/30 p-3"
+      className="mb-2 space-y-2 rounded-2xl border border-accent/30 bg-surface p-3 shadow-xs"
       aria-label={t("Assistência do agente")}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">
-          {t(draft ? (statuses[draft.status] ?? "Assistência do agente") : "Assistência do agente")}
+        <p className="text-sm font-semibold">
+          {t(draft ? (STATUSES[draft.status] ?? "Assistência do agente") : "Assistência do agente")}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || busy}
-          onClick={generate}
-        >
-          {t(busy ? "Preparando…" : "Sugerir resposta")}
-        </Button>
+        {comBotao && (
+          <Button type="button" variant="outline" size="sm" disabled={disabled || busy} onClick={s.generate}>
+            {t(busy ? "Preparando…" : "Sugerir resposta")}
+          </Button>
+        )}
       </div>
       {draft && (
         <>
           <p className="text-xs text-muted-foreground">
-            {t(
-              "Aprovar envia somente este texto. Não altera dados, agenda ou a autonomia do agente.",
-            )}
+            {t("Aprovar envia somente este texto. Não altera dados, agenda ou a autonomia do agente.")}
           </p>
           {body && (
             <Textarea
               aria-label={t("Resposta sugerida")}
               value={body}
-              onChange={(e) => setEdits({ ...edits, [draft.id]: e.target.value })}
+              onChange={(e) => s.setBody(e.target.value)}
               disabled={disabled || busy || draft.status !== "pending"}
               rows={3}
             />
@@ -200,54 +103,30 @@ export function ReplyReviewPanel({
               <Input
                 aria-label={t("Feedback para a próxima sugestão")}
                 placeholder={t("Feedback para a próxima sugestão")}
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
+                value={s.feedback}
+                onChange={(e) => s.setFeedback(e.target.value)}
                 maxLength={1000}
               />
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={disabled || busy || !body.trim()}
-                  onClick={() => decide("approve")}
-                >
+                <Button type="button" size="sm" disabled={disabled || busy || !body.trim()} onClick={() => s.decide("approve")}>
                   {t("Aprovar e enviar")}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={disabled || busy}
-                  onClick={() => decide("reject")}
-                >
+                <Button type="button" variant="outline" size="sm" disabled={disabled || busy} onClick={() => s.decide("reject")}>
                   {t("Rejeitar")}
                 </Button>
               </div>
             </>
           )}
           {draft.status === "failed" && (
-            <p className="text-xs">
-              {t("Confira a configuração do agente e tente gerar novamente.")}
-            </p>
+            <p className="text-xs">{t("Confira a configuração do agente e tente gerar novamente.")}</p>
           )}
         </>
       )}
-      {/*
-        A confirmação da rejeição ("o feedback será usado na próxima sugestão")
-        estava amarrada a `draft` existir. Agora a rejeitada some da tela — que é
-        o conserto —, e sem esta mudança a confirmação sumiria junto com ela: a
-        pessoa clicaria em Rejeitar e a tela apenas esvaziaria, sem dizer nada.
-        Quando ainda há sugestão, o aviso continua amarrado a ela.
-      */}
-      {notice &&
-        (!draft ||
-          (notice.draftId === draft.id &&
-            (notice.kind === "error" ||
-              ["approved", "sending", "sent", "dismissed"].includes(draft.status)))) && (
-          <p role="status" className="text-xs">
-            {notice.message}
-          </p>
-        )}
+      {notice && (
+        <p role="status" className="text-xs">
+          {notice.message}
+        </p>
+      )}
     </section>
   );
 }

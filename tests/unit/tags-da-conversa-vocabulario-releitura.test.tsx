@@ -41,7 +41,7 @@ describe("useUpdateConversationTags", () => {
   it("manda reler o vocabulário de tags da conversa depois de gravar", async () => {
     const { result } = renderHook(() => useUpdateConversationTags(), { wrapper });
 
-    await act(() => result.current.mutateAsync({ conversation_id: CONVERSA, tags: ["retorno"] }));
+    await act(() => result.current.mutateAsync({ conversation_id: CONVERSA, adicionar: ["retorno"] }));
 
     // Prefixo, sem o orgId: a chave real é ["conversation-tag-vocabulary", orgId].
     expect(invalidadas).toContainEqual(["conversation-tag-vocabulary"]);
@@ -50,7 +50,7 @@ describe("useUpdateConversationTags", () => {
   it("segue invalidando a lista e a conversa", async () => {
     const { result } = renderHook(() => useUpdateConversationTags(), { wrapper });
 
-    await act(() => result.current.mutateAsync({ conversation_id: CONVERSA, tags: ["retorno"] }));
+    await act(() => result.current.mutateAsync({ conversation_id: CONVERSA, adicionar: ["retorno"] }));
 
     expect(invalidadas).toContainEqual(["conversations"]);
     expect(invalidadas).toContainEqual(["conversation", CONVERSA]);

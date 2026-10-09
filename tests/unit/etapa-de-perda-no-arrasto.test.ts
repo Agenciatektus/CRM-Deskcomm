@@ -54,6 +54,7 @@ const RECUSA_DO_BANCO = {
 
 interface Estado {
   updates: Array<Record<string, unknown>>;
+  lostReasonRequired?: boolean;
 }
 
 function stub(estado: Estado) {
@@ -71,6 +72,15 @@ function stub(estado: Estado) {
               lost_reason: null,
               updated_at: UPDATED_AT,
               contact_id: "66666666-6666-4666-8666-666666666666",
+            },
+            error: null,
+          };
+        }
+        if (tabela === "crm_pipelines") {
+          return {
+            data: {
+              settings:
+                estado.lostReasonRequired === false ? { lost_reason_required: false } : {},
             },
             error: null,
           };
@@ -102,7 +112,7 @@ function stub(estado: Estado) {
             eq: () => ({
               select: () => ({
                 maybeSingle: async () =>
-                  payload.lost_reason
+                  payload.lost_reason || estado.lostReasonRequired === false
                     ? {
                         data: { id: LEAD_ID, stage_id: PERDIDO_ID, updated_at: UPDATED_AT },
                         error: null,
@@ -197,6 +207,20 @@ describe("arrastar o card para a etapa de perda sem motivo (#917)", () => {
     expect(estado.updates).toHaveLength(1);
     expect(estado.updates[0]).toMatchObject({ stage_id: PERDIDO_ID, lost_reason: "Cliente desistiu" });
     expect(res.status).toBe(200);
+  });
+
+  it("com a obrigação desligada no funil: move sem pedir motivo", async () => {
+    estado.lostReasonRequired = false;
+    sessao(estado);
+    const res = await POST(
+      pedido({ stage_id: PERDIDO_ID, position_in_stage: 1000, expected_updated_at: UPDATED_AT }),
+      { params: Promise.resolve({ id: LEAD_ID }) },
+    );
+
+    expect(res.status).toBe(200);
+    expect(estado.updates).toHaveLength(1);
+    expect(estado.updates[0]).toMatchObject({ stage_id: PERDIDO_ID });
+    expect(estado.updates[0]).not.toHaveProperty("lost_reason");
   });
 
   it("a saída que a recusa nomeia existe de verdade no menu do card", () => {

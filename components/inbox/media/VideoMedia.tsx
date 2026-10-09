@@ -29,7 +29,7 @@ export function VideoMedia({
   const { ref, visivel } = useAoAparecer<HTMLDivElement>();
 
   return (
-    <div ref={ref} className="relative w-full max-w-sm aspect-video overflow-hidden rounded-lg bg-black/5">
+    <div ref={ref} className="relative w-72 max-w-full aspect-video overflow-hidden rounded-xl bg-text/5">
       {failed ? (
         <MediaUnavailable kind="Vídeo" className="h-full w-full" />
       ) : (

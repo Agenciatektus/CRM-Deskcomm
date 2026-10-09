@@ -214,6 +214,27 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato · cor por pessoa (6 pares) -------------------
+   * Fundo claro + texto escuro do mesmo matiz, os `--av1..--av6` do protótipo
+   * da Inbox v2 convertidos de oklch para hex (a régua de contraste e os testes
+   * de tema leem hex). Contraste medido do texto sobre o fundo: 7,6:1 a 8,4:1
+   * nos dois temas (tests/unit/cor-do-avatar.test.ts refaz a conta).
+   * NÃO usa a accent: ela é a marca do revendedor e deixaria todo avatar da
+   * lista com a mesma cor. Qual par cada contato recebe sai de um hash estável
+   * do id (lib/inbox/cor-do-avatar.ts).
+   */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00484c;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -324,6 +345,19 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato (espelho do :root, mesma razão da agenda) ---- */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00484c;
 }
 
 [data-theme="dark"] {
@@ -424,6 +458,67 @@
   --agenda-pessoa-6: #6c97e7;
   --agenda-pessoa-7: #be9ef6;
   --agenda-pessoa-8: #cc77b1;
+  /* ---- Avatar do contato (escuro: fundo escuro, texto claro do matiz) -- */
+  --color-avatar-1: #5d2d2a;
+  --color-avatar-1-fg: #fed2cd;
+  --color-avatar-2: #4f3815;
+  --color-avatar-2-fg: #f3dab2;
+  --color-avatar-3: #194430;
+  --color-avatar-3-fg: #c2e9d3;
+  --color-avatar-4: #1c4159;
+  --color-avatar-4-fg: #c4e4f4;
+  --color-avatar-5: #43345c;
+  --color-avatar-5-fg: #e3d7fb;
+  --color-avatar-6: #134245;
+  --color-avatar-6-fg: #c0e7e8;
+}
+
+/* ── Gradiente do botão primário (só no tema escuro) ──────────────────────
+   O protótipo escuro pinta o botão principal com gradiente. Ele sai da marca
+   EM VIGOR, e não de um hex: com white-label, a instalação e a organização
+   trocam a rampa, e um gradiente fixo na Sage pintaria o botão de todo
+   revendedor com a cor do produto.
+
+   A REGRA QUE O DESENHO GARANTE: nenhum ponto do gradiente tem contraste com o
+   texto menor que o do próprio `--color-accent`, que é o par que a régua valida
+   (`--color-accent-fg` é CALCULADO contra ele, lib/branding/contraste.ts).
+
+   Por isso a segunda ponta NÃO é `--color-accent-hover` nem uma parada fixa:
+   o hover tem `contra: null` na régua (nunca é medido contra o texto), e uma
+   parada fixa não acompanha o deslocamento que a régua aplica à rampa da marca.
+   A ponta é o próprio accent misturado 30% com o extremo OPOSTO ao texto:
+   branco puro quando o texto é escuro, preto puro quando é branco. Misturar em
+   sRGB na direção do branco só sobe cada canal, e a luminância sobe junto (e
+   vice-versa para o preto), então a razão de contraste só pode crescer.
+   O extremo sai do próprio `--color-accent-fg`: `round(255 - canal, 255)`
+   arredonda o inverso de cada canal para 0 ou 255.
+
+   Medido (tests/unit/botao-primario-gradiente.test.ts refaz a conta):
+     Sage padrão, texto #161510: 6,31:1 no accent (#82a077) e 9,10:1 na ponta.
+     31 marcas das fixtures de contraste, nos dois temas: a ponta nunca fica
+     abaixo do accent.
+
+   Navegador sem sintaxe de cor relativa descarta o valor, o gradiente vira
+   `none` e fica o `bg-accent` chapado, que é o botão de antes.
+
+   Seletor `[data-theme="dark"] body`, e não o bloco `[data-theme="dark"]`:
+     - custom property com `var()` é resolvida ONDE é declarada. No `<html>`
+       ela congelaria a marca da instalação, e a marca da organização (que o
+       CSS injetado declara no `<body>`, `lib/branding/css.ts`) não chegaria ao
+       botão. No `<body>` ela já enxerga as duas.
+     - o bloco `[data-theme="dark"] {` tem espelho obrigatório no
+       `[data-theme="light"]` (tests/unit/branding-tema-claro-escopavel.test.ts)
+       e é lido pela régua de contraste; este token é só do escuro e não é cor. */
+[data-theme="dark"] body {
+  --gradient-primary-oposto: rgb(
+    from var(--color-accent-fg) round(calc(255 - r), 255) round(calc(255 - g), 255)
+      round(calc(255 - b), 255)
+  );
+  --gradient-primary: linear-gradient(
+    135deg,
+    var(--color-accent),
+    color-mix(in srgb, var(--color-accent) 70%, var(--gradient-primary-oposto))
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -506,6 +601,20 @@
   --color-info: var(--color-info);
   --color-info-bg: var(--color-info-bg);
   --color-info-fg: var(--color-info-fg);
+
+  /* Avatar do contato: fundo e texto de cada par (ver o :root). */
+  --color-avatar-1: var(--color-avatar-1);
+  --color-avatar-1-fg: var(--color-avatar-1-fg);
+  --color-avatar-2: var(--color-avatar-2);
+  --color-avatar-2-fg: var(--color-avatar-2-fg);
+  --color-avatar-3: var(--color-avatar-3);
+  --color-avatar-3-fg: var(--color-avatar-3-fg);
+  --color-avatar-4: var(--color-avatar-4);
+  --color-avatar-4-fg: var(--color-avatar-4-fg);
+  --color-avatar-5: var(--color-avatar-5);
+  --color-avatar-5-fg: var(--color-avatar-5-fg);
+  --color-avatar-6: var(--color-avatar-6);
+  --color-avatar-6-fg: var(--color-avatar-6-fg);
 
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
@@ -591,6 +700,18 @@
 }
 @utility duration-slow {
   transition-duration: var(--duration-slow);
+}
+
+/* Rolagem sem barra visível. Para faixas que PODEM transbordar só em telas
+   estreitas (o trilho de grupos, as abas do painel do lead): a barra fina de
+   rolagem horizontal aparecia embaixo delas mesmo quando sobravam poucos px,
+   e virava um risco cinza no meio da moldura. A rolagem continua funcionando
+   (roda, toque, teclado); só o desenho da barra some. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 
@@ -963,4 +1084,37 @@
     transition: none;
     transform: none;
   }
+}
+
+/* ---- Fundo do fio de mensagens (Inbox v2) -------------------------------
+   O protótipo escuro pinta a área da conversa com um brilho da marca no topo
+   e uma trama de pontos. Os dois saem de TOKEN, nunca de hex: o brilho mistura
+   a `--color-accent` em vigor (a marca do revendedor, injetada em runtime) e os
+   pontos misturam a cor do texto do tema, então claro e escuro saem do mesmo
+   bloco e nenhum revendedor herda a cor do produto.
+
+   Discreto de propósito: 10% de accent e 6% de texto. A bolha tem fundo
+   próprio, então a legibilidade da mensagem não depende deste fundo.
+
+   A trama mora no ELEMENTO QUE ROLA (`background-attachment: local`), e não
+   no container: assim os pontos andam junto com as mensagens virtualizadas em
+   vez de ficarem parados atrás delas, o que pareceria vidro sujo. */
+.fundo-do-fio {
+  background:
+    radial-gradient(
+      ellipse 80% 42% at 50% -12%,
+      color-mix(in srgb, var(--color-accent) 10%, transparent),
+      transparent 62%
+    ),
+    var(--color-bg);
+}
+
+.trama-do-fio {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 18px 18px;
+  background-attachment: local;
 }
