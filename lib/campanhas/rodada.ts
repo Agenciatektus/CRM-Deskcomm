@@ -114,12 +114,18 @@ interface CampanhaRow {
   /** Onde o card de quem foi abordado nasce (0378 + 9037). */
   pipeline_id: string | null;
   stage_id: string | null;
+  /**
+   * Modo de público CONTÍNUO (migration 9039). Aqui ela serve a UMA decisão: a
+   * campanha contínua não CONCLUI por fila vazia. Ver o bloco em
+   * `rodarUmaCampanha`.
+   */
+  entrada_continua: boolean;
 }
 
 const COLUNAS_DA_CAMPANHA =
   "id, organization_id, channel_session_id, name, message_body, message_variants, content_version, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario, " +
-  "followup_pointer_id, pipeline_id, stage_id";
+  "followup_pointer_id, pipeline_id, stage_id, entrada_continua";
 
 export async function rodarUmaRodadaDeCampanha(
   admin: SupabaseClient,
@@ -274,6 +280,28 @@ async function rodarUmaCampanha(
       .eq("campaign_id", campanha.id)
       .in("status", ["pending", "queued", "sending"]);
     if ((count ?? 0) > 0) return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: "aguardando" };
+
+    // ═══ A CAMPANHA CONTÍNUA NÃO CONCLUI POR FILA VAZIA (migration 9039) ═══
+    //
+    // Na campanha de lista, fila vazia significa "acabou": a lista era finita,
+    // foi inteira despachada, e `completed` é a verdade. Na contínua, fila vazia
+    // é o estado NORMAL — é como ela passa a maior parte do tempo, entre uma
+    // chegada na etapa e a seguinte. Concluir aqui encerraria a campanha no
+    // primeiro minuto depois do Iniciar, antes de o primeiro lead chegar, e o
+    // `completed` é TERMINAL: não há retomada, só duplicar.
+    //
+    // Então a contínua só sai de `running` por ato humano — Pausar (para de
+    // abordar gente nova, a régua de quem já foi abordado segue) ou Cancelar
+    // (que encerra as inscrições, `encerrarReguaDaCampanha`). Para ela,
+    // "acabou" se escreve `cancelled`, e isso é o que a tela mostra.
+    //
+    // O que isso muda no funil da tela: `snapshot_eligible` deixa de ser
+    // denominador e a barra de progresso perde sentido (fila sem fim não tem
+    // porcentagem). A tela de detalhe esconde a barra no modo contínuo e troca o
+    // número por "abordadas até agora" — ver `app/app/campaigns/[id]/_client.tsx`.
+    if (campanha.entrada_continua) {
+      return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: "aguardando_gatilho" };
+    }
 
     const { data } = await admin
       .from("campaigns")

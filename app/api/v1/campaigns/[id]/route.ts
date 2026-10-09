@@ -14,6 +14,7 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { carregarCampanha } from "@/lib/campanhas/acoes";
+import { problemaNaEntradaContinua } from "@/lib/campanhas/entrada-continua";
 import { ehEditavel, ehTerminal } from "@/lib/campanhas/maquina-de-estados";
 import { gravarPool, lerPoolExtra } from "@/lib/campanhas/pool-de-numeros";
 import { editarCampanhaSchema } from "@/lib/campanhas/schemas";
@@ -26,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 const COLUNAS =
   "id, name, description, status, channel_session_id, message_body, message_variants, " +
-  "passos, followup_pointer_id, base_legal, lia_ref, " +
+  "passos, followup_pointer_id, entrada_continua, entrada_etapa_id, base_legal, lia_ref, " +
   "audience_filter, audience_version, content_version, snapshot_total, snapshot_eligible, " +
   "snapshot_excluded, scheduled_at, prepared_at, started_at, paused_at, completed_at, " +
   "cancelled_at, failure_code, intervalo_segundos, janela_inicio_hora, janela_fim_hora, " +
@@ -152,6 +153,12 @@ export async function PATCH(
     // que a tela mostra — divergência da pior espécie, porque a tela continua
     // certa de si. Para mexer, volta-se ao rascunho, e preparar republica.
     "passos",
+    // O MODO DE PÚBLICO é CONTEÚDO (migration 9039), não ritmo: trocar a etapa
+    // que inicia a abordagem com a campanha andando mudaria para QUEM ela fala,
+    // e é exatamente essa escolha que o operador revisou antes de iniciar. Fica
+    // preso ao rascunho, como o texto e os passos.
+    "entrada_continua",
+    "entrada_etapa_id",
     "audience_filter",
     "intervalo_segundos",
     "janela_inicio_hora",
@@ -167,6 +174,39 @@ export async function PATCH(
   }
   if (entrada.base_legal !== undefined) mudanca.base_legal = entrada.base_legal;
   if (entrada.lia_ref !== undefined) mudanca.lia_ref = entrada.lia_ref;
+
+  // ═══ A CONTENÇÃO DO MODO CONTÍNUO NÃO SE DESFAZ COM A CAMPANHA EM PÉ ═══
+  //
+  // O ritmo é editável em qualquer estado vivo, e isso é deliberado — quem vê a
+  // campanha correndo rápido demais precisa poder desacelerá-la agora. Mas
+  // APAGAR o teto do dia ou a janela de uma campanha contínua em execução não é
+  // desacelerar: é remover a única contenção que ela tem, num modo em que
+  // ninguém revisa a lista. O CHECK `campaigns_entrada_continua_contida` já
+  // recusaria, com 23514 virando "internal_error" na tela; aqui a recusa chega
+  // com o motivo que o operador lê.
+  //
+  // Rascunho passa: ali a campanha pode estar incompleta (o CHECK o excetua), e
+  // quem cobra é o gate de `faltaParaEnviar` no Preparar.
+  const depois = {
+    entrada_continua: (mudanca.entrada_continua ?? campanha.entrada_continua) as boolean,
+    entrada_etapa_id: (mudanca.entrada_etapa_id ?? campanha.entrada_etapa_id) as string | null,
+    pipeline_id: (mudanca.pipeline_id ?? campanha.pipeline_id) as string | null,
+    teto_diario: (mudanca.teto_diario === undefined
+      ? campanha.teto_diario
+      : mudanca.teto_diario) as number | null,
+    janela_inicio_hora: (mudanca.janela_inicio_hora === undefined
+      ? campanha.janela_inicio_hora
+      : mudanca.janela_inicio_hora) as number | null,
+    janela_fim_hora: (mudanca.janela_fim_hora === undefined
+      ? campanha.janela_fim_hora
+      : mudanca.janela_fim_hora) as number | null,
+  };
+  if (!ehEditavel(campanha.status)) {
+    const daEntrada = problemaNaEntradaContinua(depois);
+    if (daEntrada) {
+      return fail("campanha_nao_editavel", t(daEntrada), 409, { requestId });
+    }
+  }
   // Mexer no TEXTO sobe a versão do conteúdo: é ela que o destinatário carrega,
   // e é por ela que se sabe se a mensagem preparada é a mensagem de hoje.
   // Mexer nas VARIAÇÕES também sobe a versão: elas são conteúdo tanto quanto o

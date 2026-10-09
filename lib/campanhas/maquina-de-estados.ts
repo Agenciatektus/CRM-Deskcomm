@@ -34,6 +34,18 @@ const PERMITIDO: Record<StatusDaCampanha, readonly StatusDaCampanha[]> = {
   // pessoa recebeu (o guarda de "já enviou" é do chamador, que vê os envios).
   ready: ["draft", "scheduled", "running", "cancelled"],
   scheduled: ["running", "paused", "cancelled"],
+  // ⚠️ `completed` é INALCANÇÁVEL para a campanha de ENTRADA CONTÍNUA (migration
+  // 9039), e a tabela não muda por isso. A transição continua existindo porque
+  // quem a dispara é a rodada, ao ver a fila vazia — e na contínua fila vazia é
+  // o estado NORMAL, não o fim: ela passa a maior parte do tempo assim, entre
+  // uma chegada na etapa e a próxima. Quem recusa é `rodarUmaCampanha`, que
+  // devolve `aguardando_gatilho` em vez de concluir. Modelar isso como transição
+  // proibida aqui exigiria que a máquina soubesse do modo de público, e ela é
+  // pura de propósito: o que ela guarda é a ORDEM dos estados, não quem os pede.
+  //
+  // A consequência que a tela carrega: para a campanha contínua "acabou" se
+  // escreve `cancelled` — o único terminal que ela alcança —, e `completed`
+  // segue significando exatamente o que sempre significou (a lista terminou).
   running: ["paused", "completed", "cancelled", "failed"],
   paused: ["running", "scheduled", "cancelled"],
   // Terminais de verdade: nada sai daqui. Para mandar de novo, duplica-se.
@@ -73,6 +85,18 @@ export function ehEditavel(status: StatusDaCampanha): boolean {
 export function ehTerminal(status: StatusDaCampanha): boolean {
   return PERMITIDO[status].length === 0;
 }
+
+/**
+ * Os estados TERMINAIS, como lista — para quem precisa do conjunto e não da
+ * pergunta (um predicado de consulta ao banco, por exemplo).
+ *
+ * DERIVADO de `PERMITIDO` por `ehTerminal`, nunca digitado: a tabela acima é a
+ * autoridade, e uma segunda lista de terminais divergiria no primeiro estado
+ * novo. Hoje são `completed` e `cancelled` — `failed` NÃO é terminal, ele volta
+ * a rascunho para conserto, e essa é justamente a distinção que uma lista escrita
+ * à mão erra.
+ */
+export const STATUS_TERMINAIS: readonly StatusDaCampanha[] = STATUS_DA_CAMPANHA.filter(ehTerminal);
 
 /** Só para teste e para a tela: o que sai de cada estado. */
 export function destinosDe(status: StatusDaCampanha): readonly StatusDaCampanha[] {
