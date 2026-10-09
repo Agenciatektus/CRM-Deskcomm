@@ -64,7 +64,8 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
     contactName,
     icon,
   });
-  const { sent } = await enviarPushDaOrg(row.organization_id, payload);
+  // 9042: quem silenciou a conversa não recebe (o filtro mora em `web_push`).
+  const { sent } = await enviarPushDaOrg(row.organization_id, payload, undefined, { conversationId });
   return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
 }
 
@@ -90,7 +91,8 @@ async function handleGroupInbound(row: EventRow): Promise<HandlerResult> {
     tag: conversationId ? `msg:${conversationId}` : "msg",
     href: conversationId ? `/app/inbox?id=${conversationId}` : "/app/inbox",
   };
-  const { sent } = await enviarPushDaOrg(row.organization_id, payload);
+  // 9042: quem silenciou a conversa não recebe (o filtro mora em `web_push`).
+  const { sent } = await enviarPushDaOrg(row.organization_id, payload, undefined, { conversationId });
   return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
 }
 

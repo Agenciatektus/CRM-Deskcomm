@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { conversaDeExemplo } from "@/components/inbox/__fixtures__/conversa";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 
-import { alternarEtiqueta, MAXIMO_DE_ETIQUETAS, regrasDoMenu } from "./menu-da-conversa";
+import { deltaDaEtiqueta, MAXIMO_DE_ETIQUETAS, regrasDoMenu } from "./menu-da-conversa";
 
 /**
  * As regras do menu da lista são as do cabeçalho. Cada caso aqui tem o par no
@@ -79,15 +79,15 @@ describe("regrasDoMenu", () => {
   });
 });
 
-describe("alternarEtiqueta", () => {
-  it("tira a que tem, põe a que falta", () => {
-    expect(alternarEtiqueta(["a", "b"], "a")).toEqual(["b"]);
-    expect(alternarEtiqueta(["a"], "b")).toEqual(["a", "b"]);
+describe("deltaDaEtiqueta (9045: só o que mudou, nunca a lista inteira)", () => {
+  it("tira a que tem, põe a que falta — e não carrega as outras", () => {
+    expect(deltaDaEtiqueta(["a", "b"], "a")).toEqual({ remover: ["a"] });
+    expect(deltaDaEtiqueta(["a"], "b")).toEqual({ adicionar: ["b"] });
   });
 
   it("no teto recusa acrescentar, mas deixa tirar", () => {
     const cheias = Array.from({ length: MAXIMO_DE_ETIQUETAS }, (_, i) => `t${i}`);
-    expect(alternarEtiqueta(cheias, "nova")).toBeNull();
-    expect(alternarEtiqueta(cheias, "t0")).toHaveLength(MAXIMO_DE_ETIQUETAS - 1);
+    expect(deltaDaEtiqueta(cheias, "nova")).toBeNull();
+    expect(deltaDaEtiqueta(cheias, "t0")).toEqual({ remover: ["t0"] });
   });
 });

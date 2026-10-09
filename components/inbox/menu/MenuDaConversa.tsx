@@ -39,7 +39,11 @@ interface Props {
 export function MenuDaConversa({ alvo, conversation, onFechar, meuUserId, automaticoDaOrg }: Props) {
   const { user } = useAuth();
   const podeEscrever = usePermission("inbox.claim");
-  const leitura = user.support?.access_mode === "support_readonly" || !podeEscrever;
+  const suporteSoLeitura = user.support?.access_mode === "support_readonly";
+  const leitura = suporteSoLeitura || !podeEscrever;
+  // 9042: fixar/silenciar/marcar são pessoais (viewer também); bloquear é agent+.
+  const podeEditarContato = usePermission("contact.update");
+  const pessoais = { podePreferir: !suporteSoLeitura, podeBloquear: !suporteSoLeitura && podeEditarContato };
   const [dialogo, setDialogo] = useState<DialogoDoMenu | null>(null);
   // Abrir uma janela a partir do menu: o foco vai para ela, não de volta à linha.
   const abrindoJanela = useRef(false);
@@ -63,6 +67,7 @@ export function MenuDaConversa({ alvo, conversation, onFechar, meuUserId, automa
           alvo={alvo}
           conversation={conversation}
           leitura={leitura}
+          pessoais={pessoais}
           meuUserId={meuUserId}
           automaticoDaOrg={automaticoDaOrg}
           onFechar={onFechar}

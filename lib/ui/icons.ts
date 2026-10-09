@@ -154,4 +154,8 @@ export {
   ArrowsLeftRight,
   Alarm,
   SidebarSimple,
+  // estado da conversa POR ATENDENTE (9042): fixar/desafixar e bloquear contato
+  PushPin,
+  PushPinSlash,
+  Prohibit,
 } from "@phosphor-icons/react/dist/ssr";

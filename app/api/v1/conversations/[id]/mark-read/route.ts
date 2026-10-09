@@ -11,6 +11,7 @@ import { type NextRequest } from "next/server";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { limparEstado } from "@/lib/inbox/estado-por-atendente.servidor";
 import { createClient } from "@/lib/supabase/server";
 
 import { markConversationReadHandler } from "../../_handler";
@@ -43,6 +44,14 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
       },
       id,
     );
+    // 9042: ler a conversa desfaz a marca "não lida" DE QUEM LEU (e só dela).
+    // Falha aqui não desfaz a leitura: o contador já zerou, e a marca some na
+    // próxima abertura.
+    await limparEstado(
+      supabase,
+      { orgId: authz.org.orgId, userId: authz.user.id, conversationId: id },
+      "marked_unread_at",
+    ).catch(() => undefined);
     return ok(conv, { requestId });
   } catch (err) {
     if (err instanceof ApiError) {
