@@ -47888,6 +47888,179 @@ revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, 
 
 notify pgrst, 'reload schema';
 
+-- ---- etiquetas da conversa por delta (migration 9045) ----
+--
+-- O PATCH da conversa e a `crm_manage_tags` gravavam a lista inteira de
+-- etiquetas e quem gravava por último vencia (achado do @Cassio_SecRev). As duas
+-- portas (sessão e serviço) aplicam acrescentar/remover sobre o valor ATUAL,
+-- com a linha travada, pelo mesmo núcleo. Cabeçalho completo na migration.
+-- Prova: tests/invariants/tags-da-conversa-por-delta-9045.test.ts.
+create or replace function public.fn_conversa_tags_aplicar(
+  p_tags text[],
+  p_adicionar text[],
+  p_remover text[]
+)
+returns text[]
+language sql
+immutable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select coalesce(array_agg(n.tag order by n.ord), '{}'::text[])
+  from (
+    select distinct on (s.tag) s.tag, s.ord
+    from (
+      select lower(btrim(e.valor)) as tag, e.ord
+      from unnest(coalesce(p_tags, '{}'::text[]) || coalesce(p_adicionar, '{}'::text[]))
+           with ordinality as e(valor, ord)
+      where btrim(coalesce(e.valor, '')) <> ''
+    ) s
+    -- Só sai o que CASA com a remoção (LRN da 9038). `array_remove(..., null)`:
+    -- um nulo em `= any` daria NULO e derrubaria a linha toda.
+    where not (s.tag = any (array_remove(
+      array(select lower(btrim(r)) from unnest(coalesce(p_remover, '{}'::text[])) as r),
+      null)))
+    order by s.tag, s.ord
+  ) as n;
+$$;
+
+revoke execute on function public.fn_conversa_tags_aplicar(text[], text[], text[]) from public, anon, authenticated;
+
+-- O NÚCLEO das duas portas. Invoker e revogado de todos: só roda de dentro das
+-- duas definers abaixo, como o dono.
+create or replace function public.fn_conversa_tags_gravar(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[],
+  p_remover text[],
+  p_da_sessao boolean
+)
+returns text[]
+language plpgsql
+volatile
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_add    text[];
+  v_rem    text[];
+  v_cru    text[];
+  v_antes  text[];
+  v_depois text[];
+begin
+  v_add := array(select distinct lower(btrim(x)) from unnest(coalesce(p_adicionar, '{}'::text[])) as x
+                  where btrim(coalesce(x, '')) <> '');
+  v_rem := array(select distinct lower(btrim(x)) from unnest(coalesce(p_remover, '{}'::text[])) as x
+                  where btrim(coalesce(x, '')) <> '');
+
+  if cardinality(v_add) + cardinality(v_rem) = 0
+     or cardinality(v_add) > 20 or cardinality(v_rem) > 20
+     or exists (select 1 from unnest(v_add || v_rem) as t where length(t) > 40)
+     or v_add && v_rem then
+    raise exception 'tags_delta_invalido' using errcode = '22023';
+  end if;
+
+  perform public.fn_tags_reserva(p_org, 'conversa', v_add || v_rem);
+
+  -- A trava da linha é o que serializa duas alterações concorrentes. Pela
+  -- sessão, o `where` de visibilidade é o da policy `conversations_select`
+  -- (9027), menos os ramos de platform admin e viewer, que a guarda já recusou.
+  -- Pelo serviço, só a organização.
+  select c.tags into v_cru
+    from public.conversations c
+   where c.id = p_conversa
+     and c.organization_id = p_org
+     and (
+       not p_da_sessao
+       or c.organization_id in (
+         select e.organization_id from public.fn_escopo_orgs() e
+          where e.papel in ('manager', 'admin') or (e.papel = 'agent' and e.modo = 'all'))
+       or (c.assigned_to_user_id = auth.uid()
+           and c.organization_id in (
+             select e.organization_id from public.fn_escopo_orgs() e where e.papel = 'agent'))
+       or (c.assigned_to_user_id is null
+           and c.organization_id in (
+             select e.organization_id from public.fn_escopo_orgs() e
+              where e.papel = 'agent' and e.modo = 'own_and_unassigned'))
+     )
+   for no key update;
+  if not found then
+    raise exception 'conversa_nao_encontrada' using errcode = 'P0002';
+  end if;
+
+  -- O teto compara com a lista atual JÁ normalizada: a crua de uma conversa
+  -- legada pode ter `VIP` e `vip`, que viram uma etiqueta só.
+  v_antes  := public.fn_conversa_tags_aplicar(v_cru, '{}'::text[], '{}'::text[]);
+  v_depois := public.fn_conversa_tags_aplicar(v_antes, v_add, v_rem);
+  if cardinality(v_depois) > 20 and cardinality(v_depois) > cardinality(v_antes) then
+    raise exception 'tags_limite' using errcode = '23514';
+  end if;
+
+  if v_depois is distinct from coalesce(v_cru, '{}'::text[]) then
+    -- Calculado de novo sobre `c.tags` dentro do UPDATE: com a linha travada é o
+    -- mesmo valor, e o UPDATE nunca grava uma lista lida antes.
+    update public.conversations c
+       set tags = public.fn_conversa_tags_aplicar(c.tags, v_add, v_rem)
+     where c.id = p_conversa
+       and c.organization_id = p_org
+    returning c.tags into v_depois;
+  end if;
+
+  return v_depois;
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_gravar(uuid, uuid, text[], text[], boolean)
+  from public, anon, authenticated, service_role;
+
+-- Porta da SESSÃO (PATCH da conversa).
+create or replace function public.fn_conversa_tags_alterar(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[] default '{}'::text[],
+  p_remover text[] default '{}'::text[]
+)
+returns text[]
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform public.fn_tags_guarda(p_org, 'agent');
+  return public.fn_conversa_tags_gravar(p_org, p_conversa, p_adicionar, p_remover, true);
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_alterar(uuid, uuid, text[], text[]) from public, anon, service_role;
+grant  execute on function public.fn_conversa_tags_alterar(uuid, uuid, text[], text[]) to authenticated;
+
+-- Porta do SERVIÇO (`crm_manage_tags`, MCP com client de service role).
+create or replace function public.fn_conversa_tags_alterar_servico(
+  p_org uuid,
+  p_conversa uuid,
+  p_adicionar text[] default '{}'::text[],
+  p_remover text[] default '{}'::text[]
+)
+returns text[]
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_org is null or p_conversa is null then
+    raise exception 'conversa_nao_encontrada' using errcode = 'P0002';
+  end if;
+  -- A conversa tem de ser de `p_org`: o núcleo filtra por organização e recusa
+  -- com P0002 a de outra, sem tocar nela.
+  return public.fn_conversa_tags_gravar(p_org, p_conversa, p_adicionar, p_remover, false);
+end;
+$$;
+
+revoke execute on function public.fn_conversa_tags_alterar_servico(uuid, uuid, text[], text[]) from public, anon, authenticated;
+grant  execute on function public.fn_conversa_tags_alterar_servico(uuid, uuid, text[], text[]) to service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

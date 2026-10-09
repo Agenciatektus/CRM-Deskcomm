@@ -19,6 +19,7 @@ import type { Conversation } from "@/lib/types/messaging";
 import { normalizarTermoDeBusca } from "@/lib/inbox/termo-de-busca";
 import { ORDEM_DA_ESPERA, ehAFila } from "@/lib/inbox/comando-da-conversa";
 import { aplicarMarcadores } from "@/lib/inbox/marcador-da-conversa";
+import { alterarEtiquetasDaConversa, deltaDoPedido, metadataDoDelta } from "./_tags-delta";
 
 /**
  * Prepara o termo digitado para viajar dentro de um `or=` do PostgREST.
@@ -499,6 +500,10 @@ export async function patchConversationHandler(
     if (statusError) throw new ApiError(statusError.code === "40001" ? 409 : statusError.code === "P0002" ? 404 : 500,
       statusError.code === "40001" ? "conflict" : statusError.code === "P0002" ? "not_found" : "internal_error", undefined, ctx.requestId, statusError.message);
   }
+  // 9045: o delta vai pela função do banco, sobre o valor atual; `tags` inteiro
+  // continua aceito por compatibilidade e regrava a lista (quem grava por último vence).
+  const delta = deltaDoPedido(input);
+  if (delta) await alterarEtiquetasDaConversa(supabase, ctx, conversationId, delta);
   if (input.tags !== undefined) {
     update.tags = input.tags;
   }
@@ -547,7 +552,7 @@ export async function patchConversationHandler(
       metadata: { ...a.metadataActor, status: input.status },
     });
   }
-  if (input.tags !== undefined) {
+  if (input.tags !== undefined || delta) {
     await audit({
       action: "conversation.tags_changed",
       actorUserId: a.actorUserId,
@@ -555,7 +560,7 @@ export async function patchConversationHandler(
       resourceType: "conversation",
       resourceId: conv.id,
       requestId: ctx.requestId,
-      metadata: { ...a.metadataActor, tags: input.tags },
+      metadata: { ...a.metadataActor, ...(delta ? metadataDoDelta(delta, conv.tags) : { tags: input.tags }) },
     });
   }
 

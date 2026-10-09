@@ -99,7 +99,7 @@ describe("cada item chama a rota que o cabeçalho chama", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it("Etiquetas → PATCH com a lista inteira", async () => {
+  it("Etiquetas → PATCH só com o delta (9045), nunca a lista inteira", async () => {
     await abrir({ tags: ["retorno"] });
     fireEvent.keyDown(item(/Etiquetas/), { key: "ArrowRight" });
     const sub = await screen.findByRole("menu", { name: "Etiquetas" });
@@ -107,7 +107,17 @@ describe("cada item chama a rota que o cabeçalho chama", () => {
     expect(within(sub).getByRole("menuitemcheckbox", { name: "retorno" })).toHaveAttribute("aria-checked", "true");
     fireEvent.click(vip);
     await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledWith("/api/v1/conversations/conv-1", { tags: ["retorno", "vip"] }),
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/conversations/conv-1", { tags_adicionar: ["vip"] }),
+    );
+  });
+
+  it("Etiquetas: desmarcar manda só a remoção", async () => {
+    await abrir({ tags: ["retorno", "vip"] });
+    fireEvent.keyDown(item(/Etiquetas/), { key: "ArrowRight" });
+    const sub = await screen.findByRole("menu", { name: "Etiquetas" });
+    fireEvent.click(await within(sub).findByRole("menuitemcheckbox", { name: "retorno" }));
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith("/api/v1/conversations/conv-1", { tags_remover: ["retorno"] }),
     );
   });
 
