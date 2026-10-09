@@ -66,7 +66,7 @@ describe("ConversationListItem — não lida", () => {
 });
 
 describe("ConversationListItem — seleção e dono", () => {
-  it("selecionada: fundo accent-soft, marcador à esquerda e aria-current", () => {
+  it("selecionada: fundo elevado, marcador à esquerda e aria-current", () => {
     render(
       <ConversationListItem
         conversation={conversaDeExemplo.conversation}
@@ -76,7 +76,7 @@ describe("ConversationListItem — seleção e dono", () => {
     );
     const linha = screen.getByRole("button");
     expect(linha).toHaveAttribute("aria-current", "true");
-    expect(linha).toHaveClass("bg-accent-soft");
+    expect(linha).toHaveClass("bg-surface-elevated");
     expect(linha.querySelector("span.bg-accent[aria-hidden]")).not.toBeNull();
   });
 
@@ -113,5 +113,49 @@ describe("ConversationListItem — seleção e dono", () => {
   it("CONTROLE: quando o dono não discrimina, a pílula não aparece", () => {
     render(<ConversationListItem conversation={conversaDeExemplo.conversation} {...conversaDeExemplo.props} />);
     expect(screen.queryByText("Sem dono")).toBeNull();
+  });
+});
+
+describe("ConversationListItem — espera fora da Fila", () => {
+  const haMinutos = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+  it("cliente esperando há 40 min: pílula curta no tom crítico", () => {
+    render(
+      <ConversationListItem
+        conversation={{ ...conversaDeExemplo.conversation, awaiting_since: haMinutos(40) }}
+        {...conversaDeExemplo.props}
+      />,
+    );
+    const pilula = screen.getByTestId("item-espera");
+    expect(pilula).toHaveAttribute("data-tom", "crit");
+    expect(pilula.textContent).toBe("40m");
+  });
+
+  it("14 min é atenção; 4 min é informativo", () => {
+    const { unmount } = render(
+      <ConversationListItem
+        conversation={{ ...conversaDeExemplo.conversation, awaiting_since: haMinutos(14) }}
+        {...conversaDeExemplo.props}
+      />,
+    );
+    expect(screen.getByTestId("item-espera")).toHaveAttribute("data-tom", "warn");
+    unmount();
+    render(
+      <ConversationListItem
+        conversation={{ ...conversaDeExemplo.conversation, awaiting_since: haMinutos(4) }}
+        {...conversaDeExemplo.props}
+      />,
+    );
+    expect(screen.getByTestId("item-espera")).toHaveAttribute("data-tom", "info");
+  });
+
+  it("CONTROLE: sem `awaiting_since` a linha não afirma espera", () => {
+    render(
+      <ConversationListItem
+        conversation={{ ...conversaDeExemplo.conversation, awaiting_since: null }}
+        {...conversaDeExemplo.props}
+      />,
+    );
+    expect(screen.queryByTestId("item-espera")).toBeNull();
   });
 });

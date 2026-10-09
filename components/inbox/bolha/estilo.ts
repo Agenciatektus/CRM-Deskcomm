@@ -47,9 +47,11 @@ export function classesDaBolha(f: {
   modoMeta: ModoDaMeta;
 }): string {
   return cn(
-    "relative min-w-0 max-w-full text-sm leading-normal",
+    // 15px e entrelinha 1.42, as medidas do `.bubble` do protótipo: com 14px a
+    // conversa lia miúda ao lado da lista, que já usa 13,5px na prévia.
+    "relative min-w-0 max-w-full text-[15px] leading-[1.42]",
     TOM[f.tom],
-    f.tom === "figurinha" ? "p-0" : f.modoMeta === "sobre-midia" ? "p-1" : "px-3 py-1.5",
+    f.tom === "figurinha" ? "p-0" : f.modoMeta === "sobre-midia" ? "p-1" : "px-3.5 py-2",
     f.tom !== "figurinha" && "rounded-2xl",
     // O canto achatado fica do lado de quem fala, sempre embaixo; em cima só
     // quando a bolha continua um bloco, para o bloco ler como uma fala só.

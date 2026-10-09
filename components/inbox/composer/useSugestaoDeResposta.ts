@@ -102,7 +102,15 @@ export function useSugestaoDeResposta(
       const gerando = q.state.data?.data.drafts.some((d) => d.status === "generating");
       return gerando || acordada ? RAPIDO_MS : SEGURANCA_MS;
     },
+    // Nunca repete sozinha. O padrão do `makeQueryClient` repete 429/503 duas
+    // vezes, e o 503 "unavailable" daqui é o ambiente sem o banco do motor de
+    // IA: não muda entre uma tentativa e outra.
     retry: false,
+    // Nem ao REMONTAR. Sem dado e com erro, o react-query refaz o GET em toda
+    // montagem (`retryOnMount`): trocar de conversa e voltar, ou alternar
+    // Responder/Nota (o `enabled` liga de novo), repetia o pedido que já
+    // respondeu "indisponível". Outros erros continuam tentando ao montar.
+    retryOnMount: !indisponivel(qc.getQueryState(key)?.error),
   });
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");

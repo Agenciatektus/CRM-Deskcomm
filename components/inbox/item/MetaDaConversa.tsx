@@ -11,7 +11,7 @@ import { CLASSE_DO_TOM, tomDaEspera } from "@/lib/inbox/tom-da-espera";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { cn } from "@/lib/utils";
 
-import { waitingLabel } from "./tempo-da-linha";
+import { esperaCurta, waitingLabel } from "./tempo-da-linha";
 
 /**
  * A pílula do visual v2: mesma altura para espera, dono e selos. 22px e 12px
@@ -23,7 +23,10 @@ const PILULA =
 /** A etiqueta como chip com CONTORNO (o `.tag` do protótipo): arredondada, para não
  *  se confundir com a pílula de dono/espera, que é retangular. */
 const CHIP_DA_ETIQUETA =
-  "h-[22px] rounded-full border border-border bg-surface px-2 text-xs font-normal text-text-muted";
+  // `block truncate` no lugar do `inline-flex` do Badge: texto solto num flex
+  // não ganha reticências. A etiqueta longa encolhe até 9rem e mostra o nome
+  // inteiro no `title`, em vez de empurrar o resto da linha para baixo.
+  "block h-[22px] min-w-0 max-w-[9rem] shrink truncate rounded-full border border-border bg-surface px-2 py-0 text-xs font-normal leading-5 text-text-muted";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -96,6 +99,18 @@ export function MetaDaConversa({
   const overflow = tags.length - visibleTags.length;
   const naFila = queuePosition !== undefined;
   const dono = mostrarAtendente ? donoDaConversa(comando, meuUserId, t) : null;
+  /*
+   * A ESPERA FORA DA FILA, só quando o cliente ESPERA de fato: `awaiting_since`
+   * é a mesma régua da faixa do cabeçalho ("Esperando há…"). Sem ela a linha não
+   * afirma espera nenhuma (o fallback de `esperaDaConversa` para a última
+   * mensagem ou a criação serve à ORDEM da Fila, não a um alarme). Encerrada não
+   * espera ninguém. Na Fila a pílula longa de sempre continua (o e2e de fila lê
+   * "Aguardando").
+   */
+  const esperaDesde =
+    !naFila && comando.quem !== "encerrada" ? (conversation.awaiting_since ?? null) : null;
+  const espera = esperaCurta(esperaDesde);
+  const mostraEspera = espera !== null;
 
   // POR ONDE entrou, que é diferente da REDE. O `ChannelLogo` sobre o avatar já
   // diz "Instagram"; este selo diz se foi Direct ou comentário, porque
@@ -106,6 +121,7 @@ export function MetaDaConversa({
 
   const temAlgo =
     naFila ||
+    mostraEspera ||
     dono !== null ||
     visibleTags.length > 0 ||
     rotuloEntrada !== null ||
@@ -115,7 +131,11 @@ export function MetaDaConversa({
   if (!temAlgo) return null;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    // Uma linha só sempre que couber: gap de 4px e etiquetas que encolhem (com
+    // reticências) antes de quebrar. Com as pílulas de 22px do protótipo numa
+    // lista mais estreita que a dele, dono + uma etiqueta longa já não cabiam
+    // lado a lado e cada chip descia para a sua linha.
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
       {naFila && (
         <>
           <span
@@ -138,9 +158,20 @@ export function MetaDaConversa({
           </span>
         </>
       )}
+      {espera && esperaDesde && (
+        <span
+          className={cn(PILULA, "border-transparent", CLASSE_DO_TOM[tomDaEspera(esperaDesde)])}
+          title={`${t("Esperando há")} ${espera}`}
+          data-testid="item-espera"
+          data-tom={tomDaEspera(esperaDesde)}
+        >
+          <Clock size={12} aria-hidden />
+          {espera}
+        </span>
+      )}
       {dono && <span className={cn(PILULA, dono.classe)}>{dono.rotulo}</span>}
       {visibleTags.map((tag) => (
-        <ChipDeEtiqueta key={tag} tag={tag} className={CHIP_DA_ETIQUETA} />
+        <ChipDeEtiqueta key={tag} tag={tag} title={tag} className={CHIP_DA_ETIQUETA} />
       ))}
       {overflow > 0 && <span className="text-xs text-text-muted">+{overflow}</span>}
       {rotuloEntrada && (

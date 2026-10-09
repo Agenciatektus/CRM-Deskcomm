@@ -24,13 +24,13 @@ function iniciais(nome: string): string {
 }
 
 /**
- * Os três atalhos com a MESMA largura (grid de 3) e as medidas do `.jump` do
+ * Os três atalhos lado a lado (largura pelo rótulo, sobra dividida) e as medidas do `.jump` do
  * protótipo: 34px de altura, 13px em negrito, borda forte. O ícone fica no tom
  * da marca; o "Próximo passo" troca o conjunto inteiro pelo tom de aviso quando
  * o contato não tem tarefa aberta (`CLASSES_DO_ALERTA`).
  */
 const CLASSES_DO_ATALHO =
-  "flex h-[34px] min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-border-strong px-1.5 text-[13px] font-bold text-text hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-[34px] min-w-0 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-border-strong px-2 text-[13px] font-bold text-text hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 const CLASSES_DO_ALERTA = "border-warning bg-warning-bg text-warning-fg hover:bg-warning-bg";
 
 interface Props {
@@ -137,15 +137,23 @@ export function CabecalhoDoPainel({
       </div>
       {editandoTags && contactId && <ContactTagsEditor contactId={contactId} orgId={orgId} tags={tags} />}
 
-      <div className="grid grid-cols-3 gap-1.5" data-testid="inbox-atalhos-do-painel">
+      {/* Cada atalho parte da largura do PRÓPRIO rótulo e a sobra é dividida
+          (`flex-auto`): em três terços iguais o rótulo maior virava
+          "Próximo ..." no painel de 360px. Em painel mais estreito que os três
+          rótulos juntos, o curto "Próximo" assume (container query), sem cortar. */}
+      <div className="@container flex gap-1.5" data-testid="inbox-atalhos-do-painel">
         <button
           type="button"
           data-alerta={semTarefa ? "true" : undefined}
+          // O nome acessível é sempre o completo, e CONTÉM o rótulo curto que
+          // aparece em painel estreito (WCAG 2.5.3).
+          aria-label={t("Próximo passo")}
           className={cn(CLASSES_DO_ATALHO, semTarefa && CLASSES_DO_ALERTA)}
           onClick={onIrParaProximoPasso}
         >
           <ListChecks size={15} className={semTarefa ? "text-warning-fg" : "text-accent"} aria-hidden />
-          <span className="truncate">{t("Próximo passo")}</span>
+          <span className="hidden @[19rem]:inline">{t("Próximo passo")}</span>
+          <span className="@[19rem]:hidden">{t("Próximo")}</span>
         </button>
         {/* Visível "Detalhes" porque "Detalhes do contato" não cabe em um terço do
             painel; o nome acessível CONTÉM o visível (WCAG 2.5.3). */}

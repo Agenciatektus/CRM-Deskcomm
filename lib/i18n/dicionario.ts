@@ -14290,6 +14290,14 @@ export const DICIONARIO: Traducoes = {
   "Clique para ficar disponível": { es: "Haz clic para quedar disponible" },
   "Clique para ficar indisponível": { es: "Haz clic para quedar no disponible" },
   "Nenhuma tarefa marcada": { es: "Ninguna tarea programada" },
+  // ─── Visual v2, segunda passada (lista, faixa, painel, topo) ───
+  Abertas: { es: "Abiertas" },
+  "Janela 24h:": { es: "Ventana 24h:" },
+  "Sem próximo passo. Lead sem tarefa some do radar da equipe.": {
+    es: "Sin próximo paso. Un lead sin tarea desaparece del radar del equipo.",
+  },
+  Próximo: { es: "Próximo" },
+  "aguardando resposta": { es: "esperando respuesta" },
   "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
 };
 

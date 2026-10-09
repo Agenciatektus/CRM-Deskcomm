@@ -5,6 +5,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { NAV_GROUPS } from "@/lib/navigation/registry";
 import { destinoDaRota } from "@/lib/navigation/rota-atual";
 
+import { AguardandoResposta } from "./AguardandoResposta";
 import { AlertsBell } from "./AlertsBell";
 import { AvisoDePropostaEmDestaque } from "./AvisoDePropostaEmDestaque";
 import { BotaoDeDisponibilidade } from "./BotaoDeDisponibilidade";
@@ -31,15 +32,20 @@ function TrilhaDaRota() {
   if (!destino || !grupo) return null;
   return (
     <nav aria-label={t("Onde você está")} className="hidden min-w-0 md:block">
-      <ol className="flex min-w-0 items-center gap-1.5 text-sm">
-        <li className="truncate text-muted-foreground">{t(grupo.label)}</li>
-        <li aria-hidden className="text-muted-foreground">
-          ›
-        </li>
-        <li aria-current="page" className="truncate font-semibold text-foreground">
-          {t(destino.label)}
-        </li>
-      </ol>
+      <div className="flex min-w-0 items-center gap-2">
+        <ol className="flex min-w-0 items-center gap-1.5 text-sm">
+          <li className="truncate text-muted-foreground">{t(grupo.label)}</li>
+          <li aria-hidden className="text-muted-foreground">
+            ›
+          </li>
+          <li aria-current="page" className="truncate font-semibold text-foreground">
+            {t(destino.label)}
+          </li>
+        </ol>
+        {/* Fora da lista de propósito: a trilha é "Grupo › Página"; a nota é um
+          dado da página, e o leitor de tela não deve ouvi-la como um nível. */}
+        {destino.contador === "fila" && <AguardandoResposta />}
+      </div>
     </nav>
   );
 }
