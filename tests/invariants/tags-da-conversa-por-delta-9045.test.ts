@@ -92,9 +92,16 @@ async function tagsDe(conversa: string): Promise<string[]> {
 
 async function conversa(tags: string[], dono: string | null = null): Promise<string> {
   const id = randomUUID();
+  // Um contato por conversa: a unicidade uniq_conversations_1to1_per_contact_session
+  // barra a segunda conversa aberta do mesmo contato no mesmo canal.
+  const doContato = randomUUID();
+  await pool.query(
+    "insert into contacts(id,organization_id,name,display_name,tags) values($1,$2,'9045c','9045c','{}')",
+    [doContato, org],
+  );
   await pool.query(
     "insert into conversations(id,organization_id,contact_id,channel_session_id,status,tags,assigned_to_user_id,assignee_kind) values($1,$2,$3,$4,'open',$5,$6,$7)",
-    [id, org, contato, canal, tags, dono, dono ? "user" : null],
+    [id, org, doContato, canal, tags, dono, dono ? "user" : null],
   );
   return id;
 }
