@@ -108,7 +108,16 @@ describe("contacts.observacoes — RLS (policies por comando da 9030)", () => {
   });
 
   it("anon não vê a linha", () => {
-    expect(lastLine(sql(`set role anon; select count(*) from public.contacts where id = '${CONTATO}';`))).toBe("0");
+    // O banco pode barrar o anon antes de contar ("permission denied") ou contar
+    // zero; as duas respostas provam que a observação não chega a ele.
+    let resultado: string;
+    try {
+      resultado = lastLine(sql(`set role anon; select count(*) from public.contacts where id = '${CONTATO}';`));
+    } catch (e) {
+      expect(String(e)).toMatch(/permission denied/);
+      return;
+    }
+    expect(resultado).toBe("0");
   });
 });
 
