@@ -1,6 +1,7 @@
 import type { Locale } from "date-fns";
 import { format, formatDistanceToNowStrict } from "date-fns";
 
+import { formatarDecorrido } from "@/lib/channels/janela";
 import { esperaDaConversa } from "@/lib/inbox/comando-da-conversa";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 
@@ -50,4 +51,17 @@ export function waitingLabel(
   const since = esperaDaConversa(conversation);
   if (!since) return t("Aguardando");
   return `${t("Aguardando")} ${formatDistanceToNowStrict(new Date(since), { addSuffix: true, locale: locale })}`;
+}
+
+/**
+ * "38m", "5h", "3d": há quanto tempo o cliente espera, na unidade única da faixa
+ * do cabeçalho (`formatarDecorrido`). `null` sem data, com data inválida ou no
+ * futuro (relógio da máquina atrasado): sem dado confiável a linha não afirma
+ * espera nenhuma.
+ */
+export function esperaCurta(desde: string | null, agora: Date = new Date()): string | null {
+  if (!desde) return null;
+  const ms = agora.getTime() - new Date(desde).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return formatarDecorrido(ms);
 }

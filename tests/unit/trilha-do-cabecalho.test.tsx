@@ -22,6 +22,7 @@ vi.mock("@/components/shell/TenantSwitcher", () => ({ TenantSwitcher: () => null
 vi.mock("@/components/shell/UserMenu", () => ({ UserMenu: () => null }));
 vi.mock("@/components/shell/SearchTrigger", () => ({ SearchTrigger: () => null }));
 vi.mock("@/components/shell/BotaoDeDisponibilidade", () => ({ BotaoDeDisponibilidade: () => null }));
+vi.mock("@/components/shell/AguardandoResposta", () => ({ AguardandoResposta: () => null }));
 
 afterEach(() => {
   caminho = "/app/inbox";

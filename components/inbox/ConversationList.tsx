@@ -22,6 +22,13 @@ import type {
   ConversationWithContact,
 } from "@/hooks/inbox/useConversationsRealtime";
 
+/** O rótulo do cabeçalho de seção por aba. Ausente = "Abertas". */
+const ROTULO_DA_SECAO: Partial<Record<ReturnType<typeof abaDosFiltros>, string>> = {
+  all: "Todas",
+  closed: "Fechadas",
+  archived: "Arquivadas",
+};
+
 interface ListResponse {
   data: ConversationWithContact[];
   meta?: { cursor?: string | null; has_more?: boolean };
@@ -176,6 +183,23 @@ export function ConversationList({
             e por isso o bloco do `hasNextPage` abaixo continua sendo alcancado. */}
         {items.length === 0 && filtrosAtivos.length > 0 && (
           <EmptyPorFiltro filtros={filtrosAtivos} onLimpar={onLimparFiltros} />
+        )}
+        {items.length > 0 && (
+          // O `.conv-section` do protótipo ("Abertas  8"). O rótulo diz o que a
+          // aba REALMENTE lista: "Todas" inclui fechadas, então não vira
+          // "Abertas". O número é o que está carregado, com "+" quando há página
+          // seguinte: o total exato é o badge da aba, e repetir uma contagem de
+          // outra fonte aqui poderia discordar dele.
+          <div
+            className="flex items-center justify-between px-4 pb-1 pt-3 text-xs font-semibold text-text-subtle"
+            data-testid="secao-da-lista"
+          >
+            <span>{t(ROTULO_DA_SECAO[tab] ?? "Abertas")}</span>
+            <span className="tabular-nums">
+              {items.length}
+              {q.hasNextPage ? "+" : ""}
+            </span>
+          </div>
         )}
         {items.map((c, i) => (
           <ConversationListItem

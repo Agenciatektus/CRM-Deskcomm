@@ -204,7 +204,8 @@ export const ProximoPasso = forwardRef<HTMLElement, Props>(function ProximoPasso
               {/* Aviso em destaque (o `.need` do protótipo): maior que o texto ao redor,
                   porque é a frase que decide se o lead some ou não do radar. */}
               <div data-testid="sem-proximo-passo" className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2.5 text-[13px] font-semibold text-warning-fg">
-                <Warning size={16} className="mt-px shrink-0" aria-hidden /> <span>{t("Sem próximo passo")}</span>
+                <Warning size={16} className="mt-px shrink-0" aria-hidden />{" "}
+                <span>{t("Sem próximo passo. Lead sem tarefa some do radar da equipe.")}</span>
               </div>
               {leitura ? (
                 <p className="mt-2 text-xs text-text-muted">{t("Criar e concluir tarefas fica com quem atende.")}</p>

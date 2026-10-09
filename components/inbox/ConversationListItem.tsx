@@ -66,25 +66,6 @@ interface Props {
   menuAberto?: boolean;
 }
 
-/**
- * A COR SAI DE QUEM MANDA, NÃO DO STATUS.
- *
- * O mapa anterior era por `conversations.status`, e o `bg-purple-500` de
- * `ai_handling` era a mesma mentira das abas em forma de cor: `ai_handling` é
- * escrito por UM caminho só em produção, então a bolinha do automático quase
- * nunca aparecia, enquanto o robô atendia a maior parte da lista.
- *
- * As chaves são as de `Comando["quem"]`, ao lado de `ROTULO_DO_COMANDO`, pela
- * mesma razão que ele mora ali: a cor e a palavra dizem a mesma coisa.
- */
-const COR_DO_COMANDO: Record<string, string> = {
-  humano: "bg-blue-500",
-  automatico: "bg-purple-500",
-  aguardando: "bg-amber-500",
-  ninguem: "bg-muted-foreground/60",
-  encerrada: "bg-muted-foreground/30",
-};
-
 export function ConversationListItem({
   conversation,
   isSelected,
@@ -143,7 +124,6 @@ export function ConversationListItem({
     automaticoDaOrg,
   });
   const isAi = comando.quem === "automatico";
-  const dot = COR_DO_COMANDO[comando.quem] ?? COR_DO_COMANDO.ninguem;
 
   // O número DA EMPRESA por onde esta conversa chegou, não o do cliente. Com
   // dois canais é o que decide o tom da resposta e qual número a pessoa vê
@@ -161,9 +141,12 @@ export function ConversationListItem({
       onClick={() => onSelect(conversation.id)}
       {...gatilhos}
       className={cn(
-        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-surface-elevated",
-        "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
-        isSelected && "bg-accent-soft hover:bg-accent-soft",
+        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-surface-elevated/60",
+        "focus-visible:outline-hidden focus-visible:bg-surface-elevated/60",
+        // Selecionada: o fundo ELEVADO, um degrau acima do card da lista, como
+        // no protótipo. O `accent-soft` (16% da marca) quase sumia no escuro com
+        // a marca sálvia, e a linha aberta não se destacava das vizinhas.
+        isSelected && "bg-surface-elevated hover:bg-surface-elevated",
       )}
       aria-current={isSelected ? "true" : undefined}
     >
@@ -175,20 +158,19 @@ export function ConversationListItem({
       <div className="relative h-10 w-10 shrink-0">
         {/* Cor por pessoa (hash do id), a mesma do cabeçalho e do painel. */}
         <AvatarDoContato contato={c} nome={displayName} iniciais={initials(displayName, phoneFallback)} />
-        {/* Anel em `surface`: a lista agora mora no card da área de trabalho
-            (fundo `surface`), e o anel recorta o selo contra esse fundo. */}
-        <span
-          className={cn(
-            "absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full border-2 border-surface",
-            dot,
-          )}
-          aria-hidden
-        />
-        {/* O selo do canal (WhatsApp, Instagram…) no canto do avatar. */}
+        {/* Não há mais a bolinha de "quem manda" no canto esquerdo: ela
+            sobrepunha o avatar e repetia o que a pílula de dono já diz (e só
+            onde discrimina). O canto do avatar é do selo do canal (WhatsApp,
+            Instagram…), como no protótipo. */}
         <ChannelLogo
           channel={canal}
           size={12}
-          className="absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full bg-surface ring-2 ring-surface"
+          // O anel tem a cor do FUNDO DA LINHA (que muda na seleção), para o
+          // selo recortar o avatar em vez de flutuar com uma borda de outra cor.
+          className={cn(
+            "absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full ring-2",
+            isSelected ? "bg-surface-elevated ring-surface-elevated" : "bg-surface ring-surface",
+          )}
         />
       </div>
 
