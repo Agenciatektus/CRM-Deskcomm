@@ -6,9 +6,12 @@ import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
 import { MediaUnavailable } from "@/components/inbox/media/MediaUnavailable";
 import { useT } from "@/hooks/i18n/useT";
 import type { Localizacao } from "@/lib/messaging/localizacao";
+import { transcricaoDoAudio } from "@/lib/messaging/media/texto-derivado";
 import type { Message } from "@/lib/types/messaging";
 import { Trash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
+
+import { TranscricaoDoAudio } from "./TranscricaoDoAudio";
 
 /**
  * O espaçador que reserva o lugar da hora no fim da última linha (ver
@@ -58,6 +61,7 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
   const temAnexosExtras = Array.isArray(message.metadata?.instagram_anexos_extras)
     && (message.metadata.instagram_anexos_extras as unknown[]).length > 0;
   const isContact = message.type === "contact";
+  const transcricao = transcricaoDoAudio(message);
 
   // Apagada pelo autor ("apagar para todos"). A linha continua no histórico —
   // sumir com ela deixaria a resposta seguinte respondendo ao nada —, mas o
@@ -95,6 +99,9 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
         // com legenda, e não a de um anexo solto dentro de uma caixa.
         <div className={cn(!soMidia && message.type === "image" && "-mx-2 -mt-0.5", message.body && "mb-1.5")}>
           <MediaRenderer message={message} />
+          {/* Só no corpo normal: apagada e ocultada saem antes, e a transcrição
+              de uma mensagem apagada seria o mesmo texto por outro caminho. */}
+          {transcricao && <TranscricaoDoAudio texto={transcricao} />}
         </div>
       )}
 

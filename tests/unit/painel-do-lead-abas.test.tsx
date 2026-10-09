@@ -16,7 +16,8 @@ import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
  *  3. O `crm-summary` sai UMA vez por conversa, por mais que se troque de aba:
  *     buscar por aba multiplicaria a leitura e daria retratos de momentos
  *     diferentes do mesmo contato.
- *  4. Os atalhos do cabeçalho levam à seção certa do Resumo, de qualquer aba.
+ *  4. Os atalhos do cabeçalho (Próximo passo, Detalhes, Obs) levam à seção
+ *     certa do Resumo, de qualquer aba.
  *  5. Modo leitura não oferece gesto que grava, em nenhuma aba.
  */
 
@@ -170,14 +171,16 @@ describe("painel do lead — abas", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("inbox-detalhes-do-contato")));
   });
 
-  it("Obs ainda não grava nada: o botão diz 'Em breve' e não abre campo", async () => {
+  it("Obs (9041) leva às observações do contato no Resumo, de qualquer aba", async () => {
     renderPainel();
     await screen.findByTestId("inbox-demandas");
-    const obs = screen.getByRole("button", { name: /Obs/ });
-    expect(obs).toHaveAttribute("aria-disabled", "true");
-    expect(obs.textContent).toContain("Em breve");
+    await userEvent.click(aba("Atividade"));
+    const obs = screen.getByRole("button", { name: "Obs" });
+    expect(obs).not.toHaveAttribute("aria-disabled");
     await userEvent.click(obs);
-    expect(screen.queryByRole("textbox", { name: /observa/i })).toBeNull();
+    expect(aba("Resumo")).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("inbox-observacoes-do-contato")));
+    expect(await screen.findByRole("textbox", { name: "Observações" })).toBeInTheDocument();
   });
 });
 

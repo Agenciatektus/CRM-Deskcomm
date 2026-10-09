@@ -13,9 +13,12 @@ import {
   contactCreateSchema,
   contactListQuerySchema,
   contactPatchSchema,
+  contactPatchSchemaDoPais,
   isValidCpf,
   lgpdAnonymizeSchema,
+  OBSERVACOES_MAX,
 } from "./contacts";
+import { perfilDoPais } from "@/lib/legal/perfil-do-pais";
 
 describe("isValidCpf", () => {
   it("accepts a known-valid CPF", () => {
@@ -166,5 +169,49 @@ describe("lgpdAnonymizeSchema", () => {
       justification: "Solicitação formal LGPD do titular do dado.",
     });
     expect(r.success).toBe(true);
+  });
+});
+
+/** Observações do contato (migration 9041): o MESMO teto do CHECK do banco. */
+describe("contactPatchSchema — observacoes", () => {
+  const obs = (v: unknown) => contactPatchSchema.safeParse({ observacoes: v });
+
+  it("faz trim", () => {
+    expect(obs("  liga à tarde \n").data?.observacoes).toBe("liga à tarde");
+  });
+
+  it("vazio, só espaço e null viram null (apagar a observação)", () => {
+    for (const v of ["", "   ", "\n\t", null]) {
+      const r = obs(v);
+      expect(r.success, String(v)).toBe(true);
+      expect(r.data?.observacoes, JSON.stringify(v)).toBeNull();
+    }
+  });
+
+  it("ausente continua ausente (o PATCH não apaga o que não mandou)", () => {
+    const r = contactPatchSchema.safeParse({ name: "Ana" });
+    expect(r.success).toBe(true);
+    expect(r.data).not.toHaveProperty("observacoes");
+  });
+
+  it("aceita exatamente 4000 e recusa 4001", () => {
+    expect(OBSERVACOES_MAX).toBe(4000);
+    expect(obs("a".repeat(4000)).success).toBe(true);
+    expect(obs("a".repeat(4001)).success).toBe(false);
+  });
+
+  it("mede DEPOIS do trim e em pontos de código (emoji conta 1, como o char_length)", () => {
+    expect(obs(`  ${"a".repeat(4000)}  `).success).toBe(true);
+    expect(obs("😀".repeat(4000)).success).toBe(true);
+    expect(obs("😀".repeat(4001)).success).toBe(false);
+  });
+
+  it("recusa o que não é texto", () => {
+    expect(obs(42).success).toBe(false);
+  });
+
+  it("o schema do país (o que a rota usa) também leva o campo", () => {
+    const r = contactPatchSchemaDoPais(perfilDoPais("BR")).safeParse({ observacoes: "  x  " });
+    expect(r.data?.observacoes).toBe("x");
   });
 });

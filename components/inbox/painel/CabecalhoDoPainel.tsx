@@ -31,6 +31,7 @@ interface Props {
   leitura: boolean;
   onIrParaProximoPasso: () => void;
   onIrParaDetalhes: () => void;
+  onIrParaObservacoes: () => void;
 }
 
 /**
@@ -39,13 +40,13 @@ interface Props {
  * Os três atalhos levam a SEÇÕES da aba Resumo (trocam de aba se preciso e
  * rolam até lá), em vez de abrir janela: o painel continua sendo um lugar só.
  *
- * "Obs" fica desabilitado com "Em breve": `contacts` ainda não tem campo de
- * observação, e um botão que abre um campo que não grava seria o pior estado,
- * a escrita que parece ter dado certo. Desabilitado e não escondido para a
- * fileira não mudar de forma quando o campo chegar. `aria-disabled` em vez de
- * `disabled` para o leitor de tela ainda alcançar o botão e ouvir o porquê.
+ * "Obs" leva às observações do contato (`contacts.observacoes`, migration
+ * 9041), que ficam no Resumo logo abaixo dos detalhes. Em modo leitura o botão
+ * continua: ele só navega, e a seção mostra o texto sem campo.
  */
-export function CabecalhoDoPainel({ contact, displayName, orgId, leitura, onIrParaProximoPasso, onIrParaDetalhes }: Props) {
+export function CabecalhoDoPainel({
+  contact, displayName, orgId, leitura, onIrParaProximoPasso, onIrParaDetalhes, onIrParaObservacoes,
+}: Props) {
   const t = useT();
   const [editandoTags, setEditandoTags] = useState(false);
   const contactId = contact?.id ?? null;
@@ -129,15 +130,10 @@ export function CabecalhoDoPainel({ contact, displayName, orgId, leitura, onIrPa
         <button type="button" className={CLASSES_DO_ATALHO} aria-label={t("Detalhes do contato")} onClick={onIrParaDetalhes}>
           <UserCircle size={14} className="text-accent" aria-hidden /> {t("Detalhes")}
         </button>
-        <button
-          type="button"
-          aria-disabled="true"
-          title={t("Em breve")}
-          onClick={(e) => e.preventDefault()}
-          className={`${CLASSES_DO_ATALHO} cursor-not-allowed opacity-50 hover:bg-transparent`}
-        >
-          <Note size={14} aria-hidden /> {t("Obs")}
-          <span className="sr-only">{`(${t("Em breve")})`}</span>
+        {/* Sem aria-label: o nome acessível é o próprio texto visível, em
+            qualquer idioma (WCAG 2.5.3); o `title` só descreve. */}
+        <button type="button" className={CLASSES_DO_ATALHO} title={t("Observações")} onClick={onIrParaObservacoes}>
+          <Note size={14} className="text-accent" aria-hidden /> {t("Obs")}
         </button>
       </div>
     </div>

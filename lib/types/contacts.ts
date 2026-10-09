@@ -25,6 +25,11 @@ export interface Contact {
   source: string;
   source_metadata: Record<string, unknown>;
   custom_fields: Record<string, unknown>;
+  /**
+   * Observações livres da equipe (migration 9041), até 4000 caracteres; null =
+   * sem observação. Só a FICHA (GET de um, PATCH) traz o campo; a lista não.
+   */
+  observacoes?: string | null;
   created_at: string;
   updated_at: string;
   last_activity_at: string | null;

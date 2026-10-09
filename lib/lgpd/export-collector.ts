@@ -42,6 +42,8 @@ export interface ContactSnapshot {
    * linha o titular pedia acesso e não recebia o que o roteiro coletou.
    */
   custom_fields: Record<string, unknown>;
+  /** Observações livres da equipe sobre o titular (9041): dado pessoal, vai no acesso. */
+  observacoes?: string | null; // opcional: payload legado (antes da 9041) não tem
   /** Para o PDF: rótulo da pergunta + valor, sem o CPF (ver `campos-personalizados.ts`). */
   campos_legiveis: CampoLegivel[];
   /** Um roteiro guardou o CPF nos campos (texto, não a coluna cifrada). */
@@ -925,7 +927,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     const { data, error } = await admin
       .from("contacts")
       .select(
-        "id, name, display_name, email, phone_number, wa_lid, cpf_encrypted, birthdate, is_blocked, is_anonymized, consent, tags, source, source_metadata, custom_fields, created_at, last_activity_at, first_service_at",
+        "id, name, display_name, email, phone_number, wa_lid, cpf_encrypted, birthdate, is_blocked, is_anonymized, consent, tags, source, source_metadata, custom_fields, observacoes, created_at, last_activity_at, first_service_at",
       )
       .eq("organization_id", organizationId)
       .eq("id", contactId)
@@ -993,6 +995,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
         last_activity_at: data.last_activity_at ?? null,
         first_service_at: data.first_service_at ?? null,
         custom_fields: customFields,
+        observacoes: (data.observacoes as string | null | undefined) ?? null,
         campos_legiveis: legiveis.campos,
         cpf_informado_na_conversa: legiveis.cpfInformado,
       };

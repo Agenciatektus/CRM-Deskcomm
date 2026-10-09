@@ -28,7 +28,7 @@ const ROTULO_DA_ABA: Record<AbaDoPainel, string> = {
   atividade: "Atividade",
 };
 
-type Alvo = "proximo-passo" | "detalhes";
+type Alvo = "proximo-passo" | "detalhes" | "observacoes";
 
 /**
  * O PAINEL DO LEAD NA INBOX, EM ABAS (visual v2, fases 3.3 e 3.4).
@@ -61,6 +61,7 @@ export function CRMSidePanel({ conversation }: Props) {
   const [pedidoDeRolagem, setPedidoDeRolagem] = useState(0);
   const refProximoPasso = useRef<HTMLElement | null>(null);
   const refDetalhes = useRef<HTMLElement | null>(null);
+  const refObservacoes = useRef<HTMLElement | null>(null);
 
   // O rascunho do desfecho mora AQUI, no componente que nunca desmonta: a saída
   // do filtro produz `null` enquanto o detalhe carrega, e o rascunho não pode
@@ -80,7 +81,8 @@ export function CRMSidePanel({ conversation }: Props) {
   // e `scrollIntoView` num elemento `hidden` não faz nada.
   useEffect(() => {
     if (!alvo.current || aba !== "resumo") return;
-    const el = (alvo.current === "proximo-passo" ? refProximoPasso : refDetalhes).current;
+    const ref = { "proximo-passo": refProximoPasso, detalhes: refDetalhes, observacoes: refObservacoes }[alvo.current];
+    const el = ref.current;
     alvo.current = null;
     el?.scrollIntoView?.({ block: "start", behavior: "smooth" });
     // O foco vai junto: quem chegou pelo teclado continua de onde a tela rolou.
@@ -113,6 +115,7 @@ export function CRMSidePanel({ conversation }: Props) {
         leitura={leitura}
         onIrParaProximoPasso={() => irPara("proximo-passo")}
         onIrParaDetalhes={() => irPara("detalhes")}
+        onIrParaObservacoes={() => irPara("observacoes")}
       />
       <TabsPrimitive.Root value={aba} onValueChange={(v) => setAba(v as AbaDoPainel)} activationMode="automatic">
         <TabsPrimitive.List
@@ -143,6 +146,7 @@ export function CRMSidePanel({ conversation }: Props) {
             setDesfechoDraft={setDesfechoDraft}
             refProximoPasso={refProximoPasso}
             refDetalhes={refDetalhes}
+            refObservacoes={refObservacoes}
           />
         </TabsPrimitive.Content>
         <TabsPrimitive.Content value="negocios" forceMount hidden={aba !== "negocios"} className="p-4 focus-visible:outline-hidden">

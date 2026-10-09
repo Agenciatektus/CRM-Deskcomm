@@ -113,6 +113,12 @@ export interface Message {
   media_thumb_path?: string | null;
   /** A miniatura assinada no mesmo lote de `media_signed_url`. */
   media_thumb_signed_url?: string | null;
+  /**
+   * Texto derivado da mídia pelo `workers/media-derive-worker.ts` (a transcrição,
+   * no áudio). Null enquanto o worker não rodou, quando a mídia não tem texto, ou
+   * depois da anonimização do titular (a cascata LGPD zera a coluna).
+   */
+  media_derived_text?: string | null;
   // Espelha o CHECK do banco (messages_sent_via_check): 'crm', 'external_device',
   // 'automation', 'ai', 'user', 'system'. O tipo listava só três e o TypeScript
   // aceitava os demais só porque o dado vem do Supabase sem cast — a tela então
