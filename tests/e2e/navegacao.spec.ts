@@ -99,7 +99,7 @@ test.describe("navegação agrupada", () => {
     // Organização não aparece no trilho: seu hub (Configurações) é o link
     // "Ajustes" do rodapé fixo — ver o teste do rodapé abaixo.
     const grupos = trilho(page).getByRole("button");
-    await expect(grupos).toHaveText(["Atendimento", "CRM", "Agentes", "Canais", "Análise"]);
+    await expect(grupos).toHaveText(["Conversas", "CRM", "Agentes", "Canais", "Análise"]);
 
     await page.screenshot({
       path: path.join(EVIDENCE, "nav-sidebar-agrupado.png"),
@@ -244,7 +244,7 @@ test.describe("navegação agrupada", () => {
     });
     expect(trilhoRola, "o trilho de grupos tem de caber sem scroll").toBe(false);
 
-    for (const grupo of ["Atendimento", "CRM", "Agentes", "Canais", "Análise"]) {
+    for (const grupo of ["Conversas", "CRM", "Agentes", "Canais", "Análise"]) {
       await abrirGrupo(page, grupo);
       await expect(sidebar(page).getByRole("heading", { name: grupo })).toBeVisible();
       const rola = await page.evaluate(() => {
@@ -314,6 +314,6 @@ test.describe("navegação agrupada", () => {
 
     // CANAIS é todo manager+/admin: o grupo não pode sobrar sozinho no trilho.
     await expect(trilho(page).getByRole("button", { name: "Canais" })).toHaveCount(0);
-    await expect(trilho(page).getByRole("button", { name: "Atendimento" })).toBeVisible();
+    await expect(trilho(page).getByRole("button", { name: "Conversas" })).toBeVisible();
   });
 });

@@ -107,7 +107,9 @@ export function CRMSidePanel({ conversation }: Props) {
   const doContato = resumo.summaryContactId === resumo.contactId;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-border bg-background">
+    // `bg-surface`: o painel é parte do card da área de trabalho (como a lista);
+    // só o fio da conversa fica no fundo mais escuro, que é o que o destaca.
+    <aside className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-border bg-surface">
       <CabecalhoDoPainel
         contact={contact}
         displayName={displayName}
@@ -120,14 +122,17 @@ export function CRMSidePanel({ conversation }: Props) {
       <TabsPrimitive.Root value={aba} onValueChange={(v) => setAba(v as AbaDoPainel)} activationMode="automatic">
         <TabsPrimitive.List
           aria-label={t("Seções do lead")}
-          className="sticky top-0 z-10 flex gap-0.5 overflow-x-auto border-b border-border bg-background px-3"
+          // `scrollbar-none`: nas larguras em que as quatro abas não cabem (o
+          // painel estreito do `xl`), a faixa ainda rola de lado, mas sem
+          // desenhar a barra que aparecia como um risco embaixo das abas.
+          className="scrollbar-none sticky top-0 z-10 flex gap-0.5 overflow-x-auto border-b border-border bg-surface px-3"
         >
           {ABAS_DO_PAINEL.map((a) => (
             <TabsPrimitive.Trigger
               key={a}
               value={a}
               data-testid={`painel-aba-${a}`}
-              className="relative h-10 whitespace-nowrap px-2 text-[13px] font-semibold text-text-muted hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=active]:text-text data-[state=active]:after:absolute data-[state=active]:after:inset-x-2 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full data-[state=active]:after:bg-accent"
+              className="relative h-[42px] shrink-0 whitespace-nowrap px-2 text-[13.5px] font-semibold text-text-muted hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=active]:text-text data-[state=active]:after:absolute data-[state=active]:after:inset-x-2 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full data-[state=active]:after:bg-accent"
             >
               {t(ROTULO_DA_ABA[a])}
             </TabsPrimitive.Trigger>

@@ -19,7 +19,7 @@ async function login(page: Page, email: string) {
 const nav = (page: Page) => page.getByRole("navigation", { name: "Navegação principal" });
 /**
  * Visual v2: a coluna "Navegação principal" mostra o grupo da rota; para ver
- * Radar estando em Configurações, abre-se o grupo Atendimento no trilho.
+ * Radar estando em Configurações, abre-se o grupo Conversas no trilho.
  */
 async function abrirGrupo(page: Page, nome: string) {
   await page
@@ -105,8 +105,8 @@ test("interface por membro atualiza ao vivo, preserva formulário e convite apli
     await member.goto("/app/settings/profile");
     await member.getByLabel("Nome completo").fill("Rascunho não salvo");
     await login(other, emails[2]!);
-    await abrirGrupo(member, "Atendimento");
-    await abrirGrupo(other, "Atendimento");
+    await abrirGrupo(member, "Conversas");
+    await abrirGrupo(other, "Conversas");
     await expect(nav(member).getByRole("link", { name: "Radar", exact: true })).toBeVisible();
     const framesBefore = realtime.length;
     await customize(page, emails[1]!);

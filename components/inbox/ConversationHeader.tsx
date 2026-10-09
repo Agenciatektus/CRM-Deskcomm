@@ -142,7 +142,7 @@ export function ConversationHeader({
         data-testid="cabecalho-da-conversa"
       >
         <IdentidadeDaConversa
-          nome={displayName}
+          nome={displayName} contato={c}
           status={t(STATUS_LABEL[status] ?? status)}
           encerrada={encerrada}
           canal={conversation.channel_sessions}

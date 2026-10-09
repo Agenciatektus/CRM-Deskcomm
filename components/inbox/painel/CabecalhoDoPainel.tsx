@@ -5,14 +5,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import type { ContactSummary } from "@/hooks/inbox/useConversationsRealtime";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
-import { ArrowRight, Copy, ListChecks, Note, Tag, UserCircle } from "@/lib/ui/icons";
+import { ArrowRight, Copy, ListChecks, Note, Plus, UserCircle } from "@/lib/ui/icons";
+import { cn } from "@/lib/utils";
 
+import { AvatarDoContato } from "../AvatarDoContato";
 import { ContactTagsEditor } from "../ContactTagsEditor";
+import { useTarefasDoContato } from "./useTarefasDoContato";
 
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
@@ -21,8 +23,15 @@ function iniciais(nome: string): string {
   return `${partes[0]?.[0] ?? ""}${partes[partes.length - 1]?.[0] ?? ""}`.toUpperCase();
 }
 
+/**
+ * Os três atalhos com a MESMA largura (grid de 3) e as medidas do `.jump` do
+ * protótipo: 34px de altura, 13px em negrito, borda forte. O ícone fica no tom
+ * da marca; o "Próximo passo" troca o conjunto inteiro pelo tom de aviso quando
+ * o contato não tem tarefa aberta (`CLASSES_DO_ALERTA`).
+ */
 const CLASSES_DO_ATALHO =
-  "flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-border px-1.5 text-xs font-semibold text-text hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-[34px] min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-border-strong px-1.5 text-[13px] font-bold text-text hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+const CLASSES_DO_ALERTA = "border-warning bg-warning-bg text-warning-fg hover:bg-warning-bg";
 
 interface Props {
   contact: ContactSummary | null;
@@ -52,6 +61,11 @@ export function CabecalhoDoPainel({
   const contactId = contact?.id ?? null;
   const tags = contact?.tags ?? [];
   const telefone = contact?.phone_number ? phoneForDisplay(contact.phone_number) : null;
+  // A MESMA consulta do bloco Próximo passo (o react-query dedupa pela chave):
+  // o atalho só acende o aviso quando a lista RESPONDEU vazia. Carregando ou com
+  // erro, fica neutro: afirmar "sem tarefa" sem saber seria mentir na tela.
+  const { lista } = useTarefasDoContato(contactId);
+  const semTarefa = lista.isSuccess && (lista.data ?? []).length === 0;
 
   async function copiarTelefone() {
     if (!telefone) return;
@@ -65,23 +79,14 @@ export function CabecalhoDoPainel({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 border-b border-border p-4" data-testid="inbox-cabecalho-do-painel">
+    <div className="flex flex-col gap-2.5 border-b border-border px-4 pb-3.5 pt-4" data-testid="inbox-cabecalho-do-painel">
       <div className="flex items-center gap-3">
-        <Avatar className="h-12 w-12">
-          {/* Só monta a <img> quando existe arquivo: sem isso o browser pediria a
-              rota e levaria 404 para todo contato sem foto. */}
-          {contact?.avatar_storage_path && !contact.is_anonymized ? (
-            <AvatarImage src={`/api/v1/contacts/${contact.id}/avatar`} alt="" className="object-cover" />
-          ) : null}
-          <AvatarFallback className="bg-surface-elevated text-sm font-semibold text-text-muted">
-            {iniciais(displayName)}
-          </AvatarFallback>
-        </Avatar>
+        <AvatarDoContato contato={contact} nome={displayName} iniciais={iniciais(displayName)} className="h-12 w-12 text-base" />
         <div className="min-w-0">
-          <div className="truncate text-base font-bold leading-tight text-text">{displayName}</div>
+          <div className="truncate text-[17px] font-bold leading-tight text-text">{displayName}</div>
           {telefone && (
-            <div className="flex items-center gap-1 text-xs text-text-muted">
-              <span className="tabular-nums">{telefone}</span>
+            <div className="flex items-center gap-1 text-[13px] text-text-muted">
+              <span className="font-mono tabular-nums">{telefone}</span>
               <button
                 type="button"
                 aria-label={t("Copiar telefone")}
@@ -96,22 +101,33 @@ export function CabecalhoDoPainel({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1">
+      {/* "Assunto:" do protótipo NÃO entra: nenhum dado do contato nem da
+          conversa guarda um assunto hoje, e inventar um seria texto falso. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => (
-          <ChipDeEtiqueta key={tag} tag={tag} className="h-5 px-1.5 text-[11px]" />
+          <ChipDeEtiqueta
+            key={tag}
+            tag={tag}
+            className="h-[22px] rounded-full border border-border bg-surface px-2 text-xs font-normal text-text-muted"
+          />
         ))}
+        {/* "+ Etiqueta" é o rótulo curto do protótipo; o nome acessível diz DE
+            QUEM é a etiqueta (o painel tem também as da conversa) e contém o
+            texto visível (WCAG 2.5.3). Abre o mesmo editor de antes. */}
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 border border-dashed border-border px-2 text-[11px] text-text-muted"
+          className="h-[22px] rounded-full border border-dashed border-border-strong px-2 text-xs font-normal text-text-muted"
           disabled={leitura || !contactId}
           aria-pressed={editandoTags}
+          aria-label={t("Etiqueta do contato")}
+          title={t("Etiqueta do contato")}
           onClick={() => setEditandoTags((v) => !v)}
         >
-          <Tag size={11} className="mr-1" weight="regular" aria-hidden /> {t("Tags do contato")}
+          <Plus size={11} className="mr-0.5" weight="bold" aria-hidden /> {t("Etiqueta")}
         </Button>
         {contactId && (
-          <Button asChild size="sm" variant="ghost" className="ml-auto h-6 px-1.5 text-[11px]">
+          <Button asChild size="sm" variant="ghost" className="ml-auto h-6 px-1.5 text-xs">
             <Link href={`/app/contacts/${contactId}`}>
               {t("Ver contato")}
               <ArrowRight size={11} className="ml-1" weight="regular" aria-hidden />
@@ -122,18 +138,24 @@ export function CabecalhoDoPainel({
       {editandoTags && contactId && <ContactTagsEditor contactId={contactId} orgId={orgId} tags={tags} />}
 
       <div className="grid grid-cols-3 gap-1.5" data-testid="inbox-atalhos-do-painel">
-        <button type="button" className={CLASSES_DO_ATALHO} onClick={onIrParaProximoPasso}>
-          <ListChecks size={14} className="text-accent" aria-hidden /> {t("Próximo passo")}
+        <button
+          type="button"
+          data-alerta={semTarefa ? "true" : undefined}
+          className={cn(CLASSES_DO_ATALHO, semTarefa && CLASSES_DO_ALERTA)}
+          onClick={onIrParaProximoPasso}
+        >
+          <ListChecks size={15} className={semTarefa ? "text-warning-fg" : "text-accent"} aria-hidden />
+          <span className="truncate">{t("Próximo passo")}</span>
         </button>
-        {/* Visível "Detalhes" porque "Detalhes do contato" não cabe em um terço de
-            296px; o nome acessível CONTÉM o visível (WCAG 2.5.3). */}
+        {/* Visível "Detalhes" porque "Detalhes do contato" não cabe em um terço do
+            painel; o nome acessível CONTÉM o visível (WCAG 2.5.3). */}
         <button type="button" className={CLASSES_DO_ATALHO} aria-label={t("Detalhes do contato")} onClick={onIrParaDetalhes}>
-          <UserCircle size={14} className="text-accent" aria-hidden /> {t("Detalhes")}
+          <UserCircle size={15} className="text-accent" aria-hidden /> {t("Detalhes")}
         </button>
         {/* Sem aria-label: o nome acessível é o próprio texto visível, em
             qualquer idioma (WCAG 2.5.3); o `title` só descreve. */}
         <button type="button" className={CLASSES_DO_ATALHO} title={t("Observações")} onClick={onIrParaObservacoes}>
-          <Note size={14} className="text-accent" aria-hidden /> {t("Obs")}
+          <Note size={15} className="text-accent" aria-hidden /> {t("Obs")}
         </button>
       </div>
     </div>

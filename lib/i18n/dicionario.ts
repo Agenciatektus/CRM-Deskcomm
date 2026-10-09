@@ -14284,6 +14284,13 @@ export const DICIONARIO: Traducoes = {
   Transcrição: { es: "Transcripción" },
   "Mostrar transcrição": { es: "Mostrar transcripción" },
   "Ocultar transcrição": { es: "Ocultar transcripción" },
+  // ─── Visual v2 polido (topo, painel do lead, disponibilidade) ───
+  "Buscar telas e funções": { es: "Buscar pantallas y funciones" },
+  "Indisponível": { es: "No disponible" },
+  "Clique para ficar disponível": { es: "Haz clic para quedar disponible" },
+  "Clique para ficar indisponível": { es: "Haz clic para quedar no disponible" },
+  "Nenhuma tarefa marcada": { es: "Ninguna tarea programada" },
+  "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
 };
 
 /**

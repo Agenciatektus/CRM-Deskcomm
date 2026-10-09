@@ -128,15 +128,16 @@ describe("CommandPalette", () => {
   it("permite filtrar por categorias através dos botões", async () => {
     const user = userEvent.setup();
     abrir();
-    const btnAtendimento = screen.getByRole("button", { name: /Atendimento/i });
-    expect(btnAtendimento).toBeTruthy();
-    await user.click(btnAtendimento);
-    // Ao filtrar por Atendimento, itens de CRM ou Funcionários não devem aparecer
+    // O grupo `atendimento` se chama "Conversas" na tela (rótulo curto do trilho).
+    const btnConversas = screen.getByRole("button", { name: /Conversas/i });
+    expect(btnConversas).toBeTruthy();
+    await user.click(btnConversas);
+    // Ao filtrar por Conversas, itens de CRM ou Funcionários não devem aparecer
     expect(screen.getByRole("option", { name: /Inbox/ })).toBeTruthy();
     expect(screen.queryByRole("option", { name: /Contatos/ })).toBeNull();
   });
 
-  it("no catálogo, abre em Atendimento e a seta segue a ordem da tela", async () => {
+  it("no catálogo, abre em Conversas e a seta segue a ordem da tela", async () => {
     const user = userEvent.setup();
     abrir();
     // O catálogo começa por Prospecção (CRM): agrupar pela 1ª aparição punha

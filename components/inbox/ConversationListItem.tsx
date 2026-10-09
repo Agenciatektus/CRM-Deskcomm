@@ -4,7 +4,6 @@ import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { Robot } from "@/lib/ui/icons";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { comandoDaConversa, esperaDaConversa } from "@/lib/inbox/comando-da-conversa";
 import { cn } from "@/lib/utils";
@@ -12,6 +11,7 @@ import type { ConversationWithContact } from "@/hooks/inbox/useConversationsReal
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
+import { AvatarDoContato } from "./AvatarDoContato";
 import { BotaoMaisAcoes } from "./menu/BotaoMaisAcoes";
 import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
@@ -161,7 +161,7 @@ export function ConversationListItem({
       onClick={() => onSelect(conversation.id)}
       {...gatilhos}
       className={cn(
-        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-2.5 text-left transition-colors hover:bg-surface-elevated",
+        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-surface-elevated",
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
         isSelected && "bg-accent-soft hover:bg-accent-soft",
       )}
@@ -173,20 +173,13 @@ export function ConversationListItem({
         <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-sm bg-accent" aria-hidden />
       )}
       <div className="relative h-10 w-10 shrink-0">
-        <Avatar className="h-10 w-10">
-          {/* Só monta a <img> quando existe arquivo: sem isso o browser pediria
-              a rota para TODO contato da lista e levaria 404 em cada um sem
-              foto. O AvatarFallback do Radix cobre a imagem que não carrega. */}
-          {c?.avatar_storage_path && !c?.is_anonymized ? (
-            <AvatarImage src={`/api/v1/contacts/${c.id}/avatar`} alt="" className="object-cover" />
-          ) : null}
-          <AvatarFallback className="bg-surface-elevated text-xs font-semibold text-text-muted">
-            {initials(displayName, phoneFallback)}
-          </AvatarFallback>
-        </Avatar>
+        {/* Cor por pessoa (hash do id), a mesma do cabeçalho e do painel. */}
+        <AvatarDoContato contato={c} nome={displayName} iniciais={initials(displayName, phoneFallback)} />
+        {/* Anel em `surface`: a lista agora mora no card da área de trabalho
+            (fundo `surface`), e o anel recorta o selo contra esse fundo. */}
         <span
           className={cn(
-            "absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full border-2 border-background",
+            "absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full border-2 border-surface",
             dot,
           )}
           aria-hidden
@@ -195,7 +188,7 @@ export function ConversationListItem({
         <ChannelLogo
           channel={canal}
           size={12}
-          className="absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full bg-background ring-2 ring-background"
+          className="absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full bg-surface ring-2 ring-surface"
         />
       </div>
 
@@ -204,8 +197,8 @@ export function ConversationListItem({
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <span
               className={cn(
-                "truncate text-sm text-text",
-                naoLida ? "font-bold" : "font-medium",
+                "truncate text-[14.5px] text-text",
+                naoLida ? "font-bold" : "font-semibold",
                 c?.is_anonymized && "font-normal italic text-text-muted",
               )}
             >
@@ -237,7 +230,7 @@ export function ConversationListItem({
         <div className="mt-0.5 flex items-center gap-2">
           <p
             className={cn(
-              "min-w-0 flex-1 truncate text-[13px]",
+              "min-w-0 flex-1 truncate text-[13.5px]",
               naoLida ? "text-text" : "text-text-muted",
             )}
           >

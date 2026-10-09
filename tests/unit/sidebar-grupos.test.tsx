@@ -25,6 +25,7 @@ import userEvent from "@testing-library/user-event";
 
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
+import type * as IdiomaProviderModulo from "@/lib/i18n/IdiomaProvider";
 
 const authRef: { user: Pick<AuthUser, "is_platform_admin">; activeOrg: ActiveOrg | null } = {
   user: { is_platform_admin: false },
@@ -63,12 +64,22 @@ vi.mock("@/components/shell/VersionFooter", () => ({
   VersionFooter: () => null,
 }));
 
+// O rótulo CURTO do trilho depende do idioma; o resto do arquivo roda em pt-BR.
+const idiomaRef: { valor: "pt-BR" | "es" } = { valor: "pt-BR" };
+vi.mock("@/lib/i18n/IdiomaProvider", async (original) => ({
+  ...(await original<typeof IdiomaProviderModulo>()),
+  useIdioma: () => idiomaRef.valor,
+}));
+
 function comoPapel(role: ActiveOrg["role"]) {
   authRef.user = { is_platform_admin: false };
   authRef.activeOrg = { orgId: "org-1", name: "Org", role };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  idiomaRef.valor = "pt-BR";
+  cleanup();
+});
 
 /** O trilho: um botão por grupo, na ordem do registro. */
 const trilho = () => screen.getByRole("navigation", { name: "Grupos da navegação" });
@@ -89,10 +100,10 @@ describe("Sidebar agrupado", () => {
     // Organização não está no trilho: seu hub (Configurações) é o link Ajustes do
     // rodapé fixo, fora da área que rola — medido, ele caía fora da dobra até em
     // 1080px. "Agentes" no plural é decisão do produto (era "Agente").
-    expect(nomesDosGrupos()).toEqual(["Atendimento", "CRM", "Agentes", "Canais", "Análise"]);
+    expect(nomesDosGrupos()).toEqual(["Conversas", "CRM", "Agentes", "Canais", "Análise"]);
     // A coluna tem UM título: o do grupo mostrado, que começa sendo o da rota.
     expect(screen.getAllByRole("heading").map((el) => el.textContent?.trim())).toEqual([
-      "Atendimento",
+      "Conversas",
     ]);
   });
 
@@ -135,7 +146,7 @@ describe("Sidebar agrupado", () => {
     expect(casosNoTrilho).toHaveAttribute("data-compacto", "true");
     expect(casosNoTrilho.closest("button")).toHaveTextContent("Agentes");
     const filaNoTrilho = within(trilho()).getByTestId("marcador-fila");
-    expect(filaNoTrilho.closest("button")).toHaveTextContent("Atendimento");
+    expect(filaNoTrilho.closest("button")).toHaveTextContent("Conversas");
     // Na coluna, o número inteiro fica no item da tela.
     const filaNaColuna = within(coluna()).getAllByTestId("marcador-fila");
     expect(filaNaColuna).toHaveLength(1);
@@ -208,7 +219,7 @@ describe("Sidebar agrupado", () => {
     comoPapel("agent");
     render(<Sidebar collapsed={false} />);
     expect(nomesDosGrupos()).not.toContain("Canais");
-    expect(nomesDosGrupos()).toContain("Atendimento");
+    expect(nomesDosGrupos()).toContain("Conversas");
   });
 
   it("oferece o hub dos grupos que têm um", async () => {
@@ -225,7 +236,7 @@ describe("Sidebar agrupado", () => {
     expect(screen.queryAllByRole("heading")).toHaveLength(0);
     expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull();
     // O botão do grupo abre a coluna como sobreposição, e diz isso ao leitor de tela.
-    const atendimento = within(trilho()).getByRole("button", { name: "Atendimento" });
+    const atendimento = within(trilho()).getByRole("button", { name: "Conversas" });
     expect(atendimento).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(atendimento);
     expect(atendimento).toHaveAttribute("aria-expanded", "true");
@@ -245,7 +256,7 @@ describe("Sidebar agrupado", () => {
         <button type="button">fora da barra</button>
       </>,
     );
-    const atendimento = within(trilho()).getByRole("button", { name: "Atendimento" });
+    const atendimento = within(trilho()).getByRole("button", { name: "Conversas" });
     await userEvent.click(atendimento);
     // Um Esc que o ⌘K ou um modal já consumiram não fecha o peek de carona.
     const inbox = screen.getByRole("link", { name: /Inbox/ });
@@ -261,7 +272,7 @@ describe("Sidebar agrupado", () => {
   it("expandir a barra zera o peek", async () => {
     comoPapel("admin");
     const { rerender } = render(<Sidebar collapsed />);
-    await userEvent.click(within(trilho()).getByRole("button", { name: "Atendimento" }));
+    await userEvent.click(within(trilho()).getByRole("button", { name: "Conversas" }));
     rerender(<Sidebar collapsed={false} />);
     rerender(<Sidebar collapsed />);
     // Recolhida de novo, a sobreposição não reaparece sozinha.
@@ -275,5 +286,24 @@ describe("Sidebar agrupado", () => {
     // "Kanban" saiu da interface; o item da mesma URL agora se chama "Funis".
     await abrirGrupo("CRM");
     expect(screen.getByRole("link", { name: "Funis" })).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("rótulo curto do trilho", () => {
+  it("em espanhol o grupo Conversas aparece como 'Chats' só no trilho", () => {
+    // "Conversaciones" não cabe nos 64px do botão; o título (dica) mantém o nome
+    // completo traduzido, e o dicionário de "Conversas" não muda para o resto do
+    // produto (tabelas usam a mesma chave em outro sentido).
+    idiomaRef.valor = "es";
+    comoPapel("admin");
+    render(<Sidebar collapsed={false} />);
+    const botao = within(trilho()).getByRole("button", { name: "Chats" });
+    expect(botao).toHaveAttribute("title", "Conversas");
+  });
+
+  it("em português o trilho usa o próprio rótulo do grupo", () => {
+    comoPapel("admin");
+    render(<Sidebar collapsed={false} />);
+    expect(within(trilho()).getByRole("button", { name: "Conversas" })).toBeTruthy();
   });
 });
