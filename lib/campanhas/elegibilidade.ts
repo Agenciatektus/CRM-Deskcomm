@@ -117,14 +117,33 @@ export interface ContextoDaClassificacao {
  * o primeiro da ordem estável do recorte, para a prévia e o snapshot darem o
  * mesmo resultado.
  *
- * ═══ Por que "já em campanha" só olha campanha VIVA ═══
+ * ═══ Por que "já em campanha" é por TEMPO, e só conta quem foi abordado ═══
  *
  * O produto convida a testar variantes (três textos, três campanhas), e sem este
  * veto as TRÊS mensagens iriam para a mesma pessoa: além de queimar o contato,
  * invalida a medição — a segunda mensagem não mede a segunda copy, mede alguém
- * que já foi abordado. Mas o veto termina quando a campanha termina: bloquear por
- * campanha CONCLUÍDA impediria para sempre falar de novo com quem já se falou,
- * que é o oposto do que um CRM serve para fazer.
+ * que já foi abordado. Mas ele tem de terminar: bloquear para sempre impediria
+ * falar de novo com quem já se falou, que é o oposto do que um CRM serve para
+ * fazer.
+ *
+ * ⚠⚠ A RÉGUA MUDOU NA 9039, e o que estava escrito aqui até então era "o veto
+ * termina quando a campanha termina". Terminou de valer: a campanha de entrada
+ * CONTÍNUA nunca conclui, e por aquele critério ela excluiria de toda campanha
+ * futura, para sempre, cada contato que tocasse.
+ *
+ * São DOIS critérios agora, e eles medem coisas diferentes:
+ *
+ *   (1) PASSADO — RECEBEU nos últimos `DIAS_SEM_REPETIR_A_CADENCIA` dias
+ *       (`sent_at`, a mesma janela do anti-laço da régua de prospecção).
+ *       Independe do estado da campanha: cancelar não desfaz a mensagem lida.
+ *   (2) PRESENTE — está na FILA ATIVA de uma campanha que ainda vai falar. É o
+ *       que impede duas campanhas de mandarem o primeiro contato para a mesma
+ *       pessoa na mesma semana, e só aqui o estado da campanha importa.
+ *
+ * Linha EXCLUÍDA não conta em nenhum dos dois: a preparação e o gatilho gravam
+ * linha também para quem foi vetado, e vetado não recebeu nada. Quem monta o
+ * conjunto é `contatosJaEmCampanha` (`consulta-de-audiencia.ts`), com a doutrina
+ * completa; aqui só se aplica o que ele entregou.
  */
 export function classificarAudiencia(
   candidatos: readonly CandidatoDaAudiencia[],

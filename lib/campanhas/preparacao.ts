@@ -41,6 +41,7 @@ import {
   contarExclusoes,
   type CandidatoDaAudiencia,
 } from "./elegibilidade";
+import { filtroDaEtapaDeEntrada, type EntradaDaCampanha } from "./entrada-continua";
 import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { MotivoDeExclusao } from "./tipos";
 
@@ -217,6 +218,56 @@ export async function prepararCampanha(
     elegiveis,
     excluidos: linhas.length - elegiveis,
     motivos: contarExclusoes(linhas),
+  };
+}
+
+/**
+ * A PRÉVIA da campanha CONTÍNUA (migration 9039): quem está na etapa de entrada
+ * HOJE, e o que cada um receberia.
+ *
+ * Não grava nada — e é por isso que ela existe. No modo contínuo não há o
+ * instante "antes de apertar", então esta contagem É a revisão: o operador lê
+ * quantas pessoas a etapa tem agora, quantas ficariam de fora e por quê, antes
+ * de armar o gatilho. Um `{{nome}}` que falta no cadastro ou um `{Olá|}` que
+ * resolve para nada aparece aqui, em vez de chegar como mensagem em branco no
+ * WhatsApp de um cliente.
+ *
+ * Passa por `preverAudiencia`, que é a MESMA função da prévia do modo lista —
+ * logo pelos mesmos `buscarCandidatos` e `classificarAudiencia` do snapshot.
+ * Prévia que mede por outro caminho é prévia que mente, e a mentira só aparece
+ * depois do envio.
+ *
+ * ⚠️ O que ela NÃO é: a lista da campanha. Ninguém daqui vira destinatário. Quem
+ * entra é quem CHEGAR na etapa depois do Iniciar
+ * (`lib/campanhas/entrada-por-etapa.ts`), e a tela rotula este número como "está
+ * nesta etapa hoje" justamente para ele não ser lido como fila.
+ */
+export async function resumoDaEtapaDeEntrada(
+  admin: SupabaseClient,
+  entrada: {
+    campanha: EntradaDaCampanha & {
+      id: string;
+      organization_id: string;
+      message_body: string | null;
+      message_variants: string[] | null;
+    };
+    agora: Date;
+  },
+): Promise<ResumoDoSnapshot> {
+  const c = entrada.campanha;
+  const previa = await preverAudiencia(admin, {
+    organizationId: c.organization_id,
+    filtro: filtroDaEtapaDeEntrada(c),
+    corpo: c.message_body ?? "",
+    variacoes: c.message_variants ?? [],
+    agora: entrada.agora,
+    campanhaId: c.id,
+  });
+  return {
+    total: previa.total,
+    elegiveis: previa.elegiveis,
+    excluidos: previa.excluidos,
+    motivos: previa.motivos,
   };
 }
 

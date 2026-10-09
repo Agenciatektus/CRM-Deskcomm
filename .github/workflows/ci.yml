@@ -231,6 +231,11 @@ jobs:
 
       - name: Typecheck
         if: matrix.parte == 1
+        # O script `typecheck` do package.json carrega o MESMO teto (via
+        # `node --max-old-space-size`, que vale no Windows também, onde
+        # NODE_OPTIONS não se escreve igual). Trocar aqui pede trocar lá.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm typecheck
 
       # Na parte 2, não na 1: o porquê e a conta estão no cabeçalho do job.

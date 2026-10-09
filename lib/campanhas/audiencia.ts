@@ -27,15 +27,29 @@
  */
 import { z } from "zod";
 
-/** Estados em que uma campanha ainda pretende falar com a lista dela. */
-export const CAMPANHAS_VIVAS = [
-  "draft",
-  "preparing",
-  "ready",
-  "scheduled",
-  "running",
-  "paused",
-] as const;
+/**
+ * ⚠️ `CAMPANHAS_VIVAS` FOI REMOVIDA na 9039, e o vazio aqui é deliberado.
+ *
+ * Ela listava os estados em que uma campanha "ainda pretende falar com a lista
+ * dela", e servia ao veto "já em campanha" nos DOIS lugares em que ele existe:
+ * `contatosJaEmCampanha` (`consulta-de-audiencia.ts`, o conjunto do modo lista) e
+ * `estaEmOutraCampanha` (`entrada-por-etapa.db.ts`, a pergunta por contato do
+ * gatilho contínuo). Os dois saíram dela no mesmo commit — nenhum ficou
+ * pendente.
+ * Esse veto virou DOIS critérios (decisão do dono, 06/10/2026): quem RECEBEU nos
+ * últimos 30 dias, que não olha estado de campanha nenhum, e quem está na FILA
+ * ATIVA de uma campanha que ainda vai falar, que olha.
+ *
+ * O problema dela nunca foi listar estados — era ser a lista de SEIS estados
+ * usada como se respondesse "ainda vai falar?", quando a autoridade sobre isso é
+ * a máquina de estados. O critério (2) pergunta pelo complemento, derivado de
+ * lá: `STATUS_TERMINAIS` (`lib/campanhas/maquina-de-estados.ts`). Duas listas de
+ * estados divergem no primeiro estado novo, e a que ninguém lembrasse de
+ * atualizar seria a que decide se uma pessoa recebe duas abordagens.
+ *
+ * Deixar a constante de pé sem consumidor convidaria a ressuscitar a regra
+ * antiga, com o nome que ela tinha.
+ */
 
 export const filtroDeAudienciaSchema = z
   .strictObject({

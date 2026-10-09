@@ -81,7 +81,9 @@ function makeDb(pointers: Row[], versions: Row[], stages: Row[] = [], conexoes: 
 
   function builder(table: string) {
     const filters: Array<[string, unknown]> = [];
-    // `neq` (roteiros fora da lista de follow-ups, PR 2 dos fluxos de atendimento).
+    // `neq` (roteiros fora da lista de follow-ups, PR 2 dos fluxos de
+    // atendimento) e `not` (a lista exclui atendimento E as superfícies de
+    // prospecção de uma vez). Valor `Set` = lista negada, como em `filters`.
     const negados: Array<[string, unknown]> = [];
     let orderCol: string | null = null;
     let orderAsc = true;
@@ -95,7 +97,8 @@ function makeDb(pointers: Row[], versions: Row[], stages: Row[] = [], conexoes: 
           if (v instanceof Set) return v.has(row[k]);
           if (v === null) return (row[k] ?? null) === null;
           return valor(k) === v;
-        }) && negados.every(([k, v]) => valor(k) !== v)
+        }) &&
+        negados.every(([k, v]) => (v instanceof Set ? !v.has(valor(k)) : valor(k) !== v))
       );
     }
 
@@ -190,6 +193,29 @@ function makeDb(pointers: Row[], versions: Row[], stages: Row[] = [], conexoes: 
       neq(col: string, val: unknown) {
         negados.push([col, val]);
         return b;
+      },
+      /**
+       * `.not(coluna, operador, valor)` — a negação do PostgREST é textual, no
+       * terceiro argumento (`(atendimento,cadence,campaign)`), e não um método
+       * por operador. A lista do GET passou a excluir atendimento e as
+       * superfícies de prospecção num filtro só, e sem este método o duble
+       * estourava com `base.not is not a function`.
+       *
+       * Operador não previsto ESTOURA em vez de virar filtro frouxo: negação
+       * que não nega deixa o caso verde listando o que a rota esconde, que é
+       * justamente o defeito que a lista existe para impedir.
+       */
+      not(col: string, op: string, val: unknown) {
+        if (op === "in") {
+          const dentro = String(val ?? "").trim();
+          const lista = (dentro.startsWith("(") && dentro.endsWith(")") ? dentro.slice(1, -1) : dentro)
+            .split(",")
+            .map((v) => v.trim())
+            .filter((v) => v !== "");
+          negados.push([col, new Set<unknown>(lista)]);
+          return b;
+        }
+        throw new Error(`duble de banco: not(${op}) não implementado`);
       },
       is(col: string, val: null) {
         filters.push([col, val]);
@@ -355,6 +381,41 @@ describe("GET /api/v1/ai/followup-flows — list", () => {
     const body = (await res.json()) as { data: Row[] };
     expect(body.data).toHaveLength(1);
     expect(body.data[0]!.id).toBe("33333333-3333-4333-8333-333333333333");
+  });
+
+  /**
+   * A LISTA ESCONDE CADÊNCIA, CAMPANHA E ATENDIMENTO — o controle negativo do
+   * `.not(surface, "in", …)` da rota.
+   *
+   * O duble de banco não tinha `not` nenhum, e a rota estourava com
+   * `base.not is not a function`. Implementar o método sem nenhum caso com
+   * `surface` de prospecção na lista deixaria o conserto verde medindo nada:
+   * uma negação que não negasse passaria igual, e o defeito que a exclusão
+   * existe para impedir (régua de campanha abrindo no editor genérico, cujo
+   * PATCH grava o grafo sem as validações dela) voltaria calado.
+   */
+  it("a lista do RELÓGIO esconde cadência, campanha e atendimento; `?surface=atendimento` mostra só o roteiro", async () => {
+    const base = { organization_id: ORG_ID, status: "draft", active_version_id: null, handoff_policy: "pause", updated_at: "2026-01-01" };
+    const db = makeDb(
+      [
+        { ...base, id: "11111111-1111-4111-8111-111111111111", name: "Follow-up" },
+        { ...base, id: "22222222-2222-4222-8222-222222222222", name: "Cadência", surface: "cadence" },
+        { ...base, id: "33333333-3333-4333-8333-333333333333", name: "Campanha · Outubro", surface: "campaign" },
+        { ...base, id: "44444444-4444-4444-8444-444444444444", name: "Roteiro", surface: "atendimento" },
+      ],
+      [],
+    );
+    session("viewer", db);
+    const { GET } = await import("@/app/api/v1/ai/followup-flows/route");
+
+    const doRelogio = (await (await GET(req("GET"))).json()) as { data: Row[] };
+    expect(doRelogio.data.map((r) => r.id)).toEqual(["11111111-1111-4111-8111-111111111111"]);
+
+    const comSurface = new NextRequest("http://localhost/api/v1/ai/followup-flows?surface=atendimento", {
+      method: "GET",
+    });
+    const roteiros = (await (await GET(comSurface)).json()) as { data: Row[] };
+    expect(roteiros.data.map((r) => r.id)).toEqual(["44444444-4444-4444-8444-444444444444"]);
   });
 });
 

@@ -57,6 +57,23 @@ export const TERMINAIS_DE_DESPACHO: ReadonlySet<StatusDoDestinatario> = new Set(
 ]);
 
 /**
+ * Os estados em que a campanha AINDA VAI falar com esta pessoa — a fila ativa.
+ *
+ * DERIVADO de `TERMINAIS_DE_DESPACHO`, e não uma segunda lista: o complemento é
+ * exatamente "o que o despacho ainda pega". Escrever
+ * `['pending','queued','sending']` à mão criaria duas verdades sobre a mesma
+ * fronteira, e a que ninguém lembrasse de atualizar seria a que decide se uma
+ * pessoa recebe duas abordagens.
+ *
+ * Quem o usa: o veto "já em campanha" (`contatosJaEmCampanha` e
+ * `estaEmOutraCampanha`), para duas campanhas não mandarem o primeiro contato
+ * para a mesma pessoa na mesma semana.
+ */
+export const NA_FILA_DE_DESPACHO: readonly StatusDoDestinatario[] = STATUS_DO_DESTINATARIO.filter(
+  (s) => !TERMINAIS_DE_DESPACHO.has(s),
+);
+
+/**
  * Por que alguém do recorte não vai receber.
  *
  * Código, não frase: a frase é traduzida na borda (`TEXTO_DA_EXCLUSAO`), e
@@ -74,6 +91,16 @@ export const MOTIVOS_DE_EXCLUSAO = [
   "texto_vazio",
   "ja_em_campanha",
   "suprimido",
+  /**
+   * O NEGÓCIO desta pessoa já foi fechado (ganho ou perdido) alguma vez
+   * (migration 9040). Só a entrada CONTÍNUA o produz: no modo lista o recorte é
+   * de contatos e não de negócios.
+   *
+   * Vira LINHA, e não silêncio, porque num modo de público sem lista é o único
+   * jeito de o operador ver o veto comendo a base — antes dele o rastro era um
+   * número no `detail` do `event_log`, que ninguém abre.
+   */
+  "negocio_ja_fechado",
 ] as const;
 
 export type MotivoDeExclusao = (typeof MOTIVOS_DE_EXCLUSAO)[number];
@@ -93,6 +120,7 @@ export const TEXTO_DA_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   // (um `{Olá|}` com pipe sobrando rende vazio em metade das sementes). Dizer
   // "falta um dado" mandaria o operador procurar no cadastro, que está certo.
   texto_vazio: "A variação sorteada para esta pessoa ficou sem texto",
-  ja_em_campanha: "Já está em outra campanha ainda não concluída",
+  ja_em_campanha: "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar",
   suprimido: "Está na lista de exclusão de campanhas",
+  negocio_ja_fechado: "Já comprou ou já foi perdido antes (não é primeiro contato)",
 };
