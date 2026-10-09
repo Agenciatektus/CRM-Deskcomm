@@ -126,6 +126,9 @@ export const POLITICAS_DE_AVISO = {
   },
   // `agent_case`: o caso que a IA abriu, na Central no instante da abertura
   // (`lib/escalacao/caso-na-central.handler.ts`).
+  // A tarefa chegou na hora (migration 9043): o botão leva aonde o trabalho
+  // acontece — a conversa do contato, senão o negócio, senão o contato.
+  task_due: { refs: ["conversation", "lead", "contact"], orientacao: "Abra a conversa ou o negócio e faça o que a tarefa pede. Conclua a tarefa em Tarefas quando terminar." },
   other: { refs: ["lead", "channel_session", "appointment", "ai_agent", "ai_provider_credential", "agent_case"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 

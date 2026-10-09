@@ -102,6 +102,9 @@ export type InboxKind =
   // A proposta rascunhada pela IA precisa de revisão de uma pessoa — a Central
   // acompanha até resolver.
   | 'proposta_pronta_para_revisao'
+  // (migration 9043) A tarefa chegou na hora (`lib/tarefas/aviso-de-tarefa.ts`):
+  // o cron `task-due-reminder` abre o aviso e manda o push só ao responsável.
+  | 'task_due'
   | 'other';
 
 export interface InboxItemRow {

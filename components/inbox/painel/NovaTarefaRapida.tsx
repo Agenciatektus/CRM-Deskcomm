@@ -119,7 +119,7 @@ export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar }: {
         <Button type="submit" size="sm" disabled={invalido}>
           {salvando ? t("Salvando…") : t("Criar tarefa")}
         </Button>
-        <span className="text-xs text-text-muted">{t("Entra na lista de Tarefas.")}</span>
+        <span className="text-xs text-text-muted">{t("O responsável recebe o aviso na hora marcada.")}</span>
       </div>
     </form>
   );
