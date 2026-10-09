@@ -7,7 +7,7 @@ import { roleAtLeast } from "@/lib/auth/types";
 import { cn } from "@/lib/utils";
 
 /**
- * "Disponível / Indisponível" no topo: a MESMA chave de plantão da aba
+ * "Disponível / Ausente" no topo: a MESMA chave de plantão da aba
  * Atendimento de Equipe (`attendant_availability.is_available`). Lê só o
  * PRÓPRIO estado (`useMinhaDisponibilidade`, rota `/availability/me`, sem
  * admin client nem dados da equipe) e grava pelo PATCH de sempre
@@ -40,7 +40,7 @@ export function BotaoDeDisponibilidade() {
       type="button"
       // Sem `aria-label`: o nome acessível é o próprio texto visível (o ESTADO),
       // e o `title` diz o que o clique faz (WCAG 2.5.3).
-      title={ligado ? t("Clique para ficar indisponível") : t("Clique para ficar disponível")}
+      title={ligado ? t("Clique para ficar ausente") : t("Clique para ficar disponível")}
       disabled={atualizar.isPending}
       onClick={() => atualizar.mutate({ userId: user.id, patch: { is_available: !ligado } })}
       data-testid="botao-de-disponibilidade"
@@ -55,7 +55,7 @@ export function BotaoDeDisponibilidade() {
         )}
         aria-hidden
       />
-      {ligado ? t("Disponível") : t("Indisponível")}
+      {ligado ? t("Disponível") : t("Ausente")}
     </button>
   );
 }

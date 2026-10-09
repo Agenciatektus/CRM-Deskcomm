@@ -138,11 +138,14 @@ export function ConversationHeader({
           largura da tela inteira (707px de `min-content`, painel de CRM 311px
           fora da viewport em 1280). Quando aperta, a barra desce de linha. */}
       <header
-        className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-surface px-4 py-2.5"
+        // O `.th-head` do protótipo: 64px de altura mínima, 10px em cima e
+        // embaixo, 18px à esquerda (alinha o nome com o texto das bolhas) e 12px
+        // à direita (os ícones de ação já trazem o próprio respiro).
+        className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-surface py-2.5 pl-4.5 pr-3"
         data-testid="cabecalho-da-conversa"
       >
         <IdentidadeDaConversa
-          nome={displayName} contato={c}
+          nome={displayName}
           status={t(STATUS_LABEL[status] ?? status)}
           encerrada={encerrada}
           canal={conversation.channel_sessions}
@@ -191,7 +194,7 @@ export function ConversationHeader({
                   }
                   onClick={devolver}
                 >
-                  {retomar.isPending ? t("Devolvendo...") : t("Devolver ao automático")}
+                  {retomar.isPending ? t("Devolvendo...") : t("Devolver à IA")}
                 </Button>
               )}
               {encerrada && (

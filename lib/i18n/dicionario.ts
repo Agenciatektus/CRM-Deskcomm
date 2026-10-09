@@ -1313,7 +1313,6 @@ export const DICIONARIO: Traducoes = {
   Transferir: { es: "Transferir" },
   Lembrar: { es: "Recordar" },
   Fechar: { es: "Cerrar" },
-  "Devolver ao automático": { es: "Devolver al automático" },
   Aberta: { es: "Abierta" },
   Fechada: { es: "Cerrada" },
   "Em atendimento": { es: "En atención" },
@@ -3196,8 +3195,8 @@ export const DICIONARIO: Traducoes = {
   "Aprovar e ignorar viram registro — os dois. Quando você decidir a primeira, ela fica aqui.": {
     es: "Tanto aprobar como ignorar dejan un registro. Cuando tomes la primera decisión, aparecerá aquí.",
   },
-  "As conversas em andamento vão para a fila de atendimento humano — ninguém fica sem resposta, mas alguém precisa responder. Cada uma volta ao automático pelo botão \"Devolver ao automático\" no cabeçalho dela.": {
-    es: "Las conversaciones en curso pasan a la fila de atención humana. Nadie se queda sin respuesta, pero alguien tiene que responder. Cada una vuelve al modo automático con el botón \"Devolver al automático\" de su encabezado.",
+  "As conversas em andamento vão para a fila de atendimento humano — ninguém fica sem resposta, mas alguém precisa responder. Cada uma volta ao automático pelo botão \"Devolver à IA\" no cabeçalho dela.": {
+    es: "Las conversaciones en curso pasan a la fila de atención humana. Nadie se queda sin respuesta, pero alguien tiene que responder. Cada una vuelve al modo automático con el botón \"Devolver a la IA\" de su encabezado.",
   },
   "Assuntos mais procurados": { es: "Temas más buscados" },
   "Atendimentos com IA": { es: "Atenciones con IA" },
@@ -14286,9 +14285,9 @@ export const DICIONARIO: Traducoes = {
   "Ocultar transcrição": { es: "Ocultar transcripción" },
   // ─── Visual v2 polido (topo, painel do lead, disponibilidade) ───
   "Buscar telas e funções": { es: "Buscar pantallas y funciones" },
-  "Indisponível": { es: "No disponible" },
+  Ausente: { es: "Ausente" },
   "Clique para ficar disponível": { es: "Haz clic para quedar disponible" },
-  "Clique para ficar indisponível": { es: "Haz clic para quedar no disponible" },
+  "Clique para ficar ausente": { es: "Haz clic para quedar ausente" },
   "Nenhuma tarefa marcada": { es: "Ninguna tarea programada" },
   // ─── Visual v2, segunda passada (lista, faixa, painel, topo) ───
   Abertas: { es: "Abiertas" },
@@ -14298,6 +14297,7 @@ export const DICIONARIO: Traducoes = {
   },
   Próximo: { es: "Próximo" },
   "aguardando resposta": { es: "esperando respuesta" },
+  "Recolher menu": { es: "Contraer menú" },
   "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
 };
 

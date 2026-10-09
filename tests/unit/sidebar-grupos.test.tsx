@@ -124,9 +124,11 @@ describe("Sidebar agrupado", () => {
     // ⚠️ VISUAL V2 — a coluna do CRM mostra o inventário do grupo, e Etapas do
     // funil volta a aparecer, na seção "Preparar a venda", DENTRO do CRM. A
     // propriedade fica mais forte, não mais fraca: a porta é o grupo certo.
+    //
+    // ⚠️ 09/10/2026 — o "Ver tudo em CRM" saiu do fim da coluna (decisão do
+    // Peterson, seguindo o protótipo): a coluna já é o inventário inteiro.
     await abrirGrupo("CRM");
-    const hub = within(coluna()).getByRole("link", { name: /Ver tudo em CRM/ });
-    expect(hub).toHaveAttribute("href", "/app/crm");
+    expect(within(coluna()).queryByRole("link", { name: /Ver tudo em/ })).toBeNull();
     expect(within(coluna()).getByRole("link", { name: "Etapas do funil" })).toHaveAttribute(
       "href",
       "/app/settings/tenant/pipelines",
@@ -182,8 +184,6 @@ describe("Sidebar agrupado", () => {
     // Log foi para o hub do grupo. Na barra de duas colunas, a coluna de Análise
     // mostra esse inventário, e Audit Log volta a ter linha própria NELA.
     await abrirGrupo("Análise");
-    const hubAnalise = within(coluna()).getByRole("link", { name: /Ver tudo em Análise/ });
-    expect(hubAnalise).toHaveAttribute("href", "/app/analise");
     expect(within(coluna()).getByRole("link", { name: /Audit Log/ })).toHaveAttribute(
       "href",
       "/app/audit",
@@ -222,11 +222,15 @@ describe("Sidebar agrupado", () => {
     expect(nomesDosGrupos()).toContain("Conversas");
   });
 
-  it("oferece o hub dos grupos que têm um", async () => {
+  it("a coluna não repete o hub no fim: ela já é o inventário do grupo", async () => {
+    // Decisão do Peterson (09/10/2026), seguindo o protótipo. O hub segue na rota
+    // e no menu do celular, que não tem a coluna (`SidebarContent`).
     comoPapel("admin");
     render(<Sidebar collapsed={false} />);
     await abrirGrupo("Agentes");
-    expect(screen.getByRole("link", { name: /Ver tudo em IA/ })).toHaveAttribute("href", "/app/ai");
+    expect(screen.queryByRole("link", { name: /Ver tudo em IA/ })).toBeNull();
+    // Controle: a coluna está mesmo aberta, com as telas do grupo.
+    expect(within(coluna()).getByRole("link", { name: "Roteadores" })).toBeTruthy();
   });
 
   it("colapsado esconde os títulos e abre as telas do grupo por cima", async () => {

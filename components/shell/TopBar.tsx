@@ -52,7 +52,10 @@ function TrilhaDaRota() {
 
 export function TopBar() {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur md:gap-4 md:px-6">
+    // Sem `border-b` e com o respiro do `.topbar` do protótipo (6px à esquerda,
+    // 12px à direita): a trilha começa colada na barra lateral e o topo é a
+    // mesma moldura dela, não uma faixa separada por um fio.
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur md:gap-3 md:pl-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <MobileSidebar />
         <TenantSwitcher />

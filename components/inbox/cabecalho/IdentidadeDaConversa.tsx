@@ -1,9 +1,7 @@
 "use client";
-import { AvatarDoContato } from "@/components/inbox/AvatarDoContato";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
-import { initials } from "@/components/inbox/item/tempo-da-linha";
 import { OwnerBadge } from "@/components/kanban/OwnerBadge";
-import type { ChannelSummary, ContactSummary } from "@/hooks/inbox/useConversationsRealtime";
+import type { ChannelSummary } from "@/hooks/inbox/useConversationsRealtime";
 import { useT } from "@/hooks/i18n/useT";
 import { channelBrand, CHANNEL_BRAND_LABEL } from "@/lib/channels/presentation";
 import type { Comando } from "@/lib/inbox/comando-da-conversa";
@@ -23,8 +21,6 @@ interface Props {
   telefone: string | null;
   comando: Comando;
   meuUserId: string;
-  /** O contato, para o avatar com a cor da pessoa (a mesma da lista e do painel). */
-  contato?: ContactSummary | null;
 }
 
 /**
@@ -35,16 +31,15 @@ interface Props {
  * jeito de dizer "quem manda" faria a mesma pergunta ter respostas diferentes
  * na mesma tela. O testid é contrato de `inbox-quem-manda.spec.ts`.
  */
-export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone, comando, meuUserId, contato = null }: Props) {
+export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone, comando, meuUserId }: Props) {
   const t = useT();
   const marca = channelBrand(canal);
   const rotuloDoCanal = marca === "unknown" ? null : CHANNEL_BRAND_LABEL[marca];
 
   return (
+    // Sem avatar: no protótipo ele mora só no painel do lead, ao lado, e
+    // repeti-lo aqui gastava 52px da linha do nome na coluna mais disputada.
     <div className="flex min-w-0 flex-1 items-center gap-3">
-      {/* O avatar repete a cor da linha da lista: o olho reconhece que abriu a
-          pessoa certa antes de ler o nome. */}
-      <AvatarDoContato contato={contato} nome={nome} iniciais={initials(nome, telefone ?? "?")} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="min-w-0 truncate text-base font-bold" title={nome}>

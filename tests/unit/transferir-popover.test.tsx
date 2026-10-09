@@ -136,7 +136,7 @@ describe("TransferirPopover", () => {
     const user = userEvent.setup();
     montar({ devolver: { onDevolver, pendente: false } });
     await user.click(screen.getByRole("button", { name: "Transferir conversa" }));
-    await user.click(await screen.findByRole("button", { name: "Devolver ao automático" }));
+    await user.click(await screen.findByRole("button", { name: "Devolver à IA" }));
     expect(onDevolver).toHaveBeenCalledOnce();
     expect(postMock).not.toHaveBeenCalled();
   });

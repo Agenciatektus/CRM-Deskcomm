@@ -115,7 +115,7 @@ describe("a fila tem uma definição só", () => {
 describe("quem manda não se decide por `ai_handling`", () => {
   /**
    * `conversations.status = 'ai_handling'` é escrito por UM caminho só em
-   * produção — a volta pelo botão "Devolver ao automático" — e por isso NUNCA
+   * produção — a volta pelo botão "Devolver à IA" — e por isso NUNCA
    * descreveu quem está no comando: a aba que o filtrava mostrava 2 conversas
    * enquanto o robô atendia 47.
    *

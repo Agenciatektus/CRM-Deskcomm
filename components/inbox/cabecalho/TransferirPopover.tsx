@@ -162,7 +162,7 @@ export function TransferirPopover({ conversationId, devolver, numero }: Props) {
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-accent text-accent" aria-hidden>
               <Robot size={12} />
             </span>
-            <span className="flex-1">{t("Devolver ao automático")}</span>
+            <span className="flex-1">{t("Devolver à IA")}</span>
           </button>
         )}
         <Button

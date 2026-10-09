@@ -59,7 +59,7 @@ describe("botão de disponibilidade no topo", () => {
   it("indisponível diz Indisponível e religa", async () => {
     minha = { isSuccess: true, data: { data: { user_id: "u-1", is_available: false } } };
     render(<BotaoDeDisponibilidade />);
-    await userEvent.click(screen.getByRole("button", { name: "Indisponível" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ausente" }));
     expect(mutate).toHaveBeenCalledWith({ userId: "u-1", patch: { is_available: true } });
   });
 
@@ -86,6 +86,6 @@ describe("botão de disponibilidade no topo", () => {
   it("sem linha (nunca configurou) mostra Indisponível, que é o estado real", () => {
     minha = { isSuccess: true, data: { data: null } };
     render(<BotaoDeDisponibilidade />);
-    expect(screen.getByRole("button", { name: "Indisponível" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ausente" })).toBeTruthy();
   });
 });

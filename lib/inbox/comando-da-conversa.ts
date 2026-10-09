@@ -90,7 +90,7 @@ export interface FatosDoComando {
    * que vai acontecer.
    *
    * **Mas ele NÃO liga `travaVigente`**, e a diferença é deliberada: `travaVigente`
-   * é o que acende "Devolver ao automático", e devolver não desfaz um opt-out — o
+   * é o que acende "Devolver à IA", e devolver não desfaz um opt-out — o
    * `stopGate` recusaria na mesma. Um botão que aparece e não pode funcionar é
    * controle decorativo, que é pior que ausência de botão.
    */
@@ -293,7 +293,7 @@ export function comandoDaConversa(fatos: FatosDoComando, agora: Date = new Date(
     automaticoAtivo,
     // `bloqueado` ANULA a trava devolvível: veja o comentário de `is_blocked` em
     // `FatosDoComando`. Devolver não desfaz opt-out, e o botão seria decorativo.
-    // Grupo também: "Devolver ao automático" num grupo prometeria o que não existe.
+    // Grupo também: "Devolver à IA" num grupo prometeria o que não existe.
     travaVigente: (travado || silencio.vigente) && !bloqueado && !grupo,
     motivo,
     silencioAte: motivo === "resposta_humana_recente" ? silencio.ate : null,

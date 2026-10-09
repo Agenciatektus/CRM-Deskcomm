@@ -1,7 +1,7 @@
 /**
  * GET /api/v1/attendants/availability/me — a chave de plantão de QUEM PERGUNTA.
  *
- * Existe para o botão "Disponível / Indisponível" do topo, que aparece em toda
+ * Existe para o botão "Disponível / Ausente" do topo, que aparece em toda
  * tela. Ele lia o roster (`GET /availability`), que resolve nome e e-mail de
  * cada membro pelo admin client (`getUserById` por pessoa): custo multiplicado
  * pela equipe a cada tela aberta, e PII da equipe inteira entregue a quem só
