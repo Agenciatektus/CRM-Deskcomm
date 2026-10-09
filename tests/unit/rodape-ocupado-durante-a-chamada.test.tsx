@@ -197,6 +197,10 @@ describe("com a chamada em andamento", () => {
     expect(rodape.getAttribute("style") ?? "").toContain(
       `max(${PISO_DO_RODAPE}px, var(${VARIAVEL_DA_OCUPACAO}, 0px))`,
     );
+    // O cartão da Inbox desconta da própria altura ESTA medida, publicada pelo
+    // `<main>`: as duas contas não podem divergir (P2 do Cassio na #143).
+    expect(rodape.style.getPropertyValue("--respiro-do-main")).toContain("max(");
+    expect(rodape.style.getPropertyValue("--respiro-do-main")).toBe(rodape.style.paddingBottom);
   });
 
   it("a ação do rodapé continua clicável", () => {

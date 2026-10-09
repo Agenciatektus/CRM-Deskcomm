@@ -146,14 +146,14 @@ export function ConversationListItem({
         // Selecionada: o fundo ELEVADO, um degrau acima do card da lista, como
         // no protótipo. O `accent-soft` (16% da marca) quase sumia no escuro com
         // a marca sálvia, e a linha aberta não se destacava das vizinhas.
-        isSelected && "bg-surface-elevated hover:bg-surface-elevated",
+        isSelected && "pele-selecionada bg-surface-elevated hover:bg-surface-elevated",
       )}
       aria-current={isSelected ? "true" : undefined}
     >
       {/* Marcador da seleção: o `conv.is-sel::before` do protótipo, recuado em
           cima e embaixo para não colar na borda da linha vizinha. */}
       {isSelected && (
-        <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-sm bg-accent" aria-hidden />
+        <span className="pele-grad-traco absolute inset-y-1.5 left-0 w-[3px] rounded-r-sm bg-accent" aria-hidden />
       )}
       <div className="relative h-10 w-10 shrink-0">
         {/* Cor por pessoa (hash do id), a mesma do cabeçalho e do painel. */}
@@ -223,7 +223,7 @@ export function ConversationListItem({
           </p>
           {naoLida && (
             <span
-              className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
+              className="pele-grad inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
               aria-label={soMarcada ? t("Marcada como não lida") : `${unread} ${t("mensagens não lidas")}`}
             >
               {soMarcada ? "" : unread}

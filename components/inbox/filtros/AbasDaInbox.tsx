@@ -63,7 +63,7 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
   const escondidaAtiva = escondidas.find((a) => a.value === tab);
   return (
     <Tabs value={tab} onValueChange={(v) => onChange(v as InboxTab)}>
-      <div className="flex gap-0.5 rounded-lg border border-border bg-surface-elevated p-[3px]">
+      <div className="pele-seg flex gap-0.5 rounded-lg border border-border bg-surface-elevated p-[3px]">
         <TabsList className="h-auto min-w-0 flex-1 gap-0.5 rounded-none bg-transparent p-0">
           {principais.map((aba) => (
             <TabsTrigger
@@ -71,7 +71,7 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
               value={aba.value}
               className={cn(
                 "h-7 min-w-0 flex-1 gap-1.5 rounded-md px-2 text-xs font-semibold text-text-muted shadow-none",
-                "hover:text-text data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-sm",
+                "pele-seg-item hover:text-text data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-sm",
               )}
             >
               {t(aba.label)}
@@ -86,7 +86,7 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
                 type="button"
                 data-ativa={escondidaAtiva ? "true" : undefined}
                 className={cn(
-                  "flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-text-muted hover:text-text",
+                  "pele-seg-item flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-text-muted hover:text-text",
                   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                   escondidaAtiva && "bg-surface text-text shadow-sm",
                 )}

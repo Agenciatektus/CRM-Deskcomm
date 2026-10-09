@@ -29,10 +29,10 @@ const TOM: Record<TomDaBolha, string> = {
   entrada: "border border-border bg-surface text-text shadow-xs",
   // Accent SUAVE com texto escuro, no lugar do accent cheio com texto branco:
   // legível nos dois temas e ainda inconfundível como "nosso lado".
-  saida: "bg-accent-soft text-text shadow-xs dark:bg-accent/25",
+  saida: "pele-bolha-saida bg-accent-soft text-text shadow-xs",
   // A IA fala do nosso lado, mas não é uma pessoa: borda do accent e fundo
   // quase neutro, para quem lê saber de relance o que foi automático.
-  ia: "border border-accent/35 bg-accent/5 text-text shadow-xs dark:bg-accent/10",
+  ia: "pele-bolha-ia border border-accent/35 bg-accent/5 text-text shadow-xs",
   apagada: "border border-dashed border-border-strong bg-transparent text-text-subtle shadow-none",
   figurinha: "bg-transparent shadow-none",
 };

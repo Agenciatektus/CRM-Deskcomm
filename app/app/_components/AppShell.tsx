@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
@@ -20,6 +20,20 @@ import { cn } from "@/lib/utils";
  * próprio cartão. As outras telas continuam com o `p-6` de sempre. A altura do
  * cartão desconta exatamente este respiro (ver `InboxLayout`).
  */
+/**
+ * O estilo do `<main>`: a reserva do rodapé (quando há peça fixa) e, junto, a
+ * MESMA medida publicada em `--respiro-do-main`, que o cartão da Inbox desconta
+ * da própria altura. Uma fonte só: com o painel de chamada o `<main>` reserva
+ * `max(24px, ocupação)`, e o cartão descontando outra conta (o piso de 8px)
+ * passaria da tela. Sem peça não há estilo nenhum (o `pb-2`/`p-6` de sempre),
+ * e o cartão cai no `var(--space-2)` de reserva.
+ */
+function estiloDoMain(ocupacao: number): CSSProperties | undefined {
+  const reserva = estiloDaReserva(ocupacao);
+  if (!reserva) return undefined;
+  return { ...reserva, ["--respiro-do-main" as string]: reserva.paddingBottom };
+}
+
 function ehAInbox(pathname: string | null): boolean {
   return pathname === "/app/inbox" || !!pathname?.startsWith("/app/inbox/");
 }
@@ -60,7 +74,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
   const ocupacaoDoRodape = useOcupacaoDoRodape();
   const naInbox = ehAInbox(usePathname());
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="pele-moldura flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
       <div className="hidden md:block">
         <Sidebar collapsed={sidebarCollapsed} funis={funis} />
@@ -98,7 +112,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
         */}
         <main
           className={cn("flex-1 overflow-auto", naInbox ? "pr-2 pb-2" : "p-6")}
-          style={estiloDaReserva(ocupacaoDoRodape)}
+          style={estiloDoMain(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >
           {children}

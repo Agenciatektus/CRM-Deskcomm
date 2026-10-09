@@ -75,7 +75,7 @@ const ROTULO_CURTO_NO_TRILHO: Partial<Record<NavGroupId, Partial<Record<Idioma, 
  */
 const BOTAO_DO_TRILHO =
   "relative flex min-h-14 w-16 max-w-full flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5 text-[10.5px] leading-[1.1] font-semibold tracking-[-0.01em] transition-colors";
-const BOTAO_MARCADO = "bg-card text-foreground ring-1 ring-border";
+const BOTAO_MARCADO = "pele-ativo-trilho bg-card text-foreground ring-1 ring-border";
 const BOTAO_SOLTO = "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
 
 /**

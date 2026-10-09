@@ -34,7 +34,7 @@ function TrilhaDaRota() {
     <nav aria-label={t("Onde você está")} className="hidden min-w-0 md:block">
       <div className="flex min-w-0 items-center gap-2">
         <ol className="flex min-w-0 items-center gap-1.5 text-sm">
-          <li className="truncate text-muted-foreground">{t(grupo.label)}</li>
+          <li className="pele-rotulo truncate text-muted-foreground">{t(grupo.label)}</li>
           <li aria-hidden className="text-muted-foreground">
             ›
           </li>

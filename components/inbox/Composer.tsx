@@ -235,7 +235,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           // vira tracejada no tom de aviso: quem digita sabe, sem ler nada, se
           // aquilo vai para o cliente ou fica com o time.
           className={cn(
-            "relative rounded-2xl border transition-[border-color,box-shadow]",
+            "pele-ruido relative rounded-2xl border transition-[border-color,box-shadow]",
             nota
               ? "border-dashed border-warning/60 bg-warning-bg focus-within:border-warning focus-within:ring-3 focus-within:ring-warning/20"
               : "border-border-strong bg-surface focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/20",

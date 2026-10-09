@@ -24,7 +24,7 @@ type Escolha = AtalhoDeQuando | "escolher" | null;
  */
 export const CLASSES_DO_CHIP =
   "h-8 rounded-full border border-border-strong bg-surface px-3 text-[13px] font-semibold text-text-muted hover:border-text-subtle hover:text-text disabled:cursor-not-allowed disabled:opacity-40";
-export const CLASSES_DO_CHIP_LIGADO = "border-accent bg-accent text-accent-foreground hover:border-accent hover:text-accent-foreground";
+export const CLASSES_DO_CHIP_LIGADO = "pele-grad border-accent bg-accent text-accent-foreground hover:border-accent hover:text-accent-foreground";
 
 /**
  * "Quando": três atalhos e a saída para o calendário.

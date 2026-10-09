@@ -406,19 +406,21 @@
   --color-neutral-900: #0d0e11;
   --color-neutral-950: #050607;
 
-  /* States (dark) */
+  /* States (dark): fundo e texto da pele Verdash (o `--ok/--ok-bg`, `--warn`,
+     `--crit` e `--info` do protótipo MainVerdash, em hex, porque a régua de
+     contraste lê hex). Os sólidos ficam: são fundo de botão com texto branco. */
   --color-success: #82a077;
-  --color-success-bg: rgba(130, 160, 119, 0.18);
-  --color-success-fg: #a4ba9a;
+  --color-success-bg: #0a3723;
+  --color-success-fg: #41ce90;
   --color-warning: #d09455;
-  --color-warning-bg: rgba(208, 148, 85, 0.18);
-  --color-warning-fg: #e0ad77;
+  --color-warning-bg: #412805;
+  --color-warning-fg: #ffb846;
   --color-error: #c87263;
-  --color-error-bg: rgba(200, 114, 99, 0.18);
-  --color-error-fg: #d99182;
+  --color-error-bg: #521c1d;
+  --color-error-fg: #fa8785;
   --color-info: #7da9bf;
-  --color-info-bg: rgba(125, 169, 191, 0.18);
-  --color-info-fg: #9bbfd2;
+  --color-info-bg: #182e4b;
+  --color-info-fg: #65a7fa;
 
   /* Shadows — heavier in dark */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
@@ -519,6 +521,31 @@
     var(--color-accent),
     color-mix(in srgb, var(--color-accent) 70%, var(--gradient-primary-oposto))
   );
+
+  /* ---- Pele Verdash (escuro): tokens -----------------------------------
+     O bloco "VARIANTE VERDASH" do protótipo (MainVerdash.dc.html), traduzido.
+     Os tokens de MARCA (degradê, brilho, foco) saem da marca EM VIGOR, pela
+     mesma razão do `--gradient-primary` acima: o escuro respeita o white-label
+     (`lib/branding/css.ts` injeta a rampa da organização no `<body>`), e um
+     azul->menta fixo pintaria a tela de todo revendedor com a cor do produto.
+     Adotar o degradê fixo do protótipo é trocar QUATRO linhas (`--pele-grad`,
+     `--pele-grad-fg`, `--pele-brilho`, `--pele-foco`); a decisão é do
+     Peterson e está pendente. Os tokens SEM marca (ruído, sombra dura, fundo
+     do fio) são os do protótipo. */
+  --pele-grad: var(--gradient-primary);
+  --pele-grad-fg: var(--color-accent-fg);
+  --pele-brilho: var(--color-accent);
+  --pele-foco: var(--color-accent);
+  --pele-grad-soft: linear-gradient(
+    120deg,
+    color-mix(in oklch, var(--pele-brilho) 24%, transparent),
+    color-mix(in oklch, var(--pele-brilho) 14%, transparent)
+  );
+  --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
+  --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
+  --pele-fio: #111315;
+  --pele-bolha-saida: color-mix(in oklch, var(--color-accent) 30%, var(--color-surface));
+  --pele-bolha-ia: color-mix(in oklch, var(--pele-brilho) 8%, var(--color-surface));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1109,6 +1136,18 @@
     var(--color-bg);
 }
 
+/* No escuro, o `.thread` da pele Verdash: brilho de 13% e o fundo próprio do
+   fio (`--pele-fio`), um degrau acima da moldura. */
+[data-theme="dark"] .fundo-do-fio {
+  background:
+    radial-gradient(
+      ellipse 80% 42% at 50% -12%,
+      color-mix(in oklch, var(--pele-brilho) 13%, transparent),
+      transparent 62%
+    ),
+    var(--pele-fio);
+}
+
 .trama-do-fio {
   background-image: radial-gradient(
     circle at 1px 1px,
@@ -1118,3 +1157,135 @@
   background-size: 18px 18px;
   background-attachment: local;
 }
+
+/* No escuro, os pontos do `.msgs` da pele Verdash: 7% de branco. */
+[data-theme="dark"] .trama-do-fio {
+  background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.07) 1px, transparent 0);
+}
+
+/* ═════ PELE VERDASH (só tema escuro) ═══════════════════════════════════════
+   Classes semânticas que os componentes vestem. No claro NENHUMA tem efeito:
+   todas exigem `[data-theme="dark"]` acima. Ficam FORA de `@layer` de
+   propósito: declaração sem layer vence `@layer utilities`, então a pele cobre
+   o `bg-*`/`ring-*` do componente sem `!important` e sem brigar por
+   especificidade. Cada bloco cita o seletor do protótipo que reproduz. */
+
+/* `.app.dark` (fundo): dois radiais da marca sobre a moldura. */
+[data-theme="dark"] .pele-moldura {
+  background:
+    radial-gradient(42rem 22rem at -6rem -6rem, color-mix(in oklch, var(--pele-brilho) 16%, transparent), transparent 70%),
+    radial-gradient(36rem 18rem at 100% -8rem, color-mix(in oklch, var(--pele-brilho) 10%, transparent), transparent 70%),
+    var(--color-bg);
+}
+[data-theme="dark"] ::selection {
+  background: color-mix(in oklch, var(--pele-brilho) 45%, transparent);
+}
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--pele-foco);
+}
+[data-theme="dark"] {
+  scrollbar-color: oklch(0.72 0.008 17 / 0.44) transparent;
+}
+
+/* `--noise` em `.list`, `.panel`, `.pn-tabs`, `.th-head`, `.cmp-box`, `.pop`,
+   `.ctxm` e `.pal`: a cor de fundo continua a do componente; o ruído vem por cima. */
+[data-theme="dark"] .pele-ruido {
+  background-image: var(--pele-ruido);
+  background-size: 3px 3px;
+}
+
+/* `.work`: cartão com sombra dura de 4px e brilho interno de 1px. */
+[data-theme="dark"] .pele-cartao {
+  box-shadow: var(--pele-drop), inset 0 1px 0 oklch(1 0 0 / 0.04);
+}
+
+/* `--grad`: selo do trilho, não lidas, avatar da conta, chips ativos. */
+[data-theme="dark"] .pele-grad {
+  background-image: var(--pele-grad);
+  border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+/* Só o traço (indicador da aba, barra da seleção), sem mexer no texto. */
+[data-theme="dark"] .pele-grad-traco {
+  background-image: var(--pele-grad);
+}
+/* Os que mudam de estado por atributo (aba do composer, chip, switch, etapa). */
+[data-theme="dark"]
+  .pele-grad-ativo:is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
+  background-image: var(--pele-grad);
+  border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+
+/* `.chip-ai` (Sugerir resposta): degradê suave com contorno da marca. */
+[data-theme="dark"] .pele-grad-suave {
+  background-image: var(--pele-grad-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--pele-brilho) 38%, transparent);
+}
+[data-theme="dark"] .pele-grad-suave:hover {
+  filter: brightness(1.15);
+}
+
+/* `.rail-btn.is-cur`: cartão com brilho no topo, ruído, anel e sombra dura. */
+[data-theme="dark"] .pele-ativo-trilho {
+  background:
+    radial-gradient(70% 55% at 50% 0%, color-mix(in oklch, var(--pele-brilho) 22%, transparent), transparent 75%),
+    var(--pele-ruido) 0 0 / 3px 3px,
+    var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
+}
+/* `.nav2-item.is-active`: cartão com ruído, anel e sombra dura. */
+[data-theme="dark"] .pele-ativo-item {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
+}
+/* `.conv.is-sel`: degradê horizontal da marca, saindo da barra da seleção. */
+[data-theme="dark"] .pele-selecionada {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--pele-brilho) 17%, transparent),
+      color-mix(in oklch, var(--pele-brilho) 5%, transparent) 70%,
+      transparent
+    ),
+    var(--color-surface);
+}
+
+/* `.seg` e `.seg button.is-on`: trilho escuro e item ativo em cartão. */
+[data-theme="dark"] .pele-seg {
+  background-color: oklch(0 0 0 / 0.22);
+}
+[data-theme="dark"] .pele-seg-item:is([data-state="active"], [data-ativa="true"]) {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 oklch(0 0 0 / 0.25);
+}
+
+/* `.crumb-1`: o setor como rótulo em caixa alta pequena. */
+[data-theme="dark"] .pele-rotulo {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Anel da marca na busca, na disponibilidade e na caixa do composer. */
+[data-theme="dark"] .pele-foco:is(:hover, :focus-within, :focus-visible) {
+  border-color: var(--pele-foco);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--pele-foco) 22%, transparent);
+}
+
+/* `.row.out .bubble`, `.row.ai .bubble` e `.day`. */
+[data-theme="dark"] .pele-bolha-saida {
+  background-color: var(--pele-bolha-saida);
+}
+[data-theme="dark"] .pele-bolha-ia {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--pele-bolha-ia), var(--pele-bolha-ia)) padding-box,
+    var(--pele-grad) border-box;
+}
+[data-theme="dark"] .pele-dia {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
+  border-color: var(--color-border-strong);
+}
+/* ═════ PELE VERDASH ═════ FIM */
