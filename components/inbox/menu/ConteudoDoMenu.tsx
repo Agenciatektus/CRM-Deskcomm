@@ -174,7 +174,7 @@ export function ConteudoDoMenu({
             }
             onSelect={() => retomar.mutate({ conversation_id: id })}
           >
-            <Robot size={16} aria-hidden /> {t("Devolver ao automático")}
+            <Robot size={16} aria-hidden /> {t("Devolver à IA")}
           </DropdownMenuItem>
         )}
         {regras.pausar && (

@@ -1,5 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
@@ -10,6 +11,18 @@ import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
 import { useCrmAlerts } from "@/hooks/notifications/useCrmAlerts";
 import { useNotifyOpenFromServiceWorker } from "@/lib/notifications/notify_open";
 import { estiloDaReserva, useOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
+import { cn } from "@/lib/utils";
+
+/**
+ * A INBOX ENCOSTA NA MOLDURA (o `.work` do protótipo: `margin: 0 8px 8px 0`).
+ * Ela é uma área de trabalho de tela inteira, e o `p-6` das outras telas comia
+ * 24px em cima e à esquerda da conversa sem servir a nada: a Inbox já desenha o
+ * próprio cartão. As outras telas continuam com o `p-6` de sempre. A altura do
+ * cartão desconta exatamente este respiro (ver `InboxLayout`).
+ */
+function ehAInbox(pathname: string | null): boolean {
+  return pathname === "/app/inbox" || !!pathname?.startsWith("/app/inbox/");
+}
 
 interface AppShellProps {
   sidebarCollapsed: boolean;
@@ -45,6 +58,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
   // o `p-6` inteiro é rodapé. Com o painel de chamada na tela, é ele que
   // decide a faixa que o conteúdo perde, e ninguém mais mede isso por fora.
   const ocupacaoDoRodape = useOcupacaoDoRodape();
+  const naInbox = ehAInbox(usePathname());
   return (
     <div className="flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
@@ -83,7 +97,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
           aparece no inspetor quando alguém pergunta quanto o rodapé perdeu.
         */}
         <main
-          className="flex-1 overflow-auto p-6"
+          className={cn("flex-1 overflow-auto", naInbox ? "pr-2 pb-2" : "p-6")}
           style={estiloDaReserva(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >

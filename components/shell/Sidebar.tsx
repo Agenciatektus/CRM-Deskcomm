@@ -234,7 +234,7 @@ export function Sidebar({ collapsed, funis }: { collapsed: boolean; funis?: read
         // coluna do grupo quando expandida. Recolhida, a coluna abre POR CIMA do
         // conteúdo ("peek"), presa dentro desta `<aside>`, e a largura que a
         // casca enxerga continua sendo uma só: a desta caixa.
-        "sticky top-0 z-30 flex h-screen shrink-0 flex-col border-r bg-background transition-[width] duration-200",
+        "sticky top-0 z-30 flex h-screen shrink-0 flex-col bg-background transition-[width] duration-200",
         collapsed ? "w-[72px]" : "w-[304px]",
       )}
     >

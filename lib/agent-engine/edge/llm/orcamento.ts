@@ -110,7 +110,7 @@ export function corpoDoBloqueio(gastoCents: number, tetoCents: number): string {
     'As conversas que estavam sendo atendidas foram para a FILA DE ATENDIMENTO HUMANO — ' +
     'ninguém ficou sem próximo passo, mas alguém precisa responder. ' +
     'Aumentar o limite ou desligar a parada em Uso de IA › Orçamento evita paradas NOVAS; ' +
-    'cada conversa já parada volta ao automático pelo botão "Devolver ao automático" ' +
+    'cada conversa já parada volta ao automático pelo botão "Devolver à IA" ' +
     'no cabeçalho dela.'
   );
 }

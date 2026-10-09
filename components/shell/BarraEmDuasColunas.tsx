@@ -158,7 +158,9 @@ export function BarraEmDuasColunas({
 
   return (
     <div ref={raizRef} onKeyDown={onKeyDown} onBlur={onBlur} className="relative flex h-full">
-      <div className="flex w-[72px] shrink-0 flex-col items-center border-r">
+      {/* Sem `border-r`: trilho e coluna são UM bloco da cor da moldura, como no
+          protótipo; a divisão entre eles é a diferença de conteúdo, não um fio. */}
+      <div className="flex w-[72px] shrink-0 flex-col items-center">
         {/* `data-marca-da-barra`: a caixa que o e2e da moldura do logo mede. */}
         <div data-marca-da-barra className="flex h-14 w-full items-center justify-center px-2">
           {marca}
@@ -256,6 +258,24 @@ export function BarraEmDuasColunas({
             pathname={pathname}
             funis={funis}
             onNavigate={fechar}
+            acaoDoTitulo={
+              // O « ao lado do título (o `.nav2-head` do protótipo): o MESMO
+              // `toggleSidebar` do botão do rodapé do trilho, mais perto de quem
+              // acabou de escolher a tela. Só com a coluna fixa: no "peek" ela já
+              // fecha sozinha ao sair, e não há o que recolher.
+              collapsed ? undefined : (
+                <button
+                  type="button"
+                  onClick={() => startTransition(() => toggleSidebar(collapsed))}
+                  disabled={isPending}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t("Recolher menu")}
+                  title={t("Recolher menu")}
+                >
+                  <CaretDoubleLeft size={14} aria-hidden />
+                </button>
+              )
+            }
           />
           <div className="border-t p-2">
             <VersionFooter collapsed={false} onNavigate={fechar} />

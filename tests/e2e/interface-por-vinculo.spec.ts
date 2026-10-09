@@ -133,7 +133,9 @@ test("interface por membro atualiza ao vivo, preserva formulário e convite apli
     await expect(nav(member).getByRole("link", { name: "Inbox", exact: true })).toHaveCount(0);
     await member.goto("/app");
     await member.waitForURL("**/app/products");
-    await nav(member).getByRole("link", { name: "Ver tudo em CRM" }).click();
+    // A coluna do desktop não tem mais o "Ver tudo em CRM" (09/10/2026); o hub
+    // segue na rota, e no celular o link continua (ver abaixo).
+    await member.goto("/app/crm");
     await expect(member.getByRole("link", { name: /Produtos/ }).last()).toBeVisible();
     await expect(member.getByRole("link", { name: /Contatos/ })).toHaveCount(0);
     await member.keyboard.press("ControlOrMeta+k");

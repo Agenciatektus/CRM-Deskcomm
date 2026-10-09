@@ -125,7 +125,9 @@ test.describe("navegação agrupada", () => {
     // INTEIRO em vez de checar um link: hub → tela. Que a porta existe no grupo
     // certo do sidebar é o unitário `sidebar-grupos` que prende.
     await abrirGrupo(page, "CRM");
-    await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
+    // 09/10/2026: o "Ver tudo em CRM" saiu do fim da coluna (o protótipo não
+    // tem); o hub continua sendo a rota `/app/crm`.
+    await page.goto("/app/crm");
     await page.waitForURL(/\/app\/crm$/);
     await expect(page.getByRole("heading", { name: "O dia a dia da venda" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Preparar a venda" })).toBeVisible();
@@ -149,7 +151,9 @@ test.describe("navegação agrupada", () => {
     await abrirGrupo(page, "CRM");
     await expect(sidebar(page).getByRole("link", { name: "Produtos" })).toBeVisible();
 
-    await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
+    // 09/10/2026: o "Ver tudo em CRM" saiu do fim da coluna (o protótipo não
+    // tem); o hub continua sendo a rota `/app/crm`.
+    await page.goto("/app/crm");
     await page.waitForURL(/\/app\/crm$/);
     await page.getByRole("link", { name: /Produtos/ }).click();
     await page.waitForURL(/\/app\/products/);
@@ -167,7 +171,8 @@ test.describe("navegação agrupada", () => {
     await loginAdmin(page);
 
     await abrirGrupo(page, "Agentes");
-    await sidebar(page).getByRole("link", { name: "Ver tudo em IA" }).click();
+    // O hub saiu do fim da coluna (09/10/2026); segue na rota.
+    await page.goto("/app/ai");
     await page.waitForURL(/\/app\/ai$/);
 
     // O hub organiza por jornada, não numa grade solta.

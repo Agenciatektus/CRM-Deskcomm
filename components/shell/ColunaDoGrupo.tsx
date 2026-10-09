@@ -8,9 +8,8 @@ import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
 import { useT } from "@/hooks/i18n/useT";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
-import { GRUPO_NO_RODAPE, type NavDestination, type NavGroup } from "@/lib/navigation/registry";
+import type { NavDestination, NavGroup } from "@/lib/navigation/registry";
 import { destinoDaRota } from "@/lib/navigation/rota-atual";
-import { ArrowRight } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 /** Item da coluna 2 marcado como a tela atual, e o resto. */
@@ -26,12 +25,15 @@ export function ColunaDoGrupo({
   pathname,
   funis,
   onNavigate,
+  acaoDoTitulo,
 }: {
   grupo: NavGroup;
   secoes: Secao[];
   pathname: string;
   funis: readonly FunilDoMenu[];
   onNavigate: () => void;
+  /** Um controle ao lado do título (o « de recolher a barra). Quem decide é a barra. */
+  acaoDoTitulo?: ReactNode;
 }) {
   const t = useT();
   const comTitulo = secoes.length > 1;
@@ -44,9 +46,10 @@ export function ColunaDoGrupo({
 
   return (
     <nav aria-label={t("Navegação principal")} className="flex min-h-0 flex-1 flex-col">
-      <h2 className="flex h-14 shrink-0 items-center px-4 text-sm font-semibold text-foreground">
-        {t(grupo.label)}
-      </h2>
+      <div className="flex h-14 shrink-0 items-center gap-1.5 pl-4 pr-2">
+        <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold text-foreground">{t(grupo.label)}</h2>
+        {acaoDoTitulo}
+      </div>
       <div className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
         {secoes.map((secao, i) => (
           <div key={secao.section || i} className="space-y-1">
@@ -84,20 +87,10 @@ export function ColunaDoGrupo({
             </ul>
           </div>
         ))}
-        {grupo.hub && grupo.id !== GRUPO_NO_RODAPE && (
-          <Link
-            href={grupo.hub.href}
-            aria-current={pathname === grupo.hub.href ? "page" : undefined}
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
-              pathname === grupo.hub.href ? ITEM_ATIVO : ITEM_INATIVO,
-            )}
-          >
-            <ArrowRight size={16} aria-hidden />
-            <span className="truncate">{t(grupo.hub.label)}</span>
-          </Link>
-        )}
+        {/* Sem o "Ver tudo em X" no fim da coluna (decisão do Peterson,
+            09/10/2026, seguindo o protótipo): a coluna JÁ é o inventário do
+            grupo, e o link repetia a mesma lista numa tela de cartões. A rota do
+            hub continua existindo; só o atalho no fim da coluna saiu. */}
       </div>
     </nav>
   );

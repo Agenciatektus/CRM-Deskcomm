@@ -100,7 +100,7 @@ export function tabToFilter(
       return { status: "archived" };
     case "ai":
       // `ai_handling` é escrito por UM caminho só em produção (a volta pelo botão
-      // "Devolver ao automático"), então a aba vivia mostrando 2 enquanto o robô
+      // "Devolver à IA"), então a aba vivia mostrando 2 enquanto o robô
       // atendia 47. Agora ela pergunta a régua do MOTOR.
       return { comando: ["automatico"] };
     case "all":
@@ -368,17 +368,23 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // Duas faixas em vez de uma: compacta onde aperta, generosa onde há espaço.
   // Em 1280 isso dá 424px de conversa em vez de 372 — 54px de folga sobre o
   // piso do composer (370px), em vez dos 2px que a versão de uma faixa só
-  // deixava. Margem de 2px não é margem, é sorte. Acima de 1680px o painel do
-  // lead vai a 400px (o do protótipo v2); o grid é um CARD (borda, cantos,
-  // `surface`) destacado da moldura, como o `.work` do protótipo.
+  // deixava. Margem de 2px não é margem, é sorte. A partir de 1536px valem as
+  // medidas do protótipo v2: lista de 340px e painel de 352px (a faixa de 400px
+  // acima de 1680px saiu: o protótipo usa 352 em qualquer largura, e os 48px
+  // voltam para a conversa). O grid é um CARD (borda, cantos, `surface`)
+  // encostado na moldura, como o `.work` do protótipo.
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
       className={cn(
-        "grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface md:grid-cols-[300px_1fr]",
+        // A altura é o resto EXATO da tela: topo de 56px (`3.5rem`) e o respiro
+        // de baixo do `<main>` na Inbox (`pb-2`, ou a reserva do painel de
+        // chamada quando ele existe). Sem respiro em cima: o cartão encosta no
+        // topo e na barra lateral, como o `.work` do protótipo.
+        "grid h-[calc(100dvh-3.5rem-max(var(--space-2),var(--rodape-ocupado,0px)))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface md:grid-cols-[300px_minmax(0,1fr)]",
         ferramentas.painelLead
-          ? "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_360px] min-[1680px]:grid-cols-[300px_1fr_400px]"
-          : "xl:grid-cols-[272px_1fr] 2xl:grid-cols-[300px_1fr]",
+          ? "xl:grid-cols-[272px_minmax(0,1fr)_296px] 2xl:grid-cols-[340px_minmax(0,1fr)_352px]"
+          : "xl:grid-cols-[272px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]",
       )}
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
