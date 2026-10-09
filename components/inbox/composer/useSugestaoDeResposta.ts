@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "@/lib/api/types";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { useT } from "@/hooks/i18n/useT";
@@ -68,6 +69,9 @@ export function useSugestaoDeResposta(
       if (ev.type !== "updated" || ev.action.type !== "success") return;
       const [raiz, id] = ev.query.queryKey;
       if (raiz !== "messages" || id !== conversationId) return;
+      // Indisponível (503) não acorda: cada mensagem nova voltaria a perguntar.
+      const atual = qc.getQueryState(["reply-drafts", conversationId]);
+      if (atual?.error instanceof ApiError && atual.error.status === 503) return;
       setAcordada(true);
       clearTimeout(dormir);
       dormir = setTimeout(() => setAcordada(false), JANELA_ACORDADA_MS);
@@ -84,6 +88,9 @@ export function useSugestaoDeResposta(
     queryFn: () =>
       apiClient.get<{ data: { drafts: Draft[] } }>(`/api/v1/conversations/${conversationId}/draft-reply`),
     refetchInterval: (q) => {
+      // Rascunho indisponível (503: o ambiente não tem o banco do motor de IA)
+      // não volta sozinho a cada poucos segundos: para de perguntar.
+      if (q.state.error instanceof ApiError && q.state.error.status === 503) return false;
       const gerando = q.state.data?.data.drafts.some((d) => d.status === "generating");
       return gerando || acordada ? RAPIDO_MS : SEGURANCA_MS;
     },
