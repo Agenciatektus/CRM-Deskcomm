@@ -26,6 +26,7 @@ import { haQuemAtendaASessao } from '@/lib/ai/agents/quem-atende-a-sessao';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
 import { passarConversaDaCadenciaParaHumano } from '@/lib/cadencia/conducao/turno';
 import { deveCederTurnoAoRetorno } from '@/lib/followup/ceder-turno-ao-retorno';
+import { mensagemPedeResposta, SQL_MENSAGEM_PEDE_RESPOSTA } from '@/lib/ai/elegibilidade/mensagem-respondivel';
 
 const DRAIN_CONSUMER = 'agent-engine';
 
@@ -286,6 +287,23 @@ async function processEvent(
     return 'processado';
   }
 
+  // REAÇÃO e mensagem SEM CONTEÚDO não acordam o agente (ver
+  // `mensagem-respondivel.ts`). Vale para todo canal: o dreno é o ponto único
+  // por onde todo turno passa. Mensagem não encontrada segue (o turno tem a
+  // própria checagem): falhar aberto aqui não gasta mais do que antes.
+  const { rows: gatilho } = await pool.query<{ type: string; body: string | null; media_url: string | null; media_storage_path: string | null }>(
+    'select type, body, media_url, media_storage_path from messages where organization_id = $1 and id = $2',
+    [event.organization_id, p.inbound_message_id],
+  );
+  const decisao = gatilho[0] ? mensagemPedeResposta(gatilho[0]) : { pede: true as const };
+  if (!decisao.pede) {
+    log.info('drain: mensagem não pede resposta — turno pulado (sem gasto)', {
+      event_id: event.id,
+      motivo: decisao.motivo,
+    });
+    return 'processado';
+  }
+
   // CADÊNCIA. Com condução viva, o agente é o DELA (não o da sessão): o portão
   // de capacidade abaixo não se aplica. Com régua viva sem condução, a resposta
   // ainda não passou pela transição — espera (ver ESPERA_TRANSICAO_DA_CADENCIA_MS).
@@ -346,9 +364,14 @@ async function processEvent(
   // `not null default now()` hoje, mas o padrão do repo, ver migration 0027, não
   // confia nisso) com desempate por `created_at` (ordem de INGESTÃO, uma
   // mensagem por webhook) dá recência determinística.
+  //
+  // A reação e a mensagem sem conteúdo NÃO contam como "mais nova": elas não
+  // têm turno próprio (ver acima), e contá-las faria o 👍 que o cliente deu
+  // logo depois da pergunta superar a pergunta — ninguém responderia.
   const { rows: ultimaInbound } = await pool.query<{ id: string }>(
     `select id from messages
      where organization_id = $1 and conversation_id = $2 and direction = 'inbound'
+       and ${SQL_MENSAGEM_PEDE_RESPOSTA}
      order by coalesce(sent_at, created_at) desc, created_at desc, id desc
      limit 1`,
     [event.organization_id, p.conversation_id],

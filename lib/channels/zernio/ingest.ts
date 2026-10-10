@@ -44,7 +44,13 @@ import { channelBrand } from "../presentation";
 import { SOCIAL_PROVIDER } from "../social/catalog";
 
 import { completarLocalizacao } from "./localizacao";
-import { parseZernioInbound, type ZernioIdentity, type ZernioInboundMessage } from "./webhook";
+import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
+import {
+  parseZernioInbound,
+  type ZernioEdicao,
+  type ZernioIdentity,
+  type ZernioInboundMessage,
+} from "./webhook";
 
 export interface ZernioIngestResult {
   status: "ingested" | "duplicate" | "ignored" | "unknown_account";
@@ -701,27 +707,27 @@ function tipoDoAnexo(tipo: string | undefined): string {
 export async function aplicarEdicaoZernio(
   admin: SupabaseClient,
   organizationId: string,
-  edicao: { externalId: string; tipo: "edited" | "deleted"; body: string | null },
-): Promise<"aplicado" | "sem_alvo"> {
-  const agora = new Date().toISOString();
-  const patch =
-    edicao.tipo === "deleted"
-      ? { revoked_at: agora }
-      : // Edição sem corpo novo não zera o texto: seria trocar a versão velha
-        // (útil) por um vazio (inútil), e o evento sem corpo é justamente o
-        // caso em que não sabemos o texto novo.
-        edicao.body !== null
-        ? { body: edicao.body, edited_at: agora }
-        : { edited_at: agora };
-
-  const { data } = await admin
-    .from("messages")
-    .update(patch)
-    .eq("organization_id", organizationId)
-    .eq("external_id", edicao.externalId)
-    .select("id");
-
-  return (data ?? []).length > 0 ? "aplicado" : "sem_alvo";
+  channelSessionId: string,
+  edicao: ZernioEdicao,
+): Promise<"aplicado" | "sem_alvo" | "recusado"> {
+  // A autoria é conferida antes (sessão, direção e conversa): o id-alvo vem do
+  // evento, e sem a guarda um contato reescrevia a mensagem que a empresa
+  // mandou para ele. A edição sem corpo novo carimba, mas não zera o texto.
+  const r = await aplicarAlteracaoDeMensagem(admin, {
+    organizationId,
+    channelSessionId,
+    direcao: edicao.direction,
+    alvo: edicao.externalId,
+    // O `conversationId` do provider é o que a ingestão grava em
+    // `provider_conversation_id`: é ele o "chat" desta conversa.
+    chat: { jid: edicao.conversationId, phone: edicao.phone, lid: null },
+    acao: edicao.tipo === "deleted" ? "apagar" : "editar",
+    texto: edicao.body,
+  });
+  if (r.aplicada) return "aplicado";
+  if (r.motivo.endsWith("_sem_original")) return "sem_alvo";
+  logger.warn("[zernio] alteração de mensagem recusada", { channelSessionId, motivo: r.motivo });
+  return "recusado";
 }
 
 /** Concurrent first messages share a database uniqueness constraint. */

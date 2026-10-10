@@ -51,6 +51,8 @@ export type SkipReason =
   | "handoff_recent"
   | "conversation_not_found"
   | "empty_inbound_body"
+  /** Reação (👍) não pede resposta: `lib/ai/elegibilidade/mensagem-respondivel.ts`. */
+  | "reaction_inbound"
   | "duplicate_outbound"
   /**
    * A organização tem agente PUBLICADO, e quem responde publicado é o
