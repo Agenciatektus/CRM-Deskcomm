@@ -166,10 +166,16 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
       {perdendo && (
         <div className="space-y-3 rounded-lg border border-border bg-surface p-3" data-testid="perda-no-painel">
           <p className="text-xs font-semibold text-text">{t("Marcar como perdido")}</p>
+          {lead.motivo_de_perda_obrigatorio === false && (
+            <p className="text-xs text-text-muted" data-testid="perda-motivo-opcional">
+              {t("Este funil não exige motivo. Informar ajuda a melhorar o funil.")}
+            </p>
+          )}
           <FormularioDePerda
             leadId={lead.id}
             pipelineId={lead.pipeline_id}
             motivosDoFunil={lead.motivos_de_perda}
+            motivoObrigatorio={lead.motivo_de_perda_obrigatorio !== false}
             onCancelar={() => setPerdendo(false)}
             onConcluido={() => {
               setPerdendo(false);

@@ -18,6 +18,7 @@ import { CorpoDaBolha } from "./bolha/CorpoDaBolha";
 import { EditorDaBolha } from "./bolha/EditorDaBolha";
 import { classesDaBolha, TEXTO_ACCENT, type ModoDaMeta, type TomDaBolha } from "./bolha/estilo";
 import { MetaDaBolha } from "./bolha/MetaDaBolha";
+import { TentarDeNovo } from "./bolha/TentarDeNovo";
 
 interface Props {
   message: Message;
@@ -43,11 +44,13 @@ interface Props {
    * O padrão é bolha isolada, que é o que quem monta a bolha fora do fio vê.
    */
   inicioDoBloco?: boolean;
+  /** B15: presente só quando a mensagem de saída falhou e pode ser reenviada. */
+  onReenviar?: () => void;
 }
 
 export function MessageBubble({
   message, searchMatch = false, debugCitations, onResponder, citada, viewerUserId,
-  onEditar, onApagar, onOcultar, onRestaurar, rascunho, inicioDoBloco = true,
+  onEditar, onApagar, onOcultar, onRestaurar, rascunho, inicioDoBloco = true, onReenviar,
 }: Props) {
   // Bolha que volta à tela com edição em curso reabre o editor com o rascunho.
   const [rascunhoInicial] = useState(() => rascunho?.ler() ?? null);
@@ -257,6 +260,7 @@ export function MessageBubble({
           />
         </div>
       </div>
+      {onReenviar && <TentarDeNovo onReenviar={onReenviar} />}
       <ConfirmacoesDaBolha
         apagando={apagando} setApagando={setApagando}
         ocultando={ocultando} setOcultando={setOcultando}

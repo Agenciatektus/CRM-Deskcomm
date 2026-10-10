@@ -138,13 +138,20 @@ export function EditorDoNegocio({ leads, contactId, selecionadoId, onSelecionar,
         <b className="ml-auto shrink-0 text-sm font-bold text-text tabular-nums">
           {formatMoney(ativo.value_cents, ativo.currency)}
         </b>
-        <MenuDoLead leadId={ativo.id} pipelineId={ativo.pipeline_id} />
+        <MenuDoLead
+          leadId={ativo.id}
+          pipelineId={ativo.pipeline_id}
+          titulo={ativo.title}
+          leitura={leitura}
+          onExcluido={onSalvo}
+        />
       </div>
       <BarraDeEtapas
         key={`barra-${ativo.id}`}
         leadId={ativo.id}
         pipelineId={ativo.pipeline_id}
         stageId={ativo.stage_id}
+        posicao={ativo.position_in_stage ?? null}
         updatedAt={ativo.updated_at}
         aberto={ativo.status === "open"}
         etapas={ativo.etapas ?? []}
@@ -164,6 +171,7 @@ export function EditorDoNegocio({ leads, contactId, selecionadoId, onSelecionar,
               aberto={ativo.status === "open"}
               etapas={ativo.etapas ?? []}
               motivosDoFunil={ativo.motivos_de_perda}
+              motivoObrigatorio={ativo.motivo_de_perda_obrigatorio !== false}
               onMovido={onSalvo}
             />
           </span>

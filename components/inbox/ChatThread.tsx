@@ -23,6 +23,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { capabilitiesOf, transportaMensagem, type ChannelProvider } from "@/lib/channels/capabilities";
 import { montarCartoesDaPassagem, type CartaoDaPassagem } from "@/lib/escalacao/cartao-da-passagem";
 import type { Message, Note } from "@/lib/types/messaging";
+import { useReenvioDoFio } from "./fio/useReenvioDoFio";
 
 interface Props {
   conversationId: string | null;
@@ -103,6 +104,8 @@ export function ChatThread({ conversationId, provider, onResponder, dono, contat
    * longa; quando a citada ficou fora da página, o fio simplesmente não aparece.
    */
   const porId = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+  // B15: "Tentar de novo" na mensagem de saída que falhou.
+  const reenvio = useReenvioDoFio(conversationId ?? null, messages);
 
   const cartoes: CartaoDaPassagem[] = useMemo(
     () => montarCartoesDaPassagem(passagens, {
@@ -256,6 +259,8 @@ export function ChatThread({ conversationId, provider, onResponder, dono, contat
       if (conversationId) claim.mutate({ conversation_id: conversationId, expected_assignee: dono?.userId ?? null });
     },
     onExcluirNota: (id) => deleteNote.mutate(id),
+    ofereceReenvio: reenvio.oferece,
+    reenviar: reenvio.reenviar,
   };
 
   const virtuais = virtualizer.getVirtualItems();

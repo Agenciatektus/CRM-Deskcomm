@@ -95,7 +95,7 @@ const SELECT_COLS = `
   instagram_entrada,
   passo_da_conversa,
   autor_da_ultima_mensagem,
-  contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human),
+  contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human, source, ad_platform:source_metadata->>ad_platform, utm_source:source_metadata->>utm_source, campaign_name:source_metadata->>campaign_name, utm_campaign:source_metadata->>utm_campaign),
   channel_sessions:channel_session_id (phone_number, display_name, provider, social_platform:metadata->>social_platform)
 `;
 

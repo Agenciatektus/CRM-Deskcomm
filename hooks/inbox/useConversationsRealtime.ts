@@ -32,6 +32,16 @@ export interface ContactSummary {
    * atendimento aparece. Opcional: conversas em cache de antes do campo existir.
    */
   force_human?: boolean | null;
+  /**
+   * De onde o contato veio (H13, "Entrou por …"): a coluna `source` e as chaves
+   * de `source_metadata` que respondem a pergunta, pedidas uma a uma no embed
+   * (nunca o jsonb inteiro). Opcionais: cache de antes do campo.
+   */
+  source?: string | null;
+  ad_platform?: string | null;
+  utm_source?: string | null;
+  campaign_name?: string | null;
+  utm_campaign?: string | null;
 }
 
 /**
