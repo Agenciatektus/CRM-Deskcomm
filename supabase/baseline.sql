@@ -48111,6 +48111,72 @@ create index if not exists campaigns_entrada_por_etapa
 
 notify pgrst, 'reload schema';
 
+-- ---- quando a régua da campanha para de falar com uma pessoa (migration 9046) ----
+--
+-- `campaigns.saidas` guarda a escolha do operador no MESMO formato de
+-- `followup_flow_pointers.cadence_settings.saidas` (`saidasDaCadenciaSchema`):
+-- etiquetas, etapas do funil, "negócio ganho ou perdido" e "alguém do time
+-- assumiu". Os desfechos não são novos — `lib/cadencia/saidas.ts` já os executa,
+-- e esta migration não o toca. O que era fixo no código e passa a ser escolha é
+-- QUAIS deles valem para a campanha: `lib/campanhas/regua-politica.ts` publicava
+-- o literal `{etiquetas: [], etapas: [], ao_fechar: true, humano_assumir: true}`.
+--
+-- NULO = o operador nunca abriu a seção, e `lerSaidasDaCampanha` o lê como
+-- exatamente esse literal. Por isso não há `not null default`: o default daria o
+-- mesmo comportamento e apagaria a diferença entre "configurada" e "herdou", que
+-- é a pergunta de quem audita por que alguém parou de receber.
+--
+-- CHECK raso de propósito (só `jsonb_typeof = 'object'`), diferente da função
+-- `immutable` da 9034/9037, e a razão é a DIREÇÃO DE FALHA DO LEITOR. NÃO é "o
+-- Zod da rota já cobre", que seria falso e levaria a próxima pessoa a dispensar
+-- um CHECK que era a única tranca: `service_role` pela PostgREST não passa por
+-- Zod nenhum. `passosGuardados` falha ABERTA (jsonb inválido vira lista vazia),
+-- então lá o CHECK é a ÚNICA tranca do valor e tem de ser fundo;
+-- `lerSaidasDaCampanha` falha FECHADA (o que o Zod não lê vira recusa, não
+-- padrão), então aqui o valor mal formado já para em TypeScript e o CHECK fica
+-- com o que só ele garante: a FORMA, inclusive contra `service_role`.
+--
+-- Ele barra array, string e número, e DEIXA PASSAR o objeto com campo errado, de
+-- propósito: é esse caso que `duplicarAcao` copia como está, para a cópia herdar
+-- a recusa em vez de virar o padrão por conta própria. Endurecer este CHECK
+-- quebraria a herança (a cópia passaria a levar 23514 no INSERT), e o invariante
+-- tem um caso que prova que o objeto ilegível é aceito.
+--
+-- Cria FUNÇÃO nenhuma, então este bloco não tem posição obrigatória em relação à
+-- VARREDURA anon. Fica aqui, ao lado dos outros blocos de coluna de `campaigns`
+-- (9037, 9039), que é onde quem procura vai olhar. Idempotente: coluna com
+-- `if not exists` e CHECK com guarda em `pg_constraint` (nunca drop+add, que
+-- deixaria a tabela sem a constraint se o update morresse no meio).
+
+alter table public.campaigns
+  add column if not exists saidas jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_saidas_validas'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_saidas_validas
+      check (saidas is null or jsonb_typeof(saidas) = 'object');
+  end if;
+end $$;
+
+comment on column public.campaigns.saidas is
+  'Quando a régua da campanha PARA de falar com uma pessoa, no vocabulário de '
+  'cadence_settings.saidas: {etiquetas: text[], etapas: uuid[], ao_fechar: bool, '
+  'humano_assumir: bool}. NULL = o operador nunca escolheu, e vale o padrão '
+  '{[], [], true, true} — byte a byte o literal que lib/campanhas/regua-politica.ts '
+  'publicava antes da 9046, então campanha existente não muda de comportamento. '
+  'Publicada em followup_flow_pointers.cadence_settings ao preparar/iniciar; a régua '
+  'no ar segue o SNAPSHOT, não esta coluna. Jsonb que o Zod de saidasDaCadenciaSchema '
+  'não lê PARA a régua (recusa no salvar, no gate de faltaParaEnviar e na publicação), '
+  'nunca cai no padrão. Migration 9046.';
+
+notify pgrst, 'reload schema';
+
 -- ---- a memória de que o negócio já foi fechado (migration 9040) ----
 --
 -- `crm_leads.fechado_alguma_vez_em` guarda QUANDO o negócio foi fechado pela

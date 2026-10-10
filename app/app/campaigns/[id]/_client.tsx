@@ -19,6 +19,7 @@ import { useState } from "react";
 
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
 import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
+import { ResumoDasSaidas } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -538,6 +539,11 @@ function ReguaDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
       <p className="text-xs text-muted-foreground">
         {t("Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.")}
       </p>
+      {/* QUANDO ELA PARA (9046), no MESMO card dos passos: a pergunta "por que
+          esta pessoa parou de receber?" e a pergunta "por que ela recebeu três
+          vezes?" são a mesma conversa, e separá-las em dois cards faria o
+          operador ler uma e não a outra. */}
+      <ResumoDasSaidas saidas={campanha.saidas} etapas={etapas.data ?? []} />
     </Card>
   );
 }
