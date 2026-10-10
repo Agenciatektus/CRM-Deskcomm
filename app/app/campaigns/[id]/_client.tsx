@@ -19,7 +19,7 @@ import { useState } from "react";
 
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
 import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
-import { ResumoDasSaidas, saidasDaTela } from "@/components/campanhas/SaidasDaCampanha";
+import { ResumoDasSaidas } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -543,7 +543,7 @@ function ReguaDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           esta pessoa parou de receber?" e a pergunta "por que ela recebeu três
           vezes?" são a mesma conversa, e separá-las em dois cards faria o
           operador ler uma e não a outra. */}
-      <ResumoDasSaidas saidas={saidasDaTela(campanha.saidas)} etapas={etapas.data ?? []} />
+      <ResumoDasSaidas saidas={campanha.saidas} etapas={etapas.data ?? []} />
     </Card>
   );
 }

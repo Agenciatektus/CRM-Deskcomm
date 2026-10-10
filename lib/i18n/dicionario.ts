@@ -14363,6 +14363,17 @@ export const DICIONARIO: Traducoes = {
     es: "Elige el embudo en «Quién responde» para poder detener la secuencia por etapa: la lista de etapas es la del embudo de la campaña.",
   },
   "A régua para quando": { es: "La secuencia se detiene cuando" },
+  // A RESSALVA, nas duas telas com as mesmas palavras: é nela que a expectativa
+  // errada se forma ("marquei a etapa, então quem está nela não é abordado").
+  "A primeira mensagem não é filtrada por elas: ela sai para todo mundo da lista, inclusive para quem já está na etapa ou com a etiqueta que você escolher.": {
+    es: "El primer mensaje no se filtra por ellas: sale para toda la lista, incluso para quien ya está en la etapa o con la etiqueta que elijas.",
+  },
+  "Isto vale para os passos depois da primeira mensagem. A primeira sai para todo mundo da lista, inclusive para quem já está nas etapas e etiquetas acima.": {
+    es: "Esto aplica a los pasos después del primer mensaje. El primero sale para toda la lista, incluso para quien ya está en las etapas y etiquetas de arriba.",
+  },
+  "Não foi possível ler esta configuração, então a régua está barrada: ela não vai ao ar até alguém corrigir. Nenhum passo sai enquanto isso.": {
+    es: "No fue posible leer esta configuración, así que la secuencia está bloqueada: no sale al aire hasta que alguien la corrija. Ningún paso se envía mientras tanto.",
+  },
   "O lead responde": { es: "El lead responde" },
   "O negócio é ganho ou perdido": { es: "El negocio se gana o se pierde" },
   "Alguém do time manda mensagem ao lead": { es: "Alguien del equipo le escribe al lead" },

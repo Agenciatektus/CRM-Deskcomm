@@ -188,6 +188,31 @@ export const criarExclusaoSchema = z.object({
   contact_id: z.string().uuid().nullable().optional(),
 });
 
+/**
+ * O CORPO QUE A TELA MANDA — `z.input`, e não `z.infer`.
+ *
+ * ═══ Por que estes dois tipos existem (parecer do @Cassio_SecRev, P1.1) ═══
+ *
+ * Os hooks de mutação tipavam o corpo como `Record<string, unknown>`. Com isso, a
+ * primeira das trancas da régua — o Zod da rota — era a única que podia falhar em
+ * SILÊNCIO: renomear a chave no payload, ou um refactor que tirasse `saidas`
+ * daqui (ela só entra por `...baseDaCampanha`, nunca nominalmente), passava pelo
+ * TypeScript, passava pelo Zod (que ignora campo desconhecido), gravava `null` e
+ * respondia **200**. O operador via a seção preenchida, clicava Salvar, não lia
+ * erro nenhum, e a campanha rodava no padrão. É o padrão que já custou caro:
+ * "schema aceita campo que ninguém grava: 200, desfaz o clique, sem erro".
+ *
+ * Com o corpo tipado pelo schema, chave errada e campo removido viram erro de
+ * COMPILAÇÃO — e isso vale de uma vez para `passos`, `entrada_continua` e
+ * qualquer campo futuro, não só para `saidas`.
+ *
+ * `z.input`, e não `z.infer`/`z.output`: o que a tela manda é a ENTRADA do
+ * schema, onde o que tem `.default()` é opcional. `z.output` cobraria da tela os
+ * campos que o próprio Zod preenche, e o tipo ficaria mais estrito que a API.
+ */
+export type CorpoDeCriarCampanha = z.input<typeof criarCampanhaSchema>;
+export type CorpoDeEditarCampanha = z.input<typeof editarCampanhaSchema>;
+
 export const agendarSchema = z.object({ scheduled_at: z.string().datetime() });
 export const testarSchema = z.object({ contact_id: z.string().uuid() });
 

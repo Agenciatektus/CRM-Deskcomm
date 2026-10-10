@@ -28,11 +28,24 @@
  * isso que `lerSaidasDaCampanha` devolve recusa em vez de um padrão, e que
  * `politicaDaRegua` não tem como produzir política sem passar por ela.
  *
- * O limite dessa garantia, dito aqui para ninguém confiar além dele: o motor
- * executa o que está em `followup_flow_pointers.cadence_settings`, o SNAPSHOT
- * gravado na publicação. Uma linha de `campaigns` que se corromper depois disso
- * não enfraquece a régua que já está no ar (ela nem é lida), e a próxima
- * publicação é recusada. A recusa cobre o caminho que existe.
+ * ⚠️ O LIMITE EXATO DESSA GARANTIA, dito aqui porque prometer além dele seria
+ * pior do que não prometer nada.
+ *
+ * O que este módulo garante: nada que a campanha PUBLIQUE é mais frouxo do que
+ * o que ela tem gravado. Se a coluna não dá para ler, não sai publicação.
+ *
+ * O que ele NÃO garante: a camada de baixo. O motor executa
+ * `followup_flow_pointers.cadence_settings`, o SNAPSHOT da publicação, e quem o
+ * lê é `saidasDe` (`lib/cadencia/saidas.ts`), que falha ABERTA — snapshot sem a
+ * chave `saidas`, ou com ela corrompida, cai em `SAIDAS_PADRAO` e a régua perde
+ * a etapa e a etiqueta que o operador escolheu, calada. Isso é compartilhado com
+ * a cadência, está em produção desde a 9016 e está FORA do alcance desta fatia
+ * (mexer em `saidasDe` mudaria o comportamento de toda cadência existente, que é
+ * o limite nº 3 da fatia).
+ *
+ * A consequência prática: corromper a linha de `campaigns` não enfraquece a
+ * régua que já está no ar — ela nem é lida —, mas corromper o SNAPSHOT
+ * enfraquece, e esta fatia não fecha esse caminho. Ele exige uma fatia própria.
  */
 import {
   SAIDAS_PADRAO,

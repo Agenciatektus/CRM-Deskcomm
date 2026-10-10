@@ -48127,11 +48127,20 @@ notify pgrst, 'reload schema';
 -- é a pergunta de quem audita por que alguém parou de receber.
 --
 -- CHECK raso de propósito (só `jsonb_typeof = 'object'`), diferente da função
--- `immutable` da 9034/9037: `passos` é executado pelo worker e precisava parar no
--- banco, enquanto `saidas` passa por `lerSaidasDaCampanha`, que RECUSA o que o
--- Zod não lê — e a recusa para a régua no salvar, no gate de `faltaParaEnviar` e
--- na publicação. Falha fechada; o inverso (ler ilegível como padrão) mandaria
--- abordagem de prospecção para quem o operador já tinha mandado parar.
+-- `immutable` da 9034/9037, e a razão é a DIREÇÃO DE FALHA DO LEITOR. NÃO é "o
+-- Zod da rota já cobre", que seria falso e levaria a próxima pessoa a dispensar
+-- um CHECK que era a única tranca: `service_role` pela PostgREST não passa por
+-- Zod nenhum. `passosGuardados` falha ABERTA (jsonb inválido vira lista vazia),
+-- então lá o CHECK é a ÚNICA tranca do valor e tem de ser fundo;
+-- `lerSaidasDaCampanha` falha FECHADA (o que o Zod não lê vira recusa, não
+-- padrão), então aqui o valor mal formado já para em TypeScript e o CHECK fica
+-- com o que só ele garante: a FORMA, inclusive contra `service_role`.
+--
+-- Ele barra array, string e número, e DEIXA PASSAR o objeto com campo errado, de
+-- propósito: é esse caso que `duplicarAcao` copia como está, para a cópia herdar
+-- a recusa em vez de virar o padrão por conta própria. Endurecer este CHECK
+-- quebraria a herança (a cópia passaria a levar 23514 no INSERT), e o invariante
+-- tem um caso que prova que o objeto ilegível é aceito.
 --
 -- Cria FUNÇÃO nenhuma, então este bloco não tem posição obrigatória em relação à
 -- VARREDURA anon. Fica aqui, ao lado dos outros blocos de coluna de `campaigns`

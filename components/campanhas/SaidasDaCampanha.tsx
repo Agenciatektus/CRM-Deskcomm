@@ -3,7 +3,11 @@
 import { SaidasDaCadenciaEditor } from "@/components/cadencia/SaidasDaCadencia";
 import { useT } from "@/hooks/i18n/useT";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
-import { saidasForamEscolhidas, saidasParaATela } from "@/lib/campanhas/saidas-da-campanha";
+import {
+  problemaNasSaidas,
+  saidasForamEscolhidas,
+  saidasParaATela,
+} from "@/lib/campanhas/saidas-da-campanha";
 
 interface Etapa {
   id: string;
@@ -45,6 +49,9 @@ export function SaidasDaCampanhaEditor({
       <p className="text-sm text-muted-foreground">
         {t(
           "Estas opções valem para os passos depois da primeira mensagem. Quem sai aqui não recebe os passos seguintes.",
+        )}{" "}
+        {t(
+          "A primeira mensagem não é filtrada por elas: ela sai para todo mundo da lista, inclusive para quem já está na etapa ou com a etiqueta que você escolher.",
         )}
       </p>
       {!temPassos && (
@@ -78,21 +85,51 @@ export function SaidasDaCampanhaEditor({
  * da publicação, e os dois só divergem se alguém tiver mexido na coluna por fora
  * do produto (pelo produto, `saidas` só muda em rascunho, e rascunho não tem
  * régua publicada).
+ *
+ * ⚠️ RECEBE O VALOR CRU, e não o normalizado, por dois motivos que custaram
+ * parecer:
+ *
+ *   1. ILEGÍVEL tem de aparecer como ilegível. A versão anterior recebia o valor
+ *      já passado por `saidasDaTela` e, quando a coluna não dava para ler,
+ *      mostrava o padrão MAIS o rodapé "esta campanha usa o padrão" — uma
+ *      afirmação falsa, dita justamente a quem está auditando por que alguém
+ *      recebeu ou parou de receber. Normalizar é certo no EDITOR (lá a pessoa
+ *      conserta) e errado no RESUMO (aqui ela investiga).
+ *   2. Esta tela é onde a expectativa errada se forma. Quem lê "a régua para
+ *      quando entra na etapa Fechamento" conclui que quem está em Fechamento
+ *      está poupado da ABORDAGEM — e não está: as saídas governam a régua, do 2º
+ *      toque em diante, e a 1ª mensagem sai para todo mundo do recorte. A frase
+ *      do editor precisa estar aqui também, porque aqui é onde se pergunta.
  */
 export function ResumoDasSaidas({
   saidas,
   etapas,
 }: {
-  saidas: SaidasDaCadencia;
+  /** CRU, como vem da API: `null`, o objeto do operador, ou algo ilegível. */
+  saidas: unknown;
   etapas: Etapa[];
 }) {
   const t = useT();
+  const problema = problemaNasSaidas(saidas);
+  if (problema !== null) {
+    return (
+      <div className="space-y-1.5" data-testid="resumo-das-saidas">
+        <span className="text-sm font-medium">{t("A régua para quando")}</span>
+        <p className="text-sm text-error-fg">
+          {t(
+            "Não foi possível ler esta configuração, então a régua está barrada: ela não vai ao ar até alguém corrigir. Nenhum passo sai enquanto isso.",
+          )}
+        </p>
+      </div>
+    );
+  }
+  const lidas = saidasParaATela(saidas);
   const nomeDaEtapa = (id: string) => etapas.find((e) => e.id === id)?.name ?? t("etapa removida");
   const linhas: string[] = [t("O lead responde")];
-  if (saidas.ao_fechar) linhas.push(t("O negócio é ganho ou perdido"));
-  if (saidas.humano_assumir) linhas.push(t("Alguém do time manda mensagem ao lead"));
-  for (const tag of saidas.etiquetas) linhas.push(`${t("Ganha a etiqueta")} ${tag}`);
-  for (const id of saidas.etapas) linhas.push(`${t("Entra na etapa")} ${nomeDaEtapa(id)}`);
+  if (lidas.ao_fechar) linhas.push(t("O negócio é ganho ou perdido"));
+  if (lidas.humano_assumir) linhas.push(t("Alguém do time manda mensagem ao lead"));
+  for (const tag of lidas.etiquetas) linhas.push(`${t("Ganha a etiqueta")} ${tag}`);
+  for (const id of lidas.etapas) linhas.push(`${t("Entra na etapa")} ${nomeDaEtapa(id)}`);
 
   return (
     <div className="space-y-1.5" data-testid="resumo-das-saidas">
@@ -104,7 +141,14 @@ export function ResumoDasSaidas({
           </li>
         ))}
       </ul>
-      {!saidasForamEscolhidas(saidas) && (
+      {/* A RESSALVA, e ela é a mesma do editor de propósito: é aqui que alguém
+          abre a tela perguntando "por que esta pessoa foi abordada?". */}
+      <p className="text-xs text-muted-foreground">
+        {t(
+          "Isto vale para os passos depois da primeira mensagem. A primeira sai para todo mundo da lista, inclusive para quem já está nas etapas e etiquetas acima.",
+        )}
+      </p>
+      {!saidasForamEscolhidas(lidas) && (
         <p className="text-xs text-muted-foreground">
           {t("Esta campanha usa o padrão. Para mudar, duplique e ajuste no rascunho.")}
         </p>

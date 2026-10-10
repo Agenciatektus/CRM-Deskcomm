@@ -35,8 +35,13 @@ import { sql } from "./gov-helpers";
  *     `campaigns.passos`, a coluna vizinha, que é array.
  *  5. String e número são recusados. Um `'"nao"'::jsonb` é jsonb válido, então o
  *     erro de digitação "gravei o rótulo em vez do objeto" existe de verdade.
- *  6. NULO explícito continua aceito depois de a campanha ter sido configurada:
- *     é como `duplicarAcao` normaliza o ilegível, e como voltar ao padrão.
+ *  6. OBJETO ILEGÍVEL é ACEITO. É o controle positivo da decisão de desenho:
+ *     `duplicarAcao` copia o objeto ilegível COMO ESTÁ, para a cópia herdar a
+ *     recusa em vez de virar o padrão por conta própria, e isso exige que o
+ *     banco aceite gravá-lo. Quem endurecer o CHECK amanhã quebra essa herança,
+ *     e sem este caso a suíte não acusaria — nenhum outro grava malformado.
+ *  7. NULO explícito continua aceito depois de a campanha ter sido configurada:
+ *     é como se volta ao padrão pela tela.
  *
  * Tudo em transação desfeita (`rollback`), como as irmãs. Zero PII.
  */
@@ -145,7 +150,34 @@ describe("9046: as saídas da campanha moram no banco, e nascem no padrão", () 
     expect(tenta(campanha(`'null'::jsonb`))).toBe("23514");
   });
 
-  it("voltar para NULO é aceito — é como a cópia normaliza e como se volta ao padrão", () => {
+  it("OBJETO ILEGÍVEL é ACEITO — é a premissa de `duplicarAcao` copiar ilegível", () => {
+    // ⚠️ CONTROLE POSITIVO DA PRÓPRIA DECISÃO DE DESENHO (P2.3 do
+    // @Cassio_SecRev). `duplicarAcao` copia o objeto ilegível COMO ESTÁ, para a
+    // cópia herdar a recusa em vez de virar o padrão por conta própria — e isso
+    // só funciona se o banco aceitar gravá-lo. Sem este caso, quem endurecesse o
+    // CHECK amanhã (trocando-o pela função `immutable` da 9034/9037, por
+    // exemplo) faria `duplicarAcao` passar a levar 23514 na cópia, e a suíte
+    // seguiria verde: nenhum outro caso aqui grava objeto malformado.
+    //
+    // A divisão de trabalho que isto fixa: o CHECK recusa a FORMA (array,
+    // string, número), e o CONTEÚDO errado é assunto do Zod, que falha fechado.
+    expect(
+      tenta(
+        campanha(`'{"ao_fechar": "sim"}'::jsonb`),
+        `(saidas ->> 'ao_fechar') from campaigns where id = '${CAMP}'`,
+      ),
+    ).toBe("sim");
+    expect(
+      tenta(
+        campanha(
+          `'{"etiquetas": [], "etapas": [], "ao_fechar": true, "humano_assumir": true, "ao_responder": false}'::jsonb`,
+        ),
+        `(saidas ->> 'ao_responder') from campaigns where id = '${CAMP}'`,
+      ),
+    ).toBe("false");
+  });
+
+  it("voltar para NULO é aceito — é como se volta ao padrão pela tela", () => {
     expect(
       tenta(
         `${campanha(`'{"ao_fechar": false}'::jsonb`)}

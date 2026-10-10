@@ -59,6 +59,14 @@ export function EditarCampanha({ id }: { id: string }) {
   // QUANDO A RÉGUA PARA (9046). Carregado do rascunho; `null` vira o padrão,
   // que é o MESMO objeto que o servidor publica quando a coluna é nula.
   const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
+  // ⚠️ SE A SEÇÃO FOI MEXIDA NESTA EDIÇÃO (parecer do @Cassio_SecRev, P2.1).
+  // Mandar `saidas` sempre tinha dois efeitos ruins: a coluna nula de uma
+  // campanha que nunca abriu a seção virava o objeto do padrão no primeiro
+  // Salvar (matando a distinção "escolheu × herdou" que a coluna existe para
+  // guardar), e uma coluna ILEGÍVEL era sobrescrita pelo padrão que
+  // `saidasDaTela` mostrou, sem ninguém decidir isso. Não mexeu, não manda: o
+  // laço da rota só copia campo `!== undefined`, então a coluna fica como está.
+  const [saidasMexidas, setSaidasMexidas] = useState(false);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
@@ -88,6 +96,7 @@ export function EditarCampanha({ id }: { id: string }) {
     setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
     setPassos(c.passos ?? []);
     setSaidas(saidasDaTela(c.saidas));
+    setSaidasMexidas(false);
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
@@ -397,7 +406,10 @@ export function EditarCampanha({ id }: { id: string }) {
         <h2 className="font-medium">{t("Quando a régua para")}</h2>
         <SaidasDaCampanhaEditor
           saidas={saidas}
-          onChange={setSaidas}
+          onChange={(s) => {
+            setSaidas(s);
+            setSaidasMexidas(true);
+          }}
           etapas={etapas.data ?? []}
           temPassos={passos.length > 0}
           temFunil={!!funil}
@@ -423,7 +435,7 @@ export function EditarCampanha({ id }: { id: string }) {
               stage_id: etapa || null,
               agent_id: agente || null,
               passos,
-              saidas,
+              ...(saidasMexidas ? { saidas } : {}),
               entrada_continua: continua,
               entrada_etapa_id: continua ? etapaDeEntrada || null : null,
             });

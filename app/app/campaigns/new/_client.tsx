@@ -60,6 +60,14 @@ export function NovaCampanha() {
   // quando a coluna é nula: a campanha nova se comporta como as de antes até
   // alguém mexer aqui.
   const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
+  // ⚠️ SE A SEÇÃO FOI MEXIDA, e não "qual é o valor dela" (parecer do
+  // @Cassio_SecRev, P2.1). Sem este flag a tela mandava `saidas` SEMPRE — já
+  // preenchida com o objeto do padrão —, então o `?? null` da rota nunca
+  // produzia nulo e toda campanha nova gravava o padrão. A coluna existe
+  // nulável justamente para distinguir "o operador escolheu" de "herdou", e a
+  // distinção morria aqui, calada, contra o que a migration e o MANIFEST
+  // afirmam. Enquanto ninguém encostar, vai `null`.
+  const [saidasMexidas, setSaidasMexidas] = useState(false);
   const texto = variantes[0] ?? "";
   const variacoesExtras = useMemo(
     () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
@@ -134,7 +142,7 @@ export function NovaCampanha() {
       stage_id: etapa || null,
       agent_id: agente || null,
       passos,
-      saidas,
+      saidas: saidasMexidas ? saidas : null,
       entrada_continua: continua,
       entrada_etapa_id: continua ? etapaDeEntrada || null : null,
     });
@@ -418,7 +426,10 @@ export function NovaCampanha() {
         <h2 className="font-medium">{t("Quando a régua para")}</h2>
         <SaidasDaCampanhaEditor
           saidas={saidas}
-          onChange={setSaidas}
+          onChange={(s) => {
+            setSaidas(s);
+            setSaidasMexidas(true);
+          }}
           etapas={etapas.data ?? []}
           temPassos={passos.length > 0}
           temFunil={!!funil}

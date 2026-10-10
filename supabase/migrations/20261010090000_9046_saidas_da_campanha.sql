@@ -36,27 +36,40 @@
 -- foi configurada, ou herdou?" na hora de auditar por que alguém parou de
 -- receber. Por isso não há `not null default`.
 --
--- ## O CHECK é raso DE PROPÓSITO, e quem fecha é o lado de cima
+-- ## O CHECK é raso DE PROPÓSITO, e a razão é a DIREÇÃO DE FALHA DO LEITOR
 --
 -- Só `jsonb_typeof(saidas) = 'object'`. Não há função `immutable` com
--- `jsonb_array_elements` como na 9034 e na 9037, e a razão é a direção da falha:
--- ali o CHECK era a segunda tranca de um valor que o worker lê e EXECUTA direto
--- (`passos` vira grafo publicado), então um elemento mal formado tinha de parar
--- no banco. Aqui o valor é lido por `lerSaidasDaCampanha`, que recusa qualquer
--- coisa que o Zod não aceite — e a recusa PARA a régua em três lugares:
+-- `jsonb_array_elements` como na 9034 e na 9037, e a razão NÃO é "o Zod da rota
+-- já cobre": ele não cobre. `service_role` pela PostgREST não passa por Zod
+-- nenhum, e é justamente esse caminho que um CHECK existe para alcançar — quem
+-- escrever o contrário aqui vai levar a próxima pessoa a dispensar um CHECK que
+-- era a única tranca.
 --
---   1. `saidas` no Zod da rota (`criarCampanhaSchema`/`editarCampanhaSchema`):
---      o jsonb ilegível não nasce pela porta do produto;
---   2. `problemaNasSaidas` no gate de `faltaParaEnviar`: preparar, iniciar,
---      agendar e testar são recusados com a frase que o operador lê;
---   3. `politicaDaRegua` devolve recusa em vez de política, e
---      `publicarReguaDaCampanha` para antes de qualquer escrita no pointer.
+-- A razão verdadeira é a assimetria dos LEITORES, e ela é o contraste exato com
+-- a coluna vizinha:
 --
--- Um CHECK mais fundo recusaria o INSERT pela PostgREST com service_role, que é
--- a mesma coisa que o item 1 já cobre para a porta real, e cobraria o preço de
--- uma função a mais no banco para enriquecer um 23514 que a tela mostra como
--- "internal_error". O que o CHECK raso garante é o que importa para o banco:
--- ninguém grava um array ou uma string onde o código espera objeto.
+--   * `passosGuardados` falha ABERTA, de propósito: jsonb inválido vira LISTA
+--     VAZIA, porque campanha sem passos é estado legítimo e derrubar a rodada
+--     por um passo mal gravado pararia o envio da 1ª mensagem. Com um leitor que
+--     engole, só o BANCO podia recusar o elemento mal formado — daí a função
+--     `immutable` da 9034/9037, que ali é a ÚNICA tranca do valor.
+--
+--   * `lerSaidasDaCampanha` falha FECHADA: o que o Zod não aceita não vira
+--     padrão, vira recusa. O valor mal formado já para em TypeScript, em quatro
+--     lugares (Zod da rota; `problemaNasSaidas` no gate de `faltaParaEnviar`;
+--     `politicaDaRegua`, que devolve recusa antes de qualquer escrita no
+--     pointer; e `duplicarAcao`, que HERDA o problema em vez de normalizá-lo).
+--     Uma função `immutable` aqui seria a segunda tranca da mesma porta, não a
+--     única.
+--
+-- Então o CHECK raso garante exatamente o que um leitor fechado não garante
+-- sozinho: a FORMA do valor, inclusive contra `service_role`. Ele barra array,
+-- string e número, e deixa passar o objeto com campo errado — de propósito, e
+-- isto é premissa de desenho, não descuido: é esse caso que `duplicarAcao` copia
+-- como está, para a cópia herdar a recusa em vez de virar o padrão por conta
+-- própria. Endurecer o CHECK quebraria a herança (a cópia passaria a levar 23514
+-- no INSERT), e por isso o invariante tem um caso que PROVA que o objeto
+-- ilegível é aceito pelo banco.
 --
 -- ## A régua QUE JÁ ESTÁ NO AR não é alcançada por esta coluna
 --
@@ -68,6 +81,15 @@
 -- isso `saidas` é CONTEÚDO no PATCH (só rascunho), e não ritmo — aceitá-la com a
 -- campanha andando deixaria a tela mostrando uma política e o pointer
 -- executando outra.
+--
+-- ⚠️ E o que isto NÃO afirma: que o snapshot seja seguro. Quem o lê é `saidasDe`
+-- (`lib/cadencia/saidas.ts`), que falha ABERTA — `cadence_settings` sem a chave
+-- `saidas`, ou com ela corrompida, cai em `SAIDAS_PADRAO` e a régua perde,
+-- calada, a etapa e a etiqueta escolhidas. É comportamento compartilhado com a
+-- cadência, em produção desde a 9016, e está fora do alcance desta migration:
+-- mexer nele mudaria o comportamento de toda cadência existente. A garantia
+-- desta fatia é só a de cima — nada que a campanha publique é mais frouxo do que
+-- o que ela tem gravado.
 --
 -- ## O que NÃO muda
 --
