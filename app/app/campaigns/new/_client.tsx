@@ -16,8 +16,9 @@
  * operador precisa ver antes de apertar é "quantas pessoas isto pega".
  */
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { AvisoDeRitmo } from "@/components/campanhas/AvisoDeRitmo";
 import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
@@ -27,9 +28,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
+import { useConfiguracaoDeCampanhas } from "@/hooks/campanhas/useConfiguracao";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import { ritmoDaCampanhaNova } from "@/lib/campanhas/ritmo-recomendado";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import {
   useAgentesPublicados,
@@ -73,11 +76,23 @@ export function NovaCampanha() {
     () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
     [variantes],
   );
+  // ═══ O RITMO JÁ VEM PREENCHIDO (preset anti-bloqueio) ═══
+  //
+  // Abre vazio e é PREENCHIDO quando a configuração da organização chega
+  // (`ritmoDaCampanhaNova`: o que a organização definiu, e o recomendado onde
+  // ela não definiu nada). Começar vazio em vez de já com o recomendado evita o
+  // caso em que a configuração chega depois e sobrescreve o que o operador
+  // digitou enquanto ela carregava — o `preenchido` fecha essa porta de vez.
+  //
+  // ⚠️ Só aqui. A edição e a tela de detalhe continuam lendo o ritmo da
+  // campanha como ele está gravado: preencher lá mudaria em silêncio a escolha
+  // de quem criou o rascunho.
   const [intervalo, setIntervalo] = useState("");
   const [janelaInicio, setJanelaInicio] = useState("");
   const [janelaFim, setJanelaFim] = useState("");
   const [tetoDiario, setTetoDiario] = useState("");
   const [tetoHorario, setTetoHorario] = useState("");
+  const [preenchido, setPreenchido] = useState(false);
   const [extras, setExtras] = useState<string[]>([]);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
@@ -92,6 +107,30 @@ export function NovaCampanha() {
   const etapas = useEtapas(funil || null);
   const etapasDoPublico = useEtapas(funilDoPublico || null);
   const agentes = useAgentesPublicados();
+
+  const padroes = useConfiguracaoDeCampanhas();
+  useEffect(() => {
+    if (preenchido || padroes.isLoading) return;
+    // Erro ao ler a configuração não deixa o formulário vazio: `data` ausente
+    // cai no recomendado, que é o lado seguro. Ficar em branco por causa de uma
+    // falha de rede devolveria ao operador exatamente o problema que o preset
+    // existe para resolver.
+    const r = ritmoDaCampanhaNova(padroes.data?.configuracao);
+    setIntervalo(comoTexto(r.intervaloSegundos));
+    setJanelaInicio(comoTexto(r.janelaInicioHora));
+    setJanelaFim(comoTexto(r.janelaFimHora));
+    setTetoDiario(comoTexto(r.tetoDiario));
+    setTetoHorario(comoTexto(r.tetoHorario));
+    setPreenchido(true);
+  }, [padroes.data, padroes.isLoading, preenchido]);
+
+  const ritmoEscolhido = {
+    intervaloSegundos: comoNumero(intervalo),
+    janelaInicioHora: comoNumero(janelaInicio),
+    janelaFimHora: comoNumero(janelaFim),
+    tetoDiario: comoNumero(tetoDiario),
+    tetoHorario: comoNumero(tetoHorario),
+  };
 
   const filtro = useMemo(
     () => ({
@@ -132,11 +171,11 @@ export function NovaCampanha() {
       base_legal: baseLegal,
       lia_ref: liaRef.trim() || null,
       audience_filter: filtro,
-      intervalo_segundos: intervalo ? Number(intervalo) : null,
-      janela_inicio_hora: janelaInicio ? Number(janelaInicio) : null,
-      janela_fim_hora: janelaFim ? Number(janelaFim) : null,
-      teto_diario: tetoDiario ? Number(tetoDiario) : null,
-      teto_horario: tetoHorario ? Number(tetoHorario) : null,
+      intervalo_segundos: ritmoEscolhido.intervaloSegundos,
+      janela_inicio_hora: ritmoEscolhido.janelaInicioHora,
+      janela_fim_hora: ritmoEscolhido.janelaFimHora,
+      teto_diario: ritmoEscolhido.tetoDiario,
+      teto_horario: ritmoEscolhido.tetoHorario,
       channel_session_ids: extras,
       pipeline_id: funil || null,
       stage_id: etapa || null,
@@ -509,6 +548,12 @@ export function NovaCampanha() {
             "Em branco, vale o ritmo do número (Conexões › Proteção de envio). O que você puser aqui só pode deixar mais devagar.",
           )}
         </p>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "Os campos já vêm com o ritmo que a organização definiu em Configuração de campanhas, e com o recomendado para lista fria onde ela não definiu nada. Tudo é editável, e campo esvaziado volta a herdar o número.",
+          )}
+        </p>
+        <AvisoDeRitmo ritmo={ritmoEscolhido} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="intervalo">{t("Intervalo mínimo entre mensagens (segundos)")}</Label>
@@ -575,6 +620,18 @@ export function NovaCampanha() {
       </div>
     </div>
   );
+}
+
+/** Campo vazio é `null`, que é "herda o número" (o mesmo par das outras telas). */
+function comoTexto(valor: number | null): string {
+  return valor === null ? "" : String(valor);
+}
+
+function comoNumero(bruto: string): number | null {
+  const limpo = bruto.trim();
+  if (limpo === "") return null;
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : null;
 }
 
 function listar(bruto: string): string[] {

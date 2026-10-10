@@ -13586,8 +13586,29 @@ export const DICIONARIO: Traducoes = {
   "A proteção do número — ritmo, janela e aquecimento que valem para tudo que sai por ele — fica em": {
     es: "La protección del número — ritmo, franja y calentamiento que valen para todo lo que sale por él — está en",
   },
-  "Campo vazio significa herdar o número. Toda campanha nova nasce com estes valores e pode ficar mais devagar, nunca mais rápida.": {
-    es: "Campo vacío significa heredar el número. Toda campaña nueva nace con estos valores y puede ir más lenta, nunca más rápida.",
+  // ─── PRESET ANTI-BLOQUEIO DO RITMO DA CAMPANHA ───
+  "Algum valor aqui está mais solto que o recomendado para lista fria. Dá para rodar assim, com risco maior de bloqueio do número.": {
+    es: "Algún valor aquí está más suelto que el recomendado para lista fría. Se puede operar así, con mayor riesgo de bloqueo del número.",
+  },
+  "Campo vazio usa o ritmo recomendado para lista fria:": {
+    es: "El campo vacío usa el ritmo recomendado para lista fría:",
+  },
+  "entre mensagens,": { es: "entre mensajes," },
+  "Horário mais largo que o recomendado:": { es: "Franja horaria más amplia que la recomendada:" },
+  "Intervalo menor que o recomendado:": { es: "Intervalo menor que el recomendado:" },
+  "Mais mensagens por dia que o recomendado:": {
+    es: "Más mensajes por día que el recomendado:",
+  },
+  "Mais mensagens por hora que o recomendado:": {
+    es: "Más mensajes por hora que el recomendado:",
+  },
+  "Os campos já vêm com o ritmo que a organização definiu em Configuração de campanhas, e com o recomendado para lista fria onde ela não definiu nada. Tudo é editável, e campo esvaziado volta a herdar o número.": {
+    es: "Los campos ya vienen con el ritmo que la organización definió en Configuración de campañas, y con el recomendado para lista fría donde no definió nada. Todo es editable, y un campo vaciado vuelve a heredar el número.",
+  },
+  "por dia,": { es: "por día," },
+  "por hora, das": { es: "por hora, de las" },
+  "Toda campanha nova nasce com estes valores, e pode ficar mais devagar, nunca mais rápida.": {
+    es: "Toda campaña nueva nace con estos valores, y puede ir más lenta, nunca más rápida.",
   },
   "Conexões › Proteção de envio": { es: "Conexiones › Protección de envío" },
   "Configuração de campanhas": { es: "Configuración de campañas" },
