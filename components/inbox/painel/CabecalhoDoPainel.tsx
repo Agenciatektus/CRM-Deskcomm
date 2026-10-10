@@ -13,15 +13,9 @@ import { ArrowRight, Copy, ListChecks, Note, Plus, UserCircle } from "@/lib/ui/i
 import { cn } from "@/lib/utils";
 
 import { AvatarDoContato } from "../AvatarDoContato";
+import { initials } from "../item/tempo-da-linha";
 import { ContactTagsEditor } from "../ContactTagsEditor";
 import { useTarefasDoContato } from "./useTarefasDoContato";
-
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return "?";
-  if (partes.length === 1) return (partes[0] ?? "").slice(0, 2).toUpperCase();
-  return `${partes[0]?.[0] ?? ""}${partes[partes.length - 1]?.[0] ?? ""}`.toUpperCase();
-}
 
 /**
  * Os três atalhos lado a lado (largura pelo rótulo, sobra dividida) e as medidas do `.jump` do
@@ -81,7 +75,7 @@ export function CabecalhoDoPainel({
   return (
     <div className="flex flex-col gap-2.5 border-b border-border px-4 pb-3.5 pt-4" data-testid="inbox-cabecalho-do-painel">
       <div className="flex items-center gap-3">
-        <AvatarDoContato contato={contact} nome={displayName} iniciais={iniciais(displayName)} className="h-12 w-12 text-base" />
+        <AvatarDoContato contato={contact} nome={displayName} iniciais={initials(displayName, "?")} className="h-12 w-12 text-base" />
         <div className="min-w-0">
           <div className="truncate text-[17px] font-bold leading-tight text-text">{displayName}</div>
           {telefone && (
