@@ -41,6 +41,9 @@ vi.mock("next/navigation", () => ({
 // do funil, não a fila.
 vi.mock("@/components/shell/ContadorDaFila", () => ({ ContadorDaFila: () => null }));
 vi.mock("@/components/shell/ContadorDeCasos", () => ({ ContadorDeCasos: () => null }));
+vi.mock("@/components/shell/ContadorDeTarefas", () => ({ ContadorDeTarefas: () => null }));
+// A contagem por funil (fase 8a) tem o seu próprio teste; aqui o nó só precisa do nome.
+vi.mock("@/hooks/pipelines/useLeadsAbertosPorFunil", () => ({ useLeadsAbertosPorFunil: () => ({ data: {} }) }));
 vi.mock("@/components/connections/ConnectionHealthDot", () => ({
   ConnectionHealthDot: () => null,
 }));

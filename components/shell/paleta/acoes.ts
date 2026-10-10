@@ -1,5 +1,5 @@
 "use client";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
@@ -28,12 +28,14 @@ export interface AcaoDaPaleta {
  *  - "Ver avisos em aberto": só para quem enxerga a central (a mesma régua do
  *    sino).
  *
- * "Só conversas sem próximo passo" (do protótipo) NÃO entra: a Inbox não tem
- * esse filtro hoje.
+ *  - "Só conversas sem próximo passo": para quem tem a Inbox no menu (L4,
+ *    migration 9047). Com a Inbox aberta liga o filtro na hora; de outra tela,
+ *    abre a Inbox já filtrada (`?sem_passo=1`).
  */
 export function useAcoesDaPaleta(): AcaoDaPaleta[] {
   const t = useT();
   const pathname = usePathname();
+  const router = useRouter();
   const parametros = useSearchParams();
   const { user, activeOrg } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
@@ -41,11 +43,13 @@ export function useAcoesDaPaleta(): AcaoDaPaleta[] {
     roleAtLeast(activeOrg?.role, "agent") && user.support?.access_mode !== "support_readonly";
   const minha = useMinhaDisponibilidade(podeAtender);
   const atualizar = useUpdateAvailability(t("Disponibilidade atualizada."));
-  const veAvisos = destinosDaInterface(
+  const destinos = destinosDaInterface(
     activeOrg?.interface_settings,
     user.is_platform_admin && !user.support,
     activeOrg?.role ?? null,
-  ).some((d) => d.href === "/app/ai/inbox");
+  );
+  const veAvisos = destinos.some((d) => d.href === "/app/ai/inbox");
+  const veInbox = destinos.some((d) => d.href === "/app/inbox");
 
   const acoes: AcaoDaPaleta[] = [];
   if (pathname?.startsWith("/app/inbox") && parametros?.get("id")) {
@@ -54,6 +58,15 @@ export function useAcoesDaPaleta(): AcaoDaPaleta[] {
       titulo: t("Criar próximo passo"),
       sub: t("Para a conversa aberta"),
       executar: () => pedir("proximo-passo"),
+    });
+  }
+  if (veInbox) {
+    acoes.push({
+      id: "sem-passo",
+      titulo: t("Só conversas sem próximo passo"),
+      sub: t("Filtro da Inbox"),
+      executar: () =>
+        pathname?.startsWith("/app/inbox") ? pedir("so-sem-passo") : router.push("/app/inbox?sem_passo=1"),
     });
   }
   const escuro = resolvedTheme === "dark";

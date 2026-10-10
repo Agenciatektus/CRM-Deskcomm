@@ -49,9 +49,11 @@ export interface NavMetadata {
    * Contador de pendências ao lado do rótulo. `casos`: casos em que a IA espera
    * uma pessoa (`awaiting_human`) — quem desenha é `ContadorDeCasos`. `fila`:
    * conversas que esperam uma pessoa (a aba Fila do Inbox) — `ContadorDaFila`.
+   * `tarefas`: tarefas abertas que venceram na mão de quem está logado —
+   * `ContadorDeTarefas` (migration 9047).
    * Zero não desenha nada: número que nunca some ensina a ignorar o número.
    */
-  contador?: "casos" | "fila" | "avisos";
+  contador?: "casos" | "fila" | "avisos" | "tarefas";
   /**
    * Uma etiqueta curta ao lado do nome na coluna 2 (o `.nav2-tag` do
    * protótipo): "Admin" para tela que só quem administra vê, "Opcional" para
@@ -296,6 +298,8 @@ export const NAV_CATALOG = [
     group: "crm",
     section: "O dia a dia da venda",
     sidebar: true,
+    // S14 do visual v2: o que venceu na SUA mão, em tom crítico suave.
+    contador: "tarefas",
   },
   {
     // Módulo VoIP (migration 0347). No grupo do CRM pelo mesmo critério de

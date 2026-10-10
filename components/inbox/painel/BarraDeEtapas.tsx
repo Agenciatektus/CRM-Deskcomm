@@ -39,11 +39,35 @@ export function BarraDeEtapas({ leadId, pipelineId, stageId, updatedAt, aberto, 
 
   function irPara(id: string) {
     if (id === stageId || !podeMover) return;
+    // A etapa de onde o negócio sai: é para ela que o "Desfazer" volta.
+    const anterior = stageId;
     mover.mutate(
       { leadId, stageId: id, positionInStage: fimDaColuna(), expectedUpdatedAt: updatedAt },
       {
+        onSuccess: (resposta) => {
+          toast.success(t("Etapa alterada"), {
+            // P2 do Cassio na #157: um clique na barra errada não pode custar
+            // achar a etapa de volta à mão. Volta pela MESMA rota (`/move`), com
+            // a data de atualização que a própria mudança devolveu: se outra
+            // pessoa mexeu no meio, a rota recusa em vez de sobrescrever.
+            action: {
+              label: t("Desfazer"),
+              onClick: () => desfazer(anterior, resposta?.data?.updated_at),
+            },
+          });
+          onMovido();
+        },
+      },
+    );
+  }
+
+  function desfazer(etapa: string, atualizadoEm: string | undefined) {
+    if (!atualizadoEm) return;
+    mover.mutate(
+      { leadId, stageId: etapa, positionInStage: fimDaColuna(), expectedUpdatedAt: atualizadoEm },
+      {
         onSuccess: () => {
-          toast.success(t("Etapa alterada"));
+          toast.success(t("Etapa desfeita"));
           onMovido();
         },
       },

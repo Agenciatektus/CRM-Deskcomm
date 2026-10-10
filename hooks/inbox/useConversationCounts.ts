@@ -42,6 +42,8 @@ export interface FiltrosDaContagem {
   channel_session_id?: string;
   /** De que ENTRADA do Instagram. Sem isto, o badge mente sob filtro. */
   entrada?: string;
+  /** "Sem próximo passo" (migration 9047): o badge conta o filtro da lista. */
+  semPasso?: boolean;
 }
 
 /**
@@ -54,6 +56,7 @@ export function useConversationCounts(
 ) {
   const qs = new URLSearchParams();
   if (filtros.unread) qs.set("unread", "true");
+  if (filtros.semPasso) qs.set("sem_passo", "true");
   for (const marcador of marcadoresEscolhidos(
     typeof filtros.tag === "string" ? [filtros.tag] : (filtros.tag ?? []),
   ))

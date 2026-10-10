@@ -55,6 +55,8 @@ vi.mock("@/components/shell/ContadorDaFila", () => ({
     <span data-testid="marcador-fila" data-compacto={String(compacto)} />
   ),
 }));
+vi.mock("@/components/shell/ContadorDeTarefas", () => ({ ContadorDeTarefas: () => null }));
+vi.mock("@/hooks/pipelines/useLeadsAbertosPorFunil", () => ({ useLeadsAbertosPorFunil: () => ({ data: {} }) }));
 vi.mock("@/components/shell/ContadorDeAvisos", () => ({
   ContadorDeAvisos: () => <span data-testid="marcador-avisos" />,
 }));

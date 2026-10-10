@@ -83,6 +83,16 @@ export function contagemSoNaoLidas(sp: URLSearchParams): boolean {
   return sp.get("unread") === "true";
 }
 
+/**
+ * Verdadeiro quando a lista filtra "Sem próximo passo" (migration 9047). Vai à
+ * função como `p_sem_passo`, que aplica o MESMO campo calculado da lista
+ * (`passo_da_conversa`): não é igualdade numa coluna, por isso fica fora de
+ * `filtrosAuxiliaresDaContagem`, como as não lidas.
+ */
+export function contagemSemPasso(sp: URLSearchParams): boolean {
+  return sp.get("sem_passo") === "true";
+}
+
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const supabase = await createClient();
@@ -124,6 +134,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     p_so_nao_lidas: soNaoLidas,
     p_marcadores: marcadores,
     p_modo: modo,
+    p_sem_passo: contagemSemPasso(sp),
   } as never);
   if (error) {
     return fail("internal_error", error.message, 500, { requestId });

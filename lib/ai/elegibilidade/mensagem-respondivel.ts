@@ -46,6 +46,13 @@ export function mensagemPedeResposta(m: MensagemParaResposta): DecisaoDeResposta
 /**
  * O mesmo predicado, para usar num `where` sobre `messages` (sem alias).
  * Mantenha em sincronia com `mensagemPedeResposta`.
+ *
+ * Alinhado ao TS em dois pontos (P2-1 do Cassio na #155):
+ *   - `btrim(body)` sozinho tira só espaço; o `.trim()` do JS tira também
+ *     tabulação, quebra de linha e o espaço inquebrável (U+00A0). Um corpo só
+ *     de quebra de linha ou de NBSP passava no SQL e era recusado no TS.
+ *   - `media_url = ''` é "sem mídia" no TS (`Boolean('')` é falso) e era
+ *     "com mídia" no SQL (`'' is not null`). O `nullif` iguala os dois.
  */
 export const SQL_MENSAGEM_PEDE_RESPOSTA =
-  "(type <> 'reaction' and (coalesce(btrim(body), '') <> '' or media_url is not null or media_storage_path is not null))";
+  "(type <> 'reaction' and (coalesce(btrim(body, E' \\t\\r\\n\\u00a0'), '') <> '' or nullif(media_url, '') is not null or nullif(media_storage_path, '') is not null))";

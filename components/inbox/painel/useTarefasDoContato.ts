@@ -38,7 +38,13 @@ export function useTarefasDoContato(contactId: string | null) {
     select: (r) => (Array.isArray(r?.data?.tasks) ? r.data.tasks : []),
   });
 
-  const invalidar = () => qc.invalidateQueries({ queryKey: CHAVE });
+  // A lista da Inbox também: a pílula "Sem próximo passo" / "Tarefa atrasada" e
+  // o filtro saem do banco (`passo_da_conversa`, migration 9047), e criar ou
+  // concluir a tarefa aqui muda os dois.
+  const invalidar = () => {
+    void qc.invalidateQueries({ queryKey: ["conversations"] });
+    return qc.invalidateQueries({ queryKey: CHAVE });
+  };
 
   const criar = useMutation({
     mutationFn: (entrada: NovaTarefa) => apiClient.post<{ data: { task: Tarefa } }>("/api/v1/tasks", entrada),

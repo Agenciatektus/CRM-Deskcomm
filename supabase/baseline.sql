@@ -47223,6 +47223,152 @@ grant all on table public.conversation_user_state to service_role;
 -- que alcança toda tabela com organization_id; a função dela nasce abaixo.
 
 
+-- ---- dados do visual v2 da Inbox: contagens do menu, próximo passo, autor da última mensagem e trigram (migration 9047) ----
+--
+-- Duas contagens do menu (`fn_tarefas_atrasadas`, `fn_leads_abertos_por_funil`),
+-- dois campos calculados da lista (`passo_da_conversa`, `autor_da_ultima_mensagem`)
+-- e cinco índices (dois parciais em `crm_tasks`, três trigram). Todas as funções
+-- SECURITY INVOKER, EXECUTE revogado de public/anon. Racional, plano de cada
+-- consulta e rollback no cabeçalho da migration.
+--
+-- POSIÇÃO É DEPENDÊNCIA: este bloco fica ANTES do da 9029 porque
+-- `fn_contagens_da_caixa`, reemitida lá com `p_sem_passo`, chama
+-- `passo_da_conversa`, e função SQL valida o corpo na criação. E antes da
+-- VARREDURA anon, como toda função nova do apêndice.
+--
+-- Índices sem `CONCURRENTLY` (migration roda em transação): em produção eles são
+-- criados à mão com `concurrently` antes do deploy, e o `if not exists`, que casa
+-- por NOME, vira no-op aqui; em clone novo as tabelas nascem pequenas. Os
+-- comandos estão no cabeçalho da migration.
+-- Prova: tests/invariants/inbox-v2-dados-9047.test.ts.
+-- ---- índices ----
+create index if not exists crm_tasks_abertas_do_contato_idx
+  on public.crm_tasks (contact_id, due_date) include (organization_id)
+  where contact_id is not null and status in ('pending', 'in_progress');
+
+create index if not exists crm_tasks_atrasadas_do_responsavel_idx
+  on public.crm_tasks (organization_id, assigned_to, due_date)
+  where due_date is not null and status in ('pending', 'in_progress');
+
+create index if not exists idx_contacts_display_name_trgm
+  on public.contacts using gin (display_name public.gin_trgm_ops);
+
+create index if not exists idx_contacts_phone_number_trgm
+  on public.contacts using gin (phone_number public.gin_trgm_ops);
+
+create index if not exists idx_crm_leads_title_trgm
+  on public.crm_leads using gin (title public.gin_trgm_ops);
+
+-- ---- S14: tarefas atrasadas de quem pede ----
+create or replace function public.fn_tarefas_atrasadas(p_organizacao uuid)
+returns integer
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select count(*)::integer
+    from public.crm_tasks t
+   where t.organization_id = p_organizacao
+     and t.assigned_to = (select auth.uid())
+     and t.status in ('pending', 'in_progress')
+     and t.due_date < now()
+$$;
+
+comment on function public.fn_tarefas_atrasadas(uuid) is
+  'Quantas tarefas abertas com prazo vencido estão com quem chama (auth.uid()), na organização. SECURITY INVOKER: a RLS de crm_tasks vale. Contador do menu (migration 9047).';
+
+revoke execute on function public.fn_tarefas_atrasadas(uuid) from public, anon;
+grant  execute on function public.fn_tarefas_atrasadas(uuid) to authenticated, service_role;
+
+-- ---- S18: leads abertos por funil ----
+create or replace function public.fn_leads_abertos_por_funil(p_organizacao uuid)
+returns table (pipeline_id uuid, abertos integer)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select l.pipeline_id, count(*)::integer
+    from public.crm_leads l
+   where l.organization_id = p_organizacao
+     and l.status = 'open'
+   group by l.pipeline_id
+$$;
+
+comment on function public.fn_leads_abertos_por_funil(uuid) is
+  'Leads abertos por funil na organização, contados pela RLS de crm_leads de quem chama (SECURITY INVOKER): o agent em modo own conta só o que o quadro mostra a ele. Nó Pipeline do menu (migration 9047).';
+
+revoke execute on function public.fn_leads_abertos_por_funil(uuid) from public, anon;
+grant  execute on function public.fn_leads_abertos_por_funil(uuid) to authenticated, service_role;
+
+-- ---- L4/L20: o próximo passo da conversa (campo calculado) ----
+create or replace function public.passo_da_conversa(c public.conversations)
+returns text
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select case
+    when c.contact_id is null
+      or coalesce(c.is_group, false)
+      or c.status::text in ('closed', 'archived')
+      then null
+    when not exists (
+      select 1 from public.crm_tasks t
+       where t.contact_id = c.contact_id
+         and t.organization_id = c.organization_id
+         and t.status in ('pending', 'in_progress')
+    ) then 'sem_passo'
+    when exists (
+      select 1 from public.crm_tasks t
+       where t.contact_id = c.contact_id
+         and t.organization_id = c.organization_id
+         and t.status in ('pending', 'in_progress')
+         and t.due_date < now()
+    ) then 'atrasada'
+    else 'em_dia'
+  end
+$$;
+
+comment on function public.passo_da_conversa(public.conversations) is
+  'Campo calculado do PostgREST: sem_passo (contato sem tarefa aberta), atrasada (tarefa aberta vencida) ou em_dia; nulo em conversa fechada, arquivada, de grupo ou sem contato. Pílula e filtro "Sem próximo passo" da Inbox (migration 9047).';
+
+revoke execute on function public.passo_da_conversa(public.conversations) from public, anon;
+grant  execute on function public.passo_da_conversa(public.conversations) to authenticated, service_role;
+
+-- ---- L14: de quem é a última mensagem (campo calculado) ----
+create or replace function public.autor_da_ultima_mensagem(c public.conversations)
+returns text
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select case
+    when m.direction = 'inbound' then 'cliente'
+    when m.sent_via = 'ai' then 'ia'
+    when m.sent_via in ('automation', 'system') then 'automacao'
+    else 'equipe'
+  end
+    from public.messages m
+   where m.conversation_id = c.id
+     and m.organization_id = c.organization_id
+     and m.type <> 'reaction'
+   order by m.sent_at desc
+   limit 1
+$$;
+
+comment on function public.autor_da_ultima_mensagem(public.conversations) is
+  'Campo calculado do PostgREST: cliente, ia, automacao ou equipe, para a última mensagem da conversa (reação não conta). Prefixo "Você:"/"IA:" da prévia na lista da Inbox (migration 9047).';
+
+revoke execute on function public.autor_da_ultima_mensagem(public.conversations) from public, anon;
+grant  execute on function public.autor_da_ultima_mensagem(public.conversations) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+
 -- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
 --
 -- Uma varredura de conversations devolve as seis contagens das abas
@@ -47230,7 +47376,12 @@ grant all on table public.conversation_user_state to service_role;
 -- vale para quem chama. Motivo, medição e rollback no cabeçalho da migration.
 -- Antes da VARREDURA anon, como toda função nova do apêndice; a revogação de
 -- anon é explícita porque a varredura só alcança security definer.
--- Prova: tests/invariants/contagens-da-caixa-9029.test.ts.
+-- Desde a 9047 a função tem 9 parâmetros (`p_sem_passo`, o filtro "Sem próximo
+-- passo" por `passo_da_conversa`, definida no bloco da 9047 logo acima): a de 8
+-- cai antes, porque com as duas de pé a chamada por nome da rota seria ambígua.
+-- Prova: tests/invariants/contagens-da-caixa-9029.test.ts e inbox-v2-dados-9047.test.ts.
+drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text);
+
 create or replace function public.fn_contagens_da_caixa(
   p_organizacao uuid,
   p_comandos_da_fila text[],
@@ -47239,7 +47390,8 @@ create or replace function public.fn_contagens_da_caixa(
   p_entrada text default null,
   p_so_nao_lidas boolean default false,
   p_marcadores text[] default null,
-  p_modo text default 'e'
+  p_modo text default 'e',
+  p_sem_passo boolean default false
 )
 returns jsonb
 language sql
@@ -47280,6 +47432,8 @@ as $$
               else c.tags @> p_marcadores or ct.tags @> p_marcadores
             end
        )
+       -- 9047: o MESMO campo calculado que a lista filtra.
+       and (not coalesce(p_sem_passo, false) or public.passo_da_conversa(c) = 'sem_passo')
   )
   select jsonb_build_object(
     'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
@@ -47293,11 +47447,11 @@ as $$
   from base;
 $$;
 
-comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida.';
+comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) is
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa).';
 
-revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) from public, anon;
-grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text) to authenticated, service_role;
+revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) from public, anon;
+grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
 
