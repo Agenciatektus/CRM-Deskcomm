@@ -6840,6 +6840,8 @@ export const DICIONARIO: Traducoes = {
   "O WhatsApp alterou a mensagem, mas o CRM não conseguiu atualizar o histórico.": { es: "WhatsApp modificó el mensaje, pero el CRM no pudo actualizar el historial." },
   "Esta mensagem foi apagada": { es: "Este mensaje fue eliminado" },
   "Visível só aqui no CRM": { es: "Visible solo aquí en el CRM" },
+  "Mensagem não suportada (tipo {tipo}). Veja no celular.": { es: "Mensaje no compatible (tipo {tipo}). Míralo en el celular." },
+  "Mensagem sem conteúdo. Veja no celular.": { es: "Mensaje sin contenido. Míralo en el celular." },
   editada: { es: "editado" },
   "O autor editou esta mensagem": { es: "El autor editó este mensaje" },
   "Erro desconhecido": { es: "Error desconocido" },
