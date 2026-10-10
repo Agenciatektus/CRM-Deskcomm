@@ -16,6 +16,8 @@ import {
 } from "@/lib/cadencia/settings";
 import { grafoDaTimeline, type PassoDaRegua } from "@/lib/regua/timeline";
 
+import { lerSaidasDaCampanha } from "./saidas-da-campanha";
+
 /**
  * O que a política precisa saber da campanha. É o mesmo recorte que
  * `lib/campanhas/acoes.ts` carrega, e de propósito: a régua não lê colunas que
@@ -34,6 +36,13 @@ export interface CampanhaComRegua {
   janela_fim_hora: number | null;
   teto_diario: number | null;
   passos: unknown;
+  /**
+   * Quando a régua para de falar com uma pessoa (`campaigns.saidas`, 9046).
+   * CRU, como `passos`: quem o lê é `lerSaidasDaCampanha`, que recusa o
+   * ilegível em vez de devolver padrão. `null` = o operador nunca abriu a
+   * seção, e vale o padrão de sempre.
+   */
+  saidas: unknown;
   followup_pointer_id: string | null;
 }
 
@@ -89,7 +98,24 @@ export function tetoDeEnvioComRegua(tetoDiario: number | null): number {
   return Math.min(MAX_INSCRICOES_DIA_TETO, Math.max(1, tetoDiario ?? MAX_INSCRICOES_DIA_TETO));
 }
 
-export function politicaDaRegua(c: CampanhaComRegua): CadenceSettings {
+/**
+ * A política, ou o motivo de não haver política.
+ *
+ * ⚠️ Devolve RESULTADO, e não `CadenceSettings`, porque é isso que torna a falha
+ * fechada ESTRUTURAL em vez de combinada: não existe caminho que produza a
+ * política da régua sem passar pela leitura das saídas, então uma configuração
+ * de saída ilegível não tem como virar uma régua publicada com o padrão no
+ * lugar da escolha do operador (o racional completo está em
+ * `saidas-da-campanha.ts`). Antes desta fatia a função devolvia a política
+ * direto, e as saídas eram um literal fixo aqui dentro.
+ */
+export type PoliticaDaRegua =
+  | { ok: true; politica: CadenceSettings }
+  | { ok: false; mensagem: string };
+
+export function politicaDaRegua(c: CampanhaComRegua): PoliticaDaRegua {
+  const lidas = lerSaidasDaCampanha(c.saidas);
+  if (!lidas.ok) return { ok: false, mensagem: lidas.mensagem };
   const inicio = c.janela_inicio_hora;
   const fim = c.janela_fim_hora;
   // `24` é hora válida no CHECK da campanha (`janela_fim_hora <= 24`) e inválida
@@ -105,30 +131,42 @@ export function politicaDaRegua(c: CampanhaComRegua): CadenceSettings {
       : Math.min(ESPACAMENTO_MAXIMO_S, Math.max(ESPACAMENTO_MINIMO_S, Math.round(intervalo)));
 
   return {
-    janela:
-      janelaValida && inicioTexto !== null && fimTexto !== null
-        ? { start: inicioTexto, end: fimTexto, weekdays: [0, 1, 2, 3, 4, 5, 6] }
-        : { ...CADENCE_SETTINGS_PADRAO.janela, weekdays: [0, 1, 2, 3, 4, 5, 6] },
-    espacamento:
-      espacamentoS === null
-        ? CADENCE_SETTINGS_PADRAO.espacamento
-        : { min_s: espacamentoS, max_s: espacamentoS },
-    legal_basis_ref: baseLegalDaRegua(c),
-    // O MESMO número que o envio passa a respeitar (`tetoDeEnvioComRegua`):
-    // uma fonte só, senão a campanha manda mais do que a régua absorve e a
-    // diferença some sem rastro.
-    max_inscricoes_dia: tetoDeEnvioComRegua(c.teto_diario),
-    // ⚠️ `ao_fechar: true`, igual à cadência, e a HISTÓRIA deste campo importa:
-    // ele esteve desligado enquanto o card da campanha nascia só na resposta.
-    // Naquele desenho `motivoDeSaida` lia "sem negócio" como negócio REMOVIDO e
-    // matava toda régua no primeiro passo. Com o card nascendo na ABORDAGEM a
-    // premissa caiu, e mantê-lo desligado deixaria a régua falando com quem o
-    // vendedor JÁ marcou como perdido por fora do WhatsApp: `cancel_on_reply`
-    // não pega (a pessoa não respondeu no canal) e `humano_assumir` só pega se
-    // alguém falou NO canal. Quem separa os dois significados de "sem negócio"
-    // agora é `FatosDaSaida.nasceuComNegocio`, e não o desligamento deste campo:
-    // a régua cujo card não deu para criar segue viva.
-    saidas: { etiquetas: [], etapas: [], ao_fechar: true, humano_assumir: true },
+    ok: true,
+    politica: {
+      janela:
+        janelaValida && inicioTexto !== null && fimTexto !== null
+          ? { start: inicioTexto, end: fimTexto, weekdays: [0, 1, 2, 3, 4, 5, 6] }
+          : { ...CADENCE_SETTINGS_PADRAO.janela, weekdays: [0, 1, 2, 3, 4, 5, 6] },
+      espacamento:
+        espacamentoS === null
+          ? CADENCE_SETTINGS_PADRAO.espacamento
+          : { min_s: espacamentoS, max_s: espacamentoS },
+      legal_basis_ref: baseLegalDaRegua(c),
+      // O MESMO número que o envio passa a respeitar (`tetoDeEnvioComRegua`):
+      // uma fonte só, senão a campanha manda mais do que a régua absorve e a
+      // diferença some sem rastro.
+      max_inscricoes_dia: tetoDeEnvioComRegua(c.teto_diario),
+      // ═══ AS SAÍDAS SÃO DO OPERADOR a partir da 9046 ═══
+      //
+      // Até então este campo era o literal
+      // `{ etiquetas: [], etapas: [], ao_fechar: true, humano_assumir: true }`,
+      // e `SAIDAS_DA_CAMPANHA_PADRAO` é EXATAMENTE ele — então campanha com
+      // `saidas = null` (toda campanha que existe hoje) publica a política
+      // byte a byte igual à de antes.
+      //
+      // ⚠️ `ao_fechar: true` continua sendo o padrão, e a HISTÓRIA dele importa
+      // para quem for mexer: ele esteve desligado enquanto o card da campanha
+      // nascia só na resposta. Naquele desenho `motivoDeSaida` lia "sem
+      // negócio" como negócio REMOVIDO e matava toda régua no primeiro passo.
+      // Com o card nascendo na ABORDAGEM a premissa caiu, e mantê-lo desligado
+      // deixaria a régua falando com quem o vendedor JÁ marcou como perdido por
+      // fora do WhatsApp: `cancel_on_reply` não pega (a pessoa não respondeu no
+      // canal) e `humano_assumir` só pega se alguém falou NO canal. Quem separa
+      // os dois significados de "sem negócio" é `FatosDaSaida.nasceuComNegocio`,
+      // e não o desligamento deste campo. Desligá-lo pela tela é escolha do
+      // operador sobre a campanha DELE, e ela não muda nada do que já existe.
+      saidas: lidas.saidas,
+    },
   };
 }
 

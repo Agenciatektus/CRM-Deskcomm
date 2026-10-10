@@ -14150,6 +14150,71 @@ export const DICIONARIO: Traducoes = {
   // dinâmica). Fica "Pipeline": é o termo que CRM em espanhol usa para o quadro,
   // e "Embudos" já é o rótulo de "Funis", o item vizinho do mesmo menu.
   Pipeline: { es: "Pipeline" },
+  // ---- passos de campanha ----
+  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
+  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
+    es: "Quien responde sale de la secuencia de inmediato. Los pasos siguientes aplican a quien quedó en silencio.",
+  },
+  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
+  "Exigir motivo de perda ao fechar como perdido": { es: "Exigir motivo de pérdida al cerrar como perdido" },
+  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
+    es: "El primer mensaje es el de arriba y se envía a toda la lista. Los pasos siguientes ocurren para quien NO respondió. Quien responde sale de la secuencia de inmediato.",
+  },
+  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
+    es: "Elige el embudo en «Quién responde» antes de preparar: con pasos, cada persona contactada se convierte en una tarjeta y toda tarjeta necesita un embudo.",
+  },
+  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
+    es: "Con pasos, cada persona contactada se convierte en una tarjeta en el embudo elegido desde el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Así funcionan mover de etapa y etiquetar, y también se llena el tablero:",
+  },
+  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
+  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
+  "Quem já tem negócio aberto nesse funil não ganha card novo.": { es: "Quien ya tiene un negocio abierto en este embudo no recibe una tarjeta nueva." },
+  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
+  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
+    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar y todos los que reciban tendrán los pasos.",
+  },
+  "etapa removida": { es: "etapa eliminada" },
+  "variações": { es: "variaciones" },
+  "Mover para": { es: "Mover a" },
+
+  // ---- quando a régua da campanha para (9046) ----
+  "Quando a régua para": { es: "Cuándo se detiene la secuencia" },
+  "Estas opções valem para os passos depois da primeira mensagem. Quem sai aqui não recebe os passos seguintes.": {
+    es: "Estas opciones aplican a los pasos después del primer mensaje. Quien sale aquí no recibe los pasos siguientes.",
+  },
+  "Esta campanha não tem passos, então ela manda uma mensagem e acaba. O que você escolher aqui fica guardado e passa a valer se ela ganhar passos.": {
+    es: "Esta campaña no tiene pasos, así que envía un mensaje y termina. Lo que elijas aquí queda guardado y pasa a valer si ella gana pasos.",
+  },
+  "Escolha o funil em «Quem responder» para poder parar a régua por etapa: a lista de etapas é a do funil da campanha.": {
+    es: "Elige el embudo en «Quién responde» para poder detener la secuencia por etapa: la lista de etapas es la del embudo de la campaña.",
+  },
+  "A régua para quando": { es: "La secuencia se detiene cuando" },
+  // A RESSALVA, nas duas telas com as mesmas palavras: é nela que a expectativa
+  // errada se forma ("marquei a etapa, então quem está nela não é abordado").
+  "A primeira mensagem não é filtrada por elas: ela sai para todo mundo da lista, inclusive para quem já está na etapa ou com a etiqueta que você escolher.": {
+    es: "El primer mensaje no se filtra por ellas: sale para toda la lista, incluso para quien ya está en la etapa o con la etiqueta que elijas.",
+  },
+  "Isto vale para os passos depois da primeira mensagem. A primeira sai para todo mundo da lista, inclusive para quem já está nas etapas e etiquetas acima.": {
+    es: "Esto aplica a los pasos después del primer mensaje. El primero sale para toda la lista, incluso para quien ya está en las etapas y etiquetas de arriba.",
+  },
+  "Não foi possível ler esta configuração, então a régua está barrada: ela não vai ao ar até alguém corrigir. Nenhum passo sai enquanto isso.": {
+    es: "No fue posible leer esta configuración, así que la secuencia está bloqueada: no sale al aire hasta que alguien la corrija. Ningún paso se envía mientras tanto.",
+  },
+  "O lead responde": { es: "El lead responde" },
+  "O negócio é ganho ou perdido": { es: "El negocio se gana o se pierde" },
+  "Alguém do time manda mensagem ao lead": { es: "Alguien del equipo le escribe al lead" },
+  "Ganha a etiqueta": { es: "Recibe la etiqueta" },
+  "Entra na etapa": { es: "Entra en la etapa" },
+  "Esta campanha usa o padrão. Para mudar, duplique e ajuste no rascunho.": {
+    es: "Esta campaña usa la configuración estándar. Para cambiarla, duplícala y ajústala en el borrador.",
+  },
+  // A recusa do servidor quando `campaigns.saidas` não dá para ler. Chega à tela
+  // por `t()` DINÂMICO (a rota traduz a frase que o gate devolve), e a cerca de
+  // i18n não enxerga chave dinâmica: sem esta entrada, a falta não acusaria em
+  // lugar nenhum e o operador espanhol leria português.
+  "Não foi possível ler quando esta campanha deve parar de falar com cada pessoa, então a régua não vai ao ar: sem essa configuração ela continuaria insistindo com quem já devia ter saído. Abra «Quando a régua para», confira as opções e salve de novo.": {
+    es: "No fue posible leer cuándo esta campaña debe dejar de hablar con cada persona, así que la secuencia no sale al aire: sin esa configuración seguiría insistiendo con quien ya debía haber salido. Abre «Cuándo se detiene la secuencia», revisa las opciones y guarda de nuevo.",
+  },
 };
 
 /**

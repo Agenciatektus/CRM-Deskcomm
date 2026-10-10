@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
 import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
+import { SaidasDaCampanhaEditor, saidasDaTela } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
 
@@ -54,6 +56,17 @@ export function EditarCampanha({ id }: { id: string }) {
   const [variantes, setVariantes] = useState<string[]>([""]);
   // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
   const [passos, setPassos] = useState<PassoDaRegua[]>([]);
+  // QUANDO A RÉGUA PARA (9046). Carregado do rascunho; `null` vira o padrão,
+  // que é o MESMO objeto que o servidor publica quando a coluna é nula.
+  const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
+  // ⚠️ SE A SEÇÃO FOI MEXIDA NESTA EDIÇÃO (parecer do @Cassio_SecRev, P2.1).
+  // Mandar `saidas` sempre tinha dois efeitos ruins: a coluna nula de uma
+  // campanha que nunca abriu a seção virava o objeto do padrão no primeiro
+  // Salvar (matando a distinção "escolheu × herdou" que a coluna existe para
+  // guardar), e uma coluna ILEGÍVEL era sobrescrita pelo padrão que
+  // `saidasDaTela` mostrou, sem ninguém decidir isso. Não mexeu, não manda: o
+  // laço da rota só copia campo `!== undefined`, então a coluna fica como está.
+  const [saidasMexidas, setSaidasMexidas] = useState(false);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
@@ -82,6 +95,8 @@ export function EditarCampanha({ id }: { id: string }) {
     setLimite(f.limite == null ? "100" : String(f.limite));
     setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
     setPassos(c.passos ?? []);
+    setSaidas(saidasDaTela(c.saidas));
+    setSaidasMexidas(false);
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
@@ -387,6 +402,20 @@ export function EditarCampanha({ id }: { id: string }) {
         />
       </Card>
 
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Quando a régua para")}</h2>
+        <SaidasDaCampanhaEditor
+          saidas={saidas}
+          onChange={(s) => {
+            setSaidas(s);
+            setSaidasMexidas(true);
+          }}
+          etapas={etapas.data ?? []}
+          temPassos={passos.length > 0}
+          temFunil={!!funil}
+        />
+      </Card>
+
       <div className="flex items-center justify-end gap-2">
         <Button variant="outline" onClick={() => router.push(`/app/campaigns/${id}`)}>
           {t("Cancelar")}
@@ -406,6 +435,7 @@ export function EditarCampanha({ id }: { id: string }) {
               stage_id: etapa || null,
               agent_id: agente || null,
               passos,
+              ...(saidasMexidas ? { saidas } : {}),
               entrada_continua: continua,
               entrada_etapa_id: continua ? etapaDeEntrada || null : null,
             });

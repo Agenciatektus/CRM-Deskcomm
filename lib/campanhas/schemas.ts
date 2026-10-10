@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 
+import { saidasDaCadenciaSchema } from "@/lib/cadencia/saidas";
 import { spintaxValido } from "@/lib/texto/variacao";
 
 import { filtroDeAudienciaSchema } from "./audiencia";
@@ -74,6 +75,22 @@ const baseDaCampanha = {
    */
   passos: passosDaCampanhaSchema.optional(),
   /**
+   * QUANDO A RÉGUA PARA de falar com cada pessoa (migration 9046). Ausente ou
+   * `null` = o padrão (negócio fechado e humano assumindo encerram; nenhuma
+   * etiqueta e nenhuma etapa), que é o comportamento de toda campanha anterior
+   * a ela — ver `lib/campanhas/saidas-da-campanha.ts`.
+   *
+   * ⚠️ Ao contrário dos `passos` e da entrada contínua, isto é cobrado AQUI, no
+   * SALVAR, e não só no gate de `faltaParaEnviar`. Os outros dois ficam de fora
+   * porque um rascunho incompleto é legítimo, e barrá-lo prenderia o operador
+   * num texto que ele não consegue corrigir. Uma saída não tem estado
+   * incompleto: ou o objeto é legível, ou o que foi gravado não descreve
+   * configuração nenhuma. Recusar na entrada é o que impede o jsonb ilegível de
+   * nascer pela porta do produto, e deixa o gate como a segunda tranca (para a
+   * linha que já estivesse gravada, ou escrita por fora).
+   */
+  saidas: saidasDaCadenciaSchema.nullable().optional(),
+  /**
    * O MODO DE PÚBLICO (migration 9039). Ausente ou `false` = LISTA, o snapshot
    * congelado, que é o padrão e o comportamento de toda campanha existente.
    * `true` = CONTÍNUO: quem entra na etapa de `entrada_etapa_id` é abordado.
@@ -132,6 +149,7 @@ export const editarCampanhaSchema = z
     lia_ref: baseDaCampanha.lia_ref,
     audience_filter: filtroDeAudienciaSchema.optional(),
     passos: baseDaCampanha.passos,
+    saidas: baseDaCampanha.saidas,
     entrada_continua: baseDaCampanha.entrada_continua,
     entrada_etapa_id: baseDaCampanha.entrada_etapa_id,
     channel_session_ids: baseDaCampanha.channel_session_ids,
@@ -169,6 +187,31 @@ export const criarExclusaoSchema = z.object({
   reason: z.string().trim().max(240).nullable().optional(),
   contact_id: z.string().uuid().nullable().optional(),
 });
+
+/**
+ * O CORPO QUE A TELA MANDA — `z.input`, e não `z.infer`.
+ *
+ * ═══ Por que estes dois tipos existem (parecer do @Cassio_SecRev, P1.1) ═══
+ *
+ * Os hooks de mutação tipavam o corpo como `Record<string, unknown>`. Com isso, a
+ * primeira das trancas da régua — o Zod da rota — era a única que podia falhar em
+ * SILÊNCIO: renomear a chave no payload, ou um refactor que tirasse `saidas`
+ * daqui (ela só entra por `...baseDaCampanha`, nunca nominalmente), passava pelo
+ * TypeScript, passava pelo Zod (que ignora campo desconhecido), gravava `null` e
+ * respondia **200**. O operador via a seção preenchida, clicava Salvar, não lia
+ * erro nenhum, e a campanha rodava no padrão. É o padrão que já custou caro:
+ * "schema aceita campo que ninguém grava: 200, desfaz o clique, sem erro".
+ *
+ * Com o corpo tipado pelo schema, chave errada e campo removido viram erro de
+ * COMPILAÇÃO — e isso vale de uma vez para `passos`, `entrada_continua` e
+ * qualquer campo futuro, não só para `saidas`.
+ *
+ * `z.input`, e não `z.infer`/`z.output`: o que a tela manda é a ENTRADA do
+ * schema, onde o que tem `.default()` é opcional. `z.output` cobraria da tela os
+ * campos que o próprio Zod preenche, e o tipo ficaria mais estrito que a API.
+ */
+export type CorpoDeCriarCampanha = z.input<typeof criarCampanhaSchema>;
+export type CorpoDeEditarCampanha = z.input<typeof editarCampanhaSchema>;
 
 export const agendarSchema = z.object({ scheduled_at: z.string().datetime() });
 export const testarSchema = z.object({ contact_id: z.string().uuid() });
