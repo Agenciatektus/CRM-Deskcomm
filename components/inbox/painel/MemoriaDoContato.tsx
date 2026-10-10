@@ -1,5 +1,6 @@
 "use client";
 
+import { SecaoRecolhivel } from "./SecaoRecolhivel";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 
@@ -27,12 +28,15 @@ export function MemoriaDoContato({ fatos, historico, carregando }: {
   const t = useT();
   const localeDaData = useLocaleDeData();
   return (
-    <section data-testid="inbox-memoria">
-      <h3 className="text-xs font-semibold">{t("Memória do contato")}</h3>
+    <SecaoRecolhivel
+      testId="inbox-memoria"
+      titulo={t("Memória do contato")}
+      resumo={carregando ? null : fatos.length === 1 ? t("1 fato") : `${fatos.length} ${t("fatos")}`}
+    >
       <p className="mt-1 text-xs text-muted-foreground">{t("Fatos duráveis registrados nas notas. Pendências pertencem à demanda vigente.")}</p>
       {!carregando && fatos.map((f) => <details key={f.id} className="mt-2 text-xs"><summary className="wrap-anywhere">{f.headline}</summary><p className="mt-1 whitespace-pre-wrap wrap-anywhere">{f.body}</p></details>)}
       {!carregando && fatos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{t("Nenhum fato durável registrado.")}</p>}
       {!carregando && historico.length > 0 && <div className="mt-3 text-xs"><h4>{t("Histórico encerrado — sem tarefas pendentes")}</h4>{historico.map((h) => <p key={h.id}>{t(DESFECHO_LEGIVEL[h.desfecho] ?? h.desfecho)}{h.fechada_em ? ` · ${shortDate(h.fechada_em, localeDaData)}` : ""}</p>)}</div>}
-    </section>
+    </SecaoRecolhivel>
   );
 }

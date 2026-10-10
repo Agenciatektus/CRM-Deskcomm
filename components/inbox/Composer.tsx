@@ -264,6 +264,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         <AbasDoComposer mode={mode} onMode={setMode} dicaId={dicaId} />
         <CaixaOuFaixaDoDono
           conversa={!nota && !semAssumir ? conversa : null}
+          sugerir={isDisabled ? undefined : { onSugerir: () => void sugestao.generate(), ocupado: sugestao.busy }}
           onAssumiu={() => setFocarAoVoltar(true)}
           onResponderSemAssumir={() => {
             setSemAssumir(true);

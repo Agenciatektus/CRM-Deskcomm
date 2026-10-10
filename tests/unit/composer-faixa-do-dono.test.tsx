@@ -73,6 +73,14 @@ describe("Composer: faixa de quem atende (C4-C6)", () => {
     );
   });
 
+  it("'Sugerir resposta' fica na própria faixa quando a IA atende; com outra pessoa, não (P2 da #154)", () => {
+    const { unmount } = montar(conversa());
+    expect(screen.getByRole("button", { name: "Sugerir resposta" })).toBeInTheDocument();
+    unmount();
+    montar(conversa({ assigned_to_user_id: "u-2", assigned_to_user_name: "Bruno", assignee_kind: "user" }));
+    expect(screen.queryByRole("button", { name: "Sugerir resposta" })).toBeNull();
+  });
+
   it("não trava ninguém: 'Responder sem assumir' devolve a caixa como era", () => {
     montar(conversa());
     fireEvent.click(screen.getByRole("button", { name: "Responder sem assumir" }));
@@ -148,6 +156,18 @@ describe("Composer: conversa fechada e contato bloqueado (C7, C8)", () => {
     expect(screen.getByTestId("faixa-conversa-fechada")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reabrir" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Mensagem")).toBeNull();
+  });
+
+  it("fechada vista por quem só lê: sem Reabrir (P2 da #154)", () => {
+    sessao.valor = { user: { id: "u-1" }, activeOrg: { role: "viewer" } };
+    const qc = new QueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <Composer conversationId="conv-1" conversa={conversa({ status: "closed" })} fechada />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("faixa-conversa-fechada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reabrir" })).toBeNull();
   });
 
   it("bloqueado: Desbloquear só para admin (a rota exige admin)", () => {

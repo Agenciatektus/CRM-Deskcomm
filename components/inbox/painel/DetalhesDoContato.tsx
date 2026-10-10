@@ -1,5 +1,6 @@
 "use client";
 
+import { SecaoRecolhivel } from "./SecaoRecolhivel";
 import { forwardRef, useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -86,10 +87,14 @@ export const DetalhesDoContato = forwardRef<HTMLElement, Props>(function Detalhe
   }
 
   return (
-    <section ref={ref} data-testid="inbox-detalhes-do-contato" tabIndex={-1} className="scroll-mt-12 focus:outline-hidden">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-text">
-        <UserCircle size={14} aria-hidden /> {t("Detalhes do contato")}
-      </h3>
+    <SecaoRecolhivel
+      ref={ref}
+      testId="inbox-detalhes-do-contato"
+      icone={<UserCircle size={14} aria-hidden />}
+      titulo={t("Detalhes do contato")}
+      // P6: fechada, a seção diz quantos campos estão preenchidos.
+      resumo={`${CAMPOS.filter((c) => !!atual(c)).length} ${t("de")} ${CAMPOS.length} ${t("campos")}`}
+    >
       <dl className="mt-1 text-xs">
         {CAMPOS.map((c) =>
           editando === c ? (
@@ -139,6 +144,6 @@ export const DetalhesDoContato = forwardRef<HTMLElement, Props>(function Detalhe
           <span />
         </div>
       </dl>
-    </section>
+    </SecaoRecolhivel>
   );
 });

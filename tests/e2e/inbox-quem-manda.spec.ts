@@ -230,7 +230,8 @@ test.describe("Inbox — quem manda nesta conversa", () => {
     await page.goto(`/app/inbox/${conversaId}`);
     const comando = page.getByTestId("comando-da-conversa");
     await expect(comando).toBeVisible({ timeout: 30_000 });
-    await expect(comando).toContainText(/autom/i);
+    // H2 do visual v2: a sub-linha diz "IA atendendo".
+    await expect(comando).toContainText(/IA|autom/i);
     // O CONTROLE: sem silêncio no banco, nada de selo de pausa na tela. Sem esta
     // asserção, o selo do passo (3) não distinguiria "apareceu agora" de "já
     // estava lá desde o começo".

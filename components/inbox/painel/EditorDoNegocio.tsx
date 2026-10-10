@@ -8,9 +8,12 @@ import { SeletorDeEtapa } from "@/components/kanban/SeletorDeEtapa";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
+import { Funnel } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { AcoesDoNegocio } from "./AcoesDoNegocio";
+import { BarraDeEtapas } from "./BarraDeEtapas";
+import { MenuDoLead } from "./MenuDoLead";
 import { formatMoney } from "./SemLista";
 import type { LeadRow } from "./tipos";
 
@@ -124,6 +127,30 @@ export function EditorDoNegocio({ leads, contactId, selecionadoId, onSelecionar,
           <p className={CLASSES_DE_ONDE_ESTA} title={ondeEstaOLead(ativo)}>{ondeEstaOLead(ativo)}</p>
         </div>
       )}
+      {/* P14 e P13: o funil em chip, o valor em destaque e o menu "…" do lead. */}
+      <div className="flex items-center gap-2" data-testid="inbox-cabecalho-do-negocio">
+        {ativo.funil_nome && (
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
+            <Funnel size={12} aria-hidden className="shrink-0" />
+            <span className="truncate">{ativo.funil_nome}</span>
+          </span>
+        )}
+        <b className="ml-auto shrink-0 text-sm font-bold text-text tabular-nums">
+          {formatMoney(ativo.value_cents, ativo.currency)}
+        </b>
+        <MenuDoLead leadId={ativo.id} pipelineId={ativo.pipeline_id} />
+      </div>
+      <BarraDeEtapas
+        key={`barra-${ativo.id}`}
+        leadId={ativo.id}
+        pipelineId={ativo.pipeline_id}
+        stageId={ativo.stage_id}
+        updatedAt={ativo.updated_at}
+        aberto={ativo.status === "open"}
+        etapas={ativo.etapas ?? []}
+        leitura={leitura}
+        onMovido={onSalvo}
+      />
       <fieldset disabled={leitura} className="space-y-3">
         <div className="flex items-center gap-2 text-xs" data-testid="inbox-etapa-do-negocio">
           <span className="text-muted-foreground">{t("Etapa")}</span>
