@@ -50,6 +50,7 @@ export {
   Bell,
   BellSlash,
   EnvelopeSimple,
+  EnvelopeOpen,
   PaperPlaneTilt,
   Smiley,
   Check,

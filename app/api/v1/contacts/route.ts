@@ -19,6 +19,7 @@ import type { Idioma } from "@/lib/i18n/idiomas";
 import {
   contactCreateSchemaDoPais,
   contactListQuerySchema,
+  TETO_DO_TERMO_DE_BUSCA,
   validateRequest,
   type ContactCreate,
 } from "@/lib/schemas";
@@ -118,6 +119,11 @@ export async function GET(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, idioma ?? "pt-BR");
 
   const url = new URL(req.url);
+  // Termo acima do teto não acha ninguém: devolve a lista vazia, e não um 422
+  // na cara de quem colou um texto longo na busca (P2 do Cassio na #147).
+  if ((url.searchParams.get("search") ?? "").length > TETO_DO_TERMO_DE_BUSCA) {
+    return ok([], { requestId, meta: { cursor: null, has_more: false } });
+  }
   const qsParsed = contactListQuerySchema.safeParse({
     search: url.searchParams.get("search") ?? undefined,
     // `getAll` (#1274): a repetição na URL soe viva pelo `getAll`. Um `get` leria

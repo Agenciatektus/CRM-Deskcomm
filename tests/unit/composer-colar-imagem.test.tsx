@@ -218,4 +218,4 @@ describe("Composer — texto digitado durante o envio", () => {
 });
 
 // A fixture exercita um atendente autorizado a consultar modelos de mensagem.
-vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => true }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => true, useAuthOpcional: () => null }));

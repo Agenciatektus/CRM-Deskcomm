@@ -11,6 +11,8 @@ import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { Lightning, MagnifyingGlass, UserCircle } from "@/lib/ui/icons";
 import { NAV_GROUPS, searchable, type NavDestination } from "@/lib/navigation/registry";
+import { destinosDaInterface } from "@/lib/navigation/interface";
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { cn } from "@/lib/utils";
 
 import { useAcoesDaPaleta, type AcaoDaPaleta } from "./paleta/acoes";
@@ -87,7 +89,15 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
   const [destacado, setDestacado] = useState(0);
   const termo = busca.trim();
   const palavras = normalizar(termo).split(/\s+/).filter(Boolean);
-  const { achados, carregando } = useBuscaRemota(busca);
+  const destinos = destinosDaInterface(
+    activeOrg?.interface_settings,
+    user.is_platform_admin && !user.support,
+    activeOrg?.role ?? null,
+  );
+  const { achados, carregando } = useBuscaRemota(busca, {
+    conversas: destinos.some((d) => d.href === "/app/inbox"),
+    contatos: destinos.some((d) => d.href === "/app/contacts"),
+  });
   const acoes = useAcoesDaPaleta();
 
   const visiveis = useMemo(
@@ -137,11 +147,12 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
         executar: () => ir(`/app/inbox?filter=${a.aba}&id=${a.id}`),
       };
     }
-    const nome = rotuloDoContato({ display_name: a.nome, phone_number: a.telefone }, t);
+    const nome = rotuloDoContato(a.contato, t);
+    const telefone = a.contato.phone_number ?? null;
     return {
       chave: `contato:${a.id}`,
       titulo: nome,
-      sub: a.telefone ? phoneForDisplay(a.telefone) : t("Contato"),
+      sub: telefone ? phoneForDisplay(telefone) : t("Contato"),
       icone: (
         <IconeDaLinha>
           <UserCircle size={16} aria-hidden />
@@ -247,6 +258,7 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
           value={busca}
           onChange={(e) => aoDigitar(e.target.value)}
           onKeyDown={aoTeclar}
+          maxLength={TETO_DO_TERMO_DE_BUSCA}
           placeholder={t("Buscar contato, conversa ou tela")}
           className="h-full min-w-0 flex-1 bg-transparent text-base text-text outline-hidden placeholder:text-text-subtle"
         />

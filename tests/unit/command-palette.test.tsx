@@ -11,6 +11,9 @@ import userEvent from "@testing-library/user-event";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { termoParaServidor } from "@/components/shell/paleta/busca-remota";
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
+import type * as InterfaceDoMenu from "@/lib/navigation/interface";
+
+type ModuloDeInterface = typeof InterfaceDoMenu;
 
 const push = vi.fn();
 const get = vi.hoisted(() => vi.fn());
@@ -30,6 +33,15 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => parametros,
 }));
 vi.mock("@/lib/api/client", () => ({ apiClient: { get } }));
+const semDestinos = vi.hoisted(() => ({ hrefs: [] as string[] }));
+vi.mock("@/lib/navigation/interface", async (original) => {
+  const real = await original<ModuloDeInterface>();
+  return {
+    ...real,
+    destinosDaInterface: (...args: Parameters<ModuloDeInterface["destinosDaInterface"]>) =>
+      real.destinosDaInterface(...args).filter((d) => !semDestinos.hrefs.includes(d.href)),
+  };
+});
 vi.mock("@/lib/theme", () => ({ useTheme: () => ({ resolvedTheme: "dark", setTheme }) }));
 vi.mock("@/hooks/team/useAttendants", () => ({
   useMinhaDisponibilidade: () => ({ isSuccess: true, data: { data: { is_available: true } } }),
@@ -53,6 +65,7 @@ afterEach(() => {
   comoPapel("admin");
   parametros = new URLSearchParams();
   caminho = "/app/radar";
+  semDestinos.hrefs = [];
 });
 
 function abrir() {
@@ -223,6 +236,27 @@ describe("CommandPalette: contatos e conversas", () => {
     await user.type(screen.getByRole("combobox"), "m");
     await new Promise((r) => setTimeout(r, 350));
     expect(get.mock.calls.filter(([u]) => String(u).includes("search="))).toHaveLength(0);
+  });
+
+  it("sem Contatos no menu do vínculo, não pergunta à rota de contatos; sem Inbox, nem à de conversas", async () => {
+    semDestinos.hrefs = ["/app/contacts"];
+    const user = userEvent.setup();
+    abrir();
+    await user.type(screen.getByRole("combobox"), "mariana");
+    await waitFor(() => expect(get.mock.calls.some(([u]) => String(u).includes("/conversations?search="))).toBe(true));
+    expect(get.mock.calls.some(([u]) => String(u).startsWith("/api/v1/contacts"))).toBe(false);
+    cleanup();
+    get.mockClear();
+    semDestinos.hrefs = ["/app/contacts", "/app/inbox"];
+    abrir();
+    await user.type(screen.getByRole("combobox"), "mariana");
+    await new Promise((r) => setTimeout(r, 350));
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("o campo não aceita termo além do teto das rotas (100)", () => {
+    abrir();
+    expect(screen.getByRole("combobox")).toHaveAttribute("maxLength", "100");
   });
 
   it("telefone com máscara vai como dígitos", () => {

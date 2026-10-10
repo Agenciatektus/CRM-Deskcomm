@@ -86,6 +86,15 @@ describe("GET /api/v1/contacts — sessão de navegador", () => {
     });
   });
 
+  it("termo acima de 100 caracteres → 200 com lista vazia, sem consultar (P2 da #147)", async () => {
+    sessaoOk();
+    const { GET } = await import("./route");
+    const res = await GET(req(`http://localhost/api/v1/contacts?search=${"a".repeat(101)}`));
+    expect(res.status).toBe(200);
+    expect((await res.json()).data).toEqual([]);
+    expect(listContactsHandler).not.toHaveBeenCalled();
+  });
+
   it("sem sessão e sem Bearer → 401, repassa a resposta de requireRole", async () => {
     vi.mocked(requireRole).mockResolvedValue({
       ok: false,

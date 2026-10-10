@@ -16,8 +16,8 @@ export interface AchadoDeConversa {
 export interface AchadoDeContato {
   tipo: "contato";
   id: string;
-  nome: string | null;
-  telefone: string | null;
+  /** O contato como veio da rota: o nome sai de `rotuloDoContato`, na tela. */
+  contato: ContatoDaRota;
 }
 
 export type Achado = AchadoDeConversa | AchadoDeContato;
@@ -42,7 +42,7 @@ function abaDaConversa(status: string | null | undefined): AchadoDeConversa["aba
   return "all";
 }
 
-interface ContatoDaRota {
+export interface ContatoDaRota {
   id: string;
   display_name?: string | null;
   name?: string | null;
@@ -59,19 +59,31 @@ interface ContatoDaRota {
  * Sem termo, devolve as 3 conversas mais recentes (os "Recentes").
  * Contato que já aparece por uma conversa não se repete.
  */
-export function useBuscaRemota(termo: string): { achados: Achado[]; carregando: boolean } {
+export function useBuscaRemota(
+  termo: string,
+  /**
+   * Quais fontes este vínculo pode consultar (P2 do Cassio na #147): conversas
+   * só com `/app/inbox` no menu dele, contatos só com `/app/contacts`. A mesma
+   * régua do sino com os avisos; a rota continua recusando o que não pode.
+   */
+  fontes: { conversas: boolean; contatos: boolean } = { conversas: true, contatos: true },
+): { achados: Achado[]; carregando: boolean } {
   const [estado, setEstado] = useState<{ chave: string; achados: Achado[] }>({ chave: "", achados: [] });
   const limpo = termo.trim();
   const curto = limpo.length > 0 && limpo.length < MINIMO_DE_LETRAS;
+  const nenhumaFonte = !fontes.conversas && !fontes.contatos;
   const chave = curto ? "" : limpo;
+  const { conversas: buscaConversas, contatos: buscaContatos } = fontes;
 
   useEffect(() => {
-    if (curto) return;
+    if (curto || nenhumaFonte) return;
     const controle = new AbortController();
     const espera = setTimeout(
       () => {
         const busca = termoParaServidor(chave);
-        const conversas = apiClient
+        const conversas = !buscaConversas
+          ? Promise.resolve([] as ConversationWithContact[])
+          : apiClient
           .get<{ data: ConversationWithContact[] }>(
             chave
               ? `/api/v1/conversations?search=${encodeURIComponent(busca)}&limit=5`
@@ -79,7 +91,7 @@ export function useBuscaRemota(termo: string): { achados: Achado[]; carregando: 
             { signal: controle.signal },
           )
           .then((r) => r.data ?? []);
-        const contatos = chave
+        const contatos = chave && buscaContatos
           ? apiClient
               .get<{ data: ContatoDaRota[] }>(`/api/v1/contacts?search=${encodeURIComponent(busca)}&limit=5`, {
                 signal: controle.signal,
@@ -98,12 +110,7 @@ export function useBuscaRemota(termo: string): { achados: Achado[]; carregando: 
             ...listaDeContatos
               .filter((k) => !comConversa.has(k.id))
               .map(
-                (k): AchadoDeContato => ({
-                  tipo: "contato",
-                  id: k.id,
-                  nome: k.display_name ?? k.name ?? null,
-                  telefone: k.phone_number ?? null,
-                }),
+                (k): AchadoDeContato => ({ tipo: "contato", id: k.id, contato: k }),
               ),
           ];
           setEstado({ chave, achados });
@@ -115,8 +122,8 @@ export function useBuscaRemota(termo: string): { achados: Achado[]; carregando: 
       clearTimeout(espera);
       controle.abort();
     };
-  }, [chave, curto]);
+  }, [chave, curto, nenhumaFonte, buscaConversas, buscaContatos]);
 
-  if (curto) return { achados: [], carregando: false };
+  if (curto || nenhumaFonte) return { achados: [], carregando: false };
   return { achados: estado.chave === chave ? estado.achados : [], carregando: estado.chave !== chave };
 }

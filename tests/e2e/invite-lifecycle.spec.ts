@@ -224,7 +224,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await page.waitForURL(/\/403/);
 
     await page.goto("/app/inbox");
-    await expect(page.getByText("Selecione uma conversa", { exact: true })).toBeVisible();
+    await expect(page.getByText("Escolha uma conversa", { exact: true })).toBeVisible();
 
     await page.goto("/app/kanban");
     await expect(page.getByRole("heading", { name: "Funis" })).toBeVisible();
