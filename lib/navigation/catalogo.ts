@@ -51,7 +51,14 @@ export interface NavMetadata {
    * conversas que esperam uma pessoa (a aba Fila do Inbox) — `ContadorDaFila`.
    * Zero não desenha nada: número que nunca some ensina a ignorar o número.
    */
-  contador?: "casos" | "fila";
+  contador?: "casos" | "fila" | "avisos";
+  /**
+   * Uma etiqueta curta ao lado do nome na coluna 2 (o `.nav2-tag` do
+   * protótipo): "Admin" para tela que só quem administra vê, "Opcional" para
+   * recurso que a empresa pode não usar. Só texto do catálogo; não decide
+   * permissão (isso continua com `minRole`, `modulo` e `capacidade`).
+   */
+  etiqueta?: "Admin" | "Opcional";
   /**
    * A porta de um MÓDULO OPCIONAL da instalação (`lib/instalacao/modulos.ts`).
    * Com o módulo desligado ela some do menu, do hub e do ⌘K — para todo papel.
@@ -148,6 +155,7 @@ export const NAV_CATALOG = [
     minRole: "admin",
     modulo: "prospeccao",
     section: "O dia a dia da venda",
+    etiqueta: "Admin",
   },
   // ---- Atendimento — onde o operador passa o dia ----
   {
@@ -419,6 +427,7 @@ export const NAV_CATALOG = [
     // quem lança; o que a RLS impede é ele escrever.
     href: "/app/comandas",
     label: "Comandas",
+    etiqueta: "Opcional",
     description: "O que foi feito, por quem, e quanto o cliente paga.",
     icon: "Receipt",
     group: "crm",
@@ -631,6 +640,7 @@ export const NAV_CATALOG = [
     icon: "Flag",
     group: "ia",
     section: "Acompanhar o agente",
+    contador: "avisos",
   },
   {
     // "Aviso no WhatsApp", NUNCA "Avisos": a vizinha de cima chama-se "Alertas"

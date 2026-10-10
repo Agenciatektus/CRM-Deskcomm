@@ -1282,3 +1282,93 @@
   border-color: var(--color-border-strong);
 }
 /* ═════ PELE VERDASH ═════ FIM */
+
+/* ═════ <select> nativo (os dois temas) ═════════════════════════════════════
+   O gatilho no padrão do `.inp` do protótipo, para os 45 `<select>` do produto
+   de uma vez, em vez de classe em cada tela. Em `@layer base` de propósito:
+   qualquer utilitário passado no componente (`h-8`, `h-[34px]`, `rounded-full`,
+   `bg-transparent`) continua vencendo, então os selects compactos mantêm a
+   altura que pediram.
+
+   A LISTA ABERTA era o defeito: no escuro, mesmo com `color-scheme: dark`, o
+   Chrome/Edge do Windows desenhava a lista com fundo branco e herdava o texto
+   claro do `<select>`, cinza sobre branco. `option`/`optgroup` com fundo e
+   texto explícitos dos tokens resolvem nos dois temas.
+
+   O chevron são dois triângulos de `linear-gradient` na cor de um token, e não
+   um SVG em data URI: imagem externa não herda `currentColor`, e um SVG com a
+   cor escrita dentro seria uma cor por tema fora dos tokens. O padding da
+   direita reserva o lugar dele.
+
+   Só o select de UMA linha (sem `multiple` e sem `size`): a caixa de lista
+   aberta é outro controle e tem desenho próprio. */
+@layer base {
+  select:not([multiple]):not([size]) {
+    appearance: none;
+    height: calc(var(--spacing) * 9.5);
+    padding-inline: calc(var(--spacing) * 3) calc(var(--spacing) * 9);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--color-text-subtle) 50%),
+      linear-gradient(135deg, var(--color-text-subtle) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% + 1px),
+      calc(100% - 13px) calc(50% + 1px);
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    transition:
+      border-color var(--duration-fast),
+      box-shadow var(--duration-fast);
+  }
+  select:not([multiple]):not([size]):hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--color-border-strong), var(--color-text) 30%);
+  }
+  select:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 22%, transparent);
+  }
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  option,
+  optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+  option:checked {
+    background-color: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+  option:disabled {
+    color: var(--color-text-subtle);
+  }
+}
+
+/* No escuro, a lista aberta um degrau acima do cartão (o `surface-2` do
+   protótipo) e o anel de foco no azul da pele. Fora de layer como o resto da
+   pele: precisa vencer o `@layer base` acima. */
+[data-theme="dark"] option,
+[data-theme="dark"] optgroup {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text);
+}
+[data-theme="dark"] option:checked {
+  background-color: color-mix(in oklch, var(--pele-brilho) 30%, var(--color-surface-elevated));
+}
+[data-theme="dark"] select:focus-visible {
+  border-color: var(--pele-foco);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--pele-foco) 22%, transparent);
+}
+
+/* O espaço do chevron vence o `px-*` do componente (23 selects passam `px-2` ou
+   `px-3`, que comeria o lado direito e poria o texto longo embaixo da seta).
+   Fora de layer só esta propriedade; altura, fundo e borda seguem em `base`. */
+select:not([multiple]):not([size]) {
+  padding-inline-end: calc(var(--spacing) * 8);
+}

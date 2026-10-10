@@ -34,10 +34,13 @@ const buttonVariants = cva(
         // de 4,5:1 em todas as paradas (tests/unit/botao-primario-gradiente).
         // No hover só o FUNDO escurece (`--pele-grad-texto-hover`), e o contraste sobe;
         // trocar pelo accent chapado poria o branco sobre uma cor que ninguém mediu.
+        // Desativado no escuro: fundo de linha forte e texto apagado, sem degradê
+        // (o `.btn-primary:disabled` do protótipo). O degradê a 50% de opacidade
+        // parecia um botão ativo e fraco, não um botão indisponível.
         primary:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover)",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover) dark:disabled:bg-none dark:disabled:bg-border-strong dark:disabled:text-text-subtle dark:disabled:shadow-none dark:disabled:opacity-100",
         default:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover)",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover) dark:disabled:bg-none dark:disabled:bg-border-strong dark:disabled:text-text-subtle dark:disabled:shadow-none dark:disabled:opacity-100",
         secondary:
           "bg-surface-elevated text-text border border-border hover:border-accent hover:text-accent",
         outline:

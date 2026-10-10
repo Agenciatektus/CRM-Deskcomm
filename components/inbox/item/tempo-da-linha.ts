@@ -47,6 +47,19 @@ export function initials(name: string | null | undefined, fallback: string): str
 }
 
 /**
+ * O fallback da sigla quando o nome não tem letra nenhuma: os dois primeiros
+ * DÍGITOS do telefone. Sem o "+" (antes a sigla saía "+5") e, no número
+ * brasileiro com DDI, sem o 55, para dar o DDD ("+55 21 99812-4410" vira "21",
+ * como no protótipo). Sem dígitos, "??".
+ */
+export function siglaDoTelefone(telefone: string | null | undefined): string {
+  let digitos = (telefone ?? "").replace(/\D/g, "");
+  // 55 + DDD (2) + número (8 ou 9) = 12 ou 13 dígitos: aí o 55 é o DDI.
+  if (digitos.startsWith("55") && (digitos.length === 12 || digitos.length === 13)) digitos = digitos.slice(2);
+  return digitos.length >= 2 ? digitos.slice(0, 2) : "??";
+}
+
+/**
  * Maiúscula de UMA letra, sem deixar a sigla crescer: "ß".toUpperCase() é "SS",
  * e "ßa" viraria uma sigla de três letras. Quando a maiúscula não é uma letra
  * só, fica a original.

@@ -13,7 +13,7 @@ import { ArrowRight, Copy, ListChecks, Note, Plus, UserCircle } from "@/lib/ui/i
 import { cn } from "@/lib/utils";
 
 import { AvatarDoContato } from "../AvatarDoContato";
-import { initials } from "../item/tempo-da-linha";
+import { initials, siglaDoTelefone } from "../item/tempo-da-linha";
 import { ContactTagsEditor } from "../ContactTagsEditor";
 import { useTarefasDoContato } from "./useTarefasDoContato";
 
@@ -75,7 +75,7 @@ export function CabecalhoDoPainel({
   return (
     <div className="flex flex-col gap-2.5 border-b border-border px-4 pb-3.5 pt-4" data-testid="inbox-cabecalho-do-painel">
       <div className="flex items-center gap-3">
-        <AvatarDoContato contato={contact} nome={displayName} iniciais={initials(displayName, "?")} className="h-12 w-12 text-base" />
+        <AvatarDoContato contato={contact} nome={displayName} iniciais={initials(displayName, siglaDoTelefone(contact?.phone_number))} className="h-12 w-12 text-base" />
         <div className="min-w-0">
           <div className="truncate text-[17px] font-bold leading-tight text-text">{displayName}</div>
           {telefone && (
