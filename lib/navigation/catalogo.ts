@@ -60,6 +60,12 @@ export interface NavMetadata {
    */
   etiqueta?: "Admin" | "Opcional";
   /**
+   * Outros nomes pelos quais a pessoa procura esta tela na busca (Ctrl K):
+   * nomes antigos ou do dia a dia ("kanban", "plano", "qr code"). Só a busca
+   * lê; não aparece na tela. Os do protótipo do visual v2 (`APELIDOS`).
+   */
+  apelidos?: string;
+  /**
    * A porta de um MÓDULO OPCIONAL da instalação (`lib/instalacao/modulos.ts`).
    * Com o módulo desligado ela some do menu, do hub e do ⌘K — para todo papel.
    * É apresentação, como o resto deste arquivo: quem recusa é a tela e a rota.
@@ -201,6 +207,7 @@ export const NAV_CATALOG = [
     // Composer do inbox. O nome "Templates" fica livre para os da Meta (HSM),
     // onde é o termo técnico correto.
     href: "/app/templates",
+    apelidos: "templates modelos",
     label: "Respostas rápidas",
     description: "Scripts salvos para responder mais rápido, seus ou da equipe.",
     icon: "FileText",
@@ -221,6 +228,7 @@ export const NAV_CATALOG = [
     // abre o quadro de cada um. "Pipeline" é palavra de quem construiu o
     // sistema; "funil de vendas" é palavra de quem vende.
     href: "/app/kanban",
+    apelidos: "pipeline kanban quadro",
     label: "Funis",
     description: "Seus funis de venda. Clique em um para abrir o quadro de clientes.",
     icon: "Kanban",
@@ -699,6 +707,7 @@ export const NAV_CATALOG = [
   // ---- Canais — por onde as mensagens entram e saem ----
   {
     href: "/app/connections",
+    apelidos: "whatsapp numero qr code",
     label: "Conexões",
     // Cobre os DOIS caminhos desde o PR #105: número por QR e canal oficial da
     // Meta (com os templates dele), cada um numa aba. A descrição cita "oficial"
@@ -848,6 +857,7 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/audit",
+    apelidos: "auditoria historico",
     label: "Audit Log",
     description: "Quem fez o quê e quando. O histórico que não se apaga.",
     icon: "ClockCounterClockwise",
@@ -914,6 +924,7 @@ export const NAV_CATALOG = [
     // quem monta a regra. Nada aqui apaga conversa ou muda dinheiro — o
     // alcance da operação é ao lado do de "Distribuição de atendimento".
     href: "/app/settings/tags",
+    apelidos: "etiquetas marcadores",
     label: "Tags",
     description:
       "As etiquetas da empresa: acrescentar, escolher quais são sugeridas em conversas e contatos, renomear, juntar, arquivar e excluir.",
@@ -972,6 +983,7 @@ export const NAV_CATALOG = [
     // Uma tela só, com dois campos de token parecidos, é como se cola o token
     // errado no campo errado e se perde uma semana achando que quebrou.
     href: "/app/settings/meta-ads",
+    apelidos: "facebook conectar anuncios conta",
     label: "Meta Ads",
     description: "Conectar a conta de anúncios para ler o desempenho das campanhas.",
     icon: "Megaphone",
@@ -999,6 +1011,7 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/settings/billing",
+    apelidos: "plano cobranca assinatura fatura",
     label: "Billing",
     description: "Plano e cobrança.",
     icon: "Receipt",

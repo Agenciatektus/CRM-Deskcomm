@@ -248,6 +248,24 @@ describe("Sidebar agrupado", () => {
     }
   });
 
+  it("aberta por CLIQUE, a coluna não fecha quando o mouse sai da barra (P2-1 da #146)", async () => {
+    comoPapel("admin");
+    render(<Sidebar collapsed />);
+    const atendimento = within(trilho()).getByRole("button", { name: "Conversas" });
+    await userEvent.click(atendimento);
+    expect(atendimento).toHaveAttribute("aria-expanded", "true");
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerOut(atendimento.closest("aside")!.firstElementChild!, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(screen.getByRole("link", { name: /Inbox/ })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("não deixa grupo órfão quando a permissão esvazia o grupo", () => {
     // CANAIS é todo manager+/admin. Um agent não pode ver o botão sozinho.
     comoPapel("agent");

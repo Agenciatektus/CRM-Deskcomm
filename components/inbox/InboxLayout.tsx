@@ -20,6 +20,7 @@ import { PainelDaConversa } from "./PainelDaConversa";
 import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
 import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
+import { escutar, pedir } from "@/lib/ui/comandos-da-tela";
 import { PegadorDeColuna } from "./colunas/PegadorDeColuna";
 import { useLargurasDasColunas } from "./colunas/useLargurasDasColunas";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
@@ -177,6 +178,19 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const [fichaAberta, setFichaAberta] = useState(false);
   // Busca nas mensagens (#1793) e coluna do lead: ver `useFerramentasDaConversa`.
   const ferramentas = useFerramentasDaConversa(selectedId);
+  // "Criar próximo passo" da busca (Ctrl K): o painel do lead precisa estar à
+  // vista (coluna a partir de 1280px, gaveta abaixo disso) antes de rolar até
+  // a seção. O pedido ao painel sai no quadro seguinte, quando ele já montou.
+  const { abrirPainel } = ferramentas;
+  useEffect(
+    () =>
+      escutar("proximo-passo", () => {
+        if (window.matchMedia("(min-width: 1280px)").matches) abrirPainel();
+        else setFichaAberta(true);
+        requestAnimationFrame(() => pedir("painel-proximo-passo"));
+      }),
+    [abrirPainel],
+  );
   // Colunas reguláveis a partir de 1536px (G1-G3): as larguras viram variáveis
   // CSS no cartão, e os pegadores as mudam. Abaixo disso valem as faixas fixas.
   const colunasRegulaveis = useLargurasDasColunas();
