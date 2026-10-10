@@ -86,7 +86,10 @@ export function ConversationListItem({
   // L15: a prévia é cortada pelo CSS (`truncate`), na largura que a coluna tem,
   // e não em 60 caracteres fixos que sobravam na lista larga e estouravam na
   // estreita.
-  const truncated = conversation.last_message_preview?.trim() || t("Sem mensagens");
+  const previa = conversation.last_message_preview?.trim() || null;
+  const truncated = previa ?? t("Sem mensagens");
+  // L14: quem escreveu a última mensagem, antes da prévia ("Você:" / "IA:").
+  const autor = previa ? prefixoDoAutor(conversation.autor_da_ultima_mensagem, t) : null;
   const naFila = queuePosition !== undefined;
   /**
    * A HORA DO CANTO RESPONDE À MESMA PERGUNTA QUE ORDENA A LISTA.
@@ -220,6 +223,7 @@ export function ConversationListItem({
             {isAi && mostrarAutomatico ? (
               <Robot size={12} weight="duotone" className="mr-1 inline align-[-2px]" aria-hidden />
             ) : null}
+            {autor && <span className="text-text-subtle">{autor} </span>}
             {truncated}
           </p>
           {naoLida && (
@@ -258,4 +262,20 @@ export function ConversationListItem({
       />
     </div>
   );
+}
+
+/**
+ * O prefixo da prévia (L14 da auditoria; o `.prev-who` do protótipo). Vem do
+ * campo calculado `autor_da_ultima_mensagem` (migration 9047), pedido na mesma
+ * consulta da lista. Mensagem do cliente não leva prefixo, e linha sem o campo
+ * (cache antigo, evento do realtime) também não: melhor sem prefixo que errado.
+ */
+function prefixoDoAutor(
+  autor: ConversationWithContact["autor_da_ultima_mensagem"],
+  t: (texto: string) => string,
+): string | null {
+  if (autor === "equipe") return t("Você:");
+  if (autor === "ia") return t("IA:");
+  if (autor === "automacao") return t("Automação:");
+  return null;
 }

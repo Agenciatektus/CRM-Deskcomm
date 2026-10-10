@@ -96,6 +96,15 @@ export function PopoverDeFiltros({
               onCheckedChange={(on) => onChange({ ...value, onlyUnread: on })}
             />
           </label>
+          {/* "Sem próximo passo" (L4): o contato não tem tarefa aberta. Fechada,
+              arquivada e grupo nunca entram (o banco devolve nulo nelas). */}
+          <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-sm hover:bg-surface-elevated">
+            {t("Sem próximo passo")}
+            <Switch
+              checked={value.semPasso ?? false}
+              onCheckedChange={(on) => onChange({ ...value, semPasso: on })}
+            />
+          </label>
           {/* "Só grupos" manda `is_group=true` na listagem; desligado, a aba
               mostra individual e grupo misturados, como sempre. */}
           <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-sm hover:bg-surface-elevated">

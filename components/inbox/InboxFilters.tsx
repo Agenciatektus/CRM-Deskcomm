@@ -64,6 +64,8 @@ export interface InboxFiltersValue {
   tagMode?: ModoDeEtiqueta;
   /** O filtro "Só grupos" (Task 10): manda `is_group=true` na listagem. */
   onlyGroups?: boolean;
+  /** "Sem próximo passo" (L4, migration 9047): manda `sem_passo=true`. */
+  semPasso?: boolean;
 }
 
 interface Props {
@@ -106,6 +108,7 @@ export function InboxFilters({ value, onChange }: Props) {
   // manda o atendente procurar trabalho que não existe.
   const { data: counts } = useConversationCounts(orgId, {
     unread: value.onlyUnread,
+    semPasso: value.semPasso,
     tag: etiquetas,
     tagMode: value.tagMode,
     channel_session_id: value.channel_session_id,
@@ -175,6 +178,9 @@ export function InboxFilters({ value, onChange }: Props) {
     ...(value.onlyUnread
       ? [{ id: "nao-lidas", rotulo: t("Só não lidas"), onRemover: () => onChange({ ...value, onlyUnread: false }) }]
       : []),
+    ...(value.semPasso
+      ? [{ id: "sem-passo", rotulo: t("Sem próximo passo"), onRemover: () => onChange({ ...value, semPasso: false }) }]
+      : []),
     ...(value.onlyGroups
       ? [{ id: "grupos", rotulo: t("Só grupos"), onRemover: () => onChange({ ...value, onlyGroups: false }) }]
       : []),
@@ -195,6 +201,7 @@ export function InboxFilters({ value, onChange }: Props) {
       ...value,
       onlyUnread: false,
       onlyGroups: false,
+      semPasso: false,
       channel_session_id: undefined,
       tag: undefined,
       tagMode: undefined,

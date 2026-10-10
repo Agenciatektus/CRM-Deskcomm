@@ -14,6 +14,12 @@ describe("a mensagem recebida pede resposta da IA?", () => {
   it("sem texto e sem mídia (tipo não suportado, enquete cifrada, linha vazia) não pede", () => {
     expect(mensagemPedeResposta({ type: "text", body: null })).toEqual({ pede: false, motivo: "sem_conteudo" });
     expect(mensagemPedeResposta({ type: "text", body: "   " })).toEqual({ pede: false, motivo: "sem_conteudo" });
+    // Os brancos que o SQL agora também tira (P2-1 da #155): tab, quebra e NBSP.
+    expect(mensagemPedeResposta({ type: "text", body: "\t\r\n " })).toEqual({ pede: false, motivo: "sem_conteudo" });
+    expect(mensagemPedeResposta({ type: "image", body: null, media_url: "" })).toEqual({
+      pede: false,
+      motivo: "sem_conteudo",
+    });
   });
 
   it("mídia sem legenda pede: a derivação vira texto", () => {
@@ -28,8 +34,13 @@ describe("a mensagem recebida pede resposta da IA?", () => {
 
   it("a versão SQL cobre as mesmas condições", () => {
     expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("type <> 'reaction'");
-    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("btrim(body)");
-    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("media_url is not null");
-    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("media_storage_path is not null");
+    // P2-1 do Cassio na #155: o mesmo branco que o `.trim()` do JS tira, e
+    // string vazia de mídia contando como "sem mídia", igual ao `Boolean('')`.
+    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("btrim(body, E' \\t\\r\\n\\u00a0')");
+    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("nullif(media_url, '') is not null");
+    expect(SQL_MENSAGEM_PEDE_RESPOSTA).toContain("nullif(media_storage_path, '') is not null");
+    // CONTROLE: a forma antiga, que divergia do TS, não pode voltar.
+    expect(SQL_MENSAGEM_PEDE_RESPOSTA).not.toContain("btrim(body),");
+    expect(SQL_MENSAGEM_PEDE_RESPOSTA).not.toMatch(/\(media_url is not null/);
   });
 });

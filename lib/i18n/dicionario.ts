@@ -14483,6 +14483,23 @@ export const DICIONARIO: Traducoes = {
   "Largura do painel do lead": { es: "Ancho del panel del lead" },
   "Arraste para ajustar; duplo clique volta ao padrão": { es: "Arrastra para ajustar; doble clic vuelve al estándar" },
   "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
+  // ─── Visual v2, fase 8a: contadores do menu, próximo passo, busca de leads ───
+  "Etapa desfeita": { es: "Etapa deshecha" },
+  "Você:": { es: "Tú:" },
+  "IA:": { es: "IA:" },
+  "Automação:": { es: "Automatización:" },
+  "Tarefa atrasada": { es: "Tarea atrasada" },
+  "Só conversas sem próximo passo": { es: "Solo conversaciones sin próximo paso" },
+  "Filtro da Inbox": { es: "Filtro del Inbox" },
+  "1 tarefa atrasada": { es: "1 tarea atrasada" },
+  "tarefas atrasadas": { es: "tareas atrasadas" },
+  "leads abertos": { es: "leads abiertos" },
+  "Abrir lead": { es: "Abrir lead" },
+  "Buscar contato, conversa ou lead": { es: "Buscar contacto, conversación o lead" },
+  "Erro ao contar as tarefas.": { es: "Error al contar las tareas." },
+  "Erro ao contar os leads.": { es: "Error al contar los leads." },
+  "Erro ao buscar os leads.": { es: "Error al buscar los leads." },
+  "A busca precisa de 2 a 100 caracteres.": { es: "La búsqueda necesita de 2 a 100 caracteres." },
 };
 
 /**

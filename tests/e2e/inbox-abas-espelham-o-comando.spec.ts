@@ -177,7 +177,7 @@ test.describe("Inbox: as abas perguntam quem manda", () => {
     // ESTA é a asserção que não depende de nada: a aba do automático pede
     // exatamente `comando=automatico` nos dois casos, então a separação aqui vale
     // sempre — e é ela que impede um "conserto" que simplesmente esvazie a Fila.
-    await page.getByRole("tab", { name: /Autom/i }).first().click();
+    await page.getByRole("tab", { name: /Com a IA|Autom/i }).first().click();
     await expect(page.getByText(ROBO).first()).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByText(ESPERANDO),

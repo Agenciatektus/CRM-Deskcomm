@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { apiClient } from "@/lib/api/client";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
+import type { LeadAchado } from "@/lib/leads/busca-de-leads";
 
 /** O que a busca acha fora do catálogo de telas: conversas e contatos. */
 export interface AchadoDeConversa {
@@ -18,6 +19,13 @@ export interface AchadoDeContato {
   id: string;
   /** O contato como veio da rota: o nome sai de `rotuloDoContato`, na tela. */
   contato: ContatoDaRota;
+}
+
+/** Um negócio achado por `GET /api/v1/leads?search=` (título ou contato). */
+export interface AchadoDeLead {
+  tipo: "lead";
+  id: string;
+  lead: LeadAchado;
 }
 
 export type Achado = AchadoDeConversa | AchadoDeContato;
@@ -36,7 +44,7 @@ export function termoParaServidor(termo: string): string {
   return /^\d{3,}$/.test(semMascara) ? semMascara : limpo;
 }
 
-function abaDaConversa(status: string | null | undefined): AchadoDeConversa["aba"] {
+export function abaDaConversa(status: string | null | undefined): AchadoDeConversa["aba"] {
   if (status === "archived") return "archived";
   if (status === "closed" || status === "resolved") return "closed";
   return "all";
@@ -58,6 +66,10 @@ export interface ContatoDaRota {
  *
  * Sem termo, devolve as 3 conversas mais recentes (os "Recentes").
  * Contato que já aparece por uma conversa não se repete.
+ *
+ * Os LEADS vêm à parte (`leads`), porque a paleta os mostra num grupo próprio:
+ * só com termo, só para quem tem o quadro no menu, pela rota que agora aceita
+ * `search` (`/api/v1/leads`, com o escopo de organização e papel dela).
  */
 export function useBuscaRemota(
   termo: string,
@@ -66,14 +78,18 @@ export function useBuscaRemota(
    * só com `/app/inbox` no menu dele, contatos só com `/app/contacts`. A mesma
    * régua do sino com os avisos; a rota continua recusando o que não pode.
    */
-  fontes: { conversas: boolean; contatos: boolean } = { conversas: true, contatos: true },
-): { achados: Achado[]; carregando: boolean } {
-  const [estado, setEstado] = useState<{ chave: string; achados: Achado[] }>({ chave: "", achados: [] });
+  fontes: { conversas: boolean; contatos: boolean; leads?: boolean } = { conversas: true, contatos: true },
+): { achados: Achado[]; leads: AchadoDeLead[]; carregando: boolean } {
+  const [estado, setEstado] = useState<{ chave: string; achados: Achado[]; leads: AchadoDeLead[] }>({
+    chave: "",
+    achados: [],
+    leads: [],
+  });
   const limpo = termo.trim();
   const curto = limpo.length > 0 && limpo.length < MINIMO_DE_LETRAS;
-  const nenhumaFonte = !fontes.conversas && !fontes.contatos;
+  const nenhumaFonte = !fontes.conversas && !fontes.contatos && !fontes.leads;
   const chave = curto ? "" : limpo;
-  const { conversas: buscaConversas, contatos: buscaContatos } = fontes;
+  const { conversas: buscaConversas, contatos: buscaContatos, leads: buscaLeads = false } = fontes;
 
   useEffect(() => {
     if (curto || nenhumaFonte) return;
@@ -98,8 +114,16 @@ export function useBuscaRemota(
               })
               .then((r) => r.data ?? [])
           : Promise.resolve([] as ContatoDaRota[]);
-        Promise.allSettled([conversas, contatos]).then(([rc, rk]) => {
+        const leads = chave && buscaLeads
+          ? apiClient
+              .get<{ data: LeadAchado[] }>(`/api/v1/leads?search=${encodeURIComponent(busca)}&limit=5`, {
+                signal: controle.signal,
+              })
+              .then((r) => r.data ?? [])
+          : Promise.resolve([] as LeadAchado[]);
+        Promise.allSettled([conversas, contatos, leads]).then(([rc, rk, rl]) => {
           if (controle.signal.aborted) return;
+          const listaDeLeads = rl.status === "fulfilled" ? rl.value : [];
           const listaDeConversas = rc.status === "fulfilled" ? rc.value : [];
           const listaDeContatos = rk.status === "fulfilled" ? rk.value : [];
           const comConversa = new Set(listaDeConversas.map((c) => c.contacts?.id).filter(Boolean));
@@ -113,7 +137,11 @@ export function useBuscaRemota(
                 (k): AchadoDeContato => ({ tipo: "contato", id: k.id, contato: k }),
               ),
           ];
-          setEstado({ chave, achados });
+          setEstado({
+            chave,
+            achados,
+            leads: listaDeLeads.map((l): AchadoDeLead => ({ tipo: "lead", id: l.id, lead: l })),
+          });
         });
       },
       chave ? ATRASO_DA_BUSCA_MS : 0,
@@ -122,8 +150,9 @@ export function useBuscaRemota(
       clearTimeout(espera);
       controle.abort();
     };
-  }, [chave, curto, nenhumaFonte, buscaConversas, buscaContatos]);
+  }, [chave, curto, nenhumaFonte, buscaConversas, buscaContatos, buscaLeads]);
 
-  if (curto || nenhumaFonte) return { achados: [], carregando: false };
-  return { achados: estado.chave === chave ? estado.achados : [], carregando: estado.chave !== chave };
+  if (curto || nenhumaFonte) return { achados: [], leads: [], carregando: false };
+  const emDia = estado.chave === chave;
+  return { achados: emDia ? estado.achados : [], leads: emDia ? estado.leads : [], carregando: !emDia };
 }

@@ -93,6 +93,8 @@ const SELECT_COLS = `
   bot_silenced_until, last_handoff_at, last_handoff_reason,
   comando_da_conversa,
   instagram_entrada,
+  passo_da_conversa,
+  autor_da_ultima_mensagem,
   contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human),
   channel_sessions:channel_session_id (phone_number, display_name, provider, social_platform:metadata->>social_platform)
 `;
@@ -284,6 +286,11 @@ export async function listConversationsHandler(
   // mora na coluna dela: varrer `messages.metadata` por linha faria o filtro
   // ficar lento — e filtro lento é filtro que o atendente desliga.
   if (q.entrada) query = query.eq("instagram_entrada", q.entrada);
+  // "Sem próximo passo" (L4, migration 9047): o contato não tem tarefa aberta.
+  // Campo calculado, no BANCO, pelo mesmo motivo dos filtros acima: o cursor
+  // continua valendo. É o MESMO predicado que `fn_contagens_da_caixa` aplica
+  // com `p_sem_passo`, então o badge da aba conta o que a lista mostra.
+  if (q.sem_passo === "true") query = query.eq("passo_da_conversa", "sem_passo");
 
   if (q.assigned_to === "me") {
     if (ctx.actor.type !== "user") {

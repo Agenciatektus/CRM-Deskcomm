@@ -6,6 +6,7 @@ import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDo
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeAvisos } from "@/components/shell/ContadorDeAvisos";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
+import { ContadorDeTarefas } from "@/components/shell/ContadorDeTarefas";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
 import { useT } from "@/hooks/i18n/useT";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
@@ -138,6 +139,7 @@ function ItemDaColuna({
           {item.contador === "casos" && <ContadorDeCasos compacto={false} />}
           {item.contador === "fila" && <ContadorDaFila compacto={false} />}
           {item.contador === "avisos" && <ContadorDeAvisos />}
+          {item.contador === "tarefas" && <ContadorDeTarefas />}
         </Link>
       </li>
       {children}

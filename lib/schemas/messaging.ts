@@ -511,6 +511,13 @@ export const listConversationsQuerySchema = z.object({
    */
   entrada: z.enum(["direct", "comentario"]).optional(),
   /**
+   * "Sem próximo passo" (L4 da auditoria do visual v2, migration 9047): só as
+   * conversas cujo contato não tem tarefa aberta. Só `"true"` liga; ausente é
+   * sem filtro. Fechada, arquivada e grupo nunca casam (o campo calculado é
+   * nulo nelas).
+   */
+  sem_passo: z.enum(["true"]).optional(),
+  /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
    * apareceria como erro na cara de quem digita (a rota recusa e o hook mostra).

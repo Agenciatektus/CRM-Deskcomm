@@ -247,11 +247,45 @@ describe("CommandPalette: contatos e conversas", () => {
     expect(get.mock.calls.some(([u]) => String(u).startsWith("/api/v1/contacts"))).toBe(false);
     cleanup();
     get.mockClear();
-    semDestinos.hrefs = ["/app/contacts", "/app/inbox"];
+    // Sem o quadro ("Funis") também não pergunta à rota de leads (fase 8a).
+    semDestinos.hrefs = ["/app/contacts", "/app/inbox", "/app/kanban"];
     abrir();
     await user.type(screen.getByRole("combobox"), "mariana");
     await new Promise((r) => setTimeout(r, 350));
     expect(get).not.toHaveBeenCalled();
+  });
+
+  it("leads: busca pela rota de leads e o lead abre na Inbox, na conversa do contato", async () => {
+    // Fase 8a: a rota de leads aceita `search`, e o grupo "Leads" volta à paleta.
+    get.mockImplementation(async (url: string) =>
+      String(url).startsWith("/api/v1/leads?search=")
+        ? {
+            data: [
+              {
+                id: "lead-1",
+                title: "Clareamento da Mariana",
+                status: "open",
+                pipeline_id: "funil-1",
+                contact_id: "k-1",
+                pipeline: { name: "Vendas" },
+                stage: { name: "Proposta" },
+                contato: { id: "k-1", display_name: "Mariana", name: null, phone_number: null, is_anonymized: false },
+                conversa: { id: "conv-9", status: "open" },
+              },
+            ],
+          }
+        : { data: [] },
+    );
+    const user = userEvent.setup();
+    abrir();
+    expect(screen.getByRole("combobox")).toHaveAttribute("placeholder", "Buscar contato, conversa ou lead");
+    await user.type(screen.getByRole("combobox"), "mariana");
+    await waitFor(() => expect(opcoesDoGrupo("Leads")).toHaveLength(1));
+    const [lead] = opcoesDoGrupo("Leads");
+    expect(lead).toHaveTextContent("Clareamento da Mariana");
+    expect(lead).toHaveTextContent("Mariana, Proposta, Vendas");
+    await user.click(lead!);
+    expect(push).toHaveBeenCalledWith("/app/inbox?filter=all&id=conv-9");
   });
 
   it("o campo não aceita termo além do teto das rotas (100)", () => {
