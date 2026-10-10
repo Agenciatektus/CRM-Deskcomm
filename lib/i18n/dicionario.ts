@@ -14404,6 +14404,15 @@ export const DICIONARIO: Traducoes = {
   Próximo: { es: "Próximo" },
   "aguardando resposta": { es: "esperando respuesta" },
   "Recolher menu": { es: "Contraer menú" },
+  // ─── Fase 4 do visual v2 (central no sino, menu, colunas) ───
+  "Abrir a central completa": { es: "Abrir el centro completo" },
+  "Fixar menu": { es: "Fijar menú" },
+  "1 aviso em aberto": { es: "1 aviso abierto" },
+  "avisos em aberto": { es: "avisos abiertos" },
+  Opcional: { es: "Opcional" },
+  "Largura da lista de conversas": { es: "Ancho de la lista de conversaciones" },
+  "Largura do painel do lead": { es: "Ancho del panel del lead" },
+  "Arraste para ajustar; duplo clique volta ao padrão": { es: "Arrastra para ajustar; doble clic vuelve al estándar" },
   "Disponibilidade atualizada.": { es: "Disponibilidad actualizada." },
 };
 

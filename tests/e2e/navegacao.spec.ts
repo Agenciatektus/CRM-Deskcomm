@@ -295,10 +295,10 @@ test.describe("navegação agrupada", () => {
     await page.setViewportSize({ width: 1280, height: 768 });
     await loginAdmin(page);
 
-    // No trilho de 72px o rótulo é curto: "Ajustes", com o mesmo destino.
-    const config = page.getByRole("link", { name: "Ajustes", exact: true });
+    // No trilho de 72px o rótulo é curto: "Ajustes". Desde a fase 4 ele abre a
+    // coluna 2 com as seções de Configurações (S20) em vez de ser link do hub.
+    const config = page.getByRole("button", { name: "Ajustes", exact: true });
     await expect(config).toBeVisible();
-    await expect(config).toHaveAttribute("href", "/app/settings");
 
     const dentroDaNav = await page.evaluate(() => {
       const navs = [
@@ -306,7 +306,7 @@ test.describe("navegação agrupada", () => {
           'nav[aria-label="Navegação principal"], nav[aria-label="Grupos da navegação"]',
         ),
       ];
-      const link = [...document.querySelectorAll("a")].find(
+      const link = [...document.querySelectorAll("button")].find(
         (a) => a.textContent?.trim() === "Ajustes",
       );
       return navs.some((nav) => nav.contains(link!));

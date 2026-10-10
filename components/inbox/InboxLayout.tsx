@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -20,6 +20,8 @@ import { PainelDaConversa } from "./PainelDaConversa";
 import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
 import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
+import { PegadorDeColuna } from "./colunas/PegadorDeColuna";
+import { useLargurasDasColunas } from "./colunas/useLargurasDasColunas";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 import { useAtalhosPessoais } from "@/hooks/inbox/useAtalhosPessoais";
 
@@ -175,6 +177,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const [fichaAberta, setFichaAberta] = useState(false);
   // Busca nas mensagens (#1793) e coluna do lead: ver `useFerramentasDaConversa`.
   const ferramentas = useFerramentasDaConversa(selectedId);
+  // Colunas reguláveis a partir de 1536px (G1-G3): as larguras viram variáveis
+  // CSS no cartão, e os pegadores as mudam. Abaixo disso valem as faixas fixas.
+  const colunasRegulaveis = useLargurasDasColunas();
+  const cartaoRef = useRef<HTMLDivElement>(null);
   /**
    * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
    * está aberta: sair dela — clique, atalho ou voltar do navegador — o descarta
@@ -382,11 +388,18 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         // próprio `<main>` quando há painel de chamada (a mesma conta do padding
         // dele), e o `pb-2` (`--space-2`) quando não há. Sem respiro em cima: o cartão encosta no
         // topo e na barra lateral, como o `.work` do protótipo.
-        "grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao md:grid-cols-[300px_minmax(0,1fr)]",
+        "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao md:grid-cols-[300px_minmax(0,1fr)]",
         ferramentas.painelLead
-          ? "xl:grid-cols-[272px_minmax(0,1fr)_296px] 2xl:grid-cols-[340px_minmax(0,1fr)_352px]"
-          : "xl:grid-cols-[272px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]",
+          ? "xl:grid-cols-[272px_minmax(0,1fr)_296px] 2xl:grid-cols-[var(--largura-da-lista)_minmax(0,1fr)_var(--largura-do-painel)]"
+          : "xl:grid-cols-[272px_minmax(0,1fr)] 2xl:grid-cols-[var(--largura-da-lista)_minmax(0,1fr)]",
       )}
+      ref={cartaoRef}
+      style={
+        {
+          "--largura-da-lista": `${colunasRegulaveis.larguras.lista}px`,
+          "--largura-do-painel": `${colunasRegulaveis.larguras.painel}px`,
+        } as CSSProperties
+      }
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
        * já publica (`LeadDossier`), e pela mesma razão: quando a entrega morre,
@@ -550,6 +563,27 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         </div>
       )}
 
+      {/* Os pegadores das colunas (o `.rz` do protótipo); só aparecem em 2xl. */}
+      <PegadorDeColuna
+        coluna="lista"
+        larguras={colunasRegulaveis.larguras}
+        cartaoRef={cartaoRef}
+        comPainel={ferramentas.painelLead}
+        mover={colunasRegulaveis.mover}
+        confirmar={colunasRegulaveis.confirmar}
+        restaurar={colunasRegulaveis.restaurar}
+      />
+      {ferramentas.painelLead && (
+        <PegadorDeColuna
+          coluna="painel"
+          larguras={colunasRegulaveis.larguras}
+          cartaoRef={cartaoRef}
+          comPainel
+          mover={colunasRegulaveis.mover}
+          confirmar={colunasRegulaveis.confirmar}
+          restaurar={colunasRegulaveis.restaurar}
+        />
+      )}
       <InboxKeyboardShortcuts
         visibleIds={visibleIds}
         selectedId={selectedId}

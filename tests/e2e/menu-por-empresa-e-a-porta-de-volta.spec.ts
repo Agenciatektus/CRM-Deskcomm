@@ -145,14 +145,15 @@ test("o menu da empresa encolhe pela tela — e a porta que desfaz continua lá"
   // (`/app/settings`). Procurá-lo dentro do `nav` devolve "não encontrado" com
   // a porta intacta — foi assim que este caso reprovou na primeira rodada.
   //
-  // Visual v2: no trilho de 72px o rótulo desse link é "Ajustes".
-  const portaDeVolta = page.getByRole("link", { name: "Ajustes", exact: true });
+  // Visual v2: no trilho de 72px o rótulo é "Ajustes". Desde a fase 4 ele é um
+  // BOTÃO que abre a coluna 2 com as seções de Configurações (S20), e a porta
+  // de volta é a "Organização" dentro dela.
+  const portaDeVolta = page.getByRole("button", { name: "Ajustes", exact: true });
   await expect(
     portaDeVolta,
     "a empresa encolheu o menu e perdeu a porta que desfaz a escolha — trancada do lado de fora",
   ).toBeVisible();
   await portaDeVolta.click();
-  await page.waitForURL(/\/app\/settings/);
   await page.getByRole("link", { name: /organização/i }).first().click();
   await page.waitForURL(new RegExp(CONFIGURACOES.replace(/\//g, "\\/")));
   await expect(

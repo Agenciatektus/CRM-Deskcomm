@@ -9,7 +9,6 @@ import { comandoDaConversa, esperaDaConversa } from "@/lib/inbox/comando-da-conv
 import { cn } from "@/lib/utils";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
-import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
 import { AvatarDoContato } from "./AvatarDoContato";
 import { BotaoMaisAcoes } from "./menu/BotaoMaisAcoes";
@@ -17,7 +16,7 @@ import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
 import { IconesPessoais } from "./item/IconesPessoais";
 import { naoLidasDaConversa } from "@/lib/inbox/estado-por-atendente";
-import { initials, relativeTime } from "./item/tempo-da-linha";
+import { initials, relativeTime, siglaDoTelefone } from "./item/tempo-da-linha";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -83,7 +82,7 @@ export function ConversationListItem({
   const t = useT();
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
-  const phoneFallback = c?.phone_number ? phoneForDisplay(c.phone_number) : "??";
+  const phoneFallback = siglaDoTelefone(c?.phone_number);
   const preview = conversation.last_message_preview?.trim() || t("Sem mensagens");
   const truncated = preview.length > 60 ? `${preview.slice(0, 60)}…` : preview;
   const naFila = queuePosition !== undefined;

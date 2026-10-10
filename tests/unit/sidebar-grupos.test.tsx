@@ -20,7 +20,7 @@
  * `navegacao-registry.test.ts`; aqui é a superfície.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -54,6 +54,9 @@ vi.mock("@/components/shell/ContadorDaFila", () => ({
   ContadorDaFila: ({ compacto }: { compacto: boolean }) => (
     <span data-testid="marcador-fila" data-compacto={String(compacto)} />
   ),
+}));
+vi.mock("@/components/shell/ContadorDeAvisos", () => ({
+  ContadorDeAvisos: () => <span data-testid="marcador-avisos" />,
 }));
 vi.mock("@/app/actions/shell/toggleSidebar", () => ({
   toggleSidebar: vi.fn(),
@@ -203,15 +206,46 @@ describe("Sidebar agrupado", () => {
     expect(screen.queryByRole("link", { name: /Nuvemshop/ })).toBeNull();
   });
 
-  it("Configurações fica no rodapé, nunca dependendo de scroll", () => {
+  it("Configurações fica no rodapé, nunca dependendo de scroll, e abre a coluna 2", async () => {
     comoPapel("admin");
     render(<Sidebar collapsed={false} />);
-    // No trilho de 72px o rótulo é curto ("Ajustes"); o destino é o mesmo hub.
-    const config = screen.getByRole("link", { name: /Ajustes/ });
-    expect(config).toHaveAttribute("href", "/app/settings");
+    // No trilho de 72px o rótulo é curto ("Ajustes").
+    const config = screen.getByRole("button", { name: /Ajustes/ });
     // Fora das duas áreas que rolam (o trilho de grupos e a coluna).
     expect(coluna().contains(config)).toBe(false);
     expect(trilho().contains(config)).toBe(false);
+    // S20 da auditoria: Ajustes abre a coluna 2 com as seções de Configurações,
+    // como os outros grupos, em vez de levar direto ao hub.
+    await userEvent.click(config);
+    expect(config).toHaveAttribute("aria-pressed", "true");
+    expect(within(coluna()).getByRole("link", { name: "Perfil" })).toHaveAttribute(
+      "href",
+      "/app/settings/profile",
+    );
+  });
+
+  it("recolhida: parar o mouse num grupo espia a coluna, e sair da barra fecha (S6)", () => {
+    vi.useFakeTimers();
+    try {
+      comoPapel("admin");
+      render(<Sidebar collapsed />);
+      const atendimento = within(trilho()).getByRole("button", { name: "Conversas" });
+      fireEvent.pointerOver(atendimento, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(atendimento).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("link", { name: /Inbox/ })).toBeInTheDocument();
+      // Espiar não rouba o foco de quem só passou o mouse.
+      expect(screen.getByRole("link", { name: /Inbox/ })).not.toHaveFocus();
+      fireEvent.pointerOut(atendimento.closest("aside")!.firstElementChild!, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("não deixa grupo órfão quando a permissão esvazia o grupo", () => {

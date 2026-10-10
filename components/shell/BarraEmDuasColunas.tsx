@@ -1,6 +1,5 @@
 "use client";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useId, useTransition } from "react";
 
@@ -27,7 +26,7 @@ import {
 import { grupoDaRota, rotaCasa } from "@/lib/navigation/rota-atual";
 import {
   CaretDoubleLeft,
-  CaretDoubleRight,
+  PushPin,
   ChartBar,
   ChatsCircle,
   Gear,
@@ -136,6 +135,9 @@ export function BarraEmDuasColunas({
     peekAberto,
     escolher,
     fechar,
+    apontar,
+    sairDaBarra,
+    voltarABarra,
     colunaRef,
     raizRef,
     onKeyDown,
@@ -144,8 +146,8 @@ export function BarraEmDuasColunas({
   } = usePeekDoTrilho({ collapsed, pathname });
   const daRota = grupoDaRota(pathname);
   const selecionaveis = todos.map((g) => g.group.id);
-  // Organização entra como selecionável só pela ROTA: no trilho ela é o link
-  // Ajustes, mas dentro de Configurações a coluna 2 mostra as telas dela.
+  // Organização é selecionável pelo botão Ajustes do rodapé (S20) e pela rota:
+  // dentro de Configurações a coluna 2 mostra as telas dela.
   const mostrado =
     [escolhido, daRota].find((id): id is NavGroupId => !!id && selecionaveis.includes(id)) ??
     noTrilho[0]?.group.id ??
@@ -157,7 +159,16 @@ export function BarraEmDuasColunas({
     !!rodape?.hub && (daRota === GRUPO_NO_RODAPE || rotaCasa(pathname, rodape.hub.href));
 
   return (
-    <div ref={raizRef} onKeyDown={onKeyDown} onBlur={onBlur} className="relative flex h-full">
+    <div
+      ref={raizRef}
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
+      // Espiar com o mouse (S6): sair da barra inteira (trilho + coluna por cima)
+      // fecha; voltar antes do atraso cancela o fechamento.
+      onPointerLeave={sairDaBarra}
+      onPointerEnter={voltarABarra}
+      className="relative flex h-full"
+    >
       {/* Sem `border-r`: trilho e coluna são UM bloco da cor da moldura, como no
           protótipo; a divisão entre eles é a diferença de conteúdo, não um fio. */}
       <div className="flex w-[72px] shrink-0 flex-col items-center">
@@ -185,6 +196,9 @@ export function BarraEmDuasColunas({
                 ref={registrarBotao(group.id)}
                 type="button"
                 onClick={() => escolher(group.id, mostrado)}
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") apontar(group.id);
+                }}
                 title={t(group.label)}
                 aria-pressed={collapsed ? undefined : mostrado === group.id}
                 aria-expanded={collapsed ? peekAberto && mostrado === group.id : undefined}
@@ -213,27 +227,39 @@ export function BarraEmDuasColunas({
           })}
         </nav>
         <div className="flex w-full flex-col items-center gap-1 border-t px-1 py-2">
-          {rodape?.hub && (
-            <Link
-              href={rodape.hub.href}
-              title={t(rodape.hub.label)}
-              aria-current={pathname === rodape.hub.href ? "page" : undefined}
-              onClick={fechar}
-              className={cn(BOTAO_DO_TRILHO, rodapeAtivo ? BOTAO_MARCADO : BOTAO_SOLTO)}
+          {rodape && (
+            // Ajustes abre a coluna 2 com as seções de Configurações, como os
+            // outros grupos (S20 da auditoria), em vez de levar direto ao hub.
+            <button
+              ref={registrarBotao(GRUPO_NO_RODAPE)}
+              type="button"
+              onClick={() => escolher(GRUPO_NO_RODAPE, mostrado)}
+              onPointerEnter={(e) => {
+                if (e.pointerType === "mouse") apontar(GRUPO_NO_RODAPE);
+              }}
+              title={t(rodape.hub?.label ?? "Ajustes")}
+              aria-pressed={collapsed ? undefined : mostrado === GRUPO_NO_RODAPE}
+              aria-expanded={collapsed ? peekAberto && mostrado === GRUPO_NO_RODAPE : undefined}
+              aria-controls={collapsed && peekAberto ? colunaId : undefined}
+              className={cn(
+                BOTAO_DO_TRILHO,
+                (colunaVisivel ? mostrado === GRUPO_NO_RODAPE : rodapeAtivo) ? BOTAO_MARCADO : BOTAO_SOLTO,
+              )}
             >
               <Gear size={20} className={cn(rodapeAtivo && "text-primary")} aria-hidden />
               <span className="max-w-full truncate">{t("Ajustes")}</span>
-            </Link>
+            </button>
           )}
           <button
             type="button"
             onClick={() => startTransition(() => toggleSidebar(collapsed))}
             disabled={isPending}
             className="flex h-8 w-14 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            aria-label={collapsed ? t("Expandir sidebar") : t("Recolher sidebar")}
+            aria-label={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
+            title={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
           >
             {collapsed ? (
-              <CaretDoubleRight size={14} aria-hidden />
+              <PushPin size={14} aria-hidden />
             ) : (
               <CaretDoubleLeft size={14} aria-hidden />
             )}
@@ -259,11 +285,21 @@ export function BarraEmDuasColunas({
             funis={funis}
             onNavigate={fechar}
             acaoDoTitulo={
-              // O « ao lado do título (o `.nav2-head` do protótipo): o MESMO
-              // `toggleSidebar` do botão do rodapé do trilho, mais perto de quem
-              // acabou de escolher a tela. Só com a coluna fixa: no "peek" ela já
-              // fecha sozinha ao sair, e não há o que recolher.
-              collapsed ? undefined : (
+              // Ao lado do título (o `.nav2-head` do protótipo), o MESMO
+              // `toggleSidebar` do rodapé do trilho: com a coluna fixa, « recolhe;
+              // espiando (barra recolhida), o alfinete fixa a coluna aberta (S8).
+              collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => startTransition(() => toggleSidebar(collapsed))}
+                  disabled={isPending}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={t("Fixar menu")}
+                  title={t("Fixar menu")}
+                >
+                  <PushPin size={14} aria-hidden />
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => startTransition(() => toggleSidebar(collapsed))}
