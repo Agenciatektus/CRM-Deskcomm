@@ -12,15 +12,35 @@ import type { ConversationWithContact } from "@/hooks/inbox/useConversationsReal
  * texto (que não depende de React) mora aqui, testável sem render.
  */
 
+/** Letra ou número de qualquer escrita: emoji, pontuação e símbolo ficam de fora. */
+const LETRA_OU_NUMERO = /[\p{L}\p{N}]/u;
+
+/** As letras de uma palavra, por CODE POINT (`Array.from`), nunca por unidade UTF-16. */
+function letrasDe(palavra: string): string[] {
+  return Array.from(palavra).filter((c) => LETRA_OU_NUMERO.test(c));
+}
+
+/**
+ * A sigla do avatar: primeira letra da primeira e da última palavra, ou as duas
+ * primeiras letras quando há uma palavra só.
+ *
+ * Por code point e só com letras/números. Indexar a string (`nome[0]`,
+ * `slice(0, 2)`) corta pela unidade UTF-16: "Grazy Lima 🎤" virava "G�",
+ * metade do par substituto do microfone (visto na Inbox da Delicatto). Palavra
+ * que é só emoji ou pontuação não conta; nome sem nenhuma letra (". ✨") cai no
+ * `fallback`, como o nome vazio.
+ */
 export function initials(name: string | null | undefined, fallback: string): string {
-  const v = (name ?? "").trim();
-  if (!v) return fallback.slice(0, 2).toUpperCase();
-  const parts = v.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return fallback.slice(0, 2).toUpperCase();
-  if (parts.length === 1) return (parts[0] ?? "").slice(0, 2).toUpperCase();
-  const first = parts[0]?.[0] ?? "";
-  const last = parts[parts.length - 1]?.[0] ?? "";
-  return (first + last).toUpperCase();
+  const palavras = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .map(letrasDe)
+    .filter((letras) => letras.length > 0);
+  const primeira = palavras[0];
+  const ultima = palavras[palavras.length - 1];
+  if (!primeira || !ultima) return Array.from(fallback).slice(0, 2).join("").toUpperCase();
+  if (palavras.length === 1) return primeira.slice(0, 2).join("").toUpperCase();
+  return `${primeira[0]}${ultima[0]}`.toUpperCase();
 }
 
 export function relativeTime(iso: string | null, locale: Locale): string {

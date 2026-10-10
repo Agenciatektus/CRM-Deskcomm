@@ -475,72 +475,49 @@
   --color-avatar-6-fg: #c0e7e8;
 }
 
-/* ── Gradiente do botão primário (só no tema escuro) ──────────────────────
-   O protótipo escuro pinta o botão principal com gradiente. Ele sai da marca
-   EM VIGOR, e não de um hex: com white-label, a instalação e a organização
-   trocam a rampa, e um gradiente fixo na Sage pintaria o botão de todo
-   revendedor com a cor do produto.
-
-   A REGRA QUE O DESENHO GARANTE: nenhum ponto do gradiente tem contraste com o
-   texto menor que o do próprio `--color-accent`, que é o par que a régua valida
-   (`--color-accent-fg` é CALCULADO contra ele, lib/branding/contraste.ts).
-
-   Por isso a segunda ponta NÃO é `--color-accent-hover` nem uma parada fixa:
-   o hover tem `contra: null` na régua (nunca é medido contra o texto), e uma
-   parada fixa não acompanha o deslocamento que a régua aplica à rampa da marca.
-   A ponta é o próprio accent misturado 30% com o extremo OPOSTO ao texto:
-   branco puro quando o texto é escuro, preto puro quando é branco. Misturar em
-   sRGB na direção do branco só sobe cada canal, e a luminância sobe junto (e
-   vice-versa para o preto), então a razão de contraste só pode crescer.
-   O extremo sai do próprio `--color-accent-fg`: `round(255 - canal, 255)`
-   arredonda o inverso de cada canal para 0 ou 255.
-
-   Medido (tests/unit/botao-primario-gradiente.test.ts refaz a conta):
-     Sage padrão, texto #161510: 6,31:1 no accent (#82a077) e 9,10:1 na ponta.
-     31 marcas das fixtures de contraste, nos dois temas: a ponta nunca fica
-     abaixo do accent.
-
-   Navegador sem sintaxe de cor relativa descarta o valor, o gradiente vira
-   `none` e fica o `bg-accent` chapado, que é o botão de antes.
+/* ── Degradê do escuro (botão primário e pele Verdash) ────────────────────
+   Até 10/10/2026 o botão primário do escuro saía da marca do revendedor (o
+   accent misturado com o oposto do texto). Agora o escuro usa o degradê FIXO
+   do Verdash, em duas versões (vibrante para traço, escurecida para texto);
+   ver os comentários no bloco abaixo.
 
    Seletor `[data-theme="dark"] body`, e não o bloco `[data-theme="dark"]`:
-     - custom property com `var()` é resolvida ONDE é declarada. No `<html>`
-       ela congelaria a marca da instalação, e a marca da organização (que o
-       CSS injetado declara no `<body>`, `lib/branding/css.ts`) não chegaria ao
-       botão. No `<body>` ela já enxerga as duas.
-     - o bloco `[data-theme="dark"] {` tem espelho obrigatório no
-       `[data-theme="light"]` (tests/unit/branding-tema-claro-escopavel.test.ts)
-       e é lido pela régua de contraste; este token é só do escuro e não é cor. */
+   o bloco `[data-theme="dark"] {` tem espelho obrigatório no
+   `[data-theme="light"]` (tests/unit/branding-tema-claro-escopavel.test.ts) e
+   é lido pela régua de contraste; estes tokens são só do escuro e não são cor
+   de marca. */
 [data-theme="dark"] body {
-  --gradient-primary-oposto: rgb(
-    from var(--color-accent-fg) round(calc(255 - r), 255) round(calc(255 - g), 255)
-      round(calc(255 - b), 255)
-  );
-  --gradient-primary: linear-gradient(
-    135deg,
-    var(--color-accent),
-    color-mix(in srgb, var(--color-accent) 70%, var(--gradient-primary-oposto))
-  );
-
   /* ---- Pele Verdash (escuro): tokens -----------------------------------
      O bloco "VARIANTE VERDASH" do protótipo (MainVerdash.dc.html), traduzido.
-     Os tokens de MARCA (degradê, brilho, foco) saem da marca EM VIGOR, pela
-     mesma razão do `--gradient-primary` acima: o escuro respeita o white-label
-     (`lib/branding/css.ts` injeta a rampa da organização no `<body>`), e um
-     azul->menta fixo pintaria a tela de todo revendedor com a cor do produto.
-     Adotar o degradê fixo do protótipo é trocar QUATRO linhas (`--pele-grad`,
-     `--pele-grad-fg`, `--pele-brilho`, `--pele-foco`); a decisão é do
-     Peterson e está pendente. Os tokens SEM marca (ruído, sombra dura, fundo
-     do fio) são os do protótipo. */
-  --pele-grad: var(--gradient-primary);
-  --pele-grad-fg: var(--color-accent-fg);
-  --pele-brilho: var(--color-accent);
-  --pele-foco: var(--color-accent);
-  --pele-grad-soft: linear-gradient(
-    120deg,
-    color-mix(in oklch, var(--pele-brilho) 24%, transparent),
-    color-mix(in oklch, var(--pele-brilho) 14%, transparent)
-  );
+
+     O DEGRADÊ DO ESCURO É FIXO, O DO VERDASH, PARA TODO REVENDEDOR (decisão do
+     Peterson, 10/10/2026). O claro continua com a marca do revendedor; aqui a
+     marca segue valendo para o resto (accent, bolha de saída, botões
+     secundários), e só degradê, brilho e foco ficam no azul->menta.
+
+     DOIS degradês, porque nenhuma cor de texto passa AA sobre o original
+     inteiro (branco dá 6,36:1 no azul, 3,84:1 no meio e 2,16:1 na ponta menta;
+     texto escuro reprova no azul):
+       --pele-grad        o do protótipo, VIBRANTE, só onde não há texto em cima
+                          (traço da seleção, indicador da aba, borda da bolha
+                          da IA, switch);
+       --pele-grad-texto  o mesmo matiz com o meio e a ponta escurecidos em
+                          oklch até o branco passar de 4,5:1 em TODA parada
+                          (6,36 / 4,62 / 4,67), para botão, contador, avatar e
+                          chip ligado. `tests/unit/botao-primario-gradiente.test.ts`
+                          refaz a conta a partir deste arquivo.
+     Em hex, e não oklch, porque é hex que a régua e o teste leem. */
+  --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
+  --pele-grad-texto: linear-gradient(120deg, #2a52d8 0%, #157f9f 50%, #0c845c 100%);
+  --pele-grad-fg: #ffffff;
+  --pele-brilho: #2b8cad;
+  --pele-foco: #48a5c7;
+  --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
+  /* O texto do chip da IA (o `--accent-text` do protótipo, um tom mais claro):
+     6,3:1 no pior ponto do fundo dele, já com o filtro do hover. */
+  --pele-grad-soft-fg: #8fdcef;
+  /* O botão primário no escuro usa o degradê de TEXTO (ver acima). */
+  --gradient-primary: var(--pele-grad-texto);
   --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
   --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
   --pele-fio: #111315;
@@ -1168,7 +1145,17 @@
    todas exigem `[data-theme="dark"]` acima. Ficam FORA de `@layer` de
    propósito: declaração sem layer vence `@layer utilities`, então a pele cobre
    o `bg-*`/`ring-*` do componente sem `!important` e sem brigar por
-   especificidade. Cada bloco cita o seletor do protótipo que reproduz. */
+   especificidade. Cada bloco cita o seletor do protótipo que reproduz.
+
+   ⚠️ O OUTRO LADO DISSO: estas regras vencem TAMBÉM a cor que alguém passar
+   por `className` no componente base. `Switch` (pele-grad-ativo), `Popover`,
+   `DropdownMenu` e `CommandPalette` (pele-ruido) vestem a pele no próprio
+   primitivo; um `className="bg-..."` ou `data-[state=checked]:bg-...` passado
+   numa tela continua valendo no claro e é coberto no escuro (o ruído só põe
+   `background-image`, então a cor de fundo passada sobrevive por baixo dele;
+   o switch ligado perde a cor passada para o degradê). Para fugir da pele num
+   caso específico, a saída é não usar a classe `pele-*` ali, nunca
+   `!important`. */
 
 /* `.app.dark` (fundo): dois radiais da marca sobre a moldura. */
 [data-theme="dark"] .pele-moldura {
@@ -1201,7 +1188,7 @@
 
 /* `--grad`: selo do trilho, não lidas, avatar da conta, chips ativos. */
 [data-theme="dark"] .pele-grad {
-  background-image: var(--pele-grad);
+  background-image: var(--pele-grad-texto);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
@@ -1212,7 +1199,7 @@
 /* Os que mudam de estado por atributo (aba do composer, chip, switch, etapa). */
 [data-theme="dark"]
   .pele-grad-ativo:is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
-  background-image: var(--pele-grad);
+  background-image: var(--pele-grad-texto);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
@@ -1220,6 +1207,7 @@
 /* `.chip-ai` (Sugerir resposta): degradê suave com contorno da marca. */
 [data-theme="dark"] .pele-grad-suave {
   background-image: var(--pele-grad-soft);
+  color: var(--pele-grad-soft-fg);
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--pele-brilho) 38%, transparent);
 }
 [data-theme="dark"] .pele-grad-suave:hover {

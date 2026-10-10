@@ -1,92 +1,99 @@
 /**
- * O gradiente do botão primário no escuro nunca piora o contraste do texto.
+ * O degradê do tema escuro é o FIXO do Verdash, e o texto passa AA sobre ele.
  *
- * O texto do botão (`--color-accent-fg`) é CALCULADO contra `--color-accent`; é
- * o único par que a régua valida para a marca de cada cliente. Uma ponta de
- * gradiente fora desse par (ex.: `--color-accent-hover`, `contra: null` na
- * régua) viraria estado de REPOUSO sem validação nenhuma. Por isso a outra ponta
- * é o accent misturado 30% com o extremo oposto ao texto, e esta cerca prende as
- * duas metades: a fórmula no CSS e a conta sobre as marcas das fixtures.
+ * Decisão do Peterson (10/10/2026): no escuro o degradê é azul->menta para todo
+ * revendedor; no claro nada muda (a marca do revendedor continua). Nenhuma cor
+ * de texto passa AA sobre o degradê ORIGINAL do protótipo inteiro, então há
+ * dois: o vibrante (`--pele-grad`, só onde não há texto) e o de texto
+ * (`--pele-grad-texto`, meio e ponta escurecidos). Esta cerca lê as paradas do
+ * próprio CSS e refaz a conta: nenhuma parada do degradê de texto pode ficar
+ * abaixo de 4,5:1 com o texto declarado. Transcrever as cores aqui mediria a
+ * minha cópia, que continuaria "certa" com o CSS mudado.
  */
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { derivarMarca, razaoDeContraste } from "@/lib/branding/contraste";
-import { REGUA_DO_PRODUTO } from "@/lib/branding/regua-do-produto";
+import { razaoDeContraste } from "@/lib/branding/contraste";
 
 const CSS = readFileSync("app/globals.css", "utf8");
 const BOTAO = readFileSync("components/ui/button.tsx", "utf8");
 
-/** O bloco do token, e não o arquivo inteiro: uma menção em comentário não vale. */
-function blocoDoGradiente(): string {
+/** O bloco dos tokens do escuro, e não o arquivo inteiro: comentário não vale. */
+function blocoDoEscuro(): string {
   const i = CSS.indexOf('\n[data-theme="dark"] body {');
-  expect(i, "sumiu o bloco do gradiente em app/globals.css").toBeGreaterThan(-1);
-  return CSS.slice(i, CSS.indexOf("\n}", i));
+  expect(i, "sumiu o bloco dos tokens do escuro em app/globals.css").toBeGreaterThan(-1);
+  // Só as declarações: tira os comentários, que citam hex de exemplo.
+  return CSS.slice(i, CSS.indexOf("\n}", i)).replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-/** O que `color-mix(in srgb, A 70%, B)` produz, canal a canal. */
-function misturar(a: string, b: string, pesoDeB: number): string {
-  const canal = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
-  return (
-    "#" +
-    [1, 3, 5]
-      .map((i) => Math.round(canal(a, i) * (1 - pesoDeB) + canal(b, i) * pesoDeB))
-      .map((v) => v.toString(16).padStart(2, "0"))
-      .join("")
-  );
+function token(nome: string): string {
+  const m = blocoDoEscuro().match(new RegExp(`${nome}:\\s*([^;]+);`));
+  expect(m, `sem ${nome} no bloco do escuro`).not.toBeNull();
+  return m![1]!.trim();
 }
 
-/** O que `round(255 - canal, 255)` produz: o extremo oposto ao texto. */
-function oposto(fg: string): string {
-  return (
-    "#" +
-    [1, 3, 5]
-      .map((i) => (255 - parseInt(fg.slice(i, i + 2), 16) >= 127.5 ? "ff" : "00"))
-      .join("")
-  );
+function paradas(valor: string): string[] {
+  return [...valor.matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase());
 }
 
-// As marcas das fixtures de contraste (tests/unit/branding-contraste.test.ts).
-const SEMENTES = [
-  "#000000", "#0f172a", "#101010", "#14b8a6", "#1a1f36", "#1abc9c", "#22c55e", "#2563eb",
-  "#27ae60", "#4b0082", "#4d9351", "#506d48", "#5a8a5f", "#5d594f", "#67885d", "#7c3aed",
-  "#7f7f7f", "#7f8c3a", "#808080", "#82a077", "#a94a3c", "#b07a2b", "#bd615b", "#c0392b",
-  "#dc2626", "#e11d48", "#f2f2f2", "#f59e0b", "#f5c518", "#fafafa", "#ffffff",
-];
-
-describe("gradiente do botão primário no escuro", () => {
-  it("parte do accent e vai para o accent misturado com o oposto do texto", () => {
-    const bloco = blocoDoGradiente();
-    expect(bloco).toMatch(/from var\(--color-accent-fg\) round\(calc\(255 - r\), 255\)/);
-    expect(bloco).toMatch(
-      /color-mix\(in srgb, var\(--color-accent\) 70%, var\(--gradient-primary-oposto\)\)/,
-    );
-    // A ponta que a revisão reprovou: o hover não é medido contra o texto.
-    expect(bloco).not.toContain("--color-accent-hover");
-  });
-
-  it("o botão só usa o gradiente no tema escuro, e o hover volta ao chapado", () => {
-    expect(BOTAO).toContain("dark:bg-(image:--gradient-primary)");
-    expect(BOTAO).toContain("dark:hover:bg-none");
-  });
-
-  it("Sage padrão: 6,31:1 no accent e mais que isso na ponta", () => {
-    const fg = "#161510";
-    const accent = "#82a077";
-    const ponta = misturar(accent, oposto(fg), 0.3);
-    expect(razaoDeContraste(fg, accent)).toBeCloseTo(6.31, 2);
-    expect(razaoDeContraste(fg, ponta)).toBeGreaterThan(razaoDeContraste(fg, accent));
-  });
-
-  it("em nenhuma marca das fixtures a ponta fica abaixo do accent", () => {
-    for (const semente of SEMENTES) {
-      const { escuro } = derivarMarca(semente, REGUA_DO_PRODUTO);
-      const ponta = misturar(escuro.accent, oposto(escuro.accentFg), 0.3);
+describe("degradê do escuro", () => {
+  it("o degradê de texto tem as três paradas, e o texto passa AA em todas", () => {
+    const fg = token("--pele-grad-fg");
+    const cores = paradas(token("--pele-grad-texto"));
+    expect(cores).toHaveLength(3);
+    for (const cor of cores) {
       expect(
-        razaoDeContraste(escuro.accentFg, ponta),
-        `${semente}: a ponta do gradiente reduziu o contraste do texto`,
-      ).toBeGreaterThanOrEqual(razaoDeContraste(escuro.accentFg, escuro.accent) - 1e-9);
+        razaoDeContraste(fg, cor),
+        `${fg} sobre ${cor}: o texto do botão reprova AA nesta parada`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("controle negativo: o degradê VIBRANTE reprova com o mesmo texto (por isso existem dois)", () => {
+    const fg = token("--pele-grad-fg");
+    const vibrante = paradas(token("--pele-grad"));
+    expect(vibrante).toHaveLength(3);
+    expect(vibrante.some((cor) => razaoDeContraste(fg, cor) < 4.5)).toBe(true);
+  });
+
+  it("é fixo: nenhum token de degradê, brilho ou foco lê a marca do revendedor", () => {
+    for (const nome of ["--pele-grad", "--pele-grad-texto", "--pele-brilho", "--pele-foco", "--pele-grad-fg"]) {
+      expect(token(nome), `${nome} voltou a depender da marca`).not.toMatch(/--color-accent/);
+    }
+  });
+
+  it("o botão primário usa o degradê de texto no escuro, com o texto do degradê", () => {
+    expect(token("--gradient-primary")).toBe("var(--pele-grad-texto)");
+    expect(BOTAO).toContain("dark:bg-(image:--gradient-primary)");
+    expect(BOTAO).toContain("dark:text-(--pele-grad-fg)");
+    // O hover escurece em vez de trocar pelo accent chapado: o accent é da
+    // marca, e o texto branco não foi medido contra ele.
+    expect(BOTAO).not.toContain("dark:hover:bg-none");
+  });
+
+  it("o claro não ganhou degradê: o bloco do claro não declara os tokens da pele", () => {
+    const inicio = CSS.indexOf("\n:root {");
+    const claro = CSS.slice(inicio, CSS.indexOf("\n}", inicio));
+    expect(claro).not.toMatch(/--pele-grad|--gradient-primary/);
+  });
+
+  it("o texto do chip da IA passa AA no pior ponto do fundo dele, inclusive no hover", () => {
+    // O fundo do chip no escuro: a caixa do composer (`--color-surface`), o
+    // `bg-accent-soft` da marca padrão e o `--pele-grad-soft` por cima. Os
+    // piores pontos são as duas pontas. O hover aplica `brightness(1.15)` no
+    // chip inteiro (texto e fundo).
+    const fg = token("--pele-grad-soft-fg");
+    const mistura = (b: number[], c: number[], a: number) => b.map((x, i) => x * (1 - a) + c[i]! * a);
+    const hex = (c: number[]) =>
+      "#" + c.map((v) => Math.round(Math.min(255, v)).toString(16).padStart(2, "0")).join("");
+    const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const claro = (c: number[]) => c.map((v) => v * 1.15);
+    const base = mistura([24, 26, 28], [130, 160, 119], 0.16);
+    const pontas = [mistura(base, [42, 82, 216], 0.24), mistura(base, [43, 200, 143], 0.18)];
+    for (const fundo of pontas) {
+      expect(razaoDeContraste(fg, hex(fundo))).toBeGreaterThanOrEqual(4.5);
+      expect(razaoDeContraste(hex(claro(rgb(fg))), hex(claro(fundo)))).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
