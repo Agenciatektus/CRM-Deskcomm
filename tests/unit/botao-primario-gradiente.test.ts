@@ -67,9 +67,34 @@ describe("degradê do escuro", () => {
     expect(token("--gradient-primary")).toBe("var(--pele-grad-texto)");
     expect(BOTAO).toContain("dark:bg-(image:--gradient-primary)");
     expect(BOTAO).toContain("dark:text-(--pele-grad-fg)");
-    // O hover escurece em vez de trocar pelo accent chapado: o accent é da
-    // marca, e o texto branco não foi medido contra ele.
+    // O hover não troca pelo accent chapado: o accent é da marca, e o texto
+    // branco não foi medido contra ele.
     expect(BOTAO).not.toContain("dark:hover:bg-none");
+  });
+
+  it("o hover do botão escurece SÓ o fundo, e o texto passa AA em toda parada dele", () => {
+    // P1 do Cassio na #145: `brightness()` no botão escurecia o texto junto e
+    // derrubava o meio e a ponta para 4,36 e 4,45.
+    expect(BOTAO).toContain("dark:hover:bg-(image:--pele-grad-texto-hover)");
+    expect(BOTAO, "filtro no hover escurece o texto junto com o fundo").not.toMatch(/dark:hover:brightness/);
+    const fg = token("--pele-grad-fg");
+    const cores = paradas(token("--pele-grad-texto-hover"));
+    expect(cores).toHaveLength(3);
+    for (const cor of cores) {
+      expect(razaoDeContraste(fg, cor), `${fg} sobre ${cor} no hover`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("onde há texto sobre o degradê, a pele usa o degradê de TEXTO, nunca o vibrante", () => {
+    // P2-1 do Cassio na #145: `.pele-grad` (contadores, avatar, chips) e
+    // `.pele-grad-ativo` (aba Responder, switch) levam texto em cima.
+    for (const classe of [".pele-grad {", ".pele-grad-ativo:is("]) {
+      const inicio = CSS.indexOf(classe);
+      expect(inicio, `sumiu a regra ${classe}`).toBeGreaterThan(-1);
+      const corpo = CSS.slice(inicio, CSS.indexOf("}", inicio));
+      expect(corpo, `${classe} usa o degradê vibrante`).toContain("var(--pele-grad-texto)");
+      expect(corpo).not.toMatch(/var\(--pele-grad\)/);
+    }
   });
 
   it("o claro não ganhou degradê: o bloco do claro não declara os tokens da pele", () => {

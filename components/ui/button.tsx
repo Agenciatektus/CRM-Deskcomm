@@ -32,12 +32,12 @@ const buttonVariants = cva(
         // No escuro, o degradê FIXO do Verdash (`--gradient-primary` aponta para
         // `--pele-grad-texto`, app/globals.css) com texto branco: o branco passa
         // de 4,5:1 em todas as paradas (tests/unit/botao-primario-gradiente).
-        // No hover o degradê fica e escurece 10%, o que só aumenta o contraste;
+        // No hover só o FUNDO escurece (`--pele-grad-texto-hover`), e o contraste sobe;
         // trocar pelo accent chapado poria o branco sobre uma cor que ninguém mediu.
         primary:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:brightness-90",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover)",
         default:
-          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:brightness-90",
+          "bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-texto-hover)",
         secondary:
           "bg-surface-elevated text-text border border-border hover:border-accent hover:text-accent",
         outline:

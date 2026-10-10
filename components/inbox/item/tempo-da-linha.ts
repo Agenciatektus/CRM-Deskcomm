@@ -31,7 +31,10 @@ function letrasDe(palavra: string): string[] {
  * `fallback`, como o nome vazio.
  */
 export function initials(name: string | null | undefined, fallback: string): string {
+  // NFC antes de tudo: "Á" decomposto (A + acento combinante) viraria "A" e o
+  // acento, que não é letra, sumiria da sigla.
   const palavras = (name ?? "")
+    .normalize("NFC")
     .trim()
     .split(/\s+/)
     .map(letrasDe)
@@ -39,8 +42,18 @@ export function initials(name: string | null | undefined, fallback: string): str
   const primeira = palavras[0];
   const ultima = palavras[palavras.length - 1];
   if (!primeira || !ultima) return Array.from(fallback).slice(0, 2).join("").toUpperCase();
-  if (palavras.length === 1) return primeira.slice(0, 2).join("").toUpperCase();
-  return `${primeira[0]}${ultima[0]}`.toUpperCase();
+  if (palavras.length === 1) return primeira.slice(0, 2).map(maiuscula).join("");
+  return `${maiuscula(primeira[0]!)}${maiuscula(ultima[0]!)}`;
+}
+
+/**
+ * Maiúscula de UMA letra, sem deixar a sigla crescer: "ß".toUpperCase() é "SS",
+ * e "ßa" viraria uma sigla de três letras. Quando a maiúscula não é uma letra
+ * só, fica a original.
+ */
+function maiuscula(letra: string): string {
+  const alta = letra.toUpperCase();
+  return Array.from(alta).length === 1 ? alta : letra;
 }
 
 export function relativeTime(iso: string | null, locale: Locale): string {

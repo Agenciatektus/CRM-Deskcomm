@@ -37,6 +37,18 @@ describe("initials", () => {
     expect(initials("𝓜aria Clara", "??")).toBe("𝓜C");
   });
 
+  it("nome com acento DECOMPOSTO (NFD) dá a sigla com o acento", () => {
+    const decomposto = "Ángela Ávila".normalize("NFD");
+    expect(decomposto).not.toBe("Ángela Ávila"); // guarda: o caso é mesmo NFD
+    expect(initials(decomposto, "??")).toBe("ÁÁ");
+  });
+
+  it("letra cuja maiúscula vira duas não faz a sigla crescer", () => {
+    const sigla = initials("ßa", "??");
+    expect(Array.from(sigla)).toHaveLength(2);
+    expect(sigla).toBe("ßA");
+  });
+
   it("CONTROLE: os nomes comuns seguem como antes", () => {
     expect(initials("Maria", "??")).toBe("MA");
     expect(initials("Maria da Silva", "??")).toBe("MS");
