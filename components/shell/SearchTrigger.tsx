@@ -20,10 +20,9 @@ function ehMac(): boolean {
  * O gatilho da busca no topo, nas medidas do `.search-trigger` do protótipo:
  * campo largo (até 440px), 36px de altura, fundo `surface` com borda.
  *
- * O texto NÃO é "Buscar contato, conversa ou lead" (o do protótipo): a paleta
- * hoje busca só as TELAS do produto (ver `CommandPalette`), e prometer contato
- * ou lead seria um campo que não acha o que diz achar. Quando a paleta ganhar
- * essas fontes, o texto acompanha.
+ * O texto diz o que a paleta acha: contato, conversa e tela (ver
+ * `CommandPalette`). O "lead" do protótipo fica de fora enquanto a rota de leads
+ * não aceitar busca: prometer lead seria um campo que não acha o que diz achar.
  */
 export function SearchTrigger() {
   const t = useT();
@@ -39,13 +38,13 @@ export function SearchTrigger() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={t("Buscar telas e funções")}
+        aria-label={t("Buscar contato, conversa ou tela")}
         aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
         className="pele-foco flex h-9 w-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface text-sm text-text-subtle transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:w-full md:max-w-[440px] md:justify-start md:pr-2 md:pl-3"
       >
         <MagnifyingGlass size={15} className="shrink-0" aria-hidden />
         <span className="hidden min-w-0 flex-1 truncate text-left md:inline">
-          {t("Buscar telas e funções")}
+          {t("Buscar contato, conversa ou tela")}
         </span>
         <kbd className="hidden shrink-0 rounded-md border border-border bg-surface-elevated px-1.5 py-0.5 font-sans text-[11px] text-text-muted md:inline">
           {mac ? "⌘K" : "Ctrl K"}

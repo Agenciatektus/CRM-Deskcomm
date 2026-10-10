@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { destinosDaInterface } from "@/lib/navigation/interface";
 
@@ -9,6 +9,8 @@ import { useT } from "@/hooks/i18n/useT";
 import { Bell } from "@/lib/ui/icons";
 import { roleAtLeast } from "@/lib/auth/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+import { escutar } from "@/lib/ui/comandos-da-tela";
 
 import { CentralDeAvisos } from "./CentralDeAvisos";
 
@@ -33,6 +35,8 @@ function VisibleAlertsBell() {
   const t = useT();
   const { activeOrg } = useAuth();
   const [aberto, setAberto] = useState(false);
+  // "Ver avisos em aberto" da busca (Ctrl K) abre este popover.
+  useEffect(() => escutar("abrir-avisos", () => setAberto(true)), []);
   const { data } = useAgentInbox("open");
   // O som da organização para a etapa que avisa e o pedido de pessoa.
   useSonsDaCentral(data?.items);

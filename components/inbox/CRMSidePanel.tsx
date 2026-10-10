@@ -3,6 +3,8 @@
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { useEffect, useRef, useState } from "react";
 
+import { escutar } from "@/lib/ui/comandos-da-tela";
+
 import { usePermission, useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
@@ -94,6 +96,13 @@ export function CRMSidePanel({ conversation }: Props) {
     setAba("resumo");
     setPedidoDeRolagem((n) => n + 1);
   }
+  // O "Criar próximo passo" da busca (Ctrl K), repassado pela Inbox. A ref
+  // guarda o `irPara` atual para a assinatura ser feita uma vez só.
+  const irParaAtual = useRef(irPara);
+  useEffect(() => {
+    irParaAtual.current = irPara;
+  });
+  useEffect(() => escutar("painel-proximo-passo", () => irParaAtual.current("proximo-passo")), []);
 
   if (!conversation) {
     return (
