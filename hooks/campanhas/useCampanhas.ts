@@ -10,6 +10,11 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import type {
+  CorpoDeCriarCampanha,
+  CorpoDeEditarCampanha,
+} from "@/lib/campanhas/schemas";
 import type { ContagemDaCampanha, TaxasDaCampanha } from "@/lib/campanhas/metricas";
 import type { StatusDaCampanha } from "@/lib/campanhas/tipos";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
@@ -50,6 +55,12 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   message_variants?: string[] | null;
   /** A régua do 2º toque em diante (migration 9037). Vazia = uma mensagem só. */
   passos?: PassoDaRegua[] | null;
+  /**
+   * QUANDO A RÉGUA PARA (migration 9046). `null` = o operador nunca escolheu, e
+   * vale o padrão — a conversão para o objeto da tela é `saidasDaTela`, uma só,
+   * para a tela não prometer uma política e o servidor publicar outra.
+   */
+  saidas?: SaidasDaCadencia | null;
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id?: string | null;
   /** A etapa que inicia a abordagem no modo contínuo (9039). */
@@ -207,7 +218,10 @@ export function usePreviaDaAudiencia() {
 export function useCriarCampanha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (corpo: Record<string, unknown>) =>
+    // Tipado pelo SCHEMA, e não `Record<string, unknown>`: é o que faz a chave
+    // errada e o campo removido virarem erro de compilação em vez de 200 calado
+    // com o campo descartado (parecer do @Cassio_SecRev, P1.1 da fatia 4).
+    mutationFn: async (corpo: CorpoDeCriarCampanha) =>
       (await apiClient.post<{ data: CampanhaDaLista }>("/api/v1/campaigns", corpo)).data,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["campanhas"] }),
     onError: (err) => showApiError(err),
@@ -217,7 +231,7 @@ export function useCriarCampanha() {
 export function useEditarCampanha(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (corpo: Record<string, unknown>) =>
+    mutationFn: async (corpo: CorpoDeEditarCampanha) =>
       (await apiClient.patch<{ data: CampanhaDetalhada }>(`/api/v1/campaigns/${id}`, corpo)).data,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["campanha", id] });

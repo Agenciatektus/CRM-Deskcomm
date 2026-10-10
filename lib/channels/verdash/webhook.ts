@@ -33,26 +33,13 @@
  */
 import { timingSafeEqual } from "node:crypto";
 
-/** Um anexo, já reduzido ao que o CRM precisa saber. */
-export interface VerdashAttachment {
-  /** Vocabulário de `messages.type`. */
-  type: "image" | "video" | "audio" | "sticker" | "document";
-  /**
-   * A URL que o FZAP já resolveu para este arquivo.
-   *
-   * ⚠️ EFÊMERA: o FZAP costuma dar ~30 minutos (`expiresIn` diz quanto). Ela é
-   * PONTEIRO para os bytes, nunca o lugar onde eles moram — quem recebe precisa
-   * baixar agora. Guardar esta URL e exibi-la depois mostra imagem quebrada.
-   *
-   * A `url` que vem DENTRO do protobuf do WhatsApp fica deliberadamente de
-   * fora: aquela aponta para o arquivo CRIPTOGRAFADO (`.enc`), que não abre em
-   * lugar nenhum sem a `mediaKey`.
-   */
-  url: string | null;
-  mime: string | null;
-  fileName: string | null;
-  caption: string | null;
-}
+import { lerConteudoEspecial, textoDe, type VerdashAlteracao } from "./conteudo";
+import { anexoDe, desembrulhar, type VerdashAttachment } from "./protobuf";
+
+export type { VerdashAttachment } from "./protobuf";
+
+export type { VerdashAlteracao } from "./conteudo";
+
 
 export interface VerdashInboundMessage {
   kind: "message";
@@ -70,26 +57,15 @@ export interface VerdashInboundMessage {
   text: string | null;
   attachments: VerdashAttachment[];
   sentAt: string | null;
+  /** O `messages.type` final: o do anexo, o especial (local, contato, reação) ou `text`. */
+  tipo: VerdashAttachment["type"] | "text" | "location" | "contact" | "reaction";
+  /** O que vai para `messages.metadata` além dos anexos (ver `./conteudo.ts`). */
+  extra: Record<string, unknown>;
+  /** Edição ou apagada: muda uma mensagem que JÁ existe, nunca cria outra. */
+  alteracao: VerdashAlteracao | null;
+  /** Evento que não é conversa (sinal de protocolo, anúncio de álbum): o motivo. */
+  ignorar: string | null;
 }
-
-/** Os wrappers que embrulham a mensagem de verdade no protobuf do WhatsApp. */
-const INVOLUCROS = [
-  "ephemeralMessage",
-  "viewOnceMessage",
-  "viewOnceMessageV2",
-  "documentWithCaptionMessage",
-  "editedMessage",
-  "deviceSentMessage",
-];
-
-/** `imageMessage` → `image`. A ordem importa: o primeiro que casar vence. */
-const CAMPOS_DE_MIDIA: Array<[string, VerdashAttachment["type"]]> = [
-  ["imageMessage", "image"],
-  ["videoMessage", "video"],
-  ["audioMessage", "audio"],
-  ["stickerMessage", "sticker"],
-  ["documentMessage", "document"],
-];
 
 function obj(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
@@ -128,60 +104,6 @@ export function verifyVerdashToken(
 export function tipoDoEvento(payload: unknown): string | null {
   const p = obj(payload);
   return str(p.type) ?? str(p.event);
-}
-
-/** Desembrulha os invólucros até chegar na mensagem de verdade. */
-function desembrulhar(message: Record<string, unknown>): Record<string, unknown> {
-  let atual = message;
-  // Teto de 5: invólucro aninhado é real (`ephemeral` dentro de `viewOnce`),
-  // mas um payload que se embrulha infinitamente é hostil, não legítimo.
-  for (let i = 0; i < 5; i += 1) {
-    const wrapper = INVOLUCROS.find((c) => c in atual);
-    if (!wrapper) break;
-    const dentro = obj(atual[wrapper]);
-    const proximo = obj(dentro.message ?? dentro);
-    if (Object.keys(proximo).length === 0) break;
-    atual = proximo;
-  }
-  return atual;
-}
-
-/** O texto da mensagem, onde quer que ele esteja. */
-function textoDe(message: Record<string, unknown>): string | null {
-  return (
-    str(message.conversation) ??
-    str(obj(message.extendedTextMessage).text) ??
-    str(message.text) ??
-    null
-  );
-}
-
-/**
- * O anexo, quando houver.
- *
- * A `downloadURL` mora no TOPO do payload (é metadado que o FZAP acrescenta),
- * não dentro do protobuf — por isso esta função recebe os dois.
- */
-function anexoDe(
-  message: Record<string, unknown>,
-  topo: Record<string, unknown>,
-): VerdashAttachment | null {
-  for (const [campo, tipo] of CAMPOS_DE_MIDIA) {
-    // A PRESENÇA do campo é o que diz o tipo, não o quanto ele traz dentro.
-    // Testar `Object.keys(...).length` classificaria como "sem anexo" um
-    // `videoMessage` magro — e o atendente veria bolha vazia no lugar do vídeo
-    // que o cliente mandou.
-    if (!(campo in message)) continue;
-    const no = obj(message[campo]);
-    return {
-      type: tipo,
-      url: str(topo.downloadURL),
-      mime: str(no.mimetype),
-      fileName: str(no.fileName) ?? str(no.title) ?? str(topo.downloadFileName),
-      caption: str(no.caption),
-    };
-  }
-  return null;
 }
 
 /** `5566812769 20@s.whatsapp.net` → `+556681276920`; `@lid` devolve `null`. */
@@ -228,6 +150,9 @@ export function parseVerdashInbound(payload: unknown): VerdashInboundMessage | n
 
   const message = desembrulhar(obj(evt.Message));
   const anexo = anexoDe(message, p);
+  const texto = textoDe(message);
+  const especial = lerConteudoEspecial(message, { texto: texto !== null, anexo: anexo !== null });
+  const conteudo = especial?.caso === "conteudo" ? especial.conteudo : null;
 
   const carimbo = str(info.Timestamp);
   const sentAt = carimbo
@@ -259,9 +184,13 @@ export function parseVerdashInbound(payload: unknown): VerdashInboundMessage | n
       displayName: fromMe ? null : str(info.PushName),
     },
     isGroup,
-    text: textoDe(message),
+    text: conteudo ? conteudo.texto : texto,
     attachments: anexo ? [anexo] : [],
     sentAt,
+    tipo: anexo?.type ?? conteudo?.tipo ?? "text",
+    extra: conteudo?.extra ?? {},
+    alteracao: especial?.caso === "alteracao" ? especial.alteracao : null,
+    ignorar: especial?.caso === "ignorar" ? especial.motivo : null,
   };
 }
 

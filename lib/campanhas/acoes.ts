@@ -25,6 +25,7 @@ import { baseLegalValida, motivoParaExcluir, recusouMarketing } from "./elegibil
 import { ehEntradaContinua, problemaNaEntradaContinua } from "./entrada-continua";
 import { ehStatusDaCampanha, podeTransitar } from "./maquina-de-estados";
 import { passosGuardados, problemaNosPassos } from "./passos";
+import { ehObjetoDeSaidas, problemaNasSaidas } from "./saidas-da-campanha";
 import { prepararCampanha, resumoDaEtapaDeEntrada } from "./preparacao";
 import { encerrarReguaDaCampanha, publicarReguaDaCampanha } from "./regua";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -46,6 +47,12 @@ export interface CampanhaCarregada {
   pipeline_id: string | null;
   /** A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só. */
   passos: unknown;
+  /**
+   * Quando a régua para de falar com cada pessoa (9046). `null` = o operador
+   * nunca abriu a seção, e vale o padrão de sempre. CRU, como `passos`: quem o
+   * lê é `lerSaidasDaCampanha`, que RECUSA o ilegível em vez de devolver padrão.
+   */
+  saidas: unknown;
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id: string | null;
   /**
@@ -73,7 +80,7 @@ export type Desfecho<T = unknown> = ({ ok: true } & T) | Recusa;
 
 const COLUNAS =
   "id, organization_id, name, status, channel_session_id, message_body, message_variants, " +
-  "base_legal, lia_ref, pipeline_id, passos, followup_pointer_id, " +
+  "base_legal, lia_ref, pipeline_id, passos, saidas, followup_pointer_id, " +
   "entrada_continua, entrada_etapa_id, " +
   "audience_filter, audience_version, content_version, scheduled_at, description, " +
   "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
@@ -147,6 +154,16 @@ function faltaParaEnviar(c: CampanhaCarregada): Recusa | null {
   const dosPassos = problemaNosPassos(passosGuardados(c.passos), { pipelineId: c.pipeline_id });
   if (dosPassos) {
     return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: dosPassos, status: 422 };
+  }
+  // AS SAÍDAS (9046), no MESMO gate, e por isso valendo para preparar, iniciar,
+  // agendar e testar de uma vez. Campanha que nunca abriu a seção (`saidas` nula,
+  // que é toda campanha anterior à 9046) sai daqui com `null`: nada muda para
+  // ela. Quem é barrado é a campanha cujo jsonb não dá para ler — e barrar é o
+  // lado certo de errar, porque a alternativa é publicar a régua com o padrão no
+  // lugar da escolha do operador e insistir com quem ele mandou parar.
+  const dasSaidas = problemaNasSaidas(c.saidas);
+  if (dasSaidas) {
+    return { ok: false, codigo: "campanha_conteudo_invalido", mensagem: dasSaidas, status: 422 };
   }
   // A ENTRADA CONTÍNUA (9039), no MESMO gate — e por isso ela vale para
   // preparar, iniciar, agendar e testar de uma vez. Campanha em modo lista sai
@@ -593,6 +610,26 @@ export async function duplicarAcao(
       // específica — herdá-lo faria a cópia publicar por cima da régua do
       // original, e os inscritos dele passariam a seguir os passos da cópia.
       passos: passosGuardados(c.passos),
+      // AS SAÍDAS VÃO JUNTO (9046), e isto não é detalhe: duplicar é o caminho
+      // oficial de editar o texto de uma campanha já iniciada (conteúdo só muda
+      // em rascunho). Uma cópia que largasse as saídas voltaria ao padrão sem
+      // dizer nada, e a cópia de «pare quando o card entrar em Fechamento»
+      // passaria a insistir com quem está em fechamento — fail open silencioso,
+      // no exato lugar em que o operador acha que só trocou uma palavra.
+      //
+      // ⚠️ ILEGÍVEL é COPIADO ilegível, e isto é deliberado: normalizar para o
+      // padrão aqui seria lavar o problema. A cópia publicaria uma política mais
+      // FROUXA do que a intenção que ninguém conseguiu ler, e ninguém veria —
+      // enquanto o original, que refuse publicar, pelo menos não manda nada.
+      // Herdado, o defeito herda também as três recusas, e o operador o conserta
+      // na seção «Quando a régua para» da cópia, que é rascunho.
+      //
+      // A exceção é o que NÃO É OBJETO (array, string, número): o CHECK
+      // `campaigns_saidas_validas` recusaria o INSERT com 23514, e um erro de
+      // banco aqui viraria "não foi possível duplicar" sem motivo na tela. E não
+      // há o que preservar: um array nunca descreveu configuração de saída
+      // nenhuma, nem por engano.
+      saidas: ehObjetoDeSaidas(c.saidas) ? c.saidas : null,
       // O funil vem junto porque os passos o EXIGEM: sem ele, a cópia de uma
       // campanha com régua nasceria impossível de preparar, e o operador leria
       // "escolha o funil" numa tela que ele não mexeu. `stage_id` e `agent_id`

@@ -14,6 +14,14 @@
  * `rodada.ts` não compara `campaign_recipients.content_version` com
  * `campaigns.content_version` (só carimba a da campanha no metadado da
  * mensagem), então nada nota.
+ *
+ * ─── E, desde a fatia 4, O GATE DAS SAÍDAS (P1.2 do @Cassio_SecRev) ───
+ *
+ * O arnês daqui é o único do repositório que REGISTRA AS OPERAÇÕES NA ORDEM em
+ * que `prepararAcao` as pede, e por isso é o único lugar onde se consegue provar
+ * a afirmação central da 9046: que uma configuração de saída ilegível para
+ * ANTES de qualquer escrita. Sem medir a lista de operações, "parou antes de
+ * escrever" e "parou depois e ninguém olhou" devolvem o mesmo 422.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -36,6 +44,8 @@ const campanha: CampanhaCarregada = {
   lia_ref: null,
   pipeline_id: "funil-1",
   passos: [],
+  // `null` = o operador nunca escolheu, e vale o padrão de sempre (9046).
+  saidas: null,
   followup_pointer_id: null,
   entrada_continua: true,
   entrada_etapa_id: "etapa-1",
@@ -178,5 +188,79 @@ describe("preparar em modo contínuo", () => {
     // `etapaForaDoFunil` é exclusivo do ramo contínuo: se ele apareceu, o ramo
     // errado rodou.
     expect(ops.some((o) => o.tabela === "crm_stages")).toBe(false);
+  });
+});
+
+/**
+ * O GATE DAS SAÍDAS PARA ANTES DE ESCREVER (P1.2 do @Cassio_SecRev).
+ *
+ * `faltaParaEnviar` roda na PRIMEIRA linha de `prepararAcao`, antes do `jaEnviou`
+ * e antes do CAS `draft → preparing`. Então a recusa por saída ilegível não deve
+ * deixar rastro nenhum: nem `status: 'preparing'`, nem pointer, nem destinatário.
+ *
+ * A asserção que importa é `ops` VAZIO. O 422 sozinho não distingue "parou antes
+ * de escrever" de "parou depois de escrever e ninguém olhou" — e é justamente a
+ * segunda que deixaria a campanha presa em `preparing`, ou com um pointer órfão
+ * cujo nome determinístico travaria toda tentativa seguinte (o 23505 que a 9037
+ * documenta).
+ */
+describe("saída ilegível recusa preparar SEM escrever nada (9046)", () => {
+  /** A mesma campanha contínua do resto do arquivo, agora com régua. */
+  const comRegua: CampanhaCarregada = {
+    ...campanha,
+    passos: [{ id: "p1", tipo: "mensagem", variantes: ["Passou por aqui?"] }],
+  };
+
+  it("`saidas` que o Zod não lê devolve 422 e NENHUMA operação de banco", async () => {
+    const { client, ops } = supabaseFake(filasDoCaminhoFeliz());
+    const r = await prepararAcao(
+      client,
+      // `ao_fechar: "sim"` é o erro realista: texto onde o schema quer booleano.
+      { ...comRegua, saidas: { ao_fechar: "sim" } },
+      new Date("2026-10-06T12:00:00Z"),
+      "user-1",
+    );
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.status).toBe(422);
+    expect(r.codigo).toBe("campanha_conteudo_invalido");
+    // A frase diz onde consertar, e é a mesma que o editor rotula.
+    expect(r.mensagem).toContain("Quando a régua para");
+    // ⚠️ A ASSERÇÃO DA FATIA: zero escrita, e zero LEITURA também — a recusa é
+    // pura, decidida antes do primeiro `from()`.
+    expect(ops, `não deveria tocar o banco, e tocou: ${JSON.stringify(ops)}`).toEqual([]);
+  });
+
+  // ⚠️ OS CONTROLES POSITIVOS VÃO SEM PASSOS, de propósito. Com passos a
+  // preparação segue para `publicarReguaDaCampanha`, que consulta
+  // `followup_flow_pointers` — tabela que este arnês não modela, então a
+  // recusa viria da FILA VAZIA do fake e não do código, e o controle mediria o
+  // arnês. O gate das saídas não depende de passos (`problemaNasSaidas` olha só
+  // a coluna), então tirá-los não enfraquece o que estes dois casos provam.
+
+  it("CONTROLE POSITIVO: com `saidas` legível, a preparação escreve", async () => {
+    // Sem este caso, o anterior passaria também num arnês que nunca registra
+    // operação nenhuma — "lista vazia" seria vacuidade, não prova.
+    const { client, ops } = supabaseFake(filasDoCaminhoFeliz());
+    const r = await prepararAcao(
+      client,
+      {
+        ...campanha,
+        saidas: { etiquetas: ["Reunião agendada"], etapas: [], ao_fechar: true, humano_assumir: true },
+      },
+      new Date("2026-10-06T12:00:00Z"),
+      "user-1",
+    );
+
+    expect(r.ok, `recusou: ${r.ok ? "" : r.mensagem}`).toBe(true);
+    expect(ops.length).toBeGreaterThan(0);
+    expect(ops.some((o) => o.tabela === "campaigns" && o.verbo === "update")).toBe(true);
+  });
+
+  it("`saidas` NULA (toda campanha anterior à 9046) passa o gate", async () => {
+    const { client } = supabaseFake(filasDoCaminhoFeliz());
+    const r = await prepararAcao(client, campanha, new Date("2026-10-06T12:00:00Z"), "user-1");
+    expect(r.ok, `recusou: ${r.ok ? "" : r.mensagem}`).toBe(true);
   });
 });

@@ -30,6 +30,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { CadenceSettings } from "@/lib/cadencia/settings";
 import { validarReguaDeProspeccao } from "@/lib/cadencia/validar-publicacao";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
 import { logger } from "@/lib/logger";
@@ -40,7 +41,12 @@ import { grafoDaRegua, nomeDaRegua, politicaDaRegua, type CampanhaComRegua } fro
 // Reexportadas porque quem publica a régua e quem a descreve são a mesma tela:
 // obrigar `acoes.ts` a importar de dois módulos para uma coisa só seria detalhe
 // de organização interna virando ruído na porta.
-export { grafoDaRegua, politicaDaRegua, type CampanhaComRegua } from "./regua-politica";
+export {
+  grafoDaRegua,
+  politicaDaRegua,
+  type CampanhaComRegua,
+  type PoliticaDaRegua,
+} from "./regua-politica";
 
 /** Estados em que uma inscrição ainda roda — os mesmos de `lib/cadencia/envio.ts`. */
 const INSCRICOES_VIVAS = ["active", "waiting_reply", "dormente", "paused_handoff", "paused_manual"];
@@ -95,7 +101,18 @@ export async function publicarReguaDaCampanha(
   if (problema) return { ok: false, mensagem: problema };
 
   const grafo = grafoDaRegua(passos);
-  const politica = politicaDaRegua(c);
+  // ═══ SEM POLÍTICA LEGÍVEL, NENHUMA RÉGUA VAI AO AR ═══
+  //
+  // `politicaDaRegua` recusa quando `campaigns.saidas` não dá para ler (9046), e
+  // a recusa para AQUI de propósito, antes de qualquer escrita: a régua que está
+  // no ar (se houver) continua com o snapshot anterior, e a campanha não ganha
+  // uma régua cujas condições de parada ninguém sabe quais são. O oposto —
+  // publicar com o padrão no lugar da escolha ilegível — mandaria abordagem de
+  // prospecção para quem o operador já tinha mandado parar de receber, e isso
+  // não se desfaz.
+  const resultadoDaPolitica = politicaDaRegua(c);
+  if (!resultadoDaPolitica.ok) return { ok: false, mensagem: resultadoDaPolitica.mensagem };
+  const politica = resultadoDaPolitica.politica;
 
   // ═══ A MESMA VALIDAÇÃO DE PUBLICAÇÃO DA CADÊNCIA ═══
   //
@@ -135,7 +152,7 @@ export async function publicarReguaDaCampanha(
   // o órfão de uma versão anterior não travar nada.
   let pointerId = c.followup_pointer_id;
   if (!pointerId) {
-    const criado = await criarPointer(admin, c);
+    const criado = await criarPointer(admin, c, politica);
     if ("erro" in criado) return { ok: false, mensagem: criado.erro };
     pointerId = criado.id;
   }
@@ -190,6 +207,11 @@ export async function publicarReguaDaCampanha(
 async function criarPointer(
   admin: SupabaseClient,
   c: CampanhaComRegua,
+  // A política vem de FORA, já lida: calculá-la aqui de novo faria a função
+  // precisar tratar, uma segunda vez, a recusa que o chamador acabou de tratar —
+  // e o caminho que esquecesse de tratar é o que publicaria o padrão por cima da
+  // escolha ilegível do operador.
+  politica: CadenceSettings,
 ): Promise<{ id: string } | { erro: string }> {
   const { data, error } = await admin
     .from("followup_flow_pointers")
@@ -199,7 +221,7 @@ async function criarPointer(
       surface: "campaign",
       pipeline_id: c.pipeline_id,
       channel_session_id: c.channel_session_id,
-      cadence_settings: politicaDaRegua(c),
+      cadence_settings: politica,
       trigger_config: { kind: "manual", cancel_on_reply: true },
     })
     .select("id")

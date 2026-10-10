@@ -52,10 +52,13 @@ import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual
 
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 
+import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
+
 import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
-  status: "ingested" | "duplicate" | "ignored";
+  /** `updated` = edição ou apagada aplicada sobre uma mensagem que já existia. */
+  status: "ingested" | "duplicate" | "ignored" | "updated";
   conversationId?: string;
   messageId?: string;
   /** Por que foi ignorado — vai para o log, e é o que se lê quando "sumiu". */
@@ -94,6 +97,30 @@ export async function ingestVerdashInbound(
   // têm nada a ver com paciente, e derramá-los no inbox faria o atendente
   // perder a conversa que importa no meio do ruído.
   if (msg.isGroup) return { status: "ignored", reason: "mensagem_de_grupo" };
+
+  // Sinal de protocolo, anúncio de álbum, reação retirada: não é conversa, e
+  // gravá-lo era o que punha balão VAZIO no inbox (ver `./conteudo.ts`).
+  if (msg.ignorar) return { status: "ignored", reason: msg.ignorar };
+
+  // Edição e apagada ALTERAM a original. Gravá-las como mensagem nova criava um
+  // balão vazio, deixava o texto antigo na original e — por ser INSERT de
+  // entrada — acordava a IA para responder a nada.
+  // A autoria é conferida em `aplicarAlteracaoDeMensagem` (o WhatsApp não a
+  // confere por nós): só o autor, na mesma sessão e conversa, altera.
+  if (msg.alteracao) {
+    const r = await aplicarAlteracaoDeMensagem(admin, {
+      organizationId: input.organizationId,
+      channelSessionId: input.channelSessionId,
+      direcao: msg.direction,
+      alvo: msg.alteracao.alvo,
+      chat: { jid: msg.chat, phone: msg.identity.phone, lid: msg.identity.lid },
+      acao: msg.alteracao.acao,
+      texto: msg.alteracao.acao === "editar" ? msg.alteracao.texto : null,
+    });
+    return r.aplicada
+      ? { status: "updated", conversationId: r.conversationId, messageId: r.messageId }
+      : { status: "ignored", reason: r.motivo };
+  }
 
   const identity = waIdentityFrom(msg);
   if (!identity) {
@@ -355,12 +382,14 @@ async function insertMessage(
       // filtro de eco do próprio envio depende deste valor.
       sent_via: "external_device",
       status: msg.direction === "outbound" ? "sent" : "delivered",
-      type: anexo?.type ?? "text",
+      // Nunca `text` vazio por omissão: local, contato e reação têm tipo próprio,
+      // e o que não sabemos ler leva `metadata.tipo_nao_suportado`.
+      type: msg.tipo,
       body: msg.text ?? anexo?.caption ?? null,
       // A URL é PONTEIRO, não conteúdo — e expira em ~30 min. Grava aqui para a
       // tela ter o que mostrar agora, e o worker baixa os bytes já.
       ...(anexo?.url ? { media_url: anexo.url, media_mime: anexo.mime } : {}),
-      metadata: anexo ? { provider_attachments: msg.attachments } : {},
+      metadata: { ...(anexo ? { provider_attachments: msg.attachments } : {}), ...msg.extra },
       ...(msg.sentAt ? { sent_at: msg.sentAt } : {}),
     })
     .select("id")

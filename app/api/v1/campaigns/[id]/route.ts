@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 const COLUNAS =
   "id, name, description, status, channel_session_id, message_body, message_variants, " +
-  "passos, followup_pointer_id, entrada_continua, entrada_etapa_id, base_legal, lia_ref, " +
+  "passos, saidas, followup_pointer_id, entrada_continua, entrada_etapa_id, base_legal, lia_ref, " +
   "audience_filter, audience_version, content_version, snapshot_total, snapshot_eligible, " +
   "snapshot_excluded, scheduled_at, prepared_at, started_at, paused_at, completed_at, " +
   "cancelled_at, failure_code, intervalo_segundos, janela_inicio_hora, janela_fim_hora, " +
@@ -153,6 +153,14 @@ export async function PATCH(
     // que a tela mostra — divergência da pior espécie, porque a tela continua
     // certa de si. Para mexer, volta-se ao rascunho, e preparar republica.
     "passos",
+    // AS SAÍDAS são CONTEÚDO (migration 9046), não ritmo, e por um motivo que
+    // não é simetria: a régua no ar leva o SNAPSHOT das saídas em
+    // `cadence_settings`, gravado na publicação. Aceitar a troca com a campanha
+    // andando deixaria a tela mostrando «pare na etapa Fechamento» enquanto o
+    // pointer executa a política antiga — divergência da pior espécie, porque a
+    // tela continua certa de si. Preso ao rascunho, como o texto e os passos;
+    // preparar republica e aí o snapshot passa a ser o que a tela diz.
+    "saidas",
     // O MODO DE PÚBLICO é CONTEÚDO (migration 9039), não ritmo: trocar a etapa
     // que inicia a abordagem com a campanha andando mudaria para QUEM ela fala,
     // e é exatamente essa escolha que o operador revisou antes de iniciar. Fica

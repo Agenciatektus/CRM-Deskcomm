@@ -148,6 +148,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       // Vazio, e não `null`: a coluna é `not null default '[]'` (9037), e
       // campanha de uma mensagem só é o caso comum.
       passos: entrada.passos ?? [],
+      // `null`, e não o objeto do padrão: nulo é "o operador nunca abriu esta
+      // seção", e é o que `lerSaidasDaCampanha` lê como o padrão de sempre
+      // (9046). Gravar o padrão aqui daria o MESMO comportamento e perderia a
+      // distinção — e com ela a resposta a "esta campanha foi configurada, ou
+      // herdou?" na hora de auditar por que alguém parou de receber.
+      saidas: entrada.saidas ?? null,
       // O MODO DE PÚBLICO (migration 9039). `false` por omissão: campanha criada
       // por quem não abriu essa seção nasce em modo LISTA, idêntica ao que
       // sempre foi. O que o modo contínuo exige (funil, etapa, teto do dia,
