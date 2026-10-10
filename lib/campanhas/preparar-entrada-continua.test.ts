@@ -36,6 +36,8 @@ const campanha: CampanhaCarregada = {
   lia_ref: null,
   pipeline_id: "funil-1",
   passos: [],
+  // `null` = o operador nunca escolheu, e vale o padrão de sempre (9046).
+  saidas: null,
   followup_pointer_id: null,
   entrada_continua: true,
   entrada_etapa_id: "etapa-1",

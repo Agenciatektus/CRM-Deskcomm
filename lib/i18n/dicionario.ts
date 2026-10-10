@@ -14351,6 +14351,34 @@ export const DICIONARIO: Traducoes = {
   "variações": { es: "variaciones" },
   "Mover para": { es: "Mover a" },
 
+  // ---- quando a régua da campanha para (9046) ----
+  "Quando a régua para": { es: "Cuándo se detiene la secuencia" },
+  "Estas opções valem para os passos depois da primeira mensagem. Quem sai aqui não recebe os passos seguintes.": {
+    es: "Estas opciones aplican a los pasos después del primer mensaje. Quien sale aquí no recibe los pasos siguientes.",
+  },
+  "Esta campanha não tem passos, então ela manda uma mensagem e acaba. O que você escolher aqui fica guardado e passa a valer se ela ganhar passos.": {
+    es: "Esta campaña no tiene pasos, así que envía un mensaje y termina. Lo que elijas aquí queda guardado y pasa a valer si ella gana pasos.",
+  },
+  "Escolha o funil em «Quem responder» para poder parar a régua por etapa: a lista de etapas é a do funil da campanha.": {
+    es: "Elige el embudo en «Quién responde» para poder detener la secuencia por etapa: la lista de etapas es la del embudo de la campaña.",
+  },
+  "A régua para quando": { es: "La secuencia se detiene cuando" },
+  "O lead responde": { es: "El lead responde" },
+  "O negócio é ganho ou perdido": { es: "El negocio se gana o se pierde" },
+  "Alguém do time manda mensagem ao lead": { es: "Alguien del equipo le escribe al lead" },
+  "Ganha a etiqueta": { es: "Recibe la etiqueta" },
+  "Entra na etapa": { es: "Entra en la etapa" },
+  "Esta campanha usa o padrão. Para mudar, duplique e ajuste no rascunho.": {
+    es: "Esta campaña usa la configuración estándar. Para cambiarla, duplícala y ajústala en el borrador.",
+  },
+  // A recusa do servidor quando `campaigns.saidas` não dá para ler. Chega à tela
+  // por `t()` DINÂMICO (a rota traduz a frase que o gate devolve), e a cerca de
+  // i18n não enxerga chave dinâmica: sem esta entrada, a falta não acusaria em
+  // lugar nenhum e o operador espanhol leria português.
+  "Não foi possível ler quando esta campanha deve parar de falar com cada pessoa, então a régua não vai ao ar: sem essa configuração ela continuaria insistindo com quem já devia ter saído. Abra «Quando a régua para», confira as opções e salve de novo.": {
+    es: "No fue posible leer cuándo esta campaña debe dejar de hablar con cada persona, así que la secuencia no sale al aire: sin esa configuración seguiría insistiendo con quien ya debía haber salido. Abre «Cuándo se detiene la secuencia», revisa las opciones y guarda de nuevo.",
+  },
+
   // ─── Obs do contato (9041) e transcrição do áudio na bolha ───
   "Sem observações.": { es: "Sin observaciones." },
   "Escreva o que a equipe precisa saber sobre este contato.": {

@@ -21,6 +21,7 @@ import { useMemo, useState } from "react";
 import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
 import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
 import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
+import { SaidasDaCampanhaEditor, saidasDaTela } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import {
   useAgentesPublicados,
@@ -54,6 +56,10 @@ export function NovaCampanha() {
   const [variantes, setVariantes] = useState<string[]>([""]);
   // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
   const [passos, setPassos] = useState<PassoDaRegua[]>([]);
+  // QUANDO A RÉGUA PARA (9046). Nasce no padrão, que é o que o servidor usa
+  // quando a coluna é nula: a campanha nova se comporta como as de antes até
+  // alguém mexer aqui.
+  const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
   const texto = variantes[0] ?? "";
   const variacoesExtras = useMemo(
     () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
@@ -128,6 +134,7 @@ export function NovaCampanha() {
       stage_id: etapa || null,
       agent_id: agente || null,
       passos,
+      saidas,
       entrada_continua: continua,
       entrada_etapa_id: continua ? etapaDeEntrada || null : null,
     });
@@ -404,6 +411,17 @@ export function NovaCampanha() {
           // quantos chegarão não se sabe hoje.
           quantosCards={continua ? null : (previa.data?.elegiveis ?? null)}
           tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
+        />
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Quando a régua para")}</h2>
+        <SaidasDaCampanhaEditor
+          saidas={saidas}
+          onChange={setSaidas}
+          etapas={etapas.data ?? []}
+          temPassos={passos.length > 0}
+          temFunil={!!funil}
         />
       </Card>
 

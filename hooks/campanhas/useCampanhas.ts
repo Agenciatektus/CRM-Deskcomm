@@ -10,6 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import type { ContagemDaCampanha, TaxasDaCampanha } from "@/lib/campanhas/metricas";
 import type { StatusDaCampanha } from "@/lib/campanhas/tipos";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
@@ -50,6 +51,12 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   message_variants?: string[] | null;
   /** A régua do 2º toque em diante (migration 9037). Vazia = uma mensagem só. */
   passos?: PassoDaRegua[] | null;
+  /**
+   * QUANDO A RÉGUA PARA (migration 9046). `null` = o operador nunca escolheu, e
+   * vale o padrão — a conversão para o objeto da tela é `saidasDaTela`, uma só,
+   * para a tela não prometer uma política e o servidor publicar outra.
+   */
+  saidas?: SaidasDaCadencia | null;
   /** O pointer de follow-up publicado para esta campanha (9037). */
   followup_pointer_id?: string | null;
   /** A etapa que inicia a abordagem no modo contínuo (9039). */
