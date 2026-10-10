@@ -14419,6 +14419,20 @@ export const DICIONARIO: Traducoes = {
   "Recolher menu": { es: "Contraer menú" },
   // ─── Fase 4 do visual v2 (central no sino, menu, colunas) ───
   "Abrir a central completa": { es: "Abrir el centro completo" },
+  // ─── Fase 7 do visual v2 (painel do lead, cabeçalho) ───
+  "1 fato": { es: "1 hecho" },
+  "fatos": { es: "hechos" },
+  "1 demanda aberta": { es: "1 caso abierto" },
+  "demandas abertas": { es: "casos abiertos" },
+  "O próximo passo está atrasado": { es: "El próximo paso está atrasado" },
+  "Mais ações do negócio": { es: "Más acciones del negocio" },
+  "Abrir no quadro do funil": { es: "Abrir en el tablero del embudo" },
+  "Com a IA": { es: "Con la IA" },
+  "Você está atendendo": { es: "Tú estás atendiendo" },
+  "está atendendo": { es: "está atendiendo" },
+  "IA atendendo": { es: "IA atendiendo" },
+  "Conversar com": { es: "Conversar con" },
+  "este contato": { es: "este contacto" },
   // ─── Fase 6 do visual v2 (composer, lista, toasts) ───
   "Ao assumir, o automático para nesta conversa.": { es: "Al asumir, el automático se detiene en esta conversación." },
   "Outra pessoa": { es: "Otra persona" },

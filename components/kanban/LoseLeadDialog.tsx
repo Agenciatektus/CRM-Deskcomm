@@ -47,6 +47,53 @@ export function LoseLeadDialog({
   aoConcluir,
 }: LoseLeadDialogProps) {
   const t = useT();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("Marcar como perdido")}</DialogTitle>
+          <DialogDescription>
+            {t("Informe o motivo. Essa informação ajuda a melhorar o funil.")}
+          </DialogDescription>
+        </DialogHeader>
+        <FormularioDePerda
+          leadId={leadId}
+          pipelineId={pipelineId}
+          motivosDoFunil={motivosDoFunil}
+          onCancelar={() => onOpenChange(false)}
+          onConcluido={() => {
+            onOpenChange(false);
+            aoConcluir?.();
+          }}
+          rodape={(botoes) => <DialogFooter>{botoes}</DialogFooter>}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * O FORMULÁRIO da perda, sem a janela: o mesmo conteúdo, as mesmas regras e a
+ * mesma rota da janela do quadro, para quem precisa dele no lugar (o painel do
+ * lead na Inbox, P18 da auditoria do visual v2). `rodape` decide a moldura dos
+ * botões (o `DialogFooter` da janela, ou uma linha no painel).
+ */
+export function FormularioDePerda({
+  leadId,
+  pipelineId,
+  motivosDoFunil,
+  onCancelar,
+  onConcluido,
+  rodape,
+}: {
+  leadId: string;
+  pipelineId: string;
+  motivosDoFunil?: string[];
+  onCancelar: () => void;
+  onConcluido: () => void;
+  rodape: (botoes: React.ReactNode) => React.ReactNode;
+}) {
+  const t = useT();
   const [reasonCode, setReasonCode] = useState<string>("");
   const [otherText, setOtherText] = useState("");
   const mutation = useLoseLead(pipelineId);
@@ -106,22 +153,14 @@ export function LoseLeadDialog({
       await mutation.mutateAsync({ leadId, lostReason: finalReason });
       setReasonCode("");
       setOtherText("");
-      onOpenChange(false);
-      aoConcluir?.();
+      onConcluido();
     } catch {
       // error already toasted
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Marcar como perdido")}</DialogTitle>
-          <DialogDescription>
-            {t("Informe o motivo. Essa informação ajuda a melhorar o funil.")}
-          </DialogDescription>
-        </DialogHeader>
+    <>
 
         <div className="grid gap-3">
           <Label>{t("Motivo")}</Label>
@@ -191,10 +230,11 @@ export function LoseLeadDialog({
           )}
         </div>
 
-        <DialogFooter>
+      {rodape(
+        <>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={onCancelar}
             disabled={mutation.isPending}
           >
             {t("Cancelar")}
@@ -202,8 +242,8 @@ export function LoseLeadDialog({
           <Button onClick={handleSubmit} disabled={disabled}>
             {mutation.isPending ? t("Salvando...") : t("Confirmar")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>,
+      )}
+    </>
   );
 }

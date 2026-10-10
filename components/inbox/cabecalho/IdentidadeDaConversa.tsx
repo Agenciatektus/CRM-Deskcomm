@@ -1,6 +1,5 @@
 "use client";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
-import { OwnerBadge } from "@/components/kanban/OwnerBadge";
 import type { ChannelSummary } from "@/hooks/inbox/useConversationsRealtime";
 import { useT } from "@/hooks/i18n/useT";
 import { channelBrand, CHANNEL_BRAND_LABEL } from "@/lib/channels/presentation";
@@ -26,10 +25,9 @@ interface Props {
 /**
  * QUEM é a conversa: nome, ciclo de vida, canal, telefone e quem atende.
  *
- * O dono continua desenhado pelo `OwnerBadge`, o mesmo do card do funil e do
- * dossiê (disco cheio para pessoa, anel vazado para o automático). Um quarto
- * jeito de dizer "quem manda" faria a mesma pergunta ter respostas diferentes
- * na mesma tela. O testid é contrato de `inbox-quem-manda.spec.ts`.
+ * Quem atende vira frase na sub-linha (H2 da auditoria), na mesma régua de
+ * `comandoDaConversa` que a lista e a faixa do composer usam. O testid é
+ * contrato de `inbox-quem-manda.spec.ts`.
  */
 export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone, comando, meuUserId }: Props) {
   const t = useT();
@@ -64,20 +62,17 @@ export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone,
           {canal && telefone && <Sep />}
           {telefone && <span className="truncate font-mono text-xs">{telefone}</span>}
           {(canal || telefone) && <Sep />}
-          <span className="min-w-0" data-testid="comando-da-conversa">
-            {comando.quem === "humano" ? (
-              <OwnerBadge
-                ownerKind="user"
-                ownerName={comando.userId === meuUserId ? t("Você") : (comando.nome ?? t("Atendente"))}
-                compacto
-              />
-            ) : comando.quem === "automatico" ? (
-              <OwnerBadge ownerKind="ai" ownerName={t("Automático")} compacto />
-            ) : (
-              // `ninguem`, `aguardando` e `encerrada` sem dono: o disco TRACEJADO,
-              // que é como o funil já desenha "ninguém".
-              <OwnerBadge ownerKind={null} ownerName={null} compacto />
-            )}
+          {/* H2: quem atende como FRASE na sub-linha ("Você está atendendo",
+              "IA atendendo"), como no protótipo, e não um selo. O testid é
+              contrato de `inbox-quem-manda.spec.ts`. */}
+          <span className="min-w-0 truncate font-semibold text-text-muted" data-testid="comando-da-conversa">
+            {comando.quem === "humano"
+              ? comando.userId === meuUserId
+                ? t("Você está atendendo")
+                : `${comando.nome ?? t("Atendente")} ${t("está atendendo")}`
+              : comando.quem === "automatico"
+                ? t("IA atendendo")
+                : t("Sem responsável")}
           </span>
         </div>
       </div>

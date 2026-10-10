@@ -2,6 +2,7 @@
 import { useT } from "@/hooks/i18n/useT";
 import { useEffect, useRef, useState } from "react";
 import { MagnifyingGlass } from "@/lib/ui/icons";
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import type { ModoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -20,15 +21,14 @@ const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: "unassigned", label: "Fila" },
   { value: "mine", label: "Minhas" },
   { value: "all", label: "Todas" },
+  // L9: "Com a IA" é a primeira do "Mais", como no protótipo (é a visão viva;
+  // as duas seguintes são passado). O rótulo segue o "Devolver à IA".
+  { value: "ai", label: "Com a IA" },
   { value: "closed", label: "Fechadas" },
   // "Arquivadas" fica ao lado de "Fechadas" porque as duas são passado, e
   // separada dela porque são passados diferentes (#923): fechada é atendimento
   // encerrado, arquivada é o que saiu da fila de trabalho sem ser destruído.
   { value: "archived", label: "Arquivadas" },
-  // "Automático", não "IA": a palavra deste ator já é contrato em quatro arquivos
-  // e no dicionário, e `handoff-por-orcamento.test.ts` usa literalmente "Voltar
-  // para a IA" como a sabotagem que deve reprovar.
-  { value: "ai", label: "Automático" },
 ];
 
 /**
@@ -237,6 +237,9 @@ export function InboxFilters({ value, onChange }: Props) {
             histórico entrar na busca, a tela não promete o que o backend não faz. */}
         <input
           type="search"
+          // O teto das rotas de busca: sem ele, cada tecla além de 100 virava um
+          // toast de erro (P2 do Cassio na #154).
+          maxLength={TETO_DO_TERMO_DE_BUSCA}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder={t("Nome, telefone ou última mensagem")}

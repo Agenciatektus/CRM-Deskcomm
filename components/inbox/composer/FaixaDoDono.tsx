@@ -10,7 +10,7 @@ import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { formatarDecorrido } from "@/lib/channels/janela";
 import { comandoDaConversa } from "@/lib/inbox/comando-da-conversa";
-import { Robot, UserCircle, UsersThree } from "@/lib/ui/icons";
+import { Robot, Sparkle, UserCircle, UsersThree } from "@/lib/ui/icons";
 
 export type QuemAtende = "ia" | "ninguem" | "outro";
 
@@ -72,6 +72,7 @@ export function FaixaDoDono({
   onAssumiu,
   onResponderSemAssumir,
   onNota,
+  sugerir,
 }: {
   conversa: ConversationWithContact;
   quem: QuemAtende;
@@ -80,6 +81,7 @@ export function FaixaDoDono({
   onAssumiu: () => void;
   onResponderSemAssumir: () => void;
   onNota: () => void;
+  sugerir?: { onSugerir: () => void; ocupado: boolean };
 }) {
   const t = useT();
   const claim = useClaimConversation();
@@ -123,6 +125,21 @@ export function FaixaDoDono({
         )}
       </p>
       <div className="flex shrink-0 items-center gap-1.5">
+        {/* A sugestão da IA não depende de assumir: ela aparece no painel acima
+            da faixa para revisar, e só sai com aprovação. Com outra pessoa
+            atendendo, sugerir resposta por cima dela não faz sentido. */}
+        {sugerir && quem !== "outro" && (
+          <button
+            type="button"
+            onClick={sugerir.onSugerir}
+            disabled={sugerir.ocupado}
+            aria-busy={sugerir.ocupado}
+            className="pele-grad-suave inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent/20 disabled:opacity-60 dark:text-accent-300"
+          >
+            <Sparkle size={14} weight={sugerir.ocupado ? "duotone" : "fill"} aria-hidden />
+            {sugerir.ocupado ? t("Preparando…") : t("Sugerir resposta")}
+          </button>
+        )}
         <Button
           type="button"
           size="sm"
@@ -167,6 +184,8 @@ interface AcoesDaFaixa {
   onAssumiu: () => void;
   onResponderSemAssumir: () => void;
   onNota: () => void;
+  /** "Sugerir resposta" na própria faixa (P2 do Cassio na #154). */
+  sugerir?: { onSugerir: () => void; ocupado: boolean };
 }
 
 /**

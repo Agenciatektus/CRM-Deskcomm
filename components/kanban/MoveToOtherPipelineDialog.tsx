@@ -47,32 +47,8 @@ export function MoveToOtherPipelineDialog({
   aoConcluir,
 }: MoveToOtherPipelineDialogProps) {
   const t = useT();
-  const [targetPipelineId, setTargetPipelineId] = useState("");
-  const mutation = useMoveLeadToPipeline(pipelineId);
-  const destinos = useDestinosDeFunil(leadId, open);
-
-  const disabled = !targetPipelineId || mutation.isPending;
-
-  const handleSubmit = async () => {
-    if (disabled) return;
-    try {
-      await mutation.mutateAsync({ leadId, targetPipelineId });
-      setTargetPipelineId("");
-      onOpenChange(false);
-      aoConcluir?.();
-    } catch {
-      // error already toasted
-    }
-  };
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) setTargetPipelineId("");
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("Levar para outro funil")}</DialogTitle>
@@ -82,6 +58,62 @@ export function MoveToOtherPipelineDialog({
             )}
           </DialogDescription>
         </DialogHeader>
+        {/* O formulário só monta com a janela aberta: os destinos não são
+            consultados à toa, e a escolha nasce zerada a cada abertura. */}
+        {open && (
+          <FormularioDeOutroFunil
+            leadId={leadId}
+            pipelineId={pipelineId}
+            onCancelar={() => onOpenChange(false)}
+            onConcluido={() => {
+              onOpenChange(false);
+              aoConcluir?.();
+            }}
+            rodape={(botoes) => <DialogFooter>{botoes}</DialogFooter>}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * O FORMULÁRIO de levar para outro funil, sem a janela: mesma rota (`/clone`)
+ * e mesmas regras, para o painel do lead na Inbox (P19 da auditoria).
+ */
+export function FormularioDeOutroFunil({
+  leadId,
+  pipelineId,
+  onCancelar,
+  onConcluido,
+  rodape,
+}: {
+  leadId: string;
+  pipelineId: string;
+  onCancelar: () => void;
+  onConcluido: () => void;
+  rodape: (botoes: React.ReactNode) => React.ReactNode;
+}) {
+  const t = useT();
+  const [targetPipelineId, setTargetPipelineId] = useState("");
+  const mutation = useMoveLeadToPipeline(pipelineId);
+  const destinos = useDestinosDeFunil(leadId, true);
+
+  const disabled = !targetPipelineId || mutation.isPending;
+
+  const handleSubmit = async () => {
+    if (disabled) return;
+    try {
+      await mutation.mutateAsync({ leadId, targetPipelineId });
+      setTargetPipelineId("");
+      onConcluido();
+    } catch {
+      // error already toasted
+    }
+  };
+
+  return (
+    <>
 
         {/*
           Instalação nova nasce com UM funil só: sem esta frase o diálogo abre
@@ -106,10 +138,11 @@ export function MoveToOtherPipelineDialog({
           </Select>
         )}
 
-        <DialogFooter>
+      {rodape(
+        <>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={onCancelar}
             disabled={mutation.isPending}
           >
             {t("Cancelar")}
@@ -117,8 +150,8 @@ export function MoveToOtherPipelineDialog({
           <Button onClick={handleSubmit} disabled={disabled}>
             {mutation.isPending ? t("Salvando...") : t("Confirmar")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>,
+      )}
+    </>
   );
 }

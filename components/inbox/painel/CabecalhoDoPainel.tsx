@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { AvatarDoContato } from "../AvatarDoContato";
 import { initials, siglaDoTelefone } from "../item/tempo-da-linha";
 import { ContactTagsEditor } from "../ContactTagsEditor";
+import { faixaDePrazo } from "@/lib/tarefas/tipos";
+
 import { useTarefasDoContato } from "./useTarefasDoContato";
 
 /**
@@ -60,6 +62,11 @@ export function CabecalhoDoPainel({
   // erro, fica neutro: afirmar "sem tarefa" sem saber seria mentir na tela.
   const { lista } = useTarefasDoContato(contactId);
   const semTarefa = lista.isSuccess && (lista.data ?? []).length === 0;
+  // P4: o alerta também acende quando o próximo passo está ATRASADO (a rota
+  // ordena por prazo, então a primeira tarefa é a mais urgente).
+  const primeira = lista.data?.[0];
+  const atrasada = !!primeira && faixaDePrazo(primeira) === "atrasada";
+  const alerta = semTarefa || atrasada;
 
   async function copiarTelefone() {
     if (!telefone) return;
@@ -138,14 +145,15 @@ export function CabecalhoDoPainel({
       <div className="@container flex gap-1.5" data-testid="inbox-atalhos-do-painel">
         <button
           type="button"
-          data-alerta={semTarefa ? "true" : undefined}
+          data-alerta={alerta ? "true" : undefined}
+          title={atrasada ? t("O próximo passo está atrasado") : undefined}
           // O nome acessível é sempre o completo, e CONTÉM o rótulo curto que
           // aparece em painel estreito (WCAG 2.5.3).
           aria-label={t("Próximo passo")}
-          className={cn(CLASSES_DO_ATALHO, semTarefa && CLASSES_DO_ALERTA)}
+          className={cn(CLASSES_DO_ATALHO, alerta && CLASSES_DO_ALERTA)}
           onClick={onIrParaProximoPasso}
         >
-          <ListChecks size={15} className={semTarefa ? "text-warning-fg" : "text-accent"} aria-hidden />
+          <ListChecks size={15} className={alerta ? "text-warning-fg" : "text-accent"} aria-hidden />
           <span className="hidden @[19rem]:inline">{t("Próximo passo")}</span>
           <span className="@[19rem]:hidden">{t("Próximo")}</span>
         </button>

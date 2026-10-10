@@ -4,8 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
-import { LoseLeadDialog } from "@/components/kanban/LoseLeadDialog";
-import { MoveToOtherPipelineDialog } from "@/components/kanban/MoveToOtherPipelineDialog";
+import { FormularioDePerda } from "@/components/kanban/LoseLeadDialog";
+import { FormularioDeOutroFunil } from "@/components/kanban/MoveToOtherPipelineDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,17 +34,17 @@ type Confirmacao = "ganho" | "reabrir" | null;
  *
  * ⚠️ NENHUMA REGRA NOVA. Cada botão chama a porta que o quadro já usa:
  *   - Ganho → `useWinLead` (`/win`), o mesmo do menu do card;
- *   - Perdido → `LoseLeadDialog` com os motivos DO FUNIL (vêm no `crm-summary`;
+ *   - Perdido → `FormularioDePerda` (o da janela do quadro, no painel) com os motivos DO FUNIL (vêm no `crm-summary`;
  *     o Inbox não tem o cache do quadro, ver `useMotivosDePerdaDoFunil`);
- *   - Outro funil → `MoveToOtherPipelineDialog` (`/clone`): o servidor aplica a
+ *   - Outro funil → `FormularioDeOutroFunil` (`/clone`, o da janela do quadro): o servidor aplica a
  *     P-01 (funil é imutável, troca é clone) e fecha a origem com o motivo
  *     canônico da P-03; a tela só escolhe o destino;
  *   - Reabrir → `/retomar`, que cria o negócio NOVO e não toca o encerrado.
  *
  * Confirmação onde o gesto não se desfaz pela tela: ganhar fecha o negócio (e
  * num funil `reabertura = novo_negocio` voltar atrás vira outro negócio), e
- * retomar cria um registro. Perder e trocar de funil já são janelas com
- * confirmar. "Desfazer" só existe no responsável, o único gesto que um segundo
+ * retomar cria um registro. Perder e trocar de funil já são formulários com
+ * confirmar no próprio formulário. "Desfazer" só existe no responsável, o único gesto que um segundo
  * PATCH devolve exatamente ao estado de antes.
  */
 export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
@@ -106,7 +106,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
 
       <ResponsavelDoNegocio lead={lead} contactId={contactId} podeMexer={podeMexer} onMudou={onMudou} />
 
-      {aberto && podeMexer && (
+      {aberto && podeMexer && !perdendo && !trocandoDeFunil && (
         <div className="grid grid-cols-3 gap-1.5">
           <Button size="sm" variant="outline" className="h-8 px-1.5 text-xs hover:border-success hover:bg-success-bg hover:text-success-fg" disabled={ganhar.isPending} onClick={() => setConfirmar("ganho")}>
             <Check size={14} className="mr-1" aria-hidden /> {t("Ganho")}
@@ -159,30 +159,40 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Releitura SÓ quando a janela gravou (`aoConcluir`): cancelar não mudou
-          nada, e reler ali seria trabalho sem motivo (revisão do Cassio, P3). */}
+      {/* P18 e P19: perder e trocar de funil NO PAINEL, e não numa janela por
+          cima dele. Os formulários são os mesmos das janelas do quadro (mesmas
+          rotas, mesmos motivos do funil, mesma validação); só a moldura muda.
+          Releitura só quando gravou (`onConcluido`): cancelar não mudou nada. */}
       {perdendo && (
-        <LoseLeadDialog
-          open
-          onOpenChange={(v) => {
-            if (!v) setPerdendo(false);
-          }}
-          aoConcluir={onMudou}
-          leadId={lead.id}
-          pipelineId={lead.pipeline_id}
-          motivosDoFunil={lead.motivos_de_perda}
-        />
+        <div className="space-y-3 rounded-lg border border-border bg-surface p-3" data-testid="perda-no-painel">
+          <p className="text-xs font-semibold text-text">{t("Marcar como perdido")}</p>
+          <FormularioDePerda
+            leadId={lead.id}
+            pipelineId={lead.pipeline_id}
+            motivosDoFunil={lead.motivos_de_perda}
+            onCancelar={() => setPerdendo(false)}
+            onConcluido={() => {
+              setPerdendo(false);
+              onMudou();
+            }}
+            rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
+          />
+        </div>
       )}
       {trocandoDeFunil && (
-        <MoveToOtherPipelineDialog
-          open
-          onOpenChange={(v) => {
-            if (!v) setTrocandoDeFunil(false);
-          }}
-          aoConcluir={onMudou}
-          leadId={lead.id}
-          pipelineId={lead.pipeline_id}
-        />
+        <div className="space-y-3 rounded-lg border border-border bg-surface p-3" data-testid="outro-funil-no-painel">
+          <p className="text-xs font-semibold text-text">{t("Levar para outro funil")}</p>
+          <FormularioDeOutroFunil
+            leadId={lead.id}
+            pipelineId={lead.pipeline_id}
+            onCancelar={() => setTrocandoDeFunil(false)}
+            onConcluido={() => {
+              setTrocandoDeFunil(false);
+              onMudou();
+            }}
+            rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
+          />
+        </div>
       )}
     </div>
   );

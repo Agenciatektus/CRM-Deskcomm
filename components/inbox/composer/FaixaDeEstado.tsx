@@ -24,14 +24,18 @@ export function FaixaDeConversaFechada({
   revisao: number | null | undefined;
 }) {
   const t = useT();
+  const sessao = useAuthOpcional();
   const reabrir = useReopenConversation();
+  // Quem só lê (`viewer`) não reabre: a mesma régua do cabeçalho (P2 da #154).
+  const podeReabrir = roleAtLeast(sessao?.activeOrg?.role ?? null, "agent");
   return (
     <div className={FAIXA} data-testid="faixa-conversa-fechada">
       <Archive size={18} aria-hidden className="shrink-0 text-text-subtle" />
       <p className="min-w-0 flex-1">
         <b className="font-semibold text-text">{t("Esta conversa está fechada.")}</b>{" "}
-        {t("Reabra para responder.")}
+        {podeReabrir ? t("Reabra para responder.") : null}
       </p>
+      {podeReabrir && (
       <Button
         type="button"
         size="sm"
@@ -41,6 +45,7 @@ export function FaixaDeConversaFechada({
       >
         {t("Reabrir")}
       </Button>
+      )}
     </div>
   );
 }
