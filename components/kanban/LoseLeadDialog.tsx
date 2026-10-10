@@ -28,6 +28,8 @@ interface LoseLeadDialogProps {
    * produto em vez da do funil — ver `useMotivosDePerdaDoFunil`.
    */
   motivosDoFunil?: string[];
+  /** 9044: `false` quando o funil dispensa o motivo. Ausente = exige (o de sempre). */
+  motivoObrigatorio?: boolean;
   /**
    * Chamado só quando a perda GRAVOU. `onOpenChange(false)` vem também do
    * Cancelar, e quem precisa reler depois de gravar (o painel da Inbox) não
@@ -44,6 +46,7 @@ export function LoseLeadDialog({
   leadId,
   pipelineId,
   motivosDoFunil,
+  motivoObrigatorio = true,
   aoConcluir,
 }: LoseLeadDialogProps) {
   const t = useT();
@@ -53,13 +56,16 @@ export function LoseLeadDialog({
         <DialogHeader>
           <DialogTitle>{t("Marcar como perdido")}</DialogTitle>
           <DialogDescription>
-            {t("Informe o motivo. Essa informação ajuda a melhorar o funil.")}
+            {motivoObrigatorio
+              ? t("Informe o motivo. Essa informação ajuda a melhorar o funil.")
+              : t("Este funil não exige motivo. Informar ajuda a melhorar o funil.")}
           </DialogDescription>
         </DialogHeader>
         <FormularioDePerda
           leadId={leadId}
           pipelineId={pipelineId}
           motivosDoFunil={motivosDoFunil}
+          motivoObrigatorio={motivoObrigatorio}
           onCancelar={() => onOpenChange(false)}
           onConcluido={() => {
             onOpenChange(false);
@@ -82,6 +88,7 @@ export function FormularioDePerda({
   leadId,
   pipelineId,
   motivosDoFunil,
+  motivoObrigatorio = true,
   onCancelar,
   onConcluido,
   rodape,
@@ -89,6 +96,12 @@ export function FormularioDePerda({
   leadId: string;
   pipelineId: string;
   motivosDoFunil?: string[];
+  /**
+   * 9044: com `false` o funil dispensa o motivo e o botão confirma sem escolha.
+   * A rota `/lose` decide de novo pela configuração do funil, então a tela não
+   * consegue liberar o que o servidor exige.
+   */
+  motivoObrigatorio?: boolean;
   onCancelar: () => void;
   onConcluido: () => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
@@ -140,9 +153,10 @@ export function FormularioDePerda({
     !motivoDePerdaAceito(textoOutro, cadastrados);
 
   const finalReason = reasonCode === OUTRO ? textoOutro || OUTRO : reasonCode;
+  const semMotivo = !reasonCode && !motivoObrigatorio;
   const disabled =
-    !reasonCode ||
-    finalReason.length === 0 ||
+    (!reasonCode && motivoObrigatorio) ||
+    (!semMotivo && finalReason.length === 0) ||
     finalReason.length > MAX_LEN ||
     outroRecusado ||
     mutation.isPending;
@@ -150,7 +164,7 @@ export function FormularioDePerda({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      await mutation.mutateAsync({ leadId, lostReason: finalReason });
+      await mutation.mutateAsync({ leadId, lostReason: semMotivo ? undefined : finalReason });
       setReasonCode("");
       setOtherText("");
       onConcluido();
@@ -163,7 +177,7 @@ export function FormularioDePerda({
     <>
 
         <div className="grid gap-3">
-          <Label>{t("Motivo")}</Label>
+          <Label>{motivoObrigatorio ? t("Motivo") : t("Motivo (opcional)")}</Label>
           <div className="grid grid-cols-1 gap-1.5">
             {opcoes.map((opcao) => (
               <label

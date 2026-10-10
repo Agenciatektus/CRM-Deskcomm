@@ -38,6 +38,8 @@ interface Props {
    * passar; o Inbox não tem o quadro carregado, então os recebe do resumo.
    */
   motivosDoFunil?: string[];
+  /** 9044: `false` quando o funil dispensa o motivo de perda. */
+  motivoObrigatorio?: boolean;
   onMovido?: () => void;
 }
 
@@ -62,6 +64,7 @@ export function SeletorDeEtapa({
   aberto,
   etapas,
   motivosDoFunil,
+  motivoObrigatorio,
   onMovido,
 }: Props) {
   const t = useT();
@@ -139,6 +142,7 @@ export function SeletorDeEtapa({
           leadId={leadId}
           pipelineId={pipelineId}
           motivosDoFunil={motivosDoFunil}
+          motivoObrigatorio={motivoObrigatorio}
         />
       )}
     </>

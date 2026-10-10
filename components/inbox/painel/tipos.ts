@@ -19,9 +19,13 @@ export interface LeadRow {
   updated_at: string;
   pipeline_id: string;
   stage_id: string;
+  /** A posição na coluna do quadro: o "Desfazer" da barra de etapas a devolve. */
+  position_in_stage?: number | null;
   /** Etapas ativas do funil deste lead, na ordem do quadro (crm-summary). */
   etapas?: EtapaDoSeletor[];
   motivos_de_perda?: string[];
+  /** 9044: `false` quando o funil dispensa o motivo de perda (crm-summary). */
+  motivo_de_perda_obrigatorio?: boolean;
   custom_fields: Record<string, unknown> | null;
   field_defs: CustomFieldDef[];
   funil_nome: string | null;

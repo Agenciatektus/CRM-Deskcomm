@@ -35,6 +35,9 @@ export interface ContextoDoFio {
   assumindo: boolean;
   onAssumir: () => void;
   onExcluirNota: (id: string) => void;
+  /** B15: a bolha oferece "Tentar de novo"? (`useReenvioDoFio`) */
+  ofereceReenvio?: (m: Message) => boolean;
+  reenviar?: (m: Message) => void;
 }
 
 /**
@@ -128,6 +131,8 @@ export function ConteudoDaLinha({ linha, inicioDoBloco, ctx }: { linha: LinhaDoF
       podeModerar={ctx.podeGerir && item.data.direction === "inbound"}
       inicioDoBloco={inicioDoBloco}
       acoes={ctx.acoes}
+      podeReenviar={ctx.ofereceReenvio?.(item.data) ?? false}
+      reenviar={ctx.reenviar}
     />
   );
 }

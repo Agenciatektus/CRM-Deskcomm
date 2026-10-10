@@ -14500,6 +14500,17 @@ export const DICIONARIO: Traducoes = {
   "Erro ao contar os leads.": { es: "Error al contar los leads." },
   "Erro ao buscar os leads.": { es: "Error al buscar los leads." },
   "A busca precisa de 2 a 100 caracteres.": { es: "La búsqueda necesita de 2 a 100 caracteres." },
+  // ─── Visual v2, fase 8b: excluir lead, desfecho no sino, reenvio, origem ───
+  "Excluir lead": { es: "Eliminar lead" },
+  "Lead excluído": { es: "Lead eliminado" },
+  "Não foi enviada.": { es: "No se envió." },
+  "Este funil não exige motivo. Informar ajuda a melhorar o funil.": { es: "Este embudo no exige motivo. Informarlo ayuda a mejorar el embudo." },
+  "A mensagem a reenviar não existe nesta conversa.": { es: "El mensaje a reenviar no existe en esta conversación." },
+  "Só uma mensagem enviada que falhou pode ser reenviada.": { es: "Solo se puede reenviar un mensaje enviado que falló." },
+  "A conversa mudou de número desde o envio. Escreva uma mensagem nova.": { es: "La conversación cambió de número desde el envío. Escribe un mensaje nuevo." },
+  "Esta mensagem já foi reenviada.": { es: "Este mensaje ya fue reenviado." },
+  Importação: { es: "Importación" },
+  Formulário: { es: "Formulario" },
 };
 
 /**

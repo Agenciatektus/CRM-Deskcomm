@@ -74,6 +74,7 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
         leadId={lead.id}
         pipelineId={lead.pipeline_id}
         motivosDoFunil={lead.motivos_de_perda}
+        motivoObrigatorio={lead.motivo_de_perda_obrigatorio !== false}
       />
     ) : (
       <MoveToOtherPipelineDialog open onOpenChange={aoMudar} aoConcluir={reler} leadId={lead.id} pipelineId={lead.pipeline_id} />

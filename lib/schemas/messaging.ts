@@ -203,6 +203,13 @@ export const sendMessageSchema = z
      * linha do token e o membership, no banco.
      */
     on_behalf_of_user_id: z.string().uuid().optional(),
+    /**
+     * "Tentar de novo" (B15): o id da NOSSA mensagem de saída que falhou e que
+     * este envio repete. O handler confere que ela é desta conversa, deste
+     * canal, `failed` e ainda não reenviada (`lib/messaging/reenvio.ts`), e a
+     * linha nova guarda o vínculo em `metadata.reenvio_de`.
+     */
+    reenvio_de: z.string().uuid().optional(),
   })
   .refine(
     (d) => {

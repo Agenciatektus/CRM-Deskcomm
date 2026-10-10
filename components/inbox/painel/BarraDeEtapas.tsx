@@ -11,6 +11,8 @@ interface Props {
   leadId: string;
   pipelineId: string;
   stageId: string;
+  /** A posição atual na coluna, para o "Desfazer" devolver o card ao mesmo lugar. */
+  posicao?: number | null;
   updatedAt: string;
   /** Só o negócio ABERTO anda pelas etapas; ganho e perdido têm os próprios botões. */
   aberto: boolean;
@@ -29,7 +31,7 @@ interface Props {
  * rota do quadro (`/move` com a data de atualização, que recusa se outra
  * pessoa mexeu antes), com a mesma permissão (`pipeline.move_card`).
  */
-export function BarraDeEtapas({ leadId, pipelineId, stageId, updatedAt, aberto, etapas, leitura, onMovido }: Props) {
+export function BarraDeEtapas({ leadId, pipelineId, stageId, posicao = null, updatedAt, aberto, etapas, leitura, onMovido }: Props) {
   const t = useT();
   const podeMover = usePermission("pipeline.move_card") && !leitura && aberto;
   const mover = useMoveCard(pipelineId);
@@ -41,6 +43,7 @@ export function BarraDeEtapas({ leadId, pipelineId, stageId, updatedAt, aberto, 
     if (id === stageId || !podeMover) return;
     // A etapa de onde o negócio sai: é para ela que o "Desfazer" volta.
     const anterior = stageId;
+    const posicaoAnterior = posicao;
     mover.mutate(
       { leadId, stageId: id, positionInStage: fimDaColuna(), expectedUpdatedAt: updatedAt },
       {
@@ -52,7 +55,7 @@ export function BarraDeEtapas({ leadId, pipelineId, stageId, updatedAt, aberto, 
             // pessoa mexeu no meio, a rota recusa em vez de sobrescrever.
             action: {
               label: t("Desfazer"),
-              onClick: () => desfazer(anterior, resposta?.data?.updated_at),
+              onClick: () => desfazer(anterior, posicaoAnterior, resposta?.data?.updated_at),
             },
           });
           onMovido();
@@ -61,10 +64,22 @@ export function BarraDeEtapas({ leadId, pipelineId, stageId, updatedAt, aberto, 
     );
   }
 
-  function desfazer(etapa: string, atualizadoEm: string | undefined) {
+  /**
+   * Volta pela mesma rota `/move`, na POSIÇÃO de antes (P2 do Cassio na #158):
+   * a rota aceita `position_in_stage`, e sem ela o card voltava para o fim da
+   * coluna. Sem a posição conhecida (resumo antigo em cache), cai no fim.
+   *
+   * ⚠️ Efeito nas automações: desfazer é uma MUDANÇA DE ETAPA como outra
+   * qualquer. A ida já emitiu `lead.stage_changed` (e as regras de automação,
+   * follow-ups e a conversão do funil já reagiram a ela); a volta emite outro
+   * `lead.stage_changed`, e as regras ligadas à etapa de origem disparam de
+   * novo. Nada do que a ida disparou é desfeito: mensagem enviada continua
+   * enviada. Por isso o botão vive só no toast, logo depois do clique.
+   */
+  function desfazer(etapa: string, posicaoDeAntes: number | null, atualizadoEm: string | undefined) {
     if (!atualizadoEm) return;
     mover.mutate(
-      { leadId, stageId: etapa, positionInStage: fimDaColuna(), expectedUpdatedAt: atualizadoEm },
+      { leadId, stageId: etapa, positionInStage: posicaoDeAntes ?? fimDaColuna(), expectedUpdatedAt: atualizadoEm },
       {
         onSuccess: () => {
           toast.success(t("Etapa desfeita"));

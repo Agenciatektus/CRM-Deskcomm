@@ -47303,6 +47303,9 @@ revoke execute on function public.fn_leads_abertos_por_funil(uuid) from public, 
 grant  execute on function public.fn_leads_abertos_por_funil(uuid) to authenticated, service_role;
 
 -- ---- L4/L20: o próximo passo da conversa (campo calculado) ----
+-- 9048 (P2 do Cassio na #158): `resolved` também é conversa encerrada, como
+-- `closed`. Corpo reemitido AQUI, no bloco da 9047, porque o da 9029 logo abaixo
+-- chama esta função: posição é dependência.
 create or replace function public.passo_da_conversa(c public.conversations)
 returns text
 language sql
@@ -47313,7 +47316,7 @@ as $$
   select case
     when c.contact_id is null
       or coalesce(c.is_group, false)
-      or c.status::text in ('closed', 'archived')
+      or c.status::text in ('closed', 'archived', 'resolved')
       then null
     when not exists (
       select 1 from public.crm_tasks t
@@ -47333,7 +47336,7 @@ as $$
 $$;
 
 comment on function public.passo_da_conversa(public.conversations) is
-  'Campo calculado do PostgREST: sem_passo (contato sem tarefa aberta), atrasada (tarefa aberta vencida) ou em_dia; nulo em conversa fechada, arquivada, de grupo ou sem contato. Pílula e filtro "Sem próximo passo" da Inbox (migration 9047).';
+  'Campo calculado do PostgREST: sem_passo (contato sem tarefa aberta), atrasada (tarefa aberta vencida) ou em_dia; nulo em conversa fechada (closed ou resolved), arquivada, de grupo ou sem contato. Pílula e filtro "Sem próximo passo" da Inbox (migrations 9047 e 9048).';
 
 revoke execute on function public.passo_da_conversa(public.conversations) from public, anon;
 grant  execute on function public.passo_da_conversa(public.conversations) to authenticated, service_role;
@@ -48650,6 +48653,21 @@ create trigger trg_contacts_fusao_herda_observacoes
   execute function public.fn_fusao_herda_observacoes();
 
 notify pgrst, 'reload schema';
+
+-- ---- "Tentar de novo" não duplica: um reenvio por mensagem que falhou (migration 9048) ----
+--
+-- O reenvio de uma mensagem de saída que falhou é uma linha NOVA com
+-- `metadata.reenvio_de = <id da que falhou>` (B15, `lib/messaging/reenvio.ts`).
+-- Este índice único é a trava contra dois cliques simultâneos: o segundo INSERT
+-- bate 23505 e a rota responde 409 "já foi reenviada". Parcial: só as linhas
+-- que são reenvio entram. Sem `CONCURRENTLY` (migration roda em transação); em
+-- produção é criado à mão com `concurrently` antes do deploy, e o
+-- `if not exists`, que casa por NOME, vira no-op. Racional no cabeçalho da
+-- migration. O corpo novo de `passo_da_conversa` (9048) está no bloco da 9047.
+create unique index if not exists messages_reenvio_unico
+  on public.messages (organization_id, (metadata->>'reenvio_de'))
+  where metadata ? 'reenvio_de';
+
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
