@@ -14,6 +14,7 @@ export function useFerramentasDaConversa(selectedId: string | null) {
    */
   const [painelLead, setPainelLead] = useState(true);
   const alternarPainel = useCallback(() => setPainelLead((v) => !v), []);
+  const abrirPainel = useCallback(() => setPainelLead(true), []);
 
   /**
    * A busca dentro da conversa (#1793) pertence à CONVERSA em que foi aberta.
@@ -40,6 +41,7 @@ export function useFerramentasDaConversa(selectedId: string | null) {
   return {
     painelLead,
     alternarPainel,
+    abrirPainel,
     buscaAberta,
     termoDaBusca: buscaAberta && busca ? busca.termo : "",
     botaoBuscaRef,

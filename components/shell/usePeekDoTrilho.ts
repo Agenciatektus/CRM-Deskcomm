@@ -110,7 +110,10 @@ export function usePeekDoTrilho({ collapsed, pathname }: { collapsed: boolean; p
 
   function sairDaBarra() {
     clearTimeout(timer.current);
-    if (!collapsed) return;
+    // Só a coluna ESPIADA (aberta pelo mouse) fecha ao sair. A aberta por clique
+    // ou teclado é uma escolha: fecha com Esc, clique fora ou outro grupo (P2-1
+    // do Cassio na #146), senão bastaria o mouse escorregar para perdê-la.
+    if (!collapsed || !porPonteiro.current) return;
     timer.current = setTimeout(() => setAberto(false), 250);
   }
 

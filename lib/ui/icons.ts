@@ -136,6 +136,7 @@ export {
   BookOpen,
   Key,
   UserCircle,
+  Lightning,
   UserMinus,
   ClockCounterClockwise,
   // inbox no celular: voltar para a lista e abrir a ficha do contato
