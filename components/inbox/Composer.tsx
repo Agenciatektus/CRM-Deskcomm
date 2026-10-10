@@ -6,7 +6,8 @@ import {
 } from "react";
 import { BarraDoComposer } from "@/components/inbox/composer/BarraDoComposer";
 import { DialogosDoComposer } from "@/components/inbox/composer/DialogosDoComposer";
-import { FaixaDoDono } from "@/components/inbox/composer/FaixaDoDono";
+import { CaixaOuFaixaDoDono } from "@/components/inbox/composer/FaixaDoDono";
+import { FaixaDeContatoBloqueado, FaixaDeConversaFechada } from "@/components/inbox/composer/FaixaDeEstado";
 import { AbasDoComposer, AvisoDoRascunho, FaixaDaCitacao } from "@/components/inbox/composer/FaixasDoComposer";
 import { ReplyReviewPanel } from "@/components/inbox/composer/ReplyReviewPanel";
 import { resolveSlash, TemplateMenu } from "@/components/inbox/composer/TemplateMenu";
@@ -47,13 +48,17 @@ interface Props {
   rascunho?: AvisoDeRascunho | null;
   /** Para a faixa de quem atende; sem ela o composer não afirma nada sobre o dono. */
   conversa?: ConversationWithContact | null;
+  /** Conversa fechada: a faixa com "Reabrir" no lugar da caixa (C7). */
+  fechada?: boolean;
+  /** Contato bloqueado (id dele): a faixa ganha "Desbloquear" para quem pode (C8). */
+  contatoBloqueadoId?: string | null;
 }
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   {
     conversationId, initialDraft = "", initialMode = "reply", active = true, onDraftChange, disabled,
     blockedReason, janelaFechada, contactName, currentContactId, respondendo, onCancelarResposta,
-    rascunho = null, conversa = null,
+    rascunho = null, conversa = null, fechada = false, contatoBloqueadoId = null,
   },
   ref,
 ) {
@@ -74,6 +79,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
   const [menuDismissed, setMenuDismissed] = useState(false);
   const [mode, setMode] = useState<"reply" | "note">(initialMode);
+  // C4: enquanto você não é o dono, a faixa substitui a caixa de RESPOSTA. A
+  // saída "Responder sem assumir" devolve a caixa (a regra do servidor não
+  // mudou). O composer é remontado por conversa, então a escolha não vaza.
+  const [semAssumir, setSemAssumir] = useState(false);
+  const [focarAoVoltar, setFocarAoVoltar] = useState(false);
   useEffect(() => {
     onDraftChange?.(text, mode);
   }, [text, mode, onDraftChange]);
@@ -87,6 +97,16 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const menuOpen = mode === "reply" && slash.open && !menuDismissed;
 
   useImperativeHandle(ref, () => ({ focus: () => taRef.current?.focus() }));
+  // Depois de "Assumir e responder" (ou de escolher responder sem assumir), o
+  // foco vai para a caixa que acabou de aparecer. Sem lista de dependências de
+  // propósito: a caixa só monta quando a conversa volta do servidor com você
+  // como dono, um render depois do pedido; o `if` encerra o ciclo.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!focarAoVoltar || !taRef.current) return;
+    taRef.current.focus();
+    setFocarAoVoltar(false);
+  });
 
   // send/createNote fora do disable: o texto some na hora do envio; travar o campo
   // até a API voltar impedia digitar a próxima mensagem com o campo ainda cheio.
@@ -211,6 +231,20 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     }
   }
 
+  if (blockedReason && contatoBloqueadoId) {
+    return (
+      <div className="bg-bg px-4 pb-3.5 pt-2.5">
+        <FaixaDeContatoBloqueado contatoId={contatoBloqueadoId} conversationId={conversationId} motivo={blockedReason} />
+      </div>
+    );
+  }
+  if (fechada) {
+    return (
+      <div className="bg-bg px-4 pb-3.5 pt-2.5">
+        <FaixaDeConversaFechada conversationId={conversationId} revisao={conversa?.service_revision} />
+      </div>
+    );
+  }
   if (blockedReason) {
     return (
       <div className="bg-bg px-4 pb-3.5 pt-2.5">
@@ -226,9 +260,20 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     <>
       <div className="relative bg-bg px-4 pb-3.5 pt-2.5" data-modo={mode}>
         {!nota && <ReplyReviewPanel sugestao={sugestao} disabled={isDisabled} />}
-        {!nota && conversa && <FaixaDoDono conversa={conversa} />}
         {rascunho && !rascunhoUsado && !nota && <AvisoDoRascunho rascunho={rascunho} />}
         <AbasDoComposer mode={mode} onMode={setMode} dicaId={dicaId} />
+        <CaixaOuFaixaDoDono
+          conversa={!nota && !semAssumir ? conversa : null}
+          onAssumiu={() => setFocarAoVoltar(true)}
+          onResponderSemAssumir={() => {
+            setSemAssumir(true);
+            setFocarAoVoltar(true);
+          }}
+          onNota={() => {
+            setMode("note");
+            setFocarAoVoltar(true);
+          }}
+        >
         {respondendo && !nota && <FaixaDaCitacao respondendo={respondendo} onCancelar={onCancelarResposta} />}
         <div
           // A caixa ganha a borda e o anel do accent no foco, e a nota interna
@@ -282,6 +327,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             onEnviar={handleSubmit}
           />
         </div>
+        </CaixaOuFaixaDoDono>
       </div>
       <DialogosDoComposer
         conversationId={conversationId} currentContactId={currentContactId}

@@ -927,7 +927,7 @@ async function main(): Promise<void> {
     // "Tem conteúdo" NÃO basta: o texto de convite ("Selecione uma conversa…")
     // é conteúdo e faria os critérios negativos passarem por ausência de dados.
     // A pré-condição exige a superfície REAL, não a tela de espera.
-    const ehPlaceholder = /Selecione uma conversa/i.test(painel.texto);
+    const ehPlaceholder = /Selecione uma conversa|Escolha uma conversa/i.test(painel.texto);
     const temConteudo = painel.texto.trim().length > 0 && !ehPlaceholder;
     record(
       "10-inbox.pre",

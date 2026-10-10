@@ -565,8 +565,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <ChatCircle size={36} weight="thin" className="text-text-subtle" aria-hidden />
-            <p className="text-sm font-medium text-text-muted">{t("Selecione uma conversa")}</p>
-            <p className="text-xs text-text-muted">{t("Ou navegue com J e K")}</p>
+            {/* E1: o texto do protótipo, e a dica de teclado continua. */}
+            <p className="text-sm font-medium text-text-muted">{t("Escolha uma conversa")}</p>
+            <p className="text-xs text-text-muted">{t("A fila mostra primeiro quem espera há mais tempo.")}</p>
+            <p className="text-xs text-text-subtle">{t("Ou navegue com J e K")}</p>
           </div>
         )}
       </div>

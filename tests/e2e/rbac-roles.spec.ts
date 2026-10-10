@@ -132,7 +132,7 @@ test.describe("rbac role matrix (spec 13 §4)", () => {
     await login(page, creds.users.agent!.email);
 
     await page.goto("/app/inbox");
-    await expect(page.getByText("Selecione uma conversa", { exact: true })).toBeVisible();
+    await expect(page.getByText("Escolha uma conversa", { exact: true })).toBeVisible();
     // Baseline pré-G2-04: as abas Radix de InboxFilters apontam aria-controls
     // para painel não renderizado (aria-valid-attr-value, defeito pré-existente
     // fora do escopo desta feature). Excluímos só o tablist; o resto da tela

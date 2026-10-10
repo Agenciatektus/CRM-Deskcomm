@@ -93,3 +93,10 @@ export function buscaValeConsulta(bruto: string): boolean {
   const semLixo = bruto.replace(/[()*]/g, " ");
   return normalizarTermoDeBusca(semLixo).length >= PISO_DA_BUSCA;
 }
+
+/**
+ * Teto do termo de busca (P2 do Cassio na #147): a busca vira `ilike` em várias
+ * colunas, e um termo de quilobytes não acha ninguém, só pesa no banco. Vale na
+ * busca de conversas e de contatos (schemas) e no campo da paleta (`maxLength`).
+ */
+export const TETO_DO_TERMO_DE_BUSCA = 100;

@@ -83,8 +83,10 @@ export function ConversationListItem({
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
   const phoneFallback = siglaDoTelefone(c?.phone_number);
-  const preview = conversation.last_message_preview?.trim() || t("Sem mensagens");
-  const truncated = preview.length > 60 ? `${preview.slice(0, 60)}…` : preview;
+  // L15: a prévia é cortada pelo CSS (`truncate`), na largura que a coluna tem,
+  // e não em 60 caracteres fixos que sobravam na lista larga e estouravam na
+  // estreita.
+  const truncated = conversation.last_message_preview?.trim() || t("Sem mensagens");
   const naFila = queuePosition !== undefined;
   /**
    * A HORA DO CANTO RESPONDE À MESMA PERGUNTA QUE ORDENA A LISTA.
@@ -142,10 +144,10 @@ export function ConversationListItem({
       className={cn(
         "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-surface-elevated/60",
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated/60",
-        // Selecionada: o fundo ELEVADO, um degrau acima do card da lista, como
-        // no protótipo. O `accent-soft` (16% da marca) quase sumia no escuro com
-        // a marca sálvia, e a linha aberta não se destacava das vizinhas.
-        isSelected && "pele-selecionada bg-surface-elevated hover:bg-surface-elevated",
+        // Selecionada (L13): o `accent-soft` do protótipo, com a barra de 3px.
+        // No escuro a pele troca pelo degradê horizontal da marca
+        // (`pele-selecionada`), que se destaca do card mesmo com marca escura.
+        isSelected && "pele-selecionada bg-accent-soft hover:bg-accent-soft",
       )}
       aria-current={isSelected ? "true" : undefined}
     >

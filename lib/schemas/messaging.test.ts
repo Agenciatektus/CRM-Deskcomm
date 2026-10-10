@@ -245,3 +245,10 @@ describe("openConversationWithContactSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("listConversationsQuerySchema: teto do termo (P2 da #147)", () => {
+  it("aceita 100 caracteres e recusa 101", () => {
+    expect(listConversationsQuerySchema.safeParse({ search: "a".repeat(100) }).success).toBe(true);
+    expect(listConversationsQuerySchema.safeParse({ search: "a".repeat(101) }).success).toBe(false);
+  });
+});

@@ -297,7 +297,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <MarcaDosClientComponents>
             <ThemeProvider>{children}</ThemeProvider>
           </MarcaDosClientComponents>
-          <Toaster position="top-right" richColors closeButton duration={4000} />
+          {/* E2: embaixo no centro, como no protótipo; perto da mão que agiu e longe
+              do sino e do perfil no topo. 5 s para dar tempo de "Desfazer". */}
+          <Toaster position="bottom-center" richColors closeButton duration={5000} />
         </Providers>
       </body>
     </html>

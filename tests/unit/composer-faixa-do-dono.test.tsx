@@ -26,7 +26,13 @@ vi.mock("@/hooks/inbox/useClaimConversation", () => ({
   useClaimConversation: () => ({ mutate: claimMock, isPending: false }),
 }));
 vi.mock("@/hooks/ai/useAutomaticoAtivo", () => ({ useAutomaticoAtivo: () => ({ data: automatico.ativo }) }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => true }));
+const sessao = vi.hoisted(() => ({
+  valor: { user: { id: "u-1" }, activeOrg: { role: "agent" } } as {
+    user: { id: string };
+    activeOrg: { role: string };
+  } | null,
+}));
+vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => true, useAuthOpcional: () => sessao.valor }));
 vi.mock("@/lib/api/client", () => ({
   apiClient: { get: vi.fn().mockResolvedValue({ data: { drafts: [] } }), post: vi.fn() },
 }));
@@ -47,28 +53,39 @@ function montar(c: ConversationWithContact) {
   );
 }
 
-describe("Composer: faixa de quem atende", () => {
+describe("Composer: faixa de quem atende (C4-C6)", () => {
   beforeEach(() => {
     claimMock.mockClear();
     automatico.ativo = true;
+    sessao.valor = { user: { id: "u-1" }, activeOrg: { role: "agent" } };
   });
 
-  it("a IA atendendo: avisa que assumir para o automático e assume pelo claim", () => {
+  it("a IA atendendo: a faixa SUBSTITUI a caixa, e 'Assumir e responder' assume pelo claim", () => {
     montar(conversa());
     expect(screen.getByTestId("faixa-do-dono")).toHaveAttribute("data-quem", "ia");
     expect(screen.getByText("A IA está atendendo.")).toBeInTheDocument();
-    expect(screen.getByText("Ao assumir, o automático para.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Assumir a conversa" }));
-    expect(claimMock).toHaveBeenCalledWith({ conversation_id: "conv-1", expected_assignee: null });
-    // A caixa continua disponível: a faixa avisa, não bloqueia.
-    expect(screen.getByLabelText("Mensagem")).not.toBeDisabled();
+    expect(screen.getByText("Ao assumir, o automático para nesta conversa.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Mensagem")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Assumir e responder" }));
+    expect(claimMock).toHaveBeenCalledWith(
+      { conversation_id: "conv-1", expected_assignee: null },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
-  it("ninguém assumiu (automático calado e sem dono): convida a puxar para si", () => {
-    montar(conversa({ bot_silenced_until: "infinity" }));
+  it("não trava ninguém: 'Responder sem assumir' devolve a caixa como era", () => {
+    montar(conversa());
+    fireEvent.click(screen.getByRole("button", { name: "Responder sem assumir" }));
+    expect(screen.getByLabelText("Mensagem")).not.toBeDisabled();
+    expect(screen.queryByTestId("faixa-do-dono")).toBeNull();
+    expect(claimMock).not.toHaveBeenCalled();
+  });
+
+  it("ninguém assumiu: convida a assumir e diz há quanto tempo o cliente espera", () => {
+    const desde = new Date(Date.now() - 14 * 60_000).toISOString();
+    montar(conversa({ bot_silenced_until: "infinity", awaiting_since: desde }));
     expect(screen.getByTestId("faixa-do-dono")).toHaveAttribute("data-quem", "ninguem");
-    fireEvent.click(screen.getByRole("button", { name: "Puxar para mim" }));
-    expect(claimMock).toHaveBeenCalledWith({ conversation_id: "conv-1", expected_assignee: null });
+    expect(screen.getByText(/O cliente espera há 14m/)).toBeInTheDocument();
   });
 
   it("org sem automático e sem dono também é 'ninguém', nunca 'a IA está atendendo'", () => {
@@ -78,15 +95,26 @@ describe("Composer: faixa de quem atende", () => {
     expect(screen.queryByText("A IA está atendendo.")).toBeNull();
   });
 
-  it("você atende: nenhuma faixa em cima da caixa", () => {
+  it("outra pessoa atende: diz quem, oferece a nota e responder mesmo assim (sem puxar)", () => {
+    montar(conversa({ assigned_to_user_id: "u-2", assigned_to_user_name: "Bruno", assignee_kind: "user" }));
+    expect(screen.getByTestId("faixa-do-dono")).toHaveAttribute("data-quem", "outro");
+    expect(screen.getByText(/Bruno está atendendo\./)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assumir e responder" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Escrever nota" }));
+    expect(screen.getByLabelText("Mensagem")).toHaveAttribute("placeholder", expect.stringMatching(/nota interna/));
+  });
+
+  it("você atende: nenhuma faixa, a caixa direto", () => {
     montar(conversa({ assigned_to_user_id: "u-1", assigned_to_user_name: "Eu", assignee_kind: "user" }));
     expect(screen.queryByTestId("faixa-do-dono")).toBeNull();
+    expect(screen.getByLabelText("Mensagem")).toBeInTheDocument();
   });
 
   it("em nota interna a faixa sai: assumir não muda nada no que só o time lê", () => {
     montar(conversa());
     fireEvent.click(screen.getByRole("button", { name: "Nota interna" }));
     expect(screen.queryByTestId("faixa-do-dono")).toBeNull();
+    expect(screen.getByLabelText("Mensagem")).toBeInTheDocument();
   });
 
   it("o botão não se chama só 'Assumir': as specs do cabeçalho o procuram com nome exato", () => {
@@ -102,6 +130,43 @@ describe("Composer: faixa de quem atende", () => {
       </QueryClientProvider>,
     );
     expect(screen.queryByTestId("faixa-do-dono")).toBeNull();
+  });
+});
+
+describe("Composer: conversa fechada e contato bloqueado (C7, C8)", () => {
+  beforeEach(() => {
+    sessao.valor = { user: { id: "u-1" }, activeOrg: { role: "agent" } };
+  });
+
+  it("fechada: faixa com Reabrir no lugar da caixa", () => {
+    const qc = new QueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <Composer conversationId="conv-1" conversa={conversa({ status: "closed" })} fechada />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("faixa-conversa-fechada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reabrir" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Mensagem")).toBeNull();
+  });
+
+  it("bloqueado: Desbloquear só para admin (a rota exige admin)", () => {
+    const qc = new QueryClient();
+    const { unmount } = render(
+      <QueryClientProvider client={qc}>
+        <Composer conversationId="conv-1" blockedReason="Contato bloqueado." contatoBloqueadoId="k-1" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId("faixa-contato-bloqueado")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desbloquear" })).toBeNull();
+    unmount();
+    sessao.valor = { user: { id: "u-1" }, activeOrg: { role: "admin" } };
+    render(
+      <QueryClientProvider client={qc}>
+        <Composer conversationId="conv-1" blockedReason="Contato bloqueado." contatoBloqueadoId="k-1" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Desbloquear" })).toBeInTheDocument();
   });
 });
 

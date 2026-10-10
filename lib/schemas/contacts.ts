@@ -9,6 +9,8 @@
  */
 import { z } from "zod";
 
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
+
 import { normalizarTag, normalizarTags } from "@/lib/contacts/tag-normalizada";
 import {
   MAXIMO_DE_ETIQUETAS_NO_FILTRO,
@@ -147,8 +149,10 @@ export const CONTACT_ORDER_BY = [
   "phone_number",
 ] as const;
 
+export { TETO_DO_TERMO_DE_BUSCA };
+
 export const contactListQuerySchema = z.object({
-  search: z.string().optional(),
+  search: z.string().max(TETO_DO_TERMO_DE_BUSCA).optional(),
   // O filtro normaliza pelo MESMO caminho da escrita: `?tag=VIP` acha o que a
   // ficha gravou como "vip" (issue #1224).
   //

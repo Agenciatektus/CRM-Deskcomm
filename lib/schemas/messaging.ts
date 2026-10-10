@@ -5,6 +5,7 @@
  * /api/v1/messages. Validações compartilhadas entre rota REST e webhooks
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
@@ -521,6 +522,7 @@ export const listConversationsQuerySchema = z.object({
   search: z
     .string()
     .trim()
+    .max(TETO_DO_TERMO_DE_BUSCA)
     .refine(buscaValeConsulta, {
       message: `A busca precisa de pelo menos ${PISO_DA_BUSCA} caracteres.`,
     })
