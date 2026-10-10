@@ -37,6 +37,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { ackToStatus } from "@/lib/types/messaging";
 import type { WahaEnvelope, WahaPayload } from "@/lib/waha/envelope";
 import { bareWaMessageId, chatIdFromWaMessageId } from "@/lib/waha/message-id";
+import { aplicarAlteracaoDeMensagem } from "@/lib/channels/alteracao-de-mensagem";
 import { logger } from "@/lib/logger";
 import {
   ehNumeroInternoDeAviso,
@@ -1363,12 +1364,7 @@ async function handleMessageEdited(
   const alvo = bareWaMessageId(p.editedMessageId ?? "");
   const corpo = typeof p.body === "string" ? p.body : null;
   if (!alvo || corpo === null) return;
-
-  await admin
-    .from("messages")
-    .update({ body: corpo, edited_at: new Date().toISOString() })
-    .eq("organization_id", session.organization_id)
-    .eq("external_id", alvo);
+  await alterarComAutoria(admin, session, p, alvo, "editar", corpo);
 }
 
 /**
@@ -1387,12 +1383,38 @@ async function handleMessageRevoked(
 ): Promise<void> {
   const alvo = bareWaMessageId(p.revokedMessageId ?? "");
   if (!alvo) return;
+  await alterarComAutoria(admin, session, p, alvo, "apagar", null);
+}
 
-  await admin
-    .from("messages")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("organization_id", session.organization_id)
-    .eq("external_id", alvo);
+/**
+ * Edição e apagada só valem do AUTOR, na mesma sessão e conversa — a conferência
+ * mora em `aplicarAlteracaoDeMensagem`. Sem ela, o id-alvo (escrito pelo
+ * remetente) deixava um contato reescrever a mensagem que a empresa mandou.
+ * O chat sai do mesmo lugar que a ingestão usa para cada direção.
+ */
+async function alterarComAutoria(
+  admin: Admin,
+  session: Session,
+  p: WahaPayload,
+  alvo: string,
+  acao: "editar" | "apagar",
+  texto: string | null,
+): Promise<void> {
+  const deMim = Boolean(p.fromMe);
+  const chatId = deMim ? (p.to ?? chatIdFromWaMessageId(p.id ?? "") ?? p.from ?? "") : (p.from ?? "");
+  const parsed = parseChatId(chatId);
+  const r = await aplicarAlteracaoDeMensagem(admin, {
+    organizationId: session.organization_id,
+    channelSessionId: session.id,
+    direcao: deMim ? "outbound" : "inbound",
+    alvo,
+    chat: { jid: chatId || null, phone: parsed.phone ?? telefoneAlternativoDe(p), lid: parsed.lid },
+    acao,
+    texto,
+  });
+  if (!r.aplicada && r.motivo !== `${acao}_sem_original`) {
+    logger.warn("[waha] alteração de mensagem recusada", { sessionId: session.id, motivo: r.motivo });
+  }
 }
 
 /**

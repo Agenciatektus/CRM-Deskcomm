@@ -55,6 +55,16 @@ const CHAVES_DE_SERVICO = new Set(["messageContextInfo", "senderKeyDistributionM
 
 const CAMPOS_COM_LEGENDA = ["imageMessage", "videoMessage", "documentMessage", "ptvMessage"];
 
+/**
+ * Valor do payload que vira RÓTULO (motivo de ignorar, `tipo_nao_suportado`).
+ * Vem do remetente, então só passa o que parece nome de campo — o mesmo filtro
+ * que a tela aplica ao exibir. O resto vira `desconhecido`.
+ */
+export function rotuloSeguro(v: unknown): string {
+  const s = typeof v === "number" ? String(v) : v;
+  return typeof s === "string" && /^[A-Za-z0-9_]{1,60}$/.test(s) ? s : "desconhecido";
+}
+
 function obj(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
@@ -96,7 +106,7 @@ function lerProtocolo(pm: Record<string, unknown>): LeituraEspecial {
   }
   // Troca de chave, sincronização, temporizador de mensagem temporária... São
   // conversas entre aparelhos, não entre pessoas. Nenhuma tem o que mostrar.
-  return { caso: "ignorar", motivo: `protocolo_${String(pm.type ?? "sem_tipo")}` };
+  return { caso: "ignorar", motivo: `protocolo_${pm.type === undefined ? "sem_tipo" : rotuloSeguro(pm.type)}` };
 }
 
 function conteudo(tipo: ConteudoEspecial["tipo"], texto: string | null, extra: Record<string, unknown>): LeituraEspecial {
@@ -204,5 +214,5 @@ export function lerConteudoEspecial(
 
   const chave = Object.keys(message).find((k) => !CHAVES_DE_SERVICO.has(k));
   if (!chave) return { caso: "ignorar", motivo: "sem_conteudo" };
-  return conteudo("text", null, { tipo_nao_suportado: chave.slice(0, 60) });
+  return conteudo("text", null, { tipo_nao_suportado: rotuloSeguro(chave) });
 }

@@ -52,7 +52,9 @@ import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual
 
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 
-import { parseVerdashInbound, type VerdashAlteracao, type VerdashInboundMessage } from "./webhook";
+import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
+
+import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
   /** `updated` = edição ou apagada aplicada sobre uma mensagem que já existia. */
@@ -103,7 +105,22 @@ export async function ingestVerdashInbound(
   // Edição e apagada ALTERAM a original. Gravá-las como mensagem nova criava um
   // balão vazio, deixava o texto antigo na original e — por ser INSERT de
   // entrada — acordava a IA para responder a nada.
-  if (msg.alteracao) return aplicarAlteracao(admin, input.organizationId, msg.alteracao);
+  // A autoria é conferida em `aplicarAlteracaoDeMensagem` (o WhatsApp não a
+  // confere por nós): só o autor, na mesma sessão e conversa, altera.
+  if (msg.alteracao) {
+    const r = await aplicarAlteracaoDeMensagem(admin, {
+      organizationId: input.organizationId,
+      channelSessionId: input.channelSessionId,
+      direcao: msg.direction,
+      alvo: msg.alteracao.alvo,
+      chat: { jid: msg.chat, phone: msg.identity.phone, lid: msg.identity.lid },
+      acao: msg.alteracao.acao,
+      texto: msg.alteracao.acao === "editar" ? msg.alteracao.texto : null,
+    });
+    return r.aplicada
+      ? { status: "updated", conversationId: r.conversationId, messageId: r.messageId }
+      : { status: "ignored", reason: r.motivo };
+  }
 
   const identity = waIdentityFrom(msg);
   if (!identity) {
@@ -163,44 +180,6 @@ export async function ingestVerdashInbound(
   }
 
   return { status: "ingested", conversationId, messageId: inserted };
-}
-
-/**
- * Edição ou "apagar para todos" vindos do WhatsApp, aplicados na mensagem
- * ORIGINAL — o mesmo efeito que o canal por QR já tem (`lib/waha/ingest.ts`).
- *
- * UPDATE em `messages` é inerte para a cascata (o gatilho que acorda a IA é só
- * de INSERT). A apagada não limpa o corpo: quem decide o que mostrar é a tela.
- * Reentrega do mesmo evento reaplica o mesmo valor — idempotente.
- *
- * Original ausente (mensagem anterior à conexão do número): nada a fazer, e
- * isso NÃO vira mensagem nova.
- */
-async function aplicarAlteracao(
-  admin: SupabaseClient,
-  organizationId: string,
-  alteracao: VerdashAlteracao,
-): Promise<VerdashIngestResult> {
-  const agora = new Date().toISOString();
-  const patch = alteracao.acao === "editar"
-    ? { body: alteracao.texto, edited_at: agora }
-    : { revoked_at: agora };
-
-  const { data, error } = await admin
-    .from("messages")
-    .update(patch)
-    .eq("organization_id", organizationId)
-    .eq("external_id", alteracao.alvo)
-    .select("id, conversation_id")
-    .maybeSingle();
-
-  // Falha de banco SOBE: o FZAP reenvia e a edição não se perde. Diferente do
-  // "original ausente", que reenviar não resolve.
-  if (error) throw new Error(`verdash_alteracao_falhou: ${error.message}`);
-  if (!data) return { status: "ignored", reason: `${alteracao.acao}_sem_original` };
-
-  const linha = data as { id: string; conversation_id: string };
-  return { status: "updated", conversationId: linha.conversation_id, messageId: linha.id };
 }
 
 /**

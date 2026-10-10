@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Nenhum evento do canal Verdash vira balão VAZIO no inbox.
@@ -159,58 +159,80 @@ describe("leitura: o que não é texto nem mídia comum", () => {
   });
 });
 
-/** Admin falso que registra o que a ingestão tentou escrever. */
-function adminEspiao(original: { id: string; conversation_id: string } | null) {
-  const chamadas: Array<{ tabela: string; op: string; valor?: unknown; filtros: Array<[string, unknown]> }> = [];
-  const admin = {
-    rpc: vi.fn(async () => ({ data: null, error: null })),
-    from(tabela: string) {
-      const registro = { tabela, op: "", valor: undefined as unknown, filtros: [] as Array<[string, unknown]> };
-      chamadas.push(registro);
-      const q = {
-        update(valor: unknown) { registro.op = "update"; registro.valor = valor; return q; },
-        insert(valor: unknown) { registro.op = "insert"; registro.valor = valor; return q; },
-        eq(col: string, v: unknown) { registro.filtros.push([col, v]); return q; },
-        is() { return q; },
-        select() { return q; },
-        maybeSingle: async () => ({ data: original, error: null }),
-      };
-      return q;
-    },
-  };
-  return { admin: admin as never, chamadas };
-}
+import { bancoFalso, ORIGINAL_INBOUND } from "./helpers/banco-falso-de-alteracao";
 
-describe("ingestão: edição muda a original e NÃO insere", () => {
-  it("caso Delicatto: UPDATE do corpo da original, sem INSERT em messages (que acordaria a IA)", async () => {
-    const { admin, chamadas } = adminEspiao({ id: "msg-orig", conversation_id: "conv-1" });
-    const r = await ingestVerdashInbound(admin, {
-      organizationId: "org-1", channelSessionId: "sess-1", payload: EDICAO_REAL,
-    });
+const ingerir = (admin: never, payload: unknown, sessao = "sess-1") =>
+  ingestVerdashInbound(admin, { organizationId: "org-1", channelSessionId: sessao, payload });
+
+describe("ingestão: edição muda a original, com autoria conferida, e NÃO insere", () => {
+  it("caso Delicatto: UPDATE pelo id da original, sem INSERT em messages (que acordaria a IA)", async () => {
+    const banco = bancoFalso();
+    const r = await ingerir(banco.admin, EDICAO_REAL);
 
     expect(r).toEqual({ status: "updated", conversationId: "conv-1", messageId: "msg-orig" });
-    expect(chamadas.some((c) => c.op === "insert")).toBe(false);
-    const upd = chamadas.find((c) => c.tabela === "messages" && c.op === "update");
+    expect(banco.inseriu()).toBe(false);
+    const upd = banco.update();
     expect(upd?.valor).toMatchObject({ body: "texto corrigido pela cliente" });
-    expect(upd?.filtros).toEqual([["organization_id", "org-1"], ["external_id", "3A00000000000000ORIG"]]);
+    expect(upd?.filtros).toEqual([["id", "msg-orig"], ["organization_id", "org-1"]]);
+  });
+
+  it("apagada da cliente na própria mensagem: carimba revoked_at", async () => {
+    const banco = bancoFalso();
+    const r = await ingerir(banco.admin, envelope({ protocolMessage: { key: { ID: "3A00000000000000ORIG" }, type: 0 } }));
+    expect(r.status).toBe("updated");
+    expect(banco.update()?.valor).toHaveProperty("revoked_at");
+  });
+
+  it("⛔ contato tentando editar mensagem que a EMPRESA mandou: ignorado, nada muda", async () => {
+    const banco = bancoFalso({ original: { ...ORIGINAL_INBOUND, direction: "outbound" } });
+    const r = await ingerir(banco.admin, EDICAO_REAL);
+    expect(r).toEqual({ status: "ignored", reason: "alteracao_autor_divergente" });
+    expect(banco.update()).toBeUndefined();
+  });
+
+  it("⛔ evento de OUTRA sessão de canal: ignorado, nada muda", async () => {
+    const banco = bancoFalso();
+    const r = await ingerir(banco.admin, EDICAO_REAL, "sess-OUTRA");
+    expect(r).toEqual({ status: "ignored", reason: "alteracao_autor_divergente" });
+    expect(banco.update()).toBeUndefined();
+  });
+
+  it("⛔ alvo de OUTRA conversa (chat e contato não batem): ignorado, nada muda", async () => {
+    const banco = bancoFalso({
+      conversa: { provider_conversation_id: "999999999999999@lid" },
+      contato: { phone_number: "+5511988887777", wa_lid: "999999999999999" },
+    });
+    const r = await ingerir(banco.admin, EDICAO_REAL);
+    expect(r).toEqual({ status: "ignored", reason: "alteracao_conversa_divergente" });
+    expect(banco.update()).toBeUndefined();
+  });
+
+  it("conversa reconhecida pelo telefone do contato quando o JID mudou (LID ↔ telefone)", async () => {
+    const banco = bancoFalso({
+      conversa: { provider_conversation_id: "5513900000000@s.whatsapp.net" },
+      contato: { phone_number: "+5513900000000", wa_lid: null },
+    });
+    expect((await ingerir(banco.admin, EDICAO_REAL)).status).toBe("updated");
   });
 
   it("original ausente: ignorado com motivo, e continua sem INSERT", async () => {
-    const { admin, chamadas } = adminEspiao(null);
-    const r = await ingestVerdashInbound(admin, {
-      organizationId: "org-1", channelSessionId: "sess-1", payload: EDICAO_REAL,
-    });
+    const banco = bancoFalso({ original: null });
+    const r = await ingerir(banco.admin, EDICAO_REAL);
     expect(r).toEqual({ status: "ignored", reason: "editar_sem_original" });
-    expect(chamadas.some((c) => c.op === "insert")).toBe(false);
+    expect(banco.inseriu()).toBe(false);
   });
 
   it("sinal de protocolo não toca o banco", async () => {
-    const { admin, chamadas } = adminEspiao(null);
-    const r = await ingestVerdashInbound(admin, {
-      organizationId: "org-1", channelSessionId: "sess-1",
-      payload: envelope({ protocolMessage: { type: 17 } }, { IsFromMe: true }),
-    });
+    const banco = bancoFalso();
+    const r = await ingerir(banco.admin, envelope({ protocolMessage: { type: 17 } }, { IsFromMe: true }));
     expect(r).toEqual({ status: "ignored", reason: "protocolo_17" });
-    expect(chamadas).toHaveLength(0);
+    expect(banco.chamadas).toHaveLength(0);
+  });
+
+  it("valor livre do payload não vira motivo nem tipo_nao_suportado", async () => {
+    const m = parseVerdashInbound(envelope({ protocolMessage: { type: "x'; drop table--" } }));
+    expect(m?.ignorar).toBe("protocolo_desconhecido");
+    const n = parseVerdashInbound(envelope({ "<script>": {} }));
+    expect(n?.extra).toEqual({ tipo_nao_suportado: "desconhecido" });
   });
 });
