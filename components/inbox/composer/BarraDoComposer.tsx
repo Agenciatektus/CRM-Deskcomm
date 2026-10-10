@@ -72,7 +72,7 @@ export function BarraDoComposer({
           onClick={() => void sugestao.generate()}
           disabled={isDisabled || sugestao.busy}
           aria-busy={sugestao.busy}
-          className="ml-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent/20 disabled:opacity-60 dark:text-accent-300"
+          className="pele-grad-suave ml-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent/20 disabled:opacity-60 dark:text-accent-300"
         >
           <Sparkle size={14} weight={sugestao.busy ? "duotone" : "fill"} aria-hidden />
           {t(sugestao.busy ? "Preparando…" : "Sugerir resposta")}

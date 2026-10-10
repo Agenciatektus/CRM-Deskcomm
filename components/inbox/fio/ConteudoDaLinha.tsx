@@ -60,7 +60,7 @@ export function ConteudoDaLinha({ linha, inicioDoBloco, ctx }: { linha: LinhaDoF
   if (linha.tipo === "dia")
     return (
       <div className="flex justify-center px-4 pb-1 pt-4">
-        <span className="rounded-full border border-border bg-surface px-3 py-0.5 text-xs font-semibold text-text-muted shadow-xs">
+        <span className="pele-dia rounded-full border border-border bg-surface px-3 py-0.5 text-xs font-semibold text-text-muted shadow-xs">
           {dayLabel(linha.data, t, localeDaData)}
         </span>
       </div>

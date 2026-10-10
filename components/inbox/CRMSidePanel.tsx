@@ -109,7 +109,7 @@ export function CRMSidePanel({ conversation }: Props) {
   return (
     // `bg-surface`: o painel é parte do card da área de trabalho (como a lista);
     // só o fio da conversa fica no fundo mais escuro, que é o que o destaca.
-    <aside className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-border bg-surface">
+    <aside className="pele-ruido flex h-full min-h-0 flex-col overflow-y-auto border-l border-border bg-surface">
       <CabecalhoDoPainel
         contact={contact}
         displayName={displayName}
@@ -125,14 +125,14 @@ export function CRMSidePanel({ conversation }: Props) {
           // `scrollbar-none`: nas larguras em que as quatro abas não cabem (o
           // painel estreito do `xl`), a faixa ainda rola de lado, mas sem
           // desenhar a barra que aparecia como um risco embaixo das abas.
-          className="scrollbar-none sticky top-0 z-10 flex gap-0.5 overflow-x-auto border-b border-border bg-surface px-3"
+          className="pele-ruido scrollbar-none sticky top-0 z-10 flex gap-0.5 overflow-x-auto border-b border-border bg-surface px-3"
         >
           {ABAS_DO_PAINEL.map((a) => (
             <TabsPrimitive.Trigger
               key={a}
               value={a}
               data-testid={`painel-aba-${a}`}
-              className="relative h-[42px] shrink-0 whitespace-nowrap px-2 text-[13.5px] font-semibold text-text-muted hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=active]:text-text data-[state=active]:after:absolute data-[state=active]:after:inset-x-2 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full data-[state=active]:after:bg-accent"
+              className="relative h-[42px] shrink-0 whitespace-nowrap px-2 text-[13.5px] font-semibold text-text-muted hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=active]:text-text data-[state=active]:after:absolute data-[state=active]:after:inset-x-2 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full data-[state=active]:after:bg-accent dark:data-[state=active]:after:bg-(image:--pele-grad)"
             >
               {t(ROTULO_DA_ABA[a])}
             </TabsPrimitive.Trigger>

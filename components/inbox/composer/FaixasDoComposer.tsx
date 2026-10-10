@@ -116,7 +116,7 @@ export function AbasDoComposer({
         type="button"
         aria-pressed={mode === "reply"}
         onClick={() => onMode("reply")}
-        className={cn(pilula, mode === "reply" ? "bg-text text-surface" : "text-text-muted hover:bg-muted hover:text-text")}
+        className={cn(pilula, mode === "reply" ? "pele-grad-ativo bg-text text-surface" : "text-text-muted hover:bg-muted hover:text-text")}
       >
         {t("Responder")}
       </button>

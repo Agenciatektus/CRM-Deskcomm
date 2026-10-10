@@ -33,7 +33,7 @@ export function ContadorDaFila({ compacto }: { compacto: boolean }) {
       aria-label={rotulo}
       title={rotulo}
       className={cn(
-        "grid place-items-center rounded-full bg-accent font-bold leading-none text-accent-foreground tabular-nums",
+        "pele-grad grid place-items-center rounded-full bg-accent font-bold leading-none text-accent-foreground tabular-nums",
         compacto
           ? "absolute top-1 right-2 h-[17px] min-w-[17px] px-1 text-[10.5px] ring-2 ring-background"
           : "ml-auto h-5 min-w-5 px-1.5 text-xs",

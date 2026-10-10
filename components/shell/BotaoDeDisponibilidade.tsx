@@ -44,7 +44,7 @@ export function BotaoDeDisponibilidade() {
       disabled={atualizar.isPending}
       onClick={() => atualizar.mutate({ userId: user.id, patch: { is_available: !ligado } })}
       data-testid="botao-de-disponibilidade"
-      className="hidden h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface pr-3 pl-2.5 text-[13px] font-semibold text-text transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:inline-flex"
+      className="pele-foco hidden h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface pr-3 pl-2.5 text-[13px] font-semibold text-text transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:inline-flex"
     >
       {/* O ponto com halo do `.avail` do protótipo. A cor não é a única pista:
           o texto ao lado diz o estado. */}

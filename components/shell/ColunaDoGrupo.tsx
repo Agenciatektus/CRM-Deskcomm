@@ -13,7 +13,7 @@ import { destinoDaRota } from "@/lib/navigation/rota-atual";
 import { cn } from "@/lib/utils";
 
 /** Item da coluna 2 marcado como a tela atual, e o resto. */
-const ITEM_ATIVO = "bg-card ring-1 ring-border font-semibold text-foreground";
+const ITEM_ATIVO = "pele-ativo-item bg-card ring-1 ring-border font-semibold text-foreground";
 const ITEM_INATIVO = "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
 
 export type Secao = { section: string; items: NavDestination[] };
