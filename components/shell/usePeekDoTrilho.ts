@@ -41,12 +41,18 @@ export function usePeekDoTrilho({ collapsed, pathname }: { collapsed: boolean; p
   const coluna = useRef<HTMLDivElement>(null);
   const botoes = useRef(new Map<NavGroupId, HTMLButtonElement>());
   const grupoDoPeek = useRef<NavGroupId | null>(null);
+  // Aberto pelo MOUSE (espiar, S6 da auditoria): não rouba o foco do teclado de
+  // quem só passou o ponteiro. Aberto pelo clique ou pelo teclado, o foco vai
+  // para a 1ª tela, como antes.
+  const porPonteiro = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   // Ao abrir (ou trocar o grupo com ele aberto), o foco vai para a 1ª tela da
   // coluna: quem abriu pelo teclado está a um Tab do que procurava, e não a
   // cinco botões de grupo de distância.
   useEffect(() => {
-    if (!peekAberto) return;
+    if (!peekAberto || porPonteiro.current) return;
     coluna.current?.querySelector<HTMLElement>("a[href]")?.focus();
   }, [peekAberto, escolhido]);
 
@@ -85,7 +91,36 @@ export function usePeekDoTrilho({ collapsed, pathname }: { collapsed: boolean; p
   }
 
   /** Clique num grupo do trilho. `mostrado` é o grupo que a coluna exibe agora. */
+  /**
+   * Espiar (o `.nav2.peek` do protótipo): com a barra recolhida, parar o mouse
+   * num grupo do trilho abre a coluna por cima, e sair da barra a fecha. Os
+   * atrasos (150 ms para abrir, 250 ms para fechar) evitam que cruzar o trilho
+   * a caminho de outra coisa abra e feche a coluna no caminho.
+   */
+  function apontar(id: NavGroupId) {
+    if (!collapsed) return;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      porPonteiro.current = true;
+      grupoDoPeek.current = id;
+      setEscolhido(id);
+      setAberto(true);
+    }, 150);
+  }
+
+  function sairDaBarra() {
+    clearTimeout(timer.current);
+    if (!collapsed) return;
+    timer.current = setTimeout(() => setAberto(false), 250);
+  }
+
+  function voltarABarra() {
+    clearTimeout(timer.current);
+  }
+
   function escolher(id: NavGroupId, mostrado: NavGroupId | null) {
+    clearTimeout(timer.current);
+    porPonteiro.current = false;
     setEscolhido(id);
     if (!collapsed) return;
     // Recolhida: o mesmo botão abre e fecha a sobreposição do grupo dele.
@@ -102,6 +137,9 @@ export function usePeekDoTrilho({ collapsed, pathname }: { collapsed: boolean; p
     peekAberto,
     escolher,
     fechar: () => setAberto(false),
+    apontar,
+    sairDaBarra,
+    voltarABarra,
     colunaRef: coluna,
     raizRef: raiz,
     onKeyDown,

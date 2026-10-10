@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDot";
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
+import { ContadorDeAvisos } from "@/components/shell/ContadorDeAvisos";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
 import { useT } from "@/hooks/i18n/useT";
@@ -127,9 +128,16 @@ function ItemDaColuna({
         >
           <Icon size={16} weight={ativo ? "fill" : "regular"} aria-hidden />
           <span className="truncate">{t(item.label)}</span>
+          {item.etiqueta && (
+            // O `.nav2-tag` do protótipo: rótulo do catálogo, não permissão.
+            <span className="ml-auto shrink-0 rounded-md border border-border-strong px-1.5 text-[11px] font-bold leading-[18px] text-text-subtle">
+              {t(item.etiqueta)}
+            </span>
+          )}
           {item.healthDot && <ConnectionHealthDot className="ml-auto" />}
           {item.contador === "casos" && <ContadorDeCasos compacto={false} />}
           {item.contador === "fila" && <ContadorDaFila compacto={false} />}
+          {item.contador === "avisos" && <ContadorDeAvisos />}
         </Link>
       </li>
       {children}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { initials } from "./tempo-da-linha";
+import { initials, siglaDoTelefone } from "./tempo-da-linha";
 
 /**
  * A sigla do avatar por code point. Visto na Inbox da Delicatto: "Grazy Lima 🎤"
@@ -54,5 +54,28 @@ describe("initials", () => {
     expect(initials("Maria da Silva", "??")).toBe("MS");
     expect(initials("Ângela Ávila", "??")).toBe("ÂÁ");
     expect(initials(null, "11")).toBe("11");
+  });
+});
+
+describe("siglaDoTelefone (fallback da sigla)", () => {
+  it("número brasileiro com DDI dá o DDD, sem o +", () => {
+    expect(siglaDoTelefone("+55 21 99812-4410")).toBe("21");
+    expect(siglaDoTelefone("5511987654321")).toBe("11");
+    expect(siglaDoTelefone("+55 11 3456-7890")).toBe("11");
+  });
+
+  it("número de fora ou sem DDI dá os dois primeiros dígitos", () => {
+    expect(siglaDoTelefone("+1 415 555 0100")).toBe("14");
+    expect(siglaDoTelefone("21998124410")).toBe("21");
+  });
+
+  it("sem telefone, ou sem dígitos, cai em ??", () => {
+    expect(siglaDoTelefone(null)).toBe("??");
+    expect(siglaDoTelefone("+")).toBe("??");
+  });
+
+  it("nome só com emoji usa o telefone, e a sigla nunca começa com +", () => {
+    expect(initials("🎤✨", siglaDoTelefone("+55 21 99812-4410"))).toBe("21");
+    expect(initials(". ✨", siglaDoTelefone("+55 21 99812-4410"))).not.toMatch(/^\+/);
   });
 });

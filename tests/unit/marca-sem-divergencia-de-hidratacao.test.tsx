@@ -65,6 +65,7 @@ vi.mock("@/components/connections/ConnectionHealthDot", () => ({
 // número não é o objeto destes casos (o dele mora em contador-de-casos.test.tsx).
 vi.mock("@/components/shell/ContadorDeCasos", () => ({ ContadorDeCasos: () => null }));
 vi.mock("@/components/shell/ContadorDaFila", () => ({ ContadorDaFila: () => null }));
+vi.mock("@/components/shell/ContadorDeAvisos", () => ({ ContadorDeAvisos: () => null }));
 vi.mock("@/components/shell/VersionFooter", () => ({ VersionFooter: () => null }));
 
 const usuario = {
