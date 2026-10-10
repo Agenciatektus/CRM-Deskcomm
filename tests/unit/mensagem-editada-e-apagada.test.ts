@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * A MENSAGEM QUE O CLIENTE EDITOU OU APAGOU.
@@ -22,7 +22,8 @@ import { beforeEach, describe, expect, it } from "vitest";
  * conversa; e que a tela DIGA que houve edição — o texto novo sozinho mente por
  * omissão, porque se lê como se sempre tivesse dito aquilo.
  */
-import { parseZernioEdicao } from "@/lib/channels/zernio/webhook";
+import { parseZernioEdicao, type ZernioEdicao } from "@/lib/channels/zernio/webhook";
+import { bancoFalso, ORIGINAL_INBOUND } from "./helpers/banco-falso-de-alteracao";
 import { aplicarEdicaoZernio } from "@/lib/channels/zernio/ingest";
 
 const zEvento = (event: string, extra: Record<string, unknown> = {}) => ({
@@ -57,6 +58,15 @@ describe("leitura do evento (Zernio)", () => {
     ).toBeNull();
   });
 
+  it("traz quem alterou e em qual conversa, para a guarda de autoria", () => {
+    const e = parseZernioEdicao({
+      event: "message.edited",
+      message: { platform: "whatsapp", platformMessageId: "wamid.ABC", direction: "outgoing", conversationId: "zconv-1", content: "x" },
+      conversation: { participantId: "5513900000000" },
+    });
+    expect(e).toMatchObject({ direction: "outbound", conversationId: "zconv-1", phone: "+5513900000000" });
+  });
+
   it("sem id da mensagem não há o que corrigir", () => {
     expect(parseZernioEdicao({ event: "message.edited", message: { platform: "whatsapp" } })).toBeNull();
   });
@@ -64,88 +74,78 @@ describe("leitura do evento (Zernio)", () => {
 
 // ---------------------------------------------------------------------------
 
-const ops: { tabela: string; op: string; payload?: unknown; filtros: [string, unknown][] }[] = [];
-let afetadas: unknown[] = [{ id: "m1" }];
-
-function chain(tabela: string, op: string, payload?: unknown): Record<string, unknown> {
-  const filtros: [string, unknown][] = [];
-  ops.push({ tabela, op, payload, filtros });
-  const proxy: Record<string, unknown> = new Proxy(
-    {},
-    {
-      get(_t, prop) {
-        if (prop === "then")
-          return (ok: (v: unknown) => unknown) => ok({ data: afetadas, error: null });
-        return (...args: unknown[]) => {
-          if (prop === "eq") filtros.push([String(args[0]), args[1]]);
-          return proxy;
-        };
-      },
-    },
-  ) as Record<string, unknown>;
-  return proxy;
-}
-
-const admin = {
-  from: (t: string) => ({
-    update: (p: unknown) => chain(t, "update", p),
-    insert: (p: unknown) => chain(t, "insert", p),
-    delete: () => chain(t, "delete"),
-  }),
-} as never;
-
-beforeEach(() => {
-  ops.length = 0;
-  afetadas = [{ id: "m1" }];
+const ed = (over: Partial<ZernioEdicao> = {}): ZernioEdicao => ({
+  externalId: "wamid.ABC",
+  tipo: "edited",
+  body: "preço novo: 300",
+  direction: "inbound",
+  conversationId: "zconv-1",
+  phone: "+5513900000000",
+  ...over,
 });
+
+// A original que o banco falso devolve é de ENTRADA, na sessão `sess-1`, na
+// conversa cujo `provider_conversation_id` é `zconv-1`.
+const bancoZernio = (over: Parameters<typeof bancoFalso>[0] = {}) =>
+  bancoFalso({ conversa: { provider_conversation_id: "zconv-1" }, ...over });
 
 describe("aplicar na linha que já existe", () => {
   it("edição sobrescreve o corpo e carimba quando", async () => {
-    const r = await aplicarEdicaoZernio(admin, "org", {
-      externalId: "wamid.ABC",
-      tipo: "edited",
-      body: "preço novo: 300",
-    });
-    expect(r).toBe("aplicado");
-    const up = ops.find((o) => o.op === "update");
-    expect(up?.payload).toMatchObject({ body: "preço novo: 300" });
-    expect(up?.payload).toHaveProperty("edited_at");
+    const banco = bancoZernio();
+    expect(await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed())).toBe("aplicado");
+    expect(banco.update()?.valor).toMatchObject({ body: "preço novo: 300" });
+    expect(banco.update()?.valor).toHaveProperty("edited_at");
   });
 
   it("apagar NÃO apaga a linha — carimba `revoked_at`", async () => {
     // Sumir com a linha deixaria a resposta seguinte respondendo ao nada, e
     // levaria junto o histórico de quem atendeu.
-    await aplicarEdicaoZernio(admin, "org", { externalId: "wamid.ABC", tipo: "deleted", body: null });
-    expect(ops.some((o) => o.op === "delete")).toBe(false);
-    const up = ops.find((o) => o.op === "update");
-    expect(up?.payload).toHaveProperty("revoked_at");
-    // E não mexe no corpo: quem decide o que mostrar é a tela, e limpar aqui
-    // impediria o atendente de entender depois o que tinha sido combinado.
-    expect(up?.payload).not.toHaveProperty("body");
+    const banco = bancoZernio();
+    await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed({ tipo: "deleted", body: null }));
+    expect(banco.update()?.valor).toHaveProperty("revoked_at");
+    // E não mexe no corpo: quem decide o que mostrar é a tela.
+    expect(banco.update()?.valor).not.toHaveProperty("body");
   });
 
   it("edição sem corpo novo não ZERA o texto", async () => {
-    // Trocar a versão velha (útil) por vazio (inútil) é pior que não aplicar.
-    await aplicarEdicaoZernio(admin, "org", { externalId: "wamid.ABC", tipo: "edited", body: null });
-    const up = ops.find((o) => o.op === "update");
-    expect(up?.payload).not.toHaveProperty("body");
-    expect(up?.payload).toHaveProperty("edited_at");
+    const banco = bancoZernio();
+    await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed({ body: null }));
+    expect(banco.update()?.valor).not.toHaveProperty("body");
+    expect(banco.update()?.valor).toHaveProperty("edited_at");
   });
 
-  it("casa por organização E por id externo — nunca só pelo id", async () => {
-    // O id do provider não é garantidamente único entre tenants; sem a org,
-    // uma edição de um cliente poderia reescrever a mensagem de outro.
-    await aplicarEdicaoZernio(admin, "org", { externalId: "wamid.ABC", tipo: "deleted", body: null });
-    const f = Object.fromEntries(ops.find((o) => o.op === "update")!.filtros);
-    expect(f).toMatchObject({ organization_id: "org", external_id: "wamid.ABC" });
+  it("procura por organização E id externo, e altera pelo id da linha conferida", async () => {
+    const banco = bancoZernio();
+    await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed({ tipo: "deleted", body: null }));
+    const leitura = banco.chamadas.find((c) => c.tabela === "messages" && c.op === "select");
+    expect(Object.fromEntries(leitura!.filtros)).toMatchObject({ organization_id: "org-1", external_id: "wamid.ABC" });
+    expect(banco.update()?.filtros).toEqual([["id", "msg-orig"], ["organization_id", "org-1"]]);
   });
 
   it("mensagem desconhecida devolve `sem_alvo`, sem inventar linha", async () => {
-    afetadas = [];
+    const banco = bancoZernio({ original: null });
+    expect(await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed())).toBe("sem_alvo");
+    expect(banco.inseriu()).toBe(false);
+  });
+
+  it("⛔ contato editando mensagem que a EMPRESA mandou: recusado, nada muda", async () => {
+    const banco = bancoZernio({ original: { ...ORIGINAL_INBOUND, direction: "outbound" } });
+    expect(await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed())).toBe("recusado");
+    expect(banco.update()).toBeUndefined();
+  });
+
+  it("⛔ evento de outra sessão: recusado, nada muda", async () => {
+    const banco = bancoZernio();
+    expect(await aplicarEdicaoZernio(banco.admin, "org-1", "sess-OUTRA", ed())).toBe("recusado");
+    expect(banco.update()).toBeUndefined();
+  });
+
+  it("⛔ alvo de outra conversa: recusado, nada muda", async () => {
+    const banco = bancoZernio({ contato: { phone_number: "+5511988887777", wa_lid: null } });
     expect(
-      await aplicarEdicaoZernio(admin, "org", { externalId: "nao-existe", tipo: "edited", body: "x" }),
-    ).toBe("sem_alvo");
-    expect(ops.some((o) => o.op === "insert")).toBe(false);
+      await aplicarEdicaoZernio(banco.admin, "org-1", "sess-1", ed({ conversationId: "zconv-OUTRA" })),
+    ).toBe("recusado");
+    expect(banco.update()).toBeUndefined();
   });
 });
 

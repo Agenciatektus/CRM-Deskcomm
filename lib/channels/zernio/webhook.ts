@@ -176,6 +176,13 @@ export interface ZernioEdicao {
   /** `edited` traz corpo novo; `deleted` não tem corpo a trazer. */
   tipo: "edited" | "deleted";
   body: string | null;
+  /**
+   * Quem alterou e em qual conversa: a autoria é conferida antes de aplicar
+   * (`lib/channels/alteracao-de-mensagem.ts`). `outgoing` = a própria linha.
+   */
+  direction: "inbound" | "outbound";
+  conversationId: string | null;
+  phone: string | null;
 }
 
 export function parseZernioEdicao(payload: unknown): ZernioEdicao | null {
@@ -194,10 +201,18 @@ export function parseZernioEdicao(payload: unknown): ZernioEdicao | null {
   const externalId = str(m.platformMessageId) ?? str(m.id);
   if (!externalId) return null;
 
+  const saida = str(m.direction) === "outgoing";
+  // Mesma regra do parser de mensagem: na saída, o `sender` somos nós.
+  const identidade = saida
+    ? resolveZernioIdentity(participanteDaConversa(obj(p.conversation)))
+    : resolveZernioIdentity(obj(m.sender));
   return {
     externalId,
     tipo: evento === "message.edited" ? "edited" : "deleted",
     body: str(m.content) ?? str(m.text) ?? str(m.body),
+    direction: saida ? "outbound" : "inbound",
+    conversationId: str(m.conversationId),
+    phone: identidade.phone,
   };
 }
 
