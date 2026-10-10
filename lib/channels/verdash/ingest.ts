@@ -52,10 +52,11 @@ import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual
 
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 
-import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
+import { parseVerdashInbound, type VerdashAlteracao, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
-  status: "ingested" | "duplicate" | "ignored";
+  /** `updated` = edição ou apagada aplicada sobre uma mensagem que já existia. */
+  status: "ingested" | "duplicate" | "ignored" | "updated";
   conversationId?: string;
   messageId?: string;
   /** Por que foi ignorado — vai para o log, e é o que se lê quando "sumiu". */
@@ -94,6 +95,15 @@ export async function ingestVerdashInbound(
   // têm nada a ver com paciente, e derramá-los no inbox faria o atendente
   // perder a conversa que importa no meio do ruído.
   if (msg.isGroup) return { status: "ignored", reason: "mensagem_de_grupo" };
+
+  // Sinal de protocolo, anúncio de álbum, reação retirada: não é conversa, e
+  // gravá-lo era o que punha balão VAZIO no inbox (ver `./conteudo.ts`).
+  if (msg.ignorar) return { status: "ignored", reason: msg.ignorar };
+
+  // Edição e apagada ALTERAM a original. Gravá-las como mensagem nova criava um
+  // balão vazio, deixava o texto antigo na original e — por ser INSERT de
+  // entrada — acordava a IA para responder a nada.
+  if (msg.alteracao) return aplicarAlteracao(admin, input.organizationId, msg.alteracao);
 
   const identity = waIdentityFrom(msg);
   if (!identity) {
@@ -153,6 +163,44 @@ export async function ingestVerdashInbound(
   }
 
   return { status: "ingested", conversationId, messageId: inserted };
+}
+
+/**
+ * Edição ou "apagar para todos" vindos do WhatsApp, aplicados na mensagem
+ * ORIGINAL — o mesmo efeito que o canal por QR já tem (`lib/waha/ingest.ts`).
+ *
+ * UPDATE em `messages` é inerte para a cascata (o gatilho que acorda a IA é só
+ * de INSERT). A apagada não limpa o corpo: quem decide o que mostrar é a tela.
+ * Reentrega do mesmo evento reaplica o mesmo valor — idempotente.
+ *
+ * Original ausente (mensagem anterior à conexão do número): nada a fazer, e
+ * isso NÃO vira mensagem nova.
+ */
+async function aplicarAlteracao(
+  admin: SupabaseClient,
+  organizationId: string,
+  alteracao: VerdashAlteracao,
+): Promise<VerdashIngestResult> {
+  const agora = new Date().toISOString();
+  const patch = alteracao.acao === "editar"
+    ? { body: alteracao.texto, edited_at: agora }
+    : { revoked_at: agora };
+
+  const { data, error } = await admin
+    .from("messages")
+    .update(patch)
+    .eq("organization_id", organizationId)
+    .eq("external_id", alteracao.alvo)
+    .select("id, conversation_id")
+    .maybeSingle();
+
+  // Falha de banco SOBE: o FZAP reenvia e a edição não se perde. Diferente do
+  // "original ausente", que reenviar não resolve.
+  if (error) throw new Error(`verdash_alteracao_falhou: ${error.message}`);
+  if (!data) return { status: "ignored", reason: `${alteracao.acao}_sem_original` };
+
+  const linha = data as { id: string; conversation_id: string };
+  return { status: "updated", conversationId: linha.conversation_id, messageId: linha.id };
 }
 
 /**
@@ -355,12 +403,14 @@ async function insertMessage(
       // filtro de eco do próprio envio depende deste valor.
       sent_via: "external_device",
       status: msg.direction === "outbound" ? "sent" : "delivered",
-      type: anexo?.type ?? "text",
+      // Nunca `text` vazio por omissão: local, contato e reação têm tipo próprio,
+      // e o que não sabemos ler leva `metadata.tipo_nao_suportado`.
+      type: msg.tipo,
       body: msg.text ?? anexo?.caption ?? null,
       // A URL é PONTEIRO, não conteúdo — e expira em ~30 min. Grava aqui para a
       // tela ter o que mostrar agora, e o worker baixa os bytes já.
       ...(anexo?.url ? { media_url: anexo.url, media_mime: anexo.mime } : {}),
-      metadata: anexo ? { provider_attachments: msg.attachments } : {},
+      metadata: { ...(anexo ? { provider_attachments: msg.attachments } : {}), ...msg.extra },
       ...(msg.sentAt ? { sent_at: msg.sentAt } : {}),
     })
     .select("id")

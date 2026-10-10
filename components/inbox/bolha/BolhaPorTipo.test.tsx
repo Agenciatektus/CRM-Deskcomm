@@ -265,3 +265,34 @@ describe("MessageBubble — remetente de grupo", () => {
     expect(screen.queryByText("Maria · +5521999990000")).toBeNull();
   });
 });
+
+describe("bolha sem conteúdo nunca fica vazia", () => {
+  it("tipo que o canal não soube ler: diz qual é e manda ver no celular", () => {
+    render(<MessageBubble message={msg({
+      direction: "inbound", body: null, metadata: { tipo_nao_suportado: "placeholderMessage" },
+    })} />);
+    expect(within(bolha()).getByText("Mensagem não suportada (tipo placeholderMessage). Veja no celular.")).toBeInTheDocument();
+  });
+
+  it("texto vazio sem mídia (linha antiga, gravada antes do conserto): aviso genérico", () => {
+    render(<MessageBubble message={msg({ direction: "inbound", body: null })} />);
+    expect(within(bolha()).getByText("Mensagem sem conteúdo. Veja no celular.")).toBeInTheDocument();
+  });
+
+  it("tipo de mídia sem arquivo cita o tipo do banco", () => {
+    render(<MessageBubble message={msg({ direction: "inbound", type: "audio", body: null })} />);
+    expect(within(bolha()).getByText("Mensagem não suportada (tipo audio). Veja no celular.")).toBeInTheDocument();
+  });
+
+  it("valor estranho no metadata não vira rótulo na tela", () => {
+    render(<MessageBubble message={msg({
+      direction: "inbound", body: null, metadata: { tipo_nao_suportado: "<b>clique aqui</b>" },
+    })} />);
+    expect(within(bolha()).getByText("Mensagem sem conteúdo. Veja no celular.")).toBeInTheDocument();
+  });
+
+  it("texto comum não mostra o aviso", () => {
+    render(<MessageBubble message={msg({ direction: "inbound", body: "oi" })} />);
+    expect(within(bolha()).queryByText(/Veja no celular/)).toBeNull();
+  });
+});

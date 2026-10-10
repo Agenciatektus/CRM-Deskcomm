@@ -33,6 +33,10 @@
  */
 import { timingSafeEqual } from "node:crypto";
 
+import { lerConteudoEspecial, textoDe, type VerdashAlteracao } from "./conteudo";
+
+export type { VerdashAlteracao } from "./conteudo";
+
 /** Um anexo, já reduzido ao que o CRM precisa saber. */
 export interface VerdashAttachment {
   /** Vocabulário de `messages.type`. */
@@ -70,6 +74,14 @@ export interface VerdashInboundMessage {
   text: string | null;
   attachments: VerdashAttachment[];
   sentAt: string | null;
+  /** O `messages.type` final: o do anexo, o especial (local, contato, reação) ou `text`. */
+  tipo: VerdashAttachment["type"] | "text" | "location" | "contact" | "reaction";
+  /** O que vai para `messages.metadata` além dos anexos (ver `./conteudo.ts`). */
+  extra: Record<string, unknown>;
+  /** Edição ou apagada: muda uma mensagem que JÁ existe, nunca cria outra. */
+  alteracao: VerdashAlteracao | null;
+  /** Evento que não é conversa (sinal de protocolo, anúncio de álbum): o motivo. */
+  ignorar: string | null;
 }
 
 /** Os wrappers que embrulham a mensagem de verdade no protobuf do WhatsApp. */
@@ -80,12 +92,18 @@ const INVOLUCROS = [
   "documentWithCaptionMessage",
   "editedMessage",
   "deviceSentMessage",
+  "viewOnceMessageV2Extension",
+  // A foto de um álbum chega embrulhada aqui; o álbum em si só anuncia.
+  "associatedChildMessage",
+  "lottieStickerMessage",
 ];
 
 /** `imageMessage` → `image`. A ordem importa: o primeiro que casar vence. */
 const CAMPOS_DE_MIDIA: Array<[string, VerdashAttachment["type"]]> = [
   ["imageMessage", "image"],
   ["videoMessage", "video"],
+  // Vídeo "bolinha" (recado em vídeo): é vídeo, só muda o formato na tela.
+  ["ptvMessage", "video"],
   ["audioMessage", "audio"],
   ["stickerMessage", "sticker"],
   ["documentMessage", "document"],
@@ -144,16 +162,6 @@ function desembrulhar(message: Record<string, unknown>): Record<string, unknown>
     atual = proximo;
   }
   return atual;
-}
-
-/** O texto da mensagem, onde quer que ele esteja. */
-function textoDe(message: Record<string, unknown>): string | null {
-  return (
-    str(message.conversation) ??
-    str(obj(message.extendedTextMessage).text) ??
-    str(message.text) ??
-    null
-  );
 }
 
 /**
@@ -228,6 +236,9 @@ export function parseVerdashInbound(payload: unknown): VerdashInboundMessage | n
 
   const message = desembrulhar(obj(evt.Message));
   const anexo = anexoDe(message, p);
+  const texto = textoDe(message);
+  const especial = lerConteudoEspecial(message, { texto: texto !== null, anexo: anexo !== null });
+  const conteudo = especial?.caso === "conteudo" ? especial.conteudo : null;
 
   const carimbo = str(info.Timestamp);
   const sentAt = carimbo
@@ -259,9 +270,13 @@ export function parseVerdashInbound(payload: unknown): VerdashInboundMessage | n
       displayName: fromMe ? null : str(info.PushName),
     },
     isGroup,
-    text: textoDe(message),
+    text: conteudo ? conteudo.texto : texto,
     attachments: anexo ? [anexo] : [],
     sentAt,
+    tipo: anexo?.type ?? conteudo?.tipo ?? "text",
+    extra: conteudo?.extra ?? {},
+    alteracao: especial?.caso === "alteracao" ? especial.alteracao : null,
+    ignorar: especial?.caso === "ignorar" ? especial.motivo : null,
   };
 }
 
