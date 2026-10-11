@@ -71,7 +71,7 @@ export function VitrineDoDesignSystem() {
 
           <p className="rounded-md border border-dashed border-border-strong px-3 py-2 text-label text-text-muted">
             {t(
-              "Dados de exemplo. Nenhum nome, número ou conversa desta página vem do banco, e nada que se clica aqui é gravado.",
+              "Dados de exemplo. Nenhum nome, número ou conversa desta página vem do banco. Enquanto ela está aberta, nenhuma gravação sai do navegador, nem as do menu e do topo do app.",
             )}
           </p>
           <IndiceDaVitrine tema={modo === "escuro" ? "escuro" : "claro"} />

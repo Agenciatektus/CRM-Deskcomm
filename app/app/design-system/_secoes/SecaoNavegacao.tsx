@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { useState } from "react";
 
 import { BarraEmDuasColunas } from "@/components/shell/BarraEmDuasColunas";
 import { MarcaDaBarra } from "@/components/shell/MarcaDaBarra";
@@ -15,27 +15,21 @@ import { Exemplo, Secao } from "../_componentes/Secao";
 import type { Tema } from "../_componentes/tema";
 
 /**
- * O botão de fixar a barra chama uma Server Action que grava o cookie da
- * pessoa: na vitrine ele não pode valer, senão "fixar" aqui mudaria o menu de
- * verdade. Os dois estados aparecem lado a lado em vez disso.
+ * A barra de verdade, com o « e o alfinete trocando um estado LOCAL
+ * (`aoAlternar`): sem isso eles chamariam a Server Action que grava o cookie
+ * do menu da pessoa, e recolher a amostra recolheria o menu real.
  */
-function semFixar(e: MouseEvent<HTMLDivElement>, rotulos: string[]) {
-  const botao = e.target instanceof Element ? e.target.closest("button[aria-label]") : null;
-  if (botao && rotulos.includes(botao.getAttribute("aria-label") ?? "")) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-}
-
-function Barra({ recolhida }: { recolhida: boolean }) {
-  const t = useT();
+function Barra({ recolhidaDeInicio }: { recolhidaDeInicio: boolean }) {
+  const [recolhida, setRecolhida] = useState(recolhidaDeInicio);
   return (
-    <div
-      onClickCapture={(e) => semFixar(e, [t("Fixar menu"), t("Recolher sidebar")])}
-      className="relative h-[30rem] w-[19rem] shrink-0 rounded-lg border border-border bg-bg"
-    >
+    <div className="relative h-[30rem] w-[19rem] shrink-0 rounded-lg border border-border bg-bg">
       <aside className={recolhida ? "relative h-full w-18" : "relative h-full w-[19rem]"}>
-        <BarraEmDuasColunas collapsed={recolhida} funis={FUNIS_DA_VITRINE} marca={<MarcaDaBarra compacta />} />
+        <BarraEmDuasColunas
+          collapsed={recolhida}
+          funis={FUNIS_DA_VITRINE}
+          marca={<MarcaDaBarra compacta />}
+          aoAlternar={() => setRecolhida((r) => !r)}
+        />
       </aside>
     </div>
   );
@@ -98,11 +92,11 @@ export function SecaoNavegacao({ tema }: { tema: Tema }) {
     >
       <Exemplo nome={t("Recolhida (passe o mouse ou clique num módulo) e fixada")} mapa="ds:navegacao" tema={tema}>
         <div className="flex flex-wrap gap-6">
-          <Barra recolhida />
-          <Barra recolhida={false} />
+          <Barra recolhidaDeInicio />
+          <Barra recolhidaDeInicio={false} />
         </div>
         <p className="text-meta text-text-subtle">
-          {t("O contador do módulo mostra a fila; o da página, o que pede ação. Na vitrine, fixar não grava a preferência.")}
+          {t("O contador do módulo mostra a fila; o da página, o que pede ação. Na vitrine, fixar e recolher só trocam a amostra.")}
         </p>
       </Exemplo>
       <Secao id={`modulos-${tema}`} sub titulo={t("Módulos e páginas")} mapa="ds:modulos" tema={tema}>

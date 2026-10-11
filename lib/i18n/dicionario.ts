@@ -38,7 +38,7 @@ type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>
 
 export const DICIONARIO: Traducoes = {
   // ─── VITRINE DO DESIGN SYSTEM (/app/design-system, Etapa 1) ───
-  "Dados de exemplo. Nenhum nome, número ou conversa desta página vem do banco, e nada que se clica aqui é gravado.": { es: "Datos de ejemplo. Ningún nombre, número o conversación de esta página viene de la base, y nada de lo que se hace clic aquí se guarda." },
+  "Dados de exemplo. Nenhum nome, número ou conversa desta página vem do banco. Enquanto ela está aberta, nenhuma gravação sai do navegador, nem as do menu e do topo do app.": { es: "Datos de ejemplo. Ningún nombre, número o conversación de esta página viene de la base. Mientras está abierta, ninguna escritura sale del navegador, ni las del menú y la parte superior de la app." },
   "Etapas clicáveis, Ganho, Perdido com motivo e Outro funil no próprio painel; excluir fica no menu \"…\" do lead.": { es: "Etapas clicables, Ganado, Perdido con motivo y Otro embudo en el propio panel; eliminar queda en el menú \"…\" del lead." },
   "Menu da conversa (botão direito ou \"…\")": { es: "Menú de la conversación (clic derecho o \"…\")" },
   "Digite \"mari\": contatos, conversas e leads vêm das amostras; telas e ações são as de verdade.": { es: "Escriba \"mari\": contactos, conversaciones y leads vienen de las muestras; pantallas y acciones son las de verdad." },
@@ -117,7 +117,7 @@ export const DICIONARIO: Traducoes = {
   "no rodapé": { es: "en el pie" },
   "A 1ª coluna (72 px) mostra os módulos; a 2ª (232 px), as páginas do módulo. Recolhida, a 2ª coluna abre por cima ao passar o mouse ou clicar, sem empurrar o conteúdo. Fixar deixa aberta ao lado.": { es: "La 1.ª columna (72 px) muestra los módulos; la 2.ª (232 px), las páginas del módulo. Recogida, la 2.ª columna se abre por encima al pasar el mouse o hacer clic, sin empujar el contenido. Fijar la deja abierta al lado." },
   "Recolhida (passe o mouse ou clique num módulo) e fixada": { es: "Recogida (pase el mouse o haga clic en un módulo) y fijada" },
-  "O contador do módulo mostra a fila; o da página, o que pede ação. Na vitrine, fixar não grava a preferência.": { es: "El contador del módulo muestra la fila; el de la página, lo que pide acción. En la vitrina, fijar no guarda la preferencia." },
+  "O contador do módulo mostra a fila; o da página, o que pede ação. Na vitrine, fixar e recolher só trocam a amostra.": { es: "El contador del módulo muestra la fila; el de la página, lo que pide acción. En la vitrina, fijar y recoger solo cambian la muestra." },
   "Módulos e páginas": { es: "Módulos y páginas" },
   "O CRM cumpre": { es: "El CRM cumple" },
   "Cada uma veio de um defeito real encontrado nas rodadas de revisão. Valem para qualquer tela nova.": { es: "Cada una vino de un defecto real encontrado en las rondas de revisión. Valen para cualquier pantalla nueva." },

@@ -23,6 +23,12 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/app/design-system",
   useSearchParams: () => new URLSearchParams(),
 }));
+// A paleta (Ctrl K) lê o tema do ThemeProvider da casca. O provedor de verdade
+// aplicaria o tema no <html> e apagaria o que cada teste montou ali.
+vi.mock("@/lib/theme", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useTheme: () => ({ theme: "light", resolvedTheme: "light", setTheme: vi.fn(), toggle: vi.fn() }),
+}));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: usuario, activeOrg: { orgId: "org", role: "admin", modulos_ligados: [], capacidades_ligadas: [] } }),
   useAuthOpcional: () => ({ user: usuario, activeOrg: null }),
@@ -31,7 +37,9 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   usePermission: () => true,
 }));
 
+import { ehChamadaDaVitrine } from "@/app/app/design-system/_componentes/ApiDaVitrine";
 import { VitrineDoDesignSystem } from "@/app/app/design-system/_componentes/VitrineDoDesignSystem";
+import { PREFIXO_DA_VITRINE } from "@/lib/design-system/amostras/ids";
 
 const SECOES = [
   "cor",
@@ -54,6 +62,7 @@ const fetchDoAmbiente = globalThis.fetch;
 beforeEach(() => {
   // O jsdom não desenha canvas; a amostra mostra "—", que é o caminho certo fora do navegador.
   HTMLCanvasElement.prototype.getContext = (() => null) as never;
+  Element.prototype.scrollIntoView = () => undefined;
   escapou = vi.fn(() => Promise.reject(new Error("chamada escapou da vitrine")));
   globalThis.fetch = escapou as unknown as typeof fetch;
 });
@@ -97,6 +106,37 @@ describe("vitrine do design system", () => {
     expect(escapou).not.toHaveBeenCalled();
   });
 
+  it("\"Conversar com\" do cartão de contato não sai para a rede (P1-1 da #164)", async () => {
+    await montar();
+    const botao = screen.getAllByRole("button", { name: /Conversar com Carla/ })[0]!;
+    await act(async () => {
+      fireEvent.click(botao);
+      await new Promise((ok) => setTimeout(ok, 30));
+    });
+    expect(escapou).not.toHaveBeenCalled();
+  });
+
+  it("clicar em CADA botão da vitrine não gera nenhum fetch real", async () => {
+    const { container } = await montar();
+    const botoes = [...container.querySelectorAll("button")];
+    expect(botoes.length).toBeGreaterThan(100);
+    for (const b of botoes) {
+      if (!b.isConnected) continue;
+      await act(async () => {
+        try {
+          fireEvent.click(b);
+        } catch (erroDoClique) {
+          void erroDoClique;
+        }
+        await new Promise((ok) => setTimeout(ok, 0));
+      });
+    }
+    await act(async () => {
+      await new Promise((ok) => setTimeout(ok, 50));
+    });
+    expect(escapou).not.toHaveBeenCalled();
+  });
+
   it.each(["dark", "light"])("lado a lado com o app %s: cada painel tem o próprio tema e o <html> fica como está", async (app) => {
     document.documentElement.setAttribute("data-theme", app);
     const { container } = await montar();
@@ -124,5 +164,18 @@ describe("vitrine do design system", () => {
     expect(info.textContent).toContain("Diferente do protótipo");
     expect(info.textContent).toContain("#0077bc");
     expect(claro.querySelector('[data-amostra="--color-bg"] [data-status]')).toBeNull();
+  });
+});
+
+describe("a regra do desvio", () => {
+  it("escrita para /api/ fica no navegador, venha de onde vier (controle: leitura comum passa)", () => {
+    expect(ehChamadaDaVitrine("/api/v1/conversations/open-with-contact", "POST", "{}")).toBe(true);
+    expect(ehChamadaDaVitrine("/api/v1/qualquer", "DELETE")).toBe(true);
+    expect(ehChamadaDaVitrine("/api/v1/conversations/counts", "GET")).toBe(false);
+  });
+
+  it("leitura com o prefixo das amostras no corpo fica no navegador", () => {
+    expect(ehChamadaDaVitrine("/api/v1/x", "GET", JSON.stringify({ id: PREFIXO_DA_VITRINE + "010" }))).toBe(true);
+    expect(ehChamadaDaVitrine("https://outro.example/api/v1/x", "POST")).toBe(false);
   });
 });
