@@ -8,14 +8,20 @@
  *   - ninguém é suspenso sem o aviso final DESTA dívida gravado há ≥ 48 h
  *     corridas — a data de calendário não conta;
  *   - com provedor, nunca se suspende com leitura de mais de 1 h;
- *   - teste grátis vencido sem pagamento vira dívida (não é acesso eterno);
+ *   - teste grátis vencido sem pagamento vira dívida (não é acesso eterno), e
+ *     NÃO espera a tolerância de D-5: quem nunca pagou nada não tem boleto nem
+ *     Pix em compensação, então o limite é o aviso final + 48 h (#2753);
  *   - a tolerância nunca fica abaixo de 5 dias, digite o dono o que digitar;
  *   - suspensão administrativa é do dono: a régua não avisa nem reativa.
  */
 import type { AvisoDaRegua, EstadoDaAssinatura } from "@/lib/cobranca/vocabulario";
 import { ehOperante, tipoDaSuspensao } from "@/lib/organizacao/operante";
 
-/** Boleto e Pix levam até 1 dia útil, e um fim de semana entra no meio (D-5). */
+/**
+ * Boleto e Pix levam até 1 dia útil, e um fim de semana entra no meio (D-5).
+ * O piso vale para a dívida de QUEM TEM PAGAMENTO no jogo — nunca para o trial
+ * vencido, que a régua separa em `dividaDoTeste` (#2753).
+ */
 export const PISO_DA_TOLERANCIA_DIAS = 5;
 
 const HORA_MS = 3_600_000;
@@ -46,13 +52,16 @@ export interface OrgNaRegua {
   readonly suspendedKind: string | null;
 }
 
-/** De onde vem a dívida — muda a frase do aviso, nunca a régua. */
+/**
+ * De onde vem a dívida — muda a frase do aviso E se a tolerância de D-5 vale
+ * (`dividaDoTeste` em `decidirRegua`): "teste" nunca pagou nada (#2753).
+ */
 export type OrigemDaDivida = "atraso" | "teste" | "cancelamento";
 
 export type AcaoDaRegua =
   | { tipo: "nada" }
   | { tipo: "reativar" }
-  | { tipo: "suspender"; debitoDesde: Date }
+  | { tipo: "suspender"; debitoDesde: Date; origem: OrigemDaDivida }
   | { tipo: "avisar"; aviso: AvisoDaRegua; debitoDesde: Date | null; data: Date; origem: OrigemDaDivida }
   | { tipo: "cancelar_no_provedor" };
 
@@ -111,7 +120,14 @@ export function decidirRegua(
   }
 
   if (debito !== null) {
-    const origem: OrigemDaDivida = estado === "cancelada" ? "cancelamento" : a.temProvedor ? "atraso" : "teste";
+    // Trial vencido sem pagamento confirmado: a dívida nasceu no fim do teste
+    // quando NÃO há provedor nenhum (nunca houve checkout) ou quando
+    // `vencida_desde` É o fim do teste — só `aplicarLeitura` grava assim, e só
+    // quando o provedor não tem pagamento confirmado (estado.ts, `doTesteVencido`).
+    // Quem nunca pagou nada não tem boleto nem Pix esperando compensação, então
+    // a tolerância de D-5 (5–30 dias) não cabe aqui: vale o aviso final + 48 h.
+    const dividaDoTeste = !a.temProvedor || (a.trialAte !== null && vencida !== null && vencida.getTime() === a.trialAte.getTime());
+    const origem: OrigemDaDivida = estado === "cancelada" ? "cancelamento" : dividaDoTeste ? "teste" : "atraso";
     if (suspensaPorCobranca) {
       // Um e-mail de "suspensa" e silêncio para sempre não recupera receita: um
       // lembrete por semana. `debitoDesde` = agora − 7 d faz a função SQL aceitar
@@ -125,7 +141,9 @@ export function decidirRegua(
     }
     const tolerancia = Math.max(PISO_DA_TOLERANCIA_DIAS, Math.trunc(toleranciaConfigurada)) * DIA_MS;
     const limite = Math.max(
-      debito.getTime() + (estado === "em_atraso" ? tolerancia : 0),
+      // A tolerância é para a dívida de quem tem pagamento no jogo; a do teste
+      // vencido é zero, e `prazo_extra_ate` continua valendo para as duas.
+      debito.getTime() + (estado === "em_atraso" && origem !== "teste" ? tolerancia : 0),
       a.prazoExtraAte?.getTime() ?? 0,
     );
     // Um aviso só "pertence" a esta dívida se foi dado depois que ela começou:
@@ -138,7 +156,7 @@ export function decidirRegua(
     const leituraFresca = !a.temProvedor || (a.relidaEm !== null && a.relidaEm.getTime() >= t - LEITURA_FRESCA_MS);
 
     if (t >= limite && avisoFinalEm !== null && t - avisoFinalEm >= ESPERA_DEPOIS_DO_AVISO_FINAL_MS && leituraFresca) {
-      return decisao({ tipo: "suspender", debitoDesde: debito });
+      return decisao({ tipo: "suspender", debitoDesde: debito, origem });
     }
     const avisoFinalDado = avisoDaDivida?.aviso === "suspende_em_breve" || avisoDaDivida?.aviso === "suspensa";
     if (t >= limite - JANELA_DO_AVISO_FINAL_MS && !avisoFinalDado) {

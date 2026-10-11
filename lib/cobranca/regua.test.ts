@@ -49,11 +49,11 @@ describe("sem dívida", () => {
 });
 
 describe("a dívida e os avisos", () => {
-  it("⭐ teste vencido sem provedor vira em_atraso desde o fim do teste, e avisa 'venceu'", () => {
+  it("⭐ teste vencido sem provedor vira em_atraso desde o fim do teste, e o aviso final sai na hora (sem tolerância)", () => {
     const d = decidir(a({ estado: "trial", temProvedor: false, assinaturasVivas: 0, trialAte: ha(24), relidaEm: null }));
     expect(d.estado).toBe("em_atraso");
     expect(d.gravarVencidaDesde).toEqual(ha(24));
-    expect(d.acao).toEqual({ tipo: "avisar", aviso: "venceu", debitoDesde: ha(24), data: ha(24), origem: "teste" });
+    expect(d.acao).toEqual({ tipo: "avisar", aviso: "suspende_em_breve", debitoDesde: ha(24), data: em(48), origem: "teste" });
   });
 
   it("em atraso há 1 dia, sem aviso: 'venceu', com a data da dívida", () => {
@@ -86,7 +86,7 @@ describe("a dívida e os avisos", () => {
 
 describe("a suspensão", () => {
   it("⭐ limite passado e aviso final há 49 h: suspende", () => {
-    expect(decidir(comAvisoFinal(8, 49)).acao).toEqual({ tipo: "suspender", debitoDesde: ha(24 * 8) });
+    expect(decidir(comAvisoFinal(8, 49)).acao).toEqual({ tipo: "suspender", debitoDesde: ha(24 * 8), origem: "atraso" });
   });
 
   it("⭐ 47 h 59 min depois do aviso final não suspende (48 h corridas, não dias de calendário)", () => {
@@ -113,6 +113,50 @@ describe("a suspensão", () => {
     const divida = { estado: "em_atraso" as const, vencidaDesde: ha(24 * 10), ultimoAviso: "suspende_em_breve" as const };
     expect(decidir(a({ ...divida, ultimoAvisoEm: ha(24 * 40) })).acao).toMatchObject({ tipo: "avisar", aviso: "suspende_em_breve" });
     expect(decidir(a({ ...divida, ultimoAvisoEm: ha(49) })).acao.tipo).toBe("suspender");
+  });
+});
+
+describe("⭐ trial vencido × assinatura atrasada: a tolerância só protege quem pagou (#2753)", () => {
+  // D-5 nasceu porque boleto e Pix levam até 1 dia útil para compensar, com um
+  // fim de semana no meio. Quem nunca pagou nada não tem nada a compensar: o
+  // trial vencido recebe o aviso final no próprio fim do teste e é suspenso
+  // 48 h depois, mesmo com a tolerância configurada em 30 dias. Quem JÁ pagou
+  // continua com a tolerância de D-5 intacta.
+  const fimDoTeste = ha(24 * 6);
+  const trialVencido = (p: Partial<AssinaturaNaRegua> = {}) =>
+    a({ estado: "trial", temProvedor: false, assinaturasVivas: 0, trialAte: fimDoTeste, relidaEm: null, ...p });
+
+  it("⭐ trial sem pagamento: tolerância 7 e 30 dão o MESMO resultado — aviso final agora, suspensão em 48 h", () => {
+    const esperado = { tipo: "avisar", aviso: "suspende_em_breve", debitoDesde: fimDoTeste, data: em(48), origem: "teste" } as const;
+    expect(decidir(trialVencido(), ATIVA, 7).acao).toEqual(esperado);
+    expect(decidir(trialVencido(), ATIVA, 30).acao).toEqual(esperado);
+  });
+
+  it("⭐ trial sem pagamento, aviso final há 49 h: suspende mesmo com tolerância 30", () => {
+    const d = trialVencido({ ultimoAviso: "suspende_em_breve", ultimoAvisoEm: ha(49) });
+    expect(decidir(d, ATIVA, 30).acao).toEqual({ tipo: "suspender", debitoDesde: fimDoTeste, origem: "teste" });
+  });
+
+  it("trial sem pagamento: 47 h 59 min depois do aviso final NÃO suspende — as 48 h seguem valendo", () => {
+    const d = trialVencido({ ultimoAviso: "suspende_em_breve", ultimoAvisoEm: ha(47 + 59 / 60) });
+    expect(decidir(d, ATIVA, 30).acao).toEqual({ tipo: "nada" });
+  });
+
+  it("trial vencido com checkout feito e nada vivo no provedor: a dívida é do teste, não do pagamento", () => {
+    const d = a({ estado: "em_atraso", temProvedor: true, assinaturasVivas: 0, trialAte: fimDoTeste, vencidaDesde: fimDoTeste });
+    expect(decidir(d, ATIVA, 30).acao).toEqual({
+      tipo: "avisar", aviso: "suspende_em_breve", debitoDesde: fimDoTeste, data: em(48), origem: "teste",
+    });
+  });
+
+  it("⭐ assinatura com pagamento em atraso: a tolerância configurada continua mandando (7 → suspende; 30 → espera)", () => {
+    const atraso = comAvisoFinal(10, 49);
+    expect(decidir(atraso, ATIVA, 7).acao).toEqual({ tipo: "suspender", debitoDesde: ha(24 * 10), origem: "atraso" });
+    expect(decidir(atraso, ATIVA, 30).acao).toEqual({ tipo: "nada" });
+  });
+
+  it("assinatura que já teve trial e voltou a dever (vencida_desde ≠ fim do teste): tolerância normal", () => {
+    expect(decidir(comAvisoFinal(6, 49, { trialAte: ha(24 * 60) }), ATIVA, 7).acao).toEqual({ tipo: "nada" });
   });
 });
 
