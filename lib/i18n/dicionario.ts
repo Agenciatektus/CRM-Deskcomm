@@ -37,6 +37,14 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "Canal para enviar os lembretes": { es: "Canal para enviar los recordatorios" },
+  "Automático — conversa da reserva ou único canal disponível": { es: "Automático — conversación de la reserva o único canal disponible" },
+  "Canal configurado indisponível — escolha outro": { es: "Canal configurado no disponible — elige otro" },
+  "O canal escolhido vale para todas as reservas deste tipo, inclusive as criadas manualmente. Se ele não puder enviar, a equipe recebe um aviso; o sistema não troca de número sozinho.": { es: "El canal elegido se aplica a todas las reservas de este tipo, incluidas las creadas manualmente. Si no puede enviar, el equipo recibe un aviso; el sistema no cambia de número por su cuenta." },
+  "Não foi possível carregar os canais. A escolha guardada será preservada; tente novamente.": { es: "No se pudieron cargar los canales. Se conservará la elección guardada; inténtalo de nuevo." },
+  "Canal sem nome": { es: "Canal sin nombre" },
+  "Não foi possível consultar o canal do lembrete.": { es: "No se pudo consultar el canal del recordatorio." },
+  "Escolha um canal de mensagem não arquivado desta organização.": { es: "Elige un canal de mensajes no archivado de esta organización." },
   "Conectar a assinatura do ChatGPT": { es: "Conectar la suscripción de ChatGPT" },
   "Cada empresa conecta a própria conta do ChatGPT. Abra o link e entre com a conta que tem a assinatura. No fim, o navegador vai para http://127.0.0.1:1455/auth/callback, que pode não abrir — é esperado. Copie esse endereço inteiro, da barra do navegador, e cole aqui.": {
     es: "Cada empresa conecta su propia cuenta de ChatGPT. Abre el enlace e inicia sesión con la cuenta que tiene la suscripción. Al final, el navegador irá a http://127.0.0.1:1455/auth/callback, que quizá no se abra — es normal. Copia la dirección completa de la barra del navegador y pégala aquí.",
@@ -1201,6 +1209,7 @@ export const DICIONARIO: Traducoes = {
   "Abrir negócio": { es: "Abrir negocio" },
   "Abrir acompanhamento": { es: "Abrir seguimiento" },
   "Revisar conexão": { es: "Revisar conexión" },
+  "Configurar canal do lembrete": { es: "Configurar canal del recordatorio" },
   "Revisar agente": { es: "Revisar agente" },
   "Testar ou revisar resposta": { es: "Probar o revisar respuesta" },
   "Abrir base de conhecimento": { es: "Abrir base de conocimiento" },
@@ -8966,6 +8975,7 @@ export const DICIONARIO: Traducoes = {
   "Criar funil": { es: "Crear embudo" },
   "Criar meu primeiro funil": { es: "Crear mi primer embudo" },
   "Novo funil": { es: "Nuevo embudo" },
+  "Trocar de funil": { es: "Cambiar de embudo" },
   "Subir": { es: "Subir" },
   "na lista": { es: "en la lista" },
   "Descer": { es: "Bajar" },
@@ -14945,6 +14955,21 @@ export const DICIONARIO: Traducoes = {
   "Excluir tira essas empresas da lista. Em outra busca, elas podem aparecer de novo como novas.": { es: "Eliminar quita estas empresas de la lista. En otra búsqueda pueden aparecer de nuevo como nuevas." },
   "Empresas desmarcadas excluídas.": { es: "Empresas desmarcadas eliminadas." },
   "Esta campanha já criou o contato e o negócio dessas empresas ao iniciar. Desmarcar só impede o envio: elas continuam no funil.": { es: "Esta campaña ya creó el contacto y el negocio de estas empresas al iniciar. Desmarcar solo impide el envío: siguen en el embudo." },
+  // Exportação da conversa em PDF (#2229)
+  "Celular": { es: "Móvil" },
+  "Mensagem apagada pelo autor.": { es: "Mensaje eliminado por el autor." },
+  "(editada)": { es: "(editada)" },
+  "Histórico da conversa": { es: "Historial de la conversación" },
+  "Aberta em": { es: "Abierta el" },
+  "Exportado por": { es: "Exportado por" },
+  "Atenção: esta conversa ultrapassa o limite de mensagens por arquivo — só as mais recentes entram neste histórico.": { es: "Atención: esta conversación supera el límite de mensajes por archivo; solo las más recientes entran en este historial." },
+  "recebida": { es: "recibida" },
+  "enviada": { es: "enviada" },
+  "Não foi possível gerar o PDF desta conversa.": { es: "No se pudo generar el PDF de esta conversación." },
+  "{quem} em {quando}": { es: "{quem} el {quando}" },
+  "página {atual} de {total}": { es: "página {atual} de {total}" },
+  "Muitas exportações seguidas. Tente em um minuto.": { es: "Demasiadas exportaciones seguidas. Inténtelo en un minuto." },
+  "Erro ao ler o contato.": { es: "Error al leer el contacto." },
   // ─── RELATÓRIOS: A ABA "POR ETIQUETA" (#1891) ───
   "Por etiqueta": { es: "Por etiqueta" },
   "Abertas": { es: "Abiertas" },
