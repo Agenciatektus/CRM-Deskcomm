@@ -26,7 +26,7 @@ const RESPOSTA = {
 function capturando(modelId: string) {
   const corpos: Record<string, unknown>[] = [];
   const model = createAnthropic({
-    apiKey: "sk-ant-teste",
+    apiKey: "chave-falsa-do-teste",
     fetch: async (_url, init) => {
       corpos.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return new Response(JSON.stringify({ ...RESPOSTA, model: modelId }), {
