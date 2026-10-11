@@ -57,7 +57,14 @@ export function MediaRenderer({ message }: { message: Message }) {
           sizeBytes={message.media_size_bytes}
           storagePath={message.media_storage_path}
           isOutbound={isOutbound}
+          nome={nomeDoArquivo(message.metadata)}
         />
       );
   }
+}
+
+/** O nome do arquivo, quando o canal o mandou (`metadata.filename`/`file_name`); só texto curto. */
+function nomeDoArquivo(metadata: Record<string, unknown> | null | undefined): string | null {
+  const bruto = metadata?.filename ?? metadata?.file_name;
+  return typeof bruto === "string" && bruto.trim() ? bruto.trim().slice(0, 120) : null;
 }

@@ -168,12 +168,13 @@ export function ConversationListItem({
             Instagram…), como no protótipo. */}
         <ChannelLogo
           channel={canal}
-          size={12}
+          size={11}
+          selo
           // O anel tem a cor do FUNDO DA LINHA (que muda na seleção), para o
           // selo recortar o avatar em vez de flutuar com uma borda de outra cor.
           className={cn(
-            "absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full ring-2",
-            isSelected ? "bg-surface-elevated ring-surface-elevated" : "bg-surface ring-surface",
+            "absolute -bottom-0.75 -right-0.75 size-4.5 ring-2",
+            isSelected ? "ring-accent-soft" : "ring-surface",
           )}
         />
       </div>

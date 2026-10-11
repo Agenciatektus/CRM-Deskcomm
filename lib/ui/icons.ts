@@ -74,6 +74,7 @@ export {
   CheckCircle,
   Warning,
   WarningOctagon,
+  WarningCircle,
   Info,
   CircleNotch,
   // lgpd

@@ -23,15 +23,15 @@ const audio = (extra: Record<string, unknown> = {}) =>
 describe("transcrição do áudio na bolha", () => {
   it("com texto: aparece recolhida e abre/fecha no clique", async () => {
     render(<MessageBubble message={audio({ media_derived_text: FALA })} />);
-    const botao = screen.getByRole("button", { name: "Mostrar transcrição" });
+    const botao = screen.getByRole("button", { name: "Ler transcrição" });
     expect(botao).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText(FALA)).not.toBeVisible();
 
     await userEvent.click(botao);
-    expect(screen.getByRole("button", { name: "Ocultar transcrição" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Fechar transcrição" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(FALA)).toBeVisible();
 
-    await userEvent.click(screen.getByRole("button", { name: "Ocultar transcrição" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fechar transcrição" }));
     expect(screen.getByText(FALA)).not.toBeVisible();
   });
 

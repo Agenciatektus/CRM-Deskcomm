@@ -261,6 +261,7 @@
   --color-thread: #f2f5f8;
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
+  --color-bubble-in: var(--color-surface);
   --mix-accent-soft: 11%;
   --mix-accent-hover: 86%;
   --accent-hover-alvo: #000000;
@@ -433,6 +434,7 @@
   --color-thread: #f2f5f8;
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
+  --color-bubble-in: var(--color-surface);
   --mix-accent-soft: 11%;
   --mix-accent-hover: 86%;
   --accent-hover-alvo: #000000;
@@ -572,6 +574,7 @@
   --color-thread: #111315;
   --color-tint: rgba(255, 255, 255, 0.08);
   --color-warning-line: #8d5d1c;
+  --color-bubble-in: var(--color-surface-elevated);
   --mix-accent-soft: 20%;
   --mix-accent-hover: 0%;
   --accent-hover-alvo: var(--color-accent-500);
@@ -800,6 +803,7 @@ body [data-theme] {
   --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
   --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
   --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
+  --color-bubble-in: var(--color-bubble-in);
 
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
@@ -1440,6 +1444,12 @@ body [data-theme] {
 [data-theme="dark"] .pele-grad-contador:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: var(--pele-grad-hover);
   border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+/* Ícone sobre o degradê (o play do áudio, `.play` no escuro): sem texto, o
+   degradê vibrante inteiro. */
+[data-theme="dark"] .pele-grad-icone:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad);
   color: var(--pele-grad-fg);
 }
 /* Só o traço (indicador da aba, barra da seleção), sem mexer no texto. */

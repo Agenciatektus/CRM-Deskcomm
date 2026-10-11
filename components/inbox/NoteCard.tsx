@@ -5,6 +5,9 @@ import { format } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
 import { Note as NoteIcon, Trash } from "@/lib/ui/icons";
 import type { Note } from "@/lib/types/messaging";
+import { cn } from "@/lib/utils";
+
+import { classesDaBolha, classesDaLinha, classesDoAutor, COLUNA_DA_FALA } from "./bolha/estilo";
 
 import { AudioPlayer } from "@/components/inbox/media/AudioPlayer";
 import { DocumentCard } from "@/components/inbox/media/DocumentCard";
@@ -83,17 +86,29 @@ export function NoteCard({ note, onDelete }: Props) {
   const time = format(new Date(note.created_at), "HH:mm", { locale: localeDaData });
 
   return (
-    <div className="group flex w-full min-w-0 justify-end px-4 pt-3">
-      <div className="flex min-w-0 max-w-[min(80%,36rem)] flex-col items-end">
-        <p className="mx-2 mb-1 flex items-center gap-1.5 text-xs font-semibold text-warning-fg">
+    // A nota é uma fala do nosso lado, à direita, no `.b-note` do quadro DS:
+    // fundo de aviso com borda tracejada, e o rótulo "Nota interna de Fulano,
+    // só a equipe vê" em cima, na cor de aviso.
+    <div className={classesDaLinha({ inicio: true, saida: true })}>
+      <div className={cn(COLUNA_DA_FALA, "items-end")}>
+        <p className={classesDoAutor("nota")}>
           <NoteIcon size={12} weight="fill" aria-hidden />
-          <span>{note.created_by_name ?? t("Alguém")}</span>
-          <span aria-hidden>·</span>
-          <span>{t("Nota interna · só o time vê")}</span>
+          <span>
+            {t("Nota interna de")} {note.created_by_name ?? t("Alguém")}
+          </span>
+          <em className="font-medium not-italic text-text-subtle">{t("só a equipe vê")}</em>
         </p>
         <div
           data-testid="nota-interna"
-          className="relative min-w-0 max-w-full rounded-2xl rounded-br-md border border-dashed border-warning/60 bg-warning-bg px-3 py-1.5 text-sm leading-normal text-text"
+          className={classesDaBolha({
+            tom: "nota",
+            saida: true,
+            inicio: true,
+            falhou: false,
+            busca: false,
+            temMenu: Boolean(onDelete),
+            modoMeta: note.body ? "no-texto" : "abaixo",
+          })}
         >
           {onDelete && (
             <button
@@ -118,10 +133,10 @@ export function NoteCard({ note, onDelete }: Props) {
                 {note.body}
                 <span aria-hidden className="inline-block h-px w-10 align-baseline" />
               </p>
-              <span className="absolute bottom-1.5 right-2.5 text-[0.6875rem] leading-none text-text-subtle">{time}</span>
+              <span className="absolute bottom-1.5 right-2.5 text-[11px] leading-none text-text-subtle">{time}</span>
             </>
           ) : (
-            <div className="mt-1 text-right text-[0.6875rem] leading-none text-text-subtle">{time}</div>
+            <span className="absolute bottom-1.5 right-2.5 text-[11px] leading-none text-text-subtle">{time}</span>
           )}
         </div>
       </div>

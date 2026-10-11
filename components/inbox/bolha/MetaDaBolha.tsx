@@ -5,17 +5,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useT } from "@/hooks/i18n/useT";
 import type { Citation } from "@/lib/ai/citations/types";
 import type { Message } from "@/lib/types/messaging";
-import { Check, Checks, WarningOctagon } from "@/lib/ui/icons";
+import { Check, Checks, WarningCircle } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-import { corDaMeta, type ModoDaMeta, type TomDaBolha } from "./estilo";
+import { corDaMeta, posicaoDaMeta, type ModoDaMeta, type TomDaBolha } from "./estilo";
 
-function AckIndicator({ status, t }: { status: string; t: (texto: string) => string }) {
-  // Lida em `text-info` (token), não num azul fixo: o azul do WhatsApp não
-  // existe na paleta do CRM e sumia sobre a bolha suave do accent.
-  if (status === "read") return <Checks size={14} weight="bold" className="text-info" aria-label={t("Lida")} />;
-  if (status === "delivered") return <Checks size={14} weight="bold" aria-label={t("Entregue")} />;
-  if (status === "sent") return <Check size={14} weight="bold" aria-label={t("Enviada")} />;
+function AckIndicator({ status, sobreMidia, t }: { status: string; sobreMidia: boolean; t: (texto: string) => string }) {
+  // Lida em `info` (o `.meta .read` do quadro); sobre a foto, o azul claro do
+  // `.media-only .meta .read`, que se lê no fundo escuro.
+  const lida = sobreMidia ? "text-[oklch(0.85_0.09_235)]" : "text-info-fg";
+  if (status === "read") return <Checks size={15} weight="bold" className={lida} aria-label={t("Lida")} />;
+  if (status === "delivered") return <Checks size={15} weight="bold" aria-label={t("Entregue")} />;
+  if (status === "sent") return <Check size={15} weight="bold" aria-label={t("Enviada")} />;
   return null;
 }
 
@@ -44,11 +45,11 @@ export function MetaDaBolha({ message, tom, modo, hora, editada, falhou, citacoe
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap text-[0.6875rem] leading-none",
+        // `.meta` do quadro DS: 11px, no canto de baixo, com o lugar reservado
+        // (o espaçador do texto, ou o `pb-6` da bolha sem texto no fim).
+        "inline-flex items-center gap-0.75 whitespace-nowrap text-[11px] leading-none",
         corDaMeta(tom, modo),
-        modo === "no-texto" && "absolute bottom-1.5 right-2.5",
-        modo === "sobre-midia" && "absolute bottom-2.5 right-2.5",
-        modo === "abaixo" && "mt-1 flex justify-end",
+        posicaoDaMeta(tom, modo),
       )}
     >
       {editada && (
@@ -60,7 +61,7 @@ export function MetaDaBolha({ message, tom, modo, hora, editada, falhou, citacoe
       )}
       <span>{hora}</span>
       {citacoes && <CitationButton citations={citacoes} messageId={message.id} />}
-      {saida && !falhou && <AckIndicator status={message.status} t={t} />}
+      {saida && !falhou && <AckIndicator status={message.status} sobreMidia={modo === "sobre-midia"} t={t} />}
       {falhou && (
         // Provider local: o painel do inbox não tem TooltipProvider ancestral e
         // este Tooltip só monta em mensagem failed — sem o provider, abrir uma
@@ -68,8 +69,10 @@ export function MetaDaBolha({ message, tom, modo, hora, editada, falhou, citacoe
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex items-center gap-0.5 font-semibold text-error">
-                <WarningOctagon size={11} weight="fill" aria-hidden /> {t("Falhou")}
+              {/* O anel crit do quadro (`.meta` da bolha que falhou); a frase
+                  "Não foi enviada" vem embaixo, com "Tentar de novo". */}
+              <span className="inline-flex items-center text-error-fg" role="img" aria-label={t("Falhou")}>
+                <WarningCircle size={15} weight="bold" aria-hidden />
               </span>
             </TooltipTrigger>
             <TooltipContent>

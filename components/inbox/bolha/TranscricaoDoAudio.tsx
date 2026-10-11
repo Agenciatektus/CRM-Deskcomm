@@ -25,19 +25,20 @@ export function TranscricaoDoAudio({ texto }: { texto: string }) {
   const [aberta, setAberta] = useState(false);
 
   return (
-    <div className="mt-1 text-xs" data-testid="bolha-transcricao-do-audio">
+    <div data-testid="bolha-transcricao-do-audio">
       <button
         type="button"
         aria-expanded={aberta}
         aria-controls={id}
         onClick={() => setAberta((v) => !v)}
-        className="flex items-center gap-1 rounded-sm font-semibold text-text-muted hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        // `.tr-btn` do quadro DS: 12,5/700 na cor da marca, abre e fecha.
+        className="mt-1.5 inline-flex items-center gap-1.25 rounded-sm text-[12.5px] font-bold text-accent-text underline-offset-3 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <CaretDown size={11} aria-hidden className={cn("transition-transform", !aberta && "-rotate-90")} />
-        {aberta ? t("Ocultar transcrição") : t("Mostrar transcrição")}
+        {aberta ? t("Fechar transcrição") : t("Ler transcrição")}
+        <CaretDown size={12} aria-hidden className={cn("transition-transform", aberta && "rotate-180")} />
       </button>
       {/* Sempre montado (com `hidden`): o `aria-controls` aponta para algo que existe. */}
-      <p id={id} hidden={!aberta} className="mt-1 whitespace-pre-wrap wrap-anywhere italic text-text">
+      <p id={id} hidden={!aberta} className="mt-1.5 max-w-75 whitespace-pre-wrap wrap-anywhere rounded-field bg-tint px-2.5 py-2 text-ui text-text">
         <span className="sr-only">{`${t("Transcrição")}: `}</span>
         {texto}
       </p>

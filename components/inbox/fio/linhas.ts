@@ -21,7 +21,7 @@ import type { Message } from "@/lib/types/messaging";
 export type LinhaDoFio =
   | { tipo: "mais"; key: string }
   | { tipo: "dia"; key: string; data: Date }
-  | { tipo: "novas"; key: string }
+  | { tipo: "novas"; key: string; quantas: number }
   | { tipo: "item"; key: string; item: ThreadItem };
 
 export function chaveDoItem(item: ThreadItem): string {
@@ -38,6 +38,13 @@ export function montarLinhas(
 ): LinhaDoFio[] {
   const linhas: LinhaDoFio[] = temMais ? [{ tipo: "mais", key: "carregar-mais" }] : [];
   let diaAnterior: string | null = null;
+  // Quantas RECEBIDAS a partir da primeira não lida: o texto do divisor ("N mensagens novas").
+  const inicio = idDaPrimeiraNaoLida
+    ? items.findIndex((i) => i.kind === "message" && i.data.id === idDaPrimeiraNaoLida)
+    : -1;
+  const quantas = inicio < 0
+    ? 0
+    : items.slice(inicio).filter((i) => i.kind === "message" && i.data.direction === "inbound").length;
   for (const item of items) {
     const data = new Date(item.ts);
     const dia = format(data, "yyyy-MM-dd");
@@ -48,7 +55,7 @@ export function montarLinhas(
     // Depois do rótulo do dia, não antes: a primeira não lida que abre um dia
     // novo lê "Hoje" e então "Novas mensagens", na ordem em que o olho procura.
     if (idDaPrimeiraNaoLida && item.kind === "message" && item.data.id === idDaPrimeiraNaoLida) {
-      linhas.push({ tipo: "novas", key: "novas-mensagens" });
+      linhas.push({ tipo: "novas", key: "novas-mensagens", quantas });
     }
     linhas.push({ tipo: "item", key: chaveDoItem(item), item });
   }

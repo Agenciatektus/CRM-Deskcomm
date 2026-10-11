@@ -102,7 +102,8 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
         // Com legenda, a mídia encosta quase na borda (margem negativa menor
         // que o respiro da bolha) e o texto vem embaixo: é a leitura de foto
         // com legenda, e não a de um anexo solto dentro de uma caixa.
-        <div className={cn(!soMidia && message.type === "image" && "-mx-2 -mt-0.5", message.body && "mb-1.5")}>
+        // `.media` do quadro: com legenda, encosta na borda (-3 -7 7 -8) e o texto vem embaixo.
+        <div className={cn(!soMidia && (message.type === "image" || message.type === "video") && "-ml-2 -mr-1.75 -mt-0.75", message.body && "mb-1.75")}>
           <MediaRenderer message={message} />
           {/* Só no corpo normal: apagada e ocultada saem antes, e a transcrição
               de uma mensagem apagada seria o mesmo texto por outro caminho. */}

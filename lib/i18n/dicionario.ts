@@ -92,7 +92,6 @@ export const DICIONARIO: Traducoes = {
   "Ligar quinta às 10h se não voltar.": { es: "Llamar el jueves a las 10 si no vuelve." },
   "Mensagens seguidas da mesma pessoa se agrupam: cantos de 6 px no lado de quem enviou e nome só na primeira. Horário e status ficam no canto, na linha do texto quando cabe.": { es: "Mensajes seguidos de la misma persona se agrupan: esquinas de 6 px del lado de quien envió y nombre solo en el primero. Hora y estado quedan en la esquina, en la línea del texto cuando cabe." },
   "Tipos cobertos (os mesmos que o CRM já suporta)": { es: "Tipos cubiertos (los mismos que el CRM ya soporta)" },
-  "2 mensagens novas": { es: "2 mensajes nuevos" },
   "Imagem com legenda": { es: "Imagen con leyenda" },
   "Resposta da IA": { es: "Respuesta de la IA" },
   "Áudio com transcrição": { es: "Audio con transcripción" },
@@ -229,7 +228,7 @@ export const DICIONARIO: Traducoes = {
   "Espera 10+ min": { es: "Espera 10+ min" },
   "Espera 30+ min": { es: "Espera 30+ min" },
   "Controle segmentado (AbasDaInbox)": { es: "Control segmentado (AbasDaInbox)" },
-  "O protótipo desenha a aba com sublinhado de 2px (.pn-tab); o CRM usa a aba em cartão do shadcn.": { es: "El prototipo dibuja la pestaña con subrayado de 2px (.pn-tab); el CRM usa la pestaña en tarjeta de shadcn." },
+  "Aba com sublinhado de 2px na marca, como o .tabs do quadro.": { es: "Pestaña con subrayado de 2px en la marca, como el .tabs del cuadro." },
   "Conversa arquivada": { es: "Conversación archivada" },
   "Desfeito": { es: "Deshecho" },
   "Camadas por cima da página": { es: "Capas sobre la página" },
@@ -636,6 +635,8 @@ export const DICIONARIO: Traducoes = {
   // O divisor de não lidas no fio, a faixa de quem atende acima da caixa e a
   // dica de teclado que saiu do `title` do campo para ficar à vista.
   "Novas mensagens": { es: "Mensajes nuevos" },
+  "1 mensagem nova": { es: "1 mensaje nuevo" },
+  "mensagens novas": { es: "mensajes nuevos" },
   "A IA está atendendo.": { es: "La IA está atendiendo." },
   "Ao assumir, o automático para.": { es: "Al asumir, el automático se detiene." },
   "Ninguém assumiu esta conversa.": { es: "Nadie asumió esta conversación." },
@@ -7097,7 +7098,8 @@ export const DICIONARIO: Traducoes = {
   "Arquivando...": { es: "Archivando..." },
   Automático: { es: "Automático" },
   Alguém: { es: "Alguien" },
-  "Nota interna · só o time vê": { es: "Nota interna · solo la ve el equipo" },
+  "Nota interna de": { es: "Nota interna de" },
+  "só a equipe vê": { es: "solo la ve el equipo" },
   "Excluir nota": { es: "Eliminar nota" },
 
   // ─── Inbox: transferir conversa / atalhos de teclado ───
@@ -7247,6 +7249,7 @@ export const DICIONARIO: Traducoes = {
   Vídeo: { es: "Video" },
   "Pausar áudio": { es: "Pausar audio" },
   "Reproduzir áudio": { es: "Reproducir audio" },
+  "Reproduzir vídeo": { es: "Reproducir video" },
   "Progresso do áudio": { es: "Progreso del audio" },
   "Velocidade de reprodução": { es: "Velocidad de reproducción" },
   "Ampliar imagem": { es: "Ampliar imagen" },
@@ -14645,8 +14648,8 @@ export const DICIONARIO: Traducoes = {
   "Observações salvas.": { es: "Observaciones guardadas." },
   "Caracteres usados": { es: "Caracteres usados" },
   Transcrição: { es: "Transcripción" },
-  "Mostrar transcrição": { es: "Mostrar transcripción" },
-  "Ocultar transcrição": { es: "Ocultar transcripción" },
+  "Ler transcrição": { es: "Leer transcripción" },
+  "Fechar transcrição": { es: "Cerrar transcripción" },
   // ─── Visual v2 polido (topo, painel do lead, disponibilidade) ───
   "Buscar telas e funções": { es: "Buscar pantallas y funciones" },
   Ausente: { es: "Ausente" },
