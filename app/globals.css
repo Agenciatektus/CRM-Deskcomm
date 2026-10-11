@@ -235,6 +235,48 @@
   --color-avatar-5-fg: #4b346f;
   --color-avatar-6: #c0e7e8;
   --color-avatar-6-fg: #00484c;
+  /* ---- Design System v2 · tokens que o protótipo tem e o CRM não tinha ----
+   * Etapa 1 do DS (docs/design/design-system/mapa-de-tokens.md): só ADIÇÃO.
+   * Nenhuma tela consome estes nomes ainda; a vitrine /app/design-system os
+   * mostra. Os valores são o protótipo da Inbox v2 (Main.dc.html, `.app`)
+   * convertidos de oklch para hex, porque a régua de contraste lê hex.
+   *
+   * O que deriva da marca (`accent-soft-2`, `accent-text`) NÃO mora aqui como
+   * `color-mix(var(--color-accent))`: declarado no `:root`, o `var()` seria
+   * resolvido no <html> e a marca da ORGANIZAÇÃO (injetada no <body>) nunca o
+   * alcançaria. O `@theme inline` monta o `color-mix` no elemento que pinta, e
+   * aqui ficam só as PROPORÇÕES, que são número e herdam sem esse problema. */
+  --color-hover: #eaedf2;
+  --color-thread: #f2f5f8;
+  --color-tint: rgba(23, 29, 38, 0.06);
+  --color-warning-line: #e3be80;
+  --mix-accent-soft-2: 20%;
+  --mix-accent-text: 88%;
+  --accent-text-alvo: #000000;
+  --shadow-pop: 0 12px 32px -8px rgba(17, 22, 31, 0.22), 0 2px 6px 0 rgba(17, 22, 31, 0.08);
+  --shadow-bubble: 0 1px 1px 0 rgba(17, 22, 31, 0.06);
+  /* Forma: o raio cresce com o objeto (pílula 6, botão 9, campo 10, menu 14,
+     balão 18 com o canto de quem enviou em 6). */
+  --radius-pill: 6px;
+  --radius-control: 9px;
+  --radius-field: 10px;
+  --radius-menu: 14px;
+  --radius-bubble: 18px;
+  --radius-bubble-tail: 6px;
+  /* Escala de texto do protótipo (px, linha). */
+  --font-size-rail: 10.5px;
+  --font-size-meta: 12px;
+  --font-size-label: 13px;
+  --font-size-ui: 14px;
+  --font-size-message: 15px;
+  --font-size-title-sm: 16px;
+  --font-size-title-md: 17px;
+  --font-size-title-lg: 20px;
+  --line-height-ui: 1.45;
+  --line-height-message: 1.42;
+  /* Movimento do protótipo: `--ease` e o .15s das transições. */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-ui: 150ms;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -358,6 +400,16 @@
   --color-avatar-5-fg: #4b346f;
   --color-avatar-6: #c0e7e8;
   --color-avatar-6-fg: #00484c;
+  /* ---- Design System v2 (espelho do :root, mesma razão da agenda) ---- */
+  --color-hover: #eaedf2;
+  --color-thread: #f2f5f8;
+  --color-tint: rgba(23, 29, 38, 0.06);
+  --color-warning-line: #e3be80;
+  --mix-accent-soft-2: 20%;
+  --mix-accent-text: 88%;
+  --accent-text-alvo: #000000;
+  --shadow-pop: 0 12px 32px -8px rgba(17, 22, 31, 0.22), 0 2px 6px 0 rgba(17, 22, 31, 0.08);
+  --shadow-bubble: 0 1px 1px 0 rgba(17, 22, 31, 0.06);
 }
 
 [data-theme="dark"] {
@@ -473,6 +525,18 @@
   --color-avatar-5-fg: #e3d7fb;
   --color-avatar-6: #134245;
   --color-avatar-6-fg: #c0e7e8;
+  /* ---- Design System v2 (escuro: a Variante Verdash do protótipo) -------
+   * `accent-text` no escuro é FIXO (o ciano do protótipo, oklch 0.8 0.1 215):
+   * proporção 0% da marca, 100% do alvo. */
+  --color-hover: #212326;
+  --color-thread: #111315;
+  --color-tint: rgba(255, 255, 255, 0.08);
+  --color-warning-line: #8d5d1c;
+  --mix-accent-soft-2: 30%;
+  --mix-accent-text: 0%;
+  --accent-text-alvo: #69cee6;
+  --shadow-pop: 0 4px 0 0 rgba(0, 0, 0, 0.25), 0 20px 44px -14px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--color-border-strong);
+  --shadow-bubble: none;
 }
 
 /* ── Degradê do escuro (botão primário e pele Verdash) ────────────────────
@@ -522,6 +586,31 @@
      6,3:1 no pior ponto do fundo dele, já com o filtro do hover. */
   --pele-grad-soft-fg: #8fdcef;
   /* O botão primário no escuro usa o degradê de TEXTO (ver acima). */
+  --gradient-primary: var(--pele-grad-texto);
+  --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
+  --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
+  --pele-fio: #111315;
+  --pele-bolha-saida: color-mix(in oklch, var(--color-accent) 30%, var(--color-surface));
+  --pele-bolha-ia: color-mix(in oklch, var(--pele-brilho) 8%, var(--color-surface));
+}
+
+/* A mesma pele numa SUBÁRVORE escura dentro de página clara (a vitrine
+   /app/design-system põe o tema escuro ao lado do claro). O bloco acima casa só
+   o <body> sob <html data-theme="dark">; sem este, um `<div data-theme="dark">`
+   recebia os tokens escuros mas não o degradê, e o botão primário ficava sem
+   fundo. CÓPIA EXATA do bloco acima, valor a valor:
+   `tests/unit/pele-escura-em-subarvore.test.ts` reprova quando divergem.
+   `body [data-theme="dark"]` não casa o <html> (que não está dentro do body),
+   então a página escura de sempre não muda. */
+body [data-theme="dark"] {
+  --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
+  --pele-grad-texto: linear-gradient(120deg, #2a52d8 0%, #157f9f 50%, #0c845c 100%);
+  --pele-grad-texto-hover: linear-gradient(120deg, #2145ca 0%, #007191 50%, #007750 100%);
+  --pele-grad-fg: #ffffff;
+  --pele-brilho: #2b8cad;
+  --pele-foco: #48a5c7;
+  --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
+  --pele-grad-soft-fg: #8fdcef;
   --gradient-primary: var(--pele-grad-texto);
   --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
   --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
@@ -625,6 +714,15 @@
   --color-avatar-6: var(--color-avatar-6);
   --color-avatar-6-fg: var(--color-avatar-6-fg);
 
+  /* Design System v2 (Etapa 1, aditivo). Os dois derivados da marca montam o
+     `color-mix` AQUI, no elemento que pinta, e não no `:root` (ver lá). */
+  --color-hover: var(--color-hover);
+  --color-thread: var(--color-thread);
+  --color-tint: var(--color-tint);
+  --color-warning-line: var(--color-warning-line);
+  --color-accent-soft-2: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft-2), var(--color-surface));
+  --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
+
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
      parada 500 fixa e NÃO para `--ring` (que muda no escuro). Mantido igual de
@@ -685,6 +783,12 @@
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-full: var(--radius-full);
+  --radius-pill: var(--radius-pill);
+  --radius-control: var(--radius-control);
+  --radius-field: var(--radius-field);
+  --radius-menu: var(--radius-menu);
+  --radius-bubble: var(--radius-bubble);
+  --radius-bubble-tail: var(--radius-bubble-tail);
 
   /* Sombra */
   --shadow-xs: var(--shadow-xs);
@@ -692,11 +796,26 @@
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-bubble: var(--shadow-bubble);
+
+  /* Escala de texto do protótipo (`text-meta`, `text-label`…). */
+  --text-rail: var(--font-size-rail);
+  --text-meta: var(--font-size-meta);
+  --text-label: var(--font-size-label);
+  --text-ui: var(--font-size-ui);
+  --text-ui--line-height: var(--line-height-ui);
+  --text-message: var(--font-size-message);
+  --text-message--line-height: var(--line-height-message);
+  --text-title-sm: var(--font-size-title-sm);
+  --text-title-md: var(--font-size-title-md);
+  --text-title-lg: var(--font-size-title-lg);
 
   /* Motion */
   --ease-out: var(--ease-out);
   --ease-in-out: var(--ease-in-out);
   --ease-spring: var(--ease-spring);
+  --ease-emphasized: var(--ease-emphasized);
 }
 
 /* `duration-*` não tem espaço de tema no v4 (o `transitionDuration` do v3 não
@@ -709,6 +828,9 @@
 }
 @utility duration-slow {
   transition-duration: var(--duration-slow);
+}
+@utility duration-ui {
+  transition-duration: var(--duration-ui);
 }
 
 /* Rolagem sem barra visível. Para faixas que PODEM transbordar só em telas
