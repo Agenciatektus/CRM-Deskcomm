@@ -44,7 +44,7 @@ describe("tema claro escopável em subárvore", () => {
     expect(claro.size).toBeGreaterThan(0);
   });
 
-  it("espelha EXATAMENTE o que o tema escuro sobrescreve, menos a rampa", () => {
+  it("espelha EXATAMENTE o que o tema escuro sobrescreve, rampa inclusive", () => {
     const claro = blocoDe('[data-theme="light"]');
     const escuro = blocoDe('[data-theme="dark"]');
     // Custom property herdada não volta ao valor do `:root` dentro de uma
@@ -52,12 +52,12 @@ describe("tema claro escopável em subárvore", () => {
     // obrigação da linguagem. O conjunto certo é o que o escuro sobrescreve: o
     // que só existe no `:root` é herdado sem problema.
     //
-    // A rampa fica de fora de propósito: as 11 paradas são idênticas nos dois
-    // blocos do produto (omiti-las não muda pixel), e assim uma subárvore clara
-    // herda a rampa do <html> — a do revendedor — em vez de fixar a Sage.
-    const esperado = [...escuro.keys()].filter((k) => !RAMPA.has(k)).sort();
-    expect([...claro.keys()].sort()).toEqual(esperado);
-    for (const k of claro.keys()) expect(RAMPA.has(k), k).toBe(false);
+    // A rampa ENTRA desde a etapa 2 do DS: o escuro passou a ter rampa própria
+    // (o azul Verdash, travado), e uma subárvore clara sob página escura
+    // herdaria o azul. Antes as 11 paradas eram iguais nos dois blocos e
+    // ficavam de fora.
+    expect([...claro.keys()].sort()).toEqual([...escuro.keys()].sort());
+    for (const k of RAMPA) expect(claro.has(k), k).toBe(true);
   });
 
   it("cada valor espelhado é o mesmo do `:root`", () => {

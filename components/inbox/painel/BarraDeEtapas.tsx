@@ -113,7 +113,7 @@ export function BarraDeEtapas({ leadId, pipelineId, stageId, posicao = null, upd
                 aria-hidden
                 className={cn(
                   "block h-1.5 rounded-sm",
-                  feito || agora ? "bg-accent dark:bg-(image:--pele-grad-texto)" : "bg-border group-enabled:group-hover:bg-accent-soft",
+                  feito || agora ? "bg-accent dark:bg-(image:--pele-grad)" : "bg-border group-enabled:group-hover:bg-accent-soft",
                   agora && "ring-3 ring-accent-soft",
                 )}
               />

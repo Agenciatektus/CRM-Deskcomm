@@ -47,7 +47,7 @@ const SEMENTES = [
 ] as const;
 
 /** Quantos pares cada tema tem no globals.css de hoje — o piso da vacuidade. */
-const PARES_DE_HOJE = { claro: 18, escuro: 26 } as const;
+const PARES_DE_HOJE = { claro: 18, escuro: 32 } as const;
 
 const TEMAS = [
   { nome: "claro" as const, seletor: ":root:root" },
@@ -312,8 +312,9 @@ describe("o bloco emitido não pode contradizer o globals.css", () => {
   it("a caminhada de fato ANDA — e a emissão anda junto", () => {
     // Guarda de vacuidade da sabotagem: se nenhuma semente deslocasse, emitir a
     // rampa crua e emiti-la deslocada dariam o mesmo texto, e os testes acima
-    // seriam verdes contra o defeito. 13 combos (semente × tema) andam — o mesmo
-    // número que `branding-contraste.test.ts` mede na derivação.
+    // seriam verdes contra o defeito. 4 combos (semente × tema) andam — o mesmo
+    // número que `branding-contraste.test.ts` mede na derivação (eram 13 antes do
+    // escuro travado no primary Verdash, etapa 2 do DS: hoje só o claro anda).
     let andaram = 0;
     for (const hex of SEMENTES) {
       const cor = corDe(hex);
@@ -332,33 +333,29 @@ describe("o bloco emitido não pode contradizer o globals.css", () => {
         );
       }
     }
-    expect(andaram).toBe(13);
+    expect(andaram).toBe(4);
   });
 });
 
 describe("controle positivo — o produto sem marca não pode se mexer", () => {
-  it("a Sage reproduz, pintada, os números do design system", () => {
-    // `#506d48` é a semente do próprio produto: ela não desloca nada, e os pares
-    // pintados têm que dar o que o `globals.css` sempre deu. Se estes números
-    // mudarem, o conserto vazou para quem não pediu.
-    const cor = corDe("#506d48");
+  it("o Verde Verdash reproduz, pintado, os números do design system", () => {
+    // `#0e7a5f` é a semente do próprio produto (etapa 2 do DS; antes a Sage): ela
+    // não desloca nada, e os pares pintados têm que dar o que o `globals.css` dá.
+    // Se estes números mudarem, o conserto vazou para quem não pediu.
+    const cor = corDe("#0e7a5f");
     expect(cor.derivada?.claro.deslocamento).toBe(0);
     expect(cor.derivada?.escuro.deslocamento).toBe(0);
 
-    const p = pintadosDaSemente("#506d48");
-    // Claro: os dois números que `contraste.ts` documenta como medidos à mão.
-    expect(foco(p.claro, "--color-bg")).toBeCloseTo(3.526, 2);
-    expect(foco(p.claro, "--color-surface-elevated")).toBeCloseTo(3.72, 2);
-    // Escuro: 6,65 e 5,51 na rampa DERIVADA da semente (eram 6,30 e 5,22 sobre o
-    // greige; o fundo escuro do visual v2 é mais fundo). A rampa reproduz a Sage com
-    // Δ ≤ 2/255 por canal contra os literais do `globals.css` (`#82a077`).
-    expect(foco(p.escuro, "--color-bg")).toBeCloseTo(6.648, 2);
-    expect(foco(p.escuro, "--color-surface-elevated")).toBeCloseTo(5.505, 2);
-    // No escuro o anel NÃO fica apertado contra as bases: quem aperta é o
-    // `-soft` COMPOSTO. 4,71 aqui (4,58 sobre o greige, o par que a prova em tela
-    // reportou como "4,58 no escuro"), e não `foco × --color-bg` (6,65).
-    expect(foco(p.escuro, "--color-accent-soft@--color-surface")).toBeCloseTo(4.71, 2);
-    expect(foco(p.escuro, "--color-accent-soft@--color-surface-elevated")).toBeCloseTo(4.268, 2);
+    const p = pintadosDaSemente("#0e7a5f");
+    // Claro: o anel é o próprio accent desde a etapa 2 do DS (antes a parada 500).
+    expect(foco(p.claro, "--color-bg")).toBeCloseTo(4.672, 2);
+    expect(foco(p.claro, "--color-surface-elevated")).toBeCloseTo(4.928, 2);
+    // Escuro: o primary Verdash #2690B1, travado para toda marca. Quem aperta é o
+    // `-soft` COMPOSTO (20%), e ainda folga do piso 3,0.
+    expect(foco(p.escuro, "--color-bg")).toBeCloseTo(5.245, 2);
+    expect(foco(p.escuro, "--color-surface-elevated")).toBeCloseTo(4.344, 2);
+    expect(foco(p.escuro, "--color-accent-soft@--color-surface")).toBeCloseTo(3.649, 2);
+    expect(foco(p.escuro, "--color-accent-soft@--color-surface-elevated")).toBeCloseTo(3.35, 2);
   });
 
   it("sem marca configurada nada é injetado, e a tela fica como está", () => {
@@ -374,11 +371,13 @@ describe("a navy #0f172a — o defeito que a prova em tela achou", () => {
     // escuro 2,86 e 2,37 — os dois de baixo abaixo do piso 3,0, porque o anel
     // pintava `--color-accent-400: #545f77`, o stop CRU. O tema escuro anda -1,
     // então o anel agora pinta `#828a9d`, o stop 300 da rampa da marca.
+    // Etapa 2 do DS: o anel do claro é o accent da marca (a navy, 15,76 e 16,62), e o
+    // escuro é o primary Verdash travado, que não depende da marca.
     const p = pintadosDaSemente("#0f172a");
-    expect(foco(p.claro, "--color-bg")).toBeCloseTo(10.005, 2);
-    expect(foco(p.claro, "--color-surface-elevated")).toBeCloseTo(10.554, 2);
-    expect(foco(p.escuro, "--color-bg")).toBeCloseTo(5.58, 2);
-    expect(foco(p.escuro, "--color-surface-elevated")).toBeCloseTo(4.621, 2);
+    expect(foco(p.claro, "--color-bg")).toBeCloseTo(15.758, 2);
+    expect(foco(p.claro, "--color-surface-elevated")).toBeCloseTo(16.624, 2);
+    expect(foco(p.escuro, "--color-bg")).toBeCloseTo(5.245, 2);
+    expect(foco(p.escuro, "--color-surface-elevated")).toBeCloseTo(4.344, 2);
     for (const superficie of ["--color-bg", "--color-surface-elevated"] as const) {
       expect(foco(p.escuro, superficie), superficie).toBeGreaterThanOrEqual(PISOS.componente);
     }

@@ -47,7 +47,7 @@ export const AVATARES: ItemDeCor[] = [
 ];
 export const PELE: ItemDeCor[] = [
   { token: "--pele-grad", classe: "bg-(image:--pele-grad)", mapa: "cor:pele-grad" },
-  { token: "--pele-grad-texto", classe: "bg-(image:--pele-grad-texto)", mapa: "cor:pele-grad-texto" },
+  { token: "--pele-grad-hover", classe: "bg-(image:--pele-grad-hover)", mapa: "cor:pele-grad-hover" },
   { token: "--pele-foco", classe: "bg-(--pele-foco)", mapa: "cor:pele-foco" },
 ];
 

@@ -159,8 +159,12 @@ function declaracoesDoTema(cor: CorResolvida, tema: "claro" | "escuro"): Declara
   // preço que `--color-accent-soft` já pagava sozinho, e é o que a caminhada
   // sempre significou. Com d=0 — a Sage e toda marca que já cabe — a saída é
   // idêntica à de antes, byte a byte.
+  // O escuro usa a rampa do produto (accent travado no primary Verdash, etapa 2
+  // do DS): o bloco escuro repete os valores do globals.css, e declará-lo segue
+  // obrigatório pela regra dos dois blocos acima.
+  const rampa = tema === "claro" ? derivada.rampa : derivada.rampaDoEscuro;
   for (const [i, grau] of GRAUS.entries()) {
-    saida.push([`--color-accent-${grau}`, stop(derivada.rampa, i + t.deslocamento)]);
+    saida.push([`--color-accent-${grau}`, stop(rampa, i + t.deslocamento)]);
   }
 
   saida.push(
