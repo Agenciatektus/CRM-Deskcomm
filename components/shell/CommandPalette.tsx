@@ -9,22 +9,25 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
-import { Lightning, MagnifyingGlass, UserCircle } from "@/lib/ui/icons";
+import { Kanban, Lightning, MagnifyingGlass, UserCircle } from "@/lib/ui/icons";
 import { NAV_GROUPS, searchable, type NavDestination } from "@/lib/navigation/registry";
+import { destinosDaInterface } from "@/lib/navigation/interface";
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { cn } from "@/lib/utils";
 
 import { useAcoesDaPaleta, type AcaoDaPaleta } from "./paleta/acoes";
-import { useBuscaRemota, type Achado } from "./paleta/busca-remota";
+import { useBuscaRemota, type Achado, type AchadoDeLead } from "./paleta/busca-remota";
+import { abrirLead, subDoLead } from "./paleta/lead";
 
 /**
  * A busca geral (Ctrl K), no desenho da paleta do protótipo (T6-T10): uma lista
- * agrupada em Recentes / Contatos e conversas, Ações e Telas.
+ * agrupada em Recentes / Contatos e conversas, Leads, Ações e Telas.
  *
  * Sem `cmdk`: Dialog e uma lista com setas e Enter são poucas linhas.
  *
- * Leads ficam de fora por enquanto: a rota de leads não aceita `search`, e
- * listar todos para filtrar no navegador seria o endpoint pesado que a regra
- * proíbe.
+ * Leads pela rota que aceita `search` (`GET /api/v1/leads`, fase 8a), com o
+ * escopo de organização e papel dela; só para quem tem o quadro ("Funis") no
+ * menu. O lead abre na Inbox, na aba Negócios do painel (`paleta/lead.ts`).
  */
 
 /** Sem acento e sem caixa: ninguém digita "orçamento" com cedilha às pressas. */
@@ -87,7 +90,16 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
   const [destacado, setDestacado] = useState(0);
   const termo = busca.trim();
   const palavras = normalizar(termo).split(/\s+/).filter(Boolean);
-  const { achados, carregando } = useBuscaRemota(busca);
+  const destinos = destinosDaInterface(
+    activeOrg?.interface_settings,
+    user.is_platform_admin && !user.support,
+    activeOrg?.role ?? null,
+  );
+  const { achados, leads, carregando } = useBuscaRemota(busca, {
+    conversas: destinos.some((d) => d.href === "/app/inbox"),
+    contatos: destinos.some((d) => d.href === "/app/contacts"),
+    leads: destinos.some((d) => d.href === "/app/kanban"),
+  });
   const acoes = useAcoesDaPaleta();
 
   const visiveis = useMemo(
@@ -137,11 +149,12 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
         executar: () => ir(`/app/inbox?filter=${a.aba}&id=${a.id}`),
       };
     }
-    const nome = rotuloDoContato({ display_name: a.nome, phone_number: a.telefone }, t);
+    const nome = rotuloDoContato(a.contato, t);
+    const telefone = a.contato.phone_number ?? null;
     return {
       chave: `contato:${a.id}`,
       titulo: nome,
-      sub: a.telefone ? phoneForDisplay(a.telefone) : t("Contato"),
+      sub: telefone ? phoneForDisplay(telefone) : t("Contato"),
       icone: (
         <IconeDaLinha>
           <UserCircle size={16} aria-hidden />
@@ -149,6 +162,22 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
       ),
       dica: t("Abrir contato"),
       executar: () => ir(`/app/contacts/${a.id}`),
+    };
+  }
+
+  function itemDoLead(a: AchadoDeLead): Item {
+    return {
+      chave: `lead:${a.id}`,
+      // O título do negócio é do cliente: não passa por `t()`.
+      titulo: a.lead.title,
+      sub: subDoLead(a.lead, t),
+      icone: (
+        <IconeDaLinha>
+          <Kanban size={16} aria-hidden />
+        </IconeDaLinha>
+      ),
+      dica: t("Abrir lead"),
+      executar: () => abrirLead(a.lead, ir),
     };
   }
 
@@ -204,6 +233,7 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
   // termo, até 5 contatos/conversas, 4 ações e 5 telas.
   const grupos: Grupo[] = [
     { rotulo: termo ? t("Contatos e conversas") : t("Recentes"), itens: achados.slice(0, 5).map(itemDoAchado) },
+    { rotulo: t("Leads"), itens: leads.slice(0, 5).map(itemDoLead) },
     { rotulo: t("Ações"), itens: acoesQueCasam.slice(0, termo ? 4 : 3).map(itemDaAcao) },
     { rotulo: t("Telas"), itens: telas.slice(0, termo ? 5 : 4).map(itemDaTela) },
   ].filter((g) => g.itens.length > 0);
@@ -247,7 +277,8 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
           value={busca}
           onChange={(e) => aoDigitar(e.target.value)}
           onKeyDown={aoTeclar}
-          placeholder={t("Buscar contato, conversa ou tela")}
+          maxLength={TETO_DO_TERMO_DE_BUSCA}
+          placeholder={t("Buscar contato, conversa ou lead")}
           className="h-full min-w-0 flex-1 bg-transparent text-base text-text outline-hidden placeholder:text-text-subtle"
         />
         {busca && (

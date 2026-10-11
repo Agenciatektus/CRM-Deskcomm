@@ -16,6 +16,7 @@ import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import { roleAtLeast } from "@/lib/auth/types";
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { canonicalPhoneBR, phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { encontrarContatoPorTelefone } from "@/lib/channels/contato-por-telefone";
 import { hashCpf, encryptCpfSql } from "@/lib/contacts/cpf";
@@ -100,6 +101,12 @@ export async function listContactsHandler(
   ctx: HandlerCtx,
   raw: ContactListQueryParams,
 ): Promise<ListContactsResult> {
+  // Termo acima do teto não acha ninguém: lista vazia, em QUALQUER porta (a
+  // rota e a ferramenta MCP chamam este handler). Antes do `parse`, que
+  // recusaria com erro (P2 do Cassio na #154).
+  if (typeof raw.search === "string" && raw.search.length > TETO_DO_TERMO_DE_BUSCA) {
+    return { contacts: [], cursor: null, has_more: false };
+  }
   const q: ContactListQuery = contactListQuerySchema.parse(raw);
 
   // ─── O PISO DA BUSCA (#1835) ───────────────────────────────────────────────

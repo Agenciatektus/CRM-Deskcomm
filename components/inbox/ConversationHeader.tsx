@@ -27,6 +27,7 @@ import { TransferirPopover } from "@/components/inbox/cabecalho/TransferirPopove
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { entrouPor } from "@/lib/contacts/entrou-por";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -286,6 +287,7 @@ export function ConversationHeader({
         snoozeUntil={encerrada ? null : (conversation.snooze_until ?? null)}
         motivo={motivo !== null ? t(ROTULO_DO_MOTIVO[motivo]) : null}
         instagramEntrada={conversation.instagram_entrada ?? null}
+        entradaDoContato={entrouPor(conversation.contacts)}
         leitura={leitura}
       />
       <ConfirmacoesDaConversa

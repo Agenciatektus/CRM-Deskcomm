@@ -215,3 +215,10 @@ describe("contactPatchSchema — observacoes", () => {
     expect(r.data?.observacoes).toBe("x");
   });
 });
+
+describe("contactListQuerySchema: teto do termo (P2 da #147)", () => {
+  it("aceita 100 caracteres e recusa 101 (a rota devolve lista vazia antes de chegar aqui)", () => {
+    expect(contactListQuerySchema.safeParse({ search: "a".repeat(100) }).success).toBe(true);
+    expect(contactListQuerySchema.safeParse({ search: "a".repeat(101) }).success).toBe(false);
+  });
+});

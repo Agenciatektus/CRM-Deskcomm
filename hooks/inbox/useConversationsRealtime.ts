@@ -32,6 +32,16 @@ export interface ContactSummary {
    * atendimento aparece. Opcional: conversas em cache de antes do campo existir.
    */
   force_human?: boolean | null;
+  /**
+   * De onde o contato veio (H13, "Entrou por …"): a coluna `source` e as chaves
+   * de `source_metadata` que respondem a pergunta, pedidas uma a uma no embed
+   * (nunca o jsonb inteiro). Opcionais: cache de antes do campo.
+   */
+  source?: string | null;
+  ad_platform?: string | null;
+  utm_source?: string | null;
+  campaign_name?: string | null;
+  utm_campaign?: string | null;
 }
 
 /**
@@ -120,6 +130,8 @@ export interface ConversationsFilters {
   tagMode?: ModoDeEtiqueta;
   /** A aba "Grupos" do inbox (Task 10). Ausente = sem filtro, mostra tudo. */
   is_group?: boolean;
+  /** "Sem próximo passo" (migration 9047): contato sem tarefa aberta. */
+  sem_passo?: boolean;
 }
 
 interface ListResponse {
@@ -167,6 +179,7 @@ export function useConversationsRealtime(
       // `&modo=e` colado num link de hoje mudaria a URL sem mudar o sentido.
       if (filters.tagMode === "ou") qs.set("modo", "ou");
       if (filters.is_group !== undefined) qs.set("is_group", filters.is_group ? "true" : "false");
+      if (filters.sem_passo) qs.set("sem_passo", "true");
       if (pageParam) qs.set("cursor", pageParam);
       qs.set("limit", "50");
       try {

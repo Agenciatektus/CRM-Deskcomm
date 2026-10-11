@@ -209,7 +209,8 @@ describe("painel do lead — modo leitura", () => {
     // Detalhes do contato: os valores aparecem, nenhum lápis de edição.
     const detalhes = screen.getByTestId("inbox-detalhes-do-contato");
     expect(detalhes).toHaveTextContent("Fulana");
-    expect(within(detalhes).queryByRole("button")).toBeNull();
+    // O único botão da seção é o cabeçalho do acordeão (P6); nenhum de editar.
+    expect(within(detalhes).queryByRole("button", { name: /Editar/ })).toBeNull();
     expect(within(detalhes).queryByRole("textbox")).toBeNull();
     // Tags da conversa não oferece editor.
     expect(screen.queryByText("Tags da conversa")).toBeNull();

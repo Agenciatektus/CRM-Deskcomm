@@ -66,7 +66,7 @@ describe("ConversationListItem — não lida", () => {
 });
 
 describe("ConversationListItem — seleção e dono", () => {
-  it("selecionada: fundo elevado, marcador à esquerda e aria-current", () => {
+  it("selecionada: fundo accent-soft, marcador à esquerda e aria-current", () => {
     render(
       <ConversationListItem
         conversation={conversaDeExemplo.conversation}
@@ -76,7 +76,7 @@ describe("ConversationListItem — seleção e dono", () => {
     );
     const linha = screen.getByRole("button");
     expect(linha).toHaveAttribute("aria-current", "true");
-    expect(linha).toHaveClass("bg-surface-elevated");
+    expect(linha).toHaveClass("bg-accent-soft");
     expect(linha.querySelector("span.bg-accent[aria-hidden]")).not.toBeNull();
   });
 

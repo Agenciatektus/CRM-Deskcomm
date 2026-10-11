@@ -13,7 +13,9 @@ export type ComandoDaTela =
   /** Para a Inbox: garante o painel do lead à vista e repassa ao painel. */
   | "proximo-passo"
   /** Para o painel do lead, já montado: rola até o "Próximo passo". */
-  | "painel-proximo-passo";
+  | "painel-proximo-passo"
+  /** Para a Inbox aberta: liga o filtro "Sem próximo passo". */
+  | "so-sem-passo";
 
 const PREFIXO = "crm:";
 

@@ -6,6 +6,7 @@ import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDo
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeAvisos } from "@/components/shell/ContadorDeAvisos";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
+import { ContadorDeTarefas } from "@/components/shell/ContadorDeTarefas";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
 import { useT } from "@/hooks/i18n/useT";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
@@ -38,9 +39,9 @@ export function ColunaDoGrupo({
 }) {
   const t = useT();
   const comTitulo = secoes.length > 1;
-  // O nó "Pipeline" fica logo abaixo de "Funis", que é a porta de administrar os
+  // O nó dos quadros de funil fica logo abaixo de "Funis", que é a porta de administrar os
   // mesmos funis; sem "Funis" visível, no fim da primeira seção.
-  const temFunis = secoes.some((s) => s.items.some((d) => d.href === "/app/kanban"));
+  const temFunis = temOQuadroDeFunis(secoes);
   // UMA tela ativa, a do destino mais longo que casa: `/app/ai/cases/avisos` está
   // abaixo de `/app/ai/cases`, e casar por prefixo acenderia as duas.
   const hrefAtivo = destinoDaRota(pathname)?.href ?? null;
@@ -138,9 +139,23 @@ function ItemDaColuna({
           {item.contador === "casos" && <ContadorDeCasos compacto={false} />}
           {item.contador === "fila" && <ContadorDaFila compacto={false} />}
           {item.contador === "avisos" && <ContadorDeAvisos />}
+          {item.contador === "tarefas" && <ContadorDeTarefas />}
         </Link>
       </li>
       {children}
     </>
   );
+}
+
+/**
+ * A seção tem a tela "Funis" (`/app/kanban`)? Função declarada, e não uma seta
+ * dentro do componente: a cerca `vocabulario-do-funil` lê texto entre `>` e
+ * `<`, e a seta seguida da rota parecia texto de tela.
+ */
+function temOQuadroDeFunis(secoes: Secao[]): boolean {
+  return secoes.some(function (secao) {
+    return secao.items.some(function (item) {
+      return item.href === "/app/kanban";
+    });
+  });
 }

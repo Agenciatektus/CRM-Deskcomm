@@ -34,6 +34,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { camposDoFunil, settingsDoEmbed } from "@/lib/leads/campos-do-funil";
+import { motivoDaPerdaObrigatorio } from "@/lib/leads/motivo-da-perda";
 import { motivosDoFunil } from "@/lib/leads/motivos-de-perda-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
@@ -52,7 +53,7 @@ export const dynamic = "force-dynamic";
 // no painel (visual v2, 3.4): trocar o responsável precisa saber quem é o atual,
 // para o "Desfazer" devolver a ele; o negócio perdido mostra o motivo.
 const LEAD_COLS =
-  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, custom_fields, owner_user_id, owner_agent_id, lost_reason, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
+  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, position_in_stage, custom_fields, owner_user_id, owner_agent_id, lost_reason, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
 const ORDER_COLS = "id, external_id, status, total_cents, currency, created_at";
 /** Acompanha o que a timeline mostra — `reason` e `actor_kind` inclusive. */
 /**
@@ -241,6 +242,9 @@ function comCamposDoFunil(row: Record<string, unknown>, etapasPorFunil: Map<stri
     ...lead,
     etapas: etapasPorFunil.get(String(lead.pipeline_id)) ?? [],
     motivos_de_perda: motivosDoFunil(settings),
+    // 9044: o funil pode dispensar o motivo de perda. A MESMA régua da rota
+    // `/lose` (`motivoDaPerdaObrigatorio`): só `false` explícito dispensa.
+    motivo_de_perda_obrigatorio: motivoDaPerdaObrigatorio(settings),
     field_defs: camposDoFunil(settings),
     funil_nome: nomeDoEmbed(crm_pipelines),
     etapa_nome: nomeDoEmbed(crm_stages),

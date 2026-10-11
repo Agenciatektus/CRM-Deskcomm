@@ -10,6 +10,7 @@ import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDo
 import { BarraEmDuasColunas } from "@/components/shell/BarraEmDuasColunas";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
+import { ContadorDeTarefas } from "@/components/shell/ContadorDeTarefas";
 import { MarcaDaBarra } from "@/components/shell/MarcaDaBarra";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
 import { VersionFooter } from "@/components/shell/VersionFooter";
@@ -147,6 +148,7 @@ export function SidebarContent({ onNavigate, funis = [] }: SidebarContentProps) 
                           {item.healthDot && <ConnectionHealthDot className="ml-auto" />}
                           {item.contador === "casos" && <ContadorDeCasos compacto={false} />}
                           {item.contador === "fila" && <ContadorDaFila compacto={false} />}
+                          {item.contador === "tarefas" && <ContadorDeTarefas />}
                         </Link>
                       </li>
                     );

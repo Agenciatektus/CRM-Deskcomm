@@ -41,7 +41,8 @@ interface WinArgs {
 }
 interface LoseArgs {
   leadId: string;
-  lostReason: string;
+  /** Vazio só quando o funil dispensa o motivo (9044); a rota decide de novo. */
+  lostReason?: string;
 }
 
 export function useWinLead(pipelineId: string) {
@@ -70,7 +71,7 @@ export function useLoseLead(pipelineId: string) {
     mutationFn: async ({ leadId, lostReason }: LoseArgs) => {
       marcarEcoLocal(leadId);
       return apiClient.post<{ data: Lead }>(`/api/v1/leads/${leadId}/lose`, {
-        lost_reason: lostReason,
+        ...(lostReason ? { lost_reason: lostReason } : {}),
       });
     },
     onSuccess: (res, { leadId }) => {

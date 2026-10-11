@@ -11,6 +11,7 @@ import type { Message } from "@/lib/types/messaging";
 import { Trash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
+import { AvisoSemConteudo } from "./AvisoSemConteudo";
 import { TranscricaoDoAudio } from "./TranscricaoDoAudio";
 
 /**
@@ -62,6 +63,10 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
     && (message.metadata.instagram_anexos_extras as unknown[]).length > 0;
   const isContact = message.type === "contact";
   const transcricao = transcricaoDoAudio(message);
+  // Nada a desenhar: sem texto, mídia, cartão, pino nem aviso de anexo. A bolha
+  // nunca fica vazia — mostra que há uma mensagem e onde vê-la.
+  const semConteudo = !hasMedia && !message.body && !anexoSemArquivo && !temAnexosExtras
+    && linksDoInstagram.length === 0 && !isContact && !localizacao;
 
   // Apagada pelo autor ("apagar para todos"). A linha continua no histórico —
   // sumir com ela deixaria a resposta seguinte respondendo ao nada —, mas o
@@ -141,6 +146,8 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
       {localizacao && <LocationCard localizacao={localizacao} />}
 
       {message.body && !isContact && !localizacao && <Texto espaco={espaco}>{message.body}</Texto>}
+
+      {semConteudo && <AvisoSemConteudo message={message} />}
     </>
   );
 }

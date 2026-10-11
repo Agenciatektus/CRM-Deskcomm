@@ -50,13 +50,19 @@ function assinar(avisar: () => void): () => void {
  */
 export function useAbaDoPainel(): [AbaDoPainel, (aba: AbaDoPainel) => void] {
   const aba = useSyncExternalStore(assinar, ler, () => PADRAO);
-  const escolher = useCallback((proxima: AbaDoPainel) => {
-    try {
-      window.localStorage.setItem(CHAVE, proxima);
-    } catch {
-      semStorage = proxima;
-    }
-    for (const avisar of ouvintes) avisar();
-  }, []);
+  const escolher = useCallback((proxima: AbaDoPainel) => escolherAbaDoPainel(proxima), []);
   return [aba, escolher];
+}
+
+/**
+ * Troca a aba lembrada sem precisar do hook: é o que a busca (Ctrl K) usa para
+ * abrir um LEAD na aba Negócios antes de navegar até a conversa dele.
+ */
+export function escolherAbaDoPainel(proxima: AbaDoPainel): void {
+  try {
+    window.localStorage.setItem(CHAVE, proxima);
+  } catch {
+    semStorage = proxima;
+  }
+  for (const avisar of ouvintes) avisar();
 }

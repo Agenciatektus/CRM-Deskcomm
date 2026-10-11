@@ -5,6 +5,7 @@
  * /api/v1/messages. Validações compartilhadas entre rota REST e webhooks
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
@@ -202,6 +203,13 @@ export const sendMessageSchema = z
      * linha do token e o membership, no banco.
      */
     on_behalf_of_user_id: z.string().uuid().optional(),
+    /**
+     * "Tentar de novo" (B15): o id da NOSSA mensagem de saída que falhou e que
+     * este envio repete. O handler confere que ela é desta conversa, deste
+     * canal, `failed` e ainda não reenviada (`lib/messaging/reenvio.ts`), e a
+     * linha nova guarda o vínculo em `metadata.reenvio_de`.
+     */
+    reenvio_de: z.string().uuid().optional(),
   })
   .refine(
     (d) => {
@@ -510,6 +518,13 @@ export const listConversationsQuerySchema = z.object({
    */
   entrada: z.enum(["direct", "comentario"]).optional(),
   /**
+   * "Sem próximo passo" (L4 da auditoria do visual v2, migration 9047): só as
+   * conversas cujo contato não tem tarefa aberta. Só `"true"` liga; ausente é
+   * sem filtro. Fechada, arquivada e grupo nunca casam (o campo calculado é
+   * nulo nelas).
+   */
+  sem_passo: z.enum(["true"]).optional(),
+  /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
    * apareceria como erro na cara de quem digita (a rota recusa e o hook mostra).
@@ -521,6 +536,7 @@ export const listConversationsQuerySchema = z.object({
   search: z
     .string()
     .trim()
+    .max(TETO_DO_TERMO_DE_BUSCA)
     .refine(buscaValeConsulta, {
       message: `A busca precisa de pelo menos ${PISO_DA_BUSCA} caracteres.`,
     })

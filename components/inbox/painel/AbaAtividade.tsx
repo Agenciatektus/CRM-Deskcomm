@@ -27,18 +27,21 @@ export function AbaAtividade({ activities, carregando, erro, onTentarDeNovo }: {
       {carregando ? (
         <Skeleton className="mt-2 h-14 w-full" />
       ) : activities && activities.length > 0 ? (
-        <ul className="mt-2 space-y-1.5">
+        // P26: linha do tempo com pontos (uma linha vertical e o marcador de
+        // cada evento sobre ela), e não uma pilha de cartões com borda.
+        <ul className="relative mt-3 space-y-3 border-l border-border pl-4">
           {activities.map((a) => (
-            <li key={a.id} className="rounded-md border border-border p-2 text-xs">
+            <li key={a.id} className="relative text-xs">
               {/* Rótulo do vocabulário único (activity-vocabulary), nunca o tipo
                   cru. Marcador por ator, forma e não cor (§5). */}
               <div className="flex items-center gap-1.5 font-medium">
                 <span
                   className={cn(
-                    "h-2 w-2 shrink-0",
+                    // O ponto mora SOBRE a linha do tempo (à esquerda do texto).
+                    "absolute -left-5.5 top-1 h-2.5 w-2.5 shrink-0 ring-2 ring-surface",
                     actorShape(a.actor_kind) === "filled" && "rounded-full bg-accent",
                     actorShape(a.actor_kind) === "ring" && "rounded-full border border-accent bg-surface",
-                    actorShape(a.actor_kind) === "dashed" && "rounded-full border border-dashed border-border-strong",
+                    actorShape(a.actor_kind) === "dashed" && "rounded-full border border-dashed border-border-strong bg-surface",
                   )}
                   aria-hidden
                 />

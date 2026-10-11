@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useEstadoDaConversa } from "@/hooks/inbox/useEstadoDaConversa";
+import { useT } from "@/hooks/i18n/useT";
 
 /**
  * Os atalhos "u" (marcar como não lida) e "p" (fixar/desafixar) da conversa
@@ -10,7 +11,9 @@ import { useEstadoDaConversa } from "@/hooks/inbox/useEstadoDaConversa";
  * devolve `undefined` e o atalho fica desligado.
  */
 export function useAtalhosPessoais(conversa: ConversationWithContact | null | undefined, somenteLeitura: boolean) {
-  const estado = useEstadoDaConversa();
+  const t = useT();
+  // O atalho confirma no mesmo toast do menu, com "Desfazer" (E2).
+  const estado = useEstadoDaConversa(t);
   const { mutate } = estado;
   const id = conversa?.id ?? null;
   const fixada = !!conversa?.pinned;

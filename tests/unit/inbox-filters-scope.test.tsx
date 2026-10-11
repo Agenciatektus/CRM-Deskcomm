@@ -123,11 +123,12 @@ describe("InboxFilters render — 3 visões + escopo", () => {
     const abas = screen.getAllByRole("tab").map((tab) => tab.textContent ?? "");
     expect(abas).toHaveLength(3);
     expect(abas.join(" ")).toMatch(/Fila.*Minhas.*Todas/);
-    expect(screen.queryByRole("tab", { name: /Fechadas|Arquivadas|Automático/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /Fechadas|Arquivadas|Com a IA/ })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /^Mais/ }));
     const itens = screen.getAllByRole("menuitemradio").map((i) => i.textContent ?? "");
-    expect(itens.join(" ")).toMatch(/Fechadas.*Arquivadas.*Automático/);
+    // L9: "Com a IA" primeiro, depois os dois passados.
+    expect(itens.join(" ")).toMatch(/Com a IA.*Fechadas.*Arquivadas/);
     await user.click(screen.getByRole("menuitemradio", { name: /Fechadas/ }));
     expect(onChange).toHaveBeenCalledWith({ ...VALUE, tab: "closed" });
   });

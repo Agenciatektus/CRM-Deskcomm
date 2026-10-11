@@ -171,7 +171,7 @@ describe("9029: forma e permissões", () => {
              has_function_privilege('anon', p.oid, 'EXECUTE'),
              coalesce((select bool_or(a.grantee = 0) from aclexplode(p.proacl) a where a.privilege_type = 'EXECUTE'), false)
         from pg_proc p
-       where p.oid = 'public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text)'::regprocedure;`);
+       where p.oid = 'public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean)'::regprocedure;`);
     expect(out).toBe("f|t|f|f");
   });
 });
@@ -200,7 +200,7 @@ describe("9029: os mesmos números das seis consultas antigas", () => {
 
 describe("9029: controle negativo (o instrumento pega mutante)", () => {
   const corpoDaFuncao = () =>
-    sql(`select pg_get_functiondef('public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text)'::regprocedure);`);
+    sql(`select pg_get_functiondef('public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean)'::regprocedure);`);
 
   it("sem o filtro de organização: reprova", () => {
     const def = corpoDaFuncao();

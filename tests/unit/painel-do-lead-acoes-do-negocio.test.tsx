@@ -47,18 +47,19 @@ vi.mock("@/hooks/inbox/useConversationTags", () => ({
 vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({ useContactTagVocabulary: () => ({ data: [] }) }));
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({ useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }) }));
 vi.mock("@/components/contacts/RoteirosDoContato", () => ({ RoteirosDoContato: () => null }));
-// As duas janelas têm teste próprio; aqui importa QUAL lead e QUAIS motivos chegam.
+// Os formulários têm teste próprio (os das janelas do quadro); aqui importa
+// QUAL lead e QUAIS motivos chegam, e que eles abrem NO PAINEL (P18/P19).
 vi.mock("@/components/kanban/LoseLeadDialog", () => ({
-  LoseLeadDialog: (p: { leadId: string; motivosDoFunil?: string[]; onOpenChange: (v: boolean) => void; aoConcluir?: () => void }) => (
+  FormularioDePerda: (p: { leadId: string; motivosDoFunil?: string[]; onCancelar: () => void; onConcluido: () => void }) => (
     <div data-testid="janela-de-perder" data-lead={p.leadId}>
       <span data-testid="motivos">{(p.motivosDoFunil ?? []).join(",")}</span>
-      <button type="button" onClick={() => p.onOpenChange(false)}>fecha-sem-gravar</button>
-      <button type="button" onClick={() => { p.onOpenChange(false); p.aoConcluir?.(); }}>grava-e-fecha</button>
+      <button type="button" onClick={() => p.onCancelar()}>fecha-sem-gravar</button>
+      <button type="button" onClick={() => p.onConcluido()}>grava-e-fecha</button>
     </div>
   ),
 }));
 vi.mock("@/components/kanban/MoveToOtherPipelineDialog", () => ({
-  MoveToOtherPipelineDialog: (p: { leadId: string; pipelineId: string }) => (
+  FormularioDeOutroFunil: (p: { leadId: string; pipelineId: string }) => (
     <div data-testid="janela-de-outro-funil" data-lead={p.leadId} data-funil={p.pipelineId} />
   ),
 }));

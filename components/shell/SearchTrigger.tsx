@@ -38,13 +38,13 @@ export function SearchTrigger() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={t("Buscar contato, conversa ou tela")}
+        aria-label={t("Buscar contato, conversa ou lead")}
         aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
         className="pele-foco flex h-9 w-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface text-sm text-text-subtle transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:w-full md:max-w-[440px] md:justify-start md:pr-2 md:pl-3"
       >
         <MagnifyingGlass size={15} className="shrink-0" aria-hidden />
         <span className="hidden min-w-0 flex-1 truncate text-left md:inline">
-          {t("Buscar contato, conversa ou tela")}
+          {t("Buscar contato, conversa ou lead")}
         </span>
         <kbd className="hidden shrink-0 rounded-md border border-border bg-surface-elevated px-1.5 py-0.5 font-sans text-[11px] text-text-muted md:inline">
           {mac ? "⌘K" : "Ctrl K"}

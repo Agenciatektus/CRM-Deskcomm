@@ -12,6 +12,15 @@ export interface Conversation {
    * conversa de DM.
    */
   instagram_entrada?: string | null;
+  /**
+   * Campo calculado (migration 9047): `sem_passo` quando o contato não tem
+   * tarefa aberta, `atrasada` quando tem uma vencida, `em_dia` no resto. Nulo em
+   * conversa fechada, arquivada, de grupo ou sem contato. Opcional: o cache e o
+   * realtime trazem a linha sem ele.
+   */
+  passo_da_conversa?: "sem_passo" | "atrasada" | "em_dia" | null;
+  /** Campo calculado (migration 9047): de quem é a última mensagem. */
+  autor_da_ultima_mensagem?: "cliente" | "ia" | "automacao" | "equipe" | null;
   id: string;
   organization_id: string;
   contact_id: string;

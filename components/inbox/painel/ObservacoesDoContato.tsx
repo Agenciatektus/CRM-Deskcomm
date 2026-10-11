@@ -1,5 +1,6 @@
 "use client";
 
+import { SecaoRecolhivel } from "./SecaoRecolhivel";
 import { forwardRef, useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -42,10 +43,14 @@ export const ObservacoesDoContato = forwardRef<HTMLElement, Props>(function Obse
   const podeEditar = !leitura && !anonimizado && !!contactId;
 
   return (
-    <section ref={ref} data-testid="inbox-observacoes-do-contato" tabIndex={-1} className="scroll-mt-12 focus:outline-hidden">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-text">
-        <Note size={14} aria-hidden /> {t("Observações")}
-      </h3>
+    <SecaoRecolhivel
+      ref={ref}
+      testId="inbox-observacoes-do-contato"
+      icone={<Note size={14} aria-hidden />}
+      titulo={t("Observações")}
+      // P6: fechada, a primeira linha da observação.
+      resumo={primeiraLinha(salvo) || t("Sem observações.")}
+    >
       {podeEditar && contato.isSuccess ? (
         // A chave remonta o editor quando o valor SALVO muda (outra conversa,
         // gravação concluída): o rascunho nasce do servidor sem efeito nenhum.
@@ -58,7 +63,7 @@ export const ObservacoesDoContato = forwardRef<HTMLElement, Props>(function Obse
           {salvo || t("Sem observações.")}
         </p>
       )}
-    </section>
+    </SecaoRecolhivel>
   );
 });
 
@@ -105,4 +110,9 @@ function EditorDeObservacoes({ contactId, salvo }: { contactId: string; salvo: s
       </div>
     </div>
   );
+}
+
+/** A primeira linha não vazia da observação, para o resumo da seção fechada. */
+function primeiraLinha(texto: string | null): string {
+  return (texto ?? "").split(/\r?\n/).find((l) => l.trim())?.trim() ?? "";
 }

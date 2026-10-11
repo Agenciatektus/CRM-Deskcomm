@@ -1,5 +1,6 @@
 "use client";
 
+import { SecaoRecolhivel } from "./SecaoRecolhivel";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
@@ -123,8 +124,17 @@ export function Demandas({
     d?.conversationId === conversationId && d.contactId === contactId && d.demandaId === demandaId;
 
   return (
-    <section data-testid="inbox-demandas">
-      <h3 className="text-xs font-semibold text-text">{t("Demandas abertas")}</h3>
+    <SecaoRecolhivel
+      testId="inbox-demandas"
+      titulo={t("Demandas abertas")}
+      resumo={
+        carregando || !demandas
+          ? null
+          : demandas.length === 1
+            ? t("1 demanda aberta")
+            : `${demandas.length} ${t("demandas abertas")}`
+      }
+    >
       {carregando ? (
         <Skeleton className="mt-2 h-14 w-full" />
       ) : demandas && demandas.length > 0 ? (
@@ -167,6 +177,6 @@ export function Demandas({
       ) : (
         <SemLista vazio={t("Nenhuma demanda aberta.")} erro={erro} onTentarDeNovo={recarregar} />
       )}
-    </section>
+    </SecaoRecolhivel>
   );
 }

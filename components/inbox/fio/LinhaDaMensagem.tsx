@@ -41,6 +41,10 @@ interface Props {
   /** Abre um bloco de falas do mesmo autor (`iniciaBloco`): nome e respiro em cima. */
   inicioDoBloco: boolean;
   acoes: AcoesDoFio;
+  /** B15: a mensagem de saída falhou, é reenviável e ainda não foi reenviada. */
+  podeReenviar?: boolean;
+  /** O gesto de reenviar, com identidade estável (ver `useReenvioDoFio`). */
+  reenviar?: (m: Message) => void;
 }
 
 /**
@@ -62,6 +66,8 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
   podeModerar,
   inicioDoBloco,
   acoes,
+  podeReenviar = false,
+  reenviar,
 }: Props) {
   const id = message.id;
   return (
@@ -82,6 +88,7 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
       onOcultar={podeModerar ? () => acoes.ocultar(id) : undefined}
       onRestaurar={podeModerar ? () => acoes.restaurar(id) : undefined}
       inicioDoBloco={inicioDoBloco}
+      onReenviar={podeReenviar && reenviar ? () => reenviar(message) : undefined}
     />
   );
 });

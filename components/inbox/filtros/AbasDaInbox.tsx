@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretDown } from "@/lib/ui/icons";
+import { Archive, CaretDown, CheckCircle, Robot } from "@/lib/ui/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,10 +25,17 @@ interface Props {
   tab: InboxTab;
   /** As que ficam à vista no controle segmentado (Fila, Minhas, Todas). */
   principais: AbaComContagem[];
-  /** As que vão para o "Mais" (Fechadas, Arquivadas, Automático…). */
+  /** As que vão para o "Mais" (Com a IA, Fechadas, Arquivadas). */
   escondidas: AbaComContagem[];
   onChange: (tab: InboxTab) => void;
 }
+
+/** L9: o ícone de cada visão do "Mais", como no protótipo. */
+const ICONE_DA_ABA: Partial<Record<InboxTab, typeof Robot>> = {
+  ai: Robot,
+  closed: CheckCircle,
+  archived: Archive,
+};
 
 /** Badge de contagem: zero não aparece, em nenhuma aba (ver o e2e de "Fechadas"). */
 function Contagem({ count, ativa }: { count?: number; ativa: boolean }) {
@@ -70,7 +77,7 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
               key={aba.value}
               value={aba.value}
               className={cn(
-                "h-7 min-w-0 flex-1 gap-1.5 rounded-md px-2 text-xs font-semibold text-text-muted shadow-none",
+                "h-7.5 min-w-0 flex-1 gap-1.5 rounded-md px-2 text-[13px] font-semibold text-text-muted shadow-none",
                 "pele-seg-item hover:text-text data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-sm",
               )}
             >
@@ -86,7 +93,7 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
                 type="button"
                 data-ativa={escondidaAtiva ? "true" : undefined}
                 className={cn(
-                  "pele-seg-item flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-text-muted hover:text-text",
+                  "pele-seg-item flex h-7.5 shrink-0 items-center gap-1 rounded-md px-2 text-[13px] font-semibold text-text-muted hover:text-text",
                   "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                   escondidaAtiva && "bg-surface text-text shadow-sm",
                 )}
@@ -98,14 +105,18 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuRadioGroup value={tab} onValueChange={(v) => onChange(v as InboxTab)}>
-                {escondidas.map((aba) => (
+                {escondidas.map((aba) => {
+                  const Icone = ICONE_DA_ABA[aba.value];
+                  return (
                   <DropdownMenuRadioItem key={aba.value} value={aba.value} className="gap-2">
+                    {Icone && <Icone size={15} aria-hidden className="text-text-muted" />}
                     <span className="flex-1">{t(aba.label)}</span>
                     {typeof aba.count === "number" && aba.count > 0 && (
                       <span className="text-xs tabular-nums text-text-subtle">{aba.count}</span>
                     )}
                   </DropdownMenuRadioItem>
-                ))}
+                  );
+                })}
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>

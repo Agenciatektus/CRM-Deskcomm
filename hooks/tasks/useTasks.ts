@@ -58,7 +58,13 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
     refetchOnWindowFocus: true,
   });
 
-  const invalidar = () => queryClient.invalidateQueries({ queryKey: CHAVE });
+  // As listas da Inbox também (P2 do Cassio na #158): a pílula e o filtro "Sem
+  // próximo passo" saem de `passo_da_conversa`, que muda quando uma tarefa do
+  // contato nasce, é concluída ou reagendada aqui na tela de Tarefas.
+  const invalidar = () => {
+    void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    return queryClient.invalidateQueries({ queryKey: CHAVE });
+  };
 
   const criar = useMutation({
     mutationFn: async (entrada: NovaTarefa) => {

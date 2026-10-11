@@ -71,6 +71,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     // único lugar que pode esquecer sem erro nenhum. `rota-le-todo-filtro-do-schema`
     // cobra a chave.
     is_group: url.searchParams.get("is_group") ?? undefined,
+    // "Sem próximo passo" (migration 9047). A cerca
+    // `rota-le-todo-filtro-do-schema` cobra esta linha.
+    sem_passo: url.searchParams.get("sem_passo") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.get("limit") ?? undefined,

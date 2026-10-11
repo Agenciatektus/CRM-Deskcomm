@@ -44,10 +44,9 @@ interface Props {
 /**
  * O rótulo do DONO, na régua de `comandoDaConversa` (a mesma do cabeçalho).
  *
- * "Automático", e não "IA": é a palavra do ator em todo o produto, travada por
- * `handoff-por-orcamento.test.ts`. Encerrada não ganha pílula: "Encerrada" já é
- * a aba, e repetir em cada linha é o ruído que a regra do `mostrarAtendente`
- * existe para evitar.
+ * "IA" (L19 da auditoria; decisão do Peterson, como o "Devolver à IA"). A
+ * encerrada SEM dono ganha a pílula "Fechada": na aba Todas ela se mistura às
+ * abertas. A pílula só aparece onde o dono discrimina (`mostrarAtendente`).
  */
 function donoDaConversa(
   comando: Comando,
@@ -62,7 +61,10 @@ function donoDaConversa(
         classe: "border-border bg-surface text-text-muted",
       };
     case "automatico":
-      return { rotulo: t("Automático"), classe: "border-transparent bg-accent-soft text-accent" };
+      // L19: "IA", a palavra do protótipo (e do "Devolver à IA" do cabeçalho).
+      return { rotulo: t("IA"), classe: "border-transparent bg-accent-soft text-accent-700 dark:text-accent-300" };
+    case "encerrada":
+      return { rotulo: t("Fechada"), classe: "border-border bg-surface-elevated text-text-subtle" };
     case "aguardando":
     case "ninguem":
       // Neutro de propósito: "sem dono" é o estado normal da Fila, e pintá-lo de
@@ -72,6 +74,27 @@ function donoDaConversa(
     default:
       return null;
   }
+}
+
+/**
+ * A pílula de TAREFA (L20 da auditoria), lida do campo calculado
+ * `passo_da_conversa` (migration 9047), que vem na mesma consulta da lista.
+ *
+ * "Tarefa atrasada" em qualquer conversa aberta: alguém combinou e não fez. "Sem
+ * próximo passo" só na conversa que é DE QUEM ESTÁ LOGADO, como no protótipo:
+ * na Fila e na conversa da IA quase toda linha não tem tarefa, e o aviso em
+ * todas ensinaria a ignorá-lo. Fechada, arquivada e grupo chegam nulos.
+ */
+function pilulaDoPasso(
+  passo: ConversationWithContact["passo_da_conversa"],
+  comando: Comando,
+  meuUserId: string | null | undefined,
+  t: (texto: string) => string,
+): { rotulo: string; tom: "crit" | "warn" } | null {
+  if (passo === "atrasada") return { rotulo: t("Tarefa atrasada"), tom: "crit" };
+  const minha = comando.quem === "humano" && !!meuUserId && comando.userId === meuUserId;
+  if (passo === "sem_passo" && minha) return { rotulo: t("Sem próximo passo"), tom: "warn" };
+  return null;
 }
 
 /**
@@ -95,8 +118,12 @@ export function MetaDaConversa({
   const localeDaData = useLocaleDeData();
   const c = conversation.contacts ?? null;
   const tags = c?.tags ?? [];
-  const visibleTags = tags.slice(0, 2);
-  const overflow = tags.length - visibleTags.length;
+  const passo = pilulaDoPasso(conversation.passo_da_conversa, comando, meuUserId, t);
+  // L21: uma etiqueta e "+N", como no protótipo: duas já empurravam a linha. Com
+  // a pílula de tarefa (L20) a etiqueta sai, também como no protótipo: a linha
+  // tem lugar para UM aviso, e o de tarefa é o que pede ação.
+  const visibleTags = passo ? [] : tags.slice(0, 1);
+  const overflow = passo ? 0 : tags.length - visibleTags.length;
   const naFila = queuePosition !== undefined;
   const dono = mostrarAtendente ? donoDaConversa(comando, meuUserId, t) : null;
   /*
@@ -123,6 +150,7 @@ export function MetaDaConversa({
     naFila ||
     mostraEspera ||
     dono !== null ||
+    passo !== null ||
     visibleTags.length > 0 ||
     rotuloEntrada !== null ||
     (mostrarCanal && rotuloCanal != null) ||
@@ -170,6 +198,11 @@ export function MetaDaConversa({
         </span>
       )}
       {dono && <span className={cn(PILULA, dono.classe)}>{dono.rotulo}</span>}
+      {passo && (
+        <span className={cn(PILULA, "border-transparent", CLASSE_DO_TOM[passo.tom])} data-testid="item-passo">
+          {passo.rotulo}
+        </span>
+      )}
       {visibleTags.map((tag) => (
         <ChipDeEtiqueta key={tag} tag={tag} title={tag} className={CHIP_DA_ETIQUETA} />
       ))}

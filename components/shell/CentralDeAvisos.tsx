@@ -17,6 +17,8 @@ import { kindLabel } from "@/lib/ai/agent-inbox-copy";
 import { Alarm, ArrowsClockwise, CalendarCheck, Check, Plugs, Sparkle, UserMinus, Warning } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
+import { ResultadoDoCompromisso } from "./ResultadoDoCompromisso";
+
 /** O limite que a rota aplica por padrão (`/api/v1/ai/inbox`, `limit` = 50). */
 const LIMITE_DA_LISTA = 50;
 
@@ -190,6 +192,8 @@ function ItemDoAviso({
   const locale = useLocaleDeData();
   const { Icone, tom } = aparencia(item);
   const aberto = item.status !== "resolved";
+  const pedeDesfecho =
+    aberto && podeResolver && item.kind === "appointment_outcome_required" && item.ref_kind === "appointment" && !!item.ref_id;
   const quando = formatDistanceToNowStrict(new Date(item.created_at), { addSuffix: true, locale });
   return (
     <li className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 border-b border-border px-4 py-3.5 last:border-b-0" data-testid="central-de-avisos-item">
@@ -207,7 +211,14 @@ function ItemDoAviso({
           {item.body ?? kindLabel(item.kind, t)}
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {aberto && item.destination.estado === "disponivel" && (
+          {/* T18: o desfecho do compromisso direto no aviso, para quem resolve. */}
+          {pedeDesfecho ? (
+            <ResultadoDoCompromisso
+              compromissoId={item.ref_id!}
+              hrefDoCompromisso={item.destination.estado === "disponivel" ? item.destination.href : null}
+              onNavegar={onNavegar}
+            />
+          ) : aberto && item.destination.estado === "disponivel" && (
             <Button asChild size="sm" className="h-7 px-2.5 text-xs">
               <Link href={item.destination.href} onClick={onNavegar}>
                 {t(item.destination.rotulo)}

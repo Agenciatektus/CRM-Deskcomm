@@ -123,6 +123,13 @@ export function aplicarMudancaDaConversa(
     for (const [k, v] of Object.entries(linha)) {
       if (k in atual && (v === null || typeof v !== "object" || Array.isArray(v))) patch[k] = v;
     }
+    // Mensagem nova (P2 do Cassio na #158): o autor da última mensagem é campo
+    // calculado e não vem no evento. Sem esta linha a prévia nova aparecia com o
+    // prefixo da ANTERIOR ("Você:" numa mensagem do cliente) até o refetch, que
+    // `last_message_at` já agenda (está em CAMPOS_DE_FILTRO_E_ORDEM).
+    if ("last_message_at" in linha && !igual(linha.last_message_at, atual.last_message_at)) {
+      patch.autor_da_ultima_mensagem = null;
+    }
     qc.setQueryData<Lista>(q.queryKey, (velha) =>
       velha && {
         ...velha,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
+import { useLeadsAbertosPorFunil } from "@/hooks/pipelines/useLeadsAbertosPorFunil";
 import { CaretDown, Kanban } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import {
@@ -77,33 +78,76 @@ export function NoDeFunis({
       </button>
 
       {aberto && (
-        <ul className="mt-1 ml-4 space-y-1 border-l border-border pl-3">
-          {funis.map((funil) => {
-            const href = hrefDoFunil(funil.id);
-            const ativo = pathname === href;
-            return (
-              <li key={funil.id}>
-                <Link
-                  href={href}
-                  aria-current={ativo ? "page" : undefined}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center rounded-md px-3 py-1 text-sm transition-colors",
-                    ativo ? classeAtiva : classeInativa,
-                  )}
-                >
-                  {/*
-                    O nome do funil vem do banco e é escrito pelo cliente: não passa
-                    por `t()`, que traduziria "Clientes" para outro idioma como se
-                    fosse palavra da interface.
-                  */}
-                  <span className="truncate">{funil.name}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <FunisDoNo
+          funis={funis}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          classeAtiva={classeAtiva}
+          classeInativa={classeInativa}
+        />
       )}
     </li>
+  );
+}
+
+/**
+ * Os filhos do nó, um por funil, com os leads ABERTOS de cada um (S18). Num
+ * componente à parte para a contagem só ser pedida com o nó aberto: o hook
+ * vive aqui, e este bloco só monta quando abre.
+ */
+function FunisDoNo({
+  funis,
+  pathname,
+  onNavigate,
+  classeAtiva,
+  classeInativa,
+}: {
+  funis: readonly FunilDoMenu[];
+  pathname: string;
+  onNavigate?: () => void;
+  classeAtiva: string;
+  classeInativa: string;
+}) {
+  const t = useT();
+  const { data: abertos } = useLeadsAbertosPorFunil(true);
+  return (
+    <ul className="mt-1 ml-4 space-y-1 border-l border-border pl-3">
+      {funis.map((funil) => {
+        const href = hrefDoFunil(funil.id);
+        const ativo = pathname === href;
+        const quantos = abertos?.[funil.id] ?? 0;
+        return (
+          <li key={funil.id}>
+            <Link
+              href={href}
+              aria-current={ativo ? "page" : undefined}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-3 py-1 text-sm transition-colors",
+                ativo ? classeAtiva : classeInativa,
+              )}
+            >
+              {/*
+                O nome do funil vem do banco e é escrito pelo cliente: não passa
+                por `t()`, que traduziria "Clientes" para outro idioma como se
+                fosse palavra da interface.
+              */}
+              <span className="truncate">{funil.name}</span>
+              {quantos > 0 && (
+                // O `.nav2-count` do protótipo, neutro: é volume do funil, não alerta.
+                <span
+                  data-testid="contador-do-funil"
+                  aria-label={`${quantos} ${t("leads abertos")}`}
+                  title={`${quantos} ${t("leads abertos")}`}
+                  className="ml-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-surface-elevated px-1.5 text-xs font-bold leading-none text-text-muted tabular-nums"
+                >
+                  {quantos}
+                </span>
+              )}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

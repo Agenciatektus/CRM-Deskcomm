@@ -14,7 +14,7 @@ import { useT } from "@/hooks/i18n/useT";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useEstadoDaConversa } from "@/hooks/inbox/useEstadoDaConversa";
 import { estaSilenciada, type DuracaoDeSilencio } from "@/lib/inbox/estado-por-atendente";
-import { Bell, BellSlash, EnvelopeSimple, Prohibit, PushPin, PushPinSlash } from "@/lib/ui/icons";
+import { Bell, BellSlash, EnvelopeOpen, EnvelopeSimple, Prohibit, PushPin, PushPinSlash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { CLASSE_DO_ITEM, CLASSE_DO_SUBMENU } from "./estilo";
@@ -47,7 +47,8 @@ interface Props {
  */
 export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloquear, nome }: Props) {
   const t = useT();
-  const estado = useEstadoDaConversa();
+  // Com `t`: cada ação confirma num toast com "Desfazer" quando há inverso.
+  const estado = useEstadoDaConversa(t);
   // O menu remonta a cada abertura: "agora" é o instante em que ele abriu.
   const [agora] = useState(() => Date.now());
   const id = conversation.id;
@@ -101,7 +102,12 @@ export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloq
               </DropdownMenuPortal>
             </DropdownMenuSub>
           )}
-          {!conversation.marked_unread && (
+          {/* E10: alterna. A marcada como não lida oferece "Marcar como lida". */}
+          {conversation.marked_unread ? (
+            <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => fazer({ tipo: "desmarcar_nao_lida" })}>
+              <EnvelopeOpen size={16} aria-hidden /> {t("Marcar como lida")}
+            </DropdownMenuItem>
+          ) : (
             <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => fazer({ tipo: "marcar_nao_lida" })}>
               <EnvelopeSimple size={16} aria-hidden /> {t("Marcar como não lida")}
             </DropdownMenuItem>

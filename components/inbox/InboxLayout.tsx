@@ -140,10 +140,13 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const idNaUrl = searchParams.get("id");
 
   // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
+  // `?sem_passo=1` é a porta da busca (Ctrl K) vinda de outra tela: "Só
+  // conversas sem próximo passo" abre a Inbox já filtrada.
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
     search: "",
     onlyUnread: false,
     onlyGroups: false,
+    semPasso: searchParams.get("sem_passo") === "1",
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -167,7 +170,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
   // limpá-la junto a tiraria do lugar sem ela ter pedido.
   const limparFiltrosAuxiliares = useCallback(() => {
-    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false });
+    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false, semPasso: false });
   }, [tab, setFilterValue]);
 
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? idNaUrl);
@@ -191,6 +194,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       }),
     [abrirPainel],
   );
+  // A mesma ação da busca com a Inbox já aberta: liga o filtro sem recarregar.
+  useEffect(() => escutar("so-sem-passo", () => setAux((a) => ({ ...a, semPasso: true }))), []);
   // Colunas reguláveis a partir de 1536px (G1-G3): as larguras viram variáveis
   // CSS no cartão, e os pegadores as mudam. Abaixo disso valem as faixas fixas.
   const colunasRegulaveis = useLargurasDasColunas();
@@ -241,6 +246,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       tagMode: filterValue.tagMode,
       unread: filterValue.onlyUnread || undefined,
       is_group: filterValue.onlyGroups || undefined,
+      sem_passo: filterValue.semPasso || undefined,
     }),
     [
       filterValue.tab,
@@ -252,6 +258,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       filterValue.tagMode,
       filterValue.onlyUnread,
       filterValue.onlyGroups,
+      filterValue.semPasso,
     ],
   );
 
@@ -565,8 +572,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <ChatCircle size={36} weight="thin" className="text-text-subtle" aria-hidden />
-            <p className="text-sm font-medium text-text-muted">{t("Selecione uma conversa")}</p>
-            <p className="text-xs text-text-muted">{t("Ou navegue com J e K")}</p>
+            {/* E1: o texto do protótipo, e a dica de teclado continua. */}
+            <p className="text-sm font-medium text-text-muted">{t("Escolha uma conversa")}</p>
+            <p className="text-xs text-text-muted">{t("A fila mostra primeiro quem espera há mais tempo.")}</p>
+            <p className="text-xs text-text-subtle">{t("Ou navegue com J e K")}</p>
           </div>
         )}
       </div>

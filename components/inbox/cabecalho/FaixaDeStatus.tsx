@@ -8,7 +8,15 @@ import { formatarDecorrido } from "@/lib/channels/janela";
 import { lembreteAtivo, quandoDoLembrete } from "@/lib/inbox/opcoes-do-lembrete";
 import { tomDaEspera, type TomDaEspera } from "@/lib/inbox/tom-da-espera";
 import { Alarm, X } from "@/lib/ui/icons";
+import type { EntradaDoContato } from "@/lib/contacts/entrou-por";
 import { cn } from "@/lib/utils";
+
+/** "Anúncio da Meta: Clareamento". A campanha vem do banco e não passa por `t()`. */
+function rotuloDaEntrada(e: EntradaDoContato | null, t: (texto: string) => string): string | null {
+  if (!e) return null;
+  const nome = e.traduzir ? t(e.rotulo) : e.rotulo;
+  return e.campanha ? `${nome}: ${e.campanha}` : nome;
+}
 
 /** A pílula do visual v2, a mesma altura da linha da lista de conversas. */
 const PILULA =
@@ -30,8 +38,10 @@ interface Props {
   snoozeUntil: string | null;
   /** Por que o automático está parado, já traduzido; `null` quando ele não está. */
   motivo: string | null;
-  /** Por onde a conversa entrou: hoje só o Instagram diz (`direct` ou `comentario`). */
+  /** Por onde a conversa entrou no Instagram (`direct` ou `comentario`). */
   instagramEntrada: string | null;
+  /** H13: de onde o CONTATO veio (anúncio, formulário, importação…). */
+  entradaDoContato?: EntradaDoContato | null;
   leitura: boolean;
 }
 
@@ -54,6 +64,7 @@ export function FaixaDeStatus({
   snoozeUntil,
   motivo,
   instagramEntrada,
+  entradaDoContato = null,
   leitura,
 }: Props) {
   const t = useT();
@@ -74,7 +85,7 @@ export function FaixaDeStatus({
       ? t("Direct do Instagram")
       : instagramEntrada === "comentario"
         ? t("Comentário no Instagram")
-        : null;
+        : rotuloDaEntrada(entradaDoContato, t);
 
   return (
     <div
