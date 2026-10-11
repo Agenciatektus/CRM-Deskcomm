@@ -15477,7 +15477,6 @@ export const DICIONARIO: Traducoes = {
   },
   "9. Dados do Google (Agenda e Google Ads)": { es: "9. Datos de Google (Agenda y Google Ads)" },
   "Tipo de fluxo": { es: "Tipo de flujo" },
-  "Atendimento": { es: "Atención" },
   "O roteiro de atendimento não começou: o módulo Fluxos de atendimento está desligado nesta instalação.": {
     es: "El guion de atención no comenzó: el módulo Flujos de atención está desactivado en esta instalación.",
   },
