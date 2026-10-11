@@ -40,6 +40,18 @@ const PILULA = "components/ui/badge.tsx";
 const ABAS = "components/ui/tabs.tsx";
 const MENU = "components/ui/dropdown-menu.tsx";
 const SWITCH = "components/ui/switch.tsx";
+const POPOVER = "components/ui/popover.tsx";
+const DIALOGO = "components/ui/dialog.tsx";
+const ALERTA = "components/ui/alert-dialog.tsx";
+const PAINEL = "components/ui/sheet.tsx";
+
+/** `var(--shadow-pop)` -> `shadow-pop`. */
+const sombra = (v: string) => `shadow-${/var\(--shadow-([a-z]+)\)/.exec(v)?.[1] ?? "?"}`;
+/** `popIn .16s var(--ease)` -> `data-[state=open]:animate-pop-in` (a duração é conferida nos tokens). */
+const entrada = (v: string) => {
+  const nome = v.trim().split(/\s+/)[0]!.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`);
+  return `data-[state=open]:animate-${nome}`;
+};
 
 const c = (
   id: string,
@@ -159,6 +171,21 @@ export const CHECAGENS: Checagem[] = [
   c("menu:separador", R_DS, ".msep", "margin", MENU, margem),
   c("menu:kbd-borda-baixo", R_DS, ".kbd", "border-bottom-width", MENU, (v) => `border-b-${px(v)}`),
   c("menu:kbd-fundo", R_DS, ".kbd", "background", MENU, fundo),
+  // ── Sobreposições: popover, diálogo e painel lateral (Main) ─────────────
+  c("popover:raio", R_MAIN, ".pop", "border-radius", POPOVER, (v) => raio(v)),
+  c("popover:sombra", R_MAIN, ".pop", "box-shadow", POPOVER, sombra),
+  c("popover:fundo", R_MAIN, ".pop", "background", POPOVER, fundo),
+  c("popover:padding", R_MAIN, ".pop", "padding", POPOVER, preenchimento),
+  c("popover:entrada", R_MAIN, ".pop", "animation", POPOVER, entrada),
+  ...[DIALOGO, ALERTA].flatMap((arq) => [
+    c(`dialogo:raio@${arq}`, R_MAIN, ".pal", "border-radius", arq, (v) => `sm:${raio(v)}`),
+    c(`dialogo:sombra@${arq}`, R_MAIN, ".pal", "box-shadow", arq, sombra),
+    c(`dialogo:fundo@${arq}`, R_MAIN, ".pal", "background", arq, fundo),
+    c(`dialogo:veu@${arq}`, R_MAIN, ".pal-scrim", "backdrop-filter", arq, (v) => `backdrop-blur-[${/blur\((\d+px)\)/.exec(v)?.[1]}]`),
+  ]),
+  c("painel:sombra", R_MAIN, ".app.drawer-on .panel", "box-shadow", PAINEL, sombra),
+  c("painel:entrada", R_MAIN, ".app.drawer-on .panel", "animation", PAINEL, entrada),
+  c("painel:fundo", R_MAIN, ".panel", "background", PAINEL, fundo),
   // ── Switch (o quadro não desenha; vale o Main) ──────────────────────────
   c("switch:largura", R_MAIN, ".switch", "width", SWITCH, largura),
   c("switch:altura", R_MAIN, ".switch", "height", SWITCH, altura),

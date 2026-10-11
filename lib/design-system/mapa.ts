@@ -111,7 +111,7 @@ export const MAPA = {
   "comp:avatar": { ...os("igual"), ref: r(".av", 213) },
   "comp:selo-canal": { ...os("diferente"), ref: r(".chan", 216) },
   "comp:tooltip": { ...os("sem-equivalente"), ref: null },
-  "comp:popover": { ...os("diferente"), ref: r(".pop", 246), proto: { claro: "padding 6", escuro: "padding 6" } },
+  "comp:popover": { ...os("diferente"), ref: r(".pop", 246), proto: { claro: "padding 6 (exceção aceita: o Popover hospeda formulário)", escuro: "padding 6 (exceção aceita: o Popover hospeda formulário)" } },
   "comp:menu": { ...os("igual"), ref: r(".ctxm / .mi", 602) },
   "comp:dialog": { ...os("igual"), ref: r(".pal / .pal-scrim", 669) },
   "comp:alert-dialog": { ...os("diferente"), ref: r(".confirm", 629) },
