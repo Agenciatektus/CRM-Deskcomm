@@ -25,6 +25,8 @@ export function SecaoTipografia({ tema }: { tema: Tema }) {
     <Secao
       id={`tipo-${tema}`}
       titulo={t("Tipografia")}
+      mapa="ds:tipografia"
+      tema={tema}
       apoio={t("A escala do protótipo virou token (text-meta, text-label, text-ui, text-message, text-title-*). As telas ainda usam a escala do Tailwind, mostrada no fim.")}
     >
       <Exemplo nome={t("Escala do protótipo, em tokens")} mapa="tipo:escala" tema={tema}>

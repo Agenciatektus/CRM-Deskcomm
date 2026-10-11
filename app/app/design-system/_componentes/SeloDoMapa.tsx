@@ -55,9 +55,10 @@ export function ValorDoPrototipo({ id, tema }: { id: IdDoMapa; tema: Tema }) {
  * e não link: o protótipo vive em `docs/`, que não vai para a imagem do
  * produto, e roda num runtime de design que o app não serve.
  */
-export function RefDoPrototipo({ id }: { id: IdDoMapa }) {
+export function RefDoPrototipo({ id, tema }: { id: IdDoMapa; tema?: Tema }) {
   const t = useT();
-  const ref = MAPA[id].ref;
+  const item: ItemDoMapa = MAPA[id];
+  const ref = tema === "escuro" && item.refEscuro ? item.refEscuro : item.ref;
   if (!ref) return <span className="text-meta text-text-subtle">{t("Sem par no protótipo")}</span>;
   return (
     <span className="text-meta text-text-subtle">

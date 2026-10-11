@@ -62,7 +62,7 @@ export function SecaoEspacoForma({ tema }: { tema: Tema }) {
   const t = useT();
   return (
     <>
-      <Secao id={`espaco-${tema}`} titulo={t("Espaçamento e raios")}>
+      <Secao id={`espaco-${tema}`} titulo={t("Espaço")} mapa="ds:espaco" tema={tema} apoio={t("Base de 4 px. Linha da lista com 12 px de respiro (8 px no modo compacto).")}>
         <Exemplo nome={t("Escala de espaço (base 4)")} mapa="espaco:escala" tema={tema}>
           <Grade itens={ESPACOS} forma="block rounded-sm border border-accent bg-accent-soft" />
         </Exemplo>
@@ -71,14 +71,15 @@ export function SecaoEspacoForma({ tema }: { tema: Tema }) {
             {t("Protótipo: 12px (8px no compacto). CRM: --density-py 16px, sem modo compacto.")}
           </p>
         </Exemplo>
+      </Secao>
+      <Secao id={`forma-${tema}`} titulo={t("Forma")} mapa="ds:forma" tema={tema} apoio={t("Raio cresce com o objeto: pílula 6, botão 9, campo 10, menu 14, balão 18 (6 no canto que aponta para quem enviou).")}>
         <Exemplo nome={t("Raios do CRM")} mapa="raio:escala" tema={tema}>
           <Grade itens={RAIOS_DO_CRM} forma="block size-14 border border-border-strong bg-surface-elevated" />
         </Exemplo>
         <Exemplo nome={t("Raios do protótipo, em tokens novos")} mapa="raio:escala" tema={tema}>
           <Grade itens={RAIOS_NOVOS} forma="block size-14 border border-border-strong bg-surface-elevated" />
         </Exemplo>
-      </Secao>
-      <Secao id={`sombra-${tema}`} titulo={t("Sombras, elevação, foco e movimento")}>
+        <Secao id={`sombra-${tema}`} sub titulo={t("Sombras, elevação, foco e movimento (só no CRM)")}>
         <Exemplo nome={t("Sombras")} mapa="sombra:pop" tema={tema}>
           <Grade itens={SOMBRAS} forma="block h-14 w-20 rounded-lg border border-border bg-surface" />
           <p className="text-meta text-text-subtle">
@@ -110,6 +111,7 @@ export function SecaoEspacoForma({ tema }: { tema: Tema }) {
           </div>
           <p className="text-meta text-text-subtle">{t("Passe o mouse sobre as barras.")}</p>
         </Exemplo>
+        </Secao>
       </Secao>
     </>
   );

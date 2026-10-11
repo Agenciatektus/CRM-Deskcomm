@@ -94,8 +94,15 @@ export function BarraEmDuasColunas({
   collapsed,
   funis = [],
   marca,
+  aoAlternar,
 }: {
   collapsed: boolean;
+  /**
+   * Troca o que o « e o alfinete fazem. Sem ele, gravam a preferência da pessoa
+   * (Server Action `toggleSidebar`). A vitrine do design system passa um
+   * alternador local: a barra dela é amostra e não pode mexer no menu real.
+   */
+  aoAlternar?: () => void;
   funis?: readonly FunilDoMenu[];
   /** A marca já resolvida (`MarcaDaBarra`, onde mora a proteção do logo). */
   marca: ReactNode;
@@ -105,6 +112,7 @@ export function BarraEmDuasColunas({
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const { user, activeOrg } = useAuth();
+  const alternar = () => (aoAlternar ? aoAlternar() : startTransition(() => toggleSidebar(collapsed)));
   const args = [
     user.is_platform_admin && !user.support,
     activeOrg?.role ?? null,
@@ -252,7 +260,7 @@ export function BarraEmDuasColunas({
           )}
           <button
             type="button"
-            onClick={() => startTransition(() => toggleSidebar(collapsed))}
+            onClick={alternar}
             disabled={isPending}
             className="flex h-8 w-14 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground"
             aria-label={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
@@ -291,7 +299,7 @@ export function BarraEmDuasColunas({
               collapsed ? (
                 <button
                   type="button"
-                  onClick={() => startTransition(() => toggleSidebar(collapsed))}
+                  onClick={alternar}
                   disabled={isPending}
                   className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={t("Fixar menu")}
@@ -302,7 +310,7 @@ export function BarraEmDuasColunas({
               ) : (
                 <button
                   type="button"
-                  onClick={() => startTransition(() => toggleSidebar(collapsed))}
+                  onClick={alternar}
                   disabled={isPending}
                   className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={t("Recolher menu")}

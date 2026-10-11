@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useT } from "@/hooks/i18n/useT";
 
 import { Estados, Exemplo, Secao } from "../_componentes/Secao";
+import { SegmentadoEAbas } from "./SecaoMarcadores";
 import type { Tema } from "../_componentes/tema";
 
 function Campo({ rotulo, children }: { rotulo: string; children: (id: string) => ReactNode }) {
@@ -25,7 +26,8 @@ function Campo({ rotulo, children }: { rotulo: string; children: (id: string) =>
 export function SecaoCampos({ tema }: { tema: Tema }) {
   const t = useT();
   return (
-    <Secao id={`campos-${tema}`} titulo={t("Campos")}>
+    <Secao id={`campos-${tema}`} sub titulo={t("Navegação e campos")} mapa="ds:navegacao-campos" tema={tema}>
+      <SegmentadoEAbas tema={tema} />
       <Exemplo nome="Input" mapa="comp:input" tema={tema}>
         <Estados
           itens={[
