@@ -9,22 +9,22 @@ Etapa 1 do design system ("foundation-first"): trazer o design system do protót
 - **CRM:** `app/globals.css` em `origin/dev` (f027292b1) e as classes de `components/ui`.
 - Cores do protótipo convertidas de oklch para hex com `oklchParaHex` (`lib/branding/rampa.ts`), a mesma conversão da régua de contraste. **Igual** = distância OKLab ≤ 0,01 (invisível); acima disso, **diferente**.
 - `color-mix` do protótipo que depende da marca foi calculado com a marca padrão do CRM (Sage `#506d48` no claro, `#82a077` no escuro) para comparar a FÓRMULA, e não a cor de marca. A cor de marca padrão em si é uma linha própria.
-- Status: **igual**, **diferente** (existe nos dois com valor ou forma diferente), **falta** (o protótipo tem e o CRM não tinha; os tokens criados nesta etapa continuam "falta" até alguma tela consumi-los), **só CRM** (o protótipo não desenhou).
+- Status: **igual**, **diferente** (existe nos dois com valor ou forma diferente), **novo** (o protótipo tem, o CRM não tinha e esta etapa criou; existe, mas nenhuma tela usa ainda), **falta** (o protótipo tem e o CRM continua sem), **só CRM** (o protótipo não desenhou).
 
 ## Contagem
 
-| Categoria | Igual | Diferente | Falta | Só CRM | Total |
-|---|---:|---:|---:|---:|---:|
-| Cor | 13 | 16 | 6 | 2 | 37 |
-| Tipografia | 4 | 5 | 1 | 0 | 10 |
-| Espaçamento | 1 | 4 | 1 | 0 | 6 |
-| Raios | 3 | 8 | 0 | 0 | 11 |
-| Sombras e elevação | 4 | 4 | 0 | 0 | 8 |
-| Foco | 2 | 3 | 0 | 0 | 5 |
-| Degradês e ruído | 5 | 2 | 0 | 1 | 8 |
-| Movimento | 1 | 4 | 2 | 0 | 7 |
-| **Tokens (soma)** | **33** | **46** | **10** | **3** | **92** |
-| Componentes (estados, abaixo) | 2 | 27 | 1 | 4 | 34 |
+| Categoria | Igual | Diferente | Novo | Falta | Só CRM | Total |
+|---|---:|---:|---:|---:|---:|---:|
+| Cor | 13 | 16 | 6 | 0 | 2 | 37 |
+| Tipografia | 4 | 5 | 1 | 0 | 0 | 10 |
+| Espaçamento | 1 | 4 | 0 | 1 | 0 | 6 |
+| Raios | 3 | 8 | 0 | 0 | 0 | 11 |
+| Sombras e elevação | 4 | 4 | 0 | 0 | 0 | 8 |
+| Foco | 2 | 3 | 0 | 0 | 0 | 5 |
+| Degradês e ruído | 5 | 2 | 0 | 0 | 1 | 8 |
+| Movimento | 1 | 4 | 0 | 2 | 0 | 7 |
+| **Tokens (soma)** | **33** | **46** | **7** | **3** | **3** | **92** |
+| Componentes (estados, abaixo) | 2 | 27 | 1 | 0 | 4 | 34 |
 
 Leitura rápida: as **superfícies, textos e linhas já são iguais** nos dois temas (a pele do escuro, PRs #144/#145, e a conversão anterior acertaram a base). O que separa o CRM do protótipo é **forma** (raio, peso, padding), **cores de estado no claro** e o **desenho de cada componente** (menu, diálogo, toast, campos).
 
@@ -35,24 +35,24 @@ Leitura rápida: as **superfícies, textos e linhas já são iguais** nos dois t
 | 1 | `--chrome` | `--color-bg` | `#eef1f5` | `#eef1f5` | `#0d0e11` | `#0d0e11` | igual |
 | 2 | `--surface` | `--color-surface` | `#ffffff` | `#ffffff` | `#181a1c` | `#181a1c` | igual |
 | 3 | `--surface-2` | `--color-surface-elevated` | `#f5f7f9` | `#f5f7f9` | `#1f2225` | `#1f2225` | igual |
-| 4 | `--thread` | `--color-thread` (novo). Telas: `.fundo-do-fio` usa `--color-bg` no claro e `--pele-fio` no escuro | `#f2f5f8` | `#eef1f5` | `#111315` | `#111315` | falta (token criado) |
+| 4 | `--thread` | `--color-thread` (novo). Telas: `.fundo-do-fio` usa `--color-bg` no claro e `--pele-fio` no escuro | `#f2f5f8` | `#eef1f5` | `#111315` | `#111315` | novo nesta etapa |
 | 5 | `--ink` | `--color-text` | `#171d26` | `#171d26` | `#f8f8f8` | `#f8f8f8` | igual |
 | 6 | `--ink-2` | `--color-text-muted` | `#474d58` | `#474d58` | `#c8cbce` | `#c8cbce` | igual |
 | 7 | `--ink-3` | `--color-text-subtle` | `#606671` | `#606671` | `#a1a5aa` | `#a1a5aa` | igual |
 | 8 | `--line` | `--color-border` | `#e0e3e8` | `#e0e3e8` | `#292c2f` | `#292c2f` | igual |
 | 9 | `--line-2` | `--color-border-strong` | `#cdd1d7` | `#cdd1d7` | `#3a3d41` | `#3a3d41` | igual |
-| 10 | `--hover` | `--color-hover` (novo). Telas: `hover:bg-accent-soft` / `bg-surface-elevated` | `#eaedf2` | — | `#212326` | — | falta (token criado) |
+| 10 | `--hover` | `--color-hover` (novo). Telas: `hover:bg-accent-soft` / `bg-surface-elevated` | `#eaedf2` | — | `#212326` | — | novo nesta etapa |
 | 11 | `--accent` (padrão) | `--color-accent` (injetada por `lib/branding/css.ts`) | `#0e7a5f` | `#506d48` (Sage 600) | `#2690b1` (DS Verdash) | `#82a077` (Sage 400) | diferente (só o padrão; a injeção da marca é igual) |
 | 12 | `--accent-fg` | `--color-accent-fg` | `#ffffff` | `#ffffff` | `#f8f8f8` | `#161510` (o primário usa `--pele-grad-fg` `#ffffff`) | diferente (escuro) |
 | 13 | `--accent-soft` | `--color-accent-soft` | 11% da marca na superfície (`#eaeee9`) | `--color-accent-100` (`#e4ebe0`) | 20% na superfície | `rgba(130,160,119,0.16)` | diferente (claro) |
-| 14 | `--accent-soft-2` | `--color-accent-soft-2` (novo, `@theme`) | 20% | — | 30% | — | falta (token criado) |
-| 15 | `--accent-text` | `--color-accent-text` (novo, `@theme`). Telas: classe `TEXTO_ACCENT` (`text-accent-700 dark:text-accent-300`) | 88% da marca + preto (`#425b3b`) | `#41573b` | `#69cee6` fixo | `#a4ba9a` (segue a marca) | falta (token criado); escuro diferente |
-| 16 | `--tint` | `--color-tint` (novo) | texto 6% | — | branco 8% | — | falta (token criado) |
+| 14 | `--accent-soft-2` | `--color-accent-soft-2` (novo, `@theme`) | 20% | — | 30% | — | novo nesta etapa |
+| 15 | `--accent-text` | `--color-accent-text` (novo, `@theme`). Telas: classe `TEXTO_ACCENT` (`text-accent-700 dark:text-accent-300`) | 88% da marca + preto (`#425b3b`) | `#41573b` | `#69cee6` fixo | `#a4ba9a` (segue a marca) | novo nesta etapa; escuro diferente |
+| 16 | `--tint` | `--color-tint` (novo) | texto 6% | — | branco 8% | — | novo nesta etapa |
 | 17 | `--ok` | `--color-success-fg` | `#287c42` | `#41673f` | `#41ce90` | `#41ce90` | diferente (claro) |
 | 18 | `--ok-bg` | `--color-success-bg` | `#dff6e2` | `rgba(90,138,95,0.12)` ≈ `#ebf1ec` | `#0a3723` | `#0a3723` | diferente (claro) |
 | 19 | `--warn` | `--color-warning-fg` | `#824c00` | `#875a1a` | `#ffb848` | `#ffb846` | diferente (claro) |
 | 20 | `--warn-bg` | `--color-warning-bg` | `#ffeed2` | `rgba(176,122,43,0.12)` ≈ `#f6efe6` | `#412805` | `#412805` | diferente (claro) |
-| 21 | `--warn-line` | `--color-warning-line` (novo). Telas: nota usa `border-warning/60` | `#e3be80` | — | `#8d5d1c` | — | falta (token criado) |
+| 21 | `--warn-line` | `--color-warning-line` (novo). Telas: nota usa `border-warning/60` | `#e3be80` | — | `#8d5d1c` | — | novo nesta etapa |
 | 22 | `--crit` | `--color-error-fg` | `#b02a2d` | `#8a3a2e` | `#fa8785` | `#fa8785` | diferente (claro) |
 | 23 | `--crit-bg` | `--color-error-bg` | `#ffe9e6` | ≈ `#f5e9e8` | `#521c1d` | `#521c1d` | diferente (claro) |
 | 24 | `--info` | `--color-info-fg` | `#0077bc` | `#355d72` | `#65a7fa` | `#65a7fa` | diferente (claro) |
@@ -76,7 +76,7 @@ Leitura rápida: as **superfícies, textos e linhas já são iguais** nos dois t
 |---|---|---|---|
 | 1 | Família: Atkinson Hyperlegible **Next** (400 a 700) | `--font-atkinson` = Atkinson Hyperlegible v1, embarcada só em 400 e 700 (`app/layout.tsx`) | diferente |
 | 2 | Mono: Atkinson Hyperlegible Mono (400/500) | `--font-mono` = IBM Plex Mono (400/500) | diferente |
-| 3 | Escala 10,5 / 12 / 13 / 14 / 15 / 16 / 17 / 20 | Tailwind cobre 12, 14, 16, 20; 10,5, 13, 15 e 17 só como valor arbitrário (16 usos de `text-[13/15/17px]`) | falta (tokens `text-rail/meta/label/ui/message/title-sm/md/lg` criados) |
+| 3 | Escala 10,5 / 12 / 13 / 14 / 15 / 16 / 17 / 20 | Tailwind cobre 12, 14, 16, 20; 10,5, 13, 15 e 17 só como valor arbitrário (16 usos de `text-[13/15/17px]`) | novo nesta etapa (tokens `text-rail/meta/label/ui/message/title-sm/md/lg`) |
 | 4 | Título de página 20/700/-0,01em | `text-2xl font-semibold` (24/600) | diferente |
 | 5 | Interface 14/1,45 | `text-sm` 14/1,43 | igual |
 | 6 | Mensagem 15/1,42 | `text-[15px] leading-[1.42]` (`bolha/estilo.ts`) | igual |
@@ -190,7 +190,7 @@ Hover, foco e clique não se congelam na tela: a vitrine mostra cada um ao vivo.
 | Caixa de seleção (`.chk`) | marcada / desmarcada | 16px raio 4, borda `--line-2`, marcada accent | nativa `accent-primary` | diferente |
 | Opção (radio) | — | não desenhado | nativa `accent-primary` | só CRM |
 | Switch (`.switch`) | desligado / ligado / desativado | 32x18, trilho `--line-2`, ligado accent, bola branca; escuro `--grad` | 36x20, trilho `input`, ligado `primary`, bola `background`; escuro `pele-grad-ativo` | diferente (claro) |
-| Chip (`.chip`) | desligado / hover / ligado / desativado | 30px, borda `--line-2`, hover borda `--ink-3`; ligado accent; desativado tracejado 40% | **criado**: `components/ui/chip.tsx` | falta (criado) |
+| Chip (`.chip`) | desligado / hover / ligado / desativado | 30px, borda `--line-2`, hover borda `--ink-3`; ligado accent; desativado tracejado 40% | **criado**: `components/ui/chip.tsx` | novo nesta etapa |
 | Pílula (`.pill`) | espera, IA, sem dono, tarefa | 22px, raio 6, 12/600, tons info/warn/crit, IA accent-soft | `MetaDaConversa`: 22px, raio 8, 12/600, mesmos tons | diferente (raio, cores de estado do claro) |
 | Selo de status (`.status`) | aberta / fechada | 12/600, padding 8, `--ok-bg`/`--ok` | `Badge`: 12/500, padding 12, variantes | diferente |
 | Controle segmentado (`.seg`) | normal / ativo | trilho surface-2, item ativo em cartão, 30px 13/600 | `AbasDaInbox` (mesmo desenho, pele no escuro) | igual |
@@ -274,8 +274,8 @@ Nada abaixo foi aplicado. Cada linha muda token ou componente que as telas já u
 ## 13. O que a vitrine não representa
 
 - **Hover, foco e clique congelados**: CSS não deixa forçar pseudo-classe; cada linha tem o exemplo vivo e os valores estão na seção 9.
-- **Camadas no tema do painel**: diálogo, menu, popover, dica e toast montam em portal no `<body>` (nenhum componente de `components/ui` aceita `container`), então no lado a lado abrem no tema da página (claro). No modo Escuro abrem certas.
-- **Marca da organização no painel escuro do lado a lado**: o bloco `[data-theme="dark"]` redeclara a rampa Sage do produto, e uma subárvore escura não herda a rampa injetada no `<body>`. No modo Escuro (o `<html>` escuro) a marca aparece certa.
+- **Camadas no tema do painel**: diálogo, menu, popover, dica e toast montam em portal no `<body>` (nenhum componente de `components/ui` aceita `container`), então no lado a lado abrem no tema do app. Nos modos Claro e Escuro abrem certas.
+- **Lado a lado com o app escuro** (corrigido no fix da vitrine): os dois painéis levam `data-theme`; o `dark:` e as classes `pele-*` recortam a subárvore clara (`:not(:where([data-theme="dark"] [data-theme="light"] …))`), e a marca de cada tema chega ao painel por `ESCOPO_DO_PAINEL` (`lib/branding/css.ts`). Ainda seguem o tema do app dentro do painel claro: `::selection`, a cor do anel de `:focus-visible`, a barra de rolagem e a lista aberta do `<select>` nativo (regras de pseudo-elemento e de `@layer base`).
 - **Link para o protótipo**: é referência (arquivo:linha + seletor), não link. O protótipo mora em `docs/`, que não vai para a imagem, e precisa do runtime de design que o app não serve; a cerca de hosts (`tests/unit/branding.test.ts`) também não aceita URL de repositório no código que embarca.
 - **Divisor de dia e de novas mensagens**: são marcação inline em `components/inbox/fio/ConteudoDaLinha.tsx`, sem componente; a vitrine repete as mesmas classes. Extrair os dois é tarefa da etapa de substituição.
 - **Bolhas** usam `classesDaBolha` (a fonte das classes do fio), não a `LinhaDaMensagem` inteira, que exige mensagem do banco, contexto do fio e permissões.

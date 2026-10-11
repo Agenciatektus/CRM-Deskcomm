@@ -21,8 +21,14 @@
    O `:where()` zera a especificidade do seletor de tema, para que `dark:bg-x`
    e `bg-x` continuem competindo só pela ordem em que aparecem — sem ele, todo
    utilitário `dark:` ganharia um ponto de especificidade a mais e venceria
-   coisas que no v3 ele não vencia. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+   coisas que no v3 ele não vencia.
+
+   O `:not(:where(…))` tira do escuro a subárvore `data-theme="light"` aberta
+   DENTRO de uma escura (a vitrine /app/design-system com o app escuro): sem ele,
+   o painel claro recebia os tokens claros e, por cima, todo `dark:` do
+   ancestral. Especificidade zero também, e numa página sem subárvore clara
+   nada muda. As classes `pele-*` levam o mesmo recorte mais abaixo. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *):not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)));
 
 /* ─────────────────────────────────────────────────────────────────────────
    DeskcommCRM — Design System tokens (Sage palette · density Aerada)
@@ -1242,7 +1248,7 @@ body [data-theme="dark"] {
 
 /* No escuro, o `.thread` da pele Verdash: brilho de 13% e o fundo próprio do
    fio (`--pele-fio`), um degrau acima da moldura. */
-[data-theme="dark"] .fundo-do-fio {
+[data-theme="dark"] .fundo-do-fio:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background:
     radial-gradient(
       ellipse 80% 42% at 50% -12%,
@@ -1263,7 +1269,7 @@ body [data-theme="dark"] {
 }
 
 /* No escuro, os pontos do `.msgs` da pele Verdash: 7% de branco. */
-[data-theme="dark"] .trama-do-fio {
+[data-theme="dark"] .trama-do-fio:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.07) 1px, transparent 0);
 }
 
@@ -1285,7 +1291,7 @@ body [data-theme="dark"] {
    `!important`. */
 
 /* `.app.dark` (fundo): dois radiais da marca sobre a moldura. */
-[data-theme="dark"] .pele-moldura {
+[data-theme="dark"] .pele-moldura:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background:
     radial-gradient(42rem 22rem at -6rem -6rem, color-mix(in oklch, var(--pele-brilho) 16%, transparent), transparent 70%),
     radial-gradient(36rem 18rem at 100% -8rem, color-mix(in oklch, var(--pele-brilho) 10%, transparent), transparent 70%),
@@ -1303,46 +1309,46 @@ body [data-theme="dark"] {
 
 /* `--noise` em `.list`, `.panel`, `.pn-tabs`, `.th-head`, `.cmp-box`, `.pop`,
    `.ctxm` e `.pal`: a cor de fundo continua a do componente; o ruído vem por cima. */
-[data-theme="dark"] .pele-ruido {
+[data-theme="dark"] .pele-ruido:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: var(--pele-ruido);
   background-size: 3px 3px;
 }
 
 /* `.work`: cartão com sombra dura de 4px e brilho interno de 1px. */
-[data-theme="dark"] .pele-cartao {
+[data-theme="dark"] .pele-cartao:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   box-shadow: var(--pele-drop), inset 0 1px 0 oklch(1 0 0 / 0.04);
 }
 
 /* `--grad`: selo do trilho, não lidas, avatar da conta, chips ativos. */
-[data-theme="dark"] .pele-grad {
+[data-theme="dark"] .pele-grad:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: var(--pele-grad-texto);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
 /* Só o traço (indicador da aba, barra da seleção), sem mexer no texto. */
-[data-theme="dark"] .pele-grad-traco {
+[data-theme="dark"] .pele-grad-traco:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: var(--pele-grad);
 }
 /* Os que mudam de estado por atributo (aba do composer, chip, switch, etapa). */
 [data-theme="dark"]
-  .pele-grad-ativo:is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
+  .pele-grad-ativo:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
   background-image: var(--pele-grad-texto);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
 
 /* `.chip-ai` (Sugerir resposta): degradê suave com contorno da marca. */
-[data-theme="dark"] .pele-grad-suave {
+[data-theme="dark"] .pele-grad-suave:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-image: var(--pele-grad-soft);
   color: var(--pele-grad-soft-fg);
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--pele-brilho) 38%, transparent);
 }
-[data-theme="dark"] .pele-grad-suave:hover {
+[data-theme="dark"] .pele-grad-suave:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):hover {
   filter: brightness(1.15);
 }
 
 /* `.rail-btn.is-cur`: cartão com brilho no topo, ruído, anel e sombra dura. */
-[data-theme="dark"] .pele-ativo-trilho {
+[data-theme="dark"] .pele-ativo-trilho:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background:
     radial-gradient(70% 55% at 50% 0%, color-mix(in oklch, var(--pele-brilho) 22%, transparent), transparent 75%),
     var(--pele-ruido) 0 0 / 3px 3px,
@@ -1350,12 +1356,12 @@ body [data-theme="dark"] {
   box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
 }
 /* `.nav2-item.is-active`: cartão com ruído, anel e sombra dura. */
-[data-theme="dark"] .pele-ativo-item {
+[data-theme="dark"] .pele-ativo-item:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface);
   box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
 }
 /* `.conv.is-sel`: degradê horizontal da marca, saindo da barra da seleção. */
-[data-theme="dark"] .pele-selecionada {
+[data-theme="dark"] .pele-selecionada:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background:
     linear-gradient(
       90deg,
@@ -1367,16 +1373,16 @@ body [data-theme="dark"] {
 }
 
 /* `.seg` e `.seg button.is-on`: trilho escuro e item ativo em cartão. */
-[data-theme="dark"] .pele-seg {
+[data-theme="dark"] .pele-seg:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-color: oklch(0 0 0 / 0.22);
 }
-[data-theme="dark"] .pele-seg-item:is([data-state="active"], [data-ativa="true"]) {
+[data-theme="dark"] .pele-seg-item:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is([data-state="active"], [data-ativa="true"]) {
   background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
   box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 oklch(0 0 0 / 0.25);
 }
 
 /* `.crumb-1`: o setor como rótulo em caixa alta pequena. */
-[data-theme="dark"] .pele-rotulo {
+[data-theme="dark"] .pele-rotulo:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1384,22 +1390,22 @@ body [data-theme="dark"] {
 }
 
 /* Anel da marca na busca, na disponibilidade e na caixa do composer. */
-[data-theme="dark"] .pele-foco:is(:hover, :focus-within, :focus-visible) {
+[data-theme="dark"] .pele-foco:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is(:hover, :focus-within, :focus-visible) {
   border-color: var(--pele-foco);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--pele-foco) 22%, transparent);
 }
 
 /* `.row.out .bubble`, `.row.ai .bubble` e `.day`. */
-[data-theme="dark"] .pele-bolha-saida {
+[data-theme="dark"] .pele-bolha-saida:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background-color: var(--pele-bolha-saida);
 }
-[data-theme="dark"] .pele-bolha-ia {
+[data-theme="dark"] .pele-bolha-ia:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--pele-bolha-ia), var(--pele-bolha-ia)) padding-box,
     var(--pele-grad) border-box;
 }
-[data-theme="dark"] .pele-dia {
+[data-theme="dark"] .pele-dia:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
   border-color: var(--color-border-strong);
 }
