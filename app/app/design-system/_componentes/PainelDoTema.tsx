@@ -2,14 +2,16 @@
 
 import { useT } from "@/hooks/i18n/useT";
 
-import { SecaoBolhas } from "../_secoes/SecaoBolhas";
-import { SecaoBotoes } from "../_secoes/SecaoBotoes";
-import { SecaoCampos } from "../_secoes/SecaoCampos";
-import { SecaoConteudo } from "../_secoes/SecaoConteudo";
+import { SecaoColunaDoLead } from "../_secoes/SecaoColunaDoLead";
+import { SecaoComponentesBasicos } from "../_secoes/SecaoComponentesBasicos";
 import { SecaoCores } from "../_secoes/SecaoCores";
 import { SecaoEspacoForma } from "../_secoes/SecaoEspacoForma";
-import { SecaoMarcadores } from "../_secoes/SecaoMarcadores";
-import { SecaoSobreposicoes } from "../_secoes/SecaoSobreposicoes";
+import { SecaoLayoutInbox } from "../_secoes/SecaoLayoutInbox";
+import { SecaoMensagens } from "../_secoes/SecaoMensagens";
+import { SecaoMenusAvisosBusca } from "../_secoes/SecaoMenusAvisosBusca";
+import { SecaoNavegacao } from "../_secoes/SecaoNavegacao";
+import { SecaoRegras } from "../_secoes/SecaoRegras";
+import { SecaoRetorno } from "../_secoes/SecaoRetorno";
 import { SecaoTipografia } from "../_secoes/SecaoTipografia";
 import { ATRIBUTO_DO_TEMA, type Tema } from "./tema";
 
@@ -35,15 +37,18 @@ export function PainelDoTema({ tema, subarvore = false }: { tema: Tema; subarvor
         <p className="text-meta font-bold uppercase tracking-wider text-text-subtle">
           {tema === "claro" ? t("Tema claro") : t("Tema escuro")}
         </p>
+        {/* A ordem é a dos quadros DesignSystem.dc.html e DesignSystemVerdash.dc.html. */}
         <SecaoCores tema={tema} />
         <SecaoTipografia tema={tema} />
         <SecaoEspacoForma tema={tema} />
-        <SecaoBotoes tema={tema} />
-        <SecaoCampos tema={tema} />
-        <SecaoMarcadores tema={tema} />
-        <SecaoConteudo tema={tema} />
-        <SecaoSobreposicoes tema={tema} />
-        <SecaoBolhas tema={tema} />
+        <SecaoNavegacao tema={tema} />
+        <SecaoComponentesBasicos tema={tema} />
+        <SecaoMensagens tema={tema} />
+        <SecaoColunaDoLead tema={tema} />
+        <SecaoMenusAvisosBusca tema={tema} />
+        <SecaoRetorno tema={tema} />
+        <SecaoLayoutInbox tema={tema} />
+        <SecaoRegras tema={tema} />
       </div>
     </div>
   );

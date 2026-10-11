@@ -41,7 +41,7 @@ function AvatarComCanal({ nome, canal }: { nome: string; canal: ChannelSummary }
 export function SecaoConteudo({ tema }: { tema: Tema }) {
   const t = useT();
   return (
-    <Secao id={`conteudo-${tema}`} titulo={t("Cartão, avatar, tabela e estados vazios")}>
+    <Secao id={`conteudo-${tema}`} sub titulo={t("Cartão, avatar, tabela e estados vazios (só no CRM)")}>
       <Exemplo nome="Card" mapa="comp:card" tema={tema}>
         <Card className="max-w-md">
           <CardHeader>

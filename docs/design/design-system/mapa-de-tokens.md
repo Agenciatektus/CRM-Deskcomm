@@ -279,3 +279,31 @@ Nada abaixo foi aplicado. Cada linha muda token ou componente que as telas já u
 - **Link para o protótipo**: é referência (arquivo:linha + seletor), não link. O protótipo mora em `docs/`, que não vai para a imagem, e precisa do runtime de design que o app não serve; a cerca de hosts (`tests/unit/branding.test.ts`) também não aceita URL de repositório no código que embarca.
 - **Divisor de dia e de novas mensagens**: são marcação inline em `components/inbox/fio/ConteudoDaLinha.tsx`, sem componente; a vitrine repete as mesmas classes. Extrair os dois é tarefa da etapa de substituição.
 - **Bolhas** usam `classesDaBolha` (a fonte das classes do fio), não a `LinhaDaMensagem` inteira, que exige mensagem do banco, contexto do fio e permissões.
+
+## 14. Cobertura dos quadros DS na vitrine
+
+A vitrine segue 1:1 a ordem e os títulos de `DesignSystem.dc.html` (painel claro) e `DesignSystemVerdash.dc.html` (painel escuro), com índice de âncoras no topo. Cada seção mostra o selo do mapa e a referência arquivo:linha do quadro do seu tema. Os componentes são os do CRM, alimentados por amostras (`lib/design-system/amostras/`). A API da vitrine (`app/app/design-system/_componentes/ApiDaVitrine.ts`) responde no navegador às chamadas que eles fazem. Medido no Chromium: zero requisição para `/api/` ao abrir a página e ao clicar em Ganho, Perdido, Marcar todos resolvidos, Compareceu, menu da conversa e busca.
+
+| Seção do quadro | Situação | Por quê |
+|---|---|---|
+| Cor: Neutros | coberta | |
+| Cor: Tema escuro desenhado / Atmosfera | coberta | Radiais da moldura, `pele-ruido`, sombra dura e brilho do fio, com as classes da pele |
+| Cor: Destaque | coberta | O título do painel escuro fica sem o nome da marca ("gradiente da logo"), para não exibir marca fixa a um revendedor |
+| Cor: Estados | coberta | Com o contraste AA medido |
+| Tipografia | coberta | |
+| Espaço | coberta | |
+| Forma | coberta | Sombras, foco e movimento (que o quadro não tem) ficam aqui, marcados como "só no CRM" |
+| Navegação em 2 colunas | coberta | A barra real, recolhida e fixada. Fixar não grava a preferência na vitrine |
+| Módulos e páginas | coberta | Tabela gerada do catálogo real, com o acesso de quem olha |
+| Componentes básicos (Botões, Indicadores e pílulas, Navegação e campos) | coberta | |
+| Mensagens: Tipos cobertos | parcial | Todos os tipos renderizam, com a mídia gerada no navegador. A reação aparece como bolha própria porque o CRM não a prende à mensagem reagida |
+| Coluna do lead | coberta | O painel inteiro (`CRMSidePanel`), com tarefa atrasada e sem próximo passo |
+| Seletor de data e horário | coberta | |
+| Negócio (aba Negócios) | coberta | |
+| Menu da conversa | coberta (por botão) | Abre em portal e se mede no ponto do clique |
+| Central de avisos | coberta | Fixa na página |
+| Busca geral (Ctrl K) | coberta (por botão) | Contatos, conversas e leads vêm das amostras; escolher um resultado navega para um id que não existe |
+| Aviso com Desfazer | coberta | É o toast do app |
+| Divisórias reguláveis | coberta | Os pegadores só aparecem a partir de 1536 px, como na Inbox |
+| Layout da Inbox | parcial | Diagrama e tabela com as medidas reais. A Inbox não foi montada em miniatura: ela depende de realtime, rota e mais de dez leituras do servidor |
+| Regras que aprendemos no protótipo | coberta | Com a situação do CRM em cada regra. A regra 5 foi reescrita ("arrastar não perde o ponteiro"): o CRM cumpre com captura do ponteiro, e não com ouvinte na janela |

@@ -46,14 +46,13 @@ const ATENDENTE: Comando = { quem: "humano", userId: "eu", nome: "Ana" };
 export function SecaoMarcadores({ tema }: { tema: Tema }) {
   const t = useT();
   const [agora] = useState(() => Date.now());
-  const [aba, setAba] = useState<InboxTab>("unassigned");
   const [ligados, setLigados] = useState<string[]>(["hoje"]);
   const minutosAtras = (m: number) => new Date(agora - m * 60_000).toISOString();
   const alterna = (k: string) =>
     setLigados((l) => (l.includes(k) ? l.filter((x) => x !== k) : [...l, k]));
 
   return (
-    <Secao id={`marcadores-${tema}`} titulo={t("Chips, pílulas, selos e abas")}>
+    <Secao id={`indicadores-${tema}`} sub titulo={t("Indicadores e pílulas")} mapa="ds:indicadores" tema={tema} apoio={t("Pílula quadrada é estado. Tag arredondada é classificação. Chip é escolha (preenchido quando marcado).")}>
       <Exemplo nome={t("Chip (componente novo)")} mapa="comp:chip" tema={tema}>
         <Estados
           itens={[
@@ -87,6 +86,16 @@ export function SecaoMarcadores({ tema }: { tema: Tema }) {
           <Badge variant="outline">{t("Etiqueta")}</Badge>
         </div>
       </Exemplo>
+    </Secao>
+  );
+}
+
+/** O controle segmentado e as abas: a primeira metade de "Navegação e campos". */
+export function SegmentadoEAbas({ tema }: { tema: Tema }) {
+  const t = useT();
+  const [aba, setAba] = useState<InboxTab>("unassigned");
+  return (
+    <>
       <Exemplo nome={t("Controle segmentado (AbasDaInbox)")} mapa="comp:segmentado" tema={tema}>
         <div className="w-80">
           <AbasDaInbox tab={aba} principais={PRINCIPAIS} escondidas={ESCONDIDAS} onChange={setAba} />
@@ -107,6 +116,6 @@ export function SecaoMarcadores({ tema }: { tema: Tema }) {
           </TabsContent>
         </Tabs>
       </Exemplo>
-    </Secao>
+    </>
   );
 }

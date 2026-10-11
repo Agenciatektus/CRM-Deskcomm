@@ -1,7 +1,5 @@
 "use client";
 
-import { toast } from "sonner";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,14 +40,11 @@ import type { Tema } from "../_componentes/tema";
 
 export function SecaoSobreposicoes({ tema }: { tema: Tema }) {
   const t = useT();
-  const avisar = () =>
-    toast(t("Conversa arquivada"), {
-      action: { label: t("Desfazer"), onClick: () => toast(t("Desfeito")) },
-    });
   return (
     <Secao
       id={`camadas-${tema}`}
-      titulo={t("Camadas por cima da página")}
+      titulo={t("Camadas por cima da página (só no CRM)")}
+      sub
       apoio={t("Abra cada uma para ver. Elas nascem no fim da página, então seguem o tema da página.")}
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -139,11 +134,6 @@ export function SecaoSobreposicoes({ tema }: { tema: Tema }) {
               </SheetHeader>
             </SheetContent>
           </Sheet>
-        </Exemplo>
-        <Exemplo nome={t("Aviso com Desfazer (toast)")} mapa="comp:toast" tema={tema}>
-          <Button variant="secondary" onClick={avisar}>
-            {t("Mostrar aviso")}
-          </Button>
         </Exemplo>
       </div>
     </Secao>

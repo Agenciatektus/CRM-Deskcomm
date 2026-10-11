@@ -18,7 +18,7 @@ export type StatusDoMapa = "igual" | "diferente" | "novo" | "falta" | "sem-equiv
 
 export interface RefDoPrototipo {
   seletor: string;
-  arquivo: "Main.dc.html" | "MainVerdash.dc.html" | "DesignSystem.dc.html";
+  arquivo: "Main.dc.html" | "MainVerdash.dc.html" | "DesignSystem.dc.html" | "DesignSystemVerdash.dc.html";
   linha: number;
 }
 
@@ -26,6 +26,8 @@ export interface ItemDoMapa {
   claro: StatusDoMapa;
   escuro: StatusDoMapa;
   ref: RefDoPrototipo | null;
+  /** Onde o equivalente mora no quadro escuro, quando é outro arquivo. */
+  refEscuro?: RefDoPrototipo;
   /** O valor do protótipo, por tema, onde o status é `diferente`. */
   proto?: { claro?: string; escuro?: string };
 }
@@ -33,6 +35,7 @@ export interface ItemDoMapa {
 const M = "Main.dc.html" as const;
 const V = "MainVerdash.dc.html" as const;
 const D = "DesignSystem.dc.html" as const;
+const DV = "DesignSystemVerdash.dc.html" as const;
 
 const r = (seletor: string, linha: number, arquivo: RefDoPrototipo["arquivo"] = M): RefDoPrototipo => ({
   seletor,
@@ -126,6 +129,36 @@ export const MAPA = {
   "bolha:ia": { ...os("diferente", "igual"), ref: r(".row.ai .bubble", 315) },
   "bolha:nota": { ...os("diferente"), ref: r(".row.note .bubble", 316) },
   "bolha:dia": { ...os("diferente", "igual"), ref: r(".day", 296) },
+  // ── Seções dos quadros DS (DesignSystem.dc.html / DesignSystemVerdash.dc.html) ──
+  "ds:cor": { ...os("diferente"), ref: r("Cor", 274, D), refEscuro: r("Cor", 295, DV) },
+  "ds:neutros": { ...os("igual"), ref: r("Neutros", 277, D), refEscuro: r("Neutros", 298, DV) },
+  "ds:tema-escuro": { ...os("igual"), ref: r("Tema escuro (desenhado, não invertido)", 292, D), refEscuro: r("Tema escuro (desenhado, não invertido)", 298, DV) },
+  "ds:atmosfera": { ...os("igual"), ref: r("Atmosfera", 292, D), refEscuro: r("Atmosfera", 313, DV) },
+  "ds:destaque": { ...os("diferente"), ref: r("Destaque", 302, D), refEscuro: r("Destaque", 321, DV) },
+  "ds:estados": { ...os("diferente", "igual"), ref: r("Estados", 316, D), refEscuro: r("Estados", 335, DV) },
+  "ds:tipografia": { ...os("diferente"), ref: r("Tipografia", 328, D), refEscuro: r("Tipografia", 347, DV) },
+  "ds:espaco": { ...os("diferente"), ref: r("Espaço", 345, D), refEscuro: r("Espaço", 364, DV) },
+  "ds:forma": { ...os("diferente"), ref: r("Forma", 353, D), refEscuro: r("Forma", 372, DV) },
+  "ds:navegacao": { ...os("diferente"), ref: r("Navegação em 2 colunas", 362, D), refEscuro: r("Navegação em 2 colunas", 381, DV) },
+  "ds:modulos": { ...os("diferente"), ref: r("Módulos e páginas", 382, D), refEscuro: r("Módulos e páginas", 401, DV) },
+  "ds:componentes": { ...os("diferente"), ref: r("Componentes básicos", 397, D), refEscuro: r("Componentes básicos", 416, DV) },
+  "ds:botoes": { ...os("diferente"), ref: r("Botões", 400, D), refEscuro: r("Botões", 419, DV) },
+  "ds:indicadores": { ...os("diferente"), ref: r("Indicadores e pílulas", 412, D), refEscuro: r("Indicadores e pílulas", 431, DV) },
+  "ds:navegacao-campos": { ...os("diferente"), ref: r("Navegação e campos", 420, D), refEscuro: r("Navegação e campos", 439, DV) },
+  "ds:mensagens": { ...os("diferente"), ref: r("Mensagens", 431, D), refEscuro: r("Mensagens", 450, DV) },
+  "ds:tipos": { ...os("diferente"), ref: r("Tipos cobertos", 448, D), refEscuro: r("Tipos cobertos", 467, DV) },
+  "ds:coluna-do-lead": { ...os("diferente"), ref: r("Coluna do lead", 466, D), refEscuro: r("Coluna do lead", 485, DV) },
+  "ds:seletor-de-data": { ...os("diferente"), ref: r("Seletor de data e horário", 479, D), refEscuro: r("Seletor de data e horário", 498, DV) },
+  "ds:negocio": { ...os("igual"), ref: r("Negócio (aba Negócios)", 490, D), refEscuro: r("Negócio (aba Negócios)", 509, DV) },
+  "ds:menus": { ...os("diferente"), ref: r("Menus, avisos e busca", 502, D), refEscuro: r("Menus, avisos e busca", 521, DV) },
+  "ds:menu-da-conversa": { ...os("diferente"), ref: r("Menu da conversa", 505, D), refEscuro: r("Menu da conversa", 524, DV) },
+  "ds:central-de-avisos": { ...os("igual"), ref: r("Central de avisos (sino)", 520, D), refEscuro: r("Central de avisos (sino)", 539, DV) },
+  "ds:busca-geral": { ...os("igual"), ref: r("Busca geral (Ctrl K)", 530, D), refEscuro: r("Busca geral (Ctrl K)", 549, DV) },
+  "ds:retorno": { ...os("diferente"), ref: r("Retorno e redimensionamento", 545, D), refEscuro: r("Retorno e redimensionamento", 564, DV) },
+  "ds:aviso-desfazer": { ...os("diferente"), ref: r("Aviso com Desfazer", 548, D), refEscuro: r("Aviso com Desfazer", 567, DV) },
+  "ds:divisorias": { ...os("igual"), ref: r("Divisórias reguláveis", 553, D), refEscuro: r("Divisórias reguláveis", 572, DV) },
+  "ds:layout": { ...os("diferente"), ref: r("Layout da Inbox", 561, D), refEscuro: r("Layout da Inbox", 580, DV) },
+  "ds:regras": { ...os("diferente"), ref: r("Regras que aprendemos no protótipo", 580, D), refEscuro: r("Regras que aprendemos no protótipo", 599, DV) },
 } satisfies Record<string, ItemDoMapa>;
 
 export type IdDoMapa = keyof typeof MAPA;

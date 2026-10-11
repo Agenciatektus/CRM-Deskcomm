@@ -71,11 +71,21 @@ describe("a vitrine usa os componentes de components/ui", () => {
     expect(culpados).toEqual([]);
   });
 
-  it("os componentes compartilhados da Inbox entram de verdade (pílulas, nota, bolha, avatar)", () => {
+  it("os componentes compartilhados do app entram de verdade, um por seção dos quadros DS", () => {
     for (const caminho of [
       "@/components/inbox/item/MetaDaConversa",
       "@/components/inbox/NoteCard",
-      "@/components/inbox/bolha/estilo",
+      "@/components/inbox/MessageBubble",
+      "@/components/inbox/PassagemCard",
+      "@/components/inbox/CRMSidePanel",
+      "@/components/inbox/painel/AbaNegocios",
+      "@/components/inbox/painel/QuandoFazer",
+      "@/components/inbox/painel/SeletorDeDataHora",
+      "@/components/inbox/menu/MenuDaConversa",
+      "@/components/inbox/colunas/PegadorDeColuna",
+      "@/components/shell/BarraEmDuasColunas",
+      "@/components/shell/CentralDeAvisos",
+      "@/components/shell/CommandPalette",
       "@/components/inbox/AvatarDoContato",
       "@/components/inbox/filtros/AbasDaInbox",
       "@/components/empty/EmptyState",

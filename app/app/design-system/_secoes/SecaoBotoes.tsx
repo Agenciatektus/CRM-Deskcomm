@@ -59,6 +59,9 @@ export function SecaoBotoes({ tema }: { tema: Tema }) {
     <Secao
       id={`botoes-${tema}`}
       titulo={t("Botões")}
+      sub
+      mapa="ds:botoes"
+      tema={tema}
       apoio={t("Hover, foco e clique não podem ser congelados na tela: o segundo exemplo de cada linha é o vivo.")}
     >
       {VARIANTES.map((v) => (
