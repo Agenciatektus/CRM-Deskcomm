@@ -5,6 +5,7 @@ import { rngDaSemente } from "./settings";
 
 const aberto = (extra: Partial<NonNullable<FatosDaSaida["lead"]>> = {}): FatosDaSaida => ({
   lead: { stage_id: "etapa-1", status: "open", tags: [], ...extra },
+  nasceuComNegocio: true,
   tagsDoContato: [],
   humanoFalouDepois: false,
 });
@@ -20,10 +21,42 @@ describe("motivoDeSaida", () => {
     expect(motivoDeSaida({ ...SAIDAS_PADRAO, ao_fechar: false }, aberto({ status: "won" }))).toBeNull();
   });
 
-  it("negócio apagado conta como fechado", () => {
-    expect(motivoDeSaida(SAIDAS_PADRAO, { lead: null, tagsDoContato: [], humanoFalouDepois: false })).toBe(
-      "saida_negocio_removido",
-    );
+  it("negócio APAGADO conta como fechado", () => {
+    expect(
+      motivoDeSaida(SAIDAS_PADRAO, {
+        lead: null,
+        nasceuComNegocio: true,
+        tagsDoContato: [],
+        humanoFalouDepois: false,
+      }),
+    ).toBe("saida_negocio_removido");
+  });
+
+  it("inscrição que NUNCA teve negócio não é negócio apagado: a régua segue", () => {
+    // Os dois casos chegam aqui como `lead: null`, e tratá-los igual encerrava a
+    // régua de quem nunca teve card dizendo que o negócio dele foi fechado.
+    // Acontece na régua de campanha quando `abrirNegocio` não consegue criar o
+    // card, e essa pessoa já recebeu a 1ª mensagem: calar o 2º toque dela é o
+    // pior desfecho possível.
+    expect(
+      motivoDeSaida(SAIDAS_PADRAO, {
+        lead: null,
+        nasceuComNegocio: false,
+        tagsDoContato: [],
+        humanoFalouDepois: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("sem negócio, um humano assumir AINDA encerra", () => {
+    expect(
+      motivoDeSaida(SAIDAS_PADRAO, {
+        lead: null,
+        nasceuComNegocio: false,
+        tagsDoContato: [],
+        humanoFalouDepois: true,
+      }),
+    ).toBe("saida_humano_assumiu");
   });
 
   it("etapa de saída encerra", () => {

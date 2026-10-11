@@ -20,17 +20,21 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
+import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
+import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
+import { SaidasDaCampanhaEditor, saidasDaTela } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
-import { DESCRICAO_DA_VARIAVEL, VARIAVEIS_DA_CAMPANHA } from "@/lib/campanhas/renderizador";
 
 export function EditarCampanha({ id }: { id: string }) {
   const t = useT();
@@ -48,10 +52,27 @@ export function EditarCampanha({ id }: { id: string }) {
   const [semTags, setSemTags] = useState("");
   const [semInteracao, setSemInteracao] = useState("");
   const [limite, setLimite] = useState("100");
-  const [texto, setTexto] = useState("");
+  // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
+  const [variantes, setVariantes] = useState<string[]>([""]);
+  // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
+  const [passos, setPassos] = useState<PassoDaRegua[]>([]);
+  // QUANDO A RÉGUA PARA (9046). Carregado do rascunho; `null` vira o padrão,
+  // que é o MESMO objeto que o servidor publica quando a coluna é nula.
+  const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
+  // ⚠️ SE A SEÇÃO FOI MEXIDA NESTA EDIÇÃO (parecer do @Cassio_SecRev, P2.1).
+  // Mandar `saidas` sempre tinha dois efeitos ruins: a coluna nula de uma
+  // campanha que nunca abriu a seção virava o objeto do padrão no primeiro
+  // Salvar (matando a distinção "escolheu × herdou" que a coluna existe para
+  // guardar), e uma coluna ILEGÍVEL era sobrescrita pelo padrão que
+  // `saidasDaTela` mostrou, sem ninguém decidir isso. Não mexeu, não manda: o
+  // laço da rota só copia campo `!== undefined`, então a coluna fica como está.
+  const [saidasMexidas, setSaidasMexidas] = useState(false);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
+  // O MODO DE PÚBLICO (9039). Carregado do rascunho; só muda por escolha.
+  const [continua, setContinua] = useState(false);
+  const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
   const [carregado, setCarregado] = useState(false);
 
   const funis = useFunis();
@@ -72,12 +93,23 @@ export function EditarCampanha({ id }: { id: string }) {
     setSemTags(juntar(f.sem_tags));
     setSemInteracao(f.sem_interacao_ha_dias == null ? "" : String(f.sem_interacao_ha_dias));
     setLimite(f.limite == null ? "100" : String(f.limite));
-    setTexto(c.message_body ?? "");
+    setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
+    setPassos(c.passos ?? []);
+    setSaidas(saidasDaTela(c.saidas));
+    setSaidasMexidas(false);
     setFunil(c.pipeline_id ?? "");
     setEtapa(c.stage_id ?? "");
     setAgente(c.agent_id ?? "");
+    setContinua(c.entrada_continua === true);
+    setEtapaDeEntrada(c.entrada_etapa_id ?? "");
     setCarregado(true);
   }, [campanha.data, carregado]);
+
+  const texto = variantes[0] ?? "";
+  const extras = useMemo(
+    () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
+    [variantes],
+  );
 
   const filtro = useMemo(
     () => ({
@@ -139,7 +171,9 @@ export function EditarCampanha({ id }: { id: string }) {
     nome.trim() !== "" &&
     canal !== "" &&
     texto.trim() !== "" &&
-    temCriterio &&
+    // No modo CONTÍNUO o público é a etapa, e o recorte de contatos não é usado:
+    // exigir critério ali prenderia o operador num filtro que a campanha ignora.
+    (continua || temCriterio) &&
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   return (
@@ -203,6 +237,21 @@ export function EditarCampanha({ id }: { id: string }) {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Público")}</h2>
+        <EntradaDaCampanha
+          continua={continua}
+          onContinuaChange={setContinua}
+          etapaId={etapaDeEntrada}
+          onEtapaChange={setEtapaDeEntrada}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          tetoPorDia={c.teto_diario ?? null}
+          janelaInicio={c.janela_inicio_hora ?? null}
+          janelaFim={c.janela_fim_hora ?? null}
+        />
+        {/* O recorte de contatos só existe no modo LISTA: no contínuo o público
+            é a etapa, e deixar o filtro à vista sugeriria que ele também vale. */}
+        {!continua && (
+        <>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="e-com-tags">{t("Com alguma destas etiquetas")}</Label>
@@ -248,7 +297,14 @@ export function EditarCampanha({ id }: { id: string }) {
             type="button"
             variant="outline"
             disabled={!temCriterio || previa.isPending}
-            onClick={() => previa.mutate({ audience_filter: filtro, message_body: texto, campaign_id: id })}
+            onClick={() =>
+              previa.mutate({
+                audience_filter: filtro,
+                message_body: texto,
+                message_variants: extras,
+                campaign_id: id,
+              })
+            }
           >
             {previa.isPending ? t("Contando…") : t("Ver quantas pessoas")}
           </Button>
@@ -259,6 +315,8 @@ export function EditarCampanha({ id }: { id: string }) {
             </p>
           )}
         </div>
+        </>
+        )}
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -326,26 +384,36 @@ export function EditarCampanha({ id }: { id: string }) {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
-        <Textarea
-          rows={6}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          aria-label={t("Texto da mensagem")}
+        <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Passos depois da primeira mensagem")}</h2>
+        <PassosDaCampanha
+          passos={passos}
+          onChange={setPassos}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
+          // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
+          // frase do aviso fica sem número em vez de chutar um.
+          quantosCards={continua ? null : (previa.data?.elegiveis ?? null)}
+          tetoPorDia={c.teto_diario ?? null}
         />
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {VARIAVEIS_DA_CAMPANHA.map((v) => (
-            <li key={v}>
-              <button
-                type="button"
-                className="rounded-md bg-surface-elevated px-1 font-mono text-xs"
-                onClick={() => setTexto((atual) => `${atual}{{${v}}}`)}
-              >
-                {`{{${v}}}`}
-              </button>{" "}
-              — {t(DESCRICAO_DA_VARIAVEL[v])}
-            </li>
-          ))}
-        </ul>
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Quando a régua para")}</h2>
+        <SaidasDaCampanhaEditor
+          saidas={saidas}
+          onChange={(s) => {
+            setSaidas(s);
+            setSaidasMexidas(true);
+          }}
+          etapas={etapas.data ?? []}
+          temPassos={passos.length > 0}
+          temFunil={!!funil}
+        />
       </Card>
 
       <div className="flex items-center justify-end gap-2">
@@ -359,12 +427,17 @@ export function EditarCampanha({ id }: { id: string }) {
               name: nome.trim(),
               channel_session_id: canal,
               message_body: texto.trim(),
+              message_variants: extras,
               base_legal: baseLegal,
               lia_ref: liaRef.trim() || null,
               audience_filter: filtro,
               pipeline_id: funil || null,
               stage_id: etapa || null,
               agent_id: agente || null,
+              passos,
+              ...(saidasMexidas ? { saidas } : {}),
+              entrada_continua: continua,
+              entrada_etapa_id: continua ? etapaDeEntrada || null : null,
             });
             router.push(`/app/campaigns/${id}`);
           }}

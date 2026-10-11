@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const dynamic = "force-dynamic";
 
@@ -61,15 +62,19 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return fail("already_terminal", t("Enrollment já está encerrado."), 409, { requestId });
   }
 
-  // Inscrição de CADÊNCIA só se escreve pelo servidor (migration 9020). Papel e
-  // organização já conferidos; o ponteiro é lido pela sessão (RLS).
+  // Inscrição de RÉGUA DE PROSPECÇÃO (cadência ou campanha) só se escreve pelo
+  // servidor (9020/9037), com a exceção de CANCELAR — que é exatamente o que
+  // esta rota faz, e por isso ela passa pelo cliente admin. Papel e organização
+  // já conferidos; o ponteiro é lido pela sessão (RLS).
   const { data: ponteiro } = await supabase
     .from("followup_flow_pointers")
     .select("surface")
     .eq("id", existing.pointer_id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
-  const escritor = (ponteiro as { surface?: string } | null)?.surface === "cadence" ? createAdminClient() : supabase;
+  const escritor = ehProspeccao((ponteiro as { surface?: string } | null)?.surface)
+    ? createAdminClient()
+    : supabase;
   const { data: updated, error: updErr } = await escritor
     .from("followup_enrollments")
     .update({

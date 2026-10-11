@@ -129,7 +129,7 @@ describe("aplicaGatilhoDeLead — o que não dispara", () => {
       },
       evento({ metadata: { via: ORIGEM_DA_PLANILHA } }),
     );
-    expect(s.vindos_de_planilha).toBe(1);
+    expect(s.criados_em_lote).toBe(1);
     expect(s.enrolled).toBe(0);
     expect(reg.enrollments).toHaveLength(0);
     expect(reg.contatoConsultado).toBe(0);

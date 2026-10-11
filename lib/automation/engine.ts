@@ -23,6 +23,7 @@ import { audit } from "@/lib/audit";
 import { regraDoEvento } from "@/lib/automation/gatilho-de-data-do-funil";
 import { ENTIDADE_ESPERADA_POR_GATILHO } from "@/lib/schemas/webhooks";
 import { logger } from "@/lib/logger";
+import { criacaoEmLote } from "@/lib/leads/criacao-em-lote";
 
 export const AUTOMATION_CONSUMER_KEY = "automation-rules";
 
@@ -163,6 +164,27 @@ export async function runAutomationForEvent(
     return { consumer_key: AUTOMATION_CONSUMER_KEY, status: "skipped", detail: "caused_by_rule" };
   }
 
+  // ═══ CRIAÇÃO DE CARD EM LOTE: AS AÇÕES QUE FALAM NÃO RODAM ═══
+  //
+  // Importar planilha e iniciar campanha com passos emitem UM `lead.created` por
+  // linha — centenas. Uma regra "quando entrar lead novo → mandar WhatsApp"
+  // virava centenas de mensagens no mesmo minuto, e na campanha para quem
+  // ACABOU de receber a abordagem dela: segunda mensagem, de outro fluxo, no
+  // mesmo minuto, que é a cara do robô (e o disparo em massa que a doutrina
+  // anti-banimento existe para impedir).
+  //
+  // ⚠️ O gatilho de follow-up (`lib/followup/gatilho-lead.ts`) já pulava por
+  // isto; ESTE consumidor não, e os dois leem o MESMO `lead.created`. Tampar um
+  // lado só dava a sensação de estar resolvido — o motor de regras não reclama,
+  // ele manda.
+  //
+  // Pulo POR AÇÃO, e não do evento inteiro, de propósito: etiquetar, atribuir
+  // dono, criar tarefa e mover de funil não falam com ninguém e são justamente
+  // o que se espera de uma importação. Quem declara que fala é a própria ação
+  // (`ActionExecutor.falaComOCliente`), vigiada por
+  // `tests/unit/acao-que-fala-se-declara.test.ts`.
+  const emLote = criacaoEmLote(row.metadata?.via);
+
   const expectedKind = EXPECTED_ENTITY_KIND[row.event_type];
   if (expectedKind && row.entity_kind !== expectedKind) {
   
@@ -214,6 +236,10 @@ export async function runAutomationForEvent(
     for (const action of rule.actions ?? []) {
       const executor = getAction(action.type);
       if (!executor?.postponeUntil) continue;
+      // Ação que não vai rodar (criação em lote) não adia o evento inteiro: o
+      // `postponeUntil` do WhatsApp é a janela de envio DELE, e adiar por ele
+      // seguraria as ações que ainda têm de rodar (etiqueta, dono, tarefa).
+      if (emLote && executor.falaComOCliente) continue;
       const until = await executor.postponeUntil(
         { admin, serviceBoundaries, organizationId: row.organization_id, ruleId: rule.id, ruleName: rule.name, event: row, context, requestId: row.id },
         action.config ?? {},
@@ -237,6 +263,16 @@ export async function runAutomationForEvent(
       const executor = getAction(action.type);
       if (!executor) {
         results.push({ type: action.type, status: "failed", error: "unknown_action" });
+        continue;
+      }
+      if (emLote && executor.falaComOCliente) {
+        // `skipped` com motivo, e não silêncio: quem montou a regra tem de ver
+        // na aba Atividade por que a mensagem não saiu naquelas 500 linhas.
+        results.push({
+          type: action.type,
+          status: "skipped",
+          detail: { reason: "criacao_em_lote", via: row.metadata?.via },
+        });
         continue;
       }
       try {

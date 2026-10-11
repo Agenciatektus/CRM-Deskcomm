@@ -68,6 +68,11 @@ export interface LinhaClassificada {
   motivo: MotivoDeExclusao | null;
   /** O texto final — só existe para quem é elegível. */
   corpo: string | null;
+  /**
+   * Qual variação da mensagem esta pessoa recebeu (0 = o `message_body`).
+   * `null` em quem foi excluído: não há texto, então não há variante.
+   */
+  varianteIndex: number | null;
 }
 
 export interface ContextoDaClassificacao {
@@ -82,8 +87,23 @@ export interface ContextoDaClassificacao {
   suprimidos: ReadonlySet<string>;
   /** O hash de um endereço — injetado para esta função continuar pura. */
   hashDoEndereco: (endereco: string) => string;
-  /** Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura. */
-  renderizar: (c: CandidatoDaAudiencia) => { texto: string; faltando: string[] };
+  /**
+   * Renderiza o texto e diz o que faltou. Injetado para esta função ficar pura.
+   * `varianteIndex` é opcional porque quem não tem variação (um teste, uma
+   * chamada antiga) não precisa inventar um índice.
+   */
+  renderizar: (c: CandidatoDaAudiencia) => {
+    texto: string;
+    faltando: string[];
+    /**
+     * O texto resolveu para NADA. Opcional para não quebrar chamada antiga, e
+     * tratado como exclusão própria (`texto_vazio`): `faltando` fica vazio
+     * nesse caso — `{Olá|}` é spintax válido e não usa variável nenhuma —,
+     * então sem este sinal a pessoa passava como elegível com corpo em branco.
+     */
+    vazio?: boolean;
+    varianteIndex?: number;
+  };
 }
 
 /**
@@ -97,14 +117,33 @@ export interface ContextoDaClassificacao {
  * o primeiro da ordem estável do recorte, para a prévia e o snapshot darem o
  * mesmo resultado.
  *
- * ═══ Por que "já em campanha" só olha campanha VIVA ═══
+ * ═══ Por que "já em campanha" é por TEMPO, e só conta quem foi abordado ═══
  *
  * O produto convida a testar variantes (três textos, três campanhas), e sem este
  * veto as TRÊS mensagens iriam para a mesma pessoa: além de queimar o contato,
  * invalida a medição — a segunda mensagem não mede a segunda copy, mede alguém
- * que já foi abordado. Mas o veto termina quando a campanha termina: bloquear por
- * campanha CONCLUÍDA impediria para sempre falar de novo com quem já se falou,
- * que é o oposto do que um CRM serve para fazer.
+ * que já foi abordado. Mas ele tem de terminar: bloquear para sempre impediria
+ * falar de novo com quem já se falou, que é o oposto do que um CRM serve para
+ * fazer.
+ *
+ * ⚠⚠ A RÉGUA MUDOU NA 9039, e o que estava escrito aqui até então era "o veto
+ * termina quando a campanha termina". Terminou de valer: a campanha de entrada
+ * CONTÍNUA nunca conclui, e por aquele critério ela excluiria de toda campanha
+ * futura, para sempre, cada contato que tocasse.
+ *
+ * São DOIS critérios agora, e eles medem coisas diferentes:
+ *
+ *   (1) PASSADO — RECEBEU nos últimos `DIAS_SEM_REPETIR_A_CADENCIA` dias
+ *       (`sent_at`, a mesma janela do anti-laço da régua de prospecção).
+ *       Independe do estado da campanha: cancelar não desfaz a mensagem lida.
+ *   (2) PRESENTE — está na FILA ATIVA de uma campanha que ainda vai falar. É o
+ *       que impede duas campanhas de mandarem o primeiro contato para a mesma
+ *       pessoa na mesma semana, e só aqui o estado da campanha importa.
+ *
+ * Linha EXCLUÍDA não conta em nenhum dos dois: a preparação e o gatilho gravam
+ * linha também para quem foi vetado, e vetado não recebeu nada. Quem monta o
+ * conjunto é `contatosJaEmCampanha` (`consulta-de-audiencia.ts`), com a doutrina
+ * completa; aqui só se aplica o que ele entregou.
  */
 export function classificarAudiencia(
   candidatos: readonly CandidatoDaAudiencia[],
@@ -115,7 +154,7 @@ export function classificarAudiencia(
 
   for (const candidato of candidatos) {
     const excluir = (motivo: MotivoDeExclusao): void => {
-      saida.push({ candidato, elegivel: false, motivo, corpo: null });
+      saida.push({ candidato, elegivel: false, motivo, corpo: null, varianteIndex: null });
     };
 
     if (ctx.excluidosAMao.has(candidato.contactId)) {
@@ -140,14 +179,28 @@ export function classificarAudiencia(
       excluir("duplicado");
       continue;
     }
-    const { texto, faltando } = ctx.renderizar(candidato);
+    const { texto, faltando, vazio, varianteIndex } = ctx.renderizar(candidato);
     if (faltando.length > 0) {
       excluir("variavel_ausente");
       continue;
     }
+    // Depois de `faltando`, e com motivo próprio: aqui não falta dado do
+    // contato — o texto é que resolveu para nada. Sem esta guarda, mensagem em
+    // branco é congelada no snapshot e sai pelo WhatsApp como sai qualquer
+    // outra, que é pior do que não mandar.
+    if (vazio === true || texto.trim() === "") {
+      excluir("texto_vazio");
+      continue;
+    }
 
     enderecosVistos.add(endereco);
-    saida.push({ candidato, elegivel: true, motivo: null, corpo: texto });
+    saida.push({
+      candidato,
+      elegivel: true,
+      motivo: null,
+      corpo: texto,
+      varianteIndex: varianteIndex ?? 0,
+    });
   }
 
   return saida;

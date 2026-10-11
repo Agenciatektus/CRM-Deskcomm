@@ -74,6 +74,10 @@ describe("suspensão × campanha", () => {
       pulados: 0,
       concluidas: 0,
       promovidas: 0,
+      // Nenhuma campanha rodou, então ninguém ficou fora da régua. A forma
+      // inteira continua travada aqui de propósito: rodada que devolvesse
+      // número em qualquer campo reprovaria.
+      foraDaRegua: {},
       detalhe: "nada_a_fazer",
     });
     const escolha = chamadas.find((c) => c.tabela === "campaigns" && c.operacao === "select");

@@ -5337,6 +5337,13 @@ export const DICIONARIO: Traducoes = {
     {
       es: "La regla usa un tipo de acción que esta instalación no tiene (puede que se haya retirado en una actualización). Abre la automatización y elige otra acción.",
     },
+  // `criacao_em_lote` do mapa MOTIVO_DA_PARADA. A entrada é manual porque a
+  // cerca de i18n não enxerga `t()` dinâmico: sem ela a frase ficaria em
+  // português na tela em espanhol, e nenhum gate acusaria.
+  "Este card nasceu de uma criação em lote (importação de planilha ou campanha), e as ações que falam com o cliente ficam de fora nessas levas, para a mesma regra não virar centenas de mensagens no mesmo minuto. As outras ações da regra rodaram normalmente.":
+    {
+      es: "Esta ficha nació de una creación en lote (importación de planilla o campaña), y las acciones que hablan con el cliente quedan fuera en esas tandas, para que la misma regla no se convierta en cientos de mensajes en el mismo minuto. Las demás acciones de la regla sí se ejecutaron.",
+    },
   "Título do lead": { es: "Título del lead" },
   "Nome do lead": { es: "Nombre del lead" },
   "Tags do lead": { es: "Etiquetas del lead" },
@@ -13387,8 +13394,16 @@ export const DICIONARIO: Traducoes = {
   "Excluído à mão desta campanha": { es: "Excluido manualmente de esta campaña" },
   "Mesmo telefone de outro contato da lista": { es: "Mismo teléfono que otro contacto de la lista" },
   "Falta um dado que a mensagem usa": { es: "Falta un dato que usa el mensaje" },
-  "Já está em outra campanha ainda não concluída": { es: "Ya está en otra campaña que todavía no termina" },
+  // A frase antiga ("Já está em outra campanha ainda não concluída") saiu na 9039:
+  // o veto passou a pegar também quem recebeu de campanha já concluída ou
+  // cancelada, e o operador procuraria na tela uma campanha que não existe mais.
+  "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar": {
+    es: "Otra campaña ya habló con esta persona en los últimos 30 días, o va a hablar",
+  },
   "Está na lista de exclusão de campanhas": { es: "Está en la lista de exclusión de campañas" },
+  "Já comprou ou já foi perdido antes (não é primeiro contato)": {
+    es: "Ya compró o ya se perdió antes (no es primer contacto)",
+  },
   "Parar de enviar às (hora)": { es: "Dejar de enviar a las (hora)" },
   "pediram para parar": { es: "pidieron parar" },
   "pessoas? O envio segue o ritmo do número e pode levar horas.": {
@@ -13398,6 +13413,69 @@ export const DICIONARIO: Traducoes = {
   "Preparar lista": { es: "Preparar lista" },
   "Progresso do envio": { es: "Progreso del envío" },
   "Público": { es: "Público" },
+  // ── Campanha: os PASSOS (9037) e a ENTRADA CONTÍNUA (9039) ──
+  "Quem entra nesta campanha": { es: "Quién entra en esta campaña" },
+  "Lista fixa": { es: "Lista fija" },
+  "O recorte acima vira uma lista. Você confere quantas pessoas são e o texto antes de iniciar, e depois disso a lista não muda.": {
+    es: "El recorte de arriba se convierte en una lista. Usted verifica cuántas personas son y el texto antes de iniciar, y después de eso la lista no cambia.",
+  },
+  "Contínua, por etapa do funil": { es: "Continua, por etapa del embudo" },
+  "contínua, por etapa do funil": { es: "continua, por etapa del embudo" },
+  "A campanha fica de pé e aborda quem entrar na etapa escolhida, a partir do momento em que você iniciar. Quem já está na etapa hoje não é abordado.": {
+    es: "La campaña se queda en pie y aborda a quien entre en la etapa elegida, a partir del momento en que usted la inicie. Quien ya está en la etapa hoy no es abordado.",
+  },
+  "Abordar quem entrar na etapa": { es: "Abordar a quien entre en la etapa" },
+  "Escolha primeiro o funil, em “Quem responder”. A etapa é dele.": {
+    es: "Elija primero el embudo, en “Quién responde”. La etapa es de él.",
+  },
+  "A pessoa recebe uma vez só: se o card entrar e sair da etapa várias vezes, a abordagem não repete. Quem respondeu, quem pediu para parar e quem está em outra campanha ainda em andamento ficam de fora.": {
+    es: "La persona recibe una sola vez: si la tarjeta entra y sale de la etapa varias veces, el abordaje no se repite. Quien respondió, quien pidió parar y quien está en otra campaña todavía en curso quedan fuera.",
+  },
+  "Preencha o máximo por dia e o horário de envio, em “Ritmo desta campanha”. Sem lista para conferir antes de apertar, são eles que limitam quantas pessoas a campanha aborda por dia e impedem que a abordagem saia de madrugada.": {
+    es: "Complete el máximo por día y el horario de envío, en “Ritmo de esta campaña”. Sin lista que revisar antes de pulsar, son ellos los que limitan a cuántas personas aborda la campaña por día e impiden que el abordaje salga de madrugada.",
+  },
+  "Preencha o máximo por dia, em “Ritmo desta campanha”. Sem lista para conferir antes de apertar, é ele que limita quantas pessoas novas a campanha aborda por dia.": {
+    es: "Complete el máximo por día, en “Ritmo de esta campaña”. Sin lista que revisar antes de pulsar, es él el que limita a cuántas personas nuevas aborda la campaña por día.",
+  },
+  "Preencha o horário de envio, em “Ritmo desta campanha”. O gatilho dispara a qualquer hora, e sem janela a abordagem sai de madrugada.": {
+    es: "Complete el horario de envío, en “Ritmo de esta campaña”. El disparador se activa a cualquier hora, y sin ventana el abordaje sale de madrugada.",
+  },
+  "A campanha passa a abordar quem entrar na etapa escolhida, até": {
+    es: "La campaña pasa a abordar a quien entre en la etapa elegida, hasta",
+  },
+  "por dia, dentro do horário configurado. Quem já está na etapa hoje não é abordado. Para parar, use Pausar ou Cancelar.": {
+    es: "por día, dentro del horario configurado. Quien ya está en la etapa hoy no es abordado. Para parar, use Pausar o Cancelar.",
+  },
+  "Entraram na etapa": { es: "Entraron en la etapa" },
+  "Quem já entrou": { es: "Quién ya entró" },
+  "Quem ficou de fora não é avaliado de novo nesta campanha, mesmo que o motivo deixe de valer (um telefone que faltava e foi preenchido, por exemplo). Para dar outra chance a essas pessoas, duplique a campanha.": {
+    es: "Quien quedó fuera no se vuelve a evaluar en esta campaña, aunque el motivo deje de valer (un teléfono que faltaba y se completó, por ejemplo). Para darles otra oportunidad, duplique la campaña.",
+  },
+  "Ninguém entrou na etapa desde que a campanha começou. Ela segue de pé, esperando.": {
+    es: "Nadie entró en la etapa desde que la campaña comenzó. Sigue en pie, esperando.",
+  },
+  "Andamento": { es: "Avance" },
+  "na fila agora": { es: "en la fila ahora" },
+  "entraram na etapa e ficaram de fora": { es: "entraron en la etapa y quedaron fuera" },
+  "Campanha contínua não conclui sozinha: ela fica de pé esperando a próxima pessoa entrar na etapa. Para encerrar, use Pausar ou Cancelar.": {
+    es: "Una campaña continua no concluye sola: se queda en pie esperando a que la próxima persona entre en la etapa. Para cerrarla, use Pausar o Cancelar.",
+  },
+  "Quem entrar na etapa": { es: "Quien entre en la etapa" },
+  "é abordado, a partir do momento em que a campanha foi iniciada.": {
+    es: "es abordado, a partir del momento en que la campaña fue iniciada.",
+  },
+  "A etapa que iniciava a abordagem não existe mais, então esta campanha parou de abordar. Duplique-a e escolha outra etapa.": {
+    es: "La etapa que iniciaba el abordaje ya no existe, por eso esta campaña dejó de abordar. Duplíquela y elija otra etapa.",
+  },
+  "No máximo": { es: "Como máximo" },
+  "por dia": { es: "por día" },
+  "das": { es: "de las" },
+  "A pessoa recebe uma vez só, mesmo que o card entre e saia da etapa várias vezes.": {
+    es: "La persona recibe una sola vez, aunque la tarjeta entre y salga de la etapa varias veces.",
+  },
+  "Quem já estava na etapa quando a campanha foi preparada não é abordado: para falar com esses, use uma campanha de lista fixa com recorte por etapa.": {
+    es: "Quien ya estaba en la etapa cuando la campaña fue preparada no es abordado: para hablar con esos, use una campaña de lista fija con recorte por etapa.",
+  },
   "Quem está na lista": { es: "Quién está en la lista" },
   "Quem não tiver o dado que a mensagem usa fica de fora, com o motivo na lista — mensagem com buraco não sai.": {
     es: "Quien no tenga el dato que el mensaje usa queda fuera, con el motivo en la lista — un mensaje con hueco no sale.",
@@ -13419,6 +13497,9 @@ export const DICIONARIO: Traducoes = {
   },
   "Ver quantas pessoas": { es: "Ver cuántas personas" },
   "Você pode usar:": { es: "Puedes usar:" },
+  "Use {a|b} para alternar palavras. Cada contato recebe sempre a mesma variação.": {
+    es: "Usa {a|b} para alternar palabras. Cada contacto recibe siempre la misma variación.",
+  },
   "Máximo por hora": { es: "Máximo por hora" },
   "Ritmo salvo.": { es: "Ritmo guardado." },
   "Salvar ritmo": { es: "Guardar ritmo" },
@@ -13475,8 +13556,29 @@ export const DICIONARIO: Traducoes = {
   "A proteção do número — ritmo, janela e aquecimento que valem para tudo que sai por ele — fica em": {
     es: "La protección del número — ritmo, franja y calentamiento que valen para todo lo que sale por él — está en",
   },
-  "Campo vazio significa herdar o número. Toda campanha nova nasce com estes valores e pode ficar mais devagar, nunca mais rápida.": {
-    es: "Campo vacío significa heredar el número. Toda campaña nueva nace con estos valores y puede ir más lenta, nunca más rápida.",
+  // ─── PRESET ANTI-BLOQUEIO DO RITMO DA CAMPANHA ───
+  "Algum valor aqui está mais solto que o recomendado para lista fria. Dá para rodar assim, com risco maior de bloqueio do número.": {
+    es: "Algún valor aquí está más suelto que el recomendado para lista fría. Se puede operar así, con mayor riesgo de bloqueo del número.",
+  },
+  "Campo vazio usa o ritmo recomendado para lista fria:": {
+    es: "El campo vacío usa el ritmo recomendado para lista fría:",
+  },
+  "entre mensagens,": { es: "entre mensajes," },
+  "Horário mais largo que o recomendado:": { es: "Franja horaria más amplia que la recomendada:" },
+  "Intervalo menor que o recomendado:": { es: "Intervalo menor que el recomendado:" },
+  "Mais mensagens por dia que o recomendado:": {
+    es: "Más mensajes por día que el recomendado:",
+  },
+  "Mais mensagens por hora que o recomendado:": {
+    es: "Más mensajes por hora que el recomendado:",
+  },
+  "Os campos já vêm com o ritmo que a organização definiu em Configuração de campanhas, e com o recomendado para lista fria onde ela não definiu nada. Tudo é editável, e campo esvaziado volta a herdar o número.": {
+    es: "Los campos ya vienen con el ritmo que la organización definió en Configuración de campañas, y con el recomendado para lista fría donde no definió nada. Todo es editable, y un campo vaciado vuelve a heredar el número.",
+  },
+  "por dia,": { es: "por día," },
+  "por hora, das": { es: "por hora, de las" },
+  "Toda campanha nova nasce com estes valores, e pode ficar mais devagar, nunca mais rápida.": {
+    es: "Toda campaña nueva nace con estos valores, y puede ir más lenta, nunca más rápida.",
   },
   "Conexões › Proteção de envio": { es: "Conexiones › Protección de envío" },
   "Configuração de campanhas": { es: "Configuración de campañas" },
@@ -14069,6 +14171,70 @@ export const DICIONARIO: Traducoes = {
   // dinâmica). Fica "Pipeline": é o termo que CRM em espanhol usa para o quadro,
   // e "Embudos" já é o rótulo de "Funis", o item vizinho do mesmo menu.
   Pipeline: { es: "Pipeline" },
+  // ---- passos de campanha ----
+  "Depois da primeira mensagem": { es: "Después del primer mensaje" },
+  "Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.": {
+    es: "Quien responde sale de la secuencia de inmediato. Los pasos siguientes aplican a quien quedó en silencio.",
+  },
+  "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
+  "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
+    es: "El primer mensaje es el de arriba y se envía a toda la lista. Los pasos siguientes ocurren para quien NO respondió. Quien responde sale de la secuencia de inmediato.",
+  },
+  "Escolha o funil em «Quem responder» antes de preparar: com passos, cada pessoa abordada vira card, e card precisa de funil.": {
+    es: "Elige el embudo en «Quién responde» antes de preparar: con pasos, cada persona contactada se convierte en una tarjeta y toda tarjeta necesita un embudo.",
+  },
+  "Com passos, cada pessoa abordada vira card no funil escolhido, já na primeira mensagem (sem passos, o card só nasce quando ela responde). É o que faz mover de etapa e etiquetar funcionarem, e é também o que enche o quadro:": {
+    es: "Con pasos, cada persona contactada se convierte en una tarjeta en el embudo elegido desde el primer mensaje (sin pasos, la tarjeta solo nace cuando responde). Así funcionan mover de etapa y etiquetar, y también se llena el tablero:",
+  },
+  "um card por pessoa da lista": { es: "una tarjeta por persona de la lista" },
+  "cards, um por pessoa da lista": { es: "tarjetas, una por persona de la lista" },
+  "Quem já tem negócio aberto nesse funil não ganha card novo.": { es: "Quien ya tiene un negocio abierto en este embudo no recibe una tarjeta nueva." },
+  "Com passos, a campanha manda no máximo": { es: "Con pasos, la campaña envía como máximo" },
+  "por dia, que é o que a régua absorve: a lista leva mais dias para terminar, e todo mundo que receber vai ter os passos.": {
+    es: "por día, que es lo que la secuencia absorbe: la lista tarda más días en terminar y todos los que reciban tendrán los pasos.",
+  },
+  "etapa removida": { es: "etapa eliminada" },
+  "variações": { es: "variaciones" },
+  "Mover para": { es: "Mover a" },
+
+  // ---- quando a régua da campanha para (9046) ----
+  "Quando a régua para": { es: "Cuándo se detiene la secuencia" },
+  "Estas opções valem para os passos depois da primeira mensagem. Quem sai aqui não recebe os passos seguintes.": {
+    es: "Estas opciones aplican a los pasos después del primer mensaje. Quien sale aquí no recibe los pasos siguientes.",
+  },
+  "Esta campanha não tem passos, então ela manda uma mensagem e acaba. O que você escolher aqui fica guardado e passa a valer se ela ganhar passos.": {
+    es: "Esta campaña no tiene pasos, así que envía un mensaje y termina. Lo que elijas aquí queda guardado y pasa a valer si ella gana pasos.",
+  },
+  "Escolha o funil em «Quem responder» para poder parar a régua por etapa: a lista de etapas é a do funil da campanha.": {
+    es: "Elige el embudo en «Quién responde» para poder detener la secuencia por etapa: la lista de etapas es la del embudo de la campaña.",
+  },
+  "A régua para quando": { es: "La secuencia se detiene cuando" },
+  // A RESSALVA, nas duas telas com as mesmas palavras: é nela que a expectativa
+  // errada se forma ("marquei a etapa, então quem está nela não é abordado").
+  "A primeira mensagem não é filtrada por elas: ela sai para todo mundo da lista, inclusive para quem já está na etapa ou com a etiqueta que você escolher.": {
+    es: "El primer mensaje no se filtra por ellas: sale para toda la lista, incluso para quien ya está en la etapa o con la etiqueta que elijas.",
+  },
+  "Isto vale para os passos depois da primeira mensagem. A primeira sai para todo mundo da lista, inclusive para quem já está nas etapas e etiquetas acima.": {
+    es: "Esto aplica a los pasos después del primer mensaje. El primero sale para toda la lista, incluso para quien ya está en las etapas y etiquetas de arriba.",
+  },
+  "Não foi possível ler esta configuração, então a régua está barrada: ela não vai ao ar até alguém corrigir. Nenhum passo sai enquanto isso.": {
+    es: "No fue posible leer esta configuración, así que la secuencia está bloqueada: no sale al aire hasta que alguien la corrija. Ningún paso se envía mientras tanto.",
+  },
+  "O lead responde": { es: "El lead responde" },
+  "O negócio é ganho ou perdido": { es: "El negocio se gana o se pierde" },
+  "Alguém do time manda mensagem ao lead": { es: "Alguien del equipo le escribe al lead" },
+  "Ganha a etiqueta": { es: "Recibe la etiqueta" },
+  "Entra na etapa": { es: "Entra en la etapa" },
+  "Esta campanha usa o padrão. Para mudar, duplique e ajuste no rascunho.": {
+    es: "Esta campaña usa la configuración estándar. Para cambiarla, duplícala y ajústala en el borrador.",
+  },
+  // A recusa do servidor quando `campaigns.saidas` não dá para ler. Chega à tela
+  // por `t()` DINÂMICO (a rota traduz a frase que o gate devolve), e a cerca de
+  // i18n não enxerga chave dinâmica: sem esta entrada, a falta não acusaria em
+  // lugar nenhum e o operador espanhol leria português.
+  "Não foi possível ler quando esta campanha deve parar de falar com cada pessoa, então a régua não vai ao ar: sem essa configuração ela continuaria insistindo com quem já devia ter saído. Abra «Quando a régua para», confira as opções e salve de novo.": {
+    es: "No fue posible leer cuándo esta campaña debe dejar de hablar con cada persona, así que la secuencia no sale al aire: sin esa configuración seguiría insistiendo con quien ya debía haber salido. Abre «Cuándo se detiene la secuencia», revisa las opciones y guarda de nuevo.",
+  },
 };
 
 /**

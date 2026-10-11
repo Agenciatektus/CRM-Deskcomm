@@ -19,6 +19,7 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { progresso, taxasDaCampanha, type ContagemDaCampanha } from "@/lib/campanhas/metricas";
+import { MOTIVOS_DE_EXCLUSAO, type MotivoDeExclusao } from "@/lib/campanhas/tipos";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,6 +27,28 @@ export const dynamic = "force-dynamic";
 
 /** Teto de linhas lidas por chamada. Acima disso a resposta se declara parcial. */
 const TETO = 20_000;
+
+/**
+ * Quantos excluídos por motivo — contado em memória, como o resto.
+ *
+ * Só linha EXCLUÍDA entra: `exclusion_reason` também é escrito em quem recebeu e
+ * depois pediu para parar (`fecharPorOptOut` marca `excluded` em `sent`), e
+ * aquela pessoa não "ficou de fora" — ela recebeu. Contar as duas juntas faria o
+ * detalhamento somar mais que o número de excluídos que a tela mostra ao lado.
+ */
+function porMotivo(
+  linhas: ReadonlyArray<{ eligibility_status: string; exclusion_reason: string | null }>,
+): Partial<Record<MotivoDeExclusao, number>> {
+  const conta: Partial<Record<MotivoDeExclusao, number>> = {};
+  for (const l of linhas) {
+    if (l.eligibility_status !== "excluded") continue;
+    const motivo = l.exclusion_reason;
+    if (!motivo || !(MOTIVOS_DE_EXCLUSAO as readonly string[]).includes(motivo)) continue;
+    const chave = motivo as MotivoDeExclusao;
+    conta[chave] = (conta[chave] ?? 0) + 1;
+  }
+  return conta;
+}
 
 export async function GET(
   _req: NextRequest,
@@ -40,7 +63,9 @@ export async function GET(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("campaign_recipients")
-    .select("status, eligibility_status, sent_at, delivered_at, read_at, replied_at, opted_out_at")
+    .select(
+      "status, eligibility_status, exclusion_reason, sent_at, delivered_at, read_at, replied_at, opted_out_at",
+    )
     .eq("organization_id", authz.org.orgId)
     .eq("campaign_id", id)
     .limit(TETO);
@@ -49,6 +74,7 @@ export async function GET(
   const linhas = (data ?? []) as unknown as Array<{
     status: string;
     eligibility_status: string;
+    exclusion_reason: string | null;
     sent_at: string | null;
     delivered_at: string | null;
     read_at: string | null;
@@ -85,6 +111,7 @@ export async function GET(
     falharam: linhas.filter((l) => l.status === "failed").length,
     cancelados: linhas.filter((l) => l.status === "cancelled").length,
     optOut: linhas.filter((l) => l.opted_out_at !== null).length,
+    porMotivoDaExclusao: porMotivo(linhas),
   };
 
   return ok(

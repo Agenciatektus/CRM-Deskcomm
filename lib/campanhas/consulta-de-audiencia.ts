@@ -13,7 +13,11 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CAMPANHAS_VIVAS, limiteDeSilencio, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
+import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
+
+import { limiteDeSilencio, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
+import { STATUS_TERMINAIS } from "./maquina-de-estados";
+import { NA_FILA_DE_DESPACHO } from "./tipos";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { recusouMarketing, type CandidatoDaAudiencia } from "./elegibilidade";
 
@@ -133,35 +137,106 @@ export async function buscarCandidatos(
 
 
 /**
- * Quem já está em campanha VIVA desta organização.
+ * Quem o veto "já em campanha" tira do recorte — por DOIS critérios, que medem
+ * coisas diferentes.
  *
  * Opcionalmente ignora uma campanha (a que está sendo preparada): sem isso, uma
  * preparação repetida excluiria como "já em campanha" os destinatários que ela
  * mesma gravou na tentativa anterior.
+ *
+ *   (1) PASSADO — RECEBEU nos últimos `DIAS_SEM_REPETIR_A_CADENCIA` dias. O fato
+ *       medido é a mensagem ter SAÍDO (`sent_at`), e ele independe do estado da
+ *       campanha: cancelar a campanha não desfaz a mensagem que a pessoa leu, e
+ *       por isso campanha cancelada que já falou CONTINUA contando.
+ *
+ *   (2) PRESENTE — está na FILA ATIVA (`NA_FILA_DE_DESPACHO`) de uma campanha NÃO
+ *       TERMINAL. Não é sobre o passado: é para duas campanhas não mandarem o
+ *       primeiro contato para a mesma pessoa na mesma semana, de números
+ *       possivelmente diferentes. Só aqui o estado da campanha importa, e quem
+ *       responde "ainda vai falar?" é `STATUS_TERMINAIS`, derivado da máquina de
+ *       estados.
+ *
+ * ═══ As duas voltas erradas, registradas para quem for mexer ═══
+ *
+ * • "linha em campanha VIVA" media (2) e era usado como se medisse (1). Caiu com
+ *   a 9039: a campanha de entrada contínua nunca conclui, então por aquele
+ *   critério todo contato que ela tocasse ficaria vetado de qualquer campanha
+ *   futura, para sempre — ela esterilizaria o modo lista do tenant.
+ * • "elegível nos últimos 30 dias, menos `cancelled`" tentou medir (1) com o
+ *   dado de (2). Erra nas DUAS direções: veta quem está `pending` e nunca recebeu
+ *   nada, e LIBERA quem recebeu e depois teve a campanha cancelada — justamente
+ *   o caso que a janela de 30 dias existe para impedir.
+ *
+ * Com os dois separados, "cancelada antes de falar" sai do veto por si: não tem
+ * `sent_at` e não tem linha viva. Nenhum predicado olha `cancelled`.
+ *
+ * ⚠️ `eligibility_status = 'eligible'` fica nos dois ramos, e NÃO é inerte — o
+ * comentário anterior afirmava que era. `fecharPorOptOut`
+ * (`lib/campanhas/resposta.ts`) marca `excluded` linhas que JÁ RECEBERAM
+ * (`sent`/`delivered`/`read`/`replied`), então existe linha com `sent_at` na
+ * janela e `eligible = false`, que o ramo (1) não veta. Hoje sem dano: aquele
+ * caminho só roda com `contacts.is_blocked`, e bloqueio é veto mais forte. Vira
+ * fail-open calado no dia em que alguém separar "bloqueado" de "recusou
+ * marketing". Racional completo em `entrada-por-etapa.db.ts`.
+ *
+ * ⚠️ LIMITE CONHECIDO, anterior a esta mudança: 1.000 LINHAS POR RAMO.
+ *
+ * `max_rows = 1000` (`supabase/config.toml`) trunca a resposta do PostgREST sem
+ * erro nenhum, e conjunto truncado veta MENOS gente do que devia — em silêncio.
+ * O gatilho é concreto: um tenant que tenha enviado mais de 1.000 abordagens em
+ * 30 dias, alcançável em semanas com teto diário alto (o teto da régua sozinho
+ * permite 500/dia). A janela de 30 dias estreitou muito a exposição — antes eram
+ * TODOS os destinatários de todas as campanhas vivas —, mas não a eliminou.
+ *
+ * ⚠️ E o conserto mais curto NÃO É PAGINAÇÃO. `rodada.ts` revalida bloqueio,
+ * anonimização, opt-out e supressão imediatamente antes de cada envio, mas NÃO
+ * revalida "já em campanha" — então o truncamento atravessa o snapshot e chega ao
+ * envio. Uma chamada de `estaEmOutraCampanha` por destinatário na rodada fecha as
+ * duas coisas de uma vez: o truncamento E o snapshot velho (lista preparada em
+ * segunda, despachada em quinta, com a pessoa abordada por outra campanha na
+ * quarta). É ponto por destinatário, sem conjunto, logo sem `max_rows`.
+ *
+ * Fora desta fatia de propósito: mexer no caminho de envio exige o olhar do
+ * @Cassio_SecRev sobre a rodada inteira, e o que esta fatia entrega é quem ENTRA.
  */
 export async function contatosJaEmCampanha(
   admin: SupabaseClient,
   organizationId: string,
   exceto?: string,
 ): Promise<Set<string>> {
-  let vivas = admin
-    .from("campaigns")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("status", CAMPANHAS_VIVAS);
-  if (exceto) vivas = vivas.neq("id", exceto);
-  const { data: campanhas, error } = await vivas;
-  if (error) throw new Error(`audiência: campanhas vivas — ${error.message}`);
-  const ids = (campanhas ?? []).map((c) => (c as { id: string }).id);
-  if (ids.length === 0) return new Set();
+  const desde = new Date(Date.now() - DIAS_SEM_REPETIR_A_CADENCIA * 86_400_000).toISOString();
 
-  const { data, error: erroDest } = await admin
+  // (1) RECEBEU na janela. `gte` sobre `sent_at` já descarta quem não recebeu:
+  // NULL não passa num `>=`.
+  let abordados = admin
     .from("campaign_recipients")
     .select("contact_id")
     .eq("organization_id", organizationId)
-    .in("campaign_id", ids);
-  if (erroDest) throw new Error(`audiência: comprometidos — ${erroDest.message}`);
-  return new Set((data ?? []).map((r) => (r as { contact_id: string }).contact_id));
+    .eq("eligibility_status", "eligible")
+    .gte("sent_at", desde);
+  if (exceto) abordados = abordados.neq("campaign_id", exceto);
+  const { data: jaFalou, error: erroFalou } = await abordados;
+  if (erroFalou) throw new Error(`audiência: abordados — ${erroFalou.message}`);
+
+  // (2) ESTÁ NA FILA de campanha que ainda vai falar. Pelo embed `!inner`, e não
+  // por uma lista de ids de campanha: aquela lista cresce com o tempo (a
+  // contínua nunca conclui) e em algumas centenas a URL do PostgREST estoura. O
+  // predicado de status tem tamanho FIXO, então a URL não cresce — mesmo padrão
+  // de `lib/cadencia/saidas.handler.ts` e o racional de `lib/leads/radar-de-risco.ts`.
+  let naFila = admin
+    .from("campaign_recipients")
+    .select("contact_id, campaigns!inner(status)")
+    .eq("organization_id", organizationId)
+    .eq("eligibility_status", "eligible")
+    .in("status", NA_FILA_DE_DESPACHO as unknown as string[])
+    .not("campaigns.status", "in", `(${STATUS_TERMINAIS.join(",")})`);
+  if (exceto) naFila = naFila.neq("campaign_id", exceto);
+  const { data: aCaminho, error: erroFila } = await naFila;
+  if (erroFila) throw new Error(`audiência: na fila — ${erroFila.message}`);
+
+  return new Set(
+    [...(jaFalou ?? []), ...(aCaminho ?? [])].map((r) => (r as { contact_id: string }).contact_id),
+  );
 }
 
 /** Aspas para o literal de array do Postgres — etiqueta com vírgula quebraria o `{a,b}`. */

@@ -41,11 +41,14 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { decidePacing, dayStartInTz } from "@/lib/agent-engine/pacing/engine";
 import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engine/pacing/store";
 import { beginServiceAtOrigin } from "@/lib/atendimento/origem";
+import { inscreverContatoNaRegua, type MotivoDeRecusa } from "@/lib/cadencia/inscrever";
+import { garantirCardDaAbordagem } from "./card-da-abordagem";
+import { tetoDeEnvioComRegua } from "./regua-politica";
 import { logger } from "@/lib/logger";
 
 import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
-import { renderizar } from "./renderizador";
+import { renderizarVariacao, resolverSaudacao, variantesDaCampanha } from "./renderizador";
 import { escolherNumero, poolDaCampanha, type NumeroDisponivel } from "./rodizio";
 import { podeMandarAgora, proximaTentativa, type RitmoDaCampanha } from "./ritmo";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -60,6 +63,23 @@ export interface ResultadoDaRodada {
   concluidas: number;
   /** Campanhas agendadas que viraram `running` porque a hora chegou. */
   promovidas: number;
+  /**
+   * Quem RECEBEU a 1ª mensagem e NÃO entrou na régua, por motivo.
+   *
+   * ⚠️ NÃO é agregação de volume, e o comentário anterior afirmava que era.
+   * `rodarUmaCampanha` processa UM destinatário por chamada (`.limit(1)`) e roda
+   * uma vez por campanha por rodada, então isto soma no máximo 1 por campanha
+   * por rodada — a mesma contagem do `logger.info` que havia antes.
+   *
+   * O ganho é OUTRO, e é o que importa: o motivo entra em `total.detalhe`, que é
+   * o que a rota do cron devolve e o que fica registrado da rodada. Antes, o
+   * único rastro de "esta pessoa recebeu a abordagem e ficou sem a régua" era
+   * uma linha de log, e log ninguém lê. Agora o desfecho da rodada o carrega.
+   *
+   * Contagem de verdade (por campanha, por dia) pediria tabela, e tabela nova
+   * não entra nesta branch.
+   */
+  foraDaRegua: Partial<Record<MotivoDeRecusa, number>>;
   detalhe: string;
 }
 
@@ -68,6 +88,7 @@ const VAZIA: ResultadoDaRodada = {
   pulados: 0,
   concluidas: 0,
   promovidas: 0,
+  foraDaRegua: {},
   detalhe: "nada_a_fazer",
 };
 
@@ -81,17 +102,30 @@ interface CampanhaRow {
   channel_session_id: string;
   name: string;
   message_body: string | null;
+  message_variants: string[] | null;
   content_version: number;
   intervalo_segundos: number | null;
   janela_inicio_hora: number | null;
   janela_fim_hora: number | null;
   teto_diario: number | null;
   teto_horario: number | null;
+  /** A régua publicada desta campanha (9037). `null` = campanha de uma mensagem só. */
+  followup_pointer_id: string | null;
+  /** Onde o card de quem foi abordado nasce (0378 + 9037). */
+  pipeline_id: string | null;
+  stage_id: string | null;
+  /**
+   * Modo de público CONTÍNUO (migration 9039). Aqui ela serve a UMA decisão: a
+   * campanha contínua não CONCLUI por fila vazia. Ver o bloco em
+   * `rodarUmaCampanha`.
+   */
+  entrada_continua: boolean;
 }
 
 const COLUNAS_DA_CAMPANHA =
-  "id, organization_id, channel_session_id, name, message_body, content_version, " +
-  "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario";
+  "id, organization_id, channel_session_id, name, message_body, message_variants, content_version, " +
+  "intervalo_segundos, janela_inicio_hora, janela_fim_hora, teto_diario, teto_horario, " +
+  "followup_pointer_id, pipeline_id, stage_id, entrada_continua";
 
 export async function rodarUmaRodadaDeCampanha(
   admin: SupabaseClient,
@@ -124,7 +158,7 @@ export async function rodarUmaRodadaDeCampanha(
   }
 
   const numerosAtendidos = new Set<string>();
-  const total: ResultadoDaRodada = { ...VAZIA, promovidas, detalhe: "" };
+  const total: ResultadoDaRodada = { ...VAZIA, promovidas, foraDaRegua: {}, detalhe: "" };
   const detalhes: string[] = [];
 
   for (const campanha of emExecucao) {
@@ -138,6 +172,9 @@ export async function rodarUmaRodadaDeCampanha(
       total.enviadas += r.enviadas;
       total.pulados += r.pulados;
       total.concluidas += r.concluidas;
+      if (r.foraDaRegua) {
+        total.foraDaRegua[r.foraDaRegua] = (total.foraDaRegua[r.foraDaRegua] ?? 0) + 1;
+      }
       detalhes.push(`${campanha.id.slice(0, 8)}:${r.detalhe}`);
       // Só ocupa o número quem de fato enviou: campanha parada por ritmo não
       // pode impedir a campanha seguinte do mesmo número de ser avaliada... mas
@@ -154,6 +191,18 @@ export async function rodarUmaRodadaDeCampanha(
   }
 
   total.detalhe = detalhes.join(" ") || "nada_a_fazer";
+
+  // Uma linha por rodada, e só quando houve recusa. O que ela acrescenta ao log
+  // antigo não é volume (ver `foraDaRegua`): é o motivo chegar ao `detalhe` da
+  // rodada, que é rastro do cron e não só log.
+  const forasDaRodada = Object.entries(total.foraDaRegua);
+  if (forasDaRodada.length > 0) {
+    logger.info("[campanha] destinatários fora da régua nesta rodada", {
+      por_motivo: total.foraDaRegua,
+      total: forasDaRodada.reduce((soma, [, n]) => soma + n, 0),
+    });
+    total.detalhe += ` fora_da_regua:${forasDaRodada.map(([m, n]) => `${m}=${n}`).join(",")}`;
+  }
   return total;
 }
 
@@ -199,7 +248,16 @@ async function rodarUmaCampanha(
   admin: SupabaseClient,
   campanha: CampanhaRow,
   agora: Date,
-): Promise<{ enviadas: number; pulados: number; concluidas: number; detalhe: string }> {
+): Promise<{
+  enviadas: number;
+  pulados: number;
+  concluidas: number;
+  detalhe: string;
+  /** Recebeu a 1ª mensagem e não entrou na régua. A rodada agrega. */
+  foraDaRegua?: MotivoDeRecusa;
+}> {
+  let foraDaRegua: MotivoDeRecusa | undefined;
+
   const { data: fila } = await admin
     .from("campaign_recipients")
     .select(
@@ -222,6 +280,28 @@ async function rodarUmaCampanha(
       .eq("campaign_id", campanha.id)
       .in("status", ["pending", "queued", "sending"]);
     if ((count ?? 0) > 0) return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: "aguardando" };
+
+    // ═══ A CAMPANHA CONTÍNUA NÃO CONCLUI POR FILA VAZIA (migration 9039) ═══
+    //
+    // Na campanha de lista, fila vazia significa "acabou": a lista era finita,
+    // foi inteira despachada, e `completed` é a verdade. Na contínua, fila vazia
+    // é o estado NORMAL — é como ela passa a maior parte do tempo, entre uma
+    // chegada na etapa e a seguinte. Concluir aqui encerraria a campanha no
+    // primeiro minuto depois do Iniciar, antes de o primeiro lead chegar, e o
+    // `completed` é TERMINAL: não há retomada, só duplicar.
+    //
+    // Então a contínua só sai de `running` por ato humano — Pausar (para de
+    // abordar gente nova, a régua de quem já foi abordado segue) ou Cancelar
+    // (que encerra as inscrições, `encerrarReguaDaCampanha`). Para ela,
+    // "acabou" se escreve `cancelled`, e isso é o que a tela mostra.
+    //
+    // O que isso muda no funil da tela: `snapshot_eligible` deixa de ser
+    // denominador e a barra de progresso perde sentido (fila sem fim não tem
+    // porcentagem). A tela de detalhe esconde a barra no modo contínuo e troca o
+    // número por "abordadas até agora" — ver `app/app/campaigns/[id]/_client.tsx`.
+    if (campanha.entrada_continua) {
+      return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: "aguardando_gatilho" };
+    }
 
     const { data } = await admin
       .from("campaigns")
@@ -299,7 +379,15 @@ async function rodarUmaCampanha(
     intervaloSegundos: campanha.intervalo_segundos,
     janelaInicioHora: campanha.janela_inicio_hora,
     janelaFimHora: campanha.janela_fim_hora,
-    tetoDiario: campanha.teto_diario,
+    // COM RÉGUA, o teto do dia é o que a régua absorve. A inscrição é tentada
+    // uma vez só, logo depois do envio (`campaign_recipients` só é relido com
+    // `status='pending'`), então mandar mais do que a régua aceita no dia não
+    // atrasa o 2º toque dessas pessoas: elimina. Ver `tetoDeEnvioComRegua`.
+    // Sem régua, o teto é exatamente o que o operador escreveu.
+    tetoDiario:
+      campanha.followup_pointer_id === null
+        ? campanha.teto_diario
+        : tetoDeEnvioComRegua(campanha.teto_diario),
     tetoHorario: campanha.teto_horario,
   };
   const numeros = await numerosDaCampanha(admin, campanha);
@@ -399,12 +487,41 @@ async function rodarUmaCampanha(
   // de ser a do instante em que a mensagem SAI, no fuso do canal. Montá-la na
   // preparação produziria "bom dia" numa mensagem enviada à tarde — foi o
   // defeito do primeiro piloto.
-  const congelado = alvo.rendered_body ?? campanha.message_body ?? "";
-  const corpo = renderizar(
-    congelado,
-    { nome: nomeDoContato(contato) },
-    { agora, fuso: knobs.timezone },
-  ).texto;
+  // O congelado JÁ teve a variante escolhida e o spintax resolvido na
+  // preparação; aqui só a saudação falta. O fallback (linha sem corpo
+  // congelado, que a preparação não produz para elegível) passa pelo motor de
+  // variação de propósito: sem ele, um `{a|b}` do corpo principal sairia com as
+  // chaves no WhatsApp do cliente.
+  let congelado = alvo.rendered_body;
+  if (congelado === null || congelado === undefined) {
+    const refeito = renderizarVariacao({
+      variantes: variantesDaCampanha(campanha.message_body, campanha.message_variants),
+      semente: alvo.contact_id,
+      valores: { nome: nomeDoContato(contato) },
+    });
+    // O instrumento ligado no ÚNICO ponto onde texto vira mensagem. Este
+    // caminho é morto hoje (a preparação grava `rendered_body` para todo
+    // elegível), mas se um dia não for, o custo é mandar `{{nome}}` literal —
+    // ou nada — para um lojista. Falha fechada, com o motivo visível na lista.
+    if (refeito.faltando.length > 0 || refeito.vazio) {
+      const porque = refeito.vazio ? "texto_vazio" : "variavel_ausente";
+      await admin
+        .from("campaign_recipients")
+        .update({
+          status: "skipped",
+          eligibility_status: "excluded",
+          exclusion_reason: porque,
+        })
+        .eq("id", alvo.id)
+        .eq("status", "pending");
+      return { enviadas: 0, pulados: 1, concluidas: 0, detalhe: `pulado:${porque}` };
+    }
+    congelado = refeito.texto;
+  }
+  // Só a saudação, com regex dedicada: o corpo congelado JÁ tem o nome do
+  // contato dentro, e reler tudo como template faria um cadastro chamado
+  // `Loja {{saudacao}}` virar `Loja Boa tarde` no envio.
+  const corpo = resolverSaudacao(congelado, { agora, fuso: knobs.timezone });
 
   try {
     const boundary = await beginServiceAtOrigin(
@@ -465,11 +582,71 @@ async function rodarUmaCampanha(
       .eq("id", alvo.id)
       .eq("status", "sending");
 
+    // ─── A RÉGUA: o 2º toque em diante (migration 9037) ───
+    //
+    // AQUI, e não na preparação: a inscrição marca "esta pessoa recebeu a
+    // abordagem", e inscrever na preparação prometeria passos a quem a lista
+    // ainda pode pular (veto revalidado, ritmo, número fora do ar). Só quem
+    // recebeu de fato entra.
+    //
+    // A fronteira do envio vai junto: a conversa já está aberta, e um segundo
+    // `beginServiceAtOrigin` a REABRIRIA — disparando roteamento para a equipe
+    // por causa de um passo que só sai amanhã.
+    //
+    // ⚠️ NUNCA derruba o envio. A mensagem já saiu e o destinatário já está
+    // `sent`; transformar uma recusa de inscrição em falha de envio diria que a
+    // pessoa não recebeu o que recebeu. Recusa vira linha de log com o motivo.
+    if (!falhou && campanha.followup_pointer_id) {
+      try {
+        const inscricao = await inscreverContatoNaRegua(admin, {
+          organizationId: campanha.organization_id,
+          pointerId: campanha.followup_pointer_id,
+          contactId: alvo.contact_id,
+          // O CARD NASCE AQUI, na abordagem (decisão do dono, 05/10/2026), e não
+          // só quando a pessoa responde: os passos de CRM da régua agem sobre o
+          // negócio, e a régua existe para alcançar quem NÃO respondeu. Sem
+          // card, "mover de etapa" e "etiquetar" falhavam e matavam a inscrição
+          // no backoff — a régua dessa pessoa parava ali, calada.
+          //
+          // Em CALLBACK porque a ordem é o ponto: a porta da régua o chama
+          // depois dos vetos e da reserva da vaga do dia, nunca antes. Ver
+          // `lib/campanhas/card-da-abordagem.ts`.
+          abrirNegocio: () =>
+            garantirCardDaAbordagem(admin, {
+              campanha: {
+                id: campanha.id,
+                organization_id: campanha.organization_id,
+                name: campanha.name,
+                pipeline_id: campanha.pipeline_id,
+                stage_id: campanha.stage_id,
+              },
+              contactId: alvo.contact_id,
+              destinatarioId: alvo.id,
+              requestId: `campaign:${campanha.id}:${alvo.id}`,
+            }),
+          fronteira: boundary,
+          origem: { tipo: "campanha", campanhaId: campanha.id, destinatarioId: alvo.id },
+        });
+        // O motivo SOBE para a rodada agregar; uma linha de log por
+        // destinatário era rastro que ninguém lê (ver `foraDaRegua`).
+        if (!inscricao.ok) foraDaRegua = inscricao.motivo;
+      } catch (err) {
+        // Erro DURO (não recusa) continua com log próprio: ele é raro, e o
+        // texto real dele é a única pista de um defeito.
+        logger.warn("[campanha] inscrição na régua falhou", {
+          campanha: campanha.id,
+          destinatario: alvo.id,
+          motivo: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return {
       enviadas: falhou ? 0 : 1,
       pulados: 0,
       concluidas: 0,
       detalhe: `enviado:${status ?? "?"}:${escolha.motivo}`,
+      foraDaRegua,
     };
   } catch (err) {
     const motivoErro = err instanceof Error ? err.message : String(err);

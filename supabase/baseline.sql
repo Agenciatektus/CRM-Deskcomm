@@ -168,9 +168,16 @@ begin
   if v_is_won then
     new.status := 'won';
     new.closed_at := coalesce(new.closed_at, now());
+    -- 9040: a memória que a reabertura NÃO apaga. `coalesce` guarda o PRIMEIRO
+    -- fechamento — fechar, reabrir e fechar de novo não reescreve a data. É a
+    -- única coisa que diz "este negócio já fechou" depois de reaberto, e é o que
+    -- impede a entrada contínua da campanha (9039) de abordar quem já comprou
+    -- com a copy de primeiro contato.
+    new.fechado_alguma_vez_em := coalesce(new.fechado_alguma_vez_em, now());
   elsif v_is_lost then
     new.status := 'lost';
     new.closed_at := coalesce(new.closed_at, now());
+    new.fechado_alguma_vez_em := coalesce(new.fechado_alguma_vez_em, now());
     -- #1537: DE QUEM ERA a etapa que este negócio deixou — a perda sem a
     -- etapa de origem não diz em que momento o funil vazou. Só na transição:
     -- um card já perdido arrastado entre etapas de perda mantém a origem
@@ -188,6 +195,10 @@ begin
       -- #1537: reabriu — a origem da perda passada não pertence a um negócio
       -- que voltou a ser aberto. Se morrer de novo, nasce a nova origem.
       new.lost_from_stage_id := null;
+      -- ⚠️ 9040: `fechado_alguma_vez_em` NÃO entra nesta limpeza, de propósito.
+      -- As duas linhas acima são justamente o que apaga a memória do fechamento,
+      -- e era por isso que um cliente ganho reaberto em DOIS arrastos passava por
+      -- todos os vetos da campanha contínua. Limpá-la devolve o buraco.
     end if;
   end if;
   return new;
@@ -15030,21 +15041,26 @@ alter table public.followup_flow_pointers
 alter table public.followup_flow_pointers
   drop constraint if exists followup_flow_pointers_surface_check;
 
--- ⚠️ O CONJUNTO JÁ INCLUI 'cadence' (migration 9016). Este bloco é reaplicado
--- em todo update: com o conjunto antigo, a 2ª aplicação num banco que já tem
--- cadência falharia no ADD CONSTRAINT e derrubaria o update inteiro.
+-- ⚠️ O CONJUNTO JÁ INCLUI 'cadence' (9016) E 'campaign' (9037). Este bloco é
+-- reaplicado em todo update: com o conjunto antigo, a 2ª aplicação num banco
+-- que já tem cadência (ou régua de campanha) falharia no ADD CONSTRAINT e
+-- derrubaria o update inteiro.
 alter table public.followup_flow_pointers
   add constraint followup_flow_pointers_surface_check
-  check (surface in ('followup', 'crm_automation', 'atendimento', 'cadence'));
+  check (surface in ('followup', 'crm_automation', 'atendimento', 'cadence', 'campaign'));
 -- 'atendimento' entrou na migration 0394 (roteiro de perguntas no turno, #1130);
--- 'cadence' na 9016 (fork, cadência de prospecção). Bloco ÚNICO desta
--- constraint: nem a 0394 nem a 9023 (que refaz a união na cadeia) a reconstroem
--- no apêndice.
+-- 'cadence' na 9016 (fork, cadência de prospecção); 'campaign' na 9037 (fork,
+-- os passos de uma campanha, do 2º toque em diante). Bloco ÚNICO desta
+-- constraint: nem a 0394, nem a 9023 (que refaz a união na cadeia), nem a 9037
+-- a reconstroem no apêndice — cobrado por
+-- tests/unit/baseline-constraint-reconstruida.test.ts, porque dois blocos
+-- deixariam a tabela sem constraint entre o drop de um e o add do outro.
 
 comment on column public.followup_flow_pointers.surface is
   'Onde o fluxo aparece: followup = /app/ai/followups; crm_automation = CRM Automação; '
   'atendimento = roteiro de perguntas conduzido no turno do agente (módulo opcional, 0394); '
-  'cadence = cadência de prospecção do funil (migration 9016). '
+  'cadence = cadência de prospecção do funil (migration 9016); '
+  'campaign = os passos de uma campanha, do 2º toque em diante (migration 9037). '
   'Vocabulário cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts.';
 
 -- ---- inscrição Web Push (migrations 0197 e 0199) ----
@@ -45462,14 +45478,20 @@ alter table public.followup_flow_pointers
 alter table public.followup_flow_pointers
   add column if not exists cadence_settings jsonb;
 
--- Cadência PUBLICADA tem número, funil e política. Rascunho pode nascer vazio
--- (a tela preenche aos poucos); o que não pode é ir ao ar sem eles.
+-- Régua de prospecção PUBLICADA tem número, funil e política. Rascunho pode
+-- nascer vazio (a tela preenche aos poucos); o que não pode é ir ao ar sem eles.
+--
+-- ⚠️ O PREDICADO JÁ COBRE 'campaign' (migration 9037), pelo mesmo motivo que
+-- cobre 'cadence': `move_stage` precisa do funil, a conversa precisa do número
+-- e `lib/cadencia/envio.ts` recusa enviar sem a política. Bloco ÚNICO desta
+-- constraint — a 9037 não a reconstrói no apêndice (cobrado por
+-- tests/unit/baseline-constraint-reconstruida.test.ts).
 alter table public.followup_flow_pointers
   drop constraint if exists followup_flow_pointers_cadencia_completa;
 alter table public.followup_flow_pointers
   add constraint followup_flow_pointers_cadencia_completa
   check (
-    surface <> 'cadence'
+    surface not in ('cadence', 'campaign')
     or status <> 'active'
     or (
       channel_session_id is not null
@@ -47552,6 +47574,544 @@ end $$;
 -- referência, P2-3) foi editado NO LUGAR, no bloco da 0432/0434/0435 acima.
 
 notify pgrst, 'reload schema';
+
+-- ---- a campanha ganha VARIAÇÕES de mensagem, com spintax {a|b} (migration 9034) ----
+--
+-- `campaigns.message_variants` (text[], default '{}'): as variações EXTRAS da
+-- abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é
+-- determinística pelo contact_id (lib/texto/variacao.ts, o mesmo motor da
+-- cadência), então campanha existente — lista de um item — não muda de
+-- comportamento. Teto por elemento e cardinalidade numa função `immutable`,
+-- porque `check` não aceita subconsulta (mesmo molde da 0329). Ver o cabeçalho
+-- da migration. Idempotente: função com `create or replace`, coluna com
+-- `if not exists`, CHECK com guarda em pg_constraint (nunca `drop`+`add`, que
+-- deixaria a tabela sem a constraint se o update morresse no meio).
+create or replace function public.fn_variacoes_da_campanha_validas(p_variacoes text[])
+returns boolean
+language sql
+immutable
+as $$
+  select p_variacoes is not null
+     and coalesce(cardinality(p_variacoes), 0) <= 5
+     and coalesce((
+       select bool_and(t.v is not null and length(t.v) <= 1000)
+       from unnest(p_variacoes) as t(v)
+     ), true);
+$$;
+
+revoke execute on function public.fn_variacoes_da_campanha_validas(text[]) from public, anon;
+grant execute on function public.fn_variacoes_da_campanha_validas(text[]) to authenticated, service_role;
+
+alter table public.campaigns
+  add column if not exists message_variants text[] not null default '{}'::text[];
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_variacoes_validas'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_variacoes_validas
+      check (public.fn_variacoes_da_campanha_validas(message_variants));
+  end if;
+end $$;
+
+comment on column public.campaigns.message_variants is
+  'Variações EXTRAS da abordagem. A lista efetiva é [message_body, ...message_variants] e a escolha é determinística pelo contact_id (lib/texto/variacao.ts). Vazio = campanha de um texto só. Até 5, 1.000 chars cada (campaigns_variacoes_validas). Migration 9034.';
+
+-- ---- a campanha ganha PASSOS, na régua de follow-up (migration 9037) ----
+--
+-- `campaigns.passos` (jsonb, até 20) guarda a lista do 2º toque em diante e
+-- `campaigns.followup_pointer_id` aponta para a régua publicada como pointer de
+-- follow-up com `surface='campaign'` — a MESMA máquina da cadência (9016), sem
+-- motor novo. A 1ª mensagem continua congelada em `campaign_recipients.rendered_body`
+-- e enviada pelo `campaign-worker`; a inscrição na régua acontece quando ela sai.
+-- Racional completo (incluindo por que a lista mora na campanha e o grafo no
+-- pointer) no cabeçalho da migration.
+--
+-- ⚠️ A INSCRIÇÃO ABRE O CARD NO FUNIL (decisão do dono, 05/10/2026). Campanha
+-- COM passos põe no funil escolhido todo mundo que ela abordar, não só quem
+-- responder: sem card, os passos "mover de etapa" e "etiquetar" não têm negócio
+-- em que agir, falham e matam a inscrição no backoff — e eles existem
+-- justamente para alcançar quem NÃO respondeu. Negócio já aberto do contato
+-- naquele funil é REUSADO. Campanha SEM passos não publica régua, não inscreve
+-- e não cria card nenhum: segue idêntica ao comportamento anterior, com o card
+-- nascendo na resposta. O `lead.created` desses cards vai marcado como criação
+-- em LOTE (`lib/leads/criacao-em-lote.ts`), senão o gatilho "Lead criado"
+-- mandaria uma mensagem proativa por card, no mesmo minuto da abordagem.
+--
+-- As três guardas de escrita da cadência (9020, estreitadas pela 9024) e as duas
+-- funções de vaga do dia (9016) passam a valer para as DUAS superfícies de
+-- prospecção: sem isso, um manager escreveria a régua da campanha direto pela
+-- PostgREST, e o teto do dia devolveria 0 vagas para toda régua de campanha
+-- (nenhum destinatário entraria nela, em silêncio).
+--
+-- ⚠️ ENTRA ANTES DO BLOCO DA VARREDURA anon: cria função.
+-- Idempotente: CHECK de conjunto por drop/add (padrão da coluna `surface` desde
+-- a 9016), colunas e índice com `if not exists`, CHECK de dado e FK com guarda
+-- em `pg_constraint`, funções com `create or replace`.
+
+-- ⚠️ AS DUAS CONSTRAINTS DE SUPERFÍCIE NÃO SÃO RECONSTRUÍDAS AQUI, de propósito.
+-- `followup_flow_pointers_surface_check` (com 'campaign' no conjunto) e
+-- `followup_flow_pointers_cadencia_completa` (com o predicado das duas
+-- superfícies) foram editadas NO LUGAR, nos blocos da 0196 e da 9016 acima —
+-- que são, cada um, o bloco ÚNICO da sua constraint. Um segundo drop+add aqui
+-- deixaria a tabela sem constraint entre o drop deste bloco e o add do outro
+-- numa reaplicação, e `tests/unit/baseline-constraint-reconstruida.test.ts`
+-- reprova exatamente isso. A migration 9037, que roda em transação sobre um
+-- banco já migrado, faz o drop+add normalmente.
+
+create or replace function public.fn_passos_da_campanha_validos(p_passos jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select p_passos is not null
+     and jsonb_typeof(p_passos) = 'array'
+     and jsonb_array_length(p_passos) <= 20
+     and coalesce((
+       select bool_and(
+                    jsonb_typeof(e.v) = 'object'
+                and (e.v ->> 'id') is not null
+                and length(e.v ->> 'id') between 1 and 40
+                and (e.v ->> 'tipo') in ('mensagem', 'espera', 'mover_etapa', 'etiqueta')
+              )
+       from jsonb_array_elements(p_passos) as e(v)
+     ), true);
+$$;
+
+revoke execute on function public.fn_passos_da_campanha_validos(jsonb) from public, anon;
+grant execute on function public.fn_passos_da_campanha_validos(jsonb) to authenticated, service_role;
+
+alter table public.campaigns
+  add column if not exists passos jsonb not null default '[]'::jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_passos_validos'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_passos_validos
+      check (public.fn_passos_da_campanha_validos(passos));
+  end if;
+end $$;
+
+comment on column public.campaigns.passos is
+  'A régua da campanha do 2º toque em diante: lista de {id, tipo} (mensagem | espera | '
+  'mover_etapa | etiqueta), convertida em grafo linear por lib/regua/timeline.ts e publicada '
+  'no pointer de followup_pointer_id. Vazia = campanha de uma mensagem só, idêntica ao '
+  'comportamento anterior à 9037. Até 20 passos (campaigns_passos_validos).';
+
+alter table public.campaigns
+  add column if not exists followup_pointer_id uuid;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_followup_pointer_fk'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_followup_pointer_fk
+      foreign key (organization_id, followup_pointer_id)
+      references public.followup_flow_pointers (organization_id, id)
+      on delete set null (followup_pointer_id);
+  end if;
+end $$;
+
+comment on column public.campaigns.followup_pointer_id is
+  'A régua publicada desta campanha (followup_flow_pointers com surface=campaign). NULL = '
+  'campanha sem passos, ou que nunca foi preparada depois de ganhá-los. Migration 9037.';
+
+create index if not exists campaigns_followup_pointer_id
+  on public.campaigns (organization_id, followup_pointer_id)
+  where followup_pointer_id is not null;
+
+-- Corpos idênticos aos da 9016, com `surface = 'cadence'` → `in ('cadence','campaign')`.
+create or replace function public.fn_cadencia_reservar_inscricoes(p_org uuid, p_pointer uuid, p_n integer)
+returns integer language plpgsql security definer set search_path = public as $cad_vagas$
+declare v_max integer; v_tz text; v_dia date; v_ja integer; v_dar integer;
+begin
+  if p_n is null or p_n < 0 then raise exception 'cadencia_reserva_invalida' using errcode = '22023'; end if;
+  perform pg_advisory_xact_lock(hashtext('cadencia:' || p_pointer::text));
+  select (p.cadence_settings ->> 'max_inscricoes_dia')::integer,
+         coalesce(nullif(o.timezone, ''), 'America/Sao_Paulo')
+    into v_max, v_tz
+    from public.followup_flow_pointers p
+    join public.organizations o on o.id = p.organization_id
+   where p.organization_id = p_org and p.id = p_pointer and p.surface in ('cadence', 'campaign');
+  if v_max is null then return 0; end if;
+  v_dia := (now() at time zone v_tz)::date;
+  select reservadas into v_ja from public.cadencia_inscricoes_do_dia where pointer_id = p_pointer and dia = v_dia;
+  v_dar := greatest(0, least(p_n, v_max - coalesce(v_ja, 0)));
+  if v_dar > 0 then
+    insert into public.cadencia_inscricoes_do_dia (organization_id, pointer_id, dia, reservadas)
+    values (p_org, p_pointer, v_dia, v_dar)
+    on conflict (pointer_id, dia)
+    do update set reservadas = public.cadencia_inscricoes_do_dia.reservadas + excluded.reservadas;
+  end if;
+  return v_dar;
+end; $cad_vagas$;
+
+create or replace function public.fn_cadencia_vagas_de_hoje(p_org uuid, p_pointer uuid)
+returns integer language sql stable security definer set search_path = public as $cad_vagas_hoje$
+  select greatest(0, (p.cadence_settings ->> 'max_inscricoes_dia')::integer - coalesce((
+           select d.reservadas from public.cadencia_inscricoes_do_dia d
+            where d.pointer_id = p.id
+              and d.dia = (now() at time zone coalesce(nullif(o.timezone, ''), 'America/Sao_Paulo'))::date), 0))
+    from public.followup_flow_pointers p
+    join public.organizations o on o.id = p.organization_id
+   where p.organization_id = p_org and p.id = p_pointer and p.surface in ('cadence', 'campaign');
+$cad_vagas_hoje$;
+
+revoke all on function public.fn_cadencia_reservar_inscricoes(uuid, uuid, integer) from public, anon, authenticated;
+grant execute on function public.fn_cadencia_reservar_inscricoes(uuid, uuid, integer) to service_role;
+revoke all on function public.fn_cadencia_vagas_de_hoje(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.fn_cadencia_vagas_de_hoje(uuid, uuid) to service_role;
+
+-- As três guardas da 9020/9024, agora olhando as DUAS superfícies de prospecção.
+-- Esta é a ÚLTIMA definição das três no arquivo: quem procurar o corpo que vale
+-- tem de ler daqui para baixo, não a primeira ocorrência.
+create or replace function public.fn_cadencia_guarda_ponteiro()
+returns trigger language plpgsql security invoker set search_path = public as $cad_gp$
+begin
+  if current_user in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      if new.surface in ('cadence', 'campaign') then
+        raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+      end if;
+    elsif old.surface in ('cadence', 'campaign') or new.surface in ('cadence', 'campaign') then
+      if new.cadence_settings is distinct from old.cadence_settings
+         or new.active_version_id is distinct from old.active_version_id
+         or new.status is distinct from old.status
+         or new.surface is distinct from old.surface
+         or new.channel_session_id is distinct from old.channel_session_id
+         or new.pipeline_id is distinct from old.pipeline_id
+         or new.trigger_config is distinct from old.trigger_config
+         or new.handoff_policy is distinct from old.handoff_policy then
+        raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$cad_gp$;
+revoke all on function public.fn_cadencia_guarda_ponteiro() from public, anon, authenticated;
+
+create or replace function public.fn_cadencia_guarda_versao()
+returns trigger language plpgsql security invoker set search_path = public as $cad_gv$
+begin
+  if current_user in ('authenticated', 'anon')
+     and exists (
+       select 1 from followup_flow_pointers p
+        where p.surface in ('cadence', 'campaign')
+          and p.id in (
+            case when tg_op = 'DELETE' then old.pointer_id else new.pointer_id end,
+            case when tg_op = 'UPDATE' then old.pointer_id end
+          )
+     ) then
+    raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$cad_gv$;
+revoke all on function public.fn_cadencia_guarda_versao() from public, anon, authenticated;
+
+create or replace function public.fn_cadencia_guarda_inscricao()
+returns trigger language plpgsql security invoker set search_path = public as $cad_gi$
+declare
+  v_cadencia boolean;
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+  if tg_op = 'INSERT' then
+    if exists (
+      select 1 from followup_flow_pointers p
+       where p.id = new.pointer_id and p.surface in ('cadence', 'campaign')
+    ) then
+      raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  select exists (
+           select 1 from followup_flow_pointers p
+            where p.id = old.pointer_id and p.surface in ('cadence', 'campaign')
+         )
+      or (tg_op = 'UPDATE' and exists (
+           select 1 from followup_flow_pointers p
+            where p.id = new.pointer_id and p.surface in ('cadence', 'campaign')
+         ))
+    into v_cadencia;
+  if not v_cadencia then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+  if tg_op = 'UPDATE'
+     and new.status = 'cancelled'
+     and old.status in ('active', 'waiting_reply', 'dormente', 'paused_handoff', 'paused_manual')
+     and new.pointer_id = old.pointer_id
+     and new.version_id = old.version_id
+     and new.organization_id = old.organization_id
+     and new.contact_id = old.contact_id
+     and new.current_node_id = old.current_node_id then
+    return new;
+  end if;
+  raise exception 'cadencia_escrita_so_pelo_servidor' using errcode = '42501';
+end;
+$cad_gi$;
+revoke all on function public.fn_cadencia_guarda_inscricao() from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+
+
+-- ---- quem entra na campanha: o modo CONTÍNUO por etapa (migration 9039) ----
+--
+-- `campaigns.entrada_continua` (boolean, default false) e
+-- `campaigns.entrada_etapa_id` (FK composta para `crm_stages`) dão à campanha um
+-- SEGUNDO modo de público: quem CAI na etapa escolhida é abordado, sem o
+-- operador montar lista. O modo LISTA continua o default e intacto — toda
+-- campanha existente nasce com a flag falsa e se comporta exatamente como antes.
+--
+-- Sem motor novo: o gatilho é o MESMO evento `lead.stage_changed` que
+-- `lib/followup/gatilho-etapa.ts` já consome, com consumidor próprio no
+-- dispatcher do `event_log` (idempotência de graça pelo `consumed_by[]`), e o
+-- que ele faz é inserir UMA linha em `campaign_recipients` com o `rendered_body`
+-- já congelado. Daí para frente o `campaign-worker` é bit a bit o caminho da
+-- lista: veto por pessoa revalidado, lista de exclusão, ritmo, rodízio de
+-- números e inscrição na régua (9037). O anti-repetição vem de graça do
+-- `campaign_recipients_contato_unico` que existe desde a 0375: card arrastado
+-- dez vezes para a etapa rende UMA abordagem.
+--
+-- ⚠️ O ESTADO MORA EM `campaigns`, NÃO NO `trigger_config` DO POINTER. Campanha
+-- contínua não precisa de passos, e sem passos não existe pointer (a 9037 até
+-- SOLTA o `followup_pointer_id`): o modo moraria num objeto que desaparece
+-- quando o operador limpa os passos, e a campanha seguiria `running` sem abordar
+-- ninguém, sem erro em tela. E o `trigger_config` do pointer descreve como se
+-- entra na RÉGUA, onde se entra de um jeito só (a 1ª mensagem saiu): escrever
+-- `stage_change` ali armaria uma SEGUNDA porta para o mesmo pointer, que é o
+-- modo de falha de `lib/followup/superficies.ts`.
+--
+-- ⚠️ TETO DIÁRIO E JANELA SÃO CONSTRAINT no modo contínuo, não configuração. No
+-- modo lista o volume do dia é limitado por algo que um humano olhou (o recorte
+-- tem `limite`, e o operador leu o número antes de apertar). No contínuo não há
+-- lista, não há número para olhar e não há o instante "antes de apertar": o teto
+-- é a única coisa que limita quantos estranhos recebem mensagem por dia, e a
+-- janela a única que impede que recebam às três da manhã.
+-- Rascunho é EXCETUADO (`status = 'draft'`), como o pointer não-`active` em
+-- `followup_flow_pointers_cadencia_completa`: sem isso, marcar o modo antes de
+-- digitar o teto daria 23514 no SALVAR e prenderia o operador num rascunho
+-- impossível de corrigir. A contenção morde na saída do rascunho.
+--
+-- ⚠️ FUNIL E ETAPA FICAM FORA DO CHECK, de propósito. As FKs são
+-- `on delete set null (coluna)` pelo P2-3 do @Cassio_SecRev na 9032; um CHECK
+-- que os exigisse faria o DELETE do funil ou da etapa falhar com 23514 —
+-- reintroduzindo por outro caminho o defeito que a 9032 consertou. Quem os exige
+-- é o gate de `lib/campanhas/acoes.ts`, e a falha é FECHADA: sem etapa o gatilho
+-- não casa nada (compara `entrada_etapa_id = to_stage_id`, e nulo não casa).
+--
+-- Idempotente: colunas com `if not exists`, CHECK e FK com guarda em
+-- `pg_constraint`, índice com `if not exists`. Nenhuma função nova, então este
+-- bloco não precisaria vir antes da VARREDURA anon — vem por ordem de leitura,
+-- ao lado do bloco da 9037, de que ele é a continuação.
+
+alter table public.campaigns
+  add column if not exists entrada_continua boolean not null default false;
+
+comment on column public.campaigns.entrada_continua is
+  'false (default) = modo LISTA: o público é o snapshot congelado na preparação, como em toda '
+  'campanha anterior à 9039. true = modo CONTÍNUO: quem entra na etapa de entrada_etapa_id é '
+  'abordado por esta campanha, uma linha de campaign_recipients por chegada, pelo gatilho '
+  'lib/campanhas/entrada-por-etapa.ts. O modo é escolha explícita do operador e SOBREVIVE ao '
+  'DELETE da etapa (que só anula entrada_etapa_id): campanha contínua sem etapa para de '
+  'abordar, em vez de virar campanha de lista vazia e ser concluída em silêncio. Migration 9039.';
+
+alter table public.campaigns
+  add column if not exists entrada_etapa_id uuid;
+
+comment on column public.campaigns.entrada_etapa_id is
+  'A etapa do funil que arma a entrada contínua (crm_stages). Lida só quando entrada_continua; '
+  'NULL com o modo ligado = a etapa foi apagada, e o gatilho não casa nada (falha fechada). '
+  'Não é a mesma coisa que stage_id, que é onde o CARD de quem foi abordado nasce (0378/9037): '
+  'aqui é de onde a pessoa VEM. Migration 9039.';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_entrada_etapa_org_fk'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_entrada_etapa_org_fk
+      foreign key (organization_id, entrada_etapa_id)
+      references public.crm_stages (organization_id, id)
+      on delete set null (entrada_etapa_id);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_entrada_continua_contida'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_entrada_continua_contida
+      check (
+        not entrada_continua
+        or status = 'draft'
+        or (
+          teto_diario is not null
+          and janela_inicio_hora is not null
+          and janela_fim_hora is not null
+        )
+      );
+  end if;
+end $$;
+
+-- Toda mudança de etapa do CRM pergunta "alguma campanha contínua está armada
+-- nesta etapa?". Sem índice, isso é varredura de `campaigns` a cada card
+-- arrastado. Parcial pela flag: o índice só carrega as poucas contínuas.
+create index if not exists campaigns_entrada_por_etapa
+  on public.campaigns (organization_id, entrada_etapa_id)
+  where entrada_continua and entrada_etapa_id is not null;
+
+notify pgrst, 'reload schema';
+
+-- ---- quando a régua da campanha para de falar com uma pessoa (migration 9046) ----
+--
+-- `campaigns.saidas` guarda a escolha do operador no MESMO formato de
+-- `followup_flow_pointers.cadence_settings.saidas` (`saidasDaCadenciaSchema`):
+-- etiquetas, etapas do funil, "negócio ganho ou perdido" e "alguém do time
+-- assumiu". Os desfechos não são novos — `lib/cadencia/saidas.ts` já os executa,
+-- e esta migration não o toca. O que era fixo no código e passa a ser escolha é
+-- QUAIS deles valem para a campanha: `lib/campanhas/regua-politica.ts` publicava
+-- o literal `{etiquetas: [], etapas: [], ao_fechar: true, humano_assumir: true}`.
+--
+-- NULO = o operador nunca abriu a seção, e `lerSaidasDaCampanha` o lê como
+-- exatamente esse literal. Por isso não há `not null default`: o default daria o
+-- mesmo comportamento e apagaria a diferença entre "configurada" e "herdou", que
+-- é a pergunta de quem audita por que alguém parou de receber.
+--
+-- CHECK raso de propósito (só `jsonb_typeof = 'object'`), diferente da função
+-- `immutable` da 9034/9037, e a razão é a DIREÇÃO DE FALHA DO LEITOR. NÃO é "o
+-- Zod da rota já cobre", que seria falso e levaria a próxima pessoa a dispensar
+-- um CHECK que era a única tranca: `service_role` pela PostgREST não passa por
+-- Zod nenhum. `passosGuardados` falha ABERTA (jsonb inválido vira lista vazia),
+-- então lá o CHECK é a ÚNICA tranca do valor e tem de ser fundo;
+-- `lerSaidasDaCampanha` falha FECHADA (o que o Zod não lê vira recusa, não
+-- padrão), então aqui o valor mal formado já para em TypeScript e o CHECK fica
+-- com o que só ele garante: a FORMA, inclusive contra `service_role`.
+--
+-- Ele barra array, string e número, e DEIXA PASSAR o objeto com campo errado, de
+-- propósito: é esse caso que `duplicarAcao` copia como está, para a cópia herdar
+-- a recusa em vez de virar o padrão por conta própria. Endurecer este CHECK
+-- quebraria a herança (a cópia passaria a levar 23514 no INSERT), e o invariante
+-- tem um caso que prova que o objeto ilegível é aceito.
+--
+-- Cria FUNÇÃO nenhuma, então este bloco não tem posição obrigatória em relação à
+-- VARREDURA anon. Fica aqui, ao lado dos outros blocos de coluna de `campaigns`
+-- (9037, 9039), que é onde quem procura vai olhar. Idempotente: coluna com
+-- `if not exists` e CHECK com guarda em `pg_constraint` (nunca drop+add, que
+-- deixaria a tabela sem a constraint se o update morresse no meio).
+
+alter table public.campaigns
+  add column if not exists saidas jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'campaigns_saidas_validas'
+       and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_saidas_validas
+      check (saidas is null or jsonb_typeof(saidas) = 'object');
+  end if;
+end $$;
+
+comment on column public.campaigns.saidas is
+  'Quando a régua da campanha PARA de falar com uma pessoa, no vocabulário de '
+  'cadence_settings.saidas: {etiquetas: text[], etapas: uuid[], ao_fechar: bool, '
+  'humano_assumir: bool}. NULL = o operador nunca escolheu, e vale o padrão '
+  '{[], [], true, true} — byte a byte o literal que lib/campanhas/regua-politica.ts '
+  'publicava antes da 9046, então campanha existente não muda de comportamento. '
+  'Publicada em followup_flow_pointers.cadence_settings ao preparar/iniciar; a régua '
+  'no ar segue o SNAPSHOT, não esta coluna. Jsonb que o Zod de saidasDaCadenciaSchema '
+  'não lê PARA a régua (recusa no salvar, no gate de faltaParaEnviar e na publicação), '
+  'nunca cai no padrão. Migration 9046.';
+
+notify pgrst, 'reload schema';
+
+-- ---- a memória de que o negócio já foi fechado (migration 9040) ----
+--
+-- `crm_leads.fechado_alguma_vez_em` guarda QUANDO o negócio foi fechado pela
+-- primeira vez, e o gatilho `fn_crm_lead_close_on_stage` — redefinido acima, no
+-- corpo que o banco usa, igual ao que a 0426 fez com ele — passa a preenchê-la na
+-- transição para ganho ou perda, sem NUNCA limpá-la na reabertura.
+--
+-- O buraco que isto tampa: o próprio gatilho apaga `closed_at` e
+-- `lost_from_stage_id` quando reabre o negócio, e depois disso ele é
+-- indistinguível de um que nunca fechou. O veto por `from_stage_id` da 9039 fecha
+-- o salto de UM arrasto («Ganho» → etapa armada); não fecha o de DOIS («Ganho» →
+-- «Novo lead», depois «Novo lead» → etapa armada), que é triagem normal — no
+-- segundo evento a etapa de origem é aberta, o status já é `open` e nada na linha
+-- lembra do fechamento. Resultado: um cliente que comprou em março recebendo a
+-- copy de PRIMEIRO contato em outubro.
+--
+-- Por que coluna e não `event_log`: `fn_podar_event_log` (9021) apaga `done`/`dead`
+-- em 120 dias (piso de 90), então o `lead.won` de março não existe em outubro — um
+-- veto apoiado nele funcionaria nos testes e nos primeiros meses e passaria a
+-- falhar sozinho, em silêncio, justamente nos clientes mais antigos.
+--
+-- `lost_reason` sobrevive à reabertura (o CHECK só o exige quando `status='lost'`
+-- e ninguém o limpa) e cobre a PERDA, inclusive a histórica, que nenhum backfill
+-- alcança. `won_reason` é opcional, e por isso não serve para o ganho.
+--
+-- Sem CHECK (um CHECK que exigisse a coluna faria o DELETE de etapa ou funil
+-- falhar, pela lição da 9032) e sem índice novo: a leitura é pela PK do negócio,
+-- dentro da consulta que a 9039 já fazia.
+--
+-- Idempotente: coluna com `if not exists`, backfill com
+-- `where fechado_alguma_vez_em is null` (reaplicar não reescreve data nenhuma).
+
+alter table public.crm_leads
+  add column if not exists fechado_alguma_vez_em timestamptz;
+
+comment on column public.crm_leads.fechado_alguma_vez_em is
+  'QUANDO este negócio foi fechado (ganho ou perdido) pela PRIMEIRA vez. Preenchida por '
+  'fn_crm_lead_close_on_stage e NUNCA limpa na reabertura — é a única memória de que o '
+  'negócio já fechou, porque o mesmo gatilho apaga closed_at e lost_from_stage_id ao reabrir. '
+  'Quem está fechado AGORA se lê em status; esta coluna responde "já foi fechado alguma vez?". '
+  'Lida pela entrada contínua da campanha (9039), para não abordar quem já comprou com a copy '
+  'de primeiro contato. Migration 9040.';
+
+-- Quem está fechado AGORA já foi fechado. `closed_at` quando existe (é a data
+-- real), `updated_at` como piso quando não — aproximação declarada, e o veto só
+-- pergunta "já foi fechado?", nunca quando. Quem REABRIU antes desta migration
+-- não tem como ser recuperado: a perda desses segue coberta por `lost_reason`, o
+-- funil `novo_negocio` por `retomado_de_lead_id` (0425, que é muito anterior), e o
+-- GANHO reaberto em `mesmo_registro` fica de fora, conscientemente.
+--
+-- ⚠️ Este UPDATE dispara `trg_crm_leads_updated_at`: "última modificação" de todo
+-- negócio fechado vira o instante da aplicação, e aba já aberta com card fechado
+-- leva um 409 de edição concorrente no primeiro arrasto (recarregar resolve).
+-- `closed_at` segue intacto e é ele que data o fechamento. Racional e a
+-- recomendação de aplicar fora do horário comercial estão no cabeçalho da
+-- migration 9040.
+update public.crm_leads
+   set fechado_alguma_vez_em = coalesce(closed_at, updated_at)
+ where status in ('won', 'lost')
+   and fechado_alguma_vez_em is null;
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

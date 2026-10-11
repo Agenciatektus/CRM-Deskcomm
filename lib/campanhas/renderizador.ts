@@ -27,6 +27,14 @@
  * fechado de resolvedores.
  */
 
+import {
+  VARIANTE_TAMANHO_MAXIMO,
+  escolherVariante,
+  geradorDe,
+  resolverSpintax,
+  spintaxValido,
+} from "@/lib/texto/variacao";
+
 import { horaNoFuso } from "./relogio";
 
 /** As variáveis que existem. Oferecer uma que não resolve é prometer dado que não há. */
@@ -46,7 +54,17 @@ export interface ValoresDoDestinatario {
   nome: string | null;
 }
 
-const TOKEN = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+/**
+ * `{{variavel}}` e `{{variavel|texto se faltar}}`.
+ *
+ * O `|` entrou por PARIDADE com a cadência (`lib/cadencia/render.ts`), e a razão
+ * é o operador, não a simetria: ele aprende `{{primeiro_nome|tudo bem}}` lá e
+ * escreve o mesmo aqui. Enquanto o pipe não era lido, `{{nome|lojista}}` não
+ * casava este TOKEN — logo não entrava em `faltando` NEM em `desconhecidas` — e
+ * saía LITERAL no WhatsApp, sem nada avisando. A caixa nova ainda ensina `{a|b}`
+ * logo ao lado, o que torna o engano provável em vez de teórico.
+ */
+const TOKEN = /\{\{\s*([a-zA-Z0-9_]+)\s*(?:\|([^}]*))?\}\}/g;
 
 export interface TextoRenderizado {
   texto: string;
@@ -54,6 +72,12 @@ export interface TextoRenderizado {
   faltando: VariavelDaCampanha[];
   /** Tokens que não são variáveis conhecidas — ficam literais, como no Inbox. */
   desconhecidas: string[];
+  /**
+   * O texto ficou VAZIO depois de renderizar — `{Olá|}` cai aqui na metade das
+   * sementes. Quem chama trata como falta e pula a pessoa: mensagem em branco
+   * sai do mesmo jeito pelo WhatsApp e é pior que não mandar nada.
+   */
+  vazio: boolean;
 }
 
 export function renderizar(
@@ -65,16 +89,20 @@ export function renderizar(
   const faltando = new Set<VariavelDaCampanha>();
   const desconhecidas = new Set<string>();
 
-  const texto = template.replace(TOKEN, (literal, bruto: string) => {
+  const texto = template.replace(TOKEN, (literal, bruto: string, fallback?: string) => {
     const chave = bruto.toLowerCase();
+    // O fallback cobre a falta ANTES de ela virar exclusão: quem escreveu
+    // `{{primeiro_nome|tudo bem}}` já disse o que quer no lugar do nome.
+    const semValor = (variavel: VariavelDaCampanha) =>
+      fallback !== undefined ? fallback.trim() : marcarFalta(faltando, variavel, literal);
     switch (chave) {
       case "nome": {
-        if (nome === "") return marcarFalta(faltando, "nome", literal);
+        if (nome === "") return semValor("nome");
         return nome;
       }
       case "primeiro_nome": {
         const primeiro = nome.split(/\s+/)[0] ?? "";
-        if (primeiro === "") return marcarFalta(faltando, "primeiro_nome", literal);
+        if (primeiro === "") return semValor("primeiro_nome");
         return primeiro;
       }
       case "saudacao": {
@@ -90,7 +118,18 @@ export function renderizar(
     }
   });
 
-  return { texto, faltando: [...faltando], desconhecidas: [...desconhecidas] };
+  // GUARD DE NÃO-VAZIO — paridade com `lib/cadencia/render.ts`, que já o tinha
+  // e que a extração do motor deixou de fora. Medido pelo @Cassio_SecRev: com
+  // `{Olá|}` (um pipe sobrando), 139 de 300 sementes rendiam string vazia, o
+  // `rendered_body` era congelado em branco e o envio seguia — nenhuma das
+  // quatro camadas de validação via, porque o texto É spintax válido e nenhuma
+  // variável faltou.
+  return {
+    texto,
+    faltando: [...faltando],
+    desconhecidas: [...desconhecidas],
+    vazio: texto.trim() === "",
+  };
 }
 
 function marcarFalta(
@@ -100,6 +139,24 @@ function marcarFalta(
 ): string {
   destino.add(variavel);
   return literal;
+}
+
+/**
+ * A ÚLTIMA passada sobre o corpo já congelado: troca só `{{saudacao}}`.
+ *
+ * Existe porque o despacho precisa da saudação da hora do ENVIO, e o corpo que
+ * ele tem na mão já passou pelo render na preparação — com o nome do contato
+ * dentro. Rodar `renderizar` inteiro de novo ali relê esse texto como template,
+ * e um cadastro chamado `Loja {{saudacao}}` virava `Loja Boa tarde` no WhatsApp:
+ * dado de cliente executado como comando, que é exatamente o que a ordem
+ * "spintax antes das variáveis" existe para impedir no resto do caminho.
+ *
+ * Com regex dedicada, nada mais do corpo é reinterpretado.
+ */
+export function resolverSaudacao(congelado: string, quando: { agora: Date; fuso: string }): string {
+  return congelado.replace(/\{\{\s*saudacao\s*(?:\|[^}]*)?\}\}/gi, () =>
+    saudacaoDaHora(quando.agora, quando.fuso),
+  );
 }
 
 /** Quais variáveis um texto usa — para a tela avisar antes, não depois. */
@@ -125,4 +182,91 @@ export function saudacaoDaHora(agora: Date, fuso: string): string {
   if (hora < 12) return "Bom dia";
   if (hora < 18) return "Boa tarde";
   return "Boa noite";
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * VARIAÇÕES DA MESMA ABORDAGEM
+ *
+ * ═══ Por que variação, e por que determinística ═══
+ *
+ * Quinhentas pessoas recebendo o MESMO texto, do mesmo número, na mesma tarde, é
+ * o padrão que o WhatsApp mede. As variações quebram o padrão sem mentir sobre o
+ * conteúdo: são textos que o operador escreveu, não geração automática.
+ *
+ * A escolha é por PESSOA (semente = `contact_id`), não por sorteio a cada
+ * passada. Duas consequências, e as duas são o ponto:
+ *   * a prévia mostra o que vai sair, porque é a mesma conta;
+ *   * repreparar a campanha dá a MESMA variação à mesma pessoa — quem reabre a
+ *     lista não vê o texto de todo mundo trocar de lugar sem motivo.
+ *
+ * ═══ A lista efetiva é `[message_body, ...message_variants]` ═══
+ *
+ * O corpo principal continua sendo o `message_body`, com o CHECK de não-vazio e
+ * o teto de 4.096 do banco. As variações são EXTRAS. Campanha que nunca abriu
+ * esta seção tem lista de um item e se comporta exatamente como antes —
+ * `escolherVariante` devolve 0 para total 1, sem hash nenhum.
+ *
+ * ═══ Spintax é do TEXTO, variável é da PESSOA ═══
+ *
+ * `{a|b}` quebrado (chave sem fechar, aninhado demais) não é "falta um dado
+ * deste contato": é a campanha que não pode sair, e tratá-lo como exclusão
+ * individual pintaria a lista inteira de `variavel_ausente` — motivo errado na
+ * tela do operador. Por isso `spintaxDasVariantes` existe separado e é cobrado
+ * ANTES da preparação (`lib/campanhas/acoes.ts`, `preparacao.ts`).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Quantas variações EXTRAS cabem além do corpo principal. */
+export const MAX_VARIACOES_EXTRAS = 5;
+
+export { VARIANTE_TAMANHO_MAXIMO };
+
+/**
+ * A lista efetiva de variantes. Extra em branco é DESCARTADA: a tela deixa abrir
+ * uma aba vazia, e uma variante vazia escolhida por hash mandaria mensagem sem
+ * texto para um quinto da lista.
+ */
+export function variantesDaCampanha(
+  corpo: string | null | undefined,
+  extras: readonly (string | null)[] | null | undefined,
+): string[] {
+  const alternativas = (extras ?? [])
+    .map((v) => (v ?? "").trim())
+    .filter((v) => v !== "")
+    .slice(0, MAX_VARIACOES_EXTRAS);
+  return [corpo ?? "", ...alternativas];
+}
+
+export interface VariacaoRenderizada extends TextoRenderizado {
+  /** Qual variante saiu — vai para `campaign_recipients.variables.variante_index`. */
+  varianteIndex: number;
+}
+
+/**
+ * Escolhe a variante desta pessoa, gira o spintax e troca as variáveis — nesta
+ * ordem, para que valor de cadastro nunca seja reinterpretado como template.
+ *
+ * `semente` é o `contact_id`. Spintax inválido NÃO é mascarado aqui: o texto
+ * bruto segue para a troca de variáveis (a prévia mostra as chaves como o
+ * operador as escreveu) e quem barra o envio é a cobrança de
+ * `spintaxDasVariantes` na preparação.
+ */
+export function renderizarVariacao(entrada: {
+  variantes: readonly string[];
+  semente: string;
+  valores: ValoresDoDestinatario;
+  quando?: { agora: Date; fuso: string };
+}): VariacaoRenderizada {
+  const lista = entrada.variantes.length > 0 ? entrada.variantes : [""];
+  const varianteIndex = escolherVariante(entrada.semente, lista.length);
+  const bruta = lista[varianteIndex] ?? "";
+  // Sem `slice` no teto: o corpo principal aceita 4.096 no banco, e cortar aqui
+  // mutilaria em silêncio a campanha longa que já existe. O teto de 1.000 é das
+  // variações EXTRAS e é cobrado onde elas entram (Zod + CHECK da 9034).
+  const girada = resolverSpintax(bruta, geradorDe(`spintax:${entrada.semente}`));
+  return { ...renderizar(girada ?? bruta, entrada.valores, entrada.quando), varianteIndex };
+}
+
+/** Índices (na lista efetiva) das variantes cujo `{a|b}` não resolve. Vazio = pode. */
+export function spintaxDasVariantes(variantes: readonly string[]): number[] {
+  return variantes.map((v, i) => (spintaxValido(v) ? -1 : i)).filter((i) => i >= 0);
 }

@@ -34,7 +34,10 @@ export const dynamic = "force-dynamic";
 const COLUNAS_DA_LISTA =
   "id, name, status, channel_session_id, snapshot_total, snapshot_eligible, snapshot_excluded, " +
   "scheduled_at, started_at, completed_at, cancelled_at, created_at, created_by, " +
-  "pipeline_id, stage_id, agent_id";
+  // `entrada_continua` vai na LISTA (9039) porque "Na lista: 0" numa campanha
+  // contínua se lê como campanha quebrada: sem o modo, a tela não tem como
+  // explicar o zero.
+  "pipeline_id, stage_id, agent_id, passos, entrada_continua";
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
@@ -136,9 +139,29 @@ export async function POST(req: NextRequest): Promise<Response> {
       description: entrada.description ?? null,
       channel_session_id: entrada.channel_session_id,
       message_body: entrada.message_body ?? null,
+      // Vazio, e não `null`: a coluna é `not null default '{}'` (9034) e a
+      // campanha de um texto só é o caso comum.
+      message_variants: entrada.message_variants ?? [],
       base_legal: entrada.base_legal,
       lia_ref: entrada.lia_ref ?? null,
       audience_filter: entrada.audience_filter ?? FILTRO_VAZIO,
+      // Vazio, e não `null`: a coluna é `not null default '[]'` (9037), e
+      // campanha de uma mensagem só é o caso comum.
+      passos: entrada.passos ?? [],
+      // `null`, e não o objeto do padrão: nulo é "o operador nunca abriu esta
+      // seção", e é o que `lerSaidasDaCampanha` lê como o padrão de sempre
+      // (9046). Gravar o padrão aqui daria o MESMO comportamento e perderia a
+      // distinção — e com ela a resposta a "esta campanha foi configurada, ou
+      // herdou?" na hora de auditar por que alguém parou de receber.
+      saidas: entrada.saidas ?? null,
+      // O MODO DE PÚBLICO (migration 9039). `false` por omissão: campanha criada
+      // por quem não abriu essa seção nasce em modo LISTA, idêntica ao que
+      // sempre foi. O que o modo contínuo exige (funil, etapa, teto do dia,
+      // janela) NÃO é cobrado aqui — a campanha nasce em RASCUNHO, e rascunho
+      // pode estar incompleto; o CHECK da 9039 excetua `draft` pelo mesmo
+      // motivo. Quem cobra é o gate de `faltaParaEnviar`, no Preparar.
+      entrada_continua: entrada.entrada_continua ?? false,
+      entrada_etapa_id: entrada.entrada_etapa_id ?? null,
       intervalo_segundos: entrada.intervalo_segundos ?? null,
       janela_inicio_hora: entrada.janela_inicio_hora ?? null,
       janela_fim_hora: entrada.janela_fim_hora ?? null,

@@ -412,6 +412,15 @@ export async function createLeadHandler(
      */
     via_planilha?: boolean;
     /**
+     * Interno — a MESMA marca de `via_planilha`, agora dizível por nome
+     * (migration 9037). Criação em LOTE tem de chegar marcada ao
+     * `lead.created`, senão o gatilho "Lead criado" manda uma mensagem
+     * proativa por card: a planilha já tinha esse buraco tampado, e a campanha
+     * com passos abriria o mesmo (500 cards de uma vez). Valores em
+     * `lib/leads/criacao-em-lote.ts`. Não vem do corpo da requisição.
+     */
+    via?: string;
+    /**
      * Interno (clone para outro funil, pela tela ou pela automação). O dono veio
      * do negócio de ORIGEM, não de quem pediu: se ele não pode mais ser dono
      * (desligado, virou viewer, agente arquivado), o clone nasce sem dono e a
@@ -583,7 +592,9 @@ export async function createLeadHandler(
       p_metadata: {
         request_id: ctx.requestId,
         ...a.metadataActor,
-        ...(input.via_planilha ? { via: ORIGEM_DA_PLANILHA } : {}),
+        // `via_planilha` continua valendo (é o que a importação passa) e
+        // ganha precedência sobre `via`: quem manda os dois está importando.
+        ...(input.via_planilha ? { via: ORIGEM_DA_PLANILHA } : input.via ? { via: input.via } : {}),
       },
       p_organization_id: ctx.organization_id,
     })
@@ -857,6 +868,19 @@ export interface MoveLeadAdminInput {
    * (issue #1536) — espelho do `lost_reason`, mesma disciplina de escrita.
    */
   won_reason?: string | null;
+  /**
+   * COMO este movimento nasceu, para quem reage ao `lead.stage_changed` poder
+   * decidir se reage (migration 9039). Vai para `metadata.via` do evento, e
+   * nunca para coluna nenhuma de `crm_leads` — a mesma separação de `input.via`
+   * em `createLeadHandler`: `source` diz de onde o NEGÓCIO veio, `metadata.via`
+   * diz COMO a linha mudou, e só quem decide reagir o lê.
+   *
+   * Hoje o único valor é `ORIGEM_DO_PASSO_DE_REGUA`
+   * (`lib/leads/movimento-em-regua.ts`), que a entrada contínua da campanha lê
+   * para não reagir ao movimento da própria régua. Ausente = movimento comum, e
+   * é o que todo chamador de hoje continua sendo.
+   */
+  via?: string;
 }
 
 export async function moveLeadHandler(
@@ -1073,7 +1097,14 @@ export async function moveLeadHandler(
         // aqui. Ler a releitura do fim seria amarrar este evento à ordem dela.
         status: (updated as { status: string }).status,
       },
-      p_metadata: { request_id: ctx.requestId, ...a.metadataActor },
+      // `via` só entra quando quem move a declara: `{ via: undefined }` viraria
+      // a chave presente com valor nulo no jsonb, e um consumidor que teste
+      // `'via' in metadata` passaria a ver marca onde não há.
+      p_metadata: {
+        request_id: ctx.requestId,
+        ...a.metadataActor,
+        ...(input.via ? { via: input.via } : {}),
+      },
       p_organization_id: lead.organization_id,
     })
     .then(({ error }) => {

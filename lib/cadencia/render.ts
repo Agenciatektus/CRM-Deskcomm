@@ -25,10 +25,32 @@
  * pior que nada saindo). Com `{{primeiro_nome|tudo bem}}` o fallback cobre.
  */
 
-/** Teto de aninhamento do spintax — `{a|{b|{c|d}}}` já é o máximo razoável. */
-export const SPINTAX_PROFUNDIDADE_MAXIMA = 3;
-/** Teto de tamanho de UMA variante, antes do render. */
-export const VARIANTE_TAMANHO_MAXIMO = 1000;
+import {
+  VARIANTE_TAMANHO_MAXIMO,
+  escolherVariante,
+  geradorDe,
+  resolverSpintax,
+} from "@/lib/texto/variacao";
+
+/**
+ * O motor determinístico (hash, escolha da variante, spintax) mora em
+ * `lib/texto/variacao.ts`: a CAMPANHA usa o mesmo, e cópia de motor
+ * determinístico é o anti-pattern caro — consertado num lado, o mesmo
+ * `{a|{b|c}}` sairia diferente no outro. O que fica aqui é o que é da cadência:
+ * o vocabulário de variáveis e a regra de "variável sem valor falha alto".
+ *
+ * Os nomes são REEXPORTADOS porque eram o contrato público deste módulo
+ * (`validar-publicacao.ts`, `settings.ts`, `PassoMensagem.tsx`, `followup/engine.ts`
+ * importam daqui) — mudar quinze imports para provar que o motor se mudou de
+ * casa seria diff sem informação.
+ */
+export {
+  SPINTAX_PROFUNDIDADE_MAXIMA,
+  VARIANTE_TAMANHO_MAXIMO,
+  escolherVariante,
+  hashEstavel,
+  resolverSpintax,
+} from "@/lib/texto/variacao";
 
 /** Variáveis que o operador pode usar. A lista É o contrato: nome fora dela não renderiza. */
 export const VARIAVEIS_DA_CADENCIA = [
@@ -45,95 +67,6 @@ export type ValoresDaCadencia = Partial<Record<VariavelDaCadencia, string | null
 export type RenderDaCadencia =
   | { ok: true; texto: string; varianteIndex: number }
   | { ok: false; varianteIndex: number; faltando: string[]; motivo: "variavel_sem_valor" | "variavel_desconhecida" | "spintax_invalido" };
-
-/**
- * FNV-1a 32 bits — hash estável entre processos e versões do Node (ao contrário
- * de qualquer coisa baseada em `Math.random` ou na ordem de um Map).
- */
-export function hashEstavel(texto: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < texto.length; i += 1) {
-    h ^= texto.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
-
-/** Gerador determinístico a partir de uma semente — cada chamada avança o estado. */
-function geradorDe(semente: string): () => number {
-  let estado = hashEstavel(semente) || 1;
-  return () => {
-    // xorshift32
-    estado ^= estado << 13;
-    estado >>>= 0;
-    estado ^= estado >>> 17;
-    estado ^= estado << 5;
-    estado >>>= 0;
-    return estado / 0x100000000;
-  };
-}
-
-/** Índice da variante para esta semente. `total` >= 1. */
-export function escolherVariante(semente: string, total: number): number {
-  if (total <= 1) return 0;
-  return hashEstavel(`variante:${semente}`) % total;
-}
-
-/**
- * Resolve `{a|b|c}` (com aninhamento) escolhendo com o gerador. Chaves duplas
- * `{{…}}` são VARIÁVEIS e passam intactas para a passada seguinte.
- * Devolve `null` quando o texto é inválido (chave sem fechar, profundo demais).
- */
-export function resolverSpintax(texto: string, rng: () => number): string | null {
-  let pos = 0;
-
-  function lerAte(fechamento: boolean, profundidade: number): string[] | null {
-    // Devolve as ALTERNATIVAS do grupo corrente (uma só quando fora de grupo).
-    const alternativas: string[] = [];
-    let atual = "";
-    while (pos < texto.length) {
-      const ch = texto[pos]!;
-      const prox = texto[pos + 1];
-      if (ch === "{" && prox === "{") {
-        // Variável: copia até `}}` sem interpretar.
-        const fim = texto.indexOf("}}", pos + 2);
-        if (fim === -1) return null;
-        atual += texto.slice(pos, fim + 2);
-        pos = fim + 2;
-        continue;
-      }
-      if (ch === "{") {
-        if (profundidade >= SPINTAX_PROFUNDIDADE_MAXIMA) return null;
-        pos += 1;
-        const grupo = lerAte(true, profundidade + 1);
-        if (grupo === null) return null;
-        const escolhida = grupo[Math.floor(rng() * grupo.length)] ?? "";
-        atual += escolhida;
-        continue;
-      }
-      if (ch === "}") {
-        if (!fechamento) return null; // fecha sem abrir
-        pos += 1;
-        alternativas.push(atual);
-        return alternativas;
-      }
-      if (ch === "|" && fechamento) {
-        alternativas.push(atual);
-        atual = "";
-        pos += 1;
-        continue;
-      }
-      atual += ch;
-      pos += 1;
-    }
-    if (fechamento) return null; // abriu e não fechou
-    alternativas.push(atual);
-    return alternativas;
-  }
-
-  const resultado = lerAte(false, 0);
-  return resultado === null ? null : resultado[0]!;
-}
 
 const PADRAO_VARIAVEL = /\{\{\s*([a-z_]+)\s*(?:\|([^}]*))?\}\}/g;
 

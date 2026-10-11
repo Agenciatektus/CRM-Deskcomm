@@ -58,8 +58,29 @@ export function saidasDe(settings: unknown): SaidasDaCadencia {
 }
 
 export interface FatosDaSaida {
-  /** `null` quando o negócio não existe mais (apagado): conta como fechado. */
+  /** `null` quando o negócio não existe (apagado, ou nunca houve) — ver `nasceuComNegocio`. */
   lead: { stage_id: string; status: string; tags: readonly string[] } | null;
+  /**
+   * A INSCRIÇÃO nasceu apontando para um negócio (`followup_enrollments.lead_id`)?
+   *
+   * É o que separa os dois significados de `lead: null`, que até aqui eram o
+   * mesmo e não podiam ser:
+   *
+   *   - nasceu COM negócio e o negócio não está mais lá: foi APAGADO, e isso
+   *     conta como fechado (`saida_negocio_removido`);
+   *   - nasceu SEM negócio: não há nada a concluir sobre negócio, e encerrar por
+   *     "removido" mataria a régua de quem nunca teve card.
+   *
+   * O segundo caso existe por causa da régua de campanha (9037): quando
+   * `abrirNegocio` não consegue criar o card (funil sem etapa de entrada, falha
+   * de banco), a inscrição nasce sem `lead_id` e a régua tem de seguir, porque
+   * ela é o 2º toque de quem já recebeu o 1º.
+   *
+   * Obrigatório, e não opcional com padrão: um default escolheria em silêncio um
+   * dos dois significados para todo produtor novo, e o lado errado encerra
+   * réguas vivas.
+   */
+  nasceuComNegocio: boolean;
   tagsDoContato: readonly string[];
   /** Uma pessoa mandou mensagem ao contato depois da inscrição. */
   humanoFalouDepois: boolean;
@@ -86,16 +107,35 @@ export const OUTCOME_DA_SAIDA: Record<MotivoDeSaida, "converted" | "handoff" | n
 /**
  * A régua deve parar? Devolve o PRIMEIRO motivo, na ordem do mais forte para o
  * mais fraco: o negócio fechado é fato, a etiqueta é marcação.
+ *
+ * ⚠️ SEM NEGÓCIO não é o fim da avaliação. A versão anterior saía da função na
+ * primeira linha quando `lead === null`, e com `ao_fechar` desligado isso
+ * devolvia `null` sem NUNCA olhar se uma pessoa tinha assumido a conversa ou se
+ * o CONTATO tinha etiqueta de saída — dois fatos que não dependem de negócio
+ * nenhum. O freio mais forte da régua ("um humano assumiu, pare de falar
+ * sozinho") ficava inerte.
+ *
+ * ⚠️ E `lead === null` tem DOIS significados, que `nasceuComNegocio` separa:
+ * negócio APAGADO (conta como fechado) e inscrição que nunca teve negócio (nada
+ * a concluir sobre negócio). Tratar os dois como apagado encerraria, dizendo
+ * "o negócio foi fechado", a régua de quem nunca teve card.
+ *
+ * A ordem dos desfechos que já existiam não mudou: com negócio, as mesmas
+ * perguntas na mesma sequência; sem negócio e com `ao_fechar` ligado, o mesmo
+ * `saida_negocio_removido`.
  */
 export function motivoDeSaida(saidas: SaidasDaCadencia, fatos: FatosDaSaida): MotivoDeSaida | null {
   const { lead } = fatos;
-  if (lead === null) return saidas.ao_fechar ? "saida_negocio_removido" : null;
-  if (saidas.ao_fechar && lead.status === "won") return "saida_negocio_ganho";
-  if (saidas.ao_fechar && lead.status === "lost") return "saida_negocio_perdido";
-  if (saidas.etapas.includes(lead.stage_id)) return "saida_etapa";
+  if (lead !== null) {
+    if (saidas.ao_fechar && lead.status === "won") return "saida_negocio_ganho";
+    if (saidas.ao_fechar && lead.status === "lost") return "saida_negocio_perdido";
+    if (saidas.etapas.includes(lead.stage_id)) return "saida_etapa";
+  } else if (saidas.ao_fechar && fatos.nasceuComNegocio) {
+    return "saida_negocio_removido";
+  }
   if (saidas.etiquetas.length > 0) {
     const alvo = new Set(saidas.etiquetas.map(normalizarEtiqueta));
-    const tem = [...lead.tags, ...fatos.tagsDoContato].some((t) => alvo.has(normalizarEtiqueta(t)));
+    const tem = [...(lead?.tags ?? []), ...fatos.tagsDoContato].some((t) => alvo.has(normalizarEtiqueta(t)));
     if (tem) return "saida_etiqueta";
   }
   if (saidas.humano_assumir && fatos.humanoFalouDepois) return "saida_humano_assumiu";

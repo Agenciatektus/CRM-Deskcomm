@@ -20,6 +20,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { patchFollowupFlowSchema } from "@/lib/followup/api-schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
+import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,18 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const patch = parsed.data;
 
+  // A régua de uma campanha é DERIVADA de `campaigns.passos`: editá-la por aqui
+  // produziria um grafo no ar que a tela da campanha não mostra, e o próximo
+  // "preparar" o sobrescreveria sem avisar. Quem edita são os passos.
+  if (existing.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha se edita nos passos dela, na tela da campanha."),
+      422,
+      { requestId },
+    );
+  }
+
   // Cadência editada por esta porta genérica passa pela MESMA regra de gatilho
   // da tela do funil — senão bastava trocar de rota para armar um gatilho que a
   // porta da cadência não implementa, com a cadência no ar.
@@ -154,10 +167,10 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const update: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
 
-  // Cadência só se escreve pelo servidor (migration 9020: gatilho e política de
-  // handoff dela recusam a sessão). Papel, organização e a regra de gatilho da
-  // cadência já foram conferidos acima.
-  const escritor = existing.surface === "cadence" ? createAdminClient() : supabase;
+  // Régua de prospecção só se escreve pelo servidor (9020/9037: gatilho e
+  // política de handoff dela recusam a sessão). Papel, organização e a regra de
+  // gatilho da cadência já foram conferidos acima.
+  const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;
   const { data: updated, error: updErr } = await escritor
     .from("followup_flow_pointers")
     .update(update)
@@ -222,6 +235,20 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     .maybeSingle();
   if (fetchErr) return fail("internal_error", fetchErr.message, 500, { requestId });
   if (!existing) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
+  // ⚠️ RÉGUA DE CAMPANHA NÃO SE APAGA POR AQUI. O DELETE abaixo leva as
+  // `followup_enrollments` em massa, e nelas está a PROVENIÊNCIA de cada
+  // inscrição (por que esta pessoa recebeu o 2º toque, com que base legal, de
+  // qual campanha e de qual destinatário). Apagar isso pela porta genérica
+  // perde o rastro que a prospecção fria precisa ter para ser respondida. A
+  // campanha é apagada pela tela dela, que sabe o que encerrar antes.
+  if (existing.surface === "campaign") {
+    return fail(
+      "cadencia_no_ar",
+      t("A régua de uma campanha pertence à campanha: apague a campanha, não o fluxo."),
+      422,
+      { requestId },
+    );
+  }
   // Escrita pelo client de SERVIÇO, para qualquer fluxo: a migration 9020
   // fecha toda escrita de versão pela sessão (versão é histórico; publicar já
   // era só servidor), e numa cadência também inscrição e ponteiro. O papel

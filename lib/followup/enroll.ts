@@ -15,6 +15,7 @@ import {
   resolveAgentForAutomaticTrigger,
 } from "@/lib/followup/agent-followup-gate";
 import { flowGraphSchema } from "@/lib/followup/graph-schema";
+import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const ENROLLMENT_LIST_COLUMNS =
   "id, pointer_id, version_id, contact_id, status, current_node_id, next_eval_at, outcome, started_at, completed_at, updated_at";
@@ -64,16 +65,21 @@ export async function enrollFollowupFlow(
     };
   }
 
-  // CADÊNCIA NÃO ENTRA POR AQUI. A porta dela é `lib/cadencia/inscrever.ts`,
+  // RÉGUA DE PROSPECÇÃO NÃO ENTRA POR AQUI. A porta é `lib/cadencia/inscrever.ts`,
   // que aplica o que esta não sabe: teto do dia, prévia com confirmação, base
-  // legal, conversa no número da cadência e corte por data de publicação. Esta
+  // legal, conversa no número da régua e corte por data de publicação. Esta
   // função é chamada pela inscrição manual de follow-up e pela ação de automação
-  // (em volume) — deixá-la aceitar cadência era abrir uma segunda porta sem freio.
-  if (pointer.surface === "cadence") {
+  // (em volume) — deixá-la aceitar prospecção era abrir uma segunda porta sem
+  // freio. A régua da CAMPANHA (9037) é ainda mais estreita: quem inscreve nela
+  // é o envio da 1ª mensagem, e só ele.
+  if (ehProspeccao(pointer.surface)) {
     return {
       ok: false,
       code: "cadencia_use_a_tela_do_funil",
-      message: "Cadências de prospecção recebem inscrição pela tela do funil.",
+      message:
+        pointer.surface === "campaign"
+          ? "A régua de uma campanha recebe inscrição quando a 1ª mensagem é enviada."
+          : "Cadências de prospecção recebem inscrição pela tela do funil.",
       status: 422,
     };
   }

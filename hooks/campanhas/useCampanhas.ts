@@ -10,8 +10,14 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import type {
+  CorpoDeCriarCampanha,
+  CorpoDeEditarCampanha,
+} from "@/lib/campanhas/schemas";
 import type { ContagemDaCampanha, TaxasDaCampanha } from "@/lib/campanhas/metricas";
 import type { StatusDaCampanha } from "@/lib/campanhas/tipos";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 
 export interface CampanhaDaLista {
   id: string;
@@ -27,6 +33,13 @@ export interface CampanhaDaLista {
   cancelled_at: string | null;
   created_at: string;
   created_by: string | null;
+  /**
+   * O MODO DE PÚBLICO (migration 9039). Ausente/`false` = LISTA; `true` =
+   * CONTÍNUO, quem entra na etapa de entrada é abordado. Vem já na LISTA porque
+   * "Na lista: 0" numa campanha contínua se lê como campanha quebrada — sem o
+   * modo, a tela não tem como explicar o zero.
+   */
+  entrada_continua?: boolean;
 }
 
 export interface CampanhaDetalhada extends CampanhaDaLista {
@@ -38,6 +51,20 @@ export interface CampanhaDetalhada extends CampanhaDaLista {
   agent_id?: string | null;
   description: string | null;
   message_body: string | null;
+  /** As variações EXTRAS (migration 9034). Vazio = campanha de um texto só. */
+  message_variants?: string[] | null;
+  /** A régua do 2º toque em diante (migration 9037). Vazia = uma mensagem só. */
+  passos?: PassoDaRegua[] | null;
+  /**
+   * QUANDO A RÉGUA PARA (migration 9046). `null` = o operador nunca escolheu, e
+   * vale o padrão — a conversão para o objeto da tela é `saidasDaTela`, uma só,
+   * para a tela não prometer uma política e o servidor publicar outra.
+   */
+  saidas?: SaidasDaCadencia | null;
+  /** O pointer de follow-up publicado para esta campanha (9037). */
+  followup_pointer_id?: string | null;
+  /** A etapa que inicia a abordagem no modo contínuo (9039). */
+  entrada_etapa_id?: string | null;
   base_legal: string;
   lia_ref: string | null;
   audience_filter: Record<string, unknown>;
@@ -181,6 +208,7 @@ export function usePreviaDaAudiencia() {
     mutationFn: async (corpo: {
       audience_filter: Record<string, unknown>;
       message_body: string;
+      message_variants?: string[];
       campaign_id?: string;
     }) => (await apiClient.post<{ data: PreviaDaAudiencia }>("/api/v1/campaigns/preview", corpo)).data,
     onError: (err) => showApiError(err),
@@ -190,7 +218,10 @@ export function usePreviaDaAudiencia() {
 export function useCriarCampanha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (corpo: Record<string, unknown>) =>
+    // Tipado pelo SCHEMA, e não `Record<string, unknown>`: é o que faz a chave
+    // errada e o campo removido virarem erro de compilação em vez de 200 calado
+    // com o campo descartado (parecer do @Cassio_SecRev, P1.1 da fatia 4).
+    mutationFn: async (corpo: CorpoDeCriarCampanha) =>
       (await apiClient.post<{ data: CampanhaDaLista }>("/api/v1/campaigns", corpo)).data,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["campanhas"] }),
     onError: (err) => showApiError(err),
@@ -200,7 +231,7 @@ export function useCriarCampanha() {
 export function useEditarCampanha(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (corpo: Record<string, unknown>) =>
+    mutationFn: async (corpo: CorpoDeEditarCampanha) =>
       (await apiClient.patch<{ data: CampanhaDetalhada }>(`/api/v1/campaigns/${id}`, corpo)).data,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["campanha", id] });

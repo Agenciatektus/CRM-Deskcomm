@@ -90,6 +90,10 @@ describe("fatos da saída (SQL do worker)", () => {
     const fatos = await fatosDaSaidaDaInscricao(pool, GOV_ORG, c.enrollment);
     expect(fatos).toEqual({
       lead: { stage_id: c.stage, status: "open", tags: ["prospectado"] },
+      // O cenário matricula COM `lead_id`, então a inscrição nasceu com
+      // negócio. A forma inteira segue travada: campo novo nos fatos reprova
+      // aqui até alguém dizer quanto ele vale, que é o propósito do invariante.
+      nasceuComNegocio: true,
       tagsDoContato: ["Cliente VIP"],
       humanoFalouDepois: false,
     });

@@ -41,7 +41,8 @@ import {
   contarExclusoes,
   type CandidatoDaAudiencia,
 } from "./elegibilidade";
-import { renderizar } from "./renderizador";
+import { filtroDaEtapaDeEntrada, type EntradaDaCampanha } from "./entrada-continua";
+import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { MotivoDeExclusao } from "./tipos";
 
 export interface ResumoDoSnapshot {
@@ -66,6 +67,8 @@ export async function preverAudiencia(
     organizationId: string;
     filtro: FiltroDeAudiencia;
     corpo: string;
+    /** As variações EXTRAS (o corpo é a primeira variante). */
+    variacoes?: readonly string[];
     agora: Date;
     /** Campanha a ignorar na conta de "já em campanha" (a que está sendo editada). */
     campanhaId?: string;
@@ -90,6 +93,7 @@ async function classificar(
     organizationId: string;
     filtro: FiltroDeAudiencia;
     corpo: string;
+    variacoes?: readonly string[];
     agora: Date;
     campanhaId?: string;
   },
@@ -105,6 +109,7 @@ async function classificar(
     entrada.campanhaId,
   );
   const suprimidos = await hashesExcluidos(admin, entrada.organizationId);
+  const variantes = variantesDaCampanha(entrada.corpo, entrada.variacoes);
   return classificarAudiencia(candidatos, {
     excluidosAMao: new Set(entrada.filtro.excluir_contatos),
     jaEmCampanha,
@@ -112,9 +117,18 @@ async function classificar(
     hashDoEndereco,
     // A saudação NÃO é resolvida aqui: ela é da hora do envio. O token fica no
     // corpo congelado e o despacho o troca — ver `rodada.ts`.
+    // A variante sai do `contact_id`: a MESMA pessoa recebe a MESMA variação,
+    // inclusive ao repreparar. Semente por campanha faria a lista trocar de
+    // texto a cada clique em Preparar, sem nada ter mudado.
     renderizar: (c: CandidatoDaAudiencia) => {
-      const r = renderizar(entrada.corpo, { nome: c.nome });
-      return { texto: r.texto, faltando: r.faltando };
+      const r = renderizarVariacao({
+        variantes,
+        semente: c.contactId,
+        valores: { nome: c.nome },
+      });
+      // `vazio` sobe junto: texto que resolveu para nada não pode virar
+      // `rendered_body` em branco e seguir para o envio.
+      return { texto: r.texto, faltando: r.faltando, vazio: r.vazio, varianteIndex: r.varianteIndex };
     },
   });
 }
@@ -130,6 +144,7 @@ export async function prepararCampanha(
     organizationId: string;
     filtro: unknown;
     corpo: string;
+    variacoes?: readonly string[];
     contentVersion: number;
     agora: Date;
   },
@@ -139,10 +154,23 @@ export async function prepararCampanha(
     throw new Error(`Filtro de audiência inválido: ${filtro.error.issues[0]?.message ?? "sem critério"}`);
   }
 
+  // Spintax quebrado barra a CAMPANHA, antes de gravar linha nenhuma. Deixá-lo
+  // passar daria uma lista inteira marcada `variavel_ausente` — motivo errado
+  // na tela, e o operador procurando o dado que falta num texto que, na
+  // verdade, tem uma chave sem fechar.
+  const quebradas = spintaxDasVariantes(variantesDaCampanha(entrada.corpo, entrada.variacoes));
+  if (quebradas.length > 0) {
+    throw new Error(
+      `Variação ${quebradas.map((i) => i + 1).join(", ")}: o {a|b} não fecha. ` +
+        "Confira as chaves antes de preparar.",
+    );
+  }
+
   const linhas = await classificar(admin, {
     organizationId: entrada.organizationId,
     filtro: filtro.data,
     corpo: entrada.corpo,
+    variacoes: entrada.variacoes,
     agora: entrada.agora,
     campanhaId: entrada.campanhaId,
   });
@@ -169,7 +197,10 @@ export async function prepararCampanha(
     exclusion_reason: l.motivo,
     rendered_body: l.corpo,
     content_version: entrada.contentVersion,
-    variables: { nome: l.candidato.nome },
+    // `variante_index` fica no snapshot para a tela poder dizer QUAL texto esta
+    // pessoa recebeu — sem ele, uma campanha de cinco variações mostra cinco
+    // corpos diferentes e nenhuma forma de agrupá-los.
+    variables: { nome: l.candidato.nome, variante_index: l.varianteIndex ?? 0 },
     cancelled_at: null,
     created_at: agoraIso,
   }));
@@ -187,6 +218,56 @@ export async function prepararCampanha(
     elegiveis,
     excluidos: linhas.length - elegiveis,
     motivos: contarExclusoes(linhas),
+  };
+}
+
+/**
+ * A PRÉVIA da campanha CONTÍNUA (migration 9039): quem está na etapa de entrada
+ * HOJE, e o que cada um receberia.
+ *
+ * Não grava nada — e é por isso que ela existe. No modo contínuo não há o
+ * instante "antes de apertar", então esta contagem É a revisão: o operador lê
+ * quantas pessoas a etapa tem agora, quantas ficariam de fora e por quê, antes
+ * de armar o gatilho. Um `{{nome}}` que falta no cadastro ou um `{Olá|}` que
+ * resolve para nada aparece aqui, em vez de chegar como mensagem em branco no
+ * WhatsApp de um cliente.
+ *
+ * Passa por `preverAudiencia`, que é a MESMA função da prévia do modo lista —
+ * logo pelos mesmos `buscarCandidatos` e `classificarAudiencia` do snapshot.
+ * Prévia que mede por outro caminho é prévia que mente, e a mentira só aparece
+ * depois do envio.
+ *
+ * ⚠️ O que ela NÃO é: a lista da campanha. Ninguém daqui vira destinatário. Quem
+ * entra é quem CHEGAR na etapa depois do Iniciar
+ * (`lib/campanhas/entrada-por-etapa.ts`), e a tela rotula este número como "está
+ * nesta etapa hoje" justamente para ele não ser lido como fila.
+ */
+export async function resumoDaEtapaDeEntrada(
+  admin: SupabaseClient,
+  entrada: {
+    campanha: EntradaDaCampanha & {
+      id: string;
+      organization_id: string;
+      message_body: string | null;
+      message_variants: string[] | null;
+    };
+    agora: Date;
+  },
+): Promise<ResumoDoSnapshot> {
+  const c = entrada.campanha;
+  const previa = await preverAudiencia(admin, {
+    organizationId: c.organization_id,
+    filtro: filtroDaEtapaDeEntrada(c),
+    corpo: c.message_body ?? "",
+    variacoes: c.message_variants ?? [],
+    agora: entrada.agora,
+    campanhaId: c.id,
+  });
+  return {
+    total: previa.total,
+    elegiveis: previa.elegiveis,
+    excluidos: previa.excluidos,
+    motivos: previa.motivos,
   };
 }
 

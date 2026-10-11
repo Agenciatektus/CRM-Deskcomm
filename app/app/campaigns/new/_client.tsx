@@ -16,22 +16,29 @@
  * operador precisa ver antes de apertar é "quantas pessoas isto pega".
  */
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { AvisoDeRitmo } from "@/components/campanhas/AvisoDeRitmo";
+import { EntradaDaCampanha } from "@/components/campanhas/EntradaDaCampanha";
+import { MensagemDaCampanha } from "@/components/campanhas/MensagemDaCampanha";
+import { PassosDaCampanha } from "@/components/campanhas/PassosDaCampanha";
+import { SaidasDaCampanhaEditor, saidasDaTela } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
+import { useConfiguracaoDeCampanhas } from "@/hooks/campanhas/useConfiguracao";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import { ritmoDaCampanhaNova } from "@/lib/campanhas/ritmo-recomendado";
+import type { PassoDaRegua } from "@/lib/regua/timeline";
 import {
   useAgentesPublicados,
   useEtapas,
   useFunis,
 } from "@/hooks/campanhas/useDestinoDaCampanha";
-import { VARIAVEIS_DA_CAMPANHA, DESCRICAO_DA_VARIAVEL } from "@/lib/campanhas/renderizador";
 
 export function NovaCampanha() {
   const t = useT();
@@ -48,23 +55,102 @@ export function NovaCampanha() {
   const [semTags, setSemTags] = useState("");
   const [semInteracao, setSemInteracao] = useState("");
   const [limite, setLimite] = useState("100");
-  const [texto, setTexto] = useState("");
+  // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
+  const [variantes, setVariantes] = useState<string[]>([""]);
+  // A régua do 2º toque em diante (9037). Vazia = campanha de uma mensagem só.
+  const [passos, setPassos] = useState<PassoDaRegua[]>([]);
+  // QUANDO A RÉGUA PARA (9046). Nasce no padrão, que é o que o servidor usa
+  // quando a coluna é nula: a campanha nova se comporta como as de antes até
+  // alguém mexer aqui.
+  const [saidas, setSaidas] = useState<SaidasDaCadencia>(() => saidasDaTela(null));
+  // ⚠️ SE A SEÇÃO FOI MEXIDA, e não "qual é o valor dela" (parecer do
+  // @Cassio_SecRev, P2.1). Sem este flag a tela mandava `saidas` SEMPRE — já
+  // preenchida com o objeto do padrão —, então o `?? null` da rota nunca
+  // produzia nulo e toda campanha nova gravava o padrão. A coluna existe
+  // nulável justamente para distinguir "o operador escolheu" de "herdou", e a
+  // distinção morria aqui, calada, contra o que a migration e o MANIFEST
+  // afirmam. Enquanto ninguém encostar, vai `null`.
+  const [saidasMexidas, setSaidasMexidas] = useState(false);
+  const texto = variantes[0] ?? "";
+  const variacoesExtras = useMemo(
+    () => variantes.slice(1).map((v) => v.trim()).filter((v) => v !== ""),
+    [variantes],
+  );
+  // ═══ O RITMO JÁ VEM PREENCHIDO (preset anti-bloqueio) ═══
+  //
+  // Abre vazio e é PREENCHIDO quando a configuração da organização chega
+  // (`ritmoDaCampanhaNova`: o que a organização definiu, e o recomendado onde
+  // ela não definiu nada). Começar vazio em vez de já com o recomendado evita o
+  // caso em que a configuração chega depois e sobrescreve o que o operador
+  // digitou enquanto ela carregava — o `preenchido` fecha essa porta de vez.
+  //
+  // ⚠️ Só aqui. A edição e a tela de detalhe continuam lendo o ritmo da
+  // campanha como ele está gravado: preencher lá mudaria em silêncio a escolha
+  // de quem criou o rascunho.
   const [intervalo, setIntervalo] = useState("");
   const [janelaInicio, setJanelaInicio] = useState("");
   const [janelaFim, setJanelaFim] = useState("");
   const [tetoDiario, setTetoDiario] = useState("");
   const [tetoHorario, setTetoHorario] = useState("");
+  const [preenchido, setPreenchido] = useState(false);
   const [extras, setExtras] = useState<string[]>([]);
   const [funil, setFunil] = useState("");
   const [etapa, setEtapa] = useState("");
   const [agente, setAgente] = useState("");
   const [funilDoPublico, setFunilDoPublico] = useState("");
   const [etapaDoPublico, setEtapaDoPublico] = useState("");
+  // O MODO DE PÚBLICO (9039). Nasce em LISTA, e nada aqui o liga sozinho.
+  const [continua, setContinua] = useState(false);
+  const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
 
   const funis = useFunis();
   const etapas = useEtapas(funil || null);
   const etapasDoPublico = useEtapas(funilDoPublico || null);
   const agentes = useAgentesPublicados();
+
+  const padroes = useConfiguracaoDeCampanhas();
+  useEffect(() => {
+    if (preenchido || padroes.isLoading) return;
+    // Quem já digitou MANDA, e o preset desiste. A guarda sozinha era
+    // `preenchido`, que só é marcado pelo próprio preenchimento: enquanto o GET
+    // da configuração estava no ar nada impedia digitar, e na volta os cinco
+    // `setX` rodavam sem condição. O operador que escrevesse 300 em Intervalo
+    // via o campo virar 120 e salvava sem reler, e a campanha saía 2,5x mais
+    // RÁPIDA que a escolha dele. Atropelar para o lado rápido é o único
+    // desfecho que este módulo existe para impedir.
+    if (intervalo || janelaInicio || janelaFim || tetoDiario || tetoHorario) {
+      setPreenchido(true);
+      return;
+    }
+    // Erro ao ler a configuração não deixa o formulário vazio: `data` ausente
+    // cai no recomendado, que é o lado seguro. Ficar em branco por causa de uma
+    // falha de rede devolveria ao operador exatamente o problema que o preset
+    // existe para resolver.
+    const r = ritmoDaCampanhaNova(padroes.data?.configuracao);
+    setIntervalo(comoTexto(r.intervaloSegundos));
+    setJanelaInicio(comoTexto(r.janelaInicioHora));
+    setJanelaFim(comoTexto(r.janelaFimHora));
+    setTetoDiario(comoTexto(r.tetoDiario));
+    setTetoHorario(comoTexto(r.tetoHorario));
+    setPreenchido(true);
+  }, [
+    padroes.data,
+    padroes.isLoading,
+    preenchido,
+    intervalo,
+    janelaInicio,
+    janelaFim,
+    tetoDiario,
+    tetoHorario,
+  ]);
+
+  const ritmoEscolhido = {
+    intervaloSegundos: comoNumero(intervalo),
+    janelaInicioHora: comoNumero(janelaInicio),
+    janelaFimHora: comoNumero(janelaFim),
+    tetoDiario: comoNumero(tetoDiario),
+    tetoHorario: comoNumero(tetoHorario),
+  };
 
   const filtro = useMemo(
     () => ({
@@ -89,7 +175,11 @@ export function NovaCampanha() {
     nome.trim() !== "" &&
     canal !== "" &&
     texto.trim() !== "" &&
-    temCriterio &&
+    // No modo CONTÍNUO o público é a etapa, e o recorte de contatos não é usado:
+    // exigir critério ali prenderia o operador num filtro que a campanha ignora.
+    // O que o contínuo exige (funil, etapa, teto, janela) é cobrado no Preparar,
+    // porque um RASCUNHO pode estar incompleto — a mesma regra dos passos.
+    (continua || temCriterio) &&
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   async function salvar() {
@@ -97,18 +187,23 @@ export function NovaCampanha() {
       name: nome.trim(),
       channel_session_id: canal,
       message_body: texto.trim(),
+      message_variants: variacoesExtras,
       base_legal: baseLegal,
       lia_ref: liaRef.trim() || null,
       audience_filter: filtro,
-      intervalo_segundos: intervalo ? Number(intervalo) : null,
-      janela_inicio_hora: janelaInicio ? Number(janelaInicio) : null,
-      janela_fim_hora: janelaFim ? Number(janelaFim) : null,
-      teto_diario: tetoDiario ? Number(tetoDiario) : null,
-      teto_horario: tetoHorario ? Number(tetoHorario) : null,
+      intervalo_segundos: ritmoEscolhido.intervaloSegundos,
+      janela_inicio_hora: ritmoEscolhido.janelaInicioHora,
+      janela_fim_hora: ritmoEscolhido.janelaFimHora,
+      teto_diario: ritmoEscolhido.tetoDiario,
+      teto_horario: ritmoEscolhido.tetoHorario,
       channel_session_ids: extras,
       pipeline_id: funil || null,
       stage_id: etapa || null,
       agent_id: agente || null,
+      passos,
+      saidas: saidasMexidas ? saidas : null,
+      entrada_continua: continua,
+      entrada_etapa_id: continua ? etapaDeEntrada || null : null,
     });
     router.push(`/app/campaigns/${criada.id}`);
   }
@@ -231,6 +326,22 @@ export function NovaCampanha() {
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Público")}</h2>
+        <EntradaDaCampanha
+          continua={continua}
+          onContinuaChange={setContinua}
+          etapaId={etapaDeEntrada}
+          onEtapaChange={setEtapaDeEntrada}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
+          janelaInicio={janelaInicio === "" ? null : Number(janelaInicio)}
+          janelaFim={janelaFim === "" ? null : Number(janelaFim)}
+        />
+        {/* O recorte de contatos só existe no modo LISTA: no contínuo o público
+            é a etapa, e deixar o filtro à vista sugeriria que ele também vale —
+            tela que oferece controle sem efeito é tela que ensina errado. */}
+        {!continua && (
+        <>
         <p className="text-sm text-muted-foreground">
           {t("Escolha pelo menos um critério — uma lista sem recorte ninguém confere antes de apertar.")}
         </p>
@@ -317,7 +428,11 @@ export function NovaCampanha() {
             variant="outline"
             disabled={!temCriterio || previa.isPending}
             onClick={() =>
-              previa.mutate({ audience_filter: filtro, message_body: texto })
+              previa.mutate({
+                audience_filter: filtro,
+                message_body: texto,
+                message_variants: variacoesExtras,
+              })
             }
           >
             {previa.isPending ? t("Contando…") : t("Ver quantas pessoas")}
@@ -340,39 +455,44 @@ export function NovaCampanha() {
             ))}
           </ul>
         )}
+        </>
+        )}
       </Card>
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
-        <Textarea
-          rows={6}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder={t("Escreva como você falaria com uma pessoa só.")}
-          aria-label={t("Texto da mensagem")}
+        <MensagemDaCampanha variantes={variantes} onChange={setVariantes} />
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Passos depois da primeira mensagem")}</h2>
+        <PassosDaCampanha
+          passos={passos}
+          onChange={setPassos}
+          etapas={etapas.data ?? []}
+          temFunil={!!funil}
+          // O número de cards é o número de ELEGÍVEIS da prévia: o excluído não
+          // recebe mensagem, logo não vira card. Sem prévia pedida ainda, a
+          // frase do aviso fica sem número em vez de chutar um. No modo
+          // CONTÍNUO não há número possível — a campanha aborda quem chegar, e
+          // quantos chegarão não se sabe hoje.
+          quantosCards={continua ? null : (previa.data?.elegiveis ?? null)}
+          tetoPorDia={tetoDiario ? Number(tetoDiario) : null}
         />
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>{t("Você pode usar:")}</p>
-          <ul className="space-y-1">
-            {VARIAVEIS_DA_CAMPANHA.map((v) => (
-              <li key={v}>
-                <button
-                  type="button"
-                  className="rounded-md bg-surface-elevated px-1 font-mono text-xs"
-                  onClick={() => setTexto((atual) => `${atual}{{${v}}}`)}
-                >
-                  {`{{${v}}}`}
-                </button>{" "}
-                — {t(DESCRICAO_DA_VARIAVEL[v])}
-              </li>
-            ))}
-          </ul>
-          <p>
-            {t(
-              "Quem não tiver o dado que a mensagem usa fica de fora, com o motivo na lista — mensagem com buraco não sai.",
-            )}
-          </p>
-        </div>
+      </Card>
+
+      <Card className="space-y-4 p-4">
+        <h2 className="font-medium">{t("Quando a régua para")}</h2>
+        <SaidasDaCampanhaEditor
+          saidas={saidas}
+          onChange={(s) => {
+            setSaidas(s);
+            setSaidasMexidas(true);
+          }}
+          etapas={etapas.data ?? []}
+          temPassos={passos.length > 0}
+          temFunil={!!funil}
+        />
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -448,6 +568,12 @@ export function NovaCampanha() {
             "Em branco, vale o ritmo do número (Conexões › Proteção de envio). O que você puser aqui só pode deixar mais devagar.",
           )}
         </p>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "Os campos já vêm com o ritmo que a organização definiu em Configuração de campanhas, e com o recomendado para lista fria onde ela não definiu nada. Tudo é editável, e campo esvaziado volta a herdar o número.",
+          )}
+        </p>
+        <AvisoDeRitmo ritmo={ritmoEscolhido} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="intervalo">{t("Intervalo mínimo entre mensagens (segundos)")}</Label>
@@ -514,6 +640,18 @@ export function NovaCampanha() {
       </div>
     </div>
   );
+}
+
+/** Campo vazio é `null`, que é "herda o número" (o mesmo par das outras telas). */
+function comoTexto(valor: number | null): string {
+  return valor === null ? "" : String(valor);
+}
+
+function comoNumero(bruto: string): number | null {
+  const limpo = bruto.trim();
+  if (limpo === "") return null;
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : null;
 }
 
 function listar(bruto: string): string[] {

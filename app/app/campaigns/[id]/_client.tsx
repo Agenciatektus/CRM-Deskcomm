@@ -17,7 +17,10 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { AvisoDeRitmo } from "@/components/campanhas/AvisoDeRitmo";
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
+import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
+import { ResumoDasSaidas } from "@/components/campanhas/SaidasDaCampanha";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +35,7 @@ import {
   type AcaoDeCampanha,
   type CampanhaDetalhada,
 } from "@/hooks/campanhas/useCampanhas";
-import { useAgentesPublicados, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
+import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useContactList } from "@/hooks/contacts/useContactList";
 import { useT } from "@/hooks/i18n/useT";
@@ -74,6 +77,9 @@ export function DetalheDaCampanha({ id }: { id: string }) {
   const c = campanha.data;
   const m = metricas.data;
   const linhas = destinatarios.data?.pages.flatMap((p) => p.data) ?? [];
+  // O MODO DE PÚBLICO (9039). Muda o que esta tela pode AFIRMAR: no contínuo não
+  // há lista, não há porcentagem de fila e não há conclusão automática.
+  const continua = c.entrada_continua === true;
 
   // As ações que cabem NO ESTADO — a mesma tabela da máquina de estados do
   // servidor, que é quem recusa de verdade. Aqui é só para não oferecer o
@@ -144,7 +150,14 @@ export function DetalheDaCampanha({ id }: { id: string }) {
         <Card className="space-y-3 border-warning-fg p-4">
           <p className="text-sm">
             {confirmando === "iniciar"
-              ? `${t("Começar a enviar para")} ${c.snapshot_eligible} ${c.snapshot_eligible === 1 ? t("pessoa?") : t("pessoas?")} ${t("O envio segue o ritmo do número e pode levar horas.")}`
+              ? // No modo CONTÍNUO não há número para confirmar: a campanha fica
+                // de pé e aborda quem chegar. Repetir "enviar para N pessoas"
+                // ali seria afirmar que a lista é a fila — e `snapshot_eligible`
+                // é, no contínuo, só quantos estavam na etapa quando o operador
+                // preparou.
+                continua
+                ? `${t("A campanha passa a abordar quem entrar na etapa escolhida, até")} ${c.teto_diario ?? 0} ${t("por dia, dentro do horário configurado. Quem já está na etapa hoje não é abordado. Para parar, use Pausar ou Cancelar.")}`
+                : `${t("Começar a enviar para")} ${c.snapshot_eligible} ${c.snapshot_eligible === 1 ? t("pessoa?") : t("pessoas?")} ${t("O envio segue o ritmo do número e pode levar horas.")}`
               : t("Cancelar é definitivo: quem ainda não recebeu não recebe mais, e a campanha não volta a rodar.")}
           </p>
           <div className="flex gap-2">
@@ -176,13 +189,58 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Numero titulo={t("Na lista")} valor={c.snapshot_eligible} />
+        {/* NO MODO CONTÍNUO "Na lista" não existe: o público não é uma lista, e
+            `snapshot_eligible` é só quantos estavam na etapa quando o operador
+            preparou. O número no lugar dele é quantas pessoas a campanha JÁ VIU
+            entrar na etapa — `contagem.total`, que inclui quem foi vetado. O
+            rótulo diz exatamente isso: chamá-lo de "abordadas" contaria como
+            abordado quem a campanha recusou, e a tela passaria a mentir sobre
+            quantas mensagens saíram (quem saiu está em "Enviadas", ao lado). */}
+        <Numero
+          titulo={continua ? t("Entraram na etapa") : t("Na lista")}
+          valor={continua ? (m?.contagem.total ?? 0) : c.snapshot_eligible}
+        />
         <Numero titulo={t("Enviadas")} valor={m?.contagem.enviados ?? 0} />
         <Numero titulo={t("Entregues")} valor={m?.contagem.entregues ?? 0} />
         <Numero titulo={t("Responderam")} valor={m?.contagem.responderam ?? 0} />
       </div>
 
-      {m && (
+      {/* A BARRA DE PROGRESSO NÃO VALE NO CONTÍNUO: fila sem fim não tem
+          porcentagem, e "100%" num público que continua chegando se lê como
+          "terminou" — o oposto do que está acontecendo. No lugar dela, os
+          números que fazem sentido num público que não acaba. */}
+      {m && continua && (
+        <Card className="space-y-2 p-4">
+          <h2 className="font-medium">{t("Andamento")}</h2>
+          <p className="text-sm text-muted-foreground">
+            {m.contagem.pendentes} {t("na fila agora")} · {m.contagem.falharam} {t("falharam")} ·{" "}
+            {m.contagem.optOut} {t("pediram para parar")} · {m.contagem.excluidos}{" "}
+            {t("entraram na etapa e ficaram de fora")}
+          </p>
+          {/* O DETALHAMENTO POR MOTIVO, e ele é o único lugar onde o operador vê o
+              veto comendo a base. No modo lista o número vinha da prévia, antes de
+              apertar; aqui não há "antes", e "ficaram de fora: 312" sem o motivo
+              não diz se o problema é opt-out, telefone faltando ou negócio já
+              fechado — três causas com três consertos diferentes. O único rastro
+              antes disto era um número no `detail` do event_log, que ninguém abre. */}
+          {Object.keys(m.contagem.porMotivoDaExclusao ?? {}).length > 0 && (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {Object.entries(m.contagem.porMotivoDaExclusao ?? {})
+                .sort((a, b) => b[1] - a[1])
+                .map(([motivo, quantos]) => (
+                  <li key={motivo}>
+                    {quantos} — {t(rotuloDoMotivo(motivo))}
+                  </li>
+                ))}
+            </ul>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t("Campanha contínua não conclui sozinha: ela fica de pé esperando a próxima pessoa entrar na etapa. Para encerrar, use Pausar ou Cancelar.")}
+          </p>
+        </Card>
+      )}
+
+      {m && !continua && (
         <Card className="space-y-2 p-4">
           <div className="flex items-baseline justify-between">
             <h2 className="font-medium">{t("Progresso")}</h2>
@@ -208,7 +266,11 @@ export function DetalheDaCampanha({ id }: { id: string }) {
         </Card>
       )}
 
+      <EntradaDestaCampanha campanha={c} />
+
       <DestinoDaCampanha campanha={c} />
+
+      <ReguaDaCampanha campanha={c} />
 
       <NumerosDaCampanha campanha={c} />
 
@@ -217,6 +279,17 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       <Card className="space-y-2 p-4">
         <h2 className="font-medium">{t("Mensagem")}</h2>
         <p className="whitespace-pre-wrap text-sm">{c.message_body}</p>
+        {/* As variações EXTRAS (9034): a lista preparada tem texto DIFERENTE por
+            pessoa, e mostrar só o corpo principal aqui faria a tela afirmar que
+            todo mundo recebeu aquele. Leitura só — editar é na tela de edição. */}
+        {(c.message_variants ?? []).map((v, i) => (
+          <div key={i} className="border-l-2 border-border pl-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("Variação")} {i + 2}
+            </p>
+            <p className="whitespace-pre-wrap text-sm">{v}</p>
+          </div>
+        ))}
         <p className="text-xs text-muted-foreground">
           {t("Base legal")}: {c.base_legal === "consent" ? t("consentimento") : t("interesse legítimo")}
           {c.lia_ref ? ` (${c.lia_ref})` : ""}
@@ -225,7 +298,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
 
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium">{t("Quem está na lista")}</h2>
+          <h2 className="font-medium">{continua ? t("Quem já entrou") : t("Quem está na lista")}</h2>
           <select
             className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
             value={filtroDeStatus}
@@ -243,9 +316,32 @@ export function DetalheDaCampanha({ id }: { id: string }) {
           </select>
         </div>
 
-        {c.snapshot_total === 0 ? (
+        {/* O VETO NÃO É REAVALIADO, e o operador vai supor o contrário (pedido do
+            @Cassio_SecRev). Quem entra na etapa e é vetado vira linha com o
+            motivo, e a unicidade `(campaign_id, contact_id)` impede que a mesma
+            pessoa volte a ser avaliada nesta campanha: quem entrou sem telefone
+            e depois ganhou um não é abordado por ela. É o lado certo para errar
+            (erra para NÃO mandar) e é também o que impede o card que vai e volta
+            de render uma tentativa por arrasto — mas é surpreendente, e surpresa
+            que a tela não conta o operador descobre do pior jeito. */}
+        {continua && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "Quem ficou de fora não é avaliado de novo nesta campanha, mesmo que o motivo deixe de valer (um telefone que faltava e foi preenchido, por exemplo). Para dar outra chance a essas pessoas, duplique a campanha.",
+            )}
+          </p>
+        )}
+
+        {!continua && c.snapshot_total === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("A lista ainda não foi montada. Use Preparar para ver quem entra.")}
+          </p>
+        ) : continua && linhas.length === 0 ? (
+          // Fila vazia é o estado NORMAL da contínua, entre uma chegada e a
+          // próxima: "a lista ainda não foi montada" ali manda o operador preparar
+          // de novo uma campanha que está funcionando.
+          <p className="text-sm text-muted-foreground">
+            {t("Ninguém entrou na etapa desde que a campanha começou. Ela segue de pé, esperando.")}
           </p>
         ) : (
           <div className="divide-y divide-border">
@@ -370,6 +466,90 @@ function DestinoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
 }
 
 /**
+ * QUEM ENTRA NESTA CAMPANHA (migration 9039).
+ *
+ * Só aparece no modo CONTÍNUO. No modo lista a resposta já está na tela, no
+ * número "Na lista" e na própria lista de destinatários; um card dizendo "o
+ * público é a lista" seria ruído.
+ *
+ * Aqui ele é necessário porque o público não está em lugar nenhum da tela: é uma
+ * regra ("quem entrar nesta etapa"), e sem ela escrita a campanha parece estar
+ * abordando gente sem motivo. É também onde a contenção fica visível — teto do
+ * dia e horário —, porque num modo sem revisão de lista eles são o que o
+ * operador precisa reler quando estranhar o volume.
+ */
+function EntradaDestaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
+  const t = useT();
+  const etapas = useEtapas(campanha.pipeline_id ?? null);
+  if (campanha.entrada_continua !== true) return null;
+  const etapa = (etapas.data ?? []).find((e) => e.id === campanha.entrada_etapa_id);
+
+  return (
+    <Card className="space-y-2 p-4">
+      <h2 className="font-medium">{t("Quem entra nesta campanha")}</h2>
+      {campanha.entrada_etapa_id ? (
+        <p className="text-sm">
+          {t("Quem entrar na etapa")} <strong>{etapa?.name ?? campanha.entrada_etapa_id.slice(0, 8)}</strong>{" "}
+          {t("é abordado, a partir do momento em que a campanha foi iniciada.")}
+        </p>
+      ) : (
+        // Etapa nula com o modo ligado = alguém apagou a etapa, e a FK da 9039
+        // anulou a referência. A campanha PAROU de abordar (o gatilho não casa
+        // etapa nula) e precisa dizer isso: silêncio aqui se leria como
+        // "está funcionando".
+        <p className="text-sm text-warning-fg">
+          {t("A etapa que iniciava a abordagem não existe mais, então esta campanha parou de abordar. Duplique-a e escolha outra etapa.")}
+        </p>
+      )}
+      <p className="text-sm text-muted-foreground">
+        {t("No máximo")} <strong>{campanha.teto_diario ?? 0}</strong> {t("por dia")}
+        {campanha.janela_inicio_hora !== null && campanha.janela_fim_hora !== null
+          ? `, ${t("das")} ${campanha.janela_inicio_hora}h ${t("às")} ${campanha.janela_fim_hora}h`
+          : ""}
+        . {t("A pessoa recebe uma vez só, mesmo que o card entre e saia da etapa várias vezes.")}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {t("Quem já estava na etapa quando a campanha foi preparada não é abordado: para falar com esses, use uma campanha de lista fixa com recorte por etapa.")}
+      </p>
+    </Card>
+  );
+}
+
+/**
+ * A RÉGUA: o que acontece depois da primeira mensagem (migration 9037).
+ *
+ * Só aparece quando a campanha tem passos. Em branco, ela manda uma mensagem e
+ * acaba — que é o comportamento de toda campanha até esta fatia —, e um card
+ * dizendo "sem passos" seria ruído numa tela que já tem muita informação.
+ *
+ * Leitura só: editar é na tela de edição, com a campanha em rascunho. Mas a
+ * pergunta "por que esta pessoa recebeu três mensagens?" se faz com a campanha
+ * ANDANDO, quando a edição está fechada — então a régua que está no ar precisa
+ * estar visível aqui.
+ */
+function ReguaDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
+  const t = useT();
+  const etapas = useEtapas(campanha.pipeline_id ?? null);
+  const passos = campanha.passos ?? [];
+  if (passos.length === 0) return null;
+
+  return (
+    <Card className="space-y-2 p-4">
+      <h2 className="font-medium">{t("Depois da primeira mensagem")}</h2>
+      <ResumoDosPassos passos={passos} etapas={etapas.data ?? []} />
+      <p className="text-xs text-muted-foreground">
+        {t("Quem responde sai da régua na hora. Os passos seguintes valem para quem ficou em silêncio.")}
+      </p>
+      {/* QUANDO ELA PARA (9046), no MESMO card dos passos: a pergunta "por que
+          esta pessoa parou de receber?" e a pergunta "por que ela recebeu três
+          vezes?" são a mesma conversa, e separá-las em dois cards faria o
+          operador ler uma e não a outra. */}
+      <ResumoDasSaidas saidas={campanha.saidas} etapas={etapas.data ?? []} />
+    </Card>
+  );
+}
+
+/**
  * Por quais números a campanha fala.
  *
  * Existe porque "quem falou com esta pessoa?" é a primeira pergunta quando o
@@ -441,6 +621,18 @@ function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
         <CampoDeRitmo id="r-inicio" rotulo={t("Enviar só a partir das (hora)")} valor={inicio} onChange={setInicio} />
         <CampoDeRitmo id="r-fim" rotulo={t("Parar de enviar às (hora)")} valor={fim} onChange={setFim} />
       </div>
+      {/* ⚠️ AVISA, e nada mais. Esta tela não preenche campo nenhum: a campanha
+          já existe, e repreencher o ritmo dela ao abrir a tela mudaria em
+          silêncio a escolha de quem a criou. O preset é da campanha NOVA. */}
+      <AvisoDeRitmo
+        ritmo={{
+          intervaloSegundos: numero(intervalo),
+          janelaInicioHora: numero(inicio),
+          janelaFimHora: numero(fim),
+          tetoDiario: numero(tetoDia),
+          tetoHorario: numero(tetoHora),
+        }}
+      />
       <div className="flex items-center gap-3">
         <Button
           size="sm"
