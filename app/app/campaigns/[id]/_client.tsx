@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { AvisoDeRitmo } from "@/components/campanhas/AvisoDeRitmo";
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
 import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
 import { ResumoDasSaidas } from "@/components/campanhas/SaidasDaCampanha";
@@ -620,6 +621,18 @@ function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
         <CampoDeRitmo id="r-inicio" rotulo={t("Enviar só a partir das (hora)")} valor={inicio} onChange={setInicio} />
         <CampoDeRitmo id="r-fim" rotulo={t("Parar de enviar às (hora)")} valor={fim} onChange={setFim} />
       </div>
+      {/* ⚠️ AVISA, e nada mais. Esta tela não preenche campo nenhum: a campanha
+          já existe, e repreencher o ritmo dela ao abrir a tela mudaria em
+          silêncio a escolha de quem a criou. O preset é da campanha NOVA. */}
+      <AvisoDeRitmo
+        ritmo={{
+          intervaloSegundos: numero(intervalo),
+          janelaInicioHora: numero(inicio),
+          janelaFimHora: numero(fim),
+          tetoDiario: numero(tetoDia),
+          tetoHorario: numero(tetoHora),
+        }}
+      />
       <div className="flex items-center gap-3">
         <Button
           size="sm"
