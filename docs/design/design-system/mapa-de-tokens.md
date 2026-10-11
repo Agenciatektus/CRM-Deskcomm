@@ -28,6 +28,16 @@ Etapa 1 do design system ("foundation-first"): trazer o design system do protót
 
 Leitura rápida: as **superfícies, textos e linhas já são iguais** nos dois temas (a pele do escuro, PRs #144/#145, e a conversão anterior acertaram a base). O que separa o CRM do protótipo é **forma** (raio, peso, padding), **cores de estado no claro** e o **desenho de cada componente** (menu, diálogo, toast, campos).
 
+## Etapa 2, PR A (base): o que mudou
+
+As 15 propostas da seção 11 foram aprovadas. A PR A aplica a base; as tabelas abaixo continuam descrevendo o estado da etapa 1, e `lib/design-system/mapa.ts` guarda o status atual (o selo "Diferente" da vitrine some onde foi corrigido).
+
+- **Critério de pronto:** `tests/unit/paridade-com-o-prototipo.test.ts` lê os protótipos e compara com `app/globals.css`, `app/layout.tsx` e `components/ui`. Controle negativo em `tests/unit/paridade-controle-negativo.test.ts`. Exceções só pela lista `EXCECOES` do teste, cada uma com motivo.
+- **Cor:** marca padrão Verde Verdash `#0E7A5F` (rampa `rampaDeSemente`); escuro travado no primary Verdash `#2690B1` para todo revendedor (`Regua.rampaDoEscuro`, `lib/branding/contraste.ts`); estados do claro em hex do protótipo; `accent-soft` 11%, `bub-out` 15%, `bub-ai` 7% (escuro 20%, 30% e fixo); derivados redeclarados no `<body>` e em toda subárvore `data-theme` (corrige o painel claro da vitrine com o app escuro); hover = marca a 86% com preto; ação no escuro com o degradê vibrante e branco (exceção do quadro, meio >= 3,5:1); botão destrutivo no escuro em crit claro com texto escuro.
+- **Tipografia:** Atkinson Hyperlegible Next 200-800 e Atkinson Hyperlegible Mono 400/500/700 em `app/fonts/`; cada papel `text-*` leva tamanho, peso e entrelinha do quadro; títulos de página em `text-title-lg`.
+- **Forma e componentes:** Button, Input, Textarea, Select, Tabs (sublinhado e segmento), Badge (pílula e tag, nowrap), Chip, DropdownMenu (item 34, hover neutro, perigo, `kbd`), Popover, Dialog, AlertDialog, Sheet, Switch e Card no desenho do quadro; animações `pop-in`, `fade-in`, `slide-in`; `prefers-reduced-motion` global; `--row-py` 12 com modo compacto por `data-densidade="compacta"`.
+- **Conflitos quadro DS x Main (vence o quadro):** campo com fundo `surface-2` e borda `line` (o `.inp` do Main tem `surface` e `line-2`); textarea segue o campo do quadro (o `.obs` do Main tem `line-2`); a tabela de tipografia do quadro diz "Rótulo, botão 13/600", mas o `.btn` do próprio quadro herda 14px (como o do Main): o botão padrão ficou em 14 e o `sm` em 13.
+
 ## 1. Cor
 
 | # | Protótipo | CRM | Claro: protótipo | Claro: CRM | Escuro: protótipo | Escuro: CRM | Status |

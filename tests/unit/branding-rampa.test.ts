@@ -48,7 +48,19 @@ function blocoRoot(css: string): string {
   return css.slice(i, fim);
 }
 
-function stopsSageDoCss(): string[] {
+/**
+ * A Sage desenhada à mão (o design system de origem, `app/design/lib/tokens.ts`,
+ * `PALETTES.sage`). Ela calibrou `ESCADA_L` e `CURVA_C`, e até a etapa 2 do DS era a
+ * rampa do `globals.css`. Desde então o `globals.css` traz o Verde Verdash, que JÁ É
+ * saída de `rampaDeSemente`; comparar a derivação com ele seria circular. A catraca de
+ * calibração volta a olhar a fonte desenhada.
+ */
+const SAGE_DESENHADA = [
+  "#f3f6f1", "#e4ebe0", "#c8d6c1", "#a4ba9a", "#82a077", "#67885d",
+  "#506d48", "#41573b", "#374731", "#2f3c2b", "#171f15",
+];
+
+function stopsAccentDoCss(): string[] {
   const raiz = blocoRoot(CSS);
   return GRAUS.map((g) => {
     const m = new RegExp(`--color-accent-${g}:\\s*(#[0-9a-f]{6})`, "i").exec(raiz);
@@ -103,14 +115,19 @@ describe("conversões de cor", () => {
 });
 
 describe("rampaDeSemente — catraca de calibração contra o design system", () => {
-  const esperados = stopsSageDoCss();
+  const esperados = SAGE_DESENHADA;
+  const doCss = stopsAccentDoCss();
 
   it("lê 11 stops distintos do globals.css (guarda de vacuidade)", () => {
     // Sem isto, um regex quebrado devolveria lista vazia e a comparação abaixo passaria
     // por não ter o que comparar — instrumento morto tem cara de teste verde.
-    expect(esperados).toHaveLength(11);
-    expect(new Set(esperados).size).toBe(11);
-    expect(esperados[K]).toBe("#506d48");
+    expect(doCss).toHaveLength(11);
+    expect(new Set(doCss).size).toBe(11);
+    expect(doCss[K]).toBe("#0e7a5f");
+  });
+
+  it("a rampa padrão do globals.css É a derivação do Verde Verdash #0E7A5F", () => {
+    expect(doCss).toEqual([...rampaDeSemente("#0e7a5f")]);
   });
 
   it("reproduz os 11 stops Sage a partir de #506d48 com Δ ≤ 2/255 por canal", () => {

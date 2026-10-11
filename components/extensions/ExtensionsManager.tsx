@@ -898,7 +898,7 @@ export function ExtensionsManager({
             <PuzzlePiece size={24} weight="duotone" aria-hidden />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{t("Extensões")}</h1>
+            <h1 className="text-title-lg">{t("Extensões")}</h1>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {t(
                 "Adicione guias ao CRM sem entregar dados ou executar código de terceiros. Antes de abrir Tarefas, o acesso e a ativação são conferidos novamente.",

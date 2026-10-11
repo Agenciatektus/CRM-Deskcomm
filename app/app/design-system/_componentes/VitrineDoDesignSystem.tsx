@@ -53,7 +53,7 @@ export function VitrineDoDesignSystem() {
         <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex max-w-3xl flex-col gap-1">
-              <h1 className="text-title-lg font-bold tracking-tight">{t("Design System")}</h1>
+              <h1 className="text-title-lg">{t("Design System")}</h1>
               <p className="text-ui text-text-muted">
                 {t(
                   "Os componentes reais do CRM com os tokens de hoje. O selo marca o que ainda difere do protótipo da Inbox v2; o mapa completo está em docs/design/design-system/mapa-de-tokens.md.",

@@ -145,7 +145,7 @@ export function ConversationListItem({
       onClick={() => onSelect(conversation.id)}
       {...gatilhos}
       className={cn(
-        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-surface-elevated/60",
+        "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-(--row-py) text-left transition-colors hover:bg-surface-elevated/60",
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated/60",
         // Selecionada (L13): o `accent-soft` do protótipo, com a barra de 3px.
         // No escuro a pele troca pelo degradê horizontal da marca

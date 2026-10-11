@@ -61,7 +61,7 @@ export default async function SignupPage({
     return (
       <div className="space-y-6 text-center">
         <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-title-lg">
             {t("Cadastro apenas por convite")}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -84,7 +84,7 @@ export default async function SignupPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Criar conta")}</h1>
+        <h1 className="text-title-lg">{t("Criar conta")}</h1>
         <p className="text-sm text-muted-foreground">
           {convite
             ? t("Crie sua senha para entrar na empresa que te convidou")

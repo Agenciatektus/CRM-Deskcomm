@@ -33,7 +33,7 @@ export function ListaDeCampanhas() {
     <div className="space-y-4 p-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Campanhas")}</h1>
+          <h1 className="text-title-lg">{t("Campanhas")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("Escolha o público, escreva a mensagem e acompanhe quem recebeu.")}
           </p>

@@ -12,8 +12,10 @@ que o `next/font/google` baixava.
 
 | Arquivo | Família | Pesos | Cobertura | Origem (fonts.gstatic.com) |
 |---|---|---|---|---|
-| `atkinson-hyperlegible-{400,700}-latin-latin-ext.woff2` | Atkinson Hyperlegible | 400, 700 | latin + latin-ext | `atkinsonhyperlegible/v12` |
-| `ibm-plex-mono-{400,500}-latin-latin-ext.woff2` | IBM Plex Mono | 400, 500 | latin + latin-ext | `ibmplexmono/v20` |
+| `atkinson-hyperlegible-next-{200..800}-latin-latin-ext.woff2` | Atkinson Hyperlegible Next | 200, 300, 400, 500, 600, 700, 800 | latin + latin-ext | `atkinsonhyperlegiblenext/v7` |
+| `atkinson-hyperlegible-mono-{400,500,700}-latin-latin-ext.woff2` | Atkinson Hyperlegible Mono | 400, 500, 700 | latin + latin-ext | `atkinsonhyperlegiblemono/v8` |
+| `atkinson-hyperlegible-{400,700}-latin-latin-ext.woff2` | Atkinson Hyperlegible (v1) | 400, 700 | latin + latin-ext | `atkinsonhyperlegible/v12` (só o laboratório `/design`) |
+| `ibm-plex-mono-{400,500}-latin-latin-ext.woff2` | IBM Plex Mono | 400, 500 | latin + latin-ext | `ibmplexmono/v20` (só o laboratório `/design`) |
 | `bricolage-grotesque-200-800-latin.woff2` | Bricolage Grotesque | variável 200–800 | latin | `bricolagegrotesque/v9` |
 | `plus-jakarta-sans-200-800-latin.woff2` | Plus Jakarta Sans | variável 200–800 | latin | `plusjakartasans/v12` |
 | `fraunces-100-900-latin.woff2` | Fraunces | variável 100–900 + `opsz`, `SOFT`, `WONK` | latin | `fraunces/v38` |
@@ -40,6 +42,15 @@ subsets juntos (e sem hinting, como o do Chrome):
 ```bash
 UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:40.0) Gecko/20100101 Firefox/40.0'
 curl -sA "$UA" 'https://fonts.googleapis.com/css?family=Atkinson+Hyperlegible:400,700|IBM+Plex+Mono:400,500&subset=latin,latin-ext&display=swap'
+```
+
+A Atkinson Hyperlegible Next e a Mono (o produto, desde a etapa 2 do design
+system) vêm da API CSS2 com o mesmo User-Agent antigo, que devolve um arquivo
+por peso com latin + latin-ext juntos:
+
+```bash
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:40.0) Gecko/20100101 Firefox/40.0'
+curl -sA "$UA" 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@200..800&family=Atkinson+Hyperlegible+Mono:wght@200..800&display=swap'
 ```
 
 ## Licença

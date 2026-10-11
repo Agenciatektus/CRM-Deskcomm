@@ -97,7 +97,7 @@ export function CompaniesListClient() {
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{t("Empresas")}</h1>
+          <h1 className="text-title-lg">{t("Empresas")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("Cadastro B2B com CNPJ e enriquecimento via BrasilAPI.")}
           </p>

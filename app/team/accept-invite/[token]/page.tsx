@@ -50,7 +50,7 @@ export default async function AcceptInvitePage({ params }: PageProps) {
   if (await authRateLimited("invite_accept", null, AUTH_LIMITS.invite_accept)) {
     return (
       <Shell idioma={idioma}>
-        <h1 className="text-xl font-semibold">{t("Muitas tentativas")}</h1>
+        <h1 className="text-title-lg">{t("Muitas tentativas")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {t("Aguarde alguns minutos e abra o link do convite de novo.")}
         </p>
@@ -63,7 +63,7 @@ export default async function AcceptInvitePage({ params }: PageProps) {
   if (!payload) {
     return (
       <Shell idioma={idioma}>
-        <h1 className="text-xl font-semibold">{t("Convite inválido ou expirado")}</h1>
+        <h1 className="text-title-lg">{t("Convite inválido ou expirado")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {t(
             "Este link não é válido ou já passou da janela de 24h. Peça um novo convite ao admin do tenant.",
@@ -77,7 +77,7 @@ export default async function AcceptInvitePage({ params }: PageProps) {
     const next = encodeURIComponent(`/team/accept-invite/${token}`);
     return (
       <Shell idioma={idioma}>
-        <h1 className="text-xl font-semibold">{t("Você foi convidado")}</h1>
+        <h1 className="text-title-lg">{t("Você foi convidado")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {t("Para aceitar o convite como")} <strong>{payload.role}</strong>,{" "}
           {t("faça login com o email")} <strong>{payload.email}</strong>.
@@ -111,7 +111,7 @@ export default async function AcceptInvitePage({ params }: PageProps) {
   if (userEmail !== payload.email.trim().toLowerCase()) {
     return (
       <Shell idioma={idioma}>
-        <h1 className="text-xl font-semibold">{t("Email não corresponde")}</h1>
+        <h1 className="text-title-lg">{t("Email não corresponde")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {t("Você está logado como")} <strong>{user.email}</strong>,{" "}
           {t("mas o convite foi enviado para")} <strong>{payload.email}</strong>.{" "}
@@ -131,7 +131,7 @@ export default async function AcceptInvitePage({ params }: PageProps) {
 
   return (
     <Shell idioma={idioma}>
-      <h1 className="text-xl font-semibold">{t("Aceitar convite")}</h1>
+      <h1 className="text-title-lg">{t("Aceitar convite")}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {t("Você foi convidado para entrar como")} <strong>{payload.role}</strong>.{" "}
         {t("Confirme abaixo para ativar seu acesso.")}

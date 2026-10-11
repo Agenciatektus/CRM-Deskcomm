@@ -150,7 +150,7 @@ export default async function CredentialsPage() {
   return (
     <div className="flex h-full flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Chaves de acesso à IA", idioma)}</h1>
+        <h1 className="text-title-lg">{traduzir("Chaves de acesso à IA", idioma)}</h1>
         <p className="text-sm text-muted-foreground">
           {/* Os provedores saem da lista única: escritos à mão, a frase citava
               três quando já eram cinco. */}

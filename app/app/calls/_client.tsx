@@ -138,7 +138,7 @@ export function CallsClient() {
     <div className="flex h-full flex-col gap-6 p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Chamadas")}</h1>
+          <h1 className="text-title-lg">{t("Chamadas")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("Histórico de ligações (voz por IA) com transcrição.")}
           </p>

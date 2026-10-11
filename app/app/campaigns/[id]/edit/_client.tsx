@@ -149,7 +149,7 @@ export function EditarCampanha({ id }: { id: string }) {
   if (c.status !== "draft") {
     return (
       <div className="mx-auto max-w-3xl space-y-4 p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Editar campanha")}</h1>
+        <h1 className="text-title-lg">{t("Editar campanha")}</h1>
         <Card className="space-y-3 p-4">
           <p className="text-sm">
             {t(
@@ -179,7 +179,7 @@ export function EditarCampanha({ id }: { id: string }) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Editar campanha")}</h1>
+        <h1 className="text-title-lg">{t("Editar campanha")}</h1>
         <p className="text-sm text-muted-foreground">
           {t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
         </p>

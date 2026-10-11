@@ -90,7 +90,7 @@ export function NavHub({
   return (
     <div className="flex h-full flex-col gap-8 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir(title, locale)}</h1>
+        <h1 className="text-title-lg">{traduzir(title, locale)}</h1>
         {subtitle && <p className="text-sm text-muted-foreground">{traduzir(subtitle, locale)}</p>}
       </header>
 

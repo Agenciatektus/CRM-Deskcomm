@@ -82,7 +82,7 @@ export default async function Page() {
   return (
     <div className="space-y-6" data-testid="tela-extensoes-da-instalacao">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Extensões da instalação")}</h1>
+        <h1 className="text-title-lg">{t("Extensões da instalação")}</h1>
         <p className="mt-1 max-w-2xl text-sm text-text-muted">
           {t(
             "O que este servidor conhece, de onde veio e quem está usando. Instalar e configurar continua sendo feito dentro de cada empresa.",

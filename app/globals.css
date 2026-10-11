@@ -41,7 +41,7 @@
   --color-bg: #eef1f5;
   --color-surface: #ffffff;
   --color-surface-elevated: #f5f7f9;
-  --color-overlay: rgba(23, 29, 38, 0.42);
+  --color-overlay: rgba(17, 22, 31, 0.32);
 
   /* Text (light) */
   --color-text: #171d26;
@@ -52,18 +52,20 @@
   --color-border: #e0e3e8;
   --color-border-strong: #cdd1d7;
 
-  /* Accent — Sage (11 stops) */
-  --color-accent-50:  #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
+  /* Accent — Verde Verdash #0E7A5F (11 stops), a marca padrão sem organização.
+     Rampa = rampaDeSemente("#0E7A5F") (lib/branding/rampa.ts). Até a etapa 2
+     do DS era a Sage #506D48, que segue como preset. */
+  --color-accent-50:  #eef7f4;
+  --color-accent-100: #daeee6;
+  --color-accent-200: #b4ddcd;
+  --color-accent-300: #82c4ad;
+  --color-accent-400: #4ead8f;
+  --color-accent-500: #229676;
+  --color-accent-600: #0e7a5f;
+  --color-accent-700: #17614c;
+  --color-accent-800: #1a4f3f;
+  --color-accent-900: #1a4235;
+  --color-accent-950: #0a211a;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
@@ -84,17 +86,17 @@
 
   /* States (light) */
   --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
+  --color-success-bg: #dff6e2;
+  --color-success-fg: #287c42;
   --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
+  --color-warning-bg: #ffeed2;
+  --color-warning-fg: #824c00;
+  --color-error: #b02a2d;
+  --color-error-bg: #ffe9e6;
+  --color-error-fg: #b02a2d;
   --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
+  --color-info-bg: #e1f1ff;
+  --color-info-fg: #0077bc;
 
   /* Spacing (4-base) */
   --space-0: 0px;
@@ -132,6 +134,9 @@
   --density-gap: 24px;
   --density-px: 20px;
   --density-py: 16px;
+  /* Respiro da linha da lista do quadro DS: 12 (8 no modo compacto, que liga
+     com `data-densidade="compacta"` num ancestral). */
+  --row-py: 12px;
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
@@ -167,7 +172,7 @@
   --destructive-foreground: #ffffff;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-500);
+  --ring: var(--color-accent-600);
   --radius: var(--radius-md);
   /* ---- Agenda · cor de pessoa (8 trilhas) ------------------------------
    * Quem é o dono do compromisso é o eixo visual da grade, e a accent NÃO
@@ -240,7 +245,7 @@
   --color-avatar-5: #e3d7fb;
   --color-avatar-5-fg: #4b346f;
   --color-avatar-6: #c0e7e8;
-  --color-avatar-6-fg: #00484c;
+  --color-avatar-6-fg: #00474a;
   /* ---- Design System v2 · tokens que o protótipo tem e o CRM não tinha ----
    * Etapa 1 do DS (docs/design/design-system/mapa-de-tokens.md): só ADIÇÃO.
    * Nenhuma tela consome estes nomes ainda; a vitrine /app/design-system os
@@ -256,6 +261,12 @@
   --color-thread: #f2f5f8;
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
+  --mix-accent-soft: 11%;
+  --mix-accent-hover: 86%;
+  --accent-hover-alvo: #000000;
+  --mix-bubble-out: 15%;
+  --mix-bubble-ai: 7%;
+  --bubble-ai-base: var(--color-surface);
   --mix-accent-soft-2: 20%;
   --mix-accent-text: 88%;
   --accent-text-alvo: #000000;
@@ -307,11 +318,11 @@
    — a régua inteira, e com ela os 37 testes de contraste, deixariam de ser
    extraídos.
 
-   As 11 paradas `--color-accent-NNN` ficam DE FORA de propósito. Elas são
-   idênticas nos dois blocos do produto, então omiti-las não muda pixel algum
-   aqui; e, na instalação que trocou a cor, a subárvore clara passa a herdar a
-   rampa do `<html>` (a do revendedor) em vez de fixar a Sage. Pelo mesmo
-   motivo os papéis abaixo mantêm a forma `var(--color-accent-NNN)`.
+   As 11 paradas `--color-accent-NNN` ENTRAM no espelho desde a etapa 2 do
+   DS: o escuro passou a ter rampa própria (o azul Verdash, travado), e uma
+   subárvore clara sob página escura herdaria o azul. A marca de cada painel
+   da vitrine chega pelo escopo do painel (`ESCOPO_DO_PAINEL`,
+   lib/branding/css.ts), que vence este bloco.
 
    Buraco conhecido: `--color-accent-fg` é literal `#ffffff` e, numa subárvore
    clara sob página escura, ficaria preso ao branco mesmo quando a marca exige
@@ -322,12 +333,23 @@
   --color-bg: #eef1f5;
   --color-surface: #ffffff;
   --color-surface-elevated: #f5f7f9;
-  --color-overlay: rgba(23, 29, 38, 0.42);
+  --color-overlay: rgba(17, 22, 31, 0.32);
   --color-text: #171d26;
   --color-text-muted: #474d58;
   --color-text-subtle: #606671;
   --color-border: #e0e3e8;
   --color-border-strong: #cdd1d7;
+  --color-accent-50: #eef7f4;
+  --color-accent-100: #daeee6;
+  --color-accent-200: #b4ddcd;
+  --color-accent-300: #82c4ad;
+  --color-accent-400: #4ead8f;
+  --color-accent-500: #229676;
+  --color-accent-600: #0e7a5f;
+  --color-accent-700: #17614c;
+  --color-accent-800: #1a4f3f;
+  --color-accent-900: #1a4235;
+  --color-accent-950: #0a211a;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
@@ -344,17 +366,17 @@
   --color-neutral-900: #171d26;
   --color-neutral-950: #070b12;
   --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
+  --color-success-bg: #dff6e2;
+  --color-success-fg: #287c42;
   --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
+  --color-warning-bg: #ffeed2;
+  --color-warning-fg: #824c00;
+  --color-error: #b02a2d;
+  --color-error-bg: #ffe9e6;
+  --color-error-fg: #b02a2d;
   --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
+  --color-info-bg: #e1f1ff;
+  --color-info-fg: #0077bc;
   --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
   --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.06), 0 1px 1px 0 rgba(16, 24, 40, 0.04);
   --shadow-md: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -1px rgba(16, 24, 40, 0.05);
@@ -377,7 +399,7 @@
   --destructive-foreground: #ffffff;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-500);
+  --ring: var(--color-accent-600);
   /* ---- Agenda · cor de pessoa (espelho do :root) -----------------------
    * Espelhado aqui porque o tema escuro sobrescreve estas oito chaves, e
    * `tests/unit/branding-tema-claro-escopavel.test.ts` exige que este bloco
@@ -405,12 +427,18 @@
   --color-avatar-5: #e3d7fb;
   --color-avatar-5-fg: #4b346f;
   --color-avatar-6: #c0e7e8;
-  --color-avatar-6-fg: #00484c;
+  --color-avatar-6-fg: #00474a;
   /* ---- Design System v2 (espelho do :root, mesma razão da agenda) ---- */
   --color-hover: #eaedf2;
   --color-thread: #f2f5f8;
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
+  --mix-accent-soft: 11%;
+  --mix-accent-hover: 86%;
+  --accent-hover-alvo: #000000;
+  --mix-bubble-out: 15%;
+  --mix-bubble-ai: 7%;
+  --bubble-ai-base: var(--color-surface);
   --mix-accent-soft-2: 20%;
   --mix-accent-text: 88%;
   --accent-text-alvo: #000000;
@@ -423,7 +451,7 @@
   --color-bg: #0d0e11;
   --color-surface: #181a1c;
   --color-surface-elevated: #1f2225;
-  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-overlay: rgba(17, 22, 31, 0.32);
 
   /* Text (dark) */
   --color-text: #f8f8f8;
@@ -434,22 +462,28 @@
   --color-border: #292c2f;
   --color-border-strong: #3a3d41;
 
-  /* Accent stays same hex stops; default shifts up for dark contrast */
-  --color-accent-50:  #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
-  --color-accent: var(--color-accent-400);
-  --color-accent-fg: #161510;
-  --color-accent-soft: rgba(130, 160, 119, 0.16);
-  --color-accent-hover: var(--color-accent-300);
+  /* Accent do ESCURO travado no primary Verdash #2690B1 (o meio do degradê),
+     para todo revendedor: quadro DesignSystemVerdash.dc.html, seção Cor. A
+     marca da organização só pinta o claro; lib/branding/contraste.ts deriva o
+     escuro sempre desta rampa (`rampaDoEscuro`), e o bloco injetado repete
+     estes valores. Rampa = rampaDeSemente("#2690B1"). `--color-accent-fg` é o
+     preto calculado (5,2:1): onde o quadro pinta branco sobre o azul, a tela
+     usa o degradê (botão, chip ligado, contador), não o accent sólido. */
+  --color-accent-50:  #edf7fb;
+  --color-accent-100: #daf0f8;
+  --color-accent-200: #b6e1f2;
+  --color-accent-300: #87cde7;
+  --color-accent-400: #54b9dc;
+  --color-accent-500: #2da6cc;
+  --color-accent-600: #2690b1;
+  --color-accent-700: #247089;
+  --color-accent-800: #21596c;
+  --color-accent-900: #1f4958;
+  --color-accent-950: #072028;
+  --color-accent: var(--color-accent-600);
+  --color-accent-fg: #000000;
+  --color-accent-soft: rgba(38, 144, 177, 0.2);
+  --color-accent-hover: var(--color-accent-500);
 
   /* Neutrals — greige (11 stops, dark) */
   --color-neutral-50:  #f8f8f8;
@@ -472,8 +506,8 @@
   --color-success-fg: #41ce90;
   --color-warning: #d09455;
   --color-warning-bg: #412805;
-  --color-warning-fg: #ffb846;
-  --color-error: #c87263;
+  --color-warning-fg: #ffb848;
+  --color-error: #fa8785;
   --color-error-bg: #521c1d;
   --color-error-fg: #fa8785;
   --color-info: #7da9bf;
@@ -502,10 +536,10 @@
   --muted-foreground: var(--color-text-muted);
   --accent-foreground: var(--color-accent-fg);
   --destructive: var(--color-error);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #1e1311;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-400);
+  --ring: var(--color-accent-600);
   /* ---- Agenda · cor de pessoa (tema escuro) ----------------------------
    * Mais claras e menos saturadas que as do claro: sobre `#0d0e11` a versão
    * escura de cada matiz sumiria. Mesma ordem, mesmos nomes.
@@ -538,6 +572,12 @@
   --color-thread: #111315;
   --color-tint: rgba(255, 255, 255, 0.08);
   --color-warning-line: #8d5d1c;
+  --mix-accent-soft: 20%;
+  --mix-accent-hover: 0%;
+  --accent-hover-alvo: var(--color-accent-500);
+  --mix-bubble-out: 30%;
+  --mix-bubble-ai: 0%;
+  --bubble-ai-base: #171e22;
   --mix-accent-soft-2: 30%;
   --mix-accent-text: 0%;
   --accent-text-alvo: #69cee6;
@@ -560,30 +600,26 @@
   /* ---- Pele Verdash (escuro): tokens -----------------------------------
      O bloco "VARIANTE VERDASH" do protótipo (MainVerdash.dc.html), traduzido.
 
-     O DEGRADÊ DO ESCURO É FIXO, O DO VERDASH, PARA TODO REVENDEDOR (decisão do
-     Peterson, 10/10/2026). O claro continua com a marca do revendedor; aqui a
-     marca segue valendo para o resto (accent, bolha de saída, botões
-     secundários), e só degradê, brilho e foco ficam no azul->menta.
+     O DEGRADÊ E O ACCENT DO ESCURO SÃO FIXOS, OS DO VERDASH, PARA TODO
+     REVENDEDOR (decisão do Peterson, 10/10/2026; o accent travado no primary
+     #2690B1 entrou na etapa 2 do DS). O claro continua com a marca do revendedor.
 
-     DOIS degradês, porque nenhuma cor de texto passa AA sobre o original
-     inteiro (branco dá 6,37:1 no azul, 3,85:1 no meio e 2,15:1 na ponta menta;
-     texto escuro reprova no azul):
-       --pele-grad        o do protótipo, VIBRANTE, só onde não há texto em cima
-                          (traço da seleção, indicador da aba, borda da bolha
-                          da IA, switch);
-       --pele-grad-texto  o mesmo matiz com o meio e a ponta escurecidos em
-                          oklch até o branco passar de 4,5:1 em TODA parada
-                          (6,37 / 4,60 / 4,70), para botão, contador, avatar e
-                          chip ligado. `tests/unit/botao-primario-gradiente.test.ts`
-                          refaz a conta a partir deste arquivo.
+     "Ação" usa o degradê VIBRANTE da logo com texto branco, como o quadro escuro
+     (DesignSystemVerdash.dc.html, Cor): "Branco sobre o gradiente foi validado
+     no Verdash; o trecho central mede cerca de 3,7:1, aceito para botão em 600.
+     Texto corrido nunca vai sobre o gradiente." Valores medidos com o branco:
+     6,37 no azul, 3,85 no meio, 2,15 na ponta menta. Por isso o degradê só leva
+     RÓTULO curto de peso >= 600 e 12px ou mais (botão primário, contador, chip
+     ligado, aba do composer, avatar da conta, etapa), e
+     `tests/unit/botao-primario-gradiente.test.ts` registra a exceção (meio
+     >= 3,5:1). Até a etapa 2 havia um segundo degradê, escurecido para texto
+     (`--pele-grad-texto`), que o quadro não tem; ele saiu.
      Em hex, e não oklch, porque é hex que a régua e o teste leem. */
   --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
-  --pele-grad-texto: linear-gradient(120deg, #2a52d8 0%, #157f9f 50%, #0c845c 100%);
-  /* O hover do botão escurece SÓ O FUNDO: as paradas do degradê de texto com
-     L 8% menor em oklch (7,59 / 5,57 / 5,59 com o branco). Um `brightness()`
-     no botão escureceria o texto junto e derrubaria o meio e a ponta abaixo de
-     4,5:1 (P1 do Cassio na #145). */
-  --pele-grad-texto-hover: linear-gradient(120deg, #2145ca 0%, #007191 50%, #007750 100%);
+  /* O hover do botão escurece SÓ O FUNDO: as paradas com L 6% menor em oklch
+     (8,31 / 4,92 / 2,68 com o branco). Um `brightness()` no botão escureceria o
+     texto junto (P1 do Cassio na #145). */
+  --pele-grad-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #00b47d 100%);
   --pele-grad-fg: #ffffff;
   --pele-brilho: #2b8cad;
   --pele-foco: #48a5c7;
@@ -591,13 +627,13 @@
   /* O texto do chip da IA (o `--accent-text` do protótipo, um tom mais claro):
      6,3:1 no pior ponto do fundo dele, já com o filtro do hover. */
   --pele-grad-soft-fg: #8fdcef;
-  /* O botão primário no escuro usa o degradê de TEXTO (ver acima). */
-  --gradient-primary: var(--pele-grad-texto);
+  /* O botão primário no escuro usa o degradê vibrante (ver acima). */
+  --gradient-primary: var(--pele-grad);
   --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
   --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
   --pele-fio: #111315;
-  --pele-bolha-saida: color-mix(in oklch, var(--color-accent) 30%, var(--color-surface));
-  --pele-bolha-ia: color-mix(in oklch, var(--pele-brilho) 8%, var(--color-surface));
+  --pele-bolha-saida: var(--color-bubble-out);
+  --pele-bolha-ia: var(--color-bubble-ai);
 }
 
 /* A mesma pele numa SUBÁRVORE escura dentro de página clara (a vitrine
@@ -610,19 +646,36 @@
    então a página escura de sempre não muda. */
 body [data-theme="dark"] {
   --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
-  --pele-grad-texto: linear-gradient(120deg, #2a52d8 0%, #157f9f 50%, #0c845c 100%);
-  --pele-grad-texto-hover: linear-gradient(120deg, #2145ca 0%, #007191 50%, #007750 100%);
+  --pele-grad-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #00b47d 100%);
   --pele-grad-fg: #ffffff;
   --pele-brilho: #2b8cad;
   --pele-foco: #48a5c7;
   --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
   --pele-grad-soft-fg: #8fdcef;
-  --gradient-primary: var(--pele-grad-texto);
+  --gradient-primary: var(--pele-grad);
   --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
   --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
   --pele-fio: #111315;
-  --pele-bolha-saida: color-mix(in oklch, var(--color-accent) 30%, var(--color-surface));
-  --pele-bolha-ia: color-mix(in oklch, var(--pele-brilho) 8%, var(--color-surface));
+  --pele-bolha-saida: var(--color-bubble-out);
+  --pele-bolha-ia: var(--color-bubble-ai);
+}
+
+/* ── Derivados da marca, declarados onde a marca chega (etapa 2 do DS) ──────
+   O `@theme inline` monta estes `color-mix` no utilitário (`bg-accent-soft-2`),
+   no elemento que pinta. Mas a custom property em si (`var(--color-accent-soft-2)`,
+   `getPropertyValue`) era resolvida uma vez só, no `<html>`: no painel claro da
+   vitrine com o app escuro ela devolvia o valor ESCURO (o defeito da etapa 1).
+   Redeclarar no `<body>` e em toda subárvore `data-theme` faz o `var()` valer o
+   tema e a marca daquele ponto da árvore. `body`, e não `:root`: a marca da
+   organização é injetada no `<body>` (lib/branding/css.ts). */
+body,
+body [data-theme] {
+  --color-accent-hover: color-mix(in oklch, var(--color-accent) var(--mix-accent-hover), var(--accent-hover-alvo));
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft), var(--color-surface));
+  --color-accent-soft-2: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft-2), var(--color-surface));
+  --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
+  --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
+  --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -665,8 +718,16 @@ body [data-theme="dark"] {
   /* Accent — Sage */
   --color-accent: var(--color-accent);
   --color-accent-foreground: var(--color-accent-fg);
-  --color-accent-soft: var(--color-accent-soft);
-  --color-accent-hover: var(--color-accent-hover);
+  /* `accent-soft` é a fórmula do quadro DS (11% da marca na superfície; 20% no
+     escuro), montada no elemento que pinta. O `--color-accent-soft` dos blocos de
+     tema (grau 100 no claro, `rgba` no escuro) continua sendo o que a régua de
+     contraste mede: no claro ele é um pouco MAIS escuro que os 11%, então a
+     razão medida é o piso do que a tela pinta. */
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft), var(--color-surface));
+  /* Hover do quadro DS: a marca a 86% com preto (`.btn-primary:hover`). No
+     escuro, a parada 500 (mais clara) do primary Verdash. A régua mede o grau
+     700 do bloco de tema, um pouco mais escuro que a mistura. */
+  --color-accent-hover: color-mix(in oklch, var(--color-accent) var(--mix-accent-hover), var(--accent-hover-alvo));
   --color-accent-50: var(--color-accent-50);
   --color-accent-100: var(--color-accent-100);
   --color-accent-200: var(--color-accent-200);
@@ -728,6 +789,8 @@ body [data-theme="dark"] {
   --color-warning-line: var(--color-warning-line);
   --color-accent-soft-2: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft-2), var(--color-surface));
   --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
+  --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
+  --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
 
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
@@ -737,7 +800,7 @@ body [data-theme="dark"] {
   --color-border: var(--color-border);
   --color-border-strong: var(--color-border-strong);
   --color-input: var(--color-border);
-  --color-ring: var(--color-accent-500);
+  --color-ring: var(--color-accent);
   --color-background: var(--color-bg);
   --color-foreground: var(--color-text);
   --color-primary: var(--color-accent);
@@ -745,7 +808,7 @@ body [data-theme="dark"] {
   --color-secondary: var(--color-surface-elevated);
   --color-secondary-foreground: var(--color-text);
   --color-destructive: var(--color-error);
-  --color-destructive-foreground: #ffffff;
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-muted: var(--color-surface-elevated);
   --color-muted-foreground: var(--color-text-muted);
   --color-popover: var(--color-surface);
@@ -806,22 +869,52 @@ body [data-theme="dark"] {
   --shadow-bubble: var(--shadow-bubble);
 
   /* Escala de texto do protótipo (`text-meta`, `text-label`…). */
+  /* Cada papel leva tamanho, peso e entrelinha do quadro DS ("Tipografia"):
+     `text-title-lg` sozinho já é 20/700/-0,01em. Um `font-*` explícito ainda
+     vence o peso do papel. */
   --text-rail: var(--font-size-rail);
+  --text-rail--font-weight: 600;
+  --text-rail--letter-spacing: -0.01em;
   --text-meta: var(--font-size-meta);
+  --text-meta--font-weight: 600;
   --text-label: var(--font-size-label);
+  --text-label--font-weight: 600;
   --text-ui: var(--font-size-ui);
   --text-ui--line-height: var(--line-height-ui);
   --text-message: var(--font-size-message);
   --text-message--line-height: var(--line-height-message);
   --text-title-sm: var(--font-size-title-sm);
+  --text-title-sm--font-weight: 700;
   --text-title-md: var(--font-size-title-md);
+  --text-title-md--font-weight: 700;
   --text-title-lg: var(--font-size-title-lg);
+  --text-title-lg--font-weight: 700;
+  --text-title-lg--letter-spacing: -0.01em;
 
   /* Motion */
   --ease-out: var(--ease-out);
   --ease-in-out: var(--ease-in-out);
   --ease-spring: var(--ease-spring);
   --ease-emphasized: var(--ease-emphasized);
+
+  /* Entradas do quadro DS (`popIn`, `fadeIn`, `slideIn` do Main.dc.html). O
+     `tailwindcss-animate` nunca foi instalado: os `animate-in`/`zoom-in-95` do
+     shadcn não animavam nada. */
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: fade-in 150ms ease;
+  --animate-slide-in: slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+  }
 }
 
 /* `duration-*` não tem espaço de tema no v4 (o `transitionDuration` do v3 não
@@ -956,6 +1049,9 @@ body [data-theme="dark"] {
     overflow-x: clip;
     background-color: var(--color-bg);
     color: var(--color-text);
+    /* Texto de interface do quadro DS: 14 / 1,45. */
+    font-size: var(--font-size-ui);
+    line-height: var(--line-height-ui);
     font-family: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system,
       "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
@@ -979,14 +1075,16 @@ body [data-theme="dark"] {
     color: var(--color-accent-50);
   }
 
-  /* Focus ring: Sage 500/400, 2px with offset */
+  /* Anel de foco do quadro DS: 2px na cor de destaque EM VIGOR (o grau do
+     accent, não uma parada fixa), afastado 2, raio 6 (Main.dc.html,
+     `:focus-visible`). No escuro a pele troca a cor por `--pele-foco`. */
   :focus-visible {
-    outline: 2px solid var(--color-accent-500);
+    outline: 2px solid var(--color-accent-600);
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
   }
   [data-theme="dark"] :focus-visible {
-    outline-color: var(--color-accent-400);
+    outline-color: var(--color-accent-600);
   }
 
   /* Modo de alto contraste do sistema (Windows High Contrast / forced-colors).
@@ -1321,7 +1419,7 @@ body [data-theme="dark"] {
 
 /* `--grad`: selo do trilho, não lidas, avatar da conta, chips ativos. */
 [data-theme="dark"] .pele-grad:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
-  background-image: var(--pele-grad-texto);
+  background-image: var(--pele-grad);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
@@ -1332,7 +1430,7 @@ body [data-theme="dark"] {
 /* Os que mudam de estado por atributo (aba do composer, chip, switch, etapa). */
 [data-theme="dark"]
   .pele-grad-ativo:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
-  background-image: var(--pele-grad-texto);
+  background-image: var(--pele-grad);
   border-color: transparent;
   color: var(--pele-grad-fg);
 }
@@ -1499,4 +1597,20 @@ body [data-theme="dark"] {
    Fora de layer só esta propriedade; altura, fundo e borda seguem em `base`. */
 select:not([multiple]):not([size]) {
   padding-inline-end: calc(var(--spacing) * 8);
+}
+
+/* `prefers-reduced-motion` do quadro DS: zera TODA animação e transição, e não
+   só as que alguém lembrou de marcar. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Modo compacto do quadro DS (`.app.compact`): a linha da lista com 8px. */
+[data-densidade="compacta"] {
+  --row-py: 8px;
 }

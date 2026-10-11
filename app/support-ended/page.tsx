@@ -10,7 +10,7 @@ export default async function SupportEndedPage() {
   return <main className="min-h-screen bg-background">
     <ImpersonateBanner ended impersonating={{tenantId: user.support.organization_id,
       tenantName: user.support.name, expiresAt: user.support.expires_at}} />
-    <div className="mx-auto max-w-xl p-8"><h1 className="text-xl font-semibold">{t("Encerre o acompanhamento para continuar")}</h1>
+    <div className="mx-auto max-w-xl p-8"><h1 className="text-title-lg">{t("Encerre o acompanhamento para continuar")}</h1>
     <p className="mt-3 text-muted-foreground">{t("O prazo ou as permissões desta sessão mudaram. Saia do acompanhamento para voltar à sua organização.")}</p></div>
   </main>;
 }

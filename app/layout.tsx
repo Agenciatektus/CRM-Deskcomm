@@ -30,19 +30,30 @@ import "./globals.css";
 // next/font/google as baixava durante o build, e o build caía quando o Google
 // não respondia. A família passa a se chamar como a variável JS ("atkinson"),
 // então use sempre a custom property (--font-atkinson), nunca o nome da fonte.
+// Atkinson Hyperlegible NEXT (pesos 200-800) e Atkinson Hyperlegible Mono, as
+// famílias do quadro DS (etapa 2). A v1 só tinha 400 e 700, e todo `font-medium`
+// e `font-semibold` saía como peso sintetizado pelo navegador. Um arquivo por
+// peso, latin + latin-ext juntos (ver app/fonts/README.md).
 const atkinson = localFont({
+  // Literal, peso a peso: o next/font só aceita valores escritos à mão.
   src: [
-    { path: "./fonts/atkinson-hyperlegible-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/atkinson-hyperlegible-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-200-latin-latin-ext.woff2", weight: "200", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-300-latin-latin-ext.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-600-latin-latin-ext.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-800-latin-latin-ext.woff2", weight: "800", style: "normal" },
   ],
   display: "swap",
   variable: "--font-atkinson",
 });
 
-const plexMono = localFont({
+const atkinsonMono = localFont({
   src: [
-    { path: "./fonts/ibm-plex-mono-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/ibm-plex-mono-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
   ],
   display: "swap",
   variable: "--font-mono",
@@ -282,7 +293,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="pt-BR"
       data-theme="light"
       suppressHydrationWarning
-      className={`${atkinson.variable} ${plexMono.variable}`}
+      className={`${atkinson.variable} ${atkinsonMono.variable}`}
     >
       <head>
         {/* Primeiro de tudo: a cor da instalação, antes do CSS e do script de tema. */}

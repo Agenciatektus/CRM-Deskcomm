@@ -26,7 +26,7 @@ export default async function Page() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold">{t("Honorários")}</h1>
+        <h1 className="text-title-lg">{t("Honorários")}</h1>
         <p className="text-sm text-text-muted">
           {t("O modelo de cobrança de cada caso e o calendário de parcelas.")}
         </p>

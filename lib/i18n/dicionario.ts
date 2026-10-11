@@ -211,7 +211,7 @@ export const DICIONARIO: Traducoes = {
   "Espaçamento e raios": { es: "Espaciado y radios" },
   "Escala de espaço (base 4)": { es: "Escala de espacio (base 4)" },
   "Respiro da linha da lista": { es: "Aire de la fila de la lista" },
-  "Protótipo: 12px (8px no compacto). CRM: --density-py 16px, sem modo compacto.": { es: "Prototipo: 12px (8px en compacto). CRM: --density-py 16px, sin modo compacto." },
+  "--row-py 12px; 8px com data-densidade=\"compacta\" num ancestral.": { es: "--row-py 12px; 8px con data-densidade=\"compacta\" en un ancestro." },
   "Raios do CRM": { es: "Radios del CRM" },
   "Raios do protótipo, em tokens novos": { es: "Radios del prototipo, en tokens nuevos" },
   "Sombras, elevação, foco e movimento": { es: "Sombras, elevación, foco y movimiento" },
@@ -259,7 +259,7 @@ export const DICIONARIO: Traducoes = {
   "Família e números (mono)": { es: "Familia y números (mono)" },
   "Família de texto: a variável --font-atkinson do CRM.": { es: "Familia de texto: la variable --font-atkinson del CRM." },
   "Pesos": { es: "Pesos" },
-  "O CRM embarca a fonte só em 400 e 700: 500 e 600 são aproximados pelo navegador.": { es: "El CRM incluye la fuente solo en 400 y 700: 500 y 600 los aproxima el navegador." },
+  "Atkinson Hyperlegible Next embarcada de 200 a 800: cada peso é o desenhado, não aproximado.": { es: "Atkinson Hyperlegible Next incluida de 200 a 800: cada peso es el diseñado, no aproximado." },
   "Escala usada nas telas hoje": { es: "Escala usada hoy en las pantallas" },
   // ─── EMPRESAS, PESSOAS E IMPORTAÇÃO (metade B2B do #1621, de @renatofortal) ───
   "Arquivo": {"es": "Archivo"},

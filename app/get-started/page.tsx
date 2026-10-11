@@ -63,7 +63,7 @@ export default async function GetStartedPage() {
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
               {marca.nome}
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-title-lg">
               {pedido === "pending"
                 ? t("Pedido enviado")
                 : pedido === "rejected"

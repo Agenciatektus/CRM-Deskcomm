@@ -1,14 +1,15 @@
 /**
- * O degradê do tema escuro é o FIXO do Verdash, e o texto passa AA sobre ele.
+ * O degradê do tema escuro é o FIXO do Verdash, e a AÇÃO usa o VIBRANTE com branco.
  *
  * Decisão do Peterson (10/10/2026): no escuro o degradê é azul->menta para todo
- * revendedor; no claro nada muda (a marca do revendedor continua). Nenhuma cor
- * de texto passa AA sobre o degradê ORIGINAL do protótipo inteiro, então há
- * dois: o vibrante (`--pele-grad`, só onde não há texto) e o de texto
- * (`--pele-grad-texto`, meio e ponta escurecidos). Esta cerca lê as paradas do
- * próprio CSS e refaz a conta: nenhuma parada do degradê de texto pode ficar
- * abaixo de 4,5:1 com o texto declarado. Transcrever as cores aqui mediria a
- * minha cópia, que continuaria "certa" com o CSS mudado.
+ * revendedor; no claro nada muda (a marca do revendedor continua).
+ *
+ * Etapa 2 do DS: o quadro escuro (DesignSystemVerdash.dc.html, Cor) pinta botão
+ * primário, contador e etapa com o degradê VIBRANTE e texto branco: "Branco sobre o
+ * gradiente foi validado no Verdash; o trecho central mede cerca de 3,7:1, aceito
+ * para botão em 600. Texto corrido nunca vai sobre o gradiente." Esta cerca registra a
+ * EXCEÇÃO de contraste (rótulo de peso >= 600 e >= 12px, mínimo de 3,5:1 no meio) e
+ * lê as paradas do próprio CSS: transcrever as cores aqui mediria a minha cópia.
  */
 import { readFileSync } from "node:fs";
 
@@ -37,66 +38,55 @@ function paradas(valor: string): string[] {
   return [...valor.matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase());
 }
 
-describe("degradê do escuro", () => {
-  it("o degradê de texto tem as três paradas, e o texto passa AA em todas", () => {
-    const fg = token("--pele-grad-fg");
-    const cores = paradas(token("--pele-grad-texto"));
-    expect(cores).toHaveLength(3);
-    for (const cor of cores) {
-      expect(
-        razaoDeContraste(fg, cor),
-        `${fg} sobre ${cor}: o texto do botão reprova AA nesta parada`,
-      ).toBeGreaterThanOrEqual(4.5);
-    }
-  });
+/** O mínimo aceito no TRECHO CENTRAL do degradê, pela exceção do quadro escuro. */
+const MINIMO_DA_EXCECAO = 3.5;
 
-  it("controle negativo: o degradê VIBRANTE reprova com o mesmo texto (por isso existem dois)", () => {
+describe("degradê do escuro", () => {
+  it("o meio do degradê vibrante passa a exceção do quadro com o texto branco, e o início passa AA", () => {
     const fg = token("--pele-grad-fg");
-    const vibrante = paradas(token("--pele-grad"));
-    expect(vibrante).toHaveLength(3);
-    expect(vibrante.some((cor) => razaoDeContraste(fg, cor) < 4.5)).toBe(true);
+    const [inicio, meio, fim] = paradas(token("--pele-grad"));
+    expect(razaoDeContraste(fg, inicio!)).toBeGreaterThanOrEqual(4.5);
+    expect(razaoDeContraste(fg, meio!), "o trecho central caiu abaixo da exceção do quadro").toBeGreaterThanOrEqual(
+      MINIMO_DA_EXCECAO,
+    );
+    // Controle negativo: a ponta menta reprova até a exceção (2,15:1). É por isso que
+    // o degradê só leva RÓTULO curto, centralizado, nunca texto corrido.
+    expect(razaoDeContraste(fg, fim!)).toBeLessThan(MINIMO_DA_EXCECAO);
   });
 
   it("é fixo: nenhum token de degradê, brilho ou foco lê a marca do revendedor", () => {
-    for (const nome of ["--pele-grad", "--pele-grad-texto", "--pele-brilho", "--pele-foco", "--pele-grad-fg"]) {
+    for (const nome of ["--pele-grad", "--pele-grad-hover", "--pele-brilho", "--pele-foco", "--pele-grad-fg"]) {
       expect(token(nome), `${nome} voltou a depender da marca`).not.toMatch(/--color-accent/);
     }
   });
 
-  it("o botão primário usa o degradê de texto no escuro, com o texto do degradê", () => {
-    expect(token("--gradient-primary")).toBe("var(--pele-grad-texto)");
+  it("o botão primário usa o degradê vibrante no escuro, com o texto branco e peso 600", () => {
+    expect(token("--gradient-primary")).toBe("var(--pele-grad)");
     expect(BOTAO).toContain("dark:bg-(image:--gradient-primary)");
     expect(BOTAO).toContain("dark:text-(--pele-grad-fg)");
-    // O hover não troca pelo accent chapado: o accent é da marca, e o texto
-    // branco não foi medido contra ele.
+    expect(BOTAO).toContain("font-semibold");
     expect(BOTAO).not.toContain("dark:hover:bg-none");
   });
 
-  it("o hover do botão escurece SÓ o fundo, e o texto passa AA em toda parada dele", () => {
-    // P1 do Cassio na #145: `brightness()` no botão escurecia o texto junto e
-    // derrubava o meio e a ponta para 4,36 e 4,45.
-    expect(BOTAO).toContain("dark:hover:bg-(image:--pele-grad-texto-hover)");
+  it("o hover do botão escurece SÓ o fundo, e o meio continua na exceção", () => {
+    // P1 do Cassio na #145: `brightness()` no botão escurecia o texto junto.
+    expect(BOTAO).toContain("dark:hover:bg-(image:--pele-grad-hover)");
     expect(BOTAO, "filtro no hover escurece o texto junto com o fundo").not.toMatch(/dark:hover:brightness/);
     const fg = token("--pele-grad-fg");
-    const cores = paradas(token("--pele-grad-texto-hover"));
+    const cores = paradas(token("--pele-grad-hover"));
     expect(cores).toHaveLength(3);
-    for (const cor of cores) {
-      expect(razaoDeContraste(fg, cor), `${fg} sobre ${cor} no hover`).toBeGreaterThanOrEqual(4.5);
-    }
+    expect(razaoDeContraste(fg, cores[1]!)).toBeGreaterThanOrEqual(MINIMO_DA_EXCECAO);
   });
 
-  it("onde há texto sobre o degradê, a pele usa o degradê de TEXTO, nunca o vibrante", () => {
-    // P2-1 do Cassio na #145: `.pele-grad` (contadores, avatar, chips) e
-    // `.pele-grad-ativo` (aba Responder, switch) levam texto em cima.
-    // As duas regras levam o recorte da subárvore clara (`:not(:where(…))`) logo
-    // depois da classe; o que se procura é a regra, com ou sem ele.
+  it("contador, chip ligado e etapa usam o degradê da logo (o mesmo do botão)", () => {
     for (const classe of [".pele-grad:not(", ".pele-grad-ativo:not("]) {
       const inicio = CSS.indexOf(classe);
       expect(inicio, `sumiu a regra ${classe}`).toBeGreaterThan(-1);
       const corpo = CSS.slice(inicio, CSS.indexOf("}", inicio));
-      expect(corpo, `${classe} usa o degradê vibrante`).toContain("var(--pele-grad-texto)");
-      expect(corpo).not.toMatch(/var\(--pele-grad\)/);
+      expect(corpo).toContain("var(--pele-grad)");
+      expect(corpo).toContain("var(--pele-grad-fg)");
     }
+    expect(CSS, "o degradê escurecido de texto voltou").not.toMatch(/--pele-grad-texto:/);
   });
 
   it("o claro não ganhou degradê: o bloco do claro não declara os tokens da pele", () => {
@@ -107,16 +97,15 @@ describe("degradê do escuro", () => {
 
   it("o texto do chip da IA passa AA no pior ponto do fundo dele, inclusive no hover", () => {
     // O fundo do chip no escuro: a caixa do composer (`--color-surface`), o
-    // `bg-accent-soft` da marca padrão e o `--pele-grad-soft` por cima. Os
-    // piores pontos são as duas pontas. O hover aplica `brightness(1.15)` no
-    // chip inteiro (texto e fundo).
+    // `accent-soft` do primary Verdash (20%) e o `--pele-grad-soft` por cima. Os
+    // piores pontos são as duas pontas. O hover aplica `brightness(1.15)`.
     const fg = token("--pele-grad-soft-fg");
     const mistura = (b: number[], c: number[], a: number) => b.map((x, i) => x * (1 - a) + c[i]! * a);
     const hex = (c: number[]) =>
       "#" + c.map((v) => Math.round(Math.min(255, v)).toString(16).padStart(2, "0")).join("");
     const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
     const claro = (c: number[]) => c.map((v) => v * 1.15);
-    const base = mistura([24, 26, 28], [130, 160, 119], 0.16);
+    const base = mistura([24, 26, 28], [38, 144, 177], 0.2);
     const pontas = [mistura(base, [42, 82, 216], 0.24), mistura(base, [43, 200, 143], 0.18)];
     for (const fundo of pontas) {
       expect(razaoDeContraste(fg, hex(fundo))).toBeGreaterThanOrEqual(4.5);

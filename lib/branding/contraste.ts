@@ -205,6 +205,13 @@ export type TemaDaRegua = {
 
 export type Regua = {
   readonly rampaDoProduto: Rampa;
+  /**
+   * A rampa do bloco escuro. Desde a etapa 2 do DS o accent do escuro é o primary
+   * Verdash (#2690B1), TRAVADO para todo revendedor (quadro DesignSystemVerdash,
+   * seção Cor): a marca da organização só pinta o claro, e o escuro é derivado
+   * sempre desta rampa.
+   */
+  readonly rampaDoEscuro: Rampa;
   readonly claro: TemaDaRegua;
   readonly escuro: TemaDaRegua;
 };
@@ -322,9 +329,11 @@ export function extrairRegua(css: string): Regua {
   }
 
   const rampaDoProduto = lerRampa(raiz.decls);
+  const rampaDoEscuro = lerRampa(escuro.decls);
 
   return {
     rampaDoProduto,
+    rampaDoEscuro,
     claro: montarTema("claro", raiz.decls, regras, false),
     escuro: montarTema("escuro", escuro.decls, regras, true),
   };
@@ -742,6 +751,8 @@ export type Marca = {
   /** O hex do cliente, sempre — vai para `--color-brand`, mesmo quando não vira accent. */
   readonly marca: string;
   readonly rampa: Rampa;
+  /** A rampa que o tema escuro usa: sempre a do produto (accent travado no escuro). */
+  readonly rampaDoEscuro: Rampa;
   readonly origemDaRampa: "semente" | "produto";
   readonly claro: TokensDoTema;
   readonly escuro: TokensDoTema;
@@ -843,7 +854,8 @@ export function derivarMarca(semente: string, regua: Regua): Marca {
   const rampa = acromatica ? regua.rampaDoProduto : rampaDeSemente(marca);
 
   const claro = derivarTema(regua.claro, rampa);
-  const escuro = derivarTema(regua.escuro, rampa);
+  // O escuro NÃO segue a marca: accent travado no primary Verdash (ver `Regua`).
+  const escuro = derivarTema(regua.escuro, regua.rampaDoEscuro);
   const motivos: Motivo[] = [...claro.motivos, ...escuro.motivos];
 
   if (acromatica) {
@@ -860,6 +872,7 @@ export function derivarMarca(semente: string, regua: Regua): Marca {
   return {
     marca,
     rampa,
+    rampaDoEscuro: regua.rampaDoEscuro,
     origemDaRampa: acromatica ? "produto" : "semente",
     claro: claro.tokens,
     escuro: escuro.tokens,

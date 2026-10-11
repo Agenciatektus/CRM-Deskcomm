@@ -44,7 +44,7 @@ export function ProposalsSettingsClient() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">{t("Propostas")}</h1>
+      <h1 className="text-title-lg">{t("Propostas")}</h1>
       <p className="text-sm">
         <Link href="/app/settings/tenant/proposals/modelos" className="underline underline-offset-4">
           {t("Modelos de proposta")}

@@ -114,7 +114,7 @@ export function FormularioDeSmtp({
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-title-lg">
           {t("Servidor de e-mail desta instalação")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

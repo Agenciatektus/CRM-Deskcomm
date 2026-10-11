@@ -41,7 +41,7 @@ export function ImportDetailClient({ id }: { id: string }) {
         <Link href="/app/imports" className="text-sm text-muted-foreground hover:underline">
           ← {t("Importações")}
         </Link>
-        <h1 className="text-xl font-semibold">{batch.filename as string}</h1>
+        <h1 className="text-title-lg">{batch.filename as string}</h1>
         <p className="text-sm text-muted-foreground">
           {batch.status as string} · {batch.successful_rows as number} {t("certas")} ·{" "}
           {batch.conflict_rows as number} {t("conflitos")} · {batch.failed_rows as number} {t("falhas")}

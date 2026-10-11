@@ -19,7 +19,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "pele-foco flex h-9.5 w-full items-center justify-between whitespace-nowrap rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text transition-[border-color,box-shadow] hover:border-text-subtle data-[placeholder]:text-muted-foreground focus:outline-hidden focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60 [&>span]:line-clamp-1",
+      "pele-foco flex h-9.5 w-full items-center justify-between whitespace-nowrap rounded-field border border-border bg-surface-elevated px-2.75 py-0 text-ui text-text transition-[border-color,box-shadow,background-color] duration-ui hover:border-border-strong data-[placeholder]:text-text-subtle focus:outline-hidden focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-error aria-[invalid=true]:ring-3 aria-[invalid=true]:ring-error-bg [&>span]:line-clamp-1",
       className
     )}
     {...props}
@@ -75,7 +75,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "pele-ruido relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-surface text-text shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-select-content-transform-origin)",
+        "pele-ruido relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-menu border border-border bg-surface text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-select-content-transform-origin)",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className
@@ -86,7 +86,7 @@ const SelectContent = React.forwardRef<
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1",
+          "p-1.5",
           position === "popper" &&
             "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
         )}
@@ -118,7 +118,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden focus:bg-surface-elevated focus:text-text data-[state=checked]:bg-accent-soft data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex min-h-8.5 w-full cursor-default select-none items-center rounded-md py-1.5 pl-2 pr-8 text-[13.5px] outline-hidden focus:bg-hover focus:text-text data-[state=checked]:font-semibold data-[state=checked]:text-accent-text data-[disabled]:pointer-events-none data-[disabled]:text-text-subtle",
       className
     )}
     {...props}

@@ -7,20 +7,17 @@ import { cn } from "@/lib/utils";
  * Chip de escolha — o `.chip` do protótipo da Inbox v2 (Main.dc.html:541).
  *
  * Botão de alternar, em pílula de 30px: desligado é contorno na linha forte;
- * ligado (`aria-pressed`) é o accent cheio e, no escuro, o degradê de texto da
- * pele (`pele-grad-ativo`, que lê o mesmo `aria-pressed`). Desativado segue o
- * `.dp-times .chip:disabled`: tracejado e apagado.
- *
- * Nasceu na Etapa 1 do design system para a vitrine `/app/design-system`. As
- * telas que hoje desenham chip à mão (atalhos de prazo, motivos de perda) NÃO
- * foram trocadas: isso é a etapa de substituição, com aprovação.
+ * ligado (`aria-pressed`) é o accent cheio e, no escuro, o degradê da logo
+ * (`pele-grad-ativo`, que lê o mesmo `aria-pressed`). Desativado segue o
+ * `.chip.off` do quadro DS: tracejado e a 40%. Chip é ESCOLHA; estado é a
+ * pílula (`Badge`) e classificação é a tag (`Badge variant="tag"`).
  */
 const chipVariants = cva(
   [
-    "pele-grad-ativo inline-flex h-7.5 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3",
+    "pele-grad-ativo inline-flex h-7.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2.75",
     "text-label font-semibold",
     "transition-[background-color,border-color,color] duration-ui ease-emphasized",
-    "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
     "disabled:cursor-not-allowed disabled:border-dashed disabled:opacity-40",
     "[&_svg]:size-3.5 [&_svg]:shrink-0",
   ].join(" "),

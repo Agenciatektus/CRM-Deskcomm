@@ -68,7 +68,7 @@ export function SecaoEspacoForma({ tema }: { tema: Tema }) {
         </Exemplo>
         <Exemplo nome={t("Respiro da linha da lista")} mapa="espaco:linha" tema={tema}>
           <p className="text-ui text-text-muted">
-            {t("Protótipo: 12px (8px no compacto). CRM: --density-py 16px, sem modo compacto.")}
+            {t("--row-py 12px; 8px com data-densidade=\"compacta\" num ancestral.")}
           </p>
         </Exemplo>
       </Secao>

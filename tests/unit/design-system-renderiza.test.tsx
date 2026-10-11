@@ -155,15 +155,18 @@ describe("vitrine do design system", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 
-  it("o selo mora na amostra: token novo diz 'Novo nesta etapa' e o diferente mostra o protótipo", async () => {
+  it("o selo mora na amostra: o corrigido na etapa 2 perde o selo e o diferente mostra o protótipo", async () => {
     const { container } = await montar();
     const claro = container.querySelector('[data-painel-do-tema="claro"]')!;
-    const hover = claro.querySelector('[data-amostra="--color-hover"]')!;
-    expect(hover.textContent).toContain("Novo nesta etapa");
-    const info = claro.querySelector('[data-amostra="--color-info-fg"]')!;
-    expect(info.textContent).toContain("Diferente do protótipo");
-    expect(info.textContent).toContain("#0077bc");
+    // Etapa 2 do DS: hover e estados do claro ficaram iguais ao protótipo.
+    expect(claro.querySelector('[data-amostra="--color-hover"] [data-status]')).toBeNull();
+    expect(claro.querySelector('[data-amostra="--color-info-fg"] [data-status]')).toBeNull();
     expect(claro.querySelector('[data-amostra="--color-bg"] [data-status]')).toBeNull();
+    // O que segue diferente (exceção registrada no teste de paridade) mostra o valor do protótipo.
+    const escuro = container.querySelector('[data-painel-do-tema="escuro"]')!;
+    const fg = escuro.querySelector('[data-amostra="--color-accent-fg"]')!;
+    expect(fg.textContent).toContain("Diferente do protótipo");
+    expect(fg.textContent).toContain("#f8f8f8");
   });
 });
 
