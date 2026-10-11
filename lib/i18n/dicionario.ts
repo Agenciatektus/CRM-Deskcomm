@@ -14177,7 +14177,6 @@ export const DICIONARIO: Traducoes = {
     es: "Quien responde sale de la secuencia de inmediato. Los pasos siguientes aplican a quien quedó en silencio.",
   },
   "Passos depois da primeira mensagem": { es: "Pasos después del primer mensaje" },
-  "Exigir motivo de perda ao fechar como perdido": { es: "Exigir motivo de pérdida al cerrar como perdido" },
   "A primeira mensagem é a de cima, e ela sai para todo mundo da lista. Os passos abaixo acontecem depois dela, para quem NÃO respondeu. Quem responde sai da régua na hora.": {
     es: "El primer mensaje es el de arriba y se envía a toda la lista. Los pasos siguientes ocurren para quien NO respondió. Quien responde sale de la secuencia de inmediato.",
   },
