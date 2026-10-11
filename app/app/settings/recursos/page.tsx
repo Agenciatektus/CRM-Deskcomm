@@ -79,7 +79,7 @@ export default async function RecursosOpcionaisPage() {
   return (
     <div className="flex h-full flex-col gap-8 overflow-y-auto p-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Recursos opcionais", idioma)}</h1>
+        <h1 className="text-title-lg">{traduzir("Recursos opcionais", idioma)}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           {traduzir(
             "Tudo o que se liga e desliga, num lugar só. Cada recurso continua sendo ligado na tela dele: o botão Ajustar leva até lá.",

@@ -56,7 +56,7 @@ export default async function AgentsListPage() {
     <div className="flex h-full flex-col gap-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-title-lg">
             {traduzir("Agents de IA", idioma)}
           </h1>
           <p className="text-sm text-muted-foreground">

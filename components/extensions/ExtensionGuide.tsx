@@ -179,7 +179,7 @@ export function ExtensionGuide({
       >
         <Card className="border-warning/40 bg-warning-bg p-5 sm:p-6" role="alert">
           <Warning size={24} weight="duotone" aria-hidden className="text-warning-fg" />
-          <h1 className="mt-3 text-xl font-semibold">{t("Este guia não está disponível")}</h1>
+          <h1 className="mt-3 text-title-lg">{t("Este guia não está disponível")}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {error ?? t("Não foi possível confirmar o estado atual desta extensão.")}
           </p>
@@ -241,7 +241,7 @@ export function ExtensionGuide({
           </div>
         </div>
         <div className="p-5 sm:p-7">
-          <h1 className="text-2xl font-semibold tracking-tight">{displayTitle.text}</h1>
+          <h1 className="text-title-lg">{displayTitle.text}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {displaySummary.text}
           </p>

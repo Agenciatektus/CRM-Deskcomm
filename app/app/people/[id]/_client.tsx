@@ -31,7 +31,7 @@ export function PersonDetailClient({ id }: { id: string }) {
         <Link href="/app/people" className="text-sm text-muted-foreground hover:underline">
           ← {t("Pessoas")}
         </Link>
-        <h1 className="text-xl font-semibold">{(data.person.full_name as string)}</h1>
+        <h1 className="text-title-lg">{(data.person.full_name as string)}</h1>
         <p className="text-sm text-muted-foreground">{(data.person.email as string) || "—"}</p>
       </div>
 

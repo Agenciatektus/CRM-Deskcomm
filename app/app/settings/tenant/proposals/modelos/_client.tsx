@@ -114,7 +114,7 @@ export function ModelosDeProposta() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
-      <h1 className="text-xl font-semibold">{t("Modelos de proposta")}</h1>
+      <h1 className="text-title-lg">{t("Modelos de proposta")}</h1>
 
       {salvo && !faixaFechada ? (
         <p role="status" className="flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">

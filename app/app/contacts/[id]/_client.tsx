@@ -158,7 +158,7 @@ export function ContactDetailClient({ contactId }: Props) {
           {/* Sem truncar: nome é dado que a tela existe pra mostrar, e cortar
               com reticências sem um jeito de ver o resto violaria o princípio
               de nunca esconder informação crítica. Deixa quebrar linha. */}
-          <h1 className="break-words text-2xl font-semibold tracking-tight">{displayName}</h1>
+          <h1 className="break-words text-title-lg">{displayName}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {contact.email && <span>{contact.email}</span>}
             {contact.email && contact.phone_number && <span>•</span>}

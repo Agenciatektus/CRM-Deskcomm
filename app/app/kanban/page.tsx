@@ -104,7 +104,7 @@ export default async function KanbanPickerPage() {
             era maior do que o comentário contava: são QUATRO assertions em TRÊS
             specs, e `pipelines-gestao.spec.ts` — a spec da própria feature que
             gerou o comentário — é uma delas. Todas atualizadas junto. */}
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Funis")}</h1>
+        <h1 className="text-title-lg">{t("Funis")}</h1>
       </header>
 
       <FunisClient

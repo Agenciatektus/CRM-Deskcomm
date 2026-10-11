@@ -83,7 +83,7 @@ export default async function TagsPage() {
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Tags")}</h1>
+        <h1 className="text-title-lg">{t("Tags")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           {t(
             "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Acrescente novas, escolha quais são sugeridas para quem atende em conversas e contatos, e arrume as que existem: renomear ou juntar corrige também as regras de agente e as sugestões, na mesma operação.",

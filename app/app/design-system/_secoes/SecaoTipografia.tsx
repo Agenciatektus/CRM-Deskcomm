@@ -71,18 +71,18 @@ export function SecaoTipografia({ tema }: { tema: Tema }) {
           <span className="font-bold">700 Aa</span>
         </div>
         <p className="text-meta text-text-subtle">
-          {t("O CRM embarca a fonte só em 400 e 700: 500 e 600 são aproximados pelo navegador.")}
+          {t("Atkinson Hyperlegible Next embarcada de 200 a 800: cada peso é o desenhado, não aproximado.")}
         </p>
       </Exemplo>
       <Exemplo nome={t("Escala usada nas telas hoje")} mapa="tipo:familia" tema={tema}>
         <div className="flex flex-col">
-          <Linha papel="text-2xl · 600" medida="24px" classe="text-2xl font-semibold tracking-tight">
+          <Linha papel="text-title-lg" medida="20 / 700 / -0,01em" classe="text-title-lg">
             Inbox
           </Linha>
-          <Linha papel="text-sm" medida="14px" classe="text-sm">
+          <Linha papel="text-ui" medida="14 / 400 / 1,45" classe="text-ui">
             {t("Ao assumir, o automático para nesta conversa.")}
           </Linha>
-          <Linha papel="text-xs" medida="12px" classe="text-xs text-text-muted">
+          <Linha papel="text-meta" medida="12 / 600" classe="text-meta text-text-subtle">
             {t("Esperando há")} 14 min
           </Linha>
         </div>
