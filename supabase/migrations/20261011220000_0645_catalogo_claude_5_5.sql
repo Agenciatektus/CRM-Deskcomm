@@ -3,12 +3,14 @@
 -- O catálogo da Anthropic parou no Opus 5 / Sonnet 5 (migration 0104): quem
 -- instala hoje não consegue escolher a geração 5.5, que custa igual ou menos.
 --
--- Ids e janela de contexto conferidos na documentação oficial, NÃO na API:
---   platform.claude.com/docs/en/about-claude/models/overview (11/10/2026) →
---   claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5; 1M tokens nos três.
+-- Ids, janela de contexto e data de lançamento conferidos na documentação
+-- oficial, NÃO na API (11/10/2026):
+--   platform.claude.com/docs/en/about-claude/models/overview → claude-haiku-5-5,
+--   claude-sonnet-5-5, claude-opus-5-5; 1M tokens nos três.
+--   platform.claude.com/docs/en/models/<modelo>/overview → "Released": Haiku 5.5
+--   em 07/10/2026, Sonnet 5.5 em 28/09/2026, Opus 5.5 em 22/09/2026.
 -- ⚠️ Sem chave Anthropic nesta máquina: os ids NÃO foram conferidos em
--- GET /v1/models, como a 0104 fez com os dela. `released_at` fica NULL: a
--- página não publica a data.
+-- GET /v1/models, como a 0104 fez com os dela.
 --
 -- Preços (centavos por milhão de tokens, entrada/saída), fonte:
 -- platform.claude.com/docs/en/about-claude/pricing, consultada em 11/10/2026:
@@ -33,22 +35,23 @@
 -- 1. catálogo (o que a tela oferece)
 -- ---------------------------------------------------------------------------
 insert into public.ai_models
-  (provider, model_id, display_name, description, context_window,
+  (provider, model_id, display_name, description, context_window, released_at,
    input_price_per_million_cents, output_price_per_million_cents, supports_tools)
 values
   ('anthropic', 'claude-haiku-5-5', 'Claude Haiku 5.5',
    'O mais rápido e barato da Anthropic, para alto volume e classificação. Acima de 100 mil tokens de entrada numa chamada o preço sobe para $0,50/$2,50 por milhão.',
-   1000000, 10, 50, true),
+   1000000, '2026-10-07', 10, 50, true),
   ('anthropic', 'claude-sonnet-5-5', 'Claude Sonnet 5.5',
    'Equilíbrio de velocidade e capacidade; sucessor do Sonnet 5, pelo mesmo preço.',
-   1000000, 200, 1000, true),
+   1000000, '2026-09-28', 200, 1000, true),
   ('anthropic', 'claude-opus-5-5', 'Claude Opus 5.5',
    'O Opus atual, para trabalho agêntico complexo; custa menos que o Opus 5.',
-   1000000, 400, 2000, true)
+   1000000, '2026-09-22', 400, 2000, true)
 on conflict (provider, model_id) do update set
   display_name = excluded.display_name,
   description = excluded.description,
   context_window = excluded.context_window,
+  released_at = excluded.released_at,
   input_price_per_million_cents = excluded.input_price_per_million_cents,
   output_price_per_million_cents = excluded.output_price_per_million_cents,
   supports_tools = excluded.supports_tools,
