@@ -15,7 +15,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { CHECAGENS } from "./paridade/componentes";
+import { CHECAGENS as CHECAGENS_BASE } from "./paridade/componentes";
+import { CHECAGENS_DE_MENSAGENS } from "./paridade/mensagens";
 import { divergenciasDeTokens } from "./paridade/tokens";
 import { classesDoArquivo, decl } from "./paridade/leitor";
 
@@ -39,6 +40,8 @@ function semExcecao(divergencias: string[], usadas: Set<string>): string[] {
     return true;
   });
 }
+
+const CHECAGENS = [...CHECAGENS_BASE, ...CHECAGENS_DE_MENSAGENS];
 
 describe("paridade com o protótipo", () => {
   const usadas = new Set<string>();

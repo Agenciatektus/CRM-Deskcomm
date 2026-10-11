@@ -62,7 +62,11 @@ export function regras(css: string): Map<string, Record<string, string>> {
       const cru = texto.slice(inicio, abre);
       const seletor = cru.slice(cru.lastIndexOf(";") + 1).replace(/\s+/g, " ").trim();
       const corpo = texto.slice(abre + 1, j - 1);
-      if (corpo.includes("{")) visitar(corpo);
+      // O celular (< 760), o toque e o movimento reduzido ficam de fora: a
+      // paridade desta etapa é a do desktop, e a regra deles sobrescreveria a base.
+      if (/@media[^{]*(max-width:\s*759px|hover:\s*none|prefers-reduced-motion)/.test(seletor)) {
+        // fora do escopo
+      } else if (corpo.includes("{")) visitar(corpo);
       else {
         for (const sel of seletor.split(",").map((s) => s.trim())) {
           const atual = saida.get(sel) ?? {};

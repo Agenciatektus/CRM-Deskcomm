@@ -112,7 +112,7 @@ export function SegmentadoEAbas({ tema }: { tema: Tema }) {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="resumo" className="text-ui text-text-muted">
-            {t("O protótipo desenha a aba com sublinhado de 2px (.pn-tab); o CRM usa a aba em cartão do shadcn.")}
+            {t("Aba com sublinhado de 2px na marca, como o .tabs do quadro.")}
           </TabsContent>
         </Tabs>
       </Exemplo>

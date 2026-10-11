@@ -99,6 +99,7 @@ const BORDA: Record<string, string> = {
   accent: "accent",
   crit: "error",
   "ink-3": "text-subtle",
+  "warn-line": "warning-line",
   transparent: "transparent",
 };
 

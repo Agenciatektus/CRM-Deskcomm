@@ -39,10 +39,12 @@ describe("paridade — controle negativo", () => {
     expect(tokens).toContain("cor:claro:--warn");
     expect(tokens).toContain("tipo:title-sm:tamanho");
 
-    const falhas = CHECAGENS.filter((ch) => {
+    const { CHECAGENS_DE_MENSAGENS } = await import("./paridade/mensagens");
+    const falhas = [...CHECAGENS, ...CHECAGENS_DE_MENSAGENS].filter((ch) => {
       const classes = classesDoArquivo(ch.arquivo);
       return [ch.classes(decl(ch.fonte, ch.seletor, ch.prop))].flat().some((c) => !classes.has(c));
     }).map((ch) => ch.id);
-    expect(falhas).toEqual(["botao:altura", "chip:raio"]);
+    // `popover:padding` é a exceção registrada (diverge sempre); o resto é o que mudou.
+    expect(falhas).toEqual(["botao:altura", "chip:raio", "popover:padding"]);
   });
 });

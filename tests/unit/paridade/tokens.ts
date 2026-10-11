@@ -37,6 +37,7 @@ const PARES: [string, string][] = [
   ["--hover", "--color-hover"],
   ["--tint", "--color-tint"],
   ["--accent-fg", "--color-accent-fg"],
+  ["--bub-in", "--color-bubble-in"],
   ["--ok", "--color-success-fg"],
   ["--ok-bg", "--color-success-bg"],
   ["--warn", "--color-warning-fg"],
