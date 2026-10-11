@@ -111,6 +111,17 @@ export function NovaCampanha() {
   const padroes = useConfiguracaoDeCampanhas();
   useEffect(() => {
     if (preenchido || padroes.isLoading) return;
+    // Quem já digitou MANDA, e o preset desiste. A guarda sozinha era
+    // `preenchido`, que só é marcado pelo próprio preenchimento: enquanto o GET
+    // da configuração estava no ar nada impedia digitar, e na volta os cinco
+    // `setX` rodavam sem condição. O operador que escrevesse 300 em Intervalo
+    // via o campo virar 120 e salvava sem reler, e a campanha saía 2,5x mais
+    // RÁPIDA que a escolha dele. Atropelar para o lado rápido é o único
+    // desfecho que este módulo existe para impedir.
+    if (intervalo || janelaInicio || janelaFim || tetoDiario || tetoHorario) {
+      setPreenchido(true);
+      return;
+    }
     // Erro ao ler a configuração não deixa o formulário vazio: `data` ausente
     // cai no recomendado, que é o lado seguro. Ficar em branco por causa de uma
     // falha de rede devolveria ao operador exatamente o problema que o preset
@@ -122,7 +133,16 @@ export function NovaCampanha() {
     setTetoDiario(comoTexto(r.tetoDiario));
     setTetoHorario(comoTexto(r.tetoHorario));
     setPreenchido(true);
-  }, [padroes.data, padroes.isLoading, preenchido]);
+  }, [
+    padroes.data,
+    padroes.isLoading,
+    preenchido,
+    intervalo,
+    janelaInicio,
+    janelaFim,
+    tetoDiario,
+    tetoHorario,
+  ]);
 
   const ritmoEscolhido = {
     intervaloSegundos: comoNumero(intervalo),

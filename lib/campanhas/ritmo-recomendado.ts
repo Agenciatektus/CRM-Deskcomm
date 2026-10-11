@@ -32,6 +32,15 @@
  *     janela da cadência ganhar meia hora um dia, o preset encurta em vez de
  *     esticar.
  *
+ * ⚠️ O que a janela da cadência tem e o preset NÃO copia: `weekdays`, que lá é
+ * seg a sex. A campanha não tem conceito de dia da semana — `politicaDaRegua`
+ * crava os sete de propósito, e isso é anterior a este módulo. Então o preset
+ * NÃO é "a cadência em tudo": ele roda 7 dias, e no mesmo teto diário isso dá
+ * 350 contatos frios por semana contra os 250 da cadência, 40% mais no mesmo
+ * chip, sábado e domingo incluídos. Fechar essa ponta pede campo de dia na
+ * campanha, que é fatia própria. Enquanto não houver, a frase "erra para o
+ * lado lento em TODAS as pontas" é falsa, e quem a repetir estará errado.
+ *
  * O QUARTO, o teto diário, NÃO vem da cadência. Ele é
  * `TETO_DIARIO_RECOMENDADO`, logo abaixo, e o comentário dele explica por quê.
  * Quem abrir este arquivo e vir três derivados e um solto: o solto é
