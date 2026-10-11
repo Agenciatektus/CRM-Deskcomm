@@ -16,7 +16,14 @@ import { CitacaoNaBolha } from "./bolha/CitacaoNaBolha";
 import { ConfirmacoesDaBolha } from "./bolha/ConfirmacoesDaBolha";
 import { CorpoDaBolha } from "./bolha/CorpoDaBolha";
 import { EditorDaBolha } from "./bolha/EditorDaBolha";
-import { classesDaBolha, TEXTO_ACCENT, type ModoDaMeta, type TomDaBolha } from "./bolha/estilo";
+import {
+  classesDaBolha,
+  classesDaLinha,
+  classesDoAutor,
+  COLUNA_DA_FALA,
+  type ModoDaMeta,
+  type TomDaBolha,
+} from "./bolha/estilo";
 import { MetaDaBolha } from "./bolha/MetaDaBolha";
 import { TentarDeNovo } from "./bolha/TentarDeNovo";
 
@@ -114,7 +121,9 @@ export function MessageBubble({
   const temTextoNoFim = apagada
     ? !(isOutbound && message.body)
     : ocultaNoCrm || Boolean(message.body && message.type !== "contact" && !localizacao);
-  const soImagem = hasMedia && message.type === "image" && !message.body && !citada && !apagada && !ocultaNoCrm;
+  // Foto ou vídeo sem legenda: a hora vai SOBRE a mídia, em fundo escuro (quadro DS).
+  const soImagem = hasMedia && (message.type === "image" || message.type === "video")
+    && !message.body && !citada && !apagada && !ocultaNoCrm;
   const modoMeta: ModoDaMeta = editando ? "abaixo" : temTextoNoFim ? "no-texto" : soImagem ? "sobre-midia" : "abaixo";
   const espaco = modoMeta === "no-texto"
     ? larguraDaMeta({ tiques: isOutbound && !isFailed, editada, falhou: isFailed, citacoes: mostraCitacoes })
@@ -138,20 +147,13 @@ export function MessageBubble({
       // O respiro entre falas é do BLOCO: a primeira de uma sequência abre
       // espaço em cima, as seguintes encostam. É o que faz uma conversa longa
       // ler como conversa, e não como uma pilha de caixas equidistantes.
-      className={cn(
-        "group flex w-full min-w-0 px-4",
-        inicioDoBloco ? "pt-3" : "pt-0.5",
-        isOutbound ? "justify-end" : "justify-start",
-      )}
+      className={classesDaLinha({ inicio: inicioDoBloco, saida: isOutbound })}
     >
-      <div className={cn("flex min-w-0 max-w-[min(80%,36rem)] flex-col", isOutbound ? "items-end" : "items-start")}>
+      <div className={cn(COLUNA_DA_FALA, isOutbound ? "items-end" : "items-start")}>
         {inicioDoBloco && (remetente || senderLabel) && (
           // O nome sai da bolha e fica ACIMA dela, uma vez por bloco: dentro de
           // cada bolha ele repetia "Você" em toda fala e roubava a primeira linha.
-          <p className={cn(
-            "mx-2 mb-1 flex items-center gap-1 text-xs font-semibold",
-            senderLabel === "IA" ? TEXTO_ACCENT : "text-text-subtle",
-          )}>
+          <p className={classesDoAutor(senderLabel === "IA" ? "ia" : "pessoa")}>
             {senderLabel === "IA" && <Robot size={12} weight="duotone" aria-hidden />}
             {remetente ? rotuloDoRemetente(remetente) : senderLabel && t(senderLabel)}
           </p>
@@ -210,7 +212,7 @@ export function MessageBubble({
                 {podeApagar && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setApagando(true)} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem variant="destructive" onSelect={() => setApagando(true)}>
                       <Trash size={16} aria-hidden />{t("Apagar para todos")}
                     </DropdownMenuItem>
                   </>
@@ -227,7 +229,7 @@ export function MessageBubble({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {citada && <CitacaoNaBolha citada={citada} />}
+          {citada && <CitacaoNaBolha citada={citada} viewerUserId={viewerUserId} />}
           {editando ? (
             <EditorDaBolha
               editorRef={editorRef}
@@ -259,8 +261,9 @@ export function MessageBubble({
             citacoes={mostraCitacoes ? extractCitations(message.metadata) : null}
           />
         </div>
+        {/* `.fail-row`: embaixo da bolha que falhou, do lado de quem enviou. */}
+        {onReenviar && <TentarDeNovo onReenviar={onReenviar} />}
       </div>
-      {onReenviar && <TentarDeNovo onReenviar={onReenviar} />}
       <ConfirmacoesDaBolha
         apagando={apagando} setApagando={setApagando}
         ocultando={ocultando} setOcultando={setOcultando}

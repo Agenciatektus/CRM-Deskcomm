@@ -34,7 +34,9 @@ describe("bolha por tipo", () => {
   it("recebida: tom de entrada e canto achatado embaixo à esquerda", () => {
     render(<MessageBubble message={msg({ direction: "inbound", body: "olá" })} />);
     expect(bolha()).toHaveAttribute("data-tom", "entrada");
-    expect(bolha().className).toContain("rounded-bl-md");
+    // Quadro DS: raio 18 e 6 no canto de quem enviou.
+    expect(bolha().className).toContain("rounded-bubble");
+    expect(bolha().className).toContain("rounded-bl-bubble-tail");
   });
 
   it("citação: mostra de quem era e o trecho, dentro da bolha", () => {
@@ -48,14 +50,14 @@ describe("bolha por tipo", () => {
     render(<MessageBubble message={msg({ direction: "inbound", type: "image", body: null, media_storage_path: "o/c/a.jpg" })} />);
     expect(screen.getByRole("button", { name: "Ampliar imagem" })).toBeInTheDocument();
     expect(bolha().className).toContain("p-1");
-    expect(meta().className).toContain("bg-neutral-950/60");
+    expect(meta().className).toContain("bg-[oklch(0.15_0.01_260/0.62)]");
   });
 
-  it("vídeo: controles nativos e a hora numa linha própria (não cobre os controles)", () => {
+  it("vídeo sem legenda: play sobre o quadro e a hora sobre a mídia, como a foto (quadro DS)", () => {
     const { container } = render(<MessageBubble message={msg({ direction: "inbound", type: "video", body: null, media_storage_path: "o/c/v.mp4" })} />);
     expect(container.querySelector("video")).not.toBeNull();
-    expect(meta().className).toContain("justify-end");
-    expect(meta().className).not.toContain("absolute");
+    expect(screen.getByRole("button", { name: "Reproduzir vídeo" })).toBeInTheDocument();
+    expect(meta().className).toContain("bottom-3");
   });
 
   it("figurinha: sem moldura de bolha", () => {
@@ -103,14 +105,15 @@ describe("bolha por tipo", () => {
   it("falhou: contorno de erro e o selo 'Falhou' (a explicação segue no tooltip)", () => {
     render(<MessageBubble message={msg({ status: "failed", error_message: "Número inválido" })} />);
     expect(bolha()).toHaveAttribute("data-falhou", "true");
-    expect(bolha().className).toContain("outline-error");
-    expect(within(bolha()).getByText("Falhou")).toBeInTheDocument();
+    expect(bolha().className).toContain("shadow-[inset_0_0_0_1.5px_var(--color-error)]");
+    // O anel crit do quadro, com o nome acessível "Falhou".
+    expect(within(bolha()).getByRole("img", { name: "Falhou" })).toBeInTheDocument();
   });
 
   it("bloco: a bolha que continua o bloco não repete o nome e achata o canto de cima", () => {
     render(<MessageBubble message={msg({ sent_via: "ai" })} inicioDoBloco={false} />);
     expect(screen.queryByText("IA")).toBeNull();
-    expect(bolha().className).toContain("rounded-tr-md");
+    expect(bolha().className).toContain("rounded-tr-bubble-tail");
   });
 });
 
@@ -145,8 +148,8 @@ describe("nota interna", () => {
   it("estilo distinto (tracejado de aviso) e o aviso de que só o time vê", () => {
     render(<NoteCard note={nota()} />);
     expect(screen.getByTestId("nota-interna").className).toContain("border-dashed");
-    expect(screen.getByText("Nota interna · só o time vê")).toBeInTheDocument();
-    expect(screen.getByText("Rita")).toBeInTheDocument();
+    expect(screen.getByText("só a equipe vê")).toBeInTheDocument();
+    expect(screen.getByText(/Nota interna de\s+Rita/)).toBeInTheDocument();
   });
 
   it("com permissão, o excluir continua lá", () => {
@@ -183,7 +186,7 @@ describe("MessageBubble — contenção de layout e quebra de palavras (#1451)",
     // dentro dela: `min-w-0` nas duas é o que deixa a chave quebrar.
     const bolhaDoPix = p.closest<HTMLElement>('[data-testid="message-bubble"]');
     expect(bolhaDoPix?.className).toContain("min-w-0");
-    expect(bolhaDoPix?.parentElement?.className).toContain("max-w-[min(80%,36rem)]");
+    expect(bolhaDoPix?.parentElement?.className).toContain("max-w-[min(80%,580px)]");
     expect(bolhaDoPix?.parentElement?.className).toContain("min-w-0");
     // O pre-wrap é do TEXTO, nunca do contêiner: no contêiner ele virava
     // espaço visível entre a mídia, o cartão e a hora.

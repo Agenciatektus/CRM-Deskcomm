@@ -37,6 +37,7 @@ const PARES: [string, string][] = [
   ["--hover", "--color-hover"],
   ["--tint", "--color-tint"],
   ["--accent-fg", "--color-accent-fg"],
+  ["--bub-in", "--color-bubble-in"],
   ["--ok", "--color-success-fg"],
   ["--ok-bg", "--color-success-bg"],
   ["--warn", "--color-warning-fg"],
@@ -250,11 +251,14 @@ function divergenciasDeRegras(): string[] {
   if (grad.length !== peleGrad.length || grad.some((c, i) => !coresIguais(c, peleGrad[i]!))) {
     saida.push(`regra:degrade protótipo ${grad.map(fmt).join(" ")} x CRM ${peleGrad.map(fmt).join(" ")}`);
   }
-  if (pele["--gradient-primary"] !== "var(--pele-grad)") saida.push(`regra:degrade-acao CRM --gradient-primary=${pele["--gradient-primary"]}`);
+  // A ação (botão, chip ligado) usa as MESMAS cores, com o meio esticado até 85%.
+  const acao = paradasHex(pele["--pele-grad-acao"] ?? "").filter((c, i, l) => i === 0 || l[i - 1]!.hex !== c.hex);
+  if (acao.length !== grad.length || grad.some((c, i) => !coresIguais(c, acao[i]!))) saida.push("regra:degrade-acao cores diferentes do --grad");
+  if (pele["--gradient-primary"] !== "var(--pele-grad-acao)") saida.push(`regra:degrade-acao CRM --gradient-primary=${pele["--gradient-primary"]}`);
   for (const classe of [".pele-grad:not(", ".pele-grad-ativo:not("]) {
     const i = CSS.indexOf(classe);
     const corpo = CSS.slice(i, CSS.indexOf("}", i));
-    if (i < 0 || !corpo.includes("var(--pele-grad)")) saida.push(`regra:degrade-${classe} não usa o degradê da logo`);
+    if (i < 0 || !corpo.includes("var(--pele-grad-acao)")) saida.push(`regra:degrade-${classe} não usa o degradê da logo`);
   }
   // Foco (Main `:focus-visible`) = anel na cor do accent em vigor, afastado e com raio.
   const raiz = blocoDoCrm(":root");

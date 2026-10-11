@@ -168,12 +168,13 @@ export function ConversationListItem({
             Instagram…), como no protótipo. */}
         <ChannelLogo
           channel={canal}
-          size={12}
+          size={11}
+          selo
           // O anel tem a cor do FUNDO DA LINHA (que muda na seleção), para o
           // selo recortar o avatar em vez de flutuar com uma borda de outra cor.
           className={cn(
-            "absolute -bottom-1 -right-1 h-[18px] w-[18px] rounded-full ring-2",
-            isSelected ? "bg-surface-elevated ring-surface-elevated" : "bg-surface ring-surface",
+            "absolute -bottom-0.75 -right-0.75 size-4.5 ring-2",
+            isSelected ? "ring-accent-soft" : "ring-surface",
           )}
         />
       </div>
@@ -228,7 +229,7 @@ export function ConversationListItem({
           </p>
           {naoLida && (
             <span
-              className="pele-grad inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
+              className="pele-grad-contador inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
               aria-label={soMarcada ? t("Marcada como não lida") : `${unread} ${t("mensagens não lidas")}`}
             >
               {soMarcada ? "" : unread}

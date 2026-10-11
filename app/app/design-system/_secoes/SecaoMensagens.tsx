@@ -1,5 +1,6 @@
 "use client";
 
+import { DivisorDeNovas, DivisorDoDia } from "@/components/inbox/fio/Divisores";
 import { useState, type ReactNode } from "react";
 
 import { MessageBubble } from "@/components/inbox/MessageBubble";
@@ -24,24 +25,12 @@ function Tipo({ nome, children }: { nome: string; children: ReactNode }) {
   );
 }
 
-/**
- * Os divisores de dia e de novas mensagens são marcação inline de
- * `components/inbox/fio/ConteudoDaLinha.tsx` (sem componente próprio): aqui
- * vão as mesmas classes.
- */
-function Divisores({ dia, novas }: { dia: string; novas: string }) {
+/** Os marcadores do fio, com os mesmos componentes que a Inbox usa. */
+function Divisores({ dia, novas }: { dia: string; novas: number }) {
   return (
     <>
-      <div className="flex justify-center px-4 pb-1 pt-4">
-        <span className="pele-dia rounded-full border border-border bg-surface px-3 py-0.5 text-xs font-semibold text-text-muted shadow-xs">
-          {dia}
-        </span>
-      </div>
-      <div className="flex items-center gap-3 px-4 pb-1 pt-4 text-xs font-bold text-accent-700 dark:text-accent-300">
-        <span aria-hidden className="h-px flex-1 bg-accent/35" />
-        <span>{novas}</span>
-        <span aria-hidden className="h-px flex-1 bg-accent/35" />
-      </div>
+      <DivisorDoDia rotulo={dia} />
+      <DivisorDeNovas quantas={novas} />
     </>
   );
 }
@@ -66,7 +55,7 @@ export function SecaoMensagens({ tema }: { tema: Tema }) {
       <Secao id={`tipos-${tema}`} sub titulo={t("Tipos cobertos (os mesmos que o CRM já suporta)")} mapa="ds:tipos" tema={tema}>
         <div className="fundo-do-fio overflow-hidden rounded-lg border border-border">
           <div className="trama-do-fio flex flex-col gap-3 py-4">
-            <Divisores dia={t("Hoje")} novas={t("2 mensagens novas")} />
+            <Divisores dia={t("Hoje")} novas={2} />
             <Tipo nome={t("Texto")}>
               <MessageBubble message={m.texto} onResponder={nada} />
             </Tipo>

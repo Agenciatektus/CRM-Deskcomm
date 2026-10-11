@@ -45,8 +45,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: `bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-hover) ${DESABILITADO_CHEIO} ${DESABILITADO_ESCURO}`,
-        default: `bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-hover) ${DESABILITADO_CHEIO} ${DESABILITADO_ESCURO}`,
+        primary: `bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-acao-hover) ${DESABILITADO_CHEIO} ${DESABILITADO_ESCURO}`,
+        default: `bg-accent text-accent-foreground hover:bg-accent-hover shadow-xs dark:bg-(image:--gradient-primary) dark:text-(--pele-grad-fg) dark:hover:bg-(image:--pele-grad-acao-hover) ${DESABILITADO_CHEIO} ${DESABILITADO_ESCURO}`,
         secondary:
           "bg-surface text-text border border-border-strong hover:bg-hover disabled:text-text-subtle",
         outline:

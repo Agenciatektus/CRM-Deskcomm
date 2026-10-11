@@ -10,6 +10,7 @@ import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import type { Message } from "@/lib/types/messaging";
 
+import { DivisorDeNovas, DivisorDoDia } from "./Divisores";
 import { LinhaDaMensagem, type AcoesDoFio } from "./LinhaDaMensagem";
 import type { LinhaDoFio } from "./linhas";
 
@@ -60,29 +61,8 @@ export function ConteudoDaLinha({ linha, inicioDoBloco, ctx }: { linha: LinhaDoF
         </Button>
       </div>
     );
-  if (linha.tipo === "dia")
-    return (
-      <div className="flex justify-center px-4 pb-1 pt-4">
-        <span className="pele-dia rounded-full border border-border bg-surface px-3 py-0.5 text-xs font-semibold text-text-muted shadow-xs">
-          {dayLabel(linha.data, t, localeDaData)}
-        </span>
-      </div>
-    );
-  if (linha.tipo === "novas")
-    return (
-      // Linha cheia dos dois lados com o texto no meio, no tom do accent: é o
-      // marco que o olho procura ao abrir uma conversa com o cliente esperando.
-      <div
-        role="separator"
-        aria-label={t("Novas mensagens")}
-        data-testid="divisor-novas"
-        className="flex items-center gap-3 px-4 pb-1 pt-4 text-xs font-bold text-accent-700 dark:text-accent-300"
-      >
-        <span aria-hidden className="h-px flex-1 bg-accent/35" />
-        <span aria-hidden>{t("Novas mensagens")}</span>
-        <span aria-hidden className="h-px flex-1 bg-accent/35" />
-      </div>
-    );
+  if (linha.tipo === "dia") return <DivisorDoDia rotulo={dayLabel(linha.data, t, localeDaData)} />;
+  if (linha.tipo === "novas") return <DivisorDeNovas quantas={linha.quantas} />;
   const item = linha.item;
   if (item.kind === "passagem")
     return (

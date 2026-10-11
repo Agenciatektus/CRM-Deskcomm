@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
-import { ArrowsClockwise } from "@/lib/ui/icons";
 
 /**
  * "Não foi enviada. Tentar de novo" (B15, o texto do protótipo), embaixo da
@@ -17,7 +16,7 @@ export function TentarDeNovo({ onReenviar }: { onReenviar: () => void }) {
   const [enviado, setEnviado] = useState(false);
   if (enviado) return null;
   return (
-    <p className="mt-1 flex items-center justify-end gap-1.5 text-xs text-error-fg" data-testid="tentar-de-novo">
+    <p className="mx-2 mt-1.25 flex items-center gap-2 text-meta font-semibold text-error-fg" data-testid="tentar-de-novo">
       {t("Não foi enviada.")}
       <button
         type="button"
@@ -25,9 +24,8 @@ export function TentarDeNovo({ onReenviar }: { onReenviar: () => void }) {
           setEnviado(true);
           onReenviar();
         }}
-        className="inline-flex items-center gap-1 font-semibold underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        className="inline-flex items-center gap-1 rounded-sm font-bold text-accent-text underline-offset-3 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <ArrowsClockwise size={12} aria-hidden />
         {t("Tentar de novo")}
       </button>
     </p>

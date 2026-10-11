@@ -15,7 +15,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { CHECAGENS } from "./paridade/componentes";
+import { CHECAGENS as CHECAGENS_BASE } from "./paridade/componentes";
+import { CHECAGENS_DE_MENSAGENS } from "./paridade/mensagens";
 import { divergenciasDeTokens } from "./paridade/tokens";
 import { classesDoArquivo, decl } from "./paridade/leitor";
 
@@ -23,6 +24,8 @@ import { classesDoArquivo, decl } from "./paridade/leitor";
 export const EXCECOES: Record<string, string> = {
   "cor:escuro:--accent-fg":
     "O quadro escuro põe #f8f8f8 sobre o accent sólido #2690B1 (3,5:1, reprova AA de texto). O CRM calcula a frente (preto, 5,2:1); onde o quadro pinta branco sobre azul, a tela usa o degradê (botão, chip ligado, contador), com branco.",
+  "popover:padding":
+    "O `.pop` do protótipo é um menu (padding 6). O Popover do CRM hospeda formulário nas telas (filtros, data, etiquetas) e mantém 16; o menu de verdade é o DropdownMenu, com padding 6. Exceção aceita pelo Peterson na PR B da etapa 2.",
   "mistura:escuro:accent-hover":
     "No escuro o hover do botão primário é o degradê com `brightness(1.1)` no protótipo; o filtro escurece/clareia o texto junto (P1 do Cassio na #145). O CRM troca só o fundo (`--pele-grad-hover`) e, fora do degradê, usa a parada 500 do primary Verdash.",
 };
@@ -37,6 +40,8 @@ function semExcecao(divergencias: string[], usadas: Set<string>): string[] {
     return true;
   });
 }
+
+const CHECAGENS = [...CHECAGENS_BASE, ...CHECAGENS_DE_MENSAGENS];
 
 describe("paridade com o protótipo", () => {
   const usadas = new Set<string>();

@@ -1,6 +1,6 @@
 "use client";
 import { useT } from "@/hooks/i18n/useT";
-import { DownloadSimple, FileText } from "@/lib/ui/icons";
+import { DownloadSimple } from "@/lib/ui/icons";
 
 import { formatBytes, mediaFileLabel, mediaSrc } from "./media-utils";
 
@@ -15,30 +15,40 @@ interface Props {
   src?: string;
 }
 
-/** Card de documento: rótulo (PDF/MP4/…), tamanho e download. */
-export function DocumentCard({ messageId, mime, sizeBytes, storagePath, src }: Props) {
+/**
+ * O `.doc` do quadro DS: ícone do tipo (sigla em crit sobre crit-bg), nome do
+ * arquivo, tipo e tamanho, e o botão redondo de baixar. O nome vem do
+ * `filename` que o canal mandou, quando veio; sem ele, a sigla do tipo. O
+ * número de páginas NÃO é guardado pela ingestão, então não aparece.
+ */
+export function DocumentCard({ messageId, mime, sizeBytes, storagePath, src, nome }: Props & { nome?: string | null }) {
   const t = useT();
   const label = mediaFileLabel(mime, storagePath);
+  const titulo = nome?.trim() || label;
+  const href = src ?? mediaSrc(messageId);
   return (
-    <a
-      href={src ?? mediaSrc(messageId)}
-      target="_blank"
-      rel="noreferrer"
-      aria-label={`${t("Baixar")} ${label} (${formatBytes(sizeBytes)})`}
-      // Um tom do próprio texto (`bg-text/5`) funciona sobre qualquer bolha,
-      // nos dois temas, sem uma regra por lado da conversa.
-      className="-mx-1.5 flex w-64 max-w-full items-center gap-3 rounded-xl bg-text/5 p-2 transition-colors hover:bg-text/10"
-    >
+    <div className="-ml-1.5 -mr-1.25 -mt-0.5 mb-1 flex w-67.5 max-w-full items-center gap-3 rounded-xl bg-tint p-2">
       <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent-700 dark:text-accent-300"
+        aria-hidden
+        className="grid h-11 w-9 shrink-0 place-items-center rounded-[7px] bg-error-bg text-[10.5px] font-extrabold tracking-[0.02em] text-error-fg"
       >
-        <FileText size={20} weight="duotone" aria-hidden />
+        {label.slice(0, 4)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{label}</span>
-        <span className="block text-xs text-text-subtle">{formatBytes(sizeBytes)}</span>
+        <span className="block truncate text-[13.5px] font-bold" title={titulo}>{titulo}</span>
+        <span className="block text-meta font-normal text-text-subtle">
+          {label}, {formatBytes(sizeBytes)}
+        </span>
       </span>
-      <DownloadSimple size={18} className="shrink-0 text-text-muted" aria-hidden />
-    </a>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${t("Baixar")} ${titulo} (${formatBytes(sizeBytes)})`}
+        className="grid size-8.5 shrink-0 place-items-center rounded-full border border-border-strong text-text-muted transition-colors hover:bg-surface hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <DownloadSimple size={16} aria-hidden />
+      </a>
+    </div>
   );
 }

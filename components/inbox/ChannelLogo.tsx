@@ -18,14 +18,29 @@ const brands: Record<ChannelBrand, { Icon: typeof ChatCircle; color: string }> =
   unknown: { Icon: ChatCircle, color: "text-muted-foreground" },
 };
 
-export function ChannelLogo({ channel, size = 18, className }: {
+/**
+ * O SELO do canal sobre o avatar (`.chan` do quadro DS): disco de 18px na cor
+ * da rede, com o ícone branco por cima. As cores são as do protótipo
+ * (`.chan-wa`, `.chan-ig`); o Messenger não foi desenhado e segue a mesma regra.
+ */
+const DISCO: Record<ChannelBrand, string> = {
+  whatsapp: "bg-[oklch(0.62_0.15_150)]",
+  instagram: "bg-[oklch(0.58_0.2_0)]",
+  messenger: "bg-[oklch(0.55_0.2_260)]",
+  unknown: "bg-text-subtle",
+};
+
+export function ChannelLogo({ channel, size = 18, className, selo = false }: {
   channel?: ChannelSummary | null;
   size?: number;
   className?: string;
+  /** Desenha o selo (disco colorido, ícone branco) em vez do ícone colorido solto. */
+  selo?: boolean;
 }) {
   const t = useT();
   const marca = channelBrand(channel);
-  const { Icon, color } = brands[marca];
+  const { Icon, color: corDoIcone } = brands[marca];
+  const color = selo ? cn(DISCO[marca], "rounded-full text-white") : corDoIcone;
   const label = CHANNEL_BRAND_LABEL[marca];
   // Só o genérico é traduzido: "WhatsApp" e "Instagram" são nomes próprios.
   const name = marca === "unknown" ? t("Canal") : label;

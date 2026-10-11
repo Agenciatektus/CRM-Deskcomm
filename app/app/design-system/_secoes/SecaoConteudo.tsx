@@ -31,8 +31,9 @@ function AvatarComCanal({ nome, canal }: { nome: string; canal: ChannelSummary }
       <AvatarDoContato contato={null} nome={nome} iniciais={SIGLA(nome)} />
       <ChannelLogo
         channel={canal}
-        size={12}
-        className="absolute -bottom-1 -right-1 size-4.5 rounded-full bg-surface ring-2 ring-surface"
+        size={11}
+        selo
+        className="absolute -bottom-0.75 -right-0.75 size-4.5 ring-2 ring-surface"
       />
     </div>
   );

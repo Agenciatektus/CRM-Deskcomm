@@ -8,7 +8,7 @@ import type { CartaoDaPassagem } from "@/lib/escalacao/cartao-da-passagem";
 import { cn } from "@/lib/utils";
 
 /** A faixa de baixo do cartão: separada do corpo por uma linha, como no protótipo. */
-const RODAPE = "border-t border-border px-3.5 py-2.5 text-xs text-text-subtle";
+const RODAPE = "border-t border-border px-3.5 py-2.5 text-label font-normal text-text-subtle";
 
 /**
  * O gesto. QUAL gesto é decisão de `montarCartoesDaPassagem` — aqui só se

@@ -93,31 +93,26 @@ export function PassagemCard({ cartao, contatoId, onAssumir, assumindo }: Props)
 
   const emAberto = cartao.estado === "aberta";
 
-  // Visual v2 (fase 3.5): cabeçalho em faixa colorida, corpo e rodapé
-  // separados por linha. Em aberto o cabeçalho é de AVISO (alguém precisa agir);
-  // reconhecida ou devolvida, ele volta ao tom do accent, que só informa.
+  // O `.handoff` do quadro DS: cartão da largura do fio, raio 14 com a linha
+  // forte, cabeçalho em faixa accent-soft (13/700 na cor da marca) e a hora à
+  // direita. Em aberto, a borda fica no tom de aviso: alguém precisa agir.
   return (
-    <div className="flex w-full justify-center px-4 py-2">
+    <div className="flex w-full px-2.5 pb-1 pt-3.5 lg:px-7">
       <article
         aria-labelledby={tituloId}
         data-testid="cartao-passagem"
         data-passagem-estado={cartao.estado}
         className={cn(
-          "w-full max-w-[min(92%,40rem)] overflow-hidden rounded-2xl border bg-surface text-sm shadow-xs",
-          emAberto ? "border-warning/50" : "border-border",
+          "w-full overflow-hidden rounded-menu border bg-surface text-ui",
+          emAberto ? "border-warning-line" : "border-border-strong",
         )}
       >
-        <div
-          className={cn(
-            "flex items-center gap-2 px-3.5 py-2.5",
-            emAberto ? "bg-warning-bg text-warning-fg" : "bg-accent-soft text-accent-700 dark:text-accent-300",
-          )}
-        >
-          <h3 id={tituloId} className="flex items-center gap-1.5 text-sm font-semibold">
+        <div className="flex items-center gap-2 bg-accent-soft px-3.5 py-2.5 text-accent-text">
+          <h3 id={tituloId} className="flex items-center gap-2 text-label font-bold">
             <Robot size={15} weight="fill" aria-hidden />
             {t(cartao.titulo)}
           </h3>
-          <span className="ml-auto shrink-0 text-xs text-text-subtle">{hora}</span>
+          <span className="ml-auto shrink-0 text-label font-medium text-text-subtle">{hora}</span>
         </div>
 
         <div className="px-3.5 pb-3 pt-1">

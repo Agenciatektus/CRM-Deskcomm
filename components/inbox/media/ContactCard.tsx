@@ -125,15 +125,17 @@ export function ContactCard({ message }: Props) {
   // dizia que clicar abria uma conversa.
   const primeiroNome = (contact.name ?? "").trim().split(/\s+/)[0] || t("este contato");
   return (
-    <div className="flex max-w-[240px] flex-col gap-2 rounded-lg border border-current/20 bg-background/10 p-2 text-left">
-      <span className="flex items-center gap-2">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/20">
-          <UserCircle size={28} weight="duotone" aria-hidden />
+    // O `.vcard` do quadro DS: quem é em cima, e "Conversar com" como faixa
+    // de ação de largura inteira, separada por um fio do tom do texto.
+    <div className="-ml-1 -mr-0.75 -mt-px flex w-65 max-w-full flex-col text-left">
+      <span className="flex items-center gap-2.5 px-0.5 pb-2.5 pt-1">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-avatar-4 text-avatar-4-fg">
+          <UserCircle size={26} weight="duotone" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{contact.name}</span>
+          <span className="block truncate font-bold">{contact.name}</span>
           {contact.phone_number ? (
-            <span className="block truncate text-xs opacity-80">{phoneForDisplay(contact.phone_number)}</span>
+            <span className="block truncate font-mono text-label font-normal tabular-nums text-text-muted">{phoneForDisplay(contact.phone_number)}</span>
           ) : null}
         </span>
       </span>
@@ -142,7 +144,7 @@ export function ContactCard({ message }: Props) {
           type="button"
           disabled={loading}
           onClick={handleOpen}
-          className="h-8 rounded-md border border-current/20 bg-background/20 px-2 text-xs font-semibold transition-colors hover:bg-background/30 disabled:cursor-wait disabled:opacity-70"
+          className="block w-full border-t border-[color-mix(in_oklch,var(--color-text)_12%,transparent)] pb-0.75 pt-2.25 text-center text-ui font-bold text-accent-text transition-colors hover:underline disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {t("Conversar com")} {primeiroNome}
         </button>
