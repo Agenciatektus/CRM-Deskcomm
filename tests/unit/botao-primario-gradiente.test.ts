@@ -88,7 +88,9 @@ describe("degradê do escuro", () => {
   it("onde há texto sobre o degradê, a pele usa o degradê de TEXTO, nunca o vibrante", () => {
     // P2-1 do Cassio na #145: `.pele-grad` (contadores, avatar, chips) e
     // `.pele-grad-ativo` (aba Responder, switch) levam texto em cima.
-    for (const classe of [".pele-grad {", ".pele-grad-ativo:is("]) {
+    // As duas regras levam o recorte da subárvore clara (`:not(:where(…))`) logo
+    // depois da classe; o que se procura é a regra, com ou sem ele.
+    for (const classe of [".pele-grad:not(", ".pele-grad-ativo:not("]) {
       const inicio = CSS.indexOf(classe);
       expect(inicio, `sumiu a regra ${classe}`).toBeGreaterThan(-1);
       const corpo = CSS.slice(inicio, CSS.indexOf("}", inicio));

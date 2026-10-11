@@ -4,6 +4,10 @@ import { razaoDeContraste } from "@/lib/branding/contraste";
 import { hexDasCamadas } from "@/lib/design-system/cor-computada";
 import { cn } from "@/lib/utils";
 
+import { MAPA, type IdDoMapa } from "@/lib/design-system/mapa";
+
+import { SeloDoMapa, ValorDoPrototipo } from "./SeloDoMapa";
+import type { Tema } from "./tema";
 import { useMedida } from "./useMedida";
 
 /** O fundo pintado do elemento, composto sobre o fundo do pai (para `rgba`). */
@@ -23,18 +27,45 @@ function medirAmostra(el: HTMLElement): { hex: string | null; declarado: string 
 
 /**
  * Uma amostra de cor: a classe de VERDADE que as telas usam (`bg-surface`…),
- * o nome do token e o valor que o navegador computou ali.
+ * o nome do token, o valor que o navegador computou ali e, DENTRO dela, o selo
+ * do mapa com o valor do protótipo ao lado quando difere.
  */
-export function Amostra({ token, classe }: { token: string; classe: string }) {
+export function Amostra({
+  token,
+  classe,
+  mapa,
+  tema,
+}: {
+  token: string;
+  classe: string;
+  mapa: IdDoMapa;
+  tema: Tema;
+}) {
   const [ref, medida] = useMedida<HTMLDivElement, ReturnType<typeof medirAmostra>>(medirAmostra);
+  const prototipo = MAPA[mapa].ref;
   return (
-    <div className="flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-surface">
+    <div
+      data-amostra={token}
+      className="flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-surface"
+    >
       <div ref={ref} data-token={token} className={cn("h-10 border-b border-border", classe)} />
-      <div className="flex min-w-0 flex-col px-2 py-1.5">
+      <div className="flex min-w-0 flex-col gap-0.5 px-2 py-1.5">
         <code className="truncate text-meta font-semibold">{token}</code>
         <span className="truncate font-mono text-meta text-text-subtle" title={medida?.declarado}>
           {medida?.hex ?? "—"}
         </span>
+        <ValorDoPrototipo id={mapa} tema={tema} />
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          <SeloDoMapa id={mapa} tema={tema} />
+          {prototipo ? (
+            <code
+              className="truncate text-meta text-text-subtle"
+              title={`${prototipo.arquivo}:${prototipo.linha}`}
+            >
+              {prototipo.seletor}
+            </code>
+          ) : null}
+        </div>
       </div>
     </div>
   );

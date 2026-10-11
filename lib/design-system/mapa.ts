@@ -1,18 +1,20 @@
 /**
  * O mapa protótipo x CRM em forma de dado, para a vitrine `/app/design-system`
- * marcar o que está diferente. A versão legível, com valores e propostas, é
- * `docs/design/design-system/mapa-de-tokens.md`; este arquivo guarda só o
- * STATUS por tema e onde o equivalente mora no protótipo. Se os dois
- * divergirem, o documento é a fonte e este arquivo é que está atrasado.
+ * marcar, em CADA amostra e componente, o que difere. A versão legível, com
+ * valores e propostas, é `docs/design/design-system/mapa-de-tokens.md`; este
+ * arquivo guarda o status por tema, o valor do protótipo quando difere e onde o
+ * equivalente mora. Se os dois divergirem, o documento é a fonte.
  *
  * Status:
- *  - `igual`: o CRM já entrega o valor do protótipo;
- *  - `diferente`: existe nos dois, com valor ou forma diferente (proposta no doc);
- *  - `falta`: o protótipo tem e o CRM não tinha. Os tokens criados nesta etapa
- *    continuam `falta` até alguma tela consumi-los;
+ *  - `igual`: o CRM já entrega o valor do protótipo (sem selo);
+ *  - `diferente`: existe nos dois, com valor ou forma diferente. `proto` traz o
+ *    valor do protótipo para a vitrine mostrar ao lado do atual;
+ *  - `novo`: o protótipo tem, o CRM não tinha, e esta etapa CRIOU (token ou
+ *    componente que existe, mas nenhuma tela usa ainda);
+ *  - `falta`: o protótipo tem e o CRM continua sem;
  *  - `sem-equivalente`: só o CRM tem (o protótipo não desenhou).
  */
-export type StatusDoMapa = "igual" | "diferente" | "falta" | "sem-equivalente";
+export type StatusDoMapa = "igual" | "diferente" | "novo" | "falta" | "sem-equivalente";
 
 export interface RefDoPrototipo {
   seletor: string;
@@ -24,6 +26,8 @@ export interface ItemDoMapa {
   claro: StatusDoMapa;
   escuro: StatusDoMapa;
   ref: RefDoPrototipo | null;
+  /** O valor do protótipo, por tema, onde o status é `diferente`. */
+  proto?: { claro?: string; escuro?: string };
 }
 
 const M = "Main.dc.html" as const;
@@ -38,35 +42,45 @@ const r = (seletor: string, linha: number, arquivo: RefDoPrototipo["arquivo"] = 
 const os = (claro: StatusDoMapa, escuro: StatusDoMapa = claro) => ({ claro, escuro });
 
 export const MAPA = {
-  // ── Cor ────────────────────────────────────────────────────────────────
+  // ── Cor: uma entrada por token, para o selo cair na amostra certa ──────
   "cor:bg": { ...os("igual"), ref: r("--chrome", 20) },
   "cor:surface": { ...os("igual"), ref: r("--surface", 21) },
   "cor:surface-elevated": { ...os("igual"), ref: r("--surface-2", 22) },
-  "cor:thread": { ...os("falta"), ref: r("--thread", 23) },
+  "cor:thread": { ...os("novo"), ref: r("--thread", 23) },
+  "cor:hover": { ...os("novo"), ref: r("--hover", 29) },
+  "cor:tint": { ...os("novo"), ref: r("--tint", 37) },
   "cor:text": { ...os("igual"), ref: r("--ink", 24) },
   "cor:text-muted": { ...os("igual"), ref: r("--ink-2", 25) },
   "cor:text-subtle": { ...os("igual"), ref: r("--ink-3", 26) },
   "cor:border": { ...os("igual"), ref: r("--line", 27) },
   "cor:border-strong": { ...os("igual"), ref: r("--line-2", 28) },
-  "cor:hover": { ...os("falta"), ref: r("--hover", 29) },
-  "cor:accent": { ...os("diferente"), ref: r("--accent", 741) },
-  "cor:accent-fg": { ...os("igual", "diferente"), ref: r("--accent-fg", 30) },
-  "cor:accent-soft": { ...os("diferente", "igual"), ref: r("--accent-soft", 31) },
-  "cor:accent-soft-2": { ...os("falta"), ref: r("--accent-soft-2", 32) },
-  "cor:accent-text": { ...os("falta"), ref: r("--accent-text", 33) },
-  "cor:tint": { ...os("falta"), ref: r("--tint", 37) },
-  "cor:success": { ...os("diferente", "igual"), ref: r("--ok", 38) },
-  "cor:warning": { ...os("diferente", "igual"), ref: r("--warn", 39) },
-  "cor:warning-line": { ...os("falta"), ref: r("--warn-line", 39) },
-  "cor:error": { ...os("diferente", "igual"), ref: r("--crit", 40) },
-  "cor:info": { ...os("diferente", "igual"), ref: r("--info", 41) },
+  "cor:accent": { ...os("diferente"), ref: r("--accent", 741), proto: { claro: "#0e7a5f", escuro: "#2690b1" } },
+  "cor:accent-hover": {
+    ...os("diferente"),
+    ref: r(".btn-primary:hover", 281),
+    proto: { claro: "color-mix(accent 86%, black)", escuro: "--grad, brightness(1.1)" },
+  },
+  "cor:accent-fg": { ...os("igual", "diferente"), ref: r("--accent-fg", 30), proto: { escuro: "#f8f8f8" } },
+  "cor:accent-soft": { ...os("diferente", "igual"), ref: r("--accent-soft", 31), proto: { claro: "#eaeee9 (11%)" } },
+  "cor:accent-soft-2": { ...os("novo"), ref: r("--accent-soft-2", 32) },
+  "cor:accent-text": { ...os("novo"), ref: r("--accent-text", 33) },
+  "cor:success-bg": { ...os("diferente", "igual"), ref: r("--ok-bg", 38), proto: { claro: "#dff6e2" } },
+  "cor:success-fg": { ...os("diferente", "igual"), ref: r("--ok", 38), proto: { claro: "#287c42" } },
+  "cor:warning-bg": { ...os("diferente", "igual"), ref: r("--warn-bg", 39), proto: { claro: "#ffeed2" } },
+  "cor:warning-fg": { ...os("diferente", "igual"), ref: r("--warn", 39), proto: { claro: "#824c00" } },
+  "cor:warning-line": { ...os("novo"), ref: r("--warn-line", 39) },
+  "cor:error-bg": { ...os("diferente", "igual"), ref: r("--crit-bg", 40), proto: { claro: "#ffe9e6" } },
+  "cor:error-fg": { ...os("diferente", "igual"), ref: r("--crit", 40), proto: { claro: "#b02a2d" } },
+  "cor:info-bg": { ...os("diferente", "igual"), ref: r("--info-bg", 41), proto: { claro: "#e1f1ff" } },
+  "cor:info-fg": { ...os("diferente", "igual"), ref: r("--info", 41), proto: { claro: "#0077bc" } },
   "cor:avatar": { ...os("igual"), ref: r("--av1..--av6", 47) },
   "cor:pele-grad": { ...os("igual"), ref: r("--grad", 765, V) },
+  "cor:pele-grad-texto": { ...os("sem-equivalente"), ref: null },
   "cor:pele-foco": { ...os("igual"), ref: r(":focus-visible", 815, V) },
   // ── Tipografia ─────────────────────────────────────────────────────────
   "tipo:familia": { ...os("diferente"), ref: r(".app font-family", 53) },
   "tipo:mono": { ...os("diferente"), ref: r(".mono", 101) },
-  "tipo:escala": { ...os("falta"), ref: r("Tipografia", 328, D) },
+  "tipo:escala": { ...os("novo"), ref: r("Tipografia", 328, D) },
   "tipo:pesos": { ...os("diferente"), ref: r(".btn font-weight", 278) },
   // ── Espaço, forma, sombra, movimento ───────────────────────────────────
   "espaco:escala": { ...os("igual"), ref: r("Espaço", 345, D) },
@@ -89,7 +103,7 @@ export const MAPA = {
   "comp:checkbox": { ...os("diferente"), ref: r(".chk", 626) },
   "comp:radio": { ...os("sem-equivalente"), ref: null },
   "comp:switch": { ...os("diferente", "igual"), ref: r(".switch", 258) },
-  "comp:chip": { ...os("falta"), ref: r(".chip", 541) },
+  "comp:chip": { ...os("novo"), ref: r(".chip", 541) },
   "comp:pilula": { ...os("diferente"), ref: r(".pill", 231) },
   "comp:badge": { ...os("diferente"), ref: r(".status", 270) },
   "comp:segmentado": { ...os("igual"), ref: r(".seg", 196) },

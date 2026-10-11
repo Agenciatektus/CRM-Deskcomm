@@ -4,7 +4,6 @@ import { useT } from "@/hooks/i18n/useT";
 import type { IdDoMapa } from "@/lib/design-system/mapa";
 
 import { Amostra, ParDeContraste } from "../_componentes/Amostra";
-import { RefDoPrototipo, SeloDoMapa } from "../_componentes/SeloDoMapa";
 import { Secao } from "../_componentes/Secao";
 import type { Tema } from "../_componentes/tema";
 
@@ -28,22 +27,22 @@ const TINTAS: ItemDeCor[] = [
 ];
 const MARCA: ItemDeCor[] = [
   { token: "--color-accent", classe: "bg-accent", mapa: "cor:accent" },
-  { token: "--color-accent-hover", classe: "bg-accent-hover", mapa: "cor:accent" },
+  { token: "--color-accent-hover", classe: "bg-accent-hover", mapa: "cor:accent-hover" },
   { token: "--color-accent-fg", classe: "bg-accent-foreground", mapa: "cor:accent-fg" },
   { token: "--color-accent-soft", classe: "bg-accent-soft", mapa: "cor:accent-soft" },
   { token: "--color-accent-soft-2", classe: "bg-accent-soft-2", mapa: "cor:accent-soft-2" },
   { token: "--color-accent-text", classe: "bg-accent-text", mapa: "cor:accent-text" },
 ];
 const ESTADOS: ItemDeCor[] = [
-  { token: "--color-success-bg", classe: "bg-success-bg", mapa: "cor:success" },
-  { token: "--color-success-fg", classe: "bg-success-fg", mapa: "cor:success" },
-  { token: "--color-warning-bg", classe: "bg-warning-bg", mapa: "cor:warning" },
-  { token: "--color-warning-fg", classe: "bg-warning-fg", mapa: "cor:warning" },
+  { token: "--color-success-bg", classe: "bg-success-bg", mapa: "cor:success-bg" },
+  { token: "--color-success-fg", classe: "bg-success-fg", mapa: "cor:success-fg" },
+  { token: "--color-warning-bg", classe: "bg-warning-bg", mapa: "cor:warning-bg" },
+  { token: "--color-warning-fg", classe: "bg-warning-fg", mapa: "cor:warning-fg" },
   { token: "--color-warning-line", classe: "bg-warning-line", mapa: "cor:warning-line" },
-  { token: "--color-error-bg", classe: "bg-error-bg", mapa: "cor:error" },
-  { token: "--color-error-fg", classe: "bg-error-fg", mapa: "cor:error" },
-  { token: "--color-info-bg", classe: "bg-info-bg", mapa: "cor:info" },
-  { token: "--color-info-fg", classe: "bg-info-fg", mapa: "cor:info" },
+  { token: "--color-error-bg", classe: "bg-error-bg", mapa: "cor:error-bg" },
+  { token: "--color-error-fg", classe: "bg-error-fg", mapa: "cor:error-fg" },
+  { token: "--color-info-bg", classe: "bg-info-bg", mapa: "cor:info-bg" },
+  { token: "--color-info-fg", classe: "bg-info-fg", mapa: "cor:info-fg" },
 ];
 const AVATARES: ItemDeCor[] = [
   { token: "--color-avatar-1", classe: "bg-avatar-1", mapa: "cor:avatar" },
@@ -55,7 +54,7 @@ const AVATARES: ItemDeCor[] = [
 ];
 const PELE: ItemDeCor[] = [
   { token: "--pele-grad", classe: "bg-(image:--pele-grad)", mapa: "cor:pele-grad" },
-  { token: "--pele-grad-texto", classe: "bg-(image:--pele-grad-texto)", mapa: "cor:pele-grad" },
+  { token: "--pele-grad-texto", classe: "bg-(image:--pele-grad-texto)", mapa: "cor:pele-grad-texto" },
   { token: "--pele-foco", classe: "bg-(--pele-foco)", mapa: "cor:pele-foco" },
 ];
 
@@ -75,25 +74,12 @@ const PARES: { nome: string; classe: string }[] = [
 ];
 
 function Grupo({ titulo, itens, tema }: { titulo: string; itens: ItemDeCor[]; tema: Tema }) {
-  const ids = [...new Set(itens.map((i) => i.mapa))];
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-label font-bold">{titulo}</h3>
-        {ids.map((id) => (
-          <span key={id} className="inline-flex items-center gap-1">
-            <SeloDoMapa id={id} tema={tema} />
-          </span>
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <h3 className="text-label font-bold">{titulo}</h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {itens.map((i) => (
-          <Amostra key={i.token} token={i.token} classe={i.classe} />
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4">
-        {ids.map((id) => (
-          <RefDoPrototipo key={id} id={id} />
+          <Amostra key={i.token} token={i.token} classe={i.classe} mapa={i.mapa} tema={tema} />
         ))}
       </div>
     </div>

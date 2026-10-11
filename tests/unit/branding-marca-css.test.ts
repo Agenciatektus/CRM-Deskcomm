@@ -325,7 +325,13 @@ describe("guardas de mecanismo", () => {
         chamadas.push(`${alvo}: ${chamada}`);
         const escopo = chamada.split(",")[1]?.trim().replace(/\)$/, "");
         if (escopo === undefined) continue;
-        if (escopo === "ESCOPO_DA_INSTALACAO" || escopo === "ESCOPO_DA_ORGANIZACAO") continue;
+        if (
+          escopo === "ESCOPO_DA_INSTALACAO" ||
+          escopo === "ESCOPO_DA_ORGANIZACAO" ||
+          // O painel da vitrine do design system (lib/branding/css.ts explica).
+          escopo === "ESCOPO_DO_PAINEL"
+        )
+          continue;
         forasteiros.push(`${alvo}: ${chamada}`);
       }
     }

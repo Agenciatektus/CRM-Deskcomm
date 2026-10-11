@@ -228,7 +228,26 @@ export const ESCOPO_DA_ORGANIZACAO = [
   ['[data-theme="dark"] body:has([data-marca-org])', "escuro"],
 ] as const;
 
-export type EscopoDaMarca = typeof ESCOPO_DA_INSTALACAO | typeof ESCOPO_DA_ORGANIZACAO;
+/**
+ * O escopo do PAINEL da vitrine do design system (`/app/design-system`).
+ *
+ * O lado a lado põe um painel claro e um escuro na mesma página, cada um com o
+ * seu `data-theme`. Os dois escopos acima pintam só o <html> e o <body>, então
+ * o painel que não tem o tema da página herdava a rampa do outro tema e, no
+ * escuro, o bloco `[data-theme="dark"]` do globals.css ainda redeclarava a
+ * rampa do produto por cima da marca. Aqui cada painel recebe a marca do SEU
+ * tema, no próprio elemento: (0,2,0) vence `[data-theme=…]` (0,1,0).
+ * Só a vitrine emite este bloco.
+ */
+export const ESCOPO_DO_PAINEL = [
+  ['[data-painel-do-tema][data-theme="light"]', "claro"],
+  ['[data-painel-do-tema][data-theme="dark"]', "escuro"],
+] as const;
+
+export type EscopoDaMarca =
+  | typeof ESCOPO_DA_INSTALACAO
+  | typeof ESCOPO_DA_ORGANIZACAO
+  | typeof ESCOPO_DO_PAINEL;
 
 function montarBloco(seletor: string, decls: readonly Declaracao[]): string {
   const linhas = decls.map(([nome, valor]) => `  ${nome}: ${valor};`);

@@ -11,9 +11,9 @@
  * organização de outro, não de quem a organização tem como dono. Mesma regra de
  * `settings/marca/page.tsx` (`is_platform_admin && !user.support`).
  */
-export function podeVerDesignSystem(
-  user: { is_platform_admin?: boolean | null; support?: unknown } | null | undefined,
-): boolean {
+export function podeVerDesignSystem<U extends { is_platform_admin?: boolean | null; support?: unknown }>(
+  user: U | null | undefined,
+): user is U {
   if (!user) return false;
   return user.is_platform_admin === true && !user.support;
 }
