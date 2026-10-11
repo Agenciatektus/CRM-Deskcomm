@@ -11,7 +11,7 @@
  * EXCEÇÃO de contraste (rótulo de peso >= 600 e >= 12px, mínimo de 3,5:1 no meio) e
  * lê as paradas do próprio CSS: transcrever as cores aqui mediria a minha cópia.
  */
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -55,13 +55,22 @@ describe("degradê do escuro", () => {
   });
 
   it("é fixo: nenhum token de degradê, brilho ou foco lê a marca do revendedor", () => {
-    for (const nome of ["--pele-grad", "--pele-grad-hover", "--pele-brilho", "--pele-foco", "--pele-grad-fg"]) {
+    for (const nome of ["--pele-grad", "--pele-grad-hover", "--pele-grad-acao", "--pele-grad-acao-hover", "--pele-brilho", "--pele-foco", "--pele-grad-fg"]) {
       expect(token(nome), `${nome} voltou a depender da marca`).not.toMatch(/--color-accent/);
     }
   });
 
-  it("o botão primário usa o degradê vibrante no escuro, com o texto branco e peso 600", () => {
-    expect(token("--gradient-primary")).toBe("var(--pele-grad)");
+  it("a ação usa as cores do degradê com a ponta menta só depois de 85% (P2-2 do Cassio na #167)", () => {
+    // Botão largo com rótulo longo: as últimas letras chegavam à faixa da ponta
+    // (2,15:1). Com o meio esticado até 85%, o branco fica >= 3,5:1 até ~87%.
+    const acao = token("--pele-grad-acao");
+    expect([...new Set(paradas(acao))]).toEqual(paradas(token("--pele-grad")));
+    const posicoes = [...acao.matchAll(/#[0-9a-f]{6}\s+(\d+)%/gi)].map((m) => Number(m[1]));
+    expect(posicoes.at(-2), "a cor do meio tem de ir até 85%").toBeGreaterThanOrEqual(85);
+    expect(token("--gradient-primary")).toBe("var(--pele-grad-acao)");
+  });
+
+  it("o botão primário usa o degradê da ação no escuro, com o texto branco e peso 600", () => {
     expect(BOTAO).toContain("dark:bg-(image:--gradient-primary)");
     expect(BOTAO).toContain("dark:text-(--pele-grad-fg)");
     expect(BOTAO).toContain("font-semibold");
@@ -70,23 +79,39 @@ describe("degradê do escuro", () => {
 
   it("o hover do botão escurece SÓ o fundo, e o meio continua na exceção", () => {
     // P1 do Cassio na #145: `brightness()` no botão escurecia o texto junto.
-    expect(BOTAO).toContain("dark:hover:bg-(image:--pele-grad-hover)");
+    expect(BOTAO).toContain("dark:hover:bg-(image:--pele-grad-acao-hover)");
     expect(BOTAO, "filtro no hover escurece o texto junto com o fundo").not.toMatch(/dark:hover:brightness/);
     const fg = token("--pele-grad-fg");
-    const cores = paradas(token("--pele-grad-hover"));
-    expect(cores).toHaveLength(3);
+    const cores = paradas(token("--pele-grad-acao-hover"));
+    expect(cores).toHaveLength(4);
     expect(razaoDeContraste(fg, cores[1]!)).toBeGreaterThanOrEqual(MINIMO_DA_EXCECAO);
   });
 
-  it("contador, chip ligado e etapa usam o degradê da logo (o mesmo do botão)", () => {
+  it("chip ligado, etapa e aba do composer usam o degradê da ação", () => {
     for (const classe of [".pele-grad:not(", ".pele-grad-ativo:not("]) {
       const inicio = CSS.indexOf(classe);
       expect(inicio, `sumiu a regra ${classe}`).toBeGreaterThan(-1);
       const corpo = CSS.slice(inicio, CSS.indexOf("}", inicio));
-      expect(corpo).toContain("var(--pele-grad)");
+      expect(corpo).toContain("var(--pele-grad-acao)");
       expect(corpo).toContain("var(--pele-grad-fg)");
     }
     expect(CSS, "o degradê escurecido de texto voltou").not.toMatch(/--pele-grad-texto:/);
+  });
+
+  it("contador com texto < 12px usa o degradê do hover, que passa 4,5:1 no meio (P2-1 do Cassio na #167)", () => {
+    const fg = token("--pele-grad-fg");
+    const inicio = CSS.indexOf(".pele-grad-contador:not(");
+    expect(inicio).toBeGreaterThan(-1);
+    expect(CSS.slice(inicio, CSS.indexOf("}", inicio))).toContain("var(--pele-grad-hover)");
+    expect(razaoDeContraste(fg, paradas(token("--pele-grad-hover"))[1]!)).toBeGreaterThanOrEqual(4.5);
+    // A cerca: nenhum arquivo com a classe `pele-grad` (texto sobre o degradê da
+    // ação) usa texto abaixo de 12px. Selo pequeno vai de `pele-grad-contador`.
+    const pequeno = /text-\[(?:\d|1[01])(?:\.\d+)?px\]|text-\[0\.\d+rem\]|\btext-rail\b|\btext-\[10\.5px\]/;
+    const reprovados = globSync("{app,components}/**/*.tsx").filter((arq) => {
+      const src = readFileSync(arq, "utf8");
+      return /(["'`\s])pele-grad(?=[\s"'`])/.test(src) && pequeno.test(src);
+    });
+    expect(reprovados, "texto < 12px sobre o degradê da ação: use pele-grad-contador").toEqual([]);
   });
 
   it("o claro não ganhou degradê: o bloco do claro não declara os tokens da pele", () => {

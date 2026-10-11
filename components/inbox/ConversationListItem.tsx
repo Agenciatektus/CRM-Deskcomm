@@ -228,7 +228,7 @@ export function ConversationListItem({
           </p>
           {naoLida && (
             <span
-              className="pele-grad inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
+              className="pele-grad-contador inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold tabular-nums text-accent-foreground"
               aria-label={soMarcada ? t("Marcada como não lida") : `${unread} ${t("mensagens não lidas")}`}
             >
               {soMarcada ? "" : unread}
