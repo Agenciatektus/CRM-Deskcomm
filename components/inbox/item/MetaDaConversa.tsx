@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock } from "@/lib/ui/icons";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { useT } from "@/hooks/i18n/useT";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
@@ -18,8 +18,8 @@ import { esperaCurta, waitingLabel } from "./tempo-da-linha";
  * semibold são as medidas do `.pill` do protótipo; com 20px/11px o dono e a
  * espera sumiam ao lado do nome, que é justamente o que se lê primeiro.
  */
-const PILULA =
-  "inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold";
+/** A pílula de ESTADO do quadro DS (o `Badge`, sem a cor: o tom vem de cada uso). */
+const PILULA = badgeVariants({ variant: null });
 /** A etiqueta como chip com CONTORNO (o `.tag` do protótipo): arredondada, para não
  *  se confundir com a pílula de dono/espera, que é retangular. */
 const CHIP_DA_ETIQUETA =
