@@ -37,6 +37,7 @@ import {
   useTirarDaExclusao,
 } from "@/hooks/campanhas/useConfiguracao";
 import { useT } from "@/hooks/i18n/useT";
+import { RITMO_RECOMENDADO } from "@/lib/campanhas/ritmo-recomendado";
 import { ArrowBendUpLeft } from "@/lib/ui/icons";
 
 export function ConfiguracaoDeCampanhas() {
@@ -97,7 +98,17 @@ function Padroes() {
       <div>
         <h2 className="font-medium">{t("Padrões desta organização")}</h2>
         <p className="text-sm text-muted-foreground">
-          {t("Campo vazio significa herdar o número. Toda campanha nova nasce com estes valores e pode ficar mais devagar, nunca mais rápida.")}
+          {t("Toda campanha nova nasce com estes valores, e pode ficar mais devagar, nunca mais rápida.")}
+        </p>
+        {/* Os números do recomendado ficam À VISTA aqui porque é nesta tela que
+            alguém decide o padrão da organização, e decidir sem saber qual é o
+            ritmo seguro é como os cinco campos abaixo eram usados até agora. */}
+        <p className="text-sm text-muted-foreground">
+          {t("Campo vazio usa o ritmo recomendado para lista fria:")}{" "}
+          {RITMO_RECOMENDADO.intervaloSegundos}s {t("entre mensagens,")}{" "}
+          {RITMO_RECOMENDADO.tetoDiario} {t("por dia,")} {RITMO_RECOMENDADO.tetoHorario}{" "}
+          {t("por hora, das")} {RITMO_RECOMENDADO.janelaInicioHora}h {t("às")}{" "}
+          {RITMO_RECOMENDADO.janelaFimHora}h.
         </p>
       </div>
 
