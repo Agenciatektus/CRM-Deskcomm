@@ -3,6 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
+import { FunilNoCelular } from "@/components/mobile/telas/Funil";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { useT } from "@/hooks/i18n/useT";
 import { useBoard } from "@/hooks/kanban/useBoard";
@@ -54,6 +56,7 @@ export function PipelinePageClient({
   const t = useT();
   const { data, isLoading, error, pulses, realtimeStatus, seguranca } = useBoard(pipelineId);
   const router = useRouter();
+  const celular = useEhCelular();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
@@ -105,6 +108,18 @@ export function PipelinePageClient({
     () => [...new Set((data?.leads ?? []).flatMap((l) => l.tags))].sort(),
     [data?.leads],
   );
+
+  // Celular (M3.1): o funil em lista (abas de etapa e cartões), no lugar das colunas
+  // arrastáveis, que brigam com a rolagem do dedo. Trocar de funil leva à rota dele.
+  if (celular) {
+    return (
+      <>
+        <FunilNoCelular pipelineId={pipelineId} aoTrocarFunil={(id) => router.push(`/app/pipelines/${id}`)} />
+        {/* O "Novo lead" da folha Criar chega aqui com `?criar=1` (usePedidoDeCriar). */}
+        {data && <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} pipelineId={pipelineId} stages={data.stages} />}
+      </>
+    );
+  }
 
   return (
     <div
