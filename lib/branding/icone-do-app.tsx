@@ -3,7 +3,8 @@ import { ImageResponse } from "next/og";
 import { marcaEhADoProduto } from "@/lib/branding";
 import { logger } from "@/lib/logger";
 
-import { CORES_DA_MARCA, SIMBOLO } from "./desenho";
+import { SIMBOLO } from "./desenho";
+import { CamadasDoSimbolo } from "./simbolo-svg";
 import { letraDoIcone } from "./icone";
 import {
   baseDoStorage,
@@ -81,10 +82,7 @@ export async function gerarIconeDoApp(
             width={Math.round(lado * 0.78)}
             height={Math.round(lado * 0.78)}
           >
-            <g fill={CORES_DA_MARCA.claro.simbolo} transform={SIMBOLO.transform}>
-              <path d={SIMBOLO.d} />
-              <rect {...SIMBOLO.modulo} />
-            </g>
+            <CamadasDoSimbolo prefixo="icone" />
           </svg>
         ) : (
           (letraDoIcone(marca.nome) ?? "")

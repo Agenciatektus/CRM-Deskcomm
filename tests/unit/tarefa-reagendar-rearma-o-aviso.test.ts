@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
@@ -41,6 +41,9 @@ function banco() {
 }
 
 beforeEach(() => {
+  // As datas do caso são de 7/8 de outubro: o relógio fica ANTES delas, porque
+  // a rota recusa prazo novo no passado (`lib/tarefas/prazo-no-passado.ts`).
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-06T12:00:00Z") });
   vi.clearAllMocks();
   gravado = null;
   prazoAntes = "2026-10-07T14:00:00.000Z";
@@ -50,6 +53,10 @@ beforeEach(() => {
     org: { orgId: ORG, name: "Org", role: "agent" },
   } as never);
   vi.mocked(createClient).mockResolvedValue(banco() as never);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 async function patch(dados: Record<string, unknown>) {

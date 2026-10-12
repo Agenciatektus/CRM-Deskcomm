@@ -864,6 +864,7 @@ async function exigeHorarioLivre(
 
   const foraDaGrade = podeMarcarForaDaGrade(ctx.actor);
   if (foraDaGrade) {
+    exigeDentroDoHorizonte(ctx, args.inicio, new Date());
     await exigeSemSobreposicao(supabase, ctx, args);
   } else if (!consulta.slots.some((s) => s.inicio.getTime() === args.inicio.getTime())) {
     throw new ApiError(
@@ -875,6 +876,30 @@ async function exigeHorarioLivre(
     );
   }
   return { fusoDaRegra: consulta.fusoDaRegra };
+}
+
+/** Folga para o "agora" (relógio da máquina, tempo do pedido) e o teto do encaixe. */
+export const FOLGA_DO_ENCAIXE_MS = 5 * 60_000;
+export const HORIZONTE_DO_ENCAIXE_MS = 365 * 86_400_000;
+
+/**
+ * O ENCAIXE (marcar fora da grade, só pessoa da equipe) tem limite no tempo
+ * (P2 de backend do Cassio na #171). A grade já recusa o passado pelo aviso
+ * mínimo e a janela de reserva; o encaixe pulava as duas contas e aceitava
+ * marcar ontem ou daqui a dez anos.
+ *
+ * Não há caso retroativo legítimo na CRIAÇÃO nem na remarcação: registrar o
+ * que já aconteceu é o desfecho (`completed`/`no_show`, que é sobre o passado
+ * e não passa por aqui). A tela da grade também bloqueia o horário que passou
+ * (`lib/agenda/grade-interativa.ts`).
+ */
+export function exigeDentroDoHorizonte(ctx: Pick<HandlerCtx, "requestId">, inicio: Date, agora: Date): void {
+  if (inicio.getTime() < agora.getTime() - FOLGA_DO_ENCAIXE_MS) {
+    throw new ApiError(422, "agenda_horario_no_passado", undefined, ctx.requestId, "Este horário já passou. Escolha um horário a partir de agora.");
+  }
+  if (inicio.getTime() > agora.getTime() + HORIZONTE_DO_ENCAIXE_MS) {
+    throw new ApiError(422, "agenda_horario_longe_demais", undefined, ctx.requestId, "O encaixe vai até um ano à frente. Escolha uma data mais próxima.");
+  }
 }
 
 /**

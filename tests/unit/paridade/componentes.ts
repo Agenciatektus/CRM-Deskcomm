@@ -20,7 +20,7 @@ import {
   texto,
   vao,
 } from "./conversores";
-import { R_DS, R_MAIN, R_VERDASH, decl, px } from "./leitor";
+import { DS_HTML_TEXTO, R_DS, R_MAIN, R_VERDASH, decl, px } from "./leitor";
 
 export type Checagem = {
   id: string;
@@ -62,6 +62,18 @@ const c = (
   classes: Checagem["classes"],
 ): Checagem => ({ id, fonte, seletor, prop, arquivo, classes });
 
+/**
+ * O tamanho do texto do botão vem da TABELA de tipografia do quadro ("Rótulo,
+ * botão 13/600"), e não do `.btn` (que herda 14px do corpo). Decisão do Peterson
+ * no fechamento da etapa 2: botão padrão em 13 (`text-label`).
+ */
+export const TAMANHO_DO_BOTAO_NA_TABELA = (() => {
+  const m = /Rótulo, botão<\/span><span style="font-size: (\d+(?:\.\d+)?)px/.exec(DS_HTML_TEXTO);
+  if (!m) throw new Error('quadro: linha "Rótulo, botão" da tabela de tipografia não encontrada');
+  return `${m[1]}px`;
+})();
+const R_TIPO = new Map([[".tipo-botao", { "font-size": TAMANHO_DO_BOTAO_NA_TABELA }]]);
+
 const altDoChip = () => decl(R_DS, ".chip", "height");
 const altDaPilula = () => decl(R_DS, ".pill", "height");
 const altDaTag = () => decl(R_DS, ".tag", "height");
@@ -75,7 +87,7 @@ export const CHECAGENS: Checagem[] = [
   c("botao:peso", R_DS, ".btn", "font-weight", BOTAO, peso),
   c("botao:nowrap", R_DS, ".btn", "white-space", BOTAO, () => "whitespace-nowrap"),
   c("botao:vao", R_DS, ".btn", "gap", BOTAO, vao),
-  c("botao:tamanho", R_MAIN, ".btn", "font-size", BOTAO, tamanho),
+  c("botao:tamanho", R_TIPO, ".tipo-botao", "font-size", BOTAO, tamanho),
   c("botao:primario-fundo", R_DS, ".btn-primary", "background", BOTAO, fundo),
   c("botao:primario-hover", R_DS, ".btn-primary.hover", "background", BOTAO, () => "hover:bg-accent-hover"),
   c("botao:foco", R_DS, ".btn-primary.focus", "outline", BOTAO, (v) => prefixar("focus-visible:", contorno(v))),

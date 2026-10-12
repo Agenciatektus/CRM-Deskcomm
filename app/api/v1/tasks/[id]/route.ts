@@ -23,6 +23,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
 import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
+import { prazoNoPassado } from "@/lib/tarefas/prazo-no-passado";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +99,15 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
   const prazoMudou =
     "due_date" in parsed.data &&
     instante(parsed.data.due_date) !== instante((antes as { due_date?: string | null } | null)?.due_date);
+  // Prazo novo no passado é recusado; reenviar o MESMO prazo (PATCH de título)
+  // não, senão editar uma tarefa atrasada viraria impossível.
+  const situacaoFinal = parsed.data.status ?? (antes as { status?: string } | null)?.status;
+  if (prazoMudou && prazoNoPassado(parsed.data.due_date, situacaoFinal)) {
+    return fail("validation_failed", t("O prazo da tarefa não pode estar no passado."), 422, {
+      requestId,
+      details: { campo: "due_date" },
+    });
+  }
   const mudancas = prazoMudou ? { ...parsed.data, reminded_at: null } : parsed.data;
 
   const { data, error } = await supabase

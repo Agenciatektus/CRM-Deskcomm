@@ -22,15 +22,43 @@
 /** Glifo com a transformação que o posiciona no `viewBox` do logotipo. */
 export type Glifo = { readonly transform: string; readonly d: string };
 
-const D_ABERTO =
-  "M26 108V43c0-10 8-18 18-18h54c56 0 91 33 91 81s-35 81-91 81H45l34-34h19c35 0 56-17 56-47s-21-47-56-47H60v49Z";
+/**
+ * O símbolo: o V da Verdash, SEM fundo, o mesmo `public/logo_verdash.svg` do
+ * Verdash (cópia da fonte em `docs/brand/verdash-simbolo.svg`). Três peças com
+ * degradê próprio: o V (`#1042F6` → `#00FFB0`) e as duas barras
+ * (`#FF3871` → `#FF6F1B`). Decisão do Peterson na etapa 2 do design system:
+ * substitui o D aberto pintado em sálvia. O degradê é o mesmo nos dois temas,
+ * e por isso o desenho não precisa de caixa de fundo.
+ */
+export type GradienteDoSimbolo = {
+  readonly x1: number;
+  readonly y1: number;
+  readonly x2: number;
+  readonly y2: number;
+  readonly paradas: readonly (readonly [offset: number, cor: string])[];
+};
 
-/** O símbolo: um D aberto com um módulo quadrado destacado. Quadrado de 216. */
 export const SIMBOLO = {
-  viewBox: "0 0 216 216",
-  transform: "translate(0.5 2)",
-  d: D_ABERTO,
-  modulo: { x: 26, y: 125, width: 34, height: 34, rx: 4 },
+  viewBox: "0 0 193 212",
+  caminhos: [
+    {
+      gradiente: 0,
+      d: "M64.4429 190L3.44288 68.5C-2.79251 57.7 0.844801 55.3333 3.44288 55.5H39.9429C47.1429 55.5 50.9429 62.5 51.9429 66C66.4429 96.6666 96.1429 159.4 98.9429 165C101.743 170.6 105.11 168.667 106.443 167C128.943 147.5 176.143 106.5 184.943 98.5C193.743 90.5 193.61 98.1666 192.443 103C178.086 131 147.985 189.4 142.443 199C136.9 208.6 128.133 211.667 124.443 212H88.9429C75.3429 212 66.9429 197.333 64.4429 190Z",
+    },
+    {
+      gradiente: 1,
+      d: "M139.443 5C139.443 2.23857 141.681 0 144.443 0H187.443C190.204 0 192.443 2.23858 192.443 5V71.644C192.443 73.0722 191.832 74.4322 190.765 75.3811L147.765 113.603C144.54 116.469 139.443 114.18 139.443 109.866V5Z",
+    },
+    {
+      gradiente: 2,
+      d: "M82.4429 51C82.4429 48.2386 84.6814 46 87.4429 46H121.443C124.204 46 126.443 48.2386 126.443 51V128.763C126.443 130.186 125.836 131.542 124.775 132.491L107.94 147.534C105.447 149.762 101.511 148.962 100.086 145.937L82.92 109.512C82.6058 108.846 82.4429 108.118 82.4429 107.381V51Z",
+    },
+  ],
+  gradientes: [
+    { x1: 0, y1: 133.746, x2: 193.007, y2: 133.746, paradas: [[0, "#1042F6"], [1, "#00FFB0"]] },
+    { x1: 139.443, y1: 0, x2: 165.943, y2: 121, paradas: [[0.331731, "#FF3871"], [1, "#FF6F1B"]] },
+    { x1: 82.4429, y1: 46, x2: 104.443, y2: 152, paradas: [[0.456731, "#FF3871"], [1, "#FF6F1B"]] },
+  ] as readonly GradienteDoSimbolo[],
 } as const;
 
 /**
@@ -41,7 +69,8 @@ export const LOGOTIPO = {
   viewBox: "51 25 732 211",
   /** Proporção largura/altura do `viewBox`, para dimensionar por altura. */
   proporcao: 732 / 211,
-  simbolo: { transform: "translate(44 19) scale(1.05)", d: D_ABERTO, modulo: SIMBOLO.modulo },
+  /** O V ocupa a caixa que o símbolo antigo ocupava (x 71 a 242, y 45 a 215). */
+  simbolo: { transform: "translate(79 45) scale(0.802)" },
   nome: [
     {
       transform: "translate(268 151) scale(0.05 -0.05)",
@@ -93,11 +122,11 @@ export const LOGOTIPO = {
 } as const;
 
 /**
- * As cores da marca do produto, por tema — os mesmos graus da régua
- * (`regua-do-produto.ts`): sálvia 600/400 para o símbolo, neutro 900/0 para
- * o nome e neutro 600/300 para o "CRM". Copiadas dos SVGs de `docs/brand/`.
+ * As cores do TEXTO da marca do produto, por tema: os mesmos graus da régua
+ * (`regua-do-produto.ts`), neutro 900/0 para o nome e neutro 600/300 para o
+ * "CRM". O símbolo não entra: ele tem o degradê próprio (`SIMBOLO.gradientes`).
  */
 export const CORES_DA_MARCA = {
-  claro: { simbolo: "#506d48", nome: "#171d26", sufixo: "#474d58" },
-  escuro: { simbolo: "#82a077", nome: "#f8f8f8", sufixo: "#a1a5aa" },
+  claro: { nome: "#171d26", sufixo: "#474d58" },
+  escuro: { nome: "#f8f8f8", sufixo: "#a1a5aa" },
 } as const;

@@ -29,7 +29,7 @@
  *
  *     npx vitest run tests/unit/agenda-aviso-de-compromisso.test.ts
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -328,4 +328,15 @@ describe("o aviso de compromisso (#1612)", () => {
     // uma linha qualquer.
     expect(payload.inicio).toBe(HORARIO);
   });
+});
+
+// O ENCAIXE recusa início no passado (`exigeDentroDoHorizonte`, P2 do Cassio na
+// #171), e o DESFECHO só vale depois do início. O relógio fica 2 min depois do
+// compromisso das 13:00: dentro da folga de 5 min para marcar, e já passado
+// para marcar comparecimento ou falta.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-02T13:02:00Z") });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });

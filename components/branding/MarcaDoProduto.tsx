@@ -1,4 +1,9 @@
+"use client";
+
+import { useId } from "react";
+
 import { LOGOTIPO, SIMBOLO } from "@/lib/branding/desenho";
+import { CamadasDoSimbolo } from "@/lib/branding/simbolo-svg";
 import { cn } from "@/lib/utils";
 
 /**
@@ -6,8 +11,8 @@ import { cn } from "@/lib/utils";
  * ninguém configurou marca própria (`marcaEhADoProduto`, em `lib/branding.ts`).
  *
  * Inline, e não `<img src="/algo.svg">`, por três motivos:
- *  - as cores seguem o TEMA: sálvia mais clara e nome em creme no escuro, como
- *    a régua do produto já define — um arquivo estático teria uma cor só;
+ *  - o NOME segue o tema (creme no escuro, como a régua do produto define); o
+ *    símbolo é o V da Verdash com degradê próprio, sem fundo, igual nos dois;
  *  - nada em `public/`: um `.svg` fixo ali seria servido na instalação de um
  *    revendedor que configurou a marca dele (ver `lib/branding/desenho.ts`);
  *  - a barra lateral já usa `<img>` para o logo CONFIGURADO, e o e2e
@@ -26,7 +31,6 @@ type Props = {
   readonly decorativo?: boolean;
 };
 
-const SIMBOLO_CLARO_ESCURO = "fill-[#506d48] dark:fill-[#82a077]";
 const NOME_CLARO_ESCURO = "fill-[#171d26] dark:fill-[#f8f8f8]";
 const SUFIXO_CLARO_ESCURO = "fill-[#474d58] dark:fill-[#a1a5aa]";
 
@@ -35,7 +39,6 @@ const SUFIXO_CLARO_ESCURO = "fill-[#474d58] dark:fill-[#a1a5aa]";
 // é `tests/unit/marca-do-produto.test.tsx`, que compara as classes à paleta —
 // e não uma asserção em runtime: um throw aqui derrubaria a casca inteira.
 export const CLASSES_DE_COR = {
-  simbolo: SIMBOLO_CLARO_ESCURO,
   nome: NOME_CLARO_ESCURO,
   sufixo: SUFIXO_CLARO_ESCURO,
 } as const;
@@ -48,31 +51,29 @@ function acessibilidade(nome: string, decorativo: boolean) {
 
 /** O símbolo sozinho — para a barra recolhida, avatar e cantos apertados. */
 export function SimboloDoProduto({ nome, className, decorativo = false }: Props) {
+  const prefixo = useId();
   return (
     <svg
       viewBox={SIMBOLO.viewBox}
       className={cn("shrink-0", className)}
       {...acessibilidade(nome, decorativo)}
     >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={SIMBOLO.transform}>
-        <path d={SIMBOLO.d} />
-        <rect {...SIMBOLO.modulo} />
-      </g>
+      <CamadasDoSimbolo prefixo={prefixo} />
     </svg>
   );
 }
 
 /** Símbolo + nome — para a barra aberta e a fachada de entrada. */
 export function LogotipoDoProduto({ nome, className, decorativo = false }: Props) {
+  const prefixo = useId();
   return (
     <svg
       viewBox={LOGOTIPO.viewBox}
       className={cn("shrink-0", className)}
       {...acessibilidade(nome, decorativo)}
     >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={LOGOTIPO.simbolo.transform}>
-        <path d={LOGOTIPO.simbolo.d} />
-        <rect {...LOGOTIPO.simbolo.modulo} />
+      <g transform={LOGOTIPO.simbolo.transform}>
+        <CamadasDoSimbolo prefixo={prefixo} />
       </g>
       <g className={NOME_CLARO_ESCURO}>
         {LOGOTIPO.nome.map((g) => (

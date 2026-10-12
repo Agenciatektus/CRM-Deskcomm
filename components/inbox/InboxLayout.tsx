@@ -37,6 +37,7 @@ import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
+import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
 
 /**
  * QUAL COLUNA APARECE NO CELULAR — as duas saem da MESMA pergunta.
@@ -132,6 +133,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const t = useT();
   const { activeOrg, user } = useAuth();
   const supportReadonly = user.support?.access_mode === "support_readonly";
+  const [listaCompacta] = useListaCompacta(user?.id);
   const orgId = activeOrg?.orgId ?? null;
 
   const pathname = usePathname();
@@ -454,7 +456,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         )}
       >
         <InboxFilters value={filterValue} onChange={setFilterValue} />
-        <div className="min-h-0 flex-1 overflow-hidden">
+        {/* Modo compacto (quadro DS): a linha da lista com 8px, por atendente. */}
+        <div className="min-h-0 flex-1 overflow-hidden" data-densidade={listaCompacta ? "compacta" : undefined}>
           <ConversationList
             listQuery={listQ}
             filters={filters}

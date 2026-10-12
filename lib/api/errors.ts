@@ -51,6 +51,8 @@ export const ApiErrorCodes = {
   // wire sem passar por lista nenhuma, e o consumidor do outro lado nunca sabe
   // que ele existe. Quem confia que a união protege está lendo o arquivo errado.
   agenda_horario_indisponivel: "agenda_horario_indisponivel",
+  agenda_horario_no_passado: "agenda_horario_no_passado",
+  agenda_horario_longe_demais: "agenda_horario_longe_demais",
   agenda_fora_da_jornada: "agenda_fora_da_jornada",
   agenda_tipo_desativado: "agenda_tipo_desativado",
   agenda_sem_responsavel: "agenda_sem_responsavel",

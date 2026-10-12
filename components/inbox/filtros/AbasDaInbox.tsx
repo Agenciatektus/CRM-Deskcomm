@@ -3,9 +3,11 @@
 import { Archive, CaretDown, CheckCircle, Robot } from "@/lib/ui/icons";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -34,6 +36,8 @@ interface Props {
   /** As que vão para o "Mais" (Com a IA, Fechadas, Arquivadas). */
   escondidas: AbaComContagem[];
   onChange: (tab: InboxTab) => void;
+  /** A chave do modo compacto da lista, no fim do "Mais" (preferência do atendente). */
+  compacta?: { ligada: boolean; onChange: (ligada: boolean) => void };
 }
 
 /** L9: o ícone de cada visão do "Mais", como no protótipo. */
@@ -71,7 +75,7 @@ function Contagem({ count, ativa }: { count?: number; ativa: boolean }) {
  * entre elas). As escondidas são `menuitemradio`, que marca a ativa com
  * `aria-checked`.
  */
-export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
+export function AbasDaInbox({ tab, principais, escondidas, onChange, compacta }: Props) {
   const t = useT();
   const escondidaAtiva = escondidas.find((a) => a.value === tab);
   return (
@@ -119,6 +123,17 @@ export function AbasDaInbox({ tab, principais, escondidas, onChange }: Props) {
                   );
                 })}
               </DropdownMenuRadioGroup>
+              {compacta && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={compacta.ligada}
+                    onCheckedChange={(v) => compacta.onChange(v === true)}
+                  >
+                    {t("Lista compacta")}
+                  </DropdownMenuCheckboxItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

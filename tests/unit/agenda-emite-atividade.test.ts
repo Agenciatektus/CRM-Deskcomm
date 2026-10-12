@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -538,4 +538,13 @@ describe("marcar grava local e observação neste compromisso", () => {
     expect(linha.location_details).toBe("Sala 2");
     expect(linha.description).toBeNull();
   });
+});
+
+// O ENCAIXE recusa início no passado (`exigeDentroDoHorizonte`, P2 do Cassio na
+// #171): o relógio fica ANTES das datas fixas deste caso.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-07-01T00:00:00Z") });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });

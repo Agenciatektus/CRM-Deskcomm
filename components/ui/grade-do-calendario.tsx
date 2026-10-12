@@ -22,6 +22,8 @@ export function GradeDoCalendario({
   podeVoltar,
   podeAvancar,
   anos = false,
+  podeVoltarAno = true,
+  podeAvancarAno = true,
   onDia,
 }: {
   mes: Date;
@@ -34,6 +36,8 @@ export function GradeDoCalendario({
   podeAvancar: boolean;
   /** Pular de ano em ano (data de nascimento, lançamento antigo). */
   anos?: boolean;
+  podeVoltarAno?: boolean;
+  podeAvancarAno?: boolean;
   onDia: (d: Date) => void;
 }) {
   const t = useT();
@@ -44,7 +48,8 @@ export function GradeDoCalendario({
         {anos && (
           <button
             type="button"
-            className="grid size-7 place-items-center rounded-md hover:bg-hover"
+            className="grid size-7 place-items-center rounded-md hover:bg-hover disabled:opacity-40"
+            disabled={!podeVoltarAno}
             onClick={() => setMes(new Date(mes.getFullYear() - 1, mes.getMonth(), 1))}
             aria-label={t("Ano anterior")}
           >
@@ -73,7 +78,8 @@ export function GradeDoCalendario({
         {anos && (
           <button
             type="button"
-            className="grid size-7 place-items-center rounded-md hover:bg-hover"
+            className="grid size-7 place-items-center rounded-md hover:bg-hover disabled:opacity-40"
+            disabled={!podeAvancarAno}
             onClick={() => setMes(new Date(mes.getFullYear() + 1, mes.getMonth(), 1))}
             aria-label={t("Próximo ano")}
           >
