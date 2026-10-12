@@ -67,3 +67,28 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
     expect(screen.queryByText(/continuam disponíveis em Propostas/i)).not.toBeInTheDocument();
   });
 });
+
+describe("BulkActionBar — ganho e perda fora do lote (follow-up do Cassio na #180)", () => {
+  it("Mover para… só oferece as etapas abertas", async () => {
+    const user = userEvent.setup();
+    render(
+      <BulkActionBar
+        selectedIds={["lead-1", "lead-2"]}
+        stages={
+          [
+            { id: "s1", name: "Novo" },
+            { id: "s2", name: "Proposta" },
+            { id: "g", name: "Fechado", is_won: true },
+            { id: "p", name: "Perdido", is_lost: true },
+          ] as never
+        }
+        pipelineId="p-1"
+        tagsExistentes={[]}
+        onClear={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Mover para…" }));
+    const itens = (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
+    expect(itens).toEqual(["Novo", "Proposta"]);
+  });
+});

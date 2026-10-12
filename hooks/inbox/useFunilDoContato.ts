@@ -10,8 +10,11 @@ import { apiClient } from "@/lib/api/client";
 import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
 import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
 
-/** O pedido que precisa de janela própria (perder com motivo, levar a outro funil). */
-export type DialogoDoFunil = { tipo: "perder" | "outro-funil"; lead: LeadRow };
+/**
+ * O pedido que precisa de janela própria: perder com motivo, levar a outro funil, ou
+ * CRIAR o negócio quando o contato não tem nenhum (M2.4, `NewLeadDialog` com o contato).
+ */
+export type DialogoDoFunil = { tipo: "perder" | "outro-funil"; lead: LeadRow } | { tipo: "criar-lead" };
 
 /** A chave do resumo do CRM do contato que o menu e a faixa do celular leem. */
 export function chaveDoResumoDoMenu(contactId: string) {

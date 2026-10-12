@@ -9,7 +9,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
-vi.mock("@/components/voice/DialButton", () => ({ DialButton: () => <button type="button">Ligar</button> }));
+const voz = vi.hoisted(() => ({ podeLigar: true }));
+vi.mock("@/components/voice/DialButton", () => ({
+  DialButton: () => <button type="button">Ligar</button>,
+  usePodeLigar: () => voz.podeLigar,
+}));
 vi.mock("@/components/inbox/menu/DialogosDoMenu", () => ({ DialogosDoMenu: () => null }));
 vi.mock("@/lib/mobile/useEhCelular", () => ({ useEhCelular: () => true }));
 const papel = vi.hoisted(() => ({ podeMover: true, suporte: null as null | { access_mode: string } }));
@@ -88,6 +92,15 @@ describe("faixa do negócio", () => {
     fireEvent.click(faixa);
     fireEvent.click(screen.getByRole("button", { name: "Proposta" }));
     expect(funil.escolher).toHaveBeenCalledWith("e2");
+  });
+});
+
+describe("Ligar só com as condições do botão de chamada (P2 do Cassio na #180)", () => {
+  it("sem voz pareada, telefone ou com chamada em andamento, o Ligar não aparece", () => {
+    voz.podeLigar = false;
+    render(<BarraDaConversaNoCelular conversation={CONVERSA} meuUserId="u-1" onVoltar={vi.fn()} onAbrirFicha={vi.fn()} onAbrirMenu={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Ligar" })).toBeNull();
+    voz.podeLigar = true;
   });
 });
 

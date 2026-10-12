@@ -3,6 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 
 import { LoseLeadDialog } from "@/components/kanban/LoseLeadDialog";
+import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
 import { MoveToOtherPipelineDialog } from "@/components/kanban/MoveToOtherPipelineDialog";
 import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
 
@@ -55,5 +57,33 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
     );
   }
 
+  if (dialogo.tipo === "criar-lead") {
+    return <CriarLeadDoContato contactId={dialogo.contactId} onFechar={onFechar} />;
+  }
+
   return null;
+}
+
+/**
+ * "Criar lead" para o contato sem negócio (M2.4): o MESMO `NewLeadDialog` da aba
+ * Negócios do painel, no funil padrão e já com o contato. A rota (`POST /leads`)
+ * aplica o papel; o item só aparece para quem pode criar.
+ */
+function CriarLeadDoContato({ contactId, onFechar }: { contactId: string; onFechar: () => void }) {
+  const qc = useQueryClient();
+  const padrao = useDefaultPipeline(true);
+  if (!padrao.data) return null;
+  return (
+    <NewLeadDialog
+      open
+      onOpenChange={(open) => !open && onFechar()}
+      pipelineId={padrao.data.pipeline.id}
+      stages={padrao.data.stages}
+      contactId={contactId}
+      onCreated={() => {
+        void qc.invalidateQueries({ queryKey: chaveDoResumoDoMenu(contactId) });
+        avisarQueOCrmDoContatoMudou(contactId);
+      }}
+    />
+  );
 }

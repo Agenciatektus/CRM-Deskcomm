@@ -12,6 +12,19 @@ interface Props {
 }
 
 /**
+ * Pode ligar AGORA? A mesma condição do botão abaixo: canal de voz configurado e
+ * pareado, contato com telefone e nenhuma chamada em andamento. Exportada para o
+ * "Ligar" da barra da conversa no celular não aparecer quando o botão não ligaria
+ * (P2 do Cassio na #180; grupo o chamador já exclui).
+ */
+export function usePodeLigar(hasPhone: boolean): boolean {
+  const { data: sessionStatus } = useVoiceSessionStatus();
+  const { call } = useVoiceCall();
+  const emLigacao = !!call && call.status !== "ended";
+  return !!sessionStatus?.configured && !!sessionStatus.paired && hasPhone && !emLigacao;
+}
+
+/**
  * Botão "Ligar" do Customer 360 (spec §5.1). Só aparece quando a org pareou
  * chamada de voz — feature opt-in (§1.2), nunca ligada por padrão.
  */

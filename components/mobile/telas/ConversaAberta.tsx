@@ -5,7 +5,7 @@ import { AvatarDoContato } from "@/components/inbox/AvatarDoContato";
 import { initials, siglaDoTelefone } from "@/components/inbox/item/tempo-da-linha";
 import { formatMoney } from "@/components/inbox/painel/SemLista";
 import { DialogosDoMenu, type DialogoDoMenu } from "@/components/inbox/menu/DialogosDoMenu";
-import { DialButton } from "@/components/voice/DialButton";
+import { DialButton, usePodeLigar } from "@/components/voice/DialButton";
 import { useAuth, usePermission } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
@@ -118,9 +118,12 @@ export function BarraDaConversaNoCelular({
  * na barra não pode começar uma chamada. A folha "Ligar para Fulano?" traz o botão
  * de chamada de verdade (`DialButton`), armado só depois de 300 ms (`useArmado`).
  */
-function LigarComConfirmacao({ contactId, hasPhone, nome }: { contactId: string; hasPhone: boolean; nome: string }) {
+export function LigarComConfirmacao({ contactId, hasPhone, nome }: { contactId: string; hasPhone: boolean; nome: string }) {
   const t = useT();
   const [aberta, setAberta] = useState(false);
+  // Só aparece quando o botão de verdade ligaria (voz pareada, telefone, sem chamada).
+  const podeLigar = usePodeLigar(hasPhone);
+  if (!podeLigar && !aberta) return null;
   return (
     <>
       <button

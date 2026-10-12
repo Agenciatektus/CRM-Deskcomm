@@ -14846,6 +14846,9 @@ export const DICIONARIO: Traducoes = {
   "Ações da conversa": { es: "Acciones de la conversación" },
   "Mover etapa": { es: "Mover etapa" },
   "Ligar para": { es: "Llamar a" },
+  // ─── APP DE CELULAR (M2.4: ficha do lead) ───
+  "Ficha de": { es: "Ficha de" },
+  "Tarefa": { es: "Tarea" },
 };
 
 /**
