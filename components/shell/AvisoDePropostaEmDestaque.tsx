@@ -100,7 +100,7 @@ function AvisoVisivel() {
     <div
       role="alert"
       data-testid="aviso-proposta-destaque"
-      className="fixed right-4 bottom-4 z-50 w-80 rounded-lg border border-border bg-card p-4 shadow-lg"
+      className="fixed right-4 bottom-[calc(1rem+var(--mb-area-baixo,0px))] z-50 w-80 rounded-lg border border-border bg-card p-4 shadow-lg"
     >
       {/* O TÍTULO sai como veio — é linha de `agent_inbox_items`, com dado de
           gente (nome da proposta, do cliente). Mesma regra do AgentInboxList:

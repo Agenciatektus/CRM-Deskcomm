@@ -131,8 +131,9 @@ export const PUBLIC_PATHS: RegExp[] = [
   // antes desta linha: `GET /icon` → 307 para `/login?next=%2Ficon`, enquanto
   // `/icon.png` (inexistente) devolvia 404 — a diferença é só a extensão.
   /^\/icon$/,
-  // PNGs públicos do app instalado, apenas dois tamanhos e somente marca da instalação.
-  /^\/app-icon\/(192|512)$/,
+  // PNGs públicos do app instalado (manifesto, maskable e apple-touch-icon), só os
+  // tamanhos fixos e somente a marca da instalação.
+  /^\/app-icon\/(192|512|180|maskable-192|maskable-512)$/,
   /^\/manifest\.webmanifest$/,
   /^\/team\/accept-invite\/.+$/,
   /^\/account-suspended$/,

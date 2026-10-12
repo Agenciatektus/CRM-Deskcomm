@@ -14806,6 +14806,12 @@ export const DICIONARIO: Traducoes = {
   "Esta mensagem já foi reenviada.": { es: "Este mensaje ya fue reenviado." },
   Importação: { es: "Importación" },
   Formulário: { es: "Formulario" },
+  // ─── APP DE CELULAR (M1.2: convite de instalação) ───
+  "Convite para instalar o app": { es: "Invitación para instalar la app" },
+  "Instale o app": { es: "Instala la app" },
+  "No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início.": { es: "En Safari, toca Compartir y después Agregar a la pantalla de inicio." },
+  "Abra direto da tela de início, em tela cheia.": { es: "Ábrela directo desde la pantalla de inicio, a pantalla completa." },
+  "Agora não": { es: "Ahora no" },
 };
 
 /**

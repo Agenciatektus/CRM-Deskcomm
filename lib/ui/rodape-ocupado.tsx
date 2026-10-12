@@ -104,8 +104,10 @@ export function reservaDoRodape(ocupacoes: readonly number[]): number {
  */
 export function estiloDaReserva(reserva: number): { paddingBottom: string } | undefined {
   if (reserva <= 0) return undefined;
+  // `+ --mb-area-baixo`: no app instalado do iPhone a peça sobe acima do indicador de
+  // início (ver `ActiveCallPanel`), e a reserva sobe junto. No desktop vale 0.
   return {
-    paddingBottom: `max(${PISO_DO_RODAPE}px, var(${VARIAVEL_DA_OCUPACAO}, 0px))`,
+    paddingBottom: `max(${PISO_DO_RODAPE}px, calc(var(${VARIAVEL_DA_OCUPACAO}, 0px) + var(--mb-area-baixo, 0px)))`,
   };
 }
 

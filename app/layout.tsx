@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
+import { RegistroDoApp } from "@/components/pwa/RegistroDoApp";
 import { Toaster } from "@/components/ui/sonner";
 import { coresDaBarraDoNavegador } from "@/lib/branding/barra-do-navegador";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
@@ -116,7 +117,15 @@ export async function generateMetadata(): Promise<Metadata> {
     // não pode ser um arquivo estático em `public/`.
     // Com um ícone subido em `/admin/marca` (migration 0443), o link aponta para
     // o arquivo no storage da instalação — ver `iconeDaAba`.
-    icons: { icon: iconeDaAba(linha?.favicon_path) },
+    icons: {
+      icon: iconeDaAba(linha?.favicon_path),
+      // O ícone da tela de início do iPhone (180px, com fundo: o iOS não recorta
+      // transparência). Mesma marca da instalação dos ícones do manifesto.
+      apple: `/app-icon/180${linha?.favicon_path ? `?v=${encodeURIComponent(linha.favicon_path)}` : ""}`,
+    },
+    // App instalado no iOS: abre sem a barra do Safari, com o nome da instalação, e a
+    // barra de status padrão (não translúcida, o conteúdo começa abaixo dela).
+    appleWebApp: { capable: true, title: name, statusBarStyle: "default" },
   };
 }
 
@@ -315,6 +324,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           {/* E2: embaixo no centro, como no protótipo; perto da mão que agiu e longe
               do sino e do perfil no topo. 5 s para dar tempo de "Desfazer". */}
           <Toaster position="bottom-center" closeButton duration={5000} />
+          {/* O service worker do app (tela "sem conexão" e push), em toda página. */}
+          <RegistroDoApp />
         </Providers>
       </body>
     </html>

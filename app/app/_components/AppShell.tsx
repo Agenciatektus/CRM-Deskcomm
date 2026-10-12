@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
+import { ConviteDeInstalacao } from "@/components/pwa/ConviteDeInstalacao";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
 import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessageAlerts";
@@ -76,9 +77,11 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
   const ocupacaoDoRodape = useOcupacaoDoRodape();
   const naInbox = ehAInbox(usePathname());
   return (
-    // A área segura dos lados (notch com o celular deitado). No desktop vale 0.
-    <div className="pele-moldura flex min-h-screen w-full bg-background pl-(--mb-area-esquerda) pr-(--mb-area-direita)">
+    // A área segura dos lados mora no `body` (globals.css), para valer em toda página.
+    <div className="pele-moldura flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
+      {/* Só no celular (abaixo de 760px) e uma vez por aparelho. */}
+      <ConviteDeInstalacao />
       <div className="hidden md:block">
         <Sidebar collapsed={sidebarCollapsed} fixoNaInbox={menuFixoNaInbox} funis={funis} />
       </div>
