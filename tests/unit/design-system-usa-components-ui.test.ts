@@ -80,7 +80,7 @@ describe("a vitrine usa os componentes de components/ui", () => {
       "@/components/inbox/CRMSidePanel",
       "@/components/inbox/painel/AbaNegocios",
       "@/components/inbox/painel/QuandoFazer",
-      "@/components/inbox/painel/SeletorDeDataHora",
+      "@/components/ui/seletor-de-data-hora",
       "@/components/inbox/menu/MenuDaConversa",
       "@/components/inbox/colunas/PegadorDeColuna",
       "@/components/shell/BarraEmDuasColunas",

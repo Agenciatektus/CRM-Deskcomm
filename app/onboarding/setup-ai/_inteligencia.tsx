@@ -7,6 +7,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { salvarChaveDaIa } from "@/app/actions/onboarding/chaveDaIa";
 import { PROVEDORES } from "@/lib/ai/pontos/provedores";
 import { explicacaoParaQuemInstala } from "@/lib/instalacao/explicacao-da-falha";
@@ -115,18 +116,18 @@ export function InteligenciaDele({ inicial }: { inicial: EstadoDaChave }) {
         <div className="grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
           <div className="space-y-1.5">
             <Label htmlFor="provedor_da_ia">{t("Qual você contratou")}</Label>
-            <select
+            <Escolha
               id="provedor_da_ia"
               value={provedor}
-              onChange={(e) => setProvedor(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              onValueChange={(valorEscolhido) => setProvedor(valorEscolhido)}
+              className="h-9 w-full"
             >
               {PROVEDORES.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.rotulo}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="api_key_da_ia">{t("A chave")}</Label>

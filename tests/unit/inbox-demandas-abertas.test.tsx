@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { escolherValor, selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -232,16 +233,16 @@ describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo c
     get.mockResolvedValue({ data: resposta(1) });
     const view = renderPainel();
     await userEvent.click(await screen.findByRole("button", { name: "Encerrar demanda" }));
-    await userEvent.selectOptions(screen.getByLabelText("Desfecho da demanda"), "perdida");
+    escolherValor(screen.getByLabelText("Desfecho da demanda"), "perdida");
     view.mudarConversa(null);
     expect(screen.queryByLabelText("Desfecho da demanda")).toBeNull();
     get.mockResolvedValue({ data: resposta(2) });
     view.mudarConversa({ ...conversation!, service_revision: 2 });
-    expect((await screen.findByLabelText("Desfecho da demanda") as HTMLSelectElement).value).toBe("perdida");
+    expect(selectDaEscolha(await screen.findByLabelText("Desfecho da demanda")).value).toBe("perdida");
     patch.mockRejectedValueOnce(new Error("409 service_stale"));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar desfecho" }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/demandas/d-1", { action: "encerrar", desfecho: "perdida", expected_revision: 1 }));
-    expect((screen.getByLabelText("Desfecho da demanda") as HTMLSelectElement).value).toBe("perdida");
+    expect(selectDaEscolha(screen.getByLabelText("Desfecho da demanda")).value).toBe("perdida");
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Não foi possível encerrar. Cancele esta edição e abra novamente para revisar o desfecho.");
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -253,7 +254,7 @@ describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo c
     get.mockResolvedValue({ data: resposta(1) });
     const view = renderPainel();
     await userEvent.click(await screen.findByRole("button", { name: "Encerrar demanda" }));
-    await userEvent.selectOptions(screen.getByLabelText("Desfecho da demanda"), "perdida");
+    escolherValor(screen.getByLabelText("Desfecho da demanda"), "perdida");
     view.mudarConversa(null);
     view.mudarConversa(kind === "conversa" ? { ...conversation!, id: "cv-2" } : { ...conversation!, contact_id: "outro", contacts: { ...conversation!.contacts!, id: "outro" } });
     await screen.findByRole("button", { name: "Encerrar demanda" });

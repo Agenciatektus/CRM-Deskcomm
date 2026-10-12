@@ -54,6 +54,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { Clock, Plus, Trash } from "@/lib/ui/icons";
 
 const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -221,18 +223,18 @@ function ScheduleDialog({
                 este fuso é lido por `localMoment`, que LANÇA num fuso inexistente
                 — e o atendente com agenda quebrada nunca fica elegível, sem que
                 nada na tela diga por quê. */}
-            <select
+            <Escolha
               id="tz"
               value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              onValueChange={(valorEscolhido) => setTimezone(valorEscolhido)}
+              className="h-9 w-full"
             >
               {FUSOS_OFERECIDOS.map((f) => (
                 <option key={f.codigo} value={f.codigo}>
                   {f.rotulo} — {f.codigo}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
 
           <div className="space-y-2">
@@ -262,27 +264,23 @@ function ScheduleDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Input
-                  type="time"
+                <CampoDeData tipo="time"
                   value={w.start}
                   aria-label={t("Início")}
-                  onChange={(e) =>
+                  onValorChange={(valorEscolhido) =>
                     setWindows((ws) =>
-                      ws.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)),
+                      ws.map((x, j) => (j === i ? { ...x, start: valorEscolhido } : x)),
                     )
-                  }
-                />
+                  } />
                 <span className="text-muted-foreground">–</span>
-                <Input
-                  type="time"
+                <CampoDeData tipo="time"
                   value={w.end}
                   aria-label="Fim"
-                  onChange={(e) =>
+                  onValorChange={(valorEscolhido) =>
                     setWindows((ws) =>
-                      ws.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)),
+                      ws.map((x, j) => (j === i ? { ...x, end: valorEscolhido } : x)),
                     )
-                  }
-                />
+                  } />
                 <Button
                   variant="ghost"
                   size="icon"

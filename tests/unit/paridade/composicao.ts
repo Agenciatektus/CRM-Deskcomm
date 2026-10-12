@@ -25,7 +25,7 @@ export function divergenciasDeComposicao(): string[] {
   const layout = ler("components/inbox/InboxLayout.tsx");
   const pegador = ler("components/inbox/colunas/PegadorDeColuna.tsx");
   const toaster = ler("components/ui/sonner.tsx");
-  const seletor = ler("components/inbox/painel/SeletorDeDataHora.tsx");
+  const seletor = ler("components/ui/seletor-de-data-hora.tsx") + ler("components/ui/grade-do-calendario.tsx");
   const resultado = ler("components/shell/ResultadoDoCompromisso.tsx");
   const catalogo = ler("lib/navigation/catalogo.ts");
   const conteudoDoMenu = ler("components/inbox/menu/ConteudoDoMenu.tsx");

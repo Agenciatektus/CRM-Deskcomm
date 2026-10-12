@@ -1,6 +1,7 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 
 interface Etapa {
@@ -103,11 +104,11 @@ export function EntradaDaCampanha({
         <div className="space-y-3 border-l-2 border-border pl-3">
           <div className="space-y-2">
             <Label htmlFor="entrada-etapa">{t("Abordar quem entrar na etapa")}</Label>
-            <select
+            <Escolha
               id="entrada-etapa"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={etapaId}
-              onChange={(e) => onEtapaChange(e.target.value)}
+              onValueChange={(valorEscolhido) => onEtapaChange(valorEscolhido)}
               disabled={!temFunil}
             >
               <option value="">{t("Escolha a etapa")}</option>
@@ -122,7 +123,7 @@ export function EntradaDaCampanha({
                     {e.name}
                   </option>
                 ))}
-            </select>
+            </Escolha>
             {!temFunil && (
               <p className="text-sm text-warning-fg">
                 {t("Escolha primeiro o funil, em “Quem responder”. A etapa é dele.")}

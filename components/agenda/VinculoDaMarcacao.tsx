@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { NewContactDialog } from "@/components/contacts/NewContactDialog";
+import { Escolha } from "@/components/ui/escolha";
 import { cn } from "@/lib/utils";
 
 type Vinculos = {
@@ -170,10 +171,10 @@ export function VinculoDaMarcacao({
       {contactId ? (
         <label className="block">
           {t("Conversa vinculada (opcional)")}
-          <select
-            className="mt-1 w-full rounded-md border bg-surface p-2"
+          <Escolha
+            className="mt-1 w-full"
             value={conversationId}
-            onChange={(e) => onChange(contactId, e.target.value)}
+            onValueChange={(valorEscolhido) => onChange(contactId, valorEscolhido)}
           >
             <option value="">{t("Sem conversa vinculada")}</option>
             {ficha.data?.conversations.map((c, i) => (
@@ -181,7 +182,7 @@ export function VinculoDaMarcacao({
                 {t("Conversa")} {i + 1} · {new Date(c.created_at).toLocaleDateString()}
               </option>
             ))}
-          </select>
+          </Escolha>
         </label>
       ) : null}
       {ficha.isError || lista.isError ? (

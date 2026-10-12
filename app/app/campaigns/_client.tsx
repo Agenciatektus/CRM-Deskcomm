@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/empty";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
@@ -55,11 +56,11 @@ export function ListaDeCampanhas() {
         <label className="text-sm text-muted-foreground" htmlFor="filtro-status">
           {t("Situação")}
         </label>
-        <select
+        <Escolha
           id="filtro-status"
-          className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+          className="h-9"
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onValueChange={(valorEscolhido) => setStatus(valorEscolhido)}
         >
           <option value="">{t("Todas")}</option>
           {STATUS_DA_CAMPANHA.map((s) => (
@@ -67,7 +68,7 @@ export function ListaDeCampanhas() {
               {t(rotulo(s))}
             </option>
           ))}
-        </select>
+        </Escolha>
       </div>
 
       {q.isLoading ? (

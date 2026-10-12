@@ -12,6 +12,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { apiClient } from "@/lib/api/client";
@@ -114,11 +116,11 @@ export function Parcelas({
       {podeGerenciar ? (
         <label className="mb-2 flex flex-col gap-1 text-xs text-text-muted">
           {t("Conta para receber o pagamento")}
-          <select
+          <Escolha
             value={contaId}
             data-testid="parcela-conta"
-            onChange={(e) => setContaId(e.target.value)}
-            className="w-64 rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+            onValueChange={(valorEscolhido) => setContaId(valorEscolhido)}
+            className="w-64"
           >
             <option value="">{t("Escolha")}</option>
             {(contas.data ?? []).map((c) => (
@@ -126,7 +128,7 @@ export function Parcelas({
                 {c.name}
               </option>
             ))}
-          </select>
+          </Escolha>
         </label>
       ) : null}
 
@@ -210,13 +212,10 @@ function FormularioDeParcela({
 
       <label className="flex flex-col gap-1 text-xs text-text-muted">
         {t("Vencimento")}
-        <input
-          type="date"
+        <CampoDeData tipo="date"
           value={vencimento}
           data-testid="parcela-vencimento"
-          onChange={(e) => setVencimento(e.target.value)}
-          className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
-        />
+          onValorChange={(valorEscolhido) => setVencimento(valorEscolhido)} />
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-text-muted">

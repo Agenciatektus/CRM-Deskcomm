@@ -14,6 +14,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 
 export type Regra = {
@@ -84,11 +85,10 @@ export function RegrasDeComissao({
 
       {podeEditar ? (
         <div className="flex flex-wrap items-end gap-2">
-          <select
+          <Escolha
             aria-label={t("Pessoa")}
-            className="min-h-11 rounded-md border p-2"
             value={pessoaId}
-            onChange={(e) => setPessoaId(e.target.value)}
+            onValueChange={(valorEscolhido) => setPessoaId(valorEscolhido)}
           >
             <option value="">{t("Qualquer pessoa")}</option>
             {pessoas.map((p) => (
@@ -96,13 +96,12 @@ export function RegrasDeComissao({
                 {p.name ?? p.email}
               </option>
             ))}
-          </select>
+          </Escolha>
 
-          <select
+          <Escolha
             aria-label={t("Serviço")}
-            className="min-h-11 rounded-md border p-2"
             value={servicoId}
-            onChange={(e) => setServicoId(e.target.value)}
+            onValueChange={(valorEscolhido) => setServicoId(valorEscolhido)}
           >
             <option value="">{t("Qualquer serviço")}</option>
             {servicos.map((s) => (
@@ -110,7 +109,7 @@ export function RegrasDeComissao({
                 {s.name}
               </option>
             ))}
-          </select>
+          </Escolha>
 
           <input
             aria-label={t("Percentual")}

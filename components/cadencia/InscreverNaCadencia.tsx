@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Escolha } from "@/components/ui/escolha";
 
 /**
  * "INSCREVER NA CADÊNCIA" — a ação em lote do Kanban.
@@ -80,12 +81,12 @@ function BotaoEDialogo({
               {t("Nenhuma cadência publicada neste funil. Crie e publique uma na aba Cadências.")}
             </p>
           ) : (
-            <select
+            <Escolha
               aria-label={t("Cadência")}
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="h-10 w-full"
               value={cadenciaId}
-              onChange={(e) => {
-                setCadenciaId(e.target.value);
+              onValueChange={(valorEscolhido) => {
+                setCadenciaId(valorEscolhido);
                 setPrevia(null);
               }}
             >
@@ -97,7 +98,7 @@ function BotaoEDialogo({
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           )}
 
           {previa && (

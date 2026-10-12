@@ -97,7 +97,8 @@ export const MAPA = {
   "comp:botao-icone": { ...os("igual"), ref: r(".icon-btn", 158) },
   "comp:input": { ...os("igual"), ref: r(".inp", 536) },
   "comp:textarea": { ...os("igual"), ref: r(".obs", 559) },
-  "comp:select-nativo": { ...os("diferente"), ref: r(".inp", 536) },
+  "comp:escolha": { ...os("igual"), ref: r(".inp", 536) },
+  "comp:campo-de-data": { ...os("igual"), ref: r("Seletor de data e horário", 479, D), refEscuro: r("Seletor de data e horário", 498, DV) },
   "comp:select-radix": { ...os("igual"), ref: r(".inp", 536) },
   "comp:checkbox": { ...os("diferente"), ref: r(".chk", 626) },
   "comp:radio": { ...os("sem-equivalente"), ref: null },
@@ -154,7 +155,7 @@ export const MAPA = {
   "ds:aviso-desfazer": { ...os("igual"), ref: r("Aviso com Desfazer", 548, D), refEscuro: r("Aviso com Desfazer", 567, DV) },
   "ds:divisorias": { ...os("igual"), ref: r("Divisórias reguláveis", 553, D), refEscuro: r("Divisórias reguláveis", 572, DV) },
   "ds:layout": { ...os("igual"), ref: r("Layout da Inbox", 561, D), refEscuro: r("Layout da Inbox", 580, DV) },
-  "ds:regras": { ...os("diferente"), ref: r("Regras que aprendemos no protótipo", 580, D), refEscuro: r("Regras que aprendemos no protótipo", 599, DV), proto: { claro: "regra 6 (controles nativos de data e seletor) entra na PR D", escuro: "regra 6 (controles nativos de data e seletor) entra na PR D" } },
+  "ds:regras": { ...os("igual"), ref: r("Regras que aprendemos no protótipo", 580, D), refEscuro: r("Regras que aprendemos no protótipo", 599, DV) },
 } satisfies Record<string, ItemDoMapa>;
 
 export type IdDoMapa = keyof typeof MAPA;

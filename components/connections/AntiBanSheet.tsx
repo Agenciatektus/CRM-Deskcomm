@@ -21,6 +21,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useUpdatePacingKnobs, type PacingKnobsItem } from "@/hooks/channels/usePacingKnobs";
 import { diaDeHojeLocal, valorDeOverride } from "@/lib/ai/pacing-knobs";
 import { ApiError } from "@/lib/api/types";
@@ -202,17 +204,15 @@ export function AntiBanSheet({ item, canWrite, onClose }: Props) {
         <div className="flex flex-col gap-5 px-4 py-2" data-testid="anti-ban-form">
           <fieldset className="flex flex-col gap-2" data-testid="aquecimento">
             <Label htmlFor="numero-em-uso-desde">{t("Este número é usado desde")}</Label>
-            <Input
+            <CampoDeData tipo="date"
               id="numero-em-uso-desde"
-              type="date"
               // O dia LOCAL, que é o que este campo fala. Com o dia UTC, às 21h
               // em São Paulo o limite já oferecia amanhã.
               max={diaDeHojeLocal()}
               value={form.numero_em_uso_desde}
-              onChange={(e) => set({ numero_em_uso_desde: e.target.value })}
+              onValorChange={(valorEscolhido) => set({ numero_em_uso_desde: valorEscolhido })}
               disabled={!canWrite || form.pular_aquecimento}
-              className="w-48"
-            />
+              className="w-48" />
             <p className="text-xs text-muted-foreground">
               {t(
                 "A conexão pode ser nova sem que o número seja. O aquecimento conta a idade do NÚMERO — em branco, ele é tratado como recém-criado e começa liberando pouco por dia. Uma data já salva não some se você limpar o campo: para mudá-la, informe outra.",
@@ -467,12 +467,12 @@ export function AntiBanSheet({ item, canWrite, onClose }: Props) {
                 rejeitar é devolver um erro a quem digitou certo na cabeça e
                 errado no teclado (`America/Asunción`, com o acento que um
                 hispanofalante escreve natural). Escolher não erra. */}
-            <select
+            <Escolha
               value={form.timezone}
-              onChange={(e) => set({ timezone: e.target.value })}
+              onValueChange={(valorEscolhido) => set({ timezone: valorEscolhido })}
               disabled={!canWrite}
               aria-label={t("Fuso horário IANA")}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+              className="h-9 w-full"
             >
               <option value="">
                 {t("Usar o padrão")} ({eff.timezone})
@@ -482,7 +482,7 @@ export function AntiBanSheet({ item, canWrite, onClose }: Props) {
                   {t(f.rotulo)} — {f.codigo}
                 </option>
               ))}
-            </select>
+            </Escolha>
             <p className="text-xs text-muted-foreground">
               {t("A janela de envio é avaliada neste fuso (ex.: America/Sao_Paulo).")}
             </p>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Escolha } from "@/components/ui/escolha";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { safePublicLink, type CampaignConfig, type Prospect } from "@/lib/prospecting/schema";
@@ -66,7 +67,6 @@ const labels: Record<string, string> = {
   replied: "Respondeu",
   qualified: "Qualificado",
 };
-const selectClass = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm";
 const emptyConfig: CampaignConfig = {
   agent_id: "",
   channel_session_id: "",
@@ -555,11 +555,11 @@ export function ProspectingClient() {
                               <div className="grid gap-4 md:grid-cols-2">
                                 <div>
                                   <Label htmlFor="prospecting-agent">{t("Agente de IA")}</Label>
-                                  <select
+                                  <Escolha
                                     id="prospecting-agent"
-                                    className={`${selectClass} mt-1`}
+                                    className="mt-1"
                                     value={config.agent_id}
-                                    onChange={(e) => update("agent_id", e.target.value)}
+                                    onValueChange={(valorEscolhido) => update("agent_id", valorEscolhido)}
                                     required
                                   >
                                     <option value="">{t("Escolha um agente publicado")}</option>
@@ -568,7 +568,7 @@ export function ProspectingClient() {
                                         {a.name}
                                       </option>
                                     ))}
-                                  </select>
+                                  </Escolha>
                                   {config.agent_id && (
                                     <Link
                                       className="mt-2 block text-xs underline"
@@ -582,11 +582,11 @@ export function ProspectingClient() {
                                   <Label htmlFor="prospecting-channel">
                                     {t("Conexão de saída")}
                                   </Label>
-                                  <select
+                                  <Escolha
                                     id="prospecting-channel"
-                                    className={`${selectClass} mt-1`}
+                                    className="mt-1"
                                     value={config.channel_session_id}
-                                    onChange={(e) => update("channel_session_id", e.target.value)}
+                                    onValueChange={(valorEscolhido) => update("channel_session_id", valorEscolhido)}
                                     required
                                   >
                                     <option value="">{t("Escolha uma conexão ativa")}</option>
@@ -597,7 +597,7 @@ export function ProspectingClient() {
                                           {c.display_name ?? c.phone_number ?? c.id}
                                         </option>
                                       ))}
-                                  </select>
+                                  </Escolha>
                                   <Link className="text-xs underline" href="/app/connections">
                                     {t("Ver conexões e proteções de envio")}
                                   </Link>
@@ -605,15 +605,15 @@ export function ProspectingClient() {
                               </div>
                               <div>
                                 <Label htmlFor="prospecting-pipeline">{t("Funil")}</Label>
-                                <select
+                                <Escolha
                                   id="prospecting-pipeline"
-                                  className={`${selectClass} mt-1`}
+                                  className="mt-1"
                                   value={funil}
                                   required
-                                  onChange={(e) => {
+                                  onValueChange={(valorEscolhido) => {
                                     setConfig((c) => ({
                                       ...c,
-                                      pipeline_id: e.target.value,
+                                      pipeline_id: valorEscolhido,
                                       stage_id: "",
                                       qualified_stage_id: "",
                                     }));
@@ -629,7 +629,7 @@ export function ProspectingClient() {
                                       {name}
                                     </option>
                                   ))}
-                                </select>
+                                </Escolha>
                               </div>
                               <div className="grid gap-4 md:grid-cols-2">
                                 {(
@@ -640,12 +640,12 @@ export function ProspectingClient() {
                                 ).map(([field, label]) => (
                                   <div key={field}>
                                     <Label htmlFor={`prospecting-${field}`}>{t(label)}</Label>
-                                    <select
+                                    <Escolha
                                       id={`prospecting-${field}`}
-                                      className={`${selectClass} mt-1`}
+                                      className="mt-1"
                                       required
                                       value={config[field]}
-                                      onChange={(e) => update(field, e.target.value)}
+                                      onValueChange={(valorEscolhido) => update(field, valorEscolhido)}
                                     >
                                       <option value="">{t("Escolha a etapa")}</option>
                                       {data?.stages
@@ -655,7 +655,7 @@ export function ProspectingClient() {
                                             {s.name}
                                           </option>
                                         ))}
-                                    </select>
+                                    </Escolha>
                                   </div>
                                 ))}
                               </div>

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 
@@ -120,13 +121,11 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
             return (
               <div key={f.key} className="space-y-2">
                 {labelEl}
-                <Input
+                <CampoDeData tipo="date"
                   id={id}
-                  type="date"
                   value={typeof v === "string" ? v : ""}
-                  onChange={(e) => set(f.key, e.target.value)}
-                  disabled={disabled}
-                />
+                  onValorChange={(valorEscolhido) => set(f.key, valorEscolhido)}
+                  disabled={disabled} />
               </div>
             );
           case "select":

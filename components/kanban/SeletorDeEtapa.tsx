@@ -7,6 +7,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
+import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 import {
   Select,
   SelectContent,
@@ -95,7 +96,12 @@ export function SeletorDeEtapa({
       onMovido?.();
     };
     if (alvo.is_won) {
-      ganhar.mutate({ leadId }, { onSuccess: feito });
+      // Adiado 5 s com Desfazer (`/win` dispara `lead.won` na hora, com efeito
+      // fora do CRM); só depois a etapa muda de verdade.
+      adiarAcao((s) => `${t("Ganho em")} ${s} s`, t("Desfazer"), () =>
+        // O erro já aparece pelo `onError` do hook; aqui não repete.
+        ganhar.mutateAsync({ leadId }).then(feito).catch(() => undefined),
+      );
       return;
     }
     // Vai para o fim da coluna de destino: `Date.now()` é maior que qualquer

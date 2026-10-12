@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePreviewDaCadencia } from "@/hooks/cadencia/useCadencias";
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { Eye } from "@/lib/ui/icons";
 
 /** O que a tela diz quando a variante não renderiza — o mesmo motivo que o motor registra. */
@@ -35,11 +36,11 @@ export function PreviewDaMensagem({
   return (
     <div className="space-y-2 rounded-md border border-dashed border-border p-3">
       <div className="flex items-center gap-2">
-        <select
+        <Escolha
           aria-label={t("Lead de amostra")}
-          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm"
+          className="h-9 min-w-0 flex-1"
           value={leadId}
-          onChange={(e) => setLeadId(e.target.value)}
+          onValueChange={(valorEscolhido) => setLeadId(valorEscolhido)}
         >
           {leads.length === 0 && <option value="">{t("Nenhum lead neste funil")}</option>}
           {leads.map((l) => (
@@ -47,7 +48,7 @@ export function PreviewDaMensagem({
               {l.title}
             </option>
           ))}
-        </select>
+        </Escolha>
         <Button
           type="button"
           variant="outline"

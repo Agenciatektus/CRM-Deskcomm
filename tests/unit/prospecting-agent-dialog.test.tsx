@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 import "@testing-library/jest-dom/vitest";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), patch: vi.fn() }));
@@ -637,7 +638,7 @@ describe("alternativa manual e campanha existente", () => {
     state.campaigns[0]!.config = CONFIG;
     openPage();
     const select = await screen.findByLabelText("Agente de IA");
-    expect(select).toHaveValue(AGENT);
+    expect(selectDaEscolha(select)).toHaveValue(AGENT);
     expect(select).toBeDisabled();
     expect(
       screen.queryByRole("region", { name: "Configuração por conversa" }),

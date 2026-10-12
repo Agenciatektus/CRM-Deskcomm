@@ -3,6 +3,7 @@ import { useT } from "@/hooks/i18n/useT";
 import type { GatilhoDaCadencia } from "@/hooks/cadencia/useCadencias";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 
 interface Etapa {
   id: string;
@@ -78,32 +79,32 @@ export function GatilhoDaCadenciaEditor({
   return (
     <div className="space-y-2">
       <Label htmlFor="cadencia-gatilho">{t("Quem entra na cadência")}</Label>
-      <select
+      <Escolha
         id="cadencia-gatilho"
-        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+        className="h-10 w-full"
         value={gatilho.kind}
-        onChange={(e) => onChange(padraoDo(e.target.value as Tipo, abertas))}
+        onValueChange={(valorEscolhido) => onChange(padraoDo(valorEscolhido as Tipo, abertas))}
       >
         {TIPOS.map((tipo) => (
           <option key={tipo.valor} value={tipo.valor}>
             {t(tipo.rotulo)}
           </option>
         ))}
-      </select>
+      </Escolha>
 
       {gatilho.kind === "stage_change" && (
-        <select
+        <Escolha
           aria-label={t("Etapa que dispara a cadência")}
-          className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+          className="h-10 w-full"
           value={gatilho.params.stage_id}
-          onChange={(e) => onChange({ ...gatilho, params: { stage_id: e.target.value } })}
+          onValueChange={(valorEscolhido) => onChange({ ...gatilho, params: { stage_id: valorEscolhido } })}
         >
           {abertas.map((e) => (
             <option key={e.id} value={e.id}>
               {e.name}
             </option>
           ))}
-        </select>
+        </Escolha>
       )}
 
       {gatilho.kind === "tag_added" && (
@@ -154,18 +155,18 @@ function TempoDoGatilho({
         value={qtd}
         onChange={(e) => onChange(Math.max(1, Number(e.target.value) || 1) * unidadeValida)}
       />
-      <select
+      <Escolha
         aria-label={t("Unidade de tempo")}
-        className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+        className="h-10"
         value={unidadeValida}
-        onChange={(e) => onChange(qtd * Number(e.target.value))}
+        onValueChange={(valorEscolhido) => onChange(qtd * Number(valorEscolhido))}
       >
         {unidades.map((u) => (
           <option key={u.valor} value={u.valor}>
             {t(u.rotulo)}
           </option>
         ))}
-      </select>
+      </Escolha>
     </div>
   );
 }

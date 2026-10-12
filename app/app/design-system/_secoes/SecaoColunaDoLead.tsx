@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import { AbaNegocios } from "@/components/inbox/painel/AbaNegocios";
 import { QuandoFazer } from "@/components/inbox/painel/QuandoFazer";
-import { SeletorDeDataHora } from "@/components/inbox/painel/SeletorDeDataHora";
+import { SeletorDeDataHora } from "@/components/ui/seletor-de-data-hora";
 import { useT } from "@/hooks/i18n/useT";
 import { conversaDaVitrine } from "@/lib/design-system/amostras/conversa";
 import { IDS } from "@/lib/design-system/amostras/ids";

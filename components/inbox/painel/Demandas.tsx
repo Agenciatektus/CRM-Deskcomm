@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -45,11 +46,11 @@ function EncerrarDemanda({ draft, onAbrir, onAlterar, onFechar, onPronto }: {
     finally { onAlterar({ salvando: false }); }
   }}>
     <label className="block">{t("Desfecho")}
-      <select aria-label={t("Desfecho da demanda")} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.desfecho} onChange={(e) => onAlterar({ desfecho: e.target.value })}>
+      <Escolha aria-label={t("Desfecho da demanda")} className="mt-1 w-full" value={draft.desfecho} onValueChange={(valorEscolhido) => onAlterar({ desfecho: valorEscolhido })}>
         <option value="resolvida">{t("Resolvida")}</option><option value="convertida">{t("Convertida")}</option>
         <option value="nao_procede">{t("Não procede")}</option><option value="encerrada_pelo_cliente">{t("Encerrada pelo cliente")}</option>
         <option value="perdida">{t("Perdida")}</option><option value="expirada_sem_resposta">{t("Expirada sem resposta")}</option>
-      </select>
+      </Escolha>
     </label>
     <p>{t("Registra o resultado desta demanda. As conversas dos outros canais permanecem disponíveis.")}</p>
     <Button size="sm" disabled={draft.salvando} type="submit">{t("Confirmar desfecho")}</Button>

@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { MagnifyingGlass, Tray } from "@/lib/ui/icons";
 import {
   useLeadCaptures,
@@ -168,23 +169,19 @@ export function CapturasTab() {
             <label className="block text-xs text-muted-foreground" htmlFor="captura-de">
               {t("De")}
             </label>
-            <Input
+            <CampoDeData tipo="datetime-local"
               id="captura-de"
-              type="datetime-local"
               value={de}
-              onChange={(e) => setDe(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setDe(valorEscolhido)} />
           </div>
           <div className="space-y-1">
             <label className="block text-xs text-muted-foreground" htmlFor="captura-ate">
               {t("Até")}
             </label>
-            <Input
+            <CampoDeData tipo="datetime-local"
               id="captura-ate"
-              type="datetime-local"
               value={ate}
-              onChange={(e) => setAte(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setAte(valorEscolhido)} />
           </div>
         </div>
       </Card>

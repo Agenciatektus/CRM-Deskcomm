@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import { opcoesDaEscolha, selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 /**
  * QUEM ATENDE QUANDO O LEAD RESPONDE, NA TELA.
@@ -71,11 +72,11 @@ describe("condução da resposta", () => {
   it("com IA, mostra agente, objetivo, etapa, instrução e modo (assistido marcado)", () => {
     renderizar(conducaoIa);
     const agente = screen.getByLabelText("Agente");
-    const nomes = within(agente).getAllByRole("option").map((o) => o.textContent);
+    const nomes = opcoesDaEscolha(agente);
     expect(nomes).toContain("Sofia");
     expect(nomes).not.toContain("Rascunho");
-    expect(screen.getByLabelText("Objetivo")).toHaveValue("agendar_reuniao");
-    expect(screen.getByLabelText("Até qual etapa a IA conduz")).toHaveValue("e-alvo");
+    expect(selectDaEscolha(screen.getByLabelText("Objetivo"))).toHaveValue("agendar_reuniao");
+    expect(selectDaEscolha(screen.getByLabelText("Até qual etapa a IA conduz"))).toHaveValue("e-alvo");
     expect(screen.getByLabelText("Instrução para a IA")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Assistido/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Automático/ })).not.toBeChecked();
@@ -83,9 +84,7 @@ describe("condução da resposta", () => {
 
   it("etapa que dispara a cadência e etapa de perda não são alvo", () => {
     renderizar(conducaoIa);
-    const opcoes = within(screen.getByLabelText("Até qual etapa a IA conduz"))
-      .getAllByRole("option")
-      .map((o) => o.textContent);
+    const opcoes = opcoesDaEscolha(screen.getByLabelText("Até qual etapa a IA conduz"));
     expect(opcoes).toContain("Reunião marcada");
     expect(opcoes).not.toContain("Primeiro contato");
     expect(opcoes).not.toContain("Perdido");

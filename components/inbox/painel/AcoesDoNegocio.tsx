@@ -65,7 +65,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
    * Segura a gravação por 5 s. Quando o tempo acaba, grava e relê; se falhar,
    * o estado otimista volta (o erro aparece pelo hook da rota).
    */
-  function segurar(tipo: Exclude<Pendente, null>, mensagem: string, gravar: () => Promise<unknown>) {
+  function segurar(tipo: Exclude<Pendente, null>, mensagem: (segundos: number) => string, gravar: () => Promise<unknown>) {
     setPendente(tipo);
     adiarAcao(
       mensagem,
@@ -80,7 +80,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
   }
 
   function marcarGanho() {
-    segurar("ganho", t("Negócio ganho."), () => ganhar.mutateAsync({ leadId: lead.id }));
+    segurar("ganho", (s) => `${t("Ganho em")} ${s} s`, () => ganhar.mutateAsync({ leadId: lead.id }));
   }
 
   async function retomar() {
@@ -189,7 +189,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
             motivosDoFunil={lead.motivos_de_perda}
             motivoObrigatorio={lead.motivo_de_perda_obrigatorio !== false}
             onCancelar={() => setPerdendo(false)}
-            adiar={(gravar) => segurar("perda", t("Negócio marcado como perdido."), gravar)}
+            adiar={(gravar) => segurar("perda", (s) => `${t("Perdido em")} ${s} s`, gravar)}
             onConcluido={() => setPerdendo(false)}
             rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
           />
@@ -205,7 +205,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
             leadId={lead.id}
             pipelineId={lead.pipeline_id}
             onCancelar={() => setTrocandoDeFunil(false)}
-            adiar={(gravar) => segurar("troca", t("Negócio levado para outro funil."), gravar)}
+            adiar={(gravar) => segurar("troca", (s) => `${t("Outro funil em")} ${s} s`, gravar)}
             onConcluido={() => setTrocandoDeFunil(false)}
             rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
           />

@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Escolha } from "@/components/ui/escolha";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { EstadoDaConexaoGoogle } from "@/lib/plataformas-de-anuncio/google/estado-da-conexao";
@@ -259,33 +260,31 @@ export function FormularioDeConversoesGoogle({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="google_purchase_category">{t("Categoria da conversão")}</Label>
-            <select
+            <Escolha
               id="google_purchase_category"
-              className="rounded-md border bg-background p-2 text-sm"
               value={categoriaDaVenda}
-              onChange={(e) => setCategoriaDaVenda(e.target.value as CategoriaDeConversao)}
+              onValueChange={(valorEscolhido) => setCategoriaDaVenda(valorEscolhido as CategoriaDeConversao)}
             >
               {CATEGORIAS_DE_CONVERSAO.map((c) => (
                 <option key={c.valor} value={c.valor}>
                   {t(c.rotulo)}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="google_purchase_value_mode">{t("Valor do negócio")}</Label>
-            <select
+            <Escolha
               id="google_purchase_value_mode"
-              className="rounded-md border bg-background p-2 text-sm"
               value={modoDeValor}
-              onChange={(e) => setModoDeValor(e.target.value as ModoDeValorDaVenda)}
+              onValueChange={(valorEscolhido) => setModoDeValor(valorEscolhido as ModoDeValorDaVenda)}
             >
               {MODOS_DE_VALOR.map((m) => (
                 <option key={m.valor} value={m.valor}>
                   {t(m.rotulo)}
                 </option>
               ))}
-            </select>
+            </Escolha>
             <p className="text-xs text-muted-foreground">
               {t(
                 "Com o valor, o Google pode otimizar por receita e não só por volume. Venda sem valor vai sem valor — nunca como zero.",

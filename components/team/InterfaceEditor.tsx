@@ -1,4 +1,5 @@
 "use client";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { useId } from "react";
 import type { Role } from "@/lib/auth/types";
@@ -34,15 +35,15 @@ export function InterfaceEditor({
       <legend className="px-1 text-sm font-medium">{t("Interface")}</legend>
       <p className="text-xs text-muted-foreground">{t("Define quais áreas aparecem na navegação. As permissões continuam sendo determinadas pelo papel. Links de conversas e avisos podem abrir áreas autorizadas que estejam ocultas.")}</p>
       <label htmlFor={id} className="block text-sm">{t("Perfil de interface")}</label>
-      <select
+      <Escolha
         id={id}
         value={value.preset}
-        onChange={(e) => onChange({ preset: e.target.value as InterfaceSettings["preset"] })}
-        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+        onValueChange={(valorEscolhido) => onChange({ preset: valorEscolhido as InterfaceSettings["preset"] })}
+        className="h-10 w-full"
       >
         <option value="completa">{t("Completa")}</option>
         <option value="simplificada">{t("Simplificada")}</option>
-      </select>
+      </Escolha>
       <p className="text-xs text-muted-foreground">{t("Trocar o perfil restaura sua seleção padrão. Perfil, segurança e acesso à equipe de quem administra continuam disponíveis.")}</p>
       {lerInterface(value).needsAdjustment && (
         <p role="status" className="text-sm">{t("A seleção contém áreas antigas. Confira e salve novamente.")}</p>

@@ -54,7 +54,7 @@ describe("lista de passos", () => {
     render(
       <ListaDePassos passos={[{ id: "m", tipo: "mover_etapa", stageId: "e-ativa" }]} onChange={vi.fn()} etapas={etapas} />,
     );
-    const opcoes = screen.getAllByRole("option").map((o) => o.textContent);
+    const opcoes = screen.getAllByRole("option", { hidden: true }).map((o) => o.textContent);
     expect(opcoes).toContain("Tentativa 2");
     expect(opcoes).not.toContain("Perdido");
   });

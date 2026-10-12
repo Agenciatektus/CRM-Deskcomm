@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { CaretLeft, Clock, Pause, Play, SkipForward, Trash, Warning } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import {
@@ -388,13 +389,11 @@ export function DossieDoFollowup({ id, canWrite }: Props) {
           </DialogHeader>
           <div className="flex flex-col gap-2">
             <Label htmlFor="adiar-quando">{t("Novo horário")}</Label>
-            <Input
+            <CampoDeData tipo="datetime-local"
               id="adiar-quando"
-              type="datetime-local"
               value={quando}
-              onChange={(e) => setQuando(e.target.value)}
-              data-testid="dossie-adiar-quando"
-            />
+              onValorChange={(valorEscolhido) => setQuando(valorEscolhido)}
+              data-testid="dossie-adiar-quando" />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAdiando(false)}>

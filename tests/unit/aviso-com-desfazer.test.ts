@@ -3,17 +3,21 @@
  * exclusão adiada só chama a rota depois do tempo (ou ao fechar o aviso), nunca
  * se Desfazer foi apertado antes.
  */
+import { act, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-import { adiarAcao, adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
+import { acoesPendentes, adiarAcao, adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
 
 type Opcoes = { duration: number; action: { label: string; onClick: () => void }; onAutoClose?: () => void; onDismiss?: () => void };
 const opcoes = () => toast.mock.calls.at(-1)![1] as Opcoes;
 
 beforeEach(() => {
+  // Ação que um teste deixou segurada termina aqui, para não vazar no próximo.
+  for (const chamada of toast.mock.calls) (chamada[1] as Opcoes | undefined)?.onDismiss?.();
   toast.mockClear();
   toast.error.mockClear();
 });
@@ -74,5 +78,59 @@ describe("ação adiada genérica (ganho, perda, troca de funil)", () => {
     adiarAcao("Negócio ganho.", "Desfazer", () => Promise.reject(new Error("500")));
     opcoes().onAutoClose?.();
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("500"));
+  });
+});
+
+describe("ação pendente: tempo restante no aviso e pergunta antes de sair (follow-up do Cassio na #169)", () => {
+  const sair = () => {
+    const evento = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(evento);
+    return evento.defaultPrevented;
+  };
+
+  it("o aviso conta o tempo que falta: Ganho em 5 s, 4 s, 3 s…", () => {
+    vi.useFakeTimers();
+    try {
+      adiarAcao((s) => `Ganho em ${s} s`, "Desfazer", () => Promise.resolve());
+      const conteudo = toast.mock.calls.at(-1)![0] as ReactElement;
+      render(conteudo);
+      expect(screen.getAllByText("Ganho em 5 s").length).toBeGreaterThan(0);
+      act(() => vi.advanceTimersByTime(2_000));
+      expect(screen.getByText("Ganho em 3 s")).toBeInTheDocument();
+      opcoes().onAutoClose?.();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("texto fixo ganha o tempo entre parênteses", () => {
+    adiarAcao("O lead será excluído.", "Desfazer", () => Promise.resolve());
+    render(toast.mock.calls.at(-1)![0] as ReactElement);
+    expect(screen.getAllByText("O lead será excluído. (5 s)").length).toBeGreaterThan(0);
+    opcoes().onAutoClose?.();
+  });
+
+  it("com ação segurada o navegador pergunta antes de sair; ao executar, para de perguntar", () => {
+    expect(sair()).toBe(false);
+    adiarAcao((s) => `Ganho em ${s} s`, "Desfazer", () => Promise.resolve());
+    expect(acoesPendentes()).toBe(1);
+    expect(sair()).toBe(true);
+    opcoes().onAutoClose?.();
+    expect(acoesPendentes()).toBe(0);
+    expect(sair()).toBe(false);
+  });
+
+  it("Desfazer também solta a saída; duas ações só soltam quando as duas acabam", () => {
+    adiarAcao("a", "Desfazer", () => Promise.resolve());
+    const primeira = opcoes();
+    adiarAcao("b", "Desfazer", () => Promise.resolve());
+    const segunda = opcoes();
+    expect(acoesPendentes()).toBe(2);
+    primeira.action.onClick();
+    primeira.onDismiss?.();
+    expect(sair()).toBe(true);
+    segunda.onDismiss?.();
+    expect(acoesPendentes()).toBe(0);
+    expect(sair()).toBe(false);
   });
 });
