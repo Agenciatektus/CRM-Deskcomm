@@ -3,12 +3,15 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
+import { telasAtras } from "@/lib/mobile/pilha";
 import { CaretLeft } from "@/lib/ui/icons";
 
 /**
  * A barra das telas empilhadas (o `.nb` do protótipo): voltar à esquerda, título e
  * ações. O voltar é o HISTÓRICO do navegador, o mesmo do botão voltar do Android e do
- * gesto do iOS. Sem histórico (link aberto direto), vai para `voltarPara`.
+ * gesto do iOS, mas só quando a tela anterior é do app (`telasAtras`, em
+ * `lib/mobile/pilha.ts`). Quem chegou por link vai para `voltarPara`, e não para fora
+ * do CRM.
  * `data-cabecalho-do-celular` faz a casca descontar a altura dela (`--mb-casca-topo`).
  */
 export function BarraDeTela({
@@ -23,7 +26,7 @@ export function BarraDeTela({
   const t = useT();
   const router = useRouter();
   const voltar = () => {
-    if (window.history.length > 1) router.back();
+    if (telasAtras() > 0) router.back();
     else router.push(voltarPara);
   };
   return (

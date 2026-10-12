@@ -126,7 +126,9 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
           className={cn(
             "flex-1 overflow-auto",
             // No celular o fim da página fica acima da barra inferior.
-            naInbox ? "pr-2 pb-2" : "p-6 mb:pb-[calc(var(--mb-casca-baixo)+1.5rem)]",
+            naInbox
+              ? "pr-2 pb-2 mb:pb-[calc(var(--mb-casca-baixo)+var(--space-2))]"
+              : "p-6 mb:pb-[calc(var(--mb-casca-baixo)+1.5rem)]",
           )}
           style={estiloDoMain(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}

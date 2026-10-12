@@ -8,24 +8,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { abaDaRota, acaoDeCriar, ehRaizDeAba, ehTelaCheia } from "@/lib/mobile/abas";
 
-const nav = vi.hoisted(() => ({ rota: "/app/inbox", busca: new URLSearchParams(), push: vi.fn() }));
+const nav = vi.hoisted(() => ({ rota: "/app/inbox", busca: new URLSearchParams(), push: vi.fn(), back: vi.fn() }));
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.rota,
   useSearchParams: () => nav.busca,
-  useRouter: () => ({ push: nav.push, back: vi.fn() }),
+  useRouter: () => ({ push: nav.push, back: nav.back }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ activeOrg: { orgId: "o-1" } }) }));
 vi.mock("@/hooks/inbox/useConversationCounts", () => ({ useConversationCounts: () => ({ data: { fila: 3 } }) }));
-vi.mock("@/hooks/tasks/useTarefasAtrasadas", () => ({ useTarefasAtrasadas: () => ({ data: 2 }) }));
+const contagens = vi.hoisted(() => ({ chamadas: 0 }));
+vi.mock("@/hooks/tasks/useTarefasAtrasadas", () => ({
+  useTarefasAtrasadas: () => {
+    contagens.chamadas += 1;
+    return { data: 2 };
+  },
+}));
 vi.mock("@/hooks/ai/useAgentInbox", () => ({ useAgentInbox: () => ({ data: { open_count: 0 } }) }));
 
+import { BarraDeTela } from "@/components/mobile/BarraDeTela";
 import { BarraInferior } from "@/components/mobile/BarraInferior";
 
 beforeEach(() => {
+  // Abaixo de 760px: é só lá que a barra monta os contadores (`useEhCelular`).
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }) as unknown as typeof window.matchMedia;
   nav.rota = "/app/inbox";
   nav.busca = new URLSearchParams();
   nav.push.mockClear();
+  nav.back.mockClear();
+  window.sessionStorage.clear();
+  contagens.chamadas = 0;
 });
 
 describe("rotas do app de celular", () => {
@@ -92,10 +108,37 @@ describe("barra inferior", () => {
     expect(nav.push).toHaveBeenCalledWith("/app/kanban");
   });
 
+  it("no desktop a barra não faz consulta nenhuma (contadores só abaixo de 760px)", () => {
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+    montar();
+    expect(screen.getByRole("link", { name: "Conversas" })).toBeInTheDocument();
+    expect(contagens.chamadas).toBe(0);
+  });
+
   it("Mais abre o menu", () => {
     const aoAbrirMais = vi.fn();
     render(<BarraInferior maisAberto={false} aoAbrirMais={aoAbrirMais} />);
     fireEvent.click(screen.getByRole("button", { name: "Mais" }));
     expect(aoAbrirMais).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("voltar do celular", () => {
+  it("quem chegou por link (nada do app atrás) vai ao começo da aba, e não sai do CRM", () => {
+    render(<BarraDeTela titulo="Perfil" voltarPara="/app" />);
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(nav.back).not.toHaveBeenCalled();
+    expect(nav.push).toHaveBeenCalledWith("/app");
+  });
+
+  it("com tela do app atrás, volta pelo histórico", () => {
+    window.sessionStorage.setItem("crm-telas-do-app-atras", "1");
+    render(<BarraDeTela titulo="Perfil" voltarPara="/app" />);
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(nav.back).toHaveBeenCalledTimes(1);
   });
 });

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
+import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { useT } from "@/hooks/i18n/useT";
 import { useBoard } from "@/hooks/kanban/useBoard";
 
@@ -79,7 +80,8 @@ export function PipelinePageClient({
   );
   const [newOpen, setNewOpen] = useState(false);
   // O "+" do celular chega com `?criar=1`.
-  usePedidoDeCriar(() => setNewOpen(true));
+  const podeCriar = usePodeCriar();
+  usePedidoDeCriar(() => setNewOpen(true), podeCriar);
 
   /**
    * Motivo e categoria da perda (#1537): a categoria NÃO vem no lead — ela é

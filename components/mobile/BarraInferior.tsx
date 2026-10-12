@@ -9,6 +9,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { useConversationCounts } from "@/hooks/inbox/useConversationCounts";
 import { useTarefasAtrasadas } from "@/hooks/tasks/useTarefasAtrasadas";
 import { abaDaRota, ehTelaCheia, RAIZ_DA_ABA, type AbaDoCelular } from "@/lib/mobile/abas";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { Bell, ChatCircle, DotsThree, Kanban, ListChecks } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -31,11 +32,16 @@ const ICONES: Record<AbaDoCelular, ComponentType<{ size?: number; weight?: "regu
 
 const ORDEM: AbaDoCelular[] = ["conversas", "funil", "tarefas", "avisos", "mais"];
 
+type Contadores = Partial<Record<AbaDoCelular, { n: number; classe: string; sufixo: string }>>;
+
 /**
  * Os contadores das abas, com as MESMAS consultas que o menu já faz (mesma chave do
  * React Query: nenhuma consulta nova, nenhum polling novo). Zero não desenha nada.
+ * Só roda no celular (`BarraInferior` monta `ComContadores` abaixo de 760px): no
+ * desktop a barra nem aparece, e quem não tem Tarefas no menu não ganha a consulta
+ * de atrasadas por causa dela.
  */
-function useContadores(): Partial<Record<AbaDoCelular, { n: number; classe: string; sufixo: string }>> {
+function useContadores(): Contadores {
   const { activeOrg } = useAuth();
   const fila = useConversationCounts(activeOrg?.orgId ?? null).data;
   const atrasadas = useTarefasAtrasadas().data ?? 0;
@@ -54,13 +60,25 @@ function useContadores(): Partial<Record<AbaDoCelular, { n: number; classe: stri
  * cheias (conversa, ficha). `data-barra-inferior` é o que faz a casca reservar o espaço
  * dela (globals.css, `--mb-casca-baixo`).
  */
-export function BarraInferior({ maisAberto, aoAbrirMais }: { maisAberto: boolean; aoAbrirMais: () => void }) {
+export function BarraInferior(props: PropsDaBarra) {
+  return useEhCelular() ? <ComContadores {...props} /> : <Barra {...props} contadores={{}} />;
+}
+
+interface PropsDaBarra {
+  maisAberto: boolean;
+  aoAbrirMais: () => void;
+}
+
+function ComContadores(props: PropsDaBarra) {
+  return <Barra {...props} contadores={useContadores()} />;
+}
+
+function Barra({ maisAberto, aoAbrirMais, contadores }: PropsDaBarra & { contadores: Contadores }) {
   const t = useT();
   const rota = usePathname() ?? "";
   // `?.`: fora do roteador (testes de outras peças da casca) não há parâmetros.
   const idNaUrl = useSearchParams()?.get("id") ?? null;
   const router = useRouter();
-  const contadores = useContadores();
   if (ehTelaCheia(rota, idNaUrl)) return null;
   const acesa = maisAberto ? "mais" : abaDaRota(rota);
 
