@@ -116,6 +116,7 @@ export function PeopleListClient() {
     <Pagina>
       <CabecalhoDaPagina
         titulo={t("Pessoas")}
+        acoesSoNoDesktop
         descricao={t("Decisores e contatos — telefones ficam em Contatos.")}
         acoes={
           <Button className="mb:hidden" onClick={() => setCreateOpen(true)}>

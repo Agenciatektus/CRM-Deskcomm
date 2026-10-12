@@ -12,6 +12,7 @@ import { Providers } from "@/app/providers";
 import { createClient, resetRealtimeAuthentication } from "@/lib/supabase/browser";
 import type { AuthUser, ActiveOrg, Role } from "@/lib/auth/types";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { esquecerBuscasRecentes } from "@/lib/mobile/buscas-recentes";
 
 interface AuthCtx {
   user: AuthUser;
@@ -78,6 +79,7 @@ export function AuthProvider({
       refreshing,
       signOut: async () => {
         resetRealtimeAuthentication();
+        esquecerBuscasRecentes();
         const { signOut } = await import("@/app/actions/auth/signOut");
         await signOut();
       },

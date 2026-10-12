@@ -63,6 +63,16 @@ export const PECAS: { id: string; arquivo: string; tokens: string[] }[] = [
     tokens: ["--mb-avatar-lista", "--mb-linha-nome", "--mb-linha-previa"],
   },
   {
+    id: "mais",
+    arquivo: "components/mobile/telas/Mais.tsx",
+    tokens: ["--mb-perfil-raio", "--mb-grupo-fonte", "--mb-cartao-raio", "--mb-menu-item", "--mb-menu-icone"],
+  },
+  {
+    id: "canais",
+    arquivo: "components/mobile/telas/Canais.tsx",
+    tokens: ["--mb-canal-raio", "--mb-canal-logo"],
+  },
+  {
     id: "campo-de-busca",
     arquivo: "components/mobile/CampoDeBusca.tsx",
     tokens: ["--mb-busca-altura", "--mb-busca-raio", "--mb-campo-fonte"],

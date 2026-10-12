@@ -71,9 +71,9 @@ export function ImportDetailClient({ id }: { id: string }) {
               <TableHead>#</TableHead>
               <TableHead>{t("Status")}</TableHead>
               <TableHead>{t("Erro")}</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Person</TableHead>
-              <TableHead>Contact</TableHead>
+              <TableHead>{t("Empresa")}</TableHead>
+              <TableHead>{t("Pessoa")}</TableHead>
+              <TableHead>{t("Contato")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -82,9 +82,9 @@ export function ImportDetailClient({ id }: { id: string }) {
                 <TableCell>{r.row_number as number}</TableCell>
                 <TableCell data-rotulo={t("Status")}>{r.status as string}</TableCell>
                 <TableCell data-rotulo={t("Erro")} className="max-w-xs truncate text-xs">{(r.error as string) || "—"}</TableCell>
-                <TableCell data-rotulo="Company" className="font-mono text-xs">{(r.company_id as string)?.slice(0, 8) || "—"}</TableCell>
-                <TableCell data-rotulo="Person" className="font-mono text-xs">{(r.person_id as string)?.slice(0, 8) || "—"}</TableCell>
-                <TableCell data-rotulo="Contact" className="font-mono text-xs">{(r.contact_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo={t("Empresa")} className="font-mono text-xs">{(r.company_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo={t("Pessoa")} className="font-mono text-xs">{(r.person_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo={t("Contato")} className="font-mono text-xs">{(r.contact_id as string)?.slice(0, 8) || "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>

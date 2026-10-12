@@ -7,13 +7,11 @@
  * O contrato de ONDE cada peça mora no CRM está em `paridade-mobile/contrato.ts`.
  *
  * DOIS MODOS:
- * - RELATÓRIO (padrão, fase M0 a M4): as telas ainda não existem. O teste calcula todas
+ * - RELATÓRIO (`PARIDADE_MOBILE_ESTRITA=0`; padrão de M0 a M4): calcula todas
  *   as divergências e as imprime, sem reprovar. Só reprova se o LEITOR do protótipo
  *   quebrar (valor que sumiu) ou se o próprio protótipo ferir a regra de toque.
- * - ESTRITO (`PARIDADE_MOBILE_ESTRITA=1`): cada grupo reprova listando o que diverge.
- *   É o critério de pronto da M5. Para rodar:
- *     PARIDADE_MOBILE_ESTRITA=1 pnpm vitest run tests/unit/paridade-mobile.test.ts
- *   Na M5, o modo estrito vira o padrão: troque `ESTRITO` para `true` fixo.
+ * - ESTRITO (o PADRÃO desde a M5): cada grupo reprova listando o que diverge.
+ *   O relatório volta com `PARIDADE_MOBILE_ESTRITA=0`.
  *
  * Exceção só pela lista `EXCECOES`, com motivo; exceção sem divergência também reprova
  * no estrito (a lista não pode envelhecer escondendo regressão).
@@ -33,7 +31,11 @@ import {
 } from "./paridade-mobile/divergencias";
 import { abasDoPrototipo, medidasDoPrototipo, telasDoPrototipo } from "./paridade-mobile/leitor";
 
-const ESTRITO = process.env.PARIDADE_MOBILE_ESTRITA === "1";
+/**
+ * Estrito por padrão desde a M5 (as 11 telas existem). `PARIDADE_MOBILE_ESTRITA=0`
+ * volta ao relatório, para ver a lista inteira de uma vez ao trocar o protótipo.
+ */
+const ESTRITO = process.env.PARIDADE_MOBILE_ESTRITA !== "0";
 
 /** id da divergência -> motivo. Só entra o que o Peterson aceitou. */
 const VALE_O_DS_DESKTOP =

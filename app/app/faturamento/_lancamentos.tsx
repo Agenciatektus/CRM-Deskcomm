@@ -11,6 +11,7 @@
  * à comanda — mostrar o botão e deixar a recusa para o servidor ensinaria a
  * pessoa a tentar o que nunca vai funcionar.
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -164,7 +165,7 @@ export function ListaDeLancamentos({
       {lancamentos.length === 0 ? (
         <p className="text-sm text-text-muted">{t("Nenhum lançamento no período.")}</p>
       ) : (
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <tbody>
             {lancamentos.map((l) => (
               <tr key={l.id} className="border-b border-border/60">

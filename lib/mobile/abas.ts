@@ -34,13 +34,16 @@ export function ehRaizDeAba(rota: string): boolean {
 
 /**
  * Para onde o voltar leva quem chegou por link (sem tela do app atrás). Uma tela de
- * Ajustes volta à lista de seções (`/app/settings`); o resto do "Mais" volta ao
+ * Ajustes volta à lista de seções (`/app/settings`), uma do Agente de IA ao hub
+ * (`/app/ai`); o resto do "Mais" volta ao
  * começo do app, e as outras abas ao começo delas.
  */
 export function voltarDaRota(rota: string): string {
   const aba = abaDaRota(rota);
   if (aba !== "mais") return RAIZ_DA_ABA[aba];
-  return rota.startsWith("/app/settings/") ? "/app/settings" : "/app";
+  if (rota.startsWith("/app/settings/")) return "/app/settings";
+  // As telas do Agente de IA voltam ao hub dele (`NavHub`), como Ajustes.
+  return rota.startsWith("/app/ai/") ? "/app/ai" : "/app";
 }
 
 /** A conversa aberta: a Inbox com `?id=` ou `/app/inbox/<id>`. Ela desenha a própria barra. */
@@ -48,9 +51,14 @@ export function conversaAberta(rota: string, idNaUrl: string | null): boolean {
   return /^\/app\/inbox\/[^/]+$/.test(rota) || (rota === "/app/inbox" && !!idNaUrl);
 }
 
-/** Tela cheia: sem barra inferior (a conversa e a ficha do lead). */
+/** O editor de um fluxo (follow-up ou atendimento): o canvas pede a tela inteira. */
+export function editorDeFluxo(rota: string): boolean {
+  return /^\/app\/ai\/(followups|atendimento)\/(?!enrollments$)[^/]+$/.test(rota);
+}
+
+/** Tela cheia: sem barra inferior (a conversa, a ficha do lead e o editor de fluxo). */
 export function ehTelaCheia(rota: string, idNaUrl: string | null): boolean {
-  return conversaAberta(rota, idNaUrl) || /^\/app\/leads\/[^/]+$/.test(rota);
+  return conversaAberta(rota, idNaUrl) || /^\/app\/leads\/[^/]+$/.test(rota) || editorDeFluxo(rota);
 }
 
 /** O que a folha "Criar" oferece (as opções do protótipo, por tela). */

@@ -97,6 +97,15 @@ export function medidasDoPrototipo(): Record<string, string> {
     "--mb-fab-margem": p(".fab", "right"),
     "--mb-fab-acima": p1(".fab", "bottom"),
     "--mb-campo-fonte": p(".cmp-in", "font-size"),
+    // Mais (tela 9): cartão do perfil, título de grupo, lista em cartão e a linha do menu.
+    "--mb-perfil-raio": p(".prof", "border-radius"),
+    "--mb-grupo-fonte": p(".grp-t", "font-size"),
+    "--mb-cartao-raio": p(".lst", "border-radius"),
+    "--mb-menu-item": p(".li", "min-height"),
+    "--mb-menu-icone": p(".li-ic", "width"),
+    // Canais (tela 10): o cartão do canal e o logo dele.
+    "--mb-canal-raio": p(".cc", "border-radius"),
+    "--mb-canal-logo": p(".cc-logo", "width"),
   };
 }
 

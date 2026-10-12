@@ -24,9 +24,17 @@ interface Props {
   initialData: FollowupFlowDetailRow;
 }
 
+/**
+ * No celular o editor ocupa a tela entre a barra de cima e a área segura (a barra
+ * inferior sai nesta rota, `ehTelaCheia`): desconta o respiro do `main` e não pede
+ * os 600px do desktop.
+ */
 export function FlowBuilder({ flowId, initialData }: Props) {
   return (
-    <div className="flex h-full min-h-[600px] flex-1 flex-col" data-testid="flow-builder-shell">
+    <div
+      className="flex h-full min-h-[600px] flex-1 flex-col mb:-m-6 mb:h-[calc(100dvh-var(--mb-casca-topo)-var(--mb-casca-baixo))] mb:min-h-0 mb:flex-none"
+      data-testid="flow-builder-shell"
+    >
       <FlowCanvas flowId={flowId} initialData={initialData} />
     </div>
   );

@@ -39,6 +39,7 @@ export function CabecalhoDaPagina({
   acoes,
   antes,
   tituloNoCelular = false,
+  acoesSoNoDesktop = false,
 }: {
   titulo: ReactNode;
   descricao?: ReactNode;
@@ -46,6 +47,11 @@ export function CabecalhoDaPagina({
   /** O que vem acima do título (o "voltar" de uma ficha no desktop, por exemplo). */
   antes?: ReactNode;
   tituloNoCelular?: boolean;
+  /**
+   * As ações só existem no desktop (a do celular é o `BotaoDaTela`): a faixa some
+   * inteira abaixo de 760px, em vez de ficar vazia com o botão `mb:hidden` dentro.
+   */
+  acoesSoNoDesktop?: boolean;
 }) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb:px-4 mb:pt-3">
@@ -55,7 +61,12 @@ export function CabecalhoDaPagina({
         {descricao ? <p className="mt-1 text-sm text-muted-foreground">{descricao}</p> : null}
       </div>
       {acoes ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 mb:-mx-4 mb:flex-nowrap mb:overflow-x-auto mb:px-4 mb:empty:hidden">
+        <div
+          className={cn(
+            "flex shrink-0 flex-wrap items-center gap-2 mb:-mx-4 mb:flex-nowrap mb:overflow-x-auto mb:px-4 mb:empty:hidden",
+            acoesSoNoDesktop && "mb:hidden",
+          )}
+        >
           {acoes}
         </div>
       ) : null}

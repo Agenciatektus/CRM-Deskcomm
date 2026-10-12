@@ -7,6 +7,7 @@
  * `financial_entry_id`. Por isso pagar pede uma CONTA, a mesma lista do
  * catálogo financeiro usada em Faturamento.
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -135,7 +136,7 @@ export function Parcelas({
       {lista.length === 0 ? (
         <p className="text-sm text-text-muted">{t("Nenhuma parcela ainda.")}</p>
       ) : (
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <tbody>
             {lista.map((p) => (
               <tr key={p.id} className="border-b border-border/60" data-testid={`parcela-${p.id}`}>

@@ -1,14 +1,15 @@
 "use client";
 import { useState } from "react";
 
-import { CommandPalette } from "@/components/shell/CommandPalette";
 import { useT } from "@/hooks/i18n/useT";
 import { MagnifyingGlass } from "@/lib/ui/icons";
+
+import { Busca } from "./telas/Busca";
 
 /**
  * O campo de busca do topo da lista no celular (o `.sf` do protótipo): 44px, raio 14,
  * texto de 16px. É um botão com cara de campo: abre a busca geral (contatos, conversas
- * e leads), a mesma do Ctrl K, numa instância própria e sem o atalho.
+ * e leads) em tela cheia (`telas/Busca`), com os resultados do Ctrl K e sem o atalho.
  */
 export function CampoDeBusca() {
   const t = useT();
@@ -23,7 +24,7 @@ export function CampoDeBusca() {
         <MagnifyingGlass size={18} aria-hidden />
         <span className="truncate">{t("Buscar contato, conversa ou lead")}</span>
       </button>
-      <CommandPalette open={aberta} onOpenChange={setAberta} verTodasNaLista />
+      <Busca aberta={aberta} aoMudar={setAberta} verTodasNaLista />
     </>
   );
 }
