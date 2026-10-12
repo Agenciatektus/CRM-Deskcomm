@@ -17,7 +17,9 @@ vi.mock("node:fs", async (original) => {
       return texto
         .replace(".btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px", ".btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px")
         .replace(".chip{display:inline-flex;align-items:center;height:30px;padding:0 11px;border-radius:15px", ".chip{display:inline-flex;align-items:center;height:30px;padding:0 11px;border-radius:6px")
-        .replace("16 / 700</span>", "18 / 700</span>");
+        .replace("16 / 700</span>", "18 / 700</span>")
+        .replace("Abaixo de 1024 px ela nunca fixa", "Abaixo de 1100 px ela nunca fixa")
+        .replace("<b>Lista, 340 px</b>", "<b>Lista, 360 px</b>");
     }
     return texto;
   };
@@ -40,6 +42,9 @@ describe("paridade — controle negativo", () => {
     expect(tokens).toContain("tipo:title-sm:tamanho");
 
     const { CHECAGENS_DE_MENSAGENS } = await import("./paridade/mensagens");
+    const { divergenciasDeComposicao } = await import("./paridade/composicao");
+    expect(divergenciasDeComposicao().map((d) => d.split(" ")[0])).toEqual(["nav:nunca-fixa", "layout:lista"]);
+
     const falhas = [...CHECAGENS, ...CHECAGENS_DE_MENSAGENS].filter((ch) => {
       const classes = classesDoArquivo(ch.arquivo);
       return [ch.classes(decl(ch.fonte, ch.seletor, ch.prop))].flat().some((c) => !classes.has(c));

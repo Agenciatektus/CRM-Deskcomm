@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CHECAGENS as CHECAGENS_BASE } from "./paridade/componentes";
+import { divergenciasDeComposicao } from "./paridade/composicao";
 import { CHECAGENS_DE_MENSAGENS } from "./paridade/mensagens";
 import { divergenciasDeTokens } from "./paridade/tokens";
 import { classesDoArquivo, decl } from "./paridade/leitor";
@@ -68,6 +69,11 @@ describe("paridade com o protótipo", () => {
     }
     const resto = semExcecao(divergencias, usadas);
     expect(resto, `divergências de componente:\n${resto.join("\n")}`).toEqual([]);
+  });
+
+  it("padrões compostos: navegação, layout da Inbox, seletor de data, aviso com Desfazer, menu", () => {
+    const resto = semExcecao(divergenciasDeComposicao(), usadas);
+    expect(resto, `divergências de composição:\n${resto.join("\n")}`).toEqual([]);
   });
 
   it("desabilitado é cinza, não 50% de opacidade (quadro DS, Botões)", () => {
