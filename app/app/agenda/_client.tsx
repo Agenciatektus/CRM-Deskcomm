@@ -30,6 +30,7 @@ import { recorteDaGrade as recorteDaGradeDe } from "@/lib/agenda/recorte-da-grad
 import { resolverResponsavelDoPainel } from "@/lib/agenda/responsavel-do-painel";
 import { useVinculoDaMarcacao } from "@/lib/agenda/vinculo-da-marcacao";
 import { Button } from "@/components/ui/button";
+import { BotaoDaTela } from "@/components/pagina";
 import { PainelDeMarcacao } from "@/components/agenda/PainelDeMarcacao";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAgendamentos } from "@/hooks/agenda/useAgendamentos";
@@ -467,7 +468,7 @@ export function AgendaClient({
       data-testid="tela-agenda"
       data-fonte={agendamentosIniciais.length > 0 ? "api" : "api-sem-dado"}
       data-fuso={fusoDeApresentacao ?? "organizacao"}
-      className="flex h-full flex-col gap-4 p-6"
+      className="flex h-full flex-col gap-4 mb:-mx-6 mb:-mt-6 mb:gap-3 mb:px-4 mb:pt-3"
     >
       {/*
         Em Suspense porque `useSearchParams` obriga: sem a fronteira, o Next
@@ -488,7 +489,8 @@ export function AgendaClient({
       />
 
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="min-w-0">
+        {/* No celular o título é da barra da casca (molde de página). */}
+        <div className="min-w-0 mb:hidden">
           <h1 className="text-title-lg">{t("Agenda")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("O que está marcado, com quem, e quem atende (seu e da equipe).")}
@@ -538,6 +540,7 @@ export function AgendaClient({
           {podeMarcar && (
             <Button
               size="sm"
+              className="mb:hidden"
               disabled={!tipo}
               // `data-testid` porque o RÓTULO deixou de ser estável: até este PR
               // ele era literal, e `agenda-escopo-da-organizacao.spec.ts` o acha
@@ -554,6 +557,9 @@ export function AgendaClient({
               <CalendarPlus size={16} weight="bold" aria-hidden />
               <span>{t("Novo agendamento")}</span>
             </Button>
+          )}
+          {podeMarcar && tipo && (
+            <BotaoDaTela rotulo={t("Novo agendamento")} icone={CalendarPlus} aoTocar={abrirMarcacao} />
           )}
         </div>
       </header>

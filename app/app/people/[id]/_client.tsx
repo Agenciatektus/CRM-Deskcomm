@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { useT } from "@/hooks/i18n/useT";
 
@@ -23,19 +25,22 @@ export function PersonDetailClient({ id }: { id: string }) {
     void load();
   }, [load]);
 
-  if (!data) return <div className="p-6 text-muted-foreground">{t("Carregando…")}</div>;
+  if (!data) return <p className="text-sm text-muted-foreground mb:px-4 mb:pt-3">{t("Carregando…")}</p>;
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div>
-        <Link href="/app/people" className="text-sm text-muted-foreground hover:underline">
-          ← {t("Pessoas")}
-        </Link>
-        <h1 className="text-title-lg">{(data.person.full_name as string)}</h1>
-        <p className="text-sm text-muted-foreground">{(data.person.email as string) || "—"}</p>
-      </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        antes={
+          <Link href="/app/people" className="text-sm text-muted-foreground hover:underline mb:hidden">
+            ← {t("Pessoas")}
+          </Link>
+        }
+        titulo={data.person.full_name as string}
+        descricao={(data.person.email as string) || "—"}
+      />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 mb:px-4">
         <Card className="space-y-2 p-4">
           <h2 className="font-medium">{t("Empresas")}</h2>
           {data.companies.length === 0 ? (
@@ -82,6 +87,6 @@ export function PersonDetailClient({ id }: { id: string }) {
           )}
         </Card>
       </div>
-    </div>
+    </Pagina>
   );
 }

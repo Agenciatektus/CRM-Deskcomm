@@ -2,10 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, Plus, UserCircle } from "@/lib/ui/icons";
+import { Plus, UserCircle } from "@/lib/ui/icons";
+import { EmptyState } from "@/components/empty";
+import {
+  BarraDeFiltros,
+  BotaoDaTela,
+  CabecalhoDaPagina,
+  CartaoEmpilhado,
+  EstadoDaLista,
+  Pagina,
+  TabelaOuCartoes,
+} from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -76,71 +85,72 @@ export function PeopleListClient() {
     }
   }
 
+  const tabela = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t("Nome")}</TableHead>
+          <TableHead>E-mail</TableHead>
+          <TableHead>{t("Atualizado")}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((p) => (
+          <TableRow key={p.id}>
+            <TableCell>
+              <Link className="font-medium hover:underline" href={`/app/people/${p.id}`}>
+                {p.full_name}
+              </Link>
+            </TableCell>
+            <TableCell>{p.email || "—"}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">
+              {new Date(p.updated_at).toLocaleString()}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-title-lg">{t("Pessoas")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("Decisores e contatos — telefones ficam em Contatos.")}
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          {t("Nova pessoa")}
-        </Button>
-      </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Pessoas")}
+        descricao={t("Decisores e contatos — telefones ficam em Contatos.")}
+        acoes={
+          <Button className="mb:hidden" onClick={() => setCreateOpen(true)}>
+            <Plus size={16} weight="bold" aria-hidden />
+            <span>{t("Nova pessoa")}</span>
+          </Button>
+        }
+      />
 
-      <div className="relative max-w-sm">
-        <MagnifyingGlass className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder={t("Buscar por nome ou e-mail")}
-          autoComplete="new-password"
+      <BarraDeFiltros
+        busca={{ valor: searchInput, aoMudar: setSearchInput, placeholder: t("Buscar por nome ou e-mail") }}
+      />
+
+      <EstadoDaLista
+        carregando={loading}
+        quantidade={rows.length}
+        vazio={<EmptyState icon={UserCircle} headline={t("Nenhuma pessoa ainda.")} />}
+      >
+        <TabelaOuCartoes
+          itens={rows}
+          chave={(p) => p.id}
+          rotulo={t("Pessoas")}
+          tabela={tabela}
+          cartao={(p) => (
+            <CartaoEmpilhado
+              href={`/app/people/${p.id}`}
+              titulo={p.full_name}
+              apoio={p.email || "—"}
+              campos={[{ rotulo: t("Atualizado"), valor: new Date(p.updated_at).toLocaleString() }]}
+            />
+          )}
         />
-      </div>
+      </EstadoDaLista>
 
-      <Card className="overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("Nome")}</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>{t("Atualizado")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={3}>{t("Carregando…")}</TableCell>
-              </TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
-                  <UserCircle className="mx-auto mb-2 size-8 opacity-40" />
-                  {t("Nenhuma pessoa ainda.")}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <Link className="font-medium hover:underline" href={`/app/people/${p.id}`}>
-                      {p.full_name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{p.email || "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(p.updated_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <BotaoDaTela rotulo={t("Nova pessoa")} aoTocar={() => setCreateOpen(true)} />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -167,6 +177,6 @@ export function PeopleListClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Pagina>
   );
 }
