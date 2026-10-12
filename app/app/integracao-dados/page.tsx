@@ -10,6 +10,7 @@
  * a RLS da tabela base se aplica à view `security_invoker`, então nem aqui há
  * como vazar a conexão de outra organização.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { ListaDeConexoes } from "./_components/ListaDeConexoes";
@@ -43,17 +44,17 @@ export default async function IntegracaoDeDadosPage() {
     (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Dados externos", idioma)}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {traduzir(
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Dados externos", idioma)}
+        descricao={traduzir(
             "Conecte um banco de dados de outro sistema — o seu segundo CRM, um ERP, uma planilha em PostgreSQL — e o agente passa a consultá-lo em tempo real. A conexão é sempre somente leitura: nada que o agente faz altera o banco de origem.",
             idioma,
           )}
-        </p>
-      </header>
+      />
+      <SecaoDaPagina>
       <ListaDeConexoes initialData={conexoes} canWrite={canWrite} />
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

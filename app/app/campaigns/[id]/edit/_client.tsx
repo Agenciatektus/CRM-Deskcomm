@@ -17,6 +17,7 @@
  * voltar ao rascunho — e isso só vale enquanto nada saiu. O RITMO é a exceção, e
  * ele se edita na própria tela de detalhe, com a campanha em pé.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -149,9 +150,9 @@ export function EditarCampanha({ id }: { id: string }) {
 
   if (c.status !== "draft") {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-6">
-        <h1 className="text-title-lg">{t("Editar campanha")}</h1>
-        <Card className="space-y-3 p-4">
+      <Pagina className="max-w-3xl">
+        <CabecalhoDaPagina titulo={t("Editar campanha")} />
+        <Card className="space-y-3 p-4 mb:mx-4">
           <p className="text-sm">
             {t(
               "Esta campanha já foi preparada: cada pessoa da lista tem o texto que vai receber guardado. Para mudar o texto ou o público, volte a campanha para rascunho — isso descarta a lista montada.",
@@ -164,7 +165,7 @@ export function EditarCampanha({ id }: { id: string }) {
             {t("Voltar para a campanha")}
           </Button>
         </Card>
-      </div>
+      </Pagina>
     );
   }
 
@@ -178,13 +179,12 @@ export function EditarCampanha({ id }: { id: string }) {
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <header>
-        <h1 className="text-title-lg">{t("Editar campanha")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
-        </p>
-      </header>
+    <Pagina className="max-w-3xl">
+      <CabecalhoDaPagina
+        titulo={t("Editar campanha")}
+        descricao={t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
+      />
+      <SecaoDaPagina className="gap-4">
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Informações")}</h2>
@@ -446,7 +446,8 @@ export function EditarCampanha({ id }: { id: string }) {
           {salvar.isPending ? t("Salvando…") : t("Salvar alterações")}
         </Button>
       </div>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

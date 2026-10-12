@@ -17,6 +17,8 @@ vi.mock("@/components/feedback/ApiErrorToast", () => ({ showApiError: mocks.show
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (text: string) => text }));
 vi.mock("next/navigation", () => ({
   redirect: (href: string) => { throw new Error(`redirect:${href}`); },
+  // O "+" do celular (BotaoDaTelaParaRota) navega pelo router do app.
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import ProposalsPage from "@/app/app/proposals/page";

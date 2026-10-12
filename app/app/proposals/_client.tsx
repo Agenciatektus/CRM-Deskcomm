@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoDaTelaParaRota, CabecalhoDaPagina, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -73,15 +74,18 @@ export function ProposalsClient({ podeCriar }: { podeCriar: boolean }) {
   }, [tentativa]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-title-lg">{t("Propostas")}</h1>
-        {podeCriar ? (
-          <Button asChild>
-            <Link href="/app/proposals/novo">{t("Nova proposta")}</Link>
-          </Button>
-        ) : null}
-      </header>
+    <Pagina className="max-w-5xl">
+      <CabecalhoDaPagina
+        titulo={t("Propostas")}
+        acoes={
+          podeCriar ? (
+            <Button asChild className="mb:hidden">
+              <Link href="/app/proposals/novo">{t("Nova proposta")}</Link>
+            </Button>
+          ) : null
+        }
+      />
+      <SecaoDaPagina>
 
       {carregando ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -106,8 +110,8 @@ export function ProposalsClient({ podeCriar }: { podeCriar: boolean }) {
           {t("Nenhuma proposta cadastrada ainda.")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border mb:-mx-4 mb:overflow-visible mb:rounded-none mb:border-x-0">
+          <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
             <thead>
               <tr className="border-b text-left">
                 <th scope="col" className="p-3">{t("Número")}</th>
@@ -124,21 +128,21 @@ export function ProposalsClient({ podeCriar }: { podeCriar: boolean }) {
                       ? `${String(p.numero).padStart(4, "0")}/${p.ano} v${p.versao}`
                       : t("Rascunho")}
                   </td>
-                  <td className="p-3">
+                  <td data-rotulo={t("Título")} className="p-3">
                     <Link href={`/app/proposals/${p.id}`} className="underline underline-offset-4">
                       {p.titulo}
                     </Link>
                   </td>
-                  <td className="p-3">
+                  <td data-rotulo={t("Status")} className="p-3">
                     {aguardaRevisao(p) ? (
-                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                      <span className="rounded-md bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning-fg">
                         {t("Aguardando revisão")}
                       </span>
                     ) : (
                       statusLabels[p.status]
                     )}
                   </td>
-                  <td className="whitespace-nowrap p-3 text-right tabular-nums">
+                  <td data-rotulo={t("Valor")} className="whitespace-nowrap p-3 text-right tabular-nums">
                     {formatCents(p.total_cents, p.moeda)}
                   </td>
                 </tr>
@@ -147,6 +151,10 @@ export function ProposalsClient({ podeCriar }: { podeCriar: boolean }) {
           </table>
         </div>
       )}
-    </div>
+        {podeCriar ? (
+          <BotaoDaTelaParaRota rotulo={t("Nova proposta")} href="/app/proposals/novo" />
+        ) : null}
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
