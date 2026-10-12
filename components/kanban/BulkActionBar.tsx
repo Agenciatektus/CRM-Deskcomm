@@ -213,7 +213,10 @@ export function BulkActionBar({
           <DropdownMenuContent align="start">
             <DropdownMenuLabel>{t("Etapa")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {stages.map((s) => (
+            {/* Ganho e perda NÃO entram no lote (follow-up do Cassio na #180): fechar
+                negócio emite `lead.won`/`lead.lost` com efeito fora do CRM, e
+                tem ação própria, um a um, com Desfazer (card, painel, menu). */}
+            {stages.filter((s) => !s.is_won && !s.is_lost).map((s) => (
               <DropdownMenuItem key={s.id} onClick={() => runMove(s.id)}>
                 {s.name}
               </DropdownMenuItem>

@@ -1,4 +1,5 @@
 "use client";
+import { acaoPendente, adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 import { useCallback, useMemo, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
@@ -229,14 +230,36 @@ export function KanbanBoard({
         return;
       }
 
-      moveCard.mutate({
-        leadId: lead.id,
-        stageId: destStageId,
-        positionInStage: newPosition,
-        expectedUpdatedAt: lead.updated_at,
-      });
+      const mover = () =>
+        moveCard.mutate({
+          leadId: lead.id,
+          stageId: destStageId,
+          positionInStage: newPosition,
+          expectedUpdatedAt: lead.updated_at,
+        });
+
+      // SOLTAR NA COLUNA DE GANHO OU DE PERDA FECHA O NEGÓCIO: `/move` para essas
+      // etapas emite `lead.won`/`lead.lost` na hora, com efeito fora do CRM
+      // (conversão de anúncio para a Meta/Google, cadência, push). Mover de volta não
+      // desfaz nada disso; por isso o arraste é a MESMA ação adiada do painel e do
+      // menu do card: 5 s com Desfazer, e a trava por negócio contra o segundo
+      // fechamento enquanto o primeiro está segurado (follow-up do Cassio na #180).
+      const destino = data.stages.find((s) => s.id === destStageId);
+      if (destino?.is_won || destino?.is_lost) {
+        const chave = `${destino.is_won ? "ganho" : "perda"}:${lead.id}`;
+        if (acaoPendente(`ganho:${lead.id}`) || acaoPendente(`perda:${lead.id}`)) return;
+        adiarAcao(
+          (s) => `${destino.is_won ? t("Ganho em") : t("Perdido em")} ${s} s`,
+          t("Desfazer"),
+          async () => mover(),
+          undefined,
+          { chave },
+        );
+        return;
+      }
+      mover();
     },
-    [data, grouped, moveCard],
+    [data, grouped, moveCard, t],
   );
 
   if (isLoading) {

@@ -79,6 +79,11 @@ export function useAcaoPendente(chave: string): boolean {
   );
 }
 
+/** Há ação segurada com esta chave AGORA? Para callbacks (arrastar, lote), fora de render. */
+export function acaoPendente(chave: string): boolean {
+  return chavesPendentes.has(chave);
+}
+
 /** Quantas ações estão seguradas agora (para teste e diagnóstico). */
 export function acoesPendentes(): number {
   return pendentes;
