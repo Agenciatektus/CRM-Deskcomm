@@ -32,7 +32,7 @@ export function BotaoDaTela({
 }
 
 /** O `BotaoDaTela` que leva a uma rota (a tela de criar), com navegação do app. */
-export function BotaoDaTelaParaRota({ rotulo, href }: { rotulo: string; href: string }) {
+export function BotaoDaTelaParaRota({ rotulo, href }: { rotulo: string; href: `/app/${string}` }) {
   const router = useRouter();
   return <BotaoDaTela rotulo={rotulo} aoTocar={() => router.push(href)} />;
 }

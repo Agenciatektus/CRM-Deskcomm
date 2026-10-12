@@ -27,8 +27,9 @@ export function Pagina({ children, className, testId }: { children: ReactNode; c
 
 /**
  * O cabeçalho da página: título (`text-title-lg`), descrição e ações. No celular o
- * título e a descrição saem (a barra da casca já diz onde se está), a não ser numa
- * ficha (`tituloNoCelular`), em que o título é o nome do registro. As ações viram
+ * título fica só para leitor de tela (a barra da casca já diz onde se está), a não
+ * ser numa ficha (`tituloNoCelular`), em que o título é o nome do registro. A
+ * descrição continua visível: ela carrega avisos ("Nada é enviado antes de..."). As ações viram
  * uma faixa rolável; a ação principal da tela vai para o `BotaoDaTela` (o "+" do
  * protótipo), e quem a declara aqui marca o botão com `mb:hidden`.
  */
@@ -48,9 +49,9 @@ export function CabecalhoDaPagina({
 }) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb:px-4 mb:pt-3">
-      <div className={cn("min-w-0", !tituloNoCelular && "mb:hidden")}>
-        {antes}
-        <h1 className="break-words text-title-lg">{titulo}</h1>
+      <div className={cn("min-w-0", !tituloNoCelular && !descricao && "mb:sr-only")}>
+        {antes ? <div className={cn(!tituloNoCelular && "mb:hidden")}>{antes}</div> : null}
+        <h1 className={cn("break-words text-title-lg", !tituloNoCelular && "mb:sr-only")}>{titulo}</h1>
         {descricao ? <p className="mt-1 text-sm text-muted-foreground">{descricao}</p> : null}
       </div>
       {acoes ? (
