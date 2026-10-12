@@ -73,7 +73,7 @@ export function MaisAcoes({
           <DotsThree size={18} weight="bold" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
+      <DropdownMenuContent folhaNoCelular
         align="end"
         className="w-60"
         onCloseAutoFocus={(e) => {

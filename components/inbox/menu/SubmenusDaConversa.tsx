@@ -65,7 +65,7 @@ export function SubmenuTransferir({ conversation, meuUserId, onEscolher }: {
         <span className="grow">{t("Transferir para")}</span>
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Transferir para")}>
+        <DropdownMenuSubContent folhaNoCelular className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Transferir para")}>
           {membros.isLoading && (
             <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Carregando…")}</DropdownMenuItem>
           )}
@@ -120,7 +120,7 @@ export function SubmenuLembrar({ conversationId, lembreteAtivo }: {
         {lembreteAtivo && <span className={CLASSE_DO_DETALHE}>{t("Lembrete ativo")}</span>}
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Lembrar depois")}>
+        <DropdownMenuSubContent folhaNoCelular className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Lembrar depois")}>
           {lembreteAtivo ? (
             <DropdownMenuItem
               className={CLASSE_DO_ITEM}
@@ -175,7 +175,7 @@ export function SubmenuEtiquetas({ conversation }: { conversation: ConversationW
         {atuais.length > 0 && <span className={CLASSE_DO_DETALHE}>{atuais.length}</span>}
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Etiquetas")}>
+        <DropdownMenuSubContent folhaNoCelular className={CLASSE_DO_SUBMENU} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Etiquetas")}>
           {opcoes.length === 0 && (
             <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>
               {vocabulario.isLoading ? t("Carregando…") : t("Nenhuma etiqueta criada ainda")}

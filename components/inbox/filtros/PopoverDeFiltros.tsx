@@ -87,7 +87,7 @@ export function PopoverDeFiltros({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" collisionPadding={12} className="w-72 space-y-2.5 p-2">
+      <PopoverContent folhaNoCelular align="end" collisionPadding={12} className="w-72 space-y-2.5 p-2">
         <div className="space-y-0.5">
           <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-sm hover:bg-surface-elevated">
             {t("Só não lidas")}

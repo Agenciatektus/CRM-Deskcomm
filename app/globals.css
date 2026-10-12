@@ -49,6 +49,49 @@
   body:has([data-cabecalho-do-celular]) {
     --mb-casca-topo: var(--mb-titulo-altura);
   }
+
+  /* POPOVER E MENU VIRANDO FOLHA INFERIOR (`folhaNoCelular` em PopoverContent,
+     DropdownMenuContent e DropdownMenuSubContent). O comportamento continua o do
+     Radix (foco, Esc, toque fora fecha, submenu); só a forma muda: presa embaixo, na
+     largura toda, com a alça, o raio e a altura da folha do protótipo, área segura
+     e o fundo escurecido (a sombra larga, que não intercepta o toque: o toque fora
+     é o do Radix). A folha própria, com arrastar, é `components/mobile/FolhaInferior`. */
+  [data-radix-popper-content-wrapper]:has(> [data-folha-no-celular]) {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+    box-shadow: 0 0 0 100vmax oklch(0.12 0.01 260 / 0.52);
+  }
+  [data-folha-no-celular] {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: var(--mb-folha-max) !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-width: 1px 0 0 !important;
+    border-radius: var(--mb-folha-raio) var(--mb-folha-raio) 0 0 !important;
+    padding: 0 8px calc(10px + var(--mb-area-baixo)) !important;
+    animation: folha-sobe 300ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+  [data-folha-no-celular]::before {
+    content: "";
+    display: block;
+    width: var(--mb-pegador-largura);
+    height: var(--mb-pegador-altura);
+    margin: 10px auto 8px;
+    border-radius: 9999px;
+    background: var(--color-border-strong);
+  }
+  [data-folha-no-celular] [role^="menuitem"] {
+    min-height: var(--mb-alvo);
+    font-size: 16px;
+  }
+}
+@media (max-width: 759px) and (prefers-reduced-motion: reduce) {
+  [data-folha-no-celular] {
+    animation: none !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -366,6 +409,11 @@
   --mb-barra-inferior: calc(var(--mb-aba-altura) + 12px + var(--mb-area-baixo));
   --mb-casca-topo: 0px;
   --mb-casca-baixo: var(--mb-area-baixo);
+  /* As ações do gesto de deslizar (o `.a-read`, `.a-pin`/`.a-more` e `.a-arch` do
+     protótipo), as mesmas nos dois temas, com texto branco. */
+  --color-mb-gesto-lida: oklch(0.5 0.13 245);
+  --color-mb-gesto-neutro: oklch(0.42 0.02 260);
+  --color-mb-gesto-arquivar: oklch(0.47 0.11 160);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -888,6 +936,9 @@ body [data-theme] {
   --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
   --color-bubble-in: var(--color-bubble-in);
   --color-mb-barra: var(--color-mb-barra);
+  --color-mb-gesto-lida: var(--color-mb-gesto-lida);
+  --color-mb-gesto-neutro: var(--color-mb-gesto-neutro);
+  --color-mb-gesto-arquivar: var(--color-mb-gesto-arquivar);
   --color-note-bg: var(--color-note-bg);
   --color-note-fg: var(--color-note-fg);
 
@@ -1002,6 +1053,8 @@ body [data-theme] {
   --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-in: fade-in 150ms ease;
   --animate-slide-in: slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* A folha inferior do celular subindo (o `sh-up` do MobileVerdash.dc.html). */
+  --animate-folha-sobe: folha-sobe 300ms cubic-bezier(0.22, 1, 0.36, 1);
   @keyframes pop-in {
     from { opacity: 0; transform: translateY(-4px) scale(0.98); }
     to { opacity: 1; transform: none; }
@@ -1012,6 +1065,10 @@ body [data-theme] {
   }
   @keyframes slide-in {
     from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes folha-sobe {
+    from { opacity: 0; transform: translateY(48px); }
     to { opacity: 1; transform: none; }
   }
 }

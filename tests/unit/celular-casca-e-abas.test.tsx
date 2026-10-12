@@ -6,7 +6,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { abaDaRota, acaoDeCriar, ehRaizDeAba, ehTelaCheia } from "@/lib/mobile/abas";
+import { abaDaRota, destinoDeCriar, ehRaizDeAba, ehTelaCheia, opcoesDeCriar } from "@/lib/mobile/abas";
 
 const nav = vi.hoisted(() => ({ rota: "/app/inbox", busca: new URLSearchParams(), push: vi.fn(), back: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -67,12 +67,21 @@ describe("rotas do app de celular", () => {
     expect(ehTelaCheia("/app/inbox", null)).toBe(false);
   });
 
-  it("FAB só onde há o que criar, pela ação principal da tela", () => {
-    expect(acaoDeCriar("/app/inbox")?.href).toBe("/app/contacts?criar=1");
-    expect(acaoDeCriar("/app/tasks")?.href).toBe("/app/tasks?criar=1");
-    expect(acaoDeCriar("/app/pipelines/p-1")?.href).toBe("/app/pipelines/p-1?criar=1");
-    expect(acaoDeCriar("/app/kanban")).toBeNull();
-    expect(acaoDeCriar("/app/ai/inbox")).toBeNull();
+  it("FAB só onde há o que criar, com as opções do protótipo na ordem", () => {
+    expect(opcoesDeCriar("/app/inbox")).toEqual(["conversa", "contato", "lead", "tarefa", "compromisso"]);
+    expect(opcoesDeCriar("/app/kanban")).toEqual(["lead", "contato", "tarefa"]);
+    expect(opcoesDeCriar("/app/pipelines/p-1")).toEqual(["lead", "contato", "tarefa"]);
+    expect(opcoesDeCriar("/app/tasks")).toEqual(["tarefa", "compromisso", "lead"]);
+    expect(opcoesDeCriar("/app/ai/inbox")).toEqual([]);
+  });
+
+  it("cada opção leva à tela que já cria aquilo, com ?criar=1", () => {
+    expect(destinoDeCriar("contato", "/app/inbox", null)).toBe("/app/contacts?criar=1");
+    expect(destinoDeCriar("tarefa", "/app/inbox", null)).toBe("/app/tasks?criar=1");
+    expect(destinoDeCriar("compromisso", "/app/tasks", null)).toBe("/app/agenda?criar=1");
+    expect(destinoDeCriar("lead", "/app/pipelines/p-1", "p-9")).toBe("/app/pipelines/p-1?criar=1");
+    expect(destinoDeCriar("lead", "/app/inbox", "p-9")).toBe("/app/pipelines/p-9?criar=1");
+    expect(destinoDeCriar("lead", "/app/inbox", null)).toBe("/app/kanban");
   });
 });
 

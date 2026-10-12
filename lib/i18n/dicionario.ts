@@ -14816,6 +14816,14 @@ export const DICIONARIO: Traducoes = {
   "Seções do CRM": { es: "Secciones del CRM" },
   "esperando uma pessoa": { es: "esperando a una persona" },
   "atrasadas": { es: "atrasadas" },
+  // ─── APP DE CELULAR (M1.4: folha "Criar" e gesto) ───
+  "Não lida": { es: "No leída" },
+  "Primeira mensagem para um contato": { es: "Primer mensaje para un contacto" },
+  "Negócio aberto em um funil": { es: "Negocio abierto en un embudo" },
+  "Pessoa ou empresa na base": { es: "Persona o empresa en la base" },
+  "Próximo passo com prazo e responsável": { es: "Próximo paso con plazo y responsable" },
+  "Novo compromisso": { es: "Nuevo compromiso" },
+  "Horário marcado na agenda": { es: "Horario reservado en la agenda" },
 };
 
 /**

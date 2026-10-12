@@ -1,6 +1,9 @@
 "use client";
 
+import { useRef } from "react";
+
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { useT } from "@/hooks/i18n/useT";
 import { Robot } from "@/lib/ui/icons";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
@@ -15,6 +18,7 @@ import { BotaoMaisAcoes } from "./menu/BotaoMaisAcoes";
 import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
 import { IconesPessoais } from "./item/IconesPessoais";
+import { GestoDaConversa } from "./item/GestoDaConversa";
 import { naoLidasDaConversa } from "@/lib/inbox/estado-por-atendente";
 import { initials, relativeTime, siglaDoTelefone } from "./item/tempo-da-linha";
 
@@ -80,6 +84,8 @@ export function ConversationListItem({
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
+  const celular = useEhCelular();
+  const caixaRef = useRef<HTMLDivElement | null>(null);
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
   const phoneFallback = siglaDoTelefone(c?.phone_number);
@@ -253,9 +259,22 @@ export function ConversationListItem({
   if (!onAbrirMenu) return linha;
 
   // Um <button> não pode morar dentro de outro: o "…" é IRMÃO da linha.
+  // No celular (abaixo de 760px) a linha ganha o gesto de deslizar (M1.4); as mesmas
+  // ações seguem no "…".
   return (
-    <div className="group/linha relative" data-menu-aberto={menuAberto ? "true" : undefined}>
-      {linha}
+    <div ref={caixaRef} className="group/linha relative" data-menu-aberto={menuAberto ? "true" : undefined}>
+      {celular ? (
+        <GestoDaConversa
+          conversation={conversation}
+          automaticoDaOrg={automaticoDaOrg}
+          meuUserId={meuUserId ?? null}
+          aoAbrirMenu={() => caixaRef.current && onAbrirMenu(conversation.id, caixaRef.current, caixaRef.current)}
+        >
+          {linha}
+        </GestoDaConversa>
+      ) : (
+        linha
+      )}
       <BotaoMaisAcoes
         nome={displayName}
         aberto={!!menuAberto}

@@ -72,7 +72,7 @@ function VisibleAlertsBell() {
           ) : null}
         </button>
       </PopoverTrigger>
-      <PopoverContent
+      <PopoverContent folhaNoCelular
         align="end"
         sideOffset={8}
         className="w-[396px] max-w-[calc(100vw-16px)] overflow-hidden rounded-xl p-0 shadow-lg"
