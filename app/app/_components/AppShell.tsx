@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
 import { ConviteDeInstalacao } from "@/components/pwa/ConviteDeInstalacao";
+import { CascaDoCelular } from "@/components/mobile/CascaDoCelular";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
 import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessageAlerts";
@@ -105,7 +106,12 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
         cima da lista.
       */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <TopBar />
+        {/* Abaixo de 760px o topo e a gaveta saem: entra a casca do app de celular
+            (cabeçalho, barra inferior com as 5 abas, FAB e o menu "Mais"). */}
+        <div className="hidden largo:contents">
+          <TopBar />
+        </div>
+        <CascaDoCelular funis={funis} />
         {/*
           O RODAPÉ DESCONTA O QUE AS PEÇAS FIXAS OCUPAM (issue #1305).
 
@@ -117,7 +123,13 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
           aparece no inspetor quando alguém pergunta quanto o rodapé perdeu.
         */}
         <main
-          className={cn("flex-1 overflow-auto", naInbox ? "pr-2 pb-2" : "p-6")}
+          className={cn(
+            "flex-1 overflow-auto",
+            // No celular o fim da página fica acima da barra inferior.
+            naInbox
+              ? "pr-2 pb-2 mb:pb-[calc(var(--mb-casca-baixo)+var(--space-2))]"
+              : "p-6 mb:pb-[calc(var(--mb-casca-baixo)+1.5rem)]",
+          )}
           style={estiloDoMain(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >

@@ -14812,6 +14812,10 @@ export const DICIONARIO: Traducoes = {
   "No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início.": { es: "En Safari, toca Compartir y después Agregar a la pantalla de inicio." },
   "Abra direto da tela de início, em tela cheia.": { es: "Ábrela directo desde la pantalla de inicio, a pantalla completa." },
   "Agora não": { es: "Ahora no" },
+  // ─── APP DE CELULAR (M1.3: casca, barra inferior) ───
+  "Seções do CRM": { es: "Secciones del CRM" },
+  "esperando uma pessoa": { es: "esperando a una persona" },
+  "atrasadas": { es: "atrasadas" },
 };
 
 /**

@@ -128,9 +128,9 @@ export function ActiveCallPanel() {
       // A posição no rodapé vem do contrato, não de uma classe escrita aqui: é
       // o mesmo número que a casca desconta (issue #1305). `right-4` continua
       // sendo deste arquivo — ninguém mais mede o canto direito.
-      // Soma a área segura de baixo (indicador de início do iPhone, no app instalado);
+      // Soma o que a casca ocupa embaixo (no celular, a barra inferior e a área segura);
       // a reserva do `<main>` soma o mesmo (`estiloDaReserva`). No desktop vale 0.
-      style={{ bottom: `calc(${PAINEL_DE_CHAMADA.distancia}px + var(--mb-area-baixo, 0px))` }}
+      style={{ bottom: `calc(${PAINEL_DE_CHAMADA.distancia}px + var(--mb-casca-baixo, 0px))` }}
       className="fixed right-4 z-50 flex w-[min(320px,calc(100%-2rem))] items-center gap-3 rounded-xl border border-border bg-popover p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-4"
     >
       <Avatar className="h-10 w-10 shrink-0">

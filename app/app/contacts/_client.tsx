@@ -1,5 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
+import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { useT } from "@/hooks/i18n/useT";
 import { Plus, MagnifyingGlass, UploadSimple, UsersThree } from "@/lib/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -63,6 +66,9 @@ export function ContactsListClient() {
   const [orderDir, setOrderDir] = useState<"asc" | "desc">("desc");
   const [limit, setLimit] = useState<number>(25);
   const [createOpen, setCreateOpen] = useState(false);
+  // O "+" do celular (aba Conversas) chega com `?criar=1`.
+  const podeCriar = usePodeCriar();
+  usePedidoDeCriar(() => setCreateOpen(true), podeCriar);
   const [importOpen, setImportOpen] = useState(false);
   const [duplicadosOpen, setDuplicadosOpen] = useState(false);
 

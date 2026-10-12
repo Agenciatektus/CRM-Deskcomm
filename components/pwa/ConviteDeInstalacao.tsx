@@ -94,7 +94,7 @@ export function ConviteDeInstalacao() {
   return (
     <aside
       aria-label={t("Convite para instalar o app")}
-      className="fixed inset-x-4 bottom-[calc(16px+var(--mb-area-baixo))] z-40 hidden items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-pop mb:flex"
+      className="fixed inset-x-4 bottom-[calc(16px+var(--mb-casca-baixo))] z-40 hidden items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-pop mb:flex"
     >
       <div className="min-w-0 flex-1">
         <p className="text-ui font-semibold text-text">{t("Instale o app")}</p>
