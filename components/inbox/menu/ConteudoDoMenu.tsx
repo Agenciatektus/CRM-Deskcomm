@@ -9,11 +9,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useT } from "@/hooks/i18n/useT";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useReopenConversation } from "@/hooks/inbox/useCloseConversation";
+import { useEncerrarComDesfazer } from "@/hooks/inbox/useEncerrarComDesfazer";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { usePauseAiAttendance } from "@/hooks/inbox/usePauseAiAttendance";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
@@ -50,6 +52,8 @@ interface Props {
   pessoais?: { podePreferir: boolean; podeBloquear: boolean };
   meuUserId: string | null;
   automaticoDaOrg?: boolean;
+  /** O menu é da conversa selecionada: mostra as teclas de atalho nos itens. */
+  selecionada?: boolean;
   onFechar: () => void;
   onAbrirDialogo: (d: DialogoDoMenu) => void;
   onDevolverFoco: (e: Event) => void;
@@ -66,6 +70,7 @@ export function ConteudoDoMenu({
   pessoais,
   meuUserId,
   automaticoDaOrg,
+  selecionada = false,
   onFechar,
   onAbrirDialogo,
   onDevolverFoco,
@@ -77,7 +82,10 @@ export function ConteudoDoMenu({
   const retomar = useResumeAiAttendance();
   const pausar = usePauseAiAttendance();
   const reabrir = useReopenConversation();
+  const encerrar = useEncerrarComDesfazer();
   const abrirDialogo = onAbrirDialogo;
+  // A tecla do atalho no item (`.mi kbd` do quadro), só quando a tecla age NESTA conversa.
+  const tecla = (letra: string) => (selecionada ? <DropdownMenuShortcut>{letra}</DropdownMenuShortcut> : null);
   // Foco no PRIMEIRO item ao abrir, venha de onde vier (o Radix só faz isso
   // quando a abertura foi pelo teclado DELE). Ref estável e menu remontado a
   // cada abertura: roda uma vez, não a cada re-render que o realtime provoca.
@@ -156,6 +164,7 @@ export function ConteudoDoMenu({
             onSelect={() => claim.mutate({ conversation_id: id, expected_assignee: conversation.assigned_to_user_id })}
           >
             <UserCircle size={16} aria-hidden /> {t("Assumir")}
+            {tecla("A")}
           </DropdownMenuItem>
         )}
         {regras.liberar && (
@@ -220,13 +229,15 @@ export function ConteudoDoMenu({
             nome={nome}
             podePreferir={pessoais.podePreferir}
             podeBloquear={pessoais.podeBloquear}
-            onBloquear={(contato) => abrirDialogo({ tipo: "bloquear", ...contato })}
+            selecionada={selecionada}
+            onFecharMenu={onFechar}
           />
         )}
         {(regras.fechar || regras.reabrir || regras.arquivar) && <DropdownMenuSeparator />}
         {regras.fechar && (
-          <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => abrirDialogo({ tipo: "fechar", conversation })}>
+          <DropdownMenuItem className={CLASSE_DO_ITEM} disabled={encerrar.fechando} onSelect={() => encerrar.fechar(conversation)}>
             <CheckCircle size={16} aria-hidden /> {t("Fechar")}
+            {tecla("E")}
           </DropdownMenuItem>
         )}
         {regras.reabrir && (
@@ -239,7 +250,7 @@ export function ConteudoDoMenu({
           </DropdownMenuItem>
         )}
         {regras.arquivar && (
-          <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => abrirDialogo({ tipo: "arquivar", conversation })}>
+          <DropdownMenuItem className={CLASSE_DO_ITEM} disabled={encerrar.arquivando} onSelect={() => encerrar.arquivar(conversation)}>
             <Archive size={16} aria-hidden /> {t("Arquivar")}
           </DropdownMenuItem>
         )}

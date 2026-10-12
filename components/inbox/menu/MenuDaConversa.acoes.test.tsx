@@ -43,23 +43,21 @@ describe("cada item chama a rota que o cabeçalho chama", () => {
     );
   });
 
-  it("Fechar pede a MESMA confirmação do cabeçalho e só então POST /close", async () => {
+  // Quadro DS: fechar e arquivar agem na hora, com "Desfazer" no aviso, o mesmo
+  // contrato do cabeçalho (`useEncerrarComDesfazer`).
+  it("Fechar vai direto ao POST /close, sem janela, igual ao cabeçalho", async () => {
     await abrir();
     fireEvent.click(item("Fechar"));
-    const janela = await screen.findByRole("alertdialog");
-    expect(within(janela).getByText("Fechar esta conversa?")).toBeInTheDocument();
-    expect(api.post).not.toHaveBeenCalled();
-    fireEvent.click(within(janela).getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith("/api/v1/conversations/conv-1/close", { expected_revision: 1 }),
     );
   });
 
-  it("Arquivar confirma e vai pelo PATCH versionado", async () => {
+  it("Arquivar vai direto pelo PATCH versionado", async () => {
     await abrir();
     fireEvent.click(item("Arquivar"));
-    const janela = await screen.findByRole("alertdialog");
-    fireEvent.click(within(janela).getByRole("button", { name: "Arquivar" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith("/api/v1/conversations/conv-1", { status: "archived", expected_revision: 1 }),
     );
@@ -154,5 +152,25 @@ describe("cada item chama a rota que o cabeçalho chama", () => {
     await abrir();
     fireEvent.click(item("Copiar telefone"));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("99999")));
+  });
+});
+
+describe("teclas de atalho no item (quadro DS, `.mi kbd`)", () => {
+  async function abrirMenu(selecionada: boolean) {
+    const { linha } = montar({}, selecionada);
+    fireEvent.contextMenu(linha, { clientX: 10, clientY: 10 });
+    await waitFor(() => expect(document.activeElement?.getAttribute("role") ?? "").toMatch(/^menuitem/));
+  }
+
+  it("na conversa SELECIONADA, o item mostra a tecla que age nela", async () => {
+    await abrirMenu(true);
+    expect(item(/Assumir/).querySelector("kbd")?.textContent).toBe("A");
+    expect(item(/Fechar/).querySelector("kbd")?.textContent).toBe("E");
+  });
+
+  it("CONTROLE: menu de outra linha não mostra tecla (a tecla agiria na selecionada)", async () => {
+    await abrirMenu(false);
+    expect(item(/Assumir/).querySelector("kbd")).toBeNull();
+    expect(item(/Fechar/).querySelector("kbd")).toBeNull();
   });
 });

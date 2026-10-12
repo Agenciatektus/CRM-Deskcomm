@@ -67,7 +67,7 @@ describe("motivo de perda opcional por funil (9044)", () => {
 });
 
 describe("T18: o desfecho do compromisso no aviso", () => {
-  it("Compareceu e Faltou usam o PATCH da agenda; Reagendar leva ao compromisso", async () => {
+  it("Compareceu e Faltou usam o PATCH da agenda; Remarcou (o rótulo do quadro DS) leva ao compromisso", async () => {
     comQuery(
       <ResultadoDoCompromisso compromissoId="ag-1" hrefDoCompromisso="/app/agenda?compromisso=ag-1" onNavegar={() => {}} />,
     );
@@ -79,12 +79,12 @@ describe("T18: o desfecho do compromisso no aviso", () => {
     await vi.waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith("/api/v1/agenda/agendamentos", { id: "ag-1", status: "no_show" }),
     );
-    expect(screen.getByRole("link", { name: "Reagendar" })).toHaveAttribute("href", "/app/agenda?compromisso=ag-1");
+    expect(screen.getByRole("link", { name: "Remarcou" })).toHaveAttribute("href", "/app/agenda?compromisso=ag-1");
   });
 
-  it("CONTROLE: sem destino disponível, não há Reagendar", () => {
+  it("CONTROLE: sem destino disponível, não há Remarcou", () => {
     comQuery(<ResultadoDoCompromisso compromissoId="ag-1" hrefDoCompromisso={null} onNavegar={() => {}} />);
-    expect(screen.queryByRole("link", { name: "Reagendar" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Remarcou" })).toBeNull();
   });
 });
 

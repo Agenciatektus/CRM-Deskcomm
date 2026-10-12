@@ -37,7 +37,8 @@ vi.mock("@/lib/api/client", () => ({
     patch: (...a: unknown[]) => patch(...a),
   },
 }));
-const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+// `toast(...)` é chamável (o aviso com Desfazer) e tem `error`/`success`.
+const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@/hooks/pipelines/useDefaultPipeline", () => ({ useDefaultPipeline: () => ({ data: null, isError: false }) }));
 vi.mock("@/hooks/inbox/useConversationTags", () => ({
@@ -106,21 +107,29 @@ beforeEach(() => {
   post.mockResolvedValue({ data: lead({ status: "won" }) });
   patch.mockReset();
   patch.mockResolvedValue({ data: lead() });
+  toast.mockClear();
   toast.success.mockClear();
   toast.error.mockClear();
 });
 
 describe("ações do negócio — aberto", () => {
-  it("Ganho pede confirmação; cancelar não chama rota, confirmar chama /win", async () => {
+  it("Ganho acontece na hora (sem janela) e o aviso oferece Desfazer, que volta à etapa pelo /move", async () => {
+    post.mockResolvedValue({ data: lead({ status: "won", updated_at: "2026-10-02T00:00:00Z" }) });
     const acoes = await abrirNegocios();
     await userEvent.click(within(acoes).getByRole("button", { name: "Ganho" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
-    expect(post).not.toHaveBeenCalled();
-
-    await userEvent.click(within(acoes).getByRole("button", { name: "Ganho" }));
-    const janela = await screen.findByRole("alertdialog");
-    await userEvent.click(within(janela).getByRole("button", { name: "Marcar como ganho" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/win", {}));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    const opcoes = toast.mock.calls.at(-1)![1] as { duration: number; action: { label: string; onClick: () => void } };
+    expect(opcoes.duration).toBe(5000);
+    expect(opcoes.action.label).toBe("Desfazer");
+    opcoes.action.onClick();
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        "/api/v1/leads/l-1/move",
+        expect.objectContaining({ stage_id: "s-1", expected_updated_at: "2026-10-02T00:00:00Z" }),
+      ),
+    );
   });
 
   it("Perdido abre a janela de perder com os motivos DO FUNIL", async () => {
@@ -200,8 +209,10 @@ describe("ações do negócio — encerrado e leitura", () => {
     expect(within(acoes).queryByRole("button", { name: "Ganho" })).toBeNull();
 
     await userEvent.click(within(acoes).getByRole("button", { name: "Reabrir" }));
-    const janela = await screen.findByRole("alertdialog");
-    await userEvent.click(within(janela).getByRole("button", { name: "Reabrir" }));
+    // Confirmação DENTRO do painel (quadro DS), sem janela modal.
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const confirmar = await screen.findByTestId("confirmar-reabrir");
+    await userEvent.click(within(confirmar).getByRole("button", { name: "Reabrir" }));
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/retomar", {}));
   });
 

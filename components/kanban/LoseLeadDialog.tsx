@@ -103,7 +103,8 @@ export function FormularioDePerda({
    */
   motivoObrigatorio?: boolean;
   onCancelar: () => void;
-  onConcluido: () => void;
+  /** Recebe o lead como a rota o devolveu (o "Desfazer" do painel usa o `updated_at`). */
+  onConcluido: (atualizado?: { updated_at?: string } | null) => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
 }) {
   const t = useT();
@@ -164,10 +165,10 @@ export function FormularioDePerda({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      await mutation.mutateAsync({ leadId, lostReason: semMotivo ? undefined : finalReason });
+      const resposta = await mutation.mutateAsync({ leadId, lostReason: semMotivo ? undefined : finalReason });
       setReasonCode("");
       setOtherText("");
-      onConcluido();
+      onConcluido(resposta?.data ?? null);
     } catch {
       // error already toasted
     }

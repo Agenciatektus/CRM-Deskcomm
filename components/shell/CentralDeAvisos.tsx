@@ -1,4 +1,5 @@
 "use client";
+import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
 import type { ComponentType } from "react";
@@ -94,9 +95,19 @@ export function CentralDeAvisos({ podeResolver, onFechar }: { podeResolver: bool
         {podeResolver && aba === "open" && itens.length > 1 && (
           <button
             type="button"
-            className="text-xs font-semibold text-accent-700 underline-offset-2 hover:underline disabled:opacity-60 dark:text-accent-300"
+            className="text-label text-accent-text underline-offset-2 hover:underline disabled:opacity-60"
             disabled={resolverTodos.isPending}
-            onClick={() => resolverTodos.mutate()}
+            onClick={() => {
+              // Os abertos que a tela carregou: são eles que o Desfazer reabre
+              // (a rota reabre um por vez; acima de 50 a lista não traz todos).
+              const ids = (abertos.data?.items ?? []).map((i) => i.id);
+              resolverTodos.mutate(undefined, {
+                onSuccess: () =>
+                  avisarComDesfazer(t("Avisos marcados como resolvidos."), t("Desfazer"), () =>
+                    Promise.all(ids.map((id) => atualizar.mutateAsync({ id, status: "open" }))),
+                  ),
+              });
+            }}
           >
             {t("Marcar todos resolvidos")}
           </button>

@@ -43,7 +43,7 @@ export function rede(api: Record<"get" | "post" | "patch" | "delete", Mock>) {
   api.delete.mockResolvedValue(undefined);
 }
 
-function Bancada({ conversa }: { conversa: ConversationWithContact }) {
+function Bancada({ conversa, selecionada = false }: { conversa: ConversationWithContact; selecionada?: boolean }) {
   const menu = useMenuDaConversa();
   return (
     <>
@@ -63,17 +63,18 @@ function Bancada({ conversa }: { conversa: ConversationWithContact }) {
         onFechar={menu.fechar}
         meuUserId="u1"
         automaticoDaOrg
+        selecionada={selecionada}
       />
     </>
   );
 }
 
-export function montar(extra: Partial<ConversationWithContact> = {}) {
+export function montar(extra: Partial<ConversationWithContact> = {}, selecionada = false) {
   const conversa = { ...conversaDeExemplo.conversation, ...extra } as ConversationWithContact;
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <Bancada conversa={conversa} />
+      <Bancada conversa={conversa} selecionada={selecionada} />
     </QueryClientProvider>,
   );
   return { linha: document.querySelector<HTMLElement>("[data-conversation-id]")! };

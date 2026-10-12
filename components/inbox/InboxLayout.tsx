@@ -4,7 +4,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
-import { useCloseConversation } from "@/hooks/inbox/useCloseConversation";
+import { useEncerrarComDesfazer } from "@/hooks/inbox/useEncerrarComDesfazer";
 import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
 import {
   useConversationsRealtime,
@@ -312,7 +312,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const colunas = colunasDoCelular(Boolean(selectedId));
 
   const claim = useClaimConversation();
-  const close = useCloseConversation();
+  const encerrar = useEncerrarComDesfazer();
 
   // A leitura da conversa aberta é do upstream e fica: sem ela o contador de
   // não-lidas nunca zera para quem abre a conversa.
@@ -352,10 +352,11 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       expected_assignee: selectedConversation.assigned_to_user_id,
     });
   }, [claim, selectedConversation]);
+  // "e": fecha na hora, com "Desfazer" no aviso (quadro DS).
   const handleClose = useCallback(() => {
     if (!selectedConversation) return;
-    close.mutate({ conversation_id: selectedConversation.id });
-  }, [close, selectedConversation]);
+    encerrar.fechar(selectedConversation);
+  }, [encerrar, selectedConversation]);
 
   // Altura da grade: a conta desconta TUDO que fica acima e abaixo dela.
   //   3.5rem            TopBar (`h-14`, em components/shell/TopBar.tsx)

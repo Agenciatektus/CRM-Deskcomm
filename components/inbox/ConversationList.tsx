@@ -240,6 +240,7 @@ export function ConversationList({
           onFechar={menu.fechar}
           meuUserId={meuUserId}
           automaticoDaOrg={automaticoDaOrg.data}
+          selecionada={!!menu.alvo && menu.alvo.id === selectedId}
         />
       )}
     </div>

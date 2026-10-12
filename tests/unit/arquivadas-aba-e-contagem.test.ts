@@ -108,15 +108,15 @@ describe("contagem de arquivadas", () => {
 });
 
 describe("o botão de arquivar", () => {
-  it("oferece arquivar com confirmação e some quando já está arquivada", () => {
-    // Desde o visual v2 o cabeçalho é dividido: a condição mora nele, o item no
-    // menu "Mais" e a confirmação num componente próprio. Os três juntos são o
-    // botão de arquivar.
+  it("oferece arquivar com Desfazer e some quando já está arquivada", () => {
+    // Desde a etapa 2 do DS arquivar age na hora e o aviso oferece Desfazer
+    // (`useEncerrarComDesfazer`), no lugar da janela de confirmação.
     const header = fonte("components/inbox/ConversationHeader.tsx");
     const mais = fonte("components/inbox/cabecalho/MaisAcoes.tsx");
-    const confirmacao = fonte("components/inbox/cabecalho/ConfirmacoesDaConversa.tsx");
+    const desfazer = fonte("hooks/inbox/useEncerrarComDesfazer.ts");
     expect(mais).toContain('t("Arquivar")');
-    expect(confirmacao).toContain('t("Arquivar esta conversa?")');
+    expect(desfazer).toContain('t("Conversa arquivada.")');
+    expect(desfazer).toContain('t("Desfazer")');
     expect(header).toMatch(/status !== "archived"/);
   });
 

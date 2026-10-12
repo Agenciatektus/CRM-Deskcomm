@@ -91,7 +91,8 @@ export function FormularioDeOutroFunil({
   leadId: string;
   pipelineId: string;
   onCancelar: () => void;
-  onConcluido: () => void;
+  /** Recebe a resposta do clone: o negócio NOVO e a origem encerrada como transferida. */
+  onConcluido: (resultado?: { lead?: { id: string; pipeline_id?: string }; origem?: { updated_at?: string } } | null) => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
 }) {
   const t = useT();
@@ -104,9 +105,9 @@ export function FormularioDeOutroFunil({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      await mutation.mutateAsync({ leadId, targetPipelineId });
+      const resposta = await mutation.mutateAsync({ leadId, targetPipelineId });
       setTargetPipelineId("");
-      onConcluido();
+      onConcluido(resposta?.data ?? null);
     } catch {
       // error already toasted
     }

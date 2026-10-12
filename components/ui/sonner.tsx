@@ -1,26 +1,31 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
+/**
+ * O "Aviso com Desfazer" do quadro DS, INVERTIDO por tema: no claro, cartão na
+ * cor do texto (escuro) com letra clara; no escuro, cartão quase branco com
+ * letra escura. É o mesmo par de tokens (`bg-text text-surface`), que cada tema
+ * inverte sozinho. A ação (Desfazer) vem em 700: no claro a marca clareada
+ * (`color-mix(accent 45%, branco)`); no escuro o azul do primary Verdash na
+ * parada 700 (o `.app.dark .toast button` do Main usa o accent, 3,5:1 sobre o
+ * cartão claro; a 700 dá 5,4:1 e passa AA). Embaixo, no centro, 5 segundos.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
       className="toaster group"
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast !gap-3.5 !rounded-lg !border-0 !bg-text !py-2.5 !pl-4 !pr-2.5 !text-ui !text-surface !shadow-pop",
+          description: "!text-surface/80",
           actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "!h-auto !bg-transparent !px-2 !py-1 !text-ui !font-bold !text-[color-mix(in_oklch,var(--color-accent)_45%,white)] dark:!text-accent-700 hover:!bg-[oklch(0.5_0_0/0.18)]",
+          cancelButton: "!bg-transparent !text-surface/80",
+          closeButton: "!border-0 !bg-text !text-surface",
         },
       }}
       {...props}

@@ -8,7 +8,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 
 /**
- * "Compareceu" / "Faltou" / "Reagendar" no aviso `appointment_outcome_required`
+ * "Compareceu" / "Faltou" / "Remarcou" no aviso `appointment_outcome_required`
  * do sino (T18 da auditoria do visual v2).
  *
  * Sem rota nova: é o MESMO `PATCH /api/v1/agenda/agendamentos` que o detalhe do
@@ -19,7 +19,7 @@ import { apiClient } from "@/lib/api/client";
  * os avisos do compromisso quando o status vira `completed` ou `no_show`), então
  * o aviso some sem um segundo pedido.
  *
- * "Reagendar" leva ao compromisso na Agenda, onde a remarcação tem as regras de
+ * "Remarcou" (o rótulo do quadro DS) leva ao compromisso na Agenda, onde a remarcação tem as regras de
  * horário livre; remarcar dali também fecha o aviso (a revisão muda).
  */
 export function ResultadoDoCompromisso({
@@ -65,7 +65,7 @@ export function ResultadoDoCompromisso({
       {hrefDoCompromisso && (
         <Button asChild size="sm" variant="ghost" className="h-7 px-2.5 text-xs">
           <Link href={hrefDoCompromisso} onClick={onNavegar}>
-            {t("Reagendar")}
+            {t("Remarcou")}
           </Link>
         </Button>
       )}
