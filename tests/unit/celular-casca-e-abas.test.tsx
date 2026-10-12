@@ -6,7 +6,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { abaDaRota, destinoDeCriar, ehRaizDeAba, ehTelaCheia, opcoesDeCriar } from "@/lib/mobile/abas";
+import { abaDaRota, destinoDeCriar, ehRaizDeAba, ehTelaCheia, opcoesDeCriar, voltarDaRota } from "@/lib/mobile/abas";
 
 const nav = vi.hoisted(() => ({ rota: "/app/inbox", busca: new URLSearchParams(), push: vi.fn(), back: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -53,6 +53,14 @@ describe("rotas do app de celular", () => {
     expect(abaDaRota("/app/ai/inbox")).toBe("avisos");
     expect(abaDaRota("/app/ai/agents")).toBe("mais");
     expect(abaDaRota("/app/settings/profile")).toBe("mais");
+  });
+
+  it("o voltar de quem chegou por link: Ajustes volta à lista de seções", () => {
+    expect(voltarDaRota("/app/settings/profile")).toBe("/app/settings");
+    expect(voltarDaRota("/app/settings/tenant/pipelines")).toBe("/app/settings");
+    expect(voltarDaRota("/app/settings")).toBe("/app");
+    expect(voltarDaRota("/app/team")).toBe("/app");
+    expect(voltarDaRota("/app/leads/l-1")).toBe("/app/kanban");
   });
 
   it("começo de aba x tela empilhada", () => {

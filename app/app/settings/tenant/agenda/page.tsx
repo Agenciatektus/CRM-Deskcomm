@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -92,37 +93,37 @@ export default async function TiposDeAgendamentoPage() {
   const nomes = await nomesDosAtendentes((pessoas ?? []).map((p) => String(p.user_id)));
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{t("Tipos de agendamento")}</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          {t("O que se pode marcar, quanto dura e quem atende. É isto que a tela de marcar e o agente de IA oferecem ao cliente.")}
-        </p>
-      </header>
-      <TiposDeAgendamentoClient
-        tiposIniciais={(tipos ?? []) as TipoRow[]}
-        erroDeLeitura={erroTipos ? erroTipos.message : null}
-        pessoas={(pessoas ?? []).map((p) => ({
-          id: String(p.user_id),
-          papel: String(p.role),
-          nome:
-            nomes.get(String(p.user_id)) ?? `${String(p.user_id).slice(0, 8)} · ${String(p.role)}`,
-        }))}
-        usuarioAtualId={user.id}
-        podeConfigurarGoogle={ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent}
-        podeEditar={podeEditar}
-        clientePelaAgendaLigado={clientePelaAgendaLigado(org?.settings)}
-        // A OPÇÃO DA AGENDA (migration 0343, issue #978): LIGADA por padrão, e a
-        // régua de "ligado" é a ausência da chave — quem já instalou está no
-        // padrão sem ter nada gravado. Mesma leitura do banco.
-        colegasPodemMexerNaAgendaLigado={colegasPodemMexerNaAgendaLigado(org?.settings)}
-        // `manager` aqui, e não o `admin` de clientes: esta é regra da AGENDA, a
-        // mesma tela dos prazos, e não reescreve dado nenhum. A RPC cobra de novo.
-        podeMudarAgendaDosColegas={ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager}
-        // `admin`, e não `manager` como os prazos ao lado: ligar reescreve as
-        // etiquetas de todo contato com histórico. A RPC cobra de novo.
-        podeLigarClientePelaAgenda={ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin}
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Tipos de agendamento")}
+        descricao={t("O que se pode marcar, quanto dura e quem atende. É isto que a tela de marcar e o agente de IA oferecem ao cliente.")}
       />
-    </div>
+      <SecaoDaPagina>
+        <TiposDeAgendamentoClient
+          tiposIniciais={(tipos ?? []) as TipoRow[]}
+          erroDeLeitura={erroTipos ? erroTipos.message : null}
+          pessoas={(pessoas ?? []).map((p) => ({
+            id: String(p.user_id),
+            papel: String(p.role),
+            nome:
+              nomes.get(String(p.user_id)) ?? `${String(p.user_id).slice(0, 8)} · ${String(p.role)}`,
+          }))}
+          usuarioAtualId={user.id}
+          podeConfigurarGoogle={ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent}
+          podeEditar={podeEditar}
+          clientePelaAgendaLigado={clientePelaAgendaLigado(org?.settings)}
+          // A OPÇÃO DA AGENDA (migration 0343, issue #978): LIGADA por padrão, e a
+          // régua de "ligado" é a ausência da chave — quem já instalou está no
+          // padrão sem ter nada gravado. Mesma leitura do banco.
+          colegasPodemMexerNaAgendaLigado={colegasPodemMexerNaAgendaLigado(org?.settings)}
+          // `manager` aqui, e não o `admin` de clientes: esta é regra da AGENDA, a
+          // mesma tela dos prazos, e não reescreve dado nenhum. A RPC cobra de novo.
+          podeMudarAgendaDosColegas={ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager}
+          // `admin`, e não `manager` como os prazos ao lado: ligar reescreve as
+          // etiquetas de todo contato com histórico. A RPC cobra de novo.
+          podeLigarClientePelaAgenda={ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin}
+        />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

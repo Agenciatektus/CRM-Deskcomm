@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 
@@ -102,7 +103,7 @@ export function AuditClient() {
       </Card>
 
       <Card>
-        <Table>
+        <Table className={TABELA_EMPILHADA}>
           <TableHeader>
             <TableRow>
               <TableHead>{t("Quando")}</TableHead>
@@ -136,7 +137,7 @@ export function AuditClient() {
                   <TableCell className="whitespace-nowrap text-xs">
                     {fmtDate(r.created_at, tagDoIdioma)}
                   </TableCell>
-                  <TableCell className="text-xs font-mono">
+                  <TableCell data-rotulo={t("Ator")} className="text-xs font-mono">
                     {r.acting_as_platform_admin
                       ? "platform_admin"
                       : r.actor_user_id
@@ -145,15 +146,15 @@ export function AuditClient() {
                           ? `token:${r.actor_api_token_id.slice(0, 8)}`
                           : "system"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{r.action}</TableCell>
-                  <TableCell className="font-mono text-xs">
+                  <TableCell data-rotulo={t("Ação")} className="font-mono text-xs">{r.action}</TableCell>
+                  <TableCell data-rotulo={t("Recurso")} className="font-mono text-xs">
                     {r.resource_type ?? "—"}
                     {r.resource_id ? `:${r.resource_id.slice(0, 8)}` : ""}
                   </TableCell>
-                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                  <TableCell data-rotulo="Request ID" className="font-mono text-[10px] text-muted-foreground">
                     {r.request_id ? r.request_id.slice(0, 8) : "—"}
                   </TableCell>
-                  <TableCell className="font-mono text-[10px] text-muted-foreground">
+                  <TableCell data-rotulo="Metadata" className="font-mono text-[10px] text-muted-foreground">
                     {truncJson(r.metadata)}
                   </TableCell>
                 </TableRow>

@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useState } from "react";
 import { toast } from "sonner";
@@ -91,7 +92,7 @@ export function TeamInvitesClient({ canManage }: Props) {
         <p className="text-sm text-muted-foreground">{t("Nenhum convite enviado.")}</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
-          <Table>
+          <Table className={TABELA_EMPILHADA}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("E-mail")}</TableHead>
@@ -111,10 +112,10 @@ export function TeamInvitesClient({ canManage }: Props) {
                 return (
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">{inv.email}</TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo="Role">
                       <Badge variant="secondary">{inv.role}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell data-rotulo={t("Interface")} className="text-sm">
                       {inv.interface_settings?.destinos
                         ? t("Personalizada")
                         : inv.interface_settings?.preset === "simplificada"
@@ -124,7 +125,7 @@ export function TeamInvitesClient({ canManage }: Props) {
                     <TableCell>
                       <Badge variant={BADGE_VARIANT[inv.status]}>{STATUS_LABEL[inv.status]}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo={t("E-mail enviado")}>
                       {inv.email_dispatched ? (
                         <span className="text-sm text-muted-foreground">{t("Sim")}</span>
                       ) : (
@@ -147,7 +148,7 @@ export function TeamInvitesClient({ canManage }: Props) {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-rotulo={t("Enviado em")} className="text-sm text-muted-foreground">
                       {new Date(inv.last_sent_at).toLocaleString(tagDoIdioma)}
                       {inv.resend_count > 0 ? (
                         <span className="ml-1 text-xs">
@@ -155,12 +156,12 @@ export function TeamInvitesClient({ canManage }: Props) {
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-rotulo={t("Expira em")} className="text-sm text-muted-foreground">
                       {inv.status === "aceito"
                         ? "—"
                         : new Date(inv.expires_at).toLocaleString(tagDoIdioma)}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-rotulo={t("Convidado por")} className="text-sm text-muted-foreground">
                       {inv.inviter_name ?? "—"}
                     </TableCell>
                     {canManage ? (

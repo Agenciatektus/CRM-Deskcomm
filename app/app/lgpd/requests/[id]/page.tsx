@@ -1,3 +1,4 @@
+import { Pagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -23,8 +24,8 @@ export default async function LgpdRequestDetailPage({
   if (!isAllowed) redirect("/app");
 
   return (
-    <div className="flex h-full flex-col gap-0 p-6">
+    <Pagina className="mb:px-4 mb:pt-3">
       <LgpdRequestDetail id={id} />
-    </div>
+    </Pagina>
   );
 }

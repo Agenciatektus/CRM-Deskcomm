@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { MemberInterfaceDialog } from "@/components/team/MemberInterfaceDialog";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
@@ -74,7 +75,7 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
   return (
     <>
       <div className="rounded-md border">
-        <Table>
+        <Table className={TABELA_EMPILHADA}>
           <TableHeader>
             <TableRow>
               <TableHead>{t("Membro")}</TableHead>
@@ -94,7 +95,7 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
                   </div>
                   {m.email ? <div className="text-xs text-muted-foreground">{m.email}</div> : null}
                 </TableCell>
-                <TableCell>
+                <TableCell data-rotulo="Role">
                   {canManage && m.user_id !== currentUserId ? (
                     <Select
                       value={m.role}
@@ -120,7 +121,7 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
                     <Badge variant="secondary">{m.role}</Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell data-rotulo={t("Interface")}>
                   {canManage ? (
                     <Button
                       variant="outline"
@@ -160,7 +161,7 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
                     <Badge variant="outline">{t("Pendente")}</Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell data-rotulo={t("Última atividade")} className="text-sm text-muted-foreground">
                   {m.last_sign_in_at
                     ? new Date(m.last_sign_in_at).toLocaleString(tagDoIdioma)
                     : "—"}

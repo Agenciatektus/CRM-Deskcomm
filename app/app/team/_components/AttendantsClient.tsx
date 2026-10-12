@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
@@ -490,7 +491,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
             {t("Nenhum atendente na organização. Convide membros com papel de atendente ou superior.")}
           </p>
         ) : (
-          <Table>
+          <Table className={TABELA_EMPILHADA}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("Atendente")}</TableHead>
@@ -520,12 +521,12 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                         <PresenceBadge attendant={a} />
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo={t("Carga")}>
                       <span className={load >= capacity ? "font-medium text-destructive" : ""}>
                         {load}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo={t("Capacidade")}>
                       {canManage ? (
                         <Input
                           type="number"
@@ -545,7 +546,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                         capacity
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-rotulo={t("Horário")} className="text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <span>{summarizeSchedule(windows, t)}</span>
                         {canManage ? (
@@ -562,7 +563,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                       </div>
                     </TableCell>
                     {canManage ? (
-                      <TableCell>
+                      <TableCell data-rotulo={t("Disponível")}>
                         <Switch
                           checked={!!a.availability?.is_available}
                           aria-label={`Disponibilidade de ${a.name}`}

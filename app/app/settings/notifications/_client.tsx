@@ -44,7 +44,7 @@ export function NotificationPrefsClient() {
   }
 
   return (
-    <Card className="p-0">
+    <Card className="overflow-x-auto p-0">
       <table className="w-full text-sm">
         <thead className="border-b">
           <tr>

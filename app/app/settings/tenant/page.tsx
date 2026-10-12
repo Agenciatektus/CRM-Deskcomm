@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -48,43 +49,43 @@ export default async function TenantSettingsPage() {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Organização", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir("Dados da empresa, retenção de mídia, DPO. Admin only.", idioma)}
-        </p>
-      </header>
-      {row && (
-        <TenantForm
-          initial={{
-            display_name: row.display_name,
-            legal_name: row.legal_name,
-            cnpj: row.cnpj,
-            // `null` na coluna é Brasil (migration 0277): o seletor não tem
-            // opção vazia, então o país padrão aparece EXPLÍCITO. Salvar sem
-            // trocar nada grava `BR` onde estava `null` — mesmo país, mesma
-            // lei, mesmo calendário; o que muda é a linha deixar de depender
-            // do default implícito.
-            country: row.country ?? "BR",
-            timezone: row.timezone,
-            // `en-US` saiu da lista (nunca teve tradução). Uma linha antiga
-            // com ele cai no padrão em vez de quebrar a tela.
-            locale: normalizarIdioma(row.locale),
-            currency: moedaServidaOu(row.currency),
-            media_retention_days: row.media_retention_days,
-            dpo_email: row.dpo_email,
-            privacy_policy_url: row.privacy_policy_url,
-          }}
-        />
-      )}
-      {row && (
-        <InterfaceDaEmpresaForm
-          initial={row.interface_settings}
-          role={activeOrg.role}
-        />
-      )}
-      {row && <ZonaDePerigoDaOrganizacao displayName={row.display_name} />}
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Organização", idioma)}
+        descricao={traduzir("Dados da empresa, retenção de mídia, DPO. Admin only.", idioma)}
+      />
+      <SecaoDaPagina>
+        {row && (
+          <TenantForm
+            initial={{
+              display_name: row.display_name,
+              legal_name: row.legal_name,
+              cnpj: row.cnpj,
+              // `null` na coluna é Brasil (migration 0277): o seletor não tem
+              // opção vazia, então o país padrão aparece EXPLÍCITO. Salvar sem
+              // trocar nada grava `BR` onde estava `null` — mesmo país, mesma
+              // lei, mesmo calendário; o que muda é a linha deixar de depender
+              // do default implícito.
+              country: row.country ?? "BR",
+              timezone: row.timezone,
+              // `en-US` saiu da lista (nunca teve tradução). Uma linha antiga
+              // com ele cai no padrão em vez de quebrar a tela.
+              locale: normalizarIdioma(row.locale),
+              currency: moedaServidaOu(row.currency),
+              media_retention_days: row.media_retention_days,
+              dpo_email: row.dpo_email,
+              privacy_policy_url: row.privacy_policy_url,
+            }}
+          />
+        )}
+        {row && (
+          <InterfaceDaEmpresaForm
+            initial={row.interface_settings}
+            role={activeOrg.role}
+          />
+        )}
+        {row && <ZonaDePerigoDaOrganizacao displayName={row.display_name} />}
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

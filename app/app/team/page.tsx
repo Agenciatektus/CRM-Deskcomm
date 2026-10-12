@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -47,23 +48,21 @@ export default async function TeamPage({
   const isManager = !!activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-title-lg">{t("Equipe")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("Gestão de membros, roles e atendimento do tenant.")}
-          </p>
-        </div>
-        {isAdmin ? (
-          <Button asChild className="shrink-0">
-            <Link href="/app/team/invite">{t("Convidar membros")}</Link>
-          </Button>
-        ) : null}
-      </header>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Equipe")}
+        descricao={t("Gestão de membros, roles e atendimento do tenant.")}
+        acoes={
+          isAdmin ? (
+            <Button asChild className="shrink-0">
+              <Link href="/app/team/invite">{t("Convidar membros")}</Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      <Tabs defaultValue={abaInicial} className="flex flex-1 flex-col">
-        <TabsList>
+      <Tabs defaultValue={abaInicial} className="flex flex-1 flex-col mb:px-4">
+        <TabsList className="mb:w-full">
           <TabsTrigger value="members">{t("Membros")}</TabsTrigger>
           <TabsTrigger value="attendants">{t("Atendimento")}</TabsTrigger>
         </TabsList>
@@ -101,6 +100,6 @@ export default async function TeamPage({
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </Pagina>
   );
 }

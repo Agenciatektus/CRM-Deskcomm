@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -133,7 +134,7 @@ export function LinksRastreaveis({
         </p>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <thead>
             <tr>
               {[t("Nome"), t("Cliques"), t("Contatos"), t("Negócios"), t("Estado"), t("Ação")].map(
@@ -151,9 +152,9 @@ export function LinksRastreaveis({
               return (
                 <tr key={l.id} className="border-t">
                   <td className="p-2">{l.name}</td>
-                  <td>{metricas ? (m?.clicks ?? 0) : "—"}</td>
-                  <td>{metricas ? (m?.contacts ?? 0) : "—"}</td>
-                  <td>{metricas ? (m?.leads ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Cliques")}>{metricas ? (m?.clicks ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Contatos")}>{metricas ? (m?.contacts ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Negócios")}>{metricas ? (m?.leads ?? 0) : "—"}</td>
                   <td>{t(l.enabled ? "Ativo" : "Desativado")}</td>
                   <td>
                     <Button

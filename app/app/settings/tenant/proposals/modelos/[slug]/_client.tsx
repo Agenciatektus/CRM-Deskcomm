@@ -1,4 +1,5 @@
 "use client";
+import { Pagina } from "@/components/pagina";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -125,7 +126,7 @@ export function EditorDeModelo({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-5xl gap-6 p-6 lg:grid-cols-[1fr_16rem]">
+    <Pagina className="grid max-w-5xl gap-6 mb:px-4 mb:pt-3 lg:grid-cols-[1fr_16rem]">
       <div className="space-y-4">
         {importado && modelo.sections.length === 0 ? (
           <p role="alert" className="text-sm text-amber-800">{t("O modelo importado não está mais disponível. Envie o arquivo de novo.")}</p>
@@ -208,6 +209,6 @@ export function EditorDeModelo({ slug }: { slug: string }) {
           ))}
         </ul>
       </aside>
-    </div>
+    </Pagina>
   );
 }

@@ -4,7 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { useT } from "@/hooks/i18n/useT";
-import { abaDaRota, conversaAberta, ehRaizDeAba, RAIZ_DA_ABA } from "@/lib/mobile/abas";
+import { abaDaRota, conversaAberta, ehRaizDeAba, voltarDaRota } from "@/lib/mobile/abas";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { destinoDaRota } from "@/lib/navigation/rota-atual";
 import { usePilhaDoApp } from "@/lib/mobile/pilha";
@@ -69,8 +69,7 @@ function CabecalhoDoCelular() {
     return <CabecalhoGrande titulo={t(ROTULOS_DAS_ABAS[aba])} acoes={acoes} />;
   }
   const destino = destinoDaRota(rota);
-  const voltarPara = aba === "mais" ? "/app" : RAIZ_DA_ABA[aba];
-  return <BarraDeTela titulo={destino ? t(destino.label) : ""} voltarPara={voltarPara} acoes={<BuscaDoCelular />} />;
+  return <BarraDeTela titulo={destino ? t(destino.label) : ""} voltarPara={voltarDaRota(rota)} acoes={<BuscaDoCelular />} />;
 }
 
 /**

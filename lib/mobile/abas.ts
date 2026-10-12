@@ -32,6 +32,17 @@ export function ehRaizDeAba(rota: string): boolean {
   return Object.values(RAIZ_DA_ABA).includes(rota);
 }
 
+/**
+ * Para onde o voltar leva quem chegou por link (sem tela do app atrás). Uma tela de
+ * Ajustes volta à lista de seções (`/app/settings`); o resto do "Mais" volta ao
+ * começo do app, e as outras abas ao começo delas.
+ */
+export function voltarDaRota(rota: string): string {
+  const aba = abaDaRota(rota);
+  if (aba !== "mais") return RAIZ_DA_ABA[aba];
+  return rota.startsWith("/app/settings/") ? "/app/settings" : "/app";
+}
+
 /** A conversa aberta: a Inbox com `?id=` ou `/app/inbox/<id>`. Ela desenha a própria barra. */
 export function conversaAberta(rota: string, idNaUrl: string | null): boolean {
   return /^\/app\/inbox\/[^/]+$/.test(rota) || (rota === "/app/inbox" && !!idNaUrl);

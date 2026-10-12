@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -225,7 +226,7 @@ export function RequestsTable() {
 
       {/* Table */}
       <Card className="overflow-hidden">
-        <Table>
+        <Table className={TABELA_EMPILHADA}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[90px]">ID</TableHead>
@@ -292,18 +293,18 @@ export function RequestsTable() {
                         {t(TYPE_LABELS[r.request_type] ?? r.request_type)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-[140px] truncate font-mono text-xs">
+                    <TableCell data-rotulo={t("Sujeito")} className="max-w-[140px] truncate font-mono text-xs">
                       {subject}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    <TableCell data-rotulo={t("Recebido")} className="whitespace-nowrap text-xs text-muted-foreground">
                       {fmtRelative(r.received_at, t)}
                     </TableCell>
-                    <TableCell
+                    <TableCell data-rotulo={t("Vence")}
                       className={`whitespace-nowrap text-xs font-medium ${due.urgent ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
                     >
                       {due.label}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo="SLA">
                       <Badge variant={SLA_VARIANT[r.sla_bucket]} className="text-xs">
                         {t(SLA_LABELS[r.sla_bucket])}
                       </Badge>

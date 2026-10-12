@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 /**
  * Nuvemshop integration status page.
  *
@@ -55,22 +56,21 @@ export default async function NuvemshopIntegrationPage() {
   const isAdmin = activeOrg?.role === "admin" || (user?.is_platform_admin === true && !user.support);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <Pagina className="max-w-3xl">
       <Suspense fallback={null}>
         <StatusToast />
       </Suspense>
 
-      <header className="flex items-start gap-4">
-        <div className="rounded-md border border-border bg-surface p-3">
-          <Storefront size={28} weight="duotone" className="text-muted-foreground" />
-        </div>
-        <div>
-          <h1 className="text-title-lg">Nuvemshop</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {traduzir("Sincroniza pedidos, produtos e clientes via OAuth + webhooks.", idioma)}
-          </p>
-        </div>
-      </header>
+      <CabecalhoDaPagina
+        titulo={
+          <span className="flex items-center gap-3">
+            <Storefront size={28} weight="duotone" className="shrink-0 text-muted-foreground" aria-hidden />
+            Nuvemshop
+          </span>
+        }
+        descricao={traduzir("Sincroniza pedidos, produtos e clientes via OAuth + webhooks.", idioma)}
+      />
+      <SecaoDaPagina className="gap-6">
 
       {!configured ? (
         <Card>
@@ -158,6 +158,7 @@ export default async function NuvemshopIntegrationPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
