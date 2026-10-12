@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -55,6 +57,8 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
     setAberturas((n) => n + 1);
     setFormAberto(true);
   }
+  // O "+" do celular chega com `?criar=1`.
+  usePedidoDeCriar(() => abrirNova(), podeEditar);
 
   function abrirEdicao(tarefa: Tarefa) {
     setEmEdicao(tarefa);

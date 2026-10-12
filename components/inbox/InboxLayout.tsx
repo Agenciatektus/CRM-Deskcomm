@@ -403,6 +403,9 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         // dele), e o `pb-2` (`--space-2`) quando não há. Sem respiro em cima: o cartão encosta no
         // topo e na barra lateral, como o `.work` do protótipo.
         "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao largo:grid-cols-[300px_minmax(0,1fr)]",
+        // No celular a altura sai da casca do app: o topo que está na tela (nenhum com
+        // a conversa aberta, que tem barra própria) e a barra inferior (que some nela).
+        "mb:h-[calc(100dvh-var(--mb-casca-topo)-var(--mb-casca-baixo)-var(--space-2))]",
         ferramentas.painelLead
           ? "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px-var(--largura-do-painel))))_minmax(0,1fr)_var(--largura-do-painel)]"
           : "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px)))_minmax(0,1fr)]",

@@ -40,6 +40,17 @@
    `xl:grid-cols-*` e o `xl:hidden` no desktop. */
 @custom-variant mb (@media (max-width: 759px));
 
+/* O que a casca do celular ocupa, lido por quem precisa descontar (a altura da Inbox,
+   o fim da página, os toasts). Só abaixo de 760px: acima, as peças nem aparecem. */
+@media (max-width: 759px) {
+  body:has([data-barra-inferior]) {
+    --mb-casca-baixo: var(--mb-barra-inferior);
+  }
+  body:has([data-cabecalho-do-celular]) {
+    --mb-casca-topo: var(--mb-titulo-altura);
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    DeskcommCRM — Design System tokens (Sage palette · density Aerada)
    Source of truth: /app/design/lib/tokens.ts (PALETTES.sage)
@@ -348,6 +359,13 @@
   --mb-area-baixo: env(safe-area-inset-bottom, 0px);
   --mb-area-esquerda: env(safe-area-inset-left, 0px);
   --mb-area-direita: env(safe-area-inset-right, 0px);
+  /* A casca do app de celular (components/mobile/CascaDoCelular): quanto o topo e o
+     rodapé ocupam AGORA. Sem barra inferior, o de baixo é só a área segura; com ela,
+     a barra inteira (6px + aba + 6px + área segura, o `.tb` do protótipo). As regras
+     com `:has()` logo abaixo trocam os valores quando as peças estão na tela. */
+  --mb-barra-inferior: calc(var(--mb-aba-altura) + 12px + var(--mb-area-baixo));
+  --mb-casca-topo: 0px;
+  --mb-casca-baixo: var(--mb-area-baixo);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

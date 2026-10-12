@@ -44,6 +44,8 @@ vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
 // medir o rodapé, e não a rede delas.
 vi.mock("@/components/shell/Sidebar", () => ({ Sidebar: () => null }));
 vi.mock("@/components/shell/TopBar", () => ({ TopBar: () => null }));
+// A casca do celular (M1.3) usa o roteador, que este teste não monta; como o topo, fica de fora.
+vi.mock("@/components/mobile/CascaDoCelular", () => ({ CascaDoCelular: () => null }));
 vi.mock("@/components/shell/BarraDeProgressoNavegacao", () => ({
   BarraDeProgressoNavegacao: () => null,
 }));
