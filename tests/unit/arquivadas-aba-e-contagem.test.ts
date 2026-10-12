@@ -82,9 +82,10 @@ describe("aba Arquivadas — filtro da lista", () => {
 
 describe("aba Arquivadas — rótulo e badge", () => {
   it("tem rótulo próprio em pt-BR e no tipo de aba", () => {
-    const filtros = fonte("components/inbox/InboxFilters.tsx");
-    expect(filtros).toContain('{ value: "archived", label: "Arquivadas" }');
-    expect(filtros).toContain('"archived"');
+    // As abas moraram em InboxFilters até a M2.2 do celular; hoje em `filtros/abas-da-inbox.ts`.
+    const abas = fonte("components/inbox/filtros/abas-da-inbox.ts");
+    expect(abas).toContain('{ value: "archived", label: "Arquivadas" }');
+    expect(abas).toContain('"archived"');
   });
 
   it("o badge lê a contagem archived (não a de fechadas)", () => {

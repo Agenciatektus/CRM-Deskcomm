@@ -132,6 +132,8 @@ export interface ConversationsFilters {
   is_group?: boolean;
   /** "Sem próximo passo" (migration 9047): contato sem tarefa aberta. */
   sem_passo?: boolean;
+  /** O TIPO de canal (migration 9049): whatsapp, instagram ou facebook. */
+  canal?: string;
 }
 
 interface ListResponse {
@@ -180,6 +182,7 @@ export function useConversationsRealtime(
       if (filters.tagMode === "ou") qs.set("modo", "ou");
       if (filters.is_group !== undefined) qs.set("is_group", filters.is_group ? "true" : "false");
       if (filters.sem_passo) qs.set("sem_passo", "true");
+      if (filters.canal) qs.set("canal", filters.canal);
       if (pageParam) qs.set("cursor", pageParam);
       qs.set("limit", "50");
       try {

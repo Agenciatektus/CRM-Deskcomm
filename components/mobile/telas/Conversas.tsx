@@ -1,12 +1,14 @@
 "use client";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { InboxTab } from "@/components/inbox/InboxFilters";
 import { useT } from "@/hooks/i18n/useT";
-import { Archive, CaretLeft, CaretRight, CheckCircle, X } from "@/lib/ui/icons";
+import type { TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
+import { Archive, CaretLeft, CaretRight, CheckCircle, Funnel, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { CampoDeBusca } from "../CampoDeBusca";
+import { FolhaDeFiltros } from "./FolhaDeFiltros";
 
 export interface AbaComContagem {
   value: InboxTab;
@@ -132,5 +134,52 @@ export function FiltrosDaInboxNoCelular({
           );
         })}
     </div>
+  );
+}
+
+/** Os tipos de canal a oferecer: WhatsApp sempre; Instagram e Facebook só conectados. */
+export function tiposDeCanalDisponiveis(provedores: (string | undefined)[]): TipoDeCanal[] {
+  return [
+    "whatsapp",
+    ...(provedores.includes("instagram") ? (["instagram"] as const) : []),
+    ...(provedores.includes("zernio_social") ? (["facebook"] as const) : []),
+  ];
+}
+
+/**
+ * O chip de filtro da faixa (o `.chip-f` do protótipo), com o número de filtros
+ * ligados, que abre a folha de filtros do celular.
+ */
+export function ChipDaFolhaDeFiltros({
+  ativos,
+  folha,
+}: {
+  ativos: number;
+  folha: Omit<Parameters<typeof FolhaDeFiltros>[0], "aberta" | "aoMudar">;
+}) {
+  const t = useT();
+  const [aberta, setAberta] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-pressed={ativos > 0}
+        aria-label={ativos > 0 ? `${t("Filtros")}, ${ativos} ${t("ativos")}` : t("Filtros")}
+        onClick={() => setAberta(true)}
+        className={cn(
+          "relative flex h-(--mb-chip-altura) shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold after:absolute after:inset-x-0 after:-inset-y-1",
+          ativos > 0
+            ? "pele-grad-contador bg-accent text-accent-foreground"
+            : "bg-surface-elevated text-text-muted shadow-[inset_0_0_0_1px_var(--color-border)]",
+        )}
+      >
+        <Funnel size={18} aria-hidden />
+        {ativos > 0 && (
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-tint px-1.5 text-xs font-bold tabular-nums">{ativos}</span>
+        )}
+      </button>
+      <FolhaDeFiltros aberta={aberta} aoMudar={setAberta} {...folha} />
+    </>
   );
 }

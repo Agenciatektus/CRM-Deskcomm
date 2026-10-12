@@ -14835,6 +14835,12 @@ export const DICIONARIO: Traducoes = {
   "Nenhuma conversa sua estava como não lida.": { es: "Ninguna conversación tuya estaba como no leída." },
   "Ver todas na lista": { es: "Ver todas en la lista" },
   "Limpar busca": { es: "Limpiar búsqueda" },
+  // ─── APP DE CELULAR (M2.2: folha de filtros) ───
+  "Esconde o que você já viu": { es: "Oculta lo que ya viste" },
+  "Mais filtros": { es: "Más filtros" },
+  "Agente IA": { es: "Agente IA" },
+  "Ver 1 conversa": { es: "Ver 1 conversación" },
+  "Canal inválido.": { es: "Canal inválido." },
 };
 
 /**

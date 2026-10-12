@@ -286,6 +286,9 @@ export async function listConversationsHandler(
   // mora na coluna dela: varrer `messages.metadata` por linha faria o filtro
   // ficar lento — e filtro lento é filtro que o atendente desliga.
   if (q.entrada) query = query.eq("instagram_entrada", q.entrada);
+  // O TIPO de canal (folha de filtros do celular, migration 9049): a coluna da própria
+  // conversa, o MESMO predicado de `p_canal_tipo` em `fn_contagens_da_caixa`.
+  if (q.canal) query = query.eq("channel", q.canal);
   // "Sem próximo passo" (L4, migration 9047): o contato não tem tarefa aberta.
   // Campo calculado, no BANCO, pelo mesmo motivo dos filtros acima: o cursor
   // continua valendo. É o MESMO predicado que `fn_contagens_da_caixa` aplica

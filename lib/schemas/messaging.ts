@@ -5,6 +5,7 @@
  * /api/v1/messages. Validações compartilhadas entre rota REST e webhooks
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
+import { TIPOS_DE_CANAL } from "@/lib/inbox/tipo-de-canal";
 import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
@@ -524,6 +525,11 @@ export const listConversationsQuerySchema = z.object({
    * nulo nelas).
    */
   sem_passo: z.enum(["true"]).optional(),
+  /**
+   * O TIPO de canal (folha de filtros do celular, migration 9049): a lista fixa de
+   * `lib/inbox/tipo-de-canal.ts`, aplicada em `conversations.channel`.
+   */
+  canal: z.enum(TIPOS_DE_CANAL).optional(),
   /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
