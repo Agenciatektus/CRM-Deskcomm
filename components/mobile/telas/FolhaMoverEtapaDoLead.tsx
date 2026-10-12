@@ -47,7 +47,7 @@ export function FolhaMoverEtapaDoLead({
     if (alvo.is_lost) return setPerdendo(lead);
     const args = { leadId: lead.id, stageId: alvo.id, positionInStage: fimDaColuna(), expectedUpdatedAt: lead.updated_at };
     if (alvo.is_won) {
-      adiarFechamento("ganho", lead.id, (s) => `${t("Ganho em")} ${s} s`, t("Desfazer"), () =>
+      adiarFechamento("ganho", lead.id, (s) => `${t("Ganho em")} ${s} s`, t, () =>
         mover.mutateAsync(args).then(ignorar, ignorar),
       );
       return;
@@ -106,7 +106,7 @@ export function FolhaMoverEtapaDoLead({
           leadId={perdendo.id}
           pipelineId={pipelineId}
           adiar={(gravar) =>
-            adiarFechamento("perda", perdendo.id, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+            adiarFechamento("perda", perdendo.id, (s) => `${t("Perdido em")} ${s} s`, t, () =>
               gravar().then(ignorar, ignorar),
             )
           }

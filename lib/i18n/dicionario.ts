@@ -10432,6 +10432,7 @@ export const DICIONARIO: Traducoes = {
   "Fora do limite permitido.": { es: "Fuera del límite permitido." },
   "Perdido em": { es: "Perdido en" },
   "Outro funil em": { es: "Otro embudo en" },
+  "Já há um fechamento em andamento para este negócio": { es: "Ya hay un cierre en curso para este negocio" },
   "será excluído em": { es: "será eliminado en" },
   "O lead será excluído em": { es: "El lead será eliminado en" },
   "Escolher horário": { es: "Elegir horario" },

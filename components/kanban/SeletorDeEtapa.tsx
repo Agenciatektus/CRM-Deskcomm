@@ -103,7 +103,7 @@ export function SeletorDeEtapa({
         "ganho",
         leadId,
         (s) => `${t("Ganho em")} ${s} s`,
-        t("Desfazer"),
+        t,
         // O erro já aparece pelo `onError` do hook; aqui não repete.
         () => ganhar.mutateAsync({ leadId }).then(feito).catch(() => undefined),
       );
@@ -155,7 +155,7 @@ export function SeletorDeEtapa({
           motivosDoFunil={motivosDoFunil}
           motivoObrigatorio={motivoObrigatorio}
           adiar={(gravar) =>
-            adiarFechamento("perda", leadId, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+            adiarFechamento("perda", leadId, (s) => `${t("Perdido em")} ${s} s`, t, () =>
               gravar().catch(() => undefined),
             )
           }

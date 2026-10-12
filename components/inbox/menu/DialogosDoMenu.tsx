@@ -57,7 +57,7 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
         // Perda e troca pelo menu: adiadas com Desfazer e com a trava por negócio,
         // como no painel (P2-1 do Cassio na #181). Relê só depois de gravar.
         adiar={(gravar) =>
-          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t, () =>
             gravar().then(reler, () => undefined),
           )
         }
@@ -70,7 +70,7 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
         leadId={lead.id}
         pipelineId={lead.pipeline_id}
         adiar={(gravar) =>
-          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t("Desfazer"), () =>
+          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t, () =>
             gravar().then(reler, () => undefined),
           )
         }

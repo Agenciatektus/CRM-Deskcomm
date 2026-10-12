@@ -76,7 +76,7 @@ export function useFunilDoContato(contactId: string, habilitado: boolean, onDial
     const ignorar = () => undefined;
     if (alvo.is_won) {
       // A trava confere ganho, perda e troca deste negócio (de onde vierem).
-      adiarFechamento("ganho", lead.id, (s) => `${t("Ganho em")} ${s} s`, t("Desfazer"), () =>
+      adiarFechamento("ganho", lead.id, (s) => `${t("Ganho em")} ${s} s`, t, () =>
         ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar),
       );
       return;

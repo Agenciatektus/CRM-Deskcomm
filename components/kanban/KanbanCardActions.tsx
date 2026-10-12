@@ -178,7 +178,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
                 "ganho",
                 lead.id,
                 (s) => `${t("Ganho em")} ${s} s`,
-                t("Desfazer"),
+                t,
                 // O erro já aparece pelo `onError` do hook; aqui não repete.
                 () => winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
               );
@@ -284,7 +284,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         // Perda e troca de funil esperam 5 s com Desfazer e passam pela mesma
         // trava do ganho: um fechamento pendente recusa o outro (P2-1 da #182).
         adiar={(gravar) =>
-          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t, () =>
             gravar().catch(() => undefined),
           )
         }
@@ -295,7 +295,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         leadId={lead.id}
         pipelineId={pipelineId}
         adiar={(gravar) =>
-          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t("Desfazer"), () =>
+          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t, () =>
             gravar().catch(() => undefined),
           )
         }
