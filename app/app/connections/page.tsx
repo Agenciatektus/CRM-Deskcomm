@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -26,21 +27,21 @@ export default async function ConnectionsPage() {
   const wacallsConfigured = Boolean(process.env.WACALLS_API_BASE_URL);
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Conexões", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir(
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Conexões", idioma)}
+        descricao={traduzir(
             "Por onde seu negócio fala com o cliente. Conecte números por QR ou o número oficial da Meta, e acompanhe a saúde de cada um.",
             idioma,
           )}
-        </p>
-      </header>
-      <ConexoesShell
-        wahaConfigured={wahaConfigured}
-        wacallsConfigured={wacallsConfigured}
-        graphParceiro={canalGraphParceiroLigado() ? { label: GRAPH_PARTNER_LABEL } : null}
       />
-    </div>
+      <SecaoDaPagina>
+        <ConexoesShell
+          wahaConfigured={wahaConfigured}
+          wacallsConfigured={wacallsConfigured}
+          graphParceiro={canalGraphParceiroLigado() ? { label: GRAPH_PARTNER_LABEL } : null}
+        />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

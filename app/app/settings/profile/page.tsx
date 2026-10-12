@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { requireAuth } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
@@ -27,20 +28,20 @@ export default async function ProfilePage() {
   //                    a troca de idioma da empresa passaria por cima dela.
   const idioma = user.idioma;
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Perfil", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir("Informações pessoais. Email só pode ser trocado em breve.", idioma)}
-        </p>
-      </header>
-      <ProfileForm
-        email={user.email}
-        initialFullName={meta.full_name}
-        initialAvatarUrl={meta.avatar_url}
-        initialLocale={user.locale ? normalizarIdioma(user.locale) : SEM_PREFERENCIA_DE_IDIOMA}
-        initialTimezone={meta.timezone ?? "America/Sao_Paulo"}
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Perfil", idioma)}
+        descricao={traduzir("Informações pessoais. Email só pode ser trocado em breve.", idioma)}
       />
-    </div>
+      <SecaoDaPagina>
+        <ProfileForm
+          email={user.email}
+          initialFullName={meta.full_name}
+          initialAvatarUrl={meta.avatar_url}
+          initialLocale={user.locale ? normalizarIdioma(user.locale) : SEM_PREFERENCIA_DE_IDIOMA}
+          initialTimezone={meta.timezone ?? "America/Sao_Paulo"}
+        />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

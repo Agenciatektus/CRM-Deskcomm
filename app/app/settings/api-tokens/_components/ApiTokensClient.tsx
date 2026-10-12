@@ -11,6 +11,7 @@ import {
   type CreatedApiToken,
 } from "@/hooks/team/useApiTokens";
 import { copyToClipboard } from "@/lib/clipboard";
+import { BotaoDaTela, CartaoEmpilhado, EstadoDaLista, TabelaOuCartoes } from "@/components/pagina";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,78 +102,106 @@ export function ApiTokensClient() {
     setScopes((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   };
 
+  const selo = (tok: (typeof tokens)[number]) =>
+    tok.revoked_at ? (
+      <Badge variant="destructive">{t("Revogado")}</Badge>
+    ) : (
+      <Badge variant="default">{t("Ativo")}</Badge>
+    );
+  const botaoRevogar = (tok: (typeof tokens)[number]) =>
+    !tok.revoked_at ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={revoke.isPending}
+        onClick={async () => {
+          await revoke.mutateAsync(tok.id);
+          toast.success(t("Token revogado."));
+        }}
+      >
+        {t("Revogar")}
+      </Button>
+    ) : null;
+  const expira = (tok: (typeof tokens)[number]) =>
+    tok.expires_at ? new Date(tok.expires_at).toLocaleDateString(tagDoIdioma) : "—";
+
+  const tabela = (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("Nome")}</TableHead>
+            <TableHead>{t("Prefixo")}</TableHead>
+            <TableHead>{t("Escopos")}</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>{t("Expira")}</TableHead>
+            <TableHead className="w-[120px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tokens.map((tok) => (
+            <TableRow key={tok.id}>
+              <TableCell className="font-medium">{tok.name}</TableCell>
+              <TableCell>
+                <code className="text-xs">{tok.prefix}…</code>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {tok.scopes.map((s) => (
+                    <Badge key={s} variant="secondary" className="text-xs">
+                      {s}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell>
+                {selo(tok)}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {expira(tok)}
+              </TableCell>
+              <TableCell>
+                {botaoRevogar(tok)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+  );
+
   return (
     <>
-      <div className="flex sm:justify-end">
+      {/* A ação principal: no cabeçalho no desktop, o "+" no celular. */}
+      <div className="flex sm:justify-end mb:hidden">
         <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
           {t("Criar token")}
         </Button>
       </div>
+      <BotaoDaTela rotulo={t("Criar token")} aoTocar={() => setCreateOpen(true)} />
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">{t("Carregando…")}</p>
-      ) : tokens.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("Nenhum token criado ainda.")}</p>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("Nome")}</TableHead>
-                <TableHead>{t("Prefixo")}</TableHead>
-                <TableHead>{t("Escopos")}</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>{t("Expira")}</TableHead>
-                <TableHead className="w-[120px]" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tokens.map((tok) => (
-                <TableRow key={tok.id}>
-                  <TableCell className="font-medium">{tok.name}</TableCell>
-                  <TableCell>
-                    <code className="text-xs">{tok.prefix}…</code>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {tok.scopes.map((s) => (
-                        <Badge key={s} variant="secondary" className="text-xs">
-                          {s}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {tok.revoked_at ? (
-                      <Badge variant="destructive">{t("Revogado")}</Badge>
-                    ) : (
-                      <Badge variant="default">{t("Ativo")}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {tok.expires_at ? new Date(tok.expires_at).toLocaleDateString(tagDoIdioma) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {!tok.revoked_at ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={revoke.isPending}
-                        onClick={async () => {
-                          await revoke.mutateAsync(tok.id);
-                          toast.success(t("Token revogado."));
-                        }}
-                      >
-                        {t("Revogar")}
-                      </Button>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <EstadoDaLista
+        carregando={isLoading}
+        quantidade={tokens.length}
+        vazio={<p className="p-4 text-sm text-muted-foreground">{t("Nenhum token criado ainda.")}</p>}
+      >
+        <TabelaOuCartoes
+          itens={tokens}
+          chave={(tok) => tok.id}
+          rotulo={t("API Tokens")}
+          tabela={tabela}
+          cartao={(tok) => (
+            <CartaoEmpilhado
+              titulo={tok.name}
+              selo={selo(tok)}
+              apoio={<code className="text-xs">{tok.prefix}…</code>}
+              campos={[
+                { rotulo: t("Escopos"), valor: tok.scopes.join(", ") },
+                { rotulo: t("Expira"), valor: expira(tok) },
+                ...(tok.revoked_at ? [] : [{ rotulo: "", valor: botaoRevogar(tok) }]),
+              ]}
+            />
+          )}
+        />
+      </EstadoDaLista>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

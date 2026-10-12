@@ -81,7 +81,8 @@ export function LgpdRequestDetail({ id }: Props) {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
+        {/* No celular o voltar é o da barra da casca. */}
+        <div className="flex items-center gap-2 mb:hidden">
           <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1 text-muted-foreground">
             <Link href="/app/lgpd/requests">
               <CaretLeft size={14} aria-hidden />

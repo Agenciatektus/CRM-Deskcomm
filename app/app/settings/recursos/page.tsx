@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 /**
  * Configurações › Sua empresa › Recursos opcionais.
  *
@@ -77,18 +78,16 @@ export default async function RecursosOpcionaisPage() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-8 overflow-y-auto p-6">
-      <header className="space-y-1">
-        <h1 className="text-title-lg">{traduzir("Recursos opcionais", idioma)}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {traduzir(
+    <Pagina className="gap-8 mb:gap-5">
+      <CabecalhoDaPagina
+        titulo={traduzir("Recursos opcionais", idioma)}
+        descricao={traduzir(
             "Tudo o que se liga e desliga, num lugar só. Cada recurso continua sendo ligado na tela dele: o botão Ajustar leva até lá.",
             idioma,
           )}
-        </p>
-      </header>
+      />
 
-      <section className="space-y-3" aria-labelledby="recursos-modulos">
+      <section className="space-y-3 mb:px-4" aria-labelledby="recursos-modulos">
         <div className="space-y-1">
           <h2 id="recursos-modulos" className="text-lg font-semibold">
             {traduzir("Módulos desta instalação", idioma)}
@@ -128,14 +127,14 @@ export default async function RecursosOpcionaisPage() {
         </ul>
       </section>
 
-      <section className="space-y-3" aria-labelledby="recursos-empresa">
+      <section className="space-y-3 mb:px-4" aria-labelledby="recursos-empresa">
         <h2 id="recursos-empresa" className="text-lg font-semibold">
           {traduzir("Da sua empresa", idioma)}
         </h2>
         <ul className="space-y-3">{daEmpresa.map(linha)}</ul>
       </section>
 
-      <section className="space-y-3" aria-labelledby="recursos-agente">
+      <section className="space-y-3 mb:px-4" aria-labelledby="recursos-agente">
         <div className="space-y-1">
           <h2 id="recursos-agente" className="text-lg font-semibold">
             {traduzir("Em cada agente", idioma)}
@@ -146,6 +145,6 @@ export default async function RecursosOpcionaisPage() {
         </div>
         <ul className="space-y-3">{deCadaAgente.map(linha)}</ul>
       </section>
-    </div>
+    </Pagina>
   );
 }

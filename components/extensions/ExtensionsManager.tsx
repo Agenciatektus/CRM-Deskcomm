@@ -885,10 +885,11 @@ export function ExtensionsManager({
 
   return (
     <main
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
       data-testid="extensions-manager"
     >
-      <header className="relative overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-xs sm:p-7">
+      {/* No celular o título é o da barra da casca. */}
+      <header className="relative overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-xs sm:p-7 mb:hidden">
         <div
           aria-hidden
           className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-accent-soft/70 blur-2xl"

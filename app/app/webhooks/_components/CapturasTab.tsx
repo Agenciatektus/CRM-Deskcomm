@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import * as React from "react";
@@ -231,7 +232,7 @@ export function CapturasTab() {
           {/* A tabela rola dentro do próprio container: o corpo da página nunca
               rola na horizontal (regra de responsividade do design system). */}
           <Card className="overflow-x-auto">
-            <Table>
+            <Table className={TABELA_EMPILHADA}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("Quem")}</TableHead>
@@ -265,16 +266,16 @@ export function CapturasTab() {
                           {identidade(row, t)}
                         </button>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Contato")} className="text-sm text-muted-foreground">
                         {row.captured_phone ?? row.captured_email ?? "—"}
                       </TableCell>
-                      <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Fonte")} className="max-w-[160px] truncate text-sm text-muted-foreground">
                         {row.source_name}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {w.data} <span className="tabular-nums">{w.hora}</span>
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Origem")} className="max-w-[200px] truncate text-sm text-muted-foreground">
                         {row.origin ?? row.remote_ip ?? "—"}
                       </TableCell>
                       <TableCell>
