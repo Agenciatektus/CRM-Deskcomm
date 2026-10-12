@@ -12,6 +12,11 @@ vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/components/voice/DialButton", () => ({ DialButton: () => <button type="button">Ligar</button> }));
 vi.mock("@/components/inbox/menu/DialogosDoMenu", () => ({ DialogosDoMenu: () => null }));
 vi.mock("@/lib/mobile/useEhCelular", () => ({ useEhCelular: () => true }));
+const papel = vi.hoisted(() => ({ podeMover: true, suporte: null as null | { access_mode: string } }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({ user: { support: papel.suporte } }),
+  usePermission: () => papel.podeMover,
+}));
 const funil = vi.hoisted(() => ({ escolher: vi.fn(), lead: null as unknown }));
 vi.mock("@/hooks/inbox/useFunilDoContato", () => ({
   useFunilDoContato: () => ({
@@ -60,9 +65,11 @@ describe("barra da conversa no celular", () => {
     expect(quem.textContent).toContain("Você está atendendo");
     fireEvent.click(quem);
     expect(onAbrirFicha).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Ligar" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ações da conversa" }));
     expect(onAbrirMenu).toHaveBeenCalledWith(expect.any(HTMLElement));
+    // Ligar pede confirmação: a folha "Ligar para Maria Souza?" traz o botão de verdade.
+    fireEvent.click(screen.getByRole("button", { name: "Ligar" }));
+    expect(screen.getByRole("dialog", { name: "Ligar para Maria Souza?" })).toBeInTheDocument();
   });
 });
 
@@ -81,6 +88,21 @@ describe("faixa do negócio", () => {
     fireEvent.click(faixa);
     fireEvent.click(screen.getByRole("button", { name: "Proposta" }));
     expect(funil.escolher).toHaveBeenCalledWith("e2");
+  });
+});
+
+describe("faixa do negócio só informativa para quem não pode mover (P2-1 do Cassio na #180)", () => {
+  it("viewer e suporte somente leitura: a faixa não abre a folha", () => {
+    funil.lead = { id: "l-1", status: "open", etapa_nome: "Novo", funil_nome: "Vendas", value_cents: null, currency: null };
+    papel.podeMover = false;
+    const { unmount } = render(<FaixaDoLead contactId="k-1" />);
+    expect(screen.getByRole("button", { name: /Negócio: Novo/ })).toBeDisabled();
+    unmount();
+    papel.podeMover = true;
+    papel.suporte = { access_mode: "support_readonly" };
+    render(<FaixaDoLead contactId="k-1" />);
+    expect(screen.getByRole("button", { name: /Negócio: Novo/ })).toBeDisabled();
+    papel.suporte = null;
   });
 });
 

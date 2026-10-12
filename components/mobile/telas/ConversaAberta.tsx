@@ -6,6 +6,7 @@ import { initials, siglaDoTelefone } from "@/components/inbox/item/tempo-da-linh
 import { formatMoney } from "@/components/inbox/painel/SemLista";
 import { DialogosDoMenu, type DialogoDoMenu } from "@/components/inbox/menu/DialogosDoMenu";
 import { DialButton } from "@/components/voice/DialButton";
+import { useAuth, usePermission } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useFunilDoContato } from "@/hooks/inbox/useFunilDoContato";
@@ -13,7 +14,8 @@ import { channelBrand, CHANNEL_BRAND_LABEL } from "@/lib/channels/presentation";
 import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { comandoDaConversa } from "@/lib/inbox/comando-da-conversa";
-import { CaretDown, CaretLeft, Check, DotsThree, Funnel } from "@/lib/ui/icons";
+import { CaretDown, CaretLeft, Check, DotsThree, Funnel, Phone } from "@/lib/ui/icons";
+import { useArmado } from "@/hooks/ui/useArmado";
 import { cn } from "@/lib/utils";
 
 import { FolhaInferior } from "../FolhaInferior";
@@ -96,7 +98,7 @@ export function BarraDaConversaNoCelular({
       </button>
       {/* Só no celular de fato: o Ligar do desktop é o do cabeçalho, e a chamada pede
           o provedor de voz da casca. */}
-      {celular && !conversation.is_group && c?.id && <DialButton contactId={c.id} hasPhone={!!c.phone_number} />}
+      {celular && !conversation.is_group && c?.id && <LigarComConfirmacao contactId={c.id} hasPhone={!!c.phone_number} nome={nome} />}
       <button
         ref={botaoDoMenu}
         type="button"
@@ -112,6 +114,41 @@ export function BarraDaConversaNoCelular({
 }
 
 /**
+ * O "Ligar" do celular pede confirmação (P2-2 do Cassio na #180): um toque perdido
+ * na barra não pode começar uma chamada. A folha "Ligar para Fulano?" traz o botão
+ * de chamada de verdade (`DialButton`), armado só depois de 300 ms (`useArmado`).
+ */
+function LigarComConfirmacao({ contactId, hasPhone, nome }: { contactId: string; hasPhone: boolean; nome: string }) {
+  const t = useT();
+  const [aberta, setAberta] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAberta(true)}
+        aria-haspopup="dialog"
+        aria-label={t("Ligar")}
+        className="pele-foco grid size-(--mb-alvo) shrink-0 place-items-center rounded-full text-text hover:bg-hover"
+      >
+        <Phone size={22} aria-hidden />
+      </button>
+      <FolhaInferior aberto={aberta} aoMudar={setAberta} titulo={`${t("Ligar para")} ${nome}?`}>
+        {aberta && <BotaoDeLigarArmado contactId={contactId} hasPhone={hasPhone} />}
+      </FolhaInferior>
+    </>
+  );
+}
+
+function BotaoDeLigarArmado({ contactId, hasPhone }: { contactId: string; hasPhone: boolean }) {
+  const armado = useArmado();
+  return (
+    <div className={cn("flex justify-center px-3 py-4", !armado && "pointer-events-none opacity-60")} aria-busy={!armado}>
+      <DialButton contactId={contactId} hasPhone={hasPhone} />
+    </div>
+  );
+}
+
+/**
  * A faixa do negócio sob a barra (o `.ldbar` do protótipo): etapa, funil e valor do
  * lead do contato. Tocar abre a folha "Mover etapa", com a MESMA régua do submenu do
  * menu da conversa (`useFunilDoContato`): mover, ganhar, perder (com o motivo) e
@@ -121,7 +158,11 @@ export function FaixaDoLead({ contactId }: { contactId: string }) {
   const t = useT();
   const [aberta, setAberta] = useState(false);
   const [dialogo, setDialogo] = useState<DialogoDoMenu | null>(null);
-  const { lead, etapas, indiceAtual, escolher, mover, ganhar } = useFunilDoContato(contactId, true, (d) => {
+  // Só informativa para quem não pode mover (viewer, suporte somente leitura): a
+  // mesma régua da barra de etapas do painel (P2-1 do Cassio na #180).
+  const { user } = useAuth();
+  const podeMover = usePermission("pipeline.move_card") && user.support?.access_mode !== "support_readonly";
+  const { lead, etapas, indiceAtual, escolher, mover, ganhar, ganhoPendente } = useFunilDoContato(contactId, true, (d) => {
     setAberta(false);
     setDialogo({ ...d, contactId });
   });
@@ -129,7 +170,7 @@ export function FaixaDoLead({ contactId }: { contactId: string }) {
   const etapa = lead.status === "won" ? t("Ganho") : lead.status === "lost" ? t("Perdido") : (lead.etapa_nome ?? "");
   // O mesmo formato do painel do lead; sem valor, a faixa não mostra número.
   const valor = lead.value_cents ? formatMoney(lead.value_cents, lead.currency) : null;
-  const aberto = lead.status === "open";
+  const aberto = lead.status === "open" && podeMover;
 
   return (
     <>
@@ -154,7 +195,7 @@ export function FaixaDoLead({ contactId }: { contactId: string }) {
           <button
             key={e.id}
             type="button"
-            disabled={mover.isPending || ganhar.isPending}
+            disabled={mover.isPending || ganhar.isPending || ganhoPendente}
             aria-current={i === indiceAtual ? "step" : undefined}
             onClick={() => {
               setAberta(false);

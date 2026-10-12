@@ -43,7 +43,7 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
 }) {
   const t = useT();
   const [aberto, setAberto] = useState(false);
-  const { resumo, lead, etapas, indiceAtual, escolher, mover, ganhar } = useFunilDoContato(contactId, aberto, onDialogo);
+  const { resumo, lead, etapas, indiceAtual, escolher, mover, ganhar, ganhoPendente } = useFunilDoContato(contactId, aberto, onDialogo);
   const detalhe = !lead
     ? null
     : lead.status === "won"
@@ -82,7 +82,7 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
                     <DropdownMenuRadioItem
                       key={e.id}
                       value={e.id}
-                      disabled={mover.isPending || ganhar.isPending}
+                      disabled={mover.isPending || ganhar.isPending || ganhoPendente}
                       className="h-[34px] gap-2 rounded-lg text-[13.5px] focus:bg-surface-elevated focus:text-text"
                     >
                       <span

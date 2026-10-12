@@ -8,6 +8,7 @@ import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
 import { apiClient } from "@/lib/api/client";
 import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
+import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
 
 /** O pedido que precisa de janela própria (perder com motivo, levar a outro funil). */
 export type DialogoDoFunil = { tipo: "perder" | "outro-funil"; lead: LeadRow };
@@ -23,8 +24,13 @@ export function chaveDoResumoDoMenu(contactId: string) {
  *
  * O `crm-summary` só é buscado com `habilitado` (o submenu aberto, ou a conversa
  * aberta no celular) e fica 30 s em cache. Cada destino é a porta que o
- * `SeletorDeEtapa` já usa: etapa aberta → `useMoveCard` (CAS por `updated_at`);
- * ganho → `useWinLead`; perda → `LoseLeadDialog` (pelo `onDialogo`).
+ * `SeletorDeEtapa` já usa, com as mesmas garantias:
+ * - etapa aberta → `useMoveCard` (CAS por `updated_at`), com "Desfazer" no aviso
+ *   pela MESMA rota, como a barra de etapas do painel (P2-3 do Cassio na #180);
+ * - ganho → `useWinLead`, ADIADO 5 s com Desfazer e com a trava por negócio
+ *   (`ganho:<lead>`) do painel e do quadro: `/win` dispara `lead.won` na hora, com
+ *   efeito fora do CRM (conversão de anúncio, cadência, push). P1 do Cassio na #180;
+ * - perda → `LoseLeadDialog` (pelo `onDialogo`), que exige o motivo.
  */
 export function useFunilDoContato(contactId: string, habilitado: boolean, onDialogo: (d: DialogoDoFunil) => void) {
   const t = useT();
@@ -42,12 +48,17 @@ export function useFunilDoContato(contactId: string, habilitado: boolean, onDial
   const ganhar = useWinLead(pipelineId);
   const etapas = lead?.etapas ?? [];
   const indiceAtual = etapas.findIndex((e) => e.id === lead?.stage_id);
+  const ganhoPendente = useAcaoPendente(`ganho:${lead?.id ?? ""}`);
 
-  function feito() {
-    toast.success(t("Etapa alterada"));
+  function reler() {
     void qc.invalidateQueries({ queryKey: chaveDoResumoDoMenu(contactId) });
     // O painel aberto neste contato relê; com outro contato, ignora.
     avisarQueOCrmDoContatoMudou(contactId);
+  }
+
+  function feito() {
+    toast.success(t("Etapa alterada"));
+    reler();
   }
 
   function escolher(stageId: string) {
@@ -57,15 +68,51 @@ export function useFunilDoContato(contactId: string, habilitado: boolean, onDial
     if (alvo.is_lost) return onDialogo({ tipo: "perder", lead });
     // `mutateAsync` e não `mutate(…, { onSuccess })`: o menu FECHA (e desmonta)
     // ao escolher, e o callback por chamada do react-query não roda em
-    // componente desmontado. A promessa resolve de qualquer jeito. O erro já
-    // vira aviso no `onError` do hook.
-    const ignorar = () => {};
-    if (alvo.is_won) return void ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar);
+    // componente desmontado. O erro já vira aviso no `onError` do hook.
+    const ignorar = () => undefined;
+    if (alvo.is_won) {
+      // Já há um ganho segurado para este negócio (do card, do painel ou daqui).
+      if (ganhoPendente) return;
+      adiarAcao(
+        (s) => `${t("Ganho em")} ${s} s`,
+        t("Desfazer"),
+        () => ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar),
+        undefined,
+        { chave: `ganho:${lead.id}` },
+      );
+      return;
+    }
+    const anterior = lead.stage_id;
+    const posicaoAnterior = lead.position_in_stage ?? null;
     // Fim da coluna de destino, a mesma conta do seletor do painel.
     void mover
       .mutateAsync({ leadId: lead.id, stageId, positionInStage: Date.now(), expectedUpdatedAt: lead.updated_at })
-      .then(feito, ignorar);
+      .then((resposta) => {
+        reler();
+        const atualizadoEm = (resposta as { data?: { updated_at?: string } } | undefined)?.data?.updated_at;
+        toast.success(t("Etapa alterada"), {
+          // Volta pela MESMA rota `/move`, com a data que a mudança devolveu: se outra
+          // pessoa mexeu no meio, a rota recusa em vez de sobrescrever.
+          action: atualizadoEm
+            ? {
+                label: t("Desfazer"),
+                onClick: () =>
+                  void mover
+                    .mutateAsync({
+                      leadId: lead.id,
+                      stageId: anterior,
+                      positionInStage: posicaoAnterior ?? Date.now(),
+                      expectedUpdatedAt: atualizadoEm,
+                    })
+                    .then(() => {
+                      toast.success(t("Etapa desfeita"));
+                      reler();
+                    }, ignorar),
+              }
+            : undefined,
+        });
+      }, ignorar);
   }
 
-  return { resumo, lead, etapas, indiceAtual, escolher, mover, ganhar };
+  return { resumo, lead, etapas, indiceAtual, escolher, mover, ganhar, ganhoPendente };
 }

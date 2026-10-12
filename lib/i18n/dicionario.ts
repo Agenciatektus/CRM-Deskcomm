@@ -14845,6 +14845,7 @@ export const DICIONARIO: Traducoes = {
   "Abrir ficha de": { es: "Abrir ficha de" },
   "Ações da conversa": { es: "Acciones de la conversación" },
   "Mover etapa": { es: "Mover etapa" },
+  "Ligar para": { es: "Llamar a" },
 };
 
 /**
