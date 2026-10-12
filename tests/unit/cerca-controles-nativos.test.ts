@@ -50,6 +50,39 @@ export function controlesNativos(fonte: string): string[] {
   return achados;
 }
 
+/**
+ * Os atributos de cada `<Escolha ...>` (até o `>` que fecha a abertura, fora
+ * de chaves). Lê a fonte sem comentários, para `<Escolha>` citado não contar.
+ */
+export function aberturasDeEscolha(fonte: string): string[] {
+  const limpo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  const aberturas: string[] = [];
+  const re = /<Escolha(?=[\s>/])/g;
+  for (let m = re.exec(limpo); m; m = re.exec(limpo)) {
+    let fundo = 0;
+    let j = m.index + m[0].length;
+    for (; j < limpo.length; j += 1) {
+      const c = limpo[j];
+      if (c === "{") fundo += 1;
+      else if (c === "}") fundo -= 1;
+      else if (c === ">" && fundo === 0) break;
+    }
+    aberturas.push(limpo.slice(m.index, j));
+  }
+  return aberturas;
+}
+
+/**
+ * `Escolha` com `name` e sem `value`/`defaultValue` (P2 do Cassio na #170): o
+ * `<select>` nativo assim enviava a PRIMEIRA opção; a `Escolha` envia "". É o
+ * único caso em que o valor do formulário muda na troca.
+ */
+export function escolhasSemValor(fonte: string): string[] {
+  return aberturasDeEscolha(fonte).filter(
+    (a) => /\sname=/.test(a) && !/\s(?:value|defaultValue)=/.test(a) && !/\{\.\.\./.test(a),
+  );
+}
+
 function arquivosTsx(pasta: string): string[] {
   const saida: string[] = [];
   for (const nome of readdirSync(pasta)) {
@@ -84,6 +117,20 @@ describe("cerca: controle nativo de data, hora e seletor só em components/ui", 
   it("varre de verdade: os componentes do DS existem e a varredura acha arquivos", () => {
     expect(ARQUIVOS.length).toBeGreaterThan(100);
     expect(readFileSync(join(RAIZ, "components/ui/escolha.tsx"), "utf8")).toContain("<select");
+  });
+
+  it("Escolha com name sempre diz o valor (value ou defaultValue)", () => {
+    const culpados = ARQUIVOS.filter((c) => escolhasSemValor(readFileSync(join(RAIZ, c), "utf8")).length > 0);
+    expect(culpados).toEqual([]);
+  });
+
+  it("CONTROLE NEGATIVO: Escolha com name e sem valor é achada; com valor ou sem name, não", () => {
+    expect(escolhasSemValor('<Escolha name="plano">\n<option value="a">A</option>\n</Escolha>')).toHaveLength(1);
+    expect(escolhasSemValor('<Escolha\n  name="plano"\n  onValueChange={(v) => f(v > 1)}\n>')).toHaveLength(1);
+    expect(escolhasSemValor('<Escolha name="plano" defaultValue="a">')).toEqual([]);
+    expect(escolhasSemValor('<Escolha name="plano" value={x} onValueChange={f}>')).toEqual([]);
+    expect(escolhasSemValor('<Escolha aria-label="Plano" onValueChange={f}>')).toEqual([]);
+    expect(escolhasSemValor('// <Escolha name="x">')).toEqual([]);
   });
 
   it("CONTROLE NEGATIVO: o detector acha select e campo de data, e ignora citação em texto", () => {

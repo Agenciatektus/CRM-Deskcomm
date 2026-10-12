@@ -4,7 +4,7 @@ import { format, type Locale } from "date-fns";
 
 import { useT } from "@/hooks/i18n/useT";
 import { diasDaGrade, mesmoDia } from "@/lib/ui/calendario";
-import { CaretLeft, CaretRight } from "@/lib/ui/icons";
+import { CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,6 +21,7 @@ export function GradeDoCalendario({
   foraDoLimite,
   podeVoltar,
   podeAvancar,
+  anos = false,
   onDia,
 }: {
   mes: Date;
@@ -31,13 +32,25 @@ export function GradeDoCalendario({
   foraDoLimite: (d: Date) => boolean;
   podeVoltar: boolean;
   podeAvancar: boolean;
+  /** Pular de ano em ano (data de nascimento, lançamento antigo). */
+  anos?: boolean;
   onDia: (d: Date) => void;
 }) {
   const t = useT();
   const semana = diasDaGrade(mes).slice(0, 7);
   return (
     <>
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between gap-1">
+        {anos && (
+          <button
+            type="button"
+            className="grid size-7 place-items-center rounded-md hover:bg-hover"
+            onClick={() => setMes(new Date(mes.getFullYear() - 1, mes.getMonth(), 1))}
+            aria-label={t("Ano anterior")}
+          >
+            <CaretDoubleLeft size={14} aria-hidden />
+          </button>
+        )}
         <button
           type="button"
           className="grid size-7 place-items-center rounded-md hover:bg-hover disabled:opacity-40"
@@ -47,7 +60,7 @@ export function GradeDoCalendario({
         >
           <CaretLeft size={14} aria-hidden />
         </button>
-        <b className="text-ui capitalize" aria-live="polite">{format(mes, "LLLL yyyy", { locale })}</b>
+        <b className="grow text-center text-ui capitalize" aria-live="polite">{format(mes, "LLLL yyyy", { locale })}</b>
         <button
           type="button"
           className="grid size-7 place-items-center rounded-md hover:bg-hover disabled:opacity-40"
@@ -57,6 +70,16 @@ export function GradeDoCalendario({
         >
           <CaretRight size={14} aria-hidden />
         </button>
+        {anos && (
+          <button
+            type="button"
+            className="grid size-7 place-items-center rounded-md hover:bg-hover"
+            onClick={() => setMes(new Date(mes.getFullYear() + 1, mes.getMonth(), 1))}
+            aria-label={t("Próximo ano")}
+          >
+            <CaretDoubleRight size={14} aria-hidden />
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-7 gap-0.5" aria-hidden>
         {semana.map((d) => (

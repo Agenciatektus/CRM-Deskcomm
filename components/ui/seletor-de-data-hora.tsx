@@ -88,7 +88,11 @@ export function SeletorDeDataHora({
   const podeVoltar = !piso || new Date(mes.getFullYear(), mes.getMonth(), 1).getTime() > piso.getTime();
   const podeAvancar = !teto || new Date(mes.getFullYear(), mes.getMonth() + 1, 1).getTime() <= teto.getTime();
 
-  const cabe = (d: Date) => livre || d.getTime() > agora.getTime();
+  // `min`/`max` com horário (campo de data e hora, ou só horário) limitam
+  // também o horário do mesmo dia, não só o dia (P2 do Cassio na #170).
+  const noLimite = (p: Date) =>
+    soData || ((!min || p.getTime() >= min.getTime()) && (!max || p.getTime() <= max.getTime()));
+  const cabe = (d: Date) => (livre || d.getTime() > agora.getTime()) && noLimite(d);
 
   function aplica(d: Date | null, h: [number, number] | null) {
     setDia(d);
@@ -104,7 +108,9 @@ export function SeletorDeDataHora({
     aplica(d, hora && cabe(juntaDiaEHora(d, hora[0], hora[1])) ? hora : null);
   }
 
-  const horaPassou = (h: number, m: number) => !livre && !!dia && juntaDiaEHora(dia, h, m).getTime() <= agora.getTime();
+  const horaPassou = (h: number, m: number) => !!dia && !cabe(juntaDiaEHora(dia, h, m));
+  const digitado = horarioDigitado(outro);
+  const outroForaDoLimite = !!dia && !!digitado && !cabe(juntaDiaEHora(dia, digitado[0], digitado[1]));
   const escolhido = soData ? dia : dia && hora ? juntaDiaEHora(dia, hora[0], hora[1]) : null;
   const valido = !!escolhido && (soData || cabe(escolhido));
   const rotuloDoAtalho = (a: AtalhoDeDia) =>
@@ -152,6 +158,7 @@ export function SeletorDeDataHora({
           foraDoLimite={foraDoLimite}
           podeVoltar={podeVoltar}
           podeAvancar={podeAvancar}
+          anos={passado}
           onDia={escolheDia}
         />
       )}
@@ -183,7 +190,7 @@ export function SeletorDeDataHora({
               placeholder="1430"
               value={outro}
               disabled={!dia}
-              aria-invalid={outroInvalido || undefined}
+              aria-invalid={outroInvalido || outroForaDoLimite || undefined}
               onChange={(e) => {
                 setOutro(e.target.value);
                 const h = horarioDigitado(e.target.value);
@@ -192,6 +199,7 @@ export function SeletorDeDataHora({
               className="h-8 w-21 rounded-field border border-border bg-surface-elevated text-center text-ui tabular-nums focus-visible:border-accent focus-visible:bg-surface focus-visible:outline-hidden focus-visible:ring-3 focus-visible:ring-accent-soft aria-[invalid=true]:border-error disabled:opacity-55"
             />
             {outroInvalido && <span className="text-meta text-error-fg">{t("Use hh:mm ou 1430.")}</span>}
+            {outroForaDoLimite && <span className="text-meta text-error-fg">{t("Fora do limite permitido.")}</span>}
           </div>
         </>
       )}

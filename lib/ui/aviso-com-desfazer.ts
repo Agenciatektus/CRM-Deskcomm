@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import { ContagemDoAviso } from "./ContagemDoAviso";
@@ -52,6 +52,33 @@ function soltarSaida() {
   if (pendentes === 0) window.removeEventListener("beforeunload", perguntarAntesDeSair);
 }
 
+/**
+ * Ações seguradas POR CHAVE (ex.: `ganho:<lead>`), para a tela desabilitar o
+ * botão enquanto a ação daquele item está nos 5 s: um segundo "Marcar como
+ * ganho" agendaria outro `/win`, que volta com erro de já ganho (P2 do Cassio
+ * na #170).
+ */
+const chavesPendentes = new Set<string>();
+const ouvintes = new Set<() => void>();
+function avisarOuvintes() {
+  for (const ouvir of ouvintes) ouvir();
+}
+function assinar(ouvir: () => void) {
+  ouvintes.add(ouvir);
+  return () => {
+    ouvintes.delete(ouvir);
+  };
+}
+
+/** `true` enquanto houver ação segurada com esta chave. */
+export function useAcaoPendente(chave: string): boolean {
+  return useSyncExternalStore(
+    assinar,
+    () => chavesPendentes.has(chave),
+    () => false,
+  );
+}
+
 /** Quantas ações estão seguradas agora (para teste e diagnóstico). */
 export function acoesPendentes(): number {
   return pendentes;
@@ -82,13 +109,26 @@ export function adiarAcao(
   rotuloDoDesfazer: string,
   executar: () => Promise<unknown>,
   aoDesfazer?: () => void,
+  opcoes: { chave?: string } = {},
 ): void {
   let decidido = false;
+  const { chave } = opcoes;
   segurarSaida();
+  if (chave) {
+    chavesPendentes.add(chave);
+    avisarOuvintes();
+  }
+  const soltar = () => {
+    soltarSaida();
+    if (chave) {
+      chavesPendentes.delete(chave);
+      avisarOuvintes();
+    }
+  };
   const rodar = () => {
     if (decidido) return;
     decidido = true;
-    soltarSaida();
+    soltar();
     void executar().catch((erroDaAcao: unknown) => {
       toast.error(erroDaAcao instanceof Error ? erroDaAcao.message : String(erroDaAcao));
     });
@@ -101,7 +141,7 @@ export function adiarAcao(
       onClick: () => {
         if (decidido) return;
         decidido = true;
-        soltarSaida();
+        soltar();
         aoDesfazer?.();
       },
     },

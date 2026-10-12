@@ -2,6 +2,9 @@
 
 import * as React from "react";
 
+import { useT } from "@/hooks/i18n/useT";
+
+import { juntarDescricao, useControleEscondido } from "./controle-escondido";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "./select";
 
 /**
@@ -107,8 +110,21 @@ export function Escolha({
   "data-testid": testId,
   ...aria
 }: EscolhaProps) {
-  const [interno, setInterno] = React.useState(defaultValue === undefined ? "" : String(defaultValue));
+  const t = useT();
+  const padrao = defaultValue === undefined ? "" : String(defaultValue);
+  const [interno, setInterno] = React.useState(padrao);
   const atual = value === undefined || value === null ? interno : String(value);
+  const gatilho = React.useRef<HTMLButtonElement>(null);
+  const idDoErro = React.useId();
+  const { ref: refEscondido, invalido, limparInvalido } = useControleEscondido<HTMLSelectElement>({
+    gatilho,
+    // Não controlado volta ao `defaultValue`; controlado continua com o valor
+    // do estado de quem usa, e o escondido é reposto para não divergir.
+    aoResetar: () => {
+      if (value === undefined) setInterno(padrao);
+      else if (refEscondido.current) refEscondido.current.value = atual;
+    },
+  });
   const itens = opcoes ?? itensDosFilhos(children);
   const planas = opcoesPlanas(itens);
   const temVazia = planas.some((o) => o.value === "");
@@ -116,6 +132,7 @@ export function Escolha({
   const valorDoRadix = atual === "" && !temVazia ? "" : paraDentro(atual);
 
   function mudar(v: string) {
+    limparInvalido();
     if (value === undefined) setInterno(v);
     onValueChange?.(v);
   }
@@ -129,7 +146,16 @@ export function Escolha({
   return (
     <>
       <Select value={valorDoRadix} onValueChange={(v) => mudar(paraFora(v))} disabled={disabled}>
-        <SelectTrigger id={id} title={title} className={className} data-escolha="" {...aria}>
+        <SelectTrigger
+          ref={gatilho}
+          id={id}
+          title={title}
+          className={className}
+          data-escolha=""
+          {...aria}
+          aria-invalid={invalido || aria["aria-invalid"] || undefined}
+          aria-describedby={juntarDescricao(aria["aria-describedby"], invalido && idDoErro)}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className={classeDoPainel}>
@@ -146,6 +172,7 @@ export function Escolha({
         </SelectContent>
       </Select>
       <select
+        ref={refEscondido}
         data-escolha-nativa=""
         aria-hidden
         tabIndex={-1}
@@ -165,6 +192,11 @@ export function Escolha({
           </option>
         ))}
       </select>
+      {invalido && (
+        <span id={idDoErro} role="alert" className="text-meta text-error-fg">
+          {t("Escolha uma opção.")}
+        </span>
+      )}
     </>
   );
 }

@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";

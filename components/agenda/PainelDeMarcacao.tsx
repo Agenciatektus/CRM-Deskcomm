@@ -9,7 +9,6 @@ import Link from "next/link";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CampoDeData } from "@/components/ui/campo-de-data";
 import { dataDeParede, instanteDe } from "@/lib/agenda/fuso";
 import { ApiError } from "@/lib/api/types";
