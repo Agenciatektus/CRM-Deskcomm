@@ -29,9 +29,13 @@ import { useAtalhosPessoais } from "@/hooks/inbox/useAtalhosPessoais";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
+import { CaretLeft, ChatCircle } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { BarraDaConversaNoCelular, FaixaDoLead } from "@/components/mobile/telas/ConversaAberta";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import { MenuDaConversa } from "./menu/MenuDaConversa";
+import { useMenuDaConversa } from "./menu/useMenuDaConversa";
 import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
@@ -194,6 +198,9 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const [fichaAberta, setFichaAberta] = useState(false);
   // Busca nas mensagens (#1793) e coluna do lead: ver `useFerramentasDaConversa`.
   const ferramentas = useFerramentasDaConversa(selectedId);
+  // Celular (M2.3): o ⋮ da barra da conversa abre o menu da conversa, com o lead primeiro.
+  const celular = useEhCelular();
+  const menuDoCelular = useMenuDaConversa();
   // "Criar próximo passo" da busca (Ctrl K): o painel do lead precisa estar à
   // vista (coluna a partir de 1280px, gaveta abaixo disso) antes de rolar até
   // a seção. O pedido ao painel sai no quadro seguinte, quando ele já montou.
@@ -419,8 +426,9 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         // a conversa aberta, que tem barra própria) e o respiro de baixo do `<main>`,
         // que no celular já soma a barra inferior e a área segura. Com painel de chamada
         // é o `--respiro-do-main` publicado pelo `<main>` (a mesma conta do padding dele,
-        // `estiloDaReserva`); sem, a barra mais o maior entre o `pb-2` e o rodapé.
-        "mb:h-[calc(100dvh-var(--mb-casca-topo)-var(--respiro-do-main,calc(var(--mb-casca-baixo)+max(var(--space-2),var(--rodape-ocupado,0px)))))]",
+        // `estiloDaReserva`); sem, a barra mais o maior entre o `pb-2` e o rodapé. E o
+        // teclado do iPhone (`--mb-teclado`, `useAlturaDoTeclado`), para o composer subir.
+        "mb:h-[calc(100dvh-var(--mb-casca-topo)-var(--mb-teclado,0px)-var(--respiro-do-main,calc(var(--mb-casca-baixo)+max(var(--space-2),var(--rodape-ocupado,0px)))))]",
         ferramentas.painelLead
           ? "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px-var(--largura-do-painel))))_minmax(0,1fr)_var(--largura-do-painel)]"
           : "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px)))_minmax(0,1fr)]",
@@ -512,7 +520,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
           que ele é a única saída. A porta da ficha, essa sim, depende da
           conversa, e só aparece quando há uma.
         */}
-        {selectedId && (
+        {selectedId && !selectedConversation && (
           <div className="flex items-center gap-1 border-b border-border px-1 py-1 largo:hidden">
             <Button
               variant="ghost"
@@ -523,22 +531,39 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               <CaretLeft size={16} />
               {t("Conversas")}
             </Button>
-            <div className="flex-1" />
-            {selectedConversation && (
-              <Sheet open={fichaAberta} onOpenChange={setFichaAberta}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 xl:hidden">
-                    <IdentificationCard size={16} />
-                    {t("Ficha")}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-[min(22rem,90vw)] overflow-y-auto p-0">
-                  <SheetTitle className="sr-only">{t("Ficha do contato")}</SheetTitle>
-                  <CRMSidePanel conversation={selectedConversation} />
-                </SheetContent>
-              </Sheet>
-            )}
           </div>
+        )}
+        {selectedConversation && (
+          <>
+            {/* No celular (M2.3): a barra do protótipo (voltar, quem é, Ligar, ⋮) e a
+                faixa do negócio; o cabeçalho do desktop some lá (`mb:hidden`). */}
+            <BarraDaConversaNoCelular
+              conversation={selectedConversation}
+              automaticoDaOrg={automaticoDaOrg}
+              meuUserId={user?.id ?? null}
+              onVoltar={() => handleSelect(null)}
+              onAbrirFicha={() => setFichaAberta(true)}
+              onAbrirMenu={(el) => menuDoCelular.abrir(selectedConversation.id, el, el)}
+            />
+            {celular && selectedConversation.contacts?.id && <FaixaDoLead contactId={selectedConversation.contacts.id} />}
+            {celular && (
+              <MenuDaConversa
+                alvo={menuDoCelular.alvo}
+                conversation={selectedConversation}
+                onFechar={menuDoCelular.fechar}
+                meuUserId={user?.id ?? null}
+                automaticoDaOrg={automaticoDaOrg}
+                selecionada
+                leadPrimeiro
+              />
+            )}
+            <Sheet open={fichaAberta} onOpenChange={setFichaAberta}>
+              <SheetContent side="right" className="w-[min(22rem,90vw)] overflow-y-auto p-0">
+                <SheetTitle className="sr-only">{t("Ficha do contato")}</SheetTitle>
+                <CRMSidePanel conversation={selectedConversation} />
+              </SheetContent>
+            </Sheet>
+          </>
         )}
         {selectedConversation ? (
           <>

@@ -5,6 +5,8 @@ import {
   type ClipboardEvent, type KeyboardEvent,
 } from "react";
 import { BarraDoComposer } from "@/components/inbox/composer/BarraDoComposer";
+import { FolhaDeRespostasRapidas } from "@/components/mobile/telas/FolhaDeRespostasRapidas";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { DialogosDoComposer } from "@/components/inbox/composer/DialogosDoComposer";
 import { CaixaOuFaixaDoDono } from "@/components/inbox/composer/FaixaDoDono";
 import { FaixaDeContatoBloqueado, FaixaDeConversaFechada } from "@/components/inbox/composer/FaixaDeEstado";
@@ -92,6 +94,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const upload = useUploadMedia();
   const createNote = useCreateNote();
   const templates = useMessageTemplates();
+  const celular = useEhCelular();
+  const [folhaDeRespostas, setFolhaDeRespostas] = useState(false);
   const sugestao = useSugestaoDeResposta(conversationId, mode === "reply");
   const slash = resolveSlash(text);
   const menuOpen = mode === "reply" && slash.open && !menuDismissed;
@@ -287,6 +291,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               : "border-border-strong bg-surface focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/20",
           )}
         >
+          <FolhaDeRespostasRapidas aberta={folhaDeRespostas} aoMudar={setFolhaDeRespostas} respostas={templates.data ?? []} aoEscolher={applyTemplate} />
           <TemplateMenu open={menuOpen} query={slash.query} templates={templates.data ?? []} onPick={applyTemplate} onClose={() => setMenuDismissed(true)} />
           <textarea
             ref={taRef}
@@ -321,6 +326,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             onContato={() => setContactPickerOpen(true)}
             onEmoji={inserir}
             onRespostasRapidas={() => {
+              // Celular (M2.3): a lista em folha, porque a ancorada fica atrás do teclado.
+              if (celular) return setFolhaDeRespostas(true);
               setText("/");
               setMenuDismissed(false);
               requestAnimationFrame(() => taRef.current?.focus());

@@ -14841,6 +14841,10 @@ export const DICIONARIO: Traducoes = {
   "Agente IA": { es: "Agente IA" },
   "Ver 1 conversa": { es: "Ver 1 conversación" },
   "Canal inválido.": { es: "Canal inválido." },
+  // ─── APP DE CELULAR (M2.3: conversa aberta) ───
+  "Abrir ficha de": { es: "Abrir ficha de" },
+  "Ações da conversa": { es: "Acciones de la conversación" },
+  "Mover etapa": { es: "Mover etapa" },
 };
 
 /**

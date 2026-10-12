@@ -140,6 +140,9 @@ export const viewport: Viewport = {
   // área segura pelos tokens `--mb-area-*` do globals.css. No desktop o `env()` vale
   // 0, então acima de 760px nada muda.
   viewportFit: "cover",
+  // Android: o teclado encolhe a página e o composer da conversa fica acima dele
+  // (no iPhone, ver `lib/mobile/useAlturaDoTeclado`).
+  interactiveWidget: "resizes-content",
 };
 
 // Inline FOUC-prevention. Conteúdo é string literal estática (zero input do usuário),

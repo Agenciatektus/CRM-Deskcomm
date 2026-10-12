@@ -57,6 +57,11 @@ interface Props {
   onFechar: () => void;
   onAbrirDialogo: (d: DialogoDoMenu) => void;
   onDevolverFoco: (e: Event) => void;
+  /**
+   * Celular (M2.3, o ⋮ da conversa aberta): as ações do LEAD vêm primeiro ("Funil e
+   * etapa": mover, ganho, perdido, outro funil), depois as da conversa.
+   */
+  leadPrimeiro?: boolean;
 }
 
 /**
@@ -71,6 +76,7 @@ export function ConteudoDoMenu({
   meuUserId,
   automaticoDaOrg,
   selecionada = false,
+  leadPrimeiro = false,
   onFechar,
   onAbrirDialogo,
   onDevolverFoco,
@@ -156,6 +162,12 @@ export function ConteudoDoMenu({
           </span>
         </div>
 
+        {leadPrimeiro && regras.funil && c?.id && (
+          <>
+            <SubmenuDoFunil contactId={c.id} onDialogo={(d) => abrirDialogo({ ...d, contactId: c.id })} />
+            <DropdownMenuSeparator />
+          </>
+        )}
         {regras.assumir && (
           <DropdownMenuItem
             className={cn(CLASSE_DO_ITEM, CLASSE_DO_PRINCIPAL)}
@@ -207,7 +219,7 @@ export function ConteudoDoMenu({
           )}
         {regras.lembrar && <SubmenuLembrar conversationId={id} lembreteAtivo={regras.lembreteAtivo} />}
         {regras.etiquetas && <SubmenuEtiquetas conversation={conversation} />}
-        {regras.funil && c?.id && (
+        {!leadPrimeiro && regras.funil && c?.id && (
           <SubmenuDoFunil contactId={c.id} onDialogo={(d) => abrirDialogo({ ...d, contactId: c.id })} />
         )}
         {(temAtendimento || temRoteamento) && (regras.ficha || regras.copiarTelefone) && <DropdownMenuSeparator />}
