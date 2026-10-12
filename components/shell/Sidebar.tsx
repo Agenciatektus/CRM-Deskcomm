@@ -1,4 +1,6 @@
 "use client";
+import { useCabeNoDesktop } from "@/hooks/ui/useCabeNoDesktop";
+import { ehRotaDaInbox, menuRecolhido } from "@/lib/navigation/preferencia-do-menu";
 import Link from "next/link";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname } from "next/navigation";
@@ -208,7 +210,20 @@ export function SidebarContent({ onNavigate, funis = [] }: SidebarContentProps) 
   );
 }
 
-export function Sidebar({ collapsed, funis }: { collapsed: boolean; funis?: readonly FunilDoMenu[] }) {
+export function Sidebar({
+  collapsed: recolhidoGeral,
+  fixoNaInbox = false,
+  funis,
+}: {
+  collapsed: boolean;
+  fixoNaInbox?: boolean;
+  funis?: readonly FunilDoMenu[];
+}) {
+  const pathname = usePathname();
+  const cabe = useCabeNoDesktop();
+  const naInbox = ehRotaDaInbox(pathname);
+  // Na Inbox o menu começa recolhido; abaixo de 1024px nunca fixa (quadro DS).
+  const collapsed = !cabe || menuRecolhido({ pathname, recolhidoGeral, fixoNaInbox });
   return (
     <aside
       className={cn(
@@ -237,10 +252,16 @@ export function Sidebar({ collapsed, funis }: { collapsed: boolean; funis?: read
         // conteúdo ("peek"), presa dentro desta `<aside>`, e a largura que a
         // casca enxerga continua sendo uma só: a desta caixa.
         "sticky top-0 z-30 flex h-screen shrink-0 flex-col bg-background transition-[width] duration-200",
-        collapsed ? "w-[72px]" : "w-[304px]",
+        collapsed ? "w-[72px]" : "w-[304px] max-lg:w-[72px]",
       )}
     >
-      <BarraEmDuasColunas collapsed={collapsed} funis={funis} marca={<MarcaDaBarra compacta />} />
+      <BarraEmDuasColunas
+        collapsed={collapsed}
+        escopo={naInbox ? "inbox" : "geral"}
+        podeFixar={cabe}
+        funis={funis}
+        marca={<MarcaDaBarra compacta={false} />}
+      />
     </aside>
   );
 }

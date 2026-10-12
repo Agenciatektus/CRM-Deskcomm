@@ -101,7 +101,7 @@ async function abrirGrupo(nome: string) {
 describe("Sidebar agrupado", () => {
   it("renderiza os grupos na ordem de uso", () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     // Organização não está no trilho: seu hub (Configurações) é o link Ajustes do
     // rodapé fixo, fora da área que rola — medido, ele caía fora da dobra até em
     // 1080px. "Agentes" no plural é decisão do produto (era "Agente").
@@ -114,7 +114,7 @@ describe("Sidebar agrupado", () => {
 
   it("leva às Etapas do funil pelo CRM, e não por Configurações", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     // ⚠️ O CAMINHO MUDOU, A PROPRIEDADE NÃO. Etapas do funil saiu do menu para
     // dentro do hub do CRM quando Tarefas virou o quinto destino do grupo e o
     // menu passou a rolar. A porta continua sendo CRM — "Ver tudo em CRM" leva
@@ -146,7 +146,7 @@ describe("Sidebar agrupado", () => {
 
   it("o número de Casos mora no item de Casos, e o da Fila no item de Inbox", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     // No trilho, cada contador vira ponto no botão do grupo que contém a tela:
     // é o aviso de que há o que fazer num grupo que a coluna não está mostrando.
     const casosNoTrilho = within(trilho()).getByTestId("marcador-casos");
@@ -175,14 +175,14 @@ describe("Sidebar agrupado", () => {
 
   it("e os dois itens de funil não disputam o mesmo nome", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     await abrirGrupo("CRM");
     expect(screen.getByRole("link", { name: "Funis" })).toHaveAttribute("href", "/app/kanban");
   });
 
   it("desenterra Audit Log — e Nuvemshop ficou de fora, por escolha", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     // ⚠️ O CAMINHO MUDOU, A PROPRIEDADE NÃO. O que esta linha sempre prendeu é
     // que Audit Log deixou de existir só como card enterrado em Configurações.
     // Quando Atividades (PR #583) virou o quinto destino do grupo Análise, Audit
@@ -210,7 +210,7 @@ describe("Sidebar agrupado", () => {
 
   it("Configurações fica no rodapé, nunca dependendo de scroll, e abre a coluna 2", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     // No trilho de 72px o rótulo é curto ("Ajustes").
     const config = screen.getByRole("button", { name: /Ajustes/ });
     // Fora das duas áreas que rolam (o trilho de grupos e a coluna).
@@ -271,7 +271,7 @@ describe("Sidebar agrupado", () => {
   it("não deixa grupo órfão quando a permissão esvazia o grupo", () => {
     // CANAIS é todo manager+/admin. Um agent não pode ver o botão sozinho.
     comoPapel("agent");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     expect(nomesDosGrupos()).not.toContain("Canais");
     expect(nomesDosGrupos()).toContain("Conversas");
   });
@@ -280,7 +280,7 @@ describe("Sidebar agrupado", () => {
     // Decisão do Peterson (09/10/2026), seguindo o protótipo. O hub segue na rota
     // e no menu do celular, que não tem a coluna (`SidebarContent`).
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     await abrirGrupo("Agentes");
     expect(screen.queryByRole("link", { name: /Ver tudo em IA/ })).toBeNull();
     // Controle: a coluna está mesmo aberta, com as telas do grupo.
@@ -331,15 +331,22 @@ describe("Sidebar agrupado", () => {
     comoPapel("admin");
     const { rerender } = render(<Sidebar collapsed />);
     await userEvent.click(within(trilho()).getByRole("button", { name: "Conversas" }));
-    rerender(<Sidebar collapsed={false} />);
+    rerender(<Sidebar collapsed={false} fixoNaInbox />);
     rerender(<Sidebar collapsed />);
     // Recolhida de novo, a sobreposição não reaparece sozinha.
     expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull();
   });
 
+  it("na Inbox a 2ª coluna começa recolhida, mesmo com a preferência geral aberta (quadro DS)", () => {
+    comoPapel("admin");
+    const { container } = render(<Sidebar collapsed={false} />);
+    expect(container.querySelector("aside")?.className).toContain("w-[72px]");
+    expect(screen.getByRole("button", { name: "Fixar menu" })).toBeInTheDocument();
+  });
+
   it("marca a rota atual com aria-current", async () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     expect(screen.getByRole("link", { name: /Inbox/ })).toHaveAttribute("aria-current", "page");
     // "Kanban" saiu da interface; o item da mesma URL agora se chama "Funis".
     await abrirGrupo("CRM");
@@ -354,14 +361,14 @@ describe("rótulo curto do trilho", () => {
     // produto (tabelas usam a mesma chave em outro sentido).
     idiomaRef.valor = "es";
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     const botao = within(trilho()).getByRole("button", { name: "Chats" });
     expect(botao).toHaveAttribute("title", "Conversas");
   });
 
   it("em português o trilho usa o próprio rótulo do grupo", () => {
     comoPapel("admin");
-    render(<Sidebar collapsed={false} />);
+    render(<Sidebar collapsed={false} fixoNaInbox />);
     expect(within(trilho()).getByRole("button", { name: "Conversas" })).toBeTruthy();
   });
 });

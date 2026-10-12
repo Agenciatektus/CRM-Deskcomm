@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -136,70 +136,31 @@ describe("ConversationHeader — chamada de voz na Inbox", () => {
   });
 });
 
-describe("ConversationHeader — Fechar e Arquivar por AlertDialog", () => {
-  it("Fechar pede confirmação e só encerra no clique de dentro do diálogo", async () => {
+describe("ConversationHeader — Fechar e Arquivar agem na hora, com Desfazer (quadro DS)", () => {
+  // Fechar e arquivar não apagam nada (a conversa volta quando o cliente
+  // escreve): a doutrina da ação destrutiva não pede janela, e o quadro DS pede
+  // o aviso de 5 s com Desfazer (`useEncerrarComDesfazer`).
+  it("Fechar encerra no primeiro clique, sem janela, com a revisão de quem viu", async () => {
     const user = userEvent.setup();
     render(<ConversationHeader conversation={conversa("open")} />);
 
     await user.click(screen.getByRole("button", { name: "Fechar conversa" }));
 
-    const dialogo = await screen.findByRole("alertdialog");
-    expect(within(dialogo).getByText("Fechar esta conversa?")).toBeTruthy();
-    expect(closeMutate).not.toHaveBeenCalled();
-
-    await user.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(closeMutate).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: "Fechar conversa" }));
-    const dialogo2 = await screen.findByRole("alertdialog");
-    await user.click(within(dialogo2).getByRole("button", { name: "Fechar" }));
-
-    await waitFor(() => expect(closeMutate).toHaveBeenCalledTimes(1));
-    expect(closeMutate).toHaveBeenCalledWith({
-      conversation_id: "conv-1",
-      expected_revision: 3,
-    });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(closeMutate).toHaveBeenCalledTimes(1);
+    expect(closeMutate.mock.calls[0]![0]).toEqual({ conversation_id: "conv-1", expected_revision: 3 });
   });
 
-  it("Arquivar, numa conversa aberta, avisa que o atendimento é encerrado junto", async () => {
+  it("Arquivar pelo menu Mais também age na hora, sem janela", async () => {
     const user = userEvent.setup();
     render(<ConversationHeader conversation={conversa("open")} />);
 
     await user.click(screen.getByRole("button", { name: "Mais ações" }));
     await user.click(await screen.findByRole("menuitem", { name: "Arquivar" }));
 
-    const dialogo = await screen.findByRole("alertdialog");
-    expect(within(dialogo).getByText("Arquivar esta conversa?")).toBeTruthy();
-    expect(
-      within(dialogo).getByText(
-        "Arquivar encerra este atendimento e guarda a conversa no histórico. Se o cliente escrever de novo, ela volta.",
-      ),
-    ).toBeTruthy();
-    expect(arquivarMutate).not.toHaveBeenCalled();
-
-    await user.click(within(dialogo).getByRole("button", { name: "Arquivar" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     await waitFor(() => expect(arquivarMutate).toHaveBeenCalledTimes(1));
-    expect(arquivarMutate).toHaveBeenCalledWith({
-      conversation_id: "conv-1",
-      expected_revision: 3,
-    });
-  });
-
-  it("Arquivar, numa conversa já encerrada, não repete o aviso de encerramento", async () => {
-    const user = userEvent.setup();
-    render(<ConversationHeader conversation={conversa("closed")} />);
-
-    await user.click(screen.getByRole("button", { name: "Mais ações" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Arquivar" }));
-
-    const dialogo = await screen.findByRole("alertdialog");
-    expect(within(dialogo).getByText("Arquivar esta conversa?")).toBeTruthy();
-    expect(
-      screen.queryByText(
-        "Arquivar encerra este atendimento e guarda a conversa no histórico. Se o cliente escrever de novo, ela volta.",
-      ),
-    ).toBeNull();
+    expect(arquivarMutate.mock.calls[0]![0]).toEqual({ conversation_id: "conv-1", expected_revision: 3 });
   });
 });
 

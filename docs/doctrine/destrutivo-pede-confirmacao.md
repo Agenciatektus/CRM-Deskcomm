@@ -44,6 +44,16 @@ O alvo nomeado é metade da regra. "Tem certeza?" não informa nada: quem clicou
 confirma de novo pelo mesmo motivo que errou. *"Excluir este nó?"* é uma pergunta que só faz
 sentido se era isso mesmo que ele queria — e o erro morre ali.
 
+## Etapa 2 do design system (out/2026)
+
+O quadro DS (`docs/design/inbox-v2/DesignSystem.dc.html`) trouxe dois ajustes, aprovados pelo Peterson:
+
+- **O que não apaga trabalho e tem volta** (fechar, arquivar, ganhar, perder, trocar de funil, marcar avisos)
+  age no primeiro clique e mostra o **Aviso com Desfazer** por 5 s (`lib/ui/aviso-com-desfazer.ts`).
+- **O que apaga ou vale para a empresa inteira** (excluir lead, bloquear contato) continua pedindo
+  confirmação com o alvo nomeado, mas a confirmação mora **dentro do componente** (o menu), e não numa
+  janela modal. Excluir lead, que é DELETE definitivo, ainda é **adiado** 5 s com Desfazer.
+
 ## Como aplicar
 
 O padrão da casa é o `AlertDialog` de `components/ui/alert-dialog`, o mesmo de

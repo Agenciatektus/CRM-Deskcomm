@@ -61,7 +61,9 @@ let marcaDaInstalacao: Branding = {
 function renderSidebar(props: { collapsed: boolean }) {
   return render(
     <MarcaDaInstalacaoProvider marca={marcaDaInstalacao}>
-      <Sidebar collapsed={props.collapsed} />
+      {/* `fixoNaInbox`: na Inbox a barra começa recolhida (quadro DS); estes
+          casos medem a barra aberta, onde o logo mora no rodapé da coluna. */}
+      <Sidebar collapsed={props.collapsed} fixoNaInbox={!props.collapsed} />
     </MarcaDaInstalacaoProvider>,
   );
 }
@@ -103,12 +105,12 @@ describe("o nome da marca na barra lateral", () => {
     expect(screen.queryByText("Sistema do Revendedor")).toBeNull();
   });
 
-  it("recolhida, a inicial acompanha o nome que a barra mostra", () => {
-    // Sem isto, recolher o menu trocaria a marca: o nome viria da organização e
-    // a inicial continuaria vindo da INSTALAÇÃO — "L" expandido, "S" recolhido.
+  it("recolhida, o topo do trilho mostra a SIGLA da organização, e não a inicial da instalação", () => {
+    // Quadro DS (`.rail-tenant`): o topo do trilho é a organização. O logo da
+    // marca desceu para o rodapé da 2ª coluna, que recolhida não aparece.
     contexto = { user: usuario, activeOrg: { ...org, marca: { nome: "Loja da Ana" } } };
     renderSidebar({ collapsed: true });
-    expect(screen.getByText("L")).toBeTruthy();
+    expect(screen.getByTestId("sigla-da-organizacao")).toHaveTextContent("LD");
     expect(screen.queryByText("S")).toBeNull();
   });
 });

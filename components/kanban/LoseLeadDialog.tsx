@@ -91,6 +91,7 @@ export function FormularioDePerda({
   motivoObrigatorio = true,
   onCancelar,
   onConcluido,
+  adiar,
   rodape,
 }: {
   leadId: string;
@@ -104,6 +105,12 @@ export function FormularioDePerda({
   motivoObrigatorio?: boolean;
   onCancelar: () => void;
   onConcluido: () => void;
+  /**
+   * Quando presente, a perda NÃO sai na hora: quem chama recebe a gravação e a
+   * segura (o aviso com Desfazer do painel, `adiarAcao`), porque `/lose`
+   * dispara `lead.lost` com efeito fora do CRM (saídas da cadência, push).
+   */
+  adiar?: (gravar: () => Promise<unknown>) => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
 }) {
   const t = useT();
@@ -164,7 +171,12 @@ export function FormularioDePerda({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      await mutation.mutateAsync({ leadId, lostReason: semMotivo ? undefined : finalReason });
+      const args = { leadId, lostReason: semMotivo ? undefined : finalReason };
+      if (adiar) {
+        adiar(() => mutation.mutateAsync(args));
+      } else {
+        await mutation.mutateAsync(args);
+      }
       setReasonCode("");
       setOtherText("");
       onConcluido();

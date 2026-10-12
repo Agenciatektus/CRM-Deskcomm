@@ -1,9 +1,11 @@
 "use client";
 
+import { ConfirmarBloqueio } from "./ConfirmarBloqueio";
 import { useState } from "react";
 
 import {
   DropdownMenuItem,
+  DropdownMenuShortcut,
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -32,9 +34,11 @@ interface Props {
   podePreferir: boolean;
   /** Bloquear o contato: agent+ e fora do suporte somente leitura. */
   podeBloquear: boolean;
-  /** Abre a confirmação (que sobrevive ao menu fechar). */
-  onBloquear: (contato: { contactId: string; nome: string }) => void;
+  /** Fecha o menu depois de bloquear (a confirmação mora DENTRO dele). */
+  onFecharMenu: () => void;
   nome: string;
+  /** O menu é da conversa selecionada: mostra as teclas U e P nos itens. */
+  selecionada?: boolean;
 }
 
 /**
@@ -45,7 +49,7 @@ interface Props {
  * `mutate` sem `onSuccess` por chamada: o menu desmonta ao escolher, e quem
  * corrige a linha e refaz a lista é o próprio hook.
  */
-export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloquear, nome }: Props) {
+export function ItensPessoais({ conversation, podePreferir, podeBloquear, onFecharMenu, nome, selecionada = false }: Props) {
   const t = useT();
   // Com `t`: cada ação confirma num toast com "Desfazer" quando há inverso.
   const estado = useEstadoDaConversa(t);
@@ -55,7 +59,22 @@ export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloq
   const c = conversation.contacts ?? null;
   const silenciada = estaSilenciada(conversation.muted_until, agora);
   const podeBloquearEste = podeBloquear && !!c?.id && !c.is_blocked;
+  const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
   if (!podePreferir && !podeBloquearEste) return null;
+  const tecla = (letra: string) => (selecionada ? <DropdownMenuShortcut>{letra}</DropdownMenuShortcut> : null);
+  if (confirmandoBloqueio && c?.id) {
+    return (
+      <>
+        <DropdownMenuSeparator />
+        <ConfirmarBloqueio
+          contactId={c.id}
+          nome={nome}
+          onCancelar={() => setConfirmandoBloqueio(false)}
+          onConcluido={onFecharMenu}
+        />
+      </>
+    );
+  }
 
   const fazer = (acao: Parameters<typeof estado.mutate>[0]["acao"]) => estado.mutate({ conversationId: id, acao });
 
@@ -71,6 +90,7 @@ export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloq
           >
             {conversation.pinned ? <PushPinSlash size={16} aria-hidden /> : <PushPin size={16} aria-hidden />}
             {conversation.pinned ? t("Desafixar") : t("Fixar")}
+            {tecla("P")}
           </DropdownMenuItem>
           {silenciada ? (
             <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => fazer({ tipo: "reativar_som" })}>
@@ -106,20 +126,27 @@ export function ItensPessoais({ conversation, podePreferir, podeBloquear, onBloq
           {conversation.marked_unread ? (
             <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => fazer({ tipo: "desmarcar_nao_lida" })}>
               <EnvelopeOpen size={16} aria-hidden /> {t("Marcar como lida")}
+              {tecla("U")}
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => fazer({ tipo: "marcar_nao_lida" })}>
               <EnvelopeSimple size={16} aria-hidden /> {t("Marcar como não lida")}
+              {tecla("U")}
             </DropdownMenuItem>
           )}
         </>
       )}
       {podeBloquearEste && c?.id && (
         <DropdownMenuItem
-          className={cn(CLASSE_DO_ITEM, "text-destructive focus:text-destructive [&>svg]:text-destructive")}
-          onSelect={() => onBloquear({ contactId: c.id, nome })}
+          variant="destructive"
+          className={CLASSE_DO_ITEM}
+          // A confirmação abre DENTRO do menu: o item não fecha o menu.
+          onSelect={(e) => {
+            e.preventDefault();
+            setConfirmandoBloqueio(true);
+          }}
         >
-          <Prohibit size={16} aria-hidden /> {t("Bloquear contato")}
+          <Prohibit size={16} aria-hidden /> {t("Bloquear contato…")}
         </DropdownMenuItem>
       )}
     </>

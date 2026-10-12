@@ -14,9 +14,18 @@ import { CHAVE_DAS_LARGURAS, LARGURAS_PADRAO, lerLarguras, type Coluna, type Lar
  */
 const ouvintes = new Set<() => void>();
 
-function lerBruto(): string | null {
+/**
+ * A chave é POR ATENDENTE (`…:<id do usuário>`): duas pessoas no mesmo
+ * navegador não herdam a largura uma da outra. Não há tabela de preferências
+ * do usuário no banco, então a escolha não acompanha a pessoa entre aparelhos.
+ */
+export function chaveDasLarguras(usuarioId: string | null | undefined): string {
+  return usuarioId ? `${CHAVE_DAS_LARGURAS}:${usuarioId}` : CHAVE_DAS_LARGURAS;
+}
+
+function lerBruto(chave: string): string | null {
   try {
-    return window.localStorage.getItem(CHAVE_DAS_LARGURAS);
+    return window.localStorage.getItem(chave);
   } catch (erroDoArmazenamento) {
     void erroDoArmazenamento;
     return null;
@@ -32,9 +41,9 @@ function assinar(aviso: () => void): () => void {
   };
 }
 
-function gravar(larguras: Larguras): void {
+function gravar(chave: string, larguras: Larguras): void {
   try {
-    window.localStorage.setItem(CHAVE_DAS_LARGURAS, JSON.stringify(larguras));
+    window.localStorage.setItem(chave, JSON.stringify(larguras));
   } catch (erroDoArmazenamento) {
     // Sem armazenamento a largura vale até recarregar; não há o que avisar.
     void erroDoArmazenamento;
@@ -46,8 +55,10 @@ function gravar(larguras: Larguras): void {
  * As larguras da lista e do painel: o que está salvo, mais o arrasto em curso
  * (que só grava ao soltar, para não escrever no disco a cada pixel).
  */
-export function useLargurasDasColunas() {
-  const salvo = useSyncExternalStore(assinar, lerBruto, () => null);
+export function useLargurasDasColunas(usuarioId?: string | null) {
+  const chave = chaveDasLarguras(usuarioId);
+  const ler = useCallback(() => lerBruto(chave), [chave]);
+  const salvo = useSyncExternalStore(assinar, ler, () => null);
   const [arrasto, setArrasto] = useState<Partial<Larguras> | null>(null);
   const base = lerLarguras(salvo);
   const larguras: Larguras = { ...base, ...arrasto };
@@ -59,15 +70,15 @@ export function useLargurasDasColunas() {
   const confirmar = useCallback(
     (coluna: Coluna, valor: number) => {
       setArrasto(null);
-      gravar({ ...lerLarguras(lerBruto()), [coluna]: valor });
+      gravar(chave, { ...lerLarguras(lerBruto(chave)), [coluna]: valor });
     },
-    [],
+    [chave],
   );
 
   const restaurar = useCallback((coluna: Coluna) => {
     setArrasto(null);
-    gravar({ ...lerLarguras(lerBruto()), [coluna]: LARGURAS_PADRAO[coluna] });
-  }, []);
+    gravar(chave, { ...lerLarguras(lerBruto(chave)), [coluna]: LARGURAS_PADRAO[coluna] });
+  }, [chave]);
 
   return { larguras, mover, confirmar, restaurar };
 }

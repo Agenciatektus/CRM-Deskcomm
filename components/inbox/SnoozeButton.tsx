@@ -111,7 +111,7 @@ export function SnoozeButton({ conversationId, snoozeUntil, disabled }: Props) {
         </button>
         {escolhendo && (
           <div className="px-1 pb-1">
-            <SeletorDeDataHora valor={escolhido} onEscolher={setEscolhido} agora={agora} />
+            <SeletorDeDataHora valor={escolhido} onEscolher={setEscolhido} agora={agora} atalhos={false} />
             <Button
               size="sm"
               className="mt-2 w-full"

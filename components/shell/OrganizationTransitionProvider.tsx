@@ -37,3 +37,12 @@ export function useOrganizationTransition() {
   if (!value) throw new Error("OrganizationTransitionProvider ausente");
   return value;
 }
+
+/**
+ * A mesma transição, sem exigir o provedor: o topo do trilho (a sigla da
+ * organização) também é desenhado onde a casca não monta o provedor (a barra da
+ * vitrine, os testes do menu). Sem ele, a troca acontece sem a cortina.
+ */
+export function useOrganizationTransitionOpcional() {
+  return useContext(Context);
+}

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { coresDaBarraDoNavegador } from "@/lib/branding/barra-do-navegador";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
 import { cssDaMarca } from "@/lib/branding/css";
@@ -310,7 +310,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </MarcaDosClientComponents>
           {/* E2: embaixo no centro, como no protótipo; perto da mão que agiu e longe
               do sino e do perfil no topo. 5 s para dar tempo de "Desfazer". */}
-          <Toaster position="bottom-center" richColors closeButton duration={5000} />
+          <Toaster position="bottom-center" closeButton duration={5000} />
         </Providers>
       </body>
     </html>

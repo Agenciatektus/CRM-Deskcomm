@@ -72,12 +72,15 @@ describe("itens por atendente no menu", () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith("/api/v1/conversations/conv-1/mark-unread", {}));
   });
 
-  it("Bloquear contato pede confirmação e só então POST /contacts/:id/block, com o motivo aparado", async () => {
+  it("Bloquear contato confirma DENTRO do menu (quadro DS) e só então POST /contacts/:id/block, com o motivo aparado", async () => {
     await abrir();
-    fireEvent.click(item("Bloquear contato"));
-    const janela = await screen.findByRole("alertdialog");
+    fireEvent.click(item("Bloquear contato…"));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const janela = await screen.findByTestId("confirmar-bloqueio");
     expect(api.post).not.toHaveBeenCalled();
     fireEvent.change(within(janela).getByLabelText("Motivo (opcional)"), { target: { value: "  spam  " } });
+    expect(within(janela).getByRole("button", { name: "Bloquear" })).toBeDisabled();
+    await waitFor(() => expect(within(janela).getByRole("button", { name: "Bloquear" })).toBeEnabled());
     fireEvent.click(within(janela).getByRole("button", { name: "Bloquear" }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/v1\/contacts\/.+\/block$/), { motivo: "spam" }),
@@ -88,13 +91,13 @@ describe("itens por atendente no menu", () => {
     sessao.pode = false;
     await abrir();
     expect(screen.getByRole("menuitem", { name: "Fixar" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Bloquear contato" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Bloquear contato…" })).toBeNull();
   });
 
   it("suporte somente leitura: nenhum item pessoal", async () => {
     sessao.support = { access_mode: "support_readonly" };
     await abrir();
-    for (const nome of ["Fixar", "Silenciar", "Marcar como não lida", "Bloquear contato"]) {
+    for (const nome of ["Fixar", "Silenciar", "Marcar como não lida", "Bloquear contato…"]) {
       expect(screen.queryByRole("menuitem", { name: nome })).toBeNull();
     }
   });

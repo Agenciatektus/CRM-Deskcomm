@@ -8,6 +8,7 @@ import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import {
   atalhoDisponivel,
   diasDaGrade,
+  diaDoAtalho,
   horarioDigitado,
   prazoDoAtalho,
 } from "@/components/inbox/painel/prazos";
@@ -110,7 +111,9 @@ describe("próximo passo — criar", () => {
     await userEvent.click(within(form).getByRole("button", { name: "Ligar para o cliente" }));
     // Prazo é obrigatório nesta peça: sem "Quando" o botão não habilita.
     expect(criar).toBeDisabled();
-    await userEvent.click(within(form).getByRole("button", { name: "Amanhã 9:00" }));
+    // Quadro DS: o atalho escolhe o DIA e o chip escolhe o horário.
+    await userEvent.click(within(form).getByRole("button", { name: "Amanhã" }));
+    await userEvent.click(within(form).getByRole("button", { name: "09:00" }));
     await userEvent.selectOptions(within(form).getByLabelText("Responsável"), "u-2");
     await userEvent.click(criar);
 
@@ -127,11 +130,10 @@ describe("próximo passo — criar", () => {
     });
   });
 
-  it("'Escolher data' abre o calendário, e o dia e o horário escolhidos viram o prazo", async () => {
+  it("o calendário fica à vista: o dia e o horário escolhidos viram o prazo", async () => {
     renderPainel();
     const form = await screen.findByTestId("nova-tarefa-rapida");
     await userEvent.type(within(form).getByLabelText("O que fazer"), "Confirmar consulta");
-    await userEvent.click(within(form).getByRole("button", { name: "Escolher data" }));
 
     const hoje = new Date();
     const alvo = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 2);
@@ -172,11 +174,12 @@ describe("próximo passo — a tarefa aberta", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Reagendar" }));
     const salvar = within(card).getByRole("button", { name: "Salvar novo prazo" });
     expect(salvar).toBeDisabled();
-    await userEvent.click(within(card).getByRole("button", { name: "Em 3 dias 9:00" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Em 7 dias" }));
+    await userEvent.click(within(card).getByRole("button", { name: "09:00" }));
     await userEvent.click(salvar);
-    await waitFor(() =>
-      expect(patch).toHaveBeenCalledWith("/api/v1/tasks/t-1", { due_date: prazoDoAtalho("em_3_dias_9").toISOString() }),
-    );
+    const hoje = new Date();
+    const esperado = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 7, 9, 0).toISOString();
+    await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/tasks/t-1", { due_date: esperado }));
   });
 
   it("tarefa com prazo vencido diz 'Atrasada' por escrito", async () => {
@@ -217,10 +220,23 @@ describe("prazos — a aritmética do 'Quando'", () => {
     expect(atalhoDisponivel("hoje_18", new Date(2026, 9, 6, 9))).toBe(true);
   });
 
-  it("horário digitado só vale em hh:mm", () => {
+  it("horário digitado vale em hh:mm e corrido, como '1430' (quadro DS)", () => {
     expect(horarioDigitado("9:05")).toEqual([9, 5]);
+    expect(horarioDigitado("1430")).toEqual([14, 30]);
+    expect(horarioDigitado("905")).toEqual([9, 5]);
     expect(horarioDigitado("24:00")).toBeNull();
+    expect(horarioDigitado("2460")).toBeNull();
     expect(horarioDigitado("9h")).toBeNull();
+  });
+
+  it("os atalhos de dia: Hoje, Amanhã, o próximo dia útil e Em 7 dias", () => {
+    const sexta = new Date(2026, 9, 9, 15, 0);
+    expect(diaDoAtalho("hoje", sexta)).toEqual(new Date(2026, 9, 9));
+    expect(diaDoAtalho("amanha", sexta)).toEqual(new Date(2026, 9, 10));
+    // Na sexta, o próximo dia útil é a segunda.
+    expect(diaDoAtalho("proximo_util", sexta)).toEqual(new Date(2026, 9, 12));
+    expect(diaDoAtalho("proximo_util", new Date(2026, 9, 6))).toEqual(new Date(2026, 9, 7));
+    expect(diaDoAtalho("em_7_dias", sexta)).toEqual(new Date(2026, 9, 16));
   });
 
   it("a grade do mês fecha em semanas inteiras, começando no domingo", () => {

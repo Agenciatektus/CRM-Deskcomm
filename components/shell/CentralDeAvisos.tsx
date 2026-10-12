@@ -1,4 +1,6 @@
 "use client";
+import { toast } from "sonner";
+import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
 import type { ComponentType } from "react";
@@ -94,9 +96,28 @@ export function CentralDeAvisos({ podeResolver, onFechar }: { podeResolver: bool
         {podeResolver && aba === "open" && itens.length > 1 && (
           <button
             type="button"
-            className="text-xs font-semibold text-accent-700 underline-offset-2 hover:underline disabled:opacity-60 dark:text-accent-300"
+            className="text-label text-accent-text underline-offset-2 hover:underline disabled:opacity-60"
             disabled={resolverTodos.isPending}
-            onClick={() => resolverTodos.mutate()}
+            onClick={() => {
+              // O Desfazer reabre um por vez os ids que a tela carregou. Só é
+              // oferecido com a lista COMPLETA (menos que o limite de 50): com
+              // mais abertos, o `resolve-all` resolve todos e a tela não teria
+              // como reabrir os que não vieram (P2-3 do Cassio na #169).
+              const carregados = abertos.data?.items ?? [];
+              const completa = carregados.length < LIMITE_DA_LISTA && carregados.length >= nAbertos;
+              const ids = carregados.map((i) => i.id);
+              resolverTodos.mutate(undefined, {
+                onSuccess: () => {
+                  if (completa) {
+                    avisarComDesfazer(t("Avisos marcados como resolvidos."), t("Desfazer"), () =>
+                      Promise.all(ids.map((id) => atualizar.mutateAsync({ id, status: "open" }))),
+                    );
+                  } else {
+                    toast.success(t("Avisos marcados como resolvidos."));
+                  }
+                },
+              });
+            }}
           >
             {t("Marcar todos resolvidos")}
           </button>

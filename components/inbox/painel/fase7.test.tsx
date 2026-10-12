@@ -1,11 +1,13 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mover = vi.hoisted(() => ({ mutate: vi.fn(), isPending: false }));
 const permissao = vi.hoisted(() => ({ pode: true }));
 vi.mock("@/hooks/kanban/useMoveCard", () => ({ useMoveCard: () => mover }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => permissao.pode }));
-const excluir = vi.hoisted(() => ({ mutate: vi.fn(), isPending: false }));
+const excluir = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(() => Promise.resolve()), isPending: false }));
+const adiar = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarExclusao: adiar.fn, avisarComDesfazer: vi.fn() }));
 vi.mock("@/hooks/kanban/useBulkAction", () => ({ useBulkAction: () => excluir }));
 
 import { BarraDeEtapas } from "./BarraDeEtapas";
@@ -79,19 +81,25 @@ describe("MenuDoLead (P13)", () => {
     expect(screen.getByRole("menuitem", { name: /Abrir no quadro do funil/ })).toHaveAttribute("href", "/app/pipelines/p1");
   });
 
-  it("P21: Excluir lead pede confirmação e usa a mesma porta do card (bulk delete)", () => {
+  it("P21: Excluir lead confirma DENTRO do menu e adia a exclusão 5 s (Desfazer), pela porta do card", async () => {
     permissao.pode = true;
-    excluir.mutate.mockClear();
+    excluir.mutateAsync.mockClear();
+    adiar.fn.mockClear();
     render(<MenuDoLead leadId="l1" pipelineId="p1" titulo="Clareamento" />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Mais ações do negócio" }), { button: 0, ctrlKey: false });
     fireEvent.click(screen.getByRole("menuitem", { name: /Excluir lead/ }));
-    expect(screen.getByRole("alertdialog")).toHaveTextContent('Excluir "Clareamento"?');
-    expect(excluir.mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByTestId("confirmar-exclusao-do-lead")).toHaveTextContent('Excluir "Clareamento"?');
+    // Desarmado nos primeiros 300 ms (P2-4): o duplo clique não exclui.
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
-    expect(excluir.mutate).toHaveBeenCalledWith(
-      { action: "delete", lead_ids: ["l1"], params: {} },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
+    // Nada sai na hora: o aviso segura a exclusão e só depois chama a rota.
+    expect(excluir.mutateAsync).not.toHaveBeenCalled();
+    expect(adiar.fn).toHaveBeenCalledTimes(1);
+    const executar = adiar.fn.mock.calls[0]![2] as () => Promise<unknown>;
+    await executar();
+    expect(excluir.mutateAsync).toHaveBeenCalledWith({ action: "delete", lead_ids: ["l1"], params: {} });
   });
 
   it("CONTROLE: em leitura (ou sem permissão de mexer no funil) não há Excluir", () => {

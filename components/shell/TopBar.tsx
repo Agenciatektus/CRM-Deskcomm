@@ -58,7 +58,11 @@ export function TopBar() {
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur md:gap-3 md:pl-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <MobileSidebar />
-        <TenantSwitcher />
+        {/* No desktop a organização mora no topo do trilho (quadro DS); aqui
+            fica só para o celular, que não tem trilho. */}
+        <div className="md:hidden">
+          <TenantSwitcher />
+        </div>
         <TrilhaDaRota />
       </div>
       {/* A busca ocupa o meio e cresce até os 440px do protótipo (o limite mora

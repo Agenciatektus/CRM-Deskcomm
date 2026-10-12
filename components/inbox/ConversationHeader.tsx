@@ -1,5 +1,5 @@
 "use client";
-import { useState, type RefObject } from "react";
+import { type RefObject } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
@@ -7,11 +7,8 @@ import { CheckCircle } from "@/lib/ui/icons";
 import { useAuth, usePermission } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
-import {
-  useArchiveConversation,
-  useCloseConversation,
-  useReopenConversation,
-} from "@/hooks/inbox/useCloseConversation";
+import { useReopenConversation } from "@/hooks/inbox/useCloseConversation";
+import { useEncerrarComDesfazer } from "@/hooks/inbox/useEncerrarComDesfazer";
 import { useResumeAiAttendance } from "@/hooks/inbox/useResumeAiAttendance";
 import { usePauseAiAttendance } from "@/hooks/inbox/usePauseAiAttendance";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
@@ -19,7 +16,6 @@ import { comandoDaConversa, ROTULO_DO_MOTIVO } from "@/lib/inbox/comando-da-conv
 import { SnoozeButton } from "@/components/inbox/SnoozeButton";
 import { DialButton } from "@/components/voice/DialButton";
 import { AlternarPainel } from "@/components/inbox/cabecalho/AlternarPainel";
-import { ConfirmacoesDaConversa } from "@/components/inbox/cabecalho/ConfirmacoesDaConversa";
 import { FaixaDeStatus } from "@/components/inbox/cabecalho/FaixaDeStatus";
 import { IdentidadeDaConversa } from "@/components/inbox/cabecalho/IdentidadeDaConversa";
 import { MaisAcoes } from "@/components/inbox/cabecalho/MaisAcoes";
@@ -84,16 +80,14 @@ export function ConversationHeader({
   const leitura = user.support?.access_mode === "support_readonly" || !podeAtender;
   const claim = useClaimConversation();
   const release = useReleaseConversation();
-  const close = useCloseConversation();
+  // Fechar e arquivar agem na hora, com "Desfazer" no aviso (quadro DS).
+  const encerrar = useEncerrarComDesfazer();
   const reopen = useReopenConversation();
-  const arquivar = useArchiveConversation();
   const retomar = useResumeAiAttendance();
   const pausar = usePauseAiAttendance();
   // "Existe automático nesta org?" Sem isto o selo afirmava que o robô estava
   // atendendo em instalação que nunca configurou agente nenhum.
   const automaticoDaOrg = useAutomaticoAtivo();
-  const [confirmFecharOpen, setConfirmFecharOpen] = useState(false);
-  const [confirmArquivarOpen, setConfirmArquivarOpen] = useState(false);
 
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
@@ -247,10 +241,10 @@ export function ConversationHeader({
                   size="sm"
                   variant="ghost"
                   className="w-9 px-0"
-                  disabled={close.isPending}
+                  disabled={encerrar.fechando}
                   aria-label={t("Fechar conversa")}
                   title={t("Fechar conversa")}
-                  onClick={() => setConfirmFecharOpen(true)}
+                  onClick={() => encerrar.fechar(conversation)}
                 >
                   <CheckCircle size={18} aria-hidden />
                 </Button>
@@ -265,7 +259,7 @@ export function ConversationHeader({
             // ARQUIVAR (#923): a já arquivada não mostra, arquivar duas vezes não
             // é um gesto. Fechada e resolvida mostram: são as que se manda para o
             // arquivo depois de encerradas. Mesma permissão de fechar.
-            arquivar={!leitura && status !== "archived" ? { onArquivar: () => setConfirmArquivarOpen(true), pendente: arquivar.isPending } : undefined}
+            arquivar={!leitura && status !== "archived" ? { onArquivar: () => encerrar.arquivar(conversation), pendente: encerrar.arquivando } : undefined}
             contatoId={c?.id ?? null}
             painelVisivel={painelAberto}
           />
@@ -289,15 +283,6 @@ export function ConversationHeader({
         instagramEntrada={conversation.instagram_entrada ?? null}
         entradaDoContato={entrouPor(conversation.contacts)}
         leitura={leitura}
-      />
-      <ConfirmacoesDaConversa
-        fecharAberto={confirmFecharOpen}
-        onFecharAberto={setConfirmFecharOpen}
-        onFechar={() => close.mutate({ conversation_id: conversation.id, expected_revision: conversation.service_revision })}
-        arquivarAberto={confirmArquivarOpen}
-        onArquivarAberto={setConfirmArquivarOpen}
-        onArquivar={() => arquivar.mutate({ conversation_id: conversation.id, expected_revision: conversation.service_revision })}
-        encerrada={encerrada}
       />
     </div>
   );
