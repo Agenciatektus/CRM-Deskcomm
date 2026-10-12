@@ -1,5 +1,5 @@
 "use client";
-import { acaoPendente, adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useCallback, useMemo, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
@@ -246,14 +246,13 @@ export function KanbanBoard({
       // fechamento enquanto o primeiro está segurado (follow-up do Cassio na #180).
       const destino = data.stages.find((s) => s.id === destStageId);
       if (destino?.is_won || destino?.is_lost) {
-        const chave = `${destino.is_won ? "ganho" : "perda"}:${lead.id}`;
-        if (acaoPendente(`ganho:${lead.id}`) || acaoPendente(`perda:${lead.id}`)) return;
-        adiarAcao(
+        // A trava confere ganho, perda e troca deste negócio (`fechamentoPendente`).
+        adiarFechamento(
+          destino.is_won ? "ganho" : "perda",
+          lead.id,
           (s) => `${destino.is_won ? t("Ganho em") : t("Perdido em")} ${s} s`,
           t("Desfazer"),
           async () => mover(),
-          undefined,
-          { chave },
         );
         return;
       }

@@ -36,6 +36,7 @@ vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
   adiarAcao: adiar,
   avisarComDesfazer: vi.fn(),
   useAcaoPendente: (chave: string) => chave === "ganho:l-1" && pendente.ganho,
+  acaoPendente: (chave: string) => chave === "ganho:l-1" && pendente.ganho,
 }));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({
   useWinLead: () => ({ mutate: vi.fn(), mutateAsync: ganhar, isPending: false }),

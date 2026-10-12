@@ -24,7 +24,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DotsThree, PencilSimple, Users } from "@/lib/ui/icons";
 import { useWinLead, useEditLead } from "@/hooks/kanban/useUpdateLead";
-import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLead";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
@@ -172,13 +173,14 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
             onSelect={() => {
               // Adiado 5 s com Desfazer, como no painel: `/win` dispara `lead.won`
               // (conversão de anúncio, saídas da cadência, push) na hora.
-              adiarAcao(
+              // A trava confere ganho, perda e troca deste negócio.
+              adiarFechamento(
+                "ganho",
+                lead.id,
                 (s) => `${t("Ganho em")} ${s} s`,
                 t("Desfazer"),
                 // O erro já aparece pelo `onError` do hook; aqui não repete.
                 () => winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
-                undefined,
-                { chave: `ganho:${lead.id}` },
               );
             }}
           >

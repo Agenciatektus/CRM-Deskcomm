@@ -169,6 +169,9 @@ describe("ações do negócio — aberto", () => {
     // A página sai: o painel desmonta e o aviso morre com ela, sem `onAutoClose`.
     cleanup();
     expect(post).not.toHaveBeenCalled();
+    // No teste o aviso não morre com a página: solta a trava por negócio (que agora
+    // vale para ganho, perda e troca) para os próximos casos.
+    ultimoAviso().action.onClick();
   });
 
   it("Perder também é adiado: gravar o motivo só chama /lose quando o aviso acaba", async () => {

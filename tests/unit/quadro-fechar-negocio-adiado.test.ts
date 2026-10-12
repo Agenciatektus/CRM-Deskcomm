@@ -12,9 +12,9 @@ const QUADRO = readFileSync("components/kanban/KanbanBoard.tsx", "utf8");
 describe("arrastar para ganho ou perda no quadro", () => {
   it("adia com Desfazer e trava por negócio, nas duas colunas", () => {
     expect(QUADRO).toMatch(/if \(destino\?\.is_won \|\| destino\?\.is_lost\)/);
-    expect(QUADRO).toMatch(/adiarAcao\(/);
-    expect(QUADRO).toMatch(/acaoPendente\(`ganho:\$\{lead\.id\}`\) \|\| acaoPendente\(`perda:\$\{lead\.id\}`\)/);
-    expect(QUADRO).toMatch(/\{ chave \}/);
+    // `adiarFechamento` agenda com a chave do tipo e recusa com qualquer fechamento
+    // (ganho, perda, troca) do mesmo negócio segurado (ver fechar-negocio-trava).
+    expect(QUADRO).toMatch(/adiarFechamento\(\s*destino\.is_won \? "ganho" : "perda",\s*lead\.id,/);
   });
 
   it("etapa aberta continua movendo na hora (só o fechamento é adiado)", () => {
