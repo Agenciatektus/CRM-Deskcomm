@@ -195,7 +195,7 @@ describe("com a chamada em andamento", () => {
     expect(reserva()).toBeGreaterThanOrEqual(ocupacao);
     expect(variavel()).toBe(`${reserva()}px`);
     expect(rodape.getAttribute("style") ?? "").toContain(
-      `max(${PISO_DO_RODAPE}px, var(${VARIAVEL_DA_OCUPACAO}, 0px))`,
+      `max(${PISO_DO_RODAPE}px, calc(var(${VARIAVEL_DA_OCUPACAO}, 0px) + var(--mb-area-baixo, 0px)))`,
     );
     // O cartão da Inbox desconta da própria altura ESTA medida, publicada pelo
     // `<main>`: as duas contas não podem divergir (P2 do Cassio na #143).
@@ -215,7 +215,7 @@ describe("com a chamada em andamento", () => {
     const { painel } = montar();
     const elemento = painel();
     expect(elemento).not.toBeNull();
-    expect(elemento!.style.bottom).toBe(`${PAINEL_DE_CHAMADA.distancia}px`);
+    expect(elemento!.style.bottom).toBe(`calc(${PAINEL_DE_CHAMADA.distancia}px + var(--mb-area-baixo, 0px))`);
     expect(
       elemento!.className,
       "o painel voltou a escrever a posição do rodapé por conta própria",

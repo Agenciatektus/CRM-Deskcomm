@@ -38,9 +38,25 @@ describe("ícone do app público, sem escolher tenant", () => {
       "data:image/png;base64,imagem",
     );
   });
+  it("180 (apple-touch-icon) desenha 180; maskable-* desenha com a zona segura", async () => {
+    for (const [size, args] of [
+      ["180", [180, { nome: "Central" }, "data:image/png;base64,imagem"]],
+      ["maskable-192", [192, { nome: "Central" }, "data:image/png;base64,imagem", { mascaravel: true }]],
+      ["maskable-512", [512, { nome: "Central" }, "data:image/png;base64,imagem", { mascaravel: true }]],
+    ] as const) {
+      mocks.render.mockClear();
+      expect(isPublicPath(`/app-icon/${size}`)).toBe(true);
+      const resposta = await GET(new Request(`https://crm.example/app-icon/${size}`), {
+        params: Promise.resolve({ size }),
+      });
+      expect(resposta.status).toBe(200);
+      expect(mocks.render).toHaveBeenCalledWith(...args);
+    }
+  });
   it("outros tamanhos e subcaminhos não recebem dispensa de autenticação", () => {
     expect(isPublicPath("/app-icon/64")).toBe(false);
     expect(isPublicPath("/app-icon/192/outro")).toBe(false);
+    expect(isPublicPath("/app-icon/maskable-64")).toBe(false);
   });
   it("valida o tamanho antes de ler marca/Storage", async () => {
     const resposta = await GET(new Request("https://crm.example/app-icon/999"), {

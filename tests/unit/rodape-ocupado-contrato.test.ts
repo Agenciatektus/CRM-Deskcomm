@@ -69,7 +69,8 @@ describe("o contrato tem as três partes", () => {
     // O valor que o navegador computa: nunca menos que o `p-6` que o `<main>` já
     // tem, e nunca menos que a peça declarou.
     expect(contrato).toMatch(
-      /`max\(\$\{PISO_DO_RODAPE\}px, var\(\$\{VARIAVEL_DA_OCUPACAO\}, 0px\)\)`/,
+      // + a área segura de baixo (app instalado no iPhone), que vale 0 no desktop.
+      /`max\(\$\{PISO_DO_RODAPE\}px, calc\(var\(\$\{VARIAVEL_DA_OCUPACAO\}, 0px\) \+ var\(--mb-area-baixo, 0px\)\)\)`/,
     );
     // Sem peça registrada não há faixa: o rodapé de quem não está em chamada é
     // exatamente o de antes (é a razão pela qual a exceção do gate do Inbox não

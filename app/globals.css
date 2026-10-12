@@ -1128,6 +1128,11 @@ body [data-theme] {
        o sticky de novo — consertar só um dos dois não conserta nada. */
     overflow-x: hidden;
     overflow-x: clip;
+    /* Área segura dos lados (notch com o celular deitado), para TODA página: a casca
+       do app, login, onboarding, públicas, legais, erro e admin. Só existe com
+       `viewportFit: "cover"`; no desktop o `env()` vale 0 e nada muda. */
+    padding-left: var(--mb-area-esquerda);
+    padding-right: var(--mb-area-direita);
     background-color: var(--color-bg);
     color: var(--color-text);
     /* Texto de interface do quadro DS: 14 / 1,45. */

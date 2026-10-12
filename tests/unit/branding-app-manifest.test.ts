@@ -14,6 +14,8 @@ describe("manifest do ícone configurável", () => {
     expect(valor.icons).toEqual([
       { src: "/app-icon/192", sizes: "192x192", type: "image/png" },
       { src: "/app-icon/512", sizes: "512x512", type: "image/png" },
+      { src: "/app-icon/maskable-192", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/app-icon/maskable-512", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ]);
   });
   it("trocar ou remover o arquivo muda as URLs sem trocar identidade/start_url", async () => {

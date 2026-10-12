@@ -17,6 +17,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
+      // Embaixo, acima do indicador de início do iPhone no app instalado. Os números
+      // são os padrões do sonner (24px; 16px no celular); no desktop o `env()` vale 0.
+      offset={{ bottom: "calc(24px + var(--mb-area-baixo, 0px))" }}
+      mobileOffset={{ bottom: "calc(16px + var(--mb-area-baixo, 0px))" }}
       toastOptions={{
         classNames: {
           toast:
