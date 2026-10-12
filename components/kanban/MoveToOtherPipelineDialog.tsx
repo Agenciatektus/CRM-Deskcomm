@@ -27,6 +27,11 @@ interface MoveToOtherPipelineDialogProps {
   pipelineId: string;
   /** Chamado só quando o clone GRAVOU (o Cancelar também fecha a janela). */
   aoConcluir?: () => void;
+  /**
+   * Segura a gravação (ação adiada com Desfazer e a trava por negócio,
+   * `adiarFechamento`), como o painel. Sem isto, grava na hora (o quadro).
+   */
+  adiar?: (gravar: () => Promise<unknown>) => void;
 }
 
 /**
@@ -45,6 +50,7 @@ export function MoveToOtherPipelineDialog({
   leadId,
   pipelineId,
   aoConcluir,
+  adiar,
 }: MoveToOtherPipelineDialogProps) {
   const t = useT();
   return (
@@ -64,6 +70,7 @@ export function MoveToOtherPipelineDialog({
           <FormularioDeOutroFunil
             leadId={leadId}
             pipelineId={pipelineId}
+            adiar={adiar}
             onCancelar={() => onOpenChange(false)}
             onConcluido={() => {
               onOpenChange(false);

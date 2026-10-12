@@ -36,6 +36,11 @@ interface LoseLeadDialogProps {
    * consegue distinguir os dois só por ele.
    */
   aoConcluir?: () => void;
+  /**
+   * Segura a gravação (ação adiada com Desfazer e a trava por negócio,
+   * `adiarFechamento`), como o painel. Sem isto, grava na hora (o quadro).
+   */
+  adiar?: (gravar: () => Promise<unknown>) => void;
 }
 
 const MAX_LEN = 500;
@@ -48,6 +53,7 @@ export function LoseLeadDialog({
   motivosDoFunil,
   motivoObrigatorio = true,
   aoConcluir,
+  adiar,
 }: LoseLeadDialogProps) {
   const t = useT();
   return (
@@ -66,6 +72,7 @@ export function LoseLeadDialog({
           pipelineId={pipelineId}
           motivosDoFunil={motivosDoFunil}
           motivoObrigatorio={motivoObrigatorio}
+          adiar={adiar}
           onCancelar={() => onOpenChange(false)}
           onConcluido={() => {
             onOpenChange(false);

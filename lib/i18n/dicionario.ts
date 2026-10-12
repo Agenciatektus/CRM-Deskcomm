@@ -14848,6 +14848,11 @@ export const DICIONARIO: Traducoes = {
   "Ligar para": { es: "Llamar a" },
   // ─── APP DE CELULAR (M2.4: ficha do lead) ───
   "Ficha de": { es: "Ficha de" },
+  // ─── APP DE CELULAR (M3.1: funil) ───
+  "1 lead aberto": { es: "1 lead abierto" },
+  "Nenhum lead nesta etapa": { es: "Ningún lead en esta etapa" },
+  "Leads chegam aqui quando avançam no funil ou quando você move um deles.": { es: "Los leads llegan aquí cuando avanzan en el embudo o cuando mueves uno de ellos." },
+  "Com alguém da equipe": { es: "Con alguien del equipo" },
   "Tarefa": { es: "Tarea" },
 };
 

@@ -7,7 +7,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
-import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import {
   Select,
   SelectContent,
@@ -72,7 +72,6 @@ export function SeletorDeEtapa({
   const podeMover = usePermission("pipeline.move_card");
   const mover = useMoveCard(pipelineId);
   const ganhar = useWinLead(pipelineId);
-  const ganhoPendente = useAcaoPendente(`ganho:${leadId}`);
   const [perdendo, setPerdendo] = useState(false);
   const atual = etapas.find((e) => e.id === stageId);
 
@@ -97,17 +96,16 @@ export function SeletorDeEtapa({
       onMovido?.();
     };
     if (alvo.is_won) {
-      // Já há um ganho segurado para este negócio (do card ou daqui).
-      if (ganhoPendente) return;
       // Adiado 5 s com Desfazer (`/win` dispara `lead.won` na hora, com efeito
-      // fora do CRM); só depois a etapa muda de verdade.
-      adiarAcao(
+      // fora do CRM); só depois a etapa muda de verdade. A trava confere ganho,
+      // perda e troca deste negócio.
+      adiarFechamento(
+        "ganho",
+        leadId,
         (s) => `${t("Ganho em")} ${s} s`,
         t("Desfazer"),
         // O erro já aparece pelo `onError` do hook; aqui não repete.
         () => ganhar.mutateAsync({ leadId }).then(feito).catch(() => undefined),
-        undefined,
-        { chave: `ganho:${leadId}` },
       );
       return;
     }
@@ -156,6 +154,11 @@ export function SeletorDeEtapa({
           pipelineId={pipelineId}
           motivosDoFunil={motivosDoFunil}
           motivoObrigatorio={motivoObrigatorio}
+          adiar={(gravar) =>
+            adiarFechamento("perda", leadId, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+              gravar().catch(() => undefined),
+            )
+          }
         />
       )}
     </>

@@ -6,6 +6,7 @@ import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
 import { ConviteDeInstalacao } from "@/components/pwa/ConviteDeInstalacao";
 import { CascaDoCelular } from "@/components/mobile/CascaDoCelular";
+import { FunisDoMenuProvider } from "@/components/mobile/FunisDoMenu";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
 import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessageAlerts";
@@ -133,7 +134,7 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
           style={estiloDoMain(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >
-          {children}
+          <FunisDoMenuProvider funis={funis}>{children}</FunisDoMenuProvider>
         </main>
       </div>
     </div>

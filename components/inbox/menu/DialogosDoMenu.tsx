@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/hooks/i18n/useT";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { LoseLeadDialog } from "@/components/kanban/LoseLeadDialog";
@@ -26,6 +28,7 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
   onFechar: () => void;
 }) {
   const qc = useQueryClient();
+  const t = useT();
   const aoMudar = (open: boolean) => {
     if (!open) onFechar();
   };
@@ -51,9 +54,27 @@ export function DialogosDoMenu({ dialogo, onFechar }: {
         pipelineId={lead.pipeline_id}
         motivosDoFunil={lead.motivos_de_perda}
         motivoObrigatorio={lead.motivo_de_perda_obrigatorio !== false}
+        // Perda e troca pelo menu: adiadas com Desfazer e com a trava por negócio,
+        // como no painel (P2-1 do Cassio na #181). Relê só depois de gravar.
+        adiar={(gravar) =>
+          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+            gravar().then(reler, () => undefined),
+          )
+        }
       />
     ) : (
-      <MoveToOtherPipelineDialog open onOpenChange={aoMudar} aoConcluir={reler} leadId={lead.id} pipelineId={lead.pipeline_id} />
+      <MoveToOtherPipelineDialog
+        open
+        onOpenChange={aoMudar}
+        aoConcluir={reler}
+        leadId={lead.id}
+        pipelineId={lead.pipeline_id}
+        adiar={(gravar) =>
+          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t("Desfazer"), () =>
+            gravar().then(reler, () => undefined),
+          )
+        }
+      />
     );
   }
 

@@ -8,7 +8,8 @@ import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
 import { apiClient } from "@/lib/api/client";
 import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
-import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 
 /**
  * O pedido que precisa de janela própria: perder com motivo, levar a outro funil, ou
@@ -74,14 +75,9 @@ export function useFunilDoContato(contactId: string, habilitado: boolean, onDial
     // componente desmontado. O erro já vira aviso no `onError` do hook.
     const ignorar = () => undefined;
     if (alvo.is_won) {
-      // Já há um ganho segurado para este negócio (do card, do painel ou daqui).
-      if (ganhoPendente) return;
-      adiarAcao(
-        (s) => `${t("Ganho em")} ${s} s`,
-        t("Desfazer"),
-        () => ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar),
-        undefined,
-        { chave: `ganho:${lead.id}` },
+      // A trava confere ganho, perda e troca deste negócio (de onde vierem).
+      adiarFechamento("ganho", lead.id, (s) => `${t("Ganho em")} ${s} s`, t("Desfazer"), () =>
+        ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar),
       );
       return;
     }

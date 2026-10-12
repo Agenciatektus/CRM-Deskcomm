@@ -24,7 +24,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DotsThree, PencilSimple, Users } from "@/lib/ui/icons";
 import { useWinLead, useEditLead } from "@/hooks/kanban/useUpdateLead";
-import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLead";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
@@ -172,13 +173,14 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
             onSelect={() => {
               // Adiado 5 s com Desfazer, como no painel: `/win` dispara `lead.won`
               // (conversão de anúncio, saídas da cadência, push) na hora.
-              adiarAcao(
+              // A trava confere ganho, perda e troca deste negócio.
+              adiarFechamento(
+                "ganho",
+                lead.id,
                 (s) => `${t("Ganho em")} ${s} s`,
                 t("Desfazer"),
                 // O erro já aparece pelo `onError` do hook; aqui não repete.
                 () => winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
-                undefined,
-                { chave: `ganho:${lead.id}` },
               );
             }}
           >
@@ -279,12 +281,24 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         onOpenChange={setLoseOpen}
         leadId={lead.id}
         pipelineId={pipelineId}
+        // Perda e troca de funil esperam 5 s com Desfazer e passam pela mesma
+        // trava do ganho: um fechamento pendente recusa o outro (P2-1 da #182).
+        adiar={(gravar) =>
+          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+            gravar().catch(() => undefined),
+          )
+        }
       />
       <MoveToOtherPipelineDialog
         open={moveOpen}
         onOpenChange={setMoveOpen}
         leadId={lead.id}
         pipelineId={pipelineId}
+        adiar={(gravar) =>
+          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t("Desfazer"), () =>
+            gravar().catch(() => undefined),
+          )
+        }
       />
       <EditLeadDialog
         open={editOpen}

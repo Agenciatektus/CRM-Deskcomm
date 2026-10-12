@@ -13,7 +13,7 @@ import { useArmado } from "@/hooks/ui/useArmado";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
 import { apiClient } from "@/lib/api/client";
 import { CANONICAL_LOST_REASONS, rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { Check, ArrowsClockwise, Funnel, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -66,8 +66,11 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
    * o estado otimista volta (o erro aparece pelo hook da rota).
    */
   function segurar(tipo: Exclude<Pendente, null>, mensagem: (segundos: number) => string, gravar: () => Promise<unknown>) {
-    setPendente(tipo);
-    adiarAcao(
+    // A trava por negócio vale para ganho, perda e troca (P2-1 do Cassio na #181):
+    // com outro fechamento segurado (daqui, do menu, do quadro), este não se agenda.
+    const agendado = adiarFechamento(
+      tipo,
+      lead.id,
       mensagem,
       t("Desfazer"),
       () =>
@@ -76,9 +79,8 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
           .catch(() => undefined)
           .finally(() => setPendente(null)),
       () => setPendente(null),
-      // A mesma chave do quadro: o card não agenda um segundo ganho.
-      { chave: tipo === "ganho" ? `ganho:${lead.id}` : undefined },
     );
+    if (agendado) setPendente(tipo);
   }
 
   function marcarGanho() {

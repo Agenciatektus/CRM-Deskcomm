@@ -1,4 +1,7 @@
 "use client";
+import { FunilNoCelular } from "@/components/mobile/telas/Funil";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import { useFunilEscolhido } from "@/lib/mobile/useFunilEscolhido";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -217,6 +220,9 @@ export function FunisClient({
    * navegação, refresh, outra aba.
    */
   const [funis, setFunis] = useState<FunilDaLista[]>(funisDoServidor);
+  // Celular (M3.1): a aba Funil mostra o funil (escolhido, padrão ou primeiro) em lista.
+  const celular = useEhCelular();
+  const [funilDoCelular, escolherFunilDoCelular] = useFunilEscolhido(funis);
   const [arquivados, setArquivados] = useState<FunilDaLista[]>(arquivadosDoServidor);
   const [ultimoDoServidor, setUltimoDoServidor] = useState<FunilDaLista[]>(funisDoServidor);
   // Ajuste DURANTE o render, não em efeito: é o padrão do React para "a prop
@@ -549,6 +555,10 @@ export function FunisClient({
         {gavetaDeArquivados}
       </div>
     );
+  }
+
+  if (celular && funilDoCelular) {
+    return <FunilNoCelular pipelineId={funilDoCelular} aoTrocarFunil={escolherFunilDoCelular} />;
   }
 
   return (

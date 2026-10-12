@@ -33,16 +33,21 @@ function gravar(n: number) {
 export function usePilhaDoApp(rota: string): void {
   const primeira = useRef(true);
   const voltou = useRef(false);
+  const ultimaRota = useRef(rota);
 
   useEffect(() => {
+    // Só conta o voltar que TROCA de tela. O da ficha do lead (e o do `?id=` da
+    // Inbox) volta para a MESMA rota: não houve tela a mais na ida, então não há
+    // tela a menos na volta (P2-2 do Cassio na #181, a pilha derivava -1).
     const aoVoltar = () => {
-      voltou.current = true;
+      if (window.location.pathname !== ultimaRota.current) voltou.current = true;
     };
     window.addEventListener("popstate", aoVoltar);
     return () => window.removeEventListener("popstate", aoVoltar);
   }, []);
 
   useEffect(() => {
+    ultimaRota.current = rota;
     if (primeira.current) {
       primeira.current = false;
       gravar(0);
