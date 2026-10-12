@@ -63,6 +63,13 @@ const listaSchema = z.object({
   due_to: z.string().datetime({ offset: true }).optional(),
   /** "abertas" = o que ainda pede ação. É o default da tela. */
   aberto: z.enum(["true", "false"]).optional(),
+  /**
+   * De quem é a tarefa (o "Minhas" do celular, M3.2): "eu" (o usuário da sessão)
+   * ou o id de um membro da organização. É recorte de PERGUNTA, não de permissão:
+   * só estreita a mesma consulta (mesma org, mesma RLS, mesmo limite), nunca
+   * amplia o que o papel já vê.
+   */
+  assigned_to: z.union([z.literal("eu"), z.string().uuid()]).optional(),
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -82,6 +89,26 @@ export async function GET(req: NextRequest): Promise<Response> {
   const filtros = parsed.data;
 
   const supabase = await createClient();
+
+  let responsavel: string | null = null;
+  if (filtros.assigned_to === "eu") responsavel = authz.user.id;
+  else if (filtros.assigned_to) {
+    // Id de fora da organização devolve a lista VAZIA, a mesma resposta de um
+    // membro sem tarefas: a rota não diz se o id existe em outro lugar.
+    const { data: membro, error: erroDoMembro } = await supabase
+      .from("user_organizations")
+      .select("user_id")
+      .eq("organization_id", authz.org.orgId)
+      .eq("user_id", filtros.assigned_to)
+      .limit(1)
+      .maybeSingle();
+    if (erroDoMembro) {
+      return fail("internal_error", t("Erro ao listar as tarefas."), 500, { requestId });
+    }
+    if (!membro) return ok({ tasks: [] as Tarefa[] }, { requestId });
+    responsavel = filtros.assigned_to;
+  }
+
   // ⚠️ `organization_id` à mão mesmo com RLS ligada: é a regra do CLAUDE.md, e
   // ela não é redundante — o dia em que esta rota trocar para o admin client
   // (que bypassa RLS) o filtro já está aqui.
@@ -99,6 +126,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (filtros.contact_id) query = query.eq("contact_id", filtros.contact_id);
   if (filtros.due_from) query = query.gte("due_date", filtros.due_from);
   if (filtros.due_to) query = query.lte("due_date", filtros.due_to);
+  if (responsavel) query = query.eq("assigned_to", responsavel);
   if (filtros.aberto === "true") query = query.in("status", ["pending", "in_progress"]);
 
   const { data, error } = await query;
