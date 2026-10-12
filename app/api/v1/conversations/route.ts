@@ -74,6 +74,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     // "Sem próximo passo" (migration 9047). A cerca
     // `rota-le-todo-filtro-do-schema` cobra esta linha.
     sem_passo: url.searchParams.get("sem_passo") ?? undefined,
+    // O TIPO de canal (migration 9049), validado pelo schema contra a lista fixa.
+    canal: url.searchParams.get("canal") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.get("limit") ?? undefined,

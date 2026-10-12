@@ -261,6 +261,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       unread: filterValue.onlyUnread || undefined,
       is_group: filterValue.onlyGroups || undefined,
       sem_passo: filterValue.semPasso || undefined,
+      canal: filterValue.canal,
     }),
     [
       filterValue.tab,
@@ -273,6 +274,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       filterValue.onlyUnread,
       filterValue.onlyGroups,
       filterValue.semPasso,
+      filterValue.canal,
     ],
   );
 

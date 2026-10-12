@@ -44,6 +44,9 @@ export interface FiltrosDaContagem {
   entrada?: string;
   /** "Sem próximo passo" (migration 9047): o badge conta o filtro da lista. */
   semPasso?: boolean;
+  /** Tipo de canal e "só grupos" (migration 9049): os filtros da folha do celular. */
+  canal?: string;
+  soGrupos?: boolean;
 }
 
 /**
@@ -66,6 +69,8 @@ export function useConversationCounts(
   if (filtros.tagMode === "ou") qs.set("modo", "ou");
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
   if (filtros.entrada) qs.set("entrada", filtros.entrada);
+  if (filtros.canal) qs.set("canal", filtros.canal);
+  if (filtros.soGrupos) qs.set("is_group", "true");
   const sufixo = qs.toString();
 
   return useQuery({

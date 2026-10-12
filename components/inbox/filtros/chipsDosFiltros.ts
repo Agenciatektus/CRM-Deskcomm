@@ -1,5 +1,14 @@
 import type { InboxFiltersValue } from "../InboxFilters";
+import type { TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
+
 import type { ChipDeFiltro } from "./ChipsDeFiltro";
+
+/** Nome de produto: igual em todo idioma. */
+export const ROTULO_DO_TIPO: Record<TipoDeCanal, string> = {
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  facebook: "Facebook",
+};
 
 /**
  * Os chips que nomeiam o que o popover de filtros ligou, cada um com o seu "x".
@@ -33,6 +42,9 @@ export function chipsDosFiltros({
       : []),
     ...(value.channel_session_id != null
       ? [{ id: "canal", rotulo: nomeDoCanal, onRemover: () => onChange({ ...value, channel_session_id: undefined }) }]
+      : []),
+    ...(value.canal
+      ? [{ id: "tipo-de-canal", rotulo: ROTULO_DO_TIPO[value.canal], onRemover: () => onChange({ ...value, canal: undefined }) }]
       : []),
     ...etiquetas.map((tag) => ({ id: `tag:${tag}`, rotulo: tag, onRemover: () => alternaEtiqueta(tag) })),
     ...(value.entrada != null

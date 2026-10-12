@@ -23,8 +23,6 @@ interface Props {
   mostrarSeletorDeEntrada: boolean;
   /** O seletor de etiqueta já montado (ou `null` quando não há o que oferecer). */
   seletorDeEtiqueta: ReactNode;
-  /** `chip`: o gatilho do celular (o `.chip-f` do protótipo), na faixa de chips. */
-  gatilho?: "barra" | "chip";
 }
 
 const GATILHO_DO_SELECT =
@@ -64,7 +62,6 @@ export function PopoverDeFiltros({
   filtroForaDaLista,
   mostrarSeletorDeEntrada,
   seletorDeEtiqueta,
-  gatilho = "barra",
 }: Props) {
   const t = useT();
   return (
@@ -76,15 +73,13 @@ export function PopoverDeFiltros({
           // o número colado sem dizer o que conta.
           aria-label={ativos > 0 ? `${t("Filtros")}, ${ativos} ${t("ativos")}` : t("Filtros")}
           className={cn(
-            gatilho === "chip"
-              ? "relative flex h-(--mb-chip-altura) shrink-0 items-center gap-1.5 rounded-full bg-surface-elevated px-3 text-sm font-semibold text-text-muted shadow-[inset_0_0_0_1px_var(--color-border)] after:absolute after:inset-x-0 after:-inset-y-1"
-              : "flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-elevated hover:text-text",
+            "flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-elevated hover:text-text",
             "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
             "data-[state=open]:bg-surface-elevated data-[state=open]:text-text",
           )}
         >
-          <Funnel size={gatilho === "chip" ? 18 : 14} aria-hidden />
-          {gatilho === "barra" && t("Filtros")}
+          <Funnel size={14} aria-hidden />
+          {t("Filtros")}
           {ativos > 0 && (
             <span className="rounded-full bg-accent px-1.5 text-[11px] tabular-nums text-accent-foreground">
               {ativos}

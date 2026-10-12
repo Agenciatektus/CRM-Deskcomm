@@ -47382,8 +47382,12 @@ notify pgrst, 'reload schema';
 -- Desde a 9047 a função tem 9 parâmetros (`p_sem_passo`, o filtro "Sem próximo
 -- passo" por `passo_da_conversa`, definida no bloco da 9047 logo acima): a de 8
 -- cai antes, porque com as duas de pé a chamada por nome da rota seria ambígua.
--- Prova: tests/invariants/contagens-da-caixa-9029.test.ts e inbox-v2-dados-9047.test.ts.
+-- Prova: tests/invariants/contagens-da-caixa-9029.test.ts, inbox-v2-dados-9047.test.ts e
+-- contagem-da-folha-9049.test.ts (tipo de canal e só grupos, 9049).
 drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text);
+-- Desde a 9049 a função tem 11 parâmetros (`p_canal_tipo` e `p_so_grupos`, a folha
+-- de filtros do celular): a de 9 cai antes, pelo mesmo motivo da de 8.
+drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean);
 
 create or replace function public.fn_contagens_da_caixa(
   p_organizacao uuid,
@@ -47394,7 +47398,9 @@ create or replace function public.fn_contagens_da_caixa(
   p_so_nao_lidas boolean default false,
   p_marcadores text[] default null,
   p_modo text default 'e',
-  p_sem_passo boolean default false
+  p_sem_passo boolean default false,
+  p_canal_tipo text default null,
+  p_so_grupos boolean default false
 )
 returns jsonb
 language sql
@@ -47437,6 +47443,13 @@ as $$
        )
        -- 9047: o MESMO campo calculado que a lista filtra.
        and (not coalesce(p_sem_passo, false) or public.passo_da_conversa(c) = 'sem_passo')
+       -- 9049: o TIPO de canal é a coluna da própria conversa (whatsapp, instagram,
+       -- facebook: o CHECK de `conversations.channel`), então não há sessão de outra
+       -- organização a resolver: a linha já é da organização filtrada acima. Valor
+       -- fora da lista não casa nada (a rota valida antes, contra a lista fixa).
+       and (p_canal_tipo is null or c.channel = p_canal_tipo)
+       -- 9049: "só grupos", o MESMO filtro `is_group` da lista.
+       and (not coalesce(p_so_grupos, false) or coalesce(c.is_group, false))
   )
   select jsonb_build_object(
     'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
@@ -47450,11 +47463,11 @@ as $$
   from base;
 $$;
 
-comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa).';
+comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) is
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa); desde a 9049, p_canal_tipo (conversations.channel) e p_so_grupos (is_group), os filtros da folha do celular.';
 
-revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) from public, anon;
-grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean) to authenticated, service_role;
+revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) from public, anon;
+grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
 

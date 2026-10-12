@@ -7,7 +7,6 @@ import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSes
 import type { ModoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useConversationCounts } from "@/hooks/inbox/useConversationCounts";
-import type { Role, VisibilityMode } from "@/lib/auth/types";
 
 import { AbasDaInbox } from "./filtros/AbasDaInbox";
 import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
@@ -16,46 +15,25 @@ import { PopoverDeFiltros } from "./filtros/PopoverDeFiltros";
 import { SeletorDeEtiqueta } from "./filtros/SeletorDeEtiqueta";
 import { useOpcoesDeEtiqueta } from "./filtros/useOpcoesDeEtiqueta";
 import { chipsDosFiltros } from "./filtros/chipsDosFiltros";
-import { FiltrosDaInboxNoCelular } from "@/components/mobile/telas/Conversas";
+import { ABAS_PRINCIPAIS, INBOX_TABS, visibleInboxTabs, type InboxTab } from "./filtros/abas-da-inbox";
+import {
+  ChipDaFolhaDeFiltros,
+  FiltrosDaInboxNoCelular,
+  tiposDeCanalDisponiveis,
+} from "@/components/mobile/telas/Conversas";
 import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import type { TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
 
-export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
+export { visibleInboxTabs, type InboxTab } from "./filtros/abas-da-inbox";
 
-const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: "unassigned", label: "Fila" },
-  { value: "mine", label: "Minhas" },
-  { value: "all", label: "Todas" },
-  // L9: "Com a IA" é a primeira do "Mais", como no protótipo (é a visão viva;
-  // as duas seguintes são passado). O rótulo segue o "Devolver à IA".
-  { value: "ai", label: "Com a IA" },
-  { value: "closed", label: "Fechadas" },
-  // "Arquivadas" fica ao lado de "Fechadas" porque as duas são passado, e
-  // separada dela porque são passados diferentes (#923): fechada é atendimento
-  // encerrado, arquivada é o que saiu da fila de trabalho sem ser destruído.
-  { value: "archived", label: "Arquivadas" },
-];
-
-/**
- * As três visões do dia inteiro, à vista no controle segmentado (visual v2). As
- * demais vão para o "Mais": ver `AbasDaInbox`.
- */
-const ABAS_PRINCIPAIS: readonly InboxTab[] = ["unassigned", "mine", "all"];
-
-/**
- * Visões visíveis por papel + escopo (G4-02, acceptance 1). 'Todas' fica oculta
- * para `agent` quando visibility_mode ≠ 'all'; viewer/manager/admin sempre veem.
- * É apenas cosmético: a RLS (G4-01) é quem garante o escopo mesmo via ?filter=all.
- */
-export function visibleInboxTabs(role: Role, mode: VisibilityMode | undefined): InboxTab[] {
-  const hideAll = role === "agent" && mode !== "all";
-  return INBOX_TABS.filter((t) => !(t.value === "all" && hideAll)).map((t) => t.value);
-}
 
 export interface InboxFiltersValue {
   tab: InboxTab;
   search: string;
   onlyUnread: boolean;
   channel_session_id?: string;
+  /** O TIPO de canal (folha de filtros do celular, migration 9049). */
+  canal?: TipoDeCanal;
   /** De que ENTRADA do Instagram: `direct` | `comentario`. */
   entrada?: string;
   /**
@@ -121,6 +99,9 @@ export function InboxFilters({ value, onChange }: Props) {
     // Sem isto o atendente filtra "só comentários" e lê nas abas o número de
     // TODAS as conversas: badge maior que a lista, e nada dizendo por quê.
     entrada: value.entrada,
+    // A folha do celular (9049): o mesmo tipo de canal e o "só grupos" da lista.
+    canal: value.canal,
+    soGrupos: value.onlyGroups,
   });
 
   const tabs = activeOrg
@@ -191,6 +172,7 @@ export function InboxFilters({ value, onChange }: Props) {
       tag: undefined,
       tagMode: undefined,
       entrada: undefined,
+      canal: undefined,
     });
 
   // O timer lê o valor MAIS RECENTE, não o do render em que foi agendado. Antes a
@@ -218,10 +200,10 @@ export function InboxFilters({ value, onChange }: Props) {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // O MESMO filtro nas duas formas: a barra do desktop e o chip do celular (em folha).
-  const filtros = (gatilho: "barra" | "chip") => (
+  // O filtro do desktop; no celular ele fica dentro da folha (`FolhaDeFiltros`), para
+  // número de WhatsApp, etiquetas e entrada do Instagram.
+  const filtros = () => (
     <PopoverDeFiltros
-      gatilho={gatilho}
       value={value}
       onChange={onChange}
       ativos={chips.length}
@@ -265,7 +247,7 @@ export function InboxFilters({ value, onChange }: Props) {
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-text outline-hidden placeholder:text-text-subtle"
           aria-label={t("Buscar conversas")}
         />
-        {filtros("barra")}
+        {filtros()}
       </div>
 
       <AbasDaInbox
@@ -287,7 +269,19 @@ export function InboxFilters({ value, onChange }: Props) {
         abas={abas}
         onTab={(tab) => onChange({ ...value, tab })}
         onSemPasso={(semPasso) => onChange({ ...value, semPasso })}
-        filtro={filtros("chip")}
+        filtro={
+          <ChipDaFolhaDeFiltros
+            ativos={chips.length}
+            folha={{
+              value,
+              onChange,
+              abas,
+              tiposDeCanal: tiposDeCanalDisponiveis((channels ?? []).map((c) => c.provider)),
+              maisFiltros: filtros(),
+              aoLimpar: limparDoPopover,
+            }}
+          />
+        }
         chipsAtivos={<ChipsDeFiltro chips={chips} onLimpar={limparDoPopover} />}
         busca={value.search}
         onLimparBusca={() => onChange({ ...value, search: "" })}

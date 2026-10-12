@@ -26,6 +26,7 @@ import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import { marcadoresEscolhidos, modoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { createClient } from "@/lib/supabase/server";
+import { ehTipoDeCanal, type TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,22 @@ export function contagemSemPasso(sp: URLSearchParams): boolean {
   return sp.get("sem_passo") === "true";
 }
 
+/**
+ * O TIPO de canal e o "só grupos" (folha de filtros do celular, migration 9049): os
+ * MESMOS predicados da lista (`conversations.channel` e `is_group`), por parâmetro
+ * da função, para "Ver N conversas" bater com a lista. O tipo é validado contra a
+ * lista fixa; `undefined` = valor inválido (a rota responde 422).
+ */
+export function contagemCanalTipo(sp: URLSearchParams): TipoDeCanal | null | undefined {
+  const valor = sp.get("canal");
+  if (valor === null) return null;
+  return ehTipoDeCanal(valor) ? valor : undefined;
+}
+
+export function contagemSoGrupos(sp: URLSearchParams): boolean {
+  return sp.get("is_group") === "true";
+}
+
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const supabase = await createClient();
@@ -122,6 +139,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   const soNaoLidas = contagemSoNaoLidas(sp);
   const marcadores = marcadoresEscolhidos(sp.getAll("tag"));
   const modo = modoDeEtiqueta(sp.get("modo")) ?? "e";
+  const canalTipo = contagemCanalTipo(sp);
+  if (canalTipo === undefined) {
+    return fail("validation_failed", traduzir("Canal inválido.", authUser?.idioma ?? "pt-BR"), 422, { requestId });
+  }
 
   const automaticoDaOrg = await orgTemAutomatico(supabase, org);
 
@@ -135,6 +156,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     p_marcadores: marcadores,
     p_modo: modo,
     p_sem_passo: contagemSemPasso(sp),
+    p_canal_tipo: canalTipo,
+    p_so_grupos: contagemSoGrupos(sp),
   } as never);
   if (error) {
     return fail("internal_error", error.message, 500, { requestId });
