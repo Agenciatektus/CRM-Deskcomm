@@ -62,7 +62,9 @@ function purposesDoTexto(texto: string, arquivo = "source.ts"): string[] {
       const nomes = ts.isObjectLiteralExpression(object)
         ? new Set(object.properties.map((p) => (p.name ? p.name.getText(ast).replace(/["']/g, "") : "")))
         : new Set<string>();
-      const iconeDoManifesto = nomes.has("src") && nomes.has("sizes");
+      // Só no manifesto (P2 do Cassio na #183): em qualquer outro arquivo a forma não basta.
+      const iconeDoManifesto =
+        arquivo.split(path.sep).join("/").endsWith("app/manifest.ts") && nomes.has("src") && nomes.has("sizes");
       if (!enqueueResult && !iconeDoManifesto) result.push(...literals(node.initializer));
     }
     ts.forEachChild(node, visit);
@@ -149,7 +151,8 @@ describe("registro de pontos de IA × código", () => {
     expect(purposesDoTexto(`function queue() { return { kind: "enqueue_turn", purpose: "send_message" }; }`)).toEqual([]);
     expect(purposesDoTexto(`runModelCall(db, cfg, { purpose: "send_message" });`)).toEqual(["send_message"]);
     // Ícone do manifesto (src + sizes) não é ponto de IA; só `src` não basta.
-    expect(purposesDoTexto(`const i = { src: "/a.png", sizes: "192x192", purpose: "maskable" };`)).toEqual([]);
+    expect(purposesDoTexto(`const i = { src: "/a.png", sizes: "192x192", purpose: "maskable" };`, "app/manifest.ts")).toEqual([]);
+    expect(purposesDoTexto(`const i = { src: "/a.png", sizes: "192x192", purpose: "ponto_orfao" };`, "lib/ai/x.ts")).toEqual(["ponto_orfao"]);
     expect(purposesDoTexto(`runModelCall(db, cfg, { src: "inbox", purpose: "ponto_orfao" });`)).toEqual(["ponto_orfao"]);
   });
 

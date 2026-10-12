@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import { useMinhaDisponibilidade, useUpdateAvailability } from "@/hooks/team/useAttendants";
 import { roleAtLeast } from "@/lib/auth/types";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { destinosDaInterface } from "@/lib/navigation/interface";
 import { useTheme } from "@/lib/theme";
 import { pedir } from "@/lib/ui/comandos-da-tela";
@@ -38,6 +39,7 @@ export function useAcoesDaPaleta(): AcaoDaPaleta[] {
   const router = useRouter();
   const parametros = useSearchParams();
   const { user, activeOrg } = useAuth();
+  const celular = useEhCelular();
   const { resolvedTheme, setTheme } = useTheme();
   const podeAtender =
     roleAtLeast(activeOrg?.role, "agent") && user.support?.access_mode !== "support_readonly";
@@ -90,7 +92,8 @@ export function useAcoesDaPaleta(): AcaoDaPaleta[] {
       id: "avisos",
       titulo: t("Ver avisos em aberto"),
       sub: t("Central de avisos"),
-      executar: () => pedir("abrir-avisos"),
+      // No celular o sino não existe: a central é a aba Avisos (M3.3).
+      executar: () => (celular ? router.push("/app/ai/inbox") : pedir("abrir-avisos")),
     });
   }
   return acoes;
