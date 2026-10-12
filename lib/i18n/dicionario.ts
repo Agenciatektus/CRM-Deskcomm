@@ -108,6 +108,7 @@ export const DICIONARIO: Traducoes = {
   "Ele nasce no fim da página e se mede antes de aparecer; por isso abre por botão, e não fixo aqui.": { es: "Nace al final de la página y se mide antes de aparecer; por eso se abre con un botón, y no fijo aquí." },
   "Busca geral (Ctrl K)": { es: "Búsqueda general (Ctrl K)" },
   "Abrir a busca": { es: "Abrir la búsqueda" },
+  "Buscas recentes": { es: "Búsquedas recientes" },
   "Menus abrem onde o clique aconteceu e são medidos antes de aparecer. Todo menu fecha ao clicar fora e com Esc.": { es: "Los menús se abren donde ocurrió el clic y se miden antes de aparecer. Todo menú se cierra al hacer clic afuera y con Esc." },
   "Central de avisos (sino)": { es: "Central de avisos (campana)" },
   "O conteúdo do popover do sino, fixo na página. As ações respondem com as amostras; nada é resolvido de verdade.": { es: "El contenido del popover de la campana, fijo en la página. Las acciones responden con las muestras; nada se resuelve de verdad." },

@@ -89,7 +89,22 @@ interface Grupo {
   itens: Item[];
 }
 
-function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; verTodasNaLista: boolean }) {
+/**
+ * O miolo da busca, também usado pela busca em tela cheia do celular
+ * (`components/mobile/telas/Busca.tsx`): `antesDoCampo` é o voltar dela, `semTermo`
+ * as buscas recentes, e `aoEscolher` recebe o termo para lembrá-lo.
+ */
+export function Resultados({
+  aoEscolher,
+  verTodasNaLista,
+  antesDoCampo,
+  semTermo,
+}: {
+  aoEscolher: (termo: string) => void;
+  verTodasNaLista: boolean;
+  antesDoCampo?: ReactNode;
+  semTermo?: (definir: (termo: string) => void) => ReactNode;
+}) {
   const t = useT();
   const router = useRouter();
   const { user, activeOrg } = useAuth();
@@ -129,7 +144,7 @@ function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; v
   );
 
   function ir(href: string) {
-    aoEscolher();
+    aoEscolher(termo);
     router.push(href);
   }
 
@@ -200,7 +215,7 @@ function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; v
       ),
       dica: t("Executar"),
       executar: () => {
-        aoEscolher();
+        aoEscolher(termo);
         a.executar();
       },
     };
@@ -273,37 +288,42 @@ function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; v
   let posicao = 0;
   return (
     <>
-      <div className="flex h-14 items-center gap-2.5 border-b px-3.5">
-        <MagnifyingGlass size={18} aria-hidden className="shrink-0 text-text-subtle" />
-        <input
-          autoFocus
-          role="combobox"
-          aria-expanded
-          aria-controls="palette-resultados"
-          aria-activedescendant={plana[indice] ? `palette-${indice}` : undefined}
-          value={busca}
-          onChange={(e) => aoDigitar(e.target.value)}
-          onKeyDown={aoTeclar}
-          maxLength={TETO_DO_TERMO_DE_BUSCA}
-          placeholder={t("Buscar contato, conversa ou lead")}
-          className="h-full min-w-0 flex-1 bg-transparent text-base text-text outline-hidden placeholder:text-text-subtle"
-        />
-        {busca && (
-          <button
-            type="button"
-            onClick={() => aoDigitar("")}
-            className="rounded-md px-2 py-1 text-xs text-text-muted hover:bg-surface-elevated"
-          >
-            {t("Limpar")}
-          </button>
-        )}
+      <div className="flex h-14 items-center gap-1 border-b px-3.5 mb:h-auto mb:py-1.5 mb:pr-2.5 mb:pl-1">
+        {antesDoCampo}
+        {/* No celular o campo é o `.bs-in` do protótipo: 44px, raio 14, contorno da cor. */}
+        <div className="flex h-full min-w-0 flex-1 items-center gap-2.5 mb:min-h-(--mb-busca-altura) mb:rounded-(--mb-busca-raio) mb:bg-surface-elevated mb:pr-1 mb:pl-3 mb:shadow-[inset_0_0_0_2px_var(--color-accent-text)]">
+          <MagnifyingGlass size={18} aria-hidden className="shrink-0 text-text-subtle" />
+          <input
+            autoFocus
+            role="combobox"
+            aria-expanded
+            aria-controls="palette-resultados"
+            aria-activedescendant={plana[indice] ? `palette-${indice}` : undefined}
+            value={busca}
+            onChange={(e) => aoDigitar(e.target.value)}
+            onKeyDown={aoTeclar}
+            maxLength={TETO_DO_TERMO_DE_BUSCA}
+            placeholder={t("Buscar contato, conversa ou lead")}
+            className="h-full min-w-0 flex-1 bg-transparent text-base text-text outline-hidden placeholder:text-text-subtle mb:min-h-(--mb-alvo) mb:text-(length:--mb-campo-fonte)"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => aoDigitar("")}
+              className="rounded-md px-2 py-1 text-xs text-text-muted hover:bg-surface-elevated"
+            >
+              {t("Limpar")}
+            </button>
+          )}
+        </div>
       </div>
+      {!termo && semTermo ? semTermo(aoDigitar) : null}
 
       {verTodasNaLista && buscaValeConsulta(termo) && (
         <button
           type="button"
           onClick={() => {
-            aoEscolher();
+            aoEscolher(termo);
             router.push(`/app/inbox?busca=${encodeURIComponent(termo)}`);
           }}
           className="flex min-h-11 w-full items-center gap-2 border-b border-border px-4 text-left text-ui font-semibold text-accent-text hover:bg-surface-elevated"
@@ -324,7 +344,7 @@ function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; v
           id="palette-resultados"
           role="listbox"
           aria-label={t("Resultados")}
-          className="max-h-[min(60vh,520px)] overflow-y-auto overscroll-contain p-1.5"
+          className="max-h-[min(60vh,520px)] overflow-y-auto overscroll-contain p-1.5 mb:max-h-none mb:min-h-0 mb:flex-1"
         >
           {grupos.map((g) => (
             <div key={g.rotulo} role="group" aria-label={g.rotulo}>

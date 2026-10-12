@@ -203,9 +203,8 @@ empilhada, formulário em tela cheia, segmentado, consulta) e o PR em que ele en
 `tests/unit/paridade-mobile.test.ts` lê o protótipo (tokens dos dois temas, barra inferior, cabeçalho grande,
 linha da lista, folha inferior, FAB, área segura, alvos de 44px, campos de 16px) e compara com o CRM pelo contrato
 `tests/unit/paridade-mobile/contrato.ts` (tokens `--mb-*` no `:root`, `@custom-variant mb`, peças em
-`components/mobile/`, um arquivo por tela). Hoje roda em modo **relatório**: imprime as 66 divergências (70 menos as 4 exceções) e só reprova
-se o leitor do protótipo quebrar. Modo **estrito**, critério de pronto da M5:
-`PARIDADE_MOBILE_ESTRITA=1 pnpm vitest run tests/unit/paridade-mobile.test.ts`. Controle negativo em
+`components/mobile/`, um arquivo por tela). Desde a M5 roda em modo **estrito** por padrão (zero divergências além
+das 4 exceções aceitas); `PARIDADE_MOBILE_ESTRITA=0` volta ao modo **relatório**, que só imprime. Controle negativo em
 `tests/unit/paridade-mobile-controle-negativo.test.ts`.
 
 ## Plano de implementação (M1 a M5)

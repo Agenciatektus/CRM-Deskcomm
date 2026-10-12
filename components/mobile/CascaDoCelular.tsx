@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { CommandPalette } from "@/components/shell/CommandPalette";
 import { useT } from "@/hooks/i18n/useT";
 import { abaDaRota, conversaAberta, ehRaizDeAba, voltarDaRota } from "@/lib/mobile/abas";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
@@ -17,13 +16,14 @@ import { BarraInferior, ROTULOS_DAS_ABAS } from "./BarraInferior";
 import { BotaoCriar } from "./BotaoCriar";
 import { CabecalhoGrande } from "./CabecalhoGrande";
 import { AcoesDosAvisos } from "./telas/Avisos";
+import { Busca } from "./telas/Busca";
 import { MenuMais } from "./MenuMais";
 import { AcoesDaListaDeConversas } from "./telas/AcoesDaListaDeConversas";
 
 /**
- * A lupa do cabeçalho do celular. Abre a mesma busca geral do topo do desktop, numa
- * instância própria e SEM o atalho Ctrl K (o atalho é do gatilho do desktop; dois
- * ouvintes abririam duas buscas).
+ * A lupa do cabeçalho do celular. Abre a busca em tela cheia (`telas/Busca`), com os
+ * mesmos resultados da busca geral do desktop e SEM o atalho Ctrl K (o atalho é do
+ * gatilho do desktop; dois ouvintes abririam duas buscas).
  */
 function BuscaDoCelular() {
   const t = useT();
@@ -38,7 +38,7 @@ function BuscaDoCelular() {
       >
         <MagnifyingGlass size={22} aria-hidden />
       </button>
-      <CommandPalette open={aberta} onOpenChange={setAberta} />
+      <Busca aberta={aberta} aoMudar={setAberta} />
     </>
   );
 }

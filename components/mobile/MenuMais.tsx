@@ -8,9 +8,10 @@ import { useT } from "@/hooks/i18n/useT";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 
 /**
- * A aba "Mais", PROVISÓRIA até a tela própria da M4.1: o menu inteiro do CRM (o
- * mesmo `SidebarContent` da gaveta que saiu), com organização, Disponível e o menu
- * do usuário (perfil, tema, sair) no topo. Folha de tela cheia, de baixo para cima.
+ * A aba "Mais" (tela 9 do protótipo): o menu inteiro do CRM (o mesmo `SidebarContent`
+ * da gaveta que saiu, com o filtro de papel e de módulo dele), com organização,
+ * Disponível e o menu do usuário (perfil, tema, sair) no topo. Folha de tela cheia,
+ * de baixo para cima. Canais (tela 10) é Conexões, no molde de página.
  */
 export function MenuMais({
   aberto,

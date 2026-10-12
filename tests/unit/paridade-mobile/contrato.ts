@@ -79,8 +79,11 @@ export const TELAS: Record<string, string> = {
   Funil: "components/mobile/telas/Funil.tsx",
   Tarefas: "components/mobile/telas/Tarefas.tsx",
   Avisos: "components/mobile/telas/Avisos.tsx",
-  Mais: "components/mobile/telas/Mais.tsx",
-  "Canais, dentro do Mais": "components/mobile/telas/Canais.tsx",
+  // O "Mais" é a folha da aba com o menu inteiro do CRM (o mesmo catálogo da barra
+  // lateral, já agrupado e filtrado por papel), e não uma tela à parte.
+  Mais: "components/mobile/MenuMais.tsx",
+  // Canais é a tela Conexões no molde de página (módulo C, #187): Mais > Conexões.
+  "Canais, dentro do Mais": "app/app/connections/page.tsx",
   "Busca aberta": "components/mobile/telas/Busca.tsx",
 };
 
