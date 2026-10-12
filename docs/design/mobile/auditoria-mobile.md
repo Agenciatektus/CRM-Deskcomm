@@ -184,11 +184,13 @@ precisa de rota ou campo novo.
 | Alvo de 44px nos botões | OK | `button.tsx:62-69` (`h-11` abaixo de `lg`) |
 | Alvo de 44px na casca | DIFERENTE | lupa `SearchTrigger.tsx:43` (`h-9 w-9`) |
 | Escuro = pele Verdash, claro = marca do revendedor | OK | conferido pela paridade desktop (`tests/unit/paridade-com-o-prototipo.test.ts`) |
-| Cores do celular | DIFERENTE | no claro, `--info`, `--ink-3`, `--ok` e `--warn` do protótipo mobile diferem do desktop; faltam `--bar`, `--note-bg`, `--note-ink` (ver o teste) |
+| Cores do celular | DIFERENTE | no claro, `--info`, `--ink-3`, `--ok` e `--warn` do protótipo mobile diferem do desktop (exceção: vale o DS desktop, ver abaixo); faltam `--bar`, `--note-bg`, `--note-ink` (ver o teste) |
 
-**Decisão pendente para o Peterson:** as quatro cores claras acima são tokens compartilhados com o desktop. Se o
-CRM adotar o valor do mobile, a paridade desktop reprova (e vice-versa). Opções: (a) atualizar o protótipo desktop
-para os valores do mobile; (b) registrar exceção em `EXCECOES` do teste mobile.
+**Decisão do Peterson (12/10/2026):** vence o design system desktop (`DesignSystem.dc.html` e `Main.dc.html`), que é
+a fonte e já está aplicado no CRM. As quatro cores claras (`--info`, `--ink-3`, `--ok`, `--warn`) estão como exceção
+explícita em `EXCECOES` do teste mobile, com o motivo "token compartilhado; vale o DS desktop; a divergência é do
+protótipo mobile". Conferido no teste: nenhum outro token compartilhado diverge (os outros 3 de cor, `--bar`,
+`--note-bg` e `--note-ink`, são tokens novos, só do celular, e entram na M1.1).
 
 ## As 63 telas do catálogo
 
@@ -201,12 +203,16 @@ empilhada, formulário em tela cheia, segmentado, consulta) e o PR em que ele en
 `tests/unit/paridade-mobile.test.ts` lê o protótipo (tokens dos dois temas, barra inferior, cabeçalho grande,
 linha da lista, folha inferior, FAB, área segura, alvos de 44px, campos de 16px) e compara com o CRM pelo contrato
 `tests/unit/paridade-mobile/contrato.ts` (tokens `--mb-*` no `:root`, `@custom-variant mb`, peças em
-`components/mobile/`, um arquivo por tela). Hoje roda em modo **relatório**: imprime as 70 divergências e só reprova
+`components/mobile/`, um arquivo por tela). Hoje roda em modo **relatório**: imprime as 66 divergências (70 menos as 4 exceções) e só reprova
 se o leitor do protótipo quebrar. Modo **estrito**, critério de pronto da M5:
 `PARIDADE_MOBILE_ESTRITA=1 pnpm vitest run tests/unit/paridade-mobile.test.ts`. Controle negativo em
 `tests/unit/paridade-mobile-controle-negativo.test.ts`.
 
 ## Plano de implementação (M1 a M5)
+
+**Corte: 760px.** O app de celular vale abaixo de 760px (`@custom-variant mb`, `max-width: 759px`), e não no `md`
+de 768px que o CRM usa hoje; entre 760 e 767px fica o layout de tablet. Tudo o que é do celular usa `mb:`, nunca
+`md:`/`max-md:`, e a M1.1 troca o `md` da alternância da Inbox (`InboxLayout.tsx:61-62`) pelo mesmo corte.
 
 Pronto de cada PR: o grupo dele no teste zera no modo estrito, revisão do @Cassio_SecRev, e desktop e tablet sem
 mudança (tudo atrás do corte `mb:`, abaixo de 760px).

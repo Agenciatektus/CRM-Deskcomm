@@ -36,7 +36,14 @@ import { abasDoPrototipo, medidasDoPrototipo, telasDoPrototipo } from "./paridad
 const ESTRITO = process.env.PARIDADE_MOBILE_ESTRITA === "1";
 
 /** id da divergência -> motivo. Só entra o que o Peterson aceitou. */
-export const EXCECOES: Record<string, string> = {};
+const VALE_O_DS_DESKTOP =
+  "token compartilhado; vale o DS desktop; a divergência é do protótipo mobile (decisão do Peterson, 12/10/2026)";
+export const EXCECOES: Record<string, string> = {
+  "cor:claro:--info": VALE_O_DS_DESKTOP,
+  "cor:claro:--ink-3": VALE_O_DS_DESKTOP,
+  "cor:claro:--ok": VALE_O_DS_DESKTOP,
+  "cor:claro:--warn": VALE_O_DS_DESKTOP,
+};
 
 const GRUPOS: [string, () => string[]][] = [
   ["cores dos dois temas (claro = marca do revendedor, escuro = pele Verdash)", divergenciasDeCor],
