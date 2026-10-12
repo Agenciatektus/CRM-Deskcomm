@@ -40,7 +40,7 @@ export function AlternarPainel({
         <Button
           size="sm"
           variant="ghost"
-          className="hidden w-9 px-0 md:inline-flex xl:hidden"
+          className="hidden w-9 px-0 largo:inline-flex xl:hidden"
           aria-label={t("Mostrar ou ocultar detalhes do lead")}
           title={t("Detalhes do lead")}
           onClick={onAbrirFicha}

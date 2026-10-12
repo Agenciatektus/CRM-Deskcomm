@@ -127,6 +127,10 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export const viewport: Viewport = {
   themeColor: coresDaBarraDoNavegador(REGUA_DO_PRODUTO),
+  // O app de celular desenha até a borda (notch e indicador de início) e respeita a
+  // área segura pelos tokens `--mb-area-*` do globals.css. No desktop o `env()` vale
+  // 0, então acima de 760px nada muda.
+  viewportFit: "cover",
 };
 
 // Inline FOUC-prevention. Conteúdo é string literal estática (zero input do usuário),

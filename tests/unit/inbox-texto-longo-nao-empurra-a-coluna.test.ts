@@ -114,7 +114,7 @@ describe("inbox — texto longo não empurra a coluna (#1802)", () => {
     const fonte = ler(LAYOUT);
 
     // Coluna da conversa — protegida pelo f7b1ef4, é a que o #1802 aponta.
-    expect(fonte).toMatch(/h-full min-h-0 min-w-0 flex-col md:flex/);
+    expect(fonte).toMatch(/h-full min-h-0 min-w-0 flex-col largo:flex/);
 
     // Coluna do CRM, trilha fixa do grid: min-w-0 como defesa uniforme com a
     // coluna da conversa (o transbordo do fato ficava dentro do painel).
