@@ -60,7 +60,7 @@ export function MenuDoLead({ leadId, pipelineId, titulo, leitura = false, onExcl
     setAberto(false);
     setConfirmando(false);
     adiarExclusao(
-      titulo ? `"${titulo}" ${t("será excluído.")}` : t("O lead será excluído."),
+      (s) => `${titulo ? `"${titulo}" ${t("será excluído em")}` : t("O lead será excluído em")} ${s} s`,
       t("Desfazer"),
       () =>
         excluir

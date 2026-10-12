@@ -29,8 +29,11 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: v
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   usePermission: (chave: string) => permissao(chave),
 }));
+const ganhar = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
+const adiar = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarAcao: adiar, avisarComDesfazer: vi.fn() }));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({
-  useWinLead: () => ({ mutate: vi.fn(), isPending: false }),
+  useWinLead: () => ({ mutate: vi.fn(), mutateAsync: ganhar, isPending: false }),
   useEditLead: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
@@ -239,5 +242,19 @@ describe("menu do card — Excluir", () => {
     // No desktop quem navega por teclado tabula até aqui: sem isto o foco
     // pousa num botão invisível, que só aparece depois que o menu abre.
     expect(botao.className).toContain("focus-visible:opacity-100");
+  });
+
+  it("Marcar como ganho é ADIADO 5 s com Desfazer: /win só quando o aviso acaba (follow-up do Cassio na #169)", async () => {
+    const user = userEvent.setup();
+    adiar.mockClear();
+    ganhar.mockClear();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Ações do lead" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Marcar como ganho" }));
+    expect(ganhar).not.toHaveBeenCalled();
+    expect(adiar).toHaveBeenCalledTimes(1);
+    expect((adiar.mock.calls[0]![0] as (s: number) => string)(5)).toBe("Ganho em 5 s");
+    await (adiar.mock.calls[0]![2] as () => Promise<unknown>)();
+    expect(ganhar).toHaveBeenCalledWith({ leadId: "l-1" });
   });
 });
