@@ -97,29 +97,25 @@ describe("GET /api/v1/tasks?assigned_to=", () => {
     expect(lista.limite).toBe(500);
   });
 
-  it("id de um membro da org filtra por ele, depois de conferir que é membro DESTA org", async () => {
-    const chamadas = fazerSupabase([ANA, BRUNO]);
-    const { status } = await listar(`assigned_to=${BRUNO}`);
+  it("⭐ agent filtrando por COLEGA: filtra por ele sem ler a filiação (que a RLS esconde do agent)", async () => {
+    sessao("agent");
+    const chamadas = fazerSupabase([]);
+    const { status, corpo } = await listar(`assigned_to=${BRUNO}`);
     expect(status).toBe(200);
-    expect(chamadas[0]).toMatchObject({ tabela: "user_organizations" });
-    expect(chamadas[0]!.filtros).toEqual(
-      expect.arrayContaining([
-        ["organization_id", ORG],
-        ["user_id", BRUNO],
-      ]),
-    );
+    expect(corpo.data).toEqual({ tasks: [{ id: "t-1" }] });
+    expect(chamadas.map((c) => c.tabela)).toEqual(["crm_tasks"]);
     const lista = daLista(chamadas)!;
     expect(lista.filtros).toContainEqual(["assigned_to", BRUNO]);
     expect(lista.filtros).toContainEqual(["organization_id", ORG]);
     expect(lista.limite).toBe(500);
   });
 
-  it("⭐ id de fora devolve vazio, igual a membro sem tarefa, e nem consulta as tarefas", async () => {
-    const chamadas = fazerSupabase([ANA]);
-    const { status, corpo } = await listar(`assigned_to=${ESTRANHO}`);
-    expect(status).toBe(200);
-    expect(corpo.data).toEqual({ tasks: [] });
-    expect(daLista(chamadas)).toBeUndefined();
+  it("id de fora só estreita a lista da org da sessão: nada além do que a RLS já mostra", async () => {
+    const chamadas = fazerSupabase([]);
+    await listar(`assigned_to=${ESTRANHO}`);
+    const lista = daLista(chamadas)!;
+    expect(lista.filtros).toContainEqual(["organization_id", ORG]);
+    expect(lista.filtros).toContainEqual(["assigned_to", ESTRANHO]);
   });
 
   it("valor que não é 'eu' nem uuid é recusado (422)", async () => {

@@ -90,24 +90,12 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const supabase = await createClient();
 
-  let responsavel: string | null = null;
-  if (filtros.assigned_to === "eu") responsavel = authz.user.id;
-  else if (filtros.assigned_to) {
-    // Id de fora da organização devolve a lista VAZIA, a mesma resposta de um
-    // membro sem tarefas: a rota não diz se o id existe em outro lugar.
-    const { data: membro, error: erroDoMembro } = await supabase
-      .from("user_organizations")
-      .select("user_id")
-      .eq("organization_id", authz.org.orgId)
-      .eq("user_id", filtros.assigned_to)
-      .limit(1)
-      .maybeSingle();
-    if (erroDoMembro) {
-      return fail("internal_error", t("Erro ao listar as tarefas."), 500, { requestId });
-    }
-    if (!membro) return ok({ tasks: [] as Tarefa[] }, { requestId });
-    responsavel = filtros.assigned_to;
-  }
+  // "eu" vira o usuário da sessão; o id de um colega vai direto ao filtro. Sem
+  // conferir a filiação (P2 do Cassio na #183): a RLS de `user_organizations` não
+  // deixa agent/viewer ler a linha de outro membro, e o filtro só ESTREITA a lista
+  // que a pessoa já vê (mesma org, mesma RLS). Id de fora devolve vazio, como
+  // membro sem tarefa, e a rota não diz se ele existe.
+  const responsavel = filtros.assigned_to === "eu" ? authz.user.id : (filtros.assigned_to ?? null);
 
   // ⚠️ `organization_id` à mão mesmo com RLS ligada: é a regra do CLAUDE.md, e
   // ela não é redundante — o dia em que esta rota trocar para o admin client
