@@ -50,7 +50,8 @@ const PADRAO: Branding = { name: DEFAULT_APP_NAME, logoUrl: null, initial: "D" }
 function renderSidebar(marca: Branding, collapsed: boolean) {
   return render(
     <MarcaDaInstalacaoProvider marca={marca}>
-      <Sidebar collapsed={collapsed} />
+      {/* Na Inbox a barra começa recolhida; aberta = fixada na Inbox. */}
+      <Sidebar collapsed={collapsed} fixoNaInbox={!collapsed} />
     </MarcaDaInstalacaoProvider>,
   );
 }
@@ -88,9 +89,11 @@ describe("o desenho na barra lateral", () => {
     expect(screen.queryByText(DEFAULT_APP_NAME)).toBeNull();
   });
 
-  it("recolhida, mostra só o símbolo — e não a inicial em texto", () => {
+  it("recolhida, o trilho mostra a sigla da organização, e não a marca (quadro DS, `.rail-tenant`)", () => {
     renderSidebar(PADRAO, true);
-    expect(screen.getByRole("img", { name: DEFAULT_APP_NAME }).tagName.toLowerCase()).toBe("svg");
+    expect(screen.getByTestId("sigla-da-organizacao")).toHaveTextContent("LD");
+    // O logo mora no rodapé da 2ª coluna, que recolhida não aparece.
+    expect(screen.queryByRole("img", { name: DEFAULT_APP_NAME })).toBeNull();
     expect(screen.queryByText("D")).toBeNull();
   });
 

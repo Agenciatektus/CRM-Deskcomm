@@ -260,7 +260,7 @@ export function Sidebar({
         escopo={naInbox ? "inbox" : "geral"}
         podeFixar={cabe}
         funis={funis}
-        marca={<MarcaDaBarra compacta />}
+        marca={<MarcaDaBarra compacta={false} />}
       />
     </aside>
   );

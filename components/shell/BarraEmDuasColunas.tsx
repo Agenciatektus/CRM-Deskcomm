@@ -9,6 +9,7 @@ import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDo
 import { ColunaDoGrupo, type Secao } from "@/components/shell/ColunaDoGrupo";
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
+import { TenantSwitcher } from "@/components/shell/TenantSwitcher";
 import { usePeekDoTrilho } from "@/components/shell/usePeekDoTrilho";
 import { VersionFooter } from "@/components/shell/VersionFooter";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -188,9 +189,11 @@ export function BarraEmDuasColunas({
       {/* Sem `border-r`: trilho e coluna são UM bloco da cor da moldura, como no
           protótipo; a divisão entre eles é a diferença de conteúdo, não um fio. */}
       <div className="flex w-[72px] shrink-0 flex-col items-center">
-        {/* `data-marca-da-barra`: a caixa que o e2e da moldura do logo mede. */}
-        <div data-marca-da-barra className="flex h-14 w-full items-center justify-center px-2">
-          {marca}
+        {/* Topo do trilho = a ORGANIZAÇÃO (`.rail-tenant` do quadro DS): a sigla
+            em quadrado de 40px, que abre a troca de organização. O logo da marca
+            desceu para o rodapé da 2ª coluna. */}
+        <div className="flex h-14 w-full items-center justify-center px-2">
+          <TenantSwitcher variante="trilho" />
         </div>
         <nav
           aria-label={t("Grupos da navegação")}
@@ -332,7 +335,12 @@ export function BarraEmDuasColunas({
               )
             }
           />
-          <div className="border-t p-2">
+          <div className="flex items-center gap-2 border-t border-border px-2.5 py-2">
+            {/* O logo da marca (do revendedor ou do produto), discreto no rodapé.
+                `data-marca-da-barra`: a caixa que o e2e da moldura do logo mede. */}
+            <div data-marca-da-barra className="flex min-w-0 flex-1 items-center">
+              {marca}
+            </div>
             <VersionFooter collapsed={false} onNavigate={fechar} />
           </div>
         </div>

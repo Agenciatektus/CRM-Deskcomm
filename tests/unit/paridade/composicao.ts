@@ -87,6 +87,15 @@ export function divergenciasDeComposicao(): string[] {
     },
     { id: "data:atalhos", ok: /Atalhos primeiro/.test(DS_HTML_TEXTO) && seletor.includes("ATALHOS_DE_DIA") && seletor.includes('"1430"'), detalhe: "atalhos, chips de horário e Outro horário com 1430" },
     { id: "menu:teclas", ok: conteudoDoMenu.includes('tecla("A")') && conteudoDoMenu.includes('tecla("E")') && /Atalhos de teclado aparecem no próprio item/.test(DS_HTML_TEXTO), detalhe: "tecla no item do menu" },
+    {
+      // O topo do trilho é a ORGANIZAÇÃO (`.rail-t` do quadro): sigla em quadrado de 40, raio 11.
+      id: "nav:organizacao-no-trilho",
+      ok:
+        ler("components/shell/TenantSwitcher.tsx").includes(`size-${px(decl(R_DS, ".rail-t", "width")) / 4}`) &&
+        ler("components/shell/TenantSwitcher.tsx").includes(`rounded-[${px(decl(R_DS, ".rail-t", "border-radius"))}px]`) &&
+        barra.includes('<TenantSwitcher variante="trilho" />'),
+      detalhe: "sigla da organização no topo do trilho",
+    },
     { id: "aviso:remarcou", ok: /Remarcou/.test(DS_HTML_TEXTO) && resultado.includes('t("Remarcou")'), detalhe: "Remarcou no resultado do compromisso" },
   ];
   return resultados.filter((r) => !r.ok).map((r) => `${r.id} ${r.detalhe}`);

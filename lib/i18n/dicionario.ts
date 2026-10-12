@@ -10413,6 +10413,7 @@ export const DICIONARIO: Traducoes = {
   // está; trocá-la é decisão de quem a escreveu, e vai anotada no PR.
   "Novo agendamento": { es: "Nueva cita" },
   "Remarcar agendamento": { es: "Reagendar cita" },
+  "Trocar de organização": { es: "Cambiar de organización" },
   "Não foi possível desfazer: recarregue o painel.": { es: "No se pudo deshacer: recarga el panel." },
   "Negócio marcado como perdido.": { es: "Negocio marcado como perdido." },
   "Por que perdeu?": { es: "¿Por qué se perdió?" },
