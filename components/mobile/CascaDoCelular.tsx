@@ -4,7 +4,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
 import { abaDaRota, conversaAberta, ehRaizDeAba, voltarDaRota } from "@/lib/mobile/abas";
-import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { destinoDaRota } from "@/lib/navigation/rota-atual";
 import { usePilhaDoApp } from "@/lib/mobile/pilha";
 import { useAlturaDoTeclado } from "@/lib/mobile/useAlturaDoTeclado";
@@ -17,7 +16,7 @@ import { BotaoCriar } from "./BotaoCriar";
 import { CabecalhoGrande } from "./CabecalhoGrande";
 import { AcoesDosAvisos } from "./telas/Avisos";
 import { Busca } from "./telas/Busca";
-import { MenuMais } from "./MenuMais";
+import { MenuMais } from "./telas/Mais";
 import { AcoesDaListaDeConversas } from "./telas/AcoesDaListaDeConversas";
 
 /**
@@ -77,7 +76,7 @@ function CabecalhoDoCelular() {
  * "Mais". Tudo com `hidden mb:*`: de 760px para cima nada disto aparece, e o topo e a
  * barra lateral de sempre continuam (eles é que somem abaixo de 760, na `AppShell`).
  */
-export function CascaDoCelular({ funis }: { funis: readonly FunilDoMenu[] }) {
+export function CascaDoCelular() {
   const [maisAberto, setMaisAberto] = useState(false);
   usePilhaDoApp(usePathname() ?? "");
   useAlturaDoTeclado(useEhCelular());
@@ -88,7 +87,7 @@ export function CascaDoCelular({ funis }: { funis: readonly FunilDoMenu[] }) {
       </div>
       <BarraInferior maisAberto={maisAberto} aoAbrirMais={() => setMaisAberto(true)} />
       <BotaoCriar />
-      <MenuMais aberto={maisAberto} aoMudar={setMaisAberto} funis={funis} />
+      <MenuMais aberto={maisAberto} aoMudar={setMaisAberto} />
     </>
   );
 }

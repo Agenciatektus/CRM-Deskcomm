@@ -396,6 +396,14 @@
   --mb-fab-acima: 84px;
   /* 16px nos campos: abaixo disso o Safari do iPhone dá zoom ao focar. */
   --mb-campo-fonte: 16px;
+  /* Mais (tela 9) e Canais (tela 10): cartões, linha do menu e logo do canal. */
+  --mb-perfil-raio: 18px;
+  --mb-grupo-fonte: 20px;
+  --mb-cartao-raio: 16px;
+  --mb-menu-item: 62px;
+  --mb-menu-icone: 36px;
+  --mb-canal-raio: 18px;
+  --mb-canal-logo: 46px;
   /* Área segura (notch e indicador de início). Só existe com `viewportFit: "cover"`
      (app/layout.tsx); no desktop o `env()` vale 0, então nada muda acima de 760px. */
   --mb-area-topo: env(safe-area-inset-top, 0px);

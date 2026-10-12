@@ -112,7 +112,7 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
         <div className="hidden largo:contents">
           <TopBar />
         </div>
-        <CascaDoCelular funis={funis} />
+        <CascaDoCelular />
         {/*
           O RODAPÉ DESCONTA O QUE AS PEÇAS FIXAS OCUPAM (issue #1305).
 

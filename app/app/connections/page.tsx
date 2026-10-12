@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { ConexoesShell } from "@/components/connections/ConexoesShell";
+import { Canais } from "@/components/mobile/telas/Canais";
 import { canalGraphParceiroLigado, GRAPH_PARTNER_LABEL } from "@/lib/channels/graph-parceiro/credentials";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -36,11 +37,14 @@ export default async function ConnectionsPage() {
           )}
       />
       <SecaoDaPagina>
-        <ConexoesShell
-          wahaConfigured={wahaConfigured}
-          wacallsConfigured={wacallsConfigured}
-          graphParceiro={canalGraphParceiroLigado() ? { label: GRAPH_PARTNER_LABEL } : null}
-        />
+        {/* No celular, sem `?aba=`, o começo é a lista de canais em cartões (tela 10). */}
+        <Canais>
+          <ConexoesShell
+            wahaConfigured={wahaConfigured}
+            wacallsConfigured={wacallsConfigured}
+            graphParceiro={canalGraphParceiroLigado() ? { label: GRAPH_PARTNER_LABEL } : null}
+          />
+        </Canais>
       </SecaoDaPagina>
     </Pagina>
   );
