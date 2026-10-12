@@ -18,11 +18,12 @@ import type { Lead } from "@/lib/types/leads";
  */
 
 const avisos = vi.hoisted(() => [] as { opcoes: Record<string, unknown> }[]);
+const alerta = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
   toast: Object.assign((_m: unknown, opcoes: Record<string, unknown>) => avisos.push({ opcoes }), {
     error: vi.fn(),
     success: vi.fn(),
-    warning: vi.fn(),
+    warning: alerta,
   }),
 }));
 vi.mock("@/lib/api/client", () => ({ apiClient: { post: vi.fn(), get: vi.fn(async () => ({ data: [] })), patch: vi.fn() } }));
@@ -78,6 +79,7 @@ afterEach(() => {
   perder.mockClear();
   trocar.mockClear();
   ganhar.mockClear();
+  alerta.mockClear();
 });
 
 describe("card do quadro — perda e troca passam pela trava", () => {
@@ -99,6 +101,7 @@ describe("card do quadro — perda e troca passam pela trava", () => {
     await user.click(screen.getByRole("button", { name: "confirmar perda" }));
     expect(avisos).toHaveLength(1);
     expect(perder).not.toHaveBeenCalled();
+    expect(alerta).toHaveBeenCalledWith("Já há um fechamento em andamento para este negócio");
   });
 
   it("com o ganho pendente, a troca de funil pelo card é recusada", async () => {

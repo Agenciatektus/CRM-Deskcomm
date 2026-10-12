@@ -8,8 +8,12 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const avisos = vi.hoisted(() => [] as { opcoes: Record<string, unknown> }[]);
+const alerta = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({
-  toast: Object.assign((_m: unknown, opcoes: Record<string, unknown>) => avisos.push({ opcoes }), { error: vi.fn() }),
+  toast: Object.assign((_m: unknown, opcoes: Record<string, unknown>) => avisos.push({ opcoes }), {
+    error: vi.fn(),
+    warning: alerta,
+  }),
 }));
 
 import { adiarFechamento, fechamentoPendente } from "@/lib/ui/fechar-negocio";
@@ -23,16 +27,25 @@ beforeEach(() => desfazerTodos());
 describe("trava por negócio nos três fechamentos", () => {
   it("perda segurada: o ganho do MESMO negócio não se agenda; o de outro, sim", () => {
     const gravar = vi.fn(async () => undefined);
-    expect(adiarFechamento("perda", "lead-1", () => "Perdido", "Desfazer", gravar)).toBe(true);
+    expect(adiarFechamento("perda", "lead-1", () => "Perdido", (s: string) => s, gravar)).toBe(true);
     expect(fechamentoPendente("lead-1")).toBe(true);
-    expect(adiarFechamento("ganho", "lead-1", () => "Ganho", "Desfazer", gravar)).toBe(false);
-    expect(adiarFechamento("troca", "lead-1", () => "Troca", "Desfazer", gravar)).toBe(false);
-    expect(adiarFechamento("ganho", "lead-2", () => "Ganho", "Desfazer", gravar)).toBe(true);
+    expect(adiarFechamento("ganho", "lead-1", () => "Ganho", (s: string) => s, gravar)).toBe(false);
+    expect(adiarFechamento("troca", "lead-1", () => "Troca", (s: string) => s, gravar)).toBe(false);
+    expect(adiarFechamento("ganho", "lead-2", () => "Ganho", (s: string) => s, gravar)).toBe(true);
     expect(gravar).not.toHaveBeenCalled();
   });
 
+  it("a recusa AVISA, em vez de fechar calada (observação do Cassio na #182)", () => {
+    alerta.mockClear();
+    const gravar = vi.fn(async () => undefined);
+    expect(adiarFechamento("ganho", "lead-4", () => "Ganho", (s: string) => s, gravar)).toBe(true);
+    expect(alerta).not.toHaveBeenCalled();
+    expect(adiarFechamento("perda", "lead-4", () => "Perdido", (s: string) => s, gravar)).toBe(false);
+    expect(alerta).toHaveBeenCalledWith("Já há um fechamento em andamento para este negócio");
+  });
+
   it("Desfazer solta a trava", () => {
-    adiarFechamento("troca", "lead-3", () => "Troca", "Desfazer", async () => undefined);
+    adiarFechamento("troca", "lead-3", () => "Troca", (s: string) => s, async () => undefined);
     expect(fechamentoPendente("lead-3")).toBe(true);
     desfazerTodos();
     expect(fechamentoPendente("lead-3")).toBe(false);

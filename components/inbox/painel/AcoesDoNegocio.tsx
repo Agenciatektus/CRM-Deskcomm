@@ -72,7 +72,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
       tipo,
       lead.id,
       mensagem,
-      t("Desfazer"),
+      t,
       () =>
         gravar()
           .then(() => onMudou())

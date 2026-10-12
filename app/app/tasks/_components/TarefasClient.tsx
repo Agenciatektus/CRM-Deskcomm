@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { TarefasNoCelular } from "@/components/mobile/telas/Tarefas";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ type FiltroDeSituacao = "aberto" | SituacaoDaTarefa;
 
 export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
   const t = useT();
+  const celular = useEhCelular();
   const [modo, setModo] = useState<"lista" | "calendario">("lista");
   const [situacao, setSituacao] = useState<FiltroDeSituacao>("aberto");
   const [emEdicao, setEmEdicao] = useState<Tarefa | null>(null);
@@ -70,6 +73,27 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
   async function salvar(entrada: NovaTarefa) {
     if (emEdicao) await editarTarefa(emEdicao.id, entrada);
     else await criarTarefa(entrada);
+  }
+
+  const formulario = (
+    <FormularioDeTarefa
+      key={aberturas}
+      aberto={formAberto}
+      aoMudarAbertura={setFormAberto}
+      tarefa={emEdicao}
+      prazoSugerido={prazoSugerido}
+      aoSalvar={salvar}
+    />
+  );
+
+  // Celular (M3.2): a aba Tarefas do protótipo, com o mesmo formulário.
+  if (celular) {
+    return (
+      <>
+        <TarefasNoCelular podeEditar={podeEditar} aoAbrirTarefa={abrirEdicao} />
+        {formulario}
+      </>
+    );
   }
 
   return (
@@ -184,14 +208,7 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
         />
       )}
 
-      <FormularioDeTarefa
-        key={aberturas}
-        aberto={formAberto}
-        aoMudarAbertura={setFormAberto}
-        tarefa={emEdicao}
-        prazoSugerido={prazoSugerido}
-        aoSalvar={salvar}
-      />
+      {formulario}
     </div>
   );
 }

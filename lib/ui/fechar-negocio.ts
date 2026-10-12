@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 import { acaoPendente, adiarAcao } from "./aviso-com-desfazer";
 
 /**
@@ -25,16 +27,23 @@ export function fechamentoPendente(leadId: string): boolean {
 /**
  * Agenda o fechamento com a chave dele, se nenhum outro do mesmo negócio estiver
  * segurado. Devolve `false` quando a trava recusou (quem chama não muda a tela).
+ *
+ * A recusa AVISA (observação do Cassio na #182): a janela de perda ou troca, a
+ * folha ou o menu fecham, e sem o aviso pareceria que o fechamento foi aceito.
+ * `t` é o tradutor de quem chama (`useT`), para o "Desfazer" e para o aviso.
  */
 export function adiarFechamento(
   tipo: Fechamento,
   leadId: string,
   mensagem: (segundosRestantes: number) => string,
-  rotuloDoDesfazer: string,
+  t: (texto: string) => string,
   gravar: () => Promise<unknown>,
   aoDesfazer?: () => void,
 ): boolean {
-  if (fechamentoPendente(leadId)) return false;
-  adiarAcao(mensagem, rotuloDoDesfazer, gravar, aoDesfazer, { chave: chaveDoFechamento(tipo, leadId) });
+  if (fechamentoPendente(leadId)) {
+    toast.warning(t("Já há um fechamento em andamento para este negócio"));
+    return false;
+  }
+  adiarAcao(mensagem, t("Desfazer"), gravar, aoDesfazer, { chave: chaveDoFechamento(tipo, leadId) });
   return true;
 }

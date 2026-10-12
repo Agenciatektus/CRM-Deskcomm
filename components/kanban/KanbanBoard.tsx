@@ -251,7 +251,7 @@ export function KanbanBoard({
           destino.is_won ? "ganho" : "perda",
           lead.id,
           (s) => `${destino.is_won ? t("Ganho em") : t("Perdido em")} ${s} s`,
-          t("Desfazer"),
+          t,
           async () => mover(),
         );
         return;

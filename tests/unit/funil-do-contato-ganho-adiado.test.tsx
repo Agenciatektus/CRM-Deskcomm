@@ -23,6 +23,7 @@ const sonner = vi.hoisted(() => {
         chamadas.push({ mensagem, opcoes });
       }),
       error: vi.fn(),
+      warning: vi.fn(),
     },
   );
   return { toast, chamadas };

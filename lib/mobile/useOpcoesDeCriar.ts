@@ -7,13 +7,12 @@ import { opcoesDeCriar, opcoesPermitidas, type OpcaoDeCriar } from "@/lib/mobile
 import { searchable } from "@/lib/navigation/registry";
 
 /**
- * As opções da folha "Criar" nesta tela, só as que o vínculo enxerga no menu (papel,
- * interface, módulos e capacidades: a mesma regra da busca geral). P2 do Cassio na #177.
+ * As telas que o vínculo enxerga no menu (papel, interface, módulos e capacidades: a
+ * mesma regra da busca geral), pelo `href` de cada uma.
  */
-export function useOpcoesDeCriar(): OpcaoDeCriar[] {
-  const rota = usePathname() ?? "";
+export function useTelasVisiveis(): ReadonlySet<string> {
   const { user, activeOrg } = useAuth();
-  const visiveis = useMemo(
+  return useMemo(
     () =>
       new Set(
         searchable(
@@ -26,5 +25,13 @@ export function useOpcoesDeCriar(): OpcaoDeCriar[] {
       ),
     [user.is_platform_admin, user.support, activeOrg?.role, activeOrg?.interface_settings, activeOrg?.modulos_ligados, activeOrg?.capacidades_ligadas],
   );
-  return opcoesPermitidas(opcoesDeCriar(rota), visiveis);
+}
+
+/**
+ * As opções da folha "Criar" nesta tela, só as que o vínculo enxerga no menu.
+ * P2 do Cassio na #177.
+ */
+export function useOpcoesDeCriar(): OpcaoDeCriar[] {
+  const rota = usePathname() ?? "";
+  return opcoesPermitidas(opcoesDeCriar(rota), useTelasVisiveis());
 }
