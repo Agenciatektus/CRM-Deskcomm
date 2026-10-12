@@ -21,6 +21,8 @@ interface Props {
    * nela, então a tecla só aparece no item quando o menu é dela.
    */
   selecionada?: boolean;
+  /** Celular: as ações do lead primeiro (ver `ConteudoDoMenu`). */
+  leadPrimeiro?: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ interface Props {
  * hooks já corrigem a linha pelo `cacheDasConversas` quando o servidor
  * responde, e adiantar no cliente faria a linha piscar com o evento do realtime.
  */
-export function MenuDaConversa({ alvo, conversation, onFechar, meuUserId, automaticoDaOrg, selecionada = false }: Props) {
+export function MenuDaConversa({ alvo, conversation, onFechar, meuUserId, automaticoDaOrg, selecionada = false, leadPrimeiro = false }: Props) {
   const { user } = useAuth();
   const podeEscrever = usePermission("inbox.claim");
   const suporteSoLeitura = user.support?.access_mode === "support_readonly";
@@ -76,6 +78,7 @@ export function MenuDaConversa({ alvo, conversation, onFechar, meuUserId, automa
           meuUserId={meuUserId}
           automaticoDaOrg={automaticoDaOrg}
           selecionada={selecionada}
+          leadPrimeiro={leadPrimeiro}
           onFechar={onFechar}
           onAbrirDialogo={abrirDialogo}
           onDevolverFoco={devolverFoco}

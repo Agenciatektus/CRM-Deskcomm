@@ -30,7 +30,8 @@ export function classesDaLinha(f: { inicio: boolean; saida: boolean }): string {
 }
 
 /** A coluna da fala (nome + bolha): 80% do fio, no máximo 580px. */
-export const COLUNA_DA_FALA = "flex min-w-0 max-w-[min(80%,580px)] flex-col";
+// `mb:max-w-[84%]`: no celular o balão ocupa a largura do protótipo (o `.bub`, 84%).
+export const COLUNA_DA_FALA = "flex min-w-0 max-w-[min(80%,580px)] mb:max-w-[84%] flex-col";
 
 /** `.who`: o nome acima da primeira bolha do bloco, 12/700, na cor do autor. */
 export function classesDoAutor(tom: "pessoa" | "ia" | "nota"): string {

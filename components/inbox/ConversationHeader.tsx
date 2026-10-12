@@ -136,7 +136,9 @@ export function ConversationHeader({
         // O `.th-head` do protótipo: 64px de altura mínima, 10px em cima e
         // embaixo, 18px à esquerda (alinha o nome com o texto das bolhas) e 12px
         // à direita (os ícones de ação já trazem o próprio respiro).
-        className="pele-ruido flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-surface py-2.5 pl-4.5 pr-3"
+        // `mb:hidden`: no celular a conversa tem a barra do protótipo
+        // (`BarraDaConversaNoCelular`), e as ações moram no ⋮ dela.
+        className="pele-ruido flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-surface py-2.5 pl-4.5 pr-3 mb:hidden"
         data-testid="cabecalho-da-conversa"
       >
         <IdentidadeDaConversa

@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
-import type { LeadRow } from "@/components/inbox/painel/tipos";
 import {
   DropdownMenuItem,
   DropdownMenuPortal,
@@ -16,22 +13,15 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useT } from "@/hooks/i18n/useT";
-import { useMoveCard } from "@/hooks/kanban/useMoveCard";
-import { useWinLead } from "@/hooks/kanban/useUpdateLead";
-import { apiClient } from "@/lib/api/client";
-import { avisarQueOCrmDoContatoMudou } from "@/lib/inbox/releitura-do-contato";
+import { useFunilDoContato, type DialogoDoFunil } from "@/hooks/inbox/useFunilDoContato";
 import { cn } from "@/lib/utils";
 import { Funnel } from "@/lib/ui/icons";
 
 import { CLASSE_DO_DETALHE, CLASSE_DO_ITEM, CLASSE_DO_SUBMENU, CLASSE_DO_TITULO } from "./estilo";
 
-/** O pedido que precisa de janela própria e por isso sai do menu. */
-export type DialogoDoFunil = { tipo: "perder" | "outro-funil"; lead: LeadRow };
-
-/** A chave do resumo que o menu lê. Exportada para quem precisa reler depois de gravar. */
-export function chaveDoResumoDoMenu(contactId: string) {
-  return ["menu-da-conversa", "crm-summary", contactId] as const;
-}
+// A régua do funil mora em `useFunilDoContato` (o menu e a faixa do celular a usam);
+// os nomes seguem exportados daqui para quem já os importava.
+export { chaveDoResumoDoMenu, type DialogoDoFunil } from "@/hooks/inbox/useFunilDoContato";
 
 /**
  * TROCAR DE FUNIL OU ETAPA PELO MENU DA LISTA.
@@ -52,22 +42,8 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
   onDialogo: (d: DialogoDoFunil) => void;
 }) {
   const t = useT();
-  const qc = useQueryClient();
   const [aberto, setAberto] = useState(false);
-  const resumo = useQuery({
-    queryKey: chaveDoResumoDoMenu(contactId),
-    queryFn: () => apiClient.get<{ data: { leads: LeadRow[] } }>(`/api/v1/contacts/${contactId}/crm-summary`),
-    enabled: aberto,
-    staleTime: 30_000,
-    select: (r) => r.data.leads ?? [],
-  });
-  const lead = resumo.data?.[0] ?? null;
-  const pipelineId = lead?.pipeline_id ?? "";
-  const mover = useMoveCard(pipelineId);
-  const ganhar = useWinLead(pipelineId);
-
-  const etapas = lead?.etapas ?? [];
-  const indiceAtual = etapas.findIndex((e) => e.id === lead?.stage_id);
+  const { resumo, lead, etapas, indiceAtual, escolher, mover, ganhar, ganhoPendente } = useFunilDoContato(contactId, aberto, onDialogo);
   const detalhe = !lead
     ? null
     : lead.status === "won"
@@ -75,30 +51,6 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
       : lead.status === "lost"
         ? t("Perdido")
         : (lead.etapa_nome ?? null);
-
-  function feito() {
-    toast.success(t("Etapa alterada"));
-    void qc.invalidateQueries({ queryKey: chaveDoResumoDoMenu(contactId) });
-    // O painel aberto neste contato relê; com outro contato, ignora.
-    avisarQueOCrmDoContatoMudou(contactId);
-  }
-
-  function escolher(stageId: string) {
-    if (!lead || stageId === lead.stage_id) return;
-    const alvo = etapas.find((e) => e.id === stageId);
-    if (!alvo) return;
-    if (alvo.is_lost) return onDialogo({ tipo: "perder", lead });
-    // `mutateAsync` e não `mutate(…, { onSuccess })`: o menu FECHA (e desmonta)
-    // ao escolher, e o callback por chamada do react-query não roda em
-    // componente desmontado. A promessa resolve de qualquer jeito. O erro já
-    // vira aviso no `onError` do hook.
-    const ignorar = () => {};
-    if (alvo.is_won) return void ganhar.mutateAsync({ leadId: lead.id }).then(feito, ignorar);
-    // Fim da coluna de destino, a mesma conta do seletor do painel.
-    void mover
-      .mutateAsync({ leadId: lead.id, stageId, positionInStage: Date.now(), expectedUpdatedAt: lead.updated_at })
-      .then(feito, ignorar);
-  }
 
   return (
     <DropdownMenuSub open={aberto} onOpenChange={setAberto}>
@@ -130,7 +82,7 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
                     <DropdownMenuRadioItem
                       key={e.id}
                       value={e.id}
-                      disabled={mover.isPending || ganhar.isPending}
+                      disabled={mover.isPending || ganhar.isPending || ganhoPendente}
                       className="h-[34px] gap-2 rounded-lg text-[13.5px] focus:bg-surface-elevated focus:text-text"
                     >
                       <span

@@ -8,6 +8,8 @@ import { abaDaRota, conversaAberta, ehRaizDeAba, RAIZ_DA_ABA } from "@/lib/mobil
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { destinoDaRota } from "@/lib/navigation/rota-atual";
 import { usePilhaDoApp } from "@/lib/mobile/pilha";
+import { useAlturaDoTeclado } from "@/lib/mobile/useAlturaDoTeclado";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { MagnifyingGlass } from "@/lib/ui/icons";
 
 import { BarraDeTela } from "./BarraDeTela";
@@ -67,6 +69,7 @@ function CabecalhoDoCelular() {
 export function CascaDoCelular({ funis }: { funis: readonly FunilDoMenu[] }) {
   const [maisAberto, setMaisAberto] = useState(false);
   usePilhaDoApp(usePathname() ?? "");
+  useAlturaDoTeclado(useEhCelular());
   return (
     <>
       <div className="hidden mb:contents">
