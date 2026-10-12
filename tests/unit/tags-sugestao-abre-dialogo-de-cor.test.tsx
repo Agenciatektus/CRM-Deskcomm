@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { ContactTagsEditor } from "@/components/inbox/ContactTagsEditor";
+import { ConversationTagsEditor } from "@/components/inbox/ConversationTagsEditor";
 import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 
 /**
@@ -37,6 +38,13 @@ const mutate = vi.fn();
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate, isPending: false }),
 }));
+// O editor da CONVERSA lê vocabulário e grava por outro gancho; o mesmo diálogo
+// tem de valer lá, senão a #2789 fica consertada só numa das duas telas.
+const mutateConversa = vi.fn();
+vi.mock("@/hooks/inbox/useConversationTags", () => ({
+  useUpdateConversationTags: () => ({ mutate: mutateConversa, isPending: false }),
+  useConversationTagVocabulary: () => ({ data: ["google", "vip"] }),
+}));
 const definirCor = vi.fn();
 vi.mock("@/hooks/tags/useDefinirCorDaEtiqueta", () => ({
   useDefinirCorDaEtiqueta: () => ({ definirCor }),
@@ -59,6 +67,7 @@ function montar(tags: string[] = ["vip"]) {
 beforeEach(() => {
   get.mockReset();
   mutate.mockReset();
+  mutateConversa.mockReset();
   definirCor.mockReset();
   estado.papel = "manager";
   // Duas leituras na mesma tela: vocabulário das sugestões e mapa de cores.
@@ -139,5 +148,29 @@ describe("sugestão de etiqueta — caixa de diálogo antes de enviar", () => {
     // que a escrita recusa (#2718). Aqui a tag entra sem tom, como antes.
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+  });
+});
+
+describe("sugestão de etiqueta no editor da CONVERSA", () => {
+  it("abre o diálogo, não grava no clique, e confirmar grava com o tom escolhido", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ProvedorDeCoresDasEtiquetas>
+          <ConversationTagsEditor conversationId="conv-1" orgId={ORG} tags={["vip"]} />
+        </ProvedorDeCoresDasEtiquetas>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 }));
+    expect(mutateConversa).not.toHaveBeenCalled();
+
+    const caixa = dialogo();
+    await userEvent.click(within(caixa).getByRole("button", { name: "Índigo" }));
+    await userEvent.click(within(caixa).getByRole("button", { name: "Adicionar tag" }));
+
+    expect(mutateConversa).toHaveBeenCalledWith({ conversation_id: "conv-1", tags: ["vip", "google"] });
+    expect(definirCor).toHaveBeenCalledWith("google", "#3e63dd");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
