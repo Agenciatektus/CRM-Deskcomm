@@ -6,6 +6,7 @@
  * abre (`<details>`) com o que se procura no gerenciador da plataforma: o ID
  * do evento (o mesmo em todas as tentativas), o protocolo e a ação.
  */
+import { Escolha } from "@/components/ui/escolha";
 import { formatCentsBRL } from "@/lib/money";
 import {
   PERIODOS,
@@ -91,38 +92,35 @@ export function HistoricoDeEnvios({
         <input type="hidden" name="aba" value="historico" />
         <label className="flex flex-col gap-1 text-xs">
           {t("Período")}
-          <select
+          <Escolha
             name="periodo"
             defaultValue={filtros.periodo}
-            className="rounded-md border bg-background p-2 text-sm"
           >
             {PERIODOS.map((p) => (
               <option key={p} value={p}>
                 {t(ROTULO_DO_PERIODO[p])}
               </option>
             ))}
-          </select>
+          </Escolha>
         </label>
         <label className="flex flex-col gap-1 text-xs">
           {t("Status")}
-          <select
+          <Escolha
             name="situacao"
             defaultValue={filtros.situacao}
-            className="rounded-md border bg-background p-2 text-sm"
           >
             {(Object.keys(ROTULO_DA_SITUACAO) as Situacao[]).map((s) => (
               <option key={s} value={s}>
                 {t(ROTULO_DA_SITUACAO[s])}
               </option>
             ))}
-          </select>
+          </Escolha>
         </label>
         <label className="flex flex-col gap-1 text-xs">
           {t("Evento")}
-          <select
+          <Escolha
             name="evento"
             defaultValue={filtros.evento}
-            className="rounded-md border bg-background p-2 text-sm"
           >
             <option value="">{t("Todos os eventos")}</option>
             {eventos.map((e) => (
@@ -130,19 +128,18 @@ export function HistoricoDeEnvios({
                 {t(e.rotulo)}
               </option>
             ))}
-          </select>
+          </Escolha>
         </label>
         <label className="flex flex-col gap-1 text-xs">
           {t("Plataforma")}
-          <select
+          <Escolha
             name="plataforma"
             defaultValue={filtros.plataforma}
-            className="rounded-md border bg-background p-2 text-sm"
           >
             <option value="">{t("Todas")}</option>
             <option value="google_ads">Google Ads</option>
             <option value="meta_ads">Meta Ads</option>
-          </select>
+          </Escolha>
         </label>
         <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
           {t("Buscar por negócio")}

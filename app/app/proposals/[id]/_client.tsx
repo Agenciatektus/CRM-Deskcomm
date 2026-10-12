@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
@@ -462,13 +463,11 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
 
       <div className="space-y-2">
         <label className="block text-sm font-medium">{t("Válido até")}</label>
-        <input
-          type="date"
-          className="w-full rounded-md border p-2 text-sm disabled:bg-muted"
+        <CampoDeData tipo="date"
+          className="w-full"
           value={proposta.valid_until ?? ""}
           disabled={!editavel}
-          onChange={(e) => setProposta((p) => p && { ...p, valid_until: e.target.value || null })}
-        />
+          onValorChange={(valorEscolhido) => setProposta((p) => p && { ...p, valid_until: valorEscolhido || null })} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

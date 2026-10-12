@@ -7,6 +7,7 @@ import { salvarLinkRastreavel } from "@/app/actions/settings/linksRastreaveis";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { copyToClipboard } from "@/lib/clipboard";
 import { randomId } from "@/lib/random-id";
 import { traduzir } from "@/lib/i18n/traducao";
@@ -234,18 +235,18 @@ export function LinksRastreaveis({
         </div>
         <div>
           <Label htmlFor="link-use">{t("Onde será usado")}</Label>
-          <select
+          <Escolha
             id="link-use"
-            className="w-full rounded-md border bg-background p-2"
+            className="w-full"
             value={form.use_case}
-            onChange={(e) =>
-              setForm({ ...form, use_case: e.target.value as LinkInput["use_case"] })
+            onValueChange={(valorEscolhido) =>
+              setForm({ ...form, use_case: valorEscolhido as LinkInput["use_case"] })
             }
           >
             <option value="site">{t("Site")}</option>
             <option value="anuncio">{t("Anúncio")}</option>
             <option value="organico">{t("Orgânico")}</option>
-          </select>
+          </Escolha>
         </div>
         {(
           [

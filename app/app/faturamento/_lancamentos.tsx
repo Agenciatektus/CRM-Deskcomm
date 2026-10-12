@@ -14,6 +14,8 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { formatCents, parseReaisToCents } from "@/lib/money";
 
@@ -86,24 +88,22 @@ export function ListaDeLancamentos({
         >
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             {t("Tipo")}
-            <select
+            <Escolha
               value={direcao}
               data-testid="lancamento-direcao"
-              onChange={(e) => setDirecao(e.target.value as "in" | "out")}
-              className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+              onValueChange={(valorEscolhido) => setDirecao(valorEscolhido as "in" | "out")}
             >
               <option value="out">{t("Saída")}</option>
               <option value="in">{t("Entrada")}</option>
-            </select>
+            </Escolha>
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             {t("Conta")}
-            <select
+            <Escolha
               value={contaId}
               data-testid="lancamento-conta"
-              onChange={(e) => setContaId(e.target.value)}
-              className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+              onValueChange={(valorEscolhido) => setContaId(valorEscolhido)}
             >
               <option value="">{t("Escolha")}</option>
               {contas.map((c) => (
@@ -111,7 +111,7 @@ export function ListaDeLancamentos({
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-text-muted">
@@ -138,13 +138,10 @@ export function ListaDeLancamentos({
 
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             {t("Data")}
-            <input
-              type="date"
+            <CampoDeData tipo="date"
               value={data}
               data-testid="lancamento-data"
-              onChange={(e) => setData(e.target.value)}
-              className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
-            />
+              onValorChange={(valorEscolhido) => setData(valorEscolhido)} />
           </label>
 
           <label className="flex items-center gap-2 text-xs text-text-muted">

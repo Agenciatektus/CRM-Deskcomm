@@ -32,6 +32,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { preencherData } from "@/tests/unit/helpers/controles-do-ds";
+
 const post = vi.fn((..._a: unknown[]) => Promise.resolve({ data: {} }));
 /** O que a tela já tem cadastrado — o lote confere duplicata contra isto. */
 let jaCadastrado: unknown[] = [];
@@ -72,7 +74,7 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     const u = userEvent.setup();
     montar();
 
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
     await u.click(screen.getByRole("button", { name: "Fechar este dia" }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
@@ -89,11 +91,9 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     montar();
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
-    await u.clear(screen.getByLabelText("Das"));
-    await u.type(screen.getByLabelText("Das"), "14:00");
-    await u.clear(screen.getByLabelText("Até"));
-    await u.type(screen.getByLabelText("Até"), "18:00");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Das"), "14:00");
+    preencherData(screen.getByLabelText("Até"), "18:00");
     await u.click(screen.getByRole("button", { name: "Abrir este dia" }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
@@ -110,11 +110,9 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     montar();
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
-    await u.clear(screen.getByLabelText("Das"));
-    await u.type(screen.getByLabelText("Das"), "18:00");
-    await u.clear(screen.getByLabelText("Até"));
-    await u.type(screen.getByLabelText("Até"), "14:00");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Das"), "18:00");
+    preencherData(screen.getByLabelText("Até"), "14:00");
 
     expect(screen.getByRole("button", { name: "Abrir este dia" })).toBeDisabled();
     expect(post).not.toHaveBeenCalled();
@@ -125,13 +123,11 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     montar();
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
-    await u.clear(screen.getByLabelText("Das"));
-    await u.type(screen.getByLabelText("Das"), "14:00");
-    await u.clear(screen.getByLabelText("Até"));
-    await u.type(screen.getByLabelText("Até"), "18:00");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Das"), "14:00");
+    preencherData(screen.getByLabelText("Até"), "18:00");
     // 01, 08, 15 e 22 de outubro — quatro quintas.
-    await u.type(screen.getByLabelText("Repetir toda semana até (opcional)"), "2026-10-22");
+    preencherData(screen.getByLabelText("Repetir toda semana até (opcional)"), "2026-10-22");
     await u.click(screen.getByRole("button", { name: "Abrir este dia" }));
 
     await waitFor(() => expect(post).toHaveBeenCalledTimes(4));
@@ -153,9 +149,9 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     montar();
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
     // Dez anos: é o dedo escorregando na data, e sem teto viraria 520 linhas.
-    await u.type(screen.getByLabelText("Repetir toda semana até (opcional)"), "2036-10-01");
+    preencherData(screen.getByLabelText("Repetir toda semana até (opcional)"), "2036-10-01");
     await u.click(screen.getByRole("button", { name: "Abrir este dia" }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
@@ -181,12 +177,10 @@ describe("Dias fora da rotina — fechar e abrir", () => {
     await screen.findByText(/08\/10\/2026|10\/8\/2026/);
 
     await u.selectOptions(screen.getByTestId("modo-do-dia"), "abrir");
-    await u.type(screen.getByLabelText("Dia"), "2026-10-01");
-    await u.clear(screen.getByLabelText("Das"));
-    await u.type(screen.getByLabelText("Das"), "14:00");
-    await u.clear(screen.getByLabelText("Até"));
-    await u.type(screen.getByLabelText("Até"), "18:00");
-    await u.type(screen.getByLabelText("Repetir toda semana até (opcional)"), "2026-10-15");
+    preencherData(screen.getByLabelText("Dia"), "2026-10-01");
+    preencherData(screen.getByLabelText("Das"), "14:00");
+    preencherData(screen.getByLabelText("Até"), "18:00");
+    preencherData(screen.getByLabelText("Repetir toda semana até (opcional)"), "2026-10-15");
     await u.click(screen.getByRole("button", { name: "Abrir este dia" }));
 
     // 01, 08 e 15 eram os alvos; o 08 já existia com a MESMA faixa.

@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { FUSO_PADRAO } from "@/lib/tempo/fusos";
 
@@ -200,23 +201,19 @@ export function TriggerEditor({ value, onChange, disabled, organizationTimezone 
               </div>
               <div className="space-y-1">
                 <Label htmlFor="bh_start">{t("Início")}</Label>
-                <Input
+                <CampoDeData tipo="time"
                   id="bh_start"
-                  type="time"
                   value={bh.start}
-                  onChange={(e) => patchBh({ start: e.target.value })}
-                  disabled={disabled}
-                />
+                  onValorChange={(valorEscolhido) => patchBh({ start: valorEscolhido })}
+                  disabled={disabled} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="bh_end">{t("Fim")}</Label>
-                <Input
+                <CampoDeData tipo="time"
                   id="bh_end"
-                  type="time"
                   value={bh.end}
-                  onChange={(e) => patchBh({ end: e.target.value })}
-                  disabled={disabled}
-                />
+                  onValorChange={(valorEscolhido) => patchBh({ end: valorEscolhido })}
+                  disabled={disabled} />
               </div>
             </div>
             <div>

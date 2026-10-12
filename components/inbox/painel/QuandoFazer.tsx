@@ -2,7 +2,7 @@
 
 import { chipVariants } from "@/components/ui/chip";
 
-import { SeletorDeDataHora } from "./SeletorDeDataHora";
+import { SeletorDeDataHora } from "@/components/ui/seletor-de-data-hora";
 
 /**
  * O chip dos atalhos ("O que fazer" e "Quando"), nas medidas do `.chip` do

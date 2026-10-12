@@ -21,7 +21,7 @@ const VARIANTE: Record<Situacao, "success" | "info" | "warning" | "neutral"> = {
  * Uma regra do quadro, o texto dele e, ao lado, se o CRM já cumpre e onde
  * isso se vê no código. O texto foi revisado para não contradizer o que o CRM
  * decidiu (o quadro falava em base shadcn para tudo; o CRM ainda usa o
- * `<select>` nativo estilizado, e isso aparece como "não cumpre").
+ * `<select>` nativo estilizado, e isso aparecia como "não cumpre" até a PR D trocar os controles).
  */
 function Regra({ n, titulo, texto, situacao, rotulo, onde }: {
   n: number;
@@ -67,7 +67,7 @@ export function SecaoRegras({ tema }: { tema: Tema }) {
         <Regra n={3} titulo={t("Todo menu fecha por fora e por Esc")} texto={t("Testar os dois jeitos ao criar qualquer menu suspenso.")} situacao="cumpre" rotulo={cumpre} onde="components/ui/dropdown-menu.tsx, components/ui/popover.tsx" />
         <Regra n={4} titulo={t("Pílula não quebra texto")} texto={t("Largura pelo conteúdo e quebra de linha entre itens, nunca dentro deles.")} situacao="cumpre" rotulo={cumpre} onde="components/inbox/item/MetaDaConversa.tsx (whitespace-nowrap)" />
         <Regra n={5} titulo={t("Arrastar não perde o ponteiro")} texto={t("Durante o arraste, o movimento é ouvido mesmo fora do elemento, com saídas de emergência.")} situacao="outro-jeito" rotulo={t("Cumpre de outro jeito")} onde={t("components/inbox/colunas/PegadorDeColuna.tsx: captura do ponteiro (setPointerCapture), e não ouvinte na janela")} />
-        <Regra n={6} titulo={t("Nada de controle nativo genérico")} texto={t("Data, hora e seletores seguem o design system.")} situacao="nao-cumpre" rotulo={t("Ainda não")} onde={t("O <select> e a caixa de seleção nativos seguem em uso, estilizados pelo globals.css.")} />
+        <Regra n={6} titulo={t("Nada de controle nativo genérico")} texto={t("Data, hora e seletores seguem o design system.")} situacao="cumpre" rotulo={cumpre} onde={t("components/ui/escolha.tsx e components/ui/campo-de-data.tsx; a cerca tests/unit/cerca-controles-nativos.test.ts reprova <select> e campo nativo de data ou hora fora de components/ui")} />
         <Regra n={7} titulo={t("Revisar sem remover")} texto={t("Mudança cobre só o que foi apontado; o que não foi criticado está aprovado.")} situacao="processo" rotulo={t("Regra de processo")} onde={t("Vale para a revisão, não para o código.")} />
         <Regra n={8} titulo={t("Paridade com o CRM atual")} texto={t("Toda ação que existe hoje (ganho, perdido, excluir, trocar funil) continua existindo na v2.")} situacao="cumpre" rotulo={cumpre} onde="components/inbox/painel/AcoesDoNegocio.tsx, MenuDoLead.tsx" />
       </ol>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import type { Lead } from "@/lib/types/leads";
 import { updateLeadSchema, type UpdateLeadInput } from "@/lib/schemas/leads";
@@ -159,10 +160,19 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="expected_close_date">{t("Fechamento previsto")}</Label>
-              <Input
-                id="expected_close_date"
-                type="date"
-                {...form.register("expected_close_date")}
+              <Controller
+                control={form.control}
+                name="expected_close_date"
+                render={({ field }) => (
+                  <CampoDeData
+                    tipo="date"
+                    id="expected_close_date"
+                    name={field.name}
+                    value={field.value ?? ""}
+                    onValorChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
           </div>

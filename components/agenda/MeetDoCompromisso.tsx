@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
 import { meetingErrors, meetingDeliveryErrors } from "@/lib/agenda/google/meet";
 import { copyToClipboard } from "@/lib/clipboard";
 
@@ -171,11 +172,11 @@ export function MeetDoCompromisso({
           <label htmlFor={`meet-destination-${id}`} className="block text-sm">
             {t(ehMeet ? "Conversa que receberá o link" : "Conversa que receberá os dados")}
           </label>
-          <select
+          <Escolha
             id={`meet-destination-${id}`}
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-9 w-full"
             value={sendTo}
-            onChange={(e) => setDestination(e.target.value)}
+            onValueChange={(valorEscolhido) => setDestination(valorEscolhido)}
             disabled={!meeting.destinations.length || action.isPending}
           >
             {!meeting.destinations.length && (
@@ -186,7 +187,7 @@ export function MeetDoCompromisso({
                 {d.label}
               </option>
             ))}
-          </select>
+          </Escolha>
           <Button
             size="sm"
             // `state === "failed"` é falha de CRIAR LINK: só tranca onde há link.

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import type {
   NovaTarefa,
@@ -151,22 +152,18 @@ export function FormularioDeTarefa({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="tarefa-dia">{t("Prazo")}</Label>
-              <Input
+              <CampoDeData tipo="date"
                 id="tarefa-dia"
-                type="date"
                 value={dia}
-                onChange={(e) => setDia(e.target.value)}
-              />
+                onValorChange={(valorEscolhido) => setDia(valorEscolhido)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="tarefa-hora">{t("Horário")}</Label>
-              <Input
+              <CampoDeData tipo="time"
                 id="tarefa-hora"
-                type="time"
                 value={hora}
                 disabled={!dia}
-                onChange={(e) => setHora(e.target.value)}
-              />
+                onValorChange={(valorEscolhido) => setHora(valorEscolhido)} />
             </div>
           </div>
 

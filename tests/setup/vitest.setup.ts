@@ -180,3 +180,18 @@ if (typeof document !== "undefined") {
   const { registrarDicionario } = await import("@/lib/i18n/traducao");
   registrarDicionario(DICIONARIO);
 }
+
+/**
+ * O jsdom não tem captura de ponteiro nem `scrollIntoView`, e o Radix Select
+ * chama os dois ao abrir. Desde a PR D do design system (regra 6: nada de
+ * `<select>` nativo) o seletor do DS é Radix em dezenas de telas; sem isto,
+ * cada teste que abre um seletor teria de repetir o remendo. `??=` não pisa em
+ * quem já define (testes antigos que mockam com `vi.fn`). No projeto `cercas`
+ * (ambiente node) não há `Element`, e o bloco não roda.
+ */
+if (typeof Element !== "undefined") {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+}

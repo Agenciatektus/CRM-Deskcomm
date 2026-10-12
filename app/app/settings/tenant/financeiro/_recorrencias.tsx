@@ -13,6 +13,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { formatCents, parseReaisToCents } from "@/lib/money";
 
@@ -78,21 +79,19 @@ export function Recorrencias({
             onChange={(e) => setNome(e.target.value)}
           />
 
-          <select
+          <Escolha
             aria-label={t("Entrada ou saída")}
-            className="min-h-11 rounded-md border p-2"
             value={direcao}
-            onChange={(e) => setDirecao(e.target.value as "in" | "out")}
+            onValueChange={(valorEscolhido) => setDirecao(valorEscolhido as "in" | "out")}
           >
             <option value="out">{t("Saída")}</option>
             <option value="in">{t("Entrada")}</option>
-          </select>
+          </Escolha>
 
-          <select
+          <Escolha
             aria-label={t("Conta")}
-            className="min-h-11 rounded-md border p-2"
             value={contaId}
-            onChange={(e) => setContaId(e.target.value)}
+            onValueChange={(valorEscolhido) => setContaId(valorEscolhido)}
           >
             <option value="">{t("Escolha a conta")}</option>
             {contas.map((c) => (
@@ -100,7 +99,7 @@ export function Recorrencias({
                 {c.name}
               </option>
             ))}
-          </select>
+          </Escolha>
 
           <input
             aria-label={t("Valor")}

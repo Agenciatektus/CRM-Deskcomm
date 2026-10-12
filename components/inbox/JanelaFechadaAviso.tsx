@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useT } from "@/hooks/i18n/useT";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api/client";
@@ -244,15 +245,12 @@ export function JanelaFechadaAviso({
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Escolha
             value={escolhido}
-            onChange={(e) => escolher(e.target.value)}
+            onValueChange={(valorEscolhido) => escolher(valorEscolhido)}
             disabled={send.isPending}
             aria-label={t("Modelo aprovado")}
-            className={cn(
-              "h-9 min-w-[16rem] flex-1 rounded-md border border-input bg-background px-2 text-sm",
-              "focus:outline-hidden focus:ring-1 focus:ring-ring",
-            )}
+            className="h-9 min-w-[16rem] flex-1"
           >
             <option value="">{t("Escolha um modelo aprovado…")}</option>
             {aprovados.map((tpl) => (
@@ -261,7 +259,7 @@ export function JanelaFechadaAviso({
                 {(tpl.slots?.length ?? 0) > 0 ? ` · ${tpl.slots!.length} ${t("parâmetro(s)")}` : ""}
               </option>
             ))}
-          </select>
+          </Escolha>
           {/* Desabilitado enquanto faltar valor: é a mesma conta que o servidor
               refaz em `missingSlots`, adiantada para antes do clique. */}
           <Button

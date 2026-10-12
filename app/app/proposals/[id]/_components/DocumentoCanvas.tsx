@@ -7,6 +7,7 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import type { ApiSuccess } from "@/lib/api/wrappers";
@@ -292,11 +293,10 @@ export function DocumentoCanvas({ propostaId, podeRevisar = false, emRascunho = 
               {t("Usar este modelo")}
             </button>
           )}
-          <select
+          <Escolha
             disabled={ocupado}
             defaultValue=""
-            onChange={(e) => e.target.value && void confirmarModelo(e.target.value)}
-            className="rounded-md border px-2 py-1.5 text-sm"
+            onValueChange={(valorEscolhido) => valorEscolhido && void confirmarModelo(valorEscolhido)}
           >
             <option value="" disabled>
               {t("Ou escolha outro modelo")}
@@ -306,7 +306,7 @@ export function DocumentoCanvas({ propostaId, podeRevisar = false, emRascunho = 
                 {rotulo}
               </option>
             ))}
-          </select>
+          </Escolha>
         </div>
       </div>
     );
@@ -327,19 +327,18 @@ export function DocumentoCanvas({ propostaId, podeRevisar = false, emRascunho = 
       {editavel && (
         <div className="flex items-center gap-2 text-sm">
           <span>{t("Modelo do documento")}</span>
-          <select
+          <Escolha
             aria-label={t("Modelo do documento")}
             disabled={ocupado}
             value={doc.modeloSlug}
-            onChange={(e) => trocarModelo(e.target.value)}
-            className="rounded-md border px-2 py-1.5 text-sm"
+            onValueChange={(valorEscolhido) => trocarModelo(valorEscolhido)}
           >
             {opcoesDeModelo.map(([slug, rotulo]) => (
               <option key={slug} value={slug}>
                 {rotulo}
               </option>
             ))}
-          </select>
+          </Escolha>
         </div>
       )}
 

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Escolha } from "@/components/ui/escolha";
 import { MS_POR_HORA, novoIdDePasso, type PassoDaCadencia } from "@/lib/cadencia/timeline";
 import { CaretDown, CaretUp, ChatCircle, Clock, Kanban, Plus, Tag, Trash } from "@/lib/ui/icons";
 import { PassoMensagem } from "./PassoMensagem";
@@ -116,11 +117,11 @@ export function ListaDePassos({
           )}
 
           {passo.tipo === "mover_etapa" && (
-            <select
+            <Escolha
               aria-label={t("Etapa de destino")}
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="h-10 w-full"
               value={passo.stageId}
-              onChange={(e) => trocar(i, { ...passo, stageId: e.target.value })}
+              onValueChange={(valorEscolhido) => trocar(i, { ...passo, stageId: valorEscolhido })}
             >
               <option value="" disabled>
                 {t("Escolha a etapa")}
@@ -130,20 +131,20 @@ export function ListaDePassos({
                   {e.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           )}
 
           {passo.tipo === "etiqueta" && (
             <div className="flex items-center gap-2">
-              <select
+              <Escolha
                 aria-label={t("Adicionar ou remover")}
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
+                className="h-10"
                 value={passo.op}
-                onChange={(e) => trocar(i, { ...passo, op: e.target.value as "add" | "remove" })}
+                onValueChange={(valorEscolhido) => trocar(i, { ...passo, op: valorEscolhido as "add" | "remove" })}
               >
                 <option value="add">{t("Adicionar")}</option>
                 <option value="remove">{t("Remover")}</option>
-              </select>
+              </Escolha>
               <Input
                 aria-label={t("Etiqueta")}
                 maxLength={60}

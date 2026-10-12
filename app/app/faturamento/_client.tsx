@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -189,23 +190,17 @@ export function Faturamento({
       <form className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-text-muted">
           {t("De")}
-          <input
-            type="date"
+          <CampoDeData tipo="date"
             value={de}
             data-testid="periodo-de"
-            onChange={(e) => setDe(e.target.value)}
-            className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
-          />
+            onValorChange={(valorEscolhido) => setDe(valorEscolhido)} />
         </label>
         <label className="flex flex-col gap-1 text-xs text-text-muted">
           {t("Até")}
-          <input
-            type="date"
+          <CampoDeData tipo="date"
             value={ate}
             data-testid="periodo-ate"
-            onChange={(e) => setAte(e.target.value)}
-            className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
-          />
+            onValorChange={(valorEscolhido) => setAte(valorEscolhido)} />
         </label>
       </form>
 

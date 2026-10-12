@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import type { AssignableMember } from "@/hooks/inbox/useAssignableMembers";
 import { cn } from "@/lib/utils";
@@ -103,17 +104,17 @@ export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar }: {
       <label htmlFor={`${id}-responsavel`} className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
         {t("Responsável")}
       </label>
-      <select
+      <Escolha
         id={`${id}-responsavel`}
         value={responsavel}
-        onChange={(e) => setResponsavel(e.target.value)}
-        className={CLASSES_DO_CAMPO}
+        onValueChange={(valorEscolhido) => setResponsavel(valorEscolhido)}
+        className="h-9"
       >
         <option value={usuarioId}>{t("Você")}</option>
         {outros.map((m) => (
           <option key={m.user_id} value={m.user_id}>{m.full_name ?? t("Sem nome")}</option>
         ))}
-      </select>
+      </Escolha>
 
       <div className="flex items-center gap-2 pt-3">
         <Button type="submit" size="sm" disabled={invalido}>

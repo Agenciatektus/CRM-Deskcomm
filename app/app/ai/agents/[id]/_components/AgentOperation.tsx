@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 export function AgentOperation({ agent, readOnly }: { agent: AgentRow; readOnly?: boolean }) {
   const t = useT(),
@@ -28,16 +29,16 @@ export function AgentOperation({ agent, readOnly }: { agent: AgentRow; readOnly?
     >
       <label className="text-sm">
         {t("Operação do agente")}{" "}
-        <select
-          className="ml-2 rounded-md border bg-background p-2"
+        <Escolha
+          className="ml-2"
           aria-label={t("Modo de operação")}
           value={agent.operation_mode ?? "automatic"}
           disabled={readOnly || busy}
-          onChange={(e) => change({ operation_mode: e.target.value })}
+          onValueChange={(valorEscolhido) => change({ operation_mode: valorEscolhido })}
         >
           <option value="assisted">{t("Assistido: revisar antes de enviar")}</option>
           <option value="automatic">{t("Automático: responder com as regras do agente")}</option>
-        </select>
+        </Escolha>
       </label>
       <Button
         type="button"

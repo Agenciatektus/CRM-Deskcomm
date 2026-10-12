@@ -234,10 +234,9 @@ it("ações e falha de cópia em espanhol não caem no português", async () => 
     "es",
   );
   expect(screen.getByRole("link", { name: "Abrir reunión" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Conversación que recibirá el enlace")).toBeInTheDocument();
-  expect(
-    screen.getByText("No hay ninguna atención abierta para este contacto"),
-  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Conversación que recibirá el enlace")).toHaveTextContent(
+    "No hay ninguna atención abierta para este contacto",
+  );
   expect(screen.getByRole("button", { name: "Enviar enlace al cliente" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Copiar enlace" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo copiar.");

@@ -29,6 +29,8 @@ import { useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 
@@ -177,51 +179,45 @@ export function DiasBloqueados({ podeEditar }: { podeEditar: boolean }) {
         <div className="flex flex-wrap items-end gap-2">
           <label className="block">
             <span className="block text-sm">{t("O que fazer")}</span>
-            <select
+            <Escolha
               aria-label={t("O que fazer")}
-              className="mt-1 rounded-md border p-2"
+              className="mt-1"
               data-testid="modo-do-dia"
               value={modo}
-              onChange={(e) => setModo(e.target.value === "abrir" ? "abrir" : "fechar")}
+              onValueChange={(valorEscolhido) => setModo(valorEscolhido === "abrir" ? "abrir" : "fechar")}
             >
               <option value="fechar">{t("Fechar o dia")}</option>
               <option value="abrir">{t("Abrir para atendimento")}</option>
-            </select>
+            </Escolha>
           </label>
           <label className="block">
             <span className="block text-sm">{t("Dia")}</span>
-            <input
+            <CampoDeData tipo="date"
               aria-label={t("Dia")}
-              className="mt-1 rounded-md border p-2"
-              type="date"
+              className="mt-1"
               value={data}
-              onChange={(e) => {
-                setData(e.target.value);
+              onValorChange={(valorEscolhido) => {
+                setData(valorEscolhido);
                 setResultado(null);
-              }}
-            />
+              }} />
           </label>
           {abrindo ? (
             <>
               <label className="block">
                 <span className="block text-sm">{t("Das")}</span>
-                <input
+                <CampoDeData tipo="time"
                   aria-label={t("Das")}
-                  className="mt-1 rounded-md border p-2"
-                  type="time"
+                  className="mt-1"
                   value={de}
-                  onChange={(e) => setDe(e.target.value)}
-                />
+                  onValorChange={(valorEscolhido) => setDe(valorEscolhido)} />
               </label>
               <label className="block">
                 <span className="block text-sm">{t("Até")}</span>
-                <input
+                <CampoDeData tipo="time"
                   aria-label={t("Até")}
-                  className="mt-1 rounded-md border p-2"
-                  type="time"
+                  className="mt-1"
                   value={ate}
-                  onChange={(e) => setAte(e.target.value)}
-                />
+                  onValorChange={(valorEscolhido) => setAte(valorEscolhido)} />
               </label>
             </>
           ) : null}
@@ -238,14 +234,12 @@ export function DiasBloqueados({ podeEditar }: { podeEditar: boolean }) {
           </label>
           <label className="block">
             <span className="block text-sm">{t("Repetir toda semana até (opcional)")}</span>
-            <input
+            <CampoDeData tipo="date"
               aria-label={t("Repetir toda semana até (opcional)")}
-              className="mt-1 rounded-md border p-2"
-              type="date"
+              className="mt-1"
               min={data || undefined}
               value={repetirAte}
-              onChange={(e) => setRepetirAte(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setRepetirAte(valorEscolhido)} />
           </label>
           <Button
             // Alvo de toque generoso: esta tela também é usada no celular.

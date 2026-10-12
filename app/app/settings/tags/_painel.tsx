@@ -50,6 +50,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { invalidarCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
+import { Escolha } from "@/components/ui/escolha";
 import { cn } from "@/lib/utils";
 import { PALETA_DE_ETIQUETAS } from "@/lib/tags/cor-da-etiqueta";
 import { traduzir } from "@/lib/i18n/traducao";
@@ -366,11 +367,11 @@ export function PainelDeTags({
           ) : acao === "juntar" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="destino-da-juncao">{t("Etiqueta de destino")}</Label>
-              <select
+              <Escolha
                 id="destino-da-juncao"
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9"
                 value={destino}
-                onChange={(evento) => setDestino(evento.target.value)}
+                onValueChange={(valorEscolhido) => setDestino(valorEscolhido)}
               >
                 <option value="">{t("Escolha a etiqueta que fica")}</option>
                 {destinos.map((linha) => (
@@ -378,7 +379,7 @@ export function PainelDeTags({
                     {linha.tag}
                   </option>
                 ))}
-              </select>
+              </Escolha>
             </div>
           ) : acao === "definir_cor" ? (
             <div className="flex flex-col gap-3">

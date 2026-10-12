@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useAuditQuery, type AuditFilters } from "@/hooks/audit/useAuditQuery";
 
 function fmtDate(iso: string, idioma: string): string {
@@ -86,11 +87,11 @@ export function AuditClient() {
           </div>
           <div className="space-y-1">
             <label className="block text-xs text-muted-foreground">{t("De")}</label>
-            <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <CampoDeData tipo="datetime-local" value={from} onValorChange={(valorEscolhido) => setFrom(valorEscolhido)} />
           </div>
           <div className="space-y-1">
             <label className="block text-xs text-muted-foreground">{t("Até")}</label>
-            <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+            <CampoDeData tipo="datetime-local" value={to} onValorChange={(valorEscolhido) => setTo(valorEscolhido)} />
           </div>
           <div className="flex items-end">
             <Button variant="outline" className="w-full" onClick={handleExport}>

@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { CampoEditavel, type LinhaDaInstalacao } from "@/components/admin/CampoDaInstalacao";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import type { SmtpSecurity } from "@/lib/email/config";
 import type { Idioma } from "@/lib/i18n/idiomas";
@@ -154,17 +155,17 @@ export function FormularioDeSmtp({
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="smtp-security">{t("Segurança")}</Label>
-          <select
+          <Escolha
             id="smtp-security"
             data-testid="smtp-security"
-            className="w-full rounded-md border bg-background p-2 text-sm"
+            className="w-full"
             value={form.security}
-            onChange={(e) => setSeguranca(e.target.value)}
+            onValueChange={(valorEscolhido) => setSeguranca(valorEscolhido)}
           >
             <option value="starttls">{t("STARTTLS (normalmente a porta 587)")}</option>
             <option value="tls">{t("TLS/SSL (normalmente a porta 465)")}</option>
             <option value="none">{t("Sem criptografia")}</option>
-          </select>
+          </Escolha>
         </div>
 
         <div className="flex flex-col gap-1.5">

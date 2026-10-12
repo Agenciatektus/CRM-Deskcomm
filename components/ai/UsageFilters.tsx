@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 
 export interface UsageFiltersAgent {
@@ -117,24 +118,20 @@ export function UsageFilters({ agents, initial }: Props) {
         <Label htmlFor="usage-from" className="text-xs text-muted-foreground">
           {t("De")}
         </Label>
-        <Input
+        <CampoDeData tipo="date"
           id="usage-from"
-          type="date"
           value={from}
-          onChange={(e) => setFrom(e.target.value)}
-        />
+          onValorChange={(valorEscolhido) => setFrom(valorEscolhido)} />
       </div>
 
       <div className="space-y-1">
         <Label htmlFor="usage-to" className="text-xs text-muted-foreground">
           {t("Até")}
         </Label>
-        <Input
+        <CampoDeData tipo="date"
           id="usage-to"
-          type="date"
           value={to}
-          onChange={(e) => setTo(e.target.value)}
-        />
+          onValorChange={(valorEscolhido) => setTo(valorEscolhido)} />
       </div>
     </div>
   );

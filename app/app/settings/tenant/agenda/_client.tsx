@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { LOCAIS_DE_ATENDIMENTO } from "@/lib/agenda/locais";
 import {
   TETO_DE_LEMBRETES_EXTRAS,
@@ -216,23 +217,22 @@ function LembreteDoCompromisso({ tipo }: { tipo: TipoRow }) {
                 </label>
                 <label className="flex min-w-28 flex-col gap-1 text-xs text-text-muted">
                   <span className="sr-only">{t("Unidade")}</span>
-                  <select
+                  <Escolha
                     disabled={!ligado}
                     value={c.unidade}
-                    onChange={(e) =>
-                      mudarUnidade(c.id, e.target.value as UnidadeDeAntecedencia)
+                    onValueChange={(valorEscolhido) =>
+                      mudarUnidade(c.id, valorEscolhido as UnidadeDeAntecedencia)
                     }
                     data-testid={
                       i === 0
                         ? `editar-lembrete-unidade-${tipo.id}`
                         : `editar-lembrete-unidade-${tipo.id}-${i}`
                     }
-                    className="rounded-md border border-border bg-surface p-2 text-sm text-text disabled:opacity-50"
                   >
                     <option value="minutos">{t("minutos")}</option>
                     <option value="horas">{t("horas")}</option>
                     <option value="dias">{t("dias")}</option>
-                  </select>
+                  </Escolha>
                 </label>
                 <span className="pb-2 text-xs text-text-muted">{t("antes")}</span>
                 {ligado && cartoes.length > 1 ? (
@@ -429,18 +429,17 @@ export function TiposDeAgendamentoClient({
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-text-muted">
                 {t("Categoria")}
-                <select
+                <Escolha
                   data-testid="novo-tipo-categoria"
                   value={rascunho.category}
-                  onChange={(e) => setRascunho((r) => ({ ...r, category: e.target.value }))}
-                  className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text outline-hidden focus:border-border-strong"
+                  onValueChange={(valorEscolhido) => setRascunho((r) => ({ ...r, category: valorEscolhido }))}
                 >
                   {CATEGORIAS.map((c) => (
                     <option key={c.valor} value={c.valor}>
                       {t(c.rotulo)}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-text-muted">
                 {t("Duração (minutos)")}
@@ -458,18 +457,17 @@ export function TiposDeAgendamentoClient({
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-text-muted">
                 {t("Onde acontece")}
-                <select
+                <Escolha
                   data-testid="novo-tipo-local"
                   value={rascunho.location_kind}
-                  onChange={(e) => setRascunho((r) => ({ ...r, location_kind: e.target.value }))}
-                  className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text outline-hidden focus:border-border-strong"
+                  onValueChange={(valorEscolhido) => setRascunho((r) => ({ ...r, location_kind: valorEscolhido }))}
                 >
                   {LOCAIS.map((l) => (
                     <option key={l.valor} value={l.valor}>
                       {t(l.rotulo)}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-text-muted sm:col-span-2">
                 {/* ⚠️ SEM RESPONSÁVEL NÃO HÁ AGENDA. `lib/agenda/consulta.ts` exige
@@ -477,13 +475,12 @@ export function TiposDeAgendamentoClient({
                     `sem_responsavel` e a tela de marcar não oferece horário nenhum.
                     Era exatamente o estado dos três tipos semeados. */}
                 {t("Quem atende (sem isto, não há horário para oferecer)")}
-                <select
+                <Escolha
                   data-testid="novo-tipo-dono"
                   value={rascunho.default_owner_user_id}
-                  onChange={(e) =>
-                    setRascunho((r) => ({ ...r, default_owner_user_id: e.target.value }))
+                  onValueChange={(valorEscolhido) =>
+                    setRascunho((r) => ({ ...r, default_owner_user_id: valorEscolhido }))
                   }
-                  className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text outline-hidden focus:border-border-strong"
                 >
                   <option value="">{t("Definir depois")}</option>
                   {pessoas.map((p) => (
@@ -491,7 +488,7 @@ export function TiposDeAgendamentoClient({
                       {p.nome}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               </label>
               <div className="flex justify-end gap-2 sm:col-span-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setCriando(false)}>
@@ -745,11 +742,10 @@ export function TiposDeAgendamentoClient({
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-text-muted">
                     {t("Quem atende")}
-                    <select
+                    <Escolha
                       name="default_owner_user_id"
                       defaultValue={tipo.default_owner_user_id ?? ""}
                       data-testid={`editar-dono-${tipo.id}`}
-                      className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
                     >
                       <option value="">{t("Sem responsável")}</option>
                       {pessoas.map((p) => (
@@ -757,7 +753,7 @@ export function TiposDeAgendamentoClient({
                           {p.nome}
                         </option>
                       ))}
-                    </select>
+                    </Escolha>
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-text-muted">
                   {t("Preço padrão")}

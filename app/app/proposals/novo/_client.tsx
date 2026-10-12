@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import type { ApiSuccess } from "@/lib/api/wrappers";
@@ -238,13 +239,11 @@ export function NewProposalClient({
             {/* Data de Validade */}
             <div className="space-y-2">
               <Label htmlFor="valid-until-input">{t("Validade da proposta")}</Label>
-              <Input
+              <CampoDeData tipo="date"
                 id="valid-until-input"
-                type="date"
                 value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
-                disabled={criando}
-              />
+                onValorChange={(valorEscolhido) => setValidUntil(valorEscolhido)}
+                disabled={criando} />
               <p className="text-xs text-muted-foreground">
                 {t("Data limite até a qual os valores e condições são garantidos.")}
               </p>

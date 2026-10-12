@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { CampoDeData } from "@/components/ui/campo-de-data";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 
 import { Estados, Exemplo, Secao } from "../_componentes/Secao";
@@ -46,7 +48,7 @@ export function SecaoCampos({ tema }: { tema: Tema }) {
           ]}
         />
       </Exemplo>
-      <Exemplo nome={t("Select nativo")} mapa="comp:select-nativo" tema={tema}>
+      <Exemplo nome={t("Seletor (no lugar do select nativo)")} mapa="comp:escolha" tema={tema}>
         <Estados
           itens={[
             {
@@ -54,10 +56,10 @@ export function SecaoCampos({ tema }: { tema: Tema }) {
               no: (
                 <Campo rotulo={t("Responsável")}>
                   {(id) => (
-                    <select id={id} defaultValue="ana" className="w-full">
+                    <Escolha id={id} defaultValue="ana" className="w-full">
                       <option value="ana">Ana Lima</option>
                       <option value="bruno">Bruno Reis</option>
-                    </select>
+                    </Escolha>
                   )}
                 </Campo>
               ),
@@ -67,13 +69,22 @@ export function SecaoCampos({ tema }: { tema: Tema }) {
               no: (
                 <Campo rotulo={t("Responsável")}>
                   {(id) => (
-                    <select id={id} disabled className="w-full">
+                    <Escolha id={id} disabled className="w-full">
                       <option>Ana Lima</option>
-                    </select>
+                    </Escolha>
                   )}
                 </Campo>
               ),
             },
+          ]}
+        />
+      </Exemplo>
+      <Exemplo nome={t("Campo de data e horário")} mapa="comp:campo-de-data" tema={tema}>
+        <Estados
+          itens={[
+            { rotulo: t("Data"), no: <Campo rotulo={t("Vencimento")}>{(id) => <CampoDeData id={id} tipo="date" defaultValue="2026-10-12" />}</Campo> },
+            { rotulo: t("Horário"), no: <Campo rotulo={t("Abre às")}>{(id) => <CampoDeData id={id} tipo="time" defaultValue="09:00" />}</Campo> },
+            { rotulo: t("Data e horário"), no: <Campo rotulo={t("Lembrar em")}>{(id) => <CampoDeData id={id} tipo="datetime-local" />}</Campo> },
           ]}
         />
       </Exemplo>

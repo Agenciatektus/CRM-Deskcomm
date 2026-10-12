@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SeletorDeDataHora } from "@/components/inbox/painel/SeletorDeDataHora";
+import { SeletorDeDataHora } from "@/components/ui/seletor-de-data-hora";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { useSnoozeConversation } from "@/hooks/inbox/useSnoozeConversation";

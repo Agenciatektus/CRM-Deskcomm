@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import {
   useAcaoDeCampanha,
   useCampanha,
@@ -299,10 +300,10 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium">{continua ? t("Quem já entrou") : t("Quem está na lista")}</h2>
-          <select
-            className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+          <Escolha
+            className="h-9"
             value={filtroDeStatus}
-            onChange={(e) => setFiltroDeStatus(e.target.value)}
+            onValueChange={(valorEscolhido) => setFiltroDeStatus(valorEscolhido)}
             aria-label={t("Filtrar destinatários")}
           >
             <option value="">{t("Todos")}</option>
@@ -313,7 +314,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
             <option value="replied">{t("Responderam")}</option>
             <option value="skipped">{t("Fora da lista")}</option>
             <option value="failed">{t("Falharam")}</option>
-          </select>
+          </Escolha>
         </div>
 
         {/* O VETO NÃO É REAVALIADO, e o operador vai supor o contrário (pedido do

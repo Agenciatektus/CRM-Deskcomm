@@ -10,6 +10,7 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { dataDeParede, instanteDe } from "@/lib/agenda/fuso";
 import { ApiError } from "@/lib/api/types";
 import { CaretLeft, CaretRight, CheckCircle, Clock, MapPin, Warning } from "@/lib/ui/icons";
@@ -434,19 +435,13 @@ export function PainelDeMarcacao({
               {t("Outro horário")}
             </label>
             <div className="flex gap-2">
-              <Input
+              <CampoDeData tipo="time"
                 id="hora-do-encaixe"
                 data-testid="hora-do-encaixe"
-                type="time"
-                step={60}
                 value={horaDoEncaixe}
-                onChange={(e) => setHoraDoEncaixe(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") usarHoraDoEncaixe();
-                }}
+                onValorChange={(valorEscolhido) => setHoraDoEncaixe(valorEscolhido)}
                 aria-describedby="ajuda-do-encaixe"
-                className="h-11 min-w-0 flex-1 px-2 tabular-nums lg:h-9"
-              />
+                className="h-11 min-w-0 flex-1 lg:h-9" />
               <Button
                 variant="outline"
                 size="sm"

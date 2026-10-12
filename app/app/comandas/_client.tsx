@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { formatCents, parseReaisToCents } from "@/lib/money";
@@ -349,15 +350,15 @@ function FormularioDeItem({
     >
       <label className="flex flex-col gap-1 text-xs text-text-muted">
         {t("Serviço")}
-        <select
+        <Escolha
           value={tipoId}
           data-testid="item-servico"
-          onChange={(e) => {
-            setTipoId(e.target.value);
+          onValueChange={(valorEscolhido) => {
+            setTipoId(valorEscolhido);
             // A descrição acompanha o serviço escolhido, e continua editável: o
             // que vai para a linha da venda é o TEXTO, congelado, porque o nome
             // do serviço muda e a venda de ontem não.
-            const escolhido = tipos.find((x) => x.id === e.target.value);
+            const escolhido = tipos.find((x) => x.id === valorEscolhido);
             if (escolhido?.name) setDescricao(escolhido.name);
             // O preço padrão é SEMENTE, e por isso só preenche quando existe e
             // não sobrescreve o que alguém já digitou: quem digitou um valor
@@ -366,7 +367,6 @@ function FormularioDeItem({
               setPreco((escolhido.default_price_cents / 100).toFixed(2));
             }
           }}
-          className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
         >
           <option value="">{t("Avulso")}</option>
           {tipos.map((x) => (
@@ -374,7 +374,7 @@ function FormularioDeItem({
               {x.name}
             </option>
           ))}
-        </select>
+        </Escolha>
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-text-muted">
@@ -434,11 +434,10 @@ function Fechamento({
     <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
       <label className="flex flex-col gap-1 text-xs text-text-muted">
         {t("Forma de pagamento")}
-        <select
+        <Escolha
           value={formaId}
           data-testid="forma-de-pagamento"
-          onChange={(e) => setFormaId(e.target.value)}
-          className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+          onValueChange={(valorEscolhido) => setFormaId(valorEscolhido)}
         >
           <option value="">{t("Escolha")}</option>
           {formas.map((f) => (
@@ -446,7 +445,7 @@ function Fechamento({
               {f.name}
             </option>
           ))}
-        </select>
+        </Escolha>
       </label>
 
       {temContato ? (
