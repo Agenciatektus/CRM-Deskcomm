@@ -47,7 +47,7 @@ export function ResultadoDoCompromisso({
     <div className="flex flex-wrap gap-1.5" data-testid="resultado-do-compromisso">
       <Button
         size="sm"
-        className="h-7 px-2.5 text-xs"
+        className="h-7 px-2.5 text-xs mb:h-(--mb-alvo) mb:px-3.5 mb:text-sm"
         disabled={registrar.isPending}
         onClick={() => registrar.mutate("completed")}
       >
@@ -56,14 +56,14 @@ export function ResultadoDoCompromisso({
       <Button
         size="sm"
         variant="outline"
-        className="h-7 px-2.5 text-xs"
+        className="h-7 px-2.5 text-xs mb:h-(--mb-alvo) mb:px-3.5 mb:text-sm"
         disabled={registrar.isPending}
         onClick={() => registrar.mutate("no_show")}
       >
         {t("Faltou")}
       </Button>
       {hrefDoCompromisso && (
-        <Button asChild size="sm" variant="ghost" className="h-7 px-2.5 text-xs">
+        <Button asChild size="sm" variant="ghost" className="h-7 px-2.5 text-xs mb:h-(--mb-alvo) mb:px-3.5 mb:text-sm">
           <Link href={hrefDoCompromisso} onClick={onNavegar}>
             {t("Remarcou")}
           </Link>

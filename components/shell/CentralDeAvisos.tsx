@@ -1,67 +1,17 @@
 "use client";
-import { toast } from "sonner";
-import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
-import type { ComponentType } from "react";
-import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  useAgentInbox,
-  useResolveAllInboxItems,
-  useUpdateInboxItem,
-  type AgentInboxItem,
-} from "@/hooks/ai/useAgentInbox";
+import type { AgentInboxItem } from "@/hooks/ai/useAgentInbox";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { kindLabel } from "@/lib/ai/agent-inbox-copy";
-import { Alarm, ArrowsClockwise, CalendarCheck, Check, Plugs, Sparkle, UserMinus, Warning } from "@/lib/ui/icons";
+import { Check } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { ResultadoDoCompromisso } from "./ResultadoDoCompromisso";
-
-/** O limite que a rota aplica por padrão (`/api/v1/ai/inbox`, `limit` = 50). */
-const LIMITE_DA_LISTA = 50;
-
-type Tom = "accent" | "crit" | "warn" | "muted";
-
-const CLASSE_DO_TOM: Record<Tom, string> = {
-  accent: "bg-accent-soft text-accent-700 dark:text-accent-300",
-  crit: "bg-error-bg text-error-fg",
-  warn: "bg-warning-bg text-warning-fg",
-  muted: "bg-surface-elevated text-text-subtle",
-};
-
-type Icone = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
-
-/**
- * Ícone e tom por TIPO de aviso, como o `.av-ic` do protótipo (handoff, sem
- * dono, QR, resultado de compromisso, lembrete, outros). Tipo sem par aqui cai
- * no tom da GRAVIDADE, que todo aviso tem: o crítico nunca sai cinza.
- */
-function aparencia(item: AgentInboxItem): { Icone: Icone; tom: Tom } {
-  switch (item.kind) {
-    case "handoff":
-    case "jev_pedido_de_humano":
-      return { Icone: Sparkle, tom: "accent" };
-    case "routing_unassigned":
-      return { Icone: UserMinus, tom: "crit" };
-    case "qr_rescan":
-    case "channel_number_alert":
-      return { Icone: Plugs, tom: "crit" };
-    case "appointment_outcome_required":
-      return { Icone: CalendarCheck, tom: "warn" };
-    case "snooze_expired":
-    case "task_due":
-      return { Icone: Alarm, tom: "warn" };
-    default:
-      return {
-        Icone: item.severity === "info" ? ArrowsClockwise : Warning,
-        tom: item.severity === "critical" ? "crit" : item.severity === "warn" ? "warn" : "muted",
-      };
-  }
-}
+import { aparencia, CLASSE_DO_TOM, pedeDesfecho, useCentralDeAvisos } from "./useCentralDeAvisos";
 
 /**
  * O CONTEÚDO do popover do sino: a mesma central de `/app/ai/inbox`, em tamanho
@@ -74,20 +24,9 @@ function aparencia(item: AgentInboxItem): { Icone: Icone; tom: Tom } {
  */
 export function CentralDeAvisos({ podeResolver, onFechar }: { podeResolver: boolean; onFechar: () => void }) {
   const t = useT();
-  const [aba, setAba] = useState<"open" | "resolved">("open");
-  const abertos = useAgentInbox("open");
-  const resolvidos = useAgentInbox("resolved");
-  const atual = aba === "open" ? abertos : resolvidos;
-  const itens = atual.data?.items ?? [];
-  const atualizar = useUpdateInboxItem();
-  const resolverTodos = useResolveAllInboxItems();
-  const nAbertos = abertos.data?.open_count ?? 0;
-  // "Resolvidos N" só com a lista INTEIRA na mão: a rota devolve no máximo 50,
-  // e com 50 não há como saber se existem mais. Contagem inventada é pior que
-  // nenhuma.
-  const listaDeResolvidos = resolvidos.data?.items;
-  const nResolvidos =
-    listaDeResolvidos && listaDeResolvidos.length < LIMITE_DA_LISTA ? listaDeResolvidos.length : null;
+  // O estado (listas, contagens, resolver todos) é o da aba Avisos do celular também.
+  const { aba, setAba, atual, itens, nAbertos, nResolvidos, atualizar, resolverTodos, marcarTodosResolvidos } =
+    useCentralDeAvisos(t);
 
   return (
     <div className="flex max-h-[min(620px,calc(100dvh-72px))] flex-col" role="dialog" aria-label={t("Central de avisos")}>
@@ -98,26 +37,7 @@ export function CentralDeAvisos({ podeResolver, onFechar }: { podeResolver: bool
             type="button"
             className="text-label text-accent-text underline-offset-2 hover:underline disabled:opacity-60"
             disabled={resolverTodos.isPending}
-            onClick={() => {
-              // O Desfazer reabre um por vez os ids que a tela carregou. Só é
-              // oferecido com a lista COMPLETA (menos que o limite de 50): com
-              // mais abertos, o `resolve-all` resolve todos e a tela não teria
-              // como reabrir os que não vieram (P2-3 do Cassio na #169).
-              const carregados = abertos.data?.items ?? [];
-              const completa = carregados.length < LIMITE_DA_LISTA && carregados.length >= nAbertos;
-              const ids = carregados.map((i) => i.id);
-              resolverTodos.mutate(undefined, {
-                onSuccess: () => {
-                  if (completa) {
-                    avisarComDesfazer(t("Avisos marcados como resolvidos."), t("Desfazer"), () =>
-                      Promise.all(ids.map((id) => atualizar.mutateAsync({ id, status: "open" }))),
-                    );
-                  } else {
-                    toast.success(t("Avisos marcados como resolvidos."));
-                  }
-                },
-              });
-            }}
+            onClick={() => marcarTodosResolvidos()}
           >
             {t("Marcar todos resolvidos")}
           </button>
@@ -213,8 +133,7 @@ function ItemDoAviso({
   const locale = useLocaleDeData();
   const { Icone, tom } = aparencia(item);
   const aberto = item.status !== "resolved";
-  const pedeDesfecho =
-    aberto && podeResolver && item.kind === "appointment_outcome_required" && item.ref_kind === "appointment" && !!item.ref_id;
+  const desfecho = pedeDesfecho(item, podeResolver);
   const quando = formatDistanceToNowStrict(new Date(item.created_at), { addSuffix: true, locale });
   return (
     <li className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 border-b border-border px-4 py-3.5 last:border-b-0" data-testid="central-de-avisos-item">
@@ -233,7 +152,7 @@ function ItemDoAviso({
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {/* T18: o desfecho do compromisso direto no aviso, para quem resolve. */}
-          {pedeDesfecho ? (
+          {desfecho ? (
             <ResultadoDoCompromisso
               compromissoId={item.ref_id!}
               hrefDoCompromisso={item.destination.estado === "disponivel" ? item.destination.href : null}

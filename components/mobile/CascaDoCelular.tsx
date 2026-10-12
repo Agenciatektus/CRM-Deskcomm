@@ -16,6 +16,7 @@ import { BarraDeTela } from "./BarraDeTela";
 import { BarraInferior, ROTULOS_DAS_ABAS } from "./BarraInferior";
 import { BotaoCriar } from "./BotaoCriar";
 import { CabecalhoGrande } from "./CabecalhoGrande";
+import { AcoesDosAvisos } from "./telas/Avisos";
 import { MenuMais } from "./MenuMais";
 import { AcoesDaListaDeConversas } from "./telas/AcoesDaListaDeConversas";
 
@@ -53,7 +54,18 @@ function CabecalhoDoCelular() {
   if (ehRaizDeAba(rota)) {
     // Em Conversas a busca mora no topo da lista (o campo do protótipo) e o
     // cabeçalho tem o ⋮ da lista; nas outras abas, a lupa.
-    const acoes = aba === "conversas" ? <AcoesDaListaDeConversas /> : <BuscaDoCelular />;
+    const acoes =
+      aba === "conversas" ? (
+        <AcoesDaListaDeConversas />
+      ) : aba === "avisos" ? (
+        // O ⋯ de Avisos ("Marcar todos resolvidos") ao lado da lupa.
+        <>
+          <AcoesDosAvisos />
+          <BuscaDoCelular />
+        </>
+      ) : (
+        <BuscaDoCelular />
+      );
     return <CabecalhoGrande titulo={t(ROTULOS_DAS_ABAS[aba])} acoes={acoes} />;
   }
   const destino = destinoDaRota(rota);

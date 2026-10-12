@@ -10450,6 +10450,8 @@ export const DICIONARIO: Traducoes = {
   "com compromissos": { es: "con citas" },
   "Nada marcado": { es: "Nada agendado" },
   "Este dia está livre na agenda.": { es: "Este día está libre en la agenda." },
+  "Situação dos avisos": { es: "Estado de los avisos" },
+  "Ações dos avisos": { es: "Acciones de los avisos" },
   "será excluído em": { es: "será eliminado en" },
   "O lead será excluído em": { es: "El lead será eliminado en" },
   "Escolher horário": { es: "Elegir horario" },
