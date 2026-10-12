@@ -928,8 +928,10 @@ export const NAV_CATALOG = [
     // quem monta a regra. Nada aqui apaga conversa ou muda dinheiro — o
     // alcance da operação é ao lado do de "Distribuição de atendimento".
     href: "/app/settings/tags",
-    apelidos: "etiquetas marcadores",
-    label: "Tags",
+    // "Etiquetas" unifica Tags e Etiquetas no menu (quadro DS, "Módulos e
+    // páginas"): esta tela já cobre as duas (conversas e contatos).
+    apelidos: "tags marcadores",
+    label: "Etiquetas",
     description:
       "As etiquetas da empresa: acrescentar, escolher quais são sugeridas em conversas e contatos, renomear, juntar, arquivar e excluir.",
     icon: "Tag",

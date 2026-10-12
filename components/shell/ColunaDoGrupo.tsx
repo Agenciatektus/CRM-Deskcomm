@@ -15,8 +15,10 @@ import { destinoDaRota } from "@/lib/navigation/rota-atual";
 import { cn } from "@/lib/utils";
 
 /** Item da coluna 2 marcado como a tela atual, e o resto. */
-const ITEM_ATIVO = "pele-ativo-item bg-card ring-1 ring-border font-semibold text-foreground";
-const ITEM_INATIVO = "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
+// `.nav2-item` do quadro DS: 34px, raio 8, 14px em ink-2; hover `--hover`; a
+// ativa em cartão surface com o fio da linha e peso 600.
+const ITEM_ATIVO = "pele-ativo-item bg-surface ring-1 ring-border font-semibold text-text shadow-[0_1px_2px_rgb(17_22_31/0.06)]";
+const ITEM_INATIVO = "text-text-muted hover:bg-hover hover:text-text";
 
 export type Secao = { section: string; items: NavDestination[] };
 
@@ -49,7 +51,7 @@ export function ColunaDoGrupo({
   return (
     <nav aria-label={t("Navegação principal")} className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-14 shrink-0 items-center gap-1.5 pl-4 pr-2">
-        <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold text-foreground">{t(grupo.label)}</h2>
+        <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold text-text">{t(grupo.label)}</h2>
         {acaoDoTitulo}
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
@@ -57,7 +59,7 @@ export function ColunaDoGrupo({
           <div key={secao.section || i} className="space-y-1">
             {comTitulo && secao.section && (
               // O nome da seção é do REGISTRO (catalogo.ts), não do operador.
-              <p className="px-3 pt-1 text-[11px] font-medium text-muted-foreground">
+              <p className="px-2.5 pb-1 pt-3.5 text-meta text-text-subtle">
                 {t(secao.section)}
               </p>
             )}
@@ -123,7 +125,7 @@ function ItemDaColuna({
           aria-current={ativo ? "page" : undefined}
           onClick={onNavigate}
           className={cn(
-            "relative flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+            "relative flex h-8.5 items-center gap-2 whitespace-nowrap rounded-md px-2.5 text-ui transition-colors",
             ativo ? ITEM_ATIVO : ITEM_INATIVO,
           )}
         >
@@ -131,7 +133,7 @@ function ItemDaColuna({
           <span className="truncate">{t(item.label)}</span>
           {item.etiqueta && (
             // O `.nav2-tag` do protótipo: rótulo do catálogo, não permissão.
-            <span className="ml-auto shrink-0 rounded-md border border-border-strong px-1.5 text-[11px] font-bold leading-[18px] text-text-subtle">
+            <span className="ml-auto shrink-0 rounded-pill border border-border-strong px-1.25 text-[11px] font-bold leading-[18px] text-text-subtle">
               {t(item.etiqueta)}
             </span>
           )}

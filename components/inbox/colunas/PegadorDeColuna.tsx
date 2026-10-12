@@ -36,9 +36,9 @@ interface Props {
  * 11px; o traço visível é de 1px e engrossa no hover, no foco e no arrasto,
  * com o degradê vibrante da pele no escuro.
  *
- * Só existe a partir de 1536px (`2xl`): abaixo disso as larguras são as faixas
- * fixas por breakpoint, porque não sobra espaço para regular sem espremer a
- * conversa abaixo do mínimo.
+ * Existe a partir de 1280px (`xl`, quadro DS "Layout da Inbox"). Abaixo disso o
+ * lead vira gaveta e a lista fica fixa. A posição usa a MESMA conta da trilha do
+ * grid (`InboxLayout`): a lista encolhe até 280 antes de a conversa passar de 420.
  */
 export function PegadorDeColuna({ coluna, larguras, cartaoRef, comPainel, mover, confirmar, restaurar }: Props) {
   const t = useT();
@@ -113,11 +113,15 @@ export function PegadorDeColuna({ coluna, larguras, cartaoRef, comPainel, mover,
       onKeyDown={aoTeclar}
       style={
         coluna === "lista"
-          ? { left: `calc(var(--largura-da-lista) - 6px)` }
+          ? {
+              left: comPainel
+                ? "calc(max(280px, min(var(--largura-da-lista), 100% - 420px - var(--largura-do-painel))) - 6px)"
+                : "calc(max(280px, min(var(--largura-da-lista), 100% - 420px)) - 6px)",
+            }
           : { right: `calc(var(--largura-do-painel) - 6px)` }
       }
       className={cn(
-        "group/pegador absolute inset-y-0 z-10 hidden w-[11px] cursor-col-resize touch-none justify-center 2xl:flex",
+        "group/pegador absolute inset-y-0 z-10 hidden w-[11px] cursor-col-resize touch-none justify-center xl:flex",
         "focus-visible:outline-hidden",
       )}
     >

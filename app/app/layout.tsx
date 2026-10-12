@@ -1,3 +1,4 @@
+import { COOKIE_LEGADO_DO_MENU, cookieDoMenu } from "@/lib/navigation/preferencia-do-menu";
 import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -189,9 +190,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     needsMfaGate = mfaRequired;
   }
 
-  // Read sidebar collapsed state SSR to avoid flash.
+  // A preferência do menu, lida no servidor para a barra não piscar. Por
+  // atendente (cookie com o id); a antiga, sem id, vale até a pessoa mexer.
   const store = await cookies();
-  const collapsed = store.get("sidebar_collapsed")?.value === "1";
+  const geral = store.get(cookieDoMenu("geral", user.id))?.value ?? store.get(COOKIE_LEGADO_DO_MENU)?.value;
+  const collapsed = geral === "1";
+  const menuFixoNaInbox = store.get(cookieDoMenu("inbox", user.id))?.value === "1";
 
   const impersonating = user.support ? {
     tenantId: user.support.organization_id, tenantName: user.support.name,
@@ -245,6 +249,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <VoiceCallProvider>
         <AppShell
           sidebarCollapsed={collapsed}
+          menuFixoNaInbox={menuFixoNaInbox}
           podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
           funis={funisDoMenu}
         >

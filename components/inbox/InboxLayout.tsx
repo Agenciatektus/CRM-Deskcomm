@@ -196,9 +196,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   );
   // A mesma ação da busca com a Inbox já aberta: liga o filtro sem recarregar.
   useEffect(() => escutar("so-sem-passo", () => setAux((a) => ({ ...a, semPasso: true }))), []);
-  // Colunas reguláveis a partir de 1536px (G1-G3): as larguras viram variáveis
-  // CSS no cartão, e os pegadores as mudam. Abaixo disso valem as faixas fixas.
-  const colunasRegulaveis = useLargurasDasColunas();
+  // Colunas reguláveis a partir de 1280px (quadro DS, Layout da Inbox): as
+  // larguras viram variáveis CSS no cartão, e os pegadores as mudam. A escolha
+  // é guardada por atendente (localStorage com o id; não há tabela de preferências).
+  const colunasRegulaveis = useLargurasDasColunas(user?.id);
   const cartaoRef = useRef<HTMLDivElement>(null);
   /**
    * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
@@ -378,28 +379,16 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // `dvh` em vez de `vh` porque no celular a `vh` ignora a barra do navegador — o
   // mesmo corte, só que pior e mudando conforme se rola a página.
 
-  // TRÊS COLUNAS QUE CABEM — medido, não estimado.
+  // TRÊS COLUNAS, nas medidas do quadro DS ("Layout da Inbox").
   //
-  // O `xl` do Tailwind dispara em 1280px, e era ali que a terceira coluna
-  // nascia: no ponto exato em que não havia espaço para ela. Com a barra de
-  // navegação (240px) sobram 1040px, e o grid pedia 300 + 707 + 320 = 1327 —
-  // o painel de CRM ficava 311px FORA da viewport, alcançável só rolando o
-  // `main` de lado, que ninguém faz. Em 1280 o atendente simplesmente não via
-  // contexto nenhum do cliente.
-  //
-  // Os 707px eram o `min-content` do `ConversationHeader` (a barra de ações
-  // era `shrink-0`), e `1fr` é `minmax(auto, 1fr)`: não encolhe abaixo disso.
-  // Consertado o header, o `1fr` volta a encolher sozinho — `minmax(0,1fr)`
-  // foi medido aqui e não mudou um pixel, então não entrou.
-  //
-  // Duas faixas em vez de uma: compacta onde aperta, generosa onde há espaço.
-  // Em 1280 isso dá 424px de conversa em vez de 372 — 54px de folga sobre o
-  // piso do composer (370px), em vez dos 2px que a versão de uma faixa só
-  // deixava. Margem de 2px não é margem, é sorte. A partir de 1536px valem as
-  // medidas do protótipo v2: lista de 340px e painel de 352px (a faixa de 400px
-  // acima de 1680px saiu: o protótipo usa 352 em qualquer largura, e os 48px
-  // voltam para a conversa). O grid é um CARD (borda, cantos, `surface`)
-  // encostado na moldura, como o `.work` do protótipo.
+  // De 1280px para cima: lista 340, conversa fluida e lead 352, com os
+  // pegadores. A Inbox começa com a 2ª coluna da navegação recolhida (trilho de
+  // 72px), e as medidas cabem: em 1280 sobram 1280 - 72 - 8 = 1200, e a conversa
+  // fica com 508. Se o atendente FIXAR o menu (304px) e faltar espaço, a LISTA
+  // encolhe primeiro, até 280, para a conversa não ficar abaixo de 420; só depois
+  // disso a conversa cede. É o `max(280px, min(lista, 100% - 420px - lead))`
+  // da trilha do grid (os pegadores usam a mesma conta, `PegadorDeColuna`).
+  // De 1024 a 1279 o lead vira gaveta sobre a conversa (`drawer`).
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
@@ -411,8 +400,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         // topo e na barra lateral, como o `.work` do protótipo.
         "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao md:grid-cols-[300px_minmax(0,1fr)]",
         ferramentas.painelLead
-          ? "xl:grid-cols-[272px_minmax(0,1fr)_296px] 2xl:grid-cols-[var(--largura-da-lista)_minmax(0,1fr)_var(--largura-do-painel)]"
-          : "xl:grid-cols-[272px_minmax(0,1fr)] 2xl:grid-cols-[var(--largura-da-lista)_minmax(0,1fr)]",
+          ? "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px-var(--largura-do-painel))))_minmax(0,1fr)_var(--largura-do-painel)]"
+          : "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px)))_minmax(0,1fr)]",
       )}
       ref={cartaoRef}
       style={
@@ -586,7 +575,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         </div>
       )}
 
-      {/* Os pegadores das colunas (o `.rz` do protótipo); só aparecem em 2xl. */}
+      {/* Os pegadores das colunas (o `.rz` do protótipo), a partir de 1280px. */}
       <PegadorDeColuna
         coluna="lista"
         larguras={colunasRegulaveis.larguras}

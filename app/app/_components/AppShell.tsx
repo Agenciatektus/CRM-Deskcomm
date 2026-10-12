@@ -40,6 +40,8 @@ function ehAInbox(pathname: string | null): boolean {
 
 interface AppShellProps {
   sidebarCollapsed: boolean;
+  /** Na Inbox o menu começa recolhido; fica ao lado só se o atendente fixou. */
+  menuFixoNaInbox?: boolean;
   /**
    * A pessoa pode atender (agent+)? Vem do papel resolvido no layout, e não de
    * uma consulta desta casca.
@@ -57,7 +59,7 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: AppShellProps) {
+export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtender, funis, children }: AppShellProps) {
   useInboundMessageAlerts();
   useInboundCallAlerts();
   useCrmAlerts();
@@ -77,7 +79,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
     <div className="pele-moldura flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
       <div className="hidden md:block">
-        <Sidebar collapsed={sidebarCollapsed} funis={funis} />
+        <Sidebar collapsed={sidebarCollapsed} fixoNaInbox={menuFixoNaInbox} funis={funis} />
       </div>
       {/*
         `min-w-0` é o que permite a coluna de conteúdo ENCOLHER. Um flex item

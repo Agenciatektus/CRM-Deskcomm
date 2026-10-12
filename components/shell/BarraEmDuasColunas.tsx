@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useId, useTransition } from "react";
 
 import { toggleSidebar } from "@/app/actions/shell/toggleSidebar";
+import type { EscopoDoMenu } from "@/lib/navigation/preferencia-do-menu";
 import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDot";
 import { ColunaDoGrupo, type Secao } from "@/components/shell/ColunaDoGrupo";
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
@@ -74,8 +75,8 @@ const ROTULO_CURTO_NO_TRILHO: Partial<Record<NavGroupId, Partial<Record<Idioma, 
  */
 const BOTAO_DO_TRILHO =
   "relative flex min-h-14 w-16 max-w-full flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5 text-[10.5px] leading-[1.1] font-semibold tracking-[-0.01em] transition-colors";
-const BOTAO_MARCADO = "pele-ativo-trilho bg-card text-foreground ring-1 ring-border";
-const BOTAO_SOLTO = "text-muted-foreground hover:bg-accent/50 hover:text-foreground";
+const BOTAO_MARCADO = "pele-ativo-trilho bg-surface text-text ring-1 ring-border shadow-[0_1px_2px_rgb(17_22_31/0.06)]";
+const BOTAO_SOLTO = "text-text-muted hover:bg-hover hover:text-text";
 
 /**
  * A barra do desktop em DUAS colunas: um trilho de 72px com um botão por grupo e,
@@ -95,8 +96,14 @@ export function BarraEmDuasColunas({
   funis = [],
   marca,
   aoAlternar,
+  escopo = "geral",
+  podeFixar = true,
 }: {
   collapsed: boolean;
+  /** Qual preferência o alfinete grava: a da Inbox ou a do resto do app. */
+  escopo?: EscopoDoMenu;
+  /** Abaixo de 1024px o menu nunca fixa: o alfinete some. */
+  podeFixar?: boolean;
   /**
    * Troca o que o « e o alfinete fazem. Sem ele, gravam a preferência da pessoa
    * (Server Action `toggleSidebar`). A vitrine do design system passa um
@@ -112,7 +119,7 @@ export function BarraEmDuasColunas({
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const { user, activeOrg } = useAuth();
-  const alternar = () => (aoAlternar ? aoAlternar() : startTransition(() => toggleSidebar(collapsed)));
+  const alternar = () => (aoAlternar ? aoAlternar() : startTransition(() => toggleSidebar(collapsed, escopo)));
   const args = [
     user.is_platform_admin && !user.support,
     activeOrg?.role ?? null,
@@ -135,7 +142,8 @@ export function BarraEmDuasColunas({
    */
   function secoesDe(grupo: NavGroup, itensDoMenu: NavDestination[]): Secao[] {
     if (!grupo.hub) return [{ section: "", items: itensDoMenu }];
-    return hubSections(grupo.id, ...args);
+    const secoes = hubSections(grupo.id, ...args);
+    return grupo.id === "crm" ? comModulosOpcionais(secoes, hubSections("organizacao", ...args)) : secoes;
   }
 
   const {
@@ -258,20 +266,22 @@ export function BarraEmDuasColunas({
               <span className="max-w-full truncate">{t("Ajustes")}</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={alternar}
-            disabled={isPending}
-            className="flex h-8 w-14 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            aria-label={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
-            title={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
-          >
-            {collapsed ? (
-              <PushPin size={14} aria-hidden />
-            ) : (
-              <CaretDoubleLeft size={14} aria-hidden />
-            )}
-          </button>
+          {podeFixar && (
+            <button
+              type="button"
+              onClick={alternar}
+              disabled={isPending}
+              className="flex h-8 w-14 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              aria-label={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
+              title={collapsed ? t("Fixar menu") : t("Recolher sidebar")}
+            >
+              {collapsed ? (
+                <PushPin size={14} aria-hidden />
+              ) : (
+                <CaretDoubleLeft size={14} aria-hidden />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -283,7 +293,7 @@ export function BarraEmDuasColunas({
             "flex w-[232px] shrink-0 flex-col",
             // Recolhida, a coluna vira sobreposição: sai do fluxo para não empurrar
             // o conteúdo (a barra continua com 72px, a medida que a casca conhece).
-            collapsed && "absolute top-0 left-[72px] z-40 h-full border-r bg-background shadow-lg",
+            collapsed && "absolute top-0 left-[72px] z-40 h-full border-r border-border bg-bg shadow-[12px_0_32px_-12px_rgb(17_22_31/0.28)] animate-slide-in dark:shadow-[12px_0_32px_-8px_rgb(0_0_0/0.6)]",
           )}
         >
           <ColunaDoGrupo
@@ -293,6 +303,7 @@ export function BarraEmDuasColunas({
             funis={funis}
             onNavigate={fechar}
             acaoDoTitulo={
+              !podeFixar ? null :
               // Ao lado do título (o `.nav2-head` do protótipo), o MESMO
               // `toggleSidebar` do rodapé do trilho: com a coluna fixa, « recolhe;
               // espiando (barra recolhida), o alfinete fixa a coluna aberta (S8).
@@ -328,4 +339,23 @@ export function BarraEmDuasColunas({
       )}
     </div>
   );
+}
+
+/**
+ * A seção "Módulos opcionais" no fim da coluna do CRM (quadro DS, "Navegação em
+ * 2 colunas"): as telas com a etiqueta "Opcional" saem da seção de origem e vão
+ * para lá, e o Financeiro (que se configura em Ajustes) aparece junto, quando o
+ * papel o enxerga. Só apresentação: quem decide se a tela existe é o registro.
+ */
+export function comModulosOpcionais(secoes: Secao[], deAjustes: Secao[]): Secao[] {
+  const opcionais = secoes.flatMap((s) => s.items.filter((i) => i.etiqueta === "Opcional"));
+  const financeiro = deAjustes.flatMap((s) => s.items).find((i) => i.href === "/app/settings/tenant/financeiro");
+  if (financeiro && !opcionais.some((i) => i.href === financeiro.href)) {
+    opcionais.push({ ...financeiro, etiqueta: "Opcional" });
+  }
+  if (opcionais.length === 0) return secoes;
+  const resto = secoes
+    .map((s) => ({ ...s, items: s.items.filter((i) => i.etiqueta !== "Opcional") }))
+    .filter((s) => s.items.length > 0);
+  return [...resto, { section: "Módulos opcionais", items: opcionais }];
 }
