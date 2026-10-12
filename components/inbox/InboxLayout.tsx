@@ -145,8 +145,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
   // `?sem_passo=1` é a porta da busca (Ctrl K) vinda de outra tela: "Só
   // conversas sem próximo passo" abre a Inbox já filtrada.
+  // `?busca=` vem do "Ver todas na lista" da busca do celular: o termo vira o filtro.
+  const buscaNaUrl = searchParams.get("busca");
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
-    search: "",
+    search: buscaNaUrl ?? "",
     onlyUnread: false,
     onlyGroups: false,
     semPasso: searchParams.get("sem_passo") === "1",
@@ -169,6 +171,14 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     },
     [tab, searchParams, pathname],
   );
+
+  // A busca que chega com a Inbox já aberta (de novo pelo "Ver todas na lista").
+  const ultimaBusca = useRef(buscaNaUrl);
+  useEffect(() => {
+    if (buscaNaUrl === null || buscaNaUrl === ultimaBusca.current) return;
+    ultimaBusca.current = buscaNaUrl;
+    setAux((a) => ({ ...a, search: buscaNaUrl }));
+  }, [buscaNaUrl]);
 
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
   // limpá-la junto a tiraria do lugar sem ela ter pedido.

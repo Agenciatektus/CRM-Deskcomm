@@ -13,6 +13,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({
+    user: { is_platform_admin: false, support: null },
+    activeOrg: { role: "admin", interface_settings: undefined, modulos_ligados: [], capacidades_ligadas: [] },
+  }),
+}));
 vi.mock("@/hooks/pipelines/useDefaultPipeline", () => ({
   useDefaultPipeline: (habilitado: boolean) => ({ data: habilitado ? { pipeline: { id: "p-9" } } : undefined }),
 }));
@@ -63,6 +69,16 @@ describe("folha Criar", () => {
     fireEvent.click(screen.getByRole("button", { name: /Novo lead/ }));
     expect(aoMudar).toHaveBeenCalledWith(false);
     expect(nav.push).toHaveBeenCalledWith("/app/pipelines/p-9?criar=1");
+  });
+});
+
+describe("folha Criar respeita o menu do vínculo (P2 do Cassio na #177)", () => {
+  it("opção cuja tela não está no menu some", async () => {
+    const { opcoesPermitidas } = await import("@/lib/mobile/abas");
+    const todas = ["conversa", "contato", "lead", "tarefa", "compromisso"] as const;
+    const semAgendaNemInbox = new Set(["/app/contacts", "/app/kanban", "/app/tasks"]);
+    expect(opcoesPermitidas([...todas], semAgendaNemInbox)).toEqual(["contato", "lead", "tarefa"]);
+    expect(opcoesPermitidas([...todas], new Set())).toEqual([]);
   });
 });
 

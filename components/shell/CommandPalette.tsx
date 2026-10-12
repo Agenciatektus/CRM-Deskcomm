@@ -12,7 +12,7 @@ import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { Kanban, Lightning, MagnifyingGlass, UserCircle } from "@/lib/ui/icons";
 import { NAV_GROUPS, searchable, type NavDestination } from "@/lib/navigation/registry";
 import { destinosDaInterface } from "@/lib/navigation/interface";
-import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
+import { buscaValeConsulta, TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { cn } from "@/lib/utils";
 
 import { useAcoesDaPaleta, type AcaoDaPaleta } from "./paleta/acoes";
@@ -48,9 +48,16 @@ const ORDEM_GRUPO = new Map(NAV_GROUPS.map((g, i) => [g.id, i]));
 export function CommandPalette({
   open,
   onOpenChange,
+  verTodasNaLista = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Celular (P2 do Cassio na #178): a busca geral mostra até 5 conversas; "Ver todas
+   * na lista" leva o termo ao filtro da lista inteira (`/app/inbox?busca=`), o que no
+   * desktop o campo da lista já faz.
+   */
+  verTodasNaLista?: boolean;
 }) {
   const t = useT();
   return (
@@ -59,7 +66,7 @@ export function CommandPalette({
         <DialogTitle className="sr-only">{t("Busca geral")}</DialogTitle>
         {/* O miolo é um componente à parte porque o Radix o DESMONTA ao fechar:
             busca e destaque nascem zerados na próxima abertura por construção. */}
-        <Resultados aoEscolher={() => onOpenChange(false)} />
+        <Resultados aoEscolher={() => onOpenChange(false)} verTodasNaLista={verTodasNaLista} />
       </DialogContent>
     </Dialog>
   );
@@ -82,7 +89,7 @@ interface Grupo {
   itens: Item[];
 }
 
-function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
+function Resultados({ aoEscolher, verTodasNaLista }: { aoEscolher: () => void; verTodasNaLista: boolean }) {
   const t = useT();
   const router = useRouter();
   const { user, activeOrg } = useAuth();
@@ -292,6 +299,19 @@ function Resultados({ aoEscolher }: { aoEscolher: () => void }) {
         )}
       </div>
 
+      {verTodasNaLista && buscaValeConsulta(termo) && (
+        <button
+          type="button"
+          onClick={() => {
+            aoEscolher();
+            router.push(`/app/inbox?busca=${encodeURIComponent(termo)}`);
+          }}
+          className="flex min-h-11 w-full items-center gap-2 border-b border-border px-4 text-left text-ui font-semibold text-accent-text hover:bg-surface-elevated"
+        >
+          <MagnifyingGlass size={16} aria-hidden />
+          {t("Ver todas na lista")}
+        </button>
+      )}
       {termo && plana.length === 0 && !carregando ? (
         <div className="px-5 py-9 text-center text-sm text-text-muted">
           <strong className="mb-1 block text-[15px] text-text">

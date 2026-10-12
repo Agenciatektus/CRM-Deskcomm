@@ -14824,6 +14824,17 @@ export const DICIONARIO: Traducoes = {
   "Próximo passo com prazo e responsável": { es: "Próximo paso con plazo y responsable" },
   "Novo compromisso": { es: "Nuevo compromiso" },
   "Horário marcado na agenda": { es: "Horario reservado en la agenda" },
+  // ─── APP DE CELULAR (M2.1: lista de conversas) ───
+  "Marcar todas como lidas": { es: "Marcar todas como leídas" },
+  "Só para você: o cliente não recebe confirmação de leitura": { es: "Solo para ti: el cliente no recibe confirmación de lectura" },
+  "Disponível para novas conversas": { es: "Disponible para nuevas conversaciones" },
+  "Mensagens prontas para usar na conversa": { es: "Mensajes listos para usar en la conversación" },
+  "Ações da lista de conversas": { es: "Acciones de la lista de conversaciones" },
+  "Todas marcadas como lidas.": { es: "Todas marcadas como leídas." },
+  "Filtrar conversas": { es: "Filtrar conversaciones" },
+  "Nenhuma conversa sua estava como não lida.": { es: "Ninguna conversación tuya estaba como no leída." },
+  "Ver todas na lista": { es: "Ver todas en la lista" },
+  "Limpar busca": { es: "Limpiar búsqueda" },
 };
 
 /**

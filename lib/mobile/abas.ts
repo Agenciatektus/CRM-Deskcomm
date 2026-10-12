@@ -68,3 +68,20 @@ export function destinoDeCriar(opcao: OpcaoDeCriar, rota: string, funilPadrao: s
   if (/^\/app\/pipelines\/[^/]+$/.test(rota)) return `${rota}?criar=1`;
   return funilPadrao ? `/app/pipelines/${funilPadrao}?criar=1` : "/app/kanban";
 }
+
+/**
+ * A tela de que cada opção depende: sem ela no menu do vínculo (papel, interface,
+ * módulos e capacidades, a MESMA regra da busca: `searchable`), a opção não aparece.
+ * "Nova conversa" começa em Contatos, mas é da Inbox: precisa das duas.
+ */
+const TELAS_DA_OPCAO: Record<OpcaoDeCriar, string[]> = {
+  conversa: ["/app/inbox", "/app/contacts"],
+  contato: ["/app/contacts"],
+  lead: ["/app/kanban"],
+  tarefa: ["/app/tasks"],
+  compromisso: ["/app/agenda"],
+};
+
+export function opcoesPermitidas(opcoes: OpcaoDeCriar[], telasVisiveis: ReadonlySet<string>): OpcaoDeCriar[] {
+  return opcoes.filter((o) => TELAS_DA_OPCAO[o].every((href) => telasVisiveis.has(href)));
+}
