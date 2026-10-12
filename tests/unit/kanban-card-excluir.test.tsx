@@ -31,7 +31,12 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
 }));
 const ganhar = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 const adiar = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarAcao: adiar, avisarComDesfazer: vi.fn() }));
+const pendente = vi.hoisted(() => ({ ganho: false }));
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
+  adiarAcao: adiar,
+  avisarComDesfazer: vi.fn(),
+  useAcaoPendente: (chave: string) => chave === "ganho:l-1" && pendente.ganho,
+}));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({
   useWinLead: () => ({ mutate: vi.fn(), mutateAsync: ganhar, isPending: false }),
   useEditLead: () => ({ mutate: vi.fn(), isPending: false }),
@@ -256,5 +261,18 @@ describe("menu do card — Excluir", () => {
     expect((adiar.mock.calls[0]![0] as (s: number) => string)(5)).toBe("Ganho em 5 s");
     await (adiar.mock.calls[0]![2] as () => Promise<unknown>)();
     expect(ganhar).toHaveBeenCalledWith({ leadId: "l-1" });
+  });
+
+  it("com o ganho deste negócio pendente, Marcar como ganho fica desligado (P2 do Cassio na #170)", async () => {
+    const user = userEvent.setup();
+    pendente.ganho = true;
+    try {
+      renderMenu();
+      await user.click(screen.getByRole("button", { name: "Ações do lead" }));
+      const item = await screen.findByRole("menuitem", { name: "Marcar como ganho" });
+      expect(item).toHaveAttribute("data-disabled");
+    } finally {
+      pendente.ganho = false;
+    }
   });
 });

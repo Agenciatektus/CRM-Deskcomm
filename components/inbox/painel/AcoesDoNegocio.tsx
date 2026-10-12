@@ -76,6 +76,8 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
           .catch(() => undefined)
           .finally(() => setPendente(null)),
       () => setPendente(null),
+      // A mesma chave do quadro: o card não agenda um segundo ganho.
+      { chave: tipo === "ganho" ? `ganho:${lead.id}` : undefined },
     );
   }
 

@@ -9,7 +9,6 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -164,6 +163,8 @@ export function DossieDoFollowup({ id, canWrite }: Props) {
   const cancelar = useCancelFollowupEnrollment();
   const [adiando, setAdiando] = useState(false);
   const [quando, setQuando] = useState("");
+  // Calculado ao abrir o adiar (não no render): o mesmo limite do servidor.
+  const [limites, setLimites] = useState<{ min: string; max: string } | null>(null);
   const [pulando, setPulando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
 
@@ -312,6 +313,7 @@ export function DossieDoFollowup({ id, canWrite }: Props) {
                 const alvo = base.getTime() > Date.now() ? base : new Date();
                 alvo.setDate(alvo.getDate() + 1);
                 setQuando(paraCampoLocal(alvo));
+                setLimites({ min: paraCampoLocal(new Date()), max: paraCampoLocal(new Date(Date.now() + 90 * 86_400_000)) });
                 setAdiando(true);
               }}
             >
@@ -389,11 +391,18 @@ export function DossieDoFollowup({ id, canWrite }: Props) {
           </DialogHeader>
           <div className="flex flex-col gap-2">
             <Label htmlFor="adiar-quando">{t("Novo horário")}</Label>
-            <CampoDeData tipo="datetime-local"
+            {/* O mesmo limite que o servidor confere (`lib/followup/intervencao.ts`):
+                futuro e no máximo 90 dias. Na tela, só evita a recusa. */}
+            <CampoDeData
+              tipo="datetime-local"
               id="adiar-quando"
               value={quando}
+              passado={false}
+              min={limites?.min}
+              max={limites?.max}
               onValorChange={(valorEscolhido) => setQuando(valorEscolhido)}
-              data-testid="dossie-adiar-quando" />
+              data-testid="dossie-adiar-quando"
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAdiando(false)}>

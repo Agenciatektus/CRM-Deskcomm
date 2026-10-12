@@ -24,7 +24,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DotsThree, PencilSimple, Users } from "@/lib/ui/icons";
 import { useWinLead, useEditLead } from "@/hooks/kanban/useUpdateLead";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import { adiarAcao, useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLead";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
@@ -47,6 +47,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const winMutation = useWinLead(pipelineId);
+  const ganhoPendente = useAcaoPendente(`ganho:${lead.id}`);
   const editMutation = useEditLead(pipelineId);
   // Excluir um card é a mesma ação da barra de seleção, com um id só: mesma
   // rota, mesmo gate de papel, mesmo evento e auditoria.
@@ -167,13 +168,17 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
             </DropdownMenuSub>
           )}
           <DropdownMenuItem
-            disabled={winMutation.isPending}
+            disabled={winMutation.isPending || ganhoPendente}
             onSelect={() => {
               // Adiado 5 s com Desfazer, como no painel: `/win` dispara `lead.won`
               // (conversão de anúncio, saídas da cadência, push) na hora.
-              adiarAcao((s) => `${t("Ganho em")} ${s} s`, t("Desfazer"), () =>
+              adiarAcao(
+                (s) => `${t("Ganho em")} ${s} s`,
+                t("Desfazer"),
                 // O erro já aparece pelo `onError` do hook; aqui não repete.
-                winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
+                () => winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
+                undefined,
+                { chave: `ganho:${lead.id}` },
               );
             }}
           >

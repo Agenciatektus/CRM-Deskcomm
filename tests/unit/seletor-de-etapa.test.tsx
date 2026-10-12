@@ -18,7 +18,7 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => podeMover }))
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 const adiar = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
-vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarAcao: adiar.fn }));
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarAcao: adiar.fn, useAcaoPendente: () => false }));
 vi.mock("@/hooks/kanban/useMoveCard", () => ({
   useMoveCard: () => ({ mutate: mover, isPending: false }),
 }));

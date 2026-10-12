@@ -14,7 +14,6 @@ import {
 } from "recharts";
 
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EvolutionGaps } from "@/components/ai/EvolutionGaps";

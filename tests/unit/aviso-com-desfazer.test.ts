@@ -3,14 +3,14 @@
  * exclusão adiada só chama a rota depois do tempo (ou ao fechar o aviso), nunca
  * se Desfazer foi apertado antes.
  */
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-import { acoesPendentes, adiarAcao, adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
+import { acoesPendentes, adiarAcao, useAcaoPendente, adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
 
 type Opcoes = { duration: number; action: { label: string; onClick: () => void }; onAutoClose?: () => void; onDismiss?: () => void };
 const opcoes = () => toast.mock.calls.at(-1)![1] as Opcoes;
@@ -132,5 +132,27 @@ describe("ação pendente: tempo restante no aviso e pergunta antes de sair (fol
     segunda.onDismiss?.();
     expect(acoesPendentes()).toBe(0);
     expect(sair()).toBe(false);
+  });
+});
+
+describe("ação pendente por chave (P2 do Cassio na #170: segundo ganho no quadro)", () => {
+  it("useAcaoPendente fica true nos 5 s e volta a false ao executar ou desfazer", () => {
+    const { result } = renderHook(() => useAcaoPendente("ganho:l-1"));
+    expect(result.current).toBe(false);
+    act(() => adiarAcao("Ganho", "Desfazer", () => Promise.resolve(), undefined, { chave: "ganho:l-1" }));
+    expect(result.current).toBe(true);
+    act(() => opcoes().onAutoClose?.());
+    expect(result.current).toBe(false);
+    act(() => adiarAcao("Ganho", "Desfazer", () => Promise.resolve(), undefined, { chave: "ganho:l-1" }));
+    expect(result.current).toBe(true);
+    act(() => opcoes().action.onClick());
+    expect(result.current).toBe(false);
+  });
+
+  it("CONTROLE: a chave de outro negócio não liga a deste", () => {
+    const { result } = renderHook(() => useAcaoPendente("ganho:l-2"));
+    act(() => adiarAcao("Ganho", "Desfazer", () => Promise.resolve(), undefined, { chave: "ganho:l-1" }));
+    expect(result.current).toBe(false);
+    act(() => opcoes().onDismiss?.());
   });
 });
