@@ -1,0 +1,50 @@
+# caddy-sites/ — ponto de extensão do Caddy (issue #2724)
+#
+# QUALQUER serviço a mais neste VPS é publicado por AQUI, sem editar o
+# Caddyfile. O compose monta esta pasta em /etc/caddy/sites (somente-leitura) e
+# o `import /etc/caddy/sites/*.caddy` no fim do Caddyfile (e do
+# Caddyfile.single-server) lê tudo que estiver neste diretório.
+#
+# COMO FAZER — três passos:
+#
+#   1. Crie um arquivo terminado em .caddy, com o nome que quiser. Este arquivo
+#      é só comentário, então o glob nunca fica vazio e nada é publicado por
+#      acaso. NÃO edite este README para publicar: ele é versionado, e um
+#      arquivo versionado alterado trava o update.sh em "parece haver mudanças
+#      locais que divergem" — crie um arquivo NOVO ao lado dele.
+#
+#      ./caddy-sites/wiki.caddy, por exemplo:
+#
+#        base.exemplo.com.br {
+#        	encode gzip
+#        	reverse_proxy wiki:80
+#        }
+#
+#   2. O container do serviço extra precisa estar na MESMA rede interna do
+#      stack para o nome `wiki` resolver dentro do contêiner do Caddy. Rode com
+#      `--network <nome-do-projeto>_internal` (o `docker network ls | grep
+#      _internal` mostra o nome), ou acrescente a rede no compose dele. Deixe
+#      um limite de memória (`--memory 512m`): este VPS roda o CRM, e um serviço
+#      sem teto derruba os dois.
+#
+#   3. Recarregue o proxy — o Caddy lê a configuração ao subir:
+#
+#        docker compose -f docker-compose.prod.yml restart caddy
+#
+#      (no modo single-server acrescente -f docker-compose.single-server.yml,
+#      na mesma ordem em que o kit usa.)
+#
+# O que já está resolvido sem você fazer nada: HTTPS automático (o certificado
+# é emitido para o domínio novo, com o mesmo email ACME_EMAIL), gzip, e a pasta
+# fica FORA do versionamento — os seus arquivos nunca aparecem num diff nem
+# atrapalham uma atualização.
+#
+# A validação é na hora do restart: se o arquivo estiver errado o Caddy recusa
+# a configuração e diz a linha. Confira com:
+#
+#   docker compose -f docker-compose.prod.yml exec caddy caddy validate \
+#     --config /etc/caddy/Caddyfile
+#
+# Este diretório vale para as DUAS variantes (normal e single-server): os dois
+# Caddyfiles importam o mesmo caminho e os dois composes montam esta mesma
+# pasta.

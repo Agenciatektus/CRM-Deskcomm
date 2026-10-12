@@ -178,6 +178,38 @@ Atrás do proxy do Coolify (ou outro Traefik em rede Docker própria): veja [doc
 > de repetir. (Gerar o dump com `--clean --if-exists` mudaria o formato dele — decisão do
 > mantenedor, issue #2120.)
 
+## Publicar outro serviço no mesmo VPS (issue #2724)
+
+Uma wiki, uma landing page, um n8n no mesmo servidor em que o CRM já roda: **não edite o `Caddyfile`**. Os dois arquivos (o da variante normal e o `Caddyfile.single-server`) terminam com um ponto de extensão, e os dois composes montam a mesma pasta local:
+
+```yaml
+- ./caddy-sites:/etc/caddy/sites:ro
+```
+
+O caminho do `import` e o alvo do bind mount são o mesmo — e a régua `tests/unit/ponto-de-extensao-do-caddy.test.ts` reprova qualquer um dos dois que mude sozinho, porque se divergirem o Caddy continua validando e só avisa no log (aí o arquivo existe, o subdomínio não responde e ninguém explica).
+
+Como fazer:
+
+1. Crie `caddy-sites/<nome>.caddy` na raiz do clone (um arquivo novo — **não** edite o `caddy-sites/README.caddy`, que é versionado e alterado trava a atualização):
+
+   ```
+   base.exemplo.com.br {
+   	encode gzip
+   	reverse_proxy wiki:80
+   }
+   ```
+
+2. Suba o serviço extra na MESMA rede interna do stack, para o nome `wiki` resolver dentro do contêiner do Caddy: `docker run --network <nome-do-projeto>_internal --memory 512m ...` (`docker network ls | grep _internal` mostra o nome da rede). O `--memory` não é decoração: sem teto o serviço novo derruba o CRM junto.
+
+3. Recarregue o proxy, que é quem lê a configuração ao subir:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml restart caddy
+   # single-server: acrescente -f docker-compose.single-server.yml
+   ```
+
+A pasta `caddy-sites/` está no `.gitignore` (só o `README.caddy` é versionado, para a pasta existir no clone novo e o glob do `import` nunca ficar vazio). Seus arquivos não aparecem em `git status`, não entram em `git diff` e **não atrapalham o `update.sh`** — ele troca de versão com `git checkout <tag>` e não toca nesta pasta. HTTPS automático, emissão de certificado e gzip vêm de graça, com o mesmo `ACME_EMAIL` do CRM.
+
 ## Automações e webhooks
 
 O `install.sh` (e o `update.sh`, a cada atualização) já ativa sozinho um cron que roda todo minuto e "puxa" a fila de eventos pendentes (`/api/v1/cron/event-log-drain`) — é isso que faz uma automação disparar de verdade no seu servidor (ex.: enviar uma mensagem de WhatsApp quando um pedido muda de status). **Sem esse cron, as automações ficam paradas na fila e nunca rodam** — é um requisito, não um extra.
