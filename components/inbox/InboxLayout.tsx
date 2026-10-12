@@ -33,6 +33,7 @@ import { CaretLeft, ChatCircle } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { BarraDaConversaNoCelular, FaixaDoLead } from "@/components/mobile/telas/ConversaAberta";
+import { FichaDoLeadNoCelular } from "@/components/mobile/telas/FichaDoLead";
 import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { MenuDaConversa } from "./menu/MenuDaConversa";
 import { useMenuDaConversa } from "./menu/useMenuDaConversa";
@@ -557,12 +558,17 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
                 leadPrimeiro
               />
             )}
-            <Sheet open={fichaAberta} onOpenChange={setFichaAberta}>
-              <SheetContent side="right" className="w-[min(22rem,90vw)] overflow-y-auto p-0">
-                <SheetTitle className="sr-only">{t("Ficha do contato")}</SheetTitle>
-                <CRMSidePanel conversation={selectedConversation} />
-              </SheetContent>
-            </Sheet>
+            {/* Celular (M2.4): a ficha em tela cheia; tablet: a gaveta de sempre. */}
+            {celular ? (
+              <FichaDoLeadNoCelular aberta={fichaAberta} aoMudar={setFichaAberta} conversation={selectedConversation} />
+            ) : (
+              <Sheet open={fichaAberta} onOpenChange={setFichaAberta}>
+                <SheetContent side="right" className="w-[min(22rem,90vw)] overflow-y-auto p-0">
+                  <SheetTitle className="sr-only">{t("Ficha do contato")}</SheetTitle>
+                  <CRMSidePanel conversation={selectedConversation} />
+                </SheetContent>
+              </Sheet>
+            )}
           </>
         )}
         {selectedConversation ? (

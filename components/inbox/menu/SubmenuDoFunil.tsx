@@ -66,7 +66,15 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
             <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Não foi possível ler o funil.")}</DropdownMenuItem>
           )}
           {resumo.isSuccess && !lead && (
-            <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Este contato não tem negócio")}</DropdownMenuItem>
+            <>
+              <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Este contato não tem negócio")}</DropdownMenuItem>
+              {/* "Criar lead" (M2.4). O submenu inteiro só existe para quem escreve
+                  (`regrasDoMenu().funil`: agent+, nunca suporte só leitura), a mesma
+                  régua de `POST /leads`. */}
+              <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => onDialogo({ tipo: "criar-lead" })}>
+                {t("Criar lead")}
+              </DropdownMenuItem>
+            </>
           )}
           {lead && (
             <>
