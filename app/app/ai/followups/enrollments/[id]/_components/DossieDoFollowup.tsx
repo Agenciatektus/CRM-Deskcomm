@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
 
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -201,282 +202,287 @@ export function DossieDoFollowup({ id, canWrite }: Props) {
   };
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex flex-col gap-3">
-        <Link
-          href="/app/ai/followups"
-          className="inline-flex w-fit items-center gap-1 text-sm text-text-muted hover:text-text"
-        >
-          <CaretLeft size={14} aria-hidden /> {t("Fila de follow-ups")}
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-title-lg">{data.contact.name}</h1>
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        antes={
+          <Link
+            href="/app/ai/followups"
+            className="mb-3 inline-flex w-fit items-center gap-1 text-sm text-text-muted hover:text-text mb:hidden"
+          >
+            <CaretLeft size={14} aria-hidden /> {t("Fila de follow-ups")}
+          </Link>
+        }
+        titulo={data.contact.name}
+        acoes={
           <Badge variant={tomDoStatus(data.status)} data-testid="dossie-status">
             {rotuloDoStatus(data.status, t)}
           </Badge>
-        </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Campo rotulo={t("Fluxo")}>{data.flow.name ?? t("Fluxo removido")}</Campo>
-          <Campo rotulo={t("Agente")}>{data.agent_name ?? t("Nenhum agente fixado")}</Campo>
-          <Campo rotulo={t("Começou")}>{absoluta(data.started_at, localeDaData)}</Campo>
-          <Campo rotulo={t("Passos dados")}>{data.steps_taken}</Campo>
-        </div>
-      </header>
-
-      <section className="rounded-md border border-border p-4" data-testid="dossie-onde-esta">
-        <h2 className="mb-2 text-sm font-medium">{t("Onde está agora")}</h2>
-        <div className="flex flex-col gap-1">
-          <p className="text-sm text-text">
-            {data.no_atual ? (
-              <>
-                <span className="font-medium">{data.no_atual.rotulo}</span>{" "}
-                <span className="text-text-muted">
-                  ({t(tipoDoNo(data.no_atual.tipo))} — {t(data.no_atual.resumo)})
-                </span>
-              </>
-            ) : (
-              // O passo saiu do grafo pinado: dizer o id EXPLICITAMENTE é o que
-              // permite alguém investigar; esconder deixaria a tela muda.
-              <span className="text-text-muted">
-                {t("passo")} {data.current_node_id} — {t("não existe mais na versão publicada deste fluxo")}
-              </span>
-            )}
-          </p>
-          <p className="flex items-center gap-1.5 text-sm text-text-muted" data-testid="dossie-proximo-passo">
-            <Clock size={14} aria-hidden />
-            {data.next_eval_at
-              ? `${t("Volta a andar")} ${relativa(data.next_eval_at, localeDaData)} (${absoluta(data.next_eval_at, localeDaData)})`
-              : data.status === "paused_manual"
-                ? t("Parado até alguém retomar")
-                : data.completed_at
-                  ? `${t("Encerrado em")} ${absoluta(data.completed_at, localeDaData)}`
-                  : t("Sem próximo passo agendado")}
-          </p>
-          {data.outcome && (
-            <p className="text-sm text-text-muted">
-              {t("Desfecho")}: {data.outcome}
-            </p>
-          )}
-          {data.cancel_reason && (
-            <p className="text-sm text-text-muted">
-              {t("Motivo")}: {data.cancel_reason}
-            </p>
-          )}
-          {data.last_error && (
-            <p className="flex items-center gap-1.5 text-sm text-warning-fg">
-              <Warning size={14} aria-hidden /> {t("Última falha")}: {data.last_error} ({t("tentativa")}{" "}
-              {data.attempts} {t("de")} {data.max_attempts})
-            </p>
-          )}
-          {motorOcupado && (
-            <p className="text-xs text-text-muted" data-testid="dossie-motor-ocupado">
-              {t(
-                "O automático está executando este follow-up agora — as ações abaixo podem ser recusadas por alguns instantes.",
-              )}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {canWrite && (
-        <section className="flex flex-wrap gap-2" data-testid="dossie-acoes">
-          {podePausar && (
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="dossie-pausar"
-              disabled={intervir.isPending}
-              onClick={() => intervir.mutate({ id, acao: "pause" })}
-            >
-              <Pause size={14} aria-hidden className="mr-1" /> {t("Pausar")}
-            </Button>
-          )}
-          {podeRetomar && (
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="dossie-retomar"
-              disabled={intervir.isPending}
-              onClick={() => intervir.mutate({ id, acao: "resume" })}
-            >
-              <Play size={14} aria-hidden className="mr-1" /> {t("Retomar")}
-            </Button>
-          )}
-          {podeMexerNoRelogio && (
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="dossie-adiar"
-              disabled={intervir.isPending}
-              onClick={() => {
-                const base = data.next_eval_at ? new Date(data.next_eval_at) : new Date();
-                const alvo = base.getTime() > Date.now() ? base : new Date();
-                alvo.setDate(alvo.getDate() + 1);
-                setQuando(paraCampoLocal(alvo));
-                setLimites({ min: paraCampoLocal(new Date()), max: paraCampoLocal(new Date(Date.now() + 90 * 86_400_000)) });
-                setAdiando(true);
-              }}
-            >
-              <Clock size={14} aria-hidden className="mr-1" /> {t("Adiar")}
-            </Button>
-          )}
-          {/*
-            SEM SAÍDA, O BOTÃO NÃO EXISTE — não fica desabilitado.
-            Passo sem aresta de saída não tem para onde pular NUNCA, e isso não é
-            um "agora não".
-
-            A regra, na formulação do `@QAVivo`, que nomeia quem paga e como:
-            desabilitado é PROMESSA de "agora não", então serve para o que é
-            temporário (o `isPending`, que volta em segundos). Desabilitado
-            PERMANENTE manda o usuário procurar a condição que habilita — e ela
-            não existe, então ele acha que a culpa é dele.
-
-            Mesma família do modo adaptativo desta wave: a tela oferecendo o que
-            o código ignora. Só que ali ela mentia sobre o RESULTADO, e aqui
-            mentiria sobre a POSSIBILIDADE.
-          */}
-          {podeMexerNoRelogio && data.saidas.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="dossie-pular"
-              disabled={intervir.isPending}
-              onClick={() => (data.saidas.length === 1 ? pular() : setPulando(true))}
-            >
-              <SkipForward size={14} aria-hidden className="mr-1" /> {t("Pular este passo")}
-            </Button>
-          )}
-          {/*
-            Cancelar mora aqui TAMBÉM, e não só na fila: quem abriu o dossiê para
-            decidir o que fazer com este follow-up não deve ter de voltar uma tela
-            para escolher a única saída definitiva. É a mesma rota que a fila usa.
-          */}
-          {podeCancelar && (
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="dossie-cancelar"
-              disabled={cancelar.isPending}
-              onClick={() => setCancelando(true)}
-            >
-              <Trash size={14} aria-hidden className="mr-1 text-error" /> {t("Cancelar follow-up")}
-            </Button>
-          )}
-        </section>
-      )}
-
-      <PlanoDeTempoBloco
-        plano={data.plano_de_tempo}
-        nos={data.nos}
-        decididoRelativo={relativa(data.plano_de_tempo?.decidido_em ?? null, localeDaData)}
+        }
       />
-
-      <section className="rounded-md border border-border p-4">
-        <h2 className="mb-1 text-sm font-medium">{t("O que já aconteceu")}</h2>
-        <LinhaDoTempo
-          eventos={data.eventos}
-          nos={data.nos}
-          autores={data.autores}
-          truncado={data.eventos_truncados}
-        />
-      </section>
-
-      <Dialog open={adiando} onOpenChange={setAdiando}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("Adiar o próximo passo")}</DialogTitle>
-            <DialogDescription>
-              {t("O follow-up continua no mesmo passo e volta a andar no horário que você escolher.")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="adiar-quando">{t("Novo horário")}</Label>
-            {/* O mesmo limite que o servidor confere (`lib/followup/intervencao.ts`):
-                futuro e no máximo 90 dias. Na tela, só evita a recusa. */}
-            <CampoDeData
-              tipo="datetime-local"
-              id="adiar-quando"
-              value={quando}
-              passado={false}
-              min={limites?.min}
-              max={limites?.max}
-              onValorChange={(valorEscolhido) => setQuando(valorEscolhido)}
-              data-testid="dossie-adiar-quando"
-            />
+      <div className="flex flex-col gap-6 mb:gap-4 mb:px-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Campo rotulo={t("Fluxo")}>{data.flow.name ?? t("Fluxo removido")}</Campo>
+            <Campo rotulo={t("Agente")}>{data.agent_name ?? t("Nenhum agente fixado")}</Campo>
+            <Campo rotulo={t("Começou")}>{absoluta(data.started_at, localeDaData)}</Campo>
+            <Campo rotulo={t("Passos dados")}>{data.steps_taken}</Campo>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAdiando(false)}>
-              {t("Voltar")}
-            </Button>
-            <Button
-              data-testid="dossie-adiar-confirmar"
-              disabled={!quando || intervir.isPending}
-              onClick={() => {
-                const d = new Date(quando);
-                if (Number.isNaN(d.getTime())) return;
-                intervir.mutate({ id, acao: "snooze", body: { next_eval_at: d.toISOString() } });
-                setAdiando(false);
-              }}
-            >
-              {t("Adiar")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      <AlertDialog open={cancelando} onOpenChange={setCancelando}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("Cancelar este follow-up?")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("O lead não receberá mais mensagens deste fluxo. Diferente de pausar, isto não pode ser desfeito.")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("Voltar")}</AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: "destructive" })}
-              data-testid="dossie-cancelar-confirmar"
-              onClick={() => {
-                cancelar.mutate(id);
-                setCancelando(false);
-              }}
-            >
-              {t("Cancelar follow-up")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={pulando} onOpenChange={setPulando}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("Por onde seguir?")}</DialogTitle>
-            <DialogDescription>
-              {t(
-                "Este passo tem mais de um caminho no fluxo. Escolher por você seria decidir o rumo do atendimento sem perguntar.",
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="flex flex-col gap-2">
-            {data.saidas.map((s) => (
-              <li key={s.edge_id}>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  data-testid="dossie-pular-opcao"
-                  disabled={intervir.isPending}
-                  onClick={() => pular(s.edge_id)}
-                >
-                  <span className="truncate">
-                    {s.target_rotulo} <span className="text-text-muted">— {s.quando}</span>
+        <section className="rounded-md border border-border p-4" data-testid="dossie-onde-esta">
+          <h2 className="mb-2 text-sm font-medium">{t("Onde está agora")}</h2>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-text">
+              {data.no_atual ? (
+                <>
+                  <span className="font-medium">{data.no_atual.rotulo}</span>{" "}
+                  <span className="text-text-muted">
+                    ({t(tipoDoNo(data.no_atual.tipo))} — {t(data.no_atual.resumo)})
                   </span>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </DialogContent>
-      </Dialog>
-    </div>
+                </>
+              ) : (
+                // O passo saiu do grafo pinado: dizer o id EXPLICITAMENTE é o que
+                // permite alguém investigar; esconder deixaria a tela muda.
+                <span className="text-text-muted">
+                  {t("passo")} {data.current_node_id} — {t("não existe mais na versão publicada deste fluxo")}
+                </span>
+              )}
+            </p>
+            <p className="flex items-center gap-1.5 text-sm text-text-muted" data-testid="dossie-proximo-passo">
+              <Clock size={14} aria-hidden />
+              {data.next_eval_at
+                ? `${t("Volta a andar")} ${relativa(data.next_eval_at, localeDaData)} (${absoluta(data.next_eval_at, localeDaData)})`
+                : data.status === "paused_manual"
+                  ? t("Parado até alguém retomar")
+                  : data.completed_at
+                    ? `${t("Encerrado em")} ${absoluta(data.completed_at, localeDaData)}`
+                    : t("Sem próximo passo agendado")}
+            </p>
+            {data.outcome && (
+              <p className="text-sm text-text-muted">
+                {t("Desfecho")}: {data.outcome}
+              </p>
+            )}
+            {data.cancel_reason && (
+              <p className="text-sm text-text-muted">
+                {t("Motivo")}: {data.cancel_reason}
+              </p>
+            )}
+            {data.last_error && (
+              <p className="flex items-center gap-1.5 text-sm text-warning-fg">
+                <Warning size={14} aria-hidden /> {t("Última falha")}: {data.last_error} ({t("tentativa")}{" "}
+                {data.attempts} {t("de")} {data.max_attempts})
+              </p>
+            )}
+            {motorOcupado && (
+              <p className="text-xs text-text-muted" data-testid="dossie-motor-ocupado">
+                {t(
+                  "O automático está executando este follow-up agora — as ações abaixo podem ser recusadas por alguns instantes.",
+                )}
+              </p>
+            )}
+          </div>
+        </section>
+
+        {canWrite && (
+          <section className="flex flex-wrap gap-2" data-testid="dossie-acoes">
+            {podePausar && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="dossie-pausar"
+                disabled={intervir.isPending}
+                onClick={() => intervir.mutate({ id, acao: "pause" })}
+              >
+                <Pause size={14} aria-hidden className="mr-1" /> {t("Pausar")}
+              </Button>
+            )}
+            {podeRetomar && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="dossie-retomar"
+                disabled={intervir.isPending}
+                onClick={() => intervir.mutate({ id, acao: "resume" })}
+              >
+                <Play size={14} aria-hidden className="mr-1" /> {t("Retomar")}
+              </Button>
+            )}
+            {podeMexerNoRelogio && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="dossie-adiar"
+                disabled={intervir.isPending}
+                onClick={() => {
+                  const base = data.next_eval_at ? new Date(data.next_eval_at) : new Date();
+                  const alvo = base.getTime() > Date.now() ? base : new Date();
+                  alvo.setDate(alvo.getDate() + 1);
+                  setQuando(paraCampoLocal(alvo));
+                  setLimites({ min: paraCampoLocal(new Date()), max: paraCampoLocal(new Date(Date.now() + 90 * 86_400_000)) });
+                  setAdiando(true);
+                }}
+              >
+                <Clock size={14} aria-hidden className="mr-1" /> {t("Adiar")}
+              </Button>
+            )}
+            {/*
+              SEM SAÍDA, O BOTÃO NÃO EXISTE — não fica desabilitado.
+              Passo sem aresta de saída não tem para onde pular NUNCA, e isso não é
+              um "agora não".
+
+              A regra, na formulação do `@QAVivo`, que nomeia quem paga e como:
+              desabilitado é PROMESSA de "agora não", então serve para o que é
+              temporário (o `isPending`, que volta em segundos). Desabilitado
+              PERMANENTE manda o usuário procurar a condição que habilita — e ela
+              não existe, então ele acha que a culpa é dele.
+
+              Mesma família do modo adaptativo desta wave: a tela oferecendo o que
+              o código ignora. Só que ali ela mentia sobre o RESULTADO, e aqui
+              mentiria sobre a POSSIBILIDADE.
+            */}
+            {podeMexerNoRelogio && data.saidas.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="dossie-pular"
+                disabled={intervir.isPending}
+                onClick={() => (data.saidas.length === 1 ? pular() : setPulando(true))}
+              >
+                <SkipForward size={14} aria-hidden className="mr-1" /> {t("Pular este passo")}
+              </Button>
+            )}
+            {/*
+              Cancelar mora aqui TAMBÉM, e não só na fila: quem abriu o dossiê para
+              decidir o que fazer com este follow-up não deve ter de voltar uma tela
+              para escolher a única saída definitiva. É a mesma rota que a fila usa.
+            */}
+            {podeCancelar && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="dossie-cancelar"
+                disabled={cancelar.isPending}
+                onClick={() => setCancelando(true)}
+              >
+                <Trash size={14} aria-hidden className="mr-1 text-error" /> {t("Cancelar follow-up")}
+              </Button>
+            )}
+          </section>
+        )}
+
+        <PlanoDeTempoBloco
+          plano={data.plano_de_tempo}
+          nos={data.nos}
+          decididoRelativo={relativa(data.plano_de_tempo?.decidido_em ?? null, localeDaData)}
+        />
+
+        <section className="rounded-md border border-border p-4">
+          <h2 className="mb-1 text-sm font-medium">{t("O que já aconteceu")}</h2>
+          <LinhaDoTempo
+            eventos={data.eventos}
+            nos={data.nos}
+            autores={data.autores}
+            truncado={data.eventos_truncados}
+          />
+        </section>
+
+        <Dialog open={adiando} onOpenChange={setAdiando}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("Adiar o próximo passo")}</DialogTitle>
+              <DialogDescription>
+                {t("O follow-up continua no mesmo passo e volta a andar no horário que você escolher.")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="adiar-quando">{t("Novo horário")}</Label>
+              {/* O mesmo limite que o servidor confere (`lib/followup/intervencao.ts`):
+                  futuro e no máximo 90 dias. Na tela, só evita a recusa. */}
+              <CampoDeData
+                tipo="datetime-local"
+                id="adiar-quando"
+                value={quando}
+                passado={false}
+                min={limites?.min}
+                max={limites?.max}
+                onValorChange={(valorEscolhido) => setQuando(valorEscolhido)}
+                data-testid="dossie-adiar-quando"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAdiando(false)}>
+                {t("Voltar")}
+              </Button>
+              <Button
+                data-testid="dossie-adiar-confirmar"
+                disabled={!quando || intervir.isPending}
+                onClick={() => {
+                  const d = new Date(quando);
+                  if (Number.isNaN(d.getTime())) return;
+                  intervir.mutate({ id, acao: "snooze", body: { next_eval_at: d.toISOString() } });
+                  setAdiando(false);
+                }}
+              >
+                {t("Adiar")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={cancelando} onOpenChange={setCancelando}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("Cancelar este follow-up?")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("O lead não receberá mais mensagens deste fluxo. Diferente de pausar, isto não pode ser desfeito.")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("Voltar")}</AlertDialogCancel>
+              <AlertDialogAction
+                className={buttonVariants({ variant: "destructive" })}
+                data-testid="dossie-cancelar-confirmar"
+                onClick={() => {
+                  cancelar.mutate(id);
+                  setCancelando(false);
+                }}
+              >
+                {t("Cancelar follow-up")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={pulando} onOpenChange={setPulando}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("Por onde seguir?")}</DialogTitle>
+              <DialogDescription>
+                {t(
+                  "Este passo tem mais de um caminho no fluxo. Escolher por você seria decidir o rumo do atendimento sem perguntar.",
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <ul className="flex flex-col gap-2">
+              {data.saidas.map((s) => (
+                <li key={s.edge_id}>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    data-testid="dossie-pular-opcao"
+                    disabled={intervir.isPending}
+                    onClick={() => pular(s.edge_id)}
+                  >
+                    <span className="truncate">
+                      {s.target_rotulo} <span className="text-text-muted">— {s.quando}</span>
+                    </span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Pagina>
   );
 }

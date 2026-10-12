@@ -8,6 +8,7 @@ import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
+import { Pagina } from "@/components/pagina";
 import { LegacyRecovery } from "./_components/LegacyRecovery";
 import { AgentOperation } from "./_components/AgentOperation";
 import type { MaterialDoAcervo } from "./_components/BasesDoAgente";
@@ -94,9 +95,9 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   // "o motor de voz lê a coluna que o editor legado grava".
   if (agent.channel === "voice") {
     return (
-      <div className="flex h-full flex-col gap-6 p-6">
+      <Pagina className="max-w-none mb:px-4 mb:pt-3">
         <AgentEditorClient agentId={id} initialData={agent} readOnly={readOnly} />
-      </div>
+      </Pagina>
     );
   }
 
@@ -209,7 +210,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   const materiais = [...materiaisVivos, ...materiaisArquivadosMarcados];
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <Pagina className="max-w-none mb:px-4 mb:pt-3">
       <AgentOperation agent={agent} readOnly={readOnly} />
       {(agent.kind ?? "rag_bot") !== "mcp_agent" && !agent.published_version_id && (
         <LegacyRecovery
@@ -237,6 +238,6 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         readOnly={readOnly}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
       />
-    </div>
+    </Pagina>
   );
 }

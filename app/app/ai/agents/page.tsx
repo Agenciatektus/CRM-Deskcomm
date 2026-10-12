@@ -5,6 +5,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentRow } from "@/hooks/ai/useAgent";
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { AgentsList } from "./_components/AgentsList";
 import { logger } from "@/lib/logger";
 
@@ -53,18 +54,12 @@ export default async function AgentsListPage() {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-title-lg">
-            {traduzir("Agents de IA", idioma)}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {traduzir("Configure o comportamento dos agents que respondem no WhatsApp.", idioma)}
-          </p>
-        </div>
-      </header>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Agents de IA", idioma)}
+        descricao={traduzir("Configure o comportamento dos agents que respondem no WhatsApp.", idioma)}
+      />
       <AgentsList initialData={agents} canWrite={canWrite} />
-    </div>
+    </Pagina>
   );
 }

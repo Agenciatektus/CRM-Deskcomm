@@ -6,11 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCases, type CaseListItem } from "@/hooks/ai/useCases";
 import { STATUS_BADGE_VARIANT, STATUS_LABEL, tipoDeCasoLabel } from "@/lib/ai/case-copy";
-import { Robot } from "@/lib/ui/icons";
+import { CaretLeft, Robot } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { useT } from "@/hooks/i18n/useT";
 import { CaseDetail } from "./CaseDetail";
@@ -31,8 +32,9 @@ export function CaseList() {
   const { data, isLoading } = useCases(tab);
 
   return (
-    <div className="flex min-h-0 flex-1 gap-6">
-      <div className="flex w-full max-w-xs shrink-0 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 gap-6 mb:flex-col mb:gap-3">
+      {/* Celular: lista OU caso, como a Inbox. Só CSS decide (sem ler a tela). */}
+      <div className={cn("flex w-full max-w-xs shrink-0 flex-col gap-4 mb:max-w-none", selectedId && "mb:hidden")}>
         <Tabs value={tab} onValueChange={(v) => setTab(v as "open" | "resolved")}>
           <TabsList>
             <TabsTrigger value="open">{t("Abertos")}{data ? ` (${data.open_count})` : ""}</TabsTrigger>
@@ -71,7 +73,15 @@ export function CaseList() {
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", !selectedId && "mb:hidden")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2 hidden w-fit gap-1 mb:inline-flex"
+          onClick={() => setSelectedId(null)}
+        >
+          <CaretLeft size={14} aria-hidden /> {t("Voltar")}
+        </Button>
         <CaseDetail caseId={selectedId} />
       </div>
     </div>
