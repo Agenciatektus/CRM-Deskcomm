@@ -1,0 +1,2266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>CRM Verdash mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+a{color:inherit}a:hover{color:inherit}
+
+/* ---------- Tokens: claro (cor da marca do revendedor) ---------- */
+.mb{
+  --chrome: oklch(0.958 0.006 255);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.972 0.004 255);
+  --thread: oklch(0.965 0.006 255);
+  --ink: oklch(0.23 0.02 260);
+  --ink-2: oklch(0.42 0.02 260);
+  --ink-3: oklch(0.5 0.018 260);
+  --line: oklch(0.915 0.007 255);
+  --line-2: oklch(0.86 0.009 255);
+  --hover: oklch(0.945 0.007 255);
+  --tint: oklch(0.23 0.02 260 / .06);
+  --accent-soft: color-mix(in oklch, var(--accent) 11%, var(--surface));
+  --accent-soft-2: color-mix(in oklch, var(--accent) 20%, var(--surface));
+  --accent-text: color-mix(in oklch, var(--accent) 72%, black);
+  --fill: color-mix(in oklch, var(--accent) 78%, black);
+  --pill: var(--accent-soft-2);
+  --pill-fg: var(--accent-text);
+  --bub-in: var(--surface);
+  --bub-out: color-mix(in oklch, var(--accent) 15%, var(--surface));
+  --bub-ai: color-mix(in oklch, var(--accent) 6%, var(--surface));
+  --bub-ai-line: color-mix(in oklch, var(--accent) 45%, var(--surface));
+  --ok: oklch(0.48 0.12 150);   --ok-bg: oklch(0.95 0.035 150);
+  --warn: oklch(0.46 0.11 65);  --warn-bg: oklch(0.955 0.045 80);
+  --crit: oklch(0.5 0.17 25);   --crit-bg: oklch(0.95 0.035 25);
+  --info: oklch(0.5 0.14 245);  --info-bg: oklch(0.95 0.03 245);
+  --note-bg: oklch(0.96 0.05 90); --note-ink: oklch(0.36 0.07 70);
+  --scr: var(--surface);
+  --scr-g: var(--chrome);
+  --solid: var(--surface);
+  --bar: oklch(0.99 0.002 255);
+  --sheet: var(--surface);
+  --card: var(--surface);
+  --card-sh: 0 0 0 1px var(--line);
+  --bezel: oklch(0.99 0.002 255);
+  --fab-sh: 0 10px 24px -8px color-mix(in oklch, var(--accent) 60%, transparent), 0 2px 6px oklch(0.2 0.02 260 / .15);
+  --shadow-bub: 0 1px 1px oklch(0.2 0.02 260 / .07);
+  --safe-t: 44px;
+  --safe-b: 20px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --av1: oklch(0.9 0.05 25);  --av1i: oklch(0.38 0.09 25);
+  --av2: oklch(0.9 0.05 80);  --av2i: oklch(0.38 0.08 70);
+  --av3: oklch(0.9 0.05 160); --av3i: oklch(0.36 0.07 160);
+  --av4: oklch(0.9 0.04 230); --av4i: oklch(0.37 0.08 240);
+  --av5: oklch(0.9 0.05 300); --av5i: oklch(0.38 0.1 300);
+  --av6: oklch(0.9 0.04 200); --av6i: oklch(0.36 0.07 200);
+  font-family: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  font-size: 15px; line-height: 1.4; color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+/* ---------- Tokens: escuro, pele VERDASH (mesmos valores do MainVerdash) ---------- */
+.mb.dark{
+  --chrome: oklch(0.165 0.006 255);
+  --surface: oklch(0.215 0.006 255);
+  --surface-2: oklch(0.25 0.007 255);
+  --thread: oklch(0.185 0.006 255);
+  --ink: oklch(0.98 0 0);
+  --ink-2: oklch(0.84 0.005 255);
+  --ink-3: oklch(0.72 0.008 255);
+  --line: oklch(0.29 0.007 255);
+  --line-2: oklch(0.36 0.008 255);
+  --hover: oklch(0.255 0.007 255);
+  --tint: oklch(1 0 0 / .08);
+  --accent-soft: color-mix(in oklch, var(--accent) 20%, var(--surface));
+  --accent-soft-2: color-mix(in oklch, var(--accent) 30%, var(--surface));
+  --accent-text: oklch(0.8 0.1 215);
+  --grad: linear-gradient(120deg, oklch(0.5 0.21 266) 0%, oklch(0.6 0.1 225) 50%, oklch(0.74 0.15 163) 100%);
+  --grad-soft: linear-gradient(120deg, oklch(0.5 0.21 266 / .24), oklch(0.74 0.15 163 / .18));
+  --grad-deep: linear-gradient(120deg, oklch(0.5 0.21 266) 0%, oklch(0.52 0.11 225) 55%, oklch(0.54 0.12 163) 100%);
+  --noise: radial-gradient(circle, oklch(1 0 0 / .035) .6px, transparent .8px) 0 0 / 3px 3px;
+  --drop: 0 4px 0 oklch(0 0 0 / .25);
+  --fill: var(--grad-deep);
+  --pill: var(--grad-deep);
+  --pill-fg: oklch(0.98 0 0);
+  --bub-in: var(--surface-2);
+  --bub-out: color-mix(in oklch, var(--accent) 30%, var(--surface));
+  --bub-ai: oklch(0.23 0.012 230);
+  --ok: oklch(0.76 0.15 160);   --ok-bg: oklch(0.3 0.06 160);
+  --warn: oklch(0.83 0.15 75);  --warn-bg: oklch(0.3 0.06 70);
+  --crit: oklch(0.75 0.14 22);  --crit-bg: oklch(0.31 0.08 22);
+  --info: oklch(0.72 0.14 255); --info-bg: oklch(0.3 0.06 255);
+  --note-bg: oklch(0.3 0.05 85); --note-ink: oklch(0.9 0.07 85);
+  --scr: var(--chrome);
+  --scr-g: var(--chrome);
+  --solid: var(--chrome);
+  --bar: oklch(0.19 0.006 255);
+  --sheet: var(--surface);
+  --card: var(--surface);
+  --card-sh: 0 0 0 1px var(--line), var(--drop);
+  --bezel: oklch(0.11 0.005 255);
+  --fab-sh: var(--drop), 0 10px 24px -8px oklch(0.6 0.1 225 / .7), inset 0 1px 0 oklch(1 0 0 / .2);
+  --shadow-bub: none;
+  --av1: oklch(0.36 0.07 25);  --av1i: oklch(0.9 0.05 25);
+  --av2: oklch(0.36 0.06 75);  --av2i: oklch(0.9 0.06 80);
+  --av3: oklch(0.35 0.06 160); --av3i: oklch(0.9 0.05 160);
+  --av4: oklch(0.36 0.06 240); --av4i: oklch(0.9 0.04 230);
+  --av5: oklch(0.36 0.07 300); --av5i: oklch(0.9 0.05 300);
+  --av6: oklch(0.35 0.05 200); --av6i: oklch(0.9 0.04 200);
+  color-scheme: dark;
+}
+.mb.dark ::selection{background:oklch(0.6 0.1 225 / .45)}
+
+/* ---------- Quadro ---------- */
+.board{width:2748px;height:2220px;padding:64px;display:flex;flex-direction:column;gap:56px;background:var(--chrome)}
+.mb.dark .board{background:radial-gradient(60rem 30rem at -8rem -8rem, oklch(0.5 0.21 266 / .16), transparent 70%), radial-gradient(50rem 26rem at 100% -10rem, oklch(0.6 0.1 225 / .10), transparent 70%), var(--chrome)}
+.bh{display:flex;align-items:flex-end;justify-content:space-between;gap:32px}
+.bh h1{margin:0;font-size:44px;line-height:1.1;letter-spacing:-.01em}
+.bh p{margin:10px 0 0;color:var(--ink-2);font-size:18px;max-width:980px;text-wrap:pretty}
+.seg{display:inline-flex;align-items:center;gap:4px;padding:4px;border-radius:14px;background:var(--surface);box-shadow:0 0 0 1px var(--line-2)}
+.seg-l{font-size:14px;font-weight:600;color:var(--ink-2);padding:0 10px 0 12px}
+.seg button{min-height:44px;padding:0 18px;border-radius:10px;font-weight:700;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--fill);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(6, 390px);column-gap:56px;row-gap:72px;align-items:start}
+.dev{display:flex;flex-direction:column;gap:14px}
+.dev-lab{display:flex;align-items:center;gap:12px;min-height:44px}
+.dev-n{font-size:14px;color:var(--ink-3)}
+.dev-t{flex:1;font-weight:700;font-size:18px}
+.reset{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--ink-2)}
+.reset:hover{background:var(--hover);color:var(--ink)}
+
+/* ---------- Aparelho ---------- */
+.phone{position:relative;width:390px;height:844px;border-radius:46px;overflow:hidden;isolation:isolate;background:var(--scr);box-shadow:0 0 0 7px var(--bezel), 0 0 0 8px var(--line-2), 0 40px 80px -36px oklch(0 0 0 / .5)}
+.scr{position:absolute;inset:0;display:flex;flex-direction:column;padding-top:var(--safe-t);background:var(--scr)}
+.scr.g{background:var(--scr-g)}
+.mb.dark .scr{background:radial-gradient(120% 34% at 50% -8%, oklch(0.5 0.21 266 / .18), transparent 62%), var(--noise), var(--chrome)}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column}
+.sp{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.sp::-webkit-scrollbar{display:none}
+.sp-end{height:96px}
+.sp-end.s{height:24px}
+
+.ic{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ic-s{width:18px;height:18px}
+.ic-xs{width:14px;height:14px}
+.mono{font-family:"Atkinson Hyperlegible Mono", ui-monospace, monospace}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:2px;border-radius:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* título grande */
+.lt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px;padding:4px 6px 4px 16px}
+.lt h2{margin:0;font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-.015em}
+.lt-acts{display:flex;align-items:center}
+.ib{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink);flex:none}
+.ib:hover{background:var(--hover)}
+/* barra de tela empilhada */
+.nb{display:flex;align-items:center;gap:2px;min-height:56px;padding:0 4px;border-bottom:1px solid var(--line)}
+.nb.flat{border-bottom:0}
+.nb-back{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding:0 12px 0 4px;border-radius:22px;color:var(--accent-text);font-weight:700;font-size:16px}
+.nb-back:hover{background:var(--hover)}
+.nb-who{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:48px;padding:2px 6px;border-radius:12px;text-align:left}
+.nb-who:hover{background:var(--hover)}
+.nb-tx{min-width:0;display:flex;flex-direction:column}
+.nb-tx b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-tx small{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-sp{flex:1}
+
+/* busca */
+.sf{display:flex;align-items:center;gap:10px;min-height:44px;margin:4px 16px 8px;padding:0 14px;border-radius:14px;background:var(--surface-2);color:var(--ink-3);font-size:16px;text-align:left;width:calc(100% - 32px)}
+.mb.dark .sf{background:var(--noise), var(--surface);box-shadow:0 0 0 1px var(--line)}
+
+/* chips */
+.chips{display:flex;gap:8px;padding:6px 16px 12px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips.wrap{flex-wrap:wrap;overflow:visible;padding:4px 12px 8px}
+.chip{position:relative;flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:18px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line);font-weight:600;font-size:14px;color:var(--ink-2);white-space:nowrap}
+.chip::after{content:"";position:absolute;inset:-4px 0}
+.mb.dark .chip{background:var(--noise), var(--surface)}
+.chip .n{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--tint);font-size:12px;font-weight:700;display:grid;place-items:center}
+.chip[aria-pressed="true"]{background:var(--fill);box-shadow:none;color:#fff}
+.mb.dark .chip[aria-pressed="true"]{background:var(--fill)}
+.chip[aria-pressed="true"] .n{background:oklch(1 0 0 / .24)}
+.chip-f{padding:0 12px}
+
+/* linhas do topo da lista */
+.lrow{display:flex;align-items:center;gap:16px;width:100%;min-height:50px;padding:0 18px 0 30px;text-align:left;color:var(--ink-2)}
+.lrow b{flex:1;font-weight:600;color:var(--ink);font-size:15.5px}
+.lrow .n{font-size:14px;color:var(--ink-3)}
+.lrow:hover{background:var(--hover)}
+
+/* linha da conversa + gesto */
+.sw{position:relative;overflow:hidden}
+.sw-acts{position:absolute;inset:0;display:flex;justify-content:space-between}
+.sw-side{display:flex}
+.sw-a{width:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:700;color:#fff}
+.a-read{background:oklch(0.5 0.13 245)}
+.a-pin{background:oklch(0.42 0.02 260)}
+.a-more{background:oklch(0.42 0.02 260)}
+.a-arch{background:oklch(0.47 0.11 160)}
+.cv{position:relative;z-index:1;display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;width:100%;padding:10px 16px 0;text-align:left;background:var(--solid);transition:transform .28s var(--ease);touch-action:pan-y;user-select:none}
+.cv:hover{background:color-mix(in oklch, var(--solid) 92%, var(--ink))}
+.cv.drag{transition:none}
+.av{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:16px;position:relative;flex:none}
+.av-s{width:38px;height:38px;font-size:13px}
+.av-m{width:44px;height:44px;font-size:14px}
+.av-xl{width:84px;height:84px;font-size:28px}
+.av-1{background:var(--av1);color:var(--av1i)}.av-2{background:var(--av2);color:var(--av2i)}.av-3{background:var(--av3);color:var(--av3i)}
+.av-4{background:var(--av4);color:var(--av4i)}.av-5{background:var(--av5);color:var(--av5i)}.av-6{background:var(--av6);color:var(--av6i)}
+.chan{position:absolute;right:-3px;bottom:-3px;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;color:#fff;box-shadow:0 0 0 2px var(--solid)}
+.chan .ic{width:12px;height:12px;stroke-width:2.4}
+.chan-wa{background:oklch(0.55 0.14 150)}
+.chan-ig{background:linear-gradient(45deg, oklch(0.6 0.19 45), oklch(0.53 0.21 355), oklch(0.48 0.2 300))}
+.av-xl .chan{width:28px;height:28px}
+.av-xl .chan .ic{width:15px;height:15px}
+.cv-b{min-width:0;display:flex;flex-direction:column;gap:3px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.cv-top{display:flex;align-items:baseline;gap:8px}
+.cv-name{flex:1;min-width:0;font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv-time{font-size:12.5px;color:var(--ink-3);flex:none}
+.cv-time.new{color:var(--accent-text);font-weight:700}
+.cv-mid{display:flex;align-items:center;gap:6px;min-height:22px}
+.cv-prev{flex:1;min-width:0;display:flex;align-items:center;gap:4px;color:var(--ink-2);font-size:14.5px}
+.cv-prev .who{color:var(--ink);font-weight:600;flex:none}
+.cv-prev .tx{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{width:17px;height:17px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.tick.read{stroke:var(--info)}
+.flag{width:16px;height:16px;color:var(--ink-3)}
+.unread{min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--fill);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+.cv-meta{display:flex;align-items:center;gap:6px;overflow:hidden}
+.wait{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:11px;font-size:12px;font-weight:700;flex:none}
+.w-crit{background:var(--crit-bg);color:var(--crit)}
+.w-warn{background:var(--warn-bg);color:var(--warn)}
+.w-info{background:var(--info-bg);color:var(--info)}
+.own{font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--tint);color:var(--ink-2);font-size:12px;white-space:nowrap}
+.empty{padding:40px 32px;text-align:center;color:var(--ink-2)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+.empty p{margin:0 0 14px;font-size:14.5px}
+
+/* barra inferior */
+.tb{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));padding:6px 4px calc(6px + var(--safe-b));border-top:1px solid var(--line);background:var(--bar)}
+.mb.dark .tb{background:var(--noise), var(--bar)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;font-size:12px;font-weight:600;color:var(--ink-3)}
+.tab-pill{position:relative;width:60px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .2s var(--ease)}
+.tab[aria-current="page"]{color:var(--ink);font-weight:700}
+.tab[aria-current="page"] .tab-pill{background:var(--pill);color:var(--pill-fg)}
+.mb.dark .tab[aria-current="page"] .tab-pill{box-shadow:inset 0 1px 0 oklch(1 0 0 / .18), 0 6px 14px -8px oklch(0.6 0.1 225 / .8)}
+.tb-badge{position:absolute;top:-5px;left:34px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:11.5px;font-weight:700;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bar)}
+.b-acc{background:var(--fill);color:#fff}
+.b-crit{background:oklch(0.52 0.19 25);color:#fff}
+.b-warn{background:oklch(0.84 0.14 78);color:oklch(0.22 0.04 60)}
+
+/* botão flutuante */
+.fab{position:absolute;right:16px;bottom:calc(84px + var(--safe-b));z-index:5;width:60px;height:60px;border-radius:20px;background:var(--fill);color:#fff;display:grid;place-items:center;box-shadow:var(--fab-sh)}
+.fab .ic{width:26px;height:26px;stroke-width:2.2}
+
+/* folha inferior */
+.sh-wrap{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end}
+.scrim{position:absolute;inset:0;width:100%;background:oklch(0.12 0.01 260 / .52);cursor:default}
+.sheet{position:relative;max-height:88%;display:flex;flex-direction:column;border-radius:24px 24px 0 0;background:var(--sheet);padding:8px 0 calc(10px + var(--safe-b));box-shadow:0 -14px 40px -12px oklch(0 0 0 / .45);animation:sh-up .3s var(--ease)}
+.mb.dark .sheet{background:var(--noise), var(--surface);box-shadow:0 -1px 0 var(--line-2), 0 -14px 40px -12px oklch(0 0 0 / .7)}
+@keyframes sh-up{from{transform:translateY(48px);opacity:0}to{transform:none;opacity:1}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line-2);margin:2px auto 6px;flex:none}
+.sh-h{display:flex;align-items:center;gap:8px;padding:0 8px 6px 20px;flex:none}
+.sh-h div{flex:1;min-width:0}
+.sh-h h3{margin:0;font-size:19px;line-height:1.25}
+.sh-h p{margin:2px 0 0;font-size:13.5px;color:var(--ink-2)}
+.sh-body{min-height:0;overflow-y:auto;padding:0 8px;scrollbar-width:none}
+.sh-sep{padding:12px 12px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.sh-lab{padding:14px 20px 2px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.si{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;min-height:56px;padding:8px 12px;border-radius:14px;text-align:left}
+.si:hover{background:var(--hover)}
+.si-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text);font-weight:700;font-size:14px}
+.si-av{border-radius:50%;background:var(--tint);color:var(--ink)}
+.si-tx{min-width:0}
+.si-tx b{display:block;font-weight:600;font-size:16px;line-height:1.3}
+.si-tx small{display:block;color:var(--ink-2);font-size:13.5px;line-height:1.35;margin-top:2px}
+.si-end{display:flex;align-items:center;gap:8px;color:var(--accent-text)}
+.si-n{font-size:13px;color:var(--ink-3);font-weight:600}
+.si.danger b{color:var(--crit)}
+.si.danger .si-ic{background:var(--crit-bg);color:var(--crit)}
+.sh-foot{display:flex;gap:10px;padding:12px 16px 0;border-top:1px solid var(--line);margin-top:8px;flex:none}
+.sh-foot .btn{flex:1}
+.tiles{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px;padding:4px 12px 8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:96px;justify-content:center;border-radius:16px;font-size:13.5px;font-weight:600}
+.tile:hover{background:var(--hover)}
+.tile span{width:52px;height:52px;border-radius:18px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text)}
+
+/* interruptor */
+.tg{position:relative;display:block;width:46px;min-width:46px;max-width:46px;height:28px;border-radius:14px;background:var(--line-2);flex:none;transition:background .2s}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px oklch(0 0 0 / .3);transition:transform .2s var(--ease)}
+.tg.on{background:var(--fill)}
+.tg.on::after{transform:translateX(18px)}
+
+/* aviso flutuante */
+.toast{position:absolute;left:12px;right:12px;bottom:calc(92px + var(--safe-b));z-index:30;display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 6px 6px 16px;border-radius:14px;background:oklch(0.27 0.01 260);color:oklch(0.97 0 0);box-shadow:0 12px 30px -10px oklch(0 0 0 / .55);font-size:14.5px;animation:sh-up .25s var(--ease)}
+.toast.low{bottom:calc(76px + var(--safe-b))}
+.toast span{flex:1}
+.toast button{min-height:44px;padding:0 14px;border-radius:10px;font-weight:700;color:oklch(0.85 0.1 215)}
+
+/* botões */
+.btn{min-height:44px;padding:0 16px;border-radius:12px;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn-p{background:var(--fill);color:#fff}
+.mb.dark .btn-p{box-shadow:inset 0 1px 0 oklch(1 0 0 / .18), 0 6px 16px -8px oklch(0.6 0.1 225 / .8)}
+.btn-s{background:var(--surface-2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.mb.dark .btn-s{background:var(--noise), var(--surface-2)}
+.btn-g{color:var(--accent-text);padding:0 10px}
+.btn-g:hover{background:var(--hover)}
+.btn-sm{min-height:44px;font-size:14px;padding:0 14px}
+
+/* conversa aberta */
+.th{flex:1;min-height:0;display:flex;flex-direction:column-reverse;overflow-y:auto;background:var(--thread);scrollbar-width:none}
+.mb.dark .th{background:radial-gradient(ellipse 80% 30% at 50% -6%, oklch(0.6 0.1 225 / .13), transparent 62%), radial-gradient(circle at 1px 1px, oklch(1 0 0 / .07) 1px, transparent 0) 0 0 / 18px 18px, var(--thread)}
+.th-in{display:flex;flex-direction:column;gap:4px;padding:10px 10px 14px}
+.m-day{align-self:center;margin:10px 0 6px;padding:4px 12px;border-radius:10px;background:var(--surface);box-shadow:0 0 0 1px var(--line);font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.m-new{align-self:center;margin:8px 0;padding:4px 12px;border-radius:10px;background:var(--accent-soft);color:var(--accent-text);font-size:12.5px;font-weight:700}
+.m-sys{align-self:center;max-width:90%;margin:6px 0;padding:6px 12px;border-radius:10px;background:var(--surface);box-shadow:0 0 0 1px var(--line);text-align:center;font-size:13px;color:var(--ink-2)}
+.m-pass{margin:8px 4px;padding:12px 14px;border-radius:14px;background:var(--surface);box-shadow:0 0 0 1px var(--line-2);font-size:13.5px;display:flex;flex-direction:column;gap:6px}
+.m-pass b{display:flex;align-items:center;gap:6px;color:var(--accent-text);font-size:13px}
+.m-pass p{margin:0;color:var(--ink-2)}
+.m-pass p strong{color:var(--ink);font-weight:600}
+.m-note{margin:4px 6px;padding:10px 12px;border-radius:12px;background:var(--note-bg);color:var(--note-ink);font-size:14px;display:flex;flex-direction:column;gap:4px}
+.m-note small{font-size:12px;font-weight:700}
+.mr{display:flex}
+.mr.out,.mr.ai{justify-content:flex-end}
+.bub{max-width:84%;padding:7px 10px 6px;border-radius:16px;background:var(--bub-in);box-shadow:var(--shadow-bub);display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.38}
+.mr.in .bub{border-bottom-left-radius:6px}
+.mr.out .bub,.mr.ai .bub{border-bottom-right-radius:6px}
+.mr.out .bub{background:var(--bub-out)}
+.mr.ai .bub{background:var(--bub-ai);box-shadow:inset 0 0 0 1px var(--bub-ai-line)}
+.mb.dark .mr.ai .bub{border:1px solid transparent;box-shadow:none;background:linear-gradient(var(--bub-ai), var(--bub-ai)) padding-box, var(--grad) border-box}
+.bub-who{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--accent-text)}
+.bub-q{display:block;padding:6px 9px;border-radius:9px;background:var(--tint);font-size:13.5px;color:var(--ink-2)}
+.bub-q b{display:block;font-size:12px;color:var(--accent-text)}
+.bub-t{white-space:pre-line}
+.bub-del{font-style:italic;color:var(--ink-3)}
+.bub-meta{align-self:flex-end;display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-3)}
+.bub-meta .tick{width:15px;height:15px}
+.bub-fail{color:var(--crit);font-weight:700}
+.media{width:230px;height:150px;border-radius:12px;display:grid;place-items:center;align-content:center;gap:6px;background:repeating-linear-gradient(135deg, var(--tint) 0 10px, transparent 10px 20px), var(--surface-2);color:var(--ink-2);font-size:12.5px;text-align:center;padding:12px}
+.media.vid{background:oklch(0.25 0.01 260);color:oklch(0.95 0 0)}
+.sticker{width:110px;height:110px;border-radius:20px;display:grid;place-items:center;background:var(--tint);color:var(--ink-3);font-size:12.5px}
+.aud{display:flex;align-items:center;gap:10px;min-width:232px}
+.aud-play{width:44px;height:44px;border-radius:22px;background:var(--fill);color:#fff;display:grid;place-items:center;flex:none}
+.wave{flex:1;height:22px;background:repeating-linear-gradient(90deg, var(--ink-3) 0 3px, transparent 3px 6px);-webkit-mask:linear-gradient(180deg, transparent 0 20%, #000 20% 80%, transparent 80%), radial-gradient(60% 100% at 30% 50%, #000, transparent);opacity:.7;border-radius:4px}
+.transcript{font-size:13.5px;color:var(--ink-2);font-style:italic}
+.doc{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--tint);min-width:236px}
+.doc-ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--crit-bg);color:var(--crit);flex:none}
+.doc b{display:block;font-size:14px;word-break:break-all}
+.doc small{display:block;font-size:12px;color:var(--ink-3)}
+.ctc{display:flex;align-items:center;gap:10px;padding:6px 4px;min-width:220px}
+.ctc b{display:block;font-size:14.5px}
+.ctc small{display:block;font-size:12.5px;color:var(--ink-3)}
+/* faixa da IA e composer */
+.strip{display:flex;align-items:center;gap:10px;margin:0 8px 6px;padding:6px 6px 6px 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent-text);font-size:14px;font-weight:700}
+.mb.dark .strip{background:var(--grad-soft), var(--surface);box-shadow:inset 0 0 0 1px oklch(0.6 0.1 225 / .38)}
+.strip span{flex:1;display:flex;align-items:center;gap:8px}
+.notice{margin:0 8px 6px;padding:10px 12px;border-radius:14px;background:var(--warn-bg);color:var(--warn);font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:10px}
+.notice span{flex:1}
+.notice.info{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+.cmp-wrap{padding-top:6px;background:var(--thread)}
+.mb.dark .cmp-wrap{background:var(--thread)}
+.cmp{display:flex;align-items:flex-end;gap:2px;padding:6px 6px calc(6px + var(--safe-b));border-top:1px solid var(--line);background:var(--bar)}
+.mb.dark .cmp{background:var(--noise), var(--bar)}
+.cmp-box{flex:1;min-width:0;display:flex;align-items:center;min-height:44px;border-radius:22px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line);padding:0 2px 0 14px}
+.mb.dark .cmp-box{background:var(--surface)}
+.cmp-box:focus-within{box-shadow:inset 0 0 0 2px var(--accent-text)}
+.cmp-in{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;color:var(--ink);outline:none;min-height:44px}
+.cmp-in::placeholder{color:var(--ink-3)}
+.cmp-fake{flex:1;min-width:0;min-height:44px;text-align:left;color:var(--ink-3);font-size:15px}
+.send{width:44px;height:44px;border-radius:22px;background:var(--fill);color:#fff;display:grid;place-items:center;flex:none}
+.send:disabled{background:var(--tint);color:var(--ink-3)}
+.ib:disabled{color:var(--ink-3);opacity:.6}
+
+/* ficha do lead */
+.ld-hero{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 16px 14px;text-align:center}
+.ld-name{margin:8px 0 0;font-size:23px;line-height:1.2}
+.ld-sub{font-size:14.5px;color:var(--ink-2)}
+.ld-who{font-size:13px;color:var(--ink-3)}
+.qa{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px;padding:0 16px 12px}
+.qa button{min-height:64px;border-radius:14px;background:var(--card);box-shadow:var(--card-sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:700;color:var(--accent-text)}
+.mb.dark .qa button{background:var(--noise), var(--surface)}
+.card{margin:0 16px 12px;padding:14px;border-radius:16px;background:var(--card);box-shadow:var(--card-sh)}
+.mb.dark .card{background:var(--noise), var(--surface)}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.stage-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stage-row b{font-size:17px}
+.stage-row small{display:block;font-size:13px;color:var(--ink-2);font-weight:400}
+.steps{display:grid;gap:4px;margin:12px 0 4px}
+.stp{height:6px;border-radius:3px;background:var(--line-2)}
+.stp.on{background:var(--fill)}
+.step-lab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3)}
+.next{position:relative}
+.next.has{box-shadow:inset 0 0 0 1.5px var(--accent-text)}
+.mb.dark .next.has{border:1.5px solid transparent;box-shadow:var(--drop);background:linear-gradient(var(--surface), var(--surface)) padding-box, var(--grad) border-box}
+.next-t{font-size:16.5px;font-weight:700;line-height:1.3}
+.next-d{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13.5px;font-weight:600}
+.next-acts{display:flex;gap:8px;margin-top:12px}
+.next-acts .btn{flex:1}
+.next.none .next-t{color:var(--warn)}
+.d-late{color:var(--crit)}
+.d-today{color:var(--warn)}
+.d-fut{color:var(--ink-2)}
+.ptabs{display:flex;gap:4px;margin:4px 16px 12px;padding:4px;border-radius:14px;background:var(--tint)}
+.mb.dark .ptabs{background:oklch(0 0 0 / .22)}
+.ptab{flex:1;min-height:44px;border-radius:10px;font-weight:600;font-size:14px;color:var(--ink-2)}
+.ptab[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line-2), 0 2px 0 oklch(0 0 0 / .12)}
+.mb.dark .ptab[aria-selected="true"]{background:var(--noise), var(--surface-2)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.kv:last-child{border-bottom:0}
+.kv span{color:var(--ink-2)}
+.kv b{text-align:right;font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:6px;padding-top:4px}
+.obs{font-size:14.5px;line-height:1.45}
+.obs-by{display:block;margin-top:6px;font-size:12.5px;color:var(--ink-3)}
+.tl{display:grid;grid-template-columns:14px minmax(0,1fr);gap:10px;padding:8px 0}
+.tl i{width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--fill)}
+.tl b{display:block;font-weight:600;font-size:14.5px}
+.tl small{font-size:12.5px;color:var(--ink-3)}
+.ped{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.ped b{display:block;font-size:14.5px}
+.ped small{display:block;font-size:12.5px;color:var(--ink-3)}
+
+/* funil */
+.fsel{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 16px;padding:0 12px 0 14px;border-radius:12px;background:var(--card);box-shadow:var(--card-sh);font-weight:700;font-size:16px;width:calc(100% - 32px);text-align:left}
+.mb.dark .fsel{background:var(--noise), var(--surface)}
+.fsel span{flex:1}
+.fsum{padding:8px 16px 0;font-size:13.5px;color:var(--ink-2)}
+.stabs{display:flex;gap:6px;overflow-x:auto;padding:12px 16px;scrollbar-width:none}
+.stabs::-webkit-scrollbar{display:none}
+.stab{flex:none;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:12px;font-weight:600;font-size:14.5px;color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+.stab .n{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--tint);font-size:12px;font-weight:700;display:grid;place-items:center}
+.stab[aria-selected="true"]{background:var(--fill);color:#fff;box-shadow:none}
+.stab[aria-selected="true"] .n{background:oklch(1 0 0 / .24)}
+.lcard{margin:0 16px 10px;border-radius:16px;background:var(--card);box-shadow:var(--card-sh);display:flex;flex-direction:column}
+.mb.dark .lcard{background:var(--noise), var(--surface)}
+.lc-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;padding:14px 14px 8px;text-align:left;border-radius:16px 16px 0 0}
+.lc-main:hover{background:var(--hover)}
+.lc-main b{display:block;font-size:16px}
+.lc-main small{display:block;font-size:13px;color:var(--ink-2);margin-top:2px}
+.lc-val{font-weight:700;font-size:15px;white-space:nowrap}
+.lc-foot{display:flex;align-items:center;gap:8px;padding:0 6px 6px 14px}
+.lc-foot .own{flex:1}
+.lc-next{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-top:6px}
+.sec-sum{padding:0 16px 10px;font-size:13.5px;color:var(--ink-2);font-weight:600}
+
+/* tarefas e agenda */
+.sec-t{display:flex;justify-content:space-between;padding:16px 20px 8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.sec-t.crit{color:var(--crit)}
+.tk{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;margin:0 16px 8px;padding:4px 12px 4px 2px;border-radius:14px;background:var(--card);box-shadow:var(--card-sh)}
+.mb.dark .tk{background:var(--noise), var(--surface)}
+.tk-chk{width:48px;height:48px;display:grid;place-items:center}
+.tk-chk i{width:24px;height:24px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line-2);display:grid;place-items:center;color:#fff}
+.tk-chk:hover i{box-shadow:inset 0 0 0 2px var(--accent-text)}
+.tk.done .tk-chk i{background:var(--fill);box-shadow:none}
+.tk-b{min-width:0;min-height:48px;padding:8px 0;text-align:left}
+.tk-b b{display:block;font-size:15.5px;line-height:1.3}
+.tk-b small{display:block;font-size:13px;color:var(--ink-2);margin-top:2px}
+.tk-due{display:block;font-size:13px;font-weight:600;margin-top:3px}
+.tk.done b{text-decoration:line-through;color:var(--ink-3)}
+.days{display:grid;grid-template-columns:repeat(7, minmax(0, 1fr));gap:4px;padding:4px 12px 8px}
+.day{min-height:68px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--ink-2)}
+.day b{font-size:18px;color:var(--ink)}
+.day i{width:5px;height:5px;border-radius:50%;background:transparent}
+.day i.on{background:var(--accent-text)}
+.day[aria-pressed="true"]{background:var(--fill);color:#fff}
+.day[aria-pressed="true"] b{color:#fff}
+.day[aria-pressed="true"] i.on{background:#fff}
+.day-h{padding:8px 20px 10px;font-size:15px;font-weight:700}
+.ag{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;margin:0 16px 8px}
+.ag-t{padding-top:14px;font-size:14px;color:var(--ink-2)}
+.ag-c{display:block;width:100%;padding:12px 14px;border-radius:14px;background:var(--card);box-shadow:var(--card-sh);text-align:left}
+.mb.dark .ag-c{background:var(--noise), var(--surface)}
+.ag-c b{display:block;font-size:15px}
+.ag-c small{display:block;font-size:13px;color:var(--ink-2);margin-top:2px}
+.ag-k{display:inline-flex;margin-top:6px;height:22px;align-items:center;padding:0 8px;border-radius:6px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent-text)}
+.ag-k.k2{background:var(--info-bg);color:var(--info)}
+.ag-c.done b{text-decoration:line-through;color:var(--ink-3)}
+
+/* avisos */
+.av-it{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;margin:0 16px 10px;padding:14px;border-radius:16px;background:var(--card);box-shadow:var(--card-sh)}
+.mb.dark .av-it{background:var(--noise), var(--surface)}
+.av-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center}
+.k-acc{background:var(--accent-soft);color:var(--accent-text)}
+.k-crit{background:var(--crit-bg);color:var(--crit)}
+.k-warn{background:var(--warn-bg);color:var(--warn)}
+.k-info{background:var(--info-bg);color:var(--info)}
+.k-ok{background:var(--ok-bg);color:var(--ok)}
+.av-it b{display:block;font-size:15.5px;line-height:1.3}
+.av-it p{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+.av-when{display:block;margin-top:4px;font-size:12.5px;color:var(--ink-3)}
+.av-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+/* mais */
+.prof{margin:4px 16px 8px;padding:16px;border-radius:18px;background:var(--card);box-shadow:var(--card-sh);display:flex;flex-direction:column}
+.mb.dark .prof{background:var(--noise), var(--surface)}
+.prof-top{display:flex;align-items:center;gap:14px;padding-bottom:12px}
+.me{width:60px;height:60px;border-radius:50%;background:var(--fill);color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px;flex:none}
+.prof-top b{display:block;font-size:19px}
+.prof-top small{display:block;font-size:13.5px;color:var(--ink-2)}
+.prof-row{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 4px;border-radius:12px;border-top:1px solid var(--line);text-align:left}
+.prof-tx{flex:1;min-width:0;display:block}
+.prof-tx b{display:block;font-size:16px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prof-tx small{display:block;font-size:13px;color:var(--ink-2);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prof-top .prof-tx b{font-size:19px;font-weight:700}
+.prof-ic{width:40px;height:40px;display:grid;place-items:center;color:var(--ink-2);flex:none}
+.prof-row .chev{color:var(--ink-3)}
+button.prof-row:hover{background:var(--hover)}
+.si-org{background:var(--fill);color:#fff}
+.org-t{width:40px;height:40px;border-radius:12px;background:var(--fill);color:#fff;font-weight:700;display:grid;place-items:center;flex:none}
+.org-tx{flex:1;min-width:0}
+.org-tx b{display:block;font-size:15.5px}
+.org-tx small{display:block;font-size:13px;color:var(--ink-2)}
+.grp-t{padding:20px 20px 6px;font-size:20px;font-weight:700;margin:0}
+.grp-s{padding:6px 20px 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.lst{margin:0 16px 8px;border-radius:16px;background:var(--card);box-shadow:var(--card-sh);overflow:hidden}
+.mb.dark .lst{background:var(--noise), var(--surface)}
+.li{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;min-height:62px;padding:8px 12px 8px 14px;text-align:left}
+.li:hover{background:var(--hover)}
+.li + .li::before{content:"";position:absolute;top:0;left:62px;right:0;height:1px;background:var(--line)}
+.li-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:#fff}
+.li-ic .ic{width:19px;height:19px}
+.g-atend{background:oklch(0.5 0.13 245)}
+.g-crm{background:oklch(0.48 0.11 165)}
+.g-ia{background:oklch(0.48 0.17 285)}
+.mb.dark .g-ia{background:var(--grad-deep)}
+.g-canais{background:oklch(0.5 0.13 150)}
+.g-analise{background:oklch(0.5 0.12 55)}
+.g-config{background:oklch(0.45 0.02 260)}
+.li-tx{min-width:0}
+.li-tx b{display:block;font-size:15.5px;font-weight:600;line-height:1.3}
+.li-tx small{display:block;font-size:13px;color:var(--ink-2);line-height:1.3;margin-top:1px}
+.li-end{display:flex;align-items:center;gap:6px;color:var(--ink-3)}
+.pt{font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--tint);color:var(--ink-2)}
+.cnt{min-width:22px;height:22px;padding:0 7px;border-radius:11px;font-size:12px;font-weight:700;display:grid;place-items:center}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--crit)}
+.out-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 32px);min-height:52px;margin:8px 16px 0;border-radius:16px;background:var(--card);box-shadow:var(--card-sh);color:var(--crit);font-weight:700}
+.mb.dark .out-btn{background:var(--noise), var(--surface)}
+
+/* canais */
+.cc{margin:0 16px 12px;padding:16px;border-radius:18px;background:var(--card);box-shadow:var(--card-sh);display:flex;flex-direction:column;gap:12px}
+.mb.dark .cc{background:var(--noise), var(--surface)}
+.cc-top{display:flex;align-items:center;gap:12px}
+.cc-logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;color:#fff;flex:none}
+.cc-logo.l-wa{background:oklch(0.55 0.14 150)}
+.cc-logo.l-ig{background:linear-gradient(45deg, oklch(0.6 0.19 45), oklch(0.53 0.21 355), oklch(0.48 0.2 300))}
+.cc-logo.l-store{background:oklch(0.45 0.13 250)}
+.cc-logo.l-link{background:oklch(0.45 0.02 260)}
+.cc-tx{flex:1;min-width:0}
+.cc-tx b{display:block;font-size:16px}
+.cc-tx small{display:block;font-size:13.5px;color:var(--ink-2)}
+.st{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.st i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.st-ok{background:var(--ok-bg);color:var(--ok)}
+.st-crit{background:var(--crit-bg);color:var(--crit)}
+.st-off{background:var(--tint);color:var(--ink-2)}
+.cc-warn{margin:0;font-size:13.5px;color:var(--ink-2)}
+.cc-foot{display:flex;gap:8px}
+.cc-foot .btn{flex:1}
+.add-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 32px);min-height:52px;margin:0 16px;border-radius:16px;box-shadow:inset 0 0 0 1.5px var(--line-2);color:var(--accent-text);font-weight:700}
+.add-btn:hover{background:var(--hover)}
+.lead-in{padding:0 20px 12px;font-size:14.5px;color:var(--ink-2);margin:0}
+
+/* busca aberta */
+.bs-bar{display:flex;align-items:center;gap:4px;padding:6px 10px 10px 4px;border-bottom:1px solid var(--line)}
+.bs-in{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 2px 0 12px;border-radius:14px;background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--accent-text);color:var(--ink-3)}
+.mb.dark .bs-in{background:var(--surface)}
+.bs-in input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:16px;color:var(--ink);outline:none;min-height:44px}
+.bs-in input::placeholder{color:var(--ink-3)}
+.res-t{display:flex;justify-content:space-between;padding:16px 20px 6px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.res{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;min-height:62px;padding:6px 16px;text-align:left}
+.res:hover{background:var(--hover)}
+.res b{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res small{display:block;font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res-ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text)}
+.res-k{font-size:12px;font-weight:700;color:var(--ink-3)}
+.rec{display:flex;align-items:center;gap:14px;width:100%;min-height:50px;padding:0 20px;text-align:left;color:var(--ink-2)}
+.rec:hover{background:var(--hover)}
+.rec span{flex:1;color:var(--ink);font-size:15.5px}
+
+/* lead na conversa e folha de perda */
+.ldbar{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:4px 12px 4px 16px;border-bottom:1px solid var(--line);background:var(--bar);text-align:left;color:var(--ink-2);font-size:13.5px}
+.mb.dark .ldbar{background:var(--noise), var(--bar)}
+.ldbar:hover{background:var(--hover)}
+.ldbar-t{flex:1;min-width:0;display:flex;align-items:baseline;gap:6px;white-space:nowrap;overflow:hidden}
+.ldbar-t b{color:var(--ink);font-size:14.5px}
+.ldbar-t span{overflow:hidden;text-overflow:ellipsis}
+.ldbar-v{font-weight:700;color:var(--ink);white-space:nowrap}
+.ta{display:block;width:100%;border:0;border-radius:12px;padding:10px 12px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-2);color:var(--ink);font:inherit;font-size:16px;resize:none;outline:none}
+.ta:focus{box-shadow:inset 0 0 0 2px var(--accent-text)}
+.ta::placeholder{color:var(--ink-3)}
+.btn-d{background:oklch(0.5 0.18 25);color:#fff}
+.btn-d:disabled{background:var(--tint);color:var(--ink-3)}
+
+/* arrastar para rolar (mouse simula o dedo; no aparelho vale o toque nativo) */
+.phone{-webkit-user-select:none;user-select:none}
+.phone input,.phone textarea{-webkit-user-select:text;user-select:text}
+.chips,.stabs{touch-action:pan-x;overscroll-behavior-x:contain}
+.sp,.th,.sh-body{touch-action:pan-y}
+.chips:not(.wrap),.stabs{cursor:grab;-webkit-mask-image:linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 32px), transparent 100%);mask-image:linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 32px), transparent 100%)}
+.stabs{scroll-snap-type:x proximity;scroll-padding-inline:16px}
+.stab{scroll-snap-align:start}
+.chips:not(.wrap):focus-within,.stabs:focus-within{scrollbar-width:thin}
+.chips:not(.wrap):focus-within::-webkit-scrollbar,.stabs:focus-within::-webkit-scrollbar{display:block;height:4px}
+.is-grab{cursor:grabbing !important;scroll-snap-type:none !important;scroll-behavior:auto !important}
+.is-grab *{cursor:grabbing !important}
+
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+
+<div class="{{rootCls}}" style="--accent: {{accent}}">
+
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"></path></symbol>
+<symbol id="i-wa" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"></path><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1a3.5 3.5 0 0 1-2-2l1-1-1-2z"></path></symbol>
+<symbol id="i-ig" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><path d="M17.5 6.5h.01"></path></symbol>
+<symbol id="i-kanban" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 7v7M12 7v4M16 7v9"></path></symbol>
+<symbol id="i-check-sq" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"></path><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path><path d="m2 2 20 20"></path></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="7" rx="2"></rect></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.2"></circle><circle cx="12" cy="12" r="1.2"></circle><circle cx="12" cy="19" r="1.2"></circle></symbol>
+<symbol id="i-dots-h" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"></circle><circle cx="12" cy="12" r="1.2"></circle><circle cx="19" cy="12" r="1.2"></circle></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+<symbol id="i-chev-d" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-checks" viewBox="0 0 24 24"><path d="M18 6 7 17l-5-5"></path><path d="m22 10-7.5 7.5L13 16"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"></path></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h8l-1 8 9-12h-8l1-8z"></path></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"></path><path d="M22 2 11 13"></path></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"></path></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"></path></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></symbol>
+<symbol id="i-user-plus" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"></circle><path d="M2 21a8 8 0 0 1 13.3-6"></path><path d="M19 15v6M16 18h6"></path></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"></circle><path d="M2 21a7 7 0 0 1 14 0"></path><path d="M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-4-6.3"></path></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path><path d="M19 17v4M17 19h4"></path></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"></path><path d="M4 7h16"></path><path d="m16 21 4-4-4-4"></path><path d="M20 17H4"></path></symbol>
+<symbol id="i-mail-open" viewBox="0 0 24 24"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0z"></path><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></symbol>
+<symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m15 9-6 6M9 9l6 6"></path></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></symbol>
+<symbol id="i-funnel" viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"></path><path d="M14 2v5h6"></path></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3"></circle></symbol>
+<symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"></path><circle cx="12" cy="10" r="3"></circle></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5z"></path><path d="M15 3v6h6"></path></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3M21 14v.01M14 21h7v-4"></path></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"></path></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></symbol>
+<symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></symbol>
+<symbol id="i-receipt" viewBox="0 0 24 24"><path d="M4 2v20l3-2 2 2 3-2 3 2 2-2 3 2V2l-3 2-2-2-3 2-3-2-2 2z"></path><path d="M8 9h8M8 13h6"></path></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"></path><path d="m2 17 10 5 10-5"></path><path d="m2 12 10 5 10-5"></path></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5M12 13v8"></path></symbol>
+<symbol id="i-flow" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="18" r="3"></circle><path d="M6 9v3a3 3 0 0 0 3 3h6"></path></symbol>
+<symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></symbol>
+<symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 3h5v5"></path><path d="M4 20 21 3"></path><path d="M21 16v5h-5"></path><path d="m15 15 6 6M4 4l5 5"></path></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"></path></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"></path><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"></path></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="m15 4 5 5L9 20H4v-5z"></path><path d="M19 3v4M17 5h4"></path></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4s1-1 4-1 5 2 8 2 4-1 4-1v11s-1 1-4 1-5-2-8-2-4 1-4 1"></path></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z"></path></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.3 19a10 10 0 1 1 17.4 0"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24"><path d="M3 9 5 3h14l2 6"></path><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"></path><path d="M5 12v9h14v-9"></path></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"></path><path d="M9 8V2M15 8V2"></path><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"></path></symbol>
+<symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M8 17v-6M13 17V7M18 17v-3"></path></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"></path><path d="M16 7h6v6"></path></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path></symbol>
+<symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"></path></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1.5 3.3A1.6 1.6 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1"></circle><circle cx="12" cy="7.5" r="1"></circle><circle cx="16.5" cy="10.5" r="1"></circle></symbol>
+<symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></symbol>
+<symbol id="i-toggle" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="6"></rect><circle cx="16" cy="12" r="2.5"></circle></symbol>
+<symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M19.4 14.5a2.5 2.5 0 1 0 0-5H18V6a2 2 0 0 0-2-2h-3.5v-.5a2.5 2.5 0 1 0-5 0V4H4v4.5h.5a2.5 2.5 0 1 1 0 5H4V20h3.5v-.5a2.5 2.5 0 1 1 5 0v.5H16a2 2 0 0 0 2-2v-3.5z"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5M21 12H9"></path></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></symbol>
+<symbol id="i-move" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></symbol>
+<symbol id="i-sticker" viewBox="0 0 24 24"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9.5L21 14.5V5a2 2 0 0 0-2-2z"></path><path d="M14 21v-5a2 2 0 0 1 2-2h5"></path><path d="M8 13s1.5 2 4 2"></path><path d="M9 9h.01M15 9h.01"></path></symbol>
+</svg>
+
+<div class="board">
+  <header class="bh">
+    <div>
+      <h1>CRM Verdash no celular</h1>
+      <p>Protótipo navegável em 11 telas. Toque para navegar: cada aparelho guarda o próprio caminho, e o botão ao lado do nome volta a tela ao começo. Na lista de conversas, arraste uma linha para o lado.</p>
+    </div>
+    <div class="seg" role="group" aria-label="Tema">
+      <span class="seg-l">Tema</span>
+      <button aria-pressed="{{isDark}}" onClick="{{setDark}}">Escuro</button>
+      <button aria-pressed="{{isLight}}" onClick="{{setLight}}">Claro</button>
+    </div>
+  </header>
+
+  <div class="grid">
+  <sc-for list="{{phones}}" as="p" hint-placeholder-count="11">
+  <div class="dev">
+    <div class="dev-lab">
+      <span class="dev-n mono">{{p.n}}</span>
+      <span class="dev-t">{{p.t}}</span>
+      <button class="reset" onClick="{{p.reset}}" aria-label="{{p.resetAria}}" title="Voltar ao começo"><svg class="ic ic-s"><use href="#i-reset"></use></svg></button>
+    </div>
+    <div class="phone">
+      <div class="{{p.scrCls}}">
+
+        <!-- ============ CONVERSAS (lista, fechadas, arquivadas) ============ -->
+        <sc-if value="{{p.is.list}}" hint-placeholder-val="{{ true }}">
+        <div class="pane">
+          <sc-if value="{{p.L.isMain}}" hint-placeholder-val="{{ true }}">
+            <div class="lt">
+              <h2>Conversas</h2>
+              <div class="lt-acts">
+                <button class="ib" aria-label="Ações da lista de conversas" aria-haspopup="dialog" onClick="{{p.L.menu}}"><svg class="ic"><use href="#i-dots"></use></svg></button>
+              </div>
+            </div>
+            <button class="sf" onClick="{{p.L.search}}"><svg class="ic ic-s"><use href="#i-search"></use></svg><span>Buscar contato, conversa ou lead</span></button>
+            <div class="chips" role="group" aria-label="Filtrar conversas">
+              <button class="chip chip-f" aria-label="{{p.L.fAria}}" aria-haspopup="dialog" aria-pressed="{{p.L.fOn}}" onClick="{{p.L.openF}}"><svg class="ic ic-s"><use href="#i-filter"></use></svg><sc-if value="{{p.L.hasF}}" hint-placeholder-val="{{ false }}"><span class="n">{{p.L.nF}}</span></sc-if></button>
+              <sc-for list="{{p.L.chips}}" as="ch" hint-placeholder-count="5">
+                <button class="chip" aria-pressed="{{ch.on}}" onClick="{{ch.go}}">{{ch.label}}<sc-if value="{{ch.showN}}" hint-placeholder-val="{{ false }}"><span class="n">{{ch.n}}</span></sc-if></button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{p.L.isSub}}" hint-placeholder-val="{{ false }}">
+            <div class="nb flat"><button class="nb-back" onClick="{{p.back}}"><svg class="ic"><use href="#i-back"></use></svg>Conversas</button></div>
+            <div class="lt"><h2>{{p.L.title}}</h2></div>
+          </sc-if>
+          <div class="sp">
+            <sc-if value="{{p.L.isMain}}" hint-placeholder-val="{{ true }}">
+              <button class="lrow" onClick="{{p.L.goFechadas}}"><svg class="ic"><use href="#i-check-circle"></use></svg><b>Fechadas</b><span class="n">{{p.L.nFechadas}}</span></button>
+              <button class="lrow" onClick="{{p.L.goArq}}"><svg class="ic"><use href="#i-archive"></use></svg><b>Arquivadas</b><span class="n">{{p.L.nArq}}</span></button>
+            </sc-if>
+            <sc-for list="{{p.L.rows}}" as="r" hint-placeholder-count="7">
+              <div class="sw">
+                <div class="sw-acts">
+                  <div class="sw-side">
+                    <button class="sw-a a-read" tabIndex="{{r.actTab}}" onClick="{{r.readT}}"><svg class="ic"><use href="#i-mail-open"></use></svg>{{r.readLabel}}</button>
+                    <button class="sw-a a-pin" tabIndex="{{r.actTab}}" onClick="{{r.pinT}}"><svg class="ic"><use href="#i-pin"></use></svg>{{r.pinLabel}}</button>
+                  </div>
+                  <div class="sw-side">
+                    <button class="sw-a a-more" tabIndex="{{r.actTab}}" onClick="{{r.more}}"><svg class="ic"><use href="#i-dots-h"></use></svg>Mais</button>
+                    <button class="sw-a a-arch" tabIndex="{{r.actTab}}" onClick="{{r.arch}}"><svg class="ic"><use href="#i-archive"></use></svg>{{r.archLabel}}</button>
+                  </div>
+                </div>
+                <button class="{{r.cls}}" style="transform: translateX({{r.off}}px)" onPointerDown="{{r.down}}" onPointerMove="{{r.move}}" onPointerUp="{{r.up}}" onPointerCancel="{{r.up}}" onClick="{{r.open}}">
+                  <span class="{{r.avCls}}">{{r.ini}}<sc-if value="{{r.isWa}}" hint-placeholder-val="{{ true }}"><span class="chan chan-wa" aria-label="WhatsApp"><svg class="ic"><use href="#i-chat"></use></svg></span></sc-if><sc-if value="{{r.isIg}}" hint-placeholder-val="{{ false }}"><span class="chan chan-ig" aria-label="Instagram"><svg class="ic"><use href="#i-ig"></use></svg></span></sc-if></span>
+                  <span class="cv-b">
+                    <span class="cv-top"><span class="cv-name">{{r.name}}</span><span class="{{r.timeCls}}">{{r.time}}</span></span>
+                    <span class="cv-mid">
+                      <span class="cv-prev"><sc-if value="{{r.hasTick}}" hint-placeholder-val="{{ false }}"><svg class="{{r.tickCls}}" aria-label="{{r.tickAria}}"><use href="{{r.tickHref}}"></use></svg></sc-if><sc-if value="{{r.hasWho}}" hint-placeholder-val="{{ false }}"><b class="who">{{r.who}}</b></sc-if><span class="tx">{{r.preview}}</span></span>
+                      <sc-if value="{{r.muted}}" hint-placeholder-val="{{ false }}"><svg class="ic flag" aria-label="Avisos silenciados"><use href="#i-bell-off"></use></svg></sc-if>
+                      <sc-if value="{{r.pinned}}" hint-placeholder-val="{{ false }}"><svg class="ic flag" aria-label="Fixada no topo"><use href="#i-pin"></use></svg></sc-if>
+                      <sc-if value="{{r.hasUnread}}" hint-placeholder-val="{{ false }}"><span class="unread" aria-label="{{r.unreadAria}}">{{r.unread}}</span></sc-if>
+                    </span>
+                    <span class="cv-meta">
+                      <sc-if value="{{r.hasWait}}" hint-placeholder-val="{{ false }}"><span class="{{r.waitCls}}" title="Tempo esperando resposta"><svg class="ic ic-xs"><use href="#i-clock"></use></svg>{{r.waitLabel}}</span></sc-if>
+                      <span class="own">{{r.own}}</span>
+                      <sc-if value="{{r.hasTag}}" hint-placeholder-val="{{ true }}"><span class="tag">{{r.tag}}</span></sc-if>
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </sc-for>
+            <sc-if value="{{p.L.empty}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>{{p.L.emptyT}}</b><p>{{p.L.emptyD}}</p></div></sc-if>
+            <div class="sp-end"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ CONVERSA ABERTA ============ -->
+        <sc-if value="{{p.is.conv}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="nb">
+            <button class="ib" aria-label="Voltar" onClick="{{p.back}}"><svg class="ic"><use href="#i-back"></use></svg></button>
+            <button class="nb-who" onClick="{{p.C.openLead}}" aria-label="{{p.C.leadAria}}">
+              <span class="{{p.C.avCls}}">{{p.C.ini}}</span>
+              <span class="nb-tx"><b>{{p.C.name}}</b><small>{{p.C.sub}}</small></span>
+            </button>
+            <button class="ib" aria-label="Ligar" onClick="{{p.C.call}}"><svg class="ic"><use href="#i-phone"></use></svg></button>
+            <button class="ib" aria-label="Ações da conversa" aria-haspopup="dialog" onClick="{{p.C.menu}}"><svg class="ic"><use href="#i-dots"></use></svg></button>
+          </div>
+          <sc-if value="{{p.C.hasLead}}" hint-placeholder-val="{{ true }}">
+            <button class="ldbar" onClick="{{p.C.moveLead}}" aria-haspopup="dialog" aria-label="{{p.C.lfAria}}">
+              <svg class="ic ic-s"><use href="#i-funnel"></use></svg>
+              <span class="ldbar-t"><b>{{p.C.lfStage}}</b><span>{{p.C.lfFunil}}</span></span>
+              <span class="ldbar-v">{{p.C.lfValor}}</span>
+              <svg class="ic ic-s"><use href="#i-chev-d"></use></svg>
+            </button>
+          </sc-if>
+          <div class="th">
+            <div class="th-in">
+              <sc-for list="{{p.C.msgs}}" as="m" hint-placeholder-count="6">
+                <sc-if value="{{m.isDay}}" hint-placeholder-val="{{ false }}"><div class="m-day">{{m.text}}</div></sc-if>
+                <sc-if value="{{m.isNew}}" hint-placeholder-val="{{ false }}"><div class="m-new">{{m.text}}</div></sc-if>
+                <sc-if value="{{m.isSys}}" hint-placeholder-val="{{ false }}"><div class="m-sys">{{m.text}}</div></sc-if>
+                <sc-if value="{{m.isPass}}" hint-placeholder-val="{{ false }}">
+                  <div class="m-pass">
+                    <b><svg class="ic ic-xs"><use href="#i-spark"></use></svg>A IA passou para a equipe às {{m.time}}</b>
+                    <p><strong>Quer:</strong> {{m.quer}}</p>
+                    <p><strong>Já tentou:</strong> {{m.tentou}}</p>
+                  </div>
+                </sc-if>
+                <sc-if value="{{m.isNote}}" hint-placeholder-val="{{ false }}"><div class="m-note"><small>Nota interna de {{m.by}}, {{m.time}}</small><span>{{m.text}}</span></div></sc-if>
+                <sc-if value="{{m.isBub}}" hint-placeholder-val="{{ true }}">
+                  <div class="{{m.rowCls}}">
+                    <div class="bub">
+                      <sc-if value="{{m.isAi}}" hint-placeholder-val="{{ false }}"><span class="bub-who"><svg class="ic ic-xs"><use href="#i-spark"></use></svg>Agente IA</span></sc-if>
+                      <sc-if value="{{m.hasBy}}" hint-placeholder-val="{{ false }}"><span class="bub-who">{{m.by}}</span></sc-if>
+                      <sc-if value="{{m.hasQuote}}" hint-placeholder-val="{{ false }}"><span class="bub-q"><b>{{m.qWho}}</b>{{m.qText}}</span></sc-if>
+                      <sc-if value="{{m.isImage}}" hint-placeholder-val="{{ false }}"><span class="media" role="img" aria-label="{{m.alt}}"><svg class="ic"><use href="#i-image"></use></svg>{{m.alt}}</span></sc-if>
+                      <sc-if value="{{m.isVideo}}" hint-placeholder-val="{{ false }}"><span class="media vid" role="img" aria-label="{{m.alt}}"><svg class="ic"><use href="#i-play"></use></svg>Vídeo, {{m.dur}}</span></sc-if>
+                      <sc-if value="{{m.isAudio}}" hint-placeholder-val="{{ false }}">
+                        <span class="aud"><button class="aud-play" aria-label="Ouvir áudio de {{m.dur}}"><svg class="ic ic-s"><use href="#i-play"></use></svg></button><span class="wave"></span><span class="mono" style="font-size: 12px">{{m.dur}}</span></span>
+                        <span class="transcript">Transcrição: {{m.transcript}}</span>
+                      </sc-if>
+                      <sc-if value="{{m.isDoc}}" hint-placeholder-val="{{ false }}"><span class="doc"><span class="doc-ic"><svg class="ic"><use href="#i-file"></use></svg></span><span><b>{{m.fileName}}</b><small>{{m.fileInfo}}</small></span></span></sc-if>
+                      <sc-if value="{{m.isContact}}" hint-placeholder-val="{{ false }}"><span class="ctc"><span class="av av-s av-5">{{m.cIni}}</span><span><b>{{m.cName}}</b><small class="mono">{{m.cPhone}}</small></span></span></sc-if>
+                      <sc-if value="{{m.isSticker}}" hint-placeholder-val="{{ false }}"><span class="sticker" role="img" aria-label="Figurinha"><svg class="ic"><use href="#i-sticker"></use></svg></span></sc-if>
+                      <sc-if value="{{m.isDeleted}}" hint-placeholder-val="{{ false }}"><span class="bub-del">{{m.text}}</span></sc-if>
+                      <sc-if value="{{m.hasText}}" hint-placeholder-val="{{ true }}"><span class="bub-t">{{m.text}}</span></sc-if>
+                      <span class="bub-meta">{{m.edited}}{{m.time}}<sc-if value="{{m.hasSt}}" hint-placeholder-val="{{ false }}"><svg class="{{m.stCls}}" aria-label="{{m.stAria}}"><use href="{{m.stHref}}"></use></svg></sc-if><sc-if value="{{m.failed}}" hint-placeholder-val="{{ false }}"><span class="bub-fail">Não enviada</span></sc-if></span>
+                    </div>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+          <div class="cmp-wrap">
+            <sc-if value="{{p.C.closed}}" hint-placeholder-val="{{ false }}"><div class="notice info"><span>Conversa fechada. Se o cliente escrever de novo, ela volta para a fila.</span><button class="btn btn-g btn-sm" onClick="{{p.C.reopen}}">Reabrir</button></div></sc-if>
+            <sc-if value="{{p.C.winClosed}}" hint-placeholder-val="{{ false }}"><div class="notice"><svg class="ic ic-s"><use href="#i-clock"></use></svg><span>A janela de 24h fechou. Agora só dá para mandar modelo aprovado.</span><button class="btn btn-g btn-sm" onClick="{{p.C.template}}">Escolher</button></div></sc-if>
+            <sc-if value="{{p.C.notOwner}}" hint-placeholder-val="{{ true }}"><div class="strip" role="status"><span><svg class="ic ic-s"><use href="{{p.C.stripIc}}"></use></svg>{{p.C.strip}}</span><button class="btn btn-p btn-sm" onClick="{{p.C.assume}}">Assumir e responder</button></div></sc-if>
+            <div class="cmp">
+              <button class="ib" aria-label="Anexar" aria-haspopup="dialog" disabled="{{p.C.notOwner}}" onClick="{{p.C.attach}}"><svg class="ic"><use href="#i-plus"></use></svg></button>
+              <div class="cmp-box">
+                <sc-if value="{{p.C.notOwner}}" hint-placeholder-val="{{ true }}"><button class="cmp-fake" onClick="{{p.C.assume}}">Assuma a conversa para responder</button></sc-if>
+                <sc-if value="{{p.C.isOwner}}" hint-placeholder-val="{{ false }}"><label class="sr" for="{{p.C.inputId}}">Mensagem</label><input id="{{p.C.inputId}}" class="cmp-in" placeholder="Mensagem" value="{{p.draft}}" onChange="{{p.C.onDraft}}" onKeyDown="{{p.C.onKey}}"></sc-if>
+                <button class="ib" aria-label="Respostas rápidas" aria-haspopup="dialog" onClick="{{p.C.quick}}"><svg class="ic ic-s"><use href="#i-zap"></use></svg></button>
+              </div>
+              <sc-if value="{{p.C.canSend}}" hint-placeholder-val="{{ false }}"><button class="send" aria-label="Enviar" onClick="{{p.C.send}}"><svg class="ic ic-s"><use href="#i-send"></use></svg></button></sc-if>
+              <sc-if value="{{p.C.noDraft}}" hint-placeholder-val="{{ true }}"><button class="send" aria-label="Gravar áudio" disabled="{{p.C.notOwner}}" onClick="{{p.C.mic}}"><svg class="ic ic-s"><use href="#i-mic"></use></svg></button></sc-if>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ FICHA DO LEAD ============ -->
+        <sc-if value="{{p.is.lead}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="nb flat">
+            <button class="ib" aria-label="Voltar" onClick="{{p.back}}"><svg class="ic"><use href="#i-back"></use></svg></button>
+            <span class="nb-sp"></span>
+            <button class="ib" aria-label="Ações do lead" aria-haspopup="dialog" onClick="{{p.D.menu}}"><svg class="ic"><use href="#i-dots"></use></svg></button>
+          </div>
+          <div class="sp">
+            <div class="ld-hero">
+              <span class="{{p.D.avCls}}">{{p.D.ini}}<sc-if value="{{p.D.isWa}}" hint-placeholder-val="{{ true }}"><span class="chan chan-wa" aria-label="WhatsApp"><svg class="ic"><use href="#i-chat"></use></svg></span></sc-if><sc-if value="{{p.D.isIg}}" hint-placeholder-val="{{ false }}"><span class="chan chan-ig" aria-label="Instagram"><svg class="ic"><use href="#i-ig"></use></svg></span></sc-if></span>
+              <h3 class="ld-name">{{p.D.name}}</h3>
+              <span class="ld-sub mono">{{p.D.phone}}</span>
+              <span class="ld-who">{{p.D.who}}</span>
+            </div>
+            <div class="qa">
+              <button onClick="{{p.D.goConv}}"><svg class="ic"><use href="#i-chat"></use></svg>Conversa</button>
+              <button onClick="{{p.D.call}}"><svg class="ic"><use href="#i-phone"></use></svg>Ligar</button>
+              <button onClick="{{p.D.newTask}}"><svg class="ic"><use href="#i-check-sq"></use></svg>Tarefa</button>
+            </div>
+
+            <sc-if value="{{p.D.hasNext}}" hint-placeholder-val="{{ true }}">
+              <div class="card next has">
+                <div class="card-h"><span>Próximo passo</span><span>{{p.D.nextWho}}</span></div>
+                <div class="next-t">{{p.D.nextTitle}}</div>
+                <div class="{{p.D.nextDueCls}}"><svg class="ic ic-xs"><use href="#i-clock"></use></svg>{{p.D.nextDue}}</div>
+                <div class="next-acts">
+                  <button class="btn btn-p" onClick="{{p.D.doneTask}}"><svg class="ic ic-s"><use href="#i-check"></use></svg>Concluir</button>
+                  <button class="btn btn-s" onClick="{{p.D.resched}}">Reagendar</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{p.D.noNext}}" hint-placeholder-val="{{ false }}">
+              <div class="card next none">
+                <div class="card-h"><span>Próximo passo</span></div>
+                <div class="next-t">Sem próximo passo</div>
+                <div class="next-d d-fut">Lead sem data marcada costuma esfriar. Combine o que vem agora.</div>
+                <div class="next-acts"><button class="btn btn-p" onClick="{{p.D.newTask}}"><svg class="ic ic-s"><use href="#i-plus"></use></svg>Criar próximo passo</button></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{p.D.hasLead}}" hint-placeholder-val="{{ true }}">
+              <div class="card">
+                <div class="card-h"><span>{{p.D.funil}}</span><span>{{p.D.valor}}</span></div>
+                <div class="stage-row">
+                  <b>{{p.D.stage}}<small>{{p.D.stageOf}}</small></b>
+                  <button class="btn btn-s btn-sm" onClick="{{p.D.move}}" aria-haspopup="dialog"><svg class="ic ic-s"><use href="#i-move"></use></svg>Mover etapa</button>
+                </div>
+                <div class="steps" style="grid-template-columns: repeat({{p.D.stepN}}, minmax(0, 1fr))" aria-hidden="true">
+                  <sc-for list="{{p.D.steps}}" as="st" hint-placeholder-count="5"><span class="{{st.cls}}"></span></sc-for>
+                </div>
+                <div class="step-lab"><span>{{p.D.firstStage}}</span><span>{{p.D.lastStage}}</span></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{p.D.noLead}}" hint-placeholder-val="{{ false }}">
+              <div class="card">
+                <div class="card-h"><span>Negócio</span></div>
+                <div class="stage-row"><b>Nenhum negócio aberto<small>Abra um lead para acompanhar no funil.</small></b><button class="btn btn-s btn-sm" onClick="{{p.D.createLead}}">Criar lead</button></div>
+              </div>
+            </sc-if>
+
+            <div class="ptabs" role="tablist" aria-label="Seções da ficha">
+              <sc-for list="{{p.D.tabs}}" as="tb" hint-placeholder-count="4"><button class="ptab" role="tab" aria-selected="{{tb.sel}}" onClick="{{tb.go}}">{{tb.label}}</button></sc-for>
+            </div>
+
+            <sc-if value="{{p.D.tResumo}}" hint-placeholder-val="{{ true }}">
+              <div class="card">
+                <sc-for list="{{p.D.kv}}" as="kv" hint-placeholder-count="4"><div class="kv"><span>{{kv.k}}</span><b>{{kv.v}}</b></div></sc-for>
+              </div>
+              <sc-if value="{{p.D.hasTags}}" hint-placeholder-val="{{ true }}"><div class="card"><div class="card-h"><span>Etiquetas</span></div><div class="tags"><sc-for list="{{p.D.tags}}" as="tg" hint-placeholder-count="2"><span class="tag">{{tg}}</span></sc-for></div></div></sc-if>
+              <sc-if value="{{p.D.hasObs}}" hint-placeholder-val="{{ true }}"><div class="card"><div class="card-h"><span>Observações</span></div><div class="obs">{{p.D.obs}}<span class="obs-by">{{p.D.obsBy}}</span></div></div></sc-if>
+            </sc-if>
+            <sc-if value="{{p.D.tNeg}}" hint-placeholder-val="{{ false }}">
+              <div class="card">
+                <div class="card-h"><span>Negócio no funil</span></div>
+                <sc-if value="{{p.D.hasLead}}" hint-placeholder-val="{{ true }}"><div class="kv"><span>Funil</span><b>{{p.D.funil}}</b></div><div class="kv"><span>Etapa</span><b>{{p.D.stage}}</b></div><div class="kv"><span>Valor</span><b>{{p.D.valor}}</b></div></sc-if>
+                <sc-if value="{{p.D.noLead}}" hint-placeholder-val="{{ false }}"><p class="obs" style="margin: 0">Nenhum negócio aberto para este contato.</p></sc-if>
+              </div>
+              <div class="card">
+                <div class="card-h"><span>Pedidos</span></div>
+                <sc-for list="{{p.D.pedidos}}" as="pd" hint-placeholder-count="1"><div class="ped"><span><b>{{pd.n}} {{pd.desc}}</b><small>{{pd.status}}</small></span><b>{{pd.valor}}</b></div></sc-for>
+                <sc-if value="{{p.D.noPed}}" hint-placeholder-val="{{ false }}"><p class="obs" style="margin: 0">Nenhum pedido ainda.</p></sc-if>
+              </div>
+            </sc-if>
+            <sc-if value="{{p.D.tEmp}}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{p.D.hasEmp}}" hint-placeholder-val="{{ true }}"><div class="card"><sc-for list="{{p.D.emp}}" as="kv" hint-placeholder-count="4"><div class="kv"><span>{{kv.k}}</span><b>{{kv.v}}</b></div></sc-for></div></sc-if>
+              <sc-if value="{{p.D.noEmp}}" hint-placeholder-val="{{ false }}"><div class="card"><div class="stage-row"><b>Nenhuma empresa ligada<small>Ligue a uma empresa para ver nota, endereço e site.</small></b><button class="btn btn-s btn-sm" onClick="{{p.D.linkEmp}}">Ligar</button></div></div></sc-if>
+            </sc-if>
+            <sc-if value="{{p.D.tAtiv}}" hint-placeholder-val="{{ false }}">
+              <div class="card"><sc-for list="{{p.D.ativ}}" as="a" hint-placeholder-count="3"><div class="tl"><i></i><span><b>{{a.t}}</b><small>{{a.when}}</small></span></div></sc-for></div>
+            </sc-if>
+            <div class="sp-end s"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ BUSCA ABERTA ============ -->
+        <sc-if value="{{p.is.busca}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="bs-bar">
+            <button class="ib" aria-label="Voltar" onClick="{{p.back}}"><svg class="ic"><use href="#i-back"></use></svg></button>
+            <div class="bs-in">
+              <svg class="ic ic-s"><use href="#i-search"></use></svg>
+              <label class="sr" for="{{p.B.inputId}}">Buscar contato, conversa ou lead</label>
+              <input id="{{p.B.inputId}}" type="search" placeholder="Contato, conversa ou lead" value="{{p.q}}" onChange="{{p.B.onQ}}">
+              <sc-if value="{{p.B.hasQ}}" hint-placeholder-val="{{ true }}"><button class="ib" aria-label="Limpar busca" onClick="{{p.B.clear}}"><svg class="ic ic-s"><use href="#i-x"></use></svg></button></sc-if>
+            </div>
+          </div>
+          <div class="sp">
+            <sc-if value="{{p.B.noQ}}" hint-placeholder-val="{{ false }}">
+              <div class="res-t"><span>Buscas recentes</span></div>
+              <sc-for list="{{p.B.recent}}" as="rc" hint-placeholder-count="3"><button class="rec" onClick="{{rc.go}}"><svg class="ic ic-s"><use href="#i-history"></use></svg><span>{{rc.label}}</span></button></sc-for>
+            </sc-if>
+            <sc-for list="{{p.B.groups}}" as="g" hint-placeholder-count="3">
+              <div class="res-t"><span>{{g.title}}</span><span>{{g.n}}</span></div>
+              <sc-for list="{{g.items}}" as="it" hint-placeholder-count="2">
+                <button class="res" onClick="{{it.go}}">
+                  <sc-if value="{{it.isAv}}" hint-placeholder-val="{{ true }}"><span class="{{it.avCls}}">{{it.ini}}</span></sc-if>
+                  <sc-if value="{{it.isIc}}" hint-placeholder-val="{{ false }}"><span class="res-ic"><svg class="ic"><use href="{{it.href}}"></use></svg></span></sc-if>
+                  <span style="min-width: 0"><b>{{it.title}}</b><small>{{it.sub}}</small></span>
+                  <span class="res-k">{{it.kind}}</span>
+                </button>
+              </sc-for>
+            </sc-for>
+            <sc-if value="{{p.B.none}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>Nada encontrado</b><p>Tente pelo telefone, pelo nome da empresa ou por uma palavra da conversa.</p></div></sc-if>
+            <div class="sp-end s"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ FUNIL ============ -->
+        <sc-if value="{{p.is.funil}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="lt">
+            <h2>Funil</h2>
+            <div class="lt-acts">
+              <button class="ib" aria-label="Buscar" onClick="{{p.F.search}}"><svg class="ic"><use href="#i-search"></use></svg></button>
+              <button class="ib" aria-label="Ações do funil" aria-haspopup="dialog" onClick="{{p.F.menu}}"><svg class="ic"><use href="#i-dots"></use></svg></button>
+            </div>
+          </div>
+          <button class="fsel" onClick="{{p.F.pick}}" aria-haspopup="dialog"><svg class="ic ic-s"><use href="#i-funnel"></use></svg><span>{{p.F.nome}}</span><svg class="ic ic-s"><use href="#i-chev-d"></use></svg></button>
+          <div class="fsum">{{p.F.total}}</div>
+          <div class="stabs" role="tablist" aria-label="Etapas do funil">
+            <sc-for list="{{p.F.stages}}" as="sg" hint-placeholder-count="5"><button class="stab" role="tab" aria-selected="{{sg.sel}}" onClick="{{sg.go}}">{{sg.label}}<span class="n">{{sg.n}}</span></button></sc-for>
+          </div>
+          <div class="sp">
+            <div class="sec-sum">{{p.F.sum}}</div>
+            <sc-for list="{{p.F.cards}}" as="lc" hint-placeholder-count="2">
+              <div class="lcard">
+                <button class="lc-main" onClick="{{lc.open}}">
+                  <span class="{{lc.avCls}}">{{lc.ini}}</span>
+                  <span style="min-width: 0"><b>{{lc.name}}</b><small>{{lc.interesse}}</small><span class="{{lc.nextCls}}"><svg class="ic ic-xs"><use href="{{lc.nextIc}}"></use></svg>{{lc.next}}</span></span>
+                  <span class="lc-val">{{lc.valor}}</span>
+                </button>
+                <div class="lc-foot">
+                  <span class="own">{{lc.owner}}</span>
+                  <button class="btn btn-g btn-sm" onClick="{{lc.move}}" aria-haspopup="dialog" aria-label="{{lc.moveAria}}"><svg class="ic ic-s"><use href="#i-move"></use></svg>Mover</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{p.F.empty}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>Nenhum lead em {{p.F.stageName}}</b><p>Leads chegam aqui quando avançam no funil ou quando você move um deles.</p></div></sc-if>
+            <div class="sp-end"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ TAREFAS ============ -->
+        <sc-if value="{{p.is.tarefas}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="lt"><h2>Tarefas</h2></div>
+          <div class="ptabs" role="tablist" aria-label="Modo de ver">
+            <button class="ptab" role="tab" aria-selected="{{p.T.isLista}}" onClick="{{p.T.goLista}}">Lista</button>
+            <button class="ptab" role="tab" aria-selected="{{p.T.isAgenda}}" onClick="{{p.T.goAgenda}}">Agenda</button>
+          </div>
+          <sc-if value="{{p.T.lista}}" hint-placeholder-val="{{ true }}">
+            <div class="chips" role="group" aria-label="De quem">
+              <sc-for list="{{p.T.chips}}" as="ch" hint-placeholder-count="2"><button class="chip" aria-pressed="{{ch.on}}" onClick="{{ch.go}}">{{ch.label}}<span class="n">{{ch.n}}</span></button></sc-for>
+            </div>
+            <div class="sp">
+              <sc-for list="{{p.T.sections}}" as="sec" hint-placeholder-count="3">
+                <div class="{{sec.cls}}"><span>{{sec.title}}</span><span>{{sec.n}}</span></div>
+                <sc-for list="{{sec.items}}" as="tk" hint-placeholder-count="2">
+                  <div class="{{tk.cls}}">
+                    <button class="tk-chk" onClick="{{tk.toggle}}" aria-label="{{tk.chkAria}}" aria-pressed="{{tk.pressed}}"><i><sc-if value="{{tk.done}}" hint-placeholder-val="{{ false }}"><svg class="ic ic-xs" style="stroke-width: 3"><use href="#i-check"></use></svg></sc-if></i></button>
+                    <button class="tk-b" onClick="{{tk.open}}"><b>{{tk.title}}</b><small>{{tk.sub}}</small><span class="{{tk.dueCls}}">{{tk.due}}</span></button>
+                  </div>
+                </sc-for>
+              </sc-for>
+              <sc-if value="{{p.T.empty}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>Tudo em dia</b><p>Nenhuma tarefa aberta para este filtro.</p></div></sc-if>
+              <div class="sp-end"></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{p.T.agenda}}" hint-placeholder-val="{{ false }}">
+            <div class="days" role="group" aria-label="Dias da semana">
+              <sc-for list="{{p.T.days}}" as="d" hint-placeholder-count="7"><button class="day" aria-pressed="{{d.sel}}" aria-label="{{d.aria}}" onClick="{{d.go}}"><span>{{d.wd}}</span><b>{{d.num}}</b><i class="{{d.dotCls}}"></i></button></sc-for>
+            </div>
+            <div class="day-h">{{p.T.dayTitle}}</div>
+            <div class="sp">
+              <sc-for list="{{p.T.ag}}" as="ag" hint-placeholder-count="3">
+                <div class="ag"><span class="ag-t mono">{{ag.time}}</span><button class="{{ag.cls}}" onClick="{{ag.open}}"><b>{{ag.title}}</b><small>{{ag.sub}}</small><span class="{{ag.kCls}}">{{ag.kind}}</span></button></div>
+              </sc-for>
+              <sc-if value="{{p.T.agEmpty}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>Nada marcado</b><p>Este dia está livre na agenda.</p><button class="btn btn-s" onClick="{{p.T.newAppt}}">Novo compromisso</button></div></sc-if>
+              <div class="sp-end"></div>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <!-- ============ AVISOS ============ -->
+        <sc-if value="{{p.is.avisos}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="lt">
+            <h2>Avisos</h2>
+            <div class="lt-acts"><button class="ib" aria-label="Ações dos avisos" aria-haspopup="dialog" onClick="{{p.A.menu}}"><svg class="ic"><use href="#i-dots"></use></svg></button></div>
+          </div>
+          <div class="ptabs" role="tablist" aria-label="Situação dos avisos">
+            <button class="ptab" role="tab" aria-selected="{{p.A.isOpen}}" onClick="{{p.A.goOpen}}">Abertos ({{p.A.nOpen}})</button>
+            <button class="ptab" role="tab" aria-selected="{{p.A.isDone}}" onClick="{{p.A.goDone}}">Resolvidos ({{p.A.nDone}})</button>
+          </div>
+          <div class="sp">
+            <sc-for list="{{p.A.items}}" as="av" hint-placeholder-count="4">
+              <div class="av-it">
+                <span class="{{av.icCls}}"><svg class="ic"><use href="{{av.href}}"></use></svg></span>
+                <div>
+                  <b>{{av.title}}</b>
+                  <p>{{av.sub}}</p>
+                  <span class="av-when">{{av.when}}</span>
+                  <div class="av-acts">
+                    <sc-if value="{{av.hasPrimary}}" hint-placeholder-val="{{ true }}"><button class="btn btn-p btn-sm" onClick="{{av.primary}}">{{av.primaryLabel}}</button></sc-if>
+                    <sc-if value="{{av.hasOpen}}" hint-placeholder-val="{{ false }}"><button class="btn btn-s btn-sm" onClick="{{av.openConv}}">Abrir conversa</button></sc-if>
+                    <sc-if value="{{av.isOutcome}}" hint-placeholder-val="{{ false }}"><button class="btn btn-p btn-sm" onClick="{{av.came}}">Compareceu</button><button class="btn btn-s btn-sm" onClick="{{av.missed}}">Faltou</button><button class="btn btn-s btn-sm" onClick="{{av.resched}}">Remarcou</button></sc-if>
+                    <sc-if value="{{av.isOpenItem}}" hint-placeholder-val="{{ true }}"><button class="btn btn-g btn-sm" onClick="{{av.resolve}}">Marcar resolvido</button></sc-if>
+                    <sc-if value="{{av.isDoneItem}}" hint-placeholder-val="{{ false }}"><button class="btn btn-g btn-sm" onClick="{{av.reopen}}">Reabrir</button></sc-if>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{p.A.empty}}" hint-placeholder-val="{{ false }}"><div class="empty"><b>{{p.A.emptyT}}</b><p>{{p.A.emptyD}}</p></div></sc-if>
+            <div class="sp-end s"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ MAIS ============ -->
+        <sc-if value="{{p.is.mais}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="lt">
+            <h2>Mais</h2>
+            <div class="lt-acts"><button class="ib" aria-label="Buscar no menu" onClick="{{p.M.search}}"><svg class="ic"><use href="#i-search"></use></svg></button></div>
+          </div>
+          <div class="sp">
+            <div class="prof">
+              <div class="prof-top">
+                <span class="me">PA</span>
+                <span class="prof-tx"><b>Paula Andrade</b><small>{{p.M.role}}</small></span>
+                <button class="ib" aria-label="Editar perfil" onClick="{{p.M.editProfile}}"><svg class="ic ic-s"><use href="#i-edit"></use></svg></button>
+              </div>
+              <sc-if value="{{p.M.multiOrg}}" hint-placeholder-val="{{ true }}">
+                <button class="prof-row" onClick="{{p.M.orgs}}" aria-haspopup="dialog" aria-label="{{p.M.orgAria}}">
+                  <span class="org-t">{{p.M.orgIni}}</span>
+                  <span class="prof-tx"><b>{{p.M.orgName}}</b><small>{{p.M.orgSub}}</small></span>
+                  <svg class="ic ic-s chev"><use href="#i-chev"></use></svg>
+                </button>
+              </sc-if>
+              <sc-if value="{{p.M.singleOrg}}" hint-placeholder-val="{{ false }}">
+                <div class="prof-row"><span class="org-t">{{p.M.orgIni}}</span><span class="prof-tx"><b>{{p.M.orgName}}</b><small>Organização atual</small></span></div>
+              </sc-if>
+              <button class="prof-row" role="switch" aria-checked="{{p.M.availOn}}" onClick="{{p.M.toggleAvail}}">
+                <span class="prof-ic"><svg class="ic"><use href="#i-check-circle"></use></svg></span>
+                <span class="prof-tx"><b>Disponível</b><small>{{p.M.availSub}}</small></span>
+                <span class="{{p.M.availCls}}" aria-hidden="true"></span>
+              </button>
+              <button class="prof-row" role="switch" aria-checked="{{p.M.darkOn}}" onClick="{{p.M.toggleTheme}}">
+                <span class="prof-ic"><svg class="ic"><use href="#i-moon"></use></svg></span>
+                <span class="prof-tx"><b>Tema escuro</b><small>{{p.M.darkSub}}</small></span>
+                <span class="{{p.M.darkCls}}" aria-hidden="true"></span>
+              </button>
+            </div>
+            <sc-for list="{{p.M.groups}}" as="g" hint-placeholder-count="6">
+              <h3 class="grp-t">{{g.label}}</h3>
+              <sc-for list="{{g.sections}}" as="sec" hint-placeholder-count="1">
+                <sc-if value="{{sec.hasTitle}}" hint-placeholder-val="{{ true }}"><div class="grp-s">{{sec.title}}</div></sc-if>
+                <div class="lst">
+                  <sc-for list="{{sec.items}}" as="it" hint-placeholder-count="3">
+                    <button class="li" onClick="{{it.go}}">
+                      <span class="{{it.icCls}}"><svg class="ic"><use href="{{it.href}}"></use></svg></span>
+                      <span class="li-tx"><b>{{it.label}}</b><small>{{it.sub}}</small></span>
+                      <span class="li-end">
+                        <sc-if value="{{it.hasTag}}" hint-placeholder-val="{{ false }}"><span class="pt">{{it.tag}}</span></sc-if>
+                        <sc-if value="{{it.hasN}}" hint-placeholder-val="{{ false }}"><span class="{{it.nCls}}">{{it.n}}</span></sc-if>
+                        <sc-if value="{{it.hasDot}}" hint-placeholder-val="{{ false }}"><span class="dot" aria-label="Precisa de atenção"></span></sc-if>
+                        <svg class="ic ic-s"><use href="#i-chev"></use></svg>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </sc-for>
+            <button class="out-btn" onClick="{{p.M.logout}}"><svg class="ic ic-s"><use href="#i-logout"></use></svg>Sair da conta</button>
+            <div class="sp-end s"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ CANAIS (dentro do Mais) ============ -->
+        <sc-if value="{{p.is.canais}}" hint-placeholder-val="{{ false }}">
+        <div class="pane">
+          <div class="nb flat"><button class="nb-back" onClick="{{p.back}}"><svg class="ic"><use href="#i-back"></use></svg>Mais</button></div>
+          <div class="sp">
+            <div class="lt"><h2>Canais</h2></div>
+            <p class="lead-in">Onde os clientes falam com você. Cada número ou perfil conectado vira conversa na aba Conversas.</p>
+            <sc-for list="{{p.K.cards}}" as="cc" hint-placeholder-count="4">
+              <div class="cc">
+                <div class="cc-top">
+                  <span class="{{cc.logoCls}}"><svg class="ic"><use href="{{cc.href}}"></use></svg></span>
+                  <span class="cc-tx"><b>{{cc.name}}</b><small>{{cc.sub}}</small></span>
+                  <span class="{{cc.stCls}}"><i></i>{{cc.stLabel}}</span>
+                </div>
+                <sc-if value="{{cc.hasWarn}}" hint-placeholder-val="{{ false }}"><p class="cc-warn">{{cc.warn}}</p></sc-if>
+                <div class="cc-foot">
+                  <sc-if value="{{cc.hasPrimary}}" hint-placeholder-val="{{ false }}"><button class="btn btn-p" onClick="{{cc.primary}}">{{cc.primaryLabel}}</button></sc-if>
+                  <sc-if value="{{cc.hasManage}}" hint-placeholder-val="{{ true }}"><button class="btn btn-s" onClick="{{cc.manage}}">Gerenciar</button></sc-if>
+                </div>
+              </div>
+            </sc-for>
+            <button class="add-btn" onClick="{{p.K.add}}"><svg class="ic ic-s"><use href="#i-plus"></use></svg>Conectar outro canal</button>
+            <div class="sp-end s"></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ============ BARRA INFERIOR ============ -->
+        <sc-if value="{{p.showTabs}}" hint-placeholder-val="{{ true }}">
+          <nav class="tb" aria-label="Seções do CRM">
+            <sc-for list="{{p.tabs}}" as="t" hint-placeholder-count="5">
+              <button class="tab" aria-current="{{t.cur}}" aria-label="{{t.aria}}" onClick="{{t.go}}">
+                <span class="tab-pill"><svg class="ic"><use href="{{t.href}}"></use></svg><sc-if value="{{t.hasN}}" hint-placeholder-val="{{ false }}"><span class="{{t.nCls}}">{{t.n}}</span></sc-if></span>
+                <span>{{t.label}}</span>
+              </button>
+            </sc-for>
+          </nav>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{p.showFab}}" hint-placeholder-val="{{ false }}"><button class="fab" aria-label="{{p.fabAria}}" aria-haspopup="dialog" onClick="{{p.openFab}}"><svg class="ic"><use href="#i-plus"></use></svg></button></sc-if>
+
+      <sc-if value="{{p.hasToast}}" hint-placeholder-val="{{ false }}">
+        <div class="{{p.toastCls}}" role="status"><span>{{p.toastText}}</span><sc-if value="{{p.toastHasUndo}}" hint-placeholder-val="{{ false }}"><button onClick="{{p.toastUndo}}">Desfazer</button></sc-if></div>
+      </sc-if>
+
+      <!-- ============ FOLHA INFERIOR ============ -->
+      <sc-if value="{{p.hasSheet}}" hint-placeholder-val="{{ false }}">
+        <div class="sh-wrap">
+          <button class="scrim" tabIndex="-1" aria-label="Fechar" onClick="{{p.closeSheet}}"></button>
+          <div class="sheet" role="dialog" aria-modal="true" aria-label="{{p.S.title}}">
+            <div class="grab"></div>
+            <div class="sh-h">
+              <div><h3>{{p.S.title}}</h3><sc-if value="{{p.S.hasSub}}" hint-placeholder-val="{{ false }}"><p>{{p.S.sub}}</p></sc-if></div>
+              <button class="ib" aria-label="Fechar" onClick="{{p.closeSheet}}"><svg class="ic ic-s"><use href="#i-x"></use></svg></button>
+            </div>
+
+            <sc-if value="{{p.S.isMenu}}" hint-placeholder-val="{{ true }}">
+              <div class="sh-body">
+                <sc-for list="{{p.S.items}}" as="it" hint-placeholder-count="4">
+                  <sc-if value="{{it.isHead}}" hint-placeholder-val="{{ false }}"><div class="sh-sep">{{it.label}}</div></sc-if>
+                  <sc-if value="{{it.isItem}}" hint-placeholder-val="{{ true }}">
+                    <button class="{{it.cls}}" role="{{it.role}}" aria-checked="{{it.ariaChecked}}" onClick="{{it.go}}">
+                      <span class="{{it.icCls}}"><sc-if value="{{it.hasIc}}" hint-placeholder-val="{{ true }}"><svg class="ic"><use href="{{it.href}}"></use></svg></sc-if><sc-if value="{{it.hasIni}}" hint-placeholder-val="{{ false }}">{{it.ini}}</sc-if></span>
+                      <span class="si-tx"><b>{{it.label}}</b><sc-if value="{{it.hasSub}}" hint-placeholder-val="{{ false }}"><small>{{it.sub}}</small></sc-if></span>
+                      <span class="si-end"><sc-if value="{{it.hasN}}" hint-placeholder-val="{{ false }}"><span class="si-n">{{it.n}}</span></sc-if><sc-if value="{{it.checked}}" hint-placeholder-val="{{ false }}"><svg class="ic ic-s"><use href="#i-check"></use></svg></sc-if><sc-if value="{{it.isSwitch}}" hint-placeholder-val="{{ false }}"><span class="{{it.swCls}}"></span></sc-if></span>
+                    </button>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{p.S.isTiles}}" hint-placeholder-val="{{ false }}">
+              <div class="tiles">
+                <sc-for list="{{p.S.tiles}}" as="tl" hint-placeholder-count="6"><button class="tile" onClick="{{tl.go}}"><span><svg class="ic"><use href="{{tl.href}}"></use></svg></span>{{tl.label}}</button></sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{p.S.isFiltros}}" hint-placeholder-val="{{ false }}">
+              <div class="sh-body">
+                <button class="si" role="switch" aria-checked="{{p.S.unreadOn}}" onClick="{{p.S.toggleUnread}}"><span class="si-ic"><svg class="ic"><use href="#i-mail-open"></use></svg></span><span class="si-tx"><b>Só não lidas</b><small>Esconde o que você já viu</small></span><span class="si-end"><span class="{{p.S.unreadCls}}"></span></span></button>
+              </div>
+              <div class="sh-lab">Canal</div>
+              <div class="chips wrap" role="group" aria-label="Canal">
+                <sc-for list="{{p.S.canais}}" as="ch" hint-placeholder-count="3"><button class="chip" aria-pressed="{{ch.on}}" onClick="{{ch.go}}">{{ch.label}}</button></sc-for>
+              </div>
+              <div class="sh-lab">Quem atende</div>
+              <div class="chips wrap" role="group" aria-label="Quem atende">
+                <sc-for list="{{p.S.donos}}" as="ch" hint-placeholder-count="5"><button class="chip" aria-pressed="{{ch.on}}" onClick="{{ch.go}}">{{ch.label}}</button></sc-for>
+              </div>
+              <div class="sh-foot">
+                <button class="btn btn-s" onClick="{{p.S.clear}}">Limpar</button>
+                <button class="btn btn-p" onClick="{{p.closeSheet}}">{{p.S.seeLabel}}</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{p.S.isPerdido}}" hint-placeholder-val="{{ false }}">
+              <div class="sh-lab">Motivo</div>
+              <div class="chips wrap" role="group" aria-label="Motivo da perda">
+                <sc-for list="{{p.S.reasons}}" as="ch" hint-placeholder-count="5"><button class="chip" aria-pressed="{{ch.on}}" onClick="{{ch.go}}">{{ch.label}}</button></sc-for>
+              </div>
+              <div class="sh-lab"><label for="{{p.S.detId}}">Detalhe (opcional)</label></div>
+              <div style="padding: 0 16px"><textarea id="{{p.S.detId}}" class="ta" rows="3" placeholder="O que o cliente disse, para a próxima abordagem" value="{{p.S.detail}}" onChange="{{p.S.onDetail}}"></textarea></div>
+              <div class="sh-foot">
+                <button class="btn btn-s" onClick="{{p.closeSheet}}">Cancelar</button>
+                <button class="btn btn-d" disabled="{{p.S.noReason}}" onClick="{{p.S.confirm}}">Marcar como perdido</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-for>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2690B1","options":["#2690B1","#0E7A5F","#506D48","#2B59C3","#7A3FC2"],"section":"Marca"},"theme":{"editor":"enum","options":["Escuro","Claro"],"default":"Escuro","section":"Tema"},"$preview":{"width":2748,"height":2220}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      theme: null, phones: this.starts(), drag: null,
+      owners: {}, read: {}, unreadMark: {}, pinned: { c3: true }, muted: {}, archived: { c4: true }, closed: {},
+      sent: {}, done: {}, leadOv: {}, avisoDone: { r1: true, r2: true }, qrOk: false, avail: true, org: 'sa'
+    };
+    this._tt = {};
+  }
+
+  // Arrastar com o mouse rola as faixas e listas, como o dedo no celular.
+  // Só para mouse: no toque, o navegador rola sozinho (touch-action pan-x/pan-y).
+  // O eixo dominante decide: horizontal numa faixa rola a faixa; horizontal numa
+  // linha de conversa fica com o gesto da linha; vertical rola a lista.
+  componentDidMount() {
+    const H = '.chips:not(.wrap), .stabs', V = '.sp, .th, .sh-body';
+    let g = null, raf = 0, last = null, suppress = false;
+    const stop = function () { if (raf) cancelAnimationFrame(raf); raf = 0; if (last) last.classList.remove('is-grab'); last = null; };
+    this._pd = function (e) {
+      suppress = false;
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      const t = e.target;
+      if (!t || !t.closest || !t.closest('.mbv') || t.closest('input, textarea')) return;
+      stop();
+      g = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), h: t.closest(H), v: t.closest(V), axis: null, el: null, sc: 1, vel: 0 };
+    };
+    this._pm = function (e) {
+      if (!g || e.pointerId !== g.id) return;
+      if (!g.axis) {
+        const dx = e.clientX - g.x, dy = e.clientY - g.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+        g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        g.el = g.axis === 'x' ? g.h : g.v;
+        if (!g.el) { g = null; return; }
+        const r = g.el.getBoundingClientRect();
+        g.sc = (g.axis === 'x' ? r.width / (g.el.offsetWidth || 1) : r.height / (g.el.offsetHeight || 1)) || 1;
+        g.el.classList.add('is-grab'); last = g.el;
+        try { g.el.setPointerCapture(e.pointerId); } catch (er) { /* sem captura */ }
+        g.lx = e.clientX; g.ly = e.clientY;
+      }
+      const step = g.axis === 'x' ? e.clientX - g.lx : e.clientY - g.ly;
+      if (g.axis === 'x') g.el.scrollLeft -= step / g.sc; else g.el.scrollTop -= step / g.sc;
+      const now = performance.now(), dt = Math.max(1, now - g.lt);
+      g.vel = 0.7 * (step / dt) + 0.3 * g.vel;
+      g.lx = e.clientX; g.ly = e.clientY; g.lt = now;
+      suppress = true;
+      if (e.cancelable) e.preventDefault();
+    };
+    this._pu = function (e) {
+      if (!g || e.pointerId !== g.id) return;
+      const el = g.el, axis = g.axis, sc = g.sc, idle = performance.now() - g.lt;
+      let v = idle > 80 ? 0 : g.vel * 16;
+      g = null;
+      if (!el) return;
+      setTimeout(function () { suppress = false; }, 0);
+      if (Math.abs(v) < 1) { el.classList.remove('is-grab'); last = null; return; }
+      const tick = function () {
+        v *= 0.92;
+        if (Math.abs(v) < 0.5) { raf = 0; el.classList.remove('is-grab'); last = null; return; }
+        if (axis === 'x') el.scrollLeft -= v / sc; else el.scrollTop -= v / sc;
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+    this._ck = function (e) { if (suppress) { suppress = false; e.stopPropagation(); e.preventDefault(); } };
+    this._stop = stop;
+    document.addEventListener('pointerdown', this._pd, true);
+    document.addEventListener('pointermove', this._pm, { passive: false });
+    document.addEventListener('pointerup', this._pu, true);
+    document.addEventListener('pointercancel', this._pu, true);
+    document.addEventListener('click', this._ck, true);
+  }
+
+  componentWillUnmount() {
+    const t = this._tt; Object.keys(t).forEach(function (k) { clearTimeout(t[k]); });
+    if (this._stop) this._stop();
+    document.removeEventListener('pointerdown', this._pd, true);
+    document.removeEventListener('pointermove', this._pm, { passive: false });
+    document.removeEventListener('pointerup', this._pu, true);
+    document.removeEventListener('pointercancel', this._pu, true);
+    document.removeEventListener('click', this._ck, true);
+  }
+
+  // ---------- Cada aparelho começa numa tela e guarda a própria pilha ----------
+  starts() {
+    const base = { tab: 'conversas', stack: ['conversas'], sheet: null, sheetFor: null, chip: 'todas', listKind: 'main', conv: 'c1', lead: 'c1', leadTab: 'resumo', funil: 'Vendas Clínica', stage: 1, tView: 'lista', tWho: 'todas', day: 0, avTab: 'open', q: '', draft: '', swipe: null, toast: null, fUnread: false, fCanal: 'todos', fDono: 'todos', mvFunil: null, lostReason: '', lostDetail: '' };
+    const list = [
+      { n: '01', t: 'Conversas', swipe: { id: 'c8', side: 'r' } },
+      { n: '02', t: 'Conversa aberta', stack: ['conversas', 'conversa'], conv: 'c1' },
+      { n: '03', t: 'Ficha do lead', stack: ['conversas', 'conversa', 'lead'], conv: 'c3', lead: 'c3' },
+      { n: '04', t: 'Folha de filtros', sheet: 'filtros' },
+      { n: '05', t: 'Folha do botão criar', sheet: 'fab' },
+      { n: '06', t: 'Funil', tab: 'funil', stack: ['funil'] },
+      { n: '07', t: 'Tarefas', tab: 'tarefas', stack: ['tarefas'] },
+      { n: '08', t: 'Avisos', tab: 'avisos', stack: ['avisos'] },
+      { n: '09', t: 'Mais', tab: 'mais', stack: ['mais'] },
+      { n: '10', t: 'Canais, dentro do Mais', tab: 'mais', stack: ['mais', 'canais'] },
+      { n: '11', t: 'Busca aberta', stack: ['conversas', 'busca'], q: 'Ma' }
+    ];
+    return list.map(function (o) { return Object.assign({}, base, o); });
+  }
+
+  orgs() { return [{ id: 'sa', ini: 'SA', name: 'Studio Aurora', role: 'Administradora' }, { id: 'tk', ini: 'AT', name: 'Agência Tektus', role: 'Atendente' }]; }
+  team() { return { voce: 'Você', bruno: 'Bruno Sales', leticia: 'Letícia Andrade', ia: 'Agente IA', fila: 'Sem dono' }; }
+  ownShort(o) { return ({ voce: 'Você atende', bruno: 'Bruno atende', leticia: 'Letícia atende', ia: 'IA atende', fila: 'Sem dono' })[o] || o; }
+  funis() {
+    return [
+      { nome: 'Vendas Clínica', etapas: ['Novo', 'Qualificado', 'Avaliação', 'Proposta', 'Fechado'] },
+      { nome: 'Vendas B2B', etapas: ['Novo', 'Diagnóstico', 'Proposta', 'Negociação', 'Fechado'] },
+      { nome: 'Pós-venda', etapas: ['Onboarding', 'Acompanhamento', 'Renovação'] },
+      { nome: 'Reativação', etapas: ['Frio', 'Contato feito', 'Reagendado'] }
+    ];
+  }
+  funil(nome) { return this.funis().find(function (f) { return f.nome === nome; }) || this.funis()[0]; }
+  norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  pad(n) { return (n < 10 ? '0' : '') + n; }
+  now() { const d = new Date(); return this.pad(d.getHours()) + ':' + this.pad(d.getMinutes()); }
+  num(v) { const n = parseInt(String(v || '').replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  money(n) { return 'R$ ' + n.toLocaleString('pt-BR'); }
+  flip(o, id) { const c = Object.assign({}, o); if (c[id]) delete c[id]; else c[id] = true; return c; }
+
+  // ---------- Dados de exemplo (os mesmos do MainVerdash) ----------
+  convs() {
+    if (this._c) return this._c;
+    this._c = [
+      { id: 'c1', name: 'Mariana Couto', ini: 'MC', av: 1, ch: 'wa', phone: '+55 11 98472-3310', owner: 'ia', wait: 14, unread: 2, time: '14:02', last: 'in',
+        preview: 'Se não tiver, pode ser durante a semana depois das 18h', tags: ['anúncio-meta', 'quer-agendar'], source: 'Anúncio Meta: Clareamento', cidade: 'São Paulo, SP', interesse: 'Clareamento', email: '', convenio: '', doc: '',
+        obs: 'Prefere atendimento aos sábados. Já fez limpeza aqui em 2025.', obsBy: 'Agente IA, hoje às 13:45',
+        lead: { funil: 'Vendas Clínica', valor: 'R$ 1.200', etapa: 1 }, task: null, pedidos: [], emp: null,
+        atividade: [{ t: 'IA passou o atendimento para a equipe', when: 'Hoje, 13:45' }, { t: 'Lead criado no funil Vendas Clínica', when: 'Hoje, 13:42' }, { t: 'Chegou pelo anúncio Clareamento (Meta)', when: 'Hoje, 13:41' }],
+        suggest: 'Oi, Mariana! Tenho sábado às 10h ou às 11h30. Qual fica melhor para você?',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'in', text: 'Boa tarde! Vi o anúncio do clareamento no Instagram.', time: '13:41' },
+          { k: 'in', t: 'image', alt: 'Foto do sorriso enviada pela cliente', text: 'Queria deixar assim, mais branquinho', time: '13:41' },
+          { k: 'ai', text: 'Oi, Mariana! Dá para chegar bem perto disso. O clareamento começa com uma avaliação de 30 minutos, sem custo. Quer agendar?', time: '13:41' },
+          { k: 'in', text: 'Quero sim. Vocês atendem sábado?', time: '13:44' },
+          { k: 'ai', text: 'Vou chamar alguém da equipe para conferir a agenda de sábado com você. Um instante.', time: '13:44' },
+          { k: 'pass', time: '13:45', quer: 'Avaliação de clareamento num sábado de manhã', tentou: 'Explicou a avaliação gratuita. Não tem acesso à agenda de sábado.' },
+          { k: 'new', text: '2 mensagens novas' },
+          { k: 'in', text: 'Oi! Ainda tem horário no sábado de manhã?', time: '14:02', quote: { who: 'Agente IA', text: 'Vou chamar alguém da equipe para conferir a agenda de sábado com você.' } },
+          { k: 'in', text: 'Se não tiver, pode ser durante a semana depois das 18h', time: '14:02' }
+        ] },
+      { id: 'c2', name: 'Rafael Nogueira', ini: 'RN', av: 4, ch: 'ig', phone: '+55 21 99130-5521', owner: 'fila', wait: 38, unread: 2, time: '13:38', last: 'in',
+        preview: 'Pago no Pix tem desconto?', tags: ['pediu-preço'], source: 'Direct do Instagram', cidade: '', interesse: 'Plano anual', email: '', convenio: '', doc: '',
+        obs: '', obsBy: '', lead: null, task: null, pedidos: [], emp: null,
+        atividade: [{ t: 'Conversa iniciada pelo Direct', when: 'Hoje, 13:30' }],
+        suggest: 'Oi, Rafael! O plano anual sai por R$ 1.788, ou 12x de R$ 149. No Pix tem 5% de desconto. Quer que eu mande o link?',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'in', text: 'Oi, boa tarde', time: '13:30' },
+          { k: 'in', t: 'deleted', text: 'Mensagem apagada pelo cliente', time: '13:33' },
+          { k: 'in', text: 'Qual o valor do plano anual?', time: '13:37' },
+          { k: 'in', text: 'Pago no Pix tem desconto?', time: '13:38' }
+        ] },
+      { id: 'c5', name: 'Juliana Prates', ini: 'JP', av: 5, ch: 'wa', phone: '+55 11 97711-0482', owner: 'ia', wait: 4, unread: 1, time: '14:09', last: 'in',
+        preview: 'Áudio (0:42)', tags: ['indicação'], source: 'Indicação', cidade: 'São Paulo, SP', interesse: 'Lentes de contato dental', email: 'ju.prates@gmail.com', convenio: '', doc: '',
+        obs: 'Indicada pela Carol Menezes. Casamento em março de 2027, precisa terminar antes.', obsBy: 'Agente IA, hoje às 14:09',
+        lead: { funil: 'Vendas Clínica', valor: 'R$ 9.800', etapa: 1 }, pedidos: [], emp: null,
+        task: { title: 'Mandar orçamento de lentes de contato', due: 'Hoje, 18:00', st: 'today', who: 'Você' },
+        atividade: [{ t: 'Áudio transcrito pela IA', when: 'Hoje, 14:09' }, { t: 'Tarefa criada: mandar orçamento', when: 'Hoje, 14:07' }, { t: 'Conversa iniciada', when: 'Hoje, 14:05' }],
+        suggest: 'Oi, Juliana! Fazemos sim. O tratamento leva de 3 a 4 semanas, então dá tempo para março com folga. Quer marcar uma avaliação?',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'in', text: 'Oi, aqui é a Juliana, indicação da Carol', time: '14:05' },
+          { k: 'ai', text: 'Oi, Juliana! Que bom que a Carol indicou. Como posso te ajudar?', time: '14:05' },
+          { k: 'in', t: 'video', alt: 'Vídeo de referência enviado pela cliente', dur: '0:18', time: '14:07' },
+          { k: 'in', t: 'audio', dur: '0:42', time: '14:09', transcript: 'Queria saber se vocês fazem lente de contato dental e quanto tempo leva, porque tenho um casamento em março. Esse vídeo que mandei é mais ou menos o resultado que eu quero.' }
+        ] },
+      { id: 'c8', name: 'Ana Beatriz Rocha', ini: 'AR', av: 3, ch: 'ig', phone: '+55 31 98820-1173', owner: 'ia', wait: 0, unread: 0, time: '13:55', last: 'ai', st: 'read',
+        preview: 'Atendemos sim! Trabalhamos com reembolso para a maioria dos planos.', tags: ['convênio'], source: 'Direct do Instagram', cidade: 'Belo Horizonte, MG', interesse: '', email: '', convenio: 'Unimed (a confirmar)', doc: '',
+        obs: '', obsBy: '', lead: null, task: null, pedidos: [], emp: null,
+        atividade: [{ t: 'IA respondeu', when: 'Hoje, 13:55' }, { t: 'Conversa iniciada pelo Direct', when: 'Hoje, 13:52' }],
+        suggest: 'Ana, qual é o seu plano? Assim confiro o reembolso certinho para você.',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'in', text: 'Vocês atendem convênio?', time: '13:52' },
+          { k: 'ai', text: 'Atendemos sim! Trabalhamos com reembolso para a maioria dos planos. Quer que eu confira o seu?', time: '13:55', st: 'read' }
+        ] },
+      { id: 'c3', name: 'Studio Bella Forma', ini: 'BF', av: 2, ch: 'wa', phone: '+55 11 3061-4420', owner: 'voce', wait: 0, unread: 0, time: '12:15', last: 'out', st: 'delivered',
+        preview: 'Contrato enviado. Qualquer dúvida, me chama.', tags: ['cliente', 'decide-com-sócio', 'b2b'], source: 'Indicação de parceiro', cidade: 'São Paulo, SP', interesse: 'Plano B2B anual', email: 'contato@studiobellaforma.com.br', convenio: '', doc: '41.552.093/0001-10',
+        obs: 'Quem decide é a Renata (sócia). Pagamento por boleto, todo dia 10.', obsBy: 'Bruno Sales, ontem às 17:45',
+        lead: { funil: 'Vendas B2B', valor: 'R$ 4.800/mês', etapa: 3 },
+        task: { title: 'Ligar para a Renata sobre o contrato', due: 'Quinta, 10:00', st: 'fut', who: 'Você' },
+        pedidos: [{ n: '#1043', desc: 'Implantação e 3 meses', valor: 'R$ 14.400', status: 'Aguardando assinatura' }],
+        emp: { nota: '4,8 (126 avaliações)', endereco: 'Rua Harmonia, 412, Vila Madalena, São Paulo', site: 'studiobellaforma.com.br', redes: '@studiobellaforma' },
+        atividade: [{ t: 'Você enviou o contrato', when: 'Hoje, 12:15' }, { t: 'Bruno registrou uma nota', when: 'Hoje, 12:10' }, { t: 'Lead movido para Proposta', when: 'Ontem, 17:45' }],
+        suggest: 'Oi! Passando para saber se a Renata conseguiu ver o contrato.',
+        msgs: [
+          { k: 'day', text: 'Ontem' },
+          { k: 'in', text: 'Oi! Conversei com a Renata, ela gostou da proposta.', time: '17:20' },
+          { k: 'in', t: 'contact', cName: 'Renata Albuquerque', cIni: 'RA', cPhone: '+55 11 99201-3345', time: '17:21' },
+          { k: 'out', text: 'Que ótimo! Quer que eu já prepare o contrato?', time: '17:31', by: 'Você', st: 'read', edited: true },
+          { k: 'in', text: 'Pode sim. Ela assina essa semana.', time: '17:40' },
+          { k: 'day', text: 'Hoje' },
+          { k: 'note', text: 'Renata assina até sexta. Se não voltar, ligar quinta às 10h.', time: '12:10', by: 'Bruno Sales' },
+          { k: 'out', t: 'doc', fileName: 'Contrato_BellaForma_2026.pdf', fileInfo: 'PDF, 4 páginas, 312 KB', time: '12:14', by: 'Você', st: 'read' },
+          { k: 'out', text: 'Contrato enviado. Qualquer dúvida, me chama.', time: '12:15', by: 'Você', st: 'delivered' }
+        ] },
+      { id: 'c9', name: 'Thiago Mendes', ini: 'TM', av: 6, ch: 'wa', phone: '+55 41 99654-2208', owner: 'bruno', wait: 0, unread: 0, time: '10:06', last: 'in',
+        preview: 'Figurinha', tags: ['pagamento'], source: 'Site', cidade: 'Curitiba, PR', interesse: 'Ortodontia', email: 'thiago.m@outlook.com', convenio: '', doc: '',
+        obs: 'Paga sempre no Pix.', obsBy: 'Bruno Sales, semana passada',
+        lead: { funil: 'Vendas Clínica', valor: 'R$ 3.400', etapa: 4 },
+        task: { title: 'Conferir o comprovante no financeiro', due: 'Atrasada, era hoje às 10:30', st: 'late', who: 'Bruno Sales' },
+        pedidos: [{ n: '#1039', desc: 'Tratamento ortodôntico', valor: 'R$ 3.400', status: 'Pagamento em análise' }], emp: null,
+        atividade: [{ t: 'Comprovante recebido', when: 'Hoje, 10:02' }],
+        suggest: 'Recebido, Thiago! Vou confirmar com o financeiro e te aviso.',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'out', text: 'Bom dia, Thiago! Segue a chave Pix para o sinal: financeiro@studioaurora.com.br', time: '09:40', by: 'Bruno Sales', st: 'read' },
+          { k: 'in', t: 'image', alt: 'Comprovante de Pix', text: 'Mandei o comprovante agora', time: '10:02' },
+          { k: 'out', text: 'Recebi! Vou conferir e já te confirmo.', time: '10:05', by: 'Bruno Sales', st: 'failed' },
+          { k: 'in', t: 'sticker', time: '10:06' }
+        ] },
+      { id: 'c7', name: 'Lucas Ferraz', ini: 'LF', av: 4, ch: 'wa', phone: '+55 11 98003-7754', owner: 'voce', wait: 0, unread: 0, time: 'seg', last: 'in', windowClosed: true,
+        preview: 'Vou ver com minha esposa e te falo', tags: ['decide-com-sócio'], source: 'Google Ads', cidade: 'Guarulhos, SP', interesse: 'Implante', email: '', convenio: '', doc: '',
+        obs: 'Decide junto com a esposa. Achou a entrada alta.', obsBy: 'Você, segunda',
+        lead: { funil: 'Vendas Clínica', valor: 'R$ 6.900', etapa: 3 },
+        task: { title: 'Enviar o modelo aprovado de retomada', due: 'Atrasada, era ontem às 10:00', st: 'late', who: 'Você' }, pedidos: [], emp: null,
+        atividade: [{ t: 'Janela de 24h fechou', when: 'Terça, 10:40' }, { t: 'Você enviou a simulação', when: 'Segunda, 10:12' }],
+        suggest: '',
+        msgs: [
+          { k: 'day', text: 'Segunda' },
+          { k: 'out', t: 'doc', fileName: 'Simulacao_parcelamento.pdf', fileInfo: 'PDF, 1 página, 88 KB', time: '10:11', by: 'Você', st: 'read' },
+          { k: 'out', text: 'Lucas, segue a simulação com as 3 opções de parcelamento.', time: '10:12', by: 'Você', st: 'read' },
+          { k: 'in', text: 'Vou ver com minha esposa e te falo', time: '10:40' }
+        ] },
+      { id: 'c4', name: '+55 21 99812-4410', ini: '21', av: 6, ch: 'wa', phone: '+55 21 99812-4410', owner: 'ia', wait: 0, unread: 0, time: 'ontem', last: 'none',
+        preview: 'Ainda sem mensagens', tags: ['formulário-site'], source: 'Formulário do site', cidade: '', interesse: '', email: '', convenio: '', doc: '',
+        obs: '', obsBy: '', lead: null, task: null, pedidos: [], emp: null,
+        atividade: [{ t: 'Contato criado pelo formulário Fale conosco', when: 'Ontem, 19:42' }],
+        suggest: '',
+        msgs: [{ k: 'sys', text: 'Contato criado pelo formulário Fale conosco do site, ontem às 19:42. Nenhuma mensagem trocada ainda.' }] },
+      { id: 'c6', name: 'Carlos Eduardo Lima', ini: 'CL', av: 3, ch: 'wa', phone: '+55 11 99412-8836', owner: 'voce', wait: 0, unread: 0, time: '11:20', last: 'out', st: 'read', closed: true,
+        preview: 'Combinado, até amanhã às 9h.', tags: ['agendado'], source: 'Indicação', cidade: 'São Paulo, SP', interesse: 'Retorno', email: 'carlos.lima@gmail.com', convenio: 'SulAmérica', doc: '',
+        obs: 'Prefere o primeiro horário da manhã.', obsBy: 'Você, hoje',
+        lead: null, task: { title: 'Confirmar a consulta de amanhã', due: 'Hoje, 17:00', st: 'today', who: 'Você' }, pedidos: [], emp: null,
+        atividade: [{ t: 'Conversa fechada por você', when: 'Hoje, 11:21' }, { t: 'Compromisso marcado para amanhã, 9h', when: 'Hoje, 11:19' }],
+        suggest: '',
+        msgs: [
+          { k: 'day', text: 'Hoje' },
+          { k: 'in', text: 'Consigo amanhã cedo?', time: '11:15' },
+          { k: 'out', text: 'Combinado, até amanhã às 9h.', time: '11:20', by: 'Você', st: 'read' },
+          { k: 'sys', text: 'Você fechou a conversa às 11:21.' }
+        ] }
+    ];
+    return this._c;
+  }
+
+  avisos() {
+    return [
+      { id: 'a1', kind: 'handoff', title: 'A IA passou Mariana Couto para a equipe', sub: 'Quer avaliação de clareamento num sábado de manhã.', when: 'há 25 min', conv: 'c1' },
+      { id: 'a2', kind: 'routing', title: 'Rafael Nogueira está sem dono', sub: 'Esperando resposta há 38 min no Direct do Instagram.', when: 'há 38 min', conv: 'c2' },
+      { id: 'a3', kind: 'qr', title: 'WhatsApp Comercial desconectou', sub: 'Leia o QR code de novo para voltar a receber mensagens deste número.', when: 'há 1 h' },
+      { id: 'a4', kind: 'outcome', title: 'Como foi a consulta de Carlos Eduardo Lima?', sub: 'Consulta de hoje às 9:00. O resultado alimenta os relatórios e o follow-up.', when: 'há 3 h', conv: 'c6' },
+      { id: 'a5', kind: 'snooze', title: 'Lembrete: Lucas Ferraz', sub: 'Você pediu para retomar a simulação de parcelamento hoje.', when: 'há 4 h', conv: 'c7' },
+      { id: 'r1', kind: 'other', title: 'Uso da IA chegou a 80% do orçamento do mês', sub: 'Resolvido por Bruno Sales.', when: 'ontem' },
+      { id: 'r2', kind: 'other', title: 'Follow-up de Ana Beatriz não foi enviado', sub: 'Reenviado automaticamente na tentativa seguinte.', when: 'ontem' }
+    ];
+  }
+
+  // ---------- Navegação: um setState por gesto ----------
+  ph(pi, patch, extra) { const arr = this.state.phones.slice(); arr[pi] = Object.assign({}, arr[pi], patch); return Object.assign({ phones: arr }, extra || {}); }
+  setP(pi, patch, extra) { this.setState(this.ph(pi, patch, extra)); }
+  toast(pi, text, undo, patch, extra) {
+    clearTimeout(this._tt[pi]);
+    this.setState(this.ph(pi, Object.assign({ toast: { text: text, undo: undo || null } }, patch || {}), extra));
+    const self = this;
+    this._tt[pi] = setTimeout(function () { self.setState(self.ph(pi, { toast: null })); }, 4500);
+  }
+  push(pi, scr, patch) { const p = this.state.phones[pi]; this.setP(pi, Object.assign({ stack: p.stack.concat([scr]), sheet: null, swipe: null }, patch || {})); }
+  back(pi) { const p = this.state.phones[pi]; if (p.stack.length > 1) this.setP(pi, { stack: p.stack.slice(0, -1), sheet: null, swipe: null }); }
+  goTab(pi, tab, patch) { this.setP(pi, Object.assign({ tab: tab, stack: [tab], sheet: null, swipe: null, listKind: 'main' }, patch || {})); }
+  openConv(pi, id, extra) {
+    const p = this.state.phones[pi], r = Object.assign({}, this.state.read), um = Object.assign({}, this.state.unreadMark);
+    r[id] = true; delete um[id];
+    this.setState(this.ph(pi, { stack: p.stack.concat(['conversa']), conv: id, sheet: null, swipe: null, draft: '' }, Object.assign({ read: r, unreadMark: um }, extra || {})));
+  }
+  openLead(pi, id) { this.push(pi, 'lead', { lead: id, leadTab: 'resumo' }); }
+  sheet(pi, name, forId) { this.setP(pi, { sheet: name, sheetFor: forId || null, swipe: null }); }
+
+  m(c) {
+    const s = this.state, lo = s.leadOv[c.id], sent = s.sent[c.id] || [];
+    let lead = c.lead;
+    if (lo) lead = lo.lost ? null : Object.assign({ funil: 'Vendas Clínica', valor: 'A definir', etapa: 0 }, c.lead || {}, lo);
+    const last = sent.length ? sent[sent.length - 1] : null;
+    return Object.assign({}, c, {
+      owner: s.owners[c.id] || c.owner,
+      closed: (c.id in s.closed) ? s.closed[c.id] : !!c.closed,
+      archived: !!s.archived[c.id], pinned: !!s.pinned[c.id], muted: !!s.muted[c.id],
+      unread: s.unreadMark[c.id] ? Math.max(1, c.unread) : (s.read[c.id] ? 0 : c.unread),
+      wait: sent.length ? 0 : c.wait,
+      taskDone: !!s.done[c.id], lead: lead,
+      preview: last ? last.text : c.preview, last: last ? 'out' : c.last, st: last ? 'sent' : c.st, time: last ? last.time : c.time,
+      allMsgs: c.msgs.concat(sent)
+    });
+  }
+
+  // ---------- Conversas ----------
+  rowVM(pi, p, x, byId) {
+    const self = this, s = this.state;
+    const base = p.swipe && p.swipe.id === x.id ? (p.swipe.side === 'l' ? 144 : -144) : 0;
+    const dragging = !!(s.drag && s.drag.pi === pi && s.drag.id === x.id);
+    const off = dragging ? Math.max(-170, Math.min(170, base + s.drag.dx)) : base;
+    const st = x.last === 'out' || x.last === 'ai' ? x.st : null;
+    const wcls = x.wait >= 30 ? 'wait w-crit' : x.wait >= 10 ? 'wait w-warn' : 'wait w-info';
+    return {
+      name: x.name, ini: x.ini, avCls: 'av av-' + x.av, isWa: x.ch === 'wa', isIg: x.ch === 'ig', time: x.time,
+      timeCls: 'cv-time' + (x.unread > 0 ? ' new' : ''), preview: x.preview,
+      hasWho: x.last === 'out' || x.last === 'ai', who: x.last === 'out' ? 'Você:' : 'IA:',
+      hasTick: !!st && st !== 'failed', tickHref: st === 'sent' ? '#i-check' : '#i-checks', tickCls: 'tick' + (st === 'read' ? ' read' : ''),
+      tickAria: st === 'read' ? 'Lida' : st === 'delivered' ? 'Entregue' : 'Enviada',
+      pinned: x.pinned, muted: x.muted, hasUnread: x.unread > 0, unread: x.unread, unreadAria: x.unread + ' não lidas',
+      hasWait: x.wait > 0 && !x.closed, waitCls: wcls, waitLabel: x.wait + ' min', own: this.ownShort(x.owner),
+      hasTag: !!(x.tags && x.tags.length), tag: x.tags && x.tags[0],
+      cls: 'cv' + (dragging ? ' drag' : ''), off: off, actTab: base !== 0 ? 0 : -1,
+      readLabel: x.unread > 0 ? 'Lida' : 'Não lida', pinLabel: x.pinned ? 'Desafixar' : 'Fixar', archLabel: x.archived ? 'Desarquivar' : 'Arquivar',
+      down: function (e) { self._skip = false; self._dg = { pi: pi, id: x.id, x0: e.clientX, y0: e.clientY, base: base, moved: false }; },
+      move: function (e) {
+        const d = self._dg; if (!d || d.pi !== pi || d.id !== x.id) return;
+        const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+        if (!d.moved) { if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return; d.moved = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) { /* sem captura */ } }
+        self.setState({ drag: { pi: pi, id: x.id, dx: dx } });
+      },
+      up: function () {
+        const d = self._dg; self._dg = null;
+        if (!d || d.pi !== pi || d.id !== x.id || !d.moved) return;
+        self._skip = true;
+        const fin = d.base + ((self.state.drag && self.state.drag.dx) || 0);
+        const sw = fin > 64 ? { id: x.id, side: 'l' } : fin < -64 ? { id: x.id, side: 'r' } : null;
+        self.setState(self.ph(pi, { swipe: sw }, { drag: null }));
+      },
+      open: function () {
+        if (self._skip) { self._skip = false; return; }
+        if (self.state.phones[pi].swipe) { self.setP(pi, { swipe: null }); return; }
+        self.openConv(pi, x.id);
+      },
+      readT: function () { self.toggleRead(pi, x.id, { swipe: null }); },
+      pinT: function () { self.toast(pi, x.pinned ? 'Conversa desafixada.' : 'Conversa fixada no topo.', null, { swipe: null }, { pinned: self.flip(self.state.pinned, x.id) }); },
+      arch: function () { self.toggleArchive(pi, x.id, { swipe: null }); },
+      more: function () { self.sheet(pi, 'conv', x.id); }
+    };
+  }
+  toggleRead(pi, id, patch) {
+    const s = this.state, r = Object.assign({}, s.read), um = Object.assign({}, s.unreadMark);
+    const x = this.m(this.convs().find(function (c) { return c.id === id; }));
+    if (x.unread > 0) { r[id] = true; delete um[id]; } else { um[id] = true; delete r[id]; }
+    this.toast(pi, x.unread > 0 ? 'Marcada como lida.' : 'Marcada como não lida.', null, patch, { read: r, unreadMark: um });
+  }
+  toggleArchive(pi, id, patch) {
+    const self = this, before = this.state.archived, was = !!before[id];
+    const undo = function () { self.setState(self.ph(pi, { toast: null }, { archived: before })); };
+    this.toast(pi, was ? 'Conversa desarquivada.' : 'Conversa arquivada.', undo, patch, { archived: this.flip(before, id) });
+  }
+  listVM(p, pi, live, byId, kind) {
+    const self = this;
+    const f = function (x) {
+      if (kind === 'arquivadas') return x.archived;
+      if (kind === 'fechadas') return x.closed && !x.archived;
+      if (x.archived || x.closed) return false;
+      if (p.fUnread && !(x.unread > 0)) return false;
+      if (p.fCanal !== 'todos' && x.ch !== p.fCanal) return false;
+      if (p.fDono !== 'todos' && x.owner !== p.fDono) return false;
+      return true;
+    };
+    const CF = {
+      fila: function (x) { return x.wait > 0 && x.owner !== 'voce'; }, minhas: function (x) { return x.owner === 'voce'; },
+      todas: function () { return true; }, ia: function (x) { return x.owner === 'ia'; }, passo: function (x) { return !x.task || x.taskDone; }
+    };
+    const base = live.filter(f);
+    const rows = (kind === 'main' ? base.filter(CF[p.chip] || CF.todas) : base).slice().sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); });
+    const nF = (p.fUnread ? 1 : 0) + (p.fCanal !== 'todos' ? 1 : 0) + (p.fDono !== 'todos' ? 1 : 0);
+    const EMPTY = { fila: ['Ninguém esperando', 'Toda conversa com cliente aguardando já tem resposta.'], minhas: ['Nada com você agora', 'Conversas que você assumir aparecem aqui.'], ia: ['A IA não está atendendo ninguém', 'Quando ela responder um cliente, a conversa aparece aqui.'], passo: ['Todas têm próximo passo', 'Cada conversa aberta já tem uma tarefa marcada.'], todas: ['Nenhuma conversa', 'Mude os filtros para ver mais.'] };
+    const em = kind === 'arquivadas' ? ['Nada arquivado', 'Arraste uma conversa para a esquerda para arquivar.'] : kind === 'fechadas' ? ['Nenhuma fechada', 'Conversas encerradas ficam aqui.'] : (nF ? ['Nada com esses filtros', 'Limpe os filtros para ver todas as conversas.'] : EMPTY[p.chip] || EMPTY.todas);
+    return {
+      isMain: kind === 'main', isSub: kind !== 'main', title: kind === 'fechadas' ? 'Fechadas' : 'Arquivadas',
+      chips: [['fila', 'Fila'], ['minhas', 'Minhas'], ['todas', 'Todas'], ['ia', 'Com a IA'], ['passo', 'Sem próximo passo']].map(function (c) {
+        return { label: c[1], n: base.filter(CF[c[0]]).length, showN: c[0] === 'fila' || c[0] === 'minhas', on: p.chip === c[0] ? 'true' : 'false', go: function () { self.setP(pi, { chip: c[0], swipe: null }); } };
+      }),
+      hasF: nF > 0, nF: nF, fOn: nF > 0 ? 'true' : 'false', fAria: nF ? 'Filtros, ' + nF + ' ativos' : 'Filtros',
+      nFechadas: live.filter(function (x) { return x.closed && !x.archived; }).length, nArq: live.filter(function (x) { return x.archived; }).length,
+      rows: rows.map(function (x) { return self.rowVM(pi, p, x, byId); }), count: rows.length,
+      empty: rows.length === 0, emptyT: em[0], emptyD: em[1],
+      menu: function () { self.sheet(pi, 'lista'); }, openF: function () { self.sheet(pi, 'filtros'); },
+      search: function () { self.push(pi, 'busca', { q: '' }); },
+      goFechadas: function () { self.push(pi, 'arquivo', { listKind: 'fechadas' }); },
+      goArq: function () { self.push(pi, 'arquivo', { listKind: 'arquivadas' }); }
+    };
+  }
+
+  // ---------- Conversa aberta ----------
+  msgVM(m) {
+    const k = m.k, t = m.t || 'text', bub = k === 'in' || k === 'out' || k === 'ai';
+    return {
+      isDay: k === 'day', isNew: k === 'new', isSys: k === 'sys', isPass: k === 'pass', isNote: k === 'note', isBub: bub,
+      rowCls: 'mr ' + k, isAi: k === 'ai', hasBy: k === 'out' && !!m.by && m.by !== 'Você', by: m.by || '',
+      hasQuote: !!m.quote, qWho: m.quote ? m.quote.who : '', qText: m.quote ? m.quote.text : '',
+      isImage: t === 'image', isVideo: t === 'video', isAudio: t === 'audio', isDoc: t === 'doc', isContact: t === 'contact', isSticker: t === 'sticker', isDeleted: t === 'deleted',
+      hasText: !!m.text && t !== 'deleted' && bub, text: m.text || '', time: m.time || '', alt: m.alt || '', dur: m.dur || '', transcript: m.transcript || '',
+      fileName: m.fileName || '', fileInfo: m.fileInfo || '', cName: m.cName || '', cIni: m.cIni || '', cPhone: m.cPhone || '',
+      quer: m.quer || '', tentou: m.tentou || '', edited: m.edited ? 'editada ' : '',
+      hasSt: !!m.st && m.st !== 'failed', failed: m.st === 'failed', stHref: m.st === 'sent' ? '#i-check' : '#i-checks',
+      stCls: 'tick' + (m.st === 'read' ? ' read' : ''), stAria: m.st === 'read' ? 'Lida' : m.st === 'delivered' ? 'Entregue' : 'Enviada'
+    };
+  }
+  convVM(p, pi, byId) {
+    const self = this, team = this.team(), c = byId[p.conv];
+    const chL = c.ch === 'wa' ? 'WhatsApp' : 'Instagram', isOwner = c.owner === 'voce';
+    const sub = isOwner ? 'Você atende no ' + chL : c.owner === 'fila' ? 'Sem dono no ' + chL : team[c.owner] + ' atende no ' + chL;
+    const strip = c.owner === 'ia' ? 'A IA está atendendo' : c.owner === 'fila' ? 'Ninguém atende esta conversa' : team[c.owner] + ' está atendendo';
+    const lfn = c.lead ? this.funil(c.lead.funil) : null, lst = lfn ? lfn.etapas[Math.min(c.lead.etapa, lfn.etapas.length - 1)] : '';
+    const draft = (p.draft || '').trim();
+    const send = function () {
+      const q = self.state.phones[pi], txt = (q.draft || '').trim(); if (!txt) return;
+      const sent = Object.assign({}, self.state.sent);
+      sent[c.id] = (sent[c.id] || []).concat([{ k: 'out', text: txt, time: self.now(), by: 'Você', st: 'sent' }]);
+      self.setState(self.ph(pi, { draft: '' }, { sent: sent }));
+    };
+    const assume = function () {
+      const o = Object.assign({}, self.state.owners); o[c.id] = 'voce';
+      self.toast(pi, 'Você assumiu a conversa. A IA para de responder aqui.', null, { sheet: null }, { owners: o });
+      setTimeout(function () { const el = document.getElementById('cmp-' + pi); if (el) el.focus({ preventScroll: true }); }, 60);
+    };
+    return {
+      name: c.name, ini: c.ini, avCls: 'av av-s av-' + c.av, sub: sub, leadAria: 'Abrir a ficha de ' + c.name,
+      hasLead: !!c.lead, lfStage: lst, lfFunil: c.lead ? c.lead.funil : '', lfValor: c.lead ? c.lead.valor : '',
+      lfAria: c.lead ? 'Negócio em ' + lst + ', funil ' + c.lead.funil + '. Mover etapa' : '',
+      moveLead: function () { self.sheet(pi, 'mover', c.id); },
+      msgs: c.allMsgs.map(function (m) { return self.msgVM(m); }),
+      isOwner: isOwner, notOwner: !isOwner, strip: strip, stripIc: c.owner === 'ia' ? '#i-spark' : '#i-user',
+      closed: c.closed, winClosed: !!c.windowClosed && isOwner && !c.closed,
+      inputId: 'cmp-' + pi, canSend: isOwner && !!draft, noDraft: !(isOwner && draft),
+      openLead: function () { self.openLead(pi, c.id); },
+      menu: function () { self.sheet(pi, 'conv', c.id); },
+      call: function () { self.toast(pi, 'Ligando para ' + c.phone + '.'); },
+      assume: assume, send: send,
+      onDraft: function (e) { self.setP(pi, { draft: e.target.value }); },
+      onKey: function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } },
+      attach: function () { self.sheet(pi, 'anexos', c.id); },
+      quick: function () { self.sheet(pi, 'rapidas', c.id); },
+      mic: function () { self.toast(pi, 'Segure para gravar. Solte para enviar.'); },
+      reopen: function () { const cl = Object.assign({}, self.state.closed); cl[c.id] = false; self.toast(pi, 'Conversa reaberta.', null, null, { closed: cl }); },
+      template: function () { self.toast(pi, 'Abre a lista de modelos aprovados pela Meta.'); }
+    };
+  }
+
+  // ---------- Ficha do lead ----------
+  leadVM(p, pi, byId) {
+    const self = this, team = this.team(), c = byId[p.lead];
+    const f = c.lead ? this.funil(c.lead.funil) : null, et = c.lead ? Math.min(c.lead.etapa, f.etapas.length - 1) : 0;
+    const task = c.task && !c.taskDone ? c.task : null;
+    const tabs = [['resumo', 'Resumo'], ['negocios', 'Negócios'], ['empresa', 'Empresa'], ['atividade', 'Atividade']];
+    const kv = [['Origem', c.source], ['Interesse', c.interesse], ['Cidade', c.cidade], ['E-mail', c.email], ['Convênio', c.convenio], ['CNPJ', c.doc]].filter(function (v) { return !!v[1]; }).map(function (v) { return { k: v[0], v: v[1] }; });
+    const emp = c.emp ? [['Nota no Google', c.emp.nota], ['Endereço', c.emp.endereco], ['Site', c.emp.site], ['Redes', c.emp.redes]].map(function (v) { return { k: v[0], v: v[1] }; }) : [];
+    return {
+      name: c.name, ini: c.ini, avCls: 'av av-xl av-' + c.av, isWa: c.ch === 'wa', isIg: c.ch === 'ig', phone: c.phone,
+      who: (c.ch === 'wa' ? 'WhatsApp' : 'Instagram') + ', ' + (c.owner === 'fila' ? 'sem dono' : 'atendimento com ' + team[c.owner]),
+      hasNext: !!task, noNext: !task, nextTitle: task ? task.title : '', nextDue: task ? task.due : '', nextWho: task ? task.who : '',
+      nextDueCls: 'next-d ' + (task ? (task.st === 'late' ? 'd-late' : task.st === 'today' ? 'd-today' : 'd-fut') : ''),
+      hasLead: !!c.lead, noLead: !c.lead, funil: c.lead ? c.lead.funil : '', valor: c.lead ? c.lead.valor : '',
+      stage: f ? f.etapas[et] : '', stageOf: f ? 'Etapa ' + (et + 1) + ' de ' + f.etapas.length : '',
+      stepN: f ? f.etapas.length : 1, steps: f ? f.etapas.map(function (e, i) { return { cls: 'stp' + (i <= et ? ' on' : '') }; }) : [],
+      firstStage: f ? f.etapas[0] : '', lastStage: f ? f.etapas[f.etapas.length - 1] : '',
+      tabs: tabs.map(function (t) { return { label: t[1], sel: p.leadTab === t[0] ? 'true' : 'false', go: function () { self.setP(pi, { leadTab: t[0] }); } }; }),
+      tResumo: p.leadTab === 'resumo', tNeg: p.leadTab === 'negocios', tEmp: p.leadTab === 'empresa', tAtiv: p.leadTab === 'atividade',
+      kv: kv, hasTags: !!(c.tags && c.tags.length), tags: c.tags || [], hasObs: !!c.obs, obs: c.obs, obsBy: c.obsBy,
+      pedidos: c.pedidos, noPed: !c.pedidos.length, hasEmp: !!c.emp, noEmp: !c.emp, emp: emp, ativ: c.atividade,
+      menu: function () { self.sheet(pi, 'leadmenu', c.id); },
+      move: function () { self.sheet(pi, 'mover', c.id); },
+      goConv: function () {
+        const q = self.state.phones[pi], prev = q.stack[q.stack.length - 2];
+        if (prev === 'conversa' && q.conv === c.id) self.back(pi); else self.openConv(pi, c.id);
+      },
+      call: function () { self.toast(pi, 'Ligando para ' + c.phone + '.'); },
+      newTask: function () { self.toast(pi, 'Abre o formulário de nova tarefa para ' + c.name + '.'); },
+      resched: function () { self.toast(pi, 'Abre o seletor de dia e horário.'); },
+      doneTask: function () { self.completeTask(pi, c.id); },
+      createLead: function () { self.setLead(pi, c.id, { funil: 'Vendas Clínica', etapa: 0, lost: false }, 'Lead criado em Vendas Clínica, etapa Novo.'); },
+      linkEmp: function () { self.toast(pi, 'Abre a busca de empresas para ligar a este contato.'); }
+    };
+  }
+  setLead(pi, id, patch, msg) {
+    const self = this, before = this.state.leadOv, lo = Object.assign({}, before);
+    lo[id] = Object.assign({}, lo[id] || {}, patch);
+    this.toast(pi, msg, function () { self.setState(self.ph(pi, { toast: null }, { leadOv: before })); }, { sheet: null }, { leadOv: lo });
+  }
+  completeTask(pi, id) {
+    const self = this, before = this.state.done, was = !!before[id], d = Object.assign({}, before);
+    if (was) delete d[id]; else d[id] = true;
+    const undo = function () { self.setState(self.ph(pi, { toast: null }, { done: before })); };
+    this.toast(pi, was ? 'Tarefa reaberta.' : 'Tarefa concluída.', was ? null : undo, null, { done: d });
+  }
+
+  // ---------- Funil ----------
+  funilVM(p, pi, live) {
+    const self = this, f = this.funil(p.funil), st = Math.min(p.stage, f.etapas.length - 1);
+    const leads = live.filter(function (x) { return x.lead && x.lead.funil === f.nome && !x.archived; });
+    const inSt = leads.filter(function (x) { return Math.min(x.lead.etapa, f.etapas.length - 1) === st; });
+    const sum = inSt.reduce(function (a, x) { return a + self.num(x.lead.valor); }, 0);
+    const tot = leads.reduce(function (a, x) { return a + self.num(x.lead.valor); }, 0);
+    return {
+      nome: f.nome, stageName: f.etapas[st],
+      total: leads.length + (leads.length === 1 ? ' lead aberto' : ' leads abertos') + ', ' + self.money(tot) + ' no total',
+      sum: inSt.length + (inSt.length === 1 ? ' lead' : ' leads') + ' em ' + f.etapas[st] + (inSt.length ? ', ' + self.money(sum) : ''),
+      stages: f.etapas.map(function (e, i) { return { label: e, n: leads.filter(function (x) { return x.lead.etapa === i; }).length, sel: st === i ? 'true' : 'false', go: function () { self.setP(pi, { stage: i }); } }; }),
+      cards: inSt.map(function (x) {
+        const tk = x.task && !x.taskDone ? x.task : null;
+        return {
+          name: x.name, ini: x.ini, avCls: 'av av-m av-' + x.av, valor: x.lead.valor, interesse: x.interesse || x.source,
+          next: tk ? tk.title + ', ' + tk.due : 'Sem próximo passo', nextIc: tk ? '#i-clock' : '#i-flag',
+          nextCls: 'lc-next ' + (tk ? (tk.st === 'late' ? 'd-late' : tk.st === 'today' ? 'd-today' : 'd-fut') : 'd-today'),
+          owner: self.ownShort(x.owner), moveAria: 'Mover ' + x.name + ' de etapa',
+          open: function () { self.openLead(pi, x.id); }, move: function () { self.sheet(pi, 'mover', x.id); }
+        };
+      }),
+      empty: inSt.length === 0,
+      pick: function () { self.sheet(pi, 'funis'); }, menu: function () { self.sheet(pi, 'funilmenu'); },
+      search: function () { self.push(pi, 'busca', { q: '' }); }
+    };
+  }
+
+  // ---------- Tarefas e agenda ----------
+  tarefasVM(p, pi, live) {
+    const self = this, t0 = new Date(), base = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate());
+    const all = live.filter(function (x) { return !!x.task; }).map(function (x) { return { id: x.id, name: x.name, task: x.task, done: x.taskDone }; });
+    const mine = all.filter(function (t) { return t.task.who === 'Você'; });
+    const pool = p.tWho === 'minhas' ? mine : all;
+    const item = function (t) {
+      return {
+        cls: 'tk' + (t.done ? ' done' : ''), done: t.done, pressed: t.done ? 'true' : 'false', title: t.task.title,
+        sub: t.name + (t.task.who !== 'Você' ? ', com ' + t.task.who : ''), due: t.done ? 'Concluída agora' : t.task.due,
+        dueCls: 'tk-due ' + (t.done ? 'd-fut' : t.task.st === 'late' ? 'd-late' : t.task.st === 'today' ? 'd-today' : 'd-fut'),
+        chkAria: (t.done ? 'Reabrir: ' : 'Concluir: ') + t.task.title,
+        toggle: function () { self.completeTask(pi, t.id); }, open: function () { self.openLead(pi, t.id); }
+      };
+    };
+    const open = pool.filter(function (t) { return !t.done; });
+    const secs = [
+      ['Atrasadas', 'sec-t crit', open.filter(function (t) { return t.task.st === 'late'; })],
+      ['Hoje', 'sec-t', open.filter(function (t) { return t.task.st === 'today'; })],
+      ['Próximas', 'sec-t', open.filter(function (t) { return t.task.st === 'fut'; })],
+      ['Concluídas', 'sec-t', pool.filter(function (t) { return t.done; })]
+    ].filter(function (x) { return x[2].length; }).map(function (x) { return { title: x[0], cls: x[1], n: x[2].length, items: x[2].map(item) }; });
+    // agenda
+    const thu = ((4 - base.getDay() + 7) % 7) || 7;
+    const doneMap = this.state.done;
+    const AG = [
+      { d: 0, time: '10:30', title: 'Conferir o comprovante no financeiro', sub: 'Thiago Mendes, com Bruno Sales', kind: 'Tarefa', id: 'c9' },
+      { d: 0, time: '17:00', title: 'Confirmar a consulta de amanhã', sub: 'Carlos Eduardo Lima', kind: 'Tarefa', id: 'c6' },
+      { d: 0, time: '18:00', title: 'Mandar orçamento de lentes de contato', sub: 'Juliana Prates', kind: 'Tarefa', id: 'c5' },
+      { d: 1, time: '09:00', title: 'Consulta de retorno', sub: 'Carlos Eduardo Lima, 1 hora', kind: 'Compromisso', id: 'c6' },
+      { d: thu, time: '10:00', title: 'Ligar para a Renata sobre o contrato', sub: 'Studio Bella Forma', kind: 'Tarefa', id: 'c3' }
+    ];
+    const WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const days = [0, 1, 2, 3, 4, 5, 6].map(function (i) {
+      const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+      const has = AG.some(function (a) { return a.d === i; });
+      return {
+        wd: i === 0 ? 'Hoje' : WD[d.getDay()], num: d.getDate(), sel: p.day === i ? 'true' : 'false', dotCls: has ? 'on' : '',
+        aria: d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) + (has ? ', com compromissos' : ''),
+        go: function () { self.setP(pi, { day: i }); }
+      };
+    });
+    const sel = new Date(base.getFullYear(), base.getMonth(), base.getDate() + p.day);
+    const dt = sel.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const ag = AG.filter(function (a) { return a.d === p.day; }).map(function (a) {
+      const dn = a.kind === 'Tarefa' && !!doneMap[a.id];
+      return { time: a.time, title: a.title, sub: a.sub, kind: dn ? 'Tarefa concluída' : a.kind, kCls: 'ag-k' + (a.kind === 'Compromisso' ? ' k2' : ''), cls: 'ag-c' + (dn ? ' done' : ''), open: function () { self.openLead(pi, a.id); } };
+    });
+    return {
+      isLista: p.tView === 'lista' ? 'true' : 'false', isAgenda: p.tView === 'agenda' ? 'true' : 'false', lista: p.tView === 'lista', agenda: p.tView === 'agenda',
+      goLista: function () { self.setP(pi, { tView: 'lista' }); }, goAgenda: function () { self.setP(pi, { tView: 'agenda' }); },
+      chips: [['todas', 'Todas', all], ['minhas', 'Minhas', mine]].map(function (c) { return { label: c[1], n: c[2].filter(function (t) { return !t.done; }).length, on: p.tWho === c[0] ? 'true' : 'false', go: function () { self.setP(pi, { tWho: c[0] }); } }; }),
+      sections: secs, empty: secs.length === 0,
+      days: days, dayTitle: (p.day === 0 ? 'Hoje, ' : p.day === 1 ? 'Amanhã, ' : '') + dt, ag: ag, agEmpty: ag.length === 0,
+      newAppt: function () { self.toast(pi, 'Abre o formulário de novo compromisso.'); }
+    };
+  }
+
+  // ---------- Avisos ----------
+  avisosVM(p, pi) {
+    const self = this, s = this.state, AV = this.avisos();
+    const done = function (a) { return !!s.avisoDone[a.id] || (a.kind === 'qr' && s.qrOk); };
+    const KIND = { handoff: ['#i-spark', 'k-acc'], routing: ['#i-user', 'k-crit'], qr: ['#i-qr', 'k-crit'], outcome: ['#i-cal', 'k-info'], snooze: ['#i-clock', 'k-warn'], other: ['#i-check', 'k-ok'] };
+    const resolve = function (id, msg, extra) { const o = Object.assign({}, self.state.avisoDone); o[id] = true; self.toast(pi, msg, null, null, Object.assign({ avisoDone: o }, extra || {})); };
+    const openL = AV.filter(function (a) { return !done(a); }), doneL = AV.filter(done);
+    const list = p.avTab === 'open' ? openL : doneL;
+    return {
+      isOpen: p.avTab === 'open' ? 'true' : 'false', isDone: p.avTab === 'done' ? 'true' : 'false', nOpen: openL.length, nDone: doneL.length,
+      goOpen: function () { self.setP(pi, { avTab: 'open' }); }, goDone: function () { self.setP(pi, { avTab: 'done' }); },
+      menu: function () { self.sheet(pi, 'avmenu'); },
+      empty: list.length === 0, emptyT: p.avTab === 'open' ? 'Nenhum aviso em aberto' : 'Nenhum aviso resolvido',
+      emptyD: p.avTab === 'open' ? 'Quando a IA ou o sistema precisarem de você, o aviso aparece aqui.' : 'Avisos que você marcar como resolvidos ficam aqui.',
+      items: list.map(function (a) {
+        const isOpen = !done(a), k = KIND[a.kind] || KIND.other;
+        const prim = !isOpen ? null : a.kind === 'routing' ? 'Assumir' : a.kind === 'qr' ? 'Reconectar' : (a.kind === 'handoff' || a.kind === 'snooze') ? 'Abrir conversa' : null;
+        return {
+          title: a.title, sub: a.sub, when: a.when, href: k[0], icCls: 'av-ic ' + k[1],
+          hasPrimary: !!prim, primaryLabel: prim || '', hasOpen: isOpen && a.kind === 'routing',
+          isOutcome: isOpen && a.kind === 'outcome', isOpenItem: isOpen, isDoneItem: !isOpen && a.kind !== 'qr',
+          primary: function () {
+            if (a.kind === 'routing') { const o = Object.assign({}, self.state.owners), ad = Object.assign({}, self.state.avisoDone); o[a.conv] = 'voce'; ad[a.id] = true; self.openConv(pi, a.conv, { owners: o, avisoDone: ad }); return; }
+            if (a.kind === 'qr') { const ad = Object.assign({}, self.state.avisoDone); ad[a.id] = true; self.toast(pi, 'WhatsApp Comercial reconectado.', null, null, { qrOk: true, avisoDone: ad }); return; }
+            self.openConv(pi, a.conv);
+          },
+          openConv: function () { self.openConv(pi, a.conv); },
+          came: function () { resolve(a.id, 'Resultado registrado: compareceu.'); },
+          missed: function () { resolve(a.id, 'Resultado registrado: faltou. O follow-up de falta foi agendado.'); },
+          resched: function () { resolve(a.id, 'Resultado registrado: remarcou.'); },
+          resolve: function () {
+            const before = self.state.avisoDone, o = Object.assign({}, before); o[a.id] = true;
+            self.toast(pi, 'Aviso resolvido.', function () { self.setState(self.ph(pi, { toast: null }, { avisoDone: before })); }, null, { avisoDone: o });
+          },
+          reopen: function () { const o = Object.assign({}, self.state.avisoDone); delete o[a.id]; self.toast(pi, 'Aviso reaberto.', null, null, { avisoDone: o }); }
+        };
+      })
+    };
+  }
+
+  // ---------- Mais: o menu inteiro do CRM ----------
+  maisGroups() {
+    return [
+      { label: 'Atendimento', g: 'g-atend', sections: [{ items: [
+        ['Radar', '#i-activity', 'Quem está atendendo agora e o que está parado'], ['Agenda', '#i-cal', 'Compromissos do dia e da semana'], ['Respostas rápidas', '#i-zap', 'Mensagens prontas para usar na conversa']] }] },
+      { label: 'CRM', g: 'g-crm', sections: [
+        { title: 'O dia a dia da venda', items: [
+          ['Pipeline', '#i-kanban', 'O quadro de cada funil'], ['Contatos', '#i-users', 'Todas as pessoas e empresas da base'], ['Tarefas', '#i-check-sq', 'Próximos passos, atrasadas e concluídas'],
+          ['Prospecção', '#i-target', 'Listas e disparos para buscar clientes novos', 'Admin'], ['Campanhas', '#i-megaphone', 'Envios em massa pelo WhatsApp'], ['Chamadas', '#i-phone', 'Ligações feitas e recebidas'],
+          ['Comandas', '#i-receipt', 'Pedidos e consumo de cada atendimento', 'Opcional']] },
+        { title: 'Preparar a venda', items: [['Funis', '#i-funnel', 'Criar e organizar funis'], ['Etapas do funil', '#i-list', 'Nome, ordem e regras de cada etapa'], ['Produtos', '#i-box', 'Catálogo com preço para propostas e pedidos']] }] },
+      { label: 'Agente de IA', g: 'g-ia', sections: [
+        { title: 'Montar o agente', items: [
+          ['Agentes', '#i-spark', 'Quem atende, com que tom e em quais canais'], ['Fluxos de atendimento', '#i-flow', 'Os caminhos que a conversa pode seguir'], ['Follow-ups', '#i-repeat', 'Mensagens automáticas para quem parou de responder'],
+          ['Roteadores', '#i-shuffle', 'Para qual agente ou pessoa cada conversa vai'], ['Provedores', '#i-cpu', 'Os modelos de IA que o agente usa'], ['Credenciais', '#i-key', 'Chaves de acesso dos provedores']] },
+        { title: 'Ensinar o agente', items: [['Conhecimento', '#i-book', 'Documentos, preços e respostas que a IA consulta'], ['Memória', '#i-database', 'O que a IA lembra de cada cliente'], ['Skills', '#i-wand', 'Ações que a IA executa sozinha, como agendar']] },
+        { title: 'Acompanhar o agente', items: [
+          ['Casos', '#i-flag', 'Conversas que a IA marcou para revisão'], ['Alertas', '#i-bell', 'A mesma central da aba Avisos'], ['Aviso no WhatsApp', '#i-chat', 'Receber os alertas no seu WhatsApp'],
+          ['Propostas da IA', '#i-bulb', 'Melhorias que a IA sugere para si mesma'], ['Execuções', '#i-play', 'Cada passo que a IA deu, um por um'], ['Uso e orçamento', '#i-gauge', 'Quanto a IA gastou no mês e qual é o limite']] }] },
+      { label: 'Canais', g: 'g-canais', sections: [{ items: [
+        ['Conexões', '#i-plug', 'Números de WhatsApp, Instagram e QR code'], ['Nuvemshop', '#i-store', 'Pedidos e clientes da sua loja'], ['Webhooks', '#i-link', 'Avisar outros sistemas quando algo acontece']] }] },
+      { label: 'Análise', g: 'g-analise', sections: [
+        { title: 'Dinheiro', items: [['Faturamento', '#i-dollar', 'Receita por período, canal e vendedor']] },
+        { title: 'Os números do período', items: [['Desempenho', '#i-chart', 'Tempo de resposta, conversões e atendimentos'], ['Meta Ads', '#i-target', 'Investimento e retorno das campanhas'], ['Atividades', '#i-list', 'O que a equipe fez em cada dia']] },
+        { title: 'O histórico que se consulta', items: [['Evolução da IA', '#i-trend', 'Como a IA melhorou mês a mês'], ['Audit Log', '#i-history', 'Quem mudou o quê, e quando']] }] },
+      { label: 'Ajustes', g: 'g-config', sections: [
+        { title: 'Sua conta', items: [['Perfil', '#i-user', 'Nome, foto e assinatura'], ['Segurança', '#i-shield', 'Senha, acesso em dois passos e sessões'], ['Notificações', '#i-bell', 'O que avisa no celular e no e-mail']] },
+        { title: 'Sua empresa', items: [
+          ['Organização', '#i-building', 'Nome, endereço e horário de atendimento'], ['Equipe', '#i-users', 'Pessoas, papéis e permissões'], ['Distribuição de atendimento', '#i-shuffle', 'Como as conversas se dividem na equipe'],
+          ['Etiquetas', '#i-tag', 'Criar, juntar, arquivar e ver o uso de cada etiqueta'], ['Marca', '#i-palette', 'Logo e cores do CRM'], ['Billing', '#i-card', 'Plano, faturas e forma de pagamento'],
+          ['Recursos opcionais', '#i-toggle', 'Ligar e desligar módulos extras'], ['Extensões', '#i-puzzle', 'Integrações com outros apps']] },
+        { title: 'Vendas e agenda', items: [['Tipos de agendamento', '#i-cal', 'Duração e regras de cada compromisso'], ['Propostas comerciais', '#i-file', 'Modelos de proposta com seus produtos'], ['Financeiro', '#i-dollar', 'Contas, recebimentos e conciliação']] },
+        { title: 'Anúncios', items: [['Conversões', '#i-trend', 'Eventos enviados de volta para a Meta'], ['Conta Meta Ads', '#i-target', 'Conectar a conta de anúncios']] },
+        { title: 'Dados e acesso', items: [['LGPD', '#i-lock', 'Consentimento, exportação e exclusão de dados'], ['API Tokens', '#i-key', 'Chaves para integrar com outros sistemas'], ['Trunk SIP', '#i-phone', 'Linha de telefone para as chamadas'], ['Dados externos', '#i-database', 'Planilhas e bases conectadas']] }] }
+    ];
+  }
+  maisVM(p, pi, counts, dark) {
+    const self = this, s = this.state, orgs = this.orgs(), org = orgs.find(function (o) { return o.id === s.org; }) || orgs[0];
+    const special = {
+      'Pipeline': function () { self.goTab(pi, 'funil'); }, 'Tarefas': function () { self.goTab(pi, 'tarefas', { tView: 'lista' }); },
+      'Agenda': function () { self.goTab(pi, 'tarefas', { tView: 'agenda' }); }, 'Alertas': function () { self.goTab(pi, 'avisos'); },
+      'Conexões': function () { self.push(pi, 'canais'); }
+    };
+    const extra = {
+      'Tarefas': counts.late ? { n: counts.late, nCls: 'cnt b-crit' } : null,
+      'Alertas': counts.av ? { n: counts.av, nCls: 'cnt b-warn' } : null
+    };
+    return {
+      groups: this.maisGroups().map(function (g) {
+        return { label: g.label, sections: g.sections.map(function (sec) {
+          return { hasTitle: !!sec.title, title: sec.title || '', items: sec.items.map(function (it) {
+            const ex = extra[it[0]];
+            return {
+              label: it[0], href: it[1], sub: it[2], icCls: 'li-ic ' + g.g, hasTag: !!it[3], tag: it[3] || '',
+              hasN: !!ex, n: ex ? ex.n : 0, nCls: ex ? ex.nCls : '', hasDot: it[0] === 'Conexões' && !s.qrOk,
+              go: special[it[0]] || function () { self.toast(pi, 'Abre a tela ' + it[0] + '.'); }
+            };
+          }) };
+        }) };
+      }),
+      availOn: s.avail ? 'true' : 'false', availCls: 'tg' + (s.avail ? ' on' : ''),
+      availSub: s.avail ? 'Recebe conversas da fila' : 'Ausente: a fila vai para a equipe',
+      darkSub: dark ? 'Pele Verdash, boa para a noite' : 'Cor da marca, fundo claro',
+      role: org.role, orgIni: org.ini, orgName: org.name, multiOrg: orgs.length > 1, singleOrg: orgs.length < 2,
+      orgSub: 'Organização atual (' + orgs.length + ' no total)', orgAria: org.name + ', organização atual. Trocar de organização',
+      darkOn: dark ? 'true' : 'false', darkCls: 'tg' + (dark ? ' on' : ''),
+      toggleAvail: function () { self.toast(pi, self.state.avail ? 'Você não recebe novas conversas até ficar disponível de novo.' : 'Você está disponível para novas conversas.', null, null, { avail: !self.state.avail }); },
+      toggleTheme: function () { self.setState({ theme: dark ? 'light' : 'dark' }); },
+      orgs: function () { self.sheet(pi, 'orgs'); },
+      editProfile: function () { self.toast(pi, 'Abre o perfil para editar nome, foto e assinatura.'); },
+      search: function () { self.push(pi, 'busca', { q: '' }); },
+      logout: function () { self.toast(pi, 'Pede confirmação antes de sair da conta.'); }
+    };
+  }
+
+  // ---------- Canais ----------
+  canaisVM(p, pi) {
+    const self = this, s = this.state;
+    const C = [
+      { name: 'WhatsApp Atendimento', sub: '+55 11 4003-2210', logo: 'wa', st: 'ok' },
+      { name: 'WhatsApp Comercial', sub: '+55 11 4003-2211', logo: 'wa', st: s.qrOk ? 'ok' : 'crit', warn: 'Leia o QR code de novo para voltar a receber mensagens deste número.', primaryLabel: 'Reconectar',
+        primary: function () { const ad = Object.assign({}, self.state.avisoDone); ad.a3 = true; self.toast(pi, 'WhatsApp Comercial reconectado.', null, null, { qrOk: true, avisoDone: ad }); } },
+      { name: 'Instagram Direct', sub: '@studioaurora', logo: 'ig', st: 'ok' },
+      { name: 'Nuvemshop', sub: 'Pedidos e clientes da loja', logo: 'store', st: 'off', primaryLabel: 'Conectar', primary: function () { self.toast(pi, 'Abre a Nuvemshop para autorizar a conexão.'); } },
+      { name: 'Webhooks', sub: '2 ativos', logo: 'link', st: 'ok', okLabel: 'Ativo' }
+    ];
+    const HREF = { wa: '#i-chat', ig: '#i-ig', store: '#i-store', link: '#i-link' };
+    return {
+      cards: C.map(function (c) {
+        const off = c.st === 'off', crit = c.st === 'crit';
+        return {
+          name: c.name, sub: c.sub, href: HREF[c.logo], logoCls: 'cc-logo l-' + c.logo,
+          stCls: 'st ' + (crit ? 'st-crit' : off ? 'st-off' : 'st-ok'), stLabel: crit ? 'Desconectado' : off ? 'Não conectado' : (c.okLabel || 'Conectado'),
+          hasWarn: crit, warn: c.warn || '', hasPrimary: crit || off, primaryLabel: c.primaryLabel || '', primary: c.primary || null,
+          hasManage: !off, manage: function () { self.toast(pi, 'Abre os ajustes de ' + c.name + '.'); }
+        };
+      }),
+      add: function () { self.toast(pi, 'Mostra os canais que dá para conectar.'); }
+    };
+  }
+
+  // ---------- Busca ----------
+  buscaVM(p, pi, live) {
+    const self = this, q = this.norm((p.q || '').trim()), digits = q.replace(/\D/g, '');
+    const recent = ['Mariana Couto', 'plano anual', 'Bella Forma'].map(function (r) { return { label: r, go: function () { self.setP(pi, { q: r }); } }; });
+    let groups = [];
+    if (q) {
+      const ct = live.filter(function (x) { return self.norm(x.name).indexOf(q) >= 0 || (digits.length >= 3 && x.phone.replace(/\D/g, '').indexOf(digits) >= 0); });
+      const cv = [];
+      live.forEach(function (x) {
+        const hit = x.allMsgs.find(function (m) { return m.text && self.norm(m.text).indexOf(q) >= 0; });
+        if (hit) { const i = self.norm(hit.text).indexOf(q), a = Math.max(0, i - 22); cv.push({ x: x, snip: (a > 0 ? '…' : '') + hit.text.slice(a, a + 64) }); }
+      });
+      const ld = live.filter(function (x) { return x.lead && (self.norm(x.name).indexOf(q) >= 0 || self.norm(x.lead.funil).indexOf(q) >= 0 || self.norm(x.interesse).indexOf(q) >= 0); });
+      groups = [
+        { title: 'Contatos', items: ct.slice(0, 4).map(function (x) { return { isAv: true, isIc: false, href: '', avCls: 'av av-m av-' + x.av, ini: x.ini, title: x.name, sub: x.phone, kind: 'Contato', go: function () { self.openLead(pi, x.id); } }; }) },
+        { title: 'Conversas', items: cv.slice(0, 4).map(function (o) { return { isAv: false, isIc: true, href: '#i-chat', title: o.x.name, sub: o.snip, kind: o.x.time, go: function () { self.openConv(pi, o.x.id); } }; }) },
+        { title: 'Leads', items: ld.slice(0, 4).map(function (x) { const f = self.funil(x.lead.funil); return { isAv: false, isIc: true, href: '#i-target', title: x.name, sub: x.lead.funil + ', ' + f.etapas[Math.min(x.lead.etapa, f.etapas.length - 1)] + ', ' + x.lead.valor, kind: 'Lead', go: function () { self.openLead(pi, x.id); } }; }) }
+      ].filter(function (g) { return g.items.length; }).map(function (g) { return Object.assign(g, { n: g.items.length }); });
+    }
+    return {
+      inputId: 'bs-' + pi, hasQ: !!q, noQ: !q, recent: recent, groups: groups, none: !!q && groups.length === 0,
+      onQ: function (e) { self.setP(pi, { q: e.target.value }); }, clear: function () { self.setP(pi, { q: '' }); }
+    };
+  }
+
+  // ---------- Folhas inferiores ----------
+  sheetVM(p, pi, byId, L) {
+    const self = this, s = this.state, team = this.team(), name = p.sheet;
+    const empty = { title: '', hasSub: false, sub: '', isMenu: false, isTiles: false, isFiltros: false, isPerdido: false, items: [], tiles: [], canais: [], donos: [], reasons: [] };
+    if (!name) return empty;
+    const close = { sheet: null };
+    const I = function (label, href, go, o) { const r = Object.assign({ isItem: true, isHead: false, label: label, href: href || '', hasIc: !!href, hasIni: false, ini: '', sub: '', cls: 'si', icCls: 'si-ic', checked: false, isSwitch: false, swCls: '', hasN: false, n: 0, role: undefined, ariaChecked: undefined, go: go }, o || {}); r.hasSub = !!r.sub; return r; };
+    const H = function (label) { return { isHead: true, isItem: false, label: label }; };
+    const T = function (msg) { return function () { self.toast(pi, msg, null, close); }; };
+    const menu = function (title, items, sub) { return Object.assign({}, empty, { title: title, sub: sub || '', hasSub: !!sub, isMenu: true, items: items }); };
+    const top = p.stack[p.stack.length - 1];
+
+    if (name === 'fab') {
+      const F = {
+        nc: I('Nova conversa', '#i-chat', T('Abre a nova conversa: escolha um contato ou digite o número.'), { sub: 'Primeira mensagem para um número ou contato' }),
+        ct: I('Novo contato', '#i-user-plus', T('Abre o formulário de novo contato.'), { sub: 'Pessoa ou empresa na base' }),
+        ld: I('Novo lead', '#i-target', T('Abre o formulário de novo lead.'), { sub: 'Negócio aberto em um funil' }),
+        tk: I('Nova tarefa', '#i-check-sq', T('Abre o formulário de nova tarefa.'), { sub: 'Próximo passo com prazo e responsável' }),
+        cp: I('Novo compromisso', '#i-cal', T('Abre o formulário de novo compromisso.'), { sub: 'Horário marcado na agenda' })
+      };
+      const by = { conversas: [F.nc, F.ct, F.ld, F.tk, F.cp], funil: [F.ld, F.ct, F.tk], tarefas: [F.tk, F.cp, F.ld] };
+      return menu('Criar', by[p.tab] || by.conversas);
+    }
+    if (name === 'filtros') {
+      const set = function (patch) { return function () { self.setP(pi, patch); }; };
+      return Object.assign({}, empty, {
+        title: 'Filtros', isFiltros: true, unreadOn: p.fUnread ? 'true' : 'false', unreadCls: 'tg' + (p.fUnread ? ' on' : ''),
+        toggleUnread: set({ fUnread: !p.fUnread }),
+        canais: [['todos', 'Todos'], ['wa', 'WhatsApp'], ['ig', 'Instagram']].map(function (c) { return { label: c[1], on: p.fCanal === c[0] ? 'true' : 'false', go: set({ fCanal: c[0] }) }; }),
+        donos: [['todos', 'Todos'], ['voce', 'Você'], ['ia', 'Agente IA'], ['fila', 'Sem dono'], ['bruno', 'Bruno Sales']].map(function (c) { return { label: c[1], on: p.fDono === c[0] ? 'true' : 'false', go: set({ fDono: c[0] }) }; }),
+        clear: set({ fUnread: false, fCanal: 'todos', fDono: 'todos' }),
+        seeLabel: L.count === 1 ? 'Ver 1 conversa' : 'Ver ' + L.count + ' conversas'
+      });
+    }
+    if (name === 'lista') {
+      return menu('Conversas', [
+        I('Marcar todas como lidas', '#i-mail-open', function () { const r = Object.assign({}, self.state.read); self.convs().forEach(function (c) { r[c.id] = true; }); self.toast(pi, 'Todas marcadas como lidas.', null, close, { read: r, unreadMark: {} }); }),
+        I('Selecionar conversas', '#i-check-sq', T('Toque nas conversas para escolher várias de uma vez.')),
+        I('Disponível para novas conversas', '#i-check-circle', function () { self.setState(self.ph(pi, {}, { avail: !self.state.avail })); }, { isSwitch: true, swCls: 'tg' + (s.avail ? ' on' : ''), role: 'switch', ariaChecked: s.avail ? 'true' : 'false' }),
+        I('Respostas rápidas', '#i-zap', T('Abre a lista de respostas rápidas para editar.'))
+      ]);
+    }
+    if (name === 'conv' || name === 'leadmenu') {
+      const id = p.sheetFor || p.conv, x = byId[id];
+      const pt = function (msg, extra, patch) { self.toast(pi, msg, null, Object.assign({ sheet: null }, patch || {}), extra); };
+      if (name === 'leadmenu') {
+        const items = [
+          I('Editar contato', '#i-edit', T('Abre a edição de nome, telefone e e-mail.')),
+          I('Transferir', '#i-swap', function () { self.setP(pi, { sheet: 'transfer', sheetFor: id }); }, { sub: 'Hoje com ' + team[x.owner] })
+        ];
+        if (x.lead) items.push(I('Mover etapa', '#i-move', function () { self.setP(pi, { sheet: 'mover', sheetFor: id }); }, { sub: x.lead.funil }));
+        items.push(I('Abrir conversa', '#i-chat', function () { self.openConv(pi, id); }));
+        return menu(x.name, items);
+      }
+      const items = [H('Lead')];
+      if (x.lead) {
+        const lf = self.funil(x.lead.funil), lc = Math.min(x.lead.etapa, lf.etapas.length - 1);
+        items.push(I('Mover etapa', '#i-move', function () { self.setP(pi, { sheet: 'mover', sheetFor: id }); }, { sub: 'Hoje em ' + lf.etapas[lc] + ', ' + lf.nome }));
+        items.push(I('Mudar de funil', '#i-funnel', function () { self.setP(pi, { sheet: 'trocafunil', sheetFor: id, mvFunil: null }); }, { sub: 'Levar para outro funil e etapa' }));
+        items.push(I('Marcar como ganho', '#i-check-circle', function () { self.setLead(pi, id, { etapa: lf.etapas.length - 1 }, 'Negócio de ' + x.name + ' marcado como ganho.'); }));
+        items.push(I('Marcar como perdido', '#i-x-circle', function () { self.setP(pi, { sheet: 'perdido', sheetFor: id, lostReason: '', lostDetail: '' }); }, { cls: 'si danger', sub: 'Pede o motivo antes' }));
+      } else {
+        items.push(I('Criar lead', '#i-target', function () { self.setLead(pi, id, { funil: 'Vendas Clínica', etapa: 0, lost: false }, 'Lead criado em Vendas Clínica, etapa Novo.'); }, { sub: 'Abrir negócio no funil' }));
+      }
+      if (top !== 'lead') items.push(I('Ver ficha do lead', '#i-user', function () { self.openLead(pi, id); }));
+      items.push(H('Conversa'));
+      items.push(I('Transferir', '#i-swap', function () { self.setP(pi, { sheet: 'transfer', sheetFor: id }); }, { sub: 'Hoje com ' + team[x.owner] }));
+      items.push(I(x.pinned ? 'Desafixar' : 'Fixar no topo', '#i-pin', function () { pt(x.pinned ? 'Conversa desafixada.' : 'Conversa fixada no topo.', { pinned: self.flip(self.state.pinned, id) }); }));
+      items.push(I(x.muted ? 'Reativar avisos' : 'Silenciar avisos por 8 h', '#i-bell-off', function () { pt(x.muted ? 'Avisos reativados.' : 'Avisos silenciados por 8 horas.', { muted: self.flip(self.state.muted, id) }); }));
+      items.push(I(x.unread > 0 ? 'Marcar como lida' : 'Marcar como não lida', '#i-mail-open', function () { self.toggleRead(pi, id, { sheet: null }); }));
+      items.push(I(x.archived ? 'Desarquivar' : 'Arquivar', '#i-archive', function () {
+        const q = self.state.phones[pi], inConv = q.stack[q.stack.length - 1] === 'conversa' && q.conv === id;
+        self.toggleArchive(pi, id, inConv && !x.archived ? { sheet: null, stack: q.stack.slice(0, -1) } : { sheet: null });
+      }));
+      items.push(I(x.closed ? 'Reabrir conversa' : 'Fechar conversa', '#i-check-circle', function () { const cl = Object.assign({}, self.state.closed); cl[id] = !x.closed; pt(x.closed ? 'Conversa reaberta.' : 'Conversa fechada.', { closed: cl }); }));
+      return menu(x.name, items, 'Conversa no ' + (x.ch === 'wa' ? 'WhatsApp' : 'Instagram'));
+    }
+    if (name === 'transfer') {
+      const id = p.sheetFor || p.conv, x = byId[id];
+      const INI = { voce: 'PA', bruno: 'BS', leticia: 'LA', ia: 'IA', fila: '?' };
+      const SUB = { voce: 'Paula Andrade', ia: 'Responde e passa para a equipe quando precisar', fila: 'Volta para a fila de espera' };
+      return menu('Transferir conversa', ['voce', 'bruno', 'leticia', 'ia', 'fila'].map(function (k) {
+        return I(team[k], null, function () { const o = Object.assign({}, self.state.owners); o[id] = k; self.toast(pi, k === 'fila' ? 'Conversa voltou para a fila.' : 'Conversa agora está com ' + team[k] + '.', null, close, { owners: o }); },
+          { hasIni: true, ini: INI[k], icCls: 'si-ic si-av', sub: SUB[k] || '', checked: x.owner === k, role: 'menuitemradio', ariaChecked: x.owner === k ? 'true' : 'false' });
+      }), x.name);
+    }
+    if (name === 'anexos') {
+      const tl = [['Galeria', '#i-image', 'Abre a galeria do celular.'], ['Câmera', '#i-camera', 'Abre a câmera.'], ['Documento', '#i-file', 'Abre os arquivos do celular.'], ['Contato', '#i-user', 'Escolha um contato para compartilhar.'], ['Localização', '#i-map-pin', 'Envia a localização da clínica.'], ['Modelo aprovado', '#i-note', 'Abre os modelos aprovados pela Meta.']];
+      return Object.assign({}, empty, { title: 'Anexar', isTiles: true, tiles: tl.map(function (t) { return { label: t[0], href: t[1], go: T(t[2]) }; }) });
+    }
+    if (name === 'rapidas') {
+      const id = p.sheetFor || p.conv, x = byId[id];
+      const pick = function (txt) { return function () {
+        if (x.owner !== 'voce') { const o = Object.assign({}, self.state.owners); o[id] = 'voce'; self.toast(pi, 'Você assumiu a conversa. Revise e envie.', null, { sheet: null, draft: txt }, { owners: o }); return; }
+        self.setP(pi, { sheet: null, draft: txt });
+      }; };
+      const RQ = [['Avaliação gratuita', 'A avaliação leva 30 minutos e não tem custo. Posso agendar para você?'], ['Formas de pagamento', 'Aceitamos Pix, cartão em até 12x e boleto.'], ['Confirmar horário', 'Seu horário está confirmado. Qualquer imprevisto, é só me avisar por aqui.'], ['Pedir um instante', 'Só um instante, já te respondo.']];
+      const items = [];
+      if (x.suggest) { items.push(H('Sugestão da IA')); items.push(I('Resposta sugerida', '#i-spark', pick(x.suggest), { sub: x.suggest })); }
+      items.push(H('Respostas rápidas'));
+      RQ.forEach(function (r) { items.push(I(r[0], '#i-zap', pick(r[1]), { sub: r[1] })); });
+      return menu('Respostas rápidas', items, 'Toque para colocar no campo de mensagem');
+    }
+    if (name === 'mover') {
+      const id = p.sheetFor || p.lead, x = byId[id];
+      if (!x.lead) return menu(x.name, [I('Criar lead', '#i-target', function () { self.setLead(pi, id, { funil: 'Vendas Clínica', etapa: 0, lost: false }, 'Lead criado em Vendas Clínica, etapa Novo.'); })]);
+      const f = this.funil(x.lead.funil), cur = Math.min(x.lead.etapa, f.etapas.length - 1);
+      const items = [H(f.nome)].concat(f.etapas.map(function (e, i) {
+        return I(e, null, function () { if (i === cur) { self.setP(pi, close); return; } self.setLead(pi, id, { etapa: i }, x.name + ' foi para ' + e + '.'); },
+          { hasIni: true, ini: String(i + 1), checked: i === cur, role: 'menuitemradio', ariaChecked: i === cur ? 'true' : 'false', sub: i === cur ? 'Etapa atual' : '' });
+      }));
+      items.push(I('Mudar de funil', '#i-funnel', function () { self.setP(pi, { sheet: 'trocafunil', sheetFor: id, mvFunil: null }); }, { sub: 'Levar para outro funil e etapa' }));
+      items.push(H('Encerrar'));
+      items.push(I('Marcar como ganho', '#i-check-circle', function () { self.setLead(pi, id, { etapa: f.etapas.length - 1 }, 'Negócio de ' + x.name + ' marcado como ganho.'); }));
+      items.push(I('Marcar como perdido', '#i-x-circle', function () { self.setP(pi, { sheet: 'perdido', sheetFor: id, lostReason: '', lostDetail: '' }); }, { cls: 'si danger', sub: 'Pede o motivo antes' }));
+      return menu('Mover ' + x.name, items, x.lead.valor);
+    }
+    if (name === 'trocafunil') {
+      const id = p.sheetFor || p.lead, x = byId[id], curF = x.lead ? x.lead.funil : '';
+      if (!p.mvFunil) {
+        return menu('Mudar de funil', this.funis().map(function (f) {
+          return I(f.nome, '#i-funnel', function () { self.setP(pi, { mvFunil: f.nome }); }, { checked: f.nome === curF, sub: f.nome === curF ? 'Funil atual' : f.etapas.length + ' etapas' });
+        }), x.name + ': escolha o funil de destino');
+      }
+      const tf = this.funil(p.mvFunil);
+      const items = [I('Escolher outro funil', '#i-back', function () { self.setP(pi, { mvFunil: null }); }), H(tf.nome)].concat(tf.etapas.map(function (e, i) {
+        return I(e, null, function () { self.setLead(pi, id, { funil: tf.nome, etapa: i, lost: false }, x.name + ' foi para ' + tf.nome + ', etapa ' + e + '.'); }, { hasIni: true, ini: String(i + 1) });
+      }));
+      return menu('Etapa de destino', items, x.name + ' em ' + tf.nome);
+    }
+    if (name === 'perdido') {
+      const id = p.sheetFor || p.lead, x = byId[id];
+      const set = function (patch) { return function () { self.setP(pi, patch); }; };
+      return Object.assign({}, empty, {
+        title: 'Marcar como perdido', sub: x.name + (x.lead ? ', ' + x.lead.valor : ''), hasSub: true, isPerdido: true,
+        reasons: ['Preço', 'Sem retorno do cliente', 'Comprou de outro', 'Sem interesse agora', 'Outro motivo'].map(function (r) { return { label: r, on: p.lostReason === r ? 'true' : 'false', go: set({ lostReason: r }) }; }),
+        detId: 'lost-' + pi, detail: p.lostDetail || '', noReason: !p.lostReason,
+        onDetail: function (e) { self.setP(pi, { lostDetail: e.target.value }); },
+        confirm: function () { const q = self.state.phones[pi]; if (!q.lostReason) return; self.setLead(pi, id, { lost: true, lostReason: q.lostReason, lostDetail: q.lostDetail || '' }, 'Negócio marcado como perdido: ' + q.lostReason.toLowerCase() + '.'); }
+      });
+    }
+    if (name === 'funis') {
+      const live = Object.keys(byId).map(function (k) { return byId[k]; });
+      return menu('Escolher funil', this.funis().map(function (f) {
+        const n = live.filter(function (x) { return x.lead && x.lead.funil === f.nome; }).length;
+        return I(f.nome, '#i-funnel', function () { self.setP(pi, { sheet: null, funil: f.nome, stage: 0 }); }, { checked: p.funil === f.nome, role: 'menuitemradio', ariaChecked: p.funil === f.nome ? 'true' : 'false', sub: n + (n === 1 ? ' lead aberto' : ' leads abertos') + ', ' + f.etapas.length + ' etapas' });
+      }));
+    }
+    if (name === 'funilmenu') {
+      return menu('Funil', [
+        I('Trocar de funil', '#i-funnel', function () { self.setP(pi, { sheet: 'funis' }); }),
+        I('Editar etapas', '#i-list', T('Abre as etapas do funil para renomear e reordenar.')),
+        I('Ver ganhos e perdidos', '#i-check-circle', T('Mostra os negócios encerrados no período.'))
+      ]);
+    }
+    if (name === 'avmenu') {
+      return menu('Avisos', [I('Marcar todos como resolvidos', '#i-check-circle', function () {
+        const before = self.state.avisoDone, o = Object.assign({}, before); self.avisos().forEach(function (a) { o[a.id] = true; });
+        self.toast(pi, 'Todos os avisos resolvidos.', function () { self.setState(self.ph(pi, { toast: null }, { avisoDone: before })); }, close, { avisoDone: o });
+      })]);
+    }
+    if (name === 'orgs') {
+      return menu('Trocar de organização', this.orgs().map(function (o) {
+        const on = s.org === o.id;
+        return I(o.name, null, function () { if (on) { self.setP(pi, close); return; } self.toast(pi, 'Agora em ' + o.name + '.', null, close, { org: o.id }); },
+          { hasIni: true, ini: o.ini, icCls: 'si-ic si-org', checked: on, role: 'menuitemradio', ariaChecked: on ? 'true' : 'false', sub: o.role });
+      }));
+    }
+    return empty;
+  }
+
+  // ---------- Um aparelho ----------
+  vm(p, pi, live, byId, counts, dark) {
+    const self = this;
+    const top = p.stack[p.stack.length - 1];
+    const is = { list: top === 'conversas' || top === 'arquivo', conv: top === 'conversa', lead: top === 'lead', busca: top === 'busca', funil: top === 'funil', tarefas: top === 'tarefas', avisos: top === 'avisos', mais: top === 'mais', canais: top === 'canais' };
+    const kind = top === 'arquivo' ? p.listKind : 'main';
+    const L = this.listVM(p, pi, live, byId, kind);
+    const TABS = [['conversas', 'Conversas', '#i-chat', counts.fila, 'b-acc', ' aguardando'], ['funil', 'Funil', '#i-kanban', 0, '', ''], ['tarefas', 'Tarefas', '#i-check-sq', counts.late, 'b-crit', ' atrasadas'], ['avisos', 'Avisos', '#i-bell', counts.av, 'b-warn', ' abertos'], ['mais', 'Mais', '#i-grid', 0, '', '']];
+    const toast = p.toast;
+    return {
+      n: p.n, t: p.t, resetAria: 'Voltar a tela ' + p.n + ' ao começo', is: is, draft: p.draft, q: p.q,
+      scrCls: 'scr' + (is.lead || is.mais || is.canais || is.tarefas || is.avisos || is.funil ? ' g' : ''),
+      showTabs: !(is.conv || is.lead || is.busca), showFab: top === 'conversas' || top === 'funil' || top === 'tarefas',
+      fabAria: top === 'funil' ? 'Criar: novo lead e mais' : top === 'tarefas' ? 'Criar: nova tarefa e mais' : 'Criar: nova conversa e mais',
+      tabs: TABS.map(function (t) {
+        return {
+          label: t[1], href: t[2], cur: p.tab === t[0] ? 'page' : 'false', hasN: t[3] > 0, n: t[3], nCls: 'tb-badge ' + t[4],
+          aria: t[1] + (t[3] > 0 ? ', ' + t[3] + t[5] : ''),
+          go: function () { const q = self.state.phones[pi]; if (q.tab === t[0] && q.stack.length > 1) self.setP(pi, { stack: [t[0]], sheet: null, swipe: null }); else self.goTab(pi, t[0]); }
+        };
+      }),
+      L: L, C: this.convVM(p, pi, byId), D: this.leadVM(p, pi, byId), F: this.funilVM(p, pi, live), T: this.tarefasVM(p, pi, live),
+      A: this.avisosVM(p, pi), M: this.maisVM(p, pi, counts, dark), K: this.canaisVM(p, pi), B: this.buscaVM(p, pi, live),
+      S: this.sheetVM(p, pi, byId, L), hasSheet: !!p.sheet,
+      closeSheet: function () { self.setP(pi, { sheet: null }); },
+      openFab: function () { self.sheet(pi, 'fab'); },
+      back: function () { self.back(pi); },
+      reset: function () { clearTimeout(self._tt[pi]); self.setP(pi, Object.assign({}, self.starts()[pi])); },
+      hasToast: !!toast, toastText: toast ? toast.text : '', toastHasUndo: !!(toast && toast.undo), toastUndo: toast && toast.undo ? toast.undo : null,
+      toastCls: 'toast' + (is.conv ? ' low' : '') + (is.lead || is.busca ? ' low' : '')
+    };
+  }
+
+  renderVals() {
+    const self = this, s = this.state;
+    const dark = s.theme ? s.theme === 'dark' : this.props.theme !== 'Claro';
+    const live = this.convs().map(function (c) { return self.m(c); });
+    const byId = {}; live.forEach(function (x) { byId[x.id] = x; });
+    const counts = {
+      fila: live.filter(function (x) { return !x.closed && !x.archived && x.wait > 0 && x.owner !== 'voce'; }).length,
+      late: live.filter(function (x) { return x.task && !x.taskDone && x.task.st === 'late'; }).length,
+      av: this.avisos().filter(function (a) { return !s.avisoDone[a.id] && !(a.kind === 'qr' && s.qrOk); }).length
+    };
+    return {
+      rootCls: 'mb mbv' + (dark ? ' dark' : ''), accent: this.props.accent || '#2690B1',
+      isDark: dark ? 'true' : 'false', isLight: dark ? 'false' : 'true',
+      setDark: function () { self.setState({ theme: 'dark' }); }, setLight: function () { self.setState({ theme: 'light' }); },
+      phones: s.phones.map(function (p, pi) { return self.vm(p, pi, live, byId, counts, dark); })
+    };
+  }
+}
+</script>
+</body>
+</html>
