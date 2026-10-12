@@ -84,7 +84,8 @@ describe("demanda — próximo passo é tarefa", () => {
     await userEvent.click(within(sem).getByTestId("marcar-proximo-passo"));
     const form = within(sem).getByTestId("nova-tarefa-rapida");
     await userEvent.type(within(form).getByLabelText("O que fazer"), "Ligar");
-    await userEvent.click(within(form).getByRole("button", { name: "Amanhã 9:00" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Amanhã" }));
+    await userEvent.click(within(form).getByRole("button", { name: "09:00" }));
     await userEvent.click(within(form).getByRole("button", { name: "Criar tarefa" }));
 
     // Sem leitura por demanda: a MESMA lista do contato, relida pela invalidação.
@@ -111,7 +112,8 @@ describe("demanda — próximo passo é tarefa", () => {
     await userEvent.click(within(sem).getByTestId("marcar-proximo-passo"));
     const form = within(sem).getByTestId("nova-tarefa-rapida");
     await userEvent.type(within(form).getByLabelText("O que fazer"), "Enviar a segunda via do boleto");
-    await userEvent.click(within(form).getByRole("button", { name: "Amanhã 9:00" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Amanhã" }));
+    await userEvent.click(within(form).getByRole("button", { name: "09:00" }));
     await userEvent.click(within(form).getByRole("button", { name: "Criar tarefa" }));
 
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
@@ -129,7 +131,8 @@ describe("demanda — próximo passo é tarefa", () => {
     await userEvent.click(within(sem).getByTestId("marcar-proximo-passo"));
     const form = within(sem).getByTestId("nova-tarefa-rapida");
     await userEvent.type(within(form).getByLabelText("O que fazer"), "Ligar amanhã");
-    await userEvent.click(within(form).getByRole("button", { name: "Amanhã 9:00" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Amanhã" }));
+    await userEvent.click(within(form).getByRole("button", { name: "09:00" }));
     await userEvent.click(within(form).getByRole("button", { name: "Criar tarefa" }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
