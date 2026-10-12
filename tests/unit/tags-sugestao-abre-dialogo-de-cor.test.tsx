@@ -1,0 +1,143 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { ContactTagsEditor } from "@/components/inbox/ContactTagsEditor";
+import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
+
+/**
+ * A sugestão de etiqueta vai para a CAIXA DE DIÁLOGO antes de gravar (#2789).
+ *
+ * O nome DIGITADO já nasce colorido desde a #2718 (escolhe no gatilho 🎨, clica
+ * "+"), mas a sugestão do vocabulário escapava daquele caminho: o chip chamava
+ * `add(tag)` direto, com `cor` ainda `null`, e a etiqueta nascia SEM COR sem que
+ * a paleta aparecesse. A queixa era "clico e vai direto, sem cor".
+ *
+ * Três lados, porque um sem os outros não fecha:
+ *  - o CLIQUE abre o diálogo e NÃO grava ainda (se já gravasse, a cor não teria
+ *    onde entrar);
+ *  - CONFIRMAR grava a tag com o tom escolhido, e CANCELAR não grava nada;
+ *  - para quem a rota recusaria (`agent`, manager + MFA exigidos) o clique
+ *    continua DIRETO — a tela não oferece o que a escrita recusa (#2718).
+ *
+ * O papel vem de `estado.papel` e não do mock fixo dos testes irmãos porque os
+ * dois caminhos (com e sem diálogo) precisam rodar no MESMO arquivo.
+ */
+const estado = vi.hoisted(() => ({ papel: "manager" }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({ activeOrg: { orgId: "org-1", role: estado.papel } }),
+}));
+
+const get = vi.fn();
+vi.mock("@/lib/api/client", () => ({
+  apiClient: { get: (...args: unknown[]) => get(...args), post: vi.fn(), patch: vi.fn() },
+}));
+const mutate = vi.fn();
+vi.mock("@/hooks/contacts/useUpdateContact", () => ({
+  useUpdateContact: () => ({ mutate, isPending: false }),
+}));
+const definirCor = vi.fn();
+vi.mock("@/hooks/tags/useDefinirCorDaEtiqueta", () => ({
+  useDefinirCorDaEtiqueta: () => ({ definirCor }),
+}));
+
+const ORG = "org-1";
+const dialogo = () => screen.getByRole("dialog");
+
+function montar(tags: string[] = ["vip"]) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <ProvedorDeCoresDasEtiquetas>
+        <ContactTagsEditor contactId="c-1" orgId={ORG} tags={tags} />
+      </ProvedorDeCoresDasEtiquetas>
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  get.mockReset();
+  mutate.mockReset();
+  definirCor.mockReset();
+  estado.papel = "manager";
+  // Duas leituras na mesma tela: vocabulário das sugestões e mapa de cores.
+  get.mockImplementation(async (url: string) =>
+    url === "/api/v1/tags/cores" ? { data: [] } : { data: ["google", "vip"] },
+  );
+});
+
+describe("sugestão de etiqueta — caixa de diálogo antes de enviar", () => {
+  it("clicar na sugestão ABRE o diálogo e ainda NÃO grava a tag", async () => {
+    montar();
+
+    const sugestao = await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 });
+    await userEvent.click(sugestao);
+
+    // O diálogo é o sinal de que o caminho foi desviado — e a gravação fica para
+    // depois da escolha da cor. Sem esta asserção o teste passaria hoje também
+    // só que pelo motivo errado (grava direto e o diálogo nunca aparece).
+    expect(dialogo()).toBeTruthy();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("confirmar grava a tag E define o tom escolhido no vocabulário", async () => {
+    montar();
+
+    const sugestao = await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 });
+    await userEvent.click(sugestao);
+
+    const caixa = dialogo();
+    await userEvent.click(within(caixa).getByRole("button", { name: "Índigo" }));
+    await userEvent.click(within(caixa).getByRole("button", { name: "Adicionar tag" }));
+
+    expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+    // Sem esta linha o clique poderia gravar a tag SÓ sem cor — o defeito
+    // original disfarçado de corrigido.
+    expect(definirCor).toHaveBeenCalledWith("google", "#3e63dd");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("cancelar não grava nada e fecha o diálogo", async () => {
+    montar();
+
+    const sugestao = await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 });
+    await userEvent.click(sugestao);
+
+    await userEvent.click(within(dialogo()).getByRole("button", { name: "Cancelar" }));
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(definirCor).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("abre com o tom que a sugestão JÁ tem no vocabulário pré-marcado", async () => {
+    // Sem isto, abrir como se a tag não tivesse cor faria "Confirmar" apagar o
+    // que estava lá — a mesma pegadinha da #2771.
+    get.mockImplementation(async (url: string) =>
+      url === "/api/v1/tags/cores"
+        ? { data: [{ tag: "google", cor: "#3e63dd" }] }
+        : { data: ["google", "vip"] },
+    );
+    montar();
+
+    const sugestao = await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 });
+    await userEvent.click(sugestao);
+
+    const caixa = dialogo();
+    expect(within(caixa).getByRole("button", { name: "Índigo" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("sem permissão o clique continua direto — a rota recusaria o diálogo", async () => {
+    estado.papel = "agent";
+    montar();
+
+    const sugestao = await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 });
+    await userEvent.click(sugestao);
+
+    // POST /api/v1/tags/vocabulario exige manager + MFA: a tela não oferece o
+    // que a escrita recusa (#2718). Aqui a tag entra sem tom, como antes.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+  });
+});
