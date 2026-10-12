@@ -119,6 +119,24 @@ describe("lerAnuncioDoContato — o primeiro toque, como a inbox o mostra", () =
     expect(lerAnuncioDoContato("lixo")).toBeNull();
   });
 
+  it("clique do Google (só o gclid, sem peça criativa): sem cartão — o rótulo do cartão é da Meta", () => {
+    // A forma que `extrairEEstamparAtribuicaoGoogle` carimba: plataforma e
+    // clique, sem id, título, texto nem link.
+    expect(
+      lerAnuncioDoContato({
+        ad_platform: "google_ads",
+        ad_source_id: "gclid-1",
+        ad_id: null,
+        ad_title: null,
+        ad_body: null,
+        ad_source_url: null,
+        ad_thumbnail_url: null,
+        ad_raw: { token: "ABC123", click_identifiers: { gclid: "gclid-1" } },
+        ad_captured_at: "2026-10-12T13:42:00.000Z",
+      }),
+    ).toBeNull();
+  });
+
   it("link perigoso some, o resto fica", () => {
     const a = lerAnuncioDoContato({ ...carimbado, ad_source_url: "javascript:alert(1)" });
     expect(a?.url).toBeNull();
