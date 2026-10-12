@@ -9065,5 +9065,17 @@
   "Valor da condição": "Condition value",
   "é igual a": "is equal to",
   "é maior que": "is greater than",
-  "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": "Hidden, the field does not appear in the form and is not validated as required; the value already saved stays in the record."
+  "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": "Hidden, the field does not appear in the form and is not validated as required; the value already saved stays in the record.",
+  "Lembretes de tarefa": "Task reminders",
+  "O responsável recebe o aviso mesmo com o site fechado: o sistema procura a pessoa quando o prazo chega perto ou vence.": "The responsible person gets the notice even with the site closed: the system looks for them when the deadline nears or passes.",
+  "Avisar quando a tarefa está perto do vencimento": "Notify when a task is near its deadline",
+  "Antecedência do aviso": "Notice lead time",
+  "15 minutos": "15 minutes",
+  "1 hora": "1 hour",
+  "1 dia": "1 day",
+  "Avisar quando a tarefa vence sem conclusão": "Notify when a task passes its deadline unfinished",
+  "O aviso de vencimento sai uma vez por tarefa; não se repete a cada rodada.": "The overdue notice goes out once per task; it does not repeat every run.",
+  "Receber também no WhatsApp": "Also receive it on WhatsApp",
+  "Número com DDD, só dígitos": "Phone number with area code, digits only",
+  "O WhatsApp sai pelo número da empresa, e só quando ele estiver conectado. O aviso vai para o seu contato cadastrado no CRM.": "The WhatsApp goes out from the company number, and only while it is connected. The notice goes to your contact registered in the CRM."
 }

@@ -1,0 +1,246 @@
+/**
+ * O LEMBRETE DE PRAZO DA TAREFA (#2529) — o que a rodada decide.
+ *
+ * `lembretesDaRodada` é puro de propósito: a regra de QUANDO um prazo pede
+ * gente é exercitada de verdade, nas bordas, sem dublê de banco. O que NÃO é
+ * função — o encadeamento da consulta, o recorte por organização, a ordem das
+ * portas do WhatsApp — é prendido estruturalmente, lendo a fonte, no mesmo
+ * estilo de `agenda-reminder/route.test.ts`: um dublê de Supabase provaria o
+ * dublê, e a asserção sobre o TEXTO do caminho é o que sobrevive a refactor.
+ */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import { preferenciaPadraoDeLembrete } from "@/lib/tarefas/preferencia-de-lembrete";
+import { chaveDoAviso, lembretesDaRodada, type TarefaLida } from "./route";
+
+const AGORA = new Date("2026-10-13T12:00:00.000Z");
+const MIN = 60_000;
+
+function pref(override: Partial<ReturnType<typeof preferenciaPadraoDeLembrete>> = {}) {
+  return { ...preferenciaPadraoDeLembrete(), ...override };
+}
+
+function tarefa(override: Partial<TarefaLida> = {}): TarefaLida {
+  return {
+    id: "t1",
+    organization_id: "org-1",
+    assigned_to: "pessoa-1",
+    due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString(),
+    status: "pending",
+    title: "Ligar para o cliente",
+    ...override,
+  };
+}
+
+const SEM_PREF = new Map();
+const NADA_VISTO = new Set<string>();
+
+describe("lembretesDaRodada — a janela de aviso", () => {
+  it("tarefa que vence em 2h, com a janela padrão de 1h: a rodada não avisa", () => {
+    const r = lembretesDaRodada(
+      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 120 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("tarefa que vence em 30min: a rodada avisa, como task_due", () => {
+    const r = lembretesDaRodada(
+      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]?.categoria).toBe("task_due");
+  });
+
+  it("a janela que a PESSOA escolheu é a que vale", () => {
+    const t = tarefa({ due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString() });
+    const preferencias = new Map([["pessoa-1", pref({ antecedencia_min: 15 })]]);
+    expect(lembretesDaRodada({ tarefas: [t], preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
+
+    const comDia = new Map([["pessoa-1", pref({ antecedencia_min: 1440 })]]);
+    expect(lembretesDaRodada({ tarefas: [t], preferencias: comDia, jaAvisados: NADA_VISTO }, AGORA)[0]?.categoria).toBe(
+      "task_due",
+    );
+  });
+});
+
+describe("lembretesDaRodada — a vencida sem conclusão", () => {
+  it("tarefa vencida e pendente, com task_overdue ligado: dispara", () => {
+    const r = lembretesDaRodada(
+      {
+        tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })],
+        preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
+        jaAvisados: NADA_VISTO,
+      },
+      AGORA,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]?.categoria).toBe("task_overdue");
+  });
+
+  it("tarefa vencida MAS concluída não gera aviso nenhum", () => {
+    const r = lembretesDaRodada(
+      {
+        tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString(), status: "done" })],
+        preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
+        jaAvisados: NADA_VISTO,
+      },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("o padrão do produto NÃO repete em vencida — quem não escolheu recebe só o aviso de antecedência", () => {
+    // A pessoa que nunca abriu a tela continua sendo avisada ANTES do prazo
+    // (`task_due` ligado por padrão), e não a cada rodada depois que ele venceu
+    // (`task_overdue` desligado por padrão): repetição é opt-in.
+    const r = lembretesDaRodada(
+      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+});
+
+describe("lembretesDaRodada — a preferência desligada não manda nada", () => {
+  it("task_due desligado: a tarefa dentro da janela fica sem aviso", () => {
+    const r = lembretesDaRodada(
+      {
+        tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() })],
+        preferencias: new Map([["pessoa-1", pref({ task_due: false })]]),
+        jaAvisados: NADA_VISTO,
+      },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("task_overdue desligado: a tarefa vencida fica sem aviso", () => {
+    const r = lembretesDaRodada(
+      {
+        tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })],
+        preferencias: new Map([["pessoa-1", pref({ task_overdue: false })]]),
+        jaAvisados: NADA_VISTO,
+      },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("as duas desligadas: nenhuma tarefa da rodada vira aviso", () => {
+    const preferencias = new Map([["pessoa-1", pref({ task_due: false, task_overdue: false })]]);
+    const tarefas = [
+      tarefa({ id: "t1", due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() }),
+      tarefa({ id: "t2", due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() }),
+    ];
+    expect(lembretesDaRodada({ tarefas, preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
+  });
+});
+
+describe("lembretesDaRodada — o que nunca vira aviso", () => {
+  it("tarefa sem responsável não avisa: não há a quem mandar", () => {
+    const r = lembretesDaRodada(
+      { tarefas: [tarefa({ assigned_to: null })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("o par já avisado não repete — é a trava que o item da Central grava", () => {
+    const t = tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() });
+    const jaAvisados = new Set([chaveDoAviso("task_due", t.id)]);
+    expect(lembretesDaRodada({ tarefas: [t], preferencias: SEM_PREF, jaAvisados }, AGORA)).toEqual([]);
+  });
+
+  it("a trava é POR CATEGORIA: task_due já avisado não impede o task_overdue", () => {
+    // A mesma tarefa tem dois momentos, e o segundo não some porque o primeiro
+    // virou item da Central — a pessoa ainda precisa saber que o prazo passou.
+    const t = tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() });
+    const r = lembretesDaRodada(
+      {
+        tarefas: [t],
+        preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
+        jaAvisados: new Set([chaveDoAviso("task_due", t.id)]),
+      },
+      AGORA,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]?.categoria).toBe("task_overdue");
+  });
+
+  it("responsável sem preferência gravada cai no PADRÃO do produto, e não no silêncio", () => {
+    // Ninguém nunca abriu a tela de notificações: continua sendo avisado de
+    // prazo. Um `get` vazio não pode virar "ninguém é avisado" — seria o
+    // silêncio que esta feature veio consertar, uma camada acima.
+    const r = lembretesDaRodada(
+      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toHaveLength(1);
+  });
+});
+
+describe("a rota escreve na ORGANIZAÇÃO DA TAREFA, e com o par que a trava lê", () => {
+  const fonte = readFileSync(join(__dirname, "route.ts"), "utf8");
+
+  it("o item da Central nasce com organization_id vindo da linha da tarefa", () => {
+    // A cerca do `agenda-reminder`: sem o recorte por org, esta rota viraria a
+    // organização A avisando tarefa da B. O corte vem da LINHA, nunca de
+    // parâmetro de requisição.
+    expect(fonte).toContain("organization_id: tarefa.organization_id");
+    expect(fonte).not.toContain('searchParams.get("organization_id")');
+  });
+
+  it("o aviso carrega `ref_kind: task` e o id da tarefa — é o par que a trava lê", () => {
+    expect(fonte).toContain('ref_kind: "task"');
+    expect(fonte).toContain("ref_id: tarefa.id");
+  });
+
+  it("a trava lê o MESMO par que a escrita grava (kind + ref_id)", () => {
+    // Sem esta asserção, trocar `chaveDoAviso` na escrita e não na leitura
+    // faria a rodada reenviar para sempre sem erro nenhum — o defeito que a
+    // trava existe para impedir, nascendo calado.
+    expect(fonte).toContain("chaveDoAviso(");
+    expect(fonte.match(/chaveDoAviso\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it("o push vai ao RESPONSÁVEL, e não à organização", () => {
+    expect(fonte).toContain("enviarPushAoUsuario(tarefa.organization_id, responsavel");
+  });
+
+  it("audit só quando houve efeito", () => {
+    expect(fonte).toMatch(/if \(resultado\.avisadas > 0\) \{\s*void audit\(/);
+  });
+});
+
+describe("a porta do WhatsApp é decidida ANTES de qualquer consulta", () => {
+  const fonte = readFileSync(join(__dirname, "route.ts"), "utf8");
+
+  it("sem opt-in a rodada nem busca canal da organização", () => {
+    // A guarda da issue: quem não escolheu WhatsApp não gera consulta de canal,
+    // não gera consulta de contato, não abre conversa. O `if (pref.whatsapp)`
+    // é a porta, e ele vem antes de `sessaoProntaParaEnvio`.
+    const optIn = fonte.indexOf("if (pref.whatsapp)");
+    const canal = fonte.indexOf("sessaoProntaParaEnvio(");
+    expect(optIn).toBeGreaterThan(-1);
+    expect(canal).toBeGreaterThan(-1);
+    expect(optIn).toBeLessThan(canal);
+  });
+
+  it("o contato é buscado DENTRO da organização da tarefa", () => {
+    const busca = fonte.slice(fonte.indexOf('.from("contacts")'));
+    expect(busca.slice(0, 400)).toContain('.eq("organization_id", tarefa.organization_id)');
+  });
+
+  it("a decisão passa por `decidirWhatsappDoLembrete` — a regra mora no módulo puro", () => {
+    expect(fonte).toContain("decidirWhatsappDoLembrete(");
+  });
+
+  it("o pulo do WhatsApp é registrado, nunca silencioso", () => {
+    expect(fonte).toContain("pular(`whatsapp_${decisao.motivo}`)");
+  });
+});
