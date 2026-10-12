@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -65,17 +66,17 @@ export default async function OrgMemoryPage() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Memória da IA", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir(
-            "Regras e aprendizados que TODOS os agentes de IA desta organização seguem em qualquer conversa — não é uma configuração de um agente específico.",
-            idioma,
-          )}
-        </p>
-      </header>
-      <OrgMemoryClient initialState={initialState} />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Memória da IA", idioma)}
+        descricao={traduzir(
+          "Regras e aprendizados que TODOS os agentes de IA desta organização seguem em qualquer conversa — não é uma configuração de um agente específico.",
+          idioma,
+        )}
+      />
+      <SecaoDaPagina>
+        <OrgMemoryClient initialState={initialState} />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

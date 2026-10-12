@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -55,18 +56,18 @@ export default async function AiUsagePage({ searchParams }: PageProps) {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Uso de IA", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir(
-            "Quanto a inteligência artificial custou, quantos atendimentos ela fez, quanto demorou para responder e quantas vezes precisou chamar uma pessoa — nos últimos 30 dias.",
-            idioma,
-          )}
-        </p>
-      </header>
-      <BudgetCard initialData={budget} isAdmin={isAdmin} />
-      <UsageDashboardClient agents={agents} initial={initial} />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Uso de IA", idioma)}
+        descricao={traduzir(
+          "Quanto a inteligência artificial custou, quantos atendimentos ela fez, quanto demorou para responder e quantas vezes precisou chamar uma pessoa — nos últimos 30 dias.",
+          idioma,
+        )}
+      />
+      <SecaoDaPagina className="gap-5 mb:gap-3">
+        <BudgetCard initialData={budget} isAdmin={isAdmin} />
+        <UsageDashboardClient agents={agents} initial={initial} />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

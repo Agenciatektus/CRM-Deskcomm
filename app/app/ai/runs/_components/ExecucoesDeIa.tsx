@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { useT } from "@/hooks/i18n/useT";
 import { PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
@@ -133,145 +134,148 @@ export function ExecucoesDeIa() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-6" data-testid="execucoes-de-ia">
-      <header className="mb-6">
-        <h1 className="text-title-lg">{t("Execuções de IA")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          {t(
-            "Tudo que a inteligência artificial fez por aqui — e, quando algo falhou, o que aconteceu e o que fazer.",
-          )}
-        </p>
-      </header>
-
-      {/* O resumo responde "está tudo bem?" antes da lista. */}
-      <Card className="mb-6 p-4" data-testid="resumo">
-        {resumo.erros === 0 ? (
-          <p className="text-sm">
-            <span className="font-medium text-emerald-600 dark:text-emerald-500">
-              {t("Nenhuma falha")}
-            </span>{" "}
-            {t("nas últimas")} {resumo.total} {t("execuções.")}
-          </p>
-        ) : (
-          <div>
-            <p className="text-sm font-medium text-destructive" data-testid="tem-falhas">
-              {resumo.erros} {t("de")} {resumo.total} {t("execuções falharam.")}
+    <Pagina className="max-w-5xl" testId="execucoes-de-ia">
+      <CabecalhoDaPagina
+        titulo={t("Execuções de IA")}
+        descricao={
+          <>
+            {t(
+              "Tudo que a inteligência artificial fez por aqui — e, quando algo falhou, o que aconteceu e o que fazer.",
+            )}
+          </>
+        }
+      />
+      <div className="mb:px-4">
+        {/* O resumo responde "está tudo bem?" antes da lista. */}
+        <Card className="mb-6 p-4" data-testid="resumo">
+          {resumo.erros === 0 ? (
+            <p className="text-sm">
+              <span className="font-medium text-emerald-600 dark:text-emerald-500">
+                {t("Nenhuma falha")}
+              </span>{" "}
+              {t("nas últimas")} {resumo.total} {t("execuções.")}
             </p>
-            <ul className="mt-3 space-y-2">
-              {resumo.porCodigo.map((c) => (
-                <li key={c.codigo} className="text-sm">
-                  <Badge variant="outline" className="mr-2 font-mono text-xs">
-                    {c.quantas}×
-                  </Badge>
-                  {c.oQueFazer ? t(c.oQueFazer) : c.codigo}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </Card>
+          ) : (
+            <div>
+              <p className="text-sm font-medium text-destructive" data-testid="tem-falhas">
+                {resumo.erros} {t("de")} {resumo.total} {t("execuções falharam.")}
+              </p>
+              <ul className="mt-3 space-y-2">
+                {resumo.porCodigo.map((c) => (
+                  <li key={c.codigo} className="text-sm">
+                    <Badge variant="outline" className="mr-2 font-mono text-xs">
+                      {c.quantas}×
+                    </Badge>
+                    {c.oQueFazer ? t(c.oQueFazer) : c.codigo}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
 
-      <div className="mb-3 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={soErros ? "default" : "outline"}
-          onClick={() => setSoErros((v) => !v)}
-          data-testid="filtro-erros"
-        >
-          {soErros ? t("Mostrando só as falhas") : t("Ver só as falhas")}
-        </Button>
-        {/* Só onde o Jev existe: numa instalação sem ele, o filtro seria ruído. */}
-        {(soOJev || execucoes.some((e) => e.provider === PROVEDOR_DO_JEV)) && (
+        <div className="mb-3 flex flex-wrap gap-2">
           <Button
             size="sm"
-            variant={soOJev ? "default" : "outline"}
-            aria-pressed={soOJev}
-            onClick={() =>
-              router.replace(soOJev ? pathname : `${pathname}?provider=${PROVEDOR_DO_JEV}`)
-            }
-            data-testid="filtro-jev"
+            variant={soErros ? "default" : "outline"}
+            onClick={() => setSoErros((v) => !v)}
+            data-testid="filtro-erros"
           >
-            {soOJev ? t("Mostrando só o Jev") : t("Só o Jev")}
+            {soErros ? t("Mostrando só as falhas") : t("Ver só as falhas")}
           </Button>
+          {/* Só onde o Jev existe: numa instalação sem ele, o filtro seria ruído. */}
+          {(soOJev || execucoes.some((e) => e.provider === PROVEDOR_DO_JEV)) && (
+            <Button
+              size="sm"
+              variant={soOJev ? "default" : "outline"}
+              aria-pressed={soOJev}
+              onClick={() =>
+                router.replace(soOJev ? pathname : `${pathname}?provider=${PROVEDOR_DO_JEV}`)
+              }
+              data-testid="filtro-jev"
+            >
+              {soOJev ? t("Mostrando só o Jev") : t("Só o Jev")}
+            </Button>
+          )}
+        </div>
+
+        {execucoes.length === 0 ? (
+          <Card className="p-6 text-sm text-muted-foreground" data-testid="lista-vazia">
+            {soErros
+              ? t("Nenhuma falha registrada.")
+              : soOJev
+                ? t("O Jev ainda não mediu nenhuma mensagem.")
+                : t("Nenhuma execução ainda. Assim que o agente atender alguém, aparece aqui.")}
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {execucoes.map((e) => (
+              <Card
+                key={e.id}
+                className={e.status === "erro" ? "border-destructive/40 p-4" : "p-4"}
+                data-testid={`execucao-${e.id}`}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t(e.pontoRotulo)}</span>
+                    {e.status === "erro" && (
+                      <Badge variant="destructive" className="text-xs">
+                        {t("falhou")}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {e.provedorRotulo} · {e.model}
+                  </span>
+                </div>
+
+                {e.status === "erro" ? (
+                  <div className="mt-2 space-y-2 text-sm">
+                    {/* 1º: o que o CLIENTE viu. */}
+                    {e.consequencia && (
+                      <p data-testid="consequencia">
+                        <span className="font-medium">{t("O que aconteceu:")}</span> {t(e.consequencia)}
+                      </p>
+                    )}
+                    {/* 2º: o que fazer. */}
+                    {e.oQueFazer && (
+                      <p className="text-muted-foreground" data-testid="o-que-fazer">
+                        <span className="font-medium">{t("O que fazer:")}</span> {t(e.oQueFazer)}
+                      </p>
+                    )}
+                    {/* 3º: só então, o texto cru — para quem for investigar. */}
+                    {e.error_message && (
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer">{t("Mensagem técnica do provedor")}</summary>
+                        <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2">
+                          {e.error_message}
+                          {e.http_status ? `\n(${t("código")} ${e.http_status})` : ""}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {e.input_tokens + e.output_tokens} {t("tokens")}
+                    {e.latency_ms !== null ? ` · ${e.latency_ms} ms` : ""}
+                    {/* `cost_cents` está em CENTAVOS: dividir por 100 dá REAIS, e o
+                        rótulo dizia "centavos" — uma execução de 25 centavos
+                        aparecia como "0.2500 centavos", 100× menor que o mesmo
+                        evento na tela de Uso, sem nenhuma das duas dizer qual
+                        estava certa. Aqui vale o mesmo formato de lá: reais. */}
+                    {e.cost_cents !== null ? ` · ${usd.format(e.cost_cents / 100)}` : ""}
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {new Date(e.created_at).toLocaleString(tagDoIdioma)}
+                  {e.porQueEsteModelo ? ` · ${t(e.porQueEsteModelo)}` : ""}
+                </p>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
-
-      {execucoes.length === 0 ? (
-        <Card className="p-6 text-sm text-muted-foreground" data-testid="lista-vazia">
-          {soErros
-            ? t("Nenhuma falha registrada.")
-            : soOJev
-              ? t("O Jev ainda não mediu nenhuma mensagem.")
-              : t("Nenhuma execução ainda. Assim que o agente atender alguém, aparece aqui.")}
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {execucoes.map((e) => (
-            <Card
-              key={e.id}
-              className={e.status === "erro" ? "border-destructive/40 p-4" : "p-4"}
-              data-testid={`execucao-${e.id}`}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{t(e.pontoRotulo)}</span>
-                  {e.status === "erro" && (
-                    <Badge variant="destructive" className="text-xs">
-                      {t("falhou")}
-                    </Badge>
-                  )}
-                </div>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {e.provedorRotulo} · {e.model}
-                </span>
-              </div>
-
-              {e.status === "erro" ? (
-                <div className="mt-2 space-y-2 text-sm">
-                  {/* 1º: o que o CLIENTE viu. */}
-                  {e.consequencia && (
-                    <p data-testid="consequencia">
-                      <span className="font-medium">{t("O que aconteceu:")}</span> {t(e.consequencia)}
-                    </p>
-                  )}
-                  {/* 2º: o que fazer. */}
-                  {e.oQueFazer && (
-                    <p className="text-muted-foreground" data-testid="o-que-fazer">
-                      <span className="font-medium">{t("O que fazer:")}</span> {t(e.oQueFazer)}
-                    </p>
-                  )}
-                  {/* 3º: só então, o texto cru — para quem for investigar. */}
-                  {e.error_message && (
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer">{t("Mensagem técnica do provedor")}</summary>
-                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2">
-                        {e.error_message}
-                        {e.http_status ? `\n(${t("código")} ${e.http_status})` : ""}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {e.input_tokens + e.output_tokens} {t("tokens")}
-                  {e.latency_ms !== null ? ` · ${e.latency_ms} ms` : ""}
-                  {/* `cost_cents` está em CENTAVOS: dividir por 100 dá REAIS, e o
-                      rótulo dizia "centavos" — uma execução de 25 centavos
-                      aparecia como "0.2500 centavos", 100× menor que o mesmo
-                      evento na tela de Uso, sem nenhuma das duas dizer qual
-                      estava certa. Aqui vale o mesmo formato de lá: reais. */}
-                  {e.cost_cents !== null ? ` · ${usd.format(e.cost_cents / 100)}` : ""}
-                </p>
-              )}
-
-              <p className="mt-2 text-xs text-muted-foreground">
-                {new Date(e.created_at).toLocaleString(tagDoIdioma)}
-                {e.porQueEsteModelo ? ` · ${t(e.porQueEsteModelo)}` : ""}
-              </p>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+    </Pagina>
   );
 }

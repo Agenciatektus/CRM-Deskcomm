@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw } from "lucide-react";
 
+import { BotaoDaTela } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
@@ -107,10 +108,11 @@ export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
               {reindexAll.isPending ? t("Preparando…") : t("Preparar tudo de novo")}
             </Button>
           ) : null}
-          <Button onClick={() => setNovoAberto(true)} data-testid="acervo-adicionar">
+          <Button onClick={() => setNovoAberto(true)} data-testid="acervo-adicionar" className="mb:hidden">
             <Plus className="mr-2 h-4 w-4" aria-hidden />
             {t("Adicionar material")}
           </Button>
+          <BotaoDaTela rotulo={t("Adicionar material")} aoTocar={() => setNovoAberto(true)} />
         </div>
       </div>
 

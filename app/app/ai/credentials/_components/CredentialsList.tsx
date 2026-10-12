@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 
+import { BotaoDaTela } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Plus } from "@/lib/ui/icons";
@@ -121,13 +122,14 @@ export function CredentialsList({
           </p>
         </Card>
       )}
-      <div className="flex sm:justify-end">
-        {canWrite && (
+      {canWrite && (
+        <div className="flex sm:justify-end mb:hidden">
           <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
             <Plus size={14} aria-hidden className="mr-2" /> {t("Adicionar credencial")}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
+      {canWrite && <BotaoDaTela rotulo={t("Adicionar credencial")} aoTocar={() => setAddOpen(true)} />}
       {PROVIDER_ORDER.map((p) => {
         // `?? []` porque a lista de provedores pode crescer sem que exista
         // credencial daquele provedor — o agrupamento só tem chave para quem

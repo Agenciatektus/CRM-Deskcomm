@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -16,17 +17,17 @@ export default async function CasesPage() {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Casos", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir(
-            "Quando a IA trava em algo que só um humano resolve, ela abre um caso aqui — e continua conversando com o cliente enquanto espera sua resposta.",
-            idioma,
-          )}
-        </p>
-      </header>
-      <CaseList />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Casos", idioma)}
+        descricao={traduzir(
+          "Quando a IA trava em algo que só um humano resolve, ela abre um caso aqui — e continua conversando com o cliente enquanto espera sua resposta.",
+          idioma,
+        )}
+      />
+      <SecaoDaPagina>
+        <CaseList />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

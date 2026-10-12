@@ -6,6 +6,7 @@ import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
+import { Pagina } from "@/components/pagina";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
 
@@ -58,7 +59,7 @@ export default async function NewAgentPage() {
   )?.llm;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <Pagina className="max-w-none mb:px-4 mb:pt-3">
       <AgentForm
         mode="create"
         credentials={credentials}
@@ -67,6 +68,6 @@ export default async function NewAgentPage() {
         channelSessions={channelSessions}
         organizationTimezone={fusoUtilizavel(activeOrg.timezone)}
       />
-    </div>
+    </Pagina>
   );
 }

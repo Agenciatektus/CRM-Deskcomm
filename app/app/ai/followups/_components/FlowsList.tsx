@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { BotaoDaTela } from "@/components/pagina";
 import { FlowArrow, Plus, Sparkle } from "@/lib/ui/icons";
 import { useFollowupFlows, type FollowupFlowPointerRow } from "@/hooks/followup/useFollowupFlows";
 import type { FollowupFlowSurface } from "@/lib/followup/api-schemas";
@@ -115,7 +116,11 @@ export function FlowsList({ initialData, canWrite, surface }: Props) {
       {canWrite && (
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           {!deAtendimento && modelosButton}
-          {newFlowButton}
+          <div className="contents mb:hidden">{newFlowButton}</div>
+          <BotaoDaTela
+            rotulo={deAtendimento ? t("Novo fluxo de atendimento") : t("Novo fluxo")}
+            aoTocar={() => setDialogOpen(true)}
+          />
         </div>
       )}
 

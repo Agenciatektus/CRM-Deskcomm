@@ -7,7 +7,8 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/empty";
+import { BarraDeFiltros, CartaoEmpilhado, EstadoDaLista, TabelaOuCartoes } from "@/components/pagina";
 import {
   Select,
   SelectContent,
@@ -33,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Clock, MagnifyingGlass, Trash } from "@/lib/ui/icons";
+import { Clock, Trash } from "@/lib/ui/icons";
 import { useT } from "@/hooks/i18n/useT";
 import { rotuloDoStatus, tomDoStatus } from "@/lib/followup/eventos-legiveis";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -144,24 +145,84 @@ export function QueueTab({ canWrite }: Props) {
 
   const rows: FollowupQueueRow[] = data?.pages.flatMap((p) => p.data) ?? [];
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-56">
-          <MagnifyingGlass
-            size={14}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted"
-            aria-hidden
-          />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("Buscar contato…")}
-            className="h-9 w-full pl-8 text-sm"
-            aria-label={t("Buscar contato")}
-          />
-        </div>
+  const ativos = (status !== "all" ? 1 : 0) + (pointerId !== "all" ? 1 : 0);
+  const limpar = () => {
+    setStatus("all");
+    setPointerId("all");
+    setSearchInput("");
+  };
+  const botaoCancelar = (row: FollowupQueueRow) =>
+    canWrite && podeCancelar(row) ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        data-testid="cancelar-item-da-fila"
+        aria-label={row.source === "promise" ? t("Cancelar retorno") : t("Cancelar follow-up")}
+        onClick={() => setPendingCancel(row)}
+      >
+        <Trash size={14} aria-hidden className="mr-1 text-error" /> {t("Cancelar")}
+      </Button>
+    ) : null;
+  // A porta do dossiê. Só enrollment tem história para contar: a promessa
+  // (`cron_jobs`) é uma linha só — um horário e um motivo — e um link que abrisse
+  // uma tela vazia ensinaria que o dossiê às vezes não funciona.
+  const dossie = (row: FollowupQueueRow) =>
+    row.source === "enrollment" ? `/app/ai/followups/enrollments/${row.id}` : undefined;
+  const fluxo = (row: FollowupQueueRow) => row.flow_name ?? t("Promessa");
 
+  const tabela = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t("Contato")}</TableHead>
+          <TableHead>{t("Fluxo / Promessa")}</TableHead>
+          <TableHead>{t("Nó atual / Motivo")}</TableHead>
+          <TableHead>{t("Próximo disparo")}</TableHead>
+          <TableHead>{t("Status")}</TableHead>
+          {canWrite && <TableHead className="w-[100px]" />}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={`${row.source}:${row.id}`} data-testid="queue-row">
+            <TableCell className="font-medium">
+              {dossie(row) ? (
+                <Link href={dossie(row)!} className="underline-offset-2 hover:underline" data-testid="queue-abrir-dossie">
+                  {row.contact.name}
+                </Link>
+              ) : (
+                row.contact.name
+              )}
+            </TableCell>
+            <TableCell>
+              <div className="flex flex-col">
+                <span>{row.flow_name ?? <span className="text-text-muted">{t("Promessa")}</span>}</span>
+                {row.agent_name && <span className="text-xs text-text-muted">{t("agente")} {row.agent_name}</span>}
+              </div>
+            </TableCell>
+            <TableCell className="max-w-[280px] truncate text-sm" title={row.node_or_reason}>
+              {row.node_or_reason}
+            </TableCell>
+            <TableCell>
+              <NextFireCell iso={row.next_fire_at} />
+            </TableCell>
+            <TableCell>
+              <QueueStatusBadge status={row.status} />
+            </TableCell>
+            {canWrite && <TableCell>{botaoCancelar(row)}</TableCell>}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
+  return (
+    <div className="flex flex-col gap-4 mb:gap-3">
+      <BarraDeFiltros
+        busca={{ valor: searchInput, aoMudar: setSearchInput, placeholder: t("Buscar contato…") }}
+        ativos={ativos}
+        aoLimpar={limpar}
+      >
         <Select value={status} onValueChange={(v) => setStatus(v as FollowupEnrollmentStatus | "all")}>
           <SelectTrigger className="h-9 w-48 text-sm" aria-label={t("Filtrar por status")}>
             <SelectValue placeholder={t("Todos os status")} />
@@ -189,94 +250,43 @@ export function QueueTab({ canWrite }: Props) {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </BarraDeFiltros>
 
-      {!isLoading && rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-md border border-border py-16 text-center">
-          <Clock size={36} className="text-text-muted" aria-hidden />
-          <h2 className="font-medium">{t("Nenhum item na fila")}</h2>
-          <p className="max-w-sm text-sm text-text-muted">
-            {t("Enrollments ativos e promessas de retorno agendadas pela IA aparecem aqui.")}
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-md border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("Contato")}</TableHead>
-                <TableHead>{t("Fluxo / Promessa")}</TableHead>
-                <TableHead>{t("Nó atual / Motivo")}</TableHead>
-                <TableHead>{t("Próximo disparo")}</TableHead>
-                <TableHead>{t("Status")}</TableHead>
-                {canWrite && <TableHead className="w-[100px]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => {
-                const canCancel = canWrite && podeCancelar(row);
-                return (
-                  <TableRow key={`${row.source}:${row.id}`} data-testid="queue-row">
-                    <TableCell className="font-medium">
-                      {/*
-                        A porta do dossiê. Só enrollment tem história para contar:
-                        a promessa (`cron_jobs`) é uma linha só — um horário e um
-                        motivo — e um link que abrisse uma tela vazia ensinaria
-                        que o dossiê às vezes não funciona.
-                      */}
-                      {row.source === "enrollment" ? (
-                        <Link
-                          href={`/app/ai/followups/enrollments/${row.id}`}
-                          className="underline-offset-2 hover:underline"
-                          data-testid="queue-abrir-dossie"
-                        >
-                          {row.contact.name}
-                        </Link>
-                      ) : (
-                        row.contact.name
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{row.flow_name ?? <span className="text-text-muted">{t("Promessa")}</span>}</span>
-                        {row.agent_name && (
-                          <span className="text-xs text-text-muted">{t("agente")} {row.agent_name}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[280px] truncate text-sm" title={row.node_or_reason}>
-                      {row.node_or_reason}
-                    </TableCell>
-                    <TableCell>
-                      <NextFireCell iso={row.next_fire_at} />
-                    </TableCell>
-                    <TableCell>
-                      <QueueStatusBadge status={row.status} />
-                    </TableCell>
-                    {canWrite && (
-                      <TableCell>
-                        {canCancel && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            data-testid="cancelar-item-da-fila"
-                            aria-label={
-                              row.source === "promise" ? t("Cancelar retorno") : t("Cancelar follow-up")
-                            }
-                            onClick={() => setPendingCancel(row)}
-                          >
-                            <Trash size={14} aria-hidden className="mr-1 text-error" /> {t("Cancelar")}
-                          </Button>
-                        )}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <EstadoDaLista
+        carregando={isLoading}
+        quantidade={rows.length}
+        vazio={
+          <EmptyState
+            icon={Clock}
+            headline={t("Nenhum item na fila")}
+            subcopy={t("Enrollments ativos e promessas de retorno agendadas pela IA aparecem aqui.")}
+          />
+        }
+      >
+        <TabelaOuCartoes
+          itens={rows}
+          chave={(row) => `${row.source}:${row.id}`}
+          rotulo={t("Fila")}
+          tabela={tabela}
+          cartao={(row) => (
+            <div className="flex items-center">
+              <div className="min-w-0 flex-1">
+                <CartaoEmpilhado
+                  href={dossie(row)}
+                  titulo={row.contact.name}
+                  apoio={row.agent_name ? `${fluxo(row)} · ${t("agente")} ${row.agent_name}` : fluxo(row)}
+                  selo={<QueueStatusBadge status={row.status} />}
+                  campos={[
+                    { rotulo: t("Nó atual / Motivo"), valor: row.node_or_reason },
+                    { rotulo: t("Próximo disparo"), valor: <NextFireCell iso={row.next_fire_at} /> },
+                  ]}
+                />
+              </div>
+              {botaoCancelar(row) ? <div className="shrink-0 pr-2">{botaoCancelar(row)}</div> : null}
+            </div>
+          )}
+        />
+      </EstadoDaLista>
 
       {hasNextPage && (
         <div className="flex justify-center">

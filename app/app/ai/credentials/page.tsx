@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -148,30 +149,30 @@ export default async function CredentialsPage() {
     ambiente.gateway || Object.values(ambiente.chavesDeProvedor).some(Boolean);
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-title-lg">{traduzir("Chaves de acesso à IA", idioma)}</h1>
-        <p className="text-sm text-muted-foreground">
-          {/* Os provedores saem da lista única: escritos à mão, a frase citava
-              três quando já eram cinco. */}
-          {traduzir(
-            "A conta de inteligência artificial é sua: você contrata direto com {provedores} e cola a chave aqui. A chave fica guardada criptografada e nunca mais aparece na tela depois de salva — nem para você. O Jev (TypeSafe) não conversa com o cliente: a chave dele serve só para decisões rápidas.",
-            idioma,
-          ).replace(
-            "{provedores}",
-            new Intl.ListFormat(tagDeIdioma(idioma), { type: "disjunction" }).format(
-              PROVEDORES.map((p) => p.rotulo),
-            ),
-          )}
-        </p>
-      </header>
-      <CredentialsList
-        initialData={credentials}
-        canWrite={canWrite}
-        usageMap={usageMap}
-        jev={jev}
-        instalacaoTemIa={instalacaoTemIa}
+    <Pagina>
+      {/* Os provedores saem da lista única: escritos à mão, a frase citava
+          três quando já eram cinco. */}
+      <CabecalhoDaPagina
+        titulo={traduzir("Chaves de acesso à IA", idioma)}
+        descricao={traduzir(
+          "A conta de inteligência artificial é sua: você contrata direto com {provedores} e cola a chave aqui. A chave fica guardada criptografada e nunca mais aparece na tela depois de salva — nem para você. O Jev (TypeSafe) não conversa com o cliente: a chave dele serve só para decisões rápidas.",
+          idioma,
+        ).replace(
+          "{provedores}",
+          new Intl.ListFormat(tagDeIdioma(idioma), { type: "disjunction" }).format(
+            PROVEDORES.map((p) => p.rotulo),
+          ),
+        )}
       />
-    </div>
+      <SecaoDaPagina>
+        <CredentialsList
+          initialData={credentials}
+          canWrite={canWrite}
+          usageMap={usageMap}
+          jev={jev}
+          instalacaoTemIa={instalacaoTemIa}
+        />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
