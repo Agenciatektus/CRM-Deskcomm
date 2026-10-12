@@ -49,6 +49,21 @@ describe("preferência do modo compacto, por atendente", () => {
     expect(screen.getByTestId("lista")).not.toHaveAttribute("data-densidade");
   });
 
+  it("P2-2 do Cassio na #172: valor corrompido volta ao padrão (lista normal)", () => {
+    for (const lixo of ["u-1:x", "u-1:1:extra", "u-1", ":1", "lixo", "", "u-1: 1", "U-1:1 "]) {
+      expect(listaCompactaPara(lixo, "u-1"), JSON.stringify(lixo)).toBe(false);
+    }
+  });
+
+  it("com lixo guardado, a lista abre normal e a próxima escolha sobrescreve", async () => {
+    window.localStorage.setItem(CHAVE_DA_LISTA_COMPACTA, "{quebrado");
+    render(<Lista usuarioId="u-1" />);
+    expect(screen.getByTestId("lista")).not.toHaveAttribute("data-densidade");
+    await userEvent.click(screen.getByRole("button", { name: "alternar" }));
+    expect(window.localStorage.getItem(CHAVE_DA_LISTA_COMPACTA)).toBe("u-1:1");
+    expect(screen.getByTestId("lista")).toHaveAttribute("data-densidade", "compacta");
+  });
+
   it("outra pessoa no mesmo navegador não herda a escolha", () => {
     window.localStorage.setItem(CHAVE_DA_LISTA_COMPACTA, "u-1:1");
     render(<Lista usuarioId="u-2" />);

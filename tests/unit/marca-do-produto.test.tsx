@@ -8,7 +8,7 @@ import { CLASSES_DE_COR, LogotipoDoProduto, SimboloDoProduto } from "@/component
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
 import { DEFAULT_APP_NAME, marcaEhADoProduto, type Branding } from "@/lib/branding";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
-import { CORES_DA_MARCA, SIMBOLO } from "@/lib/branding/desenho";
+import { CORES_DA_MARCA, LOGOTIPO, SIMBOLO } from "@/lib/branding/desenho";
 
 /**
  * A marca do PRODUTO aparece — e SÓ aparece — quando ninguém pôs a sua.
@@ -64,6 +64,18 @@ afterEach(() => {
 describe("marcaEhADoProduto", () => {
   it("é verdade só sem logo E com o nome padrão", () => {
     expect(marcaEhADoProduto(PADRAO)).toBe(true);
+  });
+
+  it("DECISÃO DO FORK: o padrão é Verdash CRM, e a instalação de produção (APP_NAME \"Verdash CRM\") mostra o V", () => {
+    expect(DEFAULT_APP_NAME).toBe("Verdash CRM");
+    expect(marcaEhADoProduto({ name: "Verdash CRM", logoUrl: null })).toBe(true);
+    // CONTROLE: o nome antigo do upstream já não é a marca do produto aqui.
+    expect(marcaEhADoProduto({ name: "DeskcommCRM", logoUrl: null })).toBe(false);
+  });
+
+  it("o logotipo soletra Verdash + CRM em caminhos (7 + 3 glifos)", () => {
+    expect(LOGOTIPO.nome).toHaveLength(7);
+    expect(LOGOTIPO.sufixo).toHaveLength(3);
   });
 
   it("quem trocou o nome NÃO recebe um logotipo que soletra outro nome", () => {

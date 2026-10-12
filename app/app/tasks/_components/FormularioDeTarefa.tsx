@@ -77,10 +77,14 @@ export function FormularioDeTarefa({
   // inicializador roda de novo. Efeito para sincronizar props com estado é
   // render em cascata e uma janela em que a tela mostra a tarefa anterior.
   const prazo = separaPrazo(tarefa?.due_date);
+  const [inicial] = useState(() => ({
+    dia: tarefa?.due_date ? prazo.dia : (prazoSugerido ?? ""),
+    hora: tarefa?.due_date ? prazo.hora : "09:00",
+  }));
   const [titulo, setTitulo] = useState(tarefa?.title ?? "");
   const [descricao, setDescricao] = useState(tarefa?.description ?? "");
-  const [dia, setDia] = useState(tarefa?.due_date ? prazo.dia : (prazoSugerido ?? ""));
-  const [hora, setHora] = useState(tarefa?.due_date ? prazo.hora : "09:00");
+  const [dia, setDia] = useState(inicial.dia);
+  const [hora, setHora] = useState(inicial.hora);
   const [prioridade, setPrioridade] = useState<PrioridadeDaTarefa>(tarefa?.priority ?? "medium");
   const [situacao, setSituacao] = useState<SituacaoDaTarefa>(tarefa?.status ?? "pending");
   const [salvando, setSalvando] = useState(false);
@@ -96,6 +100,11 @@ export function FormularioDeTarefa({
     // Sem dia não há hora que valha, e uma hora solta viraria "hoje às 9h" sem
     // ninguém ter pedido.
     const prazo = dia ? new Date(`${dia}T${hora || "00:00"}:00`).toISOString() : null;
+    // Editando sem mexer no dia nem na hora, o prazo NÃO vai: remontado do que a
+    // tela mostra, ele perde os segundos que a tarefa de automação tem
+    // (`criar-tarefa.ts`), e a rota leria isso como prazo novo; numa tarefa
+    // atrasada, como prazo no passado (P1 do Cassio na #172).
+    const prazoInalterado = editando && dia === inicial.dia && hora === inicial.hora;
 
     setSalvando(true);
     setErro(null);
@@ -103,7 +112,7 @@ export function FormularioDeTarefa({
       await aoSalvar({
         title: titulo.trim(),
         description: descricao.trim() || null,
-        due_date: prazo,
+        ...(prazoInalterado ? {} : { due_date: prazo }),
         priority: prioridade,
         status: situacao,
         lead_id: tarefa?.lead_id ?? leadId ?? null,

@@ -91,11 +91,15 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
   // REAGENDAR RE-ARMA O AVISO (migration 9043): o cron `task-due-reminder`
   // só avisa tarefa com `reminded_at` nula. Sem zerar aqui, a tarefa que já
   // apitou uma vez ficaria muda no prazo novo. Só quando o prazo MUDOU de
-  // fato (instante comparado por getTime; nulo↔valor conta): reenviar o mesmo
+  // fato (no minuto, ver abaixo; nulo↔valor conta): reenviar o mesmo
   // prazo num PATCH de título faria a tarefa já avisada apitar de novo.
   // `reminded_at` não está no schema do corpo: só esta linha o escreve, e só
   // para nulo.
-  const instante = (v: string | null | undefined) => (v ? new Date(v).getTime() : null);
+  // Comparado no MINUTO: a tela trabalha em dia + hora:minuto, e a tarefa de
+  // automação nasce com segundos e milissegundos (`criar-tarefa.ts`). Reenviar
+  // o mesmo prazo visto na tela não é prazo novo, nem re-arma o aviso, nem cai
+  // na recusa do passado (P1 do Cassio na #172).
+  const instante = (v: string | null | undefined) => (v ? Math.floor(new Date(v).getTime() / 60_000) : null);
   const prazoMudou =
     "due_date" in parsed.data &&
     instante(parsed.data.due_date) !== instante((antes as { due_date?: string | null } | null)?.due_date);

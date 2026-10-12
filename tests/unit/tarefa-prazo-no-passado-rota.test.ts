@@ -122,6 +122,22 @@ describe("PATCH /api/v1/tasks/[id]", () => {
     expect(gravou).toBe(true);
   });
 
+  it("P1 do Cassio na #172: tarefa de automação atrasada (com segundos) editada pela tela passa", async () => {
+    // A automação grava `agora + N dias` com segundos e ms; a tela reenvia o
+    // mesmo prazo remontado de dia + hora, com :00.000.
+    antes = { status: "pending", due_date: "2026-10-11T12:34:27.512Z" };
+    const res = await editar({ title: "Ligar de novo", due_date: "2026-10-11T12:34:00.000Z" });
+    expect(res.status).toBe(200);
+    expect(gravou).toBe(true);
+  });
+
+  it("CONTROLE: um minuto de diferença já é prazo novo, e no passado é recusado", async () => {
+    antes = { status: "pending", due_date: "2026-10-11T12:34:27.512Z" };
+    const res = await editar({ title: "Ligar de novo", due_date: "2026-10-11T12:33:00.000Z" });
+    expect(res.status).toBe(422);
+    expect(gravou).toBe(false);
+  });
+
   it("CONTROLE: mudar o prazo para o futuro grava", async () => {
     const res = await editar({ due_date: AMANHA });
     expect(res.status).toBe(200);
