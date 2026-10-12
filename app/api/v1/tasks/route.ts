@@ -34,6 +34,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
 import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
+import { prazoNoPassado } from "@/lib/tarefas/prazo-no-passado";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +125,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     return fail("validation_failed", t("Dados inválidos."), 422, {
       requestId,
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
+    });
+  }
+
+  if (prazoNoPassado(parsed.data.due_date, parsed.data.status)) {
+    return fail("validation_failed", t("O prazo da tarefa não pode estar no passado."), 422, {
+      requestId,
+      details: { campo: "due_date" },
     });
   }
 

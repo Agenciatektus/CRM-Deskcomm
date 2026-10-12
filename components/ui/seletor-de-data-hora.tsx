@@ -87,6 +87,9 @@ export function SeletorDeDataHora({
   const foraDoLimite = (d: Date) => (!!piso && d.getTime() < piso.getTime()) || (!!teto && d.getTime() > teto.getTime());
   const podeVoltar = !piso || new Date(mes.getFullYear(), mes.getMonth(), 1).getTime() > piso.getTime();
   const podeAvancar = !teto || new Date(mes.getFullYear(), mes.getMonth() + 1, 1).getTime() <= teto.getTime();
+  // Ano a ano: só enquanto o mês de destino ainda tem dia dentro do limite.
+  const podeVoltarAno = !piso || new Date(mes.getFullYear() - 1, mes.getMonth() + 1, 1).getTime() > piso.getTime();
+  const podeAvancarAno = !teto || new Date(mes.getFullYear() + 1, mes.getMonth(), 1).getTime() <= teto.getTime();
 
   // `min`/`max` com horário (campo de data e hora, ou só horário) limitam
   // também o horário do mesmo dia, não só o dia (P2 do Cassio na #170).
@@ -159,6 +162,8 @@ export function SeletorDeDataHora({
           podeVoltar={podeVoltar}
           podeAvancar={podeAvancar}
           anos={passado}
+          podeVoltarAno={podeVoltarAno}
+          podeAvancarAno={podeAvancarAno}
           onDia={escolheDia}
         />
       )}

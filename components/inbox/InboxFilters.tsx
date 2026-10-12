@@ -10,6 +10,7 @@ import { useConversationCounts } from "@/hooks/inbox/useConversationCounts";
 import type { Role, VisibilityMode } from "@/lib/auth/types";
 
 import { AbasDaInbox } from "./filtros/AbasDaInbox";
+import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
 import { ChipsDeFiltro, type ChipDeFiltro } from "./filtros/ChipsDeFiltro";
 import { PopoverDeFiltros } from "./filtros/PopoverDeFiltros";
 import { SeletorDeEtiqueta } from "./filtros/SeletorDeEtiqueta";
@@ -101,7 +102,8 @@ export function InboxFilters({ value, onChange }: Props) {
     }
   }, [value.search]);
   const { data: channels } = useChannelSessions({ refetchInterval: 30_000 });
-  const { activeOrg } = useAuth();
+  const { activeOrg, user } = useAuth();
+  const [listaCompacta, setListaCompacta] = useListaCompacta(user?.id);
   const orgId = activeOrg?.orgId ?? null;
   const { etiquetas, opcoesDoSeletor, mostrarSeletorDeTag } = useOpcoesDeEtiqueta(orgId, value.tag);
   // Os MESMOS filtros que a lista aplicou. Badge que conta o que a aba não mostra
@@ -281,6 +283,7 @@ export function InboxFilters({ value, onChange }: Props) {
         principais={abas.filter((a) => ABAS_PRINCIPAIS.includes(a.value))}
         escondidas={abas.filter((a) => !ABAS_PRINCIPAIS.includes(a.value))}
         onChange={(tab) => onChange({ ...value, tab })}
+        compacta={{ ligada: listaCompacta, onChange: setListaCompacta }}
       />
 
       <ChipsDeFiltro chips={chips} onLimpar={limparDoPopover} />

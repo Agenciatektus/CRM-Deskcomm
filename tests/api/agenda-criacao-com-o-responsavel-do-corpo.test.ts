@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const deps = vi.hoisted(() => ({ audit: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: deps.audit }));
@@ -257,4 +257,13 @@ it("Tipo sem responsável e sem responsável no corpo: 422 (a falta vem antes da
   });
 
   expect(inseridos).toHaveLength(0);
+});
+
+// O ENCAIXE recusa início no passado (`exigeDentroDoHorizonte`, P2 do Cassio na
+// #171): o relógio fica ANTES das datas fixas deste caso.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-07-01T00:00:00Z") });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });

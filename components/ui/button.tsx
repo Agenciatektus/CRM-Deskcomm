@@ -63,9 +63,11 @@ const buttonVariants = cva(
       // aciona é cursor, volta para as medidas do quadro (36 e, no `sm`, 30).
       size: {
         sm: "h-11 px-2.5 text-label rounded-md lg:h-7.5",
-        default: "h-11 px-3.5 text-ui lg:h-9",
-        md: "h-11 px-3.5 text-ui lg:h-9",
-        lg: "h-11 px-6 text-ui",
+        // 13/600 em todos os tamanhos: a tabela de tipografia do quadro diz
+        // "Rótulo, botão 13/600" (decisão do Peterson no fechamento da etapa 2).
+        default: "h-11 px-3.5 text-label lg:h-9",
+        md: "h-11 px-3.5 text-label lg:h-9",
+        lg: "h-11 px-6 text-label",
         icon: "h-11 w-11 lg:h-9 lg:w-9",
       },
     },

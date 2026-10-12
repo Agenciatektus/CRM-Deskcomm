@@ -36,7 +36,7 @@ As 15 propostas da seção 11 foram aprovadas. A PR A aplica a base; as tabelas 
 - **Cor:** marca padrão Verde Verdash `#0E7A5F` (rampa `rampaDeSemente`); escuro travado no primary Verdash `#2690B1` para todo revendedor (`Regua.rampaDoEscuro`, `lib/branding/contraste.ts`); estados do claro em hex do protótipo; `accent-soft` 11%, `bub-out` 15%, `bub-ai` 7% (escuro 20%, 30% e fixo); derivados redeclarados no `<body>` e em toda subárvore `data-theme` (corrige o painel claro da vitrine com o app escuro); hover = marca a 86% com preto; ação no escuro com o degradê vibrante e branco (exceção do quadro, meio >= 3,5:1); botão destrutivo no escuro em crit claro com texto escuro.
 - **Tipografia:** Atkinson Hyperlegible Next 200-800 e Atkinson Hyperlegible Mono 400/500/700 em `app/fonts/`; cada papel `text-*` leva tamanho, peso e entrelinha do quadro; títulos de página em `text-title-lg`.
 - **Forma e componentes:** Button, Input, Textarea, Select, Tabs (sublinhado e segmento), Badge (pílula e tag, nowrap), Chip, DropdownMenu (item 34, hover neutro, perigo, `kbd`), Popover, Dialog, AlertDialog, Sheet, Switch e Card no desenho do quadro; animações `pop-in`, `fade-in`, `slide-in`; `prefers-reduced-motion` global; `--row-py` 12 com modo compacto por `data-densidade="compacta"`.
-- **Conflitos quadro DS x Main (vence o quadro):** campo com fundo `surface-2` e borda `line` (o `.inp` do Main tem `surface` e `line-2`); textarea segue o campo do quadro (o `.obs` do Main tem `line-2`); a tabela de tipografia do quadro diz "Rótulo, botão 13/600", mas o `.btn` do próprio quadro herda 14px (como o do Main): o botão padrão ficou em 14 e o `sm` em 13.
+- **Conflitos quadro DS x Main (vence o quadro):** campo com fundo `surface-2` e borda `line` (o `.inp` do Main tem `surface` e `line-2`); textarea segue o campo do quadro (o `.obs` do Main tem `line-2`). O texto do botão segue a tabela de tipografia do quadro, "Rótulo, botão 13/600", em todos os tamanhos (decisão do Peterson no fechamento da etapa 2).
 
 ## 1. Cor
 
@@ -91,7 +91,7 @@ As 15 propostas da seção 11 foram aprovadas. A PR A aplica a base; as tabelas 
 | 5 | Interface 14/1,45 | `text-sm` 14/1,43 | igual |
 | 6 | Mensagem 15/1,42 | `text-[15px] leading-[1.42]` (`bolha/estilo.ts`) | igual |
 | 7 | Pesos 400, 500, 600, 700 reais | 500 e 600 aproximados pelo navegador (fonte só tem 400 e 700) | diferente |
-| 8 | Botão e rótulo 13/600 | `Button` `text-sm font-medium` (14/500) | diferente |
+| 8 | Botão e rótulo 13/600 | `Button` `text-label` (13/600) em todos os tamanhos | igual |
 | 9 | Meta 12/600 | `text-xs font-semibold` nas pílulas | igual |
 | 10 | Números em mono tabular | `font-mono` + `tabular-nums` (e `code/kbd` na base) | igual (família no item 2) |
 

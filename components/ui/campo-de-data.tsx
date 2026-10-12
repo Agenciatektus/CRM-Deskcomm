@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "./button";
 import { juntarDescricao, useControleEscondido } from "./controle-escondido";
-import { DigitarData } from "./digitar-data";
+import { ANO_MINIMO, DigitarData } from "./digitar-data";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { SeletorDeDataHora, type ModoDoSeletor } from "./seletor-de-data-hora";
 
@@ -132,7 +132,8 @@ export const CampoDeData = React.forwardRef<HTMLButtonElement, CampoDeDataProps>
     // No campo só de horário, o limite é horário do mesmo dia; nos outros, o
     // texto do campo nativo (com horário, no de data e hora).
     const limite = (v: string | undefined) => lerValorDoCampo(tipo, v ?? null);
-    const minimo = limite(min);
+    // Campo que aceita passado começa em 1900 (P2 do Cassio na #171).
+    const minimo = limite(min) ?? (passado && tipo !== "time" ? new Date(ANO_MINIMO, 0, 1) : null);
     const maximo = limite(max);
     const dentroDoLimite = (d: Date) => {
       const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();

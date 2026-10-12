@@ -15,11 +15,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { CHECAGENS as CHECAGENS_BASE } from "./paridade/componentes";
+import { CHECAGENS as CHECAGENS_BASE, TAMANHO_DO_BOTAO_NA_TABELA } from "./paridade/componentes";
 import { divergenciasDeComposicao } from "./paridade/composicao";
 import { CHECAGENS_DE_MENSAGENS } from "./paridade/mensagens";
 import { divergenciasDeTokens } from "./paridade/tokens";
-import { classesDoArquivo, decl } from "./paridade/leitor";
+import { classesDoArquivo, decl, ler } from "./paridade/leitor";
+import { tamanho } from "./paridade/conversores";
 
 /** id da divergência -> motivo. Só entra o que o Peterson aceitou ou o que não cabe ao CRM. */
 export const EXCECOES: Record<string, string> = {
@@ -78,6 +79,17 @@ describe("paridade com o protótipo", () => {
 
   it("desabilitado é cinza, não 50% de opacidade (quadro DS, Botões)", () => {
     expect(classesDoArquivo("components/ui/button.tsx").has("disabled:opacity-50")).toBe(false);
+  });
+
+  it("o botão PADRÃO usa o tamanho da tabela do quadro (Rótulo, botão 13/600), não só o `sm`", () => {
+    // `classesDoArquivo` só diz que a classe existe no arquivo, e o `sm` já
+    // tinha `text-label`: aqui se confere a linha do tamanho padrão.
+    const classe = tamanho(TAMANHO_DO_BOTAO_NA_TABELA);
+    const fonte = ler("components/ui/button.tsx");
+    for (const variante of ["default", "md", "lg"]) {
+      const linha = new RegExp(`\\b${variante}: "([^"]+)"`).exec(fonte)?.[1] ?? "";
+      expect(linha.split(/\s+/), variante).toContain(classe);
+    }
   });
 
   it("toda exceção da lista ainda corresponde a uma divergência real", () => {

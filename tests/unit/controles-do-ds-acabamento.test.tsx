@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { CampoDeData } from "@/components/ui/campo-de-data";
-import { lerDataDigitada } from "@/components/ui/digitar-data";
+import { lerDataDigitada, soADataSemHora } from "@/components/ui/digitar-data";
 import { Escolha } from "@/components/ui/escolha";
 import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 
@@ -133,3 +133,36 @@ describe("min/max limitam o horário do mesmo dia", () => {
     expect(mudou).not.toHaveBeenCalled();
   });
 });
+
+describe("data e hora digitada pede a hora; passado começa em 1900 (P2 do Cassio na #171)", () => {
+  it("no campo de data e hora, só a data não vale (nada de meia-noite escondida)", () => {
+    expect(lerDataDigitada("12/10/1985", true)).toBeNull();
+    expect(soADataSemHora("12/10/1985")).toBe(true);
+    expect(soADataSemHora("12/10/1985 14:30")).toBe(false);
+    expect(lerDataDigitada("12/10/1985 14:30", true)?.getHours()).toBe(14);
+  });
+
+  it("ano antes de 1900 é recusado; 1900 vale (CONTROLE da borda)", () => {
+    expect(lerDataDigitada("31/12/1899", false)).toBeNull();
+    expect(lerDataDigitada("01/01/1900", false)?.getFullYear()).toBe(1900);
+  });
+
+  it("digitar só a data no data e hora não grava e pede o horário", async () => {
+    const mudou = vi.fn();
+    render(<CampoDeData aria-label="Lembrar" tipo="datetime-local" value="" onValorChange={mudou} />);
+    await userEvent.click(screen.getByRole("button", { name: "Lembrar" }));
+    await userEvent.type(await screen.findByLabelText("Digite a data"), "12/10/2026");
+    expect(screen.getByText("Digite também o horário (hh:mm).")).toBeInTheDocument();
+    expect(mudou).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText("Digite a data"), " 14:30");
+    expect(mudou).toHaveBeenLastCalledWith("2026-10-12T14:30");
+  });
+
+  it("no calendário, o ano anterior para em 1900", async () => {
+    render(<CampoDeData aria-label="Nascimento" tipo="date" value="1900-06-10" />);
+    await userEvent.click(screen.getByRole("button", { name: "Nascimento" }));
+    expect(await screen.findByRole("button", { name: "Ano anterior" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Próximo ano" })).toBeEnabled();
+  });
+});
+
