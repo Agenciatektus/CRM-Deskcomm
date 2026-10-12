@@ -7,7 +7,6 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useMoveCard } from "@/hooks/kanban/useMoveCard";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
-import { useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
 import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import {
   Select,
@@ -73,7 +72,6 @@ export function SeletorDeEtapa({
   const podeMover = usePermission("pipeline.move_card");
   const mover = useMoveCard(pipelineId);
   const ganhar = useWinLead(pipelineId);
-  const ganhoPendente = useAcaoPendente(`ganho:${leadId}`);
   const [perdendo, setPerdendo] = useState(false);
   const atual = etapas.find((e) => e.id === stageId);
 
@@ -156,6 +154,11 @@ export function SeletorDeEtapa({
           pipelineId={pipelineId}
           motivosDoFunil={motivosDoFunil}
           motivoObrigatorio={motivoObrigatorio}
+          adiar={(gravar) =>
+            adiarFechamento("perda", leadId, (s) => `${t("Perdido em")} ${s} s`, t("Desfazer"), () =>
+              gravar().catch(() => undefined),
+            )
+          }
         />
       )}
     </>
