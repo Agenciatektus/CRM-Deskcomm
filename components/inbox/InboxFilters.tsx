@@ -289,6 +289,8 @@ export function InboxFilters({ value, onChange }: Props) {
         onSemPasso={(semPasso) => onChange({ ...value, semPasso })}
         filtro={filtros("chip")}
         chipsAtivos={<ChipsDeFiltro chips={chips} onLimpar={limparDoPopover} />}
+        busca={value.search}
+        onLimparBusca={() => onChange({ ...value, search: "" })}
       />
     )}
     </>

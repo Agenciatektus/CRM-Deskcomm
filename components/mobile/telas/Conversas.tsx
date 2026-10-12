@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import type { InboxTab } from "@/components/inbox/InboxFilters";
 import { useT } from "@/hooks/i18n/useT";
-import { Archive, CaretLeft, CaretRight, CheckCircle } from "@/lib/ui/icons";
+import { Archive, CaretLeft, CaretRight, CheckCircle, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { CampoDeBusca } from "../CampoDeBusca";
@@ -35,6 +35,8 @@ export function FiltrosDaInboxNoCelular({
   onSemPasso,
   filtro,
   chipsAtivos,
+  busca = "",
+  onLimparBusca,
 }: {
   tab: InboxTab;
   semPasso: boolean;
@@ -45,6 +47,9 @@ export function FiltrosDaInboxNoCelular({
   filtro: ReactNode;
   /** Os filtros ligados, cada um com o "x" (`ChipsDeFiltro`). */
   chipsAtivos: ReactNode;
+  /** O termo aplicado à lista (pelo "Ver todas na lista" da busca), com o "x". */
+  busca?: string;
+  onLimparBusca?: () => void;
 }) {
   const t = useT();
   const subtela = NAS_LINHAS.includes(tab);
@@ -94,6 +99,19 @@ export function FiltrosDaInboxNoCelular({
           {t("Sem próximo passo")}
         </button>
       </div>
+      {busca && (
+        <div className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={onLimparBusca}
+            aria-label={`${t("Limpar busca")}: ${busca}`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-sm font-semibold text-accent-text"
+          >
+            “{busca}”
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+      )}
       {chipsAtivos}
       {abas
         .filter((a) => NAS_LINHAS.includes(a.value))

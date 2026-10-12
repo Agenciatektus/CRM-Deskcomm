@@ -13,22 +13,23 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *      zerá-las apagaria o "não lido" de outra pessoa);
  *   2. a marca pessoal "não lida" (`conversation_user_state.marked_unread_at`, 9042)
  *      é limpa só nas linhas dele.
- * - LOTE COM LIMITE: até `LIMITE_DO_LOTE` de cada por chamada; `restam` avisa que há
- *   mais, e o cliente chama de novo. IDEMPOTENTE: zerar o que já é zero e limpar o
- *   que já é nulo não muda nada.
+ * - PELO FILTRO, SEM LISTA DE IDS (P1 do Cassio na #178): o UPDATE leva só os filtros
+ *   (organização, dono ou usuário, e "não lida"). Uma lista de ids em `.in()` iria na
+ *   URL do PostgREST, e 500 uuids passam de 18 KB: é o defeito conhecido do CRM de
+ *   consulta que estoura a URL. Pelo filtro, a URL tem tamanho fixo.
+ * - CONTA O QUE MUDOU: `count: "exact"` no próprio UPDATE devolve as linhas
+ *   REALMENTE atualizadas (RLS e corrida inclusas), e é esse número que volta.
+ *   IDEMPOTENTE: rodar de novo encontra zero e não muda nada.
  * - SEM "VISTO" NO WHATSAPP: a ação individual (`POST /conversations/[id]/mark-read`)
  *   também não envia confirmação de leitura ao cliente (ela só zera o contador), e o
  *   lote segue a mesma regra. Este módulo não chama canal nenhum; o teste
  *   `tests/unit/marcar-todas-lidas.test.ts` prende isso.
  */
-export const LIMITE_DO_LOTE = 500;
-
 type SB = SupabaseClient;
 
 export interface ResultadoDoLote {
   contadores: number;
   marcas: number;
-  restam: boolean;
 }
 
 export async function marcarTodasComoLidas(
@@ -37,49 +38,21 @@ export async function marcarTodasComoLidas(
 ): Promise<ResultadoDoLote> {
   const { orgId, userId } = alvo;
 
-  const { data: minhas, error: erroDasMinhas } = await supabase
+  const contadores = await supabase
     .from("conversations")
-    .select("id")
+    .update({ unread_count_for_assignee: 0 }, { count: "exact" })
     .eq("organization_id", orgId)
     .eq("assigned_to_user_id", userId)
-    .gt("unread_count_for_assignee", 0)
-    .limit(LIMITE_DO_LOTE + 1);
-  if (erroDasMinhas) throw new Error(erroDasMinhas.message);
-  const idsDasMinhas = (minhas ?? []).slice(0, LIMITE_DO_LOTE).map((c: { id: string }) => c.id);
-  if (idsDasMinhas.length > 0) {
-    const { error } = await supabase
-      .from("conversations")
-      .update({ unread_count_for_assignee: 0 })
-      .eq("organization_id", orgId)
-      .eq("assigned_to_user_id", userId)
-      .in("id", idsDasMinhas);
-    if (error) throw new Error(error.message);
-  }
+    .gt("unread_count_for_assignee", 0);
+  if (contadores.error) throw new Error(contadores.error.message);
 
-  const { data: marcadas, error: erroDasMarcas } = await supabase
+  const marcas = await supabase
     .from("conversation_user_state")
-    .select("conversation_id")
+    .update({ marked_unread_at: null, updated_at: new Date().toISOString() }, { count: "exact" })
     .eq("organization_id", orgId)
     .eq("user_id", userId)
-    .not("marked_unread_at", "is", null)
-    .limit(LIMITE_DO_LOTE + 1);
-  if (erroDasMarcas) throw new Error(erroDasMarcas.message);
-  const idsDasMarcas = (marcadas ?? [])
-    .slice(0, LIMITE_DO_LOTE)
-    .map((m: { conversation_id: string }) => m.conversation_id);
-  if (idsDasMarcas.length > 0) {
-    const { error } = await supabase
-      .from("conversation_user_state")
-      .update({ marked_unread_at: null, updated_at: new Date().toISOString() })
-      .eq("organization_id", orgId)
-      .eq("user_id", userId)
-      .in("conversation_id", idsDasMarcas);
-    if (error) throw new Error(error.message);
-  }
+    .not("marked_unread_at", "is", null);
+  if (marcas.error) throw new Error(marcas.error.message);
 
-  return {
-    contadores: idsDasMinhas.length,
-    marcas: idsDasMarcas.length,
-    restam: (minhas ?? []).length > LIMITE_DO_LOTE || (marcadas ?? []).length > LIMITE_DO_LOTE,
-  };
+  return { contadores: contadores.count ?? 0, marcas: marcas.count ?? 0 };
 }

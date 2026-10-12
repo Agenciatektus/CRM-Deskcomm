@@ -2,35 +2,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { apiClient } from "@/lib/api/client";
 import type { ResultadoDoLote } from "@/lib/inbox/marcar-todas-lidas";
 
-/** Teto de lotes por clique: 10 × 500. Acima disso, o resto fica para o próximo. */
-const LOTES_POR_CLIQUE = 10;
-
 /**
- * "Marcar todas como lidas" (⋮ da lista no celular). Chama a rota em lote até ela
- * dizer que não restam (ou até o teto), e atualiza a lista e os contadores.
- * O servidor decide quais conversas entram; nada vai do cliente além do pedido.
+ * "Marcar todas como lidas" (⋮ da lista no celular). Uma chamada: o servidor atualiza
+ * pelo filtro e devolve quantas linhas REALMENTE mudaram. Só com mudança o aviso diz
+ * que marcou; com zero, diz que não havia o que marcar (P2 do Cassio na #178).
  */
 export function useMarcarTodasComoLidas(t: (texto: string) => string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      let total = 0;
-      for (let i = 0; i < LOTES_POR_CLIQUE; i += 1) {
-        const r = await apiClient.post<{ data: ResultadoDoLote }>("/api/v1/conversations/mark-all-read", {});
-        total += r.data.contadores + r.data.marcas;
-        if (!r.data.restam) break;
-      }
-      return total;
+      const r = await apiClient.post<{ data: ResultadoDoLote }>("/api/v1/conversations/mark-all-read", {});
+      return r.data.contadores + r.data.marcas;
     },
     onError: showApiError,
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["conversations"] });
-      void qc.invalidateQueries({ queryKey: ["conversation-counts"] });
-      toast(t("Todas marcadas como lidas."));
+    onSuccess: (mudaram) => {
+      if (mudaram > 0) {
+        void qc.invalidateQueries({ queryKey: ["conversations"] });
+        void qc.invalidateQueries({ queryKey: ["conversation-counts"] });
+        toast(t("Todas marcadas como lidas."));
+      } else {
+        toast(t("Nenhuma conversa sua estava como não lida."));
+      }
     },
   });
 }

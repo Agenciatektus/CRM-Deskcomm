@@ -23,7 +23,7 @@ export function CampoDeBusca() {
         <MagnifyingGlass size={18} aria-hidden />
         <span className="truncate">{t("Buscar contato, conversa ou lead")}</span>
       </button>
-      <CommandPalette open={aberta} onOpenChange={setAberta} />
+      <CommandPalette open={aberta} onOpenChange={setAberta} verTodasNaLista />
     </>
   );
 }

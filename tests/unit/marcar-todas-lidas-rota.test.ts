@@ -16,7 +16,7 @@ describe("rota POST /conversations/mark-all-read", () => {
     vi.clearAllMocks();
     mocks.suporte.mockResolvedValue(null);
     mocks.papel.mockResolvedValue({ ok: true, org: { orgId: "org-1" }, user: { id: "user-1" } });
-    mocks.lote.mockResolvedValue({ contadores: 2, marcas: 1, restam: false });
+    mocks.lote.mockResolvedValue({ contadores: 2, marcas: 1 });
   });
 
   it("exige agent, recusa suporte somente leitura e audita o lote", async () => {

@@ -299,3 +299,18 @@ describe("CommandPalette: contatos e conversas", () => {
     expect(termoParaServidor("Maria 21")).toBe("Maria 21");
   });
 });
+
+describe("Ver todas na lista (celular, P2 do Cassio na #178)", () => {
+  it("só na busca do celular: leva o termo ao filtro da lista inteira", async () => {
+    render(<CommandPalette open onOpenChange={() => {}} verTodasNaLista />);
+    await userEvent.type(screen.getByRole("combobox"), "maria");
+    await userEvent.click(await screen.findByRole("button", { name: "Ver todas na lista" }));
+    expect(push).toHaveBeenCalledWith("/app/inbox?busca=maria");
+  });
+
+  it("a busca do desktop não oferece (lá o campo da lista já filtra)", async () => {
+    render(<CommandPalette open onOpenChange={() => {}} />);
+    await userEvent.type(screen.getByRole("combobox"), "maria");
+    expect(screen.queryByRole("button", { name: "Ver todas na lista" })).toBeNull();
+  });
+});

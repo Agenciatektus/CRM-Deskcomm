@@ -34,7 +34,7 @@ export async function POST(): Promise<Response> {
       actorUserId: authz.user.id,
       organizationId: authz.org.orgId,
       resourceType: "conversation",
-      metadata: { contadores: resultado.contadores, marcas: resultado.marcas, restam: resultado.restam },
+      metadata: { contadores: resultado.contadores, marcas: resultado.marcas },
       requestId,
     });
     return ok(resultado, { requestId });

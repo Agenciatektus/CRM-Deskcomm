@@ -14832,6 +14832,9 @@ export const DICIONARIO: Traducoes = {
   "Ações da lista de conversas": { es: "Acciones de la lista de conversaciones" },
   "Todas marcadas como lidas.": { es: "Todas marcadas como leídas." },
   "Filtrar conversas": { es: "Filtrar conversaciones" },
+  "Nenhuma conversa sua estava como não lida.": { es: "Ninguna conversación tuya estaba como no leída." },
+  "Ver todas na lista": { es: "Ver todas en la lista" },
+  "Limpar busca": { es: "Limpiar búsqueda" },
 };
 
 /**

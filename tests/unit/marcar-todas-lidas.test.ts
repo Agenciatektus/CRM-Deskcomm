@@ -3,83 +3,80 @@
  * - o servidor decide o conjunto, por organização e pelo usuário (sem ids do cliente);
  * - só o estado de leitura do PRÓPRIO atendente (contador das conversas dele e a
  *   marca pessoal dele);
- * - lote com limite, idempotente, auditado;
+ * - pelo FILTRO, sem lista de ids na URL (P1 do Cassio na #178), contando o que mudou,
+ *   idempotente, auditado;
  * - nenhum "visto" no WhatsApp: a rota e o módulo não tocam canal nenhum.
  */
 import { readFileSync } from "node:fs";
 
+import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
-import { LIMITE_DO_LOTE, marcarTodasComoLidas } from "@/lib/inbox/marcar-todas-lidas";
+import { marcarTodasComoLidas } from "@/lib/inbox/marcar-todas-lidas";
 
-type Chamada = { tabela: string; op: string; filtros: [string, string, unknown][]; valor?: unknown };
+type Pedido = { metodo: string; url: string; corpo: unknown; prefer: string | null };
 
-/** Um cliente falso que REGISTRA cada consulta, com todos os filtros aplicados. */
-function clienteFalso(linhas: { conversations: { id: string }[]; estado: { conversation_id: string }[] }) {
-  const chamadas: Chamada[] = [];
-  const from = (tabela: string) => {
-    const atual: Chamada = { tabela, op: "", filtros: [] };
-    const cadeia = {
-      select: () => ((atual.op = "select"), cadeia),
-      update: (valor: unknown) => ((atual.op = "update"), (atual.valor = valor), cadeia),
-      eq: (c: string, v: unknown) => (atual.filtros.push(["eq", c, v]), cadeia),
-      gt: (c: string, v: unknown) => (atual.filtros.push(["gt", c, v]), cadeia),
-      not: (c: string, o: string, v: unknown) => (atual.filtros.push(["not", c, `${o}:${v}`]), cadeia),
-      in: (c: string, v: unknown) => (atual.filtros.push(["in", c, v]), cadeia),
-      limit: (n: number) => (atual.filtros.push(["limit", "", n]), cadeia),
-      then: (ok: (r: unknown) => void) => {
-        chamadas.push(atual);
-        const data = atual.op === "select" ? (tabela === "conversations" ? linhas.conversations : linhas.estado) : null;
-        ok({ data, error: null });
-      },
-    };
-    return cadeia;
+/**
+ * O cliente DE VERDADE do supabase-js, com o `fetch` trocado: cada pedido HTTP que ele
+ * montaria para o PostgREST fica registrado (método, URL inteira, corpo). É o que mede
+ * o tamanho da URL de verdade, e não o de uma imitação.
+ */
+function clienteGravado(atualizadas: { conversations: number; estado: number }) {
+  const pedidos: Pedido[] = [];
+  const fetchFalso = async (entrada: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(entrada);
+    const cabecalhos = new Headers(init?.headers);
+    pedidos.push({ metodo: init?.method ?? "GET", url, corpo: init?.body ? JSON.parse(String(init.body)) : null, prefer: cabecalhos.get("Prefer") });
+    const n = url.includes("/conversation_user_state") ? atualizadas.estado : atualizadas.conversations;
+    return new Response(null, { status: 204, headers: { "Content-Range": `*/${n}` } });
   };
-  return { cliente: { from } as never, chamadas };
+  const cliente = createClient("https://crm.exemplo.com.br", "chave-anon", { global: { fetch: fetchFalso as typeof fetch } });
+  return { cliente: cliente as never, pedidos };
 }
 
-const ALVO = { orgId: "org-1", userId: "user-1" };
-const tem = (c: Chamada, op: string, col: string, v?: unknown) =>
-  c.filtros.some(([o, k, val]) => o === op && k === col && (v === undefined || JSON.stringify(val) === JSON.stringify(v)));
+const ALVO = { orgId: "11111111-1111-4111-8111-111111111111", userId: "22222222-2222-4222-8222-222222222222" };
 
 describe("marcar todas como lidas: o conjunto e o dono", () => {
-  it("toda consulta é da organização ativa e do próprio usuário", async () => {
-    const { cliente, chamadas } = clienteFalso({ conversations: [{ id: "c1" }], estado: [{ conversation_id: "c2" }] });
+  it("dois UPDATEs pelo FILTRO: organização, dono ou usuário e não lida, sem lista de ids", async () => {
+    const { cliente, pedidos } = clienteGravado({ conversations: 3, estado: 1 });
     await marcarTodasComoLidas(cliente, ALVO);
-    expect(chamadas).toHaveLength(4);
-    for (const c of chamadas) expect(tem(c, "eq", "organization_id", "org-1"), `${c.tabela} ${c.op}`).toBe(true);
-    const conversas = chamadas.filter((c) => c.tabela === "conversations");
+    expect(pedidos.map((p) => p.metodo)).toEqual(["PATCH", "PATCH"]);
+    const [conversas, estado] = pedidos.map((p) => new URL(p.url));
+    expect(conversas!.pathname).toBe("/rest/v1/conversations");
+    expect(conversas!.searchParams.get("organization_id")).toBe(`eq.${ALVO.orgId}`);
     // O contador é de quem ATENDE: só as conversas atribuídas a quem pediu.
-    for (const c of conversas) expect(tem(c, "eq", "assigned_to_user_id", "user-1")).toBe(true);
-    const estado = chamadas.filter((c) => c.tabela === "conversation_user_state");
-    for (const c of estado) expect(tem(c, "eq", "user_id", "user-1")).toBe(true);
+    expect(conversas!.searchParams.get("assigned_to_user_id")).toBe(`eq.${ALVO.userId}`);
+    expect(conversas!.searchParams.get("unread_count_for_assignee")).toBe("gt.0");
+    expect(estado!.pathname).toBe("/rest/v1/conversation_user_state");
+    expect(estado!.searchParams.get("organization_id")).toBe(`eq.${ALVO.orgId}`);
+    expect(estado!.searchParams.get("user_id")).toBe(`eq.${ALVO.userId}`);
+    expect(estado!.searchParams.get("marked_unread_at")).toBe("not.is.null");
+    for (const p of pedidos) expect(p.url).not.toMatch(/[?&]id=in\.|conversation_id=in\./);
+  });
+
+  it("a URL fica pequena e de tamanho fixo (bem abaixo dos ~8 KB)", async () => {
+    const { cliente, pedidos } = clienteGravado({ conversations: 5000, estado: 5000 });
+    await marcarTodasComoLidas(cliente, ALVO);
+    for (const p of pedidos) expect(p.url.length).toBeLessThan(8 * 1024);
+    expect(Math.max(...pedidos.map((p) => p.url.length))).toBeLessThan(400);
   });
 
   it("zera só o contador e limpa só a marca pessoal", async () => {
-    const { cliente, chamadas } = clienteFalso({ conversations: [{ id: "c1" }], estado: [{ conversation_id: "c2" }] });
-    const r = await marcarTodasComoLidas(cliente, ALVO);
-    const updates = chamadas.filter((c) => c.op === "update");
-    expect(updates[0]).toMatchObject({ tabela: "conversations", valor: { unread_count_for_assignee: 0 } });
-    expect(tem(updates[0]!, "in", "id", ["c1"])).toBe(true);
-    expect(updates[1]).toMatchObject({ tabela: "conversation_user_state" });
-    expect(Object.keys(updates[1]!.valor as object).sort()).toEqual(["marked_unread_at", "updated_at"]);
-    expect(r).toEqual({ contadores: 1, marcas: 1, restam: false });
+    const { cliente, pedidos } = clienteGravado({ conversations: 1, estado: 1 });
+    await marcarTodasComoLidas(cliente, ALVO);
+    expect(pedidos[0]!.corpo).toEqual({ unread_count_for_assignee: 0 });
+    expect(Object.keys(pedidos[1]!.corpo as object).sort()).toEqual(["marked_unread_at", "updated_at"]);
   });
 
-  it("idempotente: sem nada a marcar, não escreve nada", async () => {
-    const { cliente, chamadas } = clienteFalso({ conversations: [], estado: [] });
-    const r = await marcarTodasComoLidas(cliente, ALVO);
-    expect(chamadas.filter((c) => c.op === "update")).toEqual([]);
-    expect(r).toEqual({ contadores: 0, marcas: 0, restam: false });
+  it("conta as linhas REALMENTE atualizadas (count exact do próprio UPDATE)", async () => {
+    const { cliente, pedidos } = clienteGravado({ conversations: 7, estado: 2 });
+    expect(await marcarTodasComoLidas(cliente, ALVO)).toEqual({ contadores: 7, marcas: 2 });
+    for (const p of pedidos) expect(p.prefer).toContain("count=exact");
   });
 
-  it("lote com limite: acima dele, escreve o limite e avisa que restam", async () => {
-    const muitas = Array.from({ length: LIMITE_DO_LOTE + 1 }, (_, i) => ({ id: `c${i}` }));
-    const { cliente, chamadas } = clienteFalso({ conversations: muitas, estado: [] });
-    const r = await marcarTodasComoLidas(cliente, ALVO);
-    const ids = chamadas.find((c) => c.op === "update")!.filtros.find(([o]) => o === "in")![2] as string[];
-    expect(ids).toHaveLength(LIMITE_DO_LOTE);
-    expect(r.restam).toBe(true);
+  it("idempotente: sem nada a marcar, volta zero", async () => {
+    const { cliente } = clienteGravado({ conversations: 0, estado: 0 });
+    expect(await marcarTodasComoLidas(cliente, ALVO)).toEqual({ contadores: 0, marcas: 0 });
   });
 });
 
