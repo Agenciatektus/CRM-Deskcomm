@@ -4,25 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
 import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { useT } from "@/hooks/i18n/useT";
-import { Plus, MagnifyingGlass, UploadSimple, UsersThree } from "@/lib/ui/icons";
-import { Input } from "@/components/ui/input";
+import { Plus, UploadSimple, UsersThree } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useContactList } from "@/hooks/contacts/useContactList";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
-import { PontoDaEtiqueta } from "@/components/tags/PontoDaEtiqueta";
 import { NewContactDialog } from "@/components/contacts/NewContactDialog";
 import { ImportContactsDialog } from "@/components/contacts/ImportContactsDialog";
 import { TAG_DE_CLIENTE } from "@/lib/contacts/cliente";
@@ -30,6 +23,17 @@ import { type ModoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { MergeDialog } from "@/components/contacts/MergeDialog";
 import { EmptyContacts } from "@/components/empty";
+import {
+  BarraDeFiltros,
+  BotaoDaTela,
+  CabecalhoDaPagina,
+  EstadoDaLista,
+  Pagina,
+  TabelaOuCartoes,
+} from "@/components/pagina";
+
+import { CartaoDoContato } from "./_components/CartaoDoContato";
+import { FiltroDeEtiquetas } from "./_components/FiltroDeEtiquetas";
 import type { ContactOrderBy } from "@/lib/schemas/contacts";
 
 const SOURCE_OPTIONS = [
@@ -123,124 +127,49 @@ export function ContactsListClient() {
   );
 
   return (
-    <div className="space-y-4 p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="min-w-0">
-          <h1 className="text-title-lg">{t("Contatos")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("Customer 360 — busque, filtre e gerencie contatos.")}
-          </p>
-        </div>
-        {/*
-          A estrutura é a da main (o "Importar CSV" do PR #313); o `shrink-0`
-          vem do PR #267, e vale para os DOIS botões agora: numa tela de 390px
-          uma linha de dois botões sem isso comprime os rótulos.
-        */}
-        <div className="flex shrink-0 items-center gap-2">
-          {/*
-            A porta do recurso de duplicados fica AQUI, na tela que já existe, e
-            não num item de menu novo: quem descobre que tem contato repetido
-            descobre olhando a lista, e a barra lateral não precisa crescer para
-            um trabalho que se faz de vez em quando.
-          */}
-          <Button variant="outline" onClick={() => setDuplicadosOpen(true)}>
-            <UsersThree size={16} weight="bold" aria-hidden />
-            <span>{t("Duplicados")}</span>
-          </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <UploadSimple size={16} weight="bold" aria-hidden />
-            <span>{t("Importar CSV")}</span>
-          </Button>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus size={16} weight="bold" aria-hidden />
-            <span>{t("Novo contato")}</span>
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
-        <div className="relative w-full sm:w-72">
-          <MagnifyingGlass
-            size={16}
-            className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            placeholder={t("Buscar por nome, email ou telefone…")}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="h-9 w-full pl-8"
-          />
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={tagOptions.length === 0}>
-              {tags[0] ? <PontoDaEtiqueta tag={tags[0]} className="mr-2" /> : null}
-              {/* Resumo, e não a lista inteira: o gatilho tem a largura do filtro de
-                  origem ao lado. Uma etiqueta mostra o nome; duas mostram a
-                  primeira e o resto em contagem. */}
-              {tags.length === 0
-                ? `${t("Tag")}: ${t("todas")}`
-                : tags.length === 1
-                  ? `${t("Tag")}: ${tags[0]}`
-                  : `${t("Tag")}: ${tags[0]} +${tags.length - 1}`}
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Contatos")}
+        descricao={t("Customer 360 — busque, filtre e gerencie contatos.")}
+        acoes={
+          <>
+            {/* Duplicados mora AQUI, na lista: quem descobre contato repetido descobre
+                olhando a lista. `shrink-0` (PR #267): numa tela estreita os rótulos
+                não se comprimem. */}
+            <Button variant="outline" className="shrink-0" onClick={() => setDuplicadosOpen(true)}>
+              <UsersThree size={16} weight="bold" aria-hidden />
+              <span>{t("Duplicados")}</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel>{t("Tag")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                setTags([]);
-                setTagMode(undefined);
-              }}
-            >
-              {t("Todas")}
-            </DropdownMenuItem>
-            {/* O E/OU so aparece com DUAS etiquetas: com uma so o parametro nao
-                muda o resultado, e um controle que nao muda nada e pior do que
-                nenhum. */}
-            {tags.length > 1 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup
-                  value={tagMode === "ou" ? "ou" : "e"}
-                  onValueChange={(modo) => setTagMode(modo === "ou" ? "ou" : undefined)}
-                >
-                  <DropdownMenuRadioItem value="e">{t("Todas (E)")}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="ou">{t("Qualquer uma (OU)")}</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </>
-            )}
-            <DropdownMenuSeparator />
-            {/* `DropdownMenuCheckboxItem` marca e NAO fecha o menu — e o
-                `onSelect` com `preventDefault` trava esse comportamento, porque
-                o item de checkbox fecha por padrao. Sem isso, escolher a segunda
-                etiqueta exigiria reabrir o menu. */}
-            {tagOptions.map((tagOption) => (
-              <DropdownMenuCheckboxItem
-                key={tagOption}
-                checked={tags.includes(tagOption)}
-                onCheckedChange={() => {
-                  const escolhida = tags.includes(tagOption);
-                  const proximas = escolhida
-                    ? tags.filter((et) => et !== tagOption)
-                    : [...tags, tagOption];
-                  setTags(proximas);
-                  // O modo so faz sentido com DUAS: com uma so ele nao muda o
-                  // resultado, e o `&modo=ou` na URL seria ruido.
-                  setTagMode(proximas.length > 1 ? tagMode : undefined);
-                }}
-                onSelect={(e) => e.preventDefault()}
-              >
-                <PontoDaEtiqueta tag={tagOption} className="mr-2" />
-                {tagOption}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <Button variant="outline" className="shrink-0" onClick={() => setImportOpen(true)}>
+              <UploadSimple size={16} weight="bold" aria-hidden />
+              <span>{t("Importar CSV")}</span>
+            </Button>
+            <Button className="mb:hidden" onClick={() => setCreateOpen(true)}>
+              <Plus size={16} weight="bold" aria-hidden />
+              <span>{t("Novo contato")}</span>
+            </Button>
+          </>
+        }
+      />
+
+      <BarraDeFiltros
+        busca={{ valor: searchInput, aoMudar: setSearchInput, placeholder: t("Buscar por nome, email ou telefone…") }}
+        ativos={(tags.length > 0 ? 1 : 0) + (source ? 1 : 0)}
+        aoLimpar={() => {
+          setSearchInput("");
+          setSearch("");
+          setTags([]);
+          setTagMode(undefined);
+          setSource(undefined);
+        }}
+      >
+        <FiltroDeEtiquetas
+          tags={tags}
+          setTags={setTags}
+          tagMode={tagMode}
+          setTagMode={setTagMode}
+          tagOptions={tagOptions}
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -274,77 +203,42 @@ export function ContactsListClient() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {(search || tags.length > 0 || source) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchInput("");
-              setSearch("");
-              setTags([]);
-              setTagMode(undefined);
-              setSource(undefined);
-            }}
-          >
-            {t("Limpar filtros")}
-          </Button>
-        )}
-      </div>
+      </BarraDeFiltros>
 
-      {q.isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
+      <EstadoDaLista
+        carregando={q.isLoading}
+        erro={q.isError ? t("Erro ao carregar contatos.") : null}
+        aoTentarDeNovo={() => q.refetch()}
+        quantidade={allContacts.length}
+        vazio={<EmptyContacts />}
+      >
+        <TabelaOuCartoes
+          itens={allContacts}
+          chave={(c) => c.id}
+          rotulo={t("Contatos")}
+          tabela={
+            <ContactsTable contacts={allContacts} orderBy={orderBy} orderDir={orderDir} onSort={handleSort} />
+          }
+          cartao={(c) => <CartaoDoContato contato={c} />}
+        />
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between mb:px-4">
+          <p className="text-sm text-muted-foreground">
+            {allContacts.length} {allContacts.length === 1 ? t("contato") : t("contatos")}
+            {q.hasNextPage ? ` ${t("carregados — há mais resultados")}` : ""}
+          </p>
+          {q.hasNextPage && (
+            <Button variant="outline" size="sm" onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage}>
+              {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais")}
+            </Button>
+          )}
         </div>
-      ) : q.isError ? (
-        <Card className="p-6 text-center">
-          <p className="text-sm text-error-fg">{t("Erro ao carregar contatos.")}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-2"
-            onClick={() => q.refetch()}
-          >
-            {t("Tentar novamente")}
-          </Button>
-        </Card>
-      ) : allContacts.length === 0 ? (
-        <Card className="p-2">
-          <EmptyContacts />
-        </Card>
-      ) : (
-        <>
-          <Card className="overflow-hidden">
-            <ContactsTable
-              contacts={allContacts}
-              orderBy={orderBy}
-              orderDir={orderDir}
-              onSort={handleSort}
-            />
-          </Card>
-          <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              {allContacts.length} {allContacts.length === 1 ? t("contato") : t("contatos")}
-              {q.hasNextPage ? ` ${t("carregados — há mais resultados")}` : ""}
-            </p>
-            {q.hasNextPage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => q.fetchNextPage()}
-                disabled={q.isFetchingNextPage}
-              >
-                {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais")}
-              </Button>
-            )}
-          </div>
-        </>
-      )}
+      </EstadoDaLista>
+
+      <BotaoDaTela rotulo={t("Novo contato")} aoTocar={() => setCreateOpen(true)} />
 
       <NewContactDialog open={createOpen} onOpenChange={setCreateOpen} />
       <ImportContactsDialog open={importOpen} onOpenChange={setImportOpen} />
       <MergeDialog open={duplicadosOpen} onOpenChange={setDuplicadosOpen} />
-    </div>
+    </Pagina>
   );
 }

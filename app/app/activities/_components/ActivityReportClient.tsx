@@ -92,7 +92,7 @@ export function ActivityReportClient() {
 
   const seletor = (
     <Select value={String(dias)} onValueChange={(v) => setDias(Number(v))}>
-      <SelectTrigger className="w-44" aria-label={t("Período")}>
+      <SelectTrigger className="w-44 mb:h-(--mb-busca-altura) mb:w-full" aria-label={t("Período")}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -107,7 +107,7 @@ export function ActivityReportClient() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 mb:gap-4 mb:px-4 mb:pt-3">
         {seletor}
         <p className="text-sm text-muted-foreground">{t("Carregando…")}</p>
       </div>
@@ -116,7 +116,7 @@ export function ActivityReportClient() {
 
   if (isError || !relatorio) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 mb:gap-4 mb:px-4 mb:pt-3">
         {seletor}
         <p className="text-sm text-destructive">{t("Erro ao carregar o relatório.")}</p>
       </div>
@@ -126,8 +126,8 @@ export function ActivityReportClient() {
   const { total, resumo, atores, tipos, atividades, truncado, vocabulario } = relatorio;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-col gap-6 mb:gap-4 mb:px-4 mb:pt-3">
+      <div className="flex items-center justify-between gap-3 mb:flex-col mb:items-stretch">
         {seletor}
         <p className="text-sm text-muted-foreground" data-testid="total-de-atividades">
           {total} {total === 1 ? t("acontecimento") : t("acontecimentos")}

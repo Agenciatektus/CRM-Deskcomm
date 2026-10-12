@@ -1,8 +1,9 @@
+import { Pagina } from "@/components/pagina";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ContactsLoading() {
   return (
-    <div className="p-6 space-y-4">
+    <Pagina className="gap-4 mb:px-4 mb:pt-3">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-10 w-full max-w-md" />
       <div className="space-y-2">
@@ -10,6 +11,6 @@ export default function ContactsLoading() {
           <Skeleton key={i} className="h-14 w-full" />
         ))}
       </div>
-    </div>
+    </Pagina>
   );
 }

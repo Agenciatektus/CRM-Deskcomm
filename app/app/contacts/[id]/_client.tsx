@@ -7,6 +7,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ShieldCheck, PencilSimple, LockOpen } from "@/lib/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { Badge } from "@/components/ui/badge";
@@ -98,18 +99,18 @@ export function ContactDetailClient({ contactId }: Props) {
 
   if (q.isLoading) {
     return (
-      <div className="space-y-4 p-6">
+      <Pagina className="gap-4 mb:px-4 mb:pt-3">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-32 w-full" />
-      </div>
+      </Pagina>
     );
   }
 
   if (q.isError || !q.data) {
     return (
-      <div className="p-6">
+      <Pagina className="mb:px-4 mb:pt-3">
         <Card className="p-6 text-center text-sm text-error-fg">{t("Erro ao carregar contato.")}</Card>
-      </div>
+      </Pagina>
     );
   }
 
@@ -137,7 +138,7 @@ export function ContactDetailClient({ contactId }: Props) {
   );
 
   return (
-    <div className="space-y-4 p-6">
+    <Pagina className="gap-4 mb:px-4 mb:pt-3">
       {contact.is_anonymized && (
         <div
           role="alert"
@@ -173,7 +174,7 @@ export function ContactDetailClient({ contactId }: Props) {
           </div>
         </div>
         {!contact.is_anonymized && user.support?.access_mode !== "support_readonly" && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 mb:-mx-4 mb:flex-nowrap mb:overflow-x-auto mb:px-4">
             {/* O CAMINHO DE VOLTA do descadastro. Sem ele, o contato que pediu
                 para sair — ou que caiu num falso positivo — ficava preso para
                 sempre: `before-send` recusa todo envio, o funil não cria lead,
@@ -395,6 +396,6 @@ export function ContactDetailClient({ contactId }: Props) {
         customFieldDefs={camposDoFunil(pipelineQuery.data?.pipeline.settings ?? null)}
       />
       <AnonymizeDialog contactId={contactId} open={anonOpen} onOpenChange={setAnonOpen} />
-    </div>
+    </Pagina>
   );
 }
