@@ -136,7 +136,7 @@ export function ConteudoDoMenu({
           style={{ left: alvo.x, top: alvo.y }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
+      <DropdownMenuContent folhaNoCelular
         ref={focarPrimeiro}
         side="bottom"
         align="start"

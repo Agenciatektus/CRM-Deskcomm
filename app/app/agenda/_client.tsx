@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
 
 import { EntradaDaAgenda } from "@/components/agenda/EntradaDaAgenda";
 import { EnderecoDaMarcacao } from "@/components/agenda/EnderecoDaMarcacao";
@@ -230,6 +231,9 @@ export function AgendaClient({
     () => busca.get("tipo") ?? tiposIniciais[0]?.id ?? null,
   );
   const tipo = tiposIniciais.find((t) => t.id === tipoId) ?? tiposIniciais[0] ?? null;
+  // O "Novo compromisso" da folha "Criar" do celular chega com `?criar=1`: a mesma
+  // porta do botão "Novo agendamento" (quem só lê, ou sem tipo cadastrado, não abre).
+  usePedidoDeCriar(abrirMarcacao, podeMarcar && !!tipo);
   /**
    * ESCOLHER O TIPO GRAVA NA URL — a outra metade do `useState` acima.
    *

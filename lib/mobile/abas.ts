@@ -42,13 +42,29 @@ export function ehTelaCheia(rota: string, idNaUrl: string | null): boolean {
   return conversaAberta(rota, idNaUrl) || /^\/app\/leads\/[^/]+$/.test(rota);
 }
 
+/** O que a folha "Criar" oferece (as opções do protótipo, por tela). */
+export type OpcaoDeCriar = "conversa" | "contato" | "lead" | "tarefa" | "compromisso";
+
 /**
- * A ação do FAB "+" por tela. Até a folha "Criar" (M1.4), ele abre a ação principal
- * da tela pelo `?criar=1` (ver `usePedidoDeCriar`). Sem ação, sem FAB.
+ * As opções da folha "Criar" do FAB "+", na ordem do protótipo. Sem opções, sem FAB.
+ * Conversas: tudo; Funil: lead, contato, tarefa; Tarefas: tarefa, compromisso, lead.
  */
-export function acaoDeCriar(rota: string): { href: string; rotulo: string } | null {
-  if (rota === "/app/inbox") return { href: "/app/contacts?criar=1", rotulo: "Novo contato" };
-  if (rota === "/app/tasks") return { href: "/app/tasks?criar=1", rotulo: "Nova tarefa" };
-  if (/^\/app\/pipelines\/[^/]+$/.test(rota)) return { href: `${rota}?criar=1`, rotulo: "Novo Lead" };
-  return null;
+export function opcoesDeCriar(rota: string): OpcaoDeCriar[] {
+  if (rota === "/app/inbox") return ["conversa", "contato", "lead", "tarefa", "compromisso"];
+  if (rota === "/app/kanban" || /^\/app\/pipelines\/[^/]+$/.test(rota)) return ["lead", "contato", "tarefa"];
+  if (rota === "/app/tasks") return ["tarefa", "compromisso", "lead"];
+  return [];
+}
+
+/**
+ * Para onde cada opção leva: a tela que já cria aquilo, com `?criar=1` (ver
+ * `usePedidoDeCriar`). O lead vai para o funil aberto, ou para o funil padrão.
+ */
+export function destinoDeCriar(opcao: OpcaoDeCriar, rota: string, funilPadrao: string | null): string {
+  if (opcao === "conversa") return "/app/contacts";
+  if (opcao === "contato") return "/app/contacts?criar=1";
+  if (opcao === "tarefa") return "/app/tasks?criar=1";
+  if (opcao === "compromisso") return "/app/agenda?criar=1";
+  if (/^\/app\/pipelines\/[^/]+$/.test(rota)) return `${rota}?criar=1`;
+  return funilPadrao ? `/app/pipelines/${funilPadrao}?criar=1` : "/app/kanban";
 }

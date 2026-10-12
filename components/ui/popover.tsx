@@ -11,13 +11,22 @@ const PopoverTrigger = PopoverPrimitive.Trigger
 
 const PopoverAnchor = PopoverPrimitive.Anchor
 
+/**
+ * `folhaNoCelular`: abaixo de 760px o popover vira FOLHA INFERIOR (regra em
+ * globals.css, com as medidas do protótipo mobile). Acima, o popover de sempre.
+ */
+type PropsDoPopover = React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
+  folhaNoCelular?: boolean
+}
+
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  PropsDoPopover
+>(({ className, align = "center", sideOffset = 4, folhaNoCelular, ...props }, ref) => (
   <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
       ref={ref}
+      data-folha-no-celular={folhaNoCelular ? "" : undefined}
       align={align}
       sideOffset={sideOffset}
       className={cn(

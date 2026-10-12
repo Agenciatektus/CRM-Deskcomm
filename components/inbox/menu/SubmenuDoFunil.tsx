@@ -108,7 +108,7 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
         {detalhe && <span className={cn(CLASSE_DO_DETALHE, "max-w-24")}>{detalhe}</span>}
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className={cn(CLASSE_DO_SUBMENU, "w-[250px]")} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Funil e etapa")}>
+        <DropdownMenuSubContent folhaNoCelular className={cn(CLASSE_DO_SUBMENU, "w-[250px]")} collisionPadding={8} aria-labelledby={undefined} aria-label={t("Funil e etapa")}>
           {resumo.isLoading && <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Carregando…")}</DropdownMenuItem>}
           {resumo.isError && (
             <DropdownMenuItem disabled className={CLASSE_DO_ITEM}>{t("Não foi possível ler o funil.")}</DropdownMenuItem>

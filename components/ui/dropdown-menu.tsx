@@ -40,12 +40,20 @@ const DropdownMenuSubTrigger = React.forwardRef<
 DropdownMenuSubTrigger.displayName =
   DropdownMenuPrimitive.SubTrigger.displayName
 
+/**
+ * `folhaNoCelular` (aqui e no `DropdownMenuContent`): abaixo de 760px o menu vira
+ * FOLHA INFERIOR (regra em globals.css, com as medidas do protótipo mobile). Acima,
+ * o menu de sempre.
+ */
+type ComFolha = { folhaNoCelular?: boolean }
+
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent> & ComFolha
+>(({ className, folhaNoCelular, ...props }, ref) => (
   <DropdownMenuPrimitive.SubContent
     ref={ref}
+    data-folha-no-celular={folhaNoCelular ? "" : undefined}
     className={cn(
       "pele-ruido z-50 min-w-[8rem] overflow-hidden rounded-menu border border-border bg-surface p-1.5 text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-dropdown-menu-content-transform-origin)",
       className
@@ -58,11 +66,12 @@ DropdownMenuSubContent.displayName =
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & ComFolha
+>(({ className, sideOffset = 4, folhaNoCelular, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
+      data-folha-no-celular={folhaNoCelular ? "" : undefined}
       sideOffset={sideOffset}
       className={cn(
         // `.ctxm` do quadro DS: raio 14, padding 6, `--shadow-pop`, entra com o

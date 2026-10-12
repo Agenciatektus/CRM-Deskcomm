@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
- * O FAB "+" do celular chega na tela com `?criar=1` (ver `acaoDeCriar`): a tela abre
+ * O FAB "+" do celular chega na tela com `?criar=1` (a folha "Criar", ver `destinoDeCriar`): a tela abre
  * a criação dela e o parâmetro sai da URL, para voltar ou recarregar não abrir de novo.
  * `habilitado: false` (quem não pode criar) só limpa o parâmetro.
  */

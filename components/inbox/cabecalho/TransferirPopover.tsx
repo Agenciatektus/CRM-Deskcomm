@@ -104,7 +104,7 @@ export function TransferirPopover({ conversationId, devolver, numero }: Props) {
           <ArrowsLeftRight size={18} aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-1.5" aria-label={t("Transferir para")}>
+      <PopoverContent folhaNoCelular align="end" className="w-72 p-1.5" aria-label={t("Transferir para")}>
         <p className="px-2 pb-1 pt-1.5 text-xs font-semibold text-text-muted">{t("Transferir para")}</p>
         {/* O motivo vem ANTES da lista: lido depois da escolha, ficava fora da
             vista de quem já tinha decidido. */}

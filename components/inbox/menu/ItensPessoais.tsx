@@ -103,7 +103,7 @@ export function ItensPessoais({ conversation, podePreferir, podeBloquear, onFech
                 <span className="grow">{t("Silenciar")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
-                <DropdownMenuSubContent
+                <DropdownMenuSubContent folhaNoCelular
                   className={CLASSE_DO_SUBMENU}
                   collisionPadding={8}
                   aria-labelledby={undefined}
