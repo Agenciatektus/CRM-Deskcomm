@@ -42,7 +42,8 @@ import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
 /**
  * QUAL COLUNA APARECE NO CELULAR — as duas saem da MESMA pergunta.
  *
- * Abaixo do `md` só cabe uma coluna por vez, então a lista e a conversa se
+ * Abaixo de 760px (o corte do app de celular, `mb:`/`largo:` no globals.css; não o
+ * `md` de 768) só cabe uma coluna por vez, então a lista e a conversa se
  * alternam. O defeito que esta função existe para tornar impossível é as duas
  * decidirem por dados DIFERENTES: a lista somia com `selectedId` (o id) e a
  * conversa aparecia com `selectedConversation` (o objeto já carregado). Entre
@@ -55,12 +56,12 @@ import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
  *      numa tela branca sem nem o botão de voltar.
  *
  * Com uma pergunta só, "as duas escondidas" deixa de ser representável.
- * `md:flex` em ambas: no desktop as duas colunas convivem e a regra não vale.
+ * `largo:flex` em ambas: de 760px para cima as duas colunas convivem e a regra não vale.
  */
 export function colunasDoCelular(temSelecao: boolean): { lista: string; conversa: string } {
   return {
-    lista: temSelecao ? "hidden md:flex" : "flex",
-    conversa: temSelecao ? "flex" : "hidden md:flex",
+    lista: temSelecao ? "hidden largo:flex" : "flex",
+    conversa: temSelecao ? "flex" : "hidden largo:flex",
   };
 }
 
@@ -401,7 +402,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         // próprio `<main>` quando há painel de chamada (a mesma conta do padding
         // dele), e o `pb-2` (`--space-2`) quando não há. Sem respiro em cima: o cartão encosta no
         // topo e na barra lateral, como o `.work` do protótipo.
-        "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao md:grid-cols-[300px_minmax(0,1fr)]",
+        "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao largo:grid-cols-[300px_minmax(0,1fr)]",
         ferramentas.painelLead
           ? "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px-var(--largura-do-painel))))_minmax(0,1fr)_var(--largura-do-painel)]"
           : "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px)))_minmax(0,1fr)]",
@@ -451,7 +452,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       */}
       <div
         className={cn(
-          "pele-ruido h-full min-h-0 flex-col border-r border-border md:flex",
+          "pele-ruido h-full min-h-0 flex-col border-r border-border largo:flex",
           colunas.lista,
         )}
       >
@@ -483,7 +484,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       */}
       <div
         className={cn(
-          "h-full min-h-0 min-w-0 flex-col md:flex",
+          "h-full min-h-0 min-w-0 flex-col largo:flex",
           colunas.conversa,
         )}
       >
@@ -494,7 +495,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
           conversa, e só aparece quando há uma.
         */}
         {selectedId && (
-          <div className="flex items-center gap-1 border-b border-border px-1 py-1 md:hidden">
+          <div className="flex items-center gap-1 border-b border-border px-1 py-1 largo:hidden">
             <Button
               variant="ghost"
               size="sm"

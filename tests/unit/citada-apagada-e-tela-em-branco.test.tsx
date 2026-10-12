@@ -96,12 +96,12 @@ describe("a citação de uma mensagem APAGADA não devolve o texto", () => {
 /**
  * A TELA EM BRANCO DO CELULAR.
  *
- * A regra é invariante, não gosto: abaixo do `md` cabe UMA coluna, e uma tem de
+ * A regra é invariante, não gosto: abaixo de 760px (o corte `mb:` do app de celular) cabe UMA coluna, e uma tem de
  * aparecer. "Nenhuma das duas" é o defeito, e ele existia porque as duas
  * decidiam por dados diferentes — a lista pelo id, a conversa pelo objeto já
  * carregado. Este bloco cobre os dois estados possíveis, não um caso feliz.
  */
-/** O que o navegador aplica abaixo do `md`: as variantes com prefixo não valem. */
+/** O que o navegador aplica abaixo de 760px: as variantes com prefixo não valem. */
 function visivelNoCelular(classes: string): boolean {
   const semPrefixo = classes.split(/\s+/).filter((c) => !c.includes(":"));
   return semPrefixo.includes("flex") && !semPrefixo.includes("hidden");
@@ -129,7 +129,7 @@ describe("no celular sempre há exatamente UMA coluna na tela", () => {
     for (const temSelecao of [false, true]) {
       const { lista, conversa } = colunasDoCelular(temSelecao);
       for (const c of [lista, conversa]) {
-        expect(c.split(/\s+/).includes("hidden") ? c : `${c} md:flex`).toContain("md:flex");
+        expect(c.split(/\s+/).includes("hidden") ? c : `${c} largo:flex`).toContain("largo:flex");
       }
     }
   });

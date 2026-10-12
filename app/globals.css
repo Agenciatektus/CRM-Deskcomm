@@ -30,6 +30,16 @@
    nada muda. As classes `pele-*` levam o mesmo recorte mais abaixo. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *):not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)));
 
+/* O CORTE DO APP DE CELULAR (docs/design/mobile/auditoria-mobile.md, decisão fixa):
+   abaixo de 760px vale o app (`mb:`); de 760px para cima, o tablet e o desktop de
+   sempre (`largo:`). É 760, e não o `md` de 768 do Tailwind: o `md` não entra em
+   nada que seja do celular. `tests/unit/paridade-mobile.test.ts` confere o corte.
+   O `largo:` é um BREAKPOINT do tema (`--breakpoint-largo`, no `@theme inline`), e não
+   um `@custom-variant`: só breakpoint entra na ordem dos tamanhos (antes do `md` e do
+   `xl`). Como variante própria ele sairia DEPOIS do `xl:` no CSS e venceria o
+   `xl:grid-cols-*` e o `xl:hidden` no desktop. */
+@custom-variant mb (@media (max-width: 759px));
+
 /* ─────────────────────────────────────────────────────────────────────────
    DeskcommCRM — Design System tokens (Sage palette · density Aerada)
    Source of truth: /app/design/lib/tokens.ts (PALETTES.sage)
@@ -262,6 +272,11 @@
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
   --color-bubble-in: var(--color-surface);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Claro: os valores do `.mb`. */
+  --color-mb-barra: #fbfcfd;
+  --color-note-bg: #fff1cc;
+  --color-note-fg: #54360b;
   --mix-accent-soft: 11%;
   --mix-accent-hover: 86%;
   --accent-hover-alvo: #000000;
@@ -295,6 +310,44 @@
   /* Movimento do protótipo: `--ease` e o .15s das transições. */
   --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-ui: 150ms;
+  /* ── App de celular: medidas do protótipo (docs/design/mobile/MobileVerdash.dc.html) ──
+     Lidas pelo teste de paridade mobile: mudar um valor aqui sem mudar o protótipo (ou
+     o contrário) reprova. Só as telas do celular (`mb:`) consomem estes tokens. */
+  --mb-alvo: 44px;
+  --mb-abas-colunas: 5;
+  --mb-aba-altura: 56px;
+  --mb-aba-fonte: 12px;
+  --mb-aba-pilula-largura: 60px;
+  --mb-aba-pilula-altura: 32px;
+  --mb-aba-pilula-raio: 16px;
+  --mb-aba-contador: 20px;
+  --mb-titulo-fonte: 32px;
+  --mb-titulo-altura: 56px;
+  --mb-barra-altura: 56px;
+  --mb-busca-altura: 44px;
+  --mb-busca-raio: 14px;
+  --mb-chip-altura: 36px;
+  --mb-avatar-lista: 52px;
+  --mb-linha-nome: 16px;
+  --mb-linha-previa: 14.5px;
+  --mb-acao-gesto: 72px;
+  --mb-folha-raio: 24px;
+  --mb-folha-max: 88%;
+  --mb-folha-item: 56px;
+  --mb-pegador-largura: 40px;
+  --mb-pegador-altura: 5px;
+  --mb-fab: 60px;
+  --mb-fab-raio: 20px;
+  --mb-fab-margem: 16px;
+  --mb-fab-acima: 84px;
+  /* 16px nos campos: abaixo disso o Safari do iPhone dá zoom ao focar. */
+  --mb-campo-fonte: 16px;
+  /* Área segura (notch e indicador de início). Só existe com `viewportFit: "cover"`
+     (app/layout.tsx); no desktop o `env()` vale 0, então nada muda acima de 760px. */
+  --mb-area-topo: env(safe-area-inset-top, 0px);
+  --mb-area-baixo: env(safe-area-inset-bottom, 0px);
+  --mb-area-esquerda: env(safe-area-inset-left, 0px);
+  --mb-area-direita: env(safe-area-inset-right, 0px);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -435,6 +488,11 @@
   --color-tint: rgba(23, 29, 38, 0.06);
   --color-warning-line: #e3be80;
   --color-bubble-in: var(--color-surface);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Claro: os valores do `.mb`. */
+  --color-mb-barra: #fbfcfd;
+  --color-note-bg: #fff1cc;
+  --color-note-fg: #54360b;
   --mix-accent-soft: 11%;
   --mix-accent-hover: 86%;
   --accent-hover-alvo: #000000;
@@ -575,6 +633,11 @@
   --color-tint: rgba(255, 255, 255, 0.08);
   --color-warning-line: #8d5d1c;
   --color-bubble-in: var(--color-surface-elevated);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Escuro: os valores do `.mb.dark`. */
+  --color-mb-barra: #121416;
+  --color-note-bg: #392c0c;
+  --color-note-fg: #f3dba9;
   --mix-accent-soft: 20%;
   --mix-accent-hover: 0%;
   --accent-hover-alvo: var(--color-accent-500);
@@ -717,6 +780,8 @@ body [data-theme] {
    embrulhar o `:root` num `@layer`, o teste reprova e a explicação está aqui.
    ───────────────────────────────────────────────────────────────────────── */
 @theme inline {
+  /* O corte do app de celular: `largo:` = 760px para cima (ver `@custom-variant mb`). */
+  --breakpoint-largo: 47.5rem;
   /* Foundation */
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
@@ -804,6 +869,9 @@ body [data-theme] {
   --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
   --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
   --color-bubble-in: var(--color-bubble-in);
+  --color-mb-barra: var(--color-mb-barra);
+  --color-note-bg: var(--color-note-bg);
+  --color-note-fg: var(--color-note-fg);
 
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a

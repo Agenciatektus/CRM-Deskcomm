@@ -304,7 +304,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             // não vai para o cliente sem depender de abrir um diálogo.
             placeholder={nota ? t("Escreva uma nota interna… (só o time vê)") : t("Escreva uma mensagem…")}
             aria-describedby={dicaId}
-            className="block max-h-40 min-h-12 w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm leading-normal text-text placeholder:text-text-subtle focus:outline-hidden disabled:cursor-not-allowed"
+            className="block max-h-40 min-h-12 w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm mb:text-[16px] leading-normal text-text placeholder:text-text-subtle focus:outline-hidden disabled:cursor-not-allowed"
             disabled={campoBarrado}
             aria-label={t("Mensagem")}
           />

@@ -44,7 +44,10 @@ export function BotaoDeDisponibilidade() {
       disabled={atualizar.isPending}
       onClick={() => atualizar.mutate({ userId: user.id, patch: { is_available: !ligado } })}
       data-testid="botao-de-disponibilidade"
-      className="pele-foco hidden h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface pr-3 pl-2.5 text-[13px] font-semibold text-text transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:inline-flex"
+      // Abaixo de 640px a barra do topo não comporta o rótulo: o botão vira o ponto num
+      // alvo de 44px e o texto fica para o leitor de tela (era `hidden`, e quem atende
+      // pelo celular não tinha como ficar disponível). De 640px para cima, o de sempre.
+      className="pele-foco inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface text-[13px] font-semibold text-text transition-colors hover:border-border-strong focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 sm:h-8 sm:w-auto sm:justify-start sm:pr-3 sm:pl-2.5"
     >
       {/* O ponto com halo do `.avail` do protótipo. A cor não é a única pista:
           o texto ao lado diz o estado. */}
@@ -55,7 +58,7 @@ export function BotaoDeDisponibilidade() {
         )}
         aria-hidden
       />
-      {ligado ? t("Disponível") : t("Ausente")}
+      <span className="max-sm:sr-only">{ligado ? t("Disponível") : t("Ausente")}</span>
     </button>
   );
 }

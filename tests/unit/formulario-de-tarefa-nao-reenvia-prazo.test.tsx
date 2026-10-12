@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { FormularioDeTarefa } from "@/app/app/tasks/_components/FormularioDeTarefa";
-import type { Tarefa } from "@/lib/tarefas/tipos";
+import type { NovaTarefa, Tarefa } from "@/lib/tarefas/tipos";
 import { preencherData } from "@/tests/unit/helpers/controles-do-ds";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
@@ -29,7 +29,9 @@ const TAREFA = {
   updated_at: "2026-10-01T00:00:00Z",
 } as unknown as Tarefa;
 
-function montar(aoSalvar = vi.fn(async () => undefined)) {
+// Tipado pelo parâmetro: sem ele, `mock.calls` vira a tupla vazia `[]` e o
+// `calls[0]![0]` não compila no `pnpm typecheck` (que inclui tests/).
+function montar(aoSalvar = vi.fn(async (_entrada: NovaTarefa): Promise<unknown> => undefined)) {
   render(<FormularioDeTarefa aberto aoMudarAbertura={() => undefined} tarefa={TAREFA} aoSalvar={aoSalvar} />);
   return aoSalvar;
 }
@@ -42,7 +44,7 @@ describe("formulário de tarefa: o prazo só vai quando muda", () => {
     await userEvent.type(titulo, "Ligar de novo");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(aoSalvar).toHaveBeenCalledTimes(1));
-    const enviado = aoSalvar.mock.calls[0]![0] as Record<string, unknown>;
+    const enviado = aoSalvar.mock.calls[0]![0] as unknown as Record<string, unknown>;
     expect(enviado.title).toBe("Ligar de novo");
     expect("due_date" in enviado).toBe(false);
   });
@@ -52,7 +54,7 @@ describe("formulário de tarefa: o prazo só vai quando muda", () => {
     preencherData(screen.getByLabelText("Horário"), "15:00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(aoSalvar).toHaveBeenCalledTimes(1));
-    const enviado = aoSalvar.mock.calls[0]![0] as Record<string, unknown>;
+    const enviado = aoSalvar.mock.calls[0]![0] as unknown as Record<string, unknown>;
     expect(typeof enviado.due_date).toBe("string");
   });
 });

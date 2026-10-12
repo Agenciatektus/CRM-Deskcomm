@@ -76,7 +76,8 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
   const ocupacaoDoRodape = useOcupacaoDoRodape();
   const naInbox = ehAInbox(usePathname());
   return (
-    <div className="pele-moldura flex min-h-screen w-full bg-background">
+    // A área segura dos lados (notch com o celular deitado). No desktop vale 0.
+    <div className="pele-moldura flex min-h-screen w-full bg-background pl-(--mb-area-esquerda) pr-(--mb-area-direita)">
       <BarraDeProgressoNavegacao />
       <div className="hidden md:block">
         <Sidebar collapsed={sidebarCollapsed} fixoNaInbox={menuFixoNaInbox} funis={funis} />

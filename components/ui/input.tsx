@@ -12,7 +12,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           // borda `line`; no foco a borda vira a cor de destaque com anel de 3px
           // em accent-soft e o fundo vira surface; erro em crit com anel crit-bg.
           "flex h-9.5 w-full rounded-field border border-border bg-surface-elevated px-2.75 py-0",
-          "text-ui text-text placeholder:text-text-subtle",
+          // `mb:text-[16px]`: no celular o Safari dá zoom em campo abaixo de 16px.
+          "text-ui text-text placeholder:text-text-subtle mb:text-[16px]",
           "transition-[border-color,box-shadow,background-color] duration-ui ease-emphasized",
           "hover:border-border-strong",
           "focus-visible:outline-hidden focus-visible:border-accent focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-accent-soft",
