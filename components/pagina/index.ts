@@ -5,5 +5,5 @@
 export { Pagina, CabecalhoDaPagina, SecaoDaPagina } from "./Pagina";
 export { BarraDeFiltros, CampoDeBuscaDaPagina, type BuscaDaPagina } from "./BarraDeFiltros";
 export { EstadoDaLista, TabelaOuCartoes, CartaoEmpilhado, type CampoDoCartao } from "./ListaDaPagina";
-export { BotaoDaTela } from "./BotaoDaTela";
+export { BotaoDaTela, BotaoDaTelaParaRota } from "./BotaoDaTela";
 export { TABELA_EMPILHADA } from "./TabelaEmpilhada";

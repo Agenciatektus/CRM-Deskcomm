@@ -1,4 +1,5 @@
 "use client";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { randomId } from "@/lib/random-id";
@@ -172,19 +173,17 @@ export function ProspectingClient() {
     setConfig((c) => ({ ...c, [field]: value }));
   const count = (states: string[]) => candidates.filter((c) => states.includes(c.progress)).length;
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">CRM</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t("Prospecção")}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {t("Encontre empresas, aborde aos poucos e acompanhe quem avança na conversa.")}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => setSettings((s) => !s)}>
-          {t("Configurar busca")}
-        </Button>
-      </header>
+    <Pagina className="max-w-7xl">
+      <CabecalhoDaPagina
+        titulo={t("Prospecção")}
+        descricao={t("Encontre empresas, aborde aos poucos e acompanhe quem avança na conversa.")}
+        acoes={
+          <Button variant="outline" onClick={() => setSettings((s) => !s)}>
+            {t("Configurar busca")}
+          </Button>
+        }
+      />
+      <SecaoDaPagina className="gap-6">
       {(error || query.error) && (
         <div
           role="alert"
@@ -775,7 +774,7 @@ export function ProspectingClient() {
                     </p>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
+                    <table className={`w-full text-left text-sm ${TABELA_EMPILHADA}`}>
                       <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
                         <tr>
                           <th className="p-4">{t("Empresa")}</th>
@@ -794,7 +793,7 @@ export function ProspectingClient() {
                               </p>
                               <p className="mt-1 text-xs">{c.data.phone ?? t("Sem telefone")}</p>
                             </td>
-                            <td className="max-w-64 p-4 align-top">
+                            <td data-rotulo={t("Informações")} className="max-w-64 p-4 align-top">
                               <p className="text-xs text-muted-foreground">{c.data.address}</p>
                               {safePublicLink(c.data.website) && (
                                 <a
@@ -815,7 +814,7 @@ export function ProspectingClient() {
                                 </p>
                               ))}
                             </td>
-                            <td className="max-w-64 p-4 align-top">
+                            <td data-rotulo={t("Progresso")} className="max-w-64 p-4 align-top">
                               <Badge variant="outline">{t(labels[c.progress] ?? c.progress)}</Badge>
                               {c.error && (
                                 <p className="mt-2 text-xs text-muted-foreground">{c.error}</p>
@@ -826,7 +825,7 @@ export function ProspectingClient() {
                                 </p>
                               )}
                             </td>
-                            <td className="p-4 align-top">
+                            <td data-rotulo={t("Conversa")} className="p-4 align-top">
                               {c.conversation_id && (
                                 <Link
                                   className="underline"
@@ -847,6 +846,7 @@ export function ProspectingClient() {
           )}
         </div>
       </div>
-    </main>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

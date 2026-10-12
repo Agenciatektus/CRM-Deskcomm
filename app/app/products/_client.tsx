@@ -1,5 +1,6 @@
 "use client";
 
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -295,18 +296,16 @@ export function ProdutosClient({
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-6" data-testid="tela-produtos">
-      <header className="mb-6">
-        <h1 className="text-title-lg">{textos.titulo}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{textos.subtitulo}</p>
-      </header>
+    <Pagina className="max-w-5xl" testId="tela-produtos">
+      <CabecalhoDaPagina titulo={textos.titulo} descricao={textos.subtitulo} />
+      <SecaoDaPagina className="gap-0">
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder={t("Buscar por nome, código ou marca")}
-          className="h-9 w-full max-w-sm rounded-md border px-3 text-sm"
+          className="h-9 w-full max-w-sm rounded-md border px-3 text-sm mb:h-(--mb-busca-altura) mb:max-w-none mb:rounded-(--mb-busca-raio) mb:text-(length:--mb-campo-fonte)"
           data-testid="busca-produto"
         />
         {podeEditar ? (
@@ -486,18 +485,18 @@ export function ProdutosClient({
           <p className="mt-1 text-sm text-muted-foreground">{textos.vazioDica}</p>
         </div>
       ) : (
-        <ul className="divide-y rounded-lg border" data-testid="lista-produtos">
+        <ul className="divide-y rounded-lg border mb:-mx-4 mb:rounded-none mb:border-x-0" data-testid="lista-produtos">
           {filtrados.map((p) => {
             const capa = p.fotos?.[0] ? urlsDasFotos[p.fotos[0]] : undefined;
             return (
             <li key={p.id} data-testid={`produto-${p.codigo}`}>
-            <div className="flex items-center gap-4 p-3">
+            <div className="flex flex-wrap items-center gap-4 p-3 mb:gap-x-3 mb:gap-y-1 mb:px-4">
               {capa ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={capa} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
               ) : null}
               <div className="min-w-0 flex-1">
-                <p className={`truncate font-medium ${p.ativo ? "" : "text-muted-foreground line-through"}`}>
+                <p className={`truncate font-medium mb:text-(length:--mb-linha-nome) ${p.ativo ? "" : "text-muted-foreground line-through"}`}>
                   {p.nome}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -541,6 +540,7 @@ export function ProdutosClient({
           })}
         </ul>
       )}
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -36,17 +37,23 @@ export function ImportDetailClient({ id }: { id: string }) {
   if (!batch) return <div className="p-6 text-muted-foreground">{t("Carregando…")}</div>;
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div>
-        <Link href="/app/imports" className="text-sm text-muted-foreground hover:underline">
-          ← {t("Importações")}
-        </Link>
-        <h1 className="text-title-lg">{batch.filename as string}</h1>
-        <p className="text-sm text-muted-foreground">
-          {batch.status as string} · {batch.successful_rows as number} {t("certas")} ·{" "}
-          {batch.conflict_rows as number} {t("conflitos")} · {batch.failed_rows as number} {t("falhas")}
-        </p>
-      </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        antes={
+          <Link href="/app/imports" className="text-sm text-muted-foreground hover:underline mb:hidden">
+            ← {t("Importações")}
+          </Link>
+        }
+        titulo={batch.filename as string}
+        descricao={
+          <>
+            {batch.status as string} · {batch.successful_rows as number} {t("certas")} ·{" "}
+            {batch.conflict_rows as number} {t("conflitos")} · {batch.failed_rows as number} {t("falhas")}
+          </>
+        }
+      />
+      <SecaoDaPagina className="gap-4">
 
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -58,7 +65,7 @@ export function ImportDetailClient({ id }: { id: string }) {
       </label>
 
       <Card className="overflow-hidden">
-        <Table>
+        <Table className={TABELA_EMPILHADA}>
           <TableHeader>
             <TableRow>
               <TableHead>#</TableHead>
@@ -73,16 +80,17 @@ export function ImportDetailClient({ id }: { id: string }) {
             {rows.map((r) => (
               <TableRow key={r.id as string}>
                 <TableCell>{r.row_number as number}</TableCell>
-                <TableCell>{r.status as string}</TableCell>
-                <TableCell className="max-w-xs truncate text-xs">{(r.error as string) || "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{(r.company_id as string)?.slice(0, 8) || "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{(r.person_id as string)?.slice(0, 8) || "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{(r.contact_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo={t("Status")}>{r.status as string}</TableCell>
+                <TableCell data-rotulo={t("Erro")} className="max-w-xs truncate text-xs">{(r.error as string) || "—"}</TableCell>
+                <TableCell data-rotulo="Company" className="font-mono text-xs">{(r.company_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo="Person" className="font-mono text-xs">{(r.person_id as string)?.slice(0, 8) || "—"}</TableCell>
+                <TableCell data-rotulo="Contact" className="font-mono text-xs">{(r.contact_id as string)?.slice(0, 8) || "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

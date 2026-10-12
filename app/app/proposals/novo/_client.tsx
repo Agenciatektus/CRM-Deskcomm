@@ -1,5 +1,6 @@
 "use client";
 
+import { Pagina, SecaoDaPagina } from "@/components/pagina";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -130,8 +131,8 @@ export function NewProposalClient({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
-      <div className="flex items-center gap-3">
+    <Pagina className="max-w-3xl">
+      <div className="flex items-center gap-3 mb:hidden">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/app/proposals" className="flex items-center gap-1.5 text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -140,6 +141,7 @@ export function NewProposalClient({
         </Button>
       </div>
 
+      <SecaoDaPagina className="gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">{t("Nova Proposta Comercial")}</CardTitle>
@@ -155,7 +157,7 @@ export function NewProposalClient({
             {initialLeads.length === 0 ? (
               <div
                 role="alert"
-                className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"
+                className="rounded-lg border border-warning-line bg-warning-bg p-4 text-sm text-warning-fg"
               >
                 <p className="font-medium">
                   {t("Nenhum negócio elegível encontrado")}
@@ -287,6 +289,7 @@ export function NewProposalClient({
           </CardFooter>
         </form>
       </Card>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

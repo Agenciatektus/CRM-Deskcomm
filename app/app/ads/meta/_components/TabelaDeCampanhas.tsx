@@ -1,5 +1,6 @@
 "use client";
 
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import {
   Table,
   TableBody,
@@ -50,11 +51,11 @@ const ESTADO_LEGIVEL: Record<string, string> = {
 
 /** Verde só para quem está realmente entregando; âmbar para o que pede atenção. */
 const TOM_DO_ESTADO: Record<string, string> = {
-  ACTIVE: "text-emerald-600 dark:text-emerald-400",
-  WITH_ISSUES: "text-amber-600 dark:text-amber-400",
-  DISAPPROVED: "text-red-600 dark:text-red-400",
-  PENDING_BILLING_INFO: "text-amber-600 dark:text-amber-400",
-  PENDING_REVIEW: "text-amber-600 dark:text-amber-400",
+  ACTIVE: "text-success-fg",
+  WITH_ISSUES: "text-warning-fg",
+  DISAPPROVED: "text-error-fg",
+  PENDING_BILLING_INFO: "text-warning-fg",
+  PENDING_REVIEW: "text-warning-fg",
 };
 
 const TRACO = "—";
@@ -178,8 +179,8 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
       São 15 colunas; em telas estreitas a tabela rola dentro do próprio quadro e
       a página segue parada, que é o combinado do produto para conteúdo largo.
     */
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
+    <div className="overflow-x-auto rounded-md border mb:overflow-visible mb:rounded-none mb:border-x-0">
+      <Table className={TABELA_EMPILHADA}>
         <TableHeader>
           <TableRow>
             <TableHead className="sticky left-0 z-10 bg-bg">{t("Campanha")}</TableHead>
@@ -234,14 +235,14 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
             const rotulo = rotuloDoIndicador(linha.resultado.indicador);
             return (
               <TableRow key={linha.campanhaId}>
-                <TableCell className="sticky left-0 z-10 max-w-[22rem] bg-bg font-medium">
+                <TableCell className="sticky left-0 z-10 max-w-[22rem] bg-bg font-medium mb:static mb:max-w-none">
                   <span className="block truncate" title={linha.nome}>
                     {linha.nome}
                   </span>
                 </TableCell>
-                <TableCell>{estado(linha.status)}</TableCell>
-                <TableCell>{estado(linha.veiculacao)}</TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Status")}>{estado(linha.status)}</TableCell>
+                <TableCell data-rotulo={t("Veiculação")}>{estado(linha.veiculacao)}</TableCell>
+                <TableCell data-rotulo={t("Resultado")} className="text-right">
                   <Numero valor={linha.resultado.valor} />
                   {/*
                     O rótulo do indicador viaja com o número. "15" sozinho não
@@ -255,31 +256,31 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
                     </span>
                   )}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Custo por Resultado")} className="text-right">
                   {dinheiro(linha.resultado.custoPorResultado)}
                 </TableCell>
-                <TableCell className="text-right">{dinheiro(linha.gasto)}</TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Valor Gasto")} className="text-right">{dinheiro(linha.gasto)}</TableCell>
+                <TableCell data-rotulo={t("Impressões")} className="text-right">
                   <Numero valor={linha.impressoes} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Alcance")} className="text-right">
                   <Numero valor={linha.alcance} />
                 </TableCell>
-                <TableCell className="text-right">{dinheiro(linha.cpm)}</TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("CPM")} className="text-right">{dinheiro(linha.cpm)}</TableCell>
+                <TableCell data-rotulo={t("CTR")} className="text-right">
                   <Percentual valor={linha.ctr} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Connect rate")} className="text-right">
                   <Percentual valor={linha.connectRate} titulo={ressalvaDoConnectRate} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("Frequência")} className="text-right">
                   <Numero valor={linha.frequencia} casas={2} />
                 </TableCell>
-                <TableCell className="text-right">{dinheiro(linha.cpc)}</TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("CPC")} className="text-right">{dinheiro(linha.cpc)}</TableCell>
+                <TableCell data-rotulo={t("Hook Rate")} className="text-right">
                   <Percentual valor={linha.hookRate} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell data-rotulo={t("ThruPlays")} className="text-right">
                   <Numero valor={linha.thruPlays} />
                 </TableCell>
               </TableRow>

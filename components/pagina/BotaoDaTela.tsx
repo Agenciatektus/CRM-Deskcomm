@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import type { ComponentType } from "react";
 
 import { Plus } from "@/lib/ui/icons";
@@ -28,4 +29,10 @@ export function BotaoDaTela({
       <Icone size={26} weight="bold" aria-hidden />
     </button>
   );
+}
+
+/** O `BotaoDaTela` que leva a uma rota (a tela de criar), com navegação do app. */
+export function BotaoDaTelaParaRota({ rotulo, href }: { rotulo: string; href: string }) {
+  const router = useRouter();
+  return <BotaoDaTela rotulo={rotulo} aoTocar={() => router.push(href)} />;
 }
