@@ -5,13 +5,14 @@ import { Resultados } from "@/components/shell/CommandPalette";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
+import { PREFIXO_BUSCAS_RECENTES } from "@/lib/mobile/buscas-recentes";
 import { CaretLeft, ClockCounterClockwise } from "@/lib/ui/icons";
 
 const MAXIMO = 5;
 const ouvintes = new Set<() => void>();
 
 function chave(userId: string): string {
-  return `crm-buscas-recentes:${userId}`;
+  return `${PREFIXO_BUSCAS_RECENTES}${userId}`;
 }
 
 function lerCru(userId: string): string {
@@ -111,12 +112,15 @@ export function Busca({
 
 function MioloDaBusca({ aoFechar, verTodasNaLista }: { aoFechar: () => void; verTodasNaLista: boolean }) {
   const t = useT();
-  const { user } = useAuth();
+  const { user, activeOrg } = useAuth();
+  // Pessoa + organização: quem tem várias orgs não vê na B o que buscou na A.
+  // Em modo suporte nada é lembrado (a busca é sobre dados do cliente).
+  const dono = user.support ? null : `${user.id}:${activeOrg?.orgId ?? "-"}`;
   return (
     <Resultados
       verTodasNaLista={verTodasNaLista}
       aoEscolher={(termo) => {
-        lembrar(user.id, termo);
+        if (dono) lembrar(dono, termo);
         aoFechar();
       }}
       antesDoCampo={
@@ -129,7 +133,7 @@ function MioloDaBusca({ aoFechar, verTodasNaLista }: { aoFechar: () => void; ver
           <CaretLeft size={22} weight="bold" aria-hidden />
         </button>
       }
-      semTermo={(definir) => <BuscasRecentes userId={user.id} aoEscolher={definir} />}
+      semTermo={(definir) => (dono ? <BuscasRecentes userId={dono} aoEscolher={definir} /> : null)}
     />
   );
 }
