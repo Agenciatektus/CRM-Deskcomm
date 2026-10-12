@@ -24,7 +24,7 @@ import {
 type Tema = "claro" | "escuro";
 
 /** Token do protótipo -> token do CRM. */
-const PARES: [string, string][] = [
+export const PARES: [string, string][] = [
   ["--chrome", "--color-bg"],
   ["--surface", "--color-surface"],
   ["--surface-2", "--color-surface-elevated"],
