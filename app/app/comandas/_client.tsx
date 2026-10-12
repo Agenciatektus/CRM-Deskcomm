@@ -11,6 +11,7 @@
  * recalcular aqui criaria um segundo número para a mesma pergunta, e o da tela
  * seria o que a pessoa acredita.
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -241,7 +242,7 @@ export function Comandas({
               </span>
             </header>
 
-            <table className="w-full text-sm">
+            <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
               <tbody>
                 {(comanda.sale_items ?? []).map((i) => (
                   <tr key={i.id} className="border-b border-border/60">

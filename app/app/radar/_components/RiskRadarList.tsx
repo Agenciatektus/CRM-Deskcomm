@@ -83,7 +83,7 @@ export function RiskRadarList() {
           viola o invariante 5. Esta é a lista que responde "e daí?". */}
       {semPasso.length > 0 ? (
         <section
-          className="rounded-lg border border-warning-border bg-warning-bg/40 p-3"
+          className="rounded-lg border border-warning-line bg-warning-bg/40 p-3"
           data-testid="radar-sem-proximo-passo"
         >
           <p className="text-sm font-medium">
@@ -115,7 +115,7 @@ export function RiskRadarList() {
           paralela, não misturada nos itens do radar). */}
       {vencidas.length > 0 ? (
         <section
-          className="rounded-lg border border-warning-border bg-warning-bg/40 p-3"
+          className="rounded-lg border border-warning-line bg-warning-bg/40 p-3"
           data-testid="radar-propostas-vencidas"
         >
           <p className="text-sm font-medium">
@@ -147,7 +147,7 @@ export function RiskRadarList() {
           não misturada nos itens do radar). */}
       {esperandoRevisao.length > 0 ? (
         <section
-          className="rounded-lg border border-warning-border bg-warning-bg/40 p-3"
+          className="rounded-lg border border-warning-line bg-warning-bg/40 p-3"
           data-testid="radar-propostas-esperando-revisao"
         >
           <p className="text-sm font-medium">

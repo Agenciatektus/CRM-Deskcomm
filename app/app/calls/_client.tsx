@@ -179,6 +179,7 @@ export function CallsClient() {
     <Pagina>
       <CabecalhoDaPagina
         titulo={t("Chamadas")}
+        acoesSoNoDesktop
         descricao={t("Histórico de ligações (voz por IA) com transcrição.")}
         acoes={<DialerDialog />}
       />

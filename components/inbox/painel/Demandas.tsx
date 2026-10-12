@@ -148,7 +148,7 @@ export function Demandas({
               <li
                 key={d.id}
                 data-testid={semPasso ? "demanda-sem-proximo-passo" : "demanda-com-proximo-passo"}
-                className={cn("rounded-md border p-2 text-xs", semPasso ? "border-warning-border bg-warning-bg/40" : "border-border")}
+                className={cn("rounded-md border p-2 text-xs", semPasso ? "border-warning-line bg-warning-bg/40" : "border-border")}
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate font-medium">{t(ESTADO_LEGIVEL[d.estado] ?? d.estado)}</span>

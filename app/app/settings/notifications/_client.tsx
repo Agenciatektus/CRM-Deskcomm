@@ -4,6 +4,7 @@ import { useT } from "@/hooks/i18n/useT";
 
 import { useSyncExternalStore } from "react";
 
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useNotificationPermission } from "@/hooks/notifications/useNotificationPermission";
@@ -44,8 +45,8 @@ export function NotificationPrefsClient() {
   }
 
   return (
-    <Card className="overflow-x-auto p-0">
-      <table className="w-full text-sm">
+    <Card className="overflow-x-auto p-0 mb:overflow-visible">
+      <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
         <thead className="border-b">
           <tr>
             <th className="px-4 py-3 text-left font-medium">{t("Categoria")}</th>
@@ -67,17 +68,17 @@ export function NotificationPrefsClient() {
                   </p>
                 ) : null}
               </td>
-              <td className="px-4 py-3 text-center">
+              <td data-rotulo="Email" className="px-4 py-3 text-center mb:flex mb:items-center mb:gap-2">
                 <Switch checked={false} disabled aria-label={`${t(LABELS[cat])} via email`} />
               </td>
-              <td className="px-4 py-3 text-center">
+              <td data-rotulo="In-app" className="px-4 py-3 text-center mb:flex mb:items-center mb:gap-2">
                 <Switch
                   checked={prefs[cat].in_app}
                   onCheckedChange={(on) => void onToggle(cat, "in_app", on)}
                   aria-label={`${t(LABELS[cat])} via in_app`}
                 />
               </td>
-              <td className="px-4 py-3 text-center">
+              <td data-rotulo="Push" className="px-4 py-3 text-center mb:flex mb:items-center mb:gap-2">
                 <Switch
                   checked={prefs[cat].push}
                   disabled={denied || unsupported}

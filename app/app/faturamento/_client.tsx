@@ -17,6 +17,7 @@
  * `por_moeda`. A ordem dos blocos é a única decisão da tela, e ela não é uma
  * conta: a moeda da organização primeiro, as demais em ordem alfabética.
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 
@@ -391,7 +392,7 @@ function Tabela({
     <section className="rounded-md border border-border p-3">
       <h2 className="mb-2 text-sm font-semibold">{titulo}</h2>
       {temLinha ? (
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <tbody>{children}</tbody>
         </table>
       ) : (

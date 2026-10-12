@@ -129,7 +129,7 @@ export function PublishBar({
   const busy = save.isPending || publish.isPending || disable.isPending || rollback.isPending;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3 mb:gap-2 mb:py-2">
       <div className="flex items-center gap-1">
         <h1 className="text-sm font-semibold text-text">{flow.name}</h1>
         <RenameFollowupFlowButton
@@ -146,7 +146,8 @@ export function PublishBar({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* No celular os controles ficam numa faixa só, rolável, para sobrar canvas. */}
+      <div className="flex flex-wrap items-center gap-2 mb:-mx-4 mb:w-[calc(100%+2rem)] mb:flex-nowrap mb:overflow-x-auto mb:px-4">
         {/* O roteiro de atendimento começa por palavra-gatilho ou roteador (no
             Início do grafo) e encerra quando um humano assume (0397): o gatilho
             de relógio e a política de handoff do follow-up não valem para ele —

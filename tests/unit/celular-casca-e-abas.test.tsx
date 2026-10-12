@@ -60,6 +60,8 @@ describe("rotas do app de celular", () => {
     expect(voltarDaRota("/app/settings/tenant/pipelines")).toBe("/app/settings");
     expect(voltarDaRota("/app/settings")).toBe("/app");
     expect(voltarDaRota("/app/team")).toBe("/app");
+    expect(voltarDaRota("/app/ai/agents")).toBe("/app/ai");
+    expect(voltarDaRota("/app/ai")).toBe("/app");
     expect(voltarDaRota("/app/leads/l-1")).toBe("/app/kanban");
   });
 
@@ -73,6 +75,10 @@ describe("rotas do app de celular", () => {
     expect(ehTelaCheia("/app/inbox/c-1", null)).toBe(true);
     expect(ehTelaCheia("/app/leads/l-1", null)).toBe(true);
     expect(ehTelaCheia("/app/inbox", null)).toBe(false);
+    expect(ehTelaCheia("/app/ai/followups/f-1", null)).toBe(true);
+    expect(ehTelaCheia("/app/ai/atendimento/f-1", null)).toBe(true);
+    expect(ehTelaCheia("/app/ai/followups/enrollments", null)).toBe(false);
+    expect(ehTelaCheia("/app/ai/followups", null)).toBe(false);
   });
 
   it("FAB só onde há o que criar, com as opções do protótipo na ordem", () => {

@@ -142,6 +142,7 @@ export function CompaniesListClient() {
     <Pagina>
       <CabecalhoDaPagina
         titulo={t("Empresas")}
+        acoesSoNoDesktop
         descricao={t("Cadastro B2B com CNPJ e enriquecimento via BrasilAPI.")}
         acoes={
           <Button className="mb:hidden" onClick={() => setCreateOpen(true)}>

@@ -7,6 +7,7 @@
  * mesmo texto que a rota manda (quem resolve é o administrador da instalação,
  * em Configurações da instalação › Módulos, não quem está nesta tela).
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
@@ -99,7 +100,7 @@ export function Honorarios({ podeGerenciar }: { podeGerenciar: boolean }) {
         {(contratos.data ?? []).length === 0 ? (
           <p className="text-sm text-text-muted">{t("Nenhum contrato ainda.")}</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
             <tbody>
               {(contratos.data ?? []).map((c) => (
                 <tr
