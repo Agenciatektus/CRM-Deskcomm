@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-import { adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
+import { adiarAcao, adiarExclusao, avisarComDesfazer, DURACAO_DO_DESFAZER } from "@/lib/ui/aviso-com-desfazer";
 
 type Opcoes = { duration: number; action: { label: string; onClick: () => void }; onAutoClose?: () => void; onDismiss?: () => void };
 const opcoes = () => toast.mock.calls.at(-1)![1] as Opcoes;
@@ -55,5 +55,24 @@ describe("exclusão adiada", () => {
     opcoes().onAutoClose?.();
     expect(excluir).not.toHaveBeenCalled();
     expect(desfeito).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ação adiada genérica (ganho, perda, troca de funil)", () => {
+  it("adiarExclusao é a mesma adiarAcao", () => {
+    expect(adiarExclusao).toBe(adiarAcao);
+  });
+
+  it("sem o fim do aviso (página fechada) a ação nunca acontece", () => {
+    const ganhar = vi.fn(() => Promise.resolve());
+    adiarAcao("Negócio ganho.", "Desfazer", ganhar);
+    // Nem `onAutoClose` nem `onDismiss`: a aba fechou com o aviso na tela.
+    expect(ganhar).not.toHaveBeenCalled();
+  });
+
+  it("erro da ação adiada vira aviso de erro", async () => {
+    adiarAcao("Negócio ganho.", "Desfazer", () => Promise.reject(new Error("500")));
+    opcoes().onAutoClose?.();
+    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("500"));
   });
 });

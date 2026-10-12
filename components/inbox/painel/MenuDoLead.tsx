@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
+import { useArmado } from "@/hooks/ui/useArmado";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { adiarExclusao } from "@/lib/ui/aviso-com-desfazer";
 import { DotsThree, Kanban, PencilSimple, Trash } from "@/lib/ui/icons";
@@ -93,14 +94,11 @@ export function MenuDoLead({ leadId, pipelineId, titulo, leitura = false, onExcl
               <b className="text-text">{titulo ? `${t("Excluir")} "${titulo}"?` : t("Excluir lead")}</b>{" "}
               {t("O card sai do funil com o histórico de atividades. O contato e as conversas continuam.")}
             </p>
-            <div className="flex justify-end gap-1.5">
-              <Button size="sm" variant="outline" onClick={() => setConfirmando(false)}>
-                {t("Cancelar")}
-              </Button>
-              <Button size="sm" variant="destructive" disabled={excluir.isPending} onClick={excluirComDesfazer}>
-                {t("Excluir")}
-              </Button>
-            </div>
+            <BotoesArmados
+              ocupado={excluir.isPending}
+              onCancelar={() => setConfirmando(false)}
+              onExcluir={excluirComDesfazer}
+            />
           </div>
         ) : (
           <>
@@ -133,5 +131,25 @@ export function MenuDoLead({ leadId, pipelineId, titulo, leitura = false, onExcl
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** Cancelar e Excluir, desarmados nos primeiros 300 ms (contra o duplo clique). */
+function BotoesArmados({ ocupado, onCancelar, onExcluir }: {
+  ocupado: boolean;
+  onCancelar: () => void;
+  onExcluir: () => void;
+}) {
+  const t = useT();
+  const armado = useArmado();
+  return (
+    <div className="flex justify-end gap-1.5">
+      <Button size="sm" variant="outline" onClick={onCancelar} disabled={!armado}>
+        {t("Cancelar")}
+      </Button>
+      <Button size="sm" variant="destructive" disabled={ocupado || !armado} onClick={onExcluir}>
+        {t("Excluir")}
+      </Button>
+    </div>
   );
 }

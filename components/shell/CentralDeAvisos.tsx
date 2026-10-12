@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -98,14 +99,23 @@ export function CentralDeAvisos({ podeResolver, onFechar }: { podeResolver: bool
             className="text-label text-accent-text underline-offset-2 hover:underline disabled:opacity-60"
             disabled={resolverTodos.isPending}
             onClick={() => {
-              // Os abertos que a tela carregou: são eles que o Desfazer reabre
-              // (a rota reabre um por vez; acima de 50 a lista não traz todos).
-              const ids = (abertos.data?.items ?? []).map((i) => i.id);
+              // O Desfazer reabre um por vez os ids que a tela carregou. Só é
+              // oferecido com a lista COMPLETA (menos que o limite de 50): com
+              // mais abertos, o `resolve-all` resolve todos e a tela não teria
+              // como reabrir os que não vieram (P2-3 do Cassio na #169).
+              const carregados = abertos.data?.items ?? [];
+              const completa = carregados.length < LIMITE_DA_LISTA && carregados.length >= nAbertos;
+              const ids = carregados.map((i) => i.id);
               resolverTodos.mutate(undefined, {
-                onSuccess: () =>
-                  avisarComDesfazer(t("Avisos marcados como resolvidos."), t("Desfazer"), () =>
-                    Promise.all(ids.map((id) => atualizar.mutateAsync({ id, status: "open" }))),
-                  ),
+                onSuccess: () => {
+                  if (completa) {
+                    avisarComDesfazer(t("Avisos marcados como resolvidos."), t("Desfazer"), () =>
+                      Promise.all(ids.map((id) => atualizar.mutateAsync({ id, status: "open" }))),
+                    );
+                  } else {
+                    toast.success(t("Avisos marcados como resolvidos."));
+                  }
+                },
               });
             }}
           >

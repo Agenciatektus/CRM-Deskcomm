@@ -1,4 +1,4 @@
-import { COOKIE_LEGADO_DO_MENU, cookieDoMenu } from "@/lib/navigation/preferencia-do-menu";
+import { COOKIE_DO_MENU, COOKIE_LEGADO_DO_MENU, lerPreferenciaDoMenu } from "@/lib/navigation/preferencia-do-menu";
 import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -190,12 +190,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     needsMfaGate = mfaRequired;
   }
 
-  // A preferência do menu, lida no servidor para a barra não piscar. Por
-  // atendente (cookie com o id); a antiga, sem id, vale até a pessoa mexer.
+  // A preferência do menu, lida no servidor para a barra não piscar: um cookie
+  // por navegador, que só vale para o atendente que o gravou.
   const store = await cookies();
-  const geral = store.get(cookieDoMenu("geral", user.id))?.value ?? store.get(COOKIE_LEGADO_DO_MENU)?.value;
-  const collapsed = geral === "1";
-  const menuFixoNaInbox = store.get(cookieDoMenu("inbox", user.id))?.value === "1";
+  const preferencia = lerPreferenciaDoMenu(store.get(COOKIE_DO_MENU)?.value, user.id);
+  const collapsed = preferencia?.recolhidoGeral ?? store.get(COOKIE_LEGADO_DO_MENU)?.value === "1";
+  const menuFixoNaInbox = preferencia?.fixoNaInbox ?? false;
 
   const impersonating = user.support ? {
     tenantId: user.support.organization_id, tenantName: user.support.name,

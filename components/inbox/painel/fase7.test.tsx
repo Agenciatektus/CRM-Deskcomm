@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mover = vi.hoisted(() => ({ mutate: vi.fn(), isPending: false }));
@@ -90,6 +90,9 @@ describe("MenuDoLead (P13)", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /Excluir lead/ }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.getByTestId("confirmar-exclusao-do-lead")).toHaveTextContent('Excluir "Clareamento"?');
+    // Desarmado nos primeiros 300 ms (P2-4): o duplo clique não exclui.
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
     // Nada sai na hora: o aviso segura a exclusão e só depois chama a rota.
     expect(excluir.mutateAsync).not.toHaveBeenCalled();

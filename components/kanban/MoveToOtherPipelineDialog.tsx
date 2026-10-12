@@ -86,13 +86,19 @@ export function FormularioDeOutroFunil({
   pipelineId,
   onCancelar,
   onConcluido,
+  adiar,
   rodape,
 }: {
   leadId: string;
   pipelineId: string;
   onCancelar: () => void;
-  /** Recebe a resposta do clone: o negócio NOVO e a origem encerrada como transferida. */
-  onConcluido: (resultado?: { lead?: { id: string; pipeline_id?: string }; origem?: { updated_at?: string } } | null) => void;
+  onConcluido: () => void;
+  /**
+   * Quando presente, o clone NÃO sai na hora: quem chama recebe a gravação e a
+   * segura (`adiarAcao`), porque `/clone` cria o negócio no funil de destino e
+   * dispara as automações dele na hora (P2-2 do Cassio na #169).
+   */
+  adiar?: (gravar: () => Promise<unknown>) => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
 }) {
   const t = useT();
@@ -105,9 +111,14 @@ export function FormularioDeOutroFunil({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      const resposta = await mutation.mutateAsync({ leadId, targetPipelineId });
+      const args = { leadId, targetPipelineId };
+      if (adiar) {
+        adiar(() => mutation.mutateAsync(args));
+      } else {
+        await mutation.mutateAsync(args);
+      }
       setTargetPipelineId("");
-      onConcluido(resposta?.data ?? null);
+      onConcluido();
     } catch {
       // error already toasted
     }

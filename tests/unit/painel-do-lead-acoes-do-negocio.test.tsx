@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -51,11 +51,26 @@ vi.mock("@/components/contacts/RoteirosDoContato", () => ({ RoteirosDoContato: (
 // Os formulários têm teste próprio (os das janelas do quadro); aqui importa
 // QUAL lead e QUAIS motivos chegam, e que eles abrem NO PAINEL (P18/P19).
 vi.mock("@/components/kanban/LoseLeadDialog", () => ({
-  FormularioDePerda: (p: { leadId: string; motivosDoFunil?: string[]; onCancelar: () => void; onConcluido: () => void }) => (
+  FormularioDePerda: (p: {
+    leadId: string;
+    motivosDoFunil?: string[];
+    onCancelar: () => void;
+    onConcluido: () => void;
+    adiar?: (gravar: () => Promise<unknown>) => void;
+  }) => (
     <div data-testid="janela-de-perder" data-lead={p.leadId}>
       <span data-testid="motivos">{(p.motivosDoFunil ?? []).join(",")}</span>
       <button type="button" onClick={() => p.onCancelar()}>fecha-sem-gravar</button>
-      <button type="button" onClick={() => p.onConcluido()}>grava-e-fecha</button>
+      <button
+        type="button"
+        onClick={() => {
+          // Como o formulário real: com `adiar`, a gravação vai para quem segura.
+          if (p.adiar) p.adiar(() => post("/api/v1/leads/l-1/lose", {}));
+          p.onConcluido();
+        }}
+      >
+        grava-e-fecha
+      </button>
     </div>
   ),
 }));
@@ -113,23 +128,56 @@ beforeEach(() => {
 });
 
 describe("ações do negócio — aberto", () => {
-  it("Ganho acontece na hora (sem janela) e o aviso oferece Desfazer, que volta à etapa pelo /move", async () => {
-    post.mockResolvedValue({ data: lead({ status: "won", updated_at: "2026-10-02T00:00:00Z" }) });
+  type OpcoesDoAviso = {
+    duration: number;
+    action: { label: string; onClick: () => void };
+    onAutoClose?: () => void;
+    onDismiss?: () => void;
+  };
+  const ultimoAviso = () => toast.mock.calls.at(-1)![1] as OpcoesDoAviso;
+
+  it("Ganho é ADIADO: o aviso segura 5 s, e só então chama /win (P1 do Cassio na #169)", async () => {
     const acoes = await abrirNegocios();
     await userEvent.click(within(acoes).getByRole("button", { name: "Ganho" }));
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/win", {}));
     await waitFor(() => expect(toast).toHaveBeenCalled());
-    const opcoes = toast.mock.calls.at(-1)![1] as { duration: number; action: { label: string; onClick: () => void } };
-    expect(opcoes.duration).toBe(5000);
-    expect(opcoes.action.label).toBe("Desfazer");
-    opcoes.action.onClick();
-    await waitFor(() =>
-      expect(post).toHaveBeenCalledWith(
-        "/api/v1/leads/l-1/move",
-        expect.objectContaining({ stage_id: "s-1", expected_updated_at: "2026-10-02T00:00:00Z" }),
-      ),
-    );
+    // Nada sai antes dos 5 s: nem `/win`, nem o evento `lead.won` atrás dele.
+    expect(post).not.toHaveBeenCalled();
+    expect(ultimoAviso().duration).toBe(5000);
+    expect(ultimoAviso().action.label).toBe("Desfazer");
+    // A tela já mostra o estado otimista.
+    expect(acoes).toHaveTextContent("Negócio ganho");
+    ultimoAviso().onAutoClose?.();
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/win", {}));
+  });
+
+  it("Desfazer dentro dos 5 s cancela o ganho sem chamar rota nenhuma", async () => {
+    const acoes = await abrirNegocios();
+    await userEvent.click(within(acoes).getByRole("button", { name: "Ganho" }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    ultimoAviso().action.onClick();
+    ultimoAviso().onDismiss?.();
+    ultimoAviso().onAutoClose?.();
+    expect(post).not.toHaveBeenCalled();
+    await waitFor(() => expect(within(acoes).getByRole("button", { name: "Ganho" })).toBeInTheDocument());
+  });
+
+  it("fechar a página dentro dos 5 s NÃO ganha: sem o fim do aviso, a rota nunca é chamada", async () => {
+    const acoes = await abrirNegocios();
+    await userEvent.click(within(acoes).getByRole("button", { name: "Ganho" }));
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    // A página sai: o painel desmonta e o aviso morre com ela, sem `onAutoClose`.
+    cleanup();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("Perder também é adiado: gravar o motivo só chama /lose quando o aviso acaba", async () => {
+    const acoes = await abrirNegocios();
+    await userEvent.click(within(acoes).getByRole("button", { name: "Perdido" }));
+    await userEvent.click(screen.getByRole("button", { name: "grava-e-fecha" }));
+    expect(post).not.toHaveBeenCalled();
+    ultimoAviso().onAutoClose?.();
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/lose", {}));
   });
 
   it("Perdido abre a janela de perder com os motivos DO FUNIL", async () => {
@@ -153,6 +201,9 @@ describe("ações do negócio — aberto", () => {
 
     await userEvent.click(within(acoes).getByRole("button", { name: "Perdido" }));
     await userEvent.click(screen.getByRole("button", { name: "grava-e-fecha" }));
+    // A perda é adiada: a releitura vem depois que o aviso acaba e a rota grava.
+    expect(leituras()).toBe(antes);
+    ultimoAviso().onAutoClose?.();
     await waitFor(() => expect(leituras()).toBe(antes + 1));
   });
 
@@ -212,6 +263,9 @@ describe("ações do negócio — encerrado e leitura", () => {
     // Confirmação DENTRO do painel (quadro DS), sem janela modal.
     expect(screen.queryByRole("alertdialog")).toBeNull();
     const confirmar = await screen.findByTestId("confirmar-reabrir");
+    // Desarmada nos primeiros 300 ms (P2-4): o duplo clique não confirma.
+    expect(within(confirmar).getByRole("button", { name: "Reabrir" })).toBeDisabled();
+    await waitFor(() => expect(within(confirmar).getByRole("button", { name: "Reabrir" })).toBeEnabled());
     await userEvent.click(within(confirmar).getByRole("button", { name: "Reabrir" }));
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/leads/l-1/retomar", {}));
   });

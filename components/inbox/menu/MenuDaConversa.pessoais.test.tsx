@@ -79,6 +79,8 @@ describe("itens por atendente no menu", () => {
     const janela = await screen.findByTestId("confirmar-bloqueio");
     expect(api.post).not.toHaveBeenCalled();
     fireEvent.change(within(janela).getByLabelText("Motivo (opcional)"), { target: { value: "  spam  " } });
+    expect(within(janela).getByRole("button", { name: "Bloquear" })).toBeDisabled();
+    await waitFor(() => expect(within(janela).getByRole("button", { name: "Bloquear" })).toBeEnabled());
     fireEvent.click(within(janela).getByRole("button", { name: "Bloquear" }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/v1\/contacts\/.+\/block$/), { motivo: "spam" }),

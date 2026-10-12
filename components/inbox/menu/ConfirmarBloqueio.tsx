@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useBlockContact } from "@/hooks/contacts/useBlockContact";
 import { useT } from "@/hooks/i18n/useT";
+import { useArmado } from "@/hooks/ui/useArmado";
 import { apiClient } from "@/lib/api/client";
 import { roleAtLeast } from "@/lib/auth/types";
 import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
@@ -33,6 +34,9 @@ export function ConfirmarBloqueio({ contactId, nome, onCancelar, onConcluido }: 
   const bloquear = useBlockContact();
   const [motivo, setMotivo] = useState("");
   const podeDesbloquear = !!activeOrg && roleAtLeast(activeOrg.role, "admin");
+  // Os botões nascem desarmados por 300 ms: a confirmação aparece no lugar do
+  // item clicado, e um duplo clique cairia no "Bloquear".
+  const armado = useArmado();
 
   function confirmar() {
     bloquear.mutate(
@@ -67,10 +71,10 @@ export function ConfirmarBloqueio({ contactId, nome, onCancelar, onConcluido }: 
         aria-label={t("Motivo (opcional)")}
       />
       <div className="mt-3 flex justify-end gap-1.5">
-        <Button size="sm" variant="outline" onClick={onCancelar} disabled={bloquear.isPending}>
+        <Button size="sm" variant="outline" onClick={onCancelar} disabled={bloquear.isPending || !armado}>
           {t("Cancelar")}
         </Button>
-        <Button size="sm" variant="destructive" onClick={confirmar} disabled={bloquear.isPending}>
+        <Button size="sm" variant="destructive" onClick={confirmar} disabled={bloquear.isPending || !armado}>
           {t("Bloquear")}
         </Button>
       </div>

@@ -10414,6 +10414,7 @@ export const DICIONARIO: Traducoes = {
   "Novo agendamento": { es: "Nueva cita" },
   "Remarcar agendamento": { es: "Reagendar cita" },
   "Trocar de organização": { es: "Cambiar de organización" },
+  "Negócio ganho.": { es: "Negocio ganado." },
   "Não foi possível desfazer: recarregue o painel.": { es: "No se pudo deshacer: recarga el panel." },
   "Negócio marcado como perdido.": { es: "Negocio marcado como perdido." },
   "Por que perdeu?": { es: "¿Por qué se perdió?" },

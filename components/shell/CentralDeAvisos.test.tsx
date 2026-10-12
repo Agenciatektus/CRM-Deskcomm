@@ -23,6 +23,10 @@ vi.mock("@/hooks/ai/useAgentInbox", () => ({
   useResolveAllInboxItems: () => ({ mutate: estado.resolverTodos, isPending: false, isError: false }),
 }));
 
+const avisos = vi.hoisted(() => ({ comDesfazer: vi.fn(), sucesso: vi.fn() }));
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ avisarComDesfazer: avisos.comDesfazer }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: avisos.sucesso, error: vi.fn() }) }));
+
 import { CentralDeAvisos } from "./CentralDeAvisos";
 
 function aviso(id: string, extra: Partial<AgentInboxItem> = {}): AgentInboxItem {
@@ -46,7 +50,15 @@ beforeEach(() => {
   estado.resolvidos = [aviso("r1", { status: "resolved" })];
   estado.mutate.mockReset();
   estado.resolverTodos.mockReset();
+  avisos.comDesfazer.mockReset();
+  avisos.sucesso.mockReset();
 });
+
+/** Roda o `onSuccess` que o componente passou ao resolver em lote. */
+function concluirResolverTodos() {
+  const opcoes = estado.resolverTodos.mock.calls.at(-1)![1] as { onSuccess: () => void };
+  opcoes.onSuccess();
+}
 
 describe("CentralDeAvisos (popover do sino)", () => {
   it("título, abas com contagem, ação do aviso e rodapé para a central completa", () => {
@@ -64,6 +76,23 @@ describe("CentralDeAvisos (popover do sino)", () => {
     expect(estado.mutate).toHaveBeenCalledWith({ id: "a1", status: "resolved" });
     fireEvent.click(screen.getByRole("button", { name: "Marcar todos resolvidos" }));
     expect(estado.resolverTodos).toHaveBeenCalled();
+  });
+
+  it("P2-3: lista completa (menos de 50) oferece Desfazer", () => {
+    render(<CentralDeAvisos podeResolver onFechar={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Marcar todos resolvidos" }));
+    concluirResolverTodos();
+    expect(avisos.comDesfazer).toHaveBeenCalledTimes(1);
+    expect(avisos.sucesso).not.toHaveBeenCalled();
+  });
+
+  it("P2-3: com 50 ou mais abertos o Desfazer NÃO é oferecido (não reabriria os que não vieram)", () => {
+    estado.abertos = Array.from({ length: 50 }, (_, i) => aviso(`a${i}`));
+    render(<CentralDeAvisos podeResolver onFechar={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Marcar todos resolvidos" }));
+    concluirResolverTodos();
+    expect(avisos.comDesfazer).not.toHaveBeenCalled();
+    expect(avisos.sucesso).toHaveBeenCalledWith("Avisos marcados como resolvidos.");
   });
 
   it("nos resolvidos, Reabrir devolve o aviso", () => {

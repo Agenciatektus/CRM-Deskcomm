@@ -9,16 +9,19 @@ import { FormularioDeOutroFunil } from "@/components/kanban/MoveToOtherPipelineD
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
-import { useMoveCard } from "@/hooks/kanban/useMoveCard";
+import { useArmado } from "@/hooks/ui/useArmado";
 import { useWinLead } from "@/hooks/kanban/useUpdateLead";
 import { apiClient } from "@/lib/api/client";
 import { CANONICAL_LOST_REASONS, rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
-import { avisarComDesfazer } from "@/lib/ui/aviso-com-desfazer";
+import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 import { Check, ArrowsClockwise, Funnel, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { ResponsavelDoNegocio } from "./ResponsavelDoNegocio";
 import type { LeadRow } from "./tipos";
+
+/** O que está segurado pelo aviso de 5 s, mostrado de forma otimista. */
+type Pendente = "ganho" | "perda" | "troca" | null;
 
 /**
  * As ações do negócio no painel da conversa, no desenho do quadro DS ("Negócio").
@@ -27,14 +30,15 @@ import type { LeadRow } from "./tipos";
  * `/lose` com os motivos DO FUNIL e o motivo opcional por funil da 9044, `/clone`
  * para outro funil, `/retomar` para reabrir).
  *
- * O que muda é o RETORNO (quadro DS, "Aviso com Desfazer"): Ganho acontece na
- * hora, sem janela de confirmação, e o aviso embaixo oferece Desfazer por 5 s.
- * Desfazer volta o negócio para a etapa de onde saiu pela MESMA rota `/move` do
- * quadro, com a data que a própria ação devolveu (se alguém mexeu no meio, a
- * rota recusa em vez de sobrescrever). Num funil que reabre como negócio novo,
- * a rota recusa a volta e o erro aparece. Perdido e Outro funil seguem com o
- * formulário no lugar e ganham o mesmo Desfazer. Reabrir cria um registro, e
- * por isso pede confirmação DENTRO do painel, sem janela modal.
+ * GANHO, PERDA E TROCA DE FUNIL SÃO ADIADOS (P1 do Cassio na #169): as três
+ * rotas disparam eventos com efeito FORA do CRM na hora (`lead.won` vira
+ * conversão de anúncio para a Meta/Google; `lead.won` e `lead.lost` mexem nas
+ * saídas da cadência e no push; o `/clone` cria o negócio e roda as automações
+ * do funil de destino). Mover de volta não desfaz nada disso. Por isso o aviso
+ * SEGURA a rota por 5 s (`adiarAcao`): Desfazer cancela sem chamar nada, e a
+ * tela mostra o estado otimista enquanto isso. Se a página fechar dentro dos
+ * 5 s, a ação NÃO acontece. Ganho continua num clique, sem janela.
+ * Reabrir cria um registro, e por isso pede confirmação DENTRO do painel.
  */
 export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
   lead: LeadRow;
@@ -45,43 +49,38 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
   const t = useT();
   const podeMexer = usePermission("pipeline.move_card") && !leitura;
   const ganhar = useWinLead(lead.pipeline_id);
-  const mover = useMoveCard(lead.pipeline_id);
   const [confirmandoReabrir, setConfirmandoReabrir] = useState(false);
   const [perdendo, setPerdendo] = useState(false);
   const [trocandoDeFunil, setTrocandoDeFunil] = useState(false);
   const [retomando, setRetomando] = useState(false);
+  const [pendente, setPendente] = useState<Pendente>(null);
 
-  const aberto = lead.status === "open";
+  const aberto = lead.status === "open" && pendente === null;
   const motivo = lead.lost_reason ?? null;
   const rotuloDoMotivo = motivo
     ? (CANONICAL_LOST_REASONS as readonly string[]).includes(motivo) ? t(rotuloDoMotivoDePerda(motivo)) : motivo
     : null;
 
-  /** Devolve o negócio à etapa e à posição de antes (o Desfazer de ganho, perda e troca). */
-  const etapaDeAntes = { stageId: lead.stage_id, posicao: lead.position_in_stage ?? null };
-  async function voltarParaAEtapa(atualizadoEm: string | undefined) {
-    if (!atualizadoEm) throw new Error(t("Não foi possível desfazer: recarregue o painel."));
-    await mover.mutateAsync({
-      leadId: lead.id,
-      stageId: etapaDeAntes.stageId,
-      positionInStage: etapaDeAntes.posicao ?? Date.now(),
-      expectedUpdatedAt: atualizadoEm,
-    });
-    onMudou();
+  /**
+   * Segura a gravação por 5 s. Quando o tempo acaba, grava e relê; se falhar,
+   * o estado otimista volta (o erro aparece pelo hook da rota).
+   */
+  function segurar(tipo: Exclude<Pendente, null>, mensagem: string, gravar: () => Promise<unknown>) {
+    setPendente(tipo);
+    adiarAcao(
+      mensagem,
+      t("Desfazer"),
+      () =>
+        gravar()
+          .then(() => onMudou())
+          .catch(() => undefined)
+          .finally(() => setPendente(null)),
+      () => setPendente(null),
+    );
   }
 
   function marcarGanho() {
-    ganhar.mutate(
-      { leadId: lead.id },
-      {
-        onSuccess: (resposta) => {
-          onMudou();
-          avisarComDesfazer(t("Negócio marcado como ganho."), t("Desfazer"), () =>
-            voltarParaAEtapa(resposta?.data?.updated_at),
-          );
-        },
-      },
-    );
+    segurar("ganho", t("Negócio ganho."), () => ganhar.mutateAsync({ leadId: lead.id }));
   }
 
   async function retomar() {
@@ -101,18 +100,23 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
 
   return (
     <div className="space-y-2" data-testid="inbox-acoes-do-negocio">
-      {lead.status === "won" && (
+      {(lead.status === "won" || pendente === "ganho") && (
         <div className="flex items-center gap-2 rounded-field bg-success-bg px-3 py-2.25 text-[13.5px] font-semibold text-success-fg">
           <Check size={14} aria-hidden /> <span className="grow">{t("Negócio ganho")}</span>
         </div>
       )}
-      {lead.status === "lost" && (
+      {(lead.status === "lost" || pendente === "perda") && (
         <div className="flex items-center gap-2 rounded-field bg-error-bg px-3 py-2.25 text-[13.5px] font-semibold text-error-fg">
           <X size={14} aria-hidden />
           <span className="grow wrap-anywhere">{rotuloDoMotivo ? `${t("Perdido")}: ${rotuloDoMotivo}` : t("Perdido")}</span>
         </div>
       )}
-      {!aberto && podeMexer && !confirmandoReabrir && (
+      {pendente === "troca" && (
+        <div className="flex items-center gap-2 rounded-field bg-surface-elevated px-3 py-2.25 text-[13.5px] font-semibold text-text-muted">
+          <Funnel size={14} aria-hidden /> <span className="grow">{t("Levado para outro funil")}</span>
+        </div>
+      )}
+      {!aberto && pendente === null && podeMexer && !confirmandoReabrir && (
         <Button size="sm" variant="outline" className="w-full" onClick={() => setConfirmandoReabrir(true)}>
           <ArrowsClockwise size={14} aria-hidden /> {t("Reabrir")}
         </Button>
@@ -124,14 +128,12 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
           <p className="mt-1 text-label font-normal text-text-muted">
             {t("Cria um negócio novo com o mesmo contato e guarda a ligação com este. O negócio encerrado fica como está, com o motivo dele.")}
           </p>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => setConfirmandoReabrir(false)} disabled={retomando}>
-              {t("Cancelar")}
-            </Button>
-            <Button size="sm" onClick={() => void retomar()} disabled={retomando}>
-              {t("Reabrir")}
-            </Button>
-          </div>
+          <BotoesDaConfirmacao
+            ocupado={retomando}
+            onCancelar={() => setConfirmandoReabrir(false)}
+            onConfirmar={() => void retomar()}
+            rotulo={t("Reabrir")}
+          />
         </div>
       )}
 
@@ -143,7 +145,6 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
             size="sm"
             variant="outline"
             className="px-1.5 hover:border-success-fg hover:bg-success-bg hover:text-success-fg"
-            disabled={ganhar.isPending}
             onClick={marcarGanho}
           >
             <Check size={14} aria-hidden /> {t("Ganho")}
@@ -188,13 +189,8 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
             motivosDoFunil={lead.motivos_de_perda}
             motivoObrigatorio={lead.motivo_de_perda_obrigatorio !== false}
             onCancelar={() => setPerdendo(false)}
-            onConcluido={(atualizado) => {
-              setPerdendo(false);
-              onMudou();
-              avisarComDesfazer(t("Negócio marcado como perdido."), t("Desfazer"), () =>
-                voltarParaAEtapa(atualizado?.updated_at),
-              );
-            }}
+            adiar={(gravar) => segurar("perda", t("Negócio marcado como perdido."), gravar)}
+            onConcluido={() => setPerdendo(false)}
             rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
           />
         </div>
@@ -209,21 +205,33 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
             leadId={lead.id}
             pipelineId={lead.pipeline_id}
             onCancelar={() => setTrocandoDeFunil(false)}
-            onConcluido={(resultado) => {
-              setTrocandoDeFunil(false);
-              onMudou();
-              const novo = resultado?.lead?.id;
-              avisarComDesfazer(t("Negócio levado para outro funil."), t("Desfazer"), async () => {
-                // Desfazer: a origem volta à etapa de antes e o negócio novo sai.
-                // Nessa ordem: se a origem não puder reabrir, o novo fica.
-                await voltarParaAEtapa(resultado?.origem?.updated_at);
-                if (novo) await apiClient.post("/api/v1/leads/bulk", { action: "delete", lead_ids: [novo], params: {} });
-              });
-            }}
+            adiar={(gravar) => segurar("troca", t("Negócio levado para outro funil."), gravar)}
+            onConcluido={() => setTrocandoDeFunil(false)}
             rodape={(botoes) => <div className="flex justify-end gap-2">{botoes}</div>}
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Cancelar e confirmar da confirmação dentro do painel, armados depois de 300 ms. */
+function BotoesDaConfirmacao({ ocupado, onCancelar, onConfirmar, rotulo }: {
+  ocupado: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+  rotulo: string;
+}) {
+  const t = useT();
+  const armado = useArmado();
+  return (
+    <div className="mt-3 flex justify-end gap-2">
+      <Button size="sm" variant="outline" onClick={onCancelar} disabled={ocupado || !armado}>
+        {t("Cancelar")}
+      </Button>
+      <Button size="sm" onClick={onConfirmar} disabled={ocupado || !armado}>
+        {rotulo}
+      </Button>
     </div>
   );
 }
