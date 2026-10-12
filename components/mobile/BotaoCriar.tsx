@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
-import { opcoesDeCriar } from "@/lib/mobile/abas";
+import { useOpcoesDeCriar } from "@/lib/mobile/useOpcoesDeCriar";
 import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { Plus } from "@/lib/ui/icons";
 
@@ -18,7 +17,7 @@ import { FolhaCriar } from "./telas/FolhaCriar";
 export function BotaoCriar() {
   const t = useT();
   const [aberta, setAberta] = useState(false);
-  const opcoes = opcoesDeCriar(usePathname() ?? "");
+  const opcoes = useOpcoesDeCriar();
   const podeCriar = usePodeCriar();
   if (opcoes.length === 0 || !podeCriar) return null;
   return (

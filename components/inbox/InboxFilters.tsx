@@ -15,6 +15,9 @@ import { ChipsDeFiltro, type ChipDeFiltro } from "./filtros/ChipsDeFiltro";
 import { PopoverDeFiltros } from "./filtros/PopoverDeFiltros";
 import { SeletorDeEtiqueta } from "./filtros/SeletorDeEtiqueta";
 import { useOpcoesDeEtiqueta } from "./filtros/useOpcoesDeEtiqueta";
+import { chipsDosFiltros } from "./filtros/chipsDosFiltros";
+import { FiltrosDaInboxNoCelular } from "@/components/mobile/telas/Conversas";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
 
 export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
 
@@ -77,6 +80,7 @@ interface Props {
 export function InboxFilters({ value, onChange }: Props) {
   const t = useT();
   const [searchInput, setSearchInput] = useState(value.search);
+  const celular = useEhCelular();
   /**
    * O campo escuta o valor de FORA, e só ele.
    *
@@ -176,28 +180,7 @@ export function InboxFilters({ value, onChange }: Props) {
         const canal = channels?.find((c) => c.id === value.channel_session_id);
         return canal ? channelLabel(canal) : t("Número de WhatsApp");
       })();
-  const chips: ChipDeFiltro[] = [
-    ...(value.onlyUnread
-      ? [{ id: "nao-lidas", rotulo: t("Só não lidas"), onRemover: () => onChange({ ...value, onlyUnread: false }) }]
-      : []),
-    ...(value.semPasso
-      ? [{ id: "sem-passo", rotulo: t("Sem próximo passo"), onRemover: () => onChange({ ...value, semPasso: false }) }]
-      : []),
-    ...(value.onlyGroups
-      ? [{ id: "grupos", rotulo: t("Só grupos"), onRemover: () => onChange({ ...value, onlyGroups: false }) }]
-      : []),
-    ...(value.channel_session_id != null
-      ? [{ id: "canal", rotulo: nomeDoCanal, onRemover: () => onChange({ ...value, channel_session_id: undefined }) }]
-      : []),
-    ...etiquetas.map((tag) => ({ id: `tag:${tag}`, rotulo: tag, onRemover: () => alternaEtiqueta(tag) })),
-    ...(value.entrada != null
-      ? [{
-          id: "entrada",
-          rotulo: value.entrada === "comentario" ? t("Só comentários") : t("Só Direct"),
-          onRemover: () => onChange({ ...value, entrada: undefined }),
-        }]
-      : []),
-  ];
+  const chips: ChipDeFiltro[] = chipsDosFiltros({ value, onChange, t, nomeDoCanal, etiquetas, alternaEtiqueta });
   const limparDoPopover = () =>
     onChange({
       ...value,
@@ -235,8 +218,35 @@ export function InboxFilters({ value, onChange }: Props) {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // O MESMO filtro nas duas formas: a barra do desktop e o chip do celular (em folha).
+  const filtros = (gatilho: "barra" | "chip") => (
+    <PopoverDeFiltros
+      gatilho={gatilho}
+      value={value}
+      onChange={onChange}
+      ativos={chips.length}
+      channels={channels}
+      showChannelSwitch={showChannelSwitch}
+      filtroForaDaLista={filtroForaDaLista}
+      mostrarSeletorDeEntrada={mostrarSeletorDeEntrada}
+      seletorDeEtiqueta={
+        mostrarSeletorDeTag ? (
+          <SeletorDeEtiqueta
+            etiquetas={etiquetas}
+            opcoes={opcoesDoSeletor}
+            tagMode={value.tagMode}
+            onAlternar={alternaEtiqueta}
+            onLimpar={() => onChange({ ...value, tag: undefined, tagMode: undefined })}
+            onModo={(modo) => onChange({ ...value, tagMode: modo })}
+          />
+        ) : null
+      }
+    />
+  );
+
   return (
-    <div className="flex flex-col gap-2.5 border-b border-border bg-surface px-3.5 pb-2.5 pt-3.5">
+    <>
+    <div className="hidden flex-col gap-2.5 border-b border-border bg-surface px-3.5 pb-2.5 pt-3.5 largo:flex">
       <div className="flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-elevated pl-3 pr-1 transition-colors focus-within:border-accent focus-within:bg-background focus-within:ring-2 focus-within:ring-accent-soft">
         <MagnifyingGlass size={15} weight="regular" className="shrink-0 text-text-subtle" aria-hidden />
         {/* "última mensagem", e não só "mensagem": a busca alcança apenas
@@ -255,27 +265,7 @@ export function InboxFilters({ value, onChange }: Props) {
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-text outline-hidden placeholder:text-text-subtle"
           aria-label={t("Buscar conversas")}
         />
-        <PopoverDeFiltros
-          value={value}
-          onChange={onChange}
-          ativos={chips.length}
-          channels={channels}
-          showChannelSwitch={showChannelSwitch}
-          filtroForaDaLista={filtroForaDaLista}
-          mostrarSeletorDeEntrada={mostrarSeletorDeEntrada}
-          seletorDeEtiqueta={
-            mostrarSeletorDeTag ? (
-              <SeletorDeEtiqueta
-                etiquetas={etiquetas}
-                opcoes={opcoesDoSeletor}
-                tagMode={value.tagMode}
-                onAlternar={alternaEtiqueta}
-                onLimpar={() => onChange({ ...value, tag: undefined, tagMode: undefined })}
-                onModo={(modo) => onChange({ ...value, tagMode: modo })}
-              />
-            ) : null
-          }
-        />
+        {filtros("barra")}
       </div>
 
       <AbasDaInbox
@@ -288,5 +278,19 @@ export function InboxFilters({ value, onChange }: Props) {
 
       <ChipsDeFiltro chips={chips} onLimpar={limparDoPopover} />
     </div>
+    {/* Abaixo de 760px, o topo da lista do protótipo mobile. Só monta no celular: uma
+        segunda cópia dos controles no desktop seria outro "Filtros" no leitor de tela. */}
+    {celular && (
+      <FiltrosDaInboxNoCelular
+        tab={value.tab}
+        semPasso={!!value.semPasso}
+        abas={abas}
+        onTab={(tab) => onChange({ ...value, tab })}
+        onSemPasso={(semPasso) => onChange({ ...value, semPasso })}
+        filtro={filtros("chip")}
+        chipsAtivos={<ChipsDeFiltro chips={chips} onLimpar={limparDoPopover} />}
+      />
+    )}
+    </>
   );
 }

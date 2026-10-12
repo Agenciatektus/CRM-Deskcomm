@@ -19,8 +19,10 @@ import { gatilhosDoMenu, type AbrirMenu } from "./menu/useMenuDaConversa";
 import { MetaDaConversa } from "./item/MetaDaConversa";
 import { IconesPessoais } from "./item/IconesPessoais";
 import { GestoDaConversa } from "./item/GestoDaConversa";
+import { LINHA_DA_CONVERSA_NO_CELULAR as NO_CELULAR } from "@/components/mobile/telas/LinhaDaConversa";
 import { naoLidasDaConversa } from "@/lib/inbox/estado-por-atendente";
 import { initials, relativeTime, siglaDoTelefone } from "./item/tempo-da-linha";
+import { prefixoDoAutor } from "./item/prefixo-do-autor";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -152,6 +154,7 @@ export function ConversationListItem({
       {...gatilhos}
       className={cn(
         "group relative grid w-full grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-border px-3.5 py-(--row-py) text-left transition-colors hover:bg-surface-elevated/60",
+        NO_CELULAR.grade,
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated/60",
         // Selecionada (L13): o `accent-soft` do protótipo, com a barra de 3px.
         // No escuro a pele troca pelo degradê horizontal da marca
@@ -165,9 +168,14 @@ export function ConversationListItem({
       {isSelected && (
         <span className="pele-grad-traco absolute inset-y-1.5 left-0 w-[3px] rounded-r-sm bg-accent" aria-hidden />
       )}
-      <div className="relative h-10 w-10 shrink-0">
+      <div className={cn("relative h-10 w-10 shrink-0", NO_CELULAR.avatar)}>
         {/* Cor por pessoa (hash do id), a mesma do cabeçalho e do painel. */}
-        <AvatarDoContato contato={c} nome={displayName} iniciais={initials(displayName, phoneFallback)} />
+        <AvatarDoContato
+          contato={c}
+          nome={displayName}
+          iniciais={initials(displayName, phoneFallback)}
+          className={NO_CELULAR.avatarTexto}
+        />
         {/* Não há mais a bolinha de "quem manda" no canto esquerdo: ela
             sobrepunha o avatar e repetia o que a pílula de dono já diz (e só
             onde discrimina). O canto do avatar é do selo do canal (WhatsApp,
@@ -191,6 +199,7 @@ export function ConversationListItem({
             <span
               className={cn(
                 "truncate text-[14.5px] text-text",
+                NO_CELULAR.nome,
                 naoLida ? "font-bold" : "font-semibold",
                 c?.is_anonymized && "font-normal italic text-text-muted",
               )}
@@ -224,6 +233,7 @@ export function ConversationListItem({
           <p
             className={cn(
               "min-w-0 flex-1 truncate text-[13.5px]",
+              NO_CELULAR.previa,
               naoLida ? "text-text" : "text-text-muted",
             )}
           >
@@ -282,20 +292,4 @@ export function ConversationListItem({
       />
     </div>
   );
-}
-
-/**
- * O prefixo da prévia (L14 da auditoria; o `.prev-who` do protótipo). Vem do
- * campo calculado `autor_da_ultima_mensagem` (migration 9047), pedido na mesma
- * consulta da lista. Mensagem do cliente não leva prefixo, e linha sem o campo
- * (cache antigo, evento do realtime) também não: melhor sem prefixo que errado.
- */
-function prefixoDoAutor(
-  autor: ConversationWithContact["autor_da_ultima_mensagem"],
-  t: (texto: string) => string,
-): string | null {
-  if (autor === "equipe") return t("Você:");
-  if (autor === "ia") return t("IA:");
-  if (autor === "automacao") return t("Automação:");
-  return null;
 }

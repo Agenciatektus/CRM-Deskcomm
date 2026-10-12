@@ -4,7 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
-import { destinoDeCriar, opcoesDeCriar, type OpcaoDeCriar } from "@/lib/mobile/abas";
+import { destinoDeCriar, type OpcaoDeCriar } from "@/lib/mobile/abas";
+import { useOpcoesDeCriar } from "@/lib/mobile/useOpcoesDeCriar";
 import { CalendarPlus, ChatCircle, Kanban, ListChecks, Users } from "@/lib/ui/icons";
 
 import { FolhaInferior, ItemDaFolha } from "../FolhaInferior";
@@ -27,7 +28,7 @@ export function FolhaCriar({ aberta, aoMudar }: { aberta: boolean; aoMudar: (abe
   const t = useT();
   const rota = usePathname() ?? "";
   const router = useRouter();
-  const opcoes = opcoesDeCriar(rota);
+  const opcoes = useOpcoesDeCriar();
   // O funil padrão só é lido com a folha aberta e só se "Novo lead" depende dele.
   const precisaDoFunil = aberta && opcoes.includes("lead") && !/^\/app\/pipelines\//.test(rota);
   const funil = useDefaultPipeline(precisaDoFunil).data?.pipeline.id ?? null;

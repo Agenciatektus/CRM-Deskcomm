@@ -15,6 +15,7 @@ import { BarraInferior, ROTULOS_DAS_ABAS } from "./BarraInferior";
 import { BotaoCriar } from "./BotaoCriar";
 import { CabecalhoGrande } from "./CabecalhoGrande";
 import { MenuMais } from "./MenuMais";
+import { AcoesDaListaDeConversas } from "./telas/AcoesDaListaDeConversas";
 
 /**
  * A lupa do cabeçalho do celular. Abre a mesma busca geral do topo do desktop, numa
@@ -48,7 +49,10 @@ function CabecalhoDoCelular() {
   if (conversaAberta(rota, idNaUrl)) return null;
   const aba = abaDaRota(rota);
   if (ehRaizDeAba(rota)) {
-    return <CabecalhoGrande titulo={t(ROTULOS_DAS_ABAS[aba])} acoes={<BuscaDoCelular />} />;
+    // Em Conversas a busca mora no topo da lista (o campo do protótipo) e o
+    // cabeçalho tem o ⋮ da lista; nas outras abas, a lupa.
+    const acoes = aba === "conversas" ? <AcoesDaListaDeConversas /> : <BuscaDoCelular />;
+    return <CabecalhoGrande titulo={t(ROTULOS_DAS_ABAS[aba])} acoes={acoes} />;
   }
   const destino = destinoDaRota(rota);
   const voltarPara = aba === "mais" ? "/app" : RAIZ_DA_ABA[aba];

@@ -379,6 +379,9 @@ export const AUDIT_ACTIONS = [
   "conversation.unmuted",
   "conversation.marked_unread",
   "conversation.unmarked_unread",
+  // "Marcar todas como lidas" (M2.1 do app de celular): um registro por lote, com as
+  // contagens no metadata; só o estado de leitura de quem pediu.
+  "conversation.all_marked_read",
   "ai.case_replied",
   // O agente participando do chamado — separado de `ai.case_replied` (a pessoa
   // respondendo) porque juntar os dois apagaria justamente quem agiu.
