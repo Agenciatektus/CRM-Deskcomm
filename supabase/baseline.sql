@@ -47385,7 +47385,7 @@ notify pgrst, 'reload schema';
 -- Prova: tests/invariants/contagens-da-caixa-9029.test.ts, inbox-v2-dados-9047.test.ts e
 -- contagem-da-folha-9049.test.ts (tipo de canal e só grupos, 9049).
 drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text);
--- Desde a 9049 a função tem 11 parâmetros (`p_canal_tipo` e `p_so_grupos`, a folha
+-- Desde a 9049 a função tem 11 parâmetros (`p_canal_tipo` e `p_grupos`, a folha
 -- de filtros do celular): a de 9 cai antes, pelo mesmo motivo da de 8.
 drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean);
 
@@ -47400,7 +47400,7 @@ create or replace function public.fn_contagens_da_caixa(
   p_modo text default 'e',
   p_sem_passo boolean default false,
   p_canal_tipo text default null,
-  p_so_grupos boolean default false
+  p_grupos boolean default null
 )
 returns jsonb
 language sql
@@ -47448,8 +47448,9 @@ as $$
        -- organização a resolver: a linha já é da organização filtrada acima. Valor
        -- fora da lista não casa nada (a rota valida antes, contra a lista fixa).
        and (p_canal_tipo is null or c.channel = p_canal_tipo)
-       -- 9049: "só grupos", o MESMO filtro `is_group` da lista.
-       and (not coalesce(p_so_grupos, false) or coalesce(c.is_group, false))
+       -- 9049: o MESMO filtro `is_group` da lista, nos três estados: nulo = todas,
+       -- true = só grupos, false = sem grupos (P2 do Cassio na #179).
+       and (p_grupos is null or coalesce(c.is_group, false) = p_grupos)
   )
   select jsonb_build_object(
     'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
@@ -47464,7 +47465,7 @@ as $$
 $$;
 
 comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa); desde a 9049, p_canal_tipo (conversations.channel) e p_so_grupos (is_group), os filtros da folha do celular.';
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa); desde a 9049, p_canal_tipo (conversations.channel) e p_grupos (is_group: nulo, só grupos ou sem grupos), os filtros da folha do celular.';
 
 revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) from public, anon;
 grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) to authenticated, service_role;

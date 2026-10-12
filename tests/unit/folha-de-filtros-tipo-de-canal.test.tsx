@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { contagemCanalTipo, contagemSoGrupos } from "@/app/api/v1/conversations/counts/route";
+import { contagemCanalTipo, contagemGrupos } from "@/app/api/v1/conversations/counts/route";
 import { listConversationsQuerySchema } from "@/lib/schemas/messaging";
 import { TIPOS_DE_CANAL } from "@/lib/inbox/tipo-de-canal";
 
@@ -38,17 +38,19 @@ describe("tipo de canal: lista fixa, do schema à contagem", () => {
     expect(contagemCanalTipo(new URLSearchParams("canal=instagram"))).toBe("instagram");
     expect(contagemCanalTipo(new URLSearchParams(""))).toBeNull();
     expect(contagemCanalTipo(new URLSearchParams("canal=telegram"))).toBeUndefined();
-    expect(contagemSoGrupos(new URLSearchParams("is_group=true"))).toBe(true);
-    expect(contagemSoGrupos(new URLSearchParams(""))).toBe(false);
+    // Os três estados da lista (P2 do Cassio na #179): só grupos, sem grupos, todas.
+    expect(contagemGrupos(new URLSearchParams("is_group=true"))).toBe(true);
+    expect(contagemGrupos(new URLSearchParams("is_group=false"))).toBe(false);
+    expect(contagemGrupos(new URLSearchParams(""))).toBeNull();
     const rota = readFileSync("app/api/v1/conversations/counts/route.ts", "utf8");
     expect(rota).toMatch(/p_canal_tipo: canalTipo/);
-    expect(rota).toMatch(/p_so_grupos: contagemSoGrupos\(sp\)/);
+    expect(rota).toMatch(/p_grupos: contagemGrupos\(sp\)/);
   });
 
   it("a migration 9049 aplica os dois na função, que segue INVOKER e sem anon", () => {
     const mig = readFileSync("supabase/migrations/20261012120000_9049_contagem_da_folha_de_filtros.sql", "utf8");
     expect(mig).toMatch(/\(p_canal_tipo is null or c\.channel = p_canal_tipo\)/);
-    expect(mig).toMatch(/not coalesce\(p_so_grupos, false\) or coalesce\(c\.is_group, false\)/);
+    expect(mig).toMatch(/\(p_grupos is null or coalesce\(c\.is_group, false\) = p_grupos\)/);
     expect(mig).toMatch(/security invoker/);
     expect(mig).toMatch(/revoke execute on function public\.fn_contagens_da_caixa\([^)]*text, boolean\) from public, anon;/);
     expect(mig).toMatch(/drop function if exists public\.fn_contagens_da_caixa\(uuid, text\[\], text\[\], uuid, text, boolean, text\[\], text, boolean\);/);

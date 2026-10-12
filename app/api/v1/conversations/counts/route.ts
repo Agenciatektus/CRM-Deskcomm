@@ -106,8 +106,10 @@ export function contagemCanalTipo(sp: URLSearchParams): TipoDeCanal | null | und
   return ehTipoDeCanal(valor) ? valor : undefined;
 }
 
-export function contagemSoGrupos(sp: URLSearchParams): boolean {
-  return sp.get("is_group") === "true";
+/** `is_group` como a lista: `true` só grupos, `false` sem grupos, ausente = todas. */
+export function contagemGrupos(sp: URLSearchParams): boolean | null {
+  const valor = sp.get("is_group");
+  return valor === "true" ? true : valor === "false" ? false : null;
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -157,7 +159,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     p_modo: modo,
     p_sem_passo: contagemSemPasso(sp),
     p_canal_tipo: canalTipo,
-    p_so_grupos: contagemSoGrupos(sp),
+    p_grupos: contagemGrupos(sp),
   } as never);
   if (error) {
     return fail("internal_error", error.message, 500, { requestId });

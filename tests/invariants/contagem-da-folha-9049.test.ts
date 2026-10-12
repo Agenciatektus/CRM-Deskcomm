@@ -6,7 +6,8 @@ import { sql } from "./gov-helpers";
  * Migration 9049: a contagem com os filtros da folha do celular.
  *
  * `fn_contagens_da_caixa` ganha `p_canal_tipo` (`conversations.channel`) e
- * `p_so_grupos` (`is_group`), para "Ver N conversas" contar o MESMO que a lista.
+ * `p_grupos` (`is_group`: nulo, só grupos ou sem grupos), para "Ver N conversas" contar
+ * o MESMO que a lista.
  *
  * O que se prova, por ator: o número bate com a consulta da lista feita com a mesma
  * RLS (manager, agent em modo `own`, quem é de outra organização), ninguém conta o
@@ -70,13 +71,13 @@ do $t$ declare v text; begin
 end $t$;`;
 
 /** O "Todas" da contagem com o filtro, e a mesma pergunta feita como a lista faz. */
-const badge = (org: string, canal: string | null, grupos: boolean) =>
+const badge = (org: string, canal: string | null, grupos: boolean | null) =>
   `select (public.fn_contagens_da_caixa('${org}', array['aguardando'], array['closed','archived'], p_canal_tipo => ${
     canal ? `'${canal}'` : "null"
-  }, p_so_grupos => ${grupos})->>'all')::bigint`;
-const lista = (org: string, canal: string | null, grupos: boolean) =>
+  }, p_grupos => ${grupos === null ? "null" : grupos})->>'all')::bigint`;
+const lista = (org: string, canal: string | null, grupos: boolean | null) =>
   `(select count(*) from public.conversations c where c.organization_id = '${org}'${canal ? ` and c.channel = '${canal}'` : ""}${
-    grupos ? " and c.is_group" : ""
+    grupos === true ? " and c.is_group" : grupos === false ? " and not c.is_group" : ""
   })::text`;
 
 const ATORES = [
@@ -84,25 +85,40 @@ const ATORES = [
   ["ag_a", AG_A],
   ["mgr_b", MGR_B],
 ] as const;
-const FILTROS: [string | null, boolean][] = [
-  ["whatsapp", false],
-  ["instagram", false],
-  ["facebook", false],
+const FILTROS: [string | null, boolean | null][] = [
+  ["whatsapp", null],
+  ["instagram", null],
+  ["facebook", null],
   [null, true],
   ["whatsapp", true],
+  // "sem grupos", que a lista aceita (P2 do Cassio na #179).
+  [null, false],
+  ["whatsapp", false],
 ];
+const rotuloDosGrupos = (g: boolean | null) => (g === true ? "grupos" : g === false ? "sem-grupos" : "-");
 
 const PROVA = ATORES.flatMap(([nome, user]) =>
   [ORG_A, ORG_B].flatMap((org) =>
     FILTROS.map(
       ([canal, grupos]) => `${como(user)}
-${espera(`${nome}/${org === ORG_A ? "A" : "B"}/${canal ?? "todos"}/${grupos ? "grupos" : "-"}`, badge(org, canal, grupos), lista(org, canal, grupos))}`,
+${espera(`${nome}/${org === ORG_A ? "A" : "B"}/${canal ?? "todos"}/${rotuloDosGrupos(grupos)}`, badge(org, canal, grupos), lista(org, canal, grupos))}`,
     ),
   ),
 ).join("\n");
 
+/**
+ * Roda a prova e, se o psql falhar, lança com o stderr e o stdout DELE na mensagem.
+ * Medido na VPS30: o erro do `execFileSync` chegou só com "Command failed: docker
+ * exec …", sem a linha do RAISE, e o controle negativo não tinha como provar o
+ * MOTIVO da reprovação. Com o stderr anexado, o regex casa no texto do `espera`.
+ */
 function prova(corpo: string): string {
-  return sql(`${seed}\n${corpo}\nreset role;\nrollback;\nselect 'provado';`);
+  try {
+    return sql(`${seed}\n${corpo}\nreset role;\nrollback;\nselect 'provado';`);
+  } catch (erro) {
+    const e = erro as Error & { stderr?: string | Buffer; stdout?: string | Buffer };
+    throw new Error([e.message, String(e.stderr ?? ""), String(e.stdout ?? "")].join("\n"));
+  }
 }
 
 describe("9049: forma e permissões", () => {
@@ -131,16 +147,17 @@ describe("9049: o badge conta o MESMO que a lista", () => {
   it("âncoras escritas à mão: isolamento e escopo do agent", () => {
     expect(
       prova(`${como(MGR_A)}
-${espera("mgr_a A instagram", badge(ORG_A, "instagram", false), "'2'")}
+${espera("mgr_a A instagram", badge(ORG_A, "instagram", null), "'2'")}
 ${espera("mgr_a A whatsapp grupos", badge(ORG_A, "whatsapp", true), "'1'")}
-${espera("mgr_a B instagram (outra organização)", badge(ORG_B, "instagram", false), "'0'")}
+${espera("mgr_a A sem grupos", badge(ORG_A, null, false), "'4'")}
+${espera("mgr_a B instagram (outra organização)", badge(ORG_B, "instagram", null), "'0'")}
 ${como(AG_A)}
-${espera("ag_a A instagram (modo own)", badge(ORG_A, "instagram", false), "'1'")}
-${espera("ag_a A whatsapp (modo own)", badge(ORG_A, "whatsapp", false), "'0'")}
+${espera("ag_a A instagram (modo own)", badge(ORG_A, "instagram", null), "'1'")}
+${espera("ag_a A whatsapp (modo own)", badge(ORG_A, "whatsapp", null), "'0'")}
 ${como(MGR_B)}
-${espera("mgr_b A instagram (outra organização)", badge(ORG_A, "instagram", false), "'0'")}
+${espera("mgr_b A instagram (outra organização)", badge(ORG_A, "instagram", null), "'0'")}
 ${como(null)}
-${espera("sem jwt", badge(ORG_A, null, false), "'0'")}`),
+${espera("sem jwt", badge(ORG_A, null, null), "'0'")}`),
     ).toContain("provado");
   });
 });
@@ -152,13 +169,16 @@ describe("9049: controle negativo (o instrumento pega mutante)", () => {
     const original = def();
     const mutante = original.replace("(p_canal_tipo is null or c.channel = p_canal_tipo)", "true");
     expect(mutante).not.toBe(original);
-    expect(() => prova(`reset role;\n${mutante};\n${PROVA}`)).toThrow(/instagram\/-: deu/);
+    // O psql para no PRIMEIRO `espera` que falha, e a prova começa pelo manager de A
+    // com WhatsApp: sem o predicado, o badge conta as 5 de A e a lista, as 2 do WhatsApp.
+    expect(() => prova(`reset role;\n${mutante};\n${PROVA}`)).toThrow(/mgr_a\/A\/whatsapp\/-: deu 5, esperado 2/);
   });
 
   it("SECURITY DEFINER (pula a RLS de quem chama): reprova", () => {
     const original = def();
     const mutante = original.replace("\nAS $function$", "\n SECURITY DEFINER\nAS $function$");
     expect(mutante).not.toBe(original);
-    expect(() => prova(`reset role;\n${mutante};\n${PROVA}`)).toThrow(/: deu/);
+    // Sem a RLS de quem chama, o manager de A passa a contar a conversa de Instagram de B.
+    expect(() => prova(`reset role;\n${mutante};\n${PROVA}`)).toThrow(/mgr_a\/B\/instagram\/-: deu 1, esperado 0/);
   });
 });
