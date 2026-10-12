@@ -31,7 +31,7 @@ export function CampoDeBuscaDaPagina({ valor, aoMudar, placeholder }: BuscaDaPag
         onChange={(e) => aoMudar(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        autoComplete="off"
+        autoComplete="new-password"
         className="h-9 w-full pl-8 mb:h-(--mb-busca-altura) mb:rounded-(--mb-busca-raio) mb:text-(length:--mb-campo-fonte)"
       />
     </div>

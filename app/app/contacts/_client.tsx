@@ -234,7 +234,7 @@ export function ContactsListClient() {
         </div>
       </EstadoDaLista>
 
-      <BotaoDaTela rotulo={t("Novo contato")} aoTocar={() => setCreateOpen(true)} />
+      {podeCriar && <BotaoDaTela rotulo={t("Novo contato")} aoTocar={() => setCreateOpen(true)} />}
 
       <NewContactDialog open={createOpen} onOpenChange={setCreateOpen} />
       <ImportContactsDialog open={importOpen} onOpenChange={setImportOpen} />
