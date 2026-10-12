@@ -201,7 +201,10 @@ test.describe("Inbox — a conversa selecionada é legível no tema escuro", () 
     const contraste = await nome.evaluate(contrasteContraOFundo);
     expect(contraste, `contraste do nome na linha selecionada: ${contraste.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
 
+    // A captura com a conversa carregada, e o número medido ao lado dela.
+    await expect(page.getByText(MENSAGEM, { exact: true })).toBeVisible({ timeout: 60_000 });
     fs.mkdirSync(EVIDENCIA, { recursive: true });
+    fs.writeFileSync(path.join(EVIDENCIA, "01-contraste.txt"), `contraste do nome na linha selecionada: ${contraste.toFixed(2)}\n`);
     await page.screenshot({ path: path.join(EVIDENCIA, "01-selecionada-no-escuro.png"), animations: "disabled" });
   });
 });
