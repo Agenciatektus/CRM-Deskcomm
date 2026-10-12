@@ -5591,5 +5591,6 @@
   "Valor da condição": "条件值",
   "é igual a": "等于",
   "é maior que": "大于",
-  "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": "隐藏时该字段不出现在表单中，也不作为必填校验，已保存的值仍保留在记录里。"
+  "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": "隐藏时该字段不出现在表单中，也不作为必填校验，已保存的值仍保留在记录里。",
+"Formato não suportado: use ?formato=csv.": "不支持的格式：请使用 ?formato=csv。"
 }
