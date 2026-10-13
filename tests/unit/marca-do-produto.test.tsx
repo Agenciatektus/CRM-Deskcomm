@@ -185,7 +185,9 @@ describe("o favicon segue a mesma regra", () => {
 
   it("desenha o símbolo quando a marca é a do produto, e a inicial quando não é", () => {
     expect(icone).toMatch(/marcaEhADoProduto\(\{ name: marca\.nome, logoUrl: marca\.logoUrl \}\)/);
-    expect(icone).toMatch(/<CamadasDoSimbolo prefixo="icone" \/>/);
+    // Chamada como FUNÇÃO: a forma JSX (`<CamadasDoSimbolo />`) quebra o satori
+    // ("Only intrinsic elements are supported inside <svg>") e dava 500 no ícone.
+    expect(icone).toMatch(/CamadasDoSimbolo\(\{ prefixo: "icone" \}\)/);
     expect(icone).toMatch(/letraDoIcone\(marca\.nome\)/);
   });
 });

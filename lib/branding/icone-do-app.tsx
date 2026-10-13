@@ -91,7 +91,7 @@ export async function gerarIconeDoApp(
             width={Math.round(conteudo * 0.78)}
             height={Math.round(conteudo * 0.78)}
           >
-            <CamadasDoSimbolo prefixo="icone" />
+            {CamadasDoSimbolo({ prefixo: "icone" })}
           </svg>
         ) : (
           (letraDoIcone(marca.nome) ?? "")
