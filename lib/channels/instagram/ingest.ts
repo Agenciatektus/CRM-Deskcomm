@@ -48,6 +48,7 @@ import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
 import { logger } from "@/lib/logger";
+import { ehEcoDeEnvioNosso } from "../eco-de-envio-nosso";
 
 /**
  * Como a pessoa se chama: o nome do perfil, senão o `@`. `null` só quando o
@@ -373,8 +374,27 @@ export async function instagramInbound(
   // atendimento por fora, e o agente não pode responder por cima. É o mesmo
   // tratamento do canal Meta (`ingestMetaEcho`). A mensagem já está gravada
   // como `outbound` acima — é isso que separa, na tela, quem enviou.
+  //
+  // MAS o `message_echoes` do Instagram ecoa TAMBÉM o que o próprio CRM enviou
+  // (IA, composer, regra). Se o eco chega antes do `external_id` do envio ser
+  // gravado (ou com `mid` diferente), ele não bate no unique e cairia aqui —
+  // calando a IA logo depois da própria resposta. A linha fica gravada (gravar
+  // é tolerante; `removerEcoDoProprioEnvio` limpa a duplicata depois), mas a
+  // pausa só acontece quando NÃO há envio nosso em voo que explique o eco.
   if (msg.direcao === "outbound") {
-    await pausarIaPorAtendimentoManual(admin, { organizationId, conversationId, canal: "instagram" });
+    const ehNosso = await ehEcoDeEnvioNosso(admin, organizationId, conversationId, {
+      corpo: msg.texto,
+      midia: msg.anexos.midias.length > 0,
+    });
+    if (!ehNosso) {
+      await pausarIaPorAtendimentoManual(admin, { organizationId, conversationId, canal: "instagram" });
+      // Sem PII: só ids, para auditar de onde veio a pausa.
+      logger.info("[instagram] eco pausou a IA (resposta fora do CRM)", {
+        organization_id: organizationId,
+        conversation_id: conversationId,
+        external_id: msg.providerMessageId,
+      });
+    }
     return { ok: true, body: { status: "ingested", conversationId, messageId } };
   }
 
