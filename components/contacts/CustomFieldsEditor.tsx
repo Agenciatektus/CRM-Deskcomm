@@ -26,6 +26,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
+import { buscarOpcoes, valorCanonico } from "@/lib/leads/campos-pesquisaveis";
 import { cn } from "@/lib/utils";
 import { camposVisiveis, type MostrarQuando } from "@/lib/schemas/mostrar-quando";
 
@@ -37,6 +38,7 @@ export type CustomFieldType =
   | "date"
   | "select"
   | "multiselect"
+  | "searchable_select"
   | "boolean"
   | "email"
   | "phone"
@@ -47,7 +49,7 @@ export interface CustomFieldDef {
   label: string;
   type: CustomFieldType;
   required?: boolean;
-  options?: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string; aliases?: string[] }>;
   /**
    * A condição de exibição (issue #2728) — `lib/schemas/mostrar-quando.ts`.
    *
@@ -57,6 +59,8 @@ export interface CustomFieldDef {
    * e viaja no save — esconder não é limpar.
    */
   mostrar_quando?: MostrarQuando;
+  /** Só no `searchable_select`: aceita valor fora da lista (issue #2521). */
+  allow_new?: boolean;
 }
 
 interface Props {
@@ -71,6 +75,10 @@ interface Props {
 export function CustomFieldsEditor({ fields, value, onChange, disabled, className }: Props) {
   const t = useT();
   const [rascunhosDeMoeda, setRascunhosDeMoeda] = useState<Record<string, string>>({});
+  // O rascunho do `searchable_select`: enquanto a pessoa digita, o input mostra
+  // o TEXTO buscado; o valor gravado no lead é o `value` canônico, resolvido no
+  // blur (issue #2521). Sem o rascunho, editar apagaria a opção a cada tecla.
+  const [rascunhosDeBusca, setRascunhosDeBusca] = useState<Record<string, string>>({});
   // O campo é do mesmo caminho do contato: o exemplo segue o país da
   // organização, e não o DDI brasileiro em duro.
   const telefoneExemplo = perfilDoPais(useActiveOrg()?.country).telefoneExemplo;
@@ -223,6 +231,60 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                     );
                   })}
                 </div>
+              </div>
+            );
+          }
+          case "searchable_select": {
+            // LISTA PESQUISÁVEL (#2521): um input com autocompletar sobre as
+            // opções. Grava o `value` CANÔNICO da opção escolhida ("maceio" →
+            // "maceio-al"), nunca a grafia digitada — é o que faz o filtro e o
+            // relatório de "Maceió" voltarem a bater. `allow_new` deixa passar
+            // um valor novo, aparado, quando o funil o permite.
+            const opcoes = f.options ?? [];
+            const canonico = typeof v === "string" ? v : "";
+            const rotuloAtual = opcoes.find((o) => o.value === canonico)?.label ?? canonico;
+            const rascunho = rascunhosDeBusca[f.key];
+            const listaId = `cf-${f.key}-opcoes`;
+            return (
+              <div key={f.key} className="space-y-2">
+                {labelEl}
+                <Input
+                  id={id}
+                  type="text"
+                  list={listaId}
+                  autoComplete="off"
+                  placeholder={t("Digite para buscar…")}
+                  value={rascunho ?? rotuloAtual}
+                  onChange={(e) =>
+                    setRascunhosDeBusca((current) => ({ ...current, [f.key]: e.target.value }))
+                  }
+                  onBlur={() => {
+                    const draft = rascunhosDeBusca[f.key];
+                    if (draft === undefined) return;
+                    const achado = valorCanonico(opcoes, draft);
+                    if (achado !== null) set(f.key, achado);
+                    else if (draft.trim() === "") set(f.key, "");
+                    else if (f.allow_new === true) set(f.key, draft.trim());
+                    // Sem casar e sem `allow_new`, o valor não é gravado: o
+                    // input volta ao que estava, e o aviso abaixo explica.
+                    setRascunhosDeBusca((current) => {
+                      const next = { ...current };
+                      delete next[f.key];
+                      return next;
+                    });
+                  }}
+                  disabled={disabled}
+                />
+                <datalist id={listaId}>
+                  {buscarOpcoes(opcoes, rascunho ?? "").map((o) => (
+                    <option key={o.value} value={o.label} />
+                  ))}
+                </datalist>
+                {f.allow_new === true && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("Este campo aceita um valor novo, fora da lista.")}
+                  </p>
+                )}
               </div>
             );
           }

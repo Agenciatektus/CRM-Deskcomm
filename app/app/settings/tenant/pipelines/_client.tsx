@@ -18,6 +18,7 @@ import {
 import { updatePipelineConfig } from "@/app/actions/settings/updatePipelineConfig";
 import type { PipelineConfigPatch } from "@/lib/schemas/settings";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
+import { importarOpcoesCsv } from "@/lib/leads/campos-pesquisaveis";
 import { modoDeReabertura } from "@/lib/leads/reabertura";
 import { CATEGORIAS_DE_PERDA } from "@/lib/schemas/leads";
 import { customFieldSchema, type CustomFieldDef } from "@/lib/schemas/settings";
@@ -59,7 +60,7 @@ export const TIPOS_DE_CAMPO = customFieldSchema.shape.type.options;
 
 /** Tipos cujo valor sai de uma lista fechada — são os que mostram o campo de opções. */
 export function tipoTemOpcoes(tipo: CustomFieldDef["type"]): boolean {
-  return tipo === "select" || tipo === "multiselect";
+  return tipo === "select" || tipo === "multiselect" || tipo === "searchable_select";
 }
 
 /**
@@ -330,6 +331,9 @@ function PipelineEditor({
     modoDeReabertura(pipeline.settings) === "novo_negocio",
   );
   const [fields, setFields] = useState<CustomFieldDef[]>(camposDoFunil(pipeline.settings));
+  // O texto CSV de importação de opções (#2521), por chave de campo — vive só
+  // enquanto a pessoa cola; "Importar" o transforma em opções e o limpa.
+  const [csvDeOpcoes, setCsvDeOpcoes] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -346,7 +350,14 @@ function PipelineEditor({
         ? {
             ...f,
             options: (f.options ?? [])
-              .map((o) => ({ value: o.value.trim(), label: o.label.trim() }))
+              .map((o) => ({
+                value: o.value.trim(),
+                label: o.label.trim(),
+                // Os APELIDOS da opção (#2521) sobrevivem ao salvar: o input só
+                // edita rótulos, mas apagar a chave aqui apagaria os apelidos
+                // que a importação CSV acabou de cadastrar.
+                ...(o.aliases && o.aliases.length > 0 ? { aliases: o.aliases } : {}),
+              }))
               .filter((o) => o.label !== ""),
           }
         : f;
@@ -622,6 +633,72 @@ function PipelineEditor({
                   setFields(next);
                 }}
               />
+            )}
+            {/* ── LISTA PESQUISÁVEL (#2521) ────────────────────────────────
+                Duas coisas só deste tipo: a válvula "permitir valor novo" e a
+                importação de opções em lote. A importação usa o CSV que a
+                agência já tem (municípios do IBGE, destinos, IATA) — `value,
+                label, apelidos` por linha, apelidos separados por `;`. O que
+                já existe não duplica, e o que foi importado fica junto das
+                opções digitadas à mão. */}
+            {f.type === "searchable_select" && (
+              <div className="space-y-1 md:col-span-4">
+                <label className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    aria-label={`${t("Permitir valor novo")} ${i + 1}`}
+                    checked={f.allow_new === true}
+                    onChange={(ev) => {
+                      const next = [...fields];
+                      next[i] = { ...f, allow_new: ev.target.checked };
+                      setFields(next);
+                    }}
+                  />
+                  {t("Permitir valor novo (fora da lista)")}
+                </label>
+                <div className="flex items-start gap-2">
+                  <textarea
+                    aria-label={`${t("Importar opções (CSV)")} ${i + 1}`}
+                    className="min-h-16 w-full rounded-md border border-border bg-transparent p-2 text-xs"
+                    placeholder={t("value,label,apelidos — uma opção por linha")}
+                    value={csvDeOpcoes[f.key] ?? ""}
+                    onChange={(e) =>
+                      setCsvDeOpcoes((current) => ({ ...current, [f.key]: e.target.value }))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={`${t("Importar opções do campo")} ${i + 1}`}
+                    onClick={() => {
+                      const texto = csvDeOpcoes[f.key] ?? "";
+                      if (texto.trim() === "") return;
+                      const r = importarOpcoesCsv(f.options ?? [], texto);
+                      const next = [...fields];
+                      next[i] = { ...f, options: r.opcoes };
+                      setFields(next);
+                      setCsvDeOpcoes((current) => {
+                        const proximo = { ...current };
+                        delete proximo[f.key];
+                        return proximo;
+                      });
+                      if (r.adicionadas.length > 0) {
+                        toast.success(
+                          `${r.adicionadas.length} ${t("opções importadas.")}` +
+                            (r.ignoradas.length > 0
+                              ? ` ${r.ignoradas.length} ${t("já existiam.")}`
+                              : ""),
+                        );
+                      } else {
+                        toast.info(t("Nenhuma opção nova para importar."));
+                      }
+                    }}
+                  >
+                    {t("Importar")}
+                  </Button>
+                </div>
+              </div>
             )}
             {/* ── QUANDO ESTE CAMPO OBRIGA (issue #1536) ────────────────────
                 O `obrigatorio_em` nasceu no schema sem nenhuma tela: quem
