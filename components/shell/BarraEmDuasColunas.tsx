@@ -11,7 +11,6 @@ import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
 import { TenantSwitcher } from "@/components/shell/TenantSwitcher";
 import { usePeekDoTrilho } from "@/components/shell/usePeekDoTrilho";
-import { VersionFooter } from "@/components/shell/VersionFooter";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import type { Idioma } from "@/lib/i18n/idiomas";
@@ -341,7 +340,6 @@ export function BarraEmDuasColunas({
             <div data-marca-da-barra className="flex min-w-0 flex-1 items-center">
               {marca}
             </div>
-            <VersionFooter collapsed={false} onNavigate={fechar} />
           </div>
         </div>
       )}

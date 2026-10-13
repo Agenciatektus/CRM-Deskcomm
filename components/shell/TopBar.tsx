@@ -55,7 +55,7 @@ export function TopBar() {
     // Sem `border-b` e com o respiro do `.topbar` do protótipo (6px à esquerda,
     // 12px à direita): a trilha começa colada na barra lateral e o topo é a
     // mesma moldura dela, não uma faixa separada por um fio.
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur md:gap-3 md:pl-1.5">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur dark:bg-background/60 md:gap-3 md:pl-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <MobileSidebar />
         {/* No desktop a organização mora no topo do trilho (quadro DS); aqui

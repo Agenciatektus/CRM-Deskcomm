@@ -15,7 +15,6 @@ import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeTarefas } from "@/components/shell/ContadorDeTarefas";
 import { MarcaDaBarra } from "@/components/shell/MarcaDaBarra";
 import { NoDeFunis } from "@/components/shell/NoDeFunis";
-import { VersionFooter } from "@/components/shell/VersionFooter";
 import { GRUPO_NO_RODAPE, sidebarGroups } from "@/lib/navigation/registry";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 
@@ -204,7 +203,6 @@ export function SidebarContent({ onNavigate, funis = [] }: SidebarContentProps) 
             <span className="truncate">{t(rodape.label)}</span>
           </Link>
         )}
-        <VersionFooter collapsed={false} onNavigate={onNavigate} />
       </div>
     </>
   );
@@ -251,7 +249,7 @@ export function Sidebar({
         // coluna do grupo quando expandida. Recolhida, a coluna abre POR CIMA do
         // conteúdo ("peek"), presa dentro desta `<aside>`, e a largura que a
         // casca enxerga continua sendo uma só: a desta caixa.
-        "sticky top-0 z-30 flex h-screen shrink-0 flex-col bg-background transition-[width] duration-200",
+        "sticky top-0 z-30 flex h-screen shrink-0 flex-col bg-transparent transition-[width] duration-200",
         collapsed ? "w-[72px]" : "w-[304px] max-lg:w-[72px]",
       )}
     >

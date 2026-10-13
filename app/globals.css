@@ -769,6 +769,8 @@
   --pele-grad-acao-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #0c7a9a 85%, #00b47d 100%);
   --pele-grad-fg: #ffffff;
   --pele-brilho: #2b8cad;
+  /* O 1º radial da moldura (`.app.dark`): oklch(0.5 0.21 266), o azul da marca. */
+  --pele-brilho-fundo: #2a52d8;
   --pele-foco: #48a5c7;
   --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
   /* O texto do chip da IA (o `--accent-text` do protótipo, um tom mais claro):
@@ -798,6 +800,8 @@ body [data-theme="dark"] {
   --pele-grad-acao-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #0c7a9a 85%, #00b47d 100%);
   --pele-grad-fg: #ffffff;
   --pele-brilho: #2b8cad;
+  /* O 1º radial da moldura (`.app.dark`): oklch(0.5 0.21 266), o azul da marca. */
+  --pele-brilho-fundo: #2a52d8;
   --pele-foco: #48a5c7;
   --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
   --pele-grad-soft-fg: #8fdcef;
@@ -1560,7 +1564,7 @@ body [data-theme] {
 /* `.app.dark` (fundo): dois radiais da marca sobre a moldura. */
 [data-theme="dark"] .pele-moldura:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
   background:
-    radial-gradient(42rem 22rem at -6rem -6rem, color-mix(in oklch, var(--pele-brilho) 16%, transparent), transparent 70%),
+    radial-gradient(42rem 22rem at -6rem -6rem, color-mix(in oklch, var(--pele-brilho-fundo) 16%, transparent), transparent 70%),
     radial-gradient(36rem 18rem at 100% -8rem, color-mix(in oklch, var(--pele-brilho) 10%, transparent), transparent 70%),
     var(--color-bg);
 }
