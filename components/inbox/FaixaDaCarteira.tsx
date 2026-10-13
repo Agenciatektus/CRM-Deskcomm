@@ -41,7 +41,7 @@ export function FaixaDaCarteira({ contactId, quemAtendeId }: Props) {
 
   const donoId = carteira.data?.dono_user_id ?? null;
   const estado = estadoDaCarteira(
-    { donoId, qualificado: carteira.data?.qualificado === true },
+    { dono_user_id: donoId, qualificado: carteira.data?.qualificado === true },
     quemAtendeId,
   );
   if (!faixaDaCarteiraAparece(estado)) return null;
