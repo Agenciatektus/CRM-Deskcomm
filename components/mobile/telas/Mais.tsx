@@ -99,9 +99,8 @@ function CartaoDoPerfil({ aoNavegar }: { aoNavegar: () => void }) {
           <PencilSimple size={18} aria-hidden />
         </Link>
       </div>
-      <div className={LINHA_DO_PERFIL}>
-        <TenantSwitcher />
-      </div>
+      {/* Some inteira com uma organização só (antes ficava uma linha vazia). */}
+      <TenantSwitcher variante="linha" classeDaLinha={LINHA_DO_PERFIL} />
       <div className={LINHA_DO_PERFIL}>
         <span className="flex-1 text-base font-semibold text-text">{t("Disponível")}</span>
         <BotaoDeDisponibilidade />
