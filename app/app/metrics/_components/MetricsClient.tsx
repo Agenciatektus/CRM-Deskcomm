@@ -1,5 +1,6 @@
 "use client";
 
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useT } from "@/hooks/i18n/useT";
 import { useState } from "react";
 
@@ -67,7 +68,7 @@ export function MetricsClient({ canCompare, currentUserId }: Props) {
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{t("Atendente")}</span>
           <Select value={owner} onValueChange={setOwner}>
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-64 mb:w-full">
               <SelectValue placeholder={t("Todos os atendentes")} />
             </SelectTrigger>
             <SelectContent>
@@ -140,7 +141,7 @@ export function MetricsClient({ canCompare, currentUserId }: Props) {
               {t("Sem atividade no período (ganhos/perdidos, conversas ou respostas).")}
             </p>
           ) : (
-            <Table>
+            <Table className={TABELA_EMPILHADA}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("Atendente")}</TableHead>
@@ -159,12 +160,12 @@ export function MetricsClient({ canCompare, currentUserId }: Props) {
                         <span className="text-muted-foreground"> {t("(você)")}</span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{a.won}</TableCell>
-                    <TableCell className="text-right tabular-nums">{a.lost}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell data-rotulo={t("Ganhos")} className="text-right tabular-nums">{a.won}</TableCell>
+                    <TableCell data-rotulo={t("Perdidos")} className="text-right tabular-nums">{a.lost}</TableCell>
+                    <TableCell data-rotulo={t("Conversas")} className="text-right tabular-nums">
                       {a.conversations_handled}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell data-rotulo={t("1ª resposta (média)")} className="text-right tabular-nums">
                       {formatDuration(a.avg_first_response_seconds)}
                     </TableCell>
                   </TableRow>

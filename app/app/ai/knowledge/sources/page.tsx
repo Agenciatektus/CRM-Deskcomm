@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -79,21 +80,20 @@ export default async function AcervoPage() {
     .filter((a) => a.materiais.length > 0);
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("O que o agente sabe")}</h1>
-        <p className="text-sm text-text-muted">
-          {t(
-            "O material do seu negócio que os assistentes consultam antes de responder. Cada assistente escolhe, na tela dele, o que pode ler daqui.",
-          )}
-        </p>
-      </header>
-
-      <AcervoClient
-        initialSources={initialSources}
-        initialChave={estadoDaChave}
-        agentes={agentes}
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("O que o agente sabe")}
+        descricao={t(
+          "O material do seu negócio que os assistentes consultam antes de responder. Cada assistente escolhe, na tela dele, o que pode ler daqui.",
+        )}
       />
-    </div>
+      <SecaoDaPagina>
+        <AcervoClient
+          initialSources={initialSources}
+          initialChave={estadoDaChave}
+          agentes={agentes}
+        />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

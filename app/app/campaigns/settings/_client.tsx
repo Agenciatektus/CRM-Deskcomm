@@ -17,6 +17,7 @@
  * ir mais devagar que o número. O link está escrito na própria seção: mandar
  * alguém procurar é o mesmo defeito que criou esta tela.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -43,27 +44,27 @@ import { ArrowBendUpLeft } from "@/lib/ui/icons";
 export function ConfiguracaoDeCampanhas() {
   const t = useT();
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <div>
-        <Link
-          href="/app/campaigns"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-text"
-        >
-          <ArrowBendUpLeft size={14} aria-hidden />
-          {t("Campanhas")}
-        </Link>
-      </div>
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Configuração de campanhas")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("O que vale para todas as campanhas, e não para uma só.")}
-        </p>
-      </header>
+    <Pagina className="max-w-3xl">
+      <CabecalhoDaPagina
+        antes={
+          <Link
+            href="/app/campaigns"
+            className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-text mb:hidden"
+          >
+            <ArrowBendUpLeft size={14} aria-hidden />
+            {t("Campanhas")}
+          </Link>
+        }
+        titulo={t("Configuração de campanhas")}
+        descricao={t("O que vale para todas as campanhas, e não para uma só.")}
+      />
+      <SecaoDaPagina className="gap-4">
 
       <Padroes />
       <TextosSalvos />
       <ListaDeExclusao />
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

@@ -7,11 +7,13 @@
  * mesmo texto que a rota manda (quem resolve é o administrador da instalação,
  * em Configurações da instalação › Módulos, não quem está nesta tela).
  */
+import { TABELA_EMPILHADA } from "@/components/pagina";
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { apiClient } from "@/lib/api/client";
@@ -98,7 +100,7 @@ export function Honorarios({ podeGerenciar }: { podeGerenciar: boolean }) {
         {(contratos.data ?? []).length === 0 ? (
           <p className="text-sm text-text-muted">{t("Nenhum contrato ainda.")}</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
             <tbody>
               {(contratos.data ?? []).map((c) => (
                 <tr
@@ -171,16 +173,15 @@ function FormularioDeContrato({
     >
       <label className="flex flex-col gap-1 text-xs text-text-muted">
         {t("Modelo")}
-        <select
+        <Escolha
           value={modelo}
           data-testid="contrato-modelo"
-          onChange={(e) => setModelo(e.target.value as Modelo)}
-          className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+          onValueChange={(valorEscolhido) => setModelo(valorEscolhido as Modelo)}
         >
           <option value="fixo">{t("Fixo")}</option>
           <option value="exito">{t("Êxito")}</option>
           <option value="misto">{t("Misto")}</option>
-        </select>
+        </Escolha>
       </label>
 
       {precisaFixo ? (

@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -31,17 +32,17 @@ export default async function EvolutionPage() {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Evolução da IA", idioma)}</h1>
-        <p className="text-sm text-text-muted">
-          {traduzir(
-            "O que seu agente aprendeu no período, o que ele fez com isso, o que mudou no seu resultado — e o que ainda está travando.",
-            idioma,
-          )}
-        </p>
-      </header>
-      <EvolutionClient defaultRange={ultimosTrintaDiasUtc()} />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Evolução da IA", idioma)}
+        descricao={traduzir(
+          "O que seu agente aprendeu no período, o que ele fez com isso, o que mudou no seu resultado — e o que ainda está travando.",
+          idioma,
+        )}
+      />
+      <SecaoDaPagina>
+        <EvolutionClient defaultRange={ultimosTrintaDiasUtc()} />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

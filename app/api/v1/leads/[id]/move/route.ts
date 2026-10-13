@@ -199,6 +199,7 @@ export async function POST(
     etapaDeDestino: stage,
     motivo: input.lost_reason,
     motivoAtual: (lead as { lost_reason?: string | null }).lost_reason ?? null,
+    settingsDoFunil: settings,
     idioma: user.idioma,
   });
   if (!veredito.ok) {

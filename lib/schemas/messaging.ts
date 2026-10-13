@@ -5,6 +5,8 @@
  * /api/v1/messages. Validações compartilhadas entre rota REST e webhooks
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
+import { TIPOS_DE_CANAL } from "@/lib/inbox/tipo-de-canal";
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
@@ -202,6 +204,13 @@ export const sendMessageSchema = z
      * linha do token e o membership, no banco.
      */
     on_behalf_of_user_id: z.string().uuid().optional(),
+    /**
+     * "Tentar de novo" (B15): o id da NOSSA mensagem de saída que falhou e que
+     * este envio repete. O handler confere que ela é desta conversa, deste
+     * canal, `failed` e ainda não reenviada (`lib/messaging/reenvio.ts`), e a
+     * linha nova guarda o vínculo em `metadata.reenvio_de`.
+     */
+    reenvio_de: z.string().uuid().optional(),
   })
   .refine(
     (d) => {
@@ -260,15 +269,38 @@ export const conversationTagsSchema = z
 
 export type ConversationTags = z.infer<typeof conversationTagsSchema>;
 
-/** G3-05: PATCH /conversations/[id] aceita status e/ou tags (ao menos um). */
+/** 9045: um lado do delta — 1..20 tags, normalizadas e deduplicadas. */
+const conversationTagsDeltaSchema = conversationTagsSchema.refine((t) => t.length > 0);
+
+/**
+ * G3-05 + 9045: PATCH /conversations/[id] aceita status e/ou etiquetas. As
+ * etiquetas vão por DELTA (`tags_adicionar`/`tags_remover`, aplicado sobre o
+ * valor atual no banco) ou, por compatibilidade, pela lista inteira (`tags`),
+ * que regrava e perde mudança concorrente. Os dois formatos juntos são recusados.
+ */
 export const patchConversationSchema = z
   .object({
     status: conversationStatusSchema.optional(),
     expected_revision: z.number().int().positive().optional(),
     tags: conversationTagsSchema.optional(),
+    tags_adicionar: conversationTagsDeltaSchema.optional(),
+    tags_remover: conversationTagsDeltaSchema.optional(),
   })
-  .refine((d) => d.status !== undefined || d.tags !== undefined, {
-    message: "Informe status ou tags.",
+  .refine(
+    (d) =>
+      d.status !== undefined ||
+      d.tags !== undefined ||
+      d.tags_adicionar !== undefined ||
+      d.tags_remover !== undefined,
+    { message: "Informe status ou tags." },
+  )
+  .refine((d) => d.tags === undefined || (d.tags_adicionar === undefined && d.tags_remover === undefined), {
+    message: "Use tags ou tags_adicionar/tags_remover, não os dois.",
+    path: ["tags"],
+  })
+  .refine((d) => !(d.tags_adicionar ?? []).some((t) => (d.tags_remover ?? []).includes(t)), {
+    message: "A mesma tag não pode ser adicionada e removida.",
+    path: ["tags_remover"],
   });
 
 export type PatchConversationInput = z.infer<typeof patchConversationSchema>;
@@ -487,6 +519,18 @@ export const listConversationsQuerySchema = z.object({
    */
   entrada: z.enum(["direct", "comentario"]).optional(),
   /**
+   * "Sem próximo passo" (L4 da auditoria do visual v2, migration 9047): só as
+   * conversas cujo contato não tem tarefa aberta. Só `"true"` liga; ausente é
+   * sem filtro. Fechada, arquivada e grupo nunca casam (o campo calculado é
+   * nulo nelas).
+   */
+  sem_passo: z.enum(["true"]).optional(),
+  /**
+   * O TIPO de canal (folha de filtros do celular, migration 9049): a lista fixa de
+   * `lib/inbox/tipo-de-canal.ts`, aplicada em `conversations.channel`.
+   */
+  canal: z.enum(TIPOS_DE_CANAL).optional(),
+  /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
    * apareceria como erro na cara de quem digita (a rota recusa e o hook mostra).
@@ -498,6 +542,7 @@ export const listConversationsQuerySchema = z.object({
   search: z
     .string()
     .trim()
+    .max(TETO_DO_TERMO_DE_BUSCA)
     .refine(buscaValeConsulta, {
       message: `A busca precisa de pelo menos ${PISO_DA_BUSCA} caracteres.`,
     })

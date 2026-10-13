@@ -34,7 +34,7 @@ export default async function InternalErrorPage() {
     <IdiomaProvider locale={idioma}>
       <main className="flex min-h-screen items-center justify-center p-8">
         <Card className="w-full max-w-md p-8 text-center">
-          <h1 className="text-2xl font-semibold">{traduzir("500 — Erro interno", idioma)}</h1>
+          <h1 className="text-title-lg">{traduzir("500 — Erro interno", idioma)}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {traduzir(
               "Algo quebrou do nosso lado. Já registramos o ocorrido; tente de novo em instantes.",

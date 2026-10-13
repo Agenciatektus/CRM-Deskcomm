@@ -54,7 +54,7 @@ function displayName(c: Contact, t: (texto: string) => string = (texto) => texto
 // `locale` ANTES de `now`, e não depois: `now` tem default, e um parâmetro
 // obrigatório atrás de um opcional obriga todo chamador a passar os dois. O
 // codemod acrescentou no fim, que é o certo em 22 dos 23 casos e o errado aqui.
-function formatUltimaAtividade(iso: string, locale: Locale, now = new Date()): string {
+export function formatUltimaAtividade(iso: string, locale: Locale, now = new Date()): string {
   const d = new Date(iso);
   if (isToday(d) || isYesterday(d)) {
     return formatRelative(d, now, { locale: locale });

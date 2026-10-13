@@ -38,7 +38,13 @@ interface Props {
   podeAlterar: boolean;
   /** Manager+ numa mensagem recebida (ocultar/restaurar). */
   podeModerar: boolean;
+  /** Abre um bloco de falas do mesmo autor (`iniciaBloco`): nome e respiro em cima. */
+  inicioDoBloco: boolean;
   acoes: AcoesDoFio;
+  /** B15: a mensagem de saída falhou, é reenviável e ainda não foi reenviada. */
+  podeReenviar?: boolean;
+  /** O gesto de reenviar, com identidade estável (ver `useReenvioDoFio`). */
+  reenviar?: (m: Message) => void;
 }
 
 /**
@@ -58,7 +64,10 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
   temResponder,
   podeAlterar,
   podeModerar,
+  inicioDoBloco,
   acoes,
+  podeReenviar = false,
+  reenviar,
 }: Props) {
   const id = message.id;
   return (
@@ -78,6 +87,8 @@ export const LinhaDaMensagem = memo(function LinhaDaMensagem({
       onApagar={podeAlterar ? () => acoes.apagar(id) : undefined}
       onOcultar={podeModerar ? () => acoes.ocultar(id) : undefined}
       onRestaurar={podeModerar ? () => acoes.restaurar(id) : undefined}
+      inicioDoBloco={inicioDoBloco}
+      onReenviar={podeReenviar && reenviar ? () => reenviar(message) : undefined}
     />
   );
 });

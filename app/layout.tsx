@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
-import { Toaster } from "sonner";
+import { RegistroDoApp } from "@/components/pwa/RegistroDoApp";
+import { Toaster } from "@/components/ui/sonner";
 import { coresDaBarraDoNavegador } from "@/lib/branding/barra-do-navegador";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
 import { cssDaMarca } from "@/lib/branding/css";
@@ -30,19 +31,30 @@ import "./globals.css";
 // next/font/google as baixava durante o build, e o build caía quando o Google
 // não respondia. A família passa a se chamar como a variável JS ("atkinson"),
 // então use sempre a custom property (--font-atkinson), nunca o nome da fonte.
+// Atkinson Hyperlegible NEXT (pesos 200-800) e Atkinson Hyperlegible Mono, as
+// famílias do quadro DS (etapa 2). A v1 só tinha 400 e 700, e todo `font-medium`
+// e `font-semibold` saía como peso sintetizado pelo navegador. Um arquivo por
+// peso, latin + latin-ext juntos (ver app/fonts/README.md).
 const atkinson = localFont({
+  // Literal, peso a peso: o next/font só aceita valores escritos à mão.
   src: [
-    { path: "./fonts/atkinson-hyperlegible-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/atkinson-hyperlegible-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-200-latin-latin-ext.woff2", weight: "200", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-300-latin-latin-ext.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-600-latin-latin-ext.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-next-800-latin-latin-ext.woff2", weight: "800", style: "normal" },
   ],
   display: "swap",
   variable: "--font-atkinson",
 });
 
-const plexMono = localFont({
+const atkinsonMono = localFont({
   src: [
-    { path: "./fonts/ibm-plex-mono-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/ibm-plex-mono-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/atkinson-hyperlegible-mono-700-latin-latin-ext.woff2", weight: "700", style: "normal" },
   ],
   display: "swap",
   variable: "--font-mono",
@@ -105,7 +117,15 @@ export async function generateMetadata(): Promise<Metadata> {
     // não pode ser um arquivo estático em `public/`.
     // Com um ícone subido em `/admin/marca` (migration 0443), o link aponta para
     // o arquivo no storage da instalação — ver `iconeDaAba`.
-    icons: { icon: iconeDaAba(linha?.favicon_path) },
+    icons: {
+      icon: iconeDaAba(linha?.favicon_path),
+      // O ícone da tela de início do iPhone (180px, com fundo: o iOS não recorta
+      // transparência). Mesma marca da instalação dos ícones do manifesto.
+      apple: `/app-icon/180${linha?.favicon_path ? `?v=${encodeURIComponent(linha.favicon_path)}` : ""}`,
+    },
+    // App instalado no iOS: abre sem a barra do Safari, com o nome da instalação, e a
+    // barra de status padrão (não translúcida, o conteúdo começa abaixo dela).
+    appleWebApp: { capable: true, title: name, statusBarStyle: "default" },
   };
 }
 
@@ -116,6 +136,13 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export const viewport: Viewport = {
   themeColor: coresDaBarraDoNavegador(REGUA_DO_PRODUTO),
+  // O app de celular desenha até a borda (notch e indicador de início) e respeita a
+  // área segura pelos tokens `--mb-area-*` do globals.css. No desktop o `env()` vale
+  // 0, então acima de 760px nada muda.
+  viewportFit: "cover",
+  // Android: o teclado encolhe a página e o composer da conversa fica acima dele
+  // (no iPhone, ver `lib/mobile/useAlturaDoTeclado`).
+  interactiveWidget: "resizes-content",
 };
 
 // Inline FOUC-prevention. Conteúdo é string literal estática (zero input do usuário),
@@ -282,7 +309,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="pt-BR"
       data-theme="light"
       suppressHydrationWarning
-      className={`${atkinson.variable} ${plexMono.variable}`}
+      className={`${atkinson.variable} ${atkinsonMono.variable}`}
     >
       <head>
         {/* Primeiro de tudo: a cor da instalação, antes do CSS e do script de tema. */}
@@ -297,7 +324,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <MarcaDosClientComponents>
             <ThemeProvider>{children}</ThemeProvider>
           </MarcaDosClientComponents>
-          <Toaster position="top-right" richColors closeButton duration={4000} />
+          {/* E2: embaixo no centro, como no protótipo; perto da mão que agiu e longe
+              do sino e do perfil no topo. 5 s para dar tempo de "Desfazer". */}
+          <Toaster position="bottom-center" closeButton duration={5000} />
+          {/* O service worker do app (tela "sem conexão" e push), em toda página. */}
+          <RegistroDoApp />
         </Providers>
       </body>
     </html>

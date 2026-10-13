@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
@@ -54,6 +55,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { Clock, Plus, Trash } from "@/lib/ui/icons";
 
 const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -221,18 +224,18 @@ function ScheduleDialog({
                 este fuso é lido por `localMoment`, que LANÇA num fuso inexistente
                 — e o atendente com agenda quebrada nunca fica elegível, sem que
                 nada na tela diga por quê. */}
-            <select
+            <Escolha
               id="tz"
               value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              onValueChange={(valorEscolhido) => setTimezone(valorEscolhido)}
+              className="h-9 w-full"
             >
               {FUSOS_OFERECIDOS.map((f) => (
                 <option key={f.codigo} value={f.codigo}>
                   {f.rotulo} — {f.codigo}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
 
           <div className="space-y-2">
@@ -262,27 +265,23 @@ function ScheduleDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Input
-                  type="time"
+                <CampoDeData tipo="time"
                   value={w.start}
                   aria-label={t("Início")}
-                  onChange={(e) =>
+                  onValorChange={(valorEscolhido) =>
                     setWindows((ws) =>
-                      ws.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)),
+                      ws.map((x, j) => (j === i ? { ...x, start: valorEscolhido } : x)),
                     )
-                  }
-                />
+                  } />
                 <span className="text-muted-foreground">–</span>
-                <Input
-                  type="time"
+                <CampoDeData tipo="time"
                   value={w.end}
                   aria-label="Fim"
-                  onChange={(e) =>
+                  onValorChange={(valorEscolhido) =>
                     setWindows((ws) =>
-                      ws.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)),
+                      ws.map((x, j) => (j === i ? { ...x, end: valorEscolhido } : x)),
                     )
-                  }
-                />
+                  } />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -492,7 +491,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
             {t("Nenhum atendente na organização. Convide membros com papel de atendente ou superior.")}
           </p>
         ) : (
-          <Table>
+          <Table className={TABELA_EMPILHADA}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("Atendente")}</TableHead>
@@ -522,12 +521,12 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                         <PresenceBadge attendant={a} />
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo={t("Carga")}>
                       <span className={load >= capacity ? "font-medium text-destructive" : ""}>
                         {load}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-rotulo={t("Capacidade")}>
                       {canManage ? (
                         <Input
                           type="number"
@@ -547,7 +546,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                         capacity
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-rotulo={t("Horário")} className="text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <span>{summarizeSchedule(windows, t)}</span>
                         {canManage ? (
@@ -564,7 +563,7 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                       </div>
                     </TableCell>
                     {canManage ? (
-                      <TableCell>
+                      <TableCell data-rotulo={t("Disponível")}>
                         <Switch
                           checked={!!a.availability?.is_available}
                           aria-label={`Disponibilidade de ${a.name}`}

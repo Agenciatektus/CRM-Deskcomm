@@ -1,8 +1,8 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 
 export interface FollowupWindowValue {
@@ -92,25 +92,21 @@ export function FollowupWindowEditor({ value, onChange, disabled }: Props) {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="followup_window_start">{t("Início")}</Label>
-              <Input
+              <CampoDeData tipo="time"
                 id="followup_window_start"
-                type="time"
                 value={value.start}
-                onChange={(event) => patch({ start: event.target.value })}
+                onValorChange={(valorEscolhido) => patch({ start: valorEscolhido })}
                 disabled={disabled}
-                aria-invalid={invalidRange}
-              />
+                aria-invalid={invalidRange} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="followup_window_end">{t("Fim")}</Label>
-              <Input
+              <CampoDeData tipo="time"
                 id="followup_window_end"
-                type="time"
                 value={value.end}
-                onChange={(event) => patch({ end: event.target.value })}
+                onValorChange={(valorEscolhido) => patch({ end: valorEscolhido })}
                 disabled={disabled}
-                aria-invalid={invalidRange}
-              />
+                aria-invalid={invalidRange} />
             </div>
           </div>
           {invalidRange ? (

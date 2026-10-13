@@ -21,8 +21,78 @@
    O `:where()` zera a especificidade do seletor de tema, para que `dark:bg-x`
    e `bg-x` continuem competindo só pela ordem em que aparecem — sem ele, todo
    utilitário `dark:` ganharia um ponto de especificidade a mais e venceria
-   coisas que no v3 ele não vencia. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+   coisas que no v3 ele não vencia.
+
+   O `:not(:where(…))` tira do escuro a subárvore `data-theme="light"` aberta
+   DENTRO de uma escura (a vitrine /app/design-system com o app escuro): sem ele,
+   o painel claro recebia os tokens claros e, por cima, todo `dark:` do
+   ancestral. Especificidade zero também, e numa página sem subárvore clara
+   nada muda. As classes `pele-*` levam o mesmo recorte mais abaixo. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *):not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)));
+
+/* O CORTE DO APP DE CELULAR (docs/design/mobile/auditoria-mobile.md, decisão fixa):
+   abaixo de 760px vale o app (`mb:`); de 760px para cima, o tablet e o desktop de
+   sempre (`largo:`). É 760, e não o `md` de 768 do Tailwind: o `md` não entra em
+   nada que seja do celular. `tests/unit/paridade-mobile.test.ts` confere o corte.
+   O `largo:` é um BREAKPOINT do tema (`--breakpoint-largo`, no `@theme inline`), e não
+   um `@custom-variant`: só breakpoint entra na ordem dos tamanhos (antes do `md` e do
+   `xl`). Como variante própria ele sairia DEPOIS do `xl:` no CSS e venceria o
+   `xl:grid-cols-*` e o `xl:hidden` no desktop. */
+@custom-variant mb (@media (max-width: 759px));
+
+/* O que a casca do celular ocupa, lido por quem precisa descontar (a altura da Inbox,
+   o fim da página, os toasts). Só abaixo de 760px: acima, as peças nem aparecem. */
+@media (max-width: 759px) {
+  body:has([data-barra-inferior]) {
+    --mb-casca-baixo: var(--mb-barra-inferior);
+  }
+  body:has([data-cabecalho-do-celular]) {
+    --mb-casca-topo: var(--mb-titulo-altura);
+  }
+
+  /* POPOVER E MENU VIRANDO FOLHA INFERIOR (`folhaNoCelular` em PopoverContent,
+     DropdownMenuContent e DropdownMenuSubContent). O comportamento continua o do
+     Radix (foco, Esc, toque fora fecha, submenu); só a forma muda: presa embaixo, na
+     largura toda, com a alça, o raio e a altura da folha do protótipo, área segura
+     e o fundo escurecido (a sombra larga, que não intercepta o toque: o toque fora
+     é o do Radix). A folha própria, com arrastar, é `components/mobile/FolhaInferior`. */
+  [data-radix-popper-content-wrapper]:has(> [data-folha-no-celular]) {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+    box-shadow: 0 0 0 100vmax oklch(0.12 0.01 260 / 0.52);
+  }
+  [data-folha-no-celular] {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: var(--mb-folha-max) !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-width: 1px 0 0 !important;
+    border-radius: var(--mb-folha-raio) var(--mb-folha-raio) 0 0 !important;
+    padding: 0 8px calc(10px + var(--mb-area-baixo)) !important;
+    animation: folha-sobe 300ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+  [data-folha-no-celular]::before {
+    content: "";
+    display: block;
+    width: var(--mb-pegador-largura);
+    height: var(--mb-pegador-altura);
+    margin: 10px auto 8px;
+    border-radius: 9999px;
+    background: var(--color-border-strong);
+  }
+  [data-folha-no-celular] [role^="menuitem"] {
+    min-height: var(--mb-alvo);
+    font-size: 16px;
+  }
+}
+@media (max-width: 759px) and (prefers-reduced-motion: reduce) {
+  [data-folha-no-celular] {
+    animation: none !important;
+  }
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    DeskcommCRM — Design System tokens (Sage palette · density Aerada)
@@ -32,63 +102,65 @@
 
 :root {
   /* Surfaces (light) */
-  --color-bg: #faf9f6;
+  --color-bg: #eef1f5;
   --color-surface: #ffffff;
-  --color-surface-elevated: #f5f3ee;
-  --color-overlay: rgba(28, 26, 22, 0.42);
+  --color-surface-elevated: #f5f7f9;
+  --color-overlay: rgba(17, 22, 31, 0.32);
 
   /* Text (light) */
-  --color-text: #1c1a16;
-  --color-text-muted: #5d594f;
-  --color-text-subtle: #7d786c;
+  --color-text: #171d26;
+  --color-text-muted: #474d58;
+  --color-text-subtle: #606671;
 
   /* Borders (light) */
-  --color-border: #e7e3da;
-  --color-border-strong: #d2cdbf;
+  --color-border: #e0e3e8;
+  --color-border-strong: #cdd1d7;
 
-  /* Accent — Sage (11 stops) */
-  --color-accent-50:  #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
+  /* Accent — Verde Verdash #0E7A5F (11 stops), a marca padrão sem organização.
+     Rampa = rampaDeSemente("#0E7A5F") (lib/branding/rampa.ts). Até a etapa 2
+     do DS era a Sage #506D48, que segue como preset. */
+  --color-accent-50:  #eef7f4;
+  --color-accent-100: #daeee6;
+  --color-accent-200: #b4ddcd;
+  --color-accent-300: #82c4ad;
+  --color-accent-400: #4ead8f;
+  --color-accent-500: #229676;
+  --color-accent-600: #0e7a5f;
+  --color-accent-700: #17614c;
+  --color-accent-800: #1a4f3f;
+  --color-accent-900: #1a4235;
+  --color-accent-950: #0a211a;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
   --color-accent-hover: var(--color-accent-700);
 
   /* Neutrals — greige (11 stops, light) */
-  --color-neutral-50:  #faf9f6;
-  --color-neutral-100: #f3f1ec;
-  --color-neutral-200: #e7e3da;
-  --color-neutral-300: #d2cdbf;
-  --color-neutral-400: #a9a395;
-  --color-neutral-500: #7d786c;
-  --color-neutral-600: #5d594f;
-  --color-neutral-700: #46433b;
-  --color-neutral-800: #2e2c26;
-  --color-neutral-900: #1c1a16;
-  --color-neutral-950: #0e0d0a;
+  --color-neutral-50:  #eef1f5;
+  --color-neutral-100: #eaedf2;
+  --color-neutral-200: #e0e3e8;
+  --color-neutral-300: #cdd1d7;
+  --color-neutral-400: #999fa7;
+  --color-neutral-500: #606671;
+  --color-neutral-600: #474d58;
+  --color-neutral-700: #323842;
+  --color-neutral-800: #232933;
+  --color-neutral-900: #171d26;
+  --color-neutral-950: #070b12;
 
   /* States (light) */
   --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
+  --color-success-bg: #dff6e2;
+  --color-success-fg: #287c42;
   --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
+  --color-warning-bg: #ffeed2;
+  --color-warning-fg: #824c00;
+  --color-error: #b02a2d;
+  --color-error-bg: #ffe9e6;
+  --color-error-fg: #b02a2d;
   --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
+  --color-info-bg: #e1f1ff;
+  --color-info-fg: #0077bc;
 
   /* Spacing (4-base) */
   --space-0: 0px;
@@ -115,17 +187,20 @@
   --radius-full: 9999px;
 
   /* Shadows — desaturated, neutral-based */
-  --shadow-xs: 0 1px 2px 0 rgba(20, 18, 14, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(20, 18, 14, 0.05), 0 1px 1px 0 rgba(20, 18, 14, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(20, 18, 14, 0.06), 0 2px 4px -1px rgba(20, 18, 14, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(20, 18, 14, 0.10), 0 4px 12px -2px rgba(20, 18, 14, 0.06);
-  --shadow-xl: 0 24px 48px -12px rgba(20, 18, 14, 0.16), 0 8px 16px -4px rgba(20, 18, 14, 0.08);
+  --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.06), 0 1px 1px 0 rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -1px rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(16, 24, 40, 0.22), 0 2px 6px 0 rgba(16, 24, 40, 0.08);
+  --shadow-xl: 0 24px 48px -12px rgba(16, 24, 40, 0.24), 0 8px 16px -4px rgba(16, 24, 40, 0.10);
 
   /* Density — Aerada */
   --density-row: 56px;
   --density-gap: 24px;
   --density-px: 20px;
   --density-py: 16px;
+  /* Respiro da linha da lista do quadro DS: 12 (8 no modo compacto, que liga
+     com `data-densidade="compacta"` num ancestral). */
+  --row-py: 12px;
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
@@ -161,7 +236,7 @@
   --destructive-foreground: #ffffff;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-500);
+  --ring: var(--color-accent-600);
   --radius: var(--radius-md);
   /* ---- Agenda · cor de pessoa (8 trilhas) ------------------------------
    * Quem é o dono do compromisso é o eixo visual da grade, e a accent NÃO
@@ -214,6 +289,139 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato · cor por pessoa (6 pares) -------------------
+   * Fundo claro + texto escuro do mesmo matiz, os `--av1..--av6` do protótipo
+   * da Inbox v2 convertidos de oklch para hex (a régua de contraste e os testes
+   * de tema leem hex). Contraste medido do texto sobre o fundo: 7,6:1 a 8,4:1
+   * nos dois temas (tests/unit/cor-do-avatar.test.ts refaz a conta).
+   * NÃO usa a accent: ela é a marca do revendedor e deixaria todo avatar da
+   * lista com a mesma cor. Qual par cada contato recebe sai de um hash estável
+   * do id (lib/inbox/cor-do-avatar.ts).
+   */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00474a;
+  /* ---- Design System v2 · tokens que o protótipo tem e o CRM não tinha ----
+   * Etapa 1 do DS (docs/design/design-system/mapa-de-tokens.md): só ADIÇÃO.
+   * Nenhuma tela consome estes nomes ainda; a vitrine /app/design-system os
+   * mostra. Os valores são o protótipo da Inbox v2 (Main.dc.html, `.app`)
+   * convertidos de oklch para hex, porque a régua de contraste lê hex.
+   *
+   * O que deriva da marca (`accent-soft-2`, `accent-text`) NÃO mora aqui como
+   * `color-mix(var(--color-accent))`: declarado no `:root`, o `var()` seria
+   * resolvido no <html> e a marca da ORGANIZAÇÃO (injetada no <body>) nunca o
+   * alcançaria. O `@theme inline` monta o `color-mix` no elemento que pinta, e
+   * aqui ficam só as PROPORÇÕES, que são número e herdam sem esse problema. */
+  --color-hover: #eaedf2;
+  --color-thread: #f2f5f8;
+  --color-tint: rgba(23, 29, 38, 0.06);
+  --color-warning-line: #e3be80;
+  --color-bubble-in: var(--color-surface);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Claro: os valores do `.mb`. */
+  --color-mb-barra: #fbfcfd;
+  --color-note-bg: #fff1cc;
+  --color-note-fg: #54360b;
+  --mix-accent-soft: 11%;
+  --mix-accent-hover: 86%;
+  --accent-hover-alvo: #000000;
+  --mix-bubble-out: 15%;
+  --mix-bubble-ai: 7%;
+  --bubble-ai-base: var(--color-surface);
+  --mix-accent-soft-2: 20%;
+  --mix-accent-text: 88%;
+  --accent-text-alvo: #000000;
+  --shadow-pop: 0 12px 32px -8px rgba(17, 22, 31, 0.22), 0 2px 6px 0 rgba(17, 22, 31, 0.08);
+  --shadow-bubble: 0 1px 1px 0 rgba(17, 22, 31, 0.06);
+  /* Forma: o raio cresce com o objeto (pílula 6, botão 9, campo 10, menu 14,
+     balão 18 com o canto de quem enviou em 6). */
+  --radius-pill: 6px;
+  --radius-control: 9px;
+  --radius-field: 10px;
+  --radius-menu: 14px;
+  --radius-bubble: 18px;
+  --radius-bubble-tail: 6px;
+  /* Escala de texto do protótipo (px, linha). */
+  --font-size-rail: 10.5px;
+  --font-size-meta: 12px;
+  --font-size-label: 13px;
+  --font-size-ui: 14px;
+  --font-size-message: 15px;
+  --font-size-title-sm: 16px;
+  --font-size-title-md: 17px;
+  --font-size-title-lg: 20px;
+  --line-height-ui: 1.45;
+  --line-height-message: 1.42;
+  /* Movimento do protótipo: `--ease` e o .15s das transições. */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-ui: 150ms;
+  /* ── App de celular: medidas do protótipo (docs/design/mobile/MobileVerdash.dc.html) ──
+     Lidas pelo teste de paridade mobile: mudar um valor aqui sem mudar o protótipo (ou
+     o contrário) reprova. Só as telas do celular (`mb:`) consomem estes tokens. */
+  --mb-alvo: 44px;
+  --mb-abas-colunas: 5;
+  --mb-aba-altura: 56px;
+  --mb-aba-fonte: 12px;
+  --mb-aba-pilula-largura: 60px;
+  --mb-aba-pilula-altura: 32px;
+  --mb-aba-pilula-raio: 16px;
+  --mb-aba-contador: 20px;
+  --mb-titulo-fonte: 32px;
+  --mb-titulo-altura: 56px;
+  --mb-barra-altura: 56px;
+  --mb-busca-altura: 44px;
+  --mb-busca-raio: 14px;
+  --mb-chip-altura: 36px;
+  --mb-avatar-lista: 52px;
+  --mb-linha-nome: 16px;
+  --mb-linha-previa: 14.5px;
+  --mb-acao-gesto: 72px;
+  --mb-folha-raio: 24px;
+  --mb-folha-max: 88%;
+  --mb-folha-item: 56px;
+  --mb-pegador-largura: 40px;
+  --mb-pegador-altura: 5px;
+  --mb-fab: 60px;
+  --mb-fab-raio: 20px;
+  --mb-fab-margem: 16px;
+  --mb-fab-acima: 84px;
+  /* 16px nos campos: abaixo disso o Safari do iPhone dá zoom ao focar. */
+  --mb-campo-fonte: 16px;
+  /* Mais (tela 9) e Canais (tela 10): cartões, linha do menu e logo do canal. */
+  --mb-perfil-raio: 18px;
+  --mb-grupo-fonte: 20px;
+  --mb-cartao-raio: 16px;
+  --mb-menu-item: 62px;
+  --mb-menu-icone: 36px;
+  --mb-canal-raio: 18px;
+  --mb-canal-logo: 46px;
+  /* Área segura (notch e indicador de início). Só existe com `viewportFit: "cover"`
+     (app/layout.tsx); no desktop o `env()` vale 0, então nada muda acima de 760px. */
+  --mb-area-topo: env(safe-area-inset-top, 0px);
+  --mb-area-baixo: env(safe-area-inset-bottom, 0px);
+  --mb-area-esquerda: env(safe-area-inset-left, 0px);
+  --mb-area-direita: env(safe-area-inset-right, 0px);
+  /* A casca do app de celular (components/mobile/CascaDoCelular): quanto o topo e o
+     rodapé ocupam AGORA. Sem barra inferior, o de baixo é só a área segura; com ela,
+     a barra inteira (6px + aba + 6px + área segura, o `.tb` do protótipo). As regras
+     com `:has()` logo abaixo trocam os valores quando as peças estão na tela. */
+  --mb-barra-inferior: calc(var(--mb-aba-altura) + 12px + var(--mb-area-baixo));
+  --mb-casca-topo: 0px;
+  --mb-casca-baixo: var(--mb-area-baixo);
+  /* As ações do gesto de deslizar (o `.a-read`, `.a-pin`/`.a-more` e `.a-arch` do
+     protótipo), as mesmas nos dois temas, com texto branco. */
+  --color-mb-gesto-lida: oklch(0.5 0.13 245);
+  --color-mb-gesto-neutro: oklch(0.42 0.02 260);
+  --color-mb-gesto-arquivar: oklch(0.47 0.11 160);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -238,11 +446,11 @@
    — a régua inteira, e com ela os 37 testes de contraste, deixariam de ser
    extraídos.
 
-   As 11 paradas `--color-accent-NNN` ficam DE FORA de propósito. Elas são
-   idênticas nos dois blocos do produto, então omiti-las não muda pixel algum
-   aqui; e, na instalação que trocou a cor, a subárvore clara passa a herdar a
-   rampa do `<html>` (a do revendedor) em vez de fixar a Sage. Pelo mesmo
-   motivo os papéis abaixo mantêm a forma `var(--color-accent-NNN)`.
+   As 11 paradas `--color-accent-NNN` ENTRAM no espelho desde a etapa 2 do
+   DS: o escuro passou a ter rampa própria (o azul Verdash, travado), e uma
+   subárvore clara sob página escura herdaria o azul. A marca de cada painel
+   da vitrine chega pelo escopo do painel (`ESCOPO_DO_PAINEL`,
+   lib/branding/css.ts), que vence este bloco.
 
    Buraco conhecido: `--color-accent-fg` é literal `#ffffff` e, numa subárvore
    clara sob página escura, ficaria preso ao branco mesmo quando a marca exige
@@ -250,47 +458,58 @@
    (lib/branding/css.ts), que só ganha consumidor com a tela de marca.
    ───────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --color-bg: #faf9f6;
+  --color-bg: #eef1f5;
   --color-surface: #ffffff;
-  --color-surface-elevated: #f5f3ee;
-  --color-overlay: rgba(28, 26, 22, 0.42);
-  --color-text: #1c1a16;
-  --color-text-muted: #5d594f;
-  --color-text-subtle: #7d786c;
-  --color-border: #e7e3da;
-  --color-border-strong: #d2cdbf;
+  --color-surface-elevated: #f5f7f9;
+  --color-overlay: rgba(17, 22, 31, 0.32);
+  --color-text: #171d26;
+  --color-text-muted: #474d58;
+  --color-text-subtle: #606671;
+  --color-border: #e0e3e8;
+  --color-border-strong: #cdd1d7;
+  --color-accent-50: #eef7f4;
+  --color-accent-100: #daeee6;
+  --color-accent-200: #b4ddcd;
+  --color-accent-300: #82c4ad;
+  --color-accent-400: #4ead8f;
+  --color-accent-500: #229676;
+  --color-accent-600: #0e7a5f;
+  --color-accent-700: #17614c;
+  --color-accent-800: #1a4f3f;
+  --color-accent-900: #1a4235;
+  --color-accent-950: #0a211a;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
   --color-accent-hover: var(--color-accent-700);
-  --color-neutral-50: #faf9f6;
-  --color-neutral-100: #f3f1ec;
-  --color-neutral-200: #e7e3da;
-  --color-neutral-300: #d2cdbf;
-  --color-neutral-400: #a9a395;
-  --color-neutral-500: #7d786c;
-  --color-neutral-600: #5d594f;
-  --color-neutral-700: #46433b;
-  --color-neutral-800: #2e2c26;
-  --color-neutral-900: #1c1a16;
-  --color-neutral-950: #0e0d0a;
+  --color-neutral-50: #eef1f5;
+  --color-neutral-100: #eaedf2;
+  --color-neutral-200: #e0e3e8;
+  --color-neutral-300: #cdd1d7;
+  --color-neutral-400: #999fa7;
+  --color-neutral-500: #606671;
+  --color-neutral-600: #474d58;
+  --color-neutral-700: #323842;
+  --color-neutral-800: #232933;
+  --color-neutral-900: #171d26;
+  --color-neutral-950: #070b12;
   --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
+  --color-success-bg: #dff6e2;
+  --color-success-fg: #287c42;
   --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
+  --color-warning-bg: #ffeed2;
+  --color-warning-fg: #824c00;
+  --color-error: #b02a2d;
+  --color-error-bg: #ffe9e6;
+  --color-error-fg: #b02a2d;
   --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
-  --shadow-xs: 0 1px 2px 0 rgba(20, 18, 14, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(20, 18, 14, 0.05), 0 1px 1px 0 rgba(20, 18, 14, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(20, 18, 14, 0.06), 0 2px 4px -1px rgba(20, 18, 14, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(20, 18, 14, 0.10), 0 4px 12px -2px rgba(20, 18, 14, 0.06);
-  --shadow-xl: 0 24px 48px -12px rgba(20, 18, 14, 0.16), 0 8px 16px -4px rgba(20, 18, 14, 0.08);
+  --color-info-bg: #e1f1ff;
+  --color-info-fg: #0077bc;
+  --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(16, 24, 40, 0.06), 0 1px 1px 0 rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -1px rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(16, 24, 40, 0.22), 0 2px 6px 0 rgba(16, 24, 40, 0.08);
+  --shadow-xl: 0 24px 48px -12px rgba(16, 24, 40, 0.24), 0 8px 16px -4px rgba(16, 24, 40, 0.10);
   --background: var(--color-bg);
   --foreground: var(--color-text);
   --card: var(--color-surface);
@@ -308,7 +527,7 @@
   --destructive-foreground: #ffffff;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-500);
+  --ring: var(--color-accent-600);
   /* ---- Agenda · cor de pessoa (espelho do :root) -----------------------
    * Espelhado aqui porque o tema escuro sobrescreve estas oito chaves, e
    * `tests/unit/branding-tema-claro-escopavel.test.ts` exige que este bloco
@@ -324,74 +543,117 @@
   --agenda-pessoa-6: #608bda;   /* índigo */
   --agenda-pessoa-7: #7b5bad;   /* violeta */
   --agenda-pessoa-8: #cc77b1;   /* framboesa */
+  /* ---- Avatar do contato (espelho do :root, mesma razão da agenda) ---- */
+  --color-avatar-1: #fed2cd;
+  --color-avatar-1-fg: #6a2c29;
+  --color-avatar-2: #f0dbb9;
+  --color-avatar-2-fg: #5d3904;
+  --color-avatar-3: #c2e9d3;
+  --color-avatar-3-fg: #124830;
+  --color-avatar-4: #c4e4f4;
+  --color-avatar-4-fg: #084465;
+  --color-avatar-5: #e3d7fb;
+  --color-avatar-5-fg: #4b346f;
+  --color-avatar-6: #c0e7e8;
+  --color-avatar-6-fg: #00474a;
+  /* ---- Design System v2 (espelho do :root, mesma razão da agenda) ---- */
+  --color-hover: #eaedf2;
+  --color-thread: #f2f5f8;
+  --color-tint: rgba(23, 29, 38, 0.06);
+  --color-warning-line: #e3be80;
+  --color-bubble-in: var(--color-surface);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Claro: os valores do `.mb`. */
+  --color-mb-barra: #fbfcfd;
+  --color-note-bg: #fff1cc;
+  --color-note-fg: #54360b;
+  --mix-accent-soft: 11%;
+  --mix-accent-hover: 86%;
+  --accent-hover-alvo: #000000;
+  --mix-bubble-out: 15%;
+  --mix-bubble-ai: 7%;
+  --bubble-ai-base: var(--color-surface);
+  --mix-accent-soft-2: 20%;
+  --mix-accent-text: 88%;
+  --accent-text-alvo: #000000;
+  --shadow-pop: 0 12px 32px -8px rgba(17, 22, 31, 0.22), 0 2px 6px 0 rgba(17, 22, 31, 0.08);
+  --shadow-bubble: 0 1px 1px 0 rgba(17, 22, 31, 0.06);
 }
 
 [data-theme="dark"] {
   /* Surfaces (dark — drawn) */
-  --color-bg: #161510;
-  --color-surface: #1d1c17;
-  --color-surface-elevated: #272620;
-  --color-overlay: rgba(0, 0, 0, 0.55);
+  --color-bg: #0d0e11;
+  --color-surface: #181a1c;
+  --color-surface-elevated: #1f2225;
+  --color-overlay: rgba(17, 22, 31, 0.32);
 
   /* Text (dark) */
-  --color-text: #f5f4ef;
-  --color-text-muted: #8e8b7f;
-  --color-text-subtle: #605e54;
+  --color-text: #f8f8f8;
+  --color-text-muted: #c8cbce;
+  --color-text-subtle: #a1a5aa;
 
   /* Borders (dark) */
-  --color-border: #33312a;
-  --color-border-strong: #444239;
+  --color-border: #292c2f;
+  --color-border-strong: #3a3d41;
 
-  /* Accent stays same hex stops; default shifts up for dark contrast */
-  --color-accent-50:  #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
-  --color-accent: var(--color-accent-400);
-  --color-accent-fg: #161510;
-  --color-accent-soft: rgba(130, 160, 119, 0.16);
-  --color-accent-hover: var(--color-accent-300);
+  /* Accent do ESCURO travado no primary Verdash #2690B1 (o meio do degradê),
+     para todo revendedor: quadro DesignSystemVerdash.dc.html, seção Cor. A
+     marca da organização só pinta o claro; lib/branding/contraste.ts deriva o
+     escuro sempre desta rampa (`rampaDoEscuro`), e o bloco injetado repete
+     estes valores. Rampa = rampaDeSemente("#2690B1"). `--color-accent-fg` é o
+     preto calculado (5,2:1): onde o quadro pinta branco sobre o azul, a tela
+     usa o degradê (botão, chip ligado, contador), não o accent sólido. */
+  --color-accent-50:  #edf7fb;
+  --color-accent-100: #daf0f8;
+  --color-accent-200: #b6e1f2;
+  --color-accent-300: #87cde7;
+  --color-accent-400: #54b9dc;
+  --color-accent-500: #2da6cc;
+  --color-accent-600: #2690b1;
+  --color-accent-700: #247089;
+  --color-accent-800: #21596c;
+  --color-accent-900: #1f4958;
+  --color-accent-950: #072028;
+  --color-accent: var(--color-accent-600);
+  --color-accent-fg: #000000;
+  --color-accent-soft: rgba(38, 144, 177, 0.2);
+  --color-accent-hover: var(--color-accent-500);
 
   /* Neutrals — greige (11 stops, dark) */
-  --color-neutral-50:  #f5f4ef;
-  --color-neutral-100: #e6e4dc;
-  --color-neutral-200: #bbb8ac;
-  --color-neutral-300: #8e8b7f;
-  --color-neutral-400: #605e54;
-  --color-neutral-500: #444239;
-  --color-neutral-600: #33312a;
-  --color-neutral-700: #272620;
-  --color-neutral-800: #1d1c17;
-  --color-neutral-900: #161510;
-  --color-neutral-950: #0c0b08;
+  --color-neutral-50:  #f8f8f8;
+  --color-neutral-100: #e3e5e7;
+  --color-neutral-200: #c8cbce;
+  --color-neutral-300: #a1a5aa;
+  --color-neutral-400: #6e7276;
+  --color-neutral-500: #3a3d41;
+  --color-neutral-600: #292c2f;
+  --color-neutral-700: #1f2225;
+  --color-neutral-800: #181a1c;
+  --color-neutral-900: #0d0e11;
+  --color-neutral-950: #050607;
 
-  /* States (dark) */
+  /* States (dark): fundo e texto da pele Verdash (o `--ok/--ok-bg`, `--warn`,
+     `--crit` e `--info` do protótipo MainVerdash, em hex, porque a régua de
+     contraste lê hex). Os sólidos ficam: são fundo de botão com texto branco. */
   --color-success: #82a077;
-  --color-success-bg: rgba(130, 160, 119, 0.18);
-  --color-success-fg: #a4ba9a;
+  --color-success-bg: #0a3723;
+  --color-success-fg: #41ce90;
   --color-warning: #d09455;
-  --color-warning-bg: rgba(208, 148, 85, 0.18);
-  --color-warning-fg: #e0ad77;
-  --color-error: #c87263;
-  --color-error-bg: rgba(200, 114, 99, 0.18);
-  --color-error-fg: #d99182;
+  --color-warning-bg: #412805;
+  --color-warning-fg: #ffb848;
+  --color-error: #fa8785;
+  --color-error-bg: #521c1d;
+  --color-error-fg: #fa8785;
   --color-info: #7da9bf;
-  --color-info-bg: rgba(125, 169, 191, 0.18);
-  --color-info-fg: #9bbfd2;
+  --color-info-bg: #182e4b;
+  --color-info-fg: #65a7fa;
 
   /* Shadows — heavier in dark */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.40), 0 1px 1px 0 rgba(0, 0, 0, 0.20);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45), 0 2px 4px -1px rgba(0, 0, 0, 0.30);
-  --shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.40);
-  --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 8px 16px -4px rgba(0, 0, 0, 0.50);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 2px 0 0 rgba(0, 0, 0, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 0 0 rgba(0, 0, 0, 0.25), 0 6px 16px -4px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 0 0 rgba(0, 0, 0, 0.25), 0 20px 44px -14px rgba(0, 0, 0, 0.75);
+  --shadow-xl: 0 4px 0 0 rgba(0, 0, 0, 0.25), 0 28px 56px -14px rgba(0, 0, 0, 0.8);
 
   /* shadcn-compat aliases */
   --background: var(--color-bg);
@@ -408,12 +670,12 @@
   --muted-foreground: var(--color-text-muted);
   --accent-foreground: var(--color-accent-fg);
   --destructive: var(--color-error);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #1e1311;
   --border: var(--color-border);
   --input: var(--color-border);
-  --ring: var(--color-accent-400);
+  --ring: var(--color-accent-600);
   /* ---- Agenda · cor de pessoa (tema escuro) ----------------------------
-   * Mais claras e menos saturadas que as do claro: sobre `#161510` a versão
+   * Mais claras e menos saturadas que as do claro: sobre `#0d0e11` a versão
    * escura de cada matiz sumiria. Mesma ordem, mesmos nomes.
    */
   --agenda-pessoa-1: #f89080;
@@ -424,6 +686,149 @@
   --agenda-pessoa-6: #6c97e7;
   --agenda-pessoa-7: #be9ef6;
   --agenda-pessoa-8: #cc77b1;
+  /* ---- Avatar do contato (escuro: fundo escuro, texto claro do matiz) -- */
+  --color-avatar-1: #5d2d2a;
+  --color-avatar-1-fg: #fed2cd;
+  --color-avatar-2: #4f3815;
+  --color-avatar-2-fg: #f3dab2;
+  --color-avatar-3: #194430;
+  --color-avatar-3-fg: #c2e9d3;
+  --color-avatar-4: #1c4159;
+  --color-avatar-4-fg: #c4e4f4;
+  --color-avatar-5: #43345c;
+  --color-avatar-5-fg: #e3d7fb;
+  --color-avatar-6: #134245;
+  --color-avatar-6-fg: #c0e7e8;
+  /* ---- Design System v2 (escuro: a Variante Verdash do protótipo) -------
+   * `accent-text` no escuro é FIXO (o ciano do protótipo, oklch 0.8 0.1 215):
+   * proporção 0% da marca, 100% do alvo. */
+  --color-hover: #212326;
+  --color-thread: #111315;
+  --color-tint: rgba(255, 255, 255, 0.08);
+  --color-warning-line: #8d5d1c;
+  --color-bubble-in: var(--color-surface-elevated);
+  /* App de celular (MobileVerdash.dc.html): fundo da barra inferior e do composer, e a
+     nota interna com cor própria. Escuro: os valores do `.mb.dark`. */
+  --color-mb-barra: #121416;
+  --color-note-bg: #392c0c;
+  --color-note-fg: #f3dba9;
+  --mix-accent-soft: 20%;
+  --mix-accent-hover: 0%;
+  --accent-hover-alvo: var(--color-accent-500);
+  --mix-bubble-out: 30%;
+  --mix-bubble-ai: 0%;
+  --bubble-ai-base: #171e22;
+  --mix-accent-soft-2: 30%;
+  --mix-accent-text: 0%;
+  --accent-text-alvo: #69cee6;
+  --shadow-pop: 0 4px 0 0 rgba(0, 0, 0, 0.25), 0 20px 44px -14px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--color-border-strong);
+  --shadow-bubble: none;
+}
+
+/* ── Degradê do escuro (botão primário e pele Verdash) ────────────────────
+   Até 10/10/2026 o botão primário do escuro saía da marca do revendedor (o
+   accent misturado com o oposto do texto). Agora o escuro usa o degradê FIXO
+   do Verdash, em duas versões (vibrante para traço, escurecida para texto);
+   ver os comentários no bloco abaixo.
+
+   Seletor `[data-theme="dark"] body`, e não o bloco `[data-theme="dark"]`:
+   o bloco `[data-theme="dark"] {` tem espelho obrigatório no
+   `[data-theme="light"]` (tests/unit/branding-tema-claro-escopavel.test.ts) e
+   é lido pela régua de contraste; estes tokens são só do escuro e não são cor
+   de marca. */
+[data-theme="dark"] body {
+  /* ---- Pele Verdash (escuro): tokens -----------------------------------
+     O bloco "VARIANTE VERDASH" do protótipo (MainVerdash.dc.html), traduzido.
+
+     O DEGRADÊ E O ACCENT DO ESCURO SÃO FIXOS, OS DO VERDASH, PARA TODO
+     REVENDEDOR (decisão do Peterson, 10/10/2026; o accent travado no primary
+     #2690B1 entrou na etapa 2 do DS). O claro continua com a marca do revendedor.
+
+     "Ação" usa o degradê VIBRANTE da logo com texto branco, como o quadro escuro
+     (DesignSystemVerdash.dc.html, Cor): "Branco sobre o gradiente foi validado
+     no Verdash; o trecho central mede cerca de 3,7:1, aceito para botão em 600.
+     Texto corrido nunca vai sobre o gradiente." Valores medidos com o branco:
+     6,37 no azul, 3,85 no meio, 2,15 na ponta menta. Por isso o degradê só leva
+     RÓTULO curto de peso >= 600 e 12px ou mais (botão primário, contador, chip
+     ligado, aba do composer, avatar da conta, etapa), e
+     `tests/unit/botao-primario-gradiente.test.ts` registra a exceção (meio
+     >= 3,5:1). Até a etapa 2 havia um segundo degradê, escurecido para texto
+     (`--pele-grad-texto`), que o quadro não tem; ele saiu.
+     Em hex, e não oklch, porque é hex que a régua e o teste leem. */
+  --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
+  /* O hover do botão escurece SÓ O FUNDO: as paradas com L 6% menor em oklch
+     (8,31 / 4,92 / 2,68 com o branco). Um `brightness()` no botão escureceria o
+     texto junto (P1 do Cassio na #145). */
+  /* O degradê da AÇÃO (botão, chip ligado, aba do composer): as mesmas cores,
+     com o meio esticado até 85%. A ponta menta (2,15:1 com o branco) só entra
+     nos últimos 15%; o branco fica >= 3,5:1 até cerca de 87% da largura, que
+     num botão é o padding da direita. Num botão largo com rótulo longo as
+     últimas letras não chegam mais à menta (P2-2 do Cassio na #167). */
+  --pele-grad-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #00b47d 100%);
+  --pele-grad-acao: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2b8cad 85%, #2bc88f 100%);
+  --pele-grad-acao-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #0c7a9a 85%, #00b47d 100%);
+  --pele-grad-fg: #ffffff;
+  --pele-brilho: #2b8cad;
+  /* O 1º radial da moldura (`.app.dark`): oklch(0.5 0.21 266), o azul da marca. */
+  --pele-brilho-fundo: #2a52d8;
+  --pele-foco: #48a5c7;
+  --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
+  /* O texto do chip da IA (o `--accent-text` do protótipo, um tom mais claro):
+     6,3:1 no pior ponto do fundo dele, já com o filtro do hover. */
+  --pele-grad-soft-fg: #8fdcef;
+  /* O botão primário no escuro usa o degradê da ação (ver acima). */
+  --gradient-primary: var(--pele-grad-acao);
+  --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
+  --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
+  --pele-fio: #111315;
+  --pele-bolha-saida: var(--color-bubble-out);
+  --pele-bolha-ia: var(--color-bubble-ai);
+}
+
+/* A mesma pele numa SUBÁRVORE escura dentro de página clara (a vitrine
+   /app/design-system põe o tema escuro ao lado do claro). O bloco acima casa só
+   o <body> sob <html data-theme="dark">; sem este, um `<div data-theme="dark">`
+   recebia os tokens escuros mas não o degradê, e o botão primário ficava sem
+   fundo. CÓPIA EXATA do bloco acima, valor a valor:
+   `tests/unit/pele-escura-em-subarvore.test.ts` reprova quando divergem.
+   `body [data-theme="dark"]` não casa o <html> (que não está dentro do body),
+   então a página escura de sempre não muda. */
+body [data-theme="dark"] {
+  --pele-grad: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
+  --pele-grad-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #00b47d 100%);
+  --pele-grad-acao: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2b8cad 85%, #2bc88f 100%);
+  --pele-grad-acao-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #0c7a9a 85%, #00b47d 100%);
+  --pele-grad-fg: #ffffff;
+  --pele-brilho: #2b8cad;
+  /* O 1º radial da moldura (`.app.dark`): oklch(0.5 0.21 266), o azul da marca. */
+  --pele-brilho-fundo: #2a52d8;
+  --pele-foco: #48a5c7;
+  --pele-grad-soft: linear-gradient(120deg, rgb(42 82 216 / 0.24), rgb(43 200 143 / 0.18));
+  --pele-grad-soft-fg: #8fdcef;
+  --gradient-primary: var(--pele-grad-acao);
+  --pele-ruido: radial-gradient(circle, oklch(1 0 0 / 0.035) 0.6px, transparent 0.8px);
+  --pele-drop: 0 4px 0 oklch(0 0 0 / 0.25);
+  --pele-fio: #111315;
+  --pele-bolha-saida: var(--color-bubble-out);
+  --pele-bolha-ia: var(--color-bubble-ai);
+}
+
+/* ── Derivados da marca, declarados onde a marca chega (etapa 2 do DS) ──────
+   O `@theme inline` monta estes `color-mix` no utilitário (`bg-accent-soft-2`),
+   no elemento que pinta. Mas a custom property em si (`var(--color-accent-soft-2)`,
+   `getPropertyValue`) era resolvida uma vez só, no `<html>`: no painel claro da
+   vitrine com o app escuro ela devolvia o valor ESCURO (o defeito da etapa 1).
+   Redeclarar no `<body>` e em toda subárvore `data-theme` faz o `var()` valer o
+   tema e a marca daquele ponto da árvore. `body`, e não `:root`: a marca da
+   organização é injetada no `<body>` (lib/branding/css.ts). */
+body,
+body [data-theme] {
+  --color-accent-hover: color-mix(in oklch, var(--color-accent) var(--mix-accent-hover), var(--accent-hover-alvo));
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft), var(--color-surface));
+  --color-accent-soft-2: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft-2), var(--color-surface));
+  --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
+  --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
+  --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -453,6 +858,8 @@
    embrulhar o `:root` num `@layer`, o teste reprova e a explicação está aqui.
    ───────────────────────────────────────────────────────────────────────── */
 @theme inline {
+  /* O corte do app de celular: `largo:` = 760px para cima (ver `@custom-variant mb`). */
+  --breakpoint-largo: 47.5rem;
   /* Foundation */
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
@@ -466,8 +873,16 @@
   /* Accent — Sage */
   --color-accent: var(--color-accent);
   --color-accent-foreground: var(--color-accent-fg);
-  --color-accent-soft: var(--color-accent-soft);
-  --color-accent-hover: var(--color-accent-hover);
+  /* `accent-soft` é a fórmula do quadro DS (11% da marca na superfície; 20% no
+     escuro), montada no elemento que pinta. O `--color-accent-soft` dos blocos de
+     tema (grau 100 no claro, `rgba` no escuro) continua sendo o que a régua de
+     contraste mede: no claro ele é um pouco MAIS escuro que os 11%, então a
+     razão medida é o piso do que a tela pinta. */
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft), var(--color-surface));
+  /* Hover do quadro DS: a marca a 86% com preto (`.btn-primary:hover`). No
+     escuro, a parada 500 (mais clara) do primary Verdash. A régua mede o grau
+     700 do bloco de tema, um pouco mais escuro que a mistura. */
+  --color-accent-hover: color-mix(in oklch, var(--color-accent) var(--mix-accent-hover), var(--accent-hover-alvo));
   --color-accent-50: var(--color-accent-50);
   --color-accent-100: var(--color-accent-100);
   --color-accent-200: var(--color-accent-200);
@@ -507,6 +922,38 @@
   --color-info-bg: var(--color-info-bg);
   --color-info-fg: var(--color-info-fg);
 
+  /* Avatar do contato: fundo e texto de cada par (ver o :root). */
+  --color-avatar-1: var(--color-avatar-1);
+  --color-avatar-1-fg: var(--color-avatar-1-fg);
+  --color-avatar-2: var(--color-avatar-2);
+  --color-avatar-2-fg: var(--color-avatar-2-fg);
+  --color-avatar-3: var(--color-avatar-3);
+  --color-avatar-3-fg: var(--color-avatar-3-fg);
+  --color-avatar-4: var(--color-avatar-4);
+  --color-avatar-4-fg: var(--color-avatar-4-fg);
+  --color-avatar-5: var(--color-avatar-5);
+  --color-avatar-5-fg: var(--color-avatar-5-fg);
+  --color-avatar-6: var(--color-avatar-6);
+  --color-avatar-6-fg: var(--color-avatar-6-fg);
+
+  /* Design System v2 (Etapa 1, aditivo). Os dois derivados da marca montam o
+     `color-mix` AQUI, no elemento que pinta, e não no `:root` (ver lá). */
+  --color-hover: var(--color-hover);
+  --color-thread: var(--color-thread);
+  --color-tint: var(--color-tint);
+  --color-warning-line: var(--color-warning-line);
+  --color-accent-soft-2: color-mix(in oklch, var(--color-accent) var(--mix-accent-soft-2), var(--color-surface));
+  --color-accent-text: color-mix(in oklch, var(--color-accent) var(--mix-accent-text), var(--accent-text-alvo));
+  --color-bubble-out: color-mix(in oklch, var(--color-accent) var(--mix-bubble-out), var(--color-surface));
+  --color-bubble-ai: color-mix(in oklch, var(--color-accent) var(--mix-bubble-ai), var(--bubble-ai-base));
+  --color-bubble-in: var(--color-bubble-in);
+  --color-mb-barra: var(--color-mb-barra);
+  --color-mb-gesto-lida: var(--color-mb-gesto-lida);
+  --color-mb-gesto-neutro: var(--color-mb-gesto-neutro);
+  --color-mb-gesto-arquivar: var(--color-mb-gesto-arquivar);
+  --color-note-bg: var(--color-note-bg);
+  --color-note-fg: var(--color-note-fg);
+
   /* Aliases shadcn (consumers ainda não migrados). Espelham 1:1 o que o
      `tailwind.config.ts` mapeava — inclusive `ring`, que apontava para a
      parada 500 fixa e NÃO para `--ring` (que muda no escuro). Mantido igual de
@@ -515,7 +962,7 @@
   --color-border: var(--color-border);
   --color-border-strong: var(--color-border-strong);
   --color-input: var(--color-border);
-  --color-ring: var(--color-accent-500);
+  --color-ring: var(--color-accent);
   --color-background: var(--color-bg);
   --color-foreground: var(--color-text);
   --color-primary: var(--color-accent);
@@ -523,7 +970,7 @@
   --color-secondary: var(--color-surface-elevated);
   --color-secondary-foreground: var(--color-text);
   --color-destructive: var(--color-error);
-  --color-destructive-foreground: #ffffff;
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-muted: var(--color-surface-elevated);
   --color-muted-foreground: var(--color-text-muted);
   --color-popover: var(--color-surface);
@@ -567,6 +1014,12 @@
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-full: var(--radius-full);
+  --radius-pill: var(--radius-pill);
+  --radius-control: var(--radius-control);
+  --radius-field: var(--radius-field);
+  --radius-menu: var(--radius-menu);
+  --radius-bubble: var(--radius-bubble);
+  --radius-bubble-tail: var(--radius-bubble-tail);
 
   /* Sombra */
   --shadow-xs: var(--shadow-xs);
@@ -574,11 +1027,62 @@
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-bubble: var(--shadow-bubble);
+
+  /* Escala de texto do protótipo (`text-meta`, `text-label`…). */
+  /* Cada papel leva tamanho, peso e entrelinha do quadro DS ("Tipografia"):
+     `text-title-lg` sozinho já é 20/700/-0,01em. Um `font-*` explícito ainda
+     vence o peso do papel. */
+  --text-rail: var(--font-size-rail);
+  --text-rail--font-weight: 600;
+  --text-rail--letter-spacing: -0.01em;
+  --text-meta: var(--font-size-meta);
+  --text-meta--font-weight: 600;
+  --text-label: var(--font-size-label);
+  --text-label--font-weight: 600;
+  --text-ui: var(--font-size-ui);
+  --text-ui--line-height: var(--line-height-ui);
+  --text-message: var(--font-size-message);
+  --text-message--line-height: var(--line-height-message);
+  --text-title-sm: var(--font-size-title-sm);
+  --text-title-sm--font-weight: 700;
+  --text-title-md: var(--font-size-title-md);
+  --text-title-md--font-weight: 700;
+  --text-title-lg: var(--font-size-title-lg);
+  --text-title-lg--font-weight: 700;
+  --text-title-lg--letter-spacing: -0.01em;
 
   /* Motion */
   --ease-out: var(--ease-out);
   --ease-in-out: var(--ease-in-out);
   --ease-spring: var(--ease-spring);
+  --ease-emphasized: var(--ease-emphasized);
+
+  /* Entradas do quadro DS (`popIn`, `fadeIn`, `slideIn` do Main.dc.html). O
+     `tailwindcss-animate` nunca foi instalado: os `animate-in`/`zoom-in-95` do
+     shadcn não animavam nada. */
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: fade-in 150ms ease;
+  --animate-slide-in: slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* A folha inferior do celular subindo (o `sh-up` do MobileVerdash.dc.html). */
+  --animate-folha-sobe: folha-sobe 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes folha-sobe {
+    from { opacity: 0; transform: translateY(48px); }
+    to { opacity: 1; transform: none; }
+  }
 }
 
 /* `duration-*` não tem espaço de tema no v4 (o `transitionDuration` do v3 não
@@ -591,6 +1095,21 @@
 }
 @utility duration-slow {
   transition-duration: var(--duration-slow);
+}
+@utility duration-ui {
+  transition-duration: var(--duration-ui);
+}
+
+/* Rolagem sem barra visível. Para faixas que PODEM transbordar só em telas
+   estreitas (o trilho de grupos, as abas do painel do lead): a barra fina de
+   rolagem horizontal aparecia embaixo delas mesmo quando sobravam poucos px,
+   e virava um risco cinza no meio da moldura. A rolagem continua funcionando
+   (roda, toque, teclado); só o desenho da barra some. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 
@@ -696,8 +1215,16 @@
        o sticky de novo — consertar só um dos dois não conserta nada. */
     overflow-x: hidden;
     overflow-x: clip;
+    /* Área segura dos lados (notch com o celular deitado), para TODA página: a casca
+       do app, login, onboarding, públicas, legais, erro e admin. Só existe com
+       `viewportFit: "cover"`; no desktop o `env()` vale 0 e nada muda. */
+    padding-left: var(--mb-area-esquerda);
+    padding-right: var(--mb-area-direita);
     background-color: var(--color-bg);
     color: var(--color-text);
+    /* Texto de interface do quadro DS: 14 / 1,45. */
+    font-size: var(--font-size-ui);
+    line-height: var(--line-height-ui);
     font-family: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system,
       "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
@@ -721,14 +1248,16 @@
     color: var(--color-accent-50);
   }
 
-  /* Focus ring: Sage 500/400, 2px with offset */
+  /* Anel de foco do quadro DS: 2px na cor de destaque EM VIGOR (o grau do
+     accent, não uma parada fixa), afastado 2, raio 6 (Main.dc.html,
+     `:focus-visible`). No escuro a pele troca a cor por `--pele-foco`. */
   :focus-visible {
-    outline: 2px solid var(--color-accent-500);
+    outline: 2px solid var(--color-accent-600);
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
   }
   [data-theme="dark"] :focus-visible {
-    outline-color: var(--color-accent-400);
+    outline-color: var(--color-accent-600);
   }
 
   /* Modo de alto contraste do sistema (Windows High Contrast / forced-colors).
@@ -963,4 +1492,314 @@
     transition: none;
     transform: none;
   }
+}
+
+/* ---- Fundo do fio de mensagens (Inbox v2) -------------------------------
+   O protótipo escuro pinta a área da conversa com um brilho da marca no topo
+   e uma trama de pontos. Os dois saem de TOKEN, nunca de hex: o brilho mistura
+   a `--color-accent` em vigor (a marca do revendedor, injetada em runtime) e os
+   pontos misturam a cor do texto do tema, então claro e escuro saem do mesmo
+   bloco e nenhum revendedor herda a cor do produto.
+
+   Discreto de propósito: 10% de accent e 6% de texto. A bolha tem fundo
+   próprio, então a legibilidade da mensagem não depende deste fundo.
+
+   A trama mora no ELEMENTO QUE ROLA (`background-attachment: local`), e não
+   no container: assim os pontos andam junto com as mensagens virtualizadas em
+   vez de ficarem parados atrás delas, o que pareceria vidro sujo. */
+.fundo-do-fio {
+  background:
+    radial-gradient(
+      ellipse 80% 42% at 50% -12%,
+      color-mix(in srgb, var(--color-accent) 10%, transparent),
+      transparent 62%
+    ),
+    var(--color-bg);
+}
+
+/* No escuro, o `.thread` da pele Verdash: brilho de 13% e o fundo próprio do
+   fio (`--pele-fio`), um degrau acima da moldura. */
+[data-theme="dark"] .fundo-do-fio:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background:
+    radial-gradient(
+      ellipse 80% 42% at 50% -12%,
+      color-mix(in oklch, var(--pele-brilho) 13%, transparent),
+      transparent 62%
+    ),
+    var(--pele-fio);
+}
+
+.trama-do-fio {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 18px 18px;
+  background-attachment: local;
+}
+
+/* No escuro, os pontos do `.msgs` da pele Verdash: 7% de branco. */
+[data-theme="dark"] .trama-do-fio:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.07) 1px, transparent 0);
+}
+
+/* ═════ PELE VERDASH (só tema escuro) ═══════════════════════════════════════
+   Classes semânticas que os componentes vestem. No claro NENHUMA tem efeito:
+   todas exigem `[data-theme="dark"]` acima. Ficam FORA de `@layer` de
+   propósito: declaração sem layer vence `@layer utilities`, então a pele cobre
+   o `bg-*`/`ring-*` do componente sem `!important` e sem brigar por
+   especificidade. Cada bloco cita o seletor do protótipo que reproduz.
+
+   ⚠️ O OUTRO LADO DISSO: estas regras vencem TAMBÉM a cor que alguém passar
+   por `className` no componente base. `Switch` (pele-grad-ativo), `Popover`,
+   `DropdownMenu` e `CommandPalette` (pele-ruido) vestem a pele no próprio
+   primitivo; um `className="bg-..."` ou `data-[state=checked]:bg-...` passado
+   numa tela continua valendo no claro e é coberto no escuro (o ruído só põe
+   `background-image`, então a cor de fundo passada sobrevive por baixo dele;
+   o switch ligado perde a cor passada para o degradê). Para fugir da pele num
+   caso específico, a saída é não usar a classe `pele-*` ali, nunca
+   `!important`. */
+
+/* `.app.dark` (fundo): dois radiais da marca sobre a moldura. */
+[data-theme="dark"] .pele-moldura:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background:
+    radial-gradient(42rem 22rem at -6rem -6rem, color-mix(in oklch, var(--pele-brilho-fundo) 16%, transparent), transparent 70%),
+    radial-gradient(36rem 18rem at 100% -8rem, color-mix(in oklch, var(--pele-brilho) 10%, transparent), transparent 70%),
+    var(--color-bg);
+}
+[data-theme="dark"] ::selection {
+  background: color-mix(in oklch, var(--pele-brilho) 45%, transparent);
+}
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--pele-foco);
+}
+[data-theme="dark"] {
+  scrollbar-color: oklch(0.72 0.008 17 / 0.44) transparent;
+}
+
+/* `--noise` em `.list`, `.panel`, `.pn-tabs`, `.th-head`, `.cmp-box`, `.pop`,
+   `.ctxm` e `.pal`: a cor de fundo continua a do componente; o ruído vem por cima. */
+[data-theme="dark"] .pele-ruido:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-ruido);
+  background-size: 3px 3px;
+}
+
+/* `.work`: cartão com sombra dura de 4px e brilho interno de 1px. */
+[data-theme="dark"] .pele-cartao:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  box-shadow: var(--pele-drop), inset 0 1px 0 oklch(1 0 0 / 0.04);
+}
+
+/* `--grad`: selo do trilho, não lidas, avatar da conta, chips ativos. */
+[data-theme="dark"] .pele-grad:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad-acao);
+  border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+/* Contador com texto menor que 12px (o selo do trilho, as não lidas): o branco
+   pequeno pede 4,5:1, e o meio do degradê vibrante dá 3,85. O degradê do hover
+   dá 4,92 no meio, onde o dígito fica (P2-1 do Cassio na #167).
+   `tests/unit/botao-primario-gradiente.test.ts` reprova `pele-grad` com texto
+   abaixo de 12px. */
+[data-theme="dark"] .pele-grad-contador:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad-hover);
+  border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+/* Ícone sobre o degradê (o play do áudio, `.play` no escuro): sem texto, o
+   degradê vibrante inteiro. */
+[data-theme="dark"] .pele-grad-icone:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad);
+  color: var(--pele-grad-fg);
+}
+/* Só o traço (indicador da aba, barra da seleção), sem mexer no texto. */
+[data-theme="dark"] .pele-grad-traco:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad);
+}
+/* Os que mudam de estado por atributo (aba do composer, chip, switch, etapa). */
+[data-theme="dark"]
+  .pele-grad-ativo:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is([data-state="active"], [data-state="checked"], [aria-pressed="true"], [aria-checked="true"], [data-ativo="true"]) {
+  background-image: var(--pele-grad-acao);
+  border-color: transparent;
+  color: var(--pele-grad-fg);
+}
+
+/* `.chip-ai` (Sugerir resposta): degradê suave com contorno da marca. */
+[data-theme="dark"] .pele-grad-suave:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-image: var(--pele-grad-soft);
+  color: var(--pele-grad-soft-fg);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--pele-brilho) 38%, transparent);
+}
+[data-theme="dark"] .pele-grad-suave:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):hover {
+  filter: brightness(1.15);
+}
+
+/* `.rail-btn.is-cur`: cartão com brilho no topo, ruído, anel e sombra dura. */
+[data-theme="dark"] .pele-ativo-trilho:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background:
+    radial-gradient(70% 55% at 50% 0%, color-mix(in oklch, var(--pele-brilho) 22%, transparent), transparent 75%),
+    var(--pele-ruido) 0 0 / 3px 3px,
+    var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
+}
+/* `.nav2-item.is-active`: cartão com ruído, anel e sombra dura. */
+[data-theme="dark"] .pele-ativo-item:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong), var(--pele-drop);
+}
+/* `.conv.is-sel`: degradê horizontal da marca, saindo da barra da seleção. */
+[data-theme="dark"] .pele-selecionada:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--pele-brilho) 17%, transparent),
+      color-mix(in oklch, var(--pele-brilho) 5%, transparent) 70%,
+      transparent
+    ),
+    var(--color-surface);
+}
+
+/* `.seg` e `.seg button.is-on`: trilho escuro e item ativo em cartão. */
+[data-theme="dark"] .pele-seg:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-color: oklch(0 0 0 / 0.22);
+}
+[data-theme="dark"] .pele-seg-item:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is([data-state="active"], [data-ativa="true"]) {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 oklch(0 0 0 / 0.25);
+}
+
+/* `.crumb-1`: o setor como rótulo em caixa alta pequena. */
+[data-theme="dark"] .pele-rotulo:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Anel da marca na busca, na disponibilidade e na caixa do composer. */
+[data-theme="dark"] .pele-foco:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)):is(:hover, :focus-within, :focus-visible) {
+  border-color: var(--pele-foco);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--pele-foco) 22%, transparent);
+}
+
+/* `.row.out .bubble`, `.row.ai .bubble` e `.day`. */
+[data-theme="dark"] .pele-bolha-saida:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background-color: var(--pele-bolha-saida);
+}
+[data-theme="dark"] .pele-bolha-ia:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--pele-bolha-ia), var(--pele-bolha-ia)) padding-box,
+    var(--pele-grad) border-box;
+}
+[data-theme="dark"] .pele-dia:not(:where([data-theme="dark"] [data-theme="light"], [data-theme="dark"] [data-theme="light"] *)) {
+  background: var(--pele-ruido) 0 0 / 3px 3px, var(--color-surface-elevated);
+  border-color: var(--color-border-strong);
+}
+/* ═════ PELE VERDASH ═════ FIM */
+
+/* ═════ <select> nativo (os dois temas) ═════════════════════════════════════
+   O gatilho no padrão do `.inp` do protótipo, para os 45 `<select>` do produto
+   de uma vez, em vez de classe em cada tela. Em `@layer base` de propósito:
+   qualquer utilitário passado no componente (`h-8`, `h-[34px]`, `rounded-full`,
+   `bg-transparent`) continua vencendo, então os selects compactos mantêm a
+   altura que pediram.
+
+   A LISTA ABERTA era o defeito: no escuro, mesmo com `color-scheme: dark`, o
+   Chrome/Edge do Windows desenhava a lista com fundo branco e herdava o texto
+   claro do `<select>`, cinza sobre branco. `option`/`optgroup` com fundo e
+   texto explícitos dos tokens resolvem nos dois temas.
+
+   O chevron são dois triângulos de `linear-gradient` na cor de um token, e não
+   um SVG em data URI: imagem externa não herda `currentColor`, e um SVG com a
+   cor escrita dentro seria uma cor por tema fora dos tokens. O padding da
+   direita reserva o lugar dele.
+
+   Só o select de UMA linha (sem `multiple` e sem `size`): a caixa de lista
+   aberta é outro controle e tem desenho próprio. */
+@layer base {
+  select:not([multiple]):not([size]) {
+    appearance: none;
+    height: calc(var(--spacing) * 9.5);
+    padding-inline: calc(var(--spacing) * 3) calc(var(--spacing) * 9);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--color-text-subtle) 50%),
+      linear-gradient(135deg, var(--color-text-subtle) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% + 1px),
+      calc(100% - 13px) calc(50% + 1px);
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    transition:
+      border-color var(--duration-fast),
+      box-shadow var(--duration-fast);
+  }
+  select:not([multiple]):not([size]):hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--color-border-strong), var(--color-text) 30%);
+  }
+  select:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 22%, transparent);
+  }
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  option,
+  optgroup {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+  option:checked {
+    background-color: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+  option:disabled {
+    color: var(--color-text-subtle);
+  }
+}
+
+/* No escuro, a lista aberta um degrau acima do cartão (o `surface-2` do
+   protótipo) e o anel de foco no azul da pele. Fora de layer como o resto da
+   pele: precisa vencer o `@layer base` acima. */
+[data-theme="dark"] option,
+[data-theme="dark"] optgroup {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text);
+}
+[data-theme="dark"] option:checked {
+  background-color: color-mix(in oklch, var(--pele-brilho) 30%, var(--color-surface-elevated));
+}
+[data-theme="dark"] select:focus-visible {
+  border-color: var(--pele-foco);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--pele-foco) 22%, transparent);
+}
+
+/* O espaço do chevron vence o `px-*` do componente (23 selects passam `px-2` ou
+   `px-3`, que comeria o lado direito e poria o texto longo embaixo da seta).
+   Fora de layer só esta propriedade; altura, fundo e borda seguem em `base`. */
+select:not([multiple]):not([size]) {
+  padding-inline-end: calc(var(--spacing) * 8);
+}
+
+/* `prefers-reduced-motion` do quadro DS: zera TODA animação e transição, e não
+   só as que alguém lembrou de marcar. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Modo compacto do quadro DS (`.app.compact`): a linha da lista com 8px. */
+[data-densidade="compacta"] {
+  --row-py: 8px;
 }

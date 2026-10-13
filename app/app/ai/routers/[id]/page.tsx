@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { RouterDetailState } from "@/hooks/ai/useRouters";
 import { RouterEditorClient } from "./_client";
 
+import { Pagina } from "@/components/pagina";
 export const dynamic = "force-dynamic";
 
 const ROUTER_DETAIL_COLUMNS = "id, name, channel_session_id, is_active, config, fallback_agent_id";
@@ -65,7 +66,7 @@ export default async function RouterEditorPage({ params }: { params: Promise<{ i
   const agents = agentRows ?? [];
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <Pagina className="max-w-none mb:px-4 mb:pt-3">
       <RouterEditorClient
         routerId={id}
         initialState={initialState}
@@ -73,6 +74,6 @@ export default async function RouterEditorPage({ params }: { params: Promise<{ i
         channelSessions={channelSessions}
         classifierModels={classifierModels}
       />
-    </div>
+    </Pagina>
   );
 }

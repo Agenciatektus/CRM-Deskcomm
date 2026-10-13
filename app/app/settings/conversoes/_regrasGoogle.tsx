@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Escolha } from "@/components/ui/escolha";
 import {
   CANAIS_DE_ENTRADA,
   CATEGORIAS_DE_CONVERSAO,
@@ -259,12 +260,11 @@ export function RegrasDeConversaoGoogle({
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor={`categoria-${e.id}`}>{t("Categoria da conversão")}</Label>
-                    <select
+                    <Escolha
                       id={`categoria-${e.id}`}
-                      className="rounded-md border bg-background p-2 text-sm"
                       value={r.category}
-                      onChange={(ev) =>
-                        mudar(e.id, { category: ev.target.value as CategoriaDeConversao })
+                      onValueChange={(valorEscolhido) =>
+                        mudar(e.id, { category: valorEscolhido as CategoriaDeConversao })
                       }
                     >
                       {CATEGORIAS_DE_CONVERSAO.map((c) => (
@@ -272,25 +272,24 @@ export function RegrasDeConversaoGoogle({
                           {t(c.rotulo)}
                         </option>
                       ))}
-                    </select>
+                    </Escolha>
                     <p className="text-xs text-muted-foreground">
                       {t("É como o Google agrupa a conversão nos relatórios e nos lances.")}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor={`canal-${e.id}`}>{t("Canal de entrada")}</Label>
-                    <select
+                    <Escolha
                       id={`canal-${e.id}`}
-                      className="rounded-md border bg-background p-2 text-sm"
                       value={r.channel}
-                      onChange={(ev) => mudar(e.id, { channel: ev.target.value as CanalDeEntrada })}
+                      onValueChange={(valorEscolhido) => mudar(e.id, { channel: valorEscolhido as CanalDeEntrada })}
                     >
                       {CANAIS_DE_ENTRADA.map((c) => (
                         <option key={c.valor} value={c.valor}>
                           {t(c.rotulo)}
                         </option>
                       ))}
-                    </select>
+                    </Escolha>
                   </div>
                   <div className="flex items-center gap-3 md:col-span-2">
                     <Switch

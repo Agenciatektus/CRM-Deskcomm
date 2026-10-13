@@ -21,11 +21,13 @@ import { AvisoDeRitmo } from "@/components/campanhas/AvisoDeRitmo";
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
 import { ResumoDosPassos } from "@/components/campanhas/PassosDaCampanha";
 import { ResumoDasSaidas } from "@/components/campanhas/SaidasDaCampanha";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import {
   useAcaoDeCampanha,
   useCampanha,
@@ -96,55 +98,61 @@ export function DetalheDaCampanha({ id }: { id: string }) {
   disponiveis.push("duplicar");
 
   return (
-    <div className="space-y-4 p-6">
-      <div>
-        <Link
-          href="/app/campaigns"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-text"
-        >
-          <ArrowBendUpLeft size={14} aria-hidden />
-          {t("Campanhas")}
-        </Link>
-      </div>
-
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{c.name}</h1>
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        antes={
+          <Link
+            href="/app/campaigns"
+            className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-text mb:hidden"
+          >
+            <ArrowBendUpLeft size={14} aria-hidden />
+            {t("Campanhas")}
+          </Link>
+        }
+        titulo={
+          <span className="flex flex-wrap items-center gap-2">
+            {c.name}
             <EstadoDaCampanha status={c.status} />
-          </div>
-          {c.failure_code && (
-            <p className="mt-1 text-sm text-warning-fg">
+          </span>
+        }
+        descricao={
+          c.failure_code ? (
+            <span className="text-warning-fg">
               {t("Último problema")}: {c.failure_code}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {c.status === "draft" && (
-            <Button variant="outline" asChild>
-              <Link href={`/app/campaigns/${c.id}/edit`}>{t("Editar")}</Link>
-            </Button>
-          )}
-          {disponiveis.map((a) => (
-            <Button
-              key={a}
-              variant={a === "cancelar" ? "outline" : "default"}
-              disabled={acao.isPending}
-              onClick={() => {
-                // Iniciar e cancelar mexem com gente de verdade: confirmação
-                // explícita (PRD §34). As outras não pedem cerimônia.
-                if (a === "iniciar" || a === "cancelar") setConfirmando(a);
-                // O teste precisa saber PARA QUEM: mandar para o primeiro da
-                // lista transformaria um teste num envio real a um prospect.
-                else if (a === "testar") setTestando(true);
-                else acao.mutate({ acao: a });
-              }}
-            >
-              {t(ROTULO_DA_ACAO[a])}
-            </Button>
-          ))}
-        </div>
-      </header>
+            </span>
+          ) : undefined
+        }
+        acoes={
+          <>
+            {c.status === "draft" && (
+              <Button variant="outline" asChild>
+                <Link href={`/app/campaigns/${c.id}/edit`}>{t("Editar")}</Link>
+              </Button>
+            )}
+            {disponiveis.map((a) => (
+              <Button
+                key={a}
+                variant={a === "cancelar" ? "outline" : "default"}
+                disabled={acao.isPending}
+                onClick={() => {
+                  // Iniciar e cancelar mexem com gente de verdade: confirmação
+                  // explícita (PRD §34). As outras não pedem cerimônia.
+                  if (a === "iniciar" || a === "cancelar") setConfirmando(a);
+                  // O teste precisa saber PARA QUEM: mandar para o primeiro da
+                  // lista transformaria um teste num envio real a um prospect.
+                  else if (a === "testar") setTestando(true);
+                  else acao.mutate({ acao: a });
+                }}
+              >
+                {t(ROTULO_DA_ACAO[a])}
+              </Button>
+            ))}
+          </>
+        }
+      />
+
+      <SecaoDaPagina className="gap-4">
 
       {confirmando && (
         <Card className="space-y-3 border-warning-fg p-4">
@@ -299,10 +307,10 @@ export function DetalheDaCampanha({ id }: { id: string }) {
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium">{continua ? t("Quem já entrou") : t("Quem está na lista")}</h2>
-          <select
-            className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+          <Escolha
+            className="h-9"
             value={filtroDeStatus}
-            onChange={(e) => setFiltroDeStatus(e.target.value)}
+            onValueChange={(valorEscolhido) => setFiltroDeStatus(valorEscolhido)}
             aria-label={t("Filtrar destinatários")}
           >
             <option value="">{t("Todos")}</option>
@@ -313,7 +321,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
             <option value="replied">{t("Responderam")}</option>
             <option value="skipped">{t("Fora da lista")}</option>
             <option value="failed">{t("Falharam")}</option>
-          </select>
+          </Escolha>
         </div>
 
         {/* O VETO NÃO É REAVALIADO, e o operador vai supor o contrário (pedido do
@@ -372,7 +380,8 @@ export function DetalheDaCampanha({ id }: { id: string }) {
           </div>
         )}
       </Card>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

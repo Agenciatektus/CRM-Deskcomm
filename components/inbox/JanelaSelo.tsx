@@ -9,7 +9,9 @@ import {
   formatarDecorrido,
   formatarRestante,
   LIMIAR_URGENTE_MS,
+  WINDOW_MS,
 } from "@/lib/channels/janela";
+import { Clock } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,9 +41,15 @@ import { cn } from "@/lib/utils";
 export function JanelaSelo({
   provider,
   lastInboundAt,
+  comBarra = false,
 }: {
   provider: string | null | undefined;
   lastInboundAt: string | null;
+  /**
+   * A faixa de status do cabeçalho (visual v2) mostra também uma barra do que
+   * resta das 24h: a proporção se lê de relance, o número pede leitura.
+   */
+  comBarra?: boolean;
 }) {
   const t = useT();
   // O relógio do servidor não serve: o que importa é quanto falta AGORA, na
@@ -56,6 +64,26 @@ export function JanelaSelo({
   const estado = estadoDaJanela(provider, lastInboundAt, agora);
   if (estado.tipo === "sem_restricao") return null;
 
+  if (estado.tipo === "fechada" && comBarra) {
+    // Na faixa do cabeçalho (visual v2) a janela é TEXTO, sem caixa, como o
+    // `.win.closed` do protótipo: a cor de erro já diz que passou.
+    const quanto =
+      estado.fechadaHaMs === null
+        ? t("O cliente nunca escreveu")
+        : `${t("Janela fechada há")} ${formatarDecorrido(estado.fechadaHaMs)}`;
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-error-fg"
+        title={usaModelos ? t(
+          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui: a plataforma recusa texto livre.",
+        ) : t("Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.")}
+      >
+        <Clock size={13} aria-hidden />
+        {quanto} · {usaModelos ? t("só modelo") : t("aguardando o cliente")}
+      </span>
+    );
+  }
+
   if (estado.tipo === "fechada") {
     // "Fechada há 3d" responde o que o operador realmente pergunta — "passei
     // muito?" —, e essa distância é o que decide se ainda vale insistir ou se a
@@ -67,9 +95,9 @@ export function JanelaSelo({
     return (
       <Badge
         variant="outline"
-        className="h-4 border-amber-400 px-1.5 text-[10px] text-amber-700 dark:border-amber-700 dark:text-amber-300"
+        className="h-4 border-warning px-1.5 text-[10px] text-warning-fg"
         title={usaModelos ? t(
-          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.",
+          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui: a plataforma recusa texto livre.",
         ) : t("Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.")}
       >
         {quanto} · {usaModelos ? t("só modelo") : t("aguardando o cliente")}
@@ -78,16 +106,48 @@ export function JanelaSelo({
   }
 
   const urgente = estado.restanteMs <= LIMIAR_URGENTE_MS;
-  return (
+  const selo = (
     <Badge
       variant="outline"
       className={cn(
         "h-4 px-1.5 text-[10px]",
-        urgente && "border-amber-400 text-amber-700 dark:border-amber-700 dark:text-amber-300",
+        urgente && "border-warning text-warning-fg",
       )}
       title={usaModelos ? t("Tempo restante para escrever texto livre. Depois disso, só modelo aprovado.") : t("Tempo restante para responder. Uma nova mensagem do cliente reabre a janela.")}
     >
       {t("Janela")} {formatarRestante(estado.restanteMs)}
     </Badge>
+  );
+  if (!comBarra) return selo;
+  // Na faixa do cabeçalho: "Janela 24h: 21h 48m" em texto, sem caixa, e a barra
+  // do que resta (o `.win` do protótipo). A proporção se lê de relance; o
+  // número pede leitura.
+  const pct = Math.max(0, Math.min(100, (estado.restanteMs / WINDOW_MS) * 100));
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 text-xs font-semibold",
+        urgente ? "text-warning-fg" : "text-text-muted",
+      )}
+      title={usaModelos ? t("Tempo restante para escrever texto livre. Depois disso, só modelo aprovado.") : t("Tempo restante para responder. Uma nova mensagem do cliente reabre a janela.")}
+    >
+      <Clock size={13} aria-hidden />
+      <span>
+        {t("Janela 24h:")} {formatarRestante(estado.restanteMs)}
+      </span>
+      <span
+        className="h-1 w-12 overflow-hidden rounded-full bg-border"
+        role="meter"
+        aria-label={t("Tempo restante da janela de 24h")}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+      >
+        <span
+          className={cn("block h-full rounded-full", urgente ? "bg-warning" : "bg-success")}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </span>
   );
 }

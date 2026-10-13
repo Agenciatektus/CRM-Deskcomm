@@ -18,6 +18,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { formatCents } from "@/lib/money";
 
@@ -107,12 +108,11 @@ export function AtendimentosSemComanda({
 
       {podeLancar && faturaveis.length > 0 ? (
         <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-          <select
+          <Escolha
             aria-label={t("Forma de pagamento")}
             value={formaId}
             data-testid="forma-do-lote"
-            onChange={(e) => setFormaId(e.target.value)}
-            className="rounded-md border border-border bg-surface-elevated p-2 text-sm text-text"
+            onValueChange={(valorEscolhido) => setFormaId(valorEscolhido)}
           >
             <option value="">{t("Forma de pagamento")}</option>
             {formas.map((f) => (
@@ -120,7 +120,7 @@ export function AtendimentosSemComanda({
                 {f.name}
               </option>
             ))}
-          </select>
+          </Escolha>
 
           <Button
             disabled={marcados.size === 0 || !formaId || pendenteDeEnvio}

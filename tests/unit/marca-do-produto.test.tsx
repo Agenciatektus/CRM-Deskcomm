@@ -8,7 +8,7 @@ import { CLASSES_DE_COR, LogotipoDoProduto, SimboloDoProduto } from "@/component
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
 import { DEFAULT_APP_NAME, marcaEhADoProduto, type Branding } from "@/lib/branding";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
-import { CORES_DA_MARCA } from "@/lib/branding/desenho";
+import { CORES_DA_MARCA, LOGOTIPO, SIMBOLO } from "@/lib/branding/desenho";
 
 /**
  * A marca do PRODUTO aparece — e SÓ aparece — quando ninguém pôs a sua.
@@ -50,7 +50,8 @@ const PADRAO: Branding = { name: DEFAULT_APP_NAME, logoUrl: null, initial: "D" }
 function renderSidebar(marca: Branding, collapsed: boolean) {
   return render(
     <MarcaDaInstalacaoProvider marca={marca}>
-      <Sidebar collapsed={collapsed} />
+      {/* Na Inbox a barra começa recolhida; aberta = fixada na Inbox. */}
+      <Sidebar collapsed={collapsed} fixoNaInbox={!collapsed} />
     </MarcaDaInstalacaoProvider>,
   );
 }
@@ -63,6 +64,18 @@ afterEach(() => {
 describe("marcaEhADoProduto", () => {
   it("é verdade só sem logo E com o nome padrão", () => {
     expect(marcaEhADoProduto(PADRAO)).toBe(true);
+  });
+
+  it("DECISÃO DO FORK: o padrão é Verdash CRM, e a instalação de produção (APP_NAME \"Verdash CRM\") mostra o V", () => {
+    expect(DEFAULT_APP_NAME).toBe("Verdash CRM");
+    expect(marcaEhADoProduto({ name: "Verdash CRM", logoUrl: null })).toBe(true);
+    // CONTROLE: o nome antigo do upstream já não é a marca do produto aqui.
+    expect(marcaEhADoProduto({ name: "DeskcommCRM", logoUrl: null })).toBe(false);
+  });
+
+  it("o logotipo soletra Verdash + CRM em caminhos (7 + 3 glifos)", () => {
+    expect(LOGOTIPO.nome).toHaveLength(7);
+    expect(LOGOTIPO.sufixo).toHaveLength(3);
   });
 
   it("quem trocou o nome NÃO recebe um logotipo que soletra outro nome", () => {
@@ -88,9 +101,11 @@ describe("o desenho na barra lateral", () => {
     expect(screen.queryByText(DEFAULT_APP_NAME)).toBeNull();
   });
 
-  it("recolhida, mostra só o símbolo — e não a inicial em texto", () => {
+  it("recolhida, o trilho mostra a sigla da organização, e não a marca (quadro DS, `.rail-tenant`)", () => {
     renderSidebar(PADRAO, true);
-    expect(screen.getByRole("img", { name: DEFAULT_APP_NAME }).tagName.toLowerCase()).toBe("svg");
+    expect(screen.getByTestId("sigla-da-organizacao")).toHaveTextContent("LD");
+    // O logo mora no rodapé da 2ª coluna, que recolhida não aparece.
+    expect(screen.queryByRole("img", { name: DEFAULT_APP_NAME })).toBeNull();
     expect(screen.queryByText("D")).toBeNull();
   });
 
@@ -130,6 +145,32 @@ describe("as cores do desenho", () => {
     }
   });
 
+  it("o símbolo é o V da Verdash: as peças com o degradê do arquivo, sem caixa de fundo", () => {
+    render(<SimboloDoProduto nome="Marca X" />);
+    const svg = document.querySelector("svg")!;
+    expect(svg.getAttribute("viewBox")).toBe(SIMBOLO.viewBox);
+    const paradas = [...svg.querySelectorAll("stop")].map((p) => p.getAttribute("stop-color"));
+    expect(paradas).toEqual(expect.arrayContaining(["#1042F6", "#00FFB0", "#FF3871", "#FF6F1B"]));
+    // Cada peça pinta com o degradê DESTA instância; nada de retângulo de fundo.
+    const pecas = [...svg.querySelectorAll("path")];
+    expect(pecas).toHaveLength(3);
+    for (const p of pecas) expect(p.getAttribute("fill")).toMatch(/^url\(#.+-simbolo-\d\)$/);
+    expect(svg.querySelector("rect")).toBeNull();
+    cleanup();
+  });
+
+  it("dois símbolos na mesma página não dividem o id do degradê", () => {
+    render(
+      <>
+        <SimboloDoProduto nome="A" />
+        <SimboloDoProduto nome="B" />
+      </>,
+    );
+    const ids = [...document.querySelectorAll("linearGradient")].map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    cleanup();
+  });
+
   it("decorativo esconde do leitor de tela; sem isso, nomeia a marca", () => {
     render(<SimboloDoProduto nome="Marca X" decorativo />);
     expect(document.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
@@ -144,7 +185,7 @@ describe("o favicon segue a mesma regra", () => {
 
   it("desenha o símbolo quando a marca é a do produto, e a inicial quando não é", () => {
     expect(icone).toMatch(/marcaEhADoProduto\(\{ name: marca\.nome, logoUrl: marca\.logoUrl \}\)/);
-    expect(icone).toMatch(/<path d=\{SIMBOLO\.d\}/);
+    expect(icone).toMatch(/<CamadasDoSimbolo prefixo="icone" \/>/);
     expect(icone).toMatch(/letraDoIcone\(marca\.nome\)/);
   });
 });

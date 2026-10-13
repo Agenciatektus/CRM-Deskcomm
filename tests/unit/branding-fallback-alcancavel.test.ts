@@ -97,17 +97,19 @@ describe("`fallback_at` pelo `.env` — o caminho que existe", () => {
   });
 
   it("(b) cor boa NÃO acende — o alarme apaga, que é a outra metade do laço", () => {
-    // `#0b3d2e` não é neutro: ele produz motivos (`accent_deslocado` e
-    // `redundancia_nao_cromatica_necessaria`, medidos). É o caso que separa
+    // `#22c55e` não é neutro: ele produz motivos (`accent_deslocado`,
+    // `semantica_deslocada` e `redundancia_nao_cromatica_necessaria`, medidos;
+    // até a etapa 2 do DS o exemplo era `#0b3d2e`, que com o escuro travado no
+    // primary Verdash deixou de produzir motivo). É o caso que separa
     // `CODIGOS_DE_RECUSA` de "qualquer motivo" — uma implementação ingênua
     // deixaria `fallback_at` aceso em quase toda marca, e alarme sempre aceso é
     // alarme que ninguém lê.
     const marca = resolverMarca(
-      [camadaDoAmbiente({ APP_ACCENT_HEX: "#0b3d2e" })],
+      [camadaDoAmbiente({ APP_ACCENT_HEX: "#22c55e" })],
       REGUA_DO_PRODUTO,
     );
     expect(marca.motivos.length).toBeGreaterThan(0);
-    expect(fallbackDoAmbiente("#0b3d2e")).toBeNull();
+    expect(fallbackDoAmbiente("#22c55e")).toBeNull();
 
     // Chave declarada e vazia é o estado de fábrica do `install.sh`, não defeito.
     expect(fallbackDoAmbiente("")).toBeNull();

@@ -153,10 +153,12 @@ test.describe("jornada WAHA — baseline do seam de canais", () => {
     await page.getByText(/Cliente Radar E2E/i).first().click();
     await expect(page.getByLabel("Mensagem")).toBeVisible({ timeout: 30_000 });
 
-    const lembrar = page.getByRole("button", { name: /Lembrar|Lembrete ativo/ });
+    // Visual v2: "Lembrar depois" é um ícone que abre um popover de horários.
+    // Com lembrete valendo, o nome do botão passa a ser "Lembrete ativo: <quando>".
+    const lembrar = page.getByRole("button", { name: /^(Lembrar depois|Lembrete ativo:)/ });
     await expect(lembrar).toBeVisible({ timeout: 30_000 });
     await lembrar.click();
-    const opcao = page.getByRole("menuitem").first();
+    const opcao = page.getByRole("button", { name: /^Em 1 hora/ });
     await expect(opcao).toBeVisible({ timeout: 15_000 });
     await opcao.click();
     await page.waitForTimeout(3_000);

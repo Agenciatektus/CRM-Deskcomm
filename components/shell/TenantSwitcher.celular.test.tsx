@@ -15,18 +15,20 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useUser: () => ({
-    organizations: [
-      { organization_id: "a", organization_name: "Studio Mariana Castro" },
-      { organization_id: "b", organization_name: "Outra" },
-    ],
-    is_platform_admin: false,
-    support: null,
+  useAuth: () => ({
+    user: {
+      organizations: [
+        { organization_id: "a", organization_name: "Studio Mariana Castro" },
+        { organization_id: "b", organization_name: "Outra" },
+      ],
+      is_platform_admin: false,
+      support: null,
+    },
+    activeOrg: { orgId: "a", name: "Studio Mariana Castro" },
   }),
-  useActiveOrg: () => ({ orgId: "a", name: "Studio Mariana Castro" }),
 }));
 vi.mock("./OrganizationTransitionProvider", () => ({
-  useOrganizationTransition: () => ({ begin: vi.fn(), cancel: vi.fn() }),
+  useOrganizationTransitionOpcional: () => ({ begin: vi.fn(), cancel: vi.fn() }),
 }));
 vi.mock("@/app/actions/shell/setActiveOrg", () => ({ setActiveOrg: vi.fn() }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));

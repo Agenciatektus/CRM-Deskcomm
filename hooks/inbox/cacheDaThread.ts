@@ -48,7 +48,7 @@ export type DesfechoDoEvento = "aplicado" | "ignorado" | "refazer";
 const COLUNAS_DA_MENSAGEM = [
   "id", "organization_id", "conversation_id", "channel_session_id", "contact_id", "external_id",
   "type", "direction", "status", "ack", "error_code", "error_message", "body", "media_url",
-  "media_mime", "media_size_bytes", "media_storage_path", "media_thumb_path", "sent_via",
+  "media_mime", "media_size_bytes", "media_storage_path", "media_thumb_path", "media_derived_text", "sent_via",
   "sent_by_user_id", "sent_on_behalf_of_user_id", "sent_at", "delivered_at", "read_at",
   "metadata", "edited_at", "revoked_at", "reply_to_message_id", "created_at",
 ] as const;

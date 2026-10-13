@@ -170,7 +170,9 @@ describe("o reason da linha do tempo é gravado no vocabulário canônico", () =
 describe("a intenção do #600 sobrevive: quem lê em espanhol vê espanhol", () => {
   const TELAS = [
     "components/kanban/LeadTimeline.tsx",
-    "components/inbox/CRMSidePanel.tsx",
+    // A lista de atividades do painel da Inbox saiu do CRMSidePanel para a aba
+    // Atividade quando o painel ganhou abas (visual v2, 3.3).
+    "components/inbox/painel/AbaAtividade.tsx",
     "components/contacts/TimelineView.tsx",
   ] as const;
 

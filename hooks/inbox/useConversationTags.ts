@@ -7,17 +7,31 @@ import { invalidarListasDaConversa } from "@/hooks/inbox/cacheDasConversas";
 
 interface UpdateTagsArgs {
   conversation_id: string;
-  tags: string[];
+  adicionar?: string[];
+  remover?: string[];
 }
 
-/** G3-05: aplica/remove tags de uma conversa via PATCH; refaz o inbox. */
+/** O corpo do PATCH: só o lado do delta que tem etiqueta (o Zod recusa lista vazia). */
+export function corpoDoDelta(args: UpdateTagsArgs): { tags_adicionar?: string[]; tags_remover?: string[] } {
+  return {
+    ...(args.adicionar?.length ? { tags_adicionar: args.adicionar } : {}),
+    ...(args.remover?.length ? { tags_remover: args.remover } : {}),
+  };
+}
+
+/**
+ * G3-05 + 9045: acrescenta/remove tags de uma conversa por DELTA; refaz o inbox.
+ * Só viaja o que mudou, e o banco aplica sobre o valor atual: a etiqueta que
+ * outra pessoa (ou a IA) pôs no meio não se perde, como acontecia mandando a
+ * lista inteira que a tela tinha carregado.
+ */
 export function useUpdateConversationTags() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: UpdateTagsArgs) =>
       apiClient.patch<{ data: Conversation }>(
         `/api/v1/conversations/${args.conversation_id}`,
-        { tags: args.tags },
+        corpoDoDelta(args),
       ),
     onError: (err, args) => {
       invalidarListasDaConversa(qc, args.conversation_id);

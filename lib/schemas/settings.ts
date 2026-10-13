@@ -238,6 +238,8 @@ export const pipelineConfigPatchSchema = z.object({
     )
     .max(50)
     .optional(),
+  /** Exigência do motivo de perda; ausente preserva o comportamento histórico (exigir). */
+  lost_reason_required: z.boolean().optional(),
   /**
    * O MOTIVO DE GANHO por funil (issue #1536) — espelho de `lost_reasons`.
    * Sem lista cadastrada o motivo é texto livre; com lista, só o que está nela

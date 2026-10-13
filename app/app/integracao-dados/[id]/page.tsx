@@ -9,6 +9,7 @@
  * introspecção é AO VIVO e o catálogo pode levar alguns segundos; travar o
  * primeiro render do servidor nisso seguraria a navegação inteira.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { notFound, redirect } from "next/navigation";
 
 import { ExploradorDeDados } from "./_components/ExploradorDeDados";
@@ -47,22 +48,23 @@ export default async function ConexaoExternaPage({ params }: { params: Promise<{
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{conexao.label}</h1>
-        <p className="text-sm text-muted-foreground">
-          {conexao.host}:{conexao.port}/{conexao.database_name} · {conexao.username} ·{" "}
-          {traduzir("somente leitura", idioma)}
-        </p>
-      </header>
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        titulo={conexao.label}
+        descricao={<>{conexao.host}:{conexao.port}/{conexao.database_name} · {conexao.username} ·{" "}
+          {traduzir("somente leitura", idioma)}</>}
+      />
+      <SecaoDaPagina>
 
       {!conexao.enabled && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+        <div className="rounded-md border border-warning-line bg-warning-bg p-3 text-sm">
           {traduzir("Esta conexão está desativada. Ative-a na lista para consultar os dados.", idioma)}
         </div>
       )}
 
       <ExploradorDeDados connectionId={conexao.id} />
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

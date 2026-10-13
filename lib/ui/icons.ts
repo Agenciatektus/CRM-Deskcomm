@@ -50,6 +50,7 @@ export {
   Bell,
   BellSlash,
   EnvelopeSimple,
+  EnvelopeOpen,
   PaperPlaneTilt,
   Smiley,
   Check,
@@ -73,6 +74,7 @@ export {
   CheckCircle,
   Warning,
   WarningOctagon,
+  WarningCircle,
   Info,
   CircleNotch,
   // lgpd
@@ -136,6 +138,8 @@ export {
   BookOpen,
   Key,
   UserCircle,
+  Lightning,
+  UserMinus,
   ClockCounterClockwise,
   // inbox no celular: voltar para a lista e abrir a ficha do contato
   IdentificationCard,
@@ -150,4 +154,12 @@ export {
   ArrowsOutSimple,
   // /admin/modulos: módulo opcional com tabela própria (ADR-0002)
   Stack,
+  // cabeçalho do chat (visual v2): transferir, lembrar depois, alternar o painel do lead
+  ArrowsLeftRight,
+  Alarm,
+  SidebarSimple,
+  // estado da conversa POR ATENDENTE (9042): fixar/desafixar e bloquear contato
+  PushPin,
+  PushPinSlash,
+  Prohibit,
 } from "@phosphor-icons/react/dist/ssr";

@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Escolha } from "@/components/ui/escolha";
 import { ApiError } from "@/lib/api/types";
 import { PencilSimple, Trash } from "@/lib/ui/icons";
 import { PreviaDaDefinicao } from "./PreviaDaDefinicao";
@@ -254,38 +255,38 @@ export function TemplatesParceiroClient({
                 enumera os valores; digitar é onde o erro nasce — `esp`, `ES`,
                 `es-AR` e `español` são todos recusados, e a recusa volta como
                 "language not supported" horas depois. */}
-            <select
+            <Escolha
               value={idioma}
-              onChange={(e) => setIdioma(e.target.value)}
+              onValueChange={(valorEscolhido) => setIdioma(valorEscolhido)}
               aria-label={t("Idioma")}
               disabled={!!editando}
-              className="h-9 w-56 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-60"
+              className="h-9 w-56"
             >
               {IDIOMAS_DA_DEFINICAO.map((i) => (
                 <option key={i.codigo} value={i.codigo}>
                   {t(i.rotulo)} ({i.codigo})
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           {/* A CATEGORIA é obrigatória no contrato e não era oferecida: tudo
               saía como UTILITY. Mandar promoção como utility é reclassificado
               (ou recusado) pela revisão — e a tarifa da categoria errada é mais
               cara. O padrão continua UTILITY porque é o caso comum de
               atendimento, mas agora é escolha. */}
-          <select
+          <Escolha
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            onValueChange={(valorEscolhido) => setCategoria(valorEscolhido)}
             aria-label={t("Categoria")}
             disabled={!!editando}
-            className="h-9 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-60"
+            className="h-9"
           >
             <option value="UTILITY">
               {t("Utilidade — aviso de pedido, agendamento, cobrança")}
             </option>
             <option value="MARKETING">{t("Marketing — promoção, novidade, reengajamento")}</option>
             <option value="AUTHENTICATION">{t("Autenticação — código de verificação")}</option>
-          </select>
+          </Escolha>
 
           {/* CABEÇALHO opcional: texto OU mídia, nunca os dois — a plataforma
               aceita um formato por definição, e mandar ambos é recusa. */}
@@ -385,15 +386,15 @@ export function TemplatesParceiroClient({
           <div className="flex flex-col gap-1.5">
             {botoes.map((b, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2">
-                <select
+                <Escolha
                   value={b.tipo}
-                  onChange={(e) => {
+                  onValueChange={(valorEscolhido) => {
                     const p = [...botoes];
-                    p[i] = { ...b, tipo: e.target.value as BotaoDaDefinicao["tipo"] };
+                    p[i] = { ...b, tipo: valorEscolhido as BotaoDaDefinicao["tipo"] };
                     setBotoes(p);
                   }}
                   aria-label={`${t("Tipo do botão")} ${i + 1}`}
-                  className="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm"
+                  className="h-8 w-40"
                 >
                   <option value="quick_reply">{t("Resposta rápida")}</option>
                   <option value="url">{t("Abrir link")}</option>
@@ -402,7 +403,7 @@ export function TemplatesParceiroClient({
                       RulesTab.tsx) — mesma palavra fonte, sentido diferente
                       ("Llamar", não "Activar"). Texto puro evita a tradução errada. */}
                   <option value="phone_number">Ligar</option>
-                </select>
+                </Escolha>
                 <input
                   value={b.texto}
                   onChange={(e) => {

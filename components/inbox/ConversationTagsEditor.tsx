@@ -24,20 +24,18 @@ export function ConversationTagsEditor({ conversationId, orgId, tags }: Props) {
   const mutation = useUpdateConversationTags();
   const { data: vocabulary } = useConversationTagVocabulary(orgId);
 
-  // Normalização espelha o Zod do PATCH (trim+lowercase); dedup no set.
-  function apply(next: string[]) {
-    mutation.mutate({ conversation_id: conversationId, tags: next });
-  }
-
+  // 9045: manda só o DELTA; o banco aplica sobre o valor atual, então a tag
+  // que outra pessoa (ou a IA) pôs no meio não some. Normalização espelha o Zod
+  // do PATCH (trim+lowercase).
   function add(raw: string) {
     const tag = raw.trim().toLowerCase().slice(0, 40);
     if (!tag || tags.includes(tag) || tags.length >= 20) return;
-    apply([...tags, tag]);
+    mutation.mutate({ conversation_id: conversationId, adicionar: [tag] });
     setDraft("");
   }
 
   function remove(tag: string) {
-    apply(tags.filter((v) => v !== tag));
+    mutation.mutate({ conversation_id: conversationId, remover: [tag] });
   }
 
   const suggestions = (vocabulary ?? []).filter((v) => !tags.includes(v)).slice(0, 8);

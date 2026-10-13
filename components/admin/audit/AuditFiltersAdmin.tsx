@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { CaretDown, X } from "@/lib/ui/icons";
 import type { AdminAuditFilters } from "@/hooks/useAdminAuditLog";
 // A lista vem do vocabulário canônico, não de uma cópia local. Havia uma
@@ -235,25 +236,21 @@ export function AuditFiltersAdmin({
         <label className="text-xs text-muted-foreground sr-only" htmlFor="audit-from">
           {t("De")}
         </label>
-        <Input
+        <CampoDeData tipo="datetime-local"
           id="audit-from"
-          type="datetime-local"
-          className="h-9 w-48 text-sm"
-          onChange={(e) => handleFromChange(e.target.value)}
-          aria-label={t("Data de início")}
-        />
+          className="h-9 w-48"
+          onValorChange={(valorEscolhido) => handleFromChange(valorEscolhido)}
+          aria-label={t("Data de início")} />
       </div>
       <div className="flex items-center gap-1">
         <label className="text-xs text-muted-foreground sr-only" htmlFor="audit-to">
           {t("Até")}
         </label>
-        <Input
+        <CampoDeData tipo="datetime-local"
           id="audit-to"
-          type="datetime-local"
-          className="h-9 w-48 text-sm"
-          onChange={(e) => handleToChange(e.target.value)}
-          aria-label={t("Data de fim")}
-        />
+          className="h-9 w-48"
+          onValorChange={(valorEscolhido) => handleToChange(valorEscolhido)}
+          aria-label={t("Data de fim")} />
       </div>
       {hasAnyFilter && (
         <Button

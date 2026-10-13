@@ -8,7 +8,9 @@ import { marcaDaInstalacao } from "@/lib/branding/instalacao";
 import { marcaDaSaida } from "@/lib/branding/saida";
 
 export const dynamic = "force-dynamic";
-const tamanho = z.enum(["192", "512"]);
+// 192 e 512: os do manifesto. 180: o `apple-touch-icon` do iOS. `maskable-*`: as versões
+// com zona segura para o recorte do Android (`purpose: "maskable"` no manifesto).
+const tamanho = z.enum(["192", "512", "180", "maskable-192", "maskable-512"]);
 
 /** Leitura pública da mesma marca que o login mostra; nenhum dado de tenant. */
 export async function GET(request: Request, { params }: { params: Promise<{ size: string }> }) {
@@ -21,7 +23,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ size
   const marca = await marcaDaSaida(null);
   const linha = await marcaDaInstalacao();
   const arquivo = await lerArquivoDoIcone(linha?.favicon_path);
-  const corpo = await gerarIconeDoApp(lido.data === "192" ? 192 : 512, marca, arquivo);
+  const mascaravel = lido.data.startsWith("maskable-");
+  const lado = Number(lido.data.replace("maskable-", "")) as 180 | 192 | 512;
+  const corpo = mascaravel
+    ? await gerarIconeDoApp(lado, marca, arquivo, { mascaravel: true })
+    : await gerarIconeDoApp(lado, marca, arquivo);
   return new Response(corpo, {
     headers: {
       "content-type": "image/png",

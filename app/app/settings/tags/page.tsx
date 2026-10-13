@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 /**
  * Configurações → Tags. Onde a organização arruma o vocabulário de etiquetas que
  * os agentes, o Inbox e o funil já escrevem (issue #852, fatia S4).
@@ -81,29 +82,29 @@ export default async function TagsPage() {
   const t = (texto: string) => traduzir(texto, idioma);
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Tags")}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {t(
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Tags")}
+        descricao={t(
             "As etiquetas que os agentes, o Inbox e o funil usam nesta organização. Acrescente novas, escolha quais são sugeridas para quem atende em conversas e contatos, e arrume as que existem: renomear ou juntar corrige também as regras de agente e as sugestões, na mesma operação.",
           )}
-        </p>
-      </header>
+      />
+      <SecaoDaPagina>
 
-      {error ? (
-        // A falha NÃO vira lista vazia: "nenhuma etiqueta" e "não consegui ler"
-        // levam o operador a decisões opostas (uma convida a criar tudo de novo).
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
-          {t("Não foi possível carregar as etiquetas agora. Recarregue a página.")}
-        </div>
-      ) : (
-        <PainelDeTags
-          tags={(data ?? []) as LinhaDeVocabulario[]}
-          idioma={idioma}
-          sugestoes={sugestoes}
-        />
-      )}
-    </div>
+        {error ? (
+          // A falha NÃO vira lista vazia: "nenhuma etiqueta" e "não consegui ler"
+          // levam o operador a decisões opostas (uma convida a criar tudo de novo).
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
+            {t("Não foi possível carregar as etiquetas agora. Recarregue a página.")}
+          </div>
+        ) : (
+          <PainelDeTags
+            tags={(data ?? []) as LinhaDeVocabulario[]}
+            idioma={idioma}
+            sugestoes={sugestoes}
+          />
+        )}
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

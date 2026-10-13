@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 /**
  * Configurações → Meta Ads. Onde o token de LEITURA da conta de anúncios é
  * conectado.
@@ -55,41 +56,41 @@ export default async function MetaAdsSettingsPage() {
   const t = (texto: string) => traduzir(texto, idioma);
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Meta Ads")}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {t(
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Meta Ads")}
+        descricao={t(
             "Conecte um token de acesso para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. É uma conexão só de leitura: nada é criado, pausado ou alterado na sua conta de anúncios.",
           )}
-        </p>
-      </header>
-
-      <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
-        {/*
-          A permissão exata está escrita aqui porque é o erro nº 1 desta
-          integração: um token gerado sem `ads_read` conecta, salva, e só falha
-          na hora de abrir a tabela — longe daqui, com uma mensagem que parece
-          problema de outra coisa.
-        */}
-        {t(
-          "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
-        )}
-      </div>
-
-      <FormularioDeMetaAds
-        conectada={conexao.conectada}
-        contaPadrao={conexao.contaPadrao}
-        idioma={idioma}
       />
+      <SecaoDaPagina>
 
-      {conexao.conectada && (
-        <p className="text-sm text-muted-foreground">
+        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
+          {/*
+            A permissão exata está escrita aqui porque é o erro nº 1 desta
+            integração: um token gerado sem `ads_read` conecta, salva, e só falha
+            na hora de abrir a tabela — longe daqui, com uma mensagem que parece
+            problema de outra coisa.
+          */}
           {t(
-            "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.",
+            "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
           )}
-        </p>
-      )}
-    </div>
+        </div>
+
+        <FormularioDeMetaAds
+          conectada={conexao.conectada}
+          contaPadrao={conexao.contaPadrao}
+          idioma={idioma}
+        />
+
+        {conexao.conectada && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.",
+            )}
+          </p>
+        )}
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

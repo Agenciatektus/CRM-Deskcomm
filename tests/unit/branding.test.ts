@@ -12,7 +12,7 @@ describe("resolveBranding", () => {
     expect(resolveBranding(undefined, undefined)).toEqual({
       name: DEFAULT_APP_NAME,
       logoUrl: null,
-      initial: "D",
+      initial: "V",
     });
   });
 
@@ -131,7 +131,7 @@ describe("nome do arquivo de códigos de recuperação", () => {
   it("deriva o prefixo da marca, sem acento e sem espaço", () => {
     expect(prefixoDoArquivo("Vendas Turbo")).toBe("vendas-turbo");
     expect(prefixoDoArquivo("Ótima Gestão")).toBe("otima-gestao");
-    expect(prefixoDoArquivo(DEFAULT_APP_NAME)).toBe("deskcommcrm");
+    expect(prefixoDoArquivo(DEFAULT_APP_NAME)).toBe("verdash-crm");
   });
 
   it("não devolve hífen pendurado nem repetido", () => {
@@ -322,13 +322,12 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
     marcas: ["deskcommcrm", "deskcommcrm", "deskcommcrm"],
   },
 
-  // ─── PADRAO — a marca padrão precisa existir em algum lugar. ───
-  "lib/branding.ts": {
-    categoria: "PADRAO",
-    motivo:
-      "é a DEFINIÇÃO de DEFAULT_APP_NAME — o valor que aparece quando o operador não configurou marca nenhuma. Se esta linha sumir, some o padrão",
-    marcas: ["deskcommcrm"],
-  },
+  // ─── PADRAO — sem entrada desde o fechamento da etapa 2 do design system. ───
+  // `DEFAULT_APP_NAME` passou a "Verdash CRM" por DECISÃO DO FORK (Peterson:
+  // "a logo precisa ser a mesma da Verdash"). A definição continua num lugar só
+  // (`lib/branding.ts`), mas já não casa `deskcomm`, e esta catraca vigia o nome
+  // do upstream vazando. O padrão do fork é conferido em `branding.test.ts`
+  // ("cai no padrão…") e em `marca-do-produto.test.tsx`.
 };
 
 /**

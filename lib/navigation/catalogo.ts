@@ -49,9 +49,24 @@ export interface NavMetadata {
    * Contador de pendências ao lado do rótulo. `casos`: casos em que a IA espera
    * uma pessoa (`awaiting_human`) — quem desenha é `ContadorDeCasos`. `fila`:
    * conversas que esperam uma pessoa (a aba Fila do Inbox) — `ContadorDaFila`.
+   * `tarefas`: tarefas abertas que venceram na mão de quem está logado —
+   * `ContadorDeTarefas` (migration 9047).
    * Zero não desenha nada: número que nunca some ensina a ignorar o número.
    */
-  contador?: "casos" | "fila";
+  contador?: "casos" | "fila" | "avisos" | "tarefas";
+  /**
+   * Uma etiqueta curta ao lado do nome na coluna 2 (o `.nav2-tag` do
+   * protótipo): "Admin" para tela que só quem administra vê, "Opcional" para
+   * recurso que a empresa pode não usar. Só texto do catálogo; não decide
+   * permissão (isso continua com `minRole`, `modulo` e `capacidade`).
+   */
+  etiqueta?: "Admin" | "Opcional";
+  /**
+   * Outros nomes pelos quais a pessoa procura esta tela na busca (Ctrl K):
+   * nomes antigos ou do dia a dia ("kanban", "plano", "qr code"). Só a busca
+   * lê; não aparece na tela. Os do protótipo do visual v2 (`APELIDOS`).
+   */
+  apelidos?: string;
   /**
    * A porta de um MÓDULO OPCIONAL da instalação (`lib/instalacao/modulos.ts`).
    * Com o módulo desligado ela some do menu, do hub e do ⌘K — para todo papel.
@@ -87,9 +102,12 @@ export interface NavMetadata {
  * mesma conversa para a sexta tela.
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: "atendimento", label: "Atendimento" },
+  // Rótulo "Conversas" e não "Atendimento": no trilho de 72px a palavra longa
+  // saía cortada ("Atendi…"). O id continua `atendimento` porque é chave de
+  // rota, de preferência salva e de teste; só o texto de tela mudou.
+  { id: "atendimento", label: "Conversas" },
   { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
-  { id: "ia", label: "Agente", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
+  { id: "ia", label: "Agentes", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
   { id: "canais", label: "Canais" },
   { id: "analise", label: "Análise", hub: { href: "/app/analise", label: "Ver tudo em Análise" } },
   {
@@ -145,6 +163,7 @@ export const NAV_CATALOG = [
     minRole: "admin",
     modulo: "prospeccao",
     section: "O dia a dia da venda",
+    etiqueta: "Admin",
   },
   // ---- Atendimento — onde o operador passa o dia ----
   {
@@ -190,6 +209,7 @@ export const NAV_CATALOG = [
     // Composer do inbox. O nome "Templates" fica livre para os da Meta (HSM),
     // onde é o termo técnico correto.
     href: "/app/templates",
+    apelidos: "templates modelos",
     label: "Respostas rápidas",
     description: "Scripts salvos para responder mais rápido, seus ou da equipe.",
     icon: "FileText",
@@ -210,6 +230,7 @@ export const NAV_CATALOG = [
     // abre o quadro de cada um. "Pipeline" é palavra de quem construiu o
     // sistema; "funil de vendas" é palavra de quem vende.
     href: "/app/kanban",
+    apelidos: "pipeline kanban quadro",
     label: "Funis",
     description: "Seus funis de venda. Clique em um para abrir o quadro de clientes.",
     icon: "Kanban",
@@ -277,6 +298,8 @@ export const NAV_CATALOG = [
     group: "crm",
     section: "O dia a dia da venda",
     sidebar: true,
+    // S14 do visual v2: o que venceu na SUA mão, em tom crítico suave.
+    contador: "tarefas",
   },
   {
     // Módulo VoIP (migration 0347). No grupo do CRM pelo mesmo critério de
@@ -416,6 +439,7 @@ export const NAV_CATALOG = [
     // quem lança; o que a RLS impede é ele escrever.
     href: "/app/comandas",
     label: "Comandas",
+    etiqueta: "Opcional",
     description: "O que foi feito, por quem, e quanto o cliente paga.",
     icon: "Receipt",
     group: "crm",
@@ -628,6 +652,7 @@ export const NAV_CATALOG = [
     icon: "Flag",
     group: "ia",
     section: "Acompanhar o agente",
+    contador: "avisos",
   },
   {
     // "Aviso no WhatsApp", NUNCA "Avisos": a vizinha de cima chama-se "Alertas"
@@ -686,6 +711,7 @@ export const NAV_CATALOG = [
   // ---- Canais — por onde as mensagens entram e saem ----
   {
     href: "/app/connections",
+    apelidos: "whatsapp numero qr code",
     label: "Conexões",
     // Cobre os DOIS caminhos desde o PR #105: número por QR e canal oficial da
     // Meta (com os templates dele), cada um numa aba. A descrição cita "oficial"
@@ -835,6 +861,7 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/audit",
+    apelidos: "auditoria historico",
     label: "Audit Log",
     description: "Quem fez o quê e quando. O histórico que não se apaga.",
     icon: "ClockCounterClockwise",
@@ -901,7 +928,10 @@ export const NAV_CATALOG = [
     // quem monta a regra. Nada aqui apaga conversa ou muda dinheiro — o
     // alcance da operação é ao lado do de "Distribuição de atendimento".
     href: "/app/settings/tags",
-    label: "Tags",
+    // "Etiquetas" unifica Tags e Etiquetas no menu (quadro DS, "Módulos e
+    // páginas"): esta tela já cobre as duas (conversas e contatos).
+    apelidos: "tags marcadores",
+    label: "Etiquetas",
     description:
       "As etiquetas da empresa: acrescentar, escolher quais são sugeridas em conversas e contatos, renomear, juntar, arquivar e excluir.",
     icon: "Tag",
@@ -959,6 +989,7 @@ export const NAV_CATALOG = [
     // Uma tela só, com dois campos de token parecidos, é como se cola o token
     // errado no campo errado e se perde uma semana achando que quebrou.
     href: "/app/settings/meta-ads",
+    apelidos: "facebook conectar anuncios conta",
     label: "Meta Ads",
     description: "Conectar a conta de anúncios para ler o desempenho das campanhas.",
     icon: "Megaphone",
@@ -986,6 +1017,7 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/settings/billing",
+    apelidos: "plano cobranca assinatura fatura",
     label: "Billing",
     description: "Plano e cobrança.",
     icon: "Receipt",

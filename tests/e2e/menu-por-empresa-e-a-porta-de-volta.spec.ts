@@ -63,11 +63,25 @@ async function login(page: Page): Promise<void> {
 const menuLateral = (page: Page) =>
   page.getByRole("navigation", { name: "Navegação principal" });
 
+/**
+ * Visual v2: a coluna "Navegação principal" mostra UM grupo por vez, e o trilho
+ * ao lado tem um botão por grupo. "O menu inteiro" passa a ser a soma das
+ * colunas de todos os grupos do trilho, cada uma aberta pelo seu botão.
+ */
 async function itensDoMenu(page: Page): Promise<string[]> {
-  await expect(menuLateral(page)).toBeVisible();
-  return (await menuLateral(page).getByRole("link").allTextContents())
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const trilho = page.getByRole("navigation", { name: "Grupos da navegação" });
+  await expect(trilho).toBeVisible();
+  const itens: string[] = [];
+  for (const botao of await trilho.getByRole("button").all()) {
+    await botao.click();
+    await expect(menuLateral(page)).toBeVisible();
+    itens.push(
+      ...(await menuLateral(page).getByRole("link").allTextContents())
+        .map((t) => t.trim())
+        .filter(Boolean),
+    );
+  }
+  return itens;
 }
 
 async function escolherPerfil(page: Page, perfil: "Completa" | "Simplificada"): Promise<void> {
@@ -126,18 +140,20 @@ test("o menu da empresa encolhe pela tela — e a porta que desfaz continua lá"
   // deixaria a pessoa trancada do mesmo jeito. E o percurso é o de quem não sabe
   // a URL — que é justamente quem fica preso.
   //
-  // ⚠️ O grupo de Configurações NÃO mora dentro do `nav` que rola: o Sidebar o
-  // manda para um rodapé fixo (`GRUPO_NO_RODAPE`, `Sidebar.tsx:51-52`), como
-  // link do HUB (`/app/settings`). Procurá-lo dentro do `nav` devolve "não
-  // encontrado" com a porta intacta — foi assim que este caso reprovou na
-  // primeira rodada, e a mensagem acusava trancamento que não existia.
-  const portaDeVolta = page.getByRole("link", { name: /configurações/i }).last();
+  // ⚠️ O grupo de Configurações NÃO mora dentro do `nav` que rola: a barra o
+  // manda para um rodapé fixo (`GRUPO_NO_RODAPE`), como link do HUB
+  // (`/app/settings`). Procurá-lo dentro do `nav` devolve "não encontrado" com
+  // a porta intacta — foi assim que este caso reprovou na primeira rodada.
+  //
+  // Visual v2: no trilho de 72px o rótulo é "Ajustes". Desde a fase 4 ele é um
+  // BOTÃO que abre a coluna 2 com as seções de Configurações (S20), e a porta
+  // de volta é a "Organização" dentro dela.
+  const portaDeVolta = page.getByRole("button", { name: "Ajustes", exact: true });
   await expect(
     portaDeVolta,
     "a empresa encolheu o menu e perdeu a porta que desfaz a escolha — trancada do lado de fora",
   ).toBeVisible();
   await portaDeVolta.click();
-  await page.waitForURL(/\/app\/settings/);
   await page.getByRole("link", { name: /organização/i }).first().click();
   await page.waitForURL(new RegExp(CONFIGURACOES.replace(/\//g, "\\/")));
   await expect(

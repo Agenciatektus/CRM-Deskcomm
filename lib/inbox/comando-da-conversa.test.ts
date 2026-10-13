@@ -330,7 +330,7 @@ describe("o que entrou quando o banco passou a calcular o mesmo comando", () => 
     expect(r.motivo).toBe("contato_descadastrado");
   });
 
-  it("MAS o descadastro NÃO acende 'Devolver ao automático' — seria botão decorativo", () => {
+  it("MAS o descadastro NÃO acende 'Devolver à IA' — seria botão decorativo", () => {
     // `travaVigente` é o que desenha o botão. Devolver não desfaz opt-out: o
     // `stopGate` de before-send recusa na mesma. É o defeito do PR #295.
     expect(comandoDaConversa(fatos({ is_blocked: true }), AGORA).travaVigente).toBe(false);
@@ -368,7 +368,7 @@ describe("comandoDaConversa — grupo de WhatsApp (I3)", () => {
     const r = comandoDaConversa(fatos({ is_group: true, automaticoDaOrg: true }), AGORA);
     expect(r.comando.quem).toBe("aguardando");
     expect(r.automaticoAtivo).toBe(false);
-    // Nada de "Devolver ao automático" num grupo, nem motivo de automático pausado.
+    // Nada de "Devolver à IA" num grupo, nem motivo de automático pausado.
     expect(r.travaVigente).toBe(false);
     expect(r.motivo).toBeNull();
   });

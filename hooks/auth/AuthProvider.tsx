@@ -12,6 +12,7 @@ import { Providers } from "@/app/providers";
 import { createClient, resetRealtimeAuthentication } from "@/lib/supabase/browser";
 import type { AuthUser, ActiveOrg, Role } from "@/lib/auth/types";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { esquecerBuscasRecentes } from "@/lib/mobile/buscas-recentes";
 
 interface AuthCtx {
   user: AuthUser;
@@ -78,6 +79,7 @@ export function AuthProvider({
       refreshing,
       signOut: async () => {
         resetRealtimeAuthentication();
+        esquecerBuscasRecentes();
         const { signOut } = await import("@/app/actions/auth/signOut");
         await signOut();
       },
@@ -94,6 +96,19 @@ export function useAuth(): AuthCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
+}
+
+/**
+ * A sessão, ou `null` fora do provider.
+ *
+ * Para componente de LISTA que só ENFEITA com a sessão (o "Você" na pílula de
+ * dono do Inbox) e que também é renderizado isolado, em teste ou em tela sem
+ * provider. Lá, lançar derrubaria a lista inteira por causa de um rótulo; a
+ * falta da sessão só tira o enfeite. Guard de permissão NUNCA usa este: quem
+ * decide acesso continua no `useAuth`, que falha alto.
+ */
+export function useAuthOpcional(): AuthCtx | null {
+  return useContext(Ctx);
 }
 
 export function useUser(): AuthUser {

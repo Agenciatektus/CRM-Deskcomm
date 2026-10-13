@@ -101,6 +101,9 @@ export const KIND_LABEL = {
   jev_parar_de_receber: "Pedido para parar de receber mensagens, percebido pelo Jev",
   proposta_travada: "Uma proposta ficou presa em envio e voltou a rascunho",
   proposta_pronta_para_revisao: "Uma proposta está pronta para revisão",
+  // Diz que chegou a HORA, não que a tarefa "venceu": o aviso sai no prazo, e
+  // quem lê precisa saber que é para fazer agora, não que já perdeu.
+  task_due: "Chegou a hora de uma tarefa",
   other: "Aviso do assistente",
 } as const satisfies Record<InboxKind, string>;
 

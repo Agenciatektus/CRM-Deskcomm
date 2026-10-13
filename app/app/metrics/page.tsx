@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import type { Metadata } from "next";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -20,17 +21,17 @@ export default async function MetricsPage() {
   const t = (texto: string) => traduzir(texto, idioma);
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Desempenho")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {canCompare
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Desempenho")}
+        descricao={canCompare
             ? t("Atrito, funil e performance por atendente nos últimos 30 dias.")
             : t("Atrito, seu funil e sua performance nos últimos 30 dias.")}
-        </p>
-      </header>
+      />
+      <SecaoDaPagina>
 
       <MetricsClient canCompare={canCompare} currentUserId={user.id} />
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

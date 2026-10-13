@@ -2,12 +2,19 @@
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useState, type FormEvent } from "react";
 
+import { EmptyState } from "@/components/empty";
+import {
+  BotaoDaTela,
+  CabecalhoDaPagina,
+  CartaoEmpilhado,
+  EstadoDaLista,
+  Pagina,
+  TabelaOuCartoes,
+} from "@/components/pagina";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +36,7 @@ import {
 import { useT } from "@/hooks/i18n/useT";
 import { useCallsQuery, useDialCall, type CallRow } from "@/hooks/calls/useCallsQuery";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
+import { Phone } from "@/lib/ui/icons";
 
 function fmtDate(iso: string | null, idioma: string): string {
   if (!iso) return "—";
@@ -92,8 +100,9 @@ function DialerDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>{t("Nova ligação")}</Button>
+        <Button className="mb:hidden">{t("Nova ligação")}</Button>
       </DialogTrigger>
+      <BotaoDaTela rotulo={t("Nova ligação")} icone={Phone} aoTocar={() => setOpen(true)} />
       <DialogContent className="max-w-sm">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
@@ -134,65 +143,72 @@ export function CallsClient() {
   const { data: calls, isLoading } = useCallsQuery();
   const [selected, setSelected] = useState<CallRow | null>(null);
 
-  return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Chamadas")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("Histórico de ligações (voz por IA) com transcrição.")}
-          </p>
-        </div>
-        <DialerDialog />
-      </header>
+  const lista = calls ?? [];
+  const direcao = (call: CallRow) => (call.direction === "outbound" ? t("Saída") : t("Entrada"));
+  const quem = (call: CallRow) => (call.handled_by === "ai" ? t("IA") : t("Humano"));
+  const tabela = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t("Data")}</TableHead>
+          <TableHead>{t("Direção")}</TableHead>
+          <TableHead>{t("Quem é")}</TableHead>
+          <TableHead>{t("Status")}</TableHead>
+          <TableHead>{t("Atendido por")}</TableHead>
+          <TableHead>{t("Duração")}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lista.map((call) => (
+          <TableRow key={call.id} className="cursor-pointer" onClick={() => setSelected(call)}>
+            <TableCell>{fmtDate(call.started_at, idioma)}</TableCell>
+            <TableCell>{direcao(call)}</TableCell>
+            <TableCell className="font-medium">{counterpartLabel(call)}</TableCell>
+            <TableCell>
+              <Badge variant="outline">{t(STATUS_LABEL[call.status])}</Badge>
+            </TableCell>
+            <TableCell>{quem(call)}</TableCell>
+            <TableCell>{fmtDuration(call.duration_seconds)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
-      <Card className="overflow-hidden">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("Data")}</TableHead>
-                <TableHead>{t("Direção")}</TableHead>
-                <TableHead>{t("Quem é")}</TableHead>
-                <TableHead>{t("Status")}</TableHead>
-                <TableHead>{t("Atendido por")}</TableHead>
-                <TableHead>{t("Duração")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(calls ?? []).map((call) => (
-                <TableRow
-                  key={call.id}
-                  className="cursor-pointer"
-                  onClick={() => setSelected(call)}
-                >
-                  <TableCell>{fmtDate(call.started_at, idioma)}</TableCell>
-                  <TableCell>{call.direction === "outbound" ? t("Saída") : t("Entrada")}</TableCell>
-                  <TableCell className="font-medium">{counterpartLabel(call)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{t(STATUS_LABEL[call.status])}</Badge>
-                  </TableCell>
-                  <TableCell>{call.handled_by === "ai" ? t("IA") : t("Humano")}</TableCell>
-                  <TableCell>{fmtDuration(call.duration_seconds)}</TableCell>
-                </TableRow>
-              ))}
-              {(calls ?? []).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                    {t("Nenhuma chamada ainda.")}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+  return (
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Chamadas")}
+        acoesSoNoDesktop
+        descricao={t("Histórico de ligações (voz por IA) com transcrição.")}
+        acoes={<DialerDialog />}
+      />
+
+      <EstadoDaLista
+        carregando={isLoading}
+        quantidade={lista.length}
+        vazio={<EmptyState icon={Phone} headline={t("Nenhuma chamada ainda.")} />}
+      >
+        <TabelaOuCartoes
+          itens={lista}
+          chave={(call) => call.id}
+          rotulo={t("Chamadas")}
+          tabela={tabela}
+          cartao={(call) => (
+            <CartaoEmpilhado
+              aoAbrir={() => setSelected(call)}
+              titulo={counterpartLabel(call)}
+              apoio={fmtDate(call.started_at, idioma)}
+              selo={<Badge variant="outline">{t(STATUS_LABEL[call.status])}</Badge>}
+              campos={[
+                { rotulo: t("Direção"), valor: direcao(call) },
+                { rotulo: t("Atendido por"), valor: quem(call) },
+                { rotulo: t("Duração"), valor: fmtDuration(call.duration_seconds) },
+              ]}
+            />
+          )}
+        />
+      </EstadoDaLista>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-lg">
@@ -239,6 +255,6 @@ export function CallsClient() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </Pagina>
   );
 }

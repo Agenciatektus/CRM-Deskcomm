@@ -221,7 +221,7 @@ describe("precedência POR CAMPO", () => {
 
   it("sem nenhuma camada, tudo é o padrão do produto", () => {
     const marca = resolverMarca([], REGUA);
-    expect(marca.name).toBe("DeskcommCRM");
+    expect(marca.name).toBe("Verdash CRM");
     expect(marca.cor).toBeNull();
     expect(marca.origens).toEqual({ nome: "padrao", logoUrl: "padrao", cor: "padrao" });
     expect(marca.motivos).toEqual([]);
@@ -262,7 +262,9 @@ describe("diagnóstico não vaza identidade", () => {
     // Mesma disciplina de `contraste.ts`: com a tabela por organização, esses
     // motivos passam a conviver num log só, e a cor de uma empresa não tem por
     // que aparecer no diagnóstico de outra.
-    const sementes = ["#f5c518", "#808080", "#0f172a", "#dc2626"];
+    // Sementes que PRODUZEM motivo (a navy `#0f172a` deixou de produzir com o
+    // escuro travado no primary Verdash, etapa 2 do DS; entrou `#22c55e`).
+    const sementes = ["#f5c518", "#808080", "#22c55e", "#dc2626"];
     for (const hex of sementes) {
       const marca = resolverMarca([camadaDoAmbiente({ APP_ACCENT_HEX: hex })], REGUA);
       expect(marca.motivos.length).toBeGreaterThan(0);

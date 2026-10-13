@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { useMetaAdAccounts, useMetaCampaigns } from "@/hooks/ads/useMetaAds";
 import { ApiError } from "@/lib/api/types";
@@ -192,26 +192,22 @@ export function MetaAdsClient({ contaPadrao }: Props) {
           <>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="de">{t("De")}</Label>
-              <Input
+              <CampoDeData tipo="date"
                 id="de"
-                type="date"
                 className="w-40"
                 value={intervalo.de}
                 max={intervalo.ate}
-                onChange={(e) => setIntervalo((i) => ({ ...i, de: e.target.value }))}
-              />
+                onValorChange={(valorEscolhido) => setIntervalo((i) => ({ ...i, de: valorEscolhido }))} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ate">{t("Até")}</Label>
-              <Input
+              <CampoDeData tipo="date"
                 id="ate"
-                type="date"
                 className="w-40"
                 value={intervalo.ate}
                 min={intervalo.de}
                 max={comoData(ontem())}
-                onChange={(e) => setIntervalo((i) => ({ ...i, ate: e.target.value }))}
-              />
+                onValorChange={(valorEscolhido) => setIntervalo((i) => ({ ...i, ate: valorEscolhido }))} />
             </div>
           </>
         )}
@@ -230,7 +226,7 @@ export function MetaAdsClient({ contaPadrao }: Props) {
       {erro && (
         <div
           role="alert"
-          className="rounded-md border border-red-500/40 bg-red-500/10 p-4 text-sm"
+          className="rounded-md border border-error bg-error-bg p-4 text-sm text-error-fg"
         >
           <p className="font-medium">{mensagemDeErro(erro)}</p>
           {erro instanceof ApiError && (

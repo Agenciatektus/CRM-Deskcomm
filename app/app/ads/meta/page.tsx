@@ -18,6 +18,7 @@
  * "já que estou lendo a linha, leio o token junto" é exatamente como ele
  * vazaria para um prop de client component.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -57,17 +58,17 @@ export default async function MetaAdsPage() {
     */
     <div
       data-superficie="clara"
-      className="-m-6 flex min-h-[calc(100%+3rem)] flex-col gap-6 bg-bg p-6 text-text"
+      className="-m-6 flex min-h-[calc(100%+3rem)] flex-col bg-bg p-6 text-text mb:p-0"
     >
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Meta Ads")}</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          {t(
+      <Pagina className="mb:mx-0 mb:mt-0">
+        <CabecalhoDaPagina
+          titulo={t("Meta Ads")}
+          descricao={t(
             "O desempenho das campanhas que estão trazendo gente para cá. Os números vêm da plataforma no momento em que você clica em Atualizar — nada fica guardado aqui.",
           )}
-        </p>
-      </header>
+        />
 
+        <SecaoDaPagina>
       {conexao.conectada ? (
         <MetaAdsClient contaPadrao={conexao.contaPadrao} idioma={idioma} />
       ) : (
@@ -92,6 +93,8 @@ export default async function MetaAdsPage() {
           )}
         </div>
       )}
+        </SecaoDaPagina>
+      </Pagina>
     </div>
   );
 }

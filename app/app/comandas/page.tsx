@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -31,17 +32,14 @@ export default async function Page() {
   const t = (texto: string) => traduzir(texto, user.idioma);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">{t("Comandas")}</h1>
-        <p className="text-sm text-text-muted">
-          {t("O que foi feito, por quem, e quanto o cliente paga.")}
-        </p>
-      </div>
+    <Pagina>
+      <CabecalhoDaPagina titulo={t("Comandas")} descricao={t("O que foi feito, por quem, e quanto o cliente paga.")} />
+      <SecaoDaPagina>
       <Comandas
         podeLancar={ROLE_RANK[org.role] >= ROLE_RANK.agent}
         podeEstornar={ROLE_RANK[org.role] >= ROLE_RANK.manager}
       />
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

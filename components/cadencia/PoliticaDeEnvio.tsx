@@ -5,6 +5,8 @@ import type { PoliticaDaCadencia } from "@/hooks/cadencia/useCadencias";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Escolha } from "@/components/ui/escolha";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import {
   ESPACAMENTO_MAXIMO_S,
   ESPACAMENTO_MINIMO_S,
@@ -59,12 +61,12 @@ export function PoliticaDeEnvio({
     <div className="space-y-5">
       <section className="space-y-2">
         <Label htmlFor="cadencia-numero">{t("Número que envia")}</Label>
-        <select
+        <Escolha
           id="cadencia-numero"
-          className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm disabled:opacity-60"
+          className="h-10 w-full"
           value={channelSessionId ?? ""}
           disabled={numeroTravado}
-          onChange={(e) => onChangeNumero(e.target.value)}
+          onValueChange={(valorEscolhido) => onChangeNumero(valorEscolhido)}
         >
           <option value="" disabled>
             {t("Escolha um número conectado")}
@@ -74,7 +76,7 @@ export function PoliticaDeEnvio({
               {channelLabel(s, t)}
             </option>
           ))}
-        </select>
+        </Escolha>
         {numeroTravado && (
           <p className="text-xs text-text-muted">{t("Para trocar o número, desligue a cadência antes.")}</p>
         )}
@@ -103,21 +105,17 @@ export function PoliticaDeEnvio({
           })}
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <Input
-            type="time"
+          <CampoDeData tipo="time"
             aria-label={t("Início")}
             className="w-32"
             value={politica.janela.start}
-            onChange={(e) => onChange({ ...politica, janela: { ...politica.janela, start: e.target.value } })}
-          />
+            onValorChange={(valorEscolhido) => onChange({ ...politica, janela: { ...politica.janela, start: valorEscolhido } })} />
           <span className="text-text-muted">{t("até")}</span>
-          <Input
-            type="time"
+          <CampoDeData tipo="time"
             aria-label={t("Fim")}
             className="w-32"
             value={politica.janela.end}
-            onChange={(e) => onChange({ ...politica, janela: { ...politica.janela, end: e.target.value } })}
-          />
+            onValorChange={(valorEscolhido) => onChange({ ...politica, janela: { ...politica.janela, end: valorEscolhido } })} />
         </div>
       </section>
 

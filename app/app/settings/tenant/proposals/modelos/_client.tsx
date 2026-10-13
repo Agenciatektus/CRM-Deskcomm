@@ -1,4 +1,5 @@
 "use client";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -113,8 +114,9 @@ export function ModelosDeProposta() {
   if (!modelos) return <div className="p-6">{t("Carregando…")}</div>;
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
-      <h1 className="text-xl font-semibold">{t("Modelos de proposta")}</h1>
+    <Pagina className="max-w-3xl">
+      <CabecalhoDaPagina titulo={t("Modelos de proposta")} />
+      <SecaoDaPagina className="gap-6">
 
       {salvo && !faixaFechada ? (
         <p role="status" className="flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
@@ -218,6 +220,7 @@ export function ModelosDeProposta() {
           </li>
         ))}
       </ul>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

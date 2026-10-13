@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
 import { rotuloDoLocal } from "@/lib/agenda/locais";
 
 type Detalhe = {
@@ -274,13 +275,13 @@ export function DetalheDoCompromisso({
               <div className="space-y-4">
                 <label className="block">
                   {t("Mensagem do cliente usada como evidência (opcional)")}
-                  <select
-                    className="mt-2 w-full rounded-md border bg-surface p-2"
+                  <Escolha
+                    className="mt-2 w-full"
                     aria-label={t("Mensagem de evidência")}
                     value={evidence}
-                    onChange={(e) => {
+                    onValueChange={(valorEscolhido) => {
                       beginDraft();
-                      setEvidence(e.target.value);
+                      setEvidence(valorEscolhido);
                     }}
                   >
                     <option value="">{t("Confirmação da equipe, sem mensagem")}</option>
@@ -289,7 +290,7 @@ export function DetalheDoCompromisso({
                         {m.body?.slice(0, 140) ?? t("Mensagem sem texto")}
                       </option>
                     ))}
-                  </select>
+                  </Escolha>
                 </label>
                 <p className="text-sm text-text-muted">
                   {t("Ao confirmar, você valida o significado da mensagem para este compromisso.")}

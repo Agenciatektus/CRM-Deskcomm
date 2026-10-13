@@ -166,7 +166,9 @@ export function categoriaPadraoDoMotivo(valor: string): CategoriaDePerda | undef
  * permissive here to not block tenant-specific extensions.
  */
 export const loseLeadSchema = z.object({
-  lost_reason: z.string().min(1, "lost_reason é obrigatório").max(500),
+  // A obrigatoriedade depende do funil e é decidida no servidor, depois de
+  // carregar `settings.lost_reason_required`.
+  lost_reason: z.string().max(500).optional(),
 });
 export type LoseLeadInput = z.infer<typeof loseLeadSchema>;
 

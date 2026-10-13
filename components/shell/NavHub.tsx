@@ -12,7 +12,8 @@ import type { ExtensionGuideView } from "@/lib/extensions/view";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { IDIOMA_PADRAO, type Idioma } from "@/lib/i18n/idiomas";
 import { hubSections, type NavGroupId } from "@/lib/navigation/registry";
-import { BookOpen, Lightbulb, ListChecks, Warning } from "@/lib/ui/icons";
+import { BookOpen, CaretRight, Lightbulb, ListChecks, Warning } from "@/lib/ui/icons";
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 
 interface NavHubProps {
   interfaceSettings?: InterfaceSettings;
@@ -88,42 +89,43 @@ export function NavHub({
   const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings, modulosLigados, capacidadesLigadas);
 
   return (
-    <div className="flex h-full flex-col gap-8 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{traduzir(title, locale)}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground">{traduzir(subtitle, locale)}</p>}
-      </header>
+    <Pagina className="gap-8 mb:gap-1 mb:pb-4">
+      <CabecalhoDaPagina titulo={traduzir(title, locale)} descricao={subtitle ? traduzir(subtitle, locale) : undefined} />
 
+      {/* Celular: a lista de seções do protótipo (`.grp-s` + `.lst`/`.li`), uma linha
+          por tela com o chevron; tocar abre a tela, que tem o voltar da casca.
+          Desktop: os cartões de sempre. Só CSS decide. */}
       {secoes.map(({ section, items }) => (
         <section
           key={section}
           aria-labelledby={`hub-${group}-${slug(section)}`}
-          className="space-y-3"
+          className="space-y-3 mb:space-y-1.5"
         >
           <h2
             id={`hub-${group}-${slug(section)}`}
-            className="text-xs font-medium tracking-wider text-muted-foreground uppercase"
+            className="text-xs font-medium tracking-wider text-muted-foreground uppercase mb:px-5 mb:pt-3 mb:font-bold"
           >
             {traduzir(section, locale)}
           </h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 mb:mx-4 mb:gap-0 mb:divide-y mb:divide-border mb:overflow-hidden mb:rounded-2xl mb:border mb:border-border mb:bg-surface">
             {items.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href} className="block">
-                  <Card className="flex h-full gap-3 p-4 transition-colors hover:border-border-strong">
+                <Link key={item.href} href={item.href} className="pele-foco block">
+                  <Card className="flex h-full gap-3 p-4 transition-colors hover:border-border-strong mb:min-h-(--mb-folha-item) mb:items-center mb:rounded-none mb:border-0 mb:bg-transparent mb:px-3.5 mb:py-2 mb:shadow-none mb:hover:bg-hover">
                     <Icon
                       size={20}
                       weight="regular"
                       aria-hidden
-                      className="mt-0.5 shrink-0 text-muted-foreground"
+                      className="mt-0.5 shrink-0 text-muted-foreground mb:mt-0"
                     />
-                    <div>
-                      <h3 className="text-sm font-semibold">{traduzir(item.label, locale)}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold mb:text-(length:--mb-linha-nome)">{traduzir(item.label, locale)}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground mb:mt-0 mb:text-sm">
                         {traduzir(item.description, locale)}
                       </p>
                     </div>
+                    <CaretRight size={18} aria-hidden className="hidden shrink-0 text-text-subtle mb:block" />
                   </Card>
                 </Link>
               );
@@ -133,7 +135,7 @@ export function NavHub({
       ))}
 
       {group === "crm" && (extensionGuides.length > 0 || extensionsUnavailable) ? (
-        <section aria-labelledby="hub-crm-orientacoes-instaladas" className="space-y-3">
+        <section aria-labelledby="hub-crm-orientacoes-instaladas" className="space-y-3 mb:px-4">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2
@@ -234,6 +236,6 @@ export function NavHub({
           )}
         </section>
       ) : null}
-    </div>
+    </Pagina>
   );
 }

@@ -229,6 +229,10 @@ jobs:
         if: matrix.parte == 3
         run: pnpm cercas
 
+      # O tsc do projeto inteiro passou do teto padrão do heap do Node. Medido em
+      # 06/10/2026 com --extendedDiagnostics: a dev usa 4,24 GB, e uma PR que
+      # acrescentou 2% (4,34 GB) morreu com "heap out of memory" (exit 134) sem
+      # erro de tipo nenhum. 6 GB dá folga sem passar da RAM do runner.
       - name: Typecheck
         if: matrix.parte == 1
         # O script `typecheck` do package.json carrega o MESMO teto (via

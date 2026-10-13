@@ -19,7 +19,7 @@ import { type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
 import { fail, ok, noContent } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
-import { snoozeSchema } from "@/lib/schemas/snooze";
+import { SNOOZE_MAX_DIAS, snoozeSchema } from "@/lib/schemas/snooze";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -48,10 +48,22 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<R
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
     });
   }
-  const { duration_hours } = parsed.data;
-
-  const nowIso = new Date().toISOString();
-  const snoozeUntil = new Date(Date.now() + duration_hours * 3600_000).toISOString();
+  const agora = Date.now();
+  const nowIso = new Date(agora).toISOString();
+  // Duas formas de pedir (ver `lib/schemas/snooze.ts`). O instante exato vem
+  // da tela, que calcula "Amanhã 9:00" no fuso de quem clica; aqui só se
+  // confere que ele está no futuro e dentro do teto, com o relógio do SERVIDOR,
+  // porque o do navegador pode estar errado.
+  const alvo =
+    parsed.data.duration_hours !== undefined
+      ? agora + parsed.data.duration_hours * 3600_000
+      : new Date(parsed.data.snooze_until).getTime();
+  // `Number.isFinite` antes de qualquer `toISOString`: uma data inválida que
+  // escapasse do Zod viraria RangeError e 500, e a resposta certa é 422.
+  if (!Number.isFinite(alvo) || alvo <= agora || alvo > agora + SNOOZE_MAX_DIAS * 86_400_000) {
+    return fail("validation_failed", t("Escolha um horário no futuro, em até 90 dias."), 422, { requestId });
+  }
+  const snoozeUntil = new Date(alvo).toISOString();
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -71,7 +83,10 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<R
     resourceType: "conversation",
     resourceId: data.id,
     requestId,
-    metadata: { duration_hours },
+    metadata:
+      parsed.data.duration_hours !== undefined
+        ? { duration_hours: parsed.data.duration_hours }
+        : { snooze_until: snoozeUntil },
   });
   return ok({ snooze_until: snoozeUntil }, { requestId });
 }

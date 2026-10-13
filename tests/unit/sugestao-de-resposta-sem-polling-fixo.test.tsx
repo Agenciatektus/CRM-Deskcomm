@@ -3,6 +3,8 @@ import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReplyReviewPanel } from "@/components/inbox/composer/ReplyReviewPanel";
+import { ApiError } from "@/lib/api/types";
+import { makeQueryClient } from "@/lib/query/client";
 
 /**
  * A revisão de resposta deixou de perguntar a cada 4 s com a conversa parada
@@ -78,5 +80,28 @@ describe("ReplyReviewPanel", () => {
       await vi.advanceTimersByTimeAsync(4_500);
     });
     expect(pedidosDeSugestao()).toBe(2);
+  });
+
+  it("503 'unavailable': UM pedido só, nem ao remontar nem com mensagem nova", async () => {
+    // O cliente de PRODUÇÃO, que repete 429/503 por padrão.
+    qc = makeQueryClient();
+    api.get.mockRejectedValue(new ApiError(503, "unavailable", undefined, "req-1"));
+    const primeira = montar();
+    await waitFor(() => expect(qc.getQueryState(["reply-drafts", CONVERSA])?.status).toBe("error"));
+    expect(pedidosDeSugestao()).toBe(1);
+    // Sai da conversa e volta (ou alterna Responder/Nota): o painel remonta.
+    primeira.unmount();
+    montar();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(pedidosDeSugestao()).toBe(1);
+    act(() => {
+      qc.setQueryData(["messages", CONVERSA], { pages: [], pageParams: [] });
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(pedidosDeSugestao()).toBe(1);
   });
 });

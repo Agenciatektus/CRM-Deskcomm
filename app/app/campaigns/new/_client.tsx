@@ -15,6 +15,7 @@
  * A prévia do público fica ao lado do filtro, e não depois: o número que o
  * operador precisa ver antes de apertar é "quantas pessoas isto pega".
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { useCriarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { useConfiguracaoDeCampanhas } from "@/hooks/campanhas/useConfiguracao";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
@@ -209,13 +211,12 @@ export function NovaCampanha() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Nova campanha")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("Isto cria um rascunho. Nada é enviado antes de você preparar a lista e iniciar.")}
-        </p>
-      </header>
+    <Pagina className="max-w-3xl">
+      <CabecalhoDaPagina
+        titulo={t("Nova campanha")}
+        descricao={t("Isto cria um rascunho. Nada é enviado antes de você preparar a lista e iniciar.")}
+      />
+      <SecaoDaPagina className="gap-4">
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Informações")}</h2>
@@ -230,11 +231,11 @@ export function NovaCampanha() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="canal">{t("Enviar pelo número")}</Label>
-          <select
+          <Escolha
             id="canal"
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+            className="h-9 w-full"
             value={canal}
-            onChange={(e) => setCanal(e.target.value)}
+            onValueChange={(valorEscolhido) => setCanal(valorEscolhido)}
           >
             <option value="">{t("Escolha um número")}</option>
             {(canais.data ?? []).map((c) => (
@@ -242,7 +243,7 @@ export function NovaCampanha() {
                 {channelLabel(c, t)}
               </option>
             ))}
-          </select>
+          </Escolha>
           {canais.data?.length === 0 && (
             <p className="text-sm text-warning-fg">
               {t("Nenhum número conectado. Conecte um em Conexões antes de criar a campanha.")}
@@ -376,12 +377,12 @@ export function NovaCampanha() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="pub-funil">{t("Com negócio no funil")}</Label>
-            <select
+            <Escolha
               id="pub-funil"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={funilDoPublico}
-              onChange={(e) => {
-                setFunilDoPublico(e.target.value);
+              onValueChange={(valorEscolhido) => {
+                setFunilDoPublico(valorEscolhido);
                 setEtapaDoPublico("");
               }}
             >
@@ -391,15 +392,15 @@ export function NovaCampanha() {
                   {f.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="space-y-2">
             <Label htmlFor="pub-etapa">{t("Na etapa")}</Label>
-            <select
+            <Escolha
               id="pub-etapa"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={etapaDoPublico}
-              onChange={(e) => setEtapaDoPublico(e.target.value)}
+              onValueChange={(valorEscolhido) => setEtapaDoPublico(valorEscolhido)}
               disabled={!funilDoPublico}
             >
               <option value="">{t("Qualquer etapa")}</option>
@@ -408,7 +409,7 @@ export function NovaCampanha() {
                   {e.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="space-y-2">
             <Label htmlFor="limite">{t("Máximo de contatos nesta campanha")}</Label>
@@ -503,12 +504,12 @@ export function NovaCampanha() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="funil">{t("Vira card no funil")}</Label>
-            <select
+            <Escolha
               id="funil"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={funil}
-              onChange={(e) => {
-                setFunil(e.target.value);
+              onValueChange={(valorEscolhido) => {
+                setFunil(valorEscolhido);
                 setEtapa("");
               }}
             >
@@ -518,15 +519,15 @@ export function NovaCampanha() {
                   {f.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="space-y-2">
             <Label htmlFor="etapa">{t("Na etapa")}</Label>
-            <select
+            <Escolha
               id="etapa"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={etapa}
-              onChange={(e) => setEtapa(e.target.value)}
+              onValueChange={(valorEscolhido) => setEtapa(valorEscolhido)}
               disabled={!funil}
             >
               <option value="">{t("Primeira etapa do funil")}</option>
@@ -537,16 +538,16 @@ export function NovaCampanha() {
                     {e.name}
                   </option>
                 ))}
-            </select>
+            </Escolha>
           </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="agente">{t("Quem atende a resposta")}</Label>
-          <select
+          <Escolha
             id="agente"
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+            className="h-9 w-full"
             value={agente}
-            onChange={(e) => setAgente(e.target.value)}
+            onValueChange={(valorEscolhido) => setAgente(valorEscolhido)}
           >
             <option value="">{t("Agente publicado no número (padrão)")}</option>
             {(agentes.data ?? []).map((a) => (
@@ -554,7 +555,7 @@ export function NovaCampanha() {
                 {a.name}
               </option>
             ))}
-          </select>
+          </Escolha>
           <p className="text-sm text-muted-foreground">
             {t("Vale só para conversas que nascem desta campanha: quem já falava com você continua com quem o atendia. Quem aborda precisa saber dizer de onde veio o contato — essa resposta tem de estar no material do agente escolhido.")}
           </p>
@@ -638,7 +639,8 @@ export function NovaCampanha() {
           {criar.isPending ? t("Salvando…") : t("Salvar rascunho")}
         </Button>
       </div>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

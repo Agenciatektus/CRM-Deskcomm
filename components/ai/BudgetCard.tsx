@@ -418,7 +418,7 @@ function EditBudgetDialog({ status }: { status: BudgetStatus }) {
               titulo={`${t("Parar a IA ao chegar em")} ${fmtCents(tetoParaCopy)}`}
               corpo={
                 t(
-                  'As conversas em andamento vão para a fila de atendimento humano — ninguém fica sem resposta, mas alguém precisa responder. Cada uma volta ao automático pelo botão "Devolver ao automático" no cabeçalho dela.',
+                  'As conversas em andamento vão para a fila de atendimento humano — ninguém fica sem resposta, mas alguém precisa responder. Cada uma volta ao automático pelo botão "Devolver à IA" no cabeçalho dela.',
                 ) +
                 (status.gasto_incompleto
                   ? " " +

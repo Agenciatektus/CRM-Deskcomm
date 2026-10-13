@@ -17,6 +17,7 @@
  * voltar ao rascunho — e isso só vale enquanto nada saiu. O RITMO é a exceção, e
  * ele se edita na própria tela de detalhe, com a campanha em pé.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -29,6 +30,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
@@ -148,9 +150,9 @@ export function EditarCampanha({ id }: { id: string }) {
 
   if (c.status !== "draft") {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Editar campanha")}</h1>
-        <Card className="space-y-3 p-4">
+      <Pagina className="max-w-3xl">
+        <CabecalhoDaPagina titulo={t("Editar campanha")} />
+        <Card className="space-y-3 p-4 mb:mx-4">
           <p className="text-sm">
             {t(
               "Esta campanha já foi preparada: cada pessoa da lista tem o texto que vai receber guardado. Para mudar o texto ou o público, volte a campanha para rascunho — isso descarta a lista montada.",
@@ -163,7 +165,7 @@ export function EditarCampanha({ id }: { id: string }) {
             {t("Voltar para a campanha")}
           </Button>
         </Card>
-      </div>
+      </Pagina>
     );
   }
 
@@ -177,13 +179,12 @@ export function EditarCampanha({ id }: { id: string }) {
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Editar campanha")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
-        </p>
-      </header>
+    <Pagina className="max-w-3xl">
+      <CabecalhoDaPagina
+        titulo={t("Editar campanha")}
+        descricao={t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
+      />
+      <SecaoDaPagina className="gap-4">
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Informações")}</h2>
@@ -193,18 +194,18 @@ export function EditarCampanha({ id }: { id: string }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="e-canal">{t("Enviar pelo número")}</Label>
-          <select
+          <Escolha
             id="e-canal"
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+            className="h-9 w-full"
             value={canal}
-            onChange={(e) => setCanal(e.target.value)}
+            onValueChange={(valorEscolhido) => setCanal(valorEscolhido)}
           >
             {(canais.data ?? []).map((s) => (
               <option key={s.id} value={s.id}>
                 {channelLabel(s, t)}
               </option>
             ))}
-          </select>
+          </Escolha>
         </div>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">{t("Base legal do envio")}</legend>
@@ -327,12 +328,12 @@ export function EditarCampanha({ id }: { id: string }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="e-funil">{t("Vira card no funil")}</Label>
-            <select
+            <Escolha
               id="e-funil"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={funil}
-              onChange={(ev) => {
-                setFunil(ev.target.value);
+              onValueChange={(valorEscolhido) => {
+                setFunil(valorEscolhido);
                 setEtapa("");
               }}
             >
@@ -342,15 +343,15 @@ export function EditarCampanha({ id }: { id: string }) {
                   {f.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
           <div className="space-y-2">
             <Label htmlFor="e-etapa">{t("Na etapa")}</Label>
-            <select
+            <Escolha
               id="e-etapa"
-              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              className="h-9 w-full"
               value={etapa}
-              onChange={(ev) => setEtapa(ev.target.value)}
+              onValueChange={(valorEscolhido) => setEtapa(valorEscolhido)}
               disabled={!funil}
             >
               <option value="">{t("Primeira etapa do funil")}</option>
@@ -361,16 +362,16 @@ export function EditarCampanha({ id }: { id: string }) {
                     {x.name}
                   </option>
                 ))}
-            </select>
+            </Escolha>
           </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="e-agente">{t("Quem atende a resposta")}</Label>
-          <select
+          <Escolha
             id="e-agente"
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
+            className="h-9 w-full"
             value={agente}
-            onChange={(ev) => setAgente(ev.target.value)}
+            onValueChange={(valorEscolhido) => setAgente(valorEscolhido)}
           >
             <option value="">{t("Agente publicado no número (padrão)")}</option>
             {(agentes.data ?? []).map((a) => (
@@ -378,7 +379,7 @@ export function EditarCampanha({ id }: { id: string }) {
                 {a.name}
               </option>
             ))}
-          </select>
+          </Escolha>
         </div>
       </Card>
 
@@ -445,7 +446,8 @@ export function EditarCampanha({ id }: { id: string }) {
           {salvar.isPending ? t("Salvando…") : t("Salvar alterações")}
         </Button>
       </div>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

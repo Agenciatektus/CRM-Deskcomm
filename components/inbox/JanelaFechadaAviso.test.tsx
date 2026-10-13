@@ -13,6 +13,7 @@
  * `key` e só o endereço os separa).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -79,10 +80,7 @@ describe("JanelaFechadaAviso", () => {
     const user = userEvent.setup();
     montar();
 
-    await user.selectOptions(
-      screen.getByRole("combobox"),
-      "aviso_debriefing_adv|pt_BR",
-    );
+    escolherValor(screen.getByRole("combobox"), "aviso_debriefing_adv|pt_BR");
 
     expect(screen.getByRole("button", { name: /Enviar modelo/ })).toBeDisabled();
     expect(mutate).not.toHaveBeenCalled();
@@ -92,10 +90,7 @@ describe("JanelaFechadaAviso", () => {
     const user = userEvent.setup();
     montar();
 
-    await user.selectOptions(
-      screen.getByRole("combobox"),
-      "aviso_debriefing_adv|pt_BR",
-    );
+    escolherValor(screen.getByRole("combobox"), "aviso_debriefing_adv|pt_BR");
     await user.type(screen.getByRole("textbox"), "https://exemplo.com/capa.jpg");
 
     const botao = screen.getByRole("button", { name: /Enviar modelo/ });
@@ -116,10 +111,7 @@ describe("JanelaFechadaAviso", () => {
     const user = userEvent.setup();
     montar();
 
-    await user.selectOptions(
-      screen.getByRole("combobox"),
-      "aviso_debriefing_adv|pt_BR",
-    );
+    escolherValor(screen.getByRole("combobox"), "aviso_debriefing_adv|pt_BR");
 
     expect(screen.getByRole("textbox")).toHaveValue("https://exemplo.com/salva.jpg");
     expect(screen.getByRole("button", { name: /Enviar modelo/ })).toBeEnabled();

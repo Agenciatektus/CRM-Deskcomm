@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { LinksRastreaveis } from "./_linksRastreaveis";
 import { listarLinks, metricasLinks } from "@/lib/plataformas-de-anuncio/rastreio/links";
 /**
@@ -212,333 +213,333 @@ export default async function ConversoesPage({
   )}`;
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Conversões")}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {t(
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Conversões")}
+        descricao={t(
             "Quando um negócio que veio de anúncio é marcado como ganho, o valor da venda volta para a plataforma que trouxe o cliente. É esse retorno que ensina o anúncio a procurar mais gente parecida com quem comprou.",
           )}
-        </p>
-      </header>
+      />
+      <SecaoDaPagina>
 
-      <nav className="flex gap-1 border-b" aria-label={t("Seções de conversões")}>
-        {(
-          [
-            ["configuracao", t("Configuração")],
-            ["historico", t("Histórico de envios")],
-            ["diagnostico", t("Diagnóstico")],
-            ["links", t("Links rastreáveis")],
-          ] as const
-        ).map(([chave, rotulo]) => (
-          <a
-            key={chave}
-            href={chave === "configuracao" ? "?" : `?aba=${chave}`}
-            aria-current={aba === chave ? "page" : undefined}
-            className={
-              aba === chave
-                ? "-mb-px border-b-2 border-primary px-3 py-2 text-sm font-medium"
-                : "px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
-            }
-          >
-            {rotulo}
-          </a>
-        ))}
-      </nav>
-
-      {aba === "links" ? (
-        links ? (
-          <LinksRastreaveis links={links} metricas={metricas} idioma={idioma} />
-        ) : (
-          <p role="alert">
-            {t("Não foi possível ler os links. Atualize a página para tentar novamente.")}
-          </p>
-        )
-      ) : aba === "historico" ? (
-        historico ? (
-          <HistoricoDeEnvios
-            linhas={historico.linhas}
-            total={historico.total}
-            filtros={filtrosDoHistorico}
-            regras={regrasGoogle ?? []}
-            idioma={idioma}
-          />
-        ) : (
-          <p className="rounded-md border p-4 text-sm">
-            {t("Não consegui ler o histórico agora. Atualize a página em instantes.")}
-          </p>
-        )
-      ) : aba === "diagnostico" ? (
-        diagnostico ? (
-          <DiagnosticoGoogle itens={diagnostico} idioma={idioma} />
-        ) : (
-          <p className="rounded-md border p-4 text-sm">
-            {t("Não consegui ler o diagnóstico agora. Atualize a página em instantes.")}
-          </p>
-        )
-      ) : (
-        <>
-          {erroDoGoogle && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
-              {t(
-                ERRO_DO_GOOGLE_EM_PORTUGUES[erroDoGoogle] ??
-                  "Não consegui conectar com o Google Ads.",
-              )}
-            </div>
-          )}
-          {okDoGoogle && (
-            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm">
-              {t("Google Ads autorizado. Agora informe a conta e a ação de conversão abaixo.")}
-            </div>
-          )}
-
-          {estado.conectada && !estado.habilitada && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-              {t(
-                "O envio está pausado. As vendas continuam sendo registradas aqui, mas não vão para a plataforma enquanto isto estiver desligado.",
-              )}
-            </div>
-          )}
-
-          {estado.testEventCode && (
-            <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
-              {t(
-                "Modo de teste ligado: as vendas vão marcadas como teste e não contam para a otimização. Apague o código de teste quando terminar de conferir.",
-              )}
-            </div>
-          )}
-
-          <FormularioDeConversoes estado={estado} idioma={idioma} />
-          <VendaPeloCanal
-            ligada={vendaPeloCanalLigada(linhaDaOrganizacao?.settings)}
-            idioma={idioma}
-          />
-          <FormularioDeConversoesGoogle
-            estado={estadoGoogle}
-            idioma={idioma}
-            configurado={googleAdsEstaConfigurado(estadoGoogle.api)}
-            dataManagerConfigurado={googleAdsEstaConfigurado("data_manager")}
-            falta={faltaParaConectarOGoogleAds(estadoGoogle.api)}
-            podeCriarAcao={googleAdsEstaConfigurado("google_ads")}
-          />
-          {googleAdsEstaConfigurado(estadoGoogle.api) && !etapas.error && regrasGoogle && (
-            <RegrasDeConversaoGoogle
-              etapas={etapasAbertas}
-              regras={regrasGoogle}
-              idioma={idioma}
-              podeCriarAcao={
-                googleAdsEstaConfigurado("google_ads") &&
-                estadoGoogle.temRefreshToken &&
-                Boolean(estadoGoogle.customerId)
+        <nav className="flex gap-1 overflow-x-auto border-b" aria-label={t("Seções de conversões")}>
+          {(
+            [
+              ["configuracao", t("Configuração")],
+              ["historico", t("Histórico de envios")],
+              ["diagnostico", t("Diagnóstico")],
+              ["links", t("Links rastreáveis")],
+            ] as const
+          ).map(([chave, rotulo]) => (
+            <a
+              key={chave}
+              href={chave === "configuracao" ? "?" : `?aba=${chave}`}
+              aria-current={aba === chave ? "page" : undefined}
+              className={
+                aba === chave
+                  ? "-mb-px border-b-2 border-primary px-3 py-2 text-sm font-medium"
+                  : "px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
               }
-            />
-          )}
+            >
+              {rotulo}
+            </a>
+          ))}
+        </nav>
 
-          {slug && (
-            <FormularioDeCapturaDeUtm
-              plataforma="google"
-              estado={capturaGoogle}
+        {aba === "links" ? (
+          links ? (
+            <LinksRastreaveis links={links} metricas={metricas} idioma={idioma} />
+          ) : (
+            <p role="alert">
+              {t("Não foi possível ler os links. Atualize a página para tentar novamente.")}
+            </p>
+          )
+        ) : aba === "historico" ? (
+          historico ? (
+            <HistoricoDeEnvios
+              linhas={historico.linhas}
+              total={historico.total}
+              filtros={filtrosDoHistorico}
+              regras={regrasGoogle ?? []}
               idioma={idioma}
-              slug={slug}
-              numerosConectados={numerosConectados}
             />
-          )}
-
-          <p className="text-sm text-muted-foreground">
-            {t(
-              "Aceite da API não confirma atribuição ao anúncio. Confira os diagnósticos no gerenciador da plataforma. Depois de corrigir uma pendência, use o botão de reprocessamento.",
-            )}
-          </p>
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-lg font-semibold">{t("Conversões que não foram reportadas")}</h2>
-              <span className="text-sm text-muted-foreground">
-                {enviadas} {t("conversões aceitas pela plataforma")}
-              </span>
-            </div>
-
-            {pendencias.length === 0 ? (
-              <p className="rounded-md border p-4 text-sm text-muted-foreground">
-                {/*
-              Ausência de pendência tem DUAS causas com significados opostos, e
-              dizer só "tudo certo" esconderia a segunda: ou nada falhou, ou nunca
-              fechou uma venda vinda de anúncio. Quem acabou de conectar precisa
-              saber que a lista vazia ainda não prova que funciona.
-            */}
+          ) : (
+            <p className="rounded-md border p-4 text-sm">
+              {t("Não consegui ler o histórico agora. Atualize a página em instantes.")}
+            </p>
+          )
+        ) : aba === "diagnostico" ? (
+          diagnostico ? (
+            <DiagnosticoGoogle itens={diagnostico} idioma={idioma} />
+          ) : (
+            <p className="rounded-md border p-4 text-sm">
+              {t("Não consegui ler o diagnóstico agora. Atualize a página em instantes.")}
+            </p>
+          )
+        ) : (
+          <>
+            {erroDoGoogle && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
                 {t(
-                  "Nenhuma pendência. Ainda pode não haver vendas ou qualificações com origem em anúncio.",
+                  ERRO_DO_GOOGLE_EM_PORTUGUES[erroDoGoogle] ??
+                    "Não consegui conectar com o Google Ads.",
                 )}
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-left">
-                    <tr>
-                      <th className="p-3 font-medium">{t("Negócio")}</th>
-                      <th className="p-3 font-medium">{t("Evento")}</th>
-                      <th className="p-3 font-medium">{t("Origem")}</th>
-                      <th className="p-3 font-medium">{t("Valor")}</th>
-                      <th className="p-3 font-medium">{t("O que houve")}</th>
-                      <th className="p-3 font-medium">{t("Quando")}</th>
-                      <th className="p-3 font-medium">{t("Próximo passo")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendencias.map((p) => (
-                      <tr key={`${p.leadId}:${p.evento}`} className="border-t align-top">
-                        <td className="p-3">
-                          <a
-                            className="underline underline-offset-2"
-                            href={`/app/kanban?lead=${p.leadId}`}
-                          >
-                            {p.tituloDoLead ?? t("(sem título)")}
-                          </a>
-                        </td>
-                        <td className="p-3">
-                          {t(p.evento === "QualifiedLead" ? "Lead qualificado" : "Compra")}
-                        </td>
-                        <td className="p-3">
-                          {p.plataforma === "meta_ads"
-                            ? "Meta Ads"
-                            : p.plataforma === "google_ads"
-                              ? "Google Ads"
-                              : "—"}
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
-                          {p.valorCentavos === null ? "—" : formatCentsBRL(p.valorCentavos)}
-                        </td>
-                        <td className="p-3">
-                          <span>{t(MOTIVO_LEGIVEL[p.motivo ?? ""] ?? p.motivo ?? "—")}</span>
-                          {p.detalhe && (
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {p.detalhe}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 whitespace-nowrap text-muted-foreground">
-                          {new Date(p.tentadoEm).toLocaleString(idioma)}
-                        </td>
-                        <td className="p-3">
-                          <ReprocessarConversao
-                            leadId={p.leadId}
-                            idioma={idioma}
-                            evento={p.evento}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             )}
-          </section>
+            {okDoGoogle && (
+              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm">
+                {t("Google Ads autorizado. Agora informe a conta e a ação de conversão abaixo.")}
+              </div>
+            )}
 
-          {/*
-        Condição 3 da decisão da #924: "quem opera encontra a explicação de como
-        montar o link do WhatsApp com o código".
+            {estado.conectada && !estado.habilitada && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+                {t(
+                  "O envio está pausado. As vendas continuam sendo registradas aqui, mas não vão para a plataforma enquanto isto estiver desligado.",
+                )}
+              </div>
+            )}
 
-        Mora nesta tela porque esta é a tela da atribuição — a mesma que já
-        responde "a Meta recebeu minhas vendas?". O mecanismo do site não tem
-        outra superfície: sem este texto, o contrato do link existiria só no
-        código, e quem monta o botão da landing page não teria onde descobrir o
-        formato nem os limites.
-      */}
-          {slug ? (
-            <ScriptDoSite
-              slug={slug}
-              google={capturaGoogle}
-              meta={estadoDaCaptura}
+            {estado.testEventCode && (
+              <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
+                {t(
+                  "Modo de teste ligado: as vendas vão marcadas como teste e não contam para a otimização. Apague o código de teste quando terminar de conferir.",
+                )}
+              </div>
+            )}
+
+            <FormularioDeConversoes estado={estado} idioma={idioma} />
+            <VendaPeloCanal
+              ligada={vendaPeloCanalLigada(linhaDaOrganizacao?.settings)}
               idioma={idioma}
             />
-          ) : null}
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">{t("Quem chegou pelo site")}</h2>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              {t(
-                "Quando a pessoa vê a campanha numa página sua e toca num botão que abre o WhatsApp, o link desse botão pode levar a origem junto. O código abaixo vai no texto da mensagem, e a conversa entra no CRM já com a origem do site.",
-              )}
-            </p>
+            <FormularioDeConversoesGoogle
+              estado={estadoGoogle}
+              idioma={idioma}
+              configurado={googleAdsEstaConfigurado(estadoGoogle.api)}
+              dataManagerConfigurado={googleAdsEstaConfigurado("data_manager")}
+              falta={faltaParaConectarOGoogleAds(estadoGoogle.api)}
+              podeCriarAcao={googleAdsEstaConfigurado("google_ads")}
+            />
+            {googleAdsEstaConfigurado(estadoGoogle.api) && !etapas.error && regrasGoogle && (
+              <RegrasDeConversaoGoogle
+                etapas={etapasAbertas}
+                regras={regrasGoogle}
+                idioma={idioma}
+                podeCriarAcao={
+                  googleAdsEstaConfigurado("google_ads") &&
+                  estadoGoogle.temRefreshToken &&
+                  Boolean(estadoGoogle.customerId)
+                }
+              />
+            )}
 
-            <div className="rounded-md border p-4 text-sm">
-              <p className="font-medium">{t("Como montar o link do botão")}</p>
-              <ol className="mt-2 flex list-decimal flex-col gap-2 pl-5">
-                <li>
-                  {t(
-                    "Monte o texto que a pessoa vai enviar — uma saudação basta — e termine com o código.",
-                  )}
-                </li>
-                <li>
-                  {t(
-                    "Troque o número pelo WhatsApp da empresa e o texto pelo seu, mantendo o código no fim:",
-                  )}
-                </li>
-              </ol>
-              <code className="mt-3 block overflow-x-auto rounded-md bg-muted/50 p-2 text-xs break-all">
-                {linkDeExemplo}
-              </code>
-              {/*
-            A LISTA DE CHAVES VEM DO MÓDULO, e não da frase — mesma razão que o
-            exemplo logo acima é gerado e não escrito à mão. Enquanto os nomes
-            moravam dentro do texto traduzido, acrescentar uma chave exigia
-            lembrar de dois arquivos, e esquecer o segundo deixava a tela
-            ensinando uma lista incompleta em português e em espanhol.
-
-            O nome entra FORA do `t()` de propósito: `traduzir()` casa a string
-            EXATA, e um template literal não casaria chave nenhuma.
-          */}
-              <p className="mt-3 text-xs text-muted-foreground">
-                {t("Este exemplo foi gerado por esta tela. Os campos que o código aceita são:")}{" "}
-                {CHAVES_DE_UTM.join(", ")}.
-              </p>
-            </div>
-
-            {/*
-          O endereço de captura é o caminho RECOMENDADO, e o código acima
-          continua valendo: quem já montou link com ele não precisa mexer em
-          nada. A diferença é quem monta o marcador — lá é a página, aqui é o
-          servidor, e por isso só este dispensa script.
-        */}
-            {slug ? (
+            {slug && (
               <FormularioDeCapturaDeUtm
-                estado={estadoDaCaptura}
+                plataforma="google"
+                estado={capturaGoogle}
                 idioma={idioma}
                 slug={slug}
                 numerosConectados={numerosConectados}
               />
-            ) : (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-                {t(
-                  "Esta organização ainda não tem um apelido de URL, e o endereço de captura precisa de um. Fale com quem administra o servidor.",
-                )}
-              </div>
             )}
 
-            <ul className="flex max-w-2xl list-disc flex-col gap-2 pl-5 text-sm text-muted-foreground">
-              <li>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                "Aceite da API não confirma atribuição ao anúncio. Confira os diagnósticos no gerenciador da plataforma. Depois de corrigir uma pendência, use o botão de reprocessamento.",
+              )}
+            </p>
+            <section className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold">{t("Conversões que não foram reportadas")}</h2>
+                <span className="text-sm text-muted-foreground">
+                  {enviadas} {t("conversões aceitas pela plataforma")}
+                </span>
+              </div>
+
+              {pendencias.length === 0 ? (
+                <p className="rounded-md border p-4 text-sm text-muted-foreground">
+                  {/*
+                Ausência de pendência tem DUAS causas com significados opostos, e
+                dizer só "tudo certo" esconderia a segunda: ou nada falhou, ou nunca
+                fechou uma venda vinda de anúncio. Quem acabou de conectar precisa
+                saber que a lista vazia ainda não prova que funciona.
+              */}
+                  {t(
+                    "Nenhuma pendência. Ainda pode não haver vendas ou qualificações com origem em anúncio.",
+                  )}
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
+                    <thead className="bg-muted/50 text-left">
+                      <tr>
+                        <th className="p-3 font-medium">{t("Negócio")}</th>
+                        <th className="p-3 font-medium">{t("Evento")}</th>
+                        <th className="p-3 font-medium">{t("Origem")}</th>
+                        <th className="p-3 font-medium">{t("Valor")}</th>
+                        <th className="p-3 font-medium">{t("O que houve")}</th>
+                        <th className="p-3 font-medium">{t("Quando")}</th>
+                        <th className="p-3 font-medium">{t("Próximo passo")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendencias.map((p) => (
+                        <tr key={`${p.leadId}:${p.evento}`} className="border-t align-top">
+                          <td className="p-3">
+                            <a
+                              className="underline underline-offset-2"
+                              href={`/app/kanban?lead=${p.leadId}`}
+                            >
+                              {p.tituloDoLead ?? t("(sem título)")}
+                            </a>
+                          </td>
+                          <td data-rotulo={t("Evento")} className="p-3">
+                            {t(p.evento === "QualifiedLead" ? "Lead qualificado" : "Compra")}
+                          </td>
+                          <td data-rotulo={t("Origem")} className="p-3">
+                            {p.plataforma === "meta_ads"
+                              ? "Meta Ads"
+                              : p.plataforma === "google_ads"
+                                ? "Google Ads"
+                                : "—"}
+                          </td>
+                          <td data-rotulo={t("Valor")} className="p-3 whitespace-nowrap">
+                            {p.valorCentavos === null ? "—" : formatCentsBRL(p.valorCentavos)}
+                          </td>
+                          <td data-rotulo={t("O que houve")} className="p-3">
+                            <span>{t(MOTIVO_LEGIVEL[p.motivo ?? ""] ?? p.motivo ?? "—")}</span>
+                            {p.detalhe && (
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                {p.detalhe}
+                              </span>
+                            )}
+                          </td>
+                          <td data-rotulo={t("Quando")} className="p-3 whitespace-nowrap text-muted-foreground">
+                            {new Date(p.tentadoEm).toLocaleString(idioma)}
+                          </td>
+                          <td className="p-3">
+                            <ReprocessarConversao
+                              leadId={p.leadId}
+                              idioma={idioma}
+                              evento={p.evento}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/*
+          Condição 3 da decisão da #924: "quem opera encontra a explicação de como
+          montar o link do WhatsApp com o código".
+
+          Mora nesta tela porque esta é a tela da atribuição — a mesma que já
+          responde "a Meta recebeu minhas vendas?". O mecanismo do site não tem
+          outra superfície: sem este texto, o contrato do link existiria só no
+          código, e quem monta o botão da landing page não teria onde descobrir o
+          formato nem os limites.
+        */}
+            {slug ? (
+              <ScriptDoSite
+                slug={slug}
+                google={capturaGoogle}
+                meta={estadoDaCaptura}
+                idioma={idioma}
+              />
+            ) : null}
+            <section className="flex flex-col gap-3">
+              <h2 className="text-lg font-semibold">{t("Quem chegou pelo site")}</h2>
+              <p className="max-w-2xl text-sm text-muted-foreground">
                 {t(
-                  "O código vale só na primeira mensagem do contato: quem recebe um link encaminhado não ganha a origem de quem encaminhou.",
+                  "Quando a pessoa vê a campanha numa página sua e toca num botão que abre o WhatsApp, o link desse botão pode levar a origem junto. O código abaixo vai no texto da mensagem, e a conversa entra no CRM já com a origem do site.",
                 )}
-              </li>
-              <li>
-                {t(
-                  "Ele nunca sobrescreve uma origem já gravada, inclusive a de anúncio: quem chegou do Meta ou do Google antes mantém o anúncio.",
-                )}
-              </li>
-              <li>
-                {t(
-                  "Só campos de campanha viajam no código, e nenhum dado pessoal: nome, telefone, e-mail e documento ficam de fora.",
-                )}{" "}
-                {t("O código inteiro tem um teto de")} {TAMANHO_MAXIMO_DO_CODIGO} {t("caracteres.")}
-              </li>
-              <li>
-                {t(
-                  'A origem aparece na ficha do contato e no filtro "Site (landing page)" da lista de contatos.',
-                )}
-              </li>
-            </ul>
-          </section>
-        </>
-      )}
-    </div>
+              </p>
+
+              <div className="rounded-md border p-4 text-sm">
+                <p className="font-medium">{t("Como montar o link do botão")}</p>
+                <ol className="mt-2 flex list-decimal flex-col gap-2 pl-5">
+                  <li>
+                    {t(
+                      "Monte o texto que a pessoa vai enviar — uma saudação basta — e termine com o código.",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "Troque o número pelo WhatsApp da empresa e o texto pelo seu, mantendo o código no fim:",
+                    )}
+                  </li>
+                </ol>
+                <code className="mt-3 block overflow-x-auto rounded-md bg-muted/50 p-2 text-xs break-all">
+                  {linkDeExemplo}
+                </code>
+                {/*
+              A LISTA DE CHAVES VEM DO MÓDULO, e não da frase — mesma razão que o
+              exemplo logo acima é gerado e não escrito à mão. Enquanto os nomes
+              moravam dentro do texto traduzido, acrescentar uma chave exigia
+              lembrar de dois arquivos, e esquecer o segundo deixava a tela
+              ensinando uma lista incompleta em português e em espanhol.
+
+              O nome entra FORA do `t()` de propósito: `traduzir()` casa a string
+              EXATA, e um template literal não casaria chave nenhuma.
+            */}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {t("Este exemplo foi gerado por esta tela. Os campos que o código aceita são:")}{" "}
+                  {CHAVES_DE_UTM.join(", ")}.
+                </p>
+              </div>
+
+              {/*
+            O endereço de captura é o caminho RECOMENDADO, e o código acima
+            continua valendo: quem já montou link com ele não precisa mexer em
+            nada. A diferença é quem monta o marcador — lá é a página, aqui é o
+            servidor, e por isso só este dispensa script.
+          */}
+              {slug ? (
+                <FormularioDeCapturaDeUtm
+                  estado={estadoDaCaptura}
+                  idioma={idioma}
+                  slug={slug}
+                  numerosConectados={numerosConectados}
+                />
+              ) : (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+                  {t(
+                    "Esta organização ainda não tem um apelido de URL, e o endereço de captura precisa de um. Fale com quem administra o servidor.",
+                  )}
+                </div>
+              )}
+
+              <ul className="flex max-w-2xl list-disc flex-col gap-2 pl-5 text-sm text-muted-foreground">
+                <li>
+                  {t(
+                    "O código vale só na primeira mensagem do contato: quem recebe um link encaminhado não ganha a origem de quem encaminhou.",
+                  )}
+                </li>
+                <li>
+                  {t(
+                    "Ele nunca sobrescreve uma origem já gravada, inclusive a de anúncio: quem chegou do Meta ou do Google antes mantém o anúncio.",
+                  )}
+                </li>
+                <li>
+                  {t(
+                    "Só campos de campanha viajam no código, e nenhum dado pessoal: nome, telefone, e-mail e documento ficam de fora.",
+                  )}{" "}
+                  {t("O código inteiro tem um teto de")} {TAMANHO_MAXIMO_DO_CODIGO} {t("caracteres.")}
+                </li>
+                <li>
+                  {t(
+                    'A origem aparece na ficha do contato e no filtro "Site (landing page)" da lista de contatos.',
+                  )}
+                </li>
+              </ul>
+            </section>
+          </>
+        )}
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

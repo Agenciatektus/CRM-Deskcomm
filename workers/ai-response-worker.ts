@@ -52,6 +52,7 @@ import type {
 } from "@/lib/ai/types";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { resolverModeloDoPonto } from "@/lib/ai/gateway-binding";
+import { mensagemPedeResposta } from "@/lib/ai/elegibilidade/mensagem-respondivel";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -717,13 +718,17 @@ async function buildContext(input: BuildContextInput): Promise<GuardDecision> {
   // Inbound message body (the trigger payload doesn't carry it).
   const { data: msg, error: msgErr } = await admin
     .from("messages")
-    .select("id, body, direction, organization_id")
+    .select("id, type, body, media_url, media_storage_path, direction, organization_id")
     .eq("id", input.messageId)
     .eq("organization_id", input.organizationId)
     .maybeSingle();
   if (msgErr) return skip("conversation_not_found", msgErr.message);
   if (!msg) return skip("conversation_not_found", "message not found");
   if (msg.direction !== "inbound") return skip("duplicate_outbound");
+  // Reação (👍 numa proposta) não pede resposta, mesmo com o emoji no corpo.
+  // Mesma regra do dreno do agente: `lib/ai/elegibilidade/mensagem-respondivel.ts`.
+  const resposta = mensagemPedeResposta(msg);
+  if (!resposta.pede) return skip(resposta.motivo === "reacao" ? "reaction_inbound" : "empty_inbound_body");
   const inbound_body = (msg.body ?? "").trim();
   if (!inbound_body) return skip("empty_inbound_body");
 

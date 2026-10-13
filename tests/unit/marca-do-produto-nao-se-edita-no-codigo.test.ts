@@ -54,7 +54,13 @@ import { DEFAULT_APP_NAME, resolveBranding } from "@/lib/branding";
  * importado de `lib/branding`, de propósito: um teste que compara a constante
  * com ela mesma passa sempre.
  */
-const MARCA_DO_PRODUTO = "DeskcommCRM";
+/**
+ * ⚠️ DECISÃO DO FORK (Verdash/Tektus, fechamento da etapa 2 do design system,
+ * PR #172): o produto DESTE fork é "Verdash CRM", com o símbolo V da Verdash.
+ * A troca é deliberada e mora aqui, no diff, como este arquivo pede. Ao
+ * sincronizar com o upstream DeskcommCRM, esta linha fica com o fork.
+ */
+const MARCA_DO_PRODUTO = "Verdash CRM";
 
 const COMO_PERSONALIZAR =
   "Para personalizar a marca da SUA instalação, não edite esta constante: " +
@@ -64,7 +70,7 @@ const COMO_PERSONALIZAR =
   "e some com a sua marca no próximo `git pull`.";
 
 describe("a marca padrão do produto", () => {
-  it("é DeskcommCRM — e trocá-la aqui é mudar o produto, não a sua instalação", () => {
+  it("é Verdash CRM (decisão do fork) — e trocá-la aqui é mudar o produto, não a sua instalação", () => {
     expect(DEFAULT_APP_NAME, COMO_PERSONALIZAR).toBe(MARCA_DO_PRODUTO);
   });
 
@@ -76,7 +82,7 @@ describe("a marca padrão do produto", () => {
     expect(resolveBranding(undefined, undefined), COMO_PERSONALIZAR).toEqual({
       name: MARCA_DO_PRODUTO,
       logoUrl: null,
-      initial: "D",
+      initial: "V",
     });
   });
 });

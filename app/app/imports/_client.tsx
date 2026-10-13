@@ -1,5 +1,6 @@
 "use client";
 
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -66,13 +67,12 @@ export function ImportsListClient() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div>
-        <h1 className="text-xl font-semibold">{t("Importações")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("CSV ou XLSX com empresa, CNPJ, pessoa, cargo, telefone e e-mail.")}
-        </p>
-      </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Importações")}
+        descricao={t("CSV ou XLSX com empresa, CNPJ, pessoa, cargo, telefone e e-mail.")}
+      />
+      <SecaoDaPagina className="gap-4">
 
       <Card className="flex flex-wrap items-end gap-3 p-4">
         <div className="grid gap-1.5">
@@ -90,7 +90,7 @@ export function ImportsListClient() {
       </Card>
 
       <Card className="overflow-hidden">
-        <Table>
+        <Table className={TABELA_EMPILHADA}>
           <TableHeader>
             <TableRow>
               <TableHead>{t("Arquivo")}</TableHead>
@@ -117,12 +117,12 @@ export function ImportsListClient() {
                       {b.filename}
                     </Link>
                   </TableCell>
-                  <TableCell>{b.status}</TableCell>
-                  <TableCell>{b.total_rows}</TableCell>
-                  <TableCell>{b.successful_rows}</TableCell>
-                  <TableCell>{b.conflict_rows}</TableCell>
-                  <TableCell>{b.failed_rows}</TableCell>
-                  <TableCell className="text-xs">
+                  <TableCell data-rotulo={t("Status")}>{b.status}</TableCell>
+                  <TableCell data-rotulo={t("Linhas")}>{b.total_rows}</TableCell>
+                  <TableCell data-rotulo={t("Sucesso")}>{b.successful_rows}</TableCell>
+                  <TableCell data-rotulo={t("Conflitos")}>{b.conflict_rows}</TableCell>
+                  <TableCell data-rotulo={t("Falhas")}>{b.failed_rows}</TableCell>
+                  <TableCell data-rotulo={t("Data")} className="text-xs">
                     {new Date(b.created_at).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -131,6 +131,7 @@ export function ImportsListClient() {
           </TableBody>
         </Table>
       </Card>
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

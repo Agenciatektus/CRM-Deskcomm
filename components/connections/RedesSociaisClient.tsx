@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Escolha } from "@/components/ui/escolha";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
@@ -148,18 +149,18 @@ export function RedesSociaisClient() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="social-profile">{t("Perfil da empresa")}</Label>
-                <select
+                <Escolha
                   id="social-profile"
-                  className="w-full rounded-md border bg-background p-2"
+                  className="w-full"
                   value={profile}
-                  onChange={(e) => setProfile(e.target.value)}
+                  onValueChange={(valorEscolhido) => setProfile(valorEscolhido)}
                 >
                   {profiles.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               </div>
               <Button
                 disabled={!!busy || !profile}
@@ -182,18 +183,18 @@ export function RedesSociaisClient() {
           <Card className="flex flex-wrap items-end gap-3 p-4">
             <div className="min-w-48 flex-1 space-y-2">
               <Label htmlFor="social-network">{t("Conectar uma rede")}</Label>
-              <select
+              <Escolha
                 id="social-network"
-                className="w-full rounded-md border bg-background p-2"
+                className="w-full"
                 value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
+                onValueChange={(valorEscolhido) => setPlatform(valorEscolhido)}
               >
                 {state.networks.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.label}
                   </option>
                 ))}
-              </select>
+              </Escolha>
             </div>
             <Button
               disabled={!!busy}

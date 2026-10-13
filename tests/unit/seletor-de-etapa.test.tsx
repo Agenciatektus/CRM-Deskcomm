@@ -16,12 +16,14 @@ let podeMover = true;
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({ usePermission: () => podeMover }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
+const adiar = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({ adiarAcao: adiar.fn, useAcaoPendente: () => false, acaoPendente: () => false }));
 vi.mock("@/hooks/kanban/useMoveCard", () => ({
   useMoveCard: () => ({ mutate: mover, isPending: false }),
 }));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({
-  useWinLead: () => ({ mutate: ganhar, isPending: false }),
+  useWinLead: () => ({ mutateAsync: ganhar, isPending: false }),
 }));
 vi.mock("@/components/kanban/LoseLeadDialog", () => ({
   LoseLeadDialog: (p: { motivosDoFunil?: string[] }) => (
@@ -84,10 +86,18 @@ describe("seletor de etapa", () => {
     expect(ganhar).not.toHaveBeenCalled();
   });
 
-  it("etapa de ganho vai pelo /win, não pelo /move", () => {
+  it("etapa de ganho vai pelo /win ADIADO 5 s com Desfazer, não pelo /move (follow-up do Cassio na #169)", async () => {
+    adiar.fn.mockClear();
+    ganhar.mockResolvedValue({});
     montar();
     fireEvent.change(screen.getByTestId("seletor-de-etapa"), { target: { value: "ganho" } });
-    expect(ganhar).toHaveBeenCalledWith({ leadId: "lead-1" }, expect.anything());
+    // Nada sai na hora: o aviso segura o `/win` (e o `lead.won` atrás dele).
+    expect(ganhar).not.toHaveBeenCalled();
+    expect(adiar.fn).toHaveBeenCalledTimes(1);
+    expect((adiar.fn.mock.calls[0]![0] as (s: number) => string)(5)).toBe("Ganho em 5 s");
+    expect(adiar.fn.mock.calls[0]![1]).toBe("Desfazer");
+    await (adiar.fn.mock.calls[0]![2] as () => Promise<unknown>)();
+    expect(ganhar).toHaveBeenCalledWith({ leadId: "lead-1" });
     expect(mover).not.toHaveBeenCalled();
   });
 

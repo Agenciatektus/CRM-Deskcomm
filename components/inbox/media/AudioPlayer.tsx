@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
+import { cn } from "@/lib/utils";
 
 import { Pause, Play } from "@/lib/ui/icons";
-import { cn } from "@/lib/utils";
 
 import { MediaUnavailable } from "./MediaUnavailable";
 import { mediaSrc } from "./media-utils";
@@ -11,6 +11,20 @@ import { useAoAparecer } from "./useAoAparecer";
 import { useFonteComReserva } from "./useFonteComReserva";
 
 const RATES = [1, 1.5, 2] as const;
+
+/**
+ * A forma da onda: a mensagem de voz não traz a amostragem, então as alturas
+ * saem do id (estáveis entre renders e iguais para quem abrir a mesma conversa).
+ * A informação é a do trecho ouvido, não a do volume.
+ */
+export function ondaDe(id: string, barras = 28): number[] {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i += 1) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return Array.from({ length: barras }, (_, i) => {
+    h = Math.imul(h ^ (i + 1), 2654435761) >>> 0;
+    return 30 + (h % 70);
+  });
+}
 
 function fmt(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -21,7 +35,12 @@ function fmt(seconds: number): string {
 
 interface Props {
   messageId: string;
-  isOutbound: boolean;
+  /**
+   * Mantido por compatibilidade: desde o visual v2 (fase 3.5) a bolha enviada
+   * é o accent SUAVE com texto escuro, e o player usa as mesmas cores nos dois
+   * lados. O branco-sobre-accent de antes sumia na bolha nova.
+   */
+  isOutbound?: boolean;
   /** Fonte alternativa para mídia de NOTA interna (#1863, F3) — ver ImageMedia. */
   src?: string;
   /** Para onde ir se `src` falhar (a URL assinada venceu): ver `useFonteComReserva`. */
@@ -29,7 +48,7 @@ interface Props {
 }
 
 /** Player de voz estilo WhatsApp: play/pause, progresso seekável, tempo, 1x/1.5x/2x. */
-export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
+export function AudioPlayer({ messageId, src, srcReserva }: Props) {
   const t = useT();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -108,8 +127,14 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
     setCurrent(value);
   };
 
+  const progresso = safeDuration > 0 ? current / safeDuration : 0;
+
+  // `.audio` do quadro DS: play redondo de 38 na marca (no escuro, o degradê),
+  // onda com o trecho ouvido pintado, e ao lado a duração e a velocidade. O
+  // `<input type="range">` fica por cima da onda, invisível: arrastar e as setas
+  // do teclado continuam funcionando, e a onda é só o desenho dele.
   return (
-    <div ref={caixaRef} className="flex w-60 items-center gap-2 py-1">
+    <div ref={caixaRef} className="flex w-62.5 max-w-full items-center gap-2.5 py-0.5">
       <audio
         ref={audioRef}
         src={visivel ? fonte : undefined}
@@ -122,20 +147,28 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
         type="button"
         aria-label={playing ? t("Pausar áudio") : t("Reproduzir áudio")}
         onClick={toggle}
-        className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
-          isOutbound
-            ? "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30"
-            : "bg-primary/10 text-primary hover:bg-primary/20",
-        )}
+        className="pele-grad-icone grid size-9 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {playing ? (
           <Pause size={16} weight="fill" aria-hidden />
         ) : (
-          <Play size={16} weight="fill" aria-hidden />
+          <Play size={16} weight="fill" aria-hidden className="ml-0.5" />
         )}
       </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="relative flex h-7 min-w-0 flex-1 items-center gap-0.5 rounded-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent">
+        {ondaDe(messageId).map((altura, i, todas) => (
+          <i
+            key={i}
+            aria-hidden
+            style={{ height: `${altura}%` }}
+            className={cn(
+              "block min-h-0.75 flex-1 rounded-[2px]",
+              (i + 0.5) / todas.length <= progresso
+                ? "bg-accent dark:bg-(image:--pele-grad)"
+                : "bg-[color-mix(in_oklch,var(--color-text-subtle)_45%,transparent)]",
+            )}
+          />
+        ))}
         <input
           type="range"
           aria-label={t("Progresso do áudio")}
@@ -145,25 +178,22 @@ export function AudioPlayer({ messageId, isOutbound, src, srcReserva }: Props) {
           step="0.1"
           value={current}
           onChange={(e) => seek(Number(e.target.value))}
-          className="h-1 w-full cursor-pointer accent-current"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         />
-        <span className="text-[10px] tabular-nums opacity-70">
-          {fmt(current)} / {fmt(safeDuration)}
-        </span>
       </div>
-      <button
-        type="button"
-        aria-label={`${t("Velocidade de reprodução")}: ${RATES[rateIdx]}x`}
-        onClick={cycleRate}
-        className={cn(
-          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums transition-colors",
-          isOutbound
-            ? "bg-primary-foreground/20 text-primary-foreground"
-            : "bg-primary/10 text-primary",
-        )}
-      >
-        {RATES[rateIdx]}x
-      </button>
+      <div className="flex shrink-0 flex-col items-end gap-0.75">
+        <span className="font-mono text-meta font-normal tabular-nums text-text-muted">
+          {fmt(playing || current > 0 ? current : safeDuration)}
+        </span>
+        <button
+          type="button"
+          aria-label={`${t("Velocidade de reprodução")}: ${RATES[rateIdx]}x`}
+          onClick={cycleRate}
+          className="rounded-lg bg-tint px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-text-muted transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {RATES[rateIdx]}x
+        </button>
+      </div>
     </div>
   );
 }

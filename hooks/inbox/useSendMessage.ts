@@ -25,6 +25,8 @@ interface SendArgs {
   /** A mensagem citada — id da NOSSA linha; o handler traduz para o do canal. */
   reply_to_message_id?: string;
   metadata?: Record<string, unknown>;
+  /** "Tentar de novo" (B15): o id da mensagem de saída que falhou. */
+  reenvio_de?: string;
 }
 
 interface MessagesPage {

@@ -2,6 +2,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { escolherValor, selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
+
 import { DocumentoCanvas } from "./DocumentoCanvas";
 
 const get = vi.hoisted(() => vi.fn());
@@ -117,13 +119,13 @@ describe("DocumentoCanvas", () => {
     render(<DocumentoCanvas propostaId="p1" />);
     const seletor = await screen.findByRole("combobox");
     expect(seletor).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Site institucional" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Site institucional", hidden: true })).toBeInTheDocument();
   });
 
   it("o seletor mostra o modelo da empresa", async () => {
     responderDocumento(docBase());
     render(<DocumentoCanvas propostaId="p1" />);
-    expect(await screen.findByRole("option", { name: "Locação" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Locação", hidden: true })).toBeInTheDocument();
   });
 
   it("o seletor esconde o modelo desligado", async () => {
@@ -134,8 +136,8 @@ describe("DocumentoCanvas", () => {
     );
     render(<DocumentoCanvas propostaId="p1" />);
     await screen.findByRole("combobox");
-    expect(screen.queryByRole("option", { name: "Site institucional" })).toBeNull();
-    expect(screen.getByRole("option", { name: "Locação" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Site institucional", hidden: true })).toBeNull();
+    expect(screen.getByRole("option", { name: "Locação", hidden: true })).toBeInTheDocument();
   });
 
   it("o modelo atual desligado continua no seletor, marcado (desligado)", async () => {
@@ -152,9 +154,9 @@ describe("DocumentoCanvas", () => {
     );
     render(<DocumentoCanvas propostaId="p1" podeRevisar emRascunho />);
     const seletor = await screen.findByLabelText("Modelo do documento");
-    expect(seletor).toHaveValue("site_institucional");
-    expect(screen.getByRole("option", { name: "Site institucional (desligado)" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Site institucional" })).toBeNull();
+    expect(selectDaEscolha(seletor)).toHaveValue("site_institucional");
+    expect(screen.getByRole("option", { name: "Site institucional (desligado)", hidden: true })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Site institucional", hidden: true })).toBeNull();
   });
 });
 
@@ -226,7 +228,7 @@ describe("DocumentoCanvas — P1 (edição)", () => {
     responderDocumento(COM_MODELO);
     const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<DocumentoCanvas propostaId="p1" podeRevisar emRascunho />);
-    fireEvent.change(await screen.findByLabelText("Modelo do documento"), { target: { value: "empresa_locacao" } });
+    escolherValor(await screen.findByLabelText("Modelo do documento"), "empresa_locacao");
     expect(confirmar).toHaveBeenCalled();
     expect(patch).not.toHaveBeenCalled();
     confirmar.mockRestore();
@@ -237,7 +239,7 @@ describe("DocumentoCanvas — P1 (edição)", () => {
     patch.mockResolvedValue({ data: {} });
     const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<DocumentoCanvas propostaId="p1" podeRevisar emRascunho />);
-    fireEvent.change(await screen.findByLabelText("Modelo do documento"), { target: { value: "empresa_locacao" } });
+    escolherValor(await screen.findByLabelText("Modelo do documento"), "empresa_locacao");
     await waitFor(() =>
       expect(patch).toHaveBeenCalledWith("/api/v1/proposals/p1/modelo", { template_slug: "empresa_locacao", descartar_reescritas: true }),
     );

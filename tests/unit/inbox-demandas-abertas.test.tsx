@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { escolherValor, selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -97,10 +98,11 @@ const RESPOSTA = {
 
 const get = vi.fn();
 const patch = vi.fn();
+const post = vi.fn();
 vi.mock("@/lib/api/client", () => ({
   apiClient: {
     get: (...args: unknown[]) => get(...args),
-    post: vi.fn(),
+    post: (...args: unknown[]) => post(...args),
     patch: (...args: unknown[]) => patch(...args),
   },
 }));
@@ -123,8 +125,10 @@ vi.mock("@/hooks/contacts/useUpdateContact", () => ({
 }));
 
 beforeEach(() => {
+  window.localStorage.clear();
   get.mockReset();
   patch.mockReset();
+  post.mockReset();
   patch.mockResolvedValue({ data: { id: "d-1" } });
 });
 
@@ -190,40 +194,9 @@ describe("painel do inbox — demandas abertas", () => {
     expect(com.querySelector('[data-testid="marcar-proximo-passo"]')).toBeNull();
   });
 
-  it("marcar o próximo passo GRAVA e relê do servidor", async () => {
-    get.mockResolvedValue({ data: RESPOSTA });
-    renderPainel();
-    const sem = await screen.findByTestId("demanda-sem-proximo-passo");
-
-    await userEvent.click(sem.querySelector('[data-testid="marcar-proximo-passo"]')!);
-    const campo = await screen.findByTestId("campo-proximo-passo");
-    await userEvent.type(campo, "Enviar a segunda via do boleto");
-    const chamadasAntes = get.mock.calls.length;
-    await userEvent.click(screen.getByTestId("salvar-proximo-passo"));
-
-    await waitFor(() => expect(patch).toHaveBeenCalledTimes(1));
-    const [rota, corpo] = patch.mock.calls[0] as [string, Record<string, unknown>];
-    expect(rota).toBe("/api/v1/demandas/d-1");
-    expect(corpo.proximo_passo).toBe("Enviar a segunda via do boleto");
-    // RELÊ do servidor em vez de apagar da lista no cliente: escrita que só
-    // some da tela é o defeito que este painel inteiro existe para não repetir.
-    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(chamadasAntes));
-  });
-
-  it("falha ao salvar NÃO fecha o campo — o texto não pode evaporar", async () => {
-    get.mockResolvedValue({ data: RESPOSTA });
-    patch.mockRejectedValueOnce(new Error("500"));
-    renderPainel();
-    const sem = await screen.findByTestId("demanda-sem-proximo-passo");
-    await userEvent.click(sem.querySelector('[data-testid="marcar-proximo-passo"]')!);
-    await userEvent.type(await screen.findByTestId("campo-proximo-passo"), "Ligar amanhã");
-    await userEvent.click(screen.getByTestId("salvar-proximo-passo"));
-
-    await waitFor(() => expect(patch).toHaveBeenCalled());
-    // Fechar devolveria a tela ao estado de sucesso com nada gravado.
-    const campo = (await screen.findByTestId("campo-proximo-passo")) as HTMLInputElement;
-    expect(campo.value).toBe("Ligar amanhã");
-  });
+  // "Marcar próximo passo" agora cria TAREFA (revisão do @Cassio_SecRev, P2):
+  // os casos de gravar, falhar e o texto antigo como histórico moram em
+  // tests/unit/demanda-proximo-passo-e-tarefa.test.tsx.
 
   it("a demanda vem ANTES do negócio — a unidade é ela (cap. 5)", async () => {
     get.mockResolvedValue({ data: RESPOSTA });
@@ -235,11 +208,23 @@ describe("painel do inbox — demandas abertas", () => {
     // medida por ferramenta, nunca a olho.
     const posicao = secao.compareDocumentPosition(leads);
     expect(posicao & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Com as abas (visual v2, 3.3) a ordem também é a da NAVEGAÇÃO: a demanda
+    // está no Resumo, que abre por padrão, e o negócio na aba seguinte. Sem
+    // isto, o painel poderia abrir em Negócios e a afirmação acima ficaria
+    // verdadeira só no DOM, falsa para quem olha.
+    const abas = screen.getAllByRole("tab").map((a) => a.textContent);
+    expect(abas.indexOf("Resumo")).toBeLessThan(abas.indexOf("Negócios"));
+    expect(screen.getByRole("tab", { name: "Resumo" })).toHaveAttribute("aria-selected", "true");
+    expect(secao.closest('[role="tabpanel"]')).not.toHaveAttribute("hidden");
   });
 });
 
-// `usePermission` entra com o seletor de etapa do painel; aqui o assunto é outro.
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }), usePermission: () => false }));
+// `true` desde as abas (visual v2): o painel inteiro passou a ler a permissão de
+// gravar (papel `agent`+), e Encerrar demanda / Marcar próximo passo, que este
+// arquivo mede, só aparecem para quem pode gravar. O modo leitura tem caso
+// próprio em `tests/unit/painel-do-lead-abas.test.tsx`.
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { id: "u-1", support: null } }), usePermission: () => true }));
 
 
 describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo contexto", () => {
@@ -248,16 +233,16 @@ describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo c
     get.mockResolvedValue({ data: resposta(1) });
     const view = renderPainel();
     await userEvent.click(await screen.findByRole("button", { name: "Encerrar demanda" }));
-    await userEvent.selectOptions(screen.getByLabelText("Desfecho da demanda"), "perdida");
+    escolherValor(screen.getByLabelText("Desfecho da demanda"), "perdida");
     view.mudarConversa(null);
     expect(screen.queryByLabelText("Desfecho da demanda")).toBeNull();
     get.mockResolvedValue({ data: resposta(2) });
     view.mudarConversa({ ...conversation!, service_revision: 2 });
-    expect((await screen.findByLabelText("Desfecho da demanda") as HTMLSelectElement).value).toBe("perdida");
+    expect(selectDaEscolha(await screen.findByLabelText("Desfecho da demanda")).value).toBe("perdida");
     patch.mockRejectedValueOnce(new Error("409 service_stale"));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar desfecho" }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith("/api/v1/demandas/d-1", { action: "encerrar", desfecho: "perdida", expected_revision: 1 }));
-    expect((screen.getByLabelText("Desfecho da demanda") as HTMLSelectElement).value).toBe("perdida");
+    expect(selectDaEscolha(screen.getByLabelText("Desfecho da demanda")).value).toBe("perdida");
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Não foi possível encerrar. Cancele esta edição e abra novamente para revisar o desfecho.");
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
@@ -269,7 +254,7 @@ describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo c
     get.mockResolvedValue({ data: resposta(1) });
     const view = renderPainel();
     await userEvent.click(await screen.findByRole("button", { name: "Encerrar demanda" }));
-    await userEvent.selectOptions(screen.getByLabelText("Desfecho da demanda"), "perdida");
+    escolherValor(screen.getByLabelText("Desfecho da demanda"), "perdida");
     view.mudarConversa(null);
     view.mudarConversa(kind === "conversa" ? { ...conversation!, id: "cv-2" } : { ...conversation!, contact_id: "outro", contacts: { ...conversation!.contacts!, id: "outro" } });
     await screen.findByRole("button", { name: "Encerrar demanda" });
@@ -284,6 +269,8 @@ describe("desfecho — rascunho atravessa somente lacuna transitória do mesmo c
 it("mostra enriquecimento do contato e esconde ao trocar para outra conversa", async () => {
   get.mockResolvedValue({ data: { ...RESPOSTA, enrichment: { name: "Empresa enriquecida", category: "Clínica", address: "Rua Exemplo", website: "https://example.com", maps_url: "javascript:alert(1)", rating: 4.9, reviews: 123, emails: ["comercial@example.com"], socials: ["https://instagram.com/exemplo", "javascript:alert(1)"], collected_at: "2026-09-16T12:00:00Z" } } });
   const view = renderPainel();
+  // O enriquecimento mora na aba Empresa desde as abas (visual v2, 3.3).
+  await userEvent.click(await screen.findByRole("tab", { name: "Empresa" }));
   expect(await screen.findByText("Empresa enriquecida")).toBeTruthy();
   expect(screen.getByRole("link", { name: "example.com" }).getAttribute("href")).toBe("https://example.com/");
   expect(screen.queryByRole("link", { name: "Ver no Google Maps" })).toBeNull();

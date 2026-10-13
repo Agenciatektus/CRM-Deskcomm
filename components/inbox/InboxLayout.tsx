@@ -1,10 +1,10 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
-import { useCloseConversation } from "@/hooks/inbox/useCloseConversation";
+import { useEncerrarComDesfazer } from "@/hooks/inbox/useEncerrarComDesfazer";
 import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
 import {
   useConversationsRealtime,
@@ -17,25 +17,38 @@ import { InboxFilters, type InboxFiltersValue, type InboxTab } from "./InboxFilt
 import { type ComposerHandle } from "./Composer";
 import { ConversationHeader } from "./ConversationHeader";
 import { PainelDaConversa } from "./PainelDaConversa";
+import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
+import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
+import { escutar, pedir } from "@/lib/ui/comandos-da-tela";
+import { PegadorDeColuna } from "./colunas/PegadorDeColuna";
+import { useLargurasDasColunas } from "./colunas/useLargurasDasColunas";
 import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
+import { useAtalhosPessoais } from "@/hooks/inbox/useAtalhosPessoais";
 
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard, MagnifyingGlass, X } from "@/lib/ui/icons";
+import { CaretLeft, ChatCircle } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { BarraDaConversaNoCelular, FaixaDoLead } from "@/components/mobile/telas/ConversaAberta";
+import { FichaDoLeadNoCelular } from "@/components/mobile/telas/FichaDoLead";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import { MenuDaConversa } from "./menu/MenuDaConversa";
+import { useMenuDaConversa } from "./menu/useMenuDaConversa";
 import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
+import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
 
 /**
  * QUAL COLUNA APARECE NO CELULAR — as duas saem da MESMA pergunta.
  *
- * Abaixo do `md` só cabe uma coluna por vez, então a lista e a conversa se
+ * Abaixo de 760px (o corte do app de celular, `mb:`/`largo:` no globals.css; não o
+ * `md` de 768) só cabe uma coluna por vez, então a lista e a conversa se
  * alternam. O defeito que esta função existe para tornar impossível é as duas
  * decidirem por dados DIFERENTES: a lista somia com `selectedId` (o id) e a
  * conversa aparecia com `selectedConversation` (o objeto já carregado). Entre
@@ -48,12 +61,12 @@ import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
  *      numa tela branca sem nem o botão de voltar.
  *
  * Com uma pergunta só, "as duas escondidas" deixa de ser representável.
- * `md:flex` em ambas: no desktop as duas colunas convivem e a regra não vale.
+ * `largo:flex` em ambas: de 760px para cima as duas colunas convivem e a regra não vale.
  */
 export function colunasDoCelular(temSelecao: boolean): { lista: string; conversa: string } {
   return {
-    lista: temSelecao ? "hidden md:flex" : "flex",
-    conversa: temSelecao ? "flex" : "hidden md:flex",
+    lista: temSelecao ? "hidden largo:flex" : "flex",
+    conversa: temSelecao ? "flex" : "hidden largo:flex",
   };
 }
 
@@ -97,7 +110,7 @@ export function tabToFilter(
       return { status: "archived" };
     case "ai":
       // `ai_handling` é escrito por UM caminho só em produção (a volta pelo botão
-      // "Devolver ao automático"), então a aba vivia mostrando 2 enquanto o robô
+      // "Devolver à IA"), então a aba vivia mostrando 2 enquanto o robô
       // atendia 47. Agora ela pergunta a régua do MOTOR.
       return { comando: ["automatico"] };
     case "all":
@@ -126,6 +139,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const t = useT();
   const { activeOrg, user } = useAuth();
   const supportReadonly = user.support?.access_mode === "support_readonly";
+  const [listaCompacta] = useListaCompacta(user?.id);
   const orgId = activeOrg?.orgId ?? null;
 
   const pathname = usePathname();
@@ -134,10 +148,15 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const idNaUrl = searchParams.get("id");
 
   // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
+  // `?sem_passo=1` é a porta da busca (Ctrl K) vinda de outra tela: "Só
+  // conversas sem próximo passo" abre a Inbox já filtrada.
+  // `?busca=` vem do "Ver todas na lista" da busca do celular: o termo vira o filtro.
+  const buscaNaUrl = searchParams.get("busca");
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
-    search: "",
+    search: buscaNaUrl ?? "",
     onlyUnread: false,
     onlyGroups: false,
+    semPasso: searchParams.get("sem_passo") === "1",
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -158,10 +177,18 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     [tab, searchParams, pathname],
   );
 
+  // A busca que chega com a Inbox já aberta (de novo pelo "Ver todas na lista").
+  const ultimaBusca = useRef(buscaNaUrl);
+  useEffect(() => {
+    if (buscaNaUrl === null || buscaNaUrl === ultimaBusca.current) return;
+    ultimaBusca.current = buscaNaUrl;
+    setAux((a) => ({ ...a, search: buscaNaUrl }));
+  }, [buscaNaUrl]);
+
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
   // limpá-la junto a tiraria do lugar sem ela ter pedido.
   const limparFiltrosAuxiliares = useCallback(() => {
-    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false });
+    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false, semPasso: false });
   }, [tab, setFilterValue]);
 
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? idNaUrl);
@@ -170,18 +197,31 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const [helpOpen, setHelpOpen] = useState(false);
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
-  /**
-   * A busca dentro da conversa (#1793) pertence à CONVERSA em que foi aberta.
-   * Guardar o id junto fecha a busca em qualquer troca — clique, atalho j/k,
-   * voltar do navegador — sem que cada caminho precise lembrar de limpá-la.
-   */
-  const [busca, setBusca] = useState<{ conversaId: string; termo: string } | null>(null);
-  const buscaAberta = busca !== null && busca.conversaId === selectedId;
-  const botaoBuscaRef = useRef<HTMLButtonElement | null>(null);
-  const fecharBusca = useCallback(() => {
-    setBusca(null);
-    botaoBuscaRef.current?.focus();
-  }, []);
+  // Busca nas mensagens (#1793) e coluna do lead: ver `useFerramentasDaConversa`.
+  const ferramentas = useFerramentasDaConversa(selectedId);
+  // Celular (M2.3): o ⋮ da barra da conversa abre o menu da conversa, com o lead primeiro.
+  const celular = useEhCelular();
+  const menuDoCelular = useMenuDaConversa();
+  // "Criar próximo passo" da busca (Ctrl K): o painel do lead precisa estar à
+  // vista (coluna a partir de 1280px, gaveta abaixo disso) antes de rolar até
+  // a seção. O pedido ao painel sai no quadro seguinte, quando ele já montou.
+  const { abrirPainel } = ferramentas;
+  useEffect(
+    () =>
+      escutar("proximo-passo", () => {
+        if (window.matchMedia("(min-width: 1280px)").matches) abrirPainel();
+        else setFichaAberta(true);
+        requestAnimationFrame(() => pedir("painel-proximo-passo"));
+      }),
+    [abrirPainel],
+  );
+  // A mesma ação da busca com a Inbox já aberta: liga o filtro sem recarregar.
+  useEffect(() => escutar("so-sem-passo", () => setAux((a) => ({ ...a, semPasso: true }))), []);
+  // Colunas reguláveis a partir de 1280px (quadro DS, Layout da Inbox): as
+  // larguras viram variáveis CSS no cartão, e os pegadores as mudam. A escolha
+  // é guardada por atendente (localStorage com o id; não há tabela de preferências).
+  const colunasRegulaveis = useLargurasDasColunas(user?.id);
+  const cartaoRef = useRef<HTMLDivElement>(null);
   /**
    * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
    * está aberta: sair dela — clique, atalho ou voltar do navegador — o descarta
@@ -228,6 +268,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       tagMode: filterValue.tagMode,
       unread: filterValue.onlyUnread || undefined,
       is_group: filterValue.onlyGroups || undefined,
+      sem_passo: filterValue.semPasso || undefined,
+      canal: filterValue.canal,
     }),
     [
       filterValue.tab,
@@ -239,6 +281,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       filterValue.tagMode,
       filterValue.onlyUnread,
       filterValue.onlyGroups,
+      filterValue.semPasso,
+      filterValue.canal,
     ],
   );
 
@@ -291,14 +335,16 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const colunas = colunasDoCelular(Boolean(selectedId));
 
   const claim = useClaimConversation();
-  const close = useCloseConversation();
+  const encerrar = useEncerrarComDesfazer();
 
   // A leitura da conversa aberta é do upstream e fica: sem ela o contador de
   // não-lidas nunca zera para quem abre a conversa.
   useMarkAsRead(
     selectedConversation?.id ?? null,
     selectedConversation?.unread_count_for_assignee ?? 0,
+    selectedConversation?.marked_unread ?? false,
   );
+  const atalhosPessoais = useAtalhosPessoais(selectedConversation, supportReadonly);
 
   // Aceita `null`: é o VOLTAR do celular, que limpa a seleção e devolve a lista.
   // É um SUPERCONJUNTO do `handleSelect` do upstream — o tipo dele não aceita
@@ -329,10 +375,11 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       expected_assignee: selectedConversation.assigned_to_user_id,
     });
   }, [claim, selectedConversation]);
+  // "e": fecha na hora, com "Desfazer" no aviso (quadro DS).
   const handleClose = useCallback(() => {
     if (!selectedConversation) return;
-    close.mutate({ conversation_id: selectedConversation.id });
-  }, [close, selectedConversation]);
+    encerrar.fechar(selectedConversation);
+  }, [encerrar, selectedConversation]);
 
   // Altura da grade: a conta desconta TUDO que fica acima e abaixo dela.
   //   3.5rem            TopBar (`h-14`, em components/shell/TopBar.tsx)
@@ -356,28 +403,44 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   // `dvh` em vez de `vh` porque no celular a `vh` ignora a barra do navegador — o
   // mesmo corte, só que pior e mudando conforme se rola a página.
 
-  // TRÊS COLUNAS QUE CABEM — medido, não estimado.
+  // TRÊS COLUNAS, nas medidas do quadro DS ("Layout da Inbox").
   //
-  // O `xl` do Tailwind dispara em 1280px, e era ali que a terceira coluna
-  // nascia: no ponto exato em que não havia espaço para ela. Com a barra de
-  // navegação (240px) sobram 1040px, e o grid pedia 300 + 707 + 320 = 1327 —
-  // o painel de CRM ficava 311px FORA da viewport, alcançável só rolando o
-  // `main` de lado, que ninguém faz. Em 1280 o atendente simplesmente não via
-  // contexto nenhum do cliente.
-  //
-  // Os 707px eram o `min-content` do `ConversationHeader` (a barra de ações
-  // era `shrink-0`), e `1fr` é `minmax(auto, 1fr)`: não encolhe abaixo disso.
-  // Consertado o header, o `1fr` volta a encolher sozinho — `minmax(0,1fr)`
-  // foi medido aqui e não mudou um pixel, então não entrou.
-  //
-  // Duas faixas em vez de uma: compacta onde aperta, generosa onde há espaço.
-  // Em 1280 isso dá 424px de conversa em vez de 372 — 54px de folga sobre o
-  // piso do composer (370px), em vez dos 2px que a versão de uma faixa só
-  // deixava. Margem de 2px não é margem, é sorte.
+  // De 1280px para cima: lista 340, conversa fluida e lead 352, com os
+  // pegadores. A Inbox começa com a 2ª coluna da navegação recolhida (trilho de
+  // 72px), e as medidas cabem: em 1280 sobram 1280 - 72 - 8 = 1200, e a conversa
+  // fica com 508. Se o atendente FIXAR o menu (304px) e faltar espaço, a LISTA
+  // encolhe primeiro, até 280, para a conversa não ficar abaixo de 420; só depois
+  // disso a conversa cede. É o `max(280px, min(lista, 100% - 420px - lead))`
+  // da trilha do grid (os pegadores usam a mesma conta, `PegadorDeColuna`).
+  // De 1024 a 1279 o lead vira gaveta sobre a conversa (`drawer`).
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
-      className="grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]"
+      className={cn(
+        // A altura é o resto EXATO da tela: topo de 56px (`3.5rem`) e o respiro
+        // de baixo do `<main>` na Inbox: `--respiro-do-main`, publicado pelo
+        // próprio `<main>` quando há painel de chamada (a mesma conta do padding
+        // dele), e o `pb-2` (`--space-2`) quando não há. Sem respiro em cima: o cartão encosta no
+        // topo e na barra lateral, como o `.work` do protótipo.
+        "relative grid h-[calc(100dvh-3.5rem-var(--respiro-do-main,max(var(--space-2),var(--rodape-ocupado,0px))))] w-full grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface pele-cartao largo:grid-cols-[300px_minmax(0,1fr)]",
+        // No celular a altura sai da casca do app: o topo que está na tela (nenhum com
+        // a conversa aberta, que tem barra própria) e o respiro de baixo do `<main>`,
+        // que no celular já soma a barra inferior e a área segura. Com painel de chamada
+        // é o `--respiro-do-main` publicado pelo `<main>` (a mesma conta do padding dele,
+        // `estiloDaReserva`); sem, a barra mais o maior entre o `pb-2` e o rodapé. E o
+        // teclado do iPhone (`--mb-teclado`, `useAlturaDoTeclado`), para o composer subir.
+        "mb:h-[calc(100dvh-var(--mb-casca-topo)-var(--mb-teclado,0px)-var(--respiro-do-main,calc(var(--mb-casca-baixo)+max(var(--space-2),var(--rodape-ocupado,0px)))))]",
+        ferramentas.painelLead
+          ? "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px-var(--largura-do-painel))))_minmax(0,1fr)_var(--largura-do-painel)]"
+          : "xl:grid-cols-[max(280px,min(var(--largura-da-lista),calc(100%-420px)))_minmax(0,1fr)]",
+      )}
+      ref={cartaoRef}
+      style={
+        {
+          "--largura-da-lista": `${colunasRegulaveis.larguras.lista}px`,
+          "--largura-do-painel": `${colunasRegulaveis.larguras.painel}px`,
+        } as CSSProperties
+      }
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
        * já publica (`LeadDossier`), e pela mesma razão: quando a entrega morre,
@@ -416,12 +479,13 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       */}
       <div
         className={cn(
-          "h-full min-h-0 flex-col border-r border-border md:flex",
+          "pele-ruido h-full min-h-0 flex-col border-r border-border largo:flex",
           colunas.lista,
         )}
       >
         <InboxFilters value={filterValue} onChange={setFilterValue} />
-        <div className="min-h-0 flex-1 overflow-hidden">
+        {/* Modo compacto (quadro DS): a linha da lista com 8px, por atendente. */}
+        <div className="min-h-0 flex-1 overflow-hidden" data-densidade={listaCompacta ? "compacta" : undefined}>
           <ConversationList
             listQuery={listQ}
             filters={filters}
@@ -447,7 +511,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       */}
       <div
         className={cn(
-          "h-full min-h-0 min-w-0 flex-col md:flex",
+          "h-full min-h-0 min-w-0 flex-col largo:flex",
           colunas.conversa,
         )}
       >
@@ -457,8 +521,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
           que ele é a única saída. A porta da ficha, essa sim, depende da
           conversa, e só aparece quando há uma.
         */}
-        {selectedId && (
-          <div className="flex items-center gap-1 border-b border-border px-1 py-1 md:hidden">
+        {selectedId && !selectedConversation && (
+          <div className="flex items-center gap-1 border-b border-border px-1 py-1 largo:hidden">
             <Button
               variant="ghost"
               size="sm"
@@ -468,22 +532,44 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               <CaretLeft size={16} />
               {t("Conversas")}
             </Button>
-            <div className="flex-1" />
-            {selectedConversation && (
+          </div>
+        )}
+        {selectedConversation && (
+          <>
+            {/* No celular (M2.3): a barra do protótipo (voltar, quem é, Ligar, ⋮) e a
+                faixa do negócio; o cabeçalho do desktop some lá (`mb:hidden`). */}
+            <BarraDaConversaNoCelular
+              conversation={selectedConversation}
+              automaticoDaOrg={automaticoDaOrg}
+              meuUserId={user?.id ?? null}
+              onVoltar={() => handleSelect(null)}
+              onAbrirFicha={() => setFichaAberta(true)}
+              onAbrirMenu={(el) => menuDoCelular.abrir(selectedConversation.id, el, el)}
+            />
+            {celular && selectedConversation.contacts?.id && <FaixaDoLead contactId={selectedConversation.contacts.id} />}
+            {celular && (
+              <MenuDaConversa
+                alvo={menuDoCelular.alvo}
+                conversation={selectedConversation}
+                onFechar={menuDoCelular.fechar}
+                meuUserId={user?.id ?? null}
+                automaticoDaOrg={automaticoDaOrg}
+                selecionada
+                leadPrimeiro
+              />
+            )}
+            {/* Celular (M2.4): a ficha em tela cheia; tablet: a gaveta de sempre. */}
+            {celular ? (
+              <FichaDoLeadNoCelular aberta={fichaAberta} aoMudar={setFichaAberta} conversation={selectedConversation} />
+            ) : (
               <Sheet open={fichaAberta} onOpenChange={setFichaAberta}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 xl:hidden">
-                    <IdentificationCard size={16} />
-                    {t("Ficha")}
-                  </Button>
-                </SheetTrigger>
                 <SheetContent side="right" className="w-[min(22rem,90vw)] overflow-y-auto p-0">
                   <SheetTitle className="sr-only">{t("Ficha do contato")}</SheetTitle>
                   <CRMSidePanel conversation={selectedConversation} />
                 </SheetContent>
               </Sheet>
             )}
-          </div>
+          </>
         )}
         {selectedConversation ? (
           <>
@@ -493,39 +579,19 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               key={selectedConversation.id}
               conversation={selectedConversation}
               onAbrirConversa={handleSelect}
-              onBuscar={() =>
-                buscaAberta
-                  ? fecharBusca()
-                  : setBusca({ conversaId: selectedConversation.id, termo: "" })
-              }
-              buscaAberta={buscaAberta}
-              botaoBuscaRef={botaoBuscaRef}
+              onBuscar={() => ferramentas.alternarBusca(selectedConversation.id)}
+              buscaAberta={ferramentas.buscaAberta}
+              botaoBuscaRef={ferramentas.botaoBuscaRef}
+              painelAberto={ferramentas.painelLead}
+              onAlternarPainel={ferramentas.alternarPainel}
+              onAbrirFicha={() => setFichaAberta(true)}
             />
-            {buscaAberta && (
-              <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
-                <MagnifyingGlass size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                <input
-                  type="search"
-                  autoFocus
-                  className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-hidden placeholder:text-muted-foreground"
-                  aria-label={t("Buscar nas mensagens carregadas")}
-                  placeholder={t("Buscar nas mensagens carregadas")}
-                  value={busca.termo}
-                  onChange={(e) => setBusca({ conversaId: busca.conversaId, termo: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") fecharBusca();
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-11 shrink-0 px-0 lg:w-8"
-                  aria-label={t("Fechar busca")}
-                  onClick={fecharBusca}
-                >
-                  <X size={16} aria-hidden />
-                </Button>
-              </div>
+            {ferramentas.buscaAberta && (
+              <CampoDeBuscaNaConversa
+                termo={ferramentas.termoDaBusca}
+                onTermo={ferramentas.mudarTermo}
+                onFechar={ferramentas.fecharBusca}
+              />
             )}
             {/* A conversa e o campo de resposta — a MESMA peça do dossiê do
                 negócio no Kanban. Ver `PainelDaConversa`. */}
@@ -535,7 +601,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               key={`painel:${selectedConversation.id}`}
               ref={composerRef}
               conversation={selectedConversation}
-              searchTerm={buscaAberta ? busca.termo : ""}
+              searchTerm={ferramentas.termoDaBusca}
               onAbrirConversa={handleSelect}
               // O aviso é DA conversa da URL: trocar de conversa dentro da inbox
               // não pode deixar um texto sugerido no campo de outra pessoa.
@@ -549,16 +615,41 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <ChatCircle size={36} weight="thin" className="text-text-subtle" aria-hidden />
-            <p className="text-sm font-medium text-text-muted">{t("Selecione uma conversa")}</p>
-            <p className="text-xs text-text-muted">{t("Ou navegue com J e K")}</p>
+            {/* E1: o texto do protótipo, e a dica de teclado continua. */}
+            <p className="text-sm font-medium text-text-muted">{t("Escolha uma conversa")}</p>
+            <p className="text-xs text-text-muted">{t("A fila mostra primeiro quem espera há mais tempo.")}</p>
+            <p className="text-xs text-text-subtle">{t("Ou navegue com J e K")}</p>
           </div>
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block">
-        <CRMSidePanel conversation={selectedConversation} />
-      </div>
+      {ferramentas.painelLead && (
+        <div className="hidden h-full min-h-0 min-w-0 xl:block">
+          <CRMSidePanel conversation={selectedConversation} />
+        </div>
+      )}
 
+      {/* Os pegadores das colunas (o `.rz` do protótipo), a partir de 1280px. */}
+      <PegadorDeColuna
+        coluna="lista"
+        larguras={colunasRegulaveis.larguras}
+        cartaoRef={cartaoRef}
+        comPainel={ferramentas.painelLead}
+        mover={colunasRegulaveis.mover}
+        confirmar={colunasRegulaveis.confirmar}
+        restaurar={colunasRegulaveis.restaurar}
+      />
+      {ferramentas.painelLead && (
+        <PegadorDeColuna
+          coluna="painel"
+          larguras={colunasRegulaveis.larguras}
+          cartaoRef={cartaoRef}
+          comPainel
+          mover={colunasRegulaveis.mover}
+          confirmar={colunasRegulaveis.confirmar}
+          restaurar={colunasRegulaveis.restaurar}
+        />
+      )}
       <InboxKeyboardShortcuts
         visibleIds={visibleIds}
         selectedId={selectedId}
@@ -567,6 +658,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         onClaim={supportReadonly ? () => {} : handleClaim}
         onClose={supportReadonly ? () => {} : handleClose}
         onToggleHelp={() => setHelpOpen((v) => !v)}
+        {...atalhosPessoais}
       />
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

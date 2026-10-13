@@ -39,7 +39,7 @@ export function UserMenu() {
           <Button variant="ghost" size="icon" className="rounded-full" aria-label={t("Menu do usuário")}>
             <Avatar className="h-8 w-8">
               {user.avatar_url && <AvatarImage src={user.avatar_url} alt="" />}
-              <AvatarFallback>{initials(user.full_name, user.email)}</AvatarFallback>
+              <AvatarFallback className="pele-grad">{initials(user.full_name, user.email)}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>

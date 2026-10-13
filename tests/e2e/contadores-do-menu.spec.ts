@@ -125,6 +125,11 @@ async function abrirCaso(): Promise<void> {
   casoId = (data as { id: string }).id;
 }
 
+/**
+ * Visual v2: "Navegação principal" é a COLUNA do grupo da rota (a barra tem um
+ * trilho de grupos ao lado). Os casos abaixo abrem a tela do próprio grupo
+ * (`/app/ai/cases`, `/app/inbox`), então o item medido está na coluna sem clique.
+ */
 const sidebar = (page: Page) => page.getByRole("navigation", { name: "Navegação principal" });
 const itemDoMenu = (page: Page, href: string) => sidebar(page).locator(`a[href="${href}"]`);
 
@@ -176,11 +181,13 @@ function gravarMedidas(nome: string, medidas: Record<string, unknown>): void {
  */
 async function folgaDoMenu(page: Page): Promise<number> {
   return page.evaluate(() => {
+    // Na coluna, quem rola é a área logo abaixo do título do grupo.
     const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
-    const cs = getComputedStyle(nav);
+    const area = nav.querySelector("h2 + div") ?? nav;
+    const cs = getComputedStyle(area);
     const fimDaCaixa =
-      nav.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
-    const filhos = [...nav.children].map((c) => c.getBoundingClientRect().bottom);
+      area.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
+    const filhos = [...area.children].map((c) => c.getBoundingClientRect().bottom);
     return Math.round(fimDaCaixa - Math.max(...filhos));
   });
 }
@@ -253,7 +260,8 @@ test.describe("contadores do menu", () => {
       folga_do_menu_px: await folgaDoMenu(page),
       menu_rola: await page.evaluate(() => {
         const nav = document.querySelector('nav[aria-label="Navegação principal"]')!;
-        return nav.scrollHeight > Math.round(nav.getBoundingClientRect().height) + 1;
+        const area = nav.querySelector("h2 + div") ?? nav;
+        return area.scrollHeight > Math.round(area.getBoundingClientRect().height) + 1;
       }),
     });
 

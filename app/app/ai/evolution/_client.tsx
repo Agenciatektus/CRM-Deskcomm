@@ -14,11 +14,11 @@ import {
 } from "recharts";
 
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EvolutionGaps } from "@/components/ai/EvolutionGaps";
 import { EvolutionTimeline } from "@/components/ai/EvolutionTimeline";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useEvolution } from "@/hooks/ai/useEvolution";
 import type { EvolutionPayload } from "@/lib/ai/evolution/aggregate";
 import { useT } from "@/hooks/i18n/useT";
@@ -363,25 +363,21 @@ export function EvolutionClient({ defaultRange }: { defaultRange: { from: string
             <Label htmlFor="evolution-de" className="text-xs text-text-muted">
               {t("De")}
             </Label>
-            <Input
+            <CampoDeData tipo="date"
               id="evolution-de"
-              type="date"
               value={from}
               max={to}
-              onChange={(e) => setFrom(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setFrom(valorEscolhido)} />
           </div>
           <div className="space-y-1">
             <Label htmlFor="evolution-ate" className="text-xs text-text-muted">
               {t("Até")}
             </Label>
-            <Input
+            <CampoDeData tipo="date"
               id="evolution-ate"
-              type="date"
               value={to}
               min={from}
-              onChange={(e) => setTo(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setTo(valorEscolhido)} />
           </div>
         </div>
       </Card>

@@ -39,7 +39,12 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({
   useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support: null } }) }));
+// `usePermission` entrou com as abas (visual v2): o painel lê a permissão de
+// gravar. Com `true` o botão fica habilitado, como para quem atende.
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({ user: { id: "u-1", support: null } }),
+  usePermission: () => true,
+}));
 
 beforeEach(() => {
   get.mockReset();
@@ -47,15 +52,21 @@ beforeEach(() => {
 });
 
 describe("painel do inbox — o botão de tags diz de quem é a tag", () => {
-  it("o botão se chama 'Tags do contato', e não só 'Tag'", async () => {
+  // Visual v2: o texto VISÍVEL virou "+ Etiqueta" (o rótulo curto do protótipo),
+  // mas o NOME ACESSÍVEL continua dizendo de quem é: "Etiqueta do contato". É
+  // ele que distingue este botão da seção "Tags da conversa" para quem usa leitor
+  // de tela e para o `title` de quem passa o mouse.
+  it("o botão se chama 'Etiqueta do contato', e não só 'Tag' ou 'Etiqueta'", async () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <CRMSidePanel conversation={conversation} />
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole("button", { name: "Tags do contato" })).toBeTruthy();
-    // Guarda contra a volta do rótulo ambíguo: "Tag" exato, não o prefixo.
+    const botao = await screen.findByRole("button", { name: "Etiqueta do contato" });
+    expect(botao).toHaveAttribute("title", "Etiqueta do contato");
+    // Guarda contra a volta do rótulo ambíguo: "Tag"/"Etiqueta" exatos, não o prefixo.
     expect(screen.queryByRole("button", { name: "Tag" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Etiqueta" })).toBeNull();
   });
 });

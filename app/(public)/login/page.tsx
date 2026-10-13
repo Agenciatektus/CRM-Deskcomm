@@ -31,7 +31,7 @@ export default async function LoginPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Entrar")}</h1>
+        <h1 className="text-title-lg">{t("Entrar")}</h1>
         <p className="text-sm text-muted-foreground">{branding().name}</p>
       </div>
       {reset === "success" && (

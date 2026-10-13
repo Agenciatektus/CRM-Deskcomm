@@ -36,6 +36,18 @@ export interface AttendantAvailability {
 }
 
 const ATTENDANTS_KEY = ["team", "attendants"] as const;
+/**
+ * Chave própria do "meu estado". Começa com a do roster de propósito: um
+ * `invalidateQueries(ATTENDANTS_KEY)` alcança as duas, mas o PATCH invalida as
+ * duas EXPLICITAMENTE para a regra não depender de um prefixo coincidente.
+ */
+const MINHA_KEY = ["team", "attendants", "me"] as const;
+
+/** O que `GET /api/v1/attendants/availability/me` devolve: só o próprio estado. */
+export interface MinhaDisponibilidade {
+  user_id: string;
+  is_available: boolean;
+}
 const ROUTING_KEY = ["settings", "routing"] as const;
 
 /** Disponibilidade + carga da equipe (org-wide, agent+). */
@@ -48,6 +60,22 @@ export function useAttendants() {
   });
 }
 
+/**
+ * A chave de plantão de quem está logado, para o botão do topo. Rota própria
+ * (`/availability/me`) em vez do roster: o roster resolve nome e e-mail de toda
+ * a equipe pelo admin client, e o topo aparece em todas as telas. `null` = a
+ * pessoa nunca configurou (sem linha).
+ */
+export function useMinhaDisponibilidade(enabled: boolean) {
+  return useQuery({
+    queryKey: MINHA_KEY,
+    enabled,
+    queryFn: async () =>
+      apiClient.get<{ data: MinhaDisponibilidade | null }>("/api/v1/attendants/availability/me"),
+    staleTime: 30_000,
+  });
+}
+
 export interface AvailabilityUpdate {
   is_available?: boolean;
   capacity?: number;
@@ -55,7 +83,11 @@ export interface AvailabilityUpdate {
 }
 
 /** PATCH disponibilidade de um atendente (próprio OU manager+; a API enforça). */
-export function useUpdateAvailability() {
+export function useUpdateAvailability(
+  /** Aviso de sucesso JÁ traduzido. Sem ele, o da Equipe ("Atendente atualizado."); o
+   *  botão do topo fala da própria disponibilidade. */
+  mensagemDeSucesso?: string,
+) {
   const qc = useQueryClient();
   const t = useT();
   return useMutation({
@@ -66,8 +98,9 @@ export function useUpdateAvailability() {
       ),
     onError: (err) => showApiError(err),
     onSuccess: () => {
-      toast.success(t("Atendente atualizado."));
+      toast.success(mensagemDeSucesso ?? t("Atendente atualizado."));
       qc.invalidateQueries({ queryKey: ATTENDANTS_KEY });
+      qc.invalidateQueries({ queryKey: MINHA_KEY });
     },
   });
 }

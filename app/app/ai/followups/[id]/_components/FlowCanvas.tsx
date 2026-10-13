@@ -321,7 +321,7 @@ function FlowCanvasInner({ flowId, initialData }: Props) {
   );
 
   return (
-    <div className="flex h-full min-h-[600px] w-full flex-col">
+    <div className="flex h-full min-h-[600px] w-full flex-col mb:min-h-0">
       {flow && (
         <PublishBar
           flowId={flowId}

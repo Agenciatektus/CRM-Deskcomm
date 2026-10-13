@@ -30,6 +30,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,72 +183,75 @@ export function PainelDeProvedores() {
   const semChave = dados.credenciais.length === 0;
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-6" data-testid="painel-de-provedores">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Provedores de IA")}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          {t("Seu sistema usa inteligência artificial em")} {dados.pontos.length}{" "}
-          {t("lugares diferentes. Aqui você vê qual está atendendo cada um — e troca, se quiser.")}
-        </p>
-      </header>
+    <Pagina className="max-w-5xl" testId="painel-de-provedores">
+      <CabecalhoDaPagina
+        titulo={t("Provedores de IA")}
+        descricao={
+          <>
+            {t("Seu sistema usa inteligência artificial em")} {dados.pontos.length}{" "}
+            {t("lugares diferentes. Aqui você vê qual está atendendo cada um — e troca, se quiser.")}
+          </>
+        }
+      />
+      <div className="mb:px-4">
+        {semChave && (
+          <Card className="mb-6 border-amber-500/40 bg-amber-500/5 p-4" data-testid="aviso-sem-chave">
+            <p className="text-sm">
+              {t("Você ainda não cadastrou a chave da sua IA principal, a que conversa com os clientes.")}{" "}
+              {/* Só é verdade quando a instalação tem chave; sem ela, a frase
+                  contradizia o cartão do Jev logo abaixo. */}
+              {dados.instalacaoTemChave && t("Enquanto isso, o atendimento usa a chave que veio na instalação.")}{" "}
+              <Link className="underline underline-offset-4" href="/app/ai/credentials">
+                {t("Cadastrar uma chave")}
+              </Link>
+            </p>
+          </Card>
+        )}
 
-      {semChave && (
-        <Card className="mb-6 border-amber-500/40 bg-amber-500/5 p-4" data-testid="aviso-sem-chave">
-          <p className="text-sm">
-            {t("Você ainda não cadastrou a chave da sua IA principal, a que conversa com os clientes.")}{" "}
-            {/* Só é verdade quando a instalação tem chave; sem ela, a frase
-                contradizia o cartão do Jev logo abaixo. */}
-            {dados.instalacaoTemChave && t("Enquanto isso, o atendimento usa a chave que veio na instalação.")}{" "}
-            <Link className="underline underline-offset-4" href="/app/ai/credentials">
-              {t("Cadastrar uma chave")}
-            </Link>
-          </p>
-        </Card>
-      )}
+        <CartaoDoPadrao dados={dados} aoSalvar={carregar} />
 
-      <CartaoDoPadrao dados={dados} aoSalvar={carregar} />
+        <CartaoDoJev dados={jev.dados} erro={jev.erro} recarregar={jev.recarregar} />
 
-      <CartaoDoJev dados={jev.dados} erro={jev.erro} recarregar={jev.recarregar} />
-
-      <div className="space-y-8">
-        {porPapel.map(({ papel, info, pontos }) => (
-          <section key={papel} data-testid={`papel-${papel}`}>
-            <div className="mb-3">
-              <h2 className="text-lg font-medium">{t(info.rotulo)}</h2>
-              <p className="text-sm text-muted-foreground">{t(info.explicacao)}</p>
-            </div>
-
-            <ResumoDoGrupo pontos={pontos} />
-
-            <div className="mt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid={`avancado-${papel}`}
-                onClick={() => setAvancado((a) => ({ ...a, [papel]: !a[papel] }))}
-              >
-                {avancado[papel] ? t("Ocultar") : t("Configuração avançada")} ({pontos.length}{" "}
-                {pontos.length === 1 ? t("ponto") : t("pontos")})
-              </Button>
-            </div>
-
-            {avancado[papel] && (
-              <div className="mt-3 space-y-3">
-                {pontos.map((ponto) => (
-                  <CartaoDoPonto
-                    key={ponto.id}
-                    ponto={ponto}
-                    dados={dados}
-                    jev={jev.dados}
-                    aoSalvar={carregar}
-                  />
-                ))}
+        <div className="space-y-8">
+          {porPapel.map(({ papel, info, pontos }) => (
+            <section key={papel} data-testid={`papel-${papel}`}>
+              <div className="mb-3">
+                <h2 className="text-lg font-medium">{t(info.rotulo)}</h2>
+                <p className="text-sm text-muted-foreground">{t(info.explicacao)}</p>
               </div>
-            )}
-          </section>
-        ))}
+
+              <ResumoDoGrupo pontos={pontos} />
+
+              <div className="mt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid={`avancado-${papel}`}
+                  onClick={() => setAvancado((a) => ({ ...a, [papel]: !a[papel] }))}
+                >
+                  {avancado[papel] ? t("Ocultar") : t("Configuração avançada")} ({pontos.length}{" "}
+                  {pontos.length === 1 ? t("ponto") : t("pontos")})
+                </Button>
+              </div>
+
+              {avancado[papel] && (
+                <div className="mt-3 space-y-3">
+                  {pontos.map((ponto) => (
+                    <CartaoDoPonto
+                      key={ponto.id}
+                      ponto={ponto}
+                      dados={dados}
+                      jev={jev.dados}
+                      aoSalvar={carregar}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
       </div>
-    </div>
+    </Pagina>
   );
 }
 

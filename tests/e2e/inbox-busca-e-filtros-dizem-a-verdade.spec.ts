@@ -127,7 +127,9 @@ test('"Não lidos" VAI ao servidor — o defeito era filtrar a página carregada
     if (r.url().includes("unread=true")) comUnread.push(r.url());
   });
 
-  await page.getByRole("button", { name: /Não lidos/i }).click();
+  // Visual v2: o filtro mora no popover de "Filtros", como interruptor.
+  await page.getByRole("button", { name: /^Filtros/ }).click();
+  await page.getByRole("switch", { name: /Só não lidas/i }).click();
 
   await expect
     .poll(() => comUnread.length, { timeout: 5_000 })
@@ -173,5 +175,8 @@ test('a aba "Fechadas" mostra número', async ({ page }) => {
   expect(fechada.ok(), await fechada.text()).toBe(true);
 
   await page.reload();
-  await expect(page.getByRole("tab", { name: /Fechadas/i })).toHaveText(/\d/);
+  // Visual v2: "Fechadas" saiu da faixa de abas e foi para o menu "Mais", com a
+  // contagem ao lado do nome.
+  await page.getByRole("button", { name: /^Mais/ }).click();
+  await expect(page.getByRole("menuitemradio", { name: /Fechadas/i })).toHaveText(/\d/);
 });

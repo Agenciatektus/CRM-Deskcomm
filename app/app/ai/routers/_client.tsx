@@ -5,6 +5,7 @@ import { useRouter as useNextRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
+import { BotaoDaTela } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -56,13 +57,14 @@ export function RoutersClient({ initialState, channelSessions }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex sm:justify-end">
-        {canManagePerm && (
+      {canManagePerm && (
+        <div className="flex sm:justify-end mb:hidden">
           <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
             <Plus /> {t("Novo roteador")}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
+      {canManagePerm && <BotaoDaTela rotulo={t("Novo roteador")} aoTocar={() => setCreateOpen(true)} />}
 
       {routers.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 p-10 text-center">

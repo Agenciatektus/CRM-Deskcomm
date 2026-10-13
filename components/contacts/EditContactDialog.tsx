@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
@@ -20,6 +20,7 @@ import { normalizarTags } from "@/lib/contacts/tag-normalizada";
 import { contactPatchSchemaDoPais, type ContactPatch } from "@/lib/schemas/contacts";
 import { useUpdateContact } from "@/hooks/contacts/useUpdateContact";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import type { Contact } from "@/lib/types/contacts";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
@@ -131,7 +132,20 @@ export function EditContactDialog({ contact, open, onOpenChange, customFieldDefs
           </div>
           <div className="space-y-2">
             <Label htmlFor="ec-birthdate">{t("Data de nascimento")}</Label>
-            <Input id="ec-birthdate" type="date" {...form.register("birthdate")} />
+            <Controller
+              control={form.control}
+              name="birthdate"
+              render={({ field }) => (
+                <CampoDeData
+                  tipo="date"
+                  id="ec-birthdate"
+                  name={field.name}
+                  value={field.value ?? ""}
+                  onValorChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ec-tags">{t("Tags")}</Label>

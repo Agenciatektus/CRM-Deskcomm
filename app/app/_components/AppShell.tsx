@@ -1,8 +1,12 @@
 "use client";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import type { FunilDoMenu } from "@/lib/navigation/funis-no-menu";
 import { TopBar } from "@/components/shell/TopBar";
+import { ConviteDeInstalacao } from "@/components/pwa/ConviteDeInstalacao";
+import { CascaDoCelular } from "@/components/mobile/CascaDoCelular";
+import { FunisDoMenuProvider } from "@/components/mobile/FunisDoMenu";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
 import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessageAlerts";
@@ -10,9 +14,37 @@ import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
 import { useCrmAlerts } from "@/hooks/notifications/useCrmAlerts";
 import { useNotifyOpenFromServiceWorker } from "@/lib/notifications/notify_open";
 import { estiloDaReserva, useOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
+import { cn } from "@/lib/utils";
+
+/**
+ * A INBOX ENCOSTA NA MOLDURA (o `.work` do protótipo: `margin: 0 8px 8px 0`).
+ * Ela é uma área de trabalho de tela inteira, e o `p-6` das outras telas comia
+ * 24px em cima e à esquerda da conversa sem servir a nada: a Inbox já desenha o
+ * próprio cartão. As outras telas continuam com o `p-6` de sempre. A altura do
+ * cartão desconta exatamente este respiro (ver `InboxLayout`).
+ */
+/**
+ * O estilo do `<main>`: a reserva do rodapé (quando há peça fixa) e, junto, a
+ * MESMA medida publicada em `--respiro-do-main`, que o cartão da Inbox desconta
+ * da própria altura. Uma fonte só: com o painel de chamada o `<main>` reserva
+ * `max(24px, ocupação)`, e o cartão descontando outra conta (o piso de 8px)
+ * passaria da tela. Sem peça não há estilo nenhum (o `pb-2`/`p-6` de sempre),
+ * e o cartão cai no `var(--space-2)` de reserva.
+ */
+function estiloDoMain(ocupacao: number): CSSProperties | undefined {
+  const reserva = estiloDaReserva(ocupacao);
+  if (!reserva) return undefined;
+  return { ...reserva, ["--respiro-do-main" as string]: reserva.paddingBottom };
+}
+
+function ehAInbox(pathname: string | null): boolean {
+  return pathname === "/app/inbox" || !!pathname?.startsWith("/app/inbox/");
+}
 
 interface AppShellProps {
   sidebarCollapsed: boolean;
+  /** Na Inbox o menu começa recolhido; fica ao lado só se o atendente fixou. */
+  menuFixoNaInbox?: boolean;
   /**
    * A pessoa pode atender (agent+)? Vem do papel resolvido no layout, e não de
    * uma consulta desta casca.
@@ -30,7 +62,7 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: AppShellProps) {
+export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtender, funis, children }: AppShellProps) {
   useInboundMessageAlerts();
   useInboundCallAlerts();
   useCrmAlerts();
@@ -45,11 +77,15 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
   // o `p-6` inteiro é rodapé. Com o painel de chamada na tela, é ele que
   // decide a faixa que o conteúdo perde, e ninguém mais mede isso por fora.
   const ocupacaoDoRodape = useOcupacaoDoRodape();
+  const naInbox = ehAInbox(usePathname());
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    // A área segura dos lados mora no `body` (globals.css), para valer em toda página.
+    <div className="pele-moldura flex min-h-screen w-full bg-background">
       <BarraDeProgressoNavegacao />
+      {/* Só no celular (abaixo de 760px) e uma vez por aparelho. */}
+      <ConviteDeInstalacao />
       <div className="hidden md:block">
-        <Sidebar collapsed={sidebarCollapsed} funis={funis} />
+        <Sidebar collapsed={sidebarCollapsed} fixoNaInbox={menuFixoNaInbox} funis={funis} />
       </div>
       {/*
         `min-w-0` é o que permite a coluna de conteúdo ENCOLHER. Um flex item
@@ -71,7 +107,12 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
         cima da lista.
       */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <TopBar />
+        {/* Abaixo de 760px o topo e a gaveta saem: entra a casca do app de celular
+            (cabeçalho, barra inferior com as 5 abas, FAB e o menu "Mais"). */}
+        <div className="hidden largo:contents">
+          <TopBar />
+        </div>
+        <CascaDoCelular />
         {/*
           O RODAPÉ DESCONTA O QUE AS PEÇAS FIXAS OCUPAM (issue #1305).
 
@@ -83,11 +124,17 @@ export function AppShell({ sidebarCollapsed, podeAtender, funis, children }: App
           aparece no inspetor quando alguém pergunta quanto o rodapé perdeu.
         */}
         <main
-          className="flex-1 overflow-auto p-6"
-          style={estiloDaReserva(ocupacaoDoRodape)}
+          className={cn(
+            "flex-1 overflow-auto",
+            // No celular o fim da página fica acima da barra inferior.
+            naInbox
+              ? "pr-2 pb-2 mb:pb-[calc(var(--mb-casca-baixo)+var(--space-2))]"
+              : "p-6 mb:pb-[calc(var(--mb-casca-baixo)+1.5rem)]",
+          )}
+          style={estiloDoMain(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >
-          {children}
+          <FunisDoMenuProvider funis={funis}>{children}</FunisDoMenuProvider>
         </main>
       </div>
     </div>

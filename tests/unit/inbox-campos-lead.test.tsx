@@ -1,9 +1,26 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
+
+/**
+ * O negócio mora na aba Negócios desde que o painel ganhou abas (visual v2,
+ * 3.3). As abas ficam montadas, mas a inativa é `hidden`, e o que este arquivo
+ * clica (Salvar, Novo Lead) só é alcançável com a aba aberta, como na tela.
+ */
+async function abrirNegocios() {
+  await userEvent.click(await screen.findByRole("tab", { name: "Negócios" }));
+}
+
+/**
+ * "Empresa" é também o nome da aba (que rotula o painel dela por
+ * `aria-labelledby`): o campo do funil se procura DENTRO da seção do negócio.
+ */
+async function campoEmpresa() {
+  return within(await screen.findByTestId("inbox-campos-lead")).findByLabelText("Empresa");
+}
 
 function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -93,6 +110,7 @@ vi.mock("@/hooks/contacts/useUpdateContact", () => ({
 }));
 
 beforeEach(() => {
+  window.localStorage.clear();
   get.mockReset();
   patch.mockReset();
   patch.mockResolvedValue({ data: { ...LEAD } });
@@ -107,7 +125,7 @@ describe("painel do inbox — campos do lead", () => {
     expect(secao.querySelector("#title")).toBeNull();
     expect(secao.querySelector("#valueReais")).toBeNull();
 
-    const empresa = await screen.findByLabelText("Empresa");
+    const empresa = await campoEmpresa();
     expect((empresa as HTMLInputElement).value).toBe("ACME");
   });
 
@@ -119,14 +137,15 @@ describe("painel do inbox — campos do lead", () => {
 
     const secao = await screen.findByTestId("inbox-campos-lead");
     await waitFor(() => expect(secao.textContent).toMatch(/não tem campos extras/i));
-    expect(screen.queryByLabelText("Empresa")).toBeNull();
+    expect(within(secao).queryByLabelText("Empresa")).toBeNull();
   });
 
   it("gravar manda o campo customizado no PATCH do lead", async () => {
     get.mockResolvedValue({ data: RESPOSTA });
     renderPainel();
+    await abrirNegocios();
 
-    const empresa = await screen.findByLabelText("Empresa");
+    const empresa = await campoEmpresa();
     await userEvent.clear(empresa);
     await userEvent.type(empresa, "Nova Co");
     const chamadasAntes = get.mock.calls.length;
@@ -156,11 +175,12 @@ describe("painel do inbox — campos do lead", () => {
       },
     });
     renderPainel();
+    await abrirNegocios();
 
     await screen.findByTestId("inbox-lead-l-1");
-    expect((screen.getByLabelText("Empresa") as HTMLInputElement).value).toBe("ACME");
+    expect(((await campoEmpresa()) as HTMLInputElement).value).toBe("ACME");
     await userEvent.click(screen.getByTestId("inbox-lead-l-2"));
-    expect((screen.getByLabelText("Empresa") as HTMLInputElement).value).toBe("");
+    expect(((await campoEmpresa()) as HTMLInputElement).value).toBe("");
   });
 
   it("leitura que FALHA não vira 'Sem leads.'", async () => {
@@ -179,6 +199,7 @@ describe("painel do inbox — o botão diz o que faz (issue #908)", () => {
   it("o botão que abre o Novo Lead se chama 'Novo Lead' — e abre o Novo Lead", async () => {
     get.mockResolvedValue({ data: RESPOSTA });
     renderPainel();
+    await abrirNegocios();
 
     const botao = await screen.findByRole("button", { name: "Novo Lead" });
     expect(screen.queryByRole("button", { name: "Lead" })).toBeNull();
@@ -191,9 +212,11 @@ describe("painel do inbox — o botão diz o que faz (issue #908)", () => {
 });
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useAuth: () => ({ user: { support: null } }),
+  useAuth: () => ({ user: { id: "u-1", support: null } }),
   useActiveOrg: () => ({ currency: "BRL", country: null }),
-  // O painel ganhou o seletor de etapa (#28), que pergunta a permissão de mover
-  // o card. Não é o que este arquivo mede: sem permissão ele fica só leitura.
-  usePermission: () => false,
+  // `true` desde as abas (visual v2): o painel inteiro passou a ler a permissão
+  // de gravar (papel `agent`+), e é ela que libera o "Salvar" dos campos que
+  // este arquivo mede. O seletor de etapa continua só leitura aqui porque a
+  // fixture não traz as etapas do funil.
+  usePermission: () => true,
 }));

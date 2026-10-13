@@ -69,6 +69,8 @@ vi.mock("@/hooks/inbox/useClaimConversation", () => ({
 }));
 vi.mock("@/hooks/inbox/useCloseConversation", () => ({
   useCloseConversation: () => ({ mutate: vi.fn(), isPending: false }),
+  useArchiveConversation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useReopenConversation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/components/inbox/CRMSidePanel", () => ({ CRMSidePanel: () => null }));
 vi.mock("@/components/inbox/ConversationList", () => ({

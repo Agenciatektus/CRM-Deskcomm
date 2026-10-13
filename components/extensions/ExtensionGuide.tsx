@@ -161,7 +161,7 @@ export function ExtensionGuide({
 
   if (loading && !guide) {
     return (
-      <main className="mx-auto w-full max-w-4xl p-4 sm:p-6" data-testid="extension-guide-loading">
+      <main className="mx-auto w-full max-w-4xl mb:-mx-6 mb:-mt-6 mb:w-auto mb:p-4" data-testid="extension-guide-loading">
         <Card className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
           <CircleNotch className="animate-spin" aria-hidden />
           {t("Conferindo se o guia continua ativo…")}
@@ -174,12 +174,12 @@ export function ExtensionGuide({
     const removed = errorCode === "extension_removed";
     return (
       <main
-        className="mx-auto w-full max-w-4xl p-4 sm:p-6"
+        className="mx-auto w-full max-w-4xl mb:-mx-6 mb:-mt-6 mb:w-auto mb:p-4"
         data-testid="extension-guide-unavailable"
       >
         <Card className="border-warning/40 bg-warning-bg p-5 sm:p-6" role="alert">
           <Warning size={24} weight="duotone" aria-hidden className="text-warning-fg" />
-          <h1 className="mt-3 text-xl font-semibold">{t("Este guia não está disponível")}</h1>
+          <h1 className="mt-3 text-title-lg">{t("Este guia não está disponível")}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {error ?? t("Não foi possível confirmar o estado atual desta extensão.")}
           </p>
@@ -222,12 +222,12 @@ export function ExtensionGuide({
 
   return (
     <main
-      className="mx-auto flex w-full max-w-4xl flex-col gap-5 p-4 sm:p-6"
+      className="mx-auto flex w-full max-w-4xl flex-col gap-5 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
       data-testid="extension-guide"
     >
       <Link
         href="/app/extensions"
-        className="inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground hover:text-text focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden"
+        className="inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground hover:text-text focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden mb:hidden"
       >
         <CaretLeft aria-hidden />
         {t("Voltar às extensões")}
@@ -241,7 +241,7 @@ export function ExtensionGuide({
           </div>
         </div>
         <div className="p-5 sm:p-7">
-          <h1 className="text-2xl font-semibold tracking-tight">{displayTitle.text}</h1>
+          <h1 className="text-title-lg">{displayTitle.text}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {displaySummary.text}
           </p>

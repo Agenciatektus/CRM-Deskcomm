@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 
@@ -106,18 +107,17 @@ export function CatalogoFinanceiro({ podeEditar }: { podeEditar: boolean }) {
               value={nomeConta}
               onChange={(e) => setNomeConta(e.target.value)}
             />
-            <select
+            <Escolha
               aria-label={t("Tipo da conta")}
-              className="min-h-11 rounded-md border p-2"
               value={tipoConta}
-              onChange={(e) => setTipoConta(e.target.value)}
+              onValueChange={(valorEscolhido) => setTipoConta(valorEscolhido)}
             >
               {Object.entries(TIPO_DE_CONTA).map(([v, r]) => (
                 <option key={v} value={v}>
                   {t(r)}
                 </option>
               ))}
-            </select>
+            </Escolha>
             <Button
               className="min-h-11"
               disabled={nomeConta.trim().length < 2 || criar.isPending}
@@ -161,11 +161,10 @@ export function CatalogoFinanceiro({ podeEditar }: { podeEditar: boolean }) {
               value={nomeForma}
               onChange={(e) => setNomeForma(e.target.value)}
             />
-            <select
+            <Escolha
               aria-label={t("Conta de destino")}
-              className="min-h-11 rounded-md border p-2"
               value={contaDaForma}
-              onChange={(e) => setContaDaForma(e.target.value)}
+              onValueChange={(valorEscolhido) => setContaDaForma(valorEscolhido)}
             >
               <option value="">{t("Decidir depois")}</option>
               {(contas.data ?? []).map((c) => (
@@ -173,7 +172,7 @@ export function CatalogoFinanceiro({ podeEditar }: { podeEditar: boolean }) {
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
             <Button
               className="min-h-11"
               disabled={nomeForma.trim().length < 2 || criar.isPending}
@@ -229,16 +228,15 @@ export function CatalogoFinanceiro({ podeEditar }: { podeEditar: boolean }) {
               que existia e não distinguia nada, porque quem cadastra depressa
               aceita o que já vem preenchido.
             */}
-            <select
+            <Escolha
               aria-label={t("Entrada ou saída")}
-              className="min-h-11 rounded-md border p-2"
               value={direcaoPlano}
-              onChange={(e) => setDirecaoPlano(e.target.value as "in" | "out" | "")}
+              onValueChange={(valorEscolhido) => setDirecaoPlano(valorEscolhido as "in" | "out" | "")}
             >
               <option value="">{t("Entrada ou saída?")}</option>
               <option value="in">{t("Entrada")}</option>
               <option value="out">{t("Saída")}</option>
-            </select>
+            </Escolha>
             <Button
               className="min-h-11"
               disabled={nomePlano.trim().length < 2 || !direcaoPlano || criar.isPending}

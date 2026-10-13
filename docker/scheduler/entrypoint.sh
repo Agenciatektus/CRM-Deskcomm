@@ -87,6 +87,10 @@ CRONS="
 # antes em avisar entre 30 e 45 minutos antes. Barato: só olha compromisso
 # confirmado, futuro e ainda não avisado.
 */5 * * * *|45|api/v1/cron/agenda-reminder
+# A HORA DA TAREFA (migration 9043). Minuto a minuto, e não a cada 5 como o
+# lembrete da Agenda: o aviso promete a HORA, e quem marcou 14h espera o push
+# às 14h. Barato: o índice parcial só tem tarefa aberta, com prazo e não avisada.
+* * * * *|25|api/v1/cron/task-due-reminder
 */15 * * * *|45|api/v1/cron/agenda-expira-pendentes
 */15 * * * *|60|api/v1/cron/risk-watcher
 # O CASO PARADO. De hora em hora, e não a cada 5 minutos: o prazo é de 24h, e

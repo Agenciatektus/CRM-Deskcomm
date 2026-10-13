@@ -373,7 +373,7 @@ async function zernioInbound(
   // criar uma conversa do nada, com um texto sem nada antes dele.
   const edicao = parseZernioEdicao(payload);
   if (edicao) {
-    const desfecho = await aplicarEdicaoZernio(admin, input.session.organization_id, edicao);
+    const desfecho = await aplicarEdicaoZernio(admin, input.session.organization_id, input.session.id, edicao);
     return { ok: true, body: { status: "edicao", tipo: edicao.tipo, desfecho } };
   }
 

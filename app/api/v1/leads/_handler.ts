@@ -1037,6 +1037,7 @@ export async function moveLeadHandler(
     etapaDeDestino: stage,
     motivo: input.lost_reason,
     motivoAtual: (lead as { lost_reason?: string | null }).lost_reason ?? null,
+    settingsDoFunil: settings,
     idioma: ctx.idioma,
   });
   if (!veredito.ok) {

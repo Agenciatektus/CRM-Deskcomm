@@ -289,3 +289,11 @@ describe("CONTROLE: o emulador de ILIKE mede o que diz medir", () => {
     expect(padraoCasa("%PAULO LIMA%", PAULO_LIMA_JR)).toBe(true);
   });
 });
+
+describe("teto do termo também na porta do handler (MCP), P2 da #154", () => {
+  it("termo acima de 100 caracteres: lista vazia, sem erro e sem consultar", async () => {
+    const r = await busca("a".repeat(101));
+    expect(r.resultado.contacts).toEqual([]);
+    expect(r.aberturas).toBe(0);
+  });
+});

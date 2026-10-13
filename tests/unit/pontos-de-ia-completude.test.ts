@@ -55,7 +55,17 @@ function purposesDoTexto(texto: string, arquivo = "source.ts"): string[] {
       const enqueueResult = ts.isObjectLiteralExpression(object) && ts.isReturnStatement(object.parent) &&
         object.properties.some(p => ts.isPropertyAssignment(p) && p.name.getText(ast) === "kind" &&
           ts.isStringLiteralLike(p.initializer) && p.initializer.text === "enqueue_turn");
-      if (!enqueueResult) result.push(...literals(node.initializer));
+      // Ícone do manifesto web (`app/manifest.ts`, M1.2): `purpose: "maskable"` é
+      // campo da especificação W3C do ícone, não ponto de IA. Também pela FORMA:
+      // objeto com `src` E `sizes`, que é o ícone do manifesto; nenhuma chamada de
+      // modelo tem os dois. Um purpose de IA com nome qualquer continua contado.
+      const nomes = ts.isObjectLiteralExpression(object)
+        ? new Set(object.properties.map((p) => (p.name ? p.name.getText(ast).replace(/["']/g, "") : "")))
+        : new Set<string>();
+      // Só no manifesto (P2 do Cassio na #183): em qualquer outro arquivo a forma não basta.
+      const iconeDoManifesto =
+        arquivo.split(path.sep).join("/").endsWith("app/manifest.ts") && nomes.has("src") && nomes.has("sizes");
+      if (!enqueueResult && !iconeDoManifesto) result.push(...literals(node.initializer));
     }
     ts.forEachChild(node, visit);
   };
@@ -140,6 +150,10 @@ describe("registro de pontos de IA × código", () => {
     expect(purposesDoTexto(`const a = { purpose: payload.purpose };`)).toEqual([]);
     expect(purposesDoTexto(`function queue() { return { kind: "enqueue_turn", purpose: "send_message" }; }`)).toEqual([]);
     expect(purposesDoTexto(`runModelCall(db, cfg, { purpose: "send_message" });`)).toEqual(["send_message"]);
+    // Ícone do manifesto (src + sizes) não é ponto de IA; só `src` não basta.
+    expect(purposesDoTexto(`const i = { src: "/a.png", sizes: "192x192", purpose: "maskable" };`, "app/manifest.ts")).toEqual([]);
+    expect(purposesDoTexto(`const i = { src: "/a.png", sizes: "192x192", purpose: "ponto_orfao" };`, "lib/ai/x.ts")).toEqual(["ponto_orfao"]);
+    expect(purposesDoTexto(`runModelCall(db, cfg, { src: "inbox", purpose: "ponto_orfao" });`)).toEqual(["ponto_orfao"]);
   });
 
   it("a varredura enxerga o código (controle positivo)", () => {

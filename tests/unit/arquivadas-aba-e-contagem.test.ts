@@ -82,9 +82,10 @@ describe("aba Arquivadas — filtro da lista", () => {
 
 describe("aba Arquivadas — rótulo e badge", () => {
   it("tem rótulo próprio em pt-BR e no tipo de aba", () => {
-    const filtros = fonte("components/inbox/InboxFilters.tsx");
-    expect(filtros).toContain('{ value: "archived", label: "Arquivadas" }');
-    expect(filtros).toContain('"archived"');
+    // As abas moraram em InboxFilters até a M2.2 do celular; hoje em `filtros/abas-da-inbox.ts`.
+    const abas = fonte("components/inbox/filtros/abas-da-inbox.ts");
+    expect(abas).toContain('{ value: "archived", label: "Arquivadas" }');
+    expect(abas).toContain('"archived"');
   });
 
   it("o badge lê a contagem archived (não a de fechadas)", () => {
@@ -108,10 +109,15 @@ describe("contagem de arquivadas", () => {
 });
 
 describe("o botão de arquivar", () => {
-  it("oferece arquivar com confirmação e some quando já está arquivada", () => {
+  it("oferece arquivar com Desfazer e some quando já está arquivada", () => {
+    // Desde a etapa 2 do DS arquivar age na hora e o aviso oferece Desfazer
+    // (`useEncerrarComDesfazer`), no lugar da janela de confirmação.
     const header = fonte("components/inbox/ConversationHeader.tsx");
-    expect(header).toContain('t("Arquivar")');
-    expect(header).toContain('t("Arquivar esta conversa?")');
+    const mais = fonte("components/inbox/cabecalho/MaisAcoes.tsx");
+    const desfazer = fonte("hooks/inbox/useEncerrarComDesfazer.ts");
+    expect(mais).toContain('t("Arquivar")');
+    expect(desfazer).toContain('t("Conversa arquivada.")');
+    expect(desfazer).toContain('t("Desfazer")');
     expect(header).toMatch(/status !== "archived"/);
   });
 

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+
+import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useT } from "@/hooks/i18n/useT";
@@ -36,29 +38,30 @@ export function CompanyDetailClient({ id }: Props) {
   }
 
   if (!data) {
-    return <div className="p-6 text-muted-foreground">{t("Carregando…")}</div>;
+    return <p className="text-sm text-muted-foreground mb:px-4 mb:pt-3">{t("Carregando…")}</p>;
   }
 
   const c = data.company;
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link href="/app/companies" className="text-sm text-muted-foreground hover:underline">
+    <Pagina>
+      <CabecalhoDaPagina
+        tituloNoCelular
+        antes={
+          <Link href="/app/companies" className="text-sm text-muted-foreground hover:underline mb:hidden">
             ← {t("Empresas")}
           </Link>
-          <h1 className="text-xl font-semibold">
-            {(c.trade_name as string) || (c.legal_name as string) || t("Empresa")}
-          </h1>
-          <p className="font-mono text-sm text-muted-foreground">{(c.cnpj as string) || "—"}</p>
-        </div>
-        <Button variant="outline" onClick={() => void enrich()} disabled={enriching}>
-          {enriching ? t("Enriquecendo…") : t("Enriquecer CNPJ")}
-        </Button>
-      </div>
+        }
+        titulo={(c.trade_name as string) || (c.legal_name as string) || t("Empresa")}
+        descricao={<span className="font-mono">{(c.cnpj as string) || "—"}</span>}
+        acoes={
+          <Button variant="outline" onClick={() => void enrich()} disabled={enriching}>
+            {enriching ? t("Enriquecendo…") : t("Enriquecer CNPJ")}
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 mb:px-4">
         <Card className="space-y-2 p-4">
           <h2 className="font-medium">{t("Dados cadastrais")}</h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
@@ -134,6 +137,6 @@ export function CompanyDetailClient({ id }: Props) {
         </Card>
 
       </div>
-    </div>
+    </Pagina>
   );
 }

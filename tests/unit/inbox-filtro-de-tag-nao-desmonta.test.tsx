@@ -20,7 +20,7 @@
  * sua válvula.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { InboxFilters, type InboxFiltersValue } from "@/components/inbox/InboxFilters";
@@ -67,6 +67,14 @@ const GATILHO = "Filtrar por tag";
  * — o rótulo não mudou, e mudar o rótulo quebraria quem procura o controle
  * (e a tradução no dicionário).
  */
+/**
+ * Visual v2: o seletor mora no popover de "Filtros", então todo caso abre o
+ * popover primeiro, inclusive os que afirmam AUSÊNCIA (sem abrir, a ausência
+ * seria vacuidade). O popover fica montado durante a oscilação, porque o estado
+ * dele mora na barra, e é DENTRO dele que o gatilho não pode desmontar.
+ */
+const abreOsFiltros = () => fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
+
 const gatilho = (comMenuAberto = false) =>
   screen.queryByRole("button", { name: GATILHO, ...(comMenuAberto ? { hidden: true } : {}) });
 
@@ -90,6 +98,7 @@ async function abreOMenu() {
   // vermelho que não ensina nada.
   const user = userEvent.setup({ delay: null });
   const tela = render(<InboxFilters value={VALUE} onChange={() => {}} />);
+  await user.click(screen.getByRole("button", { name: /^Filtros/ }));
   await user.click(screen.getByRole("button", { name: GATILHO }));
   expect(screen.getByRole("menuitemcheckbox", { name: /vip/ })).toBeInTheDocument();
   expect(screen.getByRole("menuitemcheckbox", { name: /retorno/ })).toBeInTheDocument();
@@ -137,6 +146,7 @@ describe("não-regressão: o que a condicional protegia", () => {
     tagsRef.current = [];
     tagsDoContatoRef.current = [];
     render(<InboxFilters value={VALUE} onChange={() => {}} />);
+    abreOsFiltros();
     expect(gatilho()).not.toBeInTheDocument();
   });
 
@@ -144,6 +154,7 @@ describe("não-regressão: o que a condicional protegia", () => {
     tagsRef.current = undefined;
     tagsDoContatoRef.current = undefined;
     render(<InboxFilters value={VALUE} onChange={() => {}} />);
+    abreOsFiltros();
     expect(gatilho()).not.toBeInTheDocument();
   });
 
@@ -151,6 +162,7 @@ describe("não-regressão: o que a condicional protegia", () => {
     tagsRef.current = ["retorno"];
     tagsDoContatoRef.current = [];
     render(<InboxFilters value={{ ...VALUE, tag: "apagada" }} onChange={() => {}} />);
+    abreOsFiltros();
     expect(gatilho()).toBeInTheDocument();
   });
 
@@ -164,6 +176,7 @@ describe("não-regressão: o que a condicional protegia", () => {
     render(
       <InboxFilters value={{ ...VALUE, tag: ["retorno", "apagada"] }} onChange={() => {}} />,
     );
+    abreOsFiltros();
     expect(gatilho()).toBeInTheDocument();
   });
 });
@@ -177,6 +190,7 @@ describe("o modo E/OU marca só o modo ativo (#1274)", () => {
     render(
       <InboxFilters value={{ ...VALUE, tag: ["vip", "retorno"], tagMode }} onChange={() => {}} />,
     );
+    await user.click(screen.getByRole("button", { name: /^Filtros/ }));
     await user.click(screen.getByRole("button", { name: GATILHO }));
     return {
       e: screen.getByRole("menuitemradio", { name: "Todas (E)" }),

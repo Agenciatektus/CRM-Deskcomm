@@ -211,7 +211,9 @@ async function generate(page: Page) {
   const response = page.waitForResponse(
     (r) => r.url().endsWith("/draft-reply") && r.request().method() === "POST",
   );
-  await panel(page).getByRole("button", { name: "Sugerir resposta", exact: true }).click();
+  // Desde o visual v2 (fase 3.5) o gatilho é o chip da barra do composer;
+  // o painel só aparece quando há sugestão para revisar ou aviso a dar.
+  await page.getByRole("button", { name: "Sugerir resposta", exact: true }).click();
   const r = await response;
   expect(r.status(), await r.text()).toBe(200);
   await expect(panel(page).getByText("Sugestão para revisar", { exact: true })).toBeVisible();

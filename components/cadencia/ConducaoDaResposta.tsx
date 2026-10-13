@@ -5,6 +5,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { useAgentsList } from "@/hooks/ai/useAgents";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Escolha } from "@/components/ui/escolha";
 import {
   INSTRUCAO_MAX,
   MODO_PADRAO_DA_TELA,
@@ -38,7 +39,6 @@ const QUEM_ATENDE: ReadonlyArray<{ valor: ConducaoDaCadencia["quem_atende"]; rot
   { valor: "ia", rotulo: "Agente de IA" },
 ];
 
-const CLASSE_DO_SELECT = "h-10 w-full rounded-md border border-border bg-background px-3 text-sm";
 
 /**
  * QUANDO O LEAD RESPONDER — quem assume a conversa depois que a cadência para.
@@ -125,11 +125,10 @@ export function ConducaoDaResposta({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-agente`}>{t("Agente")}</Label>
-            <select
+            <Escolha
               id={`${id}-agente`}
-              className={CLASSE_DO_SELECT}
               value={agenteNaLista ? ia.agent_id : ""}
-              onChange={(e) => mudarIa({ agent_id: e.target.value })}
+              onValueChange={(valorEscolhido) => mudarIa({ agent_id: valorEscolhido })}
             >
               <option value="" disabled>
                 {t("Escolha o agente")}
@@ -139,33 +138,31 @@ export function ConducaoDaResposta({
                   {a.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-objetivo`}>{t("Objetivo")}</Label>
-            <select
+            <Escolha
               id={`${id}-objetivo`}
-              className={CLASSE_DO_SELECT}
               value={ia.preset}
-              onChange={(e) => mudarIa({ preset: e.target.value as PresetDaConducao })}
+              onValueChange={(valorEscolhido) => mudarIa({ preset: valorEscolhido as PresetDaConducao })}
             >
               {OBJETIVOS.map((o) => (
                 <option key={o.valor} value={o.valor}>
                   {t(o.rotulo)}
                 </option>
               ))}
-            </select>
+            </Escolha>
             {objetivo && <p className="text-xs text-text-muted">{t(objetivo.ajuda)}</p>}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-etapa`}>{t("Até qual etapa a IA conduz")}</Label>
-            <select
+            <Escolha
               id={`${id}-etapa`}
-              className={CLASSE_DO_SELECT}
               value={etapaNaLista ? ia.etapa_alvo_id : ""}
-              onChange={(e) => mudarIa({ etapa_alvo_id: e.target.value })}
+              onValueChange={(valorEscolhido) => mudarIa({ etapa_alvo_id: valorEscolhido })}
             >
               <option value="" disabled>
                 {t("Escolha a etapa")}
@@ -175,7 +172,7 @@ export function ConducaoDaResposta({
                   {e.name}
                 </option>
               ))}
-            </select>
+            </Escolha>
             <p className="text-xs text-text-muted">
               {t("Quando o negócio chegar nessa etapa, a IA passa a conversa para o time.")}
             </p>

@@ -9,6 +9,8 @@
  */
 import { z } from "zod";
 
+import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
+
 import { normalizarTag, normalizarTags } from "@/lib/contacts/tag-normalizada";
 import {
   MAXIMO_DE_ETIQUETAS_NO_FILTRO,
@@ -64,8 +66,30 @@ export const contactCreateSchema = z.object({
 });
 export type ContactCreate = z.infer<typeof contactCreateSchema>;
 
+/**
+ * Teto das observações do contato (migration 9041). O MESMO número do CHECK
+ * `contacts_observacoes_tamanho` do banco: a borda recusa com 422 legível o que
+ * o banco recusaria com 500.
+ */
+export const OBSERVACOES_MAX = 4000;
+
+/**
+ * Observações livres sobre o contato. Trim, e vazio (ou só espaço) vira `null`:
+ * apagar a observação é mandar o campo vazio, e o banco recusa texto em branco.
+ * O limite é medido DEPOIS do trim, em pontos de código (`Array.from`), que é
+ * o que o `char_length` do CHECK conta: `length` contaria emoji como dois.
+ */
+export const observacoesSchema = z
+  .string()
+  .nullable()
+  .transform((v) => (v === null ? null : v.trim() === "" ? null : v.trim()))
+  .refine((v) => v === null || Array.from(v).length <= OBSERVACOES_MAX, {
+    message: "Observações excedem o limite de 4000 caracteres",
+  });
+
 export const contactPatchSchema = contactCreateSchema.partial().extend({
   source: z.string().min(1).optional(),
+  observacoes: observacoesSchema.optional(),
 });
 export type ContactPatch = z.infer<typeof contactPatchSchema>;
 
@@ -125,8 +149,10 @@ export const CONTACT_ORDER_BY = [
   "phone_number",
 ] as const;
 
+export { TETO_DO_TERMO_DE_BUSCA };
+
 export const contactListQuerySchema = z.object({
-  search: z.string().optional(),
+  search: z.string().max(TETO_DO_TERMO_DE_BUSCA).optional(),
   // O filtro normaliza pelo MESMO caminho da escrita: `?tag=VIP` acha o que a
   // ficha gravou como "vip" (issue #1224).
   //

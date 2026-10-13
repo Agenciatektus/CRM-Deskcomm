@@ -23,6 +23,8 @@ export interface FiltrosDeTarefa {
   contact_id?: string;
   /** `true` = só o que ainda pede ação (pendente ou em andamento). */
   aberto?: boolean;
+  /** "eu" = só as tarefas de quem está logado (o "Minhas" do celular). */
+  responsavel?: "eu";
 }
 
 async function leJson<T>(res: Response, oQueFalhou: string): Promise<T> {
@@ -46,6 +48,7 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
   if (filtros.lead_id) params.set("lead_id", filtros.lead_id);
   if (filtros.contact_id) params.set("contact_id", filtros.contact_id);
   if (filtros.aberto) params.set("aberto", "true");
+  if (filtros.responsavel) params.set("assigned_to", filtros.responsavel);
   const qs = params.toString();
 
   const query = useQuery({
@@ -58,7 +61,13 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
     refetchOnWindowFocus: true,
   });
 
-  const invalidar = () => queryClient.invalidateQueries({ queryKey: CHAVE });
+  // As listas da Inbox também (P2 do Cassio na #158): a pílula e o filtro "Sem
+  // próximo passo" saem de `passo_da_conversa`, que muda quando uma tarefa do
+  // contato nasce, é concluída ou reagendada aqui na tela de Tarefas.
+  const invalidar = () => {
+    void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    return queryClient.invalidateQueries({ queryKey: CHAVE });
+  };
 
   const criar = useMutation({
     mutationFn: async (entrada: NovaTarefa) => {

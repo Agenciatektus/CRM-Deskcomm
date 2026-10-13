@@ -16,7 +16,15 @@
  * runtime em vez de lida do bundle.
  */
 
-export const DEFAULT_APP_NAME = "DeskcommCRM";
+/**
+ * ⚠️ DECISÃO DO FORK (Verdash/Tektus), não do upstream DeskcommCRM: a marca
+ * padrão deste fork é "Verdash CRM", com o símbolo V da Verdash
+ * (`lib/branding/desenho.ts`). Produção já usa `APP_NAME="Verdash CRM"`; com o
+ * padrão igual, `marcaEhADoProduto` reconhece a marca e a tela mostra o V em vez
+ * do nome em texto. White-label com nome ou logo próprios segue com os deles.
+ * Ao sincronizar com o upstream, esta linha fica com o fork.
+ */
+export const DEFAULT_APP_NAME = "Verdash CRM";
 
 export type Branding = {
   /** Nome exibido na interface e nos títulos de página. */

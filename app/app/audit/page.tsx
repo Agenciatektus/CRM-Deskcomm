@@ -1,3 +1,4 @@
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -20,14 +21,14 @@ export default async function AuditPage() {
   const t = (texto: string) => traduzir(texto, user.idioma);
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Audit Log")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir("Histórico append-only de mutações na organização. Manager+.", idioma)}
-        </p>
-      </header>
-      <AuditClient />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Audit Log")}
+        descricao={traduzir("Histórico append-only de mutações na organização. Manager+.", idioma)}
+      />
+      <SecaoDaPagina>
+        <AuditClient />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

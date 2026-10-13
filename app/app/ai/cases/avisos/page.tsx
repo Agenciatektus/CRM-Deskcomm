@@ -22,6 +22,7 @@
  * venda inteira da landing. `tests/e2e/qa-titulos-das-telas.spec.ts` mede isso
  * por ferramenta (`page.title()`), e esta rota entrou na lista dele.
  */
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -47,19 +48,17 @@ export default async function AvisoDeCasoPage() {
   const idioma = user.idioma;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {traduzir("Aviso no WhatsApp", idioma)}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {traduzir(
-            "Escolha um número da equipe para receber uma mensagem toda vez que o assistente travar e precisar de uma pessoa.",
-            idioma,
-          )}
-        </p>
-      </header>
-      <AvisoNoWhatsApp />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={traduzir("Aviso no WhatsApp", idioma)}
+        descricao={traduzir(
+          "Escolha um número da equipe para receber uma mensagem toda vez que o assistente travar e precisar de uma pessoa.",
+          idioma,
+        )}
+      />
+      <SecaoDaPagina>
+        <AvisoNoWhatsApp />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

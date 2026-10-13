@@ -24,6 +24,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DotsThree, PencilSimple, Users } from "@/lib/ui/icons";
 import { useWinLead, useEditLead } from "@/hooks/kanban/useUpdateLead";
+import { useAcaoPendente } from "@/lib/ui/aviso-com-desfazer";
+import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLead";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
@@ -46,6 +48,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const winMutation = useWinLead(pipelineId);
+  const ganhoPendente = useAcaoPendente(`ganho:${lead.id}`);
   const editMutation = useEditLead(pipelineId);
   // Excluir um card é a mesma ação da barra de seleção, com um id só: mesma
   // rota, mesmo gate de papel, mesmo evento e auditoria.
@@ -166,9 +169,19 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
             </DropdownMenuSub>
           )}
           <DropdownMenuItem
-            disabled={winMutation.isPending}
+            disabled={winMutation.isPending || ganhoPendente}
             onSelect={() => {
-              winMutation.mutate({ leadId: lead.id });
+              // Adiado 5 s com Desfazer, como no painel: `/win` dispara `lead.won`
+              // (conversão de anúncio, saídas da cadência, push) na hora.
+              // A trava confere ganho, perda e troca deste negócio.
+              adiarFechamento(
+                "ganho",
+                lead.id,
+                (s) => `${t("Ganho em")} ${s} s`,
+                t,
+                // O erro já aparece pelo `onError` do hook; aqui não repete.
+                () => winMutation.mutateAsync({ leadId: lead.id }).catch(() => undefined),
+              );
             }}
           >
             {t("Marcar como ganho")}
@@ -268,12 +281,24 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         onOpenChange={setLoseOpen}
         leadId={lead.id}
         pipelineId={pipelineId}
+        // Perda e troca de funil esperam 5 s com Desfazer e passam pela mesma
+        // trava do ganho: um fechamento pendente recusa o outro (P2-1 da #182).
+        adiar={(gravar) =>
+          adiarFechamento("perda", lead.id, (s) => `${t("Perdido em")} ${s} s`, t, () =>
+            gravar().catch(() => undefined),
+          )
+        }
       />
       <MoveToOtherPipelineDialog
         open={moveOpen}
         onOpenChange={setMoveOpen}
         leadId={lead.id}
         pipelineId={pipelineId}
+        adiar={(gravar) =>
+          adiarFechamento("troca", lead.id, (s) => `${t("Outro funil em")} ${s} s`, t, () =>
+            gravar().catch(() => undefined),
+          )
+        }
       />
       <EditLeadDialog
         open={editOpen}

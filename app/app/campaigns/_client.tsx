@@ -11,9 +11,10 @@ import { useMemo, useState } from "react";
 
 import { EstadoDaCampanha } from "@/components/campanhas/EstadoDaCampanha";
 import { EmptyState } from "@/components/empty";
+import { BarraDeFiltros, BotaoDaTelaParaRota, CabecalhoDaPagina, EstadoDaLista, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Escolha } from "@/components/ui/escolha";
 import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
@@ -30,36 +31,34 @@ export function ListaDeCampanhas() {
   const campanhas = useMemo(() => q.data?.pages.flatMap((p) => p.data) ?? [], [q.data]);
 
   return (
-    <div className="space-y-4 p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Campanhas")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("Escolha o público, escreva a mensagem e acompanhe quem recebeu.")}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/app/campaigns/settings">{t("Configuração")}</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/app/campaigns/new">
-            <Plus size={16} weight="bold" aria-hidden />
-            <span>{t("Nova campanha")}</span>
-          </Link>
-        </Button>
-        </div>
-      </header>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Campanhas")}
+        descricao={t("Escolha o público, escreva a mensagem e acompanhe quem recebeu.")}
+        acoes={
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/app/campaigns/settings">{t("Configuração")}</Link>
+            </Button>
+            <Button asChild className="mb:hidden">
+              <Link href="/app/campaigns/new">
+                <Plus size={16} weight="bold" aria-hidden />
+                <span>{t("Nova campanha")}</span>
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
+      <BarraDeFiltros ativos={status ? 1 : 0} aoLimpar={() => setStatus("")}>
         <label className="text-sm text-muted-foreground" htmlFor="filtro-status">
           {t("Situação")}
         </label>
-        <select
+        <Escolha
           id="filtro-status"
-          className="h-9 rounded-md border border-border bg-surface px-2 text-sm"
+          className="h-9"
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onValueChange={(valorEscolhido) => setStatus(valorEscolhido)}
         >
           <option value="">{t("Todas")}</option>
           {STATUS_DA_CAMPANHA.map((s) => (
@@ -67,24 +66,15 @@ export function ListaDeCampanhas() {
               {t(rotulo(s))}
             </option>
           ))}
-        </select>
-      </div>
+        </Escolha>
+      </BarraDeFiltros>
 
-      {q.isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : q.isError ? (
-        <Card className="p-6 text-center">
-          <p className="text-sm text-error-fg">{t("Erro ao carregar as campanhas.")}</p>
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => q.refetch()}>
-            {t("Tentar novamente")}
-          </Button>
-        </Card>
-      ) : campanhas.length === 0 ? (
-        <Card className="p-2">
+      <EstadoDaLista
+        carregando={q.isLoading}
+        erro={q.isError ? t("Erro ao carregar as campanhas.") : null}
+        aoTentarDeNovo={() => q.refetch()}
+        quantidade={campanhas.length}
+        vazio={
           <EmptyState
             icon={Megaphone}
             headline={t("Nenhuma campanha ainda.")}
@@ -93,55 +83,55 @@ export function ListaDeCampanhas() {
             )}
             primary={{ label: t("Nova campanha"), href: "/app/campaigns/new" }}
           />
+        }
+      >
+        <Card className="divide-y divide-border mb:rounded-none mb:border-x-0">
+          {campanhas.map((c) => (
+            <Link
+              key={c.id}
+              href={`/app/campaigns/${c.id}`}
+              className="flex flex-col gap-2 p-4 transition-colors hover:bg-surface-elevated sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium mb:text-(length:--mb-linha-nome) mb:font-semibold">{c.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {/* CAMPANHA CONTÍNUA (9039) não tem lista, e "lista ainda
+                      não preparada" numa campanha que está abordando gente é
+                      afirmação falsa — a mais perigosa desta tela, porque
+                      convida a preparar de novo. */}
+                  {c.entrada_continua === true
+                    ? t("contínua, por etapa do funil")
+                    : c.snapshot_eligible > 0
+                      ? `${c.snapshot_eligible} ${t("contatos na lista")}`
+                      : t("lista ainda não preparada")}
+                  {c.entrada_continua !== true && c.snapshot_excluded > 0
+                    ? ` · ${c.snapshot_excluded} ${t("fora")}`
+                    : ""}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="text-sm text-muted-foreground">{quando(c, t, idioma)}</span>
+                <EstadoDaCampanha status={c.status} />
+              </div>
+            </Link>
+          ))}
         </Card>
-      ) : (
-        <>
-          <Card className="divide-y divide-border">
-            {campanhas.map((c) => (
-              <Link
-                key={c.id}
-                href={`/app/campaigns/${c.id}`}
-                className="flex flex-col gap-2 p-4 transition-colors hover:bg-surface-elevated sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{c.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {/* CAMPANHA CONTÍNUA (9039) não tem lista, e "lista ainda
-                        não preparada" numa campanha que está abordando gente é
-                        afirmação falsa — a mais perigosa desta tela, porque
-                        convida a preparar de novo. */}
-                    {c.entrada_continua === true
-                      ? t("contínua, por etapa do funil")
-                      : c.snapshot_eligible > 0
-                        ? `${c.snapshot_eligible} ${t("contatos na lista")}`
-                        : t("lista ainda não preparada")}
-                    {c.entrada_continua !== true && c.snapshot_excluded > 0
-                      ? ` · ${c.snapshot_excluded} ${t("fora")}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-sm text-muted-foreground">{quando(c, t, idioma)}</span>
-                  <EstadoDaCampanha status={c.status} />
-                </div>
-              </Link>
-            ))}
-          </Card>
-          {q.hasNextPage && (
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => q.fetchNextPage()}
-                disabled={q.isFetchingNextPage}
-              >
-                {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais")}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
+        {q.hasNextPage && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => q.fetchNextPage()}
+              disabled={q.isFetchingNextPage}
+            >
+              {q.isFetchingNextPage ? t("Carregando…") : t("Carregar mais")}
+            </Button>
+          </div>
+        )}
+      </EstadoDaLista>
+
+      <BotaoDaTelaParaRota rotulo={t("Nova campanha")} href="/app/campaigns/new" />
+    </Pagina>
   );
 }
 

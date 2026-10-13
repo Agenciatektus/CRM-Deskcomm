@@ -26,6 +26,7 @@ import {
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { SimboloDoProduto } from "@/components/branding/MarcaDoProduto";
+import { VersionFooter } from "@/components/shell/VersionFooter";
 import { marcaEhADoProduto } from "@/lib/branding";
 import { useMarcaDaInstalacao } from "@/lib/branding/contexto";
 import { useT } from "@/hooks/i18n/useT";
@@ -178,6 +179,8 @@ export function AdminSidebar({ userEmail, variant = "desktop" }: AdminSidebarPro
           <ArrowRight size={14} aria-hidden />
           <span>{t("Voltar pra app")}</span>
         </Link>
+        {/* A versão do CRM só aparece aqui (área administrativa), por pedido do Peterson: o tenant não vê. */}
+        <VersionFooter collapsed={false} />
         <p className="truncate px-2 text-xs text-muted-foreground" title={userEmail}>
           {userEmail}
         </p>

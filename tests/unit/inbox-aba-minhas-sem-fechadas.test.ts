@@ -60,7 +60,7 @@ describe("tabToFilter — o que cada aba significa", () => {
 
   it("a aba do automático pergunta a régua do MOTOR, não `ai_handling`", () => {
     // `ai_handling` é escrito por UM caminho só em produção (a volta pelo botão
-    // "Devolver ao automático"), e por isso a aba mostrava 2 enquanto o robô
+    // "Devolver à IA"), e por isso a aba mostrava 2 enquanto o robô
     // atendia 47.
     expect(tabToFilter("ai")).toEqual({ comando: ["automatico"] });
   });

@@ -1,4 +1,5 @@
 "use client";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,13 +44,16 @@ export function ProposalsSettingsClient() {
   if (!cfg) return <div className="p-6">{t("Carregando…")}</div>;
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">{t("Propostas")}</h1>
-      <p className="text-sm">
-        <Link href="/app/settings/tenant/proposals/modelos" className="underline underline-offset-4">
-          {t("Modelos de proposta")}
-        </Link>
-      </p>
+    <Pagina className="max-w-2xl">
+      <CabecalhoDaPagina
+        titulo={t("Propostas")}
+        acoes={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/app/settings/tenant/proposals/modelos">{t("Modelos de proposta")}</Link>
+          </Button>
+        }
+      />
+      <SecaoDaPagina className="gap-4">
       <div className="flex items-center gap-2">
         <Switch id="proposals_enabled" checked={cfg.enabled} onCheckedChange={(v) => setCfg({ ...cfg, enabled: v })} />
         <Label htmlFor="proposals_enabled">{t("Ligar propostas comerciais para esta organização")}</Label>
@@ -88,7 +92,8 @@ export function ProposalsSettingsClient() {
           </p>
         </div>
       </div>
-      <Button onClick={salvar} disabled={salvando}>{salvando ? t("Salvando…") : t("Salvar")}</Button>
-    </div>
+      <Button onClick={salvar} disabled={salvando} className="mb:w-full">{salvando ? t("Salvando…") : t("Salvar")}</Button>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

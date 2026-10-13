@@ -1,17 +1,5 @@
 "use client";
-import { useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useT } from "@/hooks/i18n/useT";
 
 interface Props {
   /** Currently visible conversation ids in the list (for j/k nav). */
@@ -22,6 +10,10 @@ interface Props {
   onClaim: () => void;
   onClose: () => void;
   onToggleHelp: () => void;
+  /** 9042: "u" marca a conversa selecionada como não lida (para quem aperta). */
+  onMarkUnread?: () => void;
+  /** 9042: "p" fixa ou desafixa a conversa selecionada (para quem aperta). */
+  onTogglePin?: () => void;
   enabled?: boolean;
 }
 
@@ -33,15 +25,13 @@ export function InboxKeyboardShortcuts({
   onClaim,
   onClose,
   onToggleHelp,
+  onMarkUnread,
+  onTogglePin,
   enabled = true,
 }: Props) {
-  const t = useT();
-  const [confirmFecharOpen, setConfirmFecharOpen] = useState(false);
-  // Com a confirmação aberta, os atalhos param: o `window.confirm()` travava a
-  // página e ninguém trocava de conversa por trás dele. Sem isto, "e" e depois
-  // "j" deixariam o "Fechar" de dentro encerrar a conversa SEGUINTE, não a que
-  // estava na tela quando a pergunta foi feita.
-  const ativo = enabled && !confirmFecharOpen;
+  // "e" fecha na hora, com "Desfazer" no aviso (quadro DS): sem janela de
+  // confirmação, os atalhos não precisam parar enquanto ela está aberta.
+  const ativo = enabled;
   function step(delta: number) {
     if (visibleIds.length === 0) return;
     const idx = selectedId ? visibleIds.indexOf(selectedId) : -1;
@@ -63,27 +53,10 @@ export function InboxKeyboardShortcuts({
   ]);
   useHotkeys("r", () => onFocusReply(), { enabled: ativo, preventDefault: true });
   useHotkeys("a", () => onClaim(), { enabled: ativo, preventDefault: true });
-  useHotkeys(
-    "e",
-    () => setConfirmFecharOpen(true),
-    { enabled: ativo, preventDefault: true },
-  );
+  useHotkeys("e", () => onClose(), { enabled: ativo, preventDefault: true });
   useHotkeys("shift+/", () => onToggleHelp(), { enabled: ativo, preventDefault: true });
+  useHotkeys("u", () => onMarkUnread?.(), { enabled: ativo && !!onMarkUnread, preventDefault: true }, [onMarkUnread]);
+  useHotkeys("p", () => onTogglePin?.(), { enabled: ativo && !!onTogglePin, preventDefault: true }, [onTogglePin]);
 
-  return (
-    <AlertDialog open={confirmFecharOpen} onOpenChange={setConfirmFecharOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("Fechar conversa?")}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("O atendimento é encerrado. Se o cliente escrever de novo, você pode reabrir.")}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("Cancelar")}</AlertDialogCancel>
-          <AlertDialogAction onClick={onClose}>{t("Fechar")}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+  return null;
 }

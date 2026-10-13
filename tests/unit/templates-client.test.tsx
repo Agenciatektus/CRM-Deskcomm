@@ -33,7 +33,8 @@ describe("TemplatesClient", () => {
     busca = "";
     render(wrap(<TemplatesClient canShare={true} currentUserId="u1" />));
     expect(screen.getByText("Meu Pessoal")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /novo template/i }));
+    // Desktop e o "+" do celular (BotaoDaTela) abrem o mesmo form; o CSS escolhe qual aparece.
+    fireEvent.click(screen.getAllByRole("button", { name: /novo template/i })[0]!);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 

@@ -519,7 +519,7 @@ describe("o código morto de orçamento não volta", () => {
  * quando a IA para — o corpo do item `budget_exceeded` na Central e o resumo que
  * vai ao humano que assume — mandavam usar um botão chamado
  * "Retomar atendimento automático". Esse botão não existe. O rótulo que
- * `components/inbox/ConversationHeader.tsx` renderiza é **"Devolver ao automático"**.
+ * `components/inbox/ConversationHeader.tsx` renderiza é **"Devolver à IA"**.
  *
  * É exatamente o defeito que esta entrega existe para matar, uma camada acima: um
  * texto afirmando uma coisa sobre o produto, e o produto fazendo outra. Quem

@@ -42,6 +42,11 @@ export interface FiltrosDaContagem {
   channel_session_id?: string;
   /** De que ENTRADA do Instagram. Sem isto, o badge mente sob filtro. */
   entrada?: string;
+  /** "Sem próximo passo" (migration 9047): o badge conta o filtro da lista. */
+  semPasso?: boolean;
+  /** Tipo de canal e "só grupos" (migration 9049): os filtros da folha do celular. */
+  canal?: string;
+  soGrupos?: boolean;
 }
 
 /**
@@ -54,6 +59,7 @@ export function useConversationCounts(
 ) {
   const qs = new URLSearchParams();
   if (filtros.unread) qs.set("unread", "true");
+  if (filtros.semPasso) qs.set("sem_passo", "true");
   for (const marcador of marcadoresEscolhidos(
     typeof filtros.tag === "string" ? [filtros.tag] : (filtros.tag ?? []),
   ))
@@ -63,6 +69,8 @@ export function useConversationCounts(
   if (filtros.tagMode === "ou") qs.set("modo", "ou");
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
   if (filtros.entrada) qs.set("entrada", filtros.entrada);
+  if (filtros.canal) qs.set("canal", filtros.canal);
+  if (filtros.soGrupos) qs.set("is_group", "true");
   const sufixo = qs.toString();
 
   return useQuery({

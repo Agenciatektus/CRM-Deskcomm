@@ -5,6 +5,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import type { FollowupFlowPointerRow } from "@/hooks/followup/useFollowupFlows";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { FlowsList } from "../followups/_components/FlowsList";
 import { ComoUsar } from "./_components/ComoUsar";
 
@@ -35,19 +36,17 @@ export default async function AtendimentoFlowsPage() {
   const canWrite = ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Fluxos de atendimento")}</h1>
-          <p className="text-sm text-text-muted">
-            {t(
-              "Perguntas que a IA faz durante a conversa, em ordem, e o que fazer ao concluir — os dados ficam guardados por cliente.",
-            )}
-          </p>
-        </div>
-      </header>
-      <ComoUsar t={t} />
-      <FlowsList initialData={flows} canWrite={canWrite} surface="atendimento" />
-    </div>
+    <Pagina>
+      <CabecalhoDaPagina
+        titulo={t("Fluxos de atendimento")}
+        descricao={t(
+          "Perguntas que a IA faz durante a conversa, em ordem, e o que fazer ao concluir — os dados ficam guardados por cliente.",
+        )}
+      />
+      <SecaoDaPagina className="gap-5 mb:gap-3">
+        <ComoUsar t={t} />
+        <FlowsList initialData={flows} canWrite={canWrite} surface="atendimento" />
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

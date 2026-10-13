@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoDaTela } from "@/components/pagina";
 import { useT } from "@/hooks/i18n/useT";
 import * as React from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -95,11 +96,12 @@ export function TemplatesClient({ canShare, currentUserId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex sm:justify-end">
+      <div className="flex sm:justify-end mb:hidden">
         <Button type="button" onClick={openNew} className="w-full sm:w-auto">
           <Plus /> {t("Novo template")}
         </Button>
       </div>
+      <BotaoDaTela rotulo={t("Novo template")} aoTocar={openNew} />
       {!templates?.length ? (
         <p className="text-sm text-muted-foreground">{t("Nenhum template ainda.")}</p>
       ) : (

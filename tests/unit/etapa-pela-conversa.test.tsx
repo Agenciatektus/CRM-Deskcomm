@@ -177,7 +177,7 @@ vi.mock("@/hooks/inbox/useConversationTags", () => ({
 vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({ useContactTagVocabulary: () => ({ data: [] }) }));
 vi.mock("@/hooks/contacts/useUpdateContact", () => ({ useUpdateContact: () => ({ mutate: vi.fn(), isPending: false }) }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useAuth: () => ({ user: { support: null } }),
+  useAuth: () => ({ user: { id: "u-1", support: null } }),
   // O seletor do fork só aparece para quem pode mover card (a régua do quadro).
   usePermission: () => true,
 }));
@@ -216,16 +216,25 @@ function resumo(lead: Linha) {
   };
 }
 
-function renderPainel() {
+/**
+ * O seletor mora na aba Negócios desde que o painel ganhou abas (visual v2,
+ * 3.3): a inativa fica `hidden`, e o combobox só é alcançável com ela aberta,
+ * como na tela. A troca de aba vem dentro do render para cada caso continuar
+ * medindo a mesma coisa que media antes.
+ */
+async function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <CRMSidePanel conversation={conversation} />
     </QueryClientProvider>,
   );
+  await userEvent.click(await screen.findByRole("tab", { name: "Negócios" }));
+  return view;
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   get.mockReset();
   post.mockReset();
   post.mockResolvedValue({ data: { updated_count: 1 } });
@@ -261,7 +270,7 @@ const SELETOR = "Etapa do negócio";
 describe("painel da conversa — Etapa do funil (SeletorDeEtapa do fork)", () => {
   it("move pelo mesmo caminho do quadro (/move com CAS) e relê o resumo", async () => {
     get.mockResolvedValue(resumo({ stage_id: "s-dados", etapas: ETAPAS }));
-    renderPainel();
+    await renderPainel();
     const user = userEvent.setup();
 
     const seletor = await screen.findByRole("combobox", { name: SELETOR });
@@ -287,7 +296,7 @@ describe("painel da conversa — Etapa do funil (SeletorDeEtapa do fork)", () =>
     get.mockResolvedValue(
       resumo({ stage_id: "s-dados", etapas: ETAPAS, motivos_de_perda: ["Preço", "Sumiu"] }),
     );
-    renderPainel();
+    await renderPainel();
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("combobox", { name: SELETOR }));
@@ -301,7 +310,7 @@ describe("painel da conversa — Etapa do funil (SeletorDeEtapa do fork)", () =>
 
   it("escolher a etapa em que o negócio já está não chama a rota", async () => {
     get.mockResolvedValue(resumo({ stage_id: "s-dados", etapas: ETAPAS }));
-    renderPainel();
+    await renderPainel();
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("combobox", { name: SELETOR }));
@@ -319,7 +328,7 @@ describe("painel da conversa — Etapa do funil (SeletorDeEtapa do fork)", () =>
       }),
     );
     get.mockResolvedValue(resumo({ stage_id: "s-dados", etapas: ETAPAS }));
-    renderPainel();
+    await renderPainel();
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("combobox", { name: SELETOR }));
@@ -333,7 +342,7 @@ describe("painel da conversa — Etapa do funil (SeletorDeEtapa do fork)", () =>
 
   it("resposta sem as etapas do funil não desenha seletor vazio", async () => {
     get.mockResolvedValue(resumo({ stage_id: "s-dados" }));
-    renderPainel();
+    await renderPainel();
 
     // Guarda de vacuidade: o bloco do negócio desenhou — o seletor é que não.
     await waitFor(() => expect(screen.getByTestId("inbox-campos-lead").textContent).toContain("Pedidos"));

@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoDaTela } from "@/components/pagina";
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -133,11 +134,12 @@ export function ListaDeConexoes({ initialData, canWrite }: Props) {
           {conexoes.length === 1 ? t("1 conexão") : `${conexoes.length} ${t("conexões")}`}
         </h2>
         {canWrite && (
-          <Button size="sm" onClick={abrirNova}>
+          <Button size="sm" onClick={abrirNova} className="mb:hidden">
             <Plus size={14} aria-hidden className="mr-2" /> {t("Nova conexão")}
           </Button>
         )}
       </div>
+      {canWrite && <BotaoDaTela rotulo={t("Nova conexão")} aoTocar={abrirNova} />}
 
       <div className="flex flex-col gap-3">
         {conexoes.map((conexao) => (

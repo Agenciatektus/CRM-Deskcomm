@@ -1,0 +1,100 @@
+"use client";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { useT } from "@/hooks/i18n/useT";
+import { useMinhaDisponibilidade, useUpdateAvailability } from "@/hooks/team/useAttendants";
+import { roleAtLeast } from "@/lib/auth/types";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import { destinosDaInterface } from "@/lib/navigation/interface";
+import { useTheme } from "@/lib/theme";
+import { pedir } from "@/lib/ui/comandos-da-tela";
+
+export interface AcaoDaPaleta {
+  id: string;
+  titulo: string;
+  sub: string;
+  executar: () => void;
+}
+
+/**
+ * As AÇÕES da busca, na ordem do protótipo. Cada uma só aparece quando pode
+ * acontecer de verdade:
+ *
+ *  - "Criar próximo passo": só com uma conversa aberta na Inbox (`?id=`).
+ *  - Tema: sempre.
+ *  - Disponibilidade: só para quem atende (a mesma régua do botão do topo) e
+ *    depois de ler o estado atual: oferecer "Ficar ausente" sem saber se a
+ *    pessoa está disponível seria afirmar um estado que ninguém leu.
+ *  - "Ver avisos em aberto": só para quem enxerga a central (a mesma régua do
+ *    sino).
+ *
+ *  - "Só conversas sem próximo passo": para quem tem a Inbox no menu (L4,
+ *    migration 9047). Com a Inbox aberta liga o filtro na hora; de outra tela,
+ *    abre a Inbox já filtrada (`?sem_passo=1`).
+ */
+export function useAcoesDaPaleta(): AcaoDaPaleta[] {
+  const t = useT();
+  const pathname = usePathname();
+  const router = useRouter();
+  const parametros = useSearchParams();
+  const { user, activeOrg } = useAuth();
+  const celular = useEhCelular();
+  const { resolvedTheme, setTheme } = useTheme();
+  const podeAtender =
+    roleAtLeast(activeOrg?.role, "agent") && user.support?.access_mode !== "support_readonly";
+  const minha = useMinhaDisponibilidade(podeAtender);
+  const atualizar = useUpdateAvailability(t("Disponibilidade atualizada."));
+  const destinos = destinosDaInterface(
+    activeOrg?.interface_settings,
+    user.is_platform_admin && !user.support,
+    activeOrg?.role ?? null,
+  );
+  const veAvisos = destinos.some((d) => d.href === "/app/ai/inbox");
+  const veInbox = destinos.some((d) => d.href === "/app/inbox");
+
+  const acoes: AcaoDaPaleta[] = [];
+  if (pathname?.startsWith("/app/inbox") && parametros?.get("id")) {
+    acoes.push({
+      id: "proximo-passo",
+      titulo: t("Criar próximo passo"),
+      sub: t("Para a conversa aberta"),
+      executar: () => pedir("proximo-passo"),
+    });
+  }
+  if (veInbox) {
+    acoes.push({
+      id: "sem-passo",
+      titulo: t("Só conversas sem próximo passo"),
+      sub: t("Filtro da Inbox"),
+      executar: () =>
+        pathname?.startsWith("/app/inbox") ? pedir("so-sem-passo") : router.push("/app/inbox?sem_passo=1"),
+    });
+  }
+  const escuro = resolvedTheme === "dark";
+  acoes.push({
+    id: "tema",
+    titulo: escuro ? t("Usar tema claro") : t("Usar tema escuro"),
+    sub: t("Aparência"),
+    executar: () => setTheme(escuro ? "light" : "dark"),
+  });
+  if (podeAtender && minha.isSuccess) {
+    const disponivel = minha.data?.data?.is_available ?? false;
+    acoes.push({
+      id: "disponibilidade",
+      titulo: disponivel ? t("Ficar ausente") : t("Ficar disponível"),
+      sub: t("Sua disponibilidade na fila"),
+      executar: () => atualizar.mutate({ userId: user.id, patch: { is_available: !disponivel } }),
+    });
+  }
+  if (veAvisos) {
+    acoes.push({
+      id: "avisos",
+      titulo: t("Ver avisos em aberto"),
+      sub: t("Central de avisos"),
+      // No celular o sino não existe: a central é a aba Avisos (M3.3).
+      executar: () => (celular ? router.push("/app/ai/inbox") : pedir("abrir-avisos")),
+    });
+  }
+  return acoes;
+}

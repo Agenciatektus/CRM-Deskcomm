@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -7,6 +8,7 @@ import { salvarLinkRastreavel } from "@/app/actions/settings/linksRastreaveis";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Escolha } from "@/components/ui/escolha";
 import { copyToClipboard } from "@/lib/clipboard";
 import { randomId } from "@/lib/random-id";
 import { traduzir } from "@/lib/i18n/traducao";
@@ -132,7 +134,7 @@ export function LinksRastreaveis({
         </p>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <thead>
             <tr>
               {[t("Nome"), t("Cliques"), t("Contatos"), t("Negócios"), t("Estado"), t("Ação")].map(
@@ -150,9 +152,9 @@ export function LinksRastreaveis({
               return (
                 <tr key={l.id} className="border-t">
                   <td className="p-2">{l.name}</td>
-                  <td>{metricas ? (m?.clicks ?? 0) : "—"}</td>
-                  <td>{metricas ? (m?.contacts ?? 0) : "—"}</td>
-                  <td>{metricas ? (m?.leads ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Cliques")}>{metricas ? (m?.clicks ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Contatos")}>{metricas ? (m?.contacts ?? 0) : "—"}</td>
+                  <td data-rotulo={t("Negócios")}>{metricas ? (m?.leads ?? 0) : "—"}</td>
                   <td>{t(l.enabled ? "Ativo" : "Desativado")}</td>
                   <td>
                     <Button
@@ -234,18 +236,18 @@ export function LinksRastreaveis({
         </div>
         <div>
           <Label htmlFor="link-use">{t("Onde será usado")}</Label>
-          <select
+          <Escolha
             id="link-use"
-            className="w-full rounded-md border bg-background p-2"
+            className="w-full"
             value={form.use_case}
-            onChange={(e) =>
-              setForm({ ...form, use_case: e.target.value as LinkInput["use_case"] })
+            onValueChange={(valorEscolhido) =>
+              setForm({ ...form, use_case: valorEscolhido as LinkInput["use_case"] })
             }
           >
             <option value="site">{t("Site")}</option>
             <option value="anuncio">{t("Anúncio")}</option>
             <option value="organico">{t("Orgânico")}</option>
-          </select>
+          </Escolha>
         </div>
         {(
           [

@@ -179,6 +179,15 @@ export async function POST(req: NextRequest): Promise<Response> {
       }
 
       const motivoDoLote = input.params.lost_reason ?? null;
+      // O lote pode cruzar funis: a configuração do motivo e a de reabertura
+      // são lidas por funil uma vez e compartilhadas pelas duas decisões.
+      const settingsPorFunil = new Map<string, unknown>();
+      for (const linha of visible) {
+        const funilId = (linha as { pipeline_id?: string | null }).pipeline_id ?? "";
+        if (!settingsPorFunil.has(funilId)) {
+          settingsPorFunil.set(funilId, await settingsDoFunil(supabase, funilId || null));
+        }
+      }
       let recusaDoMotivo: { codigo: string; mensagem: string } | null = null;
       const leadsSemMotivo: string[] = [];
       for (const linha of visible) {
@@ -186,6 +195,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           etapaDeDestino,
           motivo: motivoDoLote,
           motivoAtual: linha.lost_reason ?? null,
+          settingsDoFunil: settingsPorFunil.get(linha.pipeline_id ?? ""),
           idioma: user.idioma,
         });
         if (!veredito.ok) {
@@ -211,13 +221,6 @@ export async function POST(req: NextRequest): Promise<Response> {
       //
       // O lote pode cruzar funis, então o settings é POR FUNIL e cacheado — o
       // MESMO cache serve a régua de campos logo abaixo.
-      const settingsPorFunil = new Map<string, unknown>();
-      for (const linha of visible) {
-        const funilId = (linha as { pipeline_id?: string | null }).pipeline_id ?? "";
-        if (!settingsPorFunil.has(funilId)) {
-          settingsPorFunil.set(funilId, await settingsDoFunil(supabase, funilId || null));
-        }
-      }
       let recusaDeReabertura: { codigo: string; mensagem: string } | null = null;
       const reabertosNoLote: string[] = [];
       for (const linha of visible) {

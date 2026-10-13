@@ -45,7 +45,7 @@
  *
  *     npx vitest run tests/unit/agenda-gatilho-leva-o-tipo-real.test.ts
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -371,4 +371,13 @@ describe("pela tela, o gatilho chega apesar da RLS de event_log", () => {
       expect.objectContaining({ error: "caller_not_authorized_for_org", organization_id: ORG }),
     );
   });
+});
+
+// O ENCAIXE recusa início no passado (`exigeDentroDoHorizonte`, P2 do Cassio na
+// #171): o relógio fica ANTES das datas fixas deste caso.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-07-01T00:00:00Z") });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });

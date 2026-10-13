@@ -1,4 +1,5 @@
 "use client";
+import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -646,14 +647,14 @@ function DetalhesTecnicos({ texto }: { texto: string | undefined }) {
 function Layout({ titulo, children }: { titulo?: string; children: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {titulo ?? t("Atualização do sistema")}
-        </h1>
-      </header>
-      <Card className="p-6">{children}</Card>
-    </div>
+    <Pagina className="max-w-2xl">
+      {/* No celular a barra da casca já diz "Atualização do sistema"; um título
+          próprio (a versão nova, "Reiniciando…") continua à vista. */}
+      <CabecalhoDaPagina titulo={titulo ?? t("Atualização do sistema")} tituloNoCelular={Boolean(titulo)} />
+      <SecaoDaPagina>
+        <Card className="p-6 mb:p-4">{children}</Card>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }
 

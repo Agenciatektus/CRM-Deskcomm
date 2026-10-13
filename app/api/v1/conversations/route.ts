@@ -12,7 +12,7 @@ import { listConversationsQuerySchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { comNomeDoAtendente } from "@/lib/users/com-nome-do-atendente";
 
-import { listConversationsHandler } from "./_handler";
+import { listarParaOAtendente } from "./_lista-do-atendente";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +71,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     // único lugar que pode esquecer sem erro nenhum. `rota-le-todo-filtro-do-schema`
     // cobra a chave.
     is_group: url.searchParams.get("is_group") ?? undefined,
+    // "Sem próximo passo" (migration 9047). A cerca
+    // `rota-le-todo-filtro-do-schema` cobra esta linha.
+    sem_passo: url.searchParams.get("sem_passo") ?? undefined,
+    // O TIPO de canal (migration 9049), validado pelo schema contra a lista fixa.
+    canal: url.searchParams.get("canal") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.get("limit") ?? undefined,
@@ -83,7 +88,8 @@ export async function GET(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { conversations, cursor, has_more } = await listConversationsHandler(
+    // 9042: com o estado DE QUEM PEDE (fixadas no topo, silenciada, marcada).
+    const { conversations, cursor, has_more } = await listarParaOAtendente(
       supabase,
       {
         organization_id: activeOrg.orgId,
@@ -92,6 +98,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         idioma: authUser?.idioma,
       },
       qsParsed.data,
+      user.id,
     );
     // O nome de quem atende entra AQUI, na borda HTTP, e não no handler: o
     // handler é compartilhado com as tools MCP, que já resolvem o nome por conta

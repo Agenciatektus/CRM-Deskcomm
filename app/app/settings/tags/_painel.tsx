@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 /**
  * O painel da tela de Tags: a lista do vocabulário com o PESO de cada etiqueta e
@@ -50,6 +51,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { invalidarCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
+import { Escolha } from "@/components/ui/escolha";
 import { cn } from "@/lib/utils";
 import { PALETA_DE_ETIQUETAS } from "@/lib/tags/cor-da-etiqueta";
 import { traduzir } from "@/lib/i18n/traducao";
@@ -237,7 +239,7 @@ export function PainelDeTags({
     <div className="flex flex-col gap-4">
       <AcrescentarEtiqueta idioma={idioma} />
       <Card className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <caption className="sr-only">{t("Etiquetas da organização e onde são usadas")}</caption>
           <thead className="bg-muted/50 text-left">
             <tr>
@@ -269,10 +271,10 @@ export function PainelDeTags({
                     </span>
                   )}
                 </td>
-                <td className="p-3 tabular-nums">{linha.uso_em_contatos}</td>
-                <td className="p-3 tabular-nums">{linha.uso_em_leads}</td>
-                <td className="p-3 tabular-nums">{linha.uso_em_conversas}</td>
-                <td className="p-3 tabular-nums">
+                <td data-rotulo={t("Contatos")} className="p-3 tabular-nums">{linha.uso_em_contatos}</td>
+                <td data-rotulo={t("Leads")} className="p-3 tabular-nums">{linha.uso_em_leads}</td>
+                <td data-rotulo={t("Conversas")} className="p-3 tabular-nums">{linha.uso_em_conversas}</td>
+                <td data-rotulo={t("Regras de agente")} className="p-3 tabular-nums">
                   {linha.em_regras > 0 ? (
                     <span className="font-medium">{linha.em_regras}</span>
                   ) : (
@@ -366,11 +368,11 @@ export function PainelDeTags({
           ) : acao === "juntar" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="destino-da-juncao">{t("Etiqueta de destino")}</Label>
-              <select
+              <Escolha
                 id="destino-da-juncao"
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9"
                 value={destino}
-                onChange={(evento) => setDestino(evento.target.value)}
+                onValueChange={(valorEscolhido) => setDestino(valorEscolhido)}
               >
                 <option value="">{t("Escolha a etiqueta que fica")}</option>
                 {destinos.map((linha) => (
@@ -378,7 +380,7 @@ export function PainelDeTags({
                     {linha.tag}
                   </option>
                 ))}
-              </select>
+              </Escolha>
             </div>
           ) : acao === "definir_cor" ? (
             <div className="flex flex-col gap-3">

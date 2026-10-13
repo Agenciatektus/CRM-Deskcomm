@@ -3,7 +3,8 @@ import { ImageResponse } from "next/og";
 import { marcaEhADoProduto } from "@/lib/branding";
 import { logger } from "@/lib/logger";
 
-import { CORES_DA_MARCA, SIMBOLO } from "./desenho";
+import { SIMBOLO } from "./desenho";
+import { CamadasDoSimbolo } from "./simbolo-svg";
 import { letraDoIcone } from "./icone";
 import {
   baseDoStorage,
@@ -50,14 +51,23 @@ export async function lerArquivoDoIcone(
   }
 }
 
-/** Um PNG por tamanho do app. Sem arquivo válido, preserva símbolo ou cor + inicial. */
+/**
+ * Um PNG por tamanho do app. Sem arquivo válido, preserva símbolo ou cor + inicial.
+ *
+ * `mascaravel`: a versão `purpose: "maskable"` do manifesto. O Android recorta o ícone
+ * num círculo ou numa gota, e só os 80% do centro são garantidos (a "zona segura").
+ * O desenho encolhe para caber nela, sobre o fundo neutro que preenche o recorte.
+ */
 export async function gerarIconeDoApp(
-  lado: 192 | 512,
+  lado: 180 | 192 | 512,
   marca: MarcaDeSaida,
   arquivo: string | null,
+  opcoes: { mascaravel?: boolean } = {},
 ): Promise<ArrayBuffer> {
+  const escala = opcoes.mascaravel ? 0.72 : 1;
   const desenhar = (imagem: string | null) => {
     const produto = marcaEhADoProduto({ name: marca.nome, logoUrl: marca.logoUrl });
+    const conteudo = Math.round(lado * escala);
     return new ImageResponse(
       <div
         style={{
@@ -68,23 +78,20 @@ export async function gerarIconeDoApp(
           justifyContent: "center",
           background: imagem || produto ? NEUTROS_DE_SAIDA.fundo : marca.accent,
           color: marca.accentFg,
-          fontSize: Math.round(lado * 0.62),
+          fontSize: Math.round(conteudo * 0.62),
         }}
       >
         {imagem ? (
           // O src é data: gerado de bytes limitados do Storage da instalação.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imagem} alt="" width={lado} height={lado} style={{ objectFit: "contain" }} />
+          <img src={imagem} alt="" width={conteudo} height={conteudo} style={{ objectFit: "contain" }} />
         ) : produto ? (
           <svg
             viewBox={SIMBOLO.viewBox}
-            width={Math.round(lado * 0.78)}
-            height={Math.round(lado * 0.78)}
+            width={Math.round(conteudo * 0.78)}
+            height={Math.round(conteudo * 0.78)}
           >
-            <g fill={CORES_DA_MARCA.claro.simbolo} transform={SIMBOLO.transform}>
-              <path d={SIMBOLO.d} />
-              <rect {...SIMBOLO.modulo} />
-            </g>
+            <CamadasDoSimbolo prefixo="icone" />
           </svg>
         ) : (
           (letraDoIcone(marca.nome) ?? "")

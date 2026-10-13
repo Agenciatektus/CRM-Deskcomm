@@ -1,9 +1,11 @@
 "use client";
 
+import { Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useEffect, useRef, useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
@@ -423,16 +425,17 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
   const editavel = podeEditar && proposta.status === "rascunho";
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 p-6">
-      <header>
+    <Pagina className="max-w-5xl">
+      <header className="mb:px-4 mb:pt-3">
         <input
-          className="text-2xl font-semibold w-full border rounded-md px-2 py-1"
+          className="text-2xl font-semibold w-full border rounded-md px-2 py-1 mb:text-title-lg"
           value={proposta.titulo}
           disabled={!editavel}
           onChange={(e) => setProposta((p) => p && { ...p, titulo: e.target.value })}
           placeholder={t("Título da proposta")}
         />
       </header>
+      <SecaoDaPagina>
 
       {erro && (
         <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -462,13 +465,11 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
 
       <div className="space-y-2">
         <label className="block text-sm font-medium">{t("Válido até")}</label>
-        <input
-          type="date"
-          className="w-full rounded-md border p-2 text-sm disabled:bg-muted"
+        <CampoDeData tipo="date"
+          className="w-full"
           value={proposta.valid_until ?? ""}
           disabled={!editavel}
-          onChange={(e) => setProposta((p) => p && { ...p, valid_until: e.target.value || null })}
-        />
+          onValorChange={(valorEscolhido) => setProposta((p) => p && { ...p, valid_until: valorEscolhido || null })} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -551,8 +552,8 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border mb:-mx-4 mb:overflow-visible mb:rounded-none mb:border-x-0">
+        <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <thead className="bg-muted">
             <tr className="border-b">
               <th scope="col" className="p-3 text-left">{t("Descrição")}</th>
@@ -578,7 +579,7 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
                       placeholder={t("Descrição")}
                     />
                   </td>
-                  <td className="p-3">
+                  <td data-rotulo={t("Qtd")} className="p-3">
                     <input
                       type="number"
                       className="w-full border rounded-md px-2 py-1 text-sm text-right disabled:bg-muted"
@@ -589,7 +590,7 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
                       step="1"
                     />
                   </td>
-                  <td className="p-3">
+                  <td data-rotulo={t("Preço unit.")} className="p-3">
                     <input
                       type="number"
                       className="w-full border rounded-md px-2 py-1 text-sm text-right disabled:bg-muted"
@@ -606,7 +607,7 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
                       step="0.01"
                     />
                   </td>
-                  <td className="p-3">
+                  <td data-rotulo={t("Desconto")} className="p-3">
                     <input
                       type="number"
                       className="w-full border rounded-md px-2 py-1 text-sm text-right disabled:bg-muted"
@@ -619,7 +620,7 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
                       step="0.01"
                     />
                   </td>
-                  <td className="p-3 text-right font-medium tabular-nums">
+                  <td data-rotulo={t("Subtotal")} className="p-3 text-right font-medium tabular-nums">
                     {subtotal === null ? t("A definir") : formatCents(Math.max(0, subtotal), proposta.moeda)}
                   </td>
                 </tr>
@@ -755,6 +756,7 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
           {salvando ? t("Salvando…") : t("Salvar")}
         </Button>
       )}
-    </div>
+      </SecaoDaPagina>
+    </Pagina>
   );
 }

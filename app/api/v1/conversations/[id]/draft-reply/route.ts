@@ -33,7 +33,19 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   const requestId = randomUUID(),
     c = await context(ctx, requestId);
   if ("response" in c) return c.response;
-  const { rows } = await getRequestPool().query(
+  // Sem SUPABASE_DB_URL o pool não existe: 503 "indisponível", como a rota de
+  // resposta a caso. Um 500 aqui fazia a tela consultar de novo sem parar.
+  let pool;
+  try {
+    pool = getRequestPool();
+  } catch (erroDoPool) {
+    logger.warn("rascunho da IA sem pool do banco", {
+      requestId,
+      detalhe: erroDoPool instanceof Error ? erroDoPool.message : String(erroDoPool),
+    });
+    return fail("unavailable", c.t("Rascunho da IA indisponível (config)."), 503, { requestId });
+  }
+  const { rows } = await pool.query(
     `select id,revision::text,original_body,edited_body,approved_body,proposals,feedback,error_code,created_at,
  case when status in ('generating','pending','approved') and not fn_reply_context_current(organization_id,id) then 'stale' else status end as status
  from ai_reply_drafts where organization_id=$1 and conversation_id=$2 order by created_at desc limit 5`,

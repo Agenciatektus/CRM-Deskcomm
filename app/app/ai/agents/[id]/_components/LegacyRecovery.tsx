@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { Escolha } from "@/components/ui/escolha";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 import type { ChannelSessionLite } from "./AgentForm";
@@ -68,11 +69,11 @@ export function LegacyRecovery({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
               {t("Canal")}
-              <select
+              <Escolha
                 aria-label={t("Canal da recuperação")}
-                className="mt-1 block w-full rounded-md border bg-background p-2"
+                className="mt-1 block w-full"
                 value={channel}
-                onChange={(e) => setChannel(e.target.value)}
+                onValueChange={(valorEscolhido) => setChannel(valorEscolhido)}
               >
                 <option value="">{t("Escolha um canal")}</option>
                 {channels.map((c) => (
@@ -80,7 +81,7 @@ export function LegacyRecovery({
                     {c.display_name}
                   </option>
                 ))}
-              </select>
+              </Escolha>
             </label>
             <label className="text-sm">
               {t("Provedor")}
@@ -96,11 +97,11 @@ export function LegacyRecovery({
             </label>
             <label className="text-sm">
               {t("Credencial")}
-              <select
+              <Escolha
                 aria-label={t("Credencial da recuperação")}
-                className="mt-1 block w-full rounded-md border bg-background p-2"
+                className="mt-1 block w-full"
                 value={credential}
-                onChange={(e) => setCredential(e.target.value)}
+                onValueChange={(valorEscolhido) => setCredential(valorEscolhido)}
               >
                 <option value="">{t("Chave da instalação (se configurada)")}</option>
                 {credentials
@@ -110,7 +111,7 @@ export function LegacyRecovery({
                       {c.label}
                     </option>
                   ))}
-              </select>
+              </Escolha>
             </label>
           </div>
           <Button

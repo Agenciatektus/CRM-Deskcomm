@@ -1,5 +1,6 @@
 import { ScriptDoSite } from "@/app/app/settings/conversoes/_scriptDoSite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FormularioDeCapturaDeUtm } from "@/app/app/settings/conversoes/_formCapturaDeUtm";
 import { FormularioDeConversoesGoogle } from "@/app/app/settings/conversoes/_formGoogle";
@@ -76,9 +77,7 @@ describe("formulários de conversão", () => {
         falta={[]}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Valor do negócio"), {
-      target: { value: "quando_houver" },
-    });
+    escolherValor(screen.getByLabelText("Valor do negócio"), "quando_houver");
     fireEvent.click(screen.getByLabelText("Enviar o telefone do contato criptografado"));
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() =>

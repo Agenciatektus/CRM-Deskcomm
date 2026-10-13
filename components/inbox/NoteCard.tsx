@@ -5,6 +5,9 @@ import { format } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
 import { Note as NoteIcon, Trash } from "@/lib/ui/icons";
 import type { Note } from "@/lib/types/messaging";
+import { cn } from "@/lib/utils";
+
+import { classesDaBolha, classesDaLinha, classesDoAutor, COLUNA_DA_FALA } from "./bolha/estilo";
 
 import { AudioPlayer } from "@/components/inbox/media/AudioPlayer";
 import { DocumentCard } from "@/components/inbox/media/DocumentCard";
@@ -69,39 +72,73 @@ interface Props {
   onDelete?: () => void;
 }
 
-/** Onda 5.2: nota interna inline no thread — nunca vai ao cliente, destaque âmbar (token `warning`). */
+/**
+ * Onda 5.2: nota interna inline no thread — nunca vai ao cliente.
+ *
+ * Visual v2 (fase 3.5): ela fica do NOSSO lado do fio (é o time falando), com
+ * borda tracejada no tom de aviso, a mesma linguagem da caixa do composer em
+ * "Nota interna". Quem escreveu e o "só o time vê" vão acima da bolha, como o
+ * nome das mensagens; a hora fica dentro, no canto, como em toda bolha.
+ */
 export function NoteCard({ note, onDelete }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
   const time = format(new Date(note.created_at), "HH:mm", { locale: localeDaData });
 
   return (
-    <div className="group flex w-full min-w-0 justify-center px-4 py-1">
-      <div className="max-w-[85%] min-w-0 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm text-warning-fg shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold opacity-80">
-            <NoteIcon size={12} weight="fill" aria-hidden />
-            <span>{note.created_by_name ?? t("Alguém")}</span>
-            <span aria-hidden>·</span>
-            <span>{t("Nota interna · só o time vê")}</span>
-          </div>
+    // A nota é uma fala do nosso lado, à direita, no `.b-note` do quadro DS:
+    // fundo de aviso com borda tracejada, e o rótulo "Nota interna de Fulano,
+    // só a equipe vê" em cima, na cor de aviso.
+    <div className={classesDaLinha({ inicio: true, saida: true })}>
+      <div className={cn(COLUNA_DA_FALA, "items-end")}>
+        <p className={classesDoAutor("nota")}>
+          <NoteIcon size={12} weight="fill" aria-hidden />
+          <span>
+            {t("Nota interna de")} {note.created_by_name ?? t("Alguém")}
+          </span>
+          <em className="font-medium not-italic text-text-subtle">{t("só a equipe vê")}</em>
+        </p>
+        <div
+          data-testid="nota-interna"
+          className={classesDaBolha({
+            tom: "nota",
+            saida: true,
+            inicio: true,
+            falhou: false,
+            busca: false,
+            temMenu: Boolean(onDelete),
+            modoMeta: note.body ? "no-texto" : "abaixo",
+          })}
+        >
           {onDelete && (
             <button
               type="button"
               onClick={onDelete}
-              className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+              // Visível onde não há hover (toque) e no foco do teclado; com mouse,
+              // aparece ao passar por cima, sem disputar a leitura da nota.
+              className="absolute right-1 top-1 grid size-6 place-items-center rounded-full border border-border bg-surface text-text-muted shadow-xs transition-opacity hover:text-destructive [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
               aria-label={t("Excluir nota")}
             >
               <Trash size={12} weight="bold" />
             </button>
           )}
+          <NoteMedia note={note} />
+          {/* Nota só de anexo (imagem colada sem legenda) chega com `body` vazio:
+              renderizar o `<p>` assim mesmo deixaria um parágrafo fantasma de
+              altura nula entre o arquivo e a hora. Com texto, a hora flutua no
+              fim da última linha (espaçador invisível), como nas mensagens. */}
+          {note.body ? (
+            <>
+              <p className="whitespace-pre-wrap wrap-anywhere">
+                {note.body}
+                <span aria-hidden className="inline-block h-px w-10 align-baseline" />
+              </p>
+              <span className="absolute bottom-1.5 right-2.5 text-[11px] leading-none text-text-subtle">{time}</span>
+            </>
+          ) : (
+            <span className="absolute bottom-1.5 right-2.5 text-[11px] leading-none text-text-subtle">{time}</span>
+          )}
         </div>
-        <NoteMedia note={note} />
-        {/* Nota só de anexo (imagem colada sem legenda) chega com `body` vazio:
-            renderizar o `<p>` assim mesmo deixaria um parágrafo fantasma de
-            altura nula entre o arquivo e a hora. */}
-        {note.body && <p className="mt-1 whitespace-pre-wrap wrap-anywhere leading-snug">{note.body}</p>}
-        <div className="mt-1 text-right text-[10px] opacity-70">{time}</div>
       </div>
     </div>
   );

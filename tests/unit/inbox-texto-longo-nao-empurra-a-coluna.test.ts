@@ -33,7 +33,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const PAINEL = "components/inbox/CRMSidePanel.tsx";
+// O bloco de fatos saiu do CRMSidePanel para a peça da Memória quando o painel
+// ganhou abas (visual v2, 3.3). A régua segue a LINHA, onde quer que ela more.
+const PAINEL = "components/inbox/painel/MemoriaDoContato.tsx";
 const LAYOUT = "components/inbox/InboxLayout.tsx";
 const PASTA_INBOX = "components/inbox";
 
@@ -112,7 +114,7 @@ describe("inbox — texto longo não empurra a coluna (#1802)", () => {
     const fonte = ler(LAYOUT);
 
     // Coluna da conversa — protegida pelo f7b1ef4, é a que o #1802 aponta.
-    expect(fonte).toMatch(/h-full min-h-0 min-w-0 flex-col md:flex/);
+    expect(fonte).toMatch(/h-full min-h-0 min-w-0 flex-col largo:flex/);
 
     // Coluna do CRM, trilha fixa do grid: min-w-0 como defesa uniforme com a
     // coluna da conversa (o transbordo do fato ficava dentro do painel).

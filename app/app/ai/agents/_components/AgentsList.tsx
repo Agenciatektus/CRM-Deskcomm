@@ -1,6 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { BarraDeFiltros, BotaoDaTela } from "@/components/pagina";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,6 +22,7 @@ interface Props {
 
 export function AgentsList({ initialData, canWrite }: Props) {
   const t = useT();
+  const router = useRouter();
   const { data, isLoading } = useAgentsList({ initialData });
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
@@ -39,7 +43,7 @@ export function AgentsList({ initialData, canWrite }: Props) {
 
   if (!isLoading && agents.length === 0) {
     return (
-      <Card className="flex flex-col items-center gap-3 p-10 text-center">
+      <Card className="flex flex-col items-center gap-3 p-10 text-center mb:mx-4">
         <Robot size={36} aria-hidden className="text-muted-foreground" />
         <h2 className="font-medium">{t("Nenhum agent configurado")}</h2>
         <p className="max-w-sm text-sm text-muted-foreground">
@@ -58,32 +62,47 @@ export function AgentsList({ initialData, canWrite }: Props) {
     );
   }
 
+  const novo = canWrite ? (
+    <>
+      <Link href="/app/ai/agents/new" className="mb:hidden">
+        <Button>
+          <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
+        </Button>
+      </Link>
+      <BotaoDaTela rotulo={t("Novo agente")} aoTocar={() => router.push("/app/ai/agents/new")} />
+    </>
+  ) : null;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <AgentsListFilters
-          status={status}
-          onStatusChange={setStatus}
-          query={query}
-          onQueryChange={setQuery}
-          showArchived={showArchived}
-          onShowArchivedChange={setShowArchived}
-        />
-        {canWrite && (
-          <Link href="/app/ai/agents/new">
-            <Button>
-              <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
-            </Button>
-          </Link>
-        )}
+    <div className="flex flex-col gap-4 mb:gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb:contents">
+        <div className="min-w-0 flex-1">
+          <BarraDeFiltros
+            busca={{ valor: query, aoMudar: setQuery, placeholder: t("Buscar por nome…") }}
+            ativos={(status !== "all" ? 1 : 0) + (showArchived ? 1 : 0)}
+            aoLimpar={() => {
+              setStatus("all");
+              setQuery("");
+              setShowArchived(false);
+            }}
+          >
+            <AgentsListFilters
+              status={status}
+              onStatusChange={setStatus}
+              showArchived={showArchived}
+              onShowArchivedChange={setShowArchived}
+            />
+          </BarraDeFiltros>
+        </div>
+        {novo}
       </div>
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-muted-foreground">
+        <Card className="p-8 text-center text-sm text-muted-foreground mb:mx-4">
           {t("Nenhum agent corresponde aos filtros atuais.")}
         </Card>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 mb:px-4">
           {filtered.map((agent) => (
             <li key={agent.id}>
               <AgentCard agent={agent} canWrite={canWrite} />

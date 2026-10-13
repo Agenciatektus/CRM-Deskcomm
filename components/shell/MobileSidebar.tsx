@@ -41,11 +41,7 @@ export function MobileSidebar() {
         className="flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-0 p-0 sm:max-w-xs"
       >
         <SheetTitle className="sr-only">{t("Navegação principal")}</SheetTitle>
-        <SidebarContent
-          collapsed={false}
-          showCollapseControl={false}
-          onNavigate={() => setOpen(false)}
-        />
+        <SidebarContent onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );

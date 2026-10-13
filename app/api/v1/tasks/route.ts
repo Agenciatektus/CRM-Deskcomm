@@ -33,6 +33,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
+import { prazoNoPassado } from "@/lib/tarefas/prazo-no-passado";
 import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +63,13 @@ const listaSchema = z.object({
   due_to: z.string().datetime({ offset: true }).optional(),
   /** "abertas" = o que ainda pede ação. É o default da tela. */
   aberto: z.enum(["true", "false"]).optional(),
+  /**
+   * De quem é a tarefa (o "Minhas" do celular, M3.2): "eu" (o usuário da sessão)
+   * ou o id de um membro da organização. É recorte de PERGUNTA, não de permissão:
+   * só estreita a mesma consulta (mesma org, mesma RLS, mesmo limite), nunca
+   * amplia o que o papel já vê.
+   */
+  assigned_to: z.union([z.literal("eu"), z.string().uuid()]).optional(),
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -80,6 +89,14 @@ export async function GET(req: NextRequest): Promise<Response> {
   const filtros = parsed.data;
 
   const supabase = await createClient();
+
+  // "eu" vira o usuário da sessão; o id de um colega vai direto ao filtro. Sem
+  // conferir a filiação (P2 do Cassio na #183): a RLS de `user_organizations` não
+  // deixa agent/viewer ler a linha de outro membro, e o filtro só ESTREITA a lista
+  // que a pessoa já vê (mesma org, mesma RLS). Id de fora devolve vazio, como
+  // membro sem tarefa, e a rota não diz se ele existe.
+  const responsavel = filtros.assigned_to === "eu" ? authz.user.id : (filtros.assigned_to ?? null);
+
   // ⚠️ `organization_id` à mão mesmo com RLS ligada: é a regra do CLAUDE.md, e
   // ela não é redundante — o dia em que esta rota trocar para o admin client
   // (que bypassa RLS) o filtro já está aqui.
@@ -97,6 +114,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (filtros.contact_id) query = query.eq("contact_id", filtros.contact_id);
   if (filtros.due_from) query = query.gte("due_date", filtros.due_from);
   if (filtros.due_to) query = query.lte("due_date", filtros.due_to);
+  if (responsavel) query = query.eq("assigned_to", responsavel);
   if (filtros.aberto === "true") query = query.in("status", ["pending", "in_progress"]);
 
   const { data, error } = await query;
@@ -126,7 +144,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
+  if (prazoNoPassado(parsed.data.due_date, parsed.data.status)) {
+    return fail("validation_failed", t("O prazo da tarefa não pode estar no passado."), 422, {
+      requestId,
+      details: { campo: "due_date" },
+    });
+  }
+
   const supabase = await createClient();
+  const recusa = await recusaDeVinculoDaTarefa(supabase, authz.org.orgId, parsed.data, t);
+  if (recusa) {
+    return fail("validation_failed", recusa.mensagem, 422, { requestId, details: { campo: recusa.campo } });
+  }
+
   const { data, error } = await supabase
     .from("crm_tasks")
     .insert({
@@ -138,8 +168,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     .single();
 
   if (error) {
-    // 23503 = lead ou contato de outra organização (ou apagado no meio). A
-    // recusa nomeia o campo porque quem lê é quem escolheu na tela.
+    // 23503 = o uuid não existe em organização NENHUMA (ou foi apagado entre a
+    // checagem acima e o INSERT). Outra organização NÃO cai aqui: a FK não passa
+    // por RLS e aceitaria, por isso `recusaDeVinculoDaTarefa` vem antes.
     if (error.code === "23503") {
       return fail("validation_failed", t("O negócio ou contato vinculado não existe."), 422, {
         requestId,

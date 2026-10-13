@@ -39,7 +39,7 @@ export function AttachMenu({ disabled, onPick, onPickContact }: Props) {
             <Plus size={18} weight="regular" aria-hidden />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" side="top" className="w-52 p-1">
+        <PopoverContent folhaNoCelular align="start" side="top" className="w-52 p-1">
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"

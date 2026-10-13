@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+import { TarefasNoCelular } from "@/components/mobile/telas/Tarefas";
+import { useEhCelular } from "@/lib/mobile/useEhCelular";
+import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -25,6 +29,7 @@ type FiltroDeSituacao = "aberto" | SituacaoDaTarefa;
 
 export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
   const t = useT();
+  const celular = useEhCelular();
   const [modo, setModo] = useState<"lista" | "calendario">("lista");
   const [situacao, setSituacao] = useState<FiltroDeSituacao>("aberto");
   const [emEdicao, setEmEdicao] = useState<Tarefa | null>(null);
@@ -55,6 +60,8 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
     setAberturas((n) => n + 1);
     setFormAberto(true);
   }
+  // O "+" do celular chega com `?criar=1`.
+  usePedidoDeCriar(() => abrirNova(), podeEditar);
 
   function abrirEdicao(tarefa: Tarefa) {
     setEmEdicao(tarefa);
@@ -68,11 +75,32 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
     else await criarTarefa(entrada);
   }
 
+  const formulario = (
+    <FormularioDeTarefa
+      key={aberturas}
+      aberto={formAberto}
+      aoMudarAbertura={setFormAberto}
+      tarefa={emEdicao}
+      prazoSugerido={prazoSugerido}
+      aoSalvar={salvar}
+    />
+  );
+
+  // Celular (M3.2): a aba Tarefas do protótipo, com o mesmo formulário.
+  if (celular) {
+    return (
+      <>
+        <TarefasNoCelular podeEditar={podeEditar} aoAbrirTarefa={abrirEdicao} />
+        {formulario}
+      </>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Tarefas")}</h1>
+          <h1 className="text-title-lg">{t("Tarefas")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t(
               "O que ficou combinado, com prazo. Tarefa presa a um negócio aparece na linha do tempo dele.",
@@ -180,14 +208,7 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
         />
       )}
 
-      <FormularioDeTarefa
-        key={aberturas}
-        aberto={formAberto}
-        aoMudarAbertura={setFormAberto}
-        tarefa={emEdicao}
-        prazoSugerido={prazoSugerido}
-        aoSalvar={salvar}
-      />
+      {formulario}
     </div>
   );
 }

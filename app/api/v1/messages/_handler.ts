@@ -52,6 +52,7 @@ import { emitirFalhaDeEntrega } from "@/lib/messaging/falha-de-entrega";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Message } from "@/lib/types/messaging";
+import { jaFoiReenviada, validarReenvio } from "@/lib/messaging/reenvio";
 
 type SB = SupabaseClient;
 
@@ -179,7 +180,7 @@ export function origemDaMensagem(actor: Actor): "user" | "ai" | "automation" | "
 }
 
 const MSG_COLS =
-  "id, organization_id, conversation_id, channel_session_id, contact_id, external_id, type, direction, status, ack, error_code, error_message, body, media_url, media_mime, media_size_bytes, media_storage_path, media_thumb_path, sent_via, sent_by_user_id, sent_on_behalf_of_user_id, sent_at, delivered_at, read_at, metadata, edited_at, revoked_at, reply_to_message_id, created_at";
+  "id, organization_id, conversation_id, channel_session_id, contact_id, external_id, type, direction, status, ack, error_code, error_message, body, media_url, media_mime, media_size_bytes, media_storage_path, media_thumb_path, media_derived_text, sent_via, sent_by_user_id, sent_on_behalf_of_user_id, sent_at, delivered_at, read_at, metadata, edited_at, revoked_at, reply_to_message_id, created_at";
 
 /**
  * `Actor.type` → o vocabulário de `messages.sent_via` (o CHECK da coluna:
@@ -466,6 +467,19 @@ export async function sendMessageHandler(
   };
   const c = conv as unknown as Joined;
 
+  // B15: "Tentar de novo" só para a mensagem de saída que falhou, nesta conversa
+  // e neste canal, uma vez (ver `lib/messaging/reenvio.ts`).
+  if (input.reenvio_de) {
+    await validarReenvio(supabase, {
+      organizationId: ctx.organization_id,
+      conversationId: c.id,
+      channelSessionId: c.channel_session_id,
+      reenvioDe: input.reenvio_de,
+      requestId: ctx.requestId,
+      idioma: ctx.idioma,
+    });
+  }
+
   if (c.contacts?.is_blocked) {
     throw new ApiError(
       403,
@@ -728,6 +742,9 @@ export async function sendMessageHandler(
     metadata: {
       ...(input.metadata ?? {}),
       ...(ctx.actor.type === "ai_agent" ? { ai_actor_id: ctx.actor.id } : {}),
+      // B15: o vínculo com a mensagem que falhou. Depois de `input.metadata`,
+      // que é entrada do cliente e passa por allowlist.
+      ...(input.reenvio_de ? { reenvio_de: input.reenvio_de } : {}),
       // Os dois nomes viajam GRAVADOS porque o balão não faz join: "Fulano ·
       // via {token}" é desenhado da própria linha. Vêm DEPOIS de
       // `input.metadata` de propósito — metadata é entrada do cliente, e
@@ -768,6 +785,9 @@ export async function sendMessageHandler(
     )
       return created as unknown as Message;
   }
+  // O índice único `messages_reenvio_unico` (9048) segurou um segundo reenvio
+  // simultâneo da mesma mensagem: a mesma recusa legível da consulta.
+  if (insErr?.code === "23505" && input.reenvio_de) throw jaFoiReenviada(ctx.requestId, ctx.idioma);
   if (insErr || !created) {
     throw new ApiError(
       500,

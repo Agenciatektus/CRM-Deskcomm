@@ -4,6 +4,7 @@
 
 | Arquivo | O que é |
 |---|---|
+| `verdash-simbolo.svg` | **Decisão do fork:** a marca padrão é "Verdash CRM" (logotipo em `lib/branding/desenho.ts`). O símbolo do produto desde a etapa 2 do design system: o V da Verdash, sem fundo, cópia do `public/logo_verdash.svg` do Verdash. Fonte de `lib/branding/desenho.ts`. |
 | `deskcomm-icon.svg` | O símbolo: D aberto com um módulo quadrado destacado. Quadrado de 216. |
 | `deskcomm-logo.svg` | Logotipo para fundo claro — símbolo em sálvia `#506d48`, nome em `#1c1a16`, "CRM" em `#5d594f`. |
 | `deskcomm-logo-dark.svg` | Logotipo para fundo escuro — sálvia `#82a077`, nome em `#f5f4ef`, "CRM" em `#8e8b7f`. |

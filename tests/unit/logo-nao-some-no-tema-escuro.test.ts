@@ -14,7 +14,8 @@
  * três superfícies, e as três precisam concordar — consertar uma só devolve o
  * defeito nas outras duas:
  *
- *   1. a barra lateral do app          (`components/shell/Sidebar.tsx`)
+ *   1. a barra lateral do app          (`components/shell/MarcaDaBarra.tsx`,
+ *      a marca que `Sidebar.tsx` desenha nas duas barras, celular e desktop)
  *   2. a tela de entrada               (`app/(public)/layout.tsx`)
  *   3. a PRÉVIA da tela de marca       (`components/branding/CampoDeLogo.tsx`)
  *
@@ -73,7 +74,9 @@ function imgDoLogoEstaDentroDoChip(fonte: string, classeDoChip: RegExp): boolean
 
 describe("o logo do operador não some no tema escuro", () => {
   it("a BARRA LATERAL desenha o logo sobre um chip claro quando o tema é escuro", () => {
-    const fonte = semComentario(leia("components/shell/Sidebar.tsx"));
+    // Desde o visual v2 a marca da barra mora em `MarcaDaBarra.tsx` (as duas
+    // barras, celular e desktop, desenham o mesmo componente).
+    const fonte = semComentario(leia("components/shell/MarcaDaBarra.tsx"));
 
     // O chip existe...
     expect(fonte, "sumiu o chip `dark:bg-white` da barra lateral").toMatch(/dark:bg-white/);
@@ -115,7 +118,7 @@ describe("o logo do operador não some no tema escuro", () => {
     // chutado: em 2026-09-11, na prévia do merge do PR #659, `logoUrl`/`logo`
     // chegava a um `<img>` em exatamente três arquivos.
     const SUPERFICIES = [
-      "components/shell/Sidebar.tsx",
+      "components/shell/MarcaDaBarra.tsx",
       "app/(public)/layout.tsx",
       "components/branding/CampoDeLogo.tsx",
     ];

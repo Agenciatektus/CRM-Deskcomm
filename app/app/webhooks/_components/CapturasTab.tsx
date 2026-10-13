@@ -1,4 +1,5 @@
 "use client";
+import { TABELA_EMPILHADA } from "@/components/pagina";
 
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import * as React from "react";
@@ -23,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CampoDeData } from "@/components/ui/campo-de-data";
 import { MagnifyingGlass, Tray } from "@/lib/ui/icons";
 import {
   useLeadCaptures,
@@ -168,23 +170,19 @@ export function CapturasTab() {
             <label className="block text-xs text-muted-foreground" htmlFor="captura-de">
               {t("De")}
             </label>
-            <Input
+            <CampoDeData tipo="datetime-local"
               id="captura-de"
-              type="datetime-local"
               value={de}
-              onChange={(e) => setDe(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setDe(valorEscolhido)} />
           </div>
           <div className="space-y-1">
             <label className="block text-xs text-muted-foreground" htmlFor="captura-ate">
               {t("Até")}
             </label>
-            <Input
+            <CampoDeData tipo="datetime-local"
               id="captura-ate"
-              type="datetime-local"
               value={ate}
-              onChange={(e) => setAte(e.target.value)}
-            />
+              onValorChange={(valorEscolhido) => setAte(valorEscolhido)} />
           </div>
         </div>
       </Card>
@@ -234,7 +232,7 @@ export function CapturasTab() {
           {/* A tabela rola dentro do próprio container: o corpo da página nunca
               rola na horizontal (regra de responsividade do design system). */}
           <Card className="overflow-x-auto">
-            <Table>
+            <Table className={TABELA_EMPILHADA}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("Quem")}</TableHead>
@@ -268,16 +266,16 @@ export function CapturasTab() {
                           {identidade(row, t)}
                         </button>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Contato")} className="text-sm text-muted-foreground">
                         {row.captured_phone ?? row.captured_email ?? "—"}
                       </TableCell>
-                      <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Fonte")} className="max-w-[160px] truncate text-sm text-muted-foreground">
                         {row.source_name}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {w.data} <span className="tabular-nums">{w.hora}</span>
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                      <TableCell data-rotulo={t("Origem")} className="max-w-[200px] truncate text-sm text-muted-foreground">
                         {row.origin ?? row.remote_ip ?? "—"}
                       </TableCell>
                       <TableCell>
