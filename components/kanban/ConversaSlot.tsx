@@ -30,7 +30,18 @@ import { cn } from "@/lib/utils";
  * conversa. Nesses casos o slot não aparece — e NÃO aparece um "sem mensagens"
  * cinza, que ocuparia a mesma linha em metade dos cards para não dizer nada.
  */
-export function ConversaSlot({ conversa }: { conversa: Lead["conversa"] }) {
+export function ConversaSlot({
+  conversa,
+  enxuto = false,
+}: {
+  conversa: Lead["conversa"];
+  /**
+   * No card novo do funil o canal já está no selo do avatar e as não lidas no
+   * topo: aqui fica só a última mensagem. Repetir os dois seria o mesmo dado
+   * duas vezes no mesmo card.
+   */
+  enxuto?: boolean;
+}) {
   const t = useT();
   if (!conversa) return null;
 
@@ -44,8 +55,9 @@ export function ConversaSlot({ conversa }: { conversa: Lead["conversa"] }) {
   // espera resposta ali; quem veio de comentário deixou um recado público. A
   // abordagem não é a mesma, e sem o selo o card não distingue as duas.
   const entrada = conversa.instagram_entrada ?? null;
-  const rotuloEntrada =
-    entrada === "direct" ? t("Direct") : entrada === "comentario" ? t("Comentário") : null;
+  const rotuloEntrada = enxuto
+    ? null
+    : entrada === "direct" ? t("Direct") : entrada === "comentario" ? t("Comentário") : null;
 
   return (
     <Link
@@ -70,7 +82,7 @@ export function ConversaSlot({ conversa }: { conversa: Lead["conversa"] }) {
       <span className="truncate">
         {preview || <span className="italic">{t("conversa sem mensagens")}</span>}
       </span>
-      {temNaoLidas && (
+      {temNaoLidas && !enxuto && (
         // O número, não um ponto: "3 sem ler" e "12 sem ler" pedem urgências
         // diferentes, e um ponto colapsa as duas.
         <span

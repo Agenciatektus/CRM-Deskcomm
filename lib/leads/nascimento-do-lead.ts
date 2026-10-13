@@ -316,7 +316,10 @@ export async function garantirLeadDaConversa(
     // `first_service_at` viaja no select que JÁ existe: decidir o funil não custa
     // uma consulta a mais no caminho quente da ingestão. É por isso que o fato
     // mora numa coluna de `contacts`, e não é derivado da agenda a cada inbound.
-    .select("is_blocked,display_name,name,phone_number,source,source_metadata,first_service_at")
+    // `instagram_username`: o @ que o ingest do Direct gravou no contato. Sem
+    // ele, uma mensagem que chegasse sem o perfil no pacote (eco, consulta do
+    // do perfil que falhou) abria o card genérico para alguém cujo @ o CRM já sabe.
+    .select("is_blocked,display_name,name,phone_number,instagram_username,source,source_metadata,first_service_at")
     .eq("organization_id", organizationId)
     .eq("id", contactId)
     .maybeSingle();
@@ -402,14 +405,19 @@ export async function garantirLeadDaConversa(
   // então o cadastro já incorporou o `pushName` desta mensagem.
   const doCadastro = rotuloDoContato(contato);
   const doPayload = (dados.nomeDoContato ?? "").trim();
+  const arroba = ((contato as { instagram_username?: string | null } | null)?.instagram_username ?? "")
+    .trim()
+    .replace(/^@/, "");
   const titulo =
     doCadastro !== SEM_NOME
       ? doCadastro
       : doPayload !== "" && !ehIdentificadorTecnico(doPayload)
         ? doPayload
-        : // "Sem nome" serve para uma linha de lista; um card de kanban precisa
-          // dizer de onde veio, senão o quadro vira uma coluna de anônimos iguais.
-          `Novo contato pelo ${origem.rotulo}`;
+        : arroba !== ""
+          ? `@${arroba}`
+          : // "Sem nome" serve para uma linha de lista; um card de kanban precisa
+            // dizer de onde veio, senão o quadro vira uma coluna de anônimos iguais.
+            `Novo contato pelo ${origem.rotulo}`;
 
   // De onde veio: o contato já carrega a atribuição de anúncio (gravada no
   // primeiro toque, por `fn_estampar_atribuicao_de_anuncio` — ver

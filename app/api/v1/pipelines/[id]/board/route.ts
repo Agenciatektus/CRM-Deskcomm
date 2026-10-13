@@ -27,6 +27,7 @@ import {
 } from "@/lib/leads/next-action";
 import type { LeadCandidate } from "@/lib/leads/active-lead";
 import { anexarDadosDoContato, type LinhaDoContatoNoQuadro } from "@/lib/kanban/dados-do-contato";
+import { anexarProximoPasso, type TarefaAbertaDoQuadro } from "@/lib/kanban/proximo-passo-do-quadro";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { createClient } from "@/lib/supabase/server";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
@@ -381,7 +382,12 @@ async function withMarcadoresDoContato(
   const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("contacts")
-      .select("id, tags, phone_number, email, custom_fields, is_anonymized")
+      // `name`, `display_name`, `instagram_username` e `avatar_storage_path`:
+      // o nome e a foto do card (proposta aprovada de 13/10/2026), na MESMA
+      // leitura — nenhuma consulta nova por quadro.
+      .select(
+        "id, tags, phone_number, email, custom_fields, is_anonymized, name, display_name, instagram_username, avatar_storage_path",
+      )
       .eq("organization_id", organizationId)
       .in("id", lote),
   );
@@ -404,6 +410,49 @@ async function withMarcadoresDoContato(
     }),
     error: null,
   };
+}
+
+/**
+ * O próximo passo de cada negócio: a tarefa aberta mais urgente (`crm_tasks`).
+ *
+ * Falhar aqui NÃO derruba o quadro: o lead segue sem o campo (`undefined`), e
+ * o card simplesmente não mostra a linha — em vez de afirmar "Sem próximo
+ * passo" para quem talvez tenha.
+ */
+/** O `max_rows` do PostgREST: resposta com tantas linhas pode ter sido cortada. */
+const LIMITE_DE_LINHAS = 1000;
+
+async function withProximosPassos(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  leads: Lead[],
+): Promise<Lead[]> {
+  if (leads.length === 0) return leads;
+  const { data, error } = await buscaEmLotes<TarefaAbertaDoQuadro>(
+    leads.map((l) => l.id),
+    async (lote) => {
+      const r = await supabase
+        .from("crm_tasks")
+        .select("lead_id, title, due_date, created_at")
+        .eq("organization_id", organizationId)
+        // Encerrada (feita ou desistida) não é próximo passo (`lib/tarefas/tipos.ts`).
+        .not("status", "in", "(done,cancelled)")
+        .in("lead_id", lote)
+        .limit(LIMITE_DE_LINHAS);
+      // O PostgREST corta em 1.000 linhas SEM erro (`max_rows`): um lote cortado
+      // faria um lead com tarefa aparecer "Sem próximo passo". Lote cheio = dado
+      // incerto, e o quadro segue sem o campo, como na falha (P2 do Cassio, #200).
+      if ((r.data?.length ?? 0) >= LIMITE_DE_LINHAS) {
+        return { data: null, error: { message: "lote_de_tarefas_cortado" } };
+      }
+      return r;
+    },
+  );
+  if (error) {
+    logger.warn("[board] próximo passo indisponível", { organizationId, error: error.message });
+    return leads;
+  }
+  return anexarProximoPasso(leads, data);
 }
 
 async function withNextActions(
@@ -565,10 +614,16 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("internal_error", leadsComScore.error, 500, { requestId });
   }
 
-  const leadsComConversa = await withConversas(
+  const leadsComPasso = await withProximosPassos(
     supabase,
     (pipeline as Pipeline).organization_id,
     leadsComScore.leads,
+  );
+
+  const leadsComConversa = await withConversas(
+    supabase,
+    (pipeline as Pipeline).organization_id,
+    leadsComPasso,
   );
   if (leadsComConversa.error) {
     return fail("internal_error", leadsComConversa.error, 500, { requestId });

@@ -46,6 +46,8 @@ interface KanbanBoardProps {
    * então o cabeçalho fica só leitura para eles.
    */
   podeRenomearEtapa?: boolean;
+  /** Densidade do card, escolhida no cabeçalho do Funil (por pessoa). */
+  compacto?: boolean;
 }
 
 function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> {
@@ -90,6 +92,7 @@ export function KanbanBoard({
   onSelectionChange,
   leadInicial,
   podeRenomearEtapa = false,
+  compacto = false,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -321,6 +324,7 @@ export function KanbanBoard({
             onSelectMany={handleSelectMany}
             onOpen={setDossieId}
             podeRenomear={podeRenomearEtapa}
+            compacto={compacto}
             onRenomear={(nome) => renameStage.mutate({ stageId: stage.id, name: nome })}
           />
         ))}

@@ -37,6 +37,8 @@ interface StageColumnProps {
   /** `manager`+ — mesmo corte de papel da rota que renomeia a etapa. */
   podeRenomear?: boolean;
   onRenomear?: (nome: string) => void;
+  /** Densidade do card (cabeçalho do Funil). */
+  compacto?: boolean;
 }
 
 export function StageColumn({
@@ -53,6 +55,7 @@ export function StageColumn({
   onOpen,
   podeRenomear = false,
   onRenomear,
+  compacto = false,
 }: StageColumnProps) {
   const t = useT();
   // O TOTAL É POR MOEDA (#1531). Antes ele somava todos os `value_cents` e
@@ -236,6 +239,8 @@ export function StageColumn({
                 pulseCount={pulses?.get(lead.id) ?? 0}
                 onSelect={aoSelecionar}
                 onOpen={onOpen}
+                compacto={compacto}
+                limiteDaEtapa={stage.expected_duration_hours}
               />
             ))}
             {provided.placeholder}

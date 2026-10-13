@@ -6,6 +6,8 @@ import { formatMoney } from "@/components/inbox/painel/SemLista";
 import { useT } from "@/hooks/i18n/useT";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useBoard } from "@/hooks/kanban/useBoard";
+import { AvatarDoLead } from "@/components/kanban/AvatarDoLead";
+import { canalDoCard, iniciaisDoCard, nomeDoCard } from "@/lib/kanban/identidade-do-card";
 import type { Lead } from "@/lib/types/leads";
 import { ArrowRight, CaretDown, Check, Funnel } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
@@ -13,14 +15,6 @@ import { cn } from "@/lib/utils";
 import { FolhaInferior } from "../FolhaInferior";
 import { useFunisDoMenu } from "../FunisDoMenu";
 import { FolhaMoverEtapaDoLead } from "./FolhaMoverEtapaDoLead";
-
-const iniciais = (texto: string) =>
-  texto
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
 
 /** "N leads abertos, R$ X": os abertos do funil e a soma do valor deles (na moeda do primeiro). */
 export function resumoDoFunil(leads: Lead[]): { abertos: number; centavos: number; moeda: string | null } {
@@ -107,11 +101,17 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
               href={`/app/leads/${l.id}`}
               className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-3 rounded-t-2xl px-3.5 pt-3.5 pb-2 hover:bg-hover"
             >
-              <span aria-hidden className="grid size-11 place-items-center rounded-full bg-tint text-sm font-bold text-text">
-                {iniciais(l.title)}
-              </span>
+              {/* O MESMO avatar e o MESMO nome do card do desktop (proposta de
+                  13/10): foto ou iniciais com a cor da pessoa, selo do canal, e
+                  nunca "Novo contato pelo WhatsApp". */}
+              <AvatarDoLead
+                semente={l.contact_id ?? l.id}
+                iniciais={iniciaisDoCard(nomeDoCard(l).nome || t("Sem nome"))}
+                foto={l.contact_tem_foto && l.contact_id ? `/api/v1/contacts/${l.contact_id}/avatar` : null}
+                canal={canalDoCard(l)}
+              />
               <span className="min-w-0">
-                <b className="block truncate text-base text-text">{l.title}</b>
+                <b className="block truncate text-base text-text">{nomeDoCard(l).nome || t("Sem nome")}</b>
                 {l.next_action?.label && (
                   <span className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-text-muted">
                     <ArrowRight size={14} aria-hidden />

@@ -27,6 +27,9 @@ function formatError(err: unknown, t: (texto: string) => string): string {
 }
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { FilterBar } from "@/components/kanban/FilterBar";
+import { SeletorDeDensidade } from "@/components/kanban/SeletorDeDensidade";
+import { useFunilCompacto } from "@/hooks/kanban/useFunilCompacto";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { BulkActionBar } from "@/components/kanban/BulkActionBar";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { CadenciasDoPipeline } from "@/components/cadencia/CadenciasDoPipeline";
@@ -57,6 +60,9 @@ export function PipelinePageClient({
   const { data, isLoading, error, pulses, realtimeStatus, seguranca } = useBoard(pipelineId);
   const router = useRouter();
   const celular = useEhCelular();
+  // Densidade do card, por pessoa (localStorage; o 1º render é sempre o padrão).
+  const { user } = useAuth();
+  const [compacto, setCompacto] = useFunilCompacto(user?.id);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
@@ -177,6 +183,7 @@ export function PipelinePageClient({
               </button>
             ))}
           </div>
+          {modo === "kanban" && <SeletorDeDensidade compacto={compacto} onChange={setCompacto} />}
           {modo === "kanban" && (
             <Button onClick={() => setNewOpen(true)} disabled={!data} className="shrink-0">
               <Plus size={16} className="mr-2" /> {t("Novo Lead")}
@@ -231,6 +238,7 @@ export function PipelinePageClient({
           onSelectionChange={setSelectedIds}
           leadInicial={searchParams.get("lead")}
           podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.manager}
+          compacto={compacto}
         />
       )}
       <BulkActionBar

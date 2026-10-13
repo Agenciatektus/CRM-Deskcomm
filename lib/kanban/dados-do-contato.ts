@@ -1,7 +1,16 @@
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { linksParaExibir } from "@/lib/leads/links-de-contato";
 import type { Lead } from "@/lib/types/leads";
 
-type DadosDoContato = Pick<Lead, "contact_phone" | "contact_email" | "contact_links">;
+type DadosDoContato = Pick<
+  Lead,
+  | "contact_phone"
+  | "contact_email"
+  | "contact_links"
+  | "contact_name"
+  | "contact_instagram"
+  | "contact_tem_foto"
+>;
 
 /** A linha de `contacts` como o quadro a lê — as colunas que esta regra usa. */
 export interface LinhaDoContatoNoQuadro {
@@ -10,6 +19,11 @@ export interface LinhaDoContatoNoQuadro {
   email: string | null;
   custom_fields: Record<string, unknown> | null;
   is_anonymized: boolean | null;
+  /** O nome e a foto do card (opcionais: leitura antiga sem as colunas segue valendo). */
+  name?: string | null;
+  display_name?: string | null;
+  instagram_username?: string | null;
+  avatar_storage_path?: string | null;
 }
 
 /**
@@ -35,10 +49,17 @@ export function anexarDadosDoContato(leads: Lead[], contatos: LinhaDoContatoNoQu
   for (const contato of contatos) {
     if (contato.is_anonymized) continue;
     const links = linksParaExibir(contato.custom_fields);
+    const nome = nomeDoContato(contato);
+    const arroba = contato.instagram_username?.trim().replace(/^@/, "");
     const dados: DadosDoContato = {
       ...(contato.phone_number ? { contact_phone: contato.phone_number } : {}),
       ...(contato.email ? { contact_email: contato.email } : {}),
       ...(links.length > 0 ? { contact_links: links } : {}),
+      ...(nome ? { contact_name: nome } : {}),
+      ...(arroba ? { contact_instagram: arroba } : {}),
+      // A rota da foto (`/api/v1/contacts/:id/avatar`) recusa contato
+      // anonimizado; este laço já pulou os anonimizados acima.
+      ...(contato.avatar_storage_path ? { contact_tem_foto: true } : {}),
     };
     if (Object.keys(dados).length > 0) porContato.set(contato.id, dados);
   }

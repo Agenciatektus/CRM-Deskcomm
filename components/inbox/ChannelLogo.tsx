@@ -23,7 +23,7 @@ const brands: Record<ChannelBrand, { Icon: typeof ChatCircle; color: string }> =
  * da rede, com o ícone branco por cima. As cores são as do protótipo
  * (`.chan-wa`, `.chan-ig`); o Messenger não foi desenhado e segue a mesma regra.
  */
-const DISCO: Record<ChannelBrand, string> = {
+export const DISCO: Record<ChannelBrand, string> = {
   whatsapp: "bg-[oklch(0.62_0.15_150)]",
   instagram: "bg-[oklch(0.58_0.2_0)]",
   messenger: "bg-[oklch(0.55_0.2_260)]",
