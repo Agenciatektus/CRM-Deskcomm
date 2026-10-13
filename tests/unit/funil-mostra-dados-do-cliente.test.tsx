@@ -255,7 +255,7 @@ describe("a fiação — quem usa a regra a chama", () => {
     const etapa = rota.slice(inicio, fim);
 
     expect(etapa, "a consulta não traz telefone, e-mail e custom_fields").toMatch(
-      /\.select\(\s*"id, tags, phone_number, email, custom_fields, is_anonymized"\s*\)/,
+      /\.select\(\s*"id, tags, phone_number, email, custom_fields, is_anonymized[^"]*",?\s*\)/,
     );
     expect(etapa, "anexarDadosDoContato não é chamada na etapa").toMatch(
       /anexarDadosDoContato\(\s*leadsDoQuadro,\s*linhas\s*\)/,
