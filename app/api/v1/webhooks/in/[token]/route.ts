@@ -114,9 +114,15 @@ function camposQueMudaram(
  * Uma leitura só, e ela faz as duas coisas: resolve o alvo (id ou nome) e
  * ordena os dois — `position` de `crm_stages` é a única régua de "para frente"
  * que o produto tem.
+ *
+ * O filtro de `organization_id` usa a organização JÁ resolvida pela fonte
+ * (`path_token`, fonte confiável — nunca o body): o service role contorna a RLS
+ * por desenho, então o escopo do tenant é declarado aqui (anti-pattern 10,
+ * régua da R3 do gate de tenant).
  */
 async function etapaAlvoDoEnvio(
   admin: SupabaseClient,
+  organizationId: string,
   pipelineId: string,
   stageAtualId: string | null,
   indicado: string | null,
@@ -125,6 +131,7 @@ async function etapaAlvoDoEnvio(
   const { data, error } = await admin
     .from("crm_stages")
     .select("id, name, position")
+    .eq("organization_id", organizationId)
     .eq("pipeline_id", pipelineId)
     .order("position", { ascending: true });
   if (error) {
@@ -468,7 +475,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     // e compará-lo com o nome de hoje faria TODO retry do Respondi virar
     // "atualizado".
     const tituloMudou = !respondiMapped && !!mapped.name && mapped.name !== lead.title;
-    const etapaAlvo = await etapaAlvoDoEnvio(admin, lead.pipelineId, lead.stageId, etapaPedida);
+    const etapaAlvo = await etapaAlvoDoEnvio(
+      admin,
+      source.organization_id as string,
+      lead.pipelineId,
+      lead.stageId,
+      etapaPedida,
+    );
 
     if (Object.keys(campos).length === 0 && !tituloMudou && etapaAlvo === null) {
       // Mesmo envio repetido: 200 com o lead existente, nada é recriado — a
