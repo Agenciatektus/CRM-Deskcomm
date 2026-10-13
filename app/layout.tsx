@@ -326,7 +326,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </MarcaDosClientComponents>
           {/* E2: embaixo no centro, como no protótipo; perto da mão que agiu e longe
               do sino e do perfil no topo. 5 s para dar tempo de "Desfazer". */}
-          <Toaster position="bottom-center" closeButton duration={5000} />
+          <Toaster position="top-center" closeButton duration={5000} />
           {/* O service worker do app (tela "sem conexão" e push), em toda página. */}
           <RegistroDoApp />
         </Providers>
