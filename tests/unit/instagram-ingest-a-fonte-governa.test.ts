@@ -30,6 +30,7 @@ import { funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { aplicarEfeitosPosEntrada } from "@/lib/channels/pos-entrada";
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
+import { ehEcoDeEnvioNosso } from "@/lib/channels/eco-de-envio-nosso";
 
 vi.mock("@/lib/leads/fontes-do-funil", async (real) => ({
   ...(await real<typeof import("@/lib/leads/fontes-do-funil")>()),
@@ -41,6 +42,11 @@ vi.mock("@/lib/channels/marcar-conversa", () => ({
 }));
 vi.mock("@/lib/escalacao/atendimento-manual", () => ({
   pausarIaPorAtendimentoManual: vi.fn(async () => true),
+}));
+// A consulta do envio em voo tem teste próprio (`eco-de-envio-nosso.test.ts`);
+// aqui interessa só o que a ingestão FAZ com a resposta.
+vi.mock("@/lib/channels/eco-de-envio-nosso", () => ({
+  ehEcoDeEnvioNosso: vi.fn(async () => false),
 }));
 
 const ORG = "aaaaaaaa-0000-4000-8000-00000000cd01";
@@ -57,7 +63,7 @@ interface Escrita {
  * Dublê fluente do Supabase. Registra INSERT e UPDATE por tabela, devolve
  * `null` em toda leitura (contato novo) e responde à RPC da conversa.
  */
-function fazerAdmin(opcoes: { contatoExistente?: string } = {}) {
+function fazerAdmin(opcoes: { contatoExistente?: string; mensagemDuplicada?: boolean } = {}) {
   const escritas: Escrita[] = [];
   const rpcs: { nome: string; args: Record<string, unknown> }[] = [];
 
@@ -80,6 +86,10 @@ function fazerAdmin(opcoes: { contatoExistente?: string } = {}) {
         // As mensagens entram num INSERT de várias linhas (uma por anexo, #13).
         const linhas = Array.isArray(payload) ? payload : [payload];
         for (const linha of linhas) escritas.push({ tabela, op: "insert", payload: linha });
+        if (opcoes.mensagemDuplicada && tabela === "messages") {
+          const dup = { data: null, error: { code: "23505", message: "duplicate" } };
+          return { select: () => ({ maybeSingle: async () => dup }) };
+        }
         const ids = linhas.map((_, i) => ({ id: i === 0 ? `${tabela}-novo` : `${tabela}-novo-${i}` }));
         return {
           select: () => ({
@@ -270,6 +280,30 @@ describe("o eco do dono separa a direção e NÃO acorda a IA", () => {
     // Uma pessoa assumiu por fora: a IA para e o eco não vira card.
     expect(pausarIaPorAtendimentoManual).toHaveBeenCalledTimes(1);
     expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
+  });
+
+  // P1 do @Cassio_SecRev na #199: o Instagram ecoa também o que o CRM enviou.
+  it("eco do PRÓPRIO envio ainda em voo grava a linha e NÃO pausa a IA", async () => {
+    vi.mocked(ehEcoDeEnvioNosso).mockResolvedValueOnce(true);
+    const { escritas, admin } = fazerAdmin();
+
+    const r = await ingerir(envelopeDeEco(), admin);
+    expect(r.ok).toBe(true);
+    // Gravar continua tolerante (a duplicata é limpa depois pelo envio).
+    expect(escritas.some((e) => e.tabela === "messages" && e.op === "insert")).toBe(true);
+    expect(ehEcoDeEnvioNosso).toHaveBeenCalledWith(admin, ORG, "conversa-1", {
+      corpo: "claro, temos sim!",
+      midia: false,
+    });
+    expect(pausarIaPorAtendimentoManual).not.toHaveBeenCalled();
+  });
+
+  it("eco do próprio envio com `mid` já gravado é duplicata e NÃO pausa a IA", async () => {
+    const { admin } = fazerAdmin({ mensagemDuplicada: true });
+
+    const r = await ingerir(envelopeDeEco(), admin);
+    expect((r as unknown as { body: { status: string } }).body.status).toBe("duplicate");
+    expect(pausarIaPorAtendimentoManual).not.toHaveBeenCalled();
   });
 });
 
