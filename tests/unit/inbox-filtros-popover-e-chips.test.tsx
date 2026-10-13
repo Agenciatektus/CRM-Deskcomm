@@ -38,6 +38,13 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
 vi.mock("@/hooks/inbox/useConversationCounts", () => ({
   useConversationCounts: () => ({ data: { fila: 3, mine: 2, all: 5 } }),
 }));
+// Funis e atendentes dos filtros de atendimento (9051), referências estáveis.
+const FUNIS = [
+  { id: "f1", name: "Vendas", etapas: [{ id: "e1", name: "Entrada" }, { id: "e2", name: "Proposta" }] },
+];
+const MEMBROS = [{ user_id: "u1", role: "agent", full_name: "Ana" }];
+vi.mock("@/hooks/inbox/useOpcoesDeFunil", () => ({ useOpcoesDeFunil: () => ({ data: FUNIS }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: MEMBROS }) }));
 
 const VALUE: InboxFiltersValue = { tab: "all", search: "", onlyUnread: false };
 const botaoFiltros = () => screen.getByRole("button", { name: /^Filtros/ });
@@ -110,6 +117,52 @@ describe("chips dos filtros ligados", () => {
         tag: undefined,
       }),
     );
+  });
+});
+
+describe("filtros de atendimento (9051): funil, etapa, responsável e período", () => {
+  it("funil, etapa, responsável e período viram chips com o NOME, e o x tira só o seu", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onChange = vi.fn();
+    const value: InboxFiltersValue = {
+      ...VALUE,
+      atendimento: { funil: "f1", etapas: ["e2"], responsavel: "u1", periodo: "7d" },
+    };
+    render(<InboxFilters value={value} onChange={onChange} />);
+    const grupo = chips()!;
+    for (const nome of ["Vendas", "Proposta", "Ana", "Últimos 7 dias"]) {
+      expect(within(grupo).getByText(nome)).toBeInTheDocument();
+    }
+    expect(botaoFiltros()).toHaveTextContent("4");
+    // Tirar o funil leva as etapas junto: a etapa é de um funil só.
+    await user.click(screen.getByRole("button", { name: "Remover filtro Vendas" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...value,
+      atendimento: { ...value.atendimento, funil: undefined, etapas: undefined },
+    });
+    await user.click(screen.getByRole("button", { name: "Remover filtro Proposta" }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...value, atendimento: { ...value.atendimento, etapas: [] } });
+  });
+
+  it("no popover, as etapas só aparecem com funil escolhido e alternam várias", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onChange = vi.fn();
+    const { rerender } = render(<InboxFilters value={VALUE} onChange={onChange} />);
+    await user.click(botaoFiltros());
+    expect(screen.getByRole("combobox", { name: "Filtrar por funil" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filtrar por responsável" })).toBeInTheDocument();
+    // CONTROLE: sem funil não há etapa para escolher.
+    expect(screen.queryByRole("group", { name: "Etapas do funil" })).toBeNull();
+
+    const comFunil: InboxFiltersValue = { ...VALUE, atendimento: { funil: "f1", etapas: ["e1"] } };
+    rerender(<InboxFilters value={comFunil} onChange={onChange} />);
+    const etapas = screen.getByRole("group", { name: "Etapas do funil" });
+    expect(within(etapas).getByRole("button", { name: "Entrada" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(etapas).getByRole("button", { name: "Proposta" }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...comFunil, atendimento: { funil: "f1", etapas: ["e1", "e2"] } });
+
+    await user.click(screen.getByRole("button", { name: "Últimas 24 h" }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...comFunil, atendimento: { funil: "f1", etapas: ["e1"], periodo: "24h" } });
   });
 });
 

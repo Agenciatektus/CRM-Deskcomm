@@ -46,6 +46,8 @@ vi.mock("@/hooks/inbox/useConversationTags", () => ({
 vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
   useContactTagVocabulary: () => ({ data: [] }),
 }));
+vi.mock("@/hooks/inbox/useOpcoesDeFunil", () => ({ useOpcoesDeFunil: () => ({ data: undefined }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: undefined }) }));
 vi.mock("@/hooks/inbox/useConversationCounts", () => ({
   useConversationCounts: () => ({ data: undefined }),
 }));

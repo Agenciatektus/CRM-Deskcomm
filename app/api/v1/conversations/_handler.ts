@@ -19,6 +19,7 @@ import type { Conversation } from "@/lib/types/messaging";
 import { normalizarTermoDeBusca } from "@/lib/inbox/termo-de-busca";
 import { ORDEM_DA_ESPERA, ehAFila } from "@/lib/inbox/comando-da-conversa";
 import { aplicarMarcadores } from "@/lib/inbox/marcador-da-conversa";
+import { aplicarFiltrosDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
 import { alterarEtiquetasDaConversa, deltaDoPedido, metadataDoDelta } from "./_tags-delta";
 
 /**
@@ -294,6 +295,9 @@ export async function listConversationsHandler(
   // continua valendo. É o MESMO predicado que `fn_contagens_da_caixa` aplica
   // com `p_sem_passo`, então o badge da aba conta o que a lista mostra.
   if (q.sem_passo === "true") query = query.eq("passo_da_conversa", "sem_passo");
+  // Funil, etapas, responsável e período (migration 9051): a MESMA régua que
+  // `fn_contagens_da_caixa` aplica com `p_funil`/`p_etapas`/`p_responsavel`/`p_desde`.
+  query = aplicarFiltrosDoAtendimento(query, q);
 
   if (q.assigned_to === "me") {
     if (ctx.actor.type !== "user") {

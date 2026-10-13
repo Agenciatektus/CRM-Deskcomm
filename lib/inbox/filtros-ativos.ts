@@ -29,6 +29,10 @@ export function filtrosAuxiliaresAtivos(filters: ConversationsFilters): string[]
   if (filters.channel_session_id) ativos.push("Canal");
   if (filters.is_group) ativos.push("Só grupos");
   if (filters.sem_passo) ativos.push("Sem próximo passo");
+  // 9051: funil (com ou sem etapa), responsável e período da última mensagem.
+  if (filters.atendimento?.funil) ativos.push("Funil");
+  if (filters.atendimento?.responsavel) ativos.push("Responsável");
+  if (filters.atendimento?.periodo) ativos.push("Última mensagem");
   // A ENTRADA do Instagram também é auxiliar: sem ela, "Só comentários" ligado
   // com lista vazia caía no vazio da ABA ("Fila vazia"), afirmando ausência
   // onde há um filtro escondendo tudo, e sem oferecer o "Limpar filtros".

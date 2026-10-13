@@ -6,6 +6,7 @@
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
 import { TIPOS_DE_CANAL } from "@/lib/inbox/tipo-de-canal";
+import { camposDosFiltrosDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
 import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
@@ -530,6 +531,11 @@ export const listConversationsQuerySchema = z.object({
    * `lib/inbox/tipo-de-canal.ts`, aplicada em `conversations.channel`.
    */
   canal: z.enum(TIPOS_DE_CANAL).optional(),
+  /**
+   * Funil, etapas, responsável e período da última mensagem (migration 9051). A forma
+   * mora em `lib/inbox/filtros-do-atendimento.ts`, a mesma que a contagem lê.
+   */
+  ...camposDosFiltrosDoAtendimento,
   /**
    * O termo de busca. A régua inteira vive em `lib/inbox/termo-de-busca.ts`, e a
    * tela lê a MESMA — repetir aqui faria os dois divergirem, e a divergência
