@@ -43,6 +43,10 @@ export interface PatchDeFunil {
    */
   is_archived?: false;
   depois_de?: string | null;
+  /** De que fontes o funil se alimenta; vazio = só recebe leads movidos (9050). */
+  fontes?: string[];
+  /** Resposta ao 409 `fonte_sem_funil`: o operador confirmou que a fonte fica sem funil. */
+  confirmarSemFunil?: true;
 }
 
 /** O funil como as rotas o devolvem — a mesma forma que a página entrega por props. */

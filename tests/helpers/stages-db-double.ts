@@ -80,6 +80,8 @@ export interface PipelineRow {
   is_default: boolean;
   is_archived: boolean;
   organization_id: string;
+  /** De que fontes o funil se alimenta (9012/9050); ausente = default `{whatsapp}`. */
+  fontes?: string[];
 }
 
 export function funilRow(over: Partial<PipelineRow> & { id: string; name: string }): PipelineRow {
