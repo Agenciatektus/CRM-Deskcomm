@@ -152,8 +152,8 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
   });
 
   it("o seletor OFERECE os marcadores pela mesma regra", () => {
-    const fonte = readFileSync("components/kanban/FilterBar.tsx", "utf8");
-    expect(fonte, "FilterBar não monta as opções com marcadoresDoCard(l)").toContain(
+    const fonte = readFileSync("components/kanban/barra/PainelDeFiltros.tsx", "utf8");
+    expect(fonte, "o painel de filtros não monta as opções com marcadoresDoCard(l)").toContain(
       "marcadoresDoCard(l)",
     );
   });

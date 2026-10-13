@@ -81,6 +81,11 @@ export interface Lead {
     unread: number;
     /** POR ONDE entrou no Instagram: `direct` | `comentario`. Null nos outros canais. */
     instagram_entrada?: string | null;
+    /**
+     * Desde quando o cliente espera resposta (`awaiting_since`, a régua da Fila),
+     * ou `null` quando a última palavra é nossa. Ordem "Esperando resposta".
+     */
+    esperando_desde?: string | null;
   } | null;
   score?: {
     probability: number;

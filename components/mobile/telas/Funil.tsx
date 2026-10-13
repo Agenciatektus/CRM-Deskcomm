@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { formatMoney } from "@/components/inbox/painel/SemLista";
 import { useT } from "@/hooks/i18n/useT";
@@ -33,7 +33,22 @@ export function resumoDoFunil(leads: Lead[]): { abertos: number; centavos: numbe
  * (a folha com as regras do quadro). Os dados são os do quadro (`useBoard`, a mesma
  * consulta e o mesmo realtime). O FAB "+" e a folha "Criar" vêm da casca.
  */
-export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: string; aoTrocarFunil: (id: string) => void }) {
+export function FunilNoCelular({
+  pipelineId,
+  aoTrocarFunil,
+  leadsDoRecorte,
+  barra,
+  conteudo,
+}: {
+  pipelineId: string;
+  aoTrocarFunil: (id: string) => void;
+  /** Os leads já filtrados e ORDENADOS pela barra do Funil (a ordem vem pronta). */
+  leadsDoRecorte?: Lead[];
+  /** A barra do Funil (resumo, busca, atalhos), no lugar do resumo simples. */
+  barra?: ReactNode;
+  /** A Lista: no lugar das abas de etapa e dos cartões. */
+  conteudo?: ReactNode;
+}) {
   const t = useT();
   const funis = useFunisDoMenu();
   const { data, isLoading } = useBoard(pipelineId);
@@ -44,8 +59,9 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
 
   const etapas = useMemo(() => (data?.stages ?? []).filter((s) => !s.is_archived), [data]);
   const etapaId = etapaEscolhida ?? etapas[0]?.id ?? null;
-  const leads = data?.leads ?? [];
-  const daEtapa = leads.filter((l) => l.stage_id === etapaId).sort((a, b) => a.position_in_stage - b.position_in_stage);
+  const leads = leadsDoRecorte ?? data?.leads ?? [];
+  const daEtapa = leads.filter((l) => l.stage_id === etapaId);
+  if (!leadsDoRecorte) daEtapa.sort((a, b) => a.position_in_stage - b.position_in_stage);
   const nomes = new Map((membros ?? []).map((m) => [m.user_id, m.full_name]));
   const resumo = resumoDoFunil(leads);
 
@@ -61,10 +77,14 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
         <span className="min-w-0 flex-1 truncate">{data?.pipeline.name ?? t("Funil")}</span>
         <CaretDown size={18} aria-hidden />
       </button>
-      <p className="px-4 pt-2 text-[13.5px] text-text-muted">
-        {resumo.abertos === 1 ? t("1 lead aberto") : `${resumo.abertos} ${t("leads abertos")}`}
-        {resumo.centavos > 0 && `, ${formatMoney(resumo.centavos, resumo.moeda)}`}
-      </p>
+      {barra ?? (
+        <p className="px-4 pt-2 text-[13.5px] text-text-muted">
+          {resumo.abertos === 1 ? t("1 lead aberto") : `${resumo.abertos} ${t("leads abertos")}`}
+          {resumo.centavos > 0 && `, ${formatMoney(resumo.centavos, resumo.moeda)}`}
+        </p>
+      )}
+      {conteudo ?? (
+      <>
       <div role="tablist" aria-label={t("Etapas do funil")} className="flex snap-x gap-1.5 overflow-x-auto scroll-px-4 px-4 py-3 scrollbar-none">
         {etapas.map((e) => {
           const ligada = e.id === etapaId;
@@ -139,6 +159,8 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
           </li>
         ))}
       </ul>
+      </>
+      )}
       <FolhaMoverEtapaDoLead lead={movendo} etapas={etapas} pipelineId={pipelineId} aoFechar={() => setMovendo(null)} />
       <FolhaInferior aberto={escolhendoFunil} aoMudar={setEscolhendoFunil} titulo={t("Funis")}>
         {funis.map((f) => (

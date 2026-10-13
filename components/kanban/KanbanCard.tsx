@@ -15,7 +15,7 @@ import { ReactivationSlot } from "./ReactivationSlot";
 import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { ContatoNoCard } from "./ContatoNoCard";
-import { EtiquetasDoCard, ProximoPassoDoCard, ResponsavelDoCard, TempoDoCard } from "./PartesDoCard";
+import { EsperaDoLead, EtiquetasDoCard, ProximoPassoDoCard, ResponsavelDoCard, TempoDoCard } from "./PartesDoCard";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
 export type GestoDeSelecao = "alterna" | "intervalo";
@@ -301,7 +301,13 @@ export function KanbanCard({
               compacto ? "pt-1.5" : "pt-2",
             )}
           >
-            <TempoDoCard tempo={tempo} />
+            {/* Parado (fora do limite da etapa) vence; senão, quem espera resposta
+                mostra há quanto tempo (barra do Funil, 13/10/2026). */}
+            {tempo?.nivel === "neutro" && lead.conversa?.esperando_desde ? (
+              <EsperaDoLead lead={lead} agora={new Date()} comRotulo />
+            ) : (
+              <TempoDoCard tempo={tempo} />
+            )}
             <ResponsavelDoCard owner={card.owner} />
           </div>
         </div>

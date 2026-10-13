@@ -22,6 +22,7 @@ vi.mock("@/hooks/kanban/useBulkAction", () => ({
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useUser: () => ({ id: "u-1" }),
+  useAuth: () => ({ user: { id: "u-1" } }),
   useActiveOrg: () => ({ orgId: "org-1", role: "agent" }),
   // `agent` não inscreve em cadência (manager+): o botão da cadência não monta.
   usePermission: () => false,
@@ -51,7 +52,12 @@ vi.mock("@/hooks/kanban/useBoard", () => ({
     seguranca: { divergencias: 0, ultimaVerificacao: null },
   }),
 }));
-vi.mock("@/components/kanban/FilterBar", () => ({ FilterBar: () => null }));
+vi.mock("@/components/kanban/barra/BarraDeBusca", () => ({ BarraDeBusca: () => null }));
+vi.mock("@/components/kanban/barra/CabecalhoDoFunil", () => ({ CabecalhoDoFunil: () => null }));
+// O Desfazer do lote segura a chamada por 5 s; aqui a ação roda na hora.
+vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
+  adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void executar(),
+}));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**
  * O quadro é substituído por um dublê que SELECIONA um card: a barra em lote só
@@ -147,7 +153,9 @@ describe("BulkActionBar — tag em lote", () => {
  * `[]` literal, a lista de outro quadro), que o tipo aceita sem reclamar.
  */
 describe("a página do funil ENTREGA as tags do quadro à barra", () => {
-  it("as tags dos leads do quadro chegam ao menu de tag em lote", async () => {
+  // A página importa a barra inteira (ícones, painel, lista): o transform frio
+  // passa dos 15 s sob a suíte paralela, como o barril de ícones.
+  it("as tags dos leads do quadro chegam ao menu de tag em lote", { timeout: 40_000 }, async () => {
     const { PipelinePageClient } = await import("@/app/app/pipelines/[id]/_client");
     render(<PipelinePageClient pipelineId="p-1" initialName="Funil" role="admin" />);
 
