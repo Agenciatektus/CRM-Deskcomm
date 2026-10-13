@@ -48771,7 +48771,9 @@ comment on column public.crm_pipelines.fontes is
 -- chama. Medido em produção na release 196 (maior org, como agent): a contagem com
 -- `p_funil` ia de ~700 ms para ~300 ms com este índice. Em produção ele foi criado À MÃO
 -- com `create index concurrently` (mesmo nome) antes de entrar aqui; `if not exists`
--- deixa esta linha inerte lá. Em base nova a tabela está vazia e não há trava.
+-- deixa esta linha inerte lá (o `lock_timeout` de 3s da sessão, no topo deste arquivo,
+-- limita a espera pela trava). Em base nova a tabela está vazia. Instalação COM tráfego e
+-- sem o índice: crie antes do deploy com `create index concurrently` (comando na 9052).
 create index if not exists crm_leads_org_contact_cobre
   on public.crm_leads (organization_id, contact_id)
   include (pipeline_id, stage_id, owner_user_id);
