@@ -34,10 +34,25 @@ export type EntradaDoInstagram = "direct" | "story" | "comentario";
 export type EntradaDaConversa = "direct" | "comentario";
 
 export interface MensagemDoInstagram {
-  /** Id estável do par (conta, pessoa). É a IDENTIDADE — o @ muda, este não. */
+  /**
+   * Id estável do par (conta, pessoa). É a IDENTIDADE — o @ muda, este não.
+   *
+   * É SEMPRE o IGSID do CLIENTE, nas duas direções: no recebido é quem
+   * escreveu (`sender`); no eco (resposta do dono pelo app do Instagram) é o
+   * destinatário (`recipient`), porque o `sender` do eco é a própria conta do
+   * negócio. Ancorar no `sender` cru faria a resposta do dono virar um contato
+   * fantasma "conta do negócio" em vez de entrar na conversa do cliente.
+   */
   igsid: string;
-  /** A conta da agência/cliente que recebeu. */
+  /** A conta do cliente da agência (o par IG que o CRM atende). */
   contaId: string | null;
+  /**
+   * Quem falou: `inbound` é o cliente escrevendo; `outbound` é o dono
+   * respondendo PELO APP do Instagram (eco `is_echo` da Meta). Sem isto, a
+   * resposta do dono entrava como se fosse do lead — a conversa não separava
+   * quem enviou — e ainda acordava a IA por cima do humano.
+   */
+  direcao: "inbound" | "outbound";
   /** Id da mensagem na Meta. Serve de chave de idempotência. */
   providerMessageId: string;
   texto: string | null;
@@ -240,12 +255,29 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
   const evento = objeto(envelope.evento);
   if (!evento) return { ok: false, motivo: "contrato_violado", detalhe: "`evento` ausente" };
 
-  const remetente = objeto(evento.sender);
-  const igsid = identificador(remetente?.id);
-  if (!igsid) return { ok: false, motivo: "contrato_violado", detalhe: "sem `sender.id`" };
-
   const mensagem = objeto(evento.message);
   if (!mensagem) return { ok: false, motivo: "contrato_violado", detalhe: "sem `message`" };
+
+  // ─── A DIREÇÃO: quem falou ────────────────────────────────────────────────
+  //
+  // `is_echo` é como a Meta marca a mensagem que a PRÓPRIA conta enviou — aqui,
+  // o dono respondendo pelo app do Instagram (não pelo CRM). No eco os papéis
+  // se invertem: `sender` é a conta do negócio e `recipient` é o cliente. A
+  // identidade do contato é SEMPRE o cliente, então no eco ela vem do
+  // `recipient`; ancorar no `sender` cru faria toda resposta do dono colapsar
+  // num contato fantasma "a conta do negócio", em vez de entrar na conversa de
+  // cada cliente.
+  const ehEco = mensagem.is_echo === true;
+  const remetente = objeto(evento.sender);
+  const destinatario = objeto(evento.recipient);
+  const igsid = ehEco ? identificador(destinatario?.id) : identificador(remetente?.id);
+  if (!igsid) {
+    return {
+      ok: false,
+      motivo: "contrato_violado",
+      detalhe: ehEco ? "eco sem `recipient.id`" : "sem `sender.id`",
+    };
+  }
 
   // O id da Meta é a chave de idempotência. Sem ele não há como reconhecer a
   // reentrega, e a fila REENTREGA por desenho — melhor recusar e investigar que
@@ -277,7 +309,8 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
     ok: true,
     mensagem: {
       igsid,
-      contaId: identificador(objeto(evento.recipient)?.id),
+      contaId: ehEco ? identificador(remetente?.id) : identificador(destinatario?.id),
+      direcao: ehEco ? "outbound" : "inbound",
       providerMessageId,
       texto: corpoTexto,
       temAnexo: anexos.length > 0,
@@ -289,8 +322,11 @@ export function lerEventoDoInstagram(corpo: unknown, agora: string): LeituraDoEv
       // todo lead de Direct nascia "Sem nome" no Inbox e "Novo contato pelo
       // Instagram" no quadro. O Verdash agora consulta o perfil e anexa
       // `perfil: { nome, username }` ao reencaminhar; sem ele, segue `null`.
-      username: arroba(objeto(envelope.perfil)?.username),
-      nome: nomeDePerfil(objeto(envelope.perfil)?.nome),
+      // No eco, o `perfil` que o Verdash anexa não é confiável como sendo o do
+      // cliente (pode ser o da própria conta do negócio), e o contato do cliente
+      // já tem nome do recebido anterior. Então o eco nunca reescreve @ nem nome.
+      username: ehEco ? null : arroba(objeto(envelope.perfil)?.username),
+      nome: ehEco ? null : nomeDePerfil(objeto(envelope.perfil)?.nome),
       conversa: "direct",
       mediaId: null,
     },
@@ -333,6 +369,8 @@ function lerComentario(envelope: Record<string, unknown>, agora: string): Leitur
     mensagem: {
       igsid,
       contaId: null,
+      // Comentário é sempre de quem comentou — nunca eco do dono.
+      direcao: "inbound",
       providerMessageId: comentarioId,
       texto: corpoTexto,
       temAnexo: false,
