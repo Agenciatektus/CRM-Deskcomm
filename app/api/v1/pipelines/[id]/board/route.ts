@@ -29,6 +29,7 @@ import type { LeadCandidate } from "@/lib/leads/active-lead";
 import { anexarDadosDoContato, type LinhaDoContatoNoQuadro } from "@/lib/kanban/dados-do-contato";
 import { anexarProximoPasso, type TarefaAbertaDoQuadro } from "@/lib/kanban/proximo-passo-do-quadro";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
+import { esperandoDesdeDaConversa } from "@/lib/kanban/ordem-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
@@ -288,7 +289,7 @@ async function withConversas(
     supabase
       .from("conversations")
       .select(
-        "id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags, instagram_entrada",
+        "id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags, instagram_entrada, awaiting_since, last_inbound_at, last_outbound_at",
       )
       .eq("organization_id", organizationId)
       .in("contact_id", lote)
@@ -306,6 +307,9 @@ async function withConversas(
     unread_count_for_assignee: number | null;
     tags: string[] | null;
     instagram_entrada: string | null;
+    awaiting_since: string | null;
+    last_inbound_at: string | null;
+    last_outbound_at: string | null;
   }>) {
     // Os marcadores somam TODAS as conversas; a linha do card é só a mais recente.
     for (const tag of row.tags ?? []) {
@@ -333,6 +337,8 @@ async function withConversas(
       // WhatsApp ficam indistinguiveis no quadro — e a abordagem de quem vai
       // atender depende disso.
       instagram_entrada: row.instagram_entrada,
+      // "Esperando resposta" (barra do Funil): a régua da Fila, na MESMA leitura.
+      esperando_desde: esperandoDesdeDaConversa(row),
     });
   }
 

@@ -13,6 +13,7 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
 import { midpoint } from "@/lib/kanban/fractional-indexing";
+import { comparadorDoFunil, type OrdemDoFunil } from "@/lib/kanban/ordem-do-funil";
 import type { Lead } from "@/lib/types/leads";
 import type { Pipeline, Stage } from "@/lib/kanban/types";
 import { StageColumn } from "./StageColumn";
@@ -48,9 +49,14 @@ interface KanbanBoardProps {
   podeRenomearEtapa?: boolean;
   /** Densidade do card, escolhida no cabeçalho do Funil (por pessoa). */
   compacto?: boolean;
+  /**
+   * A ordem DENTRO de cada coluna, escolhida na barra (Ordenar). Sem ela, a
+   * posição manual (`position_in_stage`); com ela, a posição desempata.
+   */
+  ordenar?: OrdemDoFunil;
 }
 
-function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> {
+function groupLeadsByStage(stages: Stage[], leads: Lead[], ordenar?: OrdemDoFunil): Map<string, Lead[]> {
   const map = new Map<string, Lead[]>();
   for (const stage of stages) map.set(stage.id, []);
   for (const lead of leads) {
@@ -59,7 +65,7 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> 
   }
   // Already ordered by position_in_stage at fetch time, but be defensive.
   for (const list of map.values()) {
-    list.sort((a, b) => a.position_in_stage - b.position_in_stage);
+    list.sort(ordenar ? comparadorDoFunil(ordenar) : (a, b) => a.position_in_stage - b.position_in_stage);
   }
   return map;
 }
@@ -93,6 +99,7 @@ export function KanbanBoard({
   leadInicial,
   podeRenomearEtapa = false,
   compacto = false,
+  ordenar,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -173,8 +180,8 @@ export function KanbanBoard({
 
   const grouped = useMemo(() => {
     if (!data) return null;
-    return groupLeadsByStage(data.stages, data.leads);
-  }, [data]);
+    return groupLeadsByStage(data.stages, data.leads, ordenar);
+  }, [data, ordenar]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A

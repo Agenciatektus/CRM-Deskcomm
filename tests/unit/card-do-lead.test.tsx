@@ -159,9 +159,12 @@ describe("densidade lembrada por pessoa", () => {
   });
 
   it("o cabeçalho do Funil liga o seletor ao quadro", () => {
+    // A barra aprovada (13/10/2026) moveu o seletor para a linha 1 do Funil.
+    const cabecalho = readFileSync("components/kanban/barra/CabecalhoDoFunil.tsx", "utf8");
+    expect(cabecalho).toMatch(/<SeletorDeDensidade compacto=\{compacto\} onChange=\{onCompacto\}/);
     const fonte = readFileSync("app/app/pipelines/[id]/_client.tsx", "utf8");
-    expect(fonte).toMatch(/<SeletorDeDensidade compacto=\{compacto\} onChange=\{setCompacto\}/);
-    expect(fonte).toMatch(/compacto=\{compacto\}\s*\/>/);
+    expect(fonte).toMatch(/onCompacto=\{setCompacto\}/);
+    expect(fonte).toMatch(/<KanbanBoard[\s\S]*compacto=\{compacto\}[\s\S]*\/>/);
     expect(readFileSync("components/kanban/StageColumn.tsx", "utf8")).toMatch(
       /limiteDaEtapa=\{stage\.expected_duration_hours\}/,
     );

@@ -1,4 +1,14 @@
 import type { Lead } from "@/lib/types/leads";
+import {
+  ehPeriodo,
+  estaAtrasado,
+  estaParado,
+  inicioDoPeriodo,
+  origemDoLead,
+  passaNaBusca,
+  semProximoPasso,
+  type PeriodoDeCriacao,
+} from "@/lib/kanban/recorte-do-funil";
 import { cardTemMarcador, cardTemTodasNaMesmaCaixa } from "@/lib/kanban/marcadores-do-card";
 import {
   type ModoDeEtiqueta,
@@ -40,7 +50,18 @@ export interface LeadFilters {
   search?: string;
   valueCentsMin?: number | null;
   valueCentsMax?: number | null;
+  /** Atalho "Atrasados": próximo passo vencido (a regra do card). */
   overdueOnly?: boolean;
+  /** Atalho "Meus": responsável sou eu (`contexto.userId`). */
+  meus?: boolean;
+  /** Atalho "Sem próximo passo": nenhuma tarefa aberta. */
+  semPasso?: boolean;
+  /** Atalho "Parados": passou do limite da etapa (`expected_duration_hours`). */
+  parados?: boolean;
+  /** Canal de origem (`origemDoLead`), vários = OU. */
+  canais?: readonly string[];
+  /** Período de criação do negócio. */
+  periodo?: PeriodoDeCriacao;
   /** O `lost_reason` exato do card — filtro de perda (issue #1537). */
   lostReason?: string;
   /** A categoria do motivo de perda (issue #1537), resolvida no funil. */
@@ -68,7 +89,8 @@ export function primeiroMarcador(tag: LeadFilters["tag"]): string | undefined {
 
 /**
  * Serializa/deserializa os filtros do board em query params (deep-linkável).
- * Só os controles expostos na FilterBar: owner, status, tag, busca, atrasados.
+ * Os controles da barra do Funil: responsável, status (padrão Abertos), etiquetas,
+ * busca, atalhos (meus, atrasados, sem próximo passo, parados), canal, período e valor.
  *
  * ⚠️ `getAll` no `tag` (#1274): a repetição na URL (`?tag=vip&tag=orçamento`) é o
  * que faz o link do funil com duas etiquetas sobreviver a um F5 e a um link
@@ -88,12 +110,18 @@ export function filtersFromParams(
   const tag = tags.length > 0 ? tags : sp.get("tag") ?? undefined;
   const search = sp.get("q");
   const modo = sp.get("modo") ?? undefined;
+  const canais = typeof sp.getAll === "function" ? sp.getAll("canal") : [];
+  const reais = (k: string) => {
+    const v = sp.get(k);
+    const n = v === null || v === "" ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : undefined;
+  };
+  const periodo = sp.get("periodo");
   return {
     owner: owner ?? undefined,
-    status:
-      status === "open" || status === "won" || status === "lost" || status === "all"
-        ? status
-        : "all",
+    // PADRÃO "Abertos" (barra aprovada em 13/10/2026): sem `status` na URL é
+    // aberto; "Todos" vai explícito (`status=all`).
+    status: status === "won" || status === "lost" || status === "all" ? status : "open",
     tag: tag ?? undefined,
     // Um `modo` fora dos dois vira `e`, e não erro: a URL é deep-link e não
     // resposta de API. O `z.enum` do servidor recusa (422) porque ali o
@@ -102,6 +130,13 @@ export function filtersFromParams(
     ...(modoDeEtiqueta(modo) ? { tagMode: modoDeEtiqueta(modo) } : {}),
     search: search ?? undefined,
     overdueOnly: sp.get("overdue") === "1" || undefined,
+    meus: sp.get("meus") === "1" || undefined,
+    semPasso: sp.get("sem_passo") === "1" || undefined,
+    parados: sp.get("parados") === "1" || undefined,
+    ...(canais.length > 0 ? { canais } : {}),
+    ...(ehPeriodo(periodo) ? { periodo } : {}),
+    ...(reais("vmin") !== undefined ? { valueCentsMin: reais("vmin") } : {}),
+    ...(reais("vmax") !== undefined ? { valueCentsMax: reais("vmax") } : {}),
     lostReason: sp.get("motivo") ?? undefined,
     lostCategory: sp.get("categoria") ?? undefined,
   };
@@ -110,13 +145,20 @@ export function filtersFromParams(
 export function filtersToParams(f: LeadFilters): string {
   const p = new URLSearchParams();
   if (f.owner && f.owner !== "any") p.set("owner", f.owner);
-  if (f.status && f.status !== "all") p.set("status", f.status);
+  if (f.status && f.status !== "open") p.set("status", f.status);
   // `append`, e não `set`: o último venceria, e o filtro de duas etiquetas
   // viraria uma só — a tela mostraria duas escolhidas filtrando por uma.
   for (const marcador of marcadoresDoFiltro(f.tag)) p.append("tag", marcador);
   if (f.tagMode === "ou") p.set("modo", "ou");
   if (f.search?.trim()) p.set("q", f.search.trim());
   if (f.overdueOnly) p.set("overdue", "1");
+  if (f.meus) p.set("meus", "1");
+  if (f.semPasso) p.set("sem_passo", "1");
+  if (f.parados) p.set("parados", "1");
+  for (const canal of f.canais ?? []) p.append("canal", canal);
+  if (f.periodo) p.set("periodo", f.periodo);
+  if (typeof f.valueCentsMin === "number") p.set("vmin", String(f.valueCentsMin / 100));
+  if (typeof f.valueCentsMax === "number") p.set("vmax", String(f.valueCentsMax / 100));
   if (f.lostReason) p.set("motivo", f.lostReason);
   if (f.lostCategory) p.set("categoria", f.lostCategory);
   return p.toString();
@@ -130,6 +172,11 @@ export function filtersToParams(f: LeadFilters): string {
  */
 export interface ContextoDosFiltros {
   categoriaDo?: (motivo: string) => string | undefined;
+  /** Quem olha: o atalho "Meus". Sem ele, "Meus" não acha nada (honesto). */
+  userId?: string;
+  /** `crm_stages.expected_duration_hours` por etapa: o atalho "Parados". */
+  limiteDaEtapa?: (stageId: string) => number | null | undefined;
+  agora?: Date;
 }
 
 export function applyFilters(
@@ -137,8 +184,10 @@ export function applyFilters(
   f: LeadFilters,
   contexto?: ContextoDosFiltros,
 ): Lead[] {
-  const today = new Date().toISOString().slice(0, 10);
-  const search = f.search?.trim().toLowerCase() ?? "";
+  const agora = contexto?.agora ?? new Date();
+  const search = f.search ?? "";
+  const desde = f.periodo ? inicioDoPeriodo(f.periodo, agora).getTime() : null;
+  const canais = f.canais && f.canais.length > 0 ? new Set(f.canais) : null;
   // Fora do `filter`: a escolha de E/OU é do filtro, não do card, e calculá-la a
   // cada linha pagaria uma normalização por card — a lista do funil é pequena
   // hoje e não precisa de um laço que cresce com ela.
@@ -192,19 +241,17 @@ export function applyFilters(
     // no contato ou na conversa sem casar card nenhum. O E/OU mora em
     // `passaMarcador`, lá em cima.
     if (!passaMarcador(l)) return false;
-    if (
-      search &&
-      !`${l.title} ${l.description ?? ""}`.toLowerCase().includes(search)
-    )
-      return false;
+    if (search && !passaNaBusca(l, search)) return false;
     if (typeof f.valueCentsMin === "number" && (l.value_cents ?? 0) < f.valueCentsMin)
       return false;
     if (typeof f.valueCentsMax === "number" && (l.value_cents ?? 0) > f.valueCentsMax)
       return false;
-    if (f.overdueOnly) {
-      if (l.status !== "open") return false;
-      if (!l.expected_close_date || l.expected_close_date >= today) return false;
-    }
+    if (f.overdueOnly && !estaAtrasado(l, agora)) return false;
+    if (f.meus && (!contexto?.userId || l.owner_user_id !== contexto.userId)) return false;
+    if (f.semPasso && !semProximoPasso(l)) return false;
+    if (f.parados && !estaParado(l, contexto?.limiteDaEtapa ?? (() => null), agora)) return false;
+    if (canais && !canais.has(origemDoLead(l))) return false;
+    if (desde !== null && new Date(l.created_at).getTime() < desde) return false;
     return true;
   });
 }

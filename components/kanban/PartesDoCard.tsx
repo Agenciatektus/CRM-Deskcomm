@@ -8,8 +8,10 @@ import { classeDaCorDoAvatar } from "@/lib/inbox/cor-do-avatar";
 import { primeiroNome } from "@/lib/kanban/identidade-do-card";
 import type { OwnerDisplay } from "@/lib/kanban/owner";
 import { rotuloDoTempo, type TempoNaEtapa } from "@/lib/kanban/tempo-na-etapa";
+import { duracaoCurta, esperandoDesde, tomDaEsperaDoFunil } from "@/lib/kanban/ordem-do-funil";
+import { CLASSE_DO_TOM } from "@/lib/inbox/tom-da-espera";
 import type { Lead } from "@/lib/types/leads";
-import { CalendarBlank, Clock, Flag, Plus } from "@/lib/ui/icons";
+import { CalendarBlank, Clock, Flag, Hourglass, Plus } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { OwnerBadge, ownerInitials } from "./OwnerBadge";
 
@@ -143,6 +145,20 @@ export function ResponsavelDoCard({ owner }: { owner: OwnerDisplay }) {
       </span>
       <span className="sr-only">{t("Responsável")}: </span>
       <span className="truncate">{primeiroNome(nome)}</span>
+    </span>
+  );
+}
+
+/** "Esperando há": azul até 1 h, âmbar até 4 h, vermelho acima; "Respondida" quando a bola está com o cliente. */
+export function EsperaDoLead({ lead, agora, comRotulo = false }: { lead: Lead; agora: Date; comRotulo?: boolean }) {
+  const t = useT();
+  const desde = esperandoDesde(lead);
+  if (!desde) return <span className="text-text-subtle">{lead.conversa ? t("Respondida") : ""}</span>;
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-md px-1.75 py-0.5 font-semibold whitespace-nowrap", CLASSE_DO_TOM[tomDaEsperaDoFunil(desde, agora)])}>
+      <Hourglass size={14} aria-hidden />
+      <span className={comRotulo ? undefined : "sr-only"}>{t("Esperando há")} </span>
+      {duracaoCurta(desde, agora, t)}
     </span>
   );
 }

@@ -27,6 +27,8 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
+import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
 import type { PipelineVocabulary, Stage } from "@/lib/kanban/types";
 
@@ -129,37 +131,60 @@ export function BulkActionBar({
       ? `1 ${vocab.lead} ${t("selecionado")}`
       : `${selectedIds.length} ${t("selecionados")}`;
 
-  const runMove = (stageId: string) => {
-    bulk.mutate(
-      {
-        action: "move",
-        lead_ids: selectedIds,
-        // Sem `position_in_stage`: um escalar não posiciona N cards sem
-        // empatá-los, e empate quebra o `midpoint()` do arrasto seguinte. Quem
-        // dá a posição de cada um é `fn_mover_leads_em_lote` (migration 0209).
-        params: { stage_id: stageId },
-      },
-      { onSuccess: () => onClear() },
+  /**
+   * DESFAZER no lote (barra do Funil, 13/10/2026): mover, atribuir e etiquetar
+   * em massa disparam automações do funil por lead; o aviso SEGURA a chamada
+   * por alguns segundos (`adiarAcao`, o mesmo de ganho/perda) e "Desfazer" não
+   * chama nada. A seleção sai na hora; a rota só roda no fim do aviso.
+   */
+  const comDesfazer = (
+    mensagem: string,
+    input: BulkLeadActionInput,
+    aoConcluir?: (res: { data: { updated_count: number } }) => void,
+  ) => {
+    onClear();
+    adiarAcao(
+      (s) => `${mensagem} (${s} s)`,
+      t("Desfazer"),
+      () =>
+        new Promise((resolver, recusar) =>
+          bulk.mutate(input, {
+            onSuccess: (res) => {
+              aoConcluir?.(res as { data: { updated_count: number } });
+              resolver(res);
+            },
+            onError: recusar,
+          }),
+        ),
     );
   };
 
+  const runMove = (stageId: string) => {
+    comDesfazer(t("Movendo os selecionados"), {
+      action: "move",
+      lead_ids: selectedIds,
+      // Sem `position_in_stage`: um escalar não posiciona N cards sem
+      // empatá-los, e empate quebra o `midpoint()` do arrasto seguinte. Quem
+      // dá a posição de cada um é `fn_mover_leads_em_lote` (migration 0209).
+      params: { stage_id: stageId },
+    });
+  };
+
   const runAssign = (ownerId: string | null) => {
-    bulk.mutate(
+    comDesfazer(
+      t("Atribuindo os selecionados"),
       {
         action: "assign",
         lead_ids: selectedIds,
         params: { owner_user_id: ownerId },
       },
-      {
-        onSuccess: (res) => {
-          const n = res.data.updated_count;
-          toast.success(
-            ownerId === null
-              ? `${n} ${t(n > 1 ? "ficaram sem responsável." : "ficou sem responsável.")}`
-              : `${n} ${t(n > 1 ? "atribuídos." : "atribuído.")}`,
-          );
-          onClear();
-        },
+      (res) => {
+        const n = res.data.updated_count;
+        toast.success(
+          ownerId === null
+            ? `${n} ${t(n > 1 ? "ficaram sem responsável." : "ficou sem responsável.")}`
+            : `${n} ${t(n > 1 ? "atribuídos." : "atribuído.")}`,
+        );
       },
     );
   };
@@ -167,15 +192,8 @@ export function BulkActionBar({
   const runTagAdd = (escolhida?: string) => {
     const tag = (escolhida ?? tagInput).trim();
     if (!tag) return;
-    bulk.mutate(
-      { action: "tag", lead_ids: selectedIds, params: { add: [tag] } },
-      {
-        onSuccess: () => {
-          setTagInput("");
-          onClear();
-        },
-      },
-    );
+    setTagInput("");
+    comDesfazer(t("Etiquetando os selecionados"), { action: "tag", lead_ids: selectedIds, params: { add: [tag] } });
   };
 
   const runDelete = () => {
