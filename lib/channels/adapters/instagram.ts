@@ -1,3 +1,4 @@
+import { fotoDoContatoPareado } from "../verdash/client";
 /**
  * Responder no Instagram.
  *
@@ -89,6 +90,15 @@ export const instagramAdapter: ChannelAdapter = {
    */
   async fetchInboundMedia(input) {
     return baixarMidiaDaMeta(input.url, { hintMime: input.hintMime });
+  },
+
+  async fetchProfilePictureUrl(input) {
+    const creds = await resolveVerdashCreds(createAdminClient(), {
+      organizationId: input.organizationId,
+      instanceName: input.sessionRef,
+    });
+    if (!creds?.vinculoId) return null;
+    return fotoDoContatoPareado(creds, input.recipient);
   },
 
   codes: {
@@ -203,9 +213,7 @@ export const instagramAdapter: ChannelAdapter = {
    * A queda do token aparece no primeiro envio, como `nao_autorizado` — e ali o
    * `send` já devolve a instrução de reconectar, em vez de "tente de novo".
    */
-  async checkHealth(
-    input: ChannelTenantScope & { sessionRef: string },
-  ): Promise<ChannelHealth> {
+  async checkHealth(input: ChannelTenantScope & { sessionRef: string }): Promise<ChannelHealth> {
     const admin = createAdminClient();
     const creds = await resolveVerdashCreds(admin, {
       organizationId: input.organizationId,

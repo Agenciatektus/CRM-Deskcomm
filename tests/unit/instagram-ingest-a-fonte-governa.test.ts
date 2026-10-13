@@ -1,3 +1,4 @@
+import type * as Fontes from "@/lib/leads/fontes-do-funil";
 // ─── A ingestão do Instagram ───────────────────────────────────────────────
 //
 // O que se cobra aqui são as três decisões de produto que, se saírem erradas,
@@ -27,12 +28,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { funilQueAceita } from "@/lib/leads/fontes-do-funil";
+import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 import { aplicarEfeitosPosEntrada } from "@/lib/channels/pos-entrada";
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
 
 vi.mock("@/lib/leads/fontes-do-funil", async (real) => ({
-  ...(await real<typeof import("@/lib/leads/fontes-do-funil")>()),
+  ...(await real<typeof Fontes>()),
   funilQueAceita: vi.fn(),
+}));
+vi.mock("@/lib/escalacao/atendimento-manual", () => ({
+  pausarIaPorAtendimentoManual: vi.fn(async () => {}),
 }));
 vi.mock("@/lib/channels/pos-entrada", () => ({ aplicarEfeitosPosEntrada: vi.fn(async () => {}) }));
 vi.mock("@/lib/channels/marcar-conversa", () => ({
@@ -61,9 +66,8 @@ function fazerAdmin(opcoes: { contatoExistente?: string } = {}) {
     const q: Record<string, unknown> = {};
     for (const m of ["select", "eq", "is", "order", "limit", "contains"]) q[m] = () => q;
     q.maybeSingle = async () => ({
-      data: opcoes.contatoExistente && tabela === "contacts"
-        ? { id: opcoes.contatoExistente }
-        : null,
+      data:
+        opcoes.contatoExistente && tabela === "contacts" ? { id: opcoes.contatoExistente } : null,
       error: null,
     });
     return q;
@@ -76,7 +80,9 @@ function fazerAdmin(opcoes: { contatoExistente?: string } = {}) {
         // As mensagens entram num INSERT de várias linhas (uma por anexo, #13).
         const linhas = Array.isArray(payload) ? payload : [payload];
         for (const linha of linhas) escritas.push({ tabela, op: "insert", payload: linha });
-        const ids = linhas.map((_, i) => ({ id: i === 0 ? `${tabela}-novo` : `${tabela}-novo-${i}` }));
+        const ids = linhas.map((_, i) => ({
+          id: i === 0 ? `${tabela}-novo` : `${tabela}-novo-${i}`,
+        }));
         return {
           select: () => ({
             maybeSingle: async () => ({ data: ids[0], error: null }),
@@ -255,5 +261,30 @@ describe("o que chega duas vezes não vira duas conversas", () => {
     expect(meta.instagram_entrada).toBe("comentario");
     expect(meta.instagram_media_id).toBe("post-1");
     expect(msg?.payload.external_id).toBe("comment-1");
+  });
+});
+
+describe("respostas da conta conectada", () => {
+  it("grava saída no contato destinatário, sem efeitos de entrada, e pausa a IA", async () => {
+    const { escritas, admin } = fazerAdmin();
+    const corpo = JSON.parse(envelope());
+    corpo.evento.sender = { id: "conta-do-negocio" };
+    corpo.evento.recipient = { id: "igsid-da-pessoa" };
+    corpo.evento.message.is_echo = true;
+    await ingerir(JSON.stringify(corpo), admin);
+    expect(escritas.find((e) => e.tabela === "contacts")?.payload.instagram_igsid).toBe(
+      "igsid-da-pessoa",
+    );
+    expect(escritas.find((e) => e.tabela === "messages")?.payload).toMatchObject({
+      direction: "outbound",
+      status: "sent",
+      sent_via: "external_device",
+    });
+    expect(marcarConversaComMensagem).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ direction: "outbound" }),
+    );
+    expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
+    expect(pausarIaPorAtendimentoManual).toHaveBeenCalledTimes(1);
   });
 });

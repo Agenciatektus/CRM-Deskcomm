@@ -46,6 +46,7 @@ import { fonteDaEntrada, funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { marcarConversaComMensagem } from "../marcar-conversa";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
+import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 import { logger } from "@/lib/logger";
 
 /**
@@ -218,12 +219,12 @@ async function inserirMensagem(
       contact_id: input.contactId,
       channel_session_id: input.channelSessionId,
       external_id: msg.providerMessageId,
-      direction: "inbound",
+      direction: msg.direction,
       // Nasceu de FORA do CRM. O default da coluna é `'crm'` e ele mentiria
       // aqui: as funções de fricção contam só `external_device`, e o filtro de
       // eco do próprio envio depende deste valor.
       sent_via: "external_device",
-      status: "delivered",
+      status: msg.direction === "outbound" ? "sent" : "delivered",
       // Com arquivo: o tipo dele (story/post/reel nascem `image` e o worker
       // corrige pelo mime). Sem arquivo: `text`, e a tela mostra o aviso.
       type: primeira ? (primeira.tipoDaMensagem ?? "image") : "text",
@@ -270,16 +271,22 @@ async function pedirPersistenciaDaMidia(
   conversationId: string,
   messageId: string,
 ): Promise<void> {
-  const { error } = await admin.rpc("emit_event" as never, {
-    p_event_type: "media.persist_requested",
-    p_entity_kind: "message",
-    p_entity_id: messageId,
-    p_payload: { message_id: messageId, conversation_id: conversationId },
-    p_metadata: { source: "instagram_webhook" },
-    p_organization_id: organizationId,
-  } as never);
+  const { error } = await admin.rpc(
+    "emit_event" as never,
+    {
+      p_event_type: "media.persist_requested",
+      p_entity_kind: "message",
+      p_entity_id: messageId,
+      p_payload: { message_id: messageId, conversation_id: conversationId },
+      p_metadata: { source: "instagram_webhook" },
+      p_organization_id: organizationId,
+    } as never,
+  );
   if (error) {
-    logger.warn("[instagram] emit media.persist_requested falhou", { messageId, detail: error.message });
+    logger.warn("[instagram] emit media.persist_requested falhou", {
+      messageId,
+      detail: error.message,
+    });
   }
 }
 
@@ -331,7 +338,8 @@ export async function instagramInbound(
     p_session: channelSessionId,
     p_entrada: msg.conversa,
   });
-  if (convErr || !convId) return { ok: true, body: { status: "ignored", reason: "conversa_nao_resolvida" } };
+  if (convErr || !convId)
+    return { ok: true, body: { status: "ignored", reason: "conversa_nao_resolvida" } };
   const conversationId = convId as string;
 
   const messageId = await inserirMensagem(admin, {
@@ -353,7 +361,7 @@ export async function instagramInbound(
   await marcarConversaComMensagem(admin, {
     organizationId,
     conversationId,
-    direction: "inbound",
+    direction: msg.direction,
     // `preview` e string, nao `string | null`: a lista do Inbox precisa de
     // algo escrito. Anexo sem legenda vira o selo, que e o que o operador
     // veria no aplicativo.
@@ -367,7 +375,7 @@ export async function instagramInbound(
   // Direct é pedido de atendimento e vira lead. Comentário não. Os dois
   // aparecem no Inbox — a conversa e a mensagem já estão gravadas acima, e é
   // isso que os torna respondíveis.
-  if (msg.conversa === "direct") {
+  if (msg.direction === "inbound" && msg.conversa === "direct") {
     await aplicarEfeitosPosEntrada(admin, {
       organizationId,
       contactId,
@@ -383,6 +391,14 @@ export async function instagramInbound(
       rede: "instagram",
       // O funil veio da FONTE, e não do `is_default`.
       pipelineId,
+    });
+  }
+
+  if (msg.direction === "outbound") {
+    await pausarIaPorAtendimentoManual(admin, {
+      organizationId,
+      conversationId,
+      canal: "instagram",
     });
   }
 

@@ -1,3 +1,9 @@
+import { providersDaFoto, destinatarioDaFoto } from "@/lib/channels/contact-avatar";
+import {
+  CHANNEL_SESSION_REF_COLUMNS,
+  resolveSessionRef,
+  type ChannelSessionRef,
+} from "@/lib/channels/session-ref";
 /**
  * contact-avatars — baixa e mantém atualizada a foto de perfil dos contatos.
  *
@@ -27,7 +33,6 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { DEFAULT_CHANNEL_PROVIDER, getAdapterOpcional, type ChannelProvider } from "@/lib/channels";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +48,7 @@ interface ContactRow {
   id: string;
   organization_id: string;
   wa_identity: string | null;
+  instagram_igsid?: string | null;
   wa_lid: string | null;
   phone_number: string | null;
   avatar_storage_path: string | null;
@@ -88,8 +94,10 @@ async function handle(req: NextRequest): Promise<Response> {
   // declarada irreversível no produto; esta linha é o que sustenta isso.
   const { data: contatos, error: queryError } = await admin
     .from("contacts")
-    .select("id, organization_id, wa_identity, wa_lid, phone_number, avatar_storage_path")
-    .not("wa_identity", "is", null)
+    .select(
+      "id, organization_id, wa_identity, wa_lid, phone_number, instagram_igsid, avatar_storage_path",
+    )
+    .or("wa_identity.not.is.null,instagram_igsid.not.is.null")
     .eq("is_anonymized", false)
     .or(`avatar_updated_at.is.null,avatar_updated_at.lt.${cutoff}`)
     .order("avatar_updated_at", { ascending: true, nullsFirst: true })
@@ -132,16 +140,27 @@ async function handle(req: NextRequest): Promise<Response> {
       return (afetadas ?? []).length > 0;
     };
 
-    if (!chatId) {
+    if (!chatId && !c.instagram_igsid) {
       await carimbar(null);
       semFoto++;
       continue;
     }
 
     try {
-      const { data: sessao } = await admin
+      // A foto precisa da conexão por onde ESTE contato conversou. Uma sessão
+      // arbitrária da organização falha com várias contas/números conectados.
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select("channel_session_id")
+        .eq("organization_id", c.organization_id)
+        .eq("contact_id", c.id)
+        .not("channel_session_id", "is", null)
+        .order("last_message_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let consultaSessao = admin
         .from("channel_sessions")
-        .select("waha_session_name, provider")
+        .select(CHANNEL_SESSION_REF_COLUMNS)
         .eq("organization_id", c.organization_id)
         .eq("status", "WORKING")
         // Sem o filtro, a linha de chamada de voz (spec 18) — que nasce
@@ -149,10 +168,11 @@ async function handle(req: NextRequest): Promise<Response> {
         // devolver `waha_session_name` nulo: a foto de todo mundo parava de
         // atualizar em silêncio, com o `carimbar(null)` logo abaixo parecendo
         // "este contato não tem foto".
-        .in("provider", [...PROVIDERS_DE_MENSAGEM])
-        .limit(1)
-        .maybeSingle();
-      const ref = (sessao as { waha_session_name?: string | null } | null)?.waha_session_name;
+        .in("provider", providersDaFoto(c));
+      if (conversa?.channel_session_id)
+        consultaSessao = consultaSessao.eq("id", conversa.channel_session_id);
+      const { data: sessao } = await consultaSessao.limit(1).maybeSingle();
+      const ref = sessao ? resolveSessionRef(sessao as unknown as ChannelSessionRef) : null;
       if (!ref) {
         await carimbar(null);
         semFoto++;
@@ -176,10 +196,16 @@ async function handle(req: NextRequest): Promise<Response> {
         semFoto++;
         continue;
       }
+      const recipient = destinatarioDaFoto(sessao!.provider as ChannelProvider, c, chatId);
+      if (!recipient) {
+        await carimbar(null);
+        semFoto++;
+        continue;
+      }
       const profilePictureURL = await adapter.fetchProfilePictureUrl({
         organizationId: c.organization_id,
         sessionRef: ref,
-        recipient: chatId,
+        recipient,
       });
       if (!profilePictureURL) {
         // Contato sem foto ou com privacidade fechada: estado normal, não erro.
@@ -243,7 +269,6 @@ async function handle(req: NextRequest): Promise<Response> {
       }
       atualizados++;
     } catch (err) {
-      await carimbar(null);
       falhas++;
       logger.warn("[contact-avatars] contato falhou", {
         contact_id: c.id,

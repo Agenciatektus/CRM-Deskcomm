@@ -24,6 +24,12 @@ const LID = "142704667287623";
 let linhaDoContato: Record<string, unknown> = {};
 /** Endereços que o cron pediu ao canal. */
 const pedidos: string[] = [];
+const referencias: string[] = [];
+let sessaoDaFoto = {
+  waha_session_name: "sessao-de-teste",
+  provider: "waha",
+  verdash_instance_name: "instancia-pareada",
+};
 
 vi.mock("@/lib/env", () => ({
   env: { INTERNAL_CRON_SECRET: "segredo-de-teste", INTERNAL_SECRET: "segredo-de-teste" },
@@ -34,7 +40,8 @@ vi.mock("@/lib/channels", () => ({
   // `getAdapterOpcional`: a rota passou a usar a porta que devolve `null` para canal
   // conhecido sem adapter local, em vez da que lança.
   getAdapterOpcional: () => ({
-    fetchProfilePictureUrl: async (input: { recipient: string }) => {
+    fetchProfilePictureUrl: async (input: { recipient: string; sessionRef: string }) => {
+      referencias.push(input.sessionRef);
       pedidos.push(input.recipient);
       return "https://cdn.exemplo.invalid/foto.jpg";
     },
@@ -45,10 +52,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (tabela: string) => ({
       select: () => {
-        const dados =
-          tabela === "contacts"
-            ? [linhaDoContato]
-            : { waha_session_name: "sessao-de-teste", provider: "waha" };
+        const dados = tabela === "contacts" ? [linhaDoContato] : sessaoDaFoto;
         const proxy: Record<string, unknown> = new Proxy(
           {},
           {
@@ -92,6 +96,12 @@ import { POST } from "@/app/api/v1/cron/contact-avatars/route";
 
 beforeEach(() => {
   pedidos.length = 0;
+  referencias.length = 0;
+  sessaoDaFoto = {
+    waha_session_name: "sessao-de-teste",
+    provider: "waha",
+    verdash_instance_name: "instancia-pareada",
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })),
@@ -155,4 +165,32 @@ describe("cron de fotos: qual endereço vai ao canal", () => {
 
     expect(pedidos).toEqual([`${LID}@lid`]);
   });
+});
+
+it("contato sem telefone usa o IGSID na conexão de Instagram", async () => {
+  linhaDoContato = {
+    id: CONTATO,
+    organization_id: ORG,
+    wa_identity: null,
+    instagram_igsid: "17841400000000001",
+    avatar_storage_path: null,
+  };
+  sessaoDaFoto.provider = "instagram";
+  await chamar();
+  expect(pedidos).toEqual(["17841400000000001"]);
+  expect(referencias).toEqual(["instancia-pareada"]);
+});
+
+it("WhatsApp pareado usa a referência da plataforma e não a sessão WAHA", async () => {
+  linhaDoContato = {
+    id: CONTATO,
+    organization_id: ORG,
+    wa_identity: "phone:+5511999990000",
+    wa_lid: LID,
+    avatar_storage_path: null,
+  };
+  sessaoDaFoto.provider = "verdash";
+  await chamar();
+  expect(pedidos).toEqual([`${LID}@lid`]);
+  expect(referencias).toEqual(["instancia-pareada"]);
 });
