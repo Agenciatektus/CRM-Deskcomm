@@ -32,7 +32,7 @@ const painel = (a: Partial<typeof BASE>): DadosDoPainel => ({
 const acoes = (p: Partial<PropsDasAcoes> = {}): PropsDasAcoes => ({
   estado: "ativa", temProvedor: true, assinaturasVivas: 1, linkDePagamento: null, cancelaNoFim: false,
   planosParaTroca: [PRO], planoAtual: PLANO, periodoPagoDesde: "2026-10-01T12:00:00Z", proximoVencimento: "2026-11-01T12:00:00Z",
-  trocaPagamentoUrl: null, instanteCalculo: "2026-10-13T12:00:00Z", voltouDoCheckout: false, noHub: false, provedor: "stripe", documentoDoCadastro: null, ...p,
+  trocaPagamentoUrl: null, trocaStatus: null, instanteCalculo: "2026-10-13T12:00:00Z", voltouDoCheckout: false, noHub: false, provedor: "stripe", documentoDoCadastro: null, ...p,
 });
 
 beforeEach(() => {
@@ -57,6 +57,13 @@ describe("as situações, em frases", () => {
 });
 
 describe("AcoesDaAssinatura", () => {
+  it("upgrade proporcional pendente mostra o link e bloqueia outra troca", () => {
+    render(<AcoesDaAssinatura {...acoes({ trocaStatus: "aguardando_pagamento", trocaPagamentoUrl: "https://pay.example/upgrade" })} />);
+    expect(screen.getByRole("link", { name: "Pagar ajuste do upgrade" }).getAttribute("href")).toBe("https://pay.example/upgrade");
+    expect(screen.getByText(/Conclua ou aguarde a cobrança proporcional/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Trocar de plano" })).toBeNull();
+  });
+
   it("⭐ Assinar abre o checkout do provedor", async () => {
     h.post.mockResolvedValue({ data: { url: "https://checkout.stripe.com/c/pay/cs_1" } });
     render(<AcoesDaAssinatura {...acoes({ estado: "trial", temProvedor: false, assinaturasVivas: 0 })} />);
