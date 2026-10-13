@@ -16,8 +16,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ApiError } from "@/lib/api/types";
 import { logger } from "@/lib/logger";
 
-/** No que a captação deu. Espelha o CHECK de `webhook_lead_captures.outcome`. */
-export type DesfechoDaCaptacao = "criado" | "duplicado" | "recusado";
+/**
+ * No que a captação deu.
+ *
+ * `criado`/`duplicado`/`recusado` são o vocabulário do CHECK da migration 0174
+ * (`webhook_lead_captures.outcome`). `atualizado` é o desfecho do card que o
+ * reenvio ATUALIZOU (#2316) e ainda NÃO está nesse CHECK — por isso existe a
+ * ponte em `registrarCaptacao`, sem a qual a linha sumiria da tela em vez de
+ * ser gravada com o valor antigo. A tela de "Leads recebidos"
+ * (`lib/schemas/lead-captures.ts`) segue com os três de sempre enquanto o
+ * CHECK não alargar: enquanto houver ponte, nenhum valor `atualizado` chega
+ * ao banco.
+ */
+export type DesfechoDaCaptacao = "criado" | "duplicado" | "recusado" | "atualizado";
 
 /**
  * Por que uma captação foi recusada. Vocabulário só do TypeScript — a coluna
@@ -181,7 +192,7 @@ export async function registrarCaptacao(
   admin: SupabaseClient,
   captacao: CaptacaoParaRegistrar,
 ): Promise<void> {
-  const { error } = await admin.from("webhook_lead_captures").insert({
+  const linha = {
     organization_id: captacao.organizationId,
     webhook_source_id: captacao.webhookSourceId,
     source_name: captacao.sourceName,
@@ -198,19 +209,44 @@ export async function registrarCaptacao(
     user_agent: captacao.userAgent?.slice(0, 500) ?? null,
     origin: captacao.origin ?? null,
     request_id: captacao.requestId ?? null,
-  });
+  };
+  const { error } = await admin.from("webhook_lead_captures").insert(linha);
+  if (!error) return;
+
+  // PONTE DO VOCABULÁRIO (#2316). O CHECK da migration 0174 ainda só aceita
+  // 'criado'/'duplicado'/'recusado', e a regra desta função é NUNCA LANÇAR.
+  // Sem a ponte, todo card ATUALIZADO por reenvio gravaria um erro no log e
+  // SUMIRIA da tela "Leads recebidos" — o registro que o gatilho de
+  // anonimização alcança, e o único rastro de que o dado novo chegou. Repetir
+  // como `duplicado` mantém a linha, com o vínculo, até a migration que
+  // alarga o vocabulário chegar; o desfecho correto passa a ser gravado sozinho
+  // assim que o CHECK aceitar o valor, e a ponte cai sem mais ninguém notar.
+  if (error.code === "23514" && captacao.outcome === "atualizado") {
+    const repetido = await admin
+      .from("webhook_lead_captures")
+      .insert({ ...linha, outcome: "duplicado" });
+    if (!repetido.error) {
+      logger.warn(
+        "[webhooks.captacao] desfecho 'atualizado' ainda não existe no CHECK do banco — linha gravada como 'duplicado' até a migration alargar o vocabulário",
+        {
+          organizationId: captacao.organizationId,
+          webhookSourceId: captacao.webhookSourceId,
+          leadId: captacao.leadId,
+        },
+      );
+      return;
+    }
+  }
 
   // Falha ABERTA na ação (o lead entra de qualquer jeito) e ABERTA na
   // informação: a causa vai para o log nomeada. Um "não gravou o histórico" em
   // silêncio seria indistinguível de "não chegou nada", que é justamente a
   // pergunta que esta tabela veio responder.
-  if (error) {
-    logger.error("[webhooks.captacao] não foi possível registrar o histórico da captação", {
-      organizationId: captacao.organizationId,
-      webhookSourceId: captacao.webhookSourceId,
-      outcome: captacao.outcome,
-      errorCode: error.code,
-      errorMessage: error.message,
-    });
-  }
+  logger.error("[webhooks.captacao] não foi possível registrar o histórico da captação", {
+    organizationId: captacao.organizationId,
+    webhookSourceId: captacao.webhookSourceId,
+    outcome: captacao.outcome,
+    errorCode: error.code,
+    errorMessage: error.message,
+  });
 }

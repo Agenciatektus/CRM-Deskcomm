@@ -9,12 +9,15 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createLeadHandler } from "@/app/api/v1/leads/_handler";
+import { createLeadHandler, moveLeadHandler, updateLeadHandler } from "@/app/api/v1/leads/_handler";
+import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { classificarLeadInicial, type ResultadoClassificacaoInicial } from "@/lib/leads/classificacao-inicial";
 import type { CreateLeadInput } from "@/lib/schemas";
@@ -78,6 +81,77 @@ function findRawPhoneIfUnnormalized(payload: Record<string, unknown>, fieldMap: 
     }
   }
   return null;
+}
+
+/**
+ * O que um lead JÁ GRAVADO tem de diferente do que este envio trouxe (#2316).
+ *
+ * Por CHAVE, e com o mesmo tratamento do merge atômico (`fn_lead_anotar_campos`):
+ * o banco guarda `custom_fields` com tipos mistos — o campo numérico vira
+ * número na coluna e string no envio —, então a comparação é pelo texto dos
+ * dois lados. `100` gravado e `"100"` reenviado são o MESMO dado: um envio
+ * assim é reenvio, não atualização.
+ */
+function camposQueMudaram(
+  atuais: Record<string, unknown>,
+  novos: Record<string, unknown>,
+): Record<string, unknown> {
+  const mudou: Record<string, unknown> = {};
+  for (const [chave, valor] of Object.entries(novos)) {
+    if (String(atuais[chave] ?? "") !== String(valor)) mudou[chave] = valor;
+  }
+  return mudou;
+}
+
+/**
+ * A etapa que este envio PEDIU (#2316), resolvida no funil do PRÓPRIO lead.
+ *
+ * `stage` é campo reservado do corpo (id ou nome — o nome é o que quem integra
+ * tem em mãos), e só devolve o que anda para FRENTE: o webhook é um evento de
+ * fora, e um evento velho (ou um campo fixo no formulário, que manda a mesma
+ * etapa em todo envio) não pode puxar o card para trás. `null` = nada a mover.
+ *
+ * Uma leitura só, e ela faz as duas coisas: resolve o alvo (id ou nome) e
+ * ordena os dois — `position` de `crm_stages` é a única régua de "para frente"
+ * que o produto tem.
+ */
+async function etapaAlvoDoEnvio(
+  admin: SupabaseClient,
+  pipelineId: string,
+  stageAtualId: string | null,
+  indicado: string | null,
+): Promise<string | null> {
+  if (!indicado || !pipelineId) return null;
+  const { data, error } = await admin
+    .from("crm_stages")
+    .select("id, name, position")
+    .eq("pipeline_id", pipelineId)
+    .order("position", { ascending: true });
+  if (error) {
+    // Abrir o card não pode morrer por causa de um campo de etapa: o resto do
+    // envio continua sendo aplicado e a recusa fica no log.
+    logger.error("[webhooks.in] não foi possível ler as etapas do funil do lead", {
+      pipelineId,
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
+    return null;
+  }
+  const etapas = (data ?? []) as Array<{ id: string; name: string | null; position: number | null }>;
+  const alvo =
+    etapas.find((e) => e.id === indicado) ??
+    etapas.find((e) => (e.name ?? "").trim().toLowerCase() === indicado.trim().toLowerCase());
+  if (!alvo) {
+    logger.warn("[webhooks.in] etapa pedida no envio não existe no funil do lead", {
+      pipelineId,
+      etapa: indicado,
+    });
+    return null;
+  }
+  const indiceAtual = etapas.findIndex((e) => e.id === stageAtualId);
+  const indiceAlvo = etapas.findIndex((e) => e.id === alvo.id);
+  if (indiceAtual < 0 || indiceAlvo <= indiceAtual) return null;
+  return alvo.id;
 }
 
 export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextResponse> {
@@ -258,28 +332,56 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     return ok({ lead_id: leadId }, { requestId });
   };
 
-  // Traz o CONTATO junto, e não só o id do lead: a linha de captação precisa do
-  // vínculo para a LGPD alcançá-la. O gatilho de anonimização casa por
-  // `contact_id` — uma captação `duplicado` gravada sem ele guarda nome,
-  // telefone e o formulário inteiro de alguém que pediu anonimização, por 365
-  // dias, enquanto o produto afirma que a pessoa foi anonimizada.
-  const findLeadByExternalId = async (): Promise<{ id: string; contactId: string | null } | null> => {
+  /**
+   * O lead que já existe com este `external_id` — com o que o reenvio precisa
+   * para decidir entre ATUALIZAR (#2316) e reenvio comum: os campos que o card
+   * já tem, o funil e a etapa onde ele está.
+   *
+   * Traz o CONTATO junto, e não só o id do lead: a linha de captação precisa do
+   * vínculo para a LGPD alcançá-la. O gatilho de anonimização casa por
+   * `contact_id` — uma captação gravada sem ele guarda nome, telefone e o
+   * formulário inteiro de alguém que pediu anonimização, por 365 dias, enquanto
+   * o produto afirma que a pessoa foi anonimizada.
+   */
+  type LeadExistente = {
+    id: string;
+    contactId: string | null;
+    title: string | null;
+    customFields: Record<string, unknown>;
+    pipelineId: string;
+    stageId: string | null;
+  };
+
+  const findLeadByExternalId = async (): Promise<LeadExistente | null> => {
     if (!externalId) return null;
     const { data } = await admin
       .from("crm_leads")
-      .select("id, contact_id")
+      .select("id, contact_id, title, custom_fields, pipeline_id, stage_id")
       .eq("organization_id", source.organization_id)
       .eq("source", "webhook")
       .eq("external_id", externalId)
       .maybeSingle();
     if (!data) return null;
-    return { id: data.id as string, contactId: (data.contact_id as string | null) ?? null };
+    return {
+      id: data.id as string,
+      contactId: (data.contact_id as string | null) ?? null,
+      title: (data.title as string | null) ?? null,
+      customFields: (data.custom_fields as Record<string, unknown> | null) ?? {},
+      pipelineId: (data.pipeline_id as string) ?? "",
+      stageId: (data.stage_id as string | null) ?? null,
+    };
   };
 
   const fieldMap = (source.field_map ?? {}) as FieldMap;
   // external_id não é dado do lead — sai do payload antes do mapeamento pra
   // não virar custom_field (o log de recebimento acima preserva o original).
-  const { external_id: _reservedExternalId, ...payloadForMapping } = payload;
+  // `stage` é o OUTRO campo reservado (#2316): é o jeito de quem integra pedir
+  // movimento de etapa no card que o `external_id` aponta, e ele só existe
+  // nesse caminho — fora dele o envio não tem card para onde apontar.
+  const { external_id: _reservedExternalId, stage: _reservedStage, ...payloadForMapping } = payload;
+  /** O que o envio pediu de etapa, lido do corpo CRU. */
+  const etapaPedida =
+    typeof _reservedStage === "string" && _reservedStage.trim() ? _reservedStage.trim() : null;
   // O mapeamento vem ANTES da deduplicação (era depois) porque o histórico
   // registra os DADOS também do envio repetido — sem isso, o retry de uma
   // ferramenta apareceria na tela como uma linha sem nome nem telefone, e quem
@@ -340,19 +442,94 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     utm: mapped.source_metadata,
   };
 
-  const deduped = await findLeadByExternalId();
-  if (deduped) {
-    // Mesmo envio repetido: 200 com o lead existente, nada é recriado — a
-    // ferramenta que reenviou recebe sucesso e para de tentar.
+  /**
+   * O fecho de um reenvio: o `external_id` já aponta para um card (#2316).
+   *
+   * Duas figuras, uma régua só — e a régua é o DADO, não o id:
+   * - o envio trouxe campo NOVO (valor pago, área, etapa mais à frente) → o
+   *   card é ATUALIZADO com o mesmo merge atômico do `updateLeadHandler` e a
+   *   mesma etapa do `moveLeadHandler`, e o desfecho é `atualizado`;
+   * - o envio repetiu o que já estava gravado → idempotência de sempre: nada
+   *   muda, `duplicado`, 200 com o lead existente. A ferramenta que reenviou
+   *   por timeout recebe sucesso e para de tentar.
+   *
+   * Serve para os DOIS caminhos que encontram o card — o fast-path de
+   * deduplicação e a corrida do retry, em que o índice único derruba o segundo
+   * INSERT. E nos DOIS o histórico é gravado com o vínculo do lead e do
+   * contato: é a linha de captação que o gatilho de anonimização alcança.
+   */
+  const fecharReenvio = async (
+    lead: LeadExistente,
+    contactIdDoEnvio: string | null,
+  ): Promise<NextResponse> => {
+    const campos = camposQueMudaram(lead.customFields, mapped.custom_fields);
+    // O título vem do nome só nos caminhos que usam o mapeador genérico (RD
+    // Station e Elementor também): o Respondi tem formato próprio de título,
+    // e compará-lo com o nome de hoje faria TODO retry do Respondi virar
+    // "atualizado".
+    const tituloMudou = !respondiMapped && !!mapped.name && mapped.name !== lead.title;
+    const etapaAlvo = await etapaAlvoDoEnvio(admin, lead.pipelineId, lead.stageId, etapaPedida);
+
+    if (Object.keys(campos).length === 0 && !tituloMudou && etapaAlvo === null) {
+      // Mesmo envio repetido: 200 com o lead existente, nada é recriado — a
+      // ferramenta que reenviou recebe sucesso e para de tentar.
+      await registrarCaptacao(admin, {
+        ...fonteDaCaptacao,
+        ...origemDaCaptacao,
+        ...dadosDaCaptacao,
+        leadId: lead.id,
+        contactId: contactIdDoEnvio ?? lead.contactId,
+        outcome: "duplicado",
+      });
+      return respondWithLead(lead.id);
+    }
+
+    const ctxDoLead: HandlerCtx = {
+      organization_id: source.organization_id,
+      actor: { type: "webhook_source", id: source.id },
+      requestId,
+    };
+    try {
+      if (Object.keys(campos).length > 0 || tituloMudou) {
+        await updateLeadHandler(admin, ctxDoLead, lead.id, {
+          ...(tituloMudou && mapped.name ? { title: mapped.name } : {}),
+          ...(Object.keys(campos).length > 0 ? { custom_fields: campos } : {}),
+        });
+      }
+      if (etapaAlvo) {
+        await moveLeadHandler(admin, ctxDoLead, lead.id, { to_stage_id: etapaAlvo });
+      }
+    } catch (err) {
+      // O card JÁ existe e este envio veio de uma ferramenta que reenvia: a
+      // recusa do UPDATE (régua de campos, contato de pessoal, etapa que o
+      // funil não deixa) transformaria este card num loop de retry sem que
+      // nada do dado novo chegasse. O que não pôde ser aplicado fica no log —
+      // e o PRÓXIMO evento tenta de novo, porque o desfecho é do envio, não da
+      // escrita. `registrarCaptacao` não lança, então a linha sai de qualquer
+      // jeito, com o vínculo.
+      logger.error("[webhooks.in] reenvio com dado novo não pôde atualizar o card", {
+        organizationId: source.organization_id,
+        webhookSourceId: source.id,
+        leadId: lead.id,
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     await registrarCaptacao(admin, {
       ...fonteDaCaptacao,
       ...origemDaCaptacao,
       ...dadosDaCaptacao,
-      leadId: deduped.id,
-      contactId: deduped.contactId,
-      outcome: "duplicado",
+      leadId: lead.id,
+      contactId: contactIdDoEnvio ?? lead.contactId,
+      outcome: "atualizado",
     });
-    return respondWithLead(deduped.id);
+    return respondWithLead(lead.id);
+  };
+
+  const deduped = await findLeadByExternalId();
+  if (deduped) {
+    return fecharReenvio(deduped, null);
   }
 
   if (!mapped.name && !mapped.phone && !mapped.email) {
@@ -604,22 +781,15 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     if (err instanceof ApiError) {
       // Corrida do retry: dois POSTs simultâneos com o mesmo external_id
       // passam ambos pelo fast-path; o índice único derruba o segundo INSERT
-      // (23505) — re-seleciona o vencedor e responde idempotente.
+      // (23505) — re-seleciona o vencedor e fecha com a MESMA régua de #2316:
+      // dado novo atualiza o vencedor, payload idêntico segue idempotente.
       if (externalId && err.message?.includes("uniq_crm_leads_org_source_external")) {
         const vencedor = await findLeadByExternalId();
         if (vencedor) {
-          await registrarCaptacao(admin, {
-            ...fonteDaCaptacao,
-            ...origemDaCaptacao,
-            ...dadosDaCaptacao,
-            leadId: vencedor.id,
-            // O contato desta requisição quando existe (foi resolvido acima);
-            // o do lead vencedor como plano B — o que importa é a linha ter
-            // vínculo, para o gatilho de anonimização alcançá-la.
-            contactId: contactId ?? vencedor.contactId,
-            outcome: "duplicado",
-          });
-          return respondWithLead(vencedor.id);
+          // O contato desta requisição quando existe (foi resolvido acima);
+          // o do vencedor como plano B — o que importa é a linha ter vínculo,
+          // para o gatilho de anonimização alcançá-la.
+          return fecharReenvio(vencedor, contactId ?? null);
         }
       }
       await registrarCaptacao(admin, {
