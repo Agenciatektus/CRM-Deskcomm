@@ -78,6 +78,10 @@ export const ApiErrorCodes = {
   // retentar depois resolve, enquanto conflito manda trocar a chave.
   idempotency_in_progress: "idempotency_in_progress",
   state_conflict: "state_conflict",
+  // PATCH /api/v1/pipelines/[id] tira de um funil a ÚLTIMA ocorrência de uma
+  // fonte na organização (migration 9050). `details.fontes` lista quais; a tela
+  // confirma e reenvia com `confirmarSemFunil: true`.
+  fonte_sem_funil: "fonte_sem_funil",
   invalid_state: "invalid_state", // resposta a um agent_case que saiu de awaiting_human (spec 15 §7)
   tenant_already_exists: "tenant_already_exists",
   // POST /api/v1/settings/api-tokens quando a organização já está no teto de

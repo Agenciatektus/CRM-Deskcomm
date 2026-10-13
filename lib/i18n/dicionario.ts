@@ -14484,7 +14484,15 @@ export const DICIONARIO: Traducoes = {
   "Direct do Instagram": { es: "Direct de Instagram" },
   "Comentários do Instagram": { es: "Comentarios de Instagram" },
   "Recebe de:": { es: "Recibe de:" },
-  "O funil precisa de pelo menos uma fonte.": { es: "El embudo necesita al menos una fuente." },
+  "Só recebe leads movidos de outros funis": { es: "Solo recibe leads movidos desde otros embudos" },
+  "Nenhum outro funil recebe esta fonte": { es: "Ningún otro embudo recibe esta fuente" },
+  "Conversas novas deste canal deixam de entrar no CRM: nem lead, nem conversa. Para voltar a receber, marque a fonte em algum funil.": {
+    es: "Las conversaciones nuevas de este canal dejan de entrar al CRM: ni lead, ni conversación. Para volver a recibirlas, marca la fuente en algún embudo.",
+  },
+  "Parar de receber": { es: "Dejar de recibir" },
+  "Nenhum outro funil recebe esta fonte. Conversas novas dela deixam de entrar no CRM.": {
+    es: "Ningún otro embudo recibe esta fuente. Las conversaciones nuevas de ella dejan de entrar al CRM.",
+  },
   "Instagram conectado.": { es: "Instagram conectado." },
   "Receber o Direct do Instagram aqui": { es: "Recibir aquí el Direct de Instagram" },
   "As mensagens que chegam no Direct do seu perfil passam a aparecer no atendimento, junto do WhatsApp. Quem já responde pelo aplicativo continua podendo responder por lá.": {

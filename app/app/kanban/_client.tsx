@@ -67,13 +67,20 @@ export interface FunilDaLista {
  * pagando armazenamento, a IA vendo tudo e o contador de nao lidas subindo por
  * algo que ninguem vai ler.
  *
- * ─── A ultima caixa nao se desmarca ─────────────────────────────────────────
+ * ─── Zero fontes é permitido (migration 9050) ───────────────────────────────
  *
- * Funil sem fonte nenhuma nao aceita nada, e isso e atendimento interrompido em
- * silencio. O CHECK do banco ja recusa (`cardinality(fontes) > 0`), mas chegar
- * la significaria o operador levar um erro depois de clicar — a caixa fica
- * desabilitada, com o motivo no title.
+ * Funil de pós-venda ou recompra só recebe lead MOVIDO de outro funil. Se a
+ * caixa desmarcada era a ÚLTIMA ocorrência da fonte na organização, a rota
+ * responde 409 `fonte_sem_funil` e o `FunisClient` pede confirmação antes de
+ * reenviar com `confirmarSemFunil`.
  */
+function rotuloDaFonte(f: string, t: (texto: string) => string): string {
+  if (f === "whatsapp") return t("WhatsApp");
+  if (f === "instagram_direct") return t("Direct do Instagram");
+  if (f === "instagram_comentario") return t("Comentários do Instagram");
+  return f;
+}
+
 function FontesDoFunil({
   funil,
   ocupado,
@@ -92,23 +99,18 @@ function FontesDoFunil({
   const atuais = funil.fontes ?? ["whatsapp"];
 
   const opcoes: { valor: string; rotulo: string }[] = [
-    { valor: "whatsapp", rotulo: t("WhatsApp") },
+    { valor: "whatsapp", rotulo: rotuloDaFonte("whatsapp", t) },
     ...(temInstagram
       ? [
-          { valor: "instagram_direct", rotulo: t("Direct do Instagram") },
-          { valor: "instagram_comentario", rotulo: t("Comentários do Instagram") },
+          { valor: "instagram_direct", rotulo: rotuloDaFonte("instagram_direct", t) },
+          { valor: "instagram_comentario", rotulo: rotuloDaFonte("instagram_comentario", t) },
         ]
       : []),
   ];
-  // Com uma opção só não há escolha a fazer — o controle seria uma caixa
-  // marcada que não se desmarca.
-  if (opcoes.length < 2) return null;
-
   const alternar = (valor: string) => {
     const proxima = atuais.includes(valor)
       ? atuais.filter((f) => f !== valor)
       : [...atuais, valor];
-    if (proxima.length === 0) return;
     aplicar(funil.id, { fontes: proxima });
   };
 
@@ -117,17 +119,12 @@ function FontesDoFunil({
       <span className="text-xs text-muted-foreground">{t("Recebe de:")}</span>
       {opcoes.map((o) => {
         const marcada = atuais.includes(o.valor);
-        const ultima = marcada && atuais.length === 1;
         return (
-          <label
-            key={o.valor}
-            className="flex items-center gap-1.5 text-xs"
-            title={ultima ? t("O funil precisa de pelo menos uma fonte.") : undefined}
-          >
+          <label key={o.valor} className="flex items-center gap-1.5 text-xs">
             <input
               type="checkbox"
               checked={marcada}
-              disabled={ocupado || ultima}
+              disabled={ocupado}
               onChange={() => alternar(o.valor)}
               data-testid={`fonte-${o.valor}-${funil.id}`}
             />
@@ -135,6 +132,11 @@ function FontesDoFunil({
           </label>
         );
       })}
+      {atuais.length === 0 && (
+        <span className="text-xs text-muted-foreground" data-testid={`sem-fonte-${funil.id}`}>
+          {t("Só recebe leads movidos de outros funis")}
+        </span>
+      )}
     </div>
   );
 }
@@ -248,6 +250,12 @@ export function FunisClient({
   const [excluindo, setExcluindo] = useState<{ id: string; erro: string | null } | null>(null);
   const [arquivoAberto, setArquivoAberto] = useState(false);
   const [erro, setErro] = useState<{ id: string | null; texto: string } | null>(null);
+  /** 409 `fonte_sem_funil`: o pedido aguardando confirmação, e quais fontes ficam sem funil. */
+  const [semFunil, setSemFunil] = useState<{
+    id: string;
+    patch: Parameters<typeof editar.mutate>[0]["patch"];
+    fontes: string[];
+  } | null>(null);
 
   const ocupado = criar.isPending || editar.isPending || arquivar.isPending;
 
@@ -285,8 +293,17 @@ export function FunisClient({
         onSuccess: (r) => {
           aplicarResposta(r);
           setRenomeando(null);
+          setSemFunil(null);
         },
-        onError: (e) => setErro({ id, texto: textoDoErro(e, t) }),
+        onError: (e) => {
+          if (e instanceof ApiError && e.code === "fonte_sem_funil" && !("confirmarSemFunil" in patch)) {
+            const fontes = Array.isArray(e.details?.fontes) ? (e.details.fontes as string[]) : [];
+            setSemFunil({ id, patch, fontes });
+            return;
+          }
+          setSemFunil(null);
+          setErro({ id, texto: textoDoErro(e, t) });
+        },
       },
     );
   }
@@ -725,6 +742,40 @@ export function FunisClient({
                       temInstagram={temInstagram}
                       aplicar={aplicar}
                     />
+                    <AlertDialog
+                      open={semFunil?.id === funil.id}
+                      onOpenChange={(aberto) => {
+                        if (!aberto) setSemFunil(null);
+                      }}
+                    >
+                      <AlertDialogContent className="sm:max-w-md" data-testid={`sem-funil-painel-${funil.id}`}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t("Nenhum outro funil recebe esta fonte")}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {t(
+                              "Conversas novas deste canal deixam de entrar no CRM: nem lead, nem conversa. Para voltar a receber, marque a fonte em algum funil.",
+                            )}{" "}
+                            ({(semFunil?.fontes ?? []).map((f) => rotuloDaFonte(f, t)).join(", ")})
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel disabled={ocupado} data-testid={`sem-funil-cancelar-${funil.id}`}>
+                            {t("Cancelar")}
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className={buttonVariants({ variant: "destructive" })}
+                            disabled={ocupado}
+                            data-testid={`sem-funil-confirmar-${funil.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (semFunil) aplicar(semFunil.id, { ...semFunil.patch, confirmarSemFunil: true });
+                            }}
+                          >
+                            {t("Parar de receber")}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     <Button
                       variant="ghost"
                       size="sm"

@@ -68,15 +68,17 @@ const bodySchema = z
      *
      * Governa a ENTRADA, não a exibição: fonte que não está em NENHUM funil da
      * organização não gera lead nem conversa — o evento é arquivado e
-     * descartado. Por isso `min(1)`: um funil com lista vazia não aceita nada,
-     * e é exatamente o caso de atendimento interrompido em silêncio. O CHECK do
-     * banco cobra o mesmo (`cardinality(fontes) > 0`), e os dois existem porque
-     * a mensagem daqui o operador lê, a do banco não.
+     * descartado. Lista VAZIA é permitida (migration 9050): funil de pós-venda
+     * ou recompra só recebe lead movido de outro funil. A proteção contra a
+     * fonte órfã fica no handler: tirar a ÚLTIMA ocorrência de uma fonte na
+     * organização responde 409 `fonte_sem_funil`, salvo `confirmarSemFunil`.
      *
      * Precisa estar declarado: o schema é `.strict()`, e campo desconhecido
      * devolve 422 — sem esta linha, a tela salvaria e receberia erro.
      */
-    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).min(1).max(3).optional(),
+    fontes: z.array(z.enum(["whatsapp", "instagram_direct", "instagram_comentario"])).max(3).optional(),
+    /** O operador já leu que conversas novas da fonte deixam de entrar (409 `fonte_sem_funil`). */
+    confirmarSemFunil: z.literal(true).optional(),
     /**
      * TIRAR DO ARQUIVO (#979). `true` é aceito pelo schema e recusado pelo
      * handler, de propósito: quem manda `is_archived: true` quer arquivar, e
@@ -90,7 +92,7 @@ const bodySchema = z
     depois_de: z.string().min(1).nullable().optional(),
   })
   .strict()
-  .refine((b) => Object.keys(b).length > 0, { message: "Nada para alterar." });
+  .refine((b) => Object.keys(b).some((k) => k !== "confirmarSemFunil"), { message: "Nada para alterar." });
 
 type PatchDoFunil = {
   name?: string;
@@ -187,7 +189,8 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   // posição são medidas contra a lista de ATIVOS — lista de onde o alvo ainda
   // não saiu no instante em que elas rodariam. Aceitar metade do pedido seria
   // pior: o funil voltaria com o nome velho e ninguém saberia por quê.
-  const soTiraDoArquivo = pedido.is_archived === false && Object.keys(pedido).length === 1;
+  const soTiraDoArquivo =
+    pedido.is_archived === false && Object.keys(pedido).filter((k) => k !== "confirmarSemFunil").length === 1;
   if (alvo.is_archived && !soTiraDoArquivo) {
     return fail(
       "state_conflict",
@@ -222,9 +225,29 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   }
 
   // Update simples, como nome e descrição. O `bodySchema` já garantiu o vocabulário
-  // fechado e `min(1)`; o `Set` tira repetição, que o CHECK do banco não recusa e
-  // que apareceria na tela como a mesma fonte contada duas vezes.
-  if (pedido.fontes !== undefined) patchDoAlvo.fontes = [...new Set(pedido.fontes)];
+  // fechado; o `Set` tira repetição, que o CHECK do banco não recusa e que
+  // apareceria na tela como a mesma fonte contada duas vezes.
+  if (pedido.fontes !== undefined) {
+    const novas = [...new Set(pedido.fontes)];
+    // ⚠️ FONTE ÓRFÃ: conversa de fonte que nenhum funil ATIVO da organização aceita
+    // é descartada na ingestão (`funilQueAceita`), sem volta. Lista vazia é
+    // legítima (pós-venda), mas tirar a ÚLTIMA ocorrência de uma fonte exige o
+    // operador confirmar. `funis` já vem filtrado por organização (e pela RLS).
+    const orfas = (alvo.fontes ?? ["whatsapp"]).filter(
+      (f) =>
+        !novas.includes(f as (typeof novas)[number]) &&
+        !funis.some((o) => o.id !== pipelineId && !o.is_archived && (o.fontes ?? ["whatsapp"]).includes(f)),
+    );
+    if (orfas.length > 0 && pedido.confirmarSemFunil !== true) {
+      return fail(
+        "fonte_sem_funil",
+        t("Nenhum outro funil recebe esta fonte. Conversas novas dela deixam de entrar no CRM."),
+        409,
+        { requestId, details: { fontes: orfas } },
+      );
+    }
+    patchDoAlvo.fontes = novas;
+  }
 
   // Tirar do arquivo é update SIMPLES: nenhum índice a disputar (nem o de slug
   // nem o de padrão são parciais em `is_archived`, então o funil já ocupava o

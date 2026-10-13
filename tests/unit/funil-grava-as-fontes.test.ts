@@ -129,12 +129,48 @@ describe("o que a porta NÃO aceita", () => {
     expect(escritaNoFunil(db), "nada pode ser gravado num pedido recusado").toBeUndefined();
   });
 
-  it("lista vazia é recusada — funil sem fonte é atendimento parado em silêncio", async () => {
+  it("tirar a ÚLTIMA ocorrência de uma fonte na organização é 409 `fonte_sem_funil`, sem escrita", async () => {
+    // Funil vazio é legítimo (pós-venda, migration 9050), mas conversa de fonte
+    // que nenhum funil aceita é descartada na ingestão. Sem confirmação, nada grava.
     const db = dbComOFunil();
     const r = await patch(PIPE, { fontes: [] });
 
-    expect(r.status).toBe(422);
+    expect(r.status).toBe(409);
+    const body = (await r.json()) as { error: { code: string; details: { fontes: string[] } } };
+    expect(body.error.code).toBe("fonte_sem_funil");
+    expect(body.error.details.fontes).toEqual(["whatsapp"]);
     expect(escritaNoFunil(db)).toBeUndefined();
+  });
+
+  it("com `confirmarSemFunil: true`, o funil fica sem fonte", async () => {
+    const db = dbComOFunil();
+    const r = await patch(PIPE, { fontes: [], confirmarSemFunil: true });
+
+    expect(r.status).toBe(200);
+    expect(escritaNoFunil(db)!.fontes).toEqual([]);
+    expect("confirmarSemFunil" in escritaNoFunil(db)!).toBe(false);
+  });
+
+  it("outro funil ATIVO que recebe a fonte libera sem confirmação; arquivado não conta", async () => {
+    const OUTRO = "77777777-7777-4777-8777-777777777777";
+    const comOutro = (is_archived: boolean) => {
+      const db = makeDb({
+        pipelines: [
+          funilRow({ id: PIPE, name: "Pós-venda", fontes: ["whatsapp"] }),
+          funilRow({ id: OUTRO, name: "Vendas", is_default: true, is_archived, fontes: ["whatsapp"] }),
+        ],
+      });
+      vi.mocked(createClient).mockResolvedValue(db.client as never);
+      return db;
+    };
+
+    const ativo = comOutro(false);
+    expect((await patch(PIPE, { fontes: [] })).status).toBe(200);
+    expect(escritaNoFunil(ativo)!.fontes).toEqual([]);
+
+    const arquivado = comOutro(true);
+    expect((await patch(PIPE, { fontes: [] })).status).toBe(409);
+    expect(escritaNoFunil(arquivado)).toBeUndefined();
   });
 
   it("pedido sem `fontes` não mexe na coluna", async () => {
