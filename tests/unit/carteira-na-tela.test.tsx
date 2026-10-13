@@ -144,13 +144,13 @@ describe("(c) contato sem dono não quebra a tela", () => {
 
 describe("a régua dos estados (função pura) não é reescrita na tela", () => {
   it("classifica os quatro estados", () => {
-    expect(estadoDaCarteira({ donoId: null, qualificado: false }, "u-b")).toBe("sem_carteira");
-    expect(estadoDaCarteira({ donoId: "u-a", qualificado: false }, "u-b")).toBe("dono_inativo");
-    expect(estadoDaCarteira({ donoId: "u-a", qualificado: true }, "u-a")).toBe("mesmo_dono");
-    expect(estadoDaCarteira({ donoId: "u-a", qualificado: true }, "u-b")).toBe("outro_dono");
+    expect(estadoDaCarteira({ dono_user_id: null, qualificado: false }, "u-b")).toBe("sem_carteira");
+    expect(estadoDaCarteira({ dono_user_id: "u-a", qualificado: false }, "u-b")).toBe("dono_inativo");
+    expect(estadoDaCarteira({ dono_user_id: "u-a", qualificado: true }, "u-a")).toBe("mesmo_dono");
+    expect(estadoDaCarteira({ dono_user_id: "u-a", qualificado: true }, "u-b")).toBe("outro_dono");
     // Conversa sem responsável: o dono é sempre "outro" — não se sabe quem vai
     // responder, e é justo aí que o negócio nasceria no nome errado.
-    expect(estadoDaCarteira({ donoId: "u-a", qualificado: true }, null)).toBe("outro_dono");
+    expect(estadoDaCarteira({ dono_user_id: "u-a", qualificado: true }, null)).toBe("outro_dono");
   });
 
   it("só 'outro_dono' vira faixa em cima do chat", () => {

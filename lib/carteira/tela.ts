@@ -28,7 +28,7 @@
 /** O que o servidor devolve para a tela da carteira de um contato. */
 export interface CarteiraDaTela {
   /** O id gravado em `contacts.carteira_user_id`, qualificado ou não. */
-  donoId: string | null;
+  dono_user_id: string | null;
   /** O vínculo de hoje conta? (membro ativo da org, papel `agent`/`manager`/`admin`.) */
   qualificado: boolean;
 }
@@ -48,9 +48,9 @@ export function estadoDaCarteira(
   carteira: CarteiraDaTela,
   quemAtendeId: string | null | undefined,
 ): EstadoDaCarteira {
-  if (!carteira.donoId) return "sem_carteira";
+  if (!carteira.dono_user_id) return "sem_carteira";
   if (!carteira.qualificado) return "dono_inativo";
-  if (quemAtendeId && carteira.donoId === quemAtendeId) return "mesmo_dono";
+  if (quemAtendeId && carteira.dono_user_id === quemAtendeId) return "mesmo_dono";
   return "outro_dono";
 }
 
