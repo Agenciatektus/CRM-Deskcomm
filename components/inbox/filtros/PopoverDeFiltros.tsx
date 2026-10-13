@@ -23,6 +23,8 @@ interface Props {
   mostrarSeletorDeEntrada: boolean;
   /** O seletor de etiqueta já montado (ou `null` quando não há o que oferecer). */
   seletorDeEtiqueta: ReactNode;
+  /** Funil, etapas, responsável, canal e período (9051), já montados. */
+  atendimento?: ReactNode;
 }
 
 const GATILHO_DO_SELECT =
@@ -62,6 +64,7 @@ export function PopoverDeFiltros({
   filtroForaDaLista,
   mostrarSeletorDeEntrada,
   seletorDeEtiqueta,
+  atendimento,
 }: Props) {
   const t = useT();
   return (
@@ -87,7 +90,7 @@ export function PopoverDeFiltros({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent folhaNoCelular align="end" collisionPadding={12} className="w-72 space-y-2.5 p-2">
+      <PopoverContent folhaNoCelular align="end" collisionPadding={12} className="max-h-[min(36rem,var(--radix-popover-content-available-height))] w-72 space-y-2.5 overflow-y-auto p-2">
         <div className="space-y-0.5">
           <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-sm hover:bg-surface-elevated">
             {t("Só não lidas")}
@@ -149,6 +152,8 @@ export function PopoverDeFiltros({
         )}
 
         {seletorDeEtiqueta && <Secao titulo={t("Tags")}>{seletorDeEtiqueta}</Secao>}
+
+        {atendimento}
 
         {mostrarSeletorDeEntrada && (
           <Secao titulo={t("Entrada no Instagram")}>

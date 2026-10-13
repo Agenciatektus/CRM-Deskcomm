@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
+import { escreverFiltrosDoAtendimento, type EscolhaDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { agendarRefazer, aplicarMudancaDaConversa } from "@/hooks/inbox/cacheDasConversas";
 import {
@@ -134,6 +135,8 @@ export interface ConversationsFilters {
   sem_passo?: boolean;
   /** O TIPO de canal (migration 9049): whatsapp, instagram ou facebook. */
   canal?: string;
+  /** Funil, etapas, responsável e período (migration 9051). */
+  atendimento?: EscolhaDoAtendimento;
 }
 
 interface ListResponse {
@@ -183,6 +186,7 @@ export function useConversationsRealtime(
       if (filters.is_group !== undefined) qs.set("is_group", filters.is_group ? "true" : "false");
       if (filters.sem_passo) qs.set("sem_passo", "true");
       if (filters.canal) qs.set("canal", filters.canal);
+      if (filters.atendimento) escreverFiltrosDoAtendimento(qs, filters.atendimento);
       if (pageParam) qs.set("cursor", pageParam);
       qs.set("limit", "50");
       try {

@@ -1,6 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import { escreverFiltrosDoAtendimento, type EscolhaDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
 import {
   type ModoDeEtiqueta,
   marcadoresEscolhidos,
@@ -47,6 +48,8 @@ export interface FiltrosDaContagem {
   /** Tipo de canal e "só grupos" (migration 9049): os filtros da folha do celular. */
   canal?: string;
   soGrupos?: boolean;
+  /** Funil, etapas, responsável e período (migration 9051): os MESMOS da lista. */
+  atendimento?: EscolhaDoAtendimento;
 }
 
 /**
@@ -71,6 +74,7 @@ export function useConversationCounts(
   if (filtros.entrada) qs.set("entrada", filtros.entrada);
   if (filtros.canal) qs.set("canal", filtros.canal);
   if (filtros.soGrupos) qs.set("is_group", "true");
+  if (filtros.atendimento) escreverFiltrosDoAtendimento(qs, filtros.atendimento);
   const sufixo = qs.toString();
 
   return useQuery({

@@ -47353,6 +47353,49 @@ grant  execute on function public.autor_da_ultima_mensagem(public.conversations)
 notify pgrst, 'reload schema';
 
 
+-- ---- funil e etapa do negócio do contato da conversa (migration 9051) ----
+-- Campos calculados do PostgREST para os filtros Funil e Etapa da Inbox; a contagem
+-- da 9029 logo abaixo chama os dois (posição é dependência). SECURITY INVOKER (a RLS
+-- de crm_leads vale para quem chama). Antes da VARREDURA anon, como toda função nova.
+create or replace function public.funis_da_conversa(c public.conversations)
+returns uuid[]
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select coalesce(array_agg(distinct l.pipeline_id), '{}'::uuid[])
+    from public.crm_leads l
+   where l.contact_id = c.contact_id
+     and l.organization_id = c.organization_id
+$$;
+
+comment on function public.funis_da_conversa(public.conversations) is
+  'Campo calculado do PostgREST: os funis em que o contato da conversa tem negócio (qualquer status), pela RLS de crm_leads de quem chama. Filtro "Funil" da Inbox (migration 9051).';
+
+revoke execute on function public.funis_da_conversa(public.conversations) from public, anon;
+grant  execute on function public.funis_da_conversa(public.conversations) to authenticated, service_role;
+
+create or replace function public.etapas_da_conversa(c public.conversations)
+returns uuid[]
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select coalesce(array_agg(distinct l.stage_id), '{}'::uuid[])
+    from public.crm_leads l
+   where l.contact_id = c.contact_id
+     and l.organization_id = c.organization_id
+$$;
+
+comment on function public.etapas_da_conversa(public.conversations) is
+  'Campo calculado do PostgREST: as etapas em que estão os negócios do contato da conversa (qualquer status), pela RLS de crm_leads de quem chama. Filtro "Etapa" da Inbox (migration 9051).';
+
+revoke execute on function public.etapas_da_conversa(public.conversations) from public, anon;
+grant  execute on function public.etapas_da_conversa(public.conversations) to authenticated, service_role;
+
+
 -- ---- as contagens da caixa de entrada numa consulta só (migration 9029) ----
 --
 -- Uma varredura de conversations devolve as seis contagens das abas
@@ -47369,6 +47412,9 @@ drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid,
 -- Desde a 9049 a função tem 11 parâmetros (`p_canal_tipo` e `p_grupos`, a folha
 -- de filtros do celular): a de 9 cai antes, pelo mesmo motivo da de 8.
 drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean);
+-- Desde a 9051 a função tem 15 parâmetros (`p_funil`, `p_etapas`, `p_responsavel` e
+-- `p_desde`, os filtros novos da Inbox): a de 11 cai antes, pelo mesmo motivo.
+drop function if exists public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean);
 
 create or replace function public.fn_contagens_da_caixa(
   p_organizacao uuid,
@@ -47381,7 +47427,11 @@ create or replace function public.fn_contagens_da_caixa(
   p_modo text default 'e',
   p_sem_passo boolean default false,
   p_canal_tipo text default null,
-  p_grupos boolean default null
+  p_grupos boolean default null,
+  p_funil uuid default null,
+  p_etapas uuid[] default null,
+  p_responsavel text default null,
+  p_desde timestamptz default null
 )
 returns jsonb
 language sql
@@ -47432,6 +47482,28 @@ as $$
        -- 9049: o MESMO filtro `is_group` da lista, nos três estados: nulo = todas,
        -- true = só grupos, false = sem grupos (P2 do Cassio na #179).
        and (p_grupos is null or coalesce(c.is_group, false) = p_grupos)
+       -- 9051: FUNIL e ETAPAS pelos MESMOS campos calculados que a lista filtra
+       -- (`funis_da_conversa`, `etapas_da_conversa`: o negócio do contato da conversa,
+       -- com a RLS de crm_leads de quem chama). Etapa escolhida decide sozinha (a
+       -- etapa é de um funil só); sem etapa, vale o funil.
+       and (
+         case
+           when coalesce(cardinality(p_etapas), 0) > 0
+             then public.etapas_da_conversa(c) && p_etapas
+           when p_funil is not null
+             then public.funis_da_conversa(c) @> array[p_funil]
+           else true
+         end
+       )
+       -- 9051: o RESPONSÁVEL como a lista: 'ninguem' = sem atendente; senão o id.
+       and (
+         p_responsavel is null
+         or (p_responsavel = 'ninguem' and c.assigned_to_user_id is null)
+         or c.assigned_to_user_id::text = p_responsavel
+       )
+       -- 9051: PERÍODO da última mensagem; o corte vem calculado do TypeScript, o
+       -- mesmo valor que a lista aplica em `last_message_at`.
+       and (p_desde is null or c.last_message_at >= p_desde)
   )
   select jsonb_build_object(
     'fila',       count(*) filter (where comando = any (p_comandos_da_fila)),
@@ -47445,11 +47517,11 @@ as $$
   from base;
 $$;
 
-comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) is
-  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa); desde a 9049, p_canal_tipo (conversations.channel) e p_grupos (is_group: nulo, só grupos ou sem grupos), os filtros da folha do celular.';
+comment on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean, uuid, uuid[], text, timestamptz) is
+  'As seis contagens das abas da caixa de entrada numa varredura (migration 9029). SECURITY INVOKER: a RLS de conversations vale para quem chama. As regras (fila, terminais, etiquetas limpas) vêm do TypeScript por parâmetro. Desde a 9042, "só não lidas" inclui a conversa que a pessoa marcou como não lida; desde a 9047, p_sem_passo aplica o filtro "Sem próximo passo" (passo_da_conversa); desde a 9049, p_canal_tipo (conversations.channel) e p_grupos (is_group: nulo, só grupos ou sem grupos), os filtros da folha do celular; desde a 9051, p_funil/p_etapas (funis_da_conversa/etapas_da_conversa), p_responsavel (id ou ninguem) e p_desde (last_message_at).';
 
-revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) from public, anon;
-grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean) to authenticated, service_role;
+revoke execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean, uuid, uuid[], text, timestamptz) from public, anon;
+grant  execute on function public.fn_contagens_da_caixa(uuid, text[], text[], uuid, text, boolean, text[], text, boolean, text, boolean, uuid, uuid[], text, timestamptz) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
 

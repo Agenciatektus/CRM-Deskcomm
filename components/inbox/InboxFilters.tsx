@@ -23,9 +23,10 @@ import {
 } from "@/components/mobile/telas/Conversas";
 import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import type { TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
+import type { EscolhaDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
+import { FiltrosDoAtendimento, useNomesDoAtendimento } from "./filtros/FiltrosDoAtendimento";
 
 export { visibleInboxTabs, type InboxTab } from "./filtros/abas-da-inbox";
-
 
 export interface InboxFiltersValue {
   tab: InboxTab;
@@ -48,6 +49,8 @@ export interface InboxFiltersValue {
   onlyGroups?: boolean;
   /** "Sem próximo passo" (L4, migration 9047): manda `sem_passo=true`. */
   semPasso?: boolean;
+  /** Funil, etapas, responsável e período da última mensagem (migration 9051). */
+  atendimento?: EscolhaDoAtendimento;
 }
 
 interface Props {
@@ -102,6 +105,7 @@ export function InboxFilters({ value, onChange }: Props) {
     // A folha do celular (9049): o mesmo tipo de canal e o "só grupos" da lista.
     canal: value.canal,
     soGrupos: value.onlyGroups,
+    atendimento: value.atendimento,
   });
 
   const tabs = activeOrg
@@ -161,7 +165,9 @@ export function InboxFilters({ value, onChange }: Props) {
         const canal = channels?.find((c) => c.id === value.channel_session_id);
         return canal ? channelLabel(canal) : t("Número de WhatsApp");
       })();
-  const chips: ChipDeFiltro[] = chipsDosFiltros({ value, onChange, t, nomeDoCanal, etiquetas, alternaEtiqueta });
+  const nomes = useNomesDoAtendimento(value.atendimento);
+  const chips: ChipDeFiltro[] = chipsDosFiltros({ value, onChange, t, nomeDoCanal, etiquetas, alternaEtiqueta, nomes });
+  const tiposDeCanal = tiposDeCanalDisponiveis((channels ?? []).map((c) => c.provider));
   const limparDoPopover = () =>
     onChange({
       ...value,
@@ -173,6 +179,7 @@ export function InboxFilters({ value, onChange }: Props) {
       tagMode: undefined,
       entrada: undefined,
       canal: undefined,
+      atendimento: undefined,
     });
 
   // O timer lê o valor MAIS RECENTE, não o do render em que foi agendado. Antes a
@@ -223,6 +230,7 @@ export function InboxFilters({ value, onChange }: Props) {
           />
         ) : null
       }
+      atendimento={<FiltrosDoAtendimento value={value} onChange={onChange} tiposDeCanal={tiposDeCanal} mostrarTipoDeCanal={!celular} />}
     />
   );
 
@@ -276,7 +284,7 @@ export function InboxFilters({ value, onChange }: Props) {
               value,
               onChange,
               abas,
-              tiposDeCanal: tiposDeCanalDisponiveis((channels ?? []).map((c) => c.provider)),
+              tiposDeCanal,
               maisFiltros: filtros(),
               aoLimpar: limparDoPopover,
             }}

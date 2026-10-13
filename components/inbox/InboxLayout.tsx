@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
+import { escolhaDaUrl } from "@/lib/inbox/filtros-do-atendimento";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
 
@@ -157,6 +158,8 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     onlyUnread: false,
     onlyGroups: false,
     semPasso: searchParams.get("sem_passo") === "1",
+    // 9051: funil, etapas, responsável e período também chegam por link.
+    atendimento: escolhaDaUrl(new URLSearchParams(searchParams.toString())),
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -270,6 +273,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       is_group: filterValue.onlyGroups || undefined,
       sem_passo: filterValue.semPasso || undefined,
       canal: filterValue.canal,
+      atendimento: filterValue.atendimento,
     }),
     [
       filterValue.tab,
@@ -283,6 +287,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       filterValue.onlyGroups,
       filterValue.semPasso,
       filterValue.canal,
+      filterValue.atendimento,
     ],
   );
 
