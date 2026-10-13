@@ -41,6 +41,8 @@ const XISTAO: PerfilDoPais = {
     normaliza: (valor) => valor.toUpperCase().replace(/[^0-9A-Z]/g, ""),
   },
   telefoneExemplo: "+999000000000",
+  idioma: "xi-XI",
+  fusoDoSugerido: "UTC",
   lei: { nome: "Lei do Xistão", numero: "Lei nº 1/2020", artigo: "Art. 5º", revisada: false },
   calendario: { feriados: [], rotulo: "feriados do Xistão" },
   padroesDePii: [
@@ -69,6 +71,8 @@ const REVISADOLANDIA: PerfilDoPais = {
     normaliza: (valor) => valor.replace(/\D/g, ""),
   },
   telefoneExemplo: "+999000000000",
+  idioma: "rv-RV",
+  fusoDoSugerido: "UTC",
   lei: { nome: "Lei de Revisadolândia", numero: "Lei nº 2/2021", artigo: "Art. 9º", revisada: true },
   calendario: { feriados: [], rotulo: "feriados de Revisadolândia" },
   padroesDePii: [],
