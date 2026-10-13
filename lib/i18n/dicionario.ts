@@ -14909,6 +14909,8 @@ export const DICIONARIO: Traducoes = {
   "Com alguém da equipe": { es: "Con alguien del equipo" },
   "Tarefa": { es: "Tarea" },
   // ─── BARRA DO FUNIL (13/10/2026) ───
+  "Para reordenar, use a ordem Manual": { es: "Para reordenar, use el orden Manual" },
+  "A ordem em que os cards foram arrastados": { es: "El orden en que se arrastraron las tarjetas" },
   "Buscar leads": { es: "Buscar leads" },
   "Nome, telefone, @ ou título": { es: "Nombre, teléfono, @ o título" },
   "Buscar por nome, telefone, @ do Instagram ou título": { es: "Buscar por nombre, teléfono, @ de Instagram o título" },

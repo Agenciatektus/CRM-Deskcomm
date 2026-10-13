@@ -56,8 +56,10 @@ function chave(lead: Lead, coluna: ColunaDaLista, ctx: ContextoDaLista): string 
       return lead.value_cents && lead.value_cents > 0 ? lead.value_cents : null;
     case "responsavel":
       return ctx.nomeDoDono(lead).toLocaleLowerCase("pt-BR") || null;
-    case "passo":
-      return lead.proximo_passo?.prazo ? new Date(lead.proximo_passo.prazo).getTime() : null;
+    case "passo": {
+      const ms = lead.proximo_passo?.prazo ? new Date(lead.proximo_passo.prazo).getTime() : NaN;
+      return Number.isFinite(ms) ? ms : null;
+    }
     case "parado":
       return -new Date(lead.stage_changed_at ?? lead.created_at).getTime();
     case "esperando": {

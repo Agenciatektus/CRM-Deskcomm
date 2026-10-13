@@ -32,6 +32,9 @@ import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
 import type { PipelineVocabulary, Stage } from "@/lib/kanban/types";
 
+/** O teto da rota em lote por chamada (`lead_ids` máx. 50). */
+export const LOTE_MAXIMO = 50;
+
 interface BulkActionBarProps {
   selectedIds: string[];
   stages: Stage[];
@@ -137,25 +140,33 @@ export function BulkActionBar({
    * por alguns segundos (`adiarAcao`, o mesmo de ganho/perda) e "Desfazer" não
    * chama nada. A seleção sai na hora; a rota só roda no fim do aviso.
    */
-  const comDesfazer = (
-    mensagem: string,
-    input: BulkLeadActionInput,
-    aoConcluir?: (res: { data: { updated_count: number } }) => void,
-  ) => {
-    onClear();
+  /**
+   * A rota em lote aceita até 50 ids por chamada (422 acima disso). "Selecionar
+   * todos" na Lista marca centenas: vai em BLOCOS de 50, em sequência. A seleção
+   * só sai quando TODOS os blocos deram certo; com erro, fica, para tentar de novo.
+   */
+  const emBlocos = async (input: BulkLeadActionInput): Promise<number> => {
+    let total = 0;
+    for (let i = 0; i < input.lead_ids.length; i += LOTE_MAXIMO) {
+      const bloco = { ...input, lead_ids: input.lead_ids.slice(i, i + LOTE_MAXIMO) } as BulkLeadActionInput;
+      const res = await new Promise<{ data?: { updated_count?: number } }>((resolver, recusar) =>
+        bulk.mutate(bloco, { onSuccess: (r) => resolver(r as { data?: { updated_count?: number } }), onError: recusar }),
+      );
+      total += res?.data?.updated_count ?? bloco.lead_ids.length;
+    }
+    return total;
+  };
+
+  /** Um Desfazer cobre todos os blocos: nada é chamado antes do fim do aviso. */
+  const comDesfazer = (mensagem: string, input: BulkLeadActionInput, aoConcluir?: (n: number) => void) => {
     adiarAcao(
       (s) => `${mensagem} (${s} s)`,
       t("Desfazer"),
-      () =>
-        new Promise((resolver, recusar) =>
-          bulk.mutate(input, {
-            onSuccess: (res) => {
-              aoConcluir?.(res as { data: { updated_count: number } });
-              resolver(res);
-            },
-            onError: recusar,
-          }),
-        ),
+      async () => {
+        const n = await emBlocos(input);
+        aoConcluir?.(n);
+        onClear();
+      },
     );
   };
 
@@ -178,8 +189,7 @@ export function BulkActionBar({
         lead_ids: selectedIds,
         params: { owner_user_id: ownerId },
       },
-      (res) => {
-        const n = res.data.updated_count;
+      (n) => {
         toast.success(
           ownerId === null
             ? `${n} ${t(n > 1 ? "ficaram sem responsável." : "ficou sem responsável.")}`
@@ -197,15 +207,12 @@ export function BulkActionBar({
   };
 
   const runDelete = () => {
-    bulk.mutate(
-      { action: "delete", lead_ids: selectedIds, params: {} },
-      {
-        onSuccess: () => {
-          setConfirmDelete(false);
-          onClear();
-        },
-      },
-    );
+    void emBlocos({ action: "delete", lead_ids: selectedIds, params: {} } as BulkLeadActionInput)
+      .then(() => {
+        setConfirmDelete(false);
+        onClear();
+      })
+      .catch(() => undefined); // o erro já sai no toast do useBulkAction; a seleção fica
   };
 
   return (

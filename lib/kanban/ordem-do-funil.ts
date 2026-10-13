@@ -6,7 +6,7 @@ import type { Lead } from "@/lib/types/leads";
  *
  * Pura e sem React: a tela, a Lista e o teste leem daqui.
  */
-export type OrdemDoFunil = "esperando" | "parados" | "recentes" | "valor" | "urgente";
+export type OrdemDoFunil = "esperando" | "parados" | "recentes" | "valor" | "urgente" | "manual";
 
 /** As opções do menu Ordenar, na ordem do desenho; a primeira é o padrão. */
 export const ORDENS_DO_FUNIL: ReadonlyArray<{ id: OrdemDoFunil; rotulo: string; apoio: string }> = [
@@ -19,6 +19,7 @@ export const ORDENS_DO_FUNIL: ReadonlyArray<{ id: OrdemDoFunil; rotulo: string; 
   { id: "recentes", rotulo: "Mais recentes", apoio: "Entrada no funil, mais nova primeiro" },
   { id: "valor", rotulo: "Maior valor", apoio: "Sem valor vai para o fim" },
   { id: "urgente", rotulo: "Próximo passo mais urgente", apoio: "Atrasados primeiro, depois por horário" },
+  { id: "manual", rotulo: "Manual", apoio: "A ordem em que os cards foram arrastados" },
 ];
 
 export const ORDEM_PADRAO: OrdemDoFunil = "esperando";
@@ -91,6 +92,12 @@ function porPresente<T>(a: T | null, b: T | null, cmp: (x: T, y: T) => number): 
 
 const texto = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
 
+function instante(v: string | null | undefined): number | null {
+  if (!v) return null;
+  const ms = new Date(v).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 /**
  * O comparador da ordem escolhida. Empate (e quem não entra na régua, como o
  * lead que não espera resposta) cai na posição manual da etapa, para o
@@ -112,9 +119,10 @@ export function comparadorDoFunil(ordem: OrdemDoFunil): (a: LeadOrdenavel, b: Le
           (x, y) => y - x,
         );
       case "urgente":
-        return porPresente(a.proximo_passo?.prazo ?? null, b.proximo_passo?.prazo ?? null, (x, y) =>
-          texto(new Date(x).toISOString(), new Date(y).toISOString()),
-        );
+        // Prazo inválido conta como sem prazo (NaN não pode quebrar a ordem).
+        return porPresente(instante(a.proximo_passo?.prazo), instante(b.proximo_passo?.prazo), (x, y) => x - y);
+      case "manual":
+        return null;
     }
   };
   return (a, b) => regua(a, b) ?? a.position_in_stage - b.position_in_stage;

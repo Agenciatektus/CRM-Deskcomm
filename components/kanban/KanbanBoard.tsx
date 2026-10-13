@@ -1,6 +1,7 @@
 "use client";
 import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
@@ -65,7 +66,7 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[], ordenar?: OrdemDoFuni
   }
   // Already ordered by position_in_stage at fetch time, but be defensive.
   for (const list of map.values()) {
-    list.sort(ordenar ? comparadorDoFunil(ordenar) : (a, b) => a.position_in_stage - b.position_in_stage);
+    list.sort(ordenar && ordenar !== "manual" ? comparadorDoFunil(ordenar) : (a, b) => a.position_in_stage - b.position_in_stage);
   }
   return map;
 }
@@ -221,6 +222,14 @@ export function KanbanBoard({
       const lead = data.leads.find((l) => l.id === draggableId);
       if (!lead) return;
 
+      // Com uma ordem da barra ativa, a posição na coluna não é a manual: soltar
+      // DENTRO da coluna gravaria uma posição qualquer e o card voltaria. Mover
+      // entre colunas segue valendo.
+      if (ordenar && ordenar !== "manual" && source.droppableId === destination.droppableId) {
+        toast.info(t("Para reordenar, use a ordem Manual"));
+        return;
+      }
+
       const destStageId = destination.droppableId;
       const destList = (grouped.get(destStageId) ?? []).filter(
         (l) => l.id !== draggableId,
@@ -268,7 +277,7 @@ export function KanbanBoard({
       }
       mover();
     },
-    [data, grouped, moveCard, t],
+    [data, grouped, moveCard, t, ordenar],
   );
 
   if (isLoading) {
