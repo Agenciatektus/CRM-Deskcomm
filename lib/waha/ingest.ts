@@ -1111,7 +1111,9 @@ async function handleOutboundFromUserPhone(
   // Quem reaproveitar esta condição para pular o INSERT reabre o #108.
   const ehEco = await ehEcoDeEnvioNosso(admin, session.organization_id, conversationId, {
     corpo: p.body ?? null,
-    midia: !!p.type && p.type !== "chat",
+    // Pelo tipo RESOLVIDO (P2 do Cassio na #202): cobre motor que manda `type:"text"`
+    // e mídia sem legenda do NOWEB, que não traz `type`.
+    midia: resolveMessageType(p) !== "text",
   });
   let comandoAplicado: typeof comando = null;
   if (!ehEco) {
