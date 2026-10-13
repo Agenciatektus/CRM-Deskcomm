@@ -45396,30 +45396,11 @@ alter table public.crm_pipelines
 -- Quem garante que ninguem perde o WhatsApp no deploy e o `DEFAULT` da coluna,
 -- que roda uma vez e nao se repete. Levantado por @Cassio_SecRev (P2-10).
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'crm_pipelines_fontes_conhecidas'
-      and conrelid = 'public.crm_pipelines'::regclass
-  ) then
-    -- Vocabulário FECHADO. Uma fonte nova exige migration, e é assim que se
-    -- quer: uma string livre aqui viraria `whatsapp`, `whats`, `WhatsApp` em
-    -- três instalações, e o filtro da ingestão não acharia nenhuma delas.
-    alter table public.crm_pipelines
-      add constraint crm_pipelines_fontes_conhecidas
-      check (
-        -- `cardinality > 0` NAO e zelo: `'{}'::text[] <@ qualquer_array` e TRUE
-        -- em Postgres, porque o conjunto vazio esta contido em todos. Sem esta
-        -- metade, um funil com `fontes = '{}'` passa no CHECK e nao aceita
-        -- fonte nenhuma — e, pela regra desta feature, conversa de fonte nao
-        -- aceita NAO ENTRA. Seria atendimento interrompido em silencio, e a
-        -- unica rede contra isso do dia em que a tela de configuracao chegar.
-        cardinality(fontes) > 0
-        and fontes <@ array['whatsapp', 'instagram_direct', 'instagram_comentario']::text[]
-      );
-  end if;
-end $$;
+-- O CHECK `crm_pipelines_fontes_conhecidas` (vocabulário FECHADO) mora num bloco
+-- só, o da migration 9050, antes da VARREDURA anon: a 9050 tirou a metade
+-- `cardinality(fontes) > 0` (funil de pós-venda pode ficar sem fonte) e o
+-- baseline não reconstrói constraint em dois blocos
+-- (`tests/unit/baseline-constraint-reconstruida.test.ts`).
 
 -- A ingestão pergunta "existe funil desta organização que aceite esta fonte?" a
 -- cada mensagem que chega. É consulta de caminho quente e precisa de índice.
@@ -48681,6 +48662,36 @@ notify pgrst, 'reload schema';
 create unique index if not exists messages_reenvio_unico
   on public.messages (organization_id, (metadata->>'reenvio_de'))
   where metadata ? 'reenvio_de';
+
+
+-- ---- funil sem fonte: o CHECK aceita "Recebe de" vazio (migration 9050) ----
+--
+-- Funil de pós-venda e de recompra só recebe lead MOVIDO de outro funil. O CHECK
+-- da 9012 (bloco acima, `if not exists`) exigia `cardinality(fontes) > 0`; aqui
+-- ele é TROCADO pelo vocabulário fechado sozinho. Precisa ser este bloco, e não
+-- editar o da 9012: lá o `if not exists` casa pelo NOME, e numa base que já tem o
+-- CHECK antigo (produção) a reaplicação do baseline não trocaria a definição.
+-- Só refaz quando a definição atual ainda não é a nova (reaplicar sem mudança não
+-- pega ACCESS EXCLUSIVE à toa). `lock_timeout` local ao `do`, que roda em
+-- autocommit. A proteção contra fonte órfã mora no PATCH da rota (409
+-- `fonte_sem_funil`); ver o cabeçalho da 9050.
+do $$
+begin
+  perform set_config('lock_timeout', '3s', true);
+  if coalesce((
+    select pg_get_constraintdef(oid) from pg_constraint
+     where conname = 'crm_pipelines_fontes_conhecidas'
+       and conrelid = 'public.crm_pipelines'::regclass
+  ), 'cardinality') like '%cardinality%' then
+    alter table public.crm_pipelines
+      drop constraint if exists crm_pipelines_fontes_conhecidas,
+      add constraint crm_pipelines_fontes_conhecidas
+        check (fontes <@ array['whatsapp', 'instagram_direct', 'instagram_comentario']::text[]);
+  end if;
+end $$;
+
+comment on column public.crm_pipelines.fontes is
+  'De quais fontes este funil se alimenta. Vazio = só recebe leads movidos de outros funis (pós-venda, recompra). Fonte que não está em NENHUM funil da organização não gera lead nem conversa — o evento é arquivado e descartado (migrations 9012 e 9050).';
 
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
