@@ -31,7 +31,14 @@ export function siglaDaOrganizacao(nome: string | null | undefined): string {
  *    Abre a troca; com uma organização só, é só a identificação.
  *  - `cabecalho`: o botão do topo, que fica só no celular (sem trilho).
  */
-export function TenantSwitcher({ variante = "cabecalho" }: { variante?: "cabecalho" | "trilho" }) {
+export function TenantSwitcher({
+  variante = "cabecalho",
+  classeDaLinha,
+}: {
+  variante?: "cabecalho" | "trilho" | "linha";
+  /** Só na `linha` (menu "Mais" do celular): a caixa da linha, que some junto quando não há troca. */
+  classeDaLinha?: string;
+}) {
   const t = useT();
   const { user, activeOrg: active } = useAuth();
   const transition = useOrganizationTransitionOpcional();
@@ -67,7 +74,7 @@ export function TenantSwitcher({ variante = "cabecalho" }: { variante?: "cabecal
   }
   if (!podeTrocar) return null;
 
-  return (
+  const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {variante === "trilho" ? (
@@ -80,6 +87,23 @@ export function TenantSwitcher({ variante = "cabecalho" }: { variante?: "cabecal
             className={`${QUADRADO} hover:shadow-[0_0_0_3px_var(--color-accent-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-70`}
           >
             {sigla}
+          </button>
+        ) : variante === "linha" ? (
+          // No "Mais" do celular há espaço: o nome da organização vai escrito, e a
+          // linha inteira é o alvo do toque (antes era só o ícone, quase invisível).
+          <button
+            type="button"
+            disabled={isPending || !!user.support}
+            aria-label={`${t("Organização")}: ${active?.name ?? t("Selecionar org")}. ${t("Trocar de organização")}`}
+            data-testid="tenant-switcher"
+            className="pele-foco flex min-w-0 flex-1 items-center gap-3 rounded-md text-left disabled:opacity-70"
+          >
+            <Storefront size={20} weight="duotone" aria-hidden className="shrink-0 text-text-muted" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-xs text-text-muted">{t("Organização")}</span>
+              <span className="truncate text-base font-semibold text-text">{active?.name ?? t("Selecionar org")}</span>
+            </span>
+            <CaretDown size={16} aria-hidden className="shrink-0 text-text-muted" />
           </button>
         ) : (
         /*
@@ -137,4 +161,5 @@ export function TenantSwitcher({ variante = "cabecalho" }: { variante?: "cabecal
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  return variante === "linha" ? <div className={classeDaLinha}>{menu}</div> : menu;
 }
