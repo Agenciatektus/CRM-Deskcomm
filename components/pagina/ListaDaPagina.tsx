@@ -77,7 +77,7 @@ export function TabelaOuCartoes<T>({
   return (
     <>
       <Card className="overflow-hidden mb:hidden">{tabela}</Card>
-      <ul aria-label={rotulo} className="hidden flex-col border-y border-border bg-surface mb:flex">
+      <ul aria-label={rotulo} className="pele-ruido hidden flex-col border-y border-border bg-surface mb:flex">
         {itens.map((item) => (
           <li key={chave(item)} className="border-b border-border last:border-b-0">
             {cartao(item)}
