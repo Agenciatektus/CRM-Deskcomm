@@ -29,6 +29,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { aplicarEfeitosPosEntrada } from "@/lib/channels/pos-entrada";
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
+import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 
 vi.mock("@/lib/leads/fontes-do-funil", async (real) => ({
   ...(await real<typeof import("@/lib/leads/fontes-do-funil")>()),
@@ -37,6 +38,9 @@ vi.mock("@/lib/leads/fontes-do-funil", async (real) => ({
 vi.mock("@/lib/channels/pos-entrada", () => ({ aplicarEfeitosPosEntrada: vi.fn(async () => {}) }));
 vi.mock("@/lib/channels/marcar-conversa", () => ({
   marcarConversaComMensagem: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/escalacao/atendimento-manual", () => ({
+  pausarIaPorAtendimentoManual: vi.fn(async () => true),
 }));
 
 const ORG = "aaaaaaaa-0000-4000-8000-00000000cd01";
@@ -226,6 +230,46 @@ describe("Direct vira lead, comentário não", () => {
       aplicarEfeitosPosEntrada,
       "comentário não pede atendimento — virar lead encheria o funil de ruído",
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe("o eco do dono separa a direção e NÃO acorda a IA", () => {
+  // O dono responde pelo app do Instagram: a Meta reenvia com `is_echo` e os
+  // papéis invertidos (sender = conta do negócio, recipient = cliente). Sem
+  // tratamento, isso entrava como mensagem do lead e disparava a IA por cima.
+  function envelopeDeEco() {
+    return JSON.stringify({
+      tipo: "direct",
+      provider_message_id: "mid-eco-1",
+      ad_id: null,
+      evento: {
+        sender: { id: "igid-da-conta" }, // a conta do negócio
+        recipient: { id: "igsid-da-pessoa" }, // o cliente
+        timestamp: Date.now(),
+        message: { mid: "mid-eco-1", text: "claro, temos sim!", is_echo: true },
+      },
+    });
+  }
+
+  it("grava a mensagem como `outbound`, ancora no cliente e pausa a IA sem nascer lead", async () => {
+    const { escritas, admin } = fazerAdmin();
+
+    const r = await ingerir(envelopeDeEco(), admin);
+    expect(r.ok).toBe(true);
+
+    const msg = escritas.find((e) => e.tabela === "messages" && e.op === "insert");
+    expect(msg?.payload.direction).toBe("outbound");
+    expect(msg?.payload.sent_via).toBe("external_device");
+    expect(msg?.payload.status).toBe("sent");
+    expect((msg?.payload.metadata as Record<string, unknown>).from_business_app).toBe(true);
+
+    // O contato é o CLIENTE (recipient), não a conta do negócio (sender).
+    const contato = escritas.find((e) => e.tabela === "contacts" && e.op === "insert");
+    expect(contato?.payload.instagram_igsid).toBe("igsid-da-pessoa");
+
+    // Uma pessoa assumiu por fora: a IA para e o eco não vira card.
+    expect(pausarIaPorAtendimentoManual).toHaveBeenCalledTimes(1);
+    expect(aplicarEfeitosPosEntrada).not.toHaveBeenCalled();
   });
 });
 
