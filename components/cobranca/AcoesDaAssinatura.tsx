@@ -30,6 +30,7 @@ export interface PropsDasAcoes {
   periodoPagoDesde: string | null;
   proximoVencimento: string | null;
   trocaPagamentoUrl: string | null;
+  trocaStatus: string | null;
   instanteCalculo: string;
   /** A página recebeu `?voltou=1`: relê uma vez e dá o recado. */
   voltouDoCheckout: boolean;
@@ -62,6 +63,8 @@ const FRASE_DO_ERRO: Record<string, string> = {
   pagamento_do_periodo_pendente:
     'A mensalidade de agora ainda não foi paga. Pague em "Pagar agora" e troque de plano depois que o pagamento for confirmado (Pix: minutos; boleto: até 1 dia útil).',
   troca_em_preparo: "Estamos preparando o ajuste proporcional. Aguarde alguns segundos e tente novamente.",
+  troca_pendente: "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.",
+  pagamento_nao_registrado: "A cobrança foi iniciada, mas não conseguimos registrar o pagamento. Tente novamente; se houver uma cobrança aberta, fale com o suporte.",
   periodo_indisponivel: "Não foi possível calcular o período pago. Atualize a assinatura e tente novamente.",
 };
 const FRASE_GENERICA = "Não foi possível concluir agora. Tente de novo.";
@@ -127,7 +130,7 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
   const aguardandoAsaas = p.provedor === "asaas" && (fatura !== null || (p.temProvedor && (p.estado === "trial" || link !== null)));
   // "Já paguei" só onde há o que reler: quem nunca assinou (teste que acabou) não pagou nada.
   const podeDizerQuePagou = (emDivida && p.temProvedor) || p.noHub || aguardandoAsaas || p.trocaPagamentoUrl !== null;
-  const podeTrocar = p.planosParaTroca.length > 0 && (p.estado === "trial" || p.estado === "ativa") && !p.cancelaNoFim;
+  const podeTrocar = p.planosParaTroca.length > 0 && (p.estado === "trial" || p.estado === "ativa") && !p.cancelaNoFim && !p.trocaStatus;
   const podeCancelar = p.temProvedor && p.assinaturasVivas > 0 && !p.cancelaNoFim && (p.estado === "ativa" || p.estado === "trial");
 
   async function agir(acao: () => Promise<void>) {
@@ -257,7 +260,7 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
             </a>
           </Button>
         )}
-        {linkDoAjuste && p.provedor === "asaas" && (
+        {linkDoAjuste && (
           <Button asChild variant="outline">
             <a href={linkDoAjuste} target="_blank" rel="noopener noreferrer">{t("Pagar ajuste do upgrade")}</a>
           </Button>
@@ -305,6 +308,11 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
           <Button variant="outline" disabled={ocupado} onClick={() => setTrocando(true)}>
             {t("Trocar de plano")}
           </Button>
+        )}
+        {p.trocaStatus && (
+          <p className="basis-full text-sm text-muted-foreground" role="status">
+            {t(p.trocaStatus === "criando" ? "Estamos preparando o ajuste proporcional. Aguarde alguns segundos." : "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.")}
+          </p>
         )}
         {podeCancelar && !cancelando && (
           <Button variant="ghost" disabled={ocupado} onClick={() => setCancelando(true)}>

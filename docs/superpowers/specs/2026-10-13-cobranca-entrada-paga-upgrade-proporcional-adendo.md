@@ -1,6 +1,6 @@
-# Adendo proposto — entrada paga e upgrade proporcional
+# Adendo aprovado — entrada paga e upgrade proporcional
 
-Este adendo acompanha a PR e propõe uma revisão da decisão D-3 da especificação `2026-09-29-cobranca-do-revendedor-design.md`. A decisão original mantém qualquer troca para o próximo ciclo. A experiência de homologação do revendedor mostrou a necessidade de liberar upgrades no mesmo dia sem cobrar novamente o período inteiro. A decisão final cabe à revisão da PR; até lá, este texto não altera retroativamente a decisão aceita.
+Adendo aprovado pelo dono do produto em 13/10/2026. Revisa D-3 da especificação `2026-09-29-cobranca-do-revendedor-design.md`: upgrade após o teste aplica após confirmação da cobrança proporcional, mantendo a data de renovação; downgrade aplica na próxima renovação paga, sem crédito proporcional. O registro histórico da revisão original permanece na seção 3.8 da especificação canônica.
 
 ## Entrada paga
 
@@ -17,8 +17,9 @@ Este adendo acompanha a PR e propõe uma revisão da decisão D-3 da especifica�
 - Se faltar início/fim confiável do período, recusar o cálculo e manter o plano atual. Nunca estimar o valor a partir da data de criação da organização.
 - O painel compara preço, intervalo, assentos, canais e teto mensal de IA antes da confirmação e informa o valor estimado e a data da próxima renovação.
 
-## Questões para revisão
+## Decisões aplicadas
 
-- Confirmar que upgrades devem ser imediatos após compensação da cobrança proporcional (Pix/cartão/boleto), mantendo o vencimento existente.
-- Confirmar que downgrade sem crédito proporcional é a política desejada.
-- Validar os estados de reconciliação para cobranças pagas após o link expirar ou após cancelamento da assinatura.
+- Upgrades são aplicados depois que o provedor confirma o pagamento proporcional (Pix/cartão/boleto); a renovação mantém a data atual.
+- Downgrades não geram crédito e só entram na próxima renovação paga.
+- A entrada paga inicial é separada da tolerância de renovação: acesso só abre após o primeiro pagamento confirmado quando o plano não oferece teste.
+- A aplicação não devolve link se falhar ao persistir a referência do pagamento; tenta invalidar a cobrança criada e bloqueia trocas concorrentes enquanto aguarda confirmação.

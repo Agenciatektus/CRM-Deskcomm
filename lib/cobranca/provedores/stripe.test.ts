@@ -666,7 +666,7 @@ describe("trocarPlano, cancelarNoFim, prepararWebhook e portal", () => {
   const PRODUTO_NOVO = `dc_plano_${NOVO.id}`;
   const URL_DO_WEBHOOK = "https://crm.example.com/api/v1/webhooks/cobranca/stripe";
 
-  it("⭐ trocarPlano: preço novo no MESMO item, sem proração — vale na próxima fatura (D-3)", async () => {
+  it("⭐ trocarPlano: preço novo no MESMO item, sem nova cobrança proporcional e preservando a âncora", async () => {
     const { adaptador, chamadas } = montar({
       "GET /subscriptions/sub_1QfixtureAtiva": { corpo: objetos.assinatura },
       "POST /products": { corpo: { id: PRODUTO_NOVO } },

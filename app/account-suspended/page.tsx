@@ -157,6 +157,7 @@ export default async function AccountSuspendedPage({
               periodoPagoDesde={painel.assinatura.periodo_pago_desde}
               proximoVencimento={painel.assinatura.proximo_vencimento}
               trocaPagamentoUrl={painel.assinatura.troca_pagamento_url}
+              trocaStatus={painel.assinatura.troca_status}
               instanteCalculo={new Date().toISOString()}
               provedor={painel.checkout.provedor}
               documentoDoCadastro={painel.checkout.documentoDoCadastro}

@@ -133,6 +133,12 @@ export async function trocarPlanoDaOrg(
   });
   if (planoId === atual.plano_id && atual.plano_agendado_id === null) return nada("nenhum");
   if (planoId === atual.plano_agendado_id) return nada("agendado");
+  // Um upgrade proporcional em aberto mantém um preço recorrente específico no
+  // destino. Não permita agendar outro plano enquanto o pagamento está em curso:
+  // a reconciliação do pagamento poderia aplicar o destino antigo por cima.
+  if (atual.troca_id && planoId !== atual.plano_troca_pendente_id) {
+    return recusa(409, "troca_pendente", "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.");
+  }
   if (EM_DIVIDA.includes(atual.estado)) return recusa(409, "pagamento_pendente", "Regularize o pagamento antes de trocar de plano.");
   const emTeste = atual.estado === "trial" && atual.trial_ate !== null && Date.parse(atual.trial_ate) > agora.getTime();
   if (!emTeste && !atual.provedor) {
@@ -211,7 +217,7 @@ export async function trocarPlanoDaOrg(
 
   // Upgrade durante um período pago: cobra a diferença pelo tempo restante e
   // só troca preço/limites quando o provedor confirma essa cobrança avulsa.
-  if (!emTeste && novo.preco_cents > antigo.preco_cents && provedorDaTroca && atual.provedor_cliente_id) {
+  if (!emTeste && novo.preco_cents > antigo.preco_cents && provedorDaTroca) {
     if (atual.plano_troca_pendente_id === novo.id && atual.troca_status === "aguardando_pagamento" && atual.troca_pagamento_ref) {
       const ad = (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca.provedor);
       const estadoDoPagamento = await ad.lerPagamentoProporcional(atual.troca_pagamento_ref);
@@ -228,6 +234,7 @@ export async function trocarPlanoDaOrg(
         troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
         .eq("organization_id", orgId).eq("troca_id", atual.troca_id);
     }
+    if (!atual.provedor_cliente_id) return recusa(409, "periodo_indisponivel", "Não foi possível identificar o cliente no provedor. Atualize a assinatura e tente novamente.");
     const valorCents = calcularAjusteProporcional({
       precoAtualCents: antigo.preco_cents,
       precoNovoCents: novo.preco_cents,
@@ -249,8 +256,21 @@ export async function trocarPlanoDaOrg(
           clienteRef: atual.provedor_cliente_id, orgId, plano: { id: novo.id, nome: novo.nome, precoCents: novo.preco_cents, intervalo: novo.intervalo },
           valorCents, chaveIdempotencia: id, urlDeVolta: urlDoPainelDaEmpresa(),
         });
-        await admin.from("cobranca_assinaturas").update({ troca_status: "aguardando_pagamento", troca_pagamento_ref: pagamento.pagamentoRef,
-          troca_pagamento_url: pagamento.url, troca_reserva_ate: null, updated_at: agora.toISOString() }).eq("organization_id", orgId).eq("troca_id", id);
+        const { data: pagamentoGravado, error: erroAoGravarPagamento } = await admin
+          .from("cobranca_assinaturas")
+          .update({ troca_status: "aguardando_pagamento", troca_pagamento_ref: pagamento.pagamentoRef,
+            troca_pagamento_url: pagamento.url, troca_reserva_ate: null, updated_at: agora.toISOString() })
+          .eq("organization_id", orgId).eq("troca_id", id).eq("troca_status", "criando")
+          .select("organization_id").maybeSingle();
+        if (erroAoGravarPagamento || !pagamentoGravado) {
+          // Nunca devolva um link que o reconciliador não consegue associar à
+          // assinatura. Tente invalidar a cobrança já criada no provedor.
+          try { await (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca.provedor).expirarSessao(pagamento.pagamentoRef); } catch { /* melhor esforço */ }
+          await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
+            troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
+            .eq("organization_id", orgId).eq("troca_id", id);
+          return recusa(500, "pagamento_nao_registrado", "A cobrança foi iniciada, mas não conseguimos registrar o pagamento. Tente novamente; se houver uma cobrança aberta, fale com o suporte.");
+        }
         return { ok: true, changed: false, quando: "pagamento_pendente", planoId: atual.plano_id, planoAgendadoId: null, valeAPartirDe: null, de: atual.plano_id, urlPagamento: pagamento.url };
       } catch (e) {
         await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
