@@ -190,7 +190,7 @@ const assinaturaDaStripe = z.object({
   trial_end: z.number().nullish(),
   items: z.object({
     data: z.array(
-      z.object({ id: z.string(), current_period_end: z.number(), price: z.object({ unit_amount: z.number().nullish() }).nullish() }),
+      z.object({ id: z.string(), current_period_start: z.number().nullish(), current_period_end: z.number(), price: z.object({ unit_amount: z.number().nullish() }).nullish() }),
     ),
   }),
 });
@@ -469,6 +469,36 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     return { url, expiraEm: new Date(sessao.expires_at * 1000), assinaturaRef: null, sessaoId: sessao.id };
   }
 
+  async function iniciarAjusteProporcional(p: Parameters<AdaptadorDeCobranca["iniciarAjusteProporcional"]>[0]) {
+    const orgId = UUID.parse(p.orgId);
+    const produto = await garantirProduto(p.plano);
+    const sucesso = new URL(p.urlDeVolta);
+    sucesso.searchParams.set("voltou", "1");
+    const sessao = ler(
+      sessaoDeCheckout,
+      await chamar("POST", "/checkout/sessions", {
+        mode: "payment",
+        customer: p.clienteRef,
+        client_reference_id: orgId,
+        line_items: [{ price_data: { currency: "brl", unit_amount: p.valorCents, product: produto }, quantity: 1 }],
+        metadata: { organization_id: orgId, plano_id: p.plano.id, tipo: "ajuste_proporcional" },
+        success_url: sucesso.toString(),
+        cancel_url: p.urlDeVolta,
+        locale: "pt-BR",
+      },
+      `ajuste:${orgId}:${p.chaveIdempotencia}`),
+    );
+    const url = linkSeguro(sessao.url);
+    if (url === null) throw new ErroDoProvedor(200, "resposta_invalida", false);
+    return { pagamentoRef: sessao.id, url };
+  }
+
+  async function lerPagamentoProporcional(pagamentoRef: string): Promise<"pendente" | "pago" | "encerrado"> {
+    const sessao = ler(z.object({ status: z.string(), payment_status: z.string() }), await chamar("GET", `/checkout/sessions/${encodeURIComponent(pagamentoRef)}`));
+    if (sessao.payment_status === "paid") return "pago";
+    return sessao.status === "open" ? "pendente" : "encerrado";
+  }
+
   /**
    * `POST /checkout/sessions/{id}/expire` (#2609): a sessão morre na hora e o
    * link para de aceitar pagamento — é o que deixa a troca de plano valer na
@@ -529,6 +559,7 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
       emAtraso,
       vencidaDesde: null,
       proximoVencimento: fimDoPeriodo === null ? null : emData(fimDoPeriodo),
+      periodoPagoDesde: existe && principal?.items.data[0]?.current_period_start ? emData(principal.items.data[0].current_period_start) : null,
       jaPagou: pagas.length > 0,
       emTesteNoProvedorAte: fimDoTeste === null ? null : emData(fimDoTeste),
       pagamentoSemAssinaturaViva: pagouAssinaturaEncerrada(pagas, recentes),
@@ -548,7 +579,7 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     const item = ler(assinaturaDaStripe, await chamar("GET", caminho)).items.data[0];
     if (!item) throw new ErroDoProvedor(null, "assinatura_sem_item", false);
     const produto = await garantirProduto(p.plano);
-    // Sem proração: o período em curso segue no preço pago; a próxima fatura sai com o novo (D-3).
+    // Sem proração automática: o período pago foi ajustado pela cobrança avulsa; a próxima fatura sai com o novo preço, sem mover a âncora.
     await chamar("POST", caminho, {
       items: [{ id: item.id, price_data: precoRecorrente(p.plano, produto) }],
       proration_behavior: "none",
@@ -652,6 +683,8 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     verificarWebhook: verificarWebhookStripe,
     garantirCliente,
     iniciarAssinatura,
+    iniciarAjusteProporcional,
+    lerPagamentoProporcional,
     expirarSessao,
     lerSituacao,
     trocarPlano,

@@ -19,10 +19,11 @@ import { PainelDaAssinatura } from "@/components/cobranca/PainelDaAssinatura";
 import type { DadosDoPainel } from "@/lib/cobranca/painel";
 
 const PLANO = { id: "plano-a", nome: "Essencial", preco_cents: 4990, intervalo: "mes", max_assentos: null, max_canais: null, teto_ia_usd_cents: null };
-const PRO = { id: "plano-b", nome: "Profissional", preco_cents: 9990, intervalo: "mes" };
+const PRO = { id: "plano-b", nome: "Profissional", preco_cents: 9990, intervalo: "mes", max_assentos: 3, max_canais: 5, teto_ia_usd_cents: 1000 };
 const BASE: NonNullable<DadosDoPainel["assinatura"]> = {
   estado: "ativa", trial_ate: null, prazo_extra_ate: null, proximo_vencimento: "2026-11-01T12:00:00Z", vencida_desde: null,
   cancela_no_fim: false, modo: "teste", provedor: "stripe", link_de_pagamento: null, assinaturas_vivas: 1, plano_agendado: null,
+  periodo_pago_desde: "2026-10-01T12:00:00Z", troca_pagamento_url: null, troca_status: null, pagamento_inicial_pendente: false,
 };
 const painel = (a: Partial<typeof BASE>): DadosDoPainel => ({
   assinatura: { ...BASE, ...a }, plano: PLANO, uso: { assentos: 1, canais: 1 }, gastoIaUsdCents: 0, planosParaTroca: [PRO], fuso: null,
@@ -30,7 +31,8 @@ const painel = (a: Partial<typeof BASE>): DadosDoPainel => ({
 });
 const acoes = (p: Partial<PropsDasAcoes> = {}): PropsDasAcoes => ({
   estado: "ativa", temProvedor: true, assinaturasVivas: 1, linkDePagamento: null, cancelaNoFim: false,
-  planosParaTroca: [PRO], voltouDoCheckout: false, noHub: false, provedor: "stripe", documentoDoCadastro: null, ...p,
+  planosParaTroca: [PRO], planoAtual: PLANO, periodoPagoDesde: "2026-10-01T12:00:00Z", proximoVencimento: "2026-11-01T12:00:00Z",
+  trocaPagamentoUrl: null, instanteCalculo: "2026-10-13T12:00:00Z", voltouDoCheckout: false, noHub: false, provedor: "stripe", documentoDoCadastro: null, ...p,
 });
 
 beforeEach(() => {

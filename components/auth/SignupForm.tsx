@@ -31,7 +31,15 @@ export interface ConviteDoSignup {
   email: string;
 }
 
-export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
+export interface PlanoDoCadastro {
+  id: string;
+  nome: string;
+  preco_cents: number;
+  intervalo: string;
+  trial_dias: number;
+}
+
+export function SignupForm({ convite, planos = [] }: { convite?: ConviteDoSignup; planos?: readonly PlanoDoCadastro[] }) {
   const t = useT();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -60,6 +68,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
     defaultValues: {
       full_name: "",
       org_name: "",
+      cobranca_plan_id: planos[0]?.id,
       email: convite?.email ?? "",
       password: "",
       password_confirm: "",
@@ -197,6 +206,19 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
           {errors.org_name && (
             <p className="text-xs text-destructive">{t(errors.org_name.message ?? "")}</p>
           )}
+        </div>
+      )}
+      {!convite && planos.length > 0 && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cobranca_plan_id">{t("Plano")}</Label>
+          <select id="cobranca_plan_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm" {...register("cobranca_plan_id")}>
+            {planos.map((plano) => (
+              <option key={plano.id} value={plano.id}>
+                {plano.nome} — {new Intl.NumberFormat(undefined, { style: "currency", currency: "BRL" }).format(plano.preco_cents / 100)} / {plano.intervalo === "ano" ? t("ano") : t("mês")}
+                {plano.trial_dias > 0 ? ` · ${plano.trial_dias} ${t("dias de teste")}` : ` · ${t("sem período de teste")}`}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       <div className="space-y-1.5">

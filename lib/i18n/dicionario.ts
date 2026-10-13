@@ -37,6 +37,19 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "O cadastro está temporariamente indisponível. Quem administra o sistema precisa definir o plano de entrada.": { es: "El registro no está disponible temporalmente. El administrador del sistema debe definir el plan de entrada." },
+  "Para garantir que o plano selecionado seja contratado, conclua o cadastro com e-mail e senha.": { es: "Para garantizar que se contrate el plan seleccionado, completa el registro con correo electrónico y contraseña." },
+  "sem período de teste": { es: "sin período de prueba" },
+  "Pagar ajuste do upgrade": { es: "Pagar el ajuste de la mejora" },
+  "Plano atual": { es: "Plan actual" },
+  "IA por mês": { es: "IA por mes" },
+  "Não foi possível calcular o proporcional com os dados do período pago. Nenhuma troca será realizada.": { es: "No se pudo calcular el prorrateo con los datos del período pagado. No se realizará ningún cambio." },
+  "O ajuste proporcional é zero; o novo plano entra na próxima renovação": { es: "El ajuste proporcional es cero; el nuevo plan entra en la próxima renovación" },
+  "Ajuste proporcional estimado para hoje": { es: "Ajuste proporcional estimado para hoy" },
+  "A data da próxima renovação permanece": { es: "La fecha de la próxima renovación se mantiene" },
+  "O plano escolhido e seus limites passam a valer na próxima renovação. A fatura atual mantém o valor e o vencimento.": { es: "El plan elegido y sus límites entrarán en vigor en la próxima renovación. La factura actual mantiene el importe y la fecha de vencimiento." },
+  "Pague o ajuste proporcional para aplicar o novo plano. Seus limites atuais permanecem até a confirmação.": { es: "Paga el ajuste proporcional para aplicar el nuevo plan. Tus límites actuales se mantienen hasta la confirmación." },
+  "Aguardando o primeiro pagamento. O acesso será liberado após a confirmação.": { es: "Esperando el primer pago. El acceso se habilitará después de la confirmación." },
   "Canal para enviar os lembretes": { es: "Canal para enviar los recordatorios" },
   "Automático — conversa da reserva ou único canal disponível": { es: "Automático — conversación de la reserva o único canal disponible" },
   "Canal configurado indisponível — escolha outro": { es: "Canal configurado no disponible — elige otro" },

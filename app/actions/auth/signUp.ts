@@ -3,6 +3,8 @@
 import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { moduloLigado } from "@/lib/instalacao/modulos";
 import {
   signupSchema,
   signupComConviteSchema,
@@ -134,6 +136,15 @@ export async function signUp(
     return { ok: false, error: "somente_convite" };
   }
 
+  const planoEscolhido = !convite && "cobranca_plan_id" in parsed.data ? parsed.data.cobranca_plan_id : undefined;
+  if (planoEscolhido) {
+    const admin = createAdminClient();
+    if (!(await moduloLigado(admin, "cobranca"))) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
+    const { data: plano, error: erroDoPlano } = await admin.from("cobranca_planos").select("id")
+      .eq("id", planoEscolhido).is("arquivado_em", null).eq("oferecido_ao_cliente", true).maybeSingle();
+    if (erroDoPlano || !plano) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
+  }
+
   // ── O GoTrue com o cadastro público FECHADO (#1653) ──────────────────────────
   //
   // Com `disable_signup` ligado no GoTrue — é o que fecha `POST /auth/v1/signup`
@@ -207,7 +218,7 @@ export async function signUp(
             invite_token: convite,
             full_name: (parsed.data as SignupComConviteInput).full_name,
           }
-        : { org_name: (parsed.data as SignupInput).org_name },
+        : { org_name: (parsed.data as SignupInput).org_name, ...(planoEscolhido ? { cobranca_plan_id: planoEscolhido } : {}) },
     },
   });
 

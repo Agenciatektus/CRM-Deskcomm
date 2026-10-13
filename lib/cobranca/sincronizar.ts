@@ -54,12 +54,19 @@ export type ResultadoDaSincronizacao =
 const COLUNAS =
   "organization_id, plano_id, plano_agendado_id, estado, trial_ate, provedor, provedor_cliente_id, provedor_assinatura_id, " +
   "vencida_desde, proximo_vencimento, cancela_no_fim, prazo_extra_ate, ultimo_aviso, ultimo_aviso_em, relida_em, " +
-  "link_de_pagamento, assinaturas_vivas, checkout_url, checkout_expira_em, checkout_sessao_id, updated_at";
+  "link_de_pagamento, assinaturas_vivas, checkout_url, checkout_expira_em, checkout_sessao_id, periodo_pago_desde, " +
+  "plano_troca_pendente_id, troca_id, troca_status, troca_pagamento_ref, pagamento_inicial_pendente, updated_at";
 
 interface Linha {
   checkout_url: string | null;
   checkout_expira_em: string | null;
   checkout_sessao_id: string | null;
+  periodo_pago_desde: string | null;
+  plano_troca_pendente_id: string | null;
+  troca_id: string | null;
+  troca_status: string | null;
+  troca_pagamento_ref: string | null;
+  pagamento_inicial_pendente: boolean;
   organization_id: string;
   plano_id: string;
   plano_agendado_id: string | null;
@@ -110,13 +117,44 @@ export async function sincronizar(
   deps: DependenciasDaCobranca = {},
 ): Promise<ResultadoDaSincronizacao> {
   const agora = deps.agora ?? (() => new Date());
-  const primeira = await lerLinha(admin, orgId);
+  let primeira = await lerLinha(admin, orgId);
   if (!primeira) return { tipo: "isenta" };
   if (primeira.provedor === null || primeira.provedor_cliente_id === null) {
     return { tipo: "sem_provedor", acao: await aplicarRegua(admin, orgId, deps) };
   }
   const provedor = primeira.provedor;
   const cliente = primeira.provedor_cliente_id;
+
+  // A cobrança do upgrade é uma sessão avulsa. Só depois de reler o estado
+  // diretamente no provedor aplicamos o novo preço recorrente e os novos limites.
+  if (primeira.troca_status === "aguardando_pagamento" && primeira.troca_id && primeira.troca_pagamento_ref && primeira.plano_troca_pendente_id && primeira.provedor_assinatura_id) {
+    try {
+      const adaptador = (deps.adaptador ?? adaptadorPadrao)(provedor);
+      const pagamento = await adaptador.lerPagamentoProporcional(primeira.troca_pagamento_ref);
+      if (pagamento === "pago") {
+        const { data: alvo, error: erroAlvo } = await admin.from("cobranca_planos").select("id, nome, preco_cents, intervalo").eq("id", primeira.plano_troca_pendente_id).maybeSingle();
+        if (erroAlvo || !alvo) throw new Error("plano do upgrade proporcional indisponível");
+        await adaptador.trocarPlano({ assinaturaRef: primeira.provedor_assinatura_id, plano: {
+          id: alvo.id, nome: alvo.nome, precoCents: alvo.preco_cents, intervalo: alvo.intervalo,
+        } });
+        const { data: gravacao, error: erroGravacao } = await admin.from("cobranca_assinaturas").update({
+          plano_id: primeira.plano_troca_pendente_id, plano_agendado_id: null,
+          troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null, troca_status: null,
+          troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null, updated_at: (deps.agora ?? (() => new Date()))().toISOString(),
+        }).eq("organization_id", orgId).eq("troca_id", primeira.troca_id).eq("troca_status", "aguardando_pagamento").select("organization_id").maybeSingle();
+        if (erroGravacao) throw new Error(`upgrade pago não gravado (${erroGravacao.code ?? "sem_codigo"})`);
+        if (gravacao) auditar("cobranca.plano_trocado", orgId, { de: primeira.plano_id, para: primeira.plano_troca_pendente_id, quando: "upgrade_proporcional_pago" });
+        primeira = await lerLinha(admin, orgId);
+        if (!primeira) return { tipo: "isenta" };
+      } else if (pagamento === "encerrado") {
+        await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
+          troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
+          .eq("organization_id", orgId).eq("troca_id", primeira.troca_id);
+      }
+    } catch (e) {
+      logger.warn("cobranca.upgrade_proporcional_pendente", { organization_id: orgId, codigo: e instanceof ErroDoProvedor ? e.codigo : "falha_interna" });
+    }
+  }
 
   const lidoEm = agora();
   let situacao: Situacao;
@@ -167,10 +205,12 @@ export async function sincronizar(
       estado: r.estado,
       vencida_desde: emTexto(r.vencidaDesde),
       proximo_vencimento: emTexto(r.proximoVencimento),
+      periodo_pago_desde: situacao.periodoPagoDesde?.toISOString() ?? null,
       cancela_no_fim: r.cancelaNoFim,
       provedor_assinatura_id: r.provedorAssinaturaId,
       assinaturas_vivas: r.assinaturasVivas,
       relida_em: lidoEm.toISOString(),
+      ...(linha.pagamento_inicial_pendente && situacao.existe ? { pagamento_inicial_pendente: false } : {}),
       ultimo_erro: r.ultimoErro,
       ultimo_erro_em: r.ultimoErro === null ? null : lidoEm.toISOString(),
       link_de_pagamento: situacao.linkDePagamento,

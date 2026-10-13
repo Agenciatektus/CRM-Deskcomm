@@ -432,6 +432,21 @@ describe("garantirCliente e iniciarAssinatura", () => {
     expect(checkout?.headers.get("idempotency-key")).toBe(`${base.chaveIdempotencia}:checkout`);
   });
 
+  it("⭐ cobra o proporcional numa sessão avulsa e consulta o status direto na Stripe", async () => {
+    const { adaptador, chamadas } = montar({
+      "POST /products": { corpo: { id: PRODUTO } },
+      "POST /checkout/sessions": SESSAO,
+      "GET /checkout/sessions/cs_test_1": { corpo: { status: "complete", payment_status: "paid" } },
+    });
+    const resultado = await adaptador.iniciarAjusteProporcional({ ...base, valorCents: 3065 });
+    expect(resultado).toEqual({ pagamentoRef: "cs_test_1", url: "https://checkout.stripe.com/c/pay/cs_test_1" });
+    expect(Object.fromEntries(chamadas.find((c) => c.rota === "POST /checkout/sessions")?.corpo ?? [])).toMatchObject({
+      mode: "payment", customer: base.clienteRef, client_reference_id: ORG,
+      "line_items[0][price_data][unit_amount]": "3065",
+    });
+    await expect(adaptador.lerPagamentoProporcional("cs_test_1")).resolves.toBe("pago");
+  });
+
   it("⭐ #2609 expirar a sessão: POST /checkout/sessions/{id}/expire — é a chamada que mata o link no provedor", async () => {
     const { adaptador, chamadas } = montar({ "POST /checkout/sessions/cs_aberta/expire": { corpo: { id: "cs_aberta", status: "expired" } } });
     await adaptador.expirarSessao("cs_aberta");
@@ -527,6 +542,7 @@ describe("lerSituacao", () => {
       emAtraso: false,
       vencidaDesde: null,
       proximoVencimento: FIM_DO_ITEM,
+      periodoPagoDesde: new Date(1790000000 * 1000),
       jaPagou: true,
       emTesteNoProvedorAte: null,
       pagamentoSemAssinaturaViva: false,
