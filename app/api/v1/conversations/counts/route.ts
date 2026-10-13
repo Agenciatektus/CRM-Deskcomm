@@ -27,6 +27,7 @@ import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import { marcadoresEscolhidos, modoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { createClient } from "@/lib/supabase/server";
 import { ehTipoDeCanal, type TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
+import { lerFiltrosDoAtendimento, parametrosDaContagem } from "@/lib/inbox/filtros-do-atendimento";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,11 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (canalTipo === undefined) {
     return fail("validation_failed", traduzir("Canal inválido.", authUser?.idioma ?? "pt-BR"), 422, { requestId });
   }
+  // 9051: funil, etapas, responsável e período, lidos pela MESMA forma da lista.
+  const atendimento = lerFiltrosDoAtendimento(sp);
+  if (!atendimento) {
+    return fail("validation_failed", traduzir("Query inválida.", authUser?.idioma ?? "pt-BR"), 422, { requestId });
+  }
 
   const automaticoDaOrg = await orgTemAutomatico(supabase, org);
 
@@ -160,6 +166,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     p_sem_passo: contagemSemPasso(sp),
     p_canal_tipo: canalTipo,
     p_grupos: contagemGrupos(sp),
+    ...parametrosDaContagem(atendimento),
   } as never);
   if (error) {
     return fail("internal_error", error.message, 500, { requestId });

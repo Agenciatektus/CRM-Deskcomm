@@ -30,7 +30,7 @@ const SESS_B = id(42);
 const K = (n: number) => id(100 + n);
 const CV = (n: number) => id(200 + n);
 
-const ASSINATURA = "public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean,text,boolean)";
+const ASSINATURA = "public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean,text,boolean,uuid,uuid[],text,timestamptz)";
 
 // A: CV1 e CV2 WhatsApp (CV2 grupo), CV3 e CV4 Instagram (CV4 do agent), CV5 Facebook.
 // B: CV6 Instagram. O agent de A em modo own vê só a CV4.

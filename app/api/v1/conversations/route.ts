@@ -76,6 +76,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     sem_passo: url.searchParams.get("sem_passo") ?? undefined,
     // O TIPO de canal (migration 9049), validado pelo schema contra a lista fixa.
     canal: url.searchParams.get("canal") ?? undefined,
+    // 9051: funil, etapas (várias, por `getAll`), responsável e período.
+    funil: url.searchParams.get("funil") ?? undefined,
+    etapa: url.searchParams.getAll("etapa"),
+    responsavel: url.searchParams.get("responsavel") ?? undefined,
+    periodo: url.searchParams.get("periodo") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.get("limit") ?? undefined,

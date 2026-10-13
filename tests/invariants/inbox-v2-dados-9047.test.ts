@@ -160,7 +160,7 @@ const FUNCOES = [
   "public.fn_leads_abertos_por_funil(uuid)",
   "public.passo_da_conversa(public.conversations)",
   "public.autor_da_ultima_mensagem(public.conversations)",
-  "public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean,text,boolean)",
+  "public.fn_contagens_da_caixa(uuid,text[],text[],uuid,text,boolean,text[],text,boolean,text,boolean,uuid,uuid[],text,timestamptz)",
 ];
 
 describe("9047: forma e permissões", () => {
