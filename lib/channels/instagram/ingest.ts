@@ -374,7 +374,7 @@ export async function instagramInbound(
   // tratamento do canal Meta (`ingestMetaEcho`). A mensagem já está gravada
   // como `outbound` acima — é isso que separa, na tela, quem enviou.
   if (msg.direcao === "outbound") {
-    await pausarIaPorAtendimentoManual(admin, { organizationId, conversationId });
+    await pausarIaPorAtendimentoManual(admin, { organizationId, conversationId, canal: "instagram" });
     return { ok: true, body: { status: "ingested", conversationId, messageId } };
   }
 
