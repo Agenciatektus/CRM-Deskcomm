@@ -37,6 +37,7 @@ import type { Page, Request } from "@playwright/test";
 interface Linha {
   metodo: string;
   caminho: string;
+  quando: number;
   filaMs: number;
   servidorMs: number;
   transferenciaMs: number;
@@ -49,8 +50,10 @@ export interface MedidaDeEndpoint {
   caminho: string;
   get: number;
   cancelados: number;
+  filaMedianaMs: number;
   servidorMedianaMs: number;
   servidorMaxMs: number;
+  transferenciaMedianaMs: number;
   totalMedianaMs: number;
 }
 
@@ -69,15 +72,21 @@ export class MedidorDeHops {
       const t = r.timing();
       // Requisição sem timing completo (cache, aborto antes do primeiro byte)
       // não entra: os campos vêm -1 e poluiriam a mediana com lixo.
-      if (!t || t.requestStart <= 0 || t.responseStart <= 0 || t.responseEnd <= 0) return;
+      //
+      // ⚠️ `startTime` é EPOCH (ms desde 1970) e TODO o resto é relativo a ele
+      // — somar/subtrair `startTime` de `requestStart` dava ~-1,7e12 (clamp em
+      // 0, coluna "tot" mentindo). Aqui cada elo é diferença de dois campos
+      // RELATIVOS, ou o próprio campo relativo.
+      if (!t || t.responseStart <= 0 || t.responseEnd <= 0) return;
       const url = new URL(r.url());
       this.linhas.push({
         metodo: r.method(),
         caminho: url.pathname + (url.search || ""),
-        filaMs: Math.max(0, t.requestStart - t.startTime),
-        servidorMs: Math.max(0, t.responseStart - t.requestStart),
+        quando: Date.now(),
+        filaMs: Math.max(0, t.requestStart), // espera antes de ENVIAR (rel. ao início)
+        servidorMs: Math.max(0, t.responseStart - t.requestStart), // TTFB
         transferenciaMs: Math.max(0, t.responseEnd - t.responseStart),
-        totalMs: Math.max(0, t.responseEnd - t.startTime),
+        totalMs: Math.max(0, t.responseEnd),
         cancelado,
       });
     };
@@ -90,11 +99,14 @@ export class MedidorDeHops {
     if (this.ativo) this.marcos.set(nome, Date.now());
   }
 
-  /** Só as requests de API do Next (docs/rotas `/api/`), agrupadas por endpoint. */
-  tabela(): MedidaDeEndpoint[] {
+  /** Só as requests de API do Next (docs/rotas `/api/`), agrupadas por endpoint.
+   *  Com `janela`, recorta pelo instante em que a request terminou. */
+  tabela(janela?: { desde?: number; ate?: number }): MedidaDeEndpoint[] {
     const porEndpoint = new Map<string, Linha[]>();
     for (const l of this.linhas) {
       if (!l.caminho.startsWith("/api/")) continue;
+      if (janela?.desde !== undefined && l.quando < janela.desde) continue;
+      if (janela?.ate !== undefined && l.quando > janela.ate) continue;
       // Normaliza id por UUID para agrupar o MESMO endpoint chamado com ids
       // diferentes — a pergunta é "quantos GET por endpoint", não por linha.
       const chave = `${l.metodo} ${l.caminho
@@ -118,8 +130,10 @@ export class MedidorDeHops {
           caminho,
           get: ls.length,
           cancelados: ls.filter((l) => l.cancelado).length,
+          filaMedianaMs: mediana(ls.map((l) => l.filaMs)),
           servidorMedianaMs: mediana(ls.map((l) => l.servidorMs)),
           servidorMaxMs: Math.round(Math.max(...ls.map((l) => l.servidorMs))),
+          transferenciaMedianaMs: mediana(ls.map((l) => l.transferenciaMs)),
           totalMedianaMs: mediana(ls.map((l) => l.totalMs)),
         };
       })
@@ -129,23 +143,26 @@ export class MedidorDeHops {
   /** Grava a tabela em JSON e imprime no stdout. Devolve o caminho do arquivo. */
   despejar(destinoJson: string): string {
     if (!this.ativo) return "";
-    const tabela = this.tabela();
+    const desde = this.marcos.get("antes_da_entrada_2");
+    const ate = this.marcos.get("depois_da_asseracao_240");
+    const tabela = this.tabela({ desde, ate });
     mkdirSync(destinoJson.replace(/\/[^/]+$/, ""), { recursive: true });
     writeFileSync(
       destinoJson,
-      JSON.stringify({ marcos: Object.fromEntries(this.marcos), tabela }, null, 2),
+      JSON.stringify({ marcos: Object.fromEntries(this.marcos), janelaMs: ate && desde ? ate - desde : null, tabela }, null, 2),
       "utf8",
     );
-    console.log("\n=== HOPS #2399 (E2E_MEDIR_HOPS) ===");
+    if (ate && desde) console.log(`\n=== HOPS #2399 (E2E_MEDIR_HOPS) — janela da asserção :240 (${ate - desde}ms) ===`);
     console.log(
-      "metodo caminho".padEnd(58) + "| GET | canc | srv-med | srv-max | tot-med",
+      "metodo caminho".padEnd(58) + "| n  | canc | envio | srv-med | srv-max | transf | total",
     );
     for (const m of tabela) {
       const esq = `${m.metodo} ${m.caminho}`.slice(0, 57).padEnd(58);
       console.log(
-        `${esq}| ${String(m.get).padStart(3)} | ${String(m.cancelados).padStart(4)} | ` +
-          `${String(m.servidorMedianaMs).padStart(7)} | ${String(m.servidorMaxMs).padStart(7)} | ` +
-          `${String(m.totalMedianaMs).padStart(7)}`,
+        `${esq}| ${String(m.get).padStart(2)} | ${String(m.cancelados).padStart(4)} | ` +
+          `${String(m.filaMedianaMs).padStart(5)} | ${String(m.servidorMedianaMs).padStart(7)} | ` +
+          `${String(m.servidorMaxMs).padStart(7)} | ${String(m.transferenciaMedianaMs).padStart(6)} | ` +
+          `${String(m.totalMedianaMs).padStart(5)}`,
       );
     }
     console.log(`=== fim HOPS (json em ${destinoJson}) ===\n`);
