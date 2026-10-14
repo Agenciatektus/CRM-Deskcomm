@@ -74,20 +74,40 @@ export async function syncCalendar(
       c.external_calendar_id,
       c.sync_cursor,
     );
-    for (const rawEvent of page.items) {
-      await call("renew");
-      const event = rawEvent as EventoDoGoogle;
-      const { data: linked, error } = await db
+    const eventIds = page.items
+      .map((item) => item.id?.trim())
+      .filter((eventId): eventId is string => Boolean(eventId));
+    if (eventIds.length !== page.items.length) throw new Error("Evento sem identidade no lote do Google.");
+    const linkedByEventId = new Map<string, string>();
+    if (eventIds.length) {
+      const { data: linkedAppointments, error } = await db
         .from("calendar_appointments")
-        .select("id")
+        .select("id,google_event_id")
         .eq("organization_id", org)
         .eq("google_connection_id", c.connection_id)
         .eq("google_calendar_id", c.external_calendar_id)
-        .eq("google_event_id", event.id!)
-        .maybeSingle();
+        .in("google_event_id", eventIds);
       if (error) throw error;
-      if (linked) {
-        const result = await reconcileAppointment(db, org, linked.id, {
+      for (const appointment of linkedAppointments ?? []) {
+        if (appointment.google_event_id) {
+          linkedByEventId.set(appointment.google_event_id, appointment.id);
+        }
+      }
+    }
+    const items: Record<string, unknown>[] = [];
+    const pruneIds = new Set<string>();
+    const windowStart = Date.parse(c.sync_cursor.window_start);
+    const windowEnd = Date.parse(c.sync_cursor.window_end);
+    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd) || windowEnd <= windowStart) {
+      throw new Error("Janela de cobertura inválida.");
+    }
+    for (const rawEvent of page.items) {
+      const event = rawEvent as EventoDoGoogle;
+      const eventId = event.id!.trim();
+      const linkedAppointmentId = linkedByEventId.get(eventId);
+      if (linkedAppointmentId) {
+        await call("renew");
+        const result = await reconcileAppointment(db, org, linkedAppointmentId, {
           transport,
           calendarFence: fence,
           remote: event,
@@ -95,7 +115,7 @@ export async function syncCalendar(
         });
         if (result === "busy") return "partial";
         if (result === "failed") throw new Error("Compromisso vinculado ainda não reconciliado.");
-        await call("item", { item: { external_event_id: event.id } });
+        pruneIds.add(eventId);
         continue;
       }
       if (ehEventoNosso(event.id))
@@ -103,28 +123,41 @@ export async function syncCalendar(
       const read = doEventoDoGoogle(event, { fusoDoCalendario: timeZone! });
       if (read.tipo === "recusado")
         throw new Error("Evento inválido. A leitura não foi concluída.");
-      await call("item", {
-        item:
-          read.tipo === "cancelado"
-            ? {
-                external_event_id: read.externalEventId,
-                status: "cancelled",
-                recurring_event_id: event.recurringEventId,
-                original_start_time: event.originalStartTime,
-              }
-            : {
-                ...read.evento,
-                title: null,
-                transparency: read.evento.ocupa ? "opaque" : "transparent",
-                recurring_event_id: event.recurringEventId,
-                original_start_time: event.originalStartTime,
-              },
+      if (read.tipo === "cancelado") {
+        items.push({
+          external_event_id: read.externalEventId,
+          status: "cancelled",
+          recurring_event_id: event.recurringEventId,
+          original_start_time: event.originalStartTime,
+        });
+        continue;
+      }
+      const begins = Date.parse(read.evento.starts_at);
+      const ends = Date.parse(read.evento.ends_at);
+      if (ends <= windowStart || begins >= windowEnd) {
+        pruneIds.add(eventId);
+        continue;
+      }
+      items.push({
+        ...read.evento,
+        title: null,
+        transparency: read.evento.ocupa ? "opaque" : "transparent",
+        recurring_event_id: event.recurringEventId,
+        original_start_time: event.originalStartTime,
       });
     }
     const saved = calendarSnapshotSchema.parse(
-      await call("page", {
-        next_page_token: page.nextPageToken ?? null,
-        next_sync_token: page.nextSyncToken ?? null,
+      await googleRpc(db, "fn_google_calendar_page_batch", {
+        p_org: org,
+        p_id: calendarId,
+        p_args: {
+          claim: c.claim,
+          cursor: fence.cursor,
+          items,
+          prune_ids: [...pruneIds],
+          next_page_token: page.nextPageToken ?? null,
+          next_sync_token: page.nextSyncToken ?? null,
+        },
       }),
     );
     // O cursor mudou no commit. Release só usa aquisição, não o cursor anterior.
