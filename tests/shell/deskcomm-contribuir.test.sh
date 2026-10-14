@@ -438,6 +438,72 @@ assert_contains "$saida" "20260928000000_0201_a.sql colide_em=$cabeca" "a primei
 assert_contains "$saida" "20260928010000_0201_b.sql colide_em=$cabeca" "e a segunda acusa a primeira"
 assert_contains "$controle" "20260928000000_0201_so.sql colide_em=0" "controle: a migration única não acusa a si mesma"
 
+# ── 5-quinquies. definer_revoke exige as DUAS origens na MESMA declaração ────
+# O regex do #2304 fechava em `(public|anon)` e aceitava o revoke de UMA origem
+# só, embora a mensagem de falha já falasse das DUAS (medido na main 6a067605b):
+# `revoke execute on function f() from public;` passava calado. A sonda passa a
+# exigir as duas na lista do `from` da MESMA declaração — em qualquer ordem e
+# com espaço depois da vírgula —, e o revoke de TABELA não conta como de função.
+echo "5-quinquies. o definer_revoke exige public E anon na mesma declaração"
+clone="$TMP/c5-quinquies"; clonar "$clone" "alguem@fork.dev"
+mkdir -p "$clone/triagem/scripts"
+cp "$RAIZ/triagem/scripts/complemento.sh" "$clone/triagem/scripts/"
+gh() {  # a cabeça do PR É o HEAD deste clone (checkout do PR)
+  local base; base="$(git merge-base origin/main HEAD)"
+  case "$1 $2" in
+    'pr diff') git diff "$base"...HEAD ;;
+    'pr view')
+      for a in "$@"; do
+        case "$a" in
+          files) git diff --name-only "$base"...HEAD ;;
+          headRefOid) git rev-parse HEAD ;;
+        esac
+      done ;;
+  esac
+}
+export -f gh
+# A linha medida é a `definer_revoke`; o valor cru separa passa de reprova sem
+# depender de tabulação no padrão.
+valor_definer() { awk -F'\t' '$1=="definer_revoke"{print $2}' <<<"$1"; }
+NDEF=0
+definer() { # $1 = rótulo; $2 = a declaração de revoke (vazia = nenhuma); $3 = tem|reprova
+  local rot="$1" decl="$2" saida v cab
+  NDEF=$((NDEF+1))
+  git -C "$clone" switch -q main
+  git -C "$clone" switch -q -C "tmp/definer-$NDEF" main
+  mkdir -p "$clone/db"
+  {
+    printf 'create function public.f_sonda_%s() returns void language sql security definer as $$ select 1 $$;\n' "$NDEF"
+    [ -n "$decl" ] && printf '%s\n' "$decl"
+  } > "$clone/db/definer_$NDEF.sql"
+  # `git add` do arquivo do caso, e não `-A`: a cópia local do complemento.sh é
+  # NÃO RASTREADA, e um `add -A` a commitaria no ramo do caso — aí o diff do
+  # próprio instrumento entrava no CODIGO e o `revoke … from …(public|anon)` do
+  # script se provava a si mesmo.
+  git -C "$clone" add "db/definer_$NDEF.sql" >/dev/null; git -C "$clone" commit -q --no-verify -m "caso: $rot"
+  cab="$(git -C "$clone" rev-parse HEAD)"
+  saida="$(cd "$clone" && bash triagem/scripts/complemento.sh 1790 2>&1)"; code=$?
+  git -C "$clone" switch -q main
+  git -C "$clone" branch -q -D "tmp/definer-$NDEF" >/dev/null
+  assert_exit "$code" 0 "($rot) o complemento roda"
+  v="$(valor_definer "$saida")"
+  if [ "$3" = tem ]; then
+    if [ "$v" = "tem revoke" ]; then ok "($rot) passa — revoga das DUAS"; else falha "($rot) passa — revoga das DUAS" "definer_revoke='$v' (cabeça $cab)"; fi
+  else
+    if [ "$v" = "security definer SEM revoke — as DUAS origens" ]; then ok "($rot) REPROVA — exige as DUAS origens"; else falha "($rot) REPROVA — exige as DUAS origens" "definer_revoke='$v' (cabeça $cab)"; fi
+  fi
+}
+definer "só public"                  "revoke execute on function public.alvo() from public;"                      reprova
+definer "só anon"                    "revoke execute on function public.alvo() from anon;"                        reprova
+definer "public,anon"                "revoke execute on function public.alvo() from public,anon;"                 tem
+definer "anon, public (ordem)"       "revoke execute on function public.alvo() from anon, public;"                tem
+definer "public, anon (espaço)"      "revoke execute on function public.alvo() from public, anon;"                tem
+definer "public,anon,authenticated"  "revoke execute on function public.alvo() from public,anon,authenticated;"   tem
+definer "só authenticated"           "revoke execute on function public.alvo() from authenticated;"               reprova
+definer "revoke all (as duas)"       "revoke all on function public.alvo() from public,anon;"                     tem
+definer "revoke select em TABELA"    "revoke select on table t from public,anon;"                                 reprova
+unset -f gh
+
 echo "6. sessao.sh (hook de início de sessão)"
 clone="$TMP/c6"; clonar "$clone" "alguem@fork.dev"; cfg "$clone" --unset core.hooksPath
 saida="$(cd "$clone" && bash .agents/skills/deskcomm-contribuir/scripts/hooks/sessao.sh)"; code=$?

@@ -140,7 +140,20 @@ else p tabela_nova "n/a"; fi
 
 # --- security definer exposta ---
 if c -qi 'security definer'; then
-  c -qiE 'revoke (execute|all( privileges)?) on function.*from.*(public|anon)' && p definer_revoke "tem revoke" || p definer_revoke "security definer SEM revoke — as DUAS origens"
+  # A MESMA declaração de revoke precisa revogar de public E de anon: o regex
+  # anterior fechava em `(public|anon)` e aceitava o revoke de UMA origem só,
+  # embora a mensagem de falha já falasse das DUAS (medido na main no #2304):
+  # `revoke execute on function f() from public;` passava calado. Ler a lista
+  # depois do `from` e exigir as duas palavras é mais legível que o regex gigante
+  # — e a ordem da lista e o espaço depois da vírgula não importam.
+  REVOGA=$(c -iE 'revoke (execute|all( privileges)?) on function.*from')
+  DEF_OK=0
+  while IFS= read -r LINHA; do
+    [ -n "$LINHA" ] || continue
+    LISTA="${LINHA#*from}"
+    grep -qiw public <<<"$LISTA" && grep -qiw anon <<<"$LISTA" && DEF_OK=1
+  done <<<"$REVOGA"
+  [ "$DEF_OK" = 1 ] && p definer_revoke "tem revoke" || p definer_revoke "security definer SEM revoke — as DUAS origens"
 fi
 
 # --- 4. console.log (no-console é warn, o CI não reprova) ---
