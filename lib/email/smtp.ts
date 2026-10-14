@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env } from "@/lib/env";
-import { getSmtpConfig, type SmtpConfig } from "@/lib/email/config";
+import { getSmtpConfig, lerSmtp, type SmtpConfig } from "@/lib/email/config";
 
 interface SendArgs {
   to: string | string[];
@@ -29,6 +29,31 @@ let transporterKey = "";
 
 export function isSmtpConfigured(config: SmtpConfig): boolean {
   return Boolean(config.host && config.fromEmail);
+}
+
+/**
+ * A INSTALAÇÃO está SEM SMTP? — a leitura que o painel do admin mostra.
+ *
+ * Mora aqui, ao lado de `isSmtpConfigured`, porque é ela a régua: host E
+ * remetente. `lerSmtp` (e não `getSmtpConfig`) porque um soluço do banco NÃO
+ * pode virar "sem SMTP": quem administra veria um aviso de configuração por
+ * causa de uma falha transitória, e aviso que mente é aviso que se aprende a
+ * ignorar. Só o banco que RESPONDEU (linha presente ou ausência de linha)
+ * autoriza afirmar que a instalação não tem SMTP; quando ele falha, o `.env`
+ * continua sendo lido por `lerSmtp`, e é o valor dele que decide — se nem ali
+ * houver SMTP, `bancoRespondeu` falso mantém o aviso fora da tela.
+ *
+ * Diferente do "esqueci a senha" (#2767), aqui NÃO há recorte por
+ * `SINGLE_SERVER`: o painel do admin é a instalação inteira, e "não há SMTP
+ * configurado, configure em /admin/email" é verdade em qualquer instalação —
+ * a tela `/admin/email` existe e é a porta da remediação nos dois casos.
+ *
+ * O sinal foi pedido na #2755 (item 3): sem ele, a ausência de SMTP só
+ * aparecia no log do `update.sh`.
+ */
+export async function instalacaoSemSmtp(): Promise<boolean> {
+  const { config, bancoRespondeu } = await lerSmtp();
+  return bancoRespondeu && !isSmtpConfigured(config);
 }
 
 export function formatFromAddress(config: SmtpConfig, override?: string): string | null {
