@@ -12,7 +12,7 @@
  *    escolhe o atendente e devolve `(to_user_id, reason)` para quem monta o
  *    lote — sem destino escolhido, o confirmar fica desligado.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -105,8 +105,12 @@ describe("BarraDeAcoesEmLote", () => {
     const confirmar = screen.getByTestId("lote-transferir-confirmar");
     expect(confirmar).toBeDisabled();
 
-    await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "Bruno" }));
+    // O gatilho do Select abre por teclado (Enter) — o caminho que funciona
+    // sem PointerEvent, que o jsdom não implementa.
+    const gatilho = screen.getByRole("combobox");
+    gatilho.focus();
+    fireEvent.keyDown(gatilho, { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "Bruno" }));
     expect(confirmar).toBeEnabled();
 
     await user.type(screen.getByLabelText("Motivo (opcional)"), "plantão");
