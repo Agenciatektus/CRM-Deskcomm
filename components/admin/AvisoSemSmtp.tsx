@@ -42,7 +42,7 @@ export function AvisoSemSmtp() {
           <span className="font-semibold tracking-tight">{t("Sem SMTP configurado")}</span>
         </span>
         <span className="opacity-80">
-          {t("Convites, recuperação de senha e avisos por e-mail não saem até configurar o servidor.")}
+          {t("Convites, recuperação de senha e avisos por e-mail não saem por SMTP até configurá-lo aqui.")}
         </span>
         <Link
           href="/admin/email"
