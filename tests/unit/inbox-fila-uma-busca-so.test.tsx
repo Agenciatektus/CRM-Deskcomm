@@ -130,6 +130,18 @@ function listas() {
   return chamadas.filter((c) => c.url.startsWith("/api/v1/conversations?"));
 }
 
+/**
+ * A única busca da lista — afirma a contagem antes de devolvê-la, e sem `[0]`
+ * solto: o typecheck do repositório é estrito (`noUncheckedIndexedAccess`).
+ */
+function unicaLista() {
+  const buscas = listas();
+  expect(buscas).toHaveLength(1);
+  const [primeira] = buscas;
+  if (!primeira) throw new Error("nenhum GET da lista");
+  return primeira;
+}
+
 function busca(url: string) {
   const chamada = chamadas.find((c) => c.url === url);
   if (!chamada) {
@@ -192,7 +204,7 @@ describe("a lista do inbox consulta UMA vez quando o filtro efetivo muda (#2365)
 
     // UMA requisição, com o filtro DEFINITIVO da Fila de uma org sem automático.
     await waitFor(() => expect(listas()).toHaveLength(1));
-    expect(comando(listas()[0].url)).toBe("aguardando,automatico");
+    expect(comando(unicaLista().url)).toBe("aguardando,automatico");
 
     // E nenhuma segunda chave depois: nada de GET em série.
     await assentar();
@@ -204,7 +216,7 @@ describe("a lista do inbox consulta UMA vez quando o filtro efetivo muda (#2365)
     montar();
 
     await waitFor(() => expect(listas()).toHaveLength(1));
-    expect(comando(listas()[0].url)).toBeNull();
+    expect(comando(unicaLista().url)).toBeNull();
 
     // O fato org-wide foi pedido — o cabeçalho e a lista o leem para o rótulo —
     // mas não segura a lista de uma aba que não o usa.
@@ -219,7 +231,7 @@ describe("a lista do inbox consulta UMA vez quando o filtro efetivo muda (#2365)
     await entregar(AUTOMATICO, { data: { ativo: true } });
 
     await waitFor(() => expect(listas()).toHaveLength(1));
-    expect(comando(listas()[0].url)).toBe("aguardando");
+    expect(comando(unicaLista().url)).toBe("aguardando");
 
     await assentar();
     expect(listas()).toHaveLength(1);
