@@ -63,13 +63,26 @@ const contato: Contact = {
   first_service_at: null,
 };
 
-function renderTabela(contacts: Contact[] = [contato]) {
+function renderTabela(
+  contacts: Contact[] = [contato],
+  selecao?: {
+    selecionados?: Set<string>;
+    onAlternarSelecao?: (id: string) => void;
+    onSelecionarTodosVisiveis?: () => void;
+  },
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <ContactsTable contacts={contacts} orderBy="display_name" orderDir="asc" onSort={() => {}} />
+      <ContactsTable
+        contacts={contacts}
+        orderBy="display_name"
+        orderDir="asc"
+        onSort={() => {}}
+        {...selecao}
+      />
     </QueryClientProvider>,
   );
 }
@@ -131,5 +144,69 @@ describe("ContactsTable — atalho de edição na linha (issue #2715)", () => {
     expect(
       within(linhaDoContato()).getByRole("button", { name: "Editar contato Web Speed" }),
     ).toBeInTheDocument();
+  });
+});
+
+// Issue #2484, fatia F3 — a tabela mede a seleção múltipla do lote de contatos.
+// O que estes testes prendem: SEM as props de seleção a tabela é exatamente a
+// de sempre (nenhuma caixa nasce sozinha); COM elas, cada linha ganha caixa e a
+// cabeça marca todos os visíveis de uma vez. A barra de ações em lote mora no
+// cliente da página e tem teste próprio — aqui só se mede a seleção.
+describe("ContactsTable — seleção múltipla (#2484, F3)", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  const outroContato: Contact = {
+    ...contato,
+    id: "00000000-0000-4000-8000-000000000009",
+    name: "Outro Contato",
+    tags: [],
+  };
+
+  it("sem as props de seleção, nenhuma caixa aparece", () => {
+    renderTabela([contato, outroContato]);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("com as props, cada linha ganha caixa e o clique alterna o contato certo", async () => {
+    const user = userEvent.setup();
+    const onAlternar = vi.fn();
+    renderTabela([contato, outroContato], {
+      selecionados: new Set([contato.id]),
+      onAlternarSelecao: onAlternar,
+      onSelecionarTodosVisiveis: vi.fn(),
+    });
+
+    const caixaDaWebSpeed = screen.getByTestId(`selecionar-contato-${contato.id}`);
+    const caixaDoOutro = screen.getByTestId(`selecionar-contato-${outroContato.id}`);
+    // A marca na caixa é lida do estado de seleção, não de um state interno:
+    // quem seleciona é a página, e a tabela só desenha o que recebe.
+    expect(caixaDaWebSpeed).toHaveAttribute("aria-checked", "true");
+    expect(caixaDoOutro).toHaveAttribute("aria-checked", "false");
+
+    await user.click(caixaDoOutro);
+    expect(onAlternar).toHaveBeenCalledWith(outroContato.id);
+  });
+
+  it("a cabeça marca todos os visíveis de uma vez", async () => {
+    const user = userEvent.setup();
+    const onSelecionarTodos = vi.fn();
+    renderTabela([contato, outroContato], {
+      selecionados: new Set(),
+      onAlternarSelecao: vi.fn(),
+      onSelecionarTodosVisiveis: onSelecionarTodos,
+    });
+
+    await user.click(screen.getByTestId("selecionar-todos-contatos"));
+    expect(onSelecionarTodos).toHaveBeenCalledTimes(1);
+  });
+
+  it("a caixa da linha nomeia o contato, para quem lê a tela pela audição", () => {
+    renderTabela([contato], {
+      selecionados: new Set(),
+      onAlternarSelecao: vi.fn(),
+      onSelecionarTodosVisiveis: vi.fn(),
+    });
+    expect(screen.getByRole("checkbox", { name: "Selecionar contato Web Speed" })).toBeInTheDocument();
   });
 });

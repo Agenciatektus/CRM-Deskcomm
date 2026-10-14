@@ -15484,6 +15484,47 @@ export const DICIONARIO: Traducoes = {
   "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": {
     es: "Oculto, el campo no aparece en el formulario ni se valida como obligatorio, y el valor ya guardado sigue en el registro.",
   },
+
+  // ─── Contatos: lote por seleção múltipla (#2484, fatia F3) ───
+  //
+  // Oito destas chaves são as MESMAS da fatia F1 (#2909, ainda não mesclada),
+  // com o mesmo texto e o mesmo valor de espanhol — "Ações em lote", "Mais
+  // ações", "Selecionar todas", "Para quem", "Escolha um atendente",
+  // "atualizadas", "recusadas" e "Recusada.". Elas se repetem aqui porque a
+  // main não tem o PR da F1: sem as linhas abaixo a F3 cairia no português
+  // nesta tela. Quando uma das duas branches mesclar, os valores são idênticos
+  // e a outra atualização só enxerga o mesmo par chave-valor.
+  "Ações em lote": { es: "Acciones en lote" },
+  "Mais ações": { es: "Más acciones" },
+  "Selecionar todas": { es: "Seleccionar todas" },
+  "Para quem": { es: "Para quién" },
+  "Escolha um atendente": { es: "Elige un agente" },
+  atualizadas: { es: "actualizadas" },
+  recusadas: { es: "rechazadas" },
+  "Recusada.": { es: "Rechazada." },
+  // Novas da F3.
+  "contatos por chamada.": { es: "contactos por llamada." },
+  "1 contato selecionado": { es: "1 contacto seleccionado" },
+  "contatos selecionados": { es: "contactos seleccionados" },
+  "Adicionar etiqueta": { es: "Agregar etiqueta" },
+  "Remover etiqueta": { es: "Quitar etiqueta" },
+  "Mudar responsável": { es: "Cambiar responsable" },
+  "Preencher campo personalizado": { es: "Rellenar campo personalizado" },
+  "A etiqueta entra nos contatos selecionados pelo mesmo caminho da edição individual, com auditoria por contato.": {
+    es: "La etiqueta entra en los contactos seleccionados por el mismo camino de la edición individual, con auditoría por contacto.",
+  },
+  "A etiqueta sai dos contatos selecionados pelo mesmo caminho da edição individual, com auditoria por contato.": {
+    es: "La etiqueta sale de los contactos seleccionados por el mismo camino de la edición individual, con auditoría por contacto.",
+  },
+  "Cada contato é posto na carteira pelo mesmo caminho da ficha, e o dono é validado um a um.": {
+    es: "Cada contacto se pone en la cartera por el mismo camino de la ficha, y el dueño se valida uno a uno.",
+  },
+  "Nenhum atendente disponível.": { es: "Ningún agente disponible." },
+  "O campo é gravado no mesmo caminho da edição individual; os outros campos do contato permanecem.": {
+    es: "El campo se graba por el mismo camino de la edición individual; los demás campos del contacto permanecen.",
+  },
+  "Selecionar contato": { es: "Seleccionar contacto" },
+  "Selecionar todos os contatos visíveis": { es: "Seleccionar todos los contactos visibles" },
 };
 
 /**
