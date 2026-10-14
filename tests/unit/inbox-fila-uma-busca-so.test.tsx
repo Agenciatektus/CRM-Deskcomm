@@ -38,6 +38,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *
  * O trabalho é no encontro do hook com o layout, então os dois são REAIS — só os
  * vizinhos (realtime, toast, linhas, cabeçalho) são dublês.
+ *
+ * SABOTAGEM (medida antes do conserto, com este arquivo já no repositório):
+ * consultar a Fila sem esperar o fato da org — `useConversationsRealtime(filters,
+ * orgId)` sem o terceiro argumento, ou soltar o `enabled` do hook — reproduz
+ * 1 failed | 2 passed: o caso 1 reprova JÁ na primeira asserção, com
+ * "a Fila consultou antes de saber se a org tem automático: expected length 0,
+ * got 1" (o GET que a resposta do `automatico-ativo` descarta).
  */
 
 const { ORG, AUTOMATICO } = vi.hoisted(() => ({
