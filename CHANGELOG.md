@@ -134,7 +134,7 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Contribuição de @webtecnica (#2661), a partir da issue #2641 de @carloshmlima.
 
-- **Você pode cobrar as empresas que atende pelo Asaas, com Pix e boleto todo mês** Opcional: em Admin › Cobrança › Conexão, escolha Asaas e cole a chave de API. Pix e boleto são pagos a cada cobrança (não é débito automático); atraso, suspensão e reativação funcionam como na Stripe. Assinaturas existentes ficam no provedor em que nasceram. Nada muda para quem não usa a cobrança.
+- **Você pode cobrar as empresas que atende pelo Asaas, com Pix e boleto todo mês** Opcional: ligue "Cobrança dos seus clientes" em Admin › Recursos opcionais (desligada, o menu Cobrança não aparece); depois, em Admin › Cobrança › Conexão, escolha Asaas e cole a chave de API. Pix e boleto são pagos a cada cobrança (não é débito automático); atraso, suspensão e reativação funcionam como na Stripe. Assinaturas existentes ficam no provedor em que nasceram. Nada muda para quem não usa a cobrança.
 
 - **A marca própria ganha uma cor opcional para o tema escuro, ao lado da cor principal, como o logo já tinha** Em Marca e em Configurações › Marca, o campo "Cor da marca no tema escuro". Vazio, nada muda; preenchido, só o tema escuro usa essa cor (e-mails e tema claro seguem na principal).
 
