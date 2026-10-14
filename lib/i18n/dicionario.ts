@@ -6828,6 +6828,11 @@ export const DICIONARIO: Traducoes = {
     es: "El detalle de cada pasada está en el archivo .update.log, en la carpeta del proyecto en el servidor.",
   },
   "Atualização do sistema": { es: "Actualización del sistema" },
+  // #2755 (item 3) — o aviso de "sem SMTP" no topo do painel de atualização.
+  "Sem SMTP configurado": { es: "Sin SMTP configurado" },
+  "Esta instalação não envia e-mail nenhum: \"esqueci a senha\" e a confirmação de cadastro não chegam. Configure o servidor de e-mail em /admin/email.": {
+    es: "Esta instalación no envía ningún correo: \"olvidé mi contraseña\" y la confirmación de registro no llegan. Configura el servidor de correo en /admin/email.",
+  },
   "Guardando uma cópia de segurança dos seus dados": {
     es: "Guardando una copia de seguridad de tus datos",
   },
