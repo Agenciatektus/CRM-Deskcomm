@@ -6,7 +6,7 @@
  * ~400 ms antes de a aba principal gravar o aviso do `end()` e só rodou os efeitos
  * ~230 ms depois dele: perdeu o aviso e ficou na organização do suporte (#2471).
  */
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AVISO, OrganizationTransitionProvider } from "./OrganizationTransitionProvider";
 import { notifySupportTransition } from "@/components/app/ImpersonateBanner";
@@ -100,7 +100,7 @@ describe("aba vizinha: a recarga do evento storage abre um documento só", () =>
     const agora = Date.now();
     const carimbo = String(agora); // a outra aba encerra o acompanhamento
     localStorage.setItem(AVISO, carimbo);
-    window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimbo }));
+    act(() => { window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimbo })); });
     // A recarga legítima acontece uma vez — e a aba marca o carimbo que tratou.
     expect(reload).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem(AVISO)).toBe(carimbo);
@@ -129,7 +129,7 @@ describe("aba vizinha: a recarga do evento storage abre um documento só", () =>
     reload.mockClear();
     const carimboNovo = String(Date.now() + 1); // outro encerramento, minutos depois
     localStorage.setItem(AVISO, carimboNovo);
-    window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimboNovo }));
+    act(() => { window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimboNovo })); });
     // O aviso legítimo continua valendo: tratar um carimbo não cala os próximos.
     expect(reload).toHaveBeenCalledOnce();
   });
