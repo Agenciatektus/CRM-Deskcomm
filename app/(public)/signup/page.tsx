@@ -68,7 +68,9 @@ export default async function SignupPage({
         .is("arquivado_em", null).eq("oferecido_ao_cliente", true).order("preco_cents"),
       admin.from("cobranca_planos").select("id").is("arquivado_em", null).eq("padrao_no_cadastro", true).maybeSingle()]);
       planos = data ?? [];
-      cobrancaSemPlanoDeCadastro = planoPadrao === null;
+      // Sem plano padrão, a pessoa ainda pode escolher um dos planos
+      // oferecidos. O bloqueio só é necessário quando não há nenhuma opção.
+      cobrancaSemPlanoDeCadastro = planoPadrao === null && planos.length === 0;
     }
   }
 

@@ -32,10 +32,11 @@ import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 // O client admin que `criarContaDeConvite` usa quando o GoTrue está com o
 // cadastro público fechado (#1653). Hoisted porque o factory do `vi.mock` roda
 // antes das declarações deste arquivo.
-const admin = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn() }));
+const admin = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn(), from: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: vi.fn(() => ({
     auth: { admin: { createUser: admin.createUser, deleteUser: admin.deleteUser } },
+    from: admin.from,
   })),
 }));
 
@@ -45,6 +46,7 @@ vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("@/lib/auth/politica-de-cadastro", () => ({
   modoDeCadastro: vi.fn(async () => "aberto"),
 }));
+vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: vi.fn(async () => false) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
@@ -113,6 +115,37 @@ describe("signUp — a tela precisa saber se a sessão já veio aberta", () => {
     const res = await signUp(entrada());
 
     expect(res).toEqual({ ok: false, error: "signup_failed" });
+  });
+});
+
+describe("signUp — plano obrigatório antes de criar a conta", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    signUpDoProvedor.mockReset();
+    admin.from.mockReset();
+    vi.mocked(headers).mockResolvedValue({
+      get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
+    } as never);
+    vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+  });
+
+  it("não cria conta órfã quando a cobrança exige plano e não há padrão", async () => {
+    const { moduloLigado } = await import("@/lib/instalacao/modulos");
+    vi.mocked(moduloLigado).mockResolvedValue(true);
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    admin.from.mockReturnValue(query);
+
+    const { signUp } = await import("./signUp");
+    const res = await signUp(entrada());
+
+    expect(res).toEqual({ ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_obrigatorio"] } });
+    expect(signUpDoProvedor).not.toHaveBeenCalled();
   });
 });
 

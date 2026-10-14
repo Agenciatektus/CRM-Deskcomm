@@ -137,12 +137,24 @@ export async function signUp(
   }
 
   const planoEscolhido = !convite && "cobranca_plan_id" in parsed.data ? parsed.data.cobranca_plan_id : undefined;
-  if (planoEscolhido) {
+  if (!convite) {
     const admin = createAdminClient();
-    if (!(await moduloLigado(admin, "cobranca"))) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
-    const { data: plano, error: erroDoPlano } = await admin.from("cobranca_planos").select("id")
-      .eq("id", planoEscolhido).is("arquivado_em", null).eq("oferecido_ao_cliente", true).maybeSingle();
-    if (erroDoPlano || !plano) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
+    if (await moduloLigado(admin, "cobranca")) {
+      if (planoEscolhido) {
+        const { data: plano, error: erroDoPlano } = await admin.from("cobranca_planos").select("id")
+          .eq("id", planoEscolhido).is("arquivado_em", null).eq("oferecido_ao_cliente", true).maybeSingle();
+        if (erroDoPlano || !plano) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
+      } else {
+        // Sem plano escolhido, a criação da organização dependeria do fallback
+        // do plano padrão na migration. Recusamos antes de criar a conta no
+        // GoTrue se esse fallback não existir, para não deixar usuário órfão.
+        const { data: planoPadrao, error: erroDoPlanoPadrao } = await admin.from("cobranca_planos").select("id")
+          .is("arquivado_em", null).eq("padrao_no_cadastro", true).maybeSingle();
+        if (erroDoPlanoPadrao || !planoPadrao) {
+          return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_obrigatorio"] } };
+        }
+      }
+    }
   }
 
   // ── O GoTrue com o cadastro público FECHADO (#1653) ──────────────────────────
