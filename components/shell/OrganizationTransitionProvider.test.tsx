@@ -122,7 +122,7 @@ describe("aba vizinha: a recarga do evento storage abre um documento só", () =>
     const documentoA = montar();
     const carimbo = String(Date.now());
     localStorage.setItem(AVISO, carimbo);
-    window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimbo }));
+    act(() => { window.dispatchEvent(new StorageEvent("storage", { key: AVISO, newValue: carimbo })); });
     documentoA.unmount();
     montar(); // documento B nasce sem recarregar de novo
 
