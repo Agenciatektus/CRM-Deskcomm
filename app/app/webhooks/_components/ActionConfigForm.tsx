@@ -28,7 +28,10 @@ import type { PlanoDeTarefas } from "@/lib/tarefas/plano";
 
 export type ActionItem =
   | { type: "create_or_move_lead"; config: { pipeline_id: string; stage_id: string } }
-  | { type: "send_whatsapp_message"; config: { channel_session_id: string; template: string } }
+  | {
+      type: "send_whatsapp_message";
+      config: { channel_session_id: string; template: string; media_url?: string | null };
+    }
   | {
       type: "send_ai_message";
       config: { agent_id: string; channel_session_id: string; instruction: string };
@@ -154,7 +157,7 @@ const TEMPLATE_VARS = [
 function SendWhatsappForm({
   config,
   onChange,
-}: FormProps<{ channel_session_id: string; template: string }>) {
+}: FormProps<{ channel_session_id: string; template: string; media_url?: string | null }>) {
   const t = useT();
   const { data: sessions } = useChannelSessions();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -231,6 +234,18 @@ function SendWhatsappForm({
               (Conexões), no fuso da sua organização, e quem a mudou lá veria a
               tela continuar prometendo outro horário. Rótulo visível é contrato. */}
           {t("Respeitamos a janela de envio e o limite diário configurados para esse número em Conexões — fora da janela, a mensagem espera a próxima.")}
+        </p>
+      </div>
+      <div className="space-y-1">
+        <Label>{t("Imagem ou PDF (opcional)")}</Label>
+        <Input
+          type="url"
+          value={config.media_url ?? ""}
+          onChange={(e) => onChange({ ...config, media_url: e.target.value || null })}
+          placeholder="https://…/oferta.pdf"
+        />
+        <p className="text-xs text-muted-foreground">
+          {t("Com uma imagem ou PDF, a mensagem acima vira a legenda do arquivo. Outros tipos de arquivo são recusados. Em número oficial, fora da janela de 24h a mídia não sai — só um modelo aprovado.")}
         </p>
       </div>
     </div>
