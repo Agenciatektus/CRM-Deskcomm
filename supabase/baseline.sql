@@ -22850,7 +22850,7 @@ create table if not exists public.channel_routing_responsibles (
  foreign key(organization_id,user_id) references public.user_organizations(organization_id,user_id) on delete cascade
 );
 create index if not exists channel_routing_responsibles_org_user on public.channel_routing_responsibles(organization_id,user_id);
--- (migration 0658, issue #2331) Regras de atendimento POR NÚMERO: o modo de
+-- (migration 0663, issue #2331) Regras de atendimento POR NÚMERO: o modo de
 -- distribuição e o destino padrão do canal. Nulo = herda a organização.
 alter table public.channel_routing_policies add column if not exists distribution_mode text;
 alter table public.channel_routing_policies add column if not exists default_assignee_user_id uuid;
@@ -22922,7 +22922,7 @@ $$;
 revoke all on function public.fn_wake_channel_routing(uuid,uuid) from public,anon,authenticated;
 grant execute on function public.fn_wake_channel_routing(uuid,uuid) to service_role;
 
--- (migration 0658, issue #2331) Dois parâmetros novos COM DEFAULT (modo por
+-- (migration 0663, issue #2331) Dois parâmetros novos COM DEFAULT (modo por
 -- número e destino padrão). A assinatura de 4 argumentos é derrubada para não
 -- sobrar overload que sombreie a nova.
 drop function if exists public.fn_set_channel_routing(uuid,uuid,uuid[],boolean);
@@ -23166,7 +23166,7 @@ begin
  select id into member_id from public.user_organizations where organization_id=p_org and user_id=p_user
   and revoked_at is null and role in('agent','manager','admin') for share;
  if not found then return 'candidate_revoked';end if;
- -- (migration 0658, issue #2331) O destino padrão do número é aceito mesmo que
+ -- (migration 0663, issue #2331) O destino padrão do número é aceito mesmo que
  -- não esteja na lista de responsáveis: são ajustes distintos (responsáveis
  -- restringem o rodízio; o destino padrão é entrega direta).
  select id,default_assignee_user_id into v_policy_id,v_default from public.channel_routing_policies where organization_id=p_org and channel_session_id=p_channel;

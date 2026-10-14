@@ -1,4 +1,4 @@
--- 0658 — regras de atendimento POR NÚMERO (canal): modo de distribuição e destino padrão.
+-- 0663 — regras de atendimento POR NÚMERO (canal): modo de distribuição e destino padrão.
 --
 -- manifest: modo de distribuição (manual/rodízio/carga) e atendente de destino padrão POR NÚMERO, em channel_routing_policies; nulo = herda o comportamento da organização.
 --
