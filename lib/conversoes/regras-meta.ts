@@ -11,6 +11,7 @@
  * segunda linha de defesa.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ChannelConversionInput } from "@/lib/channels/types";
 
 /**
  * Os eventos padrão que a Meta aceita também em conversão de conversa
@@ -32,6 +33,40 @@ export const VALORES_DE_EVENTO_DA_META = EVENTOS_DA_META.map((e) => e.valor) as 
   EventoDaMeta,
   ...EventoDaMeta[],
 ];
+
+/**
+ * Os eventos de etapa que o canal sabe repassar (`ChannelConversionInput`) — um
+ * recorte de `EVENTOS_DA_META`. Mora aqui, e não no envio, para o texto da
+ * pendência (`MOTIVO_LEGIVEL.evento_fora_do_canal`) listar a MESMA coisa que o
+ * envio aceita, com os rótulos da tela.
+ */
+export const EVENTOS_DE_ETAPA_NO_CANAL = [
+  "InitiateCheckout",
+  "LeadSubmitted",
+  "AddToCart",
+] as const satisfies readonly (ChannelConversionInput["event"] & EventoDaMeta)[];
+
+/**
+ * O evento escolhido para a etapa tem para onde sair?
+ *
+ * `false` = não está em `EVENTOS_DE_ETAPA_NO_CANAL` (o canal não o repassa) E
+ * não há conexão direta configurada. Gravada assim, a regra vira a pendência
+ * `evento_fora_do_canal` e quem opera só descobre no Histórico, dias depois —
+ * por isso a tela avisa no ato (#2457).
+ *
+ * Mora aqui, e não no componente, porque a lista é a MESMA que o envio usa: com
+ * uma segunda cópia, a tela avisaria de um evento que o envio aceita, ou ficaria
+ * calada sobre um que ele recusa. Pura, para o teste julgar a regra sem DOM.
+ */
+export function eventoDaEtapaTemSaida(
+  metaEvent: string,
+  conexaoDiretaConfigurada: boolean,
+): boolean {
+  return (
+    conexaoDiretaConfigurada ||
+    (EVENTOS_DE_ETAPA_NO_CANAL as readonly string[]).includes(metaEvent)
+  );
+}
 
 export function ehEventoDaMeta(valor: unknown): valor is EventoDaMeta {
   return (
