@@ -242,8 +242,24 @@ async function corpoDe(res: Response): Promise<{
   };
   error?: { code: string; message: string };
 }> {
-  const json = (await res.json()) as never;
-  return { status: res.status, ...json };
+  const json = (await res.json()) as {
+    data?: {
+      acao?: string;
+      teto?: number;
+      total?: number;
+      feitos?: number;
+      recusados?: number;
+      resultados?: Array<{
+        id: string;
+        feito: boolean;
+        codigo?: string;
+        motivo?: string;
+        request_id?: string;
+      }>;
+    };
+    error?: { code: string; message: string };
+  };
+  return { status: res.status, data: json.data ?? {}, error: json.error };
 }
 
 describe("POST /api/v1/conversations/bulk", () => {

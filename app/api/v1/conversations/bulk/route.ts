@@ -60,6 +60,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { bulkConversationActionSchema, validateRequest } from "@/lib/schemas";
+import type { BulkConversationActionInput } from "@/lib/schemas";
 
 import { POST as fecharUmaConversa } from "../[id]/close/route";
 import { POST as marcarComoLida } from "../[id]/mark-read/route";
