@@ -11,7 +11,7 @@ import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moduloLigado } from "@/lib/instalacao/modulos";
-import { lerPlanosDoCadastro, type PlanoDoCadastro } from "@/lib/cobranca/cadastro";
+import { cadastroExigeEscolhaDePlano, lerPlanosDoCadastro, type PlanoDoCadastro } from "@/lib/cobranca/cadastro";
 
 export const metadata = { title: "Criar conta" };
 
@@ -59,15 +59,19 @@ export default async function SignupPage({
   // acima do `.env`, e nunca lança) — `branding()` só veria a semente do `.env`,
   // e o convite não muda isso (#2511, mesmo defeito das páginas `/legal`).
   const marca = await marcaDaSaida(null);
-  // Com plano oferecido, o seletor aparece e o Google some: ele não leva a
-  // escolha. Sem plano nenhum, a empresa nasce isenta e o Google fica (doc 146,
-  // opção B) — o critério é o de `lib/cobranca/cadastro.ts`, o mesmo do gatilho.
-  // Leitura que falha não esconde nada: quem recusa é a action.
+  // Com plano oferecido, o seletor aparece. O Google não leva a escolha: ele
+  // some enquanto não há plano padrão — o gatilho recusaria a empresa —, e com
+  // padrão a empresa dele nasce no padrão. Sem plano nenhum, nasce isenta e o
+  // Google fica (doc 146, opção B). O critério é o de `lib/cobranca/cadastro.ts`,
+  // o mesmo do gatilho. Leitura que falha não esconde nada: quem recusa é a action.
   let planos: PlanoDoCadastro[] = [];
+  let googleSemPlano = false;
   if (!convite) {
     const admin = createAdminClient();
     if (await moduloLigado(admin, "cobranca")) {
-      planos = (await lerPlanosDoCadastro(admin))?.oferecidos ?? [];
+      const lidos = await lerPlanosDoCadastro(admin);
+      planos = lidos?.oferecidos ?? [];
+      googleSemPlano = lidos !== null && cadastroExigeEscolhaDePlano(lidos);
     }
   }
 
@@ -129,10 +133,15 @@ export default async function SignupPage({
       <SignupForm convite={convite} planos={planos} />
       {/* O convite atravessa o Google na URL de retorno: sem ele, quem foi
           convidado e cria a conta com Google ganharia uma empresa própria. */}
-      {planos.length > 0 ? (
+      {googleSemPlano ? (
         <p className="text-center text-xs text-muted-foreground">{t("Para garantir que o plano selecionado seja contratado, conclua o cadastro com e-mail e senha.")}</p>
       ) : (
-        <EntrarComGoogle convite={convite?.token} />
+        <>
+          <EntrarComGoogle convite={convite?.token} />
+          {planos.length > 0 && (
+            <p className="text-center text-xs text-muted-foreground">{t("Com o Google, a empresa começa no plano padrão. Para escolher outro, use e-mail e senha.")}</p>
+          )}
+        </>
       )}
 
       <p className="text-center text-sm text-muted-foreground">
