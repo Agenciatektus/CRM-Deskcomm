@@ -35,7 +35,10 @@ import {
 } from "@/lib/ai/pontos/resolver";
 import { PAPEIS, PONTOS_DE_IA, PONTO_POR_ID } from "@/lib/ai/pontos/registro";
 import { PROVEDORES, ehProvedorSuportado, PROVEDOR_POR_ASSINATURA } from "@/lib/ai/pontos/provedores";
-import { listarModelosDaAssinaturaOuVazio } from "@/lib/ai/catalogo/modelos-da-assinatura";
+import {
+  listarModelosDaAssinatura,
+  listarModelosDaAssinaturaOuVazio,
+} from "@/lib/ai/catalogo/modelos-da-assinatura";
 import { validarBinding } from "@/lib/ai/pontos/validar-binding";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { decidirTranscricao } from "@/lib/messaging/media/escada-de-transcricao";
@@ -369,20 +372,36 @@ export async function PUT(req: NextRequest): Promise<Response> {
     .is("deprecated_at", null)
     .maybeSingle();
 
+  // Modelos da assinatura são por organização e não entram no catálogo global
+  // `ai_models`. Resolva o catálogo da conta conectada para validar capacidades
+  // com a mesma informação que alimenta o seletor da tela.
+  const modeloDaAssinatura =
+    corpo.provider === PROVEDOR_POR_ASSINATURA
+      ? (await listarModelosDaAssinatura(org.orgId))?.find((m) => m.model_id === corpo.model_id) ?? null
+      : null;
+  const modeloConhecido =
+    corpo.provider === PROVEDOR_POR_ASSINATURA ? modeloDaAssinatura !== null : modelo !== null;
+
   const validacao = validarBinding({
     pontoId: corpo.purpose,
     modelo: {
       model_id: corpo.model_id,
-      supports_tools: modelo?.supports_tools ?? false,
+      supports_tools:
+        corpo.provider === PROVEDOR_POR_ASSINATURA
+          ? modeloDaAssinatura?.supports_tools ?? false
+          : modelo?.supports_tools ?? false,
       // A capacidade vem do MOTOR, não da coluna: os dois discordavam e a tela
       // avisava "não enxerga imagens" sobre modelo que enxerga. Ver
       // `lib/ai/pontos/capacidade-em-vigor.ts`.
       supports_vision: enxergaImagem({
-        provider: corpo.provider,
+        provider: modeloDaAssinatura ? "openai" : corpo.provider,
         modelId: corpo.model_id,
-        doCatalogo: modelo?.supports_vision ?? null,
+        doCatalogo:
+          corpo.provider === PROVEDOR_POR_ASSINATURA
+            ? modeloDaAssinatura?.supports_vision ?? null
+            : modelo?.supports_vision ?? null,
       }),
-      conhecido: modelo !== null,
+      conhecido: modeloConhecido,
     },
   });
   if (!validacao.ok) {
@@ -510,6 +529,11 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     .eq("model_id", corpo.default_model)
     .maybeSingle();
 
+  const modeloDaAssinatura =
+    corpo.provider === PROVEDOR_POR_ASSINATURA
+      ? (await listarModelosDaAssinatura(org.orgId))?.find((m) => m.model_id === corpo.default_model) ?? null
+      : null;
+
   // MAS A CONFERÊNCIA SÓ VALE SE HOUVER CATÁLOGO PARA CONFERIR. `ai_models` é
   // populada pela sincronização do catálogo; numa instalação recém-feita, ou
   // numa que não roda scheduler, ela está VAZIA para o provedor escolhido — e o
@@ -526,19 +550,23 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   // instalação não tem como fazer, e travar a tela que existe justamente para
   // configurar isso.
   let avisos: string[] = [];
-  if (!modelo) {
-    const { data: algumDoProvedor } = await db
-      .from("ai_models")
-      .select("model_id")
-      .eq("provider", corpo.provider)
-      .limit(1)
-      .maybeSingle();
-    if (algumDoProvedor) {
-      return fail(
-        "modelo_desconhecido",
-        t(`"${corpo.default_model}" não está no catálogo de ${corpo.provider}`),
-        404,
-      );
+  const modeloConhecido =
+    corpo.provider === PROVEDOR_POR_ASSINATURA ? modeloDaAssinatura !== null : modelo !== null;
+  if (!modeloConhecido) {
+    if (corpo.provider !== PROVEDOR_POR_ASSINATURA) {
+      const { data: algumDoProvedor } = await db
+        .from("ai_models")
+        .select("model_id")
+        .eq("provider", corpo.provider)
+        .limit(1)
+        .maybeSingle();
+      if (algumDoProvedor) {
+        return fail(
+          "modelo_desconhecido",
+          t(`"${corpo.default_model}" não está no catálogo de ${corpo.provider}`),
+          404,
+        );
+      }
     }
     avisos = [
       t(
