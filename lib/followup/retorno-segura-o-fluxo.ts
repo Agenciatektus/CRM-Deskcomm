@@ -91,9 +91,11 @@ export async function contatosComRetornoVivo(admin: SupabaseClient, orgId: strin
  * marca — `cancelaRetorno`) e SEM `last_error`: o disparo bem-sucedido grava
  * `enabled=false, last_error=null`; a empresa parada grava
  * `last_error='org_nao_operante'` e a falha definitiva de disparo grava a razão
- * — nesses dois o retorno NÃO saiu, e `situacaoDoRetorno` (`retorno.ts`) é quem
- * distingue. Também não entram os turnos de passo de fluxo (mesma tabela, mesmo
- * `job_kind`, com `followup_enrollment_id` no payload).
+ * — nesses dois o retorno NÃO saiu (é o que o disparo grava em
+ * `lib/agent-engine/cron/scheduler.ts`). `situacaoDoRetorno` (`retorno.ts`) é mais
+ * largo: conta a falha definitiva como "disparado"; aqui ela não segura.
+ * Também não entram os turnos de passo de fluxo (mesma tabela, mesmo `job_kind`,
+ * com `followup_enrollment_id` no payload).
  *
  * `next_run_at` é a âncora do "quando o retorno saiu": o disparo one-shot só
  * desabilita a linha, não move a data — é o MESMO instante que
