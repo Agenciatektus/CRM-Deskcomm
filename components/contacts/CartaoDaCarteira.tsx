@@ -65,6 +65,9 @@ export function CartaoDaCarteira({ contactId, papelDoUsuario }: Props) {
   const selecionadoLimpo = selecionado === "__sem_dono__" ? null : selecionado;
   const mudou = selecionadoLimpo !== donoAtual;
 
+  // Erro de leitura não é "sem dono": afirmar ausência sem ter lido seria mentir.
+  if (carteira.isError) return null;
+
   return (
     <Card className="p-4" data-testid="carteira-do-contato">
       <div className="flex items-start gap-3">
@@ -75,7 +78,7 @@ export function CartaoDaCarteira({ contactId, papelDoUsuario }: Props) {
             {t("O vendedor dono deste cliente. Sem dono, o atendimento segue o fluxo de sempre.")}
           </p>
 
-          {carteira.isLoading ? (
+          {!carteira.data ? (
             <Skeleton className="mt-3 h-6 w-40" />
           ) : donoAtual ? (
             <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="carteira-dono">

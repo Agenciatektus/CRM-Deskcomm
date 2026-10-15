@@ -421,10 +421,13 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
               geral, junto dos dados que dizem "quem é esta pessoa" — quem atende
               responde a pergunta antes de prometer o negócio, e o gerente muda o
               dono aqui (o seletor só aparece para `manager`+; o gate real é o da
-              rota `PATCH /contacts/[id]/carteira`). */}
-          <div className="mt-4">
-            <CartaoDaCarteira contactId={contactId} papelDoUsuario={activeOrg?.role ?? null} />
-          </div>
+              rota `PATCH /contacts/[id]/carteira`). Só de `agent` para cima: é
+              o piso do GET da carteira, e o `viewer` receberia 403. */}
+          {activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent && (
+            <div className="mt-4">
+              <CartaoDaCarteira contactId={contactId} papelDoUsuario={activeOrg.role} />
+            </div>
+          )}
           <div className="mt-4">
             <RoteirosDoContato contactId={contactId} />
           </div>

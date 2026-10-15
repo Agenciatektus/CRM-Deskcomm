@@ -122,6 +122,13 @@ describe("(c) contato sem dono não quebra a tela", () => {
     expect(screen.queryByTestId("carteira-dono")).toBeNull();
   });
 
+  it("erro ao ler a carteira não vira \"sem dono\"", () => {
+    deps.carteira.mockReturnValue({ isLoading: false, isError: true, data: undefined });
+    render(<CartaoDaCarteira contactId="c1" papelDoUsuario="agent" />);
+    expect(screen.queryByTestId("carteira-vazio")).toBeNull();
+    expect(screen.queryByTestId("carteira-dono")).toBeNull();
+  });
+
   it("a faixa do chat não aparece sem carteira (nada para prometer)", () => {
     deps.carteira.mockReturnValue({ isLoading: false, data: SEM_DONO });
     const { container } = render(<FaixaDaCarteira contactId="c1" quemAtendeId="u-b" />);
