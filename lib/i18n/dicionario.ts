@@ -15595,8 +15595,10 @@ export const DICIONARIO: Traducoes = {
   // O cartão de Configurações › Empresa, só fora do Brasil. Os rótulos trazem
   // a letra porque é assim que o relatório de acesso os imprime ("a) Finalidades:").
   "Alíneas do art. 15.º do RGPD": { es: "Alíneas del art. 15.º del RGPD" },
-  "O relatório de acesso imprime estes três textos em nome da organização. Deixar em branco faz o documento mostrar «não informado pelo controlador» — nada é inventado no lugar do que falta.": {
-    es: "El informe de acceso imprime estos tres textos en nombre de la organización. Dejarlos en blanco hace que el documento muestre «no informado por el responsable»: no se inventa nada en lugar de lo que falta.",
+  // `{naoInformado}` é a frase LITERAL que o PDF imprime (em português, no
+  // vocabulário do país da organização) — por isso não se traduz.
+  "O relatório de acesso imprime estes três textos em nome da organização. Deixar em branco faz o documento mostrar «{naoInformado}» — nada é inventado no lugar do que falta.": {
+    es: "El informe de acceso imprime estos tres textos en nombre de la organización. Dejarlos en blanco hace que el documento muestre «{naoInformado}»: no se inventa nada en lugar de lo que falta.",
   },
   "Finalidades do tratamento (alínea a))": {
     es: "Finalidades del tratamiento (letra a))",

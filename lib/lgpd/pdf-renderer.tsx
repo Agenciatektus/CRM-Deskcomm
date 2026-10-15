@@ -39,7 +39,7 @@ import { mascaraCpf } from "@/lib/lgpd/mask";
 import {
   COPIA_DO_NUMERO_3,
   DIREITOS_DA_ALINEA_E,
-  NAO_INFORMADO_PELO_CONTROLADOR,
+  naoInformadoPelo,
 } from "@/lib/legal/art15";
 import { PAIS_PADRAO, PERFIS_DO_PAIS } from "@/lib/legal/perfil-do-pais";
 
@@ -69,16 +69,14 @@ function papelEncarregado(data: ExportPayload): string {
 /**
  * O que a alínea do art. 15.º em branco diz, no vocabulário do país.
  *
- * A constante de `lib/legal/art15.ts` é o texto brasileiro de sempre, e o
+ * `naoInformadoPelo("Controlador")` é a constante brasileira de sempre, e o
  * Brasil é o perfil padrão: no papel dele o texto continua byte a byte o mesmo.
  * Fora dele a frase repete o nome que a lei do país dá ao papel — em Portugal
  * a seção do art. 15.º falava em "controlador", palavra que o RGPD pt-PT não
  * usa (issue #2344).
  */
 function naoInformado(data: ExportPayload): string {
-  const papel = papelControlador(data);
-  if (papel === PADRAO.papel.controlador) return NAO_INFORMADO_PELO_CONTROLADOR;
-  return `não informado pelo ${papel.toLocaleLowerCase("pt-BR")}`;
+  return naoInformadoPelo(papelControlador(data));
 }
 
 const styles = StyleSheet.create({
@@ -173,7 +171,9 @@ function encarregado(data: ExportPayload): string {
   // resolve o encarregado (organização acima, instalação abaixo) é o coletor,
   // que é assíncrono e já busca `dpo_email` da organização. Deixar a busca aqui
   // obrigaria um componente de PDF a falar com o banco no meio do desenho.
-  return data.dpo_email || "não informado pelo controlador";
+  // Sem DPO, o rodapé diz quem não informou com o nome que a lei do país dá
+  // ao papel — a mesma frase das alíneas do art. 15.º (`naoInformado`).
+  return data.dpo_email || naoInformado(data);
 }
 
 // Concluir o processamento do job não comprova envio: ele também pode terminar

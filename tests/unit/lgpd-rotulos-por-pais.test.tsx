@@ -84,6 +84,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }),
 }));
+// O cartão das alíneas usa `useT`; aqui mede-se o TEXTO, não a tradução.
+vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
 vi.mock("@/lib/i18n/idiomaAnonimo", () => ({ idiomaDoVisitante: async () => "pt-BR" }));
 vi.mock("@/lib/legal/operador", () => ({
   resolverOperador: async () => operador.valor,
@@ -93,6 +95,7 @@ vi.mock("@/lib/legal/operador", () => ({
 import PrivacyPage from "@/app/legal/privacy/page";
 import { collectExportData, type ExportPayload } from "@/lib/lgpd/export-collector";
 import { LgpdExportPdf } from "@/lib/lgpd/pdf-renderer";
+import { Art15Form } from "@/app/app/settings/tenant/_art15";
 
 /** O payload da organização do país escolhido, pelo coletor de verdade. */
 async function payloadDe(country: string | null): Promise<ExportPayload> {
@@ -199,5 +202,34 @@ describe("Brasil: os termos continuam os da LGPD, e a citação é rotulada de d
     expect(texto).toContain("(CNPJ 12.345.678/0001-90)");
     expect(texto).toContain("A LGPD garante a você confirmar se há tratamento");
     expect(texto).toContain("fale com o encarregado de dados:");
+  });
+});
+
+describe("sem DPO, o rodapé e o cartão das alíneas falam a língua do PDF do país", () => {
+  it("Portugal: o rodapé sem DPO não chama o responsável de controlador", async () => {
+    const pdf = pdfDe({ ...(await payloadDe("PT")), dpo_email: null });
+
+    expect(pdf).toContain(
+      "Encarregado da proteção de dados: não informado pelo responsável pelo tratamento",
+    );
+    expect(pdf, "o PDF português ainda diz 'controlador' em algum lugar").not.toMatch(/controlador/i);
+  });
+
+  it("Brasil: o rodapé sem DPO é o texto de sempre, byte a byte", async () => {
+    const pdf = pdfDe({ ...(await payloadDe(null)), dpo_email: null });
+
+    expect(pdf).toContain("Encarregado (DPO): não informado pelo controlador");
+  });
+
+  it("o cartão de Configurações cita a frase que o PDF português REALMENTE imprime", async () => {
+    const pdf = pdfDe({ ...(await payloadDe("PT")), dpo_email: null });
+    const { container } = render(
+      <Art15Form pais="PT" initial={{ finalidades: "", destinatarios: "", prazo_conservacao: "" }} />,
+    );
+
+    const prometido = /«([^»]+)»/.exec(container.textContent ?? "")?.[1];
+    expect(prometido, "o cartão deixou de citar a frase do documento").toBeTruthy();
+    expect(pdf, `a tela promete «${prometido}», que o PDF não imprime`).toContain(prometido!);
+    expect(prometido).not.toMatch(/controlador/i);
   });
 });
