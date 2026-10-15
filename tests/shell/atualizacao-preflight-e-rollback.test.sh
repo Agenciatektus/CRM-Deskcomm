@@ -637,6 +637,15 @@ else
   ok "nenhum serviço foi parado, recriado ou removido"
 fi
 
+# A frase da moldura do update.sh ("nada foi parado") sai UMA vez: o motivo
+# repetia "Nada foi parado nem baixado" logo abaixo dela.
+n8="$(grep -ci 'nada foi parado' "$OUT8")"
+if [ "$n8" -eq 1 ]; then
+  ok "'nada foi parado' aparece uma vez só na tela"
+else
+  nao "frase sem repetição" "1 ocorrência de 'nada foi parado'" "$n8"
+fi
+
 # ════════════════════════════════════════════════════════════════════════════
 echo "── caso 8b — CONTROLE: alteração local que a versão alvo NÃO troca não trava"
 # O par do caso 8 isola a variável: mesma instalação, mesma sujeira, arquivo
@@ -661,15 +670,6 @@ if grep -qE ' (created|exited)$' "$DUB/estado.txt"; then
       "$(grep -E ' (created|exited)$' "$DUB/estado.txt" | tr '\n' ' ')"
 else
   ok "app, worker, scheduler e proxy saíram SAUDÁVEIS"
-fi
-
-# A frase da moldura do update.sh ("nada foi parado") sai UMA vez: o motivo
-# repetia "Nada foi parado nem baixado" logo abaixo dela.
-n8="$(grep -ci 'nada foi parado' "$OUT8")"
-if [ "$n8" -eq 1 ]; then
-  ok "'nada foi parado' aparece uma vez só na tela"
-else
-  nao "frase sem repetição" "1 ocorrência de 'nada foi parado'" "$n8"
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
