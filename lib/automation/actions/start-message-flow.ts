@@ -7,8 +7,9 @@ import { serviceForAutomation } from "@/lib/atendimento/origem-automacao";
  * PRODUTO — porque os dois caminhos são de fato diferentes:
  *
  *   * follow-up (padrão, `surface` ausente): `enrollFollowupFlow`, o mesmo
- *     caminho do POST de enrollments. Byte a byte como antes: toda regra já
- *     gravada continua inscrevendo no MESMO fluxo.
+ *     caminho do POST de enrollments. Toda regra já gravada continua
+ *     inscrevendo no MESMO fluxo; a única diferença é a guarda de opt-out,
+ *     que vale para as duas superfícies.
  *   * atendimento (`surface: "atendimento"`): `iniciarFluxoDeAtendimento`, a
  *     MESMA entrada da palavra-gatilho e do roteador. Não dá para reusar o
  *     enroll aqui — ele recusa superfície `atendimento` (`flow_not_enrollable`)
