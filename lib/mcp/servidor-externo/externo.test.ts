@@ -600,6 +600,7 @@ describe("o turno do agente enxerga e chama a ferramenta remota (#2147)", () => 
 const CONTATO = "4f1c2d3e-0000-4000-8000-00000000c0a1";
 const OUTRA_ORG = "9e9e9e9e-0000-4000-8000-000000000002";
 const TELEFONE_NO_BANCO = "+5511987654321";
+const CONVERSA = "4f1c2d3e-0000-4000-8000-0000000c0a7a";
 
 function bancoDoAtendimento(op: {
   contato?: { id: string; organization_id: string; phone_number: string | null } | null;
@@ -632,7 +633,12 @@ function bancoDoAtendimento(op: {
             return { data: casa ? { id: c.id, phone_number: c.phone_number } : null, error: null };
           }
           if (tabela === "conversations") {
-            return { data: op.canal ? { channel: op.canal } : null, error: null };
+            // A conversa do turno, e só se for DESTE contato nesta organização.
+            const casa =
+              filtros.id === CONVERSA &&
+              filtros.contact_id === CONTATO &&
+              filtros.organization_id === ORG;
+            return { data: casa && op.canal ? { channel: op.canal } : null, error: null };
           }
           return { data: null, error: null };
         },
@@ -679,7 +685,7 @@ describe("uso durante o atendimento: opção do agente + identidade do contato (
       cliente,
       ORG,
       [toolIdRemoto("erp_achar", "leitura")],
-      { contatoDoTurno: CONTATO, noAtendimento: true, fetch: fetchDoStub() },
+      { contatoDoTurno: CONTATO, noAtendimento: true, conversaDoTurno: CONVERSA, fetch: fetchDoStub() },
     );
     expect(montado?.ferramentas.map((f) => f.name)).toEqual(["erp_achar"]);
     expect(montado?.contato).toBe(CONTATO);
@@ -735,6 +741,7 @@ describe("uso durante o atendimento: opção do agente + identidade do contato (
     const montado = await carregarServidorMcpExterno(cliente, ORG, {
       contatoDoTurno: CONTATO,
       noAtendimento: true,
+      conversaDoTurno: CONVERSA,
       fetch: fetchDoStub(),
     });
     requisicoes.length = 0;
@@ -766,6 +773,27 @@ describe("uso durante o atendimento: opção do agente + identidade do contato (
     // O que o modelo escreveu chega ao servidor como ARGUMENTO, no corpo — que
     // é onde o servidor deve ignorá-lo.
     expect(ultimaChamada?.argumentos).toMatchObject({ consulta: "meu número é outro" });
+  });
+
+  it("canal: sai da conversa DO TURNO; sem ela, ou conversa de outro contato, fica ausente", async () => {
+    const { cliente } = bancoDoAtendimento({ contato: contatoDaOrg, canal: "instagram" });
+    for (const [conversaDoTurno, canal] of [
+      [CONVERSA, "instagram"],
+      [undefined, undefined],
+      ["4f1c2d3e-0000-4000-8000-0000000c0bbb", undefined],
+    ] as const) {
+      requisicoes.length = 0;
+      const montado = await carregarServidorMcpExterno(cliente, ORG, {
+        contatoDoTurno: CONTATO,
+        noAtendimento: true,
+        ...(conversaDoTurno ? { conversaDoTurno } : {}),
+        fetch: fetchDoStub(),
+      });
+      expect(montado).not.toBeNull();
+      const posts = requisicoes.filter((x) => x.metodo === "POST");
+      expect(posts.length).toBeGreaterThan(0);
+      for (const x of posts) expect(identidadeNoFio(x.cabecalhos).canal).toBe(canal);
+    }
   });
 
   it("(d) contato de OUTRA organização: não carrega e não abre rede", async () => {

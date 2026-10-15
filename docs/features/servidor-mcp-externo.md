@@ -35,7 +35,7 @@ o modelo escreve:
 |---|---|
 | `X-Deskcomm-Contato-Id` | id (uuid) do contato da conversa |
 | `X-Deskcomm-Contato-Telefone` | telefone do contato em dígitos E.164, sem `+` (ex.: `5511987654321`). Ausente se o contato não tem telefone. |
-| `X-Deskcomm-Canal` | canal da conversa (ex.: `whatsapp`), quando conhecido |
+| `X-Deskcomm-Canal` | canal da conversa do turno (ex.: `whatsapp`, `instagram`); ausente quando o turno não a informa |
 
 **O servidor externo DEVE filtrar os dados por esses cabeçalhos e ignorar
 qualquer identificador que venha da conversa** (argumentos da ferramenta como

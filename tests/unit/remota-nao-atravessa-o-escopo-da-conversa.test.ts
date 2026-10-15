@@ -190,7 +190,7 @@ describe("remota classificada como escrita cai na conferência de escopo do turn
 
 // ─── 3. Escolha (b) na origem ────────────────────────────────────────────────
 
-describe("turno com contato não carrega servidor remoto nenhum (item 8, escolha (b))", () => {
+describe("turno com contato, sem a opção do agente, não carrega servidor remoto nenhum (item 8, escolha (b))", () => {
   it("devolve `null` sem tocar em banco e sem abrir rede", async () => {
     const supabase = supabaseDeMentira();
     const montado = await carregarServidorMcpExterno(supabase.cliente, ORG, {

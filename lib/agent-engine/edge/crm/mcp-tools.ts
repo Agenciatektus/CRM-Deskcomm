@@ -62,7 +62,13 @@ export async function buildMcpTurnTools(
    * Obrigatório de propósito: `null` só onde não há cliente (o ensaio do agente);
    * omiti-lo num turno de conversa abriria as leituras escopadas por ele.
    */
-  ids: { organizationId: string; jobId: string; contactId: string | null },
+  ids: {
+    organizationId: string;
+    jobId: string;
+    contactId: string | null;
+    /** A conversa do turno — o canal que o servidor MCP externo recebe (#2147). */
+    conversationId?: string | null;
+  },
   agentConfig: PublishedAgentConfig,
   log: Logger,
   options?: { readOnly: boolean },
@@ -144,7 +150,12 @@ export async function buildMcpTurnTools(
       ...(ids.contactId
         ? {
             contatoDoTurno: ids.contactId,
-            ...(agentConfig.mcpExternoNoAtendimento === true ? { noAtendimento: true } : {}),
+            ...(agentConfig.mcpExternoNoAtendimento === true
+              ? {
+                  noAtendimento: true,
+                  ...(ids.conversationId ? { conversaDoTurno: ids.conversationId } : {}),
+                }
+              : {}),
           }
         : {}),
     },

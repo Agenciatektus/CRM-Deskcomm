@@ -79,6 +79,8 @@ export interface OpcoesDeCarga {
   contatoDoTurno?: string;
   /** `ai_agents.config.mcp_externo_no_atendimento` do agente do turno. */
   noAtendimento?: boolean;
+  /** A CONVERSA deste turno — de onde sai `X-Deskcomm-Canal`. */
+  conversaDoTurno?: string;
   /** `fetch` de saída para a descoberta — teste stuba o ERP em `127.0.0.1`. */
   fetch?: FetchLike;
 }
@@ -92,14 +94,16 @@ const CANAL_VALIDO = /^[a-z_]{1,32}$/;
  * contato de outra organização ou inexistente) — e aí o servidor não carrega.
  *
  * Telefone em dígitos E.164, sem o `+` (a coluna guarda `+5511...`); ausente
- * quando o contato não tem telefone. Canal da conversa mais recente do
- * contato; ausente quando não se sabe — ele é contexto, não identidade, e por
- * isso a falha dele não fecha a carga.
+ * quando o contato não tem telefone. Canal da conversa DO TURNO (lida pelo id,
+ * pela organização e pelo contato); ausente quando o turno não a informa ou
+ * ela não resolve — ele é contexto, não identidade, e por isso a falha dele
+ * não fecha a carga.
  */
 async function cabecalhosDoContato(
   supabase: SupabaseClient,
   organizationId: string,
   contatoId: string,
+  conversaId: string | undefined,
 ): Promise<Record<string, string> | null> {
   const { data, error } = await supabase
     .from("contacts")
@@ -121,13 +125,13 @@ async function cabecalhosDoContato(
     typeof contato.phone_number === "string" ? contato.phone_number.replace(/\D/g, "") : "";
   if (digitos !== "") cabecalhos[CABECALHOS_DO_CONTATO.telefone] = digitos;
 
+  if (!conversaId) return cabecalhos;
   const { data: conversa } = await supabase
     .from("conversations")
     .select("channel")
     .eq("organization_id", organizationId)
+    .eq("id", conversaId)
     .eq("contact_id", contatoId)
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .limit(1)
     .maybeSingle();
   const canal = (conversa as { channel?: unknown } | null)?.channel;
   if (typeof canal === "string" && CANAL_VALIDO.test(canal)) {
@@ -186,7 +190,7 @@ export async function carregarServidorMcpExterno(
 
   const contato = opcoes?.contatoDoTurno;
   const cabecalhos = contato
-    ? await cabecalhosDoContato(supabase, organizationId, contato)
+    ? await cabecalhosDoContato(supabase, organizationId, contato, opcoes?.conversaDoTurno)
     : undefined;
   if (cabecalhos === null) return null;
 

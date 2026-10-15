@@ -632,7 +632,12 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
         ...(contatoDoTurno
           ? {
               contatoDoTurno,
-              ...(agent?.config?.mcp_externo_no_atendimento === true ? { noAtendimento: true } : {}),
+              ...(agent?.config?.mcp_externo_no_atendimento === true
+                ? {
+                    noAtendimento: true,
+                    ...(run.conversation_id ? { conversaDoTurno: run.conversation_id } : {}),
+                  }
+                : {}),
             }
           : {}),
       },
