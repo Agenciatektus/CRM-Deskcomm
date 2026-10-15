@@ -70,7 +70,9 @@ describe("o add_tag atômico (#2888) no schema", () => {
 
   it("⭐ EXECUTE só para service_role, e revogado de public/anon/authenticated", () => {
     const sql = lerMigration();
-    expect(sql.match(/security definer/g)).toHaveLength(2);
+    // Uma linha `security definer` por cabeçalho de função — o texto do
+    // `-- manifest:` também cita a expressão, e não conta como definição.
+    expect(sql.match(/^security definer$/gm)).toHaveLength(2);
     expect(sql).toContain("from public, anon, authenticated;");
     for (const f of ["fn_lead_adicionar_etiquetas", "fn_contato_adicionar_etiquetas"]) {
       expect(sql).toContain(`revoke all on function public.${f}(uuid, uuid, text[]) from public, anon, authenticated;`);
