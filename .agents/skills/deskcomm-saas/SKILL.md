@@ -98,7 +98,7 @@ que ela erra:
 ## Para conferir em vez de afirmar
 
 - Versão no ar: `curl -s https://SEU_DOMINIO/api/v1/health` (campo `"version"`).
-- CRM no ar: `curl -sI https://SEU_DOMINIO/app | head -1` dá `HTTP/2 307`. A raiz dá `200`,
+- CRM no ar: `curl -sSI https://SEU_DOMINIO/app | head -1` dá `HTTP/2 307`. A raiz dá `200`,
   porque é uma página pública.
 - Regras da troca de plano: `lib/cobranca/troca.ts`, comentário do topo.
 - Provedores aceitos pela cobrança: `lib/cobranca/provedores/`.

@@ -245,6 +245,9 @@ export const AUDIT_ACTIONS = [
   "channel.social_configured",
   "channel.social_disconnected",
   "channel.social_desvinculado",
+  // Reescreve a URL da assinatura de webhook do canal social pela origem atual
+  // (#2863): não arquiva a linha nem cria canal — só reconcilia o endereço.
+  "channel.social_webhook_ressincronizado",
   "channel.ai_access_updated",
   "channel.acervo_updated",
   "channel.reconnected",
