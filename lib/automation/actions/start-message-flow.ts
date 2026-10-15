@@ -57,6 +57,15 @@ export async function executeStartMessageFlow(
     return { type: TYPE, status: "skipped", detail: { reason: "no_contact" } };
   }
 
+  // Quem pediu opt-out não é inscrito em fluxo nenhum, das DUAS superfícies.
+  // Sem esta guarda, o contato bloqueado ganhava roteiro (ou follow-up) vivo,
+  // a ficha mostrava o fluxo e o run dizia "Sucesso". O motor hidrata
+  // `context.contact` com a linha inteira do banco — a mesma fonte que
+  // `checarGuardasDeContato` lê nas ações que mandam mensagem.
+  if ((ctx.context.contact as { is_blocked?: boolean } | undefined)?.is_blocked === true) {
+    return { type: TYPE, status: "skipped", detail: { reason: "contact_blocked" } };
+  }
+
   // Só `atendimento` desvia. Qualquer outra valor — incluindo ausente — é o
   // follow-up de sempre, que é o que toda regra existente aponta.
   const superficie: Superficie = config.surface === "atendimento" ? "atendimento" : "followup";

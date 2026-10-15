@@ -135,6 +135,24 @@ describe("start_message_flow — a superfície escolhe o caminho (#2647)", () =>
     expect(result.detail).toEqual({ reason: "roteiro_nao_iniciado" });
   });
 
+  it.each([undefined, "atendimento"])(
+    "contato que pediu opt-out não é inscrito (surface=%s)",
+    async (surface) => {
+      const ctx = baseCtx();
+      ctx.context = { contact: { id: "c-1", is_blocked: true } };
+
+      const result = await executeStartMessageFlow(ctx, { flow_pointer_id: POINTER, surface });
+
+      expect(result).toEqual({
+        type: "start_message_flow",
+        status: "skipped",
+        detail: { reason: "contact_blocked" },
+      });
+      expect(enroll).not.toHaveBeenCalled();
+      expect(iniciar).not.toHaveBeenCalled();
+    },
+  );
+
   it("com o módulo Fluxos de atendimento desligado, não arma roteiro que ninguém conduz", async () => {
     modulo.mockResolvedValue(false);
 
