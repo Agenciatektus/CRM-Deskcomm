@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bancoFalso, filtros, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
+import { argumentos, bancoFalso, filtros, valorDoFiltro, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
 const h = vi.hoisted(() => ({ enviar: vi.fn(), aviso: vi.fn() }));
 vi.mock("@/lib/email/roteador", () => ({ sendEmail: h.enviar }));
@@ -11,7 +11,7 @@ vi.mock("@/lib/branding/saida", async (importOriginal) => ({
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "https://crm.exemplo.com/" } }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: h.aviso, error: vi.fn(), info: vi.fn() } }));
 
-import { avisarTrocaDeChave, enviarAvisoAosAdmins } from "./emails";
+import { avisarTrocaDeChave, emailDoAdminDaEmpresa, enviarAvisoAosAdmins } from "./emails";
 
 const ORG = "aaaaaaaa-0000-4000-8000-000000000001";
 const TEXTO = { titulo: "Não identificamos o pagamento de 05/10", corpo: "Pague pelo link.", severidade: "warn" as const };
@@ -73,5 +73,60 @@ describe("avisarTrocaDeChave", () => {
     expect(filtros(banco.cadeias[0]!)).toEqual([["eq", "scope", "full"], ["is", "revoked_at", null]]);
     expect(h.enviar.mock.calls[0]?.[0].subject).toContain("…1234 → …5678");
     expect(h.enviar.mock.calls[0]?.[0].html).toContain('href="https://crm.exemplo.com/admin/cobranca"');
+  });
+});
+
+describe("emailDoAdminDaEmpresa (o e-mail do cliente quando o dono gera o link)", () => {
+  /** Responde `platform_admins` com `donos` e `user_organizations` com `admins`. */
+  const comDonos = (donos: string[], admins: (c: Cadeia) => string[]) =>
+    montar((c) => ({ data: (c.tabela === "platform_admins" ? donos : admins(c)).map((user_id) => ({ user_id })) }));
+
+  it("⭐ devolve o admin ativo mais antigo: a leitura ordena por created_at e filtra a org", async () => {
+    const { admin, banco } = comDonos([], () => ["ana", "bia"]);
+    expect(await emailDoAdminDaEmpresa(admin, ORG)).toBe("ana@exemplo.com");
+    const leitura = banco.cadeias.find((c) => c.tabela === "user_organizations")!;
+    expect(filtros(leitura)).toEqual([
+      ["eq", "organization_id", ORG],
+      ["eq", "role", "admin"],
+      ["is", "revoked_at", null],
+      ["eq", "provisional_until_handover", false],
+    ]);
+    expect(argumentos(leitura, "order")).toEqual(["created_at"]);
+    expect(filtros(banco.cadeias.find((c) => c.tabela === "platform_admins")!)).toEqual([["is", "revoked_at", null]]);
+  });
+
+  it("⭐ vínculo provisório do dono não conta como admin da empresa: convite pendente → null (409 empresa_sem_email)", async () => {
+    // O dono criou a empresa para outra pessoa: o único admin ativo é ele, provisório (fn_create_tenant_with_owner).
+    // `platform_admins` vazio isola o filtro de provisório da exclusão dos donos.
+    const { admin } = comDonos([], (c) => (valorDoFiltro(c, "eq", "provisional_until_handover") === false ? [] : ["dono"]));
+    expect(await emailDoAdminDaEmpresa(admin, ORG)).toBeNull();
+    // Os avisos da régua seguem chegando ao dono provisório.
+    await enviarAvisoAosAdmins(admin, { id: ORG, idioma: "pt-BR" }, TEXTO, null);
+    expect(h.enviar.mock.calls.map((c) => c[0].to)).toEqual(["dono@exemplo.com"]);
+  });
+
+  it("⭐ empresa criada antes da 0237: o vínculo do dono não é provisório e é o mais antigo, e mesmo assim fica de fora", async () => {
+    const { admin } = comDonos(["dono"], () => ["dono", "cliente"]);
+    expect(await emailDoAdminDaEmpresa(admin, ORG)).toBe("cliente@exemplo.com");
+  });
+
+  it("⭐ empresa antiga ainda não entregue: o único admin é o dono → null (409 empresa_sem_email)", async () => {
+    const { admin } = comDonos(["dono"], () => ["dono"]);
+    expect(await emailDoAdminDaEmpresa(admin, ORG)).toBeNull();
+  });
+
+  it("null quando nenhum admin tem e-mail", async () => {
+    const { admin } = comDonos([], () => []);
+    expect(await emailDoAdminDaEmpresa(admin, ORG)).toBeNull();
+  });
+
+  it("lança se a leitura dos admins falhar (quem chama decide; nunca um null que vira 'sem admin')", async () => {
+    const { admin } = montar((c) => (c.tabela === "platform_admins" ? { data: [] } : { error: { code: "57014", message: "timeout" } }));
+    await expect(emailDoAdminDaEmpresa(admin, ORG)).rejects.toThrow("admins ilegíveis (57014)");
+  });
+
+  it("lança se a leitura dos donos falhar: sem ela, o e-mail do dono poderia ir para o provedor", async () => {
+    const { admin } = montar((c) => (c.tabela === "platform_admins" ? { error: { code: "57014", message: "timeout" } } : { data: [{ user_id: "ana" }] }));
+    await expect(emailDoAdminDaEmpresa(admin, ORG)).rejects.toThrow("donos ilegíveis (57014)");
   });
 });

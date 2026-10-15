@@ -25,6 +25,46 @@ async function emailsDe(admin: SupabaseClient, ids: readonly string[]): Promise<
   return [...new Set(lidos.filter((e): e is string => typeof e === "string" && e.includes("@")))];
 }
 
+/**
+ * Admins ativos da empresa, o mais antigo primeiro. LANÇA se a leitura falhar.
+ * `semProvisorio` tira o vínculo que o dono ganha ao criar a empresa para outra
+ * pessoa (`provisional_until_handover`, até o convite ser aceito): sem isso, o
+ * "admin mais antigo" de uma empresa recém-criada é o próprio dono. `exceto`
+ * tira esses usuários antes de ler o e-mail deles.
+ */
+export async function emailsDosAdmins(
+  admin: SupabaseClient,
+  orgId: string,
+  { semProvisorio = false, exceto = [] }: { semProvisorio?: boolean; exceto?: readonly string[] } = {},
+): Promise<string[]> {
+  let consulta = admin
+    .from("user_organizations")
+    .select("user_id")
+    .eq("organization_id", orgId)
+    .eq("role", "admin")
+    .is("revoked_at", null);
+  if (semProvisorio) consulta = consulta.eq("provisional_until_handover", false);
+  const { data, error } = await consulta.order("created_at");
+  if (error) throw new Error(`admins ilegíveis (${error.code ?? "sem_codigo"})`);
+  const ids = ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id);
+  return emailsDe(admin, ids.filter((id) => !exceto.includes(id)));
+}
+
+/**
+ * O e-mail do cliente da empresa no provedor quando quem gera o link é o dono
+ * (D-15): fica gravado no cliente para sempre, então nunca o de um dono da
+ * instalação. O filtro de provisório não basta: o vínculo de quem criou a
+ * empresa antes da migration 0237 ficou `provisional_until_handover = false`
+ * (sem expurgo retroativo) e sobrevive ao aceite do convite, ativo e mais antigo
+ * que o do cliente. Os avisos (`enviarAvisoAosAdmins`) seguem chegando a ele.
+ */
+export async function emailDoAdminDaEmpresa(admin: SupabaseClient, orgId: string): Promise<string | null> {
+  const { data, error } = await admin.from("platform_admins").select("user_id").is("revoked_at", null);
+  if (error) throw new Error(`donos ilegíveis (${error.code ?? "sem_codigo"})`);
+  const donos = ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id);
+  return (await emailsDosAdmins(admin, orgId, { semProvisorio: true, exceto: donos }))[0] ?? null;
+}
+
 async function enviarParaCada(
   para: readonly string[],
   email: { subject: string; html: string; text: string },
@@ -44,14 +84,7 @@ export async function enviarAvisoAosAdmins(
   linkDePagamento: string | null,
 ): Promise<void> {
   try {
-    const { data, error } = await admin
-      .from("user_organizations")
-      .select("user_id")
-      .eq("organization_id", org.id)
-      .eq("role", "admin")
-      .is("revoked_at", null);
-    if (error) throw new Error(`admins ilegíveis (${error.code ?? "sem_codigo"})`);
-    const para = await emailsDe(admin, ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id));
+    const para = await emailsDosAdmins(admin, org.id);
     if (para.length === 0) return;
     const t = (s: string) => traduzir(s, org.idioma);
     const marca = await marcaDaSaida(org.id);
