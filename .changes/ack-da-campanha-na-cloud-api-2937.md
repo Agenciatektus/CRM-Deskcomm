@@ -13,4 +13,4 @@ Agora o entregue e o lido da API oficial alcançam o destinatário e as taxas da
 campanha acompanham, igual ao canal não oficial. A atualização aplica a mudança
 de banco sozinha.
 
-Contribuição de @webtecnica, a partir da issue #2937.
+Contribuição de @webtecnica (#2946), a partir da issue #2937.
