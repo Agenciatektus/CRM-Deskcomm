@@ -404,7 +404,7 @@ export async function aplicarAgendas(
  * A batida COM o aviso da Central (critério 6 da #2388).
  *
  * Envolve `aplicarAgendas` e sincroniza o aviso do agendador: falha vira aviso
- * com o motivo; batida inteira fecha o aviso de uma falha anterior (o laço de
+ * (o motivo vai para o log); batida inteira fecha o aviso de uma falha anterior (o laço de
  * retorno, DoD 13). O erro da batida CONTINUA subindo — a rota responde 500 e o
  * cron tenta de novo; o aviso é acessório e nunca engole o incidente.
  */

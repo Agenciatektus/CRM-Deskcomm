@@ -46,7 +46,7 @@ import type { Logger } from "@/lib/agent-engine/obs/logger";
 export const TITULO_DO_AVISO_DO_AGENDADOR =
   "A pausa agendada de conexões não está sendo aplicada";
 
-const CORPO_DO_AVISO =
+export const CORPO_DO_AVISO_DO_AGENDADOR =
   "O agendador das janelas de manutenção não conseguiu aplicar uma batida: " +
   "uma janela pode ter deixado de pausar ou de retomar no horário marcado. " +
   "A próxima tentativa é automática; se este aviso continuar aberto, verifique " +
@@ -61,7 +61,11 @@ const CORPO_DO_AVISO =
 const KIND_DO_AVISO = "other";
 
 export type EstadoDoAgendador =
-  /** A batida não foi aplicada (lançou, ou recusou escrita): abre/mantém o aviso com o motivo. */
+  /**
+   * A batida não foi aplicada (lançou, ou recusou escrita): abre/mantém o aviso.
+   * O `motivo` é detalhe técnico: vai só para o LOG. O corpo do aviso é fixo,
+   * como em `lib/event-log/aviso-do-laco.ts`.
+   */
   | { estado: "falhou"; motivo: string }
   /** A batida foi aplicada por inteiro: o incidente — se havia — deixou de valer. */
   | { estado: "saudavel" };
@@ -71,7 +75,7 @@ export type EstadoDoAgendador =
  *
  * - `saudavel`: fecha todos os avisos abertos deste incidente (idempotente);
  * - `falhou`: abre um aviso por organização que ainda não tenha um aberto, com
- *   o motivo no corpo;
+ *   corpo fixo (o motivo vai só para o log);
  * - qualquer falha aqui é logada e NUNCA sobe para quem chamou.
  */
 export async function sincronizarAvisoDoAgendador(
@@ -123,12 +127,16 @@ export async function sincronizarAvisoDoAgendador(
         kind: KIND_DO_AVISO,
         severity: "warn" as const,
         title: TITULO_DO_AVISO_DO_AGENDADOR,
-        body: `${CORPO_DO_AVISO}\n\nMotivo: ${estado.motivo}`,
+        body: CORPO_DO_AVISO_DO_AGENDADOR,
         ref_kind: null,
         ref_id: null,
       })),
     );
     if (erroInsert) throw new Error(`abrir aviso: ${erroInsert.message}`);
+    log.info("[channel-pause-scheduler] aviso do agendador aberto na Central", {
+      organizacoes: faltantes.length,
+      motivo: estado.motivo.slice(0, 300),
+    });
   } catch (err) {
     // `warn`, e não `error`: o aviso na Central é acessório. O incidente da
     // batida já tem o seu `log.error` (ou o 500 da rota); uma Central lenta não

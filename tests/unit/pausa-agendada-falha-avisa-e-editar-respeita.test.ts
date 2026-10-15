@@ -8,8 +8,9 @@
  * critério 6 (falha do agendador vira aviso na Central, em vez de silêncio no
  * log) e "editar uma janela já agendada" ficaram para depois. É isto aqui.
  *
- *   (a) Uma batida que FALHA abre UM aviso por organização na Central, com o
- *       motivo — nunca um por canal (critério 6) — e uma batida saudável FECHA
+ *   (a) Uma batida que FALHA abre UM aviso por organização na Central, com
+ *       corpo fixo (o motivo vai só para o log) — nunca um por canal
+ *       (critério 6) — e uma batida saudável FECHA
  *       o aviso de uma falha anterior (o laço do `canal-mudo-watcher`, DoD 13).
  *   (b) Editar uma janela que ainda não começou grava o horário NOVO, e o cron
  *       respeita o horário NOVO: no instante do horário ANTIGO já não pausa, e
@@ -39,6 +40,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import {
+  CORPO_DO_AVISO_DO_AGENDADOR,
   sincronizarAvisoDoAgendador,
   TITULO_DO_AVISO_DO_AGENDADOR,
 } from "@/lib/channels/aviso-do-agendador";
@@ -55,8 +57,8 @@ type Linha = Record<string, unknown>;
 type Filtro = [string, unknown[]];
 type Operacao = { tabela: string; tipo: "select" | "insert" | "update"; valor: unknown; filtros: Filtro[] };
 
-/** O logger de mentira que o módulo recebe; só o `warn` é usado. */
-const logFake = { warn: vi.fn() };
+/** O logger de mentira que o módulo recebe: `info` leva o motivo, `warn` a falha da Central. */
+const logFake = { info: vi.fn(), warn: vi.fn() };
 
 /**
  * Banco falso para as batidas do cron e para o aviso da Central.
@@ -163,7 +165,7 @@ beforeEach(() => {
 });
 
 describe("a falha do agendador vira aviso na Central (critério 6 da #2388)", () => {
-  it("abre UM aviso por organização, com o motivo — nunca um por canal", async () => {
+  it("abre UM aviso por organização, com corpo fixo — nunca um por canal", async () => {
     const db = dbFalso({ todasAsOrgs: [ORG, ORG_2], abertos: [] });
 
     await sincronizarAvisoDoAgendador(
@@ -179,7 +181,13 @@ describe("a falha do agendador vira aviso na Central (critério 6 da #2388)", ()
     expect(linhas).toHaveLength(2);
     expect(linhas.map((l) => l.organization_id)).toEqual([ORG, ORG_2]);
     expect(linhas[0]).toMatchObject({ kind: "other", severity: "warn", title: TITULO_DO_AVISO_DO_AGENDADOR });
-    expect(String(linhas[0]?.body)).toContain("leitura da agenda: conexão recusada");
+    // O corpo é FIXO: o motivo é detalhe técnico e vai só para o log.
+    expect(linhas[0]?.body).toBe(CORPO_DO_AVISO_DO_AGENDADOR);
+    expect(String(linhas[0]?.body)).not.toContain("leitura da agenda");
+    expect(logFake.info).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ motivo: "leitura da agenda: conexão recusada" }),
+    );
   });
 
   it("não reabre o aviso de quem já tem um aberto (dedup pelo título)", async () => {
@@ -223,7 +231,7 @@ describe("a falha do agendador vira aviso na Central (critério 6 da #2388)", ()
     expect(logFake.warn).toHaveBeenCalled();
   });
 
-  it("o cron que não consegue aplicar a janela abre o aviso COM o motivo e segue falhando alto", async () => {
+  it("o cron que não consegue aplicar a janela abre o aviso SEM o motivo no corpo e segue falhando alto", async () => {
     const db = dbFalso({ erroAgenda: "leitura da agenda: conexão recusada", todasAsOrgs: [ORG] });
 
     await expect(aplicarAgendasEavisar(db as never, new Date("2026-10-10T03:00:00Z"))).rejects.toThrow(
@@ -232,10 +240,11 @@ describe("a falha do agendador vira aviso na Central (critério 6 da #2388)", ()
 
     const linhas = db.operacoes.find((o) => o.tipo === "insert")?.valor as Array<Linha>;
     expect(linhas).toHaveLength(1);
-    expect(String(linhas[0]?.body)).toContain("leitura da agenda: conexão recusada");
+    expect(String(linhas[0]?.body)).not.toContain("leitura da agenda");
+    expect(linhas[0]?.body).toBe(CORPO_DO_AVISO_DO_AGENDADOR);
   });
 
-  it("escrita de canal recusada também vira aviso, com a contagem da batida", async () => {
+  it("escrita de canal recusada também vira aviso, e a contagem vai para o log", async () => {
     const db = dbFalso({
       agendas: [
         {
@@ -259,7 +268,8 @@ describe("a falha do agendador vira aviso na Central (critério 6 da #2388)", ()
     expect(resumo.falhas).toBe(1);
     const linhas = db.operacoes.find((o) => o.tipo === "insert")?.valor as Array<Linha>;
     expect(linhas).toHaveLength(1);
-    expect(String(linhas[0]?.body)).toContain("1 escrita(s) recusada(s)");
+    expect(linhas[0]?.body).toBe(CORPO_DO_AVISO_DO_AGENDADOR);
+    expect(String(linhas[0]?.body)).not.toContain("escrita(s) recusada(s)");
   });
 });
 
@@ -267,8 +277,12 @@ describe("editar a janela: o relógio respeita o horário NOVO (critério 2 da #
   const daqui = (horas: number) => new Date(Date.now() + horas * 3_600_000);
   const iso = (d: Date) => d.toISOString();
 
-  /** Banco falso só para a rota PATCH: guarda a linha e o claim por status. */
-  function dbDaRota(linhas: Linha[]) {
+  /**
+   * Banco falso só para a rota PATCH: guarda a linha, respeita o filtro de
+   * organização e o claim por status. `depoisDoSelect` simula o cron virando a
+   * janela entre a leitura e a escrita da rota.
+   */
+  function dbDaRota(linhas: Linha[], depoisDoSelect?: (linha: Linha) => void) {
     function tabela(nome: string) {
       const ctx: { filtros: Filtro[]; tipo: "select" | "update"; valor: unknown } = {
         filtros: [],
@@ -302,14 +316,18 @@ describe("editar a janela: o relógio respeita o horário NOVO (critério 2 da #
     ): Promise<{ data: unknown; error: null }> {
       if (nome !== "channel_schedules") throw new Error(`tabela não prevista: ${nome}`);
       const id = String(valorDe(ctx.filtros, "eq", "id") ?? "");
-      const alvo = linhas.find((l) => l.id === id);
+      const org = valorDe(ctx.filtros, "eq", "organization_id");
+      const alvo = linhas.find((l) => l.id === id && (org === undefined || l.organization_id === org));
       if (ctx.tipo === "update") {
         const esperado = valorDe(ctx.filtros, "eq", "status");
         if (!alvo || (esperado && alvo.status !== esperado)) return { data: [], error: null };
         Object.assign(alvo, ctx.valor as Linha);
         return { data: [{ id }], error: null };
       }
-      return { data: alvo ?? null, error: null };
+      if (!alvo) return { data: null, error: null };
+      const lida = { ...alvo };
+      depoisDoSelect?.(alvo);
+      return { data: lida, error: null };
     }
 
     return { from: (nome: string) => tabela(nome), rpc: vi.fn() };
@@ -383,6 +401,53 @@ describe("editar a janela: o relógio respeita o horário NOVO (critério 2 da #
     const corpo = (await r.json()) as { error: { message: string } };
     expect(corpo.error.message).toContain("ainda não começou");
     expect(linha.starts_at).toBe(inicioAntigo);
+  });
+
+  it("não edita janela de OUTRA organização (404, nada gravado)", async () => {
+    const inicioAntigo = iso(daqui(2));
+    const linha: Linha = {
+      id: JANELA,
+      organization_id: ORG_2,
+      status: "scheduled",
+      starts_at: inicioAntigo,
+      ends_at: iso(daqui(3)),
+    };
+    vi.mocked(createAdminClient).mockReturnValue(dbDaRota([linha]) as never);
+
+    const r = await PATCH(reqPatch(JANELA, { starts_at: iso(daqui(6)), ends_at: iso(daqui(8)) }), {
+      params: Promise.resolve({ id: JANELA }),
+    });
+
+    expect(r.status).toBe(404);
+    expect(linha.starts_at).toBe(inicioAntigo);
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("perde a corrida para o cron que abriu a janela: 409 e nada gravado", async () => {
+    const inicioAntigo = iso(daqui(2));
+    const linha: Linha = {
+      id: JANELA,
+      organization_id: ORG,
+      status: "scheduled",
+      starts_at: inicioAntigo,
+      ends_at: iso(daqui(3)),
+    };
+    // A rota lê `scheduled`; antes do update, o cron vira a linha para `running`.
+    vi.mocked(createAdminClient).mockReturnValue(
+      dbDaRota([linha], (l) => {
+        l.status = "running";
+      }) as never,
+    );
+
+    const r = await PATCH(reqPatch(JANELA, { starts_at: iso(daqui(6)), ends_at: iso(daqui(8)) }), {
+      params: Promise.resolve({ id: JANELA }),
+    });
+
+    expect(r.status).toBe(409);
+    const corpo = (await r.json()) as { error: { message: string } };
+    expect(corpo.error.message).toContain("mudou de estado");
+    expect(linha.starts_at).toBe(inicioAntigo);
+    expect(audit).not.toHaveBeenCalled();
   });
 
   it("sem papel admin não há edição sequer", async () => {
