@@ -132,11 +132,14 @@ export function PainelDeTags({ tags, idioma }: { tags: LinhaDeVocabulario[]; idi
    * só chega depois, quando já não há o que desfazer. Mesma régua visual do
    * aviso de `excluir`: uma frase que diz o que vai acontecer, não um "tem
    * certeza?".
+   *
+   * Compara com `destinos`, que já exclui a própria etiqueta: mudar só a caixa
+   * ("cliente" → "Cliente") é renome, não junção.
    */
   const destinoJaExiste =
     acao === "renomear" &&
     destino.trim().length > 0 &&
-    tags.some((linha) => linha.tag.toLowerCase() === destino.trim().toLowerCase());
+    destinos.some((linha) => linha.tag.toLowerCase() === destino.trim().toLowerCase());
 
   function abrir(linha: LinhaDeVocabulario, qual: AcaoDeVocabulario) {
     setAlvo(linha);
