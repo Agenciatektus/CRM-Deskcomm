@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 
+import { WARMUP_PULADO } from "@/lib/ai/pacing-knobs";
 import { dispatchWahaEvent, type WahaEnvelope } from "@/lib/waha/ingest";
 
 /**
@@ -25,10 +26,11 @@ import { dispatchWahaEvent, type WahaEnvelope } from "@/lib/waha/ingest";
  * ─── O que estes casos prendem ──────────────────────────────────────────────
  *
  * Que a PRIMEIRA `WORKING` grave o início do aquecimento; que nenhum outro
- * status grave; que a mesma `WORKING` que começa NÃO conclua (começar e
- * terminar são dois eventos); que, com o escritor no lugar, `is_warmup_complete`
- * vira `true` quando o aquecimento termina — e que NINGUÉM atribua a coluna
- * gerada, porque atribuir aborta o UPDATE INTEIRO, inclusive o `status`.
+ * status grave; que o FIM siga a régua do controle de ritmo, escolhida pelo
+ * mantenedor na #2432, e não "a próxima WORKING" — que chega na primeira reconexão e
+ * marcaria aquecido um número de um dia; que número com idade declarada
+ * suficiente ou com "pular o aquecimento" fique aquecido; e que NINGUÉM atribua
+ * a coluna gerada, porque atribuir aborta o UPDATE INTEIRO, inclusive o `status`.
  *
  * O evento entra por `dispatchWahaEvent` — o mesmo roteador que a rota do
  * webhook chama — e o que se afirma é o UPDATE gravado numa
@@ -60,6 +62,16 @@ const linha: Record<string, unknown> = {
   phone_number: null,
 };
 
+/**
+ * A linha de `channel_knobs` desta conexão — `null` = nunca salva na tela de
+ * ritmo (idade 0 para o motor). `erroDosKnobs` simula a leitura falhando.
+ */
+let knobs: Record<string, unknown> | null = null;
+let erroDosKnobs: { message: string } | null = null;
+
+const DIA = 86_400_000;
+const diasAtras = (n: number) => new Date(Date.now() - n * DIA).toISOString();
+
 /** É assim que o Postgres calcula `is_warmup_complete` — derivada, nunca gravada. */
 function derivarFlagGerada(): void {
   linha.is_warmup_complete = linha.warmup_completed_at !== null;
@@ -72,6 +84,8 @@ function reiniciar(): void {
   linha.warmup_completed_at = null;
   linha.display_name = "Vendas";
   linha.phone_number = null;
+  knobs = null;
+  erroDosKnobs = null;
   derivarFlagGerada();
 }
 
@@ -85,6 +99,8 @@ function chain(tabela: string, op: string, payload?: unknown): Record<string, un
     {},
     {
       get(_alvo, prop) {
+        if (prop === "maybeSingle" && tabela === "channel_knobs")
+          return async () => ({ data: erroDosKnobs ? null : knobs, error: erroDosKnobs });
         if (prop === "maybeSingle")
           return async () => ({ data: { ...linha, escalated_status: null }, error: null });
         if (prop === "then")
@@ -151,38 +167,66 @@ describe("o escritor de warmup_started_at (#2432)", () => {
     ).toBe(false);
   });
 
-  it("a mesma WORKING que começa NÃO conclui — começar e terminar são dois eventos", async () => {
+  it("número de um dia: a reconexão NÃO conclui o aquecimento", async () => {
     reiniciar();
+    knobs = { number_activated_at: diasAtras(1), warmup_daily_caps: null };
+    // Conectou, caiu e voltou no mesmo dia: duas WORKING seguidas.
     await despacha("WORKING");
-
-    expect(linha.warmup_completed_at, "conclui o aquecimento no evento que o começou").toBeNull();
-    expect(linha.is_warmup_complete, "a flag virou true junto com o início").toBe(false);
-  });
-
-  it("quando o aquecimento termina, is_warmup_complete vira true", async () => {
-    reiniciar();
-    // O aquecimento COMEÇA na primeira transição para WORKING…
-    await despacha("WORKING");
-    // …e TERMINA quando a sessão reporta WORKING de novo com o aquecimento já
-    // iniciado — é o critério do próprio guard (o mesmo que o invariante
-    // `triagem194-defeitos-alegados` exercita com `warmup_started_at` preenchido).
     await despacha("WORKING");
 
     expect(
       linha.warmup_completed_at,
-      "warmup_completed_at nunca é gravado — é por isso que a flag é constante false",
-    ).toEqual(expect.any(String));
+      "a segunda WORKING concluiu o aquecimento de um número de um dia — é a " +
+        "conclusão por 'próxima WORKING' que a #2432 trocou pela régua do ritmo",
+    ).toBeNull();
+    expect(linha.is_warmup_complete).toBe(false);
+  });
+
+  it("sem knobs salvos o número conta como novo — reconexão não conclui", async () => {
+    reiniciar();
+    await despacha("WORKING");
+    await despacha("WORKING");
+
+    expect(linha.warmup_completed_at, "concluiu sem idade declarada (idade 0)").toBeNull();
+  });
+
+  it("número com idade declarada além do último degrau fica aquecido", async () => {
+    reiniciar();
+    knobs = { number_activated_at: diasAtras(40), warmup_daily_caps: null };
+    await despacha("WORKING");
+
+    expect(linha.warmup_started_at, "o início não foi gravado").toEqual(expect.any(String));
     expect(
       linha.is_warmup_complete,
-      "sem o escritor de warmup_started_at o guard nunca fica verdadeiro e a flag " +
-        "permanece false para sempre",
+      "o controle de ritmo já não põe teto neste número, e a marca diz que não aquecido",
     ).toBe(true);
+  });
+
+  it("'pular o aquecimento' ligado fica aquecido desde o dia 0", async () => {
+    reiniciar();
+    knobs = { number_activated_at: diasAtras(0), warmup_daily_caps: WARMUP_PULADO };
+    await despacha("WORKING");
+
+    expect(linha.is_warmup_complete, "o dono pulou o aquecimento e a marca ignorou").toBe(true);
+  });
+
+  it("falha ao ler os knobs não conclui — o erro vai para o lado seguro", async () => {
+    reiniciar();
+    knobs = { number_activated_at: diasAtras(40), warmup_daily_caps: null };
+    erroDosKnobs = { message: "boom" };
+    await despacha("WORKING");
+
+    expect(linha.warmup_started_at, "a falha nos knobs levou junto o início").toEqual(
+      expect.any(String),
+    );
+    expect(linha.is_warmup_complete, "concluiu sem conseguir ler a régua").toBe(false);
   });
 
   it("ninguém atribui a coluna gerada — atribuir aborta o UPDATE INTEIRO", async () => {
     reiniciar();
+    knobs = { number_activated_at: diasAtras(40), warmup_daily_caps: null };
     await despacha("WORKING");
-    await despacha("WORKING");
+    expect(linha.is_warmup_complete, "o caminho de conclusão nem executou").toBe(true);
 
     const atribuemAGerada = escritas.filter(
       (e) =>
