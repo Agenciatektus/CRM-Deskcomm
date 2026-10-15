@@ -13163,6 +13163,19 @@ export const DICIONARIO: Traducoes = {
   "registro(s).": { es: "registro(s)." },
   "registro(s) e em": { es: "registro(s) y en" },
   "regra(s) de agente.": { es: "regla(s) de agente." },
+  // ── O AVISO DE JUNÇÃO (issue #2801) ────────────────────────────────────────
+  //
+  // Renomear para um nome que já EXISTE junta as duas etiquetas numa só, e a
+  // operação respondia idêntica a um renome simples. São duas frases, e as
+  // duas são novas: o toast que substitui o de sucesso quando o banco devolve
+  // `juntou: true`, e o aviso ANTES do clique, quando o nome digitado já é uma
+  // etiqueta da organização. `destino` (o nome digitado) entra FORA do `t()`,
+  // como em toda frase montada em runtime.
+  "Etiqueta juntada em": { es: "Etiqueta unificada en" },
+  "as duas etiquetas viraram uma só.": { es: "las dos etiquetas se unificaron en una sola." },
+  "Este nome já existe no vocabulário — confirmar vai juntar as duas etiquetas numa só.": {
+    es: "Este nombre ya existe en el vocabulario: confirmar unificará las dos etiquetas en una sola.",
+  },
   // As frases de recusa do servidor. Três delas não tinham entrada: o argumento
   // de `t()` ali é uma expressão `??`, que o guarda também não resolve.
   "Confira a etiqueta e o novo nome.": { es: "Revisa la etiqueta y el nombre nuevo." },
@@ -13915,6 +13928,9 @@ export const DICIONARIO: Traducoes = {
   "Lendo o catálogo…": { es: "Leyendo el catálogo…" },
   "Não foi possível ler o catálogo.": { es: "No se pudo leer el catálogo." },
   "Este banco não tem tabelas visíveis.": { es: "Esta base no tiene tablas visibles." },
+  "Nenhuma tabela liberada ainda. Marque acima, em “O que o assistente pode ver”, as que podem ser lidas.": {
+    es: "Ninguna tabla habilitada todavía. Marca arriba, en “Qué puede ver el asistente”, las que se pueden leer.",
+  },
   "view": { es: "vista" },
   "Escolha uma tabela à esquerda para ver os dados.": {
     es: "Elige una tabla a la izquierda para ver los datos.",
