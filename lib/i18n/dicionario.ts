@@ -6014,6 +6014,8 @@ export const DICIONARIO: Traducoes = {
   },
   "Quando um lead ganhar uma tag": { es: "Cuando un lead reciba una etiqueta" },
   "Quando um contato ganhar uma tag": { es: "Cuando un contacto reciba una etiqueta" },
+  // #2812 — o gatilho de ficha SEM número que recebe um.
+  "Quando um contato ganhar um telefone": { es: "Cuando un contacto reciba un teléfono" },
   "alterado pelo assistente": { es: "cambiado por el asistente" },
   "alterado automaticamente pelo sistema": { es: "cambiado automáticamente por el sistema" },
   é: { es: "es" },
@@ -15483,6 +15485,26 @@ export const DICIONARIO: Traducoes = {
   "é maior que": { es: "es mayor que" },
   "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": {
     es: "Oculto, el campo no aparece en el formulario ni se valida como obligatorio, y el valor ya guardado sigue en el registro.",
+  },
+  // #2813 — o painel "Iniciar conversa" do Inbox.
+  "Nova conversa": { es: "Nueva conversación" },
+  "Diga para quem e o que dizer. O canal de saída é você quem escolhe quando há mais de um número.": {
+    es: "Di para quién y qué decir. El canal de salida lo eliges tú cuando hay más de un número.",
+  },
+  "Para quem": { es: "Para quién" },
+  "Telefone ou nome do contato": { es: "Teléfono o nombre del contacto" },
+  "Contato existente": { es: "Contacto existente" },
+  "Como o contato aparece no CRM": { es: "Cómo aparece el contacto en el CRM" },
+  "Primeira mensagem": { es: "Primer mensaje" },
+  "O que dizer ao contato (opcional)": { es: "Qué decirle al contacto (opcional)" },
+  "Usar modelo de mensagem": { es: "Usar plantilla de mensaje" },
+  "A conversa abre atribuída a você: a IA não assume este atendimento.": {
+    es: "La conversación se abre asignada a ti: la IA no asume esta atención.",
+  },
+  "Criar conversa": { es: "Crear conversación" },
+  "Nenhum contato encontrado": { es: "Ningún contacto encontrado" },
+  "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": {
+    es: "La conversación se abrió, pero el primer mensaje no se pudo enviar.",
   },
 };
 

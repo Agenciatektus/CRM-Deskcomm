@@ -17,7 +17,7 @@ primeiro login feito.
 3. **Esperar** (cerca de 3 minutos na primeira vez). Comente as linhas que aparecem.
 4. **As credenciais**: pause a gravação antes do bloco "Credenciais iniciais" e mostre só o
    caminho do arquivo onde elas ficam guardadas.
-5. **Conferir por fora** (Passo 6): `curl -sI https://SEU_DOMINIO/app | head -1` dá `307`.
+5. **Conferir por fora** (Passo 6): `curl -sSI https://SEU_DOMINIO/app | head -1` dá `307`.
    Explique por que é `/app`: a raiz é uma página pública e dá `200`.
 6. **O primeiro login** e o assistente "Boas-vindas ao DeskcommCRM", que dá para pular por
    enquanto.

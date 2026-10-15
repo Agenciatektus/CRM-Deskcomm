@@ -3483,6 +3483,7 @@
   "Janela de 24 horas fechada: texto livre é recusado pela plataforma (131047). Envie um modelo aprovado ou aguarde o cliente escrever.": "24-hour window closed: free text is rejected by the platform (131047). Send an approved template or wait for the client to write.",
   "Quando um lead ganhar uma tag": "When a lead gets a tag",
   "Quando um contato ganhar uma tag": "When a contact gets a tag",
+  "Quando um contato ganhar um telefone": "When a contact gets a phone number",
   "alterado pelo assistente": "changed by the assistant",
   "alterado automaticamente pelo sistema": "changed automatically by the system",
   "é": "is",
@@ -9067,5 +9068,18 @@
   "é maior que": "is greater than",
   "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": "Hidden, the field does not appear in the form and is not validated as required; the value already saved stays in the record.",
   "Este evento não sai pelo canal da conversa. Para esta etapa, escolha um destes": "This event is not relayed by the conversation channel. For this stage, pick one of these",
-  "ou configure a conexão direta da Meta no formulário acima.": "or set up the Meta direct connection in the form above."
+  "ou configure a conexão direta da Meta no formulário acima.": "or set up the Meta direct connection in the form above.",
+  "Nova conversa": "New conversation",
+  "Diga para quem e o que dizer. O canal de saída é você quem escolhe quando há mais de um número.": "Say who it is for and what to say. You choose the outgoing channel when there is more than one number.",
+  "Para quem": "For whom",
+  "Telefone ou nome do contato": "Phone or contact name",
+  "Contato existente": "Existing contact",
+  "Como o contato aparece no CRM": "How the contact appears in the CRM",
+  "Primeira mensagem": "First message",
+  "O que dizer ao contato (opcional)": "What to tell the contact (optional)",
+  "Usar modelo de mensagem": "Use a message template",
+  "A conversa abre atribuída a você: a IA não assume este atendimento.": "The conversation opens assigned to you: the AI does not take over this service.",
+  "Criar conversa": "Create conversation",
+  "Nenhum contato encontrado": "No contact found",
+  "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent."
 }

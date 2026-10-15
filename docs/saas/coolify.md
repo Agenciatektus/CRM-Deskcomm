@@ -357,7 +357,7 @@ Não tire print nem grave a tela.** Eles também ficam guardados em
   sabe se ele foi necessário). Com o kit atual, o fim mostra "Quase lá — falta o cadeado
   (HTTPS) do seu domínio" (provado por teste); o kit da 1.80.0 mostra "Quase lá — falta o
   app responder" e manda olhar o `.env`, mas nesse caso o `.env` está certo. Nos dois casos,
-  espere alguns minutos, confira com `curl -sI https://crm.SEUDOMINIO.com.br/app | head -1`
+  espere alguns minutos, confira com `curl -sSI https://crm.SEUDOMINIO.com.br/app | head -1`
   (tem de dar `HTTP/2 307`) e rode o bloco do Passo 5 de novo, na mesma pasta: medido, ele
   terminou em 21 s com "✓ app no ar e saudável" e mostrou as "Credenciais iniciais", sem
   duplicar o dono.
@@ -392,7 +392,7 @@ versão**.
 **Conferência técnica (opcional), na VPS.** Cada comando mostra o que deve responder.
 
 ```bash
-curl -sI https://crm.SEUDOMINIO.com.br/app | head -1
+curl -sSI https://crm.SEUDOMINIO.com.br/app | head -1
 ```
 
 Responde `HTTP/2 307`: o CRM está no ar e manda para o login. Use o `/app`: desde 07/10/2026
@@ -641,7 +641,7 @@ Cada item: o que você vê → como conferir → o que fazer. Os comandos rodam 
 
      ```bash
      cd ~/deskcommcrm && docker compose -f docker-compose.prod.yml -f docker-compose.single-server.yml -f docker-compose.traefik.yml --env-file .env up -d app
-     curl -sI https://crm.SEUDOMINIO.com.br/app | head -1
+     curl -sSI https://crm.SEUDOMINIO.com.br/app | head -1
      ```
 
      Deve voltar a responder `HTTP/2 307`. Para conferir se o CRM está marcado para o proxy
@@ -667,7 +667,7 @@ Cada item: o que você vê → como conferir → o que fazer. Os comandos rodam 
   continuou fechado para fora (medido uma vez, numa VPS recém-montada: a VPS respondeu em
   cerca de 1 minuto, com todos os serviços `Up` e os dados do banco intactos). Para conferir:
   `docker ps --format '{{.Names}} {{.Status}}'` (tudo `Up`) e
-  `curl -sI https://crm.SEUDOMINIO.com.br/app | head -1` (`HTTP/2 307`).
+  `curl -sSI https://crm.SEUDOMINIO.com.br/app | head -1` (`HTTP/2 307`).
 - **Você clicou em "Restart Proxy" no painel do Coolify, ou ele recriou o proxy** → nada a
   fazer. Durante o restart o painel mostra "Waiting for the process to start…" e um aviso
   vermelho, "Cannot connect to real-time service": são esperados, porque o painel perde a
