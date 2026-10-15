@@ -4678,7 +4678,7 @@ async function executarTurnoDoAgente(
       { registry: deps.registry, log: runLog },
     );
 
-    // WORKSTREAM B — SAÍDA TRUNCADA (finish_reason = 'length'): o modelo bateu no
+    // SAÍDA TRUNCADA (finish_reason = 'length'): o modelo bateu no
     // teto de tokens de saída e o que produziu veio cortado. A detecção mora aqui,
     // no ponto que consome o resultado, porque o seam devolve o resultado INTEIRO
     // (ramo generateText e ramo de assinatura streamText — este último monta o
@@ -4687,8 +4687,8 @@ async function executarTurnoDoAgente(
     // NUNCA se manda parcial: texto fora de `send_message` não sai, e argumento de
     // tool cortado falha no schema (zod) e nem executa. Logo, truncamento só é
     // DANO quando nada despachou — aí vira correção limitada (UM retry, o mesmo
-    // caminho do turno mudo) e, se não recuperar, FALHA TERMINAL VISÍVEL com caso
-    // humano. Nunca retry infinito, nunca silêncio mascarado como decisão.
+    // caminho do turno mudo) e, se a correção também falhar, FALHA TERMINAL
+    // VISÍVEL. Nunca retry infinito, nunca silêncio mascarado como decisão.
     const saidaTruncada = turn.result.finishReason === 'length';
     if (saidaTruncada) {
       runLog.warn('output_truncated — resposta do modelo cortada no teto de tokens', {
@@ -4735,10 +4735,14 @@ async function executarTurnoDoAgente(
     // qualquer outro. O fechamento lê a fita das DUAS chamadas.
     let mensagensDoTurno: ModelMessage[] = turn.result.responseMessages;
     // Foi PEDIDA (e logo abaixo EXECUTADA) a correção limitada do turno mudo? O
-    // valor é consumido DEPOIS dela, no desfecho terminal: silêncio que persiste
-    // mesmo com a correção rodada é falha terminal visível — não mais um turno
-    // mudo qualquer. As condições são as do próprio pedido (turno-mudo.ts):
-    // razões legítimas de silêncio nem chegam a corrigir.
+    // valor é consumido DEPOIS dela, no desfecho terminal, junto com
+    // `correcaoTruncou` (o sinal de FALHA da própria correção): correção que
+    // terminou truncada (length) é defeito, mas silêncio DELIBERADO — que o
+    // CORRECAO_DO_TURNO_MUDO autoriza o modelo a escolher — nunca abre caso.
+    // Erro da chamada de correção propaga e o job falha na fila (retry /
+    // dead-letter visível). As condições são as do próprio pedido
+    // (turno-mudo.ts): razões legítimas de silêncio nem chegam a corrigir.
+    let correcaoTruncou = false;
     const correcaoDoTurnoMudoPedida =
       !preview &&
       liveJob().kind === 'inbound_turn' &&
@@ -4779,6 +4783,9 @@ async function executarTurnoDoAgente(
         },
         { registry: deps.registry, log: runLog },
       );
+      // Sinal de FALHA da correção: terminou no teto de tokens. Silêncio com
+      // finishReason normal (stop/tool-calls) é resposta escolhida, não defeito.
+      correcaoTruncou = correcao.result.finishReason === 'length';
       mensagensDoTurno = [...mensagensDoTurno, pedidoDeCorrecao, ...correcao.result.responseMessages];
       if (runError !== null) throw runError;
       if (outcomes.some((o) => o.kind === 'failed')) {
@@ -4787,20 +4794,24 @@ async function executarTurnoDoAgente(
       runLog.info('correção do turno mudo concluída', { messages_sent: outcomes.length });
     }
 
-    // WORKSTREAM B — FALHA TERMINAL VISÍVEL: duas causas, um único bloco (um
-    // caso humano por turno, nunca duplicado):
+    // FALHA TERMINAL VISÍVEL — só com sinal de FALHA, nunca por silêncio
+    // deliberado (#2938): o CORRECAO_DO_TURNO_MUDO autoriza o modelo a responder
+    // "nada a dizer", então silêncio que persiste com a correção NÃO é defeito.
+    // Duas causas, um único bloco (um caso humano por turno, nunca duplicado):
     //  - saída TRUNCADA (finish_reason=length): o modelo cortou no teto de tokens;
-    //  - saída VAZIA PERSISTENTE: o turno terminou sem mensagem, a correção
-    //    limitada do turno mudo (UMA, `correcaoDoTurnoMudoPedida` acima) rodou e
-    //    AINDA ASSIM nada saiu.
+    //  - a correção limitada do turno mudo (UMA, `correcaoDoTurnoMudoPedida`
+    //    acima) TAMBÉM terminou truncada (`correcaoTruncou`) — sinal de falha.
     // As condições isentam toda razão LEGÍTIMA de silêncio — turno descartado
     // (obsoleto), passagem para a equipe (handoff do cliente), teto de pacing, e
     // `tentativasDeEnvio === 0` (o modelo nunca chegou a chamar `send_message`;
     // se chamou e levou veto, o veto é a razão e já ensinou o modelo). Os flags
     // são re-avaliados DEPOIS da correção: se nela nasceu handoff/teto/descarte,
-    // aquilo é a razão e não há caso. O bloco não despacha nada (só registra e
-    // abre caso) — logo nunca duplica mensagem; `caso.ok` gateia o move do funil
-    // — logo nunca duplica caso humano. O retry continua limitado à UMA correção.
+    // aquilo é a razão e não há caso. O caso humano abre só com `casesEnabled`
+    // ligado (mesma régua dos fail-safes clínico e de promessa; `openCase`
+    // deduplica caso aberto) — a falha em si continua visível pelo log de erro.
+    // O bloco não despacha nada (só registra e abre caso) — logo nunca duplica
+    // mensagem; `caso.ok` gateia o move do funil — logo nunca duplica caso
+    // humano. O retry continua limitado à UMA correção.
     const silencioSemRazaoLegitima =
       !preview &&
       outcomes.length === 0 &&
@@ -4809,53 +4820,64 @@ async function executarTurnoDoAgente(
       !turnoDescartado &&
       !passouParaAEquipe &&
       !capDeEnvioAtingido();
-    if (silencioSemRazaoLegitima && (saidaTruncada || correcaoDoTurnoMudoPedida)) {
+    if (silencioSemRazaoLegitima && (saidaTruncada || correcaoTruncou)) {
       const desfechoTerminal = saidaTruncada
         ? 'output_truncated_recovered_failed'
-        : 'empty_output_recovered_failed';
-      const kindDoCaso = saidaTruncada ? 'saida_truncada' : 'saida_vazia_persistente';
-      runLog.error(`${desfechoTerminal} — sem nenhuma mensagem entregue; abrindo caso humano`, {
+        : 'correction_truncated_failed';
+      runLog.error(`${desfechoTerminal} — sem nenhuma mensagem entregue`, {
         job_id: job?.id ?? null,
         kind: liveJob().kind,
         finish_reason: turn.result.finishReason,
         correcao_limitada_rodou: correcaoDoTurnoMudoPedida,
+        correcao_truncou: correcaoTruncou,
       });
-      try {
-        const caso = await openCase(
-          pool,
-          { tenantId, conversationId: input.conversationId, agentId: agentConfig?.agentId ?? null },
-          {
-            title: saidaTruncada
-              ? 'Resposta do agente truncada — nenhuma mensagem saiu'
-              : 'Agente não respondeu — saída vazia persistente',
-            summary: saidaTruncada
-              ? 'finish_reason=length: o modelo cortou no teto de tokens de saída e o turno não despachou ' +
-                'nenhuma mensagem mesmo após a correção limitada (UM retry). Atendente precisa responder o cliente.'
-              : 'O turno terminou sem nenhuma mensagem ao cliente e a correção limitada do turno mudo (UM retry), ' +
-                'que rodou, também não despachou nada. Atendente precisa responder o cliente.',
-            blocker: kindDoCaso,
-            source: 'guardrail_autofallback',
-            kind: kindDoCaso,
-            contextSnapshot: buildCaseContextSnapshot(),
-          },
-        );
-        if (caso.ok) {
-          openedCaseThisTurn = true;
-          moverParaHandoffBestEffort(kindDoCaso);
-        } else {
-          // Caso não abriu (já existe um aberto) — a falha fica visível pelo log
-          // de erro acima; nada de retry extra aqui.
-          runLog.error(`${desfechoTerminal} — caso humano não abriu (já existe)`, {
+      // Cases vêm desligados por padrão (`ai_agent_versions.cases_enabled`) — a
+      // mesma régua dos fail-safes clínico e de promessa de caso. Com a feature
+      // desligada a falha segue visível pelo log de erro acima; o caso para o
+      // time (e o move do funil) só acontece com ela ligada e sem caso aberto.
+      const haCasoAberto =
+        agentConfig?.casesEnabled === true
+          ? await hasOpenCaseForContact(pool, tenantId, input.conversationId)
+          : false;
+      if (agentConfig?.casesEnabled === true && !openedCaseThisTurn && !haCasoAberto) {
+        try {
+          const caso = await openCase(
+            pool,
+            { tenantId, conversationId: input.conversationId, agentId: agentConfig?.agentId ?? null },
+            {
+              title: saidaTruncada
+                ? 'Resposta do agente truncada — nenhuma mensagem saiu'
+                : 'A correção automática da IA também falhou — nenhuma mensagem saiu',
+              summary:
+                'O cliente ficou sem resposta neste turno: a IA não entregou mensagem nenhuma e a ' +
+                'correção automática não recuperou. Atendente precisa retomar a conversa e responder o cliente.',
+              blocker: saidaTruncada
+                ? 'A resposta da IA veio cortada no limite de tamanho, e mensagem cortada não é enviada ao cliente.'
+                : 'O turno terminou sem mensagem para o cliente e a correção automática da IA também veio ' +
+                  'cortada no limite de tamanho.',
+              kind: 'problema',
+              source: 'guardrail_autofallback',
+              contextSnapshot: buildCaseContextSnapshot(),
+            },
+          );
+          if (caso.ok) {
+            openedCaseThisTurn = true;
+            moverParaHandoffBestEffort(desfechoTerminal);
+          } else {
+            // Caso não abriu (já existe um aberto) — a falha fica visível pelo log
+            // de erro acima; nada de retry extra aqui.
+            runLog.error(`${desfechoTerminal} — caso humano não abriu (já existe)`, {
+              job_id: job?.id ?? null,
+              code: caso.error.code,
+            });
+          }
+        } catch (err) {
+          // Best-effort: erro do banco não pode mascarar a causa original.
+          runLog.error(`${desfechoTerminal} — openCase lançou`, {
             job_id: job?.id ?? null,
-            code: caso.error.code,
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
           });
         }
-      } catch (err) {
-        // Best-effort: erro do banco não pode mascarar a causa original.
-        runLog.error(`${desfechoTerminal} — openCase lançou`, {
-          job_id: job?.id ?? null,
-          error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
-        });
       }
     }
 

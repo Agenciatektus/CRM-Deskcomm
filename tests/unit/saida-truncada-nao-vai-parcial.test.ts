@@ -1,5 +1,5 @@
 /**
- * WORKSTREAM B — saída truncada nunca vira mensagem parcial.
+ * Saída truncada nunca vira mensagem parcial.
  *
  * O defeito que este gate cobre: o modelo bate no teto de tokens de saída
  * (`finish_reason === 'length'`) e o que produziu veio cortado. Três invariantes,
@@ -13,12 +13,13 @@
  *  2. A detecção mora no ponto que CONSUME o resultado (`finishReason === 'length'`),
  *     com log distinto `output_truncated`.
  *  3. Truncamento que não se recupera (nada despachado depois da UMA correção do
- *     turno mudo) vira FALHA TERMINAL VISÍVEL: caso humano (`openCase`) com
- *     `kind/blocker = saida_truncada` e log `output_truncated_recovered_failed` —
- *     nunca envio parcial, nunca retry além do limitado, nunca silêncio mudo.
- *     O MESMO bloco cobre saída VAZIA PERSISTENTE (ver o teste irmão
- *     saida-vazia-persistente-vira-caso-humano.test.ts): o comportamento
- *     truncado acima é preservado byte a byte nas mensagens de causa própria.
+ *     turno mudo) vira FALHA TERMINAL VISÍVEL: caso humano (`openCase`, gated por
+ *     `agentConfig.casesEnabled`) com `kind: 'problema'` (TIPOS_DE_CASO) e
+ *     blocker/summary em português simples, e log `output_truncated_recovered_failed`
+ *     — nunca envio parcial, nunca retry além do limitado, nunca silêncio mudo.
+ *     O MESMO bloco escala quando a correção TAMBÉM trunca (`correcaoTruncou`),
+ *     e só com sinal de falha: silêncio deliberado autorizado pela correção não
+ *     abre caso (ver o teste irmão correcao-do-turno-mudo-so-escala-com-falha.test.ts).
  *
  * Por que contrato de fonte (mesma técnica de send-message-corpo-vazio.test.ts):
  * o detect fica no meio do closure do turno, sem ponto de injeção barato; o que
@@ -83,17 +84,20 @@ describe("turno: detecção, retry limitado e falha terminal visível", () => {
     expect(bloco).toContain("!preview");
   });
 
-  it("o desfecho terminal abre caso humano visível com o código próprio", () => {
-    const i = turno.indexOf("output_truncated_recovered_failed");
-    const bloco = turno.slice(i, i + 1800);
-    expect(bloco).toContain("openCase(");
-    // O código do caso é mapeado POR CAUSA no mesmo bloco: truncada → saida_truncada
-    // (comportamento preservado), vazia persistente → saida_vazia_persistente.
-    expect(bloco).toContain(
-      "const kindDoCaso = saidaTruncada ? 'saida_truncada' : 'saida_vazia_persistente';",
+  it("o desfecho terminal abre caso humano visível com causa própria", () => {
+    // A condição única de escala vem logo acima do desfecho.
+    expect(turno).toContain(
+      "if (silencioSemRazaoLegitima && (saidaTruncada || correcaoTruncou)) {",
     );
-    expect(bloco).toContain("blocker: kindDoCaso");
-    expect(bloco).toContain("kind: kindDoCaso");
+    const i = turno.indexOf("output_truncated_recovered_failed");
+    const bloco = turno.slice(i, i + 2600);
+    expect(bloco).toContain("openCase(");
+    // `kind` vem de TIPOS_DE_CASO ('problema') — senão a tela do time mostra "Outro".
+    expect(bloco).toContain("kind: 'problema'");
+    // blocker/summary são exibidos ao time ("Por que a IA travou"/"O que o
+    // cliente precisa") — português simples, sem código de máquina neles.
+    expect(bloco).not.toContain("saida_truncada");
+    expect(bloco).not.toContain("finish_reason=length");
     expect(bloco).toContain("source: 'guardrail_autofallback'");
     // Falha do openCase também fica visível (não engole o erro).
     expect(turno).toContain("`${desfechoTerminal} — openCase lançou`");

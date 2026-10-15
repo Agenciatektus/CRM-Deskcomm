@@ -933,7 +933,7 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
       let steps: Awaited<typeof streamed.steps>;
       let responseMessages: Awaited<typeof streamed.responseMessages>;
       let toolCalls: Awaited<typeof streamed.toolCalls>;
-      // WORKSTREAM B: `finishReason` ('stop' | 'length' | 'tool-calls' | ...). O
+      // `finishReason` ('stop' | 'length' | 'tool-calls' | ...). O
       // ramo da assinatura monta o resultado à mão, então sem ele aqui o campo
       // FALTARIA no runtime (generateText devolve sozinho) e a detecção de
       // saída truncada ('length') cegaria exatamente no provedor de assinatura.

@@ -1,28 +1,31 @@
 /**
- * SAÍDA VAZIA PERSISTENTE vira falha terminal visível.
+ * A correção do turno mudo só escala com SINAL DE FALHA — nunca por silêncio
+ * deliberado (#2938).
  *
- * O defeito que este gate cobre: o turno terminou sem nenhuma mensagem ao
- * cliente (`messages_sent: 0`, sem veto, sem descarte), a correção limitada do
- * turno mudo (UMA) roda e AINDA ASSIM nada sai. Antes disso virava silêncio
- * mudo com um log — o cliente ficava sem resposta e ninguém era notificado.
+ * O defeito que este gate cobre: o CORRECAO_DO_TURNO_MUDO autoriza o modelo a
+ * responder "nada a dizer", então um turno que termina em silêncio mesmo com a
+ * correção rodada NÃO é defeito — e era exatamente isso que um caso humano
+ * falso-positive marcava para o time. O desfecho terminal passou a exigir um
+ * sinal de falha: a saída truncada (length) ou a correção que TAMBÉM terminou
+ * truncada. Erro da chamada de correção propaga e o job falha na fila
+ * (retry/dead-letter) — caminho alto que já existia.
  *
  * Cenários, na ordem em que o código os garante:
  *
  *  1. Recuperação limitada preservada: a correção continua sendo pedida sob as
  *     condições do próprio pedido (`turno-mudo.ts`) e continua sendo UMA.
  *  2. Decisão DEPOIS da correção: o desfecho terminal é avaliado com os flags
- *     e `outcomes` re-avalizados depois dela — correção que recuperou (mensagens
+ *     e `outcomes` re-avaliados depois dela — correção que recuperou (mensagens
  *     saíram) nunca vira caso humano.
- *  3. Proteção por mensagem existente: `outcomes.length === 0` e
- *     `tentativasDeEnvio === 0` — turno que já despachou (ou tentou e levou
- *     veto, que já ensinou) não escala.
+ *  3. Silêncio sem razão legítima: nada despachado, nada tentado, primeira passada.
  *  4. Isenção de silêncio legítimo: descartado, handoff da equipe, teto de
  *     pacing e preview ficam de fora — mesma régua do truncamento.
- *  5. Desfecho distinto por causa: `empty_output_recovered_failed` +
- *     caso humano `saida_vazia_persistente` (truncamento preservado com
- *     `output_truncated_recovered_failed`/`saida_truncada` no MESMO bloco —
- *     um caso por turno, nunca duplicado).
- *  6. Nunca duplica: o bloco terminal não despacha nada (só registra e abre
+ *  5. Escala só com falha: truncamento não recuperado OU correção truncada —
+ *     `correcaoDoTurnoMudoPedida` sozinho NÃO escala.
+ *  6. Caso humano com `kind` de TIPOS_DE_CASO ('problema'), copy em português
+ *     simples e gate `agentConfig.casesEnabled` — mesma régua dos outros
+ *     fail-safes.
+ *  7. Nunca duplica: o bloco terminal não despacha nada (só registra e abre
  *     caso) e `caso.ok` gateia o move do funil.
  *
  * Por que contrato de fonte (mesma técnica de saida-truncada-nao-vai-parcial.test.ts):
@@ -39,6 +42,9 @@ const turno = ler("lib/agent-engine/agent/inbound-turn.ts");
 
 // Posições de âncora (fonte única de verdade para as ordens abaixo).
 const idxCorrecaoConst = turno.indexOf("const correcaoDoTurnoMudoPedida =");
+const idxCorrecaoTruncou = turno.indexOf(
+  "correcaoTruncou = correcao.result.finishReason === 'length';",
+);
 const idxCorrecaoIf = turno.indexOf("if (correcaoDoTurnoMudoPedida) {");
 const idxCorrecaoExec = turno.indexOf(
   "mensagensDoTurno = [...mensagensDoTurno, pedidoDeCorrecao, ...correcao.result.responseMessages];",
@@ -69,6 +75,11 @@ describe("recuperação limitada do turno mudo (preservada)", () => {
     expect(cabeca).toContain("turnoMudoPedeCorrecao({");
     expect(cabeca).toContain("enviadas: outcomes.length,");
     expect(cabeca).toContain("liveJob().kind === 'inbound_turn'");
+    // O sinal de falha da correção é declarado junto com o pedido, falso por
+    // padrão (logo acima da const) — silêncio deliberado não nasce escalado.
+    const idxCorrecaoTruncouDecl = turno.indexOf("let correcaoTruncou = false;");
+    expect(idxCorrecaoTruncouDecl).toBeGreaterThan(-1);
+    expect(idxCorrecaoTruncouDecl).toBeLessThan(idxCorrecaoConst);
   });
 
   it("a correção continua UMA só — um único runModelCall, steps limitados", () => {
@@ -78,18 +89,24 @@ describe("recuperação limitada do turno mudo (preservada)", () => {
     // O pedido de correção é a instrução canônica do motor.
     expect(bloco).toContain("CORRECAO_DO_TURNO_MUDO");
     // Nenhum desfecho terminal dentro da correção — decisão é separada.
-    expect(bloco).not.toContain("empty_output_recovered_failed");
+    expect(bloco).not.toContain("output_truncated_recovered_failed");
     expect(bloco).not.toContain("openCase(");
   });
 });
 
 describe("decisão terminal: DEPOIS da correção, com os flags re-avaliados", () => {
-  it("a ordem é: pedir correção → executar → decidir o desfecho", () => {
+  it("a ordem é: pedir correção → executar → medir a falha → decidir o desfecho", () => {
     expect(idxCorrecaoConst).toBeLessThan(idxCorrecaoIf);
-    expect(idxCorrecaoIf).toBeLessThan(idxCorrecaoExec);
+    expect(idxCorrecaoIf).toBeLessThan(idxCorrecaoTruncou);
+    expect(idxCorrecaoTruncou).toBeLessThan(idxCorrecaoExec);
     // A decisão lê `outcomes`/flags DEPOIS da correção rodar: recuperação
     // bem-sucedida (mensagens saíram) é vista como `outcomes.length > 0`.
     expect(idxCorrecaoExec).toBeLessThan(idxSilencio);
+  });
+
+  it("o sinal de falha da correção é o finishReason dela: truncada (length)", () => {
+    const bloco = blocoCorrecao();
+    expect(bloco).toContain("correcaoTruncou = correcao.result.finishReason === 'length';");
   });
 
   it("silêncio sem razão legítima: nada despachado, nada tentado, primeira passada", () => {
@@ -109,36 +126,57 @@ describe("decisão terminal: DEPOIS da correção, com os flags re-avaliados", (
     expect(bloco).toContain("!capDeEnvioAtingido()");
   });
 
-  it("só escala com causa: truncamento NÃO recuperado OU correção pedida e sem sucesso", () => {
+  it("só escala com sinal de FALHA: truncamento OU correção truncada — nunca por ter corrigido", () => {
     const bloco = blocoTerminal();
     expect(bloco).toContain(
-      "if (silencioSemRazaoLegitima && (saidaTruncada || correcaoDoTurnoMudoPedida)) {",
+      "if (silencioSemRazaoLegitima && (saidaTruncada || correcaoTruncou)) {",
+    );
+    // O gatilho antigo — correção apenas PEDIDA — é exatamente o regresso que
+    // fazia silêncio deliberado abrir caso à toa.
+    expect(bloco).not.toMatch(
+      /silencioSemRazaoLegitima && \(saidaTruncada \|\| correcaoDoTurnoMudoPedida\)/,
     );
   });
 });
 
 describe("desfecho distinto, caso humano único, nunca duplica", () => {
-  it("causa vira código próprio: vazia persistente ≠ truncada (truncamento preservado)", () => {
+  it("causa vira código próprio: truncada ≠ correção truncada (truncamento preservado)", () => {
     const bloco = blocoTerminal();
     expect(bloco).toContain("const desfechoTerminal = saidaTruncada");
     expect(bloco).toContain("? 'output_truncated_recovered_failed'");
-    expect(bloco).toContain(": 'empty_output_recovered_failed';");
-    expect(bloco).toContain(
-      "const kindDoCaso = saidaTruncada ? 'saida_truncada' : 'saida_vazia_persistente';",
-    );
+    expect(bloco).toContain(": 'correction_truncated_failed';");
     // O mesmo mecanismo suportado de caso humano, com a causa no snapshot.
     expect(bloco).toContain("openCase(");
     expect(bloco).toContain("source: 'guardrail_autofallback'");
-    expect(bloco).toContain("blocker: kindDoCaso");
-    expect(bloco).toContain("kind: kindDoCaso");
     expect(bloco).toContain("correcao_limitada_rodou: correcaoDoTurnoMudoPedida");
+    expect(bloco).toContain("correcao_truncou: correcaoTruncou");
+  });
+
+  it("caso com `kind` de TIPOS_DE_CASO e copy em português simples (sem código de máquina)", () => {
+    const bloco = blocoTerminal();
+    // `kind: 'problema'` vem do vocabulário do product (case-copy.ts) — um kind
+    // inventado faz a tela do time mostrar "Outro".
+    expect(bloco).toContain("kind: 'problema'");
+    // blocker/summary são exibidos ao time ("Por que a IA travou"/"O que o
+    // cliente precisa") — nenhum rótulo de máquina neles.
+    expect(bloco).not.toContain("saida_truncada");
+    expect(bloco).not.toContain("finish_reason=length");
+  });
+
+  it("casesEnabled gateia o caso — mesma régua dos fail-safes clínico e de promessa", () => {
+    const bloco = blocoTerminal();
+    expect(bloco).toContain("agentConfig?.casesEnabled === true");
+    expect(bloco).toContain("!openedCaseThisTurn");
+    expect(bloco).toContain("hasOpenCaseForContact(pool, tenantId, input.conversationId)");
+    // A FALHA continua visível pelo log mesmo com cases desligados.
+    expect(bloco).toContain("runLog.error(`${desfechoTerminal} — sem nenhuma mensagem entregue`");
   });
 
   it("um caso por turno: `caso.ok` gateia o move do funil e a falha fica visível", () => {
     const bloco = blocoTerminal();
     expect(bloco).toContain("if (caso.ok) {");
     expect(bloco).toContain("openedCaseThisTurn = true;");
-    expect(bloco).toContain("moverParaHandoffBestEffort(kindDoCaso);");
+    expect(bloco).toContain("moverParaHandoffBestEffort(desfechoTerminal);");
     // Caso já aberto → log distinto, sem segundo move; openCase que lançou
     // também fica visível (não engole a causa original).
     expect(bloco).toContain("caso humano não abriu (já existe)");
