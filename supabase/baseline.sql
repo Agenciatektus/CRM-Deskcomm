@@ -53662,7 +53662,7 @@ create trigger trg_messages_sincroniza_campanha
   when (new.direction = 'outbound')
   execute function public.fn_campanha_sincroniza_ack();
 
--- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0679, #2888) ----
+-- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0682, #2888) ----
 -- DUAS execuções ao mesmo tempo sobre o mesmo negócio ou contato não se apagam.
 --
 -- ─── O defeito, e por que o #2864 não o fechou ──────────────────────────────

@@ -1,6 +1,6 @@
 -- manifest: **O `add_tag` junta as etiquetas DENTRO do UPDATE, e dois eventos concorrentes sobre o mesmo negócio ou contato não se apagam mais (issue #2888).** O PR #2864 fez a ação reler a linha antes do merge, o que resolveu as duas regras do MESMO evento — mas o `event_log` é drenado por DOIS consumidores em paralelo (o laço do agent-worker e o cron `app/api/v1/cron/event-log-drain`) e o claim é exclusivo por LINHA, não por negócio: dois eventos DISTINTOS do mesmo negócio (um em cada dreno) leem a mesma lista, cada um grava a lista lida mais as suas etiquetas, e a última gravação apaga a etiqueta da outra. Funções `fn_lead_adicionar_etiquetas` e `fn_contato_adicionar_etiquetas` fazem a junção `tags = tags || array(select unnest(p) except select unnest(tags))` na PRÓPRIA instrução `UPDATE`, com `RETURNING tags`: em READ COMMITTED quem chega depois espera o commit da linha e recalcula sobre a linha vigente. A ação passa a anunciar o que o `RETURNING` devolveu, em vez de calcular a lista antes. `security definer`, `EXECUTE` só para `service_role`, `revoke` de `public`, `anon` e `authenticated`.
 
--- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0679, #2888) ----
+-- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0682, #2888) ----
 -- DUAS execuções ao mesmo tempo sobre o mesmo negócio ou contato não se apagam.
 --
 -- ─── O defeito, e por que o #2864 não o fechou ──────────────────────────────
