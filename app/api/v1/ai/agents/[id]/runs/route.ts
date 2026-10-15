@@ -10,9 +10,9 @@
  * última do próprio dia.
  *
  * `ai_agent_runs` só tem dois escritores no repo, e nenhum é o motor de
- * produção: o dispatcher legado (`lib/ai/dispatcher/index.ts`, sem chamador — o
- * cron `app/api/v1/cron/agent-dispatcher` devolve `{ skipped: true,
- * deprecated: true }`) e o runner legado. O motor que responde de verdade é o
+ * produção: o runner legado (`runAgent`, em `lib/ai/runtime/agent.ts`), que
+ * perdeu a rota interna e o dispatcher que o chamavam — o cron
+ * `app/api/v1/cron/agent-dispatcher` devolve `{ skipped: true, deprecated: true }`. O motor que responde de verdade é o
  * `lib/agent-engine`, e ele registra em `llm_calls`.
  *
  * Uma tela que promete um registro que motor nenhum escreve é pior que uma tela
