@@ -1513,7 +1513,6 @@ export const DICIONARIO: Traducoes = {
   "Cada conversa é transferida pelo mesmo caminho de sempre, com evento e auditoria próprios.": {
     es: "Cada conversación se transfiere por el mismo camino de siempre, con evento y auditoría propios.",
   },
-  "Para quem": { es: "Para quién" },
   "Escolha um atendente": { es: "Elige un agente" },
   "Escolha para quem transferir.": { es: "Elige a quién transferir." },
   "Nenhum atendente disponível para transferir.": {
