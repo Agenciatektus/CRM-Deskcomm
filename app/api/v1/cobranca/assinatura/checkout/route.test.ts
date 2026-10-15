@@ -22,6 +22,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: h.logError, warn: vi.fn(), inf
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.banco.cliente }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: async () => null }));
 vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: h.taxaOk }) }));
+vi.mock("@/lib/cobranca/emails", () => ({ emailDoAdminDaEmpresa: async () => "ana@loja.com" }));
 
 import { ErroDoProvedor } from "@/lib/cobranca/provedores/contrato";
 
@@ -270,5 +271,49 @@ describe("checkout da assinatura pelo Asaas (PR 3b)", () => {
     expect(res.status).toBe(422);
     expect((await codigo(res)).code).toBe("documento_recusado");
     expect(updates().at(-1)).toEqual({ checkout_expira_em: null });
+  });
+});
+
+describe("#2961: entrada paga e ajuste proporcional x o checkout cheio (as duas portas passam por gerarLinkDePagamento)", () => {
+  const AJUSTE = {
+    troca_id: "troca-1", plano_troca_pendente_id: "plano-b", troca_status: "aguardando_pagamento",
+    troca_pagamento_ref: "pay_ajuste", troca_pagamento_url: "https://sandbox.asaas.com/i/pay_ajuste",
+    troca_reserva_ate: new Date(Date.now() + 10 * 86_400_000).toISOString(),
+  };
+
+  it("⭐ ajuste aguardando com a assinatura VIVA: 409 pagamento_em_andamento, nenhum checkout cheio", async () => {
+    m.linha = { ...EM_TESTE, ...AJUSTE, estado: "ativa", trial_ate: null, provedor: "asaas", provedor_cliente_id: "cus_1" };
+    h.ad.lerSituacao.mockResolvedValue({ assinaturasVivas: 1, linkDePagamento: null });
+    expect((await codigo(await assinar())).code).toBe("sem_link_de_pagamento");
+    h.ad.lerSituacao.mockResolvedValue({ assinaturasVivas: 1, linkDePagamento: "https://sandbox.asaas.com/i/pay_mensal" });
+    expect((await codigo(await assinar())).code).toBe("pagamento_em_andamento");
+    expect(h.ad.iniciarAssinatura).not.toHaveBeenCalled();
+  });
+
+  it("⭐ entrada pendente (teste de 0 dia, sem cliente): o checkout É a entrada, e o 2º clique devolve o MESMO link", async () => {
+    const criada = new Date(Date.now() - 60_000).toISOString();
+    m.linha = { ...EM_TESTE, trial_ate: criada, pagamento_inicial_pendente: true };
+    expect((await (await assinar()).json()).data).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_1" });
+    expect(h.ad.iniciarAssinatura).toHaveBeenCalledTimes(1);
+    m.linha = { ...m.linha, provedor: "stripe", provedor_cliente_id: "cus_novo", checkout_url: "https://checkout.stripe.com/c/pay/cs_1", checkout_expira_em: new Date(Date.now() + 3_600_000).toISOString() };
+    expect((await (await assinar()).json()).data).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_1" });
+    expect(h.ad.iniciarAssinatura).toHaveBeenCalledTimes(1);
+  });
+
+  // DEFEITO ABERTO (#2961, ponto 5): o checkout não olha troca_*. `.fails` é catraca — o conserto o deixa vermelho e tira o `.fails`.
+  it.fails("SONDA: ajuste aguardando e pagável com a assinatura MORTA (Asaas cancela na hora): não emite um checkout cheio por cima", async () => {
+    m.linha = { ...EM_TESTE, ...AJUSTE, estado: "cancelada", trial_ate: null, provedor: "asaas", provedor_cliente_id: "cus_1" };
+    h.ad.lerSituacao.mockResolvedValue({ assinaturasVivas: 0, linkDePagamento: null });
+    h.ad.iniciarAssinatura.mockResolvedValue({ url: "https://sandbox.asaas.com/i/pay_cheio", expiraEm: null, assinaturaRef: "sub_nova" });
+    await assinar();
+    expect(h.ad.iniciarAssinatura).not.toHaveBeenCalled();
+  });
+
+  // DEFEITO ABERTO (#2961, ponto 6): a porta da empresa usa o e-mail de quem clicou (route.ts). Catraca, como acima.
+  it.fails("SONDA: quem clica é o dono/provisório (empresa sem cliente no provedor): o cliente nasce com o e-mail do admin da empresa", async () => {
+    h.papel.mockResolvedValue({ ok: true, user: { id: "dono-1", email: "dono@instalacao.com" }, org: { orgId: ORG } });
+    m.linha = { ...EM_TESTE, trial_ate: new Date(Date.now() - 60_000).toISOString(), pagamento_inicial_pendente: true };
+    await assinar();
+    expect(h.ad.garantirCliente).toHaveBeenCalledWith(expect.objectContaining({ email: "ana@loja.com" }));
   });
 });
