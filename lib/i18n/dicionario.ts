@@ -8739,10 +8739,10 @@ export const DICIONARIO: Traducoes = {
     es: "Para ejercer sus derechos o resolver dudas sobre privacidad, hable con el encargado de protección de datos:",
   },
   "O operador ainda não publicou um endereço de contato do encarregado de dados nesta instalação. Os pedidos devem ser feitos pelos canais de atendimento da própria organização.": {
-    es: "El operador todavía no publicó una dirección de contacto del encargado de datos en esta instalación. Las solicitudes deben hacerse por los canais de atención de la propia organización.",
+    es: "El operador todavía no publicó una dirección de contacto del encargado de datos en esta instalación. Las solicitudes deben hacerse por los canales de atención de la propia organización.",
   },
   "O operador ainda não publicou um endereço de contato do encarregado da proteção de dados nesta instalação. Os pedidos devem ser feitos pelos canais de atendimento da própria organização.": {
-    es: "El operador todavía no publicó una dirección de contacto del encargado de protección de datos en esta instalación. Las solicitudes deben hacerse por los canais de atención de la propia organización.",
+    es: "El operador todavía no publicó una dirección de contacto del encargado de protección de datos en esta instalación. Las solicitudes deben hacerse por los canales de atención de la propia organización.",
   },
 
   "As regras de uso desta instalação do": { es: "Las reglas de uso de esta instalación de" },
