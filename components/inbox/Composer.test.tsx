@@ -294,4 +294,18 @@ describe("o que o conserto NÃO muda (preservado, medido)", () => {
     });
     expect(sendMutate).not.toHaveBeenCalled();
   });
+
+  it("texto digitado numa conversa e enviado noutra leva o nome do contato de DESTINO", async () => {
+    // O `InboxLayout` monta o compositor com chave fixa: trocar de conversa
+    // mantém o texto no campo. A interpolação acontece no ENVIO, com o contato
+    // da conversa para onde a mensagem vai — nunca o da conversa onde se digitou.
+    const { rerender } = renderComposer({ contactName: "Rafael Melgaço" });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Oi {{primeiro_nome}}" } });
+
+    rerender(<Composer conversationId="conv-2" initialDraft="" contactName="Ana Paula" contactDisplayName={null} />);
+    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
+
+    expect(sendMutate).toHaveBeenCalledTimes(1);
+    expect(sendMutate.mock.calls[0]![0]).toMatchObject({ conversation_id: "conv-2", body: "Oi Ana" });
+  });
 });
