@@ -17,7 +17,7 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ### Adicionado
 
-- **O histórico de uma conversa pode ser baixado em PDF, pelo endereço da rota e com a sessão logada** `GET /api/v1/conversations/[id]/export?formato=pdf` devolve o fio de mensagens em ordem cronológica, com até as 500 mais recentes. O papel `agent` baixa; `viewer` não leva o arquivo. O botão na tela da conversa ainda não existe. Nenhuma mudança de banco.
+- **O histórico de uma conversa pode ser baixado em PDF, pelo endereço da rota e com a sessão logada** `GET /api/v1/conversations/[id]/export?formato=pdf` devolve o fio de mensagens em ordem cronológica, com até as 500 mais recentes. O papel `agent` baixa; `viewer` não leva o arquivo. Limite de 5 exportações por minuto por pessoa e 20 por organização. O botão na tela da conversa ainda não existe. Nenhuma mudança de banco.
 
   Contribuição de @webtecnica (refs #1982).
 
@@ -51,11 +51,11 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Contribuição de @webtecnica (refs #2812).
 
-- **GPT-6 Luna, GPT-6.1 Sol e GPT-6 Astra entram na lista de modelos** Aparecem em Provedores de IA e no seletor do agente, com o custo contado em Uso e orçamento. O modelo padrão não muda. Crédito: @rafaelcesardev.
+- **GPT-6 Luna, GPT-6.1 Sol e GPT-6 Astra entram na lista de modelos** Aparecem em Provedores de IA e no seletor do agente, com o custo contado em Uso e orçamento. O modelo padrão não muda. Se o seu `.env` tem `OPENAI_REASONING_EFFORT` em `none` ou `minimal`: o GPT-6.1 Sol e o GPT-6 Astra passam a receber `low` (antes recusavam a resposta), e o GPT-6 Luna com `minimal` passa a usar `none`. Crédito: @rafaelcesardev.
 
 - **O guia de uso diário do CRM passa a conhecer todas as telas e todos os recursos lançados** O guia (a skill `deskcomm-operacao`) passa a conhecer os recursos da 1.79.0. Nada precisa ser feito ao atualizar. Contribuição de @paulolimajr77.
 
-- **O Inbox ganha o botão Iniciar conversa, para número novo ou contato existente** No topo da lista do Inbox, o botão abre um painel: digite o telefone ou busque o contato, escolha o número de saída e escreva a primeira mensagem ou use um modelo. A conversa abre atribuída a quem a iniciou, e a IA não assume. Aparece para atendente ou acima. Você não precisa fazer nada.
+- **O Inbox ganha o botão Iniciar conversa, para número novo ou contato existente** No topo da lista do Inbox, o botão abre um painel: digite o telefone ou busque o contato, escolha o número de saída e escreva a primeira mensagem ou use um modelo. A conversa abre atribuída a quem a iniciou, e a IA não assume. Se ela já está com outro atendente, o painel diz com quem e a primeira mensagem não é enviada. Aparece para atendente ou acima. Você não precisa fazer nada.
 
   Contribuição de @webtecnica (#2838), a partir da issue #2813 de @aerosuiteapp.
 
