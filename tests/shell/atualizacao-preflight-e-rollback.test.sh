@@ -223,10 +223,16 @@ ENV
   (
     cd "$proj" || exit 1
     git init --quiet
+    # Os casos 8* precisam de um arquivo que a versão alvo TROCA (versao.txt) e
+    # de um que ela TRAZ e o topo não tem (so-na-versao.txt).
+    printf 'alvo\n' > versao.txt
+    printf 'nova\n' > so-na-versao.txt
     git add -A
     git commit --quiet -m "v0.9.0"
     git tag v0.9.0
     echo topo > topo.txt
+    printf 'topo\n' > versao.txt
+    git rm --quiet so-na-versao.txt
     git add -A
     git commit --quiet -m "topo da main"
   ) >/dev/null 2>&1
@@ -549,7 +555,7 @@ PATH_ANTES7="$PATH"
 PATH="$WORK/bin-apt-ubuntu:$PATH"
 motivo7b="$(preflight_atualizacao 0.9.0)"; rc7b=$?
 PATH="$PATH_ANTES7"
-if [ "$rc7b" -ne 0 ] && printf '%s' "$motivo7b" | grep -q 'Instale o pacote docker-buildx\. '; then
+if [ "$rc7b" -ne 0 ] && printf '%s' "$motivo7b" | grep -qE 'Instale o pacote docker-buildx\.( |$)'; then
   ok "com o pacote do Ubuntu no cache, manda instalar docker-buildx"
 else
   nao "pacote do Ubuntu" "rc≠0 com 'Instale o pacote docker-buildx. '" "rc $rc7b: $motivo7b"
@@ -563,7 +569,7 @@ fi
 PATH="$WORK/bin-apt-repo-docker:$PATH"
 motivo7c="$(preflight_atualizacao 0.9.0)"; rc7c=$?
 PATH="$PATH_ANTES7"
-if [ "$rc7c" -ne 0 ] && printf '%s' "$motivo7c" | grep -q 'Instale o pacote docker-buildx-plugin\. '; then
+if [ "$rc7c" -ne 0 ] && printf '%s' "$motivo7c" | grep -qE 'Instale o pacote docker-buildx-plugin\.( |$)'; then
   ok "com o repo do Docker habilitado, manda instalar docker-buildx-plugin"
 else
   nao "pacote do repo Docker" "rc≠0 com 'Instale o pacote docker-buildx-plugin. '" "rc $rc7c: $motivo7c"
@@ -572,7 +578,7 @@ fi
 PATH="$WORK/bin-apt-ambos:$PATH"
 motivo7e="$(preflight_atualizacao 0.9.0)"; rc7e=$?
 PATH="$PATH_ANTES7"
-if [ "$rc7e" -ne 0 ] && printf '%s' "$motivo7e" | grep -q 'Instale o pacote docker-buildx-plugin\. '; then
+if [ "$rc7e" -ne 0 ] && printf '%s' "$motivo7e" | grep -qE 'Instale o pacote docker-buildx-plugin\.( |$)'; then
   ok "com os dois nomes no índice (docker-ce + universe), manda instalar docker-buildx-plugin"
 else
   nao "dois nomes no índice" "rc≠0 com 'Instale o pacote docker-buildx-plugin. '" "rc $rc7e: $motivo7e"
@@ -612,7 +618,9 @@ if [ "$RC8" -eq 3 ]; then
 else
   nao "recusa em árvore suja" "RC 3" "RC $RC8"
 fi
-if grep -q 'topo\.txt' "$OUT8"; then
+# Na MENSAGEM DO KIT (a linha "Motivo:"), não no erro cru do git: o erro cru
+# também nomeia o arquivo, e é ele que o dono via quando a recusa vinha tarde.
+if grep -q 'Motivo:.*topo\.txt' "$OUT8"; then
   ok "e o motivo NOMEIA o arquivo alterado (não é um 'parece haver')"
 else
   nao "motivo nomeia o arquivo" "topo.txt na mensagem" "$(tail -3 "$OUT8" | tr '\n' ' ')"
@@ -627,6 +635,15 @@ if grep -qE ' stop | up -d| rm -f' "$DOCKER_LOG"; then
       "$(grep -E ' stop | up -d| rm -f' "$DOCKER_LOG" | head -2 | tr '\n' ';')"
 else
   ok "nenhum serviço foi parado, recriado ou removido"
+fi
+
+# A frase da moldura do update.sh ("nada foi parado") sai UMA vez: o motivo
+# repetia "Nada foi parado nem baixado" logo abaixo dela.
+n8="$(grep -ci 'nada foi parado' "$OUT8")"
+if [ "$n8" -eq 1 ]; then
+  ok "'nada foi parado' aparece uma vez só na tela"
+else
+  nao "frase sem repetição" "1 ocorrência de 'nada foi parado'" "$n8"
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -654,6 +671,66 @@ if grep -qE ' (created|exited)$' "$DUB/estado.txt"; then
 else
   ok "app, worker, scheduler e proxy saíram SAUDÁVEIS"
 fi
+
+# ════════════════════════════════════════════════════════════════════════════
+# Casos 8c–8g: a régua do preflight é a MESMA do checkout (doc 144). A régua do
+# #2932 divergia em três casos medidos; cada um vira caso aqui, e cada um fica
+# vermelho com a régua antiga de volta (sabotagem conferida ao escrever).
+#
+# segue_8 <nome> <descrição> <preparo>: o update tem de SEGUIR e fechar no ar.
+segue_8() {
+  local nome="$1" desc="$2" preparo="$3" r out
+  preparar_vps
+  r="$WORK/caso$nome"; mkdir -p "$r"; montar_instalacao "$r"
+  ( cd "$r/deskcommcrm" && eval "$preparo" ) >/dev/null 2>&1
+  out="$WORK/saida$nome.txt"
+  rodar_update "$r" "$out" DESKCOMM_BUILD_LOCAL=1
+  if [ "$RC" -eq 0 ] && grep -q 'Atualização concluída' "$out"; then
+    ok "$desc: a atualização SEGUIU e fechou no ar"
+  else
+    nao "$desc" "RC 0 com 'Atualização concluída'" "RC $RC: $(grep -m1 'Motivo:' "$out" || tail -3 "$out" | tr '\n' ' ')"
+  fi
+}
+# recusa_8 <nome> <descrição> <preparo> <regex...>: RC 3 antes do backup, e a
+# linha "Motivo:" do kit casa com CADA regex.
+recusa_8() {
+  local nome="$1" desc="$2" preparo="$3" r out padrao; shift 3
+  preparar_vps
+  r="$WORK/caso$nome"; mkdir -p "$r"; montar_instalacao "$r"
+  ( cd "$r/deskcommcrm" && eval "$preparo" ) >/dev/null 2>&1
+  out="$WORK/saida$nome.txt"
+  rodar_update "$r" "$out"
+  if [ "$RC" -eq 3 ] && [ ! -f "$r/marca-backup" ]; then
+    ok "$desc: recusou ANTES do backup (RC 3)"
+  else
+    nao "$desc" "RC 3 sem marca-backup" "RC $RC, backup $( [ -f "$r/marca-backup" ] && echo rodou || echo 'não rodou')"
+  fi
+  for padrao in "$@"; do
+    if grep -q "Motivo:.*$padrao" "$out"; then
+      ok "$desc: a mensagem do kit diz '$padrao'"
+    else
+      nao "$desc" "'$padrao' na linha Motivo:" "$(grep -m1 'Motivo:' "$out" || tail -3 "$out" | tr '\n' ' ')"
+    fi
+  done
+}
+
+echo "── caso 8c — arquivo APAGADO na VPS que a versão nova troca: segue"
+segue_8 8c "apagado sem git rm" 'rm versao.txt'
+
+echo "── caso 8d — alteração no índice IGUAL ao arquivo da versão nova: segue"
+segue_8 8d "staged igual ao alvo" 'printf "alvo\n" > versao.txt && git add versao.txt'
+
+echo "── caso 8e — só a data mudou (mtime) num arquivo que a versão troca: segue"
+segue_8 8e "mtime-only" 'touch -t 202001010000 versao.txt'
+
+echo "── caso 8f — arquivo FORA do git que a versão nova traz: recusa antes do backup"
+recusa_8 8f "untracked sobrescrito" 'printf "meu\n" > so-na-versao.txt' \
+  'so-na-versao\.txt' 'fora do git' 'Mova-os'
+
+echo "── caso 8g — vários: a mensagem nomeia TODOS, não só o primeiro"
+recusa_8 8g "vários de uma vez" \
+  'echo x >> topo.txt && echo x >> versao.txt && printf "meu\n" > so-na-versao.txt' \
+  'topo\.txt' ' versao\.txt' 'so-na-versao\.txt' 'git checkout HEAD -- '
 
 printf '\n'
 if [ "$falhas" -eq 0 ]; then echo "TUDO VERDE"; exit 0; fi
