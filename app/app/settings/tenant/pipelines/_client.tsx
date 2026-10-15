@@ -36,6 +36,8 @@ export interface PipelineRow {
   slug: string;
   vocabulary: Record<string, string> | null;
   settings: Record<string, unknown> | null;
+  /** Opcional só para os testes; a página sempre manda (ver `ehFunilPadrao`). */
+  is_default?: boolean;
 }
 
 /**
@@ -289,6 +291,7 @@ export function PipelinesClient({
               pipeline={p}
               etapas={etapas[p.id] ?? []}
               comandaDisponivel={comandaDisponivel}
+              ehFunilPadrao={p.id === (pipelines.find((x) => x.is_default) ?? pipelines[0])?.id}
             />
           )}
         </Card>
@@ -301,10 +304,18 @@ function PipelineEditor({
   pipeline,
   etapas,
   comandaDisponivel,
+  ehFunilPadrao,
 }: {
   pipeline: PipelineRow;
   etapas: EtapaDoFunil[];
   comandaDisponivel: boolean;
+  /**
+   * A ficha do contato lê as definições SÓ do funil padrão — a mesma régua de
+   * `/api/v1/pipelines/default`: `is_default`, senão o primeiro não arquivado por
+   * `position` (a página entrega a lista nessa ordem). Num funil secundário,
+   * marcar "Contato" tiraria o campo do card sem pô-lo na ficha: some de toda tela.
+   */
+  ehFunilPadrao: boolean;
 }) {
   const t = useT();
   const v = pipeline.vocabulary ?? {};
@@ -821,31 +832,35 @@ function PipelineEditor({
                 cujo valor mora em `contacts.custom_fields`. A chave só é
                 gravada quando vale `contato` — um funil sem ela continua
                 idêntico ao de antes. */}
-            <div className="flex flex-wrap items-center gap-3 md:col-span-4">
-              <span className="text-xs font-medium">{t("Este campo pertence a:")}</span>
-              <Select
-                value={escopoDoCampo(f)}
-                onValueChange={(escopo) => {
-                  const next = [...fields];
-                  const copia = { ...next[i] } as CustomFieldDef;
-                  if (escopo === "contato") copia.escopo = "contato";
-                  else delete (copia as { escopo?: unknown }).escopo;
-                  next[i] = copia;
-                  setFields(next);
-                }}
-              >
-                <SelectTrigger
-                  aria-label={`${t("Escopo do campo")} ${i + 1}`}
-                  className="h-8 w-40 text-xs"
+            {/* Fora do funil padrão o seletor só aparece para DESFAZER uma marca
+                "Contato" que já exista (gravada quando este era o padrão). */}
+            {(ehFunilPadrao || escopoDoCampo(f) === "contato") && (
+              <div className="flex flex-wrap items-center gap-3 md:col-span-4">
+                <span className="text-xs font-medium">{t("Este campo pertence a:")}</span>
+                <Select
+                  value={escopoDoCampo(f)}
+                  onValueChange={(escopo) => {
+                    const next = [...fields];
+                    const copia = { ...next[i] } as CustomFieldDef;
+                    if (escopo === "contato") copia.escopo = "contato";
+                    else delete (copia as { escopo?: unknown }).escopo;
+                    next[i] = copia;
+                    setFields(next);
+                  }}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="negocio">{t("Negócio")}</SelectItem>
-                  <SelectItem value="contato">{t("Contato")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  <SelectTrigger
+                    aria-label={`${t("Escopo do campo")} ${i + 1}`}
+                    className="h-8 w-40 text-xs"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="negocio">{t("Negócio")}</SelectItem>
+                    <SelectItem value="contato">{t("Contato")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         ))}
         {fields.length < 50 && (
