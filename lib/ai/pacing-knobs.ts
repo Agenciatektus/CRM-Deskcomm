@@ -266,9 +266,11 @@ export function idadeEmDias(
  * aquecimento" (`WARMUP_PULADO`), ou degraus próprios já chegaram ao "sem
  * limite". Sem linha de knobs = idade 0 = ainda aquecendo (erra para o seguro).
  *
- * É a mesma conta do `cap_today` de `knobsView`, e é ela que decide
- * `channel_sessions.warmup_completed_at` (a ingestão do status da sessão): uma régua só
- * para "número formado", na tela, na API e no envio.
+ * É a mesma conta do `cap_today` de `knobsView`, e é ela que decide QUANDO
+ * `channel_sessions.warmup_completed_at` é gravado (a ingestão do status da sessão).
+ * A marca gravada não volta: se o dono depois desligar "pular o aquecimento" ou
+ * declarar uma data mais recente, ela segue "sim" enquanto o controle de ritmo volta
+ * a limitar. Por isso nada no envio lê a marca — quem decide envio chama esta função.
  */
 export function numeroJaAquecido(
   row: Pick<ChannelKnobsRow, "number_activated_at" | "warmup_daily_caps"> | null,

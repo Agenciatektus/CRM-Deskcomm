@@ -1681,10 +1681,12 @@ async function handleSessionStatus(
     // (warmup_completed_at IS NOT NULL)`, e atribuir a ela abortava o UPDATE
     // INTEIRO — inclusive o `status`, e o espelho do canal congelava sem erro.
     //
-    // Limite conhecido: a marca só anda num `session.status` WORKING; um número
+    // Limites conhecidos: a marca só anda num `session.status` WORKING; um número
     // que fica conectado sem reconectar a recebe atrasada (erra para o lado
-    // seguro). Se alguém passar a DECIDIR envio por ela, calcule na leitura com a
-    // mesma função.
+    // seguro). E, gravada, ela não volta (o ramo só roda com `!is_warmup_complete`):
+    // desligar "pular o aquecimento" depois deixa a marca "sim" com o ritmo de
+    // volta a limitar — erro para o lado INSEGURO. Por isso nada no envio a lê; quem
+    // decide envio calcula na leitura com a mesma função.
     if (await aquecimentoTerminou(admin, session)) update.warmup_completed_at = now;
   }
   await admin.from("channel_sessions").update(update).eq("id", session.id);
