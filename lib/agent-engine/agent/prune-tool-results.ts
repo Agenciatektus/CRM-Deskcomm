@@ -152,9 +152,9 @@ export function toolPartsAsText(messages: ModelMessage[], maxResultTokens?: numb
         const result = raw === undefined ? 'sem resultado' : capChars === undefined ? raw : truncateOneLine(raw, capChars);
         return [{ type: 'text' as const, text: `[ferramenta ${part.toolName} chamada com ${args} → ${result}]` }];
       }
-      // Thinking blocks carry a signature bound to the conversation (system + tools + prefix) they were produced in;
-      // replaying them in a call without `tools` makes the API reject the request.
-      if ((['reasoning', 'thinking', 'redacted_thinking'] as string[]).includes(part.type)) return [];
+      // Raciocínio sai: o bloco é assinado contra a conversa em que nasceu (system + tools + prefixo), e
+      // reenviá-lo numa chamada sem `tools` faz a API recusar o pedido.
+      if (part.type === 'reasoning' || part.type === 'reasoning-file') return [];
       if (part.type === 'tool-result' || part.type === 'tool-approval-request') return [];
       return [part];
     });
