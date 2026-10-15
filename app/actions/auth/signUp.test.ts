@@ -118,33 +118,86 @@ describe("signUp — a tela precisa saber se a sessão já veio aberta", () => {
   });
 });
 
-describe("signUp — plano obrigatório antes de criar a conta", () => {
-  beforeEach(() => {
+/**
+ * A COBRANÇA LIGADA E O PLANO DO CADASTRO (#2846, doc 146 opção B).
+ *
+ * A action recusa ANTES do GoTrue o que o gatilho `fn_trial_na_criacao_da_org`
+ * recusaria depois — senão a conta nasceria sem organização. O critério é o do
+ * gatilho: sem escolha, vale o padrão; sem padrão e com plano oferecido, recusa;
+ * sem plano NENHUM, passa e a empresa nasce isenta.
+ */
+describe("signUp — o plano do cadastro com a cobrança ligada", () => {
+  const OFERECIDO = "11111111-1111-4111-8111-111111111111";
+  const PADRAO = "22222222-2222-4222-8222-222222222222";
+
+  function planos(p: { oferecidos: string[]; padrao: string | null; erro?: boolean }) {
+    admin.from.mockImplementation(() => {
+      const q = {
+        select: vi.fn(() => q),
+        is: vi.fn(() => q),
+        eq: vi.fn(() => q),
+        order: vi.fn(async () => (p.erro ? { data: null, error: { code: "57014" } } : {
+          data: p.oferecidos.map((id) => ({ id, nome: "Plano", preco_cents: 4990, intervalo: "mes", trial_dias: 0 })), error: null,
+        })),
+        maybeSingle: vi.fn(async () => ({ data: p.padrao === null ? null : { id: p.padrao }, error: null })),
+      };
+      return q;
+    });
+  }
+
+  beforeEach(async () => {
     vi.resetModules();
     signUpDoProvedor.mockReset();
+    signUpDoProvedor.mockResolvedValue({ data: { user: { id: "u-plano" }, session: null }, error: null });
     admin.from.mockReset();
     vi.mocked(headers).mockResolvedValue({
       get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
     } as never);
     vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
     vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
-  });
-
-  it("não cria conta órfã quando a cobrança exige plano e não há padrão", async () => {
     const { moduloLigado } = await import("@/lib/instalacao/modulos");
     vi.mocked(moduloLigado).mockResolvedValue(true);
-    const query = {
-      select: vi.fn().mockReturnThis(),
-      is: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    };
-    admin.from.mockReturnValue(query);
+  });
 
+  const cadastrar = async (plano?: string) => {
     const { signUp } = await import("./signUp");
-    const res = await signUp(entrada());
+    return signUp({ ...entrada(), ...(plano ? { cobranca_plan_id: plano } : {}) });
+  };
+  const recusa = (motivo: string) => ({ ok: false, error: "validation_error", details: { cobranca_plan_id: [motivo] } });
 
-    expect(res).toEqual({ ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_obrigatorio"] } });
+  it("⭐ plano oferecido e sem padrão: cadastro sem escolha é recusado e a conta não nasce", async () => {
+    planos({ oferecidos: [OFERECIDO], padrao: null });
+    expect(await cadastrar()).toEqual(recusa("plano_obrigatorio"));
+    expect(signUpDoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("⭐ sem plano nenhum (nem padrão, nem oferecido): o cadastro passa — a empresa nasce isenta", async () => {
+    planos({ oferecidos: [], padrao: null });
+    expect(await cadastrar()).toEqual({ ok: true, sessao_ativa: false });
+    expect(signUpDoProvedor).toHaveBeenCalledOnce();
+  });
+
+  it("com plano padrão: o cadastro sem escolha passa e não leva plano na metadata", async () => {
+    planos({ oferecidos: [OFERECIDO], padrao: PADRAO });
+    expect(await cadastrar()).toEqual({ ok: true, sessao_ativa: false });
+    expect(signUpDoProvedor.mock.calls[0]?.[0]?.options?.data).not.toHaveProperty("cobranca_plan_id");
+  });
+
+  it("plano escolhido e oferecido: passa e atravessa na metadata até o gatilho", async () => {
+    planos({ oferecidos: [OFERECIDO], padrao: null });
+    expect(await cadastrar(OFERECIDO)).toEqual({ ok: true, sessao_ativa: false });
+    expect(signUpDoProvedor.mock.calls[0]?.[0]?.options?.data).toMatchObject({ cobranca_plan_id: OFERECIDO });
+  });
+
+  it("plano escolhido que não é oferecido: recusado como indisponível", async () => {
+    planos({ oferecidos: [OFERECIDO], padrao: PADRAO });
+    expect(await cadastrar(PADRAO)).toEqual(recusa("plano_indisponivel"));
+    expect(signUpDoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("leitura dos planos falhou: recusa (é ação), em vez de criar conta que o gatilho barraria", async () => {
+    planos({ oferecidos: [], padrao: null, erro: true });
+    expect(await cadastrar()).toEqual(recusa("plano_obrigatorio"));
     expect(signUpDoProvedor).not.toHaveBeenCalled();
   });
 });

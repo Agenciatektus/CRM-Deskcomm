@@ -286,3 +286,74 @@ describe("sincronizar", () => {
     expect(acoes()).not.toContain("cobranca.plano_trocado");
   });
 });
+
+// #2846: o dinheiro da troca proporcional e da entrada paga passa por aqui.
+describe("sincronizar — upgrade proporcional", () => {
+  const lerPagamento = vi.fn<AdaptadorDeCobranca["lerPagamentoProporcional"]>();
+  const trocarPlano = vi.fn<AdaptadorDeCobranca["trocarPlano"]>();
+  const depsDoUpgrade = (): DependenciasDaCobranca => ({
+    ...deps(),
+    adaptador: () => ({ lerSituacao: ler, cancelarNoFim, lerPagamentoProporcional: lerPagamento, trocarPlano } as unknown as AdaptadorDeCobranca),
+  });
+  const rodarUpgrade = () => sincronizar(banco.cliente as never, ORG, depsDoUpgrade());
+
+  beforeEach(() => {
+    m.linha = {
+      ...LINHA, troca_id: "troca-1", troca_status: "aguardando_pagamento", troca_pagamento_ref: "cs_1",
+      plano_troca_pendente_id: "plano-b", pagamento_inicial_pendente: false,
+    };
+    m.plano = { id: "plano-b", nome: "Profissional", preco_cents: 9990, intervalo: "mes" };
+  });
+
+  it("⭐ pagamento ainda pendente: o plano NÃO muda, o provedor não troca o preço, nada se audita como troca", async () => {
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(lerPagamento).toHaveBeenCalledWith("cs_1");
+    expect(trocarPlano).not.toHaveBeenCalled();
+    for (const c of escritas()) expect(argumentos(c, "update")?.[0]).not.toHaveProperty("plano_id", "plano-b");
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_status: "aguardando_pagamento", plano_troca_pendente_id: "plano-b" });
+    expect(acoes()).not.toContain("cobranca.plano_trocado");
+  });
+
+  it("pago: troca o preço no provedor, aplica o plano novo e audita (o controle do caso acima)", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    await rodarUpgrade();
+    expect(trocarPlano).toHaveBeenCalledWith({ assinaturaRef: "sub_1", plano: { id: "plano-b", nome: "Profissional", precoCents: 9990, intervalo: "mes" } });
+    expect(m.linha).toMatchObject({ plano_id: "plano-b", troca_status: null, plano_troca_pendente_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: { de: "plano-a", para: "plano-b", quando: "upgrade_proporcional_pago" },
+    }));
+  });
+});
+
+describe("sincronizar — entrada paga (plano sem dias de teste)", () => {
+  beforeEach(() => {
+    // Como o gatilho da 0660 a deixa: teste de 0 dias, suspensa por cobrança.
+    m.linha = { ...LINHA, estado: "trial", trial_ate: ha(2), proximo_vencimento: null, pagamento_inicial_pendente: true, assinaturas_vivas: 0 };
+    m.org = { ...m.org, status: "suspended", suspended_kind: "cobranca" };
+  });
+
+  it("⭐ sem pagamento confirmado no provedor: continua suspensa e a entrada continua pendente", async () => {
+    ler.mockResolvedValue(situacao({ existe: false, jaPagou: false, assinaturasVivas: 1, proximoVencimento: null, statusBruto: "ACTIVE:sem_pagamento" }));
+    const r = await rodar();
+    expect(r).not.toMatchObject({ acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")).toEqual([]);
+    for (const c of escritas()) expect(argumentos(c, "update")?.[0]).not.toHaveProperty("pagamento_inicial_pendente");
+    expect(m.linha).toMatchObject({ pagamento_inicial_pendente: true });
+  });
+
+  it("pagamento confirmado: a entrada deixa de estar pendente e o acesso volta", async () => {
+    ler.mockResolvedValue(situacao());
+    expect(await rodar()).toMatchObject({ tipo: "aplicada", estado: "ativa", acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")[0]?.args).toEqual({ p_org: ORG, p_kind_exigido: "cobranca", p_ator: null });
+    expect(m.linha).toMatchObject({ pagamento_inicial_pendente: false, estado: "ativa" });
+  });
+
+  it("sem provedor (ninguém pagou nada): a régua não reativa", async () => {
+    m.linha = { ...m.linha, provedor: null, provedor_cliente_id: null, provedor_assinatura_id: null, relida_em: null };
+    const r = await rodar();
+    expect(r).toMatchObject({ tipo: "sem_provedor" });
+    expect(r).not.toMatchObject({ acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")).toEqual([]);
+  });
+});
