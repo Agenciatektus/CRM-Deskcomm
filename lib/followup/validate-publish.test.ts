@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { algumCanalExigeModeloForaDaJanela, validateFlowForPublish } from './validate-publish';
+import { algumCanalExigeModeloForaDaJanela, CONTA_NO_TETO, validateFlowForPublish } from './validate-publish';
 import { idsDeEtapaCitados } from './etapas-citadas';
-import type { FlowGraph, FlowNode, FlowEdge } from './graph-schema';
+import { NODE_TYPES, type FlowGraph, type FlowNode, type FlowEdge } from './graph-schema';
 import { CHANNEL_CAPABILITIES, PROVIDERS_DE_MENSAGEM, PROVIDERS_SEM_MENSAGEM } from '../channels/capabilities';
 
 const pos = { x: 0, y: 0 };
@@ -278,7 +278,7 @@ describe('validateFlowForPublish', () => {
     }
   });
 
-  it('does not flag max_steps_exceeded for a path of exactly 30 nodes', () => {
+  it('does not flag max_steps_exceeded for 28 waits (30 boxes) — the wait counts, the trigger and the end do not', () => {
     const waitNodes: FlowNode[] = [];
     const edges: FlowEdge[] = [];
     let prev = 't1';
@@ -289,11 +289,15 @@ describe('validateFlowForPublish', () => {
       prev = id;
     }
     edges.push(edge(prev, 'e1', always()));
-    const g = graph([trigger('t1'), ...waitNodes, end('e1')], edges); // 1 + 28 + 1 = 30 nodes
+    const g = graph([trigger('t1'), ...waitNodes, end('e1')], edges); // 30 boxes, 28 counted steps
     expect(validateFlowForPublish(g).ok).toBe(true);
   });
 
-  it('flags max_steps_exceeded for a path of exactly 31 nodes', () => {
+  it('also publishes 29 waits (31 boxes): the trigger and the end stopped being a step the client feels (#2896)', () => {
+    // Este fixture ERA o limite, e a troca é o conserto: 31 caixas + gatilho +
+    // fim davam 31 passos e reprovavam, embora só as esperas cheguem ao cliente.
+    // Hoje quem conta é o que ele sente (as 29 esperas), e o teto continua
+    // valendo para elas — ver o caso de 31 passos contados abaixo.
     const waitNodes: FlowNode[] = [];
     const edges: FlowEdge[] = [];
     let prev = 't1';
@@ -304,12 +308,155 @@ describe('validateFlowForPublish', () => {
       prev = id;
     }
     edges.push(edge(prev, 'e1', always()));
-    const g = graph([trigger('t1'), ...waitNodes, end('e1')], edges); // 1 + 29 + 1 = 31 nodes
-    const result = validateFlowForPublish(g);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.map((e) => e.code)).toEqual(['max_steps_exceeded']);
+    const g = graph([trigger('t1'), ...waitNodes, end('e1')], edges);
+    expect(validateFlowForPublish(g).ok).toBe(true);
+  });
+
+  /**
+   * #2896 — o teto de passos conta o que o CLIENTE sente.
+   *
+   * A régua antiga dava o mesmo peso a TODO nó do caminho: o gatilho, a condição
+   * que decide, a tag gravada, o mover no funil e o fim valiam uma mensagem
+   * cada. Com isso a retomada de 7 toques que o reporter montou — 32 caixas em
+   * que só 14 chegam ao cliente — era recusada, e a única saída era cortar
+   * toque. Os dois lados da troca estão abaixo: o fluxo dele publica, e a
+   * cadência que ABUSA de mensagem continua reprovada.
+   */
+  describe('o teto conta o que o cliente sente (#2896)', () => {
+    const codigos = (r: ReturnType<typeof validateFlowForPublish>) => (r.ok ? [] : r.errors.map((e) => e.code));
+    const marcar = (id: string, tags: string[]): FlowNode => ({
+      id,
+      type: 'edit_lead_tag',
+      label: id,
+      position: pos,
+      config: { tags },
+    });
+
+    /** `n` mensagens em linha: o caminho mais longo conta exatamente `n` passos. */
+    function mensagens(n: number): FlowGraph {
+      const nodes: FlowNode[] = [trigger('t1')];
+      const edges: FlowEdge[] = [];
+      let anterior = 't1';
+      for (let i = 1; i <= n; i++) {
+        const id = `a${i}`;
+        nodes.push(actionTemplate(id));
+        edges.push(edge(anterior, id, always()));
+        anterior = id;
+      }
+      nodes.push(end('fim'));
+      edges.push(edge(anterior, 'fim', always()));
+      return graph(nodes, edges);
     }
+
+    it('publica com 30 passos contados, e reprova no 31º — o teto continua sendo 30', () => {
+      expect(validateFlowForPublish(mensagens(30))).toEqual({ ok: true });
+
+      const r = validateFlowForPublish(mensagens(31));
+      expect(codigos(r)).toEqual(['max_steps_exceeded']);
+      if (r.ok) return;
+      expect(r.errors[0]!.message).toMatch(/30 passos que o cliente sente/);
+    });
+
+    it('a espera pesa igual à mensagem: 16 toques com espera (32 passos) reprovam', () => {
+      const nodes: FlowNode[] = [trigger('t1')];
+      const edges: FlowEdge[] = [];
+      let anterior = 't1';
+      for (let toque = 1; toque <= 16; toque++) {
+        nodes.push(actionTemplate(`a${toque}`), wait(`w${toque}`, { mode: 'fixed', duration_ms: 300_000 }));
+        edges.push(edge(anterior, `a${toque}`, always()), edge(`a${toque}`, `w${toque}`, always()));
+        anterior = `w${toque}`;
+      }
+      nodes.push(end('fim'));
+      edges.push(edge(anterior, 'fim', always()));
+
+      expect(codigos(validateFlowForPublish(graph(nodes, edges)))).toEqual(['max_steps_exceeded']);
+    });
+
+    /**
+     * O fluxo do reporter, caixa por caixa: gatilho, filtro de entrada, 7 ×
+     * (mensagem + condição por etapa com uma saída por regra + tag), 7 esperas,
+     * mover para Perdido e fim — 32 caixas, 14 passos que o cliente sente (as
+     * caixas internas e as arestas das regras não contam). Era esta a
+     * publicação que o publish recusava.
+     */
+    it('publica a retomada de 7 toques com registro por toque (32 caixas, 14 passos)', () => {
+      const QUALIFICADO = 'bbbbbbbb-2222-4222-8222-222222222222';
+      const NEGOCIACAO = 'cccccccc-3333-4333-8333-333333333333';
+      const PERDIDO = 'aaaaaaaa-1111-4111-8111-111111111111';
+      const etapa = (nome: string, isPerda = false) => ({
+        nome,
+        arquivada: false,
+        isPerda,
+        settingsDoFunil: isPerda ? { lost_reasons: ['Sem orçamento'] } : null,
+      });
+      const etapas = new Map([
+        [QUALIFICADO, etapa('Qualificado · Vendas')],
+        [NEGOCIACAO, etapa('Negociação · Vendas')],
+        [PERDIDO, etapa('Perdido · Vendas', true)],
+      ]);
+      /** A condição de cada toque: uma saída por regra, como o reporter montou. */
+      const confereEtapa = (id: string): FlowNode => ({
+        id,
+        type: 'condition',
+        label: id,
+        position: pos,
+        config: {
+          combinator: 'and',
+          branching: 'per_check',
+          checks: [
+            { id: 'qualificado', label: 'Qualificado', field: 'lead_stage', op: 'eq', value: QUALIFICADO },
+            { id: 'negociacao', label: 'Negociação', field: 'lead_stage', op: 'eq', value: NEGOCIACAO },
+          ],
+        },
+      });
+      const branch = (branchId: string): FlowEdge['condition'] => ({ type: 'branch', branch_id: branchId });
+
+      const nodes: FlowNode[] = [trigger('t1'), condition('filtro')];
+      const edges: FlowEdge[] = [edge('t1', 'filtro', always())];
+      let anterior = 'filtro';
+      for (let toque = 1; toque <= 7; toque++) {
+        nodes.push(
+          actionTemplate(`msg${toque}`),
+          wait(`espera${toque}`, { mode: 'fixed', duration_ms: 300_000 }),
+          confereEtapa(`confere${toque}`),
+          marcar(`marca${toque}`, [`toque-${toque}`]),
+        );
+        edges.push(
+          edge(anterior, `msg${toque}`, always()),
+          edge(`msg${toque}`, `espera${toque}`, always()),
+          edge(`espera${toque}`, `confere${toque}`, always()),
+          edge(`confere${toque}`, `marca${toque}`, branch('qualificado')),
+          edge(`confere${toque}`, `marca${toque}`, branch('negociacao')),
+          edge(`confere${toque}`, `marca${toque}`, always()),
+        );
+        anterior = `marca${toque}`;
+      }
+      nodes.push(
+        { id: 'mover', type: 'move_lead', label: 'Mover', position: pos, config: { stage_id: PERDIDO, lost_reason: 'no_response' } },
+        end('fim'),
+      );
+      edges.push(edge(anterior, 'mover', always()), edge('mover', 'fim', always()));
+
+      expect(nodes.length).toBe(32);
+      expect(validateFlowForPublish(graph(nodes, edges), { etapas })).toEqual({ ok: true });
+    });
+
+    /**
+     * A régua é COMPLETA: cada tipo de nó diz se conta. Um tipo novo quebra o
+     * typecheck (`Record<NodeType, boolean>`) e este teste, em vez de cair fora
+     * da conta calado — que é como o teto passou a mentir.
+     */
+    it('classifica todo tipo de nó: contam mensagem, pergunta, skill e o que faz esperar', () => {
+      expect(Object.keys(CONTA_NO_TETO).sort()).toEqual([...NODE_TYPES].sort());
+      expect(NODE_TYPES.filter((tipo) => CONTA_NO_TETO[tipo])).toEqual([
+        'wait',
+        'ai_classify',
+        'match_reply',
+        'collect',
+        'skill',
+        'action',
+      ]);
+    });
   });
 
   // Regression for the old per-path DFS: a width-2 "diamond" DAG re-converges
@@ -319,9 +466,10 @@ describe('validateFlowForPublish', () => {
   // violation. The SCC-condensation sweep is O(V+E) regardless of path count,
   // so this must both finish fast and still catch the violator correctly.
   it('flags long_wait_needs_template in a wide reconverging DAG without blowing up', () => {
-    // 27 wait layers + trigger + action + end = 30 steps exactly, so this
-    // exercises long_wait_needs_template in isolation without also crossing
-    // the (separately regression-tested) max_steps_exceeded boundary.
+    // 27 wait layers + the action = 28 counted steps (#2896: the trigger and
+    // the end stopped counting), so this exercises long_wait_needs_template in
+    // isolation without also crossing the (separately regression-tested)
+    // max_steps_exceeded boundary.
     const LAYERS = 27;
     const LAYER_WAIT_MS = 3_200_000; // 27 * 3.2M = 86.4M ms == 24h threshold
     const nodes: FlowNode[] = [trigger('t1')];

@@ -265,6 +265,51 @@ function validarSuperficie(
 const LONG_WAIT_THRESHOLD_MS = 86_400_000; // 24h
 const MIN_CYCLE_WAIT_MS = 300_000; // 5min
 const MAX_PATH_STEPS = 30;
+/**
+ * O QUE o teto de passos conta (#2896): o que o CLIENTE sente, não o que a tela
+ * desenha.
+ *
+ * O teto existe para limitar o tamanho da cadência — quantas vezes o cliente é
+ * tocado e quanto ele espera entre os toques. Contar TODO nó do caminho com o
+ * mesmo peso fazia a medida mentir: o fluxo de retomada do reporter (gatilho,
+ * filtro de entrada, 7 × mensagem + condição + tag, 7 esperas, mover para
+ * Perdido e fim) soma 32 nós e era recusado, embora só 14 deles — 7 mensagens e
+ * 7 esperas — cheguem ao cliente. Os outros 18 (gatilho, condição, tag, mover,
+ * fim) são trabalho interno e não somam toque nenhum; do jeito antigo QUALQUER
+ * cadência que registrasse algo por toque estourava com 6 ou 7 toques, e a
+ * única saída era cortar toque.
+ *
+ * Então conta quem produz algo que o cliente lê (mensagem, pergunta, o turno em
+ * que a skill entra no contexto do agente) ou quem o faz esperar (`wait`, e as
+ * caixas que ficam esperando a resposta com prazo — `ai_classify` e
+ * `match_reply`, que `isSufficientWaitNode` já trata como espera). Roteamento
+ * (`condition`, `repeat`) e ação interna (`internal_task`, `move_lead`,
+ * `edit_lead_tag`) não contam: não mudam nada do que o cliente sente, que é a
+ * única coisa que o teto prometeu medir.
+ *
+ * O `Record` é exaustivo DE PROPÓSITO: um tipo de nó novo quebra o typecheck
+ * até alguém dizer se ele conta. Com um `Set` de contados, o tipo novo cairia
+ * fora da conta sem ninguém notar — que é exatamente como o teto passou a
+ * mentir.
+ */
+export const CONTA_NO_TETO: Record<NodeType, boolean> = {
+  // Fala com o cliente.
+  action: true, // mensagem: texto, IA ou modelo
+  collect: true, // pergunta do roteiro de atendimento
+  skill: true, // o turno em que a skill entra no contexto do agente
+  // Faz o cliente esperar.
+  wait: true,
+  ai_classify: true, // parado esperando a resposta classificar (grace)
+  match_reply: true, // parado esperando a resposta casar o texto (grace)
+  // Controle e trabalho interno: não chegam ao cliente.
+  trigger: false, // entrada do fluxo
+  condition: false, // decide o caminho
+  repeat: false, // conta as voltas
+  internal_task: false, // lembrete para a equipe
+  move_lead: false, // move o card no funil
+  edit_lead_tag: false, // grava tag no lead
+  end: false, // desfecho
+};
 
 function waitMs(config: Extract<FlowNode, { type: 'wait' }>['config']): number {
   return config.mode === 'fixed' ? config.duration_ms : config.max_ms;
@@ -377,6 +422,9 @@ function isCycleComponent(component: string[], outEdges: Map<string, FlowEdge[]>
  * "cycles count 1 iteration"). Polynomial (O(V+E)): no per-path enumeration,
  * so branching/reconverging DAGs can't blow it up.
  *
+ * O passo contado é o que o CLIENTE sente (`CONTA_NO_TETO`, #2896) — mensagem,
+ * pergunta, espera — e nunca o nó interno que só registra estado.
+ *
  * ponytail: dentro de um SCC multi-ramo o total soma TODOS os waits/nós do
  * componente — upper bound conservador (nunca aceita grafo ruim; pode gerar
  * 422 a mais num SCC com sub-loops independentes). Máximo exato por caminho
@@ -404,7 +452,14 @@ function analyzeCondensedPaths(
       return node && node.type === 'wait' ? sum + waitMs(node.config) : sum;
     }, 0)
   );
-  const stepWeight = components.map((comp) => comp.length);
+  // O passo do teto é o que o cliente sente: mensagem, pergunta, espera. Um nó
+  // interno (condição, tag, mover, fim) não conta — ver `CONTA_NO_TETO` (#2896).
+  const stepWeight = components.map((comp) =>
+    comp.reduce((sum, id) => {
+      const node = nodesById.get(id);
+      return node !== undefined && CONTA_NO_TETO[node.type] ? sum + 1 : sum;
+    }, 0)
+  );
 
   const condOut = new Map<number, Set<number>>();
   for (const edgeList of outEdges.values()) {
@@ -727,7 +782,7 @@ export function validateFlowForPublish(
       errors.push({
         node_id: null,
         code: 'max_steps_exceeded',
-        message: `O caminho mais longo a partir do trigger excede ${MAX_PATH_STEPS} passos.`,
+        message: `O caminho mais longo a partir do trigger passa de ${MAX_PATH_STEPS} passos que o cliente sente (mensagem, pergunta, skill e espera) — tire um toque da cadência.`,
       });
     }
   }
