@@ -11,6 +11,7 @@ import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moduloLigado } from "@/lib/instalacao/modulos";
+import { lerPlanosDoCadastro, type PlanoDoCadastro } from "@/lib/cobranca/cadastro";
 
 export const metadata = { title: "Criar conta" };
 
@@ -58,19 +59,15 @@ export default async function SignupPage({
   // acima do `.env`, e nunca lança) — `branding()` só veria a semente do `.env`,
   // e o convite não muda isso (#2511, mesmo defeito das páginas `/legal`).
   const marca = await marcaDaSaida(null);
-  let planos: Array<{ id: string; nome: string; preco_cents: number; intervalo: string; trial_dias: number }> = [];
-  let cobrancaSemPlanoDeCadastro = false;
+  // Com plano oferecido, o seletor aparece e o Google some: ele não leva a
+  // escolha. Sem plano nenhum, a empresa nasce isenta e o Google fica (doc 146,
+  // opção B) — o critério é o de `lib/cobranca/cadastro.ts`, o mesmo do gatilho.
+  // Leitura que falha não esconde nada: quem recusa é a action.
+  let planos: PlanoDoCadastro[] = [];
   if (!convite) {
     const admin = createAdminClient();
     if (await moduloLigado(admin, "cobranca")) {
-      const [{ data }, { data: planoPadrao }] = await Promise.all([admin.from("cobranca_planos")
-        .select("id, nome, preco_cents, intervalo, trial_dias")
-        .is("arquivado_em", null).eq("oferecido_ao_cliente", true).order("preco_cents"),
-      admin.from("cobranca_planos").select("id").is("arquivado_em", null).eq("padrao_no_cadastro", true).maybeSingle()]);
-      planos = data ?? [];
-      // Sem plano padrão, a pessoa ainda pode escolher um dos planos
-      // oferecidos. O bloqueio só é necessário quando não há nenhuma opção.
-      cobrancaSemPlanoDeCadastro = planoPadrao === null && planos.length === 0;
+      planos = (await lerPlanosDoCadastro(admin))?.oferecidos ?? [];
     }
   }
 
@@ -129,14 +126,10 @@ export default async function SignupPage({
         </p>
       )}
 
-      {cobrancaSemPlanoDeCadastro ? (
-        <p role="alert" className="rounded-md border px-4 py-3 text-sm text-muted-foreground">{t("O cadastro está temporariamente indisponível. Quem administra o sistema precisa definir o plano de entrada.")}</p>
-      ) : (
-        <SignupForm convite={convite} planos={planos} />
-      )}
+      <SignupForm convite={convite} planos={planos} />
       {/* O convite atravessa o Google na URL de retorno: sem ele, quem foi
           convidado e cria a conta com Google ganharia uma empresa própria. */}
-      {cobrancaSemPlanoDeCadastro ? null : planos.length > 0 ? (
+      {planos.length > 0 ? (
         <p className="text-center text-xs text-muted-foreground">{t("Para garantir que o plano selecionado seja contratado, conclua o cadastro com e-mail e senha.")}</p>
       ) : (
         <EntrarComGoogle convite={convite?.token} />

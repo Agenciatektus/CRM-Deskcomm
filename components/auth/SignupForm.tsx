@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { signUp } from "@/app/actions/auth/signUp";
 import { Eye, EyeSlash } from "@/lib/ui/icons";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
+import type { PlanoDoCadastro } from "@/lib/cobranca/cadastro";
 
 /**
  * Convite em curso: a conta está sendo criada para ACEITAR um convite, não para
@@ -29,14 +30,6 @@ import { PasswordStrength } from "@/components/auth/PasswordStrength";
 export interface ConviteDoSignup {
   token: string;
   email: string;
-}
-
-export interface PlanoDoCadastro {
-  id: string;
-  nome: string;
-  preco_cents: number;
-  intervalo: string;
-  trial_dias: number;
 }
 
 export function SignupForm({ convite, planos = [] }: { convite?: ConviteDoSignup; planos?: readonly PlanoDoCadastro[] }) {

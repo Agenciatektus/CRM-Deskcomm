@@ -6,6 +6,7 @@ import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { moduloLigado } from "@/lib/instalacao/modulos";
+import { cadastroExigeEscolhaDePlano, lerPlanosDoCadastro } from "@/lib/cobranca/cadastro";
 import {
   signupSchema,
   signupComConviteSchema,
@@ -141,19 +142,16 @@ export async function signUp(
   if (!convite) {
     const admin = createAdminClient();
     if (await moduloLigado(admin, "cobranca")) {
+      // Recusa ANTES de criar a conta no GoTrue o que o gatilho da 0660 recusaria
+      // depois — senão o usuário ficaria órfão, sem organização. Leitura que
+      // falha recusa: é ação, não informação.
+      const planos = await lerPlanosDoCadastro(admin);
       if (planoEscolhido) {
-        const { data: plano, error: erroDoPlano } = await admin.from("cobranca_planos").select("id")
-          .eq("id", planoEscolhido).is("arquivado_em", null).eq("oferecido_ao_cliente", true).maybeSingle();
-        if (erroDoPlano || !plano) return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
-      } else {
-        // Sem plano escolhido, a criação da organização dependeria do fallback
-        // do plano padrão na migration. Recusamos antes de criar a conta no
-        // GoTrue se esse fallback não existir, para não deixar usuário órfão.
-        const { data: planoPadrao, error: erroDoPlanoPadrao } = await admin.from("cobranca_planos").select("id")
-          .is("arquivado_em", null).eq("padrao_no_cadastro", true).maybeSingle();
-        if (erroDoPlanoPadrao || !planoPadrao) {
-          return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_obrigatorio"] } };
+        if (!planos?.oferecidos.some((p) => p.id === planoEscolhido)) {
+          return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_indisponivel"] } };
         }
+      } else if (!planos || cadastroExigeEscolhaDePlano(planos)) {
+        return { ok: false, error: "validation_error", details: { cobranca_plan_id: ["plano_obrigatorio"] } };
       }
     }
   }

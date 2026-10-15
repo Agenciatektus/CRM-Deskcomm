@@ -2,6 +2,8 @@
 -- O cadastro público pode escolher um plano oferecido; planos sem trial bloqueiam
 -- a organização até a primeira confirmação de pagamento. Upgrade em período pago
 -- guarda o ajuste pendente, preserva o vencimento e só aplica o plano após pagar.
+-- Revendedor sem plano nenhum (nem padrão, nem oferecido): a empresa segue
+-- nascendo isenta, como antes (doc 146, opção B).
 
 alter table public.cobranca_assinaturas
   add column if not exists pagamento_inicial_pendente boolean not null default false,
@@ -14,11 +16,17 @@ alter table public.cobranca_assinaturas
   add column if not exists troca_pagamento_url text,
   add column if not exists troca_reserva_ate timestamptz;
 
-alter table public.cobranca_assinaturas
-  drop constraint if exists cobranca_assinaturas_troca_status_check;
-alter table public.cobranca_assinaturas
-  add constraint cobranca_assinaturas_troca_status_check
-  check (troca_status is null or troca_status in ('criando', 'aguardando_pagamento', 'pago'));
+-- Num bloco só: o update.sh reaplica sem ON_ERROR_STOP e em autocommit, e um
+-- add que falhasse depois do drop solto deixaria a coluna sem guarda.
+do $troca_status$
+begin
+  alter table public.cobranca_assinaturas
+    drop constraint if exists cobranca_assinaturas_troca_status_check;
+  alter table public.cobranca_assinaturas
+    add constraint cobranca_assinaturas_troca_status_check
+    check (troca_status is null or troca_status in ('criando', 'aguardando_pagamento', 'pago'));
+end
+$troca_status$;
 
 -- Cadastro self-service: o plano escolhido atravessa `organizations.settings`
 -- apenas durante o INSERT. O gatilho valida que continua público e remove o
@@ -59,6 +67,14 @@ begin
       from public.cobranca_planos p
      where p.padrao_no_cadastro and p.arquivado_em is null;
     if v_plano_id is null then
+      -- Decisão do dono (doc 146, opção B, 15/10): o revendedor que não tem
+      -- plano NENHUM (nem padrão, nem oferecido) segue como antes da 0660 e a
+      -- empresa nasce isenta. Com plano oferecido e sem padrão, não: o cadastro
+      -- sem escolha pularia a entrada paga. Espelho em lib/cobranca/cadastro.ts.
+      if not exists (select 1 from public.cobranca_planos p
+                      where p.arquivado_em is null and p.oferecido_ao_cliente) then
+        return null;
+      end if;
       raise exception 'plano_obrigatorio' using errcode = '22023';
     end if;
   end if;
