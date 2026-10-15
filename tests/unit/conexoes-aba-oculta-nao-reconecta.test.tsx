@@ -6,9 +6,9 @@
  * "conectado" chegar sozinho. Com a aba escondida o tick continuava saindo:
  * cada um é uma consulta ao transporte, numa tela em que ninguém está
  * escaneando nada. A guarda é a convenção da casa, a mesma do refetch de
- * segurança (`hooks/realtime/useRefetchDeSeguranca.ts`, PR #2821): presença,
- * voz, alertas e a atualização da interface já pulavam o trabalho de rede com
- * a aba oculta.
+ * segurança (`hooks/realtime/useRefetchDeSeguranca.ts`, PR #2821); a
+ * atualização da interface (`hooks/auth/InterfaceRefresh.tsx`) também pula o
+ * trabalho de rede com a aba oculta.
  *
  * O que este arquivo prova, sem mudar a cadência de 3 s: com a aba visível o
  * refetch continua correndo (o fluxo precisa acompanhar o pareamento), com a
