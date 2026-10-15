@@ -211,6 +211,8 @@ import {
 } from '@/lib/escalacao/briefing-da-passagem';
 import { diffCheckpoint } from '@/lib/leads/checkpoint-diff';
 import { CORRECAO_DO_TURNO_MUDO, turnoMudoPedeCorrecao } from './turno-mudo';
+import { encontraDuplicado } from './near-dup';
+import { corposEnviadosDesdeUltimaInbound } from './memoria-envio';
 import { emitAgentActivityForContact } from '@/lib/leads/agent-activity';
 import { resolveActiveLeadForContact, type LeadCandidate } from '@/lib/leads/active-lead';
 import { aplicaDestinoDaIntencao, funisDeProdutoDoRoteador } from './destino-da-intencao';
@@ -2788,6 +2790,12 @@ async function executarTurnoDoAgente(
   // O que o modelo de fato mandou neste turno (depois da cadeia). A trava "a
   // pergunta saiu?" do roteiro de atendimento lê daqui.
   const corposEnviados: string[] = [];
+  // DUPLICATA PRÓXIMA NO MESMO TURNO: corpos de `send_message` que PASSARAM pela
+  // cadeia e foram aceitos neste turno (o corpo PRÉ-cadeia, para comparar candidato
+  // contra candidato). É a memória que a régua `near-dup.ts` consulta para suprimir
+  // restatemente — o defeito medido em produção (4 respostas a 1 pergunta, 3 vindas
+  // da correção do turno mudo). Só conteúdos ACEITOS entram: um veto não é resposta.
+  const corposAceitosDoTurno: string[] = [];
   // #1943: o turno foi DESCARTADO como obsoleto (guard `resposta_obsoleta`, #1940)
   // ainda no run — o cliente escreveu de novo enquanto o modelo pensava. Quando
   // ligada, NADA mais sai dele, nem a pergunta pendente do roteiro (que segue
@@ -3296,6 +3304,32 @@ async function executarTurnoDoAgente(
             },
           };
         }
+        // DUPLICATA PRÓXIMA NO MESMO TURNO (near-dup): o corpo é quase idêntico a algo
+        // que JÁ foi aceito e enviado NESTE turno. O contrato é UMA resposta adequada e
+        // completa — restatemente imediato é redundância, não informação nova. Suprime
+        // sem tocar no canal nem no ledger (nada é marcado como entregue), devolvendo ao
+        // modelo um erro de ENSINO (mesma forma de corpo_vazio/resposta_obsoleta). Cobre
+        // o caminho de recuperação do turno mudo: a correção re-entra por aqui, memória
+        // em memória. Bolhas de UM send_message não se comparam entre si (só candidato
+        // contra candidato), então fatiamento legítimo não se autossuprime.
+        const corpoRepetido = encontraDuplicado(body, corposAceitosDoTurno);
+        if (corpoRepetido !== null) {
+          runLog.info('duplicate_suppressed — candidato quase idêntico ao já aceito no turno', {
+            job_id: liveJob().id,
+            prior_len: corpoRepetido.length,
+            candidato_len: body.length,
+          });
+          return {
+            ok: false,
+            error: {
+              code: 'duplicate_suppressed',
+              message:
+                'Você já enviou uma mensagem muito parecida a esta neste turno — ela NÃO foi reenviada. ' +
+                'Não repita a mesma informação. Se há algo genuinamente novo a acrescentar, envie SÓ a parte nova; ' +
+                'senão encerre o turno agora.',
+            },
+          };
+        }
         if (claimsCurrentInboundIsEmpty(body, mensagemDoJob)) {
           falseEmptyInboundVetoCount += 1;
           if (falseEmptyInboundVetoCount < MAX_VETOS_DE_FALSO_VAZIO) {
@@ -3725,6 +3759,12 @@ async function executarTurnoDoAgente(
           }
           const outcome = chain.outcome;
           outcomes.push(outcome);
+          // MEMÓRIA DE DUPLICATA: só o que saiu de fato vira referência para a régua.
+          // sent/already_sent/queued = o corpo (ou quase) chegou/chegará ao cliente;
+          // blocked/failed/unavailable não é resposta — não deve suprimir a próxima.
+          if (outcome.kind === 'sent' || outcome.kind === 'already_sent' || outcome.kind === 'queued') {
+            corposAceitosDoTurno.push(body);
+          }
           if (outcome.kind === 'sent' && pendingCitations.length > 0) {
             try {
               await pool.query(
@@ -4650,6 +4690,30 @@ async function executarTurnoDoAgente(
       nativeParts.length === 0
         ? openingTextOnly
         : [{ role: 'user', content: [{ type: 'text', text: openingText }, ...nativeParts] }];
+
+    // MEMÓRIA DE DUPLICATA CRUZADA (near-dup): semeia a régua com o que JÁ saiu
+    // para esta conversa desde a última inbound do cliente. Num turno fresco que
+    // responde mensagem NOVA a janela está vazia (nada saiu depois dela), então
+    // nada legítimo é suprimido; num follow-up de promessa que re-responde uma
+    // conversa CALADA a janela está cheia e a re-resposta quase idêntica é
+    // suprimida — a redundância de follow-up medida em produção. Não-fatal: banco
+    // indisponível → degrada para a memória só-do-turno (dedup parcial melhor que
+    // turno derrubado).
+    if (turnoVaiFalarComOLead(liveJob())) {
+      try {
+        const jaDito = await corposEnviadosDesdeUltimaInbound(pool, {
+          organizationId: tenantId,
+          conversationId: input.conversationId,
+        });
+        if (jaDito.length > 0) {
+          corposAceitosDoTurno.push(...jaDito);
+        }
+      } catch (err) {
+        runLog.warn('memória de duplicata não carregada — dedup cai só para o turno', {
+          error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+        });
+      }
+    }
 
     // O "digitando…" ENQUANTO o modelo pensa já está aceso e sendo renovado desde
     // o início do `try` (`manterDigitando`). A pausa humana antes da 1ª bolha
