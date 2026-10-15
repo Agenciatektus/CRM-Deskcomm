@@ -590,6 +590,71 @@ else
   nao "sem índice do apt" "rc≠0 citando os dois nomes" "rc $rc7d: $motivo7d"
 fi
 
+# ════════════════════════════════════════════════════════════════════════════
+echo "── caso 8 — árvore suja: recusa ANTES do backup, nomeando o arquivo"
+# Defeito medido numa VPS real em 15/10/2026: quem clicou em "Atualizar" na tela
+# passou o preflight, teve o backup inteiro feito (banco + sessões do WhatsApp +
+# 403 MB de anexos) e só então parou em "Your local changes to the following
+# files would be overwritten by checkout: hostgator-setup-kit/install.sh", sem
+# dizer o que fazer com o arquivo. O preflight é o lugar da pergunta "dá para
+# atualizar?" — e a resposta era não.
+preparar_vps
+R8="$WORK/caso8"; mkdir -p "$R8"; montar_instalacao "$R8"
+# `topo.txt` existe no topo e NÃO existe na v0.9.0: é um dos arquivos que a troca
+# de versão mexe, e é por ele que o `git checkout` recusaria (medido: o git
+# recusa exatamente nos arquivos que `git diff HEAD <tag>` lista).
+printf 'ajuste local de quem opera\n' >> "$R8/deskcommcrm/topo.txt"
+OUT8="$WORK/saida8.txt"
+rodar_update "$R8" "$OUT8"; RC8="$RC"
+
+if [ "$RC8" -eq 3 ]; then
+  ok "o update RECUSOU sem começar (RC 3 — o agente não tenta desfazer)"
+else
+  nao "recusa em árvore suja" "RC 3" "RC $RC8"
+fi
+if grep -q 'topo\.txt' "$OUT8"; then
+  ok "e o motivo NOMEIA o arquivo alterado (não é um 'parece haver')"
+else
+  nao "motivo nomeia o arquivo" "topo.txt na mensagem" "$(tail -3 "$OUT8" | tr '\n' ' ')"
+fi
+if [ ! -f "$R8/marca-backup" ]; then
+  ok "o backup NUNCA rodou (a recusa veio antes dele)"
+else
+  nao "backup não iniciado" "marca-backup ausente" "marca-backup foi criada"
+fi
+if grep -qE ' stop | up -d| rm -f' "$DOCKER_LOG"; then
+  nao "nenhum serviço foi parado/recriado" "sem stop/up/rm no log do docker" \
+      "$(grep -E ' stop | up -d| rm -f' "$DOCKER_LOG" | head -2 | tr '\n' ';')"
+else
+  ok "nenhum serviço foi parado, recriado ou removido"
+fi
+
+# ════════════════════════════════════════════════════════════════════════════
+echo "── caso 8b — CONTROLE: alteração local que a versão alvo NÃO troca não trava"
+# O par do caso 8 isola a variável: mesma instalação, mesma sujeira, arquivo
+# outro. `hostgator-setup-kit/install.sh` é IDÊNTICO na 0.8.0 (HEAD) e na 0.9.0
+# (a tag), e é isso que o git mede antes de recusar um checkout — então este
+# update tem de SEGUIR. Sem este controle, um preflight que recusasse por
+# qualquer arquivo alterado passaria no caso 8 e travaria quem só editou um
+# arquivo que a versão nova nem toca.
+preparar_vps
+R8B="$WORK/caso8b"; mkdir -p "$R8B"; montar_instalacao "$R8B"
+printf '# ajuste local de quem opera\n' >> "$R8B/deskcommcrm/hostgator-setup-kit/install.sh"
+OUT8B="$WORK/saida8b.txt"
+rodar_update "$R8B" "$OUT8B" DESKCOMM_BUILD_LOCAL=1; RC8B="$RC"
+
+if [ "$RC8B" -eq 0 ] && grep -q 'Atualização concluída' "$OUT8B"; then
+  ok "a atualização SEGUIU e fechou no ar (RC 0, 'Atualização concluída')"
+else
+  nao "árvore suja irrelevante não trava" "RC 0 com a frase final" "RC $RC8B: $(tail -3 "$OUT8B" | tr '\n' ' ')"
+fi
+if grep -qE ' (created|exited)$' "$DUB/estado.txt"; then
+  nao "todos os serviços de pé" "sem created/exited" \
+      "$(grep -E ' (created|exited)$' "$DUB/estado.txt" | tr '\n' ' ')"
+else
+  ok "app, worker, scheduler e proxy saíram SAUDÁVEIS"
+fi
+
 printf '\n'
 if [ "$falhas" -eq 0 ]; then echo "TUDO VERDE"; exit 0; fi
 echo "$falhas caso(s) vermelho(s)"
