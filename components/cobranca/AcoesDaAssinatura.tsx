@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/types";
 import { documentoDoPagador, exigeDocumento } from "@/lib/cobranca/documento";
 import { formatadorDeData } from "@/lib/cobranca/fuso";
 import { linkDePagamentoSeguro } from "@/lib/cobranca/link";
+import { calcularAjusteProporcional } from "@/lib/cobranca/prorata";
 import { abrirNoNavegador } from "@/lib/cobranca/navegar";
 import type { PlanoParaTroca } from "@/lib/cobranca/painel";
 import type { EstadoDaAssinatura, ProvedorDeCobranca } from "@/lib/cobranca/vocabulario";
@@ -101,16 +102,17 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
   }, []);
   const dia = (v: string | null) => (v ? formatadorDeData(idioma, p.fuso ?? null, { day: "2-digit", month: "2-digit" }).format(new Date(v)) : "");
   const selecionado = p.planosParaTroca.find((plano) => plano.id === novo) ?? null;
-  const ajusteProporcional = (() => {
-    if (!p.planoAtual || !selecionado || selecionado.preco_cents <= p.planoAtual.preco_cents) return 0;
-    if (!p.periodoPagoDesde || !p.proximoVencimento) return null;
-    const inicio = Date.parse(p.periodoPagoDesde);
-    const fim = Date.parse(p.proximoVencimento);
-    const agora = Date.parse(p.instanteCalculo);
-    if (!Number.isFinite(agora)) return null;
-    if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim <= inicio || fim <= agora) return 0;
-    return Math.round((selecionado.preco_cents - p.planoAtual.preco_cents) * Math.min(1, (fim - agora) / (fim - inicio)));
-  })();
+  // A MESMA conta da cobrança (`troca.ts`), mínimo do provedor incluído: abaixo
+  // dele a tela diz "na próxima renovação", que é o que o servidor faz.
+  const ajusteProporcional = !p.planoAtual || !selecionado
+    ? 0
+    : calcularAjusteProporcional({
+        precoAtualCents: p.planoAtual.preco_cents,
+        precoNovoCents: selecionado.preco_cents,
+        periodoPagoDesde: p.periodoPagoDesde ? new Date(p.periodoPagoDesde) : null,
+        proximoVencimento: p.proximoVencimento ? new Date(p.proximoVencimento) : null,
+        agora: new Date(p.instanteCalculo),
+      });
   const reais = (centavos: number) => new Intl.NumberFormat(idioma, { style: "currency", currency: "BRL" }).format(centavos / 100);
   const dolares = (centavos: number) => new Intl.NumberFormat(idioma, { style: "currency", currency: "USD" }).format(centavos / 100);
 
@@ -130,7 +132,7 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
   const aguardandoAsaas = p.provedor === "asaas" && (fatura !== null || (p.temProvedor && (p.estado === "trial" || link !== null)));
   // "Já paguei" só onde há o que reler: quem nunca assinou (teste que acabou) não pagou nada.
   const podeDizerQuePagou = (emDivida && p.temProvedor) || p.noHub || aguardandoAsaas || p.trocaPagamentoUrl !== null;
-  const podeTrocar = p.planosParaTroca.length > 0 && (p.estado === "trial" || p.estado === "ativa") && !p.cancelaNoFim && !p.trocaStatus;
+  const podeTrocar = p.planosParaTroca.length > 0 && (p.estado === "trial" || p.estado === "ativa") && !p.cancelaNoFim && p.trocaStatus !== "criando";
   const podeCancelar = p.temProvedor && p.assinaturasVivas > 0 && !p.cancelaNoFim && (p.estado === "ativa" || p.estado === "trial");
 
   async function agir(acao: () => Promise<void>) {
@@ -311,7 +313,7 @@ export function AcoesDaAssinatura(p: PropsDasAcoes) {
         )}
         {p.trocaStatus && (
           <p className="basis-full text-sm text-muted-foreground" role="status">
-            {t(p.trocaStatus === "criando" ? "Estamos preparando o ajuste proporcional. Aguarde alguns segundos." : "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.")}
+            {t(p.trocaStatus === "criando" ? "Estamos preparando o ajuste proporcional. Aguarde alguns segundos." : "Há um ajuste proporcional esperando pagamento. Escolher outro plano cancela esse ajuste.")}
           </p>
         )}
         {podeCancelar && !cancelando && (

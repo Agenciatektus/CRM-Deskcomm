@@ -659,6 +659,16 @@ describe("iniciarAssinatura", () => {
     });
   });
 
+  it.each([
+    ["PENDING", "pendente"], ["OVERDUE", "pendente"],
+    // Cartão em análise de risco: ainda pode ser aprovado — encerrado esqueceria o pagamento.
+    ["AWAITING_RISK_ANALYSIS", "pendente"],
+    ["RECEIVED", "pago"], ["CONFIRMED", "pago"], ["REFUNDED", "encerrado"],
+  ])("⭐ ajuste proporcional com status %s → %s", async (status, esperado) => {
+    const { adaptador } = montar({ "GET /payments/pay_upgrade": { corpo: cobranca({ id: "pay_upgrade", status }) } });
+    await expect(adaptador.lerPagamentoProporcional("pay_upgrade")).resolves.toBe(esperado);
+  });
+
   it("⭐ #2609 expirar a sessão: DELETE /payments/{id} — a cobrança some e a invoiceUrl dela para de valer", async () => {
     const { adaptador, chamadas } = montar({ "DELETE /payments/pay_aberta": { corpo: { id: "pay_aberta", deleted: true } } });
     await adaptador.expirarSessao("pay_aberta");

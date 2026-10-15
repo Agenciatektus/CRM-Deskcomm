@@ -91,11 +91,69 @@ describe("trocarPlanoDaOrg", () => {
     expect(argumentos(escritas()[0]!, "update")?.[0]).toMatchObject({ plano_agendado_id: null });
   });
 
-  it("não permite agendar outro plano enquanto o upgrade proporcional está pendente", async () => {
-    m.linha = { ...PAGANDO, troca_id: "troca-1", plano_troca_pendente_id: "pro", troca_status: "aguardando_pagamento", troca_pagamento_ref: "pay-1" };
+  const COM_AJUSTE = { ...PAGANDO, troca_id: "troca-1", plano_troca_pendente_id: "pro", troca_status: "aguardando_pagamento", troca_pagamento_ref: "pay-1", troca_reserva_ate: "2026-11-01T00:00:00Z" };
+  const limpouATroca = () => escritas().some((c) => (argumentos(c, "update")?.[0] as Record<string, unknown>).troca_id === null);
+
+  it("⭐ outro plano com o ajuste em aberto: a cobrança morre NO PROVEDOR antes, a linha a esquece, e o pedido novo segue", async () => {
+    m.linha = { ...COM_AJUSTE };
+    expect(await trocar("mini")).toMatchObject({ ok: true, quando: "agendado", planoAgendadoId: "mini" });
+    expect(expirarSessao).toHaveBeenCalledWith("pay-1");
+    expect(expirarSessao.mock.invocationCallOrder[0]!).toBeLessThan(trocarNoProvedor.mock.invocationCallOrder[0]!);
+    const limpeza = escritas().find((c) => (argumentos(c, "update")?.[0] as Record<string, unknown>).troca_id === null);
+    expect(filtros(limpeza!)).toContainEqual(["eq", "troca_id", "troca-1"]);
+  });
+
+  it("⭐ outro plano com o ajuste JÁ PAGO: não há desistência — 409 troca_pendente, nada expirado nem limpo", async () => {
+    m.linha = { ...COM_AJUSTE };
+    lerPagamentoProporcional.mockResolvedValue("pago");
     expect(await trocar("mini")).toMatchObject({ ok: false, status: 409, code: "troca_pendente" });
+    expect(expirarSessao).not.toHaveBeenCalled();
     expect(escritas()).toEqual([]);
     expect(trocarNoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("outro plano e o provedor recusa expirar (boleto já emitido): 409 troca_pendente e a linha não esquece a cobrança", async () => {
+    m.linha = { ...COM_AJUSTE };
+    expirarSessao.mockRejectedValue(new ErroDoProvedor(400, "sessao_nao_expiravel", false));
+    expect(await trocar("mini")).toMatchObject({ ok: false, status: 409, code: "troca_pendente" });
+    expect(limpouATroca()).toBe(false);
+    expect(trocarNoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("pedido recusado (uso acima do plano) não custa o ajuste em aberto", async () => {
+    m.linha = { ...COM_AJUSTE };
+    m.assentos = 3;
+    expect(await trocar("mini")).toMatchObject({ ok: false, code: "plan_limit_reached" });
+    expect(expirarSessao).not.toHaveBeenCalled();
+    expect(escritas()).toEqual([]);
+  });
+
+  it("⭐ o DONO pede upgrade depois do teste: agenda (plano negociado não paga diferença) — nenhuma cobrança avulsa", async () => {
+    m.linha = { ...PAGANDO };
+    expect(await trocar("pro", "dono")).toMatchObject({ ok: true, changed: true, quando: "agendado", planoAgendadoId: "pro" });
+    expect(iniciarAjusteProporcional).not.toHaveBeenCalled();
+    expect(trocarNoProvedor).toHaveBeenCalledOnce();
+  });
+
+  it("o DONO pede o MESMO plano do ajuste em aberto: desiste do ajuste e agenda", async () => {
+    m.linha = { ...COM_AJUSTE };
+    expect(await trocar("pro", "dono")).toMatchObject({ ok: true, quando: "agendado", planoAgendadoId: "pro" });
+    expect(expirarSessao).toHaveBeenCalledWith("pay-1");
+    expect(iniciarAjusteProporcional).not.toHaveBeenCalled();
+  });
+
+  it("⭐ ajuste abaixo do mínimo do provedor: agenda em vez de mandar ao provedor uma cobrança que ele recusaria", async () => {
+    // A 6 h do fim do período, R$ 50,00 de diferença dá ~R$ 0,40.
+    m.linha = { ...PAGANDO, proximo_vencimento: "2026-10-10T18:00:00Z", periodo_pago_desde: "2026-09-10T18:00:00Z" };
+    expect(await trocar("pro")).toMatchObject({ ok: true, quando: "agendado", planoAgendadoId: "pro" });
+    expect(iniciarAjusteProporcional).not.toHaveBeenCalled();
+  });
+
+  it("⭐ mesmo upgrade com o ajuste vencido (o período do cálculo acabou): a cobrança velha morre e sai uma nova, com a conta de agora", async () => {
+    m.linha = { ...COM_AJUSTE, troca_reserva_ate: "2026-10-01T00:00:00Z" };
+    expect(await trocar("pro")).toMatchObject({ ok: true, quando: "pagamento_pendente", urlPagamento: "https://pay.example/adjustment" });
+    expect(expirarSessao).toHaveBeenCalledWith("pay-1");
+    expect(iniciarAjusteProporcional).toHaveBeenCalledOnce();
   });
 
   it("solicitação repetida do mesmo upgrade devolve o link pendente sem duplicar cobrança", async () => {
@@ -114,6 +172,8 @@ describe("trocarPlanoDaOrg", () => {
     expect(salvar).toBeDefined();
     expect(filtros(salvar!)).toContainEqual(["eq", "troca_id", expect.any(String)]);
     expect(filtros(salvar!)).toContainEqual(["eq", "troca_status", "criando"]);
+    // O prazo da cobrança é o fim do período em que a conta foi feita.
+    expect(argumentos(salvar!, "update")?.[0]).toMatchObject({ troca_reserva_ate: "2026-11-01T00:00:00Z" });
     expect(expirarSessao).not.toHaveBeenCalled();
   });
 

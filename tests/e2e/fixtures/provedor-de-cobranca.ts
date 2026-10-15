@@ -340,9 +340,10 @@ export async function subirProvedorDeCobranca(opcoes: { porta: number }): Promis
         ? intervalo === "month" || intervalo === "year"
         : modo === "payment" && intervalo === undefined;
       if ((modo !== "subscription" && modo !== "payment") || !clientes.has(cliente) || corpo["line_items[0][price_data][currency]"] !== "brl"
-        || !Number.isInteger(valor) || valor < 1 || !recorrenciaValida
+        // ≥ R$ 5,00 nos dois modos: é o piso que o app respeita (AJUSTE_MINIMO_CENTS), e o dublê o cobra.
+        || !Number.isInteger(valor) || valor < 500 || !recorrenciaValida
         || !produtos.has(produto) || sucesso === "" || cancela === "") {
-        return erroDaApi(res, 400, "sessão fora do contrato (mode, customer, price_data brl, recurring para assinatura, product, success_url, cancel_url)");
+        return erroDaApi(res, 400, "sessão fora do contrato (mode, customer, price_data brl ≥ 500, recurring para assinatura, product, success_url, cancel_url)");
       }
       const fim = corpo["subscription_data[trial_end]"];
       const fimDoTeste = fim === undefined ? null : Number(fim);

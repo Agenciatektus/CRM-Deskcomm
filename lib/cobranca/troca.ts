@@ -7,9 +7,15 @@
  *     enquanto nada foi pago — pagou dentro do teste (estado `ativa`), agenda;
  *   - a empresa só escolhe plano com `oferecido_ao_cliente` (Task 4A); o dono,
  *     qualquer um ativo (plano negociado);
- *   - depois do teste, upgrade com provedor: cobra a diferença proporcional e
- *     só aplica preço/limites quando o pagamento é confirmado; conserva a data
- *     de renovação. Downgrade segue agendado para a próxima cobrança paga;
+ *   - depois do teste, upgrade PEDIDO PELA EMPRESA com provedor: cobra a
+ *     diferença proporcional e só aplica preço/limites quando o pagamento é
+ *     confirmado; conserva a data de renovação. A cobrança vale até essa data
+ *     (`troca_reserva_ate`): depois dela, `sincronizar` a invalida. Ajuste abaixo
+ *     do mínimo do provedor, downgrade e todo pedido do DONO (plano negociado,
+ *     sem cobrar diferença) seguem agendados para a próxima cobrança paga;
+ *   - pedir OUTRO plano com um ajuste em aberto (ou o dono pedir qualquer um)
+ *     desiste dele: a cobrança é invalidada no provedor primeiro; já paga, não
+ *     há desistência — o plano pago está sendo aplicado;
  *   - em dívida, ou teste vencido sem assinatura: recusa ("regularize antes");
  *   - teste com link de pagamento em aberto e sem assinatura: a sessão é
  *     expirada NO PROVEDOR e a troca vale na hora (#2609); sem a id da sessão
@@ -29,7 +35,7 @@ import { randomUUID } from "node:crypto";
 import { adaptador as adaptadorPadrao } from "@/lib/cobranca/provedores";
 import { ErroDoProvedor, type AdaptadorDeCobranca } from "@/lib/cobranca/provedores/contrato";
 import { excedenteDoPlano, lerUsoDaOrganizacao } from "@/lib/cobranca/uso";
-import { calcularAjusteProporcional } from "@/lib/cobranca/prorata";
+import { calcularAjusteProporcional, SEM_TROCA } from "@/lib/cobranca/prorata";
 import { urlDoPainelDaEmpresa } from "@/lib/cobranca/url";
 import type { EstadoDaAssinatura, Intervalo, ProvedorDeCobranca } from "@/lib/cobranca/vocabulario";
 
@@ -79,6 +85,7 @@ interface Plano {
 }
 
 const EM_DIVIDA: readonly EstadoDaAssinatura[] = ["em_atraso", "cancelada"];
+
 const recusa = (status: number, code: string, message: string, details?: unknown): ResultadoDaTroca => ({
   ok: false, status, code, message, ...(details === undefined ? {} : { details }),
 });
@@ -111,6 +118,45 @@ async function lerPlanoCompleto(admin: SupabaseClient, id: string): Promise<Plan
   return (data as Plano | null) ?? null;
 }
 
+/**
+ * Desiste da troca proporcional em curso. Devolve a RECUSA quando não dá, ou
+ * `null` depois de limpar a linha (e `atual` junto, para quem chamou seguir).
+ * Ordem do #2609: a cobrança morre no provedor ANTES de a linha esquecê-la —
+ * esquecida e viva, ela seria paga sem nunca virar plano.
+ */
+async function desistirDoAjuste(
+  admin: SupabaseClient,
+  orgId: string,
+  atual: Atual,
+  adaptadorDe: (id: ProvedorDeCobranca) => AdaptadorDeCobranca,
+  agora: Date,
+): Promise<ResultadoDaTroca | null> {
+  if (atual.troca_status === "criando" && atual.troca_reserva_ate && Date.parse(atual.troca_reserva_ate) > agora.getTime()) {
+    return recusa(409, "troca_em_preparo", "Estamos preparando o ajuste proporcional. Aguarde alguns segundos e tente novamente.");
+  }
+  if (atual.troca_status === "aguardando_pagamento" && atual.troca_pagamento_ref && atual.provedor) {
+    const ad = adaptadorDe(atual.provedor);
+    try {
+      const pagamento = await ad.lerPagamentoProporcional(atual.troca_pagamento_ref);
+      if (pagamento === "pago") {
+        return recusa(409, "troca_pendente", "O ajuste proporcional já foi pago e o plano novo está sendo aplicado. Tente de novo em alguns minutos.");
+      }
+      if (pagamento === "pendente") await ad.expirarSessao(atual.troca_pagamento_ref);
+    } catch (e) {
+      if (!(e instanceof ErroDoProvedor)) throw e;
+      return e.transitorio
+        ? recusa(503, "provedor_indisponivel", "O provedor de pagamento não respondeu. A troca não foi feita; tente de novo.")
+        : recusa(409, "troca_pendente", "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.");
+    }
+  }
+  const { data, error } = await admin.from("cobranca_assinaturas").update({ ...SEM_TROCA, updated_at: agora.toISOString() })
+    .eq("organization_id", orgId).eq("troca_id", atual.troca_id).select("organization_id").maybeSingle();
+  if (error) return recusa(500, "internal_error", "Não foi possível trocar o plano.");
+  if (!data) return recusa(409, "state_conflict", "A assinatura mudou enquanto você trocava o plano. Recarregue e tente de novo.");
+  Object.assign(atual, SEM_TROCA);
+  return null;
+}
+
 export async function trocarPlanoDaOrg(
   admin: SupabaseClient,
   orgId: string,
@@ -133,12 +179,8 @@ export async function trocarPlanoDaOrg(
   });
   if (planoId === atual.plano_id && atual.plano_agendado_id === null) return nada("nenhum");
   if (planoId === atual.plano_agendado_id) return nada("agendado");
-  // Um upgrade proporcional em aberto mantém um preço recorrente específico no
-  // destino. Não permita agendar outro plano enquanto o pagamento está em curso:
-  // a reconciliação do pagamento poderia aplicar o destino antigo por cima.
-  if (atual.troca_id && planoId !== atual.plano_troca_pendente_id) {
-    return recusa(409, "troca_pendente", "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.");
-  }
+  const origem = deps.origem ?? "empresa";
+  const adaptadorDe = deps.adaptador ?? adaptadorPadrao;
   if (EM_DIVIDA.includes(atual.estado)) return recusa(409, "pagamento_pendente", "Regularize o pagamento antes de trocar de plano.");
   const emTeste = atual.estado === "trial" && atual.trial_ate !== null && Date.parse(atual.trial_ate) > agora.getTime();
   if (!emTeste && !atual.provedor) {
@@ -167,7 +209,7 @@ export async function trocarPlanoDaOrg(
   }
   if (!desfazendo) {
     // Plano negociado: só o dono atribui (a tela da empresa nem o lista).
-    if ((deps.origem ?? "empresa") === "empresa" && !novo.oferecido_ao_cliente) {
+    if (origem === "empresa" && !novo.oferecido_ao_cliente) {
       return recusa(422, "plano_invalido", "Este plano não está disponível para troca. Fale com quem administra o sistema.");
     }
     const uso = await lerUsoDaOrganizacao(admin, orgId);
@@ -178,9 +220,19 @@ export async function trocarPlanoDaOrg(
     }
   }
 
+  // Depois de validado o pedido (uma recusa não pode custar o ajuste de ninguém):
+  // um upgrade proporcional em aberto e um pedido de OUTRO plano (ou do dono, que
+  // nunca paga diferença): o pedido novo vence, mas só depois de a cobrança em
+  // aberto morrer no provedor — senão a reconciliação do pagamento aplicaria o
+  // destino antigo por cima do novo.
+  if (atual.troca_id && (planoId !== atual.plano_troca_pendente_id || origem === "dono")) {
+    const desistencia = await desistirDoAjuste(admin, orgId, atual, adaptadorDe, agora);
+    if (desistencia) return desistencia;
+  }
+
   const provedorDaTroca = atual.provedor && atual.provedor_assinatura_id ? { provedor: atual.provedor, ref: atual.provedor_assinatura_id } : null;
   const aoProvedor = (p: Plano) =>
-    (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca!.provedor).trocarPlano({
+    adaptadorDe(provedorDaTroca!.provedor).trocarPlano({
       assinaturaRef: provedorDaTroca!.ref,
       plano: { id: p.id, nome: p.nome, precoCents: p.preco_cents, intervalo: p.intervalo },
     });
@@ -205,7 +257,7 @@ export async function trocarPlanoDaOrg(
   // 503 (tente de novo); o resto → a mesma recusa de sempre (o link continua em aberto).
   if (sessaoAExperrar !== null) {
     try {
-      await (deps.adaptador ?? adaptadorPadrao)(sessaoAExperrar.provedor).expirarSessao(sessaoAExperrar.id);
+      await adaptadorDe(sessaoAExperrar.provedor).expirarSessao(sessaoAExperrar.id);
     } catch (e) {
       if (!(e instanceof ErroDoProvedor)) throw e;
       if (e.transitorio) {
@@ -215,24 +267,24 @@ export async function trocarPlanoDaOrg(
     }
   }
 
-  // Upgrade durante um período pago: cobra a diferença pelo tempo restante e
-  // só troca preço/limites quando o provedor confirma essa cobrança avulsa.
-  if (!emTeste && novo.preco_cents > antigo.preco_cents && provedorDaTroca) {
+  // Upgrade da EMPRESA durante um período pago: cobra a diferença pelo tempo
+  // restante e só troca preço/limites quando o provedor confirma essa cobrança
+  // avulsa. O dono atribui plano negociado: agenda, como antes do #2846.
+  if (!emTeste && origem === "empresa" && novo.preco_cents > antigo.preco_cents && provedorDaTroca) {
     if (atual.plano_troca_pendente_id === novo.id && atual.troca_status === "aguardando_pagamento" && atual.troca_pagamento_ref) {
-      const ad = (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca.provedor);
-      const estadoDoPagamento = await ad.lerPagamentoProporcional(atual.troca_pagamento_ref);
-      if (estadoDoPagamento !== "encerrado") {
+      const estadoDoPagamento = await adaptadorDe(provedorDaTroca.provedor).lerPagamentoProporcional(atual.troca_pagamento_ref);
+      const venceu = atual.troca_reserva_ate !== null && Date.parse(atual.troca_reserva_ate) <= agora.getTime();
+      if (estadoDoPagamento === "pago" || (estadoDoPagamento === "pendente" && !venceu)) {
         return { ok: true, changed: false, quando: "pagamento_pendente", planoId: atual.plano_id, planoAgendadoId: null, valeAPartirDe: null, de: atual.plano_id, urlPagamento: atual.troca_pagamento_url ?? undefined };
       }
-      await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
-        troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
-        .eq("organization_id", orgId).eq("troca_id", atual.troca_id);
+      // Encerrada, ou viva com o período do cálculo já vencido: some, e o pedido
+      // gera uma cobrança nova com a conta de agora.
+      const desistencia = await desistirDoAjuste(admin, orgId, atual, adaptadorDe, agora);
+      if (desistencia) return desistencia;
     }
     if (atual.troca_status === "criando" && atual.troca_reserva_ate && Date.parse(atual.troca_reserva_ate) > agora.getTime()) return recusa(409, "troca_em_preparo", "Estamos preparando o ajuste proporcional. Aguarde alguns segundos e tente novamente.");
     if (atual.troca_status === "criando" && atual.troca_id) {
-      await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
-        troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
-        .eq("organization_id", orgId).eq("troca_id", atual.troca_id);
+      await admin.from("cobranca_assinaturas").update(SEM_TROCA).eq("organization_id", orgId).eq("troca_id", atual.troca_id);
     }
     if (!atual.provedor_cliente_id) return recusa(409, "periodo_indisponivel", "Não foi possível identificar o cliente no provedor. Atualize a assinatura e tente novamente.");
     const valorCents = calcularAjusteProporcional({
@@ -252,29 +304,29 @@ export async function trocarPlanoDaOrg(
       }).eq("organization_id", orgId).eq("plano_id", atual.plano_id).is("troca_id", null).select("organization_id").maybeSingle();
       if (erroReserva || !reserva) return recusa(409, "troca_em_preparo", "A assinatura mudou enquanto você solicitava a troca. Atualize a página e tente novamente.");
       try {
-        const pagamento = await (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca.provedor).iniciarAjusteProporcional({
+        const pagamento = await adaptadorDe(provedorDaTroca.provedor).iniciarAjusteProporcional({
           clienteRef: atual.provedor_cliente_id, orgId, plano: { id: novo.id, nome: novo.nome, precoCents: novo.preco_cents, intervalo: novo.intervalo },
           valorCents, chaveIdempotencia: id, urlDeVolta: urlDoPainelDaEmpresa(),
         });
         const { data: pagamentoGravado, error: erroAoGravarPagamento } = await admin
           .from("cobranca_assinaturas")
+          // `troca_reserva_ate` passa a ser o PRAZO da cobrança: o fim do período em
+          // que a conta foi feita. Paga depois dele, ela cobriria um período que já
+          // acabou — `sincronizar` a invalida e não aplica o plano por ela.
           .update({ troca_status: "aguardando_pagamento", troca_pagamento_ref: pagamento.pagamentoRef,
-            troca_pagamento_url: pagamento.url, troca_reserva_ate: null, updated_at: agora.toISOString() })
+            troca_pagamento_url: pagamento.url, troca_reserva_ate: atual.proximo_vencimento, updated_at: agora.toISOString() })
           .eq("organization_id", orgId).eq("troca_id", id).eq("troca_status", "criando")
           .select("organization_id").maybeSingle();
         if (erroAoGravarPagamento || !pagamentoGravado) {
           // Nunca devolva um link que o reconciliador não consegue associar à
           // assinatura. Tente invalidar a cobrança já criada no provedor.
-          try { await (deps.adaptador ?? adaptadorPadrao)(provedorDaTroca.provedor).expirarSessao(pagamento.pagamentoRef); } catch { /* melhor esforço */ }
-          await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
-            troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
-            .eq("organization_id", orgId).eq("troca_id", id);
+          try { await adaptadorDe(provedorDaTroca.provedor).expirarSessao(pagamento.pagamentoRef); } catch { /* melhor esforço */ }
+          await admin.from("cobranca_assinaturas").update(SEM_TROCA).eq("organization_id", orgId).eq("troca_id", id);
           return recusa(500, "pagamento_nao_registrado", "A cobrança foi iniciada, mas não conseguimos registrar o pagamento. Tente novamente; se houver uma cobrança aberta, fale com o suporte.");
         }
         return { ok: true, changed: false, quando: "pagamento_pendente", planoId: atual.plano_id, planoAgendadoId: null, valeAPartirDe: null, de: atual.plano_id, urlPagamento: pagamento.url };
       } catch (e) {
-        await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
-          troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null }).eq("organization_id", orgId).eq("troca_id", id);
+        await admin.from("cobranca_assinaturas").update(SEM_TROCA).eq("organization_id", orgId).eq("troca_id", id);
         if (e instanceof ErroDoProvedor) return recusa(e.transitorio ? 503 : 502, e.transitorio ? "provedor_indisponivel" : "provedor_recusou", "Não foi possível gerar a cobrança proporcional. Tente novamente.");
         throw e;
       }

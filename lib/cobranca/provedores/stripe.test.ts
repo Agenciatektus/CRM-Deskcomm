@@ -447,6 +447,20 @@ describe("garantirCliente e iniciarAssinatura", () => {
     await expect(adaptador.lerPagamentoProporcional("cs_test_1")).resolves.toBe("pago");
   });
 
+  it.each([
+    [{ status: "open", payment_status: "unpaid" }, "pendente"],
+    // Boleto emitido e ainda não compensado: a sessão já está `complete`.
+    [{ status: "complete", payment_status: "unpaid", payment_intent: { status: "requires_action" } }, "pendente"],
+    [{ status: "complete", payment_status: "unpaid", payment_intent: { status: "processing" } }, "pendente"],
+    // Boleto que venceu sem pagar: a sessão continua `complete`, o PaymentIntent morreu.
+    [{ status: "complete", payment_status: "unpaid", payment_intent: { status: "requires_payment_method" } }, "encerrado"],
+    [{ status: "expired", payment_status: "unpaid", payment_intent: null }, "encerrado"],
+  ])("⭐ ajuste proporcional %j → %s (o PaymentIntent vem expandido)", async (corpo, esperado) => {
+    const { adaptador, chamadas } = montar({ "GET /checkout/sessions/cs_test_1": { corpo } });
+    await expect(adaptador.lerPagamentoProporcional("cs_test_1")).resolves.toBe(esperado);
+    expect(chamadas[0]?.url.searchParams.get("expand[]")).toBe("payment_intent");
+  });
+
   it("⭐ #2609 expirar a sessão: POST /checkout/sessions/{id}/expire — é a chamada que mata o link no provedor", async () => {
     const { adaptador, chamadas } = montar({ "POST /checkout/sessions/cs_aberta/expire": { corpo: { id: "cs_aberta", status: "expired" } } });
     await adaptador.expirarSessao("cs_aberta");

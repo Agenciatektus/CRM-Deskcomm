@@ -284,7 +284,8 @@ test("[P0] primeira cobrança: conectar, assinar, atrasar, suspender e voltar so
     await pB.getByRole("button", { name: "Pagar fatura" }).click();
     await expect(pB.getByText("Fatura paga")).toBeVisible();
     await drenarAte(request, "reativada sozinha", async () => (await estadoDaOrg(orgB)).status === "active");
-    expect(await assinaturaDe(orgB)).toMatchObject({ estado: "ativa", ultimo_aviso: null, plano_id: idProfissional, plano_agendado_id: null });
+    // Pagar o atraso é pagar o período novo: o downgrade agendado no passo 7 vira aqui.
+    expect(await assinaturaDe(orgB)).toMatchObject({ estado: "ativa", ultimo_aviso: null, plano_id: idEssencial, plano_agendado_id: null });
     expect(await saidasDe(orgB)).toEqual({ llm: 0, outbound: 0 });
     const revisao = await db.from("agent_inbox_items").select("id").eq("organization_id", orgB).eq("kind", "org_reativada");
     if (revisao.error) throw revisao.error;

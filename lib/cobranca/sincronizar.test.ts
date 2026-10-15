@@ -291,9 +291,10 @@ describe("sincronizar", () => {
 describe("sincronizar — upgrade proporcional", () => {
   const lerPagamento = vi.fn<AdaptadorDeCobranca["lerPagamentoProporcional"]>();
   const trocarPlano = vi.fn<AdaptadorDeCobranca["trocarPlano"]>();
+  const expirar = vi.fn<AdaptadorDeCobranca["expirarSessao"]>();
   const depsDoUpgrade = (): DependenciasDaCobranca => ({
     ...deps(),
-    adaptador: () => ({ lerSituacao: ler, cancelarNoFim, lerPagamentoProporcional: lerPagamento, trocarPlano } as unknown as AdaptadorDeCobranca),
+    adaptador: () => ({ lerSituacao: ler, cancelarNoFim, lerPagamentoProporcional: lerPagamento, trocarPlano, expirarSessao: expirar } as unknown as AdaptadorDeCobranca),
   });
   const rodarUpgrade = () => sincronizar(banco.cliente as never, ORG, depsDoUpgrade());
 
@@ -301,6 +302,8 @@ describe("sincronizar — upgrade proporcional", () => {
     m.linha = {
       ...LINHA, troca_id: "troca-1", troca_status: "aguardando_pagamento", troca_pagamento_ref: "cs_1",
       plano_troca_pendente_id: "plano-b", pagamento_inicial_pendente: false,
+      // O prazo da cobrança: o fim do período em que a conta foi feita.
+      troca_reserva_ate: "2026-11-01T00:00:00.000Z",
     };
     m.plano = { id: "plano-b", nome: "Profissional", preco_cents: 9990, intervalo: "mes" };
   });
@@ -324,11 +327,62 @@ describe("sincronizar — upgrade proporcional", () => {
       action: "cobranca.plano_trocado", metadata: { de: "plano-a", para: "plano-b", quando: "upgrade_proporcional_pago" },
     }));
   });
+  it("⭐ não pago e com o prazo vencido: a cobrança morre no provedor e sai da linha — não fica pagável nem trava a próxima troca", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(expirar).toHaveBeenCalledWith("cs_1");
+    expect(trocarPlano).not.toHaveBeenCalled();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_id: null, troca_status: null, troca_pagamento_ref: null });
+  });
+
+  it("controle: não pago e no prazo — a cobrança segue viva", async () => {
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(expirar).not.toHaveBeenCalled();
+    expect(m.linha).toMatchObject({ troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
+
+  it("vencida e o provedor não confirma a expiração: a linha NÃO esquece a cobrança (ela ainda pode ser paga)", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pendente");
+    expirar.mockRejectedValueOnce(new ErroDoProvedor(503, "api_error", true));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
+
+  it("⭐ pago FORA do prazo: o plano só vale na próxima cobrança paga (agendado) — o período novo não sai pela fração do velho", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pago");
+    await rodarUpgrade();
+    expect(trocarPlano).toHaveBeenCalledOnce();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", plano_agendado_id: "plano-b", troca_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: { de: "plano-a", para: "plano-b", quando: "upgrade_proporcional_pago_fora_do_prazo" },
+    }));
+  });
+
+  it("⭐ pago e o provedor recusa de vez a troca de preço (assinatura cancelada no meio): a diferença foi paga, o plano vale, e a recusa fica auditada", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    trocarPlano.mockRejectedValueOnce(new ErroDoProvedor(400, "resource_missing", false));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ plano_id: "plano-b", troca_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: expect.objectContaining({ preco_no_provedor: "recusado" }),
+    }));
+  });
+
+  it("pago e o provedor fora do ar: nada aplicado agora, a próxima leitura tenta de novo", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    trocarPlano.mockRejectedValueOnce(new ErroDoProvedor(503, "api_error", true));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
 });
 
 describe("sincronizar — entrada paga (plano sem dias de teste)", () => {
   beforeEach(() => {
-    // Como o gatilho da 0660 a deixa: teste de 0 dias, suspensa por cobrança.
+    // Como o gatilho da 0679 a deixa: teste de 0 dias, suspensa por cobrança.
     m.linha = { ...LINHA, estado: "trial", trial_ate: ha(2), proximo_vencimento: null, pagamento_inicial_pendente: true, assinaturas_vivas: 0 };
     m.org = { ...m.org, status: "suspended", suspended_kind: "cobranca" };
   });

@@ -35,3 +35,14 @@ describe("calcularAjusteProporcional", () => {
     })).toBeNull();
   });
 });
+
+describe("calcularAjusteProporcional — mínimo do provedor", () => {
+  const base = { periodoPagoDesde: data("2026-10-01T00:00:00Z"), proximoVencimento: data("2026-11-01T00:00:00Z") };
+  it("ajuste abaixo de R$ 5,00 vira 0: o upgrade é agendado em vez de ir ao provedor e voltar recusado", () => {
+    // Faltando 6 h para o fim, R$ 50,00 de diferença dá ~R$ 0,40.
+    expect(calcularAjusteProporcional({ ...base, precoAtualCents: 4_990, precoNovoCents: 9_990, agora: data("2026-10-31T18:00:00Z") })).toBe(0);
+  });
+  it("controle: R$ 5,00 em diante é cobrado", () => {
+    expect(calcularAjusteProporcional({ ...base, precoAtualCents: 0, precoNovoCents: 1_000, agora: data("2026-10-16T12:00:00Z") })).toBe(500);
+  });
+});

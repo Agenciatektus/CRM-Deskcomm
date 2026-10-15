@@ -23,6 +23,7 @@ import { textoDoAviso, type TextoDoAviso } from "@/lib/cobranca/avisos";
 import { toleranciaDias } from "@/lib/cobranca/configuracao";
 import { enviarAvisoAosAdmins } from "@/lib/cobranca/emails";
 import { aplicarLeitura } from "@/lib/cobranca/estado";
+import { SEM_TROCA } from "@/lib/cobranca/prorata";
 import { adaptador as adaptadorPadrao } from "@/lib/cobranca/provedores";
 import {
   ErroDoProvedor,
@@ -55,7 +56,7 @@ const COLUNAS =
   "organization_id, plano_id, plano_agendado_id, estado, trial_ate, provedor, provedor_cliente_id, provedor_assinatura_id, " +
   "vencida_desde, proximo_vencimento, cancela_no_fim, prazo_extra_ate, ultimo_aviso, ultimo_aviso_em, relida_em, " +
   "link_de_pagamento, assinaturas_vivas, checkout_url, checkout_expira_em, checkout_sessao_id, periodo_pago_desde, " +
-  "plano_troca_pendente_id, troca_id, troca_status, troca_pagamento_ref, pagamento_inicial_pendente, updated_at";
+  "plano_troca_pendente_id, troca_id, troca_status, troca_pagamento_ref, troca_reserva_ate, pagamento_inicial_pendente, updated_at";
 
 interface Linha {
   checkout_url: string | null;
@@ -66,6 +67,8 @@ interface Linha {
   troca_id: string | null;
   troca_status: string | null;
   troca_pagamento_ref: string | null;
+  /** Com a troca `aguardando_pagamento`: o fim do período em que o ajuste foi calculado. */
+  troca_reserva_ate: string | null;
   pagamento_inicial_pendente: boolean;
   organization_id: string;
   plano_id: string;
@@ -127,29 +130,54 @@ export async function sincronizar(
 
   // A cobrança do upgrade é uma sessão avulsa. Só depois de reler o estado
   // diretamente no provedor aplicamos o novo preço recorrente e os novos limites.
+  // Ela vale até o fim do período em que foi calculada (`troca_reserva_ate`):
+  //   - paga no prazo: o plano vale na hora;
+  //   - paga FORA do prazo: ela cobriu um período que já acabou — o plano só
+  //     vale na próxima cobrança paga (agendado), senão o período novo inteiro
+  //     sairia pela fração do anterior;
+  //   - não paga e vencida (ou encerrada): morre no provedor e sai da linha —
+  //     senão ela seguiria pagável e travaria toda troca com `troca_pendente`.
   if (primeira.troca_status === "aguardando_pagamento" && primeira.troca_id && primeira.troca_pagamento_ref && primeira.plano_troca_pendente_id && primeira.provedor_assinatura_id) {
+    const instante = agora();
+    const venceu = primeira.troca_reserva_ate !== null && Date.parse(primeira.troca_reserva_ate) <= instante.getTime();
     try {
       const adaptador = (deps.adaptador ?? adaptadorPadrao)(provedor);
       const pagamento = await adaptador.lerPagamentoProporcional(primeira.troca_pagamento_ref);
       if (pagamento === "pago") {
         const { data: alvo, error: erroAlvo } = await admin.from("cobranca_planos").select("id, nome, preco_cents, intervalo").eq("id", primeira.plano_troca_pendente_id).maybeSingle();
         if (erroAlvo || !alvo) throw new Error("plano do upgrade proporcional indisponível");
-        await adaptador.trocarPlano({ assinaturaRef: primeira.provedor_assinatura_id, plano: {
-          id: alvo.id, nome: alvo.nome, precoCents: alvo.preco_cents, intervalo: alvo.intervalo,
-        } });
+        let precoAtualizado = true;
+        try {
+          await adaptador.trocarPlano({ assinaturaRef: primeira.provedor_assinatura_id, plano: {
+            id: alvo.id, nome: alvo.nome, precoCents: alvo.preco_cents, intervalo: alvo.intervalo,
+          } });
+        } catch (e) {
+          // Transitório, ou a mensalidade do período ainda aberta (Asaas): a próxima leitura tenta de novo.
+          if (!(e instanceof ErroDoProvedor) || e.transitorio || e.codigo === "pagamento_do_periodo_pendente") throw e;
+          // Recusa definitiva (ex.: assinatura cancelada no meio): a diferença foi
+          // PAGA, então o plano vale; o preço que ficou para trás no provedor é
+          // auditado por `conferirPreco` a cada releitura (`cobranca.preco_divergente`).
+          precoAtualizado = false;
+        }
+        const plano = venceu
+          ? { plano_agendado_id: primeira.plano_troca_pendente_id }
+          : { plano_id: primeira.plano_troca_pendente_id, plano_agendado_id: null };
         const { data: gravacao, error: erroGravacao } = await admin.from("cobranca_assinaturas").update({
-          plano_id: primeira.plano_troca_pendente_id, plano_agendado_id: null,
-          troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null, troca_status: null,
-          troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null, updated_at: (deps.agora ?? (() => new Date()))().toISOString(),
+          ...plano, ...SEM_TROCA, updated_at: instante.toISOString(),
         }).eq("organization_id", orgId).eq("troca_id", primeira.troca_id).eq("troca_status", "aguardando_pagamento").select("organization_id").maybeSingle();
         if (erroGravacao) throw new Error(`upgrade pago não gravado (${erroGravacao.code ?? "sem_codigo"})`);
-        if (gravacao) auditar("cobranca.plano_trocado", orgId, { de: primeira.plano_id, para: primeira.plano_troca_pendente_id, quando: "upgrade_proporcional_pago" });
+        if (gravacao) {
+          auditar("cobranca.plano_trocado", orgId, {
+            de: primeira.plano_id, para: primeira.plano_troca_pendente_id,
+            quando: venceu ? "upgrade_proporcional_pago_fora_do_prazo" : "upgrade_proporcional_pago",
+            ...(precoAtualizado ? {} : { preco_no_provedor: "recusado" }),
+          });
+        }
         primeira = await lerLinha(admin, orgId);
         if (!primeira) return { tipo: "isenta" };
-      } else if (pagamento === "encerrado") {
-        await admin.from("cobranca_assinaturas").update({ troca_id: null, plano_troca_pendente_id: null, troca_valor_cents: null,
-          troca_status: null, troca_pagamento_ref: null, troca_pagamento_url: null, troca_reserva_ate: null })
-          .eq("organization_id", orgId).eq("troca_id", primeira.troca_id);
+      } else if (pagamento === "encerrado" || venceu) {
+        if (pagamento === "pendente") await adaptador.expirarSessao(primeira.troca_pagamento_ref);
+        await admin.from("cobranca_assinaturas").update(SEM_TROCA).eq("organization_id", orgId).eq("troca_id", primeira.troca_id);
       }
     } catch (e) {
       logger.warn("cobranca.upgrade_proporcional_pendente", { organization_id: orgId, codigo: e instanceof ErroDoProvedor ? e.codigo : "falha_interna" });

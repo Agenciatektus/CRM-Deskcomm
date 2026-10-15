@@ -57,11 +57,23 @@ describe("as situações, em frases", () => {
 });
 
 describe("AcoesDaAssinatura", () => {
-  it("upgrade proporcional pendente mostra o link e bloqueia outra troca", () => {
+  it("upgrade proporcional pendente mostra o link e deixa escolher outro plano (que cancela o ajuste)", () => {
     render(<AcoesDaAssinatura {...acoes({ trocaStatus: "aguardando_pagamento", trocaPagamentoUrl: "https://pay.example/upgrade" })} />);
     expect(screen.getByRole("link", { name: "Pagar ajuste do upgrade" }).getAttribute("href")).toBe("https://pay.example/upgrade");
-    expect(screen.getByText(/Conclua ou aguarde a cobrança proporcional/)).toBeTruthy();
+    expect(screen.getByText(/Escolher outro plano cancela esse ajuste/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Trocar de plano" })).toBeTruthy();
+  });
+
+  it("ajuste ainda sendo criado: não há troca a oferecer", () => {
+    render(<AcoesDaAssinatura {...acoes({ trocaStatus: "criando" })} />);
     expect(screen.queryByRole("button", { name: "Trocar de plano" })).toBeNull();
+  });
+
+  it("ajuste abaixo do mínimo do provedor: a tela diz 'na próxima renovação', como o servidor faz", async () => {
+    // A 6 h do fim do período, R$ 50,00 de diferença dá ~R$ 0,40 — abaixo de R$ 5,00.
+    render(<AcoesDaAssinatura {...acoes({ instanteCalculo: "2026-11-01T06:00:00Z" })} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Trocar de plano" }));
+    expect(screen.getByText(/o novo plano entra na próxima renovação/)).toBeTruthy();
   });
 
   it("⭐ Assinar abre o checkout do provedor", async () => {

@@ -538,7 +538,8 @@ export function criarAdaptadorAsaas(dep: DependenciasDoAsaas): AdaptadorDeCobran
   async function lerPagamentoProporcional(pagamentoRef: string): Promise<"pendente" | "pago" | "encerrado"> {
     const pagamento = ler(cobrancaDoAsaas, await chamar("GET", `/payments/${encodeURIComponent(pagamentoRef)}`));
     if (PAGO.has(pagamento.status)) return "pago";
-    if (pagamento.status === "PENDING" || pagamento.status === "OVERDUE") return "pendente";
+    // Cartão em análise de risco ainda pode ser aprovado: encerrá-lo esqueceria um pagamento que vai chegar.
+    if (pagamento.status === "PENDING" || pagamento.status === "OVERDUE" || pagamento.status === "AWAITING_RISK_ANALYSIS") return "pendente";
     return "encerrado";
   }
 

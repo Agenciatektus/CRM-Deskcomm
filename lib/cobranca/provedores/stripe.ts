@@ -493,10 +493,26 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     return { pagamentoRef: sessao.id, url };
   }
 
+  /**
+   * Boleto (e todo método que confirma depois) deixa a sessão `complete` com
+   * `payment_status: unpaid` até compensar: isso é PENDENTE, não encerrado —
+   * lido como encerrado, a troca era esquecida e o boleto pago depois nunca
+   * virava plano. Quem diz se ainda vai pagar é o PaymentIntent: `processing` ou
+   * `requires_action` (boleto emitido, esperando) seguem vivos; o resto morreu.
+   */
   async function lerPagamentoProporcional(pagamentoRef: string): Promise<"pendente" | "pago" | "encerrado"> {
-    const sessao = ler(z.object({ status: z.string(), payment_status: z.string() }), await chamar("GET", `/checkout/sessions/${encodeURIComponent(pagamentoRef)}`));
+    const sessao = ler(
+      z.object({
+        status: z.string(),
+        payment_status: z.string(),
+        payment_intent: z.object({ status: z.string() }).nullish(),
+      }),
+      await chamar("GET", `/checkout/sessions/${encodeURIComponent(pagamentoRef)}?expand[]=payment_intent`),
+    );
     if (sessao.payment_status === "paid") return "pago";
-    return sessao.status === "open" ? "pendente" : "encerrado";
+    if (sessao.status === "open") return "pendente";
+    const intencao = sessao.payment_intent?.status;
+    return sessao.status === "complete" && (intencao === "processing" || intencao === "requires_action") ? "pendente" : "encerrado";
   }
 
   /**
