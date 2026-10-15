@@ -351,7 +351,7 @@ describe("sincronizar — upgrade proporcional", () => {
     expect(m.linha).toMatchObject({ troca_id: "troca-1", troca_status: "aguardando_pagamento" });
   });
 
-  it("⭐ pago FORA do prazo: o plano só vale na próxima cobrança paga (agendado) — o período novo não sai pela fração do velho", async () => {
+  it("⭐ pago FORA do prazo: o plano só vale na próxima cobrança paga (agendado): ela foi calculada para um período que já acabou", async () => {
     m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
     lerPagamento.mockResolvedValue("pago");
     await rodarUpgrade();

@@ -132,9 +132,8 @@ export async function sincronizar(
   // diretamente no provedor aplicamos o novo preço recorrente e os novos limites.
   // Ela vale até o fim do período em que foi calculada (`troca_reserva_ate`):
   //   - paga no prazo: o plano vale na hora;
-  //   - paga FORA do prazo: ela cobriu um período que já acabou — o plano só
-  //     vale na próxima cobrança paga (agendado), senão o período novo inteiro
-  //     sairia pela fração do anterior;
+  //   - paga FORA do prazo: ela foi calculada para um período que já acabou —
+  //     o plano só vale na próxima cobrança paga (agendado);
   //   - não paga e vencida (ou encerrada): morre no provedor e sai da linha —
   //     senão ela seguiria pagável e travaria toda troca com `troca_pendente`.
   if (primeira.troca_status === "aguardando_pagamento" && primeira.troca_id && primeira.troca_pagamento_ref && primeira.plano_troca_pendente_id && primeira.provedor_assinatura_id) {
