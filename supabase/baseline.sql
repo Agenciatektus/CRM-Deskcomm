@@ -4692,6 +4692,13 @@ GRANT ALL ON TABLE "public"."lgpd_requests" TO "anon";
 GRANT ALL ON TABLE "public"."lgpd_requests" TO "authenticated";
 GRANT ALL ON TABLE "public"."lgpd_requests" TO "service_role";
 
+-- I/U/D/T de `anon` e `authenticated` saem junto dos grants (migration 0672):
+-- a escrita em `lgpd_requests` é do servidor — o pedido nasce do webhook e muda
+-- de estado pelos workers e pela aprovação, todos com a chave de serviço. Colada
+-- no grant para a chave anon não recuperar a escrita até o bloco do apêndice a
+-- cada passada (o mesmo desenho de `ai_budgets`). O bloco da 0672 repete a linha.
+revoke insert, update, delete, truncate on table public.lgpd_requests from authenticated, anon;
+
 
 
 GRANT ALL ON TABLE "public"."merge_queue" TO "anon";
@@ -51173,6 +51180,126 @@ grant execute on function public.comando_da_conversa(public.conversations) to au
 
 notify pgrst, 'reload schema';
 
+-- ---- pedido de LGPD sem e-mail vira revisão pendente (migration 0651) ----
+--
+-- O CHECK de `lgpd_requests.status` passa a aceitar `pending_review` (que os
+-- workers de LGPD gravam desde o EPIC-08 e o banco recusava com 23514), e os
+-- pedidos que ficaram presos em `processing` por isso — os que têm a prova no
+-- `api_audit_log` — são levados ao estado que o worker teria gravado. Bloco
+-- IDÊNTICO, letra a letra, ao de
+-- `supabase/migrations/20261013000001_0651_pedido_lgpd_sem_email_vira_revisao_pendente.sql`
+-- (o racional inteiro mora no cabeçalho dela); preso por
+-- `tests/invariants/pedido-lgpd-sem-email-vira-revisao-pendente.test.ts`. Não
+-- cria função, então fica antes da VARREDURA anon só por ordem de apêndice.
+-- Reaplicável: a troca do CHECK é pulada quando ele já aceita o estado, e
+-- pedido curado não está mais em `processing`.
+
+do $$
+declare
+  v_exportacoes integer;
+  v_sem_pegada integer;
+  v_tenants integer;
+begin
+  -- 1. O CHECK passa a aceitar o estado que o código grava. Drop e add no MESMO
+  --    statement: se o add falhar, a transação desfaz o drop junto.
+  if not exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.lgpd_requests'::regclass
+       and conname = 'lgpd_requests_status_check'
+       and pg_get_constraintdef(oid) like '%''pending_review''%'
+  ) then
+    alter table public.lgpd_requests drop constraint if exists lgpd_requests_status_check;
+    alter table public.lgpd_requests add constraint lgpd_requests_status_check
+      check (status = any (array['received'::text, 'processing'::text, 'completed'::text,
+                                 'failed'::text, 'expired'::text, 'pending_review'::text]));
+  end if;
+
+  -- 2. Exportação presa: sem transporte de e-mail, ou titular sem endereço.
+  with prova as (
+    select distinct on (a.resource_id) a.resource_id, a.organization_id, a.metadata
+      from public.api_audit_log a
+     where a.action = 'lgpd.export_generated'
+       and a.resource_type = 'lgpd_request'
+       and (a.metadata->>'warning' = 'email_not_configured'
+            or a.metadata->>'delivery' = 'pending_review_no_email')
+     order by a.resource_id, a.created_at desc
+  )
+  update public.lgpd_requests r
+     set status = 'pending_review',
+         error_message = case when p.metadata->>'warning' = 'email_not_configured'
+                              then 'email_not_configured' else 'no_delivery_email' end,
+         result = jsonb_build_object(
+                    'pdf_path', r.organization_id::text || '/' || r.id::text || '/report.pdf',
+                    'json_path', r.organization_id::text || '/' || r.id::text || '/data.json',
+                    'sha256', p.metadata->'sha256',
+                    'signed_pades', p.metadata->'signed_pades',
+                    'warning', case when (p.metadata->>'signed_pades')::boolean
+                                    then null else 'pades_key_missing' end
+                  )
+                  || case when p.metadata->>'warning' = 'email_not_configured'
+                          then jsonb_build_object('delivered_to_hash', p.metadata->'delivered_to_hash')
+                          else '{}'::jsonb end
+    from prova p
+   where r.id = p.resource_id
+     and r.organization_id = p.organization_id
+     and r.request_type = 'data_request'
+     and r.status = 'processing'
+     and r.result is null;
+  get diagnostics v_exportacoes = row_count;
+
+  -- 3. Anonimização de contato sem pegada local.
+  update public.lgpd_requests r
+     set status = 'pending_review',
+         error_message = 'no_local_footprint',
+         result = jsonb_build_object('reason', 'no_local_footprint')
+   where r.request_type in ('redact', 'store_redact')
+     and r.status = 'processing'
+     and r.result is null
+     and exists (
+       select 1
+         from public.api_audit_log a
+        where a.action = 'lgpd.redact_no_local_footprint'
+          and a.resource_type = 'lgpd_request'
+          and a.resource_id = r.id
+          and a.organization_id = r.organization_id
+     );
+  get diagnostics v_sem_pegada = row_count;
+
+  -- 4. Anonimização de tenant com falha parcial.
+  with prova as (
+    select distinct on (a.resource_id) a.resource_id, a.organization_id, a.metadata, a.created_at
+      from public.api_audit_log a
+     where a.action = 'lgpd.tenant_redacted'
+       and a.resource_type = 'lgpd_request'
+       and a.metadata->>'partial_failure' = 'true'
+     order by a.resource_id, a.created_at desc
+  )
+  update public.lgpd_requests r
+     set status = 'pending_review',
+         completed_at = p.created_at,
+         error_message = 'partial_failure',
+         cascaded_to = p.metadata->'aggregate_counts',
+         result = jsonb_build_object(
+                    'scope', 'tenant',
+                    'processed', p.metadata->'processed',
+                    'failed_contacts_count', p.metadata->'failed_count',
+                    'aggregate_counts', p.metadata->'aggregate_counts',
+                    'callback_status', p.metadata->'callback_status',
+                    'organization_status', 'redacted'
+                  )
+    from prova p
+   where r.id = p.resource_id
+     and r.organization_id = p.organization_id
+     and r.request_type in ('redact', 'store_redact')
+     and r.status = 'processing'
+     and r.result is null;
+  get diagnostics v_tenants = row_count;
+
+  raise notice '0651: pedidos presos levados a pending_review — exportacao %, sem pegada %, tenant %',
+    v_exportacoes, v_sem_pegada, v_tenants;
+end $$;
+
 -- ---- o export do titular é reivindicado pelo worker (migration 0652, issue #2751) ----
 -- O worker de exportação LGPD só pulava pedido `completed`, então dois eventos
 -- do MESMO pedido — o webhook da Nuvemshop e a aprovação emitem
@@ -52179,6 +52306,527 @@ revoke execute on function public.fn_agent_tool_usage_por_termo(uuid, uuid, time
 
 grant execute on function public.fn_agent_tool_usage_por_termo(uuid, uuid, timestamptz)
   to authenticated, service_role;
+-- ---- o pedido de dados nasce só pelo caminho do servidor (migration 0672) ----
+-- A exportação de dados do titular só começa pela aprovação de alguém da
+-- equipe, na tela do pedido; a anonimização, pelo webhook assinado ou pela
+-- mesma aprovação. Os dois eventos que acordam esses workers são, então, fatos
+-- do SERVIDOR (chave de serviço, sem sessão), nunca um pedido de login. O
+-- gatilho fica em `event_log`, e não na lista de `emit_event`, para valer em
+-- todo caminho até a tabela. O `when` mantém o custo fora das demais inserções.
+--
+-- A escrita em `lgpd_requests` é do servidor pela mesma razão: o pedido nasce
+-- do webhook (`lib/lgpd/repository.ts`) e muda de estado pelos workers e pela
+-- aprovação. A leitura pela sessão continua como está (RLS).
+
+create or replace function public.fn_event_log_lgpd_so_do_servidor()
+returns trigger
+language plpgsql
+set search_path to 'public', 'pg_temp'
+as $fn$
+begin
+  if new.event_type in ('lgpd.data_request_received', 'lgpd.redact_received')
+     and auth.uid() is not null then
+    raise exception 'reserved_server_event' using errcode = '42501';
+  end if;
+  return new;
+end;
+$fn$;
+
+revoke all on function public.fn_event_log_lgpd_so_do_servidor() from public, anon, authenticated;
+grant execute on function public.fn_event_log_lgpd_so_do_servidor() to service_role;
+
+drop trigger if exists trg_event_log_lgpd_so_do_servidor on public.event_log;
+create trigger trg_event_log_lgpd_so_do_servidor
+  before insert on public.event_log
+  for each row
+  when (new.event_type in ('lgpd.data_request_received', 'lgpd.redact_received'))
+  execute function public.fn_event_log_lgpd_so_do_servidor();
+
+revoke insert, update, delete, truncate on table public.lgpd_requests from anon, authenticated;
+
+-- ---- excluir uma etiqueta não apaga as outras (migration 0673, issue #2895) ----
+-- `fn_tags_normalizar` anulava com `when p_remover then null` SEM conferir o
+-- valor, e `fn_vocabulario_de_tags_operar` repetia o mesmo `when v_remover then
+-- null` em `settings.tags` e em `canonical_conversation_tags`. Excluir UMA
+-- etiqueta em Configurações › Etiquetas apagava TODAS as etiquetas dos contatos,
+-- negócios e conversas que a tinham, e esvaziava o vocabulário curado — onde
+-- mora a cor. Medido pela tela na vps-teste (prova do #2784).
+--
+-- Agora a exclusão anula só o valor cuja chave canônica (`lower(btrim(...))`) é
+-- a da etiqueta excluída, nos três lugares. O resto do corpo é a definição da
+-- 0336, letra a letra. Quem redefinir estas funções depois parte DESTA versão.
+-- Vigiado por tests/invariants/tags-excluir-preserva-as-outras.test.ts.
+
+create or replace function public.fn_tags_normalizar(
+  p_tags text[],
+  p_de text,
+  p_para text,
+  p_remover boolean
+)
+returns text[]
+language sql
+immutable
+security invoker
+set search_path = public
+as $$
+  -- `distinct on` pela chave canônica DO RESULTADO, e não da entrada.
+  --
+  -- ⚠️ Deduplicar pela entrada parece a mesma coisa e não é: no `juntar`, os dois
+  -- nomes têm chaves DIFERENTES por definição (é o que os torna duas etiquetas),
+  -- e depois da substituição viram o MESMO nome. Medido num Postgres real:
+  -- `{VIP, obra}` juntando `obra` em `VIP` devolvia `{VIP, VIP}` — a etiqueta
+  -- duplicada no array, e `fn_vocabulario_de_tags` conta OCORRÊNCIAS, então o
+  -- registro passava a pesar 2 na própria tela que deveria arrumá-lo. O caso
+  -- `{vip, VIP}` do teste passava por acidente: ali as duas chaves já eram
+  -- iguais ANTES da substituição.
+  select coalesce(array_agg(n.tag order by n.ord), '{}'::text[])
+  from (
+    select distinct on (lower(s.tag)) s.tag, s.ord
+    from (
+      select case
+               when p_remover and lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then null
+               when lower(btrim(e.valor)) = lower(btrim(coalesce(p_de, ''))) then btrim(p_para)
+               else btrim(e.valor)
+             end as tag,
+             e.ord
+      from unnest(coalesce(p_tags, '{}'::text[])) with ordinality as e(valor, ord)
+      where btrim(coalesce(e.valor, '')) <> ''
+    ) s
+    where s.tag is not null and s.tag <> ''
+    order by lower(s.tag), s.ord
+  ) as n;
+$$;
+
+create or replace function public.fn_vocabulario_de_tags_operar(
+  p_org uuid,
+  p_acao text,
+  p_tag text,
+  p_destino text,
+  p_cor text default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_tag     text := btrim(coalesce(p_tag, ''));
+  v_destino text := btrim(coalesce(p_destino, ''));
+  -- A cor entra normalizada (minúscula, sem espaço). A rota valida com Zod antes;
+  -- esta linha defende o caminho que NÃO passa por ela — RPC direta, psql, um
+  -- cliente futuro. Sem isso, `#FFF` gravaria e a comparação por igualdade da
+  -- tela (que compara o que o servidor devolveu) passaria a mentir.
+  v_cor     text := lower(btrim(coalesce(p_cor, '')));
+  v_remover boolean;
+  v_so_cor  boolean;
+  v_contatos integer := 0;
+  v_leads integer := 0;
+  v_conversas integer := 0;
+  v_regras integer := 0;
+  v_id uuid;
+  v_ids uuid[];
+  v_settings jsonb;
+  v_antes jsonb;
+  v_depois jsonb;
+  v_definido boolean := false;
+begin
+  -- Portão de papel ANTES de qualquer escrita. Definer com p_org vindo da rota:
+  -- é esta linha que separa o tenant de quem chama.
+  if p_org is null or not public.fn_role_at_least(p_org, 'manager') then
+    raise exception using errcode = '42501', message = 'insufficient_role';
+  end if;
+
+  if p_acao is null or p_acao not in ('renomear', 'juntar', 'excluir', 'definir_cor') then
+    raise exception using errcode = '22023', message = 'acao_invalida';
+  end if;
+  if v_tag = '' then
+    raise exception using errcode = '22023', message = 'tag_obrigatoria';
+  end if;
+  v_remover := (p_acao = 'excluir');
+  v_so_cor  := (p_acao = 'definir_cor');
+  if not v_remover and not v_so_cor and v_destino = '' then
+    raise exception using errcode = '22023', message = 'destino_obrigatorio';
+  end if;
+  -- `v_cor` vazio é pedido legítimo ("sem cor"): limpa. O que não passa é cor
+  -- malformada — gravar `#12` e devolver `#12` para a tela pintar deixaria o
+  -- chip sem cor sem ninguém saber por quê.
+  if v_so_cor and v_cor <> '' and v_cor !~ '^#[0-9a-f]{6}$' then
+    raise exception using errcode = '22023', message = 'cor_invalida';
+  end if;
+
+  -- ── POR QUE NÃO SAI EVENTO DAQUI ──────────────────────────────────────────
+  --
+  -- Os laços abaixo CONTAM as linhas alteradas e não emitem nada em `event_log`.
+  -- A primeira versão emitia `contact.tags_changed` / `lead.tags_changed` /
+  -- `conversation.tags_changed` POR LINHA, e nenhum desses tipos tem consumidor:
+  -- `lib/event-log/register-handlers.ts` registra 13 handlers e nenhum os
+  -- declara; o motor de automação ouve `lead.tag_added`/`contact.tag_added`, que
+  -- é outro tipo (e disparar automação num renomear em lote seria pior que não
+  -- disparar). Evento sem consumidor é o anti-pattern 3 do CLAUDE.md, e aqui
+  -- custava milhares de linhas dentro de UMA transação, num log que nada drena e
+  -- nada expurga.
+  --
+  -- Quem registra a operação é o AUDIT LOG, na borda: `tag_vocabulary.changed`
+  -- em `app/api/v1/tags/vocabulario/route.ts`, com os contadores que este corpo
+  -- devolve. E a tela aberta se atualiza pelo Realtime das próprias tabelas.
+
+  -- ── (z) A COR SAI ANTES DOS LAÇOS, E NÃO É OTIMIZAÇÃO ─────────────────────
+  --
+  -- Cor é atributo do VOCABULÁRIO, não das linhas: `contacts.tags`,
+  -- `crm_leads.tags` e `conversations.tags` continuam `text[]` de nomes, porque
+  -- automação, webhook (`lead.tag_added`) e MCP (`*.tags_changed`) falam em
+  -- string há versões (contrato da fatia S4). Então a ação `definir_cor` não tem
+  -- o que reescrever em contatos, leads nem conversas — e os laços abaixo, se
+  -- rodassem, custariam uma varredura das três tabelas para devolver zero.
+  --
+  -- O bloco de `canonical_conversation_tags` (mais abaixo) é pior que inútil
+  -- aqui: ele troca o nome da semente por `v_destino` e descarta o que sobra
+  -- vazio — com `destino` nulo nesta ação, a semente seria APAGADA. Daí o
+  -- `return` cedo: nesta ação, só o vocabulário curado muda.
+  if v_so_cor then
+    select coalesce(o.settings, '{}'::jsonb) into v_settings
+    from public.organizations o where o.id = p_org;
+    if v_settings is null then
+      v_settings := '{}'::jsonb;
+    end if;
+
+    -- (a) tolera `settings.tags` torto (escalar/objeto): a leitura já tolera com
+    -- `jsonb_typeof`, e sem esta guarda o `jsonb_array_elements` levantava
+    -- `cannot extract elements from a scalar` e derrubava a tela inteira numa
+    -- organização com o dado malformado. Lista que não é lista é lista vazia.
+    v_antes := case
+      when jsonb_typeof(v_settings -> 'tags') = 'array' then v_settings -> 'tags'
+      else '[]'::jsonb
+    end;
+    v_depois := coalesce(
+      (
+        select jsonb_agg(entrada.valor order by entrada.ord)
+        from (
+          -- Uma entrada por chave canônica, agora acrescentando a cor na que
+          -- casar. A entrada que era string vira objeto — a mesma forma que o
+          -- rename já grava (mais abaixo, `jsonb_build_object('tag', …)`) — e
+          -- `descricao` que já existia é PRESERVADA: esta ação fala de cor.
+          --
+          -- ⚠️ O desempate é o MESMO da função de leitura
+          -- (`fn_vocabulario_de_tags`, `order by … (cor is not null or descricao
+          -- is not null) desc`), e de propósito: onde a lista curada já tiver a
+          -- mesma etiqueta duas vezes (uma como string, outra como objeto com
+          -- cor), quem sobrevive é a entrada que carrega o metadado. Ordenar só
+          -- por `ord` apagaria a cor na primeira vez que a ação rodasse sobre um
+          -- vocabulário nesse estado, e a tela mostraria "sem cor" logo depois de
+          -- alguém ter escolhido uma.
+          select distinct on (lower(x.chave)) x.valor, x.ord
+          from (
+            select btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}')) as chave,
+                   case
+                     when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
+                     then case
+                            when nullif(v_cor, '') is null
+                            then (case when jsonb_typeof(e.valor) = 'string'
+                                       then jsonb_build_object('tag', e.valor #>> '{}')
+                                       else e.valor end) - 'cor'
+                            else jsonb_set(
+                                   case when jsonb_typeof(e.valor) = 'string'
+                                        then jsonb_build_object('tag', e.valor #>> '{}')
+                                        else e.valor end,
+                                   '{cor}', to_jsonb(v_cor))
+                          end
+                     else case when jsonb_typeof(e.valor) = 'string'
+                               then jsonb_build_object('tag', e.valor #>> '{}')
+                               else e.valor end
+                   end as valor,
+                   e.ord
+            from jsonb_array_elements(v_antes) with ordinality as e(valor, ord)
+            where btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}')) <> ''
+          ) x
+          where x.valor is not null
+          order by lower(x.chave),
+                   ((x.valor ->> 'cor') is not null or (x.valor ->> 'descricao') is not null) desc,
+                   x.ord
+        ) as entrada
+      ),
+      '[]'::jsonb
+    );
+
+    -- A etiqueta que ainda não tinha entrada no vocabulário curado — semente, ou
+    -- nome que só existe em uso (`no_vocabulario = false` na leitura) — GANHA
+    -- uma. É deliberado: dar cor é curar. Sem isto, a tela ofereceria cor para
+    -- uma etiqueta que continuaria marcada como "em uso, fora do vocabulário", e
+    -- a leitura devolveria a cor de uma linha que não está na lista curada.
+    if nullif(v_cor, '') is not null and not exists (
+      select 1 from jsonb_array_elements(v_depois) as e(valor)
+      where lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
+    ) then
+      v_depois := v_depois || jsonb_build_array(jsonb_build_object('tag', v_tag, 'cor', v_cor));
+    end if;
+
+    if v_depois <> v_antes then
+      v_settings := jsonb_set(v_settings, '{tags}', v_depois);
+      update public.organizations o
+         set settings = v_settings,
+             updated_at = now()
+       where o.id = p_org;
+      v_definido := true;
+    end if;
+
+    return jsonb_build_object(
+      'acao', p_acao,
+      'tag', v_tag,
+      'destino', null,
+      'cor', nullif(v_cor, ''),
+      'contatos', 0,
+      'leads', 0,
+      'conversas', 0,
+      'regras', 0,
+      'alterou', v_definido
+    );
+  end if;
+
+  -- (a) contatos
+  for v_id in
+    with alvo as (
+      select c.id, public.fn_tags_normalizar(c.tags, v_tag, v_destino, v_remover) as novas
+      from public.contacts c
+      where c.organization_id = p_org
+        and exists (
+          select 1 from unnest(coalesce(c.tags, '{}'::text[])) as x(valor)
+          where lower(btrim(x.valor)) = lower(v_tag)
+        )
+    ), mudou as (
+      update public.contacts c
+         set tags = a.novas
+        from alvo a
+       where c.id = a.id
+         and c.tags is distinct from a.novas
+      returning c.id
+    )
+    select id from mudou
+  loop
+    v_contatos := v_contatos + 1;
+  end loop;
+
+  -- (b) leads
+  for v_id in
+    with alvo as (
+      select l.id, public.fn_tags_normalizar(l.tags, v_tag, v_destino, v_remover) as novas
+      from public.crm_leads l
+      where l.organization_id = p_org
+        and exists (
+          select 1 from unnest(coalesce(l.tags, '{}'::text[])) as x(valor)
+          where lower(btrim(x.valor)) = lower(v_tag)
+        )
+    ), mudou as (
+      update public.crm_leads l
+         set tags = a.novas
+        from alvo a
+       where l.id = a.id
+         and l.tags is distinct from a.novas
+      returning l.id
+    )
+    select id from mudou
+  loop
+    v_leads := v_leads + 1;
+  end loop;
+
+  -- (c) conversas
+  for v_id in
+    with alvo as (
+      select v.id, public.fn_tags_normalizar(v.tags, v_tag, v_destino, v_remover) as novas
+      from public.conversations v
+      where v.organization_id = p_org
+        and exists (
+          select 1 from unnest(coalesce(v.tags, '{}'::text[])) as x(valor)
+          where lower(btrim(x.valor)) = lower(v_tag)
+        )
+    ), mudou as (
+      update public.conversations v
+         set tags = a.novas
+        from alvo a
+       where v.id = a.id
+         and v.tags is distinct from a.novas
+      returning v.id
+    )
+    select id from mudou
+  loop
+    v_conversas := v_conversas + 1;
+  end loop;
+
+  -- (d) as regras dos agentes — o ponto da issue.
+  --
+  -- `excluir` NÃO apaga a regra: quem exclui a etiqueta é avisado de quantas
+  -- regras a escrevem (o número volta no jsonb e a tela pede confirmação), mas
+  -- apagar `add_tag` de um agente em produção é decisão de outra tela. Aqui a
+  -- lista da regra só é reescrita quando o nome muda ou quando ele sai.
+  select coalesce(o.settings, '{}'::jsonb) into v_settings
+  from public.organizations o where o.id = p_org;
+
+  if v_settings is null then
+    v_settings := '{}'::jsonb;
+  end if;
+
+  if not v_remover then
+    with alvo as (
+      select r.id,
+             jsonb_agg(
+               case
+                 when a.valor ->> 'type' = 'add_tag'
+                  and jsonb_typeof(a.valor -> 'config' -> 'tags') = 'array'
+                 then jsonb_set(
+                        a.valor,
+                        '{config,tags}',
+                        to_jsonb(public.fn_tags_normalizar(
+                          array(select jsonb_array_elements_text(a.valor -> 'config' -> 'tags')),
+                          v_tag, v_destino, false
+                        ))
+                      )
+                 else a.valor
+               end
+               order by a.ord
+             ) as novas
+      from public.automation_rules r
+      cross join lateral jsonb_array_elements(coalesce(r.actions, '[]'::jsonb))
+        with ordinality as a(valor, ord)
+      where r.organization_id = p_org
+      -- ⚠️ `group by r.id` E SÓ. Agrupar também pelo TIPO da ação devolvia uma
+      -- linha por (regra, tipo), cada uma com `novas` = só o subconjunto daquele
+      -- tipo; o `update ... from alvo` casava as duas linhas, o Postgres usava
+      -- UMA arbitrária, e `is distinct from` é sempre verdadeiro num subconjunto
+      -- — então a regra com ações de dois tipos era TRUNCADA a um tipo só, em
+      -- toda organização, mesmo que ela nunca tenha citado a etiqueta renomeada.
+      -- Medido num Postgres real: regra com `add_tag` + `assign_owner` ficava com
+      -- uma ação, e a tela dizia "atualizada em 1 regra(s) de agente".
+      group by r.id
+    ), mudou as (
+      update public.automation_rules r
+         set actions = alvo.novas,
+             updated_at = now()
+        from alvo
+       where r.id = alvo.id
+         and r.actions is distinct from alvo.novas
+      returning r.id
+    )
+    select count(*) into v_regras from mudou;
+  else
+    -- Exclusão: conta as regras que ainda escrevem a etiqueta, sem tocar nelas.
+    select count(distinct r.id) into v_regras
+    from public.automation_rules r
+    cross join lateral jsonb_array_elements(coalesce(r.actions, '[]'::jsonb)) as a(valor)
+    cross join lateral jsonb_array_elements(
+      case when jsonb_typeof(a.valor -> 'config' -> 'tags') = 'array'
+           then a.valor -> 'config' -> 'tags' else '[]'::jsonb end
+    ) as e(valor)
+    where r.organization_id = p_org
+      and a.valor ->> 'type' = 'add_tag'
+      and lower(btrim(e.valor #>> '{}')) = lower(v_tag);
+  end if;
+
+  -- (e) o vocabulário da organização, nos dois lugares onde ele mora.
+  -- Mesma guarda do ramo de renomear: `settings.tags` malformado não pode
+  -- derrubar a cor (a leitura tolera; a escrita agora também).
+  v_antes := case
+    when jsonb_typeof(v_settings -> 'tags') = 'array' then v_settings -> 'tags'
+    else '[]'::jsonb
+  end;
+  v_depois := coalesce(
+    (
+      select jsonb_agg(entrada.valor order by entrada.ord)
+      from (
+        -- Dedupe pela chave DEPOIS da substituição (mesma razão de
+        -- `fn_tags_normalizar`): juntar duas entradas de chaves diferentes num
+        -- nome só deixava as duas no vocabulário, agora com o mesmo `tag`.
+        --
+        -- ⚠️ `cor` e `descricao` da entrada sobrevivem ao rename: o `jsonb_set`
+        -- mexe só em `{tag}`. Renomear não é perder a cor que alguém escolheu.
+        select distinct on (lower(x.chave)) x.valor, x.ord
+        from (
+          select case
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
+                   when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
+                     then v_destino
+                   else btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))
+                 end as chave,
+                 case
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
+                   when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
+                     then jsonb_set(
+                            case when jsonb_typeof(e.valor) = 'string' then jsonb_build_object('tag', e.valor #>> '{}')
+                                 else e.valor end,
+                            '{tag}', to_jsonb(v_destino))
+                   else case when jsonb_typeof(e.valor) = 'string' then jsonb_build_object('tag', e.valor #>> '{}')
+                             else e.valor end
+                 end as valor,
+                 e.ord
+          from jsonb_array_elements(v_antes) with ordinality as e(valor, ord)
+          where btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}')) <> ''
+        ) x
+        where x.valor is not null and coalesce(x.chave, '') <> ''
+        order by lower(x.chave), x.ord
+      ) as entrada
+      where entrada.valor is not null
+    ),
+    '[]'::jsonb
+  );
+  if v_depois <> v_antes then
+    v_settings := jsonb_set(v_settings, '{tags}', v_depois);
+    v_definido := true;
+  end if;
+
+  v_antes := coalesce(v_settings -> 'canonical_conversation_tags', '[]'::jsonb);
+  v_depois := coalesce(
+    (
+      select jsonb_agg(semente.valor order by semente.ord)
+      from (
+        -- Dedupe pela chave DEPOIS da substituição, como acima.
+        select distinct on (lower(y.valor)) y.valor, y.ord
+        from (
+          select case
+                   when v_remover and lower(btrim(s.valor #>> '{}')) = lower(v_tag) then null
+                   when lower(btrim(s.valor #>> '{}')) = lower(v_tag) then v_destino
+                   else btrim(s.valor #>> '{}')
+                 end as valor,
+                 s.ord
+          from jsonb_array_elements(v_antes) with ordinality as s(valor, ord)
+          where btrim(s.valor #>> '{}') <> ''
+        ) y
+        where coalesce(y.valor, '') <> ''
+        order by lower(y.valor), y.ord
+      ) as semente
+      where semente.valor is not null
+    ),
+    '[]'::jsonb
+  );
+  if v_depois <> v_antes then
+    v_settings := jsonb_set(v_settings, '{canonical_conversation_tags}', v_depois);
+    v_definido := true;
+  end if;
+
+  if v_definido then
+    update public.organizations o
+       set settings = v_settings,
+           updated_at = now()
+     where o.id = p_org;
+  end if;
+
+  return jsonb_build_object(
+    'acao', p_acao,
+    'tag', v_tag,
+    'destino', nullif(v_destino, ''),
+    'cor', null,
+    'contatos', v_contatos,
+    'leads', v_leads,
+    'conversas', v_conversas,
+    'regras', v_regras,
+    'alterou', (v_contatos + v_leads + v_conversas + v_regras > 0 or v_definido)
+  );
+end;
+$$;
+
+-- Doutrina 9: as duas origens de EXECUTE, com os mesmos grants da definição anterior.
+revoke execute on function public.fn_tags_normalizar(text[], text, text, boolean) from public, anon;
+grant  execute on function public.fn_tags_normalizar(text[], text, text, boolean) to authenticated, service_role;
+revoke execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) from public, anon;
+grant  execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) to authenticated, service_role;
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
@@ -54543,6 +55191,49 @@ begin
 end
 $pedido_sem_conector$;
 
+-- ---- 0624: contato "sempre atendimento humano" — a coluna permanente (issue 2379) ----
+-- Espelho idempotente da migration 0624. É este apêndice que chega a todo
+-- self-host: o install.sh aplica o baseline num banco novo e o update.sh o
+-- re-aplica num banco existente; nenhum dos dois roda as migrations.
+-- `ai_opt_out` nasce desligado: contato novo é atendido pela IA até alguém
+-- marcar. Separada de `force_human` (trava de handoff, desfeita pela
+-- devolução) de propósito: a devolução NÃO pode desfazer esta marca.
+-- manifest: **Contato "sempre atendimento humano" nasce no banco (issue 2379): `contacts.ai_opt_out` com default desligado e índice parcial — a marca PERMANENTE, separada da trava de handoff.** A devolução automática (`lib/escalacao/retomada.ts`, cron `handoff-devolucao`) limpava `contacts.force_human` e trazia a conversa de volta para a IA sem ninguém decidir; a coluna nova é o que ela passa a consultar antes de mexer em qualquer coisa. Quem marcou/quando fica na auditoria, sem coluna extra (mesma decisão do `is_personal`, spec 21 §3.6). Idempotente: `add column if not exists`, `create index if not exists`. Apêndice espelhado no fim do `baseline.sql`; `MANIFEST.md` é histórico e não recebe linha.
+
+-- 0624 — a trava permanente "sempre atendimento humano" (issue 2379).
+--
+-- `ai_opt_out boolean DEFAULT false NOT NULL` (espelha `is_personal`): o contato
+-- nasce atendido pela IA, e só vira "sempre humano" por gesto explícito de
+-- gerente/dono na rota `POST /api/v1/contacts/[id]/always-human`.
+--
+-- POR QUE COLUNA NOVA e não reusar `force_human`:
+--
+--   * `contacts.force_human` é a trava de HANDOFF — ela nasce quando o agente
+--     escala (`performHumanHandoff`) e morre quando um humano devolve o comando
+--     (`devolverAtendimentoAoAgente`, o único escritor de `force_human = false`
+--     do repositório). Misturar os dois faria toda escalação automática virar
+--     permanente, que é o oposto do pedido.
+--   * A issue 2379 mediu exatamente isso: "mesmo a trava do contato é desfeita
+--     na primeira devolução". O que falta não é uma trava mais forte, é uma
+--     marca que a devolução NÃO desfaça.
+--
+-- As duas convivem: armar `ai_opt_out` também liga `force_human` (é o gate que
+-- o worker, o harness e o `before-send` já leem — a IA para NA HORA), e
+-- `ai_opt_out` é o pred que impede qualquer caminho de desligar essa trava.
+-- Cada guard passa a ler as DUAS colunas de propósito: se um escritor futuro
+-- limpar `force_human` por engano, a marca permanente continua barrando a IA sozinha.
+
+alter table public.contacts
+  add column if not exists ai_opt_out boolean default false not null;
+
+comment on column public.contacts.ai_opt_out is
+  'Contato marcado "sempre atendimento humano" (issue 2379): a IA nunca responde este contato e NENHUM caminho de devolução (manual ou automática) desfaz a marca — só um humano a desliga pela rota always-human. Separada de force_human, que é a trava de handoff e continua sendo desfeita pela devolução. Quem marcou/quando fica na auditoria.';
+
+create index if not exists idx_contacts_org_ai_opt_out
+  on public.contacts (organization_id)
+  where (ai_opt_out = true);
+
+notify pgrst, 'reload schema';
 
 -- ---- cor da marca no tema escuro: coluna da instalação (migration 0627) ----
 alter table public.platform_branding
@@ -54680,3 +55371,43 @@ on conflict (model) do update set
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
   notes = excluded.notes,
   superseded_at = null;
+
+-- ---- a tarefa nasce presa à demanda do atendimento (migration 0659, #2818) ----
+-- Hoje a tarefa tem DOIS vínculos opcionais, `lead_id` e `contact_id`, e nenhum
+-- dos dois responde "de qual ATENDIMENTO veio este combinado". No meio da
+-- conversa o atendente combina algo e tem dois caminhos ruins: abrir a aba
+-- Tarefas (que não sabe de qual atendimento ele estava falando — a tarefa nasce
+-- avulsa) ou escrever na nota da conversa (que é texto: sem prazo, responsável
+-- nem situação, não entra na lista de abertas e não lembra ninguém). Em ambos o
+-- combinado morre, porque ele não volta para a tela de quem precisa cumprir.
+--
+-- O vínculo é a DEMANDA, não a conversa direta (a opção A, preferida na
+-- proposta da #2818). A conversa já é atravessada pela demanda (`conversations.current_demanda_id`
+-- e a ponte `demanda_conversas`), e uma FK direta na conversa morreria com ela
+-- (cascade) — perderia o histórico do combinado. A demanda é a unidade de
+-- ATENDIMENTO: sobrevive à conversa pontual, e para o caso de uma conversa sem
+-- demanda o `contact_id` (já suportado) cobre.
+--
+-- `on delete set null` e não `cascade`, pelo mesmo motivo escrito no `lead_id`
+-- (migration 0210): apagar o assunto do atendimento não pode apagar o lembrete
+-- que a pessoa escreveu para si mesma. A tarefa continua na lista, com o vínculo
+-- zerado — nada some da tela de quem ainda tem o que fazer.
+--
+-- Sem RLS nova: a policy de `crm_tasks` isola por `organization_id`. A FK só
+-- garante que a demanda apontada existe; que ela é da organização de quem grava
+-- é conferido nas rotas de criar e editar, em `lib/tarefas/demanda.ts`. Sem
+-- trigger. Idempotente (`add column if not exists`, `create index if not
+-- exists`), re-aplicável pelo `update.sh` de um clone.
+
+alter table public.crm_tasks
+  add column if not exists demanda_id uuid references public.demandas(id) on delete set null;
+
+-- As tarefas de UMA demanda, para a seção "Tarefas desta demanda" do inbox.
+-- Parcial porque a maioria das linhas não tem demanda (a tarefa avulsa é caso
+-- real) — indexar NULL aqui só engorda o índice. Mesmo desenho do
+-- `crm_tasks_lead_idx` (0210).
+create index if not exists crm_tasks_demanda_idx
+  on public.crm_tasks (demanda_id) where demanda_id is not null;
+
+comment on column public.crm_tasks.demanda_id is
+  'A demanda de atendimento que originou o combinado (#2818). set null, não cascade: encerrar ou apagar a demanda não pode apagar o lembrete que a pessoa escreveu para si mesma — a tarefa continua na lista, com o vínculo zerado. NULL = tarefa avulsa ou presa só a negócio/contato.';

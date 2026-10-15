@@ -245,6 +245,9 @@ export const AUDIT_ACTIONS = [
   "channel.social_configured",
   "channel.social_disconnected",
   "channel.social_desvinculado",
+  // Reescreve a URL da assinatura de webhook do canal social pela origem atual
+  // (#2863): não arquiva a linha nem cria canal — só reconcilia o endereço.
+  "channel.social_webhook_ressincronizado",
   "channel.ai_access_updated",
   "channel.acervo_updated",
   "channel.reconnected",
@@ -1129,6 +1132,12 @@ export const AUDIT_ACTIONS = [
   // dedicada `PATCH /contacts/[id]/carteira` (#2591) — a escrita é do servidor,
   // então o audit é a única trilha de quem mudou o dono.
   "contact.carteira_changed",
+  // Marca permanente "sempre atendimento humano" (issue 2379): `ai_opt_out`
+  // ligado na ficha do contato — a devolução (manual ou automática) não a desfaz.
+  "contacts.always_human_marked",
+  // A marca foi removida: só limpa `ai_opt_out`; a conversa segue com a trava
+  // de handoff de quem a pôs.
+  "contacts.always_human_unmarked",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */
