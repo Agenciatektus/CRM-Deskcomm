@@ -7394,6 +7394,11 @@ export const DICIONARIO: Traducoes = {
   "O relatório de {lei} entregue ao cliente traz a {campo_alto} da sua empresa, e não o nome aqui de cima — é ela que responde legalmente pelos dados. Confira o campo \"{campo}\" em Configurações → Organização.": {
     es: "El informe de {lei} que se entrega al cliente incluye la {campo_alto} de tu empresa, no el nombre de arriba, porque es ella quien responde legalmente por los datos. Revisa el campo \"{campo}\" en Configuración → Organización.",
   },
+  // País sem citação revisada não cita lei nenhuma (issue #2344): o `??
+  // "LGPD"` do call site afirmava a lei brasileira a quem nem tem perfil.
+  "O relatório entregue ao cliente traz a {campo_alto} da sua empresa, e não o nome aqui de cima — é ela que responde legalmente pelos dados. Confira o campo \"{campo}\" em Configurações → Organização.": {
+    es: "El informe entregado al cliente muestra la {campo_alto} de tu empresa, no el nombre de arriba, porque es ella quien responde legalmente por los datos. Revisa el campo \"{campo}\" en Configuración → Organización.",
+  },
   "Use a ação \"Webhooks\" → POST, apontando para o endereço acima.": {
     es: "Usa la acción \"Webhooks\" → POST y apunta a la dirección de arriba.",
   },
@@ -8810,9 +8815,18 @@ export const DICIONARIO: Traducoes = {
   "Como esta instalação do": { es: "Cómo esta instalación de" },
   "trata dados pessoais.": { es: "trata los datos personales." },
   "1. Quem é o controlador": { es: "1. Quién es el responsable" },
+  // Vocabulário do RGPD em pt-PT para a política de uma organização de
+  // Portugal (issue #2344): "responsável pelo tratamento" (art. 4.º, n.º 7).
+  "1. Quem é o responsável pelo tratamento": { es: "1. Quién es el responsable del tratamiento" },
   "O controlador dos dados tratados aqui é": { es: "El responsable de los datos tratados aquí es" },
+  "O responsável pelo tratamento dos dados tratados aqui é": {
+    es: "El responsable del tratamiento de los datos tratados aquí es",
+  },
   "quem instalou e opera este sistema. Os autores do software não têm acesso a este servidor nem aos dados guardados nele, e não são controladores nem operadores desses dados.": {
     es: "quien instaló y opera este sistema. Los autores del software no tienen acceso a este servidor ni a los datos guardados en él, y no son responsables ni encargados de esos datos.",
+  },
+  "quem instalou e opera este sistema. Os autores do software não têm acesso a este servidor nem aos dados guardados nele, e não são responsáveis pelo tratamento nem operadores desses dados.": {
+    es: "quien instaló y opera este sistema. Los autores del software no tienen acceso a este servidor ni a los datos guardados en él, y no son responsables del tratamiento ni encargados de esos datos.",
   },
   "2. Que dados são tratados": { es: "2. Qué datos se tratan" },
   "De quem é atendido:": { es: "De quien recibe atención:" },
@@ -8857,6 +8871,9 @@ export const DICIONARIO: Traducoes = {
   "A LGPD garante a você confirmar se há tratamento, acessar seus dados, corrigir dados incompletos ou desatualizados, pedir anonimização ou eliminação, saber com quem foram compartilhados e revogar consentimento.": {
     es: "La LGPD te da derecho a confirmar si se tratan tus datos, acceder a ellos, corregir datos incompletos o desactualizados, pedir su anonimización o eliminación, saber con quién se compartieron y revocar tu consentimiento.",
   },
+  "O RGPD garante-lhe confirmar se há tratamento, aceder aos seus dados, corrigir dados incompletos ou desatualizados, pedir anonimização ou eliminação, saber com quem foram partilhados e retirar o consentimento.": {
+    es: "El RGPD le garantiza confirmar si hay tratamiento, acceder a sus datos, corregir datos incompletos o desactualizados, pedir su anonimización o eliminación, saber con quién fueron compartidos y retirar el consentimiento.",
+  },
   "O sistema atende esses pedidos por um fluxo próprio: a exportação reúne o que existe sobre a pessoa, e a anonimização remove a identificação preservando o histórico de atendimento — por isso ela": {
     es: "El sistema atiende estas solicitudes con un flujo propio: la exportación reúne lo que existe sobre la persona, y la anonimización elimina su identificación y conserva el historial de atención; por eso",
   },
@@ -8866,11 +8883,18 @@ export const DICIONARIO: Traducoes = {
     es: "El acceso se controla con cuenta, contraseña y rol. La verificación en dos pasos es opcional para todos y solo se puede exigir a quien administra. Cada organización alojada solo ve sus propios datos y las claves de integración se guardan cifradas.",
   },
   "8. Encarregado e contato": { es: "8. Encargado y contacto" },
+  "8. Encarregado da proteção de dados e contato": { es: "8. Encargado de protección de datos y contacto" },
   "Para exercer seus direitos ou tirar dúvidas sobre privacidade, fale com o encarregado de dados:": {
     es: "Para ejercer tus derechos o resolver dudas sobre privacidad, habla con el encargado de datos:",
   },
+  "Para exercer seus direitos ou tirar dúvidas sobre privacidade, fale com o encarregado da proteção de dados:": {
+    es: "Para ejercer sus derechos o resolver dudas sobre privacidad, hable con el encargado de protección de datos:",
+  },
   "O operador ainda não publicou um endereço de contato do encarregado de dados nesta instalação. Os pedidos devem ser feitos pelos canais de atendimento da própria organização.": {
     es: "El operador todavía no publicó una dirección de contacto del encargado de datos en esta instalación. Las solicitudes deben hacerse por los canales de atención de la propia organización.",
+  },
+  "O operador ainda não publicou um endereço de contato do encarregado da proteção de dados nesta instalação. Os pedidos devem ser feitos pelos canais de atendimento da própria organização.": {
+    es: "El operador todavía no publicó una dirección de contacto del encargado de protección de datos en esta instalación. Las solicitudes deben hacerse por los canales de atención de la propia organización.",
   },
 
   "As regras de uso desta instalação do": { es: "Las reglas de uso de esta instalación de" },
@@ -10377,6 +10401,16 @@ export const DICIONARIO: Traducoes = {
   // Contato pessoal (spec 21): botão no cabeçalho da conversa e na ficha,
   // selo na lista e filtro "Pessoais".
   "Marcar como pessoal": { es: "Marcar como personal" },
+  // Issue 2379 — a marca PERMANENTE "sempre atendimento humano".
+  "Sempre atendimento humano": { es: "Siempre atención humana" },
+  "Marcar como sempre humano": { es: "Marcar como siempre atención humana" },
+  "Marcar este contato como sempre humano?": { es: "¿Marcar este contacto como siempre atención humana?" },
+  "A IA deixa de responder este contato para sempre: a devolução automática e o botão de devolver ao automático passam a recusar, e a marca só sai por aqui. A conversa atual continua com a equipe.": { es: "La IA deja de responder a este contacto para siempre: la devolución automática y el botón de devolver al automático pasan a rechazar, y la marca solo se quita desde aquí. La conversación actual sigue con el equipo." },
+  "Remover marca de humano": { es: "Quitar marca de humano" },
+  "Removendo...": { es: "Quitando..." },
+  "Este contato está marcado como sempre atendimento humano. Para a IA voltar a atendê-lo, remova a marca na ficha do contato.": { es: "Este contacto está marcado como siempre atención humana. Para que la IA vuelva a atenderlo, quita la marca en la ficha del contacto." },
+  "Não foi possível conferir o contato desta conversa — nada foi alterado. Tente de novo.": { es: "No fue posible verificar el contacto de esta conversación — no se cambió nada. Inténtalo de nuevo." },
+  "Não foi possível alterar a marca de atendimento humano.": { es: "No fue posible cambiar la marca de atención humana." },
   "Desmarcar pessoal": { es: "Desmarcar personal" },
   "Desmarcando...": { es: "Desmarcando..." },
   "Marcar este contato como pessoal?": { es: "¿Marcar este contacto como personal?" },
@@ -11569,6 +11603,16 @@ export const DICIONARIO: Traducoes = {
 
   // ─── Tarefas (extraídas do PR #418) ───
   "Tarefas": { es: "Tareas" },
+  "Tarefas desta demanda": { es: "Tareas de esta demanda" },
+  "Nenhuma tarefa nesta demanda. Anote o próximo passo combinado, com prazo e responsável.": {
+    es: "Ninguna tarea en esta demanda. Anota el próximo paso acordado, con plazo y responsable.",
+  },
+  "O negócio, o contato ou a demanda vinculada não existe.": {
+    es: "El negocio, el contacto o la demanda vinculada no existe.",
+  },
+  "Esta demanda já foi encerrada. Crie a tarefa numa demanda em andamento.": {
+    es: "Esta demanda ya fue cerrada. Crea la tarea en una demanda en curso.",
+  },
   "O que ficou combinado, com prazo. Tarefa presa a um negócio aparece na linha do tempo dele.": {
     es: "Lo que quedó acordado, con plazo. Una tarea vinculada a un negocio aparece en su línea de tiempo.",
   },
@@ -12499,6 +12543,7 @@ export const DICIONARIO: Traducoes = {
   "Este atendimento está atribuído a uma pessoa. O responsável pode autorizar somente este link pelo botão de envio.": { es: "Esta atención está asignada a una persona. El responsable puede autorizar solo este enlace con el botón de envío." },
   "O contato não está autorizado para atendimento automático. O responsável pode autorizar somente este link pelo botão de envio.": { es: "El contacto no está autorizado para la atención automática. El responsable puede autorizar solo este enlace con el botón de envío." },
   "A autorização de atendimento automático expirou. O responsável pode autorizar somente este link pelo botão de envio.": { es: "La autorización de atención automática venció. El responsable puede autorizar solo este enlace con el botón de envío." },
+  "O contato está marcado como sempre atendimento humano. O responsável pode enviar este link pelo botão de envio, sem ativar a IA.": { es: "El contacto está marcado como siempre atención humana. El responsable puede enviar este enlace con el botón de envío, sin activar la IA." },
   "O envio atingiu uma janela ou limite do canal. Aguarde a liberação antes de tentar novamente.": { es: "El envío alcanzó una ventana o un límite del canal. Espera a que se habilite antes de intentarlo de nuevo." },
   "Uma regra de envio impediu a mensagem. Confira o aviso na Central antes de tentar novamente.": { es: "Una regla de envío bloqueó el mensaje. Revisa el aviso en la Central antes de intentarlo de nuevo." },
   "Sua reunião está marcada para": { es: "Tu reunión está programada para" },
@@ -15571,8 +15616,10 @@ export const DICIONARIO: Traducoes = {
   // O cartão de Configurações › Empresa, só fora do Brasil. Os rótulos trazem
   // a letra porque é assim que o relatório de acesso os imprime ("a) Finalidades:").
   "Alíneas do art. 15.º do RGPD": { es: "Alíneas del art. 15.º del RGPD" },
-  "O relatório de acesso imprime estes três textos em nome da organização. Deixar em branco faz o documento mostrar «não informado pelo controlador» — nada é inventado no lugar do que falta.": {
-    es: "El informe de acceso imprime estos tres textos en nombre de la organización. Dejarlos en blanco hace que el documento muestre «no informado por el responsable»: no se inventa nada en lugar de lo que falta.",
+  // `{naoInformado}` é a frase LITERAL que o PDF imprime (em português, no
+  // vocabulário do país da organização) — por isso não se traduz.
+  "O relatório de acesso imprime estes três textos em nome da organização. Deixar em branco faz o documento mostrar «{naoInformado}» — nada é inventado no lugar do que falta.": {
+    es: "El informe de acceso imprime estos tres textos en nombre de la organización. Dejarlos en blanco hace que el documento muestre «{naoInformado}»: no se inventa nada en lugar de lo que falta.",
   },
   "Finalidades do tratamento (alínea a))": {
     es: "Finalidades del tratamiento (letra a))",

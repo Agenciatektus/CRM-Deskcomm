@@ -52828,6 +52828,66 @@ grant  execute on function public.fn_tags_normalizar(text[], text, text, boolean
 revoke execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) from public, anon;
 grant  execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) to authenticated, service_role;
 
+-- ---- a marca "sempre atendimento humano" vale no envio da agenda (migration 0676) ----
+-- O envio do link de reunião decidia a elegibilidade com `aiOptOut: false` fixo,
+-- confiando que ligar `contacts.ai_opt_out` também deixa `force_human` ligado.
+-- Agora a política devolve a marca e quem decide a lê. O settle precisa aceitar
+-- o motivo novo, senão a recusa vira exceção e o job fica sem acerto.
+create or replace function public.fn_meet_delivery_policy(p_org uuid,p_job uuid,p_worker text,p_acquired_at timestamptz)
+returns jsonb language plpgsql stable security definer set search_path=public as $$
+declare r record;
+begin
+ select a.meeting_delivery,a.contact_id,v.channel_session_id,c.is_blocked,c.is_anonymized,c.force_human,c.ai_opt_out,c.ai_authorized_at,v.assignee_kind,v.bot_silenced_until,cs.metadata,cs.archived_at,
+  public.fn_meet_delivery_current(p_org,p_job,p_worker,p_acquired_at) as current
+ into r from public.job_queue j join public.calendar_appointments a on a.organization_id=j.organization_id and a.id::text=j.payload->>'appointment_id'
+ join public.contacts c on c.organization_id=a.organization_id and c.id=a.contact_id
+ join public.conversations v on v.organization_id=a.organization_id and v.contact_id=a.contact_id and v.id::text=j.payload->'service_boundary'->>'conversation_id'
+ join public.channel_sessions cs on cs.organization_id=v.organization_id and cs.id=v.channel_session_id
+ where j.organization_id=p_org and j.id=p_job and j.kind='transactional_delivery' and j.status='running' and j.locked_by=p_worker and j.locked_at=p_acquired_at
+  and a.meeting_delivery_job_id=j.id and a.meeting_delivery->>'generation'=j.payload->>'delivery_generation';
+ if not found then return jsonb_build_object('current',false,'reason','stale');end if;
+ if not r.current then return jsonb_build_object('current',false,'reason',case when r.is_anonymized then 'lgpd' when r.is_blocked then 'opt_out' when r.archived_at is not null then 'channel' else 'access_or_stale' end);end if;
+ return jsonb_build_object('current',true,'contact_id',r.contact_id,'channel_session_id',r.channel_session_id,'human_command',r.meeting_delivery->'authorized_by'->>'kind'='user',
+  'force_human',r.force_human,'ai_opt_out',r.ai_opt_out,'ai_gate',r.metadata->>'ai_gate','ai_authorized_at',r.ai_authorized_at,'assignee_kind',r.assignee_kind,'bot_silenced_until',r.bot_silenced_until);
+end;$$;
+revoke all on function public.fn_meet_delivery_policy(uuid,uuid,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.fn_meet_delivery_policy(uuid,uuid,text,timestamptz) to service_role;
+
+create or replace function public.fn_meet_delivery_settle(p_org uuid,p_job uuid,p_worker text,p_acquired_at timestamptz,p_state text,p_retry_at timestamptz default null)
+returns boolean language plpgsql security definer set search_path=public as $$
+declare j public.job_queue; a public.calendar_appointments; contact uuid; current_intent boolean; reason text;
+begin
+ select contact_id into contact from public.job_queue where organization_id=p_org and id=p_job;
+ if contact is null then return false;end if;
+ perform public.fn_service_lock(p_org,contact);
+ select * into j from public.job_queue where organization_id=p_org and id=p_job for update;
+ if not found or j.kind<>'transactional_delivery' or j.status<>'running' or j.locked_by is distinct from p_worker or j.locked_at is distinct from p_acquired_at then return false;end if;
+ select * into a from public.calendar_appointments where organization_id=p_org and id::text=j.payload->>'appointment_id' for update;
+ current_intent:=a.meeting_delivery_job_id=j.id and a.meeting_delivery->>'generation'=j.payload->>'delivery_generation';
+ if p_state like 'blocked:%' then
+  reason:=substring(p_state from 9);
+  if reason not in ('opt_out','lgpd','channel','access_or_stale','force_human','conversa_silenciada','conversa_de_humano','sem_autorizacao','autorizacao_expirada','ai_opt_out','limits','guardrail') then raise exception 'meet_reason_invalid' using errcode='22023';end if;
+  p_state:='blocked';
+ end if;
+ if p_state not in ('sent','queued','retry','failed','blocked','stale') then raise exception 'meet_state_invalid' using errcode='22023';end if;
+ if p_state in ('sent','queued','retry') and not public.fn_meet_delivery_current(p_org,p_job,p_worker,p_acquired_at) then p_state:='stale';end if;
+ if p_state='sent' and not exists(select 1 from public.send_ledger where organization_id=p_org and job_id=p_job and seq=1 and status='accepted') then raise exception 'meet_delivery_not_accepted' using errcode='PT409';end if;
+ if p_state='retry' and j.attempts>=j.max_attempts then p_state:='failed';end if;
+ if p_state in ('queued','retry') then
+  update public.job_queue set status='pending',locked_by=null,locked_at=null,attempts=case when p_state='queued' then greatest(0,attempts-1) else attempts end,run_after=coalesce(p_retry_at,now()+interval '1 minute'),last_error='meet_delivery_waiting' where id=p_job and organization_id=p_org;
+ else
+  update public.job_queue set status=case when p_state='sent' then 'done' else 'failed' end,locked_by=null,locked_at=null,last_error=case when p_state='sent' then null else coalesce(reason,'meet_delivery_'||p_state) end where id=p_job and organization_id=p_org;
+  if current_intent then
+   update public.calendar_appointments set meeting_delivery=meeting_delivery||jsonb_build_object('state',p_state,'error',case when p_state='sent' then null else coalesce(reason,'meet_delivery_'||p_state) end,'settled_at',now()) where id=a.id and organization_id=p_org;
+   if p_state<>'sent' then perform public.fn_meet_notice(p_org,a.id,p_state);
+   else update public.agent_inbox_items set status='resolved',resolved_at=now() where organization_id=p_org and ref_kind='appointment' and ref_id=a.id and kind='other' and status='open';end if;
+  end if;
+ end if;
+ return true;
+end;$$;
+revoke all on function public.fn_meet_delivery_settle(uuid,uuid,text,timestamptz,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.fn_meet_delivery_settle(uuid,uuid,text,timestamptz,text,timestamptz) to service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -55191,6 +55251,49 @@ begin
 end
 $pedido_sem_conector$;
 
+-- ---- 0624: contato "sempre atendimento humano" — a coluna permanente (issue 2379) ----
+-- Espelho idempotente da migration 0624. É este apêndice que chega a todo
+-- self-host: o install.sh aplica o baseline num banco novo e o update.sh o
+-- re-aplica num banco existente; nenhum dos dois roda as migrations.
+-- `ai_opt_out` nasce desligado: contato novo é atendido pela IA até alguém
+-- marcar. Separada de `force_human` (trava de handoff, desfeita pela
+-- devolução) de propósito: a devolução NÃO pode desfazer esta marca.
+-- manifest: **Contato "sempre atendimento humano" nasce no banco (issue 2379): `contacts.ai_opt_out` com default desligado e índice parcial — a marca PERMANENTE, separada da trava de handoff.** A devolução automática (`lib/escalacao/retomada.ts`, cron `handoff-devolucao`) limpava `contacts.force_human` e trazia a conversa de volta para a IA sem ninguém decidir; a coluna nova é o que ela passa a consultar antes de mexer em qualquer coisa. Quem marcou/quando fica na auditoria, sem coluna extra (mesma decisão do `is_personal`, spec 21 §3.6). Idempotente: `add column if not exists`, `create index if not exists`. Apêndice espelhado no fim do `baseline.sql`; `MANIFEST.md` é histórico e não recebe linha.
+
+-- 0624 — a trava permanente "sempre atendimento humano" (issue 2379).
+--
+-- `ai_opt_out boolean DEFAULT false NOT NULL` (espelha `is_personal`): o contato
+-- nasce atendido pela IA, e só vira "sempre humano" por gesto explícito de
+-- gerente/dono na rota `POST /api/v1/contacts/[id]/always-human`.
+--
+-- POR QUE COLUNA NOVA e não reusar `force_human`:
+--
+--   * `contacts.force_human` é a trava de HANDOFF — ela nasce quando o agente
+--     escala (`performHumanHandoff`) e morre quando um humano devolve o comando
+--     (`devolverAtendimentoAoAgente`, o único escritor de `force_human = false`
+--     do repositório). Misturar os dois faria toda escalação automática virar
+--     permanente, que é o oposto do pedido.
+--   * A issue 2379 mediu exatamente isso: "mesmo a trava do contato é desfeita
+--     na primeira devolução". O que falta não é uma trava mais forte, é uma
+--     marca que a devolução NÃO desfaça.
+--
+-- As duas convivem: armar `ai_opt_out` também liga `force_human` (é o gate que
+-- o worker, o harness e o `before-send` já leem — a IA para NA HORA), e
+-- `ai_opt_out` é o pred que impede qualquer caminho de desligar essa trava.
+-- Cada guard passa a ler as DUAS colunas de propósito: se um escritor futuro
+-- limpar `force_human` por engano, a marca permanente continua barrando a IA sozinha.
+
+alter table public.contacts
+  add column if not exists ai_opt_out boolean default false not null;
+
+comment on column public.contacts.ai_opt_out is
+  'Contato marcado "sempre atendimento humano" (issue 2379): a IA nunca responde este contato e NENHUM caminho de devolução (manual ou automática) desfaz a marca — só um humano a desliga pela rota always-human. Separada de force_human, que é a trava de handoff e continua sendo desfeita pela devolução. Quem marcou/quando fica na auditoria.';
+
+create index if not exists idx_contacts_org_ai_opt_out
+  on public.contacts (organization_id)
+  where (ai_opt_out = true);
+
+notify pgrst, 'reload schema';
 
 -- ---- cor da marca no tema escuro: coluna da instalação (migration 0627) ----
 alter table public.platform_branding
@@ -55328,3 +55431,43 @@ on conflict (model) do update set
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
   notes = excluded.notes,
   superseded_at = null;
+
+-- ---- a tarefa nasce presa à demanda do atendimento (migration 0659, #2818) ----
+-- Hoje a tarefa tem DOIS vínculos opcionais, `lead_id` e `contact_id`, e nenhum
+-- dos dois responde "de qual ATENDIMENTO veio este combinado". No meio da
+-- conversa o atendente combina algo e tem dois caminhos ruins: abrir a aba
+-- Tarefas (que não sabe de qual atendimento ele estava falando — a tarefa nasce
+-- avulsa) ou escrever na nota da conversa (que é texto: sem prazo, responsável
+-- nem situação, não entra na lista de abertas e não lembra ninguém). Em ambos o
+-- combinado morre, porque ele não volta para a tela de quem precisa cumprir.
+--
+-- O vínculo é a DEMANDA, não a conversa direta (a opção A, preferida na
+-- proposta da #2818). A conversa já é atravessada pela demanda (`conversations.current_demanda_id`
+-- e a ponte `demanda_conversas`), e uma FK direta na conversa morreria com ela
+-- (cascade) — perderia o histórico do combinado. A demanda é a unidade de
+-- ATENDIMENTO: sobrevive à conversa pontual, e para o caso de uma conversa sem
+-- demanda o `contact_id` (já suportado) cobre.
+--
+-- `on delete set null` e não `cascade`, pelo mesmo motivo escrito no `lead_id`
+-- (migration 0210): apagar o assunto do atendimento não pode apagar o lembrete
+-- que a pessoa escreveu para si mesma. A tarefa continua na lista, com o vínculo
+-- zerado — nada some da tela de quem ainda tem o que fazer.
+--
+-- Sem RLS nova: a policy de `crm_tasks` isola por `organization_id`. A FK só
+-- garante que a demanda apontada existe; que ela é da organização de quem grava
+-- é conferido nas rotas de criar e editar, em `lib/tarefas/demanda.ts`. Sem
+-- trigger. Idempotente (`add column if not exists`, `create index if not
+-- exists`), re-aplicável pelo `update.sh` de um clone.
+
+alter table public.crm_tasks
+  add column if not exists demanda_id uuid references public.demandas(id) on delete set null;
+
+-- As tarefas de UMA demanda, para a seção "Tarefas desta demanda" do inbox.
+-- Parcial porque a maioria das linhas não tem demanda (a tarefa avulsa é caso
+-- real) — indexar NULL aqui só engorda o índice. Mesmo desenho do
+-- `crm_tasks_lead_idx` (0210).
+create index if not exists crm_tasks_demanda_idx
+  on public.crm_tasks (demanda_id) where demanda_id is not null;
+
+comment on column public.crm_tasks.demanda_id is
+  'A demanda de atendimento que originou o combinado (#2818). set null, não cascade: encerrar ou apagar a demanda não pode apagar o lembrete que a pessoa escreveu para si mesma — a tarefa continua na lista, com o vínculo zerado. NULL = tarefa avulsa ou presa só a negócio/contato.';
