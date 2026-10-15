@@ -71,9 +71,9 @@ update public.ai_models set description = 'Geração anterior do Sonnet.'
 insert into public.ai_pricing
   (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
 values
-  ('claude-haiku-5-5',   10,   50, 'catálogo 0647 — acima de 100k tokens de entrada, 50/250'),
-  ('claude-sonnet-5-5', 200, 1000, 'catálogo 0647'),
-  ('claude-opus-5-5',   400, 2000, 'catálogo 0647')
+  ('claude-haiku-5-5',   10,   50, 'catálogo 0675 — acima de 100k tokens de entrada, 50/250'),
+  ('claude-sonnet-5-5', 200, 1000, 'catálogo 0675'),
+  ('claude-opus-5-5',   400, 2000, 'catálogo 0675')
 on conflict (model) do update set
   prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,

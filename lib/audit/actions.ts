@@ -245,6 +245,9 @@ export const AUDIT_ACTIONS = [
   "channel.social_configured",
   "channel.social_disconnected",
   "channel.social_desvinculado",
+  // Reescreve a URL da assinatura de webhook do canal social pela origem atual
+  // (#2863): não arquiva a linha nem cria canal — só reconcilia o endereço.
+  "channel.social_webhook_ressincronizado",
   "channel.ai_access_updated",
   "channel.acervo_updated",
   "channel.reconnected",
@@ -264,6 +267,9 @@ export const AUDIT_ACTIONS = [
   // trilha dizer nos dois sentidos, como `archived`/`reactivated`.
   "channel.disabled",
   "channel.enabled",
+  // Rótulo interno do canal (channel_sessions.display_name); nada vai ao
+  // provedor. Emitida por app/api/v1/channel-sessions/[id]/name.
+  "channel.renamed",
   // A janela de manutenção (#2388): criar e cancelar são mutações da tela e
   // auditam como toda mutação. A pausa e a retomada que a janela aplica saem
   // como `channel.disabled`/`channel.enabled`, com `origem: schedule`.
@@ -615,6 +621,10 @@ export const AUDIT_ACTIONS = [
   // negativa de um colega não teria explicação na trilha — nem como responder
   // "quando foi que desligaram isso?".
   "agenda.colegas_podem_mexer_alterado",
+  // A opção que faz o Meet da reunião nascer JÁ ABERTO (issue #2063, migration
+  // 0648). Risco é parte do desenho — quem tiver o link entra sem pedir —, então
+  // "quando foi que ligaram isso?" é a primeira pergunta depois de um incidente.
+  "agenda.meet_acesso_aberto_alterado",
   // A rodada que AVISOU alguém do próprio compromisso. Mensagem que saiu para o
   // telefone de um cliente é efeito, e efeito audita — mas só a rodada que
   // enviou: a que varreu e não achou ninguém a avisar não é mutação.

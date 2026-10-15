@@ -7401,6 +7401,7 @@ export type Database = {
           due_at: string
           emergency: boolean
           error_message: string | null
+          export_claimed_at: string | null
           external_customer_id: string | null
           id: string
           organization_id: string
@@ -7422,6 +7423,7 @@ export type Database = {
           due_at: string
           emergency?: boolean
           error_message?: string | null
+          export_claimed_at?: string | null
           external_customer_id?: string | null
           id?: string
           organization_id: string
@@ -7443,6 +7445,7 @@ export type Database = {
           due_at?: string
           emergency?: boolean
           error_message?: string | null
+          export_claimed_at?: string | null
           external_customer_id?: string | null
           id?: string
           organization_id?: string
@@ -10642,6 +10645,16 @@ export type Database = {
         Returns: {
           em_teste: number
           falhas: number
+          tool_name: string
+          total: number
+          ultima_vez: string
+        }[]
+      }
+      fn_agent_tool_usage_por_termo: {
+        Args: { p_agent_id: string; p_organization_id: string; p_since: string }
+        Returns: {
+          falhas: number
+          termo: string
           tool_name: string
           total: number
           ultima_vez: string
