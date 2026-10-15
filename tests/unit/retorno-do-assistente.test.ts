@@ -21,6 +21,10 @@ const RETORNO_DO_ASSISTENTE: readonly string[] = [
   "Combinado, retomamos daqui a duas horas.",
   "Combinado, retomamos daqui a duas horas. Até já!",
   "Vou retomar o contato na segunda.",
+  "Irei retomar o contato amanhã.",
+  "Retomamos amanhã às 10h, combinado?",
+  "Combinado, amanhã retomamos.",
+  "Retomamos a conversa na sexta-feira.",
   "Combinado! Te chamo mais tarde.",
   "Perfeito, volto a falar com você depois.",
   "Vou voltar a falar com você amanhã.",
@@ -57,6 +61,29 @@ const NAO_E_RETORNO_DO_ASSISTENTE: readonly string[] = [
   // 3ª pessoa / gerúndio de assunto (o "retoma" que NÃO é o assistente prometendo voltar)
   "O sistema retoma automaticamente.",
   "Retomando o que conversamos, o prazo é de 3 dias.",
+  // infinitivo SEM sujeito de 1ª pessoa: convite, instrução ou pergunta ao cliente
+  "Quer retomar de onde paramos?",
+  "Para retomar o atendimento, me confirme seu CPF.",
+  "Você pode retomar o pagamento pelo link.",
+  "Quando quiser retomar a conversa, estou aqui.",
+  // retomada AGORA, no próprio turno: a 1ª pessoa não separa promessa de retomada imediata;
+  // o que separa é o QUANDO colado ao verbo (`RETOMADA_COM_QUANDO`, triagem do #2928)
+  "Vamos retomar de onde paramos: qual o seu CEP?",
+  "Vamos retomar? Me conta o que faltou.",
+  "Então retomamos: qual o seu CPF?",
+  "Retomo o que você disse: o pedido é o 123.",
+  // dia e hora como ASSUNTO da retomada, não como o quando dela: num CRM que marca
+  // horário é o caso comum (medido na 2ª triagem do #2928 — a régua "a frase tem um
+  // marcador de tempo" vetava todas estas)
+  "Vamos retomar o agendamento: prefere segunda ou terça?",
+  "Retomo o que você disse: você prefere sexta às 14h, certo?",
+  "Vamos retomar de onde paramos: o horário de amanhã às 10h ainda serve?",
+  "Então retomamos: sua consulta fica para quinta-feira, ok?",
+  "Retomo as 2 opções que te passei: plano mensal ou anual",
+  "Vamos retomar seu pedido: qual a próxima etapa que você quer ver?",
+  "Retomo a segunda via do boleto: o vencimento é dia 10",
+  "Vamos retomar o agendamento da sua consulta de amanhã às 10h?",
+  "Sua consulta é amanhã às 10h, vamos retomar o cadastro?",
   "Nos falamos sobre isso na sua última visita.",
   // alvo humano — quem pega é o léxico de humano (`detectHumanPromise`), não este
   "Vou chamar o responsável para te ajudar.",

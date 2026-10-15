@@ -367,6 +367,8 @@ describe("cerca prometer — retorno do PRÓPRIO assistente pelo léxico (issue 
     "Consigo te oferecer quinta às 14h ou sexta às 10h.",
     "Bom dia! Como posso ajudar?",
     "Qual prazo você julga ideal?",
+    "Quer retomar de onde paramos?",
+    "Vamos retomar o agendamento: prefere segunda ou terça?",
   ])("CONTROLE — fala inocente segue passando: %s", (frase) => {
     expect(casePromiseGate.evaluate(ctx(frase, SEM_AGENDAR)).pass).toBe(true);
   });

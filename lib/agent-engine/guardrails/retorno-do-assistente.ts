@@ -66,11 +66,8 @@ function normalize(body: string): string {
  * que conversamos…") ou de uma 3ª pessoa de sistema ("o sistema retoma automaticamente").
  */
 const PATTERNS: readonly RegExp[] = [
-  // (1) RETOMAR a conversa/contato: retomo, retomamos, retomaremos, retomar. O caso medido
-  //     ("retomamos daqui a duas horas") mora aqui. "retoma"/"retomando" ficam FORA de
-  //     propósito: "o sistema retoma" (3ª pessoa) e "Retomando o que conversamos"
-  //     (gerúndio de assunto) são texto legítimo e casariam por engano.
-  /\bretom(?:o|amos|aremos|ar)\b/,
+  // (1) RETOMAR no FUTURO do indicativo: "retomarei", "retomaremos". A forma já é a promessa.
+  /\bretomar(?:ei|emos)\b/,
   // (2) VOLTAR a falar/conversar/contatar: "volto a falar", "volto a te conversar",
   //     "vou voltar a falar", "voltarei a contatar". O verbo de retomada já é futuro.
   /\b(?:volto|voltarei|vou voltar)\b[^.!?\n]{0,25}\b(?:fal|convers|contat|cham|procur|lig|escrev)\w*/,
@@ -85,6 +82,34 @@ const PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * RETOMAR no presente ou em perífrase ("retomo", "retomamos", "vou/vamos/irei retomar") é
+ * AMBÍGUO: tanto é a promessa ("retomamos daqui a duas horas", o caso medido) quanto a
+ * retomada AGORA, no próprio turno ("Vamos retomar o agendamento: prefere segunda ou
+ * terça?", "Retomo a segunda via do boleto: …"). Num CRM que marca horário, dia e hora
+ * aparecem como ASSUNTO da retomada o tempo todo, então "a frase tem um marcador de tempo"
+ * não separa as duas (medido na triagem do #2928). O que separa é a POSIÇÃO: na promessa,
+ * o QUANDO vem colado ao verbo — logo depois dele (só com o objeto da conversa no meio:
+ * "vou retomar o contato na segunda") ou logo antes ("amanhã retomamos").
+ */
+const RETOMAR_AMBIGUO = /(?:retom(?:o|amos)|(?:vou|vamos|irei|iremos) retomar)/.source;
+const OBJETO_DA_CONVERSA =
+  /(?: (?:o|a|nosso|nossa|o nosso|a nossa) (?:contato|conversa|atendimento|assunto|papo)| de onde (?:paramos|parou|parei))?(?: com (?:voce|vc)| contigo)?/
+    .source;
+// O QUANDO que torna a retomada uma promessa. Dia da semana só com preposição de data ou
+// "-feira" ("a segunda via" não é data); hora só com h, minutos ou "horas" ("as 2 opções"
+// não é hora).
+const QUANDO =
+  /(?:amanha|depois|mais tarde|daqui (?:a|ha|uns|umas|\d)|em breve|logo mais|assim que|semana que vem|mes que vem|(?:na |no )?proxim[ao] (?:semana|mes|hora|dia|segunda|terca|quarta|quinta|sexta|sabado|domingo)|(?:na|no|ate|para|pra) (?:segunda|terca|quarta|quinta|sexta|sabado|domingo)|(?:segunda|terca|quarta|quinta|sexta)-feira|(?:de|pela|a|na|hoje a) (?:manha|tarde|noite)|(?:no )?(?:fim|final) do dia|outra hora|outro dia|as \d{1,2}(?:h|:\d{2}| ?horas?)\b|\d{1,2} ?h\b|\d{1,2}:\d{2}|em \d+ ?(?:min|minutos?|horas?|dias?)\b)/
+    .source;
+const RETOMADA_COM_QUANDO = new RegExp(
+  // Depois do verbo: "retomamos daqui a duas horas", "vou retomar o contato na segunda".
+  // Antes dele, só abrindo a oração ("Combinado, amanhã retomamos"): em "Sua consulta é
+  // amanhã às 10h, vamos retomar?" o quando é da consulta, não da retomada.
+  `\\b${RETOMAR_AMBIGUO}${OBJETO_DA_CONVERSA},? ${QUANDO}` +
+    `|(?:^|[.!?;:,\\n] *)${QUANDO}(?: ${QUANDO})?,? (?:a gente |nos |eu )?${RETOMAR_AMBIGUO}\\b`,
+);
+
+/**
  * True se o corpo é (ou contém) uma promessa do PRÓPRIO assistente de voltar a falar com
  * o cliente — a família medida da issue #2916. Puro, sem LLM, sem I/O. Vazio = false.
  *
@@ -94,5 +119,5 @@ const PATTERNS: readonly RegExp[] = [
 export function detectarPromessaDeRetornoDoAssistente(body: string): boolean {
   if (body.trim() === "") return false;
   const text = normalize(body);
-  return PATTERNS.some((re) => re.test(text));
+  return PATTERNS.some((re) => re.test(text)) || RETOMADA_COM_QUANDO.test(text);
 }
