@@ -17,4 +17,4 @@ voltam a reconhecer essas mensagens.
 
 Você não precisa fazer nada.
 
-Contribuição de @webtecnica (#2960).
+Contribuição de @webtecnica (#2968).
