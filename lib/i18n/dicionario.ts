@@ -1522,6 +1522,36 @@ export const DICIONARIO: Traducoes = {
   Lembrar: { es: "Recordar" },
   Fechar: { es: "Cerrar" },
   "Devolver ao automático": { es: "Devolver al automático" },
+
+  // ─── Inbox: lote por seleção múltipla (#2484, fatia F1) ───
+  "Ações em lote": { es: "Acciones en lote" },
+  "1 conversa selecionada": { es: "1 conversación seleccionada" },
+  "conversas selecionadas": { es: "conversaciones seleccionadas" },
+  "Marcar como lida": { es: "Marcar como leída" },
+  "Mais ações": { es: "Más acciones" },
+  "Pausar IA": { es: "Pausar IA" },
+  "Transferir para…": { es: "Transferir a…" },
+  "Transferir a conversa selecionada": {
+    es: "Transferir la conversación seleccionada",
+  },
+  "Cada conversa é transferida pelo mesmo caminho de sempre, com evento e auditoria próprios.": {
+    es: "Cada conversación se transfiere por el mismo camino de siempre, con evento y auditoría propios.",
+  },
+  "Escolha um atendente": { es: "Elige un agente" },
+  "Escolha para quem transferir.": { es: "Elige a quién transferir." },
+  "Nenhum atendente disponível para transferir.": {
+    es: "Ningún agente disponible para transferir.",
+  },
+  "Selecionar conversa": { es: "Seleccionar conversación" },
+  "Selecionar todas": { es: "Seleccionar todas" },
+  "Selecionar todas as conversas visíveis": {
+    es: "Seleccionar todas las conversaciones visibles",
+  },
+  // O relatório do lote, no toast: contas e recusas por ação.
+  fechadas: { es: "cerradas" },
+  atualizadas: { es: "actualizadas" },
+  recusadas: { es: "rechazadas" },
+  "Recusada.": { es: "Rechazada." },
   Aberta: { es: "Abierta" },
   Fechada: { es: "Cerrada" },
   "Em atendimento": { es: "En atención" },
@@ -13952,6 +13982,11 @@ export const DICIONARIO: Traducoes = {
   "Lendo o catálogo…": { es: "Leyendo el catálogo…" },
   "Não foi possível ler o catálogo.": { es: "No se pudo leer el catálogo." },
   "Este banco não tem tabelas visíveis.": { es: "Esta base no tiene tablas visibles." },
+  "Obrigatório (padrão)": { es: "Obligatorio (predeterminado)" },
+  "Verificar certificado e host": { es: "Verificar certificado y host" },
+  "Verificar certificado": { es: "Verificar certificado" },
+  "Preferir TLS": { es: "Preferir TLS" },
+  "Sem TLS (rede local confiável)": { es: "Sin TLS (red local de confianza)" },
   "Nenhuma tabela liberada ainda. Marque acima, em “O que o assistente pode ver”, as que podem ser lidas.": {
     es: "Ninguna tabla habilitada todavía. Marca arriba, en “Qué puede ver el asistente”, las que se pueden leer.",
   },
