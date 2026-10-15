@@ -94,11 +94,12 @@ test("[P0] o dono gera o link de pagamento pelo card do tenant (Asaas) e a empre
     // ativo e NÃO provisório (o criador de empresa anterior à 0237), só pela exclusão de
     // `platform_admins`; o provisório, que não é dono, só pelo `provisional_until_handover`.
     // Com só o adminB na empresa, a asserção do e-mail passaria sem filtro nenhum.
+    // Toda linha com as MESMAS chaves: no lote, o PostgREST grava null (e não o default) na coluna que falta numa delas.
     const horasAtras = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
     const vincB = await db.from("user_organizations").insert([
       { organization_id: orgB, user_id: dono.id, role: "admin", accepted_at: horasAtras(2), created_at: horasAtras(2), provisional_until_handover: false },
       { organization_id: orgB, user_id: provisorio.id, role: "admin", accepted_at: horasAtras(1), created_at: horasAtras(1), provisional_until_handover: true },
-      { organization_id: orgB, user_id: adminB.id, role: "admin", accepted_at: new Date().toISOString() },
+      { organization_id: orgB, user_id: adminB.id, role: "admin", accepted_at: horasAtras(0), created_at: horasAtras(0), provisional_until_handover: false },
     ]);
     if (vincB.error) throw vincB.error;
     await inserir("cobranca_planos", { nome: PLANO, preco_cents: 4990, intervalo: "mes", trial_dias: 7, updated_by: dono.id });
