@@ -1,15 +1,17 @@
 /**
  * Os planos que o cadastro público enxerga, e a regra de quando ele exige um.
  *
- * É o espelho, no servidor, de `fn_trial_na_criacao_da_org` (migration 0660):
+ * É o espelho, no servidor, de `fn_trial_na_criacao_da_org` (migration 0679):
  * sem plano escolhido, a empresa nasce no plano padrão; sem padrão, o gatilho
  * recusa com `plano_obrigatorio` — EXCETO quando o revendedor não tem plano
  * NENHUM (nem padrão, nem oferecido): aí a empresa nasce isenta, como antes da
- * 0660 (decisão do dono, doc 146, opção B). Os dois lados têm de usar o mesmo
+ * 0679 (decisão do dono, doc 146, opção B). Os dois lados têm de usar o mesmo
  * critério: se a tela deixasse passar o que o gatilho recusa, a conta nasceria
  * no GoTrue sem organização.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { moduloLigado } from "@/lib/instalacao/modulos";
 
 export interface PlanoDoCadastro {
   id: string;
@@ -50,4 +52,29 @@ export async function lerPlanosDoCadastro(admin: SupabaseClient): Promise<Planos
 /** Cadastro SEM plano escolhido é recusado? O mesmo critério do gatilho. */
 export function cadastroExigeEscolhaDePlano(planos: PlanosDoCadastro): boolean {
   return planos.padraoId === null && planos.oferecidos.length > 0;
+}
+
+export interface CadastroNaTela {
+  oferecidos: PlanoDoCadastro[];
+  padraoId: string | null;
+  /** O cadastro sem escolha seria recusado: o Google some e o seletor é obrigatório. */
+  exigeEscolha: boolean;
+}
+
+/**
+ * O que as telas de cadastro (`/signup`, `/get-started`) mostram. Cobrança
+ * desligada, ou leitura que falha: nada — a tela não esconde nem exige coisa
+ * alguma, e quem recusa é a action (e, por baixo dela, o gatilho).
+ */
+export async function lerCadastroNaTela(admin: SupabaseClient): Promise<CadastroNaTela> {
+  const nada: CadastroNaTela = { oferecidos: [], padraoId: null, exigeEscolha: false };
+  if (!(await moduloLigado(admin, "cobranca"))) return nada;
+  const lidos = await lerPlanosDoCadastro(admin);
+  if (!lidos) return nada;
+  return { ...lidos, exigeEscolha: cadastroExigeEscolhaDePlano(lidos) };
+}
+
+/** O plano que o seletor já traz marcado: o padrão, quando ele está entre os oferecidos. */
+export function planoInicialDoSeletor(oferecidos: readonly PlanoDoCadastro[], padraoId: string | null): string | undefined {
+  return oferecidos.find((p) => p.id === padraoId)?.id ?? oferecidos[0]?.id;
 }

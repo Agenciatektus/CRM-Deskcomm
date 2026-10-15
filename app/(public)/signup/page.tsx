@@ -10,8 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { moduloLigado } from "@/lib/instalacao/modulos";
-import { cadastroExigeEscolhaDePlano, lerPlanosDoCadastro, type PlanoDoCadastro } from "@/lib/cobranca/cadastro";
+import { lerCadastroNaTela, planoInicialDoSeletor } from "@/lib/cobranca/cadastro";
 
 export const metadata = { title: "Criar conta" };
 
@@ -64,16 +63,9 @@ export default async function SignupPage({
   // padrão a empresa dele nasce no padrão. Sem plano nenhum, nasce isenta e o
   // Google fica (doc 146, opção B). O critério é o de `lib/cobranca/cadastro.ts`,
   // o mesmo do gatilho. Leitura que falha não esconde nada: quem recusa é a action.
-  let planos: PlanoDoCadastro[] = [];
-  let googleSemPlano = false;
-  if (!convite) {
-    const admin = createAdminClient();
-    if (await moduloLigado(admin, "cobranca")) {
-      const lidos = await lerPlanosDoCadastro(admin);
-      planos = lidos?.oferecidos ?? [];
-      googleSemPlano = lidos !== null && cadastroExigeEscolhaDePlano(lidos);
-    }
-  }
+  const cadastro = convite ? null : await lerCadastroNaTela(createAdminClient());
+  const planos = cadastro?.oferecidos ?? [];
+  const googleSemPlano = cadastro?.exigeEscolha ?? false;
 
   // Convite VÁLIDO passa em qualquer modo — é o ponto inteiro do convite.
   const modo = convite ? null : await modoDeCadastro();
@@ -130,7 +122,7 @@ export default async function SignupPage({
         </p>
       )}
 
-      <SignupForm convite={convite} planos={planos} />
+      <SignupForm convite={convite} planos={planos} planoInicial={planoInicialDoSeletor(planos, cadastro?.padraoId ?? null)} />
       {/* O convite atravessa o Google na URL de retorno: sem ele, quem foi
           convidado e cria a conta com Google ganharia uma empresa própria. */}
       {googleSemPlano ? (

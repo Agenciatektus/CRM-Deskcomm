@@ -6,7 +6,7 @@ import {
 } from "./cobranca-helpers";
 
 /**
- * ENTRADA PAGA E PLANO DO CADASTRO — migration 0660 (#2846), com a exceção do
+ * ENTRADA PAGA E PLANO DO CADASTRO — migration 0679 (#2846), com a exceção do
  * doc 146 (opção B, 15/10).
  *
  * Com a cobrança ligada, `fn_trial_na_criacao_da_org`:
@@ -16,7 +16,7 @@ import {
  *    pendente, até o 1º pagamento confirmado (quem reativa é a régua);
  *  - sem padrão e com plano oferecido: recusa com `plano_obrigatorio`;
  *  - sem plano NENHUM (nem padrão, nem oferecido): a org nasce isenta, como
- *    antes da 0660. O espelho TS do critério é `lib/cobranca/cadastro.ts`.
+ *    antes da 0679. O espelho TS do critério é `lib/cobranca/cadastro.ts`.
  *
  * O banco é limpo por arquivo, então os únicos planos aqui são os deste arquivo.
  */
@@ -70,7 +70,7 @@ beforeAll(() => {
   chaveDeCobranca("ligado");
 });
 
-describe("0660 — entrada paga na criação da organização", () => {
+describe("0679 — entrada paga na criação da organização", () => {
   it("⭐ plano de 0 dias (padrão): nasce em trial vencido, SUSPENSA por cobrança e com a entrada pendente", () => {
     comPlanos({ padrao: SEM_TESTE, oferecidos: [SEM_TESTE] }, () => criarOrg(org(1), "cob-entrada-1", CLIENTE));
     expect(assinatura(org(1))).toBe(`trial|${SEM_TESTE}|0`);
@@ -98,11 +98,21 @@ describe("0660 — entrada paga na criação da organização", () => {
     expect(valor(`select (settings ? 'cobranca_signup_plan_id')::text from public.organizations where id = '${org(4)}';`)).toBe("false");
   });
 
-  it("plano escolhido que não é oferecido é recusado, e nenhuma org nasce", () => {
-    comPlanos({ padrao: PADRAO, oferecidos: [PADRAO] }, () => {
-      expect(erroDe(orgComEscolha(org(5), OFERECIDO))).toContain("plano_invalido");
+  // A escolha que deixou de valer (plano tirado do cadastro entre o cadastro e a
+  // confirmação do e-mail, ou metadata adulterada) vale como "sem escolha". Antes
+  // ela recusava, e a recuperação reenviava a mesma escolha: empresa travada.
+  it("⭐ plano escolhido que não é (mais) oferecido: vale como sem escolha e a org nasce no PADRÃO, sem o campo", () => {
+    comPlanos({ padrao: PADRAO, oferecidos: [PADRAO] }, () => sql(`${orgComEscolha(org(5), OFERECIDO)};`));
+    expect(assinatura(org(5))).toBe(`trial|${PADRAO}|7`);
+    expect(valor(`select (settings ? 'cobranca_signup_plan_id')::text from public.organizations where id = '${org(5)}';`)).toBe("false");
+  });
+
+  it("plano escolhido inválido e sem padrão (com oferecido): a mesma recusa de quem não escolheu — plano_obrigatorio", () => {
+    comPlanos({ padrao: null, oferecidos: [OFERECIDO] }, () => {
+      expect(erroDe(orgComEscolha(org(10), SEM_TESTE))).toContain("plano_obrigatorio");
+      expect(erroDe(orgComEscolha(org(11), "nao-e-uuid"))).toContain("plano_obrigatorio");
     });
-    expect(existe(org(5))).toBe(0);
+    expect(existe(org(10)) + existe(org(11))).toBe(0);
   });
 });
 

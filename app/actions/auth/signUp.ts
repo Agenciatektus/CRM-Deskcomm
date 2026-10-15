@@ -142,9 +142,11 @@ export async function signUp(
   if (!convite) {
     const admin = createAdminClient();
     if (await moduloLigado(admin, "cobranca")) {
-      // Recusa ANTES de criar a conta no GoTrue o que o gatilho da 0660 recusaria
-      // depois — senão o usuário ficaria órfão, sem organização. Leitura que
-      // falha recusa: é ação, não informação.
+      // Recusa ANTES de criar a conta no GoTrue o que o gatilho da 0679 recusaria
+      // depois — senão o usuário ficaria órfão, sem organização. Leitura dos
+      // PLANOS que falha recusa: é ação, não informação. A da CHAVE do módulo, não:
+      // `moduloLigado` trata a falha como "desligado", e aí a conta nasce e quem
+      // decide é o gatilho; se ele recusar, a saída é /get-started, que pede o plano.
       const planos = await lerPlanosDoCadastro(admin);
       if (planoEscolhido) {
         if (!planos?.oferecidos.some((p) => p.id === planoEscolhido)) {

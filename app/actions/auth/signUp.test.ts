@@ -130,16 +130,26 @@ describe("signUp — o plano do cadastro com a cobrança ligada", () => {
   const OFERECIDO = "11111111-1111-4111-8111-111111111111";
   const PADRAO = "22222222-2222-4222-8222-222222222222";
 
-  function planos(p: { oferecidos: string[]; padrao: string | null; erro?: boolean }) {
+  // Os filtros da leitura são APLICADOS sobre linhas de verdade: um mock que os
+  // ignorasse deixaria verde a remoção de `.is("arquivado_em", null)` ou de um `.eq`.
+  type LinhaDePlano = { id: string; oferecido_ao_cliente: boolean; padrao_no_cadastro: boolean; arquivado_em: string | null };
+  function planos(p: { oferecidos: string[]; padrao: string | null; arquivados?: string[]; erro?: boolean }) {
+    const linhas: LinhaDePlano[] = [
+      ...p.oferecidos.map((id) => ({ id, oferecido_ao_cliente: true, padrao_no_cadastro: id === p.padrao, arquivado_em: null })),
+      ...(p.padrao && !p.oferecidos.includes(p.padrao)
+        ? [{ id: p.padrao, oferecido_ao_cliente: false, padrao_no_cadastro: true, arquivado_em: null }] : []),
+      ...(p.arquivados ?? []).map((id) => ({ id, oferecido_ao_cliente: true, padrao_no_cadastro: true, arquivado_em: "2026-10-01T00:00:00Z" })),
+    ];
     admin.from.mockImplementation(() => {
+      let filtradas = linhas;
       const q = {
         select: vi.fn(() => q),
-        is: vi.fn(() => q),
-        eq: vi.fn(() => q),
+        is: vi.fn((col: keyof LinhaDePlano, v: unknown) => { filtradas = filtradas.filter((l) => l[col] === v); return q; }),
+        eq: vi.fn((col: keyof LinhaDePlano, v: unknown) => { filtradas = filtradas.filter((l) => l[col] === v); return q; }),
         order: vi.fn(async () => (p.erro ? { data: null, error: { code: "57014" } } : {
-          data: p.oferecidos.map((id) => ({ id, nome: "Plano", preco_cents: 4990, intervalo: "mes", trial_dias: 0 })), error: null,
+          data: filtradas.map(({ id }) => ({ id, nome: "Plano", preco_cents: 4990, intervalo: "mes", trial_dias: 0 })), error: null,
         })),
-        maybeSingle: vi.fn(async () => ({ data: p.padrao === null ? null : { id: p.padrao }, error: null })),
+        maybeSingle: vi.fn(async () => ({ data: filtradas[0] ? { id: filtradas[0].id } : null, error: null })),
       };
       return q;
     });
@@ -193,6 +203,13 @@ describe("signUp — o plano do cadastro com a cobrança ligada", () => {
     planos({ oferecidos: [OFERECIDO], padrao: PADRAO });
     expect(await cadastrar(PADRAO)).toEqual(recusa("plano_indisponivel"));
     expect(signUpDoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("plano oferecido (e padrão) só ARQUIVADO não conta: segue sem plano nenhum e o cadastro passa", async () => {
+    const ARQUIVADO = "33333333-3333-4333-8333-333333333333";
+    planos({ oferecidos: [], padrao: null, arquivados: [ARQUIVADO] });
+    expect(await cadastrar()).toEqual({ ok: true, sessao_ativa: false });
+    expect(await cadastrar(ARQUIVADO)).toEqual(recusa("plano_indisponivel"));
   });
 
   it("leitura dos planos falhou: recusa (é ação), em vez de criar conta que o gatilho barraria", async () => {

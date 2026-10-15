@@ -32,7 +32,16 @@ export interface ConviteDoSignup {
   email: string;
 }
 
-export function SignupForm({ convite, planos = [] }: { convite?: ConviteDoSignup; planos?: readonly PlanoDoCadastro[] }) {
+export function SignupForm({
+  convite,
+  planos = [],
+  planoInicial,
+}: {
+  convite?: ConviteDoSignup;
+  planos?: readonly PlanoDoCadastro[];
+  /** O plano padrão quando ele é oferecido — "sem mexer, vale o padrão" —, senão o primeiro. */
+  planoInicial?: string;
+}) {
   const t = useT();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -61,7 +70,7 @@ export function SignupForm({ convite, planos = [] }: { convite?: ConviteDoSignup
     defaultValues: {
       full_name: "",
       org_name: "",
-      cobranca_plan_id: planos[0]?.id,
+      cobranca_plan_id: planoInicial,
       email: convite?.email ?? "",
       password: "",
       password_confirm: "",
@@ -112,7 +121,17 @@ export function SignupForm({ convite, planos = [] }: { convite?: ConviteDoSignup
       if (res.error === "rate_limited") {
         setServerError(t("Muitas tentativas. Aguarde alguns minutos."));
       } else if (res.error === "validation_error") {
-        setServerError(t("Dados inválidos. Confira os campos."));
+        // As recusas do plano dizem o que fazer: "confira os campos" não diz.
+        const recusaDoPlano = (res.details?.cobranca_plan_id as string[] | undefined)?.[0];
+        setServerError(
+          t(
+            recusaDoPlano === "plano_indisponivel"
+              ? "Esse plano não está mais disponível. Recarregue a página e escolha outro."
+              : recusaDoPlano === "plano_obrigatorio"
+                ? "Não foi possível carregar os planos agora. Recarregue a página e escolha um plano."
+                : "Dados inválidos. Confira os campos.",
+          ),
+        );
       } else if (res.error === "conta_ja_existe" && convite) {
         // Ramo próprio porque o `else` mandava "Tente novamente" — e tentar de
         // novo nunca funciona quando a conta já existe. Em vez da mensagem,

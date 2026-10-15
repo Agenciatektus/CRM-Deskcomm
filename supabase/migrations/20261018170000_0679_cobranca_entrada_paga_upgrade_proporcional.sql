@@ -50,25 +50,35 @@ begin
     return null;
   end if;
 
+  -- O campo é transitório: sai já, em todo caminho que segue (inclusive o isento).
+  update public.organizations
+     set settings = coalesce(settings, '{}'::jsonb) - 'cobranca_signup_plan_id'
+   where id = new.id and settings ? 'cobranca_signup_plan_id';
+
+  -- Escolha que não vale mais (o plano deixou de ser oferecido ou foi arquivado
+  -- entre o cadastro e a confirmação do e-mail; ou metadata adulterada) vale
+  -- como "sem escolha": cai no padrão. Recusar travava a empresa para sempre —
+  -- a recuperação em /get-started reenvia a MESMA metadata.
   if v_escolheu_plano then
     begin
       v_plano_id := (new.settings->>'cobranca_signup_plan_id')::uuid;
     exception when invalid_text_representation then
-      raise exception 'plano_invalido' using errcode = '22023';
+      v_plano_id := null;
     end;
     select p.trial_dias into v_trial_dias
       from public.cobranca_planos p
      where p.id = v_plano_id and p.arquivado_em is null and p.oferecido_ao_cliente;
     if not found then
-      raise exception 'plano_invalido' using errcode = '22023';
+      v_escolheu_plano := false;
     end if;
-  else
+  end if;
+  if not v_escolheu_plano then
     select p.id, p.trial_dias into v_plano_id, v_trial_dias
       from public.cobranca_planos p
      where p.padrao_no_cadastro and p.arquivado_em is null;
     if v_plano_id is null then
       -- Decisão do dono (doc 146, opção B, 15/10): o revendedor que não tem
-      -- plano NENHUM (nem padrão, nem oferecido) segue como antes da 0660 e a
+      -- plano NENHUM (nem padrão, nem oferecido) segue como antes da 0679 e a
       -- empresa nasce isenta. Com plano oferecido e sem padrão, não: o cadastro
       -- sem escolha pularia a entrada paga. Espelho em lib/cobranca/cadastro.ts.
       if not exists (select 1 from public.cobranca_planos p
@@ -78,10 +88,6 @@ begin
       raise exception 'plano_obrigatorio' using errcode = '22023';
     end if;
   end if;
-
-  update public.organizations
-     set settings = coalesce(settings, '{}'::jsonb) - 'cobranca_signup_plan_id'
-   where id = new.id and settings ? 'cobranca_signup_plan_id';
 
   insert into public.cobranca_assinaturas
     (organization_id, plano_id, estado, trial_ate, pagamento_inicial_pendente)
