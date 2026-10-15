@@ -57,14 +57,36 @@ function negocio(id: string, pipeline: string, extra: Record<string, unknown> = 
   };
 }
 
+type Contato = { is_blocked: boolean; is_anonymized: boolean } | null;
+
 /**
- * Supabase fake com as três leituras do módulo: os negócios ABERTOS do contato
- * (`.eq` ×3), o histórico nos funis de produto (a única que usa `.in`) e a
- * escrita do aviso na Central.
+ * Supabase fake com as leituras do módulo: os negócios ABERTOS do contato
+ * (`status = open`), o histórico nos funis de produto (a única que usa `.in`),
+ * o histórico no funil de destino (`pipeline_id = destino`), as marcas do
+ * contato e a escrita do aviso na Central.
  */
-function admin({ abertos = [], historico = [] }: { abertos?: unknown[]; historico?: unknown[] }) {
+function admin({
+  abertos = [],
+  historico = [],
+  contato = { is_blocked: false, is_anonymized: false },
+}: {
+  abertos?: unknown[];
+  historico?: Array<{ pipeline_id: string }>;
+  contato?: Contato;
+}) {
   const avisos: Record<string, unknown>[] = [];
+  const filtrosDoContato: Array<[string, unknown]> = [];
   const from = (tabela: string) => {
+    if (tabela === "contacts") {
+      const cadeia: Record<string, unknown> = {};
+      cadeia.select = () => cadeia;
+      cadeia.eq = (coluna: string, valor: unknown) => {
+        filtrosDoContato.push([coluna, valor]);
+        return cadeia;
+      };
+      cadeia.maybeSingle = async () => ({ data: contato, error: null });
+      return cadeia;
+    }
     if (tabela === "organizations") {
       return {
         select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { locale: null }, error: null }) }) }),
@@ -81,18 +103,27 @@ function admin({ abertos = [], historico = [] }: { abertos?: unknown[]; historic
       return cadeia;
     }
     let usouIn = false;
+    const filtros: Record<string, unknown> = {};
     const cadeia: Record<string, unknown> = {};
     cadeia.select = () => cadeia;
-    cadeia.eq = () => cadeia;
+    cadeia.eq = (coluna: string, valor: unknown) => {
+      filtros[coluna] = valor;
+      return cadeia;
+    };
+    cadeia.limit = () => cadeia;
     cadeia.in = () => {
       usouIn = true;
       return cadeia;
     };
-    cadeia.then = (resolve: (v: unknown) => unknown) =>
-      resolve({ data: usouIn ? historico : abertos, error: null });
+    cadeia.then = (resolve: (v: unknown) => unknown) => {
+      if (filtros.status === "open") return resolve({ data: abertos, error: null });
+      if (usouIn) return resolve({ data: historico, error: null });
+      const noFunil = historico.filter((linha) => linha.pipeline_id === filtros.pipeline_id);
+      return resolve({ data: noFunil, error: null });
+    };
     return cadeia;
   };
-  return { cliente: { from } as never, avisos };
+  return { cliente: { from } as never, avisos, filtrosDoContato };
 }
 
 function deps(cliente: never, destino: string, extra: Record<string, unknown> = {}) {
@@ -332,5 +363,81 @@ describe("funisDeProdutoDoRoteador", () => {
     const { cliente } = leitura({ data: null, error: { message: "falhou" } });
 
     expect(await funisDeProdutoDoRoteador(cliente, "org-1", "router-1")).toEqual([]);
+  });
+});
+
+describe("as duas guardas do card adicional (#2799, decisão de 14/10)", () => {
+  it("card aberto em Consórcio e Investimentos JÁ GANHO → falar de Investimentos não abre outro card de venda", async () => {
+    const { cliente } = admin({
+      abertos: [negocio("lead-con", CONSORCIO)],
+      historico: [negocio("lead-inv-ganho", INVESTIMENTOS, { status: "won" })],
+    });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, INVESTIMENTOS));
+
+    expect(r.status).toBe("ja_passou_pelo_destino");
+    expect(r.origemId).toBe("lead-inv-ganho");
+    expect(abrirAdicional).not.toHaveBeenCalled();
+    expect(transferir).not.toHaveBeenCalled();
+  });
+
+  it("card aberto em Consórcio e Investimentos PERDIDO → também não abre (a regra do ramo sem card aberto)", async () => {
+    const { cliente } = admin({
+      abertos: [negocio("lead-con", CONSORCIO)],
+      historico: [negocio("lead-inv-perdido", INVESTIMENTOS, { status: "lost" })],
+    });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, INVESTIMENTOS));
+
+    expect(r.status).toBe("ja_passou_pelo_destino");
+    expect(abrirAdicional).not.toHaveBeenCalled();
+  });
+
+  it("contato BLOQUEADO que já comprou outro produto → não ganha card novo", async () => {
+    const { cliente, filtrosDoContato } = admin({
+      abertos: [],
+      historico: [negocio("lead-inv-ganho", INVESTIMENTOS, { status: "won" })],
+      contato: { is_blocked: true, is_anonymized: false },
+    });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, CONSORCIO));
+
+    expect(r.status).toBe("contato_bloqueado");
+    expect(abrirAdicional).not.toHaveBeenCalled();
+    // A marca é lida na organização do turno, não só pelo id do contato.
+    expect(filtrosDoContato).toContainEqual(["organization_id", "org-1"]);
+    expect(filtrosDoContato).toContainEqual(["id", "c1"]);
+  });
+
+  it("contato ANONIMIZADO com card aberto em outro produto → não ganha card novo", async () => {
+    const { cliente } = admin({
+      abertos: [negocio("lead-con", CONSORCIO)],
+      contato: { is_blocked: false, is_anonymized: true },
+    });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, INVESTIMENTOS));
+
+    expect(r.status).toBe("contato_bloqueado");
+    expect(abrirAdicional).not.toHaveBeenCalled();
+  });
+
+  it("contato que não aparece na organização → não abre (falha fechada)", async () => {
+    const { cliente } = admin({ abertos: [negocio("lead-con", CONSORCIO)], contato: null });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, INVESTIMENTOS));
+
+    expect(r.status).toBe("contato_bloqueado");
+    expect(abrirAdicional).not.toHaveBeenCalled();
+  });
+
+  it("a guarda de contato não toca a transferência do funil de entrada (comportamento de antes)", async () => {
+    const { cliente } = admin({
+      abertos: [negocio("lead-r", RECEPCAO)],
+      contato: { is_blocked: true, is_anonymized: false },
+    });
+
+    const r = await aplicaDestinoDaIntencao(deps(cliente, INVESTIMENTOS));
+
+    expect(r.status).toBe("transferido");
   });
 });

@@ -82,7 +82,8 @@ describe("abreCardAdicionalNoFunil", () => {
       source_metadata: { aberto_ao_lado_de: { lead_id: "lead-con", pipeline_id: "pipe-origem" } },
     });
     // O que pertence ao OUTRO produto não atravessa: etiquetas, campos, valor, dono.
-    for (const campo of ["tags", "custom_fields", "value_cents", "owner_user_id", "owner_agent_id", "description"]) {
+    expect(payload.tags).toEqual([]);
+    for (const campo of ["custom_fields", "value_cents", "owner_user_id", "owner_agent_id", "description"]) {
       expect(payload).not.toHaveProperty(campo);
     }
     // O rastro do canal de origem também não é copiado para o card do outro produto.

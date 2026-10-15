@@ -32,6 +32,18 @@ export type StatusDoDestino =
    * card no destino e o do outro produto fica como está (nada é encerrado).
    */
   | "card_adicional"
+  /**
+   * Todos os cards abertos são de outros produtos, mas o contato JÁ PASSOU pelo
+   * destino (ganhou ou perdeu lá): não nasce outro card de venda do mesmo
+   * produto a cada mensagem — a regra do ramo sem card aberto (#2799).
+   */
+  | "ja_passou_pelo_destino"
+  /**
+   * Contato bloqueado (pediu para parar) ou anonimizado: não ganha card novo.
+   * O pedido de parar encerra só os negócios ABERTOS; o ganho que fica é
+   * justamente o que o ramo de "cliente que já comprou" lê (#2799).
+   */
+  | "contato_bloqueado"
   /** A transferência recusou (`stage_pipeline_mismatch`, etapa, etc.). */
   | "recusado";
 
@@ -142,6 +154,18 @@ export async function aplicaDestinoDaIntencao(
   // outro produto segue vivo e o destino ganha o seu.
   const emEntrada = abertos.filter((linha) => !funisDeProduto.includes(linha.pipeline_id));
   if (emEntrada.length === 0) {
+    // Nenhum card aberto no destino (filtrado acima); qualquer linha lá é um
+    // negócio já fechado — quem já passou pelo destino não ganha outro.
+    const { data: noDestinoFechado, error: destinoErr } = await deps.admin
+      .from("crm_leads")
+      .select("id")
+      .eq("organization_id", deps.organizationId)
+      .eq("contact_id", deps.contactId)
+      .eq("pipeline_id", deps.destinoPipelineId)
+      .limit(1);
+    if (destinoErr) return { status: "recusado", error: destinoErr.message };
+    const fechado = ((noDestinoFechado ?? []) as Array<{ id: string }>)[0];
+    if (fechado !== undefined) return { status: "ja_passou_pelo_destino", origemId: fechado.id };
     return abreAdicional(deps, maisRecente(abertos));
   }
 
@@ -238,6 +262,21 @@ async function abreAdicional(
   deps: DestinoDaIntencaoDeps,
   base: OrigemDaTransferencia,
 ): Promise<ResultadoDoDestino> {
+  // Os dois ramos que ABREM card são novos (#2799): antes deles, contato sem
+  // negócio aberto não ganhava nada. Bloqueado ou anonimizado continua assim.
+  // Leitura que falha ou contato que não aparece: não abre (falha fechada).
+  const { data: contato, error: contatoErr } = await deps.admin
+    .from("contacts")
+    .select("is_blocked, is_anonymized")
+    .eq("organization_id", deps.organizationId)
+    .eq("id", deps.contactId)
+    .maybeSingle();
+  if (contatoErr) return { status: "recusado", error: contatoErr.message, origemId: base.id };
+  const flags = contato as { is_blocked: boolean; is_anonymized: boolean } | null;
+  if (flags === null || flags.is_blocked || flags.is_anonymized) {
+    return { status: "contato_bloqueado", origemId: base.id };
+  }
+
   const aberto = await abreCardAdicionalNoFunil(
     deps.admin,
     deps.organizationId,

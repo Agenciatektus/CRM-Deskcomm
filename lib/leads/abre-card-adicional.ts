@@ -51,13 +51,12 @@ export async function abreCardAdicionalNoFunil(
     title: origem.title,
     contact_id: origem.contact_id ?? null,
     source: origem.source ?? "manual",
+    // Vazio de propósito: as etiquetas da origem descrevem o OUTRO produto.
+    tags: [],
     source_metadata: {
       aberto_ao_lado_de: { lead_id: origem.id, pipeline_id: origem.pipeline_id },
     },
-    // `tags` fica de fora de propósito (o card é de OUTRO produto); o handler
-    // defaulta para `[]`. O cast passa por `unknown` porque o tipo do input
-    // exige `tags` — e presente aqui seria mentira sobre o produto de origem.
-  } as unknown as Parameters<typeof createLeadHandler>[2]);
+  });
 
   return { ok: true, card: card as unknown as Record<string, unknown> };
 }
