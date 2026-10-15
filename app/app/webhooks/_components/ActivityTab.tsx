@@ -102,6 +102,16 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   no_target: "O evento que disparou a regra não trouxe um lead nem um contato para etiquetar.",
   no_lead_or_contact: "O evento que disparou a regra não trouxe um lead para criar ou mover.",
   cross_pipeline_move_not_allowed: "Mover um lead para outro funil está desligado nesta organização.",
+  /*
+   * #2769 — o caso específico do ganho, com frase própria: a porta está aberta
+   * (a ação é permitida em `lead.won`), então "mover para outro funil está
+   * desligado" seria mentira. O diagnóstico é outro e o conserto é uma linha:
+   * apontar a ação para o funil de pós-venda. Emitido por
+   * lib/automation/actions/create-or-move-lead.ts como `error`, o mesmo canal
+   * de `cross_pipeline_move_not_allowed` (canal cobrado pela guarda da #1090).
+   */
+  continuacao_exige_outro_funil:
+    "A continuação de um negócio ganho só nasce em OUTRO funil. Aponte esta ação para o funil de pós-venda — nada foi movido.",
   lead_already_transferred_in_event:
     "Outra regra deste mesmo evento já levou o lead para outro funil. Vale a primeira regra; esta não transfere de novo.",
   flow_not_active:
