@@ -141,7 +141,7 @@ export async function GET(): Promise<Response> {
   const temAssinatura = (credsRes.data ?? []).some(
     (credential) => credential.provider === PROVEDOR_POR_ASSINATURA,
   );
-  // A listagem da assinatura só ALIMENTA esta tela: se o backend do Codex
+  // A listagem da assinatura só ALIMENTA esta tela: se a API do catálogo SIWC
   // falhar, a tela de Credenciais continua abrindo (com a lista vazia e o
   // motivo no log) — o editor do agente é quem recebe o erro de cara (#2602).
   const modelosDaAssinatura = temAssinatura
