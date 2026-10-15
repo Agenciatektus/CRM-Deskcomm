@@ -98,16 +98,23 @@ export async function funisDeProdutoDoRoteador(
  * Leva o card do contato para o funil que a intenção do roteador declarou (#2155).
  *
  * O roteador escolhia o AGENTE e o card ficava no funil de entrada: o agente do
- * produto não escrevia nele. Aqui o destino é aplicado com a MESMA transferência
- * das regras de automação (`transfereParaOFunil`: clona no destino e encerra a
- * origem como transferência) — duas implementações de "trocar de funil"
- * divergiriam na primeira mudança de uma delas.
+ * produto não escrevia nele. Quando o card está num funil de ENTRADA, o destino é
+ * aplicado com a MESMA transferência das regras de automação
+ * (`transfereParaOFunil`: clona no destino e encerra a origem como
+ * transferência) — duas implementações de "trocar de funil" divergiriam na
+ * primeira mudança de uma delas.
  *
- * Quatro recusas são silenciosas e propositalmente não são erro: card já no
+ * Quando o contato só tem card em funis de PRODUTO (ou nenhum aberto, mas um
+ * ganho em outro produto), nada é transferido: o destino ganha um card a mais
+ * (`card_adicional`, #2799) e o do outro produto segue vivo.
+ *
+ * Seis recusas são silenciosas e propositalmente não são erro: card já no
  * destino (idempotente em toda mensagem seguinte), destino já com negócio aberto
- * (não duplica o card do cliente), sem negócio aberto e alvo ambíguo — a única
- * coisa visível ao cliente final que este caminho pode causar é mover o card
- * errado.
+ * (não duplica o card do cliente), sem negócio aberto, alvo ambíguo, contato que
+ * já passou pelo destino (`ja_passou_pelo_destino`: ganho ou perdido lá não
+ * ganha outro) e contato bloqueado ou anonimizado (`contato_bloqueado`: não
+ * ganha card novo) — o que este caminho pode causar de visível ao cliente final
+ * é mover ou abrir o card errado.
  *
  * A QUINTA — `recusado`, quando a transferência é barrada (a régua de campos
  * obrigatórios do destino, entre outras) — NÃO é silenciosa desde o #2297: ela

@@ -34,7 +34,7 @@ Causa: `ai_router_members` guarda agente, intenção, descrição, exemplos, pos
 
 ## 2. Decisões de produto
 
-O segundo card entre funis de produto foi pedido pelo autor da issue #2480 e decidido pelo mantenedor em 14/10/2026 (opção A: entra, com duas guardas — contato bloqueado ou anonimizado não ganha card novo, e quem já passou pelo funil de destino não ganha outro card lá, tenha ou não card aberto em outro produto).
+O segundo card entre funis de produto foi pedido pelo autor da issue #2480 e aprovado pelo mantenedor em 14/10/2026 (opção A: entra, com duas guardas — contato bloqueado ou anonimizado não ganha card novo, e quem já passou pelo funil de destino não ganha outro card lá, tenha ou não card aberto em outro produto).
 
 - **Um contato pode ter dois cards abertos, um por funil de produto.** Quem começa em
   Investimentos e depois pergunta de Consórcio (ou o contrário) ganha um segundo card; o primeiro
