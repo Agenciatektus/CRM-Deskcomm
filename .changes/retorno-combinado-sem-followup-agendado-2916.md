@@ -12,4 +12,4 @@ Agora o gate lê também um detector léxico determinístico, sem chamada de mod
 
 Nenhuma configuração nova, nenhum passo manual.
 
-Contribuição de @webtecnica (#<PR>), a partir da issue #2916.
+Contribuição de @webtecnica (#2928), a partir da issue #2916.
