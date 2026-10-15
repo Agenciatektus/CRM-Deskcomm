@@ -44,6 +44,11 @@
 -- reaplica o apêndice do baseline inteiro sem erro.
 -- ============================================================================
 
+-- Alvo da FK composta da versão (o de channel_sessions já existe:
+-- channel_sessions_org_id_unique).
+create unique index if not exists uq_ai_agent_versions_org_id
+  on public.ai_agent_versions (organization_id, id);
+
 create table if not exists public.ai_agent_version_channels (
   id uuid primary key default gen_random_uuid(),
 
@@ -51,17 +56,23 @@ create table if not exists public.ai_agent_version_channels (
   -- para a policy de RLS isolar por organização sem precisar subir por join.
   organization_id uuid not null references public.organizations(id) on delete cascade,
 
-  -- Apagar a versão apaga o vínculo: o vínculo não tem vida própria fora dela.
-  agent_version_id uuid not null references public.ai_agent_versions(id) on delete cascade,
-
-  -- `on delete restrict` ESPELHA `ai_agent_versions_channel_session_id_fkey`:
-  -- o que acontece ao desconectar um número vinculado ainda NÃO foi decidido
-  -- pela issue, então esta fatia preserva o comportamento de hoje em vez de
-  -- inventar um (`restrict` barra apagar a sessão; `cascade` apagaria o vínculo
-  -- em silêncio; `set null` não cabe numa coluna NOT NULL).
-  channel_session_id uuid not null references public.channel_sessions(id) on delete restrict,
+  agent_version_id uuid not null,
+  channel_session_id uuid not null,
 
   created_at timestamptz not null default now(),
+
+  -- FK COMPOSTA pela doutrina multi-tenant (mesmo molde de
+  -- campaign_channel_sessions, 0377): a linha não pode apontar para a versão nem
+  -- para o número de OUTRA organização. A checagem de FK não passa pela RLS, então
+  -- só a FK por (organization_id, id) amarra os três à mesma organização.
+  -- Apagar a versão apaga o vínculo; apagar o número segue barrado (restrict),
+  -- espelhando ai_agent_versions_channel_session_id_fkey.
+  constraint ai_agent_version_channels_versao_da_org_fk
+    foreign key (organization_id, agent_version_id)
+    references public.ai_agent_versions (organization_id, id) on delete cascade,
+  constraint ai_agent_version_channels_numero_da_org_fk
+    foreign key (organization_id, channel_session_id)
+    references public.channel_sessions (organization_id, id) on delete restrict,
 
   -- Único por (versão, número): a mesma versão não declara o mesmo número duas vezes.
   constraint ai_agent_version_channels_unico unique (agent_version_id, channel_session_id)

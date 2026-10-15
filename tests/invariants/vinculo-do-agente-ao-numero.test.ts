@@ -326,4 +326,22 @@ describe("ai_agent_version_channels — cercas da fatia 1", () => {
     );
     expect(passou).toBe(false);
   });
+
+  // FK composta (organization_id, id): a checagem de FK não passa pela RLS, então
+  // só ela amarra a versão e o número à MESMA organização da linha. O admin de A
+  // passa na policy (organization_id = A); o que barra é o banco.
+  it.each([
+    ["o número", VERSION_A, SESS_B],
+    ["a versão", VERSION_B, SESS_A],
+  ])("a linha de A não aponta para %s de OUTRA organização (FK composta)", (_o, versao, numero) => {
+    expect(() =>
+      sql(`
+        set role authenticated;
+        select set_config('request.jwt.claims', '{"sub":"${USER_A}"}', false);
+        insert into public.ai_agent_version_channels
+          (organization_id, agent_version_id, channel_session_id)
+          values ('${ORG_A}', '${versao}', '${numero}');
+      `),
+    ).toThrow(/violates foreign key constraint "ai_agent_version_channels_(versao|numero)_da_org_fk"/);
+  });
 });
