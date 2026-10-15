@@ -18,15 +18,26 @@ import { logger } from "@/lib/logger";
 
 const base = () => (env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
-async function emailsDe(admin: SupabaseClient, ids: readonly string[]): Promise<string[]> {
+/**
+ * `estrito`: o auth-js devolve falha de rede/5xx como `{ user: null, error }` sem
+ * lançar. No melhor esforço (avisos) isso tira só aquele destinatário; em quem
+ * DECIDE um dado (o e-mail gravado no provedor) tem de lançar, senão a falha
+ * vira "esse admin não existe" e o próximo da fila ocupa o lugar dele.
+ */
+async function emailsDe(admin: SupabaseClient, ids: readonly string[], estrito = false): Promise<string[]> {
   const lidos = await Promise.all(
-    ids.map(async (id) => (await admin.auth.admin.getUserById(id)).data.user?.email ?? null),
+    ids.map(async (id) => {
+      const { data, error } = await admin.auth.admin.getUserById(id);
+      if (error && estrito) throw new Error(`e-mail de admin ilegível (${error.code ?? error.status ?? "sem_codigo"})`);
+      return data.user?.email ?? null;
+    }),
   );
   return [...new Set(lidos.filter((e): e is string => typeof e === "string" && e.includes("@")))];
 }
 
 /**
- * Admins ativos da empresa, o mais antigo primeiro. LANÇA se a leitura falhar.
+ * Admins ativos da empresa, o mais antigo primeiro. LANÇA se a leitura dos
+ * vínculos falhar; a de cada e-mail só lança com `estrito`.
  * `semProvisorio` tira o vínculo que o dono ganha ao criar a empresa para outra
  * pessoa (`provisional_until_handover`, até o convite ser aceito): sem isso, o
  * "admin mais antigo" de uma empresa recém-criada é o próprio dono. `exceto`
@@ -35,7 +46,11 @@ async function emailsDe(admin: SupabaseClient, ids: readonly string[]): Promise<
 export async function emailsDosAdmins(
   admin: SupabaseClient,
   orgId: string,
-  { semProvisorio = false, exceto = [] }: { semProvisorio?: boolean; exceto?: readonly string[] } = {},
+  {
+    semProvisorio = false,
+    exceto = [],
+    estrito = false,
+  }: { semProvisorio?: boolean; exceto?: readonly string[]; estrito?: boolean } = {},
 ): Promise<string[]> {
   let consulta = admin
     .from("user_organizations")
@@ -47,7 +62,7 @@ export async function emailsDosAdmins(
   const { data, error } = await consulta.order("created_at");
   if (error) throw new Error(`admins ilegíveis (${error.code ?? "sem_codigo"})`);
   const ids = ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id);
-  return emailsDe(admin, ids.filter((id) => !exceto.includes(id)));
+  return emailsDe(admin, ids.filter((id) => !exceto.includes(id)), estrito);
 }
 
 /**
@@ -62,7 +77,7 @@ export async function emailDoAdminDaEmpresa(admin: SupabaseClient, orgId: string
   const { data, error } = await admin.from("platform_admins").select("user_id").is("revoked_at", null);
   if (error) throw new Error(`donos ilegíveis (${error.code ?? "sem_codigo"})`);
   const donos = ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id);
-  return (await emailsDosAdmins(admin, orgId, { semProvisorio: true, exceto: donos }))[0] ?? null;
+  return (await emailsDosAdmins(admin, orgId, { semProvisorio: true, exceto: donos, estrito: true }))[0] ?? null;
 }
 
 async function enviarParaCada(

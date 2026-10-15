@@ -16,11 +16,19 @@ import { avisarTrocaDeChave, emailDoAdminDaEmpresa, enviarAvisoAosAdmins } from 
 const ORG = "aaaaaaaa-0000-4000-8000-000000000001";
 const TEXTO = { titulo: "Não identificamos o pagamento de 05/10", corpo: "Pague pelo link.", severidade: "warn" as const };
 
-function montar(responder: (c: Cadeia) => Resposta) {
+/** Forma do auth-js numa falha de rede/5xx: devolve, não lança. */
+const FALHA_DO_AUTH = { data: { user: null }, error: { name: "AuthRetryableFetchError", status: 503, code: undefined } };
+
+function montar(responder: (c: Cadeia) => Resposta, { authFalhaPara = [] as string[] } = {}) {
   const banco = bancoFalso(responder);
   const admin = {
     ...banco.cliente,
-    auth: { admin: { getUserById: async (id: string) => ({ data: { user: { email: `${id}@exemplo.com` } }, error: null }) } },
+    auth: {
+      admin: {
+        getUserById: async (id: string) =>
+          authFalhaPara.includes(id) ? FALHA_DO_AUTH : { data: { user: { email: `${id}@exemplo.com` } }, error: null },
+      },
+    },
   };
   return { admin: admin as never, banco };
 }
@@ -57,6 +65,12 @@ describe("enviarAvisoAosAdmins", () => {
     await expect(enviarAvisoAosAdmins(admin, { id: ORG, idioma: "pt-BR" }, TEXTO, null)).resolves.toBeUndefined();
     expect(h.aviso).toHaveBeenCalledWith("cobranca.email_nao_saiu", { organization_id: ORG, erro: "sender_rejected", via: "smtp" });
     expect(JSON.stringify(h.aviso.mock.calls)).not.toContain("@exemplo.com");
+  });
+
+  it("o Auth falhou na leitura de um admin: os outros recebem mesmo assim (melhor esforço)", async () => {
+    const { admin } = montar(() => ({ data: [{ user_id: "ana" }, { user_id: "bia" }] }), { authFalhaPara: ["ana"] });
+    await enviarAvisoAosAdmins(admin, { id: ORG, idioma: "pt-BR" }, TEXTO, null);
+    expect(h.enviar.mock.calls.map((c) => c[0].to)).toEqual(["bia@exemplo.com"]);
   });
 
   it("leitura dos admins falhou: não lança e não envia", async () => {
@@ -123,6 +137,18 @@ describe("emailDoAdminDaEmpresa (o e-mail do cliente quando o dono gera o link)"
   it("lança se a leitura dos admins falhar (quem chama decide; nunca um null que vira 'sem admin')", async () => {
     const { admin } = montar((c) => (c.tabela === "platform_admins" ? { data: [] } : { error: { code: "57014", message: "timeout" } }));
     await expect(emailDoAdminDaEmpresa(admin, ORG)).rejects.toThrow("admins ilegíveis (57014)");
+  });
+
+  it("⭐ o Auth falhou na leitura do admin mais antigo: lança, nunca grava o e-mail do segundo no provedor", async () => {
+    const { admin } = montar((c) => ({ data: c.tabela === "platform_admins" ? [] : [{ user_id: "ana" }, { user_id: "bia" }] }), {
+      authFalhaPara: ["ana"],
+    });
+    await expect(emailDoAdminDaEmpresa(admin, ORG)).rejects.toThrow("e-mail de admin ilegível (503)");
+  });
+
+  it("⭐ o Auth falhou na leitura do único admin: lança (500), nunca null (409 'sem admin com e-mail' falso)", async () => {
+    const { admin } = montar((c) => ({ data: c.tabela === "platform_admins" ? [] : [{ user_id: "ana" }] }), { authFalhaPara: ["ana"] });
+    await expect(emailDoAdminDaEmpresa(admin, ORG)).rejects.toThrow("e-mail de admin ilegível");
   });
 
   it("lança se a leitura dos donos falhar: sem ela, o e-mail do dono poderia ir para o provedor", async () => {

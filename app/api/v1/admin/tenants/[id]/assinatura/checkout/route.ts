@@ -23,6 +23,7 @@ import { emailDoAdminDaEmpresa } from "@/lib/cobranca/emails";
 import { urlDoPainelDaEmpresa } from "@/lib/cobranca/url";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { moduloLigado } from "@/lib/instalacao/modulos";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const corpoSchema = z.strictObject({
@@ -65,7 +66,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let email: string | null;
   try {
     email = await emailDoAdminDaEmpresa(admin, tenantId);
-  } catch {
+  } catch (e) {
+    // A mensagem leva só o código do PostgREST/Auth, nunca o endereço (`lib/cobranca/emails.ts`).
+    logger.error("cobranca: admins da empresa ilegíveis no link do dono", {
+      requestId,
+      organizationId: tenantId,
+      motivo: e instanceof Error ? e.message : "desconhecido",
+    });
     return fail("internal_error", "Não foi possível ler os administradores da empresa.", 500, { requestId });
   }
 
