@@ -32,7 +32,9 @@ Recepção como fallback.
 Causa: `ai_router_members` guarda agente, intenção, descrição, exemplos, posição e
 `flow_pointer_id`. **Não guarda funil nem etapa.** O resolvedor escolhe o agente e não toca no card.
 
-## 2. Decisões de produto (já tomadas pelo dono da instalação)
+## 2. Decisões de produto
+
+O segundo card entre funis de produto foi pedido pelo autor da issue #2480 e decidido pelo mantenedor em 14/10/2026 (opção A: entra, com duas guardas — contato bloqueado ou anonimizado não ganha card novo, e quem já passou pelo funil de destino não ganha outro card lá, tenha ou não card aberto em outro produto).
 
 - **Um contato pode ter dois cards abertos, um por funil de produto.** Quem começa em
   Investimentos e depois pergunta de Consórcio (ou o contrário) ganha um segundo card; o primeiro
@@ -55,7 +57,7 @@ ao mesmo `organization_id` (FK composta ou validação na API **e** no banco —
 composta de `flow_pointer_id`, migration 0394, com `on delete set null`); funil ou etapa apagados
 voltam a intenção ao comportamento antigo, sem derrubar o roteador. Tripla de migration como
 manda a doutrina: arquivo em `supabase/migrations/`, apêndice idempotente no `baseline.sql`,
-linha no `MANIFEST.md`. Número: o próximo livre — rode `pnpm checar:colisao-de-migration`.
+e a linha `-- manifest: <o quê e porquê>` no cabeçalho do `.sql` (o `MANIFEST.md` é histórico). Número: o próximo livre — rode `pnpm checar:colisao-de-migration`.
 
 ### 3.2 Onde decidir
 
