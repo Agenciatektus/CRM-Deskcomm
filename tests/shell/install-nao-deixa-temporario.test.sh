@@ -184,7 +184,7 @@ rodar sem_cadeado APP_SEM_CADEADO=1
 check "saiu com 1 (contrato: automação sabe que não terminou)" [ "$RC" -eq 1 ]
 check "passou do passo 7 (controle)" passou_do_passo_7
 check "a tela fala do cadeado do domínio" grep -q 'falta o cadeado (HTTPS) do seu domínio' "$OUT"
-check "ensina a conferir o 307 no domínio desta instalação" grep -q 'curl -sI https://crm.exemplo.com.br/app' "$OUT"
+check "ensina a conferir o 307 no domínio desta instalação" grep -q 'curl -sSI https://crm.exemplo.com.br/app' "$OUT"
 check "não manda procurar chave no .env (a causa não é o .env)" eval '! grep -q "chave faltando ou errada no .env" "$OUT"'
 check "nenhum arquivo temporário ficou para trás" vazio
 
