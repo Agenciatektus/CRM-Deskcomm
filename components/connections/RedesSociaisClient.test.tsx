@@ -144,3 +144,28 @@ it("asks before unlinking the profile and posts unlink on confirm", async () => 
     expect(h.post).toHaveBeenCalledWith("/api/v1/channels/social", { action: "unlink" }),
   );
 });
+it("titles the card with the name typed in Renomear, and keeps the username when nobody renamed it", async () => {
+  // A conexão nasce com `${rede} · ${usuario}`; esse nome de nascença não troca o
+  // título de todo cartão que já existe — só o nome digitado à mão troca.
+  const conta = (id: string, username: string, display_name: string) => ({
+    id,
+    platform: "instagram",
+    username,
+    active: true,
+    inbox_supported: true,
+    channel: { id: `c-${id}`, status: "WORKING", display_name, metadata: {} },
+  });
+  h.get.mockResolvedValue({
+    data: {
+      configured: true,
+      label: "Partner",
+      networks: [{ id: "instagram", label: "Instagram" }],
+      accounts: [conta("a", "brand", "instagram · brand"), conta("b", "loja", "Loja do centro")],
+    },
+  });
+  mount();
+  expect((await screen.findByRole("heading", { name: "brand" })).tagName).toBe("H3");
+  expect(screen.queryByText("instagram · brand")).toBeNull();
+  expect(screen.getByRole("heading", { name: "Loja do centro" })).toBeTruthy();
+  expect(screen.getByText("loja")).toBeTruthy();
+});

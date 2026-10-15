@@ -23,6 +23,7 @@ import { apiClient } from "@/lib/api/client";
 import { canalDesativado } from "@/lib/channels/desativado";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
+import { RenomearConexao } from "./RenomearConexao";
 
 type Account = {
   id: string;
@@ -30,8 +31,23 @@ type Account = {
   username: string;
   active: boolean;
   inbox_supported: boolean;
-  channel: { id: string; status: string; metadata?: Record<string, unknown> | null } | null;
+  channel: {
+    id: string;
+    status: string;
+    display_name: string | null;
+    metadata?: Record<string, unknown> | null;
+  } | null;
 };
+/**
+ * O nome que alguém DIGITOU em Renomear, ou nada. A conexão nasce com
+ * `${rede} · ${usuario}` (lib/channels/social/store.ts), e esse nome de nascença
+ * não vira título: os cartões que ninguém renomeou seguem mostrando o usuário.
+ */
+function nomeInterno(account: Account): string | null {
+  const rotulo = account.channel?.display_name;
+  return rotulo && rotulo !== `${account.platform} · ${account.username}` ? rotulo : null;
+}
+
 type Orphaned = {
   channel_id: string;
   account_id: string;
@@ -301,7 +317,10 @@ export function RedesSociaisClient() {
                       {state.networks.find((n) => n.id === account.platform)?.label ??
                         account.platform}
                     </p>
-                    <h3 className="font-semibold">{account.username}</h3>
+                    <h3 className="font-semibold">{nomeInterno(account) || account.username}</h3>
+                    {nomeInterno(account) && nomeInterno(account) !== account.username && (
+                      <p className="text-xs text-muted-foreground">{account.username}</p>
+                    )}
                   </div>
                   <Badge variant={account.active ? "secondary" : "outline"}>
                     {account.active ? t("Vinculada") : t("Reconectar")}
@@ -311,6 +330,13 @@ export function RedesSociaisClient() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {account.channel && (
+                    <RenomearConexao
+                      channelId={account.channel.id}
+                      currentName={account.channel.display_name}
+                      onSaved={load}
+                    />
+                  )}
                   <Button
                     variant="outline"
                     disabled={!!busy}

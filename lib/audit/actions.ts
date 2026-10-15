@@ -264,6 +264,9 @@ export const AUDIT_ACTIONS = [
   // trilha dizer nos dois sentidos, como `archived`/`reactivated`.
   "channel.disabled",
   "channel.enabled",
+  // Rótulo interno do canal (channel_sessions.display_name); nada vai ao
+  // provedor. Emitida por app/api/v1/channel-sessions/[id]/name.
+  "channel.renamed",
   // A janela de manutenção (#2388): criar e cancelar são mutações da tela e
   // auditam como toda mutação. A pausa e a retomada que a janela aplica saem
   // como `channel.disabled`/`channel.enabled`, com `origem: schedule`.
@@ -615,6 +618,10 @@ export const AUDIT_ACTIONS = [
   // negativa de um colega não teria explicação na trilha — nem como responder
   // "quando foi que desligaram isso?".
   "agenda.colegas_podem_mexer_alterado",
+  // A opção que faz o Meet da reunião nascer JÁ ABERTO (issue #2063, migration
+  // 0648). Risco é parte do desenho — quem tiver o link entra sem pedir —, então
+  // "quando foi que ligaram isso?" é a primeira pergunta depois de um incidente.
+  "agenda.meet_acesso_aberto_alterado",
   // A rodada que AVISOU alguém do próprio compromisso. Mensagem que saiu para o
   // telefone de um cliente é efeito, e efeito audita — mas só a rodada que
   // enviou: a que varreu e não achou ninguém a avisar não é mutação.
@@ -1041,6 +1048,10 @@ export const AUDIT_ACTIONS = [
   // (#2098): gravada pela tela de Conversões, em `organizations.settings.conversions`.
   "conversions.meta_identity_updated",
 
+  // O operador baixou o histórico de UMA conversa em PDF (issue #1982): o gesto
+  // auditável é a saída de dados — QUANTAS linhas saíram, não o que elas dizem
+  // (o corpo da mensagem não vai para log nem para metadata, LGPD).
+  "conversation.exported",
   // ── Cobrança do revendedor — rotas do dono (spec 2026-09-29, PR 2) ───────
   // Plano criado/editado e arquivado; plano atribuído ou trocado numa empresa
   // (`metadata.quando`: atribuido | imediato); prazo dado e isenção
@@ -1066,6 +1077,11 @@ export const AUDIT_ACTIONS = [
   "cobranca.org_reativada",
   "cobranca.rodada",
   "cobranca.regua_salva",
+  // #2609, a conferência da releitura: o preço da assinatura NO PROVEDOR
+  // divergiu do preço do PLANO gravado (metadata com os DOIS números, o plano e
+  // a assinatura). Detecção, não correção — o preço de quem já assinou é
+  // decisão de quem administra, e o audit é o lugar de vê-la.
+  "cobranca.preco_divergente",
   // O servidor MCP externo registrado pela instalação (#2147): gravado (ou
   // apagado, com `registrado: false` no metadata) em
   // `organizations.settings.mcp_externo`. É mutação de TENANT — o endereço que
