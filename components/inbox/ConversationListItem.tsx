@@ -246,7 +246,7 @@ export function ConversationListItem({
     <div
       className={cn(
         "relative flex w-full items-start border-b border-border/70",
-        selecionado && "bg-accent-50",
+        selecionado && "bg-accent-soft",
       )}
     >
       {/*

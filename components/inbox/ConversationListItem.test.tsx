@@ -135,4 +135,21 @@ describe("ConversationListItem — seleção em lote", () => {
     );
     expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   });
+
+  it("linha marcada usa o fundo que acompanha o tema, não o degrau fixo da marca", () => {
+    // `bg-accent-50` tem o mesmo hex quase branco nos dois temas: no escuro o nome
+    // (texto claro) sumia (prova pela tela do #2909). `bg-accent-soft` muda com o tema.
+    render(
+      <ConversationListItem
+        conversation={conversaDeExemplo.conversation}
+        {...conversaDeExemplo.props}
+        selecionado
+        onAlternarSelecao={() => {}}
+      />,
+    );
+    // A caixa é filha direta do contêiner da linha, que é quem recebe o fundo.
+    const linha = screen.getByRole("checkbox").parentElement!;
+    expect(linha.className).toContain("bg-accent-soft");
+    expect(linha.className).not.toContain("bg-accent-50");
+  });
 });
