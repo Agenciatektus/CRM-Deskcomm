@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -141,31 +141,70 @@ describe("crm_find_free_slots", () => {
     expect(params.ate.toISOString()).toBe("2026-09-14T14:00:00.000Z");
   });
 
-  it("⚠️ quando dia e dias_a_frente vêm juntos, vale o PERÍODO — o caso dos modelos GPT (#2889)", async () => {
-    // O caso medido na issue: modelos tipo GPT (OpenRouter) preenchem TODOS os
-    // campos da ferramenta, inclusive os opcionais — chega `dia = HOJE` junto
-    // com `dias_a_frente`. Com a precedência do dia (#1436), a janela colapsava
-    // em HOJE só; a agenda de hoje cheia → resposta VAZIA → o agente repetia a
-    // chamada 8 e 11 vezes num turno e desistia.
-    //
-    // Aqui o `dia` aponta um dia SEM slot (2026-09-05) e o único slot do mock é
-    // de outro dia: só o PERÍODO vencendo devolve algo. Antes deste fix este
-    // teste falhava com `total_de_horarios: 0`.
-    respondeCom(SUCESSO);
-    const antes = Date.now();
-    const r = (await crmFindFreeSlots.handler(
-      { event_type_slug: "c", dia: "2026-09-05", dias_a_frente: 7 },
-      ctx,
-    )) as { horarios: { inicio: string }[]; total_de_horarios: number };
-    // O slot do período (2026-09-01) volta — o dia pedido não o apaga.
-    expect(r.total_de_horarios).toBe(1);
-    expect(r.horarios.map((h) => h.inicio)).toEqual(["2026-09-01T14:00:00.000Z"]);
+  describe("dia e dias_a_frente juntos: o período COMEÇA no dia (#2889)", () => {
+    // O relógio é fixado: o handler lê `new Date()`, e a janela depende de agora.
+    const AGORA = new Date("2026-08-20T15:00:00.000Z");
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(AGORA);
+    });
+    afterEach(() => vi.useRealTimers());
 
-    // E a janela consultada é a do PERÍODO (agora → +7 dias), nunca a faixa
-    // ampla do dia pedido (-14h/+38h em torno de 2026-09-05).
-    const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
-    expect(Math.round((params.ate.getTime() - params.de.getTime()) / 86_400_000)).toBe(7);
-    expect(Math.abs(params.de.getTime() - antes)).toBeLessThan(60_000);
+    it("⚠️ dia = HOJE com dias_a_frente — o caso dos modelos GPT — devolve o período, não só hoje", async () => {
+      // Auditoria da issue: `{"dia":"<hoje>","dias_a_frente":62}`. Com a precedência
+      // do dia (#1436) a janela era só hoje e a resposta saía vazia.
+      respondeCom(SUCESSO);
+      const r = (await crmFindFreeSlots.handler(
+        { event_type_slug: "c", dia: "2026-08-20", dias_a_frente: 62 },
+        ctx,
+      )) as { horarios: { inicio: string }[]; total_de_horarios: number };
+      expect(r.horarios.map((h) => h.inicio)).toEqual(["2026-09-01T14:00:00.000Z"]);
+      const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+      expect(params.de.toISOString()).toBe(AGORA.toISOString());
+      expect(Math.round((params.ate.getTime() - params.de.getTime()) / 86_400_000)).toBe(62);
+    });
+
+    it("⚠️ dia futuro com dias_a_frente = 1 ainda traz o dia pedido inteiro", async () => {
+      // "Tem vaga dia 05?" — a janela relativa a agora (o head antigo do #2921)
+      // nem chegava ao dia 05; um `ate = de + 1 dia` cortava a tarde de São Paulo.
+      respondeCom({
+        ...SUCESSO,
+        slots: [{ inicio: new Date("2026-09-05T20:00:00.000Z"), fim: new Date("2026-09-05T20:30:00.000Z") }],
+      });
+      const r = (await crmFindFreeSlots.handler(
+        { event_type_slug: "c", dia: "2026-09-05", dias_a_frente: 1 },
+        ctx,
+      )) as { horarios: { inicio: string }[] };
+      expect(r.horarios.map((h) => h.inicio)).toEqual(["2026-09-05T20:00:00.000Z"]);
+      const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+      // A faixa larga do dia, igual à de `dia` sozinho.
+      expect(params.de.toISOString()).toBe("2026-09-04T10:00:00.000Z");
+      expect(params.ate.toISOString()).toBe("2026-09-06T14:00:00.000Z");
+    });
+
+    it("dia futuro com dias_a_frente = 7: do dia pedido em diante, sem a véspera", async () => {
+      respondeCom({
+        ...SUCESSO,
+        slots: [
+          // 04/09 às 21h em São Paulo: véspera, a faixa larga alcança mas não é do período.
+          { inicio: new Date("2026-09-05T00:00:00.000Z"), fim: new Date("2026-09-05T00:30:00.000Z") },
+          { inicio: new Date("2026-09-05T14:00:00.000Z"), fim: new Date("2026-09-05T14:30:00.000Z") },
+          { inicio: new Date("2026-09-11T20:00:00.000Z"), fim: new Date("2026-09-11T20:30:00.000Z") },
+        ],
+      });
+      const r = (await crmFindFreeSlots.handler(
+        { event_type_slug: "c", dia: "2026-09-05", dias_a_frente: 7 },
+        ctx,
+      )) as { horarios: { inicio: string }[] };
+      expect(r.horarios.map((h) => h.inicio)).toEqual([
+        "2026-09-05T14:00:00.000Z",
+        "2026-09-11T20:00:00.000Z",
+      ]);
+      const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+      expect(params.de.toISOString()).toBe("2026-09-04T10:00:00.000Z");
+      // 7 dias civis a partir de 05/09: até o fim da faixa larga de 11/09.
+      expect(params.ate.toISOString()).toBe("2026-09-12T14:00:00.000Z");
+    });
   });
 
   it("o pedido legítimo de dia único NÃO muda: `dia` sozinho ainda recorta naquele dia", async () => {
