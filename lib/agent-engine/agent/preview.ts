@@ -193,15 +193,15 @@ export const SCENARIO_READS = new Set([
  * e a produção seguem com `BEFORE_SEND_GATES` intacta. O veto vira linha
  * `skipped: 'sandbox_send_embargo'` no trace e um aviso explícito no resultado —
  * nunca um `pass` silencioso.
+ *
+ * A comparação é INLINE, e não um `Set` de módulo: há testes que substituem este
+ * módulo inteiro por um dublê (`vi.mock(..., () => ({ runBeforeSend }))`), e ler
+ * `pacingGate.name` no topo do arquivo derrubaria todos eles no import. Aqui a
+ * leitura acontece só quando o Teste de fato avalia a cadeia.
  */
-const VETOS_REBAIXADOS_NO_SANDBOX: ReadonlySet<string> = new Set([
-  pacingGate.name,
-  factualClaimGate.name,
-]);
-
 function gatesDoSandbox(avisos: Array<{ code: string; message: string }>): readonly Gate[] {
   return BEFORE_SEND_GATES.map((gate) =>
-    !VETOS_REBAIXADOS_NO_SANDBOX.has(gate.name)
+    gate.name !== pacingGate.name && gate.name !== factualClaimGate.name
       ? gate
       : {
           name: gate.name,
