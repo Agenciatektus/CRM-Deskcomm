@@ -237,9 +237,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       ...(par.ok ? {} : { motivo: par.motivo }),
     });
     if (!par.ok) {
+      // A frase da recusa é LITERAL — chave montada em runtime não entra em
+      // dicionário nenhum e o `t()` com template é reprovado por
+      // `tests/unit/i18n-espanhol-cobre-a-tela.test.ts`. O motivo, que é
+      // diagnóstico e varia com a instalação, vai concatenado.
       return fail(
         "validation_failed",
-        t(`Não foi possível definir o provedor e o modelo deste agente: ${par.motivo}. Nada foi criado.`),
+        `${t("Não foi possível definir o provedor e o modelo deste agente.")} ${par.motivo}. Nada foi criado.`,
         422,
         { requestId },
       );
