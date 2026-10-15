@@ -13958,6 +13958,11 @@ export const DICIONARIO: Traducoes = {
   "Lendo o catálogo…": { es: "Leyendo el catálogo…" },
   "Não foi possível ler o catálogo.": { es: "No se pudo leer el catálogo." },
   "Este banco não tem tabelas visíveis.": { es: "Esta base no tiene tablas visibles." },
+  "Obrigatório (padrão)": { es: "Obligatorio (predeterminado)" },
+  "Verificar certificado e host": { es: "Verificar certificado y host" },
+  "Verificar certificado": { es: "Verificar certificado" },
+  "Preferir TLS": { es: "Preferir TLS" },
+  "Sem TLS (rede local confiável)": { es: "Sin TLS (red local de confianza)" },
   "Nenhuma tabela liberada ainda. Marque acima, em “O que o assistente pode ver”, as que podem ser lidas.": {
     es: "Ninguna tabla habilitada todavía. Marca arriba, en “Qué puede ver el asistente”, las que se pueden leer.",
   },
