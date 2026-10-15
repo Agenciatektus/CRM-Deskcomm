@@ -147,11 +147,8 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
   // Nulo = linha inexistente OU de outra organização: nada foi lido, nada foi
   // gravado, e a ação não anuncia alteração que não houve.
   if (data === null || data === undefined) {
-    return {
-      type: "add_tag",
-      status: "skipped",
-      detail: { reason: destino === "contato" ? "no_contact" : "no_target" },
-    };
+    if (destino === "contato") return { type: "add_tag", status: "skipped", detail: { reason: "no_contact" } };
+    return { type: "add_tag", status: "skipped", detail: { reason: "no_target" } };
   }
 
   const retorno = data as RetornoDaJuncao;
