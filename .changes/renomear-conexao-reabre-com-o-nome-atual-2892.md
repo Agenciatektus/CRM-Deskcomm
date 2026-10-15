@@ -1,5 +1,5 @@
 ---
-impacto: capacidade_nova
+impacto: nada_mudou
 secao: corrigido
 titulo: Renomear conexão reabre com o nome atual, não com o texto que foi cancelado
 ---
