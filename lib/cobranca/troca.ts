@@ -122,12 +122,13 @@ async function lerPlanoCompleto(admin: SupabaseClient, id: string): Promise<Plan
  * Desiste da troca proporcional em curso. Devolve a RECUSA quando não dá, ou
  * `null` depois de limpar a linha (e `atual` junto, para quem chamou seguir).
  * Ordem do #2609: a cobrança morre no provedor ANTES de a linha esquecê-la —
- * esquecida e viva, ela seria paga sem nunca virar plano.
+ * esquecida e viva, ela seria paga sem nunca virar plano. O checkout cheio
+ * (`checkout.ts`) também desiste: assinatura morta não tem o que ajustar.
  */
-async function desistirDoAjuste(
+export async function desistirDoAjuste(
   admin: SupabaseClient,
   orgId: string,
-  atual: Atual,
+  atual: Pick<Atual, "provedor" | "troca_id" | "troca_status" | "troca_pagamento_ref" | "troca_reserva_ate">,
   adaptadorDe: (id: ProvedorDeCobranca) => AdaptadorDeCobranca,
   agora: Date,
 ): Promise<ResultadoDaTroca | null> {
