@@ -124,8 +124,8 @@ interface Pedido {
 
 /** Captura o pedido e responde — sem rede nenhuma. */
 function fetchQueCaptura(pedidos: Pedido[], resposta: Response = respostaHttp(200, CORPO_OK)) {
-  return vi.fn(async (url: string, init?: RequestInit) => {
-    pedidos.push({ url, corpo: JSON.parse(String(init?.body ?? "{}")) as { model?: string } });
+  return vi.fn(async (input: string | URL | RequestInfo, init?: RequestInit) => {
+    pedidos.push({ url: String(input), corpo: JSON.parse(String(init?.body ?? "{}")) as { model?: string } });
     return resposta;
   });
 }
