@@ -5,7 +5,8 @@
  *   1. o dono conecta o sandbox do Asaas pela tela (o webhook nasce no dublê);
  *   2. no card do tenant: atribui o plano, digita o CPF (dígito errado não sai) e gera o link;
  *   3. o dublê recebeu o CPF SEM máscara e o e-mail do ADMIN DA EMPRESA, nunca o
- *      do dono (D-15); o banco não guarda o CPF; o audit diz que foi o dono;
+ *      do dono nem o do vínculo provisório, ambos admins mais antigos dela (D-15);
+ *      o banco não guarda o CPF; o audit diz que foi o dono;
  *   4. gerar de novo devolve o MESMO link, sem 2º cliente nem 2ª assinatura — antes
  *      e depois de o aviso do provedor limpar o checkout (aí o 409
  *      pagamento_em_andamento do núcleo vira 200 com o link da fatura);
@@ -84,10 +85,21 @@ test("[P0] o dono gera o link de pagamento pelo card do tenant (Asaas) e a empre
 
     const adminB = await criarPessoa("admin-link", sufixo);
     pessoas.push(adminB.id);
+    const provisorio = await criarPessoa("provisorio-link", sufixo);
+    pessoas.push(provisorio.id);
     // SEM cnpj no cadastro: o documento vem só do que o dono digita.
     const orgB = await inserir("organizations", { slug: `cob-link-b-${sufixo}`, display_name: EMPRESA, legal_name: EMPRESA, onboarded_at: new Date().toISOString() });
     orgs.push(orgB);
-    const vincB = await db.from("user_organizations").insert({ organization_id: orgB, user_id: adminB.id, role: "admin", accepted_at: new Date().toISOString() });
+    // D-15: dois admins MAIS ANTIGOS que o adminB, e cada um só cai por um filtro. O dono,
+    // ativo e NÃO provisório (o criador de empresa anterior à 0237), só pela exclusão de
+    // `platform_admins`; o provisório, que não é dono, só pelo `provisional_until_handover`.
+    // Com só o adminB na empresa, a asserção do e-mail passaria sem filtro nenhum.
+    const horasAtras = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+    const vincB = await db.from("user_organizations").insert([
+      { organization_id: orgB, user_id: dono.id, role: "admin", accepted_at: horasAtras(2), created_at: horasAtras(2), provisional_until_handover: false },
+      { organization_id: orgB, user_id: provisorio.id, role: "admin", accepted_at: horasAtras(1), created_at: horasAtras(1), provisional_until_handover: true },
+      { organization_id: orgB, user_id: adminB.id, role: "admin", accepted_at: new Date().toISOString() },
+    ]);
     if (vincB.error) throw vincB.error;
     await inserir("cobranca_planos", { nome: PLANO, preco_cents: 4990, intervalo: "mes", trial_dias: 7, updated_by: dono.id });
 
@@ -132,7 +144,7 @@ test("[P0] o dono gera o link de pagamento pelo card do tenant (Asaas) e a empre
     expect(criacao?.cpfCnpj, "o CPF não chegou ao Asaas sem máscara").toBe(CPF);
     expect(criacao?.externalReference).toBe(orgB);
     // D-15: o e-mail fica gravado no cliente do provedor para sempre; o do dono receberia as cobranças da empresa.
-    expect(criacao?.email, "o cliente no Asaas não nasceu com o e-mail do admin da empresa").toBe(adminB.email);
+    expect(criacao?.email, "o cliente no Asaas não nasceu com o e-mail do admin da empresa (dono e provisório são mais antigos)").toBe(adminB.email);
     expect(link).toBe(`${duble.base}/i/${duble.asaas.cobrancasDe(cliente)[0]?.id}`);
     expect(await assinaturaDe(orgB)).toMatchObject({ estado: "trial", provedor: "asaas", modo: "teste", provedor_cliente_id: cliente });
     // LGPD (§2.3): o documento vai ao provedor e não fica no nosso banco.

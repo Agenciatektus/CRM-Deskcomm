@@ -15385,6 +15385,12 @@ export const DICIONARIO: Traducoes = {
   "A empresa já tem assinatura, mas não há cobrança aberta agora. Ela precisa atualizar o cartão em Plano e cobrança.": { es: "La empresa ya tiene suscripción, pero no hay ningún cobro abierto ahora. Debe actualizar la tarjeta en Plan y facturación." },
   "A empresa ainda não tem administrador com e-mail. Gere o link depois que um convite de administrador for aceito.": { es: "La empresa aún no tiene un administrador con correo electrónico. Genera el enlace después de que se acepte una invitación de administrador." },
   "O provedor de pagamento recusou o pedido. Confira a chave em Cobrança › Conexão e tente de novo; o motivo aparece no painel do provedor.": { es: "El proveedor de pago rechazó la solicitud. Revisa la clave en Cobro › Conexión e inténtalo de nuevo; el motivo aparece en el panel del proveedor." },
+  "Não foi possível ler os administradores da empresa.": { es: "No se pudieron leer los administradores de la empresa." },
+  // ─── cobrança: frases do núcleo do checkout (`lib/cobranca/checkout.ts`), comuns ao "Assinar" e ao link do dono ───
+  "Não foi possível ler a assinatura.": { es: "No se pudo leer la suscripción." },
+  "Não foi possível reservar o pagamento.": { es: "No se pudo reservar el pago." },
+  "Não foi possível gerar o link de pagamento. Tente de novo em instantes.": { es: "No se pudo generar el enlace de pago. Inténtalo de nuevo en unos instantes." },
+  "Informe o CPF ou CNPJ de quem paga: o provedor de pagamento exige para emitir a cobrança.": { es: "Indica el CPF o CNPJ de quien paga: el proveedor de pago lo exige para emitir el cobro." },
   "A Stripe só avisa pagamentos num endereço https público (ex.: https://crm.example.com). Configure o domínio do sistema com HTTPS e volte aqui.": { es: "Stripe solo avisa pagos en una dirección https pública (ej.: https://crm.example.com). Configura el dominio del sistema con HTTPS y vuelve aquí." },
   "Modo de teste: suas empresas reais ainda não conseguem pagar. Quando a compra de teste der certo, troque para a chave de produção em Conexão.": { es: "Modo de prueba: tus empresas reales todavía no pueden pagar. Cuando la compra de prueba funcione, cambia a la clave de producción en Conexión." },
   "{n} aviso de pagamento recusado nas últimas 24 h: a assinatura não confere. Conecte a chave de novo na aba Conexão.": { es: "{n} aviso de pago rechazado en las últimas 24 h: la firma no coincide. Conecta la clave de nuevo en la pestaña Conexión." },
