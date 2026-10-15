@@ -34,14 +34,29 @@ const RECUSA_DA_TYPESAFE = {
   chaveOuCredito: "A TypeSafe recusou a chave. Confira se ela está inteira e se a conta na TypeSafe tem crédito.",
 } as const;
 
+/**
+ * A mesma recusa nomeada, para a credencial da OpenRouter — que é a que o Jev
+ * consome quando ele responde por lá (issue #2947). Dizer "a TypeSafe recusou" a
+ * quem colou uma chave da OpenRouter mandaria a pessoa conferir a conta errada.
+ */
+const RECUSA_DA_OPENROUTER = {
+  chave: "A OpenRouter recusou a chave. Confira se copiou inteira ou gere uma nova.",
+  chaveOuCredito: "A OpenRouter recusou a chave. Confira se ela está inteira e se a conta na OpenRouter tem crédito.",
+} as const;
+
+const RECUSA_POR_PROVEDOR: Readonly<Record<string, typeof RECUSA_DA_TYPESAFE>> = {
+  [PROVEDOR_DO_JEV]: RECUSA_DA_TYPESAFE,
+  openrouter: RECUSA_DA_OPENROUTER,
+};
+
 export function descreverErroDeValidacao(codigo: string | null, provedor?: string): ErroDescrito {
   if (!codigo) return { frase: "", chaveErrada: false, generico: false };
-  const ehTypeSafe = provedor === PROVEDOR_DO_JEV;
+  const recusa = provedor === undefined ? undefined : RECUSA_POR_PROVEDOR[provedor];
 
   if (codigo === "auth_failed_401") {
     return {
-      frase: ehTypeSafe
-        ? RECUSA_DA_TYPESAFE.chave
+      frase: recusa
+        ? recusa.chave
         : "O provedor recusou a chave. Confira se copiou inteira ou gere uma nova.",
       chaveErrada: true,
       generico: false,
@@ -115,8 +130,8 @@ export function descreverErroDeValidacao(codigo: string | null, provedor?: strin
   // código cru na tela ("provider_status_402") não diz nada a ninguém.
   if (/^provider_status_4\d\d$/.test(codigo)) {
     return {
-      frase: ehTypeSafe
-        ? RECUSA_DA_TYPESAFE.chaveOuCredito
+      frase: recusa
+        ? recusa.chaveOuCredito
         : "O provedor recusou a chave. Confira se ela está inteira e se a conta no provedor tem crédito.",
       chaveErrada: true,
       generico: false,
