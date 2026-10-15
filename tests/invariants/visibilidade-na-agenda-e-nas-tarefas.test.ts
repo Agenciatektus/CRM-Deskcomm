@@ -13,7 +13,7 @@ import {
 } from "./gov-helpers";
 
 /**
- * A AGENDA E AS TAREFAS RESPEITAM `visibility_mode` — LER **E** ESCREVER.
+ * A AGENDA E AS TAREFAS RESPEITAM `visibility_mode` — E A OPÇÃO DA #978 MANDA.
  *
  * ═══ O defeito (issue #2902, baseline 1.80.0) ═══════════════════════════════
  *
@@ -25,6 +25,34 @@ import {
  * responsável. O desfecho, nas palavras de quem abriu a issue: o atendente vê os
  * compromissos pessoais do dono e as tarefas de carteira da colega — e consegue
  * editar e excluir o que não é dele.
+ *
+ * ═══ A colisão declarada, e o lado que venceu (medido, não suposto) ═════════
+ *
+ * `fn_colegas_podem_mexer_na_agenda(p_org)` (migration 0343, issue #978) é uma
+ * OPÇÃO POR ORGANIZAÇÃO, **ligada por ausência**: o COALESCE da chave com `true`
+ * faz a chave inexistente valer como ligada. E o caminho de RPC da agenda
+ * (`fn_appointment_change` → `fn_appointment_change_core`, linha do
+ * `appointment_do_colega`) já consulta essa opção ANTES de recusar o compromisso
+ * alheio. Sem consultá-la também nas policies, a RLS passaria a recusar o que o
+ * RPC permite — a rota devolveria `internal_error` num caminho que o produto
+ * declara válido.
+ *
+ * Por isso as QUATRO policies consultam a opção
+ * (`or public.fn_colegas_podem_mexer_na_agenda(organization_id)`), e este
+ * arquivo mede OS DOIS lados:
+ *
+ *   · chave AUSENTE ou LIGADA (o padrão, e o estado de toda organização que
+ *     nunca mexeu nela) — o `agent` vê e mexe na agenda e nas tarefas da equipe
+ *     da própria organização, como antes desta migration;
+ *   · chave em FALSO — aí a régua por responsável da #2902 aperta: o `agent` vê e
+ *     escreve só o que é dele (mais a fila, em `own_and_unassigned`).
+ *
+ * O `or` mora DENTRO da conjunção de pertencimento, e não é estilo:
+ * `fn_colegas_podem_mexer_na_agenda` lê a configuração da organização DA LINHA e
+ * não olha quem pergunta — devolveria verdadeiro para um não-membro (e até para
+ * uma organização que não existe, por causa do COALESCE), e a policy passaria a
+ * servir leitura entre empresas. O caso "o agent de OUTRA organização continua
+ * lendo zero" fecha essa porta.
  *
  * ═══ Por que um teste de BANCO, e não um teste de rota ══════════════════════
  *
@@ -46,13 +74,14 @@ import {
  *
  * As fixtures são LOCAIS e por id (namespace `e2902…`, hex de propósito) —
  * nunca contagens por organização, porque os arquivos de invariante rodam em
- * paralelo e o `GOV_ORG` é compartilhado com os `gov-*.test.ts`. O modo
- * restritivo vive numa organização DEDICADA (`OWN_ORG`), como em `gov-5`.
+ * paralelo e o `GOV_ORG` é compartilhado com os `gov-*.test.ts`. Os modos
+ * restritivos vivem em organizações DEDICADAS (`OFF_ORG`, `OWN_ORG`), como em
+ * `gov-5`.
  *
  * Sem PII (LGPD): títulos sintéticos, nenhum telefone/nome de pessoa real.
  */
 
-// ─── GOV_ORG: o default (`own_and_unassigned`) ───────────────────────────────
+// ─── GOV_ORG: o default (`own_and_unassigned`) e a opção AUSENTE (ligada) ─────
 const APPT_A = "e2902001-0000-4000-8000-000000000001"; // dono = agent A
 const APPT_B = "e2902001-0000-4000-8000-000000000002"; // dono = agent B
 /** Reservado ao probe de DELETE: se a RLS falhar, ele é apagado — e mais nada. */
@@ -64,7 +93,20 @@ const TASK_B = "e2902002-0000-4000-8000-000000000002"; // resp. e criador = agen
 const TASK_B_APAGAR = "e2902002-0000-4000-8000-000000000003";
 const TASK_NULO = "e2902002-0000-4000-8000-000000000004"; // sem responsável nem criador
 
-// ─── OWN_ORG: `visibility_mode = 'own'` ("Só os seus") ────────────────────────
+/** A organização de OUTRA empresa, para o caso de leitura entre organizações. */
+const OUTRA_ORG = "e2904000-0000-4000-8000-000000000001";
+const APPT_OUTRA_ORG = "e2904001-0000-4000-8000-000000000001";
+
+// ─── OFF_ORG: default (`own_and_unassigned`) + opção da #978 DESLIGADA ───────
+const OFF_ORG = "e2903500-0000-4000-8000-000000000001";
+const APPT_B_OFF = "e2903501-0000-4000-8000-000000000001"; // dono = agent B
+const APPT_B_OFF_APAGAR = "e2903501-0000-4000-8000-000000000002";
+const APPT_NULO_OFF = "e2903501-0000-4000-8000-000000000003"; // dono = null
+const TASK_B_OFF = "e2903502-0000-4000-8000-000000000001"; // resp./criador = agent B
+const TASK_B_OFF_APAGAR = "e2903502-0000-4000-8000-000000000002";
+const TASK_NULO_OFF = "e2903502-0000-4000-8000-000000000003"; // sem responsável
+
+// ─── OWN_ORG: `visibility_mode = 'own'` + opção da #978 DESLIGADA ────────────
 const OWN_ORG = "e2903000-0000-4000-8000-000000000001";
 const APPT_B_OWN = "e2903001-0000-4000-8000-000000000001"; // dono = agent B
 const APPT_B_OWN_APAGAR = "e2903001-0000-4000-8000-000000000002";
@@ -75,7 +117,7 @@ const TASK_B_OWN_APAGAR = "e2903002-0000-4000-8000-000000000002";
 const TASK_DO_AUTO_OWN = "e2903002-0000-4000-8000-000000000003";
 
 beforeAll(() => {
-  seedGov(); // GOV_ORG (default own_and_unassigned) + agentes A/B, manager, viewer
+  seedGov(); // GOV_ORG (default own_and_unassigned, opção ausente) + agentes A/B, manager, viewer
 
   sql(`
     insert into public.calendar_appointments
@@ -95,12 +137,59 @@ beforeAll(() => {
       ('${TASK_NULO}',     '${GOV_ORG}', 'Tarefa sem responsável (fila)', 'pending', null, null)
       on conflict (id) do nothing;
 
-    -- A organização em modo restritivo. Isolada de propósito: mexer no
-    -- visibility_mode do GOV_ORG mediria outro produto e sujaria os arquivos
-    -- vizinhos que compartilham a fixture.
+    -- ─── As organizações de teste, isoladas de propósito: mexer nas settings do
+    -- GOV_ORG mediria outro produto e sujaria os arquivos vizinhos que
+    -- compartilham a fixture. Cada modo restritivo mora na sua.
+
+    -- A OUTRA empresa (o caso de leitura entre organizações, abaixo). A opção
+    -- dela fica AUSENTE de propósito: é a organização em que o
+    -- o fn_colegas_podem_mexer_na_agenda devolve verdadeiro, e é exatamente aí
+    -- que um or solto na policy de SELECT abriria a leitura entre empresas.
+    insert into public.organizations (id, slug, legal_name, display_name)
+      values ('${OUTRA_ORG}', 'inv-2902-outra', 'Invariante 2902 Outra', 'Inv 2902 Outra')
+      on conflict (id) do nothing;
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at)
+      values ('${GOV_AGENT_B}', '${OUTRA_ORG}', 'agent', now())
+      on conflict do nothing;
+    insert into public.calendar_appointments
+      (id, organization_id, title, starts_at, ends_at, owner_user_id, status)
+    values
+      ('${APPT_OUTRA_ORG}', '${OUTRA_ORG}', 'Compromisso de outra empresa', now() + interval '11 days', now() + interval '11 days 30 minutes', '${GOV_AGENT_B}', 'confirmed')
+      on conflict (id) do nothing;
+
+    -- Opção da #978 em FALSO, no modo default: é aqui que a régua da #2902
+    -- aperta (o outro lado da colisão declarada).
+    insert into public.organizations (id, slug, legal_name, display_name, settings)
+      values ('${OFF_ORG}', 'inv-2902-off', 'Invariante 2902 Off', 'Inv 2902 Off',
+              jsonb_build_object('colegas_podem_mexer_na_agenda', false))
+      on conflict (id) do nothing;
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
+      ('${GOV_AGENT_A}', '${OFF_ORG}', 'agent',   now()),
+      ('${GOV_AGENT_B}', '${OFF_ORG}', 'agent',   now()),
+      ('${GOV_MANAGER}', '${OFF_ORG}', 'manager', now()),
+      ('${GOV_VIEWER}',  '${OFF_ORG}', 'viewer',  now())
+      on conflict do nothing;
+
+    insert into public.calendar_appointments
+      (id, organization_id, title, starts_at, ends_at, owner_user_id, status)
+    values
+      ('${APPT_B_OFF}',        '${OFF_ORG}', 'Compromisso do agent B (opção desligada)', now() + interval '6 days', now() + interval '6 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
+      ('${APPT_B_OFF_APAGAR}', '${OFF_ORG}', 'Compromisso do agent B (probe de DELETE, opção desligada)', now() + interval '7 days', now() + interval '7 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
+      ('${APPT_NULO_OFF}',     '${OFF_ORG}', 'Compromisso sem dono (opção desligada)', now() + interval '8 days', now() + interval '8 days 30 minutes', null, 'confirmed')
+      on conflict (id) do nothing;
+
+    insert into public.crm_tasks (id, organization_id, title, status, assigned_to, created_by)
+    values
+      ('${TASK_B_OFF}',        '${OFF_ORG}', 'Tarefa do agent B (opção desligada)', 'pending', '${GOV_AGENT_B}', '${GOV_AGENT_B}'),
+      ('${TASK_B_OFF_APAGAR}', '${OFF_ORG}', 'Tarefa do agent B (probe de DELETE, opção desligada)', 'pending', '${GOV_AGENT_B}', '${GOV_AGENT_B}'),
+      ('${TASK_NULO_OFF}',     '${OFF_ORG}', 'Tarefa sem responsável (opção desligada)', 'pending', null, null)
+      on conflict (id) do nothing;
+
+    -- Modo "Só os seus" COM a opção desligada: o recorte mais estreito que
+    -- existe — nem a fila entra.
     insert into public.organizations (id, slug, legal_name, display_name, settings)
       values ('${OWN_ORG}', 'inv-2902-own', 'Invariante 2902 Own', 'Inv 2902 Own',
-              jsonb_build_object('visibility_mode', 'own'))
+              jsonb_build_object('visibility_mode', 'own', 'colegas_podem_mexer_na_agenda', false))
       on conflict (id) do nothing;
     insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
       ('${GOV_AGENT_A}', '${OWN_ORG}', 'agent',   now()),
@@ -111,9 +200,9 @@ beforeAll(() => {
     insert into public.calendar_appointments
       (id, organization_id, title, starts_at, ends_at, owner_user_id, status)
     values
-      ('${APPT_B_OWN}',        '${OWN_ORG}', 'Compromisso do agent B (modo own)', now() + interval '6 days', now() + interval '6 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
-      ('${APPT_B_OWN_APAGAR}', '${OWN_ORG}', 'Compromisso do agent B (probe de DELETE, modo own)', now() + interval '7 days', now() + interval '7 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
-      ('${APPT_NULO_OWN}',     '${OWN_ORG}', 'Compromisso sem dono (modo own)', now() + interval '8 days', now() + interval '8 days 30 minutes', null, 'confirmed')
+      ('${APPT_B_OWN}',        '${OWN_ORG}', 'Compromisso do agent B (modo own)', now() + interval '9 days', now() + interval '9 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
+      ('${APPT_B_OWN_APAGAR}', '${OWN_ORG}', 'Compromisso do agent B (probe de DELETE, modo own)', now() + interval '10 days', now() + interval '10 days 30 minutes', '${GOV_AGENT_B}', 'confirmed'),
+      ('${APPT_NULO_OWN}',     '${OWN_ORG}', 'Compromisso sem dono (modo own)', now() + interval '11 days', now() + interval '11 days 30 minutes', null, 'confirmed')
       on conflict (id) do nothing;
 
     insert into public.crm_tasks (id, organization_id, title, status, assigned_to, created_by)
@@ -125,11 +214,11 @@ beforeAll(() => {
   `);
 });
 
-describe("agenda — o default (own_and_unassigned): o agent vê e mexe no que é dele", () => {
-  it("⭐ agent A NÃO vê o compromisso do agent B (o defeito da #2902)", () => {
+describe("agenda — a opção da #978 ligada por ausência (o padrão): os colegas veem e mexem na agenda da equipe", () => {
+  it("agent A VÊ o compromisso do agent B — a opção ligada entrega a agenda da equipe", () => {
     expect(
       countAs(GOV_AGENT_A, `select count(*) from public.calendar_appointments where id = '${APPT_B}';`),
-    ).toBe(0);
+    ).toBe(1);
   });
 
   it("agent A vê o próprio compromisso (controle positivo)", () => {
@@ -142,6 +231,19 @@ describe("agenda — o default (own_and_unassigned): o agent vê e mexe no que �
     expect(
       countAs(GOV_AGENT_A, `select count(*) from public.calendar_appointments where id = '${APPT_NULO}';`),
     ).toBe(1);
+  });
+
+  it("agent A NÃO vê o compromisso de OUTRA organização (o `or` não cruza empresa)", () => {
+    // A organização de lá tem a opção AUSENTE — o `fn_colegas_podem_mexer_na_agenda`
+    // devolve verdadeiro. Se o `or` não estivesse dentro da conjunção de
+    // pertencimento, este caso seria 1 e a policy estaria servindo leitura entre
+    // empresas. É o caso que prende a colocação do `or`.
+    expect(
+      countAs(
+        GOV_AGENT_A,
+        `select count(*) from public.calendar_appointments where id = '${APPT_OUTRA_ORG}';`,
+      ),
+    ).toBe(0);
   });
 
   it("manager vê os compromissos dos dois atendentes (org-wide, preservado)", () => {
@@ -174,19 +276,19 @@ describe("agenda — o default (own_and_unassigned): o agent vê e mexe no que �
     ).toBe(1);
   });
 
-  it("⭐ agent A NÃO edita o compromisso do agent B (0 linhas)", () => {
+  it("agent A EDITA o compromisso do agent B — é o que a #978 decidiu e a RPC já permitia", () => {
     expect(
       writeCountAs(
         GOV_AGENT_A,
-        `update public.calendar_appointments set title = 'invadido pelo agent A' where id = '${APPT_B}'`,
+        `update public.calendar_appointments set title = 'remarcado pelo agent A' where id = '${APPT_B}'`,
       ),
-    ).toBe(0);
+    ).toBe(1);
   });
 
-  it("⭐ agent A NÃO apaga o compromisso do agent B (0 linhas)", () => {
+  it("agent A APAGA o compromisso do agent B (a opção é sobre a agenda inteira, não só sobre editar)", () => {
     expect(
       writeCountAs(GOV_AGENT_A, `delete from public.calendar_appointments where id = '${APPT_B_APAGAR}'`),
-    ).toBe(0);
+    ).toBe(1);
   });
 
   it("agent A edita o compromisso SEM dono no default (puxa a fila)", () => {
@@ -203,28 +305,19 @@ describe("agenda — o default (own_and_unassigned): o agent vê e mexe no que �
       writeCountAs(
         GOV_AGENT_A,
         `insert into public.calendar_appointments (organization_id, title, starts_at, ends_at, owner_user_id)
-           values ('${GOV_ORG}', 'Compromisso novo do agent A', now() + interval '9 days', now() + interval '9 days 30 minutes', '${GOV_AGENT_A}')`,
+           values ('${GOV_ORG}', 'Compromisso novo do agent A', now() + interval '12 days', now() + interval '12 days 30 minutes', '${GOV_AGENT_A}')`,
       ),
     ).toBe(1);
   });
 
-  it("⚠️ agent A NÃO cria compromisso em nome de um colega (modo do default) — colisão declarada com a opção da #978", () => {
-    // ESTE CASO É UM AVISO, e o nome dele é a decisão: a #978 decidiu que
-    // "Atendentes podem mexer na agenda dos colegas" é uma opção POR
-    // ORGANIZAÇÃO, LIGADA POR PADRÃO, e a rota honra a opção. Com
-    // visibility_mode restritivo o banco passa a recusar mesmo com a opção
-    // ligada — é o que a #2902 pede ("agent edita/exclui só o que é dele").
-    // Se o mantenedor preferir a opção vencendo o eixo, a migration declara a
-    // linha exata que muda (o `or fn_colegas_podem_mexer_na_agenda(...)` no
-    // using/with check de `calendar_appointments_write`) — e este caso vira o
-    // oposto, de propósito e com registro.
+  it("agent A CRIA compromisso em nome de um colega — o que a rota sempre prometeu com a opção ligada", () => {
     expect(
       writeCountAs(
         GOV_AGENT_A,
         `insert into public.calendar_appointments (organization_id, title, starts_at, ends_at, owner_user_id)
-           values ('${GOV_ORG}', 'Compromisso do agent A na agenda do B', now() + interval '10 days', now() + interval '10 days 30 minutes', '${GOV_AGENT_B}')`,
+           values ('${GOV_ORG}', 'Compromisso do agent A na agenda do B', now() + interval '13 days', now() + interval '13 days 30 minutes', '${GOV_AGENT_B}')`,
       ),
-    ).toBe(0);
+    ).toBe(1);
   });
 
   it("manager EDITA o compromisso de um atendente (org-wide write, preservado)", () => {
@@ -237,9 +330,9 @@ describe("agenda — o default (own_and_unassigned): o agent vê e mexe no que �
   });
 });
 
-describe("tarefas — o default (own_and_unassigned): o agent vê e mexe no que é dele", () => {
-  it("⭐ agent A NÃO vê a tarefa do agent B (o defeito da #2902)", () => {
-    expect(countAs(GOV_AGENT_A, `select count(*) from public.crm_tasks where id = '${TASK_B}';`)).toBe(0);
+describe("tarefas — a opção da #978 ligada por ausência (o padrão): os colegas veem e mexem nas tarefas da equipe", () => {
+  it("agent A VÊ a tarefa do agent B", () => {
+    expect(countAs(GOV_AGENT_A, `select count(*) from public.crm_tasks where id = '${TASK_B}';`)).toBe(1);
   });
 
   it("agent A vê a própria tarefa (controle positivo)", () => {
@@ -268,14 +361,14 @@ describe("tarefas — o default (own_and_unassigned): o agent vê e mexe no que 
     ).toBe(1);
   });
 
-  it("⭐ agent A NÃO edita a tarefa do agent B (0 linhas)", () => {
+  it("agent A EDITA a tarefa do agent B (a opção ligada cobre as duas telas)", () => {
     expect(
-      writeCountAs(GOV_AGENT_A, `update public.crm_tasks set title = 'invadida pelo agent A' where id = '${TASK_B}'`),
-    ).toBe(0);
+      writeCountAs(GOV_AGENT_A, `update public.crm_tasks set title = 'revisada pelo agent A' where id = '${TASK_B}'`),
+    ).toBe(1);
   });
 
-  it("⭐ agent A NÃO apaga a tarefa do agent B (0 linhas)", () => {
-    expect(writeCountAs(GOV_AGENT_A, `delete from public.crm_tasks where id = '${TASK_B_APAGAR}'`)).toBe(0);
+  it("agent A APAGA a tarefa do agent B", () => {
+    expect(writeCountAs(GOV_AGENT_A, `delete from public.crm_tasks where id = '${TASK_B_APAGAR}'`)).toBe(1);
   });
 
   it("agent A edita a tarefa SEM responsável no default (puxa a fila)", () => {
@@ -294,12 +387,7 @@ describe("tarefas — o default (own_and_unassigned): o agent vê e mexe no que 
     ).toBe(1);
   });
 
-  it("agent A ENTREGA uma tarefa a um colega (preservado: a tela oferece a equipe no responsável)", () => {
-    // O recorte da #2902 é sobre EDITAR e EXCLUIR o que o outro escreveu, não
-    // sobre entregar trabalho. A tela oferece a equipe inteira
-    // (`useAssignableMembers`), a rota confere o membro (`lib/tarefas/responsavel.ts`),
-    // e o criador enxerga o que criou — por isso este caso passa, e o de editar
-    // a tarefa ALHEIA, acima, não.
+  it("agent A ENTREGA uma tarefa a um colega (a tela oferece a equipe no responsável)", () => {
     expect(
       writeCountAs(
         GOV_AGENT_A,
@@ -316,7 +404,113 @@ describe("tarefas — o default (own_and_unassigned): o agent vê e mexe no que 
   });
 });
 
-describe("agenda e tarefas — organização em visibility_mode = 'own' (só os seus)", () => {
+describe("agenda e tarefas — opção da #978 DESLIGADA (default `own_and_unassigned`): a régua da #2902 aperta", () => {
+  it("⭐ agent A NÃO vê o compromisso do agent B (o defeito da #2902, fechado com a opção em falso)", () => {
+    expect(
+      countAs(GOV_AGENT_A, `select count(*) from public.calendar_appointments where id = '${APPT_B_OFF}';`),
+    ).toBe(0);
+  });
+
+  it("⭐ agent A NÃO edita o compromisso do agent B (0 linhas)", () => {
+    expect(
+      writeCountAs(
+        GOV_AGENT_A,
+        `update public.calendar_appointments set title = 'invadido pelo agent A' where id = '${APPT_B_OFF}'`,
+      ),
+    ).toBe(0);
+  });
+
+  it("⭐ agent A NÃO apaga o compromisso do agent B (0 linhas)", () => {
+    expect(
+      writeCountAs(GOV_AGENT_A, `delete from public.calendar_appointments where id = '${APPT_B_OFF_APAGAR}'`),
+    ).toBe(0);
+  });
+
+  it("agent A NÃO cria compromisso em nome de um colega (o `with check` recusa)", () => {
+    expect(
+      writeCountAs(
+        GOV_AGENT_A,
+        `insert into public.calendar_appointments (organization_id, title, starts_at, ends_at, owner_user_id)
+           values ('${OFF_ORG}', 'Compromisso do agent A na agenda do B', now() + interval '14 days', now() + interval '14 days 30 minutes', '${GOV_AGENT_B}')`,
+      ),
+    ).toBe(0);
+  });
+
+  it("agent A vê o próprio compromisso (controle positivo do modo restritivo)", () => {
+    expect(
+      writeCountAs(
+        GOV_AGENT_A,
+        `insert into public.calendar_appointments (organization_id, title, starts_at, ends_at, owner_user_id)
+           values ('${OFF_ORG}', 'Compromisso novo do agent A (opção desligada)', now() + interval '15 days', now() + interval '15 days 30 minutes', '${GOV_AGENT_A}')`,
+      ),
+    ).toBe(1);
+  });
+
+  it("agent A vê e edita o compromisso SEM dono (a fila de `own_and_unassigned` sobrevive)", () => {
+    expect(
+      countAs(GOV_AGENT_A, `select count(*) from public.calendar_appointments where id = '${APPT_NULO_OFF}';`),
+    ).toBe(1);
+    expect(
+      writeCountAs(
+        GOV_AGENT_A,
+        `update public.calendar_appointments set title = 'Compromisso da fila (assumido, opção desligada)' where id = '${APPT_NULO_OFF}'`,
+      ),
+    ).toBe(1);
+  });
+
+  it("⭐ agent A NÃO vê a tarefa do agent B", () => {
+    expect(countAs(GOV_AGENT_A, `select count(*) from public.crm_tasks where id = '${TASK_B_OFF}';`)).toBe(0);
+  });
+
+  it("⭐ agent A NÃO edita a tarefa do agent B (0 linhas)", () => {
+    expect(
+      writeCountAs(GOV_AGENT_A, `update public.crm_tasks set title = 'invadida pelo agent A' where id = '${TASK_B_OFF}'`),
+    ).toBe(0);
+  });
+
+  it("⭐ agent A NÃO apaga a tarefa do agent B (0 linhas)", () => {
+    expect(writeCountAs(GOV_AGENT_A, `delete from public.crm_tasks where id = '${TASK_B_OFF_APAGAR}'`)).toBe(0);
+  });
+
+  it("agent A vê e assume a tarefa SEM responsável (a fila do time, preservada)", () => {
+    expect(countAs(GOV_AGENT_A, `select count(*) from public.crm_tasks where id = '${TASK_NULO_OFF}';`)).toBe(1);
+    expect(
+      writeCountAs(GOV_AGENT_A, `update public.crm_tasks set assigned_to = '${GOV_AGENT_A}' where id = '${TASK_NULO_OFF}'`),
+    ).toBe(1);
+  });
+
+  it("agent A ENTREGA uma tarefa a um colega mesmo com a opção desligada (entregar não é editar o do outro)", () => {
+    expect(
+      writeCountAs(
+        GOV_AGENT_A,
+        `insert into public.crm_tasks (organization_id, title, assigned_to, created_by)
+           values ('${OFF_ORG}', 'Tarefa que o agent A entrega ao agent B (opção desligada)', '${GOV_AGENT_B}', '${GOV_AGENT_A}')`,
+      ),
+    ).toBe(1);
+  });
+
+  it("manager vê e edita o compromisso e a tarefa do atendente (a escada para em manager+)", () => {
+    expect(
+      countAs(GOV_MANAGER, `select count(*) from public.calendar_appointments where id = '${APPT_B_OFF}';`),
+    ).toBe(1);
+    expect(
+      writeCountAs(
+        GOV_MANAGER,
+        `update public.calendar_appointments set title = 'remarcado pelo manager (opção desligada)' where id = '${APPT_B_OFF}'`,
+      ),
+    ).toBe(1);
+    expect(countAs(GOV_MANAGER, `select count(*) from public.crm_tasks where id = '${TASK_B_OFF}';`)).toBe(1);
+  });
+
+  it("viewer LÊ a agenda e as tarefas da equipe mesmo com a opção desligada (o gate é de escrita)", () => {
+    expect(
+      countAs(GOV_VIEWER, `select count(*) from public.calendar_appointments where id = '${APPT_B_OFF}';`),
+    ).toBe(1);
+    expect(countAs(GOV_VIEWER, `select count(*) from public.crm_tasks where id = '${TASK_B_OFF}';`)).toBe(1);
+  });
+});
+
+describe("agenda e tarefas — organização em visibility_mode = 'own' e opção desligada (só os seus)", () => {
   it("⭐ agent A NÃO vê o compromisso do agent B (nem da mesma equipe)", () => {
     expect(
       countAs(GOV_AGENT_A, `select count(*) from public.calendar_appointments where id = '${APPT_B_OWN}';`),

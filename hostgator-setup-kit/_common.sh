@@ -7,6 +7,7 @@ set -euo pipefail
 # por install.sh; instalação já em andamento no mesmo processo (install.sh)
 # mantém a escolha, já exportada em DESKCOMM_IDIOMA_CLI.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_i18n.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_manifestos.sh"
 
 COMPOSE="docker-compose.prod.yml"
 COMPOSE_TRAEFIK="docker-compose.traefik.yml"
@@ -400,8 +401,11 @@ pg_container() {
 # o update.sh leva quem já instalou até ela (atualizar_supabase_single_server).
 # Sem `readonly`: o update.sh relê este arquivo depois do checkout.
 # Esta ref foi conferida em ARM64: todas as 11 imagens do compose oficial têm
-# manifesto linux/arm64. Antes de atualizar a ref, confira as imagens novamente;
-# o update automático também precisa continuar funcionando na VPS A1.
+# manifesto linux/arm64. Antes de atualizar a ref, confira as imagens novamente
+# com `preflight_supabase_da_ref <ref nova> linux/arm64` (e linux/amd64), de
+# _supabase-images.sh: a troca da ref reprova tests/shell/single-server-installer.test.sh,
+# que a fixa, e é ali que esta conferência é cobrada — não na promoção de
+# `stable`, onde uma falha de rede ou do upstream seguraria a release de todos.
 SUPABASE_REF="self-hosted/v0.8.1"
 
 dir_do_supabase() { printf '%s/.runtime/supabase' "${PROJECT_DIR:-$PWD}"; }
@@ -1111,6 +1115,39 @@ preflight_atualizacao() {  # preflight_atualizacao <versão alvo>
   if ! com_prazo 30 docker info >/dev/null 2>&1; then
     printf '%s' "o Docker não respondeu em 30s (daemon parado ou travado — veja 'systemctl status docker' e 'journalctl -u docker -n 100')."
     return 1
+  fi
+  # ── Alteração local em arquivo que a versão alvo TROCA ─────────────────────
+  # O `git checkout` do passo "Baixando o código novo" recusa passar por cima de
+  # alteração local, e a atualização morre LÁ — depois do backup. Medido numa VPS
+  # real em 15/10/2026: o clique na tela passou por este preflight, fez o backup
+  # inteiro (banco, sessões do WhatsApp, 403 MB de anexos) e só então parou em
+  # "Your local changes to the following files would be overwritten by
+  # checkout", sem dizer o que fazer com o arquivo. A pergunta deste passo é
+  # "dá para atualizar sem derrubar o que está no ar?", e com a árvore assim não.
+  #
+  # A régua é a INTERSEÇÃO com o que a versão alvo troca, e não "existe arquivo
+  # alterado?": `git diff HEAD <tag>` devolve exatamente os arquivos em que o
+  # checkout recusa, e um alterado IDÊNTICO nas duas versões não impede nada
+  # (os dois desfechos medidos em 15/10/2026). Recusar por esse último travaria o
+  # dono sem motivo — e quem recusa sem motivo perde a autoridade para recusar.
+  local raiz_git tag_alvo sujos arq bloqueio
+  raiz_git="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  tag_alvo="v$versao"
+  if [ -n "$raiz_git" ] && git -C "$raiz_git" rev-parse -q --verify "refs/tags/$tag_alvo" >/dev/null 2>&1; then
+    sujos="$({ git -C "$raiz_git" diff --name-only; git -C "$raiz_git" diff --cached --name-only; } 2>/dev/null | sort -u)"
+    bloqueio=""
+    while IFS= read -r arq; do
+      [ -n "$arq" ] || continue
+      if git -C "$raiz_git" diff --quiet HEAD "$tag_alvo" -- "$arq" 2>/dev/null; then
+        : # idêntico nas duas versões: o checkout passa, não bloqueia
+      else
+        bloqueio="$bloqueio $arq"
+      fi
+    done <<<"$sujos"
+    if [ -n "$bloqueio" ]; then
+      printf '%s' "a instalação tem alterações locais em arquivo(s) que a versão $versao troca:$bloqueio. A troca de versão recusa passar por cima delas, e a atualização pararia DEPOIS do backup. Guarde o que é seu (git diff > minhas-mudancas.patch, ou git stash) ou desfaça (git checkout -- <arquivo>) e rode de novo. Nada foi parado nem baixado."
+      return 1
+    fi
   fi
   # Quem pediu construção local de propósito não depende do registro: é a
   # saída de escape que o próprio portão do build ensina, e recusá-la aqui a
@@ -2042,6 +2079,45 @@ trio_publicado() {
     [ "$(ghcr_status "$i" "$tag")" = "200" ] || return 1
   done
   return 0
+}
+
+# Instalação nova usa uma única versão numérica nas quatro imagens próprias e
+# confere a imagem WAHA efetiva, inclusive quando foi escolhida pelo operador.
+# Só consulta registry; não escreve .env, banco, Docker ou configuração.
+preflight_instalacao() { # <X.Y.Z> <linux/platform> <WAHA_IMAGE efetiva>
+  local versao="${1:-}" plataforma="${2:-}" waha="${3:-}"
+  if ! [[ "$versao" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'A instalação ARM64 exige versão numérica publicada (X.Y.Z): %s\n' "$versao" >&2
+    return 1
+  fi
+  [ -n "$waha" ] || { printf 'WAHA_IMAGE vazia\n' >&2; return 1; }
+  preflight_imagens_crm "$versao" "$plataforma" || return 1
+  if ! manifesto_tem_plataforma "$waha" "$plataforma"; then
+    printf 'WAHA_IMAGE %s não oferece %s; escolha uma imagem compatível, sem perder sessões/volumes.\n' "$waha" "$plataforma" >&2
+    return 1
+  fi
+}
+
+# Confere uma atualização real sem mudar o .env. No ARM64 legado, apenas os
+# defaults AMD64 conhecidos serão migrados por gravar_imagens DEPOIS do backup;
+# a sonda usa o destino futuro para não rejeitar falsamente a instalação.
+# WAHA customizada/Plus nunca é substituída nem na sonda nem no update.
+preflight_plataforma_atualizacao() { # <vX.Y.Z> <linux/platform>; usa WAHA_IMAGE carregada
+  local tag="${1:-}" plataforma="${2:-}" versao waha
+  if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'Atualização exige tag numérica publicada (vX.Y.Z): %s\n' "$tag" >&2
+    return 1
+  fi
+  versao="${tag#v}"
+  waha="${WAHA_IMAGE:-$(imagem_waha_padrao_para_host)}"
+  if [ "$plataforma" = linux/arm64 ] && waha_amd64_conhecido_em_arm arm64 "$waha"; then
+    waha='devlikeapro/waha:noweb-arm-2026.7.2'
+  fi
+  preflight_imagens_crm "$versao" "$plataforma" || return 1
+  if ! manifesto_tem_plataforma "$waha" "$plataforma"; then
+    printf 'WAHA_IMAGE %s não oferece %s; não alterei a escolha do operador.\n' "$waha" "$plataforma" >&2
+    return 1
+  fi
 }
 
 # O .env está com pin PELA METADE? (app fixado numa versão, worker/scheduler não)
