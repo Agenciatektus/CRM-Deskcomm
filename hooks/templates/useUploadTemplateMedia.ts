@@ -1,5 +1,5 @@
 "use client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { ApiError, type ApiErrorBody } from "@/lib/api/types";
@@ -15,6 +15,7 @@ import type { MidiaDeTemplate } from "@/lib/templates/midias";
  * remoção, para os dois não disputarem a ordem da lista.
  */
 export function useUploadTemplateMedia() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { templateId: string; file: File }): Promise<MidiaDeTemplate[]> => {
       const form = new FormData();
@@ -36,6 +37,9 @@ export function useUploadTemplateMedia() {
       }
       return json.data.midias ?? [];
     },
+    // Cada imagem que entra muda a lista e o compositor (mesma chave): sem
+    // isto, a edição com upload deixava "Imagens 4" na tela até recarregar.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["message-templates"] }),
     onError: (err) => showApiError(err),
   });
 }

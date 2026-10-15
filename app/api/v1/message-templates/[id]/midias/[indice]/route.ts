@@ -79,9 +79,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams): Promise<R
     headers: {
       "Content-Type": mimeDaMidia(midia.storage_path),
       "Content-Length": String(corpo.byteLength),
-      // Privado e curto: a imagem é material comercial da organização, não
-      // arquivo público. Um cache compartilhado guardaria esse material.
-      "Cache-Control": "private, max-age=300",
+      // `no-store`: a URL é a POSIÇÃO na lista, e a posição muda de imagem
+      // quando o operador troca ou remove uma. Com cache, o navegador servia
+      // os bytes da imagem antiga sob a URL da nova (prova pela tela do #2704).
+      "Cache-Control": "private, no-store",
     },
   });
 }

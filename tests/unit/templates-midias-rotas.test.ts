@@ -217,6 +217,8 @@ describe("GET /message-templates/:id/midias/:indice", () => {
 
     expect(r.status).toBe(200);
     expect(r.headers.get("Content-Type")).toBe("image/jpeg");
+    // A URL é a posição, não a imagem: cache aqui serve a imagem trocada.
+    expect(r.headers.get("Cache-Control")).toBe("private, no-store");
     expect(h.storage.download).toHaveBeenCalledWith(minha(1).storage_path);
   });
 });

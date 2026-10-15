@@ -45,10 +45,15 @@ export function AttachmentPreviewDialog({
   onRemove,
 }: Props) {
   const t = useT();
-  const [caption, setCaption] = useState("");
-  // As deps são ESTADOS (`files` vem do state do composer), então isto roda na
-  // troca da fila e não a cada tecla digitada na legenda.
-  useEffect(() => setCaption(legendaInicial ?? ""), [files, legendaInicial]);
+  const [caption, setCaption] = useState(legendaInicial ?? "");
+  // A legenda é reposta NA MESMA renderização em que a fila muda, e não num
+  // efeito depois dela: com o efeito, um Enviar entre a troca da fila e o
+  // efeito mandava a legenda velha junto da imagem do retry (#2526).
+  const [base, setBase] = useState({ files, legendaInicial });
+  if (base.files !== files || base.legendaInicial !== legendaInicial) {
+    setBase({ files, legendaInicial });
+    setCaption(legendaInicial ?? "");
+  }
 
   // PAR resolvido de uma vez: arquivo + URL do preview. É o que mantém
   // `noUncheckedIndexedAccess` feliz (nenhum índice cru vira `src`) e mantém a
