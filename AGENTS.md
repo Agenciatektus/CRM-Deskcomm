@@ -200,6 +200,7 @@ cite cada um:
 | Instalar, atualizar ou consertar a instalação numa VPS; domínio, Supabase, WhatsApp | `deskcomm-instalar`     |
 | Usar o CRM no dia a dia; encontrar telas, fluxos e configurações pela interface     | `deskcomm-operacao`     |
 | Configurar o CRM para um cliente ou nicho: agentes, roteadores, follow-ups, base    | `deskcomm-cliente-novo` |
+| Revender como SaaS: planos, cobrança pela Stripe ou Asaas, régua, contrato          | `deskcomm-saas`         |
 | Desempenho, conversão, custo de IA, funil, relatório                                | `deskcomm-metricas`     |
 | O agente responde errado, passa tudo para humano, não usa a agenda; afinar o prompt | `deskcomm-prompt`       |
 | Contribuir: corrigir bug, abrir ou atualizar PR, migration, conflito com a `main`   | `deskcomm-contribuir`   |
@@ -544,6 +545,7 @@ casar, mesmo que a pessoa não saiba que ele existe. Fora de um clone (ou num cl
 |---|---|
 | instalar, atualizar ou consertar a instalação numa VPS; domínio, Supabase, WhatsApp que não conecta | `deskcomm-instalar` |
 | configurar o CRM para um cliente ou nicho: agentes, roteadores, follow-ups, base de conhecimento | `deskcomm-cliente-novo` |
+| revender como SaaS: painel do dono, planos, cobrança pela Stripe ou pelo Asaas, régua, contrato com o cliente final | `deskcomm-saas` |
 | desempenho, conversão, custo de IA, funil, relatório | `deskcomm-metricas` |
 | o agente responde errado, passa tudo para humano, não usa a agenda; melhorar o prompt | `deskcomm-prompt` |
 | contribuir: corrigir bug, abrir ou atualizar PR, migration, conflito com a `main` | `deskcomm-contribuir` — que fica quieto quando `bash .agents/skills/deskcomm-contribuir/scripts/quem-sou.sh` responde `mantenedor` |

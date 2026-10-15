@@ -249,7 +249,9 @@ docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml --env-fi
 Omitir `-f docker-compose.traefik.yml` recria o contêiner sem as labels de
 roteamento; o Traefik da hospedagem deixa de enxergá-lo e **o domínio inteiro
 responde `404 page not found`** — com o contêiner `healthy`, porque o
-healthcheck é um probe TCP interno e não sabe nada de roteamento.
+healthcheck é um probe TCP interno e não sabe nada de roteamento. Atrás do
+Coolify a cara é outra: `503` com `no available server` no `https` (medido,
+ver `docs/runbooks/deploy.md`).
 
 **Numa VPS atrás de NAT (ou CGNAT, ou rede sem entrada), `REVERSE_PROXY=cloudflared`
 entra o `docker-compose.cloudflared.yml`:** desliga o Caddy e sobe o `cloudflared`, que
@@ -694,6 +696,7 @@ naquele clone — no Claude Code a skill GLOBAL vence a do projeto com o mesmo n
 - `deskcomm-instalar` — instalar, atualizar ou consertar a instalação numa VPS
 - `deskcomm-operacao` — usar o CRM no dia a dia, encontrar telas, fluxos e configurações pela interface
 - `deskcomm-cliente-novo` — configurar o CRM para um cliente ou nicho (agentes, roteadores, follow-ups, conhecimento)
+- `deskcomm-saas` — revender o CRM como SaaS: planos, cobrança pela Stripe ou pelo Asaas, régua, contrato
 - `deskcomm-metricas` — desempenho, conversão, custo de IA, funil, relatório
 - `deskcomm-prompt` — afinar o prompt de um agente que não performa
 - `deskcomm-contribuir` — o espelho da triagem, antes do PR; fica quieto para o mantenedor

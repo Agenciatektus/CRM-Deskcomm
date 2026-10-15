@@ -17,6 +17,10 @@
 #   1. o serviço `caddy` ganha um profile que nunca é ativado — o compose
 #      simplesmente não o cria (não há 80/443 para publicar);
 #   2. sobe o `cloudflared`, que fala com `app:3000` pela rede interna.
+#   3. o `app` passa a ler o endereço de quem acessa do `cf-connecting-ip`
+#      (IP_DO_CLIENTE_HEADER, lib/http/ip-do-cliente.ts). A borda da
+#      Cloudflare ACRESCENTA ao `x-forwarded-for` que recebe, em vez de
+#      substituí-lo como o Caddy faz; o `cf-connecting-ip` é ela quem escreve.
 #
 # O comportamento padrão (sem este arquivo) fica EXATAMENTE como antes: quem não
 # passa o `-f docker-compose.cloudflared.yml` não é afetado por nada aqui.
@@ -71,6 +75,14 @@
 # precisa de outro caminho para a mídia, e isso está fora do escopo deste overlay.
 
 services:
+  # Só acrescenta uma variável ao `app` do arquivo base (o compose mescla o
+  # mapa `environment`). Ela vive AQUI, e não no .env, porque só vale para
+  # esta topologia: sem a borda da Cloudflare na frente, quem escreveria o
+  # `cf-connecting-ip` seria o próprio cliente.
+  app:
+    environment:
+      IP_DO_CLIENTE_HEADER: cf-connecting-ip
+
   cloudflared:
     # Imagem UPSTREAM: referencia-se com tag fixa, nunca se republica
     # (docs/doctrine/packaging.md). Tag de versão é imutável aqui, então
