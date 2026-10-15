@@ -218,7 +218,7 @@ test("[P0] primeira cobrança: conectar, assinar, atrasar, suspender e voltar so
     await expect(pB.getByRole("heading", { name: "Checkout de teste" })).toBeVisible();
     await expect(pB.getByText("(pagamento único)")).toBeVisible();
     expect(await assinaturaDe(orgB)).toMatchObject({ plano_id: idEssencial, plano_agendado_id: null });
-    expect(duble.assinaturaPrincipal(cliente!).unit_amount).toBe(4990);
+    expect(duble.assinaturaPrincipal(cliente!)?.unit_amount).toBe(4990);
     await pB.getByRole("button", { name: "Pagar com cartão de teste" }).click();
     await pB.waitForURL(/\/app\/settings\/billing\?voltou=1/);
     await expect(pB.getByText("Pagamento confirmado. Obrigado!")).toBeVisible({ timeout: 60_000 });
@@ -232,7 +232,9 @@ test("[P0] primeira cobrança: conectar, assinar, atrasar, suspender e voltar so
     await pB.getByRole("button", { name: "Confirmar troca" }).click();
     await expect(pB.getByText(/O novo plano vale a partir de \d{2}\/\d{2}/)).toBeVisible();
     expect(await assinaturaDe(orgB)).toMatchObject({ plano_id: idProfissional, plano_agendado_id: idEssencial });
-    expect(duble.assinaturaPrincipal(cliente!)).toMatchObject({ unit_amount: 9990, proration_behavior: "none" });
+    // A próxima fatura já sai com o preço novo, sem proração (spec §7e): o plano
+    // e os limites é que só viram na renovação paga.
+    expect(duble.assinaturaPrincipal(cliente!)).toMatchObject({ unit_amount: 4990, proration_behavior: "none" });
     await pB.screenshot({ path: `${EVIDENCIA}/billing-downgrade-agendado.png`, fullPage: true });
 
     // ── 8. Atraso, avisos com link de pagamento, suspensão ──────────────────
