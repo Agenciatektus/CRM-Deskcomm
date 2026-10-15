@@ -23,7 +23,7 @@ import { describe, expect, it } from "vitest";
 
 const RAIZ = process.cwd();
 const MIGRATION =
-  "supabase/migrations/20261013000344_0656_renomear_que_junta_guarda_a_cor_e_avisa.sql";
+  "supabase/migrations/20261018120002_0677_renomear_que_junta_guarda_a_cor_e_avisa.sql";
 
 /** A ÚLTIMA definição da função — é a que o Postgres deixa de pé. */
 function ultimaDefinicao(texto: string, fn: string): string {
@@ -100,6 +100,23 @@ describe("renomear que junta: o desempate e o aviso estão nos DOIS artefatos", 
     expect(corpo).toMatch(DESEMPATE);
     expect(corpo).not.toMatch(/order by lower\(x\.chave\), x\.ord/);
     expect(corpo).toMatch(/'juntou', v_juntou/);
+  });
+
+  it("⭐ a última definição mantém a anulação POR CHAVE da 0673 — excluir uma não apaga as outras", () => {
+    // A 0673 (issue #2895) redefine a MESMA função e troca o `when v_remover
+    // then null` por uma anulação que só pega a chave excluída. Esta migration
+    // parte do corpo dela; partir do anterior traria o defeito de volta.
+    for (const texto of [migration, baseline]) {
+      const corpo = ultimaDefinicao(texto, "fn_vocabulario_de_tags_operar");
+      expect(corpo.length).toBeGreaterThan(1000);
+      expect(corpo).not.toMatch(/when v_remover then null/);
+      expect(corpo.match(/when v_remover and lower\(btrim\(/g)?.length).toBe(3);
+    }
+    // E no baseline o bloco desta vem DEPOIS do da 0673, que é a ordem da cadeia.
+    expect(baseline.indexOf("-- ---- renomear que junta:")).toBeGreaterThan(
+      baseline.indexOf("(migration 0673, issue #2895) ----"),
+    );
+    expect(baseline.indexOf("(migration 0673, issue #2895) ----")).toBeGreaterThan(-1);
   });
 
   it("o apêndice entra ANTES da VARREDURA anon — depois dela a cura não o alcança", () => {

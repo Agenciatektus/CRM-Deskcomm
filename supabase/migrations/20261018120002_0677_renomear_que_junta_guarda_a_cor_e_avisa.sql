@@ -1,6 +1,6 @@
--- manifest: **Renomear para um nome que já existe JUNTA as duas etiquetas — e agora a junção não perde a cor nem responde como renome simples (issue #2801).** Medido em Postgres na triagem do #2784: com o vocabulário `[{tag: "b"}, {tag: "a", cor: "#ab4aba"}]` ("b" sem cor, ANTES de "a"), `renomear a -> b` devolvia `[{tag: "b"}]` — a cor que o operador escolheu sumia, e a operação respondia `alterou: true` idêntica a um renome simples. O dedupe do ramo renomear/juntar em `fn_vocabulario_de_tags_operar` era `order by lower(x.chave), x.ord`: ficava a primeira entrada pela POSIÇÃO, com ou sem metadado. (A) O desempate passa a ser PELO METADADO ANTES DA ORDEM — `((x.valor ->> 'cor') is not null or (x.valor ->> 'descricao') is not null) desc, x.ord`, o MESMO desempate da função de leitura (`fn_vocabulario_de_tags`) e do ramo `definir_cor`, que já preferia metadado. Regra dos DOIS sentidos, declarada: metadado decide contra AUSÊNCIA de metadado; quando as duas entradas já têm metadado (duas cores), o empate volta a ser a ordem no vocabulário, isto é, fica quem já ocupava a posição de destino — cor contra cor tem de perder uma, e preservar a identidade (nome + posição + cor) de quem já estava lá é a escolha. (B) O retorno ganha `juntou boolean`: o banco é quem sabe se o destino já existia, e sem o marcador a tela não tinha o que dizer — hoje ela avisa, no toast e antes de confirmar. `create or replace` na MESMA assinatura de cinco argumentos; `revoke`/`grant` reafirmados nas DUAS origens de EXECUTE. Sem tabela, coluna ou dado novo. Apêndice no `baseline.sql` ANTES da VARREDURA anon (0116). Gates: `tests/invariants/tags-juntar-guarda-a-cor.test.ts` (RED/GREEN em Postgres real: a cor sobrevive, os DOIS sentidos, `juntou` no retorno e `definir_cor` intacto), `tests/unit/tags-juntar-guarda-a-cor.test.ts` (o desempate está no TEXTO da última definição, nos dois artefatos) e a suíte de vocabulário existente.
+-- manifest: **Renomear para um nome que já existe JUNTA as duas etiquetas — e agora a junção não perde a cor nem responde como renome simples (issue #2801).** Medido em Postgres na triagem do #2784: com o vocabulário `[{tag: "b"}, {tag: "a", cor: "#ab4aba"}]` ("b" sem cor, ANTES de "a"), `renomear a -> b` devolvia `[{tag: "b"}]` — a cor que o operador escolheu sumia, e a operação respondia `alterou: true` idêntica a um renome simples. O dedupe do ramo renomear/juntar em `fn_vocabulario_de_tags_operar` era `order by lower(x.chave), x.ord`: ficava a primeira entrada pela POSIÇÃO, com ou sem metadado. (A) O desempate passa a ser PELO METADADO ANTES DA ORDEM — `((x.valor ->> 'cor') is not null or (x.valor ->> 'descricao') is not null) desc, x.ord`, o MESMO desempate da função de leitura (`fn_vocabulario_de_tags`) e do ramo `definir_cor`, que já preferia metadado. Regra dos DOIS sentidos, declarada: metadado decide contra AUSÊNCIA de metadado; quando as duas entradas já têm metadado (duas cores), o empate volta a ser a ordem no vocabulário, isto é, fica quem já ocupava a posição de destino — cor contra cor tem de perder uma, e preservar a identidade (nome + posição + cor) de quem já estava lá é a escolha. (B) O retorno ganha `juntou boolean`: o banco é quem sabe se o destino já existia, e sem o marcador a tela não tinha o que dizer — hoje ela avisa, no toast e antes de confirmar. `create or replace` na MESMA assinatura de cinco argumentos; `revoke`/`grant` reafirmados nas DUAS origens de EXECUTE. Sem tabela, coluna ou dado novo. O corpo parte da 0673 (issue #2895, "excluir etiqueta preserva as outras"), que redefine a MESMA função: a anulação por chave da 0673 fica intacta, e esta migration vem DEPOIS dela na cadeia. Apêndice no `baseline.sql` depois do bloco da 0673 e ANTES da VARREDURA anon (0116). Gates: `tests/invariants/tags-juntar-guarda-a-cor.test.ts` (RED/GREEN em Postgres real: a cor sobrevive, os DOIS sentidos, `juntou` no retorno e `definir_cor` intacto), `tests/unit/tags-juntar-guarda-a-cor.test.ts` (o desempate está no TEXTO da última definição, nos dois artefatos) e a suíte de vocabulário existente.
 
--- 0656: renomear que junta guarda a cor e avisa (issue #2801).
+-- 0677: renomear que junta guarda a cor e avisa (issue #2801).
 --
 -- Detalhe completo no `-- manifest:` acima; o bloco é o MESMO, letra a letra, no
 -- apêndice de `supabase/baseline.sql` — é ele que o `update.sh` reaplica a cada
@@ -9,8 +9,13 @@
 -- As DUAS mudanças estão no ramo renomear/juntar de
 -- `fn_vocabulario_de_tags_operar`, e as duas são correção de comportamento, não
 -- de forma: a assinatura, os privilégios e as ações continuam os mesmos da 0336.
+--
+-- ⚠️ O corpo parte da 0673 (excluir uma etiqueta não apaga as outras), letra a
+-- letra, e só acrescenta o delta desta: o desempate pelo metadado e `juntou`. A
+-- anulação por chave da 0673 (`when v_remover and lower(...) = lower(v_tag)`)
+-- fica como está. Quem redefinir esta função depois parte DESTA versão.
 
--- ---- renomear que junta: a cor sobrevive e a operação avisa (migration 0656, issue #2801) ----
+-- ---- renomear que junta: a cor sobrevive e a operação avisa (migration 0677, issue #2801) ----
 -- O dedupe do ramo renomear/juntar era `order by lower(x.chave), x.ord`: a
 -- primeira entrada pela posição ficava, COM OU SEM cor/descrição. Renomear "a"
 -- (com cor) para "b" (que já existia, sem cor) perdia a cor — e a operação
@@ -402,13 +407,13 @@ begin
         select distinct on (lower(x.chave)) x.valor, x.ord
         from (
           select case
-                   when v_remover then null
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
                    when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
                      then v_destino
                    else btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))
                  end as chave,
                  case
-                   when v_remover then null
+                   when v_remover and lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag) then null
                    when lower(btrim(coalesce(e.valor ->> 'tag', e.valor #>> '{}'))) = lower(v_tag)
                      then jsonb_set(
                             case when jsonb_typeof(e.valor) = 'string' then jsonb_build_object('tag', e.valor #>> '{}')
@@ -460,7 +465,7 @@ begin
         select distinct on (lower(y.valor)) y.valor, y.ord
         from (
           select case
-                   when v_remover then null
+                   when v_remover and lower(btrim(s.valor #>> '{}')) = lower(v_tag) then null
                    when lower(btrim(s.valor #>> '{}')) = lower(v_tag) then v_destino
                    else btrim(s.valor #>> '{}')
                  end as valor,

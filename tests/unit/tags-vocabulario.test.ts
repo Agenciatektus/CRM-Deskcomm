@@ -154,7 +154,7 @@ describe("fatia S4 — vocabulário de tags (contrato do que foi escrito)", () =
     // não pode sobrar em lugar nenhum, nem aqui nem na migration nova.
     //
     // A âncora é a ÚLTIMA ocorrência, pela regra de
-    // `sonda-do-baseline-ancora-na-ultima-definicao.test.ts`: a 0656 (issue
+    // `sonda-do-baseline-ancora-na-ultima-definicao.test.ts`: a 0677 (issue
     // #2801) reafirma o MESMO revoke/grant no apêndice dela, como a convenção
     // do repo faz em toda redefinição de função — e o baseline aplica tudo em
     // ordem, então quem vale é a última definição. Antes era `.match(...)` sem
