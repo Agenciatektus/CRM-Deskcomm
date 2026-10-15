@@ -15883,7 +15883,7 @@ revoke all on public.calendar_event_types from anon;
 alter table public.calendar_appointments enable row level security;
 drop policy if exists tenant_isolation_calendar_appointments_all on public.calendar_appointments;
 drop policy if exists calendar_appointments_select on public.calendar_appointments;
--- as policies desta tabela nascem no apendice (migration 0677), que as recria desde a origem.
+-- as policies desta tabela nascem no apendice (migration 0680), que as recria desde a origem.
 drop policy if exists calendar_appointments_write on public.calendar_appointments;
 revoke all on public.calendar_appointments from anon;
 
@@ -18236,7 +18236,7 @@ create index if not exists crm_tasks_lead_idx
 
 alter table public.crm_tasks enable row level security;
 
--- as policies desta tabela nascem no apendice (migration 0677), que as recria desde a origem.
+-- as policies desta tabela nascem no apendice (migration 0680), que as recria desde a origem.
 drop policy if exists crm_tasks_select on public.crm_tasks;
 drop policy if exists crm_tasks_write on public.crm_tasks;
 -- `ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES TO anon` do baseline alcança
@@ -53524,7 +53524,7 @@ $$;
 revoke execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) from public, anon;
 grant  execute on function public.fn_vocabulario_de_tags_operar(uuid, text, text, text, text) to authenticated, service_role;
 
--- ---- agenda e tarefas respeitam a visibilidade do atendente (migration 0677) ----
+-- ---- agenda e tarefas respeitam a visibilidade do atendente (migration 0680) ----
 -- manifest: agenda e tarefas passam a respeitar organizations.settings.visibility_mode — o agent vê e escreve só o que é dele, manager+ segue org-wide (#2902)
 --
 -- ─── O defeito, medido (issue #2902, baseline 1.80.0) ───────────────────────
