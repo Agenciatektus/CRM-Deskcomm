@@ -1,13 +1,15 @@
 # Adendo aprovado — entrada paga e upgrade proporcional
 
-Adendo aprovado pelo dono do produto em 13/10/2026. Revisa D-3 da especificação `2026-09-29-cobranca-do-revendedor-design.md`: upgrade após o teste aplica após confirmação da cobrança proporcional, mantendo a data de renovação; downgrade aplica na próxima renovação paga, sem crédito proporcional. O registro histórico da revisão original permanece na seção 3.8 da especificação canônica.
+Adendo aprovado pelo dono do produto no doc 146 (opção B, 15/10/2026). Revisa D-3 da especificação `2026-09-29-cobranca-do-revendedor-design.md`: upgrade após o teste aplica após confirmação da cobrança proporcional, mantendo a data de renovação; downgrade aplica na próxima renovação paga, sem crédito proporcional. O registro histórico da revisão original permanece na seção 3.8 da especificação canônica.
 
 ## Entrada paga
 
 - No cadastro público, quando a cobrança está ligada, a pessoa pode selecionar um plano oferecido. O identificador escolhido é validado no servidor e novamente pelo gatilho que cria a assinatura.
 - Plano com dias de teste positivos mantém o período de teste existente.
 - Plano com zero dias de teste cria a assinatura como pendente e suspende a organização até o provedor confirmar o primeiro pagamento. A tolerância de renovação não abre o acesso inicial.
-- Organizações sem assinatura continuam isentas; o comportamento só vale quando a cobrança está ligada e há plano de cadastro válido.
+- Com a cobrança ligada, toda empresa nova nasce com plano: o escolhido ou, sem escolha, o padrão. Sem padrão e com plano oferecido, o cadastro sem escolha é recusado (`plano_obrigatorio`) e o "Entrar com Google" some do cadastro, porque não leva a escolha.
+- Exceção (doc 146, opção B): o revendedor que não tem plano nenhum — nem padrão, nem oferecido — segue como antes. A empresa nasce isenta e o "Entrar com Google" aparece. A exceção não vale para quem oferece planos sem padrão, senão o Google e o cadastro sem escolha pulariam a entrada paga. O mesmo critério está no gatilho (`fn_trial_na_criacao_da_org`, migration 0660) e em `lib/cobranca/cadastro.ts`.
+- Com a cobrança desligada, nada muda: nenhuma empresa nasce com plano.
 
 ## Troca de plano
 
