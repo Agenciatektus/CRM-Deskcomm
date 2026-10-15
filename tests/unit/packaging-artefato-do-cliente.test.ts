@@ -372,8 +372,14 @@ describe("packaging — o caminho Cloudflare Tunnel (docker-compose.cloudflared.
   const overlay = fs.readFileSync(path.join(RAIZ, "docker-compose.cloudflared.yml"), "utf8");
   const servicos = lerServicos(overlay);
 
-  it("o parser enxerga o cloudflared e o caddy desligado", () => {
-    expect([...servicos.keys()].sort()).toEqual(["caddy", "cloudflared"]);
+  it("o parser enxerga o cloudflared, o caddy desligado e o app", () => {
+    expect([...servicos.keys()].sort()).toEqual(["app", "caddy", "cloudflared"]);
+  });
+
+  it("o app lê o endereço de quem acessa do cabeçalho que a Cloudflare escreve", () => {
+    // Sem isto, `ipDoCliente` usa o 1º salto do x-forwarded-for — que, atrás
+    // da borda da Cloudflare, é o que o cliente mandou.
+    expect(servicos.get("app")!).toMatch(/^\s{6}IP_DO_CLIENTE_HEADER:\s*cf-connecting-ip\s*$/m);
   });
 
   it("a imagem do cloudflared está pinada — nunca :latest nem tag implícita", () => {
