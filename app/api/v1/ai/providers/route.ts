@@ -35,10 +35,7 @@ import {
 } from "@/lib/ai/pontos/resolver";
 import { PAPEIS, PONTOS_DE_IA, PONTO_POR_ID } from "@/lib/ai/pontos/registro";
 import { PROVEDORES, ehProvedorSuportado, PROVEDOR_POR_ASSINATURA } from "@/lib/ai/pontos/provedores";
-import {
-  listarModelosDaAssinatura,
-  listarModelosDaAssinaturaOuVazio,
-} from "@/lib/ai/catalogo/modelos-da-assinatura";
+import { listarModelosDaAssinaturaOuVazio } from "@/lib/ai/catalogo/modelos-da-assinatura";
 import { validarBinding } from "@/lib/ai/pontos/validar-binding";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { decidirTranscricao } from "@/lib/messaging/media/escada-de-transcricao";
@@ -374,10 +371,12 @@ export async function PUT(req: NextRequest): Promise<Response> {
 
   // Modelos da assinatura são por organização e não entram no catálogo global
   // `ai_models`. Resolva o catálogo da conta conectada para validar capacidades
-  // com a mesma informação que alimenta o seletor da tela.
+  // com a mesma informação que alimenta o seletor da tela. Se a consulta falhar
+  // (rede, 401/403), o modelo fica "desconhecido" e grava com aviso — o mesmo
+  // caminho de antes —, em vez de a falha virar um 500 na gravação.
   const modeloDaAssinatura =
     corpo.provider === PROVEDOR_POR_ASSINATURA
-      ? (await listarModelosDaAssinatura(org.orgId))?.find((m) => m.model_id === corpo.model_id) ?? null
+      ? (await listarModelosDaAssinaturaOuVazio(org.orgId)).find((m) => m.model_id === corpo.model_id) ?? null
       : null;
   const modeloConhecido =
     corpo.provider === PROVEDOR_POR_ASSINATURA ? modeloDaAssinatura !== null : modelo !== null;
@@ -531,7 +530,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
 
   const modeloDaAssinatura =
     corpo.provider === PROVEDOR_POR_ASSINATURA
-      ? (await listarModelosDaAssinatura(org.orgId))?.find((m) => m.model_id === corpo.default_model) ?? null
+      ? (await listarModelosDaAssinaturaOuVazio(org.orgId)).find((m) => m.model_id === corpo.default_model) ?? null
       : null;
 
   // MAS A CONFERÊNCIA SÓ VALE SE HOUVER CATÁLOGO PARA CONFERIR. `ai_models` é
