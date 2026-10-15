@@ -54,6 +54,29 @@ export async function GET(
     return fail("not_found", t("Solicitação não encontrada."), 404, { requestId });
   }
 
+  // Quem recebe e para onde vai: o admin aprova o envio VENDO o nome do
+  // titular e o e-mail de destino (doc 134). O destino é o mesmo que o worker
+  // usa — o endereço que veio no pedido, senão o e-mail do contato.
+  let contato: { display_name: string | null; email: string | null } | null = null;
+  if (request.contact_id) {
+    const { data: c } = await admin
+      .from("contacts")
+      .select("display_name, email")
+      .eq("organization_id", orgId)
+      .eq("id", request.contact_id)
+      .maybeSingle();
+    contato = c ?? null;
+  }
+  const pedido = (request.request_payload ?? {}) as {
+    customer?: { name?: unknown } | null;
+    delivery?: { address?: unknown } | null;
+  };
+  const textoOuNulo = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const titular = {
+    nome: textoOuNulo(contato?.display_name) ?? textoOuNulo(pedido.customer?.name),
+    email_destino: textoOuNulo(pedido.delivery?.address) ?? textoOuNulo(contato?.email),
+  };
+
   // Fetch audit trail entries for this request
   const { data: auditRows, error: auditErr } = await admin
     .from("api_audit_log")
@@ -93,7 +116,7 @@ export async function GET(
   }
 
   return ok(
-    { request, audit_trail, signed_pdf_url },
+    { request, audit_trail, signed_pdf_url, titular },
     { requestId },
   );
 }

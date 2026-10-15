@@ -74,7 +74,7 @@ export function LgpdRequestDetail({ id, hrefDaLista = "/app/lgpd/requests" }: Pr
     );
   }
 
-  const { request, audit_trail, signed_pdf_url } = data.data;
+  const { request, audit_trail, signed_pdf_url, titular } = data.data;
 
   const shortId = request.id.slice(0, 8);
   const typeLabel = t(TYPE_LABELS[request.request_type] ?? request.request_type);
@@ -137,6 +137,7 @@ export function LgpdRequestDetail({ id, hrefDaLista = "/app/lgpd/requests" }: Pr
           requestId={request.id}
           requestType={request.request_type}
           status={request.status}
+          titular={titular}
         />
       </div>
 

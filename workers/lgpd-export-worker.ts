@@ -2,6 +2,8 @@
  * lgpd-export-worker — consumes `lgpd.data_request_received` events.
  *
  * Pipeline (S-08.04):
+ *   0. Only events from the approval route (`manually_approved` + `approved_by`)
+ *      export — the Nuvemshop request waits for the admin's click (doc 134).
  *   1. Load lgpd_requests row (programmatic org filter).
  *   2. Move status received -> processing, attempts++ (cap at 3).
  *   3. collectExportData → varredura das tabelas que a anonimização alcança (PII-safe).
@@ -102,6 +104,25 @@ export async function processLgpdExport(event: EventRow): Promise<HandlerResult>
     };
   }
 
+  // 0. Só exporta o pedido que alguém da equipe APROVOU (doc 134, opção A).
+  //
+  // O dado sai da empresa para um e-mail que o CRM não confere: quem decide o
+  // envio é uma pessoa, na tela do pedido, vendo o nome do titular. O único
+  // emissor com essa marca é a rota de aprovação
+  // (`app/api/v1/lgpd/requests/[id]/approve/route.ts`), e o tipo do evento só
+  // nasce pelo servidor (migration 0672). Evento sem a marca — o que o webhook
+  // da Nuvemshop emitia antes desta versão e ainda pode estar na fila de quem
+  // atualiza — é consumido sem efeito: o pedido continua `received`, esperando
+  // o clique, e o aviso de prazo segue cobrando a equipe.
+  const aprovadoPor = event.payload?.["approved_by"];
+  if (event.payload?.["manually_approved"] !== true || typeof aprovadoPor !== "string" || !aprovadoPor) {
+    return {
+      consumer_key: "lgpd-export-worker.v1",
+      status: "skipped",
+      detail: "awaiting_approval",
+    };
+  }
+
   const admin = createAdminClient();
 
   // 1. Load request.
@@ -165,11 +186,13 @@ export async function processLgpdExport(event: EventRow): Promise<HandlerResult>
 
   // ─── REIVINDICAÇÃO ATÔMICA (issue #2751) ───────────────────────────────────
   //
-  // O webhook da Nuvemshop e a aprovação emitem `lgpd.data_request_received`
+  // O webhook da Nuvemshop e a aprovação emitiam `lgpd.data_request_received`
   // cada um; com dois drenos (o laço do worker e o cron) os dois eventos rodam
   // em paralelo, os dois leem o pedido fora de `completed` — e, antes desta
   // reivindicação, os dois exportavam (`attempts=2`, dois
-  // `lgpd.export_generated`). Quem exporta é quem CONSEGUE gravar
+  // `lgpd.export_generated`). Hoje só a aprovação dispara a exportação, mas
+  // dois cliques (ou o retry do dreno junto de um clique novo) ainda produzem
+  // dois eventos do mesmo pedido. Quem exporta é quem CONSEGUE gravar
   // `export_claimed_at`: o UPDATE é a trava, e o predicado é reavaliado contra a
   // linha já comitada por quem chegou primeiro.
   //
