@@ -39,6 +39,12 @@
 -- `crm_lead_activities` continua sendo a única régua do que conta como
 -- atividade lá.
 --
+-- ⚠️ E ESTE BLOCO ENTRA ANTES DA VARREDURA anon (migration 0116), que é de
+-- propósito o último do arquivo: `create function` depois dela nasceria com
+-- EXECUTE para anon e sem quem cure (o `alter default privileges` do corpo grava
+-- a concessão no catálogo, e a varredura só alcança o que veio antes). Vigiado
+-- por `tests/unit/varredura-anon-e-o-ultimo-bloco.test.ts`.
+--
 -- `security definer` com `search_path` fixo: o INSERT em `messages` chega tanto
 -- com a sessão do usuário quanto com o service role, e o carimbo do negócio não
 -- pode depender da policy de quem enviou. O EXECUTE é revogado de public/anon/
