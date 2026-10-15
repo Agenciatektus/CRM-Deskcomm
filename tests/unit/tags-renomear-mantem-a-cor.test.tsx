@@ -208,7 +208,7 @@ describe("o aviso de junção antes do clique (#2801)", () => {
 
   it("mudar só a caixa da própria etiqueta NÃO avisa junção; o nome de OUTRA avisa", () => {
     montar([OBRA, VIP]);
-    fireEvent.click(screen.getAllByRole("button", { name: "Renomear" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Renomear" })[0]!);
     const campo = screen.getByLabelText("Novo nome");
 
     // "obra" → "OBRA" é renome: a lista de comparação não inclui a própria etiqueta.
