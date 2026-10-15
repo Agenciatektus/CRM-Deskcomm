@@ -30,8 +30,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  *    no corpo, e a sessão é a única fonte;
  *  - AUDITORIA: cada rota escreve a sua própria entrada (`conversation.closed`,
  *    `conversation.transferred`, `conversation.ai_paused`, …), uma por
- *    conversa. Não há auditoria do lote: uma entrada agregada apagaria qual
- *    conversa sofreu qual ação.
+ *    conversa — exceto `mark-read`, que já não audita na rota individual.
+ *    Não há auditoria do lote: uma entrada agregada apagaria qual conversa
+ *    sofreu qual ação.
  *
  * ── O que esta rota acrescenta ────────────────────────────────────────────
  *
