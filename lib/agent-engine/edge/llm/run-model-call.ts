@@ -216,6 +216,9 @@ export function tetoDeSaida(daOrganizacao: number | undefined, daChamada: number
   return daChamada === undefined ? base : Math.min(base, daChamada);
 }
 
+/** Provedores em que `reasoning: 'none'` foi conferido contra a API real (#2904). */
+const PROVEDORES_COM_RACIOCINIO_NENHUM_MEDIDO: ReadonlySet<string> = new Set(['anthropic', 'openai']);
+
 export interface RunModelCallInput {
   tenantId: string;
   leadId?: string | null;
@@ -967,7 +970,14 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
       topP,
       topK,
       maxOutputTokens: tetoDeSaida(maxOutputTokens, input.maxOutputTokens),
-      ...(input.reasoning !== undefined ? { reasoning: input.reasoning } : {}),
+      // Só onde o `'none'` foi aceito pela API real (#2904). Nos de Chat Completions
+      // (OpenRouter, Requesty, personalizado) o SDK manda `reasoning_effort` para
+      // qualquer modelo; no Gemini 2.5 Pro vira `thinkingBudget: 0`, que o Google
+      // documenta como recusado, e no 3.x Pro, `thinkingLevel: "minimal"`. Uma recusa
+      // derrubaria a classificação em todo turno. Entram com a medição deles.
+      ...(input.reasoning !== undefined && PROVEDORES_COM_RACIOCINIO_NENHUM_MEDIDO.has(cfgUsada.provider)
+        ? { reasoning: input.reasoning }
+        : {}),
     });
   };
 
