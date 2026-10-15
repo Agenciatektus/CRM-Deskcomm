@@ -44,7 +44,14 @@ const RECUSA_DA_OPENROUTER = {
   chaveOuCredito: "A OpenRouter recusou a chave. Confira se ela está inteira e se a conta na OpenRouter tem crédito.",
 } as const;
 
-const RECUSA_POR_PROVEDOR: Readonly<Record<string, typeof RECUSA_DA_TYPESAFE>> = {
+/**
+ * A recusa nomeada de um provedor: a frase da chave e a frase de chave-ou-crédito.
+ * As frases de cada provedor têm literais diferentes, então o mapa é indexado por
+ * esta forma comum — e não pelo tipo literal de uma das entradas.
+ */
+type RecusaDoProvedor = { chave: string; chaveOuCredito: string };
+
+const RECUSA_POR_PROVEDOR: Readonly<Record<string, RecusaDoProvedor>> = {
   [PROVEDOR_DO_JEV]: RECUSA_DA_TYPESAFE,
   openrouter: RECUSA_DA_OPENROUTER,
 };
