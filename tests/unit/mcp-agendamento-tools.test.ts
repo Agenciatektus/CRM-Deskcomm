@@ -141,18 +141,50 @@ describe("crm_find_free_slots", () => {
     expect(params.ate.toISOString()).toBe("2026-09-14T14:00:00.000Z");
   });
 
-  it("prioriza dia específico quando dia e dias_a_frente forem informados juntos (#1436)", async () => {
+  it("⚠️ quando dia e dias_a_frente vêm juntos, vale o PERÍODO — o caso dos modelos GPT (#2889)", async () => {
+    // O caso medido na issue: modelos tipo GPT (OpenRouter) preenchem TODOS os
+    // campos da ferramenta, inclusive os opcionais — chega `dia = HOJE` junto
+    // com `dias_a_frente`. Com a precedência do dia (#1436), a janela colapsava
+    // em HOJE só; a agenda de hoje cheia → resposta VAZIA → o agente repetia a
+    // chamada 8 e 11 vezes num turno e desistia.
+    //
+    // Aqui o `dia` aponta um dia SEM slot (2026-09-05) e o único slot do mock é
+    // de outro dia: só o PERÍODO vencendo devolve algo. Antes deste fix este
+    // teste falhava com `total_de_horarios: 0`.
+    respondeCom(SUCESSO);
+    const antes = Date.now();
+    const r = (await crmFindFreeSlots.handler(
+      { event_type_slug: "c", dia: "2026-09-05", dias_a_frente: 7 },
+      ctx,
+    )) as { horarios: { inicio: string }[]; total_de_horarios: number };
+    // O slot do período (2026-09-01) volta — o dia pedido não o apaga.
+    expect(r.total_de_horarios).toBe(1);
+    expect(r.horarios.map((h) => h.inicio)).toEqual(["2026-09-01T14:00:00.000Z"]);
+
+    // E a janela consultada é a do PERÍODO (agora → +7 dias), nunca a faixa
+    // ampla do dia pedido (-14h/+38h em torno de 2026-09-05).
+    const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+    expect(Math.round((params.ate.getTime() - params.de.getTime()) / 86_400_000)).toBe(7);
+    expect(Math.abs(params.de.getTime() - antes)).toBeLessThan(60_000);
+  });
+
+  it("o pedido legítimo de dia único NÃO muda: `dia` sozinho ainda recorta naquele dia", async () => {
+    // O trade-off do fix #2889, na outra perna: `dia` sem `dias_a_frente` é o
+    // caminho de "o cliente pediu dia 13", e ele segue recortando pelo dia
+    // civil (o teste de Manaus acima é a outra perna do mesmo contrato).
     respondeCom(SUCESSO);
     const r = (await crmFindFreeSlots.handler(
-      { event_type_slug: "c", dia: "2026-09-01", dias_a_frente: 7 },
+      { event_type_slug: "c", dia: "2026-09-05" },
       ctx,
     )) as { horarios: unknown[]; total_de_horarios: number };
-    expect(r.total_de_horarios).toBe(1);
-    expect(horariosLivresDaOrg).toHaveBeenCalled();
+    // O único slot do mock é de 2026-09-01: recortado no dia 05, a resposta é
+    // vazia mesmo — e vazio AQUI é a resposta certa (dia sem vaga).
+    expect(r.total_de_horarios).toBe(0);
+    expect(r.horarios).toEqual([]);
     const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
-    // A janela consultada é a ampla do dia 2026-09-01 (-14h/+38h), ignorando o dias_a_frente: 7
-    expect(params.de.toISOString()).toBe("2026-08-31T10:00:00.000Z");
-    expect(params.ate.toISOString()).toBe("2026-09-02T14:00:00.000Z");
+    // A janela segue sendo a faixa ampla do dia (2026-09-04T10:00Z → 2026-09-06T14:00Z).
+    expect(params.de.toISOString()).toBe("2026-09-04T10:00:00.000Z");
+    expect(params.ate.toISOString()).toBe("2026-09-06T14:00:00.000Z");
   });
 
   it("⚠️ a recusa que sai é a do CLIENTE, nunca a do OPERADOR", async () => {

@@ -161,7 +161,7 @@ const horariosLivresShape = {
     .optional()
     .describe(
       `quantos dias olhar a partir de agora (padrão ${DIAS_PADRAO}). Use ESTE campo se você não sabe a data de hoje. ` +
-        `Se 'dia' também for informado, 'dia' tem precedência.`,
+        `Se 'dia' também for informado, vale ESTE (o período): 'dia' delimita a um dia civil só quando vier sozinho.`,
     ),
   /**
    * A data civil é deliberadamente diferente de um ISO com offset. O modelo sabe
@@ -174,8 +174,8 @@ const horariosLivresShape = {
     .regex(/^\d{4}-\d{2}-\d{2}$/, "dia deve estar em YYYY-MM-DD")
     .optional()
     .describe(
-      "dia civil pedido pelo cliente, em YYYY-MM-DD. Use para uma data específica; o servidor aplica o fuso da agenda " +
-        "(tem precedência sobre dias_a_frente).",
+      "dia civil pedido pelo cliente, em YYYY-MM-DD. Use para uma data específica; o servidor aplica o fuso da agenda. " +
+        "Sozinho, recorta a resposta nesse dia; junto com 'dias_a_frente', vale o período (dias_a_frente).",
     ),
   owner_user_id: z.string().uuid().optional(),
   limite: z
@@ -296,6 +296,7 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
     "existem e `ha_mais` avisa que sobraram — lista cortada NÃO é agenda cheia. " +
     "QUANDO: informe `dias_a_frente` (a partir de agora — ex.: 7 para a próxima semana). " +
     "Para uma data que o cliente nomeou, use `dia` em YYYY-MM-DD; o servidor aplica o fuso da agenda. " +
+    "Se mandar os DOIS, vale o PERÍODO (`dias_a_frente`) — `dia` recorta a um dia só quando vier sozinho. " +
     "NUNCA monte um intervalo UTC por conta própria. " +
     "Lista vazia NÃO é erro e NÃO significa que a agenda está cheia: leia `publicou_horarios`. " +
     "Se ele for false, o atendente ainda não publicou os horários dele — não invente horários e " +
@@ -308,8 +309,16 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
   requiresScope: "mcp:read",
   handler: async (input, ctx) => {
     const agora = new Date();
-    // Se o modelo enviar `dia` e `dias_a_frente` juntos, toleramos e priorizamos
-    // o mais específico (`dia`), evitando recusa silenciosa em produção (#1436).
+    // Toleramos os dois campos juntos sem recusa silenciosa (#1436), mas o que
+    // VENCE quando os dois vêm é o PERÍODO, não o dia (#2889).
+    //
+    // O caso medido: modelos tipo GPT (OpenRouter) preenchem TODOS os campos da
+    // ferramenta, inclusive os opcionais — chega `dia = HOJE` junto com
+    // `dias_a_frente`, e a precedência do dia colapsava a janela em HOJE só. Com
+    // a agenda de hoje cheia (ou a sessão de hoje fora do aviso mínimo), a
+    // resposta saía VAZIA e o agente repetia a chamada 8 e 11 vezes num turno
+    // até desistir. O pedido legítimo continua intacto: `dia` SOZINHO ainda
+    // recorta naquele dia civil — é o caminho de "o cliente pediu dia 13".
 
     // A faixa larga contém o dia civil em QUALQUER fuso. Depois de a coleta
     // revelar o fuso da regra, filtramos pelo mesmo dia local. Assim a IA não
@@ -320,7 +329,8 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
     // agenda precisam perguntar a mesma coisa" e ficou com um chamador só,
     // enquanto esta cópia seguia inline — duas fontes para a mesma janela, que
     // divergem no primeiro ajuste.
-    const janela = input.dia === undefined ? null : faixaAmplaDoDia(input.dia);
+    const comPeriodo = input.dias_a_frente !== undefined;
+    const janela = input.dia !== undefined && !comPeriodo ? faixaAmplaDoDia(input.dia) : null;
     const de = janela === null ? agora : janela.de;
     const ate =
       janela === null
@@ -351,8 +361,11 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
     // nele que os horários foram calculados, e é o que esta resposta já publica.
     // Rotular com outro faria `quando` discordar de `fuso_da_regra` na mesma
     // resposta.
+    // Recorte por dia local só quando `dia` mandou na janela (veio SOZINHO):
+    // com dois juntos o período vence, e filtrar o dia de novo traria o mesmo
+    // recorte estreito que causava a resposta vazia (#2889).
     const slotsDoPeriodo =
-      input.dia === undefined
+      input.dia === undefined || comPeriodo
         ? consulta.slots
         : consulta.slots.filter((s) => diaLocalISO(s.inicio, consulta.fusoDaRegra) === input.dia);
     return payloadDeHorarios(consulta, slotsDoPeriodo, input.limite ?? HORARIOS_PADRAO);
