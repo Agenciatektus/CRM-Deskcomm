@@ -179,7 +179,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
   const admin = createAdminClient();
   const { data: source, error: srcErr } = await admin
     .from("webhook_sources")
-    .select("id, name, organization_id, secret_encrypted, default_pipeline_id, default_stage_id, field_map, form_fields, redirect_to, is_active, authorize_ai_on_capture")
+    .select("id, name, organization_id, secret_encrypted, default_pipeline_id, default_stage_id, field_map, form_fields, redirect_to, is_active, authorize_ai_on_capture, update_existing_lead_on_capture")
     .eq("path_token", token)
     .maybeSingle();
   if (srcErr) return fail("internal_error", srcErr.message, 500, { requestId });
@@ -353,6 +353,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
   type LeadExistente = {
     id: string;
     contactId: string | null;
+    /**
+     * A fonte que CRIOU este card (#2316). É a coluna durável
+     * `crm_leads.webhook_source_id` (migration 0683), e não o histórico de
+     * captação nem o `source_metadata`: o primeiro é podado em 365 dias e não
+     * existe para os cards antigos, e o segundo é jsonb de terceiros.
+     */
+    webhookSourceId: string | null;
     title: string | null;
     customFields: Record<string, unknown>;
     pipelineId: string;
@@ -363,7 +370,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     if (!externalId) return null;
     const { data } = await admin
       .from("crm_leads")
-      .select("id, contact_id, title, custom_fields, pipeline_id, stage_id")
+      .select("id, contact_id, webhook_source_id, title, custom_fields, pipeline_id, stage_id")
       .eq("organization_id", source.organization_id)
       .eq("source", "webhook")
       .eq("external_id", externalId)
@@ -372,6 +379,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     return {
       id: data.id as string,
       contactId: (data.contact_id as string | null) ?? null,
+      webhookSourceId: (data.webhook_source_id as string | null) ?? null,
       title: (data.title as string | null) ?? null,
       customFields: (data.custom_fields as Record<string, unknown> | null) ?? {},
       pipelineId: (data.pipeline_id as string) ?? "",
@@ -452,13 +460,30 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
   /**
    * O fecho de um reenvio: o `external_id` já aponta para um card (#2316).
    *
-   * Duas figuras, uma régua só — e a régua é o DADO, não o id:
+   * A régua tem DUAS perguntas antes da terceira, e as duas são portões:
+   *
+   * 1. a fonte tem a OPÇÃO LIGADA? Ela nasce DESLIGADA (`update_existing_lead_on_capture`,
+   *    migration 0683) — atualizar card é integração entre sistemas, e a issue
+   *    #2316 pediu a opção por fonte justamente por isto. Desligada, o envio
+   *    repetido é o que sempre foi: `duplicado`, card intocado;
+   * 2. o card é DESTA fonte? A busca é por organização + `external_id`, então
+   *    sem esta pergunta a fonte A reescreveria o card que nasceu na B. `null`
+   *    (card sem origem carimbada) também não deixa passar: na dúvida, não
+   *    escreve.
+   *
+   * Passados os dois, a régua é o DADO, não o id:
    * - o envio trouxe campo NOVO (valor pago, área, etapa mais à frente) → o
    *   card é ATUALIZADO com o mesmo merge atômico do `updateLeadHandler` e a
    *   mesma etapa do `moveLeadHandler`, e o desfecho é `atualizado`;
    * - o envio repetiu o que já estava gravado → idempotência de sempre: nada
    *   muda, `duplicado`, 200 com o lead existente. A ferramenta que reenviou
    *   por timeout recebe sucesso e para de tentar.
+   *
+   * O portão 1 é o que protege a edição MANUAL: sem ele, o vendedor que corrige
+   * o título ou um campo à mão e depois recebe um retry (ou um evento antigo)
+   * da ferramenta tem a correção sobrescrita — a comparação é com o valor
+   * atual, então o envio conta como "dado novo". Com a opção desligada, quem
+   * não liga continua exatamente como antes do #2316.
    *
    * Serve para os DOIS caminhos que encontram o card — o fast-path de
    * deduplicação e a corrida do retry, em que o índice único derruba o segundo
@@ -469,6 +494,24 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     lead: LeadExistente,
     contactIdDoEnvio: string | null,
   ): Promise<NextResponse> => {
+    /** O reenvio de sempre: nada muda no card, 200 com o lead existente. */
+    const fecharComoReenvio = async (): Promise<NextResponse> => {
+      await registrarCaptacao(admin, {
+        ...fonteDaCaptacao,
+        ...origemDaCaptacao,
+        ...dadosDaCaptacao,
+        leadId: lead.id,
+        contactId: contactIdDoEnvio ?? lead.contactId,
+        outcome: "duplicado",
+      });
+      return respondWithLead(lead.id);
+    };
+
+    // PORTÃO 1 — a opção é da fonte, e nasce desligada.
+    if (!source.update_existing_lead_on_capture) return fecharComoReenvio();
+    // PORTÃO 2 — só o card que ESTA fonte criou.
+    if (lead.webhookSourceId !== source.id) return fecharComoReenvio();
+
     const campos = camposQueMudaram(lead.customFields, mapped.custom_fields);
     // O título vem do nome só nos caminhos que usam o mapeador genérico (RD
     // Station e Elementor também): o Respondi tem formato próprio de título,
@@ -483,18 +526,10 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
       etapaPedida,
     );
 
+    // Mesmo envio repetido: nada é recriado — a ferramenta que reenviou recebe
+    // sucesso e para de tentar.
     if (Object.keys(campos).length === 0 && !tituloMudou && etapaAlvo === null) {
-      // Mesmo envio repetido: 200 com o lead existente, nada é recriado — a
-      // ferramenta que reenviou recebe sucesso e para de tentar.
-      await registrarCaptacao(admin, {
-        ...fonteDaCaptacao,
-        ...origemDaCaptacao,
-        ...dadosDaCaptacao,
-        leadId: lead.id,
-        contactId: contactIdDoEnvio ?? lead.contactId,
-        outcome: "duplicado",
-      });
-      return respondWithLead(lead.id);
+      return fecharComoReenvio();
     }
 
     const ctxDoLead: HandlerCtx = {
@@ -762,6 +797,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     custom_fields?: Record<string, unknown>;
     source_metadata?: Record<string, unknown>;
     external_id?: string;
+    webhook_source_id?: string;
   } = {
     pipeline_id: source.default_pipeline_id,
     stage_id: source.default_stage_id,
@@ -773,6 +809,11 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     source: "webhook",
     custom_fields: mapped.custom_fields,
     source_metadata: { ...mapped.source_metadata, webhook_source_id: source.id },
+    // A coluna que responde "de quem é este card" para a atualização por
+    // integração (migration 0683). Vai junto do `source_metadata` porque é o
+    // MESMO fato em dois lugares: o jsonb é o registro histórico do envio, e a
+    // coluna é o que a régua lê — durável, tipada e indexada.
+    webhook_source_id: source.id,
     ...(externalId ? { external_id: externalId } : {}),
   };
 

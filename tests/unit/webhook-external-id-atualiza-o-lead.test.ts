@@ -59,12 +59,21 @@ const FONTE = {
   redirect_to: null,
   is_active: true,
   authorize_ai_on_capture: false,
+  /**
+   * A OPÇÃO LIGADA (#2316, migration 0683): estes casos medem o comportamento
+   * das ferramentas que integram de verdade, com a fonte configurada para
+   * atualizar. Que o PADRÃO seja desligado — e que o card de outra fonte fique
+   * de fora — é o que a `webhook-atualizacao-de-card-e-opcao-por-fonte` cobre.
+   */
+  update_existing_lead_on_capture: true,
 };
 
 /** O card que a pessoa JÁ tem — o primeiro evento (cadastro) que entrou. */
 const CARD = {
   id: "lead-1",
   contact_id: "contato-1",
+  // A fonte que criou o card: a régua só atualiza o card DESTA fonte.
+  webhook_source_id: "fonte-1",
   title: "Joana",
   custom_fields: { valor_pago: "100", area_ha: "2" },
   pipeline_id: "pipe-1",

@@ -19,14 +19,14 @@ import { logger } from "@/lib/logger";
 /**
  * No que a captação deu.
  *
- * `criado`/`duplicado`/`recusado` são o vocabulário do CHECK da migration 0174
- * (`webhook_lead_captures.outcome`). `atualizado` é o desfecho do card que o
- * reenvio ATUALIZOU (#2316) e ainda NÃO está nesse CHECK — por isso existe a
- * ponte em `registrarCaptacao`, sem a qual a linha sumiria da tela em vez de
- * ser gravada com o valor antigo. A tela de "Leads recebidos"
- * (`lib/schemas/lead-captures.ts`) segue com os três de sempre enquanto o
- * CHECK não alargar: enquanto houver ponte, nenhum valor `atualizado` chega
- * ao banco.
+ * Os QUATRO valores são o vocabulário do CHECK de
+ * `webhook_lead_captures.outcome` (migration 0683, que alargou o da 0174), e a
+ * tela "Leads recebidos" (`lib/schemas/lead-captures.ts`) espelha a mesma
+ * lista: as três listas — coluna, aqui e lá — não podem divergir, e é a
+ * `desfecho-da-captacao-um-vocabulario-so` que cobra isso.
+ *
+ * `atualizado` é o desfecho do card que a integração REESCREVEU (#2316), e ele
+ * só existe com a opção `update_existing_lead_on_capture` ligada na fonte.
  */
 export type DesfechoDaCaptacao = "criado" | "duplicado" | "recusado" | "atualizado";
 
@@ -212,31 +212,6 @@ export async function registrarCaptacao(
   };
   const { error } = await admin.from("webhook_lead_captures").insert(linha);
   if (!error) return;
-
-  // PONTE DO VOCABULÁRIO (#2316). O CHECK da migration 0174 ainda só aceita
-  // 'criado'/'duplicado'/'recusado', e a regra desta função é NUNCA LANÇAR.
-  // Sem a ponte, todo card ATUALIZADO por reenvio gravaria um erro no log e
-  // SUMIRIA da tela "Leads recebidos" — o registro que o gatilho de
-  // anonimização alcança, e o único rastro de que o dado novo chegou. Repetir
-  // como `duplicado` mantém a linha, com o vínculo, até a migration que
-  // alarga o vocabulário chegar; o desfecho correto passa a ser gravado sozinho
-  // assim que o CHECK aceitar o valor, e a ponte cai sem mais ninguém notar.
-  if (error.code === "23514" && captacao.outcome === "atualizado") {
-    const repetido = await admin
-      .from("webhook_lead_captures")
-      .insert({ ...linha, outcome: "duplicado" });
-    if (!repetido.error) {
-      logger.warn(
-        "[webhooks.captacao] desfecho 'atualizado' ainda não existe no CHECK do banco — linha gravada como 'duplicado' até a migration alargar o vocabulário",
-        {
-          organizationId: captacao.organizationId,
-          webhookSourceId: captacao.webhookSourceId,
-          leadId: captacao.leadId,
-        },
-      );
-      return;
-    }
-  }
 
   // Falha ABERTA na ação (o lead entra de qualquer jeito) e ABERTA na
   // informação: a causa vai para o log nomeada. Um "não gravou o histórico" em
