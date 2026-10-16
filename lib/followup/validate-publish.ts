@@ -532,7 +532,7 @@ const TETO_DAS_VOLTAS = 1_000_000;
 export interface CustoNoMotorDoFluxo {
   /** Ticks que o motor gasta no caminho mais caro a partir do gatilho. */
   total: number;
-  /** O ciclo com `repeat` que mais pesa no caminho — o que a recusa nomeia. `null` sem `repeat`. */
+  /** O ciclo com `repeat` que mais pesa no caminho MAIS CARO — o que a recusa nomeia. `null` se esse caminho não passa por `repeat`. */
   cicloDeRepeat: { node_id: string; voltas: number; peso: number } | null;
 }
 
@@ -638,6 +638,9 @@ export function custoNoMotorDoFluxo(graph: FlowGraph): CustoNoMotorDoFluxo {
   if (emCiclo[startComp]) return semCiclo;
 
   const chegaEm = new Map<number, number>([[startComp, 0]]);
+  // O ciclo com `repeat` que mais pesa no caminho MAIS CARO até cada componente:
+  // a recusa cita o repeat do caminho que estoura, não o de um ramo paralelo.
+  const cicloNoCaminho = new Map<number, CustoNoMotorDoFluxo['cicloDeRepeat']>([[startComp, null]]);
   let total = 0;
   let cicloDeRepeat: CustoNoMotorDoFluxo['cicloDeRepeat'] = null;
 
@@ -647,19 +650,24 @@ export function custoNoMotorDoFluxo(graph: FlowGraph): CustoNoMotorDoFluxo {
     const chegou = chegaEm.get(idx);
     if (chegou === undefined) continue; // não é alcançável a partir do gatilho
     const custoAqui = chegou + custoDoComponente[idx]!;
-    total = Math.max(total, custoAqui);
 
+    const herdado = cicloNoCaminho.get(idx) ?? null;
     const detalhe = detalheDoCiclo[idx];
-    if (
-      detalhe &&
-      (cicloDeRepeat === null ||
-        detalhe.peso * detalhe.voltas > cicloDeRepeat.peso * cicloDeRepeat.voltas)
-    ) {
-      cicloDeRepeat = detalhe;
+    const cicloAqui =
+      detalhe && (herdado === null || detalhe.peso * detalhe.voltas > herdado.peso * herdado.voltas)
+        ? detalhe
+        : herdado;
+
+    if (custoAqui > total) {
+      total = custoAqui;
+      cicloDeRepeat = cicloAqui;
     }
 
     for (const succ of condOut.get(idx) ?? []) {
-      chegaEm.set(succ, Math.max(chegaEm.get(succ) ?? -Infinity, custoAqui));
+      if (custoAqui > (chegaEm.get(succ) ?? -Infinity)) {
+        chegaEm.set(succ, custoAqui);
+        cicloNoCaminho.set(succ, cicloAqui);
+      }
     }
   }
 
@@ -952,12 +960,20 @@ export function validateFlowForPublish(
     if (surface !== 'atendimento') {
       const { total: custoNoMotor, cicloDeRepeat } = custoNoMotorDoFluxo(graph);
       if (custoNoMotor > TETO_DE_PASSOS_DO_MOTOR) {
+        // A caixa é nomeada pelo RÓTULO que a pessoa vê no editor, não pelo id
+        // interno (`repeat-3`). E só cita o repeat que está no caminho que estoura
+        // e dá mais de uma volta: com 1 volta, "reduza as voltas" é um conselho
+        // impossível — quem estoura é a cadência.
+        const repeatQuePesa = cicloDeRepeat && cicloDeRepeat.voltas > 1 ? cicloDeRepeat : null;
+        const rotuloDoRepeat = repeatQuePesa
+          ? graph.nodes.find((n) => n.id === repeatQuePesa.node_id)?.label ?? repeatQuePesa.node_id
+          : null;
         errors.push({
           node_id: null,
           code: 'max_engine_steps_exceeded',
           message: `O caminho mais longo deste fluxo custa ${custoNoMotor} passos no motor (o relógio conta cada tick: gatilho, mensagem, espera e registro) e ele desiste da inscrição depois de ${TETO_DE_PASSOS_DO_MOTOR} — a retomada morreria no meio, sem chegar ao fim.${
-            cicloDeRepeat
-              ? ` O trecho que a caixa "${cicloDeRepeat.node_id}" repete custa ${cicloDeRepeat.peso} passos por volta e ela permite até ${cicloDeRepeat.voltas} voltas — reduza as voltas ou tire um toque de dentro do repetir.`
+            repeatQuePesa
+              ? ` O trecho que a caixa "${rotuloDoRepeat}" repete custa ${repeatQuePesa.peso} passos por volta e ela permite até ${repeatQuePesa.voltas} voltas — reduza as voltas ou tire um toque de dentro do repetir.`
               : ' Encurte a cadência.'
           }`,
         });

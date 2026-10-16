@@ -646,6 +646,78 @@ describe('validateFlowForPublish', () => {
         expect(r.errors[0]!.message).toContain('até 20 voltas');
       });
 
+      it('a recusa nomeia a caixa pelo rótulo que a pessoa vê, não pelo id interno', () => {
+        const g = repeatComVoltas(20);
+        const comRotulo = graph(
+          g.nodes.map((n) => (n.id === 'r1' ? { ...n, label: 'Lembretes semanais' } : n)),
+          g.edges
+        );
+        const r = validateFlowForPublish(comRotulo);
+        expect(r.ok).toBe(false);
+        if (r.ok) return;
+        expect(r.errors[0]!.message).toContain('a caixa "Lembretes semanais" repete');
+      });
+
+      it('com uma volta só, a culpa é da cadência: a recusa não manda reduzir voltas', () => {
+        const r = validateFlowForPublish(repeatComCauda(13));
+        expect(r.ok).toBe(false);
+        if (r.ok) return;
+        expect(r.errors[0]!.message).not.toContain('reduza as voltas');
+        expect(r.errors[0]!.message).toContain('Encurte a cadência.');
+      });
+
+      it('o repeat de um ramo paralelo não leva a culpa: a recusa cita o caminho que estoura', () => {
+        // Ramo A: repeat de 3 voltas curto até o fim (19 ticks). Ramo B: a cadência
+        // de 13 toques (1 + 1 + 13 × 6 + 1 = 81 > 80). Quem estoura é B, e reduzir
+        // as voltas de A não muda nada.
+        const nodes: FlowNode[] = [
+          trigger('t1'),
+          condition('c1'),
+          { id: 'r1', type: 'repeat', label: 'r1', position: pos, config: { max_count: 3 } },
+          actionTemplate('msg1'),
+          wait('w1', { mode: 'fixed', duration_ms: 300_000 }),
+        ];
+        const edges: FlowEdge[] = [
+          edge('t1', 'c1', always()),
+          edge('c1', 'r1', condResult(true)),
+          edge('r1', 'msg1', ramo('body')),
+          edge('msg1', 'w1', always()),
+          edge('w1', 'r1', always()),
+          edge('r1', 'fim', ramo('done')),
+          edge('r1', 'fim', always()),
+        ];
+        let anterior = 'c1';
+        for (let i = 1; i <= 13; i++) {
+          nodes.push(
+            actionTemplate(`cauda${i}`),
+            marcar(`tag${i}a`, `a${i}`),
+            marcar(`tag${i}b`, `b${i}`),
+            wait(`espera${i}`, { mode: 'fixed', duration_ms: 300_000 })
+          );
+          edges.push(
+            edge(anterior, `cauda${i}`, i === 1 ? condResult(false) : always()),
+            edge(`cauda${i}`, `tag${i}a`, always()),
+            edge(`tag${i}a`, `tag${i}b`, always()),
+            edge(`tag${i}b`, `espera${i}`, always())
+          );
+          anterior = `espera${i}`;
+        }
+        nodes.push(end('fim'));
+        edges.push(edge(anterior, 'fim', always()));
+        const g = graph(nodes, edges);
+
+        const custo = custoNoMotorDoFluxo(g);
+        expect(custo.total).toBe(81);
+        expect(custo.cicloDeRepeat).toBeNull();
+        const r = validateFlowForPublish(g);
+        expect(r.ok).toBe(false);
+        if (r.ok) return;
+        expect(r.errors.map((e) => e.code)).toContain('max_engine_steps_exceeded');
+        const recusa = r.errors.find((e) => e.code === 'max_engine_steps_exceeded')!;
+        expect(recusa.message).not.toContain('reduza as voltas');
+        expect(recusa.message).toContain('Encurte a cadência.');
+      });
+
       it('publica o mesmo desenho com 15 voltas: 78 ticks, dentro do orçamento', () => {
         // 1 gatilho + 15 × 5 do corpo + 1 da passada do `done` + 1 fim = 78 ≤ 80.
         expect(custoNoMotorDoFluxo(repeatComVoltas(15)).total).toBe(78);
