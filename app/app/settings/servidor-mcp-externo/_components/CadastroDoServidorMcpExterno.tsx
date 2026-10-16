@@ -103,6 +103,13 @@ export function CadastroDoServidorMcpExterno() {
 
   function salvar() {
     limparRetrato();
+    // Endereço OU chave vazios são o contrato de APAGAR da action — "Salvar"
+    // com um dos dois em branco removeria o registro e anunciaria "salva".
+    // Apagar tem botão próprio; aqui o vazio é recusa de formulário.
+    if (endpoint.trim() === "" || chave.trim() === "") {
+      setErro(t("Preencha o endereço e a chave para salvar. Para apagar o registro, use Remover."));
+      return;
+    }
     iniciar(async () => {
       const r = await definirServidorMcpExterno({ endpoint, chave });
       if (!r.ok) {
@@ -166,7 +173,7 @@ export function CadastroDoServidorMcpExterno() {
             <Input
               id="mcp-endpoint"
               data-testid="endpoint"
-              placeholder="https://erp.suaempresa.com/mcp"
+              placeholder="https://erp.example.com/mcp"
               value={endpoint}
               spellCheck={false}
               onChange={(e) => setEndpoint(e.target.value)}

@@ -142,6 +142,25 @@ describe("teste: a tela pergunta ao servidor salvo o que ele oferece", () => {
   });
 });
 
+describe("salvar com um campo vazio não vira remoção", () => {
+  // Na action, endereço OU chave vazios APAGAM o registro. Sem esta guarda,
+  // trocar só o endereço (deixando a chave em branco) removia o servidor e a
+  // tela dizia "Configuração salva".
+  it.each([
+    ["chave vazia", ENDERECO, ""],
+    ["endereço vazio", "", CHAVE],
+  ])("%s: não chama a action e diz o que falta", async (_caso, endpoint, chave) => {
+    abrir();
+    digitar(endpoint, chave);
+    fireEvent.click(screen.getByTestId("salvar"));
+
+    await waitFor(() => expect(screen.getByTestId("erro")).toBeInTheDocument());
+    expect(screen.getByRole("alert").textContent).toContain("use Remover");
+    expect(cadastro()).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("aviso")).toBeNull();
+  });
+});
+
 describe("remoção: a mesma action, com o contrato de apagar", () => {
   it("remover manda endereço e chave vazios, avisa o desfecho e não revela chave nenhuma", async () => {
     abrir();

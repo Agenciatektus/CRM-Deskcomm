@@ -14371,6 +14371,9 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível salvar. Tente de novo em instantes.": {
     es: "No fue posible guardar. Inténtalo de nuevo en unos momentos.",
   },
+  "Preencha o endereço e a chave para salvar. Para apagar o registro, use Remover.": {
+    es: "Completa la dirección y la clave para guardar. Para borrar el registro, usa Quitar.",
+  },
   "Nenhum servidor externo respondeu. Salve o endereço e a chave e teste de novo.": {
     es: "Ningún servidor externo respondió. Guarda la dirección y la clave y prueba de nuevo.",
   },
