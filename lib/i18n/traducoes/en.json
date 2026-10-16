@@ -9153,5 +9153,6 @@
   "A conversa abre atribuída a você: a IA não assume este atendimento.": "The conversation opens assigned to you: the AI does not take over this service.",
   "Criar conversa": "Create conversation",
   "Nenhum contato encontrado": "No contact found",
-  "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent."
+  "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent.",
+  "Formato não suportado: use ?formato=csv.": "Unsupported format: use ?formato=csv."
 }
