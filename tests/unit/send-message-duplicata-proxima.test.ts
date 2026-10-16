@@ -1,11 +1,11 @@
 /**
- * `send_message` recusa restatemente quase idêntico do que JÁ saiu no turno
+ * `send_message` recusa repetição quase idêntica do que JÁ saiu no turno
  * (regressão de segurança do gate near-dup).
  *
  * Defeito observado em produção: uma única pergunta levou 4 respostas — 3 do
  * caminho de recuperação do "turno mudo" (o modelo chamou `send_message` 3× com
  * corpos quase idênticos) e 1 de um follow-up de promessa. O contrato é UMA
- * resposta adequada e completa por turno; restatemente imediato é redundância.
+ * resposta adequada e completa por turno; repetição imediata é redundância.
  *
  * Mesma técnica de `send-message-corpo-vazio.test.ts`: o `execute` é uma closure
  * dentro do turno, sem ponto de injeção barato, então o teste prende o `if` no
@@ -39,7 +39,7 @@ const corpoDoSend = (() => {
   return FONTE.slice(i, j);
 })();
 
-describe("send_message nunca reenvia restatemente do mesmo turno", () => {
+describe("send_message nunca reenvia repetição do mesmo turno", () => {
   it("o execute recusa duplicata próxima com erro de ENSINO (ok:false, nunca entregue)", () => {
     // A recusa é um `ok:false` com code distinto — mesma forma de corpo_vazio/
     // resposta_obsoleta. Não há `outcomes.push`, ledger nem chamada de canal

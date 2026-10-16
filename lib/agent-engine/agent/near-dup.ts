@@ -10,8 +10,8 @@
  * pelas cadeias de guardrails e virou uma bolha separada no WhatsApp. A quarta
  * veio de um follow-up de promessa agendado que re-respondeu a mesma pergunta.
  *
- * O contrato do produto é UMA resposta adequada e completa por turno. Restatemente
- * imediato da mesma ideia é redundância, não informação nova. Este módulo é a régua
+ * O contrato do produto é UMA resposta adequada e completa por turno. Repetição
+ * imediata da mesma ideia é redundância, não informação nova. Este módulo é a régua
  * pura que decide se um candidato é repetição do que já saiu — onde "já saiu" é
  * decidido por quem chama (turno em memória ou histórico recente via banco).
  *
@@ -20,7 +20,7 @@
  * A comparação é CONTEÚDO, não tópico. Dois textos que falam do mesmo exame com
  * redação diferente passam (semelhança baixa); o mesmo texto (ou quase) é
  * redundância. A janela temporal é responsabilidade de quem chama: o turno guarda
- * só o que saiu NOSTE turno; o follow-up olha uma janela recente do banco. Isso
+ * o que saiu desde a última fala do cliente (no próprio turno e no banco). Isso
  * mantém "não suprimir resposta futura legítima sobre o mesmo tópico" fora da
  * régua — a régua só vê similaridade de texto, nunca assunto.
  *
@@ -35,12 +35,11 @@
  *
  * ## Exceção de informação nova (#2996, item 3)
  *
- * Perto do limiar, NEM todo quase-idêntico é restatemente: preço/hora mudado
+ * Perto do limiar, NEM todo quase-idêntico é repetição: preço/hora mudado
  * ("R$ 1.250" → "R$ 1.350", "9h" → "10h") ou negação trocada ("Sim, fazemos
  * entrega" → "Não, fazemos entrega") é INFORMAÇÃO NOVA e passa
- * (`mudaInformacao`). Contador solto mudando ("Tentativa 1 de 3" → "Tentativa
- * 2 de 3") continua suprimindo — é ruído de retry, não conteúdo. Igualdade
- * normalizada continua suprindo incondicionalmente.
+ * (`mudaInformacao`). Qualquer número mudado passa. Igualdade normalizada
+ * continua suprimindo incondicionalmente.
  */
 
 /** Zero-width e BOM — invisíveis, mas quebram a igualdade ingênua. */
@@ -101,56 +100,41 @@ export const LIMIAR_DUPLICADO_PROXIMO = 0.9;
 /**
  * Negação em PT-BR (após normalização: caixa baixa, espaços colapsados).
  * Lista fechada e curta de propósito: "não/nao", "nem", "nunca", "jamais" —
- * palavras que INVERTEM o sentido. Não inclui artifios ("sem", "livre de")
+ * palavras que INVERTEM o sentido. Não inclui atenuantes ("sem", "livre de")
  * porque suprimir com eles erraria para o lado de suprimir informação nova.
  */
 const NEGACOES = /\bn[ãa]o\b|\bnem\b|\bnunca\b|\bjamais\b/;
 
-/** Dígitos de um texto, cada run (com separador, ex.: "1.250") + a unidade após. */
-function digitosComUnidade(texto: string): Array<{ digito: string; proximo: string }> {
-  const saida: Array<{ digito: string; proximo: string }> = [];
-  const re = /(\d+(?:[.,]\d+)*)([a-zA-Z%]?)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(texto)) !== null) {
-    saida.push({ digito: m[1]!, proximo: m[2]! });
-  }
-  return saida;
+/** Os números do texto, na ordem em que aparecem ("às 9:00, R$ 1.250" → "9 00 1 250"). */
+function numeros(texto: string): string {
+  return (texto.match(/\d+/g) ?? []).join(' ');
 }
 
 /**
  * `true` quando a diferença entre os dois textos carrega INFORMAÇÃO NOVA e não
- * é mais restatemente — a régua não suprime (revisão do #2996, item 3):
+ * é mais repetição — a régua não suprime (revisão do #2996, item 3):
  *
  *  1. NEGAÇÃO adicionada, removida ou trocada ("Sim, fazemos entrega" →
  *     "Não, fazemos entrega"; "pagamento foi confirmado" → "não foi") — o
  *     sentido invertido é a informação;
- *  2. DÍGITOS com valor de contexto mudados: um run com separador
- *     ("1.250" → "1.350") ou colado em unidade ("9h" → "10h") — preço, hora,
- *     quantidade são dado novo. Dígito SOLTO mudando ("Tentativa 1 de 3" →
- *     "Tentativa 2 de 3") é contador, não informação: segue suprimindo.
+ *  2. QUALQUER número mudado: preço ("R$ 25" → "R$ 35"), data ("dia 15" →
+ *     "dia 16"), hora ("9:00" → "10:00"), pedido, telefone, vagas. Separar
+ *     "valor" de "contador" pela forma do número errava nos dois sentidos: um
+ *     número solto também é preço, data e hora. Repetição sem número novo segue
+ *     suprimindo.
  */
 export function mudaInformacao(candidato: string, jaEnviado: string): boolean {
   const temNegC = NEGACOES.test(candidato);
   const temNegE = NEGACOES.test(jaEnviado);
   if (temNegC !== temNegE) return true;
-  const dC = digitosComUnidade(candidato);
-  const dE = digitosComUnidade(jaEnviado);
-  if (dC.length !== dE.length) return true;
-  for (let i = 0; i < dC.length; i++) {
-    const a = dC[i]!;
-    const b = dE[i]!;
-    if (a.digito === b.digito) continue;
-    const comValor = /[.,]/.test(a.digito) || /[.,]/.test(b.digito) || a.proximo !== '' || b.proximo !== '';
-    if (comValor) return true;
-  }
-  return false;
+  return numeros(candidato) !== numeros(jaEnviado);
 }
 
 /**
  * `true` quando `candidato` é duplicata (igual normalizada) ou duplicata próxima
  * (semelhança >= `limiar`) de `jaEnviado`. Comparação em branco nunca suprime.
  * Iguais normalizadas suprimem SEM passar pelas exceções — reentrada idêntica
- * é o caso mais forte de restatemente; as exceções valem só perto do limiar.
+ * é o caso mais forte de repetição; as exceções valem só perto do limiar.
  */
 export function ehDuplicadoOuProximo(
   candidato: string,
@@ -168,7 +152,7 @@ export function ehDuplicadoOuProximo(
 /**
  * Primeiro corpo de `jaEnviados` do qual `candidato` é duplicata (ou `null`).
  * Ordem = ordem de envio; devolver o primeiro mantém a PRIMEIRA resposta e
- * suprime o restatemente — é o que "retendo a primeira resposta adequada" pede.
+ * suprime a repetição — é o que "retendo a primeira resposta adequada" pede.
  */
 export function encontraDuplicado(
   candidato: string,

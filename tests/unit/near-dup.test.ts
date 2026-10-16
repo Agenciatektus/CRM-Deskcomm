@@ -64,7 +64,7 @@ describe('ehDuplicadoOuProximo', () => {
     ).toBe(false);
   });
 
-  it('restatemente quase idêntico suprime', () => {
+  it('repetição quase idêntica suprime', () => {
     expect(
       ehDuplicadoOuProximo(
         'Jejum de 12 horas é necessário para o perfil da tireoide.',
@@ -110,7 +110,7 @@ describe('encontraDuplicado', () => {
   });
 });
 
-// ─── #2996 item 3: informação nova não é restatemente ───────────────────────
+// ─── #2996 item 3: informação nova não é repetição ───────────────────────
 describe('informação nova (valor/negação) NÃO suprime — exceção da revisão', () => {
   // Os pares abaixo são as medições do mantenedor (main 330ead5ca): todos ficam
   // ACIMA do limiar (por isso a régua ingênua os suprimia) e passam GRÂCIAS à
@@ -157,11 +157,37 @@ describe('informação nova (valor/negação) NÃO suprime — exceção da revi
     expect(ehDuplicadoOuProximo(b, a)).toBe(false);
   });
 
-  it('CONTADOR de retry (Tentativa 1 → 2 de 3) segue SUPRIMINDO', () => {
-    // Dígito solto mudando é ruído de retry, não conteúdo — a exceção é
-    // estreita de propósito (só valor com separador/unidade passa).
-    const a = 'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 1 de 3.';
-    const b = 'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 2 de 3.';
+  it('número SOLTO mudado também é informação (data, hora com dois-pontos, preço sem separador)', () => {
+    // Um número sem separador nem unidade colada também é preço, data, hora,
+    // pedido. Separar "valor" de "contador" pela forma suprimia correção de
+    // data e de horário (medido na triagem do #2996).
+    const pares: Array<[string, string]> = [
+      [
+        'Sua consulta está marcada para dia 15 de outubro às 9h, com a Dra. Ana.',
+        'Sua consulta está marcada para dia 16 de outubro às 9h, com a Dra. Ana.',
+      ],
+      [
+        'Sua consulta está marcada para amanhã às 9:00, com a Dra. Ana, na unidade Centro.',
+        'Sua consulta está marcada para amanhã às 10:00, com a Dra. Ana, na unidade Centro.',
+      ],
+      [
+        'O frete para o seu CEP fica R$ 25 e chega em até 3 dias úteis.',
+        'O frete para o seu CEP fica R$ 35 e chega em até 3 dias úteis.',
+      ],
+      [
+        'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 1 de 3.',
+        'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 2 de 3.',
+      ],
+    ];
+    for (const [a, b] of pares) {
+      quaseId(a, b);
+      expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+    }
+  });
+
+  it('mesmos números, só pontuação mudada: segue suprimindo', () => {
+    const a = 'O valor do tratamento fica em R$ 1.250, podendo ser parcelado em 10x sem juros.';
+    const b = 'O valor do tratamento fica em R$ 1.250, podendo ser parcelado em 10x sem juros!';
     quaseId(a, b);
     expect(ehDuplicadoOuProximo(b, a)).toBe(true);
   });

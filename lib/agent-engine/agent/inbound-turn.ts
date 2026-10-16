@@ -2794,7 +2794,7 @@ async function executarTurnoDoAgente(
   // DUPLICATA PRÓXIMA NO MESMO TURNO: a trava `near-dup.ts` guarda DUAS memórias.
   // `aceitos` = corpos de `send_message` que PASSARAM pela cadeia e foram aceitos
   // neste turno (o corpo PRÉ-cadeia, para comparar candidato contra candidato) —
-  // a memória que a régua consulta para suprimir restatemente (o defeito medido
+  // a memória que a régua consulta para suprimir repetição (o defeito medido
   // em produção: 4 respostas a 1 pergunta, 3 vindas da correção do turno mudo).
   // Só conteúdos ACEITOS entram: um veto não é resposta. `emVoo` = candidatas cuja
   // cadeia ainda roda: fecha a corrida de tool calls paralelas do MESMO passo (o
@@ -3313,7 +3313,7 @@ async function executarTurnoDoAgente(
         // que JÁ foi aceito e enviado NESTE turno, ou que está EM VOO agora (tool calls
         // paralelas do mesmo passo — a reserva vira logo abaixo, antes do primeiro
         // await; a candidata checada ainda não foi reservada, então nunca se suprime
-        // a si mesma). O contrato é UMA resposta adequada e completa — restatemente
+        // a si mesma). O contrato é UMA resposta adequada e completa — repetição
         // imediato é redundância, não informação nova (mudança de valor/negação é
         // exceção na régua: preço, hora ou "não" trocado passam, ver near-dup.ts).
         // Suprime sem tocar no canal nem no ledger (nada é marcado como entregue),
@@ -3371,7 +3371,7 @@ async function executarTurnoDoAgente(
             error: {
               code: 'duplicate_suppressed',
               message:
-                'Você já enviou uma mensagem muito parecida a esta neste turno — ela NÃO foi reenviada. ' +
+                'Você já enviou uma mensagem muito parecida a esta nesta conversa, depois da última fala do cliente — ela NÃO foi reenviada. ' +
                 'Não repita a mesma informação. Se há algo genuinamente novo a acrescentar, envie SÓ a parte nova; ' +
                 'senão encerre o turno agora.',
             },

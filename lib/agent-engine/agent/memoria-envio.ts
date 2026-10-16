@@ -6,7 +6,7 @@
  * Um turno fresco que responde a uma mensagem NOVA começa com a janela VAZIA: a
  * inbound mais nova acabou de chegar e nada foi enviado depois dela. Então a
  * régua não suprime resposta legítima a pergunta nova — só dentro do turno a
- * memória cresce, pegando o restatemente da correção do turno mudo.
+ * memória cresce, pegando a repetição da correção do turno mudo.
  *
  * Um follow-up agendado que re-responde uma conversa CALADA tem a janela CHEIA:
  * a última inbound é antiga e tudo o que o agente disse desde então (inclusive a

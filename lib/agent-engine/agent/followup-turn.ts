@@ -1104,7 +1104,7 @@ async function sendFixedOutbound(
     return { kind: "skipped" };
   }
 
-  // SEM gate near-dup AQUI (#2996, item 2 — decisão do mantenedor após medir os
+  // SEM gate near-dup AQUI (#2996, item 2 — pedido da triagem após medir os
   // caminhos reais): follow-up de promessa NÃO passa por `sendFixedOutbound` —
   // ele roda por `runAgentTurn` e cai no `send_message`, cujo gate em memória do
   // turno (com a janela desde a última inbound) já cobre a re-resposta quase
