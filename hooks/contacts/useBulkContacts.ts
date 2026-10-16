@@ -74,7 +74,10 @@ export function useBulkContacts() {
         );
         return;
       }
-      toast.warning(`${r.feitos} ${t("atualizados")}, ${recusados.length} ${t("recusados")}.`, {
+      // Número e palavra concordam: "1 atualizados, 1 recusados." foi medido na tela (#2913).
+      const feitos = `${r.feitos} ${r.feitos === 1 ? t("atualizado") : t("atualizados")}`;
+      const recusas = `${recusados.length} ${recusados.length === 1 ? t("recusado") : t("recusados")}`;
+      toast.warning(`${feitos}, ${recusas}.`, {
         description: recusados.map((x) => x.motivo ?? x.codigo ?? t("Recusado.")).join(" · "),
       });
     },

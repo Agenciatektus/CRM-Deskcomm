@@ -15967,6 +15967,8 @@ export const DICIONARIO: Traducoes = {
   "1 contato atualizado.": { es: "1 contacto actualizado." },
   "contatos atualizados": { es: "contactos actualizados" },
   "recusados": { es: "rechazados" },
+  "atualizado": { es: "actualizado" },
+  "recusado": { es: "rechazado" },
   "Recusado.": { es: "Rechazado." },
 };
 
