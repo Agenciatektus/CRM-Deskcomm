@@ -1,239 +1,151 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+/**
+ * A prévia da lista da Inbox nos três caminhos do CRM que NÃO são a ingestão
+ * (issue #2742, PR #2850).
+ *
+ * A ingestão passou a gravar "Imagem", "Áudio"… em vez de `[image]`, `[audio]`.
+ * Três lugares do CRM também montam essa prévia, e precisam andar juntos:
+ *
+ * - o envio pela tela (`previewFrom`), que grava a prévia da mídia enviada;
+ * - ocultar/restaurar mensagem e apagar mensagem enviada, que só trocam a
+ *   prévia se ela ainda for a desta mensagem (compare-and-set em
+ *   `last_message_preview`). Se a régua do filtro divergir da que gravou, o
+ *   filtro não acha nada, a rota responde 200 e a lista continua mostrando
+ *   "Imagem" para uma mensagem ocultada ou apagada. Nenhum erro em lugar nenhum.
+ */
+import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * A PRÉVIA DA LISTA NO CANAL OFICIAL — a MESMA régua dos outros canais (#2960).
- *
- * ─── O defeito, medido na lista ─────────────────────────────────────────────
- *
- * A prévia que a Inbox mostra (`conversations.last_message_preview`) passou a
- * sair em português nos ingests do WhatsApp por QR e de grupo, e no envio,
- * ocultar e apagar pelo CRM — todos pela MESMA função `previaDaMensagem`. O
- * canal OFICIAL ficou com uma régua própria (`previewOf` / `previewOfEcho`),
- * que devolvia "📷 Imagem" para imagem e `[tipo]` para o resto. Numa instalação
- * com os dois canais a lista misturava vocabulários: "Imagem", "📷 Imagem" e
- * "[audio]".
- *
- * ─── O efeito que dói mais ──────────────────────────────────────────────────
- *
- * As rotas de ocultar e apagar reconstroem a prévia gravada como
- * `body?.slice(0, 280) || [tipo]` e só escrevem a nova prévia se ela casar com a
- * coluna. Para mídia SEM legenda o canal oficial gravava "📷 Imagem" enquanto a
- * rota reconstruía `[image]` — a igualdade nunca fechava, e a mídia sem legenda
- * do canal oficial não podia ser ocultada nem apagada pela lista.
- *
- * ─── O que estes casos prendem ──────────────────────────────────────────────
- *
- * Que imagem, áudio, documento, vídeo e figurinha gravem a MESMA prévia dos
- * outros canais (o retorno literal de `previaDaMensagem`), com e sem legenda; e
- * que, sem legenda, essa prévia seja EXATAMENTE a que as rotas de ocultar/apagar
- * reconstroem — a igualdade que faltava.
- *
- * ⚠️ Os casos entram pelo CAMINHO DE PRODUÇÃO (`ingestMetaInbound` /
- * `ingestMetaEcho`), capturando a prévia que chega ao carimbo da conversa, e não
- * chamando a régua local: quem prova o comportamento da lista é o valor
- * gravado, não o helper.
- */
+import { previewFrom } from "@/app/api/v1/messages/_handler";
+import { POST as ocultar, DELETE as restaurar } from "@/app/api/v1/messages/[id]/hide/route";
+import { DELETE as apagar } from "@/app/api/v1/messages/[id]/route";
 
-const estado = vi.hoisted(() => ({
-  insert: null as Record<string, unknown> | null,
-  rpcs: [] as Array<{ name: string; args: Record<string, unknown> }>,
-  marcacoes: [] as Array<Record<string, unknown>>,
-  pausas: [] as Array<Record<string, unknown>>,
-  auditorias: [] as Array<Record<string, unknown>>,
+const ORG = "11111111-1111-4111-8111-111111111111";
+const MSG = "22222222-2222-4222-8222-222222222222";
+const CONV = "33333333-3333-4333-8333-333333333333";
+const SESSION = "44444444-4444-4444-8444-444444444444";
+const USER = "55555555-5555-4555-8555-555555555555";
+
+vi.mock("@/lib/auth/require-role", () => ({
+  requireRole: vi.fn(async () => ({
+    ok: true,
+    user: { id: "55555555-5555-4555-8555-555555555555", idioma: "pt-BR" },
+    org: { orgId: "11111111-1111-4111-8111-111111111111", name: "Org", role: "admin" },
+  })),
+}));
+vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
+vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+vi.mock("@/lib/channels", () => ({
+  CHANNEL_SESSION_REF_COLUMNS: "id, provider",
+  transportaMensagem: () => true,
+  resolveSessionRef: () => ({ id: "sessao" }),
+  getAdapter: () => ({
+    editMessage: vi.fn(async () => undefined),
+    revokeMessage: vi.fn(async () => undefined),
+    isConfigured: () => true,
+    resolveRecipient: () => "5531999998888@c.us",
+  }),
 }));
 
-vi.mock("@/lib/channels/contato-por-telefone", () => ({
-  encontrarContatoPorTelefone: async () => null,
-}));
-vi.mock("@/lib/escalacao/numero-interno-de-aviso", () => ({
-  ehNumeroInternoDeAviso: async () => false,
-  registrarMensagemIgnorada: async () => undefined,
-}));
-vi.mock("@/lib/channels/marcar-conversa", () => ({
-  marcarConversaComMensagem: async (_a: unknown, args: Record<string, unknown>) => {
-    estado.marcacoes.push(args);
-  },
-}));
-vi.mock("@/lib/escalacao/atendimento-manual", () => ({
-  pausarIaPorAtendimentoManual: async (_a: unknown, input: Record<string, unknown>) => {
-    estado.pausas.push(input);
-    return true;
-  },
-}));
-vi.mock("@/lib/channels/pos-entrada", () => ({
-  aplicarEfeitosPosEntrada: async () => undefined,
-}));
-vi.mock("@/lib/audit", () => ({
-  audit: async (entrada: Record<string, unknown>) => {
-    estado.auditorias.push(entrada);
-  },
-}));
+/** O que a rota escreveu em `conversations`, com os filtros do compare-and-set. */
+let escritas: { payload: unknown; filtros: [string, unknown][] }[] = [];
+let mensagem: Record<string, unknown> = {};
 
-import { ingestMetaEcho, ingestMetaInbound } from "@/lib/channels/meta/ingest";
-import type {
-  InboundMessageEvent,
-  OutboundEchoEvent,
-} from "@/lib/channels/meta/webhook";
-import { previaDaMensagem } from "@/lib/messaging/previa-da-mensagem";
-
-/** Os cinco tipos de mídia do canal oficial que a issue nomeia. */
-const TIPOS = ["image", "audio", "document", "video", "sticker"] as const;
-
-/**
- * A prévia que as rotas de ocultar e apagar RECONSTROEM — verbatim de
- * `app/api/v1/messages/[id]/hide/route.ts:55` e `app/api/v1/messages/[id]/route.ts:124`.
- */
-const previaQueARotaReconstroi = (body: string | null | undefined, tipo: string) =>
-  body?.slice(0, 280) || `[${tipo}]`;
-
-function adminFalso(): SupabaseClient {
-  const from = (table: string) => {
-    if (table === "channel_sessions") {
-      const chain: Record<string, unknown> = {
-        select: () => chain,
-        eq: () => chain,
-        is: () => chain,
-        maybeSingle: async () => ({
-          data: { id: "session-1", organization_id: "org-1" },
-          error: null,
-        }),
-      };
-      return chain;
-    }
-    if (table === "messages") {
-      const terminal = {
-        maybeSingle: async () => ({ data: { id: "message-1" }, error: null }),
-      };
-      return {
-        insert: (payload: Record<string, unknown>) => {
-          estado.insert = payload;
-          return { select: () => terminal };
-        },
-      };
-    }
-    throw new Error(`tabela inesperada: ${table}`);
+function consulta(tabela: string) {
+  let op = "select";
+  let payload: unknown;
+  const filtros: [string, unknown][] = [];
+  const linha = (): unknown => {
+    if (tabela === "messages") return op === "update" ? { id: MSG } : mensagem;
+    if (tabela === "conversations") return { id: CONV, contact_id: "c", is_group: false, channel_session_id: SESSION };
+    if (tabela === "channel_sessions") return { id: SESSION, provider: "waha", archived_at: null };
+    return { phone_number: "+5531999998888", wa_identity: null, wa_lid: null };
   };
-
-  const rpc = async (name: string, args: Record<string, unknown>) => {
-    estado.rpcs.push({ name, args });
-    if (name === "fn_upsert_wa_contact") return { data: "contact-1", error: null };
-    if (name === "fn_upsert_wa_conversation") return { data: "conversation-1", error: null };
-    return { data: null, error: null };
+  const q: Record<string, unknown> = {
+    select: () => q,
+    order: () => q,
+    limit: () => q,
+    eq: (coluna: string, valor: unknown) => {
+      filtros.push([coluna, valor]);
+      return q;
+    },
+    update: (p: unknown) => {
+      op = "update";
+      payload = p;
+      if (tabela === "conversations") escritas.push({ payload, filtros });
+      return q;
+    },
+    // `latest` (última mensagem da conversa) também cai aqui e devolve o id MSG.
+    maybeSingle: async () => ({ data: linha(), error: null }),
+    then: (ok: (v: unknown) => unknown) => ok({ data: null, error: null }),
   };
-
-  return { from, rpc } as unknown as SupabaseClient;
+  return q;
 }
 
-function eventoRecebido(tipo: string, text: string | null): InboundMessageEvent {
-  return {
-    kind: "inbound_message",
-    wabaId: "waba-1",
-    phoneNumberId: "phone-1",
-    externalId: `wamid.IN.${tipo}`,
-    from: "5519999999999",
-    profileName: "Cliente",
-    sentAt: new Date("2026-09-15T12:00:00.000Z"),
-    type: tipo,
-    text,
-    media: { id: "media-1", url: null, mime: "application/octet-stream", voice: false },
-  };
-}
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({ from: (t: string) => consulta(t) }),
+}));
 
-function eventoEco(tipo: string, text: string | null): OutboundEchoEvent {
-  return {
-    kind: "outbound_echo",
-    wabaId: "waba-1",
-    phoneNumberId: "phone-1",
-    externalId: `wamid.OUT.${tipo}`,
-    to: "5519999999999",
-    sentAt: new Date("2026-09-15T12:00:00.000Z"),
-    type: tipo,
-    text,
-    media: { id: "media-9", url: null, mime: "application/octet-stream", voice: false },
-  };
-}
-
-function ultimaMarcacao(): Record<string, unknown> {
-  return estado.marcacoes[estado.marcacoes.length - 1]!;
-}
+const pedido = (metodo: string) =>
+  new NextRequest(`https://crm.exemplo/api/v1/messages/${MSG}`, { method: metodo });
+const params = { params: Promise.resolve({ id: MSG }) };
 
 beforeEach(() => {
-  estado.insert = null;
-  estado.rpcs = [];
-  estado.marcacoes = [];
-  estado.pausas = [];
-  estado.auditorias = [];
+  escritas = [];
 });
 
-describe("canal oficial — mídia recebida pela mesma régua dos outros canais (#2960)", () => {
-  it.each(TIPOS)("%s COM legenda: a prévia é a legenda, como em qualquer canal", async (tipo) => {
-    const legenda = `segue o ${tipo}`;
-    await ingestMetaInbound(adminFalso(), eventoRecebido(tipo, legenda), { organizationId: "org-1" });
-
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe(legenda);
-    expect(preview).toBe(previaDaMensagem(legenda, tipo));
-    // A régua antiga do canal oficial ignorava a legenda e dizia "📷 Imagem".
-    expect(preview).not.toMatch(/📷|🎵|🎤|🎬|📎|👤/);
+describe("envio pelo CRM grava a mesma prévia que a ingestão", () => {
+  it("imagem sem legenda vira 'Imagem', não `[image]`", () => {
+    expect(previewFrom({ type: "image", media_storage_path: "org/x.jpg" })).toBe("Imagem");
   });
 
-  it.each(TIPOS)("%s SEM legenda: o rótulo do tipo, e ocultar/apagar passam a reconhecer", async (tipo) => {
-    await ingestMetaInbound(adminFalso(), eventoRecebido(tipo, null), { organizationId: "org-1" });
-
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe(`[${tipo}]`);
-    expect(preview).toBe(previaDaMensagem(null, tipo));
-    // A IGUALDADE que faltava: a prévia gravada casa com a que as rotas de
-    // ocultar e apagar reconstroem a partir do corpo NULO da mídia sem legenda.
-    expect(preview).toBe(
-      previaQueARotaReconstroi(estado.insert?.body as string | null, estado.insert?.type as string),
-    );
+  it("imagem com legenda mostra a legenda", () => {
+    expect(previewFrom({ type: "image", media_url: "https://x/y.jpg", body: "olha a foto" })).toBe("olha a foto");
   });
 
-  it("legenda gravada também casa com a prévia reconstruída pela rota (corpo com texto)", async () => {
-    const legenda = "olha essa foto";
-    await ingestMetaInbound(adminFalso(), eventoRecebido("image", legenda), { organizationId: "org-1" });
-
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe(
-      previaQueARotaReconstroi(estado.insert?.body as string | null, estado.insert?.type as string),
-    );
+  it("sem corpo e sem mídia, não há prévia", () => {
+    expect(previewFrom({ type: "image" })).toBe("");
   });
 });
 
-describe("canal oficial — eco da empresa (app WhatsApp Business) pela mesma régua (#2960)", () => {
-  it.each(TIPOS)("%s COM legenda: a prévia é a legenda", async (tipo) => {
-    const legenda = `mando o ${tipo}`;
-    await ingestMetaEcho(adminFalso(), eventoEco(tipo, legenda), { organizationId: "org-1" });
-
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe(legenda);
-    expect(preview).toBe(previaDaMensagem(legenda, tipo));
-    expect(preview).not.toMatch(/📷|🎵|🎤|🎬|📎|👤/);
+describe("ocultar e restaurar casam a prévia que a ingestão gravou", () => {
+  beforeEach(() => {
+    mensagem = {
+      id: MSG, organization_id: ORG, conversation_id: CONV, direction: "inbound",
+      body: null, type: "image", metadata: {}, revoked_at: null,
+    };
   });
 
-  it.each(TIPOS)("%s SEM legenda: o rótulo do tipo e a igualdade da rota fecha", async (tipo) => {
-    await ingestMetaEcho(adminFalso(), eventoEco(tipo, null), { organizationId: "org-1" });
+  it("ocultar imagem recebida sem legenda procura 'Imagem' na lista", async () => {
+    const r = await ocultar(pedido("POST"), params);
+    expect(r.status).toBe(200);
+    const w = escritas.at(-1);
+    expect(w?.payload).toEqual({ last_message_preview: "Mensagem ocultada no CRM" });
+    expect(w?.filtros).toContainEqual(["last_message_preview", "Imagem"]);
+  });
 
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe(`[${tipo}]`);
-    expect(preview).toBe(previaDaMensagem(null, tipo));
-    expect(preview).toBe(
-      previaQueARotaReconstroi(estado.insert?.body as string | null, estado.insert?.type as string),
-    );
+  it("restaurar devolve 'Imagem' à lista, nunca `[image]`", async () => {
+    const r = await restaurar(pedido("DELETE"), params);
+    expect(r.status).toBe(200);
+    const w = escritas.at(-1);
+    expect(w?.payload).toEqual({ last_message_preview: "Imagem" });
+    expect(w?.filtros).toContainEqual(["last_message_preview", "Mensagem ocultada no CRM"]);
   });
 });
 
-describe("canal oficial — texto segue a mesma régua (teto 280, não 120)", () => {
-  it("texto longo é cortado em 280, como nos outros canais", async () => {
-    const longo = "x".repeat(400);
-    await ingestMetaInbound(adminFalso(), { ...eventoRecebido("text", longo), media: null }, {
-      organizationId: "org-1",
-    });
-
-    const { preview } = ultimaMarcacao();
-    expect(preview).toBe("x".repeat(280));
-    expect(preview).toBe(previaDaMensagem(longo, "text"));
+describe("apagar casa a prévia que o envio pelo CRM gravou", () => {
+  it("apagar imagem enviada sem legenda procura a prévia de `previewFrom`", async () => {
+    mensagem = {
+      id: MSG, organization_id: ORG, conversation_id: CONV, channel_session_id: SESSION,
+      external_id: "true_x@c.us_ABC", direction: "outbound", type: "image", status: "sent",
+      body: null, sent_via: "user", sent_by_user_id: USER, sent_at: new Date().toISOString(),
+      revoked_at: null,
+    };
+    const r = await apagar(pedido("DELETE"), params);
+    expect(r.status).toBe(200);
+    const w = escritas.at(-1);
+    expect(w?.payload).toEqual({ last_message_preview: "Esta mensagem foi apagada" });
+    const gravada = previewFrom({ type: "image", media_storage_path: "org/x.jpg" });
+    expect(w?.filtros).toContainEqual(["last_message_preview", gravada]);
+    expect(gravada).toBe("Imagem");
   });
 });
