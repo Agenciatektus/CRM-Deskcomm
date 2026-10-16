@@ -41,6 +41,11 @@ tem_ufw() { grep -qE 'ufw allow ' "$1"; }
 # ── comecar.sh: o script de ENTRADA do kit (curl | bash) ────────────────────
 check "o comecar.sh tem ao menos um comando ssh (senão o resto passaria vazio)" tem_ssh "$COMECAR"
 check "todo ssh do comecar.sh leva -p 22022" test -z "$(ssh_sem_porta "$COMECAR")"
+# O texto do `ssh` mora num heredoc SEM aspas no delimitador: ali uma crase vira
+# substituição de comando, e quem roda o `curl | bash` vê "-p: command not found"
+# no lugar da frase. Executa o bloco como o bash executaria e exige stderr vazio.
+mensagem_ssh_stderr() { awk '/cat <<SSH$/{p=1} p{print} p&&/^SSH$/{exit}' "$1" | bash 2>&1 >/dev/null; }
+check "a mensagem de SSH do comecar.sh sai sem erro do bash (crase em heredoc vira comando)" test -z "$(mensagem_ssh_stderr "$COMECAR")"
 
 # ── README do kit: o firewall que ele ensina ────────────────────────────────
 check "o README do kit tem ao menos um ufw allow (senão o resto passaria vazio)" tem_ufw "$README_KIT"
@@ -54,6 +59,7 @@ check "nenhum ufw allow do runbook deixa a porta de ssh sem a 22022" test -z "$(
 
 if [ "$FAILS" -gt 0 ]; then
   ssh_sem_porta "$COMECAR" | sed 's/^/    comecar.sh ssh sem porta: /'
+  mensagem_ssh_stderr "$COMECAR" | sed 's/^/    comecar.sh mensagem de ssh: /'
   ssh_sem_porta "$RUNBOOK" | sed 's/^/    runbook ssh sem porta: /'
   scp_sem_porta "$RUNBOOK" | sed 's/^/    runbook scp sem porta: /'
   ufw_ssh_sem_22022 "$README_KIT" | sed 's/^/    README ufw sem a 22022: /'
