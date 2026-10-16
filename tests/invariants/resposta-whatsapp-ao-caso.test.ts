@@ -17,7 +17,11 @@ const SESSION = "06180000-0000-4000-8000-000000000003";
 const CONVERSATION = "06180000-0000-4000-8000-000000000004";
 const CASE_RESOLVED = "06180000-0000-4000-8000-000000000005";
 const CASE_QUESTION = "06180000-0000-4000-8000-000000000006";
+const CASE_UNTOUCHED = "06180000-0000-4000-8000-000000000007";
 const PHONE = "+5511990000001";
+// Outra empresa com o MESMO telefone de suporte: o telefone não pode ser a chave.
+const ORG_B = "06180000-0000-4000-8000-0000000000b1";
+const SESSION_B = "06180000-0000-4000-8000-0000000000b3";
 
 async function reply(input: {
   caseId: string;
@@ -25,6 +29,8 @@ async function reply(input: {
   body: string;
   messageKey: string;
   phones?: string[];
+  org?: string;
+  session?: string;
 }) {
   const client = await pool.connect();
   try {
@@ -37,7 +43,15 @@ async function reply(input: {
       `select public.fn_responder_caso_por_whatsapp(
          $1::uuid, $2::uuid, $3::uuid, $4::text[], $5::text, $6::text, $7::text
        ) as fn_responder_caso_por_whatsapp`,
-      [ORG, input.caseId, SESSION, input.phones ?? [PHONE], input.action, input.body, input.messageKey],
+      [
+        input.org ?? ORG,
+        input.caseId,
+        input.session ?? SESSION,
+        input.phones ?? [PHONE],
+        input.action,
+        input.body,
+        input.messageKey,
+      ],
     );
     const row = result.rows[0];
     if (!row) throw new Error("RPC returned no row");
@@ -100,7 +114,7 @@ beforeAll(async () => {
            telefone_destino = excluded.telefone_destino, ligado = true`,
     [ORG, SESSION, PHONE],
   );
-  for (const caseId of [CASE_RESOLVED, CASE_QUESTION]) {
+  for (const caseId of [CASE_RESOLVED, CASE_QUESTION, CASE_UNTOUCHED]) {
     await pool.query(
       `insert into public.agent_cases (id, organization_id, conversation_id, status, title, summary, blocker)
        values ($1, $2, $3, 'awaiting_human', 'Dúvida de tamanho', 'Cliente quer saber o tamanho', 'Confirmar com a equipe')
@@ -117,10 +131,45 @@ beforeAll(async () => {
       [ORG, caseId, PHONE, SESSION],
     );
   }
+  await pool.query(
+    `insert into public.organizations (id, slug, legal_name, display_name)
+     values ($1, 'whatsapp-case-reply-0618-b', 'Teste 0618 B', 'Teste 0618 B') on conflict (id) do nothing`,
+    [ORG_B],
+  );
+  await pool.query(
+    `insert into public.channel_sessions
+       (id, organization_id, waha_session_name, status, webhook_secret_encrypted)
+     values ($1, $2, 'case-reply-0618-b', 'WORKING', '\\x00'::bytea) on conflict (id) do nothing`,
+    [SESSION_B, ORG_B],
+  );
+  await pool.query(
+    `insert into public.config_aviso_de_caso
+       (organization_id, channel_session_id, telefone_destino, ligado)
+     values ($1, $2, $3, true) on conflict (organization_id) do update
+       set channel_session_id = excluded.channel_session_id,
+           telefone_destino = excluded.telefone_destino, ligado = true`,
+    [ORG_B, SESSION_B, PHONE],
+  );
 });
 
+async function intocado(caseId: string) {
+  const caso = await pool.query("select status from public.agent_cases where id = $1", [caseId]);
+  expect(caso.rows[0].status).toBe("awaiting_human");
+  const trilha = await pool.query(
+    "select count(*)::int as n from public.agent_case_events where case_id = $1 and kind = 'human_replied'",
+    [caseId],
+  );
+  expect(trilha.rows[0].n).toBe(0);
+  const fila = await pool.query(
+    `select count(*)::int as n from public.job_queue
+      where kind = 'case_reply_turn' and payload->>'case_id' = $1`,
+    [caseId],
+  );
+  expect(fila.rows[0].n).toBe(0);
+}
+
 afterAll(async () => {
-  await pool.query("delete from public.organizations where id = $1", [ORG]);
+  await pool.query("delete from public.organizations where id = any($1::uuid[])", [[ORG, ORG_B]]);
   await pool.end();
 });
 
@@ -207,9 +256,10 @@ describe("resposta do funcionário pelo WhatsApp", () => {
   });
 
   it("não aceita outro telefone nem caso sem entrega enviada", async () => {
+    // Caso ainda aguardando a equipe: a recusa tem de vir do telefone, não do status.
     expect(
       await reply({
-        caseId: CASE_QUESTION,
+        caseId: CASE_UNTOUCHED,
         action: "resolved",
         body: "Resposta não autorizada.",
         messageKey: "session:wamid-wrong-phone",
@@ -224,5 +274,30 @@ describe("resposta do funcionário pelo WhatsApp", () => {
         messageKey: "session:wamid-no-case",
       }),
     ).toBe("case_unavailable");
+    await intocado(CASE_UNTOUCHED);
+  });
+
+  it("outra empresa com o mesmo telefone de suporte não alcança o caso", async () => {
+    expect(
+      await reply({
+        org: ORG_B,
+        session: SESSION_B,
+        caseId: CASE_UNTOUCHED,
+        action: "resolved",
+        body: "Resposta de outra empresa.",
+        messageKey: "session-b:wamid-cross-tenant",
+      }),
+    ).toBe("case_unavailable");
+    // Nem apontando a conexão da empresa dona do caso.
+    expect(
+      await reply({
+        org: ORG_B,
+        caseId: CASE_UNTOUCHED,
+        action: "resolved",
+        body: "Resposta de outra empresa.",
+        messageKey: "session-b:wamid-cross-session",
+      }),
+    ).toBe("unauthorized");
+    await intocado(CASE_UNTOUCHED);
   });
 });
