@@ -78,7 +78,8 @@ export function DialogoDeNovaEtiqueta({
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{t("Prévia:")}</span>
-            <ChipDeEtiqueta tag={tag} cor={tom ?? undefined} />
+            {/* `null` força a prévia sem cor; `undefined` cairia no tom do vocabulário. */}
+            <ChipDeEtiqueta tag={tag} cor={tom} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

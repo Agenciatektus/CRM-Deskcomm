@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -135,6 +135,79 @@ describe("sugestão de etiqueta — caixa de diálogo antes de enviar", () => {
 
     const caixa = dialogo();
     expect(within(caixa).getByRole("button", { name: "Índigo" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("Sem cor sobre sugestão colorida apaga a cor do vocabulário", async () => {
+    // No diálogo, `null` é "Sem cor" escolhido de propósito. Tratá-lo como "não
+    // mexer" fazia a etiqueta entrar com o tom que o gerente acabou de recusar.
+    get.mockImplementation(async (url: string) =>
+      url === "/api/v1/tags/cores"
+        ? { data: [{ tag: "google", cor: "#3e63dd" }] }
+        : { data: ["google", "vip"] },
+    );
+    montar();
+    await userEvent.click(await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 }));
+    const caixa = dialogo();
+    await userEvent.click(within(caixa).getByRole("button", { name: "Sem cor" }));
+    await userEvent.click(within(caixa).getByRole("button", { name: "Adicionar tag" }));
+    expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+    expect(definirCor).toHaveBeenCalledWith("google", null);
+  });
+
+  it("Sem cor sobre sugestão colorida mostra a prévia SEM cor", async () => {
+    // A prévia é a promessa do que vai ser gravado: com "Sem cor" marcado, ela
+    // não pode continuar pintada com o tom do vocabulário.
+    get.mockImplementation(async (url: string) =>
+      url === "/api/v1/tags/cores"
+        ? { data: [{ tag: "google", cor: "#3e63dd" }] }
+        : { data: ["google", "vip"] },
+    );
+    montar();
+    await userEvent.click(await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 }));
+    const caixa = dialogo();
+    expect(within(caixa).getByText("google").style.backgroundColor).not.toBe("");
+    await userEvent.click(within(caixa).getByRole("button", { name: "Sem cor" }));
+    expect(within(caixa).getByText("google").style.backgroundColor).toBe("");
+  });
+
+  it("confirmar o tom já marcado grava a tag sem regravar a cor", async () => {
+    get.mockImplementation(async (url: string) =>
+      url === "/api/v1/tags/cores"
+        ? { data: [{ tag: "google", cor: "#3e63dd" }] }
+        : { data: ["google", "vip"] },
+    );
+    montar();
+    await userEvent.click(await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 }));
+    await userEvent.click(within(dialogo()).getByRole("button", { name: "Adicionar tag" }));
+    expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+    expect(definirCor).not.toHaveBeenCalled();
+  });
+
+  it("cor que chega DEPOIS de o diálogo abrir não é apagada pelo Sem cor que o gerente viu", async () => {
+    // O diálogo guarda o tom que mostrou ao abrir. Comparar com o mapa ao vivo
+    // faria confirmar o "Sem cor" exibido por omissão apagar da organização uma
+    // cor que o gerente nunca viu.
+    let soltarCores: (v: unknown) => void = () => {};
+    get.mockImplementation((url: string) =>
+      url === "/api/v1/tags/cores"
+        ? new Promise((resolve) => {
+            soltarCores = resolve;
+          })
+        : Promise.resolve({ data: ["google", "vip"] }),
+    );
+    montar();
+    await userEvent.click(await screen.findByRole("button", { name: "+ google" }, { timeout: 5000 }));
+    const caixa = dialogo();
+    expect(within(caixa).getByRole("button", { name: "Sem cor" }).getAttribute("aria-pressed")).toBe("true");
+
+    await act(async () => soltarCores({ data: [{ tag: "google", cor: "#3e63dd" }] }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-ponto-da-etiqueta="google"]')).not.toBeNull(),
+    );
+
+    await userEvent.click(within(caixa).getByRole("button", { name: "Adicionar tag" }));
+    expect(mutate).toHaveBeenCalledWith({ tags: ["vip", "google"] });
+    expect(definirCor).not.toHaveBeenCalled();
   });
 
   it("sem permissão o clique continua direto — a rota recusaria o diálogo", async () => {
