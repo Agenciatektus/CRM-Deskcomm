@@ -26,6 +26,8 @@ const EV_MENSAGEM = "e0e0e0e0-0685-4000-8000-000000000012";
 const EV_JOB = "e0e0e0e0-0685-4000-8000-000000000013";
 const EV_MENSAGEM_ID_SEM_FORMA = "e0e0e0e0-0685-4000-8000-000000000014";
 const EV_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000015";
+// Nota cujo payload não repete a conversa: só o `entity_id` a identifica.
+const EV_NOTA_SO_ENTIDADE = "e0e0e0e0-0685-4000-8000-000000000019";
 // `payload.conversation_id` que não é uuid: texto, vazio e número.
 const EV_MALFORMADOS = [
   "e0e0e0e0-0685-4000-8000-000000000016",
@@ -50,6 +52,8 @@ beforeAll(() => {
       ('${EV_MENSAGEM_ID_SEM_FORMA}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(),
         jsonb_build_object('conversation_id', '5511999999999@c.us'), 'done'),
       ('${EV_CONVERSA}', '${GOV_ORG}', 'conversation.claimed', 'conversation', '${GOV_CONV_AGENT_B}', '{}'::jsonb, 'done'),
+      ('${EV_NOTA_SO_ENTIDADE}', '${GOV_ORG}', 'user.mentioned', 'conversation_note', '${GOV_CONV_AGENT_B}',
+        jsonb_build_object('body_preview', 'nota interna'), 'done'),
       ('${EV_MALFORMADOS[0]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":"x"}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[1]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":""}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[2]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":12345}'::jsonb, 'done')
@@ -64,7 +68,7 @@ beforeEach(() => {
 });
 
 describe("0685 — eventos ligados a uma conversa seguem a visibilidade dela", () => {
-  it.each([EV_NOTA, EV_MENSAGEM, EV_JOB])("o dono lê (controle positivo) e o colega em modo own não (%s)", (ev) => {
+  it.each([EV_NOTA, EV_NOTA_SO_ENTIDADE, EV_MENSAGEM, EV_JOB])("o dono lê (controle positivo) e o colega em modo own não (%s)", (ev) => {
     expect(countAs(GOV_AGENT_B, contar(ev))).toBe(1);
     expect(countAs(GOV_AGENT_A, contar(ev))).toBe(0);
   });
@@ -80,7 +84,7 @@ describe("0685 — eventos ligados a uma conversa seguem a visibilidade dela", (
   });
 
   it("gestão lê os eventos ligados à conversa de qualquer atendente", () => {
-    for (const ev of [EV_NOTA, EV_MENSAGEM, EV_JOB]) expect(countAs(GOV_MANAGER, contar(ev))).toBe(1);
+    for (const ev of [EV_NOTA, EV_NOTA_SO_ENTIDADE, EV_MENSAGEM, EV_JOB]) expect(countAs(GOV_MANAGER, contar(ev))).toBe(1);
   });
 
   it("conversation_id malformado não derruba a leitura e segue o pertencimento à organização", () => {
