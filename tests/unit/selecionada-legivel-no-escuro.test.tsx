@@ -107,6 +107,21 @@ describe("a conversa selecionada é legível no tema escuro", () => {
     expect(pintam).toHaveLength(1);
   });
 
+  it("aberta E marcada: hover e foco não pintam o botão (senão a linha fica em dois tons) e o foco vira anel", () => {
+    render(
+      <ConversationListItem
+        {...conversaDeExemplo.props}
+        conversation={conversaDeExemplo.conversation}
+        isSelected
+        selecionado
+        onAlternarSelecao={() => {}}
+      />,
+    );
+    const classes = (screen.getByRole("button", { current: true }).getAttribute("class") ?? "").split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(["hover:bg-transparent", "focus-visible:bg-transparent", "focus-visible:ring-2"]));
+    expect(classes.filter((c) => /^(hover|focus-visible):bg-(?!transparent$)/.test(c))).toEqual([]);
+  });
+
   it.each(["dark", "light"] as const)("na aberta, a prévia tem contraste ≥ 4,5 sobre o accent-soft (%s)", (tema) => {
     render(<ConversationListItem {...conversaDeExemplo.props} conversation={conversaDeExemplo.conversation} isSelected />);
     const classe = screen.getByText("bom dia").closest("p")?.getAttribute("class") ?? "";

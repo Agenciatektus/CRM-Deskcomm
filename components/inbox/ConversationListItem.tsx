@@ -285,8 +285,13 @@ export function ConversationListItem({
           // hex nos dois temas, e o `accent-50` (quase branco) no escuro deixava o
           // nome — `text-text`, claro no escuro — branco sobre branco.
           // Marcada no lote, quem pinta é o wrapper: no escuro o `accent-soft` é
-          // translúcido, e pintar os dois o somava (prévia a 3,2:1).
-          isSelected && !selecionado && "bg-accent-soft hover:bg-accent-soft",
+          // translúcido, e pintar os dois o somava (prévia a 3,2:1). O botão fica
+          // transparente também no hover/foco, senão o cinza do hover cobria só ele
+          // e a linha ficava em dois tons; o foco vira anel, como o da caixa.
+          isSelected &&
+            (selecionado
+              ? "hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+              : "bg-accent-soft hover:bg-accent-soft"),
         )}
         aria-current={isSelected ? "true" : undefined}
       >
