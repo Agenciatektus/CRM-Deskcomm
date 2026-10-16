@@ -284,7 +284,9 @@ export function ConversationListItem({
           // `accent-soft`, e não um degrau fixo da rampa: os degraus têm o MESMO
           // hex nos dois temas, e o `accent-50` (quase branco) no escuro deixava o
           // nome — `text-text`, claro no escuro — branco sobre branco.
-          isSelected && "bg-accent-soft hover:bg-accent-soft",
+          // Marcada no lote, quem pinta é o wrapper: no escuro o `accent-soft` é
+          // translúcido, e pintar os dois o somava (prévia a 3,2:1).
+          isSelected && !selecionado && "bg-accent-soft hover:bg-accent-soft",
         )}
         aria-current={isSelected ? "true" : undefined}
       >
@@ -375,7 +377,9 @@ export function ConversationListItem({
           <p
             className={cn(
               "min-w-0 truncate text-[13px]",
-              unread > 0 ? "text-text" : "text-text-muted",
+              // Na aberta, `text-text`: `text-muted` sobre o `accent-soft` do
+              // escuro dá 4,2:1, abaixo do AA (medido em selecionada-legivel-no-escuro.test).
+              unread > 0 || isSelected ? "text-text" : "text-text-muted",
             )}
           >
             {isAi && mostrarAutomatico ? (
