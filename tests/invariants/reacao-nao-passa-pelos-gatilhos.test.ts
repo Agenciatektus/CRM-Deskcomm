@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createPgAdminClient } from "@/lib/followup/turn-bridge";
+
 import { GOV_ORG, GOV_SESSION, seedGov } from "./gov-helpers";
 
 /**
@@ -208,5 +210,22 @@ describe("a reação não é mensagem recebida", () => {
       await eventosDa(reacao),
       "a reação de saída emitiu `message.outbound` — reação não é mensagem de saída tampouco",
     ).toEqual([]);
+  });
+
+  it("o follow-up lê a última FALA do cliente, não o 👍 que veio depois", async () => {
+    const { contact, conversation } = await conversaEncerrada();
+    const sim = randomUUID();
+    await pool.query(
+      `insert into messages
+         (id,organization_id,conversation_id,channel_session_id,contact_id,type,direction,status,sent_via,body,sent_at)
+       values($1,$2,$3,$4,$5,'text','inbound','received','ai','SIM',clock_timestamp())`,
+      [sim, GOV_ORG, conversation, GOV_SESSION, contact],
+    );
+    await reagir({ conversation, contact, alvo: sim });
+
+    expect(
+      await createPgAdminClient(pool).loadLastInboundBody(GOV_ORG, contact, conversation),
+      "o 👍 (body nulo) escondeu o SIM — o match_reply do follow-up não casaria a resposta",
+    ).toBe("SIM");
   });
 });
