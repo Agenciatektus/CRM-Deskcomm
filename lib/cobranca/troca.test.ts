@@ -78,6 +78,16 @@ describe("trocarPlanoDaOrg", () => {
 
   // Se a assinatura está ativa, upgrade usa o fluxo proporcional. Sem dados
   // suficientes do período pago, a operação falha fechada e não agenda plano.
+  it("⭐ upgrade com cobrança cheia em aberto e a linha atrasada: recusa, sem ajuste sobre o período antigo", async () => {
+    // Linha ainda 'ativa' com o período antigo, mas um Assinar já gravou link vivo e
+    // assinatura nova (aviso de remoção da antiga perdido). Sem a guarda, o ajuste
+    // seria calculado sobre o período velho e somaria à cobrança cheia.
+    m.linha = { ...PAGANDO, provedor: "asaas", provedor_assinatura_id: "sub_nova", checkout_url: "https://pay.example/cheia", checkout_expira_em: "2026-10-11T12:00:00Z" };
+    expect(await trocar("pro", "empresa")).toMatchObject({ ok: false, status: 409, code: "pagamento_do_periodo_pendente" });
+    expect(iniciarAjusteProporcional).not.toHaveBeenCalled();
+    expect(escritas()).toHaveLength(0);
+  });
+
   it("⭐ upgrade com período pago desconhecido: recusa sem alterar plano ou preço", async () => {
     m.linha = { ...PAGANDO, periodo_pago_desde: null };
     expect(await trocar("pro")).toMatchObject({ ok: false, status: 409, code: "periodo_indisponivel" });

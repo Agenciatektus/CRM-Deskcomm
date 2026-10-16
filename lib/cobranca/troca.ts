@@ -272,6 +272,16 @@ export async function trocarPlanoDaOrg(
   // restante e só troca preço/limites quando o provedor confirma essa cobrança
   // avulsa. O dono atribui plano negociado: agenda, como antes do #2846.
   if (!emTeste && origem === "empresa" && novo.preco_cents > antigo.preco_cents && provedorDaTroca) {
+    // Cobrança cheia em aberto (um Assinar que a leitura ainda não alcançou): o ajuste
+    // seria calculado sobre o período antigo da linha e cobraria em dobro. Só acontece
+    // com a linha atrasada — a leitura que vê a assinatura viva limpa o link.
+    if (linkEmAberto) {
+      return recusa(
+        409,
+        "pagamento_do_periodo_pendente",
+        'A mensalidade de agora ainda não foi paga. Pague em "Pagar agora" e troque de plano depois que o pagamento for confirmado (Pix: minutos; boleto: até 1 dia útil).',
+      );
+    }
     if (atual.plano_troca_pendente_id === novo.id && atual.troca_status === "aguardando_pagamento" && atual.troca_pagamento_ref) {
       const estadoDoPagamento = await adaptadorDe(provedorDaTroca.provedor).lerPagamentoProporcional(atual.troca_pagamento_ref);
       const venceu = atual.troca_reserva_ate !== null && Date.parse(atual.troca_reserva_ate) <= agora.getTime();
