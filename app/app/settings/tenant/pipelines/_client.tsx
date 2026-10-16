@@ -353,9 +353,10 @@ function PipelineEditor({
               .map((o) => ({
                 value: o.value.trim(),
                 label: o.label.trim(),
-                // Os APELIDOS da opção (#2521) sobrevivem ao salvar: o input só
-                // edita rótulos, mas apagar a chave aqui apagaria os apelidos
-                // que a importação CSV acabou de cadastrar.
+                // Os APELIDOS da opção (#2521) sobrevivem ao salvar: o input de
+                // opções preserva `value` e apelidos de todo rótulo que já
+                // existia (ver o `onChange` dele), e esquecer a chave aqui
+                // apagaria o que a importação CSV cadastrou.
                 ...(o.aliases && o.aliases.length > 0 ? { aliases: o.aliases } : {}),
               }))
               .filter((o) => o.label !== ""),
@@ -624,10 +625,26 @@ function PipelineEditor({
                   // motivo só o INÍCIO é aparado (o espaço que o `join(", ")`
                   // põe): aparar o fim apagaria o espaço recém-digitado, e
                   // "Clareamento" + " " + "D" viraria "ClareamentoD".
+                  //
+                  // O input só mostra RÓTULOS, mas a opção é mais que isso: o
+                  // `value` canônico e os apelidos que a importação CSV trouxe
+                  // (#2521). Reconstruir tudo como `{ value: label }` faria uma
+                  // tecla qualquer trocar `maceio-al` por `Maceió (AL)` e apagar
+                  // os apelidos — e os negócios já gravados com `maceio-al`
+                  // deixariam de casar com a lista. Por isso o rótulo que JÁ
+                  // existia (comparado aparado) mantém a opção dele; só o rótulo
+                  // sem par vira opção nova. O limite: renomear um rótulo
+                  // importado gera opção nova, porque o texto do meio da edição
+                  // não casa com nada.
                   const options = e.target.value
                     .split(",")
                     .map((s) => s.trimStart())
-                    .map((label) => ({ value: label, label }));
+                    .map((label) => {
+                      const existente = (f.options ?? []).find(
+                        (o) => label.trim() !== "" && o.label.trim() === label.trim(),
+                      );
+                      return existente ? { ...existente, label } : { value: label, label };
+                    });
                   const next = [...fields];
                   next[i] = { ...f, options };
                   setFields(next);
