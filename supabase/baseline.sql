@@ -57844,3 +57844,30 @@ comment on column public.webhook_lead_captures.outcome is
   'criado = virou lead novo; duplicado = envio repetido, nada mudou no card; atualizado = o card da mesma fonte recebeu o dado novo (issue #2316, só com a opção da fonte ligada); recusado = não entrou (reject_reason diz por quê).';
 
 notify pgrst, 'reload schema';
+
+
+-- ---- #3042: desmarcar o exemplo tira do RAG os trechos já aprendidos da conversa (migration 0688) ----
+-- Desmarcar `usable_for_rag` só impedia ingestões futuras; os `ai_chunks` já gravados da conversa
+-- seguiam alcançáveis por `retrieve_top_k_chunks`. A função remove os trechos cujo
+-- `metadata.conversation_id` é a conversa (na mesma organização) e devolve a contagem.
+-- Cabeçalho da 0688 para o racional inteiro.
+create or replace function public.fn_conversa_remove_trechos_do_rag(p_org uuid,p_conversation uuid)
+returns integer language plpgsql security definer set search_path=public as $$
+declare removidos integer;
+begin
+ if auth.uid() is not null and not public.fn_role_at_least(p_org,'agent') then
+  raise exception 'caller_not_authorized_for_org'
+    using hint = 'fn_conversa_remove_trechos_do_rag: caller must be agent of the organization';
+ end if;
+ delete from public.ai_chunks c
+  where c.organization_id=p_org
+    and c.metadata->>'conversation_id'=p_conversation::text
+    and exists (select 1 from public.conversations v
+                 where v.id=p_conversation and v.organization_id=p_org);
+ get diagnostics removidos = row_count;
+ return removidos;
+end $$;
+revoke all on function public.fn_conversa_remove_trechos_do_rag(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.fn_conversa_remove_trechos_do_rag(uuid,uuid) to service_role;
+
+notify pgrst,'reload schema';
