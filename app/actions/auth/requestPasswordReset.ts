@@ -7,8 +7,7 @@ import { forgotPasswordSchema, type ForgotPasswordInput } from "@/lib/auth/schem
 import { audit, hashEmail } from "@/lib/audit";
 import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
 import { env } from "@/lib/env";
-import { lerSmtp } from "@/lib/email/config";
-import { isSmtpConfigured } from "@/lib/email/smtp";
+import { semSmtpRespondido } from "@/lib/email/smtp";
 
 export type RequestPasswordResetResult =
   | { ok: true }
@@ -35,9 +34,7 @@ export type RequestPasswordResetResult =
  * configurar o mesmo SMTP em /admin/email (que o kit passa a sincronizar).
  */
 async function semSmtpNoSingleServer(): Promise<boolean> {
-  if (process.env.SINGLE_SERVER !== "1") return false;
-  const { config, bancoRespondeu } = await lerSmtp();
-  return bancoRespondeu && !isSmtpConfigured(config);
+  return process.env.SINGLE_SERVER === "1" && (await semSmtpRespondido());
 }
 
 /**

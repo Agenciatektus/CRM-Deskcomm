@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env } from "@/lib/env";
 import { getSmtpConfig, lerSmtp, type SmtpConfig } from "@/lib/email/config";
+import { isEmailConfigured } from "@/lib/email/resend";
 
 interface SendArgs {
   to: string | string[];
@@ -32,28 +33,43 @@ export function isSmtpConfigured(config: SmtpConfig): boolean {
 }
 
 /**
- * A INSTALAÇÃO está SEM SMTP? — a leitura que o painel do admin mostra.
+ * O CRM está SEM SMTP, com o banco tendo RESPONDIDO? — a base comum de quem
+ * pergunta pela falta de SMTP: o "esqueci a senha" (#2767) e a tarja do painel
+ * do admin (#2755, item 3). Cada um faz a SUA pergunta em cima dela.
  *
- * Mora aqui, ao lado de `isSmtpConfigured`, porque é ela a régua: host E
- * remetente. `lerSmtp` (e não `getSmtpConfig`) porque um soluço do banco NÃO
- * pode virar "sem SMTP": quem administra veria um aviso de configuração por
- * causa de uma falha transitória, e aviso que mente é aviso que se aprende a
- * ignorar. Só o banco que RESPONDEU (linha presente ou ausência de linha)
- * autoriza afirmar que a instalação não tem SMTP; quando ele falha, o `.env`
- * continua sendo lido por `lerSmtp`, e é o valor dele que decide — se nem ali
- * houver SMTP, `bancoRespondeu` falso mantém o aviso fora da tela.
- *
- * Diferente do "esqueci a senha" (#2767), aqui NÃO há recorte por
- * `SINGLE_SERVER`: o painel do admin é a instalação inteira, e "não há SMTP
- * configurado, configure em /admin/email" é verdade em qualquer instalação —
- * a tela `/admin/email` existe e é a porta da remediação nos dois casos.
- *
- * O sinal foi pedido na #2755 (item 3): sem ele, a ausência de SMTP só
- * aparecia no log do `update.sh`.
+ * Régua: host E remetente (`isSmtpConfigured`). `lerSmtp`, e não
+ * `getSmtpConfig`, porque um soluço do banco NÃO pode virar "sem SMTP": só o
+ * banco que respondeu (linha presente ou ausência de linha) autoriza afirmar a
+ * falta. Quando ele falha, `lerSmtp` lê o `.env`, e `bancoRespondeu` falso
+ * mantém a resposta em "não".
  */
-export async function instalacaoSemSmtp(): Promise<boolean> {
+export async function semSmtpRespondido(): Promise<boolean> {
   const { config, bancoRespondeu } = await lerSmtp();
   return bancoRespondeu && !isSmtpConfigured(config);
+}
+
+/**
+ * A tarja "Sem SMTP configurado" do painel do admin deve aparecer?
+ *
+ * Duas situações em que falta SMTP e isso tem efeito:
+ *
+ *   - servidor único (`SINGLE_SERVER=1`): o serviço de login só recebe o SMTP
+ *     do CRM (`sincronizar_smtp_do_gotrue`, em `_common.sh`), nunca a Resend —
+ *     ali a recuperação de senha morre mesmo com a Resend configurada;
+ *   - qualquer topologia SEM Resend: convites, LGPD, cobrança e automações saem
+ *     todos pelo roteador do app (`lib/email/roteador.ts`: SMTP, senão Resend),
+ *     e sem nenhum dos dois nada sai.
+ *
+ * Fora do servidor único, com a Resend entregando, a tarja seria alarme falso:
+ * o login tem e-mail próprio e o resto sai pela Resend.
+ *
+ * Limite aceito: quem pôs SMTP direto no `.env` do Supabase, sem passar pela
+ * tela, vê a tarja com um e-mail de login que sairia. O app não enxerga aquele
+ * arquivo; o remédio é configurar o mesmo SMTP em /admin/email.
+ */
+export async function instalacaoSemSmtp(): Promise<boolean> {
+  if (!(await semSmtpRespondido())) return false;
+  return process.env.SINGLE_SERVER === "1" || !(await isEmailConfigured());
 }
 
 export function formatFromAddress(config: SmtpConfig, override?: string): string | null {

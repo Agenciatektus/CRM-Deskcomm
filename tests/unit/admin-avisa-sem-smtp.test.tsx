@@ -57,6 +57,7 @@ const LINHA_COM_SMTP: LinhaSmtp = {
 
 const estado = {
   banco: { data: null, error: null } as RespostaBanco,
+  resend: false,
 };
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -72,6 +73,13 @@ vi.mock("@/lib/supabase/admin", () => ({
       }),
     }),
   }),
+}));
+// A Resend é lida por `valorDaInstalacao`, que cai no `env` já parseado na
+// importação — `vi.stubEnv` não a alcança. O dublê fica na pergunta "a Resend
+// entrega?", e a composição que decide a tarja (`instalacaoSemSmtp`) roda real.
+vi.mock("@/lib/email/resend", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  isEmailConfigured: async () => estado.resend,
 }));
 vi.mock("@/lib/webhooks/secrets", () => ({
   decryptWebhookSecret: async () => "",
@@ -109,9 +117,15 @@ async function montarPainelDoAdmin() {
 
 beforeEach(() => {
   estado.banco = { data: null, error: null };
+  estado.resend = false;
+  // O caso que a #2755 descreve: servidor único, onde o login só recebe o SMTP do CRM.
+  vi.stubEnv("SINGLE_SERVER", "1");
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("painel do admin — o sinal de 'sem SMTP' (#2755, item 3)", () => {
   it("⭐ sem SMTP o aviso aparece e aponta /admin/email", async () => {
@@ -147,5 +161,30 @@ describe("painel do admin — o sinal de 'sem SMTP' (#2755, item 3)", () => {
     await montarPainelDoAdmin();
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("servidor único com a Resend configurada e sem SMTP MANTÉM a tarja: o login só recebe o SMTP", async () => {
+    estado.resend = true;
+
+    await montarPainelDoAdmin();
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("fora do servidor único COM a Resend, sem tarja: o login tem e-mail próprio e o resto sai pela Resend", async () => {
+    vi.stubEnv("SINGLE_SERVER", "");
+    estado.resend = true;
+
+    await montarPainelDoAdmin();
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("⭐ fora do servidor único SEM a Resend e sem SMTP, a tarja APARECE: convites e avisos não saem", async () => {
+    vi.stubEnv("SINGLE_SERVER", "");
+
+    await montarPainelDoAdmin();
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 });
