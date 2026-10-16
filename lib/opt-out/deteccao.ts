@@ -396,6 +396,13 @@ const FRASES_DE_OPT_OUT: readonly RegExp[] = [
   // recorte desta fatia é `assinatura`/`suscripcion`. A medição dela está na
   // evidência da issue como medida-e-não-movida, com o número.
   /\bcancelar?\s+(?:a\s+)?inscricao\b/u,
+  // ...mas "cancelar a assinatura DAS MENSAGENS" nomeia o objeto de
+  // comunicação, e aí bloqueia na hora — a regra do cabeçalho. A ambígua lá
+  // embaixo só cobre a frase SEM objeto. Vale também para a `subscricao` de
+  // Portugal (#2872), que tinha o mesmo buraco. "do whatsapp" e "de vocês"
+  // ficam DE FORA de propósito: também podem ser o plano, então seguem só
+  // escalando para uma pessoa.
+  /\bcancelar?\s+(?:a\s+)?(?:minha\s+)?(?:assinatura|subscricao)\s+(?:d(?:as|essas|estas)\s+(?:mensagens|notificacoes|promocoes|ofertas|novidades)|d(?:os|esses|estes)\s+(?:avisos|disparos|envios)|d(?:a|essa|esta)\s+newsletter)\b/u,
   // ── PORTUGUÊS DE PORTUGAL: o pronome vem PRESO ao verbo, DEPOIS dele ──────
   //
   // Em pt-PT o pronome átono é ENCLÍTICO ("remova-me da lista"), enquanto o
@@ -495,6 +502,9 @@ const FRASES_DE_OPT_OUT: readonly RegExp[] = [
   // suscripcion" é o plano, e bloqueava quem só perguntava. `inscripcion` fica
   // pelo mesmo motivo de `inscricao` lá em cima.
   /\bcancelar\s+(?:la\s+)?inscripcion\b/u,
+  // E o espelho da forma com objeto: "cancelar la suscripción a los mensajes"
+  // bloqueia na hora; "cancelar la suscripción" sozinha só escala.
+  /\bcancelar\s+(?:la\s+|mi\s+)?suscripcion\s+(?:a|de)\s+(?:los|estos|tus|sus)\s+(?:mensajes|promociones|ofertas)\b/u,
 ];
 
 /**

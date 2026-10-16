@@ -737,3 +737,47 @@ describe("comecaComPalavraDeSaida — qual frase o cliente lê quando a IA sai d
     expect(comecaComPalavraDeSaida(undefined)).toBe(false);
   });
 });
+
+/**
+ * ─── Com objeto de comunicação, `assinatura` BLOQUEIA (#2971) ───────────────
+ *
+ * O outro lado do bloco de cima. Quando a frase nomeia o que se quer parar de
+ * receber — as mensagens, as notificações, os avisos, a newsletter —, ela tem
+ * objeto de comunicação e bloqueia na hora, como na main antes do #2886. Só a
+ * frase SEM objeto (que também pode ser o plano) escala sem bloquear.
+ *
+ * "do whatsapp" e "de vocês" ficam fora DE PROPÓSITO: também podem ser o plano
+ * ("cancelar a assinatura do whatsapp" numa revenda de planos de WhatsApp), e
+ * seguem só escalando para uma pessoa. A mesma regra fecha o buraco igual da
+ * `subscricao` de Portugal (#2872).
+ */
+const ASSINATURA_COM_OBJETO_BLOQUEIA = [
+  "cancelar a assinatura das mensagens",
+  "quero cancelar a assinatura dessas mensagens",
+  "cancelar a assinatura da newsletter",
+  "cancelar a assinatura das notificações",
+  "quero cancelar a assinatura dos avisos",
+  "cancelar minha assinatura das promoções",
+  "quero cancelar a subscrição das mensagens",
+  "cancelar la suscripción a los mensajes",
+  "quiero cancelar mi suscripcion de sus promociones",
+];
+
+describe("com objeto de comunicação, `assinatura` BLOQUEIA (#2971)", () => {
+  for (const texto of ASSINATURA_COM_OBJETO_BLOQUEIA) {
+    it(`bloqueia: ${texto}`, () => {
+      expect(ehPedidoDeOptOut(texto)).toBe(true);
+    });
+  }
+
+  it("o objeto que pode ser o PLANO não bloqueia — só escala", () => {
+    for (const texto of [
+      "cancelar a assinatura do plano de mensagens",
+      "cancelar a assinatura de mensagens",
+      "cancelar a assinatura do whatsapp",
+    ]) {
+      expect(ehPedidoDeOptOut(texto), texto).toBe(false);
+      expect(ehOptOutProvavel(texto), texto).toBe(true);
+    }
+  });
+});
