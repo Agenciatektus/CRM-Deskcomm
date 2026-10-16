@@ -1819,6 +1819,7 @@ export type Database = {
           followup: Json
           handoff_keywords: string[]
           handoff_tool_enabled: boolean
+          handoff_legal_enabled: boolean
           proposal_ai_draft_enabled: boolean
           history_message_window: number
           history_token_window: number
@@ -1858,6 +1859,7 @@ export type Database = {
           followup?: Json
           handoff_keywords?: string[]
           handoff_tool_enabled?: boolean
+          handoff_legal_enabled?: boolean
           proposal_ai_draft_enabled?: boolean
           history_message_window?: number
           history_token_window?: number
@@ -1897,6 +1899,7 @@ export type Database = {
           followup?: Json
           handoff_keywords?: string[]
           handoff_tool_enabled?: boolean
+          handoff_legal_enabled?: boolean
           proposal_ai_draft_enabled?: boolean
           history_message_window?: number
           history_token_window?: number
@@ -3666,6 +3669,7 @@ export type Database = {
         Row: {
           calendar_selection_revision: number
           account_email: string
+          catalog_retry_at: string | null
           created_at: string
           id: string
           last_sync_at: string | null
@@ -3684,6 +3688,7 @@ export type Database = {
         Insert: {
           calendar_selection_revision?: number
           account_email: string
+          catalog_retry_at?: string | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
@@ -3702,6 +3707,7 @@ export type Database = {
         Update: {
           calendar_selection_revision?: number
           account_email?: string
+          catalog_retry_at?: string | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
@@ -3747,6 +3753,7 @@ export type Database = {
           position: number
           reminder_body: string | null
           reminder_bodies: Json
+          reminder_channel_session_id: string | null
           reminder_enabled: boolean
           reminder_minutes_before: number
           reminder_extra_offsets_minutes: number[]
@@ -3776,6 +3783,7 @@ export type Database = {
           position?: number
           reminder_body?: string | null
           reminder_bodies?: Json
+          reminder_channel_session_id?: string | null
           reminder_enabled?: boolean
           reminder_minutes_before?: number
           reminder_extra_offsets_minutes?: number[]
@@ -3805,6 +3813,7 @@ export type Database = {
           position?: number
           reminder_body?: string | null
           reminder_bodies?: Json
+          reminder_channel_session_id?: string | null
           reminder_enabled?: boolean
           reminder_minutes_before?: number
           reminder_extra_offsets_minutes?: number[]
@@ -4345,6 +4354,7 @@ export type Database = {
           assinaturas_vivas: number
           cancela_no_fim: boolean
           checkout_expira_em: string | null
+          checkout_sessao_id: string | null
           checkout_url: string | null
           link_de_pagamento: string | null
           created_at: string
@@ -4371,6 +4381,7 @@ export type Database = {
           assinaturas_vivas?: number
           cancela_no_fim?: boolean
           checkout_expira_em?: string | null
+          checkout_sessao_id?: string | null
           checkout_url?: string | null
           link_de_pagamento?: string | null
           created_at?: string
@@ -4397,6 +4408,7 @@ export type Database = {
           assinaturas_vivas?: number
           cancela_no_fim?: boolean
           checkout_expira_em?: string | null
+          checkout_sessao_id?: string | null
           checkout_url?: string | null
           link_de_pagamento?: string | null
           created_at?: string
@@ -4868,6 +4880,7 @@ export type Database = {
           channel: string
           channel_session_id: string
           contact_id: string
+          contato_trava_humano: boolean
           created_at: string
           current_demanda_id: string | null
           group_chat_id: string | null
@@ -4912,6 +4925,7 @@ export type Database = {
           channel?: string
           channel_session_id: string
           contact_id: string
+          contato_trava_humano?: boolean
           created_at?: string
           current_demanda_id?: string | null
           group_chat_id?: string | null
@@ -4956,6 +4970,7 @@ export type Database = {
           channel?: string
           channel_session_id?: string
           contact_id?: string
+          contato_trava_humano?: boolean
           created_at?: string
           current_demanda_id?: string | null
           group_chat_id?: string | null
@@ -7389,6 +7404,7 @@ export type Database = {
           due_at: string
           emergency: boolean
           error_message: string | null
+          export_claimed_at: string | null
           external_customer_id: string | null
           id: string
           organization_id: string
@@ -7410,6 +7426,7 @@ export type Database = {
           due_at: string
           emergency?: boolean
           error_message?: string | null
+          export_claimed_at?: string | null
           external_customer_id?: string | null
           id?: string
           organization_id: string
@@ -7431,6 +7448,7 @@ export type Database = {
           due_at?: string
           emergency?: boolean
           error_message?: string | null
+          export_claimed_at?: string | null
           external_customer_id?: string | null
           id?: string
           organization_id?: string
@@ -8630,6 +8648,7 @@ export type Database = {
       }
       platform_branding: {
         Row: {
+          accent_dark_hex: string | null
           accent_hex: string | null
           app_name: string | null
           fallback_at: string | null
@@ -8643,6 +8662,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          accent_dark_hex?: string | null
           accent_hex?: string | null
           app_name?: string | null
           fallback_at?: string | null
@@ -8656,6 +8676,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          accent_dark_hex?: string | null
           accent_hex?: string | null
           app_name?: string | null
           fallback_at?: string | null
@@ -10427,6 +10448,7 @@ export type Database = {
 
       fn_google_appointment: { Args: { p_org: string; p_id: string; p_action: string; p_args?: Json }; Returns: Json }
       fn_google_calendar: { Args: { p_org: string; p_id: string; p_action: string; p_args?: Json }; Returns: Json }
+      fn_google_calendar_page_batch: { Args: { p_org: string; p_id: string; p_args: Json }; Returns: Json }
       fn_google_calendar_fence: { Args: { p_org: string; p_id: string; p_claim: Json; p_cursor?: Json }; Returns: undefined }
       fn_google_catalog: { Args: { p_org: string; p_connection: string; p_items: Json; p_revision: string }; Returns: undefined }
       fn_google_selection: { Args: { p_org: string; p_revisions: Json; p_sources: string[]; p_destination: string }; Returns: undefined }
@@ -10449,6 +10471,7 @@ export type Database = {
 
       fn_followup_job_current: { Args: { p_org: string; p_job: string; p_enrollment: string; p_node: string }; Returns: boolean }
       fn_agenda_minutes: { Args: { p_settings: Json; p_key: string; p_default: number }; Returns: number }
+      fn_autonomous_turn_revoked: { Args: { p_org: string; p_job: string }; Returns: boolean };
       fn_followup_claim_current: { Args: { p_org: string; p_job: string; p_worker: string; p_acquired_at: string }; Returns: boolean }
       fn_appointment_change: { Args: { p_org: string; p_id: string; p_revision: number; p_patch: Json }; Returns: Json }
       fn_appointment_recover: { Args: { p_org: string; p_event: string }; Returns: Json }
@@ -10592,6 +10615,7 @@ export type Database = {
         Returns: Json
       }
 
+      fn_resolver_avisos_de_lembrete_expirados: { Args: Record<PropertyKey, never>; Returns: number }
       fn_support_context: { Args: Record<PropertyKey, never>; Returns: Json }
       fn_support_write_allowed: { Args: { p_org: string }; Returns: boolean }
       fn_support_storage_write_allowed: { Args: { p_name: string }; Returns: boolean }
@@ -10625,6 +10649,16 @@ export type Database = {
         Returns: {
           em_teste: number
           falhas: number
+          tool_name: string
+          total: number
+          ultima_vez: string
+        }[]
+      }
+      fn_agent_tool_usage_por_termo: {
+        Args: { p_agent_id: string; p_organization_id: string; p_since: string }
+        Returns: {
+          falhas: number
+          termo: string
           tool_name: string
           total: number
           ultima_vez: string
@@ -10675,12 +10709,20 @@ export type Database = {
           source_name: string
         }[]
       }
+      fn_can_view_appointment: {
+        Args: { p_org: string; p_owner_user_id: string }
+        Returns: boolean
+      }
       fn_can_view_conversation: {
         Args: { p_assigned_to_user_id: string; p_org: string }
         Returns: boolean
       }
       fn_can_view_lead: {
         Args: { p_org: string; p_owner_user_id: string }
+        Returns: boolean
+      }
+      fn_can_view_task: {
+        Args: { p_assigned_to: string; p_created_by: string; p_org: string }
         Returns: boolean
       }
       fn_claim_due_followup_enrollments: {
@@ -10967,6 +11009,32 @@ export type Database = {
       fn_semear_tipos_de_agendamento: {
         Args: { p_organization_id: string }
         Returns: number
+      }
+      fn_arquivos_da_organizacao: {
+        Args: {
+          p_apos_bucket?: string
+          p_apos_nome?: string
+          p_limite?: number
+          p_org: string
+        }
+        Returns: {
+          bucket_id: string
+          name: string
+        }[]
+      }
+      fn_logins_sem_vinculo: {
+        Args: { p_users: string[] }
+        Returns: string[]
+      }
+      fn_excluir_organizacao: {
+        Args: {
+          p_actor: string
+          p_confirmacao: string
+          p_motivo: string
+          p_org: string
+          p_request_id?: string
+        }
+        Returns: Json
       }
       fn_suspender_organizacao: {
         Args: {

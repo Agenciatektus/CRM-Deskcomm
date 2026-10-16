@@ -15,6 +15,7 @@ interface Alvo { tabela: string; papel: Role; rotulo: string; href: (id: string,
 /** Apenas entidades que têm produtor e superfície atual; agenda nasce com a Task 6. */
 export const REFERENCIAS_DE_AVISO = {
   ai_agent: { tabela: "ai_agents", papel: "admin", rotulo: "Revisar agente", href: (id: string) => `/app/ai/agents/${id}`, ativo: true },
+  agenda_reminder_sender: { tabela: "calendar_appointments", papel: "manager", rotulo: "Configurar canal do lembrete", href: () => "/app/settings/tenant/agenda" },
   appointment: {tabela:"calendar_appointments",papel:"agent",rotulo:"Abrir compromisso",href:(id:string)=>`/app/agenda?compromisso=${id}`},
   conversation: { tabela: "conversations", papel: "agent", rotulo: "Abrir conversa", href: (id: string) => `/app/inbox/${id}` },
   contact: { tabela: "contacts", papel: "agent", rotulo: "Ver contato", href: (id: string) => `/app/contacts/${id}` },
@@ -159,7 +160,15 @@ export const POLITICAS_DE_AVISO = {
       "Abra Plano e cobrança: lá estão o link para pagar, a troca do cartão e a troca de plano. Só quem administra a empresa vê essa tela.",
     geral: { papel: "admin", href: "/app/settings/billing", rotulo: "Abrir plano e cobrança" },
   },
-  other: { refs: ["lead", "channel_session", "appointment", "ai_agent", "ai_provider_credential", "agent_case"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
+  // A troca do e-mail de login pelo admin da plataforma. Sem referência: o
+  // aviso não leva o id da pessoa (a Central é lida por toda a empresa), e
+  // quem precisa conferir é quem administra a equipe.
+  email_de_login_trocado: {
+    refs: [],
+    orientacao: "Confirme com a pessoa que ela reconhece a troca. Se não reconhece, fale com quem administra o servidor.",
+    geral: { papel: "admin", href: "/app/team", rotulo: "Abrir a equipe" },
+  },
+  other: { refs: ["agenda_reminder_sender", "lead", "channel_session", "appointment", "ai_agent", "ai_provider_credential", "agent_case"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 
 /**
