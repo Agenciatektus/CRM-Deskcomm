@@ -51,6 +51,7 @@ import {
 } from "./no-show-recuperacao-esgotada";
 import { interpolarDestino, persistirRespostaFollowupSupabase } from "./persistir-resposta";
 import { funilUnicoDasEtapas, idsDeEtapaCitados } from "./etapas-citadas";
+import { desvioAntesDoEnvio } from "./condicao-antes-do-envio";
 import { criarTarefaInterna as criarTarefaNoCrm } from "@/lib/tarefas/criar-tarefa";
 import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
@@ -979,7 +980,7 @@ async function processEnrollment(
   const nextAlways = selectEdge(graph.edges, node.id, { type: "always" });
   const proximo = nextAlways ? (graph.nodes.find((n) => n.id === nextAlways.target) ?? null) : null;
 
-  const result = processNode({
+  let result = processNode({
     node,
     edges: graph.edges,
     enrollment,
@@ -998,6 +999,36 @@ async function processEnrollment(
     repeatTotal,
     proximo,
   });
+  // A CONDIÇÃO É REAVALIADA AQUI, no instante do envio — ver
+  // `condicao-antes-do-envio.ts`. A decisão tomada no nó de condição pode ter
+  // dois dias de idade quando a espera vence, e o lead que saiu da etapa no
+  // meio é justamente quem não pode receber a mensagem.
+  //
+  // Só quando o envio está sendo ENFILEIRADO agora: `recheck` (turno em voo) e
+  // `advance` não mandam nada, e reavaliar ali desviaria uma inscrição cujo
+  // envio JÁ saiu.
+  if (result.kind === "enqueue_turn" && result.purpose === "send_message" && node.type === "action") {
+    const desvio = desvioAntesDoEnvio(graph.nodes, graph.edges, node.id, lead);
+    if (desvio) {
+      await db.insertEnrollmentEvent({
+        organization_id: enrollment.organization_id,
+        enrollment_id: enrollment.id,
+        node_id: node.id,
+        event_type: "condition_revalidated",
+        payload: { esperado: desvio.esperado, agora: desvio.agora, proximo: desvio.proximo },
+        idempotency_key: `${node.id}:${enrollment.steps_taken}:revalidado`,
+      });
+      logger.info("followup: condição deixou de valer no instante do envio — não enviou", {
+        organization_id: enrollment.organization_id,
+        enrollment_id: enrollment.id,
+        node_id: node.id,
+        esperado: desvio.esperado,
+        agora: desvio.agora,
+      });
+      result = { kind: "advance", next_node_id: desvio.proximo, next_eval_at: clock() };
+    }
+  }
+
   // #2528 — O TEXTO FIXO VAI COM OS DADOS DE QUEM RECEBE. O render é no
   // ENFILEIRAMENTE (e não no envio) porque são dois caminhos que mandam este
   // `fixed_body`: o worker (`followup-turn.ts`) e o atalho inline

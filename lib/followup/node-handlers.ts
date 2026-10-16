@@ -515,7 +515,13 @@ function evaluateCheck(
   }
 }
 
-function evaluateCondition(
+/**
+ * Exportada para a revalidação imediatamente antes do envio
+ * (`condicao-antes-do-envio.ts`): a mesma função, nunca uma segunda régua —
+ * duas avaliações da mesma condição que pudessem divergir seriam pior que
+ * nenhuma revalidação.
+ */
+export function evaluateCondition(
   config: Extract<FlowNode, { type: "condition" }>["config"],
   lead: LeadFacts,
 ): boolean {
