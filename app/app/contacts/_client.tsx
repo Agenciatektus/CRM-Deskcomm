@@ -97,6 +97,7 @@ export function ContactsListClient() {
   // agent+); quem só lê nem vê a barra. (A rota ainda valida por conta própria:
   // este portão é de tela, a fonte da regra é a API.)
   const podeAgirEmLote = usePermission("contact.update");
+  const podeMudarResponsavel = usePermission("contact.carteira");
   const selecao = useSelecaoEmLote();
   const lote = useBulkContacts();
 
@@ -337,8 +338,11 @@ export function ContactsListClient() {
           pendente={lote.isPending}
           onAdicionarEtiqueta={(tag) => rodarLote({ action: "tag", op: "add", tag })}
           onRemoverEtiqueta={(tag) => rodarLote({ action: "tag", op: "remove", tag })}
-          onMudarResponsavel={(donoUserId) =>
-            rodarLote({ action: "carteira", dono_user_id: donoUserId, origem: "manual" })
+          onMudarResponsavel={
+            podeMudarResponsavel
+              ? (donoUserId) =>
+                  rodarLote({ action: "carteira", dono_user_id: donoUserId, origem: "manual" })
+              : undefined
           }
           onPreencherCampo={(chave, valor) => rodarLote({ action: "custom-field", chave, valor })}
           onLimpar={selecao.limpar}

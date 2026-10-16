@@ -37,8 +37,13 @@ interface Props {
   pendente: boolean;
   onAdicionarEtiqueta: (tag: string) => void;
   onRemoverEtiqueta: (tag: string) => void;
-  /** `null` tira o contato da carteira (volta ao fluxo normal, sem dono). */
-  onMudarResponsavel: (donoUserId: string) => void;
+  /**
+   * Ausente = o item "Mudar responsável" não aparece. A rota de carteira é
+   * ≥manager (`requireRole("manager")`), mais alta que o piso da barra
+   * (`contact.update`, agent): oferecê-lo a um agent era um controle que
+   * devolve 403 em todo item.
+   */
+  onMudarResponsavel?: (donoUserId: string) => void;
   onPreencherCampo: (chave: string, valor: string) => void;
   onLimpar: () => void;
 }
@@ -98,7 +103,7 @@ export function BarraDeContatosEmLote({
     setDestino("");
   };
   const confirmarResponsavel = () => {
-    if (!destino) return;
+    if (!destino || !onMudarResponsavel) return;
     onMudarResponsavel(destino);
     fecharResponsavel();
   };
@@ -148,13 +153,15 @@ export function BarraDeContatosEmLote({
             {t("Remover etiqueta")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() => setResponsavelAberto(true)}
-            data-testid="lote-mudar-responsavel"
-          >
-            <Users size={14} className="mr-2" aria-hidden />
-            {t("Mudar responsável")}
-          </DropdownMenuItem>
+          {onMudarResponsavel && (
+            <DropdownMenuItem
+              onSelect={() => setResponsavelAberto(true)}
+              data-testid="lote-mudar-responsavel"
+            >
+              <Users size={14} className="mr-2" aria-hidden />
+              {t("Mudar responsável")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onSelect={() => setCampoAberto(true)}
             data-testid="lote-preencher-campo"

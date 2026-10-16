@@ -104,6 +104,16 @@ describe("BarraDeContatosEmLote", () => {
     expect(h.onMudarResponsavel).toHaveBeenCalledWith("user-dono-1");
   });
 
+  it("sem onMudarResponsavel (papel abaixo de manager), o item não aparece", async () => {
+    const user = userEvent.setup();
+    const h = { ...mao(), onMudarResponsavel: undefined };
+    render(<BarraDeContatosEmLote quantidade={2} pendente={false} {...h} />);
+
+    await user.click(screen.getByTestId("lote-mais-acoes"));
+    expect(screen.getByTestId("lote-adicionar-etiqueta")).toBeInTheDocument();
+    expect(screen.queryByTestId("lote-mudar-responsavel")).toBeNull();
+  });
+
   it("preencher campo personalizado: chave e valor juntos; sem chave, desligado", async () => {
     const user = userEvent.setup();
     const h = mao();
