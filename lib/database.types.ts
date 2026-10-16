@@ -1057,6 +1057,8 @@ export type Database = {
         Row: {
           channel_session_id: string
           created_at: string
+          default_assignee_user_id: string | null
+          distribution_mode: string | null
           id: string
           organization_id: string
           updated_at: string
@@ -1064,6 +1066,8 @@ export type Database = {
         Insert: {
           channel_session_id: string
           created_at?: string
+          default_assignee_user_id?: string | null
+          distribution_mode?: string | null
           id?: string
           organization_id: string
           updated_at?: string
@@ -1071,6 +1075,8 @@ export type Database = {
         Update: {
           channel_session_id?: string
           created_at?: string
+          default_assignee_user_id?: string | null
+          distribution_mode?: string | null
           id?: string
           organization_id?: string
           updated_at?: string

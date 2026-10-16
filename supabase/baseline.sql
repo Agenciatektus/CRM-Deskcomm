@@ -22828,6 +22828,18 @@ create table if not exists public.channel_routing_responsibles (
  foreign key(organization_id,user_id) references public.user_organizations(organization_id,user_id) on delete cascade
 );
 create index if not exists channel_routing_responsibles_org_user on public.channel_routing_responsibles(organization_id,user_id);
+-- (migration 0663, issue #2331) Regras de atendimento POR NÚMERO: o modo de
+-- distribuição e o destino padrão do canal. Nulo = herda a organização.
+alter table public.channel_routing_policies add column if not exists distribution_mode text;
+alter table public.channel_routing_policies add column if not exists default_assignee_user_id uuid;
+alter table public.channel_routing_policies drop constraint if exists channel_routing_policies_distribution_mode_check;
+alter table public.channel_routing_policies add constraint channel_routing_policies_distribution_mode_check
+ check (distribution_mode is null or distribution_mode in ('manual','round_robin','load'));
+alter table public.channel_routing_policies drop constraint if exists channel_routing_policies_default_assignee_fkey;
+alter table public.channel_routing_policies add constraint channel_routing_policies_default_assignee_fkey
+ foreign key (organization_id, default_assignee_user_id)
+ references public.user_organizations (organization_id, user_id)
+ on delete set null (default_assignee_user_id);
 alter table public.channel_routing_policies enable row level security;
 alter table public.channel_routing_responsibles enable row level security;
 revoke all on public.channel_routing_policies,public.channel_routing_responsibles from public,anon,authenticated,service_role;
@@ -22888,40 +22900,60 @@ $$;
 revoke all on function public.fn_wake_channel_routing(uuid,uuid) from public,anon,authenticated;
 grant execute on function public.fn_wake_channel_routing(uuid,uuid) to service_role;
 
-create or replace function public.fn_set_channel_routing(p_org uuid,p_channel uuid,p_users uuid[],p_reset boolean default false)
+-- (migration 0663, issue #2331) Dois parâmetros novos COM DEFAULT (modo por
+-- número e destino padrão). A assinatura de 4 argumentos é derrubada para não
+-- sobrar overload que sombreie a nova.
+drop function if exists public.fn_set_channel_routing(uuid,uuid,uuid[],boolean);
+create or replace function public.fn_set_channel_routing(
+  p_org uuid,p_channel uuid,p_users uuid[],p_reset boolean default false,
+  p_mode text default null,p_default_assignee uuid default null)
 returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_policy_id uuid; requested_count integer; found_count integer;
+declare v_policy_id uuid; v_mode text; requested_count integer; found_count integer;
 begin
  if auth.uid() is null or not public.fn_role_at_least(p_org,'manager') or not public.fn_support_write_allowed(p_org)
  then raise exception 'routing_forbidden' using errcode='42501';end if;
  if not public.fn_session_mfa_proven() then raise exception 'routing_mfa_required' using errcode='42501';end if;
  if p_users is null or cardinality(p_users)>1000 or array_position(p_users,null) is not null then
   raise exception 'routing_invalid_members' using errcode='22023';end if;
+ if p_mode is not null and p_mode not in('manual','round_robin','load') then
+  raise exception 'routing_invalid_mode' using errcode='22023';end if;
  -- Leitores de claim usam SHARE nesta identidade, inclusive na ausência de policy.
  perform 1 from public.channel_sessions where organization_id=p_org and id=p_channel and archived_at is null for update;
  if not found then raise exception 'routing_channel_not_found' using errcode='P0002';end if;
  if p_reset then
   delete from public.channel_routing_policies where organization_id=p_org and channel_session_id=p_channel;
+  v_mode:=null;
  else
   select count(distinct x) into requested_count from unnest(p_users) x;
   perform 1 from public.user_organizations where organization_id=p_org and user_id=any(p_users)
    and revoked_at is null and role in('agent','manager','admin') order by user_id for share;
   get diagnostics found_count=row_count;
   if found_count<>requested_count then raise exception 'routing_invalid_members' using errcode='22023';end if;
-  insert into public.channel_routing_policies(organization_id,channel_session_id) values(p_org,p_channel)
-   on conflict(organization_id,channel_session_id) do update set updated_at=now() returning id into v_policy_id;
+  -- O destino padrão passa pela MESMA régua dos responsáveis: membro ativo.
+  if p_default_assignee is not null then
+   perform 1 from public.user_organizations where organization_id=p_org and user_id=p_default_assignee
+    and revoked_at is null and role in('agent','manager','admin') for share;
+   if not found then raise exception 'routing_invalid_members' using errcode='22023';end if;
+  end if;
+  insert into public.channel_routing_policies(organization_id,channel_session_id,distribution_mode,default_assignee_user_id)
+   values(p_org,p_channel,p_mode,p_default_assignee)
+   on conflict(organization_id,channel_session_id) do update set distribution_mode=excluded.distribution_mode,
+    default_assignee_user_id=excluded.default_assignee_user_id,updated_at=now() returning id into v_policy_id;
   delete from public.channel_routing_responsibles where organization_id=p_org and channel_routing_responsibles.policy_id=v_policy_id;
   insert into public.channel_routing_responsibles(organization_id,policy_id,user_id)
    select p_org,v_policy_id,x from(select distinct unnest(p_users) x) users;
+  v_mode:=p_mode;
  end if;
  perform public.fn_wake_channel_routing(p_org,p_channel);
  return jsonb_build_object('channel_session_id',p_channel,'policy_id',v_policy_id,
   'mode',case when p_reset then 'legacy_unconfigured' when cardinality(p_users)=0 then 'restricted_empty' else 'restricted' end,
-  'user_ids',case when p_reset then '[]'::jsonb else to_jsonb(p_users) end);
+  'user_ids',case when p_reset then '[]'::jsonb else to_jsonb(p_users) end,
+  'distribution_mode',to_jsonb(v_mode),
+  'default_assignee_user_id',to_jsonb(case when p_reset then null else p_default_assignee end));
 end;
 $$;
-revoke all on function public.fn_set_channel_routing(uuid,uuid,uuid[],boolean) from public,anon;
-grant execute on function public.fn_set_channel_routing(uuid,uuid,uuid[],boolean) to authenticated;
+revoke all on function public.fn_set_channel_routing(uuid,uuid,uuid[],boolean,text,uuid) from public,anon;
+grant execute on function public.fn_set_channel_routing(uuid,uuid,uuid[],boolean,text,uuid) to authenticated;
 
 -- Revogação é UPDATE, não DELETE: cascade sozinho não remove elegibilidade,
 -- nem desatribui conversas abertas (#1562).
@@ -22932,6 +22964,9 @@ declare
 begin
  if new.revoked_at is not null or new.role not in('agent','manager','admin') then
   delete from public.channel_routing_responsibles where organization_id=new.organization_id and user_id=new.user_id;
+  -- (0663, #2331) Revogação é UPDATE: o ON DELETE SET NULL da FK não dispara aqui.
+  update public.channel_routing_policies set default_assignee_user_id=null,updated_at=now()
+   where organization_id=new.organization_id and default_assignee_user_id=new.user_id;
 
   for v_conv in
     select id from public.conversations
@@ -23095,7 +23130,7 @@ $function$;
 
 create or replace function public.fn_channel_routing_claim(p_org uuid,p_conversation uuid,p_channel uuid,p_user uuid,p_schedule jsonb default null,p_reason text default 'routing')
 returns text language plpgsql security definer set search_path=public as $$
-declare c public.conversations; pre_contact uuid; member_id uuid; v_policy_id uuid; availability public.attendant_availability; current_load integer;
+declare c public.conversations; pre_contact uuid; member_id uuid; v_policy_id uuid; v_default uuid; availability public.attendant_availability; current_load integer;
 begin
  if p_reason not in('routing','handoff') then raise exception 'routing_reason_invalid' using errcode='22023';end if;
  select contact_id into pre_contact from public.conversations where organization_id=p_org and id=p_conversation;
@@ -23112,8 +23147,12 @@ begin
  select id into member_id from public.user_organizations where organization_id=p_org and user_id=p_user
   and revoked_at is null and role in('agent','manager','admin') for share;
  if not found then return 'candidate_revoked';end if;
- select id into v_policy_id from public.channel_routing_policies where organization_id=p_org and channel_session_id=p_channel;
- if found and not exists(select 1 from public.channel_routing_responsibles r where r.organization_id=p_org and r.policy_id=v_policy_id and r.user_id=p_user)
+ -- (migration 0663, issue #2331) O destino padrão do número é aceito mesmo que
+ -- não esteja na lista de responsáveis: são ajustes distintos (responsáveis
+ -- restringem o rodízio; o destino padrão é entrega direta).
+ select id,default_assignee_user_id into v_policy_id,v_default from public.channel_routing_policies where organization_id=p_org and channel_session_id=p_channel;
+ if found and p_user is distinct from v_default
+  and not exists(select 1 from public.channel_routing_responsibles r where r.organization_id=p_org and r.policy_id=v_policy_id and r.user_id=p_user)
  then return 'candidate_not_allowed';end if;
  select * into availability from public.attendant_availability where organization_id=p_org and user_id=p_user for share;
  if not found or not availability.is_available or (p_schedule is not null and availability.schedule is distinct from p_schedule)
@@ -54144,6 +54183,176 @@ comment on function public.fn_lead_adicionar_etiquetas(uuid, uuid, text[]) is
 comment on function public.fn_contato_adicionar_etiquetas(uuid, uuid, text[]) is
   'Acrescenta etiquetas ao contato DENTRO do UPDATE, numa única instrução atômica, e devolve as etiquetas gravadas. '
   'Mesma corrida e mesmo desenho de fn_lead_adicionar_etiquetas, no destino `contato` da add_tag.';
+
+notify pgrst, 'reload schema';
+-- ---- a mensagem do vendedor é atividade do negócio (migration 0686, issue #2953) ----
+-- O DEFEITO, medido por quem reportou: `crm_leads.last_activity_at` só muda por
+-- `fn_update_last_activity_at`, que é o gatilho `trg_update_last_activity_at` em
+-- `crm_lead_activities`. A mensagem do vendedor não cria linha lá, e
+-- `fn_mark_conversation_message` carimba apenas `contacts.last_activity_at`.
+-- Resultado: o negócio trabalhado todo dia — pelo Inbox ou pelo celular
+-- conectado — seguia com o relógio parado, e o radar de risco
+-- (`lib/leads/radar-de-risco.ts`, que ordena e mede por `last_activity_at`) o
+-- listava como FRIO. Alarme falso é o defeito caro aqui: ele ensina quem opera a
+-- desconfiar do radar inteiro.
+--
+-- A REGRA: a fala HUMANA do vendedor quebra o silêncio do negócio. "Humana" é o
+-- vocabulário que o resto do produto já usa para separar gente de máquina —
+-- `sent_via in ('user', 'crm', 'external_device')`, isto é, o Inbox do CRM e o
+-- aparelho conectado.
+--
+-- CADA LINHA DO `when` QUE VAI ALÉM DE `sent_via`, com sua razão:
+--   direction = 'outbound'     A mensagem do CLIENTE não é trabalho do vendedor.
+--                              Cliente escrevendo e vendedor calado é o negócio
+--                              em risco que o radar EXISTE para apontar: se
+--                              inbound carimbasse, o radar ficaria cego
+--                              exatamente no caso que ele deve mostrar.
+--   type not in ('reaction')   reação de emoji não é fala;
+--   type not in ('system')     aviso do sistema/canal não é fala;
+--   histórico importado        conversa trazida de fora é passado, não
+--                              atendimento de agora. A chave é acordada com quem
+--                              importa: `metadata.historico_importado = 'true'`.
+--                              (Hoje não há quem a grave neste repositório; o
+--                              ramo fica de pé para o dia em que o importador
+--                              chegar — tirá-lo seria reabrir a porta por onde o
+--                              passado entraria como atendimento.)
+--
+-- SÓ O TOPO, E SÓ QUANDO ELE É ÚNICO — este é o desenho do arremate, pedido na
+-- revisão do PR.
+--
+-- A primeira versão carimbava TODOS os negócios abertos do contato com o MESMO
+-- `new.created_at`. Isso FABRICAVA um empate onde podia não haver nenhum. O
+-- roteador — `resolveActiveLeadForContact`, em `lib/leads/active-lead.ts` —
+-- decide por `atividade()` = `coalesce(last_activity_at, created_at)`
+-- decrescente, preferindo o pipeline default, e trata EMPATE no topo como
+-- ambíguo DE PROPÓSITO (`ambiguous_open_leads`): mover o card errado do cliente
+-- errado é o único bug visível para o cliente final, então "empatou" não vira
+-- "escolhe o primeiro". Efeito medido da versão anterior: depois de UMA fala do
+-- vendedor, dois negócios abertos que o roteador compara entre si (os dois no
+-- funil padrão, ou nenhum deles) deixavam de ter vencedor, e os treze pontos que
+-- usam o roteador paravam de achar o negócio da pessoa.
+--
+-- A ESCOLHA, e por que ela e não outra: carimbar APENAS o negócio aberto mais
+-- recentemente ativo do contato (o topo geral, que é a escolha do roteador
+-- quando ele é chamado sem funil preferido). A chave é a mesma de `atividade()`,
+-- na mesma precisão (milissegundo) — `coalesce(last_activity_at, created_at)`
+-- decrescente, truncada ao milissegundo —, entre os `status = 'open'` do MESMO
+-- contato e da MESMA organização. Assim o carimbo não muda a decisão, nem a de
+-- quem chama o roteador com o funil padrão: se o topo geral está no funil
+-- padrão, ele segue o topo ali; se não está, os negócios do funil padrão não
+-- são tocados. O que já era o topo continua o topo, e a ORDEM entre os abertos
+-- se preserva.
+--
+-- POR QUE O MILISSEGUNDO: o roteador compara em milissegundos — `atividade()`
+-- faz `new Date(iso).getTime()` —, e o Postgres guarda microssegundos. Sem
+-- truncar, dois abertos separados por menos de 1 ms seriam EMPATE para o
+-- roteador (`ambiguous_open_leads`) e topo ÚNICO aqui, e o carimbo arbitraria
+-- exatamente a ambiguidade que este gatilho promete não arbitrar. Por isso as
+-- três leituras da chave abaixo usam `date_trunc('milliseconds', ...)`.
+--
+-- E NÃO CARIMBA NADA quando o topo está EMPATADO. Empate era ambíguo antes desta
+-- mudança e continua ambíguo: resolver ambiguidade alheia escolhendo um dos dois
+-- é exatamente o "chute com 50% de chance de mover o card errado" que a regra
+-- §3.2 recusa. O gatilho não arbitra o que o produto decidiu não arbitrar.
+--
+-- NUNCA RETROCEDE: o `where` do `update` casa só negócio cujo relógio é MAIS
+-- ANTIGO que a mensagem (`coalesce(last_activity_at, '-infinity') < new.created_at`).
+-- Relógio já mais novo fica intocado — nem escrita inútil em `updated_at`. É a
+-- mesma assimetria que a 0079 declara: o relógio do negócio só anda para frente.
+-- (Um topo único cujo relógio já é mais novo que a mensagem simplesmente não é
+-- carimbado: o roteador já o escolheria de qualquer forma.)
+--
+-- SEM TOQUE NO QUE JÁ EXISTE: `fn_update_last_activity_at` e
+-- `fn_mark_conversation_message` ficam como estão. Este é um gatilho NOVO, em
+-- outra tabela, com função própria — a lista positiva de tipos de
+-- `crm_lead_activities` continua sendo a única régua do que conta como
+-- atividade lá.
+--
+-- ⚠️ E ESTE BLOCO ENTRA ANTES DA VARREDURA anon (migration 0116), que é de
+-- propósito o último do arquivo: `create function` depois dela nasceria com
+-- EXECUTE para anon e sem quem cure (o `alter default privileges` do corpo grava
+-- a concessão no catálogo, e a varredura só alcança o que veio antes). Vigiado
+-- por `tests/unit/varredura-anon-e-o-ultimo-bloco.test.ts`.
+--
+-- `security definer` com `search_path` fixo: o INSERT em `messages` chega tanto
+-- com a sessão do usuário quanto com o service role, e o carimbo do negócio não
+-- pode depender da policy de quem enviou. O EXECUTE é revogado de public/anon/
+-- authenticated e concedido só a service_role — o `alter default privileges` do
+-- baseline concede a anon e authenticated toda função nova, então sem o revoke
+-- esta nasceria exposta.
+
+create or replace function public.fn_mensagem_do_vendedor_e_atividade()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $fn$
+declare
+  v_topo timestamptz;
+  v_quantos integer;
+begin
+  -- O topo da ordem que o roteador usa — `coalesce(last_activity_at, created_at)`
+  -- decrescente, a mesma chave de `atividade()` em `lib/leads/active-lead.ts`, na
+  -- mesma precisão (milissegundo) — entre os negócios ABERTOS do MESMO contato e
+  -- da MESMA organização.
+  select date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at))
+    into v_topo
+    from public.crm_leads l
+   where l.organization_id = new.organization_id
+     and l.contact_id = new.contact_id
+     and l.status = 'open'
+   order by date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) desc
+   limit 1;
+
+  -- Contato sem negócio aberto: nada a carimbar.
+  if v_topo is null then
+    return new;
+  end if;
+
+  -- TOPO EMPATADO: o roteador responde `ambiguous_open_leads`, e é de propósito.
+  -- Não se resolve ambiguidade alheia escolhendo um dos lados — o carimbo
+  -- criaria um vencedor que o produto recusa escolher.
+  select count(*)
+    into v_quantos
+    from public.crm_leads l
+   where l.organization_id = new.organization_id
+     and l.contact_id = new.contact_id
+     and l.status = 'open'
+     and date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) = v_topo;
+
+  if v_quantos <> 1 then
+    return new;
+  end if;
+
+  -- SÓ O TOPO ÚNICO, e nunca retrocede: negócio com relógio já mais novo que a
+  -- mensagem fica intocado, e os demais abertos do contato — que o roteador não
+  -- escolheria — também.
+  update public.crm_leads l
+     set last_activity_at = new.created_at
+   where l.organization_id = new.organization_id
+     and l.contact_id = new.contact_id
+     and l.status = 'open'
+     and date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) = v_topo
+     and coalesce(l.last_activity_at, '-infinity'::timestamptz) < new.created_at;
+
+  return new;
+end$fn$;
+
+comment on function public.fn_mensagem_do_vendedor_e_atividade() is
+  'Gatilho de `messages`: a fala humana do vendedor (sent_via em user/crm/external_device, outbound, sem reação/sistema/histórico importado) carimba `crm_leads.last_activity_at` do negócio ABERTO mais recentemente ativo do contato, na mesma organização — o topo da ordenação por coalesce(last_activity_at, created_at), truncada ao milissegundo como o roteador a compara —, e nunca retrocede a data. Topo empatado ou contato sem negócio aberto: não carimba nada. Existe porque `crm_lead_activities` nunca recebeu linha de mensagem e o radar de risco lia o negócio trabalhado como frio (#2953).';
+
+revoke execute on function public.fn_mensagem_do_vendedor_e_atividade() from public, anon, authenticated;
+grant execute on function public.fn_mensagem_do_vendedor_e_atividade() to service_role;
+
+drop trigger if exists trg_mensagem_do_vendedor_e_atividade on public.messages;
+create trigger trg_mensagem_do_vendedor_e_atividade
+  after insert on public.messages
+  for each row
+  when (new.direction = 'outbound'
+        and new.sent_via in ('user', 'crm', 'external_device')
+        and new.type not in ('reaction', 'system')
+        and coalesce(new.metadata ->> 'historico_importado', '') <> 'true')
+  execute function public.fn_mensagem_do_vendedor_e_atividade();
 
 notify pgrst, 'reload schema';
 
