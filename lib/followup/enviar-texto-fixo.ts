@@ -139,6 +139,11 @@ export async function enviarTextoFixoPendente(
             enrollment_id: enrollmentId,
             motivo: classificada.motivo,
           });
+          // O desfecho VOLTA para o enrollment como `skipped` com o motivo, igual ao
+          // caminho do worker (`runFlowDrivenTurn`): fechar só o job deixava o nó de
+          // ação em recheck até o dead-man matar a inscrição com
+          // `action_turn_never_completed`, um motivo falso no lugar deste.
+          await completeTurnForEnrollment(ponte, job.organization_id, enrollmentId, nodeId, { kind: "skipped", reason: classificada.motivo }, undefined, job.id, jobClaim);
           await settle(job.organization_id, job.id, jobClaim.acquired_at, true, classificada.motivo);
           continue;
         }
@@ -232,6 +237,8 @@ export async function enviarTextoFixoPendente(
             conversation_id: conversationId,
             motivo: recusa,
           });
+          // Volta para o enrollment como `skipped`, pelo mesmo motivo da recusa de tipo acima.
+          await completeTurnForEnrollment(ponte, job.organization_id, enrollmentId, nodeId, { kind: "skipped", reason: recusa }, undefined, job.id, jobClaim);
           await settle(job.organization_id, job.id, jobClaim.acquired_at, true, recusa);
           continue;
         }
