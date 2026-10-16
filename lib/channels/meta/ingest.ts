@@ -149,8 +149,8 @@ async function findContactByVariants(
  * O corpo que a MESMA mensagem grava — é o que o INSERT destas duas funções
  * escreve em `messages.body`. A prévia lê o mesmo valor, para a igualdade de
  * prévia das rotas de ocultar/apagar (`app/api/v1/messages/[id]/hide/route.ts` e
- * `app/api/v1/messages/[id]/route.ts`, que comparam a coluna com
- * `body?.slice(0,280) || [tipo]`) fechar para a mídia SEM legenda.
+ * `app/api/v1/messages/[id]/route.ts`, que remontam a prévia com
+ * `previaDaMensagem(message.body, message.type)` e comparam com a coluna) fechar.
  */
 function corpoDaPrevia(e: InboundMessageEvent | OutboundEchoEvent): string | null {
   return e.type === "contact" ? (e.sharedContact?.name ?? e.text) : e.text;
@@ -159,12 +159,14 @@ function corpoDaPrevia(e: InboundMessageEvent | OutboundEchoEvent): string | nul
 /**
  * Prévia curta para a lista de conversas, pela MESMA régua dos outros canais —
  * `previaDaMensagem` (`lib/messaging/previa-da-mensagem.ts`): texto e legenda até
- * 280, `[tipo]` para mídia SEM legenda, e o cartão vira `Contato: <nome>`.
+ * 280, o nome do tipo em português (`ROTULO_DO_TIPO`) para mídia SEM legenda, e
+ * o cartão vira `Contato: <nome>`.
  *
  * A régua local que vivia aqui ("📷 Imagem", "🎵 Áudio") fazia a lista misturar
- * vocabulários entre canais e — pior — gravava, para mídia sem legenda, uma
- * prévia que as rotas de ocultar/apagar não reconheciam: elas reconstroem a
- * prévia como `body?.slice(0,280) || [tipo]`, então a igualdade nunca fechava.
+ * vocabulários entre canais e — pior — gravava uma prévia que as rotas de
+ * ocultar/apagar não reconheciam: elas reconstroem a prévia com
+ * `previaDaMensagem`, então a igualdade nunca fechava — para mídia com ou sem
+ * legenda, texto acima de 120 caracteres e cartão de contato.
  */
 function previewOf(e: InboundMessageEvent): string {
   return previaDaMensagem(corpoDaPrevia(e), e.type);
