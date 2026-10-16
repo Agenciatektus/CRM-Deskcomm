@@ -657,7 +657,7 @@ const corpoDoPatch = z
      * credencial da origem nova já validada.
      */
     origem: z.enum(ORIGENS_DO_JEV).optional(),
-    /** A caixa marcada na tela. Só pesa ao ligar pela primeira vez. */
+    /** A caixa marcada na tela. Pesa ao ligar pela primeira vez e ao trocar a origem para a OpenRouter. */
     aceite_lgpd: z.literal(true).optional(),
     tarefa: idDaTarefaSchema.optional(),
     estado: z.enum(ESTADOS_DA_TAREFA).optional(),
@@ -736,6 +736,23 @@ export async function PATCH(req: NextRequest): Promise<Response> {
         422,
         { requestId },
       );
+    }
+    // LGPD: o aceite gravado foi dado a um texto que nomeava só a TypeSafe AI.
+    // Pela OpenRouter a mensagem passa por mais um operador nos EUA, então a
+    // troca pede o aceite de novo — mesmo com o Jev desligado, porque religar
+    // não pergunta (D6). Sem aceite gravado, quem pergunta é o `ligado: true`.
+    if (corpo.origem === "openrouter" && atual.aceite !== null) {
+      if (corpo.aceite_lgpd !== true) {
+        return fail(
+          "jev_exige_aceite",
+          t(
+            "Pela OpenRouter, cada mensagem dos clientes vai, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, pela OpenRouter, nos Estados Unidos. Para trocar, confirme que você está de acordo.",
+          ),
+          422,
+          { requestId },
+        );
+      }
+      mudanca.aceite = { ...atual.aceite, em: new Date().toISOString(), por: user.id };
     }
     mudanca.origem = corpo.origem;
   }

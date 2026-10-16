@@ -548,6 +548,19 @@ function DeOndeResponde({ dados, recarregar }: { dados: DadosDoJev; recarregar: 
   const { mudar, enviando } = useMudarOJev(recarregar);
   const origem = origemDoCartao(dados);
   const podeReaproveitar = dados.openrouter?.disponivel === true;
+  // O aceite gravado nomeava só a TypeSafe AI: ir para a OpenRouter pede o
+  // aceite de novo antes do PATCH (a rota recusa sem ele).
+  const [confirmandoOpenRouter, setConfirmandoOpenRouter] = useState(false);
+  const [concordo, setConcordo] = useState(false);
+  const escolher = (nova: string) => {
+    if (nova === "openrouter" && dados.config.aceite !== null) {
+      setConcordo(false);
+      setConfirmandoOpenRouter(true);
+      return;
+    }
+    setConfirmandoOpenRouter(false);
+    void mudar({ origem: nova }, t("Origem do Jev salva."));
+  };
 
   return (
     <div className="mt-4 space-y-1" data-testid="jev-origem">
@@ -557,13 +570,46 @@ function DeOndeResponde({ dados, recarregar }: { dados: DadosDoJev; recarregar: 
       <select
         id="jev-origem-escolha"
         className="block w-full max-w-md rounded-md border bg-background p-2 text-sm"
-        value={origem}
+        value={confirmandoOpenRouter ? "openrouter" : origem}
         disabled={!dados.pode_editar || enviando}
-        onChange={(e) => void mudar({ origem: e.target.value }, t("Origem do Jev salva."))}
+        onChange={(e) => escolher(e.target.value)}
       >
         <option value="typesafe">{t("TypeSafe AI (chave própria)")}</option>
         <option value="openrouter">{t("OpenRouter (reaproveita a credencial OpenRouter)")}</option>
       </select>
+      {confirmandoOpenRouter && (
+        <div className="max-w-2xl rounded-md border border-border p-3 text-sm" data-testid="jev-origem-aceite">
+          <div className="flex items-start gap-2">
+            <input
+              id="jev-origem-aceite"
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+              checked={concordo}
+              onChange={(e) => setConcordo(e.target.checked)}
+            />
+            <label htmlFor="jev-origem-aceite" className="text-sm">
+              {t(
+                "Concordo com o envio de cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, pela OpenRouter, nos Estados Unidos.",
+              )}
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={!concordo || enviando}
+              onClick={() => {
+                setConfirmandoOpenRouter(false);
+                void mudar({ origem: "openrouter", aceite_lgpd: true }, t("Origem do Jev salva."));
+              }}
+            >
+              {t("Trocar para a OpenRouter")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmandoOpenRouter(false)}>
+              {t("Cancelar")}
+            </Button>
+          </div>
+        </div>
+      )}
       {origem === "openrouter" ? (
         <p className="max-w-2xl text-xs text-muted-foreground" data-testid="jev-origem-openrouter">
           {podeReaproveitar
@@ -867,9 +913,14 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
 
       <div className="rounded-md border border-border p-3 text-sm">
         <p>
-          {t(
-            "Ao ligar, cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Com o Jev desligado, nada é enviado.",
-          )}
+          {/* O aceite nomeia QUEM recebe: via OpenRouter a mensagem passa por ela antes da TypeSafe. */}
+          {origemDoCartao(dados) === "openrouter"
+            ? t(
+                "Ao ligar, cada mensagem que o cliente manda vai para a TypeSafe AI, pela OpenRouter, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Com o Jev desligado, nada é enviado.",
+              )
+            : t(
+                "Ao ligar, cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Com o Jev desligado, nada é enviado.",
+              )}
         </p>
         {aceite === null ? (
           <div className="mt-3 flex items-start gap-2">
@@ -882,9 +933,13 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
               disabled={!dados.pode_editar}
             />
             <label htmlFor="jev-aceite" className="text-sm">
-              {t(
-                "Concordo com o envio de cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, nos Estados Unidos.",
-              )}
+              {origemDoCartao(dados) === "openrouter"
+                ? t(
+                    "Concordo com o envio de cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, pela OpenRouter, nos Estados Unidos.",
+                  )
+                : t(
+                    "Concordo com o envio de cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, nos Estados Unidos.",
+                  )}
             </label>
           </div>
         ) : (
