@@ -3359,6 +3359,7 @@ export const DICIONARIO: Traducoes = {
   "O cliente respondeu": { es: "El cliente respondió" },
   "O cliente não respondeu a tempo": { es: "El cliente no respondió a tiempo" },
   "Você concluiu o caso": { es: "Concluiste el caso" },
+  "A equipe respondeu pelo WhatsApp": { es: "El equipo respondió por WhatsApp" },
   "Você pediu uma informação ao cliente": { es: "Pediste información al cliente" },
   "Você decidiu passar para atendimento humano": { es: "Decidiste pasar a atención humana" },
   "O sistema abriu o caso automaticamente": { es: "El sistema abrió el caso automáticamente" },
