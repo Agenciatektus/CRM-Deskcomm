@@ -54193,11 +54193,23 @@ notify pgrst, 'reload schema';
 -- funil padrão, ou nenhum deles) deixavam de ter vencedor, e os treze pontos que
 -- usam o roteador paravam de achar o negócio da pessoa.
 --
--- A ESCOLHA, e por que ela e não outra: carimbar APENAS o negócio que o próprio
--- roteador já escolheria. A chave é a MESMA dele — `coalesce(last_activity_at,
--- created_at)` decrescente —, entre os `status = 'open'` do MESMO contato e da
--- MESMA organização. Assim o carimbo não muda a decisão: o que já era o topo
--- continua o topo, e a ORDEM entre os abertos se preserva.
+-- A ESCOLHA, e por que ela e não outra: carimbar APENAS o negócio aberto mais
+-- recentemente ativo do contato (o topo geral, que é a escolha do roteador
+-- quando ele é chamado sem funil preferido). A chave é a mesma de `atividade()`,
+-- na mesma precisão (milissegundo) — `coalesce(last_activity_at, created_at)`
+-- decrescente, truncada ao milissegundo —, entre os `status = 'open'` do MESMO
+-- contato e da MESMA organização. Assim o carimbo não muda a decisão, nem a de
+-- quem chama o roteador com o funil padrão: se o topo geral está no funil
+-- padrão, ele segue o topo ali; se não está, os negócios do funil padrão não
+-- são tocados. O que já era o topo continua o topo, e a ORDEM entre os abertos
+-- se preserva.
+--
+-- POR QUE O MILISSEGUNDO: o roteador compara em milissegundos — `atividade()`
+-- faz `new Date(iso).getTime()` —, e o Postgres guarda microssegundos. Sem
+-- truncar, dois abertos separados por menos de 1 ms seriam EMPATE para o
+-- roteador (`ambiguous_open_leads`) e topo ÚNICO aqui, e o carimbo arbitraria
+-- exatamente a ambiguidade que este gatilho promete não arbitrar. Por isso as
+-- três leituras da chave abaixo usam `date_trunc('milliseconds', ...)`.
 --
 -- E NÃO CARIMBA NADA quando o topo está EMPATADO. Empate era ambíguo antes desta
 -- mudança e continua ambíguo: resolver ambiguidade alheia escolhendo um dos dois
@@ -54241,15 +54253,16 @@ declare
   v_quantos integer;
 begin
   -- O topo da ordem que o roteador usa — `coalesce(last_activity_at, created_at)`
-  -- decrescente, a MESMA chave de `atividade()` em `lib/leads/active-lead.ts` —
-  -- entre os negócios ABERTOS do MESMO contato e da MESMA organização.
-  select coalesce(l.last_activity_at, l.created_at)
+  -- decrescente, a mesma chave de `atividade()` em `lib/leads/active-lead.ts`, na
+  -- mesma precisão (milissegundo) — entre os negócios ABERTOS do MESMO contato e
+  -- da MESMA organização.
+  select date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at))
     into v_topo
     from public.crm_leads l
    where l.organization_id = new.organization_id
      and l.contact_id = new.contact_id
      and l.status = 'open'
-   order by coalesce(l.last_activity_at, l.created_at) desc
+   order by date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) desc
    limit 1;
 
   -- Contato sem negócio aberto: nada a carimbar.
@@ -54266,7 +54279,7 @@ begin
    where l.organization_id = new.organization_id
      and l.contact_id = new.contact_id
      and l.status = 'open'
-     and coalesce(l.last_activity_at, l.created_at) = v_topo;
+     and date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) = v_topo;
 
   if v_quantos <> 1 then
     return new;
@@ -54280,14 +54293,14 @@ begin
    where l.organization_id = new.organization_id
      and l.contact_id = new.contact_id
      and l.status = 'open'
-     and coalesce(l.last_activity_at, l.created_at) = v_topo
+     and date_trunc('milliseconds', coalesce(l.last_activity_at, l.created_at)) = v_topo
      and coalesce(l.last_activity_at, '-infinity'::timestamptz) < new.created_at;
 
   return new;
 end$fn$;
 
 comment on function public.fn_mensagem_do_vendedor_e_atividade() is
-  'Gatilho de `messages`: a fala humana do vendedor (sent_via em user/crm/external_device, outbound, sem reação/sistema/histórico importado) carimba `crm_leads.last_activity_at` do negócio ABERTO mais recentemente ativo do contato, na mesma organização — o topo da ordenação por coalesce(last_activity_at, created_at) que o roteador usa —, e nunca retrocede a data. Topo empatado ou contato sem negócio aberto: não carimba nada. Existe porque `crm_lead_activities` nunca recebeu linha de mensagem e o radar de risco lia o negócio trabalhado como frio (#2953).';
+  'Gatilho de `messages`: a fala humana do vendedor (sent_via em user/crm/external_device, outbound, sem reação/sistema/histórico importado) carimba `crm_leads.last_activity_at` do negócio ABERTO mais recentemente ativo do contato, na mesma organização — o topo da ordenação por coalesce(last_activity_at, created_at), truncada ao milissegundo como o roteador a compara —, e nunca retrocede a data. Topo empatado ou contato sem negócio aberto: não carimba nada. Existe porque `crm_lead_activities` nunca recebeu linha de mensagem e o radar de risco lia o negócio trabalhado como frio (#2953).';
 
 revoke execute on function public.fn_mensagem_do_vendedor_e_atividade() from public, anon, authenticated;
 grant execute on function public.fn_mensagem_do_vendedor_e_atividade() to service_role;

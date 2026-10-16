@@ -29,7 +29,10 @@ import { sql } from "./gov-helpers";
  *
  * Agora o gatilho carimba SÓ o topo daquela mesma ordenação, e NADA quando o
  * topo está empatado. Os casos (12) e (13) medem exatamente isso, com a MESMA
- * função que o produto usa para rotear — não uma reimplementação da chave.
+ * função que o produto usa para rotear — não uma reimplementação da chave. O
+ * caso (14) mede a PRECISÃO: o roteador compara em milissegundos, e dois abertos
+ * separados por microssegundos são empate para ele — o gatilho também tem de
+ * vê-los assim.
  *
  * ## Este arquivo mede COMPORTAMENTO, não a cláusula `when` do gatilho
  *
@@ -474,6 +477,43 @@ describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
     ).toBe(medida.relogios.get("abertoB")!.antes);
 
     // ...e a ambiguidade segue EXATAMENTE como estava: mesmo desfecho, mesmos candidatos.
+    expect(resolveActiveLeadForContact(medida.candidatos.depois)).toEqual(ambiguidade);
+  });
+
+  it("(14) dois abertos separados por MICROssegundos no mesmo milissegundo: empate para o roteador, e a fala não carimba NADA", () => {
+    // O roteador compara em MILIssegundos (`new Date(iso).getTime()`); o Postgres
+    // guarda MICROssegundos. Os dois relógios caem no MESMO milissegundo, 500 µs
+    // um do outro. As frações .250 e .750 ficam longe da borda do ms de propósito:
+    // a leitura do candidato passa por `extract(epoch)` em ponto flutuante, e uma
+    // fração .000 poderia virar .999 do milissegundo anterior.
+    const base = "date_trunc('milliseconds', now() - interval '30 days') + interval '250 microseconds'";
+    const medida = medirComRoteador(
+      { sentVia: "user", direction: "outbound" },
+      { relogio: `(${base}) + interval '500 microseconds'`, relogioDeB: base },
+    );
+
+    // CONTROLE da bancada, nos dois lados: para o Postgres os relógios DIFEREM...
+    expect(
+      medida.relogios.get("abertoA")!.antes,
+      "a bancada nasceu com os dois relógios iguais no microssegundo — o caso não mediria a precisão",
+    ).not.toBe(medida.relogios.get("abertoB")!.antes);
+
+    // ...e para o roteador são EMPATE.
+    const ambiguidade = {
+      routed: false,
+      reason: "ambiguous_open_leads",
+      candidateIds: medida.candidatos.antes.map((c) => c.id),
+    };
+    expect(resolveActiveLeadForContact(medida.candidatos.antes)).toEqual(ambiguidade);
+
+    // NADA foi carimbado: comparar no microssegundo veria um topo único e o
+    // carimbaria, criando o vencedor que o roteador recusa escolher.
+    expect(
+      medida.relogios.get("abertoA")!.depois,
+      "o `abertoA` andou num empate de milissegundo — o gatilho comparou em microssegundos e arbitrou a ambiguidade do roteador",
+    ).toBe(medida.relogios.get("abertoA")!.antes);
+    expect(medida.relogios.get("abertoB")!.depois).toBe(medida.relogios.get("abertoB")!.antes);
+
     expect(resolveActiveLeadForContact(medida.candidatos.depois)).toEqual(ambiguidade);
   });
 });
