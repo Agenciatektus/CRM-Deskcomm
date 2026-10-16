@@ -244,14 +244,14 @@ export function motivoDoVeto(codigo: string | null | undefined): MotivoDaFalha |
         codigo,
         acionavel: true,
         texto:
-          "A sugestão usava uma ação que a prévia não conhece. Publique o agente de novo para a prévia acompanhar as ferramentas atuais.",
+          "A sugestão tentou usar uma ação que a prévia não reconhece. Gere de novo; se repetir, revise as ferramentas ligadas no agente.",
       };
     case "generation_failed":
       return {
         codigo,
         acionavel: true,
         texto:
-          "A geração da sugestão falhou (provedor de IA ou tempo esgotado). Tente de novo; se repetir, confira a chave e o uso de IA no servidor.",
+          "Não foi possível gerar a sugestão: o contato pode ter pedido para não receber mensagens ou ter sido anonimizado, ou a geração falhou. Tente de novo; se repetir, o motivo ficou registrado no servidor.",
       };
     default:
       return null;
