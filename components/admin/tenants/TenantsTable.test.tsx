@@ -39,6 +39,7 @@ function linha(parcial: Partial<AdminTenantRow>): AdminTenantRow {
     status: "active",
     onboarded_at: "2026-01-15T12:00:00.000Z",
     suspended_at: null,
+    suspended_kind: null,
     created_at: "2026-01-01T12:00:00.000Z",
     user_count: [{ count: 3 }],
     conversations_count: [{ count: 12 }],
@@ -115,6 +116,27 @@ describe("o botão de ciclo de vida reage ao status da linha", () => {
     expect(screen.queryByLabelText(/^Suspender/)).toBeNull();
   });
 
+  it("suspensão por falta de pagamento NÃO oferece Reativar: o atalho leva à ficha", () => {
+    // A rota /reactivate recusa esta com 409 `suspensao_de_cobranca`; a saída é
+    // o card Cobrança da ficha (Dar prazo / Tornar isenta).
+    montar(
+      linha({
+        id: "77777777-7777-4777-8777-777777777777",
+        display_name: "Zeta",
+        status: "suspended",
+        suspended_at: "2026-02-01T12:00:00.000Z",
+        suspended_kind: "cobranca",
+      }),
+    );
+
+    expect(screen.queryByLabelText(/Reativar/)).toBeNull();
+    expect(screen.queryByLabelText(/^Suspender/)).toBeNull();
+    expect(screen.getByLabelText("Suspensa por falta de pagamento — Zeta")).toHaveAttribute(
+      "href",
+      "/admin/tenants/77777777-7777-4777-8777-777777777777",
+    );
+  });
+
   it("tenant ativo mantém Suspender (e a lista continua com os outros dois)", () => {
     montar(linha({}));
 
@@ -144,6 +166,23 @@ describe("tenant redigido", () => {
     expect(screen.queryByLabelText(/Editar/)).toBeNull();
     expect(screen.queryByLabelText(/Suspender/)).toBeNull();
     expect(screen.queryByLabelText(/Reativar/)).toBeNull();
+  });
+
+  it("continua alcançável: a linha mantém o link para a ficha", () => {
+    montar(
+      linha({
+        id: "44444444-4444-4444-8444-444444444444",
+        display_name: "Apagada",
+        status: "redacted",
+        onboarded_at: null,
+      }),
+    );
+
+    expect(screen.getByRole("link", { name: "Ver" })).toHaveAttribute(
+      "href",
+      "/admin/tenants/44444444-4444-4444-8444-444444444444",
+    );
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 });
 
