@@ -13,6 +13,7 @@ import {
   GOV_AGENT_A,
   GOV_AGENT_B,
   GOV_CONV_AGENT_B,
+  GOV_MANAGER,
   GOV_ORG,
   GOV_VIEWER,
   countAs,
@@ -25,6 +26,12 @@ const EV_MENSAGEM = "e0e0e0e0-0685-4000-8000-000000000012";
 const EV_JOB = "e0e0e0e0-0685-4000-8000-000000000013";
 const EV_MENSAGEM_ID_SEM_FORMA = "e0e0e0e0-0685-4000-8000-000000000014";
 const EV_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000015";
+// `payload.conversation_id` que não é uuid: texto, vazio e número.
+const EV_MALFORMADOS = [
+  "e0e0e0e0-0685-4000-8000-000000000016",
+  "e0e0e0e0-0685-4000-8000-000000000017",
+  "e0e0e0e0-0685-4000-8000-000000000018",
+];
 
 const contar = (id: string) => `select count(*) from public.event_log where id = '${id}';`;
 const modo = (m: string) =>
@@ -42,7 +49,10 @@ beforeAll(() => {
         jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}'), 'done'),
       ('${EV_MENSAGEM_ID_SEM_FORMA}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(),
         jsonb_build_object('conversation_id', '5511999999999@c.us'), 'done'),
-      ('${EV_CONVERSA}', '${GOV_ORG}', 'conversation.claimed', 'conversation', '${GOV_CONV_AGENT_B}', '{}'::jsonb, 'done')
+      ('${EV_CONVERSA}', '${GOV_ORG}', 'conversation.claimed', 'conversation', '${GOV_CONV_AGENT_B}', '{}'::jsonb, 'done'),
+      ('${EV_MALFORMADOS[0]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":"x"}'::jsonb, 'done'),
+      ('${EV_MALFORMADOS[1]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":""}'::jsonb, 'done'),
+      ('${EV_MALFORMADOS[2]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":12345}'::jsonb, 'done')
       on conflict (id) do nothing;
   `);
 });
@@ -67,6 +77,20 @@ describe("0685 — eventos ligados a uma conversa seguem a visibilidade dela", (
 
   it("conversation_id que não é id de conversa não restringe nada", () => {
     expect(countAs(GOV_AGENT_A, contar(EV_MENSAGEM_ID_SEM_FORMA))).toBe(1);
+  });
+
+  it("gestão lê os eventos ligados à conversa de qualquer atendente", () => {
+    for (const ev of [EV_NOTA, EV_MENSAGEM, EV_JOB]) expect(countAs(GOV_MANAGER, contar(ev))).toBe(1);
+  });
+
+  it("conversation_id malformado não derruba a leitura e segue o pertencimento à organização", () => {
+    const ids = EV_MALFORMADOS.map((id) => `'${id}'`).join(", ");
+    expect(countAs(GOV_AGENT_A, `select count(*) from public.event_log where id in (${ids});`)).toBe(3);
+    // A tabela inteira, pela sessão do atendente: a policy roda em toda linha e não lança.
+    expect(countAs(GOV_AGENT_A, "select count(*) from public.event_log;")).toBeGreaterThanOrEqual(3);
+    const fora = "e0e0e0e0-0685-4000-8000-0000000000fe";
+    sql(`insert into auth.users (id, email) values ('${fora}', 'fora-0685b@invariant.test') on conflict do nothing;`);
+    expect(countAs(fora, `select count(*) from public.event_log where id in (${ids});`)).toBe(0);
   });
 
   it("viewer lê pela visão ampla, como em fn_can_view_conversation", () => {
