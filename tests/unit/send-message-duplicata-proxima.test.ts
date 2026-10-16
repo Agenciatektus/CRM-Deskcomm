@@ -16,6 +16,8 @@
  *  - item 1: seeding com `!preview &&` (o `liveJob()` do preview lança);
  *  - item 6: `checar` → `reservar` síncronos antes do primeiro `await`, `promover`
  *    no aceite e `liberar` em todo caminho de não-envio (finally incluso);
+ *  - item 6 (revisão): a janela entre a reserva e a cadeia fica sob `try/catch`
+ *    que libera e re-lança intacto — exceção pré-cadeia não deixa reserva órfã;
  *  - item 7: a supressão emite `send_vetoed` na timeline, sem conteúdo de mensagem.
  *
  * A régua pura de similaridade (normalização + Dice + exceções) vive em
@@ -25,6 +27,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+import { criarTravaDeDuplicata } from "@/lib/agent-engine/agent/near-dup";
 
 const FONTE = readFileSync(join(process.cwd(), "lib/agent-engine/agent/inbound-turn.ts"), "utf8");
 const corpoDoSend = (() => {
@@ -142,6 +146,69 @@ describe("reserva em voo fecha a corrida de tool calls paralelas", () => {
     // O corpo só entra em `emVoo` depois da própria checagem — `checar` consulta
     // aceitos ∪ emVoo, então a ordem é a garantia contra auto-supressão.
     expect(corpoDoSend.slice(gi, ri)).not.toContain("dupTrava.reservar");
+  });
+});
+
+// ─── #2996 item 6 (revisão): exceção pré-cadeia não deixa reserva órfã ──────
+describe("janela pré-cadeia sob try/catch: libera a reserva e re-lança o erro intacto", () => {
+  const janela = (() => {
+    const ri = corpoDoSend.indexOf("dupTrava.reservar(body)");
+    const fim = corpoDoSend.indexOf("// Cadeia de guardrails", ri);
+    expect(ri).toBeGreaterThan(-1);
+    expect(fim).toBeGreaterThan(ri);
+    // O `try` que envolve a janela vem IMEDIATAMENTE antes da reserva (o emit
+    // do ramo de supressão é outro `try`, bem mais acima — este acha o mais
+    // próximo por trás dela).
+    const ti = corpoDoSend.lastIndexOf("try {", ri);
+    expect(ti).toBeGreaterThan(-1);
+    return { fonte: corpoDoSend.slice(ti, fim), fim };
+  })();
+
+  it("as duas consultas pré-cadeia ficam DEPOIS da reserva e ANTES do catch que libera", () => {
+    const { fonte } = janela;
+    // Ordem obrigatória dentro da janela: try → reservar → resposta obsoleta →
+    // preparo de fotos → catch. Uma exceção em QUALQUER das duas consultas passa
+    // pelo catch, que é quem tem que soltar a reserva.
+    const iReserva = fonte.indexOf("dupTrava.reservar(body);");
+    const iObs = fonte.indexOf("await respostaFicouObsoleta(");
+    const iFotos = fonte.indexOf("await prepararFotosDoProduto(");
+    const iCatch = fonte.indexOf("} catch (err) {");
+    expect(iReserva).toBeGreaterThan(-1);
+    expect(iObs).toBeGreaterThan(iReserva);
+    expect(iFotos).toBeGreaterThan(iObs);
+    expect(iCatch).toBeGreaterThan(iFotos);
+    // O catch da janela SOLTA a reserva e RE-LANÇA o erro original — sem
+    // `return` com code novo e sem traduzir para `internal_error` (a tradução
+    // continua sendo exclusivamente da cadeia, que vem depois).
+    expect(fonte).toMatch(/\} catch \(err\) \{[\s\S]*?dupTrava\.liberar\(body\);\s*throw err;/);
+    expect(fonte).not.toContain("internal_error");
+    // Sem este catch, a janela não teria fecho nenhum: o `finally` que libera
+    // pertence à cadeia e roda DEPOIS — uma exceção aqui escaparia por cima dele.
+    expect(fonte).not.toMatch(/finally/);
+  });
+
+  it("a tradução de falha e o finally que libera seguem intocados DENTRO da cadeia", () => {
+    const cadeia = corpoDoSend.slice(janela.fim);
+    expect(cadeia).toMatch(
+      /code: 'internal_error'[\s\S]*\} finally \{[\s\S]*dupTrava\.liberar\(body\);/,
+    );
+    expect(cadeia).toContain("dupTrava.promover(body);");
+  });
+
+  it("liberada a reserva órfã, a tentativa equivalente NÃO é suprimida (trava real)", () => {
+    // Metade executável do contrato: o único efeito do catch é chamar
+    // `liberar`, e a trava real prova as duas pontas — com a reserva viva a
+    // re-tentativa idêntica cai na supressão (é o vazamento), e com o
+    // `liberar` que o catch garante a candidata volta a passar. O `execute` em
+    // si é closure do turno sem ponto de injeção (ver cabeçalho), então a
+    // rejeição em runtime das consultas não é exercitável aqui — o que se
+    // prende é a presença/ordem da janela acima.
+    const t = criarTravaDeDuplicata();
+    const corpo = "Olá! Sua entrega sai amanhã de manhã, tudo certo?";
+    t.reservar(corpo);
+    expect(t.checar(corpo)).not.toBeNull(); // sem liberar: suprimida (o vazamento)
+    t.liberar(corpo); // o que o catch pré-cadeia garante em exceção
+    expect(t.checar(corpo)).toBeNull(); // com liberar: elegível de novo
   });
 });
 

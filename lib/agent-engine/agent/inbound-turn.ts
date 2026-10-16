@@ -3420,69 +3420,92 @@ async function executarTurnoDoAgente(
         // mesmo passo não passam todos pela checagem. Veto/falha/exceção removem
         // a reserva (os `liberar` explícitos + o `finally`); envio aceito
         // PROMOVE para a memória durável (exatamente uma vez, em `promover`).
-        dupTrava.reservar(body);
-        // RESPOSTA OBSOLETA: o cliente escreveu de novo enquanto este turno pensava.
-        // Só antes do PRIMEIRO envio — cortar a meio uma resposta já começada é pior
-        // que a duplicata. A mensagem nova tem job próprio, que lê a conversa inteira
-        // e responde a tudo de uma vez. Ver `respostaFicouObsoleta`.
-        if (
-          !preview &&
-          seq === 0 &&
-          (await respostaFicouObsoleta(
-            pool,
-            { organizationId: tenantId, conversationId: input.conversationId, jobId: liveJob().id },
-            deps.knobs.respostaObsoletaTetoMs ?? 0,
-          ))
-        ) {
-          runLog.info('resposta descartada — o cliente escreveu de novo durante o turno', {
-            job_id: liveJob().id,
-            conversation_id: input.conversationId,
-          });
-          // #1943: marca o turno como descartado. NADA mais sai dele, nem a
-          // pergunta pendente do roteiro — ela segue feita para o turno da
-          // mensagem nova. Ver `perguntaDoRoteiroPodeSair` no `enviar`.
-          turnoDescartado = true;
-          // Nada saiu: a reserva em voo não pode virar memória (nem sobreviver
-          // ao turno como entrada órfã). #2996, item 6.
-          dupTrava.liberar(body);
-          return {
-            ok: false,
-            error: {
-              code: 'resposta_obsoleta',
-              message:
-                'O cliente mandou mensagem nova enquanto você escrevia; esta resposta ficou desatualizada e NÃO foi enviada. ' +
-                'NÃO chame send_message de novo neste turno — encerre agora. O próximo turno lê a conversa inteira e responde a tudo de uma vez.',
-            },
-          };
-        }
-        // A foto do produto (ideia de @vgamkt, #1130): preparada ANTES da cadeia e
-        // fora do lock do número — a cópia no Storage é rede. Código errado volta
-        // ao modelo sem enviar nada; foto que não copiou sai do envio e o texto
-        // segue (degradar para só texto). Ver `agent/fotos-do-produto.ts`.
+        // JANELA PRÉ-CADEIA COM DONO (revisão do #2996, item 6): as duas
+        // consultas de antes da cadeia — a de resposta obsoleta e a de preparo
+        // de fotos — não têm catch próprio; uma exceção delas escaparia por
+        // CIMA do `finally` da cadeia e deixaria a reserva órfã em `emVoo`,
+        // suprimindo depois a re-tentativa legítima da candidata que nunca saiu
+        // (no provedor com chave de reserva da assinatura, o turno até re-entra
+        // no modelo e esbarra nela). Este bloco envolve a reserva e as duas
+        // consultas: em exceção ele SOLTA a reserva e RE-LANÇA o erro original
+        // intacto — sem traduzir para `internal_error`, sem mudar classificação
+        // nem desfecho do turno; só o vazamento deixa de existir. Os `liberar`
+        // dos returns estruturados seguem valendo (return não passa por catch).
+        // `let` das fotos declarado antes do bloco porque o escopo precisa
+        // alcançar a cadeia; envolver a reserva não altera o caminho do gate —
+        // ele segue inteiramente síncrono do `checar` até a reserva.
         let fotosDoProduto: FotoParaEnvio[] = [];
         let fotosQueFaltaram = 0;
-        if (produto_codigo !== undefined && produto_codigo.trim() !== '' && !preview) {
-          const preparadas = await prepararFotosDoProduto(pool, copiarFotoNoStorage(runLog), {
-            tenantId,
-            conversationId: input.conversationId,
-            codigo: produto_codigo,
-          });
-          if (!preparadas.ok) {
-            // Nada saiu: libera a reserva antes de devolver o erro ao modelo.
+        try {
+          dupTrava.reservar(body);
+          // RESPOSTA OBSOLETA: o cliente escreveu de novo enquanto este turno pensava.
+          // Só antes do PRIMEIRO envio — cortar a meio uma resposta já começada é pior
+          // que a duplicata. A mensagem nova tem job próprio, que lê a conversa inteira
+          // e responde a tudo de uma vez. Ver `respostaFicouObsoleta`.
+          if (
+            !preview &&
+            seq === 0 &&
+            (await respostaFicouObsoleta(
+              pool,
+              { organizationId: tenantId, conversationId: input.conversationId, jobId: liveJob().id },
+              deps.knobs.respostaObsoletaTetoMs ?? 0,
+            ))
+          ) {
+            runLog.info('resposta descartada — o cliente escreveu de novo durante o turno', {
+              job_id: liveJob().id,
+              conversation_id: input.conversationId,
+            });
+            // #1943: marca o turno como descartado. NADA mais sai dele, nem a
+            // pergunta pendente do roteiro — ela segue feita para o turno da
+            // mensagem nova. Ver `perguntaDoRoteiroPodeSair` no `enviar`.
+            turnoDescartado = true;
+            // Nada saiu: a reserva em voo não pode virar memória (nem sobreviver
+            // ao turno como entrada órfã). #2996, item 6.
             dupTrava.liberar(body);
-            return { ok: false, error: { code: preparadas.code, message: preparadas.message } };
+            return {
+              ok: false,
+              error: {
+                code: 'resposta_obsoleta',
+                message:
+                  'O cliente mandou mensagem nova enquanto você escrevia; esta resposta ficou desatualizada e NÃO foi enviada. ' +
+                  'NÃO chame send_message de novo neste turno — encerre agora. O próximo turno lê a conversa inteira e responde a tudo de uma vez.',
+              },
+            };
           }
-          fotosDoProduto = preparadas.fotos;
-          fotosQueFaltaram = preparadas.tinha - preparadas.fotos.length;
-        }
-        // F4-04: sinaliza (independente do gate F4-01/F4-08) se ESTA candidata é uma
-        // promessa fora de tabela — usado só para correlacionar com o jailbreak no fim do
-        // turno. A detecção é determinística (decidePromise); sem tabela do tenant = no-op.
-        if (
-          promiseTable !== null &&
-          !decidePromise({ candidate: body, table: promiseTable }).allow
-        ) {
-          outOfTablePromiseAttempted = true;
+          // A foto do produto (ideia de @vgamkt, #1130): preparada ANTES da cadeia e
+          // fora do lock do número — a cópia no Storage é rede. Código errado volta
+          // ao modelo sem enviar nada; foto que não copiou sai do envio e o texto
+          // segue (degradar para só texto). Ver `agent/fotos-do-produto.ts`.
+          if (produto_codigo !== undefined && produto_codigo.trim() !== '' && !preview) {
+            const preparadas = await prepararFotosDoProduto(pool, copiarFotoNoStorage(runLog), {
+              tenantId,
+              conversationId: input.conversationId,
+              codigo: produto_codigo,
+            });
+            if (!preparadas.ok) {
+              // Nada saiu: libera a reserva antes de devolver o erro ao modelo.
+              dupTrava.liberar(body);
+              return { ok: false, error: { code: preparadas.code, message: preparadas.message } };
+            }
+            fotosDoProduto = preparadas.fotos;
+            fotosQueFaltaram = preparadas.tinha - preparadas.fotos.length;
+          }
+          // F4-04: sinaliza (independente do gate F4-01/F4-08) se ESTA candidata é uma
+          // promessa fora de tabela — usado só para correlacionar com o jailbreak no fim do
+          // turno. A detecção é determinística (decidePromise); sem tabela do tenant = no-op.
+          if (
+            promiseTable !== null &&
+            !decidePromise({ candidate: body, table: promiseTable }).allow
+          ) {
+            outOfTablePromiseAttempted = true;
+          }
+        } catch (err) {
+          // EXCEÇÃO PRÉ-CADEIA (revisão do #2996, item 6): nada saiu — a reserva
+          // órfã sai junto e o erro sobe idêntico ao de antes (nenhum code novo,
+          // nenhum return inventado). `liberar` é idempotente: se um caminho já
+          // tiver liberado, aqui é no-op.
+          dupTrava.liberar(body);
+          throw err;
         }
         // Cadeia de guardrails (F2-13): stop/opt-out → anti-ban → spinning rodam
         // AQUI, entre a decisão do modelo e o adapter. Se um gate veta, o
