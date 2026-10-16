@@ -14,6 +14,9 @@ export function mensagemDaRecusaDeLeitura(erro: unknown): string {
   return "A leitura não terminou. Tente sincronizar novamente nas configurações.";
 }
 
+/** Ids por consulta de vínculo: mantém a URL do `.in` bem abaixo de 8 KB. */
+const IDS_POR_CONSULTA = 50;
+
 export async function refreshCatalog(
   db: SupabaseClient,
   org: string,
@@ -79,14 +82,16 @@ export async function syncCalendar(
       .filter((eventId): eventId is string => Boolean(eventId));
     if (eventIds.length !== page.items.length) throw new Error("Evento sem identidade no lote do Google.");
     const linkedByEventId = new Map<string, string>();
-    if (eventIds.length) {
+    // Em blocos: o `.in` vai na URL do PostgREST, e 250 ids do Google (a página
+    // cheia) passam do limite de linha de requisição comum em proxy (8 KB).
+    for (let i = 0; i < eventIds.length; i += IDS_POR_CONSULTA) {
       const { data: linkedAppointments, error } = await db
         .from("calendar_appointments")
         .select("id,google_event_id")
         .eq("organization_id", org)
         .eq("google_connection_id", c.connection_id)
         .eq("google_calendar_id", c.external_calendar_id)
-        .in("google_event_id", eventIds);
+        .in("google_event_id", eventIds.slice(i, i + IDS_POR_CONSULTA));
       if (error) throw error;
       for (const appointment of linkedAppointments ?? []) {
         if (appointment.google_event_id) {

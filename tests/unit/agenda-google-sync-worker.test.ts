@@ -32,6 +32,7 @@ const event = {
 let snapshot: Record<string, unknown>,
   actions: Array<{ action: string; args: Record<string, unknown> }>,
   batches: Array<Record<string, unknown>>,
+  consultasDeVinculo: number[],
   linked: { id: string; google_event_id: string } | null,
   transport: ReturnType<typeof vi.fn<typeof fetch>>;
 function db() {
@@ -62,7 +63,10 @@ function db() {
       const c = {
         select: () => c,
         eq: () => c,
-        in: async () => ({ data: linked ? [linked] : [], error: null }),
+        in: async (_k: string, ids: string[]) => {
+          consultasDeVinculo.push(ids.length);
+          return { data: linked ? [linked] : [], error: null };
+        },
         maybeSingle: async () => ({ data: linked, error: null }),
         single: async () => ({
           data: table === "organizations" ? { timezone: "America/Manaus" } : null,
@@ -86,6 +90,7 @@ beforeEach(() => {
   };
   actions = [];
   batches = [];
+  consultasDeVinculo = [];
   linked = null;
   transport = vi
     .fn()
@@ -214,5 +219,12 @@ describe("leitura paginada sob claim original", () => {
       expect(action.args.claim).toEqual(claim);
     }
     expect(batches[0]!.cursor).toEqual(cursor);
+  });
+  it("página cheia consulta os vínculos em blocos de até 50 ids", async () => {
+    const items = Array.from({ length: 120 }, (_, i) => ({ ...event, id: `${event.id}-${i}` }));
+    transport.mockResolvedValue(new Response(JSON.stringify({ items, nextSyncToken: "new" })));
+    expect(await syncCalendar(db(), org, id, transport)).toBe("complete");
+    expect(consultasDeVinculo).toEqual([50, 50, 20]);
+    expect(batches[0]!.items).toHaveLength(120);
   });
 });
