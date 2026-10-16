@@ -213,6 +213,7 @@ export function ContactTagsEditor(props: Props) {
           disabled={pendente || tags.length >= 20}
         />
         <Button
+          type="button"
           size="sm"
           variant="outline"
           className="h-7 px-2"
