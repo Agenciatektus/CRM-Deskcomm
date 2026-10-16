@@ -11,6 +11,7 @@ import { reportarEnvio, type MensagemEnviada } from "@/lib/automation/desfecho-d
 import { checarGuardasDeContato } from "@/lib/automation/guarda-do-contato";
 import { classificarMidiaComLegenda } from "@/lib/messaging/media/midia-com-legenda";
 import { recusaDeMidiaForaDaJanela } from "@/lib/messaging/media/recusa-de-midia-fora-da-janela";
+import { mensagemDeErro } from "@/lib/automation/actions/erro-legivel";
 
 async function postponeUntil(ctx: ActionCtx, config: Record<string, unknown>): Promise<string | null> {
   const contato = checarGuardasDeContato(ctx);
@@ -107,7 +108,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     return {
       type: "send_whatsapp_message",
       status: "failed",
-      error: err instanceof Error ? err.message : String(err),
+      error: mensagemDeErro(err),
     };
   }
 }
