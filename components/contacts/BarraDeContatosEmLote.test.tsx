@@ -16,6 +16,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { contrasteNoTema, tokenDaClasse } from "@/tests/setup/contraste-do-utilitario";
+
 import { BarraDeContatosEmLote } from "./BarraDeContatosEmLote";
 
 // Polyfills que o Radix Select exige e o jsdom não tem (mesmo padrão de
@@ -57,6 +59,18 @@ describe("BarraDeContatosEmLote", () => {
     render(<BarraDeContatosEmLote quantidade={3} pendente={false} {...mao()} />);
     expect(screen.getByTestId("barra-de-contatos-em-lote")).toBeInTheDocument();
     expect(screen.getByText("3 contatos selecionados")).toBeInTheDocument();
+  });
+
+  it("a contagem passa 4.5:1 sobre o fundo da barra nos dois temas", () => {
+    render(<BarraDeContatosEmLote quantidade={3} pendente={false} {...mao()} />);
+    // Medido na prova do #2913 com `text-text-muted` sobre `bg-surface-elevated`:
+    // 4.44:1 no escuro, em texto de 12px.
+    const barra = screen.getByTestId("barra-de-contatos-em-lote");
+    const fundo = tokenDaClasse(barra.className, "bg");
+    const frente = tokenDaClasse(screen.getByText("3 contatos selecionados").className, "text");
+    for (const tema of ["claro", "escuro"] as const) {
+      expect(contrasteNoTema(frente, fundo, tema), `${frente} sobre ${fundo} no ${tema}`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("adicionar etiqueta: escreve, confirma e delega a etiqueta aparada", async () => {

@@ -125,7 +125,7 @@ export function BarraDeContatosEmLote({
       aria-label={t("Ações em lote")}
       data-testid="barra-de-contatos-em-lote"
     >
-      <span className="mr-1 text-xs font-medium text-text-muted">
+      <span className="mr-1 text-xs font-medium text-foreground">
         {quantidade === 1
           ? t("1 contato selecionado")
           : `${quantidade} ${t("contatos selecionados")}`}

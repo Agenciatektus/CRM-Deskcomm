@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContactsTable } from "./ContactsTable";
 import type { Contact } from "@/lib/types/contacts";
+import { contrasteNoTema, tokenDaClasse } from "@/tests/setup/contraste-do-utilitario";
 
 // Issue #2715 — a linha ganha o atalho de edição: presença e ordem dos ícones,
 // e abertura do MESMO diálogo da ficha (EditContactDialog) pré-preenchido.
@@ -209,5 +210,24 @@ describe("ContactsTable — seleção múltipla (#2484, F3)", () => {
       onSelecionarTodosVisiveis: vi.fn(),
     });
     expect(screen.getByRole("checkbox", { name: "Selecionar contato Web Speed" })).toBeInTheDocument();
+  });
+
+  it("a borda da caixa DESMARCADA passa 3:1 contra a linha nos dois temas (WCAG 1.4.11)", () => {
+    renderTabela([contato], {
+      selecionados: new Set(),
+      onAlternarSelecao: vi.fn(),
+      onSelecionarTodosVisiveis: vi.fn(),
+    });
+    // Medido na prova do #2913 com `border-input`: 1.31:1 no escuro (e 1.28:1
+    // no claro, calculado) — a caixa sem marca quase sumia na linha.
+    for (const caixa of [
+      screen.getByTestId(`selecionar-contato-${contato.id}`),
+      screen.getByTestId("selecionar-todos-contatos"),
+    ]) {
+      const borda = tokenDaClasse(caixa.className, "border");
+      for (const tema of ["claro", "escuro"] as const) {
+        expect(contrasteNoTema(borda, "surface", tema), `${borda} no ${tema}`).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });
