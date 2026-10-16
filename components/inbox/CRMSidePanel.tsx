@@ -668,6 +668,7 @@ function BotaoDeRecolherDoPainel({
         recolhido && "justify-center",
       )}
       aria-label={rotulo}
+      aria-expanded={!recolhido}
       title={rotulo}
       data-testid="inbox-recolher-painel"
     >
