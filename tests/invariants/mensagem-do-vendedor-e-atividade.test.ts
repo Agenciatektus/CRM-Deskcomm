@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
+
 import { sql } from "./gov-helpers";
 
 /**
@@ -16,6 +18,19 @@ import { sql } from "./gov-helpers";
  * ou pelo celular — ficava com o relógio parado, e o radar de risco
  * (`lib/leads/radar-de-risco.ts`) o listava como frio.
  *
+ * ## Qual negócio a fala carimba (o arremate, pedido na revisão do PR)
+ *
+ * A primeira versão carimbava TODOS os abertos do contato com o MESMO
+ * `new.created_at` — e isso FABRICAVA um empate onde podia não haver nenhum. O
+ * roteador (`resolveActiveLeadForContact`) decide por
+ * `coalesce(last_activity_at, created_at)` decrescente e trata empate no topo
+ * como ambíguo de propósito. Depois de UMA fala, dois abertos que o roteador
+ * compara entre si deixavam de ter vencedor.
+ *
+ * Agora o gatilho carimba SÓ o topo daquela mesma ordenação, e NADA quando o
+ * topo está empatado. Os casos (12) e (13) medem exatamente isso, com a MESMA
+ * função que o produto usa para rotear — não uma reimplementação da chave.
+ *
  * ## Este arquivo mede COMPORTAMENTO, não a cláusula `when` do gatilho
  *
  * Cada caso insere UMA mensagem de verdade em `public.messages` e olha o relógio
@@ -29,9 +44,12 @@ import { sql } from "./gov-helpers";
  * Da fala do vendedor sobre o contato dependem quatro decisões do gatilho, e cada
  * negócio abaixo isola uma:
  *
- *   `abertoA`, `abertoB`   MESMO contato, MESMA organização, ABERTOS — os dois têm
- *                          de andar (o alvo é "os negócios abertos DO CONTATO",
- *                          não o card que alguém tem na mão).
+ *   `abertoA`              MESMO contato, MESMA organização, ABERTO, e o TOPO da
+ *                          ordenação do roteador — é ele (só ele) que tem de andar.
+ *   `abertoB`              MESMO contato, MESMA organização, ABERTO, UM DIA mais
+ *                          velho que `abertoA` — tem de ficar INTOCADO. É o par que
+ *                          mede "só o topo anda": com os dois no mesmo instante o
+ *                          caso passaria sem medir ordem nenhuma.
  *   `ganho`, `perdido`     mesmo contato, MESMA organização, FECHADOS — fechar é o
  *                          fim do relógio, e o radar só olha negócio aberto.
  *   `deOutroContato`       MESMA organização, contato DIFERENTE, aberto — a
@@ -48,6 +66,11 @@ import { sql } from "./gov-helpers";
 
 const DIAS_TRINTA = "now() - interval '30 days'";
 
+/** `abertoB` nasce UM DIA mais velho que `abertoA`: o topo do contato é ÚNICO. */
+function umDiaMaisVelho(relogio: string): string {
+  return `(${relogio}) - interval '1 day'`;
+}
+
 /** Os seis negócios da bancada, na ordem em que são lidos. */
 const ROTULOS = [
   "abertoA",
@@ -60,6 +83,8 @@ const ROTULOS = [
 
 type Rotulo = (typeof ROTULOS)[number];
 type Leitura = { antes: string; depois: string };
+/** O trecho de relógio: quanto andou cada negócio, antes e depois da fala. */
+type Momento = "antes" | "depois";
 
 interface Mensagem {
   /** `messages.direction`. Default `outbound`: quem fala é o vendedor. */
@@ -81,16 +106,29 @@ interface Mensagem {
   organizacaoDeOutra?: boolean;
 }
 
-/**
- * Roda a bancada inteira numa transação revertida e devolve o relógio dos seis
- * negócios ANTES e DEPOIS da mensagem. Os ids vêm do Node para o script dispensar
- * `returning` — nada a extrair da saída do psql, uma fonte de erro a menos.
- *
- * `relogio` é a idade inicial dos negócios (expressão SQL): o caso do "nunca anda
- * para trás" precisa de um negócio com relógio MAIS NOVO que a mensagem.
- */
-function medir(m: Mensagem, relogio: string = DIAS_TRINTA): Map<Rotulo, Leitura> {
-  const b = {
+/** Os ids sorteados da bancada. Viajam para o Node, então nada vem de `returning`. */
+interface Ids {
+  org: string;
+  outraOrg: string;
+  pipeline: string;
+  outraPipeline: string;
+  etapa: string;
+  outraEtapa: string;
+  sessao: string;
+  contato: string;
+  outroContato: string;
+  contatoDeOutraOrg: string;
+  conversa: string;
+  abertoA: string;
+  abertoB: string;
+  ganho: string;
+  perdido: string;
+  deOutroContato: string;
+  deOutraOrg: string;
+}
+
+function sortear(): Ids {
+  return {
     org: randomUUID(),
     outraOrg: randomUUID(),
     pipeline: randomUUID(),
@@ -109,21 +147,14 @@ function medir(m: Mensagem, relogio: string = DIAS_TRINTA): Map<Rotulo, Leitura>
     deOutroContato: randomUUID(),
     deOutraOrg: randomUUID(),
   };
+}
 
-  // O mapa rótulo → id viaja para dentro do SQL: a leitura sai ordenada por
-  // rótulo, então `antes` e `depois` vêm na MESMA ordem sem o Node adivinhar.
-  const mapa = ROTULOS.map((r) => `('${r}', '${b[r]}'::uuid)`).join(",\n        ");
-  const leitura = (momento: string): string => `
-    select '${momento}', v.rotulo, coalesce(l.last_activity_at::text, 'NULO')
-      from (values
-        ${mapa}
-      ) as v(rotulo, id)
-      join public.crm_leads l on l.id = v.id
-     order by v.rotulo;`;
-
-  const saida = sql(`
-    begin;
-
+/**
+ * Os INSERTs da bancada. `relogioA` e `relogioB` são expressões SQL e podem ser
+ * IGUAIS (o caso (13), de propósito) ou diferentes (o default, e o caso (12)).
+ */
+function bancadaSQL(b: Ids, relogioA: string, relogioB: string): string {
+  return `
     insert into public.organizations (id, slug, legal_name, display_name)
       values ('${b.org}', 'inv-2953-a', 'Inv 2953 A', 'Inv 2953 A'),
              ('${b.outraOrg}', 'inv-2953-b', 'Inv 2953 B', 'Inv 2953 B');
@@ -145,47 +176,135 @@ function medir(m: Mensagem, relogio: string = DIAS_TRINTA): Map<Rotulo, Leitura>
       (id, organization_id, pipeline_id, stage_id, contact_id, title, status, lost_reason, closed_at, last_activity_at, position_in_stage)
       values
         ('${b.abertoA}', '${b.org}', '${b.pipeline}', '${b.etapa}', '${b.contato}',
-         'Aberto A', 'open', null, null, ${relogio}, 1000),
+         'Aberto A', 'open', null, null, ${relogioA}, 1000),
         ('${b.abertoB}', '${b.org}', '${b.pipeline}', '${b.etapa}', '${b.contato}',
-         'Aberto B', 'open', null, null, ${relogio}, 2000),
+         'Aberto B', 'open', null, null, ${relogioB}, 2000),
         ('${b.ganho}', '${b.org}', '${b.pipeline}', '${b.etapa}', '${b.contato}',
-         'Ganho', 'won', null, now(), ${relogio}, 3000),
+         'Ganho', 'won', null, now(), ${relogioA}, 3000),
         ('${b.perdido}', '${b.org}', '${b.pipeline}', '${b.etapa}', '${b.contato}',
-         'Perdido', 'lost', 'no_response', now(), ${relogio}, 4000),
+         'Perdido', 'lost', 'no_response', now(), ${relogioA}, 4000),
         ('${b.deOutroContato}', '${b.org}', '${b.pipeline}', '${b.etapa}', '${b.outroContato}',
-         'Aberto de outro contato', 'open', null, null, ${relogio}, 5000),
+         'Aberto de outro contato', 'open', null, null, ${relogioA}, 5000),
         ('${b.deOutraOrg}', '${b.outraOrg}', '${b.outraPipeline}', '${b.outraEtapa}', '${b.contatoDeOutraOrg}',
-         'Aberto na outra organização', 'open', null, null, ${relogio}, 6000);
+         'Aberto na outra organização', 'open', null, null, ${relogioA}, 6000);`;
+}
 
-    ${leitura("antes")}
-
+/** A fala do vendedor — a mensagem que dispara o gatilho (ou não, pelo `when`). */
+function mensagemSQL(b: Ids, m: Mensagem): string {
+  return `
     insert into public.messages
       (organization_id, conversation_id, channel_session_id, contact_id, type, direction, status, sent_via, created_at, metadata)
     values ('${m.organizacaoDeOutra ? b.outraOrg : b.org}', '${b.conversa}', '${b.sessao}', '${b.contato}',
             '${m.type ?? "text"}', '${m.direction ?? "outbound"}', 'sent', '${m.sentVia ?? "user"}',
-            ${m.createdAt ?? "now()"}, ${m.metadata ?? "'{}'"}::jsonb);
+            ${m.createdAt ?? "now()"}, ${m.metadata ?? "'{}'"}::jsonb);`;
+}
+
+interface BancadaMedida {
+  /** O relógio dos seis negócios, como texto, antes e depois da fala. */
+  relogios: Map<Rotulo, Leitura>;
+  /** Os negócios ABERTOS do contato, como o roteador os enxerga. */
+  candidatos: Record<Momento, LeadCandidate[]>;
+  ids: Ids;
+}
+
+/**
+ * Roda a bancada inteira numa transação revertida e devolve, das DUAS leituras:
+ *
+ *   - o relógio dos seis negócios (o que os casos de comportamento conferem);
+ *   - os negócios abertos DO CONTATO no formato `LeadCandidate`, para que os
+ *     casos (12) e (13) chamem a MESMA `resolveActiveLeadForContact` do produto.
+ *
+ * `relogioDeB` só existe para o caso (13) nascer empatado; nos demais `abertoB`
+ * fica um dia atrás de `abertoA`, que é o que dá ao contato um TOPO ÚNICO.
+ */
+function medirComRoteador(
+  m: Mensagem,
+  opts: { relogio?: string; relogioDeB?: string } = {},
+): BancadaMedida {
+  const b = sortear();
+  const relogioA = opts.relogio ?? DIAS_TRINTA;
+  const relogioB = opts.relogioDeB ?? umDiaMaisVelho(relogioA);
+
+  // O mapa rótulo → id viaja para dentro do SQL: a leitura sai ordenada por
+  // rótulo, então `antes` e `depois` vêm na MESMA ordem sem o Node adivinhar.
+  const mapa = ROTULOS.map((r) => `('${r}', '${b[r]}'::uuid)`).join(",\n        ");
+
+  // Os dois seletores saem de UMA chamada só, com prefixo dizendo o que cada
+  // linha é. O relógio vem como TEXTO (a igualdade de duas leituras é o que os
+  // casos de comportamento medem); o candidato vem como epoch de ms, e é o Node
+  // quem devolve o ISO — assim a MESMA `new Date()` do roteador lê os dois lados.
+  const leitura = (momento: string): string => `
+    select 'relogio|${momento}|' || v.rotulo || '|' || coalesce(l.last_activity_at::text, 'NULO')
+      from (values
+        ${mapa}
+      ) as v(rotulo, id)
+      join public.crm_leads l on l.id = v.id
+     order by v.rotulo;
+
+    select 'cand|${momento}|' || l.id || '|' || l.organization_id || '|' || l.pipeline_id || '|' || l.status
+           || '|' || coalesce(extract(epoch from l.last_activity_at)::text, 'NULO')
+           || '|' || extract(epoch from l.created_at)::text
+      from public.crm_leads l
+     where l.contact_id = '${b.contato}'
+       and l.status = 'open'
+     order by l.id;`;
+
+  const saida = sql(`
+    begin;
+
+    ${bancadaSQL(b, relogioA, relogioB)}
+
+    ${leitura("antes")}
+
+    ${mensagemSQL(b, m)}
 
     ${leitura("depois")}
 
     rollback;
   `);
 
-  const porRotulo = new Map<Rotulo, Leitura>();
+  const relogios = new Map<Rotulo, Leitura>();
+  const candidatos: Record<Momento, LeadCandidate[]> = { antes: [], depois: [] };
+
   for (const linha of saida.split("\n")) {
-    const [momento, rotulo, valor] = linha.split("|");
+    const campos = linha.split("|");
+    const tipo = campos[0];
+    const momento = campos[1];
     if (momento !== "antes" && momento !== "depois") continue;
-    const atual = porRotulo.get(rotulo as Rotulo) ?? { antes: "", depois: "" };
-    atual[momento] = valor ?? "";
-    porRotulo.set(rotulo as Rotulo, atual);
+
+    if (tipo === "relogio") {
+      const rotulo = campos[2] as Rotulo;
+      const atual = relogios.get(rotulo) ?? { antes: "", depois: "" };
+      atual[momento] = campos[3] ?? "";
+      relogios.set(rotulo, atual);
+      continue;
+    }
+
+    if (tipo === "cand") {
+      candidatos[momento].push({
+        id: campos[2]!,
+        organization_id: campos[3]!,
+        pipeline_id: campos[4]!,
+        status: campos[5] as LeadCandidate["status"],
+        last_activity_at: campos[6] === "NULO" ? null : new Date(Number(campos[6]) * 1000).toISOString(),
+        created_at: new Date(Number(campos[7]) * 1000).toISOString(),
+      });
+    }
   }
-  return porRotulo;
+
+  return { relogios, candidatos, ids: b };
+}
+
+/** A bancada dos casos de comportamento: só o relógio interessa. */
+function medir(m: Mensagem, relogio: string = DIAS_TRINTA): Map<Rotulo, Leitura> {
+  return medirComRoteador(m, { relogio }).relogios;
 }
 
 /**
  * A régua de TODOS os casos, e é por isso que ela é uma só: em nenhum cenário um
- * negócio fechado, o de outro contato ou o de outra organização pode andar —
- * inclusive nos cenários em que a fala humana CARIMBA os abertos. Um caso que só
- * olhasse o alvo deixaria passar um `update` sem filtro de status.
+ * negócio fechado, o de outro contato ou o de outra organização pode andar — nem
+ * o OUTRO aberto do contato, que o roteador não escolheria. Um caso que só
+ * olhasse o topo deixaria passar um `update` sem filtro.
  */
 function conferir(leitura: Map<Rotulo, Leitura>, moveram: readonly Rotulo[]): void {
   expect(
@@ -211,20 +330,24 @@ function conferir(leitura: Map<Rotulo, Leitura>, moveram: readonly Rotulo[]): vo
   }
 }
 
-/** Os negócios que a fala do vendedor sobre o contato tem de mover. */
-const A_ABERTA_DO_CONTATO = ["abertoA", "abertoB"] as const;
+/**
+ * O negócio que a fala do vendedor sobre o contato tem de mover: SÓ o topo da
+ * ordenação do roteador — `coalesce(last_activity_at, created_at)` decrescente.
+ * `abertoB` fica de fora de propósito: é o par que mede "só o topo anda".
+ */
+const O_TOPO_ABERTO_DO_CONTATO = ["abertoA"] as const;
 
 describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
-  it("(1) fala pelo Inbox do CRM (sent_via='user'): carimba os negócios ABERTOS do contato, e só eles", () => {
-    conferir(medir({ sentVia: "user", direction: "outbound" }), A_ABERTA_DO_CONTATO);
+  it("(1) fala pelo Inbox do CRM (sent_via='user'): carimba o TOPO aberto do contato, e só ele", () => {
+    conferir(medir({ sentVia: "user", direction: "outbound" }), O_TOPO_ABERTO_DO_CONTATO);
   });
 
-  it("(2) fala pelo aparelho conectado (sent_via='external_device'): carimba os abertos do contato", () => {
-    conferir(medir({ sentVia: "external_device", direction: "outbound" }), A_ABERTA_DO_CONTATO);
+  it("(2) fala pelo aparelho conectado (sent_via='external_device'): carimba o topo aberto do contato", () => {
+    conferir(medir({ sentVia: "external_device", direction: "outbound" }), O_TOPO_ABERTO_DO_CONTATO);
   });
 
-  it("(3) fala pelo vocabulário antigo de envio do CRM (sent_via='crm'): carimba os abertos do contato", () => {
-    conferir(medir({ sentVia: "crm", direction: "outbound" }), A_ABERTA_DO_CONTATO);
+  it("(3) fala pelo vocabulário antigo de envio do CRM (sent_via='crm'): carimba o topo aberto do contato", () => {
+    conferir(medir({ sentVia: "crm", direction: "outbound" }), O_TOPO_ABERTO_DO_CONTATO);
   });
 
   it("(4) mensagem da IA (sent_via='ai') não carimba: o relógio do negócio é de GENTE", () => {
@@ -271,7 +394,7 @@ describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
     // A mesma bancada com o envio de A continua carimbando: a sonda acima é
     // viva, o que ela mede não é "o gatilho não funciona neste arquivo".
     const mesma = medir({ sentVia: "user", direction: "outbound" });
-    conferir(mesma, A_ABERTA_DO_CONTATO);
+    conferir(mesma, O_TOPO_ABERTO_DO_CONTATO);
   });
 
   it("(11) a data NUNCA anda para trás: negócio com relógio mais NOVO que a mensagem fica intocado", () => {
@@ -290,7 +413,67 @@ describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
         { sentVia: "user", direction: "outbound", createdAt: "now() - interval '10 days'" },
         "now() - interval '30 days'",
       ),
-      A_ABERTA_DO_CONTATO,
+      O_TOPO_ABERTO_DO_CONTATO,
     );
+  });
+
+  it("(12) dois abertos de relógios DIFERENTES: a fala carimba SÓ o topo e o roteador continua no MESMO negócio", () => {
+    const medida = medirComRoteador({ sentVia: "user", direction: "outbound" });
+
+    // CONTROLE VIVO da bancada: os dois abertos PARTEM de relógios diferentes, e
+    // por isso o roteador JÁ tem um topo único antes de a fala acontecer. Sem
+    // este controle, uma bancada nascida empatada passaria sem medir ordem nenhuma.
+    expect(
+      resolveActiveLeadForContact(medida.candidatos.antes),
+      "a bancada nasceu empatada — sem topo único não há ordem a preservar",
+    ).toEqual({ routed: true, leadId: medida.ids.abertoA });
+
+    // O EFEITO QUE O MANTENEDOR MEDIU: sob a versão que carimbava todos os
+    // abertos, os dois ficavam com o MESMO instante e o roteador caía em
+    // `ambiguous_open_leads` — os treze pontos que usam o roteador deixavam de
+    // achar o negócio da pessoa depois de UMA fala.
+    expect(
+      resolveActiveLeadForContact(medida.candidatos.depois),
+      "a fala do vendedor derrubou o roteador para `ambiguous_open_leads` — a ordem entre os abertos não se preservou",
+    ).toEqual({ routed: true, leadId: medida.ids.abertoA });
+
+    // E a ORDEM se preserva negócio a negócio: só o topo andou; o outro aberto do
+    // contato — que o roteador não escolheria — fica exatamente onde estava.
+    expect(medida.relogios.get("abertoA")!.depois).not.toBe(medida.relogios.get("abertoA")!.antes);
+    expect(
+      medida.relogios.get("abertoB")!.depois,
+      "o TOPO era o `abertoA` e o `abertoB` andou junto — o gatilho voltou a carimbar todos os abertos",
+    ).toBe(medida.relogios.get("abertoB")!.antes);
+  });
+
+  it("(13) dois abertos EMPATADOS: a fala não carimba NADA e a ambiguidade segue exatamente como estava", () => {
+    const medida = medirComRoteador(
+      { sentVia: "user", direction: "outbound" },
+      { relogioDeB: DIAS_TRINTA }, // MESMO instante do `abertoA`: o contato nasce empatado
+    );
+
+    // CONTROLE: os dois abertos partem do MESMO instante, e o roteador já responde
+    // ambíguo — é o cenário do caso.
+    const ambiguidade = {
+      routed: false,
+      reason: "ambiguous_open_leads",
+      candidateIds: medida.candidatos.antes.map((c) => c.id),
+    };
+    expect(resolveActiveLeadForContact(medida.candidatos.antes)).toEqual(ambiguidade);
+
+    // NADA foi carimbado: os dois relógios ficam exatamente como estavam. Empate
+    // era ambíguo antes desta mudança e continua ambíguo — o gatilho não arbitra
+    // o que a regra §3.2 decidiu não arbitrar.
+    expect(
+      medida.relogios.get("abertoA")!.depois,
+      "o `abertoA` andou num contato com o topo EMPATADO — o gatilho arbitrou uma ambiguidade",
+    ).toBe(medida.relogios.get("abertoA")!.antes);
+    expect(
+      medida.relogios.get("abertoB")!.depois,
+      "o `abertoB` andou num contato com o topo EMPATADO — o gatilho arbitrou uma ambiguidade",
+    ).toBe(medida.relogios.get("abertoB")!.antes);
+
+    // ...e a ambiguidade segue EXATAMENTE como estava: mesmo desfecho, mesmos candidatos.
+    expect(resolveActiveLeadForContact(medida.candidatos.depois)).toEqual(ambiguidade);
   });
 });
