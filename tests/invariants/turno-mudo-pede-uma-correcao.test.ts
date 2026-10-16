@@ -326,6 +326,16 @@ describe("o turno de resposta que terminou sem mensagem ao cliente", () => {
     expect(await contarCasos(conversa), "truncamento sem envio não virou caso").toBe(1);
   });
 
+  it("saída truncada numa sessão SEM casos ligados não abre caso (régua casesEnabled)", async () => {
+    // Controle do gate: a sessão base não tem agente com `cases_enabled=true`
+    // (e a conversa é a 1:1 do contato nela, a CONV).
+    const { fake } = modelo([cortado("Claro, o seu pedido fica"), texto("(nada)")]);
+    await turno(fake);
+
+    expect(enviados).toEqual([]);
+    expect(await contarCasos(CONV), "caso abriu com casos desligados").toBe(0);
+  });
+
   it("a correção que TAMBÉM trunca é sinal de falha — abre caso", async () => {
     // Decisão (b): a 1ª chamada parou em silêncio normal, mas a correção
     // limitada bateu no mesmo teto (length) → a recuperação falhou → caso.

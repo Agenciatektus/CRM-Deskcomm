@@ -4829,6 +4829,8 @@ async function executarTurnoDoAgente(
     // humano. O retry continua limitado à UMA correção.
     const silencioSemRazaoLegitima =
       !preview &&
+      // Só turno que RESPONDE ao cliente: retomada (followup) cortada não é "cliente sem resposta".
+      eTurnoDeResposta(liveJob()) &&
       outcomes.length === 0 &&
       seq === 0 &&
       tentativasDeEnvio === 0 &&
