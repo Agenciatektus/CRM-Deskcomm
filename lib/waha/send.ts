@@ -111,6 +111,10 @@ export async function sendWAHA(input: SendWahaInput): Promise<unknown | null> {
 export async function marcarConversaComoLida(
   input: MarcarConversaComoLidaInput,
 ): Promise<boolean> {
+  // Grupo não leva visto: sem `messageIds`, o WAHA marcaria como lidas até 100
+  // mensagens de OUTRAS pessoas, e o recibo aparece para todos os participantes.
+  // "Respondi, então li" é sobre a conversa com o cliente, não sobre o grupo.
+  if (input.chatId.endsWith("@g.us")) return false;
   const client = getWahaClient();
   if (!client) return false;
   try {

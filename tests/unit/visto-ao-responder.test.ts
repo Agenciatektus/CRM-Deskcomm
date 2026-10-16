@@ -217,6 +217,15 @@ describe("o visto azul ao responder (#2981)", () => {
     expect(vistoTentado, "o visto nem chegou a sair").toBe(true);
   }, 2_000);
 
+  it("resposta em GRUPO sai, mas sem visto: marcaria como lidas as mensagens dos outros", async () => {
+    const pedidos = stubWaha();
+
+    await expect(envio("120363000000000000@g.us")).resolves.toEqual({ externalId: "ABC123" });
+
+    expect(doTexto(pedidos).at(-1)!.body?.chatId).toBe("120363000000000000@g.us");
+    expect(doVisto(pedidos)).toHaveLength(0);
+  });
+
   it("sem env do WAHA nada sai pela rede — nem o visto", async () => {
     vi.stubEnv("WAHA_API_BASE_URL", "");
     vi.stubEnv("WAHA_API_KEY", "");
