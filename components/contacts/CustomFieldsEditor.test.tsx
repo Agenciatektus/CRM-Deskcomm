@@ -15,7 +15,7 @@
  *   3. um filtro que "conserta" limpando o valor — `registro` teria de voltar
  *      sem a chave, e é justamente o contrário: esconder não é limpar.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CustomFieldsEditor, type CustomFieldDef } from "./CustomFieldsEditor";
@@ -97,5 +97,32 @@ describe("CustomFieldsEditor — campos com mostrar_quando", () => {
       />,
     );
     expect(screen.getByLabelText("Segmento")).toBeTruthy();
+  });
+});
+
+describe("CustomFieldsEditor — lista pesquisável recusa o que não está na lista (#2521)", () => {
+  const DESTINO: CustomFieldDef[] = [
+    {
+      key: "destino",
+      label: "Destino",
+      type: "searchable_select",
+      options: [{ value: "maceio-al", label: "Maceió (AL)", aliases: ["maceio", "mcz"] }],
+    },
+  ];
+
+  it("valor fora da lista, sem allow_new: não grava e explica por quê", () => {
+    const onChange = vi.fn();
+    render(<CustomFieldsEditor fields={DESTINO} value={{}} onChange={onChange} />);
+
+    const input = screen.getByLabelText(/Destino/);
+    fireEvent.change(input, { target: { value: "Recife" } });
+    fireEvent.blur(input);
+
+    expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ destino: "Recife" }));
+    expect(screen.getByText("Esse valor não está na lista. Escolha uma das opções.")).toBeTruthy();
+
+    // A próxima digitação limpa o aviso: ele fala do texto recusado, não do novo.
+    fireEvent.change(input, { target: { value: "mace" } });
+    expect(screen.queryByText("Esse valor não está na lista. Escolha uma das opções.")).toBeNull();
   });
 });

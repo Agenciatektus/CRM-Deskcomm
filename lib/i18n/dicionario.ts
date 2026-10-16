@@ -15856,6 +15856,9 @@ export const DICIONARIO: Traducoes = {
   "opções importadas.": { es: "opciones importadas." },
   "já existiam.": { es: "ya existían." },
   "Nenhuma opção nova para importar.": { es: "Ninguna opción nueva para importar." },
+  "Esse valor não está na lista. Escolha uma das opções.": {
+    es: "Ese valor no está en la lista. Elija una de las opciones.",
+  },
   // #2813 — o painel "Iniciar conversa" do Inbox.
   "Nova conversa": { es: "Nueva conversación" },
   "Diga para quem e o que dizer. O canal de saída é você quem escolhe quando há mais de um número.": {

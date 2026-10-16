@@ -79,6 +79,9 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
   // o TEXTO buscado; o valor gravado no lead é o `value` canônico, resolvido no
   // blur (issue #2521). Sem o rascunho, editar apagaria a opção a cada tecla.
   const [rascunhosDeBusca, setRascunhosDeBusca] = useState<Record<string, string>>({});
+  // Os campos cujo último blur RECUSOU o texto (fora da lista, sem `allow_new`).
+  // Sem o aviso, o input só voltava ao valor anterior e a pessoa não sabia por quê.
+  const [recusados, setRecusados] = useState<Record<string, true>>({});
   // O campo é do mesmo caminho do contato: o exemplo segue o país da
   // organização, e não o DDI brasileiro em duro.
   const telefoneExemplo = perfilDoPais(useActiveOrg()?.country).telefoneExemplo;
@@ -255,9 +258,10 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                   autoComplete="off"
                   placeholder={t("Digite para buscar…")}
                   value={rascunho ?? rotuloAtual}
-                  onChange={(e) =>
-                    setRascunhosDeBusca((current) => ({ ...current, [f.key]: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setRascunhosDeBusca((current) => ({ ...current, [f.key]: e.target.value }));
+                    setRecusados(({ [f.key]: _limpo, ...resto }) => resto);
+                  }}
                   onBlur={() => {
                     const draft = rascunhosDeBusca[f.key];
                     if (draft === undefined) return;
@@ -267,6 +271,7 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                     else if (f.allow_new === true) set(f.key, draft.trim());
                     // Sem casar e sem `allow_new`, o valor não é gravado: o
                     // input volta ao que estava, e o aviso abaixo explica.
+                    else setRecusados((current) => ({ ...current, [f.key]: true }));
                     setRascunhosDeBusca((current) => {
                       const next = { ...current };
                       delete next[f.key];
@@ -280,6 +285,11 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                     <option key={o.value} value={o.label} />
                   ))}
                 </datalist>
+                {recusados[f.key] && (
+                  <p className="text-xs text-destructive">
+                    {t("Esse valor não está na lista. Escolha uma das opções.")}
+                  </p>
+                )}
                 {f.allow_new === true && (
                   <p className="text-xs text-muted-foreground">
                     {t("Este campo aceita um valor novo, fora da lista.")}
