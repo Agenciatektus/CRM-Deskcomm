@@ -53710,6 +53710,24 @@ create trigger trg_messages_sincroniza_campanha
 --
 -- Uma única RPC aplica a página, remove linhas fora da janela e avança o cursor
 -- sob o mesmo fence. Isso evita centenas de viagens HTTP ao PostgREST por página.
+
+-- Cursors criados pela leitura expansiva podem apontar para um backlog enorme.
+-- Reconstrói uma vez com timeMin/timeMax; o cache existente permanece até o
+-- ciclo full concluir e a limpeza por geração preservar a ocupação nesse meio.
+-- Roda UMA vez: só enquanto a função de baixo ainda não existe. O update.sh
+-- reaplica este apêndice em toda atualização, e um update solto zeraria os
+-- cursores a cada uma, forçando a releitura completa e o aviso "Atualizando
+-- a cobertura" de novo.
+do $reset_0668$
+begin
+  if to_regprocedure('public.fn_google_calendar_page_batch(uuid,uuid,jsonb)') is null then
+    update public.calendar_connection_calendars set sync_token=null,sync_cursor=null,
+     sync_coverage=null,sync_next_attempt_at=now(),
+     sync_error='Atualizando a cobertura da agenda após alteração da sincronização.'
+     where sync_token is not null or sync_cursor is not null;
+  end if;
+end $reset_0668$;
+
 create or replace function public.fn_google_calendar_page_batch(p_org uuid,p_id uuid,p_args jsonb)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare
@@ -53775,13 +53793,14 @@ end;$$;
 revoke execute on function public.fn_google_calendar_page_batch(uuid,uuid,jsonb) from public,anon,authenticated;
 grant execute on function public.fn_google_calendar_page_batch(uuid,uuid,jsonb) to service_role;
 
--- Cursors criados pela leitura expansiva podem apontar para um backlog enorme.
--- Reconstrói uma vez com timeMin/timeMax; o cache existente permanece até o
--- ciclo full concluir e a limpeza por geração preservar a ocupação nesse meio.
-update public.calendar_connection_calendars set sync_token=null,sync_cursor=null,
- sync_coverage=null,sync_next_attempt_at=now(),
- sync_error='Atualizando a cobertura da agenda após alteração da sincronização.'
- where sync_token is not null or sync_cursor is not null;
+-- Recuo da leitura da lista de agendas. Só `fn_google_catalog` grava
+-- `catalog_checked_at`, e só quando dá certo: uma falha (429, 5xx, 403 do
+-- Google) deixava o catálogo vencido e a rota o tentava de novo a cada tick.
+-- Com o cron de 1 min, seriam 60 tentativas e 60 audits por hora, em vez de 4.
+-- A rota grava aqui "não tente antes de" quando a leitura do catálogo falha.
+alter table public.calendar_connections add column if not exists catalog_retry_at timestamptz;
+comment on column public.calendar_connections.catalog_retry_at is
+  'Não tentar ler a lista de agendas do Google antes deste instante. Gravado pela rota agenda-google-sync quando a leitura do catálogo falha; NULL ou passado = pode tentar.';
 
 notify pgrst,'reload schema';
 

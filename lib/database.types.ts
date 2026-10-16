@@ -3669,6 +3669,7 @@ export type Database = {
         Row: {
           calendar_selection_revision: number
           account_email: string
+          catalog_retry_at: string | null
           created_at: string
           id: string
           last_sync_at: string | null
@@ -3687,6 +3688,7 @@ export type Database = {
         Insert: {
           calendar_selection_revision?: number
           account_email: string
+          catalog_retry_at?: string | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
@@ -3705,6 +3707,7 @@ export type Database = {
         Update: {
           calendar_selection_revision?: number
           account_email?: string
+          catalog_retry_at?: string | null
           created_at?: string
           id?: string
           last_sync_at?: string | null
