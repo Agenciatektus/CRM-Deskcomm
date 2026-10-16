@@ -55,7 +55,9 @@ describe("montarBlocoDeOrigem — o anúncio que o contato clicou, para o agente
 
   it("texto enorme é cortado (o bloco é pago em todo turno)", () => {
     const bloco = montarBlocoDeOrigem({ ...anuncio, body: "x".repeat(5000) }, AGORA);
-    expect(bloco.length).toBeLessThan(1500);
+    // Mede o corte, não o tamanho do rótulo: o teto total de 1.500 reprovava qualquer
+    // ajuste de redação (o rótulo cresceu ~40 caracteres na triagem do #2984).
+    expect(bloco).not.toContain("x".repeat(700));
   });
 
   it("Google Ads também é anúncio", () => {
