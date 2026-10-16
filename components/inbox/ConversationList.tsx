@@ -43,6 +43,12 @@ interface Props {
   selecionados?: Set<string>;
   onAlternarSelecao?: (id: string) => void;
   onSelecionarTodosVisiveis?: () => void;
+  /**
+   * Quem a rota `usable-for-rag` aceita (atendente para cima, ou admin de
+   * plataforma fora do suporte). Sem isto a linha mostra o selo e não o
+   * controle: o leitor veria um botão que só devolve 403.
+   */
+  podeMarcarExemplo?: boolean;
 }
 
 export function ConversationList({
@@ -55,6 +61,7 @@ export function ConversationList({
   selecionados,
   onAlternarSelecao,
   onSelecionarTodosVisiveis,
+  podeMarcarExemplo = false,
 }: Props) {
   const t = useT();
   // Só mostra POR ONDE a conversa entrou quando há mais de um número. Com um
@@ -254,7 +261,7 @@ export function ConversationList({
             automaticoDaOrg={automaticoDaOrg.data}
             selecionado={selecionados?.has(c.id)}
             onAlternarSelecao={onAlternarSelecao}
-            onAlternarExemplo={alternarExemplo}
+            onAlternarExemplo={podeMarcarExemplo ? alternarExemplo : undefined}
           />
         ))}
         {q.hasNextPage && (

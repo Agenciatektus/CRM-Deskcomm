@@ -85,7 +85,7 @@ function montarLinha(conversation: ConversationWithContact) {
  * a mutação de verdade. É o caminho que produção percorre — é ele que precisa
  * chegar na rota.
  */
-function montarLista(conversation: ConversationWithContact) {
+function montarLista(conversation: ConversationWithContact, podeMarcarExemplo = true) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -106,6 +106,7 @@ function montarLista(conversation: ConversationWithContact) {
         filters={{} as ConversationsFilters}
         selectedId={null}
         onSelect={() => undefined}
+        podeMarcarExemplo={podeMarcarExemplo}
       />
     </QueryClientProvider>,
   );
@@ -181,5 +182,13 @@ describe("a linha sem a ação continua sendo a linha de antes (#3006)", () => {
     );
     expect(screen.queryByTestId(`exemplo-ia-${conversaDeExemplo.conversation.id}`)).toBeNull();
     expect(screen.queryByRole("button", { name: ROTULO_DESMARCAR })).toBeNull();
+  });
+});
+
+describe("quem só lê vê o selo e não o controle (#3006)", () => {
+  it("sem `podeMarcarExemplo` a lista não monta o botão, e o selo continua", () => {
+    montarLista(comExemplo(true), false);
+    expect(screen.queryByTestId(`exemplo-ia-${conversaDeExemplo.conversation.id}`)).toBeNull();
+    expect(screen.getByTestId("selo-exemplo-ia")).toHaveTextContent("Exemplo para a IA");
   });
 });

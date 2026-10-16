@@ -9154,5 +9154,10 @@
   "Criar conversa": "Create conversation",
   "Nenhum contato encontrado": "No contact found",
   "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent.",
-  "Formato não suportado: use ?formato=csv.": "Unsupported format: use ?formato=csv."
+  "Formato não suportado: use ?formato=csv.": "Unsupported format: use ?formato=csv.",
+  "Usar como exemplo para a IA": "Use as an example for the AI",
+  "Deixar de usar como exemplo": "Stop using as an example",
+  "Exemplo para a IA": "AI example",
+  "Conversa marcada como exemplo para a IA.": "Conversation marked as an example for the AI.",
+  "A conversa deixou de ser exemplo para a IA.": "This conversation is no longer an example for the AI."
 }
