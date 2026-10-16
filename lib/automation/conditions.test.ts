@@ -78,4 +78,89 @@ describe("evaluateConditions", () => {
     expect(evaluateConditions([{ field: "lead.ghost", op: "eq", value: "x" }], ctx)).toBe(false));
   it("campo ausente com neq → true (ausente ≠ valor)", () =>
     expect(evaluateConditions([{ field: "lead.ghost", op: "neq", value: "x" }], ctx)).toBe(true));
+
+  /**
+   * #2973: a comparação sem caixa já existia; sem ACENTO e sem PONTUAÇÃO não.
+   * O lead escreve a mesma frase com um acento a mais ou a menos e a regra não
+   * dispara — sem erro e sem aviso —, e o operador passa a ler a automação como
+   * aleatória. Os casos abaixo prendem a forma NOVA nos dois lados (o valor da
+   * condição e o texto recebido); os controles fecham a porta para "afrouxou
+   * demais" — inclusive o `eq`, que continua comparação EXATA.
+   */
+  const comTexto = (texto: string) => ({ event: { body_preview: texto } });
+
+  it("contém em texto: casa com e sem acento, nos DOIS sentidos", () => {
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "anúncio" }],
+        comTexto("vi o anuncio de voces"),
+      ),
+    ).toBe(true);
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "anuncio" }],
+        comTexto("vi o anúncio de vocês"),
+      ),
+    ).toBe(true);
+  });
+
+  it("contém em texto: Olá casa Ola e olá!", () => {
+    for (const escrito of ["Ola", "olá!", "OLÁ", "olá,"]) {
+      expect(
+        evaluateConditions(
+          [{ field: "event.body_preview", op: "contains", value: "Olá" }],
+          comTexto(`Oi, tudo bem? ${escrito}`),
+        ),
+        `"Olá" tinha de casar "${escrito}"`,
+      ).toBe(true);
+    }
+  });
+
+  it("contém em texto: o que é OUTRA coisa continua não casando", () => {
+    // Sem estes dois, "ignora acento e pontuação" ficaria indistinguível de
+    // "casa tudo", e o verde não provaria nada.
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "anúncio" }],
+        comTexto("quero uma proposta comercial"),
+      ),
+    ).toBe(false);
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "olá" }],
+        comTexto("bom dia, tudo certo?"),
+      ),
+    ).toBe(false);
+  });
+
+  it("eq continua EXATO: acento e caixa ainda decidem (só o contains dobra a grafia)", () => {
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "eq", value: "anúncio" }],
+        comTexto("anuncio"),
+      ),
+    ).toBe(false);
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "eq", value: "anuncio" }],
+        comTexto("Anuncio"),
+      ),
+    ).toBe(false);
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "eq", value: "anuncio" }],
+        comTexto("anuncio"),
+      ),
+    ).toBe(true);
+  });
+
+  it("contém em lista: a mesma grafia dobra, a pertinência (tag inteira) NÃO", () => {
+    expect(
+      evaluateConditions([{ field: "event.added_tags", op: "contains", value: "tráfego" }], comTags(["trafego"])),
+    ).toBe(true);
+    // #956 continua de pé: tag inteira, nunca o pedaço — nem depois de dobrar a grafia.
+    expect(
+      evaluateConditions([{ field: "event.added_tags", op: "contains", value: "trafego" }], comTags(["trafego pago"])),
+    ).toBe(false);
+  });
 });
