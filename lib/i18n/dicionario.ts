@@ -16075,6 +16075,14 @@ export const DICIONARIO: Traducoes = {
   "atualizado": { es: "actualizado" },
   "recusado": { es: "rechazado" },
   "Recusado.": { es: "Rechazado." },
+  // #3006 — "usar como exemplo para a IA": a conversa marcada vira material do
+  // agente (opt-in de LGPD). O selo fica curto de propósito: ele divide a faixa
+  // com as etiquetas do contato, e o verbo inteiro mora no `title` do controle.
+  "Usar como exemplo para a IA": { es: "Usar como ejemplo para la IA" },
+  "Deixar de usar como exemplo": { es: "Dejar de usar como ejemplo" },
+  "Exemplo para a IA": { es: "Ejemplo para la IA" },
+  "Conversa marcada como exemplo para a IA.": { es: "Conversación marcada como ejemplo para la IA." },
+  "A conversa deixou de ser exemplo para a IA.": { es: "La conversación dejó de ser ejemplo para la IA." },
 };
 
 /**
