@@ -14,7 +14,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { preferenciaPadraoDeLembrete } from "@/lib/tarefas/preferencia-de-lembrete";
-import { chaveDoAviso, lembretesDaRodada, type TarefaLida } from "./route";
+import { phoneLookupVariants } from "@/lib/channels/phone-variants";
+import { chaveDoAviso, janelaDaVarredura, lembretesDaRodada, type TarefaLida } from "./route";
 
 const AGORA = new Date("2026-10-13T12:00:00.000Z");
 const MIN = 60_000;
@@ -241,6 +242,14 @@ describe("a porta do WhatsApp é decidida ANTES de qualquer consulta", () => {
     expect(fonte).toContain("phoneLookupVariants(telefone)");
   });
 
+  it("o número só de dígitos, como a tela grava, vira uma variante que o CHECK do contato aceita", () => {
+    // `contacts_phone_e164_format` é `^\+\d{8,15}$`: sem uma variante nessa forma
+    // a busca nunca casa, qualquer que seja o texto da consulta.
+    const e164 = /^\+\d{8,15}$/;
+    expect(e164.test("5511999990000")).toBe(false);
+    expect(phoneLookupVariants("5511999990000").some((v) => e164.test(v))).toBe(true);
+  });
+
   it("o contato é buscado DENTRO da organização da tarefa", () => {
     const busca = fonte.slice(fonte.indexOf('.from("contacts")'));
     expect(busca.slice(0, 400)).toContain('.eq("organization_id", tarefa.organization_id)');
@@ -288,6 +297,18 @@ describe("a varredura que alimenta a régua", () => {
     // teto inteiro: a tarefa que vence daqui a 30 minutos nunca é examinada.
     expect(fonte).toMatch(/\.gte\("due_date", piso\)/);
     expect(fonte).toMatch(/\.lte\("due_date", corte\)/);
+  });
+
+  it("a janela vai de 1 dia atrás até a maior antecedência: o sentido do piso e do corte", () => {
+    const { piso, corte } = janelaDaVarredura(AGORA);
+    const p = Date.parse(piso);
+    const c = Date.parse(corte);
+    expect(p).toBeLessThan(AGORA.getTime());
+    expect(c).toBeGreaterThan(AGORA.getTime());
+    const dentro = (ms: number) => ms >= p && ms <= c;
+    expect(dentro(AGORA.getTime() + 30 * MIN)).toBe(true); // vence daqui a 30 min
+    expect(dentro(AGORA.getTime() - 10 * MIN)).toBe(true); // venceu há 10 min
+    expect(dentro(AGORA.getTime() - 2 * 1440 * MIN)).toBe(false); // vencida há 2 dias
   });
 
   it("lê o vínculo ATIVO de cada responsável", () => {

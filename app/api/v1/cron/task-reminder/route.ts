@@ -14,10 +14,11 @@
  * a de `source_kind = promised_proposal`, e pelo critério dele: promessa de
  * proposta sem proposta criada. Aqui não se repete nenhuma daquela checagem
  * (nem `due_date < agora`, nem `status != done` num sentido novo): o recorte é
- * o da PRÓPRIA tarefa, para toda tarefa com prazo e responsável, e o que se
- * produz é um aviso PARA O RESPONSÁVEL, não um item de revisão para a
- * organização. Os dois convivem: uma tarefa de proposta prometida pode receber
- * os dois avisos, e ambos são certos.
+ * o da PRÓPRIA tarefa, para toda tarefa com prazo e responsável. O push vai
+ * ao aparelho do RESPONSÁVEL; o item da Central é da ORGANIZAÇÃO
+ * (`agent_inbox_items` não tem coluna de pessoa), então toda a equipe vê a
+ * tarefa perto do vencimento. Os dois convivem: uma tarefa de proposta
+ * prometida pode receber os dois avisos, e ambos são certos.
  *
  * ═══ AS DUAS CATEGORIAS, E A ORDEM DELAS ═══
  *
@@ -105,8 +106,21 @@ const LIMITE_DA_VARREDURA = 200;
  * MOMENTO em que o prazo passa; com o cron a cada 5 minutos, um dia de folga
  * cobre agendador parado sem trazer de volta o que venceu há semanas.
  */
-// ponytail: piso fixo de 1 dia; se o agendador puder ficar parado mais que isso, vira knob
+// ponytail: piso fixo de 1 dia. Limite que resta: as 200 vagas ainda são
+// divididas por TODA tarefa aberta na janela de ±24 h (as já avisadas, as de org
+// suspensa, as de membro revogado e as vencidas de quem deixou task_overdue
+// desligado). Com 200 delas vencidas nas últimas 24 h, a de daqui a 30 min volta a
+// não ser examinada. Próximo passo: separar a consulta da janela futura da
+// consulta da vencida, cada uma com o seu teto.
 const FOLGA_DA_VENCIDA_MIN = 1440;
+
+/** O recorte de prazo da consulta — puro, para o teste prender o sentido. */
+export function janelaDaVarredura(agora: Date): { piso: string; corte: string } {
+  return {
+    piso: new Date(agora.getTime() - FOLGA_DA_VENCIDA_MIN * 60_000).toISOString(),
+    corte: new Date(agora.getTime() + MAIOR_JANELA_MIN * 60_000).toISOString(),
+  };
+}
 
 export interface TarefaLida {
   id: string;
@@ -175,8 +189,7 @@ interface Rodada {
 
 async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: string): Promise<Rodada> {
   const agora = new Date();
-  const corte = new Date(agora.getTime() + MAIOR_JANELA_MIN * 60_000).toISOString();
-  const piso = new Date(agora.getTime() - FOLGA_DA_VENCIDA_MIN * 60_000).toISOString();
+  const { piso, corte } = janelaDaVarredura(agora);
 
   // ORGANIZAÇÃO SUSPENSA NÃO LÊ NADA. A suspensão não tem exceção no
   // CLAUDE.md, e um lembrete de tarefa não é o porto que burla ela: o filtro é
