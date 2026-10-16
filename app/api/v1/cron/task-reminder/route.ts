@@ -42,8 +42,9 @@
  * Sem migration nova para estado: o item aberto com o mesmo `kind` e o mesmo
  * `ref_id` é o registro de que este prazo já pediu gente. É o mesmo desenho do
  * `proposal-promised-not-created`, e ele tem duas vantagens sobre uma coluna
- * nova: quem resolve o aviso na Central rearma a leitura sem mexer em nada, e
- * o histórico de "quando este prazo gritou" fica onde a pessoa já olha.
+ * nova: a leitura não depende de o aviso estar aberto (resolver o item na
+ * Central não faz a rodada seguinte gritar de novo), e o histórico de "quando
+ * este prazo gritou" fica onde a pessoa já olha.
  *
  * ═══ WHATSAPP É CANAL OPCIONAL, E A GUARDA VEM ANTES DA CONSULTA ═══
  *
@@ -93,6 +94,19 @@ const MAIOR_JANELA_MIN = Math.max(...ANTCEDENCIAS_DE_TAREFA_MIN);
 /** Teto de tarefas examinadas por rodada. */
 const LIMITE_DA_VARREDURA = 200;
 
+/**
+ * Até quando uma vencida ainda é candidata a `task_overdue`.
+ *
+ * Sem piso, a consulta ordenada por prazo devolve primeiro as vencidas mais
+ * antigas — e tarefa esquecida em aberto não sai da lista nunca. 200 delas
+ * (somadas de todas as organizações) tomavam o teto inteiro, e a tarefa que
+ * vence daqui a 30 minutos deixava de ser examinada. O aviso de vencida é do
+ * MOMENTO em que o prazo passa; com o cron a cada 5 minutos, um dia de folga
+ * cobre agendador parado sem trazer de volta o que venceu há semanas.
+ */
+// ponytail: piso fixo de 1 dia; se o agendador puder ficar parado mais que isso, vira knob
+const FOLGA_DA_VENCIDA_MIN = 1440;
+
 export interface TarefaLida {
   id: string;
   organization_id: string;
@@ -128,6 +142,8 @@ export function lembretesDaRodada(
     preferencias: ReadonlyMap<string, PreferenciaDeLembrete>;
     /** Pares `${categoria}:${tarefaId}` que já viraram item da Central. */
     jaAvisados: ReadonlySet<string>;
+    /** Pares `${organization_id}:${user_id}` com vínculo ATIVO (`revoked_at` nulo). */
+    membrosAtivos: ReadonlySet<string>;
   },
   agora: Date,
 ): LembreteDecidido[] {
@@ -137,6 +153,10 @@ export function lembretesDaRodada(
     // dono, que é ruído que ensina a ignorar a Central (a mesma razão de
     // `criarTarefaInterna` recusar tarefa sem dono).
     if (!tarefa.assigned_to) continue;
+    // Revogar um membro não limpa `assigned_to`: só quem ainda é da equipe DA
+    // ORGANIZAÇÃO DA TAREFA recebe — a régua do `send_email` (#2794) e do
+    // `assign-owner`.
+    if (!input.membrosAtivos.has(`${tarefa.organization_id}:${tarefa.assigned_to}`)) continue;
     const preferencia = input.preferencias.get(tarefa.assigned_to) ?? lerPreferenciaDeLembrete(undefined);
     const categoria = decidirLembreteDeTarefa(tarefa, agora, preferencia);
     if (!categoria) continue;
@@ -155,6 +175,7 @@ interface Rodada {
 async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: string): Promise<Rodada> {
   const agora = new Date();
   const corte = new Date(agora.getTime() + MAIOR_JANELA_MIN * 60_000).toISOString();
+  const piso = new Date(agora.getTime() - FOLGA_DA_VENCIDA_MIN * 60_000).toISOString();
 
   // ORGANIZAÇÃO SUSPENSA NÃO LÊ NADA. A suspensão não tem exceção no
   // CLAUDE.md, e um lembrete de tarefa não é o porto que burla ela: o filtro é
@@ -168,6 +189,7 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
     .in("status", ["pending", "in_progress"])
     .not("assigned_to", "is", null)
     .not("due_date", "is", null)
+    .gte("due_date", piso)
     .lte("due_date", corte)
     .order("due_date", { ascending: true })
     .limit(LIMITE_DA_VARREDURA);
@@ -210,6 +232,20 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
     preferencias.set(responsavel, lerPreferenciaDeLembrete(metadata));
   }
 
+  // ─── Quem ainda é da equipe ───────────────────────────────────────────────
+  //
+  // Consulta que não voltou não é "ninguém saiu": a rodada falha inteira e não
+  // avisa ninguém, em vez de avisar quem pode já não ser da empresa.
+  const { data: vinculos, error: erroVinculos } = await admin
+    .from("user_organizations")
+    .select("organization_id, user_id")
+    .in("user_id", responsaveis)
+    .is("revoked_at", null);
+  if (erroVinculos) throw new Error(`query_vinculos_failed: ${erroVinculos.message}`);
+  const membrosAtivos = new Set(
+    (vinculos ?? []).map((v) => `${v.organization_id as string}:${v.user_id as string}`),
+  );
+
   // ─── A trava de "já avisado", lida do próprio item da Central ─────────────
   const { data: avisos, error: erroAvisos } = await admin
     .from("agent_inbox_items")
@@ -221,7 +257,7 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
     (avisos ?? []).map((a) => chaveDoAviso(a.kind as TipoDeAvisoDeTarefa, a.ref_id as string)),
   );
 
-  const decididos = lembretesDaRodada({ tarefas: linhas, preferencias, jaAvisados }, agora);
+  const decididos = lembretesDaRodada({ tarefas: linhas, preferencias, jaAvisados, membrosAtivos }, agora);
   let avisadas = 0;
 
   for (const { tarefa, categoria } of decididos) {

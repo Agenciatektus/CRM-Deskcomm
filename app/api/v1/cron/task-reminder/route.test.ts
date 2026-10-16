@@ -37,11 +37,13 @@ function tarefa(override: Partial<TarefaLida> = {}): TarefaLida {
 
 const SEM_PREF = new Map();
 const NADA_VISTO = new Set<string>();
+/** Quem ainda é da equipe, no par `${organization_id}:${user_id}` que a rota monta. */
+const EQUIPE = new Set(["org-1:pessoa-1"]);
 
 describe("lembretesDaRodada — a janela de aviso", () => {
   it("tarefa que vence em 2h, com a janela padrão de 1h: a rodada não avisa", () => {
     const r = lembretesDaRodada(
-      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 120 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      { membrosAtivos: EQUIPE, tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 120 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
       AGORA,
     );
     expect(r).toEqual([]);
@@ -49,7 +51,7 @@ describe("lembretesDaRodada — a janela de aviso", () => {
 
   it("tarefa que vence em 30min: a rodada avisa, como task_due", () => {
     const r = lembretesDaRodada(
-      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      { membrosAtivos: EQUIPE, tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
       AGORA,
     );
     expect(r).toHaveLength(1);
@@ -59,10 +61,10 @@ describe("lembretesDaRodada — a janela de aviso", () => {
   it("a janela que a PESSOA escolheu é a que vale", () => {
     const t = tarefa({ due_date: new Date(AGORA.getTime() + 30 * MIN).toISOString() });
     const preferencias = new Map([["pessoa-1", pref({ antecedencia_min: 15 })]]);
-    expect(lembretesDaRodada({ tarefas: [t], preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
+    expect(lembretesDaRodada({ membrosAtivos: EQUIPE, tarefas: [t], preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
 
     const comDia = new Map([["pessoa-1", pref({ antecedencia_min: 1440 })]]);
-    expect(lembretesDaRodada({ tarefas: [t], preferencias: comDia, jaAvisados: NADA_VISTO }, AGORA)[0]?.categoria).toBe(
+    expect(lembretesDaRodada({ membrosAtivos: EQUIPE, tarefas: [t], preferencias: comDia, jaAvisados: NADA_VISTO }, AGORA)[0]?.categoria).toBe(
       "task_due",
     );
   });
@@ -71,7 +73,7 @@ describe("lembretesDaRodada — a janela de aviso", () => {
 describe("lembretesDaRodada — a vencida sem conclusão", () => {
   it("tarefa vencida e pendente, com task_overdue ligado: dispara", () => {
     const r = lembretesDaRodada(
-      {
+      { membrosAtivos: EQUIPE,
         tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })],
         preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
         jaAvisados: NADA_VISTO,
@@ -84,7 +86,7 @@ describe("lembretesDaRodada — a vencida sem conclusão", () => {
 
   it("tarefa vencida MAS concluída não gera aviso nenhum", () => {
     const r = lembretesDaRodada(
-      {
+      { membrosAtivos: EQUIPE,
         tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString(), status: "done" })],
         preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
         jaAvisados: NADA_VISTO,
@@ -99,7 +101,7 @@ describe("lembretesDaRodada — a vencida sem conclusão", () => {
     // (`task_due` ligado por padrão), e não a cada rodada depois que ele venceu
     // (`task_overdue` desligado por padrão): repetição é opt-in.
     const r = lembretesDaRodada(
-      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      { membrosAtivos: EQUIPE, tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
       AGORA,
     );
     expect(r).toEqual([]);
@@ -109,7 +111,7 @@ describe("lembretesDaRodada — a vencida sem conclusão", () => {
 describe("lembretesDaRodada — a preferência desligada não manda nada", () => {
   it("task_due desligado: a tarefa dentro da janela fica sem aviso", () => {
     const r = lembretesDaRodada(
-      {
+      { membrosAtivos: EQUIPE,
         tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() })],
         preferencias: new Map([["pessoa-1", pref({ task_due: false })]]),
         jaAvisados: NADA_VISTO,
@@ -121,7 +123,7 @@ describe("lembretesDaRodada — a preferência desligada não manda nada", () =>
 
   it("task_overdue desligado: a tarefa vencida fica sem aviso", () => {
     const r = lembretesDaRodada(
-      {
+      { membrosAtivos: EQUIPE,
         tarefas: [tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() })],
         preferencias: new Map([["pessoa-1", pref({ task_overdue: false })]]),
         jaAvisados: NADA_VISTO,
@@ -137,14 +139,14 @@ describe("lembretesDaRodada — a preferência desligada não manda nada", () =>
       tarefa({ id: "t1", due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() }),
       tarefa({ id: "t2", due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() }),
     ];
-    expect(lembretesDaRodada({ tarefas, preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
+    expect(lembretesDaRodada({ membrosAtivos: EQUIPE, tarefas, preferencias, jaAvisados: NADA_VISTO }, AGORA)).toEqual([]);
   });
 });
 
 describe("lembretesDaRodada — o que nunca vira aviso", () => {
   it("tarefa sem responsável não avisa: não há a quem mandar", () => {
     const r = lembretesDaRodada(
-      { tarefas: [tarefa({ assigned_to: null })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      { membrosAtivos: EQUIPE, tarefas: [tarefa({ assigned_to: null })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
       AGORA,
     );
     expect(r).toEqual([]);
@@ -153,7 +155,7 @@ describe("lembretesDaRodada — o que nunca vira aviso", () => {
   it("o par já avisado não repete — é a trava que o item da Central grava", () => {
     const t = tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() });
     const jaAvisados = new Set([chaveDoAviso("task_due", t.id)]);
-    expect(lembretesDaRodada({ tarefas: [t], preferencias: SEM_PREF, jaAvisados }, AGORA)).toEqual([]);
+    expect(lembretesDaRodada({ membrosAtivos: EQUIPE, tarefas: [t], preferencias: SEM_PREF, jaAvisados }, AGORA)).toEqual([]);
   });
 
   it("a trava é POR CATEGORIA: task_due já avisado não impede o task_overdue", () => {
@@ -161,7 +163,7 @@ describe("lembretesDaRodada — o que nunca vira aviso", () => {
     // virou item da Central — a pessoa ainda precisa saber que o prazo passou.
     const t = tarefa({ due_date: new Date(AGORA.getTime() - 5 * MIN).toISOString() });
     const r = lembretesDaRodada(
-      {
+      { membrosAtivos: EQUIPE,
         tarefas: [t],
         preferencias: new Map([["pessoa-1", pref({ task_overdue: true })]]),
         jaAvisados: new Set([chaveDoAviso("task_due", t.id)]),
@@ -177,7 +179,7 @@ describe("lembretesDaRodada — o que nunca vira aviso", () => {
     // prazo. Um `get` vazio não pode virar "ninguém é avisado" — seria o
     // silêncio que esta feature veio consertar, uma camada acima.
     const r = lembretesDaRodada(
-      { tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      { membrosAtivos: EQUIPE, tarefas: [tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() })], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
       AGORA,
     );
     expect(r).toHaveLength(1);
@@ -242,5 +244,47 @@ describe("a porta do WhatsApp é decidida ANTES de qualquer consulta", () => {
 
   it("o pulo do WhatsApp é registrado, nunca silencioso", () => {
     expect(fonte).toContain("pular(`whatsapp_${decisao.motivo}`)");
+  });
+});
+
+describe("lembretesDaRodada — só quem ainda é da equipe recebe", () => {
+  // Revogar um membro não limpa `crm_tasks.assigned_to`: o responsável gravado
+  // pode ser quem já saiu. A régua é a do `send_email` (#2794) e do
+  // `assign-owner`: vínculo em `user_organizations` com `revoked_at` nulo, NA
+  // organização da tarefa.
+  const vencendo = () => tarefa({ due_date: new Date(AGORA.getTime() + 5 * MIN).toISOString() });
+
+  it("responsável que saiu da organização não vira aviso", () => {
+    const r = lembretesDaRodada(
+      { membrosAtivos: new Set<string>(), tarefas: [vencendo()], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("vínculo ativo em OUTRA organização não conta", () => {
+    const r = lembretesDaRodada(
+      { membrosAtivos: new Set(["org-2:pessoa-1"]), tarefas: [vencendo()], preferencias: SEM_PREF, jaAvisados: NADA_VISTO },
+      AGORA,
+    );
+    expect(r).toEqual([]);
+  });
+});
+
+describe("a varredura que alimenta a régua", () => {
+  const fonte = readFileSync(join(__dirname, "route.ts"), "utf8");
+
+  it("tem PISO no prazo: vencida antiga não ocupa o teto da rodada", () => {
+    // Sem piso, a consulta ordenada por prazo devolve primeiro as vencidas mais
+    // antigas, e 200 delas em aberto (somadas de todas as organizações) tomam o
+    // teto inteiro: a tarefa que vence daqui a 30 minutos nunca é examinada.
+    expect(fonte).toMatch(/\.gte\("due_date", piso\)/);
+    expect(fonte).toMatch(/\.lte\("due_date", corte\)/);
+  });
+
+  it("lê o vínculo ATIVO de cada responsável", () => {
+    const busca = fonte.slice(fonte.indexOf('.from("user_organizations")'));
+    expect(fonte).toContain('.from("user_organizations")');
+    expect(busca.slice(0, 300)).toContain('.is("revoked_at", null)');
   });
 });
