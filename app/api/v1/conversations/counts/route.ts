@@ -54,6 +54,12 @@ export function filtrosAuxiliaresDaContagem(
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
+  // O atendente escolhido pelo gerente. Só id de usuário (uuid) entra: qualquer
+  // outra coisa seria ignorada em silêncio e a contagem divergiria da lista.
+  const atendente = sp.get("assigned_to");
+  if (atendente && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(atendente)) {
+    filtros.push(["assigned_to_user_id", atendente]);
+  }
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
   // IGUALDADE numa coluna, é um `or=` sobre DUAS caixas — `conversations.tags`
   // e o campo calculado do contato. `conversations` não tem coluna `tag` (`tag`
