@@ -54,10 +54,18 @@ export const COLUNAS_DO_CSV = [
   "conversations_count",
 ] as const;
 
-/** RFC 4180 — a MESMA regra de escape do export de auditoria. */
+/**
+ * RFC 4180, mais a neutralização de célula que começa com caractere de fórmula.
+ *
+ * `display_name` e `legal_name` são gravados pelo próprio tenant, e uma célula
+ * que começa com `=`, `+`, `-`, `@`, TAB ou CR é lida como FÓRMULA pelo Excel e
+ * pelo LibreOffice. A aspa simples na frente faz a planilha mostrar o texto
+ * como texto. Só vale para `string`: número (a contagem) não passa por aqui.
+ */
 function csvEscape(valor: unknown): string {
   if (valor === null || valor === undefined) return "";
-  const texto = typeof valor === "string" ? valor : String(valor);
+  let texto = typeof valor === "string" ? valor : String(valor);
+  if (typeof valor === "string" && /^[=+\-@\t\r]/.test(texto)) texto = `'${texto}`;
   if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
   return texto;
 }

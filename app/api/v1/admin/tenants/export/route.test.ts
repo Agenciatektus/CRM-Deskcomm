@@ -367,6 +367,25 @@ describe("⭐ o tenant redacted não entrega o que a anonimização apagou", () 
   });
 });
 
+describe("célula que a planilha leria como fórmula", () => {
+  it("⭐ texto do tenant que começa com = ou @ sai com aspa simples na frente; o resto, intacto", async () => {
+    montar([
+      tenant(1, { status: "active", display_name: "=1+1", legal_name: "@x" }),
+      tenant(2, { status: "active", display_name: "Loja Comum", legal_name: "Loja Comum Ltda" }),
+    ]);
+
+    const csv = await (await chamarExport()).text();
+    const linhas = csvParaMatriz(csv).slice(1);
+    const perigosa = linhas.find((l) => l[0] === tenant(1).id) as string[];
+    const controle = linhas.find((l) => l[0] === tenant(2).id) as string[];
+
+    expect(perigosa.slice(2, 4)).toEqual(["'=1+1", "'@x"]);
+    // Controle: o texto comum não ganha prefixo, e a contagem segue número.
+    expect(controle.slice(2, 4)).toEqual(["Loja Comum", "Loja Comum Ltda"]);
+    expect(controle[9]).toBe("3");
+  });
+});
+
 describe("o corte", () => {
   it("⭐ passa do teto: corta em 10.000 e avisa com X-Export-Truncado", async () => {
     montar(Array.from({ length: TETO_DO_EXPORT + 1 }, (_, k) => tenant(k + 1)));
