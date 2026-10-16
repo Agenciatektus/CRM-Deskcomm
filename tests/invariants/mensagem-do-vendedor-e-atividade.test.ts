@@ -340,7 +340,7 @@ function conferir(leitura: Map<Rotulo, Leitura>, moveram: readonly Rotulo[]): vo
  */
 const O_TOPO_ABERTO_DO_CONTATO = ["abertoA"] as const;
 
-describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
+describe("0686 · a mensagem do vendedor é atividade do negócio", () => {
   it("(1) fala pelo Inbox do CRM (sent_via='user'): carimba o TOPO aberto do contato, e só ele", () => {
     conferir(medir({ sentVia: "user", direction: "outbound" }), O_TOPO_ABERTO_DO_CONTATO);
   });

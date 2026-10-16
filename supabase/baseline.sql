@@ -54146,7 +54146,7 @@ comment on function public.fn_contato_adicionar_etiquetas(uuid, uuid, text[]) is
   'Mesma corrida e mesmo desenho de fn_lead_adicionar_etiquetas, no destino `contato` da add_tag.';
 
 notify pgrst, 'reload schema';
--- ---- a mensagem do vendedor é atividade do negócio (migration 0683, issue #2953) ----
+-- ---- a mensagem do vendedor é atividade do negócio (migration 0686, issue #2953) ----
 -- O DEFEITO, medido por quem reportou: `crm_leads.last_activity_at` só muda por
 -- `fn_update_last_activity_at`, que é o gatilho `trg_update_last_activity_at` em
 -- `crm_lead_activities`. A mensagem do vendedor não cria linha lá, e
