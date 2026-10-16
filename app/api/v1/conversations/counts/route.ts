@@ -124,13 +124,13 @@ export async function GET(req: NextRequest): Promise<Response> {
   // Canal desativado nunca entra na inbox: o mesmo corte da lista, para badge
   // e aba nunca divergirem.
   const idsDesativados = await idsDosCanaisDesativados(supabase, org);
-  const countExact = () => {
+  const countExact = (filtrosDaAba: readonly FiltroDeContagem[] = auxiliares) => {
     let q = supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", org);
     if (idsDesativados.length > 0) q = q.not("channel_session_id", "in", `(${idsDesativados.join(",")})`);
-    for (const [coluna, valor] of auxiliares) q = q.eq(coluna, valor);
+    for (const [coluna, valor] of filtrosDaAba) q = q.eq(coluna, valor);
     // O marcador entra pela régua da LISTA — a mesma função, não uma segunda.
     q = aplicarMarcadores(q, marcadores, modo);
     if (pessoais.length > 0) q = q.not("contact_id", "in", `(${pessoais.join(",")})`);
@@ -164,7 +164,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     // A aba "Automático". Antes ela pedia `status='ai_handling'`, escrito por UM
     // caminho só em produção — por isso vivia quase vazia.
     countExact().eq("comando_da_conversa", "automatico"),
-    countExact()
+    // Minhas IGNORA o atendente escolhido pelo gerente: a lista da aba pede
+    // `assigned_to=me`, que vence a escolha. Com o atendente aqui, o badge
+    // contava `eu E ele` (zero) enquanto a aba listava as do gerente.
+    countExact(auxiliares.filter(([coluna]) => coluna !== "assigned_to_user_id"))
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
     countExact(),

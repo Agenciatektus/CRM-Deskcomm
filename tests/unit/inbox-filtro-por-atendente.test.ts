@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { filtrosAuxiliaresDaContagem } from "@/app/api/v1/conversations/counts/route";
 import { tabToFilter } from "@/components/inbox/InboxLayout";
+import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtime";
+import { filtrosAuxiliaresAtivos } from "@/lib/inbox/filtros-ativos";
 
 /**
  * Filtro por ATENDENTE do Inbox (gerente para cima). A lista pede `assigned_to`
@@ -48,5 +50,15 @@ describe("filtro por atendente — a aba Minhas continua sendo só as minhas", (
     for (const aba of ["all", "closed", "archived", "unassigned", "ai"] as const) {
       expect(tabToFilter(aba).assigned_to).toBeUndefined();
     }
+  });
+});
+
+describe("filtro por atendente — lista vazia diz que há filtro ligado", () => {
+  it("o atendente escolhido é nomeado, e a lista vazia vira 'vazio por filtro'", () => {
+    expect(filtrosAuxiliaresAtivos({ assigned_to: ATENDENTE } as ConversationsFilters)).toEqual(["Atendente"]);
+  });
+
+  it("a aba Minhas (`me`) não é filtro ligado por cima da aba", () => {
+    expect(filtrosAuxiliaresAtivos({ assigned_to: "me" } as ConversationsFilters)).toEqual([]);
   });
 });
