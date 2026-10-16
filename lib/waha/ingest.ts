@@ -48,6 +48,7 @@ import {
   ehNumeroInternoDeAviso,
   registrarMensagemIgnorada,
 } from "@/lib/escalacao/numero-interno-de-aviso";
+import { consumirRespostaDoSuporteNoWhatsApp } from "@/lib/escalacao/resposta-whatsapp-ao-caso";
 
 export type Admin = ReturnType<typeof createAdminClient>;
 
@@ -921,11 +922,14 @@ async function handleInbound(
   // dispara o pedido de rodízio pelo banco. Cortar depois já teria criado
   // contato, conversa e uma "conversa do suporte" na fila de um atendente — e o
   // "cancelar" que alguém da equipe digitasse bloquearia esse contato.
-  if (await ehNumeroInternoDeAviso(admin, session.organization_id, parsed)) {
-    await registrarMensagemIgnorada(admin, session.organization_id, {
-      direction: "inbound",
-      sessionId: session.id,
-    });
+  if (await consumirRespostaDoSuporteNoWhatsApp(admin, {
+    organizationId: session.organization_id,
+    channelSessionId: session.id,
+    identidade: parsed,
+    direction: "inbound",
+    texto,
+    externalId: p.id,
+  })) {
     return;
   }
 

@@ -508,6 +508,7 @@ export async function aplicaAvisoDeCaso(
     title: caso.title,
     summary: caso.summary,
     blocker: caso.blocker,
+    caseId: caso.id,
     nomeDoCliente: nome,
     link: linkDoCaso(deps.urlPublica, caso.id),
   });

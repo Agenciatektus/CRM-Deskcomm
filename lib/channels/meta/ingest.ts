@@ -30,6 +30,7 @@ import {
   ehNumeroInternoDeAviso,
   registrarMensagemIgnorada,
 } from "@/lib/escalacao/numero-interno-de-aviso";
+import { consumirRespostaDoSuporteNoWhatsApp } from "@/lib/escalacao/resposta-whatsapp-ao-caso";
 import { logger } from "@/lib/logger";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
@@ -37,7 +38,7 @@ import { extrairAtribuicaoMeta } from "../atribuicao-de-anuncio-oficial";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import { encontrarContatoPorTelefone } from "../contato-por-telefone";
 import { marcarConversaComMensagem } from "../marcar-conversa";
-import { canonicalPhoneBR, phoneLookupVariants } from "../phone-variants";
+import { canonicalPhoneBR } from "../phone-variants";
 import type { ChannelTenantScope } from "../types";
 import { nomeDeArquivoLimpo } from "@/lib/messaging/media/nome-de-arquivo";
 import { previaDaMensagem } from "@/lib/messaging/previa-da-mensagem";
@@ -210,16 +211,19 @@ export async function ingestMetaInbound(
   // dígitos (`wa_id`), e o `+` é o que a comparação por variantes do nono dígito
   // espera — quem casa é a mesma regra dos outros dois ingestores.
   if (
-    await ehNumeroInternoDeAviso(admin, orgId, {
-      kind: "phone",
-      phone: `+${e.from.replace(/\D/g, "")}`,
-      lid: null,
+    await consumirRespostaDoSuporteNoWhatsApp(admin, {
+      organizationId: orgId,
+      channelSessionId: sessao.id,
+      identidade: {
+        kind: "phone",
+        phone: `+${e.from.replace(/\D/g, "")}`,
+        lid: null,
+      },
+      direction: "inbound",
+      texto: e.text,
+      externalId: e.externalId,
     })
   ) {
-    await registrarMensagemIgnorada(admin, orgId, {
-      direction: "inbound",
-      sessionId: sessao.id,
-    });
     return { status: "ignored", reason: "numero_interno_de_aviso" };
   }
 

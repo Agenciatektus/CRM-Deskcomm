@@ -1,10 +1,11 @@
 /**
- * O NÚMERO QUE RECEBE OS AVISOS É INTERNO — E NADA QUE VENHA DELE VIRA ATENDIMENTO.
+ * O NÚMERO DE AVISOS É INTERNO — NÃO VIRA CONVERSA DE CLIENTE.
  *
  * ## O que acontece sem este corte
  *
- * A equipe responde "ok" ao aviso de caso. Essa mensagem entra pelo webhook como
- * qualquer outra e, na ordem em que os efeitos rodam, vira:
+ * Uma mensagem solta da equipe não pode virar conversa de cliente. Respostas
+ * explícitas `RESPONDER`/`PERGUNTAR` ao caso são tratadas antes deste corte, no
+ * módulo `resposta-whatsapp-ao-caso.ts`. O resto, se passasse, poderia virar:
  *
  *   · um CONTATO com o número do plantão e uma CONVERSA — e é o INSERT da
  *     conversa que dispara o pedido de rodízio pelo banco, então um atendente
@@ -36,8 +37,8 @@
  * tentação de acrescentar o número "para depurar" é o defeito conhecido: o log
  * de diagnóstico vira depósito de dado pessoal, num arquivo que ninguém
  * expurga. O que identifica a linha é a organização e a direção; o QUE foi
- * ignorado está, em contagem, na configuração — e é a tela que diz ao operador
- * "3 mensagens deste número foram ignoradas, é o esperado".
+ * ignorado está, em contagem, na configuração — e é a tela que mostra quantas
+ * mensagens fora do formato de resposta de caso foram ignoradas.
  *
  * **Não** `emit_event`: evento sem consumidor é o anti-pattern nº 3 do
  * CLAUDE.md, e o descarte aqui é decisão de PRODUTO — a mesma natureza do

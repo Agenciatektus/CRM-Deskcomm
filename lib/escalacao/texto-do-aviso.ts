@@ -15,7 +15,7 @@
  *
  *     Abrir: https://crm.exemplo.com.br/app/ai/cases?caso=<uuid>
  *
- *     Responder aqui não chega ao cliente — abra o link para responder.
+ *     RESPONDER <uuid> <orientação> — a IA continua com o cliente.
  *
  * ## As decisões, cada uma com o motivo
  *
@@ -42,10 +42,8 @@
  * **Linha sem conteúdo não aparece.** Um `Assunto: ` vazio AFIRMA que há assunto
  * e que ele é nada. A ausência da linha é a verdade disponível.
  *
- * **A última linha não é enfeite.** O número do suporte só RECEBE — o corte da
- * ingestão (`lib/escalacao/numero-interno-de-aviso.ts`) descarta tudo o que
- * chega dele, de propósito. Sem essa linha, a primeira resposta da equipe vai
- * para o vazio e ninguém descobre por quê.
+ * **Os comandos levam o id completo.** Uma resposta do suporte precisa apontar
+ * para o caso exato, e uma pergunta adicional volta ao cliente pelo agente.
  */
 import { tipoDeCasoLabel } from "@/lib/ai/case-copy";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -68,6 +66,8 @@ export interface AvisoDeCaso {
   title: string | null;
   summary: string | null;
   blocker: string | null;
+  /** Id completo do caso — o comando do WhatsApp precisa apontar sem ambiguidade. */
+  caseId: string;
   /** `contacts.name` inteiro — o corte para o primeiro nome é feito aqui. */
   nomeDoCliente: string | null;
   /** O link já montado pelo servidor. É o ÚNICO link do texto. */
@@ -123,7 +123,11 @@ export function montarAvisoDeCaso(aviso: AvisoDeCaso): string {
   if (travou) linhas.push(`${t("Por que a IA travou")}: ${travou}`);
 
   linhas.push("", `${t("Abrir")}: ${aviso.link}`, "");
-  linhas.push(t("Responder aqui não chega ao cliente — abra o link para responder."));
+  linhas.push(t("Para orientar a IA sem falar diretamente com o cliente, envie:"));
+  linhas.push(`RESPONDER ${aviso.caseId} <resposta ou decisão>`);
+  linhas.push(t("Para pedir que a IA esclareça algo com o cliente, envie:"));
+  linhas.push(`PERGUNTAR ${aviso.caseId} <pergunta ao cliente>`);
+  linhas.push(t("A IA usa sua orientação e o histórico para continuar o atendimento."));
 
   return linhas.join("\n");
 }

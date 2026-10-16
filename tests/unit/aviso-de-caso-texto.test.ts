@@ -29,6 +29,7 @@ const BASE = {
   title: "Desconto acima da política",
   summary: "15% de desconto no plano anual",
   blocker: "a política permite até 10%",
+  caseId: "0b1f7a2e-0000-4000-8000-000000000000",
   nomeDoCliente: "Maria Aparecida de Souza",
   link: "https://crm.exemplo.com.br/app/ai/cases?caso=0b1f7a2e-0000-4000-8000-000000000000",
 };
@@ -102,12 +103,11 @@ describe("montarAvisoDeCaso", () => {
     expect(texto).toContain(BASE.link);
   });
 
-  it("termina com a linha que impede a equipe de responder no lugar errado", () => {
-    // B3 da revisão: o número do suporte não fala com o cliente. Sem esta linha,
-    // a primeira resposta da equipe vai para o vazio e ninguém descobre.
-    expect(montarAvisoDeCaso(BASE).trimEnd()).toMatch(
-      /Responder aqui não chega ao cliente — abra o link para responder\.$/,
-    );
+  it("ensina a equipe a responder com o id do caso e a IA retoma o cliente", () => {
+    const texto = montarAvisoDeCaso(BASE);
+    expect(texto).toContain(`RESPONDER ${BASE.caseId} <resposta ou decisão>`);
+    expect(texto).toContain(`PERGUNTAR ${BASE.caseId} <pergunta ao cliente>`);
+    expect(texto).toContain("A IA usa sua orientação e o histórico para continuar o atendimento.");
   });
 
   it("NÃO leva telefone, CPF nem trecho de mensagem do cliente", () => {

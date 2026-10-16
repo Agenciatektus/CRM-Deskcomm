@@ -41,7 +41,7 @@ const TITULO_DO_ESTADO = {
   agente_assistido: "Seus assistentes só sugerem respostas",
   atendimento_externo: "O atendimento desta conta é conduzido por outro sistema",
   aquecimento: "Este número ainda está em aquecimento",
-  descarte_acontecendo: "As respostas para este número são ignoradas de propósito",
+  descarte_acontecendo: "Mensagens comuns deste número são ignoradas",
 } as const satisfies Record<CodigoDoEstadoDoAviso, string>;
 
 const CORPO_DO_ESTADO = {
@@ -66,7 +66,7 @@ const CORPO_DO_ESTADO = {
   aquecimento:
     "Um número novo começa com poucas mensagens por dia e vai crescendo por cerca de um mês. É o que protege o número de ser bloqueado pelo WhatsApp.",
   descarte_acontecendo:
-    "Quem responder a esse número não vira atendimento, não vira contato e não chega ao CRM. É assim que o recurso funciona.",
+    "Para orientar a IA sem falar diretamente com o cliente, responda ao aviso com RESPONDER, o ID do caso e sua orientação. Use PERGUNTAR, o ID do caso e a pergunta para pedir que a IA esclareça algo com o cliente. Outras mensagens deste número são ignoradas.",
 } as const satisfies Record<CodigoDoEstadoDoAviso, string>;
 
 /** Para onde o leigo vai resolver cada estado. Ausente = resolve nesta tela. */
