@@ -314,7 +314,15 @@ export const wahaAdapter: ChannelAdapter = {
     // mensagem, no MESMO endereço resolvido do envio — marcar outro deixaria a
     // conversa respondida sem visto —, e o helper falha macio: a resposta já
     // saiu, e um recibo de leitura que falha nunca custa a mensagem.
-    await marcarConversaComoLida({
+    //
+    // `void`, e não `await`: o pedido do visto sai aqui mesmo, logo depois do
+    // aceite, mas NÃO segura o retorno. Quem chama só grava o `external_id`
+    // depois que este `send` volta, e o `message.ack` do webhook encontra a
+    // linha SÓ por esse id (`handleAck` em `lib/waha/ingest.ts`): um ack de
+    // "entregue" que chegasse durante o visto se perderia, e a mensagem ficaria
+    // em "enviada" (o efeito descrito em `session-reconciler.ts`). O helper
+    // nunca rejeita, então não há rejeição solta.
+    void marcarConversaComoLida({
       organizationId: envelope.organizationId,
       sessionName: envelope.sessionRef,
       chatId: to,

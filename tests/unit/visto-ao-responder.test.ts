@@ -28,6 +28,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getAdapter } from "@/lib/channels";
 import type { OutboundEnvelope } from "@/lib/channels/types";
+import { logger } from "@/lib/logger";
 import { limparMemoCheckExists } from "@/lib/waha/resolve-contact-whatsapp-id";
 
 const ORG = "00000000-0000-4000-8000-000000002981";
@@ -90,7 +91,12 @@ afterEach(() => {
   limparMemoCheckExists();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
+
+/** O visto não segura o retorno: a falha dele aparece DEPOIS, no log. */
+const warnDoVisto = () =>
+  vi.spyOn(logger, "warn").mockImplementation(() => undefined);
 
 describe("o visto azul ao responder (#2981)", () => {
   it("a conversa é marcada como lida — POST /api/sendSeen, com a sessão no CORPO", async () => {
@@ -147,8 +153,15 @@ describe("o visto azul ao responder (#2981)", () => {
 
   it("visto que FALHA (500) não derruba a resposta, e a resposta é a de sempre", async () => {
     const pedidos = stubWaha({ statusDoVisto: 500 });
+    const warn = warnDoVisto();
 
     await expect(envio("5531999998888@c.us")).resolves.toEqual({ externalId: "ABC123" });
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("não marcada como lida"),
+        { organization_id: ORG, detail: "waha_500" },
+      ),
+    );
 
     // As duas metades de novo, no MESMO caso: tentou marcar e a mensagem saiu.
     expect(doVisto(pedidos)).toHaveLength(1);
@@ -172,9 +185,37 @@ describe("o visto azul ao responder (#2981)", () => {
       ),
     );
 
+    const warn = warnDoVisto();
+
     await expect(envio("5531999998888@c.us")).resolves.toEqual({ externalId: "ABC123" });
     expect(vistoTentado, "o caminho do visto não foi exercitado").toBe(true);
+    await vi.waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("não marcada como lida"),
+        expect.objectContaining({ organization_id: ORG }),
+      ),
+    );
   });
+
+  // Quem chama só grava o `external_id` depois que o `send` volta, e o
+  // `message.ack` do webhook acha a linha SÓ por esse id. Um visto que segurasse
+  // o retorno abriria a janela em que o ack de "entregue" se perde.
+  it("sendSeen PENDURADO não segura o send: o externalId volta sem esperar o visto", async () => {
+    vi.stubEnv("WAHA_API_BASE_URL", WAHA_BASE);
+    vi.stubEnv("WAHA_API_KEY", "hash123");
+    let vistoTentado = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: unknown) =>
+        String(url).includes("/api/sendSeen")
+          ? ((vistoTentado = true), new Promise<Response>(() => undefined))
+          : Promise.resolve(Response.json({ id: { _serialized: "ABC123" } })),
+      ),
+    );
+
+    await expect(envio("5531999998888@c.us")).resolves.toEqual({ externalId: "ABC123" });
+    expect(vistoTentado, "o visto nem chegou a sair").toBe(true);
+  }, 2_000);
 
   it("sem env do WAHA nada sai pela rede — nem o visto", async () => {
     vi.stubEnv("WAHA_API_BASE_URL", "");
