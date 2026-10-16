@@ -144,6 +144,13 @@ describe("o CSV espelha as colunas que o importer aceita", () => {
     for (const trecho of linha.split(/[;,]/)) expect(trecho.replace(/^"/, "")).not.toMatch(/^[=@]/);
   });
 
+  it("trecho depois de quebra de linha ou de vírgula também sai como texto (leitor que não respeita aspas)", () => {
+    const linha = linhaDoCsv({ name: "Ana\n=1+1", display_name: "a,@x", phone_number: "+5511999998888" });
+    expect(linha).toContain("Ana\n'=1+1");
+    expect(linha).toContain("a,'@x");
+    for (const trecho of linha.split(/[;,\n\r]/)) expect(trecho.replace(/^"/, "")).not.toMatch(/^[=@]/);
+  });
+
   it("o BOM sai na frente (Excel pt-BR lê acento) e o import tira ele", () => {
     const csv = csvDosContatos(BASE);
     expect(csv.charCodeAt(0)).toBe(0xfeff);

@@ -74,9 +74,12 @@ function neutralizarFormula(trecho: string): string {
 function csvEscape(valor: unknown): string {
   if (valor === null || valor === undefined) return "";
   const bruto = typeof valor === "string" ? valor : String(valor);
-  // O Excel em pt-BR abre CSV dividindo por `;`: cada trecho depois de um `;`
-  // vira célula própria, e é ele que precisa sair como texto — não só o começo.
-  const texto = bruto.split(";").map(neutralizarFormula).join(";");
+  // Quem lê o CSV nem sempre divide como nós: o Excel em pt-BR divide por `;`
+  // e ali as aspas de um campo que não começa com aspa não protegem nada, então
+  // uma quebra de linha abre linha nova; leitor sem aspas divide em `,`. Todo
+  // trecho que começa depois de `;`, `,`, LF ou CR pode virar célula: cada um
+  // sai como texto, e não só o começo.
+  const texto = bruto.split(/(?<=[;,\n\r])/).map(neutralizarFormula).join("");
   if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
   return texto;
 }
