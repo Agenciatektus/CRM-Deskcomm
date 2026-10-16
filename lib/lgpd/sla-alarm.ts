@@ -225,14 +225,18 @@ export async function triggerSlaAlarm(
       const modeloDaFrase = noBrasil
         ? "A solicitação LGPD {id} de {org} atingiu o limiar {limiar}."
         : t("A solicitação {id} de {org} atingiu o limiar {limiar}.");
+      // O nome da organização entra por ÚLTIMO e por FUNÇÃO: é texto de quem
+      // cadastrou, e como string de substituição um `$$`/`$&`/`$'` no nome
+      // seria lido como padrão do `replace` — o Brasil deixaria de sair byte a
+      // byte igual para "Ca$$h Store".
       const fraseHtml = modeloDaFrase
         .replace("{id}", `<strong>#${shortId}</strong>`)
-        .replace("{org}", `<strong>${orgName}</strong>`)
-        .replace("{limiar}", `<strong>${thresholdLabel}</strong>`);
+        .replace("{limiar}", `<strong>${thresholdLabel}</strong>`)
+        .replace("{org}", () => `<strong>${orgName}</strong>`);
       const fraseTexto = modeloDaFrase
         .replace("{id}", `#${shortId}`)
-        .replace("{org}", origemBruta)
-        .replace("{limiar}", thresholdLabel);
+        .replace("{limiar}", thresholdLabel)
+        .replace("{org}", () => origemBruta);
 
       // `#dc2626` FICA, e não vira o accent: é semântica de ALERTA, não marca.
       // Um atraso que aparece em verde-sálvia porque o revendedor escolheu

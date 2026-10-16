@@ -97,6 +97,7 @@ async function alarme(opcoes: {
   agora?: string;
   tipo?: string;
   threshold?: AlarmThreshold;
+  nome?: string;
 }) {
   vi.setSystemTime(new Date(opcoes.agora ?? AGORA));
   enviados.length = 0;
@@ -113,7 +114,7 @@ async function alarme(opcoes: {
     } as unknown as LgpdRequest,
     threshold: opcoes.threshold ?? "data_request_d5",
     organizationDpoEmail: "dpo@x.test",
-    organizationName: "Empresa <B>",
+    organizationName: opcoes.nome ?? "Empresa <B>",
     marca: MARCA,
     country: opcoes.country,
   });
@@ -229,4 +230,24 @@ describe("item 2 — o alarme é por IDIOMA do destinatário, não por país", (
       delete PERFIS_DO_PAIS.XT;
     }
   });
+});
+
+/**
+ * O nome da organização é texto de quem cadastrou. Como string de substituição
+ * do `replace`, `$$`, `$&` e `$'` são PADRÕES, não caracteres: o Brasil saía
+ * "Ca$h Store" e "Loja {org} Cia". E `{limiar}` no nome era trocado pelo limiar
+ * quando o nome entrava antes dele. O nome tem de chegar verbatim.
+ */
+describe("o nome da organização chega verbatim, com `$` e chaves", () => {
+  const html = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  for (const nome of ["Ca$$h Store", "Loja $& Cia", "A$'B", "{limiar} Ltda"]) {
+    it(`BR: "${nome}" sai igual no texto e no HTML`, async () => {
+      const email = await alarme({ country: "BR", nome });
+      expect(email.text).toContain(`A solicitação LGPD #22222222 de ${nome} atingiu o limiar D+5 (acesso a dados).`);
+      expect(email.html).toContain(
+        `A solicitação LGPD <strong>#22222222</strong> de <strong>${html(nome)}</strong> atingiu o limiar <strong>D+5 (acesso a dados)</strong>.`,
+      );
+    });
+  }
 });
