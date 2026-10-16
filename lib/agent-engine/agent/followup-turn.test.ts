@@ -13,8 +13,10 @@
  *     "Você prometeu" — o silêncio do payload vira silêncio no prompt, não
  *     promessa fabricada.
  *
- * O gate near-dup de `sendFixedOutbound` (`duplicate_suppressed`) mora dentro
- * da closure, sem ponto de injeção barato — o contrato dele é pinçado por
+ * O follow-up fixo NÃO tem gate near-dup (#2996, item 2 — decisão registrada
+ * em `sendFixedOutbound`): re-resposta de promessa é protegida no caminho do
+ * agente (`runAgentTurn` → `send_message`), e a AUSÊNCIA do gate — contrato de
+ * que texto do operador e laço `{{volta}}` nunca somem — é pinçada por
  * `tests/unit/seguranca-supressao-duplicata-e-desfecho-terminal.test.ts`.
  */
 import { describe, expect, it } from 'vitest';

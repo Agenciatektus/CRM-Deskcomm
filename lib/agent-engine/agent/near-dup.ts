@@ -32,6 +32,15 @@
  * Igualdade normalizada é duplicata por construção; semelhança >= limiar é
  * duplicata próxima. Padrão de limiar alto (0.9): só quase-idênticos suprimem,
  * para preservar mensagens genuinamente distintas.
+ *
+ * ## Exceção de informação nova (#2996, item 3)
+ *
+ * Perto do limiar, NEM todo quase-idêntico é restatemente: preço/hora mudado
+ * ("R$ 1.250" → "R$ 1.350", "9h" → "10h") ou negação trocada ("Sim, fazemos
+ * entrega" → "Não, fazemos entrega") é INFORMAÇÃO NOVA e passa
+ * (`mudaInformacao`). Contador solto mudando ("Tentativa 1 de 3" → "Tentativa
+ * 2 de 3") continua suprimindo — é ruído de retry, não conteúdo. Igualdade
+ * normalizada continua suprindo incondicionalmente.
  */
 
 /** Zero-width e BOM — invisíveis, mas quebram a igualdade ingênua. */
@@ -90,8 +99,58 @@ export function similaridadeDice(a: string, b: string): number {
 export const LIMIAR_DUPLICADO_PROXIMO = 0.9;
 
 /**
+ * Negação em PT-BR (após normalização: caixa baixa, espaços colapsados).
+ * Lista fechada e curta de propósito: "não/nao", "nem", "nunca", "jamais" —
+ * palavras que INVERTEM o sentido. Não inclui artifios ("sem", "livre de")
+ * porque suprimir com eles erraria para o lado de suprimir informação nova.
+ */
+const NEGACOES = /\bn[ãa]o\b|\bnem\b|\bnunca\b|\bjamais\b/;
+
+/** Dígitos de um texto, cada run (com separador, ex.: "1.250") + a unidade após. */
+function digitosComUnidade(texto: string): Array<{ digito: string; proximo: string }> {
+  const saida: Array<{ digito: string; proximo: string }> = [];
+  const re = /(\d+(?:[.,]\d+)*)([a-zA-Z%]?)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(texto)) !== null) {
+    saida.push({ digito: m[1]!, proximo: m[2]! });
+  }
+  return saida;
+}
+
+/**
+ * `true` quando a diferença entre os dois textos carrega INFORMAÇÃO NOVA e não
+ * é mais restatemente — a régua não suprime (revisão do #2996, item 3):
+ *
+ *  1. NEGAÇÃO adicionada, removida ou trocada ("Sim, fazemos entrega" →
+ *     "Não, fazemos entrega"; "pagamento foi confirmado" → "não foi") — o
+ *     sentido invertido é a informação;
+ *  2. DÍGITOS com valor de contexto mudados: um run com separador
+ *     ("1.250" → "1.350") ou colado em unidade ("9h" → "10h") — preço, hora,
+ *     quantidade são dado novo. Dígito SOLTO mudando ("Tentativa 1 de 3" →
+ *     "Tentativa 2 de 3") é contador, não informação: segue suprimindo.
+ */
+export function mudaInformacao(candidato: string, jaEnviado: string): boolean {
+  const temNegC = NEGACOES.test(candidato);
+  const temNegE = NEGACOES.test(jaEnviado);
+  if (temNegC !== temNegE) return true;
+  const dC = digitosComUnidade(candidato);
+  const dE = digitosComUnidade(jaEnviado);
+  if (dC.length !== dE.length) return true;
+  for (let i = 0; i < dC.length; i++) {
+    const a = dC[i]!;
+    const b = dE[i]!;
+    if (a.digito === b.digito) continue;
+    const comValor = /[.,]/.test(a.digito) || /[.,]/.test(b.digito) || a.proximo !== '' || b.proximo !== '';
+    if (comValor) return true;
+  }
+  return false;
+}
+
+/**
  * `true` quando `candidato` é duplicata (igual normalizada) ou duplicata próxima
  * (semelhança >= `limiar`) de `jaEnviado`. Comparação em branco nunca suprime.
+ * Iguais normalizadas suprimem SEM passar pelas exceções — reentrada idêntica
+ * é o caso mais forte de restatemente; as exceções valem só perto do limiar.
  */
 export function ehDuplicadoOuProximo(
   candidato: string,
@@ -102,7 +161,8 @@ export function ehDuplicadoOuProximo(
   const e = normalizarParaComparacao(jaEnviado);
   if (c === e) return c.length > 0;
   if (c.length < 2 || e.length < 2) return false;
-  return similaridadeDice(c, e) >= limiar;
+  if (similaridadeDice(c, e) < limiar) return false;
+  return !mudaInformacao(c, e);
 }
 
 /**
@@ -119,4 +179,64 @@ export function encontraDuplicado(
     if (ehDuplicadoOuProximo(candidato, previo, limiar)) return previo;
   }
   return null;
+}
+
+/**
+ * A trava de envio do turno — memória durável + reserva EM VOO (#2996, item 6).
+ *
+ * O SDK executa as tool calls de um MESMO passo em paralelo: sem a reserva,
+ * três `send_message` quase idênticos passariam todos pela checagem antes de
+ * qualquer envio terminar de registrar. A disciplina é:
+ *
+ *  - `checar(candidato)` — compara contra `aceitos ∪ emVoo` (não se auto-
+ *    suprime: o candidato ainda não foi reservado quando é checado);
+ *  - `reservar(candidato)` — síncrono, imediatamente após o `checar` vazio e
+ *    antes de QUALQUER await; a partir daqui a candidata vale como "em envio"
+ *    para as chamadas paralelas;
+ *  - `promover(candidato)` — envio aceito (sent/already_sent/queued): sai de
+ *    `emVoo` e entra em `aceitos` — transição exatamente uma vez;
+ *  - `liberar(candidato)` — veto, falha ou exceção: só sai de `emVoo`; nada
+ *    é promovido, então a próxima tentativa legítima não fica bloqueada por
+ *    uma reserva órfã.
+ *
+ * Puro e síncrono por construção — sem lock, sem tempo: o fechamento da
+ * corrida vem do check-then-reserve ser atômico no event loop (uma chamada
+ * reserva na mesma tick em que passa, antes de ceder o event loop).
+ */
+export interface TravaDeDuplicata {
+  checar(candidato: string): string | null;
+  reservar(candidato: string): void;
+  promover(candidato: string): void;
+  liberar(candidato: string): void;
+  /** Semeia a memória durável com o histórico do banco (janela desde a última inbound). */
+  semear(corpos: readonly string[]): void;
+  aceitos(): readonly string[];
+  emVoo(): readonly string[];
+}
+
+export function criarTravaDeDuplicata(
+  limiar: number = LIMIAR_DUPLICADO_PROXIMO,
+): TravaDeDuplicata {
+  const aceitos: string[] = [];
+  const emVoo: string[] = [];
+  return {
+    checar: (candidato) => encontraDuplicado(candidato, [...aceitos, ...emVoo], limiar),
+    reservar: (candidato) => {
+      emVoo.push(candidato);
+    },
+    promover: (candidato) => {
+      const i = emVoo.indexOf(candidato);
+      if (i >= 0) emVoo.splice(i, 1);
+      if (!aceitos.includes(candidato)) aceitos.push(candidato);
+    },
+    liberar: (candidato) => {
+      const i = emVoo.indexOf(candidato);
+      if (i >= 0) emVoo.splice(i, 1);
+    },
+    semear: (corpos) => {
+      for (const c of corpos) if (!aceitos.includes(c)) aceitos.push(c);
+    },
+    aceitos: () => [...aceitos],
+    emVoo: () => [...emVoo],
+  };
 }

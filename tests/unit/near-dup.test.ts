@@ -4,6 +4,7 @@ import {
   similaridadeDice,
   ehDuplicadoOuProximo,
   encontraDuplicado,
+  criarTravaDeDuplicata,
   LIMIAR_DUPLICADO_PROXIMO,
 } from '@/lib/agent-engine/agent/near-dup';
 
@@ -106,5 +107,143 @@ describe('encontraDuplicado', () => {
 
   it('lista vazia = null', () => {
     expect(encontraDuplicado('qualquer coisa', [])).toBeNull();
+  });
+});
+
+// ─── #2996 item 3: informação nova não é restatemente ───────────────────────
+describe('informação nova (valor/negação) NÃO suprime — exceção da revisão', () => {
+  // Os pares abaixo são as medições do mantenedor (main 330ead5ca): todos ficam
+  // ACIMA do limiar (por isso a régua ingênua os suprimia) e passam GRÂCIAS à
+  // exceção. O `quaseIdentico` documenta isso — sem ele, um Dice que "caísse
+  // sozinho" sob a exceção mascararia a regressão dela.
+  const quaseId = (a: string, b: string): void => {
+    expect(similaridadeDice(normalizarParaComparacao(a), normalizarParaComparacao(b))).toBeGreaterThanOrEqual(
+      LIMIAR_DUPLICADO_PROXIMO,
+    );
+  };
+
+  it('preço mudado (R$ 1.250 → R$ 1.350) passa', () => {
+    const a = 'O valor total do tratamento fica em R$ 1.250, podendo ser parcelado em 10x sem juros.';
+    const b = 'O valor total do tratamento fica em R$ 1.350, podendo ser parcelado em 10x sem juros.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+
+  it('hora mudada (9h → 10h) passa', () => {
+    const a = 'Sua consulta está marcada para amanhã às 9h, com a Dra. Ana, na unidade Centro.';
+    const b = 'Sua consulta está marcada para amanhã às 10h, com a Dra. Ana, na unidade Centro.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+
+  it('negação acrescentada (Sim → Não na entrega) passa', () => {
+    const a = 'Sim, fazemos entrega na região central, das 8h às 18h.';
+    const b = 'Não, fazemos entrega na região central, das 8h às 18h.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+
+  it('negação no meio da frase (foi → não foi confirmado) passa', () => {
+    const a = 'O seu pagamento foi confirmado e o agendamento está liberado para você.';
+    const b = 'O seu pagamento não foi confirmado e o agendamento está liberado para você.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+
+  it('REMOVER a negação também é informação (não só acrescentar)', () => {
+    const a = 'Não conseguimos entregar hoje, mas amanhã podemos sim.';
+    const b = 'Conseguimos entregar hoje, mas amanhã podemos sim.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+
+  it('CONTADOR de retry (Tentativa 1 → 2 de 3) segue SUPRIMINDO', () => {
+    // Dígito solto mudando é ruído de retry, não conteúdo — a exceção é
+    // estreita de propósito (só valor com separador/unidade passa).
+    const a = 'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 1 de 3.';
+    const b = 'Oi! Passando para saber se ficou alguma dúvida sobre a proposta. Tentativa 2 de 3.';
+    quaseId(a, b);
+    expect(ehDuplicadoOuProximo(b, a)).toBe(true);
+  });
+
+  it('reentrada idêntica segue suprimindo mesmo com valor e negação presentes', () => {
+    const msg = 'Não é preciso pagar agora, o valor é R$ 1.250, às 9h.';
+    expect(ehDuplicadoOuProximo(msg, msg)).toBe(true);
+    expect(ehDuplicadoOuProximo(msg, '  Não é preciso pagar agora, o valor é R$ 1.250, às 9h.  ')).toBe(true);
+  });
+
+  it('Obrigado! → Obrigada! já passava por baixo do limiar (não é a exceção)', () => {
+    const a = 'Obrigado!';
+    const b = 'Obrigada!';
+    expect(similaridadeDice(normalizarParaComparacao(a), normalizarParaComparacao(b))).toBeLessThan(
+      LIMIAR_DUPLICADO_PROXIMO,
+    );
+    expect(ehDuplicadoOuProximo(b, a)).toBe(false);
+  });
+});
+
+// ─── #2996 item 6: a trava em voo fecha a corrida de chamadas paralelas ─────
+describe('criarTravaDeDuplicata — em-voo, promoção e liberação', () => {
+  it('checar → reservar atômico: a 2ª candidata idêntica ENXERGA a 1ª em voo', () => {
+    const t = criarTravaDeDuplicata();
+    expect(t.checar('Sua consulta é amanhã às 10h.')).toBeNull(); // 1ª passa e reserva
+    t.reservar('Sua consulta é amanhã às 10h.');
+    // chamada paralela seguinte (mesma tick posterior): vê a reserva → suprime
+    expect(t.checar('Sua consulta é amanhã às 10h!')).not.toBeNull();
+    // candidata genuinamente diferente segue elegível
+    expect(t.checar('Outro assunto: seu exame ficou pronto.')).toBeNull();
+  });
+
+  it('Promise.all: de 3 candidatas idênticas UMA só passa — determinístico', async () => {
+    const t = criarTravaDeDuplicata();
+    const corpo = 'Oi! Tudo bem? Vi que você pediu um orçamento, posso ajudar?';
+    const resultados = await Promise.all(
+      Array.from({ length: 3 }, async () => {
+        // mesma ordem do execute real: checar → (se passou) reservar, síncronos,
+        // ANTES do primeiro await da "cadeia".
+        const r = t.checar(corpo);
+        if (r === null) t.reservar(corpo);
+        await new Promise((resolve) => setTimeout(resolve, 0)); // a cadeia
+        if (r === null) t.promover(corpo);
+        return r;
+      }),
+    );
+    expect(resultados.filter((r) => r === null)).toHaveLength(1);
+    expect(t.aceitos()).toHaveLength(1);
+    expect(t.emVoo()).toHaveLength(0);
+  });
+
+  it('liberar devolve a candidata à elegibilidade (sem reserva órfã)', () => {
+    const t = criarTravaDeDuplicata();
+    const corpo = 'Seu pagamento foi aprovado.';
+    expect(t.checar(corpo)).toBeNull();
+    t.reservar(corpo);
+    t.liberar(corpo); // veto/falha/exceção/finally
+    expect(t.emVoo()).toHaveLength(0);
+    expect(t.aceitos()).toHaveLength(0);
+    expect(t.checar(corpo)).toBeNull(); // elegível de novo
+  });
+
+  it('promover transiciona exatamente uma vez; finally seguinte é no-op', () => {
+    const t = criarTravaDeDuplicata();
+    const corpo = 'Segunda via do comprovante a caminho.';
+    expect(t.checar(corpo)).toBeNull();
+    t.reservar(corpo);
+    t.promover(corpo);
+    t.promover(corpo); // chamada dupla não duplica a memória
+    expect(t.aceitos()).toEqual([corpo]);
+    expect(t.emVoo()).toHaveLength(0);
+    t.liberar(corpo); // finally após o promover: no-op, não remove da durável
+    expect(t.aceitos()).toEqual([corpo]);
+    expect(t.checar('Segunda via do comprovante a caminho!')).not.toBeNull();
+  });
+
+  it('semear popula a memória durável sem tocar no em-voo', () => {
+    const t = criarTravaDeDuplicata();
+    t.semear(['Resposta histórica um.', 'Resposta histórica dois.']);
+    t.semear(['Resposta histórica um.']); // semeador repetido não duplica
+    expect(t.aceitos()).toHaveLength(2);
+    expect(t.emVoo()).toHaveLength(0);
+    expect(t.checar('Resposta histórica um.')).not.toBeNull();
   });
 });

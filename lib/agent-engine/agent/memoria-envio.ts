@@ -17,6 +17,12 @@
  * O janelamento temporal (limite + janelaMs) mantém "não suprimir resposta futura
  * legítima sobre o mesmo tópico" sob controle: só o que é quase idêntico E recente
  * suprime, nunca assunto parecido com redação diferente.
+ *
+ * Mensagem que FALHOU (`status = 'failed'`, gravado por `session-reconciler`/
+ * `queue` quando o envio não chegou) NÃO é resposta: ela fica de fora da janela,
+ * senão uma falha bloquearia a próxima tentativa legítima (#2996, item 4). Só o
+ * `'failed'` explícito é excluído — status nulo (linha antiga) ou outro estado
+ * segue contando.
  */
 import type pg from 'pg';
 
@@ -63,6 +69,7 @@ export async function corposEnviadosDesdeUltimaInbound(
         and m.direction = 'outbound'
         and m.created_at > coalesce(u.em, '-infinity'::timestamptz)
         and m.created_at > now() - ($3::bigint * interval '1 millisecond')
+        and coalesce(m.status, '') <> 'failed'
       order by m.created_at desc
       limit $4`,
     [alvo.organizationId, alvo.conversationId, janelaMs, limite],
