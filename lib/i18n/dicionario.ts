@@ -14399,6 +14399,57 @@ export const DICIONARIO: Traducoes = {
   },
   "Abrir integração com o sistema de gestão": { es: "Abrir integración con el sistema de gestión" },
 
+  // ─── Tela do servidor MCP externo (#2948) ───
+  "Servidor MCP externo": { es: "Servidor MCP externo" },
+  "O endereço e a chave do sistema de fora que a IA da empresa pode consultar.": {
+    es: "La dirección y la clave del sistema externo que la IA de la empresa puede consultar.",
+  },
+  "O endereço e a chave do sistema de fora que a IA desta empresa pode consultar. Só o dono da instalação vê esta tela.": {
+    es: "La dirección y la clave del sistema externo que la IA de esta empresa puede consultar. Solo el dueño de la instalación ve esta pantalla.",
+  },
+  "Endereço e chave": { es: "Dirección y clave" },
+  "O endereço precisa ser um servidor público em https. Rede interna, localhost e segredo colado no endereço são recusados na hora de salvar.": {
+    es: "La dirección debe ser un servidor público en https. Una red interna, localhost y un secreto pegado en la dirección se rechazan al guardar.",
+  },
+  "A chave é gravada cifrada e não é mostrada de novo: depois de salvar, a tela revela só os quatro últimos caracteres.": {
+    es: "La clave se guarda cifrada y no se muestra de nuevo: después de guardar, la pantalla revela solo los cuatro últimos caracteres.",
+  },
+  "Remover apaga o endereço e a chave desta empresa: a IA deixa de alcançar o servidor de fora.": {
+    es: "Eliminar borra la dirección y la clave de esta empresa: la IA deja de alcanzar el servidor externo.",
+  },
+  "Chave gravada. Ela aparece só agora, na criação — termina em": {
+    es: "Clave guardada. Aparece solo ahora, al crearla — termina en",
+  },
+  "Servidor externo removido. A IA desta empresa não alcança mais o sistema de fora.": {
+    es: "Servidor externo eliminado. La IA de esta empresa ya no alcanza el sistema externo.",
+  },
+  "O que o servidor oferece": { es: "Lo que ofrece el servidor" },
+  "Endereço consultado:": { es: "Dirección consultada:" },
+  "Só o dono da instalação cadastra o servidor externo desta empresa.": {
+    es: "Solo el dueño de la instalación registra el servidor externo de esta empresa.",
+  },
+  "Não foi possível identificar a empresa ativa desta sessão.": {
+    es: "No fue posible identificar la empresa activa de esta sesión.",
+  },
+  "Esta ação exige a verificação em duas etapas.": {
+    es: "Esta acción exige la verificación en dos pasos.",
+  },
+  "Confira o endereço e a chave: um dos dois passou do tamanho aceito.": {
+    es: "Revisa la dirección y la clave: una de las dos superó el tamaño aceptado.",
+  },
+  "Endereço recusado por segurança: informe um servidor público em https, sem rede interna, sem localhost e sem segredo colado no endereço.": {
+    es: "Dirección rechazada por seguridad: indica un servidor público en https, sin red interna, sin localhost y sin secreto pegado en la dirección.",
+  },
+  "Não foi possível salvar. Tente de novo em instantes.": {
+    es: "No fue posible guardar. Inténtalo de nuevo en unos momentos.",
+  },
+  "Preencha o endereço e a chave para salvar. Para apagar o registro, use Remover.": {
+    es: "Completa la dirección y la clave para guardar. Para borrar el registro, usa Quitar.",
+  },
+  "Nenhum servidor externo respondeu. Salve o endereço e a chave e teste de novo.": {
+    es: "Ningún servidor externo respondió. Guarda la dirección y la clave y prueba de nuevo.",
+  },
+
   // ─── Campanhas (migration 0264) ───
   "Agendar": { es: "Programar" },
   "ainda não enviadas": { es: "aún no enviadas" },
