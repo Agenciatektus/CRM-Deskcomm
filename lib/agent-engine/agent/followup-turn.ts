@@ -1104,6 +1104,16 @@ async function sendFixedOutbound(
     return { kind: "skipped" };
   }
 
+  // SEM gate near-dup AQUI (#2996, item 2 — pedido da triagem após medir os
+  // caminhos reais): follow-up de promessa NÃO passa por `sendFixedOutbound` —
+  // ele roda por `runAgentTurn` e cai no `send_message`, cujo gate em memória do
+  // turno (com a janela desde a última inbound) já cobre a re-resposta quase
+  // idêntica. Quem passa por aqui é texto fixo escrito pelo OPERADOR no passo do
+  // fluxo e o modelo da re-entrada: bloquear a 2ª/3ª bolha de um laço com
+  // `{{volta}}` ou a re-resposta de re-entrada sem resposta do lead seria sumir
+  // com o follow-up sem aviso. Se um dia aparecer um caso concreto em que a
+  // trava aqui é necessária, ele vira decisão de produto — não regra implícita.
+
   const context = await getLeadContext(
     pool,
     deps.crmCfg,
