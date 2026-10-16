@@ -15934,6 +15934,65 @@ export const DICIONARIO: Traducoes = {
   "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": {
     es: "Oculto, el campo no aparece en el formulario ni se valida como obligatorio, y el valor ya guardado sigue en el registro.",
   },
+  // ─── Alarme de SLA ao encarregado (lib/lgpd/sla-alarm.ts, issue #2347) ─────
+  // O e-mail fala a LÍNGUA de quem recebe, que vem do PAÍS (`PerfilDoPais.idioma`):
+  // Portugal fala `pt-PT` e cai no português daqui. A LEI continua vindo do país,
+  // e é por isso que os rodapés do Brasil ("Base legal: LGPD …") não estão nesta
+  // lista — só saem no Brasil, sempre em português.
+  "[Pedido de titular]": {
+    es: "[Solicitud del interesado]",
+  },
+  "[Apagamento da loja]": {
+    es: "[Eliminación de la tienda]",
+  },
+  "Solicitação {id} próxima do vencimento": {
+    es: "Solicitud {id} próxima al vencimiento",
+  },
+  "Alerta de SLA — Solicitação {id}": {
+    es: "Alerta de SLA — Solicitud {id}",
+  },
+  "Olá,": {
+    es: "Hola,",
+  },
+  "A solicitação {id} de {org} atingiu o limiar {limiar}.": {
+    es: "La solicitud {id} de {org} alcanzó el umbral {limiar}.",
+  },
+  "D+5 (acesso a dados)": {
+    es: "D+5 (acceso a datos)",
+  },
+  "D+10 (anonimização/exclusão)": {
+    es: "D+10 (anonimización/supresión)",
+  },
+  "Esta solicitação está {n} dia(s) em atraso.": {
+    es: "Esta solicitud lleva {n} día(s) de retraso.",
+  },
+  "O prazo vence em {data}.": {
+    es: "El plazo vence el {data}.",
+  },
+  "Prazo: {data}.": {
+    es: "Plazo: {data}.",
+  },
+  "Status atual:": {
+    es: "Estado actual:",
+  },
+  "Ver solicitação no painel": {
+    es: "Ver solicitud en el panel",
+  },
+  "Acesse:": {
+    es: "Acceda:",
+  },
+  "Prazo interno do sistema.": {
+    es: "Plazo interno del sistema.",
+  },
+  "Prazo interno do sistema, mais curto que o prazo legal (RGPD: um mês, art. 12.º, n.º 3).": {
+    es: "Plazo interno del sistema, más corto que el plazo legal (RGPD: un mes, art. 12.º, n.º 3).",
+  },
+  "Prazo interno do sistema, mais curto que o prazo legal.": {
+    es: "Plazo interno del sistema, más corto que el plazo legal.",
+  },
+  "O prazo do art. 12.º, n.º 3 do RGPD (um mês) venceu.": {
+    es: "El plazo del art. 12.º, n.º 3 del RGPD (un mes) venció.",
+  },
   // #2813 — o painel "Iniciar conversa" do Inbox.
   "Nova conversa": { es: "Nueva conversación" },
   "Diga para quem e o que dizer. O canal de saída é você quem escolhe quando há mais de um número.": {
