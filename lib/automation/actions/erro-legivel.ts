@@ -21,16 +21,15 @@
  *     lado quando existe — não muda o texto de quem já lança `Error` sem code);
  *   - OBJETO com cara de erro (`message`/`details`/`code`) → extrai o texto de
  *     gente e o código, separados por " — ";
- *   - OBJETO sem esses campos → `JSON.stringify` (nunca `"[object Object]"`),
- *     e, se nem JSON houver (circular ou vazio), um texto explícito;
+ *   - OBJETO sem esses campos → os NOMES dos campos, nunca os valores (um
+ *     objeto qualquer pode carregar cabeçalho, token ou corpo), e um texto
+ *     explícito quando não há campo nenhum — nunca `"[object Object]"`;
  *   - PRIMITIVO (string, número, `null`, `undefined`) → `String(erro)`.
  *
  * O `limite` existe para as chamadas que já truncavam a mensagem (a de
  * `send_ai_message` cortava em 160) — truncar continua sendo decisão de quem
  * chama, não esconderijo de defeito.
  */
-
-const LIMITE_PADRAO = 200;
 
 /** `code` do PostgREST é string; aceitamos número por defesa. */
 function comoTexto(valor: unknown): string | null {
@@ -40,7 +39,9 @@ function comoTexto(valor: unknown): string | null {
 }
 
 function comoCodigo(valor: unknown): string | null {
-  return comoTexto(valor);
+  // Só texto: o `code` numérico do DOMException (20 abort, 23 timeout) é
+  // legado e não diz nada a quem lê.
+  return typeof valor === "string" && valor.trim() !== "" ? valor : null;
 }
 
 function deObjeto(erro: object): string | null {
@@ -52,17 +53,14 @@ function deObjeto(erro: object): string | null {
   if (codigo) partes.push(`código ${codigo}`);
   if (partes.length > 0) return partes.join(" — ");
 
-  try {
-    const json = JSON.stringify(erro);
-    if (json && json !== "{}") return json;
-  } catch {
-    // Referência circular: não há representação fiel em JSON.
-  }
-  return "erro sem mensagem";
+  // Nomes dos campos, nunca os valores: um objeto qualquer pode carregar
+  // cabeçalho, token ou corpo.
+  const campos = Object.keys(erro);
+  return campos.length > 0 ? `erro sem mensagem (campos: ${campos.join(", ")})` : "erro sem mensagem";
 }
 
 /** Texto legível de `erro`, com teto opcional (para caber no run). */
-export function mensagemDeErro(erro: unknown, limite: number = LIMITE_PADRAO): string {
+export function mensagemDeErro(erro: unknown, limite?: number): string {
   let texto: string;
   if (erro instanceof Error) {
     const codigo = comoCodigo((erro as { code?: unknown }).code);
@@ -72,5 +70,5 @@ export function mensagemDeErro(erro: unknown, limite: number = LIMITE_PADRAO): s
   } else {
     texto = String(erro);
   }
-  return texto.length > limite ? texto.slice(0, limite) : texto;
+  return limite !== undefined && texto.length > limite ? texto.slice(0, limite) : texto;
 }

@@ -66,7 +66,7 @@ describe("mensagemDeErro — extrai o motivo do objeto que o `String()` apagava"
     expect(mensagemDeErro(undefined)).toBe("undefined");
   });
 
-  it("objeto sem campos de erro vira JSON, não `[object Object]`", () => {
+  it("objeto sem campos de erro diz os NOMES dos campos, não `[object Object]`", () => {
     const texto = mensagemDeErro({ fora: true, tentativas: 3 });
     expect(texto).not.toContain("[object Object]");
     expect(texto).toContain("tentativas");
@@ -76,7 +76,27 @@ describe("mensagemDeErro — extrai o motivo do objeto que o `String()` apagava"
     expect(mensagemDeErro({})).toBe("erro sem mensagem");
     const circular: Record<string, unknown> = {};
     circular.eu = circular;
-    expect(mensagemDeErro(circular)).toBe("erro sem mensagem");
+    expect(mensagemDeErro(circular)).toBe("erro sem mensagem (campos: eu)");
+  });
+
+  it("objeto sem mensagem nunca grava os VALORES dos campos (cabeçalho, token)", () => {
+    const texto = mensagemDeErro({ headers: { authorization: "Bearer tok_x" } });
+    expect(texto).not.toContain("tok_x");
+    expect(texto).toContain("headers");
+  });
+
+  it("o `code` numérico legado do DOMException não vira 'código 23'", () => {
+    const erro = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    expect(mensagemDeErro(erro)).toBe("The operation was aborted due to timeout");
+  });
+
+  it("sem `limite`, a mensagem sai inteira (a instrução do erro de configuração da IA)", () => {
+    const instrucao =
+      "o endereço de IA configurado para esta empresa só é usado com a chave dela, e ela não tem chave cadastrada para este provedor — a chave da instalação não é enviada a endereço escolhido pela empresa; cadastre a chave da empresa em Agente de IA › Provedores, ou tire o endereço próprio para voltar ao provedor padrão da instalação";
+    expect(instrucao.length).toBeGreaterThan(200);
+    const texto = mensagemDeErro(new Error(instrucao));
+    expect(texto).toBe(instrucao);
+    expect(texto).toContain("Agente de IA › Provedores");
   });
 
   it("o `limite` trunca sem reintroduzir o defeito", () => {
