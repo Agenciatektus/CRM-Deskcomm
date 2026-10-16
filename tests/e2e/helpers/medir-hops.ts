@@ -38,10 +38,11 @@ interface Linha {
   metodo: string;
   caminho: string;
   quando: number;
-  filaMs: number;
-  servidorMs: number;
-  transferenciaMs: number;
-  totalMs: number;
+  // null = cancelada antes do primeiro byte: conta, mas não tem tempo.
+  filaMs: number | null;
+  servidorMs: number | null;
+  transferenciaMs: number | null;
+  totalMs: number | null;
   cancelado: boolean;
 }
 
@@ -70,23 +71,26 @@ export class MedidorDeHops {
     this.ativo = true;
     const registrar = (r: Request, cancelado: boolean) => {
       const t = r.timing();
-      // Requisição sem timing completo (cache, aborto antes do primeiro byte)
-      // não entra: os campos vêm -1 e poluiriam a mediana com lixo.
+      // Sem timing completo os campos vêm -1. Concluída assim é cache: não
+      // entra. CANCELADA assim é aborto antes do primeiro byte — exatamente o
+      // cancelamento da lista que a #2399 pergunta: entra, com tempos nulos,
+      // para contar em `get`/`cancelados` sem poluir as medianas.
       //
       // ⚠️ `startTime` é EPOCH (ms desde 1970) e TODO o resto é relativo a ele
       // — somar/subtrair `startTime` de `requestStart` dava ~-1,7e12 (clamp em
       // 0, coluna "tot" mentindo). Aqui cada elo é diferença de dois campos
       // RELATIVOS, ou o próprio campo relativo.
-      if (!t || t.responseStart <= 0 || t.responseEnd <= 0) return;
+      const temTiming = !!t && t.responseStart > 0 && t.responseEnd > 0;
+      if (!temTiming && !cancelado) return;
       const url = new URL(r.url());
       this.linhas.push({
         metodo: r.method(),
         caminho: url.pathname + (url.search || ""),
         quando: Date.now(),
-        filaMs: Math.max(0, t.requestStart), // espera antes de ENVIAR (rel. ao início)
-        servidorMs: Math.max(0, t.responseStart - t.requestStart), // TTFB
-        transferenciaMs: Math.max(0, t.responseEnd - t.responseStart),
-        totalMs: Math.max(0, t.responseEnd),
+        filaMs: temTiming ? Math.max(0, t.requestStart) : null, // espera antes de ENVIAR (rel. ao início)
+        servidorMs: temTiming ? Math.max(0, t.responseStart - t.requestStart) : null, // TTFB
+        transferenciaMs: temTiming ? Math.max(0, t.responseEnd - t.responseStart) : null,
+        totalMs: temTiming ? Math.max(0, t.responseEnd) : null,
         cancelado,
       });
     };
@@ -117,9 +121,11 @@ export class MedidorDeHops {
         )}`;
       (porEndpoint.get(chave) ?? porEndpoint.set(chave, []).get(chave)!).push(l);
     }
-    const mediana = (xs: number[]): number => {
-      if (xs.length === 0) return 0;
-      const o = [...xs].sort((a, b) => a - b);
+    const comTempo = (xs: (number | null)[]): number[] =>
+      xs.filter((x): x is number => x !== null);
+    const mediana = (xs: (number | null)[]): number => {
+      const o = comTempo(xs).sort((a, b) => a - b);
+      if (o.length === 0) return 0;
       return Math.round(o[Math.floor(o.length / 2)]!);
     };
     return [...porEndpoint.entries()]
@@ -132,7 +138,7 @@ export class MedidorDeHops {
           cancelados: ls.filter((l) => l.cancelado).length,
           filaMedianaMs: mediana(ls.map((l) => l.filaMs)),
           servidorMedianaMs: mediana(ls.map((l) => l.servidorMs)),
-          servidorMaxMs: Math.round(Math.max(...ls.map((l) => l.servidorMs))),
+          servidorMaxMs: Math.round(Math.max(0, ...comTempo(ls.map((l) => l.servidorMs)))),
           transferenciaMedianaMs: mediana(ls.map((l) => l.transferenciaMs)),
           totalMedianaMs: mediana(ls.map((l) => l.totalMs)),
         };
@@ -152,20 +158,20 @@ export class MedidorDeHops {
       JSON.stringify({ marcos: Object.fromEntries(this.marcos), janelaMs: ate && desde ? ate - desde : null, tabela }, null, 2),
       "utf8",
     );
-    if (ate && desde) console.log(`\n=== HOPS #2399 (E2E_MEDIR_HOPS) — janela da asserção :240 (${ate - desde}ms) ===`);
-    console.log(
+    if (ate && desde) console.info(`\n=== HOPS #2399 (E2E_MEDIR_HOPS) — janela da asserção :240 (${ate - desde}ms) ===`);
+    console.info(
       "metodo caminho".padEnd(58) + "| n  | canc | envio | srv-med | srv-max | transf | total",
     );
     for (const m of tabela) {
       const esq = `${m.metodo} ${m.caminho}`.slice(0, 57).padEnd(58);
-      console.log(
+      console.info(
         `${esq}| ${String(m.get).padStart(2)} | ${String(m.cancelados).padStart(4)} | ` +
           `${String(m.filaMedianaMs).padStart(5)} | ${String(m.servidorMedianaMs).padStart(7)} | ` +
           `${String(m.servidorMaxMs).padStart(7)} | ${String(m.transferenciaMedianaMs).padStart(6)} | ` +
           `${String(m.totalMedianaMs).padStart(5)}`,
       );
     }
-    console.log(`=== fim HOPS (json em ${destinoJson}) ===\n`);
+    console.info(`=== fim HOPS (json em ${destinoJson}) ===\n`);
     return destinoJson;
   }
 }
