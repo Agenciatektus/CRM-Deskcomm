@@ -100,7 +100,7 @@ window.matchMedia = vi.fn().mockImplementation((query: string) => ({
 })) as unknown as typeof window.matchMedia;
 
 import { AdminShell } from "@/components/admin/AdminShell";
-import { instalacaoSemSmtp } from "@/lib/email/smtp";
+import { instalacaoSemSmtp } from "@/lib/email/estado";
 import { ThemeProvider } from "@/lib/theme";
 
 /** Monta a casca do admin como o layout faz: a leitura entra ANTES do render. */

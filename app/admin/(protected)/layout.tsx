@@ -3,7 +3,7 @@ import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 import { modulosLigados } from "@/lib/instalacao/modulos";
-import { instalacaoSemSmtp } from "@/lib/email/smtp";
+import { instalacaoSemSmtp } from "@/lib/email/estado";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function ProtectedAdminLayout({ children }: { children: ReactNode }) {
@@ -21,7 +21,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   // persistente — #2755, item 3). É AQUI, e não em cada tela, porque o layout
   // é o denominador comum de todo `/admin/*`: nenhum componente do painel
   // repete consulta, e tela nova nasce com o sinal. `instalacaoSemSmtp` só
-  // afirma "sem SMTP" com o banco tendo RESPONDIDO — ver `lib/email/smtp.ts`.
+  // afirma "sem SMTP" com o banco tendo RESPONDIDO — ver `lib/email/estado.ts`.
   const [modulos, semSmtp] = await Promise.all([
     modulosLigados(createAdminClient()),
     instalacaoSemSmtp(),

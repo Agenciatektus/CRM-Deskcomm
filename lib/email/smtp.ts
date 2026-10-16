@@ -1,8 +1,7 @@
 import { isIP } from "node:net";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env } from "@/lib/env";
-import { getSmtpConfig, lerSmtp, type SmtpConfig } from "@/lib/email/config";
-import { isEmailConfigured } from "@/lib/email/resend";
+import { getSmtpConfig, type SmtpConfig } from "@/lib/email/config";
 
 interface SendArgs {
   to: string | string[];
@@ -30,46 +29,6 @@ let transporterKey = "";
 
 export function isSmtpConfigured(config: SmtpConfig): boolean {
   return Boolean(config.host && config.fromEmail);
-}
-
-/**
- * O CRM está SEM SMTP, com o banco tendo RESPONDIDO? — a base comum de quem
- * pergunta pela falta de SMTP: o "esqueci a senha" (#2767) e a tarja do painel
- * do admin (#2755, item 3). Cada um faz a SUA pergunta em cima dela.
- *
- * Régua: host E remetente (`isSmtpConfigured`). `lerSmtp`, e não
- * `getSmtpConfig`, porque um soluço do banco NÃO pode virar "sem SMTP": só o
- * banco que respondeu (linha presente ou ausência de linha) autoriza afirmar a
- * falta. Quando ele falha, `lerSmtp` lê o `.env`, e `bancoRespondeu` falso
- * mantém a resposta em "não".
- */
-export async function semSmtpRespondido(): Promise<boolean> {
-  const { config, bancoRespondeu } = await lerSmtp();
-  return bancoRespondeu && !isSmtpConfigured(config);
-}
-
-/**
- * A tarja "Sem SMTP configurado" do painel do admin deve aparecer?
- *
- * Duas situações em que falta SMTP e isso tem efeito:
- *
- *   - servidor único (`SINGLE_SERVER=1`): o serviço de login só recebe o SMTP
- *     do CRM (`sincronizar_smtp_do_gotrue`, em `_common.sh`), nunca a Resend —
- *     ali a recuperação de senha morre mesmo com a Resend configurada;
- *   - qualquer topologia SEM Resend: convites, LGPD, cobrança e automações saem
- *     todos pelo roteador do app (`lib/email/roteador.ts`: SMTP, senão Resend),
- *     e sem nenhum dos dois nada sai.
- *
- * Fora do servidor único, com a Resend entregando, a tarja seria alarme falso:
- * o login tem e-mail próprio e o resto sai pela Resend.
- *
- * Limite aceito: quem pôs SMTP direto no `.env` do Supabase, sem passar pela
- * tela, vê a tarja com um e-mail de login que sairia. O app não enxerga aquele
- * arquivo; o remédio é configurar o mesmo SMTP em /admin/email.
- */
-export async function instalacaoSemSmtp(): Promise<boolean> {
-  if (!(await semSmtpRespondido())) return false;
-  return process.env.SINGLE_SERVER === "1" || !(await isEmailConfigured());
 }
 
 export function formatFromAddress(config: SmtpConfig, override?: string): string | null {
