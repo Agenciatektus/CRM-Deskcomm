@@ -182,6 +182,29 @@ describe("decidir — a URL e o nome do modelo saem da ORIGEM", () => {
   });
 });
 
+describe("a chave da conversa vai para onde a conversa vai", () => {
+  it("com OPENROUTER_BASE_URL apontando para um gateway próprio, o Jev via OpenRouter usa ESSE host", async () => {
+    envMock.OPENROUTER_BASE_URL = "https://gateway.interno.exemplo/v1";
+    try {
+      const pedidos: Pedido[] = [];
+      await decidir(
+        { chave: "sk-gw-x", estado: "cliente: adorei!", perguntas: PERGUNTAS, origem: "openrouter" },
+        { fetchImpl: fetchQueCaptura(pedidos) },
+      );
+      expect(pedidos[0]!.url).toBe("https://gateway.interno.exemplo/v1/systemone");
+      // A TypeSafe direto não é afetada pelo gateway da conversa.
+      const daTypesafe: Pedido[] = [];
+      await decidir(
+        { chave: "tsk_x", estado: "cliente: adorei!", perguntas: PERGUNTAS },
+        { fetchImpl: fetchQueCaptura(daTypesafe) },
+      );
+      expect(daTypesafe[0]!.url).toBe("https://api.typesafe.ai/v1/systemone");
+    } finally {
+      envMock.OPENROUTER_BASE_URL = "";
+    }
+  });
+});
+
 describe("destinoDasTarefas — a credencial lida é a da ORIGEM escolhida", () => {
   it("origem OpenRouter: lê a credencial `openrouter` (a mesma da conversa) e devolve a origem junto", async () => {
     banco.settings = { jev: { ...LIGADO.jev, origem: "openrouter" } };

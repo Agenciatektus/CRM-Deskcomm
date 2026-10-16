@@ -61,7 +61,15 @@ import { basePadraoDaOrigem, MODELO_DA_TYPESAFE, modeloDaOrigem, ORIGEM_PADRAO, 
  */
 export function baseDaApiDoJev(origem: OrigemDoJev = ORIGEM_PADRAO): string {
   const configurada = (env.JEV_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
-  return configurada || basePadraoDaOrigem(origem);
+  if (configurada) return configurada;
+  // Via OpenRouter a chave é a da CONVERSA, e ela vai para onde a conversa vai:
+  // com `OPENROUTER_BASE_URL` apontando para um gateway próprio, mandar essa
+  // chave para openrouter.ai entregaria a credencial a um host que não é o dela.
+  if (origem === "openrouter") {
+    const daConversa = (env.OPENROUTER_BASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/v1$/, "");
+    if (daConversa) return daConversa;
+  }
+  return basePadraoDaOrigem(origem);
 }
 
 /**
