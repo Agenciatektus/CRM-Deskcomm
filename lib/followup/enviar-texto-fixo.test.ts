@@ -38,6 +38,8 @@ const JOB = {
 };
 
 const statusUpdates: string[] = [];
+/** Linhas gravadas em `pacing_ledger` — é por aqui que se prova que o envio foi CONTABILIZADO. */
+const ledgerInserts: Record<string, unknown>[] = [];
 const filtrosRunAfter: { op: string; col: string; v: string }[] = [];
 const settleCalls: Record<string, unknown>[] = [];
 
@@ -59,9 +61,16 @@ const CONFIG = {
     allow_sunday: true as boolean | null,
     timezone: null as string | null,
     warmup_daily_caps: null as unknown,
+    /** `null` = idade 0, o degrau mais conservador do warm-up (teto de 20/dia). */
+    number_activated_at: null as string | null,
   },
   /** `ai_agent_versions.followup` da versão publicada — `null` = sem faixa. */
   followup: null as unknown,
+  /** Estado do `pacing_ledger` deste número — o freio anti-ban do texto fixo. */
+  ritmo: {
+    ultimoEnvioIso: null as string | null,
+    doDia: 0,
+  },
 };
 
 function reiniciarConfig() {
@@ -75,8 +84,20 @@ function reiniciarConfig() {
     allow_sunday: true,
     timezone: null,
     warmup_daily_caps: null,
+    number_activated_at: null,
   };
   CONFIG.followup = null;
+  CONFIG.ritmo = { ultimoEnvioIso: null, doDia: 0 };
+}
+
+/** Congela o relógio num instante — as réguas de horário e de ritmo leem `Date`. */
+async function comRelogoEm<T>(instanteISO: string, corpo: () => Promise<T>): Promise<T> {
+  vi.useFakeTimers({ now: new Date(instanteISO), toFake: ["Date"] });
+  try {
+    return await corpo();
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 /** Admin stub: job_queue (select pending / claim / status) + followup_enrollments. */
@@ -90,9 +111,16 @@ function admin(revogado = false, falhaDeLeitura: Error | null = null) {
       eq: () => chain,
       lte: (col: string, v: string) => (filtrosRunAfter.push({ op: "lte", col, v }), chain),
       lt: (col: string, v: string) => (filtrosRunAfter.push({ op: "lt", col, v }), chain),
+      // `lerEstadoDoPacing` conta as linhas do dia com `.gte("sent_at", …)`.
+      // Sem este método o freio de ritmo estourava TypeError e o job caía no
+      // catch do drain — foi o que quebrou sete casos deste arquivo.
+      gte: () => chain,
       in: () => chain,
       single: () => Promise.resolve({data:table==="send_ledger"?{id:"ledger-1"}:{settings:{}},error:null}),
-      insert: () => chain,
+      insert: (p: Record<string, unknown>) => {
+        if (table === "pacing_ledger") ledgerInserts.push(p);
+        return chain;
+      },
       order: () => chain,
       limit: () => chain,
       update: (p: Record<string, unknown>) => {
@@ -106,6 +134,11 @@ function admin(revogado = false, falhaDeLeitura: Error | null = null) {
           return Promise.resolve({ data: { current_node_id: "node-1",status:"active",revision:1,agent_id:"ag-1" }, error: null });
         if (table === "conversations") return Promise.resolve({ data: { channel_session_id: CONFIG.sessao }, error: null });
         if (table === "channel_knobs") return Promise.resolve({ data: CONFIG.knobs, error: null });
+        if (table === "pacing_ledger")
+          return Promise.resolve({
+            data: CONFIG.ritmo.ultimoEnvioIso ? { sent_at: CONFIG.ritmo.ultimoEnvioIso } : null,
+            error: null,
+          });
         if (table === "organizations") return Promise.resolve({ data: { timezone: CONFIG.fuso }, error: null });
         if (table === "ai_agents") return Promise.resolve({ data: { published_version_id: "v1" }, error: null });
         if (table === "ai_agent_versions") return Promise.resolve({ data: { followup: CONFIG.followup }, error: null });
@@ -114,6 +147,10 @@ function admin(revogado = false, falhaDeLeitura: Error | null = null) {
       then: (r: (v: unknown) => unknown) => {
         if (table === "job_queue" && !chain._upd) {
           return Promise.resolve({ data: [JOB], error: null }).then(r);
+        }
+        // A contagem do dia é `head: true`: volta `count`, nunca linha.
+        if (table === "pacing_ledger") {
+          return Promise.resolve({ data: null, count: CONFIG.ritmo.doDia, error: null }).then(r);
         }
         return Promise.resolve({ data: null, error: null }).then(r);
       },
@@ -134,6 +171,7 @@ beforeEach(() => {
   statusUpdates.length = 0;
   filtrosRunAfter.length = 0;
   settleCalls.length = 0;
+  ledgerInserts.length = 0;
   reiniciarConfig();
 });
 
@@ -245,17 +283,11 @@ describe("enviarTextoFixoPendente · janela de disparo (#2658)", () => {
       allow_sunday: true,
       timezone: null,
       warmup_daily_caps: null,
+      // Número FORMADO: estes casos medem a janela de horário, e o degrau de
+      // warm-up (teto de 20/dia na idade 0) vetaria por outro motivo.
+      number_activated_at: '2026-01-01T00:00:00Z',
     };
     CONFIG.followup = FAIXA_SEG_A_SEX;
-  }
-
-  async function comRelogoEm<T>(instanteISO: string, corpo: () => Promise<T>): Promise<T> {
-    vi.useFakeTimers({ now: new Date(instanteISO), toFake: ["Date"] });
-    try {
-      return await corpo();
-    } finally {
-      vi.useRealTimers();
-    }
   }
 
   it("03h da madrugada (canal 8h–18h) → NÃO envia, adia para a abertura e registra o motivo", async () => {
@@ -325,5 +357,87 @@ describe("enviarTextoFixoPendente · janela de disparo (#2658)", () => {
 
     expect(enviados).toBe(1);
     expect(sendMessageHandler).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * O FREIO ANTI-BAN DO TEXTO FIXO.
+ *
+ * O atalho inline chama `sendMessageHandler` direto e, com isso, passa por fora
+ * da cadeia `before_send` — onde mora `decidePacing`. O passo de IA tinha
+ * espaçamento, jitter, warm-up e teto diário; o de texto fixo não tinha nenhum
+ * dos quatro, e os envios dele nem entravam no `pacing_ledger` — então o agente
+ * do próprio CRM seguia achando o número folgado.
+ *
+ * A janela de horário fica ABERTA nestes casos (canal 0h–24h, sem faixa) de
+ * propósito: o que está sob medição aqui é o ritmo, e um veto de janela
+ * esconderia o resultado.
+ */
+describe("enviarTextoFixoPendente · ritmo do canal", () => {
+  it("envio há 200 ms: adia por pacing_throttle, não manda e não gasta tentativa", async () => {
+    decidir.mockResolvedValue({ permite: true, motivo: "autorizado" });
+    CONFIG.ritmo.ultimoEnvioIso = "2026-10-15T15:00:00.000Z";
+
+    const enviados = await comRelogoEm("2026-10-15T15:00:00.200Z", () =>
+      enviarTextoFixoPendente(admin()),
+    );
+
+    expect(enviados).toBe(0);
+    expect(sendMessageHandler).not.toHaveBeenCalled();
+    expect(completeTurnForEnrollment.mock.calls[0]![4]).toMatchObject({
+      kind: "deferred",
+      reason: "pacing_throttle",
+    });
+    // `hold` = o job volta para `pending` sem consumir tentativa; o envio sai
+    // sozinho na liberação.
+    expect(settleCalls.at(-1)!.p_done).toBe(false);
+    expect(statusUpdates).toContain("pending");
+    expect(ledgerInserts).toHaveLength(0);
+  });
+
+  it("número novo que já bateu o teto de 20/dia: adia por daily_cap", async () => {
+    decidir.mockResolvedValue({ permite: true, motivo: "autorizado" });
+    // `number_activated_at` nulo = idade 0 = o degrau mais conservador.
+    CONFIG.ritmo.doDia = 20;
+
+    const enviados = await comRelogoEm("2026-10-15T15:00:00Z", () =>
+      enviarTextoFixoPendente(admin()),
+    );
+
+    expect(enviados).toBe(0);
+    expect(sendMessageHandler).not.toHaveBeenCalled();
+    expect(completeTurnForEnrollment.mock.calls[0]![4]).toMatchObject({
+      kind: "deferred",
+      reason: "daily_cap",
+    });
+  });
+
+  it("número formado, espaçado e dentro do teto: envia E CONTABILIZA no ledger", async () => {
+    decidir.mockResolvedValue({ permite: true, motivo: "autorizado" });
+    CONFIG.knobs.number_activated_at = "2026-01-01T00:00:00Z";
+    CONFIG.ritmo.ultimoEnvioIso = "2026-10-15T14:00:00.000Z";
+    CONFIG.ritmo.doDia = 3;
+
+    const enviados = await comRelogoEm("2026-10-15T15:00:00Z", () =>
+      enviarTextoFixoPendente(admin()),
+    );
+
+    expect(enviados).toBe(1);
+    expect(sendMessageHandler).toHaveBeenCalledOnce();
+    // A linha no ledger é o que faltava: sem ela o teto protegia metade do número.
+    expect(ledgerInserts).toHaveLength(1);
+    expect(ledgerInserts[0]).toMatchObject({ channel_session_id: "sess-1" });
+  });
+
+  it("conversa sem canal: o ritmo não tem o que consultar e o envio segue", async () => {
+    decidir.mockResolvedValue({ permite: true, motivo: "autorizado" });
+    CONFIG.sessao = null;
+
+    const enviados = await comRelogoEm("2026-10-15T15:00:00Z", () =>
+      enviarTextoFixoPendente(admin()),
+    );
+
+    expect(enviados).toBe(1);
+    expect(ledgerInserts).toHaveLength(0);
   });
 });
