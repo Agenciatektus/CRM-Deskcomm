@@ -3314,7 +3314,7 @@ async function executarTurnoDoAgente(
         // paralelas do mesmo passo — a reserva vira logo abaixo, antes do primeiro
         // await; a candidata checada ainda não foi reservada, então nunca se suprime
         // a si mesma). O contrato é UMA resposta adequada e completa — repetição
-        // imediato é redundância, não informação nova (mudança de valor/negação é
+        // imediata é redundância, não informação nova (mudança de valor/negação é
         // exceção na régua: preço, hora ou "não" trocado passam, ver near-dup.ts).
         // Suprime sem tocar no canal nem no ledger (nada é marcado como entregue),
         // devolvendo ao modelo um erro de ENSINO (mesma forma de corpo_vazio/
