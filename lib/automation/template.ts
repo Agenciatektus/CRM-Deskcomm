@@ -46,7 +46,16 @@ function campoPersonalizadoDoLead(context: Record<string, unknown>, nome: string
   return Array.isArray(valor) ? valor.join(", ") : valor;
 }
 
-export function renderTemplate(template: string, context: Record<string, unknown>): string {
+/**
+ * `formatarValor` recebe cada VALOR já resolvido, nunca o template: quem
+ * renderiza para HTML escapa o que veio do contato/negócio e mantém a marcação
+ * que o operador escreveu.
+ */
+export function renderTemplate(
+  template: string,
+  context: Record<string, unknown>,
+  formatarValor: (valor: string) => string = (valor) => valor,
+): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_m, path: string) => {
     // `{{nome}}` fala com a pessoa: segue a régua única de nome de gente
     // (cadastrado, depois o perfil do WhatsApp). Contato que chega pelo
@@ -57,6 +66,6 @@ export function renderTemplate(template: string, context: Record<string, unknown
         : (resolveField(context, ALIASES[path] ?? path) ?? campoPersonalizadoDoLead(context, path));
     // `{{primeiro_nome}}` = primeira palavra do nome, como no Inbox e na campanha.
     const texto = String(resolved ?? "");
-    return path === "primeiro_nome" ? (texto.trim().split(/\s+/)[0] ?? "") : texto;
+    return formatarValor(path === "primeiro_nome" ? (texto.trim().split(/\s+/)[0] ?? "") : texto);
   });
 }
