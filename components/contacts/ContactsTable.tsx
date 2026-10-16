@@ -216,7 +216,7 @@ export function ContactsTable({
                 title={t("Selecionar todas")}
                 data-testid="selecionar-todos-contatos"
                 onClick={onSelecionarTodosVisiveis}
-                className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-input bg-background transition-colors hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-input bg-background transition-colors hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               >
                 {selecionados && contacts.every((c) => selecionados.has(c.id)) && (
                   <Check size={12} weight="bold" aria-hidden />
@@ -271,7 +271,7 @@ export function ContactsTable({
                   aria-label={`${t("Selecionar contato")} ${displayName(c, t)}`}
                   data-testid={`selecionar-contato-${c.id}`}
                   onClick={() => onAlternarSelecao(c.id)}
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-input bg-background transition-colors hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-input bg-background transition-colors hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   {selecionados?.has(c.id) && <Check size={12} weight="bold" aria-hidden />}
                 </button>
