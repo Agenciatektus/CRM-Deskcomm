@@ -10,9 +10,10 @@
  * responde 200. O passo automático que ignorasse isso "enviaria" e o cliente não
  * receberia nada.
  *
- * A issue é explícita sobre o desfecho: se a mídia não pode sair, RECUSE com motivo
- * explícito — e NUNCA mande o texto solto no lugar. Mandar só a legenda como texto é
- * pior que não mandar: o cliente recebe uma frase sobre uma imagem que não veio.
+ * O desfecho é decisão deste PR (a #2734 pede só "respeitar as regras de modelo
+ * aprovado"): se a mídia não pode sair, RECUSE com motivo explícito — e NUNCA mande
+ * o texto solto no lugar. Mandar só a legenda como texto é pior que não mandar: o
+ * cliente recebe uma frase sobre uma imagem que não veio.
  *
  * ═══ Por que a régua não é reescrita aqui ═══
  *

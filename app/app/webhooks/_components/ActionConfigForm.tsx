@@ -181,6 +181,8 @@ function SendWhatsappForm({
   const t = useT();
   const { data: sessions } = useChannelSessions();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  // Uma regra pode ter mais de uma ação de WhatsApp: id fixo repetiria na página.
+  const midiaId = React.useId();
   // Os campos cadastrados no funil (Configurações › Funis) viram botões: quem
   // monta a mensagem clica em "Serviço" em vez de adivinhar o nome interno. O
   // token é só a chave — `renderTemplate` a resolve em `lead.custom_fields`.
@@ -257,8 +259,9 @@ function SendWhatsappForm({
         </p>
       </div>
       <div className="space-y-1">
-        <Label>{t("Imagem ou PDF (opcional)")}</Label>
+        <Label htmlFor={midiaId}>{t("Imagem ou PDF (opcional)")}</Label>
         <Input
+          id={midiaId}
           type="url"
           value={config.media_url ?? ""}
           onChange={(e) => onChange({ ...config, media_url: e.target.value || null })}
