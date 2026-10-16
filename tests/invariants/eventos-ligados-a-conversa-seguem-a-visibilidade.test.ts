@@ -1,9 +1,11 @@
 /**
  * 0685 — evento LIGADO a uma conversa segue a visibilidade dela, não só o de
  * `entity_kind = 'conversation'`: a nota (`conversation_note`, cujo `entity_id`
- * é o id da conversa) e os demais eventos que trazem `payload.conversation_id`
- * (mensagem, job). E a atribuição de conversa fora da visibilidade não toca a
- * linha: ela é decidida no WHERE do `for no key update`.
+ * é o id da conversa), os eventos que trazem `payload.conversation_id`
+ * (mensagem, job) — inclusive o de conversa/nota sem `entity_id` — e o aviso
+ * da Central (`central.aviso_criado`) cujo `ref_kind` é `conversation`. E a
+ * atribuição de conversa fora da visibilidade não toca a linha: ela é decidida
+ * no WHERE do `for no key update`.
  *
  * `GOV_CONV_AGENT_B` é de `GOV_AGENT_B`; `GOV_AGENT_A`, em modo `own`, não a vê.
  */
@@ -17,6 +19,7 @@ import {
   GOV_ORG,
   GOV_VIEWER,
   countAs,
+  lastLine,
   seedGov,
   sql,
 } from "./gov-helpers";
@@ -35,6 +38,15 @@ const EV_MALFORMADOS = [
   "e0e0e0e0-0685-4000-8000-000000000018",
 ];
 
+// Conversa e nota SEM `entity_id`: a conversa vem do `payload.conversation_id`.
+const EV_CONVERSA_SEM_ENTIDADE = "e0e0e0e0-0685-4000-8000-000000000021";
+const EV_NOTA_SEM_ENTIDADE = "e0e0e0e0-0685-4000-8000-000000000022";
+// Avisos da Central (ids em `agent_inbox_items`); o evento nasce do trigger de produção.
+const AVISO_DA_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000023";
+const AVISO_DE_CONTATO = "e0e0e0e0-0685-4000-8000-000000000024";
+const contarAviso = (aviso: string) =>
+  `select count(*) from public.event_log where event_type = 'central.aviso_criado' and entity_id = '${aviso}';`;
+
 const contar = (id: string) => `select count(*) from public.event_log where id = '${id}';`;
 const modo = (m: string) =>
   sql(`update public.organizations set settings = jsonb_set(coalesce(settings,'{}'), '{visibility_mode}', '"${m}"') where id = '${GOV_ORG}';`);
@@ -47,6 +59,10 @@ beforeAll(() => {
         jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}', 'body_preview', 'nota interna'), 'done'),
       ('${EV_MENSAGEM}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(),
         jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}'), 'done'),
+      ('${EV_CONVERSA_SEM_ENTIDADE}', '${GOV_ORG}', 'conversation.claimed', 'conversation', null,
+        jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}'), 'done'),
+      ('${EV_NOTA_SEM_ENTIDADE}', '${GOV_ORG}', 'user.mentioned', 'conversation_note', null,
+        jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}'), 'done'),
       ('${EV_JOB}',      '${GOV_ORG}', 'conversation.autonomous_turn_revoked', 'job', gen_random_uuid(),
         jsonb_build_object('conversation_id', '${GOV_CONV_AGENT_B}'), 'done'),
       ('${EV_MENSAGEM_ID_SEM_FORMA}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(),
@@ -57,6 +73,10 @@ beforeAll(() => {
       ('${EV_MALFORMADOS[0]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":"x"}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[1]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":""}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[2]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":12345}'::jsonb, 'done')
+      on conflict (id) do nothing;
+    insert into public.agent_inbox_items (id, organization_id, kind, ref_kind, ref_id, title) values
+      ('${AVISO_DA_CONVERSA}', '${GOV_ORG}', 'other', 'conversation', '${GOV_CONV_AGENT_B}', 'aviso da conversa'),
+      ('${AVISO_DE_CONTATO}',  '${GOV_ORG}', 'other', 'contact',      gen_random_uuid(),     'aviso de contato')
       on conflict (id) do nothing;
   `);
 });
@@ -95,6 +115,28 @@ describe("0685 — eventos ligados a uma conversa seguem a visibilidade dela", (
     const fora = "e0e0e0e0-0685-4000-8000-0000000000fe";
     sql(`insert into auth.users (id, email) values ('${fora}', 'fora-0685b@invariant.test') on conflict do nothing;`);
     expect(countAs(fora, `select count(*) from public.event_log where id in (${ids});`)).toBe(0);
+  });
+
+  it.each([EV_CONVERSA_SEM_ENTIDADE, EV_NOTA_SEM_ENTIDADE])(
+    "conversa/nota sem entity_id cai no payload.conversation_id: dono e gestão leem, colega own não (%s)",
+    (ev) => {
+      expect(countAs(GOV_AGENT_B, contar(ev))).toBe(1);
+      expect(countAs(GOV_MANAGER, contar(ev))).toBe(1);
+      expect(countAs(GOV_AGENT_A, contar(ev))).toBe(0);
+    },
+  );
+
+  it("aviso da Central sobre uma conversa segue a visibilidade dela pelo ref_id", () => {
+    // O trigger de produção emitiu um evento por aviso (sem isto, o zero abaixo seria vazio).
+    expect(Number(lastLine(sql(contarAviso(AVISO_DA_CONVERSA))))).toBe(1);
+    expect(countAs(GOV_AGENT_B, contarAviso(AVISO_DA_CONVERSA))).toBe(1);
+    expect(countAs(GOV_MANAGER, contarAviso(AVISO_DA_CONVERSA))).toBe(1);
+    expect(countAs(GOV_AGENT_A, contarAviso(AVISO_DA_CONVERSA))).toBe(0);
+  });
+
+  it("aviso da Central que não é de conversa segue o pertencimento à organização (controle)", () => {
+    expect(Number(lastLine(sql(contarAviso(AVISO_DE_CONTATO))))).toBe(1);
+    expect(countAs(GOV_AGENT_A, contarAviso(AVISO_DE_CONTATO))).toBe(1);
   });
 
   it("viewer lê pela visão ampla, como em fn_can_view_conversation", () => {

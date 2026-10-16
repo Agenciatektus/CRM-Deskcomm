@@ -54770,13 +54770,15 @@ revoke all     on function public.fn_conversation_assign(uuid, uuid, uuid, text,
 grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean) to authenticated, service_role;
 
 -- event_log: evento ligado a uma conversa segue a visibilidade da própria
--- conversa (mesmo molde de conversation_notes e ai_reply_drafts). Ligado =
--- entity_kind 'conversation' ou 'conversation_note' (o entity_id é o id da
--- conversa) ou, nos demais, payload.conversation_id com forma de uuid. Demais
--- eventos seguem só o pertencimento à organização, como antes. Workers usam a
--- service role e não passam por aqui. Troca de policy num bloco só: o update.sh
--- reaplica o baseline sem ON_ERROR_STOP, e drop/create soltos poderiam deixar
--- a tabela sem policy de leitura.
+-- conversa (mesmo molde de conversation_notes e ai_reply_drafts). A conversa do
+-- evento é resolvida, nesta ordem (coalesce): pelo entity_id quando entity_kind
+-- é 'conversation' ou 'conversation_note'; por payload.conversation_id; ou pelo
+-- payload.ref_id quando payload.ref_kind = 'conversation' (o aviso da Central,
+-- central.aviso_criado). Os dois campos do payload só valem com forma de uuid.
+-- Evento sem conversa resolvível segue só o pertencimento à organização, como
+-- antes. Workers usam a service role e não passam por aqui. Troca de policy num
+-- bloco só: o update.sh reaplica o baseline sem ON_ERROR_STOP, e drop/create
+-- soltos poderiam deixar a tabela sem policy de leitura.
 --
 -- Custo: o ramo "visão ampla" é uma subconsulta SEM correlação — o Postgres a
 -- avalia uma vez por consulta. Sem ele, a contagem de eventos das telas de
@@ -54784,14 +54786,15 @@ grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text,
 -- repete a de fn_can_view_conversation (viewer/manager/admin liberam por papel):
 -- se ela mudar, mude aqui também. No ramo do atendente (agent), a expressão que
 -- resolve a conversa aparece duas vezes, inline e sem subconsulta derivada: assim
--- o Postgres monta UMA vez por consulta o conjunto de conversas visíveis (hashed
--- SubPlan) em vez de uma busca por linha de evento. Medido com 100.000 eventos e
--- 5.000 conversas: a forma com subconsulta derivada levava ~140 s numa contagem
--- da organização; esta, ~7,5 s, na mesma ordem da versão que só cobria
--- entity_kind 'conversation'. O custo do atendente cresce com o número de
--- conversas da organização; nenhuma tela do produto lê event_log com sessão de
--- agent. A guarda de regex fica antes do ::uuid porque uma policy que lança erro
--- derruba toda leitura da tabela.
+-- o Postgres pode montar UMA vez por consulta o conjunto de conversas visíveis
+-- (hashed SubPlan) em vez de uma busca por linha de evento. O custo do atendente
+-- cresce com o número de conversas da organização; nenhuma tela do produto lê
+-- event_log com sessão de agent. Régua para medir: EXPLAIN (ANALYZE) de
+-- `select count(*) from public.event_log` com set role authenticated e
+-- request.jwt.claims de um agent e de um manager, numa organização com N
+-- conversas e eventos ligados a elas; confira o hashed SubPlan no plano do
+-- agent e o InitPlan único no do manager. A guarda de regex fica antes do
+-- ::uuid porque uma policy que lança erro derruba toda leitura da tabela.
 do $$
 begin
   drop policy if exists "event_log_select" on public.event_log;
@@ -54803,21 +54806,29 @@ begin
           select o from public.fn_user_org_ids() o
            where public.fn_user_role_in_org(o) in ('viewer', 'manager', 'admin')
         )
-        or (case
-               when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id
-               when event_log.payload ->> 'conversation_id'
-                    ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                 then (event_log.payload ->> 'conversation_id')::uuid
-             end) is null
+        or coalesce(
+             case when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id end,
+             case when event_log.payload ->> 'conversation_id'
+                       ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  then (event_log.payload ->> 'conversation_id')::uuid end,
+             case when event_log.payload ->> 'ref_kind' = 'conversation'
+                       and event_log.payload ->> 'ref_id'
+                       ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  then (event_log.payload ->> 'ref_id')::uuid end
+           ) is null
         or exists (
           select 1 from public.conversations c
            where c.organization_id = event_log.organization_id
-             and c.id = (case
-               when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id
-               when event_log.payload ->> 'conversation_id'
-                    ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                 then (event_log.payload ->> 'conversation_id')::uuid
-             end)
+             and c.id = coalesce(
+               case when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id end,
+               case when event_log.payload ->> 'conversation_id'
+                         ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                    then (event_log.payload ->> 'conversation_id')::uuid end,
+               case when event_log.payload ->> 'ref_kind' = 'conversation'
+                         and event_log.payload ->> 'ref_id'
+                         ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                    then (event_log.payload ->> 'ref_id')::uuid end
+             )
              and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
         )
       )

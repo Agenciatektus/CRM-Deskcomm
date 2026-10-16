@@ -1,10 +1,14 @@
 /**
  * 0685 — o registro de eventos (`event_log`) acompanha a visibilidade da conversa.
  *
- * Linha com `entity_kind = 'conversation'` só é legível pela sessão de quem
- * pode abrir a conversa (`fn_can_view_conversation`, mesmo molde de
- * `conversation_notes`). Os demais eventos seguem só o pertencimento à
- * organização, como antes. Workers leem com a service role e não passam aqui.
+ * Evento ligado a uma conversa só é legível pela sessão de quem pode abrir a
+ * conversa (`fn_can_view_conversation`, mesmo molde de `conversation_notes`).
+ * A conversa do evento é resolvida pelo `entity_id` (`conversation`/
+ * `conversation_note`), por `payload.conversation_id`, ou pelo `ref_id` do
+ * aviso da Central (`payload.ref_kind = 'conversation'`). Evento sem conversa
+ * resolvível segue só o pertencimento à organização. Workers leem com a
+ * service role e não passam aqui. Os casos de nota, payload e aviso estão em
+ * `eventos-ligados-a-conversa-seguem-a-visibilidade.test.ts`.
  *
  * `GOV_CONV_AGENT_B` é de `GOV_AGENT_B`; `GOV_AGENT_A` é do mesmo papel e da
  * mesma organização, e só não a enxerga porque não é o dono (modo `own`).
@@ -72,7 +76,7 @@ describe("0685 — evento de conversa segue a visibilidade da conversa", () => {
     expect(countAs(quem, contar(EV_CONVERSA_LIVRE))).toBe(1);
   });
 
-  it("eventos que não são de conversa seguem só o pertencimento à organização", () => {
+  it("eventos sem conversa resolvível seguem só o pertencimento à organização", () => {
     expect(countAs(GOV_AGENT_A, contar(EV_LEAD))).toBe(1);
     expect(countAs(GOV_AGENT_A, contar(EV_SEM_ENTIDADE))).toBe(1);
   });
