@@ -54699,8 +54699,16 @@ grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text,
 -- avalia uma vez por consulta. Sem ele, a contagem de eventos das telas de
 -- gestão (Evolução, Uso de IA) pagaria o exists por linha. A lista de papéis
 -- repete a de fn_can_view_conversation (viewer/manager/admin liberam por papel):
--- se ela mudar, mude aqui também. O ramo do atendente (agent) paga o exists por
--- linha; nenhuma tela do produto lê event_log com sessão de agent.
+-- se ela mudar, mude aqui também. No ramo do atendente (agent), a expressão que
+-- resolve a conversa aparece duas vezes, inline e sem subconsulta derivada: assim
+-- o Postgres monta UMA vez por consulta o conjunto de conversas visíveis (hashed
+-- SubPlan) em vez de uma busca por linha de evento. Medido com 100.000 eventos e
+-- 5.000 conversas: a forma com subconsulta derivada levava ~140 s numa contagem
+-- da organização; esta, ~7,5 s, na mesma ordem da versão que só cobria
+-- entity_kind 'conversation'. O custo do atendente cresce com o número de
+-- conversas da organização; nenhuma tela do produto lê event_log com sessão de
+-- agent. A guarda de regex fica antes do ::uuid porque uma policy que lança erro
+-- derruba toda leitura da tabela.
 do $$
 begin
   drop policy if exists "event_log_select" on public.event_log;
@@ -54712,21 +54720,22 @@ begin
           select o from public.fn_user_org_ids() o
            where public.fn_user_role_in_org(o) in ('viewer', 'manager', 'admin')
         )
+        or (case
+               when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id
+               when event_log.payload ->> 'conversation_id'
+                    ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                 then (event_log.payload ->> 'conversation_id')::uuid
+             end) is null
         or exists (
-          select 1
-            from (select case
-                    when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id
-                    when event_log.payload ->> 'conversation_id'
-                         ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                      then (event_log.payload ->> 'conversation_id')::uuid
-                  end as conversa) r
-           where r.conversa is null
-              or exists (
-                select 1 from public.conversations c
-                 where c.organization_id = event_log.organization_id
-                   and c.id = r.conversa
-                   and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
-              )
+          select 1 from public.conversations c
+           where c.organization_id = event_log.organization_id
+             and c.id = (case
+               when event_log.entity_kind in ('conversation', 'conversation_note') then event_log.entity_id
+               when event_log.payload ->> 'conversation_id'
+                    ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                 then (event_log.payload ->> 'conversation_id')::uuid
+             end)
+             and public.fn_can_view_conversation(c.organization_id, c.assigned_to_user_id)
         )
       )
     );
