@@ -61,6 +61,11 @@ export const triggerConfigSchema = z.discriminatedUnion("kind", [
       max_silence_minutes: z.number().int().min(5).max(10_080).optional(),
       // De onde a pausa conta (`pausa-de-reentrada.ts`). Ausente = `ultima_mensagem`.
       reentry_pause_basis: z.enum(BASES_DA_PAUSA).optional(),
+      // Só alcança quem a EQUIPE já respondeu: na conversa que guarda o inbound
+      // mais recente, tem de haver outbound DEPOIS dele. Ausente ou `false` = o
+      // comportamento de sempre, byte a byte — ver a seção "Dívida da equipe não
+      // é silêncio do cliente" no cabeçalho de `silence-sweep.ts`.
+      exige_resposta_da_equipe: z.boolean().optional(),
     }),
     ...CANCEL_ON_REPLY,
   }),

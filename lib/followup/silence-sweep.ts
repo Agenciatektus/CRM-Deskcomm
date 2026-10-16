@@ -89,6 +89,29 @@ import { StaleServiceBoundaryError, parseServiceBoundary, assertCurrentServiceBo
  * cancelado, num laço com a varredura seguinte (o cooldown o espaça, não o
  * encerra).
  *
+ * ─── Dívida da equipe não é silêncio do cliente (2026-10-15) ──────────────
+ *
+ * O limiar mede UMA coisa: há quanto tempo o CLIENTE não escreve. Mensagem
+ * nossa não zera esse relógio, e nada aqui perguntava se a última palavra da
+ * conversa era dele ou nossa — então o contato que escreveu e NÃO FOI
+ * ATENDIDO é, pela régua, o silencioso mais perfeito que existe.
+ *
+ * Medido na instalação do relato (15/10/2026), antes de qualquer publicação:
+ * 147 conversas abertas SEM DONO, com média de 5 dias desde a última mensagem
+ * do cliente e nenhum atendente disponível. Um fluxo de "primeiro contato sem
+ * resposta" com limiar de 180 min alcançaria as 147 e perguntaria "ainda tem
+ * interesse?" a quem estava esperando resposta há cinco dias. O gatilho não
+ * estava errado sozinho: ele mede silêncio do cliente, e quem o armou leu
+ * "ninguém respondeu" — as duas leituras são razoáveis e divergem exatamente
+ * onde a fila está atrasada.
+ *
+ * `exige_resposta_da_equipe` fecha isso: só entra quem já tem resposta nossa
+ * DEPOIS da última mensagem dele, medido por conversa (`last_outbound_at >` o
+ * inbound vencedor), na MESMA consulta que já decide o silêncio — nenhuma ida
+ * a mais ao banco. Fica **desligado por default**: ligá-lo para todos calaria
+ * fluxos de silêncio já publicados em outras instalações, que é dado alheio.
+ * Quem quer a proteção liga no painel do gatilho.
+ *
  * agent_id: `decidirAgenteDoEnrollmentAutomatico` pina o agente publicado que
  * ARMA o pointer (menor uuid se >1). Grafo só de texto fixo nasce com
  * `agent_id` nulo. Grafo que pede IA sem agente é gate-out.
@@ -139,6 +162,8 @@ export interface SilencePointer {
   max_silence_minutes?: number;
   /** De onde a pausa de reentrada conta; ausente = `ultima_mensagem`. */
   reentry_pause_basis?: BaseDaPausa;
+  /** Só alcança quem a equipe já respondeu; ausente/`false` = o comportamento de sempre. */
+  exige_resposta_da_equipe?: boolean;
   /** `followup_flow_pointers.handoff_policy`; ausente = `pause` (o default da coluna). */
   handoff_policy?: "pause" | "cancel" | "allow";
 }
@@ -170,6 +195,19 @@ export interface SilenceSweepDb {
    * por alguém da equipe, contato em `force_human` ou IA silenciada agora.
    */
   loadContatosComPessoaNoComando(orgId: string, contactIds: string[]): Promise<Set<string>>;
+  /**
+   * Dos `contactIds`, os que AINDA NÃO FORAM RESPONDIDOS: na conversa que guarda
+   * o inbound mais recente, não há outbound depois dele.
+   *
+   * OPCIONAL pela mesma razão de `loadContactPersonal` em `reactivity.ts` — os
+   * falsos de `tests/unit` e `tests/invariants` implementam só o que medem, e
+   * exigir o método quebraria os treze. A ausência NÃO lê como "todos
+   * respondidos": com o knob ligado e o método ausente, `runSilenceSweep` trata
+   * TODOS como não respondidos e não inscreve ninguém (falha FECHADA). Mandar
+   * contato proativo sem conseguir confirmar que a dívida é do cliente, e não
+   * nossa, é o defeito que este knob existe para fechar.
+   */
+  loadContatosSemRespostaDaEquipe?(orgId: string, contactIds: string[]): Promise<Set<string>>;
   /** Nó `trigger` do grafo pinado + se o fluxo pede agente; `null` se version/nó não existir. */
   loadTriggerNode(orgId: string, versionId: string): Promise<NoDeGatilho | null>;
   /**
@@ -226,6 +264,8 @@ export interface SilenceSweepSummary {
   skipped_reentry_pause: number;
   /** Silenciosos cuja conversa tem uma pessoa no comando (fluxo sem `handoff_policy='allow'`). */
   skipped_human_owned: number;
+  /** Silenciosos que a equipe ainda não respondeu (só conta com `exige_resposta_da_equipe`). */
+  skipped_sem_resposta_da_equipe: number;
   /**
    * Pointers que FALHARAM nesta varredura (logados e pulados). Um pointer ruim
    * — de uma empresa só — não pode calar a varredura de todas as outras: antes,
@@ -251,6 +291,7 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
     skipped_pending_return: 0,
     skipped_reentry_pause: 0,
     skipped_human_owned: 0,
+    skipped_sem_resposta_da_equipe: 0,
     pointers_failed: 0,
   };
 
@@ -315,6 +356,13 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
         pointer.handoff_policy !== "allow"
           ? await db.loadContatosComPessoaNoComando(pointer.organization_id, contactIds)
           : new Set<string>();
+      // Falha FECHADA de propósito: sem o método no adapter (falso de teste), o
+      // `??` trata todo mundo como não respondido e ninguém é inscrito. Ver o
+      // contrato de `loadContatosSemRespostaDaEquipe`.
+      const semRespostaDaEquipe = pointer.exige_resposta_da_equipe
+        ? (await db.loadContatosSemRespostaDaEquipe?.(pointer.organization_id, contactIds)) ??
+          new Set<string>(contactIds)
+        : new Set<string>();
       const comInscricaoViva = await db.loadContatosComInscricaoViva(pointer.organization_id, contactIds);
 
       for (const contactId of contactIds) {
@@ -324,6 +372,12 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
         }
         if (comPessoa.has(contactId)) {
           summary.skipped_human_owned++;
+          continue;
+        }
+        // Antes do cooldown: não é throttle de tempo, é "este contato nunca
+        // devia ter sido considerado". A dívida é NOSSA, não dele.
+        if (semRespostaDaEquipe.has(contactId)) {
+          summary.skipped_sem_resposta_da_equipe++;
           continue;
         }
         if (emCooldown.has(contactId)) {
@@ -389,6 +443,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
   // de `loadSilentContactIds` — as duas leituras abaixo não voltam ao banco por eles.
   const ultimaMensagem = new Map<string, number>();
   const pessoaNoComando = new Set<string>();
+  const semRespostaDaEquipe = new Set<string>();
   return {
     async loadActiveSilencePointers() {
       const { data, error } = await admin
@@ -421,6 +476,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
           reentry_pause_minutes: parsed.data.params.reentry_pause_minutes ?? 0,
           ...(parsed.data.params.max_silence_minutes ? { max_silence_minutes: parsed.data.params.max_silence_minutes } : {}),
           ...(parsed.data.params.reentry_pause_basis ? { reentry_pause_basis: parsed.data.params.reentry_pause_basis } : {}),
+          ...(parsed.data.params.exige_resposta_da_equipe ? { exige_resposta_da_equipe: true } : {}),
           handoff_policy:
             row.handoff_policy === "allow" || row.handoff_policy === "cancel" ? row.handoff_policy : "pause",
         });
@@ -443,7 +499,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
       const { data, error } = await admin
         .from("conversations")
         .select(
-          "id, service_revision, current_demanda_id, demandas!conversations_current_demanda_id_fkey(revision,fechada_em), status, assignee_kind, bot_silenced_until, messages!messages_conversation_id_fkey(organization_id,contact_id,conversation_id,service_revision,demanda_id,demanda_revision,sent_at), contact_id, last_inbound_at, contacts:contact_id(tags, is_blocked, ai_authorized_at, phone_number, force_human, ai_opt_out), sessao:channel_session_id(metadata), organizations:organization_id(status)",
+          "id, service_revision, current_demanda_id, demandas!conversations_current_demanda_id_fkey(revision,fechada_em), status, assignee_kind, bot_silenced_until, last_outbound_at, messages!messages_conversation_id_fkey(organization_id,contact_id,conversation_id,service_revision,demanda_id,demanda_revision,sent_at), contact_id, last_inbound_at, contacts:contact_id(tags, is_blocked, ai_authorized_at, phone_number, force_human, ai_opt_out), sessao:channel_session_id(metadata), organizations:organization_id(status)",
         )
         .eq("organization_id", orgId).eq("demandas.organization_id", orgId)
         .eq("contacts.organization_id", orgId).eq("sessao.organization_id", orgId)
@@ -461,6 +517,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
         assignee_kind?: string | null; bot_silenced_until?: string | null;
         contact_id: string;
         last_inbound_at: string;
+        last_outbound_at?: string | null;
         contacts: ContactEmbed;
         sessao: { metadata: Record<string, unknown> | null } | null;
         organizations: { status: string | null } | null;
@@ -478,6 +535,7 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
           blocked: boolean;
           permitidoPeloGate: boolean;
           pessoaNoComando: boolean;
+          respondido: boolean;
         }
       >();
       for (const row of (data ?? []) as unknown as Row[]) {
@@ -520,6 +578,12 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
             permitidoPeloGate: acesso.permite,
             // Os três vetos que valem sempre no atendimento (`decidirElegibilidade`),
             // lidos à parte: quem decide se barram o fluxo é a política de handoff dele.
+            // POR CONVERSA, e é a conversa do inbound vencedor: responder em
+            // OUTRA conversa do mesmo contato não quita a última mensagem dele.
+            // `Date.parse` de valor inválido é NaN, e `NaN > at` é falso — data
+            // estragada lê como "não respondido", nunca como respondido.
+            respondido:
+              row.last_outbound_at != null && Date.parse(row.last_outbound_at) > at,
             pessoaNoComando:
               row.assignee_kind === "user" ||
               row.contacts?.force_human === true ||
@@ -542,6 +606,8 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
         silentIds.push(contactId);
         origins.set(`${orgId}:${contactId}`, v.boundary);
         ultimaMensagem.set(`${orgId}:${contactId}`, v.at);
+        if (v.respondido) semRespostaDaEquipe.delete(`${orgId}:${contactId}`);
+        else semRespostaDaEquipe.add(`${orgId}:${contactId}`);
         if (v.pessoaNoComando) pessoaNoComando.add(`${orgId}:${contactId}`);
         else pessoaNoComando.delete(`${orgId}:${contactId}`);
       }
@@ -574,6 +640,10 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
 
     async loadContatosComPessoaNoComando(orgId, contactIds) {
       return new Set(contactIds.filter((id) => pessoaNoComando.has(`${orgId}:${id}`)));
+    },
+
+    async loadContatosSemRespostaDaEquipe(orgId, contactIds) {
+      return new Set(contactIds.filter((id) => semRespostaDaEquipe.has(`${orgId}:${id}`)));
     },
 
     async loadContatosComInscricaoViva(orgId, contactIds) {
