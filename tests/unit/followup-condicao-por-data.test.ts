@@ -148,10 +148,16 @@ describe("o contrato da regra no grafo", () => {
     expect(conditionCheckSchema.safeParse(base).success).toBe(true);
   });
 
-  it("recusa regra de data SEM o campo que ela lê", () => {
+  it("ACEITA rascunho sem o campo preenchido — quem exige é o publish", () => {
+    // Achado pela prova de tela: o painel grava a cada tecla, e exigir a chave
+    // AQUI fazia aparecer um erro no instante em que a pessoa escolhia o campo
+    // de data, antes de ela poder digitar — e a regra nova nem era persistida,
+    // então o nó seguia com a regra anterior enquanto a tela mostrava a nova.
+    // Mesma doutrina de `move_lead.stage_id` e `edit_lead_tag.tags`: rascunho é
+    // estrutural, publish é semântico (`campo_de_data_ausente`).
     const { key: _key, ...semKey } = base;
-    expect(conditionCheckSchema.safeParse(semKey).success).toBe(false);
-    expect(conditionCheckSchema.safeParse({ ...base, key: "   " }).success).toBe(false);
+    expect(conditionCheckSchema.safeParse(semKey).success).toBe(true);
+    expect(conditionCheckSchema.safeParse({ ...base, key: "   " }).success).toBe(true);
   });
 
   it("recusa regra de data com operador que não é de data", () => {
@@ -164,9 +170,11 @@ describe("o contrato da regra no grafo", () => {
     ).toBe(false);
   });
 
-  it("recusa prazo negativo ou em texto", () => {
-    expect(conditionCheckSchema.safeParse({ ...base, value: -1 }).success).toBe(false);
-    expect(conditionCheckSchema.safeParse({ ...base, value: "0" }).success).toBe(false);
+  it("ACEITA prazo em texto no rascunho — limpar o campo para redigitar passa por vazio", () => {
+    // Pelo mesmo motivo da chave: `trocarValor` grava o texto cru enquanto não
+    // é um inteiro, e o publish recusa com `check_value_not_number`.
+    expect(conditionCheckSchema.safeParse({ ...base, value: "0" }).success).toBe(true);
+    expect(conditionCheckSchema.safeParse({ ...base, value: "" }).success).toBe(true);
   });
 
   it("as regras antigas continuam válidas, sem key", () => {
@@ -255,5 +263,53 @@ describe("o publish recusa regra de data mal montada", () => {
     expect(codigos).not.toContain("empty_check_value");
     // `0` dias é o caso mais comum e não pode cair no "valor vazio".
     expect(codigos).not.toContain("check_value_not_number");
+  });
+});
+
+describe("o publish recusa o que o rascunho deixa passar", () => {
+  /** Grafo mínimo válido com UMA regra de data, para medir só a regra. */
+  function grafoComRegra(check: Record<string, unknown>) {
+    return {
+      nodes: [
+        { id: "t", type: "trigger", label: "Começo", position: { x: 0, y: 0 }, config: {} },
+        {
+          id: "c",
+          type: "condition",
+          label: "Teste acabou?",
+          position: { x: 0, y: 0 },
+          config: { combinator: "and", checks: [check] },
+        },
+        { id: "f", type: "end", label: "Fim", position: { x: 0, y: 0 }, config: { outcome: "exhausted" } },
+      ],
+      edges: [
+        { id: "e0", source: "t", target: "c", priority: 0, condition: { type: "always" } },
+        { id: "e1", source: "c", target: "f", priority: 0, condition: { type: "cond_result", value: true } },
+        { id: "e2", source: "c", target: "f", priority: 1, condition: { type: "cond_result", value: false } },
+      ],
+    };
+  }
+
+  const codigos = async (check: Record<string, unknown>) => {
+    const { validateFlowForPublish } = await import("../../lib/followup/validate-publish");
+    const r = validateFlowForPublish(grafoComRegra(check) as never, {} as never);
+    return r.ok ? [] : r.errors.map((e) => e.code);
+  };
+
+  it("prazo em texto é recusado NO PUBLISH", async () => {
+    expect(await codigos({ field: "lead_date", op: "passou_ha", value: "", key: "fim_teste" })).toContain(
+      "check_value_not_number",
+    );
+  });
+
+  it("prazo negativo é recusado NO PUBLISH", async () => {
+    expect(await codigos({ field: "lead_date", op: "passou_ha", value: -1, key: "fim_teste" })).toContain(
+      "check_value_not_number",
+    );
+  });
+
+  it("chave só com espaços é recusada NO PUBLISH", async () => {
+    expect(await codigos({ field: "lead_date", op: "passou_ha", value: 0, key: "   " })).toContain(
+      "campo_de_data_ausente",
+    );
   });
 });

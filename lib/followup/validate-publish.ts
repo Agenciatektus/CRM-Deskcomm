@@ -692,7 +692,9 @@ function conferirRegras(
         });
         return;
       }
-      const dias = Number(check.value);
+      // `valor` vazio NAO pode virar 0: `Number("")` e 0, e um prazo em branco
+      // publicaria como "inclui hoje" sem ninguem ver. Achado pela prova de tela.
+      const dias = valor === "" ? Number.NaN : Number(valor);
       if (!Number.isInteger(dias) || dias < 0) {
         errors.push({
           ...ancora,

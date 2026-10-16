@@ -350,10 +350,19 @@ export const conditionCheckSchema = z
      */
     key: z.string().min(1).max(60).optional(),
   })
-  .refine((c) => c.field !== 'lead_date' || (c.key ?? '').trim().length > 0, {
-    message: 'uma regra de data precisa do campo (key) que ela lê',
-    path: ['key'],
-  })
+  // ⚠️ `key` VAZIA PASSA AQUI, de propósito, e isso foi achado pela prova de
+  // tela. O rascunho é validado SÓ estruturalmente — a mesma razão pela qual
+  // `move_lead.stage_id` e `edit_lead_tag.tags` aceitam vazio: quem escolhe o
+  // campo de data ainda não digitou o nome dele, e o painel grava a cada
+  // tecla (`commit` → `safeParse`). Exigir a chave aqui fazia aparecer um erro
+  // no instante em que a pessoa escolhia «Data de um campo do negócio», antes
+  // de ela ter chance de preencher — e a regra nem era persistida, então o nó
+  // continuava com a regra ANTERIOR enquanto a tela mostrava a nova.
+  //
+  // Quem exige é o publish (`campo_de_data_ausente` em `validate-publish.ts`),
+  // como exige etapa de destino e tag. O mesmo vale para o prazo: limpar o
+  // campo para redigitar passa por um valor vazio, e o publish é que recusa
+  // (`check_value_not_number`).
   .refine((c) => c.field !== 'lead_date' || ehOpDeData(c.op), {
     message: `uma regra de data usa ${OPS_DE_DATA.join(' ou ')}`,
     path: ['op'],
@@ -361,10 +370,6 @@ export const conditionCheckSchema = z
   .refine((c) => c.field === 'lead_date' || !ehOpDeData(c.op), {
     message: 'passou_ha e falta_para existem só para regra de data',
     path: ['op'],
-  })
-  .refine((c) => c.field !== 'lead_date' || (typeof c.value === 'number' && c.value >= 0), {
-    message: 'o prazo em dias é um número de 0 para cima (0 = inclui hoje)',
-    path: ['value'],
   });
 
 export type ConditionCheck = z.infer<typeof conditionCheckSchema>;
