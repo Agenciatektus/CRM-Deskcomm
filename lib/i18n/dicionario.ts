@@ -16001,6 +16001,14 @@ export const DICIONARIO: Traducoes = {
   "Abrir tarefa": {
     es: "Abrir tarea",
   },
+  // Os rótulos dos dois kinds (KIND_LABEL em lib/ai/agent-inbox-copy.ts): é o
+  // título que a Central mostra em cada aviso, via `kindLabel(item.kind, t)`.
+  "Uma tarefa está perto do vencimento": {
+    es: "Una tarea está cerca del vencimiento",
+  },
+  "Uma tarefa venceu sem conclusão": {
+    es: "Una tarea venció sin terminarse",
+  },
   "Abra a tarefa e conclua antes do prazo — ou reagende agora, se já dá para ver que não vai caber.": {
     es: "Abre la tarea y cúmplela antes del plazo — o reprograma ahora, si ya ves que no va a caber.",
   },
