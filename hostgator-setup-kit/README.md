@@ -207,16 +207,21 @@ Como fazer:
    }
    ```
 
-2. Suba o serviço extra na MESMA rede interna do stack, para o nome `wiki` resolver dentro do contêiner do Caddy: `docker run --network <nome-do-projeto>_internal --memory 512m ...` (`docker network ls | grep _internal` mostra o nome da rede). O `--memory` não é decoração: sem teto o serviço novo derruba o CRM junto.
+2. Suba o serviço extra na rede `caddy-sites` do stack, para o nome `wiki` resolver dentro do contêiner do Caddy: `docker run --network <nome-do-projeto>_caddy-sites --memory 512m ...` (`docker network ls | grep caddy-sites` mostra o nome da rede). Essa rede existe só entre o Caddy e os serviços extras; **não** use a `_internal`, que é a dos serviços internos do CRM. O `--memory` não é decoração: sem teto o serviço novo derruba o CRM junto.
 
-3. Recarregue o proxy, que é quem lê a configuração ao subir:
+3. Confira e recarregue o proxy, **sem reiniciá-lo**:
 
    ```bash
-   docker compose -f docker-compose.prod.yml restart caddy
+   docker compose -f docker-compose.prod.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
+   docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
    # single-server: acrescente -f docker-compose.single-server.yml
    ```
 
+   Não use `restart caddy`: com um arquivo errado o Caddy reiniciado não sobe, e o CRM sai do ar junto. O `reload` recusa o arquivo errado, diz a linha e mantém no ar o que já estava.
+
 A pasta `caddy-sites/` está no `.gitignore` (só o `README.caddy` é versionado, para a pasta existir no clone novo e o glob do `import` nunca ficar vazio). Seus arquivos não aparecem em `git status`, não entram em `git diff` e **não atrapalham o `update.sh`** — ele troca de versão com `git checkout <tag>` e não toca nesta pasta. HTTPS automático, emissão de certificado e gzip vêm de graça, com o mesmo `ACME_EMAIL` do CRM.
+
+Na atualização, o `update.sh` confere a configuração do proxy (esta pasta inclusive) **antes** de recriá-lo. Se a conferência recusar um arquivo seu, o proxy antigo continua no ar, o CRM segue respondendo e a saída da atualização mostra o motivo, citando `caddy-sites/`.
 
 ## Automações e webhooks
 

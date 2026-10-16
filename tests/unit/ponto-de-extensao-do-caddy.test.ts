@@ -243,6 +243,36 @@ describe("o ponto de extensão do Caddy (#2724)", () => {
     expect(conteudo, "o placeholder não explica onde o operador solta o arquivo").toContain(PASTA_LOCAL);
   });
 
+  it.each(VARIANTES)("o caddy do $compose entra na rede própria dos serviços extras", (v) => {
+    // O serviço extra é de terceiro (wiki, n8n). Ele entra na `caddy-sites`,
+    // que só tem o Caddy, e não na `internal`, que é a dos serviços do CRM.
+    // Sem o Caddy nesta rede, o nome do serviço extra não resolve no proxy.
+    // Só a declaração de rede conta: o volume `./caddy-sites:` também cita o nome.
+    expect(
+      blocoDoServico(ler(v.compose), "caddy"),
+      `${v.compose}: o serviço caddy não está na rede caddy-sites`,
+    ).toMatch(/networks: \[[^\]]*\bcaddy-sites\b[^\]]*\]|^ {6}caddy-sites: \{\}$/m);
+  });
+
+  it("a rede dos serviços extras é declarada pela base, ao lado da internal", () => {
+    expect(ler("docker-compose.prod.yml")).toMatch(/^networks:\n(?: {2}.*\n| {4}.*\n)*? {2}caddy-sites:\n/m);
+  });
+
+  it.each([PLACEHOLDER, "hostgator-setup-kit/README.md"])("o passo a passo de %s recarrega sem derrubar e usa a rede própria", (arquivo) => {
+    const texto = ler(arquivo);
+    // `restart` com um arquivo errado deixa o Caddy parado e o CRM fora do ar
+    // (medido); `reload` recusa o arquivo errado e mantém o que está no ar.
+    expect(texto, `${arquivo}: o passo a passo não recarrega com caddy reload`).toContain("caddy reload");
+    expect(texto, `${arquivo}: o passo a passo não confere com caddy validate`).toContain("caddy validate");
+    expect(texto, `${arquivo}: o passo a passo ainda manda reiniciar o proxy`).not.toMatch(
+      /docker compose -f docker-compose\.prod\.yml restart caddy/,
+    );
+    expect(texto, `${arquivo}: o serviço extra ainda vai para a rede interna do CRM`).not.toContain(
+      "--network <nome-do-projeto>_internal",
+    );
+    expect(texto).toContain("<nome-do-projeto>_caddy-sites");
+  });
+
   it.each(VARIANTES)("a configuração que já existia continua de pé no $caddy", (v) => {
     // A outra metade do critério: acrescentar não pode mudar o resultado do que
     // já estava publicado. O que segue é o contrato de borda do produto, medido

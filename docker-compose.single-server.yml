@@ -38,6 +38,8 @@ services:
           # chamada entre os servicos precisa sair da VPS e voltar pelo IP.
           - ${DOMAIN}
       supabase_private: {}
+      # A rede dos serviços extras de caddy-sites/ (#2724), a mesma da base.
+      caddy-sites: {}
 
 networks:
   supabase_private:

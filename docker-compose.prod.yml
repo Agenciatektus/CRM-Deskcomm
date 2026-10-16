@@ -456,7 +456,10 @@ services:
       app:
         condition: service_healthy
     logging: *default-logging
-    networks: [internal]
+    # `caddy-sites` (#2724): rede só entre o Caddy e os serviços extras que o
+    # operador publica por caddy-sites/. O serviço de terceiro entra nela, e
+    # não na `internal`, para não alcançar os serviços internos do CRM.
+    networks: [internal, caddy-sites]
 
 volumes:
   waha-data:
@@ -469,4 +472,6 @@ volumes:
 
 networks:
   internal:
+    driver: bridge
+  caddy-sites:
     driver: bridge

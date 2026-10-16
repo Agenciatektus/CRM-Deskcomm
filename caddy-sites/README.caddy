@@ -20,30 +20,38 @@
 #        	reverse_proxy wiki:80
 #        }
 #
-#   2. O container do serviço extra precisa estar na MESMA rede interna do
-#      stack para o nome `wiki` resolver dentro do contêiner do Caddy. Rode com
-#      `--network <nome-do-projeto>_internal` (o `docker network ls | grep
-#      _internal` mostra o nome), ou acrescente a rede no compose dele. Deixe
-#      um limite de memória (`--memory 512m`): este VPS roda o CRM, e um serviço
-#      sem teto derruba os dois.
+#   2. Ponha o serviço extra na rede `caddy-sites` do stack, para o nome
+#      `wiki` resolver dentro do contêiner do Caddy. Ela existe só entre o
+#      Caddy e os serviços extras: NÃO use a rede `_internal`, que é a dos
+#      serviços internos do CRM. Rode com
+#      `--network <nome-do-projeto>_caddy-sites` (o
+#      `docker network ls | grep caddy-sites` mostra o nome), ou declare essa
+#      rede como `external` no compose dele. Deixe um limite de memória
+#      (`--memory 512m`): este VPS roda o CRM, e um serviço sem teto derruba
+#      os dois.
 #
-#   3. Recarregue o proxy — o Caddy lê a configuração ao subir:
+#   3. Confira e recarregue o proxy, sem reiniciá-lo:
 #
-#        docker compose -f docker-compose.prod.yml restart caddy
+#        docker compose -f docker-compose.prod.yml exec caddy caddy validate \
+#          --config /etc/caddy/Caddyfile
+#        docker compose -f docker-compose.prod.yml exec caddy caddy reload \
+#          --config /etc/caddy/Caddyfile
 #
 #      (no modo single-server acrescente -f docker-compose.single-server.yml,
 #      na mesma ordem em que o kit usa.)
+#
+#      NÃO use `restart caddy`: com um arquivo errado o Caddy reiniciado não
+#      sobe, e o CRM sai do ar junto. O `reload` recusa o arquivo errado, diz
+#      a linha e mantém no ar o que já estava.
 #
 # O que já está resolvido sem você fazer nada: HTTPS automático (o certificado
 # é emitido para o domínio novo, com o mesmo email ACME_EMAIL), gzip, e a pasta
 # fica FORA do versionamento — os seus arquivos nunca aparecem num diff nem
 # atrapalham uma atualização.
 #
-# A validação é na hora do restart: se o arquivo estiver errado o Caddy recusa
-# a configuração e diz a linha. Confira com:
-#
-#   docker compose -f docker-compose.prod.yml exec caddy caddy validate \
-#     --config /etc/caddy/Caddyfile
+# Na atualização: o update.sh confere a configuração (esta pasta inclusive)
+# antes de recriar o proxy. Se a conferência recusar, o proxy antigo continua
+# no ar e a saída da atualização mostra o motivo citando caddy-sites/.
 #
 # Este diretório vale para as DUAS variantes (normal e single-server): os dois
 # Caddyfiles importam o mesmo caminho e os dois composes montam esta mesma
