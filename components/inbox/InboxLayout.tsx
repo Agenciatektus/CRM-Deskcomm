@@ -577,7 +577,7 @@ export function InboxLayout({
   const estiloDaGrade: CSSProperties | undefined =
     faixa && larguras
       ? {
-          gridTemplateColumns: painelRecolhido
+          gridTemplateColumns: painelRecolhido && faixa.temFicha
             ? // Recolhido: a ficha sai da conta e o trilho do painel entra no
               // lugar dela. A largura AJUSTADA da ficha não se perde — ela volta
               // inteira quando o painel reabre.

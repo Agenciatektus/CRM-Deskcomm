@@ -287,4 +287,28 @@ describe("Inbox — recolher o painel do contato (#3004)", () => {
     // Recolhido resta só a da lista: a ficha não está na grade.
     expect(screen.getAllByRole("separator")).toHaveLength(1);
   });
+  it("recolhido com a divisória ajustada (xl): o estilo inline troca a ficha pelo trilho", async () => {
+    // Com largura salva, quem manda é o `style` da grade, não a classe: é o
+    // ramo que os casos acima (sem ajuste) não alcançam.
+    window.localStorage.setItem("inbox:divisorias:xl", JSON.stringify({ lista: 300, ficha: 320 }));
+    montar(true);
+    await screen.findByTestId("inbox-painel-recolhido");
+    await waitFor(() =>
+      expect(grade().style.gridTemplateColumns).toBe("300px minmax(0,1fr) 2.75rem"),
+    );
+  });
+
+  it("recolhido numa tela sem ficha em coluna (768–1279px): nenhuma trilha vazia à direita", async () => {
+    // Entre 768 e 1279px a ficha abre como painel deslizante, não como coluna.
+    // O trilho recolhido só existe onde a ficha existe; sem esta guarda a grade
+    // ganhava uma terceira trilha de 2.75rem vazia.
+    window.innerWidth = 1000;
+    try {
+      window.localStorage.setItem("inbox:divisorias:md", JSON.stringify({ lista: 320, ficha: 300 }));
+      montar(true);
+      await waitFor(() => expect(grade().style.gridTemplateColumns).toBe("320px minmax(0,1fr)"));
+    } finally {
+      window.innerWidth = 1440;
+    }
+  });
 });
