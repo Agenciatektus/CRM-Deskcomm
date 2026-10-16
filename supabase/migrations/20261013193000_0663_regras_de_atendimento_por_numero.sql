@@ -45,9 +45,10 @@ alter table public.channel_routing_policies
   add constraint channel_routing_policies_distribution_mode_check
   check (distribution_mode is null or distribution_mode in ('manual','round_robin','load'));
 
--- O destino padrão é membro ATIVO da MESMA organização (FK composta). Ao sair da
--- equipe, o vínculo cai (set null) e o número volta a não ter destino — em vez
--- de travar apontando para quem já não atende.
+-- O destino padrão é membro da MESMA organização (FK composta). Se a linha do
+-- membro é APAGADA, o vínculo cai (set null). Só que sair da equipe aqui é um
+-- UPDATE em `revoked_at` (ou rebaixamento a leitor), não um DELETE: esse caso é
+-- tratado pelo gatilho `fn_routing_member_revoked`, no fim desta migration.
 alter table public.channel_routing_policies
   drop constraint if exists channel_routing_policies_default_assignee_fkey;
 alter table public.channel_routing_policies
@@ -155,3 +156,57 @@ end;
 $$;
 revoke all on function public.fn_channel_routing_claim(uuid,uuid,uuid,uuid,jsonb,text) from public,anon,authenticated;
 grant execute on function public.fn_channel_routing_claim(uuid,uuid,uuid,uuid,jsonb,text) to service_role;
+
+-- ─── Revogar o destino padrão solta o vínculo ────────────────────────────────
+--
+-- Corpo vigente de `fn_routing_member_revoked` (0228, editada no lugar pela 0405)
+-- MAIS o update do destino padrão: quem é removido da equipe (ou rebaixado a
+-- leitor) deixa de ser destino de qualquer número. Sem isto, o worker tentaria
+-- entregar a quem saiu, receberia `candidate_revoked` e devolveria a conversa à
+-- fila; e o próximo Salvar daquele número na tela voltaria 422. O gatilho
+-- `trg_routing_member_revoked` (0228) já aponta para esta função.
+-- Revogação é UPDATE, não DELETE: cascade sozinho não remove elegibilidade,
+-- nem desatribui conversas abertas (#1562).
+create or replace function public.fn_routing_member_revoked()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare
+ v_conv record;
+begin
+ if new.revoked_at is not null or new.role not in('agent','manager','admin') then
+  delete from public.channel_routing_responsibles where organization_id=new.organization_id and user_id=new.user_id;
+  -- (0663, #2331) Revogação é UPDATE: o ON DELETE SET NULL da FK não dispara aqui.
+  update public.channel_routing_policies set default_assignee_user_id=null,updated_at=now()
+   where organization_id=new.organization_id and default_assignee_user_id=new.user_id;
+
+  for v_conv in
+    select id from public.conversations
+     where organization_id=new.organization_id
+       and assigned_to_user_id=new.user_id
+       and status in('open','pending','claimed','ai_handling')
+     order by id
+  loop
+    update public.conversations
+       set assigned_to_user_id=null,
+           assigned_to_user_name=null,
+           assigned_at=null,
+           assignee_kind=null,
+           status='open',
+           status_changed_at=now(),
+           unread_count_for_assignee=0,
+           -- Mesma regra do release de fn_conversation_assign: a conversa que a IA
+           -- passou a um humano (last_handoff_at) continua com a IA calada.
+           bot_silenced_until=case when last_handoff_at is null then null else bot_silenced_until end,
+           updated_at=now()
+     where id=v_conv.id;
+
+    insert into public.conversation_assignment_events
+      (organization_id,conversation_id,from_user_id,to_user_id,changed_by,reason)
+    values
+      (new.organization_id,v_conv.id,new.user_id,null,auth.uid(),'member_revoked');
+  end loop;
+ end if;
+ perform public.fn_wake_channel_routing(new.organization_id);
+ return new;
+end;
+$$;
+revoke all on function public.fn_routing_member_revoked() from public,anon,authenticated;
