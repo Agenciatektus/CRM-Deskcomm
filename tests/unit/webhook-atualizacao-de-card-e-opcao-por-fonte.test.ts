@@ -258,3 +258,63 @@ describe("com a opção LIGADA, a régua do card da própria fonte continua vale
     expect(desfecho()).toBe("duplicado");
   });
 });
+
+describe("card de titular ANONIMIZADO não recebe dado de volta pelo reenvio (#2316, LGPD)", () => {
+  /**
+   * A anonimização (`fn_lgpd_cascade_redact_contact`) limpa título e campos do
+   * card, mas mantém `external_id` e `webhook_source_id`. Com a opção ligada,
+   * o reenvio da integração passaria pelos portões 1 e 2 e tudo pareceria
+   * "novo": o nome e os campos do titular voltariam para o card.
+   */
+  const CARD_ANONIMIZADO = { ...CARD_DA_FONTE_1, title: "Cliente Anonimizado #1", custom_fields: {} };
+
+  it("⭐ contato anonimizado, opção ligada, mesma fonte, nome e campo novos: nada volta", async () => {
+    h.leituras.set("webhook_sources", [{ data: FONTE_LIGADA, error: null }]);
+    h.leituras.set("crm_leads", [{ data: CARD_ANONIMIZADO, error: null }]);
+    h.leituras.set("contacts", [{ data: { is_anonymized: true }, error: null }]);
+
+    const res = await enviar({ ...ENVIO_COM_DADO_NOVO, stage: "Pagou" });
+
+    expect(
+      h.atualizarLead,
+      "o reenvio devolveu o nome e os campos do titular a um card anonimizado",
+    ).not.toHaveBeenCalled();
+    expect(h.moverLead).not.toHaveBeenCalled();
+    expect(desfecho()).toBe("duplicado");
+    expect(res.status).toBe(200);
+  });
+
+  it("⭐ Respondi (o título não muda por desenho): o campo novo também é barrado", async () => {
+    h.leituras.set("webhook_sources", [{ data: FONTE_LIGADA, error: null }]);
+    h.leituras.set("crm_leads", [{ data: CARD_ANONIMIZADO, error: null }]);
+    h.leituras.set("contacts", [{ data: { is_anonymized: true }, error: null }]);
+
+    await enviar({
+      external_id: "ext-1",
+      form: { form_name: "Diagnóstico" },
+      respondent: {
+        answers: {
+          "Qual é o seu nome?": "Joana",
+          "Qual é o nome da sua empresa?": "Fazenda Boa Vista",
+        },
+      },
+    });
+
+    expect(
+      h.atualizarLead,
+      "no Respondi o título não conta como mudança, mas o campo do titular voltou ao card anonimizado",
+    ).not.toHaveBeenCalled();
+    expect(desfecho()).toBe("duplicado");
+  });
+
+  it("contato NÃO anonimizado segue a régua de sempre: o dado novo entra", async () => {
+    h.leituras.set("webhook_sources", [{ data: FONTE_LIGADA, error: null }]);
+    h.leituras.set("crm_leads", [{ data: CARD_DA_FONTE_1, error: null }]);
+    h.leituras.set("contacts", [{ data: { is_anonymized: false }, error: null }]);
+
+    await enviar(ENVIO_COM_DADO_NOVO);
+
+    expect(h.atualizarLead).toHaveBeenCalledTimes(1);
+    expect(desfecho()).toBe("atualizado");
+  });
+});

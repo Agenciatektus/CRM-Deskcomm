@@ -511,6 +511,26 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     if (!source.update_existing_lead_on_capture) return fecharComoReenvio();
     // PORTÃO 2 — só o card que ESTA fonte criou.
     if (lead.webhookSourceId !== source.id) return fecharComoReenvio();
+    // PORTÃO 3 — card de titular ANONIMIZADO não recebe dado de volta. A
+    // `fn_lgpd_cascade_redact_contact` limpa título, campos e tags do card, mas
+    // mantém `external_id` e `webhook_source_id`: sem esta pergunta, o próximo
+    // envio da integração passaria pelos portões 1 e 2, tudo pareceria "novo" e
+    // o nome e os campos do titular voltariam — a anonimização é irreversível.
+    // Leitura que falha também fecha como reenvio: na dúvida, não escreve.
+    //
+    // Fronteira: a anonimização também alcança o card por `crm_lead_links`
+    // (`target_kind='contact'`), e este portão só olha o `contact_id`. Hoje
+    // nada no produto grava esse vínculo; se passar a gravar, a causa raiz é
+    // zerar `webhook_source_id` no passo 5 da `fn_lgpd_cascade_redact_contact`.
+    if (lead.contactId) {
+      const { data: titular, error: erroTitular } = await admin
+        .from("contacts")
+        .select("is_anonymized")
+        .eq("organization_id", source.organization_id)
+        .eq("id", lead.contactId)
+        .maybeSingle();
+      if (erroTitular || titular?.is_anonymized === true) return fecharComoReenvio();
+    }
 
     const campos = camposQueMudaram(lead.customFields, mapped.custom_fields);
     // O título vem do nome só nos caminhos que usam o mapeador genérico (RD
