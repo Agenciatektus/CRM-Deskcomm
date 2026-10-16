@@ -233,6 +233,14 @@ describe("a porta do WhatsApp é decidida ANTES de qualquer consulta", () => {
     expect(optIn).toBeLessThan(canal);
   });
 
+  it("o número da pessoa é procurado na forma em que o contato é gravado", () => {
+    // A tela grava só dígitos; `contacts.phone_number` só aceita E.164 com `+`.
+    // Comparar o número cru deixava o opt-in de WhatsApp sempre em `sem_contato`.
+    const busca = fonte.slice(fonte.indexOf('.from("contacts")'));
+    expect(busca.slice(0, 400)).toContain('.in("phone_number", variantes)');
+    expect(fonte).toContain("phoneLookupVariants(telefone)");
+  });
+
   it("o contato é buscado DENTRO da organização da tarefa", () => {
     const busca = fonte.slice(fonte.indexOf('.from("contacts")'));
     expect(busca.slice(0, 400)).toContain('.eq("organization_id", tarefa.organization_id)');

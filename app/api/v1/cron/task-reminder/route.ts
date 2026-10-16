@@ -63,6 +63,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { ensureConversation, sessaoProntaParaEnvio } from "@/lib/automation/start-conversation";
 import { espacarEnvio } from "@/lib/automation/throttle";
+import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 import { logger } from "@/lib/logger";
 import { truncar } from "@/lib/notifications/push_payload";
@@ -318,7 +319,12 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
       const canalId = await sessaoProntaParaEnvio(admin, tarefa.organization_id);
       const telefone = pref.whatsapp_numero ?? null;
       let contatoId: string | null = null;
-      if (canalId && telefone) {
+      // A tela grava só dígitos (`5511999990000`) e `contacts.phone_number`
+      // guarda E.164 com `+` (CHECK `contacts_phone_e164_format`): o `.eq` com o
+      // número cru nunca casava. As variantes devolvem a forma com `+` e a
+      // contraparte com/sem o nono dígito, como a importação de contatos faz.
+      const variantes = telefone ? phoneLookupVariants(telefone) : [];
+      if (canalId && variantes.length > 0) {
         // O NÚMERO é o da pessoa que optou, e o contato tem de ser da MESMA
         // organização — a cerca do lembrete de compromisso, na prática: sem o
         // recorte por org esta linha viria a organização A mandando mensagem
@@ -327,7 +333,7 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
           .from("contacts")
           .select("id")
           .eq("organization_id", tarefa.organization_id)
-          .eq("phone_number", telefone)
+          .in("phone_number", variantes)
           .limit(1)
           .maybeSingle();
         contatoId = (data as { id: string } | null)?.id ?? null;
