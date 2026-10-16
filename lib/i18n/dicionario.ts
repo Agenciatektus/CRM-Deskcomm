@@ -5926,6 +5926,25 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível salvar a carteira do cliente.": {
     es: "No fue posible guardar la cartera del cliente.",
   },
+  // TELA da carteira (#2591): o cartão da ficha do contato e a faixa em cima do chat.
+  "Carteira": { es: "Cartera" },
+  "O vendedor dono deste cliente. Sem dono, o atendimento segue o fluxo de sempre.": {
+    es: "El vendedor dueño de este cliente. Sin dueño, la atención sigue el flujo de siempre.",
+  },
+  "Dono da carteira:": { es: "Dueño de la cartera:" },
+  "Membro da equipe": { es: "Miembro del equipo" },
+  "Não conta: saiu da equipe ou só lê": { es: "No cuenta: salió del equipo o solo lee" },
+  "Sem vendedor dono. O atendimento segue o fluxo de sempre.": {
+    es: "Sin vendedor dueño. La atención sigue el flujo de siempre.",
+  },
+  "Escolha o vendedor dono": { es: "Elige el vendedor dueño" },
+  "Sem vendedor dono": { es: "Sin vendedor dueño" },
+  "Salvar carteira": { es: "Guardar cartera" },
+  // Faixa em cima do chat: o nome do dono entra por replace de {nome}.
+  "Este cliente pertence à carteira de {nome}.": {
+    es: "Este cliente pertenece a la cartera de {nome}.",
+  },
+  "outro vendedor": { es: "otro vendedor" },
   "assinatura inválida": { es: "firma inválida" },
   // Assinatura HMAC da fonte de captação, na tela de detalhe da fonte.
   "Assinatura (HMAC)": { es: "Firma (HMAC)" },
@@ -10407,6 +10426,18 @@ export const DICIONARIO: Traducoes = {
   "Agent não encontrado nesta organização.": { es: "Agente no encontrado en esta organización." },
   "Agent não tem versão para duplicar.": { es: "El agente no tiene versión para duplicar." },
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
+  "Imagens (opcional)": { es: "Imágenes (opcional)" },
+  "JPG ou PNG, até 5 MB por imagem. A imagem vai junto com o texto.": { es: "JPG o PNG, hasta 5 MB por imagen. La imagen va junto con el texto." },
+  "Imagem da resposta rápida": { es: "Imagen de la respuesta rápida" },
+  "Remover imagem": { es: "Quitar imagen" },
+  "Prévia da imagem": { es: "Vista previa de la imagen" },
+  "Adicionar imagem": { es: "Agregar imagen" },
+  "Cada resposta rápida tem no máximo 5 imagens.": { es: "Cada respuesta rápida admite un máximo de 5 imágenes." },
+  "Imagens": { es: "Imágenes" },
+  "A imagem precisa ser JPG ou PNG.": { es: "La imagen debe ser JPG o PNG." },
+  "Imagem não encontrada.": { es: "Imagen no encontrada." },
+  "As imagens mudaram. Recarregue a página.": { es: "Las imágenes cambiaron. Recargue la página." },
+  "Só manager+ altera template compartilhado.": { es: "Solo manager+ modifica la plantilla compartida." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50MB.": { es: "El archivo supera los 50MB." },
   "Arquivo excede o limite de 20MB.": { es: "El archivo supera el límite de 20MB." },
@@ -13904,17 +13935,17 @@ export const DICIONARIO: Traducoes = {
   "Atendentes podem mexer na agenda dos colegas": {
     es: "Los asesores pueden modificar la agenda de sus colegas",
   },
-  "Com isto ligado, qualquer atendente cancela e remarca o compromisso de qualquer colega — é o comportamento de sempre. Desligado, cada atendente mexe só no compromisso de que é o responsável; gerentes e administradores seguem mexendo em tudo.": {
-    es: "Con esta opción activada, cualquier asesor puede cancelar y reprogramar las citas de cualquier colega, como siempre ha sido. Si la desactivas, cada asesor solo puede modificar las citas de las que es responsable. Los gerentes y administradores pueden seguir modificándolo todo.",
+  "Com isto ligado, qualquer atendente vê, cancela e remarca o compromisso de qualquer colega, e vê e mexe nas tarefas da equipe — é o comportamento de sempre. Desligado, cada atendente mexe só no compromisso de que é o responsável; gerentes e administradores seguem mexendo em tudo.": {
+    es: "Con esta opción activada, cualquier asesor puede ver, cancelar y reprogramar las citas de cualquier colega, y ver y modificar las tareas del equipo, como siempre ha sido. Si la desactivas, cada asesor solo puede modificar las citas de las que es responsable. Los gerentes y administradores pueden seguir modificándolo todo.",
   },
-  "Ligado: qualquer atendente mexe na agenda de qualquer colega.": {
-    es: "Activado: cualquier asesor puede modificar la agenda de cualquier colega.",
+  "Ligado: qualquer atendente mexe na agenda e nas tarefas de qualquer colega.": {
+    es: "Activado: cualquier asesor puede modificar la agenda y las tareas de cualquier colega.",
   },
-  "Desligado: cada atendente mexe só na própria agenda. Gerentes e administradores continuam mexendo em tudo.": {
-    es: "Desactivado: cada asesor solo puede modificar su propia agenda. Los gerentes y administradores pueden seguir modificándolo todo.",
+  "Desligado: cada atendente mexe só na própria agenda, e a agenda e as tarefas seguem o que ele enxerga. Gerentes e administradores continuam mexendo em tudo.": {
+    es: "Desactivado: cada asesor solo puede modificar su propia agenda, y la agenda y las tareas siguen lo que él ve. Los gerentes y administradores pueden seguir modificándolo todo.",
   },
-  "Isto não muda o que cada pessoa vê na agenda, só quem pode alterar o compromisso de quem.": {
-    es: "Esto no cambia lo que cada persona ve en la agenda, solo define quién puede modificar las citas de quién.",
+  "Desligado, a agenda e as tarefas também seguem “O que cada atendente enxerga”: em “Só os seus” ou “Os seus, mais os que ainda não têm dono”, o atendente vê e mexe só nos próprios compromissos e nas próprias tarefas, mais as que ele criou (e, no segundo modo, o que ainda não tem dono). Em “Todos veem tudo”, ele continua vendo tudo.": {
+    es: "Desactivado, la agenda y las tareas también siguen “Qué ve cada asesor”: en “Solo los tuyos” o en “Los tuyos, más los que todavía no tienen dueño”, el asesor ve y modifica solo sus propias citas y tareas, más las que él creó (y, en el segundo modo, lo que aún no tiene dueño). En “Todos ven todo”, sigue viéndolo todo.",
   },
   "Só um gerente ou administrador pode mudar essa regra.": {
     es: "Solo un gerente o administrador puede cambiar esta regla.",
@@ -14367,6 +14398,57 @@ export const DICIONARIO: Traducoes = {
     es: "El asistente pierde las cinco consultas al instante: una pregunta sobre factura, contrato o bloqueo vuelve a convertirse en atención humana.",
   },
   "Abrir integração com o sistema de gestão": { es: "Abrir integración con el sistema de gestión" },
+
+  // ─── Tela do servidor MCP externo (#2948) ───
+  "Servidor MCP externo": { es: "Servidor MCP externo" },
+  "O endereço e a chave do sistema de fora que a IA da empresa pode consultar.": {
+    es: "La dirección y la clave del sistema externo que la IA de la empresa puede consultar.",
+  },
+  "O endereço e a chave do sistema de fora que a IA desta empresa pode consultar. Só o dono da instalação vê esta tela.": {
+    es: "La dirección y la clave del sistema externo que la IA de esta empresa puede consultar. Solo el dueño de la instalación ve esta pantalla.",
+  },
+  "Endereço e chave": { es: "Dirección y clave" },
+  "O endereço precisa ser um servidor público em https. Rede interna, localhost e segredo colado no endereço são recusados na hora de salvar.": {
+    es: "La dirección debe ser un servidor público en https. Una red interna, localhost y un secreto pegado en la dirección se rechazan al guardar.",
+  },
+  "A chave é gravada cifrada e não é mostrada de novo: depois de salvar, a tela revela só os quatro últimos caracteres.": {
+    es: "La clave se guarda cifrada y no se muestra de nuevo: después de guardar, la pantalla revela solo los cuatro últimos caracteres.",
+  },
+  "Remover apaga o endereço e a chave desta empresa: a IA deixa de alcançar o servidor de fora.": {
+    es: "Eliminar borra la dirección y la clave de esta empresa: la IA deja de alcanzar el servidor externo.",
+  },
+  "Chave gravada. Ela aparece só agora, na criação — termina em": {
+    es: "Clave guardada. Aparece solo ahora, al crearla — termina en",
+  },
+  "Servidor externo removido. A IA desta empresa não alcança mais o sistema de fora.": {
+    es: "Servidor externo eliminado. La IA de esta empresa ya no alcanza el sistema externo.",
+  },
+  "O que o servidor oferece": { es: "Lo que ofrece el servidor" },
+  "Endereço consultado:": { es: "Dirección consultada:" },
+  "Só o dono da instalação cadastra o servidor externo desta empresa.": {
+    es: "Solo el dueño de la instalación registra el servidor externo de esta empresa.",
+  },
+  "Não foi possível identificar a empresa ativa desta sessão.": {
+    es: "No fue posible identificar la empresa activa de esta sesión.",
+  },
+  "Esta ação exige a verificação em duas etapas.": {
+    es: "Esta acción exige la verificación en dos pasos.",
+  },
+  "Confira o endereço e a chave: um dos dois passou do tamanho aceito.": {
+    es: "Revisa la dirección y la clave: una de las dos superó el tamaño aceptado.",
+  },
+  "Endereço recusado por segurança: informe um servidor público em https, sem rede interna, sem localhost e sem segredo colado no endereço.": {
+    es: "Dirección rechazada por seguridad: indica un servidor público en https, sin red interna, sin localhost y sin secreto pegado en la dirección.",
+  },
+  "Não foi possível salvar. Tente de novo em instantes.": {
+    es: "No fue posible guardar. Inténtalo de nuevo en unos momentos.",
+  },
+  "Preencha o endereço e a chave para salvar. Para apagar o registro, use Remover.": {
+    es: "Completa la dirección y la clave para guardar. Para borrar el registro, usa Quitar.",
+  },
+  "Nenhum servidor externo respondeu. Salve o endereço e a chave e teste de novo.": {
+    es: "Ningún servidor externo respondió. Guarda la dirección y la clave y prueba de nuevo.",
+  },
 
   // ─── Campanhas (migration 0264) ───
   "Agendar": { es: "Programar" },
@@ -14914,6 +14996,10 @@ export const DICIONARIO: Traducoes = {
   // ─── C-076: Comandos pelo celular (#on/#off) ───
   "Comandos pelo celular": { es: "Comandos desde el celular" },
   "Aceitar #on/#off enviados pelo celular": { es: "Aceptar #on/#off enviados desde el celular" },
+  "Usar o servidor de ferramentas externo durante o atendimento": { es: "Usar el servidor de herramientas externo durante la atención" },
+  "O servidor recebe a identidade do cliente da conversa e deve filtrar os dados por ela.": { es: "El servidor recibe la identidad del cliente de la conversación y debe filtrar los datos por ella." },
+  "Servidor de ferramentas externo ligado no atendimento.": { es: "Servidor de herramientas externo activado en la atención." },
+  "Servidor de ferramentas externo desligado no atendimento.": { es: "Servidor de herramientas externo desactivado en la atención." },
   "Ligado, QUALQUER mensagem enviada pelo WhatsApp do celular pausa a IA nesta conversa até alguém mandar #on — a pausa não vence sozinha. #off pausa sem precisar responder o cliente. Desligado, #on e #off são texto comum, e responder pelo celular pausa a IA só por um tempo.":
     {
       es: "Activado, CUALQUIER mensaje enviado desde el WhatsApp del celular pausa la IA en esta conversación hasta que alguien envíe #on — la pausa no vence sola. #off pausa sin necesidad de responder al cliente. Desactivado, #on y #off son texto normal, y responder desde el celular pausa la IA solo por un tiempo.",
