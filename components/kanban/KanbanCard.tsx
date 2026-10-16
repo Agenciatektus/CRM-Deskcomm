@@ -14,7 +14,6 @@ import { ScoreSlot } from "./ScoreSlot";
 import { OwnerBadge } from "./OwnerBadge";
 import { ContatoNoCard } from "./ContatoNoCard";
 import { TarefasNoCard } from "./TarefasNoCard";
-import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
 export type GestoDeSelecao = "alterna" | "intervalo";
@@ -65,11 +64,6 @@ function formatValor(cents: number | null, currency: string | null): string | nu
  * e a faixa do agente existe mesmo vazia. É isso que faz o board continuar
  * legível quando score, próxima ação e alerta chegarem — o card não cresce com
  * dados, ele TROCA de estado.
- *
- * A única faixa que entra SOB DEMANDA é a das etiquetas do negócio (#2979), e
- * ela some por inteiro quando o negócio não tem nenhuma: quem não usa etiqueta
- * continua com a altura exata de antes, e quem usa vê o que o negócio carrega
- * sem precisar do hover.
  *
  * Cor só aparece na borda esquerda, e só quando o estado pede (Lei C).
  */
@@ -141,9 +135,7 @@ export function KanbanCard({
           role="group"
           aria-label={`${t("Lead")}: ${card.title}`}
           onClick={handleClick}
-          // As etiquetas do negócio ganharam chips visíveis (#2979) e continuam
-          // inteiras aqui: a lista COMPLETA, inclusive as que o "+N" resumiu,
-          // e sem ocupar altura quando não há etiqueta nenhuma.
+          // Tags saem do card (Lei A): ficam a um hover, sem ocupar altura.
           title={card.tags.length > 0 ? `Tags: ${card.tags.join(", ")}` : undefined}
           className={cn(
             "group relative overflow-hidden rounded-md border border-border bg-surface",
@@ -255,25 +247,6 @@ export function KanbanCard({
           >
             {value ?? "—"}
           </p>
-
-          {/* ②b as etiquetas do NEGÓCIO (#2979) — visíveis, não só no hover.
-              Até TRÊS chips com a cor da etiqueta e um "+N" para o resto: a
-              faixa é do tamanho do card, e despejar vinte chips aqui faria o
-              quadro perder a leitura que ele existe para dar. O `title` acima
-              continua com a lista completa, para quem para o mouse.
-              Sem etiqueta a faixa NÃO existe: card sem tag segue com a altura
-              exata de antes desta mudança. */}
-          {card.tags.length > 0 && (
-            <div data-testid="card-etiquetas" className="mt-1 flex flex-wrap items-center gap-1">
-              {card.tags.slice(0, 3).map((tag) => (
-                <ChipDeEtiqueta key={tag} tag={tag} className="h-5 px-1.5 text-[10px]" />
-              ))}
-              {card.tags.length > 3 && (
-                // O que ficou de fora, contado — não a lista, que já está no title.
-                <span className="text-[10px] text-text-muted">+{card.tags.length - 3}</span>
-              )}
-            </div>
-          )}
 
           {/* ③ a linha do agente — um slot, três estados, nunca três blocos. */}
           <div className="mt-1.5 flex h-6 items-center gap-2 text-xs">
