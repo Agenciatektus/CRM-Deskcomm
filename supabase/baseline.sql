@@ -15883,22 +15883,8 @@ revoke all on public.calendar_event_types from anon;
 alter table public.calendar_appointments enable row level security;
 drop policy if exists tenant_isolation_calendar_appointments_all on public.calendar_appointments;
 drop policy if exists calendar_appointments_select on public.calendar_appointments;
-create policy calendar_appointments_select on public.calendar_appointments
-  for select using (
-    (organization_id in (select public.fn_user_org_ids())) or public.fn_is_platform_admin()
-  );
+-- as policies desta tabela nascem no apendice (migration 0680), que as recria desde a origem.
 drop policy if exists calendar_appointments_write on public.calendar_appointments;
-create policy calendar_appointments_write on public.calendar_appointments
-  using (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  )
-  with check (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  );
 revoke all on public.calendar_appointments from anon;
 
 -- ─── as exceções: a agenda é de quem a vive ───────────────────────────────
@@ -18250,25 +18236,9 @@ create index if not exists crm_tasks_lead_idx
 
 alter table public.crm_tasks enable row level security;
 
+-- as policies desta tabela nascem no apendice (migration 0680), que as recria desde a origem.
 drop policy if exists crm_tasks_select on public.crm_tasks;
-create policy crm_tasks_select on public.crm_tasks
-  for select using (
-    (organization_id in (select public.fn_user_org_ids())) or public.fn_is_platform_admin()
-  );
-
 drop policy if exists crm_tasks_write on public.crm_tasks;
-create policy crm_tasks_write on public.crm_tasks
-  using (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  )
-  with check (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  );
-
 -- `ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES TO anon` do baseline alcança
 -- TODA tabela criada depois dele — inclusive esta. Sem o revoke, as tarefas da
 -- organização ficam legíveis pela anon key, que vai para o browser.
@@ -53701,6 +53671,549 @@ create trigger trg_messages_sincroniza_campanha
   for each row
   when (new.direction = 'outbound')
   execute function public.fn_campanha_sincroniza_ack();
+
+-- ---- agenda e tarefas respeitam a visibilidade do atendente (migration 0680) ----
+-- manifest: agenda e tarefas passam a respeitar organizations.settings.visibility_mode — o agent vê e escreve só o que é dele, manager+ segue org-wide (#2902)
+--
+-- ─── O defeito, medido (issue #2902, baseline 1.80.0) ───────────────────────
+--
+-- Numa organização em `visibility_mode = 'own'` ("Só os seus"), `conversations`
+-- (migration 0035) e `crm_leads` (0036) já recortam o papel `agent` pelo
+-- responsável. A agenda e as tarefas ficaram de fora das duas ondas:
+--
+--   · `calendar_appointments_select` e `crm_tasks_select` liberavam a LEITURA a
+--     qualquer membro da organização (`organization_id in (select
+--     public.fn_user_org_ids())`);
+--   · `calendar_appointments_write` e `crm_tasks_write` liberavam a ESCRITA a
+--     qualquer papel `agent`+ SEM OLHAR O RESPONSÁVEL.
+--
+-- O desfecho, nas palavras de quem abriu a #2902: o atendente vê os
+-- compromissos pessoais do dono e as tarefas de carteira da colega — e consegue
+-- editar e excluir o que não é dele.
+--
+-- ─── Por que o conserto é de RLS, e não de rota ─────────────────────────────
+--
+-- As duas tabelas são servidas pelo PostgREST com a anon key (que vai no bundle
+-- do browser) + o JWT do usuário. `requireRole()` na rota Next não é a única
+-- porta: qualquer aba com a key e o token do atendente fala direto com
+-- `/rest/v1/calendar_appointments`. Uma regra que só exista na rota é uma regra
+-- que existe em uma das duas portas.
+--
+-- ─── O conserto: o MESMO eixo das duas irmãs ────────────────────────────────
+--
+-- `fn_can_view_appointment` espelha `fn_can_view_conversation` (0035) e
+-- `fn_can_view_lead` (0036), com a mesma escada: plataforma tudo; não-membro
+-- nada; viewer/manager/admin org-wide; o dono o que é dele; e o resto quem
+-- decide é `organizations.settings.visibility_mode` — `all` = tudo,
+-- `own_and_unassigned` = o dono MAIS o que não tem dono, `own` = só o dono. O
+-- default continua `own_and_unassigned` (G1-06a), igual às conversas e aos
+-- negócios.
+--
+-- `fn_can_view_task` é o mesmo eixo sobre `crm_tasks`, com UMA diferença
+-- medida: além do responsável (`assigned_to`), o CRIADOR (`created_by`) também
+-- enxerga a própria tarefa. Isso preserva dois contratos que a tela e a rota já
+-- declaram, e que um recorte só-por-responsável quebraria:
+--
+--   · a tarefa SEM responsável. `FormularioDeTarefa.tsx` grava
+--     `assigned_to: null` quando o campo fica em "Ninguém" — e é o estado
+--     INICIAL do formulário de criação (`responsavelInicial = responsavelPadrao
+--     ?? NINGUEM`), enquanto `POST /api/v1/tasks` aceita a falta de propósito
+--     (contrato declarado em
+--     `tests/unit/tarefas-responsavel-da-mesma-equipe.test.ts`: "sem
+--     responsável, a equipe nem é consultada"). Recortando só por
+--     responsável, numa organização em `own` o `with check` barraria esse insert
+--     — 500 na cara de quem escreveu o combinado — e, se passasse, a linha
+--     ficaria invisível até para o autor, porque `own` não abre nada sem dono.
+--   · entregar a tarefa a um colega. A tela oferece a EQUIPE INTEIRA no campo
+--     de responsável (`useAssignableMembers`) e a rota confere que o membro é da
+--     organização (`lib/tarefas/responsavel.ts`). Com o criador enxergando o que
+--     criou, o agent continua podendo ENTREGAR trabalho a um colega — o que a
+--     #2902 pede é parar de EDITAR e EXCLUIR o que o outro escreveu, e isso é o
+--     que fica barrado (tarefa de B, criada por B: o agent A não lê, não edita,
+--     não apaga).
+--
+-- Em `own_and_unassigned` o comportamento da fila (tarefa sem responsável
+-- visível a todo `agent`) fica intacto.
+--
+-- ─── O que muda, e o que NÃO muda ───────────────────────────────────────────
+--
+--   · Painel de agenda (a rota e o realtime, que herda a policy de SELECT): o
+--     `agent` passa a ver a PRÓPRIA agenda; `viewer`, `manager` e `admin`
+--     seguem vendo a equipe inteira — o `viewer` continua lendo tudo, como
+--     `tests/invariants/agenda-rls.test.ts` exige.
+--   · Rota de tarefas (POST/PATCH/DELETE) e o selo do quadro do funil: mesmo
+--     recorte, pelo responsável. É o mesmo escopo que o kanban de negócios já
+--     aplica hoje com os cards.
+--   · ⚠️ Os dois recortes acima valem para quem DESLIGOU a opção da #978: com a
+--     chave ausente ou ligada — o padrão, e o estado de toda organização que
+--     nunca mexeu nela — as quatro policies seguem entregando a equipe inteira
+--     ao `agent`+. É a COLISÃO DECLARADA logo abaixo, e ela está RESOLVIDA a
+--     favor da opção, porque o caminho de RPC da agenda (`fn_appointment_change`)
+--     já a honrava e a RLS recusava o que o RPC permitia.
+--   · Quem escreve por `service_role` NÃO muda nada: o motor de follow-up
+--     (`lib/followup/engine.ts`), a ação de automação `create_task`
+--     (`ctx.admin`), o aviso ao dono (`lib/carteira/aviso-ao-dono.ts`) e a
+--     exportação LGPD (`lib/lgpd/export-collector.ts`) passam por
+--     `createAdminClient()` e BYPASSAM RLS.
+--   · ⚠️ COLISÃO DECLARADA — `fn_colegas_podem_mexer_na_agenda` (#978) — E
+--     RESOLVIDA A FAVOR DA OPÇÃO. A #978 decidiu que "o Atendente marca/mexe na
+--     agenda do colega" é uma OPÇÃO POR ORGANIZAÇÃO, LIGADA POR PADRÃO. O eixo
+--     desta migration é mais restritivo que essa opção, e deixá-lo vencer calado
+--     revogaria uma decisão que a organização já tinha tomado — e criaria uma
+--     incoerência medida: o caminho de RPC da agenda (`fn_appointment_change`,
+--     `fn_appointment_change_core`) JÁ consulta a opção e recusa o compromisso do
+--     colega só com ela desligada; a RLS recusava o que o RPC permitia, e a rota
+--     HTTP devolvia `internal_error` num caminho que o produto declara válido.
+--     Por isso as QUATRO policies abaixo consultam a opção, e é isto que elas
+--     medem:
+--
+--       · chave AUSENTE ou LIGADA (o padrão, e o estado de toda organização que
+--         nunca mexeu nela): `fn_colegas_podem_mexer_na_agenda` devolve verdadeiro
+--         — o COALESCE da chave com `true` — e o comportamento é o de antes desta
+--         migration: o `agent` vê e mexe na agenda e nas tarefas da equipe da
+--         própria organização;
+--       · chave em FALSO: aí sim a régua por responsável da #2902 aperta, e o
+--         `agent` vê e escreve só o que é dele (mais a fila, em
+--         `own_and_unassigned`). É a restrição que a issue pede, e ela está
+--         medida em
+--         `tests/invariants/visibilidade-na-agenda-e-nas-tarefas.test.ts`, nos
+--         dois lados.
+--
+--     O `or` entra DENTRO da conjunção de pertencimento nas policies de leitura
+--     (`organization_id in (select public.fn_user_org_ids()) and
+--     fn_colegas_podem_mexer_na_agenda(organization_id)`) e dentro do grupo de
+--     papel nas de escrita. Isso não é estilo: `fn_colegas_podem_mexer_na_agenda`
+--     lê a configuração da organização DA LINHA e não olha quem pergunta — solto
+--     numa policy de SELECT, ele devolveria verdadeiro também para quem não é
+--     membro (inclusive para organização que não existe, por causa do COALESCE),
+--     e a policy passaria a servir leitura entre empresas.
+--
+-- ─── Por que as policies de escrita mantêm o NOME e o FOR ALL ───────────────
+--
+-- Os nomes `calendar_appointments_write` e `crm_tasks_write` são cobrados pelo
+-- catálogo de `tests/invariants/platform-admin-full-so-escreve.test.ts`
+-- (policy viva com `fn_is_platform_admin_full` dentro, e sem a função pura), e
+-- os corpos abaixo conservam isso.
+--
+-- FOR ALL, e não por-comando como nas 0035/0036: o `using` de um FOR ALL
+-- também governa o SELECT (policies são OR-adas), e aqui ele é SUBCONJUNTO do
+-- que a policy de leitura concede — o recorte por papel é o mesmo (`agent`+ com
+-- o mesmo `fn_can_view_*`), então a OR não alarga leitura nenhuma. O `viewer`
+-- segue barrado na escrita pelo piso `agent`.
+--
+-- Idempotente (`create or replace`, `drop policy if exists`): o `update.sh`
+-- reaplica o baseline inteiro sobre um banco que já tem tudo.
+
+create or replace function public.fn_can_view_appointment(
+  p_org uuid,
+  p_owner_user_id uuid
+) returns boolean
+language sql stable security definer
+set search_path = public
+as $$
+  select case
+    when public.fn_is_platform_admin() then true
+    when public.fn_user_role_in_org(p_org) is null then false
+    when public.fn_user_role_in_org(p_org) in ('viewer','manager','admin') then true
+    when p_owner_user_id = auth.uid() then true
+    else case coalesce(
+           (select settings->>'visibility_mode' from public.organizations where id = p_org),
+           'own_and_unassigned')
+         when 'all' then true
+         when 'own_and_unassigned' then p_owner_user_id is null
+         else false
+       end
+  end;
+$$;
+
+revoke all on function public.fn_can_view_appointment(uuid, uuid) from public;
+revoke execute on function public.fn_can_view_appointment(uuid, uuid) from anon;
+grant execute on function public.fn_can_view_appointment(uuid, uuid)
+  to authenticated, service_role;
+
+create or replace function public.fn_can_view_task(
+  p_org uuid,
+  p_assigned_to uuid,
+  p_created_by uuid
+) returns boolean
+language sql stable security definer
+set search_path = public
+as $$
+  select case
+    when public.fn_is_platform_admin() then true
+    when public.fn_user_role_in_org(p_org) is null then false
+    when public.fn_user_role_in_org(p_org) in ('viewer','manager','admin') then true
+    when p_assigned_to = auth.uid() then true
+    when p_created_by = auth.uid() then true
+    else case coalesce(
+           (select settings->>'visibility_mode' from public.organizations where id = p_org),
+           'own_and_unassigned')
+         when 'all' then true
+         when 'own_and_unassigned' then p_assigned_to is null
+         else false
+       end
+  end;
+$$;
+
+revoke all on function public.fn_can_view_task(uuid, uuid, uuid) from public;
+revoke execute on function public.fn_can_view_task(uuid, uuid, uuid) from anon;
+grant execute on function public.fn_can_view_task(uuid, uuid, uuid)
+  to authenticated, service_role;
+
+-- ─── calendar_appointments: leitura e escrita pelo dono do compromisso ──────
+
+drop policy if exists calendar_appointments_select on public.calendar_appointments;
+create policy calendar_appointments_select on public.calendar_appointments
+  for select using (
+    public.fn_can_view_appointment(organization_id, owner_user_id)
+    -- A OPÇÃO da #978, dentro do pertencimento (ver COLISÃO DECLARADA acima):
+    -- com ela ligada ou ausente o colega da MESMA organização continua lendo a
+    -- agenda da equipe; com ela em falso só o que `fn_can_view_appointment`
+    -- concede.
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_colegas_podem_mexer_na_agenda(organization_id))
+  );
+
+drop policy if exists calendar_appointments_write on public.calendar_appointments;
+create policy calendar_appointments_write on public.calendar_appointments
+  using (
+    public.fn_is_platform_admin_full()
+    or ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent')
+        and (public.fn_role_at_least(organization_id, 'manager')
+             or public.fn_can_view_appointment(organization_id, owner_user_id)
+             or public.fn_colegas_podem_mexer_na_agenda(organization_id)))
+  )
+  with check (
+    public.fn_is_platform_admin_full()
+    or ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent')
+        and (public.fn_role_at_least(organization_id, 'manager')
+             or public.fn_can_view_appointment(organization_id, owner_user_id)
+             or public.fn_colegas_podem_mexer_na_agenda(organization_id)))
+  );
+
+-- ─── crm_tasks: leitura e escrita pelo responsável (e por quem criou) ───────
+
+drop policy if exists crm_tasks_select on public.crm_tasks;
+create policy crm_tasks_select on public.crm_tasks
+  for select using (
+    public.fn_can_view_task(organization_id, assigned_to, created_by)
+    -- Mesma opção, mesma colocação da irmã da agenda: o recorte por responsável
+    -- da #2902 entra na leitura das tarefas quando a organização desliga a chave.
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_colegas_podem_mexer_na_agenda(organization_id))
+  );
+
+drop policy if exists crm_tasks_write on public.crm_tasks;
+create policy crm_tasks_write on public.crm_tasks
+  using (
+    public.fn_is_platform_admin_full()
+    or ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent')
+        and (public.fn_role_at_least(organization_id, 'manager')
+             or public.fn_can_view_task(organization_id, assigned_to, created_by)
+             or public.fn_colegas_podem_mexer_na_agenda(organization_id)))
+  )
+  with check (
+    public.fn_is_platform_admin_full()
+    or ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'agent')
+        and (public.fn_role_at_least(organization_id, 'manager')
+             or public.fn_can_view_task(organization_id, assigned_to, created_by)
+             or public.fn_colegas_podem_mexer_na_agenda(organization_id)))
+  );
+
+-- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0682, #2888) ----
+-- DUAS execuções ao mesmo tempo sobre o mesmo negócio ou contato não se apagam.
+--
+-- ─── O defeito, e por que o #2864 não o fechou ──────────────────────────────
+--
+-- O #2864 fez `lib/automation/actions/add-tag.ts` reler `tags` do banco antes de
+-- mesclar, consertando o caso que a correção pública jmpo/DeskcommCRM#89
+-- descreve: o motor monta o contexto UMA vez por evento, e TODAS as regras
+-- daquele evento recebem a mesma foto; a segunda regra gravava `foto + as suas`
+-- e apagava o que a primeira tinha acabado de gravar.
+--
+-- O que continua aberto é o caso de DOIS EVENTOS DIFERENTES processados ao mesmo
+-- tempo sobre a mesma linha. Eles não são hipótese: o `event_log` tem dois
+-- consumidores concorrentes — o laço do worker (`workers/agent-worker/main.ts`,
+-- as linhas do `drainEventLog`) e o cron `app/api/v1/cron/event-log-drain`. O
+-- claim é exclusivo por LINHA, então dois eventos distintos do mesmo negócio
+-- podem rodar um em cada dreno, em paralelo:
+--
+--     dreno A: select tags --> (janela) --> update lista_lida + etiqueta_A
+--     dreno B:       select tags --> update lista_lida + etiqueta_B
+--
+-- As duas leem a MESMA lista. A última gravação sobrescreve a coluna inteira com
+-- a foto que ela leu mais as suas etiquetas, e a etiqueta da outra some — sem
+-- erro, sem log, sem ninguém saber. É a mesma classe da 0502 (`custom_fields`) e
+-- da 0673 (excluir uma etiqueta preserva as outras), aqui no eixo do `add_tag`.
+--
+-- ─── Por que a correção é na GRAVAÇÃO, e não no dreno ──────────────────────
+--
+-- Fechar a janela por fora exigiria serializar por NEGÓCIO a execução das
+-- automações — um claim por negócio no lugar do claim por linha. Isso muda o
+-- motor, o claim e os dois drenos, e o preço apareceria em toda instalação: a
+-- fila de eventos do mesmo negócio passa a ser sequencial, e a ação paga por uma
+-- corrida que é dela. A linha já é o alvo da escrita; é ali que a corrida se
+-- resolve, como nas 0502/0673.
+--
+-- ─── Por que uma FUNÇÃO, e não uma linha no handler ────────────────────────
+--
+-- A ação grava pelo PostgREST (`supabase.update()`), e ele não sabe dizer
+-- `tags = tags || array(...)`: só sabe mandar um VALOR pronto — que é justamente
+-- o valor calculado a partir de uma leitura anterior. O que o app não expressa,
+-- o `UPDATE` expressa. `fn_lead_anotar_campos` (0502) é o precedente exato.
+--
+-- ─── Por que isso basta (medido, não suposto) ──────────────────────────────
+--
+-- Numa ÚNICA instrução `update ... set tags = coalesce(tags,'{}'::text[]) ||
+-- array(select unnest(p_etiquetas) except select unnest(coalesce(tags,'{}'::text[])))`,
+-- em READ COMMITTED (o padrão do PostgREST), a segunda transação ESPERA o commit
+-- da primeira, RECALCULA a expressão sobre a versão nova da linha e soma sobre o
+-- que a primeira gravou. Em REPEATABLE READ ou SERIALIZABLE a segunda recebe
+-- 40001 em vez de sobrescrever: falha alta, nunca dado perdido em silêncio.
+-- O gate é `tests/invariants/add-tag-concorrente-nao-apaga.test.ts`, com duas
+-- transações abertas sobre a mesma linha.
+--
+-- `EXCEPT` já é operação de conjunto: ele devolve cada etiqueta nova uma vez só,
+-- então repetir na lista pedida não duplica nada. A ordem das etiquetas que já
+-- estavam é preservada (a junção acrescenta no fim).
+--
+-- ─── A leitura sob a TRAVA, e o que ela é (e não é) ────────────────────────
+--
+-- O `select ... for update` que abre cada função NÃO é o que conserta a corrida
+-- — quem conserta é a junção dentro do `UPDATE`, e é por isso que a sabotagem
+-- que reintroduz o merge em memória fica vermelha. Ele existe para uma segunda
+-- pergunta, que o `RETURNING tags` sozinho não responde: QUAIS etiquetas esta
+-- chamada de fato acrescentou.
+--
+-- Isso importa: a ação só anuncia `lead.tag_added`/`contact.tag_added` quando
+-- alguma etiqueta entrou de verdade (é o que evita evento à toa e laço de
+-- automação), e o `event.added_tags` é condição de regra. Calcular o delta fora
+-- do UPDATE sobre uma leitura que não segura a linha reintroduziria exatamente a
+-- foto velha — agora só no relatório, mas mentindo para a automação.
+--
+-- Com a trava, a pré-imagem é a vigente e `p_etiquetas menos v_antes` é exato. Se
+-- ela fosse removida, a JUNÇÃO continuaria correta: o que se perderia é a
+-- exatidão do delta (ele passaria a superestimar). As duas metades são
+-- independentes de propósito.
+--
+-- ─── O que estas funções NÃO fazem ─────────────────────────────────────────
+--
+-- Não decidem QUEM pode escrever: papel e organização são de quem chama (a ação
+-- roda no dreno, com o client de serviço, e `p_org` vem do evento, nunca do
+-- corpo de uma requisição). O filtro por `organization_id` é defesa em
+-- profundidade e o que faz uma linha de OUTRA organização devolver nulo em vez
+-- de ser tocada. Não emitem evento — quem emite é a ação, que é dona do
+-- `caused_by_rule` (o anti-laco).
+--
+-- Não normalizam o vocabulário: `btrim`, dedupe por chave canônica e cor são de
+-- `fn_tags_normalizar`/`fn_vocabulario_de_tags_operar` (0336/0673), que operam em
+-- lote. Aqui o contrato é o de sempre da `add_tag`: a lista pedida entra como
+-- veio, e o que muda é só ONDE a junção acontece.
+--
+-- Idempotente: `create or replace`, `revoke`/`grant` reaplicáveis. Sem tabela,
+-- coluna, policy ou dado a corrigir.
+
+create or replace function public.fn_lead_adicionar_etiquetas(
+  p_org uuid,
+  p_lead uuid,
+  p_etiquetas text[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_antes       text[];
+  v_adicionadas text[];
+  v_depois      text[];
+begin
+  if p_etiquetas is null or cardinality(p_etiquetas) = 0 then
+    raise exception 'etiquetas_vazio' using errcode = '22023';
+  end if;
+
+  -- A PRÉ-IMAGEM SOB A TRAVA (ver cabeçalho: é o delta, não a junção).
+  -- Sem linha — lead inexistente OU de outra organização — nada é lido e a
+  -- função devolve nulo. Silêncio de propósito: quem pede um negócio que não é
+  -- da organização dele não recebe confirmação de que ele existe em outro lugar.
+  select coalesce(tags, '{}'::text[])
+    into v_antes
+    from public.crm_leads
+   where organization_id = p_org and id = p_lead
+     for update;
+  if not found then
+    return null;
+  end if;
+
+  v_adicionadas := array(select unnest(p_etiquetas) except select unnest(v_antes));
+
+  -- Nada a acrescentar: não há escrita e não há o que anunciar. A ação traduz
+  -- `adicionadas` vazio em `success` sem evento, como sempre fez.
+  if cardinality(v_adicionadas) = 0 then
+    return jsonb_build_object('tags', to_jsonb(v_antes), 'adicionadas', '[]'::jsonb);
+  end if;
+
+  -- UMA instrução: a conta é refeita sobre a linha vigente quando há escrita
+  -- concorrente (ver cabeçalho). O `RETURNING tags` é o que a ação anuncia.
+  update public.crm_leads
+     set tags = coalesce(tags, '{}'::text[])
+                || array(select unnest(p_etiquetas) except select unnest(coalesce(tags, '{}'::text[]))),
+         updated_at = now()
+   where organization_id = p_org and id = p_lead
+   returning tags into v_depois;
+
+  return jsonb_build_object(
+    'tags', to_jsonb(coalesce(v_depois, '{}'::text[])),
+    'adicionadas', to_jsonb(v_adicionadas)
+  );
+end
+$fn$;
+
+create or replace function public.fn_contato_adicionar_etiquetas(
+  p_org uuid,
+  p_contato uuid,
+  p_etiquetas text[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_antes       text[];
+  v_adicionadas text[];
+  v_depois      text[];
+begin
+  if p_etiquetas is null or cardinality(p_etiquetas) = 0 then
+    raise exception 'etiquetas_vazio' using errcode = '22023';
+  end if;
+
+  -- Irmã da de cima, na tabela do CONTATO: o destino `contato` da #2498 escreve
+  -- aqui, e ali a corrida é a MESMA — dois eventos distintos do mesmo contato em
+  -- drenos diferentes. Corpo idêntico trocando a tabela e o nome do parâmetro.
+  select coalesce(tags, '{}'::text[])
+    into v_antes
+    from public.contacts
+   where organization_id = p_org and id = p_contato
+     for update;
+  if not found then
+    return null;
+  end if;
+
+  v_adicionadas := array(select unnest(p_etiquetas) except select unnest(v_antes));
+
+  if cardinality(v_adicionadas) = 0 then
+    return jsonb_build_object('tags', to_jsonb(v_antes), 'adicionadas', '[]'::jsonb);
+  end if;
+
+  update public.contacts
+     set tags = coalesce(tags, '{}'::text[])
+                || array(select unnest(p_etiquetas) except select unnest(coalesce(tags, '{}'::text[]))),
+         updated_at = now()
+   where organization_id = p_org and id = p_contato
+   returning tags into v_depois;
+
+  return jsonb_build_object(
+    'tags', to_jsonb(coalesce(v_depois, '{}'::text[])),
+    'adicionadas', to_jsonb(v_adicionadas)
+  );
+end
+$fn$;
+
+-- Função nova em `public` NASCE EXPOSTA, e são DUAS origens de EXECUTE: o
+-- `ALTER DEFAULT PRIVILEGES … GRANT ALL ON FUNCTIONS` do corpo do baseline (que
+-- alcança toda função criada depois dele, para anon, authenticated E
+-- service_role) e o grant a PUBLIC que o Postgres dá a qualquer função ao
+-- criá-la. Revogar só de `public, anon` deixaria estas funções — que ESCREVEM —
+-- executáveis por qualquer usuário logado de QUALQUER organização.
+-- `tests/invariants/hardening-definer-varredura.test.ts` cobra as duas origens.
+revoke all on function public.fn_lead_adicionar_etiquetas(uuid, uuid, text[]) from public, anon, authenticated;
+revoke all on function public.fn_contato_adicionar_etiquetas(uuid, uuid, text[]) from public, anon, authenticated;
+grant execute on function public.fn_lead_adicionar_etiquetas(uuid, uuid, text[]) to service_role;
+grant execute on function public.fn_contato_adicionar_etiquetas(uuid, uuid, text[]) to service_role;
+
+comment on function public.fn_lead_adicionar_etiquetas(uuid, uuid, text[]) is
+  'Acrescenta etiquetas ao negócio DENTRO do UPDATE, numa única instrução atômica, e devolve as etiquetas gravadas. '
+  'Existe porque o merge no aplicativo perdia a etiqueta de outro evento concorrente do mesmo negócio. '
+  'Não decide papel nem organização — isso é de quem chama.';
+comment on function public.fn_contato_adicionar_etiquetas(uuid, uuid, text[]) is
+  'Acrescenta etiquetas ao contato DENTRO do UPDATE, numa única instrução atômica, e devolve as etiquetas gravadas. '
+  'Mesma corrida e mesmo desenho de fn_lead_adicionar_etiquetas, no destino `contato` da add_tag.';
+
+notify pgrst, 'reload schema';
+
+-- ---- o agente declara em quais números atende (migration 0665, #2796) ----
+-- Tabela de vínculo versão↔número. Não cria FUNÇÃO, então poderia ficar depois
+-- da VARREDURA anon; entra aqui porque é onde a fatia a coloca e é inofensivo.
+-- `channel_session_id` segue como número PRINCIPAL em ai_agent_versions — sem
+-- data migration. `on delete restrict` no número espelha o FK de hoje; o que
+-- acontece ao desconectar um número vinculado é decisão de produto em aberto.
+-- Leitura por organização; escrita com o gate de papel de ai_agent_versions
+-- (admin) — tabela NOVA não entra com policy ALL só-tenancy.
+-- Alvo da FK composta da versão (o de channel_sessions já existe:
+-- channel_sessions_org_id_unique).
+create unique index if not exists uq_ai_agent_versions_org_id
+  on public.ai_agent_versions (organization_id, id);
+
+create table if not exists public.ai_agent_version_channels (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  agent_version_id uuid not null,
+  channel_session_id uuid not null,
+  created_at timestamptz not null default now(),
+  -- FK COMPOSTA pela doutrina multi-tenant (mesmo molde de
+  -- campaign_channel_sessions, 0377): a linha não pode apontar para a versão nem
+  -- para o número de OUTRA organização. A checagem de FK não passa pela RLS, então
+  -- só a FK por (organization_id, id) amarra os três à mesma organização.
+  -- Apagar a versão apaga o vínculo; apagar o número segue barrado (restrict),
+  -- espelhando ai_agent_versions_channel_session_id_fkey.
+  constraint ai_agent_version_channels_versao_da_org_fk
+    foreign key (organization_id, agent_version_id)
+    references public.ai_agent_versions (organization_id, id) on delete cascade,
+  constraint ai_agent_version_channels_numero_da_org_fk
+    foreign key (organization_id, channel_session_id)
+    references public.channel_sessions (organization_id, id) on delete restrict,
+  constraint ai_agent_version_channels_unico unique (agent_version_id, channel_session_id)
+);
+
+create index if not exists ai_agent_version_channels_por_numero_idx
+  on public.ai_agent_version_channels (organization_id, channel_session_id);
+
+alter table public.ai_agent_version_channels enable row level security;
+
+drop policy if exists tenant_isolation_ai_agent_version_channels_all on public.ai_agent_version_channels;
+
+drop policy if exists tenant_isolation_ai_agent_version_channels_select on public.ai_agent_version_channels;
+create policy tenant_isolation_ai_agent_version_channels_select on public.ai_agent_version_channels
+  for select using (organization_id in (select * from public.fn_user_org_ids()));
+
+drop policy if exists tenant_isolation_ai_agent_version_channels_write on public.ai_agent_version_channels;
+create policy tenant_isolation_ai_agent_version_channels_write on public.ai_agent_version_channels
+  for all using (
+    organization_id in (select * from public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'admin')
+  ) with check (
+    organization_id in (select * from public.fn_user_org_ids())
+      and public.fn_role_at_least(organization_id, 'admin')
+  );
+
+revoke all on public.ai_agent_version_channels from anon;
+grant select, insert, update, delete on public.ai_agent_version_channels to authenticated;
+grant all on public.ai_agent_version_channels to service_role;
+
+drop trigger if exists trg_ai_agent_version_channels_audit on public.ai_agent_version_channels;
+create trigger trg_ai_agent_version_channels_audit
+  after insert or update or delete on public.ai_agent_version_channels
+  for each row execute function public.fn_audit_log_row();
+
+comment on table public.ai_agent_version_channels is
+  'Em quais números uma versão de agente atende (um, vários, ou todos). O número PRINCIPAL segue em ai_agent_versions.channel_session_id; esta tabela é o vínculo adicional. Agente antigo não tem linha aqui e continua como antes.';
+comment on column public.ai_agent_version_channels.channel_session_id is
+  'Um dos números em que a versão atende. `on delete restrict` espelha ai_agent_versions_channel_session_id_fkey — desconectar número vinculado ainda é decisão de produto em aberto (#2796).';
 
 -- ---- atribuição respeita a carteira (migration 0667) ----
 CREATE OR REPLACE FUNCTION public.fn_conversation_assign(p_organization_id uuid, p_conversation_id uuid, p_to_user_id uuid, p_reason text, p_expected_assignee uuid DEFAULT NULL::uuid, p_enforce_expected boolean DEFAULT false)
