@@ -163,4 +163,56 @@ describe("evaluateConditions", () => {
       evaluateConditions([{ field: "event.added_tags", op: "contains", value: "trafego" }], comTags(["trafego pago"])),
     ).toBe(false);
   });
+
+  /**
+   * Doc 161 (16/10), opção D: a pontuação vira ESPAÇO, não some. O caso que
+   * motivou a #2973 é a mensagem pronta do anúncio que o lead edita. Os casos
+   * acima passam só com o acento; este é o que prende a pontuação.
+   */
+  it("contém em texto: a mensagem do anúncio casa mesmo sem a pontuação", () => {
+    for (const recebido of ["ola vi o anuncio", "ola, vi o anuncio", "Olá!! Vi o anúncio."]) {
+      expect(
+        evaluateConditions(
+          [{ field: "event.body_preview", op: "contains", value: "Olá! vi o anúncio" }],
+          comTexto(recebido),
+        ),
+        `"Olá! vi o anúncio" tinha de casar "${recebido}"`,
+      ).toBe(true);
+    }
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "pré-venda" }],
+        comTexto("quero entrar na pre venda"),
+      ),
+    ).toBe(true);
+  });
+
+  it("contém em texto: pontuação vira espaço e não junta números nem endereços", () => {
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "10,00" }],
+        comTexto("o plano custa 1.000"),
+      ),
+    ).toBe(false);
+    expect(
+      evaluateConditions(
+        [{ field: "event.body_preview", op: "contains", value: "@gmail.com" }],
+        comTexto("meu email é fulanogmailcom"),
+      ),
+    ).toBe(false);
+  });
+
+  it("contém em texto: regra só de pontuação não casa toda mensagem", () => {
+    // "?" normalizado fica vazio, e "contém vazio" casaria tudo: uma regra que
+    // manda WhatsApp passaria a disparar para todo mundo. Ela compara como antes.
+    expect(
+      evaluateConditions([{ field: "event.body_preview", op: "contains", value: "?" }], comTexto("bom dia")),
+    ).toBe(false);
+    expect(
+      evaluateConditions([{ field: "event.body_preview", op: "contains", value: "?" }], comTexto("tudo bem?")),
+    ).toBe(true);
+    expect(
+      evaluateConditions([{ field: "event.added_tags", op: "contains", value: "!" }], comTags(["vip"])),
+    ).toBe(false);
+  });
 });
