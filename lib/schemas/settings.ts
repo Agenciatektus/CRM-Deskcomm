@@ -232,9 +232,9 @@ export const customFieldSchema = z.object({
    * LIGADO, a pessoa pode cadastrar na ficha um valor que não está na lista e
    * ele é gravado como digitado. DESLIGADO (o padrão, e a chave ausente em toda
    * definição que já existe), a escrita só aceita um valor que case com uma
-   * opção (por `value`, `label` ou apelido), gravando o `value` CANÔNICO. A
-   * decisão de aceitar/recusar é do servidor (`lib/leads/campos-pesquisaveis`);
-   * este campo só diz o que o funil permitiu.
+   * opção (por `value`, `label` ou apelido), gravando o `value` CANÔNICO.
+   * Hoje a régua vale na ficha (CustomFieldsEditor); `validarValorPesquisavel`
+   * existe pronta para as escritas do servidor, ainda não plugada (#2521).
    */
   allow_new: z.boolean().optional(),
 });
