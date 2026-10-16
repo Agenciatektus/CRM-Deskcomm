@@ -66,6 +66,16 @@ export const triggerConfigSchema = z.discriminatedUnion("kind", [
       // comportamento de sempre, byte a byte — ver a seção "Dívida da equipe não
       // é silêncio do cliente" no cabeçalho de `silence-sweep.ts`.
       exige_resposta_da_equipe: z.boolean().optional(),
+      /**
+       * Quantas vezes NO TOTAL este fluxo pode recomeçar para o mesmo contato.
+       * Ausente = sem teto (o comportamento de sempre).
+       *
+       * A pausa de reentrada só ESPAÇA as repetições; quem nunca responde
+       * continua elegível para sempre, porque nada atualiza a última mensagem
+       * dele. Sem teto, o fluxo recomeça a cada pausa — 24 h, 48 h, 72 h —
+       * indefinidamente.
+       */
+      max_enrollments_por_contato: z.number().int().min(1).max(50).optional(),
     }),
     ...CANCEL_ON_REPLY,
   }),

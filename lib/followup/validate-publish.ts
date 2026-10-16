@@ -1,5 +1,5 @@
 import type { FlowGraph, FlowEdge, FlowNode, NodeType } from './graph-schema';
-import type { FollowupFlowSurface } from './api-schemas';
+import type { FollowupFlowSurface, TriggerConfig } from './api-schemas';
 import { branchIdForCondition, nodeBranches } from './graph-schema';
 import { rotuloDoRamo } from './rotulo-do-ramo';
 import type { NomesDeValor } from './vocabulario';
@@ -57,9 +57,40 @@ export type PublishValidationError = {
   branch_id?: string;
 };
 
+/**
+ * AVISOS DE SEGURANÇA DA PUBLICAÇÃO — o que não reprova, mas quem publica
+ * precisa ler antes de clicar.
+ *
+ * Por que aviso e não erro: estes três são decisões legítimas em algum fluxo
+ * (um toque único de "10 minutos depois" não quer teto de silêncio), e virar
+ * erro duro REPROVARIA o re-publish de fluxos de silêncio que já existem em
+ * outras instalações. Reprovar o que já está publicado e funcionando é quebrar
+ * dado alheio para dar uma lição.
+ */
+export const PUBLISH_WARNING_CODES = [
+  /** Fluxo de silêncio sem teto: alcança todo contato calado além do mínimo, de uma vez, ao ser ligado. */
+  'silencio_sem_teto',
+  /** Fluxo de silêncio sem teto de repetições: a pausa só espaça, e quem nunca responde recomeça para sempre. */
+  'silencio_sem_limite_de_repeticoes',
+  /** Fluxo de silêncio que alcança quem a EQUIPE não respondeu. */
+  'silencio_alcanca_nao_atendido',
+] as const;
+export type PublishWarningCode = (typeof PUBLISH_WARNING_CODES)[number];
+
+export type PublishValidationWarning = {
+  code: PublishWarningCode;
+  message: string;
+};
+
+/**
+ * `warnings` é OPCIONAL nos dois braços de propósito: todo consumidor atual lê
+ * `ok` e, no `false`, `errors`. Acrescentar campo opcional não quebra nenhum —
+ * e o braço `ok: true` passa a poder carregar recado, que antes não tinha onde
+ * caber.
+ */
 export type PublishValidationResult =
-  | { ok: true }
-  | { ok: false; errors: PublishValidationError[] };
+  | { ok: true; warnings?: PublishValidationWarning[] }
+  | { ok: false; errors: PublishValidationError[]; warnings?: PublishValidationWarning[] };
 
 /**
  * O que só o banco sabe, lido por quem chama (a rota de publish). Ausente, a
@@ -86,6 +117,44 @@ export interface ContextoDoPublish {
    * canal não os tem. Ausente = exige (o comportamento de antes).
    */
   exigeModeloForaDaJanela?: boolean;
+  /**
+   * O gatilho que vai armar este fluxo. Só os AVISOS o leem — nenhuma recusa
+   * depende dele —, e ausente significa "não há o que avisar sobre o gatilho".
+   */
+  trigger?: TriggerConfig;
+}
+
+/**
+ * Os avisos que o gatilho de silêncio rende. Nenhum reprova; todos são coisas
+ * medidas em instalação real que quem publica não tinha como ver na tela.
+ */
+export function avisosDoGatilho(trigger: TriggerConfig | undefined): PublishValidationWarning[] {
+  if (!trigger || trigger.kind !== 'silence') return [];
+  const avisos: PublishValidationWarning[] = [];
+  const p = trigger.params;
+
+  if (!p.max_silence_minutes) {
+    avisos.push({
+      code: 'silencio_sem_teto',
+      message:
+        'Sem “silêncio máximo”, o fluxo alcança TODO contato calado há mais que o mínimo — inclusive quem sumiu há meses — e começa para todos eles na primeira varredura, um minuto depois de publicar.',
+    });
+  }
+  if (!p.max_enrollments_por_contato) {
+    avisos.push({
+      code: 'silencio_sem_limite_de_repeticoes',
+      message:
+        'Sem limite de repetições, a pausa só ESPAÇA os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, indefinidamente.',
+    });
+  }
+  if (!p.exige_resposta_da_equipe) {
+    avisos.push({
+      code: 'silencio_alcanca_nao_atendido',
+      message:
+        'O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “exigir resposta da equipe” se o fluxo é para quem sumiu, não para quem está esperando.',
+    });
+  }
+  return avisos;
 }
 
 /**
@@ -881,7 +950,11 @@ export function validateFlowForPublish(
     });
   }
 
-  if (errors.length === 0) return { ok: true };
+  const warnings = avisosDoGatilho(contexto.trigger);
+
+  if (errors.length === 0) {
+    return warnings.length > 0 ? { ok: true, warnings } : { ok: true };
+  }
 
   errors.sort((a, b) => {
     const rankDiff = PUBLISH_ERROR_CODES.indexOf(a.code) - PUBLISH_ERROR_CODES.indexOf(b.code);
@@ -889,5 +962,5 @@ export function validateFlowForPublish(
     return (a.node_id ?? '').localeCompare(b.node_id ?? '');
   });
 
-  return { ok: false, errors };
+  return warnings.length > 0 ? { ok: false, errors, warnings } : { ok: false, errors };
 }

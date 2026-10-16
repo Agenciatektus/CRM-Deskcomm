@@ -164,6 +164,8 @@ export interface SilencePointer {
   reentry_pause_basis?: BaseDaPausa;
   /** Só alcança quem a equipe já respondeu; ausente/`false` = o comportamento de sempre. */
   exige_resposta_da_equipe?: boolean;
+  /** Quantas vezes no total o fluxo pode recomeçar para o mesmo contato; ausente = sem teto. */
+  max_enrollments_por_contato?: number;
   /** `followup_flow_pointers.handoff_policy`; ausente = `pause` (o default da coluna). */
   handoff_policy?: "pause" | "cancel" | "allow";
 }
@@ -208,6 +210,15 @@ export interface SilenceSweepDb {
    * nossa, é o defeito que este knob existe para fechar.
    */
   loadContatosSemRespostaDaEquipe?(orgId: string, contactIds: string[]): Promise<Set<string>>;
+  /**
+   * Quantas inscrições deste fluxo cada contato JÁ TEVE (vivas e encerradas) —
+   * a conta do teto de repetições. Contato ausente do mapa é zero.
+   *
+   * Opcional pela mesma razão dos demais; e, como o outro, a ausência falha
+   * FECHADA: com teto configurado e sem o método, ninguém é inscrito. Um teto
+   * que o adaptador não sabe contar não pode ser lido como "pode mandar".
+   */
+  loadContagemDeInscricoes?(orgId: string, pointerId: string, contactIds: string[]): Promise<Map<string, number>>;
   /** Nó `trigger` do grafo pinado + se o fluxo pede agente; `null` se version/nó não existir. */
   loadTriggerNode(orgId: string, versionId: string): Promise<NoDeGatilho | null>;
   /**
@@ -266,6 +277,8 @@ export interface SilenceSweepSummary {
   skipped_human_owned: number;
   /** Silenciosos que a equipe ainda não respondeu (só conta com `exige_resposta_da_equipe`). */
   skipped_sem_resposta_da_equipe: number;
+  /** Silenciosos que já bateram o teto de repetições deste fluxo. */
+  skipped_teto_de_repeticoes: number;
   /**
    * Pointers que FALHARAM nesta varredura (logados e pulados). Um pointer ruim
    * — de uma empresa só — não pode calar a varredura de todas as outras: antes,
@@ -292,6 +305,7 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
     skipped_reentry_pause: 0,
     skipped_human_owned: 0,
     skipped_sem_resposta_da_equipe: 0,
+    skipped_teto_de_repeticoes: 0,
     pointers_failed: 0,
   };
 
@@ -363,6 +377,15 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
         ? (await db.loadContatosSemRespostaDaEquipe?.(pointer.organization_id, contactIds)) ??
           new Set<string>(contactIds)
         : new Set<string>();
+      // Teto de repetições: a pausa só ESPAÇA, e quem nunca responde segue
+      // elegível para sempre. Falha FECHADA como a guarda de resposta — mapa
+      // vazio aqui leria como "ninguém repetiu", que é o oposto do seguro.
+      const teto = pointer.max_enrollments_por_contato ?? 0;
+      const repeticoes =
+        teto > 0
+          ? ((await db.loadContagemDeInscricoes?.(pointer.organization_id, pointer.id, contactIds)) ??
+            new Map(contactIds.map((id) => [id, teto])))
+          : new Map<string, number>();
       const comInscricaoViva = await db.loadContatosComInscricaoViva(pointer.organization_id, contactIds);
 
       for (const contactId of contactIds) {
@@ -378,6 +401,10 @@ export async function runSilenceSweep(deps: SilenceSweepDeps): Promise<SilenceSw
         // devia ter sido considerado". A dívida é NOSSA, não dele.
         if (semRespostaDaEquipe.has(contactId)) {
           summary.skipped_sem_resposta_da_equipe++;
+          continue;
+        }
+        if (teto > 0 && (repeticoes.get(contactId) ?? 0) >= teto) {
+          summary.skipped_teto_de_repeticoes++;
           continue;
         }
         if (emCooldown.has(contactId)) {
@@ -477,6 +504,9 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
           ...(parsed.data.params.max_silence_minutes ? { max_silence_minutes: parsed.data.params.max_silence_minutes } : {}),
           ...(parsed.data.params.reentry_pause_basis ? { reentry_pause_basis: parsed.data.params.reentry_pause_basis } : {}),
           ...(parsed.data.params.exige_resposta_da_equipe ? { exige_resposta_da_equipe: true } : {}),
+          ...(parsed.data.params.max_enrollments_por_contato
+            ? { max_enrollments_por_contato: parsed.data.params.max_enrollments_por_contato }
+            : {}),
           handoff_policy:
             row.handoff_policy === "allow" || row.handoff_policy === "cancel" ? row.handoff_policy : "pause",
         });
@@ -644,6 +674,27 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
 
     async loadContatosSemRespostaDaEquipe(orgId, contactIds) {
       return new Set(contactIds.filter((id) => semRespostaDaEquipe.has(`${orgId}:${id}`)));
+    },
+
+    async loadContagemDeInscricoes(orgId, pointerId, contactIds) {
+      // Conta TODAS as inscrições, de qualquer status: o teto é "quantas vezes
+      // este fluxo já falou com esta pessoa", e uma tentativa cancelada no meio
+      // também gastou a vez. O índice
+      // `(organization_id, pointer_id, contact_id, updated_at)` serve a consulta.
+      const contagem = new Map<string, number>();
+      for (let i = 0; i < contactIds.length; i += LOTE_DE_CONTATOS) {
+        const { data, error } = await admin
+          .from("followup_enrollments")
+          .select("contact_id")
+          .eq("organization_id", orgId)
+          .eq("pointer_id", pointerId)
+          .in("contact_id", contactIds.slice(i, i + LOTE_DE_CONTATOS));
+        if (error) throw new Error(error.message);
+        for (const row of (data ?? []) as Array<{ contact_id: string }>) {
+          contagem.set(row.contact_id, (contagem.get(row.contact_id) ?? 0) + 1);
+        }
+      }
+      return contagem;
     },
 
     async loadContatosComInscricaoViva(orgId, contactIds) {
