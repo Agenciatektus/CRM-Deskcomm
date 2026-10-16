@@ -137,6 +137,13 @@ describe("o CSV espelha as colunas que o importer aceita", () => {
     expect(linha.startsWith("'=SOMA(1;2),'@x,,+5511999998888,")).toBe(true);
   });
 
+  it("trecho depois de `;` que começa com fórmula também sai como texto (Excel pt-BR divide por `;`)", () => {
+    const linha = linhaDoCsv({ name: "Ana;=1+1", phone_number: "+5511999998888", tags: ["vip", "=HYPERLINK(\"x\")", "+5511"] });
+    expect(linha).toContain("Ana;'=1+1");
+    expect(linha.endsWith(`"vip;'=HYPERLINK(""x"");+5511"`)).toBe(true);
+    for (const trecho of linha.split(/[;,]/)) expect(trecho.replace(/^"/, "")).not.toMatch(/^[=@]/);
+  });
+
   it("o BOM sai na frente (Excel pt-BR lê acento) e o import tira ele", () => {
     const csv = csvDosContatos(BASE);
     expect(csv.charCodeAt(0)).toBe(0xfeff);

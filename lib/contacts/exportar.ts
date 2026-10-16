@@ -61,6 +61,10 @@ export interface ContatoParaExportar {
   tags?: readonly string[] | null;
 }
 
+function neutralizarFormula(trecho: string): string {
+  return /^[=+\-@\t\r]/.test(trecho) && !/^\+\d+$/.test(trecho) ? `'${trecho}` : trecho;
+}
+
 /**
  * RFC 4180, mais a neutralização de célula que começa com caractere de fórmula
  * — a mesma regra do export de tenants (`app/api/v1/admin/tenants/export/_csv.ts`).
@@ -69,8 +73,10 @@ export interface ContatoParaExportar {
  */
 function csvEscape(valor: unknown): string {
   if (valor === null || valor === undefined) return "";
-  let texto = typeof valor === "string" ? valor : String(valor);
-  if (/^[=+\-@\t\r]/.test(texto) && !/^\+\d+$/.test(texto)) texto = `'${texto}`;
+  const bruto = typeof valor === "string" ? valor : String(valor);
+  // O Excel em pt-BR abre CSV dividindo por `;`: cada trecho depois de um `;`
+  // vira célula própria, e é ele que precisa sair como texto — não só o começo.
+  const texto = bruto.split(";").map(neutralizarFormula).join(";");
   if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
   return texto;
 }
