@@ -8,6 +8,8 @@ O provedor personalizado serve qualquer modelo — o endereço é de quem instal
 
 Agora, quando a tabela embutida não conhece o id, o preço sai do catálogo da própria instalação — as tabelas `ai_models` e `ai_pricing`, as mesmas que a tela de Provedores mostra e que a tela de orçamento já usava nos outros caminhos de custo. É de lá que sai o preço do modelo que você cadastrou, sem nenhum número inventado no código: modelo que não está em nenhuma das duas continua sem custo, e agora isso deixa aviso no log uma vez por provedor e modelo, em vez de passar calado.
 
+O que muda no número que você vê: essas chamadas passam a entrar na tela de Uso de IA e no teto mensal de gasto. Se a sua organização tem teto configurado e usa o provedor personalizado, o gasto que aparece sobe para o real — confira se o teto comporta. Se a leitura do catálogo falhar (banco indisponível naquele instante), a chamada segue normalmente, o custo daquela chamada fica sem valor e o log diz que foi a leitura que falhou.
+
 Quem só usa os modelos de fábrica não vê mudança nenhuma: a tabela embutida continua sendo consultada primeiro, e para eles nada mais é lido do banco.
 
 Refs #3013.

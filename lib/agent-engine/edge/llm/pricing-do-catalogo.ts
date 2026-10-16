@@ -223,6 +223,44 @@ export function escolherPrecoDaLinha(
   return null;
 }
 
+/** A leitura do banco falhou — distinto de "o banco não tem preço". */
+const FALHOU = Symbol("leitura_do_preco_falhou");
+
+async function lerPreco(
+  db: DbDePreco,
+  model: string,
+  provider: string,
+  agora: number,
+  log?: Logger,
+): Promise<PrecoDaInstalacao | null | typeof FALHOU> {
+  const chave = `${provider}|${model}`;
+  const guardado = memo.get(chave);
+  if (guardado !== undefined && agora - guardado.lidoEm < TTL_MS) return guardado.preco;
+
+  try {
+    const candidatos = candidatosDeId(model);
+    // Só `$1`: o provedor desempata em JS (`escolherPrecoDaLinha`). Um segundo
+    // parâmetro sem `$2` no SQL é recusado pelo Postgres ("bind message supplies
+    // 2 parameters, but prepared statement requires 1") — medido na triagem do
+    // #3034, onde isso fazia TODA leitura cair no `catch` com os testes de dublê
+    // verdes. Guardado por `tests/invariants/custo-do-catalogo-no-postgres-de-verdade.test.ts`.
+    const { rows } = await db.query<LinhaDePrecoDoBanco>(SQL, [candidatos]);
+    const preco = escolherPrecoDaLinha(rows ?? [], candidatos, provider);
+    memo.set(chave, { lidoEm: agora, preco });
+    return preco;
+  } catch (erro) {
+    // Catálogo fora do ar NÃO pode derrubar uma chamada já paga: o custo volta a
+    // ser desconhecido, que é exatamente o estado de antes desta frente. Mas a
+    // falha é DITA (e não memoizada): calada, ela se passaria por "sem preço".
+    log?.warn("llm: leitura do preço do catálogo falhou — a chamada grava custo nulo", {
+      provider,
+      model,
+      erro: erro instanceof Error ? erro.message : String(erro),
+    });
+    return FALHOU;
+  }
+}
+
 /**
  * O preço da instalação para um id que a tabela estática do motor não conhece.
  * Memoizado por (provedor, modelo); leitura que falha devolve `null`.
@@ -233,23 +271,8 @@ export async function precoDaInstalacao(
   provider: string,
   agora = Date.now(),
 ): Promise<PrecoDaInstalacao | null> {
-  const chave = `${provider}|${model}`;
-  const guardado = memo.get(chave);
-  if (guardado !== undefined && agora - guardado.lidoEm < TTL_MS) return guardado.preco;
-
-  let preco: PrecoDaInstalacao | null = null;
-  try {
-    const candidatos = candidatosDeId(model);
-    const { rows } = await db.query<LinhaDePrecoDoBanco>(SQL, [candidatos, provider]);
-    preco = escolherPrecoDaLinha(rows ?? [], candidatos, provider);
-  } catch {
-    // Catálogo fora do ar NÃO pode derrubar uma chamada já paga: o custo volta a
-    // ser desconhecido, que é exatamente o estado de antes desta frente.
-    preco = null;
-  }
-
-  memo.set(chave, { lidoEm: agora, preco });
-  return preco;
+  const preco = await lerPreco(db, model, provider, agora);
+  return preco === FALHOU ? null : preco;
 }
 
 /**
@@ -281,7 +304,14 @@ export async function custoDoModeloForaDoMotor(
   db: DbDePreco,
   input: { model: string; provider: string; usage: TokenUsage; log?: Logger; agora?: number },
 ): Promise<number | null> {
-  const preco = await precoDaInstalacao(db, input.model, input.provider, input.agora);
+  const preco = await lerPreco(
+    db,
+    input.model,
+    input.provider,
+    input.agora ?? Date.now(),
+    input.log,
+  );
+  if (preco === FALHOU) return null;
   if (preco === null) {
     const chave = `${input.provider}|${input.model}`;
     if (!avisados.has(chave)) {

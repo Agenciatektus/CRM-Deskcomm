@@ -264,6 +264,39 @@ describe("controle negativo — id sem preço continua sem preço inventado", ()
     });
     expect(custo).toBeNull();
   });
+
+  it("a falha da leitura é DITA como falha — não como 'sem preço' — e não é memoizada", async () => {
+    let falhar = true;
+    const query = vi.fn(async (_sql: string, params: unknown[] = []) => {
+      if (falhar) throw new Error("connection terminated unexpectedly");
+      const ids = new Set((params[0] as string[] | undefined) ?? []);
+      return { rows: [LINHA_DO_GPT_OSS].filter((l) => ids.has(l.id)) };
+    });
+    const log = logEspiao();
+    const entrada = { model: "openai/gpt-oss-120b", provider: "custom", usage: USO, log };
+
+    expect(await custoDoModeloForaDoMotor({ query } as never, entrada)).toBeNull();
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn.mock.calls[0]![0]).toContain("leitura do preço do catálogo falhou");
+    expect(log.warn.mock.calls[0]![1]).toMatchObject({
+      provider: "custom",
+      model: "openai/gpt-oss-120b",
+      erro: "connection terminated unexpectedly",
+    });
+
+    // O banco voltou: a chamada seguinte lê de novo (a falha não ficou no memo
+    // por 5 minutos) e o custo sai.
+    falhar = false;
+    expect(await custoDoModeloForaDoMotor({ query } as never, entrada)).not.toBeNull();
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("a consulta leva UM parâmetro — o SQL só referencia $1 e o Postgres recusa bind a mais", async () => {
+    const { db, consultas } = bancoFalso([LINHA_DO_GPT_OSS]);
+    await precoDaInstalacao(db, "openai/gpt-oss-120b", "custom");
+    expect(consultas).toHaveLength(1);
+    expect(consultas[0]).toHaveLength(1);
+  });
 });
 
 describe("o nulo deixa de ser CALADO — o aviso sai uma vez por (provedor, modelo)", () => {
