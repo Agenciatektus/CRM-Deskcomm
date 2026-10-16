@@ -7725,6 +7725,29 @@ export const DICIONARIO: Traducoes = {
     es: "Archivar cierra esta atención y guarda la conversación en el historial. Si el cliente vuelve a escribir, la conversación regresa. ¿Archivar?",
   },
   "Arquivando...": { es: "Archivando..." },
+
+  // ─── Guias curtas dos botões da barra de ações do cabeçalho (#3003) ───
+  //
+  // O rótulo diz o GESTO; a guia diz a CONSEQUÊNCIA — é a pergunta "o que
+  // acontece se eu clicar aqui?", que chega antes do clique. Mesmo vocabulário
+  // já usado acima nesta seção (`atención automática`, `atención se cierra`).
+  "Solta esta conversa: ela volta para a fila e o atendimento automático assume de novo.": {
+    es: "Suelta esta conversación: vuelve a la cola y la atención automática la retoma.",
+  },
+  "Passa esta conversa para outro atendente ou para outro número.": {
+    es: "Pasa esta conversación a otro agente o a otro número.",
+  },
+  "Encerra o atendimento. Depois você pode reabrir a conversa.": {
+    es: "Cierra la atención. Después puedes reabrir la conversación.",
+  },
+  "Volta a atender esta conversa, que estava encerrada.": {
+    es: "Vuelve a atender esta conversación, que estaba cerrada.",
+  },
+  "Tira a conversa do inbox e guarda no histórico. Se ainda estiver aberta, o atendimento é encerrado.":
+    {
+      es: "Saca la conversación del inbox y la guarda en el historial. Si todavía está abierta, la atención se cierra.",
+    },
+  "Abre a ficha completa deste contato.": { es: "Abre la ficha completa de este contacto." },
   Automático: { es: "Automático" },
   Alguém: { es: "Alguien" },
   "Nota interna · só o time vê": { es: "Nota interna · solo la ve el equipo" },
