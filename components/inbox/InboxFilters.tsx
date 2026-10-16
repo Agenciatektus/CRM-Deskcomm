@@ -101,6 +101,16 @@ export interface InboxFiltersValue {
   assigned_to?: string;
 }
 
+/**
+ * Trocar de aba, por QUALQUER caminho (clique na aba ou setas de "Aba anterior"/
+ * "Próxima aba"). Minhas já é "só as minhas": um atendente escolhido antes não
+ * vale ali, e seguir com ele deixaria as outras abas contando o atendente com o
+ * seletor escondido.
+ */
+export function comAba(value: InboxFiltersValue, tab: InboxTab): InboxFiltersValue {
+  return { ...value, tab, ...(tab === "mine" ? { assigned_to: undefined } : {}) };
+}
+
 interface Props {
   value: InboxFiltersValue;
   onChange: (next: InboxFiltersValue) => void;
@@ -221,7 +231,7 @@ export function InboxFilters({ value, onChange }: Props) {
     : INBOX_TABS.map((t) => t.value);
   const moveTab = (direction: -1 | 1) => {
     const next = tabs[tabs.indexOf(value.tab) + direction];
-    if (next) onChange({ ...value, tab: next });
+    if (next) onChange(comAba(value, next));
   };
   const countFor: Partial<Record<InboxTab, number>> = {
     // `fila` é o nome novo; `unassigned` é o alias que a rota versionada mantém.
@@ -646,14 +656,7 @@ export function InboxFilters({ value, onChange }: Props) {
           filtro com o mesmo rótulo, e "Automático" continua "Automático". */}
       <Tabs
         value={value.tab}
-        onValueChange={(v) =>
-          onChange({
-            ...value,
-            tab: v as InboxTab,
-            // Minhas já é "só as minhas": um atendente escolhido antes não vale ali.
-            ...(v === "mine" ? { assigned_to: undefined } : {}),
-          })
-        }
+        onValueChange={(v) => onChange(comAba(value, v as InboxTab))}
         className="px-3"
       >
         <div className="flex items-center gap-1">
