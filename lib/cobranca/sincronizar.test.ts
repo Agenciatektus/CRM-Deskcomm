@@ -415,6 +415,14 @@ describe("sincronizar — entrada paga (plano sem dias de teste)", () => {
     expect(m.linha).toMatchObject({ pagamento_inicial_pendente: true });
   });
 
+  it("o lembrete de quem aguarda a entrada não fala em teste grátis: nunca houve teste", async () => {
+    ler.mockResolvedValue(situacao({ existe: false, jaPagou: false, assinaturasVivas: 1, proximoVencimento: null, statusBruto: "ACTIVE:sem_pagamento" }));
+    await rodar();
+    const aviso = rpcs("fn_cobranca_registrar_aviso")[0]?.args;
+    expect(aviso).toMatchObject({ p_aviso: "suspensa" });
+    expect(`${aviso?.p_titulo} ${aviso?.p_corpo}`).not.toContain("teste grátis");
+  });
+
   it("pagamento confirmado: a entrada deixa de estar pendente e o acesso volta", async () => {
     ler.mockResolvedValue(situacao());
     expect(await rodar()).toMatchObject({ tipo: "aplicada", estado: "ativa", acao: "reativar" });

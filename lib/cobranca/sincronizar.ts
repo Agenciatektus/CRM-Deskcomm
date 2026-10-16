@@ -382,6 +382,7 @@ export async function aplicarRegua(
       ultimoAviso: linha.ultimo_aviso,
       ultimoAvisoEm: emData(linha.ultimo_aviso_em),
       relidaEm: emData(linha.relida_em),
+      entradaPendente: linha.pagamento_inicial_pendente === true,
     },
     { status: org.status, suspendedKind: org.suspended_kind },
     agora,

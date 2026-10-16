@@ -296,7 +296,7 @@ cancelada ──nova assinatura com 1º pagamento confirmado──▶ ativa
 - `plano_agendado_id`: aplicado (vira `plano_id`) quando `proximo_vencimento` avança e o estado é `ativa` (o período novo foi pago). Durante o teste grátis (`trial_ate > now()`, com ou sem provedor), a troca é imediata (decisão D-13, §7e).
 - `assinaturas_vivas`, `relida_em = lido_em`, `ultimo_erro = null` (ou `pagamento_de_assinatura_cancelada` se `situacao.pagamentoSemAssinaturaViva`).
 
-**Régua pura** (`lib/cobranca/regua.ts`, sem banco). Entradas: assinatura, org, plano, `agora` injetável, `toleranciaDias = max(5, configurada)` (piso no código: boleto Stripe ~1 dia útil, `CONFIRMED→RECEIVED` e compensação Asaas, mais um fim de semana — razão de D-5, que só existe para **quem tem pagamento no jogo**). Trial vencido sem pagamento confirmado (`vencida_desde` igual a `trial_ate`, ou assinatura sem provedor nenhum) fica **fora da tolerância**: o aviso final sai no próprio fim do teste e a suspensão 48 h depois (#2753), com a frase dizendo que é o teste que acabou.
+**Régua pura** (`lib/cobranca/regua.ts`, sem banco). Entradas: assinatura, org, plano, `agora` injetável, `toleranciaDias = max(5, configurada)` (piso no código: boleto Stripe ~1 dia útil, `CONFIRMED→RECEIVED` e compensação Asaas, mais um fim de semana — razão de D-5, que só existe para **quem tem pagamento no jogo**). Trial vencido sem cobrança em jogo (assinatura sem provedor nenhum, ou `vencida_desde` igual a `trial_ate` **e** nenhuma assinatura viva no provedor) fica **fora da tolerância**: o aviso final sai no próprio fim do teste e a suspensão 48 h depois (#2753), com a frase dizendo que é o teste que acabou.
 
 **Filtro por org** (antes de tudo):
 - org `active` ou `suspended{cobranca}` → avalia.
@@ -305,7 +305,7 @@ cancelada ──nova assinatura com 1º pagamento confirmado──▶ ativa
 
 **Dívida corrente:** `debito_desde = vencida_desde` (`em_atraso`) ou `proximo_vencimento` já passado (`cancelada`; se `proximo_vencimento` é nulo, a primeira avaliação grava `vencida_desde = agora` e daí em diante `debito_desde = vencida_desde` — sem valor persistido, `agora` muda a cada rodada e nenhum aviso chega a "pertencer" à dívida). Um aviso "pertence à dívida" só se `ultimo_aviso_em >= debito_desde`.
 
-`limite = max(debito_desde + (em_atraso e dívida ≠ teste ? tolerância : 0), prazo_extra_ate)` — a tolerância é zero para a dívida nascida no fim do teste (#2753); `prazo_extra_ate` vale para as duas.
+`limite = max(debito_desde + (em_atraso e dívida ≠ teste ? tolerância : 0), prazo_extra_ate)` — a tolerância é zero para a dívida nascida no fim do teste sem cobrança em jogo (#2753); com assinatura viva no provedor (no Asaas, o 1º boleto vence no fim do teste) ela vale, porque há pagamento em compensação; `prazo_extra_ate` vale para as duas.
 
 | Situação | Ação |
 |---|---|

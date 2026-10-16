@@ -9,8 +9,8 @@
  *     corridas — a data de calendário não conta;
  *   - com provedor, nunca se suspende com leitura de mais de 1 h;
  *   - teste grátis vencido sem pagamento vira dívida (não é acesso eterno), e
- *     NÃO espera a tolerância de D-5: quem nunca pagou nada não tem boleto nem
- *     Pix em compensação, então o limite é o aviso final + 48 h (#2753);
+ *     NÃO espera a tolerância de D-5 quando não há cobrança em jogo (nenhuma
+ *     assinatura viva no provedor): o limite é o aviso final + 48 h (#2753);
  *   - a tolerância nunca fica abaixo de 5 dias, digite o dono o que digitar;
  *   - suspensão administrativa é do dono: a régua não avisa nem reativa.
  */
@@ -45,6 +45,8 @@ export interface AssinaturaNaRegua {
   readonly ultimoAviso: AvisoDaRegua | null;
   readonly ultimoAvisoEm: Date | null;
   readonly relidaEm: Date | null;
+  /** Plano com entrada paga (D-16): nunca houve teste grátis, mesmo com `trial_ate` gravado na criação. */
+  readonly entradaPendente: boolean;
 }
 
 export interface OrgNaRegua {
@@ -120,13 +122,18 @@ export function decidirRegua(
   }
 
   if (debito !== null) {
-    // Trial vencido sem pagamento confirmado: a dívida nasceu no fim do teste
-    // quando NÃO há provedor nenhum (nunca houve checkout) ou quando
-    // `vencida_desde` É o fim do teste — só `aplicarLeitura` grava assim, e só
-    // quando o provedor não tem pagamento confirmado (estado.ts, `doTesteVencido`).
-    // Quem nunca pagou nada não tem boleto nem Pix esperando compensação, então
-    // a tolerância de D-5 (5–30 dias) não cabe aqui: vale o aviso final + 48 h.
-    const dividaDoTeste = !a.temProvedor || (a.trialAte !== null && vencida !== null && vencida.getTime() === a.trialAte.getTime());
+    // Dívida do teste (#2753): nasceu no fim do teste e não há cobrança em jogo
+    // — nenhum provedor (nunca houve checkout), ou `vencida_desde` É o fim do
+    // teste (estado.ts, `doTesteVencido`) e nenhuma assinatura viva no provedor.
+    // Sem boleto nem Pix esperando compensação, a tolerância de D-5 não cabe:
+    // vale o aviso final + 48 h. Com assinatura viva há cobrança em jogo (no
+    // Asaas o 1º boleto vence no próprio fim do teste e fica PENDING até
+    // compensar): é o caso de D-5, e ele espera a tolerância. A entrada paga
+    // (D-16) grava `trial_ate` = criação sem ter havido teste.
+    const dividaDoTeste =
+      !a.entradaPendente &&
+      (!a.temProvedor ||
+        (a.assinaturasVivas === 0 && a.trialAte !== null && vencida !== null && vencida.getTime() === a.trialAte.getTime()));
     const origem: OrigemDaDivida = estado === "cancelada" ? "cancelamento" : dividaDoTeste ? "teste" : "atraso";
     if (suspensaPorCobranca) {
       // Um e-mail de "suspensa" e silêncio para sempre não recupera receita: um

@@ -20,7 +20,7 @@ function a(p: Partial<AssinaturaNaRegua> = {}): AssinaturaNaRegua {
   return {
     estado: "ativa", temProvedor: true, cancelaNoFim: false, assinaturasVivas: 1, trialAte: null,
     vencidaDesde: null, proximoVencimento: null, prazoExtraAte: null, ultimoAviso: null, ultimoAvisoEm: null,
-    relidaEm: ha(0.25), ...p,
+    relidaEm: ha(0.25), entradaPendente: false, ...p,
   };
 }
 const decidir = (x: AssinaturaNaRegua, org: OrgNaRegua = ATIVA, tolerancia = 7) => decidirRegua(x, org, AGORA, tolerancia);
@@ -153,6 +153,21 @@ describe("⭐ trial vencido × assinatura atrasada: a tolerância só protege qu
     const atraso = comAvisoFinal(10, 49);
     expect(decidir(atraso, ATIVA, 7).acao).toEqual({ tipo: "suspender", debitoDesde: ha(24 * 10), origem: "atraso" });
     expect(decidir(atraso, ATIVA, 30).acao).toEqual({ tipo: "nada" });
+  });
+
+  it("⭐ trial que terminou com o 1º boleto/Pix em aberto no provedor (Asaas: vence no fim do teste): espera a tolerância", () => {
+    // Pagou no vencimento, a compensação leva até 1 dia útil + fim de semana — o
+    // caso exato de D-5. Assinatura viva no provedor = há cobrança em jogo.
+    const d = a({ estado: "em_atraso", temProvedor: true, assinaturasVivas: 1, trialAte: ha(1), vencidaDesde: ha(1) });
+    expect(decidir(d, ATIVA, 7).acao).toEqual({ tipo: "avisar", aviso: "venceu", debitoDesde: ha(1), data: ha(1), origem: "atraso" });
+    const comAviso = { ...d, vencidaDesde: ha(50), trialAte: ha(50), ultimoAviso: "suspende_em_breve" as const, ultimoAvisoEm: ha(49) };
+    expect(decidir(comAviso, ATIVA, 7).acao).toEqual({ tipo: "nada" });
+  });
+
+  it("entrada paga (plano de 0 dias, D-16) suspensa à espera do 1º pagamento: o lembrete NÃO fala em teste grátis", () => {
+    const criada = ha(0.1);
+    const d = decidir(a({ estado: "trial", temProvedor: false, assinaturasVivas: 0, trialAte: criada, relidaEm: null, entradaPendente: true }), SUSPENSA_POR_COBRANCA);
+    expect(d.acao).toMatchObject({ tipo: "avisar", aviso: "suspensa", origem: "atraso" });
   });
 
   it("assinatura que já teve trial e voltou a dever (vencida_desde ≠ fim do teste): tolerância normal", () => {
