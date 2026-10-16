@@ -1,5 +1,5 @@
 ---
-impacto: corrigido
+impacto: nada_mudou
 secao: corrigido
 titulo: Sincronização da agenda do Google conclui páginas grandes sem lotar o cache
 ---
