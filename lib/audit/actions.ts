@@ -1144,6 +1144,12 @@ export const AUDIT_ACTIONS = [
   // A marca foi removida: só limpa `ai_opt_out`; a conversa segue com a trava
   // de handoff de quem a pôs.
   "contacts.always_human_unmarked",
+  // O operador carregou a imagem que a Resposta rápida passa a enviar junto
+  // com o texto — `POST /message-templates/:id/midias` (#2526). A REMOÇÃO não
+  // tem código próprio: ela acontece dentro do `template.updated` (campo
+  // `removidas` no metadata) ou dentro do `template.deleted`, que são os atos
+  // em que a imagem sai de fato.
+  "template.media_added",
   // O cron de lembrete de tarefa (#2529) avisou RESPONSÁVEIS nesta rodada —
   // só quando houve efeito, como manda a lei do §Audit log. O metadata traz
   // quantas tarefas, quantas puladas e por quê; nunca o número de WhatsApp de
