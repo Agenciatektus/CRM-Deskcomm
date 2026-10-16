@@ -696,7 +696,7 @@ function AvisoDeSmtp() {
       <p className="font-medium">⚠️ {t("Sem SMTP configurado")}</p>
       <p className="mt-1">
         {t(
-          "Esta instalação não envia e-mail nenhum: \"esqueci a senha\" e a confirmação de cadastro não chegam. Configure o servidor de e-mail em /admin/email.",
+          "O serviço de login desta instalação não envia e-mail: \"esqueci a senha\" e a confirmação de cadastro não chegam. Configure o servidor de e-mail em /admin/email e, no servidor, rode bash hostgator-setup-kit/update.sh — é ele que leva o SMTP ao serviço de login.",
         )}
       </p>
     </div>

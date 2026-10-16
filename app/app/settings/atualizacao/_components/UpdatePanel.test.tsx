@@ -128,6 +128,12 @@ describe("tela de atualização — o aviso de 'sem SMTP'", () => {
     expect(
       screen.getByText(/Configure o servidor de e-mail em \/admin\/email/),
     ).toBeInTheDocument();
+    // O SMTP de /admin/email só chega ao serviço de login pelo update.sh
+    // (`sincronizar_smtp_do_gotrue`); sem o passo, o aviso some e o e-mail segue sem sair.
+    expect(screen.getByTestId("aviso-sem-smtp").textContent).toMatch(/update\.sh/);
+    // Sem SMTP, convite e LGPD ainda saem pela Resend (lib/email/roteador.ts):
+    // o aviso fala do serviço de login, nunca de "nenhum e-mail".
+    expect(screen.getByTestId("aviso-sem-smtp").textContent).not.toMatch(/e-mail nenhum/);
   });
 
   it("o aviso vem ANTES do conteúdo — ele é da instalação, não do estado da atualização", () => {
