@@ -214,7 +214,7 @@ function conferir(leitura: Map<Rotulo, Leitura>, moveram: readonly Rotulo[]): vo
 /** Os negócios que a fala do vendedor sobre o contato tem de mover. */
 const A_ABERTA_DO_CONTATO = ["abertoA", "abertoB"] as const;
 
-describe("0678 · a mensagem do vendedor é atividade do negócio", () => {
+describe("0683 · a mensagem do vendedor é atividade do negócio", () => {
   it("(1) fala pelo Inbox do CRM (sent_via='user'): carimba os negócios ABERTOS do contato, e só eles", () => {
     conferir(medir({ sentVia: "user", direction: "outbound" }), A_ABERTA_DO_CONTATO);
   });

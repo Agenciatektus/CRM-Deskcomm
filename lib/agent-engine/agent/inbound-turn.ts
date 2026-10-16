@@ -2872,6 +2872,14 @@ async function executarTurnoDoAgente(
       contactId: leadId || null,
       agentId: agentConfig?.agentId ?? null,
       lerEvidencias: () => evidenciasComerciais.ler(),
+      // #2923 — o RUN que mediu: o job no turno automático, o RASCUNHO na prévia
+      // (é o que o `runId` da prévia já carrega). É o ponteiro que a resposta
+      // aprovada usa para fechar a linha que a prévia deixou em aberto.
+      runId: job?.id ?? preview?.runId ?? null,
+      // Na prévia o rascunho AINDA NÃO saiu: a linha nasce "sem par" de propósito
+      // (o cartão só conta o que chegou ao cliente), e quem a fecha é a resposta
+      // aprovada. No turno automático o par nasce fechado, como sempre.
+      rotuloAtual: preview ? null : 'enviado',
     },
     deps.jev ?? {},
   );
@@ -4265,6 +4273,7 @@ async function executarTurnoDoAgente(
             organizationId: tenantId,
             jobId: preview?.runId ?? liveJob().id,
             contactId: leadId || null,
+            conversationId: input.conversationId,
           },
           configDoTurno,
           runLog,
@@ -4397,6 +4406,12 @@ async function executarTurnoDoAgente(
                 conversationId: PASTA_DE_TESTE_DE_MIDIA,
                 codigo,
               }),
+            // #2923 — a conferência de fato do turno entra na prévia: o mesmo
+            // conferidor criado acima, com as evidências que as ferramentas
+            // consultaram NESTE turno. É ele que grava a observação e que faz um
+            // `contradiz`/`nao_esta_na_base` aparecer para quem revisa o rascunho
+            // (impedimento no assistido, aviso no Teste) em vez de sair calado.
+            conferirAfirmacoes,
           )
         : rawTools;
     const tools = wrapToolsWithBreaker(previewTools, {
