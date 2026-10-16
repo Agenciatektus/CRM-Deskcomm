@@ -62,10 +62,19 @@ export const COLUNAS_DO_CSV = [
  * pelo LibreOffice. A aspa simples na frente faz a planilha mostrar o texto
  * como texto. Só vale para `string`: número (a contagem) não passa por aqui.
  */
+function neutralizarFormula(trecho: string): string {
+  return /^[=+\-@\t\r]/.test(trecho) ? `'${trecho}` : trecho;
+}
+
 function csvEscape(valor: unknown): string {
   if (valor === null || valor === undefined) return "";
-  let texto = typeof valor === "string" ? valor : String(valor);
-  if (typeof valor === "string" && /^[=+\-@\t\r]/.test(texto)) texto = `'${texto}`;
+  // Quem lê o CSV nem sempre divide como nós: o Excel em pt-BR divide por `;`
+  // e ali as aspas de um campo que não começa com aspa não protegem nada, então
+  // uma quebra de linha abre linha nova; leitor sem aspas divide em `,`. Todo
+  // trecho que começa depois de `;`, `,`, LF ou CR pode virar célula: cada um
+  // sai como texto, e não só o começo.
+  const texto =
+    typeof valor === "string" ? valor.split(/(?<=[;,\n\r])/).map(neutralizarFormula).join("") : String(valor);
   if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
   return texto;
 }
