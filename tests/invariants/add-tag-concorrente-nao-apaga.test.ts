@@ -1,6 +1,6 @@
 /**
  * DOIS EVENTOS DIFERENTES, processados por dois drenos AO MESMO TEMPO sobre o
- * mesmo negócio ou contato, NÃO se apagam (issue #2888, migration 0679).
+ * mesmo negócio ou contato, NÃO se apagam (issue #2888, migration 0682).
  *
  * ─── O que este arquivo mede, e por que ele é diferente do unitário ────────
  *

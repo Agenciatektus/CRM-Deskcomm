@@ -23,7 +23,7 @@
  *
  * ─── #2888 — o dublê acompanhou a troca de lado da junção ──────────────────
  *
- * Desde a 0679 quem junta é a função SQL, dentro do `UPDATE`. Aqui isso é o que
+ * Desde a 0682 quem junta é a função SQL, dentro do `UPDATE`. Aqui isso é o que
  * dá ainda mais força ao item 1: o dublê devolve o que o BANCO tem (["antiga"]),
  * não o que o contexto lembra (["desatualizada"]) — se a ação voltasse a montar
  * a lista em memória, as etiquetas do banco sumiriam do que ela anuncia. A

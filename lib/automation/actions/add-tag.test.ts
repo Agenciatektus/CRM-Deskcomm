@@ -11,7 +11,7 @@
  *
  * ─── #2888 — a junção mudou de lado, e o dublê mudou com ela ───────────────
  *
- * Este arquivo NÃO mede mais a releitura do aplicativo: desde a 0679 não há
+ * Este arquivo NÃO mede mais a releitura do aplicativo: desde a 0682 não há
  * releitura nenhuma aqui. Quem junta é `fn_lead_adicionar_etiquetas` /
  * `fn_contato_adicionar_etiquetas`, DENTRO do `UPDATE` (`tags || array(select
  * unnest(p) except select unnest(tags))`), e o que decide escrita e evento é o
@@ -34,7 +34,7 @@ import "@/lib/automation/actions/add-tag";
 import type { ActionCtx } from "@/lib/automation/types";
 
 /** Banco de mentira: guarda as etiquetas por linha, e serve as DUAS funções de
- *  junção da 0679 com a mesma semântica do SQL (`except` = nada duplica). */
+ *  junção da 0682 com a mesma semântica do SQL (`except` = nada duplica). */
 function banco(inicial: Record<string, string[]>, falhaDeLeitura = false) {
   const linhas: Record<string, string[]> = { ...inicial };
   const gravacoes: Array<{ tabela: string; tags: string[] }> = [];
@@ -107,7 +107,7 @@ describe("add_tag junta com as etiquetas gravadas", () => {
 
   it("⭐ a ação não monta a lista: quem junta é a função do banco, sobre a linha VIGENTE", async () => {
     // A foto diz uma lista, o banco diz outra — a do banco é a que vale, e é o
-    // que o `UPDATE` da 0679 garante sem o app ter de reler nada.
+    // que o `UPDATE` da 0682 garante sem o app ter de reler nada.
     const { admin, juncoes } = banco({ "lead-1": ["do-banco"] });
     await addTag().execute(
       ctx(admin, { lead: { id: "lead-1", tags: ["da-foto-velha"] } }, "r"),

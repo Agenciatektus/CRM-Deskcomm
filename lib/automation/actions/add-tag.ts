@@ -25,7 +25,7 @@
  *
  * A junção vai para dentro da instrução `UPDATE`, numa função SQL por tabela
  * (`fn_lead_adicionar_etiquetas` / `fn_contato_adicionar_etiquetas`, migration
- * 0679): `tags = tags || array(select unnest(p_etiquetas) except select
+ * 0682): `tags = tags || array(select unnest(p_etiquetas) except select
  * unnest(tags))` com `RETURNING tags`. Em READ COMMITTED quem chega depois
  * ESPERA o commit da linha e RECALCULA sobre a linha vigente — soma sobre o que
  * a outra gravou em vez de sobre o que leu antes. Mesma saída da 0502
@@ -67,7 +67,7 @@ import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 
 type Destino = "card" | "contato";
 
-/** A função SQL que faz a junção na linha alvo — uma por tabela (migration 0679). */
+/** A função SQL que faz a junção na linha alvo — uma por tabela (migration 0682). */
 type RpcDaJuncao = "fn_lead_adicionar_etiquetas" | "fn_contato_adicionar_etiquetas";
 
 type Alvo = {

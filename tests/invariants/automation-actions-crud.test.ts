@@ -221,7 +221,7 @@ function fakeAdminClient(): SupabaseClient {
     from: (table: string) => new FakeQuery(table),
     rpc: (name: string, params: Record<string, unknown>): Promise<QResult> => {
       return (async () => {
-        // A JUNÇÃO (#2888, migration 0679): quem soma as etiquetas é a função,
+        // A JUNÇÃO (#2888, migration 0682): quem soma as etiquetas é a função,
         // DENTRO do UPDATE. O dublê só a chama — é a mesma instrução que roda em
         // produção, e o que volta é o que o RETURNING devolveu.
         if (name === "fn_lead_adicionar_etiquetas" || name === "fn_contato_adicionar_etiquetas") {
