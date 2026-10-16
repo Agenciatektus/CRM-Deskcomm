@@ -112,7 +112,7 @@ describe("CustomFieldsEditor — lista pesquisável recusa o que não está na l
 
   it("valor fora da lista, sem allow_new: não grava e explica por quê", () => {
     const onChange = vi.fn();
-    render(<CustomFieldsEditor fields={DESTINO} value={{}} onChange={onChange} />);
+    render(<CustomFieldsEditor mode="lead" fields={DESTINO} value={{}} onChange={onChange} />);
 
     const input = screen.getByLabelText(/Destino/);
     fireEvent.change(input, { target: { value: "Recife" } });
