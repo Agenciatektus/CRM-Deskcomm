@@ -1,20 +1,17 @@
 -- manifest: **Transferir não pode revelar carteira oculta.** A função definer de atribuição agora respeita visibility_mode antes de gravar/devolver a conversa. Preserva claim otimista, auditoria transacional, silêncio, nome desnormalizado e worker service-role. Assinatura/tipos existentes inalterados.
-begin;
-create or replace function public.fn_conversation_assign(
-  p_organization_id uuid,
-  p_conversation_id uuid,
-  p_to_user_id uuid,
-  p_reason text,
-  p_expected_assignee uuid default null,
-  p_enforce_expected boolean default false
-) returns setof public.conversations
-language plpgsql security definer
-set search_path = public
-as $$
+-- Parte da última definição (0228): mantém a guarda de suporte somente-leitura e o lock 'for no key update'.
+
+CREATE OR REPLACE FUNCTION public.fn_conversation_assign(p_organization_id uuid, p_conversation_id uuid, p_to_user_id uuid, p_reason text, p_expected_assignee uuid DEFAULT NULL::uuid, p_enforce_expected boolean DEFAULT false)
+ RETURNS SETOF conversations
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare
   v_from uuid;
   v_conv public.conversations%rowtype;
 begin
+  if not public.fn_support_write_allowed(p_organization_id) then raise exception 'support_readonly' using errcode='42501'; end if;
   if auth.uid() is not null
      and not public.fn_role_at_least(p_organization_id, 'agent') then
     raise exception 'caller_not_authorized_for_org'
@@ -33,7 +30,7 @@ begin
     from public.conversations
    where id = p_conversation_id
      and organization_id = p_organization_id
-   for update;
+   for no key update;
 
   if not found then
     return;
@@ -52,11 +49,12 @@ begin
 
   update public.conversations
      set assigned_to_user_id = p_to_user_id,
-         -- Desnormalizado JUNTO com o dono, na mesma transação: nunca existe uma
-         -- janela em que id e nome discordam. NULL junto com o id quando a
-         -- atribuição é removida (release) — nunca sobra um nome órfão de dono
-         -- nenhum. Lido de auth.users porque quem chama esta função (RPC) não
-         -- necessariamente tem acesso ao Admin API — a definer resolve por dentro.
+         -- Desnormalizado JUNTO com o dono, na mesma transação: nunca existe
+         -- uma janela em que id e nome discordam. NULL junto com o id quando
+         -- a atribuição é removida (release) — nunca sobra um nome órfão de
+         -- dono nenhum. Lido de auth.users porque quem chama esta função
+         -- (RPC) não necessariamente tem acesso ao Admin API — a definer
+         -- resolve por dentro.
          assigned_to_user_name = case
            when p_to_user_id is null then null
            else (select raw_user_meta_data ->> 'full_name' from auth.users where id = p_to_user_id)
@@ -66,8 +64,6 @@ begin
          status = case when p_to_user_id is null then 'open' else 'claimed' end,
          status_changed_at = now(),
          unread_count_for_assignee = 0,
-         -- A trava só é solta por quem a pôs. `last_handoff_at` é o discriminador
-         -- que já existe: uma ESCALAÇÃO o carimba, um humano ASSUMINDO não.
          bot_silenced_until = case
            when p_reason = 'routing'  then bot_silenced_until
            when p_to_user_id is null  then (case when last_handoff_at is null
@@ -86,7 +82,7 @@ begin
 
   return next v_conv;
 end;
-$$;
-revoke all on function public.fn_conversation_assign(uuid,uuid,uuid,text,uuid,boolean) from public,anon;
-grant execute on function public.fn_conversation_assign(uuid,uuid,uuid,text,uuid,boolean) to authenticated,service_role;
-commit;
+$function$;
+
+revoke all     on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean) from public, anon;
+grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean) to authenticated, service_role;
