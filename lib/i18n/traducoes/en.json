@@ -9154,6 +9154,7 @@
   "Criar conversa": "Create conversation",
   "Nenhum contato encontrado": "No contact found",
   "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent.",
+  "Formato não suportado: use ?formato=csv.": "Unsupported format: use ?formato=csv.",
   "O contato pediu para não receber mensagens (opt-out): o envio pelo automático fica bloqueado. Nada a enviar.": "The contact asked not to receive messages (opt-out): automatic sending is blocked. Nothing to send.",
   "Este contato foi anonimizado (LGPD) — é proibido enviar mensagens a ele.": "This contact has been anonymized (LGPD) — sending messages to them is forbidden.",
   "Não há base legal (LGPD) registrada para o primeiro contato com este lead. O time precisa regularizar o cadastro antes de abordar.": "There is no registered legal basis (LGPD) for the first contact with this lead. The team must regularize the record before reaching out.",

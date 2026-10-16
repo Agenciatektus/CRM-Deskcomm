@@ -37,6 +37,30 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "Há um ajuste proporcional esperando pagamento. Escolher outro plano cancela esse ajuste.": { es: "Hay un ajuste proporcional esperando el pago. Elegir otro plan cancela ese ajuste." },
+  "Estamos preparando o ajuste proporcional. Aguarde alguns segundos e tente novamente.": { es: "Estamos preparando el ajuste proporcional. Espera unos segundos e inténtalo de nuevo." },
+  "Estamos preparando o ajuste proporcional. Aguarde alguns segundos.": { es: "Estamos preparando el ajuste proporcional. Espera unos segundos." },
+  "Não foi possível calcular o período pago. Atualize a assinatura e tente novamente.": { es: "No se pudo calcular el período pagado. Actualiza la suscripción e inténtalo de nuevo." },
+  "Esse plano não está mais disponível. Recarregue a página e escolha outro.": { es: "Ese plan ya no está disponible. Recarga la página y elige otro." },
+  "Não foi possível carregar os planos agora. Recarregue a página e escolha um plano.": { es: "No se pudieron cargar los planes ahora. Recarga la página y elige un plan." },
+  "Escolha um plano para criar a empresa.": { es: "Elige un plan para crear la empresa." },
+  "0 = entrada paga: a empresa que entra neste plano fica suspensa até o primeiro pagamento.": { es: "0 = entrada pagada: la empresa que entra en este plan queda suspendida hasta el primer pago." },
+  "Nenhum plano está marcado para o cadastro. Quem se cadastra precisa escolher um plano, o “Entrar com Google” some da tela de cadastro e empresas criadas sem plano pela integração são recusadas. Use “Usar no cadastro” em um plano.": { es: "Ningún plan está marcado para el registro. Quien se registra debe elegir un plan, “Entrar con Google” desaparece de la pantalla de registro y las empresas creadas sin plan por la integración se rechazan. Usa “Usar en el registro” en un plan." },
+  "Com o Google, a empresa começa no plano padrão. Para escolher outro, use e-mail e senha.": { es: "Con Google, la empresa empieza en el plan predeterminado. Para elegir otro, usa correo electrónico y contraseña." },
+  "Para garantir que o plano selecionado seja contratado, conclua o cadastro com e-mail e senha.": { es: "Para garantizar que se contrate el plan seleccionado, completa el registro con correo electrónico y contraseña." },
+  "sem período de teste": { es: "sin período de prueba" },
+  "Pagar ajuste do upgrade": { es: "Pagar el ajuste de la mejora" },
+  "Conclua ou aguarde a cobrança proporcional antes de solicitar outra troca de plano.": { es: "Completa o espera el cobro proporcional antes de solicitar otro cambio de plan." },
+  "A cobrança foi iniciada, mas não conseguimos registrar o pagamento. Tente novamente; se houver uma cobrança aberta, fale com o suporte.": { es: "Se inició el cobro, pero no pudimos registrar el pago. Inténtalo de nuevo; si hay un cobro abierto, contacta con soporte." },
+  "Plano atual": { es: "Plan actual" },
+  "IA por mês": { es: "IA por mes" },
+  "Não foi possível calcular o proporcional com os dados do período pago. Nenhuma troca será realizada.": { es: "No se pudo calcular el prorrateo con los datos del período pagado. No se realizará ningún cambio." },
+  "O ajuste proporcional é zero; o novo plano entra na próxima renovação": { es: "El ajuste proporcional es cero; el nuevo plan entra en la próxima renovación" },
+  "Ajuste proporcional estimado para hoje": { es: "Ajuste proporcional estimado para hoy" },
+  "A data da próxima renovação permanece": { es: "La fecha de la próxima renovación se mantiene" },
+  "O plano escolhido e seus limites passam a valer na próxima renovação. A fatura atual mantém o valor e o vencimento.": { es: "El plan elegido y sus límites entrarán en vigor en la próxima renovación. La factura actual mantiene el importe y la fecha de vencimiento." },
+  "Pague o ajuste proporcional para aplicar o novo plano. Seus limites atuais permanecem até a confirmação.": { es: "Paga el ajuste proporcional para aplicar el nuevo plan. Tus límites actuales se mantienen hasta la confirmación." },
+  "Aguardando o primeiro pagamento. O acesso será liberado após a confirmação.": { es: "Esperando el primer pago. El acceso se habilitará después de la confirmación." },
   "Canal para enviar os lembretes": { es: "Canal para enviar los recordatorios" },
   "Automático — conversa da reserva ou único canal disponível": { es: "Automático — conversación de la reserva o único canal disponible" },
   "Canal configurado indisponível — escolha outro": { es: "Canal configurado no disponible — elige otro" },
@@ -7051,6 +7075,11 @@ export const DICIONARIO: Traducoes = {
     es: "El detalle de cada pasada está en el archivo .update.log, en la carpeta del proyecto en el servidor.",
   },
   "Atualização do sistema": { es: "Actualización del sistema" },
+  // #2755 (item 3) — o aviso de "sem SMTP" no topo do painel de atualização.
+  "Sem SMTP configurado": { es: "Sin SMTP configurado" },
+  "O serviço de login desta instalação não envia e-mail: \"esqueci a senha\" e a confirmação de cadastro não chegam. Configure o servidor de e-mail em /admin/email e, no servidor, rode bash hostgator-setup-kit/update.sh — é ele que leva o SMTP ao serviço de login.": {
+    es: "El servicio de inicio de sesión de esta instalación no envía correo: \"olvidé mi contraseña\" y la confirmación de registro no llegan. Configura el servidor de correo en /admin/email y, en el servidor, ejecuta bash hostgator-setup-kit/update.sh — es él quien lleva el SMTP al servicio de inicio de sesión.",
+  },
   "Guardando uma cópia de segurança dos seus dados": {
     es: "Guardando una copia de seguridad de tus datos",
   },
@@ -7536,6 +7565,8 @@ export const DICIONARIO: Traducoes = {
   "Buscar conversas": { es: "Buscar conversaciones" },
   "Filtrar por número de WhatsApp": { es: "Filtrar por número de WhatsApp" },
   "Filtrar por tag": { es: "Filtrar por etiqueta" },
+  "Filtrar por atendente": { es: "Filtrar por agente" },
+  "Atendente removido": { es: "Agente eliminado" },
   Anonimizado: { es: "Anonimizado" },
   "Entrou por": { es: "Entró por" },
   "Posição": { es: "Posición" },
@@ -11836,6 +11867,8 @@ export const DICIONARIO: Traducoes = {
   "produtos por importação — divida a planilha.": {
     es: "productos por importación — divide la hoja de cálculo.",
   },
+  // Mensagem de erro de app/api/v1/admin/tenants/export/route.ts (#2777)
+  "Formato não suportado: use ?formato=csv.": { es: "Formato no compatible: usa ?formato=csv." },
   // Mensagens de erro de lib/contacts/csv.ts e app/api/v1/contacts/import/route.ts
   "cabeçalho sem coluna de telefone nem e-mail": {
     es: "encabezado sin columna de teléfono ni e-mail",
