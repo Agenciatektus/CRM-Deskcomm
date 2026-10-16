@@ -36,6 +36,8 @@
  * veio consertar, uma camada acima.
  */
 
+import { z } from "zod";
+
 /**
  * As duas categorias, na ordem em que a tela as mostra.
  *
@@ -92,6 +94,26 @@ export function preferenciaPadraoDeLembrete(): PreferenciaDeLembrete {
 export function ehAntecedenciaValida(min: unknown): min is AntecedenciaDaTarefa {
   return typeof min === "number" && (ANTCEDENCIAS_DE_TAREFA_MIN as readonly number[]).includes(min);
 }
+
+/**
+ * O que a action de gravar aceita (Server Action é endpoint público: o tipo do
+ * parâmetro não chega ao servidor). Mora AQUI, e não na action, porque um
+ * arquivo "use server" só pode exportar função async — exportar a schema de lá
+ * derrubava o módulo inteiro no `next start` (prova pela tela do #2809).
+ */
+export const preferenciaDeLembreteSchema = z.object({
+  task_due: z.boolean(),
+  task_overdue: z.boolean(),
+  /** As três que a tela oferece — a MESMA régua que a varredura aceita. */
+  antecedencia_min: z.number().refine(ehAntecedenciaValida),
+  whatsapp: z.boolean(),
+  /** O número que a PESSOA deixa para receber o aviso no WhatsApp — o dela. */
+  whatsapp_numero: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{8,15}$/, "whatsapp_numero_invalido")
+    .nullable(),
+});
 
 function booleanoOuPadrao(valor: unknown, padrao: boolean): boolean {
   return typeof valor === "boolean" ? valor : padrao;

@@ -17,7 +17,6 @@
  * metadata (nome, idioma, avatar) não é tocado.
  */
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { loadAuthUser } from "@/lib/auth/server";
@@ -26,24 +25,10 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import {
   CHAVE_DA_PREFERENCIA,
-  ehAntecedenciaValida,
   lerPreferenciaDeLembrete,
+  preferenciaDeLembreteSchema,
   type PreferenciaDeLembrete,
 } from "@/lib/tarefas/preferencia-de-lembrete";
-
-export const preferenciaDeLembreteSchema = z.object({
-  task_due: z.boolean(),
-  task_overdue: z.boolean(),
-  /** As três que a tela oferece — a MESMA régua que a varredura aceita. */
-  antecedencia_min: z.number().refine(ehAntecedenciaValida),
-  whatsapp: z.boolean(),
-  /** O número que a PESSOA deixa para receber o aviso no WhatsApp — o dela. */
-  whatsapp_numero: z
-    .string()
-    .trim()
-    .regex(/^[0-9]{8,15}$/, "whatsapp_numero_invalido")
-    .nullable(),
-});
 
 /**
  * Códigos, e não frases: a tela traduz (pt-BR/es) — a mesma régua das outras
