@@ -11838,6 +11838,8 @@ export const DICIONARIO: Traducoes = {
   "produtos por importação — divida a planilha.": {
     es: "productos por importación — divide la hoja de cálculo.",
   },
+  // Mensagem de erro de app/api/v1/admin/tenants/export/route.ts (#2777)
+  "Formato não suportado: use ?formato=csv.": { es: "Formato no compatible: usa ?formato=csv." },
   // Mensagens de erro de lib/contacts/csv.ts e app/api/v1/contacts/import/route.ts
   "cabeçalho sem coluna de telefone nem e-mail": {
     es: "encabezado sin columna de teléfono ni e-mail",
