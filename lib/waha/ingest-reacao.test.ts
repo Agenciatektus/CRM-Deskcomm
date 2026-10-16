@@ -368,24 +368,31 @@ describe("a reação do cliente vira linha LIGADA à mensagem alvo (#2797)", () 
 });
 
 describe("o transporte assina o gesto — sem a lista, nada chega (#2797)", () => {
-  it("`message.reaction` está em WHATSAPP_HOOK_EVENTS", () => {
+  it("`message.reaction` está em WHATSAPP_HOOK_EVENTS (nos TRÊS composes)", () => {
     // O elo mais silencioso de todos: o código trata o evento perfeitamente e o
     // transporte nunca o envia. Era o defeito 1 da issue — e a mesma armadilha
     // de `mensagem-editada-e-apagada.test.ts`, que já vigia `message.edited`.
-    const compose = readFileSync("docker-compose.yml", "utf8");
-    const linha = compose.split("\n").find((l) => l.includes("WHATSAPP_HOOK_EVENTS")) ?? "";
-    expect(linha, "o WAHA nunca entrega a reação: o evento não está na lista").toContain("message.reaction");
-    // E o corte não pode ter custado o resto.
-    const restantes = [
-      "message.any",
-      "message.ack",
-      "message.edited",
-      "message.revoked",
-      "session.status",
-      "state.change",
-    ];
-    for (const e of restantes) {
-      expect(linha, `sumiu ${e}`).toContain(e);
+    //
+    // Os TRÊS composes, e não só o de desenvolvimento: foi assinar só nele que
+    // deixou a instalação real (que sobe o `.prod.yml` pelo kit) sem a reação.
+    for (const arquivo of ["docker-compose.prod.yml", "docker-compose.yml", "docker-compose.local.yml"]) {
+      const compose = readFileSync(arquivo, "utf8");
+      const linha = compose.split("\n").find((l) => l.includes("WHATSAPP_HOOK_EVENTS")) ?? "";
+      expect(linha, `${arquivo}: o WAHA nunca entrega a reação: o evento não está na lista`).toContain(
+        "message.reaction",
+      );
+      // E o corte não pode ter custado o resto.
+      const restantes = [
+        "message.any",
+        "message.ack",
+        "message.edited",
+        "message.revoked",
+        "session.status",
+        "state.change",
+      ];
+      for (const e of restantes) {
+        expect(linha, `${arquivo}: sumiu ${e}`).toContain(e);
+      }
     }
   });
 });
