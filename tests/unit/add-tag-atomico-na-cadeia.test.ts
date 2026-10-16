@@ -35,7 +35,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RAIZ = join(__dirname, "..", "..");
-const MIGRATION = "supabase/migrations/20261015231102_0682_add_tag_atomico_entre_eventos.sql";
+const MIGRATION = "supabase/migrations/20261019000001_0682_add_tag_atomico_entre_eventos.sql";
 const CABECALHO = "-- ---- o add_tag junta no UPDATE, sob a trava da linha (migration 0682, #2888) ----";
 const VARREDURA = "-- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----";
 
