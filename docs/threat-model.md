@@ -98,8 +98,8 @@ log nem em query string.
 > front-matter diz nunca ter havido. O que esta nota faz é corrigir os **fatos** e marcar o T1
 > como devendo reauditoria — não decidir por ela.
 
-`checkRateLimit` existe (`lib/ai/dispatcher/rate-limit.ts`) e é chamado em **2** pontos
-do código: `/api/v1/webhooks/in/:token` e o dispatcher de IA. Nada mais.
+`checkRateLimit` existe (`lib/ai/dispatcher/rate-limit.ts`) e é chamado em vários pontos de
+`app/` e `lib/`, o webhook `/api/v1/webhooks/in/:token` entre eles. Reconte, não cite: `grep -rln 'checkRateLimit(' app lib --include='*.ts' | grep -v '\.test\.'`.
 
 Não há **nenhum** limite de tentativa em:
 
@@ -109,7 +109,7 @@ Não há **nenhum** limite de tentativa em:
   exaustão de recurso (e de cota de IA, se as chaves forem da instância).
 - **`/team/accept-invite/:token`** — o HMAC é forte, mas sem limite o atacante pode
   sondar indefinidamente e sem custo, e sem gerar sinal de alerta.
-- **Os 9 crons e `/api/internal/*`** — o secret é forte e a comparação é em tempo
+- **Os 9 crons** — o secret é forte e a comparação é em tempo
   constante, mas nada limita o volume de tentativas.
 - **`/api/mcp`** — enumeração de bearer token.
 
