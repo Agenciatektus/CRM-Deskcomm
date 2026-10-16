@@ -6,6 +6,7 @@ import type { NomesDeValor } from './vocabulario';
 import type { EtapaCitada } from './etapas-citadas';
 import { recusaDeMotivoForaDoVocabulario } from '../leads/motivo-da-perda';
 import { capabilitiesOf, transportaMensagem, type ChannelProvider } from '../channels/capabilities';
+import { CUSTO_NO_MOTOR, TETO_DE_PASSOS_DO_MOTOR } from './custo-no-motor';
 
 /**
  * Structural publish validator for follow-up flow graphs.
@@ -32,6 +33,9 @@ export const PUBLISH_ERROR_CODES = [
   'immune_wait_too_short',
   'cycle_without_wait',
   'max_steps_exceeded',
+  // #2965 — o teto do MOTOR (`steps_taken`/`MAX_STEPS`, ver `custo-no-motor.ts`):
+  // o caminho linear que ele não conseguiria terminar.
+  'max_engine_steps_exceeded',
   'no_fora_da_superficie',
   'interno_com_envio',
   'roteiro_ramificado',
@@ -517,6 +521,54 @@ function byId(a: { id: string }, b: { id: string }): number {
   return a.id.localeCompare(b.id);
 }
 
+/**
+ * O custo, em ticks do MOTOR (ver `custo-no-motor.ts`), do caminho LINEAR mais
+ * caro a partir do trigger (#2965) — o que o `steps_taken` gastaria até o fim do
+ * fluxo na hipótese mais custosa sem repetição.
+ *
+ * SÓ o caminho linear: nó que está dentro de um ciclo fica de fora, porque o
+ * custo dele depende de quantas voltas o lead faz na resposta e não cabe numa
+ * soma. Esse caso — o `repeat` — já existia antes do #2896 e é da issue #2977;
+ * aqui a régua para na fronteira do que ela consegue medir.
+ *
+ * O subgrafo que sobra depois de tirar os nós de ciclo é ACÍCLICO (todo ciclo
+ * seria componente própria de Tarjan e teria saído), então a recursão com memo
+ * termina sem precisar de guarda de visitação.
+ */
+export function custoDoCaminhoLinear(graph: FlowGraph): number {
+  const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
+  const outEdges = buildOutEdges(graph.edges);
+  const trigger = graph.nodes.find((n) => n.type === 'trigger');
+  if (!trigger) return 0;
+
+  const components = stronglyConnectedComponents(
+    graph.nodes.map((n) => n.id),
+    outEdges
+  );
+  const emCiclo = new Set<string>();
+  for (const component of components) {
+    if (isCycleComponent(component, outEdges)) component.forEach((id) => emCiclo.add(id));
+  }
+  if (emCiclo.has(trigger.id)) return 0;
+
+  const memo = new Map<string, number>();
+  const custo = (id: string): number => {
+    const cache = memo.get(id);
+    if (cache !== undefined) return cache;
+    const node = nodesById.get(id);
+    const proprio = node ? CUSTO_NO_MOTOR[node.type] : 0;
+    let maiorSucessor = 0;
+    for (const edge of outEdges.get(id) ?? []) {
+      if (emCiclo.has(edge.target)) continue;
+      maiorSucessor = Math.max(maiorSucessor, custo(edge.target));
+    }
+    const total = proprio + maiorSucessor;
+    memo.set(id, total);
+    return total;
+  };
+  return custo(trigger.id);
+}
+
 
 /**
  * Toda saída declarada do nó precisa levar a algum lugar, e a mensagem nomeia
@@ -784,6 +836,28 @@ export function validateFlowForPublish(
         code: 'max_steps_exceeded',
         message: `O caminho mais longo a partir do trigger passa de ${MAX_PATH_STEPS} passos que o cliente sente (mensagem, pergunta, skill e espera) — tire um toque da cadência.`,
       });
+    }
+
+    // A SEGUNDA ponta do teto (#2965): o do MOTOR. O caminho LINEAR que custa mais
+    // ticks do que o relógio consegue dar publicava e morria no meio — a inscrição
+    // fechava com `cancel_reason = 'max_steps'` sem gravar as últimas caixas nem
+    // chegar ao fim (medido pelo mantenedor: 14 toques × mensagem+tag+tag+espera
+    // somam 86 ticks e o teto do motor é 80).
+    //
+    // O caso do `repeat` fica FORA de propósito: o custo de um ciclo não é uma
+    // soma (depende das voltas que o lead pedir) e a régua dele é a #2977, que já
+    // existia antes deste PR — `custoDoCaminhoLinear` exclui os nós de ciclo.
+    // O roteiro de atendimento também fica fora: quem o conduz é o motor do TURNO
+    // (`atendimento.ts`, com o teto próprio), não o relógio.
+    if (surface !== 'atendimento') {
+      const custoNoMotor = custoDoCaminhoLinear(graph);
+      if (custoNoMotor > TETO_DE_PASSOS_DO_MOTOR) {
+        errors.push({
+          node_id: null,
+          code: 'max_engine_steps_exceeded',
+          message: `O caminho mais longo deste fluxo custa ${custoNoMotor} passos no motor (o relógio conta cada tick: gatilho, mensagem, espera e registro) e ele desiste da inscrição depois de ${TETO_DE_PASSOS_DO_MOTOR} — a retomada morreria no meio, sem chegar ao fim. Encurte a cadência.`,
+        });
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { algumCanalExigeModeloForaDaJanela, CONTA_NO_TETO, validateFlowForPublish } from './validate-publish';
+import { algumCanalExigeModeloForaDaJanela, CONTA_NO_TETO, custoDoCaminhoLinear, validateFlowForPublish } from './validate-publish';
+import { CUSTO_NO_MOTOR, TETO_DE_PASSOS_DO_MOTOR } from './custo-no-motor';
 import { idsDeEtapaCitados } from './etapas-citadas';
 import { NODE_TYPES, type FlowGraph, type FlowNode, type FlowEdge } from './graph-schema';
 import { CHANNEL_CAPABILITIES, PROVIDERS_DE_MENSAGEM, PROVIDERS_SEM_MENSAGEM } from '../channels/capabilities';
@@ -456,6 +457,123 @@ describe('validateFlowForPublish', () => {
         'skill',
         'action',
       ]);
+    });
+  });
+
+  /**
+   * #2965 — o SEGUNDO teto: o do MOTOR.
+   *
+   * O teto de passos do publish conta o que o cliente SENTE (`CONTA_NO_TETO`).
+   * O relógio conta TICKS (`steps_taken`, `MAX_STEPS`) e mata a inscrição quando
+   * começa um tick acima do teto. Até aqui ninguém cruzava as duas pontas: um
+   * fluxo passava nos 30 passos sentidos, publicava, e morria no meio no motor —
+   * sem gravar as últimas caixas nem chegar ao fim (medido pelo mantenedor).
+   *
+   * Estes casos cruzam o VALIDADOR com o CUSTO no motor: o mesmo grafo passa
+   * pelas duas réguas e o veredito da publicação tem de bater com o que o motor
+   * consegue terminar.
+   */
+  describe('o motor também tem teto (#2965)', () => {
+    const codigos = (r: ReturnType<typeof validateFlowForPublish>) => (r.ok ? [] : r.errors.map((e) => e.code));
+    const ramo = (branchId: string): FlowEdge['condition'] => ({ type: 'branch', branch_id: branchId });
+    const marcar = (id: string, valor: string): FlowNode => ({
+      id,
+      type: 'edit_lead_tag',
+      label: id,
+      position: pos,
+      config: { tags: [valor] },
+    });
+
+    /**
+     * O fluxo medido pelo mantenedor, caixa por caixa: `n` toques, cada um
+     * mensagem → tag → tag → espera, entre o gatilho e o fim. Ele somou 14 toques
+     * e 85 ticks — sem o `fim`, porque o motor morre antes de chegar lá; com o
+     * `fim` (que também gasta o seu tick) são 86, e os dois passam de 80.
+     */
+    function toques(n: number): FlowGraph {
+      const nodes: FlowNode[] = [trigger('t1')];
+      const edges: FlowEdge[] = [];
+      let anterior = 't1';
+      for (let i = 1; i <= n; i++) {
+        nodes.push(
+          actionTemplate(`msg${i}`),
+          marcar(`tag${i}a`, `a${i}`),
+          marcar(`tag${i}b`, `b${i}`),
+          wait(`espera${i}`, { mode: 'fixed', duration_ms: 300_000 })
+        );
+        edges.push(
+          edge(anterior, `msg${i}`, always()),
+          edge(`msg${i}`, `tag${i}a`, always()),
+          edge(`tag${i}a`, `tag${i}b`, always()),
+          edge(`tag${i}b`, `espera${i}`, always())
+        );
+        anterior = `espera${i}`;
+      }
+      nodes.push(end('fim'));
+      edges.push(edge(anterior, 'fim', always()));
+      return graph(nodes, edges);
+    }
+
+    it('diz quanto cada tipo de nó custa em ticks — a régua é completa', () => {
+      expect(Object.keys(CUSTO_NO_MOTOR).sort()).toEqual([...NODE_TYPES].sort());
+      // Fatos das invariantes que o CI já roda (tests/invariants/followup-engine.test.ts):
+      expect(CUSTO_NO_MOTOR.trigger).toBe(1); // :344 — gatilho → fim leva 2 ticks
+      expect(CUSTO_NO_MOTOR.wait).toBe(2); // :376 — arma num tick, vence e avança no outro
+      expect(CUSTO_NO_MOTOR.end).toBe(1);
+      // A mensagem custa 2: o motor ENFILEIRA (engine.ts) e a ponte CONCLUI (turn-bridge.ts).
+      expect(CUSTO_NO_MOTOR.action).toBe(2);
+      // Caixa interna é passagem: um tick cada (node-handlers.ts).
+      expect(CUSTO_NO_MOTOR.condition).toBe(1);
+      expect(CUSTO_NO_MOTOR.edit_lead_tag).toBe(1);
+      expect(CUSTO_NO_MOTOR.move_lead).toBe(1);
+    });
+
+    it('recusa a retomada de 14 toques: 86 ticks no motor, com só 28 passos sentidos', () => {
+      const g = toques(14);
+      // 1 gatilho + 14 × (mensagem 2 + tag 1 + tag 1 + espera 2) + 1 fim = 86.
+      expect(custoDoCaminhoLinear(g)).toBe(86);
+      expect(custoDoCaminhoLinear(g)).toBeGreaterThan(TETO_DE_PASSOS_DO_MOTOR);
+
+      // O teto dos passos SENTIDOS (30) sozinho NÃO pega este fluxo — 28 é o que
+      // o cliente sente —, e era por isso que ele publicava e morria no motor.
+      expect(codigos(validateFlowForPublish(g))).toEqual(['max_engine_steps_exceeded']);
+    });
+
+    it('publica 13 toques, que cabem no orçamento do motor (80 ticks)', () => {
+      const g = toques(13);
+      // 1 + 13 × 6 + 1 = 80 — exatamente o teto do motor.
+      expect(custoDoCaminhoLinear(g)).toBe(80);
+      expect(custoDoCaminhoLinear(g)).toBeLessThanOrEqual(TETO_DE_PASSOS_DO_MOTOR);
+      expect(validateFlowForPublish(g)).toEqual({ ok: true });
+    });
+
+    it('não julga o caminho que passa por um ciclo — o caso do repeat é da #2977', () => {
+      // trigger → repeat(20) → [mensagem → espera] → repeat → fim. O custo de um
+      // ciclo não é uma soma: quantas voltas o lead pedir é que decide, e quem
+      // mede isso é a régua da #2977. Publica hoje, e continua publicando.
+      const g = graph(
+        [
+          trigger('t1'),
+          { id: 'r1', type: 'repeat', label: 'r1', position: pos, config: { max_count: 20 } },
+          actionTemplate('msg1'),
+          wait('w1', { mode: 'fixed', duration_ms: 300_000 }),
+          end('fim'),
+        ],
+        [
+          edge('t1', 'r1', always()),
+          edge('r1', 'msg1', ramo('body')),
+          edge('msg1', 'w1', always()),
+          edge('w1', 'r1', always()),
+          edge('r1', 'fim', ramo('done')),
+          edge('r1', 'fim', always()),
+        ]
+      );
+      expect(validateFlowForPublish(g)).toEqual({ ok: true });
+    });
+
+    it('não julga o roteiro de atendimento — quem o conduz é o motor do turno', () => {
+      const g = graph([trigger('t1'), end('fim')], [edge('t1', 'fim', always())]);
+      expect(validateFlowForPublish(g, { surface: 'atendimento' })).toEqual({ ok: true });
     });
   });
 
