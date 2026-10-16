@@ -132,6 +132,11 @@ describe("o CSV espelha as colunas que o importer aceita", () => {
     expect(linhas[0]!.name).toBe('Silva, Maria "Da"');
   });
 
+  it("célula que começa com caractere de fórmula sai como texto; telefone E.164 não", () => {
+    const linha = linhaDoCsv({ name: "=SOMA(1;2)", display_name: "@x", phone_number: "+5511999998888" });
+    expect(linha.startsWith("'=SOMA(1;2),'@x,,+5511999998888,")).toBe(true);
+  });
+
   it("o BOM sai na frente (Excel pt-BR lê acento) e o import tira ele", () => {
     const csv = csvDosContatos(BASE);
     expect(csv.charCodeAt(0)).toBe(0xfeff);

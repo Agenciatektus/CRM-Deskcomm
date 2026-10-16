@@ -61,10 +61,16 @@ export interface ContatoParaExportar {
   tags?: readonly string[] | null;
 }
 
-/** RFC 4180 — a MESMA regra de escape do export de auditoria. */
+/**
+ * RFC 4180, mais a neutralização de célula que começa com caractere de fórmula
+ * — a mesma regra do export de tenants (`app/api/v1/admin/tenants/export/_csv.ts`).
+ * Telefone E.164 (`+` e só dígitos) passa intacto: o `'` na frente dele
+ * quebraria o round-trip.
+ */
 function csvEscape(valor: unknown): string {
   if (valor === null || valor === undefined) return "";
-  const texto = typeof valor === "string" ? valor : String(valor);
+  let texto = typeof valor === "string" ? valor : String(valor);
+  if (/^[=+\-@\t\r]/.test(texto) && !/^\+\d+$/.test(texto)) texto = `'${texto}`;
   if (/[",\n\r]/.test(texto)) return `"${texto.replace(/"/g, '""')}"`;
   return texto;
 }

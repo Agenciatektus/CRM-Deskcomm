@@ -267,6 +267,16 @@ describe("bordas", () => {
     expect(listContactsHandler).not.toHaveBeenCalled();
     expect(audit).not.toHaveBeenCalled();
   });
+
+  it("o papel vem da membership: nenhuma opção além de requestId e resource", async () => {
+    devolvePaginas([contato(1)]);
+
+    await chamar();
+
+    const [papel, opcoes] = vi.mocked(requireRole).mock.calls[0]!;
+    expect(papel).toBe("manager");
+    expect(Object.keys(opcoes ?? {}).sort()).toEqual(["requestId", "resource"]);
+  });
 });
 
 describe("a trilha de auditoria", () => {
