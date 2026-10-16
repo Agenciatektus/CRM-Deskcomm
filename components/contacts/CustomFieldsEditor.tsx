@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 /**
  * CustomFieldsEditor — lê `crm_pipelines.settings.fields[]` e renderiza o
  * input certo por tipo. Usado pelo dossiê e pelo painel do inbox, via
@@ -82,6 +82,12 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
   // Os campos cujo último blur RECUSOU o texto (fora da lista, sem `allow_new`).
   // Sem o aviso, o input só voltava ao valor anterior e a pessoa não sabia por quê.
   const [recusados, setRecusados] = useState<Record<string, true>>({});
+  // A lista aberta do `searchable_select` e a opção destacada nela. Um campo
+  // por vez, porque só um tem o foco. `-1` = nada destacado: sair do campo
+  // sem ter escolhido não grava palpite.
+  const [buscaAberta, setBuscaAberta] = useState<string | null>(null);
+  const [destacado, setDestacado] = useState(-1);
+  const baseId = useId();
   // O campo é do mesmo caminho do contato: o exemplo segue o país da
   // organização, e não o DDI brasileiro em duro.
   const telefoneExemplo = perfilDoPais(useActiveOrg()?.country).telefoneExemplo;
@@ -247,44 +253,116 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
             const canonico = typeof v === "string" ? v : "";
             const rotuloAtual = opcoes.find((o) => o.value === canonico)?.label ?? canonico;
             const rascunho = rascunhosDeBusca[f.key];
-            const listaId = `cf-${f.key}-opcoes`;
+            const listaId = `${baseId}-${f.key}-opcoes`;
+            // A lista é NOSSA, não um `<datalist>`: o navegador refiltra o
+            // datalist pelo rótulo e leva acento em conta, e "sao paulo" ou
+            // "mcz" não mostravam nada, embora `buscarOpcoes` achasse a opção.
+            const resultados = buscarOpcoes(opcoes, rascunho ?? "");
+            const aberta = buscaAberta === f.key && resultados.length > 0;
+            const limparRascunho = () =>
+              setRascunhosDeBusca(({ [f.key]: _limpo, ...resto }) => resto);
+            const fechar = () => {
+              setBuscaAberta(null);
+              setDestacado(-1);
+            };
+            const escolher = (valor: string) => {
+              set(f.key, valor);
+              limparRascunho();
+              setRecusados(({ [f.key]: _limpo, ...resto }) => resto);
+              fechar();
+            };
             return (
               <div key={f.key} className="space-y-2">
                 {labelEl}
-                <Input
-                  id={id}
-                  type="text"
-                  list={listaId}
-                  autoComplete="off"
-                  placeholder={t("Digite para buscar…")}
-                  value={rascunho ?? rotuloAtual}
-                  onChange={(e) => {
-                    setRascunhosDeBusca((current) => ({ ...current, [f.key]: e.target.value }));
-                    setRecusados(({ [f.key]: _limpo, ...resto }) => resto);
-                  }}
-                  onBlur={() => {
-                    const draft = rascunhosDeBusca[f.key];
-                    if (draft === undefined) return;
-                    const achado = valorCanonico(opcoes, draft);
-                    if (achado !== null) set(f.key, achado);
-                    else if (draft.trim() === "") set(f.key, "");
-                    else if (f.allow_new === true) set(f.key, draft.trim());
-                    // Sem casar e sem `allow_new`, o valor não é gravado: o
-                    // input volta ao que estava, e o aviso abaixo explica.
-                    else setRecusados((current) => ({ ...current, [f.key]: true }));
-                    setRascunhosDeBusca((current) => {
-                      const next = { ...current };
-                      delete next[f.key];
-                      return next;
-                    });
-                  }}
-                  disabled={disabled}
-                />
-                <datalist id={listaId}>
-                  {buscarOpcoes(opcoes, rascunho ?? "").map((o) => (
-                    <option key={o.value} value={o.label} />
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <Input
+                    id={id}
+                    type="text"
+                    role="combobox"
+                    aria-expanded={aberta}
+                    aria-controls={listaId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={
+                      aberta && destacado >= 0 ? `${listaId}-${destacado}` : undefined
+                    }
+                    autoComplete="off"
+                    placeholder={t("Digite para buscar…")}
+                    value={rascunho ?? rotuloAtual}
+                    onFocus={() => {
+                      setBuscaAberta(f.key);
+                      setDestacado(-1);
+                    }}
+                    onChange={(e) => {
+                      setRascunhosDeBusca((current) => ({ ...current, [f.key]: e.target.value }));
+                      setRecusados(({ [f.key]: _limpo, ...resto }) => resto);
+                      setBuscaAberta(f.key);
+                      setDestacado(-1);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        if (!aberta) setBuscaAberta(f.key);
+                        else setDestacado((i) => Math.min(i + 1, resultados.length - 1));
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setDestacado((i) => Math.max(i - 1, 0));
+                      } else if (e.key === "Enter") {
+                        const alvo = aberta ? resultados[destacado] : undefined;
+                        if (alvo) {
+                          e.preventDefault();
+                          escolher(alvo.value);
+                        }
+                      } else if (e.key === "Escape") {
+                        fechar();
+                      }
+                    }}
+                    onBlur={() => {
+                      // Destacar com as setas e sair com Tab é escolha explícita.
+                      const alvo = aberta ? resultados[destacado] : undefined;
+                      if (alvo) {
+                        escolher(alvo.value);
+                        return;
+                      }
+                      fechar();
+                      const draft = rascunhosDeBusca[f.key];
+                      if (draft === undefined) return;
+                      const achado = valorCanonico(opcoes, draft);
+                      if (achado !== null) set(f.key, achado);
+                      else if (draft.trim() === "") set(f.key, "");
+                      else if (f.allow_new === true) set(f.key, draft.trim());
+                      // Sem casar e sem `allow_new`, o valor não é gravado: o
+                      // input volta ao que estava, e o aviso abaixo explica.
+                      else setRecusados((current) => ({ ...current, [f.key]: true }));
+                      limparRascunho();
+                    }}
+                    disabled={disabled}
+                  />
+                  {aberta && (
+                    <ul
+                      id={listaId}
+                      role="listbox"
+                      className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-surface shadow-md"
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      {resultados.map((o, i) => (
+                        <li
+                          key={o.value}
+                          id={`${listaId}-${i}`}
+                          role="option"
+                          aria-selected={i === destacado}
+                          className={cn(
+                            "flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm",
+                            i === destacado && "bg-accent text-accent-foreground",
+                          )}
+                          onMouseEnter={() => setDestacado(i)}
+                          onClick={() => escolher(o.value)}
+                        >
+                          {o.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 {recusados[f.key] && (
                   <p className="text-xs text-destructive">
                     {t("Esse valor não está na lista. Escolha uma das opções.")}

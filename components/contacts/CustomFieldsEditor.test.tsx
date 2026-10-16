@@ -126,3 +126,87 @@ describe("CustomFieldsEditor — lista pesquisável recusa o que não está na l
     expect(screen.queryByText("Esse valor não está na lista. Escolha uma das opções.")).toBeNull();
   });
 });
+
+describe("CustomFieldsEditor — lista pesquisável mostra o que a busca acha (#2521)", () => {
+  // O `<datalist>` do navegador refiltrava pelo rótulo, com acento: "sao paulo"
+  // e "mcz" não mostravam opção nenhuma. A lista agora é a de `buscarOpcoes`.
+  const DESTINO: CustomFieldDef[] = [
+    {
+      key: "destino",
+      label: "Destino",
+      type: "searchable_select",
+      options: [
+        { value: "sao-paulo-sp", label: "São Paulo (SP)" },
+        { value: "sao-luis-ma", label: "São Luís (MA)" },
+        { value: "maceio-al", label: "Maceió (AL)", aliases: ["maceio", "mcz"] },
+        { value: "gramado-rs", label: "Gramado (RS)" },
+      ],
+    },
+  ];
+  const AVISO = "Esse valor não está na lista. Escolha uma das opções.";
+
+  function montar() {
+    const onChange = vi.fn();
+    render(<CustomFieldsEditor mode="lead" fields={DESTINO} value={{}} onChange={onChange} />);
+    return { onChange, input: screen.getByRole("combobox", { name: /Destino/ }) };
+  }
+
+  it("'sao paulo' mostra São Paulo (SP), e seta + Enter grava o value", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "sao paulo" } });
+    expect(screen.getByRole("option", { name: "São Paulo (SP)" })).toBeTruthy();
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith({ destino: "sao-paulo-sp" });
+  });
+
+  it("o apelido 'mcz' mostra Maceió (AL)", () => {
+    const { input } = montar();
+    fireEvent.change(input, { target: { value: "mcz" } });
+    expect(screen.getByRole("option", { name: "Maceió (AL)" })).toBeTruthy();
+  });
+
+  it("Escape fecha a lista", () => {
+    const { input } = montar();
+    fireEvent.change(input, { target: { value: "mcz" } });
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("clicar numa opção grava o value", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "gram" } });
+    fireEvent.click(screen.getByRole("option", { name: "Gramado (RS)" }));
+    expect(onChange).toHaveBeenCalledWith({ destino: "gramado-rs" });
+  });
+
+  it("destacar com a seta e sair com Tab grava a destacada", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "gramado" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledWith({ destino: "gramado-rs" });
+  });
+
+  it("'gramado' e sair sem escolher: avisa e não grava (sem palpite por pedaço)", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "gramado" } });
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(AVISO)).toBeTruthy();
+  });
+
+  it("'Sao' é ambíguo: sair sem escolher avisa e não grava", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "Sao" } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "São Paulo (SP)",
+      "São Luís (MA)",
+    ]);
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(AVISO)).toBeTruthy();
+  });
+});
