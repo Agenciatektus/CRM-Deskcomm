@@ -16,7 +16,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   // admin), então o `user_metadata.locale` dele já existe e é o mesmo lido em
   // `lib/auth/server.ts`.
   const locale = (user.user_metadata?.locale as string | undefined) ?? null;
-  // Duas leituras da INSTALAÇÃO, em paralelo e uma vez por navegação: os
+  // Duas leituras da INSTALAÇÃO, em paralelo, no layout: os
   // módulos ligados (entradas do menu) e a ausência de SMTP (o aviso
   // persistente — #2755, item 3). É AQUI, e não em cada tela, porque o layout
   // é o denominador comum de todo `/admin/*`: nenhum componente do painel

@@ -27,7 +27,7 @@ import { useT } from "@/hooks/i18n/useT";
  * ─── Quem decide exibir é o LAYOUT, não este componente ─────────────────────
  *
  * Este componente só desenha; quem lê o estado e passa `semSmtp` é
- * `app/admin/(protected)/layout.tsx`, uma vez por navegação — a leitura não se
+ * `app/admin/(protected)/layout.tsx` — a leitura não se
  * repete em cada tela nem em cada componente. Onde isso aparece MEDIDO:
  * `layout.tsx` já roda no servidor para todo `/admin/*` e já consulta o banco
  * para os módulos ligados; a leitura de SMTP entra no MESMO `Promise.all`.
