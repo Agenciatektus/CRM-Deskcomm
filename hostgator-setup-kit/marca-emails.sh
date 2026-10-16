@@ -115,12 +115,14 @@ instrua_e_saia() {
     # O Supabase é o do kit: os moldes moram no GoTrue desta VPS (gravados por
     # `gravar_modelos_do_gotrue`, _common.sh — #2109) e o Site URL sai do `.env`
     # do Supabase. Não há painel da nuvem a abrir.
+    local dir_sb
+    dir_sb="$(PROJECT_DIR="$PROJ_DIR" dir_do_supabase)"
     c_dim "  Este Supabase é o do kit (na VPS) — o caminho é o do kit, não um painel:"
     c_dim "    bash hostgator-setup-kit/update.sh   # grava os moldes no GoTrue e reinicia o auth"
-    c_dim "    Site URL / Redirect URLs, no .env do Supabase:"
+    c_dim "    Site URL / Redirect URLs, no .env do Supabase desta VPS (${dir_sb}/.env):"
     c_dim "         SITE_URL:                 ${APP_URL:-https://SEU_DOMINIO}"
     c_dim "         ADDITIONAL_REDIRECT_URLS: ${APP_URL:-https://SEU_DOMINIO}/auth/confirm"
-    c_dim "    (ao mudar o .env, recrie o auth: docker compose up -d auth)"
+    c_dim "    (ao mudar o .env, recrie o auth; um restart não relê o .env: cd ${dir_sb} && docker compose up -d --no-deps auth)"
     ;;
   proprio)
     # Supabase próprio FORA do kit: também não há painel da nuvem — a

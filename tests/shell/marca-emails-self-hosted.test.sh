@@ -213,6 +213,7 @@ check "single-server: NÃO mostra o caminho de painel da nuvem" \
   nao_diz sem-modelos-single 'Authentication → URL Configuration'
 check "single-server: aponta o update.sh do kit" diz sem-modelos-single 'update.sh'
 check "single-server: e o .env do Supabase dele (SITE_URL)" diz sem-modelos-single 'SITE_URL'
+check "single-server: diz onde fica o .env do Supabase do kit" diz sem-modelos-single '.runtime/supabase'
 
 montar_sem_modelos sem-modelos-proprio 'NEXT_PUBLIC_SUPABASE_URL=https://supabase.meucliente.com.br
 NEXT_PUBLIC_APP_URL=https://crm.meucliente.com.br'
