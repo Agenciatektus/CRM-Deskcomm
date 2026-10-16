@@ -7768,6 +7768,9 @@ export const DICIONARIO: Traducoes = {
   Imagem: { es: "Imagen" },
   Figurinha: { es: "Sticker" },
   Vídeo: { es: "Video" },
+  // Rótulo da prévia de uma reação sem corpo (#2742): a palavra é a mesma no
+  // balão e na lista de conversas, e por isso mora junto do vocabulário de mídia.
+  "Reação": { es: "Reacción" },
   "Pausar áudio": { es: "Pausar audio" },
   "Reproduzir áudio": { es: "Reproducir audio" },
   "Progresso do áudio": { es: "Progreso del audio" },
