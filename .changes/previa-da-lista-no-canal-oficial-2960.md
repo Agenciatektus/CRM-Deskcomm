@@ -5,15 +5,14 @@ titulo: A prévia da lista do canal oficial passa a usar a mesma régua dos outr
 ---
 
 A lista da Inbox mostra a última mensagem de cada conversa. O canal oficial do
-WhatsApp gravava essa prévia com um vocabulário próprio — emoji mais o nome do
-tipo no lugar da legenda, e colchete com o tipo para os demais —, então uma
-instalação com dois canais misturava "Imagem", "Imagem com emoji" e "audio".
-Pior: a prévia gravada para mídia sem legenda não batia com a que as rotas de
-ocultar e apagar reconstroem, e essa mídia do canal oficial não podia ser
-ocultada nem apagada pela lista. Agora as duas metades da ingestão oficial usam
-a mesma régua dos outros canais: a legenda quando existe, o nome do contato no
-cartão, e o tipo entre colchetes para mídia sem legenda — e ocultar e apagar
-voltam a reconhecer essas mensagens.
+WhatsApp gravava essa prévia com um vocabulário próprio: emoji mais o nome do
+tipo ("📷 Imagem"), ignorando a legenda, e texto cortado em 120 caracteres. Por
+isso, ao ocultar ou apagar a última mensagem de uma conversa do canal oficial, a
+mensagem saía, mas a prévia da lista continuava mostrando o conteúdo antigo.
+Agora a ingestão oficial usa a mesma régua dos outros canais: a legenda quando
+existe, o texto até 280 caracteres, "Contato: <nome>" no cartão e o nome do tipo
+em português (Imagem, Áudio, Documento…) para mídia sem legenda. Ocultar e apagar
+passam a atualizar a prévia das mensagens que chegarem a partir desta versão.
 
 Você não precisa fazer nada.
 
