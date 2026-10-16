@@ -100,11 +100,12 @@ export function desvioAntesDoEnvio(
   edges: readonly FlowEdge[],
   idDoEnvio: string,
   lead: LeadFacts,
+  instante: Date,
 ): { proximo: string; esperado: boolean; agora: boolean } | null {
   const governa = condicaoQueGoverna(nodes, edges, idDoEnvio);
   if (!governa) return null;
 
-  const agora = evaluateCondition(governa.condicao.config, lead);
+  const agora = evaluateCondition(governa.condicao.config, lead, instante);
   if (agora === governa.esperado) return null;
 
   // Para onde a condição aponta AGORA. `selectEdge` é o MESMO seletor que o

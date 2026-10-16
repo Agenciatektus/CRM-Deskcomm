@@ -152,6 +152,13 @@ export interface AdminClient {
    * não recorta por funil e segue como antes.
    */
   loadFunisDasEtapas?(orgId: string, stageIds: string[]): Promise<(string | null)[]>;
+  /**
+   * Fuso da organização, para a condição por DATA comparar dia de calendário
+   * (`condicao-por-data.ts`). Opcional, e só consultado quando o grafo tem
+   * regra de data; ausente cai no padrão do produto — nunca lança, porque um
+   * fuso faltando não pode derrubar o tick.
+   */
+  loadFusoDaOrganizacao?(orgId: string): Promise<string | null>;
   loadEnrollmentEvents(enrollmentId: string): Promise<EnrollmentEventRef[]>;
   /**
    * #2528 — o contexto `{ contact, lead }` do render das mensagens de follow-up
@@ -869,7 +876,19 @@ async function processEnrollment(
     enrollment.contact_id,
     funilDoFluxo,
   );
+  // O FUSO só é lido quando o grafo PERGUNTA por data: comparar dia de
+  // calendário em UTC adiantaria o disparo em três horas num fuso a oeste, e
+  // disparar cedo é o dano que a regra de data existe para evitar.
+  const temRegraDeData = graph.nodes.some(
+    (n) => n.type === "condition" && n.config.checks.some((c) => c.field === "lead_date"),
+  );
+  const fusoDaOrg =
+    temRegraDeData && db.loadFusoDaOrganizacao
+      ? await db.loadFusoDaOrganizacao(enrollment.organization_id)
+      : null;
+
   const lead: LeadFacts = {
+    fuso: fusoDaOrg,
     lead_stage: leadRow.lead_stage,
     tags: leadRow.tags,
     steps_taken: enrollment.steps_taken,
@@ -1008,7 +1027,7 @@ async function processEnrollment(
   // `advance` não mandam nada, e reavaliar ali desviaria uma inscrição cujo
   // envio JÁ saiu.
   if (result.kind === "enqueue_turn" && result.purpose === "send_message" && node.type === "action") {
-    const desvio = desvioAntesDoEnvio(graph.nodes, graph.edges, node.id, lead);
+    const desvio = desvioAntesDoEnvio(graph.nodes, graph.edges, node.id, lead, clock());
     if (desvio) {
       await db.insertEnrollmentEvent({
         organization_id: enrollment.organization_id,
@@ -1132,6 +1151,24 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
       if (error) throw new Error(error.message);
       if (!data) return null;
       return flowGraphSchema.parse(data.graph);
+    },
+    async loadFusoDaOrganizacao(orgId) {
+      const { data, error } = await admin
+        .from("organizations")
+        .select("timezone")
+        .eq("id", orgId)
+        .maybeSingle();
+      // Falha ABERTA: `condicao-por-data` cai no fuso padrão do produto, e o
+      // pior que acontece é a comparação de dia usar America/Sao_Paulo. Subir
+      // o erro calaria o fluxo inteiro por causa de uma leitura de preferência.
+      if (error) {
+        logger.warn("followup: fuso da organização não lido; a regra de data usa o padrão", {
+          organization_id: orgId,
+          error: error.message,
+        });
+        return null;
+      }
+      return (data as { timezone?: string | null } | null)?.timezone ?? null;
     },
     async loadFunisDasEtapas(orgId, stageIds) {
       if (stageIds.length === 0) return [];

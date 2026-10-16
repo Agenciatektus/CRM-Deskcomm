@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { PRIORIDADES_DA_TAREFA } from '@/lib/tarefas/tipos';
+import { ehOpDeData, OPS_DE_DATA } from './condicao-por-data';
 
 /**
  * Flow graph schema for the follow-up automation system.
@@ -325,18 +326,46 @@ export const editLeadTagConfigSchema = z.strictObject({
  * — identity lives on the rule itself, never in a parallel array that would
  * desync the moment the user reorders the rules.
  */
-export const conditionCheckSchema = z.strictObject({
-  id: declaredBranchIdSchema.optional(),
-  label: z.string().min(1).max(60).optional(),
-  field: z.enum([
-    'lead_stage',
-    'tag',
-    'steps_taken',
-    'last_outcome',
-  ]),
-  op: z.enum(['eq', 'neq', 'gte', 'lte', 'contains']),
-  value: z.union([z.string(), z.number()]),
-});
+export const conditionCheckSchema = z
+  .strictObject({
+    id: declaredBranchIdSchema.optional(),
+    label: z.string().min(1).max(60).optional(),
+    field: z.enum([
+      'lead_stage',
+      'tag',
+      'steps_taken',
+      'last_outcome',
+      // Data relativa sobre um campo personalizado do negócio — ver
+      // `condicao-por-data.ts`. É o que permite perguntar "o período de teste
+      // terminou?", que nenhum dos quatro campos acima alcança.
+      'lead_date',
+    ]),
+    op: z.enum(['eq', 'neq', 'gte', 'lte', 'contains', ...OPS_DE_DATA]),
+    value: z.union([z.string(), z.number()]),
+    /**
+     * A chave em `crm_leads.custom_fields` que a regra lê (ex.: `fim_teste`).
+     * Só `lead_date` usa, e para ele é OBRIGATÓRIA: regra de data sem campo não
+     * tem o que comparar, e deixá-la passar daria uma condição que responde
+     * sempre `false` sem dizer por quê.
+     */
+    key: z.string().min(1).max(60).optional(),
+  })
+  .refine((c) => c.field !== 'lead_date' || (c.key ?? '').trim().length > 0, {
+    message: 'uma regra de data precisa do campo (key) que ela lê',
+    path: ['key'],
+  })
+  .refine((c) => c.field !== 'lead_date' || ehOpDeData(c.op), {
+    message: `uma regra de data usa ${OPS_DE_DATA.join(' ou ')}`,
+    path: ['op'],
+  })
+  .refine((c) => c.field === 'lead_date' || !ehOpDeData(c.op), {
+    message: 'passou_ha e falta_para existem só para regra de data',
+    path: ['op'],
+  })
+  .refine((c) => c.field !== 'lead_date' || (typeof c.value === 'number' && c.value >= 0), {
+    message: 'o prazo em dias é um número de 0 para cima (0 = inclui hoje)',
+    path: ['value'],
+  });
 
 export type ConditionCheck = z.infer<typeof conditionCheckSchema>;
 

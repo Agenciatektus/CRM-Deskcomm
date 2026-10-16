@@ -2654,6 +2654,17 @@ export const DICIONARIO: Traducoes = {
   "Etiqueta do contato": { es: "Etiqueta del contacto" },
   "Passos já dados no fluxo": { es: "Pasos ya dados en el flujo" },
   "Desfecho do passo anterior": { es: "Resultado del paso anterior" },
+  // Regra de data da condição (item 14) — a regra que pergunta se o período de
+  // teste terminou. Ver `lib/followup/condicao-por-data.ts`.
+  "Data de um campo do negócio": { es: "Fecha de un campo del negocio" },
+  "Campo do negócio com a data": { es: "Campo del negocio con la fecha" },
+  "Ex.: fim_teste": { es: "Ej.: fim_teste" },
+  "Prazo em dias": { es: "Plazo en días" },
+  "0 = inclui hoje": { es: "0 = incluye hoy" },
+  "O campo é o mesmo nome usado na ficha do negócio. O prazo conta em dias de calendário no fuso da organização; 0 inclui o dia de hoje.":
+    {
+      es: "El campo es el mismo nombre usado en la ficha del negocio. El plazo cuenta en días de calendario en la zona horaria de la organización; 0 incluye el día de hoy.",
+    },
   "está na etapa": { es: "está en la etapa" },
   "não está na etapa": { es: "no está en la etapa" },
   "contém": { es: "contiene" },

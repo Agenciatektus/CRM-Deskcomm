@@ -43,6 +43,9 @@ export const PUBLISH_ERROR_CODES = [
   'motivo_da_perda_ausente',
   'motivo_da_perda_invalido',
   'tag_ausente',
+  // Regra de data (item 14): sem o campo do negócio ela não tem o que comparar
+  // e responderia `false` para sempre, sem dizer por quê.
+  'campo_de_data_ausente',
 ] as const;
 export type PublishErrorCode = (typeof PUBLISH_ERROR_CODES)[number];
 
@@ -606,6 +609,30 @@ function conferirRegras(
       ...(node.config.branching === 'per_check' && check.id !== undefined ? { branch_id: check.id } : {}),
     };
     const valor = String(check.value).trim();
+
+    // A regra de DATA é conferida antes: o "valor" dela é um prazo em dias, e
+    // `0` — o caso mais comum, "hoje ou já passou" — não pode cair no
+    // `empty_check_value` nem no `check_value_not_number`.
+    if (check.field === 'lead_date') {
+      const chave = (check.key ?? '').trim();
+      if (chave === '') {
+        errors.push({
+          ...ancora,
+          code: 'campo_de_data_ausente',
+          message: `${regra}: escolha o campo do negócio que guarda a data.`,
+        });
+        return;
+      }
+      const dias = Number(check.value);
+      if (!Number.isInteger(dias) || dias < 0) {
+        errors.push({
+          ...ancora,
+          code: 'check_value_not_number',
+          message: `${regra}: o prazo em dias é um número de 0 para cima (0 inclui hoje).`,
+        });
+      }
+      return;
+    }
 
     if (valor === '') {
       errors.push({ ...ancora, code: 'empty_check_value', message: `${regra} sem valor: preencha ou remova a regra.` });

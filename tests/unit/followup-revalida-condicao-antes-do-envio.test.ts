@@ -118,16 +118,16 @@ describe("condicaoQueGoverna — sobe pelas arestas atravessando esperas", () =>
 
 describe("desvioAntesDoEnvio", () => {
   it("lead continua na etapa devolve null (envia)", () => {
-    expect(desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(ETAPA))).toBeNull();
+    expect(desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(ETAPA), NOW)).toBeNull();
   });
 
   it("lead saiu da etapa durante a espera: desvia para o ramo do Nao", () => {
-    const desvio = desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(OUTRA));
+    const desvio = desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(OUTRA), NOW);
     expect(desvio).toEqual({ proximo: "fim", esperado: true, agora: false });
   });
 
   it("lead sem oportunidade nenhuma tambem desvia (ausencia nao autoriza envio)", () => {
-    expect(desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(null))?.proximo).toBe("fim");
+    expect(desvioAntesDoEnvio(NODES, EDGES, "act-1", lead(null), NOW)?.proximo).toBe("fim");
   });
 
   it("sem aresta desenhada para o novo resultado, volta a condicao e NAO envia", () => {
@@ -135,7 +135,7 @@ describe("desvioAntesDoEnvio", () => {
       aresta("cond-1", "wait-1", { type: "cond_result", value: true }),
       aresta("wait-1", "act-1", { type: "always" }),
     ];
-    expect(desvioAntesDoEnvio(NODES, edges, "act-1", lead(OUTRA))?.proximo).toBe("cond-1");
+    expect(desvioAntesDoEnvio(NODES, edges, "act-1", lead(OUTRA), NOW)?.proximo).toBe("cond-1");
   });
 });
 
