@@ -345,3 +345,39 @@ describe("#3003 — guia curta: todo botão da barra diz o que faz", () => {
     }
   });
 });
+
+/**
+ * A GUIA DE "LIBERAR" DIZ PARA ONDE A CONVERSA VAI — e isso depende do estado.
+ *
+ * `fn_conversation_assign` (dono → null) só limpa `bot_silenced_until` quando não
+ * houve escalação (`last_handoff_at is null`); trava do contato, opt-out e org sem
+ * automático também deixam a conversa na fila. Uma guia fixa prometendo "o
+ * automático assume de novo" mentiria em todos esses estados.
+ */
+describe("#3003 — a guia de Liberar não promete o automático quando ele não volta", () => {
+  const VOLTA = "Solta esta conversa: ela fica sem dono e o atendimento automático volta a responder.";
+  const FILA = "Solta esta conversa: ela fica sem dono e volta para a fila, esperando um atendente.";
+  const minha = { assigned_to_user_id: "u1", assignee_kind: "user", bot_silenced_until: "infinity" };
+
+  const casos: Array<{ nome: string; cenario: Partial<Cenario>; guia: string }> = [
+    { nome: "assumida sem escalação, org com automático", cenario: { conversa: minha }, guia: VOLTA },
+    {
+      nome: "assumida DEPOIS de uma escalação — a RPC mantém o silêncio",
+      cenario: { conversa: { ...minha, last_handoff_at: "2026-10-01T10:00:00Z" } },
+      guia: FILA,
+    },
+    { nome: "org sem automático no ar", cenario: { conversa: minha, automaticoDaOrg: false }, guia: FILA },
+    {
+      nome: "contato travado (force_human) — Liberar não destrava",
+      cenario: { conversa: minha, contato: { force_human: true } },
+      guia: FILA,
+    },
+  ];
+
+  for (const caso of casos) {
+    it(caso.nome, () => {
+      montar({ nome: caso.nome, ancora: "Liberar", esperadas: [], ...caso.cenario });
+      expect(screen.getByRole("button", { name: "Liberar" }).getAttribute("title")).toBe(caso.guia);
+    });
+  }
+});

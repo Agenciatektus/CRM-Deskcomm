@@ -7731,22 +7731,24 @@ export const DICIONARIO: Traducoes = {
   // O rótulo diz o GESTO; a guia diz a CONSEQUÊNCIA — é a pergunta "o que
   // acontece se eu clicar aqui?", que chega antes do clique. Mesmo vocabulário
   // já usado acima nesta seção (`atención automática`, `atención se cierra`).
-  "Solta esta conversa: ela volta para a fila e o atendimento automático assume de novo.": {
-    es: "Suelta esta conversación: vuelve a la cola y la atención automática la retoma.",
+  "Solta esta conversa: ela fica sem dono e o atendimento automático volta a responder.": {
+    es: "Suelta esta conversación: queda sin responsable y la atención automática vuelve a responder.",
   },
-  "Passa esta conversa para outro atendente ou para outro número.": {
-    es: "Pasa esta conversación a otro agente o a otro número.",
+  "Solta esta conversa: ela fica sem dono e volta para a fila, esperando um atendente.": {
+    es: "Suelta esta conversación: queda sin responsable y vuelve a la cola, esperando a un asesor.",
+  },
+  "Passa esta conversa para outro atendente. Se houver outro número conectado, dá para continuar o atendimento por ele.": {
+    es: "Pasa esta conversación a otro asesor. Si hay otro número conectado, puedes continuar la atención por él.",
   },
   "Encerra o atendimento. Depois você pode reabrir a conversa.": {
     es: "Cierra la atención. Después puedes reabrir la conversación.",
   },
-  "Volta a atender esta conversa, que estava encerrada.": {
-    es: "Vuelve a atender esta conversación, que estaba cerrada.",
+  "Reabre o atendimento desta conversa, que estava encerrada.": {
+    es: "Reabre la atención de esta conversación, que estaba cerrada.",
   },
-  "Tira a conversa do inbox e guarda no histórico. Se ainda estiver aberta, o atendimento é encerrado.":
-    {
-      es: "Saca la conversación del inbox y la guarda en el historial. Si todavía está abierta, la atención se cierra.",
-    },
+  "Guarda a conversa na aba Arquivadas. Se ainda estiver aberta, o atendimento é encerrado.": {
+    es: "Guarda la conversación en la pestaña Archivadas. Si todavía está abierta, la atención se cierra.",
+  },
   "Abre a ficha completa deste contato.": { es: "Abre la ficha completa de este contacto." },
   Automático: { es: "Automático" },
   Alguém: { es: "Alguien" },
