@@ -379,10 +379,15 @@ export function ContactsListClient() {
               orderBy={orderBy}
               orderDir={orderDir}
               onSort={handleSort}
-              selecionados={selecao.selecionados}
-              onAlternarSelecao={selecao.alternar}
-              onSelecionarTodosVisiveis={() =>
-                selecao.selecionarTodos(allContacts.map((c) => c.id))
+              // Sem `contact.update` não há barra, então as caixas seriam um
+              // controle que marca e não leva a nada: a tabela só as desenha
+              // quando recebe `onAlternarSelecao`.
+              selecionados={podeAgirEmLote ? selecao.selecionados : undefined}
+              onAlternarSelecao={podeAgirEmLote ? selecao.alternar : undefined}
+              onSelecionarTodosVisiveis={
+                podeAgirEmLote
+                  ? () => selecao.selecionarTodos(allContacts.map((c) => c.id))
+                  : undefined
               }
             />
           </Card>
