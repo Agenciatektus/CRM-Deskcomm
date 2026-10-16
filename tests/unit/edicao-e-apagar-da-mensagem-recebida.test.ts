@@ -131,7 +131,24 @@ const recebidaEditada = (chat: string, bare: string, corpo: string) => ({
   },
 });
 
+/**
+ * A forma REAL do `message.revoked`: `WAMessageRevokedBody` do WAHA, como o
+ * NOWEB emite (`session.noweb.core.ts`) — `{ after, before: null,
+ * revokedMessageId }`, SEM `from`/`fromMe` no topo. O chat vem em `after`, que é
+ * a protocolMessage de quem apagou (outro id, mesmo chat). Lida da fonte pública
+ * do WAHA, não de um payload capturado nesta instalação.
+ */
 const recebidaApagada = (chat: string, bare: string) => ({
+  event: "message.revoked",
+  payload: {
+    after: { id: `false_${chat}_3EB0PROTOCOLO`, from: chat, fromMe: false },
+    before: null,
+    revokedMessageId: bare,
+  },
+});
+
+/** A forma flat (chat no topo), caso algum engine a mande — as duas são aceitas. */
+const recebidaApagadaFlat = (chat: string, bare: string) => ({
   event: "message.revoked",
   payload: {
     id: `false_${chat}_${bare}`,
@@ -179,6 +196,12 @@ describe("edição e apagar de mensagem RECEBIDA chegam ao CRM", () => {
     // O corpo fica: quem decide o que mostrar é a tela; apagar aqui impediria o
     // atendente de entender depois o que tinha sido combinado.
     expect(rows[0]!.body).toBe("texto combinado");
+  });
+
+  it("apagar na forma flat (chat no topo) também carimba `revoked_at`", async () => {
+    const rows = [linha("m1", `false_${CHAT_A}_3EB0RECEBIDA`, "texto combinado")];
+    await dispatchWahaEvent(makeAdmin(rows), SESSION, recebidaApagadaFlat(CHAT_A, "3EB0RECEBIDA"), "req-2b");
+    expect(rows[0]!.revoked_at).not.toBeNull();
   });
 });
 

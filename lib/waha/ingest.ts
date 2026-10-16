@@ -1798,11 +1798,26 @@ async function handleMessageRevoked(
 ): Promise<void> {
   if (!p.revokedMessageId) return;
 
+  // Forma de WAMessageRevokedBody / session.noweb.core.ts do WAHA; nenhum payload real de revoked medido nesta instalação.
+  // O chat vem em `after` (a protocolMessage de quem apagou), não no topo; o topo fica primeiro para não regredir num engine que mande flat.
+  const depois =
+    (p as { after?: { from?: unknown; fromMe?: unknown; id?: unknown } | null }).after ?? null;
+  const chat =
+    (typeof p.from === "string" && p.from) ||
+    (typeof depois?.from === "string" ? depois.from : "") ||
+    (typeof depois?.id === "string" ? (chatIdFromWaMessageId(depois.id) ?? "") : "");
+  const fromMe =
+    typeof p.fromMe === "boolean"
+      ? p.fromMe
+      : typeof depois?.fromMe === "boolean"
+        ? depois.fromMe
+        : undefined;
+
   await admin
     .from("messages")
     .update({ revoked_at: new Date().toISOString() })
     .eq("organization_id", session.organization_id)
-    .in("external_id", formasDaMensagemOriginal(p.revokedMessageId, p.from ?? "", p.fromMe));
+    .in("external_id", formasDaMensagemOriginal(p.revokedMessageId, chat, fromMe));
 }
 
 /**
