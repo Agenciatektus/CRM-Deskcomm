@@ -15871,6 +15871,11 @@ export const DICIONARIO: Traducoes = {
   },
   "Selecionar contato": { es: "Seleccionar contacto" },
   "Selecionar todos os contatos visíveis": { es: "Seleccionar todos los contactos visibles" },
+  // O toast do lote, no masculino de "contato" ("atualizados" já existe).
+  "1 contato atualizado.": { es: "1 contacto actualizado." },
+  "contatos atualizados": { es: "contactos actualizados" },
+  "recusados": { es: "rechazados" },
+  "Recusado.": { es: "Rechazado." },
 };
 
 /**

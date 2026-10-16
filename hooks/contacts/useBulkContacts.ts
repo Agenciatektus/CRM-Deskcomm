@@ -67,11 +67,15 @@ export function useBulkContacts() {
 
       const recusados = r.resultados.filter((x) => !x.feito);
       if (recusados.length === 0) {
-        toast.success(`${r.feitos} ${t("contatos")} ${t("atualizadas")}.`);
+        // Texto próprio dos contatos: "atualizadas"/"recusadas" são as chaves
+        // das conversas (F1) e davam "2 contatos atualizadas".
+        toast.success(
+          r.feitos === 1 ? t("1 contato atualizado.") : `${r.feitos} ${t("contatos atualizados")}.`,
+        );
         return;
       }
-      toast.warning(`${r.feitos} ${t("atualizadas")}, ${recusados.length} ${t("recusadas")}.`, {
-        description: recusados.map((x) => x.motivo ?? x.codigo ?? t("Recusada.")).join(" · "),
+      toast.warning(`${r.feitos} ${t("atualizados")}, ${recusados.length} ${t("recusados")}.`, {
+        description: recusados.map((x) => x.motivo ?? x.codigo ?? t("Recusado.")).join(" · "),
       });
     },
   });

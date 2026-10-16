@@ -68,8 +68,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * Quantos contatos uma chamada aceita. A issue #2484 pede "teto por chamada
- * (ex.: 100)"; 100 é o mesmo tamanho de página da lista de contatos, então um
- * "selecionar todas" feito com o que está na tela nunca estoura sozinho.
+ * (ex.: 100)"; 100 é o tamanho máximo de página da lista de contatos. Com
+ * "carregar mais", a tela pode ter mais de 100 linhas e o "selecionar todas"
+ * passa do teto: a chamada volta 422 `bulk_too_large`, a tela mostra o erro e
+ * nada é gravado.
  */
 export const TETO_DO_LOTE = 100;
 

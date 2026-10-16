@@ -5689,5 +5689,9 @@
   "Nenhum atendente disponível.": "没有可用的客服。",
   "O campo é gravado no mesmo caminho da edição individual; os outros campos do contato permanecem.": "该字段通过与单个编辑相同的路径写入；联系人的其他字段保持不变。",
   "Selecionar contato": "选择联系人",
-  "Selecionar todos os contatos visíveis": "选择所有可见联系人"
+  "Selecionar todos os contatos visíveis": "选择所有可见联系人",
+  "1 contato atualizado.": "已更新 1 个联系人。",
+  "contatos atualizados": "个联系人已更新",
+  "recusados": "被拒绝",
+  "Recusado.": "已拒绝。"
 }
