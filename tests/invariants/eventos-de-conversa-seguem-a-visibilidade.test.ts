@@ -5,8 +5,9 @@
  * conversa (`fn_can_view_conversation`, mesmo molde de `conversation_notes`).
  * A conversa do evento é resolvida pelo `entity_id` (`conversation`/
  * `conversation_note`), por `payload.conversation_id`, ou pelo `ref_id` do
- * aviso da Central (`payload.ref_kind = 'conversation'`). Evento sem conversa
- * resolvível segue só o pertencimento à organização. Workers leem com a
+ * aviso da Central (`payload.ref_kind = 'conversation'`). Valor SEM forma de
+ * uuid não restringe (segue o pertencimento à organização); uuid que não aponta
+ * para conversa da organização fica oculto ao atendente. Workers leem com a
  * service role e não passam aqui. Os casos de nota, payload e aviso estão em
  * `eventos-ligados-a-conversa-seguem-a-visibilidade.test.ts`.
  *

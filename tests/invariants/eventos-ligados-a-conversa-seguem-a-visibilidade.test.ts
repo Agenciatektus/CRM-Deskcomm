@@ -31,6 +31,12 @@ const EV_MENSAGEM_ID_SEM_FORMA = "e0e0e0e0-0685-4000-8000-000000000014";
 const EV_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000015";
 // Nota cujo payload não repete a conversa: só o `entity_id` a identifica.
 const EV_NOTA_SO_ENTIDADE = "e0e0e0e0-0685-4000-8000-000000000019";
+// Uuid com forma certa que não aponta para conversa da organização (no payload e no ref_id do aviso).
+const EV_UUID_SEM_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000031";
+const EV_REF_SEM_CONVERSA = "e0e0e0e0-0685-4000-8000-000000000032";
+const UUID_SEM_CONVERSA = "e0e0e0e0-0685-4000-8000-0000000000aa";
+// Administrador da plataforma que não é membro da organização.
+const ADMIN_PLATAFORMA = "e0e0e0e0-0685-4000-8000-0000000000fd";
 // `payload.conversation_id` que não é uuid: texto, vazio e número.
 const EV_MALFORMADOS = [
   "e0e0e0e0-0685-4000-8000-000000000016",
@@ -70,6 +76,10 @@ beforeAll(() => {
       ('${EV_CONVERSA}', '${GOV_ORG}', 'conversation.claimed', 'conversation', '${GOV_CONV_AGENT_B}', '{}'::jsonb, 'done'),
       ('${EV_NOTA_SO_ENTIDADE}', '${GOV_ORG}', 'user.mentioned', 'conversation_note', '${GOV_CONV_AGENT_B}',
         jsonb_build_object('body_preview', 'nota interna'), 'done'),
+      ('${EV_UUID_SEM_CONVERSA}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(),
+        jsonb_build_object('conversation_id', '${UUID_SEM_CONVERSA}'), 'done'),
+      ('${EV_REF_SEM_CONVERSA}', '${GOV_ORG}', 'central.aviso_criado', 'agent_inbox_item', gen_random_uuid(),
+        jsonb_build_object('ref_kind', 'conversation', 'ref_id', '${UUID_SEM_CONVERSA}'), 'done'),
       ('${EV_MALFORMADOS[0]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":"x"}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[1]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":""}'::jsonb, 'done'),
       ('${EV_MALFORMADOS[2]}', '${GOV_ORG}', 'message.sent', 'message', gen_random_uuid(), '{"conversation_id":12345}'::jsonb, 'done')
@@ -99,8 +109,24 @@ describe("0685 — eventos ligados a uma conversa seguem a visibilidade dela", (
     expect(countAs(GOV_AGENT_A, contar(EV_MENSAGEM))).toBe(1);
   });
 
-  it("conversation_id que não é id de conversa não restringe nada", () => {
+  it("conversation_id sem forma de uuid não restringe nada", () => {
     expect(countAs(GOV_AGENT_A, contar(EV_MENSAGEM_ID_SEM_FORMA))).toBe(1);
+  });
+
+  it.each([EV_UUID_SEM_CONVERSA, EV_REF_SEM_CONVERSA])(
+    "uuid que não aponta para conversa da organização fica oculto ao atendente, e a gestão lê (%s)",
+    (ev) => {
+      expect(countAs(GOV_AGENT_A, contar(ev))).toBe(0);
+      expect(countAs(GOV_AGENT_B, contar(ev))).toBe(0);
+      expect(countAs(GOV_MANAGER, contar(ev))).toBe(1);
+    },
+  );
+
+  it("administrador da plataforma fora da organização lê os eventos ligados à conversa", () => {
+    sql(`insert into auth.users (id, email) values ('${ADMIN_PLATAFORMA}', 'plataforma-0685@invariant.test') on conflict do nothing;
+         insert into public.platform_admins (user_id, granted_by, scope, mfa_required, reason)
+           values ('${ADMIN_PLATAFORMA}', '${ADMIN_PLATAFORMA}', 'full', false, 'invariante 0685') on conflict (user_id) do nothing;`);
+    for (const ev of [EV_NOTA, EV_MENSAGEM, EV_UUID_SEM_CONVERSA]) expect(countAs(ADMIN_PLATAFORMA, contar(ev))).toBe(1);
   });
 
   it("gestão lê os eventos ligados à conversa de qualquer atendente", () => {
