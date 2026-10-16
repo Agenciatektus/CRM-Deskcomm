@@ -1148,6 +1148,12 @@ export const AUDIT_ACTIONS = [
   // LGPD art. 18, V. Audita o GESTO com o total de linhas e os filtros que
   // valiam, nunca o termo de busca.
   "contacts.exported",
+  // O operador carregou a imagem que a Resposta rápida passa a enviar junto
+  // com o texto — `POST /message-templates/:id/midias` (#2526). A REMOÇÃO não
+  // tem código próprio: ela acontece dentro do `template.updated` (campo
+  // `removidas` no metadata) ou dentro do `template.deleted`, que são os atos
+  // em que a imagem sai de fato.
+  "template.media_added",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

@@ -3014,6 +3014,9 @@ export const DICIONARIO: Traducoes = {
   "Guardrails inválidos": { es: "Guardrails inválidos" },
   "Nada para salvar.": { es: "Nada que guardar." },
   "Campos inválidos.": { es: "Campos inválidos." },
+  "Não foi possível definir o provedor e o modelo deste agente.": {
+    es: "No fue posible definir el proveedor y el modelo de este agente.",
+  },
   "Modelo não encontrado.": { es: "Modelo no encontrado." },
   "Modelo da plataforma não encontrado.": { es: "Modelo de la plataforma no encontrado." },
   "Este modelo já foi personalizado.": { es: "Este modelo ya fue personalizado." },
@@ -5925,6 +5928,25 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível salvar a carteira do cliente.": {
     es: "No fue posible guardar la cartera del cliente.",
   },
+  // TELA da carteira (#2591): o cartão da ficha do contato e a faixa em cima do chat.
+  "Carteira": { es: "Cartera" },
+  "O vendedor dono deste cliente. Sem dono, o atendimento segue o fluxo de sempre.": {
+    es: "El vendedor dueño de este cliente. Sin dueño, la atención sigue el flujo de siempre.",
+  },
+  "Dono da carteira:": { es: "Dueño de la cartera:" },
+  "Membro da equipe": { es: "Miembro del equipo" },
+  "Não conta: saiu da equipe ou só lê": { es: "No cuenta: salió del equipo o solo lee" },
+  "Sem vendedor dono. O atendimento segue o fluxo de sempre.": {
+    es: "Sin vendedor dueño. La atención sigue el flujo de siempre.",
+  },
+  "Escolha o vendedor dono": { es: "Elige el vendedor dueño" },
+  "Sem vendedor dono": { es: "Sin vendedor dueño" },
+  "Salvar carteira": { es: "Guardar cartera" },
+  // Faixa em cima do chat: o nome do dono entra por replace de {nome}.
+  "Este cliente pertence à carteira de {nome}.": {
+    es: "Este cliente pertenece a la cartera de {nome}.",
+  },
+  "outro vendedor": { es: "otro vendedor" },
   "assinatura inválida": { es: "firma inválida" },
   // Assinatura HMAC da fonte de captação, na tela de detalhe da fonte.
   "Assinatura (HMAC)": { es: "Firma (HMAC)" },
@@ -7767,6 +7789,9 @@ export const DICIONARIO: Traducoes = {
   Imagem: { es: "Imagen" },
   Figurinha: { es: "Sticker" },
   Vídeo: { es: "Video" },
+  // Rótulo da prévia de uma reação sem corpo (#2742): a palavra é a mesma no
+  // balão e na lista de conversas, e por isso mora junto do vocabulário de mídia.
+  "Reação": { es: "Reacción" },
   "Pausar áudio": { es: "Pausar audio" },
   "Reproduzir áudio": { es: "Reproducir audio" },
   "Progresso do áudio": { es: "Progreso del audio" },
@@ -10403,6 +10428,18 @@ export const DICIONARIO: Traducoes = {
   "Agent não encontrado nesta organização.": { es: "Agente no encontrado en esta organización." },
   "Agent não tem versão para duplicar.": { es: "El agente no tiene versión para duplicar." },
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
+  "Imagens (opcional)": { es: "Imágenes (opcional)" },
+  "JPG ou PNG, até 5 MB por imagem. A imagem vai junto com o texto.": { es: "JPG o PNG, hasta 5 MB por imagen. La imagen va junto con el texto." },
+  "Imagem da resposta rápida": { es: "Imagen de la respuesta rápida" },
+  "Remover imagem": { es: "Quitar imagen" },
+  "Prévia da imagem": { es: "Vista previa de la imagen" },
+  "Adicionar imagem": { es: "Agregar imagen" },
+  "Cada resposta rápida tem no máximo 5 imagens.": { es: "Cada respuesta rápida admite un máximo de 5 imágenes." },
+  "Imagens": { es: "Imágenes" },
+  "A imagem precisa ser JPG ou PNG.": { es: "La imagen debe ser JPG o PNG." },
+  "Imagem não encontrada.": { es: "Imagen no encontrada." },
+  "As imagens mudaram. Recarregue a página.": { es: "Las imágenes cambiaron. Recargue la página." },
+  "Só manager+ altera template compartilhado.": { es: "Solo manager+ modifica la plantilla compartida." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50MB.": { es: "El archivo supera los 50MB." },
   "Arquivo excede o limite de 20MB.": { es: "El archivo supera el límite de 20MB." },
@@ -14910,6 +14947,10 @@ export const DICIONARIO: Traducoes = {
   // ─── C-076: Comandos pelo celular (#on/#off) ───
   "Comandos pelo celular": { es: "Comandos desde el celular" },
   "Aceitar #on/#off enviados pelo celular": { es: "Aceptar #on/#off enviados desde el celular" },
+  "Usar o servidor de ferramentas externo durante o atendimento": { es: "Usar el servidor de herramientas externo durante la atención" },
+  "O servidor recebe a identidade do cliente da conversa e deve filtrar os dados por ela.": { es: "El servidor recibe la identidad del cliente de la conversación y debe filtrar los datos por ella." },
+  "Servidor de ferramentas externo ligado no atendimento.": { es: "Servidor de herramientas externo activado en la atención." },
+  "Servidor de ferramentas externo desligado no atendimento.": { es: "Servidor de herramientas externo desactivado en la atención." },
   "Ligado, QUALQUER mensagem enviada pelo WhatsApp do celular pausa a IA nesta conversa até alguém mandar #on — a pausa não vence sozinha. #off pausa sem precisar responder o cliente. Desligado, #on e #off são texto comum, e responder pelo celular pausa a IA só por um tempo.":
     {
       es: "Activado, CUALQUIER mensaje enviado desde el WhatsApp del celular pausa la IA en esta conversación hasta que alguien envíe #on — la pausa no vence sola. #off pausa sin necesidad de responder al cliente. Desactivado, #on y #off son texto normal, y responder desde el celular pausa la IA solo por un tiempo.",
