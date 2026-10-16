@@ -180,11 +180,11 @@ function bearerReq(method: "GET" | "POST", body?: unknown) {
   });
 }
 
-function token(scopes: string[]) {
+function token(scopes: string[], role: "agent" | "admin" = "admin") {
   return {
     organizationId: OTHER_ORG_ID,
     scopes,
-    role: "admin",
+    role,
     actor: { type: "api_token", id: "tok-router" },
     apiTokenId: "tok-router",
   };
@@ -363,8 +363,8 @@ describe("POST /api/v1/ai/routers", () => {
 });
 
 describe("auth dual dos routers", () => {
-  it("Bearer válido com mcp:read lista somente a organização do token", async () => {
-    dualDeps.validateBearerToken.mockResolvedValue(token(["mcp:read"]) as never);
+  it("Bearer válido com config:read lista somente a organização do token", async () => {
+    dualDeps.validateBearerToken.mockResolvedValue(token(["config:read"]) as never);
     vi.mocked(createAdminClient).mockReturnValue(makeAdminStub({}) as never);
 
     const { GET } = await import("./route");
@@ -384,8 +384,8 @@ describe("auth dual dos routers", () => {
     });
   });
 
-  it("Bearer válido com mcp:write cria na organização do token e audita o token", async () => {
-    dualDeps.validateBearerToken.mockResolvedValue(token(["mcp:write"]) as never);
+  it("Bearer válido com config:write cria na organização do token e audita o token", async () => {
+    dualDeps.validateBearerToken.mockResolvedValue(token(["config:write"]) as never);
     vi.mocked(createAdminClient).mockReturnValue(
       makeAdminStub({ insertResult: { data: { id: "new-router-token" }, error: null } }) as never,
     );
@@ -414,12 +414,27 @@ describe("auth dual dos routers", () => {
   });
 
   it("scope insuficiente responde 403 antes de consultar o banco", async () => {
-    dualDeps.validateBearerToken.mockResolvedValue(token(["mcp:read"]) as never);
+    dualDeps.validateBearerToken.mockResolvedValue(token(["config:read"]) as never);
     const { POST } = await import("./route");
 
     const res = await POST(
       bearerReq("POST", { name: "Sem poder", channel_session_id: SESSION_ID }),
     );
+
+    expect(res.status).toBe(403);
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  // #2194: token já emitido não ganha poder na atualização — nem a lista, que
+  // expõe channel_session_id e fallback_agent_id.
+  it.each([
+    { nome: "mcp:read de admin", scopes: ["mcp:read"], role: "admin" as const },
+    { nome: "config:read sem papel de admin", scopes: ["config:read"], role: "agent" as const },
+  ])("Bearer com $nome não lista (403)", async ({ scopes, role }) => {
+    dualDeps.validateBearerToken.mockResolvedValue(token(scopes, role) as never);
+    const { GET } = await import("./route");
+
+    const res = await GET(bearerReq("GET"));
 
     expect(res.status).toBe(403);
     expect(createAdminClient).not.toHaveBeenCalled();
@@ -438,7 +453,7 @@ describe("auth dual dos routers", () => {
   });
 
   it("escrita por Bearer respeita o teto antes de qualquer efeito", async () => {
-    dualDeps.validateBearerToken.mockResolvedValue(token(["mcp:write"]) as never);
+    dualDeps.validateBearerToken.mockResolvedValue(token(["config:write"]) as never);
     dualDeps.checkRateLimit.mockResolvedValueOnce({ allowed: false });
     const { POST } = await import("./route");
 

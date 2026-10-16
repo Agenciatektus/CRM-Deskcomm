@@ -45,7 +45,12 @@ export async function GET(req: NextRequest): Promise<Response> {
     requestId,
     resource: "ai_routers",
     role: "agent",
-    scope: "mcp:read",
+    // Roteador é configuração de IA (decide qual agente responde): pelo token
+    // vale a regra de #2194 — escopo próprio `config:*` com token de admin, e
+    // token já emitido não ganha poder novo. Inclui a lista, que expõe
+    // channel_session_id e fallback_agent_id.
+    scope: "config:read",
+    tokenRole: "admin",
   });
   if (!authz.ok) return authz.response;
   const { organizationId } = authz;
@@ -92,7 +97,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     requestId,
     resource: "ai_routers",
     role: "admin",
-    scope: "mcp:write",
+    scope: "config:write",
+    tokenRole: "admin",
   });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.idioma ?? "pt-BR");

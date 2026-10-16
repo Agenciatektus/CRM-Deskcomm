@@ -59,7 +59,8 @@ export async function PUT(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     requestId,
     resource: "ai_routers",
     role: "admin",
-    scope: "mcp:write",
+    scope: "config:write",
+    tokenRole: "admin",
   });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.idioma ?? "pt-BR");

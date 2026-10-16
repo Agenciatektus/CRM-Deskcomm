@@ -67,7 +67,8 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     resource: "ai_routers",
     role: "manager",
     // A prévia persiste custo em llm_calls e pode registrar a execução do Jev.
-    scope: "mcp:write",
+    scope: "config:write",
+    tokenRole: "admin",
   });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.idioma ?? "pt-BR");

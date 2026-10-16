@@ -38,7 +38,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: "",
       method: "GET",
       role: "agent",
-      scope: "mcp:read",
+      scope: "config:read",
+      tokenRole: "admin",
     },
     {
       nome: "GET detalhe",
@@ -46,7 +47,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: `/${ROUTER_ID}`,
       method: "GET",
       role: "agent",
-      scope: "mcp:read",
+      scope: "config:read",
+      tokenRole: "admin",
     },
     {
       nome: "POST coleção",
@@ -54,7 +56,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: "",
       method: "POST",
       role: "admin",
-      scope: "mcp:write",
+      scope: "config:write",
+      tokenRole: "admin",
     },
     {
       nome: "PATCH detalhe",
@@ -62,7 +65,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: `/${ROUTER_ID}`,
       method: "PATCH",
       role: "admin",
-      scope: "mcp:write",
+      scope: "config:write",
+      tokenRole: "admin",
     },
     {
       nome: "DELETE detalhe",
@@ -70,7 +74,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: `/${ROUTER_ID}`,
       method: "DELETE",
       role: "admin",
-      scope: "mcp:write",
+      scope: "config:write",
+      tokenRole: "admin",
     },
     {
       nome: "PUT membros",
@@ -78,7 +83,8 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: `/${ROUTER_ID}/members`,
       method: "PUT",
       role: "admin",
-      scope: "mcp:write",
+      scope: "config:write",
+      tokenRole: "admin",
     },
     {
       nome: "POST teste",
@@ -86,9 +92,10 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       path: `/${ROUTER_ID}/test`,
       method: "POST",
       role: "manager",
-      scope: "mcp:write",
+      scope: "config:write",
+      tokenRole: "admin",
     },
-  ])("$nome preserva o papel e exige $scope", async ({ chamar, path, method, role, scope }) => {
+  ])("$nome preserva o papel e exige $scope com token de admin", async ({ chamar, path, method, role, scope, tokenRole }) => {
     deps.resolveAuthDual.mockResolvedValue({
       ok: false,
       response: new Response(null, { status: 401 }),
@@ -100,7 +107,7 @@ describe("contrato de autorização dual das sete operações de routers", () =>
     expect(response.status).toBe(401);
     expect(deps.resolveAuthDual).toHaveBeenCalledWith(
       request,
-      expect.objectContaining({ resource: "ai_routers", role, scope }),
+      expect.objectContaining({ resource: "ai_routers", role, scope, tokenRole }),
     );
   });
 
@@ -147,7 +154,7 @@ describe("contrato de autorização dual das sete operações de routers", () =>
       actor: { type: "api_token", id: "tok-router" },
       supabase: {},
       via: "token",
-      scopes: ["mcp:write"],
+      scopes: ["config:write", "role:admin"],
       apiTokenId: "tok-router",
     };
     deps.resolveAuthDual.mockResolvedValue(authz);
