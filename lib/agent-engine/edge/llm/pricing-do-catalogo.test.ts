@@ -169,8 +169,18 @@ describe("🔴 #3013 — o custo do provedor personalizado pelo catálogo da INS
     const { db } = bancoFalso([{ ...LINHA_DO_GPT_OSS, provider: null, origem: "tabela_de_preco" }]);
 
     const preco = await precoDaInstalacao(db, "openai/gpt-oss-120b", "custom");
-    expect(preco).toMatchObject({ entradaCentsPorMilhao: 15, saidaCentsPorMilhao: 60, origem: "tabela_de_preco" });
-    expect(await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO })).toBeGreaterThan(0);
+    expect(preco).toMatchObject({
+      entradaCentsPorMilhao: 15,
+      saidaCentsPorMilhao: 60,
+      origem: "tabela_de_preco",
+    });
+    expect(
+      await custoDoModeloForaDoMotor(db, {
+        model: "openai/gpt-oss-120b",
+        provider: "custom",
+        usage: USO,
+      }),
+    ).toBeGreaterThan(0);
   });
 
   it("o catálogo (linha VIVA) vence a cópia de ai_pricing quando as duas existem", async () => {
@@ -223,12 +233,24 @@ describe("controle negativo — id sem preço continua sem preço inventado", ()
 
     // Conhecer o modelo e não saber o preço não é melhor que não o conhecer, e
     // devolver 0 aqui declararia "de graça" um modelo que a instalação paga.
-    expect(await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO })).toBeNull();
+    expect(
+      await custoDoModeloForaDoMotor(db, {
+        model: "openai/gpt-oss-120b",
+        provider: "custom",
+        usage: USO,
+      }),
+    ).toBeNull();
   });
 
   it("0/0 é grátis DE VERDADE e continua sendo 0 — não vira 'desconhecido'", async () => {
     const { db } = bancoFalso([{ ...LINHA_DO_GPT_OSS, entrada: 0, saida: 0 }]);
-    expect(await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO })).toBe(0);
+    expect(
+      await custoDoModeloForaDoMotor(db, {
+        model: "openai/gpt-oss-120b",
+        provider: "custom",
+        usage: USO,
+      }),
+    ).toBe(0);
   });
 
   it("leitura que falha não derruba a chamada já paga: null, sem exceção", async () => {
@@ -259,13 +281,21 @@ describe("o nulo deixa de ser CALADO — o aviso sai uma vez por (provedor, mode
     }
 
     expect(log.warn).toHaveBeenCalledTimes(1);
-    expect(log.warn.mock.calls[0]![1]).toEqual({ provider: "custom", model: "provedor-x/desconhecido" });
+    expect(log.warn.mock.calls[0]![1]).toEqual({
+      provider: "custom",
+      model: "provedor-x/desconhecido",
+    });
   });
 
   it("com preço resolvido, aviso nenhum", async () => {
     const { db } = bancoFalso([LINHA_DO_GPT_OSS]);
     const log = logEspiao();
-    await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO, log });
+    await custoDoModeloForaDoMotor(db, {
+      model: "openai/gpt-oss-120b",
+      provider: "custom",
+      usage: USO,
+      log,
+    });
     expect(log.warn).not.toHaveBeenCalled();
   });
 });
@@ -273,14 +303,20 @@ describe("o nulo deixa de ser CALADO — o aviso sai uma vez por (provedor, mode
 describe("as tolerâncias de id do motor valem para a consulta ao banco", () => {
   it("sufixo de data e prefixo `provider/` acham a mesma linha", async () => {
     const { db } = bancoFalso([LINHA_DO_GPT_OSS]);
-    const esperado = { entradaCentsPorMilhao: 15, saidaCentsPorMilhao: 60, origem: "catalogo" as const };
+    const esperado = {
+      entradaCentsPorMilhao: 15,
+      saidaCentsPorMilhao: 60,
+      origem: "catalogo" as const,
+    };
 
     // Id com prefixo de roteador + sufixo de data, como `chaveDoModelo` já tolera.
     expect(await precoDaInstalacao(db, "openai/gpt-oss-120b-20250805", "custom")).toEqual(esperado);
     _esquecerPrecosDoCatalogoParaTestes();
     // O mesmo modelo servido por um roteador com o id SEM prefixo.
     const semPrefixo = bancoFalso([{ ...LINHA_DO_GPT_OSS, id: "gpt-oss-120b" } as LinhaFalsa]);
-    expect(await precoDaInstalacao(semPrefixo.db, "openai/gpt-oss-120b", "custom")).toEqual(esperado);
+    expect(await precoDaInstalacao(semPrefixo.db, "openai/gpt-oss-120b", "custom")).toEqual(
+      esperado,
+    );
   });
 
   it("a ordem dos candidatos começa no id EXATO", () => {
@@ -307,8 +343,16 @@ describe("uma ida ao banco por (provedor, modelo) dentro do TTL", () => {
   it("a primeira chamada consulta e as seguintes usam o memo", async () => {
     const { db, consultas } = bancoFalso([LINHA_DO_GPT_OSS]);
 
-    await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO });
-    await custoDoModeloForaDoMotor(db, { model: "openai/gpt-oss-120b", provider: "custom", usage: USO });
+    await custoDoModeloForaDoMotor(db, {
+      model: "openai/gpt-oss-120b",
+      provider: "custom",
+      usage: USO,
+    });
+    await custoDoModeloForaDoMotor(db, {
+      model: "openai/gpt-oss-120b",
+      provider: "custom",
+      usage: USO,
+    });
 
     expect(consultas).toHaveLength(1);
   });
@@ -316,8 +360,16 @@ describe("uma ida ao banco por (provedor, modelo) dentro do TTL", () => {
   it("o ausente também é memoizado — o modelo sem preço não paga uma query por turno", async () => {
     const { db, consultas } = bancoFalso([]);
 
-    await custoDoModeloForaDoMotor(db, { model: "provedor-x/desconhecido", provider: "custom", usage: USO });
-    await custoDoModeloForaDoMotor(db, { model: "provedor-x/desconhecido", provider: "custom", usage: USO });
+    await custoDoModeloForaDoMotor(db, {
+      model: "provedor-x/desconhecido",
+      provider: "custom",
+      usage: USO,
+    });
+    await custoDoModeloForaDoMotor(db, {
+      model: "provedor-x/desconhecido",
+      provider: "custom",
+      usage: USO,
+    });
 
     expect(consultas).toHaveLength(1);
   });

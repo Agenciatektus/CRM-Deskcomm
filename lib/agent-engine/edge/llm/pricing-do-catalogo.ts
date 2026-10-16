@@ -51,13 +51,13 @@
  *    chamada já paga.
  */
 
-import type pg from 'pg';
+import type pg from "pg";
 
-import type { Logger } from '../../obs/logger';
-import type { TokenUsage } from './pricing';
+import type { Logger } from "../../obs/logger";
+import type { TokenUsage } from "./pricing";
 
 /** O mínimo que este módulo precisa do pool — o seam passa o `pg.Pool` inteiro. */
-export type DbDePreco = Pick<pg.Pool, 'query'>;
+export type DbDePreco = Pick<pg.Pool, "query">;
 
 /** Uma linha de preço achada no banco, já em CENTAVOS por milhão de tokens. */
 export interface PrecoDaInstalacao {
@@ -68,7 +68,7 @@ export interface PrecoDaInstalacao {
    * catálogo é preço que o operador vê na tela de Provedores, e é isso que
    * permite auditar de onde saiu o número gravado.
    */
-  origem: 'catalogo' | 'tabela_de_preco';
+  origem: "catalogo" | "tabela_de_preco";
 }
 
 /** TTL do memo — o mesmo dos irmãos (`lib/ai/cost.ts`, `lib/ai/runtime/cost.ts`). */
@@ -109,9 +109,11 @@ export function _esquecerPrecosDoCatalogoParaTestes(): void {
  * tolera no outro lado da mesma conta.
  */
 export function candidatosDeId(model: string): string[] {
-  const semPrefixo = model.includes('/') ? model.slice(model.indexOf('/') + 1) : model;
-  const semData = (id: string) => id.replace(/-\d{8}$/, '').replace(/-\d{4}-\d{2}-\d{2}$/, '');
-  return [...new Set([model, semData(model), semPrefixo, semData(semPrefixo)])].filter((id) => id !== '');
+  const semPrefixo = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model;
+  const semData = (id: string) => id.replace(/-\d{8}$/, "").replace(/-\d{4}-\d{2}-\d{2}$/, "");
+  return [...new Set([model, semData(model), semPrefixo, semData(semPrefixo)])].filter(
+    (id) => id !== "",
+  );
 }
 
 /**
@@ -197,7 +199,7 @@ export function escolherPrecoDaLinha(
 
     // O catálogo é a linha VIVA (o cron diário a reescreve com o preço publicado
     // hoje); `ai_pricing` é a cópia derivada dele. Havendo as duas, a viva manda.
-    const doCatalogo = doId.filter((l) => l.origem === 'catalogo');
+    const doCatalogo = doId.filter((l) => l.origem === "catalogo");
     const candidatas = doCatalogo.length > 0 ? doCatalogo : doId;
 
     const comPreco = candidatas.filter((l) => l.entrada !== null || l.saida !== null);
@@ -210,12 +212,12 @@ export function escolherPrecoDaLinha(
     // nunca cobrar dois preços diferentes entre dois turnos.
     const escolhida =
       comPreco.find((l) => l.provider === provider) ??
-      [...comPreco].sort((a, b) => (a.provider ?? '').localeCompare(b.provider ?? ''))[0]!;
+      [...comPreco].sort((a, b) => (a.provider ?? "").localeCompare(b.provider ?? ""))[0]!;
 
     return {
       entradaCentsPorMilhao: numero(escolhida.entrada),
       saidaCentsPorMilhao: numero(escolhida.saida),
-      origem: escolhida.origem === 'catalogo' ? 'catalogo' : 'tabela_de_preco',
+      origem: escolhida.origem === "catalogo" ? "catalogo" : "tabela_de_preco",
     };
   }
   return null;
@@ -261,7 +263,8 @@ export async function precoDaInstalacao(
  */
 export function custoComPrecoDaInstalacao(preco: PrecoDaInstalacao, usage: TokenUsage): number {
   return (
-    (usage.inputTokens * preco.entradaCentsPorMilhao + usage.outputTokens * preco.saidaCentsPorMilhao) /
+    (usage.inputTokens * preco.entradaCentsPorMilhao +
+      usage.outputTokens * preco.saidaCentsPorMilhao) /
     1_000_000
   );
 }
@@ -283,10 +286,13 @@ export async function custoDoModeloForaDoMotor(
     const chave = `${input.provider}|${input.model}`;
     if (!avisados.has(chave)) {
       avisados.add(chave);
-      input.log?.warn('llm: modelo sem preço no motor nem no catálogo — a chamada grava custo nulo', {
-        provider: input.provider,
-        model: input.model,
-      });
+      input.log?.warn(
+        "llm: modelo sem preço no motor nem no catálogo — a chamada grava custo nulo",
+        {
+          provider: input.provider,
+          model: input.model,
+        },
+      );
     }
     return null;
   }

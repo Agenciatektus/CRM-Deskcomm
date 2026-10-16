@@ -129,7 +129,9 @@ function poolFalso(linhasDePreco: LinhaDePreco[] = [], opts: { precoFalha?: bool
     // O endereço do provedor personalizado vem da CREDENCIAL (#1642).
     if (sql.includes("base_url")) return { rows: [{ base_url: ENDERECO_DO_GROQ }] };
     if (sql.includes("api_key_encrypted")) {
-      return { rows: [{ id: "cred-1", api_key_encrypted: "x", api_key_iv: "y", api_key_tag: "z" }] };
+      return {
+        rows: [{ id: "cred-1", api_key_encrypted: "x", api_key_iv: "y", api_key_tag: "z" }],
+      };
     }
     return { rows: [] };
   });
@@ -190,7 +192,8 @@ async function rodar(opts: { linhasDePreco?: LinhaDePreco[]; modelo?: string } =
 /** `cost_cents` é o 12º parâmetro do INSERT (organization_id … cost_cents). */
 const custoGravado = (inserts: unknown[][]) => inserts[0]![11] as number | null;
 
-const consultouOpreco = (consultas: string[]) => consultas.some((sql) => sql.includes("candidatos_de_preco"));
+const consultouOpreco = (consultas: string[]) =>
+  consultas.some((sql) => sql.includes("candidatos_de_preco"));
 
 beforeEach(() => _esquecerPrecosDoCatalogoParaTestes());
 
@@ -242,7 +245,10 @@ describe("controle negativo pelo seam — id sem preço em tabela nenhuma", () =
     // O que a issue cobra: o nulo passa a ser EXPLÍCITO.
     expect(log.warn).toHaveBeenCalledTimes(1);
     expect(log.warn.mock.calls[0]![0]).toContain("sem preço");
-    expect(log.warn.mock.calls[0]![1]).toEqual({ provider: "custom", model: "provedor-x/modelo-que-nao-existe" });
+    expect(log.warn.mock.calls[0]![1]).toEqual({
+      provider: "custom",
+      model: "provedor-x/modelo-que-nao-existe",
+    });
 
     // E a linha do log da chamada continua dizendo null — sem `custo_origem`,
     // porque origem nenhuma cobrou este modelo.
