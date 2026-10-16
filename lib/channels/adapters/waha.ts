@@ -21,7 +21,7 @@ import {
   parseWahaMessageId,
   wahaEchoExternalIds,
 } from "@/lib/waha/message-id";
-import { resolveWahaChatId } from "@/lib/waha/send";
+import { marcarConversaComoLida, resolveWahaChatId } from "@/lib/waha/send";
 import type { FetchedMedia } from "@/lib/messaging/media/types";
 import { DETALHE_CREDENCIAL_RECUSADA } from "../health";
 import type { ChannelAdapter, ChannelHealth, OutboundEnvelope, RecipientInput } from "../types";
@@ -308,6 +308,17 @@ export const wahaAdapter: ChannelAdapter = {
         envelope.replyToExternalId ? idCompletoDaMensagem(envelope.replyToExternalId, to) : null,
       );
     }
+
+    // O visto azul no aparelho do cliente (issue #2981): responder sem ter
+    // "lido" é o que denuncia automação. Vem DEPOIS de o transporte aceitar a
+    // mensagem, no MESMO endereço resolvido do envio — marcar outro deixaria a
+    // conversa respondida sem visto —, e o helper falha macio: a resposta já
+    // saiu, e um recibo de leitura que falha nunca custa a mensagem.
+    await marcarConversaComoLida({
+      organizationId: envelope.organizationId,
+      sessionName: envelope.sessionRef,
+      chatId: to,
+    });
 
     return { externalId: parseWahaMessageId(res) };
   },
