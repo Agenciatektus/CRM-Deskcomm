@@ -140,19 +140,32 @@ else p tabela_nova "n/a"; fi
 
 # --- security definer exposta ---
 if c -qi 'security definer'; then
-  # A MESMA declaração de revoke precisa revogar de public E de anon: o regex
-  # anterior fechava em `(public|anon)` e aceitava o revoke de UMA origem só,
-  # embora a mensagem de falha já falasse das DUAS (medido na main no #2304):
-  # `revoke execute on function f() from public;` passava calado. Ler a lista
-  # depois do `from` e exigir as duas palavras é mais legível que o regex gigante
-  # — e a ordem da lista e o espaço depois da vírgula não importam.
-  REVOGA=$(c -iE 'revoke (execute|all( privileges)?) on function.*from')
-  DEF_OK=0
-  while IFS= read -r LINHA; do
-    [ -n "$LINHA" ] || continue
-    LISTA="${LINHA#*from}"
-    grep -qiw public <<<"$LISTA" && grep -qiw anon <<<"$LISTA" && DEF_OK=1
-  done <<<"$REVOGA"
+  # As origens se SOMAM por FUNÇÃO. O regex anterior fechava em `(public|anon)`
+  # e aceitava o revoke de UMA origem só, embora a mensagem já falasse das DUAS
+  # (medido na main no #2304); a primeira correção passou a exigir as duas, mas
+  # na MESMA declaração — e aí reprovava função correta que parte o revoke em
+  # duas linhas, uma para `public` e outra para `anon` (as migrations 0428 e
+  # 0442 revogam assim). Agora o `from public` de uma linha e o `from anon` de
+  # outra, para a MESMA função, somam; e as origens de funções DIFERENTES NÃO se
+  # misturam (misturar continua reprovando). A chave é a referência entre
+  # `on function` e o `from`, lida sem diferenciar maiúscula, e o
+  # `revoke[[:space:]]+…[[:space:]]+on[[:space:]]+function` aceita espaço
+  # múltiplo (as 0428/0442 alinham `revoke all     on`). Bash 3.2 não tem array
+  # associativo — o awk, que o script já usa, tem, e agrega por chave numa passada.
+  REVOGA=$(c -iE 'revoke[[:space:]]+(execute|all([[:space:]]+privileges)?)[[:space:]]+on[[:space:]]+function.*from')
+  DEF_OK=$(awk '
+    {
+      low = tolower($0)
+      lista = low; sub(/.*from/, "", lista)
+      fn = low
+      sub(/.*on[[:space:]]+function/, "", fn)
+      sub(/from.*/, "", fn)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", fn)
+      if (lista ~ /(^|[^[:alnum:]_])public([^[:alnum:]_]|$)/) rev_pub[fn] = 1
+      if (lista ~ /(^|[^[:alnum:]_])anon([^[:alnum:]_]|$)/)   rev_anon[fn] = 1
+    }
+    END { for (f in rev_pub) if (f in rev_anon) { print 1; exit } print 0 }
+  ' <<<"$REVOGA")
   [ "$DEF_OK" = 1 ] && p definer_revoke "tem revoke" || p definer_revoke "security definer SEM revoke — as DUAS origens"
 fi
 

@@ -438,13 +438,18 @@ assert_contains "$saida" "20260928000000_0201_a.sql colide_em=$cabeca" "a primei
 assert_contains "$saida" "20260928010000_0201_b.sql colide_em=$cabeca" "e a segunda acusa a primeira"
 assert_contains "$controle" "20260928000000_0201_so.sql colide_em=0" "controle: a migration única não acusa a si mesma"
 
-# ── 5-quinquies. definer_revoke exige as DUAS origens na MESMA declaração ────
+# ── 5-quinquies. definer_revoke agrega public e anon POR FUNÇÃO ──────────────
 # O regex do #2304 fechava em `(public|anon)` e aceitava o revoke de UMA origem
 # só, embora a mensagem de falha já falasse das DUAS (medido na main 6a067605b):
-# `revoke execute on function f() from public;` passava calado. A sonda passa a
-# exigir as duas na lista do `from` da MESMA declaração — em qualquer ordem e
-# com espaço depois da vírgula —, e o revoke de TABELA não conta como de função.
-echo "5-quinquies. o definer_revoke exige public E anon na mesma declaração"
+# `revoke execute on function f() from public;` passava calado. Exigir as duas na
+# MESMA declaração reprovava função correta que parte o revoke em duas linhas
+# (o mantenedor mediu 0428, 0442, 0547 e 0612). Agora as origens se SOMAM por
+# FUNÇÃO: o `from public` de uma linha e o `from anon` de outra, para a MESMA
+# função, revogam das DUAS — mas as origens de funções DIFERENTES não se
+# misturam. O `from` é lido sem diferenciar maiúscula, o `revoke … on function`
+# aceita espaço múltiplo (o `revoke all     on` alinhado das citadas), e o revoke
+# de TABELA não conta como de função.
+echo "5-quinquies. o definer_revoke agrega public e anon POR FUNÇÃO"
 clone="$TMP/c5-quinquies"; clonar "$clone" "alguem@fork.dev"
 mkdir -p "$clone/triagem/scripts"
 cp "$RAIZ/triagem/scripts/complemento.sh" "$clone/triagem/scripts/"
@@ -466,7 +471,7 @@ export -f gh
 # depender de tabulação no padrão.
 valor_definer() { awk -F'\t' '$1=="definer_revoke"{print $2}' <<<"$1"; }
 NDEF=0
-definer() { # $1 = rótulo; $2 = a declaração de revoke (vazia = nenhuma); $3 = tem|reprova
+definer() { # $1 = rótulo; $2 = as declarações de revoke, uma por linha (vazia = nenhuma); $3 = tem|reprova
   local rot="$1" decl="$2" saida v cab
   NDEF=$((NDEF+1))
   git -C "$clone" switch -q main
@@ -502,6 +507,18 @@ definer "public,anon,authenticated"  "revoke execute on function public.alvo() f
 definer "só authenticated"           "revoke execute on function public.alvo() from authenticated;"               reprova
 definer "revoke all (as duas)"       "revoke all on function public.alvo() from public,anon;"                     tem
 definer "revoke select em TABELA"    "revoke select on table t from public,anon;"                                 reprova
+# As origens somam POR FUNÇÃO (item 1 do mantenedor): par separado da MESMA
+# função passa; o par com `revoke all     on` alinhado passa (item 2); origens de
+# funções DIFERENTES reprovam; o `FROM` maiúsculo não faz o `public` do nome
+# contar como origem (item 3); e security definer sem revoke nenhum reprova.
+definer "par separado (mesma função)" \
+  $'revoke execute on function public.alvo() from public;\nrevoke execute on function public.alvo() from anon;' tem
+definer "par separado, revoke all alinhado" \
+  $'revoke all     on function public.alvo() from public;\nrevoke execute on function public.alvo() from anon;' tem
+definer "origens misturadas entre funções" \
+  $'revoke execute on function public.alvo() from public;\nrevoke execute on function public.outra() from anon;' reprova
+definer "FROM maiúsculo, só anon"    "REVOKE EXECUTE ON FUNCTION public.alvo() FROM anon;"                       reprova
+definer "sem revoke nenhum"          ""                                                                          reprova
 unset -f gh
 
 echo "6. sessao.sh (hook de início de sessão)"
