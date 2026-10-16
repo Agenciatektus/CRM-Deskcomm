@@ -50,6 +50,7 @@ import {
   type AvisoRecuperacaoEsgotada,
 } from "./no-show-recuperacao-esgotada";
 import { interpolarDestino, persistirRespostaFollowupSupabase } from "./persistir-resposta";
+import { funilUnicoDasEtapas, idsDeEtapaCitados } from "./etapas-citadas";
 import { criarTarefaInterna as criarTarefaNoCrm } from "@/lib/tarefas/criar-tarefa";
 import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
@@ -132,12 +133,24 @@ export interface AdminClient {
   retornoQueSeguraOFluxo?(enrollment: EnrollmentRow): Promise<string | null>;
   claimDueEnrollments(limit: number, leaseSeconds: number): Promise<EnrollmentRow[]>;
   loadFlowGraph(orgId: string, versionId: string): Promise<FlowGraph | null>;
-  loadLeadFacts(orgId: string, contactId: string): Promise<{
+  /**
+   * `pipelineId` recorta a oportunidade ao funil do fluxo — ver
+   * `funilUnicoDasEtapas` (`etapas-citadas.ts`) para o defeito que ele fecha.
+   * Ausente/`null` = o comportamento de antes (o card de `updated_at` mais
+   * recente, de qualquer funil), que é o que todo falso de teste exercita.
+   */
+  loadLeadFacts(orgId: string, contactId: string, pipelineId?: string | null): Promise<{
     lead_stage: string | null;
     tags: string[];
     contact_name?: string | null;
     custom_fields?: Record<string, unknown>;
   }>;
+  /**
+   * Os `pipeline_id` das etapas citadas pelo grafo, para `funilUnicoDasEtapas`
+   * eleger um. Opcional como os demais avisos deste adaptador: sem ele o motor
+   * não recorta por funil e segue como antes.
+   */
+  loadFunisDasEtapas?(orgId: string, stageIds: string[]): Promise<(string | null)[]>;
   loadEnrollmentEvents(enrollmentId: string): Promise<EnrollmentEventRef[]>;
   /**
    * #2528 — o contexto `{ contact, lead }` do render das mensagens de follow-up
@@ -840,7 +853,21 @@ async function processEnrollment(
     return;
   }
 
-  const leadRow = await db.loadLeadFacts(enrollment.organization_id, enrollment.contact_id);
+  // O FUNIL DO FLUXO, antes dos fatos do lead. Só consulta quando o grafo
+  // CITA etapa — fluxo que só manda mensagem não paga a leitura. Erro de banco
+  // SOBE (o enrollment reentra com backoff): avaliar a condição contra o card
+  // de outro funil é exatamente o defeito que isto conserta, e seria pior que
+  // tentar de novo.
+  const etapasDoGrafo = idsDeEtapaCitados(graph.nodes);
+  const funilDoFluxo =
+    etapasDoGrafo.length > 0 && db.loadFunisDasEtapas
+      ? funilUnicoDasEtapas(await db.loadFunisDasEtapas(enrollment.organization_id, etapasDoGrafo))
+      : null;
+  const leadRow = await db.loadLeadFacts(
+    enrollment.organization_id,
+    enrollment.contact_id,
+    funilDoFluxo,
+  );
   const lead: LeadFacts = {
     lead_stage: leadRow.lead_stage,
     tags: leadRow.tags,
@@ -1075,13 +1102,26 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
       if (!data) return null;
       return flowGraphSchema.parse(data.graph);
     },
-    async loadLeadFacts(orgId, contactId) {
+    async loadFunisDasEtapas(orgId, stageIds) {
+      if (stageIds.length === 0) return [];
+      const { data, error } = await admin
+        .from("crm_stages")
+        .select("pipeline_id")
+        .eq("organization_id", orgId)
+        .in("id", stageIds);
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r: { pipeline_id: string | null }) => r.pipeline_id);
+    },
+    async loadLeadFacts(orgId, contactId, pipelineId) {
+      // O recorte por funil entra ANTES do `order`: com dois cards do mesmo
+      // contato, quem decide não pode ser quem mudou por último.
+      const doContato = admin
+        .from("crm_leads")
+        .select("stage_id, tags, custom_fields")
+        .eq("organization_id", orgId)
+        .eq("contact_id", contactId);
       const [{ data: lead, error: leadErr }, { data: contact, error: contactErr }] = await Promise.all([
-        admin
-          .from("crm_leads")
-          .select("stage_id, tags, custom_fields")
-          .eq("organization_id", orgId)
-          .eq("contact_id", contactId)
+        (pipelineId ? doContato.eq("pipeline_id", pipelineId) : doContato)
           .order("updated_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
