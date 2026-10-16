@@ -10606,7 +10606,8 @@ select
   case when cv.status in ('resolved', 'closed') then 'resolvida' else null end,
   case when cv.status in ('resolved', 'closed') then cv.status_changed_at else null end
   from public.conversations cv
- where not exists (
+ where cv.status <> 'archived'
+   and not exists (
    select 1 from public.agent_cases c where c.conversation_id = cv.id
  )
    and not exists (
@@ -54215,6 +54216,474 @@ comment on table public.ai_agent_version_channels is
 comment on column public.ai_agent_version_channels.channel_session_id is
   'Um dos números em que a versão atende. `on delete restrict` espelha ai_agent_versions_channel_session_id_fkey — desconectar número vinculado ainda é decisão de produto em aberto (#2796).';
 
+-- ---- atribuição respeita a carteira (migration 0667) ----
+CREATE OR REPLACE FUNCTION public.fn_conversation_assign(p_organization_id uuid, p_conversation_id uuid, p_to_user_id uuid, p_reason text, p_expected_assignee uuid DEFAULT NULL::uuid, p_enforce_expected boolean DEFAULT false)
+ RETURNS SETOF conversations
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_from uuid;
+  v_conv public.conversations%rowtype;
+begin
+  if not public.fn_support_write_allowed(p_organization_id) then raise exception 'support_readonly' using errcode='42501'; end if;
+  if auth.uid() is not null
+     and not public.fn_role_at_least(p_organization_id, 'agent') then
+    raise exception 'caller_not_authorized_for_org'
+      using hint = 'caller must be an active agent+ member of the organization';
+  end if;
+
+  if p_to_user_id is not null then
+    if coalesce(public.fn_member_role_in_org(p_to_user_id, p_organization_id), 'none')
+         not in ('agent','manager','admin') then
+      raise exception 'assignee_not_eligible_member'
+        using hint = 'target must be an active agent+ member of the organization';
+    end if;
+  end if;
+
+  select assigned_to_user_id into v_from
+    from public.conversations
+   where id = p_conversation_id
+     and organization_id = p_organization_id
+   for no key update;
+
+  if not found then
+    return;
+  end if;
+
+  if p_enforce_expected and v_from is distinct from p_expected_assignee then
+    return;
+  end if;
+
+  -- A definer lê a linha sob lock; isso não pode ampliar a carteira do chamador.
+  -- O controle é anterior ao UPDATE/RETURNING e usa o dono da linha bloqueada,
+  -- não um id/assignee vindo do corpo. Service role sem auth.uid segue para ingestão.
+  if auth.uid() is not null and not public.fn_can_view_conversation(p_organization_id, v_from) then
+    raise exception 'conversation_outside_visibility_scope' using errcode = '42501';
+  end if;
+
+  update public.conversations
+     set assigned_to_user_id = p_to_user_id,
+         -- Desnormalizado JUNTO com o dono, na mesma transação: nunca existe
+         -- uma janela em que id e nome discordam. NULL junto com o id quando
+         -- a atribuição é removida (release) — nunca sobra um nome órfão de
+         -- dono nenhum. Lido de auth.users porque quem chama esta função
+         -- (RPC) não necessariamente tem acesso ao Admin API — a definer
+         -- resolve por dentro.
+         assigned_to_user_name = case
+           when p_to_user_id is null then null
+           else (select raw_user_meta_data ->> 'full_name' from auth.users where id = p_to_user_id)
+         end,
+         assigned_at = case when p_to_user_id is null then null else now() end,
+         assignee_kind = case when p_to_user_id is null then null else 'user' end,
+         status = case when p_to_user_id is null then 'open' else 'claimed' end,
+         status_changed_at = now(),
+         unread_count_for_assignee = 0,
+         bot_silenced_until = case
+           when p_reason = 'routing'  then bot_silenced_until
+           when p_to_user_id is null  then (case when last_handoff_at is null
+                                                 then null
+                                                 else bot_silenced_until end)
+           else 'infinity'::timestamptz
+         end,
+         updated_at = now()
+   where id = p_conversation_id
+   returning * into v_conv;
+
+  insert into public.conversation_assignment_events
+    (organization_id, conversation_id, from_user_id, to_user_id, changed_by, reason)
+  values
+    (p_organization_id, p_conversation_id, v_from, p_to_user_id, auth.uid(), p_reason);
+
+  return next v_conv;
+end;
+$function$;
+
+revoke all     on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean) from public, anon;
+grant  execute on function public.fn_conversation_assign(uuid, uuid, uuid, text, uuid, boolean) to authenticated, service_role;
+
+-- ---- entrada paga e upgrade proporcional na cobrança (migration 0679, #2846) ----
+-- Apêndice idempotente: o cadastro guarda a escolha temporária em settings; o
+-- gatilho valida e apaga o dado, inicia trial ou suspende até o primeiro pagamento.
+-- manifest: **Entrada paga e upgrades proporcionais na cobrança do revendedor.**
+-- O cadastro público pode escolher um plano oferecido; planos sem trial bloqueiam
+-- a organização até a primeira confirmação de pagamento. Upgrade em período pago
+-- guarda o ajuste pendente, preserva o vencimento e só aplica o plano após pagar.
+-- Revendedor sem plano nenhum (nem padrão, nem oferecido): a empresa segue
+-- nascendo isenta, como antes (doc 146, opção B).
+
+alter table public.cobranca_assinaturas
+  add column if not exists pagamento_inicial_pendente boolean not null default false,
+  add column if not exists periodo_pago_desde timestamptz,
+  add column if not exists plano_troca_pendente_id uuid references public.cobranca_planos(id) on delete restrict,
+  add column if not exists troca_id uuid,
+  add column if not exists troca_valor_cents integer,
+  add column if not exists troca_status text,
+  add column if not exists troca_pagamento_ref text,
+  add column if not exists troca_pagamento_url text,
+  add column if not exists troca_reserva_ate timestamptz;
+
+-- Num bloco só: o update.sh reaplica sem ON_ERROR_STOP e em autocommit, e um
+-- add que falhasse depois do drop solto deixaria a coluna sem guarda.
+do $troca_status$
+begin
+  alter table public.cobranca_assinaturas
+    drop constraint if exists cobranca_assinaturas_troca_status_check;
+  alter table public.cobranca_assinaturas
+    add constraint cobranca_assinaturas_troca_status_check
+    check (troca_status is null or troca_status in ('criando', 'aguardando_pagamento', 'pago'));
+end
+$troca_status$;
+
+-- Cadastro self-service: o plano escolhido atravessa `organizations.settings`
+-- apenas durante o INSERT. O gatilho valida que continua público e remove o
+-- campo transitório na mesma transação. Sem escolha explícita, usa o padrão.
+create or replace function public.fn_trial_na_criacao_da_org()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_plano_id uuid;
+  v_trial_dias integer;
+  v_escolheu_plano boolean := nullif(new.settings->>'cobranca_signup_plan_id', '') is not null;
+begin
+  if new.created_by is null or not public.fn_cobranca_ligada() then
+    return null;
+  end if;
+  if exists (select 1 from public.platform_admins pa
+              where pa.user_id = new.created_by and pa.revoked_at is null) then
+    return null;
+  end if;
+
+  -- O campo é transitório: sai já, em todo caminho que segue (inclusive o isento).
+  update public.organizations
+     set settings = coalesce(settings, '{}'::jsonb) - 'cobranca_signup_plan_id'
+   where id = new.id and settings ? 'cobranca_signup_plan_id';
+
+  -- Escolha que não vale mais (o plano deixou de ser oferecido ou foi arquivado
+  -- entre o cadastro e a confirmação do e-mail; ou metadata adulterada) vale
+  -- como "sem escolha": cai no padrão. Recusar travava a empresa para sempre —
+  -- a recuperação em /get-started reenvia a MESMA metadata.
+  if v_escolheu_plano then
+    begin
+      v_plano_id := (new.settings->>'cobranca_signup_plan_id')::uuid;
+    exception when invalid_text_representation then
+      v_plano_id := null;
+    end;
+    select p.trial_dias into v_trial_dias
+      from public.cobranca_planos p
+     where p.id = v_plano_id and p.arquivado_em is null and p.oferecido_ao_cliente;
+    if not found then
+      v_escolheu_plano := false;
+    end if;
+  end if;
+  if not v_escolheu_plano then
+    select p.id, p.trial_dias into v_plano_id, v_trial_dias
+      from public.cobranca_planos p
+     where p.padrao_no_cadastro and p.arquivado_em is null;
+    if v_plano_id is null then
+      -- Decisão do dono (doc 146, opção B, 15/10): o revendedor que não tem
+      -- plano NENHUM (nem padrão, nem oferecido) segue como antes da 0679 e a
+      -- empresa nasce isenta. Com plano oferecido e sem padrão, não: o cadastro
+      -- sem escolha pularia a entrada paga. Espelho em lib/cobranca/cadastro.ts.
+      if not exists (select 1 from public.cobranca_planos p
+                      where p.arquivado_em is null and p.oferecido_ao_cliente) then
+        return null;
+      end if;
+      raise exception 'plano_obrigatorio' using errcode = '22023';
+    end if;
+  end if;
+
+  insert into public.cobranca_assinaturas
+    (organization_id, plano_id, estado, trial_ate, pagamento_inicial_pendente)
+  values
+    (new.id, v_plano_id,
+     'trial',
+     now() + make_interval(days => v_trial_dias),
+     v_trial_dias = 0)
+  on conflict (organization_id) do nothing;
+
+  if v_trial_dias = 0 then
+    perform public.fn_suspender_organizacao(new.id, 'cobranca', 'Aguardando o primeiro pagamento', null);
+  end if;
+  return null;
+end;
+$$;
+
+revoke execute on function public.fn_trial_na_criacao_da_org() from public, anon, authenticated;
+
+-- A criação pelo painel do dono tem o mesmo bloqueio de entrada sem trial.
+-- Corpo vigente da migration 0583, com o estado pendente e a suspensão na mesma
+-- transação da organização, vínculo e assinatura.
+create or replace function public.fn_create_tenant_with_owner(
+  p_actor uuid, p_key uuid, p_request jsonb, p_hash text
+) returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  prior public.idempotency_keys%rowtype;
+  org public.organizations%rowtype;
+  result jsonb;
+  dono_e_outra_pessoa boolean;
+  v_plano_id uuid;
+  v_trial_dias integer;
+begin
+  if not exists (select 1 from public.platform_admins where user_id = p_actor
+    and revoked_at is null and scope = 'full') then
+    raise exception 'platform_admin_required' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_actor::text || ':' || p_key::text, 0));
+  select * into prior from public.idempotency_keys
+    where key = p_key::text and endpoint = '/api/v1/admin/tenants:' || p_actor::text
+      and expires_at > now() and tenant_creation_trusted;
+  if found then
+    if prior.request_hash <> decode(p_hash, 'hex') then
+      raise exception 'idempotency_conflict' using errcode = '22023';
+    end if;
+    if prior.response_body->>'id' is distinct from prior.organization_id::text
+      or not exists (select 1 from public.organizations where id = prior.organization_id and created_by = p_actor) then
+      raise exception 'idempotency_provenance_invalid' using errcode = '22023';
+    end if;
+    return prior.response_body || jsonb_build_object('created', false);
+  end if;
+
+  v_plano_id := nullif(p_request->>'plano_id', '')::uuid;
+  if v_plano_id is not null then
+    if not public.fn_cobranca_ligada() then
+      raise exception 'cobranca_desligada' using errcode = '22023';
+    end if;
+    select p.trial_dias into v_trial_dias
+      from public.cobranca_planos p
+     where p.id = v_plano_id and p.arquivado_em is null;
+    if not found then
+      raise exception 'plano_invalido' using errcode = '22023';
+    end if;
+  end if;
+
+  dono_e_outra_pessoa := lower(p_request->>'owner_email') is distinct from
+    (select lower(email) from auth.users where id = p_actor);
+
+  insert into public.organizations(display_name, slug, legal_name, cnpj, status, settings, created_by)
+    values (p_request->>'display_name', p_request->>'slug', coalesce(nullif(p_request->>'legal_name', ''), p_request->>'display_name'),
+      p_request->>'cnpj', 'active',
+      case when p_request ? 'plan' then jsonb_build_object('plan', p_request->>'plan') else '{}'::jsonb end,
+      p_actor)
+    returning * into org;
+  insert into public.user_organizations(organization_id, user_id, role, accepted_at, interface_settings, provisional_until_handover)
+    values (org.id, p_actor, 'admin', now(),
+      case when dono_e_outra_pessoa
+        then '{"preset":"completa"}'::jsonb
+        else coalesce(p_request->'owner_interface_settings', '{"preset":"completa"}'::jsonb) end,
+      dono_e_outra_pessoa);
+
+  if v_plano_id is not null then
+    insert into public.cobranca_assinaturas
+      (organization_id, plano_id, estado, trial_ate, pagamento_inicial_pendente)
+    values (org.id, v_plano_id,
+      'trial',
+      now() + make_interval(days => v_trial_dias), v_trial_dias = 0);
+    if v_trial_dias = 0 then
+      perform public.fn_suspender_organizacao(org.id, 'cobranca', 'Aguardando o primeiro pagamento', null);
+    end if;
+  end if;
+
+  result := jsonb_build_object('id', org.id, 'slug', org.slug, 'display_name', org.display_name,
+    'invite_id', gen_random_uuid(), 'issued_at', floor(extract(epoch from now()))::bigint);
+  insert into public.idempotency_keys(organization_id, key, endpoint, request_hash, status_code, response_body, tenant_creation_trusted)
+    values (org.id, p_key::text, '/api/v1/admin/tenants:' || p_actor::text,
+      decode(p_hash, 'hex'), 201, result, true);
+  return result || jsonb_build_object('created', true);
+end $$;
+
+revoke all on function public.fn_create_tenant_with_owner(uuid, uuid, jsonb, text) from public, anon, authenticated;
+grant execute on function public.fn_create_tenant_with_owner(uuid, uuid, jsonb, text) to service_role;
+
+-- ---- agenda do Google: janela ativa e página em lote (migration 0668) ----
+-- A API expande uma série em muitas instâncias quando singleEvents=true. O
+-- syncToken não aceita timeMin/timeMax, então uma série alterada podia enfileirar
+-- ocorrências décadas à frente. A página continua sendo consumida, mas o cache
+-- guarda somente a janela do cursor (90 dias na leitura completa diária).
+--
+-- Uma única RPC aplica a página, remove linhas fora da janela e avança o cursor
+-- sob o mesmo fence. Isso evita centenas de viagens HTTP ao PostgREST por página.
+
+-- Cursors criados pela leitura expansiva podem apontar para um backlog enorme.
+-- Reconstrói uma vez com timeMin/timeMax; o cache existente permanece até o
+-- ciclo full concluir e a limpeza por geração preservar a ocupação nesse meio.
+-- Roda UMA vez: só enquanto a função de baixo ainda não existe. O update.sh
+-- reaplica este apêndice em toda atualização, e um update solto zeraria os
+-- cursores a cada uma, forçando a releitura completa e o aviso "Atualizando
+-- a cobertura" de novo.
+do $reset_0668$
+begin
+  if to_regprocedure('public.fn_google_calendar_page_batch(uuid,uuid,jsonb)') is null then
+    update public.calendar_connection_calendars set sync_token=null,sync_cursor=null,
+     sync_coverage=null,sync_next_attempt_at=now(),
+     sync_error='Atualizando a cobertura da agenda após alteração da sincronização.'
+     where sync_token is not null or sync_cursor is not null;
+  end if;
+end $reset_0668$;
+
+create or replace function public.fn_google_calendar_page_batch(p_org uuid,p_id uuid,p_args jsonb)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+ c public.calendar_connection_calendars;
+ v_cursor jsonb;
+ item jsonb;
+ result jsonb;
+ window_start timestamptz;
+ window_end timestamptz;
+ prune_ids text[];
+begin
+ v_cursor:=p_args->'cursor';
+ if v_cursor is null or jsonb_typeof(v_cursor)<>'object' then
+  raise exception 'google_cursor_missing' using errcode='22023';
+ end if;
+ if jsonb_typeof(coalesce(p_args->'items','[]'::jsonb))<>'array'
+  or jsonb_typeof(coalesce(p_args->'prune_ids','[]'::jsonb))<>'array' then
+  raise exception 'google_page_invalid' using errcode='22023';
+ end if;
+ window_start:=(v_cursor->>'window_start')::timestamptz;
+ window_end:=(v_cursor->>'window_end')::timestamptz;
+ if window_start is null or window_end is null or window_end<=window_start then
+  raise exception 'google_window_invalid' using errcode='22023';
+ end if;
+
+ -- Valida tenant, conexão, claim e cursor antes de qualquer efeito.
+ perform public.fn_google_calendar(p_org,p_id,'renew',
+  jsonb_build_object('claim',p_args->'claim','cursor',v_cursor));
+ select * into c from public.calendar_connection_calendars
+  where organization_id=p_org and id=p_id;
+ if not found then raise exception 'google_calendar_not_found' using errcode='P0002';end if;
+
+ prune_ids:=array(select jsonb_array_elements_text(coalesce(p_args->'prune_ids','[]'::jsonb)));
+ for item in select value from jsonb_array_elements(coalesce(p_args->'items','[]'::jsonb)) loop
+  if coalesce(item->>'status','confirmed')<>'cancelled'
+   and ((item->>'starts_at')::timestamptz>=window_end or (item->>'ends_at')::timestamptz<=window_start) then
+   if coalesce(item->>'external_event_id','')<>'' then
+    prune_ids:=array_append(prune_ids,item->>'external_event_id');
+   end if;
+  else
+   perform public.fn_google_calendar(p_org,p_id,'item',
+    jsonb_build_object('claim',p_args->'claim','cursor',v_cursor,'item',item));
+  end if;
+ end loop;
+
+ if cardinality(prune_ids)>0 then
+  delete from public.calendar_external_events
+   where organization_id=p_org and connection_id=c.connection_id
+    and external_calendar_id=c.external_calendar_id and external_event_id=any(prune_ids);
+ end if;
+
+ result:=public.fn_google_calendar(p_org,p_id,'page',
+  p_args-'items'-'prune_ids');
+
+ -- Limpa também o cache legado já gravado fora da janela. Eventos do Google
+ -- não ocupam horário fora da cobertura usada pelo motor de disponibilidade.
+ delete from public.calendar_external_events
+  where organization_id=p_org and connection_id=c.connection_id
+   and external_calendar_id=c.external_calendar_id and starts_at is not null
+   and (starts_at>=window_end or ends_at<=window_start);
+ return result;
+end;$$;
+revoke execute on function public.fn_google_calendar_page_batch(uuid,uuid,jsonb) from public,anon,authenticated;
+grant execute on function public.fn_google_calendar_page_batch(uuid,uuid,jsonb) to service_role;
+
+-- Recuo da leitura da lista de agendas. Só `fn_google_catalog` grava
+-- `catalog_checked_at`, e só quando dá certo: uma falha (429, 5xx, 403 do
+-- Google) deixava o catálogo vencido e a rota o tentava de novo a cada tick.
+-- Com o cron de 1 min, seriam 60 tentativas e 60 audits por hora, em vez de 4.
+-- A rota grava aqui "não tente antes de" quando a leitura do catálogo falha.
+alter table public.calendar_connections add column if not exists catalog_retry_at timestamptz;
+comment on column public.calendar_connections.catalog_retry_at is
+  'Não tentar ler a lista de agendas do Google antes deste instante. Gravado pela rota agenda-google-sync quando a leitura do catálogo falha; NULL ou passado = pode tentar.';
+
+notify pgrst,'reload schema';
+
+-- ---- uma ordem de locks para marcar a mensagem e travar o contato (migration 0681, issue #2884) ----
+-- A 0645 deu ao contato um gatilho que, ao gravar `force_human`/`is_blocked`,
+-- trava o CONTATO (o proprio UPDATE) e so entao atualiza as CONVERSAS dele
+-- (`trg_contato_atualiza_trava_nas_conversas`). A `fn_mark_conversation_message`
+-- (0267) fazia o contrario: travava a CONVERSA (`for no key update`) e DEPOIS o
+-- CONTATO (`update contacts set last_activity_at`). As duas ordens, opostas,
+-- fecham um ciclo AB-BA quando rodam ao mesmo tempo sobre o mesmo contato: a
+-- ingestao segura a conversa e pede o contato, a passagem para humano (ou o
+-- STOP) segura o contato e pede a conversa — o Postgres derruba uma das
+-- transacoes com 40P01. Se a vitima e a passagem para humano, A TRAVA NAO E
+-- GRAVADA; com a 0658 na main, a criacao de conversa nova (que le o contato com
+-- `for share`) tambem entra como vitima.
+--
+-- UMA ordem so para os DOIS caminhos: o CONTATO primeiro, a CONVERSA depois.
+-- Nao ha escolha entre "inverter a funcao" e "inverter o gatilho": o gatilho do
+-- contato e AFTER UPDATE, entao o contato JA esta travado quando ele roda — a
+-- ordem dele (contato -> conversa) e imposta pelo UPDATE que o dispara e nao da
+-- para trocar. A unica ordem unificavel e contato -> conversa, e e ela que a
+-- funcao passa a seguir: a mesma que a criacao de conversa ja usa (o upsert de
+-- contato trava o contato antes do INSERT da conversa). O contato ja era
+-- travado por esta funcao no fim; a trava so sobe de lugar — nenhum lock novo no
+-- caminho quente, e o unico custo e travar o contato no raro retorno cedo de
+-- mensagem atrasada (que antes nao o tocava).
+create or replace function public.fn_mark_conversation_message(p_conv uuid,p_direction text,p_preview text,p_at timestamptz)
+returns void language plpgsql security definer set search_path=public as $$
+declare c public.conversations; pre_contact uuid;
+begin
+ select * into c from public.conversations where id=p_conv;
+ if not found then return; end if;
+ pre_contact:=c.contact_id;
+ perform public.fn_service_lock(c.organization_id,c.contact_id);
+ -- ORDEM UNICA (issue #2884): o CONTATO antes da CONVERSA. O gatilho do
+ -- contato (trg_contato_atualiza_trava_nas_conversas, 0645) e AFTER UPDATE:
+ -- ele trava o contato no proprio UPDATE e so entao toca as conversas. Travar
+ -- a conversa antes do contato (a forma da 0267) fechava o ciclo AB-BA com a
+ -- passagem para humano e derrubava uma das transacoes com 40P01. Travar o
+ -- contato aqui, no mesmo modo `for no key update` que o UPDATE do gatilho
+ -- usa, poe as duas no MESMO sentido.
+ perform 1 from public.contacts
+   where id=pre_contact and organization_id=c.organization_id
+   for no key update;
+ select * into c from public.conversations where id=p_conv for no key update;
+ if c.contact_id is distinct from pre_contact then raise exception 'service_contact_changed' using errcode='40001'; end if;
+ if p_direction='inbound' and p_at<=c.service_closed_at then return; end if;
+ update public.conversations set
+  last_message_at=greatest(last_message_at,p_at),
+  last_message_preview=case when last_message_at is null or p_at>=last_message_at then p_preview else last_message_preview end,
+  last_inbound_at=case when p_direction='inbound' then greatest(last_inbound_at,p_at) else last_inbound_at end,
+  last_outbound_at=case when p_direction='outbound' then greatest(last_outbound_at,p_at) else last_outbound_at end,
+  unread_count_for_assignee=case when p_direction='inbound' then unread_count_for_assignee+1 when p_direction='outbound' then 0 else unread_count_for_assignee end,
+  -- A régua da Fila (issue #990). Os três ramos do inbound, na ordem:
+  --   1. mensagem ATRASADA (escrita antes da última resposta) — já respondida,
+  --      não é espera: mantém o que havia;
+  --   2. a espera guardada é de uma mensagem SEM RESPOSTA deste atendimento —
+  --      o cliente insistiu: fica o começo da espera, o mais ANTIGO dos dois;
+  --   3. não havia espera (tudo respondido) ou ela é de um atendimento já
+  --      encerrado: a espera de agora começa nesta mensagem.
+  -- E o outbound: resposta anterior à espera guardada não a responde (fora de
+  -- ordem, mantém); qualquer outra responde tudo até aqui, e a coluna volta ao
+  -- last_inbound_at — "não há mensagem sem resposta".
+  awaiting_since=case
+    when p_direction='inbound' then
+      case
+        when p_at<=coalesce(c.last_outbound_at,'-infinity'::timestamptz) then
+          coalesce(c.awaiting_since,greatest(coalesce(c.last_inbound_at,'-infinity'::timestamptz),p_at))
+        when c.awaiting_since>coalesce(c.last_outbound_at,'-infinity'::timestamptz)
+         and c.awaiting_since>coalesce(c.service_closed_at,'-infinity'::timestamptz) then
+          least(c.awaiting_since,p_at)
+        else p_at
+      end
+    else
+      case
+        when c.awaiting_since is not null and p_at<c.awaiting_since then c.awaiting_since
+        else c.last_inbound_at
+      end
+  end
+ where id=p_conv and organization_id=c.organization_id;
+ update public.contacts set last_activity_at=greatest(last_activity_at,p_at)
+ where id=c.contact_id and organization_id=c.organization_id;
+end; $$;
+revoke execute on function public.fn_mark_conversation_message(uuid,text,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.fn_mark_conversation_message(uuid,text,text,timestamptz) to service_role;
+
 -- ---- a reação não é mensagem recebida: os três gatilhos do INSERT (migration 0684, #2797/#2815) ----
 --
 -- ─── O defeito, e por que o "não carimba" do PR não bastava ─────────────────
@@ -57027,3 +57496,100 @@ on conflict (model) do update set
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
   notes = excluded.notes,
   superseded_at = null;
+
+-- ---- atualizar o card pela integração é opção da fonte (migration 0683, #2316) ----
+-- manifest: Atualizar o card quando o `external_id` já existe passa a ser OPÇÃO POR FONTE, desligada por padrão (issue #2316) e só ligável em fonte com segredo; `crm_leads.webhook_source_id` carimba a fonte que CRIOU o card (durável, backfill do `source_metadata`) e a atualização só alcança o card da mesma fonte; na mesma passada o CHECK de `webhook_lead_captures.outcome` aceita `atualizado`, o que aposenta a ponte de `registrarCaptacao`.
+-- O webhook de entrada passou a ATUALIZAR o card quando chega um `external_id`
+-- repetido com dado novo (#2316) — o valor pago, a área, a etapa da integração
+-- de diagnóstico. Como estava, a régua valia para TODA fonte de TODA instalação,
+-- e isso inclui um efeito que ninguém pediu: o vendedor que corrige o título ou
+-- um campo do card à mão e depois recebe um retry (ou um evento antigo) da
+-- ferramenta tem a edição SOBRESCRITA, porque a comparação é com o valor atual.
+--
+-- O desenho é o da própria issue: a atualização é uma OPÇÃO DA FONTE, e ela
+-- nasce DESLIGADA. Quem não liga fica exatamente como estava antes do #2316 —
+-- reenvio continua sendo reenvio (`duplicado`), sem tocar no card.
+--
+-- ─── Por que `crm_leads.webhook_source_id`, e não o histórico ──────────────
+--
+-- Saber de QUEM é o card é o que impede a fonte A de reescrever o card que
+-- nasceu na fonte B (a busca é por organização + `external_id`). O caminho
+-- barato seria a linha `criado` em `webhook_lead_captures`, e ele não serve:
+-- aquela tabela é PODADA (365 dias por padrão, migration 0174) e não existe
+-- para os leads anteriores a ela — a pergunta "de quem é este card?" voltaria
+-- sem resposta justamente nos cards velhos, que são os que mais têm edição
+-- manual em cima. A coluna é durável e tipada.
+--
+-- O backfill sai do `source_metadata ->> 'webhook_source_id'`, que a rota grava
+-- desde sempre — a coluna passa a ser a autoridade, e nenhum card já existente
+-- fica sem a resposta. Genérico: casa pelo `organization_id` da fonte, nunca por
+-- id de tenant.
+--
+-- ─── Por que NÃO há CHECK exigindo segredo para ligar a opção ──────────────
+--
+-- "Atualizar card é integração entre sistemas, e o formulário HTML público não
+-- precisa disso" — a regra é exigida na BORDA (`assinaturaObrigatoriaAusente`,
+-- a MESMA função que já guarda a autorização de IA), como a opção irmã. Um
+-- CHECK aqui teria o efeito colateral oposto: uma fonte com a opção ligada não
+-- conseguiria mais REMOVER o segredo, e a tela promete o contrário ("desligue
+-- primeiro a autorização"). O índice único de negócio fica onde o produto o lê.
+--
+-- ─── O CHECK do desfecho, na mesma passada ─────────────────────────────────
+--
+-- `atualizado` foi o vocabulário novo do #2316, e ele não cabia no CHECK da
+-- 0174 — daí a ponte que regravava a linha como `duplicado` para ela não sumir
+-- da tela "Leads recebidos". Alargar o CHECK agora aposenta a ponte e faz a tela
+-- mostrar o desfecho VERDADEIRO. O `do $$` só troca a constraint quando ela
+-- ainda não conhece o valor: reaplicar o baseline num clone atualizado não
+-- dispara DDL nenhuma.
+
+alter table public.webhook_sources
+  add column if not exists update_existing_lead_on_capture boolean not null default false;
+
+comment on column public.webhook_sources.update_existing_lead_on_capture is
+  'Opção da fonte (issue #2316), DESLIGADA por padrão: quando um envio chega com um external_id que já existe, o card da MESMA fonte é atualizado com os campos novos e a etapa pedida, em vez de o envio ser descartado como reenvio. Só liga em fonte com segredo configurado (régua da borda, a mesma da autorização de IA) — é integração entre sistemas, não formulário HTML público.';
+
+alter table public.crm_leads
+  add column if not exists webhook_source_id uuid references public.webhook_sources(id) on delete set null;
+
+comment on column public.crm_leads.webhook_source_id is
+  'Fonte de webhook que CRIOU este card (issue #2316). DURÁVEL por desenho: a linha de webhook_lead_captures é podada (365 dias) e não existe para leads antigos, e é esta coluna que responde "de quem é este card" para a atualização por integração só alcançar o card da própria fonte. NULL = card que não nasceu de webhook (ou anterior à coluna e sem source_metadata).';
+
+-- A fonte de ORIGEM do card, para quem já está no banco: a rota grava
+-- `source_metadata.webhook_source_id` desde sempre, e a coluna passa a ser a
+-- autoridade. Idempotente: só preenche o que está nulo.
+update public.crm_leads l
+   set webhook_source_id = s.id
+  from public.webhook_sources s
+ where l.webhook_source_id is null
+   and l.source = 'webhook'
+   and l.organization_id = s.organization_id
+   and l.source_metadata ->> 'webhook_source_id' = s.id::text;
+
+create index if not exists crm_leads_webhook_source_idx
+  on public.crm_leads (webhook_source_id)
+  where webhook_source_id is not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.webhook_lead_captures'::regclass
+       and conname = 'webhook_lead_captures_outcome_check'
+       and pg_get_constraintdef(oid) like '%''atualizado''%'
+  ) then
+    -- Drop e add na MESMA transação: se o add falhar, o drop desfaz junto.
+    alter table public.webhook_lead_captures
+      drop constraint if exists webhook_lead_captures_outcome_check;
+    alter table public.webhook_lead_captures
+      add constraint webhook_lead_captures_outcome_check
+      check (outcome = any (array['criado'::text, 'duplicado'::text, 'recusado'::text,
+                                  'atualizado'::text]));
+  end if;
+end $$;
+
+comment on column public.webhook_lead_captures.outcome is
+  'criado = virou lead novo; duplicado = envio repetido, nada mudou no card; atualizado = o card da mesma fonte recebeu o dado novo (issue #2316, só com a opção da fonte ligada); recusado = não entrou (reject_reason diz por quê).';
+
+notify pgrst, 'reload schema';
