@@ -8013,6 +8013,7 @@
   "Quando ele trava e abre um pedido de ajuda, chega uma mensagem nesse número, na hora": "When it gets stuck and opens a help request, a message arrives at that number, right away",
   "A mensagem traz o assunto e um link que abre o atendimento — e nunca o telefone do cliente": "The message brings the subject and a link that opens the conversation — and never the client's phone number",
   "Responder àquele número não chega ao cliente: ele é só da equipe": "Replying to that number doesn't reach the client: it's for the team only",
+  "Se você ligar a opção, a equipe também orienta a IA respondendo ao aviso com RESPONDER ou PERGUNTAR": "If you turn the option on, the team can also guide the AI by replying to the alert with RESPONDER or PERGUNTAR",
   "Receber no WhatsApp quando o assistente abrir um caso.": "Get notified on WhatsApp when the assistant opens a case.",
   "A conexão escolhida está fora do ar": "The chosen connection is down",
   "A conexão que enviava os avisos foi removida": "The connection that sent the alerts was removed",
