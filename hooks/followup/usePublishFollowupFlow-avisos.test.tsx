@@ -34,7 +34,8 @@ vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 
 import { usePublishFollowupFlow } from "./useFollowupFlow";
 
-const FLUXO = "3c1e21b0-1ac4-49df-9fa8-7a53d2ce1835";
+/** Identificadores SINTÉTICOS. Fixture nunca copia id do banco — ver `tests/unit/sem-identificador-de-producao.test.ts`. */
+const FLUXO = "66666666-6666-4666-8666-666666666666";
 
 function envoltorio({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });

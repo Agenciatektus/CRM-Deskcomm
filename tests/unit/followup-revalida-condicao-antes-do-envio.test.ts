@@ -15,8 +15,9 @@ import type { FlowEdge, FlowGraph, FlowNode } from "../../lib/followup/graph-sch
  * quem NÃO andou, e quem andou é quem mais não pode receber a cobrança.
  */
 
-const ETAPA = "339a4a6f-096c-4770-8ef6-18f13c7df027";
-const OUTRA = "630b0ae5-f44c-4ede-85db-bddf778095a1";
+/** Identificadores SINTÉTICOS. Fixture nunca copia id do banco — ver `tests/unit/sem-identificador-de-producao.test.ts`. */
+const ETAPA = "44444444-4444-4444-8444-444444444444";
+const OUTRA = "55555555-5555-4555-8555-555555555555";
 const NOW = new Date("2026-10-15T12:00:00.000Z");
 
 function condicao(id = "cond-1", branching?: "per_check"): FlowNode {

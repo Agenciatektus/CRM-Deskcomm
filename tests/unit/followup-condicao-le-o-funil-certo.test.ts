@@ -19,10 +19,11 @@ import type { FlowGraph, FlowNode } from "../../lib/followup/graph-schema";
  * de antes — é o que preserva fluxo publicado de outras instalações.
  */
 
-const FUNIL_VENDAS = "339914fb-dcce-40a3-9e9d-fc798f097758";
-const FUNIL_CAPTACAO = "27b02f3e-7a1f-4096-801a-30f923af257b";
-const ETAPA_INTERESSADO = "339a4a6f-096c-4770-8ef6-18f13c7df027";
-const ETAPA_AGUARDANDO = "0be906bc-efb7-4a72-ac1a-1bd60d98dbc9";
+/** Identificadores SINTÉTICOS. Fixture nunca copia id do banco — ver `tests/unit/sem-identificador-de-producao.test.ts`. */
+const FUNIL_VENDAS = "22222222-2222-4222-8222-222222222222";
+const FUNIL_CAPTACAO = "11111111-1111-4111-8111-111111111111";
+const ETAPA_INTERESSADO = "44444444-4444-4444-8444-444444444444";
+const ETAPA_AGUARDANDO = "33333333-3333-4333-8333-333333333333";
 
 describe("funilUnicoDasEtapas", () => {
   it("todas as etapas no mesmo funil → é ele", () => {

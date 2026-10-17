@@ -183,7 +183,7 @@ describe("avisos do gatilho na publicacao", () => {
       avisosDoGatilho(
         triggerConfigSchema.parse({
           kind: "stage_change",
-          params: { stage_id: "339a4a6f-096c-4770-8ef6-18f13c7df027" },
+          params: { stage_id: "44444444-4444-4444-8444-444444444444" },
         }),
       ),
     ).toEqual([]);

@@ -40,7 +40,8 @@ function cliente() {
   });
 }
 
-const FLUXO = "3c1e21b0-1ac4-49df-9fa8-7a53d2ce1835";
+/** Identificadores SINTÉTICOS. Fixture nunca copia id do banco — ver `tests/unit/sem-identificador-de-producao.test.ts`. */
+const FLUXO = "66666666-6666-4666-8666-666666666666";
 
 /** O gatilho dos cinco fluxos da auditoria: silêncio cru, só com o limiar. */
 const SILENCIO_CRU = { kind: "silence", params: { threshold_minutes: 180 } };
