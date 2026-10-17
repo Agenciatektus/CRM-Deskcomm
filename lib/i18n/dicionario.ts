@@ -14121,6 +14121,8 @@ export const DICIONARIO: Traducoes = {
   "Verificar certificado": { es: "Verificar certificado" },
   "Preferir TLS": { es: "Preferir TLS" },
   "Sem TLS (rede local confiável)": { es: "Sin TLS (red local de confianza)" },
+  PostgreSQL: { es: "PostgreSQL" },
+  MySQL: { es: "MySQL" },
   "Nenhuma tabela liberada ainda. Marque acima, em “O que o assistente pode ver”, as que podem ser lidas.": {
     es: "Ninguna tabla habilitada todavía. Marca arriba, en “Qué puede ver el asistente”, las que se pueden leer.",
   },
