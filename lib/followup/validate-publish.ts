@@ -47,6 +47,9 @@ export const PUBLISH_ERROR_CODES = [
   'motivo_da_perda_ausente',
   'motivo_da_perda_invalido',
   'tag_ausente',
+  // Seguimento do #3056 — o modelo de mensagem do passo não existe nesta conta
+  // (importado de outra, ou apagado): o motor lançaria a cada envio.
+  'modelo_inexistente',
   // Regra de data (item 14): sem o campo do negócio ela não tem o que comparar
   // e responderia `false` para sempre, sem dizer por quê.
   'campo_de_data_ausente',
@@ -126,7 +129,16 @@ export interface ContextoDoPublish {
    * depende dele —, e ausente significa "não há o que avisar sobre o gatilho".
    */
   trigger?: TriggerConfig;
+  /**
+   * Dos modelos que o grafo cita (`template_id`/`fallback_template_id`), os que
+   * existem na organização (`carregaModelosCitados`). Ausente = não confere.
+   */
+  modelos?: ReadonlySet<string>;
 }
+
+/** Chave do dicionário (a rota traduz): a frase não cita id, que a pessoa não lê. */
+export const MENSAGEM_MODELO_INEXISTENTE =
+  'Escolha um modelo de mensagem: o que estava aqui não existe nesta conta.';
 
 /**
  * Os avisos que o gatilho de silêncio rende. Nenhum reprova; todos são coisas
@@ -1117,6 +1129,14 @@ export function validateFlowForPublish(
   for (const node of [...nodes].sort(byId)) {
     if (node.type === 'move_lead') conferirEtapaDestino(node, contexto, errors);
     if (node.type === 'edit_lead_tag') conferirTags(node, errors);
+    if (node.type === 'action' && contexto.modelos !== undefined) {
+      const cfg = node.config;
+      const citado =
+        cfg.mode === 'template' ? cfg.template_id : cfg.mode === 'ai_message' ? cfg.fallback_template_id : undefined;
+      if (citado && !contexto.modelos.has(citado)) {
+        errors.push({ node_id: node.id, code: 'modelo_inexistente', message: MENSAGEM_MODELO_INEXISTENTE });
+      }
+    }
   }
 
   for (const node of [...nodes].sort(byId)) {
