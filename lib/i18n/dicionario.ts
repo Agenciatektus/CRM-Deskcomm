@@ -1609,6 +1609,12 @@ export const DICIONARIO: Traducoes = {
 
   // ─── Painel do contato ───
   CONTATO: { es: "CONTACTO" },
+  // O recolher do painel inteiro (#3004) — mesmo verbo do recolher da barra
+  // lateral, com o alvo explícito: são dois controles na mesma tela.
+  "Recolher painel do contato": { es: "Contraer panel del contacto" },
+  "Expandir painel do contato": { es: "Expandir panel del contacto" },
+  // O atalho do negócio ativo para o quadro do funil (#3004).
+  "Abrir no funil": { es: "Abrir en el embudo" },
   "TAGS DA CONVERSA": { es: "ETIQUETAS DE LA CONVERSACIÓN" },
   "DEMANDAS ABERTAS": { es: "CASOS ABIERTOS" },
   "LEADS RECENTES": { es: "LEADS RECIENTES" },
@@ -5060,6 +5066,11 @@ export const DICIONARIO: Traducoes = {
   "— operação cross-tenant": { es: "— operación cross-tenant" },
   "Modo Plataforma": { es: "Modo plataforma" },
   "Sair pra app pessoal": { es: "Salir a la app personal" },
+  "Aviso: sem SMTP na instalação": { es: "Aviso: sin SMTP en la instalación" },
+  "Convites, recuperação de senha e avisos por e-mail não saem por SMTP até configurá-lo aqui.": {
+    es: "Invitaciones, recuperación de contraseña y avisos por correo no salen por SMTP hasta configurarlo aquí.",
+  },
+  "Configurar em /admin/email": { es: "Configurar en /admin/email" },
   "Navegação plataforma": { es: "Navegación de la plataforma" },
   "Voltar pra app": { es: "Volver a la app" },
   Dashboard: { es: "Panel" },
@@ -5467,6 +5478,8 @@ export const DICIONARIO: Traducoes = {
   },
   "Uso por tenant": { es: "Uso por tenant" },
   "Exportar CSV": { es: "Exportar CSV" },
+  "Exportar": { es: "Exportar" },
+  "Exportar vCard": { es: "Exportar vCard" },
   "Invoc. AI": { es: "Invoc. IA" },
   "Custo AI": { es: "Costo IA" },
 
@@ -7750,6 +7763,31 @@ export const DICIONARIO: Traducoes = {
     es: "Archivar cierra esta atención y guarda la conversación en el historial. Si el cliente vuelve a escribir, la conversación regresa. ¿Archivar?",
   },
   "Arquivando...": { es: "Archivando..." },
+
+  // ─── Guias curtas dos botões da barra de ações do cabeçalho (#3003) ───
+  //
+  // O rótulo diz o GESTO; a guia diz a CONSEQUÊNCIA — é a pergunta "o que
+  // acontece se eu clicar aqui?", que chega antes do clique. Mesmo vocabulário
+  // já usado acima nesta seção (`atención automática`, `atención se cierra`).
+  "Solta esta conversa: ela fica sem dono e o atendimento automático volta a responder.": {
+    es: "Suelta esta conversación: queda sin responsable y la atención automática vuelve a responder.",
+  },
+  "Solta esta conversa: ela fica sem dono e volta para a fila, esperando um atendente.": {
+    es: "Suelta esta conversación: queda sin responsable y vuelve a la cola, esperando a un asesor.",
+  },
+  "Passa esta conversa para outro atendente. Se houver outro número conectado, dá para continuar o atendimento por ele.": {
+    es: "Pasa esta conversación a otro asesor. Si hay otro número conectado, puedes continuar la atención por él.",
+  },
+  "Encerra o atendimento. Depois você pode reabrir a conversa.": {
+    es: "Cierra la atención. Después puedes reabrir la conversación.",
+  },
+  "Reabre o atendimento desta conversa, que estava encerrada.": {
+    es: "Reabre la atención de esta conversación, que estaba cerrada.",
+  },
+  "Guarda a conversa na aba Arquivadas. Se ainda estiver aberta, o atendimento é encerrado.": {
+    es: "Guarda la conversación en la pestaña Archivadas. Si todavía está abierta, la atención se cierra.",
+  },
+  "Abre a ficha completa deste contato.": { es: "Abre la ficha completa de este contacto." },
   Automático: { es: "Automático" },
   Alguém: { es: "Alguien" },
   "Nota interna · só o time vê": { es: "Nota interna · solo la ve el equipo" },
@@ -16177,6 +16215,22 @@ export const DICIONARIO: Traducoes = {
   "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.": { es: "La automatización fue modificada y ya no tiene la rotación que disparó esta acción. No se asignó nada." },
   "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": { es: "El lead de este evento no se encontró en esta organización, así que no se asignó a nadie." },
   "Vez de {nome}, posição {posicao} da fila do rodízio.": { es: "Turno de {nome}, posición {posicao} de la fila de la rotación." },
+  "O contato pediu para não receber mensagens (opt-out): o envio pelo automático fica bloqueado. Nada a enviar.": { es: "El contacto pidió no recibir mensajes (opt-out): el envío por el automático queda bloqueado. Nada que enviar." },
+  "Este contato foi anonimizado (LGPD) — é proibido enviar mensagens a ele.": { es: "Este contacto fue anonimizado (LGPD) — está prohibido enviarle mensajes." },
+  "Não há base legal (LGPD) registrada para o primeiro contato com este lead. O time precisa regularizar o cadastro antes de abordar.": { es: "No hay base legal (LGPD) registrada para el primer contacto con este lead. El equipo debe regularizar el registro antes de abordarlo." },
+  "A resposta prometia um preço ou condição fora da tabela aprovada. Ajuste a tabela de promessas ou gere de novo sem a promessa.": { es: "La respuesta prometía un precio o condición fuera de la tabla aprobada. Ajusta la tabla de promesas o genera de nuevo sin la promesa." },
+  "A resposta continha uma promessa que o sistema não registrou (ex.: um retorno combinado). Marque o retorno ou gere de novo sem prometer.": { es: "La respuesta contenía una promesa que el sistema no registró (p. ej., un retorno acordado). Marca el retorno o genera de nuevo sin prometer." },
+  "A resposta prometeu voltar a falar com o cliente, mas não deixou o retorno marcado no CRM. Agende o retorno ou gere de novo sem a promessa.": { es: "La respuesta prometió volver a hablar con el cliente, pero no dejó el retorno marcado en el CRM. Agenda el retorno o genera de nuevo sin la promesa." },
+  "A resposta usava um termo interno que não pode chegar ao cliente. Gere de novo — se repetir, ajuste o texto do agente.": { es: "La respuesta usaba un término interno que no puede llegar al cliente. Genera de nuevo — si se repite, ajusta el texto del agente." },
+  "A resposta fazia uma afirmação clínica, e a camada de afirmações clínicas está ligada nesta organização. Gere de novo sem o trecho.": { es: "La respuesta hacía una afirmación clínica, y la capa de afirmaciones clínicas está activada en esta organización. Genera de nuevo sin el fragmento." },
+  "A resposta ia depender de horário, mas o agente não tem ferramenta de agenda ligada. Ligue a agenda no agente ou gere de novo sem horário.": { es: "La respuesta iba a depender de un horario, pero el agente no tiene la herramienta de agenda activada. Actívala en el agente o genera de nuevo sin horario." },
+  "A primeira mensagem a um contato novo precisa se apresentar como assistente virtual. Ajuste o modelo de apresentação e gere de novo.": { es: "El primer mensaje a un contacto nuevo debe presentarse como asistente virtual. Ajusta la plantilla de presentación y genera de nuevo." },
+  "A janela de 24 horas com este contato fechou: o canal recusa texto livre. Responda com um modelo aprovado ou aguarde o contato escrever de novo.": { es: "La ventana de 24 horas con este contacto se cerró: el canal rechaza texto libre. Responde con una plantilla aprobada o espera a que el contacto escriba de nuevo." },
+  "A resposta afirmava um fato que o material de referência CONTRADIZ. Nada foi enviado — confira a base de conhecimento e gere de novo.": { es: "La respuesta afirmaba un hecho que el material de referencia CONTRADICE. Nada fue enviado — revisa la base de conocimiento y genera de nuevo." },
+  "A resposta afirmava um fato sem apoio no material de referência. Nada foi enviado — confira a base de conhecimento e gere de novo.": { es: "La respuesta afirmaba un hecho sin respaldo en el material de referencia. Nada fue enviado — revisa la base de conocimiento y genera de nuevo." },
+  "A resposta ia mostrar um produto que não foi encontrado no cadastro. Confira o produto e gere de novo.": { es: "La respuesta iba a mostrar un producto que no se encontró en el registro. Revisa el producto y genera de nuevo." },
+  "A sugestão tentou usar uma ação que a prévia não reconhece. Gere de novo; se repetir, revise as ferramentas ligadas no agente.": { es: "La sugerencia intentó usar una acción que la previsualización no reconoce. Genera de nuevo; si se repite, revisa las herramientas activadas en el agente." },
+  "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.": { es: "La generación de la sugerencia falló, o no se pudo armar el contexto de la conversación. Inténtalo de nuevo; si se repite, el motivo quedó registrado en el servidor." },
 };
 
 /**
