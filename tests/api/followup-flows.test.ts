@@ -598,10 +598,10 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
     const passoDeModelo: FlowNode = {
       id: "m1", type: "action", label: "m1", position: pos, config: { mode: "template", template_id: MODELO },
     };
-    const iaComPlanoB: FlowNode = {
+    const iaComPlanoB = (planoB = MODELO): FlowNode => ({
       id: "ia1", type: "action", label: "ia1", position: pos,
-      config: { mode: "ai_message", prompt_hint: "oi", fallback_template_id: MODELO },
-    };
+      config: { mode: "ai_message", prompt_hint: "oi", fallback_template_id: planoB },
+    });
     const ponteiro = (g: FlowGraph) => [{ id: PID, organization_id: ORG_ID, status: "draft", draft_graph: g }];
 
     it("modelo de OUTRA org → 422 modelo_inexistente, com a frase no idioma de quem publica", async () => {
@@ -623,7 +623,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
     });
 
     it("plano B apontando para texto pronto → 422: o motor só lê o plano B em meta_templates", async () => {
-      const db = makeDb(ponteiro(comPassos(iaComPlanoB)), [], [], [], [
+      const db = makeDb(ponteiro(comPassos(iaComPlanoB())), [], [], [], [
         { tabela: "message_templates", id: MODELO, organization_id: ORG_ID },
       ]);
       session("manager", db);
@@ -637,7 +637,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
     it("modelo da própria org publica — texto pronto no passo, modelo do canal no plano B", async () => {
       const DO_CANAL = "66666666-6666-4666-8666-666666666666";
       const db = makeDb(
-        ponteiro(comPassos(passoDeModelo, { ...iaComPlanoB, config: { ...iaComPlanoB.config, fallback_template_id: DO_CANAL } })),
+        ponteiro(comPassos(passoDeModelo, iaComPlanoB(DO_CANAL))),
         [], [], [],
         [
           { tabela: "message_templates", id: MODELO, organization_id: ORG_ID },
