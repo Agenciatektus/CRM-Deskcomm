@@ -16158,8 +16158,8 @@ export const DICIONARIO: Traducoes = {
   "Lembretes de tarefa": {
     es: "Recordatorios de tareas",
   },
-  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Chega também no aparelho de quem ligou o Push, se esta instalação tiver as chaves do Push (veja o aviso no topo da página).": {
-    es: "El aviso queda en la Central del responsable cuando el plazo se acerca o vence, aunque nadie tenga el sitio abierto. También llega al dispositivo de quien activó el Push, si esta instalación tiene las claves del Push (vea el aviso al inicio de la página).",
+  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Se ele ligou o Push e esta instalação tem as chaves do Push (veja o aviso no topo da página), o aviso chega também no aparelho dele.": {
+    es: "El aviso queda en la Central del responsable cuando el plazo se acerca o vence, aunque nadie tenga el sitio abierto. Si activó el Push y esta instalación tiene las claves del Push (vea el aviso al inicio de la página), el aviso también llega a su dispositivo.",
   },
   "Avisar quando a tarefa está perto do vencimento": {
     es: "Avisar cuando la tarea está por vencer",
