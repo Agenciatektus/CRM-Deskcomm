@@ -9179,5 +9179,6 @@
   "Ninguém da fila do rodízio pode receber agora: todos estão pausados, saíram da equipe ou só visualizam. O lead ficou sem responsável.": "No one in the rotation queue can receive leads right now: everyone is paused, has left the team, or is view-only. The lead was left without an owner.",
   "A fila do rodízio desta automação está vazia. Abra a automação e escolha quem entra no rodízio.": "This automation's rotation queue is empty. Open the automation and choose who joins the rotation.",
   "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.": "The automation was changed and no longer has the rotation that triggered this action. Nothing was assigned.",
-  "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": "This event's lead was not found in this organization, so no one was assigned."
+  "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": "This event's lead was not found in this organization, so no one was assigned.",
+  "Vez de {nome}, posição {posicao} da fila do rodízio.": "{nome}'s turn, position {posicao} in the rotation queue."
 }

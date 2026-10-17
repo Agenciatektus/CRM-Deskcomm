@@ -5742,5 +5742,6 @@
   "Ninguém da fila do rodízio pode receber agora: todos estão pausados, saíram da equipe ou só visualizam. O lead ficou sem responsável.": "轮流队列中现在没有人可以接收：所有人都已暂停、已离开团队或只有查看权限。该线索暂无负责人。",
   "A fila do rodízio desta automação está vazia. Abra a automação e escolha quem entra no rodízio.": "此自动化的轮流队列为空。请打开自动化并选择参与轮流的人。",
   "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.": "该自动化已被修改，不再包含触发此动作的轮流。未进行任何分配。",
-  "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": "在此组织中未找到该事件的线索，因此未分配任何人。"
+  "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": "在此组织中未找到该事件的线索，因此未分配任何人。",
+  "Vez de {nome}, posição {posicao} da fila do rodízio.": "轮到 {nome}，轮流队列第 {posicao} 位。"
 }

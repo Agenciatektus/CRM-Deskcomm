@@ -48,6 +48,7 @@ async function executarRodizio(ctx: ActionCtx, leadId: string): Promise<ActionRe
       detail: {
         user_id: desfecho.user_id,
         posicao: desfecho.posicao,
+        nome,
         explicacao: `Vez de ${nome}, posição ${desfecho.posicao} da fila do rodízio.`,
       },
     };

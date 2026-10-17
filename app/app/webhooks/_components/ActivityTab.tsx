@@ -225,6 +225,14 @@ function explicacaoDe(
   t: (texto: string) => string,
 ): string | null {
   const detail = action.detail ?? {};
+  // A vez do rodízio (#2041) leva nome e posição: a frase pronta em
+  // `explicacao` muda a cada lead e nunca casaria com o dicionário. Traduz o
+  // molde e só depois cola os valores.
+  if (typeof detail.nome === "string" && typeof detail.posicao === "number") {
+    return t("Vez de {nome}, posição {posicao} da fila do rodízio.")
+      .replace("{nome}", detail.nome)
+      .replace("{posicao}", String(detail.posicao));
+  }
   if (typeof detail.explicacao === "string") return t(detail.explicacao);
   // O motivo chega por DOIS canais: `detail.reason` (quem monta o detalhe) e
   // `action.error` (quem devolve só o código — `user_not_in_org` e

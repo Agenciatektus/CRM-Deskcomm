@@ -63,7 +63,7 @@ describe("assign_owner em rodízio", () => {
     expect(r).toEqual({
       type: "assign_owner",
       status: "success",
-      detail: { user_id: PESSOA, posicao: 2, explicacao: "Vez de Ana, posição 2 da fila do rodízio." },
+      detail: { user_id: PESSOA, posicao: 2, nome: "Ana", explicacao: "Vez de Ana, posição 2 da fila do rodízio." },
     });
   });
 
