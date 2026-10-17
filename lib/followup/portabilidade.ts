@@ -563,23 +563,33 @@ export function nomeDoImportado(original: string, ocupados: Iterable<string>): s
   return `${raiz.slice(0, 71)} ${randomId().slice(0, 8)}`.slice(0, MAX_FOLLOWUP_FLOW_NAME);
 }
 
+// `Record<Idioma, …>`: idioma novo promovido no registro obriga a escolher o locale aqui.
+const LOCALE_DO_ZOD: Record<Idioma, () => { localeError: z.core.$ZodErrorMap }> = {
+  "pt-BR": z.locales.pt,
+  es: z.locales.es,
+};
+
+/**
+ * O idioma das mensagens GENÉRICAS do Zod numa leitura
+ * (`schema.safeParse(x, zodNoIdioma(idioma))`). Sem isto a lista de problemas
+ * saía em inglês («Invalid UUID») para quem lê em português ou espanhol. As
+ * frases são as dos locales que o próprio Zod traz.
+ *
+ * Mensagem escrita no schema vence o locale e sai como está: em `graph-schema.ts`
+ * parte delas é inglês («min_ms must be <= max_ms») e parte é português, que
+ * quem lê em espanhol recebe em português.
+ */
+export function zodNoIdioma(idioma: Idioma): { error: z.core.$ZodErrorMap } {
+  // ponytail: locale `pt` do Zod é português de Portugal («Demasiado pequeno»); troque por mapa próprio se alguém tropeçar.
+  return { error: LOCALE_DO_ZOD[idioma]().localeError };
+}
+
 /**
  * Os problemas de um arquivo recusado, um por linha, com o caminho até o campo
  * («flow.graph.nodes.3.config.duration_ms: …»). É o que a tela mostra — o
  * `flatten()` do Zod perde o caminho dos nós, que é justamente o que a pessoa
  * precisa para achar o erro num arquivo de 200 linhas.
  */
-/**
- * O idioma das mensagens do Zod numa leitura (`schema.safeParse(x, zodNoIdioma(idioma))`).
- * Sem isto a lista de problemas saía em inglês («Invalid UUID») para quem lê em
- * português ou espanhol. As frases são as dos locales que o próprio Zod traz;
- * mensagem escrita no schema continua vencendo o locale.
- */
-export function zodNoIdioma(idioma: Idioma): { error: z.core.$ZodErrorMap } {
-  // ponytail: locale `pt` do Zod é português de Portugal («Demasiado pequeno»); troque por mapa próprio se alguém tropeçar.
-  return { error: (idioma === "es" ? z.locales.es() : z.locales.pt()).localeError };
-}
-
 export function problemasDoArquivo(erro: z.ZodError, limite = 20): string[] {
   return erro.issues.slice(0, limite).map((issue) => {
     const caminho = issue.path.map(String).join(".");

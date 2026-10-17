@@ -55,3 +55,23 @@ describe("POST /followup-flows/import — problemas no idioma de quem importa", 
     expect(deps.admin).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /followup-flows/import — o corpo do pedido também lê no idioma de quem importa", () => {
+  it.each([
+    ["pt-BR", "name: Entrada inválida: esperava um texto, recebeu um número"],
+    ["es", "name: Entrada inválida: se esperaba texto, recibido número"],
+  ] as const)("%s", async (idioma, linha) => {
+    comoQuem(idioma);
+    const res = await POST(
+      new NextRequest("http://localhost/api/v1/ai/followup-flows/import", {
+        method: "POST",
+        body: JSON.stringify({ file: ARQUIVO_SEM_GRAFO, name: 5 }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    expect(res.status).toBe(422);
+    const corpo = (await res.json()) as { error: { code: string; details: { problemas: string[] } } };
+    expect(corpo.error.code).toBe("validation_failed");
+    expect(corpo.error.details.problemas).toEqual([linha]);
+  });
+});
