@@ -204,7 +204,55 @@ describe("CustomFieldsEditor — lista pesquisável mostra o que a busca acha (#
     const { onChange, input } = montar();
     fireEvent.focus(input);
     fireEvent.mouseEnter(screen.getByRole("option", { name: "São Luís (MA)" }));
-    fireEvent.keyDown(input, { key: "Enter" });
+    // `fireEvent` devolve false quando o evento teve preventDefault: com a
+    // lista aberta, o Enter não pode cair na submissão implícita do <form>.
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("texto que casa exatamente + Enter sem seta grava o value e não submete o formulário", () => {
+    // Em Editar contato e no dossiê o editor vive dentro de um <form>: o Enter
+    // sem destaque submetia com o valor VELHO e o digitado se perdia.
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "São Paulo (SP)" } });
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+    expect(onChange).toHaveBeenCalledWith({ destino: "sao-paulo-sp" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("texto fora da lista + Enter: recusa com aviso, sem gravar e sem submeter", () => {
+    const { onChange, input } = montar();
+    fireEvent.change(input, { target: { value: "gramado" } });
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(AVISO)).toBeTruthy();
+  });
+
+  it("valor novo com allow_new + Enter grava o novo mesmo sem opção na lista", () => {
+    // Sem resultado nenhum a lista não abre; o Enter ainda é do campo enquanto
+    // há texto pendente, senão o valor novo se perdia na submissão.
+    const onChange = vi.fn();
+    render(
+      <CustomFieldsEditor
+        mode="lead"
+        fields={[{ ...DESTINO[0]!, allow_new: true }]}
+        value={{}}
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByRole("combobox", { name: /Destino/ });
+    fireEvent.change(input, { target: { value: "  Recife  " } });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+    expect(onChange).toHaveBeenCalledWith({ destino: "Recife" });
+  });
+
+  it("lista fechada e nada pendente: o Enter segue para o formulário", () => {
+    const { onChange, input } = montar();
+    fireEvent.focus(input);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(true);
     expect(onChange).not.toHaveBeenCalled();
   });
 

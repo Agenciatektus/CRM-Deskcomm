@@ -290,6 +290,20 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
               setRecusados(({ [f.key]: _limpo, ...resto }) => resto);
               fechar();
             };
+            // Sem escolha explícita, o texto digitado vale se casar exatamente
+            // (ou se o campo aceita valor novo). Mesma régua no blur e no Enter.
+            const resolverRascunho = () => {
+              fechar();
+              if (rascunho === undefined) return;
+              const achado = valorCanonico(opcoes, rascunho);
+              if (achado !== null) set(f.key, achado);
+              else if (rascunho.trim() === "") set(f.key, "");
+              else if (f.allow_new === true) set(f.key, rascunho.trim());
+              // Sem casar e sem `allow_new`, o valor não é gravado: o
+              // input volta ao que estava, e o aviso abaixo explica.
+              else setRecusados((current) => ({ ...current, [f.key]: true }));
+              limparRascunho();
+            };
             return (
               <div key={f.key} className="space-y-2">
                 {labelEl}
@@ -326,11 +340,18 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                         e.preventDefault();
                         setDestacado((i) => Math.max(i - 1, 0));
                       } else if (e.key === "Enter") {
+                        // Com a lista aberta (ou texto ainda não resolvido), o
+                        // Enter é do CAMPO, nunca do formulário: sem o
+                        // preventDefault ele caía na submissão implícita do
+                        // <form> de Editar contato e do dossiê, que salvava o
+                        // valor VELHO e jogava fora o digitado (prova pela
+                        // tela, 17/10). Lista fechada e nada pendente: o Enter
+                        // segue para o formulário, como em qualquer input.
+                        if (!aberta && rascunho === undefined) return;
+                        e.preventDefault();
                         const alvo = aberta ? resultados[destacado] : undefined;
-                        if (alvo) {
-                          e.preventDefault();
-                          escolher(alvo.value);
-                        }
+                        if (alvo) escolher(alvo.value);
+                        else resolverRascunho();
                       } else if (e.key === "Escape") {
                         fechar();
                       }
@@ -342,17 +363,7 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                         escolher(alvo.value);
                         return;
                       }
-                      fechar();
-                      const draft = rascunhosDeBusca[f.key];
-                      if (draft === undefined) return;
-                      const achado = valorCanonico(opcoes, draft);
-                      if (achado !== null) set(f.key, achado);
-                      else if (draft.trim() === "") set(f.key, "");
-                      else if (f.allow_new === true) set(f.key, draft.trim());
-                      // Sem casar e sem `allow_new`, o valor não é gravado: o
-                      // input volta ao que estava, e o aviso abaixo explica.
-                      else setRecusados((current) => ({ ...current, [f.key]: true }));
-                      limparRascunho();
+                      resolverRascunho();
                     }}
                     disabled={disabled}
                   />
