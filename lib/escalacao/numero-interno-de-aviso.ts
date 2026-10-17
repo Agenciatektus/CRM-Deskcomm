@@ -72,6 +72,8 @@ export interface NumeroInternoDeAviso {
   /** `config_aviso_de_caso.destino_jid` — o endereço que o transporte resolveu. */
   jid: string | null;
   respostaWhatsappHabilitada?: boolean;
+  /** `config_aviso_de_caso.channel_session_id` — a conexão que envia os avisos. */
+  sessaoId?: string | null;
 }
 
 /**
@@ -101,13 +103,18 @@ export function limparCacheDoNumeroInterno(): void {
 export function ehOChatDoAviso(parsed: ChatIdentidade, cfg: NumeroInternoDeAviso): boolean {
   if (!cfg.destino && !cfg.jid) return false;
 
-  if (parsed.kind === "phone" && parsed.phone && cfg.destino) {
-    return phoneLookupVariants(cfg.destino).includes(parsed.phone);
+  // Em modo privacidade (`@lid`) o ingestor do canal preenche `phone` com o
+  // `_data.key.remoteJidAlt` do payload — e é por ele que o número cadastrado
+  // é reconhecido, porque o transporte resolve o destino por telefone
+  // (`<tel>@c.us`) e o `destino_jid` nunca termina em `@lid`.
+  if ((parsed.kind === "phone" || parsed.kind === "lid") && parsed.phone && cfg.destino &&
+      phoneLookupVariants(cfg.destino).includes(parsed.phone)) {
+    return true;
   }
 
-  // O destinatário em modo privacidade chega SEM telefone, com um identificador
-  // que o canal inventa. O JID só é conhecido depois do primeiro aviso enviado —
-  // antes disso uma resposta dele passa, e esse buraco está declarado no teste.
+  // Sem o telefone alternativo, o `@lid` só casa pelo JID, que só é conhecido
+  // depois de um aviso enviado a esse endereço — esse buraco está declarado no
+  // teste.
   if (parsed.kind === "lid" && parsed.lid && cfg.jid) {
     return cfg.jid === `${parsed.lid}@lid`;
   }
@@ -135,7 +142,7 @@ export async function lerNumeroInternoDeAviso(
   try {
     const r = await db
       .from("config_aviso_de_caso")
-      .select("telefone_destino, destino_jid, resposta_whatsapp_habilitada")
+      .select("telefone_destino, destino_jid, resposta_whatsapp_habilitada, channel_session_id")
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (r.error) throw new Error(r.error.message);
@@ -148,18 +155,20 @@ export async function lerNumeroInternoDeAviso(
       organizationId,
       causa: err instanceof Error ? err.message : String(err),
     });
-    return { destino: null, jid: null, respostaWhatsappHabilitada: false };
+    return { destino: null, jid: null, respostaWhatsappHabilitada: false, sessaoId: null };
   }
 
   const linha = data as {
     telefone_destino?: string | null;
     destino_jid?: string | null;
     resposta_whatsapp_habilitada?: boolean | null;
+    channel_session_id?: string | null;
   } | null;
   const valor: NumeroInternoDeAviso = {
     destino: linha?.telefone_destino ?? null,
     jid: linha?.destino_jid ?? null,
     respostaWhatsappHabilitada: linha?.resposta_whatsapp_habilitada === true,
+    sessaoId: linha?.channel_session_id ?? null,
   };
   _cache.set(organizationId, { at: agora, valor });
   return valor;

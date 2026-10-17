@@ -15,7 +15,11 @@
  *
  *     Abrir: https://crm.exemplo.com.br/app/ai/cases?caso=<uuid>
  *
- *     RESPONDER <uuid> <orientação> — a IA continua com o cliente.
+ *     Responder aqui não chega ao cliente — abra o link para responder.
+ *
+ * Com a opção «Responder casos por este WhatsApp» ligada, a última linha dá
+ * lugar às instruções de `RESPONDER <uuid> <resposta ou decisão>` e
+ * `PERGUNTAR <uuid> <pergunta ao cliente>` (ver `montarAvisoDeCaso`).
  *
  * ## As decisões, cada uma com o motivo
  *
@@ -42,8 +46,15 @@
  * **Linha sem conteúdo não aparece.** Um `Assunto: ` vazio AFIRMA que há assunto
  * e que ele é nada. A ausência da linha é a verdade disponível.
  *
- * **Os comandos levam o id completo.** Uma resposta do suporte precisa apontar
- * para o caso exato, e uma pergunta adicional volta ao cliente pelo agente.
+ * **A última linha não é enfeite.** Com a opção desligada (o padrão), o número
+ * do suporte só RECEBE — o corte da ingestão
+ * (`lib/escalacao/numero-interno-de-aviso.ts`) descarta tudo o que chega dele,
+ * de propósito. Sem essa linha, a primeira resposta da equipe vai para o vazio
+ * e ninguém descobre por quê.
+ *
+ * **Os comandos levam o id completo.** Com a opção ligada, uma resposta do
+ * suporte precisa apontar para o caso exato, e uma pergunta adicional volta ao
+ * cliente pelo agente.
  */
 import { tipoDeCasoLabel } from "@/lib/ai/case-copy";
 import { traduzir } from "@/lib/i18n/dicionario";

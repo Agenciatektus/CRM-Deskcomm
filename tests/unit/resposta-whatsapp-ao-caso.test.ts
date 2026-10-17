@@ -5,9 +5,11 @@ import {
   consumirRespostaDoSuporteNoWhatsApp,
 } from "@/lib/escalacao/resposta-whatsapp-ao-caso";
 import { limparCacheDoNumeroInterno } from "@/lib/escalacao/numero-interno-de-aviso";
+import { identidadeDoRemetente, parseChatId, type WahaPayload } from "@/lib/waha/ingest";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const SESSION = "22222222-2222-4222-8222-222222222222";
+const SESSAO_DE_VENDAS = "33333333-3333-4333-8333-333333333333";
 const PHONE = "+5531998966398";
 const CASE = "02920000-5555-4000-8000-000000000001";
 
@@ -38,6 +40,7 @@ function db(options: { enabled?: boolean; result?: string; error?: boolean; jid?
     telefone_destino: PHONE,
     destino_jid: options.jid ?? null,
     resposta_whatsapp_habilitada: options.enabled ?? true,
+    channel_session_id: SESSION,
   };
   const rpc = vi.fn(async (..._args: unknown[]) => ({
     data: options.result ?? "accepted",
@@ -116,7 +119,7 @@ describe("confirmações de comando pelo WhatsApp", () => {
       builder.eq = () => builder;
       builder.maybeSingle = async () => ({
         data: table === "config_aviso_de_caso"
-          ? { telefone_destino: PHONE, destino_jid: null, resposta_whatsapp_habilitada: false }
+          ? { telefone_destino: PHONE, destino_jid: null, resposta_whatsapp_habilitada: false, channel_session_id: SESSION }
           : null,
         error: null,
       });
@@ -172,11 +175,35 @@ describe("confirmações de comando pelo WhatsApp", () => {
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it("número em modo privacidade (@lid) responde pelo telefone cadastrado", async () => {
-    const lid = db({ jid: "123456789@lid" });
+  // Payload na forma que o WAHA entrega (ver `telefone-alternativo-do-payload`):
+  // `from` opaco em `@lid` e o telefone em `_data.key.remoteJidAlt`. O
+  // `destino_jid` é o que o transporte grava — sempre `<tel>@c.us`, nunca `@lid`.
+  function payloadLid(body: string, remoteJidAlt = "5531998966398@s.whatsapp.net"): WahaPayload {
+    return {
+      id: "false_100000000000777@lid_3A60443E83484256AF03",
+      from: "100000000000777@lid",
+      fromMe: false,
+      body,
+      timestamp: 1_760_000_000,
+      _data: {
+        key: {
+          id: "3A60443E83484256AF03",
+          fromMe: false,
+          remoteJid: "100000000000777@lid",
+          remoteJidAlt,
+          addressingMode: "lid",
+        },
+      },
+    };
+  }
+  const identidadeDe = (p: WahaPayload) => identidadeDoRemetente(p, parseChatId(p.from ?? ""));
+
+  it("número em modo privacidade (@lid) responde pelo telefone do remoteJidAlt", async () => {
+    const lid = db({ jid: "5531998966398@c.us" });
+    const p = payloadLid(`RESPONDER ${CASE} Resolvido`);
     const result = await consumirComResultado(lid.db, {
-      ...entry(`RESPONDER ${CASE} Resolvido`),
-      identidade: { kind: "lid", phone: null, lid: "123456789" },
+      ...entry(p.body ?? null, p.id ?? ""),
+      identidade: identidadeDe(p),
     });
     expect(result).toEqual({ consumed: true, result: "accepted" });
     expect(lid.rpc).toHaveBeenCalledWith(
@@ -185,15 +212,44 @@ describe("confirmações de comando pelo WhatsApp", () => {
     );
   });
 
+  it("@lid de OUTRO telefone não é o número de avisos: segue o caminho de cliente", async () => {
+    const lid = db({ jid: "5531998966398@c.us" });
+    const p = payloadLid(`RESPONDER ${CASE} Resolvido`, "5511900000001@s.whatsapp.net");
+    await expect(consumirRespostaDoSuporteNoWhatsApp(lid.db, {
+      ...entry(p.body ?? null, p.id ?? ""),
+      identidade: identidadeDe(p),
+    })).resolves.toBe(false);
+    expect(lid.rpc).not.toHaveBeenCalled();
+  });
+
   it("mensagem comum do @lid continua contada como ignorada", async () => {
-    const lid = db({ jid: "123456789@lid" });
+    const lid = db({ jid: "5531998966398@c.us" });
+    const p = payloadLid("bom dia");
     const result = await consumirComResultado(lid.db, {
-      ...entry("bom dia"),
-      identidade: { kind: "lid", phone: null, lid: "123456789" },
+      ...entry(p.body ?? null, p.id ?? ""),
+      identidade: identidadeDe(p),
     });
     expect(result).toEqual({ consumed: true, result: null });
     const chamadas = lid.rpc.mock.calls.map((c: unknown[]) => c[0]);
     expect(chamadas).toContain("fn_contar_mensagem_ignorada");
     expect(chamadas).not.toContain("fn_responder_caso_por_whatsapp");
+  });
+
+  it("comando que chega pela conexão de VENDAS não é interpretado nem respondido", async () => {
+    for (const texto of ["RESPONDER esse aqui", `RESPONDER ${CASE} Resolvido`]) {
+      vi.clearAllMocks();
+      limparCacheDoNumeroInterno();
+      const vendas = db();
+      const result = await consumirComResultado(vendas.db, {
+        ...entry(texto),
+        channelSessionId: SESSAO_DE_VENDAS,
+      });
+      // O corte de antes: ignorada e contada, como qualquer mensagem do número de avisos.
+      expect(result).toEqual({ consumed: true, result: null });
+      const chamadas = vendas.rpc.mock.calls.map((c: unknown[]) => c[0]);
+      expect(chamadas).toEqual(["fn_contar_mensagem_ignorada"]);
+      expect(mocks.send).not.toHaveBeenCalled();
+      expect(mocks.register).not.toHaveBeenCalled();
+    }
   });
 });

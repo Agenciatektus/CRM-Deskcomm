@@ -84,14 +84,19 @@ export async function consumirComResultado(
   // consultar o opt-in sem uma segunda ida ao banco e mantém os ingestores que
   // só precisam do corte compatíveis com seus mocks/integrações.
   const config = await lerNumeroInternoDeAviso(admin, entrada.organizationId);
-  // O corte acima já provou que é o número de avisos — pelo telefone ou, em modo
-  // privacidade (`@lid`), pelo JID que o transporte resolveu. Nesse segundo caso
-  // o telefone não chega no webhook, e o remetente é o próprio número cadastrado.
-  const phone = entrada.identidade.kind === "phone"
-    ? entrada.identidade.phone
-    : config.destino;
+  // O corte acima já provou que é o número de avisos. Em modo privacidade
+  // (`@lid`) o telefone vem do `remoteJidAlt` do payload, que o ingestor põe em
+  // `identidade.phone`; só quando ele falta e o `@lid` casou pelo `destino_jid`
+  // gravado o remetente é tomado como o próprio número cadastrado. O transporte
+  // do aviso resolve o destino por telefone, então esse segundo caminho é raro.
+  const phone = entrada.identidade.phone ??
+    (entrada.identidade.kind === "lid" ? config.destino : null);
 
-  if (!config.respostaWhatsappHabilitada) {
+  // Comando só vale na conexão que ENVIA os avisos. Fora dela (o número de
+  // vendas, por exemplo) a mensagem segue o corte de antes: ignorada e contada,
+  // sem RPC e sem resposta — uma confirmação ali gastaria o ritmo anti-banimento
+  // do número de clientes e ensinaria o comando a quem não devia.
+  if (!config.respostaWhatsappHabilitada || config.sessaoId !== entrada.channelSessionId) {
     await registrarMensagemIgnorada(admin, entrada.organizationId, {
       direction: entrada.direction,
       sessionId: entrada.channelSessionId,
