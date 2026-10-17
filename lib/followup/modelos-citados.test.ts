@@ -50,7 +50,7 @@ const ia = (id: string, fallback?: string): FlowNode => ({
 describe("validateFlowForPublish — modelo que não existe nesta conta", () => {
   it("reprova o passo de modelo e o plano B que a conta não tem, um problema por nó", () => {
     const r = validateFlowForPublish(fluxo(modelo("m1", DE_FORA), ia("ia1", PLANO_B_DE_FORA)), {
-      modelos: new Set([DA_CONTA]),
+      modelos: { prontos: new Set([DA_CONTA]), doCanal: new Set([DA_CONTA]) },
       exigeModeloForaDaJanela: false,
     });
     expect(r.ok).toBe(false);
@@ -63,10 +63,20 @@ describe("validateFlowForPublish — modelo que não existe nesta conta", () => 
 
   it("passa quando o modelo existe na conta", () => {
     const r = validateFlowForPublish(fluxo(modelo("m1", DA_CONTA), ia("ia1", DA_CONTA), ia("ia2")), {
-      modelos: new Set([DA_CONTA]),
+      modelos: { prontos: new Set(), doCanal: new Set([DA_CONTA]) },
       exigeModeloForaDaJanela: false,
     });
     expect(r).toEqual({ ok: true });
+  });
+
+  it("o passo de modelo aceita texto pronto; o plano B, só modelo do canal — é o que o motor lê", () => {
+    const r = validateFlowForPublish(fluxo(modelo("m1", DA_CONTA), ia("ia1", DA_CONTA)), {
+      modelos: { prontos: new Set([DA_CONTA]), doCanal: new Set() },
+      exigeModeloForaDaJanela: false,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors).toEqual([{ node_id: "ia1", code: "modelo_inexistente", message: MENSAGEM_MODELO_INEXISTENTE }]);
   });
 
   it("sem o conjunto do banco a conferência não roda — nunca adivinha", () => {
@@ -100,7 +110,7 @@ describe("carregaModelosCitados", () => {
       meta_templates: [{ id: PLANO_B_DE_FORA }],
     });
     const r = await carregaModelosCitados(client, ORG, fluxo(modelo("m1", DA_CONTA), ia("ia1", PLANO_B_DE_FORA)).nodes);
-    expect(r).toEqual({ ok: true, modelos: new Set([DA_CONTA, PLANO_B_DE_FORA]) });
+    expect(r).toEqual({ ok: true, modelos: { prontos: new Set([DA_CONTA]), doCanal: new Set([PLANO_B_DE_FORA]) } });
     expect(filtros).toEqual([
       "message_templates.select(id)",
       `message_templates.eq(organization_id,${ORG})`,
@@ -113,7 +123,10 @@ describe("carregaModelosCitados", () => {
 
   it("sem modelo citado não consulta nada", async () => {
     const { client, filtros } = clienteQueRegistra({});
-    expect(await carregaModelosCitados(client, ORG, fluxo(ia("ia1")).nodes)).toEqual({ ok: true, modelos: new Set() });
+    expect(await carregaModelosCitados(client, ORG, fluxo(ia("ia1")).nodes)).toEqual({
+      ok: true,
+      modelos: { prontos: new Set(), doCanal: new Set() },
+    });
     expect(filtros).toEqual([]);
   });
 

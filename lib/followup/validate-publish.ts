@@ -4,6 +4,7 @@ import { branchIdForCondition, nodeBranches } from './graph-schema';
 import { rotuloDoRamo } from './rotulo-do-ramo';
 import type { NomesDeValor } from './vocabulario';
 import type { EtapaCitada } from './etapas-citadas';
+import type { ModelosDaConta } from './modelos-citados';
 import { recusaDeMotivoForaDoVocabulario } from '../leads/motivo-da-perda';
 import { capabilitiesOf, transportaMensagem, type ChannelProvider } from '../channels/capabilities';
 import { CUSTO_NO_MOTOR, TETO_DE_PASSOS_DO_MOTOR } from './custo-no-motor';
@@ -133,7 +134,7 @@ export interface ContextoDoPublish {
    * Dos modelos que o grafo cita (`template_id`/`fallback_template_id`), os que
    * existem na organização (`carregaModelosCitados`). Ausente = não confere.
    */
-  modelos?: ReadonlySet<string>;
+  modelos?: ModelosDaConta;
 }
 
 /** Chave do dicionário (a rota traduz): a frase não cita id, que a pessoa não lê. */
@@ -1130,10 +1131,13 @@ export function validateFlowForPublish(
     if (node.type === 'move_lead') conferirEtapaDestino(node, contexto, errors);
     if (node.type === 'edit_lead_tag') conferirTags(node, errors);
     if (node.type === 'action' && contexto.modelos !== undefined) {
+      const { prontos, doCanal } = contexto.modelos;
       const cfg = node.config;
-      const citado =
-        cfg.mode === 'template' ? cfg.template_id : cfg.mode === 'ai_message' ? cfg.fallback_template_id : undefined;
-      if (citado && !contexto.modelos.has(citado)) {
+      const faltando =
+        cfg.mode === 'template'
+          ? !!cfg.template_id && !prontos.has(cfg.template_id) && !doCanal.has(cfg.template_id)
+          : cfg.mode === 'ai_message' && !!cfg.fallback_template_id && !doCanal.has(cfg.fallback_template_id);
+      if (faltando) {
         errors.push({ node_id: node.id, code: 'modelo_inexistente', message: MENSAGEM_MODELO_INEXISTENTE });
       }
     }
