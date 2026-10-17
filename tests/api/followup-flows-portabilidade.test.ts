@@ -194,7 +194,7 @@ describe("GET /api/v1/ai/followup-flows/:id/export", () => {
     const body = (await res.json()) as { data: { file_name: string; file: Row } };
     expect(body.data.file_name).toBe("mover-para-proposta.fluxo.json");
     expect(body.data.file).toMatchObject({
-      format: "deskcomm.followup_flow",
+      format: "followup_flow",
       version: 1,
       flow: {
         name: "Mover para proposta",
@@ -240,7 +240,7 @@ describe("GET /api/v1/ai/followup-flows/:id/export", () => {
 
 function arquivo(stageId: string, nomeDaEtapa = "Proposta · Vendas", nome = "Mover para proposta") {
   return {
-    format: "deskcomm.followup_flow",
+    format: "followup_flow",
     version: 1,
     flow: {
       name: nome,

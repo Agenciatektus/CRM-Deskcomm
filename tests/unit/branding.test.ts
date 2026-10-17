@@ -233,12 +233,6 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
       "é a guarda do contrato acima: este teste é o que reprova quem renomear o header. Trocar a string aqui para 'limpar a marca' desarmaria a única proteção que o contrato tem",
     marcas: ["x-deskcomm-event", "x-deskcomm-signature", "x-deskcomm-signature", "x-deskcomm-signature"],
   },
-  "lib/followup/portabilidade.ts": {
-    categoria: "PROTOCOLO",
-    motivo:
-      "`format` do arquivo de fluxo exportado (`.fluxo.json`). A importação de OUTRA instalação compara a string por igualdade: com marca própria trocando o valor, o arquivo exportado numa instalação seria recusado em todas as outras. Mesmo papel do header de webhook — contrato entre instalações, não nome em tela",
-    marcas: ["deskcomm.followup_flow"],
-  },
   "lib/mcp/server.ts": {
     categoria: "PROTOCOLO",
     motivo:

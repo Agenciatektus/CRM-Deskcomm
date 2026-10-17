@@ -71,7 +71,7 @@ O que **não** é conferido, porque não aponta para registro da conta: o `media
 
 ```json
 {
-  "format": "deskcomm.followup_flow",
+  "format": "followup_flow",
   "version": 1,
   "exported_at": "2026-10-17T12:00:00.000Z",
   "flow": {

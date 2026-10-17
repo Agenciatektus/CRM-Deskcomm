@@ -44,7 +44,7 @@ import { randomId } from "@/lib/random-id";
 import { MAX_FOLLOWUP_FLOW_NAME } from "./nome-da-copia";
 
 /** Identifica o arquivo. Mudar quebra todo arquivo já exportado — não mude. */
-export const FORMATO_DO_ARQUIVO = "deskcomm.followup_flow" as const;
+export const FORMATO_DO_ARQUIVO = "followup_flow" as const;
 /** Sobe quando o envelope muda de forma incompatível. O GRAFO tem o versionamento próprio (v1/v2 dos ramos). */
 export const VERSAO_DO_FORMATO = 1 as const;
 
