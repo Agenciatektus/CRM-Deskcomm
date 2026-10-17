@@ -40,6 +40,7 @@ import { z } from "zod";
 import { triggerConfigSchema, FOLLOWUP_FLOW_SURFACES, type TriggerConfig } from "./api-schemas";
 import { flowGraphSchema, type FlowGraph, type FlowNode } from "./graph-schema";
 import { randomId } from "@/lib/random-id";
+import type { Idioma } from "@/lib/i18n/idiomas";
 
 import { MAX_FOLLOWUP_FLOW_NAME } from "./nome-da-copia";
 
@@ -568,6 +569,17 @@ export function nomeDoImportado(original: string, ocupados: Iterable<string>): s
  * `flatten()` do Zod perde o caminho dos nós, que é justamente o que a pessoa
  * precisa para achar o erro num arquivo de 200 linhas.
  */
+/**
+ * O idioma das mensagens do Zod numa leitura (`schema.safeParse(x, zodNoIdioma(idioma))`).
+ * Sem isto a lista de problemas saía em inglês («Invalid UUID») para quem lê em
+ * português ou espanhol. As frases são as dos locales que o próprio Zod traz;
+ * mensagem escrita no schema continua vencendo o locale.
+ */
+export function zodNoIdioma(idioma: Idioma): { error: z.core.$ZodErrorMap } {
+  // ponytail: locale `pt` do Zod é português de Portugal («Demasiado pequeno»); troque por mapa próprio se alguém tropeçar.
+  return { error: (idioma === "es" ? z.locales.es() : z.locales.pt()).localeError };
+}
+
 export function problemasDoArquivo(erro: z.ZodError, limite = 20): string[] {
   return erro.issues.slice(0, limite).map((issue) => {
     const caminho = issue.path.map(String).join(".");
