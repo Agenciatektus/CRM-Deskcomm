@@ -15,7 +15,7 @@
   "mainPath": ["form", "regras", "acao", "funcao", "historico", "leads", "atividade"],
   "nodes": [
     { "id": "form", "lane": "humano", "col": 1, "type": "frontend", "label": "AssignOwnerForm", "sublabel": "um atendente fixo × em rodízio · subir, descer, pausar, tirar" },
-    { "id": "atividade", "lane": "humano", "col": 4, "type": "frontend", "label": "ActivityTab", "sublabel": "detail.explicacao: Vez de <nome>, posição N · ou o motivo de ninguém" },
+    { "id": "atividade", "lane": "humano", "col": 4, "type": "frontend", "label": "ActivityTab", "sublabel": "detail.nome + posicao no molde traduzido: Vez de <nome>, posição N · ou o motivo de ninguém" },
     { "id": "schema", "lane": "regra", "col": 2, "type": "regra", "label": "configDoAtribuirSchema", "sublabel": "{ user_id } | { modo: rodizio, fila } · um rodízio por regra" },
     { "id": "acao", "lane": "motor", "col": 3, "type": "worker", "label": "actions/assign-owner.ts", "sublabel": "modo rodízio: rpc(regra, lead) e traduz o desfecho" },
     { "id": "regras", "lane": "dados", "col": 2, "type": "tabela", "label": "automation_rules", "sublabel": "a fila mora em actions[].config.fila" },
