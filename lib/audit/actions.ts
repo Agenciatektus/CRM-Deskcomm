@@ -1154,6 +1154,10 @@ export const AUDIT_ACTIONS = [
   // A marca foi removida: só limpa `ai_opt_out`; a conversa segue com a trava
   // de handoff de quem a pôs.
   "contacts.always_human_unmarked",
+  // A tela de Contatos devolvendo a base em CSV/vCard (#2759) — portabilidade,
+  // LGPD art. 18, V. Audita o GESTO com o total de linhas e os filtros que
+  // valiam, nunca o termo de busca.
+  "contacts.exported",
   // O operador carregou a imagem que a Resposta rápida passa a enviar junto
   // com o texto — `POST /message-templates/:id/midias` (#2526). A REMOÇÃO não
   // tem código próprio: ela acontece dentro do `template.updated` (campo
