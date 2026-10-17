@@ -72,7 +72,7 @@ export function TaskReminderPrefs() {
       <h2 className="text-base font-semibold">{t("Lembretes de tarefa")}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {t(
-          "O responsável recebe o aviso mesmo com o site fechado: o sistema procura a pessoa quando o prazo chega perto ou vence.",
+          "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Chega também no aparelho de quem ligou o Push, se esta instalação tiver as chaves do Push (veja o aviso no topo da página).",
         )}
       </p>
 

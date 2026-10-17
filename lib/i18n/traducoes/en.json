@@ -9162,7 +9162,7 @@
   "Nenhum contato encontrado": "No contact found",
   "A conversa abriu, mas a primeira mensagem não pôde ser enviada.": "The conversation opened, but the first message could not be sent.",
   "Lembretes de tarefa": "Task reminders",
-  "O responsável recebe o aviso mesmo com o site fechado: o sistema procura a pessoa quando o prazo chega perto ou vence.": "The responsible person gets the notice even with the site closed: the system looks for them when the deadline nears or passes.",
+  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Chega também no aparelho de quem ligou o Push, se esta instalação tiver as chaves do Push (veja o aviso no topo da página).": "The notice stays in the responsible person's Notification center when the deadline nears or passes, even if nobody has the site open. It also reaches the device of anyone who turned on Push, if this installation has the Push keys (see the notice at the top of the page).",
   "Avisar quando a tarefa está perto do vencimento": "Notify when a task is near its deadline",
   "Antecedência do aviso": "Notice lead time",
   "15 minutos": "15 minutes",

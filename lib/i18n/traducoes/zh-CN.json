@@ -5698,7 +5698,7 @@
   "Janela cancelada. O que ela já pausou continua pausado.": "窗口已取消。它已暂停的连接将保持暂停。",
   "Não foi possível cancelar a janela.": "无法取消窗口。",
   "Lembretes de tarefa": "任务提醒",
-  "O responsável recebe o aviso mesmo com o site fechado: o sistema procura a pessoa quando o prazo chega perto ou vence.": "负责人即使在网站关闭时也会收到提醒：临近截止或已逾期时系统会主动找到本人。",
+  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Chega também no aparelho de quem ligou o Push, se esta instalação tiver as chaves do Push (veja o aviso no topo da página).": "临近截止或已逾期时，提醒会留在负责人的通知中心，即使没有人打开网站。已开启推送的人也会在设备上收到，前提是本安装已配置推送密钥（见页面顶部的提示）。",
   "Avisar quando a tarefa está perto do vencimento": "任务临近截止时提醒",
   "Antecedência do aviso": "提前提醒时间",
   "15 minutos": "15 分钟",
