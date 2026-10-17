@@ -41,6 +41,9 @@ import { evaluateCondition, selectEdge, type LeadFacts } from "./node-handlers";
 /** Quantos nós a travessia sobe antes de desistir — espera→espera em cadeia é raro e 8 é folga. */
 const MAX_SUBIDA = 8;
 
+/** Campos que nem o fluxo nem o relógio mudam entre a condição e o envio. */
+const CAMPOS_REAVALIADOS: ReadonlySet<string> = new Set(["lead_stage", "tag"]);
+
 export interface CondicaoQueGoverna {
   condicao: Extract<FlowNode, { type: "condition" }>;
   /** O que o caminho até o envio assumiu: veio pelo ramo do Sim (`true`) ou do Não. */
@@ -75,6 +78,14 @@ export function condicaoQueGoverna(
       // escape não é promessa de nada — reavaliar seria inventar intenção.
       if (entrada.condition.type !== "cond_result") return null;
       if (origem.config.branching === "per_check") return null;
+      // Só reavalia o que muda FORA do fluxo e que o relógio não mexe. Os outros
+      // campos mudam por causa do próprio caminho até aqui, e reavaliá-los
+      // desviaria envio legítimo:
+      //  - `steps_taken` sobe a cada passo (a espera já o incrementou);
+      //  - `last_outcome` o motor só carrega no nó `condition` — no envio é `null`;
+      //  - `lead_date` é relativo ao relógio: "falta 3 dias → espera 3 dias"
+      //    deixa de valer pela própria espera.
+      if (origem.config.checks.some((c) => !CAMPOS_REAVALIADOS.has(c.field))) return null;
       return { condicao: origem, esperado: entrada.condition.value };
     }
 

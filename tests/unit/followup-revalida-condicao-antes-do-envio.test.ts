@@ -224,3 +224,122 @@ describe("o motor nao envia quando a condicao deixou de valer", () => {
     expect(eventos.some((e) => e.event_type === "condition_revalidated")).toBe(false);
   });
 });
+
+/* ─── O que o fluxo ou o relógio mudam NÃO é reavaliado ───────────────────────
+ *
+ * `steps_taken` sobe a cada passo, `last_outcome` só é carregado no nó
+ * `condition` (no envio é `null`) e `lead_date` é relativo ao relógio. Reavaliar
+ * qualquer um deles no envio desviava envio legítimo pelo ramo do Não. */
+
+function condicaoSobre(check: Record<string, unknown>): FlowNode {
+  return {
+    id: "cond-1",
+    type: "condition",
+    label: "c",
+    position: { x: 0, y: 0 },
+    config: { combinator: "and", checks: [{ id: "r1", label: "r", ...check }] },
+  } as unknown as FlowNode;
+}
+
+function motorCom(opts: {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  steps: number;
+  eventosExtras?: Array<Record<string, unknown>>;
+  custom_fields?: Record<string, unknown>;
+}) {
+  const eventos: Array<Record<string, unknown>> = [];
+  const db: Record<string, unknown> = {
+    loadFlowGraph: async () => ({ nodes: opts.nodes, edges: opts.edges }) as unknown as FlowGraph,
+    loadLeadFacts: async () => ({ lead_stage: ETAPA, tags: [], custom_fields: opts.custom_fields }),
+    loadEnrollmentEvents: async () => [
+      ...(opts.eventosExtras ?? []),
+      {
+        node_id: "act-1",
+        idempotency_key: `act-1:${opts.steps}:wait_started`,
+        event_type: "wait_started",
+        payload: {},
+      },
+    ],
+    loadLastInboundBody: async () => null,
+    loadFlowPointerName: async () => null,
+    loadRenderContext: async () => null,
+    insertEnrollmentEvent: async (e: Record<string, unknown>) => {
+      eventos.push(e);
+      return { inserted: true };
+    },
+    updateEnrollment: async () => {},
+    applyEnrollmentStep: async () => {},
+    assertServiceBoundary: async () => {},
+    assertAgenda: async () => {},
+    retornoQueSeguraOFluxo: async () => null,
+  };
+  const enqueueJob = vi.fn(async () => {});
+  const deps = { db: db as unknown as AdminClient, clock: () => NOW, enqueueJob } as TickDeps;
+  return { run: () => avancarEnrollmentAtivo(deps, { ...enrollment(), steps_taken: opts.steps }), eventos, enqueueJob };
+}
+
+const SIM_ESPERA_ENVIO = [
+  aresta("cond-1", "wait-1", { type: "cond_result", value: true }),
+  aresta("cond-1", "fim", { type: "cond_result", value: false }),
+  aresta("wait-1", "act-1", { type: "always" }),
+];
+const CLASSIFICOU_INTERESSADO = {
+  node_id: "cls",
+  idempotency_key: "cls:0:ai_classified",
+  event_type: "ai_classified",
+  payload: { class: "interessado" },
+};
+
+describe("campos que o fluxo ou o relógio mudam não desviam o envio", () => {
+  it("last_outcome eq interessado → espera → envio: enfileira", async () => {
+    const m = motorCom({
+      nodes: [condicaoSobre({ field: "last_outcome", op: "eq", value: "interessado" }), ESPERA, ENVIO, FIM],
+      edges: SIM_ESPERA_ENVIO,
+      steps: 2,
+      eventosExtras: [CLASSIFICOU_INTERESSADO],
+    });
+    await m.run();
+    expect(m.enqueueJob).toHaveBeenCalled();
+    expect(m.eventos.some((e) => e.event_type === "condition_revalidated")).toBe(false);
+  });
+
+  it("last_outcome eq interessado → envio direto, sem espera: enfileira", async () => {
+    const m = motorCom({
+      nodes: [condicaoSobre({ field: "last_outcome", op: "eq", value: "interessado" }), ENVIO, FIM],
+      edges: [
+        aresta("cond-1", "act-1", { type: "cond_result", value: true }),
+        aresta("cond-1", "fim", { type: "cond_result", value: false }),
+      ],
+      steps: 2,
+      eventosExtras: [CLASSIFICOU_INTERESSADO],
+    });
+    await m.run();
+    expect(m.enqueueJob).toHaveBeenCalled();
+    expect(m.eventos.some((e) => e.event_type === "condition_revalidated")).toBe(false);
+  });
+
+  it("steps_taken lte 1 → espera → envio com steps=3: enfileira", async () => {
+    const m = motorCom({
+      nodes: [condicaoSobre({ field: "steps_taken", op: "lte", value: 1 }), ESPERA, ENVIO, FIM],
+      edges: SIM_ESPERA_ENVIO,
+      steps: 3,
+    });
+    await m.run();
+    expect(m.enqueueJob).toHaveBeenCalled();
+    expect(m.eventos.some((e) => e.event_type === "condition_revalidated")).toBe(false);
+  });
+
+  it("lead_date falta_para 3 → espera que atravessa o limiar → envio: enfileira", async () => {
+    // No envio faltam 2 dias (era ≥3 quando passou pela condição).
+    const m = motorCom({
+      nodes: [condicaoSobre({ field: "lead_date", op: "falta_para", value: 3, key: "fim_teste" }), ESPERA, ENVIO, FIM],
+      edges: SIM_ESPERA_ENVIO,
+      steps: 2,
+      custom_fields: { fim_teste: "2026-10-17" },
+    });
+    await m.run();
+    expect(m.enqueueJob).toHaveBeenCalled();
+    expect(m.eventos.some((e) => e.event_type === "condition_revalidated")).toBe(false);
+  });
+});
