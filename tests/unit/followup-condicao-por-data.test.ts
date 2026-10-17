@@ -158,6 +158,43 @@ describe("o contrato da regra no grafo", () => {
     const { key: _key, ...semKey } = base;
     expect(conditionCheckSchema.safeParse(semKey).success).toBe(true);
     expect(conditionCheckSchema.safeParse({ ...base, key: "   " }).success).toBe(true);
+    // A chave VAZIA é o que o painel grava quando a pessoa apaga o campo (o
+    // `onChange` faz `trim()`). Com `min(1)` o rascunho reprovava, o `onChange`
+    // nunca era chamado, a tela mostrava o erro cru do zod em inglês e o nó
+    // seguia com a chave antiga — achado pela prova de tela de 17/10.
+    expect(conditionCheckSchema.safeParse({ ...base, key: "" }).success).toBe(true);
+  });
+
+  it("chave vazia passa no rascunho e é o publish que recusa, com a frase própria", async () => {
+    const { validateFlowForPublish } = await import("../../lib/followup/validate-publish");
+    const graph = {
+      nodes: [
+        { id: "t", type: "trigger", label: "Começo", position: { x: 0, y: 0 }, config: {} },
+        {
+          id: "c",
+          type: "condition",
+          label: "Teste acabou?",
+          position: { x: 0, y: 0 },
+          config: { combinator: "and", checks: [{ ...base, key: "" }] },
+        },
+        { id: "f", type: "end", label: "Fim", position: { x: 0, y: 0 }, config: { outcome: "exhausted" } },
+      ],
+      edges: [
+        { id: "e0", source: "t", target: "c", priority: 0, condition: { type: "always" } },
+        { id: "e1", source: "c", target: "f", priority: 0, condition: { type: "cond_result", value: true } },
+        { id: "e2", source: "c", target: "f", priority: 1, condition: { type: "cond_result", value: false } },
+      ],
+    };
+    const r = validateFlowForPublish(graph as never, {} as never);
+    expect(r.ok).toBe(false);
+    const erro = r.ok ? undefined : r.errors.find((e) => e.code === "campo_de_data_ausente");
+    expect(erro?.message).toBe("Regra 1: escolha o campo do negócio que guarda a data.");
+  });
+
+  it("chave longa demais reprova com frase em português, não com o erro cru do zod", () => {
+    const r = conditionCheckSchema.safeParse({ ...base, key: "x".repeat(61) });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0]?.message).toBe("Nome do campo muito longo: máximo de 60 caracteres.");
   });
 
   it("recusa regra de data com operador que não é de data", () => {

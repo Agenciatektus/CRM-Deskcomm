@@ -351,11 +351,12 @@ export const conditionCheckSchema = z
     value: z.union([z.string(), z.number()]),
     /**
      * A chave em `crm_leads.custom_fields` que a regra lê (ex.: `fim_teste`).
-     * Só `lead_date` usa, e para ele é OBRIGATÓRIA: regra de data sem campo não
-     * tem o que comparar, e deixá-la passar daria uma condição que responde
-     * sempre `false` sem dizer por quê.
+     * Só `lead_date` usa, e para ele é OBRIGATÓRIA no PUBLISH: regra de data
+     * sem campo não tem o que comparar, e deixá-la passar daria uma condição
+     * que responde sempre `false` sem dizer por quê. Aqui, no rascunho, a
+     * chave VAZIA passa — ver o aviso logo abaixo.
      */
-    key: z.string().min(1).max(60).optional(),
+    key: z.string().max(60, 'Nome do campo muito longo: máximo de 60 caracteres.').optional(),
   })
   // ⚠️ `key` VAZIA PASSA AQUI, de propósito, e isso foi achado pela prova de
   // tela. O rascunho é validado SÓ estruturalmente — a mesma razão pela qual

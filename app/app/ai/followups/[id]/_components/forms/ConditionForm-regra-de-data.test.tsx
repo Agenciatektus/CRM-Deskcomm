@@ -166,6 +166,23 @@ describe("o que o painel GRAVA no grafo", () => {
     await waitFor(() => expect(ultimaRegra(onChange).key).toBe("fim_teste"));
   });
 
+  it("APAGAR o nome do campo grava a chave vazia, sem erro cru na tela", async () => {
+    // Achado pela prova de tela de 17/10: com `key` exigindo 1 caractere no
+    // schema do rascunho, apagar o campo reprovava o `safeParse`, o `onChange`
+    // nunca era chamado (o nó seguia com «fim_teste») e a tela mostrava
+    // «Too small: expected string to have >=1 characters». Quem recusa a regra
+    // sem campo é o publish (`campo_de_data_ausente`), não o rascunho.
+    const user = userEvent.setup();
+    const { onChange } = montar([
+      { field: "lead_date", op: "passou_ha", value: 0, key: "fim_teste" },
+    ]);
+
+    await user.clear(screen.getByLabelText("Campo do negócio com a data"));
+
+    await waitFor(() => expect(ultimaRegra(onChange).key).toBe(""));
+    expect(screen.queryByText(/too small/i)).not.toBeInTheDocument();
+  });
+
   it("trocar para OUTRO campo descarta a chave — regra de etiqueta não guarda fim_teste", async () => {
     const user = userEvent.setup();
     const { onChange } = montar([
