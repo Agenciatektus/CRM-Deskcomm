@@ -35,12 +35,14 @@ function situacao(p: Partial<Situacao> = {}): Situacao {
   return {
     assinaturaRef: "sub_1", existe: true, assinaturasVivas: 1, cancelada: false, cancelaNoFim: false, emAtraso: false,
     vencidaDesde: null, proximoVencimento: new Date("2026-11-01T00:00:00Z"), jaPagou: true, emTesteNoProvedorAte: null,
-    pagamentoSemAssinaturaViva: false, linkDePagamento: null, statusBruto: "active", ...p,
+    pagamentoSemAssinaturaViva: false, linkDePagamento: null, statusBruto: "active", precoCents: null, ...p,
   };
 }
 
 interface Mundo {
   linha: Record<string, unknown> | null;
+  /** A linha de `cobranca_planos` que a leitura do preço da conferência devolve. */
+  plano: Record<string, unknown> | null;
   org: Record<string, unknown>;
   /** Quantas compare-and-set seguidas perdem; `aoPerder` é o escritor concorrente. */
   casPerdidos: number;
@@ -57,6 +59,7 @@ const enviarAviso = vi.fn();
 function responder(c: Cadeia): Resposta {
   if (c.tabela === "organizations") return { data: m.org };
   if (c.tabela === "agent_inbox_items") return { data: null };
+  if (c.tabela === "cobranca_planos") return { data: m.plano };
   const op = operacao(c);
   if (op === "select") return { data: m.linha };
   const campos = argumentos(c, "update")?.[0] as Record<string, unknown>;
@@ -91,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m = {
     linha: { ...LINHA },
+    plano: { id: "plano-a", preco_cents: 4990 },
     org: { status: "active", suspended_kind: null, locale: "pt-BR", timezone: "America/Sao_Paulo" },
     casPerdidos: 0,
     aoPerder: null,
@@ -136,6 +140,26 @@ describe("sincronizar", () => {
       action: "cobranca.estado_mudou", organizationId: ORG, metadata: { de: "ativa", para: "em_atraso", status_bruto: "past_due" },
     }));
     expect(enviarAviso.mock.calls[0]?.[3]).toBe("https://invoice.stripe.com/i/x");
+  });
+
+  // #2609: a sincronização CONFERE o preço da assinatura no provedor contra o
+  // preço do plano gravado. O alvo é o agendado, senão o atual — o mesmo que
+  // `troca.ts` leva ao provedor. Divergiu: os dois números vão para o audit.
+  it("⭐ #2609 preço da assinatura no provedor ≠ preço do plano gravado: detectado e auditado", async () => {
+    ler.mockResolvedValue(situacao({ precoCents: 9990 }));
+    expect(await rodar()).toMatchObject({ tipo: "aplicada" });
+    expect(acoes()).toContain("cobranca.preco_divergente");
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.preco_divergente",
+      organizationId: ORG,
+      metadata: expect.objectContaining({ plano_id: "plano-a", preco_plano_cents: 4990, preco_provedor_cents: 9990, provedor: "stripe" }),
+    }));
+  });
+
+  it("#2609 controle: preço do provedor igual ao do plano — nada auditado", async () => {
+    ler.mockResolvedValue(situacao({ precoCents: 4990 }));
+    expect(await rodar()).toMatchObject({ tipo: "aplicada" });
+    expect(acoes()).not.toContain("cobranca.preco_divergente");
   });
 
   it("⭐ leitura mais velha que a já aplicada é descartada: nada de audit, nada de régua", async () => {
@@ -260,5 +284,130 @@ describe("sincronizar", () => {
     expect(campos).toMatchObject({ estado: "cancelada", plano_agendado_id: null });
     expect(Object.keys(campos)).not.toContain("plano_id");
     expect(acoes()).not.toContain("cobranca.plano_trocado");
+  });
+});
+
+// #2846: o dinheiro da troca proporcional e da entrada paga passa por aqui.
+describe("sincronizar — upgrade proporcional", () => {
+  const lerPagamento = vi.fn<AdaptadorDeCobranca["lerPagamentoProporcional"]>();
+  const trocarPlano = vi.fn<AdaptadorDeCobranca["trocarPlano"]>();
+  const expirar = vi.fn<AdaptadorDeCobranca["expirarSessao"]>();
+  const depsDoUpgrade = (): DependenciasDaCobranca => ({
+    ...deps(),
+    adaptador: () => ({ lerSituacao: ler, cancelarNoFim, lerPagamentoProporcional: lerPagamento, trocarPlano, expirarSessao: expirar } as unknown as AdaptadorDeCobranca),
+  });
+  const rodarUpgrade = () => sincronizar(banco.cliente as never, ORG, depsDoUpgrade());
+
+  beforeEach(() => {
+    m.linha = {
+      ...LINHA, troca_id: "troca-1", troca_status: "aguardando_pagamento", troca_pagamento_ref: "cs_1",
+      plano_troca_pendente_id: "plano-b", pagamento_inicial_pendente: false,
+      // O prazo da cobrança: o fim do período em que a conta foi feita.
+      troca_reserva_ate: "2026-11-01T00:00:00.000Z",
+    };
+    m.plano = { id: "plano-b", nome: "Profissional", preco_cents: 9990, intervalo: "mes" };
+  });
+
+  it("⭐ pagamento ainda pendente: o plano NÃO muda, o provedor não troca o preço, nada se audita como troca", async () => {
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(lerPagamento).toHaveBeenCalledWith("cs_1");
+    expect(trocarPlano).not.toHaveBeenCalled();
+    for (const c of escritas()) expect(argumentos(c, "update")?.[0]).not.toHaveProperty("plano_id", "plano-b");
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_status: "aguardando_pagamento", plano_troca_pendente_id: "plano-b" });
+    expect(acoes()).not.toContain("cobranca.plano_trocado");
+  });
+
+  it("pago: troca o preço no provedor, aplica o plano novo e audita (o controle do caso acima)", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    await rodarUpgrade();
+    expect(trocarPlano).toHaveBeenCalledWith({ assinaturaRef: "sub_1", plano: { id: "plano-b", nome: "Profissional", precoCents: 9990, intervalo: "mes" } });
+    expect(m.linha).toMatchObject({ plano_id: "plano-b", troca_status: null, plano_troca_pendente_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: { de: "plano-a", para: "plano-b", quando: "upgrade_proporcional_pago" },
+    }));
+  });
+  it("⭐ não pago e com o prazo vencido: a cobrança morre no provedor e sai da linha — não fica pagável nem trava a próxima troca", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(expirar).toHaveBeenCalledWith("cs_1");
+    expect(trocarPlano).not.toHaveBeenCalled();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_id: null, troca_status: null, troca_pagamento_ref: null });
+  });
+
+  it("controle: não pago e no prazo — a cobrança segue viva", async () => {
+    lerPagamento.mockResolvedValue("pendente");
+    await rodarUpgrade();
+    expect(expirar).not.toHaveBeenCalled();
+    expect(m.linha).toMatchObject({ troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
+
+  it("vencida e o provedor não confirma a expiração: a linha NÃO esquece a cobrança (ela ainda pode ser paga)", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pendente");
+    expirar.mockRejectedValueOnce(new ErroDoProvedor(503, "api_error", true));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
+
+  it("⭐ pago FORA do prazo: o plano só vale na próxima cobrança paga (agendado): ela foi calculada para um período que já acabou", async () => {
+    m.linha = { ...m.linha!, troca_reserva_ate: ha(1) };
+    lerPagamento.mockResolvedValue("pago");
+    await rodarUpgrade();
+    expect(trocarPlano).toHaveBeenCalledOnce();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", plano_agendado_id: "plano-b", troca_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: { de: "plano-a", para: "plano-b", quando: "upgrade_proporcional_pago_fora_do_prazo" },
+    }));
+  });
+
+  it("⭐ pago e o provedor recusa de vez a troca de preço (assinatura cancelada no meio): a diferença foi paga, o plano vale, e a recusa fica auditada", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    trocarPlano.mockRejectedValueOnce(new ErroDoProvedor(400, "resource_missing", false));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ plano_id: "plano-b", troca_id: null });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "cobranca.plano_trocado", metadata: expect.objectContaining({ preco_no_provedor: "recusado" }),
+    }));
+  });
+
+  it("pago e o provedor fora do ar: nada aplicado agora, a próxima leitura tenta de novo", async () => {
+    lerPagamento.mockResolvedValue("pago");
+    trocarPlano.mockRejectedValueOnce(new ErroDoProvedor(503, "api_error", true));
+    await rodarUpgrade();
+    expect(m.linha).toMatchObject({ plano_id: "plano-a", troca_id: "troca-1", troca_status: "aguardando_pagamento" });
+  });
+});
+
+describe("sincronizar — entrada paga (plano sem dias de teste)", () => {
+  beforeEach(() => {
+    // Como o gatilho da 0679 a deixa: teste de 0 dias, suspensa por cobrança.
+    m.linha = { ...LINHA, estado: "trial", trial_ate: ha(2), proximo_vencimento: null, pagamento_inicial_pendente: true, assinaturas_vivas: 0 };
+    m.org = { ...m.org, status: "suspended", suspended_kind: "cobranca" };
+  });
+
+  it("⭐ sem pagamento confirmado no provedor: continua suspensa e a entrada continua pendente", async () => {
+    ler.mockResolvedValue(situacao({ existe: false, jaPagou: false, assinaturasVivas: 1, proximoVencimento: null, statusBruto: "ACTIVE:sem_pagamento" }));
+    const r = await rodar();
+    expect(r).not.toMatchObject({ acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")).toEqual([]);
+    for (const c of escritas()) expect(argumentos(c, "update")?.[0]).not.toHaveProperty("pagamento_inicial_pendente");
+    expect(m.linha).toMatchObject({ pagamento_inicial_pendente: true });
+  });
+
+  it("pagamento confirmado: a entrada deixa de estar pendente e o acesso volta", async () => {
+    ler.mockResolvedValue(situacao());
+    expect(await rodar()).toMatchObject({ tipo: "aplicada", estado: "ativa", acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")[0]?.args).toEqual({ p_org: ORG, p_kind_exigido: "cobranca", p_ator: null });
+    expect(m.linha).toMatchObject({ pagamento_inicial_pendente: false, estado: "ativa" });
+  });
+
+  it("sem provedor (ninguém pagou nada): a régua não reativa", async () => {
+    m.linha = { ...m.linha, provedor: null, provedor_cliente_id: null, provedor_assinatura_id: null, relida_em: null };
+    const r = await rodar();
+    expect(r).toMatchObject({ tipo: "sem_provedor" });
+    expect(r).not.toMatchObject({ acao: "reativar" });
+    expect(rpcs("fn_reativar_organizacao")).toEqual([]);
   });
 });
