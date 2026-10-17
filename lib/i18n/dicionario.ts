@@ -16150,6 +16150,28 @@ export const DICIONARIO: Traducoes = {
   "atualizado": { es: "actualizado" },
   "recusado": { es: "rechazado" },
   "Recusado.": { es: "Rechazado." },
+  // #2041 — rodízio de atendentes na ação assign_owner.
+  "Como atribuir": { es: "Cómo asignar" },
+  "Um atendente fixo": { es: "Un asesor fijo" },
+  "Em rodízio entre estas pessoas": { es: "En rotación entre estas personas" },
+  "Fila do rodízio": { es: "Fila de la rotación" },
+  "Cada lead vai para a próxima pessoa da fila, nesta ordem. Quem está pausado é pulado sem sair da fila.": { es: "Cada lead va a la siguiente persona de la fila, en este orden. Quien está en pausa se salta sin salir de la fila." },
+  "Ninguém na fila ainda. Adicione pelo menos uma pessoa.": { es: "Todavía no hay nadie en la fila. Agrega al menos una persona." },
+  "pausado": { es: "en pausa" },
+  "Subir na fila": { es: "Subir en la fila" },
+  "Descer na fila": { es: "Bajar en la fila" },
+  "Voltar ao rodízio": { es: "Volver a la rotación" },
+  "Pausar no rodízio": { es: "Pausar en la rotación" },
+  "Tirar da fila": { es: "Quitar de la fila" },
+  "Adicionar à fila": { es: "Agregar a la fila" },
+  "Escolha quem entra no rodízio": { es: "Elige quién entra en la rotación" },
+  "Rodízio": { es: "Rotación" },
+  "Monte a fila do rodízio com pelo menos uma pessoa, sem repetir ninguém.": { es: "Arma la fila de la rotación con al menos una persona, sin repetir a nadie." },
+  "Uma automação tem no máximo um rodízio de atendentes, como ação direta: a vez de cada pessoa é contada pela automação.": { es: "Una automatización tiene como máximo una rotación de asesores, como acción directa: el turno de cada persona lo cuenta la automatización." },
+  "Ninguém da fila do rodízio pode receber agora: todos estão pausados, saíram da equipe ou só visualizam. O lead ficou sem responsável.": { es: "Nadie de la fila de la rotación puede recibir ahora: todos están en pausa, salieron del equipo o solo visualizan. El lead quedó sin responsable." },
+  "A fila do rodízio desta automação está vazia. Abra a automação e escolha quem entra no rodízio.": { es: "La fila de la rotación de esta automatización está vacía. Abre la automatización y elige quién entra en la rotación." },
+  "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.": { es: "La automatización fue modificada y ya no tiene la rotación que disparó esta acción. No se asignó nada." },
+  "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": { es: "El lead de este evento no se encontró en esta organización, así que no se asignó a nadie." },
 };
 
 /**
