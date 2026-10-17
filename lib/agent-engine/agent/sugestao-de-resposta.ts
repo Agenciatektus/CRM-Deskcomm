@@ -251,7 +251,7 @@ export function motivoDoVeto(codigo: string | null | undefined): MotivoDaFalha |
         codigo,
         acionavel: true,
         texto:
-          "Não foi possível gerar a sugestão: o contato pode ter pedido para não receber mensagens ou ter sido anonimizado, ou a geração falhou. Tente de novo; se repetir, o motivo ficou registrado no servidor.",
+          "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.",
       };
     default:
       return null;

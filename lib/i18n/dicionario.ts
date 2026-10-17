@@ -16019,7 +16019,7 @@ export const DICIONARIO: Traducoes = {
   "A resposta afirmava um fato sem apoio no material de referência. Nada foi enviado — confira a base de conhecimento e gere de novo.": { es: "La respuesta afirmaba un hecho sin respaldo en el material de referencia. Nada fue enviado — revisa la base de conocimiento y genera de nuevo." },
   "A resposta ia mostrar um produto que não foi encontrado no cadastro. Confira o produto e gere de novo.": { es: "La respuesta iba a mostrar un producto que no se encontró en el registro. Revisa el producto y genera de nuevo." },
   "A sugestão tentou usar uma ação que a prévia não reconhece. Gere de novo; se repetir, revise as ferramentas ligadas no agente.": { es: "La sugerencia intentó usar una acción que la previsualización no reconoce. Genera de nuevo; si se repite, revisa las herramientas activadas en el agente." },
-  "Não foi possível gerar a sugestão: o contato pode ter pedido para não receber mensagens ou ter sido anonimizado, ou a geração falhou. Tente de novo; se repetir, o motivo ficou registrado no servidor.": { es: "No fue posible generar la sugerencia: el contacto puede haber pedido no recibir mensajes o haber sido anonimizado, o la generación falló. Inténtalo de nuevo; si se repite, el motivo quedó registrado en el servidor." },
+  "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.": { es: "La generación de la sugerencia falló, o no se pudo armar el contexto de la conversación. Inténtalo de nuevo; si se repite, el motivo quedó registrado en el servidor." },
 };
 
 /**

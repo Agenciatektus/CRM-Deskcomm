@@ -171,15 +171,16 @@ describe("o código do veto vira a causa em linguagem de quem opera", () => {
     expect(motivoDoVeto("lgpd_anonymized")!.acionavel).toBe(false);
   });
 
-  it("generation_failed não nomeia causa: o mesmo catch grava o opt-out e a anonimização", () => {
-    // `reply-drafts.ts` lança `reply_context_unavailable` DENTRO do try quando o
-    // contato está bloqueado ou anonimizado, e o catch grava `generation_failed`.
-    // Uma frase que culpe o provedor manda quem atende um descadastrado conferir
-    // a chave de IA — e, como o rascunho persiste, a mentira fica na tela.
+  it("generation_failed abre pela falha de geração e não culpa provedor nem chave", () => {
+    // Quem grava `generation_failed` é o catch de `reply-drafts.ts`: a prévia ou o
+    // LLM lançou, ou `getLeadContext` não montou o contexto. Contato bloqueado ou
+    // anonimizado é recusado ANTES, por `fn_reply_begin` (rota 422
+    // `reply_context_unavailable`, sem rascunho gravado) — por isso a frase não o
+    // nomeia como causa. E não manda conferir a chave: o motivo real fica no log.
     const texto = motivoDoVeto("generation_failed")!.texto;
     expect(texto).not.toMatch(/provedor|chave|tempo esgotado/i);
-    expect(texto).toMatch(/não receber mensagens/);
-    expect(texto).toMatch(/anonimizado/);
+    expect(texto).toMatch(/^A geração da sugestão falhou/);
+    expect(texto).toMatch(/contexto da conversa/);
   });
 
   it("CONTROLE: código desconhecido e ausente devolvem null — o genérico fica", () => {
