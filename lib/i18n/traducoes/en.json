@@ -7964,6 +7964,7 @@
   "A conversa tocou em assunto jurídico": "The conversation touched on a legal matter",
   "A conversa tocou em reembolso": "The conversation touched on a refund",
   "Uma pessoa da equipe escalou um atendimento": "Someone on the team escalated a conversation",
+  "Um fluxo automático coletou dados e passou a conversa para verificação humana": "An automated flow collected data and handed the conversation over for human review",
   "A mensagem ficou na fila porque o canal está fora do ar": "The message stayed queued because the channel is down",
   "O canal recusou a mensagem de aviso": "The channel rejected the alert message",
   "O contato não tem telefone cadastrado": "The contact has no phone number on file",
