@@ -153,7 +153,7 @@ export function ContactsListClient() {
 
   return (
     <div className="space-y-4 p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{t("Contatos")}</h1>
           <p className="text-sm text-muted-foreground">
@@ -161,11 +161,15 @@ export function ContactsListClient() {
           </p>
         </div>
         {/*
-          A estrutura é a da main (o "Importar CSV" do PR #313); o `shrink-0`
-          vem do PR #267, e vale para todos os botões: numa tela de 390px
-          uma linha de botões sem isso comprime os rótulos.
+          A estrutura é a da main (o "Importar CSV" do PR #313). Os botões
+          QUEBRAM linha em vez de encolher: o `whitespace-nowrap` do Button já
+          impede o rótulo de comprimir, e o `shrink-0` que estava aqui (PR #267)
+          fazia a fila inteira passar da tela — medido em 390px, "Novo contato"
+          em 446–585. O `flex-wrap` do header faz o mesmo um nível acima: quando
+          título e botões não cabem lado a lado, os botões descem para a linha
+          de baixo, e o título não é espremido. Onde cabem (1280px), nada muda.
         */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/*
             A porta do recurso de duplicados fica AQUI, na tela que já existe, e
             não num item de menu novo: quem descobre que tem contato repetido
