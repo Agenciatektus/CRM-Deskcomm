@@ -5,13 +5,14 @@
  * o valor de um campo de escopo `contato` (#2791) mora em `contacts.custom_fields`.
  * Uma regra assim seria salva e nunca dispararia, sem erro e sem log. O seletor
  * da tela já não oferece o campo (`camposDeDataDoNegocio`); esta é a mesma regra
- * pela porta da API e da regra antiga regravada.
+ * pela porta da API, da regra antiga regravada e do religar pelo MCP
+ * (`definirRegraAtiva`).
  */
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { configDoGatilhoDeData, GATILHO_DE_DATA_DO_FUNIL } from "@/lib/automation/gatilho-de-data-do-funil";
 import { campoEhDoContato } from "@/lib/leads/campos-do-funil";
-import type { createClient } from "@/lib/supabase/server";
 
 export const MENSAGEM_CAMPO_DE_DATA_DO_CONTATO =
   "Este campo de data é do contato, e o gatilho por data só lê campos do negócio. Escolha um campo de data do negócio.";
@@ -21,7 +22,7 @@ export const MENSAGEM_CAMPO_DE_DATA_DO_CONTATO =
  * declarada no funil como campo do contato. Erro de banco sobe como `{ erro }`.
  */
 export async function campoDoGatilhoDeDataEhDoContato(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   orgId: string,
   triggerEvent: string,
   triggerConfig: unknown,
