@@ -33,6 +33,7 @@ import {
 } from "@/lib/automation/gatilhos-de-tempo";
 import {
   MENSAGEM_DO_LACO_DE_LEAD,
+  MENSAGEM_DO_RODIZIO_FORA_DO_LUGAR,
   acoesQueFechamLaco,
   createAutomationRuleSchema,
   type CreateAutomationRuleInput,
@@ -144,6 +145,8 @@ export const PROBLEMA_DO_CAMPO: Record<string, string> = {
   instruction: "Diga o que a IA deve fazer com os dados.",
   tags: "Escreva de 1 a 10 tags, cada uma com até 60 caracteres.",
   user_id: "Escolha o atendente.",
+  fila: "Monte a fila do rodízio com pelo menos uma pessoa, sem repetir ninguém.",
+  modo: MENSAGEM_DO_RODIZIO_FORA_DO_LUGAR,
   url: "Informe um endereço válido, começando com https://.",
   flow_pointer_id: "Escolha o fluxo de follow-up.",
   titulo: "Dê um título à tarefa.",

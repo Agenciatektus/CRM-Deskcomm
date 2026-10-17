@@ -96,6 +96,14 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
     "A pessoa escolhida como responsável não é atendente desta equipe. Escolha outra pessoa na automação.",
   invalid_owner:
     "A pessoa escolhida como responsável não pode atender — o papel dela é só de visualização. Escolha um atendente.",
+  /* #2041 — o modo rodízio de `assign_owner`. Nascem em
+     fn_automation_rodizio_atribuir e saem literais de lib/automation/actions/assign-owner.ts. */
+  ninguem_disponivel:
+    "Ninguém da fila do rodízio pode receber agora: todos estão pausados, saíram da equipe ou só visualizam. O lead ficou sem responsável.",
+  fila_vazia: "A fila do rodízio desta automação está vazia. Abra a automação e escolha quem entra no rodízio.",
+  sem_rodizio:
+    "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.",
+  lead_nao_encontrado: "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.",
   missing_input:
     "A ação não recebeu o que precisava (o lead do evento ou a pessoa configurada). Abra a automação e revise.",
   no_tags: "Esta ação não tem nenhuma etiqueta escolhida. Abra a automação e escolha pelo menos uma.",
