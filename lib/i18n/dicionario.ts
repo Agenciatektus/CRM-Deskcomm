@@ -3438,6 +3438,7 @@ export const DICIONARIO: Traducoes = {
   "O cliente respondeu": { es: "El cliente respondió" },
   "O cliente não respondeu a tempo": { es: "El cliente no respondió a tiempo" },
   "Você concluiu o caso": { es: "Concluiste el caso" },
+  "A equipe respondeu pelo WhatsApp": { es: "El equipo respondió por WhatsApp" },
   "Você pediu uma informação ao cliente": { es: "Pediste información al cliente" },
   "Você decidiu passar para atendimento humano": { es: "Decidiste pasar a atención humana" },
   "O sistema abriu o caso automaticamente": { es: "El sistema abrió el caso automáticamente" },
@@ -9030,6 +9031,11 @@ export const DICIONARIO: Traducoes = {
   "Importado (CSV)": { es: "Importado (CSV)" },
   "Anúncio da Meta": { es: "Anuncio de Meta" },
   "Anúncio do Google": { es: "Anuncio de Google" },
+  // ─── Inbox: o anúncio que trouxe a pessoa (bolha e painel) ───
+  "Ver anúncio": { es: "Ver anuncio" },
+  "Anúncio de origem": { es: "Anuncio de origen" },
+  "Clicou em {data}": { es: "Hizo clic el {data}" },
+  "Voltou por outro anúncio": { es: "Volvió por otro anuncio" },
 
   // ─── Settings: painel de atualização — histórico multi-versão (merge upstream) ───
   "Da versão": { es: "De la versión" },
@@ -13760,6 +13766,29 @@ export const DICIONARIO: Traducoes = {
     { es: "(resumen escrito por la IA a partir de la conversación)" },
   "Responder aqui não chega ao cliente — abra o link para responder.":
     { es: "Las respuestas aquí no le llegan al cliente. Abre el enlace para responder." },
+  "Para orientar a IA sem falar diretamente com o cliente, envie:": {
+    es: "Para orientar a la IA sin hablar directamente con el cliente, envía:",
+  },
+  "Para pedir que a IA esclareça algo com o cliente, envie:": {
+    es: "Para pedirle a la IA que aclare algo con el cliente, envía:",
+  },
+  "Responder casos por este WhatsApp": { es: "Responder casos por este WhatsApp" },
+  "Permite usar RESPONDER ou PERGUNTAR no número que recebe os avisos. Desligado por padrão.": {
+    es: "Permite usar RESPONDER o PERGUNTAR en el número que recibe los avisos. Está desactivado por defecto.",
+  },
+  "Recebido. A IA vai seguir com o cliente.": { es: "Recibido. La IA continuará con el cliente." },
+  "Não consegui: esse caso já foi respondido ou não existe.": {
+    es: "No pude hacerlo: el caso ya fue respondido o no existe.",
+  },
+  "Formato: RESPONDER <id> <orientação> ou PERGUNTAR <id> <pergunta>.": {
+    es: "Formato: RESPONDER <id> <indicación> o PERGUNTAR <id> <pregunta>.",
+  },
+  "Para orientar a IA, responda ao aviso de um caso com RESPONDER ou PERGUNTAR, o ID do caso e a sua mensagem. Responder a esta mensagem de teste não chega a ninguém.": {
+    es: "Para orientar a la IA, responde al aviso de un caso con RESPONDER o PERGUNTAR, el ID del caso y tu mensaje. Responder a este mensaje de prueba no le llega a nadie.",
+  },
+  "A IA usa sua orientação e o histórico para continuar o atendimento.": {
+    es: "La IA usa tu indicación y el historial para continuar la atención.",
+  },
   "Dúvida": { es: "Duda" },
   Pagamento: { es: "Pago" },
   "Acesso ou cadastro": { es: "Acceso o registro" },
@@ -13819,6 +13848,8 @@ export const DICIONARIO: Traducoes = {
     { es: "El mensaje trae el asunto y un enlace que abre la atención, pero nunca el teléfono del cliente" },
   "Responder àquele número não chega ao cliente: ele é só da equipe":
     { es: "Las respuestas a ese número no llegan al cliente: es solo del equipo" },
+  "Se você ligar a opção, a equipe também orienta a IA respondendo ao aviso com RESPONDER ou PERGUNTAR":
+    { es: "Si activas la opción, el equipo también puede orientar a la IA respondiendo al aviso con RESPONDER o PERGUNTAR" },
   // A DESCRIÇÃO da entrada no catálogo de navegação. Ela é cobrada por um
   // guarda PRÓPRIO (`tests/unit/nav-hub.test.tsx`), que varre rótulo e
   // descrição de todo destino do grupo IA — e não pelo guarda de espanhol das
@@ -13839,6 +13870,8 @@ export const DICIONARIO: Traducoes = {
     { es: "Todavía no hay suficientes casos en los últimos 30 días para comparar. La comparación aparecerá automáticamente cuando los haya." },
   "As respostas para este número são ignoradas de propósito":
     { es: "Las respuestas a este número se ignoran a propósito" },
+  "Mensagens comuns deste número são ignoradas":
+    { es: "Los mensajes comunes de este número se ignoran" },
   "Aviso de teste enviado. Confira o WhatsApp desse número.":
     { es: "Aviso de prueba enviado. Revisa el WhatsApp de ese número." },
   "Aviso no WhatsApp":
@@ -13919,6 +13952,8 @@ export const DICIONARIO: Traducoes = {
     { es: "Cuando la atención automática se trabe, aquí llegan el tipo de asunto, el primer nombre del cliente, lo que necesita y un enlace para abrir la conversación." },
   "Quem conduz as conversas desta conta é um sistema de fora, e ele não abre casos aqui.":
     { es: "Un sistema externo lleva las conversaciones de esta cuenta y no abre casos aquí." },
+  "Para orientar a IA sem falar diretamente com o cliente, responda ao aviso com RESPONDER, o ID do caso e sua orientação. Use PERGUNTAR, o ID do caso e a pergunta para pedir que a IA esclareça algo com o cliente. Outras mensagens deste número são ignoradas.":
+    { es: "Para orientar a la IA sin hablar directamente con el cliente, responde al aviso con RESPONDER, el ID del caso y tu indicación. Usa PERGUNTAR, el ID del caso y la pregunta para pedirle a la IA que aclare algo con el cliente. Los demás mensajes de este número se ignoran." },
   "Quem responder a esse número não vira atendimento, não vira contato e não chega ao CRM. É assim que o recurso funciona.":
     { es: "Quien responda a ese número no genera una conversación ni un contacto, y tampoco llega al CRM. Así funciona esta opción." },
   "Receber avisos no WhatsApp":
