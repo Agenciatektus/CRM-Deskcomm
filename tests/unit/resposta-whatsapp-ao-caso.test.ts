@@ -17,7 +17,10 @@ const mocks = vi.hoisted(() => ({
   register: vi.fn(async () => undefined),
   config: vi.fn(async () => true),
   resolve: vi.fn(async () => ({ to: PHONE })),
+  audit: vi.fn(async () => undefined),
 }));
+
+vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
 
 vi.mock("@/lib/escalacao/aviso-ao-suporte.handler", () => ({
   criarTransporteDoAviso: async () => ({
@@ -30,10 +33,10 @@ vi.mock("@/lib/agent-engine/pacing/ledger-supabase", () => ({
   criarPacingDoCanal: async () => ({ decide: mocks.decide, registraEnvio: mocks.register }),
 }));
 
-function db(options: { enabled?: boolean; result?: string; error?: boolean } = {}) {
+function db(options: { enabled?: boolean; result?: string; error?: boolean; jid?: string } = {}) {
   const cfg = {
     telefone_destino: PHONE,
-    destino_jid: null,
+    destino_jid: options.jid ?? null,
     resposta_whatsapp_habilitada: options.enabled ?? true,
   };
   const rpc = vi.fn(async (..._args: unknown[]) => ({
@@ -149,5 +152,48 @@ describe("confirmações de comando pelo WhatsApp", () => {
       entry(`RESPONDER ${CASE} Resolvido`),
     )).resolves.toBe(true);
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it("o aceito vai para a auditoria sem usuário e com a origem; o duplicado não", async () => {
+    const { db: client } = db();
+    await consumirComResultado(client, entry(`PERGUNTAR ${CASE} Qual o pedido?`));
+    expect(mocks.audit).toHaveBeenCalledTimes(1);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "ai.case_replied",
+      actorUserId: null,
+      organizationId: ORG,
+      resourceType: "agent_case",
+      resourceId: CASE,
+      metadata: expect.objectContaining({ case_action: "need_lead_info", source: "whatsapp" }),
+    }));
+    vi.clearAllMocks();
+    limparCacheDoNumeroInterno();
+    await consumirComResultado(db({ result: "duplicate" }).db, entry(`RESPONDER ${CASE} Resolvido`, "msg-2"));
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it("número em modo privacidade (@lid) responde pelo telefone cadastrado", async () => {
+    const lid = db({ jid: "123456789@lid" });
+    const result = await consumirComResultado(lid.db, {
+      ...entry(`RESPONDER ${CASE} Resolvido`),
+      identidade: { kind: "lid", phone: null, lid: "123456789" },
+    });
+    expect(result).toEqual({ consumed: true, result: "accepted" });
+    expect(lid.rpc).toHaveBeenCalledWith(
+      "fn_responder_caso_por_whatsapp",
+      expect.objectContaining({ p_phone_variants: expect.arrayContaining([PHONE]) }),
+    );
+  });
+
+  it("mensagem comum do @lid continua contada como ignorada", async () => {
+    const lid = db({ jid: "123456789@lid" });
+    const result = await consumirComResultado(lid.db, {
+      ...entry("bom dia"),
+      identidade: { kind: "lid", phone: null, lid: "123456789" },
+    });
+    expect(result).toEqual({ consumed: true, result: null });
+    const chamadas = lid.rpc.mock.calls.map((c: unknown[]) => c[0]);
+    expect(chamadas).toContain("fn_contar_mensagem_ignorada");
+    expect(chamadas).not.toContain("fn_responder_caso_por_whatsapp");
   });
 });

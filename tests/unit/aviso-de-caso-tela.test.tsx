@@ -152,6 +152,27 @@ describe("os avisos de estado viram frase", () => {
     expect(bloco.textContent).toContain("17/09");
   });
 
+  it("o texto do descarte segue a opção de responder casos pelo WhatsApp", () => {
+    const descarte = (comandos: number) =>
+      estado({
+        avisos: [
+          {
+            codigo: "descarte_acontecendo",
+            bloqueia: false,
+            dados: { ignoradas: 3, ultimaEm: "2026-09-17T15:30:00.000Z", comandos },
+          },
+        ],
+      });
+    const { unmount } = montar(descarte(0));
+    expect(screen.getByTestId("alerta-descarte_acontecendo").textContent).toContain(
+      "não chega ao CRM",
+    );
+    expect(screen.getByTestId("alerta-descarte_acontecendo").textContent).not.toContain("RESPONDER");
+    unmount();
+    montar(descarte(1));
+    expect(screen.getByTestId("alerta-descarte_acontecendo").textContent).toContain("RESPONDER");
+  });
+
   it("instalação saudável não mostra bloco de alerta nenhum", () => {
     montar(estado());
     expect(screen.queryByTestId("alertas-do-aviso")).toBeNull();

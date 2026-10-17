@@ -161,6 +161,8 @@ export function montarAvisoDeTeste(entrada: {
   idioma: Idioma;
   /** O link já montado pelo servidor — a lista de casos desta instalação. */
   link: string;
+  /** Com a opção ligada, o teste ensina que a resposta ao AVISO DO CASO funciona. */
+  respostaWhatsappHabilitada?: boolean;
 }): string {
   const t = (texto: string): string => traduzir(texto, entrada.idioma);
   return [
@@ -174,6 +176,10 @@ export function montarAvisoDeTeste(entrada: {
     "",
     `${t("Abrir")}: ${entrada.link}`,
     "",
-    t("Responder aqui não chega ao cliente — abra o link para responder."),
+    entrada.respostaWhatsappHabilitada
+      ? t(
+          "Para orientar a IA, responda ao aviso de um caso com RESPONDER ou PERGUNTAR, o ID do caso e a sua mensagem. Responder a esta mensagem de teste não chega a ninguém.",
+        )
+      : t("Responder aqui não chega ao cliente — abra o link para responder."),
   ].join("\n");
 }

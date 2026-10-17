@@ -11,6 +11,8 @@ import {
 } from "./numero-interno-de-aviso";
 import { logger } from "@/lib/logger";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { normalizarIdioma } from "@/lib/i18n/idiomas";
+import { audit } from "@/lib/audit";
 
 const RESPOSTA = /^(RESPONDER|PERGUNTAR)\s+([0-9a-f-]{36})\s+([\s\S]+)$/i;
 const CasoId = z.string().uuid();
@@ -82,10 +84,12 @@ export async function consumirComResultado(
   // consultar o opt-in sem uma segunda ida ao banco e mantém os ingestores que
   // só precisam do corte compatíveis com seus mocks/integrações.
   const config = await lerNumeroInternoDeAviso(admin, entrada.organizationId);
-  const phone = entrada.identidade.kind === "phone" ? entrada.identidade.phone : null;
-  if (!phone || !config.destino || !phoneLookupVariants(config.destino).includes(phone)) {
-    return { consumed: true, result: null };
-  }
+  // O corte acima já provou que é o número de avisos — pelo telefone ou, em modo
+  // privacidade (`@lid`), pelo JID que o transporte resolveu. Nesse segundo caso
+  // o telefone não chega no webhook, e o remetente é o próprio número cadastrado.
+  const phone = entrada.identidade.kind === "phone"
+    ? entrada.identidade.phone
+    : config.destino;
 
   if (!config.respostaWhatsappHabilitada) {
     await registrarMensagemIgnorada(admin, entrada.organizationId, {
@@ -148,6 +152,19 @@ export async function consumirComResultado(
 
   const resultado = typeof data === "string" ? data : null;
   if (resultado === "accepted") {
+    // Sem usuário: quem respondeu não tem login no CRM. A origem vai no metadata.
+    await audit({
+      action: "ai.case_replied",
+      actorUserId: null,
+      organizationId: entrada.organizationId,
+      resourceType: "agent_case",
+      resourceId: comando.caseId,
+      metadata: {
+        case_action: comando.action,
+        source: "whatsapp",
+        channel_session_id: entrada.channelSessionId,
+      },
+    });
     await enviarConfirmacao(admin, entrada, config, "accepted");
     return { consumed: true, result: "accepted" };
   } else if (resultado === "case_unavailable") {
@@ -207,7 +224,7 @@ async function enviarConfirmacao(
       .select("locale")
       .eq("id", entrada.organizationId)
       .maybeSingle();
-    const idioma = (idiomaData as { locale?: "pt-BR" | "es" } | null)?.locale ?? "pt-BR";
+    const idioma = normalizarIdioma((idiomaData as { locale?: string | null } | null)?.locale ?? null);
     const body = traduzir(frases[tipo], idioma);
     await transporte.envia(entrada.organizationId, canal, destino, body);
     await pacing.registraEnvio(entrada.organizationId, entrada.channelSessionId, agora);

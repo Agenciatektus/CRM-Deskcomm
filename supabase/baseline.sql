@@ -30789,7 +30789,6 @@ create table if not exists public.config_aviso_de_caso (
   -- Como a equipe chama esse número ("Plantão", "Suporte 1"). Só rótulo.
   rotulo              text,
   ligado              boolean not null default false,
-  resposta_whatsapp_habilitada boolean not null default false,
   -- A SUPERFÍCIE DO DESCARTE (ver o cabeçalho): sem elas, "as mensagens deste
   -- número somem" é indistinguível de defeito para quem olha a tela.
   mensagens_ignoradas         integer not null default 0,
@@ -30808,7 +30807,6 @@ create table if not exists public.config_aviso_de_caso (
 alter table public.config_aviso_de_caso
   add column if not exists destino_jid                 text,
   add column if not exists rotulo                      text,
-  add column if not exists resposta_whatsapp_habilitada boolean not null default false,
   add column if not exists mensagens_ignoradas         integer not null default 0,
   add column if not exists ultima_mensagem_ignorada_em timestamptz,
   add column if not exists criado_por                  uuid,
@@ -55087,6 +55085,9 @@ begin
 end $$;
 
 -- ---- resposta do suporte ao caso pelo WhatsApp (migration 0687) ----
+alter table public.config_aviso_de_caso
+  add column if not exists resposta_whatsapp_habilitada boolean not null default false;
+
 -- A mensagem recebida é idempotente por organização e id de mensagem do canal.
 -- O valor fica em metadata, junto do evento que já registra a resposta humana;
 -- a cascata LGPD já limpa metadata de agent_case_events.
@@ -55227,7 +55228,8 @@ revoke all on function public.fn_responder_caso_por_whatsapp(uuid, uuid, uuid, t
 grant execute on function public.fn_responder_caso_por_whatsapp(uuid, uuid, uuid, text[], text, text, text)
   to service_role;
 
--- ---- opção de resposta pelo WhatsApp (migration 0687) ----
+-- A opção é gravada pela mesma RPC administrativa que protege o restante da
+-- configuração de avisos. A coluna e a guarda acima mantêm o opt-in no banco.
 create or replace function public.fn_definir_aviso_de_caso(
   p_org uuid,
   p_channel uuid,
