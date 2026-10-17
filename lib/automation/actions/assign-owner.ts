@@ -34,6 +34,8 @@ async function executarRodizio(ctx: ActionCtx, leadId: string): Promise<ActionRe
     p_org: ctx.organizationId,
     p_rule: ctx.ruleId,
     p_lead: leadId,
+    // O mesmo evento reprocessado devolve a mesma pessoa em vez de andar a fila.
+    p_event: ctx.event.id,
   });
   if (error) return { type: "assign_owner", status: "failed", error: error.message };
   const desfecho = data as DesfechoDoRodizio | null;

@@ -27,7 +27,7 @@
     { "id": "r1", "from": "form", "to": "schema", "label": "o corpo da regra passa pelo mesmo schema da rota" },
     { "id": "r2", "from": "schema", "to": "regras", "label": "POST/PATCH /api/v1/automation-rules grava a fila na regra" },
     { "id": "r3", "from": "regras", "to": "acao", "label": "lead.created casa a regra; o motor executa a ação" },
-    { "id": "r4", "from": "acao", "to": "funcao", "label": "rpc(p_org, p_rule, p_lead) — a fila não vai na chamada" },
+    { "id": "r4", "from": "acao", "to": "funcao", "label": "rpc(p_org, p_rule, p_lead, p_event) — a fila não vai na chamada; o mesmo evento não anda a fila duas vezes" },
     { "id": "r5", "from": "regras", "to": "funcao", "label": "a função lê a fila da regra gravada, dentro da org" },
     { "id": "r6", "from": "funcao", "to": "historico", "label": "lê o último da regra e grava a vez nova" },
     { "id": "r7", "from": "funcao", "to": "leads", "label": "UPDATE do dono na mesma transação" },

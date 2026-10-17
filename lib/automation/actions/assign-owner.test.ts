@@ -51,7 +51,7 @@ function ctx(admin: ReturnType<typeof adminFalso>, lead: { id: string } | null =
 const RODIZIO = { modo: "rodizio", fila: [{ user_id: PESSOA, pausado: false }] };
 
 describe("assign_owner em rodízio", () => {
-  it("chama a função pela regra e pelo lead, e escreve a frase da vez", async () => {
+  it("chama a função pela regra, pelo lead e pelo evento, e escreve a frase da vez", async () => {
     const admin = adminFalso({ data: { user_id: PESSOA, posicao: 2 }, error: null });
     const r = await getAction("assign_owner")!.execute(ctx(admin), RODIZIO);
     // A fila NÃO vai na chamada: a função lê a da regra gravada.
@@ -59,6 +59,8 @@ describe("assign_owner em rodízio", () => {
       p_org: "org-1",
       p_rule: "rule-1",
       p_lead: "lead-1",
+      // O id do evento vai junto: é a chave que impede o reprocessamento de andar a fila.
+      p_event: "evt-1",
     });
     expect(r).toEqual({
       type: "assign_owner",

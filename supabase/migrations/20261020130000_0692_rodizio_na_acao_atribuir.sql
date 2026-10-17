@@ -1,4 +1,4 @@
--- manifest: **Rodízio de atendentes na ação "Atribuir a um atendente" das Automações (issue #2041, substitui o PR #2269 de @hamiltonviana).** A ação `assign_owner` ganha o modo `{ modo: "rodizio", fila: [{ user_id, pausado }] }`. Quem escolhe a pessoa da vez é a função nova `fn_automation_rodizio_atribuir(p_org, p_rule, p_lead)`: numa transação só, ela trava por regra (`pg_advisory_xact_lock`), lê a fila da própria regra em `automation_rules`, escolhe o próximo elegível (na fila, não pausado, membro não revogado, não `viewer`), grava a linha no histórico append-only `automation_rodizio_atribuicoes` e faz o UPDATE do dono em `crm_leads` — o UPDATE é o que emite `lead.assigned` (o push). Leitura do histórico por organização; escrita só pela função (`service_role`). Aditiva e idempotente; apêndice igual no `baseline.sql`.
+-- manifest: **Rodízio de atendentes na ação "Atribuir a um atendente" das Automações (issue #2041, substitui o PR #2269 de @hamiltonviana).** A ação `assign_owner` ganha o modo `{ modo: "rodizio", fila: [{ user_id, pausado }] }`. Quem escolhe a pessoa da vez é a função nova `fn_automation_rodizio_atribuir(p_org, p_rule, p_lead, p_event)`: numa transação só, ela trava por regra (`pg_advisory_xact_lock`), lê a fila da própria regra em `automation_rules`, escolhe o próximo elegível (na fila, não pausado, membro não revogado, não `viewer`), grava a linha no histórico append-only `automation_rodizio_atribuicoes` e faz o UPDATE do dono em `crm_leads` — o UPDATE é o que emite `lead.assigned` (o push). O histórico guarda o `event_id` com índice único por (organização, regra, evento): o mesmo evento reprocessado (worker derrubado antes de marcar o consumo) devolve a mesma pessoa e não anda a fila. Leitura do histórico por organização; escrita só pela função (`service_role`). Aditiva e idempotente; apêndice igual no `baseline.sql`.
 -- ============================================================================
 -- 0692 — RODÍZIO DE ATENDENTES NA AÇÃO "ATRIBUIR A UM ATENDENTE" (#2041)
 --
@@ -54,6 +54,18 @@ create index if not exists automation_rodizio_atribuicoes_ultimo_da_regra_idx
 create index if not exists automation_rodizio_atribuicoes_org_idx
   on public.automation_rodizio_atribuicoes (organization_id, created_at desc);
 
+-- O MESMO EVENTO NÃO ANDA A FILA DUAS VEZES. O dreno marca o evento como
+-- consumido só DEPOIS de os handlers voltarem (`lib/event-log/drain.ts`): um
+-- worker derrubado entre esta função e essa marca deixa o evento `processing`,
+-- e o reaper o devolve à fila em 10 min — a regra roda de novo. Sem a chave
+-- do evento, a segunda volta andava uma casa e trocava o dono. Sem FK para
+-- `event_log` pelo mesmo motivo de `user_id`: a retenção apaga eventos, e o
+-- histórico do rodízio não pode perder a linha por isso.
+alter table public.automation_rodizio_atribuicoes add column if not exists event_id uuid;
+create unique index if not exists automation_rodizio_atribuicoes_um_por_evento_idx
+  on public.automation_rodizio_atribuicoes (organization_id, rule_id, event_id)
+  where event_id is not null;
+
 alter table public.automation_rodizio_atribuicoes enable row level security;
 
 -- Leitura por quem é da organização; ninguém grava pela API (só a função).
@@ -68,7 +80,10 @@ grant all on public.automation_rodizio_atribuicoes to service_role;
 comment on table public.automation_rodizio_atribuicoes is
   'Histórico append-only do rodízio da ação assign_owner (#2041): quem recebeu cada lead e em que posição da fila. O próximo da regra é calculado da linha mais nova. Escrito só por fn_automation_rodizio_atribuir.';
 
-create or replace function public.fn_automation_rodizio_atribuir(p_org uuid, p_rule uuid, p_lead uuid)
+-- A assinatura ganhou `p_event`; a de três argumentos sairia ambígua ao lado.
+drop function if exists public.fn_automation_rodizio_atribuir(uuid, uuid, uuid);
+
+create or replace function public.fn_automation_rodizio_atribuir(p_org uuid, p_rule uuid, p_lead uuid, p_event uuid default null)
 returns jsonb
 language plpgsql
 security definer
@@ -83,6 +98,20 @@ declare
   v_posicao integer;
 begin
   perform pg_advisory_xact_lock(hashtextextended('automation_rodizio:' || p_rule::text, 2041));
+
+  -- Reexecução do MESMO evento: devolve a decisão já tomada, sem linha nova e
+  -- sem andar a fila. Não regrava o dono: a linha e o UPDATE commitaram juntos,
+  -- então a linha existir prova que o dono foi gravado — regravar só desfaria
+  -- uma troca manual feita depois e dispararia outro `lead.assigned`.
+  if p_event is not null then
+    select h.user_id, h.member_position
+      into v_user, v_posicao
+      from public.automation_rodizio_atribuicoes h
+     where h.organization_id = p_org and h.rule_id = p_rule and h.event_id = p_event;
+    if found then
+      return jsonb_build_object('user_id', v_user, 'posicao', v_posicao);
+    end if;
+  end if;
 
   select a.valor -> 'config' -> 'fila'
     into v_fila
@@ -141,8 +170,8 @@ begin
     return jsonb_build_object('motivo', 'ninguem_disponivel');
   end if;
 
-  insert into public.automation_rodizio_atribuicoes (organization_id, rule_id, lead_id, user_id, member_position)
-  values (p_org, p_rule, p_lead, v_user, v_posicao);
+  insert into public.automation_rodizio_atribuicoes (organization_id, rule_id, lead_id, user_id, member_position, event_id)
+  values (p_org, p_rule, p_lead, v_user, v_posicao, p_event);
 
   update public.crm_leads
      set owner_user_id = v_user,
@@ -157,7 +186,7 @@ begin
 end;
 $function$;
 
-revoke all on function public.fn_automation_rodizio_atribuir(uuid, uuid, uuid) from public, anon, authenticated;
-grant execute on function public.fn_automation_rodizio_atribuir(uuid, uuid, uuid) to service_role;
+revoke all on function public.fn_automation_rodizio_atribuir(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.fn_automation_rodizio_atribuir(uuid, uuid, uuid, uuid) to service_role;
 
 notify pgrst, 'reload schema';

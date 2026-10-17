@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import {
   seedGov,
@@ -68,8 +69,8 @@ async function novoLead(organizacao = org): Promise<string> {
   return r.rows[0].id as string;
 }
 
-async function rodar(regra: string, lead: string, organizacao = org) {
-  const r = await query("select public.fn_automation_rodizio_atribuir($1,$2,$3) as d", [organizacao, regra, lead]);
+async function rodar(regra: string, lead: string, organizacao = org, evento: string | null = null) {
+  const r = await query("select public.fn_automation_rodizio_atribuir($1,$2,$3,$4) as d", [organizacao, regra, lead, evento]);
   const dono = await query("select owner_user_id from crm_leads where id=$1", [lead]);
   return { desfecho: r.rows[0].d as { user_id?: string; posicao?: number; motivo?: string }, dono: dono.rows[0]?.owner_user_id as string | null };
 }
@@ -161,6 +162,23 @@ describe("rodízio da ação assign_owner", () => {
     );
     const r = await rodar(semRodizio, await novoLead());
     expect(r).toEqual({ desfecho: { motivo: "sem_rodizio" }, dono: null });
+  });
+
+  it("o MESMO evento reprocessado devolve a mesma pessoa, sem linha nova e sem andar a fila", async () => {
+    // O dreno só marca o evento consumido depois de a regra voltar: um worker
+    // derrubado no meio devolve o evento à fila, e a regra roda de novo.
+    const regra = await novaRegra([{ user_id: ana }, { user_id: bruno }]);
+    const lead = await novoLead();
+    const evento = randomUUID();
+    expect((await rodar(regra, lead, org, evento)).desfecho).toEqual({ user_id: ana, posicao: 1 });
+    // Troca manual entre as duas voltas: a reexecução não a desfaz.
+    await query("update crm_leads set owner_user_id=$2 where id=$1", [lead, manager]);
+    const denovo = await rodar(regra, lead, org, evento);
+    expect(denovo).toEqual({ desfecho: { user_id: ana, posicao: 1 }, dono: manager });
+    const hist = await query("select count(*)::int n from automation_rodizio_atribuicoes where rule_id=$1", [regra]);
+    expect(hist.rows[0].n).toBe(1);
+    // Evento DIFERENTE anda a fila: a vez é de quem vinha depois de Ana.
+    expect((await rodar(regra, await novoLead(), org, randomUUID())).dono).toBe(bruno);
   });
 
   it("quatro leads simultâneos se repartem 2/2 (a trava é por regra)", async () => {
