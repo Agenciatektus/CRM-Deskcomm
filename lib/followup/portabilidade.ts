@@ -413,8 +413,8 @@ export function reconciliarComAConta(
             return { ...node, config: { ...node.config, template_id: r.id } };
           }
           // O modo `template` exige um id (uuid) — não há "vazio" válido. Fica o
-          // de fora, e a pendência BLOQUEIA: a publicação não confere o modelo,
-          // então quem avisa é esta tela.
+          // de fora, e a pendência BLOQUEIA: a publicação também recusaria
+          // (`modelo_inexistente`), mas esta tela avisa antes de o fluxo existir.
           pendencias.push({
             codigo: "modelo_nao_encontrado",
             bloqueia: true,
