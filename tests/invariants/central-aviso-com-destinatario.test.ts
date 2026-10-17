@@ -34,7 +34,7 @@ describe("aviso da Central com destinatário (0689)", () => {
   it("a coluna é opcional e referencia auth.users com on delete cascade", () => {
     expect(lastLine(sql(`select is_nullable from information_schema.columns
       where table_schema='public' and table_name='agent_inbox_items' and column_name='para_user_id';`))).toBe("YES");
-    expect(lastLine(sql(`select confdeltype || ':' || confrelid::regclass::text from pg_constraint
+    expect(lastLine(sql(`select confdeltype::text || ':' || confrelid::regclass::text from pg_constraint
       where conrelid = 'public.agent_inbox_items'::regclass and contype = 'f'
         and conkey = array[(select attnum from pg_attribute where attrelid = 'public.agent_inbox_items'::regclass and attname = 'para_user_id')];`))).toBe("c:auth.users");
   });
