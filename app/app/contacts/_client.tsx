@@ -162,12 +162,14 @@ export function ContactsListClient() {
         </div>
         {/*
           A estrutura é a da main (o "Importar CSV" do PR #313). Os botões
-          QUEBRAM linha em vez de encolher: o `whitespace-nowrap` do Button já
-          impede o rótulo de comprimir, e o `shrink-0` que estava aqui (PR #267)
-          fazia a fila inteira passar da tela — medido em 390px, "Novo contato"
-          em 446–585. O `flex-wrap` do header faz o mesmo um nível acima: quando
-          título e botões não cabem lado a lado, os botões descem para a linha
-          de baixo, e o título não é espremido. Onde cabem (1280px), nada muda.
+          QUEBRAM linha em vez de passar da tela: o `whitespace-nowrap` do
+          Button impede o rótulo de comprimir, e sem `flex-wrap` a fila
+          estourava em 390px (medido: "Novo contato" em 446–585). O `shrink-0`
+          do PR #267 saiu por outro motivo: com o header em linha (sm+), ele
+          esmagava o título até largura 0. O `flex-wrap` do header faz o mesmo
+          um nível acima: quando título e botões não cabem lado a lado, os
+          botões descem de linha e o título não é espremido. Onde cabem
+          (1280px), nada muda.
         */}
         <div className="flex flex-wrap items-center gap-2">
           {/*
