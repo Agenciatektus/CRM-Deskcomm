@@ -2704,6 +2704,39 @@ export const DICIONARIO: Traducoes = {
   "Etiqueta do contato": { es: "Etiqueta del contacto" },
   "Passos já dados no fluxo": { es: "Pasos ya dados en el flujo" },
   "Desfecho do passo anterior": { es: "Resultado del paso anterior" },
+  // Regra de data da condição (item 14) — a regra que pergunta se o período de
+  // teste terminou. Ver `lib/followup/condicao-por-data.ts`.
+  "Data de um campo do negócio": { es: "Fecha de un campo del negocio" },
+  // Avisos de seguranca da publicacao (`avisosDoGatilho`).
+  "Sem “silêncio máximo”, o fluxo alcança TODO contato calado há mais que o mínimo — inclusive quem sumiu há meses — e começa para todos eles na primeira varredura, um minuto depois de publicar.":
+    { es: "Sin “silencio máximo”, el flujo alcanza a TODO contacto callado por más que el mínimo — incluso a quien desapareció hace meses — y empieza para todos ellos en el primer barrido, un minuto después de publicar." },
+  "Sem limite de repetições, a pausa só ESPAÇA os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, indefinidamente.":
+    { es: "Sin límite de repeticiones, la pausa solo ESPACIA los reinicios: quien nunca responde vuelve a recibir el flujo en cada pausa, indefinidamente." },
+  "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “Só começar se a equipe já respondeu a última mensagem do cliente” se o fluxo é para quem sumiu, não para quem está esperando.":
+    { es: "El silencio cuenta desde el último mensaje del CLIENTE, y un mensaje del equipo no reinicia esa cuenta: quien escribió y no fue atendido también entra en el flujo. Active “Empezar solo si el equipo ya respondió el último mensaje del cliente” si el flujo es para quien desapareció, no para quien está esperando." },
+  // Teto de repeticoes e guarda de resposta da equipe (item 16 / item 12).
+  "Quantas vezes no máximo, por contato (opcional)": {
+    es: "Cuántas veces como máximo, por contacto (opcional)",
+  },
+  "A pausa acima só espaça os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, para sempre. Com um limite, o fluxo para de recomeçar depois deste número de vezes. 0 = sem limite.":
+    {
+      es: "La pausa de arriba solo espacia los reinicios: quien nunca responde vuelve a recibir el flujo en cada pausa, para siempre. Con un límite, el flujo deja de reiniciarse después de esta cantidad de veces. 0 = sin límite.",
+    },
+  "Só começar se a equipe já respondeu a última mensagem do cliente": {
+    es: "Empezar solo si el equipo ya respondió el último mensaje del cliente",
+  },
+  "O tempo de silêncio conta da última mensagem do cliente, e mensagem da equipe não zera essa conta — então quem escreveu e ainda não foi atendido também entra no fluxo. Ligue isto quando o fluxo é para quem sumiu, e não para quem está esperando resposta.":
+    {
+      es: "El tiempo de silencio cuenta desde el último mensaje del cliente, y un mensaje del equipo no reinicia esa cuenta — así que quien escribió y todavía no fue atendido también entra en el flujo. Active esto cuando el flujo es para quien desapareció, y no para quien está esperando respuesta.",
+    },
+  "Campo do negócio com a data": { es: "Campo del negocio con la fecha" },
+  "Ex.: fim_teste": { es: "Ej.: fim_teste" },
+  "Prazo em dias": { es: "Plazo en días" },
+  "0 = inclui hoje": { es: "0 = incluye hoy" },
+  "O campo é o mesmo nome usado na ficha do negócio. O prazo conta em dias de calendário no fuso da organização; 0 inclui o dia de hoje.":
+    {
+      es: "El campo es el mismo nombre usado en la ficha del negocio. El plazo cuenta en días de calendario en la zona horaria de la organización; 0 incluye el día de hoy.",
+    },
   "está na etapa": { es: "está en la etapa" },
   "não está na etapa": { es: "no está en la etapa" },
   "contém": { es: "contiene" },
