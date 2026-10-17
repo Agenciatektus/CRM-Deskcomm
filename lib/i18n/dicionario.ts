@@ -12926,6 +12926,7 @@ export const DICIONARIO: Traducoes = {
   "Adicionar pergunta": { es: "Añadir pregunta" },
   "O limite é de 20 perguntas extras por formulário.": { es: "El límite es de 20 preguntas adicionales por formulario." },
   "A fonte escolhida não pertence a esta empresa.": { es: "La fuente elegida no pertenece a esta empresa." },
+  "Este campo de data é do contato, e o gatilho por data só lê campos do negócio. Escolha um campo de data do negócio.": { es: "Este campo de fecha es del contacto, y el disparador por fecha solo lee campos del negocio. Elige un campo de fecha del negocio." },
   "Escolha uma fonte de formulário válida.": { es: "Elige una fuente de formulario válida." },
   "Escreva o texto da pergunta.": { es: "Escribe el texto de la pregunta." },
   "Use uma chave iniciada por letra minúscula, sem espaços.": { es: "Usa una clave que empiece con letra minúscula, sin espacios." },
