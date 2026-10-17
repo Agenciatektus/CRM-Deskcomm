@@ -91,5 +91,5 @@ export function mensagemDasRegrasQuePerdemOCampo(nomes: string[], idioma: Idioma
     nomes.length === 1
       ? "A regra {regras} usa no gatilho por data um campo que você marcou como Contato, e o gatilho só lê campos do negócio: ela deixaria de disparar. Troque o campo da regra ou desligue-a antes."
       : "As regras {regras} usam no gatilho por data um campo que você marcou como Contato, e o gatilho só lê campos do negócio: elas deixariam de disparar. Troque o campo das regras ou desligue-as antes.",
-  ).replace("{regras}", regras);
+  ).replace("{regras}", () => regras);
 }

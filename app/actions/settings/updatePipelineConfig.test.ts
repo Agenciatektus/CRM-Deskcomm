@@ -111,6 +111,15 @@ describe("updatePipelineConfig — campo que vira Contato e o gatilho por data",
     expect(h.filtrosDasRegras).toContainEqual(["organization_id", ORG]);
   });
 
+  it("o nome da regra sai como foi escrito, mesmo com $& ou $1", async () => {
+    h.regras = [regra("Cupom R$& 10 $1", "nascimento")];
+
+    const r = await updatePipelineConfig(FUNIL, { fields: [NASCIMENTO_CONTATO] });
+
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain('"Cupom R$& 10 $1"');
+  });
+
   it("cita até três regras e conta o resto, no idioma de quem salva", async () => {
     h.idioma = "es";
     h.regras = ["A", "B", "C", "D", "E"].map((n) => regra(n, "nascimento"));
