@@ -209,4 +209,26 @@ describe("CustomFieldsEditor — lista pesquisável mostra o que a busca acha (#
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByText(AVISO)).toBeTruthy();
   });
+
+  it("a lista e a opção destacada são trazidas à vista dentro do container que rola", () => {
+    // A lista é `absolute` e abre para baixo; num campo perto do fim do dossiê
+    // ou do diálogo, ela nascia fora da área visível, e Enter gravava a opção
+    // destacada sem que ninguém a visse. O jsdom não implementa scrollIntoView.
+    const original = Element.prototype.scrollIntoView;
+    const vistos: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      vistos.push(this);
+    };
+    try {
+      const { input } = montar();
+      fireEvent.change(input, { target: { value: "Sao" } });
+      expect(vistos).toContain(screen.getByRole("listbox"));
+
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(vistos.at(-1)).toBe(screen.getByRole("option", { name: "São Luís (MA)" }));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
 });

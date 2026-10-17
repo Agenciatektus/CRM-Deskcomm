@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 /**
  * CustomFieldsEditor — lê `crm_pipelines.settings.fields[]` e renderiza o
  * input certo por tipo. Usado pelo dossiê e pelo painel do inbox, via
@@ -88,6 +88,21 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
   const [buscaAberta, setBuscaAberta] = useState<string | null>(null);
   const [destacado, setDestacado] = useState(-1);
   const baseId = useId();
+  // A lista é `absolute` e abre para baixo, dentro de containers que rolam
+  // (dossiê, diálogo Editar contato): perto do fim, ela nascia fora da área
+  // visível, e a opção destacada pelas setas também — Enter gravava o que não
+  // se via. Traz a lista à vista ao abrir e a cada tecla, e a opção destacada
+  // quando ela muda. `nearest` não mexe em nada que já está visível.
+  useEffect(() => {
+    if (buscaAberta === null) return;
+    const lista = document.getElementById(`${baseId}-${buscaAberta}-opcoes`);
+    lista?.scrollIntoView?.({ block: "nearest" });
+    if (destacado >= 0) {
+      document
+        .getElementById(`${baseId}-${buscaAberta}-opcoes-${destacado}`)
+        ?.scrollIntoView?.({ block: "nearest" });
+    }
+  }, [baseId, buscaAberta, destacado, rascunhosDeBusca]);
   // O campo é do mesmo caminho do contato: o exemplo segue o país da
   // organização, e não o DDI brasileiro em duro.
   const telefoneExemplo = perfilDoPais(useActiveOrg()?.country).telefoneExemplo;
