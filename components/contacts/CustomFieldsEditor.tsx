@@ -84,7 +84,11 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
   const [recusados, setRecusados] = useState<Record<string, true>>({});
   // A lista aberta do `searchable_select` e a opção destacada nela. Um campo
   // por vez, porque só um tem o foco. `-1` = nada destacado: sair do campo
-  // sem ter escolhido não grava palpite.
+  // sem ter escolhido não grava palpite. Só as SETAS mexem no destaque: o
+  // mouse sobre uma opção é realce visual (`hover:`), não escolha. Quando o
+  // `onMouseEnter` destacava, clicar no campo e sair com Tab gravava a opção
+  // que estava sob o ponteiro parado (prova pela tela, 17/10). Pela mesma
+  // razão, Enter com o mouse sobre uma opção e sem seta não grava nada.
   const [buscaAberta, setBuscaAberta] = useState<string | null>(null);
   const [destacado, setDestacado] = useState(-1);
   const baseId = useId();
@@ -367,9 +371,10 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
                           aria-selected={i === destacado}
                           className={cn(
                             "flex min-h-11 cursor-pointer items-center px-3 py-2 text-sm",
-                            i === destacado && "bg-accent text-accent-foreground",
+                            i === destacado
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-accent/50",
                           )}
-                          onMouseEnter={() => setDestacado(i)}
                           onClick={() => escolher(o.value)}
                         >
                           {o.label}

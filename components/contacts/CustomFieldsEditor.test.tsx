@@ -190,6 +190,33 @@ describe("CustomFieldsEditor — lista pesquisável mostra o que a busca acha (#
     expect(onChange).toHaveBeenCalledWith({ destino: "gramado-rs" });
   });
 
+  it("passar o mouse sobre uma opção e sair com Tab não grava nada", () => {
+    // Prova pela tela de 17/10: clicar no campo e sair com Tab gravava a opção
+    // que estava sob o ponteiro parado (o banco recebeu 'sao-luis-ma').
+    const { onChange, input } = montar();
+    fireEvent.focus(input);
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "São Luís (MA)" }));
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("mouse sobre uma opção e Enter sem seta não grava nada", () => {
+    const { onChange, input } = montar();
+    fireEvent.focus(input);
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "São Luís (MA)" }));
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("seta depois do mouse e sair com Tab grava a destacada pela seta", () => {
+    const { onChange, input } = montar();
+    fireEvent.focus(input);
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "São Luís (MA)" }));
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledWith({ destino: "sao-paulo-sp" });
+  });
+
   it("'gramado' e sair sem escolher: avisa e não grava (sem palpite por pedaço)", () => {
     const { onChange, input } = montar();
     fireEvent.change(input, { target: { value: "gramado" } });
