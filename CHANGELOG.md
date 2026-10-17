@@ -72,9 +72,11 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Você não precisa fazer nada.
 
+  Contribuição de @webtecnica (#2783, refs #2724).
+
 - **Recolher o painel do contato e abrir o negócio no quadro do funil, sem sair do Inbox** O painel do contato do Inbox ganhou o botão de recolher, no alto: recolhido, ele vira um trilho estreito com o botão de expandir e a conversa recebe a largura que era da ficha, como já acontecia com o menu da esquerda. A preferência fica lembrada por navegador. Ao lado da etapa do funil, o atalho "Abrir no funil" leva ao quadro já com o negócio aberto, na etapa em que ele está, em vez de exigir sair do Inbox e procurar o card na mão.
 
-  Refs #3004.
+  Contribuição de @webtecnica (#3043, refs #3004).
 
 - **Cada número de WhatsApp pode ter o seu jeito de distribuir as conversas** Em Configurações › Atendimento, cada número ganha:
   - "Como este número distribui": cada um pega, rodízio ou por carga;
@@ -125,7 +127,7 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Quem só usa os modelos de fábrica não vê mudança nenhuma: a tabela embutida continua sendo consultada primeiro, e para eles nada mais é lido do banco.
 
-  Refs #3013.
+  Contribuição de @webtecnica (#3034, refs #3013).
 
 - **Desmarcar uma conversa como exemplo para a IA tira o que o agente já tinha aprendido dela** Quando uma conversa deixava de ser exemplo para a IA, o sistema parava de usá-la nos próximos aprendizados, mas os trechos que o agente já tinha guardado dela continuavam disponíveis para ele consultar. Agora, ao desmarcar, esses trechos são apagados na hora. Os de outras conversas não mudam. Se a conversa for marcada de novo, ela volta a ser aprendida no próximo lote.
 
@@ -166,6 +168,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
   Quem assinou durante o teste e ainda tem a primeira cobrança em aberto no provedor (no Asaas, o primeiro boleto vence no próprio fim do teste) continua com a tolerância: ali há pagamento em compensação. A empresa que aguarda a entrada paga de um plano sem dias de teste também não recebe a frase de teste grátis. O aviso final continua tendo que ser dado, e as 48 horas depois dele seguem valendo para os dois casos.
 
   Na atualização, a empresa cujo teste já acabou sem cobrança nenhuma e que ainda estava dentro da tolerância recebe o aviso final na primeira rodada da régua e é suspensa 48 horas depois.
+
+  Contribuição de @webtecnica (#2774, refs #2753).
 
 - **A visibilidade de cada conversa vale também na atribuição e no registro de eventos** Assumir ou transferir uma conversa que o atendente não enxerga agora responde como uma conversa que não existe. No registro interno de eventos, o evento ligado a uma conversa passa a seguir a mesma regra de quem pode ver a conversa (o modo de visibilidade em Configurações › Atendimento); a conversa do evento é resolvida pelo entity_id (conversation/conversation_note), por payload.conversation_id, ou pelo ref_id do aviso da Central. Quem só lê (viewer), gestores, administradores e o administrador da plataforma continuam vendo todos. Para o atendente, um valor sem forma de identificador de conversa não restringe nada (o evento segue o pertencimento à organização, como antes), e um identificador que não aponta para uma conversa da organização fica oculto. A atualização aplica a mudança de banco sozinha; nada a fazer.
 
