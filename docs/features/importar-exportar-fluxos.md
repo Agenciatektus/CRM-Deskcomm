@@ -65,6 +65,8 @@ Caso a caso:
 
 Etapa **arquivada** conta como inexistente: o Publicar não aceita destino arquivado.
 
+O que **não** é conferido, porque não aponta para registro da conta: o `media_url` de uma Ação (a URL vai como está; se ela aponta para o armazenamento da instalação de origem, confira se continua acessível), o `key` de uma regra `lead_date` e o `save_to` de uma Resposta (nomes de campo personalizado: crie o campo com o mesmo nome na conta de destino) e o `skill_name` (a skill precisa estar instalada).
+
 ## O formato do arquivo
 
 ```json
@@ -124,7 +126,7 @@ Todo objeto é **estrito**: chave desconhecida é recusada (é o que pega erro d
 | `webhook` | Automação (Webhooks) | Por uma regra em Webhooks. | — |
 | `lead_created` | Lead criado | Quando nasce um negócio. | `{}` (opcional) |
 | `stage_change` | Etapa do funil | Quando o lead entra numa etapa. | `{ "stage_id": "<uuid>" }` |
-| `silence` | Silêncio | Quando o contato fica calado. | `threshold_minutes` (5–10080), opcional `max_silence_minutes` (teto: só silêncio recente), `reentry_pause_minutes` (pausa antes de recomeçar para quem já passou pelo fluxo), `reentry_pause_basis`, `segments` |
+| `silence` | Silêncio | Quando o contato fica calado. | `threshold_minutes` (5–10080), opcional `max_silence_minutes` (teto: só silêncio recente), `reentry_pause_minutes` (pausa antes de recomeçar para quem já passou pelo fluxo), `reentry_pause_basis`, `max_enrollments_por_contato` (1–50: quantas vezes no total o fluxo pode recomeçar para o mesmo contato), `exige_resposta_da_equipe` (`true` = só alcança quem a equipe já respondeu), `segments` |
 | `inbound_after_silence` | Cliente voltou | Quando o contato volta a escrever depois de um tempo parado. | `threshold_minutes` (mínimo 1 h, máximo 90 dias), opcional `segments` |
 | `case_opened` | Agente pediu ajuda | Quando o agente abre um caso. | `{}` (opcional) |
 | `appointment_no_show` | Falta confirmada pela equipe | Quando a equipe confirma a falta num compromisso. | opcional `event_type_ids` (vazio = todos os tipos) |
@@ -145,7 +147,7 @@ palavra-gatilho (`settings.gatilhos`) ou pelo roteador.
 | `ai_classify` | Classificar (IA) | Espera a resposta e a IA escolhe uma classe. | `classes` (1–8 nomes), `grace_timeout_ms` (mínimo 15 min: prazo para responder), `target` (`last_reply`/`summary`), `hint` (dica para a IA, até 500), opcional `branches` (ids estáveis; ver [Saídas](#saídas-de-cada-caixa-ligações)). |
 | `match_reply` | Resposta (texto) | Espera a resposta e decide por texto, sem IA. | `branches` (1–8, cada uma `{ id, label, op: "eq"/"contains", pattern }`), `grace_timeout_ms` (mínimo 15 min), opcional `save_to` (`{ "kind": "contact_name" }` ou `{ "kind": "lead_custom", "key": "campo" }`) e `if_exists` (`skip`/`overwrite`/`confirm`). |
 | `repeat` | Repetir | Repete o trecho `body` N vezes, com N tirado da última resposta (número ou palavra). | `{ "max_count": 1…20 }` |
-| `action` | Ação | Envia mensagem. | Texto: `{ "mode": "text", "body": "…" }` (até 4000). IA: `{ "mode": "ai_message", "prompt_hint": "…", "fallback_template_id"? }`. Modelo: `{ "mode": "template", "template_id": "<uuid>" }`. |
+| `action` | Ação | Envia mensagem. | Texto: `{ "mode": "text", "body": "…" }` (até 4000), opcional `media_url` (imagem ou PDF por URL; o `body` vira a legenda). IA: `{ "mode": "ai_message", "prompt_hint": "…", "fallback_template_id"? }`. Modelo: `{ "mode": "template", "template_id": "<uuid>" }`. |
 | `internal_task` | Lembrete interno | Cria tarefa para a equipe; **não** envia mensagem. | `titulo` (até 200), `vence_em_dias` (0–365), `atribuir_a` (`"dono_do_lead"` ou `{ "usuario_id": "<uuid>" }`), `prioridade` (`low`/`medium`/`high`/`urgent`). |
 | `move_lead` | Mover lead no funil | Move o card para outra etapa **do mesmo funil**. | `stage_id` (vazio no rascunho; o Publicar exige), `lost_reason` (obrigatório ao mover para etapa de perda). |
 | `edit_lead_tag` | Editar tag do lead | Grava tags no lead. | `tags` (até 10, até 60 caracteres cada; vazio só no rascunho). |
@@ -167,8 +169,9 @@ Cada regra é `{ "field", "op", "value" }`, com `id` e `label` opcionais (obriga
 | `tag` | Tags do lead (`value` = a tag) | `eq`/`contains` = "tem a tag"; `neq` = "não tem" |
 | `steps_taken` | Quantos passos o lead já deu no fluxo | `eq`, `gte`, `lte` |
 | `last_outcome` | Última classe escolhida por um `ai_classify`/`match_reply` | `eq`, `neq`, `contains` |
+| `lead_date` | Uma data num campo personalizado do lead (`key` = nome do campo, ex.: `fim_teste`), por dia de calendário no fuso da organização | `passou_ha` N (a data é hoje ou ficou N dias ou mais no passado; N = 0 inclui hoje), `falta_para` N (faltam N dias ou mais). Só estes dois operadores valem para `lead_date`. |
 
-Dado ausente nunca satisfaz uma negação: um lead que ainda não foi classificado **não** passa por
+Dado ausente nunca satisfaz uma negação, e campo de data vazio ou inválido responde sempre "não": um lead que ainda não foi classificado **não** passa por
 `last_outcome neq "quente"`.
 
 ### Saídas de cada caixa (ligações)
