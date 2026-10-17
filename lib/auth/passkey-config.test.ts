@@ -55,7 +55,7 @@ describe("configPasskeyDoAmbiente — não oferecer provider que só sabe falhar
     const c = configPasskeyDoAmbiente({
       [ENV_PASSKEY_LIGADO]: "true",
       [ENV_RP_ID]: "crm.exemplo.com",
-      DESKCOMM_MFA_WEBAUTHN_RP_ORIGINS: "https://crm.exemplo.com, https://admin.exemplo.com",
+      MFA_WEBAUTHN_RP_ORIGINS: "https://crm.exemplo.com, https://admin.exemplo.com",
     });
     expect(c.rpOrigins).toEqual([
       "https://crm.exemplo.com",
@@ -104,7 +104,7 @@ describe("transporte binário servidor↔navegador", () => {
   it("creation options: round-trip preserva challenge, user.id e excludeCredentials", () => {
     const original = {
       challenge: new Uint8Array([1, 2, 3, 250]),
-      rp: { id: "crm.exemplo.com", name: "Deskcomm" },
+      rp: { id: "crm.exemplo.com", name: "Acme CRM" },
       user: { id: new Uint8Array([9, 8, 7]), name: "ana", displayName: "Ana" },
       pubKeyCredParams: [{ type: "public-key" as const, alg: -7 }],
       excludeCredentials: [{ type: "public-key" as const, id: new Uint8Array([5, 6]) }],

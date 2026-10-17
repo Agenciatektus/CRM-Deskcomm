@@ -40,9 +40,9 @@ export interface ConfigPasskey {
   rpOrigins?: string[];
 }
 
-export const ENV_PASSKEY_LIGADO = "DESKCOMM_MFA_WEBAUTHN_ENROLL_ENABLED";
-export const ENV_RP_ID = "DESKCOMM_MFA_WEBAUTHN_RP_ID";
-export const ENV_RP_ORIGINS = "DESKCOMM_MFA_WEBAUTHN_RP_ORIGINS";
+export const ENV_PASSKEY_LIGADO = "MFA_WEBAUTHN_ENROLL_ENABLED";
+export const ENV_RP_ID = "MFA_WEBAUTHN_RP_ID";
+export const ENV_RP_ORIGINS = "MFA_WEBAUTHN_RP_ORIGINS";
 
 function parseOrigins(bruto: string | undefined): string[] {
   if (!bruto) return [];
@@ -56,8 +56,8 @@ function parseOrigins(bruto: string | undefined): string[] {
  * Decide se o provider passkey pode ser oferecido nesta instalação.
  *
  * Duas portas fecham o provider (retorno `{ disponivel: false }`):
- *   1. O operador não ligou `DESKCOMM_MFA_WEBAUTHN_ENROLL_ENABLED` (= `"true"`).
- *   2. Ligou, mas não definiu `DESKCOMM_MFA_WEBAUTHN_RP_ID` — sem RP, o GoTrue
+ *   1. O operador não ligou `MFA_WEBAUTHN_ENROLL_ENABLED` (= `"true"`).
+ *   2. Ligou, mas não definiu `MFA_WEBAUTHN_RP_ID` — sem RP, o GoTrue
  *      responde "webAuthn RP ID cannot be empty" em TODO challenge; seria um
  *      provider que só sabe falhar, então nem aparece.
  *
