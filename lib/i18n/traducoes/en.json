@@ -1920,6 +1920,8 @@
   "Nunca indexado": "Never indexed",
   "agora há pouco": "just now",
   "há {tempo}": "{tempo} ago",
+  "Cliente reagiu com {emoji}": "Client reacted with {emoji}",
+  "Atendente reagiu com {emoji}": "Agent reacted with {emoji}",
   "Nenhuma fonte configurada.": "No source configured.",
   "Configurar": "Configure",
   "Última indexação": "Last indexed",

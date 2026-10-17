@@ -1090,6 +1090,8 @@
   "Nunca indexado": "从未索引",
   "agora há pouco": "刚刚",
   "há {tempo}": "距今 {tempo}",
+  "Cliente reagiu com {emoji}": "客户回应了 {emoji}",
+  "Atendente reagiu com {emoji}": "客服回应了 {emoji}",
   "Nenhuma fonte configurada.": "未配置任何来源。",
   "Configurar": "配置",
   "Última indexação": "上次索引",
