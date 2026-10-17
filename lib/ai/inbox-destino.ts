@@ -300,3 +300,15 @@ export async function resolverDestinosDosAvisos<T extends ReferenciaDoAviso>(
     return { ...item, destination };
   });
 }
+
+/**
+ * Quem ENXERGA um aviso da Central (migration 0689, doc de decisão 162): sem
+ * `para_user_id` é da empresa inteira; com ele, só daquela pessoa. É o filtro
+ * `.or()` do PostgREST que a lista, o contador do sino, o "Marcar todos
+ * resolvidos" e o resolver de um aviso aplicam — os quatro com o mesmo texto,
+ * para que o que a pessoa vê seja exatamente o que ela resolve. `userId` vem do
+ * JWT validado (`requireRole` → `getUser`), nunca do corpo.
+ */
+export function avisoVisivelPara(userId: string): string {
+  return `para_user_id.is.null,para_user_id.eq.${userId}`;
+}

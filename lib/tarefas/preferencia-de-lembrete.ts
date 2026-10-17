@@ -234,7 +234,11 @@ export function decidirWhatsappDoLembrete(input: {
   return { enviar: true, motivo: null };
 }
 
-/** O texto do aviso da Central e do push — sem dado de cliente, pelo mesmo motivo do push da Central. */
+/**
+ * O texto do PUSH — sem dado de cliente, pelo mesmo motivo do push da Central.
+ * O item da Central usa só o `corpo` (o nome da tarefa) como título: lá o
+ * rótulo traduzido do kind já diz o que aconteceu (doc de decisão 162).
+ */
 export function textoDoAvisoDeTarefa(
   categoria: TipoDeAvisoDeTarefa,
   tarefa: { title: string },

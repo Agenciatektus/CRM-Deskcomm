@@ -15,10 +15,11 @@
  * proposta sem proposta criada. Aqui não se repete nenhuma daquela checagem
  * (nem `due_date < agora`, nem `status != done` num sentido novo): o recorte é
  * o da PRÓPRIA tarefa, para toda tarefa com prazo e responsável. O push vai
- * ao aparelho do RESPONSÁVEL; o item da Central é da ORGANIZAÇÃO
- * (`agent_inbox_items` não tem coluna de pessoa), então toda a equipe vê a
- * tarefa perto do vencimento. Os dois convivem: uma tarefa de proposta
- * prometida pode receber os dois avisos, e ambos são certos.
+ * ao aparelho do RESPONSÁVEL, e o item da Central também é SÓ dele
+ * (`para_user_id`, migration 0689, doc de decisão 162): o colega não vê o
+ * prazo do outro no sino, e o "Marcar todos resolvidos" de um não resolve o
+ * do outro. Os dois convivem: uma tarefa de proposta prometida pode receber os
+ * dois avisos, e ambos são certos.
  *
  * ═══ AS DUAS CATEGORIAS, E A ORDEM DELAS ═══
  *
@@ -181,6 +182,25 @@ export function lembretesDaRodada(
   return decididos;
 }
 
+/**
+ * A linha da Central de um lembrete — pura, para o teste prender o DONO.
+ *
+ * `para_user_id` é o responsável (0689): sem ele o aviso volta a ser da equipe
+ * inteira, que é o defeito que o doc de decisão 162 fechou. O título é o nome
+ * da tarefa (ver o comentário no insert).
+ */
+export function avisoDaCentral({ tarefa, categoria }: LembreteDecidido) {
+  return {
+    organization_id: tarefa.organization_id,
+    para_user_id: tarefa.assigned_to,
+    kind: categoria,
+    severity: "warn",
+    title: textoDoAvisoDeTarefa(categoria, tarefa).corpo,
+    ref_kind: "task",
+    ref_id: tarefa.id,
+  };
+}
+
 interface Rodada {
   examinadas: number;
   avisadas: number;
@@ -278,18 +298,18 @@ async function rodar(admin: ReturnType<typeof createAdminClient>, requestId: str
     const responsavel = tarefa.assigned_to as string;
     const texto = textoDoAvisoDeTarefa(categoria, tarefa);
 
-    // IN-APP: o item da Central, que é onde a operação inteira olha. A trava de
-    // "já avisado" mora nele — se o INSERT cair por corrida com outra rodada, o
-    // efeito é um segundo aviso, nunca um aviso perdido.
-    const { error: erroInbox } = await admin.from("agent_inbox_items").insert({
-      organization_id: tarefa.organization_id,
-      kind: categoria,
-      severity: "warn",
-      title: texto.titulo,
-      body: texto.corpo,
-      ref_kind: "task",
-      ref_id: tarefa.id,
-    });
+    // IN-APP: o item da Central do RESPONSÁVEL (`para_user_id`, 0689). A trava
+    // de "já avisado" mora nele — se o INSERT cair por corrida com outra rodada,
+    // o efeito é um segundo aviso, nunca um aviso perdido.
+    //
+    // O título do item é o NOME DA TAREFA, e não a frase do push: a Central
+    // mostra o título cru (dado de gente, `AgentInboxList.tsx`) e logo abaixo o
+    // rótulo do kind já traduzido — "Uma tarefa está perto do vencimento" em PT
+    // no título ficaria sem tradução para quem usa espanhol, e repetido em
+    // português. O push não tem rótulo, por isso leva a frase (doc 162).
+    const { error: erroInbox } = await admin
+      .from("agent_inbox_items")
+      .insert(avisoDaCentral({ tarefa, categoria }));
     if (erroInbox) {
       logger.error("[task-reminder] aviso na Central falhou", {
         organization_id: tarefa.organization_id,

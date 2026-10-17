@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { preferenciaPadraoDeLembrete } from "@/lib/tarefas/preferencia-de-lembrete";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { chaveDoAviso, janelaDaVarredura, lembretesDaRodada, type TarefaLida } from "./route";
+import { avisoDaCentral, chaveDoAviso, janelaDaVarredura, lembretesDaRodada, type TarefaLida } from "./route";
 
 const AGORA = new Date("2026-10-13T12:00:00.000Z");
 const MIN = 60_000;
@@ -315,5 +315,27 @@ describe("a varredura que alimenta a régua", () => {
     const busca = fonte.slice(fonte.indexOf('.from("user_organizations")'));
     expect(fonte).toContain('.from("user_organizations")');
     expect(busca.slice(0, 300)).toContain('.is("revoked_at", null)');
+  });
+});
+
+describe("avisoDaCentral — o aviso de prazo é do RESPONSÁVEL (doc 162, migration 0689)", () => {
+  it("leva o responsável em para_user_id: o colega não vê, e o Marcar todos dele não resolve", () => {
+    const linha = avisoDaCentral({ tarefa: tarefa({ assigned_to: "pessoa-7" }), categoria: "task_due" });
+    expect(linha.para_user_id).toBe("pessoa-7");
+    expect(linha.organization_id).toBe("org-1");
+    expect(linha).toMatchObject({ kind: "task_due", ref_kind: "task", ref_id: "t1" });
+  });
+
+  it("o título do item é o NOME da tarefa — a frase do push não vai para a Central", () => {
+    for (const categoria of ["task_due", "task_overdue"] as const) {
+      const linha = avisoDaCentral({ tarefa: tarefa({ title: "  Ligar para a Ana  " }), categoria });
+      expect(linha.title).toBe("Ligar para a Ana");
+      expect(linha).not.toHaveProperty("body");
+    }
+  });
+
+  it("a rodada grava pela função, e não por um insert à mão que perderia o dono", () => {
+    const fonte = readFileSync(join(__dirname, "route.ts"), "utf8");
+    expect(fonte).toMatch(/\.from\("agent_inbox_items"\)\s*\.insert\(avisoDaCentral\(/);
   });
 });
