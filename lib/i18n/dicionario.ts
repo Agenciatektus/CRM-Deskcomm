@@ -2704,6 +2704,39 @@ export const DICIONARIO: Traducoes = {
   "Etiqueta do contato": { es: "Etiqueta del contacto" },
   "Passos já dados no fluxo": { es: "Pasos ya dados en el flujo" },
   "Desfecho do passo anterior": { es: "Resultado del paso anterior" },
+  // Regra de data da condição (item 14) — a regra que pergunta se o período de
+  // teste terminou. Ver `lib/followup/condicao-por-data.ts`.
+  "Data de um campo do negócio": { es: "Fecha de un campo del negocio" },
+  // Avisos de seguranca da publicacao (`avisosDoGatilho`).
+  "Sem “silêncio máximo”, o fluxo alcança TODO contato calado há mais que o mínimo — inclusive quem sumiu há meses — e começa para todos eles na primeira varredura, um minuto depois de publicar.":
+    { es: "Sin “silencio máximo”, el flujo alcanza a TODO contacto callado por más que el mínimo — incluso a quien desapareció hace meses — y empieza para todos ellos en el primer barrido, un minuto después de publicar." },
+  "Sem limite de repetições, a pausa só ESPAÇA os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, indefinidamente.":
+    { es: "Sin límite de repeticiones, la pausa solo ESPACIA los reinicios: quien nunca responde vuelve a recibir el flujo en cada pausa, indefinidamente." },
+  "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “Só começar se a equipe já respondeu a última mensagem do cliente” se o fluxo é para quem sumiu, não para quem está esperando.":
+    { es: "El silencio cuenta desde el último mensaje del CLIENTE, y un mensaje del equipo no reinicia esa cuenta: quien escribió y no fue atendido también entra en el flujo. Active “Empezar solo si el equipo ya respondió el último mensaje del cliente” si el flujo es para quien desapareció, no para quien está esperando." },
+  // Teto de repeticoes e guarda de resposta da equipe (item 16 / item 12).
+  "Quantas vezes no máximo, por contato (opcional)": {
+    es: "Cuántas veces como máximo, por contacto (opcional)",
+  },
+  "A pausa acima só espaça os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, para sempre. Com um limite, o fluxo para de recomeçar depois deste número de vezes. 0 = sem limite.":
+    {
+      es: "La pausa de arriba solo espacia los reinicios: quien nunca responde vuelve a recibir el flujo en cada pausa, para siempre. Con un límite, el flujo deja de reiniciarse después de esta cantidad de veces. 0 = sin límite.",
+    },
+  "Só começar se a equipe já respondeu a última mensagem do cliente": {
+    es: "Empezar solo si el equipo ya respondió el último mensaje del cliente",
+  },
+  "O tempo de silêncio conta da última mensagem do cliente, e mensagem da equipe não zera essa conta — então quem escreveu e ainda não foi atendido também entra no fluxo. Ligue isto quando o fluxo é para quem sumiu, e não para quem está esperando resposta.":
+    {
+      es: "El tiempo de silencio cuenta desde el último mensaje del cliente, y un mensaje del equipo no reinicia esa cuenta — así que quien escribió y todavía no fue atendido también entra en el flujo. Active esto cuando el flujo es para quien desapareció, y no para quien está esperando respuesta.",
+    },
+  "Campo do negócio com a data": { es: "Campo del negocio con la fecha" },
+  "Ex.: fim_teste": { es: "Ej.: fim_teste" },
+  "Prazo em dias": { es: "Plazo en días" },
+  "0 = inclui hoje": { es: "0 = incluye hoy" },
+  "O campo é o mesmo nome usado na ficha do negócio. O prazo conta em dias de calendário no fuso da organização; 0 inclui o dia de hoje.":
+    {
+      es: "El campo es el mismo nombre usado en la ficha del negocio. El plazo cuenta en días de calendario en la zona horaria de la organización; 0 incluye el día de hoy.",
+    },
   "está na etapa": { es: "está en la etapa" },
   "não está na etapa": { es: "no está en la etapa" },
   "contém": { es: "contiene" },
@@ -7835,6 +7868,10 @@ export const DICIONARIO: Traducoes = {
   // ─── Inbox: tags de contato/conversa ───
   "Sem tags no contato.": { es: "Sin etiquetas en el contacto." },
   "Adicionar tag ao contato": { es: "Agregar etiqueta al contacto" },
+  // ─── #2979: o MESMO editor no funil, onde a etiqueta é do NEGÓCIO ───
+  "Sem tags no negócio.": { es: "Sin etiquetas en el negocio." },
+  "Adicionar tag ao negócio": { es: "Agregar etiqueta al negocio" },
+  "Tags do negócio": { es: "Etiquetas del negocio" },
   "Remover tag": { es: "Quitar etiqueta" },
   "Tags da conversa": { es: "Etiquetas de la conversación" },
 
@@ -16154,6 +16191,60 @@ export const DICIONARIO: Traducoes = {
   "O roteiro de atendimento não começou para este contato: o fluxo pode não estar publicado, o contato já pode ter um roteiro em andamento, ou já ter concluído este sem poder recomeçar.": {
     es: "El guion de atención no comenzó para este contacto: el flujo puede no estar publicado, el contacto puede ya tener un guion en curso, o ya haber concluido este sin poder reiniciar.",
   },
+  "9. Dados do Google (Agenda e Google Ads)": { es: "9. Datos de Google (Agenda y Google Ads)" },
+  "Lembretes de tarefa": {
+    es: "Recordatorios de tareas",
+  },
+  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Se ele ligou o Push e esta instalação tem as chaves do Push (veja o aviso no topo da página), o aviso chega também no aparelho dele.": {
+    es: "El aviso queda en la Central del responsable cuando el plazo se acerca o vence, aunque nadie tenga el sitio abierto. Si activó el Push y esta instalación tiene las claves del Push (vea el aviso al inicio de la página), el aviso también llega a su dispositivo.",
+  },
+  "Avisar quando a tarefa está perto do vencimento": {
+    es: "Avisar cuando la tarea está por vencer",
+  },
+  "Antecedência do aviso": {
+    es: "Antelación del aviso",
+  },
+  "15 minutos": {
+    es: "15 minutos",
+  },
+  "1 hora": {
+    es: "1 hora",
+  },
+  "1 dia": {
+    es: "1 día",
+  },
+  "Avisar quando a tarefa vence sem conclusão": {
+    es: "Avisar cuando la tarea vence sin terminarse",
+  },
+  "O aviso de vencimento sai uma vez por tarefa; não se repete a cada rodada.": {
+    es: "El aviso de vencimiento sale una vez por tarea; no se repite en cada corrida.",
+  },
+  "Receber também no WhatsApp": {
+    es: "Recibir también en WhatsApp",
+  },
+  "Número com DDD, só dígitos": {
+    es: "Número con código de área, solo dígitos",
+  },
+  "O WhatsApp sai pelo número da empresa, e só quando ele estiver conectado. O aviso vai para o seu contato cadastrado no CRM.": {
+    es: "El WhatsApp sale por el número de la empresa, y solo cuando esté conectado. El aviso va a su contacto registrado en el CRM.",
+  },
+  "Abrir tarefa": {
+    es: "Abrir tarea",
+  },
+  // Os rótulos dos dois kinds (KIND_LABEL em lib/ai/agent-inbox-copy.ts): é o
+  // título que a Central mostra em cada aviso, via `kindLabel(item.kind, t)`.
+  "Uma tarefa está perto do vencimento": {
+    es: "Una tarea está cerca del vencimiento",
+  },
+  "Uma tarefa venceu sem conclusão": {
+    es: "Una tarea venció sin terminarse",
+  },
+  "Abra a tarefa e conclua antes do prazo — ou reagende agora, se já dá para ver que não vai caber.": {
+    es: "Abre la tarea y cúmplela antes del plazo — o reprograma ahora, si ya ves que no va a caber.",
+  },
+  "A tarefa venceu sem conclusão. Abra e conclua, ou reagende o prazo se ele não for mais possível.": {
+    es: "La tarea venció sin terminarse. Ábrela y cúmplela, o reprograma el plazo si ya no es posible.",
+  },
 
   // ─── Contatos: lote por seleção múltipla (#2484, fatia F3) ───
   //
@@ -16215,6 +16306,14 @@ export const DICIONARIO: Traducoes = {
   "A automação foi alterada e não tem mais o rodízio que disparou esta ação. Nada foi atribuído.": { es: "La automatización fue modificada y ya no tiene la rotación que disparó esta acción. No se asignó nada." },
   "O lead deste evento não foi encontrado nesta organização, então ninguém foi atribuído.": { es: "El lead de este evento no se encontró en esta organización, así que no se asignó a nadie." },
   "Vez de {nome}, posição {posicao} da fila do rodízio.": { es: "Turno de {nome}, posición {posicao} de la fila de la rotación." },
+  // #3006 — "usar como exemplo para a IA": a conversa marcada vira material do
+  // agente (opt-in de LGPD). O selo fica curto de propósito: ele divide a faixa
+  // com as etiquetas do contato, e o verbo inteiro mora no `title` do controle.
+  "Usar como exemplo para a IA": { es: "Usar como ejemplo para la IA" },
+  "Deixar de usar como exemplo": { es: "Dejar de usar como ejemplo" },
+  "Exemplo para a IA": { es: "Ejemplo para la IA" },
+  "Conversa marcada como exemplo para a IA.": { es: "Conversación marcada como ejemplo para la IA." },
+  "A conversa deixou de ser exemplo para a IA.": { es: "La conversación dejó de ser ejemplo para la IA." },
   "O contato pediu para não receber mensagens (opt-out): o envio pelo automático fica bloqueado. Nada a enviar.": { es: "El contacto pidió no recibir mensajes (opt-out): el envío por el automático queda bloqueado. Nada que enviar." },
   "Este contato foi anonimizado (LGPD) — é proibido enviar mensagens a ele.": { es: "Este contacto fue anonimizado (LGPD) — está prohibido enviarle mensajes." },
   "Não há base legal (LGPD) registrada para o primeiro contato com este lead. O time precisa regularizar o cadastro antes de abordar.": { es: "No hay base legal (LGPD) registrada para el primer contacto con este lead. El equipo debe regularizar el registro antes de abordarlo." },
