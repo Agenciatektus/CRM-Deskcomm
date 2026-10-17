@@ -16191,6 +16191,60 @@ export const DICIONARIO: Traducoes = {
   "O roteiro de atendimento não começou para este contato: o fluxo pode não estar publicado, o contato já pode ter um roteiro em andamento, ou já ter concluído este sem poder recomeçar.": {
     es: "El guion de atención no comenzó para este contacto: el flujo puede no estar publicado, el contacto puede ya tener un guion en curso, o ya haber concluido este sin poder reiniciar.",
   },
+  "9. Dados do Google (Agenda e Google Ads)": { es: "9. Datos de Google (Agenda y Google Ads)" },
+  "Lembretes de tarefa": {
+    es: "Recordatorios de tareas",
+  },
+  "O aviso fica na Central do responsável quando o prazo chega perto ou vence, mesmo que ninguém esteja com o site aberto. Se ele ligou o Push e esta instalação tem as chaves do Push (veja o aviso no topo da página), o aviso chega também no aparelho dele.": {
+    es: "El aviso queda en la Central del responsable cuando el plazo se acerca o vence, aunque nadie tenga el sitio abierto. Si activó el Push y esta instalación tiene las claves del Push (vea el aviso al inicio de la página), el aviso también llega a su dispositivo.",
+  },
+  "Avisar quando a tarefa está perto do vencimento": {
+    es: "Avisar cuando la tarea está por vencer",
+  },
+  "Antecedência do aviso": {
+    es: "Antelación del aviso",
+  },
+  "15 minutos": {
+    es: "15 minutos",
+  },
+  "1 hora": {
+    es: "1 hora",
+  },
+  "1 dia": {
+    es: "1 día",
+  },
+  "Avisar quando a tarefa vence sem conclusão": {
+    es: "Avisar cuando la tarea vence sin terminarse",
+  },
+  "O aviso de vencimento sai uma vez por tarefa; não se repete a cada rodada.": {
+    es: "El aviso de vencimiento sale una vez por tarea; no se repite en cada corrida.",
+  },
+  "Receber também no WhatsApp": {
+    es: "Recibir también en WhatsApp",
+  },
+  "Número com DDD, só dígitos": {
+    es: "Número con código de área, solo dígitos",
+  },
+  "O WhatsApp sai pelo número da empresa, e só quando ele estiver conectado. O aviso vai para o seu contato cadastrado no CRM.": {
+    es: "El WhatsApp sale por el número de la empresa, y solo cuando esté conectado. El aviso va a su contacto registrado en el CRM.",
+  },
+  "Abrir tarefa": {
+    es: "Abrir tarea",
+  },
+  // Os rótulos dos dois kinds (KIND_LABEL em lib/ai/agent-inbox-copy.ts): é o
+  // título que a Central mostra em cada aviso, via `kindLabel(item.kind, t)`.
+  "Uma tarefa está perto do vencimento": {
+    es: "Una tarea está cerca del vencimiento",
+  },
+  "Uma tarefa venceu sem conclusão": {
+    es: "Una tarea venció sin terminarse",
+  },
+  "Abra a tarefa e conclua antes do prazo — ou reagende agora, se já dá para ver que não vai caber.": {
+    es: "Abre la tarea y cúmplela antes del plazo — o reprograma ahora, si ya ves que no va a caber.",
+  },
+  "A tarefa venceu sem conclusão. Abra e conclua, ou reagende o prazo se ele não for mais possível.": {
+    es: "La tarea venció sin terminarse. Ábrela y cúmplela, o reprograma el plazo si ya no es posible.",
+  },
 
   // ─── Contatos: lote por seleção múltipla (#2484, fatia F3) ───
   //

@@ -10189,6 +10189,16 @@ alter table public.agent_inbox_items
     -- pessoa da equipe (PATCH .../members/[userId]/email): a empresa fica
     -- sabendo pela Central — com o nome e a data, nunca o endereço.
     'email_de_login_trocado',
+    -- (migration 0655, issue #2529) A tarefa vencida só aparecia em vermelho
+    -- para quem ABRIA a lista de tarefas: quem não abria perdia o prazo em
+    -- silêncio. O cron `task-reminder` varre `crm_tasks` com prazo na janela e
+    -- nasce com estes DOIS kinds — um por momento, e não um genérico: a
+    -- Central dá rótulo e destino por kind, e "tarefa perto do vencimento" e
+    -- "tarefa venceu sem conclusão" pedem leituras diferentes de quem abre.
+    -- Nascem com `ref_kind='task'`, levando à lista de tarefas. Entra NESTA
+    -- lista pelas razões de sempre (bloco único por constraint, #159).
+    'task_due',
+    'task_overdue',
     'other'
   ));
 
@@ -55099,6 +55109,31 @@ revoke all on function public.fn_conversa_remove_trechos_do_rag(uuid,uuid) from 
 grant execute on function public.fn_conversa_remove_trechos_do_rag(uuid,uuid) to service_role;
 
 notify pgrst,'reload schema';
+
+-- ---- #2529: o aviso da Central com destinatário (migration 0689) ----
+-- manifest: **O aviso da Central pode ter DONO (#2529, doc de decisão 162, caminho A).** `agent_inbox_items.para_user_id uuid null references auth.users(id) on delete cascade`: nulo é o aviso da EMPRESA (todos os avisos de hoje, sem backfill); preenchido, só aquela pessoa o vê. O cron `task-reminder` grava o responsável da tarefa ali, e a leitura da Central (lista e contador do sino), o "Marcar todos resolvidos" e o resolver de um aviso passam a enxergar `para_user_id is null or para_user_id = <quem pediu>` — o colega não vê o aviso de prazo do outro, e o "Marcar todos" de um não resolve o do outro. Sem índice: a leitura já filtra por organização e status, e a coluna só recorta o que sobra. Idempotente (`add column if not exists`); o mesmo bloco entra no fim do `baseline.sql`, antes da VARREDURA anon.
+
+-- ============================================================================
+-- 0689 — O AVISO DA CENTRAL COM DESTINATÁRIO (#2529, doc 162)
+--
+-- Até aqui todo aviso da Central era da ORGANIZAÇÃO: a tabela não tinha campo
+-- de pessoa. O lembrete de prazo da tarefa (0655) nasce ligado para toda tarefa
+-- com prazo, e numa equipe de 10 pessoas virava o aviso de cada tarefa de cada
+-- colega no sino de todos — e o "Marcar todos resolvidos" de qualquer um
+-- resolvia o de todo mundo.
+--
+-- A coluna é opcional de propósito: nulo é exatamente o comportamento de hoje
+-- (aviso da empresa). `on delete cascade` porque um aviso pessoal de quem saiu
+-- da instalação não tem mais leitor — ficaria aberto para ninguém.
+-- ============================================================================
+
+alter table public.agent_inbox_items
+  add column if not exists para_user_id uuid null references auth.users(id) on delete cascade;
+
+comment on column public.agent_inbox_items.para_user_id is
+  'Destinatário do aviso. Nulo = aviso da organização inteira; preenchido = só esta pessoa vê, resolve e conta no sino (doc 162, #2529).';
+
+notify pgrst, 'reload schema';
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
