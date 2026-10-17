@@ -57,7 +57,7 @@ const TRES_AVISOS = [
   {
     code: "silencio_alcanca_nao_atendido",
     message:
-      "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “exigir resposta da equipe” se o fluxo é para quem sumiu, não para quem está esperando.",
+      "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “Só começar se a equipe já respondeu a última mensagem do cliente” se o fluxo é para quem sumiu, não para quem está esperando.",
   },
 ];
 

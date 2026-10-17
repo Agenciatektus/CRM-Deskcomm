@@ -2706,8 +2706,8 @@ export const DICIONARIO: Traducoes = {
     { es: "Sin “silencio máximo”, el flujo alcanza a TODO contacto callado por más que el mínimo — incluso a quien desapareció hace meses — y empieza para todos ellos en el primer barrido, un minuto después de publicar." },
   "Sem limite de repetições, a pausa só ESPAÇA os reinícios: quem nunca responde volta a receber o fluxo a cada pausa, indefinidamente.":
     { es: "Sin límite de repeticiones, la pausa solo ESPACIA los reinicios: quien nunca responde vuelve a recibir el flujo en cada pausa, indefinidamente." },
-  "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “exigir resposta da equipe” se o fluxo é para quem sumiu, não para quem está esperando.":
-    { es: "El silencio cuenta desde el último mensaje del CLIENTE, y un mensaje del equipo no reinicia esa cuenta: quien escribió y no fue atendido también entra en el flujo. Active “exigir respuesta del equipo” si el flujo es para quien desapareció, no para quien está esperando." },
+  "O silêncio conta da última mensagem do CLIENTE, e mensagem da equipe não zera essa conta: quem escreveu e não foi atendido também entra no fluxo. Ligue “Só começar se a equipe já respondeu a última mensagem do cliente” se o fluxo é para quem sumiu, não para quem está esperando.":
+    { es: "El silencio cuenta desde el último mensaje del CLIENTE, y un mensaje del equipo no reinicia esa cuenta: quien escribió y no fue atendido también entra en el flujo. Active “Empezar solo si el equipo ya respondió el último mensaje del cliente” si el flujo es para quien desapareció, no para quien está esperando." },
   // Teto de repeticoes e guarda de resposta da equipe (item 16 / item 12).
   "Quantas vezes no máximo, por contato (opcional)": {
     es: "Cuántas veces como máximo, por contacto (opcional)",
