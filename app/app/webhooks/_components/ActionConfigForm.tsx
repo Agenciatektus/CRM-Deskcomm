@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -574,8 +575,11 @@ function AddTagForm({
 
 function AssignOwnerForm({ config, onChange }: FormProps<ConfigDoAtribuir>) {
   const t = useT();
-  const { data: members } = useAssignableMembers(true);
+  const { data: members, isLoading: carregandoMembros } = useAssignableMembers(true);
+  // Enquanto a lista de membros não chega, o nome é `null` (a tela mostra um
+  // esqueleto): o começo do user_id que aparecia ali não diz nada a ninguém.
   const nomeDe = (userId: string) => {
+    if (carregandoMembros) return null;
     const membro = members?.find((m) => m.user_id === userId);
     return membro?.full_name ?? userId.slice(0, 8);
   };
@@ -629,56 +633,73 @@ function AssignOwnerForm({ config, onChange }: FormProps<ConfigDoAtribuir>) {
         {fila.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t("Ninguém na fila ainda. Adicione pelo menos uma pessoa.")}</p>
         ) : (
-          <ol className="space-y-1" data-testid="fila-do-rodizio">
+          <ol className="space-y-1" data-testid="fila-do-rodizio" aria-busy={carregandoMembros}>
             {fila.map((pessoa, i) => {
-              const nome = nomeDe(pessoa.user_id);
+              const nomeCarregado = nomeDe(pessoa.user_id);
+              const nome = nomeCarregado ?? String(i + 1);
+              // Duas partes que QUEBRAM de linha quando a largura não cabe as
+              // duas (celular): o nome nunca disputa espaço com os 4 botões de
+              // 44px — a 360px ele ficava com 51px, e com 0px quando pausado.
               return (
-                <li key={pessoa.user_id} className="flex items-center gap-1 rounded-md border px-2 py-1">
-                  <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">{i + 1}</span>
-                  <span
-                    className={`min-w-0 flex-1 truncate text-sm ${pessoa.pausado ? "text-muted-foreground line-through" : ""}`}
-                  >
-                    {nome}
-                  </span>
-                  {pessoa.pausado ? <span className="text-xs text-muted-foreground">{t("pausado")}</span> : null}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${t("Subir na fila")}: ${nome}`}
-                    disabled={i === 0}
-                    onClick={() => trocar(i, i - 1)}
-                  >
-                    <CaretUp size={16} aria-hidden />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${t("Descer na fila")}: ${nome}`}
-                    disabled={i === fila.length - 1}
-                    onClick={() => trocar(i, i + 1)}
-                  >
-                    <CaretDown size={16} aria-hidden />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${pessoa.pausado ? t("Voltar ao rodízio") : t("Pausar no rodízio")}: ${nome}`}
-                    onClick={() => mudarFila(fila.map((p, k) => (k === i ? { ...p, pausado: !p.pausado } : p)))}
-                  >
-                    {pessoa.pausado ? <Play size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${t("Tirar da fila")}: ${nome}`}
-                    onClick={() => mudarFila(fila.filter((_, k) => k !== i))}
-                  >
-                    <X size={16} aria-hidden />
-                  </Button>
+                <li
+                  key={pessoa.user_id}
+                  className="flex flex-wrap items-center gap-x-1 gap-y-0.5 rounded-md border px-2 py-1"
+                >
+                  <div className="flex min-w-0 grow basis-48 items-center gap-1" data-testid="pessoa-da-fila">
+                    <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">{i + 1}</span>
+                    {nomeCarregado === null ? (
+                      <Skeleton aria-hidden className="h-4 w-24 max-w-full" />
+                    ) : (
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm ${pessoa.pausado ? "text-muted-foreground line-through" : ""}`}
+                      >
+                        {nomeCarregado}
+                      </span>
+                    )}
+                    {pessoa.pausado ? (
+                      <span className="shrink-0 text-xs text-muted-foreground">{t("pausado")}</span>
+                    ) : null}
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${t("Subir na fila")}: ${nome}`}
+                      disabled={i === 0}
+                      onClick={() => trocar(i, i - 1)}
+                    >
+                      <CaretUp size={16} aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${t("Descer na fila")}: ${nome}`}
+                      disabled={i === fila.length - 1}
+                      onClick={() => trocar(i, i + 1)}
+                    >
+                      <CaretDown size={16} aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${pessoa.pausado ? t("Voltar ao rodízio") : t("Pausar no rodízio")}: ${nome}`}
+                      onClick={() => mudarFila(fila.map((p, k) => (k === i ? { ...p, pausado: !p.pausado } : p)))}
+                    >
+                      {pessoa.pausado ? <Play size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${t("Tirar da fila")}: ${nome}`}
+                      onClick={() => mudarFila(fila.filter((_, k) => k !== i))}
+                    >
+                      <X size={16} aria-hidden />
+                    </Button>
+                  </div>
                 </li>
               );
             })}
