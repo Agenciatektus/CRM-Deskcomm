@@ -594,7 +594,7 @@ beforeAll(() => {
             (v_org, v_sess, timestamptz '2030-01-01 03:00:00+00', timestamptz '2030-01-01 05:00:00+00');
         end if;
 
-        -- migration 0689 (#2041): o historico do rodizio da acao assign_owner.
+        -- migration 0692 (#2041): o historico do rodizio da acao assign_owner.
         -- Semeado pelo ESCRITOR de producao (a funcao), com uma regra cuja fila
         -- e o usuario semeado (agent, elegivel). A leitura e org-scoped sem gate
         -- de papel, entao o agent e controle positivo legitimo; a escrita nao e
@@ -790,7 +790,7 @@ export const TABLES = [
   // medida em vinculo-do-agente-ao-numero.test.ts. O número PRINCIPAL segue em
   // ai_agent_versions.channel_session_id — esta tabela só acrescenta vínculos.
   "ai_agent_version_channels",
-  // migration 0689 (#2041) — o histórico do rodízio da ação "Atribuir a um
+  // migration 0692 (#2041) — o histórico do rodízio da ação "Atribuir a um
   // atendente": quem recebeu cada lead e em que posição da fila. Vazar a linha
   // entrega ao vizinho quem atende qual negócio e o ritmo de distribuição da
   // equipe. A LEITURA é org-scoped sem gate de papel (o `agent` semeado é

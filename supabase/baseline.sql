@@ -55100,9 +55100,9 @@ grant execute on function public.fn_conversa_remove_trechos_do_rag(uuid,uuid) to
 
 notify pgrst,'reload schema';
 
--- ---- rodízio de atendentes na ação assign_owner (migration 0689, #2041) ----
+-- ---- rodízio de atendentes na ação assign_owner (migration 0692, #2041) ----
 -- Histórico append-only + função única que trava por regra, escolhe, registra e
--- grava o dono. O porquê inteiro está no cabeçalho da migration 0689.
+-- grava o dono. O porquê inteiro está no cabeçalho da migration 0692.
 create table if not exists public.automation_rodizio_atribuicoes (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations (id) on delete cascade,

@@ -1,6 +1,6 @@
 -- manifest: **Rodízio de atendentes na ação "Atribuir a um atendente" das Automações (issue #2041, substitui o PR #2269 de @hamiltonviana).** A ação `assign_owner` ganha o modo `{ modo: "rodizio", fila: [{ user_id, pausado }] }`. Quem escolhe a pessoa da vez é a função nova `fn_automation_rodizio_atribuir(p_org, p_rule, p_lead)`: numa transação só, ela trava por regra (`pg_advisory_xact_lock`), lê a fila da própria regra em `automation_rules`, escolhe o próximo elegível (na fila, não pausado, membro não revogado, não `viewer`), grava a linha no histórico append-only `automation_rodizio_atribuicoes` e faz o UPDATE do dono em `crm_leads` — o UPDATE é o que emite `lead.assigned` (o push). Leitura do histórico por organização; escrita só pela função (`service_role`). Aditiva e idempotente; apêndice igual no `baseline.sql`.
 -- ============================================================================
--- 0689 — RODÍZIO DE ATENDENTES NA AÇÃO "ATRIBUIR A UM ATENDENTE" (#2041)
+-- 0692 — RODÍZIO DE ATENDENTES NA AÇÃO "ATRIBUIR A UM ATENDENTE" (#2041)
 --
 -- O lead de formulário nasce SEM conversa, então o rodízio de conversas
 -- (`channel_routing_policies`) nunca chega até ele. O diagnóstico, a trava e o

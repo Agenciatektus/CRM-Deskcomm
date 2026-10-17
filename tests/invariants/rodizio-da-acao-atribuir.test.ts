@@ -12,7 +12,7 @@ import {
 } from "./gov-helpers";
 
 /**
- * Rodízio na ação "Atribuir a um atendente" (migration 0689, issue #2041).
+ * Rodízio na ação "Atribuir a um atendente" (migration 0692, issue #2041).
  *
  * Os casos vêm do PR #2269 (@hamiltonviana), agora chamando a função pela
  * REGRA: `fn_automation_rodizio_atribuir(org, regra, lead)` lê a fila da regra
