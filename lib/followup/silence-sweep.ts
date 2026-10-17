@@ -462,6 +462,8 @@ type ContactEmbed =
 const STATUS_ENCERRADOS = ["completed", "cancelled", "dead"] as const;
 /** Lote do `in(contact_id, …)`: a lista vai na URL do PostgREST. */
 const LOTE_DE_CONTATOS = 100;
+/** Teto de linhas por resposta do PostgREST (`max-rows`); páginas maiores voltam cortadas em silêncio. */
+const PAGINA_DE_INSCRICOES = 1000;
 
 /** Production adapter: `SilenceSweepDb` sobre o client service-role real. */
 export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSweepDb {
@@ -681,17 +683,27 @@ export function createSupabaseSilenceSweepDb(admin: SupabaseClient): SilenceSwee
       // este fluxo já falou com esta pessoa", e uma tentativa cancelada no meio
       // também gastou a vez. O índice
       // `(organization_id, pointer_id, contact_id, updated_at)` serve a consulta.
+      //
+      // PAGINADO: o PostgREST corta a resposta em 1000 linhas sem erro. Sem
+      // páginas, 100 contatos com 11+ inscrições cada (quem está em laço há
+      // meses) eram contados pela metade e o teto falhava ABERTO justo para eles.
       const contagem = new Map<string, number>();
       for (let i = 0; i < contactIds.length; i += LOTE_DE_CONTATOS) {
-        const { data, error } = await admin
-          .from("followup_enrollments")
-          .select("contact_id")
-          .eq("organization_id", orgId)
-          .eq("pointer_id", pointerId)
-          .in("contact_id", contactIds.slice(i, i + LOTE_DE_CONTATOS));
-        if (error) throw new Error(error.message);
-        for (const row of (data ?? []) as Array<{ contact_id: string }>) {
-          contagem.set(row.contact_id, (contagem.get(row.contact_id) ?? 0) + 1);
+        for (let de = 0; ; de += PAGINA_DE_INSCRICOES) {
+          const { data, error } = await admin
+            .from("followup_enrollments")
+            .select("contact_id")
+            .eq("organization_id", orgId)
+            .eq("pointer_id", pointerId)
+            .in("contact_id", contactIds.slice(i, i + LOTE_DE_CONTATOS))
+            .order("id")
+            .range(de, de + PAGINA_DE_INSCRICOES - 1);
+          if (error) throw new Error(error.message);
+          const linhas = (data ?? []) as Array<{ contact_id: string }>;
+          for (const row of linhas) {
+            contagem.set(row.contact_id, (contagem.get(row.contact_id) ?? 0) + 1);
+          }
+          if (linhas.length < PAGINA_DE_INSCRICOES) break;
         }
       }
       return contagem;
