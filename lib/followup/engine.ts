@@ -1253,7 +1253,9 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
         .select("body")
         .eq("organization_id", orgId)
         .in("contact_id", ids)
-        .eq("direction", "inbound");
+        .eq("direction", "inbound")
+        // #2815: a reação (👍) é inbound sem `body` — se contasse, esconderia o "SIM" que ela segue.
+        .neq("type", "reaction");
       if (conversationId) q = q.eq("conversation_id", conversationId);
       if (naoAntesDe) q = q.gte("sent_at", naoAntesDe);
       const { data, error } = await q.order("sent_at", { ascending: false }).limit(1).maybeSingle();

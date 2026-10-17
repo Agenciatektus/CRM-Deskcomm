@@ -408,7 +408,7 @@ export function createPgAdminClient(pool: pg.Pool): TurnBridgeAdminClient {
       if (naoAntesDe) params.push(naoAntesDe);
       const { rows } = await pool.query<{ body: string | null }>(
         `select body from messages
-         where organization_id = $1 and contact_id = $2 and ($3::uuid is null or conversation_id=$3) and direction = 'inbound' ${desde}
+         where organization_id = $1 and contact_id = $2 and ($3::uuid is null or conversation_id=$3) and direction = 'inbound' and type <> 'reaction' ${desde}
          order by sent_at desc limit 1`,
         params,
       );

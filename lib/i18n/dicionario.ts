@@ -3034,6 +3034,8 @@ export const DICIONARIO: Traducoes = {
   "Nunca indexado": { es: "Nunca indexado" },
   "agora há pouco": { es: "hace un momento" },
   "há {tempo}": { es: "hace {tempo}" },
+  "Cliente reagiu com {emoji}": { es: "El cliente reaccionó con {emoji}" },
+  "Atendente reagiu com {emoji}": { es: "El agente reaccionó con {emoji}" },
   "Nenhuma fonte configurada.": { es: "Ninguna fuente configurada." },
   Configurar: { es: "Configurar" },
   "Última indexação": { es: "Última indexación" },
