@@ -5060,6 +5060,11 @@ export const DICIONARIO: Traducoes = {
   "— operação cross-tenant": { es: "— operación cross-tenant" },
   "Modo Plataforma": { es: "Modo plataforma" },
   "Sair pra app pessoal": { es: "Salir a la app personal" },
+  "Aviso: sem SMTP na instalação": { es: "Aviso: sin SMTP en la instalación" },
+  "Convites, recuperação de senha e avisos por e-mail não saem por SMTP até configurá-lo aqui.": {
+    es: "Invitaciones, recuperación de contraseña y avisos por correo no salen por SMTP hasta configurarlo aquí.",
+  },
+  "Configurar em /admin/email": { es: "Configurar en /admin/email" },
   "Navegação plataforma": { es: "Navegación de la plataforma" },
   "Voltar pra app": { es: "Volver a la app" },
   Dashboard: { es: "Panel" },
