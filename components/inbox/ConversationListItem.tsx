@@ -490,6 +490,12 @@ export function ConversationListItem({
         conserta é justamente um recurso que ninguém achava. Um ícone que só
         aparece sob o cursor continuaria escondido no celular, onde não há
         hover — e o alvo de toque é maior do que o desenho sugere.
+
+        Desmarcado usa `text-text-muted`, não `text-text-subtle`: é componente
+        gráfico e precisa de 3:1 contra o fundo da linha. Medido na prova de
+        tela, subtle dava 2,81:1 no escuro (#605e54 sobre #161510). Muted, no
+        pior fundo de cada tema (linha selecionada, `bg-accent-soft`): 5,74:1 no
+        claro (#5d594f sobre #e4ebe0) e 4,23:1 no escuro (#8e8b7f sobre #272b20).
       */}
       {onAlternarExemplo && (
         <button
@@ -504,7 +510,7 @@ export function ConversationListItem({
             "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent",
             exemploMarcado
               ? "text-accent hover:bg-accent-soft"
-              : "text-text-subtle hover:bg-surface-elevated hover:text-text",
+              : "text-text-muted hover:bg-surface-elevated hover:text-text",
           )}
         >
           <Sparkle size={14} weight={exemploMarcado ? "fill" : "regular"} aria-hidden />
