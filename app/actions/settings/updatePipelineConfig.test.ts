@@ -145,6 +145,15 @@ describe("updatePipelineConfig — campo que vira Contato e o gatilho por data",
     expect(h.gravou).not.toBeNull();
   });
 
+  it("aceita salvar com o campo que segue do Negócio, mesmo com regra ativa na chave", async () => {
+    // O caso mais comum: a regra de aniversário funciona e alguém só muda o
+    // vocabulário. Recusar aqui travaria a tela de Funis de toda org com regra.
+    h.regras = [regra("Parabéns", "nascimento")];
+
+    expect(await updatePipelineConfig(FUNIL, { fields: [NASCIMENTO_NEGOCIO] })).toEqual({ ok: true });
+    expect(h.gravou).not.toBeNull();
+  });
+
   it("aceita trocar de Contato para Negócio, mesmo com regra ativa na chave", async () => {
     h.settings = { fields: [NASCIMENTO_CONTATO] };
     h.regras = [regra("Parabéns", "nascimento")];
