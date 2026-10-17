@@ -30064,7 +30064,7 @@ create table if not exists public.passagens_de_atendimento (
   motivo_codigo    text not null check (motivo_codigo in (
                      'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
                      'low_confidence','critical_stage','legal_mention','refund_mention',
-                     'caso_escalado')),
+                     'caso_escalado','verificacao_manual')),
 
   -- ─── OS QUATRO NOMES QUE O GATE DE LGPD LÊ (ver o cabeçalho) ─────────────
   --   title   ← "o que o cliente quer", em uma linha (é o título do cartão)
@@ -58196,5 +58196,20 @@ end $$;
 
 comment on column public.webhook_lead_captures.outcome is
   'criado = virou lead novo; duplicado = envio repetido, nada mudou no card; atualizado = o card da mesma fonte recebeu o dado novo (issue #2316, só com a opção da fonte ligada); recusado = não entrou (reject_reason diz por quê).';
+
+notify pgrst, 'reload schema';
+
+-- 0693 - `verificacao_manual` entra no vocabulario fechado de `motivo_codigo`
+-- (`lib/escalacao/passagem.ts` -> MOTIVOS_DA_PASSAGEM + FRASE_DO_MOTIVO): um
+-- fluxo deterministico coletou dados e passou a conversa para verificacao
+-- humana. Mesmo drop/add da migration, replayado no baseline.
+alter table public.passagens_de_atendimento
+  drop constraint if exists passagens_de_atendimento_motivo_codigo_check;
+alter table public.passagens_de_atendimento
+  add constraint passagens_de_atendimento_motivo_codigo_check
+  check (motivo_codigo in (
+    'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
+    'low_confidence','critical_stage','legal_mention','refund_mention',
+    'caso_escalado','verificacao_manual'));
 
 notify pgrst, 'reload schema';
