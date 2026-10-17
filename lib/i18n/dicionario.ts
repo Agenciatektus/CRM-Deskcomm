@@ -1563,6 +1563,14 @@ export const DICIONARIO: Traducoes = {
   atualizadas: { es: "actualizadas" },
   recusadas: { es: "rechazadas" },
   "Recusada.": { es: "Rechazada." },
+  // O MESMO relatório, no singular (#2990): o verbo era fixo no plural e a barra
+  // escrevia "1 conversas fechadas" / "1 fechadas, 1 recusadas". "Conversa" é
+  // feminino, então o particípio e a recusa vão no feminino.
+  fechada: { es: "cerrada" },
+  atualizada: { es: "actualizada" },
+  recusada: { es: "rechazada" },
+  "1 conversa fechada.": { es: "1 conversación cerrada." },
+  "1 conversa atualizada.": { es: "1 conversación actualizada." },
   Aberta: { es: "Abierta" },
   Fechada: { es: "Cerrada" },
   "Em atendimento": { es: "En atención" },
@@ -1876,16 +1884,17 @@ export const DICIONARIO: Traducoes = {
   "Central de avisos": { es: "Central de avisos" },
   "em aberto": { es: "abiertos" },
   // ─── Agentes de IA: lista ───
-  "Agents de IA": { es: "Agentes de IA" },
-  "Configure o comportamento dos agents que respondem no WhatsApp.": {
+  "Agentes de IA": { es: "Agentes de IA" },
+  "Configure o comportamento dos agentes que respondem no WhatsApp.": {
     es: "Configura el comportamiento de los agentes que responden en WhatsApp.",
   },
-  "Nenhum agent configurado": { es: "Ningún agente configurado" },
-  "Crie um agent para responder a conversas no WhatsApp com IA. Você configura prompt, tools, gatilhos e janela de contexto.": {
+  "Nenhum agente configurado": { es: "Ningún agente configurado" },
+  "Crie um agente para responder a conversas no WhatsApp com IA. Você configura prompt, tools, gatilhos e janela de contexto.": {
     es: "Crea un agente para responder conversaciones de WhatsApp con IA. Configuras el prompt, las herramientas, los disparadores y la ventana de contexto.",
   },
   "Novo agente": { es: "Nuevo agente" },
-  "Nenhum agent corresponde aos filtros atuais.": {
+  "Criar novo": { es: "Crear nuevo" },
+  "Nenhum agente corresponde aos filtros atuais.": {
     es: "Ningún agente coincide con los filtros actuales.",
   },
   "Buscar por nome…": { es: "Buscar por nombre…" },
@@ -5183,6 +5192,14 @@ export const DICIONARIO: Traducoes = {
   "Tenant redigido — ação não disponível": { es: "Tenant anonimizado — acción no disponible" },
   "Suspender tenant": { es: "Suspender tenant" },
   "Reativar tenant": { es: "Reactivar tenant" },
+  // ─── #2778 — os três botões de ícone de TODA linha da listagem de tenants ───
+  // `aria-label` E `title`, os dois saem daqui: o botão é só ícone, então o
+  // rótulo é a ÚNICA coisa que o leitor de tela anuncia. Vão com `{nome}` porque
+  // a lista tem 30 linhas iguais — `t()` traduz, `.replace("{nome}", …)` cola o
+  // display_name, que é dado e não se traduz.
+  "Acompanhar a saúde de {nome}": { es: "Dar seguimiento a la salud de {nome}" },
+  "Editar os dados de {nome}": { es: "Editar los datos de {nome}" },
+  "Suspender {nome}": { es: "Suspender a {nome}" },
   // ─── Admin de plataforma: gestão de tenants (editar, excluir, e-mail de acesso) ───
   "Tenant excluído.": { es: "Tenant eliminado." },
   "Logins removidos": { es: "Accesos eliminados" },
@@ -15591,6 +15608,9 @@ export const DICIONARIO: Traducoes = {
   "A suspensão acontece se o pagamento não for confirmado até lá. Pague pelo link para evitar.": { es: "La suspensión ocurre si el pago no se confirma hasta entonces. Paga por el enlace para evitarla." },
   "Conta suspensa por falta de pagamento": { es: "Cuenta suspendida por falta de pago" },
   "A empresa volta a funcionar sozinha, na hora, assim que o pagamento for confirmado.": { es: "La empresa vuelve a funcionar sola, al instante, en cuanto se confirme el pago." },
+  "Seu teste grátis terminou e não identificamos pagamento. Assine em Plano e cobrança até a data da suspensão para manter a conta ativa.": { es: "Tu prueba gratis terminó y no identificamos ningún pago. Suscríbete en Plan y facturación antes de la fecha de suspensión para mantener la cuenta activa." },
+  "Conta suspensa: o teste grátis terminou": { es: "Cuenta suspendida: terminó la prueba gratis" },
+  "Seu teste grátis acabou sem pagamento, então a conta foi suspensa. Assine em Plano e cobrança para reativar na hora.": { es: "Tu prueba gratis terminó sin pago, así que la cuenta fue suspendida. Suscríbete en Plan y facturación para reactivarla al instante." },
   "Sua conta foi liberada": { es: "Tu cuenta fue liberada" },
   "Recebemos o pagamento e tudo voltou a funcionar. As conversas que chegaram durante a suspensão estão na Central, para revisão.": { es: "Recibimos el pago y todo volvió a funcionar. Las conversaciones que llegaron durante la suspensión están en la Central, para revisión." },
   // ─── Cobrança do revendedor — e-mails (PR 3a) ───
@@ -15664,6 +15684,7 @@ export const DICIONARIO: Traducoes = {
   "Dia {n}: aviso final, com a data da suspensão.": { es: "Día {n}: aviso final, con la fecha de la suspensión." },
   "Dia {n} (e pelo menos 48 horas depois do aviso final): a empresa é suspensa.": { es: "Día {n} (y al menos 48 horas después del aviso final): la empresa se suspende." },
   "Pagou: volta a funcionar sozinha, na hora, sem disparar o que ficou parado.": { es: "Pagó: vuelve a funcionar sola, al instante, sin disparar lo que quedó en pausa." },
+  "Essa tolerância é para pagamento em atraso. O teste grátis que acaba sem pagamento não espera por ela: o aviso final sai no fim do teste e a suspensão acontece 48 horas depois.": { es: "Esa tolerancia es para pagos atrasados. La prueba gratis que termina sin pago no la espera: el aviso final sale al final de la prueba y la suspensión ocurre 48 horas después." },
   "Salvar régua": { es: "Guardar reglas" },
   "Régua salva.": { es: "Reglas guardadas." },
   "Próximo vencimento": { es: "Próximo vencimiento" },
