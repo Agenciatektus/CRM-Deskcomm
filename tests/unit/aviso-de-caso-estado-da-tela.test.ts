@@ -48,6 +48,7 @@ function fatos(patch: Partial<FatosDaTelaDeAviso> = {}): FatosDaTelaDeAviso {
       telefone: "+5531998966398",
       rotulo: "Plantão da Ana",
       ligado: true,
+      respostaWhatsappHabilitada: false,
     },
     urlPublicaOk: true,
     agentesPublicados: { total: 1, comCasos: 1, assistidos: 0 },

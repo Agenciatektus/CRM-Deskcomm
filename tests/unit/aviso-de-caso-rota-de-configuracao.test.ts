@@ -172,6 +172,7 @@ describe("PUT — salvar a configuração", () => {
         p_telefone: TELEFONE,
         p_ligado: true,
         p_confirma_contato: false,
+        p_resposta_whatsapp_habilitada: false,
       }),
     );
   });

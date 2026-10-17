@@ -71,6 +71,7 @@ export interface NumeroInternoDeAviso {
   destino: string | null;
   /** `config_aviso_de_caso.destino_jid` — o endereço que o transporte resolveu. */
   jid: string | null;
+  respostaWhatsappHabilitada?: boolean;
 }
 
 /**
@@ -134,7 +135,7 @@ export async function lerNumeroInternoDeAviso(
   try {
     const r = await db
       .from("config_aviso_de_caso")
-      .select("telefone_destino, destino_jid")
+      .select("telefone_destino, destino_jid, resposta_whatsapp_habilitada")
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (r.error) throw new Error(r.error.message);
@@ -147,13 +148,18 @@ export async function lerNumeroInternoDeAviso(
       organizationId,
       causa: err instanceof Error ? err.message : String(err),
     });
-    return { destino: null, jid: null };
+    return { destino: null, jid: null, respostaWhatsappHabilitada: false };
   }
 
-  const linha = data as { telefone_destino?: string | null; destino_jid?: string | null } | null;
+  const linha = data as {
+    telefone_destino?: string | null;
+    destino_jid?: string | null;
+    resposta_whatsapp_habilitada?: boolean | null;
+  } | null;
   const valor: NumeroInternoDeAviso = {
     destino: linha?.telefone_destino ?? null,
     jid: linha?.destino_jid ?? null,
+    respostaWhatsappHabilitada: linha?.resposta_whatsapp_habilitada === true,
   };
   _cache.set(organizationId, { at: agora, valor });
   return valor;

@@ -95,6 +95,7 @@ export interface ConfiguracaoNaTela {
   telefone: string;
   rotulo: string | null;
   ligado: boolean;
+  respostaWhatsappHabilitada?: boolean;
 }
 
 /** O que o `pacing_ledger` responde sobre o número que ENVIA os avisos. */

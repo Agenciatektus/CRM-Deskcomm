@@ -13655,6 +13655,17 @@ export const DICIONARIO: Traducoes = {
   "Para pedir que a IA esclareça algo com o cliente, envie:": {
     es: "Para pedirle a la IA que aclare algo con el cliente, envía:",
   },
+  "Responder casos por este WhatsApp": { es: "Responder casos por este WhatsApp" },
+  "Permite usar RESPONDER ou PERGUNTAR no número que recebe os avisos. Desligado por padrão.": {
+    es: "Permite usar RESPONDER o PERGUNTAR en el número que recibe los avisos. Está desactivado por defecto.",
+  },
+  "Recebido. A IA vai seguir com o cliente.": { es: "Recibido. La IA continuará con el cliente." },
+  "Não consegui: esse caso já foi respondido ou não existe.": {
+    es: "No pude hacerlo: el caso ya fue respondido o no existe.",
+  },
+  "Formato: RESPONDER <id> <orientação> ou PERGUNTAR <id> <pergunta>.": {
+    es: "Formato: RESPONDER <id> <indicación> o PERGUNTAR <id> <pregunta>.",
+  },
   "A IA usa sua orientação e o histórico para continuar o atendimento.": {
     es: "La IA usa tu indicación y el historial para continuar la atención.",
   },

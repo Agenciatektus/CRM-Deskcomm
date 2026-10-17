@@ -5,12 +5,17 @@ import { z } from "zod";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import {
   ehNumeroInternoDeAviso,
+  lerNumeroInternoDeAviso,
   registrarMensagemIgnorada,
   type ChatIdentidade,
 } from "./numero-interno-de-aviso";
+import { logger } from "@/lib/logger";
+import { traduzir } from "@/lib/i18n/dicionario";
 
 const RESPOSTA = /^(RESPONDER|PERGUNTAR)\s+([0-9a-f-]{36})\s+([\s\S]+)$/i;
 const CasoId = z.string().uuid();
+
+export type ResultadoDeRespostaWhatsApp = "accepted" | "duplicate" | "unavailable" | "malformed" | null;
 
 export type ComandoDeRespostaDoSuporte = {
   caseId: string;
@@ -52,38 +57,165 @@ export async function consumirRespostaDoSuporteNoWhatsApp(
     externalId: string;
   },
 ): Promise<boolean> {
-  const interno = await ehNumeroInternoDeAviso(admin, entrada.organizationId, entrada.identidade);
-  if (!interno) return false;
+  const { consumed } = await consumirComResultado(admin, entrada);
+  return consumed;
+}
+
+export async function consumirComResultado(
+  admin: SupabaseClient,
+  entrada: {
+    organizationId: string;
+    channelSessionId: string;
+    identidade: ChatIdentidade;
+    direction: "inbound" | "outbound";
+    texto: string | null;
+    externalId: string;
+  },
+): Promise<{ consumed: boolean; result: ResultadoDeRespostaWhatsApp }> {
+  const interno = await ehNumeroInternoDeAviso(
+    admin,
+    entrada.organizationId,
+    entrada.identidade,
+  );
+  if (!interno) return { consumed: false, result: null };
+  // `ehNumeroInternoDeAviso` já memoiza a leitura; reusar o valor permite
+  // consultar o opt-in sem uma segunda ida ao banco e mantém os ingestores que
+  // só precisam do corte compatíveis com seus mocks/integrações.
+  const config = await lerNumeroInternoDeAviso(admin, entrada.organizationId);
+  const phone = entrada.identidade.kind === "phone" ? entrada.identidade.phone : null;
+  if (!phone || !config.destino || !phoneLookupVariants(config.destino).includes(phone)) {
+    return { consumed: true, result: null };
+  }
+
+  if (!config.respostaWhatsappHabilitada) {
+    await registrarMensagemIgnorada(admin, entrada.organizationId, {
+      direction: entrada.direction,
+      sessionId: entrada.channelSessionId,
+    });
+    return { consumed: true, result: null };
+  }
 
   const comando = entrada.direction === "inbound"
     ? parseComandoDeRespostaDoSuporte(entrada.texto)
     : null;
-  const phone = entrada.identidade.kind === "phone" ? entrada.identidade.phone : null;
   if (!comando || !phone || !entrada.externalId) {
     await registrarMensagemIgnorada(admin, entrada.organizationId, {
       direction: entrada.direction,
       sessionId: entrada.channelSessionId,
     });
-    return true;
+    if (entrada.direction === "inbound" && phone && entrada.externalId &&
+        /^(RESPONDER|PERGUNTAR)(?:\s|$)/i.test(entrada.texto?.trim() ?? "")) {
+      await enviarConfirmacao(admin, entrada, config, "malformed");
+    }
+    return {
+      consumed: true,
+      result: entrada.direction === "inbound" && /^(RESPONDER|PERGUNTAR)(?:\s|$)/i.test(entrada.texto?.trim() ?? "")
+        ? "malformed"
+        : null,
+    };
   }
 
-  const { data, error } = await admin.rpc("fn_responder_caso_por_whatsapp" as never, {
-    p_org: entrada.organizationId,
-    p_case: comando.caseId,
-    p_session: entrada.channelSessionId,
-    p_phone_variants: phoneLookupVariants(phone),
-    p_action: comando.action,
-    p_body: comando.body,
-    p_message_key: `${entrada.channelSessionId}:${entrada.externalId}`,
-  } as never);
-  if (error) throw new Error(`case_reply_whatsapp_failed: ${error.message}`);
+  let data: unknown;
+  let error: { message: string } | null;
+  try {
+    const resposta = await admin.rpc("fn_responder_caso_por_whatsapp" as never, {
+      p_org: entrada.organizationId,
+      p_case: comando.caseId,
+      p_session: entrada.channelSessionId,
+      p_phone_variants: phoneLookupVariants(phone),
+      p_action: comando.action,
+      p_body: comando.body,
+      p_message_key: `${entrada.channelSessionId}:${entrada.externalId}`,
+    } as never);
+    data = resposta.data;
+    error = resposta.error;
+  } catch (err) {
+    data = null;
+    error = { message: err instanceof Error ? err.message : String(err) };
+  }
+  if (error) {
+    logger.warn("[case-reply-whatsapp] RPC falhou; ingestão segue e a mensagem interna não vira conversa", {
+      organizationId: entrada.organizationId,
+      channelSessionId: entrada.channelSessionId,
+      causa: error.message,
+    });
+    await registrarMensagemIgnorada(admin, entrada.organizationId, {
+      direction: entrada.direction,
+      sessionId: entrada.channelSessionId,
+    });
+    return { consumed: true, result: null };
+  }
 
   const resultado = typeof data === "string" ? data : null;
-  if (resultado !== "accepted" && resultado !== "duplicate") {
+  if (resultado === "accepted") {
+    await enviarConfirmacao(admin, entrada, config, "accepted");
+    return { consumed: true, result: "accepted" };
+  } else if (resultado === "case_unavailable") {
+    await enviarConfirmacao(admin, entrada, config, "unavailable");
+    return { consumed: true, result: "unavailable" };
+  } else if (resultado !== "duplicate") {
     await registrarMensagemIgnorada(admin, entrada.organizationId, {
       direction: entrada.direction,
       sessionId: entrada.channelSessionId,
     });
   }
-  return true;
+  return { consumed: true, result: resultado === "duplicate" ? "duplicate" : null };
+}
+
+async function enviarConfirmacao(
+  admin: SupabaseClient,
+  entrada: {
+    organizationId: string;
+    channelSessionId: string;
+    identidade: ChatIdentidade;
+  },
+  config: { destino: string | null },
+  tipo: "accepted" | "unavailable" | "malformed",
+): Promise<void> {
+  try {
+    const [{ criarTransporteDoAviso }, { criarPacingDoCanal }] = await Promise.all([
+      import("@/lib/escalacao/aviso-ao-suporte.handler"),
+      import("@/lib/agent-engine/pacing/ledger-supabase"),
+    ]);
+    const telefone = config.destino;
+    if (!telefone) return;
+    const transporte = await criarTransporteDoAviso(admin as never);
+    const agora = new Date();
+    const canal = {
+      id: entrada.channelSessionId,
+      status: "WORKING",
+      archived_at: null,
+      aceitaMensagemLivre: true,
+    } as Parameters<Awaited<ReturnType<typeof criarTransporteDoAviso>>["configurado"]>[1];
+    if (!(await transporte.configurado(entrada.organizationId, canal))) return;
+    const destino = await transporte.resolveDestino(
+      entrada.organizationId,
+      canal,
+      telefone,
+    );
+    if (!destino) return;
+    const pacing = await criarPacingDoCanal(admin);
+    const decisao = await pacing.decide(entrada.organizationId, entrada.channelSessionId, agora);
+    if (!decisao.liberado) return;
+    const frases = {
+      accepted: "Recebido. A IA vai seguir com o cliente.",
+      unavailable: "Não consegui: esse caso já foi respondido ou não existe.",
+      malformed: "Formato: RESPONDER <id> <orientação> ou PERGUNTAR <id> <pergunta>.",
+    };
+    const { data: idiomaData } = await admin
+      .from("organizations")
+      .select("locale")
+      .eq("id", entrada.organizationId)
+      .maybeSingle();
+    const idioma = (idiomaData as { locale?: "pt-BR" | "es" } | null)?.locale ?? "pt-BR";
+    const body = traduzir(frases[tipo], idioma);
+    await transporte.envia(entrada.organizationId, canal, destino, body);
+    await pacing.registraEnvio(entrada.organizationId, entrada.channelSessionId, agora);
+  } catch (err) {
+    logger.warn("[case-reply-whatsapp] não foi possível enviar confirmação", {
+      organizationId: entrada.organizationId,
+      channelSessionId: entrada.channelSessionId,
+      causa: err instanceof Error ? err.message : String(err),
+    });
+  }
 }

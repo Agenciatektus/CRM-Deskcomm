@@ -32,6 +32,7 @@ const BASE = {
   caseId: "0b1f7a2e-0000-4000-8000-000000000000",
   nomeDoCliente: "Maria Aparecida de Souza",
   link: "https://crm.exemplo.com.br/app/ai/cases?caso=0b1f7a2e-0000-4000-8000-000000000000",
+  respostaWhatsappHabilitada: true,
 };
 
 describe("sanitizarTextoDoLead", () => {
@@ -108,6 +109,13 @@ describe("montarAvisoDeCaso", () => {
     expect(texto).toContain(`RESPONDER ${BASE.caseId} <resposta ou decisão>`);
     expect(texto).toContain(`PERGUNTAR ${BASE.caseId} <pergunta ao cliente>`);
     expect(texto).toContain("A IA usa sua orientação e o histórico para continuar o atendimento.");
+  });
+
+  it("quando o opt-in está desligado mantém o aviso antigo e não ensina comandos", () => {
+    const texto = montarAvisoDeCaso({ ...BASE, respostaWhatsappHabilitada: false });
+    expect(texto).toContain("Responder aqui não chega ao cliente — abra o link para responder.");
+    expect(texto).not.toContain("RESPONDER ");
+    expect(texto).not.toContain("PERGUNTAR ");
   });
 
   it("NÃO leva telefone, CPF nem trecho de mensagem do cliente", () => {

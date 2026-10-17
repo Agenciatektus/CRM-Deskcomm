@@ -72,6 +72,8 @@ export interface AvisoDeCaso {
   nomeDoCliente: string | null;
   /** O link já montado pelo servidor. É o ÚNICO link do texto. */
   link: string;
+  /** Só ensina comandos quando a organização habilitou o opt-in. */
+  respostaWhatsappHabilitada?: boolean;
 }
 
 /**
@@ -123,11 +125,15 @@ export function montarAvisoDeCaso(aviso: AvisoDeCaso): string {
   if (travou) linhas.push(`${t("Por que a IA travou")}: ${travou}`);
 
   linhas.push("", `${t("Abrir")}: ${aviso.link}`, "");
-  linhas.push(t("Para orientar a IA sem falar diretamente com o cliente, envie:"));
-  linhas.push(`RESPONDER ${aviso.caseId} <resposta ou decisão>`);
-  linhas.push(t("Para pedir que a IA esclareça algo com o cliente, envie:"));
-  linhas.push(`PERGUNTAR ${aviso.caseId} <pergunta ao cliente>`);
-  linhas.push(t("A IA usa sua orientação e o histórico para continuar o atendimento."));
+  if (aviso.respostaWhatsappHabilitada) {
+    linhas.push(t("Para orientar a IA sem falar diretamente com o cliente, envie:"));
+    linhas.push(`RESPONDER ${aviso.caseId} <resposta ou decisão>`);
+    linhas.push(t("Para pedir que a IA esclareça algo com o cliente, envie:"));
+    linhas.push(`PERGUNTAR ${aviso.caseId} <pergunta ao cliente>`);
+    linhas.push(t("A IA usa sua orientação e o histórico para continuar o atendimento."));
+  } else {
+    linhas.push(t("Responder aqui não chega ao cliente — abra o link para responder."));
+  }
 
   return linhas.join("\n");
 }

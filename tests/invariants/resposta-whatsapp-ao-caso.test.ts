@@ -108,10 +108,11 @@ beforeAll(async () => {
   );
   await pool.query(
     `insert into public.config_aviso_de_caso
-       (organization_id, channel_session_id, telefone_destino, ligado)
-     values ($1, $2, $3, true) on conflict (organization_id) do update
+       (organization_id, channel_session_id, telefone_destino, ligado, resposta_whatsapp_habilitada)
+     values ($1, $2, $3, true, true) on conflict (organization_id) do update
        set channel_session_id = excluded.channel_session_id,
-           telefone_destino = excluded.telefone_destino, ligado = true`,
+           telefone_destino = excluded.telefone_destino, ligado = true,
+           resposta_whatsapp_habilitada = true`,
     [ORG, SESSION, PHONE],
   );
   for (const caseId of [CASE_RESOLVED, CASE_QUESTION, CASE_UNTOUCHED]) {
@@ -144,10 +145,11 @@ beforeAll(async () => {
   );
   await pool.query(
     `insert into public.config_aviso_de_caso
-       (organization_id, channel_session_id, telefone_destino, ligado)
-     values ($1, $2, $3, true) on conflict (organization_id) do update
+       (organization_id, channel_session_id, telefone_destino, ligado, resposta_whatsapp_habilitada)
+     values ($1, $2, $3, true, true) on conflict (organization_id) do update
        set channel_session_id = excluded.channel_session_id,
-           telefone_destino = excluded.telefone_destino, ligado = true`,
+           telefone_destino = excluded.telefone_destino, ligado = true,
+           resposta_whatsapp_habilitada = true`,
     [ORG_B, SESSION_B, PHONE],
   );
 });
@@ -174,6 +176,31 @@ afterAll(async () => {
 });
 
 describe("resposta do funcionário pelo WhatsApp", () => {
+  it("mantém o opt-in desligado por padrão e a função recusa sem tocar caso ou fila", async () => {
+    const row = await pool.query(
+      `insert into public.config_aviso_de_caso
+         (organization_id, channel_session_id, telefone_destino, ligado)
+       values ($1, $2, $3, true)
+       on conflict (organization_id) do update set resposta_whatsapp_habilitada = false
+       returning resposta_whatsapp_habilitada`,
+      [ORG, SESSION, PHONE],
+    );
+    expect(row.rows[0].resposta_whatsapp_habilitada).toBe(false);
+    expect(
+      await reply({
+        caseId: CASE_UNTOUCHED,
+        action: "resolved",
+        body: "Resposta sem opt-in.",
+        messageKey: "session:wamid-opt-out",
+      }),
+    ).toBe("unauthorized");
+    await intocado(CASE_UNTOUCHED);
+    await pool.query(
+      "update public.config_aviso_de_caso set resposta_whatsapp_habilitada = true where organization_id = $1",
+      [ORG],
+    );
+  });
+
   it("recusa uma chamada sem a credencial service_role", async () => {
     await expect(replySemCredencialDeServico()).rejects.toThrow("service_role_required");
   });
