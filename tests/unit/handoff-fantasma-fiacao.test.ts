@@ -103,7 +103,9 @@ describe("fiação — resposta manual pelo WhatsApp silencia o bot temporariame
     const j = FONTE_INGEST.indexOf("async function handleAck(", i);
     const corpo = FONTE_INGEST.slice(i, j);
     expect(corpo).toMatch(
-      /const ehEco = await ehEcoDeEnvioNosso\([^)]*\);[\s\S]{0,80}?if \(!ehEco\) \{/,
+      // Fork: a chamada leva um objeto `{ corpo, midia }` (com parênteses dentro), e a
+      // variável do comando nasce entre a chamada e a guarda.
+      /const ehEco = await ehEcoDeEnvioNosso\([\s\S]*?\}\);[\s\S]{0,120}?if \(!ehEco\) \{/,
     );
     expect(corpo).toMatch(/if \(!ehEco\) \{[\s\S]{0,700}?pausarIaDuravelmente\(/);
     expect(corpo).toMatch(/if \(!ehEco\) \{[\s\S]{0,700}?devolverAtendimentoAoAgente\(/);

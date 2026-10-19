@@ -249,6 +249,7 @@ export function MessageBubble({
               localizacao={localizacao}
               espaco={espaco}
               soMidia={soImagem}
+              agora={agora}
             />
           )}
           <MetaDaBolha

@@ -34,6 +34,12 @@ export interface EtapaDoFunil {
   /** Negócio que entra aqui envia o evento de conversão (9054). */
   envia_conversao?: boolean;
   evento_de_conversao?: "Purchase" | "QualifiedLead" | null;
+  /**
+   * Janela de "esfriando" da etapa, em HORAS (issue #1532). `null` = sem
+   * janela configurada e o radar cai no padrão de 24 h/72 h. `undefined` em
+   * leituras antigas em cache.
+   */
+  expected_duration_hours?: number | null;
   /** Quem mexeu nesta etapa por último (migration 0101). `null` antes dela. */
   last_change_actor_kind?: string | null;
   last_change_at?: string | null;

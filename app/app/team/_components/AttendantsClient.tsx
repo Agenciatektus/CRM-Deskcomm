@@ -64,6 +64,7 @@ const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MODE_LABELS: Record<(typeof ROUTING_MODES)[number], string> = {
   manual: "Manual (atendente puxa da fila)",
   round_robin: "Rodízio (distribui automático)",
+  load: "Menor carga (quem tem menos conversas na mão)",
 };
 
 interface Attendant {
@@ -382,10 +383,6 @@ function RoutingCard({ canManage }: { canManage: boolean }) {
                     {MODE_LABELS[m]}
                   </SelectItem>
                 ))}
-                {/* 'load' (balanceamento por carga) é pós-MVP: a API rejeita — desabilitado. */}
-                <SelectItem value="load" disabled>
-                  Balanceamento por carga (em breve)
-                </SelectItem>
               </SelectContent>
             </Select>
           </div>

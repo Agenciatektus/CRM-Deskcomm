@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLgpdRequest } from "@/hooks/useLgpdRequest";
+import { prazoEmBr } from "@/lib/lgpd/sla";
 import { SlaTimeline } from "./SlaTimeline";
 import { PreviewPanel } from "./PreviewPanel";
 import { ApproveButton } from "./ApproveButton";
@@ -19,6 +20,8 @@ import type { LgpdRequestStatus, LgpdRequestType } from "@/hooks/useLgpdRequests
 
 interface Props {
   id: string;
+  /** Volta para a lista. O hub de `/account-suspended` passa o próprio endereço (ver `RequestsTable`). */
+  hrefDaLista?: string;
 }
 
 const TYPE_LABELS: Record<LgpdRequestType, string> = {
@@ -46,7 +49,7 @@ const STATUS_VARIANT: Record<
   pending_review: "secondary",
 };
 
-export function LgpdRequestDetail({ id }: Props) {
+export function LgpdRequestDetail({ id, hrefDaLista = "/app/lgpd/requests" }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
   const { data, isLoading, error } = useLgpdRequest(id);
@@ -84,7 +87,7 @@ export function LgpdRequestDetail({ id }: Props) {
         {/* No celular o voltar é o da barra da casca. */}
         <div className="flex items-center gap-2 mb:hidden">
           <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1 text-muted-foreground">
-            <Link href="/app/lgpd/requests">
+            <Link href={hrefDaLista}>
               <CaretLeft size={14} aria-hidden />
               {t("Solicitações")}
             </Link>
@@ -110,8 +113,7 @@ export function LgpdRequestDetail({ id }: Props) {
           {request.due_at && (
             <>
               {" · "}
-              {t("Vence em")}{" "}
-              {format(new Date(request.due_at), "dd/MM/yyyy", { locale: localeDaData })}
+              {t("Vence em")} {prazoEmBr(request.due_at)}
             </>
           )}
         </p>

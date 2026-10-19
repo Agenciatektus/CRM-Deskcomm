@@ -249,7 +249,9 @@ export function KanbanCard({
           {value && <span className="text-[15px] leading-tight font-bold text-text tabular-nums">{value}</span>}
 
           {/* ③ a última mensagem (1 linha), com atalho para o inbox. */}
-          {!compacto && <ConversaSlot conversa={lead.conversa} enxuto />}
+          {!compacto && (
+            <ConversaSlot conversa={lead.conversa} contactId={lead.contact_id} phone={lead.contact_phone} enxuto />
+          )}
 
           {!compacto && <EtiquetasDoCard tags={card.tags} />}
 

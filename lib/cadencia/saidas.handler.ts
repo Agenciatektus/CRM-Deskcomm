@@ -166,6 +166,8 @@ export function createSupabaseSaidasDb(admin: SupabaseClient): SaidasDb {
 
 export const cadenciaSaidasHandler: EventHandler = {
   key: CADENCIA_SAIDAS_HANDLER_KEY,
+  // Org parada (0501, upstream): não age em nome dela.
+  naOrgParada: "pula",
   events: [...EVENTOS_DE_SAIDA],
   async handle(row): Promise<HandlerResult> {
     try {

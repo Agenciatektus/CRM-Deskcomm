@@ -8,6 +8,7 @@ import { SeletorDeEtapa } from "@/components/kanban/SeletorDeEtapa";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
+import { soChavesAlteradas } from "@/lib/leads/custom-fields-so-diff";
 import { Funnel } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,9 @@ function CamposDoFunil({ leadId, pipelineId, fieldDefs, valores, onSalvo }: {
   const t = useT();
   const edit = useEditLead(pipelineId);
   const [customFields, setCustomFields] = useState(valores);
+  // A RÉGUA do diff (upstream #2132): o valor carregado quando o painel abriu.
+  // Só o que a pessoa mudar daqui vai viajar — o merge é do servidor.
+  const [camposCarregados, setCamposCarregados] = useState(valores);
 
   if (fieldDefs.length === 0) {
     return <p className="text-xs text-muted-foreground">{t("Este funil não tem campos extras.")}</p>;
@@ -59,7 +63,11 @@ function CamposDoFunil({ leadId, pipelineId, fieldDefs, valores, onSalvo }: {
 
   async function salvar() {
     try {
-      await edit.mutateAsync({ leadId, patch: { custom_fields: customFields } });
+      const payload = soChavesAlteradas(camposCarregados, customFields);
+      await edit.mutateAsync({ leadId, patch: { custom_fields: payload } });
+      // O que acabou de gravar vira a nova régua: o próximo salvamento não
+      // reenvia este, e uma limpeza alheia no intervalo não é atropelada.
+      setCamposCarregados({ ...customFields });
       toast.success(t("Campos atualizados"));
       onSalvo();
     } catch {

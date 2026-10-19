@@ -73,6 +73,11 @@ export function createApprovedReplyHandler(
           optedOutThisTurn: false,
           crmDailyLimit: rows[0].daily_message_limit,
           now: new Date(),
+          // A RESPOSTA aprovada responde a uma mensagem recebida — é um turno de
+          // resposta (#1984): a janela que vale é a de `resposta_*`, não a de
+          // disparo. Sem isto, a resposta aprovada seria vetada pelo
+          // `outside_window` da janela de disparo em vez da de resposta.
+          resposta: true,
           lgpd: deriveLgpdFromContact(rows[0], false),
           ...(disclosureDesde instanceof Date ? { disclosureDesde } : {}),
           sleep: deps.sleep,

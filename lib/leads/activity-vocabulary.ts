@@ -191,7 +191,7 @@ export type ActivityType =
   | "proposal_followup_skipped";
 
 export const ACTIVITY_LABELS: Record<ActivityType, string> = {
-  lead_created: "Entrou pelo WhatsApp",
+  lead_created: "Entrou no funil",
   stage_changed: "Mudou de estágio",
   agent_move_corrected: "Correção do que o assistente tinha feito",
   note: "Anotação",

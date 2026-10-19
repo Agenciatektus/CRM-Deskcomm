@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useLeadTimeline } from "@/hooks/leads/useLeadTimeline";
 import type { Lead } from "@/lib/types/leads";
 import { ContatoDoNegocio } from "./ContatoDoNegocio";
+import { AbrirConversaDoLead, temAlvoParaAbrir } from "./AbrirConversaDoLead";
 import { ConversaDoNegocio } from "./ConversaDoNegocio";
 import { LeadFieldsForm } from "./LeadFieldsForm";
 import { ScoreSlot } from "./ScoreSlot";
@@ -248,13 +249,25 @@ export function LeadDossier({
           </p>
         )}
 
+        {/* Sem conversa, mas com contato (upstream #1993): a AÇÃO no lugar da
+            conversa ao lado. `undefined` é "ainda não carregou" e fica mudo. */}
+        {lead.conversa === null && temAlvoParaAbrir(lead.contact_id, lead.contact_phone) && (
+          <div className="pt-2">
+            <AbrirConversaDoLead contactId={lead.contact_id} phone={lead.contact_phone} variante="dossie" />
+          </div>
+        )}
+
         {/* Os dados do CLIENTE: telefone e e-mail numa aba, links (Instagram,
             site, Google Meu Negócio…) na outra. Vêm do contato, não do lead. */}
         <section className="border-b border-border py-3">
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
             {t("Contato")}
           </h3>
-          <ContatoDoNegocio contactId={lead.contact_id} pipelineId={pipelineId} />
+          <ContatoDoNegocio
+            contactId={lead.contact_id}
+            pipelineId={pipelineId}
+            leadId={lead.id}
+          />
         </section>
 
         {/* ② timeline */}

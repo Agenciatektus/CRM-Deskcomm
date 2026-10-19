@@ -168,6 +168,8 @@ export function createSupabaseGatilhoEtiquetaDb(admin: SupabaseClient): GatilhoE
 
 export const cadenciaGatilhoEtiquetaHandler: EventHandler = {
   key: CADENCIA_GATILHO_ETIQUETA_KEY,
+  // Org parada (0501, upstream): não age em nome dela.
+  naOrgParada: "pula",
   events: ["lead.tag_added", "contact.tag_added"],
   async handle(row): Promise<HandlerResult> {
     try {

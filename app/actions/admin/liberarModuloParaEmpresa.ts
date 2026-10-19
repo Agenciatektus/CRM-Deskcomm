@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { audit } from "@/lib/audit";
-import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
+import { escritaDeAdminOuRecusa } from "@/lib/auth/escritaDeAdminOuRecusa";
 import {
   MODULOS_LIBERADOS_POR_EMPRESA,
   gravarLiberacao,
@@ -35,7 +35,10 @@ const entradaSchema = z.object({
 export async function liberarModuloParaEmpresa(
   input: z.infer<typeof entradaSchema>,
 ): Promise<LiberarModuloResult> {
-  const { user } = await requirePlatformAdmin();
+  // Escrita: `support_readonly` lê, não libera (régua do upstream, 0508).
+  const escrita = await escritaDeAdminOuRecusa();
+  if (!escrita.ok) return escrita;
+  const { user } = escrita.ctx;
 
   const parsed = entradaSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid_input" };
