@@ -140,6 +140,12 @@ function usuarioAdminDeOrganizacao(): AuthUser {
   } as AuthUser;
 }
 
+// Desde 19/10 a marca da ORGANIZAÇÃO também é só do admin da plataforma: os testes
+// de escopo=organizacao rodam com ele, com uma organização ativa.
+function usuarioAdminDaPlataformaNaOrganizacao(): AuthUser {
+  return { ...usuarioAdminDeOrganizacao(), is_platform_admin: true, platform_admin_scope: "full" } as AuthUser;
+}
+
 function usuarioDonoDoServidor(): AuthUser {
   return {
     id: USER_ID,
@@ -159,7 +165,7 @@ beforeEach(() => {
 
 describe("POST /api/v1/marca/logo — escopo organizacao nunca toca platform_branding", () => {
   it("upload com escopo=organizacao nunca chama .from(\"platform_branding\")", async () => {
-    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDaPlataformaNaOrganizacao());
     const espiao = criarAdminEspiao();
     vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
 
@@ -198,9 +204,40 @@ describe("POST /api/v1/marca/logo — escopo organizacao nunca toca platform_bra
   });
 });
 
+describe("escopo=organizacao — o admin do CLIENTE não troca nem apaga o logo (19/10)", () => {
+  it("POST como admin de organização é recusado com 403, sem banco nem storage", async () => {
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    const espiao = criarAdminEspiao();
+    vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
+    const form = new FormData();
+    form.set("escopo", "organizacao");
+    form.set("file", arquivoPng());
+
+    const { POST } = await import("./route");
+    const res = await POST(new NextRequest("http://localhost/api/v1/marca/logo", { method: "POST", body: form }));
+
+    expect(res.status).toBe(403);
+    expect(vi.mocked(createAdminClient)).not.toHaveBeenCalled();
+  });
+
+  it("DELETE como admin de organização é recusado com 403, sem banco nem storage", async () => {
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    const espiao = criarAdminEspiao();
+    vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
+
+    const { DELETE } = await import("./route");
+    const res = await DELETE(
+      new NextRequest("http://localhost/api/v1/marca/logo?escopo=organizacao", { method: "DELETE" }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(vi.mocked(createAdminClient)).not.toHaveBeenCalled();
+  });
+});
+
 describe("DELETE /api/v1/marca/logo — escopo organizacao nunca apaga o prefixo da instalação", () => {
   it("DELETE com escopo=organizacao nunca chama .from(\"platform_branding\") nem remove arquivo sob platform/", async () => {
-    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDaPlataformaNaOrganizacao());
     const espiao = criarAdminEspiao();
     vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
 
@@ -221,7 +258,7 @@ describe("DELETE /api/v1/marca/logo — escopo organizacao nunca apaga o prefixo
   });
 
   it("logo anterior adulterado para platform/ não é apagado, e a recusa fica no log", async () => {
-    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDaPlataformaNaOrganizacao());
     const espiao = criarAdminEspiao(LOGO_DA_INSTALACAO);
     vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
     const erro = vi.spyOn(logger, "error").mockImplementation(() => undefined);
@@ -246,7 +283,7 @@ describe("DELETE /api/v1/marca/logo — escopo organizacao nunca apaga o prefixo
   });
 
   it("controle positivo: logo anterior dentro do prefixo da organização é apagado", async () => {
-    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDeOrganizacao());
+    vi.mocked(loadAuthUser).mockResolvedValue(usuarioAdminDaPlataformaNaOrganizacao());
     const espiao = criarAdminEspiao(LOGO_DA_ORGANIZACAO);
     vi.mocked(createAdminClient).mockReturnValue(espiao.client as never);
 
