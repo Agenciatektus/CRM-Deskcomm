@@ -54,6 +54,8 @@ function mensagem(n: number): Message {
   return {
     id: `m-${n}`,
     sent_at: new Date(Date.UTC(2026, 8, 24, 12, n)).toISOString(),
+    // Com texto: mensagem sem dado nenhum não entra no fio (`mensagemSemDado`).
+    body: `mensagem ${n}`,
     reply_to_message_id: null,
   } as unknown as Message;
 }
