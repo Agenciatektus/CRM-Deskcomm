@@ -28,7 +28,7 @@ import { type NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
-import { loadAuthUser } from "@/lib/auth/server";
+import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,16 +65,12 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: leadId } = await ctx.params;
 
+  // Mesmo portão das rotas irmãs de leads (P2 do Cassio na #210): sessão,
+  // membro ativo da org ATIVA e papel mínimo; recusa org suspensa e revogado.
+  const authz = await requireRole("viewer", { requestId, resource: "crm_leads" });
+  if (!authz.ok) return authz.response;
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
-  if (authErr || !user) {
-    return fail("unauthenticated", "Auth required.", 401, { requestId });
-  }
-  const authUser = await loadAuthUser();
-  const t = (texto: string) => traduzir(texto, authUser?.idioma ?? "pt-BR");
+  const t = (texto: string) => traduzir(texto, authz.user.idioma ?? "pt-BR");
 
   // O lead vem pela RLS do caller — é ele que prova a org, nunca o body.
   const { data: lead, error: leadErr } = await supabase
@@ -85,6 +81,8 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (leadErr) return fail("internal_error", leadErr.message, 500, { requestId });
   if (!lead) return fail("not_found", t("Negócio não encontrado."), 404, { requestId });
   const orgId = (lead as { organization_id: string }).organization_id;
+  // Lead de outra org em que a pessoa também é membro não vaza pela org ativa.
+  if (orgId !== authz.org.orgId) return fail("not_found", t("Negócio não encontrado."), 404, { requestId });
 
   // Filtro de tenant EXPLÍCITO na tabela (doutrina multi-tenancy da CLAUDE.md),
   // não só RLS: o lead prova a org na linha acima, e o vínculo é da mesma org.
