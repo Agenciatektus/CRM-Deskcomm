@@ -11359,6 +11359,9 @@ export const DICIONARIO: Traducoes = {
   "Só um negócio aberto pode ser levado para outro funil.": {
     es: "Solo un negocio abierto puede moverse a otro embudo.",
   },
+  "Este negócio já foi levado para outro funil.": {
+    es: "Este negocio ya fue movido a otro embudo.",
+  },
   "A etapa não pertence ao funil de destino.": {
     es: "La etapa no pertenece al embudo de destino.",
   },

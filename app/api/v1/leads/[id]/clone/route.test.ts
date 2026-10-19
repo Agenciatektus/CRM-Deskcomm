@@ -406,17 +406,45 @@ describe("POST /api/v1/leads/[id]/clone", () => {
     expect(body.error.code).toBe("stage_pipeline_mismatch");
   });
 
-  it("recusa negócio já encerrado", async () => {
+  it("negócio GANHO vai para outro funil como negócio novo, e o ganho fica intacto", async () => {
     const { POST } = await import("./route");
     const negocio = (db.tables.crm_leads ?? [])[0];
     if (!negocio) throw new Error("o teste espera um crm_leads semeado neste ponto");
     negocio.status = "won";
+    const antes = { ...negocio };
+    const quantosAntes = (db.tables.crm_leads ?? []).length;
 
     const response = await POST(cloneRequest({ pipeline_id: P2 }), params);
-    const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error.code).toBe("lead_not_open");
+    expect(response.status).toBe(201);
+    // A origem não foi reescrita (continua `won`, mesma etapa e mesmo funil).
+    expect(negocio.status).toBe("won");
+    expect(negocio.stage_id).toBe(antes.stage_id);
+    expect(negocio.pipeline_id).toBe(antes.pipeline_id);
+    // E nasceu um negócio aberto no funil de destino.
+    const novos = (db.tables.crm_leads ?? []).slice(quantosAntes);
+    expect(novos).toHaveLength(1);
+    expect(novos[0]?.pipeline_id).toBe(P2);
+    expect(novos[0]?.status).toBe("open");
+    // O valor do ganho já foi contado: a nova tentativa nasce sem valor.
+    expect(novos[0]?.value_cents ?? null).toBeNull();
+
+    // Segundo clique no mesmo ganho: recusa, e nenhum negócio a mais.
+    const repetido = await POST(cloneRequest({ pipeline_id: P2 }), params);
+    expect(repetido.status).toBe(409);
+    expect((db.tables.crm_leads ?? []).length).toBe(quantosAntes + 1);
+  });
+
+  it("aberto já transferido não é levado de novo no segundo clique", async () => {
+    const { POST } = await import("./route");
+    const quantosAntes = (db.tables.crm_leads ?? []).length;
+
+    const primeiro = await POST(cloneRequest({ pipeline_id: P2 }), params);
+    expect(primeiro.status).toBe(201);
+
+    const segundo = await POST(cloneRequest({ pipeline_id: P2 }), params);
+    expect(segundo.status).toBe(409);
+    expect((db.tables.crm_leads ?? []).length).toBe(quantosAntes + 1);
   });
 
   it("recusa funil inexistente na organização", async () => {
