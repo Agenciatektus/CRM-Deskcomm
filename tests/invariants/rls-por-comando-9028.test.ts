@@ -312,8 +312,16 @@ describe("9028: forma", () => {
             from pg_policies p
            where p.schemaname = 'public' and p.tablename = t
              and p.cmd in ('INSERT','UPDATE','DELETE') and p.permissive = 'PERMISSIVE') x on true
-       where x.n <> 3 or x.textos <> 1 or x.update_torto > 0;`);
+       where x.n <> 3 or x.textos <> (case when t = 'conversation_notes' then 2 else 1 end) or x.update_torto > 0;`);
+    // conversation_notes tem DOIS textos desde a subida 1.73 (0509 do upstream,
+    // integrada na 9055): o INSERT exige `created_by_user_id = auth.uid()` e o
+    // UPDATE/DELETE exigem autor OU manager+. As outras três seguem com um só.
     expect(out).toBe("");
+    const notas = sql(`
+      select count(distinct coalesce(qual, with_check)) from pg_policies
+       where schemaname = 'public' and tablename = 'conversation_notes'
+         and cmd in ('UPDATE','DELETE') and permissive = 'PERMISSIVE';`);
+    expect(notas).toBe("1");
   });
 });
 
@@ -323,7 +331,24 @@ describe("9028: antes = depois, por papel e tabela", () => {
     // de aceitar escrita de viewer (as antigas aqui são as de antes da 9028, e a
     // trigger da 9030, que vale nas duas fases, recusa o upd_move). Qualquer
     // outra linha neste diff é regressão.
+    //
+    // Subida 1.73 (9055): as linhas de conversation_notes são a 0509 do upstream,
+    // de propósito — a nota nasce no nome de quem a cria (o semeio grava com
+    // outro autor, daí o 42501 no INSERT) e só o AUTOR ou manager+ edita/apaga
+    // (agent, revogado e viewer deixam de mexer na nota alheia).
     expect(diferencas(ANTIGAS)).toEqual([
+      "adm_a:conversation_notes:ins_a novo=42501 outro=n=1",
+      "ag_a:conversation_notes:del novo=n=0 outro=n=1",
+      "ag_a:conversation_notes:ins_a novo=42501 outro=n=1",
+      "ag_a:conversation_notes:upd novo=n=0 outro=n=1",
+      "ag_a:conversation_notes:upd_move novo=n=0 outro=42501",
+      "mgr_a:conversation_notes:ins_a novo=42501 outro=n=1",
+      "mix:conversation_notes:ins_b novo=42501 outro=n=1",
+      "rev:conversation_notes:del novo=n=0 outro=n=1",
+      "rev:conversation_notes:upd novo=n=0 outro=n=1",
+      "sup_full:conversation_notes:ins_a novo=42501 outro=n=1",
+      "sup_full:conversation_notes:ins_b novo=42501 outro=n=1",
+      "sup_support_readonly:conversation_notes:ins_b novo=42501 outro=n=1",
       "vw_a:contacts:del novo=n=0 outro=n=1",
       "vw_a:contacts:ins_a novo=42501 outro=n=1",
       "vw_a:contacts:upd novo=n=0 outro=n=4",
