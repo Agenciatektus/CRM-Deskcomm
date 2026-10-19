@@ -4,7 +4,7 @@ secao: adicionado
 titulo: A caixa de entrada mostra o nome salvo na agenda do celular, só para a equipe
 ---
 
-Contato que está salvo no WhatsApp do celular e não tem apelido no perfil chegava na caixa de entrada só com o telefone. Agora, a cada 10 minutos, o sistema pergunta ao canal o nome que está na agenda do aparelho (quando a conexão guarda o acervo do número) e o mostra na caixa de entrada, na lista de contatos e na ficha, no campo "Nome na agenda do celular".
+Contato que está salvo no WhatsApp do celular e não tem apelido no perfil chegava na caixa de entrada só com o telefone. Agora, a cada 10 minutos, o sistema pergunta ao canal o nome que está na agenda do aparelho (quando a conexão guarda o acervo do número) e o mostra na caixa de entrada, na lista de contatos e na ficha, no campo "Nome na agenda do celular". A busca da caixa de entrada e a da lista de contatos também acham o contato por esse nome.
 
 Esse nome é só da equipe: ele nunca entra no `{{nome}}` das mensagens automáticas, das campanhas nem das respostas rápidas, porque é o apelido que alguém da empresa escreveu no celular e pode não ser para o cliente ver. Para usá-lo numa mensagem, copie-o para o nome do contato na ficha. Nome que você já digitou no CRM, ou que veio da planilha, continua o que está e continua sendo o que aparece primeiro.
 
