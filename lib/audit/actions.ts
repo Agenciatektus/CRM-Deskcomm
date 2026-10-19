@@ -244,6 +244,10 @@ export const AUDIT_ACTIONS = [
   // Emitida pelo worker quando houve EFEITO (tentativa de envio), nunca em
   // rodada de cron vazia.
   "prospecting.approach_sent",
+  // A SAÍDA ("responda PARAR") oferecida numa mensagem automática da prospecção
+  // (modos 2ª/3ª mensagem). Sem texto, sem telefone — só os ponteiros.
+  // Emitida por inbound-turn e followup-turn quando o envio é aceito.
+  "prospecting.exit_offered",
   "channel.pairing_code_requested",
   "channel.social_configured",
   "channel.social_disconnected",

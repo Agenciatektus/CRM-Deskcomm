@@ -43,6 +43,9 @@ type Candidate = {
   message_status: string | null;
   error: string | null;
   conversation_id: string | null;
+  automatic_sends?: number;
+  exit_offered_at?: string | null;
+  is_blocked?: boolean | null;
 };
 type State = {
   configured: boolean;
@@ -88,6 +91,9 @@ const emptyConfig: CampaignConfig = {
   legal_basis_ref: "",
   // Campanha nova nasce no modo recomendado; a configuração já gravada manda no que existe.
   funnel_entry: "on_send",
+  // A saída é oferecida na primeira mensagem por padrão; config gravada antes desta chave
+  // segue igual.
+  exit_offer: "first_message",
 };
 export function ProspectingClient() {
   const t = useT();
@@ -510,6 +516,7 @@ export function ProspectingClient() {
                     [t("Encontrados"), candidates.length],
                     [t("Na fila"), count(["queued", "sending"])],
                     [t("Responderam"), count(["replied", "qualified"])],
+                    [t("Pediram para parar"), candidates.filter((c) => c.is_blocked).length],
                     [t("Qualificados"), count(["qualified"])],
                   ].map(([label, value]) => (
                     <div key={label}>
@@ -953,6 +960,70 @@ export function ProspectingClient() {
                               </span>
                             </label>
                           </fieldset>
+                          <fieldset className="space-y-2">
+                            <legend className="text-sm font-medium">
+                              {t("Quando oferecer a opção de parar de receber")}
+                            </legend>
+                            <label className="flex items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="prospecting-exit-offer"
+                                checked={(config.exit_offer ?? "first_message") === "first_message"}
+                                onChange={() => update("exit_offer", "first_message")}
+                                className="mt-1"
+                              />
+                              <span>
+                                {t("Na primeira mensagem (recomendado)")}
+                                <span className="block text-xs text-muted-foreground">
+                                  {t(
+                                    "A abertura já diz como parar: Se não quiser mais receber mensagens, responda PARAR.",
+                                  )}
+                                </span>
+                              </span>
+                            </label>
+                            <label className="flex items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="prospecting-exit-offer"
+                                checked={(config.exit_offer ?? "first_message") === "second_message"}
+                                onChange={() => update("exit_offer", "second_message")}
+                                className="mt-1"
+                              />
+                              <span>
+                                {t("Atrasar para a 2ª mensagem")}
+                                <span className="block text-xs text-muted-foreground">
+                                  {t(
+                                    "A abertura só cumprimenta e confirma se é a empresa certa, sem oferta. A instrução para parar vai na mensagem seguinte.",
+                                  )}
+                                </span>
+                              </span>
+                            </label>
+                            <label className="flex items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="prospecting-exit-offer"
+                                checked={(config.exit_offer ?? "first_message") === "third_message"}
+                                onChange={() => update("exit_offer", "third_message")}
+                                className="mt-1"
+                              />
+                              <span>
+                                {t("Atrasar para a 3ª mensagem")}
+                                <span className="block text-xs text-muted-foreground">
+                                  {t(
+                                    "As duas primeiras mensagens não fazem oferta: cumprimentar, depois apresentar-se e pedir permissão. A instrução para parar vai na terceira.",
+                                  )}
+                                </span>
+                              </span>
+                            </label>
+                            {((config.exit_offer ?? "first_message") === "second_message" ||
+                              (config.exit_offer ?? "first_message") === "third_message") && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {t(
+                                  "Exemplo de instrução para os atrasados: na primeira mensagem, só cumprimente e pergunte se é da empresa. Quando a pessoa responder, apresente-se e peça permissão para mostrar o serviço.",
+                                )}
+                              </p>
+                            )}
+                          </fieldset>
                           <div>
                             <Label htmlFor="prospecting-basis">
                               {t("Referência da avaliação de legítimo interesse")}
@@ -1188,6 +1259,14 @@ export function ProspectingClient() {
                               {c.message_status && (
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {t("Mensagem:")} {c.message_status}
+                                </p>
+                              )}
+                              {(campaign?.config?.exit_offer === "second_message" ||
+                                campaign?.config?.exit_offer === "third_message") && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {c.exit_offered_at
+                                    ? t("Saída oferecida")
+                                    : t("Saída ainda não oferecida")}
                                 </p>
                               )}
                             </td>

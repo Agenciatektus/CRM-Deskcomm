@@ -58595,3 +58595,8 @@ on conflict (model) do update set
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
   notes = excluded.notes,
   superseded_at = null;
+
+-- ---- prospecção: saída configurável (migration 0705) ----
+alter table public.prospecting_candidates
+  add column if not exists automatic_sends smallint not null default 0,
+  add column if not exists exit_offered_at timestamptz;
