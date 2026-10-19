@@ -7,6 +7,7 @@ import { AdminSidePanel } from "./AdminSidePanel";
 import { CircleNotch, Lock } from "@/lib/ui/icons";
 import { Badge } from "@/components/ui/badge";
 import type { Message } from "@/lib/types/messaging";
+import { mensagemSemDado } from "@/lib/inbox/mensagem-sem-dado";
 import { useT } from "@/hooks/i18n/useT";
 
 // ---------------------------------------------------------------------------
@@ -35,7 +36,7 @@ export function AdminThreadClient({ conversationId }: Props) {
   // Messages come in desc order from API — reverse for chronological display
   const messages = useMemo<Message[]>(() => {
     const msgs = data?.messages ?? [];
-    return [...msgs].reverse() as Message[];
+    return ([...msgs].reverse() as Message[]).filter((m) => !mensagemSemDado(m));
   }, [data?.messages]);
 
   if (isLoading) {
