@@ -1,57 +1,41 @@
 /**
- * A REGRA QUE TROCA DE FUNIL TRANSFERE O NEGÓCIO — NÃO ABRE UM SEGUNDO (#992).
+ * A REGRA QUE TROCA DE FUNIL MOVE O MESMO NEGÓCIO — NÃO ABRE UM SEGUNDO (#992, 9053).
  *
- * ═══ O defeito, medido antes do conserto ═══
+ * A ação `create_or_move_lead` com negócio do contato aberto em OUTRO funil (ou com
+ * o lead do gatilho em outro funil) MOVE o mesmo card pelo caminho da rota da tela
+ * (`moverNegocioDeFunil`, decisão do Peterson de 19/10/2026): nada de clone, nada de
+ * origem encerrada como "Levado para outro funil".
  *
- * A ação `create_or_move_lead` de uma regra com gatilho de CONTATO procurava o
- * negócio aberto do contato SÓ no funil de destino (`negocioAbertoDoContato`,
- * que filtra por `pipeline_id`). Contato com negócio aberto em OUTRO funil não
- * era encontrado, e a execução caía no `createLeadHandler`: o cliente ficava com
- * DOIS negócios abertos, um em cada funil, e a origem continuava aberta no funil
- * antigo como se nada tivesse acontecido. Quem olha dois cards iguais não sabe
- * qual dos dois a equipe está tocando.
+ * Controle negativo: nos casos de troca, `createLeadHandler` (o negócio novo, que
+ * emite `lead.created` e dispara a cadência) e `encerraDemanda` (a perda) NÃO são
+ * chamados. Controles de comportamento: mesmo funil continua sendo `moveLeadHandler`
+ * e sem negócio aberto a ação cria, como sempre criou.
  *
- * ═══ O que este arquivo vigia ═══
- *
- * A decisão da ação, que é uma só: com negócio aberto em OUTRO funil, a regra
- * TRANSFERE — clona para o funil dela (`montaPayloadDoClone`) e encerra a origem
- * como perdida com o motivo de transferência —, e o CLONE segue para as ações
- * seguintes da mesma regra (`publicaNoContexto`).
- *
- * Casos 2 e 3 são controles: negócio aberto no MESMO funil continua sendo movido
- * de etapa (nada é encerrado, nada é criado), e sem negócio aberto a ação cria,
- * como sempre criou. Sem eles, um "conserto" que passasse a clonar em todo caso
- * passaria aqui.
- *
- * ═══ O motivo, e as duas metades dele ═══
- *
- * O último bloco prende o NOME do motivo nos três lugares que precisam concordar:
- * o vocabulário do código (`CANONICAL_LOST_REASONS`), o array canônico do trigger
- * `fn_validate_lost_reason_required` e o filtro de perdas de `fn_attendant_metrics`.
- * O motivo da transferência não é perda comercial: se ele não existir no trigger,
- * o banco recusa o encerramento com `lost_reason_invalid` (22023) e a origem fica
- * aberta — o defeito de novo, agora com o clone já criado.
+ * O bloco do fim prende o motivo canônico da transferência nos lugares que precisam
+ * concordar (perdas antigas por clone seguem fora da métrica).
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const spies = vi.hoisted(() => ({
   createLeadHandler: vi.fn(),
   moveLeadHandler: vi.fn(),
   encerraDemanda: vi.fn(),
+  moverNegocioDeFunil: vi.fn(),
 }));
 
 vi.mock("@/app/api/v1/leads/_handler", () => ({
   createLeadHandler: (...args: unknown[]) => spies.createLeadHandler(...args),
   moveLeadHandler: (...args: unknown[]) => spies.moveLeadHandler(...args),
 }));
-
 vi.mock("@/lib/leads/encerramento", () => ({
   encerraDemanda: (...args: unknown[]) => spies.encerraDemanda(...args),
 }));
-
+vi.mock("@/lib/leads/mover-de-funil", () => ({
+  moverNegocioDeFunil: (...args: unknown[]) => spies.moverNegocioDeFunil(...args),
+}));
 vi.mock("@/lib/atendimento/origem-automacao", () => ({
   originFromAutomationEvent: async () => null,
 }));
@@ -69,53 +53,22 @@ const ORG = "11111111-1111-1111-1111-111111111111";
 const CONTATO = "c0c0c0c0-0000-0000-0000-000000000001";
 const FUNIL_DA_REGRA = "f0f0f0f0-0000-0000-0000-000000000002";
 const OUTRO_FUNIL = "f0f0f0f0-0000-0000-0000-000000000003";
-const ETAPA_INICIAL = "e0e0e0e0-0000-0000-0000-000000000001";
 const ETAPA_ESCOLHIDA = "e0e0e0e0-0000-0000-0000-000000000002";
-const ETAPA_DE_PERDA = "e0e0e0e0-0000-0000-0000-0000000000ff";
 
-const TITULO_DA_ORIGEM = "Reforma da cozinha";
 const NEGOCIO_EM_OUTRO_FUNIL = {
   id: "1ea1-0000-0000-0000-000000000001",
   pipeline_id: OUTRO_FUNIL,
-  status: "open",
-  title: TITULO_DA_ORIGEM,
+  stage_id: "e0e0e0e0-0000-0000-0000-0000000000aa",
+  status: "won",
   contact_id: CONTATO,
-  value_cents: 250000,
-  currency: "BRL",
-  tags: ["orcamento"],
-  source: "whatsapp",
   custom_fields: { ambiente: "cozinha" },
-  source_metadata: {},
+  value_cents: 250000,
 };
 
-const ETAPAS_DO_DESTINO = [
-  {
-    id: ETAPA_INICIAL,
-    pipeline_id: FUNIL_DA_REGRA,
-    position: 1,
-    is_won: false,
-    is_lost: false,
-    is_archived: false,
-  },
-  {
-    id: ETAPA_ESCOLHIDA,
-    pipeline_id: FUNIL_DA_REGRA,
-    position: 2,
-    is_won: false,
-    is_lost: false,
-    is_archived: false,
-  },
-];
-
 /** O suficiente do client admin para as leituras que a ação faz. */
-function adminFalso(cenarios: {
-  negocioNoFunilDaRegra?: unknown;
-  negocioEmOutroFunil?: unknown;
-  etapasDoDestino?: unknown;
-  etapaDePerda?: unknown;
-}) {
+function adminFalso(cenarios: { negocioNoFunilDaRegra?: unknown; negocioEmOutroFunil?: unknown; porId?: unknown }) {
   return {
-    from(tabela: string) {
+    from() {
       const filtros: Record<string, unknown> = {};
       const api: Record<string, unknown> = {};
       const mesmo = () => api;
@@ -131,149 +84,107 @@ function adminFalso(cenarios: {
         return api;
       };
       const resposta = () => {
-        if (tabela === "crm_leads") {
-          if (filtros["neq:pipeline_id"]) return cenarios.negocioEmOutroFunil ?? null;
-          return cenarios.negocioNoFunilDaRegra ?? null;
-        }
-        if (tabela === "crm_stages") {
-          if (filtros.is_lost === true) return cenarios.etapaDePerda ?? null;
-          return cenarios.etapasDoDestino ?? null;
-        }
-        return null;
+        if (filtros.id) return cenarios.porId ?? null;
+        if (filtros["neq:pipeline_id"]) return cenarios.negocioEmOutroFunil ?? null;
+        return cenarios.negocioNoFunilDaRegra ?? null;
       };
       const terminal = async () => ({ data: resposta(), error: null });
       api.maybeSingle = terminal;
       api.single = terminal;
-      api.then = (resolver: (valor: unknown) => unknown) => terminal().then(resolver);
       return api;
     },
   };
 }
 
-function contexto(cenarios: Parameters<typeof adminFalso>[0] = {}) {
-  const ctx = {
+function contexto(cenarios: Parameters<typeof adminFalso>[0] = {}, lead?: Record<string, unknown>) {
+  return {
     admin: adminFalso(cenarios),
     organizationId: ORG,
     ruleId: "r0r0r0r0-0000-0000-0000-000000000001",
-    ruleName: "Novo negócio no funil A",
+    ruleName: "Ganho vai para o pós-venda",
     event: {},
     context: {
       contact: { id: CONTATO, name: "Marina Prado", phone_number: "+5511900000000" },
+      ...(lead ? { lead } : {}),
     },
     requestId: "rule:r0r0r0r0-0000-0000-0000-000000000001",
   } as unknown as ActionCtx;
-  return ctx;
 }
 
 const CONFIG = { pipeline_id: FUNIL_DA_REGRA, stage_id: ETAPA_ESCOLHIDA };
+const MOVIDO = { ...NEGOCIO_EM_OUTRO_FUNIL, pipeline_id: FUNIL_DA_REGRA, stage_id: ETAPA_ESCOLHIDA, status: "open" };
 
-/** O TERCEIRO argumento de uma chamada (admin, ctx, payload) — sem `[0][2]` solto. */
-function argumentoDaChamada(
-  spy: { mock: { calls: unknown[][] } },
-  indice = 0,
-): Record<string, unknown> {
-  const chamada = spy.mock.calls[indice];
-  expect(chamada).toBeDefined();
-  return (chamada as unknown[])[2] as Record<string, unknown>;
-}
+beforeEach(() => {
+  for (const spy of Object.values(spies)) spy.mockReset();
+  spies.moverNegocioDeFunil.mockResolvedValue({ ok: true, lead: MOVIDO });
+});
 
-describe("create_or_move_lead — a regra transfere o negócio entre funis", () => {
-  it("O DEFEITO: contato com negócio aberto em OUTRO funil transfere, não cria um segundo", async () => {
-    spies.createLeadHandler.mockReset();
-    spies.moveLeadHandler.mockReset();
-    spies.encerraDemanda.mockReset();
-    spies.createLeadHandler.mockResolvedValue({
-      id: "clone-0001",
-      pipeline_id: FUNIL_DA_REGRA,
-      stage_id: ETAPA_ESCOLHIDA,
-      contact_id: CONTATO,
-    });
-    spies.encerraDemanda.mockResolvedValue({ lead: { id: NEGOCIO_EM_OUTRO_FUNIL.id } });
-
-    const ctx = contexto({ negocioEmOutroFunil: NEGOCIO_EM_OUTRO_FUNIL, etapasDoDestino: ETAPAS_DO_DESTINO, etapaDePerda: { id: ETAPA_DE_PERDA } });
-    const acao = getAction("create_or_move_lead");
-    const resultado = await acao!.execute(ctx, CONFIG);
+describe("create_or_move_lead — troca de funil move o mesmo card", () => {
+  it("contato com negócio aberto em OUTRO funil: move ESSE negócio, sem criar nem encerrar", async () => {
+    const ctx = contexto({ negocioEmOutroFunil: NEGOCIO_EM_OUTRO_FUNIL });
+    const resultado = await getAction("create_or_move_lead")!.execute(ctx, CONFIG);
 
     expect(resultado.status).toBe("success");
-
-    // O negócio do destino nasce com os dados da origem — não é um negócio em branco.
-    expect(spies.createLeadHandler).toHaveBeenCalledTimes(1);
-    const payload = argumentoDaChamada(spies.createLeadHandler);
-    expect(payload.pipeline_id).toBe(FUNIL_DA_REGRA);
-    expect(payload.stage_id).toBe(ETAPA_ESCOLHIDA);
-    expect(payload.title).toBe(TITULO_DA_ORIGEM);
-    expect(payload.contact_id).toBe(CONTATO);
-    expect(payload.value_cents).toBe(250000);
-    expect(payload.custom_fields).toEqual({ ambiente: "cozinha" });
-    expect(payload.source_metadata).toMatchObject({
-      clonado_de: { lead_id: NEGOCIO_EM_OUTRO_FUNIL.id, pipeline_id: OUTRO_FUNIL },
+    expect(spies.moverNegocioDeFunil).toHaveBeenCalledTimes(1);
+    const [, , negocio, destino] = spies.moverNegocioDeFunil.mock.calls[0] as unknown[];
+    expect((negocio as { id: string }).id).toBe(NEGOCIO_EM_OUTRO_FUNIL.id);
+    expect(destino).toMatchObject({ pipelineId: FUNIL_DA_REGRA, stageId: ETAPA_ESCOLHIDA });
+    // Controle negativo: nenhum negócio novo (lead.created/cadência) e nenhuma perda.
+    expect(spies.createLeadHandler).not.toHaveBeenCalled();
+    expect(spies.encerraDemanda).not.toHaveBeenCalled();
+    // As próximas ações da regra enxergam o MESMO id, agora no funil da regra.
+    expect(ctx.context.lead as { id: string; pipeline_id: string }).toMatchObject({
+      id: NEGOCIO_EM_OUTRO_FUNIL.id,
+      pipeline_id: FUNIL_DA_REGRA,
     });
+  });
 
-    // A origem fecha como PERDIDA, com o motivo da transferência.
-    expect(spies.encerraDemanda).toHaveBeenCalledTimes(1);
-    const encerramento = argumentoDaChamada(spies.encerraDemanda);
-    expect(encerramento.leadId).toBe(NEGOCIO_EM_OUTRO_FUNIL.id);
-    expect(encerramento.desfecho).toBe("lost");
-    expect(encerramento.motivo).toBe(MOTIVO_DA_TRANSFERENCIA);
-    expect(encerramento.payloadNaTimeline).toMatchObject({ to_pipeline_id: FUNIL_DA_REGRA });
+  it("lead do gatilho em outro funil (ex.: ganho em Vendas): move o mesmo card, não falha", async () => {
+    const ctx = contexto(
+      { porId: NEGOCIO_EM_OUTRO_FUNIL },
+      { id: NEGOCIO_EM_OUTRO_FUNIL.id, pipeline_id: OUTRO_FUNIL },
+    );
+    const resultado = await getAction("create_or_move_lead")!.execute(ctx, CONFIG);
 
-    // E o CLONE é o negócio que as próximas ações da regra enxergam.
-    const publicado = (ctx.context.lead ?? {}) as Record<string, unknown>;
-    expect(publicado.id).toBe("clone-0001");
+    expect(resultado.status).toBe("success");
+    expect(spies.moverNegocioDeFunil).toHaveBeenCalledTimes(1);
+    expect(spies.createLeadHandler).not.toHaveBeenCalled();
     expect(spies.moveLeadHandler).not.toHaveBeenCalled();
   });
 
-  it("CONTROLE: negócio aberto no MESMO funil continua sendo movido de etapa", async () => {
-    spies.createLeadHandler.mockReset();
-    spies.moveLeadHandler.mockReset();
-    spies.encerraDemanda.mockReset();
-    spies.moveLeadHandler.mockResolvedValue({ id: "no-mesmo-funil", pipeline_id: FUNIL_DA_REGRA });
+  it("a recusa da troca vira failed com o código, sem meia execução", async () => {
+    spies.moverNegocioDeFunil.mockResolvedValue({
+      ok: false,
+      status: 422,
+      code: "required_fields_missing",
+      texto: "x",
+    });
+    const ctx = contexto({ negocioEmOutroFunil: NEGOCIO_EM_OUTRO_FUNIL });
+    const resultado = await getAction("create_or_move_lead")!.execute(ctx, CONFIG);
 
-    const ctx = contexto({ negocioNoFunilDaRegra: { id: "no-mesmo-funil" }, etapasDoDestino: ETAPAS_DO_DESTINO, etapaDePerda: { id: ETAPA_DE_PERDA } });
-    const acao = getAction("create_or_move_lead");
-    const resultado = await acao!.execute(ctx, CONFIG);
+    expect(resultado).toMatchObject({ status: "failed", error: "required_fields_missing" });
+    expect(spies.createLeadHandler).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE: negócio aberto no MESMO funil continua sendo movido de etapa", async () => {
+    spies.moveLeadHandler.mockResolvedValue({ id: "no-mesmo-funil", pipeline_id: FUNIL_DA_REGRA });
+    const ctx = contexto({ negocioNoFunilDaRegra: { id: "no-mesmo-funil" } });
+    const resultado = await getAction("create_or_move_lead")!.execute(ctx, CONFIG);
 
     expect(resultado.status).toBe("success");
     expect(spies.moveLeadHandler).toHaveBeenCalledTimes(1);
+    expect(spies.moverNegocioDeFunil).not.toHaveBeenCalled();
     expect(spies.createLeadHandler).not.toHaveBeenCalled();
-    expect(spies.encerraDemanda).not.toHaveBeenCalled();
   });
 
   it("CONTROLE: sem negócio aberto, a ação cria — como sempre criou", async () => {
-    spies.createLeadHandler.mockReset();
-    spies.moveLeadHandler.mockReset();
-    spies.encerraDemanda.mockReset();
     spies.createLeadHandler.mockResolvedValue({ id: "novo-0001", contact_id: CONTATO });
-
-    const ctx = contexto({ etapasDoDestino: ETAPAS_DO_DESTINO });
-    const acao = getAction("create_or_move_lead");
-    const resultado = await acao!.execute(ctx, CONFIG);
+    const ctx = contexto({});
+    const resultado = await getAction("create_or_move_lead")!.execute(ctx, CONFIG);
 
     expect(resultado.status).toBe("success");
     expect(spies.createLeadHandler).toHaveBeenCalledTimes(1);
-    const payload = argumentoDaChamada(spies.createLeadHandler);
-    expect(payload.source).toBe("automation");
-    expect(payload.title).toBe("Marina Prado");
-    expect(payload.source_metadata).toBeUndefined();
-    expect(spies.encerraDemanda).not.toHaveBeenCalled();
-  });
-
-  it("a origem sem etapa de perda é recusa explícita, nunca meia transferência", async () => {
-    spies.createLeadHandler.mockReset();
-    spies.encerraDemanda.mockReset();
-    spies.createLeadHandler.mockResolvedValue({ id: "clone-0002" });
-
-    const ctx = contexto({
-      negocioEmOutroFunil: NEGOCIO_EM_OUTRO_FUNIL,
-      etapasDoDestino: ETAPAS_DO_DESTINO,
-      etapaDePerda: null,
-    });
-    const acao = getAction("create_or_move_lead");
-    const resultado = await acao!.execute(ctx, CONFIG);
-
-    expect(resultado.status).toBe("failed");
-    expect(spies.createLeadHandler).not.toHaveBeenCalled();
-    expect(spies.encerraDemanda).not.toHaveBeenCalled();
+    expect(spies.moverNegocioDeFunil).not.toHaveBeenCalled();
   });
 });
 
@@ -304,6 +215,8 @@ describe("o motivo da transferência — as duas metades do mesmo nome", () => {
     expect(corte, "fn_attendant_metrics não encontrada no baseline").toBeGreaterThan(-1);
     const metrica = baseline.slice(corte);
     expect(metrica).toContain(`coalesce(lost_reason, '') <> '${MOTIVO_DA_TRANSFERENCIA}'`);
+    // 9053: e conta os desfechos da época (o ganho que saiu com o card segue do responsável).
+    expect(metrica.slice(0, 1500)).toContain("from public.crm_desfechos_de_negocio");
   });
 
   it("a migration 0266 existe, está no baseline e no MANIFEST", () => {

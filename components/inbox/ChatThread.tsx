@@ -22,6 +22,7 @@ import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { capabilitiesOf, transportaMensagem, type ChannelProvider } from "@/lib/channels/capabilities";
 import { montarCartoesDaPassagem, type CartaoDaPassagem } from "@/lib/escalacao/cartao-da-passagem";
+import { mensagemSemDado } from "@/lib/inbox/mensagem-sem-dado";
 import type { Message, Note } from "@/lib/types/messaging";
 import { useReenvioDoFio } from "./fio/useReenvioDoFio";
 
@@ -115,7 +116,9 @@ export function ChatThread({ conversationId, provider, onResponder, dono, contat
     }),
     [passagens, currentUser.id, dono?.userId, dono?.nome],
   );
-  const items: ThreadItem[] = useMemo(() => mergeThreadItems(messages, notes, cartoes), [messages, notes, cartoes]);
+  // Ruído sem dado nenhum não entra no fio (fica no banco e no `porId`).
+  const visiveis = useMemo(() => messages.filter((m) => !mensagemSemDado(m)), [messages]);
+  const items: ThreadItem[] = useMemo(() => mergeThreadItems(visiveis, notes, cartoes), [visiveis, notes, cartoes]);
   const paginas = q.data?.pages.length ?? 0;
 
   /**

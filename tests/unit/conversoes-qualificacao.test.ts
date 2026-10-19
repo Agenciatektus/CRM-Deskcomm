@@ -99,7 +99,7 @@ beforeEach(() => {
                   : null
                 : tabela === "crm_stages"
                   ? etapaExiste
-                    ? { id: ETAPA }
+                    ? { id: ETAPA, envia_conversao: true, evento_de_conversao: "QualifiedLead" }
                     : null
                   : {
                       id: "lead",
@@ -108,6 +108,8 @@ beforeEach(() => {
                       value_cents: null,
                       currency: "BRL",
                       closed_at: null,
+                      stage_id: ETAPA,
+                      stage_changed_at: ocorridoEm,
                     };
           return { data, error: null };
         },
@@ -150,7 +152,7 @@ describe("qualificação por etapa", () => {
       ),
     ).toBe(true);
   });
-  it("a mesma qualificação não é reenviada ao sair e voltar à etapa", async () => {
+  it("o mesmo evento reprocessado (mesma entrada) não é reenviado", async () => {
     await conversaoDeQualificacaoHandler.handle(row);
     expect(await conversaoDeQualificacaoHandler.handle(row)).toMatchObject({
       detail: "ja_enviada",

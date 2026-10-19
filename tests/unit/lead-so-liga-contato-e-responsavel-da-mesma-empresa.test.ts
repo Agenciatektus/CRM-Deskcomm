@@ -116,7 +116,6 @@ vi.mock("@/lib/leads/activity-emitter", () => ({
 
 import { createLeadHandler, updateLeadHandler } from "@/app/api/v1/leads/_handler";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
-import { montaPayloadDoClone, type OrigemParaClonar } from "@/lib/leads/clonar-para-funil";
 import { crmCreateLead, crmUpdateLead } from "@/lib/mcp/tools/leads";
 
 const ctx = {
@@ -265,21 +264,19 @@ describe("a recusa do gatilho do banco (migration 0403) vira a mesma resposta, n
   });
 });
 
-describe("clone para outro funil: o dono vem da ORIGEM", () => {
-  const origem = (dono: string): OrigemParaClonar =>
+describe("dono herdado (retomada): o dono vem da ORIGEM", () => {
+  const herdado = (dono: string) =>
     ({
-      id: LEAD,
-      pipeline_id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-      status: "open",
+      pipeline_id: PIPELINE,
+      stage_id: ETAPA,
       title: "Negócio",
       contact_id: CONTATO_A,
       owner_user_id: dono,
-      owner_agent_id: null,
-    }) as OrigemParaClonar;
-  const etapa = { id: ETAPA, pipeline_id: PIPELINE } as never;
+      dono_herdado: true,
+    }) as never;
 
   it("dono desligado: o clone nasce SEM dono, e a linha do tempo diz por quê — nunca 422", async () => {
-    await createLeadHandler(banco as never, ctx, montaPayloadDoClone(origem(DESLIGADO_A), etapa));
+    await createLeadHandler(banco as never, ctx, herdado(DESLIGADO_A));
     expect(leadsGravados()).toHaveLength(1);
     expect(primeiroLead().valores).toMatchObject({
       owner_user_id: null,
@@ -294,7 +291,7 @@ describe("clone para outro funil: o dono vem da ORIGEM", () => {
   });
 
   it("dono ainda ativo: o clone mantém o dono, sem atividade extra", async () => {
-    await createLeadHandler(banco as never, ctx, montaPayloadDoClone(origem(ATENDENTE_A), etapa));
+    await createLeadHandler(banco as never, ctx, herdado(ATENDENTE_A));
     expect(primeiroLead().valores).toMatchObject({ owner_user_id: ATENDENTE_A, owner_kind: "user" });
     expect(vi.mocked(emitLeadActivity)).not.toHaveBeenCalled();
   });

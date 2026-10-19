@@ -5484,6 +5484,14 @@ export const DICIONARIO: Traducoes = {
   "Etapa onde o card nasce": { es: "Etapa donde nace la tarjeta" },
   "Copiar o valor do card de origem": { es: "Copiar el valor de la tarjeta de origen" },
   "Manter o mesmo responsável": { es: "Mantener el mismo responsable" },
+  "Se o card estiver em outro funil": { es: "Si la tarjeta está en otro embudo" },
+  "Mover o card": { es: "Mover la tarjeta" },
+  "O negócio não foi encontrado (pode ter sido excluído).": { es: "No se encontró el negocio (puede haber sido eliminado)." },
+  "O mesmo card vai para o funil escolhido, com conversa e histórico.": { es: "La misma tarjeta va al embudo elegido, con conversación e historial." },
+  "Criar card novo": { es: "Crear tarjeta nueva" },
+  "O card continua onde está e nasce outro no funil escolhido.": { es: "La tarjeta sigue donde está y nace otra en el embudo elegido." },
+  "Rodar as automações de entrada da etapa": { es: "Ejecutar las automatizaciones de entrada de la etapa" },
+  "As automações da etapa de destino rodam como se o card tivesse acabado de entrar. Conversões de anúncio não são enviadas.": { es: "Las automatizaciones de la etapa de destino se ejecutan como si la tarjeta acabara de entrar. No se envían conversiones de anuncios." },
   "O card que disparou a regra continua onde está. Se o contato já tem um card aberto nesse funil, nenhum outro é criado.": { es: "La tarjeta que disparó la regla sigue donde está. Si el contacto ya tiene una tarjeta abierta en ese embudo, no se crea otra." },
   "O card foi criado sem responsável: quem era o dono do card de origem não atende mais nesta equipe (saiu, foi removido ou só visualiza).": { es: "La tarjeta se creó sin responsable: quien era el dueño de la tarjeta de origen ya no atiende en este equipo (salió, fue removido o solo visualiza)." },
   "O card foi criado sem responsável: não deu para confirmar na hora se o dono do card de origem ainda atende (falha de rede ou banco). Escolha o responsável no card.": { es: "La tarjeta se creó sin responsable: no se pudo confirmar en ese momento si el dueño de la tarjeta de origen todavía atiende (falla de red o de base de datos). Elige el responsable en la tarjeta." },
@@ -10223,6 +10231,21 @@ export const DICIONARIO: Traducoes = {
   "Avisar a equipe na Central quando um negócio entrar em": {
     es: "Avisar al equipo en la Central cuando un negocio entre en",
   },
+  // ─── conversão por etapa (migration 9054; pipelines/_conversao-da-etapa.tsx) ───
+  "Enviar evento de conversão (Meta/Google) ao entrar nesta etapa": {
+    es: "Enviar evento de conversión (Meta/Google) al entrar en esta etapa",
+  },
+  "Enviar evento de conversão (Meta/Google) ao entrar em": {
+    es: "Enviar evento de conversión (Meta/Google) al entrar en",
+  },
+  "Evento de conversão de": { es: "Evento de conversión de" },
+  "Compra (com o valor do negócio)": { es: "Compra (con el valor del negocio)" },
+  "Lead qualificado (ação do Google Ads da etapa)": {
+    es: "Lead calificado (acción de Google Ads de la etapa)",
+  },
+  "Sai a cada entrada nesta etapa, inclusive na recompra. Trocar de funil não envia. O negócio precisa ter vindo de anúncio.": {
+    es: "Sale en cada entrada a esta etapa, incluso en la recompra. Cambiar de embudo no envía. El negocio tiene que haber venido de un anuncio.",
+  },
   // ─── sons dos avisos (migration 0441; app/app/settings/notifications/_sons.tsx) ───
   "Sons dos avisos": { es: "Sonidos de los avisos" },
   "Tocam com o site aberto quando o aviso chega na Central. MP3, OGG ou WAV de até 1 MB.": {
@@ -11322,6 +11345,9 @@ export const DICIONARIO: Traducoes = {
   "Levado para outro funil": { es: "Movido a otro embudo" },
   // A TELA que faltava para a troca de funil — menu do card e o diálogo.
   "Levar para outro funil": { es: "Llevar a otro embudo" },
+  // 9053: o desfecho que saiu da coluna com o card levado a outro funil.
+  "+1 levado para outro funil": { es: "+1 llevado a otro embudo" },
+  "levados para outro funil": { es: "llevados a otro embudo" },
   // ── Retomada como novo negócio (issue #1538) ──
   "Retomar como novo negócio": { es: "Retomar como negocio nuevo" },
   "Retomando…": { es: "Retomando…" },
@@ -11349,15 +11375,12 @@ export const DICIONARIO: Traducoes = {
   "Este é o único funil. Crie outro funil para poder levar o negócio até ele.": {
     es: "Este es el único embudo. Crea otro embudo para poder llevar el negocio hasta él.",
   },
-  'O negócio é recriado no funil escolhido e este encerra como perdido, com o motivo "Levado para outro funil" — o histórico dos dois lados fica registrado na linha do tempo.': {
-    es: 'El negocio se recrea en el embudo elegido y este se cierra como perdido, con el motivo "Movido a otro embudo" — el historial de los dos lados queda registrado en la línea de tiempo.',
+  "O mesmo negócio vai para o funil escolhido, com conversa, histórico, etiquetas e campos. Este funil continua contando o resultado que ele teve aqui.": {
+    es: "El mismo negocio va al embudo elegido, con conversación, historial, etiquetas y campos. Este embudo sigue contando el resultado que tuvo aquí.",
   },
   // As recusas da troca de funil (lib/leads/clonar-para-funil.ts e a rota).
   "O negócio já está neste funil. Para trocar de etapa use /api/v1/leads/[id]/move.": {
     es: "El negocio ya está en este embudo. Para cambiar de etapa, usa /api/v1/leads/[id]/move.",
-  },
-  "Só um negócio aberto pode ser levado para outro funil.": {
-    es: "Solo un negocio abierto puede moverse a otro embudo.",
   },
   "A etapa não pertence ao funil de destino.": {
     es: "La etapa no pertenece al embudo de destino.",
@@ -11369,9 +11392,6 @@ export const DICIONARIO: Traducoes = {
     es: "El embudo de destino no tiene etapa abierta para recibir el negocio.",
   },
   "Funil de destino não encontrado.": { es: "Embudo de destino no encontrado." },
-  "O funil de origem não tem etapa de perda para encerrar o negócio.": {
-    es: "El embudo de origen no tiene etapa de pérdida para cerrar el negocio.",
-  },
 
   // ─── Fase B: vocabulario de dominio persistido (reason de crm_lead_activities) ───
   //

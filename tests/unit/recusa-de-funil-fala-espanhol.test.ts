@@ -19,7 +19,6 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { ACTIVITY_LABELS } from "@/lib/leads/activity-vocabulary";
 import {
   FUNIL_DE_DESTINO_NAO_ENCONTRADO,
-  ORIGEM_SEM_ETAPA_DE_PERDA,
   RECUSA_DE_TROCA_DE_FUNIL,
   escolheEtapaDeDestino,
   recusaTrocaDeFunil,
@@ -74,13 +73,11 @@ function textoDe(r: { texto: string } | { ok: true } | null): string {
 
 describe("a troca de funil recusa em espanhol", () => {
   const recusas: Record<string, string> = {
-    pipeline_unchanged: textoDe(recusaTrocaDeFunil({ pipeline_id: "p1", status: "open" }, "p1")),
-    lead_not_open: textoDe(recusaTrocaDeFunil({ pipeline_id: "p1", status: "won" }, "p2")),
+    pipeline_unchanged: textoDe(recusaTrocaDeFunil({ pipeline_id: "p1" }, "p1")),
     stage_pipeline_mismatch: textoDe(escolheEtapaDeDestino([etapa({})], "outra")),
     stage_destino_terminal: textoDe(escolheEtapaDeDestino([etapa({ is_lost: true })], "e1")),
     pipeline_without_initial_stage: textoDe(escolheEtapaDeDestino([etapa({ is_won: true })])),
     pipeline_not_found: FUNIL_DE_DESTINO_NAO_ENCONTRADO,
-    pipeline_no_lost_stage: ORIGEM_SEM_ETAPA_DE_PERDA,
   };
 
   for (const [codigo, texto] of Object.entries(recusas)) {

@@ -8,6 +8,12 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+### Alterado
+
+- **Levar um negócio para outro funil move o mesmo card** Em **Levar para outro funil** (no card, no quadro e no painel da conversa), o negócio vai para o funil escolhido com a conversa, o histórico, as etiquetas e os campos, e deixa de ser recriado. Isso vale também para negócio ganho ou perdido: um ganho no funil de vendas pode seguir para o pós-venda sem duplicar. O funil de origem continua contando o ganho, a perda e o valor daquela passagem, e a coluna de onde o card saiu mostra "+N levados para outro funil". Um negócio ganho chega ao destino sem valor, porque a venda já foi contada na origem. A automação "Criar ou mover lead" passa a mover o mesmo card quando o negócio está em outro funil.
+
+  **⚠️ Requer atenção (quem integra pela API)**: `POST /api/v1/leads/{id}/clone` passa a responder **200** (antes 201), e `data.lead.id` é o **mesmo** id do negócio, não um id novo. `data.origem` traz o mesmo objeto, e `lost_reason` é ignorado. Quem checava `201` ou guardava `data.lead.id` como negócio novo precisa ajustar. A migration 9053 precisa rodar antes do app.
+
 ## [1.69.0] — 2026-09-30
 
 ### Adicionado

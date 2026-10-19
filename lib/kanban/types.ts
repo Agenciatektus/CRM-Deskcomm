@@ -42,8 +42,22 @@ export interface Stage {
   win_probability?: number | null;
 }
 
+/**
+ * Um desfecho que ficou NESTA etapa quando o card foi levado a outro funil
+ * (migration 9053): o ganho levado ao pós-venda continua contado na coluna de
+ * ganho de onde saiu, com o valor da época.
+ */
+export interface PassagemDaColuna {
+  stage_id: string;
+  status: "won" | "lost";
+  value_cents: number | null;
+  currency: string | null;
+}
+
 export interface BoardData {
   pipeline: Pipeline;
   stages: Stage[];
   leads: Lead[];
+  /** Desfechos que saíram deste funil com o card (9053). Ausente em cliente antigo. */
+  passagens?: PassagemDaColuna[];
 }

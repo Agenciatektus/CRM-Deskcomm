@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import {
   Dialog,
@@ -36,8 +36,8 @@ interface MoveToOtherPipelineDialogProps {
 
 /**
  * "Levar para outro funil" — a TELA que faltava para
- * `POST /api/v1/leads/[id]/clone` (a rota já existe, testada, e fecha a
- * origem sozinha com o motivo canônico; aqui só se escolhe o destino).
+ * `POST /api/v1/leads/[id]/clone`, que MOVE o mesmo card desde a 9053 (aqui só
+ * se escolhe o destino).
  *
  * Sem seletor de etapa: a rota já escolhe a primeira etapa aberta do funil
  * destino quando nenhuma é informada — um segundo campo aqui duplicaria uma
@@ -60,7 +60,7 @@ export function MoveToOtherPipelineDialog({
           <DialogTitle>{t("Levar para outro funil")}</DialogTitle>
           <DialogDescription>
             {t(
-              'O negócio é recriado no funil escolhido e este encerra como perdido, com o motivo "Levado para outro funil" — o histórico dos dois lados fica registrado na linha do tempo.',
+              'O mesmo negócio vai para o funil escolhido, com conversa, histórico, etiquetas e campos. Este funil continua contando o resultado que ele teve aqui.',
             )}
           </DialogDescription>
         </DialogHeader>
@@ -102,14 +102,17 @@ export function FormularioDeOutroFunil({
   onConcluido: () => void;
   /**
    * Quando presente, o clone NÃO sai na hora: quem chama recebe a gravação e a
-   * segura (`adiarAcao`), porque `/clone` cria o negócio no funil de destino e
-   * dispara as automações dele na hora (P2-2 do Cassio na #169).
+   * segura (`adiarAcao`): Desfazer dentro da janela cancela sem chamar a rota
+   * (P2-2 do Cassio na #169).
    */
   adiar?: (gravar: () => Promise<unknown>) => void;
   rodape: (botoes: React.ReactNode) => React.ReactNode;
 }) {
   const t = useT();
   const [targetPipelineId, setTargetPipelineId] = useState("");
+  // Padrão DESLIGADO: ligada, a etapa de destino roda as automações de entrada.
+  const [rodarAutomacoes, setRodarAutomacoes] = useState(false);
+  const idRodar = useId();
   const mutation = useMoveLeadToPipeline(pipelineId);
   const destinos = useDestinosDeFunil(leadId, true);
 
@@ -118,7 +121,7 @@ export function FormularioDeOutroFunil({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      const args = { leadId, targetPipelineId };
+      const args = { leadId, targetPipelineId, rodarAutomacoesDeEntrada: rodarAutomacoes };
       if (adiar) {
         adiar(() => mutation.mutateAsync(args));
       } else {
@@ -155,6 +158,24 @@ export function FormularioDeOutroFunil({
               ))}
             </SelectContent>
           </Select>
+        )}
+
+        {destinos.data?.length !== 0 && (
+          <label htmlFor={idRodar} className="flex items-start gap-2 text-sm">
+            <input
+              id={idRodar}
+              type="checkbox"
+              checked={rodarAutomacoes}
+              onChange={(e) => setRodarAutomacoes(e.target.checked)}
+              className="mt-1 accent-primary"
+            />
+            <span>
+              {t("Rodar as automações de entrada da etapa")}
+              <span className="block text-xs text-muted-foreground">
+                {t("As automações da etapa de destino rodam como se o card tivesse acabado de entrar. Conversões de anúncio não são enviadas.")}
+              </span>
+            </span>
+          </label>
         )}
 
       {rodape(

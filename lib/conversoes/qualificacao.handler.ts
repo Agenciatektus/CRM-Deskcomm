@@ -7,7 +7,9 @@
  * `QualifiedLead` para a qualificação migrada, `Etapa:<uuid>` para as novas.
  *
  * As travas de sempre continuam aqui, e em ordem:
- *  - o que já foi enviado não sai de novo (sair e voltar à etapa não duplica);
+ *  - a etapa precisa estar com a chave "enviar conversão" ligada e o evento
+ *    `QualifiedLead` (9054); o que já foi enviado NA MESMA ENTRADA não sai de
+ *    novo, e a recompra (nova entrada) sai (`entrada-na-etapa.ts`);
  *  - movimento anterior à regra não envia (`configured_at`, a trava de
  *    retroatividade: ligar uma regra não despeja o histórico no Google);
  *  - a etapa precisa ser desta organização e estar aberta (ganho é compra, e é
@@ -18,6 +20,7 @@
  * envio — quando aconteceu e qual ação —, nunca a regra de agora: mudar a regra
  * depois não pode redirecionar uma conversão antiga para outra ação.
  */
+import { ehEntradaPelaTroca } from "@/lib/leads/entrada-pela-troca";
 import { z } from "zod";
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,6 +52,8 @@ async function enviar(
 
 async function handle(row: EventRow): Promise<HandlerResult> {
   if (!row.entity_id) return ignorar("sem_entidade");
+  // A entrada pedida pela troca de funil não envia conversão (`entrada-pela-troca.ts`).
+  if (ehEntradaPelaTroca(row.metadata)) return ignorar("entrada_pela_troca_de_funil");
   const admin = createAdminClient();
   try {
     if (row.event_type === "ad_conversion.retry_requested") {
@@ -80,16 +85,13 @@ async function handle(row: EventRow): Promise<HandlerResult> {
       row.entity_id,
       regra.eventName as NomeDoEvento,
     );
-    if (registro?.status === "sent") return ignorar("ja_enviada");
-    if (registro?.event_occurred_at && registro.google_action_id)
-      return await enviar(
-        row,
-        regra.eventName,
-        registro.event_occurred_at,
-        registro.google_action_id,
-      );
-
-    if (Date.parse(row.created_at) < Date.parse(regra.configuredAt))
+    // "Já enviada" é decidido por ENTRADA em `processarConversao` (9054): a
+    // recompra numa etapa ligada envia de novo. Um envio em curso (retrato
+    // gravado, ainda não enviado) segue sem a trava de retroatividade; o retrato
+    // da mesma entrada vence lá dentro.
+    const emCurso =
+      registro?.status !== "sent" && registro?.event_occurred_at && registro.google_action_id;
+    if (!emCurso && Date.parse(row.created_at) < Date.parse(regra.configuredAt))
       return ignorar("anterior_a_configuracao");
 
     const { data: etapa, error: erroEtapa } = await admin

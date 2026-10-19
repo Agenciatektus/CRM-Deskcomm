@@ -159,12 +159,11 @@ export type ActivityType =
    */
   | "contacts_merged"
   /**
-   * O negócio nasceu da TROCA DE FUNIL (`POST /api/v1/leads/[id]/clone`).
-   *
-   * ⚠️ Não é `lead_created`: aquele rótulo diz "Entrou pelo WhatsApp", e este
-   * negócio não entrou por canal nenhum — ele veio de outro funil, e é isso que
-   * quem abre o card no destino precisa ler. O outro lado da troca é a
-   * `demand_closed` da origem, com a razão "Levado para o funil X".
+   * O negócio foi levado para outro funil (`POST /api/v1/leads/[id]/clone` ou a
+   * automação `create_or_move_lead`). Desde a 9053 é o MESMO card: a linha fica
+   * nele, com a razão "Saiu do funil X (ganho) e entrou no funil Y" e o payload
+   * `from_pipeline_id`/`from_status`/`from_value_cents`/`to_pipeline_id`. Linhas
+   * antigas desta atividade ficaram no clone das trocas de antes.
    */
   | "moved_from_pipeline"
   /**

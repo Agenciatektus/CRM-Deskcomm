@@ -88,9 +88,30 @@ describe("MoveToOtherPipelineDialog", () => {
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith(`/api/v1/leads/${LEAD_ID}/clone`, {
         pipeline_id: "p-destino-1",
+        // Controle negativo: sem marcar a opção, nenhuma automação de entrada roda.
+        rodar_automacoes_de_entrada: false,
       }),
     );
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("'Rodar as automações de entrada da etapa' nasce desmarcada; marcada, vai no POST uma vez só (duplo clique)", async () => {
+    const user = userEvent.setup();
+    post.mockReturnValue(new Promise(() => {})); // segura o envio: o botão fica ocupado
+    renderDialog();
+
+    const caixa = screen.getByRole("checkbox", { name: /Rodar as automações de entrada da etapa/ });
+    expect(caixa).not.toBeChecked();
+    await user.click(await screen.findByRole("combobox", { name: "Funil de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Suporte" }));
+    await user.click(caixa);
+    await user.dblClick(screen.getByRole("button", { name: "Confirmar" }));
+
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post).toHaveBeenCalledWith(`/api/v1/leads/${LEAD_ID}/clone`, {
+      pipeline_id: "p-destino-1",
+      rodar_automacoes_de_entrada: true,
+    });
   });
 
   it("sem outro funil (instalação nova), explica em vez de abrir uma lista vazia", async () => {

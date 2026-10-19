@@ -73,6 +73,8 @@ beforeEach(() => {
     currency: "BRL",
     closed_at: "2026-09-27T09:00:00.000Z",
     contact_id: "contato",
+    stage_id: "etapa-ganho",
+    stage_changed_at: "2026-09-27T09:00:00.000Z",
   };
   mocks.enviar.mockResolvedValue({ tipo: "ok" });
   mocks.atribuicao.mockResolvedValue({
@@ -100,7 +102,9 @@ beforeEach(() => {
               ? lead
               : tabela === "ad_conversion_dispatches"
                 ? (registros[String(filtros.event_name)] ?? null)
-                : null,
+                : tabela === "crm_stages"
+                  ? { envia_conversao: true, evento_de_conversao: "Purchase" }
+                  : null,
           error: null,
         }),
         upsert: async (d: Record<string, unknown>) => {

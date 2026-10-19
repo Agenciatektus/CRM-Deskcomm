@@ -65,8 +65,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   const supabase = createAdminClient();
 
   const [perdas, funis, etapas] = await Promise.all([
+    // 9053: os desfechos da ÉPOCA — a perda que saiu do funil com o card levado a
+    // outro funil continua contada no funil e na etapa de onde saiu.
     supabase
-      .from("crm_leads")
+      .from("crm_desfechos_de_negocio" as never)
       .select("lost_reason, lost_from_stage_id, value_cents, currency, pipeline_id")
       .eq("organization_id", activeOrg.orgId)
       .eq("status", "lost")

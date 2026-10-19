@@ -1,47 +1,12 @@
 /**
- * LEVAR UM NEGÓCIO PARA OUTRO FUNIL — o caminho que a P-01 manda usar e que não
- * existia.
+ * LEVAR UM NEGÓCIO PARA OUTRO FUNIL — a parte DECIDÍVEL da troca (quando recusar,
+ * qual etapa recebe o card). Quem escreve é `lib/leads/mover-de-funil.ts`.
  *
- * A P-01 diz que `crm_leads.pipeline_id` é imutável e que "mover entre funis" se
- * resolve clonando: cria-se o negócio no funil destino e encerra-se a origem. O
- * `/move` devolve 422 `pipeline_immutable_use_clone` mandando "clonar o lead para
- * o pipeline alvo" — e nenhuma rota, tool MCP ou tela materializava esse clone.
- * A instrução apontava para o vazio: quem recebia o 422 não tinha para onde ir.
- *
- * ⚠️ O clone da P-01 também trazia uma instrução IMPOSSÍVEL. Ela mandava fechar a
- * origem com `lost_reason='moved_to_pipeline_X'`, mas o trigger
- * `fn_validate_lost_reason_required` (baseline.sql:851) recusa qualquer motivo
- * fora da lista canônica do produto ou de `crm_pipelines.settings.lost_reasons`:
- * a origem morreria com `lost_reason_invalid` e o negócio ficaria aberto em DOIS
- * funis — o defeito que a troca de funil deveria evitar. Aqui a origem fecha com
- * um motivo canônico (default `other`) e o destino REAL fica registrado em
- * `source_metadata.movido_para`, que é onde a informação sobrevive.
- *
- * Este módulo é a parte DECIDÍVEL da troca (o que se copia, o que não se copia,
- * qual etapa recebe o clone, quando recusar). Quem fala com o banco é a rota
- * `app/api/v1/leads/[id]/clone/route.ts`.
+ * Desde a migration 9053 (decisão do Peterson, 19/10/2026) a troca MOVE o mesmo
+ * card: o nome do arquivo e da rota (`/clone`) ficaram pelo contrato, mas nada
+ * aqui clona mais. A P-01 antiga (clonar e encerrar a origem como "Levado para
+ * outro funil") e a nova tentativa da #205 (clonar o encerrado) saíram.
  */
-import type { CreateLeadInput } from "@/lib/schemas";
-import { type ModoReabertura } from "@/lib/leads/reabertura";
-
-/** O negócio de origem, como a rota o lê do banco. */
-export interface OrigemParaClonar {
-  id: string;
-  pipeline_id: string;
-  status: string;
-  title: string;
-  description?: string | null;
-  contact_id?: string | null;
-  value_cents?: number | null;
-  currency?: string | null;
-  owner_user_id?: string | null;
-  owner_agent_id?: string | null;
-  expected_close_date?: string | null;
-  tags?: string[] | null;
-  source?: string | null;
-  custom_fields?: Record<string, unknown> | null;
-  source_metadata?: Record<string, unknown> | null;
-}
 
 /** As colunas de `crm_stages` que a escolha da etapa destino precisa. */
 export interface EtapaDoFunil {
@@ -72,10 +37,6 @@ export const RECUSA_DE_TROCA_DE_FUNIL =
 /** Recusa da rota quando o funil de destino não existe na organização. */
 export const FUNIL_DE_DESTINO_NAO_ENCONTRADO = "Funil de destino não encontrado.";
 
-/** Recusa da rota quando a origem não tem onde fechar (antes de criar o clone). */
-export const ORIGEM_SEM_ETAPA_DE_PERDA =
-  "O funil de origem não tem etapa de perda para encerrar o negócio.";
-
 export interface Recusa {
   status: number;
   code: string;
@@ -88,23 +49,13 @@ export type ResultadoDaEtapa =
   | { ok: false; status: number; code: string; texto: string };
 
 /**
- * As duas trocas que ESTA rota não faz.
- *
- * Mesmo funil não é troca — é `/move`, que preserva a posição no quadro e não
- * encerra nada; passar por aqui fecharia o negócio como perdido para reabri-lo ao
- * lado. E negócio já encerrado não é clonado POR PADRÃO: a origem seria
- * reescrita de `won` para `lost` (perda de dado, não conveniência).
- *
- * A exceção é a `moda` do funil (issue #1538): num funil `novo_negocio`, levar
- * um encerrado para OUTRO funil é exatamente "abrir uma nova tentativa" — e aí
- * a rota já sabe que não deve reencerrar a origem (o `status` e o motivo dela
- * ficam intactos). `modo` é opcional: sem ele, quem chama está fora do escopo
- * desta issue e a recusa de antes continua valendo.
+ * A única troca que esta rota não faz: para o MESMO funil (isso é `/move`, que só
+ * troca a etapa). Negócio aberto ou encerrado pode ir para outro funil: o card é
+ * o mesmo e a origem segue contando o desfecho pela passagem (9053).
  */
 export function recusaTrocaDeFunil(
-  origem: { pipeline_id: string; status: string },
+  origem: { pipeline_id: string },
   pipelineDestinoId: string,
-  modo?: ModoReabertura,
 ): Recusa | null {
   if (origem.pipeline_id === pipelineDestinoId) {
     return {
@@ -113,24 +64,17 @@ export function recusaTrocaDeFunil(
       texto: "O negócio já está neste funil. Para trocar de etapa use /api/v1/leads/[id]/move.",
     };
   }
-  if (origem.status !== "open" && modo !== "novo_negocio") {
-    return {
-      status: 422,
-      code: "lead_not_open",
-      texto: "Só um negócio aberto pode ser levado para outro funil.",
-    };
-  }
   return null;
 }
 
 /**
- * Qual etapa recebe o clone.
+ * Qual etapa recebe o card no funil de destino.
  *
  * Com `stage_id` informado, ele precisa ser uma etapa do funil destino — a rota
  * só carrega as etapas daquele funil, então "não está na lista" é exatamente
  * "é de outro funil". Sem `stage_id`, a primeira etapa aberta (menor `position`):
  * `is_won`/`is_lost` não entram, porque nascer dentro de uma etapa de desfecho
- * fecharia o clone no mesmo instante em que ele foi criado.
+ * fecharia o card no mesmo instante em que ele chega.
  */
 export function escolheEtapaDeDestino(
   etapas: EtapaDoFunil[],
@@ -172,87 +116,4 @@ export function escolheEtapaDeDestino(
     };
   }
   return { ok: true, etapa: inicial };
-}
-
-/**
- * O que o clone herda da origem — e o que ele NÃO herda.
- *
- * Herda o conteúdo do negócio (título, descrição, contato, valor, moeda, dono,
- * previsão, tags, campos personalizados) e registra de onde veio em
- * `source_metadata.clonado_de`. Não herda:
- *
- * - `external_id` — é a chave do pedido na origem; repetir o valor colide com
- *   `uniq_crm_leads_org_source_external` (org + source + external_id) e o clone
- *   nem nasceria;
- * - `status`/`lost_reason`/`closed_at` — o clone NASCE aberto (o banco fecha pelo
- *   trigger da etapa, que aqui é sempre uma etapa aberta);
- * - `position_in_stage` — quem posiciona é o handler de criação (MAX + 1000), que
- *   é quem conhece o fim da fila da etapa escolhida.
- *
- * ⚠️ `custom_fields` vem INTEIRO, inclusive chaves que o funil de destino não
- * declara em `settings.fields` — e já foi filtrado, por uma rodada que tratou a
- * declaração do funil como o único leitor do campo. Não é: a automação entrega o
- * jsonb cru à IA (`lib/automation/dados-do-formulario.ts`) e ao webhook de saída
- * (`lib/automation/actions/call-webhook.ts`), e resposta de formulário gravada em
- * chave nunca declarada é o caso comum. Filtrar apagava do negócio novo o que o
- * assistente sabia do cliente — e, com o destino sem campo declarado nenhum (o
- * outro caso comum), apagava TUDO. A chave que o destino não declara fica na
- * linha e só não aparece na tela do funil até alguém declará-la lá; é o mesmo
- * estado de quando um funil deixa de declarar um campo que já tinha valor.
- */
-export function montaPayloadDoClone(
-  origem: OrigemParaClonar,
-  etapa: EtapaDoFunil,
-): CreateLeadInput & {
-  custom_fields: Record<string, unknown>;
-  source_metadata: Record<string, unknown>;
-  dono_herdado: true;
-  /** `null` para origem aberta; o id da origem quando a clonagem É a retomada. */
-  retomado_de_lead_id: string | null;
-} {
-  const dono: { owner_user_id?: string; owner_agent_id?: string } = {};
-  if (origem.owner_user_id) dono.owner_user_id = origem.owner_user_id;
-  if (origem.owner_agent_id) dono.owner_agent_id = origem.owner_agent_id;
-
-  return {
-    pipeline_id: etapa.pipeline_id,
-    stage_id: etapa.id,
-    title: origem.title,
-    description: origem.description ?? null,
-    contact_id: origem.contact_id ?? null,
-    value_cents: origem.value_cents ?? null,
-    currency: origem.currency ?? "BRL",
-    ...dono,
-    // O dono é o da origem: se ele não pode mais ser dono, o clone nasce sem
-    // dono em vez de a troca de funil falhar (ver `createLeadHandler`).
-    dono_herdado: true,
-    expected_close_date: origem.expected_close_date ?? null,
-    tags: origem.tags ?? [],
-    source: origem.source ?? "manual",
-    custom_fields: origem.custom_fields ?? {},
-    source_metadata: {
-      ...(origem.source_metadata ?? {}),
-      clonado_de: {
-        lead_id: origem.id,
-        pipeline_id: origem.pipeline_id,
-      },
-    },
-    // Origem ABERTA = troca de funil de sempre (a P-01), sem cadeia nenhuma.
-    // Origem ENCERRADA = a nova tentativa que o funil `novo_negocio` autoriza
-    // (issue #1538): o clone passa a apontar para ela, e "tentativas até
-    // ganhar" continua derivável por `retomado_de_lead_id` também quando a
-    // retomada troca de funil.
-    retomado_de_lead_id: origem.status !== "open" ? origem.id : null,
-  };
-}
-
-/** O registro que fica na origem: para onde o negócio foi. */
-export function registroDoDestino(
-  clone: { id?: unknown; pipeline_id?: unknown; stage_id?: unknown },
-): Record<string, unknown> {
-  return {
-    lead_id: clone.id ?? null,
-    pipeline_id: clone.pipeline_id ?? null,
-    stage_id: clone.stage_id ?? null,
-  };
 }

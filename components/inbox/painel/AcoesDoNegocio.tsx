@@ -33,8 +33,8 @@ type Pendente = "ganho" | "perda" | "troca" | null;
  * GANHO, PERDA E TROCA DE FUNIL SÃO ADIADOS (P1 do Cassio na #169): as três
  * rotas disparam eventos com efeito FORA do CRM na hora (`lead.won` vira
  * conversão de anúncio para a Meta/Google; `lead.won` e `lead.lost` mexem nas
- * saídas da cadência e no push; o `/clone` cria o negócio e roda as automações
- * do funil de destino). Mover de volta não desfaz nada disso. Por isso o aviso
+ * saídas da cadência e no push; o `/clone` move o card para outro funil (9053)
+ * e o tira deste). Mover de volta não desfaz o ganho/perda. Por isso o aviso
  * SEGURA a rota por 5 s (`adiarAcao`): Desfazer cancela sem chamar nada, e a
  * tela mostra o estado otimista enquanto isso. Se a página fechar dentro dos
  * 5 s, a ação NÃO acontece. Ganho continua num clique, sem janela.

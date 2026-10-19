@@ -31,6 +31,9 @@ export interface EtapaDoFunil {
   win_probability?: number | null;
   /** Negócio que entra aqui abre um aviso na Central (migration 0440). */
   avisar_na_central?: boolean;
+  /** Negócio que entra aqui envia o evento de conversão (9054). */
+  envia_conversao?: boolean;
+  evento_de_conversao?: "Purchase" | "QualifiedLead" | null;
   /** Quem mexeu nesta etapa por último (migration 0101). `null` antes dela. */
   last_change_actor_kind?: string | null;
   last_change_at?: string | null;

@@ -57,6 +57,14 @@
  * depende disso: são duas mudanças de etapa feitas por gente, cada uma um
  * evento de origem humana.
  *
+ * ─── "Mover o card" ou "Criar card novo" (19/10/2026) ─────────────────────
+ *
+ * Com `modo: "mover"` (o padrão do editor para regra NOVA) esta ação MOVE o
+ * mesmo card, pelo caminho de `create_or_move_lead` (`mover-de-funil.ts`). Regra
+ * salva ANTES da opção não tem `modo` e segue criando card novo, como sempre:
+ * trocar o padrão dela tiraria do funil de Vendas, sem ninguém pedir, o card
+ * ganho que a regra existia para deixar lá.
+ *
  * O `organization_id` vem da regra (`ctx.organizationId`), nunca da config; o
  * funil e a etapa da config são conferidos contra ele com o client de serviço,
  * que não tem RLS.
@@ -64,7 +72,7 @@
 import { createLeadHandler } from "@/app/api/v1/leads/_handler";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { originFromAutomationEvent } from "@/lib/atendimento/origem-automacao";
-import { registerAction } from "@/lib/automation/actions";
+import { getAction, registerAction } from "@/lib/automation/actions";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { viaHerdada } from "@/lib/leads/criacao-em-lote";
@@ -114,6 +122,12 @@ function falhaDoBanco(mensagem: string): ActionResultDetail {
 }
 
 async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
+  if (config.modo === "mover") {
+    // Pelo registro, sem import circular entre as duas ações.
+    const mover = getAction("create_or_move_lead");
+    if (!mover) return { type: TYPE, status: "failed", error: "unknown_action" };
+    return { ...(await mover.execute(ctx, config)), type: TYPE };
+  }
   const pipelineId = typeof config.pipeline_id === "string" ? config.pipeline_id : null;
   const stageId = typeof config.stage_id === "string" ? config.stage_id : null;
   if (!pipelineId || !stageId) return { type: TYPE, status: "failed", error: "missing_config" };
