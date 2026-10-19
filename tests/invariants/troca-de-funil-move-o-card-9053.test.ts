@@ -171,8 +171,17 @@ ${espera("ator = p_ator", `(select movido_por_user_id::text from crm_lead_passag
 describe("9053: as guardas da troca de funil (P1-2 da #206)", () => {
   it("PATCH direto de pipeline_id é recusado: agent, manager e até o servidor fora da função", () => {
     const patch = `update crm_leads set pipeline_id = '${POS}' where id = '${LEAD}';`;
-    expect(() => prova(`${como(AG_A)}
+    // O agent é o DONO do negócio: sem isso a RLS não o deixaria ver a linha, o
+    // UPDATE afetaria zero linhas e a recusa não seria da guarda.
+    const doAgent = `update crm_leads set owner_user_id = '${AG_A}' where id = '${LEAD}';`;
+    expect(() => prova(`${doAgent}
+${como(AG_A)}
 ${patch}`)).toThrow(/pipeline_immutable_use_clone/);
+    expect(
+      prova(`${doAgent}
+${como(AG_A)}
+${espera("o agent vê o negócio (controle)", `(select count(*) from crm_leads where id = '${LEAD}')`, "'1'")}`),
+    ).toContain("provado");
     expect(() => prova(`${como(MGR_A)}
 ${patch}`)).toThrow(/pipeline_immutable_use_clone/);
     expect(() => prova(patch)).toThrow(/pipeline_immutable_use_clone/);
