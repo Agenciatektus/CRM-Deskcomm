@@ -1001,21 +1001,6 @@ export const NAV_CATALOG = [
     minRole: "admin",
   },
   {
-    href: "/app/settings/marca",
-    label: "Marca",
-    description: "O nome e a cor que sua empresa mostra dentro do sistema.",
-    icon: "Palette",
-    group: "organizacao",
-    section: "Sua empresa",
-    // `admin` pelo mesmo motivo da linha de cima: o que se edita ali é
-    // identidade da empresa, e dá-lo a `manager` o colocaria abaixo de billing e
-    // de API tokens na mesma prancheta.
-    minRole: "admin",
-    // SEM `sidebar`: fica só no hub. Trocar a marca é tarefa de uma vez, e
-    // agrupar o menu já o fez crescer — duas telas a mais estouraram a dobra em
-    // 900px, medido pelo e2e `navegacao.spec.ts`.
-  },
-  {
     href: "/app/settings/billing",
     apelidos: "plano cobranca assinatura fatura",
     label: "Billing",

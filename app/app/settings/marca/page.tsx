@@ -31,7 +31,6 @@ import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { ROLE_RANK } from "@/lib/auth/types";
 import { marcaDaInstalacao } from "@/lib/branding/instalacao";
 import { marcaDaOrganizacaoDeSettings } from "@/lib/branding/organizacao";
 import { env } from "@/lib/env";
@@ -47,7 +46,10 @@ export default async function MarcaDaOrganizacaoPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
-  if (!(user.is_platform_admin && !user.support) && ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
+  // Só o admin da PLATAFORMA (pedido do Peterson, 19/10): a marca da organização
+  // deixou de ser tela do CRM do cliente. Fora do menu (catalogo.ts) e com a
+  // gravação travada igual em `updateMarcaDaOrganizacao`.
+  if (!(user.is_platform_admin && !user.support)) {
     redirect("/403");
   }
 

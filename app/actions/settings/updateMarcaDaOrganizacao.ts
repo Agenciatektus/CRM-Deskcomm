@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
-import { ROLE_RANK } from "@/lib/auth/types";
 import { normalizarHex } from "@/lib/branding/rampa";
 import {
   marcaDaOrganizacaoSchema,
@@ -98,7 +97,10 @@ export async function updateMarcaDaOrganizacao(
   if (supportWriteError(authUser.support)) return { ok: false, error: "forbidden_role" };
   const activeOrg = await resolveActiveOrg(authUser);
   if (!activeOrg) return { ok: false, error: "forbidden_tenant" };
-  if (!authUser.is_platform_admin && ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
+  // Só o admin da PLATAFORMA, fora do modo suporte (mesmo gate da página): a marca
+  // da organização deixou de ser editável pelo admin do cliente (19/10). A
+  // função SQL só executa por service_role, então esta action é a única porta.
+  if (!authUser.is_platform_admin || authUser.support) {
     return { ok: false, error: "forbidden_role" };
   }
   // DEPOIS do papel, de propósito: quem nem tem o papel recebe `forbidden_role`,
