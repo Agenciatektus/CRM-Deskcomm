@@ -45,7 +45,7 @@ describe("crm_consultar_receita listar: tipos dos parâmetros (Zod 4)", () => {
       receitas: Array<{ parametrosDaBusca: { campos: Array<{ nome: string; tipo: string }> } }>;
     };
     const campos = Object.fromEntries(r.receitas[0]!.parametrosDaBusca.campos.map((c) => [c.nome, c.tipo]));
-    expect(campos.busca).toBe("string");
+    expect(campos.termos).toBe("array");
     expect(campos.preco_max).toBe("number");
     expect(campos.so_em_estoque).toBe("boolean");
     expect(campos.limite).toBe("number");

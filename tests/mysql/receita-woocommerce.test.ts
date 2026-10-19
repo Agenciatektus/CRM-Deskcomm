@@ -57,6 +57,7 @@ async function criarTabelasWP(root: Root, banco: string): Promise<void> {
       post_type varchar(20) not null default 'post',
       post_status varchar(20) not null default 'publish',
       guid varchar(255) not null default '',
+      post_excerpt varchar(500) not null default '',
       primary key (ID)
     ) engine=InnoDB character set utf8mb4;
   `);
@@ -99,6 +100,24 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
   );
   const idBota = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 103);
 
+  // 5. publicado, Camiseta Básica, estoque ok
+  await q(
+    `insert into \`${banco}\`.\`${WP_PREFIXO}posts\` (post_title, post_type, post_status, guid) values ('Camiseta Básica', 'product', 'publish', 'http://loja.exemplo/?p=104')`,
+  );
+  const idCamiseta = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 104);
+
+  // 6. publicado, Sorvete de Morango, estoque ok
+  await q(
+    `insert into \`${banco}\`.\`${WP_PREFIXO}posts\` (post_title, post_type, post_status, guid) values ('Sorvete de Morango', 'product', 'publish', 'http://loja.exemplo/?p=105')`,
+  );
+  const idSorvete = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 105);
+
+  // 7. publicado, Boxer (nome não tem "cueca", mas o resumo tem), estoque ok
+  await q(
+    `insert into \`${banco}\`.\`${WP_PREFIXO}posts\` (post_title, post_type, post_status, post_excerpt, guid) values ('Boxer Algodão', 'product', 'publish', 'cueca boxer', 'http://loja.exemplo/?p=106')`,
+  );
+  const idBoxer = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 106);
+
   // metas
   await q(
     `insert into \`${banco}\`.\`${WP_PREFIXO}postmeta\` (post_id, meta_key, meta_value) values
@@ -111,7 +130,16 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
       (${idCamisa}, '_sku', 'CAMISA-AZUL'),
       (${idBota}, '_stock_status', 'instock'),
       (${idBota}, '_price', '120.00'),
-      (${idBota}, '_sku', 'BOTA-CO')`,
+      (${idBota}, '_sku', 'BOTA-CO'),
+      (${idCamiseta}, '_stock_status', 'instock'),
+      (${idCamiseta}, '_price', '35.00'),
+      (${idCamiseta}, '_sku', 'CAMISETA-BASICA'),
+      (${idSorvete}, '_stock_status', 'instock'),
+      (${idSorvete}, '_price', '8.90'),
+      (${idSorvete}, '_sku', 'SORVETE-MORANGO'),
+      (${idBoxer}, '_stock_status', 'instock'),
+      (${idBoxer}, '_price', '25.00'),
+      (${idBoxer}, '_sku', 'BOXER-ALGODAO')`,
   );
 }
 
@@ -144,7 +172,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
   it("monta SQL e passa no validador com as tabelas permitidas", () => {
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: "camisa", preco_max: 60, so_em_estoque: true, limite: 5 },
+      { termos: ["camisa"], preco_max: 60, so_em_estoque: true, limite: 5 },
       5,
     );
     const tabelas = RECEITA_WOOCOMMERCE_PRODUTOS.tabelas(WP_PREFIXO);
@@ -175,7 +203,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     // Passa pela receita de verdade: montar + executar o SQL montado contra o MySQL.
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: "camisa", preco_max: undefined, so_em_estoque: undefined, limite: 5 },
+      { termos: ["camisa"], preco_max: undefined, so_em_estoque: undefined, limite: 5 },
       5,
     );
     const conexao = await pool.getConnection();
@@ -198,7 +226,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: undefined, preco_max: 60, so_em_estoque: undefined, limite: 5 },
+      { preco_max: 60, so_em_estoque: undefined, limite: 5 },
       5,
     );
     // Executa o SQL da receita diretamente contra o MySQL.
@@ -229,7 +257,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: undefined, preco_max: undefined, so_em_estoque: true, limite: 5 },
+      { preco_max: undefined, so_em_estoque: true, limite: 5 },
       5,
     );
     const conexao = await pool.getConnection();
@@ -251,7 +279,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: undefined, preco_max: undefined, so_em_estoque: undefined, limite: 1 },
+      { preco_max: undefined, so_em_estoque: undefined, limite: 1 },
       1,
     );
     const conexao = await pool.getConnection();
@@ -271,7 +299,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { busca: undefined, preco_max: undefined, so_em_estoque: undefined, limite: 5 },
+      { preco_max: undefined, so_em_estoque: undefined, limite: 5 },
       5,
     );
     const conexao = await pool.getConnection();
@@ -345,5 +373,32 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     registrar("C1-woocommerce-colunas", `colunas de ${WP_PREFIXO}posts: ${nomes.join(", ")}`);
     expect(nomes).toContain("ID");
     expect(nomes).toContain("post_title");
+  });
+
+  it("termos: ['camisetas','sorvetes','cuecas'] traz Camiseta Básica, Sorvete de Morango e Boxer, cada um com o seu termo", async () => {
+    const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
+      { prefixo: WP_PREFIXO },
+      { termos: ["camisetas", "sorvetes", "cuecas"], limite: 5 },
+      5,
+    );
+    const conexao = await pool.getConnection();
+    try {
+      await conexao.query("START TRANSACTION READ ONLY");
+      await conexao.query("SET SESSION max_execution_time = 10000");
+      await conexao.query("SET SESSION lock_wait_timeout = 5");
+      const [linhas] = await conexao.execute(sql, valores.map((v: unknown) => (v === undefined ? null : v)));
+      await conexao.query("COMMIT");
+      const encontrados = (linhas as { titulo: string; termo: string }[]).map((l) => `${l.titulo} (${l.termo})`);
+      registrar("C1-woocommerce-termos", `termos camisetas/sorvetes/cuecas → ${encontrados.join(", ")}`);
+      expect(encontrados).toContain("Camiseta Básica (camisetas)");
+      expect(encontrados).toContain("Sorvete de Morango (sorvetes)");
+      // "Boxer Algodão" casa com "cuecas" pelo resumo (post_excerpt = "cueca boxer").
+      expect(encontrados).toContain("Boxer Algodão (cuecas)");
+      expect(encontrados).not.toContain("Camisa azul");
+      expect(encontrados).not.toContain("Bota de couro");
+    } finally {
+      conexao.release();
+    }
   });
 });

@@ -5,6 +5,7 @@
  * O JOIN lê:
  *  - `<prefixo>posts` — post_type = 'product', post_status = 'publish'
  *  - `<prefixo>postmeta` — metas _price, _regular_price, _sku, _stock_status
+ *  - `post_excerpt` (resumo) fica na mesma tabela `posts`.
  *
  * Resultado por produto: id, título, preço, SKU, estoque, link (guid).
  *
@@ -23,6 +24,9 @@ const PREFIXO_REGEX = /^[A-Za-z0-9_]{1,20}$/;
 /** Teto desta fatia: o C2 (custo em tokens de uma resposta de receita) não foi medido. */
 export const TETO_ITENS_WOOCOMMERCE = 5;
 
+/** Máximo de termos de busca em uma única chamada. */
+export const MAX_TERMOS_WOOCOMMERCE = 4;
+
 const prefixoSchema = z
   .string()
   .min(1)
@@ -37,11 +41,15 @@ export const PARAMETROS_FIXOS_WOOCOMMERCE = z
   })
   .strict();
 
-/** O que o agente preenche na conversa. */
+/** Uma palavra de um termo: aceita a forma exata e, se terminar em `s` com mais
+ * de 3 letras, também aceita a forma sem o `s` final (camisetas → camiseta). */
+const palavraSchema = z.string().trim().min(2).max(60);
+
+/** O que o agente preenche na conversa. Cada termo é UM item que o cliente pediu. */
 export const PARAMETROS_DA_BUSCA_WOOCOMMERCE = z
   .object({
-    /** Trecho do título ou do SKU (até 80 chars). Vira LIKE com % escapado. */
-    busca: z.string().max(80).optional(),
+    /** Cada termo é um item pedido (ex.: "camiseta", "sorvete"). No singular ou plural. Sem "e"/vírgula dentro do termo. */
+    termos: z.array(palavraSchema).min(1).max(MAX_TERMOS_WOOCOMMERCE).optional(),
     /** Preço máximo (≥ 0). Compara CAST(meta_value AS DECIMAL(10,2)). */
     preco_max: z.number().nonnegative().optional(),
     /** Só produtos com estoque (stock_status = 'instock'). */
@@ -68,12 +76,16 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
     "Lê os produtos publicados do WordPress/WooCommerce: título, preço, SKU e estoque. " +
     "O prefixo é o que aparece antes de _posts no banco do WordPress (padrão wp_). " +
     "Para trazer os mais novos primeiro (por exemplo, 'os últimos produtos'), use ordem: \"recentes\"; sem ordem, vêm os mais antigos. " +
-    "Sem foto e sem funil nesta fatia (R4/R5 ficam para depois).",
+    "O cliente pede vários itens? Separe cada um em um termo, no singular ou plural, sem \"e\" nem vírgula dentro do termo " +
+    '(ex.: "camisetas e sorvetes" vira termos: ["camiseta", "sorvete"]). ' +
+    "Cada termo casa com as palavras dele (em qualquer forma aceita) em título, SKU ou resumo (post_excerpt). " +
+    "O teto é o limite vezes o número de termos (até 20). Sem foto e sem funil nesta fatia (R4/R5 ficam para depois). " +
+    "Se um termo não trouxer nada, tente um sinônimo numa nova chamada.",
   parametrosFixos: PARAMETROS_FIXOS_WOOCOMMERCE,
   parametrosDaBusca: PARAMETROS_DA_BUSCA_WOOCOMMERCE,
   tabelas: (prefixo) => [`${prefixo}posts`, `${prefixo}postmeta`],
   colunas: (prefixo) => ({
-    [`${prefixo}posts`]: ["ID", "post_title", "post_status", "post_type", "guid"],
+    [`${prefixo}posts`]: ["ID", "post_title", "post_status", "post_type", "guid", "post_excerpt"],
     [`${prefixo}postmeta`]: ["post_id", "meta_key", "meta_value"],
   }),
   montar: (fixos, busca, limite) => {
@@ -91,54 +103,116 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       return `?`;
     };
 
-    // `busca` já foi validado pelo Zod do chamador (rota de preview / tool do
-    // agente). Tipamos uma vez aqui para ler os campos sem cast por campo.
     const b = busca as BuscaWoocommerce;
 
-    // Monta na ORDEM do texto do SQL: primeiro os JOINs (que aparecem antes
-    // do WHERE), depois as cláusulas do WHERE, por fim o LIMIT. Cada chamada a
-    // `marcador()` empurra um valor em `valores` exatamente na posição do `?`
-    // que gera no texto, então valores nunca saem fora de ordem.
-    const joins: string[] = [
-      // preço de venda (mp): sempre participa para poder ordenar/filtrar por preço e projetar
-      `join ${postmeta} ${mp} on ${mp}.post_id = ${posts}.ID and ${mp}.meta_key = ${marcador("_price")}`,
-      // preço regular (mrp): fallback quando _price não existe ou é 0
-      `left join ${postmeta} ${mrp} on ${mrp}.post_id = ${posts}.ID and ${mrp}.meta_key = ${marcador("_regular_price")}`,
-      // SKU
-      `left join ${postmeta} ${msku} on ${msku}.post_id = ${posts}.ID and ${msku}.meta_key = ${marcador("_sku")}`,
-      // estoque
-      `left join ${postmeta} ${mstock} on ${mstock}.post_id = ${posts}.ID and ${mstock}.meta_key = ${marcador("_stock_status")}`,
-    ];
-
-    const clausulas: string[] = [
-      `${posts}.post_type = ${marcador("product")}`,
-      `${posts}.post_status = ${marcador("publish")}`,
-    ];
-
-    // Busca por título ou SKU: LIKE com % escapado e ESCAPE '!'.
-    const buscaStr = b.busca;
-    if (buscaStr) {
-      const alvo = `%${escaparLikeMysql(String(buscaStr).toLowerCase().replace(/\s+/g, ""))}%`;
-      clausulas.push(
-        `(
-          replace(lower(cast(${posts}.post_title as char)), ' ', '') like ${marcador(alvo)} escape '!'
-          or replace(lower(cast(${msku}.meta_value as char)), ' ', '') like ${marcador(alvo)} escape '!'
-        )`,
-      );
-    }
-
-    const precoMax = b.preco_max;
-    if (precoMax !== undefined) {
-      clausulas.push(`(${PRECO_COLUNA}) <= ${marcador(precoMax)}`);
-    }
-
-    const soEmEstoque = b.so_em_estoque;
-    if (soEmEstoque) {
-      clausulas.push(`${mstock}.meta_value = ${marcador("instock")}`);
-    }
-
-    // `desc` é fixo no código: nunca vem do valor recebido pelo agente.
     const direcao = b.ordem === "recentes" ? " desc" : "";
+    const efetivoLimite = Math.max(1, Math.floor(limite ?? TETO_ITENS_WOOCOMMERCE));
+
+    /** Separa um termo em palavras e devolve as variantes aceitas de cada uma. */
+    function variantesDaPalavra(palavra: string): string[] {
+      const base = palavra.toLowerCase();
+      const variantes = new Set<string>([base]);
+      if (base.length > 3 && base.endsWith("s")) {
+        variantes.add(base.slice(0, -1));
+      }
+      return [...variantes];
+    }
+
+    /** Uma cláusula que exige TODAS as palavras do termo (em qualquer forma aceita)
+     *  em título, SKU ou resumo. Cada palavra gera um bloco de OR (colunas) e as
+     *  palavras se combinam com AND. */
+    function clausulaDoTermo(termo: string): { sql: string; valores: unknown[] } {
+      const palavras = termo.split(/\s+/).filter((w) => w.length > 0);
+      const valorLocal: unknown[] = [];
+      const marca = (v: unknown): string => {
+        valorLocal.push(v === undefined ? null : v);
+        return `?`;
+      };
+
+      const blocosPorPalavra = palavras.map((palavra) => {
+        const variantes = variantesDaPalavra(palavra);
+        const ors = variantes.flatMap((variante) => [
+          `replace(lower(cast(${posts}.post_title as char)), ' ', '') like ${marca(`%${escaparLikeMysql(variante)}%`)} escape '!'`,
+          `replace(lower(cast(${msku}.meta_value as char)), ' ', '') like ${marca(`%${escaparLikeMysql(variante)}%`)} escape '!'`,
+          `replace(lower(cast(${posts}.post_excerpt as char)), ' ', '') like ${marca(`%${escaparLikeMysql(variante)}%`)} escape '!'`,
+        ]);
+        return `(${ors.join(" or ")})`;
+      });
+
+      return { sql: blocosPorPalavra.join(" and "), valores: valorLocal };
+    }
+
+    /** Monta as 4 joins (preço, preço regular, SKU, estoque), chamando `marcador`
+     *  na ordem em que os `?` aparecem no texto. */
+    function montarJoins(): string[] {
+      return [
+        `join ${postmeta} ${mp} on ${mp}.post_id = ${posts}.ID and ${mp}.meta_key = ${marcador("_price")}`,
+        `left join ${postmeta} ${mrp} on ${mrp}.post_id = ${posts}.ID and ${mrp}.meta_key = ${marcador("_regular_price")}`,
+        `left join ${postmeta} ${msku} on ${msku}.post_id = ${posts}.ID and ${msku}.meta_key = ${marcador("_sku")}`,
+        `left join ${postmeta} ${mstock} on ${mstock}.post_id = ${posts}.ID and ${mstock}.meta_key = ${marcador("_stock_status")}`,
+      ];
+    }
+
+    /** Monta as cláusulas base do WHERE (post_type, post_status, [preço], [estoque]),
+     *  chamando `marcador` na ordem em que os `?` aparecem no texto. */
+    function montarBase(): string[] {
+      const base: string[] = [
+        `${posts}.post_type = ${marcador("product")}`,
+        `${posts}.post_status = ${marcador("publish")}`,
+      ];
+      const precoMax = b.preco_max;
+      if (precoMax !== undefined) {
+        base.push(`(${PRECO_COLUNA}) <= ${marcador(precoMax)}`);
+      }
+      const soEmEstoque = b.so_em_estoque;
+      if (soEmEstoque) {
+        base.push(`${mstock}.meta_value = ${marcador("instock")}`);
+      }
+      return base;
+    }
+
+    const termos = b.termos;
+
+    if (termos && termos.length > 0) {
+      // Um bloco por termo, cada um com o seu limite. UNION ALL entre eles.
+      //
+      // Ordem dos `?` no texto de cada sub-select:
+      // 1. termo (coluna `termo` no select)
+      // 2-5. joins (4 meta_key)
+      // 6-N. base (post_type, post_status, [preco_max], [so_em_estoque])
+      // N+1..N+3. busca (cada palavra: or sobre título/SKU/resumo)
+      // último. limite interno
+      // Chamar `marcador` nesta mesma ordem para que `valores` alinhe com os `?`.
+      const blocos: string[] = [];
+      for (const termo of termos) {
+        const termoPos = marcador(termo); // 1
+        const joins = montarJoins(); // 2-5
+        const base = montarBase(); // 6-N
+        const clausula = clausulaDoTermo(termo);
+        clausula.valores.forEach((v) => valores.push(v)); // busca (N+1..N+3)
+        const limiteInterno = marcador(efetivoLimite); // último
+        blocos.push(
+          `(
+            select ${posts}.ID as id, ${posts}.post_title as titulo, ${PRECO_COLUNA} as preco, ${msku}.meta_value as sku, ${mstock}.meta_value as estoque, ${posts}.guid as link, ${termoPos} as termo
+            from ${posts}
+            ${joins.join(" ")}
+            where ${base.join(" and ")} and ${clausula.sql}
+            order by ${posts}.ID${direcao}
+            limit ${limiteInterno}
+          )`,
+        );
+      }
+
+      const limiteTotal = marcador(efetivoLimite * termos.length);
+      const sql =
+        `select * from (${blocos.join(" union all ")}) as t order by t.id${direcao} limit ${limiteTotal}`;
+
+      return { sql, valores };
+    }
+
+    // Sem termos: um bloco só, como antes (lista geral com ordem).
+    const joins = montarJoins();
+    const base = montarBase();
     const sql =
       `select ${posts}.ID as id, ` +
       `${posts}.post_title as titulo, ` +
@@ -148,9 +222,9 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       `${posts}.guid as link ` +
       `from ${posts} ` +
       `${joins.join(" ")} ` +
-      `where ${clausulas.join(" and ")} ` +
+      `where ${base.join(" and ")} ` +
       `order by ${posts}.ID${direcao} ` +
-      `limit ${marcador(limite ?? TETO_ITENS_WOOCOMMERCE)}`;
+      `limit ${marcador(efetivoLimite)}`;
 
     return { sql, valores };
   },

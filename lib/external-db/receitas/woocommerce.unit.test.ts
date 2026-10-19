@@ -42,7 +42,7 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
   it("não concatena valor cru no SQL (sempre placeholder ?)", () => {
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       fixos,
-      { busca: "camisa", preco_max: 60, so_em_estoque: true, limite: 3 },
+      { termos: ["camisa"], preco_max: 60, so_em_estoque: true, limite: 3 },
       3,
     );
     // Nenhum valor aparece como texto no SQL.
@@ -52,21 +52,24 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
     expect(sql).not.toContain("publish");
     expect(sql).not.toContain("product");
     // Todo valor virou um placeholder `?`. A ordem dos valores espelha a ordem
-    // dos `?` no texto: primeiro as quatro meta_key dos JOINs (que aparecem
-    // antes do WHERE), depois as cláusulas do WHERE e por fim o LIMIT.
+    // dos `?` no texto: primeiro o termo (coluna `termo` no SELECT), depois as
+    // quatro meta_key dos JOINs, depois as cláusulas do WHERE e por fim o LIMIT.
     expect(sql.split("?").length - 1).toBe(valores.length);
     expect(valores).toEqual([
+      "camisa", // a coluna `termo`
       "_price",
       "_regular_price",
       "_sku",
       "_stock_status",
       "product",
       "publish",
-      "%camisa%",
-      "%camisa%",
       60,
       "instock",
-      3,
+      "%camisa%",
+      "%camisa%",
+      "%camisa%",
+      3, // limite interno do bloco
+      3, // limite total externo
     ]);
   });
 
@@ -80,7 +83,7 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
   it("placeholders estão alinhados com os valores na ordem do texto (R-A)", () => {
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       fixos,
-      { busca: "camisa", preco_max: 60, so_em_estoque: true, limite: 3 },
+      { termos: ["camisa"], preco_max: 60, so_em_estoque: true, limite: 3 },
       3,
     );
 
@@ -143,5 +146,76 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
 
   it("descricao avisa o agente sobre ordem: \"recentes\"", () => {
     expect(RECEITA_WOOCOMMERCE_PRODUTOS.descricao).toContain("ordem: \"recentes\"");
+  });
+
+  it("termos: ['camisetas', 'sorvetes'] → dois blocos union all", () => {
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
+      fixos,
+      { termos: ["camisetas", "sorvetes"], limite: 3 },
+      3,
+    );
+    expect(sql).toContain("union all");
+    expect(sql.split("union all").length - 1).toBe(1);
+    // Cada termo aceita a forma sem o s final (plural).
+    expect(valores).toContain("%camiseta%");
+    expect(valores).toContain("%sorvete%");
+    expect(sql).not.toContain("%camisetasesorvetes%");
+  });
+
+  it("termo com duas palavras exige as duas no mesmo bloco (AND)", () => {
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
+      fixos,
+      { termos: ["camiseta preta"], limite: 3 },
+      3,
+    );
+    expect(valores).toContain("%camiseta%");
+    expect(valores).toContain("%preta%");
+    // Duas palavras × 3 colunas = 6 blocos de OR, unidos por and entre as palavras.
+    expect(sql).toContain("post_title");
+    expect(sql).toContain("post_excerpt");
+  });
+
+  it("o resumo (post_excerpt) entra na comparação", () => {
+    const { sql } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(fixos, { termos: ["cueca"], limite: 3 }, 3);
+    expect(sql).toContain("post_excerpt");
+  });
+
+  it("termos: [] é recusado pela validação", () => {
+    expect(() => RECEITA_WOOCOMMERCE_PRODUTOS.parametrosDaBusca.parse({ termos: [] })).toThrow();
+  });
+
+  it("5 termos é recusado pela validação (máximo 4)", () => {
+    expect(() =>
+      RECEITA_WOOCOMMERCE_PRODUTOS.parametrosDaBusca.parse({ termos: ["a", "b", "c", "d", "e"] }),
+    ).toThrow();
+  });
+
+  it("texto malicioso num termo só aparece em valores, nunca no SQL", () => {
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
+      fixos,
+      { termos: ["x' or 1=1 --"], limite: 3 },
+      3,
+    );
+    expect(sql).not.toContain("x' or 1=1 --");
+    expect(sql).not.toContain("--");
+    expect(valores).toContain("x' or 1=1 --");
+  });
+
+  it("sem termos → um bloco só, como antes", () => {
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(fixos, {}, 5);
+    expect(sql).toMatch(/^select /i);
+    expect(sql).not.toContain("union all");
+    expect(valores).toContain("product");
+    expect(valores).toContain("publish");
+  });
+
+  it("ordem: 'recentes' continua gerando desc sem termos", () => {
+    const { sql } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(fixos, { ordem: "recentes" }, 5);
+    expect(sql).toContain("order by `wp_posts`.ID desc ");
+  });
+
+  it("a descricao cita termos e o exemplo [\"camiseta\", \"sorvete\"]", () => {
+    expect(RECEITA_WOOCOMMERCE_PRODUTOS.descricao).toContain("termos");
+    expect(RECEITA_WOOCOMMERCE_PRODUTOS.descricao).toContain('["camiseta", "sorvete"]');
   });
 });

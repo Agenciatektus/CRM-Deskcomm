@@ -213,6 +213,11 @@ export const crmConsultarReceita: McpToolDefinition<typeof consultaReceitaShape>
     const prefixo = (instancia.fixos as { prefixo?: string }).prefixo ?? "wp_";
     const { sql, valores } = receita.montar(instancia.fixos, buscaValidada, receita.tetoDeItens);
 
+    // Teto total de itens: limite por termo × número de termos (até 20: 5 × 4).
+    // Sem termos, cai no teto da receita (5), como antes.
+    const termos = (buscaValidada as { termos?: unknown[] })?.termos;
+    const limiteMax = receita.tetoDeItens * (Array.isArray(termos) ? termos.length : 1);
+
     let resultado;
     try {
       resultado = await acesso.dialeto.executarReceita(
@@ -222,7 +227,7 @@ export const crmConsultarReceita: McpToolDefinition<typeof consultaReceitaShape>
           tabelas: receita.tabelas(prefixo),
           colunasPorTabela: receita.colunas(prefixo),
         },
-        { limiteMax: receita.tetoDeItens },
+        { limiteMax },
       );
     } catch (err) {
       if (err instanceof Error && err.name === "FonteNaoLiberadaError") {

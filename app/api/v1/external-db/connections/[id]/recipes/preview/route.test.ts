@@ -121,7 +121,7 @@ describe("POST /connections/:id/recipes/preview", () => {
   it("a organização vem da sessão (organization_id)", async () => {
     const { visto, client } = banco({ data: { receitas: [INSTANCIA_ID], db_type: "mysql" } });
     deps.admin.mockReturnValue(client);
-    await POST(post({ instancia_id: INSTANCIA_ID, busca: { busca: "camisa" } }), ctx);
+    await POST(post({ instancia_id: INSTANCIA_ID, busca: { termos: ["camisa"] } }), ctx);
     expect(visto.eq[0]).toEqual(["organization_id", ORG]);
     expect(visto.eq[1]).toEqual(["id", ID]);
   });
@@ -178,7 +178,7 @@ describe("POST /connections/:id/recipes/preview", () => {
     const { client } = banco({ data: { receitas: [INSTANCIA_ID], db_type: "mysql" } });
     deps.admin.mockReturnValue(client);
 
-    const res = await POST(post({ instancia_id: INSTANCIA_ID, busca: { busca: "camisa", preco_max: 60 } }), ctx);
+    const res = await POST(post({ instancia_id: INSTANCIA_ID, busca: { termos: ["camisa"], preco_max: 60 } }), ctx);
 
     expect(res.status).toBe(200);
     expect(deps.acessar).toHaveBeenCalled();
