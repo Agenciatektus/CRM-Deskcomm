@@ -12,10 +12,10 @@ import type { Message } from "@/lib/types/messaging";
  * real, que a tela mostra.
  */
 export function mensagemSemDado(
-  m: Pick<Message, "body" | "media_url" | "media_storage_path" | "metadata" | "revoked_at">,
+  m: Pick<Message, "body" | "media_url" | "media_storage_path" | "media_thumb_path" | "metadata" | "revoked_at">,
 ): boolean {
   if (m.body?.trim()) return false;
-  if (m.media_url || m.media_storage_path) return false;
+  if (m.media_url || m.media_storage_path || m.media_thumb_path) return false;
   if (m.revoked_at) return false;
   return !m.metadata || Object.keys(m.metadata).length === 0;
 }
