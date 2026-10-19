@@ -58,7 +58,6 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
-import { roleAtLeast } from "@/lib/auth/types";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { invalidarMarcaDaInstalacao } from "@/lib/branding/instalacao";
 import {
@@ -191,11 +190,14 @@ async function abrirContexto(escopo: Escopo): Promise<{ ctx: Contexto } | { recu
       recusa: { codigo: "forbidden_tenant", mensagem: "Sem organização ativa.", status: 403 },
     };
   }
-  if (!user.is_platform_admin && !roleAtLeast(org.role, "admin")) {
+  // Só o admin da PLATAFORMA, fora do modo suporte (19/10, pedido do Peterson):
+  // a marca da organização saiu do CRM do cliente — mesmo gate da página
+  // `settings/marca` e da action `updateMarcaDaOrganizacao` (P1 do Cassio na #211).
+  if (!user.is_platform_admin || user.support) {
     return {
       recusa: {
         codigo: "forbidden_role",
-        mensagem: "Só quem administra a empresa pode trocar o logo dela.",
+        mensagem: "Só o admin da plataforma pode trocar o logo da empresa.",
         status: 403,
       },
     };
