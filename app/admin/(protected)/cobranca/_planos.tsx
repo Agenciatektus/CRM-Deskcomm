@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
+import { cadastroExigeEscolhaDePlano } from "@/lib/cobranca/cadastro";
 import type { Intervalo } from "@/lib/cobranca/vocabulario";
 import { useIdioma } from "@/lib/i18n/IdiomaProvider";
 import { novoPlanoSchema } from "@/lib/schemas/cobranca-plano";
@@ -25,6 +26,8 @@ export interface PlanoDaTela {
   max_canais: number | null;
   teto_ia_usd_cents: number | null;
   padrao_no_cadastro: boolean;
+  /** false = só o dono atribui (plano negociado): a empresa não o vê nem o escolhe. */
+  oferecido_ao_cliente: boolean;
   arquivado_em: string | null;
 }
 
@@ -150,7 +153,10 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
         </div>
         <div className="space-y-1">
           <Label htmlFor="plano-trial">{t("Dias de teste grátis")}</Label>
-          <Input id="plano-trial" inputMode="numeric" {...campo("trial_dias")} />
+          <Input id="plano-trial" inputMode="numeric" aria-describedby="plano-trial-dica" {...campo("trial_dias")} />
+          <p id="plano-trial-dica" className="text-xs text-muted-foreground">
+            {t("0 = entrada paga: a empresa que entra neste plano fica suspensa até o primeiro pagamento.")}
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -180,6 +186,15 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
       </form>
 
       <div className="space-y-2">
+        {/* O critério do gatilho da 0679 (doc 146): com plano oferecido e sem padrão, quem se cadastra é obrigado a escolher. */}
+        {cadastroExigeEscolhaDePlano({
+          padraoId: planos.find((p) => p.padrao_no_cadastro && !p.arquivado_em)?.id ?? null,
+          oferecidos: planos.filter((p) => p.oferecido_ao_cliente && !p.arquivado_em),
+        }) && (
+          <p role="status" className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm dark:border-amber-500/30 dark:bg-amber-950/20">
+            {t("Nenhum plano está marcado para o cadastro. Quem se cadastra precisa escolher um plano, o “Entrar com Google” some da tela de cadastro e empresas criadas sem plano pela integração são recusadas. Use “Usar no cadastro” em um plano.")}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {t("O preço e o intervalo de um plano travam quando alguém o assina: para mudar, arquive e crie outro.")}
         </p>
@@ -196,6 +211,7 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
                     {p.nome}
                     {p.padrao_no_cadastro && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Plano do cadastro")}</span>}
                     {p.arquivado_em && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Arquivado")}</span>}
+                    {!p.oferecido_ao_cliente && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Só você atribui")}</span>}
                   </p>
                   <p className="text-muted-foreground">
                     {brl.format(p.preco_cents / 100)} {p.intervalo === "mes" ? t("por mês") : t("por ano")} · {p.trial_dias} {t("dias de teste")}
@@ -212,6 +228,11 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
                   {!p.arquivado_em && (
                     <Button size="sm" variant="outline" onClick={() => mudar(p.id, { padrao_no_cadastro: !p.padrao_no_cadastro })}>
                       {p.padrao_no_cadastro ? t("Tirar do cadastro") : t("Usar no cadastro")}
+                    </Button>
+                  )}
+                  {!p.arquivado_em && (
+                    <Button size="sm" variant="outline" onClick={() => mudar(p.id, { oferecido_ao_cliente: !p.oferecido_ao_cliente })}>
+                      {p.oferecido_ao_cliente ? t("Esconder das empresas") : t("Mostrar às empresas")}
                     </Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => mudar(p.id, { arquivado: !p.arquivado_em })}>

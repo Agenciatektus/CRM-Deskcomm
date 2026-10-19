@@ -37,6 +37,8 @@ import { runBeforeSend } from '../guardrails/before-send';
 import { definicaoNaConexao } from '@/lib/channels/linha-do-espelho';
 import { estadoDaJanela } from '@/lib/channels/janela';
 import { renderTemplateBody } from '@/lib/channels/meta/render-template';
+import { contextoDoContato, renderizarTextoDeFollowup } from '@/lib/automation/texto-do-followup';
+import { classificarMidiaComLegenda } from '@/lib/messaging/media/midia-com-legenda';
 import { isStatusSendable } from '@/lib/channels/meta/template-binding';
 import { deriveTemplateContract } from '@/lib/channels/meta/template-contract';
 import { camadaLigada, lerCamadasDaOrg } from '../guardrails/camadas-da-org';
@@ -50,6 +52,7 @@ import {
   type LeadCheckpointRow,
 } from './inbound-turn';
 import { isLeadInHandoff } from './human-handoff';
+import { aplicarPessoaNoComandoAoTurno } from '@/lib/followup/pessoa-no-comando-no-turno';
 import { fusoDaOrganizacao } from './fuso-da-org';
 import {
   followupPublicadoDoEnrollment,
@@ -94,6 +97,11 @@ export const followupTurnPayloadSchema = z
     prompt_hint: z.string().optional(),
     /** action mode `text` — enviado pela cadeia de guardrails, sem LLM. */
     fixed_body: z.string().min(1).max(4000).optional(),
+    /**
+     * #2734 — mídia OPCIONAL (imagem ou PDF) por URL do passo `action`/`text`; o
+     * `fixed_body` vira a LEGENDA. Opcional: payloads antigos seguem válidos.
+     */
+    fixed_media_url: z.string().url().max(2000).optional(),
     /** action mode `template` — `message_templates` (texto) ou `meta_templates` (modelo aprovado do canal). */
     template_id: z.string().uuid().optional(),
     /** action mode `ai_message` — modelo aprovado que sai no lugar da IA com a janela de 24 h fechada. */
@@ -389,6 +397,52 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
     // sem nó é defeito de programação e segue falhando alto em
     // `runFlowDrivenTurn`, como falhava.
     if (payload.followup_enrollment_id !== undefined && payload.node_id !== undefined) {
+      // PESSOA NO COMANDO: a política de handoff do fluxo vale também para a
+      // conversa assumida à mão, que não emite `ai.handoff_triggered`. Com
+      // `pause` o passo é ADIADO e confere de novo (o mesmo `deferred` da janela
+      // de envio, abaixo); cancelada, a inscrição cai no descarte logo abaixo.
+      if (payload.purpose === 'send_message') {
+        const agora = (deps.clock ?? ((): Date => new Date()))();
+        const pessoa = await aplicarPessoaNoComandoAoTurno(
+          pool,
+          {
+            organizationId: tenantId,
+            enrollmentId: payload.followup_enrollment_id,
+            nodeId: payload.node_id,
+            contactId: leadId,
+          },
+          agora,
+        );
+        if (pessoa !== null) {
+          withFields(deps.log, {
+            job_id: job.id,
+            tenant_id: tenantId,
+            lead_id: leadId,
+            enrollment_id: payload.followup_enrollment_id,
+          }).info('turno de fluxo não fala por cima de quem assumiu a conversa', {
+            inscricao: pessoa.kind,
+            ...(pessoa.kind === 'adiada' ? { next_run_at: pessoa.ate.toISOString() } : {}),
+          });
+        }
+        if (pessoa?.kind === 'adiada') {
+          const complete = deps.completeFollowupTurn;
+          if (!complete) {
+            throw new Error(
+              'passo adiado por pessoa no comando sem completeFollowupTurn — o enrollment não saberia do adiamento',
+            );
+          }
+          await rescheduleReentry(pool, { tenantId, leadId, jobId: job.id, at: pessoa.ate, payload: job.payload });
+          await complete(pool, {
+            jobId: job.id,
+            jobClaim: claimOfJob(job),
+            organizationId: tenantId,
+            enrollmentId: payload.followup_enrollment_id,
+            nodeId: payload.node_id,
+            result: { kind: 'deferred', until: pessoa.ate, reason: 'pessoa_no_comando' },
+          });
+          return;
+        }
+      }
       const { rows: inscricaoRows } = await pool.query<{ current_node_id: string; status: string }>(
         `select current_node_id, status from followup_enrollments where organization_id = $1 and id = $2 limit 1`,
         [tenantId, payload.followup_enrollment_id],
@@ -529,6 +583,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
           purpose: payload.purpose,
           promptHint: payload.prompt_hint,
           fixedBody: payload.fixed_body,
+          fixedMediaUrl: payload.fixed_media_url,
           templateId: payload.template_id,
           fallbackTemplateId: payload.fallback_template_id,
           voltaIndex: payload.volta_index,
@@ -618,6 +673,8 @@ async function runFlowDrivenTurn(
     purpose: 'send_message' | 'classify' | 'plan_timing' | undefined;
     promptHint: string | undefined;
     fixedBody: string | undefined;
+    /** #2734 — mídia opcional (imagem ou PDF) do passo `action`/`text`. */
+    fixedMediaUrl: string | undefined;
     templateId: string | undefined;
     fallbackTemplateId: string | undefined;
     voltaIndex: number | undefined;
@@ -640,7 +697,7 @@ async function runFlowDrivenTurn(
   const runLog = withFields(deps.log, { job_id: job.id, tenant_id: target.tenantId, lead_id: target.leadId, enrollment_id: enrollmentId });
 
   if (input.purpose === 'send_message') {
-    let passo = await resolveFlowSendBody(pool, target.tenantId, target.channelSessionId, input);
+    let passo = await resolveFlowSendBody(pool, target.tenantId, target.channelSessionId, target.leadId, input);
     // O PLANO B DA MENSAGEM POR IA. Com a janela de 24 h fechada, o canal recusa
     // qualquer texto livre — o da IA inclusive —, e o passo terminava sem mandar
     // nada. A tela prometia "se a IA não conseguir escrever, mandar este modelo"
@@ -660,10 +717,31 @@ async function runFlowDrivenTurn(
       return;
     }
     if (passo !== null) {
+      // #2734 — CANAL OFICIAL, JANELA FECHADA: mídia com legenda é mensagem LIVRE e
+      // não sai fora da janela de 24 h, e o texto NÃO sai sozinho no lugar dela — o
+      // cliente receberia a legenda de uma imagem que não veio. `janelaFechada` é a
+      // MESMA régua que o plano B por modelo aprovado consulta logo acima. Só o passo
+      // COM mídia passa por aqui: o texto puro segue com o contrato de antes.
+      if (passo.tipo === 'texto' && passo.midia !== undefined && (await janelaFechada(pool, target, clock()))) {
+        runLog.info('passo do fluxo pulado — mídia fora da janela de 24 h', { media_url: passo.midia.url });
+        await complete(pool, {
+          jobId: job.id,
+          jobClaim: claimOfJob(job),
+          organizationId: target.tenantId,
+          enrollmentId,
+          nodeId,
+          result: {
+            kind: 'skipped',
+            reason: 'A janela de 24 horas deste canal está fechada: fora dela só um modelo aprovado pode sair, e mídia com legenda é mensagem livre. A mídia não foi enviada, e o texto não saiu sozinho.',
+          },
+        });
+        return;
+      }
       // Texto do operador: sem camada semântica (ver o cabeçalho de sendFixedOutbound).
       const desfecho = await sendFixedOutbound(
         deps, job, pool, ctx, clock, target, passo.body, false,
         passo.tipo === 'modelo_aprovado' ? passo.modelo : undefined,
+        passo.tipo === 'texto' ? passo.midia : undefined,
       );
       // TODO OS TRÊS DESFECHOS VOLTAM PARA O ENROLLMENT. O adiado era o que não
       // voltava, e o silêncio dele custava o enrollment inteiro: o motor ficava
@@ -844,9 +922,25 @@ async function runDeterministicReentry(
   );
 }
 
-function interpolarVoltaDoPayload(texto: string, index: number | undefined, total: number | undefined): string {
-  if (index === undefined || total === undefined) return texto;
-  return texto.replaceAll('{{volta}}', String(index)).replaceAll('{{voltas}}', String(total));
+/**
+ * `{{volta}}`/`{{voltas}}` PRIMEIRO e, com o contexto do contato e do negócio
+ * (#2528), o resto pelo MESMO renderizador das automações: `{{nome}}`,
+ * `{{primeiro_nome}}`, `{{contact.*}}` e `{{lead.*}}` saem preenchidos, e
+ * marcação sem valor sai da frase junto com o espaço vizinho — nunca `{{...}}`
+ * cru ao cliente. Sem contexto (chamador que não leu) o comportamento é o de
+ * antes: só a volta.
+ */
+function interpolarVoltaDoPayload(
+  texto: string,
+  index: number | undefined,
+  total: number | undefined,
+  contexto?: Record<string, unknown> | null,
+): string {
+  const comVolta =
+    index === undefined || total === undefined
+      ? texto
+      : texto.replaceAll('{{volta}}', String(index)).replaceAll('{{voltas}}', String(total));
+  return contexto ? renderizarTextoDeFollowup(comVolta, contexto) : comVolta;
 }
 
 /**
@@ -858,7 +952,7 @@ function interpolarVoltaDoPayload(texto: string, index: number | undefined, tota
  * vez de a fila re-tentar até matar a inscrição por algo que tempo não conserta.
  */
 type PassoSemIa =
-  | { tipo: 'texto'; body: string }
+  | { tipo: 'texto'; body: string; midia?: MidiaComLegenda }
   | {
       tipo: 'modelo_aprovado';
       body: string;
@@ -866,19 +960,42 @@ type PassoSemIa =
     }
   | { tipo: 'recusado'; motivo: string };
 
+/** #2734 — mídia do passo: imagem ou PDF, por URL, com o `body` como LEGENDA. */
+export type MidiaComLegenda = { url: string; type: 'image' | 'document'; mime: string };
+
 async function resolveFlowSendBody(
   pool: pg.Pool,
   tenantId: string,
   channelSessionId: string,
+  /** `job.contact_id` — de quem é este texto (#2528). */
+  contactId: string,
   input: {
     fixedBody: string | undefined;
+    /** #2734 — mídia opcional do passo (`media_url` do nó de ação). */
+    fixedMediaUrl: string | undefined;
     templateId: string | undefined;
     voltaIndex: number | undefined;
     voltaTotal: number | undefined;
   },
 ): Promise<PassoSemIa | null> {
+  // O `fixed_body` já chega renderizado do enfileiramento (`lib/followup/engine.ts`),
+  // ou é a confirmação, que é dado do contato. Renderizar de novo leria o que veio
+  // do cadastro como modelo — por isso aqui ele só ganha a volta, nunca o contexto.
   if (input.fixedBody !== undefined) {
-    return { tipo: 'texto', body: interpolarVoltaDoPayload(input.fixedBody, input.voltaIndex, input.voltaTotal) };
+    const body = interpolarVoltaDoPayload(input.fixedBody, input.voltaIndex, input.voltaTotal);
+    // #2734 — MÍDIA DO PASSO. O que não é imagem nem PDF é recusa de CONFIGURAÇÃO:
+    // o passo é pulado com o motivo (mesmo desfecho do modelo que não pode sair) em
+    // vez de a fila re-tentar algo que tempo não conserta — e em vez de mandar o
+    // texto solto, que era o comportamento equivalente a prometer uma imagem que
+    // não vem.
+    if (input.fixedMediaUrl !== undefined) {
+      const url = input.fixedMediaUrl.trim();
+      if (url.length === 0) return { tipo: 'texto', body };
+      const classificada = classificarMidiaComLegenda(url);
+      if (!classificada.ok) return { tipo: 'recusado', motivo: classificada.motivo };
+      return { tipo: 'texto', body, midia: { url, type: classificada.type, mime: classificada.mime } };
+    }
+    return { tipo: 'texto', body };
   }
   if (input.templateId === undefined) return null;
   const { rows } = await pool.query<{ body: string }>(
@@ -887,7 +1004,9 @@ async function resolveFlowSendBody(
   );
   const body = rows[0]?.body;
   if (body !== undefined && body.length > 0) {
-    return { tipo: 'texto', body: interpolarVoltaDoPayload(body, input.voltaIndex, input.voltaTotal) };
+    // #2528 — o corpo de `message_templates` só existe aqui: esta é a passada única dele.
+    const contexto = await contextoDoContato(pool, tenantId, contactId);
+    return { tipo: 'texto', body: interpolarVoltaDoPayload(body, input.voltaIndex, input.voltaTotal, contexto) };
   }
   // Não é texto pronto: pode ser um modelo APROVADO do canal. Até aqui o passo só
   // lia `message_templates`, e um fluxo apontado para um modelo aprovado — o único
@@ -1024,6 +1143,13 @@ async function sendFixedOutbound(
    * passar, que é o que um modelo aprovado é — como no `send_template` do agente.
    */
   modelo?: { name: string; language: string; values: Record<string, string> },
+  /**
+   * #2734 — presente = o envio sai como MÍDIA (imagem ou PDF) e o `body` é a LEGENDA.
+   * O caminho é o de sempre: `channel.send` → `sendTurnMessage` → `sendMessageHandler`,
+   * o MESMO que o Inbox e as campanhas usam. `storagePath` (foto de produto) e `url`
+   * (mídia do passo) convivem no mesmo campo — ver `ChannelSendInput`.
+   */
+  midia?: MidiaComLegenda,
 ): Promise<EnvioFixoDesfecho> {
   const { tenantId, leadId, channelSessionId, conversationId } = target;
   const runLog = withFields(deps.log, { job_id: job.id, tenant_id: tenantId, lead_id: leadId });
@@ -1032,6 +1158,16 @@ async function sendFixedOutbound(
     runLog.info('envio fixo pulado — lead silenciado (handoff/opt-out)', { kind: job.kind });
     return { kind: "skipped" };
   }
+
+  // SEM gate near-dup AQUI (#2996, item 2 — pedido da triagem após medir os
+  // caminhos reais): follow-up de promessa NÃO passa por `sendFixedOutbound` —
+  // ele roda por `runAgentTurn` e cai no `send_message`, cujo gate em memória do
+  // turno (com a janela desde a última inbound) já cobre a re-resposta quase
+  // idêntica. Quem passa por aqui é texto fixo escrito pelo OPERADOR no passo do
+  // fluxo e o modelo da re-entrada: bloquear a 2ª/3ª bolha de um laço com
+  // `{{volta}}` ou a re-resposta de re-entrada sem resposta do lead seria sumir
+  // com o follow-up sem aviso. Se um dia aparecer um caso concreto em que a
+  // trava aqui é necessária, ele vira decisão de produto — não regra implícita.
 
   const context = await getLeadContext(
     pool,
@@ -1086,6 +1222,8 @@ async function sendFixedOutbound(
       channel.send({
         tenantId, leadId, jobId: job.id, jobClaim: claimOfJob(job), seq: 1, conversationId, body: finalBody,
         ...(modelo !== undefined ? { template: modelo } : {}),
+        // #2734 — mídia do passo: o `body` acima é a LEGENDA dela.
+        ...(midia !== undefined ? { media: { url: midia.url, mime: midia.mime, type: midia.type } } : {}),
       }),
   });
 

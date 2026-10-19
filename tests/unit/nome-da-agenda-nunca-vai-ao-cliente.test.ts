@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { renderTemplate } from "@/lib/automation/template";
+import { renderizarTextoDeFollowup } from "@/lib/automation/texto-do-followup";
 import { renderizar } from "@/lib/campanhas/renderizador";
 import { patchDoNome } from "@/lib/contacts/nome-da-agenda";
 import { nomeDoContato, rotuloDoContato, rotuloParaAEquipe } from "@/lib/contacts/rotulo-do-contato";
@@ -15,11 +16,14 @@ import { interpolateTemplate } from "@/lib/inbox/template-vars";
  *
  * Esse nome é o rótulo que alguém da empresa escreveu no celular — "Maria
  * caloteira", "João obra". Ele mora em `contacts.address_book_name`, que só a
- * equipe vê (caixa de entrada, ficha, lista). Os quatro caminhos que põem nome
+ * equipe vê (caixa de entrada, ficha, lista). Os cinco caminhos que põem nome
  * numa mensagem são provados aqui com um contato que SÓ tem o nome da agenda:
  *
  *   - `{{nome}}` da automação e do modelo de mensagem (`renderTemplate`, que lê
  *     a linha inteira do contato — inclusive pelo caminho explícito);
+ *   - o texto do follow-up (`renderizarTextoDeFollowup`, #2528), que também
+ *     carrega a linha inteira (`select * from contacts`) e passa marca a marca
+ *     pelo `renderTemplate`;
  *   - `{{nome}}` da campanha (`renderizar` com `nomeDoContato`, que é como a
  *     consulta de audiência o monta);
  *   - `{{nome}}` da resposta rápida da caixa de entrada (`interpolateTemplate`);
@@ -50,6 +54,16 @@ describe("o nome da agenda não entra em mensagem", () => {
     );
     expect(texto).not.toContain("caloteira");
     expect(texto).not.toContain("Maria");
+  });
+
+  it("follow-up: nem {{nome}} nem o caminho explícito trazem o apelido", () => {
+    const texto = renderizarTextoDeFollowup(
+      "Oi {{nome}}, {{primeiro_nome}}! Lembrete para {{contact.address_book_name}}.",
+      { contact: CONTATO },
+    );
+    expect(texto).not.toContain("caloteira");
+    expect(texto).not.toContain("Maria");
+    expect(texto).not.toContain("{{");
   });
 
   it("campanha: o nome do destinatário falta, e a variável é marcada como faltando", () => {
