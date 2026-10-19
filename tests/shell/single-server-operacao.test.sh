@@ -440,7 +440,9 @@ check "Supabase que não sobe: reprova sem mexer no modo de cadastro" \
 
 # A Resend como SMTP do GoTrue chega JÁ na atualização que a traz, pelo mesmo
 # caminho do #1653: o corpo novo desta função, não a chamada do update.sh antigo.
-env_sb_inicial; : > "$LOG"
+# DISABLE_SIGNUP já no valor do modo: sem ele o sincronizador do cadastro também
+# reinicia o auth na 1ª rodada, e o caso do reinício ficaria verde sem o do SMTP.
+env_sb_inicial; printf 'DISABLE_SIGNUP=false\n' >> "$SB/.env"; : > "$LOG"
 RESEND_API_KEY=re_doEnv RESEND_FROM_EMAIL=env@loja.com PSQL_RESEND='' PSQL_SMTP='' atualiza_sm >/dev/null; rc=$?
 check "Resend sem SMTP: a atualização leva a Resend ao GoTrue (rc=0)" \
   bash -c '[ "$1" -eq 0 ] && grep -qx "SMTP_HOST=\"smtp.resend.com\"" "$2"' _ "$rc" "$SB/.env"
