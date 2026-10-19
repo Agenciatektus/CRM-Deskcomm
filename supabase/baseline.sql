@@ -58518,3 +58518,39 @@ create view public.external_db_connections_safe
 
 revoke all on public.external_db_connections_safe from anon;
 grant select on public.external_db_connections_safe to authenticated;
+
+-- ---- catálogo: Gemini 4 Argon (migration 0703) ----
+-- Não cria função, então pode ficar depois da VARREDURA anon. Sem este bloco,
+-- clones novos (install.sh) e clones atualizando (update.sh) ficam sem o
+-- Gemini 4 no seletor do agente. As DUAS tabelas com os MESMOS números: a
+-- tarifa de 01/12/2026 (400/2000). O gasto em llm_calls segue costCents e
+-- computeCost, que cobram a promo até o instante anterior a
+-- 2026-12-01T00:00:00Z: 200/1000/10 centavos por milhão (entrada, saída,
+-- leitura de cache). Fontes no cabeçalho da migration.
+insert into public.ai_models
+  (provider, model_id, display_name, description, context_window, released_at,
+   supports_vision, input_price_per_million_cents, output_price_per_million_cents, supports_tools)
+values
+  ('google', 'gemini-4-argon', 'Gemini 4 Argon',
+   'O modelo de raciocínio mais capaz do Google; aceita texto, imagem, vídeo, áudio e PDF. Preço de catálogo: tarifa de 01/12/2026 (US$ 4/US$ 20). O motor cobra a promo (US$ 2/US$ 10) até essa data (UTC).',
+   1048576, '2026-10-13', true, 400, 2000, true)
+on conflict (provider, model_id) do update set
+  display_name = excluded.display_name,
+  description = excluded.description,
+  context_window = excluded.context_window,
+  released_at = excluded.released_at,
+  supports_vision = excluded.supports_vision,
+  input_price_per_million_cents = excluded.input_price_per_million_cents,
+  output_price_per_million_cents = excluded.output_price_per_million_cents,
+  supports_tools = excluded.supports_tools,
+  deprecated_at = null;
+
+insert into public.ai_pricing
+  (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
+values
+  ('gemini-4-argon', 400, 2000, 'catálogo 0703 — tarifa de 01/12/2026 UTC; o motor aplica 200/1000 até lá')
+on conflict (model) do update set
+  prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
+  completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
+  notes = excluded.notes,
+  superseded_at = null;
