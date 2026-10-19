@@ -39,6 +39,9 @@ import {
 } from "@/lib/leads/stage-editing";
 import { autoriaDaMudanca } from "@/lib/operacao/autoria";
 
+/** O vocabulário de `crm_stages.evento_de_conversao` (9054; CHECK no banco). */
+type EventoDeConversaoDaEtapa = "Purchase" | "QualifiedLead";
+
 type SB = SupabaseClient;
 
 export interface DepsDeEtapa {
@@ -51,7 +54,7 @@ export interface DepsDeEtapa {
 
 /** As colunas que a tela e as regras usam. `position` entra: a reordenação calcula em cima dela. */
 const COLUNAS =
-  "id, name, slug, position, is_won, is_lost, is_archived, win_probability, agent_stage_hint, avisar_na_central, last_change_actor_kind, last_change_at";
+  "id, name, slug, position, is_won, is_lost, is_archived, win_probability, agent_stage_hint, avisar_na_central, envia_conversao, evento_de_conversao, last_change_actor_kind, last_change_at";
 
 /** A etapa como sai para quem lê — inclui a autoria da última mudança de configuração. */
 export interface EtapaVisivel {
@@ -71,6 +74,9 @@ export interface EtapaVisivel {
   win_probability: number | null;
   /** Negócio que entra aqui abre um aviso na Central (migration 0440). */
   avisar_na_central: boolean;
+  /** Negócio que entra aqui envia o evento de conversão `evento_de_conversao` (9054). */
+  envia_conversao: boolean;
+  evento_de_conversao: EventoDeConversaoDaEtapa | null;
   /** `user` | `ai` | `system` — `null` nas etapas anteriores a esta coluna. */
   last_change_actor_kind: string | null;
   last_change_at: string | null;
@@ -78,6 +84,8 @@ export interface EtapaVisivel {
 
 type EtapaLida = EtapaEditavel & {
   avisar_na_central?: boolean | null;
+  envia_conversao?: boolean | null;
+  evento_de_conversao?: string | null;
   last_change_actor_kind: string | null;
   last_change_at: string | null;
 };
@@ -132,6 +140,8 @@ export function corpo(etapas: EtapaLida[]): { etapas: EtapaVisivel[] } {
         is_lost: e.is_lost,
         win_probability: e.win_probability ?? null,
         avisar_na_central: e.avisar_na_central === true,
+        envia_conversao: e.envia_conversao === true,
+        evento_de_conversao: (e.evento_de_conversao ?? null) as EventoDeConversaoDaEtapa | null,
         last_change_actor_kind: e.last_change_actor_kind ?? null,
         last_change_at: e.last_change_at ?? null,
       })),
@@ -305,6 +315,9 @@ export interface PedidoDeEdicao {
   depois_de?: string | null;
   /** Liga ou desliga o aviso na Central para quem entra nesta etapa (0440). */
   avisar_na_central?: boolean;
+  /** Liga ou desliga o envio de conversão ao entrar nesta etapa, e qual evento (9054). */
+  envia_conversao?: boolean;
+  evento_de_conversao?: EventoDeConversaoDaEtapa;
 }
 
 export async function atualizarEtapa(
@@ -373,11 +386,16 @@ export async function atualizarEtapa(
     position?: number;
     win_probability?: number | null;
     avisar_na_central?: boolean;
+    envia_conversao?: boolean;
+    evento_de_conversao?: EventoDeConversaoDaEtapa;
   } = {};
   if (pedido.name !== undefined) patchDoAlvo.name = pedido.name.trim();
   // `undefined` não viaja; `null` limpa a calibração de propósito.
   if (pedido.win_probability !== undefined) patchDoAlvo.win_probability = pedido.win_probability;
   if (pedido.avisar_na_central !== undefined) patchDoAlvo.avisar_na_central = pedido.avisar_na_central;
+  if (pedido.envia_conversao !== undefined) patchDoAlvo.envia_conversao = pedido.envia_conversao;
+  if (pedido.evento_de_conversao !== undefined)
+    patchDoAlvo.evento_de_conversao = pedido.evento_de_conversao;
 
   if (pedido.depois_de !== undefined) {
     // Só as ativas compõem a régua: arquivada não ocupa lugar no quadro.

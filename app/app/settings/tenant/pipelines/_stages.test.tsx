@@ -636,3 +636,44 @@ describe("StagesSection — a etapa que avisa na Central (migration 0440)", () =
     expect(vi.mocked(apiClient.patch).mock.calls[0]![1]).toEqual({ avisar_na_central: false });
   });
 });
+
+describe("StagesSection — enviar conversão ao entrar na etapa (migration 9054)", () => {
+  it("vem desligada; ligar numa etapa aberta manda a chave com o evento de etapa", async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { etapas: [] } });
+    montar();
+    const chave = await screen.findByTestId("conversao-e2");
+    expect(chave).toHaveAttribute("aria-checked", "false");
+    expect(chave).toHaveAccessibleName(/«Aguardando pagamento»/);
+    // Desligada, o seletor do evento nem aparece.
+    expect(screen.queryByTestId("evento-conversao-e2")).toBeNull();
+
+    await user.click(chave);
+    await waitFor(() => expect(apiClient.patch).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(apiClient.patch).mock.calls[0]![1]).toEqual({
+      envia_conversao: true,
+      evento_de_conversao: "QualifiedLead",
+    });
+  });
+
+  it("ligada no servidor aparece ligada, e desligar manda só `envia_conversao: false`", async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: estado(
+        {},
+        ETAPAS.map((e) =>
+          e.id === "e2" ? { ...e, envia_conversao: true, evento_de_conversao: "Purchase" } : e,
+        ),
+      ),
+    });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { etapas: [] } });
+    montar();
+    const chave = await screen.findByTestId("conversao-e2");
+    expect(chave).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("conversao-e1")).toHaveAttribute("aria-checked", "false");
+
+    await user.click(chave);
+    await waitFor(() => expect(apiClient.patch).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(apiClient.patch).mock.calls[0]![1]).toEqual({ envia_conversao: false });
+  });
+});

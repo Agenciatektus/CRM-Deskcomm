@@ -23,6 +23,7 @@ import { respostaDeRecusa } from "@/lib/api/recusa";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { arquivarEtapa, atualizarEtapa } from "@/lib/leads/stage-operations";
+import { EVENTOS_DE_CONVERSAO_DA_ETAPA } from "@/lib/conversoes/entrada-na-etapa";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -53,9 +54,16 @@ const bodySchema = z
     win_probability: z.number().int().min(0).max(100).nullable().optional(),
     /** Negócio que entra nesta etapa abre um aviso na Central (migration 0440). */
     avisar_na_central: z.boolean().optional(),
+    /** Envia conversão (Meta/Google) ao entrar na etapa, e qual evento (9054). */
+    envia_conversao: z.boolean().optional(),
+    evento_de_conversao: z.enum(EVENTOS_DE_CONVERSAO_DA_ETAPA).optional(),
   })
   .strict()
-  .refine((b) => Object.keys(b).length > 0, { message: "Nada para alterar." });
+  .refine((b) => Object.keys(b).length > 0, { message: "Nada para alterar." })
+  // O CHECK do banco recusa a chave ligada sem evento; aqui sai em português.
+  .refine((b) => b.envia_conversao !== true || b.evento_de_conversao !== undefined, {
+    message: "Escolha o evento de conversão.",
+  });
 
 export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const supportDenied = await requireSupportWrite();

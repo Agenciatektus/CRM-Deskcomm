@@ -31,6 +31,7 @@ import { Archive, CaretDown, CaretUp, Plus, Warning } from "@/lib/ui/icons";
 import { SeloDeAutoria } from "@/components/operacao/SeloDeAutoria";
 import { useT } from "@/hooks/i18n/useT";
 
+import { ConversaoDaEtapa } from "./_conversao-da-etapa";
 import { mensagemDeErro } from "./_mapping";
 
 /**
@@ -511,6 +512,8 @@ export function StagesSection({
                 />
                 {t("Avisar a equipe na Central quando um negócio entrar aqui")}
               </label>
+
+              <ConversaoDaEtapa etapa={etapa} ocupado={ocupado} aplicar={aplicar} />
 
               {passo && (
                 <p className="text-xs text-text-muted" data-testid={`passo-de-${etapa.id}`}>

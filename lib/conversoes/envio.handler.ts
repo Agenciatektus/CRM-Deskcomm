@@ -55,6 +55,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lerAtribuicao } from "./leitura-da-atribuicao";
 import { lerVendaPeloCanal } from "./venda-pelo-canal";
 import { ehEventoDeEtapa } from "./regras-google";
+import { etapaEnvia, lerConversaoDaEtapa, resolverEntrada } from "./entrada-na-etapa";
 import { lerRegistro, registraEnvio } from "./registro-de-envio";
 
 const CONSUMER_KEY = "conversoes.venda";
@@ -86,7 +87,7 @@ export async function processarConversao(
   // ⚠️ Filtro de organização junto do id: o client é service-role e bypassa RLS.
   const { data, error } = await admin
     .from("crm_leads")
-    .select("id, status, value_cents, currency, closed_at, contact_id")
+    .select("id, status, value_cents, currency, closed_at, contact_id, stage_id, stage_changed_at")
     .eq("id", row.entity_id)
     .eq("organization_id", row.organization_id)
     .maybeSingle();
@@ -110,17 +111,50 @@ export async function processarConversao(
     currency: string | null;
     closed_at: string | null;
     contact_id: string | null;
+    stage_id?: string | null;
+    stage_changed_at?: string | null;
   };
 
-  // O filtro que faz `lead.stage_changed` valer a pena escutar: a grande maioria
-  // das mudanças de etapa não é fechamento, e sai por aqui sem tocar no banco de
-  // novo nem sujar o livro-razão.
-  const registro = await lerRegistro(admin, row.organization_id, lead.id, EVENTO);
-  if (!qualificacao && lead.status !== "won" && !registro?.remote_request_id)
-    return ok("skipped", "nao_e_ganho");
+  // A conversão sai pela ENTRADA numa etapa com a chave ligada (9054,
+  // `entrada-na-etapa.ts`). A grande maioria das mudanças de etapa cai em
+  // `etapa_sem_conversao` sem sujar o livro-razão. O reenvio segue a linha que
+  // já existe, sem olhar a etapa de agora.
+  let registro = await lerRegistro(admin, row.organization_id, lead.id, EVENTO);
+  let entradaEm: string | null = registro?.entrada_em ?? null;
+  let novaEntrada = false;
+  if (row.event_type === "ad_conversion.retry_requested") {
+    if (!registro) return ok("skipped", "sem_registro");
+  } else {
+    const etapaAlvo =
+      row.event_type === "lead.stage_changed" && typeof row.payload.to_stage_id === "string"
+        ? row.payload.to_stage_id
+        : lead.stage_id;
+    if (
+      !etapaAlvo ||
+      !etapaEnvia(
+        await lerConversaoDaEtapa(admin, row.organization_id, etapaAlvo),
+        qualificacao ? "QualifiedLead" : "Purchase",
+      )
+    )
+      return ok("skipped", "etapa_sem_conversao");
+    const entrada = resolverEntrada(lead, etapaAlvo, registro);
+    if (entrada.tipo === "saiu") return ok("skipped", "saiu_da_etapa");
+    entradaEm = entrada.entradaEm;
+    novaEntrada = entrada.nova;
+    // Recompra: a linha é da entrada anterior; esta começa do zero (o gatilho
+    // `fn_preservar_conversao_enviada` aceita a troca só com `entrada_em` mais nova).
+    if (novaEntrada) registro = null;
+  }
   if (registro?.status === "sent") {
     return ok("skipped", "ja_enviada");
   }
+  // Deduplicação na plataforma: estável por entrada. A primeira entrada mantém o
+  // formato de sempre (`<lead>:<evento>`); a recompra ganha o carimbo da entrada.
+  const eventoId =
+    registro?.event_id ??
+    (novaEntrada && entradaEm
+      ? `${lead.id}:${EVENTO}:${Date.parse(entradaEm)}`
+      : `${lead.id}:${EVENTO}`);
 
   const leitura =
     registro?.remote_request_id && ehPlataformaConhecida(registro.platform)
@@ -157,7 +191,8 @@ export async function processarConversao(
       evento: EVENTO,
       status,
       motivo,
-      eventoId: `${lead.id}:${EVENTO}`,
+      eventoId,
+      entradaEm,
       valorCentavos: qualificacao
         ? null
         : registro?.remote_request_id
@@ -252,7 +287,7 @@ export async function processarConversao(
       if (canal) {
         const pelo = await canal.reportar({
           event: EVENTO,
-          eventId: `${lead.id}:${EVENTO}`,
+          eventId: eventoId,
           occurredAt: new Date(lead.closed_at ?? row.created_at ?? Date.now()),
           phone: telefone,
           valueCents: lead.value_cents,
@@ -292,7 +327,7 @@ export async function processarConversao(
     organizationId: row.organization_id,
     leadId: lead.id,
     evento: EVENTO,
-    eventoId: `${lead.id}:${EVENTO}`,
+    eventoId,
     // `closed_at` é escrito pelo trigger junto com o `status`, então em won ele
     // existe. O fallback é para a linha antiga de um banco que fechou por outro
     // caminho — e cair em `created_at` do evento é melhor que em `now()`, que
