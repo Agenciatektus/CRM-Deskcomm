@@ -126,8 +126,10 @@ test.describe("Lote 12 — #936 a troca de funil", () => {
     });
     const corpo = await resposta.text();
     registra(`#936 · POST /leads/${leadId}/clone = ${resposta.status()} · ${corpo.slice(0, 500)}`);
-    expect(resposta.status(), "a troca de funil devolve 201").toBe(201);
+    // 9053: a troca MOVE o mesmo card (200, mesmo id), nunca clona.
+    expect(resposta.status(), "a troca de funil devolve 200").toBe(200);
     const clone = JSON.parse(corpo).data.lead as { id: string; custom_fields: Record<string, string> };
+    expect(clone.id, "o card que chega ao destino é o MESMO").toBe(leadId);
 
     // ── O DESTINO, pela tela ──────────────────────────────────────────────
     await page.goto(`/app/pipelines/${destinoId}`);
@@ -176,12 +178,17 @@ test.describe("Lote 12 — #936 a troca de funil", () => {
 
     const { data: origem } = await admin
       .from("crm_leads")
-      .select("status, lost_reason, source_metadata")
+      .select("status, pipeline_id")
       .eq("id", leadId)
       .single();
-    registra(`#936 · lead de ORIGEM depois = ${JSON.stringify(origem)}`);
-    expect((origem as { status: string }).status).toBe("lost");
-    expect(JSON.stringify(origem)).toContain(destinoId);
+    registra(`#936 · o card depois = ${JSON.stringify(origem)}`);
+    expect(origem).toMatchObject({ status: "open", pipeline_id: destinoId });
+    const { count: passagens } = await admin
+      .from("crm_lead_passagens_de_funil" as never)
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", leadId)
+      .eq("de_pipeline_id", origemId);
+    expect(passagens, "a origem guarda a passagem").toBe(1);
 
     // Abrir o card da origem pela tela, para ver a linha do tempo com os olhos.
     const cardVelho = page.getByRole("group", { name: `Lead: Negócio ${S}` }).first();

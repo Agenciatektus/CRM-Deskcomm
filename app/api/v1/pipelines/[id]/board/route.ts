@@ -543,6 +543,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     { data: pipeline, error: pipelineErr },
     { data: stages, error: stagesErr },
     { data: leads, error: leadsErr, truncado: leadsTruncados },
+    { data: passagens, error: passagensErr },
   ] = await Promise.all([
     supabase.from("crm_pipelines").select("*").eq("id", pipelineId).maybeSingle(),
     supabase
@@ -565,11 +566,24 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
         .order("id")
         .range(de, ate),
     ),
+    // 9053: o ganho/perda que saiu deste funil com o card segue contado na coluna
+    // de onde saiu. A RLS de quem lê vale (a passagem segue a do negócio).
+    buscarTodasAsPaginas<{ de_stage_id: string; status_na_saida: string; value_cents: number | null; currency: string | null }>(
+      (de, ate) =>
+        supabase
+          .from("crm_lead_passagens_de_funil" as never)
+          .select("de_stage_id, status_na_saida, value_cents, currency")
+          .eq("de_pipeline_id", pipelineId)
+          .neq("status_na_saida", "open")
+          .order("id")
+          .range(de, ate) as never,
+    ),
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });
   if (stagesErr) return fail("internal_error", stagesErr.message, 500, { requestId });
   if (leadsErr) return fail("internal_error", leadsErr, 500, { requestId });
+  if (passagensErr) return fail("internal_error", passagensErr, 500, { requestId });
   if (leadsTruncados) {
     // O helper produz este sinal e até aqui ele era DESCARTADO — a mesma classe
     // do defeito que esta rota acabou de consertar: aviso fabricado e jogado no
@@ -648,6 +662,12 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     pipeline: pipeline as Pipeline,
     stages: (stages ?? []) as Stage[],
     leads: leadsComMarcadores.leads,
+    passagens: (passagens ?? []).map((p) => ({
+      stage_id: p.de_stage_id,
+      status: p.status_na_saida as "won" | "lost",
+      value_cents: p.value_cents,
+      currency: p.currency,
+    })),
   };
 
   return ok(board, { requestId });

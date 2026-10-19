@@ -241,3 +241,29 @@ describe("total da coluna do funil", () => {
     expect(document.body.textContent).not.toContain("€");
   });
 });
+
+describe("9053: o ganho levado a outro funil continua na coluna de onde saiu", () => {
+  it("mostra quantos saíram e o valor da época, sem virar card", () => {
+    render(
+      <DragDropContext onDragEnd={() => {}}>
+        <StageColumn
+          stage={etapa}
+          leads={[]}
+          pipelineId={etapa.pipeline_id}
+          passagens={[
+            { stage_id: etapa.id, status: "won", value_cents: 500000, currency: "BRL" },
+            { stage_id: etapa.id, status: "won", value_cents: 100000, currency: "BRL" },
+          ]}
+        />
+      </DragDropContext>,
+    );
+    const linha = document.querySelector("[data-passagens-da-etapa]");
+    expect(semNbsp(linha?.textContent ?? "")).toBe("+2 levados para outro funil · R$ 6.000,00");
+    expect(screen.queryByTestId(/^cartao-/)).toBeNull();
+  });
+
+  it("CONTROLE: sem passagem, a linha não aparece", () => {
+    montar([]);
+    expect(document.querySelector("[data-passagens-da-etapa]")).toBeNull();
+  });
+});

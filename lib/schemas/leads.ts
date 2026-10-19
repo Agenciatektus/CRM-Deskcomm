@@ -57,10 +57,10 @@ export type MoveLeadInput = z.infer<typeof moveLeadSchema>;
 /**
  * cloneLeadSchema → POST /api/v1/leads/[id]/clone (P-01).
  *
- * O caminho para OUTRO funil: `pipeline_id` é obrigatório, `stage_id` é opcional
- * (sem ele a primeira etapa aberta do funil destino recebe o negócio) e
- * `lost_reason` é o motivo do encerramento da ORIGEM — canônico ou estendido pelo
- * funil (o trigger do banco é a fonte de verdade, como em `loseLeadSchema`).
+ * O caminho para OUTRO funil (move o MESMO card desde a 9053): `pipeline_id` é
+ * obrigatório e `stage_id` é opcional (sem ele a primeira etapa aberta do funil
+ * destino recebe o negócio). `lost_reason` é aceito e IGNORADO, só para não
+ * quebrar quem já o mandava: a origem não fecha mais como perdida.
  */
 export const cloneLeadSchema = z.object({
   pipeline_id: z.string().uuid(),

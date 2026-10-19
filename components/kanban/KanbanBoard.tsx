@@ -341,6 +341,7 @@ export function KanbanBoard({
             onOpen={setDossieId}
             podeRenomear={podeRenomearEtapa}
             compacto={compacto}
+            passagens={data.passagens?.filter((p) => p.stage_id === stage.id)}
             onRenomear={(nome) => renameStage.mutate({ stageId: stage.id, name: nome })}
           />
         ))}

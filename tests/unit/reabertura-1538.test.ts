@@ -20,12 +20,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { traduzir } from "@/lib/i18n/dicionario";
-import {
-  montaPayloadDoClone,
-  recusaTrocaDeFunil,
-  type EtapaDoFunil,
-  type OrigemParaClonar,
-} from "@/lib/leads/clonar-para-funil";
+import { recusaTrocaDeFunil } from "@/lib/leads/clonar-para-funil";
 import {
   CAMPOS_COPIAVEIS,
   CAMPOS_PADRAO_DA_RETOMADA,
@@ -126,42 +121,15 @@ describe("os campos que a retomada copia", () => {
   });
 });
 
-describe("clone (P-01): encerrado só entra num funil novo_negocio", () => {
+describe("troca de funil (9053): move o mesmo card, aberto ou encerrado", () => {
   const outroFunil = "99999999-9999-4999-8999-999999999999";
   const funilDaOrigem = "44444444-4444-4444-8444-444444444444";
-  const etapa: EtapaDoFunil = {
-    id: "66666666-6666-4666-8666-666666666666",
-    pipeline_id: outroFunil,
-    position: 1000,
-    is_won: false,
-    is_lost: false,
-    is_archived: false,
-  };
-  const origem = (status: string): OrigemParaClonar => ({
-    id: "33333333-3333-4333-8333-333333333333",
-    pipeline_id: funilDaOrigem,
-    status,
-    title: "Consulta de avaliação",
-    tags: ["quente"],
-    custom_fields: { plano: "anual" },
-  });
 
-  it("sem o modo, a recusa de antes continua valendo", () => {
-    expect(recusaTrocaDeFunil(origem("lost"), outroFunil)?.code).toBe("lead_not_open");
-    expect(recusaTrocaDeFunil(origem("won"), outroFunil, "mesmo_registro")?.code).toBe("lead_not_open");
-  });
-
-  it("novo_negocio abre a porta — e mesmo funil continua sendo /move", () => {
-    expect(recusaTrocaDeFunil(origem("lost"), outroFunil, "novo_negocio")).toBeNull();
-    expect(recusaTrocaDeFunil(origem("won"), outroFunil, "novo_negocio")).toBeNull();
-    expect(recusaTrocaDeFunil(origem("open"), funilDaOrigem, "novo_negocio")?.code).toBe(
+  it("encerrado também vai: só o MESMO funil é recusado (isso é /move)", () => {
+    expect(recusaTrocaDeFunil({ pipeline_id: funilDaOrigem }, outroFunil)).toBeNull();
+    expect(recusaTrocaDeFunil({ pipeline_id: funilDaOrigem }, funilDaOrigem)?.code).toBe(
       "pipeline_unchanged",
     );
-  });
-
-  it("o clone de encerrado aponta para a origem; o de aberto não tem cadeia", () => {
-    expect(montaPayloadDoClone(origem("lost"), etapa).retomado_de_lead_id).toBe(origem("lost").id);
-    expect(montaPayloadDoClone(origem("open"), etapa).retomado_de_lead_id).toBeNull();
   });
 });
 
