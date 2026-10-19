@@ -123,6 +123,28 @@ select envia_conversao from crm_stages where slug='nova' and organization_id='${
   });
 });
 
+describe("9054: etapa de GANHO nova nasce enviando a compra", () => {
+  it("ganho nova → Purchase ligada; aberta nova → desligada; marcar ganho numa etapa nunca configurada liga; configurada não é sobrescrita", () => {
+    const out = prova(`
+insert into crm_stages(id,organization_id,pipeline_id,name,slug,position,is_won) values
+ ('${id(51)}','${ORG}','${FUNIL}','Ganho 2','ganho-2',10,false);
+update crm_stages set is_won=false where id='${S_GANHO}';
+insert into crm_stages(id,organization_id,pipeline_id,name,slug,position,is_won) values
+ ('${id(52)}','${ORG}','${FUNIL}','Fechado','fechado',11,true),
+ ('${id(53)}','${ORG}','${FUNIL}','Aberta','aberta',12,false);
+${estado(id(52))}
+${estado(id(53))}
+update crm_stages set is_won=false where id='${id(52)}';
+update crm_stages set envia_conversao=false where id='${id(52)}';
+update crm_stages set is_won=true where id='${id(52)}';
+${estado(id(52))}
+update crm_stages set is_won=false where id='${id(52)}';
+update crm_stages set is_won=true where id='${id(53)}';
+${estado(id(53))}`);
+    expect(linhas(out, /^(true|false)\//)).toEqual(["true/Purchase", "false/-", "false/Purchase", "true/Purchase"]);
+  });
+});
+
 describe("9054: livro-razão por entrada", () => {
   it("mesma entrada não rebaixa sent; entrada velha é ignorada; entrada nova reabre", () => {
     const linha = `select status || '/' || entrada_em::date from ad_conversion_dispatches where lead_id='${LEAD}';`;

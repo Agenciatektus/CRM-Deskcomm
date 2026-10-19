@@ -49477,7 +49477,8 @@ create index if not exists crm_leads_org_contact_cobre
 -- ---- cada etapa decide se envia conversão ao receber um negócio (migration 9054) ----
 --
 -- Decisão do Peterson (19/10/2026): a chave "Enviar evento de conversão (Meta/Google)
--- ao entrar nesta etapa" é POR ETAPA, desligada por padrão numa etapa nova. Até aqui
+-- ao entrar nesta etapa" é POR ETAPA: etapa nova nasce desligada, exceto a de GANHO,
+-- que nasce enviando a compra (`trg_etapa_de_ganho_envia_compra`). Até aqui
 -- a compra saía de todo negócio ganho (`status = 'won'`) e a etapa do Google saía
 -- pela regra da etapa, uma vez por (negócio, evento): a recompra no mesmo card não
 -- reenviava.
@@ -49536,6 +49537,27 @@ comment on column public.crm_stages.envia_conversao is
   'Negócio que ENTRA nesta etapa envia o evento de conversão evento_de_conversao (Meta/Google). Padrão desligado (9054).';
 comment on column public.crm_stages.evento_de_conversao is
   'Purchase (compra com valor, Meta e Google) ou QualifiedLead (conversão de etapa do Google, ação da regra da etapa) (9054).';
+
+-- Etapa de GANHO nova (o funil semeado de organização nova, a criação pela UI/API ou a
+-- marcação de ganho numa etapa nunca configurada) nasce ENVIANDO a compra: parar de
+-- medir venda em silêncio é o pior desfecho. As demais etapas novas nascem desligadas.
+-- Só age sem evento escolhido: quem já configurou a etapa não é sobrescrito.
+create or replace function public.fn_etapa_de_ganho_envia_compra()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.is_won and new.evento_de_conversao is null and not new.envia_conversao
+     and (tg_op = 'INSERT' or not old.is_won) then
+    new.envia_conversao := true;
+    new.evento_de_conversao := 'Purchase';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_etapa_de_ganho_envia_compra() from public, anon, authenticated;
+drop trigger if exists trg_etapa_de_ganho_envia_compra on public.crm_stages;
+create trigger trg_etapa_de_ganho_envia_compra
+  before insert or update of is_won on public.crm_stages
+  for each row execute function public.fn_etapa_de_ganho_envia_compra();
 
 alter table public.ad_conversion_dispatches add column if not exists entrada_em timestamptz;
 comment on column public.ad_conversion_dispatches.entrada_em is

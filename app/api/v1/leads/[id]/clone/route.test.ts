@@ -41,8 +41,10 @@ const S_POS_1 = "88888888-8888-4888-8888-888888888888";
 const S_POS_2 = "99999999-9999-4999-8999-999999999999";
 
 type Row = Record<string, unknown>;
+/** As tabelas que o seed sempre traz; as demais nascem sob demanda no fake. */
+type Tabelas = Record<string, Row[]> & { crm_pipelines: Row[]; crm_stages: Row[]; crm_leads: Row[] };
 
-function fakeDb(tables: Record<string, Row[]>) {
+function fakeDb(tables: Tabelas) {
   const inserts: string[] = [];
   function from(table: string) {
     const filtros: ((r: Row) => boolean)[] = [];
@@ -93,7 +95,7 @@ function fakeDb(tables: Record<string, Row[]>) {
   return { client: { from, rpc } as never, rpc, inserts };
 }
 
-function seed(exigeCampo = false): Record<string, Row[]> {
+function seed(exigeCampo = false): Tabelas {
   const etapa = (id: string, pipeline_id: string, position: number, is_won = false) => ({
     id,
     organization_id: ORG_ID,
@@ -133,7 +135,7 @@ function seed(exigeCampo = false): Record<string, Row[]> {
 }
 
 /** Ganhos de um funil como a métrica conta desde a 9053: atual + passagens. */
-function ganhosDoFunil(t: Record<string, Row[]>, funil: string, comPassagens = true) {
+function ganhosDoFunil(t: Tabelas, funil: string, comPassagens = true) {
   const atuais = t.crm_leads.filter((l) => l.pipeline_id === funil && l.status === "won");
   const passadas = comPassagens
     ? (t.crm_lead_passagens_de_funil ?? []).filter(
@@ -153,7 +155,7 @@ function req(body: Row) {
 }
 const ctx = { params: Promise.resolve({ id: LEAD_ID }) };
 
-let tables: Record<string, Row[]>;
+let tables: Tabelas;
 let db: ReturnType<typeof fakeDb>;
 
 function prepara(exigeCampo = false) {
@@ -218,7 +220,7 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
 
     const emitidos = db.rpc.mock.calls.filter(([nome]) => nome === "emit_event");
     expect(emitidos).toHaveLength(1);
-    expect(emitidos[0][1]).toMatchObject({
+    expect(emitidos[0]![1]).toMatchObject({
       p_event_type: "lead.stage_changed",
       p_entity_kind: "crm_lead",
       p_entity_id: LEAD_ID,
@@ -251,10 +253,10 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
   });
 
   it("etapa escolhida do destino é respeitada; aberto também move, com o valor", async () => {
-    Object.assign(tables.crm_leads[0], { status: "open", closed_at: null });
+    Object.assign(tables.crm_leads[0]!, { status: "open", closed_at: null });
     const res = await POST(req({ pipeline_id: POS_VENDA, stage_id: S_POS_2 }), ctx);
     expect(res.status).toBe(200);
-    expect(tables.crm_leads[0]).toMatchObject({ pipeline_id: POS_VENDA, stage_id: S_POS_2, value_cents: 500000 });
+    expect(tables.crm_leads[0]!).toMatchObject({ pipeline_id: POS_VENDA, stage_id: S_POS_2, value_cents: 500000 });
     expect(tables.crm_leads).toHaveLength(1);
   });
 
@@ -266,7 +268,7 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
   });
 
   it("funil de destino de outra organização é 404, sem escrever", async () => {
-    tables.crm_pipelines[1].organization_id = "outra-org";
+    tables.crm_pipelines[1]!.organization_id = "outra-org";
     const res = await POST(req({ pipeline_id: POS_VENDA }), ctx);
     expect(res.status).toBe(404);
     expect(db.rpc).not.toHaveBeenCalled();
@@ -278,6 +280,6 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
     expect(res.status).toBe(422);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("required_fields_missing");
     expect(db.rpc).not.toHaveBeenCalled();
-    expect(tables.crm_leads[0].pipeline_id).toBe(VENDAS);
+    expect(tables.crm_leads[0]!.pipeline_id).toBe(VENDAS);
   });
 });
