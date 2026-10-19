@@ -7,6 +7,7 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { ok, fail } from "@/lib/api/wrappers";
 import { agentChatInputSchema } from "@/lib/prospecting/agent-chat-schema";
 import { chatAboutAgent } from "@/lib/prospecting/agent-chat";
+import { provedorOferecido } from "@/lib/ai/pontos/provedores-oferecidos";
 import { AgentSetupError } from "@/lib/prospecting/agent-setup";
 import { beginAgentChat, finishAgentChat } from "@/lib/prospecting/agent-session";
 
@@ -32,7 +33,13 @@ export async function POST(req: Request) {
     req.signal.throwIfAborted();
     const pending =
       parsed.data.revision === undefined ? null : await beginAgentChat(pool, actor, parsed.data);
-    const data = await chatAboutAgent(pool, auth.org.orgId, parsed.data, req.signal);
+    const data = await chatAboutAgent(
+      pool,
+      auth.org.orgId,
+      parsed.data,
+      await provedorOferecido(createAdminClient()),
+      req.signal,
+    );
     const saved = pending
       ? await finishAgentChat(
           pool,

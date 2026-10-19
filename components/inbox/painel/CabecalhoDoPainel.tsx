@@ -109,7 +109,7 @@ export function CabecalhoDoPainel({
           <ChipDeEtiqueta
             key={tag}
             tag={tag}
-            className="h-[22px] rounded-full border border-border bg-surface px-2 text-xs font-normal text-text-muted"
+            className="h-[22px] rounded-full border border-border bg-surface px-2 text-xs font-normal"
           />
         ))}
         {/* "+ Etiqueta" é o rótulo curto do protótipo; o nome acessível diz DE

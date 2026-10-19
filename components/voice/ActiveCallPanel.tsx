@@ -107,18 +107,30 @@ export function ActiveCallPanel() {
     ? // A ligação é desta pessoa, mas o áudio está noutra aba ou aparelho dela.
       // Abrir aqui sozinho trocaria a ponte do serviço de voz e emudeceria a aba
       // que ela está usando — então pergunta, com o botão.
-      { texto: t("O áudio desta ligação está em outra aba"), grave: false, ouvirAqui: t("Ouvir aqui") }
+      {
+        texto: t("O áudio desta ligação está em outra aba"),
+        grave: false,
+        ouvirAqui: t("Ouvir aqui"),
+      }
     : estadoDaMidia === "falhou"
       ? // Antes do "connected" também: o microfone é pedido no clique, com o
         // telefone ainda tocando, e dá tempo de corrigir antes de o cliente atender.
-        { texto: t("Não consegui abrir o áudio. Confira o microfone."), grave: true, ouvirAqui: t("Tentar de novo") }
-    : call.status !== "connected" || estadoDaMidia === "com_audio"
-      ? null
-      : estadoDaMidia === "sem_rota"
-        ? { texto: t("Sem áudio: o canal de voz não abriu"), grave: true, ouvirAqui: t("Tentar de novo") }
-        : estadoDaMidia === "caiu"
-          ? { texto: t("O áudio caiu"), grave: true, ouvirAqui: t("Reconectar o áudio") }
-          : { texto: t("Abrindo o áudio…"), grave: false };
+        {
+          texto: t("Não consegui abrir o áudio. Confira o microfone."),
+          grave: true,
+          ouvirAqui: t("Tentar de novo"),
+        }
+      : call.status !== "connected" || estadoDaMidia === "com_audio"
+        ? null
+        : estadoDaMidia === "sem_rota"
+          ? {
+              texto: t("Sem áudio: o canal de voz não abriu"),
+              grave: true,
+              ouvirAqui: t("Tentar de novo"),
+            }
+          : estadoDaMidia === "caiu"
+            ? { texto: t("O áudio caiu"), grave: true, ouvirAqui: t("Reconectar o áudio") }
+            : { texto: t("Abrindo o áudio…"), grave: false };
 
   return (
     <div
@@ -131,7 +143,9 @@ export function ActiveCallPanel() {
       // Soma o que a casca ocupa embaixo (no celular, a barra inferior e a área segura);
       // a reserva do `<main>` soma o mesmo (`estiloDaReserva`). No desktop vale 0.
       style={{ bottom: `calc(${PAINEL_DE_CHAMADA.distancia}px + var(--mb-casca-baixo, 0px))` }}
-      className="fixed right-4 z-50 flex w-[min(320px,calc(100%-2rem))] items-center gap-3 rounded-xl border border-border bg-popover p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-4"
+      // `ds-surge` (upstream 1.76) no lugar de `animate-in fade-in slide-in-from-bottom-4`,
+      // classes do `tailwindcss-animate`, que nunca foi instalado aqui.
+      className="ds-surge fixed right-4 z-50 flex w-[min(320px,calc(100%-2rem))] items-center gap-3 rounded-xl border border-border bg-popover p-3 shadow-2xl"
     >
       <Avatar className="h-10 w-10 shrink-0">
         {contact?.id ? (

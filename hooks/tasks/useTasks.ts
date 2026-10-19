@@ -2,7 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { EdicaoDaTarefa, NovaTarefa, Tarefa } from "@/lib/tarefas/tipos";
+import {
+  proximoEstadoAoAlternar,
+  type EdicaoDaTarefa,
+  type NovaTarefa,
+  type Tarefa,
+} from "@/lib/tarefas/tipos";
 
 /**
  * As tarefas da organização, com as três mutações que a tela dispara.
@@ -112,7 +117,9 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
     alternarConcluida: (tarefa: Tarefa) =>
       editar.mutateAsync({
         id: tarefa.id,
-        entrada: { status: tarefa.status === "done" ? "pending" : "done" },
+        // A MESMA regra da caixa da lista: `cancelled` reabre para `pending`
+        // (#2549), nunca para `done`.
+        entrada: { status: proximoEstadoAoAlternar(tarefa.status) },
       }),
   };
 }

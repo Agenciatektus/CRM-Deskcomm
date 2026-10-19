@@ -10,6 +10,7 @@ import { camposDosFiltrosDoAtendimento } from "@/lib/inbox/filtros-do-atendiment
 import { TETO_DO_TERMO_DE_BUSCA } from "@/lib/inbox/termo-de-busca";
 import { z } from "zod";
 import { ApiError } from "@/lib/api/types";
+import { randomId } from "@/lib/random-id";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
 import {
   MAXIMO_DE_ETIQUETAS_NO_FILTRO,
@@ -145,7 +146,7 @@ const metadataDoClienteSchema = z.preprocess((v) => {
       413,
       "payload_too_large",
       { limite_bytes: METADATA_DO_CLIENTE_MAX_BYTES },
-      crypto.randomUUID(),
+      randomId(),
       "metadata passa de 8 KB.",
     );
   }

@@ -456,6 +456,13 @@ export function NovaCampanha() {
             ))}
           </ul>
         )}
+        {previa.data?.truncado && (
+          <p className="text-sm text-amber-600">
+            {t(
+              "O recorte bateu o teto de 20.000 negócios desta prévia — a lista pode estar incompleta. Refine o filtro para ver o todo.",
+            )}
+          </p>
+        )}
         </>
         )}
       </Card>
