@@ -1859,3 +1859,20 @@ select:not([multiple]):not([size]) {
     cursor: not-allowed;
   }
 }
+/* Alto contraste do Windows (`forced-colors`): o navegador apaga o fundo e o
+   `background-color` do ✓; devolve com as cores de sistema (P2 do Cassio na #209). */
+@media (forced-colors: active) {
+  input[type="checkbox"] {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate {
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+  input[type="checkbox"]:checked::after,
+  input[type="checkbox"]:indeterminate::after {
+    background-color: HighlightText;
+  }
+}
