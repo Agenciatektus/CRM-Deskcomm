@@ -88,6 +88,10 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Desenho e código de @paulolimajr77 (Spec 23, fatia 3, #2636).
 
+- **Por dentro, a passagem para a equipe ganha espaço para os dados que um fluxo automático coletar** Mudança interna, sem efeito na tela por enquanto: nesta versão nenhum fluxo entrega esses dados. Quando um fluxo automático que pergunta um dado por vez (nome, exame, data) passar a conversa para uma pessoa, o resumo de quem assume vai mostrar esses dados no bloco "Dados coletados automaticamente (confira antes de usar):", com até 12 campos e sem os que ficaram em branco. O motivo da passagem vai aparecer como "Um fluxo automático coletou dados e passou a conversa para verificação humana", e não como se o cliente tivesse pedido um atendente. Os dados ficam na passagem, que só quem pode ver a conversa abre, e nunca no texto do aviso da Central. A atualização só acrescenta o motivo novo no banco (migration 0693) e não exige nenhuma ação de quem opera a instalação.
+
+  Contribuição de @guptasp82-jpg (#3052).
+
 ### Corrigido
 
 - **Ao importar um fluxo de follow-up inválido, as frases genéricas da lista de problemas saem em português ou espanhol** Quando o arquivo de um fluxo importado não passava na conferência, a lista de problemas mostrava o caminho até o campo seguido de uma frase em inglês (por exemplo, «Invalid UUID» ou «Invalid input: expected object, received undefined»). Agora essas frases genéricas — tipo errado, campo faltando, formato inválido — saem no idioma de quem importa, em português ou espanhol, e o caminho até o campo continua o mesmo. As regras específicas do fluxo que já tinham frase própria (como «min_ms must be <= max_ms») continuam com a frase de antes, algumas ainda em inglês. Achado na prova do #3056 de @salomaobatistamkt.
