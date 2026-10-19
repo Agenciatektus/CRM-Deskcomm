@@ -15,6 +15,7 @@
 import { z } from "zod";
 
 import type { DefinicaoDeReceita } from "./tipos";
+import { quotarIdentificadorMysql, escaparLikeMysql } from "./sql-mysql";
 
 const PREFIXO_PADRAO = "wp_";
 const PREFIXO_REGEX = /^[A-Za-z0-9_]{1,20}$/;
@@ -47,16 +48,10 @@ export const PARAMETROS_DA_BUSCA_WOOCOMMERCE = z
     so_em_estoque: z.boolean().optional(),
     /** 1 .. tetoDeItens. */
     limite: z.number().int().min(1).max(TETO_ITENS_WOOCOMMERCE).optional().default(TETO_ITENS_WOOCOMMERCE),
+    /** Ordem dos resultados. `recentes` traz os IDs maiores primeiro. */
+    ordem: z.enum(["antigos", "recentes"]).optional().default("antigos"),
   })
   .strict();
-
-function quotarIdentificadorMysql(nome: string): string {
-  return `\`${nome.replace(/`/g, "``")}\``;
-}
-
-function escaparLikeMysql(valor: string): string {
-  return valor.replace(/!/g, "!!").replace(/%/g, "!%").replace(/_/g, "!_");
-}
 
 /** O preço de venda: _price vence; senão _regular_price. Ambas são meta_value (texto). */
 const PRECO_COLUNA =
@@ -145,7 +140,7 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       `from ${posts} ` +
       `${joins.join(" ")} ` +
       `where ${clausulas.join(" and ")} ` +
-      `order by ${posts}.ID ` +
+      `order by ${posts}.ID ${(busca as { ordem?: "antigos" | "recentes" }).ordem === "recentes" ? "desc" : ""} ` +
       `limit ${marcador(limite ?? TETO_ITENS_WOOCOMMERCE)}`;
 
     return { sql, valores };
