@@ -99,7 +99,7 @@ export async function updateMarcaDaOrganizacao(
   if (!activeOrg) return { ok: false, error: "forbidden_tenant" };
   // Só o admin da PLATAFORMA, fora do modo suporte (mesmo gate da página): a marca
   // da organização deixou de ser editável pelo admin do cliente (19/10). A
-  // função SQL só executa por service_role, então esta action é a única porta.
+  // função SQL só executa por service_role; o logo (/api/v1/marca/logo) tem o mesmo gate.
   if (!authUser.is_platform_admin || authUser.support) {
     return { ok: false, error: "forbidden_role" };
   }
