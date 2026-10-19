@@ -40,6 +40,7 @@
  * é registrado: ele volta no `HandlerResult` e o drain o persiste no `event_log`
  * (invariante 4 — não-aplicação é auditável, não invisível).
  */
+import { ehEntradaPelaTroca } from "@/lib/leads/entrada-pela-troca";
 import { canalQueReportaConversao } from "@/lib/channels/conversao-pelo-canal";
 import type { ChannelConversionResult } from "@/lib/channels/types";
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
@@ -398,6 +399,11 @@ function doCanal(r: ChannelConversionResult): ResultadoDeEnvio {
 }
 
 async function handle(row: EventRow): Promise<HandlerResult> {
+  // A entrada pedida pela troca de funil roda automações, NUNCA conversão
+  // (decisão do Peterson, 19/10/2026; `lib/leads/entrada-pela-troca.ts`).
+  if (ehEntradaPelaTroca(row.metadata)) {
+    return { consumer_key: CONSUMER_KEY, status: "skipped", detail: "entrada_pela_troca_de_funil" };
+  }
   try {
     return await processarConversao(row);
   } catch {

@@ -14,7 +14,9 @@ import { Switch } from "@/components/ui/switch";
 import { useT } from "@/hooks/i18n/useT";
 import { usePipelines, usePipelineStages } from "@/hooks/webhooks/useWebhookSources";
 
-export interface CreateLeadInPipelineConfig {
+import { OpcoesDaTrocaDeFunil, type OpcoesDaTroca } from "./OpcoesDaTrocaDeFunil";
+
+export interface CreateLeadInPipelineConfig extends OpcoesDaTroca {
   pipeline_id: string;
   stage_id: string;
   copiar_valor?: boolean;
@@ -42,6 +44,7 @@ export function CreateLeadInPipelineForm({
   const { data: pipelinesRes, isLoading: pipelinesLoading } = usePipelines();
   const { data: boardRes, isLoading: stagesLoading } = usePipelineStages(config.pipeline_id || null);
   const pipelines = pipelinesRes?.data ?? [];
+  const criar = (config.modo ?? "criar") === "criar";
   const etapasAbertas = (boardRes?.data?.stages ?? []).filter((s) => !s.is_won && !s.is_lost);
 
   return (
@@ -89,6 +92,15 @@ export function CreateLeadInPipelineForm({
         </div>
       </div>
 
+      {/* Regra salva antes da opção (sem `modo`) segue criando card novo. */}
+      <OpcoesDaTrocaDeFunil
+        config={config}
+        modoSemValor="criar"
+        onChange={(opcoes) => onChange({ ...config, ...opcoes })}
+      />
+
+      {criar && (
+        <>
       <div className="flex items-center gap-2">
         <Switch
           id={idValor}
@@ -111,6 +123,8 @@ export function CreateLeadInPipelineForm({
           "O card que disparou a regra continua onde está. Se o contato já tem um card aberto nesse funil, nenhum outro é criado.",
         )}
       </p>
+        </>
+      )}
     </div>
   );
 }

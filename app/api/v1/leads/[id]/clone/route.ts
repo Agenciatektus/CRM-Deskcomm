@@ -118,6 +118,7 @@ export async function POST(
       pipelineId: input.pipeline_id,
       stageId: input.stage_id ?? null,
       origemDaChamada: "app/api/v1/leads/[id]/clone",
+      rodarAutomacoesDeEntrada: input.rodar_automacoes_de_entrada === true,
     });
     if (!troca.ok) {
       return fail(troca.code, t(troca.texto), troca.status, {

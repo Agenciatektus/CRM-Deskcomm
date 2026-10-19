@@ -66,6 +66,8 @@ export const cloneLeadSchema = z.object({
   pipeline_id: z.string().uuid(),
   stage_id: z.string().uuid().optional(),
   lost_reason: z.string().min(1).max(500).optional(),
+  /** "Rodar as automações de entrada da etapa" — padrão desligado (`lib/leads/entrada-pela-troca.ts`). */
+  rodar_automacoes_de_entrada: z.boolean().optional(),
 });
 export type CloneLeadInput = z.infer<typeof cloneLeadSchema>;
 

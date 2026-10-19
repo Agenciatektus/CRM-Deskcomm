@@ -18,6 +18,7 @@
  * envio — quando aconteceu e qual ação —, nunca a regra de agora: mudar a regra
  * depois não pode redirecionar uma conversão antiga para outra ação.
  */
+import { ehEntradaPelaTroca } from "@/lib/leads/entrada-pela-troca";
 import { z } from "zod";
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,6 +50,8 @@ async function enviar(
 
 async function handle(row: EventRow): Promise<HandlerResult> {
   if (!row.entity_id) return ignorar("sem_entidade");
+  // A entrada pedida pela troca de funil não envia conversão (`entrada-pela-troca.ts`).
+  if (ehEntradaPelaTroca(row.metadata)) return ignorar("entrada_pela_troca_de_funil");
   const admin = createAdminClient();
   try {
     if (row.event_type === "ad_conversion.retry_requested") {

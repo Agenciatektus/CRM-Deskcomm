@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import {
   Dialog,
@@ -110,6 +110,9 @@ export function FormularioDeOutroFunil({
 }) {
   const t = useT();
   const [targetPipelineId, setTargetPipelineId] = useState("");
+  // Padrão DESLIGADO: ligada, a etapa de destino roda as automações de entrada.
+  const [rodarAutomacoes, setRodarAutomacoes] = useState(false);
+  const idRodar = useId();
   const mutation = useMoveLeadToPipeline(pipelineId);
   const destinos = useDestinosDeFunil(leadId, true);
 
@@ -118,7 +121,7 @@ export function FormularioDeOutroFunil({
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      const args = { leadId, targetPipelineId };
+      const args = { leadId, targetPipelineId, rodarAutomacoesDeEntrada: rodarAutomacoes };
       if (adiar) {
         adiar(() => mutation.mutateAsync(args));
       } else {
@@ -155,6 +158,24 @@ export function FormularioDeOutroFunil({
               ))}
             </SelectContent>
           </Select>
+        )}
+
+        {destinos.data?.length !== 0 && (
+          <label htmlFor={idRodar} className="flex items-start gap-2 text-sm">
+            <input
+              id={idRodar}
+              type="checkbox"
+              checked={rodarAutomacoes}
+              onChange={(e) => setRodarAutomacoes(e.target.checked)}
+              className="mt-1 accent-primary"
+            />
+            <span>
+              {t("Rodar as automações de entrada da etapa")}
+              <span className="block text-xs text-muted-foreground">
+                {t("As automações da etapa de destino rodam como se o card tivesse acabado de entrar. Conversões de anúncio não são enviadas.")}
+              </span>
+            </span>
+          </label>
         )}
 
       {rodape(

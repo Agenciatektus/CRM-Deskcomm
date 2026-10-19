@@ -209,6 +209,30 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
     );
   });
 
+  it("'rodar as automações de entrada' ligada: UM lead.stage_changed marcado para a etapa de destino; o duplo clique não emite de novo", async () => {
+    const primeiro = await POST(req({ pipeline_id: POS_VENDA, rodar_automacoes_de_entrada: true }), ctx);
+    expect(primeiro.status).toBe(200);
+    // O duplo clique: o card já está no destino, a troca é recusada e nada mais sai.
+    const segundo = await POST(req({ pipeline_id: POS_VENDA, rodar_automacoes_de_entrada: true }), ctx);
+    expect(segundo.status).toBe(422);
+
+    const emitidos = db.rpc.mock.calls.filter(([nome]) => nome === "emit_event");
+    expect(emitidos).toHaveLength(1);
+    expect(emitidos[0][1]).toMatchObject({
+      p_event_type: "lead.stage_changed",
+      p_entity_kind: "crm_lead",
+      p_entity_id: LEAD_ID,
+      p_payload: { pipeline_id: POS_VENDA, from_pipeline_id: VENDAS, to_stage_id: S_POS_1 },
+      p_metadata: { entrada_pela_troca_de_funil: true, actor_user_id: USER_ID },
+    });
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE NEGATIVO: opção desligada (explícita) não emite evento de etapa", async () => {
+    await POST(req({ pipeline_id: POS_VENDA, rodar_automacoes_de_entrada: false }), ctx);
+    expect(db.rpc.mock.calls.filter(([nome]) => nome === "emit_event")).toHaveLength(0);
+  });
+
   it("a passagem entra na linha do tempo do mesmo card", async () => {
     await POST(req({ pipeline_id: POS_VENDA }), ctx);
     expect(vi.mocked(emitLeadActivity)).toHaveBeenCalledWith(
