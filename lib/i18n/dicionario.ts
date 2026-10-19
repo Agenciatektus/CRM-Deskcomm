@@ -5486,6 +5486,7 @@ export const DICIONARIO: Traducoes = {
   "Manter o mesmo responsável": { es: "Mantener el mismo responsable" },
   "Se o card estiver em outro funil": { es: "Si la tarjeta está en otro embudo" },
   "Mover o card": { es: "Mover la tarjeta" },
+  "O negócio não foi encontrado (pode ter sido excluído).": { es: "No se encontró el negocio (puede haber sido eliminado)." },
   "O mesmo card vai para o funil escolhido, com conversa e histórico.": { es: "La misma tarjeta va al embudo elegido, con conversación e historial." },
   "Criar card novo": { es: "Crear tarjeta nueva" },
   "O card continua onde está e nasce outro no funil escolhido.": { es: "La tarjeta sigue donde está y nace otra en el embudo elegido." },

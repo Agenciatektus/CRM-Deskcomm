@@ -75,6 +75,7 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   contact_blocked: "O contato pediu para não receber mensagens (opt-out).",
   no_phone: "O contato não tem telefone cadastrado.",
   missing_config: "Falta preencher alguma configuração desta ação — abra a automação e revise.",
+  not_found: "O negócio não foi encontrado (pode ter sido excluído).",
   fora_da_janela_de_envio:
     "Está fora da janela de envio configurada para esse número. A mensagem sai sozinha quando ela reabrir.",
   aguardando_o_canal: "A mensagem está na fila e sai assim que o canal aceitar.",
