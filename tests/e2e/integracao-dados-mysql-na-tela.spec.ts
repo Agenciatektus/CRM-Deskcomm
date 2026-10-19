@@ -147,6 +147,11 @@ test.describe("Motor e aviso na tela", () => {
     await page.getByTestId("como-criar-acesso").locator("summary").click();
     await expect(page.getByTestId("como-criar-acesso").getByText(/CREATE USER 'crm_leitura'/)).toBeVisible();
     await expect(page.getByTestId("como-criar-acesso").getByText(/GRANT SELECT ON NOME_DO_BANCO/)).toBeVisible();
+    // Visível não é caber: com o guia aberto, o comando mais longo já empurrou o
+    // formulário 104px para fora da janela (scrollWidth 639 > clientWidth 510).
+    const largura = await page.getByRole("dialog").evaluate((d) => ({ scrollWidth: d.scrollWidth, clientWidth: d.clientWidth }));
+    expect(largura.scrollWidth, `a janela rola na horizontal: ${JSON.stringify(largura)}`).toBeLessThanOrEqual(largura.clientWidth);
+    await page.screenshot({ path: evidencia("03-guia-aberto.png") });
     await page.locator("#ext-port").fill("3307");
     await page.locator("#ext-motor").click();
     await page.getByRole("option", { name: "PostgreSQL" }).click();

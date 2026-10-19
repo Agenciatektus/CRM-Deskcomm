@@ -250,7 +250,10 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={salvar} className="space-y-4">
+        {/* `min-w-0`: o DialogContent é grid, e item de grid não encolhe abaixo
+            do conteúdo. Sem isto o <pre> do guia (MySQL) alarga o formulário
+            além da janela e o overflow-x-auto dele nunca entra em ação. */}
+        <form onSubmit={salvar} className="min-w-0 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="ext-motor">{t("Tipo de banco")}</Label>
             <Select value={dbType} onValueChange={trocarMotor} disabled={editando}>
