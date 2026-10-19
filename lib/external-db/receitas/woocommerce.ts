@@ -67,6 +67,7 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
   descricao:
     "Lê os produtos publicados do WordPress/WooCommerce: título, preço, SKU e estoque. " +
     "O prefixo é o que aparece antes de _posts no banco do WordPress (padrão wp_). " +
+    "Para trazer os mais novos primeiro (por exemplo, 'os últimos produtos'), use ordem: \"recentes\"; sem ordem, vêm os mais antigos. " +
     "Sem foto e sem funil nesta fatia (R4/R5 ficam para depois).",
   parametrosFixos: PARAMETROS_FIXOS_WOOCOMMERCE,
   parametrosDaBusca: PARAMETROS_DA_BUSCA_WOOCOMMERCE,

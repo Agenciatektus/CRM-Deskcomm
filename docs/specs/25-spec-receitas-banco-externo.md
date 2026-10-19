@@ -144,7 +144,8 @@ A fatia R1 (receita `woocommerce` + instância + tool) entrega:
 
 - `lib/external-db/receitas/tipos.ts` — `DefinicaoDeReceita` e `InstanciaDeReceita`
 - `lib/external-db/receitas/woocommerce.ts` — receita `woocommerce-produtos` (JOIN posts+postmeta, parâmetros `busca`/`preco_max`/`so_em_estoque`/`limite`/`ordem`, teto 5)
-- `lib/external-db/receitas/sql-mysql.ts` — `quotarIdentificadorMysql` e `escaparLikeMysql` em um só arquivo, reutilizado por todas as famílias de receitas
+- parâmetro `ordem` da receita `woocommerce-produtos`: `antigos` é o padrão; `recentes` vira `order by ID desc` e o `desc` é fixo no código, nunca vem do agente
+- `lib/external-db/receitas/sql-mysql.ts` — `quotarIdentificadorMysql` e `escaparLikeMysql` em um só arquivo (crases e LIKE), reutilizado por todas as famílias de receitas; R2/R3 importam daqui
 - `lib/external-db/receitas/registro.ts` — mapa `RECEITAS` e `receitaDe(id)`
 - `lib/external-db/receitas/validador.ts` — `validarConsultaDeReceita` (SELECT-only, sem `;`/`--`/`INTO`/`SLEEP(`/etc., tabelas permitidas)
 - `lib/external-db/receitas/instancias.ts` — `instanciaDeReceitaSchema`, `lerReceitasDoBanco`, `validarFixosDaReceita`

@@ -140,4 +140,8 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
       RECEITA_WOOCOMMERCE_PRODUTOS.parametrosDaBusca.parse({ ordem: "qualquer" }),
     ).toThrow();
   });
+
+  it("descricao avisa o agente sobre ordem: \"recentes\"", () => {
+    expect(RECEITA_WOOCOMMERCE_PRODUTOS.descricao).toContain("ordem: \"recentes\"");
+  });
 });
