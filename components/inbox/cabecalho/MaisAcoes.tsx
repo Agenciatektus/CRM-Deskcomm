@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useT } from "@/hooks/i18n/useT";
-import { Archive, ArrowRight, DotsThree, MagnifyingGlass, Pause } from "@/lib/ui/icons";
+import { Archive, ArrowRight, DotsThree, MagnifyingGlass, Pause, UserCircle } from "@/lib/ui/icons";
 
 interface Props {
   /** A busca dentro da conversa (#1793). Ausente: quem monta o cabeçalho não a oferece. */
@@ -26,6 +26,8 @@ interface Props {
   pausar?: { onPausar: () => void; pendente: boolean };
   arquivar?: { onArquivar: () => void; pendente: boolean };
   contatoId?: string | null;
+  /** Contato pessoal (spec 21): gerente+ marca e desmarca. Ausente: não oferece. */
+  pessoal?: { ehPessoal: boolean; pendente: boolean; onMarcar: () => void; onDesmarcar: () => void };
   /**
    * A coluna do lead está na tela a partir do `xl`? Só então "Ver contato" se
    * cala ali, porque o painel tem o seu. Com o painel fechado, esta é a porta.
@@ -48,6 +50,7 @@ export function MaisAcoes({
   botaoRef,
   pausar,
   arquivar,
+  pessoal,
   contatoId,
   painelVisivel = true,
 }: Props) {
@@ -55,7 +58,7 @@ export function MaisAcoes({
   // Escolher "Buscar" monta o campo com `autoFocus`, e o Radix, ao fechar o
   // menu, devolveria o foco ao gatilho logo em seguida, tirando-o do campo.
   const escolheuBusca = useRef(false);
-  if (!onBuscar && !pausar && !arquivar && !contatoId) return null;
+  if (!onBuscar && !pausar && !arquivar && !contatoId && !pessoal) return null;
 
   return (
     // `modal={false}`: Arquivar abre um AlertDialog a partir deste menu, e o menu
@@ -115,6 +118,26 @@ export function MaisAcoes({
               <ArrowRight size={14} aria-hidden />
               {t("Ver contato")}
             </Link>
+          </DropdownMenuItem>
+        )}
+        {pessoal && (
+          // O `data-testid` é contrato do e2e da spec (`contato-pessoal-sai-da-operacao.spec.ts`).
+          <DropdownMenuItem
+            disabled={pessoal.pendente}
+            data-testid={pessoal.ehPessoal ? "desmarcar-pessoal" : "marcar-pessoal"}
+            title={
+              pessoal.ehPessoal
+                ? t("Devolve este contato à operação: a conversa volta ao inbox.")
+                : t("Tira este contato da operação: a conversa sai do inbox.")
+            }
+            onSelect={pessoal.ehPessoal ? pessoal.onDesmarcar : pessoal.onMarcar}
+          >
+            <UserCircle size={14} aria-hidden />
+            {pessoal.ehPessoal
+              ? pessoal.pendente
+                ? t("Desmarcando...")
+                : t("Desmarcar pessoal")
+              : t("Marcar como pessoal")}
           </DropdownMenuItem>
         )}
         {arquivar && (

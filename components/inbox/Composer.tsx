@@ -12,7 +12,14 @@ import { CaixaOuFaixaDoDono } from "@/components/inbox/composer/FaixaDoDono";
 import { FaixaDeContatoBloqueado, FaixaDeConversaFechada } from "@/components/inbox/composer/FaixaDeEstado";
 import { AbasDoComposer, AvisoDoRascunho, FaixaDaCitacao } from "@/components/inbox/composer/FaixasDoComposer";
 import { ReplyReviewPanel } from "@/components/inbox/composer/ReplyReviewPanel";
+import {
+  MentionMenu,
+  opcoesDeMencao,
+  resolverMencao,
+  type OpcaoDeMencao,
+} from "@/components/inbox/composer/MentionMenu";
 import { resolveSlash, TemplateMenu } from "@/components/inbox/composer/TemplateMenu";
+import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useSugestaoDeResposta } from "@/components/inbox/composer/useSugestaoDeResposta";
 import { useCreateNote } from "@/hooks/inbox/useCreateNote";
 import { useMessageTemplates, type MessageTemplate } from "@/hooks/inbox/useMessageTemplates";
@@ -24,6 +31,7 @@ import { interpolateTemplate } from "@/lib/inbox/template-vars";
 import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { embutirMencoes, podarMencoes, type MencaoEscolhida } from "@/lib/notifications/mentions";
 
 export interface ComposerHandle { focus: () => void }
 
@@ -86,6 +94,16 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   // mudou). O composer é remontado por conversa, então a escolha não vaza.
   const [semAssumir, setSemAssumir] = useState(false);
   const [focarAoVoltar, setFocarAoVoltar] = useState(false);
+  /**
+   * Menção de atendente (#2372, upstream 1.76). `caret` porque o gatilho `@` é
+   * relativo à POSIÇÃO do cursor; `mencoes` é o que foi ESCOLHIDO na lista (o
+   * campo mostra o nome, o id entra só no corpo que sai, por `embutirMencoes`);
+   * `mencaoDispensada` (Esc) e `mencaoIndice` (setas) seguem o slash-menu.
+   */
+  const [caret, setCaret] = useState(initialDraft.length);
+  const [mencoes, setMencoes] = useState<MencaoEscolhida[]>([]);
+  const [mencaoDispensada, setMencaoDispensada] = useState(false);
+  const [mencaoIndice, setMencaoIndice] = useState(0);
   useEffect(() => {
     onDraftChange?.(text, mode);
   }, [text, mode, onDraftChange]);
@@ -99,6 +117,13 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const sugestao = useSugestaoDeResposta(conversationId, mode === "reply");
   const slash = resolveSlash(text);
   const menuOpen = mode === "reply" && slash.open && !menuDismissed;
+  // SÓ em nota: a menção é assunto interno; no campo de resposta ela sairia
+  // para o cliente como texto solto.
+  const gatilho = mode === "note" && !mencaoDispensada ? resolverMencao(text, caret) : null;
+  const membros = useAssignableMembers(gatilho !== null);
+  const opcoes = gatilho ? opcoesDeMencao(membros.data ?? [], gatilho.query, t("Atendente")) : [];
+  const mencaoAberta = gatilho !== null;
+  const opcaoAtual = opcoes[mencaoIndice] ?? opcoes[0];
 
   useImperativeHandle(ref, () => ({ focus: () => taRef.current?.focus() }));
   // Depois de "Assumir e responder" (ou de escolher responder sem assumir), o
@@ -149,18 +174,56 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     });
   }
 
+  /** Escolhe da lista e escreve o NOME no campo (`@Ana Lima `), do `@` até o cursor. */
+  function escolherMencao(opcao: OpcaoDeMencao): void {
+    const gatilhoAqui = resolverMencao(text, caret);
+    if (!gatilhoAqui) return;
+    const inserido = `@${opcao.rotulo} `;
+    setText(text.slice(0, gatilhoAqui.start) + inserido + text.slice(caret));
+    setMencoes((atual) => [...atual, { id: opcao.membro.user_id, nome: opcao.rotulo }]);
+    const pos = gatilhoAqui.start + inserido.length;
+    setCaret(pos);
+    setMencaoIndice(0);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(pos, pos);
+      autoresize();
+    });
+  }
+
   function handleSubmit() {
     const body = text.trim();
     if (!body || campoBarrado) return;
+    // A menção vira token AQUI, na saída do campo (#2372): o rascunho e o
+    // `restoreOnError` ficam com o nome legível. Em resposta não há token.
+    const corpo = mode === "note" ? embutirMencoes(body, mencoes) : body;
     setText("");
     requestAnimationFrame(() => autoresize());
+    // Se a pessoa já começou a próxima resposta, preserve os dois textos.
+    const restaurar = (current: string) => (current ? `${body}\n${current}` : body);
     const restoreOnError = () => {
-      // Se a pessoa já começou a próxima resposta, preserve os dois textos.
-      setText((current) => (current ? `${body}\n${current}` : body));
+      setText(restaurar);
       requestAnimationFrame(() => autoresize());
     };
     if (mode === "note") {
-      createNote.mutate({ conversation_id: conversationId, body }, { onError: restoreOnError });
+      // As escolhas DESTA nota: a 1ª tecla durante o envio poda `mencoes`, e o
+      // retry voltaria sem o id (#2463).
+      const mencoesEnviadas = mencoes;
+      createNote.mutate(
+        { conversation_id: conversationId, body: corpo },
+        {
+          onError: () => {
+            restoreOnError();
+            const restaurado = restaurar(taRef.current?.value ?? "");
+            setMencoes((atual) =>
+              podarMencoes(restaurado, [...mencoesEnviadas, ...atual.filter((m) => !mencoesEnviadas.includes(m))]),
+            );
+          },
+          onSuccess: () => setMencoes([]),
+        },
+      );
       return;
     }
     send.mutate(
@@ -224,6 +287,34 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // A lista de menções come as teclas ANTES do Enter salvar (a lei do slash-menu).
+    if (mencaoAberta) {
+      if (e.key === "Escape") {
+        setMencaoDispensada(true);
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMencaoIndice((i) => (opcoes.length ? (i + 1) % opcoes.length : 0));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMencaoIndice((i) => (opcoes.length ? (i - 1 + opcoes.length) % opcoes.length : 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (opcaoAtual) escolherMencao(opcaoAtual);
+        return;
+      }
+      // Tab só é interceptado quando HÁ o que escolher.
+      if (e.key === "Tab" && opcaoAtual) {
+        e.preventDefault();
+        escolherMencao(opcaoAtual);
+        return;
+      }
+    }
     if (e.key === "Escape" && menuOpen) {
       setMenuDismissed(true);
       return;
@@ -293,14 +384,29 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         >
           <FolhaDeRespostasRapidas aberta={folhaDeRespostas} aoMudar={setFolhaDeRespostas} respostas={templates.data ?? []} aoEscolher={applyTemplate} />
           <TemplateMenu open={menuOpen} query={slash.query} templates={templates.data ?? []} onPick={applyTemplate} onClose={() => setMenuDismissed(true)} />
+          {/* A lista de atendentes (#2372): só em nota, só com o `@` aberto. */}
+          <MentionMenu
+            open={mencaoAberta}
+            opcoes={opcoes}
+            indice={opcaoAtual ? opcoes.indexOf(opcaoAtual) : 0}
+            onPick={escolherMencao}
+          />
           <textarea
             ref={taRef}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
               if (!resolveSlash(e.target.value).open) setMenuDismissed(false);
+              const pos = e.target.selectionStart ?? e.target.value.length;
+              setCaret(pos);
+              setMencaoIndice(0);
+              // A escolha que sumiu do texto sai da lista agora (#2463); só na
+              // edição à mão, para o retry da nota manter as menções.
+              setMencoes((atual) => podarMencoes(e.target.value, atual));
+              if (!resolverMencao(e.target.value, pos)) setMencaoDispensada(false);
               autoresize();
             }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             rows={1}

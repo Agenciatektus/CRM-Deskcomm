@@ -65,6 +65,21 @@ const DIR_MIGRATIONS = path.join(process.cwd(), "supabase", "migrations");
  * dado existente faz o `update.sh` de um clone quebrar no meio.
  */
 const REMOCOES_DELIBERADAS: Record<string, { valores: string[]; porque: string }> = {
+  "20261007180001_0589_canal_pausado_na_central.sql::agent_inbox_items_kind_check": {
+    valores: ["task_due"],
+    porque:
+      "O ENCONTRO do fork com o upstream v1.77.0, a mesma classe da 0387. A 0589 do upstream " +
+      "(canal pausado na Central) reconstrói a lista que ELE vê, sem `task_due`, que só existe " +
+      "no fork (9043, que roda ANTES dela). Editar a 0589 é proibido (migration do upstream). " +
+      "A forward-fix é a 9056 (`integracao_da_subida_1_77`), com a UNIÃO literal da lista do baseline.",
+  },
+  "20261019210000_9055_integracao_da_subida_1_73.sql::agent_inbox_items_kind_check": {
+    valores: ["canal_pausado"],
+    porque:
+      "A 9055 foi escrita na subida 1.73, antes de a 0589 (1.77) existir na cadeia; na cadeia " +
+      "unida ela roda depois da 0589 e reconstrói sem `canal_pausado`. A 9056 reafirma a UNIÃO " +
+      "(e é a última reconstrução, a que `kind-check-migration-x-baseline` compara com o baseline).",
+  },
   "20260922164700_0387_canal_datafy.sql::channel_sessions_provider_check": {
     valores: ["instagram", "verdash"],
     porque:

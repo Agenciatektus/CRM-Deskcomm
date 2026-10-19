@@ -68,6 +68,16 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
   const temAnexosExtras = Array.isArray(message.metadata?.instagram_anexos_extras)
     && (message.metadata.instagram_anexos_extras as unknown[]).length > 0;
   const isContact = message.type === "contact";
+  // A retenção marcou `metadata.media_status = 'expired'` (upstream 0557, #1534)
+  // e a poda anulou os dois campos de mídia: sem isto a bolha perdia o render.
+  // O aviso leva os DIAS que a organização configurou, quando a 0557 os gravou.
+  const mediaExpirada = !hasMedia && message.metadata?.media_status === "expired";
+  const diasDaRetencao =
+    typeof message.metadata?.media_retention_days === "number" ? message.metadata.media_retention_days : null;
+  const avisoDeExpiracao =
+    diasDaRetencao !== null
+      ? t("Mídia apagada pela política de retenção ({n} dias)").replace("{n}", String(diasDaRetencao))
+      : t("Mídia apagada pela política de retenção.");
   const transcricao = transcricaoDoAudio(message);
   // Upstream #2133: o worker não grava "pending" — a linha nasce com status null
   // e só ele muda. Sem status terminal, áudio recebido (ou enviado pelo
@@ -83,7 +93,7 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
   // Nada a desenhar: sem texto, mídia, cartão, pino nem aviso de anexo. A bolha
   // nunca fica vazia — mostra que há uma mensagem e onde vê-la.
   const semConteudo = !hasMedia && !message.body && !anexoSemArquivo && !temAnexosExtras
-    && linksDoInstagram.length === 0 && !isContact && !localizacao;
+    && linksDoInstagram.length === 0 && !isContact && !localizacao && !mediaExpirada;
 
   // Apagada pelo autor ("apagar para todos"). A linha continua no histórico —
   // sumir com ela deixaria a resposta seguinte respondendo ao nada —, mas o
@@ -133,6 +143,12 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
         </div>
       )}
 
+      {mediaExpirada && (
+        <div className={cn(message.body && "mb-1.5")}>
+          <MediaUnavailable kind={avisoDeExpiracao} />
+        </div>
+      )}
+
       {anexoSemArquivo && (
         <div className={cn(message.body && "mb-1.5")}>
           {anexoTemporario ? (
@@ -159,7 +175,7 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
         </a>
       ))}
 
-      {isContact && !hasMedia && (
+      {isContact && !hasMedia && !mediaExpirada && (
         <div className={cn(message.body && "mb-1.5")}>
           <ContactCard message={message} />
         </div>

@@ -32,6 +32,8 @@ export interface ContatoDoAlvo {
   nome: string | null;
   telefone: string | null;
   bloqueado: boolean;
+  /** `contacts.is_personal` (spec 21, upstream 1.75): fora da operação. */
+  pessoal: boolean;
   anonimizado: boolean;
   recusouMarketing: boolean;
 }

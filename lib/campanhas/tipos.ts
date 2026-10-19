@@ -2,8 +2,8 @@
  * O vocabulário do módulo de Campanhas — os dois conjuntos de estado e os
  * motivos de exclusão, num lugar só.
  *
- * Os valores são os mesmos do CHECK da migration 0375. Quem mudar um lado muda o
- * outro: `tests/invariants/vocabulario-banco-x-typescript.test.ts` varre as
+ * Os valores são os mesmos do CHECK da migration 0375, estendido pela 0563
+ * (`personal`). Quem mudar um lado muda o outro: `tests/invariants/vocabulario-banco-x-typescript.test.ts` varre as
  * colunas que têm CHECK e reprova divergência.
  */
 
@@ -33,6 +33,8 @@ export const STATUS_DO_DESTINATARIO = [
   "skipped",
   "cancelled",
   "opted_out",
+  /** Spec 21: saída própria de quem vira pessoal — nunca `opted_out` (D7). */
+  "personal",
 ] as const;
 
 export type StatusDoDestinatario = (typeof STATUS_DO_DESTINATARIO)[number];
@@ -54,6 +56,7 @@ export const TERMINAIS_DE_DESPACHO: ReadonlySet<StatusDoDestinatario> = new Set(
   "skipped",
   "cancelled",
   "opted_out",
+  "personal",
 ]);
 
 /**
@@ -101,6 +104,8 @@ export const MOTIVOS_DE_EXCLUSAO = [
    * número no `detail` do `event_log`, que ninguém abre.
    */
   "negocio_ja_fechado",
+  /** Spec 21: o contato virou pessoal e saiu da campanha com a saída própria. */
+  "contato_pessoal",
 ] as const;
 
 export type MotivoDeExclusao = (typeof MOTIVOS_DE_EXCLUSAO)[number];
@@ -123,4 +128,5 @@ export const TEXTO_DA_EXCLUSAO: Record<MotivoDeExclusao, string> = {
   ja_em_campanha: "Outra campanha já falou com esta pessoa nos últimos 30 dias, ou vai falar",
   suprimido: "Está na lista de exclusão de campanhas",
   negocio_ja_fechado: "Já comprou ou já foi perdido antes (não é primeiro contato)",
+  contato_pessoal: "Contato marcado como pessoal",
 };

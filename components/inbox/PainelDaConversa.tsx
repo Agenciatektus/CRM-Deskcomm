@@ -4,8 +4,8 @@ import { forwardRef, useEffect, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePermission } from "@/hooks/auth/AuthProvider";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
-import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
-import { estadoDaJanela, formatarDecorrido } from "@/lib/channels/janela";
+import { motivoDaJanelaFechada, motivoDoContato } from "@/lib/inbox/motivo-do-envio-bloqueado";
+import { estadoDaJanela } from "@/lib/channels/janela";
 import type { Message as ConversationMensagem } from "@/lib/types/messaging";
 import { ChatThread } from "./ChatThread";
 import { Composer, type ComposerHandle } from "./Composer";
@@ -91,20 +91,11 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
     // de cobrir o áudio ou o anexo.
     const provider = conversation.channel_sessions?.provider ?? null;
     const janela = estadoDaJanela(provider, conversation.last_inbound_at ?? null, agoraJanela);
-    const motivoDaJanela =
-      janela.tipo === "fechada"
-        ? fonteDeTemplates(provider) === null
-          ? t("Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.")
-          : janela.fechadaHaMs === null
-            ? t("O cliente ainda não escreveu — a janela de 24h nunca abriu. Só um modelo aprovado sai daqui.")
-            : `${t("A janela de 24h fechou há")} ${formatarDecorrido(janela.fechadaHaMs)}. ${t("Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.")}`
-        : null;
+    // Os textos moram em lib/inbox/motivo-do-envio-bloqueado.ts (upstream 1.76):
+    // o "Enviar link" da videochamada desabilita na mesma conversa com o MESMO motivo.
+    const motivoDaJanela = motivoDaJanelaFechada(janela, provider, t);
 
-    const blockedReason = conversation.contacts?.is_blocked
-      ? t("Contato bloqueado — envio de mensagens desabilitado.")
-      : conversation.contacts?.is_anonymized
-        ? t("Contato anonimizado — não é possível enviar mensagens.")
-        : null;
+    const blockedReason = motivoDoContato(conversation.contacts, t);
 
     return (
       <>

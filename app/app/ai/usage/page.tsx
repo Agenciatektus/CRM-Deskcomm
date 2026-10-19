@@ -60,7 +60,7 @@ export default async function AiUsagePage({ searchParams }: PageProps) {
       <CabecalhoDaPagina
         titulo={traduzir("Uso de IA", idioma)}
         descricao={traduzir(
-          "Quanto a inteligência artificial custou, quantos atendimentos ela fez, quanto demorou para responder e quantas vezes precisou chamar uma pessoa — nos últimos 30 dias.",
+          "Quanto a inteligência artificial custou, quantas vezes foi chamada, quantos turnos o agente fez, quanto demora uma chamada e quantas vezes precisou chamar uma pessoa — nos últimos 30 dias.",
           idioma,
         )}
       />

@@ -238,9 +238,16 @@ export function Sidebar({
         // que é a assinatura de servidor e navegador terem pintado estados
         // diferentes — e `AppShell` e `Sidebar` são ambos `"use client"`.
         //
-        // `sticky top-0 h-screen` dá o mesmo efeito visual (a barra não rola com
+        // `sticky top-0 h-dvh` dá o mesmo efeito visual (a barra não rola com
         // a página) e ela VOLTA a ocupar lugar: sobra para o conteúdo exatamente
         // o que ela não usou, e não há segunda medida para discordar.
+        //
+        // `h-dvh` e não `h-screen`: `100vh` é a janela com a barra de endereço
+        // RECOLHIDA, e o navegador nunca corrige esse valor. No tablet entre 768
+        // e 1023px — onde esta barra JÁ aparece, porque a casca a mostra a partir
+        // de `md` — a barra media mais que a janela e o fim dela ficava fora do
+        // alcance. `dvh` acompanha a barra do navegador aparecendo e sumindo.
+        // Princípio 2 de `docs/design-system/screen-flow/07-responsive-strategy.md`.
         //
         // `shrink-0` porque item de flex encolhe por padrão, e uma barra de 60
         // espremida para caber é o mesmo defeito por outro caminho.
@@ -249,7 +256,7 @@ export function Sidebar({
         // coluna do grupo quando expandida. Recolhida, a coluna abre POR CIMA do
         // conteúdo ("peek"), presa dentro desta `<aside>`, e a largura que a
         // casca enxerga continua sendo uma só: a desta caixa.
-        "sticky top-0 z-30 flex h-screen shrink-0 flex-col bg-transparent transition-[width] duration-200",
+        "sticky top-0 z-30 flex h-dvh shrink-0 flex-col bg-transparent transition-[width] duration-base",
         collapsed ? "w-[72px]" : "w-[304px] max-lg:w-[72px]",
       )}
     >

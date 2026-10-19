@@ -117,6 +117,20 @@ const ORIGENS: DeclaracaoDeOrigem[] = [
       "a recusa da troca de funil (#206: mover o mesmo card) chega à tela pelo `error` do resultado; os códigos nascem em `moverNegocioDeFunil`, o mesmo caminho da rota /clone",
     produtor: { arquivo: "lib/leads/mover-de-funil.ts" },
   },
+  {
+    arquivo: "lib/automation/actions/apply-task-plan.ts",
+    expressao: "resultado.codigo",
+    porque:
+      "a recusa do PLANO de tarefas (#1752 — plano inexistente, sem alvo, sem dono, título vazio, falha de gravação) chega à tela pelo `reason` do resultado; os códigos possíveis estão escritos no tipo CodigoDaAplicacao",
+    produtor: { arquivo: "lib/tarefas/plano.ts" },
+  },
+  {
+    arquivo: "lib/automation/actions/ai-decide.ts",
+    expressao: "decisao.motivo",
+    porque:
+      "a resposta da IA que não virou escolha (JSON vazio, sem JSON, escolha ausente ou fora do conjunto) chega aos dois canais pelo `reason` da decisão; os códigos possíveis são escritos no tipo MotivoDaDecisao, no produtor declarado ao lado",
+    produtor: { arquivo: "lib/automation/decider.ts" },
+  },
 ];
 
 describe("o mapa de frases e o código que emite os motivos não podem divergir", () => {

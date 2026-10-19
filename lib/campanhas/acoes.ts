@@ -29,6 +29,7 @@ import { ehObjetoDeSaidas, problemaNasSaidas } from "./saidas-da-campanha";
 import { prepararCampanha, resumoDaEtapaDeEntrada } from "./preparacao";
 import { encerrarReguaDaCampanha, publicarReguaDaCampanha } from "./regua";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
+import { camposDoDestinatario } from "./consulta-de-audiencia";
 import { renderizarVariacao, spintaxDasVariantes, variantesDaCampanha } from "./renderizador";
 import type { StatusDaCampanha } from "./tipos";
 
@@ -687,7 +688,7 @@ export async function testarAcao(
 
   const { data: contato } = await admin
     .from("contacts")
-    .select("id, name, display_name, phone_number, is_blocked, is_anonymized, consent")
+    .select("id, name, display_name, phone_number, is_blocked, is_personal, is_anonymized, consent")
     .eq("organization_id", c.organization_id)
     .eq("id", contactId)
     .maybeSingle();
@@ -705,6 +706,7 @@ export async function testarAcao(
     display_name: string | null;
     phone_number: string | null;
     is_blocked: boolean;
+    is_personal: boolean;
     is_anonymized: boolean;
     consent: unknown;
   };
@@ -715,6 +717,7 @@ export async function testarAcao(
     contactId: linha.id,
     telefone: linha.phone_number,
     bloqueado: linha.is_blocked,
+    pessoal: linha.is_personal === true,
     anonimizado: linha.is_anonymized,
     recusouMarketing: recusouMarketing(linha.consent),
   });
@@ -730,10 +733,19 @@ export async function testarAcao(
   // O teste passa pelo MESMO motor de variação, com a mesma semente do envio
   // real (`contact_id`): o operador vê no celular a variante que AQUELE contato
   // receberia, não uma sexta versão que a campanha nunca manda.
+  // Os campos personalizados que o TEXTO usa entram pelo MESMO caminho da
+  // prévia: teste que não resolvia `{{lead.gancho}}` reprovaria o texto que o
+  // envio manda certo.
+  const variantes = variantesDaCampanha(c.message_body, c.message_variants);
+  const campos = await camposDoDestinatario(admin, {
+    organizationId: c.organization_id,
+    contactId: linha.id,
+    corpo: variantes.join("\n"),
+  });
   const render = renderizarVariacao({
-    variantes: variantesDaCampanha(c.message_body, c.message_variants),
+    variantes,
     semente: linha.id,
-    valores: { nome: nomeDoContato(linha) },
+    valores: { nome: nomeDoContato(linha), ...campos },
     quando: { agora, fuso },
   });
   if (render.faltando.length > 0) {

@@ -57,6 +57,7 @@ function consulta(tabela: string) {
   const q: Record<string, unknown> = {
     select: () => q,
     eq: (c: string, v: unknown) => (filtros.push((l) => l[c] === v), q),
+    neq: (c: string, v: unknown) => (filtros.push((l) => l[c] !== v), q),
     is: (c: string, v: unknown) => (filtros.push((l) => (l[c] ?? null) === v), q),
     in: (c: string, vs: unknown[]) => (filtros.push((l) => vs.includes(l[c])), q),
     lte: (c: string, v: string) => (filtros.push((l) => typeof l[c] === "string" && (l[c] as string) <= v), q),
@@ -99,7 +100,7 @@ beforeEach(() => {
   push = vi.fn(async () => ({ sent: 1 })) as typeof push;
   tabelas = {
     crm_tasks: [],
-    organizations: [{ id: ORG, locale: "pt-BR" }, { id: OUTRA, locale: "es" }],
+    organizations: [{ id: ORG, locale: "pt-BR", status: "active" }, { id: OUTRA, locale: "es", status: "active" }],
     user_organizations: [
       { user_id: ANA, organization_id: ORG, revoked_at: null },
       { user_id: BIA, organization_id: ORG, revoked_at: null },

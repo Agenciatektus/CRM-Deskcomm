@@ -51,6 +51,7 @@ import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { normalizarIdioma, type Idioma } from "@/lib/i18n/idiomas";
 import { logger } from "@/lib/logger";
+import { idsDeOrgsParadas } from "@/lib/organizacao/operante";
 import { truncar, type PushPayload } from "@/lib/notifications/push_payload";
 
 /** Tarefas avisadas por rodada. A rodada é de minuto em minuto. */
@@ -224,6 +225,10 @@ export async function avisarTarefasNaHora(
   if (error) throw new Error(`consulta das tarefas falhou: ${error.message}`);
 
   const tarefas = (data ?? []) as TarefaAAvisar[];
+  // Organização PARADA (suspensa ou encerrada, 0501) não recebe aviso nem push:
+  // a régua de `cron-respeita-org-operante`. A tarefa NÃO é reivindicada, então
+  // o aviso sai se a organização voltar dentro da janela.
+  const paradas = tarefas.length > 0 ? new Set(await idsDeOrgsParadas(db)) : new Set<string>();
   const pulados: Record<string, number> = {};
   const pular = (motivo: string) => (pulados[motivo] = (pulados[motivo] ?? 0) + 1);
   const idiomas = new Map<string, Promise<Idioma>>();
@@ -241,6 +246,10 @@ export async function avisarTarefasNaHora(
 
   let avisadas = 0;
   for (const tarefa of tarefas) {
+    if (paradas.has(tarefa.organization_id)) {
+      pular("org_parada");
+      continue;
+    }
     // A REIVINDICAÇÃO: só quem recebe a linha de volta avisa.
     const { data: minha } = await db
       .from("crm_tasks")

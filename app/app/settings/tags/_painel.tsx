@@ -53,7 +53,7 @@ import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { invalidarCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 import { Escolha } from "@/components/ui/escolha";
 import { cn } from "@/lib/utils";
-import { PALETA_DE_ETIQUETAS } from "@/lib/tags/cor-da-etiqueta";
+import { PALETA_DE_ETIQUETAS, normalizarCorDeEtiqueta } from "@/lib/tags/cor-da-etiqueta";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { AcaoDeVocabulario, InventarioDeTags, LinhaDeVocabulario } from "@/lib/schemas/tags";
@@ -91,8 +91,8 @@ const TETO_DA_LISTA = 500;
 const NOME_DO_TOM: Record<string, string> = {
   "#ffe629": "Amarelo",
   "#ffb224": "Âmbar",
-  "#e54d2e": "Vermelho",
-  "#12a594": "Verde-água",
+  "#cf3716": "Vermelho",
+  "#00655a": "Verde-água",
   "#0091ff": "Azul",
   "#3e63dd": "Índigo",
   "#ab4aba": "Roxo",
@@ -155,8 +155,10 @@ export function PainelDeTags({
     setDestino("");
     // A cor já vem do servidor (`linha.cor`): a fileira abre com a escolha atual
     // marcada. Sem isso, abrir a cor de uma etiqueta que JÁ tem uma faria parecer
-    // que ela não tem nenhuma, e "Confirmar" apagaria o que estava lá.
-    setCor(qual === "definir_cor" ? (linha.cor ?? null) : null);
+    // que ela não tem nenhuma, e "Confirmar" apagaria o que estava lá. Lida pela
+    // normalização porque `linha.cor` vem crua do SQL: uma etiqueta com o tom
+    // antigo da #2373 abre com o tom novo marcado.
+    setCor(qual === "definir_cor" ? normalizarCorDeEtiqueta(linha.cor) : null);
   }
 
   async function enviar() {

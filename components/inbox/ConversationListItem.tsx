@@ -23,6 +23,7 @@ import { LINHA_DA_CONVERSA_NO_CELULAR as NO_CELULAR } from "@/components/mobile/
 import { naoLidasDaConversa } from "@/lib/inbox/estado-por-atendente";
 import { initials, relativeTime, siglaDoTelefone } from "./item/tempo-da-linha";
 import { prefixoDoAutor } from "./item/prefixo-do-autor";
+import { rotuloDoCanalDaConversa } from "@/lib/channels/estado";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -139,9 +140,9 @@ export function ConversationListItem({
 
   // O número DA EMPRESA por onde esta conversa chegou, não o do cliente. Com
   // dois canais é o que decide o tom da resposta e qual número a pessoa vê
-  // respondendo. Cai no nome do canal quando não há número (canal recém-criado).
+  // respondendo. #2383: o nome dado em Conexões vem na frente do número.
   const canal = conversation.channel_sessions ?? null;
-  const rotuloCanal = canal?.phone_number ?? canal?.display_name ?? null;
+  const rotuloCanal = rotuloDoCanalDaConversa(canal, t);
 
   const gatilhos = gatilhosDoMenu(conversation.id, onAbrirMenu, !!menuAberto);
 

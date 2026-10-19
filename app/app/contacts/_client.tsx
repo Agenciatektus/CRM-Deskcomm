@@ -66,6 +66,9 @@ export function ContactsListClient() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagMode, setTagMode] = useState<ModoDeEtiqueta | undefined>(undefined);
   const [source, setSource] = useState<string | undefined>(undefined);
+  // Só pessoais (spec 21, etapa 15 — filtro "Pessoais"): ligado lista SÓ
+  // pessoais (`?pessoais=true`, etapa 13); desligado é o padrão que exclui.
+  const [soPessoais, setSoPessoais] = useState(false);
   const [orderBy, setOrderBy] = useState<ContactOrderBy>("last_activity_at");
   const [orderDir, setOrderDir] = useState<"asc" | "desc">("desc");
   const [limit, setLimit] = useState<number>(25);
@@ -87,11 +90,12 @@ export function ContactsListClient() {
       tag: tags.length > 0 ? tags : undefined,
       tagMode,
       source,
+      pessoais: soPessoais || undefined,
       order_by: orderBy,
       order_dir: orderDir,
       limit,
     }),
-    [search, tags, tagMode, source, orderBy, orderDir, limit],
+    [search, tags, tagMode, source, soPessoais, orderBy, orderDir, limit],
   );
   const q = useContactList(filters);
 
@@ -154,13 +158,14 @@ export function ContactsListClient() {
 
       <BarraDeFiltros
         busca={{ valor: searchInput, aoMudar: setSearchInput, placeholder: t("Buscar por nome, email ou telefone…") }}
-        ativos={(tags.length > 0 ? 1 : 0) + (source ? 1 : 0)}
+        ativos={(tags.length > 0 ? 1 : 0) + (source ? 1 : 0) + (soPessoais ? 1 : 0)}
         aoLimpar={() => {
           setSearchInput("");
           setSearch("");
           setTags([]);
           setTagMode(undefined);
           setSource(undefined);
+          setSoPessoais(false);
         }}
       >
         <FiltroDeEtiquetas
@@ -185,6 +190,19 @@ export function ContactsListClient() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Só pessoais: o filtro que acha quem saiu da operação — e a porta do
+            desmarcar em lote mental (abre a ficha e desmarca um a um). O
+            `data-testid` é contrato do e2e da spec. */}
+        <Button
+          variant={soPessoais ? "default" : "outline"}
+          size="sm"
+          data-testid="filtro-pessoais"
+          aria-pressed={soPessoais}
+          onClick={() => setSoPessoais((v) => !v)}
+        >
+          {t("Pessoais")}
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
