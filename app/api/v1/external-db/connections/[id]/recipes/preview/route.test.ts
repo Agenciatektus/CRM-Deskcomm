@@ -200,4 +200,34 @@ describe("POST /connections/:id/recipes/preview", () => {
     expect(texto).not.toContain("camisa");
     expect(texto).not.toContain("60");
   });
+
+  it("com dois termos, o dialeto recebe limiteMax = 2 × o limite por termo", async () => {
+    let limiteMaxRecebido: number | undefined;
+    const executarReceita = vi.fn(async (_opcoes: unknown, opts?: { limiteMax?: number }) => {
+      limiteMaxRecebido = opts?.limiteMax;
+      return {
+        colunas: ["id", "titulo"],
+        linhas: [{ id: "1", titulo: "Camisa" }],
+        limite: 5,
+        offset: 0,
+        truncado: false,
+      };
+    });
+    deps.acessar.mockResolvedValue({
+      ok: true,
+      conexao: { id: ID, organizationId: ORG },
+      dialeto: { executarReceita },
+    });
+    const { client } = banco({ data: { receitas: [INSTANCIA_ID], db_type: "mysql" } });
+    deps.admin.mockReturnValue(client);
+
+    const res = await POST(
+      post({ instancia_id: INSTANCIA_ID, busca: { termos: ["camiseta", "sorvete"] } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(200);
+    expect(executarReceita).toHaveBeenCalledTimes(1);
+    expect(limiteMaxRecebido).toBe(10);
+  });
 });

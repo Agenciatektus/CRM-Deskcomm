@@ -125,6 +125,15 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     receita.tetoDeItens,
   );
 
+  // Teto total de itens: limite por termo × número de termos (até 20: 5 × 4).
+  // Sem termos, cai no teto da receita (5), como antes — igual à ferramenta do
+  // agente (crm_consultar_receita), para a prévia mostrar o que o agente recebe.
+  const termos = (buscaValidada as { termos?: unknown[] })?.termos;
+  const limiteMax = Math.min(
+    conexao.max_rows ?? 200,
+    limiteItens * (Array.isArray(termos) ? termos.length : 1),
+  );
+
   const { sql, valores } = receita.montar(instancia.fixos, buscaValidada, limiteItens);
 
   const prefixo = (instancia.fixos as { prefixo?: string }).prefixo ?? "wp_";
@@ -139,7 +148,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   try {
     resultado = await acesso.dialeto.executarReceita(
       { sql, valores, tabelas: tabelasPermitidas, colunasPorTabela: receita.colunas(prefixo) },
-      { limiteMax: Math.min(conexao.max_rows ?? 200, limiteItens) },
+      { limiteMax },
     );
   } catch (err) {
     if (err instanceof Error && err.name === "FonteNaoLiberadaError") {
