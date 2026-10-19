@@ -132,6 +132,49 @@ create trigger trg_crm_leads_passagem_de_funil
   when (old.pipeline_id is distinct from new.pipeline_id)
   execute function public.fn_crm_leads_passagem_de_funil();
 
+-- As DUAS guardas da troca de funil (P1-2 do @Cassio_SecRev na #206). Sem elas um
+-- PATCH direto em `crm_leads.pipeline_id` (sem `stage_id`) num ganho deixava o
+-- status `won` (o gatilho de etapa não roda), o retrato acima gravava outro `won` e
+-- cada vaivém somava um ganho; e o `pipeline_id` podia ser de outra organização.
+--  (a) a troca de funil só passa por fn_mover_lead_de_funil, que liga
+--      `app.movendo_funil` na própria transação (service_role e automação usam a
+--      mesma função; o flag não é alcançável pelo PostgREST);
+--  (b) sempre que o funil muda, a etapa nova é do funil novo, da MESMA organização
+--      do negócio, não arquivada e não terminal.
+create or replace function public.fn_crm_leads_guarda_troca_de_funil()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if coalesce(current_setting('app.movendo_funil', true), '') <> 'on' then
+    raise exception 'pipeline_immutable_use_clone' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from public.crm_stages s
+      join public.crm_pipelines p on p.id = s.pipeline_id
+     where s.id = new.stage_id
+       and s.pipeline_id = new.pipeline_id
+       and s.organization_id = old.organization_id
+       and p.organization_id = old.organization_id
+       and new.organization_id = old.organization_id
+       and not s.is_archived and not s.is_won and not s.is_lost
+  ) then
+    raise exception 'stage_pipeline_mismatch' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.fn_crm_leads_guarda_troca_de_funil() from public, anon;
+
+drop trigger if exists trg_crm_leads_guarda_troca_de_funil on public.crm_leads;
+create trigger trg_crm_leads_guarda_troca_de_funil
+  before update of pipeline_id on public.crm_leads
+  for each row
+  when (old.pipeline_id is distinct from new.pipeline_id)
+  execute function public.fn_crm_leads_guarda_troca_de_funil();
+
 -- Os desfechos que as métricas contam: o atual de cada negócio fechado e os que
 -- ficaram para trás nas passagens. `pipeline_id` é o funil DA ÉPOCA do desfecho.
 create or replace view public.crm_desfechos_de_negocio
@@ -200,6 +243,7 @@ begin
   -- O valor de um GANHO já foi contado na venda (e segue contado na origem pela
   -- passagem acima): no destino o card começa sem valor, senão a soma do funil de
   -- pós-venda mostraria a venda passada como negócio em aberto.
+  perform set_config('app.movendo_funil', 'on', true);
   update public.crm_leads
      set pipeline_id = p_pipeline,
          stage_id = p_stage,
@@ -208,6 +252,8 @@ begin
          updated_at = now()
    where id = v_lead.id and organization_id = p_org
   returning * into v_saida;
+  -- Desliga na hora: o resto da transação de quem chamou não herda a passagem livre.
+  perform set_config('app.movendo_funil', '', true);
 
   return v_saida;
 end;

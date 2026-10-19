@@ -35,6 +35,8 @@ const S_GANHO = id(32);
 const S_POS_1 = id(33);
 const S_POS_2 = id(34);
 const LEAD = id(41);
+const PB = id(23);
+const SB = id(35);
 
 const seed = `
 begin;
@@ -45,12 +47,13 @@ insert into organizations(id,slug,display_name,legal_name) values
 insert into user_organizations(organization_id,user_id,role,accepted_at) values
  ('${ORG_A}','${MGR_A}','manager',now()),('${ORG_B}','${MGR_B}','manager',now()),('${ORG_A}','${AG_A}','agent',now());
 insert into crm_pipelines(id,organization_id,name,slug) values
- ('${VENDAS}','${ORG_A}','D9053 Vendas','d9053-vendas'),('${POS}','${ORG_A}','D9053 Pos','d9053-pos');
+ ('${VENDAS}','${ORG_A}','D9053 Vendas','d9053-vendas'),('${POS}','${ORG_A}','D9053 Pos','d9053-pos'),('${PB}','${ORG_B}','D9053 PB','d9053-pb');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position,is_won) values
  ('${S_NOVO}','${ORG_A}','${VENDAS}','Novo','novo',1,false),
  ('${S_GANHO}','${ORG_A}','${VENDAS}','Ganho','ganho',9,true),
  ('${S_POS_1}','${ORG_A}','${POS}','Boas-vindas','boas-vindas',1,false),
- ('${S_POS_2}','${ORG_A}','${POS}','Recompra','recompra',2,false);
+ ('${S_POS_2}','${ORG_A}','${POS}','Recompra','recompra',2,false),
+ ('${SB}','${ORG_B}','${PB}','Entrada B','entrada-b',1,false);
 insert into crm_leads(id,organization_id,pipeline_id,stage_id,title,owner_user_id,value_cents) values
  ('${LEAD}','${ORG_A}','${VENDAS}','${S_GANHO}','D9053 venda','${MGR_A}',500000);
 `;
@@ -137,14 +140,14 @@ select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${POS}','${S_NOVO}','
 });
 
 describe("9053: o retrato é do GATILHO, com o OLD real", () => {
-  it("UPDATE direto de pipeline_id grava a passagem; trocar só a etapa não grava", () => {
+  it("o retrato vem do gatilho na troca pela função; trocar só a etapa não grava", () => {
     expect(
       prova(`
 update crm_leads set stage_id = '${S_NOVO}' where id = '${LEAD}';
 ${espera("trocar etapa no mesmo funil não é passagem", `(select count(*) from crm_lead_passagens_de_funil)`, "'0'")}
 update crm_leads set stage_id = '${S_GANHO}' where id = '${LEAD}';
-update crm_leads set pipeline_id = '${POS}', stage_id = '${S_POS_1}' where id = '${LEAD}';
-${espera("o UPDATE de pipeline_id gravou o retrato do OLD", `(select count(*) || '/' || max(status_na_saida) || '/' || max(value_cents) || '/' || max(de_pipeline_id::text) from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'1/won/500000/${VENDAS}'`)}`),
+${mover()}
+${espera("a troca gravou o retrato do OLD", `(select count(*) || '/' || max(status_na_saida) || '/' || max(value_cents) || '/' || max(de_pipeline_id::text) from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'1/won/500000/${VENDAS}'`)}`),
     ).toContain("provado");
   });
 
@@ -161,6 +164,54 @@ ${espera("ator = quem está logado", `(select movido_por_user_id::text from crm_
       prova(`
 select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${POS}','${S_POS_1}','${MGR_A}');
 ${espera("ator = p_ator", `(select movido_por_user_id::text from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'${MGR_A}'`)}`),
+    ).toContain("provado");
+  });
+});
+
+describe("9053: as guardas da troca de funil (P1-2 da #206)", () => {
+  it("PATCH direto de pipeline_id é recusado: agent, manager e até o servidor fora da função", () => {
+    const patch = `update crm_leads set pipeline_id = '${POS}' where id = '${LEAD}';`;
+    expect(() => prova(`${como(AG_A)}
+${patch}`)).toThrow(/pipeline_immutable_use_clone/);
+    expect(() => prova(`${como(MGR_A)}
+${patch}`)).toThrow(/pipeline_immutable_use_clone/);
+    expect(() => prova(patch)).toThrow(/pipeline_immutable_use_clone/);
+    expect(() =>
+      prova(`update crm_leads set pipeline_id = '${POS}', stage_id = '${S_POS_1}' where id = '${LEAD}';`),
+    ).toThrow(/pipeline_immutable_use_clone/);
+  });
+
+  it("CONTROLE: com o flag (só a função o liga), a etapa ainda tem de ser do funil novo e da mesma org", () => {
+    const comFlag = (sqlUpdate: string) =>
+      `select set_config('app.movendo_funil','on',true);
+${sqlUpdate}`;
+    expect(() =>
+      prova(comFlag(`update crm_leads set pipeline_id = '${POS}' where id = '${LEAD}';`)),
+    ).toThrow(/stage_pipeline_mismatch/);
+    expect(() =>
+      prova(comFlag(`update crm_leads set pipeline_id = '${PB}', stage_id = '${SB}' where id = '${LEAD}';`)),
+    ).toThrow(/stage_pipeline_mismatch/);
+    expect(
+      prova(comFlag(`update crm_leads set pipeline_id = '${POS}', stage_id = '${S_POS_1}' where id = '${LEAD}';`)),
+    ).toContain("provado");
+  });
+
+  it("funil de outra organização pela função é recusado", () => {
+    expect(() =>
+      prova(`select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${PB}','${SB}',null);`),
+    ).toThrow(/stage_pipeline_mismatch/);
+  });
+
+  it("vaivém pela função não duplica o ganho (o retrato de um card já movido sai aberto)", () => {
+    expect(
+      prova(`${como(MGR_A)}
+${mover()}
+select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${VENDAS}','${S_NOVO}',null);
+${mover(S_POS_2)}
+select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${VENDAS}','${S_NOVO}',null);
+${espera("quatro passagens, um ganho só", `(select count(*) || '/' || count(*) filter (where status_na_saida = 'won') from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, "'4/1'")}
+${espera("a view conta UM ganho na org", `(select count(*) from crm_desfechos_de_negocio where organization_id = '${ORG_A}' and status = 'won')`, "'1'")}
+${espera("ganho do responsável segue 1", `(public.fn_attendant_metrics('${ORG_A}', ${JANELA})->'attendants'->0->>'won')`, "'1'")}`),
     ).toContain("provado");
   });
 });
