@@ -219,6 +219,9 @@ export async function listContactsHandler(
       // zero resultados para um contato que EXISTE, e desistiu — a demanda
       // morreria por uma coluna faltando no OR.
       `display_name.imatch.${s}`,
+      // O nome da agenda do celular (#2439) é o que a tela mostra quando não há
+      // nome escolhido no CRM — mesma razão do `display_name` acima.
+      `address_book_name.imatch.${s}`,
       `email.imatch.${s}`,
       `phone_number.imatch.${s}`,
     ];

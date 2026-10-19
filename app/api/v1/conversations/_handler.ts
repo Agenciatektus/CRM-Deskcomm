@@ -380,6 +380,8 @@ export async function listConversationsHandler(
     const camposDoContato = [
       `display_name.ilike.*${s}*`,
       `name.ilike.*${s}*`,
+      // O nome da agenda do celular (#2439): a lista o mostra, a busca o acha.
+      `address_book_name.ilike.*${s}*`,
       ...(pareceTelefone ? [`phone_number.ilike.*${somenteDigitos}*`] : []),
     ].join(",");
 

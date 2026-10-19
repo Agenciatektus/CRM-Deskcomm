@@ -103,6 +103,11 @@ describe("busca de contatos", () => {
     expect(casaNoNome(filtro, "Cliente Retorno E2E"), `filtro=${filtro}`).toBe(true);
   });
 
+  it("procura no nome da agenda do celular — a tela o mostra quando não há nome no CRM (#2439)", async () => {
+    const filtro = await filtroDaBusca("João obra");
+    expect(filtro).toContain("address_book_name.imatch.");
+  });
+
   it("continua procurando nas colunas que já procurava", async () => {
     // A adição não pode custar as outras: quem cadastrou o contato à mão tem
     // `name`, e quem digita telefone espera achar por telefone.
