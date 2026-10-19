@@ -35,7 +35,7 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 - **Dados externos passa a aceitar conexões MySQL pela API** Quem cria conexões de Dados externos pela API pode agora informar `db_type: "mysql"`, além de `postgres`, e o assistente passa a consultar também bancos MySQL (por exemplo, o de um site WordPress). A leitura é sempre somente leitura: cada consulta roda numa transação só de leitura, com tempo máximo, e o teste da conexão avisa quando o usuário do banco pode escrever ou ler o banco inteiro. A tela ainda não oferece a escolha do motor; ela chega numa próxima atualização. A atualização instala a biblioteca `mysql2`, não acrescenta tabela nem coluna e não exige nenhuma ação de quem opera a instalação.
 
-  Desenho e código de @paulolimajr77 (Spec 23, fatia 4a-2a, #2638).
+  Desenho e código de @paulolimajr77 (Spec 23, fatia 4a-2a, #2638), com a prova contra um MySQL 8 de verdade também dele (fatia 4a-2b, #2640).
 
 - **No funil, cada campo personalizado agora diz se é do contato ou do negócio** O editor de campos do funil padrão (Configurações › Funis › Vocabulário e campos) ganhou, em cada campo, a escolha "Este campo pertence a: Negócio ou Contato".
 
@@ -59,6 +59,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
   Contribuição de @webtecnica (refs #3006).
 
 - **Fluxos de follow-up podem ser exportados como arquivo e importados nesta ou em outra conta** Em Agente de IA › Follow-ups, cada fluxo ganhou o botão **Exportar**, que baixa um `.fluxo.json` com o desenho inteiro (caixas, ligações, gatilho e política de handoff), e a lista ganhou **Importar fluxo**. O fluxo importado nasce sempre como rascunho: não é publicado e não manda mensagem até passar pelo Publicar, com a mesma conferência de um fluxo desenhado à mão. O arquivo é validado pelas regras do editor, e o que estiver errado aparece com o caminho exato até o campo. Etapas, modelos de mensagem, responsáveis e próximos fluxos citados são conferidos contra a conta: o que existe fica, o que tem o mesmo nome aqui é ligado sozinho, e o resto é esvaziado e listado como pendência a resolver antes de publicar. Nada é adivinhado quando o nome é ambíguo. A importação registra `followup_flow.imported` na auditoria, com contagens e nunca o texto das mensagens. Rotas: `GET /api/v1/ai/followup-flows/:id/export` e `POST /api/v1/ai/followup-flows/import`. O formato e o catálogo completo das caixas, gatilhos e condições estão em `docs/features/importar-exportar-fluxos.md`. Nenhuma mudança de banco.
+
+  Contribuição de @salomaobatistamkt (#3056).
 
 - **O responsável recebe um lembrete antes de a tarefa vencer e, se quiser, quando ela vence** Uma tarefa com prazo só aparecia em vermelho para quem abria a lista de tarefas. Agora, quando falta pouco para o prazo, o aviso fica na Central do responsável, mesmo que ninguém esteja com o site aberto. No aparelho, ele chega só ao do próprio responsável, se ele ligou o Push e a instalação já tem as chaves do Push configuradas: o aviso no topo de Configurações › Notificações diz se esta tem. O aviso da Central é só dele: o colega não o vê, e o «Marcar todos resolvidos» de outra pessoa não o resolve. O lembrete sai 1 hora antes por padrão, ou 15 minutos, ou 1 dia, à escolha de cada pessoa em Configurações › Notificações › Lembretes de tarefa. O aviso de tarefa vencida sem conclusão e o envio pelo WhatsApp para o número da própria pessoa existem, mas nascem desligados. Só recebe quem ainda faz parte da equipe da empresa dona da tarefa. O agendador passa a rodar a verificação a cada 5 minutos. Nada a fazer na atualização.
 
@@ -84,6 +86,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 - **Por dentro, o conector de Dados externos passa a escolher o banco por um registro de drivers** Mudança interna, sem efeito para quem opera: o conector de Dados externos passa a escolher como falar com cada tipo de banco por um registro de drivers, em vez de chamar o PostgreSQL diretamente. Nada muda na tela nem no que o assistente consegue ler. É o passo que prepara o conector para falar com outros bancos.
 
+  Desenho e código de @paulolimajr77 (Spec 23, fatia 3, #2636).
+
 ### Corrigido
 
 - **Ao importar um fluxo de follow-up inválido, as frases genéricas da lista de problemas saem em português ou espanhol** Quando o arquivo de um fluxo importado não passava na conferência, a lista de problemas mostrava o caminho até o campo seguido de uma frase em inglês (por exemplo, «Invalid UUID» ou «Invalid input: expected object, received undefined»). Agora essas frases genéricas — tipo errado, campo faltando, formato inválido — saem no idioma de quem importa, em português ou espanhol, e o caminho até o campo continua o mesmo. As regras específicas do fluxo que já tinham frase própria (como «min_ms must be <= max_ms») continuam com a frase de antes, algumas ainda em inglês. Achado na prova do #3056 de @salomaobatistamkt.
@@ -102,6 +106,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
   Nenhuma mudança de banco. As três correções acima (o funil certo, a reavaliação antes do envio e o ritmo do texto fixo) valem para os fluxos já publicados, sem configurar nada; só a guarda de resposta da equipe e o limite de repetições dependem de alguém ligá-los.
 
+  Contribuição de @brunowatz (#3048).
+
 - **O gatilho "faltam N dias para uma data do funil" não oferece mais campo do contato, que nunca disparava** Depois que os campos do funil passaram a poder ser do contato, um campo de data marcado como Contato (ex.: Nascimento) aparecia como opção de "Campo de data" no editor de regras e no Designer de automações. A varredura diária lê a data no negócio, e o valor de um campo do contato fica gravado no contato: a regra era salva e nunca disparava, sem aviso. Agora os dois seletores oferecem só campos de data do negócio, como o calendário do funil já fazia, e o servidor recusa salvar ou religar, pela tela, pela API ou pelo assistente, uma regra desse gatilho apontada para um campo do contato, com a frase "Este campo de data é do contato, e o gatilho por data só lê campos do negócio. Escolha um campo de data do negócio." Desligar ou renomear segue liberado.
 
   Nas configurações do funil, marcar como Contato um campo que uma regra ligada desse gatilho já usa também passou a ser recusado: a mensagem nomeia as regras e pede para trocar o campo delas ou desligá-las antes. O que ainda não é barrado: uma regra antiga que já estivesse ligada sobre um campo do contato continua ligada e sem disparar, e a frase só aparece quando alguém edita o gatilho ou religa a regra. Nesse caso, troque o campo da regra por um campo de data do negócio.
@@ -111,6 +117,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 - **No servidor único, o cadastro por convite volta a funcionar quando o e-mail é só pela Resend** Na instalação de servidor único (o Supabase que o instalador sobe na própria VPS), o serviço de login só sabia mandar e-mail pelo SMTP configurado no CRM. Quem configurou o e-mail apenas com a chave da Resend tinha o convite entregue — quem envia o convite é o CRM —, mas a pessoa convidada não conseguia criar a conta: o login tentava mandar o e-mail de confirmação para um servidor que não existe, e a tela dizia "Não foi possível criar a conta. Tente novamente.", o que nunca funcionava. Agora, sem SMTP configurado, o serviço de login passa a enviar pela mesma Resend do CRM (a chave e o remetente da tela E-mail, ou do arquivo de instalação), e "esqueci a senha" também volta a sair. Basta atualizar: a própria atualização leva a Resend ao serviço de login, sem editar nada à mão.
 
   E, quando o e-mail de confirmação não puder sair por falta de e-mail configurado, a tela de cadastro deixa de mandar tentar de novo: diz que o envio de e-mails da instalação não está configurado e pede para avisar quem convidou (ou quem administra o sistema).
+
+  Contribuição de @rafaelcesardev (#3060).
 
 - **Conversa marcada como exemplo e resolvida dias depois entra no aprendizado da IA** Marcar uma conversa como exemplo enquanto ela ainda estava aberta e resolvê-la mais de 24 horas depois deixava o selo na tela e a conversa nunca entrava no lote que ensina o agente. Agora o lote considera o momento em que a conversa ficou elegível — marcada e resolvida — e não só a hora da marcação; quem foi marcada depois de resolvida continua entrando como antes.
 
@@ -130,6 +138,8 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
   Contribuição de @webtecnica (refs #2797).
 
 - **Trocar a localização no primeiro acesso não derruba a tela traduzida pelo navegador** Os seletores continuam funcionando quando a tradução automática do navegador altera o texto da opção selecionada. No primeiro acesso, escolher onde a empresa atende não interrompe mais a configuração com um erro de interface.
+
+  Contribuição de @rominparekh (#3066).
 
 ## [1.85.0] — 2026-10-17
 
