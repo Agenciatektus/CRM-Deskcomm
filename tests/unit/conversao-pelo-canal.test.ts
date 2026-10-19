@@ -152,7 +152,10 @@ function fakeAdmin(t: {
           currency: "BRL",
           closed_at: new Date(Date.now() - 60_000).toISOString(),
           contact_id: CONTATO,
+          stage_id: "etapa-ganho",
         },
+        // A etapa do negócio envia a compra (9054).
+        crm_stages: { envia_conversao: true, evento_de_conversao: "Purchase" },
         contacts: {
           phone_number: "+55 11 98888-0000",
           source_metadata: { ad_platform: "meta_ads", ad_source_id: "CTWA_X" },
