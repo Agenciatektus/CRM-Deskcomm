@@ -27,6 +27,7 @@ const ORG_A = id(1);
 const ORG_B = id(2);
 const MGR_A = id(11);
 const MGR_B = id(12);
+const AG_A = id(13);
 const VENDAS = id(21);
 const POS = id(22);
 const S_NOVO = id(31);
@@ -38,11 +39,11 @@ const LEAD = id(41);
 const seed = `
 begin;
 insert into auth.users(id,email) values
- ('${MGR_A}','d9053-mgra@invariant.test'),('${MGR_B}','d9053-mgrb@invariant.test');
+ ('${MGR_A}','d9053-mgra@invariant.test'),('${MGR_B}','d9053-mgrb@invariant.test'),('${AG_A}','d9053-aga@invariant.test');
 insert into organizations(id,slug,display_name,legal_name) values
  ('${ORG_A}','d9053-a','D9053 A','D9053 A'),('${ORG_B}','d9053-b','D9053 B','D9053 B');
 insert into user_organizations(organization_id,user_id,role,accepted_at) values
- ('${ORG_A}','${MGR_A}','manager',now()),('${ORG_B}','${MGR_B}','manager',now());
+ ('${ORG_A}','${MGR_A}','manager',now()),('${ORG_B}','${MGR_B}','manager',now()),('${ORG_A}','${AG_A}','agent',now());
 insert into crm_pipelines(id,organization_id,name,slug) values
  ('${VENDAS}','${ORG_A}','D9053 Vendas','d9053-vendas'),('${POS}','${ORG_A}','D9053 Pos','d9053-pos');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position,is_won) values
@@ -135,6 +136,35 @@ select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${POS}','${S_NOVO}','
   });
 });
 
+describe("9053: o retrato é do GATILHO, com o OLD real", () => {
+  it("UPDATE direto de pipeline_id grava a passagem; trocar só a etapa não grava", () => {
+    expect(
+      prova(`
+update crm_leads set stage_id = '${S_NOVO}' where id = '${LEAD}';
+${espera("trocar etapa no mesmo funil não é passagem", `(select count(*) from crm_lead_passagens_de_funil)`, "'0'")}
+update crm_leads set stage_id = '${S_GANHO}' where id = '${LEAD}';
+update crm_leads set pipeline_id = '${POS}', stage_id = '${S_POS_1}' where id = '${LEAD}';
+${espera("o UPDATE de pipeline_id gravou o retrato do OLD", `(select count(*) || '/' || max(status_na_saida) || '/' || max(value_cents) || '/' || max(de_pipeline_id::text) from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'1/won/500000/${VENDAS}'`)}`),
+    ).toContain("provado");
+  });
+
+  it("movido_por é auth.uid(): o p_ator do cliente é ignorado com sessão", () => {
+    expect(
+      prova(`${como(MGR_A)}
+select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${POS}','${S_POS_1}','${MGR_B}');
+${espera("ator = quem está logado", `(select movido_por_user_id::text from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'${MGR_A}'`)}`),
+    ).toContain("provado");
+  });
+
+  it("sem sessão (service_role), vale o p_ator", () => {
+    expect(
+      prova(`
+select public.fn_mover_lead_de_funil('${ORG_A}','${LEAD}','${POS}','${S_POS_1}','${MGR_A}');
+${espera("ator = p_ator", `(select movido_por_user_id::text from crm_lead_passagens_de_funil where lead_id = '${LEAD}')`, `'${MGR_A}'`)}`),
+    ).toContain("provado");
+  });
+});
+
 describe("9053: isolamento entre organizações", () => {
   it("o manager de B não move o negócio de A, nem vê a passagem ou o desfecho", () => {
     expect(() => prova(`${como(MGR_B)}\n${mover()}`)).toThrow(/lead_not_found/);
@@ -149,11 +179,18 @@ ${espera("A vê a própria passagem (controle positivo)", `(select count(*) from
     ).toContain("provado");
   });
 
-  it("o manager de B não grava passagem no negócio de A (RLS do insert)", () => {
-    expect(() =>
-      prova(`${como(MGR_B)}
-insert into crm_lead_passagens_de_funil (organization_id, lead_id, de_pipeline_id, status_na_saida, closed_at, para_pipeline_id, para_stage_id)
-values ('${ORG_A}','${LEAD}','${VENDAS}','won',now(),'${POS}','${S_POS_1}');`),
-    ).toThrow(/row-level security/);
+  it("ninguém do cliente grava retrato: nem o agent da PRÓPRIA org, nem o de outra (P1 da #206)", () => {
+    const retratoFalso = `insert into crm_lead_passagens_de_funil (organization_id, lead_id, de_pipeline_id, status_na_saida, value_cents, closed_at, para_pipeline_id, para_stage_id)
+values ('${ORG_A}','${LEAD}','${VENDAS}','won',99900000,now(),'${POS}','${S_POS_1}');`;
+    expect(() => prova(`${como(AG_A)}
+${retratoFalso}`)).toThrow(/permission denied/);
+    expect(() => prova(`${como(MGR_A)}
+${retratoFalso}`)).toThrow(/permission denied/);
+    expect(() => prova(`${como(MGR_B)}
+${retratoFalso}`)).toThrow(/permission denied/);
+    expect(
+      sql(`select has_table_privilege('authenticated','public.crm_lead_passagens_de_funil','INSERT'),
+                  has_table_privilege('anon','public.crm_lead_passagens_de_funil','INSERT');`),
+    ).toBe("f|f");
   });
 });

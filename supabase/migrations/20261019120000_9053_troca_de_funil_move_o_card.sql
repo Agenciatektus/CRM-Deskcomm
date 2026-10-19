@@ -22,7 +22,7 @@ set lock_timeout = '3s';
 -- os desfechos que ficaram para trás nas passagens) e é o que as métricas leem.
 -- SECURITY INVOKER: a RLS das duas tabelas vale para quem consulta.
 --
--- `fn_mover_lead_de_funil` faz a troca numa transação só (retrato + UPDATE), também
+-- `fn_mover_lead_de_funil` faz a troca (UPDATE; o retrato vem do gatilho DEFINER), também
 -- INVOKER: o usuário precisa poder atualizar o negócio pela RLS de `crm_leads`, como
 -- no arrasto. O UPDATE de `stage_id` dispara `fn_crm_lead_close_on_stage`, que reabre
 -- o negócio (`status = 'open'`, `closed_at` nulo) por ser a etapa de destino aberta:
@@ -39,8 +39,10 @@ create table if not exists public.crm_lead_passagens_de_funil (
   id                 uuid primary key default gen_random_uuid(),
   organization_id    uuid not null references public.organizations(id) on delete cascade,
   lead_id            uuid not null,
-  de_pipeline_id     uuid not null,
-  de_stage_id        uuid,
+  -- FKs com `on delete set null` (lição da 9032: apagar funil ou etapa não pode
+  -- ser recusado por um retrato; a referência zera e o desfecho segue na org).
+  de_pipeline_id     uuid references public.crm_pipelines(id) on delete set null,
+  de_stage_id        uuid references public.crm_stages(id) on delete set null,
   status_na_saida    text not null check (status_na_saida in ('open', 'won', 'lost')),
   value_cents        bigint,
   currency           text,
@@ -48,8 +50,8 @@ create table if not exists public.crm_lead_passagens_de_funil (
   lost_from_stage_id uuid,
   owner_user_id      uuid,
   closed_at          timestamptz,
-  para_pipeline_id   uuid not null,
-  para_stage_id      uuid not null,
+  para_pipeline_id   uuid references public.crm_pipelines(id) on delete set null,
+  para_stage_id      uuid references public.crm_stages(id) on delete set null,
   movido_em          timestamptz not null default now(),
   movido_por_user_id uuid,
   -- FK só no id (crm_leads não tem unique (organization_id, id)); a organização
@@ -61,7 +63,7 @@ create table if not exists public.crm_lead_passagens_de_funil (
 );
 
 comment on table public.crm_lead_passagens_de_funil is
-  'Uma linha por vez que um negócio saiu de um funil para outro (o MESMO crm_leads.id, decisão do Peterson em 19/10/2026: mover não clona). Retrato do negócio na saída: funil, etapa, status, valor, motivo, responsável e closed_at da época. É o que mantém o ganho, a perda e o valor contados no funil de ORIGEM depois que o card sai. Escrita só por fn_mover_lead_de_funil. Migration 9053.';
+  'Uma linha por vez que um negócio saiu de um funil para outro (o MESMO crm_leads.id, decisão do Peterson em 19/10/2026: mover não clona). Retrato do negócio na saída: funil, etapa, status, valor, motivo, responsável e closed_at da época. É o que mantém o ganho, a perda e o valor contados no funil de ORIGEM depois que o card sai. Escrita SÓ pelo gatilho trg_crm_leads_passagem_de_funil (SECURITY DEFINER, AFTER UPDATE OF pipeline_id, lendo OLD): authenticated/anon não inserem. Migration 9053.';
 
 create index if not exists crm_lead_passagens_org_de_pipeline
   on public.crm_lead_passagens_de_funil (organization_id, de_pipeline_id, closed_at);
@@ -78,25 +80,57 @@ create policy crm_lead_passagens_select on public.crm_lead_passagens_de_funil
     (select public.fn_is_platform_admin())
     or (organization_id in (select public.fn_user_org_ids())
         and exists (select 1 from public.crm_leads l
-                     where l.id = lead_id and l.organization_id = organization_id))
+                     where l.id = crm_lead_passagens_de_funil.lead_id
+                       and l.organization_id = crm_lead_passagens_de_funil.organization_id))
   );
 
--- Inserir: agent+ da organização, sobre um negócio que ele enxerga. Sem policy de
--- UPDATE/DELETE: o retrato não se reescreve (some só com o negócio, pela FK).
+-- Ninguém do lado do cliente ESCREVE retrato (P1 do @Cassio_SecRev na #206: com
+-- insert liberado, um agent gravava ganho falso e inflava as métricas). Sem policy
+-- de insert/update/delete e sem o grant: quem grava é o gatilho abaixo, que lê o
+-- OLD real do negócio.
 drop policy if exists crm_lead_passagens_insert on public.crm_lead_passagens_de_funil;
-create policy crm_lead_passagens_insert on public.crm_lead_passagens_de_funil
-  for insert with check (
-    public.fn_is_platform_admin()
-    or (organization_id in (select public.fn_user_org_ids())
-        and public.fn_role_at_least(organization_id, 'agent')
-        and exists (select 1 from public.crm_leads l
-                     where l.id = lead_id and l.organization_id = organization_id))
-  );
-
-revoke all on public.crm_lead_passagens_de_funil from anon;
-revoke update, delete, truncate on public.crm_lead_passagens_de_funil from authenticated;
-grant select, insert on public.crm_lead_passagens_de_funil to authenticated;
+revoke all on public.crm_lead_passagens_de_funil from anon, authenticated;
+grant select on public.crm_lead_passagens_de_funil to authenticated;
 grant all on public.crm_lead_passagens_de_funil to service_role;
+
+-- O retrato da saída, gravado na troca de `pipeline_id` de QUALQUER caminho (a
+-- função abaixo, ou um UPDATE direto que a RLS de crm_leads permita): o OLD é o
+-- negócio como estava. `movido_por_user_id` = auth.uid(); sem sessão (service_role,
+-- automação) vale o `app.movido_por` que fn_mover_lead_de_funil põe na transação,
+-- e sem ele fica nulo (ator de sistema).
+create or replace function public.fn_crm_leads_passagem_de_funil()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.crm_lead_passagens_de_funil (
+    organization_id, lead_id, de_pipeline_id, de_stage_id, status_na_saida,
+    value_cents, currency, lost_reason, lost_from_stage_id, owner_user_id, closed_at,
+    para_pipeline_id, para_stage_id, movido_por_user_id
+  ) values (
+    old.organization_id, old.id, old.pipeline_id, old.stage_id, old.status,
+    old.value_cents, old.currency,
+    case when old.status = 'lost' then old.lost_reason end,
+    case when old.status = 'lost' then old.lost_from_stage_id end,
+    old.owner_user_id,
+    case when old.status in ('won', 'lost') then old.closed_at end,
+    new.pipeline_id, new.stage_id,
+    coalesce(auth.uid(), nullif(current_setting('app.movido_por', true), '')::uuid)
+  );
+  return null;
+end;
+$$;
+
+revoke all on function public.fn_crm_leads_passagem_de_funil() from public, anon, authenticated;
+
+drop trigger if exists trg_crm_leads_passagem_de_funil on public.crm_leads;
+create trigger trg_crm_leads_passagem_de_funil
+  after update of pipeline_id on public.crm_leads
+  for each row
+  when (old.pipeline_id is distinct from new.pipeline_id)
+  execute function public.fn_crm_leads_passagem_de_funil();
 
 -- Os desfechos que as métricas contam: o atual de cada negócio fechado e os que
 -- ficaram para trás nas passagens. `pipeline_id` é o funil DA ÉPOCA do desfecho.
@@ -153,19 +187,12 @@ begin
     raise exception 'stage_pipeline_mismatch' using errcode = '22023';
   end if;
 
-  insert into public.crm_lead_passagens_de_funil (
-    organization_id, lead_id, de_pipeline_id, de_stage_id, status_na_saida,
-    value_cents, currency, lost_reason, lost_from_stage_id, owner_user_id, closed_at,
-    para_pipeline_id, para_stage_id, movido_por_user_id
-  ) values (
-    p_org, v_lead.id, v_lead.pipeline_id, v_lead.stage_id, v_lead.status,
-    v_lead.value_cents, v_lead.currency,
-    case when v_lead.status = 'lost' then v_lead.lost_reason end,
-    case when v_lead.status = 'lost' then v_lead.lost_from_stage_id end,
-    v_lead.owner_user_id,
-    case when v_lead.status in ('won', 'lost') then v_lead.closed_at end,
-    p_pipeline, p_stage, p_ator
-  );
+  -- O retrato é do gatilho trg_crm_leads_passagem_de_funil. `p_ator` só vale sem
+  -- sessão (service_role/automação): com usuário logado, o ator é auth.uid() e o
+  -- que o cliente mandar é ignorado (P2 do Cassio na #206).
+  if auth.uid() is null and p_ator is not null then
+    perform set_config('app.movido_por', p_ator::text, true);
+  end if;
 
   select coalesce(max(position_in_stage), 0) + 1000 into v_pos
     from public.crm_leads where organization_id = p_org and stage_id = p_stage;
@@ -187,7 +214,7 @@ end;
 $$;
 
 comment on function public.fn_mover_lead_de_funil(uuid, uuid, uuid, uuid, uuid) is
-  'Leva o MESMO negócio para outro funil (decisão do Peterson, 19/10/2026): grava o retrato da saída em crm_lead_passagens_de_funil e atualiza pipeline_id/stage_id/posição numa transação. A etapa de destino é aberta, então fn_crm_lead_close_on_stage reabre o negócio no destino. Não emite lead.won/lost/created/stage_changed. SECURITY INVOKER. Migration 9053.';
+  'Leva o MESMO negócio para outro funil (decisão do Peterson, 19/10/2026): atualiza pipeline_id/stage_id/posição; o retrato da saída é gravado na mesma transação pelo gatilho trg_crm_leads_passagem_de_funil. p_ator só vale sem auth.uid() (service_role). A etapa de destino é aberta, então fn_crm_lead_close_on_stage reabre o negócio no destino. Não emite lead.won/lost/created/stage_changed. SECURITY INVOKER. Migration 9053.';
 
 revoke all on function public.fn_mover_lead_de_funil(uuid, uuid, uuid, uuid, uuid) from public, anon;
 grant execute on function public.fn_mover_lead_de_funil(uuid, uuid, uuid, uuid, uuid) to authenticated, service_role;
