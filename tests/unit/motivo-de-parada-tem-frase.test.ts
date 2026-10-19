@@ -110,6 +110,13 @@ const ORIGENS: DeclaracaoDeOrigem[] = [
       "a recusa da tarefa (sem alvo, sem dono, título vazio, falha de gravação) chega à tela pelo `reason` do resultado; os códigos possíveis são quatro e estão escritos no tipo ResultadoDaTarefa",
     produtor: { arquivo: "lib/tarefas/criar-tarefa.ts" },
   },
+  {
+    arquivo: "lib/automation/actions/create-or-move-lead.ts",
+    expressao: "troca.code",
+    porque:
+      "a recusa da troca de funil (#206: mover o mesmo card) chega à tela pelo `error` do resultado; os códigos nascem em `moverNegocioDeFunil`, o mesmo caminho da rota /clone",
+    produtor: { arquivo: "lib/leads/mover-de-funil.ts" },
+  },
 ];
 
 describe("o mapa de frases e o código que emite os motivos não podem divergir", () => {

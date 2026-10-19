@@ -14,7 +14,9 @@
  *
  * O que NÃO acontece aqui, de propósito: nada reescreve won→lost, nenhum
  * `lead.won`/`lead.lost` (conversão Meta/Google/CAPI) sai de novo, nenhum
- * `lead.created` (a cadência de lead novo) e nenhum `lead.stage_changed`.
+ * `lead.created` (a cadência de lead novo) e nenhum `lead.stage_changed` — salvo
+ * quando quem move pede "rodar as automações de entrada da etapa"
+ * (`rodarAutomacoesDeEntrada`, padrão desligado; ver `entrada-pela-troca.ts`).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -22,6 +24,7 @@ import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
+import { emiteEntradaNaEtapa } from "@/lib/leads/entrada-pela-troca";
 import {
   recusaDeCamposObrigatorios,
   settingsDoFunil,
@@ -95,7 +98,13 @@ export async function moverNegocioDeFunil(
   db: SupabaseClient,
   ctx: HandlerCtx,
   negocio: NegocioParaMover,
-  destino: { pipelineId: string; stageId?: string | null; origemDaChamada: string },
+  destino: {
+    pipelineId: string;
+    stageId?: string | null;
+    origemDaChamada: string;
+    /** Padrão desligado: só com `true` a entrada na etapa de destino dispara automações. */
+    rodarAutomacoesDeEntrada?: boolean;
+  },
 ): Promise<ResultadoDaTroca> {
   const recusa = recusaTrocaDeFunil(negocio, destino.pipelineId);
   if (recusa) return { ok: false, status: recusa.status, code: recusa.code, texto: recusa.texto };
@@ -199,6 +208,20 @@ export async function moverNegocioDeFunil(
     requestId: ctx.requestId,
     metadata: { actor_type: ctx.actor.type, ...payload },
   });
+
+  if (destino.rodarAutomacoesDeEntrada === true) {
+    await emiteEntradaNaEtapa(db, {
+      organizationId: ctx.organization_id,
+      leadId: negocio.id,
+      deFunil: negocio.pipeline_id,
+      deEtapa: negocio.stage_id ?? null,
+      paraFunil: destino.pipelineId,
+      paraEtapa: etapa.etapa.id,
+      status: String(lead?.status ?? negocio.status),
+      actor: ctx.actor,
+      requestId: ctx.requestId,
+    });
+  }
 
   return { ok: true, lead };
 }

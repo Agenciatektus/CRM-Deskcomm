@@ -27,9 +27,12 @@ import {
   CreateLeadInPipelineForm,
   type CreateLeadInPipelineConfig,
 } from "./CreateLeadInPipelineForm";
+import { OpcoesDaTrocaDeFunil, type OpcoesDaTroca } from "./OpcoesDaTrocaDeFunil";
+
+type CreateOrMoveLeadConfig = { pipeline_id: string; stage_id: string } & OpcoesDaTroca;
 
 export type ActionItem =
-  | { type: "create_or_move_lead"; config: { pipeline_id: string; stage_id: string } }
+  | { type: "create_or_move_lead"; config: CreateOrMoveLeadConfig }
   | { type: "create_lead_in_pipeline"; config: CreateLeadInPipelineConfig }
   | { type: "send_whatsapp_message"; config: { channel_session_id: string; template: string } }
   | {
@@ -54,9 +57,20 @@ export type ActionItem =
 export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
   switch (type) {
     case "create_or_move_lead":
-      return { type, config: { pipeline_id: "", stage_id: "" } };
+      // Regra NOVA nasce com "Mover o card" e sem rodar as automações de entrada.
+      return { type, config: { pipeline_id: "", stage_id: "", modo: "mover", rodar_automacoes_de_entrada: false } };
     case "create_lead_in_pipeline":
-      return { type, config: { pipeline_id: "", stage_id: "", copiar_valor: false, copiar_dono: false } };
+      return {
+        type,
+        config: {
+          pipeline_id: "",
+          stage_id: "",
+          copiar_valor: false,
+          copiar_dono: false,
+          modo: "mover",
+          rodar_automacoes_de_entrada: false,
+        },
+      };
     case "send_whatsapp_message":
       return { type, config: { channel_session_id: "", template: "" } };
     case "send_ai_message":
@@ -86,7 +100,7 @@ interface FormProps<T> {
 function CreateOrMoveLeadForm({
   config,
   onChange,
-}: FormProps<{ pipeline_id: string; stage_id: string }>) {
+}: FormProps<CreateOrMoveLeadConfig>) {
   const t = useT();
   const { data: pipelinesRes, isLoading: pipelinesLoading } = usePipelines();
   const { data: boardRes, isLoading: stagesLoading } = usePipelineStages(
@@ -96,12 +110,13 @@ function CreateOrMoveLeadForm({
   const stages = boardRes?.data?.stages ?? [];
 
   return (
+    <div className="space-y-3">
     <div className="grid gap-2 sm:grid-cols-2">
       <div className="space-y-1">
         <Label>{t("Funil")}</Label>
         <Select
           value={config.pipeline_id}
-          onValueChange={(v) => onChange({ pipeline_id: v, stage_id: "" })}
+          onValueChange={(v) => onChange({ ...config, pipeline_id: v, stage_id: "" })}
           disabled={pipelinesLoading}
         >
           <SelectTrigger>
@@ -137,6 +152,13 @@ function CreateOrMoveLeadForm({
           </SelectContent>
         </Select>
       </div>
+    </div>
+      {/* Regra salva antes da opção (sem `modo`) segue movendo, como desde a 9053. */}
+      <OpcoesDaTrocaDeFunil
+        config={config}
+        modoSemValor="mover"
+        onChange={(opcoes) => onChange({ ...config, ...opcoes })}
+      />
     </div>
   );
 }

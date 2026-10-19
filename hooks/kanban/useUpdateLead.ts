@@ -88,6 +88,8 @@ export function useLoseLead(pipelineId: string) {
 interface MoveToPipelineArgs {
   leadId: string;
   targetPipelineId: string;
+  /** "Rodar as automações de entrada da etapa" — padrão desligado. */
+  rodarAutomacoesDeEntrada?: boolean;
 }
 
 /**
@@ -101,11 +103,11 @@ export function useMoveLeadToPipeline(pipelineId: string) {
   const qc = useQueryClient();
   const queryKey = ["board", pipelineId] as const;
   return useMutation({
-    mutationFn: async ({ leadId, targetPipelineId }: MoveToPipelineArgs) => {
+    mutationFn: async ({ leadId, targetPipelineId, rodarAutomacoesDeEntrada }: MoveToPipelineArgs) => {
       marcarEcoLocal(leadId);
       return apiClient.post<{ data: { lead: Lead } }>(
         `/api/v1/leads/${leadId}/clone`,
-        { pipeline_id: targetPipelineId },
+        { pipeline_id: targetPipelineId, rodar_automacoes_de_entrada: rodarAutomacoesDeEntrada === true },
       );
     },
     onSuccess: (_res, { leadId }) => {

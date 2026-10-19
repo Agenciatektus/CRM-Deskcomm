@@ -9,13 +9,27 @@ import { originFromAutomationEvent } from "@/lib/atendimento/origem-automacao";
  * esse prefixo "rule:" que o engine (Task 8) usa pra não reprocessar os
  * eventos derivados (anti-loop profundidade 1: regra→ação→handler→evento).
  */
-import { registerAction } from "@/lib/automation/actions";
+import { getAction, registerAction } from "@/lib/automation/actions";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { createLeadHandler, moveLeadHandler } from "@/app/api/v1/leads/_handler";
 import { viaHerdada } from "@/lib/leads/criacao-em-lote";
 import { moverNegocioDeFunil, type NegocioParaMover } from "@/lib/leads/mover-de-funil";
+import { entradaEncadeada } from "@/lib/leads/entrada-pela-troca";
+
+/**
+ * "Criar card novo" (`modo: "criar"`): o card em outro funil fica onde está e
+ * nasce um card NOVO no destino — o caminho de `create_lead_in_pipeline`, pelo
+ * registro (sem import circular entre as duas ações). Sem `modo`, esta ação MOVE,
+ * como desde a 9053.
+ */
+async function criaCardNovo(ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
+  const criar = getAction("create_lead_in_pipeline");
+  if (!criar) return { type: "create_or_move_lead", status: "failed", error: "unknown_action" };
+  const r = await criar.execute(ctx, { ...config, modo: "criar" });
+  return { ...r, type: "create_or_move_lead" };
+}
 
 async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
   const pipelineId = typeof config.pipeline_id === "string" ? config.pipeline_id : null;
@@ -23,6 +37,11 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
   if (!pipelineId || !stageId) {
     return { type: "create_or_move_lead", status: "failed", error: "missing_config" };
   }
+  const criarNovo = config.modo === "criar";
+  // Uma regra que rodou POR CAUSA de uma entrada pedida por outra regra não
+  // encadeia outra entrada (anti-laço, `lib/leads/entrada-pela-troca.ts`).
+  const rodarAutomacoesDeEntrada =
+    config.rodar_automacoes_de_entrada === true && !entradaEncadeada(ctx.event?.metadata);
 
   const handlerCtx: HandlerCtx = {
     organization_id: ctx.organizationId,
@@ -42,6 +61,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
   try {
     if (lead) {
       if (lead.pipeline_id !== pipelineId) {
+        if (criarNovo) return criaCardNovo(ctx, config);
         // Outro funil: MOVE o mesmo card (9053), como a rota da tela.
         const negocio = await leDoBanco(ctx, lead.id);
         if (!negocio) return { type: "create_or_move_lead", status: "failed", error: "not_found" };
@@ -49,6 +69,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
           pipelineId,
           stageId,
           origemDaChamada: "lib/automation/actions/create-or-move-lead",
+          rodarAutomacoesDeEntrada,
         });
         if (!troca.ok) return { type: "create_or_move_lead", status: "failed", error: troca.code };
         publicaNoContexto(ctx, troca.lead, contactId);
@@ -78,11 +99,13 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       // (sem clone e sem a perda "Levado para outro funil"), pelo mesmo caminho
       // da rota da tela (`lib/leads/mover-de-funil.ts`).
       const emOutroFunil = await negocioAbertoEmOutroFunil(ctx, contact.id, pipelineId);
+      if (emOutroFunil && criarNovo) return criaCardNovo(ctx, config);
       if (emOutroFunil) {
         const troca = await moverNegocioDeFunil(ctx.admin, handlerCtx, emOutroFunil, {
           pipelineId,
           stageId,
           origemDaChamada: "lib/automation/actions/create-or-move-lead",
+          rodarAutomacoesDeEntrada,
         });
         if (!troca.ok) return { type: "create_or_move_lead", status: "failed", error: troca.code };
         publicaNoContexto(ctx, troca.lead, contact.id);
