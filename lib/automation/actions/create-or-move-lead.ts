@@ -48,12 +48,17 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     actor: { type: "webhook_source", id: ctx.ruleId },
     requestId: `rule:${ctx.ruleId}`,
   };
-  const lead = ctx.context.lead as { id: string; pipeline_id: string; contact_id?: string } | undefined;
+  // A LINHA INTEIRA do negócio, como `buildContext` a lê (`select *` de
+  // `crm_leads`): o ramo abaixo precisa de `title`, `tags`, `custom_fields` e
+  // companhia quando o caminho é a transferência (#2155).
+  const lead = ctx.context.lead as (NegocioParaMover & { contact_id?: string | null }) | undefined;
   const contact = ctx.context.contact as
     | { id: string; name?: string | null; display_name?: string | null; phone_number?: string | null }
     | undefined;
 
-  const contactId = contact?.id ?? lead?.contact_id;
+  // `?? undefined` porque `contact_id` admite `null` (a linha
+  // do banco) e `publicaNoContexto` aceita `string | undefined`.
+  const contactId = contact?.id ?? lead?.contact_id ?? undefined;
   handlerCtx.serviceOrigin = contactId
     ? (await originFromAutomationEvent(ctx, contactId)) ?? { kind: "unavailable", reason: "origin_capture_failed" }
     : { kind: "unavailable", reason: "origin_capture_failed" };

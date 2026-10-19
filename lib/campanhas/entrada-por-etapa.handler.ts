@@ -29,6 +29,8 @@ export const CAMPANHA_ENTRADA_ETAPA_HANDLER_KEY = "campanha-entrada-etapa.v1";
 
 export const campanhaEntradaPorEtapaHandler: EventHandler = {
   key: CAMPANHA_ENTRADA_ETAPA_HANDLER_KEY,
+  // Org parada (0501, upstream): não age em nome dela.
+  naOrgParada: "pula",
   events: [EVENTO_DE_ETAPA],
   async handle(row): Promise<HandlerResult> {
     try {

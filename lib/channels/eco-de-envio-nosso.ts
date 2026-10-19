@@ -22,6 +22,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { semAssinatura } from "@/lib/messaging/assinatura";
+
 /**
  * Quanto tempo um envio nosso pode ficar "em voo" antes de o eco deixar de ser
  * explicável por ele. Folgado de propósito: errar para o lado permissivo custa um
@@ -70,7 +72,11 @@ export async function ehEcoDeEnvioNosso(
       if (!TIPOS_DE_TEXTO.has(l.type ?? "text")) return true;
       continue;
     }
-    if (corpo.length > 0 && (l.body ?? "").trim() === corpo) return true;
+    // Com a assinatura do emissor ligada (upstream #2066), o eco traz `*Nome*\ntexto` e a
+    // linha guarda `texto`: sem tirar a linha do nome, o eco do próprio envio
+    // assinado seria lido como digitação no celular e calaria a IA.
+    const gravado = (l.body ?? "").trim();
+    if (corpo.length > 0 && (gravado === corpo || gravado === semAssinatura(corpo).trim())) return true;
   }
   return false;
 }

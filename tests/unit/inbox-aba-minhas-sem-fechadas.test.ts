@@ -182,7 +182,7 @@ describe("contador de Minhas", () => {
     expect(fonte).toMatch(/p_terminais:\s*\[\.\.\.CONVERSATION_TERMINAL_STATUSES\]/);
     // Desde a 9029 o predicado mora na função do banco, que recebe os terminais por parâmetro.
     const funcao = readFileSync(
-      "supabase/migrations/20261004090000_9029_contagens_da_caixa_numa_consulta.sql",
+      "supabase/migrations/20261004090002_9029_contagens_da_caixa_numa_consulta.sql",
       "utf8",
     );
     expect(funcao).toMatch(

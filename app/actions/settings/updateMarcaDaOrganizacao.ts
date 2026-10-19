@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
+import { escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { normalizarHex } from "@/lib/branding/rampa";
 import {
   marcaDaOrganizacaoSchema,
@@ -97,10 +98,11 @@ export async function updateMarcaDaOrganizacao(
   if (supportWriteError(authUser.support)) return { ok: false, error: "forbidden_role" };
   const activeOrg = await resolveActiveOrg(authUser);
   if (!activeOrg) return { ok: false, error: "forbidden_tenant" };
-  // Só o admin da PLATAFORMA, fora do modo suporte (mesmo gate da página): a marca
-  // da organização deixou de ser editável pelo admin do cliente (19/10). A
-  // função SQL só executa por service_role; o logo (/api/v1/marca/logo) tem o mesmo gate.
-  if (!authUser.is_platform_admin || authUser.support) {
+  // Só o admin da PLATAFORMA com escopo completo (régua do upstream:
+  // `escreveComoPlatformAdmin`) e fora do modo suporte: a marca da organização
+  // deixou de ser editável pelo admin do cliente (19/10). A função SQL só executa
+  // por service_role; o logo (/api/v1/marca/logo) tem o mesmo gate.
+  if (!escreveComoPlatformAdmin(authUser) || authUser.support) {
     return { ok: false, error: "forbidden_role" };
   }
   // DEPOIS do papel, de propósito: quem nem tem o papel recebe `forbidden_role`,

@@ -7,15 +7,13 @@
  */
 
 /**
- * O texto que substitui a string vazia quando a mídia não pôde ser lida.
- *
- * Não é cosmético: o agente recebe este texto como derivado da mensagem, então
- * ele passa a SABER que chegou algo que não conseguiu interpretar, em vez de
- * concluir que a mensagem veio vazia. A diferença aparece na resposta ao
- * cliente — "não consegui abrir sua foto, pode me dizer o que é?" no lugar de
- * um silêncio que parece descaso.
+ * O texto que substitui a string vazia quando a mídia não pôde ser lida. Mora em
+ * `derivable.ts` desde a subida 1.73 (o upstream o pôs lá, sem import nenhum,
+ * pelo mesmo motivo que o pusemos aqui: a tela precisa dele): UMA fonte só.
  */
-export const MARCADOR_NAO_LIDA = "[o cliente enviou uma mídia que não consegui interpretar]";
+import { MARCADOR_NAO_LIDA } from "./derivable";
+
+export { MARCADOR_NAO_LIDA };
 
 /**
  * A transcrição que a bolha do áudio mostra, ou `null` para não mostrar nada.

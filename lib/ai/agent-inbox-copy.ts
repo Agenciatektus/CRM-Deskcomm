@@ -104,6 +104,9 @@ export const KIND_LABEL = {
   // Diz que chegou a HORA, não que a tarefa "venceu": o aviso sai no prazo, e
   // quem lê precisa saber que é para fazer agora, não que já perdeu.
   task_due: "Chegou a hora de uma tarefa",
+  // Igual ao `title` que fn_reativar_organizacao grava: diz o que a pessoa tem
+  // de FAZER agora — as conversas que chegaram durante a suspensão ficaram sem resposta.
+  org_reativada: "A conta foi reativada — há conversas para revisar",
   other: "Aviso do assistente",
 } as const satisfies Record<InboxKind, string>;
 

@@ -59,6 +59,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         const cas: Record<string, unknown> = {
           eq: () => cas,
           is: () => cas,
+          filter: () => cas,
           select: async () => ({ data: [{ id: messageRow.id }], error: null }),
         };
         return cas;

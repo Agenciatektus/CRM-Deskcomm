@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
  *
  * O atalho do card existe e funciona. Mas o usuário foi procurá-lo no DOSSIÊ —
  * que é para onde se vai quando a pergunta é "o que está acontecendo com este
- * negócio?" — e lá a linha do tempo ANUNCIA "Entrou pelo WhatsApp / primeira
+ * negócio?" — e lá a linha do tempo ANUNCIA "Entrou no funil / primeira
  * mensagem recebida no WhatsApp" sem oferecer nenhum jeito de abrir a conversa.
  *
  * Anunciar o canal e não dar a porta é pior que não anunciar: quem lê procura,
@@ -90,7 +90,7 @@ describe("o elo que some sem barulho", () => {
   });
 
   it("e a porta vem ANTES da linha do tempo que anuncia o canal", () => {
-    // É a timeline que diz "Entrou pelo WhatsApp". No celular a porta é a aba
+    // É a timeline que diz "Entrou no funil". No celular a porta é a aba
     // Conversa, no topo; ela atrás do anúncio obrigaria a rolar para achar o
     // que o próprio texto acabou de prometer.
     const fonte = readFileSync("components/kanban/LeadDossier.tsx", "utf8");

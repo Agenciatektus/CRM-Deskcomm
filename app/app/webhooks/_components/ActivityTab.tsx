@@ -123,6 +123,8 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
     "A etapa escolhida não pertence ao funil de destino ou foi arquivada. Abra a automação e escolha outra etapa.",
   etapa_de_destino_de_fechamento:
     "A etapa escolhida é de ganho ou de perda, e um card novo não pode nascer fechado. Escolha uma etapa aberta.",
+  lead_already_transferred_in_event:
+    "Outra regra deste mesmo evento já levou o lead para outro funil. Vale a primeira regra; esta não transfere de novo.",
   flow_not_active:
     "O funil escolhido não está ativo, então a inscrição não foi feita. Ative o funil ou escolha outro na automação.",
   live_enrollment_exists: "O contato já está em um funil ativo — esta ação não inscreve duas vezes.",
@@ -144,6 +146,9 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   // certo.
   criacao_em_lote:
     "Este card nasceu de uma criação em lote (importação de planilha ou campanha), e as ações que falam com o cliente ficam de fora nessas levas, para a mesma regra não virar centenas de mensagens no mesmo minuto. As outras ações da regra rodaram normalmente.",
+  // #1528 — o motor pula atribuir/mover nos gatilhos do trigger (laço).
+  acao_fecharia_laco:
+    "Neste gatilho esta ação não roda: atribuir responsável ou mover o lead dispararia a automação de novo, sem fim. Abra a automação e tire a ação.",
   /*
    * #1540 — a ação criar tarefa. Estes quatro não passam por literal nenhum
    * em lib/automation: nascem em lib/tarefas/criar-tarefa.ts como

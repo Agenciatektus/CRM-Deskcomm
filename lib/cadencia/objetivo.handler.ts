@@ -80,6 +80,8 @@ export function createSupabaseObjetivoDb(admin: SupabaseClient): ObjetivoDb {
 
 export const cadenciaObjetivoHandler: EventHandler = {
   key: CADENCIA_OBJETIVO_HANDLER_KEY,
+  // Org parada (0501, upstream): não age em nome dela.
+  naOrgParada: "pula",
   events: [...EVENTOS_DO_OBJETIVO],
   async handle(row): Promise<HandlerResult> {
     try {

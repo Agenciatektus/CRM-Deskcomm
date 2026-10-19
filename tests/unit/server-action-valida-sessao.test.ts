@@ -51,6 +51,9 @@ const PASTAS = ["app", "lib", "components"];
 const PORTOES = [
   "requireOnboardingCtx",
   "requirePlatformAdmin",
+  // Upstream 1.70+: o portão de ESCRITA de platform admin (chama
+  // requirePlatformAdminEscrita, que exige scope full).
+  "escritaDeAdminOuRecusa",
   "requireAuth",
   "requireRole",
   "ensureAdmin",

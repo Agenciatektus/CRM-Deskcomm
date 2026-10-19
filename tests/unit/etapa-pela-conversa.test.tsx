@@ -94,9 +94,8 @@ describe("crm-summary: a etapa do negócio e as etapas do funil", () => {
         {
           user_id: "u-1", organization_id: ORG, role: "agent", accepted_at: "2026-09-01T00:00:00Z", revoked_at: null,
           interface_settings: null,
-          organizations: { display_name: "Loja", locale: "pt-BR", timezone: "America/Sao_Paulo", currency: "BRL", country: "BR" },
+          organizations: { display_name: "Loja", locale: "pt-BR", timezone: "America/Sao_Paulo", currency: "BRL", country: "BR", status: "active" },
           interface_da_empresa: { interface_settings: null },
-          situacao_da_empresa: { status: "active" },
         },
       ],
       crm_leads: [

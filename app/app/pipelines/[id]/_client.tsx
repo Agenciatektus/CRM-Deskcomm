@@ -131,7 +131,17 @@ export function PipelinePageClient({
       onClear={() => setSelectedIds([])}
     />
   );
-  const novo = data && <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} pipelineId={pipelineId} stages={data.stages} />;
+  // #1751 (upstream): o quadro é a lista que o diálogo confere ANTES de criar —
+  // é ela que faz o aviso de negócio duplicado existir sem rede.
+  const novo = data && (
+    <NewLeadDialog
+      open={newOpen}
+      onOpenChange={setNewOpen}
+      pipelineId={pipelineId}
+      stages={data.stages}
+      leads={data.leads}
+    />
+  );
   const lista = (Lista: typeof ListaDoFunil) =>
     data && (
       <Lista

@@ -28,7 +28,7 @@ const org = (id: string, status: string | null): UserOrgMembership => ({
   organization_id: id,
   organization_name: `Org ${id}`,
   role: "admin",
-  status,
+  org_status: status,
 });
 
 describe("escolha da organização ativa", () => {
@@ -41,15 +41,15 @@ describe("escolha da organização ativa", () => {
     expect(escolhida?.organization_id).toBe("tektus");
   });
 
-  it("ignora o cookie quando ele aponta para uma suspensa", () => {
-    // A suspensão acontece DEPOIS de o cookie ser gravado — que é a ordem normal
-    // dos fatos. Sem isto, quem entrou uma vez fica preso por um cookie que não
-    // sabe que existe.
+  it("com cookie numa suspensa, entra nela: é o caminho até o hub /account-suspended", () => {
+    // Subida 1.73: o upstream criou o hub da suspensão (0501), que diz QUAL empresa
+    // parou e lista as outras para trocar. Ignorar o cookie deixaria o hub
+    // inalcançável para quem tem outra empresa ativa — e é por ele que se paga.
     const escolhida = escolher(
       [org("suspensa", "suspended"), org("tektus", "active")],
       "suspensa",
     );
-    expect(escolhida?.organization_id).toBe("tektus");
+    expect(escolhida?.organization_id).toBe("suspensa");
   });
 
   it("respeita o cookie quando ele aponta para uma que está de pé", () => {
@@ -74,10 +74,10 @@ describe("escolha da organização ativa", () => {
     expect(escolher([], "qualquer")).toBeNull();
   });
 
-  it("status ausente conta como de pé", () => {
-    // Instalação antiga, ou linha gravada antes de a coluna existir: a ausência
-    // de status não pode barrar ninguém. Só `suspended` barra, e só ele.
+  it("status ausente não conta como operante: a régua é a do upstream (`ehOperante`)", () => {
+    // Desde a 0501 a coluna é obrigatória; `null` só vem de leitura que não trouxe
+    // o campo, e a escolha não aposta nela quando há uma empresa ativa.
     const escolhida = escolher([org("sem-status", null), org("ativa", "active")], undefined);
-    expect(escolhida?.organization_id).toBe("sem-status");
+    expect(escolhida?.organization_id).toBe("ativa");
   });
 });
