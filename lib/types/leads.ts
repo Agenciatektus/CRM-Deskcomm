@@ -81,6 +81,11 @@ export interface Lead {
     unread: number;
     /** POR ONDE entrou no Instagram: `direct` | `comentario`. Null nos outros canais. */
     instagram_entrada?: string | null;
+    /**
+     * Desde quando o cliente espera resposta (`awaiting_since`, a régua da Fila),
+     * ou `null` quando a última palavra é nossa. Ordem "Esperando resposta".
+     */
+    esperando_desde?: string | null;
   } | null;
   score?: {
     probability: number;
@@ -129,6 +134,22 @@ export interface Lead {
   contact_phone?: string;
   contact_email?: string;
   contact_links?: Array<{ tipo: string; href: string }>;
+  /**
+   * Derivado (não é coluna): o nome de gente do CONTATO (`nomeDoContato`, que
+   * descarta identificador técnico) — o nome do card do funil. Inclui o nome
+   * do perfil do Instagram, que o ingest do Direct grava em `contacts.name`.
+   */
+  contact_name?: string;
+  /** Derivado: o @ do Instagram do contato (`contacts.instagram_username`), sem o `@`. */
+  contact_instagram?: string;
+  /** Derivado: o contato tem foto guardada (`avatar_storage_path`), servida por `/api/v1/contacts/:id/avatar`. */
+  contact_tem_foto?: boolean;
+  /**
+   * Derivado: a tarefa ABERTA mais urgente do negócio (`crm_tasks`), o
+   * "próximo passo" do card. `null` = nenhuma tarefa aberta; ausente = não
+   * carregou (o card não afirma "sem próximo passo" sem saber).
+   */
+  proximo_passo?: { titulo: string; prazo: string | null } | null;
   /**
    * Derivado (não é coluna): os marcadores das CONVERSAS do contato deste
    * negócio — a terceira caixa, "Tags da conversa" no painel do Inbox, onde a

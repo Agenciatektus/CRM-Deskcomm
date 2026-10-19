@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { formatMoney } from "@/components/inbox/painel/SemLista";
 import { useT } from "@/hooks/i18n/useT";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useBoard } from "@/hooks/kanban/useBoard";
+import { AvatarDoLead } from "@/components/kanban/AvatarDoLead";
+import { canalDoCard, iniciaisDoCard, nomeDoCard } from "@/lib/kanban/identidade-do-card";
 import type { Lead } from "@/lib/types/leads";
 import { ArrowRight, CaretDown, Check, Funnel } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
@@ -13,14 +15,6 @@ import { cn } from "@/lib/utils";
 import { FolhaInferior } from "../FolhaInferior";
 import { useFunisDoMenu } from "../FunisDoMenu";
 import { FolhaMoverEtapaDoLead } from "./FolhaMoverEtapaDoLead";
-
-const iniciais = (texto: string) =>
-  texto
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
 
 /** "N leads abertos, R$ X": os abertos do funil e a soma do valor deles (na moeda do primeiro). */
 export function resumoDoFunil(leads: Lead[]): { abertos: number; centavos: number; moeda: string | null } {
@@ -39,7 +33,22 @@ export function resumoDoFunil(leads: Lead[]): { abertos: number; centavos: numbe
  * (a folha com as regras do quadro). Os dados são os do quadro (`useBoard`, a mesma
  * consulta e o mesmo realtime). O FAB "+" e a folha "Criar" vêm da casca.
  */
-export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: string; aoTrocarFunil: (id: string) => void }) {
+export function FunilNoCelular({
+  pipelineId,
+  aoTrocarFunil,
+  leadsDoRecorte,
+  barra,
+  conteudo,
+}: {
+  pipelineId: string;
+  aoTrocarFunil: (id: string) => void;
+  /** Os leads já filtrados e ORDENADOS pela barra do Funil (a ordem vem pronta). */
+  leadsDoRecorte?: Lead[];
+  /** A barra do Funil (resumo, busca, atalhos), no lugar do resumo simples. */
+  barra?: ReactNode;
+  /** A Lista: no lugar das abas de etapa e dos cartões. */
+  conteudo?: ReactNode;
+}) {
   const t = useT();
   const funis = useFunisDoMenu();
   const { data, isLoading } = useBoard(pipelineId);
@@ -50,8 +59,9 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
 
   const etapas = useMemo(() => (data?.stages ?? []).filter((s) => !s.is_archived), [data]);
   const etapaId = etapaEscolhida ?? etapas[0]?.id ?? null;
-  const leads = data?.leads ?? [];
-  const daEtapa = leads.filter((l) => l.stage_id === etapaId).sort((a, b) => a.position_in_stage - b.position_in_stage);
+  const leads = leadsDoRecorte ?? data?.leads ?? [];
+  const daEtapa = leads.filter((l) => l.stage_id === etapaId);
+  if (!leadsDoRecorte) daEtapa.sort((a, b) => a.position_in_stage - b.position_in_stage);
   const nomes = new Map((membros ?? []).map((m) => [m.user_id, m.full_name]));
   const resumo = resumoDoFunil(leads);
 
@@ -67,10 +77,14 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
         <span className="min-w-0 flex-1 truncate">{data?.pipeline.name ?? t("Funil")}</span>
         <CaretDown size={18} aria-hidden />
       </button>
-      <p className="px-4 pt-2 text-[13.5px] text-text-muted">
-        {resumo.abertos === 1 ? t("1 lead aberto") : `${resumo.abertos} ${t("leads abertos")}`}
-        {resumo.centavos > 0 && `, ${formatMoney(resumo.centavos, resumo.moeda)}`}
-      </p>
+      {barra ?? (
+        <p className="px-4 pt-2 text-[13.5px] text-text-muted">
+          {resumo.abertos === 1 ? t("1 lead aberto") : `${resumo.abertos} ${t("leads abertos")}`}
+          {resumo.centavos > 0 && `, ${formatMoney(resumo.centavos, resumo.moeda)}`}
+        </p>
+      )}
+      {conteudo ?? (
+      <>
       <div role="tablist" aria-label={t("Etapas do funil")} className="flex snap-x gap-1.5 overflow-x-auto scroll-px-4 px-4 py-3 scrollbar-none">
         {etapas.map((e) => {
           const ligada = e.id === etapaId;
@@ -107,11 +121,17 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
               href={`/app/leads/${l.id}`}
               className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-3 rounded-t-2xl px-3.5 pt-3.5 pb-2 hover:bg-hover"
             >
-              <span aria-hidden className="grid size-11 place-items-center rounded-full bg-tint text-sm font-bold text-text">
-                {iniciais(l.title)}
-              </span>
+              {/* O MESMO avatar e o MESMO nome do card do desktop (proposta de
+                  13/10): foto ou iniciais com a cor da pessoa, selo do canal, e
+                  nunca "Novo contato pelo WhatsApp". */}
+              <AvatarDoLead
+                semente={l.contact_id ?? l.id}
+                iniciais={iniciaisDoCard(nomeDoCard(l).nome || t("Sem nome"))}
+                foto={l.contact_tem_foto && l.contact_id ? `/api/v1/contacts/${l.contact_id}/avatar` : null}
+                canal={canalDoCard(l)}
+              />
               <span className="min-w-0">
-                <b className="block truncate text-base text-text">{l.title}</b>
+                <b className="block truncate text-base text-text">{nomeDoCard(l).nome || t("Sem nome")}</b>
                 {l.next_action?.label && (
                   <span className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-text-muted">
                     <ArrowRight size={14} aria-hidden />
@@ -139,6 +159,8 @@ export function FunilNoCelular({ pipelineId, aoTrocarFunil }: { pipelineId: stri
           </li>
         ))}
       </ul>
+      </>
+      )}
       <FolhaMoverEtapaDoLead lead={movendo} etapas={etapas} pipelineId={pipelineId} aoFechar={() => setMovendo(null)} />
       <FolhaInferior aberto={escolhendoFunil} aoMudar={setEscolhendoFunil} titulo={t("Funis")}>
         {funis.map((f) => (

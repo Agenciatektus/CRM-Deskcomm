@@ -27,8 +27,13 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
+import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
 import type { PipelineVocabulary, Stage } from "@/lib/kanban/types";
+
+/** O teto da rota em lote por chamada (`lead_ids` máx. 50). */
+export const LOTE_MAXIMO = 50;
 
 interface BulkActionBarProps {
   selectedIds: string[];
@@ -129,37 +134,67 @@ export function BulkActionBar({
       ? `1 ${vocab.lead} ${t("selecionado")}`
       : `${selectedIds.length} ${t("selecionados")}`;
 
-  const runMove = (stageId: string) => {
-    bulk.mutate(
-      {
-        action: "move",
-        lead_ids: selectedIds,
-        // Sem `position_in_stage`: um escalar não posiciona N cards sem
-        // empatá-los, e empate quebra o `midpoint()` do arrasto seguinte. Quem
-        // dá a posição de cada um é `fn_mover_leads_em_lote` (migration 0209).
-        params: { stage_id: stageId },
+  /**
+   * DESFAZER no lote (barra do Funil, 13/10/2026): mover, atribuir e etiquetar
+   * em massa disparam automações do funil por lead; o aviso SEGURA a chamada
+   * por alguns segundos (`adiarAcao`, o mesmo de ganho/perda) e "Desfazer" não
+   * chama nada. A seleção sai na hora; a rota só roda no fim do aviso.
+   */
+  /**
+   * A rota em lote aceita até 50 ids por chamada (422 acima disso). "Selecionar
+   * todos" na Lista marca centenas: vai em BLOCOS de 50, em sequência. A seleção
+   * só sai quando TODOS os blocos deram certo; com erro, fica, para tentar de novo.
+   */
+  const emBlocos = async (input: BulkLeadActionInput): Promise<number> => {
+    let total = 0;
+    for (let i = 0; i < input.lead_ids.length; i += LOTE_MAXIMO) {
+      const bloco = { ...input, lead_ids: input.lead_ids.slice(i, i + LOTE_MAXIMO) } as BulkLeadActionInput;
+      const res = await new Promise<{ data?: { updated_count?: number } }>((resolver, recusar) =>
+        bulk.mutate(bloco, { onSuccess: (r) => resolver(r as { data?: { updated_count?: number } }), onError: recusar }),
+      );
+      total += res?.data?.updated_count ?? bloco.lead_ids.length;
+    }
+    return total;
+  };
+
+  /** Um Desfazer cobre todos os blocos: nada é chamado antes do fim do aviso. */
+  const comDesfazer = (mensagem: string, input: BulkLeadActionInput, aoConcluir?: (n: number) => void) => {
+    adiarAcao(
+      (s) => `${mensagem} (${s} s)`,
+      t("Desfazer"),
+      async () => {
+        const n = await emBlocos(input);
+        aoConcluir?.(n);
+        onClear();
       },
-      { onSuccess: () => onClear() },
     );
   };
 
+  const runMove = (stageId: string) => {
+    comDesfazer(t("Movendo os selecionados"), {
+      action: "move",
+      lead_ids: selectedIds,
+      // Sem `position_in_stage`: um escalar não posiciona N cards sem
+      // empatá-los, e empate quebra o `midpoint()` do arrasto seguinte. Quem
+      // dá a posição de cada um é `fn_mover_leads_em_lote` (migration 0209).
+      params: { stage_id: stageId },
+    });
+  };
+
   const runAssign = (ownerId: string | null) => {
-    bulk.mutate(
+    comDesfazer(
+      t("Atribuindo os selecionados"),
       {
         action: "assign",
         lead_ids: selectedIds,
         params: { owner_user_id: ownerId },
       },
-      {
-        onSuccess: (res) => {
-          const n = res.data.updated_count;
-          toast.success(
-            ownerId === null
-              ? `${n} ${t(n > 1 ? "ficaram sem responsável." : "ficou sem responsável.")}`
-              : `${n} ${t(n > 1 ? "atribuídos." : "atribuído.")}`,
-          );
-          onClear();
-        },
+      (n) => {
+        toast.success(
+          ownerId === null
+            ? `${n} ${t(n > 1 ? "ficaram sem responsável." : "ficou sem responsável.")}`
+            : `${n} ${t(n > 1 ? "atribuídos." : "atribuído.")}`,
+        );
       },
     );
   };
@@ -167,27 +202,17 @@ export function BulkActionBar({
   const runTagAdd = (escolhida?: string) => {
     const tag = (escolhida ?? tagInput).trim();
     if (!tag) return;
-    bulk.mutate(
-      { action: "tag", lead_ids: selectedIds, params: { add: [tag] } },
-      {
-        onSuccess: () => {
-          setTagInput("");
-          onClear();
-        },
-      },
-    );
+    setTagInput("");
+    comDesfazer(t("Etiquetando os selecionados"), { action: "tag", lead_ids: selectedIds, params: { add: [tag] } });
   };
 
   const runDelete = () => {
-    bulk.mutate(
-      { action: "delete", lead_ids: selectedIds, params: {} },
-      {
-        onSuccess: () => {
-          setConfirmDelete(false);
-          onClear();
-        },
-      },
-    );
+    void emBlocos({ action: "delete", lead_ids: selectedIds, params: {} } as BulkLeadActionInput)
+      .then(() => {
+        setConfirmDelete(false);
+        onClear();
+      })
+      .catch(() => undefined); // o erro já sai no toast do useBulkAction; a seleção fica
   };
 
   return (

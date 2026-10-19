@@ -12,9 +12,10 @@ import { SIMBOLO } from "./desenho";
  */
 export function CamadasDoSimbolo({ prefixo }: { prefixo: string }) {
   const id = (i: number) => `${prefixo.replace(/[^a-zA-Z0-9_-]/g, "")}-simbolo-${i}`;
-  return (
-    <>
-      <defs>
+  // Lista com chave, e não fragmento: o satori (ícones via `ImageResponse`) só
+  // aceita elementos nativos dentro de `<svg>` e recusa até o `<>`.
+  return [
+      <defs key="defs">
         {SIMBOLO.gradientes.map((g, i) => (
           <linearGradient key={i} id={id(i)} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} gradientUnits="userSpaceOnUse">
             {g.paradas.map(([offset, cor]) => (
@@ -22,10 +23,9 @@ export function CamadasDoSimbolo({ prefixo }: { prefixo: string }) {
             ))}
           </linearGradient>
         ))}
-      </defs>
-      {SIMBOLO.caminhos.map((c) => (
+      </defs>,
+      ...SIMBOLO.caminhos.map((c) => (
         <path key={c.gradiente} d={c.d} fill={`url(#${id(c.gradiente)})`} />
-      ))}
-    </>
-  );
+      )),
+  ];
 }

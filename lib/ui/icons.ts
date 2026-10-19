@@ -15,6 +15,13 @@ export {
   PlugsConnected,
   QrCode,
   Kanban,
+  // barra do Funil (13/10/2026): Lista, densidade, ordenar, filtros e espera
+  ListBullets,
+  Rows,
+  ListDashes,
+  ArrowsDownUp,
+  SlidersHorizontal,
+  Hourglass,
   Users,
   UsersThree,
   Storefront,

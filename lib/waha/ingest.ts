@@ -39,6 +39,7 @@ import type { WahaEnvelope, WahaPayload } from "@/lib/waha/envelope";
 import { bareWaMessageId, chatIdFromWaMessageId } from "@/lib/waha/message-id";
 import { aplicarAlteracaoDeMensagem } from "@/lib/channels/alteracao-de-mensagem";
 import { logger } from "@/lib/logger";
+import { ehEcoDeEnvioNosso } from "@/lib/channels/eco-de-envio-nosso";
 import {
   ehNumeroInternoDeAviso,
   registrarMensagemIgnorada,
@@ -61,85 +62,6 @@ export type Admin = ReturnType<typeof createAdminClient>;
  * celular": são lidos por `lerComandoDeControle` e escondidos do cliente com
  * `revogarComando`.
  */
-
-/**
- * Quanto tempo um envio nosso pode ficar "em voo" antes de o eco deixar de ser
- * explicável por ele.
- *
- * 60s é folgado de propósito: o custo de errar para o lado permissivo é uma
- * digitação real do celular não silenciar a IA por um minuto; o custo de errar
- * para o outro lado é a IA muda por três horas. Os dois erros não são simétricos.
- */
-const JANELA_DO_ECO_MS = 60_000;
-
-/**
- * A mensagem `fromMe` que chegou é o eco de um envio que ESTE CRM acabou de
- * fazer — e não alguém digitando no celular?
- *
- * A prova exigida é forte: uma linha nossa na MESMA conversa, ainda sem
- * `external_id` (portanto ainda em voo), com o MESMO corpo, dentro da janela.
- * Qualquer uma dessas faltando, a resposta é "não sei" — e "não sei" silencia,
- * porque é o desfecho seguro do lado do atendente humano (#371).
- *
- * Mídia não tem corpo comparável (o eco traz `media_url`, não texto): ali a
- * prova cai para "existe envio nosso em voo do mesmo tipo na janela", que é mais
- * permissivo e assumidamente mais fraco.
- */
-async function ehEcoDeEnvioNosso(
-  admin: Admin,
-  organizationId: string,
-  conversationId: string,
-  p: WahaPayload,
-): Promise<boolean> {
-  const desde = new Date(Date.now() - JANELA_DO_ECO_MS).toISOString();
-  const { data, error } = await admin
-    .from("messages")
-    .select("id, body, type")
-    .eq("organization_id", organizationId)
-    .eq("conversation_id", conversationId)
-    .eq("direction", "outbound")
-    // `sent_via` separa o que NASCEU aqui do que veio do celular: a linha do
-    // celular é gravada como `external_device` e nunca pode servir de álibi.
-    //
-    // `automation` entrou junto do carimbo novo (#652). A mensagem que a REGRA
-    // manda nasceu aqui tanto quanto a da IA e a do composer; sem ela nesta
-    // lista, o eco do próprio envio da regra era lido como resposta pelo celular
-    // e a IA ficava pausada na conversa por causa de uma mensagem que o CRM
-    // mandou sozinho. Lista e carimbo andam juntos: quem escreve estes valores é
-    // `origemDaMensagem`, em `app/api/v1/messages/_handler.ts`.
-    //
-    // `system` ENTRA pela mesma razão, e o sintoma seria idêntico: é o valor que
-    // o envio por TOKEN DE SERVIDOR grava (#866). Fora desta lista, a linha da
-    // integração deixa de ser reconhecida como envio NOSSO, o eco do próprio
-    // envio vira "resposta pelo celular" e cala a IA por três horas.
-    .in("sent_via", ["ai", "user", "automation", "system"])
-    // Sem `external_id` = ainda não confirmada pelo canal = ainda em voo. É esta
-    // a janela exata em que o eco é indistinguível de digitação humana.
-    .is("external_id", null)
-    .in("status", ["queued", "sending"])
-    .gte("created_at", desde)
-    .limit(20);
-
-  if (error) {
-    // Falha de leitura não pode virar "é eco": na dúvida, silencia — o
-    // desfecho seguro é o do atendente humano.
-    console.error("[waha.ingest] checagem de eco falhou", error.message);
-    return false;
-  }
-
-  const corpo = (p.body ?? "").trim();
-  for (const linha of data ?? []) {
-    const l = linha as { body: string | null; type?: string | null };
-    if (p.type && p.type !== "chat") {
-      // Mídia: sem corpo para comparar, a existência do envio em voo é a prova
-      // possível. Mais fraco, e escrito para ninguém supor o contrário.
-      if ((l.type ?? "chat") !== "chat") return true;
-      continue;
-    }
-    if (corpo.length > 0 && (l.body ?? "").trim() === corpo) return true;
-  }
-  return false;
-}
 
 interface Session {
   id: string;
@@ -1187,7 +1109,12 @@ async function handleOutboundFromUserPhone(
   //   mexer no automa. -> ESTRITO   (na dúvida NÃO age; calar/ligar a IA por
   //                                  engano é pior que não agir)
   // Quem reaproveitar esta condição para pular o INSERT reabre o #108.
-  const ehEco = await ehEcoDeEnvioNosso(admin, session.organization_id, conversationId, p);
+  const ehEco = await ehEcoDeEnvioNosso(admin, session.organization_id, conversationId, {
+    corpo: p.body ?? null,
+    // Pelo tipo RESOLVIDO (P2 do Cassio na #202): cobre motor que manda `type:"text"`
+    // e mídia sem legenda do NOWEB, que não traz `type`.
+    midia: resolveMessageType(p) !== "text",
+  });
   let comandoAplicado: typeof comando = null;
   if (!ehEco) {
     let revogar = true;

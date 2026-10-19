@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
 import { FunilNoCelular } from "@/components/mobile/telas/Funil";
@@ -8,11 +8,25 @@ import { useEhCelular } from "@/lib/mobile/useEhCelular";
 import { usePodeCriar } from "@/lib/mobile/usePodeCriar";
 import { useT } from "@/hooks/i18n/useT";
 import { useBoard } from "@/hooks/kanban/useBoard";
+import { KanbanBoard } from "@/components/kanban/KanbanBoard";
+import { CabecalhoDoFunil } from "@/components/kanban/barra/CabecalhoDoFunil";
+import { BarraDeBusca } from "@/components/kanban/barra/BarraDeBusca";
+import { PainelDeFiltros } from "@/components/kanban/barra/PainelDeFiltros";
+import { ListaDoFunil } from "@/components/kanban/ListaDoFunil";
+import { ListaDoFunilCelular } from "@/components/kanban/ListaDoFunilCelular";
+import { useFunilCompacto } from "@/hooks/kanban/useFunilCompacto";
+import { useOrdemDoFunil, useVistaDoFunil } from "@/hooks/kanban/usePreferenciasDoFunil";
+import { useRecorteDoFunil } from "@/hooks/kanban/useRecorteDoFunil";
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
+import { BulkActionBar } from "@/components/kanban/BulkActionBar";
+import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { ROLE_RANK, type Role } from "@/lib/auth/types";
 
 function formatError(err: unknown, t: (texto: string) => string): string {
   if (err instanceof Error) return err.message;
   if (err && typeof err === "object") {
-    const obj = err as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    const obj = err as { message?: unknown; code?: unknown };
     if (typeof obj.message === "string") {
       const code = typeof obj.code === "string" ? ` [${obj.code}]` : "";
       return `${obj.message}${code}`;
@@ -25,25 +39,17 @@ function formatError(err: unknown, t: (texto: string) => string): string {
   }
   return String(err);
 }
-import { KanbanBoard } from "@/components/kanban/KanbanBoard";
-import { FilterBar } from "@/components/kanban/FilterBar";
-import { BulkActionBar } from "@/components/kanban/BulkActionBar";
-import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
-import { CadenciasDoPipeline } from "@/components/cadencia/CadenciasDoPipeline";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Plus } from "@/lib/ui/icons";
-import type { LeadFilters } from "@/lib/kanban/filters";
-import { applyFilters, filtersFromParams, filtersToParams } from "@/lib/kanban/filters";
-import { categoriaDoMotivo } from "@/lib/leads/motivos-de-perda-do-funil";
-import { ROLE_RANK, type Role } from "@/lib/auth/types";
 
-/** As duas vistas do funil; o rótulo passa por `t()` no render. */
-const MODOS_DO_FUNIL: ReadonlyArray<{ id: "kanban" | "cadencias"; rotulo: string }> = [
-  { id: "kanban", rotulo: "Kanban" },
-  { id: "cadencias", rotulo: "Cadências" },
-];
-
+/**
+ * A página do Funil com a barra aprovada pelo Peterson (board "Barra do
+ * Funil", 13/10/2026): resumo do recorte no título, Kanban × Lista e
+ * densidade só com ícone, busca por gente, atalhos, painel de filtros e
+ * Ordenar. Filtros na URL (e lembrados por pessoa); vista, ordem e densidade
+ * por pessoa neste navegador.
+ *
+ * Cadências saiu da barra (não é um modo de ver o funil): `?modo=cadencias`
+ * cai no Kanban. A tela de cadências do funil segue no código.
+ */
 export function PipelinePageClient({
   pipelineId,
   initialName,
@@ -56,162 +62,121 @@ export function PipelinePageClient({
   const t = useT();
   const { data, isLoading, error, pulses, realtimeStatus, seguranca } = useBoard(pipelineId);
   const router = useRouter();
-  const celular = useEhCelular();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
-  const setFilters = useCallback(
-    (next: LeadFilters) => {
-      const qs = filtersToParams(next);
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [router, pathname],
-  );
+  const celular = useEhCelular();
+  const { user } = useAuth();
+  const userId = user?.id ?? "";
+  const [compacto, setCompacto] = useFunilCompacto(user?.id);
+  const [vista, setVista] = useVistaDoFunil(user?.id);
+  const [ordem, setOrdem] = useOrdemDoFunil(user?.id);
+  const { filters, setFilters, recorte, ordenados, resumo, contagens } = useRecorteDoFunil(pipelineId, data, user?.id, ordem);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  // O MODO mora na URL (`?modo=cadencias`): dá para mandar o link da cadência
-  // do funil para alguém, e voltar do navegador devolve ao Kanban.
-  const modo = searchParams.get("modo") === "cadencias" ? "cadencias" : "kanban";
-  const trocarModo = useCallback(
-    (proximo: "kanban" | "cadencias") => {
-      const params = new URLSearchParams(searchParams);
-      if (proximo === "cadencias") params.set("modo", "cadencias");
-      else params.delete("modo");
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [router, pathname, searchParams],
-  );
   const [newOpen, setNewOpen] = useState(false);
   // O "+" do celular chega com `?criar=1`.
   const podeCriar = usePodeCriar();
   usePedidoDeCriar(() => setNewOpen(true), podeCriar);
+  const { data: membros } = useAssignableMembers(true);
+  const ownerNames = useMemo(() => new Map((membros ?? []).map((m) => [m.user_id, m.full_name])), [membros]);
 
-  /**
-   * Motivo e categoria da perda (#1537): a categoria NÃO vem no lead — ela é
-   * `settings.lost_reasons` do funil, que o payload do quadro já traz. O
-   * resolvedor é o MESMO que o relatório usa (`categoriaDoMotivo`), para o
-   * filtro e o relatório nunca dizerem coisas diferentes.
-   */
-  const categoriaDo = useMemo(() => {
-    const settings = data?.pipeline.settings;
-    return (motivo: string) => categoriaDoMotivo(motivo, settings);
-  }, [data?.pipeline.settings]);
-  const filteredLeads = data ? applyFilters(data.leads, filters, { categoriaDo }) : [];
-  // NÃO é a conta do FilterBar: o seletor de filtro lista as três caixas
-  // (`marcadoresDoCard`: negócio, contato e conversa), e esta lista, a da tag em
-  // lote, só `lead.tags` — é lá que a ação em lote grava (#852). O `useMemo` é o
-  // mesmo cuidado de lá: solta no corpo, a conta roda em toda renderização
-  // e devolve um array NOVO a cada vez. E esta página re-renderiza a cada tecla
-  // da busca (o debounce do FilterBar mexe na query string) e a cada mudança de
-  // seleção de card.
+  // A lista da tag em lote é só `lead.tags` (é lá que a ação em lote grava, #852),
+  // não as três caixas do painel de filtros.
   const tagsDoQuadro = useMemo(
     () => [...new Set((data?.leads ?? []).flatMap((l) => l.tags))].sort(),
     [data?.leads],
   );
 
-  // Celular (M3.1): o funil em lista (abas de etapa e cartões), no lugar das colunas
-  // arrastáveis, que brigam com a rolagem do dedo. Trocar de funil leva à rota dele.
+  const cabecalho = (
+    <CabecalhoDoFunil
+      titulo={data?.pipeline.name ?? initialName}
+      resumo={resumo}
+      atrasadosLigado={!!filters.overdueOnly}
+      onAtrasados={() => setFilters({ ...filters, overdueOnly: filters.overdueOnly ? undefined : true })}
+      vista={vista}
+      onVista={setVista}
+      compacto={compacto}
+      onCompacto={setCompacto}
+      onNovo={() => setNewOpen(true)}
+      carregado={!!data}
+      celular={celular}
+    />
+  );
+  const barra = (
+    <BarraDeBusca
+      filters={filters}
+      onChange={setFilters}
+      contagens={contagens}
+      totalDoRecorte={recorte.length}
+      ordem={ordem}
+      onOrdem={setOrdem}
+      userId={userId}
+      celular={celular}
+      painel={
+        <PainelDeFiltros
+          filters={filters}
+          onChange={setFilters}
+          leads={data?.leads ?? []}
+          settings={data?.pipeline.settings}
+          userId={userId}
+        />
+      }
+    />
+  );
+  const lote = (
+    <BulkActionBar
+      selectedIds={selectedIds}
+      stages={data?.stages ?? []}
+      pipelineId={pipelineId}
+      vocabulary={data?.pipeline.vocabulary ?? null}
+      tagsExistentes={tagsDoQuadro}
+      onClear={() => setSelectedIds([])}
+    />
+  );
+  const novo = data && <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} pipelineId={pipelineId} stages={data.stages} />;
+  const lista = (Lista: typeof ListaDoFunil) =>
+    data && (
+      <Lista
+        leads={ordenados}
+        stages={data.stages}
+        ownerNames={ownerNames}
+        ordem={ordem}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+      />
+    );
+
+  // Celular (M3.1): abas de etapa e cartões (as colunas arrastáveis brigam com o
+  // dedo), com a MESMA barra empilhada em cima; a Lista vira cards com toque longo.
   if (celular) {
     return (
       <>
-        <FunilNoCelular pipelineId={pipelineId} aoTrocarFunil={(id) => router.push(`/app/pipelines/${id}`)} />
-        {/* O "Novo lead" da folha Criar chega aqui com `?criar=1` (usePedidoDeCriar). */}
-        {data && <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} pipelineId={pipelineId} stages={data.stages} />}
+        <FunilNoCelular
+          pipelineId={pipelineId}
+          aoTrocarFunil={(id) => router.push(`/app/pipelines/${id}`)}
+          leadsDoRecorte={data ? ordenados : undefined}
+          barra={<div className="flex flex-col gap-2 px-4 pt-2">{cabecalho}{barra}</div>}
+          conteudo={vista === "lista" ? lista(ListaDoFunilCelular) : undefined}
+        />
+        {vista === "lista" && lote}
+        {novo}
       </>
     );
   }
 
   return (
     <div
-      // O QUADRO CABE NA TELA. A página rolava com a janela: o quadro media o
-      // que media a coluna mais comprida, e a barra de rolagem horizontal ficava
-      // no pé dele — com uma etapa cheia, era preciso descer até o fim para
-      // conseguir andar para o lado, e no caminho o nome da etapa sumia do alto.
-      // Com a altura da área visível (100dvh menos a barra do topo, h-14, e o
-      // p-6 do <main>), quem rola é o quadro: a barra horizontal fica sempre no
-      // pé da tela e o cabeçalho de cada etapa fica preso em cima. O piso de
-      // 28rem é para tela baixa demais, onde a página volta a rolar.
-      className="flex h-[calc(100dvh-3.5rem-3rem)] min-h-[28rem] flex-col gap-4"
-      // OBSERVÁVEL de propósito, e é a razão de existir desta linha: "a
-      // assinatura morreu" e "nada aconteceu" produzem o MESMO silêncio na
-      // tela, e sem este valor nem o produto nem o teste conseguem separar as
-      // duas famílias de causa. Com ele, quem investiga olha DURANTE a rodada
-      // que falha: `subscribed` manda procurar a montante (entrega, filtro, ou
-      // o evento nunca saiu); `channel_error`/`timed_out`/`closed` já é a
-      // resposta.
-      //
-      // Ainda NÃO religa — religar é desenho e merece bloco próprio. Isto aqui
-      // é só parar de descartar o que já era calculado.
+      // O QUADRO CABE NA TELA: altura da área visível (100dvh menos a barra do
+      // topo, h-14, e o p-6 do <main>); quem rola é o quadro, com a barra
+      // horizontal no pé e o cabeçalho de cada etapa preso em cima.
+      className="flex h-[calc(100dvh-3.5rem-3rem)] min-h-[28rem] flex-col gap-3"
+      // OBSERVÁVEIS de propósito: "a assinatura morreu" e "nada aconteceu"
+      // produzem o mesmo silêncio na tela; estes valores separam as duas causas.
       data-realtime-status={realtimeStatus.toLowerCase()}
-      // A rede de segurança fica OBSERVÁVEL pelo mesmo motivo do status do
-      // canal: "a entrega morreu" e "nada aconteceu" têm a mesma aparência, que
-      // é silêncio. Aqui o número de divergências é a diferença entre os dois —
-      // e é o sinal que faltava para uma verificação poder APROVAR, e não só
-      // reprovar.
       data-refetch-divergencias={seguranca.divergencias}
       data-refetch-em={seguranca.ultimaVerificacao ?? ""}
     >
-      {/* `flex-col` no mobile: nome de funil comprido (é texto livre, sem
-          limite curto) + botão na mesma linha sem quebra empurrava o botão pra
-          fora da viewport em telas estreitas. De `sm:` pra cima volta a ser
-          uma linha só, como sempre foi. */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="min-w-0 truncate text-title-lg">
-          {data?.pipeline.name ?? initialName}
-        </h1>
-        <div className="flex shrink-0 items-center gap-2">
-          <div role="tablist" aria-label={t("Modo do funil")} className="flex rounded-md border border-border p-0.5">
-            {MODOS_DO_FUNIL.map((opcao) => (
-              <button
-                key={opcao.id}
-                type="button"
-                role="tab"
-                aria-selected={modo === opcao.id}
-                onClick={() => trocarModo(opcao.id)}
-                className={cn(
-                  "h-8 rounded-sm px-3 text-sm transition-colors",
-                  modo === opcao.id ? "bg-muted font-medium text-text" : "text-text-muted hover:text-text",
-                )}
-              >
-                {t(opcao.rotulo)}
-              </button>
-            ))}
-          </div>
-          {modo === "kanban" && (
-            <Button onClick={() => setNewOpen(true)} disabled={!data} className="shrink-0">
-              <Plus size={16} className="mr-2" /> {t("Novo Lead")}
-            </Button>
-          )}
-        </div>
-      </header>
-      {data && (
-        <NewLeadDialog
-          open={newOpen}
-          onOpenChange={setNewOpen}
-          pipelineId={pipelineId}
-          stages={data.stages}
-        />
-      )}
-      {modo === "cadencias" ? (
-        data ? (
-          <CadenciasDoPipeline
-            pipelineId={pipelineId}
-            etapas={data.stages}
-            leads={data.leads.map((l) => ({ id: l.id, title: l.title }))}
-          />
-        ) : (
-          <div className="flex flex-1 animate-pulse items-center justify-center text-muted-foreground">
-            {t("Carregando…")}
-          </div>
-        )
-      ) : (
-      <>
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        leads={data?.leads ?? []}
-        settings={data?.pipeline.settings}
-      />
+      {cabecalho}
+      {novo}
+      {barra}
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
           {t("Não consegui carregar este funil:")} {formatError(error, t)}
@@ -220,29 +185,24 @@ export function PipelinePageClient({
         <div className="flex flex-1 animate-pulse items-center justify-center text-muted-foreground">
           {t("Carregando…")}
         </div>
+      ) : vista === "lista" ? (
+        lista(ListaDoFunil)
       ) : (
         <KanbanBoard
           pipelineId={pipelineId}
           stages={data.stages}
-          leads={filteredLeads}
+          leads={recorte}
           pulses={pulses}
           pipeline={data.pipeline}
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           leadInicial={searchParams.get("lead")}
           podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.manager}
+          compacto={compacto}
+          ordenar={ordem}
         />
       )}
-      <BulkActionBar
-        selectedIds={selectedIds}
-        stages={data?.stages ?? []}
-        pipelineId={pipelineId}
-        vocabulary={data?.pipeline.vocabulary ?? null}
-        tagsExistentes={tagsDoQuadro}
-        onClear={() => setSelectedIds([])}
-      />
-      </>
-      )}
+      {lote}
     </div>
   );
 }

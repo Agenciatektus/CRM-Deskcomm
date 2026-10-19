@@ -93,6 +93,49 @@ describe("leitura do evento do Instagram", () => {
     expect(r.mensagem.providerMessageId).toBe("mid-1");
   });
 
+  it("recebido é `inbound` e a identidade é o remetente (o cliente)", () => {
+    const r = lerEventoDoInstagram(direct(), AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.direcao).toBe("inbound");
+    expect(r.mensagem.igsid).toBe("igsid-abc");
+    expect(r.mensagem.contaId).toBe("conta-1");
+  });
+
+  it("eco (`is_echo`) é `outbound`: o dono respondeu pelo app e a identidade vira o DESTINATÁRIO", () => {
+    // No eco a Meta inverte os papéis: `sender` é a conta do negócio e
+    // `recipient` é o cliente. Sem isto, a resposta do dono entrava como se
+    // fosse do lead e colapsava num contato fantasma "a conta do negócio" —
+    // é a mistura que o comercial da Delicatto via no Inbox.
+    const r = lerEventoDoInstagram(direct({}, { is_echo: true }), AGORA);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.direcao).toBe("outbound");
+    expect(r.mensagem.igsid).toBe("conta-1"); // recipient = o cliente
+    expect(r.mensagem.contaId).toBe("igsid-abc"); // sender = a conta do negócio
+  });
+
+  it("o eco nunca reescreve @ nem nome, mesmo com `perfil` no envelope", () => {
+    // O `perfil` anexado num eco pode ser o da conta do negócio, não o do
+    // cliente; o contato do cliente já tem nome do recebido anterior.
+    const r = lerEventoDoInstagram(
+      { ...direct({}, { is_echo: true }), perfil: { nome: "Loja Delicatto", username: "@delicatto" } },
+      AGORA,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.mensagem.nome).toBeNull();
+    expect(r.mensagem.username).toBeNull();
+  });
+
+  it("eco sem `recipient.id` é contrato violado — sem o cliente não há a quem ancorar", () => {
+    const e = direct({}, { is_echo: true });
+    const r = lerEventoDoInstagram({ ...e, evento: { ...e.evento, recipient: {} } }, AGORA);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).toBe("contrato_violado");
+  });
+
   it("resposta a story guarda a ORIGEM, que é o que muda na tela", () => {
     const r = lerEventoDoInstagram(direct({}, { reply_to: { story: { id: "s1" } } }), AGORA);
     expect(r.ok).toBe(true);

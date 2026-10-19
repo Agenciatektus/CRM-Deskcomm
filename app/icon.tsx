@@ -98,7 +98,7 @@ export default async function Icon() {
           }}
         >
           <svg viewBox={SIMBOLO.viewBox} width={lado} height={lado}>
-            <CamadasDoSimbolo prefixo="icone" />
+            {CamadasDoSimbolo({ prefixo: "icone" })}
           </svg>
         </div>
       ),

@@ -45,8 +45,10 @@ import { lerEventoDoInstagram, type MensagemDoInstagram } from "./evento";
 import { fonteDaEntrada, funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { marcarConversaComMensagem } from "../marcar-conversa";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
+import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 import type { InboundWebhookInput, InboundWebhookOutcome } from "../inbound";
 import { logger } from "@/lib/logger";
+import { ehEcoDeEnvioNosso } from "../eco-de-envio-nosso";
 
 /**
  * Como a pessoa se chama: o nome do perfil, senão o `@`. `null` só quando o
@@ -218,12 +220,13 @@ async function inserirMensagem(
       contact_id: input.contactId,
       channel_session_id: input.channelSessionId,
       external_id: msg.providerMessageId,
-      direction: "inbound",
+      direction: msg.direcao,
       // Nasceu de FORA do CRM. O default da coluna é `'crm'` e ele mentiria
       // aqui: as funções de fricção contam só `external_device`, e o filtro de
-      // eco do próprio envio depende deste valor.
+      // eco do próprio envio depende deste valor. No eco (o dono respondeu pelo
+      // app do Instagram) vale o mesmo: saiu por fora do CRM.
       sent_via: "external_device",
-      status: "delivered",
+      status: msg.direcao === "outbound" ? "sent" : "delivered",
       // Com arquivo: o tipo dele (story/post/reel nascem `image` e o worker
       // corrige pelo mime). Sem arquivo: `text`, e a tela mostra o aviso.
       type: primeira ? (primeira.tipoDaMensagem ?? "image") : "text",
@@ -235,6 +238,9 @@ async function inserirMensagem(
       // de um mesmo fio.
       metadata: {
         instagram_entrada: msg.entrada,
+        // Eco: resposta do dono pelo app do Instagram. Mesma marca do canal
+        // Meta, para os relatórios que separam "respondido por humano fora do CRM".
+        ...(msg.direcao === "outbound" ? { from_business_app: true } : {}),
         // "Tinha mídia" — é o que faz a tela dizer "Mídia expirada" se o
         // arquivo nunca chegar. Permalink e cartão não contam.
         ...(primeira || msg.anexos.temporaria ? { instagram_tem_anexo: true } : {}),
@@ -353,7 +359,7 @@ export async function instagramInbound(
   await marcarConversaComMensagem(admin, {
     organizationId,
     conversationId,
-    direction: "inbound",
+    direction: msg.direcao,
     // `preview` e string, nao `string | null`: a lista do Inbox precisa de
     // algo escrito. Anexo sem legenda vira o selo, que e o que o operador
     // veria no aplicativo.
@@ -361,6 +367,36 @@ export async function instagramInbound(
     at: msg.recebidaEm,
     canal: "instagram",
   });
+
+  // ── ECO: O DONO RESPONDEU PELO APP, NÃO PELO CRM ─────────────────────────
+  //
+  // Não nasce lead e a IA PARA nesta conversa: uma pessoa assumiu o
+  // atendimento por fora, e o agente não pode responder por cima. É o mesmo
+  // tratamento do canal Meta (`ingestMetaEcho`). A mensagem já está gravada
+  // como `outbound` acima — é isso que separa, na tela, quem enviou.
+  //
+  // MAS o `message_echoes` do Instagram ecoa TAMBÉM o que o próprio CRM enviou
+  // (IA, composer, regra). Se o eco chega antes do `external_id` do envio ser
+  // gravado (ou com `mid` diferente), ele não bate no unique e cairia aqui —
+  // calando a IA logo depois da própria resposta. A linha fica gravada (gravar
+  // é tolerante; `removerEcoDoProprioEnvio` limpa a duplicata depois), mas a
+  // pausa só acontece quando NÃO há envio nosso em voo que explique o eco.
+  if (msg.direcao === "outbound") {
+    const ehNosso = await ehEcoDeEnvioNosso(admin, organizationId, conversationId, {
+      corpo: msg.texto,
+      midia: msg.anexos.midias.length > 0,
+    });
+    if (!ehNosso) {
+      await pausarIaPorAtendimentoManual(admin, { organizationId, conversationId, canal: "instagram" });
+      // Sem PII: só ids, para auditar de onde veio a pausa.
+      logger.info("[instagram] eco pausou a IA (resposta fora do CRM)", {
+        organization_id: organizationId,
+        conversation_id: conversationId,
+        external_id: msg.providerMessageId,
+      });
+    }
+    return { ok: true, body: { status: "ingested", conversationId, messageId } };
+  }
 
   // ── A LINHA QUE SEPARA DIRECT DE COMENTÁRIO ──────────────────────────────
   //

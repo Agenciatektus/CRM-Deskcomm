@@ -1,6 +1,7 @@
 "use client";
 import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
 import { midpoint } from "@/lib/kanban/fractional-indexing";
+import { comparadorDoFunil, type OrdemDoFunil } from "@/lib/kanban/ordem-do-funil";
 import type { Lead } from "@/lib/types/leads";
 import type { Pipeline, Stage } from "@/lib/kanban/types";
 import { StageColumn } from "./StageColumn";
@@ -46,9 +48,16 @@ interface KanbanBoardProps {
    * então o cabeçalho fica só leitura para eles.
    */
   podeRenomearEtapa?: boolean;
+  /** Densidade do card, escolhida no cabeçalho do Funil (por pessoa). */
+  compacto?: boolean;
+  /**
+   * A ordem DENTRO de cada coluna, escolhida na barra (Ordenar). Sem ela, a
+   * posição manual (`position_in_stage`); com ela, a posição desempata.
+   */
+  ordenar?: OrdemDoFunil;
 }
 
-function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> {
+function groupLeadsByStage(stages: Stage[], leads: Lead[], ordenar?: OrdemDoFunil): Map<string, Lead[]> {
   const map = new Map<string, Lead[]>();
   for (const stage of stages) map.set(stage.id, []);
   for (const lead of leads) {
@@ -57,7 +66,7 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> 
   }
   // Already ordered by position_in_stage at fetch time, but be defensive.
   for (const list of map.values()) {
-    list.sort((a, b) => a.position_in_stage - b.position_in_stage);
+    list.sort(ordenar && ordenar !== "manual" ? comparadorDoFunil(ordenar) : (a, b) => a.position_in_stage - b.position_in_stage);
   }
   return map;
 }
@@ -90,6 +99,8 @@ export function KanbanBoard({
   onSelectionChange,
   leadInicial,
   podeRenomearEtapa = false,
+  compacto = false,
+  ordenar,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -170,8 +181,8 @@ export function KanbanBoard({
 
   const grouped = useMemo(() => {
     if (!data) return null;
-    return groupLeadsByStage(data.stages, data.leads);
-  }, [data]);
+    return groupLeadsByStage(data.stages, data.leads, ordenar);
+  }, [data, ordenar]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A
@@ -210,6 +221,14 @@ export function KanbanBoard({
 
       const lead = data.leads.find((l) => l.id === draggableId);
       if (!lead) return;
+
+      // Com uma ordem da barra ativa, a posição na coluna não é a manual: soltar
+      // DENTRO da coluna gravaria uma posição qualquer e o card voltaria. Mover
+      // entre colunas segue valendo.
+      if (ordenar && ordenar !== "manual" && source.droppableId === destination.droppableId) {
+        toast.info(t("Para reordenar, use a ordem Manual"));
+        return;
+      }
 
       const destStageId = destination.droppableId;
       const destList = (grouped.get(destStageId) ?? []).filter(
@@ -258,7 +277,7 @@ export function KanbanBoard({
       }
       mover();
     },
-    [data, grouped, moveCard, t],
+    [data, grouped, moveCard, t, ordenar],
   );
 
   if (isLoading) {
@@ -321,6 +340,7 @@ export function KanbanBoard({
             onSelectMany={handleSelectMany}
             onOpen={setDossieId}
             podeRenomear={podeRenomearEtapa}
+            compacto={compacto}
             onRenomear={(nome) => renameStage.mutate({ stageId: stage.id, name: nome })}
           />
         ))}
