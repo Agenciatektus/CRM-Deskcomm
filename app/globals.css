@@ -1803,3 +1803,76 @@ select:not([multiple]):not([size]) {
 [data-densidade="compacta"] {
   --row-py: 8px;
 }
+
+/* ─── Caixa de marcar (checkbox) do design system: o `.chk` do protótipo ────────
+   (Main.dc.html:626, igual no MainVerdash). Uma regra só para os ~50
+   `<input type="checkbox">` nativos do app (a cerca de controles nativos exige o
+   input nativo; aqui só a APARÊNCIA muda). Sem isto o navegador desenhava a caixa
+   dele: clara no escuro e fora dos tokens (pedido do Peterson, 19/10; o mapa já a
+   marcava "diferente" em lib/design-system/mapa.ts). 16px, raio 4px, borda 1,5px
+   em `--color-border-strong` (o `--line-2`), fundo transparente; marcada = accent
+   com o "✓" do protótipo (traço 3) em `--color-accent-fg`. Em `@layer base`: quem
+   passa `size-*`/`h-*` por className continua mandando no tamanho. */
+@layer base {
+  input[type="checkbox"] {
+    appearance: none;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: 4px;
+    background-color: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+  input[type="checkbox"]:hover:not(:disabled) {
+    border-color: var(--color-accent);
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+  input[type="checkbox"]:checked::after {
+    content: "";
+    width: 69%;
+    height: 69%;
+    background-color: var(--color-accent-fg);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  input[type="checkbox"]:indeterminate::after {
+    content: "";
+    width: 50%;
+    height: 2px;
+    border-radius: 1px;
+    background-color: var(--color-accent-fg);
+  }
+  input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+/* Alto contraste do Windows (`forced-colors`): o navegador apaga o fundo e o
+   `background-color` do ✓; devolve com as cores de sistema (P2 do Cassio na #209). */
+@media (forced-colors: active) {
+  input[type="checkbox"] {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate {
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+  input[type="checkbox"]:checked::after,
+  input[type="checkbox"]:indeterminate::after {
+    background-color: HighlightText;
+  }
+}

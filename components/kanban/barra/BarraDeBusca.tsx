@@ -154,7 +154,7 @@ export function BarraDeBusca({
               <DropdownMenuLabel>{t("Ordenar por")}</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={ordem} onValueChange={(v) => ehOrdemDoFunil(v) && onOrdem(v)}>
                 {ORDENS_DO_FUNIL.map((o) => (
-                  <DropdownMenuRadioItem key={o.id} value={o.id} className="items-start py-2">
+                  <DropdownMenuRadioItem key={o.id} value={o.id} className="h-auto items-start whitespace-normal py-2">
                     <span className="flex flex-col">
                       <span className="font-medium">{t(o.rotulo)}</span>
                       <span className="text-xs text-text-muted">{t(o.apoio)}</span>
