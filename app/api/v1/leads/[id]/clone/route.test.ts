@@ -406,17 +406,26 @@ describe("POST /api/v1/leads/[id]/clone", () => {
     expect(body.error.code).toBe("stage_pipeline_mismatch");
   });
 
-  it("recusa negócio já encerrado", async () => {
+  it("negócio GANHO vai para outro funil como negócio novo, e o ganho fica intacto", async () => {
     const { POST } = await import("./route");
     const negocio = (db.tables.crm_leads ?? [])[0];
     if (!negocio) throw new Error("o teste espera um crm_leads semeado neste ponto");
     negocio.status = "won";
+    const antes = { ...negocio };
+    const quantosAntes = (db.tables.crm_leads ?? []).length;
 
     const response = await POST(cloneRequest({ pipeline_id: P2 }), params);
-    const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error.code).toBe("lead_not_open");
+    expect(response.status).toBe(201);
+    // A origem não foi reescrita (continua `won`, mesma etapa e mesmo funil).
+    expect(negocio.status).toBe("won");
+    expect(negocio.stage_id).toBe(antes.stage_id);
+    expect(negocio.pipeline_id).toBe(antes.pipeline_id);
+    // E nasceu um negócio aberto no funil de destino.
+    const novos = (db.tables.crm_leads ?? []).slice(quantosAntes);
+    expect(novos).toHaveLength(1);
+    expect(novos[0]?.pipeline_id).toBe(P2);
+    expect(novos[0]?.status).toBe("open");
   });
 
   it("recusa funil inexistente na organização", async () => {

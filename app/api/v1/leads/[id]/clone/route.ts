@@ -178,10 +178,16 @@ export async function POST(
       (pipelineOrigem as { settings?: unknown } | null)?.settings,
     );
 
+    // Negócio ENCERRADO levado à mão para outro funil é sempre "nova tentativa"
+    // (pedido do Peterson, 19/10: ganho no funil de vendas segue para pós-venda
+    // ou recompra). Abre um negócio novo no destino e a origem fica INTACTA (o
+    // `won` continua `won`, sem nova conversão) — o mesmo caminho do modo
+    // `novo_negocio` da issue #1538, logo abaixo (`origemJaEncerrada`). Automação
+    // continua chamando `recusaTrocaDeFunil` sem modo e mantém a recusa.
     const recusa = recusaTrocaDeFunil(
       origem as OrigemParaClonar,
       input.pipeline_id,
-      modoDaOrigem,
+      (origem as OrigemParaClonar).status !== "open" ? "novo_negocio" : modoDaOrigem,
     );
     if (recusa) {
       return fail(recusa.code, t(recusa.texto), recusa.status, { requestId });
