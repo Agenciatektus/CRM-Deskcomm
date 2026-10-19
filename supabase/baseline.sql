@@ -47443,9 +47443,10 @@ create table if not exists public.crm_lead_passagens_de_funil (
   para_stage_id      uuid not null,
   movido_em          timestamptz not null default now(),
   movido_por_user_id uuid,
+  -- FK só no id (crm_leads não tem unique (organization_id, id)); a organização
+  -- é a do negócio: a função copia a dele, e a policy de insert confere.
   constraint crm_lead_passagens_lead_fk
-    foreign key (organization_id, lead_id)
-    references public.crm_leads (organization_id, id) on delete cascade,
+    foreign key (lead_id) references public.crm_leads (id) on delete cascade,
   constraint crm_lead_passagens_fechada_tem_data
     check (status_na_saida = 'open' or closed_at is not null)
 );
