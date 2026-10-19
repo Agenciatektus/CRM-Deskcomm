@@ -21,6 +21,7 @@ const CONTATO = "33333333-3333-3333-3333-333333333333";
 
 interface Tabelas {
   crm_leads?: unknown;
+  crm_stages?: unknown;
   contacts?: unknown;
   ad_platform_connections?: unknown;
   ad_conversion_dispatches?: unknown;
@@ -39,7 +40,11 @@ function fakeAdmin(tabelas: Tabelas) {
         order: () => construtor,
         limit: () => construtor,
         maybeSingle: async () => ({
-          data: (tabelas as Record<string, unknown>)[tabela] ?? null,
+          // Sem etapa no cenário, a etapa do negócio está ligada com a compra (9054).
+          data:
+            tabela === "crm_stages" && !("crm_stages" in tabelas)
+              ? { envia_conversao: true, evento_de_conversao: "Purchase" }
+              : ((tabelas as Record<string, unknown>)[tabela] ?? null),
           error: null,
         }),
         upsert: async (valores: Record<string, unknown>) => {
@@ -60,6 +65,8 @@ const leadGanho = {
   currency: "BRL",
   closed_at: new Date().toISOString(),
   contact_id: CONTATO,
+  stage_id: "etapa-ganho",
+  stage_changed_at: new Date().toISOString(),
 };
 
 const contatoComAnuncio = {
@@ -124,16 +131,19 @@ describe("as duas portas do fechamento", () => {
     expect(upserts.at(-1)?.valores.status).toBe("sent");
   });
 
-  it("sai barato quando a etapa mudou e o negócio não fechou", async () => {
+  it("sai barato quando a etapa de destino não envia conversão (9054)", async () => {
     vi.mocked(createAdminClient).mockReturnValue(
-      fakeAdmin({ crm_leads: { ...leadGanho, status: "open" } }) as never,
+      fakeAdmin({
+        crm_leads: { ...leadGanho, status: "open" },
+        crm_stages: { envia_conversao: false, evento_de_conversao: null },
+      }) as never,
     );
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     const r = await conversaoDeVendaHandler.handle(evento("lead.stage_changed"));
 
     expect(r.status).toBe("skipped");
-    expect(r.detail).toBe("nao_e_ganho");
+    expect(r.detail).toBe("etapa_sem_conversao");
     // A maioria esmagadora das mudanças de etapa cai aqui: não pode nem falar
     // com a rede nem sujar o livro-razão.
     expect(fetchSpy).not.toHaveBeenCalled();

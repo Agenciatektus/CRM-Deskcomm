@@ -10231,6 +10231,21 @@ export const DICIONARIO: Traducoes = {
   "Avisar a equipe na Central quando um negócio entrar em": {
     es: "Avisar al equipo en la Central cuando un negocio entre en",
   },
+  // ─── conversão por etapa (migration 9054; pipelines/_conversao-da-etapa.tsx) ───
+  "Enviar evento de conversão (Meta/Google) ao entrar nesta etapa": {
+    es: "Enviar evento de conversión (Meta/Google) al entrar en esta etapa",
+  },
+  "Enviar evento de conversão (Meta/Google) ao entrar em": {
+    es: "Enviar evento de conversión (Meta/Google) al entrar en",
+  },
+  "Evento de conversão de": { es: "Evento de conversión de" },
+  "Compra (com o valor do negócio)": { es: "Compra (con el valor del negocio)" },
+  "Lead qualificado (ação do Google Ads da etapa)": {
+    es: "Lead calificado (acción de Google Ads de la etapa)",
+  },
+  "Sai a cada entrada nesta etapa, inclusive na recompra. Trocar de funil não envia. O negócio precisa ter vindo de anúncio.": {
+    es: "Sale en cada entrada a esta etapa, incluso en la recompra. Cambiar de embudo no envía. El negocio tiene que haber venido de un anuncio.",
+  },
   // ─── sons dos avisos (migration 0441; app/app/settings/notifications/_sons.tsx) ───
   "Sons dos avisos": { es: "Sonidos de los avisos" },
   "Tocam com o site aberto quando o aviso chega na Central. MP3, OGG ou WAV de até 1 MB.": {
