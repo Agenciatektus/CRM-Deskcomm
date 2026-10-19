@@ -35,8 +35,22 @@ import { createClient } from "@/lib/supabase/server";
 import { GET } from "@/app/api/v1/leads/[id]/contatos-relacionados/route";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/auth/server", () => ({
-  loadAuthUser: vi.fn(async () => ({ idioma: "pt-BR" })),
+// A rota passa pelo requireRole (P2 do Cassio na #210): sem sessão devolve 401,
+// com sessão a org ativa é a ORG_A. `sessaoDoPortao` acompanha o `montarBanco`.
+let sessaoDoPortao: { id: string } | null = { id: "usuario-1" };
+vi.mock("@/lib/auth/require-role", () => ({
+  requireRole: vi.fn(async () =>
+    sessaoDoPortao
+      ? {
+          ok: true,
+          user: { id: sessaoDoPortao.id, idioma: "pt-BR" },
+          org: { orgId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", role: "agent" },
+        }
+      : {
+          ok: false,
+          response: new Response(JSON.stringify({ error: { code: "unauthenticated" } }), { status: 401 }),
+        },
+  ),
 }));
 
 const ORG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -95,6 +109,7 @@ function montarBanco(
   tabelas: Record<string, Linha[]>,
   sessao: { id: string } | null = { id: "usuario-1" },
 ) {
+  sessaoDoPortao = sessao;
   const from = (nome: string) => {
     const base = tabelas[nome] ?? [];
     const eqs: [string, unknown][] = [];
@@ -266,6 +281,19 @@ describe("GET contatos-relacionados — a F1 da #1506", () => {
   it("devolve 404 para lead que o caller não enxerga (a org prova o acesso)", async () => {
     montarBanco({
       crm_leads: [{ id: LEAD_DE_LA, organization_id: ORG_B }],
+      crm_lead_links: [],
+      contacts: [],
+    });
+
+    const resposta = await chamar(LEAD);
+
+    expect(resposta.status).toBe(404);
+    expect((await corpo(resposta)).error?.code).toBe("not_found");
+  });
+
+  it("lead de OUTRA org visível pela RLS (membro das duas) não sai pela org ativa", async () => {
+    montarBanco({
+      crm_leads: [{ id: LEAD, organization_id: ORG_B }],
       crm_lead_links: [],
       contacts: [],
     });
