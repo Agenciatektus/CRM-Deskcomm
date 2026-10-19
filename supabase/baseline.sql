@@ -58519,7 +58519,7 @@ create view public.external_db_connections_safe
 revoke all on public.external_db_connections_safe from anon;
 grant select on public.external_db_connections_safe to authenticated;
 
--- ---- receitas do banco externo (migration 0693) ----
+-- ---- receitas do banco externo (migration 0704) ----
 -- manifest: Banco externo — coluna `receitas` (jsonb) em `external_db_connections`: as instâncias das receitas prontas (Spec 25, R1: receita woocommerce + instância + tool). Cada organização guarda suas instâncias (RLS herda da tabela), default '[]', só-array, teto de 256 KiB. A coluna fica FORA da view `_safe` (precedente das `sources`); só a contagem `receitas_count` é exposta, como última coluna da view, com `revoke`/`grant` reemitidos.
 --
 -- ─── O que isto resolve ─────────────────────────────────────────────────────
