@@ -241,6 +241,14 @@ beforeAll(() => {
             values (v_org, v_pipe, v_stage, 'RLS invariant lead');
         end if;
 
+        -- migration 9053: a passagem do negócio por outro funil (o retrato da saída).
+        if not exists (select 1 from public.crm_lead_passagens_de_funil where organization_id = v_org) then
+          insert into public.crm_lead_passagens_de_funil
+            (organization_id, lead_id, de_pipeline_id, de_stage_id, status_na_saida, para_pipeline_id, para_stage_id)
+          select v_org, id, v_pipe, v_stage, 'open', v_pipe, v_stage
+            from public.crm_leads where organization_id = v_org limit 1;
+        end if;
+
         -- crm_proposals/crm_proposal_items (migration 0464): a proposta comercial.
         -- crm_proposal_items tem organization_id próprio, com trigger de
         -- consistência contra crm_proposals.organization_id
@@ -594,6 +602,9 @@ export const TABLES = [
   "messages",
   "contacts",
   "crm_leads",
+  // migration 9053 — a passagem do negócio por outro funil. A leitura segue a
+  // do negócio (exists em crm_leads pela RLS de quem lê).
+  "crm_lead_passagens_de_funil",
   "org_memory_versions",
   "org_memory_entries",
   "skill_activations",

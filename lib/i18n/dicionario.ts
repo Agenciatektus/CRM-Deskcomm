@@ -11322,6 +11322,9 @@ export const DICIONARIO: Traducoes = {
   "Levado para outro funil": { es: "Movido a otro embudo" },
   // A TELA que faltava para a troca de funil — menu do card e o diálogo.
   "Levar para outro funil": { es: "Llevar a otro embudo" },
+  // 9053: o desfecho que saiu da coluna com o card levado a outro funil.
+  "+1 levado para outro funil": { es: "+1 llevado a otro embudo" },
+  "levados para outro funil": { es: "llevados a otro embudo" },
   // ── Retomada como novo negócio (issue #1538) ──
   "Retomar como novo negócio": { es: "Retomar como negocio nuevo" },
   "Retomando…": { es: "Retomando…" },
@@ -11349,18 +11352,12 @@ export const DICIONARIO: Traducoes = {
   "Este é o único funil. Crie outro funil para poder levar o negócio até ele.": {
     es: "Este es el único embudo. Crea otro embudo para poder llevar el negocio hasta él.",
   },
-  'O negócio é recriado no funil escolhido e este encerra como perdido, com o motivo "Levado para outro funil" — o histórico dos dois lados fica registrado na linha do tempo.': {
-    es: 'El negocio se recrea en el embudo elegido y este se cierra como perdido, con el motivo "Movido a otro embudo" — el historial de los dos lados queda registrado en la línea de tiempo.',
+  "O mesmo negócio vai para o funil escolhido, com conversa, histórico, etiquetas e campos. Este funil continua contando o resultado que ele teve aqui.": {
+    es: "El mismo negocio va al embudo elegido, con conversación, historial, etiquetas y campos. Este embudo sigue contando el resultado que tuvo aquí.",
   },
   // As recusas da troca de funil (lib/leads/clonar-para-funil.ts e a rota).
   "O negócio já está neste funil. Para trocar de etapa use /api/v1/leads/[id]/move.": {
     es: "El negocio ya está en este embudo. Para cambiar de etapa, usa /api/v1/leads/[id]/move.",
-  },
-  "Só um negócio aberto pode ser levado para outro funil.": {
-    es: "Solo un negocio abierto puede moverse a otro embudo.",
-  },
-  "Este negócio já foi levado para outro funil.": {
-    es: "Este negocio ya fue movido a otro embudo.",
   },
   "A etapa não pertence ao funil de destino.": {
     es: "La etapa no pertenece al embudo de destino.",
@@ -11372,9 +11369,6 @@ export const DICIONARIO: Traducoes = {
     es: "El embudo de destino no tiene etapa abierta para recibir el negocio.",
   },
   "Funil de destino não encontrado.": { es: "Embudo de destino no encontrado." },
-  "O funil de origem não tem etapa de perda para encerrar o negócio.": {
-    es: "El embudo de origen no tiene etapa de pérdida para cerrar el negocio.",
-  },
 
   // ─── Fase B: vocabulario de dominio persistido (reason de crm_lead_activities) ───
   //

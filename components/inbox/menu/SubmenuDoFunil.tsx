@@ -35,7 +35,7 @@ export { chaveDoResumoDoMenu, type DialogoDoFunil } from "@/hooks/inbox/useFunil
  *   - etapa aberta → `useMoveCard` (`/move`, com o CAS por `updated_at`);
  *   - etapa de ganho → `useWinLead` (`/win`);
  *   - etapa de perda → `LoseLeadDialog`, que exige o motivo;
- *   - outro funil → `MoveToOtherPipelineDialog` (`/clone`).
+ *   - outro funil → `MoveToOtherPipelineDialog` (`/clone`, move o mesmo card).
  */
 export function SubmenuDoFunil({ contactId, onDialogo }: {
   contactId: string;

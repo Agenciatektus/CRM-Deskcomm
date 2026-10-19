@@ -4,7 +4,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/types/leads";
-import type { Stage } from "@/lib/kanban/types";
+import type { PassagemDaColuna, Stage } from "@/lib/kanban/types";
 import { buildCardInput } from "@/lib/kanban/card-state";
 import { intervaloDaColuna } from "@/lib/kanban/selecao";
 import { formatSomaPorMoeda, formatValorDoNegocio, MOEDA_PADRAO, somaPorMoeda } from "@/lib/money";
@@ -39,6 +39,11 @@ interface StageColumnProps {
   onRenomear?: (nome: string) => void;
   /** Densidade do card (cabeçalho do Funil). */
   compacto?: boolean;
+  /**
+   * Desfechos que saíram DESTA etapa com o card levado a outro funil (9053). A
+   * coluna de ganho continua contando a venda que foi para o pós-venda.
+   */
+  passagens?: PassagemDaColuna[];
 }
 
 export function StageColumn({
@@ -56,8 +61,11 @@ export function StageColumn({
   podeRenomear = false,
   onRenomear,
   compacto = false,
+  passagens = [],
 }: StageColumnProps) {
   const t = useT();
+  const totaisLevados = somaPorMoeda(passagens, (p) => p.value_cents, (p) => p.currency ?? MOEDA_PADRAO);
+  const temValorLevado = [...totaisLevados.values()].some((cents) => cents > 0);
   // O TOTAL É POR MOEDA (#1531). Antes ele somava todos os `value_cents` e
   // escrevia o resultado na moeda do primeiro negócio: R$ 5.000 e 5.000 € saíam
   // "R$ 10.000,00", um valor que não existe. Agora cada moeda tem o seu total,
@@ -197,6 +205,17 @@ export function StageColumn({
             </span>
           </div>
 
+          {passagens.length > 0 && (
+            <div
+              className="border-b border-border px-3 py-1.5 text-[11px] text-text-muted tabular-nums"
+              data-passagens-da-etapa
+            >
+              {passagens.length === 1
+                ? t("+1 levado para outro funil")
+                : `+${passagens.length} ${t("levados para outro funil")}`}
+              {temValorLevado && <> · {formatSomaPorMoeda(totaisLevados, formatValorDoNegocio)}</>}
+            </div>
+          )}
           {temTotal && (
             <div className="border-b border-border px-3 py-1.5 text-[11px] text-text-muted tabular-nums">
               {formatSomaPorMoeda(totais, formatValorDoNegocio, { primeira })}
