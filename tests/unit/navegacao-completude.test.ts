@@ -50,6 +50,8 @@ const NAV_ALLOWLIST: Record<string, string> = {
     "porta é o rodapé de versão (VersionFooter, só na barra de /admin), que aparece justamente quando há versão nova — melhor que um card fixo. Além disso é só do dono do servidor (is_platform_admin), papel que o registro não modela",
   "/app/proposals/novo":
     "sub-fluxo de criação de proposta, alcançado pelo botão 'Nova proposta' em /app/proposals",
+  "/app/settings/marca":
+    "marca da organização: só o admin da plataforma (is_platform_admin, papel que o registro não modela) desde 19/10, por pedido do Peterson; sai do menu do CRM dos clientes e é acessada pelo endereço",
   "/app/design-system":
     "vitrine do design system (Etapa 1): ferramenta de quem mantém o produto, noindex e só do dono do servidor (is_platform_admin, papel que o registro não modela); sem porta no menu por pedido do dono do produto",
 };

@@ -211,7 +211,7 @@ export function KanbanCard({
             {naoLidas > 0 && (
               // O número, não um ponto: "3" e "12" sem ler pedem urgências diferentes.
               <span
-                className="grid h-5 min-w-5 shrink-0 place-items-center self-start rounded-full bg-accent px-1.5 text-[11.5px] font-bold text-accent-foreground tabular-nums"
+                className="mt-1 grid h-5 min-w-5 shrink-0 place-items-center self-start rounded-full bg-accent px-1.5 text-[11.5px] font-bold text-accent-foreground tabular-nums"
                 aria-label={`${naoLidas} ${t("mensagens não lidas")}`}
               >
                 {naoLidas}
@@ -235,7 +235,7 @@ export function KanbanCard({
                 /* estado vem de `isSelected`; quem decide é o onClick acima */
               }}
               className={cn(
-                "h-4 w-4 shrink-0 cursor-pointer self-start accent-accent transition-opacity mb:h-5 mb:w-5",
+                "mt-1.5 h-4 w-4 shrink-0 cursor-pointer self-start transition-opacity mb:mt-1 mb:h-5 mb:w-5",
                 "focus:opacity-100 focus-visible:outline-2 focus-visible:outline-accent",
                 isSelected || isSelecting ? "opacity-100" : "opacity-0 group-hover:opacity-100",
               )}
