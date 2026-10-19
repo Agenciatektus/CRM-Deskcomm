@@ -192,6 +192,17 @@ export async function POST(
     if (recusa) {
       return fail(recusa.code, t(recusa.texto), recusa.status, { requestId });
     }
+    // Encerrado que JÁ foi levado (tem `movido_para`) não é levado de novo: é o
+    // segundo clique num aberto recém-transferido (a origem fechou como "Levado
+    // para outro funil") ou o repetido num ganho. Sem isto cada clique abria mais
+    // um negócio no destino, com `lead.created` e cadência em dobro (P1 do
+    // @Cassio_SecRev na #205). O próximo movimento parte do negócio novo.
+    if (
+      (origem as OrigemParaClonar).status !== "open" &&
+      ((origem as OrigemParaClonar).source_metadata as Record<string, unknown> | null)?.movido_para
+    ) {
+      return fail("lead_not_open", t("Este negócio já foi levado para outro funil."), 409, { requestId });
+    }
 
     // ── O MOTIVO DO CHAMADOR SE CONFERE ANTES DA PRIMEIRA ESCRITA ─────────────
     //
@@ -311,7 +322,13 @@ export async function POST(
     const clone = await createLeadHandler(
       supabase,
       handlerCtx,
-      montaPayloadDoClone(origem as OrigemParaClonar, destino.etapa),
+      {
+        ...montaPayloadDoClone(origem as OrigemParaClonar, destino.etapa),
+        // O valor de um GANHO já foi contado na venda: a nova tentativa (pós-venda,
+        // recompra) nasce sem valor, senão o forecast e a soma do funil contam a
+        // mesma venda duas vezes (P2 do Cassio na #205).
+        ...((origem as OrigemParaClonar).status === "won" ? { value_cents: null } : {}),
+      },
     );
 
     const destination = registroDoDestino(clone);
