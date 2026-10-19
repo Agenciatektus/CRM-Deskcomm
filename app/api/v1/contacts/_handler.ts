@@ -220,8 +220,11 @@ export async function listContactsHandler(
       // morreria por uma coluna faltando no OR.
       `display_name.imatch.${s}`,
       // O nome da agenda do celular (#2439) é o que a tela mostra quando não há
-      // nome escolhido no CRM — mesma razão do `display_name` acima.
-      `address_book_name.imatch.${s}`,
+      // nome escolhido no CRM — mesma razão do `display_name` acima. Mas ele é SÓ
+      // DA EQUIPE: com `soContato` (a busca do agente durante a conversa), casar
+      // nele faria a ferramenta responder ao modelo se o rótulo interno contém o
+      // termo digitado — o rótulo chegaria ao cliente aos pedaços.
+      ...(soContato ? [] : [`address_book_name.imatch.${s}`]),
       `email.imatch.${s}`,
       `phone_number.imatch.${s}`,
     ];
