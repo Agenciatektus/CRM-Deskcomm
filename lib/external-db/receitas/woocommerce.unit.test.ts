@@ -121,4 +121,23 @@ describe("receita woocommerce-produtos (unit, sem MySQL)", () => {
       RECEITA_WOOCOMMERCE_PRODUTOS.parametrosFixos.parse({ prefixo: "a".repeat(21) }),
     ).toThrow();
   });
+
+  it("sem ordem o SQL termina com order by ID seguido de limit, sem desc", () => {
+    const { sql } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(fixos, {}, 5);
+    expect(sql).toContain("order by `wp_posts`.ID ");
+    expect(sql).toContain(" limit ");
+    expect(sql).not.toContain("desc");
+  });
+
+  it("ordem: 'recentes' acrescenta desc ao order by", () => {
+    const { sql } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(fixos, { ordem: "recentes" }, 5);
+    expect(sql).toContain("order by `wp_posts`.ID desc ");
+    expect(sql).toContain(" limit ");
+  });
+
+  it("ordem invalido e rejeitado pela validacao do Zod", () => {
+    expect(() =>
+      RECEITA_WOOCOMMERCE_PRODUTOS.parametrosDaBusca.parse({ ordem: "qualquer" }),
+    ).toThrow();
+  });
 });

@@ -57,6 +57,8 @@ export const PARAMETROS_DA_BUSCA_WOOCOMMERCE = z
 const PRECO_COLUNA =
   "COALESCE(NULLIF(CAST(mp.meta_value AS DECIMAL(10,2)), 0), CAST(mrp.meta_value AS DECIMAL(10,2)))";
 
+type BuscaWoocommerce = z.output<typeof PARAMETROS_DA_BUSCA_WOOCOMMERCE>;
+
 export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
   id: "woocommerce-produtos",
   familia: "woocommerce",
@@ -88,6 +90,10 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       return `?`;
     };
 
+    // `busca` já foi validado pelo Zod do chamador (rota de preview / tool do
+    // agente). Tipamos uma vez aqui para ler os campos sem cast por campo.
+    const b = busca as BuscaWoocommerce;
+
     // Monta na ORDEM do texto do SQL: primeiro os JOINs (que aparecem antes
     // do WHERE), depois as cláusulas do WHERE, por fim o LIMIT. Cada chamada a
     // `marcador()` empurra um valor em `valores` exatamente na posição do `?`
@@ -109,7 +115,7 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
     ];
 
     // Busca por título ou SKU: LIKE com % escapado e ESCAPE '!'.
-    const buscaStr = (busca as { busca?: string }).busca;
+    const buscaStr = b.busca;
     if (buscaStr) {
       const alvo = `%${escaparLikeMysql(String(buscaStr).toLowerCase().replace(/\s+/g, ""))}%`;
       clausulas.push(
@@ -120,16 +126,18 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       );
     }
 
-    const precoMax = (busca as { preco_max?: number }).preco_max;
+    const precoMax = b.preco_max;
     if (precoMax !== undefined) {
       clausulas.push(`(${PRECO_COLUNA}) <= ${marcador(precoMax)}`);
     }
 
-    const soEmEstoque = (busca as { so_em_estoque?: boolean }).so_em_estoque;
+    const soEmEstoque = b.so_em_estoque;
     if (soEmEstoque) {
       clausulas.push(`${mstock}.meta_value = ${marcador("instock")}`);
     }
 
+    // `desc` é fixo no código: nunca vem do valor recebido pelo agente.
+    const direcao = b.ordem === "recentes" ? " desc" : "";
     const sql =
       `select ${posts}.ID as id, ` +
       `${posts}.post_title as titulo, ` +
@@ -140,7 +148,7 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       `from ${posts} ` +
       `${joins.join(" ")} ` +
       `where ${clausulas.join(" and ")} ` +
-      `order by ${posts}.ID ${(busca as { ordem?: "antigos" | "recentes" }).ordem === "recentes" ? "desc" : ""} ` +
+      `order by ${posts}.ID${direcao} ` +
       `limit ${marcador(limite ?? TETO_ITENS_WOOCOMMERCE)}`;
 
     return { sql, valores };
