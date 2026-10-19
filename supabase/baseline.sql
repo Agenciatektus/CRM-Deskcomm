@@ -47426,6 +47426,10 @@ grant  execute on function public.etapas_da_conversa(public.conversations) to au
 -- certo pelo `crm_leads`. Idempotente (`if not exists`, `create or replace`,
 -- `drop policy if exists`).
 
+-- `lost_from_stage_id` é da 0426, que neste arquivo vem DEPOIS (abaixo da varredura
+-- anon), e a view abaixo já a lê. Idempotente: o bloco da 0426 repete e põe a FK.
+alter table public.crm_leads add column if not exists lost_from_stage_id uuid;
+
 create table if not exists public.crm_lead_passagens_de_funil (
   id                 uuid primary key default gen_random_uuid(),
   organization_id    uuid not null references public.organizations(id) on delete cascade,
