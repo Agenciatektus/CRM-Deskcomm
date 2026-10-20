@@ -65,7 +65,7 @@ describe("barra do Funil, a tela", () => {
     const onAbrir = vi.fn();
     const onSel = vi.fn();
     render(<ListaDoFunil leads={LEADS} stages={STAGES} ownerNames={new Map()} ordem="valor" selectedIds={[]} onSelectionChange={onSel} onAbrir={onAbrir} />);
-    fireEvent.click(screen.getAllByText("Novo contato", { selector: "td" })[0]);
+    fireEvent.click(screen.getAllByText("Novo contato", { selector: "td" })[0]!);
     expect(onAbrir).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByText("Ana"));
     expect(onAbrir).toHaveBeenCalledTimes(2);
