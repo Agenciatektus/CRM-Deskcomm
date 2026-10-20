@@ -36,8 +36,3 @@ export function truncar(text: string): string {
   if (t.length <= PUSH_PAYLOAD_MAX) return t;
   return `${t.slice(0, PUSH_PAYLOAD_MAX - 1)}…`;
 }
-
-/** Sem cliente visível o SW mostra a bandeja; aba visível o emit da página cobre. */
-export function pushDeveMostrarBandeja(clientesVisiveis: number): boolean {
-  return clientesVisiveis === 0;
-}

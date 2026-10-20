@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { NOTIFY_KINDS } from "./kinds";
-import { montarPayloadDeInbound, pushDeveMostrarBandeja, truncar } from "./push_payload";
+import { montarPayloadDeInbound, truncar } from "./push_payload";
 
 describe("push_payload", () => {
   it("trunca corpo longo", () => {
@@ -32,10 +32,6 @@ describe("push_payload", () => {
     expect(p.title).toBe("Maria");
   });
 
-  it("só mostra bandeja via push quando nenhum cliente está visível", () => {
-    expect(pushDeveMostrarBandeja(0)).toBe(true);
-    expect(pushDeveMostrarBandeja(1)).toBe(false);
-  });
 
   /**
    * O aviso da página e o push do servidor só se substituem na bandeja quando a
