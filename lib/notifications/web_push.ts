@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
 import { vapidPronto, vapidPublica, vapidSubject } from "./vapid";
+import { ehServicoDePushConhecido } from "./servicos-de-push";
 import type { PushPayload } from "./push_payload";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -46,7 +47,10 @@ async function membrosAtivos(
 
 /**
  * O funil de todo envio: só sai para inscrições de quem tem vínculo ativo na
- * organização (e o papel mínimo, quando pedido). Inscrição morta (404/410) é apagada.
+ * organização (e o papel mínimo, quando pedido), e só para serviço de push
+ * conhecido (`servicos-de-push.ts`). A regra de host mora no envio, não só na
+ * rota de inscrição: vale para toda linha gravada, qualquer que seja a origem.
+ * Inscrição morta (404/410) é apagada.
  */
 async function enviarAsInscricoes(
   admin: Admin,
@@ -55,10 +59,11 @@ async function enviarAsInscricoes(
   payload: PushPayload,
   papelMinimo?: Role,
 ): Promise<{ sent: number; gone: number }> {
-  if (inscricoes.length === 0) return NADA;
+  const conhecidas = inscricoes.filter((i) => ehServicoDePushConhecido(i.endpoint));
+  if (conhecidas.length === 0) return NADA;
   const membros = await membrosAtivos(admin, organizationId, papelMinimo);
   if (!membros) return NADA;
-  const rows = inscricoes.filter((i) => membros.has(i.user_id));
+  const rows = conhecidas.filter((i) => membros.has(i.user_id));
   if (rows.length === 0) return NADA;
 
   webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());

@@ -6,6 +6,8 @@
  * - `enviarPushAQuemVeAConversa` (push de `message.received`) só sai para as
  *   inscrições que o banco devolveu como capazes de ver a conversa; a lista de
  *   quem deve ser avisado (responsável + admins) só estreita esse conjunto.
+ * - Só sai para serviço de push conhecido (`servicos-de-push.ts`), qualquer
+ *   que seja o caminho por onde a inscrição foi gravada.
  * - A faxina 404/410 continua valendo.
  *
  * Roda com: npx vitest run lib/notifications/web_push.test.ts
@@ -104,8 +106,8 @@ beforeEach(() => {
 
 describe("o push segue o vínculo de quem recebe", () => {
   const inscricoes: Inscricao[] = [
-    { id: "s1", user_id: "u-ana", endpoint: "https://push/ana" },
-    { id: "s2", user_id: "u-bruno", endpoint: "https://push/bruno" },
+    { id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/ana" },
+    { id: "s2", user_id: "u-bruno", endpoint: "https://fcm.googleapis.com/fcm/send/bruno" },
   ];
 
   it("envio da organização: só às inscrições de quem tem vínculo ativo nela", async () => {
@@ -118,7 +120,7 @@ describe("o push segue o vínculo de quem recebe", () => {
     });
     const r = await enviarPushDaOrg("org-1", payload, {}, admin as never);
     expect(r).toEqual({ sent: 1, gone: 0 });
-    expect(enviados()).toEqual(["https://push/ana"]);
+    expect(enviados()).toEqual(["https://fcm.googleapis.com/fcm/send/ana"]);
   });
 
   it("vínculo em OUTRA organização não conta", async () => {
@@ -147,7 +149,7 @@ describe("o push segue o vínculo de quem recebe", () => {
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
     const r = await enviarPushAoUsuario("org-1", "u-bruno", payload);
     expect(r).toEqual({ sent: 1, gone: 0 });
-    expect(enviados()).toEqual(["https://push/bruno"]);
+    expect(enviados()).toEqual(["https://fcm.googleapis.com/fcm/send/bruno"]);
   });
 
   it("conversa: quem o banco devolve como capaz de ver, mas sem vínculo ativo, não recebe", async () => {
@@ -157,16 +159,16 @@ describe("o push segue o vínculo de quem recebe", () => {
     });
     const r = await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, undefined, admin as never);
     expect(r).toEqual({ sent: 1, gone: 0 });
-    expect(enviados()).toEqual(["https://push/ana"]);
+    expect(enviados()).toEqual(["https://fcm.googleapis.com/fcm/send/ana"]);
   });
 
   it("com papel mínimo, só quem o alcança recebe (papel desconhecido não alcança)", async () => {
     const { admin } = adminFalso({
       inscricoes: [
-        { id: "s1", user_id: "u-viewer", endpoint: "https://push/viewer" },
-        { id: "s2", user_id: "u-agent", endpoint: "https://push/agent" },
-        { id: "s3", user_id: "u-admin", endpoint: "https://push/admin" },
-        { id: "s4", user_id: "u-x", endpoint: "https://push/x" },
+        { id: "s1", user_id: "u-viewer", endpoint: "https://fcm.googleapis.com/fcm/send/viewer" },
+        { id: "s2", user_id: "u-agent", endpoint: "https://fcm.googleapis.com/fcm/send/agent" },
+        { id: "s3", user_id: "u-admin", endpoint: "https://fcm.googleapis.com/fcm/send/admin" },
+        { id: "s4", user_id: "u-x", endpoint: "https://fcm.googleapis.com/fcm/send/x" },
       ],
       membros: [
         { user_id: "u-viewer", role: "viewer", revoked_at: null },
@@ -177,7 +179,20 @@ describe("o push segue o vínculo de quem recebe", () => {
     });
     const r = await enviarPushDaOrg("org-1", payload, { papelMinimo: "agent" }, admin as never);
     expect(r).toEqual({ sent: 2, gone: 0 });
-    expect(enviados().sort()).toEqual(["https://push/admin", "https://push/agent"]);
+    expect(enviados().sort()).toEqual(["https://fcm.googleapis.com/fcm/send/admin", "https://fcm.googleapis.com/fcm/send/agent"]);
+  });
+
+  it("só sai para serviço de push conhecido, mesmo com a inscrição já gravada", async () => {
+    const { admin } = adminFalso({
+      inscricoes: [
+        { id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/ana" },
+        { id: "s2", user_id: "u-ana", endpoint: "https://exemplo.invalid/ana" },
+        { id: "s3", user_id: "u-bruno", endpoint: "https://fcm.googleapis.com:8443/fcm/send/bruno" },
+      ],
+    });
+    const r = await enviarPushDaOrg("org-1", payload, {}, admin as never);
+    expect(r).toEqual({ sent: 1, gone: 0 });
+    expect(enviados()).toEqual(["https://fcm.googleapis.com/fcm/send/ana"]);
   });
 
   it("falha ao ler os vínculos → ninguém recebe", async () => {
@@ -192,8 +207,8 @@ describe("enviarPushAQuemVeAConversa", () => {
   it("pergunta ao banco quem vê a conversa DO EVENTO e envia só a essas inscrições", async () => {
     const { admin, chamadas } = adminFalso({
       visiveis: [
-        { id: "s1", user_id: "u-ana", endpoint: "https://push/1" },
-        { id: "s2", user_id: "u-admin", endpoint: "https://push/2" },
+        { id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/1" },
+        { id: "s2", user_id: "u-admin", endpoint: "https://fcm.googleapis.com/fcm/send/2" },
       ],
     });
     const r = await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, undefined, admin as never);
@@ -204,17 +219,17 @@ describe("enviarPushAQuemVeAConversa", () => {
   });
 
   it("a lista de quem deve ser avisado só estreita: quem não pode ver não entra por ela", async () => {
-    const { admin } = adminFalso({ visiveis: [{ id: "s1", user_id: "u-ana", endpoint: "https://push/ana" }] });
+    const { admin } = adminFalso({ visiveis: [{ id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/ana" }] });
     const r = await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, ["u-ana", "u-bruno"], admin as never);
     expect(r).toEqual({ sent: 1, gone: 0 });
-    expect(enviados()).toEqual(["https://push/ana"]);
+    expect(enviados()).toEqual(["https://fcm.googleapis.com/fcm/send/ana"]);
   });
 
   it("quem pode ver mas não está na lista decidida não recebe", async () => {
     const { admin } = adminFalso({
       visiveis: [
-        { id: "s1", user_id: "u-ana", endpoint: "https://push/ana" },
-        { id: "s2", user_id: "u-carla", endpoint: "https://push/carla" },
+        { id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/ana" },
+        { id: "s2", user_id: "u-carla", endpoint: "https://fcm.googleapis.com/fcm/send/carla" },
       ],
     });
     await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, ["u-ana"], admin as never);
@@ -226,8 +241,8 @@ describe("enviarPushAQuemVeAConversa", () => {
     sendNotification.mockRejectedValueOnce({ statusCode: 410 }).mockResolvedValueOnce(undefined);
     const { admin } = adminFalso({
       visiveis: [
-        { id: "morta", user_id: "u-ana", endpoint: "https://push/1" },
-        { id: "viva", user_id: "u-ana", endpoint: "https://push/2" },
+        { id: "morta", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/1" },
+        { id: "viva", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/2" },
       ],
     });
     const r = await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, undefined, admin as never);
@@ -236,7 +251,7 @@ describe("enviarPushAQuemVeAConversa", () => {
   });
 
   it("lista decidida vazia não consulta nem envia nada", async () => {
-    const { admin, chamadas } = adminFalso({ visiveis: [{ id: "s1", user_id: "u-ana", endpoint: "https://push/1" }] });
+    const { admin, chamadas } = adminFalso({ visiveis: [{ id: "s1", user_id: "u-ana", endpoint: "https://fcm.googleapis.com/fcm/send/1" }] });
     const r = await enviarPushAQuemVeAConversa("org-1", "conv-1", payload, [], admin as never);
     expect(r).toEqual({ sent: 0, gone: 0 });
     expect(chamadas).toEqual([]);
