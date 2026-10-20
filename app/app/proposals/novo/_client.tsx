@@ -140,7 +140,7 @@ export function NewProposalClient({
   }
 
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <div className="flex items-center gap-3 mb:hidden">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/app/proposals" className="flex items-center gap-1.5 text-muted-foreground">
@@ -150,7 +150,7 @@ export function NewProposalClient({
         </Button>
       </div>
 
-      <SecaoDaPagina className="gap-6">
+      <SecaoDaPagina className="max-w-3xl gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">{t("Nova Proposta Comercial")}</CardTitle>

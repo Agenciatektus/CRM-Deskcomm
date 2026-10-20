@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { idsDosProvedoresOferecidos } from "@/lib/ai/pontos/provedores-oferecidos";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
-import { Pagina } from "@/components/pagina";
+import { LinkDeVolta, Pagina } from "@/components/pagina";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
 
@@ -61,7 +62,10 @@ export default async function NewAgentPage() {
   )?.llm;
 
   return (
-    <Pagina className="max-w-none mb:px-4 mb:pt-3">
+    <Pagina className="mb:px-4 mb:pt-3">
+      <LinkDeVolta href="/app/ai/agents" className="-mb-3">
+        {traduzir("Agentes", user.idioma)}
+      </LinkDeVolta>
       <AgentForm
         mode="create"
         credentials={credentials}

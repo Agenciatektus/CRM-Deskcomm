@@ -278,7 +278,7 @@ export function ProspectingClient() {
     if (excluiu) setConfirmandoExclusao(false);
   }
   return (
-    <Pagina className="max-w-7xl">
+    <Pagina>
       <CabecalhoDaPagina
         titulo={t("Prospecção")}
         descricao={t("Encontre empresas, aborde aos poucos e acompanhe quem avança na conversa.")}

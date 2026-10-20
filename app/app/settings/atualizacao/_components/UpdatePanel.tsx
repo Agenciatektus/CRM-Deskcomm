@@ -721,12 +721,12 @@ function Layout({
 }) {
   const t = useT();
   return (
-    <Pagina className="max-w-2xl">
+    <Pagina>
       {/* No celular a barra da casca já diz "Atualização do sistema"; um título
           próprio (a versão nova, "Reiniciando…") continua à vista. */}
       <CabecalhoDaPagina titulo={titulo ?? t("Atualização do sistema")} tituloNoCelular={Boolean(titulo)} />
       {semSmtp ? <AvisoDeSmtp /> : null}
-      <SecaoDaPagina>
+      <SecaoDaPagina className="max-w-2xl">
         <Card className="p-6 mb:p-4">{children}</Card>
       </SecaoDaPagina>
     </Pagina>

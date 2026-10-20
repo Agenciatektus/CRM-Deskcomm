@@ -893,7 +893,7 @@ export function ExtensionsManager({
 
   return (
     <main
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
+      className="flex w-full flex-col gap-6 p-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
       data-testid="extensions-manager"
     >
       {/* No celular o título é o da barra da casca. */}

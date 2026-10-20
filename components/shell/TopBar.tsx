@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -30,17 +31,40 @@ function TrilhaDaRota() {
   const destino = destinoDaRota(pathname);
   const grupo = destino ? NAV_GROUPS.find((g) => g.id === destino.group) : undefined;
   if (!destino || !grupo) return null;
+  // O grupo leva ao hub dele ("Ver tudo em ..."); grupo sem hub (Conversas,
+  // Canais) não tem página própria, e apontar a primeira tela do grupo seria
+  // apontar uma tela que o papel da pessoa pode não ver. Fica texto.
+  const hrefDoGrupo = grupo.hub?.href;
+  // Dentro de uma tela (o detalhe de uma campanha, de um caso), a tela que a
+  // contém deixa de ser a página atual e vira o caminho de volta.
+  const naPropriaTela = pathname === destino.href;
   return (
     <nav aria-label={t("Onde você está")} className="hidden min-w-0 md:block">
       <div className="flex min-w-0 items-center gap-2">
         <ol className="flex min-w-0 items-center gap-1.5 text-sm">
-          <li className="pele-rotulo truncate text-muted-foreground">{t(grupo.label)}</li>
+          <li className="pele-rotulo truncate text-muted-foreground">
+            {hrefDoGrupo && hrefDoGrupo !== pathname ? (
+              <Link href={hrefDoGrupo} className={LINK_DA_TRILHA}>
+                {t(grupo.label)}
+              </Link>
+            ) : (
+              t(grupo.label)
+            )}
+          </li>
           <li aria-hidden className="text-muted-foreground">
             ›
           </li>
-          <li aria-current="page" className="truncate font-semibold text-foreground">
-            {t(destino.label)}
-          </li>
+          {naPropriaTela ? (
+            <li aria-current="page" className="truncate font-semibold text-foreground">
+              {t(destino.label)}
+            </li>
+          ) : (
+            <li className="truncate font-semibold text-foreground">
+              <Link href={destino.href} className={LINK_DA_TRILHA}>
+                {t(destino.label)}
+              </Link>
+            </li>
+          )}
         </ol>
         {/* Fora da lista de propósito: a trilha é "Grupo › Página"; a nota é um
           dado da página, e o leitor de tela não deve ouvi-la como um nível. */}
@@ -50,12 +74,17 @@ function TrilhaDaRota() {
   );
 }
 
+/** Link da trilha: herda a cor do nível, sublinha no hover e mostra o foco. */
+const LINK_DA_TRILHA =
+  "rounded-sm hover:text-foreground hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500";
+
 export function TopBar() {
   return (
-    // Sem `border-b` e com o respiro do `.topbar` do protótipo (6px à esquerda,
-    // 12px à direita): a trilha começa colada na barra lateral e o topo é a
-    // mesma moldura dela, não uma faixa separada por um fio.
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur dark:bg-background/60 md:gap-3 md:pl-1.5">
+    // Sem `border-b`: o topo é a mesma moldura da barra lateral, não uma faixa
+    // separada por um fio. `md:pl-12` põe a trilha na MESMA coluna do conteúdo:
+    // o `p-6` do `<main>` somado ao `p-6` da `Pagina` (e do skeleton). Medir as
+    // duas bordas juntas ao mudar uma.
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 bg-background/95 pl-3 pr-3 backdrop-blur dark:bg-background/60 md:gap-3 md:pl-12">
       <div className="flex min-w-0 items-center gap-2">
         <MobileSidebar />
         {/* No desktop a organização mora no topo do trilho (quadro DS); aqui

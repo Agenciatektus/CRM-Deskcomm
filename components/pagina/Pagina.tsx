@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
  * telas de lista e de ficha fora da Inbox, do Funil e das Tarefas (que têm tela
  * própria no celular).
  *
- * Desktop: coluna centralizada, no respiro do `main` da AppShell. Celular (`mb:`):
+ * Desktop: a largura toda da área de conteúdo, com o MESMO respiro do skeleton de
+ * carregamento (`app/app/loading.tsx`: `p-6` somado ao `p-6` do `main` da AppShell),
+ * então o conteúdo começa e termina onde o skeleton começa e termina; limite de
+ * legibilidade (um formulário, um texto) fica DENTRO da página, nunca nela. Celular (`mb:`):
  * a página encosta nas bordas (desconta o `p-6` do `main`) e cada peça põe o próprio
  * respiro de 16px, como as telas do protótipo; o topo com voltar é da casca
  * (`BarraDeTela`), e por isso o título da página some no celular.
@@ -18,7 +21,7 @@ export function Pagina({ children, className, testId }: { children: ReactNode; c
   return (
     <div
       data-testid={testId}
-      className={cn("mx-auto flex w-full max-w-6xl flex-col gap-5 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3", className)}
+      className={cn("flex w-full flex-col gap-5 p-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-0", className)}
     >
       {children}
     </div>
