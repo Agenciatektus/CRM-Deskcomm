@@ -242,7 +242,8 @@ describe("sugestão de etiqueta no editor da CONVERSA", () => {
     await userEvent.click(within(caixa).getByRole("button", { name: "Índigo" }));
     await userEvent.click(within(caixa).getByRole("button", { name: "Adicionar tag" }));
 
-    expect(mutateConversa).toHaveBeenCalledWith({ conversation_id: "conv-1", tags: ["vip", "google"] });
+    // No fork o editor da conversa grava por DELTA (`adicionar`/`remover`), não pela lista inteira.
+    expect(mutateConversa).toHaveBeenCalledWith({ conversation_id: "conv-1", adicionar: ["google"] });
     expect(definirCor).toHaveBeenCalledWith("google", "#3e63dd");
     expect(screen.queryByRole("dialog")).toBeNull();
   });

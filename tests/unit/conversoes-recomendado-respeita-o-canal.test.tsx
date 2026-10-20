@@ -27,6 +27,7 @@
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
@@ -72,8 +73,9 @@ function abrir(conexaoDireta: boolean) {
 const switchDaEtapa = (id: string) =>
   within(screen.getByTestId(`regra-meta-${id}`)).getByRole("switch");
 
+// O seletor é o `Escolha` do DS: o rótulo aponta para o gatilho e o valor mora no <select> escondido.
 const eventoDaEtapa = (id: string) =>
-  within(screen.getByTestId(`regra-meta-${id}`)).getByLabelText("Evento enviado à Meta");
+  selectDaEscolha(within(screen.getByTestId(`regra-meta-${id}`)).getByLabelText("Evento enviado à Meta"));
 
 const usarRecomendado = () =>
   fireEvent.click(screen.getByRole("button", { name: "Usar o recomendado" }));

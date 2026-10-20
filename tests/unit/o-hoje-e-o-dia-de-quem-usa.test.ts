@@ -13,7 +13,8 @@
  *   2. faturamento/_client.tsx: o período padrão ia "até amanhã" e, no último
  *      dia do mês, o "dia 1º" saltava para o mês seguinte;
  *   3. lib/kanban/filters.ts: "Apenas atrasados" marcava como atrasado o
- *      negócio que fecha HOJE;
+ *      negócio que fecha HOJE (no fork o atalho é "próximo passo vencido",
+ *      por instante; ver o ponto 3 abaixo);
  *   4. proposals/novo/_client.tsx: a validade padrão "hoje + 15" saía com 16
  *      dias.
  *
@@ -123,17 +124,21 @@ describe("às 23:30 em Brasília, o 'hoje' das 4 telas é o dia de quem usa a te
   });
 
   it("ponto 3 — 'Apenas atrasados' NÃO marca quem fecha HOJE", () => {
+    // NO FORK, "Atrasados" é o PRÓXIMO PASSO vencido (a regra do card, barra do
+    // Funil #201), não a data prevista de fechamento: o prazo é um instante e
+    // comparar instantes não depende de fuso. O que este caso protege é o mesmo
+    // do upstream: às 23:30 em Brasília, nada que vence HOJE vira atraso.
     relogio(FUSO_DO_OPERADOR, INSTANTE_23H30_BRT);
-    const fechaHoje = lead("fecha-hoje", { expected_close_date: DIA_DE_QUEM_USA });
-    const fechouOntem = lead("fechou-ontem", { expected_close_date: "2026-09-29" });
-    const fechaAmanha = lead("fecha-amanha", { expected_close_date: DIA_UTC });
+    // 23:59 de hoje em Brasília = 02:59Z de amanhã no UTC.
+    const venceHoje = lead("vence-hoje", { proximo_passo: { titulo: "ligar", prazo: "2026-10-01T02:59:00.000Z" } });
+    const venceuOntem = lead("venceu-ontem", { proximo_passo: { titulo: "ligar", prazo: "2026-09-29T15:00:00.000Z" } });
+    // A data prevista de fechamento no passado NÃO é o critério do fork.
+    const fechouOntemSemPasso = lead("fechou-ontem-sem-passo", { expected_close_date: "2026-09-29", proximo_passo: null });
 
-    const atrasados = applyFilters([fechaHoje, fechouOntem, fechaAmanha], {
+    const atrasados = applyFilters([venceHoje, venceuOntem, fechouOntemSemPasso], {
       overdueOnly: true,
     });
-    // Só o que fechou ANTES de hoje é atrasado; o que fecha hoje ainda está no
-    // prazo. Com o dia UTC, `fecha-hoje` entrava nesta lista.
-    expect(atrasados.map((l) => l.id)).toEqual(["fechou-ontem"]);
+    expect(atrasados.map((l) => l.id)).toEqual(["venceu-ontem"]);
   });
 
   it("ponto 4 — a validade padrão é hoje + 15 exatos, não 16 dias", () => {
@@ -157,10 +162,10 @@ describe("com o navegador em UTC, nada muda — o dia local É o dia UTC", () =>
 
   it("o funil em UTC trata hoje como hoje (nenhum atraso inventado)", () => {
     relogio("UTC", INSTANTE_23H30_BRT);
-    const fechaHoje = lead("fecha-hoje", { expected_close_date: DIA_UTC });
-    const fechouOntem = lead("fechou-ontem", { expected_close_date: "2026-09-30" });
+    const venceHoje = lead("vence-hoje", { proximo_passo: { titulo: "ligar", prazo: "2026-10-01T23:00:00.000Z" } });
+    const venceuOntem = lead("venceu-ontem", { proximo_passo: { titulo: "ligar", prazo: "2026-09-30T12:00:00.000Z" } });
     expect(
-      applyFilters([fechaHoje, fechouOntem], { overdueOnly: true }).map((l) => l.id),
-    ).toEqual(["fechou-ontem"]);
+      applyFilters([venceHoje, venceuOntem], { overdueOnly: true }).map((l) => l.id),
+    ).toEqual(["venceu-ontem"]);
   });
 });

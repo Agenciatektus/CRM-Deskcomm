@@ -29,6 +29,7 @@
  * Confira com: pnpm vitest run tests/unit/admin-avisa-sem-smtp.test.tsx
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 
 type LinhaSmtp = {
@@ -106,12 +107,16 @@ import { ThemeProvider } from "@/lib/theme";
 /** Monta a casca do admin como o layout faz: a leitura entra ANTES do render. */
 async function montarPainelDoAdmin() {
   const semSmtp = await instalacaoSemSmtp();
+  // Em produção a casca do admin vive dentro do `QueryClientProvider` de `app/providers.tsx`.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <ThemeProvider>
-      <AdminShell userEmail="dono@revenda.test" semSmtp={semSmtp}>
-        <p>conteúdo da tela</p>
-      </AdminShell>
-    </ThemeProvider>,
+    <QueryClientProvider client={client}>
+      <ThemeProvider>
+        <AdminShell userEmail="dono@revenda.test" semSmtp={semSmtp}>
+          <p>conteúdo da tela</p>
+        </AdminShell>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 

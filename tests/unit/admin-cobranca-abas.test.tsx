@@ -4,6 +4,7 @@
  * Régua mostra a linha do tempo que a empresa vai viver.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -138,7 +139,7 @@ describe("Conexão com o Asaas (PR 3b)", () => {
     expect(screen.getByText(/paga por Pix, boleto ou cartão/)).toBeTruthy();
     expect(screen.getByText(/Recomendado se seus clientes estão no Brasil\./)).toBeTruthy();
     expect(screen.queryByText(/recorrentes/)).toBeNull();
-    await userEvent.setup().selectOptions(screen.getByLabelText("Provedor"), "asaas");
+    escolherValor(screen.getByLabelText("Provedor"), "asaas");
     expect((screen.getByLabelText("Chave de API do Asaas") as HTMLInputElement).placeholder).toBe("$aact_hmlg_…");
     expect(screen.getByText(/No Asaas: menu Integrações/)).toBeTruthy();
     expect(screen.getByText("https://crm.exemplo.com/api/v1/webhooks/cobranca/asaas")).toBeTruthy();
@@ -151,7 +152,7 @@ describe("Conexão com o Asaas (PR 3b)", () => {
     });
     const u = userEvent.setup();
     render(<ConexaoDaCobranca provedor={null} modo={null} last4={null} urlDoWebhook={VAZIA.urlDoWebhook} />);
-    await u.selectOptions(screen.getByLabelText("Provedor"), "asaas");
+    escolherValor(screen.getByLabelText("Provedor"), "asaas");
     await u.type(screen.getByLabelText("Chave de API do Asaas"), CHAVE_ASAAS);
     await u.click(screen.getByRole("button", { name: "Testar e conectar" }));
     await waitFor(() => expect(h.post).toHaveBeenCalledWith("/api/v1/admin/cobranca/conexao", { provedor: "asaas", chave: CHAVE_ASAAS }));

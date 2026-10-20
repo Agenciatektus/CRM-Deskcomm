@@ -16,9 +16,14 @@ let podeEditar = true;
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useActiveOrg: () => ({ orgId: "org-1", role: "viewer", cliente_pela_agenda: false }),
   usePermission: () => podeEditar,
+  useUser: () => ({ id: "u-1", email: "u@x.test" }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/app/contacts",
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/components/channels/SeletorDeCanalParaConversa", () => ({
   useConversaNovaComEscolhaDeCanal: () => ({ iniciarConversa: vi.fn(), abrindo: false, seletor: null }),
 }));
@@ -91,7 +96,8 @@ describe("caixas de seleção da lista de contatos", () => {
   it("sem contact.update (viewer), nenhuma caixa — nem de linha, nem 'todas'", () => {
     podeEditar = false;
     renderLista();
-    expect(screen.getByText("Joana Prado")).toBeInTheDocument();
+    // Na linha do fork o nome aparece mais de uma vez (nome + avatar/rótulo); basta que a linha exista.
+    expect(screen.getAllByText("Joana Prado").length).toBeGreaterThan(0);
     expect(caixas()).toHaveLength(0);
   });
 });

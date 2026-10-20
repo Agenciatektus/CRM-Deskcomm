@@ -102,6 +102,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: { id: "u-1", role: "admin" }, activeOrg: { orgId: ORG } }),
+  useAuthOpcional: () => ({ user: { id: "u-1", role: "admin" }, activeOrg: { orgId: ORG } }),
+  useUser: () => ({ id: "u-1", role: "admin" }),
+  useActiveOrg: () => ({ orgId: ORG }),
   usePermission: () => true,
 }));
 vi.mock("@/hooks/inbox/useMarkAsRead", () => ({ useMarkAsRead: () => undefined }));
@@ -110,6 +113,8 @@ vi.mock("@/hooks/inbox/useClaimConversation", () => ({
 }));
 vi.mock("@/hooks/inbox/useCloseConversation", () => ({
   useCloseConversation: () => ({ mutate: vi.fn(), isPending: false }),
+  useArchiveConversation: () => ({ mutate: vi.fn(), isPending: false }),
+  useReopenConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("@/components/inbox/CRMSidePanel", () => ({ CRMSidePanel: () => null }));
 vi.mock("@/components/inbox/InboxFilters", () => ({ InboxFilters: () => null }));

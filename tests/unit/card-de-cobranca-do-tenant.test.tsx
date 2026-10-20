@@ -4,6 +4,7 @@
  * rota do dono, e a tela recarrega depois.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { escolherValor, preencherData } from "@/tests/unit/helpers/controles-do-ds";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,7 +38,7 @@ describe("card Cobrança do tenant", () => {
     render(<CardDeCobranca orgId={ORG} planos={[BASICO, PRO, VELHO]} assinatura={null} suspensaPorCobranca={false} rotuloAntigo={null} />);
     expect(screen.getByText("Isenta: não paga e não tem limites.")).toBeTruthy();
     expect(screen.queryByRole("option", { name: "Velho" })).toBeNull();
-    await u.selectOptions(screen.getByLabelText("Plano da empresa"), PRO.id);
+    escolherValor(screen.getByLabelText("Plano da empresa"), PRO.id);
     await u.click(screen.getByRole("button", { name: "Atribuir plano" }));
     await waitFor(() => expect(h.post).toHaveBeenCalledWith(BASE, { plano_id: PRO.id }));
     expect(h.refresh).toHaveBeenCalled();
@@ -49,11 +50,11 @@ describe("card Cobrança do tenant", () => {
     const u = userEvent.setup();
     render(<CardDeCobranca orgId={ORG} planos={[BASICO, PRO]} assinatura={EM_TESTE} suspensaPorCobranca={false} rotuloAntigo={null} />);
     expect(screen.getByText("Teste grátis")).toBeTruthy();
-    await u.selectOptions(screen.getByLabelText("Plano da empresa"), PRO.id);
+    escolherValor(screen.getByLabelText("Plano da empresa"), PRO.id);
     await u.click(screen.getByRole("button", { name: "Trocar plano" }));
     await waitFor(() => expect(h.patch).toHaveBeenCalledWith(BASE, { plano_id: PRO.id }));
     await waitFor(() => expect(h.invalidate).toHaveBeenCalledTimes(1));
-    await u.type(screen.getByLabelText("Dar prazo até"), "2026-10-20");
+    preencherData(screen.getByLabelText("Dar prazo até"), "2026-10-20");
     await u.click(screen.getByRole("button", { name: "Dar prazo" }));
     await waitFor(() => expect(h.post).toHaveBeenCalledWith(`${BASE}/prazo`, { ate: fimDoDia("2026-10-20") }));
     await waitFor(() => expect(h.invalidate).toHaveBeenCalledTimes(2));
@@ -80,7 +81,7 @@ describe("card Cobrança do tenant", () => {
       new ApiError(409, "plan_limit_reached", { excedente: { assentos: 2, canais: 1 } }, "req-1", "O uso atual não cabe no plano escolhido."),
     );
     render(<CardDeCobranca orgId={ORG} planos={[BASICO, PRO]} assinatura={EM_TESTE} suspensaPorCobranca={false} rotuloAntigo={null} />);
-    await u.selectOptions(screen.getByLabelText("Plano da empresa"), PRO.id);
+    escolherValor(screen.getByLabelText("Plano da empresa"), PRO.id);
     await u.click(screen.getByRole("button", { name: "Trocar plano" }));
     const alerta = await screen.findByRole("alert");
     expect(alerta.textContent).toContain("Revogue o acesso de 2 pessoa(s) em Equipe.");
@@ -158,7 +159,7 @@ describe("link de pagamento", () => {
     await u.click(screen.getByRole("button", { name: "Trocar plano" }));
     await waitFor(() => expect(h.showApiError).toHaveBeenCalledWith(erro));
     expect(screen.getByLabelText("Link de pagamento")).toBeTruthy();
-    await u.selectOptions(screen.getByLabelText("Plano da empresa"), PRO.id);
+    escolherValor(screen.getByLabelText("Plano da empresa"), PRO.id);
     await u.click(screen.getByRole("button", { name: "Trocar plano" }));
     await waitFor(() => expect(h.patch).toHaveBeenLastCalledWith(BASE, { plano_id: PRO.id }));
     await waitFor(() => expect(screen.queryByLabelText("Link de pagamento")).toBeNull());

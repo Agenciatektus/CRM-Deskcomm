@@ -1,42 +1,39 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConversationHeader } from "./ConversationHeader";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 
 /**
- * PARIDADE E GUIA DA BARRA DE AÇÕES DO CABEÇALHO (#3003).
+ * PARIDADE E GUIA DAS AÇÕES DO CABEÇALHO (#3003), NA VERSÃO DO FORK.
  *
- * ─── O que este arquivo prova, e o que ele NÃO prova ─────────────────────────
+ * ─── Por que este arquivo difere do upstream ─────────────────────────────────
  *
- * A issue pede duas coisas: (1) menu "⋯" para as ações menos usadas e (2) guia
- * curta em cada botão. A (2) está aqui. A (1) NÃO foi implementada — e o motivo
- * é medido, não estético: `tests/unit/inbox-header-nao-trava.test.tsx` (do
- * mantenedor, commit `e079acf30`) afirma que as ações continuam TODAS na barra e
- * que um botão "Mais ações" **não pode existir**; o próprio JSX deste componente
- * diz por quê ("um menu 'mais' … esconderia ação de quem atende"). Esconder ação
- * da barra é regra de PRODUTO (`#1625`, `#1627`, `#2700` fechado sem merge em
- * 14/10 — e `#2810`, do mantenedor, merged no mesmo dia, nos MESMOS arquivos,
- * resolveu a mesma altura com uma fileira que rola). Quem muda essa regra é ele.
- * A paridade abaixo é o que garante que seguimos do lado certo dela.
+ * O upstream mede uma barra única, sem menu "Mais ações". O cabeçalho do fork é
+ * o da Inbox v2: as ações do FLUXO de atendimento ficam à vista na barra
+ * (Assumir, Devolver à IA, Reabrir, Liberar, Transferir, Lembrar, Fechar) e o
+ * que é leitura ou exceção mora no menu "Mais ações" (buscar, pausar o
+ * automático, ver contato, marcar/desmarcar pessoal, arquivar). A regra "o
+ * fluxo não vai para dentro do menu" também é vigiada em
+ * `tests/unit/inbox-header-nao-trava.test.tsx`. Aqui o que se protege é o mesmo
+ * do #3003: nenhuma ação SOME (em nenhum estado) e todo botão da barra tem guia.
  *
  * ─── Por que a paridade é por CENÁRIO, e não uma lista só ────────────────────
  *
- * A barra é CONDICIONAL: "Liberar" só existe para o dono, "Reabrir" só em
- * conversa encerrada, "Arquivar" some na já arquivada. Uma lista única mediria o
- * pior caso e não veria a ação que sumiu de UM estado. Por isso cada cenário
- * declara o seu conjunto EXATO, e um caso à parte afirma que a UNIÃO dos
+ * As ações são CONDICIONAIS: "Liberar" só existe para o dono, "Reabrir" só em
+ * conversa encerrada, "Arquivar" some na já arquivada. Cada cenário declara o
+ * seu conjunto EXATO (barra + menu), e um caso à parte afirma que a UNIÃO dos
  * cenários cobre o inventário inteiro: é isso que pega a ação removida do
- * componente (ela deixa de aparecer em qualquer cenário, e a união encolhe).
+ * componente.
  *
  * ─── Dublês ─────────────────────────────────────────────────────────────────
  *
  * `useAuth` e `useAutomaticoAtivo` são mutáveis: o estado do cenário decide o
- * que eles devolvem, senão não haveria como montar "com dono, automático de pé".
- * `SnoozeButton`, `DialButton` e `VideoCallButton` são componentes PRÓPRIOS e
- * ficam fora do escopo do #3003 (que é `ConversationHeader.tsx`); o dublê do
- * `SnoozeButton` preserva só o que a PARIDADE mede — que o cabeçalho continua
- * MONTANDO a ação. A guia deles é trabalho dos componentes deles.
+ * que eles devolvem. `SnoozeButton`, `DialButton` e `VideoCallButton` são
+ * componentes PRÓPRIOS; o dublê do `SnoozeButton` preserva só o que a paridade
+ * mede: que o cabeçalho continua MONTANDO a ação.
  */
 
 const estado = vi.hoisted(() => ({
@@ -47,7 +44,7 @@ const estado = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useAuth: () => estado.auth,
+  useAuth: () => ({ activeOrg: null, ...estado.auth }),
   usePermission: () => true,
 }));
 vi.mock("@/hooks/inbox/useClaimConversation", () => ({
@@ -67,6 +64,18 @@ vi.mock("@/hooks/inbox/useResumeAiAttendance", () => ({
 vi.mock("@/hooks/inbox/usePauseAiAttendance", () => ({
   usePauseAiAttendance: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
+  useAssignableMembers: () => ({ data: [], isLoading: false }),
+}));
+vi.mock("@/hooks/inbox/useTransferConversation", () => ({
+  useTransferConversation: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock("@/hooks/channels/useChannelSessions", () => ({
+  useChannelSessions: () => ({ data: [] }),
+}));
+vi.mock("@/hooks/inbox/useSnoozeConversation", () => ({
+  useSnoozeConversation: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock("@/hooks/contacts/usePersonalContact", () => ({
   useMarkPersonalContact: () => ({ mutate: vi.fn(), isPending: false }),
   useUnmarkPersonalContact: () => ({ mutate: vi.fn(), isPending: false }),
@@ -74,47 +83,40 @@ vi.mock("@/hooks/contacts/usePersonalContact", () => ({
 vi.mock("@/hooks/ai/useAutomaticoAtivo", () => ({
   useAutomaticoAtivo: () => ({ data: estado.automaticoDaOrg }),
 }));
-vi.mock("@/components/kanban/OwnerBadge", () => ({ OwnerBadge: () => null }));
-vi.mock("@/components/inbox/FaixaDaCarteira", () => ({ FaixaDaCarteira: () => null }));
-vi.mock("@/components/inbox/ReassignDialog", () => ({ ReassignDialog: () => null }));
-vi.mock("@/components/inbox/JanelaSelo", () => ({ JanelaSelo: () => null }));
 vi.mock("@/components/inbox/ChannelLogo", () => ({ ChannelLogo: () => null }));
+vi.mock("@/components/inbox/JanelaSelo", () => ({ JanelaSelo: () => null }));
 vi.mock("@/components/voice/DialButton", () => ({ DialButton: () => null }));
 vi.mock("@/components/inbox/VideoCallButton", () => ({ VideoCallButton: () => null }));
 vi.mock("@/components/inbox/SnoozeButton", () => ({
-  SnoozeButton: () => <button type="button">Lembrar</button>,
+  SnoozeButton: () => <button type="button">Lembrar depois</button>,
 }));
 
-/**
- * O INVENTÁRIO — toda ação que a barra do cabeçalho oferece hoje.
- *
- * Ele é a régua da paridade: a união dos cenários tem de ser EXATAMENTE isto.
- * Apagar uma ação do componente encolhe a união de um cenário E desta lista (o
- * caso "a união cobre o inventário" reprova nos dois lados).
- */
-const INVENTARIO = [
-  "Buscar nesta conversa",
+/** As ações À VISTA na barra (nome acessível). */
+const DA_BARRA = [
   "Assumir",
   "Liberar",
-  "Devolver ao automático",
-  "Pausar o automático",
-  "Transferir",
-  "Lembrar",
-  "Fechar",
+  "Devolver à IA",
   "Reabrir",
-  "Arquivar",
-  "Marcar como pessoal",
-  "Desmarcar pessoal",
-  "Ver contato",
+  "Transferir conversa",
+  "Lembrar depois",
+  "Fechar conversa",
 ] as const;
 
-/**
- * Botões que a barra RENDERIZA mas que pertencem a outros componentes — a guia
- * deles não está neste arquivo e não pode ser cobrada aqui. Estão nomeados um a
- * um, de propósito: a lista é curta e qualquer botão NOVO que este arquivo
- * desenhe cai fora dela e é cobrado.
- */
-const GUIAS_DE_OUTROS_COMPONENTES = ["Lembrar"];
+/** As ações do menu "Mais ações". */
+const DO_MENU = [
+  "Buscar nesta conversa",
+  "Pausar o automático",
+  "Ver contato",
+  "Marcar como pessoal",
+  "Desmarcar pessoal",
+  "Arquivar",
+] as const;
+
+/** O INVENTÁRIO — toda ação que o cabeçalho do fork oferece hoje. */
+const INVENTARIO: string[] = [...DA_BARRA, ...DO_MENU];
+
+/** Botões da barra que pertencem a outros componentes: a guia deles não é cobrada aqui. */
+const GUIAS_DE_OUTROS_COMPONENTES = ["Lembrar depois"];
 
 const CONTATO = {
   id: "contato-1",
@@ -130,24 +132,15 @@ const CONTATO = {
 
 interface Cenario {
   nome: string;
-  /** Sobrescreve a conversa base. */
   conversa?: Record<string, unknown>;
   contato?: Record<string, unknown>;
-  /** Sobrescreve `estado.auth`. */
   auth?: typeof estado.auth;
   automaticoDaOrg?: boolean | undefined;
-  /** Rótulo de uma ação (ou de qualquer texto) que ancora a barra neste cenário. */
-  ancora: string;
-  /** O conjunto EXATO de ações que este cenário oferece. */
+  /** O conjunto EXATO de ações (barra + menu) que este cenário oferece. */
   esperadas: string[];
   comBusca?: boolean;
 }
 
-/**
- * O cenário que oferece MAIS ações de uma vez: é ele que ancora o caso "a guia
- * não renomeou nenhum botão" (abaixo) e precisa de nome próprio — `CENARIOS[1]`
- * é `Cenario | undefined` sob `noUncheckedIndexedAccess`.
- */
 const CENARIO_MAIS_COMPLETO: Cenario = {
   nome: "minha, com o automático calado — o estado que devolve as duas voltas",
   conversa: {
@@ -155,77 +148,70 @@ const CENARIO_MAIS_COMPLETO: Cenario = {
     assignee_kind: "user",
     bot_silenced_until: new Date(Date.now() + 10 * 60_000).toISOString(),
   },
-  ancora: "Liberar",
   esperadas: [
     "Assumir",
     "Liberar",
-    "Devolver ao automático",
-    "Transferir",
-    "Lembrar",
-    "Fechar",
-    "Arquivar",
-    "Marcar como pessoal",
+    "Devolver à IA",
+    "Transferir conversa",
+    "Lembrar depois",
+    "Fechar conversa",
     "Ver contato",
+    "Marcar como pessoal",
+    "Arquivar",
   ],
 };
 
 const CENARIOS: Cenario[] = [
   {
     nome: "aberta e sem dono — a fila",
-    ancora: "Assumir",
     comBusca: true,
     esperadas: [
-      "Buscar nesta conversa",
       "Assumir",
-      "Transferir",
-      "Lembrar",
-      "Fechar",
-      "Arquivar",
-      "Marcar como pessoal",
+      "Transferir conversa",
+      "Lembrar depois",
+      "Fechar conversa",
+      "Buscar nesta conversa",
       "Ver contato",
+      "Marcar como pessoal",
+      "Arquivar",
     ],
   },
   CENARIO_MAIS_COMPLETO,
   {
     nome: "com dono e o automático de pé — pausar é gesto PRÓPRIO aqui",
     conversa: { assigned_to_user_id: "u2", assignee_kind: "user" },
-    ancora: "Pausar o automático",
     esperadas: [
       "Assumir",
+      "Transferir conversa",
+      "Lembrar depois",
+      "Fechar conversa",
       "Pausar o automático",
-      "Transferir",
-      "Lembrar",
-      "Fechar",
-      "Arquivar",
-      "Marcar como pessoal",
       "Ver contato",
+      "Marcar como pessoal",
+      "Arquivar",
     ],
   },
   {
     nome: "encerrada — o par Fechar/Reabrir vira Reabrir",
     conversa: { status: "closed" },
-    ancora: "Reabrir",
-    esperadas: ["Assumir", "Reabrir", "Arquivar", "Marcar como pessoal", "Ver contato"],
+    esperadas: ["Assumir", "Reabrir", "Ver contato", "Marcar como pessoal", "Arquivar"],
   },
   {
     nome: "arquivada — arquivar de novo não é gesto que exista",
     conversa: { status: "archived" },
-    ancora: "Reabrir",
-    esperadas: ["Assumir", "Reabrir", "Marcar como pessoal", "Ver contato"],
+    esperadas: ["Assumir", "Reabrir", "Ver contato", "Marcar como pessoal"],
   },
   {
     nome: "contato marcado como pessoal — o par inverte",
     contato: { is_personal: true },
-    auth: { user: { id: "u1", support: null, is_platform_admin: true } },
-    ancora: "Desmarcar pessoal",
     esperadas: [
       "Assumir",
-      "Transferir",
-      "Lembrar",
-      "Fechar",
-      "Arquivar",
-      "Desmarcar pessoal",
+      "Transferir conversa",
+      "Lembrar depois",
+      "Fechar conversa",
       "Ver contato",
+      "Desmarcar pessoal",
+      "Arquivar",
     ],
   },
 ];
@@ -254,36 +240,42 @@ function montar(cenario: Cenario) {
     ...cenario.conversa,
   } as unknown as ConversationWithContact;
 
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <ConversationHeader conversation={conversa} onBuscar={cenario.comBusca ? () => {} : undefined} />,
+    <QueryClientProvider client={client}>
+      <ConversationHeader conversation={conversa} onBuscar={cenario.comBusca ? () => {} : undefined} />
+    </QueryClientProvider>,
   );
 }
 
-/** A barra de ações — ancorada por rótulo, nunca por índice fixo (contrato da catraca). */
-function barraDeAcoes(ancora: string): HTMLElement {
-  const botao = screen.getByText(ancora).closest("button");
-  expect(botao, `a âncora "${ancora}" não renderizou um botão`).toBeTruthy();
-  const barra = (botao as HTMLElement).parentElement;
-  expect(barra, "a barra de ações não renderizou").toBeTruthy();
-  return barra as HTMLElement;
+/** A barra de ações — achada pelo testid, nunca por índice. */
+function barraDeAcoes(): HTMLElement {
+  return screen.getByTestId("acoes-da-conversa");
 }
 
-/** "Esta ação está alcançável nesta barra?" — por texto (botão) ou por nome acessível (ícone). */
-function naBarra(barra: HTMLElement, rotulo: string): boolean {
-  return (
-    within(barra).queryAllByText(rotulo).length > 0 ||
-    within(barra).queryByRole("button", { name: rotulo }) !== null ||
-    within(barra).queryByRole("link", { name: rotulo }) !== null
-  );
+function nomeDe(el: Element): string {
+  return (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
 }
 
-describe("#3003 — paridade: nenhuma ação da barra desaparece", () => {
+/** O que o cenário oferece: os botões da barra MAIS os itens do "Mais ações" (aberto). */
+async function acoesOferecidas(): Promise<string[]> {
+  const barra = barraDeAcoes();
+  const naBarra: string[] = DA_BARRA.filter((r) => within(barra).queryByRole("button", { name: r }) !== null);
+  const mais = within(barra).queryByRole("button", { name: "Mais ações" });
+  let noMenu: string[] = [];
+  if (mais) {
+    await userEvent.setup().click(mais);
+    const itens = await screen.findAllByRole("menuitem");
+    noMenu = DO_MENU.filter((r) => itens.some((i) => nomeDe(i) === r));
+  }
+  return [...naBarra, ...noMenu];
+}
+
+describe("#3003 — paridade: nenhuma ação do cabeçalho desaparece", () => {
   for (const cenario of CENARIOS) {
-    it(`${cenario.nome}: continua oferecendo exatamente ${cenario.esperadas.length} ações`, () => {
+    it(`${cenario.nome}: continua oferecendo exatamente ${cenario.esperadas.length} ações`, async () => {
       montar(cenario);
-      const barra = barraDeAcoes(cenario.ancora);
-
-      const presentes = INVENTARIO.filter((rotulo) => naBarra(barra, rotulo));
+      const presentes = await acoesOferecidas();
       expect(
         [...presentes].sort(),
         `o conjunto de ações do cenário "${cenario.nome}" mudou — ação a menos (ou a mais) quebra a paridade do #3003`,
@@ -291,21 +283,26 @@ describe("#3003 — paridade: nenhuma ação da barra desaparece", () => {
     });
   }
 
-  it("a união dos cenários cobre TODA ação do inventário — é aqui que a ação removida do componente reprova", () => {
+  it("a união dos cenários cobre TODA ação do inventário — é aqui que a ação removida do componente reprova", async () => {
     const vistas = new Set<string>();
     for (const cenario of CENARIOS) {
       const { unmount } = montar(cenario);
-      const barra = barraDeAcoes(cenario.ancora);
-      for (const rotulo of INVENTARIO) if (naBarra(barra, rotulo)) vistas.add(rotulo);
+      for (const rotulo of await acoesOferecidas()) vistas.add(rotulo);
       unmount();
     }
-
     expect(
-      [...INVENTARIO].filter((rotulo) => !vistas.has(rotulo)),
+      INVENTARIO.filter((rotulo) => !vistas.has(rotulo)),
       "ação do inventário que NENHUM cenário oferece: ela saiu do componente, não do estado",
     ).toEqual([]);
-    // Controle de não-vacuidade: a varredura varreu de verdade.
-    expect(vistas.size, "a união não pode ser maior que o inventário").toBe(INVENTARIO.length);
+    expect(vistas.size).toBe(INVENTARIO.length);
+  });
+
+  it("as ações do fluxo ficam À VISTA na barra, não dentro do menu", () => {
+    montar(CENARIO_MAIS_COMPLETO);
+    const barra = barraDeAcoes();
+    for (const rotulo of ["Assumir", "Liberar", "Devolver à IA", "Transferir conversa", "Fechar conversa"]) {
+      expect(within(barra).queryByRole("button", { name: rotulo }), `"${rotulo}" saiu da barra`).not.toBeNull();
+    }
   });
 });
 
@@ -313,21 +310,14 @@ describe("#3003 — guia curta: todo botão da barra diz o que faz", () => {
   for (const cenario of CENARIOS) {
     it(`${cenario.nome}: nome acessível e guia, em cada botão`, () => {
       montar(cenario);
-      const barra = barraDeAcoes(cenario.ancora);
-
-      const alvos = Array.from(barra.querySelectorAll<HTMLElement>("button, a[href]"));
+      const alvos = Array.from(barraDeAcoes().querySelectorAll<HTMLElement>("button, a[href]"));
       expect(alvos.length, "a barra não renderizou botão nenhum").toBeGreaterThan(0);
 
       for (const el of alvos) {
-        const nome = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
+        const nome = nomeDe(el);
         expect(nome, `botão sem nome acessível na barra: ${el.outerHTML}`).not.toBe("");
-
         if (GUIAS_DE_OUTROS_COMPONENTES.includes(nome)) continue;
-
-        // A guia vai em `title` e NÃO em `aria-label`: o `aria-label` SUBSTITUI o
-        // nome acessível, e a catraca do mantenedor acha estes botões por
-        // `getByRole("button", { name: "Fechar" })`. Guia que renomeia o botão
-        // quebraria a régua em vez de ajudar quem está começando.
+        // A guia vai em `title` e NÃO substitui o nome acessível.
         expect(
           (el.getAttribute("title") ?? "").trim(),
           `"${nome}" não tem guia curta (#3003): quem está começando não sabe o que ele faz`,
@@ -336,12 +326,17 @@ describe("#3003 — guia curta: todo botão da barra diz o que faz", () => {
     });
   }
 
-  it("a guia não renomeou nenhum botão — o nome acessível continua sendo o rótulo visível", () => {
+  it("a guia não renomeou nenhum botão — o nome acessível continua sendo o rótulo", () => {
     montar(CENARIO_MAIS_COMPLETO);
-    const barra = barraDeAcoes("Liberar");
-    for (const rotulo of ["Assumir", "Liberar", "Devolver ao automático", "Transferir", "Fechar"]) {
+    const barra = barraDeAcoes();
+    for (const rotulo of ["Assumir", "Liberar", "Devolver à IA"]) {
       const botao = within(barra).getByRole("button", { name: rotulo });
       expect(botao.textContent?.trim()).toBe(rotulo);
+    }
+    // Os de ícone têm o nome pelo aria-label, e a guia é OUTRO texto.
+    for (const rotulo of ["Transferir conversa", "Fechar conversa"]) {
+      const botao = within(barra).getByRole("button", { name: rotulo });
+      expect(botao.getAttribute("title")).not.toBe(rotulo);
     }
   });
 });
@@ -376,7 +371,7 @@ describe("#3003 — a guia de Liberar não promete o automático quando ele não
 
   for (const caso of casos) {
     it(caso.nome, () => {
-      montar({ nome: caso.nome, ancora: "Liberar", esperadas: [], ...caso.cenario });
+      montar({ nome: caso.nome, esperadas: [], ...caso.cenario });
       expect(screen.getByRole("button", { name: "Liberar" }).getAttribute("title")).toBe(caso.guia);
     });
   }

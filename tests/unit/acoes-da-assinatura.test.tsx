@@ -4,6 +4,7 @@
  * Pagar em um clique é o que recupera a receita do revendedor.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -137,7 +138,7 @@ describe("AcoesDaAssinatura", () => {
     h.post.mockResolvedValue({ data: { changed: true, quando: "agendado", plano_id: "plano-a", plano_agendado_id: "plano-b", vale_a_partir_de: "2026-11-01T12:00:00Z" } });
     render(<AcoesDaAssinatura {...acoes()} />);
     await u.click(screen.getByRole("button", { name: "Trocar de plano" }));
-    await u.selectOptions(screen.getByLabelText("Novo plano"), "plano-b");
+    escolherValor(screen.getByLabelText("Novo plano"), "plano-b");
     await u.click(screen.getByRole("button", { name: "Confirmar troca" }));
     expect((await screen.findByRole("status")).textContent).toMatch(/O novo plano vale a partir de \d{2}\/\d{2}/);
     expect(h.post).toHaveBeenCalledWith("/api/v1/cobranca/assinatura/plano", { plano_id: "plano-b" });
@@ -277,7 +278,7 @@ describe("Asaas no Plano e cobrança (PR 3b)", () => {
     h.post.mockRejectedValue(new ApiError(409, "pagamento_do_periodo_pendente", undefined, "r", "x"));
     render(<AcoesDaAssinatura {...acoes({ provedor: "asaas" })} />);
     await u.click(screen.getByRole("button", { name: "Trocar de plano" }));
-    await u.selectOptions(screen.getByLabelText("Novo plano"), "plano-b");
+    escolherValor(screen.getByLabelText("Novo plano"), "plano-b");
     await u.click(screen.getByRole("button", { name: "Confirmar troca" }));
     expect((await screen.findByRole("status")).textContent).toBe(
       'A mensalidade de agora ainda não foi paga. Pague em "Pagar agora" e troque de plano depois que o pagamento for confirmado (Pix: minutos; boleto: até 1 dia útil).',
