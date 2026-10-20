@@ -183,13 +183,16 @@ describe("o código do veto vira a causa em linguagem de quem opera", () => {
     expect(texto).toMatch(/contexto da conversa/);
   });
 
-  it("⛔ 'o agente decidiu não responder' (no_candidate) não vira erro de configuração", () => {
+  it("⛔ 'o agente terminou sem propor resposta' (no_candidate) não vira erro de configuração", () => {
     // Caso real: a abordagem recebeu a saudação automática do WhatsApp Business,
     // e o agente, certo, não respondeu. O painel dizia "Confira a configuração do
-    // agente" — fazendo uma decisão correta parecer defeito.
+    // agente" — fazendo uma decisão correta parecer defeito. Mas no_candidate
+    // também nasce de parada (texto solto, truncamento, passos esgotados), então
+    // o texto não pode afirmar a decisão: oferece gerar de novo.
     const motivo = motivoDoVeto("no_candidate")!;
-    expect(motivo.acionavel).toBe(false);
-    expect(motivo.texto).toMatch(/não há o que responder/);
+    expect(motivo.acionavel).toBe(true);
+    expect(motivo.texto).toMatch(/sem propor uma resposta/);
+    expect(motivo.texto).toMatch(/gere de novo/);
     expect(motivo.texto).not.toMatch(/configura|falhou|erro/i);
     // O código é contrato do motor: é o impedimento que a prévia grava quando o
     // agente não propôs resposta. Se o nome mudar lá, este caso deixa de valer.

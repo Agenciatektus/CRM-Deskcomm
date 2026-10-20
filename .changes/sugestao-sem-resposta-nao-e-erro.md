@@ -1,6 +1,6 @@
 ---
 impacto: nada_mudou
 secao: corrigido
-titulo: "Sugerir resposta" deixa de culpar a configuração quando o agente decide que não há o que responder
+titulo: "Sugerir resposta" deixa de culpar a configuração quando o agente termina sem propor resposta
 ---
-Quando o agente lia a conversa e concluía que não havia o que responder — por exemplo, a saudação automática do WhatsApp Business de uma empresa abordada —, o painel de "Sugerir resposta" mostrava "Confira a configuração do agente e tente gerar novamente", como se algo estivesse quebrado. Agora ele diz que o agente avaliou que não há o que responder agora e que não há nada a enviar; quem atende pode escrever a mensagem se quiser responder mesmo assim. Crédito: @paulolimajr77
+Quando o agente terminava sem propor resposta — por exemplo, diante da saudação automática do WhatsApp Business de uma empresa abordada —, o painel de "Sugerir resposta" mostrava "Confira a configuração do agente e tente gerar novamente", como se algo estivesse quebrado. Agora ele explica que o agente terminou sem propor uma resposta, que isso pode ter sido uma decisão ou a geração ter parado antes da resposta, e sugere gerar de novo quando se esperava uma. Crédito: @paulolimajr77
