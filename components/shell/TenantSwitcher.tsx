@@ -75,7 +75,10 @@ export function TenantSwitcher({
   if (!podeTrocar) return null;
 
   const menu = (
-    <DropdownMenu>
+    // `modal={false}` (aqui, no UserMenu e no SeletorDeIdioma): o menu modal do Radix
+    // trava a rolagem do <body>; com a página rolada, a barra lateral e o topo
+    // (sticky) saíam do lugar e a rolagem ficava presa (bug relatado em 20/10).
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         {variante === "trilho" ? (
           <button

@@ -34,7 +34,7 @@ export function UserMenu() {
     <div className="flex items-center gap-2">
       <SeletorDeIdioma />
       <ThemeToggle />
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full" aria-label={t("Menu do usuário")}>
             <Avatar className="h-8 w-8">
