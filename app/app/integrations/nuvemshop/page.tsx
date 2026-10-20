@@ -56,7 +56,7 @@ export default async function NuvemshopIntegrationPage() {
   const isAdmin = activeOrg?.role === "admin" || (user?.is_platform_admin === true && !user.support);
 
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <Suspense fallback={null}>
         <StatusToast />
       </Suspense>

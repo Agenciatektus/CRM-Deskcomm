@@ -212,12 +212,12 @@ export function NovaCampanha() {
   }
 
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <CabecalhoDaPagina
         titulo={t("Nova campanha")}
         descricao={t("Isto cria um rascunho. Nada é enviado antes de você preparar a lista e iniciar.")}
       />
-      <SecaoDaPagina className="gap-4">
+      <SecaoDaPagina className="max-w-3xl gap-4">
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Informações")}</h2>

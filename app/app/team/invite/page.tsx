@@ -1,4 +1,4 @@
-import { CabecalhoDaPagina, Pagina, SecaoDaPagina } from "@/components/pagina";
+import { CabecalhoDaPagina, LinkDeVolta, Pagina, SecaoDaPagina } from "@/components/pagina";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -20,6 +20,11 @@ export default async function TeamInvitePage() {
   return (
     <Pagina>
       <CabecalhoDaPagina
+        antes={
+          <LinkDeVolta href="/app/team" className="mb-2">
+            {t("Equipe")}
+          </LinkDeVolta>
+        }
         titulo={t("Convidar membros")}
         descricao={t("Cole até 20 emails (um por linha) e escolha a role compartilhada.")}
       />

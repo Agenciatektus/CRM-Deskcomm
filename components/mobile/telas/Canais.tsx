@@ -34,7 +34,7 @@ const SELO: Record<Estado, { classe: string; rotulo: string }> = {
 
 /** Os outros canais, na ordem das abas de Conexões (os mesmos rótulos e as mesmas abas). */
 const OUTROS: { aba: string; nome: string; sub: string; Icone: typeof Phone; logo: string }[] = [
-  { aba: "hospedado", nome: "Número já conectado", sub: "WhatsApp que já funciona em outro sistema", Icone: WhatsappLogo, logo: "bg-avatar-2 text-avatar-2-fg" },
+  { aba: "hospedado", nome: "Verdash", sub: "WhatsApp que já está na Verdash", Icone: WhatsappLogo, logo: "bg-avatar-2 text-avatar-2-fg" },
   { aba: "instagram", nome: "Instagram", sub: "Direct do Instagram na aba Conversas", Icone: InstagramLogo, logo: "bg-avatar-3 text-avatar-3-fg" },
   { aba: "oficial", nome: "API Oficial (Meta)", sub: "Número oficial e templates da Meta", Icone: ChatCircle, logo: "bg-avatar-1 text-avatar-1-fg" },
   { aba: "parceiro", nome: "Provedor parceiro", sub: "Número por um provedor parceiro", Icone: PlugsConnected, logo: "bg-avatar-4 text-avatar-4-fg" },

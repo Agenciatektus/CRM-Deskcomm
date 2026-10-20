@@ -45,7 +45,7 @@ import { ArrowBendUpLeft } from "@/lib/ui/icons";
 export function ConfiguracaoDeCampanhas() {
   const t = useT();
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <CabecalhoDaPagina
         antes={
           <Link

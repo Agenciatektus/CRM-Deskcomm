@@ -102,7 +102,7 @@ export function RoteamentoResultados() {
   const routers = dados?.roteadores ?? [];
   const porcentagem = (a: number, b: number) => b ? `${Math.round(100 * a / b)}% (${a}/${b})` : t("Sem pares");
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 p-6" data-testid="resultados-roteamento">
+    <div className="w-full space-y-5 p-6" data-testid="resultados-roteamento">
       <header>
         <div className="mb-2 flex gap-3 text-sm"><Link href="/app/ai/runs" className="underline">{t("Execuções")}</Link><span aria-current="page" className="font-medium">{t("Roteamento")}</span></div>
         <h1 className="text-2xl font-semibold">{t("Resultados do roteamento")}</h1>

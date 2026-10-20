@@ -150,7 +150,7 @@ export function EditarCampanha({ id }: { id: string }) {
 
   if (c.status !== "draft") {
     return (
-      <Pagina className="max-w-3xl">
+      <Pagina>
         <CabecalhoDaPagina titulo={t("Editar campanha")} />
         <Card className="space-y-3 p-4 mb:mx-4">
           <p className="text-sm">
@@ -179,12 +179,12 @@ export function EditarCampanha({ id }: { id: string }) {
     (baseLegal !== "legitimate_interest" || liaRef.trim() !== "");
 
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <CabecalhoDaPagina
         titulo={t("Editar campanha")}
         descricao={t("Enquanto é rascunho, tudo muda. Depois de preparada, só o ritmo.")}
       />
-      <SecaoDaPagina className="gap-4">
+      <SecaoDaPagina className="max-w-3xl gap-4">
 
       <Card className="space-y-4 p-4">
         <h2 className="font-medium">{t("Informações")}</h2>

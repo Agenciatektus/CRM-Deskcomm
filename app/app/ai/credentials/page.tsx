@@ -71,7 +71,10 @@ export default async function CredentialsPage() {
   // de chaves, ela também não mentiria como "credencial" no agrupamento por
   // provedor (que só conhece quem cadastra chave).
   const linhaDeLogin = moduloLoginCodex
-    ? (todas.find((c) => c.provider === PROVEDOR_POR_ASSINATURA) ?? null)
+    ? // Só a ATIVA: desconectar deixa a linha no banco (desativada e sem
+      // segredo, porque versões publicadas apontam para ela) e ela não pode
+      // aparecer como conectada.
+      (todas.find((c) => c.provider === PROVEDOR_POR_ASSINATURA && c.is_active) ?? null)
     : null;
   const credentials = todas.filter((c) => c.provider !== PROVEDOR_POR_ASSINATURA);
   const canWrite = ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;

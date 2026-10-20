@@ -52,6 +52,24 @@ describe("a trilha do cabeçalho", () => {
     caminho = "/app/ai/cases/123";
     render(<TopBar />);
     expect(trilha()).toHaveTextContent("Agentes›Casos");
+    // A tela que contém o detalhe vira o caminho de volta, e deixa de ser a atual.
+    const casos = within(trilha()!).getByRole("link", { name: "Casos" });
+    expect(casos).toHaveAttribute("href", "/app/ai/cases");
+    expect(within(trilha()!).queryByText("Casos")?.closest("[aria-current]")).toBeNull();
+  });
+
+  it("o grupo com hub leva ao hub; a página atual não é link", () => {
+    caminho = "/app/ai/cases";
+    render(<TopBar />);
+    const nav = trilha()!;
+    expect(within(nav).getByRole("link", { name: "Agentes" })).toHaveAttribute("href", "/app/ai");
+    expect(within(nav).queryByRole("link", { name: "Casos" })).toBeNull();
+    expect(within(nav).getByText("Casos")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("grupo sem hub (Conversas) fica texto, sem link inventado", () => {
+    render(<TopBar />);
+    expect(within(trilha()!).queryAllByRole("link")).toHaveLength(0);
   });
 
   it("sem destino que case, não há trilha", () => {

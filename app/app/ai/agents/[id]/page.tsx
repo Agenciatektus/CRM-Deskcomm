@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +11,7 @@ import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 
-import { Pagina } from "@/components/pagina";
+import { LinkDeVolta, Pagina } from "@/components/pagina";
 import { LegacyRecovery } from "./_components/LegacyRecovery";
 import { AgentOperation } from "./_components/AgentOperation";
 import type { MaterialDoAcervo } from "./_components/BasesDoAgente";
@@ -97,7 +98,10 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   // "o motor de voz lê a coluna que o editor legado grava".
   if (agent.channel === "voice") {
     return (
-      <Pagina className="max-w-none mb:px-4 mb:pt-3">
+      <Pagina className="mb:px-4 mb:pt-3">
+        <LinkDeVolta href="/app/ai/agents" className="-mb-3">
+          {traduzir("Agentes", user.idioma)}
+        </LinkDeVolta>
         <AgentEditorClient agentId={id} initialData={agent} readOnly={readOnly} />
       </Pagina>
     );
@@ -212,7 +216,10 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   const materiais = [...materiaisVivos, ...materiaisArquivadosMarcados];
 
   return (
-    <Pagina className="max-w-none mb:px-4 mb:pt-3">
+    <Pagina className="mb:px-4 mb:pt-3">
+      <LinkDeVolta href="/app/ai/agents" className="-mb-3">
+        {traduzir("Agentes", user.idioma)}
+      </LinkDeVolta>
       <AgentOperation agent={agent} readOnly={readOnly} />
       {(agent.kind ?? "rag_bot") !== "mcp_agent" && !agent.published_version_id && (
         <LegacyRecovery

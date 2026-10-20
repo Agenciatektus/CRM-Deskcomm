@@ -1,5 +1,5 @@
 "use client";
-import { Pagina } from "@/components/pagina";
+import { LinkDeVolta, Pagina } from "@/components/pagina";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -126,8 +126,9 @@ export function EditorDeModelo({ slug }: { slug: string }) {
   }
 
   return (
-    <Pagina className="grid max-w-5xl gap-6 mb:px-4 mb:pt-3 lg:grid-cols-[1fr_16rem]">
+    <Pagina className="grid gap-6 mb:px-4 mb:pt-3 lg:grid-cols-[1fr_16rem]">
       <div className="space-y-4">
+        <LinkDeVolta href="/app/settings/tenant/proposals/modelos">{t("Modelos de proposta")}</LinkDeVolta>
         {importado && modelo.sections.length === 0 ? (
           <p role="alert" className="text-sm text-amber-800">{t("O modelo importado não está mais disponível. Envie o arquivo de novo.")}</p>
         ) : null}

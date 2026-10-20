@@ -66,7 +66,7 @@ vi.mock("@/lib/ai/credenciais/host-siwc", () => ({
 const guardar = vi.hoisted(() => vi.fn(async (_p: unknown) => ({ ok: true as const, id: "cred-1" })));
 vi.mock("@/lib/ai/credenciais/login-codex", () => ({
   guardarLoginCodex: guardar,
-  desconectarLoginCodex: vi.fn(async () => true),
+  desconectarLoginCodex: vi.fn(async () => ({ ok: true, id: null })),
   lerLoginCodex: vi.fn(async () => null),
 }));
 

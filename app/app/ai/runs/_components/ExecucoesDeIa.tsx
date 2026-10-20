@@ -139,7 +139,7 @@ export function ExecucoesDeIa() {
   }
 
   return (
-    <Pagina className="max-w-5xl" testId="execucoes-de-ia">
+    <Pagina testId="execucoes-de-ia">
       <CabecalhoDaPagina
         titulo={t("Execuções de IA")}
         descricao={

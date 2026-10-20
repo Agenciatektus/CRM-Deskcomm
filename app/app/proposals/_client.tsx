@@ -74,7 +74,7 @@ export function ProposalsClient({ podeCriar }: { podeCriar: boolean }) {
   }, [tentativa]);
 
   return (
-    <Pagina className="max-w-5xl">
+    <Pagina>
       <CabecalhoDaPagina
         titulo={t("Propostas")}
         acoes={

@@ -123,6 +123,72 @@ export const vocabularioDeTagsSchema = z
 
 export type VocabularioDeTagsInput = z.infer<typeof vocabularioDeTagsSchema>;
 
+/**
+ * O LOTE da tela de Tags: a mesma operação, aplicada a várias etiquetas.
+ *
+ * Renomear fica de fora de propósito: "renomear dez etiquetas para o mesmo
+ * nome" é juntar, e a tela oferece juntar com esse nome.
+ *
+ * O teto (50 por chamada) é o mesmo da barra em lote do Funil
+ * (`LOTE_MAXIMO` de `components/kanban/BulkActionBar.tsx`): cada etiqueta é uma
+ * chamada da função de banco dentro do MESMO pedido, e um pedido sem teto
+ * segura a conexão pelo tempo que o operador tiver selecionado. A tela manda em
+ * blocos; "selecionar todas" com 500 etiquetas vira 10 pedidos em sequência.
+ *
+ * Cada item é validado pelo schema de UMA etiqueta (`vocabularioDeTagsSchema`):
+ * a regra de cor/destino por ação não é reescrita aqui, e uma régua nova lá vale
+ * para o lote no mesmo commit.
+ */
+export const LOTE_MAXIMO_DE_ETIQUETAS = 50;
+export const ACOES_EM_LOTE = ["juntar", "excluir", "definir_cor"] as const;
+export type AcaoEmLote = (typeof ACOES_EM_LOTE)[number];
+
+export const loteDeVocabularioSchema = z
+  .object({
+    acao: z.enum(ACOES_EM_LOTE, { error: "acao_invalida" }),
+    tags: z
+      .array(tagSchema)
+      .min(1, "tags_obrigatorias")
+      .max(LOTE_MAXIMO_DE_ETIQUETAS, "lote_grande_demais"),
+    destino: tagSchema.nullish(),
+    cor: corDeEtiquetaSchema.nullish(),
+  })
+  .transform((valor) => {
+    // Uma etiqueta por nome canônico, e o destino de uma junção não é origem
+    // dela mesma: juntar "vip" em "vip" não é operação, e na lista selecionada
+    // o destino costuma estar marcado junto.
+    const destino = valor.destino?.toLowerCase();
+    const vistas = new Set<string>();
+    const tags = valor.tags.filter((tag) => {
+      const chave = tag.toLowerCase();
+      if (vistas.has(chave) || (valor.acao === "juntar" && chave === destino)) return false;
+      vistas.add(chave);
+      return true;
+    });
+    return { ...valor, tags };
+  })
+  .superRefine((valor, ctx) => {
+    if (valor.tags.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tags"], message: "tags_obrigatorias" });
+      return;
+    }
+    // O primeiro item basta: acao, destino e cor são os mesmos para todos, e a
+    // tag de cada um já passou por `tagSchema` acima.
+    const item = vocabularioDeTagsSchema.safeParse({
+      acao: valor.acao,
+      tag: valor.tags[0],
+      destino: valor.destino,
+      cor: valor.cor,
+    });
+    if (!item.success) {
+      for (const issue of item.error.issues) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: issue.path, message: issue.message });
+      }
+    }
+  });
+
+export type LoteDeVocabularioInput = z.infer<typeof loteDeVocabularioSchema>;
+
 /** Uma linha do vocabulário, como a função de leitura devolve. */
 export type LinhaDeVocabulario = {
   tag: string;

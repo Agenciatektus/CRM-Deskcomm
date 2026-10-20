@@ -52,7 +52,7 @@ export function ProposalsSettingsClient() {
   if (!cfg) return <div className="p-6">{t("Carregando…")}</div>;
 
   return (
-    <Pagina className="max-w-2xl">
+    <Pagina>
       <CabecalhoDaPagina
         titulo={t("Propostas")}
         acoes={
@@ -63,7 +63,7 @@ export function ProposalsSettingsClient() {
           ) : null
         }
       />
-      <SecaoDaPagina className="gap-4">
+      <SecaoDaPagina className="max-w-2xl gap-4">
       <div className="flex items-center gap-2">
         <Switch id="proposals_enabled" checked={cfg.enabled} onCheckedChange={(v) => setCfg({ ...cfg, enabled: v })} />
         <Label htmlFor="proposals_enabled">{t("Ligar propostas comerciais para esta organização")}</Label>
