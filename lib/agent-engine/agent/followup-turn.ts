@@ -1298,16 +1298,6 @@ async function sendFixedOutbound(
 }
 
 /**
- * Re-agenda a re-entrada para `at` (próxima janela válida) num cron_job 'at' one-shot
- * (F3-01), reusando o payload de origem (mantém mode='template'). IDEMPOTENTE por job
- * de origem: dois runs do MESMO job (retry pós-crash) criam UM só cron. staggerWindowMs
- * 0 de propósito — o jitter anti-ban já está embutido em `at` (nextAllowedAt do gate),
- * não é um número novo escondido.
- * ponytail: check-then-insert é seguro porque o followup_turn de um lead roda numa lane
- * serializada (F2-03) e o retry é sequencial; se um dia rodar concorrente por lead, vira
- * unique index parcial em (tenant_id, lead_id, payload->>'reschedule_of').
- */
-/**
  * Próxima abertura da janela de DISPARO do canal quando ela está fechada agora;
  * `null` quando o envio pode sair. É a mesma régua de `runAgentTurn` para a
  * retomada (`janelaDeEnvioAberta(agora, knobs, false)`), lida antes do turno
@@ -1324,6 +1314,16 @@ async function aberturaDaJanelaDeDisparo(
   return proximaAberturaDaJanela(agora, knobs, false);
 }
 
+/**
+ * Re-agenda a re-entrada para `at` (próxima janela válida) num cron_job 'at' one-shot
+ * (F3-01), reusando o payload de origem (mantém mode='template'). IDEMPOTENTE por job
+ * de origem: dois runs do MESMO job (retry pós-crash) criam UM só cron. staggerWindowMs
+ * 0 de propósito — o jitter anti-ban já está embutido em `at` (nextAllowedAt do gate),
+ * não é um número novo escondido.
+ * ponytail: check-then-insert é seguro porque o followup_turn de um lead roda numa lane
+ * serializada (F2-03) e o retry é sequencial; se um dia rodar concorrente por lead, vira
+ * unique index parcial em (tenant_id, lead_id, payload->>'reschedule_of').
+ */
 async function rescheduleReentry(
   pool: pg.Pool,
   input: { tenantId: string; leadId: string; jobId: string; at: Date; payload: Record<string, unknown> },
