@@ -135,6 +135,21 @@ test("3. sem rede, a navegação cai na página neutra e volta com a rede", asyn
 test.describe("Android", () => {
   test.use({ userAgent: ANDROID });
 
+  // A página é instalável (manifest + SW + localhost): um pedido VERDADEIRO do
+  // Chromium mudaria o 4a para "botão" sem aviso. Só o evento sintético do 4b
+  // (que não é `isTrusted`) chega ao app.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener(
+        "beforeinstallprompt",
+        (evento) => {
+          if (evento.isTrusted) evento.stopImmediatePropagation();
+        },
+        true,
+      );
+    });
+  });
+
   test("4a. sem pedido do navegador, ensina pelo menu", async ({ page }) => {
     await abrirATela(page);
     await expect(page.getByTestId("app-android-menu")).toBeVisible();
