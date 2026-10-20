@@ -6,6 +6,8 @@ import { env } from "@/lib/env";
 import { vapidPronto, vapidPublica, vapidSubject } from "./vapid";
 import type { PushPayload } from "./push_payload";
 
+type Admin = ReturnType<typeof createAdminClient>;
+
 export type PushSubRow = {
   id: string;
   endpoint: string;
@@ -13,35 +15,39 @@ export type PushSubRow = {
   auth: string;
 };
 
-type AdminLike = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (col: string, val: string) => Promise<{ data: PushSubRow[] | null; error: { message: string } | null }>;
-    };
-    delete: () => {
-      eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
-    };
-  };
-};
+type Inscricao = PushSubRow & { user_id: string };
 
-function store(admin: AdminLike) {
-  return admin.from("push_subscriptions");
+const NADA = { sent: 0, gone: 0 } as const;
+
+/** Quem tem vínculo ativo na organização. `null` quando a leitura falha: ninguém recebe. */
+async function membrosAtivos(admin: Admin, organizationId: string): Promise<Set<string> | null> {
+  const { data, error } = await admin
+    .from("user_organizations")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .is("revoked_at", null);
+  if (error) {
+    logger.warn("push_membros_ativos_falhou", { detail: error.message });
+    return null;
+  }
+  return new Set(((data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id));
 }
 
-export async function enviarPushDaOrg(
+/**
+ * O funil de todo envio: só sai para inscrições de quem tem vínculo ativo na
+ * organização. Inscrição morta (404/410) é apagada.
+ */
+async function enviarAsInscricoes(
+  admin: Admin,
   organizationId: string,
+  inscricoes: Inscricao[],
   payload: PushPayload,
-  admin: AdminLike = createAdminClient() as unknown as AdminLike,
 ): Promise<{ sent: number; gone: number }> {
-  if (!vapidPronto()) return { sent: 0, gone: 0 };
-
-  const { data, error } = await store(admin).select("id, endpoint, p256dh, auth").eq("organization_id", organizationId);
-  if (error) {
-    logger.warn("push_subscriptions_list_failed", { detail: error.message });
-    return { sent: 0, gone: 0 };
-  }
-  const rows = data ?? [];
-  if (rows.length === 0) return { sent: 0, gone: 0 };
+  if (inscricoes.length === 0) return NADA;
+  const membros = await membrosAtivos(admin, organizationId);
+  if (!membros) return NADA;
+  const rows = inscricoes.filter((i) => membros.has(i.user_id));
+  if (rows.length === 0) return NADA;
 
   webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());
 
@@ -61,7 +67,11 @@ export async function enviarPushDaOrg(
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) {
           gone += 1;
-          await store(admin).delete().eq("id", row.id);
+          await admin
+            .from("push_subscriptions")
+            .delete()
+            .eq("id", row.id)
+            .eq("organization_id", organizationId);
           return;
         }
         logger.warn("web_push_send_failed", { status: status ?? 0 });
@@ -72,23 +82,34 @@ export async function enviarPushDaOrg(
   return { sent, gone };
 }
 
+/** Push às inscrições da organização — ou só às de `soUsuario`. */
+export async function enviarPushDaOrg(
+  organizationId: string,
+  payload: PushPayload,
+  quem: { soUsuario?: string } = {},
+  admin: Admin = createAdminClient(),
+): Promise<{ sent: number; gone: number }> {
+  if (!vapidPronto()) return NADA;
+
+  let query = admin
+    .from("push_subscriptions")
+    .select("id, user_id, endpoint, p256dh, auth")
+    .eq("organization_id", organizationId);
+  if (quem.soUsuario) query = query.eq("user_id", quem.soUsuario);
+  const { data, error } = await query;
+  if (error) {
+    logger.warn("push_subscriptions_list_failed", { detail: error.message });
+    return NADA;
+  }
+  return enviarAsInscricoes(admin, organizationId, (data ?? []) as Inscricao[], payload);
+}
+
 export async function enviarPushAoUsuario(
   organizationId: string,
   userId: string,
   payload: PushPayload,
 ): Promise<{ sent: number; gone: number }> {
-  if (!vapidPronto()) return { sent: 0, gone: 0 };
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId);
-  if (error) {
-    logger.warn("push_subscriptions_user_list_failed", { detail: error.message });
-    return { sent: 0, gone: 0 };
-  }
-  return enviarPushDaOrg(organizationId, payload, inscricoesJaFiltradas(admin, data ?? []));
+  return enviarPushDaOrg(organizationId, payload, { soUsuario: userId });
 }
 
 /**
@@ -106,36 +127,19 @@ export async function enviarPushAQuemVeAConversa(
   conversationId: string,
   payload: PushPayload,
   soUsuarios?: ReadonlyArray<string>,
-  admin: ReturnType<typeof createAdminClient> = createAdminClient(),
+  admin: Admin = createAdminClient(),
 ): Promise<{ sent: number; gone: number }> {
-  if (!vapidPronto() || soUsuarios?.length === 0) return { sent: 0, gone: 0 };
+  if (!vapidPronto() || soUsuarios?.length === 0) return NADA;
   const { data, error } = await admin.rpc("fn_push_inscricoes_que_veem_a_conversa", {
     p_org: organizationId,
     p_conversation: conversationId,
   });
   if (error) {
     logger.warn("push_subscriptions_visible_list_failed", { detail: error.message });
-    return { sent: 0, gone: 0 };
+    return NADA;
   }
   // O admin client não é tipado pelo schema: a forma vem de `lib/database.types.ts`.
-  const visiveis: Array<PushSubRow & { user_id: string }> = data ?? [];
+  const visiveis: Inscricao[] = data ?? [];
   const linhas = visiveis.filter((l) => !soUsuarios || soUsuarios.includes(l.user_id));
-  return enviarPushDaOrg(organizationId, payload, inscricoesJaFiltradas(admin, linhas));
-}
-
-/** Lista já filtrada para `enviarPushDaOrg`; a faxina de inscrição morta (404/410) segue indo ao banco. */
-function inscricoesJaFiltradas(admin: ReturnType<typeof createAdminClient>, rows: PushSubRow[]): AdminLike {
-  return {
-    from: (table: string) => ({
-      select: () => ({
-        eq: async () => ({ data: rows, error: null }),
-      }),
-      delete: () => ({
-        eq: async (col: string, val: string) => {
-          const { error: delErr } = await admin.from(table).delete().eq(col, val);
-          return { error: delErr };
-        },
-      }),
-    }),
-  };
+  return enviarAsInscricoes(admin, organizationId, linhas, payload);
 }
