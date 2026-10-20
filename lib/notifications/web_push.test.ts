@@ -160,6 +160,26 @@ describe("o push segue o vínculo de quem recebe", () => {
     expect(enviados()).toEqual(["https://push/ana"]);
   });
 
+  it("com papel mínimo, só quem o alcança recebe (papel desconhecido não alcança)", async () => {
+    const { admin } = adminFalso({
+      inscricoes: [
+        { id: "s1", user_id: "u-viewer", endpoint: "https://push/viewer" },
+        { id: "s2", user_id: "u-agent", endpoint: "https://push/agent" },
+        { id: "s3", user_id: "u-admin", endpoint: "https://push/admin" },
+        { id: "s4", user_id: "u-x", endpoint: "https://push/x" },
+      ],
+      membros: [
+        { user_id: "u-viewer", role: "viewer", revoked_at: null },
+        { user_id: "u-agent", role: "agent", revoked_at: null },
+        { user_id: "u-admin", role: "admin", revoked_at: null },
+        { user_id: "u-x", role: "dono", revoked_at: null },
+      ],
+    });
+    const r = await enviarPushDaOrg("org-1", payload, { papelMinimo: "agent" }, admin as never);
+    expect(r).toEqual({ sent: 2, gone: 0 });
+    expect(enviados().sort()).toEqual(["https://push/admin", "https://push/agent"]);
+  });
+
   it("falha ao ler os vínculos → ninguém recebe", async () => {
     const { admin } = adminFalso({ inscricoes, erroMembros: { message: "banco fora" } });
     const r = await enviarPushDaOrg("org-1", payload, {}, admin as never);

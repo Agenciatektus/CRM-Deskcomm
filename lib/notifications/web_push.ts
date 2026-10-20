@@ -1,5 +1,6 @@
 import webpush from "web-push";
 
+import { roleAtLeast, type Role } from "@/lib/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
@@ -19,32 +20,43 @@ type Inscricao = PushSubRow & { user_id: string };
 
 const NADA = { sent: 0, gone: 0 } as const;
 
-/** Quem tem vínculo ativo na organização. `null` quando a leitura falha: ninguém recebe. */
-async function membrosAtivos(admin: Admin, organizationId: string): Promise<Set<string> | null> {
+/**
+ * Quem tem vínculo ativo na organização — e, com `papelMinimo`, o papel que o
+ * alcança. `null` quando a leitura falha: ninguém recebe.
+ */
+async function membrosAtivos(
+  admin: Admin,
+  organizationId: string,
+  papelMinimo?: Role,
+): Promise<Set<string> | null> {
   const { data, error } = await admin
     .from("user_organizations")
-    .select("user_id")
+    .select("user_id, role")
     .eq("organization_id", organizationId)
     .is("revoked_at", null);
   if (error) {
     logger.warn("push_membros_ativos_falhou", { detail: error.message });
     return null;
   }
-  return new Set(((data ?? []) as Array<{ user_id: string }>).map((m) => m.user_id));
+  const membros = (data ?? []) as Array<{ user_id: string; role: string | null }>;
+  return new Set(
+    membros.filter((m) => !papelMinimo || roleAtLeast(m.role, papelMinimo)).map((m) => m.user_id),
+  );
 }
 
 /**
  * O funil de todo envio: só sai para inscrições de quem tem vínculo ativo na
- * organização. Inscrição morta (404/410) é apagada.
+ * organização (e o papel mínimo, quando pedido). Inscrição morta (404/410) é apagada.
  */
 async function enviarAsInscricoes(
   admin: Admin,
   organizationId: string,
   inscricoes: Inscricao[],
   payload: PushPayload,
+  papelMinimo?: Role,
 ): Promise<{ sent: number; gone: number }> {
   if (inscricoes.length === 0) return NADA;
-  const membros = await membrosAtivos(admin, organizationId);
+  const membros = await membrosAtivos(admin, organizationId, papelMinimo);
   if (!membros) return NADA;
   const rows = inscricoes.filter((i) => membros.has(i.user_id));
   if (rows.length === 0) return NADA;
@@ -82,11 +94,13 @@ async function enviarAsInscricoes(
   return { sent, gone };
 }
 
-/** Push às inscrições da organização — ou só às de `soUsuario`. */
+export type DestinoDoPush = { soUsuario?: string; papelMinimo?: Role };
+
+/** Push às inscrições da organização — ou só às de `soUsuario`, e só a quem alcança `papelMinimo`. */
 export async function enviarPushDaOrg(
   organizationId: string,
   payload: PushPayload,
-  quem: { soUsuario?: string } = {},
+  quem: DestinoDoPush = {},
   admin: Admin = createAdminClient(),
 ): Promise<{ sent: number; gone: number }> {
   if (!vapidPronto()) return NADA;
@@ -101,7 +115,7 @@ export async function enviarPushDaOrg(
     logger.warn("push_subscriptions_list_failed", { detail: error.message });
     return NADA;
   }
-  return enviarAsInscricoes(admin, organizationId, (data ?? []) as Inscricao[], payload);
+  return enviarAsInscricoes(admin, organizationId, (data ?? []) as Inscricao[], payload, quem.papelMinimo);
 }
 
 export async function enviarPushAoUsuario(
