@@ -41,6 +41,17 @@ function lendoAConversa(cliente, conversa) {
   }
 }
 
+/* Para onde vai o clique: a janela do app em foco, senão a visível, senão qualquer uma. */
+function escolherJanela(clientes) {
+  const doApp = clientes.filter(janelaDoApp);
+  return (
+    doApp.find((c) => c.focused) ||
+    doApp.find((c) => c.visibilityState === "visible") ||
+    doApp[0] ||
+    clientes[0]
+  );
+}
+
 self.addEventListener("install", (event) => {
   // Só a navegação precisa do SW: o resto vai à rede sem acordá-lo. Navegador
   // sem esta API (ou sem a condição `not`) segue pelo `fetch` abaixo, que deixa
@@ -125,13 +136,17 @@ self.addEventListener("push", (event) => {
   );
 });
 
-/* Clique na notificação: a janela do app vai para o destino; sem janela, abre uma. */
+/*
+ * Clique na notificação: a janela do app vai para o destino; sem janela, abre
+ * uma. Aviso sem destino (ex.: "Alertas ligados") só traz a janela à frente,
+ * sem tirar a pessoa da tela em que ela está.
+ */
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const origem = self.location.origin;
-  let url = origem + PADRAO.href;
+  const href = event.notification.data && event.notification.data.href;
+  let url = href ? origem + PADRAO.href : null;
   try {
-    const href = event.notification.data && event.notification.data.href;
     if (href) {
       const destino = new URL(href, origem);
       if (destino.origin === origem) url = destino.href;
@@ -142,13 +157,14 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       const clientes = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const alvo = clientes.find(janelaDoApp) || clientes[0];
-      if (!alvo) return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
+      const alvo = escolherJanela(clientes);
+      if (!alvo) return self.clients.openWindow ? self.clients.openWindow(url || origem + "/app") : undefined;
       try {
         await alvo.focus();
       } catch {
         // foco recusado: ainda dá para navegar
       }
+      if (!url) return undefined;
       try {
         await alvo.navigate(url);
       } catch {

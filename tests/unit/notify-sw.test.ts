@@ -227,6 +227,40 @@ describe("clique na notificação", () => {
     expect(app.navigate).toHaveBeenCalledWith(ORIGEM + "/app/inbox");
   });
 
+  it("com várias janelas do app, vai para a que está em foco, não a primeira", async () => {
+    const atras = janela("/app/agenda", "hidden");
+    const visivel = janela("/app/contacts", "visible");
+    const emFoco = janela("/app/settings", "visible", true);
+    const sw = carregar({ janelas: [atras, visivel, emFoco] });
+    await disparar(sw.handlers.notificationclick, clique("/app/inbox?id=c1"));
+    expect(emFoco.navigate).toHaveBeenCalledWith(ORIGEM + "/app/inbox?id=c1");
+    expect(atras.navigate).not.toHaveBeenCalled();
+  });
+
+  it("sem foco em nenhuma, prefere a visível", async () => {
+    const atras = janela("/app/agenda", "hidden");
+    const visivel = janela("/app/contacts", "visible");
+    const sw = carregar({ janelas: [atras, visivel] });
+    await disparar(sw.handlers.notificationclick, clique("/app/inbox?id=c1"));
+    expect(visivel.navigate).toHaveBeenCalled();
+    expect(atras.navigate).not.toHaveBeenCalled();
+  });
+
+  it("aviso sem destino (o aviso local manda href vazio) só foca, não tira a pessoa da tela", async () => {
+    const app = janela("/app/settings/notifications", "visible", true);
+    const sw = carregar({ janelas: [app] });
+    await disparar(sw.handlers.notificationclick, clique(""));
+    expect(app.focus).toHaveBeenCalled();
+    expect(app.navigate).not.toHaveBeenCalled();
+    expect(app.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("aviso sem destino e sem janela abre o app", async () => {
+    const sw = carregar({ janelas: [] });
+    await disparar(sw.handlers.notificationclick, clique(""));
+    expect(sw.openWindow).toHaveBeenCalledWith(ORIGEM + "/app");
+  });
+
   it("sem janela nenhuma, abre uma", async () => {
     const sw = carregar({ janelas: [] });
     await disparar(sw.handlers.notificationclick, clique("/app/inbox?id=c1"));
