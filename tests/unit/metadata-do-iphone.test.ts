@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type * as Instalacao from "@/lib/branding/instalacao";
+
 /**
  * O iPhone não lê o manifest para o ícone nem para o nome da tela de início:
  * lê `apple-touch-icon` e `apple-mobile-web-app-title`. Sem o título, ele usa
@@ -8,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/font/local", () => ({ default: () => ({ variable: "" }) }));
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("@/lib/branding/instalacao", async (original) => ({
-  ...(await original<typeof import("@/lib/branding/instalacao")>()),
+  ...(await original<typeof Instalacao>()),
   marcaDaInstalacao: vi.fn().mockResolvedValue({ app_name: "Central", favicon_path: "platform/x.png" }),
 }));
 
