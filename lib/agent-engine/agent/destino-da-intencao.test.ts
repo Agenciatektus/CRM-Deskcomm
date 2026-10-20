@@ -11,6 +11,13 @@ vi.mock("@/lib/leads/mover-de-funil", () => ({
   moverNegocioDeFunil: vi.fn(async () => ({ ok: true, lead: { id: "lead-1" } })),
 }));
 
+// O card adicional (consórcio ↔ investimentos) tem o arquivo próprio
+// `destino-da-intencao-produtos.test.ts`; aqui só não pode arrastar o handler de
+// leads (e o `.env`) para dentro do teste.
+vi.mock("@/lib/leads/abre-card-adicional", () => ({
+  abreCardAdicionalNoFunil: vi.fn(),
+}));
+
 import { moverNegocioDeFunil } from "@/lib/leads/mover-de-funil";
 
 import { TITULO_AVISO_DE_DESTINO_RECUSADO, tituloDoAvisoDeDestinoRecusado } from "./aviso-de-destino-recusado";

@@ -26,8 +26,10 @@ import { createClient } from "@/lib/supabase/server";
  *     (`/api/v1/leads/bulk`, ação `move`): é ele que grava atividade, evento e
  *     auditoria. Um PATCH direto no lead moveria o card sem nada disso, e a
  *     etapa que avisa na Central deixaria de avisar quando movida pela conversa.
- *  3. **Etapa de perda não é oferecida** — ela pede motivo, e esse diálogo mora
- *     no quadro. Oferecê-la aqui seria perder sem motivo.
+ *  3. **Etapa de perda é oferecida, mas não move direto** — ela pede motivo, então
+ *     abre o `LoseLeadDialog` do quadro, com os motivos do funil que a rota
+ *     devolve (o quadro não está em cache aqui). Mover direto seria perder sem
+ *     motivo (issue #2871).
  *  4. **Resposta antiga (sem as etapas) não desenha seletor vazio.**
  */
 

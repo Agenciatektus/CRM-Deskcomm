@@ -90,6 +90,8 @@ const bodySchema = z.object({
  * a regra do mapeamento carregar um campo que ela nunca lê.
  */
 type EtapaComAutoria = EtapaDoMapa & {
+  /** Chance de fechamento calibrada pelo gestor, 0–100; `null` = sem calibração. */
+  win_probability?: number | null;
   avisar_na_central?: boolean | null;
   envia_conversao?: boolean | null;
   evento_de_conversao?: string | null;
@@ -155,6 +157,9 @@ function corpo(etapas: EtapaComAutoria[]) {
       name: e.name,
       is_won: e.is_won,
       is_lost: e.is_lost,
+      // #2999: o select trazia a coluna desde bec1ab38c, mas o corpo a deixava
+      // cair — a tela de etapas lê DAQUI e mostrava a chance vazia ao recarregar.
+      win_probability: e.win_probability ?? null,
       avisar_na_central: e.avisar_na_central === true,
       envia_conversao: e.envia_conversao === true,
       evento_de_conversao: e.evento_de_conversao ?? null,
