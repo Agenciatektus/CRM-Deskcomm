@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { requireAuth } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { Card } from "@/components/ui/card";
@@ -32,8 +34,8 @@ export const dynamic = "force-dynamic";
  *
  * ⚠️ O INTERRUPTOR CONTINUA LIGÁVEL DE PROPÓSITO, e isto não é descuido: sem
  * VAPID o aviso na bandeja AINDA funciona enquanto a aba está aberta — é
- * `new Notification()` em `lib/notifications/emit.ts`, que não depende de
- * inscrição nenhuma. Desabilitar o controle tiraria capacidade que a
+ * `lib/notifications/emit.ts` (pelo service worker ou por `new Notification()`),
+ * que não depende de inscrição nenhuma. Desabilitar o controle tiraria capacidade que a
  * instalação tem. O que faltava era dizer a verdade sobre a metade que ela
  * não tem, e como consegui-la.
  *
@@ -55,6 +57,13 @@ export default async function NotificationsPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t("Notificações")}</h1>
         <p className="text-sm text-muted-foreground">{t("Canais e categorias.")}</p>
+        <Link
+          href="/app/settings/aplicativo"
+          data-testid="link-app-no-celular"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-4 hover:underline"
+        >
+          {t("Receber no celular: instalar o app")}
+        </Link>
       </header>
 
       {pushPronto ? (
