@@ -97,15 +97,33 @@ describe("problemaNosPassos", () => {
     ).toBeNull();
   });
 
-  it("recusa régua sem nenhuma mensagem", () => {
+  it("aceita régua só com etiqueta: marcar quem recebeu o disparo, sem 2º toque", () => {
+    // Decisão do dono (20/10/2026): etiquetar/mover sem mensagem é legítimo — o
+    // BDR conduz pela resposta. O que não vale é régua que só espera (abaixo).
+    const problema = problemaNosPassos(
+      [{ id: "p1", tipo: "etiqueta", op: "add", tag: "disparo-enviado" }],
+      { pipelineId: FUNIL },
+    );
+    expect(problema).toBeNull();
+  });
+
+  it("aceita régua só com mover de etapa, sem mensagem", () => {
+    const problema = problemaNosPassos(
+      [{ id: "p1", tipo: "mover_etapa", stageId: ETAPA }],
+      { pipelineId: FUNIL },
+    );
+    expect(problema).toBeNull();
+  });
+
+  it("recusa régua que só espera (não age sobre ninguém)", () => {
     const problema = problemaNosPassos(
       [
         { id: "p1", tipo: "espera", duracaoMs: 86_400_000 },
-        { id: "p2", tipo: "etiqueta", op: "add", tag: "x" },
+        { id: "p2", tipo: "espera", duracaoMs: 43_200_000 },
       ],
       { pipelineId: FUNIL },
     );
-    expect(problema).toContain("pelo menos uma mensagem");
+    expect(problema).toContain("faça algo");
   });
 
   it("recusa mensagem em branco citando o número do passo", () => {
