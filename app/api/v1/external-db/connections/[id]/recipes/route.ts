@@ -100,6 +100,20 @@ export async function PUT(req: NextRequest, ctx: Ctx): Promise<Response> {
   }
   const { receitas } = parsed.data;
 
+  // Fixos inválidos são erro de entrada: 422 antes de qualquer leitura do banco.
+  for (const inst of receitas) {
+    try {
+      validarFixosDaReceita(inst.receita, inst.fixos);
+    } catch (err) {
+      return fail(
+        "validation_failed",
+        t("Os parâmetros fixos da receita são inválidos."),
+        422,
+        { requestId, details: err instanceof Error ? err.message : String(err) },
+      );
+    }
+  }
+
   // Carrega a conexão para conferir o motor (db_type) antes de gravar.
   const admin = createAdminClient();
   const { data: conexao, error: erroConexao } = await admin
@@ -112,20 +126,9 @@ export async function PUT(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (erroConexao) return fail("internal_error", "Erro ao ler a conexão.", 500, { requestId });
   if (!conexao) return fail("not_found", t("Conexão não encontrada."), 404, { requestId });
 
-  // Cada instância: fixos válidos para a receita escolhida; e se alguma receita
-  // só aceita mysql, a conexão deve ser mysql.
+  // Se alguma receita só aceita mysql, a conexão deve ser mysql.
   let receitasIncompativeis = false;
   for (const inst of receitas) {
-    try {
-      validarFixosDaReceita(inst.receita, inst.fixos);
-    } catch (err) {
-      return fail(
-        "validation_failed",
-        t("Os parâmetros fixos da receita são inválidos."),
-        422,
-        { requestId, details: err instanceof Error ? err.message : String(err) },
-      );
-    }
     const receita = receitaDe(inst.receita);
     if (receita && !receita.motores.includes(conexao.db_type as "mysql" | "postgres")) {
       receitasIncompativeis = true;
