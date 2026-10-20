@@ -16480,6 +16480,9 @@ export const DICIONARIO: Traducoes = {
   "Mostrar quem mandou e a mensagem": { es: "Mostrar quién lo envió y el mensaje" },
   "Aparecem o nome, a foto e o começo da mensagem.": { es: "Aparecen el nombre, la foto y el comienzo del mensaje." },
   "Quem decide é um administrador.": { es: "Quien decide es un administrador." },
+  "Desligar o push de mensagem desliga todos os avisos deste aparelho fora do app.": {
+    es: "Apagar el push de mensajes apaga todos los avisos de este dispositivo fuera de la app.",
+  },
 };
 
 /**

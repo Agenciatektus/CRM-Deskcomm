@@ -193,4 +193,24 @@ describe("o interruptor de Push de mensagem liga e desliga a inscrição do apar
     expect(pushClient.encerrarPushDesteAparelho).not.toHaveBeenCalled();
     expect(pushClient.syncPushSubscription).not.toHaveBeenCalled();
   });
+
+  // A inscrição é do aparelho e o servidor não separa categorias: sem ela,
+  // nenhum push chega. A tela não pode mostrar os outros como ligados.
+  it("com o push de mensagem desligado, os outros pushes aparecem desligados e travados, com o porquê", () => {
+    window.localStorage.setItem(CHAVE, JSON.stringify({ message: { in_app: true, push: false } }));
+    const container = montar();
+    const lead = container.querySelector('[aria-label="Lead ganho via push"]') as HTMLButtonElement;
+    expect(lead.getAttribute("aria-checked")).toBe("false");
+    expect(lead.disabled).toBe(true);
+    expect(container.textContent).toContain(
+      "Desligar o push de mensagem desliga todos os avisos deste aparelho fora do app.",
+    );
+  });
+
+  it("com o push de mensagem ligado, os outros pushes seguem a própria preferência (controle)", () => {
+    const container = montar();
+    const lead = container.querySelector('[aria-label="Lead ganho via push"]') as HTMLButtonElement;
+    expect(lead.getAttribute("aria-checked")).toBe("true");
+    expect(lead.disabled).toBe(false);
+  });
 });

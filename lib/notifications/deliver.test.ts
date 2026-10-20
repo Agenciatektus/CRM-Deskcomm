@@ -43,6 +43,14 @@ describe("entregarAviso", () => {
     expect(emitNotification).not.toHaveBeenCalled();
   });
 
+  it("push de mensagem desligado: nenhuma categoria vai à bandeja (a inscrição é do aparelho)", async () => {
+    gravarCanal("message", "push", false);
+    entregarAviso({ category: "lead_assigned", kind: "lead_assigned", title: "Lead atribuído", body: "Carlos" });
+    expect(toast).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(emitNotification).not.toHaveBeenCalled();
+  });
+
   it("o toast da mensagem leva a ação de abrir a conversa, e ela navega para o destino", () => {
     const assign = vi.fn();
     // `window.location` não é substituível direto no jsdom.
