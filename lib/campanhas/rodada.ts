@@ -144,32 +144,38 @@ export async function rodarUmaRodadaDeCampanha(
     return promovidas > 0 ? { ...VAZIA, promovidas, detalhe: "promovidas" } : VAZIA;
   }
 
-  const numerosAtendidos = new Set<string>();
+  // Dois conjuntos, e não um (#3112). `principaisOcupados` decide se a campanha
+  // inteira espera a vez (regra do #3107, `ocupaONumero`); `numerosQueFalaram`
+  // só tira o número do RODÍZIO das campanhas seguintes. Juntá-los pulava a
+  // campanha cujo principal é o vinculado que outra usou, mesmo com outro número
+  // dela livre — e ela ficava em zero até a outra terminar.
+  const principaisOcupados = new Set<string>();
+  const numerosQueFalaram = new Set<string>();
   const total: ResultadoDaRodada = { ...VAZIA, promovidas, detalhe: "" };
   const detalhes: string[] = [];
 
   for (const campanha of emExecucao) {
     // Um número, uma mensagem por rodada. A campanha mais antiga do número ganha
     // a vez: sem isso, a última criada poderia monopolizar a fila para sempre.
-    if (numerosAtendidos.has(campanha.channel_session_id)) continue;
-    if (numerosAtendidos.size >= NUMEROS_POR_RODADA) break;
+    if (principaisOcupados.has(campanha.channel_session_id)) continue;
+    if (new Set([...principaisOcupados, ...numerosQueFalaram]).size >= NUMEROS_POR_RODADA) break;
 
     try {
-      const r = await rodarUmaCampanha(admin, campanha, agora, numerosAtendidos);
+      const r = await rodarUmaCampanha(admin, campanha, agora, numerosQueFalaram);
       total.enviadas += r.enviadas;
       total.pulados += r.pulados;
       total.concluidas += r.concluidas;
       detalhes.push(`${campanha.id.slice(0, 8)}:${r.detalhe}`);
-      if (ocupaONumero(r)) numerosAtendidos.add(campanha.channel_session_id);
+      if (ocupaONumero(r)) principaisOcupados.add(campanha.channel_session_id);
       // O número que FALOU nesta rodada, que no rodízio pode não ser o principal
       // (#3112): sem isto, outra campanha que divide o vinculado mandava por ele
       // de novo no mesmo tique.
-      if (r.numero) numerosAtendidos.add(r.numero);
+      if (r.numero) numerosQueFalaram.add(r.numero);
     } catch (err) {
       const motivo = err instanceof Error ? err.message : String(err);
       logger.warn("[campanha] rodada falhou", { campanha: campanha.id, motivo });
       detalhes.push(`${campanha.id.slice(0, 8)}:erro`);
-      numerosAtendidos.add(campanha.channel_session_id);
+      principaisOcupados.add(campanha.channel_session_id);
     }
   }
 

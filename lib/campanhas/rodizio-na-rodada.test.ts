@@ -210,3 +210,50 @@ describe("rodada: número cujo pacing só falta o intervalo (allow com waitMs > 
     expect(r.enviadas).toBe(1);
   });
 });
+
+describe("rodada: o número que falou por uma campanha é o PRINCIPAL de outra", () => {
+  /**
+   * O caso do cético da rodada 1. A é mais antiga, com o principal fora do ar, e
+   * fala pelo vinculado V. B tem V como principal e um vinculado X livre. Pôr o
+   * número que falou no mesmo conjunto do principal ocupado pulava B inteira
+   * antes do rodízio — B ficava em zero até A terminar. O número que falou sai
+   * do RODÍZIO de B, e B segue por X.
+   */
+  beforeEach(() => {
+    mundo.knobs = { ...PACING_DEFAULTS };
+  });
+
+  it("⭐ em 3 rodadas, B sai por X nas 3 e V nunca manda 2 na mesma rodada", async () => {
+    const admin = fakeAdmin({
+      campaigns: [
+        campanha("camp-a", "pa", "2026-10-20T11:00:00.000Z"),
+        campanha("camp-b", "V", "2026-10-20T11:00:05.000Z"),
+      ],
+      campaign_recipients: [
+        pendente("r-a1", "camp-a", "ana"),
+        pendente("r-a2", "camp-a", "ana2"),
+        pendente("r-a3", "camp-a", "ana3"),
+        pendente("r-b1", "camp-b", "bia"),
+        pendente("r-b2", "camp-b", "bia2"),
+        pendente("r-b3", "camp-b", "bia3"),
+      ],
+      campaign_channel_sessions: [
+        { organization_id: "org-1", campaign_id: "camp-a", channel_session_id: "V" },
+        { organization_id: "org-1", campaign_id: "camp-b", channel_session_id: "X" },
+      ],
+      channel_sessions: [canal("pa", "STOPPED"), canal("V", "WORKING"), canal("X", "WORKING")],
+    });
+
+    for (let rodada = 0; rodada < 3; rodada++) {
+      const antesV = mundo.ledger.get("V")?.length ?? 0;
+      await rodarUmaRodadaDeCampanha(admin, new Date(AGORA.getTime() + rodada * 60_000));
+      expect((mundo.ledger.get("V")?.length ?? 0) - antesV).toBeLessThanOrEqual(1);
+    }
+    expect(mundo.envios.filter((c) => c.startsWith("conv:bia"))).toEqual([
+      "conv:bia:X",
+      "conv:bia2:X",
+      "conv:bia3:X",
+    ]);
+    expect(mundo.ledger.get("V")).toHaveLength(3);
+  });
+});
