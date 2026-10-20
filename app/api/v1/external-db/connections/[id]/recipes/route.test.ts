@@ -205,7 +205,7 @@ describe("PUT /connections/:id/recipes", () => {
 
     expect(res.status).toBe(422);
     const corpo = (await res.json()) as { error: { details: { fieldErrors: Record<string, string[]> } } };
-    expect(corpo.error.details.fieldErrors.descricao[0]).toBe("pode ter no máximo 300 caracteres");
+    expect(corpo.error.details.fieldErrors.descricao?.[0]).toBe("pode ter no máximo 300 caracteres");
     expect(deps.audit).not.toHaveBeenCalled();
     expect(deps.admin.mock.calls).toHaveLength(0);
   });
