@@ -63,22 +63,23 @@ export async function aplicarAlteracaoDeMensagem(
   admin: SupabaseClient,
   pedido: PedidoDeAlteracao,
 ): Promise<ResultadoDaAlteracao> {
+  // Uma forma por vez, na ordem: o `alvo` primeiro (o caminho de sempre), depois
+  // as outras formas do mesmo id. A primeira que acha é a original; a
+  // conferência de autoria abaixo vale para ela do mesmo jeito.
   const formas = [...new Set([pedido.alvo, ...(pedido.alvosAlternativos ?? [])].filter((f) => f.length > 0))];
-  const { data, error } = await admin
-    .from("messages")
-    .select("id, channel_session_id, direction, conversation_id, contact_id")
-    .eq("organization_id", pedido.organizationId)
-    .in("external_id", formas)
-    .limit(5);
-  // Falha de banco SOBE: o transporte reenvia e a alteração não se perde.
-  if (error) throw new Error(`alteracao_leitura_falhou: ${error.message}`);
-  const candidatas = (data ?? []) as Original[];
-  // Mais de uma forma casou: vale a da MESMA sessão e direção (as outras caem na
-  // conferência de autoria abaixo e seriam recusadas de qualquer jeito).
-  const original =
-    candidatas.find((c) => c.channel_session_id === pedido.channelSessionId && c.direction === pedido.direcao) ??
-    candidatas[0] ??
-    null;
+  let original: Original | null = null;
+  for (const forma of formas) {
+    const { data, error } = await admin
+      .from("messages")
+      .select("id, channel_session_id, direction, conversation_id, contact_id")
+      .eq("organization_id", pedido.organizationId)
+      .eq("external_id", forma)
+      .maybeSingle();
+    // Falha de banco SOBE: o transporte reenvia e a alteração não se perde.
+    if (error) throw new Error(`alteracao_leitura_falhou: ${error.message}`);
+    original = data as Original | null;
+    if (original) break;
+  }
   if (!original) return { aplicada: false, motivo: `${pedido.acao}_sem_original` };
 
   if (original.channel_session_id !== pedido.channelSessionId || original.direction !== pedido.direcao) {

@@ -57,10 +57,30 @@ interface Linha {
   body: string | null;
   edited_at: string | null;
   revoked_at: string | null;
+  // Fork: a alteração confere AUTORIA (sessão, direção e conversa) antes de
+  // gravar (`aplicarAlteracaoDeMensagem`); o dublê precisa carregar as três.
+  channel_session_id: string;
+  direction: "inbound" | "outbound";
+  conversation_id: string;
+  contact_id: string;
 }
 
-function linha(id: string, external_id: string, body: string): Linha {
-  return { id, organization_id: ORG, external_id, body, edited_at: null, revoked_at: null };
+/** `chat` é o endereço da conversa; sem ele, sai do composto `false_<chat>_<bare>`. */
+function linha(id: string, external_id: string, body: string, chat?: string): Linha {
+  const m = /^(true|false)_(.+)_[^_]+$/.exec(external_id);
+  const endereco = chat ?? m?.[2] ?? "";
+  return {
+    id,
+    organization_id: ORG,
+    external_id,
+    body,
+    edited_at: null,
+    revoked_at: null,
+    channel_session_id: SESSION.id,
+    direction: m?.[1] === "false" ? "inbound" : "outbound",
+    conversation_id: `conv:${endereco}`,
+    contact_id: `contato:${endereco}`,
+  };
 }
 
 /**
@@ -105,7 +125,19 @@ function makeAdmin(rows: Linha[]) {
         return chain;
       },
       limit: () => chain,
-      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => {
+        // Lê de verdade: `messages` devolve a linha que casa; `conversations`
+        // devolve o endereço da conversa da linha (o `provider_conversation_id`).
+        if (name === "messages") return Promise.resolve({ data: rows.find(casa) ?? null, error: null });
+        if (name === "conversations") {
+          const id = filtros.find(([k]) => k === "id")?.[1] as string | undefined;
+          return Promise.resolve({
+            data: id ? { provider_conversation_id: id.replace(/^conv:/, "") } : null,
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      },
       // A cadeia é aguardada (thenable): é aqui que o UPDATE acontece.
       then: (res: (v: unknown) => unknown) => {
         if (name === "messages" && op === "update" && payload) {
@@ -207,7 +239,7 @@ describe("edição e apagar de mensagem RECEBIDA chegam ao CRM", () => {
 
 describe("a edição da mensagem ENVIADA continua funcionando", () => {
   it("casa a linha do envio (bare) sem depender do composto", async () => {
-    const rows = [linha("m-env", "3EB0ENVIADA", "valor errado")];
+    const rows = [linha("m-env", "3EB0ENVIADA", "valor errado", "5511999999999@c.us")];
     await dispatchWahaEvent(
       makeAdmin(rows),
       SESSION,

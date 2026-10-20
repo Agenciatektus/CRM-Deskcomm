@@ -31,6 +31,9 @@ vi.mock("@/hooks/inbox/useConversationTags", async (original) => ({
 }));
 // Desde a subida 1.81 o editor também pinta a etiqueta (#2718/#2771, upstream).
 vi.mock("@/components/tags/SeletorDeCorDaEtiqueta", () => ({ SeletorDeCorDaEtiqueta: () => null }));
+// O editor (subida 1.85, #2789) lê o papel para decidir se a sugestão abre o
+// diálogo de cor; aqui o assunto é o delta, então um atendente comum basta.
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ activeOrg: { orgId: "org-1", role: "agent" } }) }));
 vi.mock("@/hooks/tags/useDefinirCorDaEtiqueta", () => ({ useDefinirCorDaEtiqueta: () => ({ definirCor: vi.fn() }) }));
 vi.mock("@/components/tags/CoresDasEtiquetas", async (original) => ({
   ...(await original<typeof import("@/components/tags/CoresDasEtiquetas")>()),

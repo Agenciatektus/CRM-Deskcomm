@@ -102,6 +102,11 @@ vi.mock("@/lib/messaging/contact-card", () => ({
 
 // Os filhos do compositor são render de tela: o que este teste mede é o corpo que
 // SAI do `handleSubmit`, então cada um vira um placeholder sem comportamento.
+// O composer do fork lê a sugestão pelo hook (fase 3.5), que fala com o
+// react-query; aqui ele não é o assunto.
+vi.mock("@/components/inbox/composer/useSugestaoDeResposta", () => ({
+  useSugestaoDeResposta: () => ({ generate: vi.fn(), busy: false, draft: null, body: "", notice: null }),
+}));
 vi.mock("@/components/inbox/composer/ReplyReviewPanel", () => ({
   ReplyReviewPanel: () => null,
 }));

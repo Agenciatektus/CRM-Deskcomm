@@ -191,7 +191,7 @@ describe("ConversationListItem — seleção em lote", () => {
       />,
     );
     const caixa = screen.getByRole("checkbox");
-    expect(caixa).toHaveAttribute("aria-checked", "false");
+    expect(caixa).not.toBeChecked();
     fireEvent.click(caixa);
     expect(alternar).toHaveBeenCalledWith(conversaDeExemplo.conversation.id);
     expect(onSelect).not.toHaveBeenCalled();
@@ -206,7 +206,7 @@ describe("ConversationListItem — seleção em lote", () => {
         onAlternarSelecao={() => {}}
       />,
     );
-    expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("checkbox")).toBeChecked();
   });
 
   it("linha marcada usa o fundo que acompanha o tema, não o degrau fixo da marca", () => {
@@ -220,8 +220,8 @@ describe("ConversationListItem — seleção em lote", () => {
         onAlternarSelecao={() => {}}
       />,
     );
-    // A caixa é filha direta do contêiner da linha, que é quem recebe o fundo.
-    const linha = screen.getByRole("checkbox").parentElement!;
+    // O contêiner da linha (o `div` em volta da caixa) é quem recebe o fundo.
+    const linha = screen.getByRole("checkbox").closest("div")!;
     expect(linha.className).toContain("bg-accent-soft");
     expect(linha.className).not.toContain("bg-accent-50");
   });
