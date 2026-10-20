@@ -653,8 +653,8 @@ informação ausente.
 
 **O conserto exagerado, recusado de propósito:** desabilitar o interruptor sem
 VAPID. Sem as chaves o aviso na bandeja **ainda funciona com a aba aberta** —
-é `new Notification()` em `lib/notifications/emit.ts`, que não depende de
-inscrição nenhuma. Desabilitar trocaria prometer demais por entregar de menos, e
+é `lib/notifications/emit.ts` (pelo service worker, ou `new Notification()`
+sem ele), que não depende de inscrição nenhuma. Desabilitar trocaria prometer demais por entregar de menos, e
 o segundo não deixa rastro. **J12.5** existe para impedir esse conserto (era
 J12.3, no `e2e`, até a medição mostrar que ali ela não era observável — ver
 abaixo).
@@ -1570,6 +1570,44 @@ Spec: `tests/e2e/inbox-selecionada-no-escuro.spec.ts`.
 | J47.1 | Tema escuro, conversa aberta pela lista | o nome do contato na linha selecionada tem contraste ≥ 4,5 contra o fundo EFETIVO (cor computada, camadas translúcidas compostas) | **PASS pela tela** — Evidência: `evidence/inbox-selecionada-no-escuro/01-selecionada-no-escuro.png` |
 | J47.2 | A classe da selecionada | `bg-accent-soft`, nenhum degrau fixo `bg-accent-50…950`; a não selecionada não ganha o fundo | **PASS (unit)** — `tests/unit/selecionada-legivel-no-escuro.test.tsx` |
 | J47.3 | Tema escuro, conversa aberta E marcada no lote, com o mouse ou o foco de teclado | a linha fica num tom só (o botão não pinta por cima do fundo da linha), o foco aparece como anel, e o nome e a prévia seguem com contraste ≥ 4,5 contra o fundo efetivo | **PASS pela tela** — Evidência: `evidence/inbox-selecionada-no-escuro/02-aberta-e-marcada-com-foco.png` |
+
+## J48 — Instalar o app no celular e ser avisado `[P0]` (2026-10-20)
+
+Contexto: ADR-0006, fase F1 ("Instala e avisa"). O app do atendente no celular é
+a PWA do mesmo Next: manifest com `id`, cores e ícone `maskable`; ícone e título
+do iPhone; um service worker escrito à mão que mostra TODO push e responde uma
+página neutra quando a navegação cai sem rede; e a tela **Configurações › Sua
+conta › App no celular** (`app/app/settings/aplicativo/`), que guia a instalação
+por aparelho. Por que P0: é a primeira coisa que o atendente faz no celular, e a
+decisão (c) do dono manda a tela dizer a verdade em `http://IP` em vez de
+oferecer botão que não funciona.
+
+Spec: `tests/e2e/app-no-celular.spec.ts` (parte 6). Aparelho, pedido de
+instalação do Android, contexto inseguro e "aberto pelo ícone" são EMULADOS, e a
+spec declara isso no cabeçalho. A regra da tela por aparelho está em
+`lib/pwa/estado-da-instalacao.test.ts`; o SW, em `tests/unit/notify-sw.test.ts`.
+Evidência: `evidence/app-no-celular-20261020/` (gravada pelo CI).
+
+| # | Caso | Expectativa | Resultado |
+|---|------|-------------|-----------|
+| J48.1 | Manifest e ícones antes do login | `id: /app`, `standalone`, cores, terceiro ícone `maskable`; PNG de 192, 512, maskable e 180 com o lado medido no cabeçalho; `/login` declara `apple-touch-icon` → `/app-icon/180` | E2E (CI) + UNIT `branding-app-manifest`, `branding-icone-do-app`, `metadata-do-iphone` |
+| J48.2 | SW nasce em todo /app sem permissão de avisos | `navigator.serviceWorker.ready` com `notify-sw.js`, com `Notification.permission` ≠ `granted` | E2E (CI) + UNIT `sw-registrado-em-todo-app` |
+| J48.3 | Navegação sem rede | 503 com «Sem conexão», nada da casca do app; «Tentar de novo» devolve o app com a rede de volta | E2E (CI) + UNIT `notify-sw` (503, `no-store`, 3xx/5xx intactos, POST e não-navegação passam direto) |
+| J48.4 `[P0]` | A tela diz a verdade em endereço sem https | `app-sem-https`, «Esta instalação não tem app no celular.» e nenhum botão de instalar | E2E (CI, emulado) + UNIT |
+| J48.5 | Android sem pedido do navegador | passo a passo pelo menu (⋮) | E2E (CI, emulado) |
+| J48.6 | Android com pedido do navegador | botão «Instalar app» ≥ 44 px, o dedo no centro acerta o botão, o clique abre o diálogo uma vez | E2E (CI, evento sintético) + UNIT `pedido-de-instalacao` |
+| J48.7 | iPhone | passo a passo pelo Compartilhar, com «entre de novo» e o aviso do iOS 16.4 | E2E (CI, emulado) |
+| J48.8 | Aberto pelo ícone | «Você já está usando o app.» | E2E (CI, emulado) |
+| J48.9 | Navegador de dentro de outro app, https que recusa o SW, Chrome em modo computador | manda abrir no Safari/Chrome; fica sem app; conta como celular | UNIT `estado-da-instalacao` |
+| J48.10 | Push com o app à vista | AINDA vira notificação, calada (a página já tocou o som); fora do app ou tipo sem aviso local, com som | UNIT `notify-sw` |
+| J48.11 | A porta | o link «Receber no celular: instalar o app» em Notificações leva à tela | E2E (CI) |
+
+**NÃO COBERTO, declarado:** aparelho real. Instalar pelo caminho guiado num
+Android e num iPhone de verdade, numa instalação HTTPS fresca; o ícone com a
+marca da instalação na tela de início; o aviso chegando com o app fechado e a
+tela bloqueada seguindo a decisão (a); o toque no aviso caindo na conversa. É
+critério de pronto da F1 na ADR, e o CI não alcança — vai para
+`evidence/<data>-f1/`.
 
 ## Jornadas exercitadas (instalação final, virgem)
 
