@@ -24,15 +24,27 @@
  * como linguagem de programação: regex malformada (`"["`, `"(orçamento"`),
  * valor que nem é string, campo vazio ou ausente ⇒ NENHUM filtro ⇒ o agente
  * responde como sempre. Uma config quebrada não pode virar mordaça (mesma
- * decisão do cabeçalho da janela). Dois casos particulares seguem a mesma
+ * decisão do cabeçalho da janela). Três casos particulares seguem a mesma
  * direção e por isso ficam na função de decisão:
  *
- *  - Corpo SEM texto (`null`): mídia sem legenda chega com `body` NULL e a
- *    transcrição só é gravada depois pelo media-derive-worker — a corrida que
- *    o #617 mediu. Barrar aqui calaria o áudio inteiro por causa de uma coluna
- *    que ainda vai ser preenchida. Dispara, como antes.
- *  - Mensagem fixada ausente (turno montado à mão, teste): sem corpo não há o
- *    que casar, e adivinhar é calar. Dispara, como antes.
+ *  - Corpo SEM TEXTO: mídia sem legenda chega com `body` NULL e a transcrição
+ *    só é gravada depois pelo media-derive-worker — a corrida que o #617
+ *    mediu. Barrar aqui calaria o áudio inteiro por causa de uma coluna que
+ *    ainda vai ser preenchida. Dispara, como antes.
+ *
+ *    ⚠️ "SEM TEXTO" NÃO É `corpo === null`. O corpo do turno é composto por
+ *    `corpoDaMensagem` (get-lead-context), que devolve o marcador `[audio]` /
+ *    `[image]` enquanto não há derivado — `null` só quando a linha não existe.
+ *    A régua é a mesma do roteador (`resolve-turn-agent.ts`, que decide pelo
+ *    `signal`): sem `body` E sem `media_derived_text`. Sobre o corpo já
+ *    composto, isso é `corpoTemTexto`: vazio ou só o marcador de mídia. (CR do
+ *    mantenedor no #2696, ponto 2 — com `=== null` a falha aberta da mídia
+ *    nunca rodava em produção.)
+ *  - Nenhuma mensagem a julgar (turno montado à mão, teste, mensagem fixada
+ *    ausente): sem corpo não há o que casar, e adivinhar é calar. Dispara.
+ *  - Uma RAJADA é julgada pelo CONJUNTO: o drain coalesce a segunda mensagem no
+ *    job da primeira, então "oi" + "quero um orçamento" só casa se o filtro
+ *    olhar as duas (ponto 3 do mesmo CR). Ver `turnoDisparaNasMensagens`.
  *
  * ## Por que um miss NÃO adia (diferente da janela)
  *
@@ -51,11 +63,13 @@
  *
  * ## Onde isto é aplicado
  *
- * `inbound-turn.ts`, no mesmo lugar e com o mesmo escopo do gate da janela de
- * atendimento: turno `inbound_turn` do caminho AUTOMÁTICO, depois de resolver
- * o agente publicado e antes de qualquer chamada de modelo. No modo assistido
- * o rascunho passa por aprovação humana — quem decide é gente, e filtrar a
- * fila de aprovação tiraria de lá mensagens que o operador talvez quisesse
+ * `inbound-turn.ts`, no caminho AUTOMÁTICO do turno `inbound_turn`: depois de
+ * resolver o agente publicado, depois das DUAS detecções determinísticas —
+ * pedido de humano e opt-out ambíguo (CR do #2696, ponto 1: elas não dependem
+ * do filtro e não podem ser caladas por ele; é a mesma ordem do modo
+ * assistido) — e antes de qualquer chamada de modelo. No modo assistido o
+ * rascunho passa por aprovação humana — quem decide é gente, e filtrar a fila
+ * de aprovação tiraria de lá mensagens que o operador talvez quisesse
  * responder.
  */
 
@@ -87,15 +101,62 @@ export function lerFiltroDePalavraChave(triggerConfig: unknown): RegExp | null {
 }
 
 /**
+ * O marcador que `corpoDaMensagem` põe no lugar do texto quando a mídia ainda
+ * não tem derivado: `[audio]`, `[image]`, `[document]`, `[video]`… O tipo vem
+ * de `messages.type`, em minúsculas.
+ */
+const MARCADOR_DE_MIDIA = /^\[[a-z_]+\]$/i;
+
+/**
+ * O corpo composto tem TEXTO de gente? A régua do "sem texto" do roteador
+ * (`resolve-turn-agent.ts`: `body` nulo E `media_derived_text` vazio), lida
+ * sobre o corpo que o turno já tem em mãos.
+ *
+ * `corpoDaMensagem` compõe a linha uma única vez: derivado ⇒ texto enquadrado
+ * (tem texto); senão `body ?? '[tipo]'` (mídia sem derivado). Então "sem texto"
+ * sobre o composto é: nulo, vazio/whitespace, ou só o marcador de mídia.
+ */
+export function corpoTemTexto(corpo: string | null): boolean {
+  if (corpo === null) return false;
+  const texto = corpo.trim();
+  if (texto === '') return false;
+  return !MARCADOR_DE_MIDIA.test(texto);
+}
+
+/**
  * A decisão pura do gate: o turno deste inbound ENTRA no agente?
  *
  * `filtro === null` ⇒ sempre `true` (sem keyword preenchida nada muda — as
- * instalações existentes continuam respondendo a tudo). `corpo === null` ⇒
+ * instalações existentes continuam respondendo a tudo). Sem texto no corpo ⇒
  * `true` (falha aberta da mídia, ver cabeçalho). Caso contrário, o corpo tem
  * de casar a regex — a promessa da tela, literal.
  */
 export function turnoDisparaNaPalavraChave(filtro: RegExp | null, corpo: string | null): boolean {
   if (filtro === null) return true;
-  if (corpo === null) return true;
-  return filtro.test(corpo);
+  if (!corpoTemTexto(corpo)) return true;
+  // Depois da guarda acima o corpo é string de gente: `corpoTemTexto` já
+  // recusou `null` e vazio, e o TS não estreita por função.
+  return filtro.test(corpo as string);
+}
+
+/**
+ * A MESMA decisão sobre o que o cliente disse e AINDA NÃO FOI RESPONDIDO — a
+ * lista que o handoff e o opt-out usam (`inboundsNaoRespondidos`).
+ *
+ * Uma mensagem que casa basta: o filtro é por mensagem (spec 10), e a rajada
+ * coalescida pelo drain ("oi" + "quero um orçamento" no job do "oi") não pode
+ * ser descartada inteira por causa da primeira linha. Cada mensagem é julgada
+ * sozinha — emendar a rajada num texto só destruiria as réguas de palavra
+ * isolada do opt-out, o mesmo motivo de `inboundsNaoRespondidos` ser lista.
+ *
+ * Lista vazia (nada a julgar) ⇒ `true`: falha aberta, como no caso do corpo
+ * ausente.
+ */
+export function turnoDisparaNasMensagens(
+  filtro: RegExp | null,
+  corpos: readonly (string | null)[],
+): boolean {
+  if (filtro === null) return true;
+  if (corpos.length === 0) return true;
+  return corpos.some((corpo) => turnoDisparaNaPalavraChave(filtro, corpo));
 }
