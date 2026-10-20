@@ -118,6 +118,12 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
   );
   const idBoxer = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 106);
 
+  // 8. publicado, só _regular_price (sem _price), estoque ok
+  await q(
+    `insert into \`${banco}\`.\`${WP_PREFIXO}posts\` (post_title, post_type, post_status, guid) values ('Fone de Ouvido', 'product', 'publish', 'http://loja.exemplo/?p=108')`,
+  );
+  const idFone = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 108);
+
   // metas
   await q(
     `insert into \`${banco}\`.\`${WP_PREFIXO}postmeta\` (post_id, meta_key, meta_value) values
@@ -139,7 +145,10 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
       (${idSorvete}, '_sku', 'SORVETE-MORANGO'),
       (${idBoxer}, '_stock_status', 'instock'),
       (${idBoxer}, '_price', '25.00'),
-      (${idBoxer}, '_sku', 'BOXER-ALGODAO')`,
+      (${idBoxer}, '_sku', 'BOXER-ALGODAO'),
+      // Fone de Ouvido tem só _regular_price (não tem _price).
+      (${idFone}, '_stock_status', 'instock'),
+      (${idFone}, '_regular_price', '55.00')`,
   );
 }
 
@@ -311,6 +320,35 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
       await conexao.query("COMMIT");
       const titulos = (linhas as { titulo: string }[]).map((l) => l.titulo);
       expect(titulos).not.toContain("Rascunho invisível");
+    } finally {
+      conexao.release();
+    }
+  });
+
+  it("produto só com _regular_price aparece, com o preço do _regular_price", async () => {
+    const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
+    const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
+      { prefixo: WP_PREFIXO },
+      { preco_max: undefined, so_em_estoque: undefined, limite: 5 },
+      5,
+    );
+    const conexao = await pool.getConnection();
+    try {
+      await conexao.query("START TRANSACTION READ ONLY");
+      await conexao.query("SET SESSION max_execution_time = 10000");
+      await conexao.query("SET SESSION lock_wait_timeout = 5");
+      const [linhas] = await conexao.execute(sql, valores.map((v: unknown) => (v === undefined ? null : v)));
+      await conexao.query("COMMIT");
+      const produtos = (linhas as { id: string; titulo: string; preco: unknown }[]);
+      registrar(
+        "C1-woocommerce-sem-preco",
+        `somente _regular_price → ${produtos.map((p) => `${p.titulo} (${p.preco})`).join(", ")}`,
+      );
+      const fone = produtos.find((p) => p.titulo === "Fone de Ouvido");
+      expect(fone).toBeDefined();
+      // Só tem _regular_price (55,00): o left join mantém o produto e o preço
+      // sai do COALESCE do _regular_price.
+      expect(Number(fone!.preco)).toBe(55);
     } finally {
       conexao.release();
     }

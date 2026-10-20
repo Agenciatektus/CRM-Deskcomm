@@ -12,6 +12,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { toast } from "sonner";
+import { ApiError } from "@/lib/api/types";
+
 import ReceitasProntas from "./ReceitasProntas";
 import type { InstanciaDeReceita } from "@/lib/external-db/receitas/tipos";
 
@@ -79,6 +82,14 @@ vi.mock("@/hooks/external-db/useReceitasDaConexao", () => ({
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
 vi.mock("@/lib/random-id", () => ({ randomId: () => "id-gerado" }));
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
+}));
 
 function renderComQuery(receitas: InstanciaDeReceita[], canWrite = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -274,5 +285,47 @@ describe("Receitas prontas — comportamento da lista", () => {
     expect(screen.queryByRole("button", { name: /Editar/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Remover/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Salvar/i })).toBeNull();
+  });
+
+  it("adicionar e salvar sem editar envia descricao com no máximo 300 caracteres", async () => {
+    renderComQuery([], true);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Adicionar receita/i })!);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Salvar/i })!);
+    });
+
+    const args = deps.salvarReceitas.mock.calls[0]![1] as InstanciaDeReceita[];
+    expect(args[0]!.descricao.length).toBeLessThanOrEqual(300);
+  });
+
+  it("salvar com 422 mostra o campo que falhou (não o genérico)", async () => {
+    renderComQuery([], true);
+    deps.salvarReceitas.mockRejectedValueOnce(
+      new ApiError(
+        422,
+        "validation_failed",
+        { fieldErrors: { descricao: ["String must contain at most 300 character(s)"] } },
+        "req-1",
+        "Campos inválidos.",
+      ),
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Adicionar receita/i })!);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Salvar/i })!);
+    });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+      expect.stringContaining("Descrição"),
+      expect.anything(),
+    );
   });
 });

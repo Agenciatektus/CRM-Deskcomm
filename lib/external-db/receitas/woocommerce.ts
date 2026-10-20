@@ -146,7 +146,9 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
      *  na ordem em que os `?` aparecem no texto. */
     function montarJoins(): string[] {
       return [
-        `join ${postmeta} ${mp} on ${mp}.post_id = ${posts}.ID and ${mp}.meta_key = ${marcador("_price")}`,
+        // left join: um produto pode não ter _price (só _regular_price). O JOIN
+        // interno tiraria o produto antes do COALESCE da PRECO_COLUNA agir.
+        `left join ${postmeta} ${mp} on ${mp}.post_id = ${posts}.ID and ${mp}.meta_key = ${marcador("_price")}`,
         `left join ${postmeta} ${mrp} on ${mrp}.post_id = ${posts}.ID and ${mrp}.meta_key = ${marcador("_regular_price")}`,
         `left join ${postmeta} ${msku} on ${msku}.post_id = ${posts}.ID and ${msku}.meta_key = ${marcador("_sku")}`,
         `left join ${postmeta} ${mstock} on ${mstock}.post_id = ${posts}.ID and ${mstock}.meta_key = ${marcador("_stock_status")}`,
@@ -162,6 +164,9 @@ export const RECEITA_WOOCOMMERCE_PRODUTOS: DefinicaoDeReceita = {
       ];
       const precoMax = b.preco_max;
       if (precoMax !== undefined) {
+        // PRECO_COLUNA vira NULL quando o produto não tem _price nem _regular_price.
+        // No MySQL `NULL <= x` é falso (desconhecido), então produto sem preço
+        // nenhum nunca passa no filtro de preço máximo — mesmo com left join.
         base.push(`(${PRECO_COLUNA}) <= ${marcador(precoMax)}`);
       }
       const soEmEstoque = b.so_em_estoque;

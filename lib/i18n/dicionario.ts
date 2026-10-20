@@ -14408,6 +14408,11 @@ export const DICIONARIO: Traducoes = {
   "Carregando receitas…": { es: "Cargando recetas…" },
   "Prefixo:": { es: "Prefijo:" },
   "Não foi possível carregar as receitas.": { es: "No se pudieron cargar las recetas." },
+  "Descrição": { es: "Descripción" },
+  "linha": { es: "línea" },
+  "O campo {campo} não pôde ser salvo: {motivo}": {
+    es: "El campo {campo} no se pudo guardar: {motivo}",
+  },
   // Rotas de receitas (recipes, preview, suggest) — erros que a tela mostra.
   "Conexão não encontrada.": { es: "Conexión no encontrada." },
   "Muitas alterações em pouco tempo. Tente de novo em instantes.": { es: "Demasiados cambios en poco tiempo. Inténtalo de nuevo en unos instantes." },

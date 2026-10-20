@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { previewReceita, salvarReceitas, useReceitasDaConexao } from "@/hooks/external-db/useReceitasDaConexao";
 import { randomId } from "@/lib/random-id";
+import { ApiError } from "@/lib/api/types";
 import { useT } from "@/hooks/i18n/useT";
 import { RECEITAS, receitaDe } from "@/lib/external-db/receitas/registro";
 import type { InstanciaDeReceita } from "@/lib/external-db/receitas/tipos";
@@ -78,6 +79,29 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
       setRascunho(null);
       await query.refetch();
     } catch (err) {
+      // 422 de validação do Zod: a rota devolve `details.fieldErrors` com o
+      // campo que falhou. Mostra qual campo e por quê, em vez do genérico
+      // "Campos inválidos."
+      if (err instanceof ApiError && err.code === "validation_failed") {
+        const fieldErrors = (err.details as
+          | { fieldErrors?: Record<string, string[]> }
+          | undefined)?.fieldErrors;
+        const campo = fieldErrors ? Object.keys(fieldErrors)[0] : undefined;
+        const motivo = campo ? fieldErrors[campo]?.[0] : undefined;
+        if (campo) {
+          const rotuloDoCampo: Record<string, string> = {
+            descricao: t("Descrição"),
+            rotulo: t("Rótulo"),
+          };
+          const label = rotuloDoCampo[campo] ?? campo;
+          toast.error(
+            t("O campo {campo} não pôde ser salvo: {motivo}")
+              .replace("{campo}", label)
+              .replace("{motivo}", motivo ?? ""),
+          );
+          return;
+        }
+      }
       showApiError(err);
     }
   };
@@ -91,7 +115,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
       id: randomId(),
       receita: primeira.id,
       rotulo: receita?.rotulo ?? primeira.id,
-      descricao: receita?.descricao ?? "",
+      descricao: "",
       fixos: { prefixo: PREFIXO_PADRAO },
       ativa: true,
     };
@@ -271,7 +295,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
                 {preview && preview.instancia.id === inst.id && (
                   <div className="mt-3 border-t pt-2">
                     <p className="text-xs text-muted-foreground mb-1">
-                      {t("Pré-visualização (até 5 linhas)")} — {preview.linhas_devolvidas} {t("linhas")}
+                      {t("Pré-visualização (até 5 linhas)")} — {preview.linhas_devolvidas} {preview.linhas_devolvidas === 1 ? t("linha") : t("linhas")}
                       {preview.truncado ? ` · ${t("truncado")}` : ""}
                     </p>
                     <div className="overflow-x-auto">
@@ -304,15 +328,15 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
 
           return (
             <Card key={inst.id} className="border border-border p-3 mb-2">
-              <div className="flex flex-row items-center justify-between gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium">{inst.rotulo || (receita?.rotulo ?? inst.receita)}</p>
-                  <p className="text-xs text-muted-foreground">{inst.descricao || (receita?.descricao ?? "")}</p>
+                  <p className="text-xs text-muted-foreground min-w-0 break-words">{inst.descricao || (receita?.descricao ?? "")}</p>
                   <p className="text-xs text-muted-foreground">
                     {t("Prefixo:")} <span className="font-mono">{cols}</span>
                   </p>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   <Badge variant={inst.ativa ? "success" : "secondary"}>
                     {inst.ativa ? t("Ativa") : t("Inativa")}
                   </Badge>
@@ -349,7 +373,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
               {preview && preview.instancia.id === inst.id && (
                 <div className="mt-3 border-t pt-2">
                   <p className="text-xs text-muted-foreground mb-1">
-                    {t("Pré-visualização (até 5 linhas)")} — {preview.linhas_devolvidas} {t("linhas")}
+                    {t("Pré-visualização (até 5 linhas)")} — {preview.linhas_devolvidas} {preview.linhas_devolvidas === 1 ? t("linha") : t("linhas")}
                     {preview.truncado ? ` · ${t("truncado")}` : ""}
                   </p>
                   <div className="overflow-x-auto">
