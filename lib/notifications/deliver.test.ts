@@ -75,4 +75,17 @@ describe("entregarAviso", () => {
     const [, opcoes] = vi.mocked(toast).mock.calls.at(-1)!;
     expect(opcoes?.action).toBeUndefined();
   });
+
+  it("naBandeja troca só o que vai à bandeja do sistema; o toast fica com o conteúdo", () => {
+    entregarAviso({
+      category: "message",
+      kind: "message_inbound",
+      title: "Maria Souza",
+      body: "oi",
+      icon: "https://avatar",
+      naBandeja: { title: "Novo aviso", body: "" },
+    });
+    expect(vi.mocked(toast).mock.calls.at(-1)![0]).toBe("Maria Souza");
+    expect(vi.mocked(emitNotification).mock.calls.at(-1)![0]).toMatchObject({ title: "Novo aviso", body: "", icon: undefined });
+  });
 });

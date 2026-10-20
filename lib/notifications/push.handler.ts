@@ -2,7 +2,7 @@ import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/disp
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { canalDoEventoDesativado } from "@/lib/channels/desativado";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { montarPayloadDeInbound, truncar } from "./push_payload";
+import { corpoDoAvisoDeMensagem, montarPayloadDeInbound, truncar } from "./push_payload";
 import { enviarPushAoUsuario, enviarPushAQuemVeAConversa, enviarPushDaOrg } from "./web_push";
 import { carregarDestinatariosDaMensagem, type DestinatariosDaMensagem } from "./destinatarios-da-mensagem";
 import { logger } from "@/lib/logger";
@@ -12,6 +12,13 @@ import type { PushPayload } from "./push_payload";
 import { rotuloDoContato, SEM_NOME } from "@/lib/contacts/rotulo-do-contato";
 
 export const WEB_PUSH_INBOUND_KEY = "web-push-inbound.v1";
+
+/** Corpo do aviso de mensagem a partir do evento (`body_preview` + `type`). */
+function corpoDoEvento(row: EventRow): { body: string; corpoSemPrevia: string } {
+  const previa = typeof row.payload.body_preview === "string" ? row.payload.body_preview : null;
+  const tipo = typeof row.payload.type === "string" ? row.payload.type : "text";
+  return corpoDoAvisoDeMensagem(tipo, previa);
+}
 
 async function handleInbound(row: EventRow): Promise<HandlerResult> {
   // Canal DESATIVADO (#2329): a lei do #2318 vale nos dois sentidos — o canal
@@ -27,10 +34,7 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
   if (!conversationId) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_conversa" };
   }
-  const previewRaw = row.payload.body_preview;
-  const preview = typeof previewRaw === "string" && previewRaw.trim() ? previewRaw : "Nova mensagem";
-  const type = typeof row.payload.type === "string" ? row.payload.type : "text";
-  const body = type === "text" ? preview : "Mídia";
+  const { body, corpoSemPrevia } = corpoDoEvento(row);
 
   const marca = await marcaDaSaida(row.organization_id);
   const contactId = typeof row.payload.contact_id === "string" ? row.payload.contact_id : null;
@@ -82,6 +86,7 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
     preview: body,
     contactName,
     icon,
+    corpoSemPrevia,
   });
   const destino = await destinatariosDoInbound(row.organization_id, conversationId, contactId);
   // Quem DEVE ser avisado (`destino`) nunca alarga quem PODE ver: nome e prévia
@@ -144,14 +149,12 @@ async function handleGroupInbound(row: EventRow): Promise<HandlerResult> {
   if (!conversationId) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_conversa" };
   }
-  const previewRaw = row.payload.body_preview;
-  const preview = typeof previewRaw === "string" && previewRaw.trim() ? previewRaw : "Nova mensagem";
-  const type = typeof row.payload.type === "string" ? row.payload.type : "text";
-  const body = type === "text" ? preview : "Mídia";
+  const { body, corpoSemPrevia } = corpoDoEvento(row);
 
   const payload: PushPayload = {
     title: "Nova mensagem no grupo",
-    body: truncar(body),
+    body,
+    corpoSemPrevia,
     tag: `msg:${conversationId}`,
     href: `/app/inbox?id=${conversationId}`,
   };
@@ -251,6 +254,7 @@ export const webPushInboundHandler: EventHandler = {
       const { sent } = await enviarPushAQuemVeAConversa(
         row.organization_id,
         conversationId,
+        // Sem corpo sem prévia: o texto da nota é conteúdo.
         {
           title: "Você foi mencionado",
           body: truncar(preview),
@@ -276,6 +280,7 @@ export const webPushInboundHandler: EventHandler = {
       return enviarParaUsuario(row.organization_id, toUserId, {
         title: "Lead atribuído a você",
         body: truncar(lead.title),
+        corpoSemPrevia: truncar(lead.title),
         tag: `lead-assigned:${leadId}`,
         href,
       });
@@ -284,6 +289,7 @@ export const webPushInboundHandler: EventHandler = {
       return enviarParaUsuario(row.organization_id, lead.ownerUserId, {
         title: "Lead ganho",
         body: truncar(lead.title),
+        corpoSemPrevia: truncar(lead.title),
         tag: `lead-won:${leadId}`,
         href,
       });
@@ -291,6 +297,7 @@ export const webPushInboundHandler: EventHandler = {
     return enviarParaUsuario(row.organization_id, lead.ownerUserId, {
       title: "Lead perdido",
       body: truncar(lead.title),
+      corpoSemPrevia: truncar(lead.title),
       tag: `lead-lost:${leadId}`,
       href,
     });

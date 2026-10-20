@@ -307,4 +307,71 @@ describe("webPushInboundHandler", () => {
       expect(enviarPushAQuemVeAConversaMock).not.toHaveBeenCalled();
     });
   });
+
+  describe("o que cada produtor declara para a tela bloqueada", () => {
+    beforeEach(() => {
+      state.vapidPronto = true;
+    });
+
+    function inbound(payload: Record<string, unknown>) {
+      return {
+        id: "e-tb",
+        organization_id: "org1",
+        event_type: "message.received",
+        entity_kind: "message",
+        entity_id: "m-tb",
+        payload: { conversation_id: "conv-1", ...payload },
+        metadata: {},
+        consumed_by: [],
+        attempts: 0,
+      };
+    }
+
+    it("áudio diz 'Áudio' (nunca 'Mídia') no corpo e no corpo sem prévia", async () => {
+      await webPushInboundHandler.handle(inbound({ type: "audio", body_preview: "legenda" }));
+      expect(enviarPushAQuemVeAConversaMock.mock.calls[0]![2]).toMatchObject({ body: "Áudio", corpoSemPrevia: "Áudio" });
+    });
+
+    it("texto: a prévia no corpo e 'Nova mensagem' sem prévia", async () => {
+      await webPushInboundHandler.handle(inbound({ type: "text", body_preview: "oi, tudo bem?" }));
+      expect(enviarPushAQuemVeAConversaMock.mock.calls[0]![2]).toMatchObject({
+        body: "oi, tudo bem?",
+        corpoSemPrevia: "Nova mensagem",
+      });
+    });
+
+    it("grupo: título fixo e o mesmo corpo sem prévia", async () => {
+      await webPushInboundHandler.handle(grupoRow({ type: "image" }));
+      expect(enviarPushAQuemVeAConversaMock.mock.calls[0]![2]).toMatchObject({
+        title: "Nova mensagem no grupo",
+        body: "Imagem",
+        corpoSemPrevia: "Imagem",
+      });
+    });
+
+    it("menção: o texto da nota é conteúdo, então não declara corpo sem prévia", async () => {
+      await webPushInboundHandler.handle({
+        ...inbound({ to_user_id: "u-1", body_preview: "nota" }),
+        event_type: "user.mentioned",
+      });
+      expect(enviarPushAQuemVeAConversaMock.mock.calls[0]![2]).not.toHaveProperty("corpoSemPrevia");
+    });
+
+    it.each(["lead.assigned", "lead.won", "lead.lost"])("%s: o título do negócio é quem, e pode aparecer", async (tipo) => {
+      fromMock.mockImplementation(() => {
+        const q = {
+          select: () => q,
+          eq: () => q,
+          maybeSingle: async () => ({ data: { title: "Pedido da Ana", owner_user_id: "u-dono", pipeline_id: "p1" }, error: null }),
+        };
+        return q;
+      });
+      await webPushInboundHandler.handle({ ...inbound({ lead_id: "l1", to_user_id: "u-dono" }), event_type: tipo });
+      expect(enviarPushAoUsuarioMock.mock.calls[0]![2]).toMatchObject({
+        body: "Pedido da Ana",
+        corpoSemPrevia: "Pedido da Ana",
+      });
+      fromMock.mockReset();
+    });
+  });
 });

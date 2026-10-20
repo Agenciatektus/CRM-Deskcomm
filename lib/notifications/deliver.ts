@@ -14,6 +14,8 @@ export interface EntregarAvisoInput {
   tag?: string;
   href?: string;
   icon?: string;
+  /** O que a bandeja do sistema mostra, quando difere do toast (opção da tela bloqueada). */
+  naBandeja?: { title: string; body: string; icon?: string };
 }
 
 export function entregarAviso(input: EntregarAvisoInput): void {
@@ -43,13 +45,15 @@ export function entregarAviso(input: EntregarAvisoInput): void {
     });
   }
   if (canalLigado(input.category, "push")) {
+    // O toast fica dentro do app aberto; a bandeja aparece fora dele.
+    const bandeja = input.naBandeja ?? { title: input.title, body: input.body, icon: input.icon };
     emitNotification({
       kind: input.kind,
-      title,
-      body,
+      title: traduzir(bandeja.title, idioma),
+      body: traduzir(bandeja.body, idioma),
       tag: input.tag,
       href: input.href,
-      icon: input.icon,
+      icon: bandeja.icon,
       force: true,
     });
   }

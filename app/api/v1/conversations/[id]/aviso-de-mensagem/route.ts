@@ -1,6 +1,10 @@
 /**
  * GET /api/v1/conversations/[id]/aviso-de-mensagem — "devo avisar ESTA pessoa
- * da mensagem que acabou de chegar nesta conversa?" → `{ avisar: boolean }`.
+ * da mensagem que acabou de chegar nesta conversa?" → `{ avisar, conteudo }`.
+ *
+ * `conteudo` é o que a bandeja do sistema pode mostrar (a opção da empresa em
+ * `settings.notificacoes`, a mesma que o funil do push aplica), decidido aqui
+ * no servidor e não no navegador.
  *
  * Quem lê é `hooks/notifications/useInboundMessageAlerts.ts` (toast e
  * notificação do navegador). A regra é a do push do servidor, na MESMA função:
@@ -41,6 +45,7 @@ import {
   carregarDestinatariosDaMensagem,
   usuarioRecebeAviso,
 } from "@/lib/notifications/destinatarios-da-mensagem";
+import { lerTelaBloqueada } from "@/lib/notifications/tela-bloqueada";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -77,7 +82,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams): Promise<R
     // `null` só se a conversa sumiu entre as duas leituras: sem dono conhecido,
     // é fila — avisa, como antes da regra.
     const avisar = destino === null ? true : usuarioRecebeAviso(destino, user.id);
-    return ok({ avisar }, { requestId });
+    // O que a bandeja do sistema pode mostrar é decidido aqui, no servidor,
+    // pela mesma opção que o funil do push aplica.
+    const { modo } = await lerTelaBloqueada(createAdminClient(), org.orgId);
+    return ok({ avisar, conteudo: modo }, { requestId });
   } catch (err) {
     logger.error("[aviso-de-mensagem] leitura falhou", {
       conversation_id: id,
