@@ -99,7 +99,8 @@ export function TransferirPopover({ conversationId, devolver, numero }: Props) {
           variant="ghost"
           className="w-9 px-0"
           aria-label={t("Transferir conversa")}
-          title={t("Transferir")}
+          // Guia curta (#3003): "Transferir" não diz PARA QUEM.
+          title={t("Passa esta conversa para outro atendente. Se houver outro número conectado, dá para continuar o atendimento por ele.")}
         >
           <ArrowsLeftRight size={18} aria-hidden />
         </Button>

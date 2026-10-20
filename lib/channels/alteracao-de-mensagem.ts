@@ -34,6 +34,12 @@ export interface PedidoDeAlteracao {
   direcao: "inbound" | "outbound";
   /** `external_id` da mensagem original. */
   alvo: string;
+  /**
+   * Outras FORMAS do mesmo id (subida 1.85, #2xxx do upstream): o evento do WAHA
+   * traz só a cauda, e a recebida foi gravada com o composto `false_<chat>_<id>`.
+   * A conferência de autoria abaixo vale para qualquer uma delas.
+   */
+  alvosAlternativos?: string[];
   /** O chat do evento, como o transporte o entregou. */
   chat: { jid: string | null; phone: string | null; lid: string | null };
   acao: "editar" | "apagar";
@@ -57,15 +63,22 @@ export async function aplicarAlteracaoDeMensagem(
   admin: SupabaseClient,
   pedido: PedidoDeAlteracao,
 ): Promise<ResultadoDaAlteracao> {
+  const formas = [...new Set([pedido.alvo, ...(pedido.alvosAlternativos ?? [])].filter((f) => f.length > 0))];
   const { data, error } = await admin
     .from("messages")
     .select("id, channel_session_id, direction, conversation_id, contact_id")
     .eq("organization_id", pedido.organizationId)
-    .eq("external_id", pedido.alvo)
-    .maybeSingle();
+    .in("external_id", formas)
+    .limit(5);
   // Falha de banco SOBE: o transporte reenvia e a alteração não se perde.
   if (error) throw new Error(`alteracao_leitura_falhou: ${error.message}`);
-  const original = data as Original | null;
+  const candidatas = (data ?? []) as Original[];
+  // Mais de uma forma casou: vale a da MESMA sessão e direção (as outras caem na
+  // conferência de autoria abaixo e seriam recusadas de qualquer jeito).
+  const original =
+    candidatas.find((c) => c.channel_session_id === pedido.channelSessionId && c.direction === pedido.direcao) ??
+    candidatas[0] ??
+    null;
   if (!original) return { aplicada: false, motivo: `${pedido.acao}_sem_original` };
 
   if (original.channel_session_id !== pedido.channelSessionId || original.direction !== pedido.direcao) {

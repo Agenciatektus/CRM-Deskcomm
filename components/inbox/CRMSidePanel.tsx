@@ -21,6 +21,20 @@ import { useResumoDoContato } from "./painel/useResumoDoContato";
 
 interface Props {
   conversation: ConversationWithContact | null;
+  /**
+   * O painel inteiro recolhido (issue #3004): em vez do conteúdo, desenha só o
+   * trilho com o botão de expandir — e a tela (`InboxLayout`) devolve a largura
+   * ao fio da conversa. São DOIS valores, um estado: `recolhido` diz como
+   * desenhar, `onAlternarRecolhido` diz se há controle.
+   */
+  recolhido?: boolean;
+  /**
+   * O clique do controle. Só existe na coluna do desktop: o painel do celular
+   * abre dentro de um `Sheet`, que já tem o próprio gesto de fechar — por isso o
+   * controle é OPCIONAL, como o `showCollapseControl` do menu da esquerda, e o
+   * `Sheet` do Inbox não o passa.
+   */
+  onAlternarRecolhido?: () => void;
 }
 
 const ROTULO_DA_ABA: Record<AbaDoPainel, string> = {
@@ -104,9 +118,30 @@ export function CRMSidePanel({ conversation }: Props) {
   });
   useEffect(() => escutar("painel-proximo-passo", () => irParaAtual.current("proximo-passo")), []);
 
+  /**
+   * RECOLHIDO (issue #3004): só o trilho, com o botão de expandir. Sem o
+   * controle — o caso do `Sheet` do celular — o trilho não teria porta de volta,
+   * então nesse caso o painel desenha inteiro, como sempre desenhou.
+   */
+  if (recolhido && onAlternarRecolhido) {
+    return (
+      <aside
+        className="flex h-full flex-col items-center border-l border-border bg-background py-2"
+        data-testid="inbox-painel-recolhido"
+      >
+        <BotaoDeRecolherDoPainel recolhido onAlternar={onAlternarRecolhido} />
+      </aside>
+    );
+  }
+
   if (!conversation) {
     return (
-      <aside className="flex h-full items-center justify-center border-l border-border p-4 text-center text-xs text-muted-foreground">
+      <aside className="relative flex h-full items-center justify-center border-l border-border p-4 text-center text-xs text-muted-foreground">
+        {onAlternarRecolhido && (
+          <div className="absolute top-2 right-2">
+            <BotaoDeRecolherDoPainel recolhido={false} onAlternar={onAlternarRecolhido} />
+          </div>
+        )}
         {t("Selecione uma conversa para ver detalhes do contato.")}
       </aside>
     );

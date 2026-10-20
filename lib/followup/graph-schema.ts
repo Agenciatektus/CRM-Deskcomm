@@ -255,6 +255,13 @@ export const actionConfigSchema = z.discriminatedUnion('mode', [
      * byte-idêntico ao de antes.
      */
     variants: z.array(z.string().min(1).max(1000)).min(1).max(9).optional(),
+    /**
+     * #2734 — MÍDIA OPCIONAL (imagem ou PDF) por URL. Presente, o `body` vira a
+     * LEGENDA. Opcional de propósito: os grafos publicados não têm a chave e
+     * continuam válidos byte a byte (o `strictObject` só recusa o que ELE não
+     * conhece; um campo novo e opcional é aceito pelos antigos).
+     */
+    media_url: z.string().url().max(2000).optional(),
   }),
   /**
    * Efeitos de CRM (cadência) — não falam com o cliente, então não viram turno:

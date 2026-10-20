@@ -138,7 +138,7 @@ export function ConversationHeader({
    * espelhando os gates que o MOTOR lê, e esta tela só a consome: somar
    * condições à mão aqui é como três leituras parciais divergiram no passado.
    */
-  const { comando, automaticoAtivo, travaVigente, motivo } = comandoDaConversa({
+  const fatosDoComando = {
     status,
     assigned_to_user_id: conversation.assigned_to_user_id,
     assigned_to_user_name: conversation.assigned_to_user_name ?? null,
@@ -149,7 +149,28 @@ export function ConversationHeader({
     is_blocked: conversation.contacts?.is_blocked ?? null,
     is_group: conversation.is_group ?? false,
     automaticoDaOrg: automaticoDaOrg.data,
-  });
+  };
+  const { comando, automaticoAtivo, travaVigente, motivo } = comandoDaConversa(fatosDoComando);
+  /**
+   * O QUE "LIBERAR" FAZ DEPENDE DO ESTADO, e a guia do botão (#3003) não pode
+   * prometer o automático de volta quando ele não volta.
+   *
+   * `fn_conversation_assign` com dono `null` deixa a conversa aberta e sem dono,
+   * mas só limpa `bot_silenced_until` quando NÃO houve escalação
+   * (`last_handoff_at is null`). Depois de uma escalação, com o contato travado
+   * (`force_human`), descadastrado, em grupo ou numa org sem automático, a
+   * conversa cai na fila esperando gente. A pergunta é a mesma regra de quem
+   * manda, aplicada ao estado que a RPC vai gravar.
+   */
+  const liberarDevolveAoAutomatico =
+    comandoDaConversa({
+      ...fatosDoComando,
+      status: "open",
+      assigned_to_user_id: null,
+      assigned_to_user_name: null,
+      assignee_kind: null,
+      bot_silenced_until: conversation.last_handoff_at ? fatosDoComando.bot_silenced_until : null,
+    }).comando.quem === "automatico";
 
   const encerrada = status === "closed" || status === "archived" || status === "resolved";
   // A VOLTA aparece sempre que há trava a desfazer, inclusive ENCERRADA (senão
@@ -239,6 +260,8 @@ export function ConversationHeader({
                   size="sm"
                   variant="outline"
                   disabled={reopen.isPending}
+                  // Guia curta (#3003): o rótulo não diz que a conversa volta a ser atendida.
+                  title={t("Reabre o atendimento desta conversa, que estava encerrada.")}
                   onClick={() =>
                     reopen.mutate({ conversation_id: conversation.id, expected_revision: conversation.service_revision })
                   }
@@ -251,6 +274,13 @@ export function ConversationHeader({
                   size="sm"
                   variant="ghost"
                   disabled={release.isPending}
+                  // Guia curta (#3003) em `title`, não em `aria-label` (que trocaria o
+                  // nome acessível "Liberar"): diz para onde a conversa vai.
+                  title={
+                    liberarDevolveAoAutomatico
+                      ? t("Solta esta conversa: ela fica sem dono e o atendimento automático volta a responder.")
+                      : t("Solta esta conversa: ela fica sem dono e volta para a fila, esperando um atendente.")
+                  }
                   onClick={() => release.mutate({ conversation_id: conversation.id })}
                 >
                   {t("Liberar")}
@@ -294,7 +324,7 @@ export function ConversationHeader({
                   className="w-9 px-0"
                   disabled={encerrar.fechando}
                   aria-label={t("Fechar conversa")}
-                  title={t("Fechar conversa")}
+                  title={t("Encerra o atendimento. Depois você pode reabrir a conversa.")}
                   onClick={() => encerrar.fechar(conversation)}
                 >
                   <CheckCircle size={18} aria-hidden />

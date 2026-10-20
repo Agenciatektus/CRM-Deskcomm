@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { useEhCelular } from "@/lib/mobile/useEhCelular";
@@ -70,6 +70,18 @@ interface Props {
   onAbrirMenu?: AbrirMenu;
   /** O menu está aberto NESTA linha: o "…" fica visível enquanto isso. */
   menuAberto?: boolean;
+  /**
+   * Marca esta linha no lote (#2484, F1). Presente só quando a seleção
+   * múltipla está ligada — sem ela a caixa não aparece, e a lista continua
+   * sendo o que era.
+   */
+  selecionado?: boolean;
+  /**
+   * Liga o modo de seleção: com esta prop a linha ganha a caixa de marcação.
+   * A ação da caixa é SEPARADA do clique na linha — quem marca não abre a
+   * conversa, e quem abre não marca.
+   */
+  onAlternarSelecao?: (id: string) => void;
 }
 
 export function ConversationListItem({
@@ -84,6 +96,8 @@ export function ConversationListItem({
   meuUserId,
   onAbrirMenu,
   menuAberto,
+  selecionado = false,
+  onAlternarSelecao,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -162,7 +176,6 @@ export function ConversationListItem({
         // (`pele-selecionada`), que se destaca do card mesmo com marca escura.
         isSelected && "pele-selecionada bg-accent-soft hover:bg-accent-soft",
       )}
-      aria-current={isSelected ? "true" : undefined}
     >
       {/* Marcador da seleção: o `conv.is-sel::before` do protótipo, recuado em
           cima e embaixo para não colar na borda da linha vizinha. */}
@@ -264,15 +277,42 @@ export function ConversationListItem({
           meuUserId={meuUserId}
         />
       </div>
-    </button>
+      </button>
+    </div>
   );
 
-  if (!onAbrirMenu) return linha;
+  /**
+   * A CAIXA DE SELEÇÃO DO LOTE (#2484, F1) — IRMÃ da linha, nunca dentro dela:
+   * controle interativo dentro de `<button>` é HTML inválido, e marcar não pode
+   * abrir a conversa. É o checkbox nativo com a pele global do DS
+   * (`input[type="checkbox"]` em `app/globals.css`). Sem `onAlternarSelecao`
+   * (viewer, ou fora da lista) a linha continua sendo o que era.
+   */
+  const comSelecao = (conteudo: ReactNode) =>
+    onAlternarSelecao ? (
+      <div className={cn("relative flex w-full items-stretch", selecionado && "bg-accent-soft")}>
+        <span className="flex shrink-0 items-start pl-2 pt-3">
+          <input
+            type="checkbox"
+            checked={selecionado}
+            onChange={() => onAlternarSelecao(conversation.id)}
+            aria-label={t("Selecionar conversa")}
+            title={t("Selecionar conversa")}
+            data-testid={`selecao-em-lote-${conversation.id}`}
+          />
+        </span>
+        <div className="min-w-0 flex-1">{conteudo}</div>
+      </div>
+    ) : (
+      conteudo
+    );
+
+  if (!onAbrirMenu) return comSelecao(linha);
 
   // Um <button> não pode morar dentro de outro: o "…" é IRMÃO da linha.
   // No celular (abaixo de 760px) a linha ganha o gesto de deslizar (M1.4); as mesmas
   // ações seguem no "…".
-  return (
+  return comSelecao(
     <div ref={caixaRef} className="group/linha relative" data-menu-aberto={menuAberto ? "true" : undefined}>
       {celular ? (
         <GestoDaConversa
