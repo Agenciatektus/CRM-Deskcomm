@@ -59,7 +59,8 @@ export function MaisAcoesDoLote({
     const s = porId.get(id)?.status;
     return s === "won" || s === "lost";
   });
-  const naoGanhos = selectedIds.filter((id) => porId.get(id)?.status !== "won");
+  // Ganho só nos ABERTOS; os encerrados são contados no aviso (use Reabrir).
+  const abertos = selectedIds.filter((id) => porId.get(id)?.status === "open");
   const abertas = stages.filter((s) => !s.is_won && !s.is_lost);
   const temGanho = stages.some((s) => s.is_won);
   const fechar = (aberto: boolean) => {
@@ -96,7 +97,7 @@ export function MaisAcoesDoLote({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}
-          {temGanho && naoGanhos.length > 0 && (
+          {temGanho && abertos.length > 0 && (
             <DropdownMenuItem onClick={() => setDialogo("ganho")}>{t("Marcar como ganho…")}</DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
@@ -128,7 +129,14 @@ export function MaisAcoesDoLote({
         />
       )}
       {dialogo === "ganho" && (
-        <GanhoEmLote open onOpenChange={fechar} ids={naoGanhos} pipelineId={pipelineId} onConcluido={onClear} />
+        <GanhoEmLote
+          open
+          onOpenChange={fechar}
+          ids={abertos}
+          ignorados={selectedIds.length - abertos.length}
+          pipelineId={pipelineId}
+          onConcluido={onClear}
+        />
       )}
     </>
   );

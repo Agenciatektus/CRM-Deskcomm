@@ -9,10 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { useT } from "@/hooks/i18n/useT";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
-import { useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
+import { agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
 import { apiClient } from "@/lib/api/client";
 import type { Lead } from "@/lib/types/leads";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 
 /**
  * "Criar tarefa / próximo passo" em LOTE: o MESMO formulário do painel de
@@ -56,8 +55,8 @@ export function TarefaEmLote({
 
   const criar = async (pedido: PedidoDeTarefa): Promise<boolean> => {
     const ids = [...selectedIds];
-    onOpenChange(false);
-    adiarAcao(
+    const agendado = agendarNoLote(
+      pipelineId,
       (s) => `${t("Criando a tarefa nos selecionados")} (${s} s)`,
       t("Desfazer"),
       async () => {
@@ -75,10 +74,12 @@ export function TarefaEmLote({
             }),
           (n) => `${n} ${t(n === 1 ? "tarefa criada." : "tarefas criadas.")}`,
         );
-        onConcluido();
       },
     );
-    return true;
+    onOpenChange(false);
+    // A seleção sai na hora: reconfirmar nos 5 s criaria a tarefa de novo.
+    if (agendado) onConcluido();
+    return agendado;
   };
 
   return (

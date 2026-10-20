@@ -17528,6 +17528,8 @@ export const DICIONARIO: Traducoes = {
   "negócios recebem a tarefa, uma em cada.": { es: "negocios reciben la tarea, una en cada uno." },
   "não foram:": { es: "no se hicieron:" },
   "não foi:": { es: "no se hizo:" },
+  "ignorado por já estar encerrado; use Reabrir.": { es: "ignorado por estar ya cerrado; usa Reabrir." },
+  "ignorados por já estarem encerrados; use Reabrir.": { es: "ignorados por estar ya cerrados; usa Reabrir." },
 };
 
 /**

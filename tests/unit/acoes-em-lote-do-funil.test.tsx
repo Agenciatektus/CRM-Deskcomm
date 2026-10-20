@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,12 +24,40 @@ const mutate = vi.hoisted(() =>
 );
 /** O Desfazer: a ação fica GUARDADA aqui; só roda quando o teste deixa o aviso acabar. */
 const adiadas = vi.hoisted(() => [] as Array<() => Promise<unknown>>);
+/** As chaves seguradas nos 5 s (a trava do lote). */
+const chaves = vi.hoisted(() => new Set<string>());
 const toastWarning = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api/client", () => ({ apiClient: { get, post, patch: vi.fn() } }));
-vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
-  adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void adiadas.push(executar),
-}));
+vi.mock("@/lib/ui/aviso-com-desfazer", async () => {
+  // Reativo como o de verdade: quem lê a chave re-renderiza quando ela muda.
+  const { useSyncExternalStore } = await import("react");
+  const ouvintes = new Set<() => void>();
+  const avisar = () => ouvintes.forEach((o) => o());
+  const assinar = (o: () => void) => {
+    ouvintes.add(o);
+    return () => void ouvintes.delete(o);
+  };
+  return {
+    adiarAcao: (
+      _m: unknown,
+      _r: unknown,
+      executar: () => Promise<unknown>,
+      _d?: unknown,
+      o: { chave?: string } = {},
+    ) => {
+      if (o.chave) chaves.add(o.chave);
+      avisar();
+      adiadas.push(async () => {
+        if (o.chave) chaves.delete(o.chave);
+        avisar();
+        return executar();
+      });
+    },
+    useAcaoPendente: (c: string) => useSyncExternalStore(assinar, () => chaves.has(c), () => false),
+    acaoPendente: (c: string) => chaves.has(c),
+  };
+});
 vi.mock("@/hooks/kanban/useBulkAction", () => ({
   useBulkAction: () => ({ mutate, mutateAsync: vi.fn(), isPending: false }),
 }));
@@ -109,16 +137,22 @@ beforeEach(() => {
   mutate.mockClear();
   toastWarning.mockReset();
   adiadas.splice(0);
+  chaves.clear();
 });
 
 describe("marcar como ganho em lote (decisão do Peterson: confirmação + Desfazer de 5 s)", () => {
   it("nada sai antes da confirmação NEM antes do fim do Desfazer; depois, um /win por negócio", async () => {
-    const onClear = montar(["a", "b", "c"], [lead("a"), lead("b"), lead("c", { status: "won" })]);
+    const onClear = montar(
+      ["a", "b", "c", "d"],
+      [lead("a"), lead("b"), lead("c", { status: "won" }), lead("d", { status: "lost" })],
+    );
     await abrirMais();
     await userEvent.click(await screen.findByRole("menuitem", { name: "Marcar como ganho…" }));
 
     const alerta = await screen.findByRole("alertdialog");
     expect(alerta.textContent).toContain("2 negócios");
+    // Só os ABERTOS: o ganho e o perdido ficam de fora, contados no aviso.
+    expect(alerta.textContent).toContain("2 ignorados por já estarem encerrados; use Reabrir.");
     expect(alerta.textContent).toContain("evento de venda (conversão)");
     expect(post).not.toHaveBeenCalled();
 
@@ -199,6 +233,35 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
     expect(corpos.find((c) => c.lead_id === "b")).toMatchObject({ assigned_to: "eu", contact_id: "c-b" });
   });
 
+  it("reconfirmar nos 5 s não cria a tarefa de novo: a seleção sai e a barra trava", async () => {
+    const onClear = montar(["a"], [lead("a")]);
+    await abrirMais();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Criar tarefa…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
+    expect(onClear).toHaveBeenCalled();
+    expect(adiadas).toHaveLength(1);
+    // Controle negativo da trava: o "Mais ações" não abre de novo enquanto segura.
+    expect(screen.getByRole("button", { name: "Mais ações…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
+    await soltarOAviso();
+    expect(post.mock.calls.filter((c) => c[0] === "/api/v1/tasks")).toHaveLength(1);
+  });
+
+  it("a barra segue travada enquanto as chamadas negócio a negócio saem", async () => {
+    let liberar: () => void = () => undefined;
+    post.mockImplementation(() => new Promise<void>((r) => (liberar = r)));
+    montar(["a"], [lead("a")]);
+    await abrirMais();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Criar tarefa…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
+    const rodando = soltarOAviso();
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Mais ações…" })).toBeDisabled();
+    liberar();
+    await rodando;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Mais ações…" })).toBeEnabled());
+  });
+
   it("responsável escolhido vence o dono", () => {
     expect(responsavelDaTarefa("m1", { owner_user_id: "dono" }, "eu")).toBe("m1");
     expect(responsavelDaTarefa("", undefined, "eu")).toBe("eu");
@@ -263,6 +326,14 @@ describe("CSV dos selecionados (no navegador, só o que está na tela)", () => {
     expect(celulaCsv('a;"b"')).toBe('"a;""b"""');
     expect(celulaCsv("=HYPERLINK(1)")).toBe("'=HYPERLINK(1)");
     expect(celulaCsv("+5511")).toBe("+5511");
+    expect(celulaCsv("+55 (11) 99999-0000")).toBe("+55 (11) 99999-0000");
+    expect(celulaCsv("-3")).toBe("-3");
+    // P1 do Cassio na #220: nome vindo do WhatsApp é controlado por terceiro.
+    expect(celulaCsv("+1+HYPERLINK(\"http://x\")")).toBe("\"'+1+HYPERLINK(\"\"http://x\"\")\"");
+    expect(celulaCsv("-1+cmd|' /C calc'!A0")).toBe("'-1+cmd|' /C calc'!A0");
+    expect(celulaCsv("1 +SUM(A1)")).toBe("1 +SUM(A1)");
+    expect(celulaCsv("@SUM(A1)")).toBe("'@SUM(A1)");
+    expect(celulaCsv("\t=1")).toBe("'\t=1");
     expect(montarCsv([["a", 1]]).startsWith("﻿a;1")).toBe(true);
   });
 });

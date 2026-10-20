@@ -7,9 +7,12 @@
  */
 export function celulaCsv(valor: string | number | null | undefined): string {
   const texto = valor === null || valor === undefined ? "" : String(valor);
-  // Fórmula no começo vira texto: CSV aberto no Excel não executa nada. `+`/`-`
-  // seguidos de dígito ficam (telefone "+55…"): número não é fórmula.
-  const seguro = /^(?:[=@\t\r]|[+-](?![\d ]))/.test(texto) ? `'${texto}` : texto;
+  // Fórmula no começo vira texto: CSV aberto no Excel não executa nada. Só a
+  // célula INTEIRA de número/telefone ("+55 (11) 9…", "-3") passa sem o
+  // apóstrofo; `+1+HYPERLINK(…)` num nome vindo do WhatsApp recebe (P1 do
+  // Cassio na #220).
+  const numero = /^[+-]?[\d\s().-]+$/.test(texto);
+  const seguro = !numero && /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
   return /[;"\n\r]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro;
 }
 

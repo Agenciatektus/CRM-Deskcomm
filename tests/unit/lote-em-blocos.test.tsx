@@ -15,6 +15,8 @@ const mutate = vi.hoisted(() =>
 vi.mock("@/hooks/kanban/useBulkAction", () => ({ useBulkAction: () => ({ mutate, isPending: false }) }));
 vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
   adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void executar(),
+  useAcaoPendente: () => false,
+  acaoPendente: () => false,
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({

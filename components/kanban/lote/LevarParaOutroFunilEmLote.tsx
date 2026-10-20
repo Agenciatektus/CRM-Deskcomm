@@ -13,10 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
-import { useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
+import { agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
 import { apiClient } from "@/lib/api/client";
 import type { Stage } from "@/lib/kanban/types";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 
 /**
  * "Levar para outro funil" em LOTE. Cada negócio vai pela MESMA rota da ação
@@ -69,7 +68,8 @@ export function LevarParaOutroFunilEmLote({
       rodar_automacoes_de_entrada: rodar,
     };
     onOpenChange(false);
-    adiarAcao(
+    const agendado = agendarNoLote(
+      pipelineId,
       (s) => `${t("Levando os selecionados para outro funil")} (${s} s)`,
       t("Desfazer"),
       async () => {
@@ -78,9 +78,9 @@ export function LevarParaOutroFunilEmLote({
           (leadId) => apiClient.post(`/api/v1/leads/${leadId}/clone`, corpo),
           (n) => `${n} ${t(n === 1 ? "levado para o outro funil." : "levados para o outro funil.")}`,
         );
-        onConcluido();
       },
     );
+    if (agendado) onConcluido();
   };
 
   return (

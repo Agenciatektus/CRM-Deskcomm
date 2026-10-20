@@ -27,6 +27,7 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
+import { useLoteOcupado } from "@/hooks/kanban/useAcaoPorNegocio";
 import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
@@ -86,6 +87,10 @@ export function BulkActionBar({
   const activeOrg = useActiveOrg();
   const vocab = resolveVocabulary(vocabulary);
   const bulk = useBulkAction(pipelineId);
+  // A barra trava também nos 5 s e na execução das ações negócio a negócio
+  // (P2 do Cassio na #220), não só na rota em lote.
+  const loteOcupado = useLoteOcupado(pipelineId);
+  const ocupado = bulk.isPending || loteOcupado;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loseOpen, setLoseOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -288,7 +293,7 @@ export function BulkActionBar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" disabled={bulk.isPending}>
+            <Button size="sm" variant="outline" disabled={ocupado}>
               {t("Mover para…")}
             </Button>
           </DropdownMenuTrigger>
@@ -316,7 +321,7 @@ export function BulkActionBar({
         {podeAtribuir && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" disabled={bulk.isPending}>
+              <Button size="sm" variant="outline" disabled={ocupado}>
                 {t("Responsável…")}
               </Button>
             </DropdownMenuTrigger>
@@ -339,7 +344,7 @@ export function BulkActionBar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" disabled={bulk.isPending}>
+            <Button size="sm" variant="outline" disabled={ocupado}>
               Tag…
             </Button>
           </DropdownMenuTrigger>
@@ -419,7 +424,7 @@ export function BulkActionBar({
           pipelineId={pipelineId}
           ownerNames={ownerNames}
           usuarioId={user.id}
-          ocupado={bulk.isPending}
+          ocupado={ocupado}
           onReabrir={runReabrir}
           onClear={onClear}
         />
@@ -429,7 +434,7 @@ export function BulkActionBar({
             size="sm"
             variant="outline"
             onClick={() => setLoseOpen(true)}
-            disabled={bulk.isPending}
+            disabled={ocupado}
           >
             {t("Marcar como perdido…")}
           </Button>
@@ -439,7 +444,7 @@ export function BulkActionBar({
           size="sm"
           variant="destructive"
           onClick={() => setConfirmDelete(true)}
-          disabled={bulk.isPending}
+          disabled={ocupado}
         >
           {t("Excluir")}
         </Button>
@@ -468,7 +473,7 @@ export function BulkActionBar({
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
               {t("Cancelar")}
             </Button>
-            <Button variant="destructive" onClick={runDelete} disabled={bulk.isPending}>
+            <Button variant="destructive" onClick={runDelete} disabled={ocupado}>
               {t("Excluir")}
             </Button>
           </DialogFooter>

@@ -10,9 +10,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/hooks/i18n/useT";
-import { useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
+import { agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
 import { apiClient } from "@/lib/api/client";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 
 /**
  * "Marcar como ganho" em LOTE — decisão do Peterson (20/10/2026), que revê a
@@ -32,13 +31,16 @@ export function GanhoEmLote({
   open,
   onOpenChange,
   ids,
+  ignorados,
   pipelineId,
   onConcluido,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Só os ainda não ganhos (ganhar de novo não é ação). */
+  /** Só os ABERTOS (P2 do Cassio na #220): encerrado não é ganho, é Reabrir. */
   ids: string[];
+  /** Quantos selecionados ficaram de fora por já estarem encerrados. */
+  ignorados: number;
   pipelineId: string;
   onConcluido: () => void;
 }) {
@@ -48,7 +50,8 @@ export function GanhoEmLote({
 
   const confirmar = () => {
     const alvo = [...ids];
-    adiarAcao(
+    const agendado = agendarNoLote(
+      pipelineId,
       (s) => `${t("Marcando os selecionados como ganhos")} (${s} s)`,
       t("Desfazer"),
       async () => {
@@ -57,9 +60,10 @@ export function GanhoEmLote({
           (leadId) => apiClient.post(`/api/v1/leads/${leadId}/win`, {}),
           (feitos) => `${feitos} ${t(feitos === 1 ? "marcado como ganho." : "marcados como ganhos.")}`,
         );
-        onConcluido();
       },
     );
+    // A seleção sai na hora: nos 5 s não há o que reconfirmar.
+    if (agendado) onConcluido();
   };
 
   return (
@@ -73,6 +77,8 @@ export function GanhoEmLote({
             {t(
               "Cada negócio pode disparar o evento de venda (conversão) nas etapas configuradas. Você ainda terá 5 segundos para desfazer.",
             )}
+            {ignorados > 0 &&
+              ` ${ignorados} ${t(ignorados === 1 ? "ignorado por já estar encerrado; use Reabrir." : "ignorados por já estarem encerrados; use Reabrir.")}`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -57,6 +57,8 @@ vi.mock("@/components/kanban/barra/CabecalhoDoFunil", () => ({ CabecalhoDoFunil:
 // O Desfazer do lote segura a chamada por 5 s; aqui a ação roda na hora.
 vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
   adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void executar(),
+  useAcaoPendente: () => false,
+  acaoPendente: () => false,
 }));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**
