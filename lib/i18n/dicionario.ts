@@ -14408,7 +14408,6 @@ export const DICIONARIO: Traducoes = {
   "Carregando receitas…": { es: "Cargando recetas…" },
   "Prefixo:": { es: "Prefijo:" },
   "Não foi possível carregar as receitas.": { es: "No se pudieron cargar las recetas." },
-  "Descrição": { es: "Descripción" },
   "linha": { es: "línea" },
   "O campo {campo} não pôde ser salvo: {motivo}": {
     es: "El campo {campo} no se pudo guardar: {motivo}",

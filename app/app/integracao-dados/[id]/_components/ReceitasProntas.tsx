@@ -87,8 +87,8 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
           | { fieldErrors?: Record<string, string[]> }
           | undefined)?.fieldErrors;
         const campo = fieldErrors ? Object.keys(fieldErrors)[0] : undefined;
-        const motivo = campo ? fieldErrors[campo]?.[0] : undefined;
-        if (campo) {
+        const motivo = fieldErrors && campo ? fieldErrors[campo]?.[0] : undefined;
+        if (fieldErrors && campo) {
           const rotuloDoCampo: Record<string, string> = {
             descricao: t("Descrição"),
             rotulo: t("Rótulo"),
