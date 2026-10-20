@@ -410,3 +410,67 @@ describe("signUp — convite com o cadastro público do GoTrue fechado (#1653)",
     expect(res).toEqual({ ok: false, error: "conta_ja_existe" });
   });
 });
+
+describe("signUp — o teto de tentativas deixa rastro", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    // O bloco dos planos liga a cobrança no mock e o estado atravessa os
+    // `describe`. Sem desligar aqui, a action recusa por `plano_obrigatorio`
+    // antes de falar com o provedor, e este arquivo mediria outra coisa.
+    const { moduloLigado } = await import("@/lib/instalacao/modulos");
+    vi.mocked(moduloLigado).mockResolvedValue(false);
+    signUpDoProvedor.mockReset();
+    vi.mocked(headers).mockResolvedValue({
+      get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
+    } as never);
+    vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+  });
+
+  /**
+   * A RECUSA QUE NINGUÉM VIA. Todas as outras saídas do bloco de erro gravavam
+   * `auth.signup_failed`; o 429 voltava antes de qualquer linha.
+   *
+   * Em 20/10/2026 uma pessoa da equipe de um cliente ficou na tela com "Muitas
+   * tentativas" e a trilha não tinha nada sobre ela — só os cadastros que
+   * deram certo. Quem foi investigar leu o silêncio como "o cadastro nem foi
+   * tentado" e procurou defeito no redirecionamento, que estava inteiro.
+   */
+  it("⭐ 429 do provedor: devolve rate_limited E grava o motivo na trilha", async () => {
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "email rate limit exceeded", status: 429 },
+    });
+
+    const { signUp } = await import("./signUp");
+    expect(await signUp(entrada())).toEqual({ ok: false, error: "rate_limited" });
+
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.signup_failed",
+        metadata: expect.objectContaining({ reason: "rate_limited", com_convite: false }),
+      }),
+    );
+  });
+
+  /**
+   * CONTROLE. Sem ele, um `audit()` solto no começo do bloco passaria neste
+   * arquivo e gravaria "rate_limited" para erro que não é teto nenhum.
+   */
+  it("CONTROLE — erro que não é 429 não vira rate_limited na trilha", async () => {
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "Database error saving new user", status: 500 },
+    });
+
+    const { signUp } = await import("./signUp");
+    await signUp(entrada());
+
+    const motivos = vi.mocked(audit).mock.calls.map((c) => (c[0] as { metadata?: { reason?: string } })?.metadata?.reason);
+    expect(motivos).not.toContain("rate_limited");
+  });
+});

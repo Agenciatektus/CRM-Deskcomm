@@ -236,7 +236,32 @@ export async function signUp(
   });
 
   if (error) {
-    if (error.status === 429) return { ok: false, error: "rate_limited" };
+    if (error.status === 429) {
+      // ── O TETO DE TENTATIVAS ERA A ÚNICA RECUSA MUDA ──────────────────────
+      //
+      // Todas as outras saídas deste bloco gravam `auth.signup_failed`; esta
+      // voltava antes de qualquer linha. O resultado, medido em 20/10/2026: uma
+      // pessoa da equipe de um cliente ficou travada na tela com "Muitas
+      // tentativas", e a trilha não tinha absolutamente nada sobre ela — só os
+      // cadastros que DERAM certo. Quem foi investigar viu silêncio e concluiu
+      // que o problema era outro (falta de redirecionamento), porque a recusa
+      // que a pessoa tinha visto na tela não existia em lugar nenhum.
+      //
+      // O motivo é fixo, e não `error.message`: o teto vem do provedor de auth
+      // e a frase dele muda de versão para versão.
+      await audit({
+        action: "auth.signup_failed",
+        metadata: {
+          email_hash: hashEmail(parsed.data.email),
+          reason: "rate_limited",
+          com_convite: convite !== null,
+        },
+        requestId,
+        ip,
+        userAgent,
+      });
+      return { ok: false, error: "rate_limited" };
+    }
 
     // ── O BECO SEM SAÍDA DE QUEM JÁ TEM CONTA ────────────────────────────
     //
