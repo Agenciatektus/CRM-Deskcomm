@@ -93,9 +93,15 @@ export async function PUT(req: NextRequest, ctx: Ctx): Promise<Response> {
 
   const parsed = atualizarReceitasSchema.safeParse(rawBody);
   if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const strings = issue.path.filter((p) => typeof p === "string");
+      const chave = strings.length > 0 ? strings[strings.length - 1]! : "receitas";
+      (fieldErrors[chave] ??= []).push(issue.message);
+    }
     return fail("validation_failed", t("Campos inválidos."), 422, {
       requestId,
-      details: parsed.error.flatten(),
+      details: { fieldErrors },
     });
   }
   const { receitas } = parsed.data;

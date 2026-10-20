@@ -199,6 +199,17 @@ describe("PUT /connections/:id/recipes", () => {
     expect(deps.audit).not.toHaveBeenCalled();
   });
 
+  it("descrição de 301 caracteres: 422 com details.fieldErrors.descricao em português", async () => {
+    const inst301 = { ...INSTANCIA, descricao: "a".repeat(301) };
+    const res = await PUT(put({ receitas: [inst301] }), ctx);
+
+    expect(res.status).toBe(422);
+    const corpo = (await res.json()) as { error: { details: { fieldErrors: Record<string, string[]> } } };
+    expect(corpo.error.details.fieldErrors.descricao[0]).toBe("pode ter no máximo 300 caracteres");
+    expect(deps.audit).not.toHaveBeenCalled();
+    expect(deps.admin.mock.calls).toHaveLength(0);
+  });
+
   it("fixos inválidos (validarFixosDaReceita lança): 422 validation_failed", async () => {
     deps.validarFixos.mockImplementation(() => {
       throw new Error("fixos_invalidos:woocommerce-produtos: prefixo deve ser string");

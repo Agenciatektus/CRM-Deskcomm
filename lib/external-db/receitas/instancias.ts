@@ -23,8 +23,8 @@ export const instanciaDeReceitaSchemaItem = z
   .object({
     id: z.string().uuid(),
     receita: z.enum(IDS_DAS_RECEITAS as [string, ...string[]]),
-    rotulo: z.string().trim().min(1).max(80),
-    descricao: z.string().trim().max(300),
+    rotulo: z.string().trim().min(1, "não pode ficar vazio").max(80, "pode ter no máximo 80 caracteres"),
+    descricao: z.string().trim().max(300, "pode ter no máximo 300 caracteres"),
     fixos: z.unknown(),
     ativa: z.boolean(),
   })

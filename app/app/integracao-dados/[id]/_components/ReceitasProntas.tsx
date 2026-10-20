@@ -97,7 +97,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
           toast.error(
             t("O campo {campo} não pôde ser salvo: {motivo}")
               .replace("{campo}", label)
-              .replace("{motivo}", motivo ?? ""),
+              .replace("{motivo}", t(motivo ?? "")),
           );
           return;
         }
@@ -214,6 +214,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
                     </Label>
                     <Input
                       id={idInputRotulo}
+                      maxLength={80}
                       value={inst.rotulo}
                       onChange={(e) => {
                         const prox = { ...inst, rotulo: e.target.value };
@@ -227,6 +228,7 @@ export default function ReceitasProntas({ connectionId, motor, canWrite }: Props
                     </Label>
                     <Input
                       id={idInputDescricao}
+                      maxLength={300}
                       value={inst.descricao}
                       onChange={(e) => {
                         const prox = { ...inst, descricao: e.target.value };

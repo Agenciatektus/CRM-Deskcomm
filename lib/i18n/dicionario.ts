@@ -14412,6 +14412,9 @@ export const DICIONARIO: Traducoes = {
   "O campo {campo} não pôde ser salvo: {motivo}": {
     es: "El campo {campo} no se pudo guardar: {motivo}",
   },
+  "não pode ficar vazio": { es: "no puede quedar vacío" },
+  "pode ter no máximo 80 caracteres": { es: "puede tener como máximo 80 caracteres" },
+  "pode ter no máximo 300 caracteres": { es: "puede tener como máximo 300 caracteres" },
   // Rotas de receitas (recipes, preview, suggest) — erros que a tela mostra.
   "Conexão não encontrada.": { es: "Conexión no encontrada." },
   "Muitas alterações em pouco tempo. Tente de novo em instantes.": { es: "Demasiados cambios en poco tiempo. Inténtalo de nuevo en unos instantes." },

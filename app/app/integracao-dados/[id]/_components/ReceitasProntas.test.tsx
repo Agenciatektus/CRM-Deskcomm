@@ -308,7 +308,7 @@ describe("Receitas prontas — comportamento da lista", () => {
       new ApiError(
         422,
         "validation_failed",
-        { fieldErrors: { descricao: ["String must contain at most 300 character(s)"] } },
+        { fieldErrors: { descricao: ["pode ter no máximo 300 caracteres"] } },
         "req-1",
         "Campos inválidos.",
       ),
@@ -323,9 +323,6 @@ describe("Receitas prontas — comportamento da lista", () => {
     });
 
     expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
-      expect.stringContaining("Descrição"),
-      expect.anything(),
-    );
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(expect.stringContaining("Descrição"));
   });
 });
