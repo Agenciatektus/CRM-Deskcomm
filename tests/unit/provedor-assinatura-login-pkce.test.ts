@@ -24,7 +24,6 @@ import {
   ENDPOINT_DE_TOKEN,
   ESCOPO_SIWC,
   ErroDeToken,
-  NOME_DO_CLIENTE_SIWC,
   REDIRECT_URI_SIWC,
   codeChallengeS256,
   criarSessaoPkce,
@@ -311,7 +310,7 @@ describe("a revogação da assinatura", () => {
 describe("agent_name_hint", () => {
   it("vai no primeiro registro, com o nome fixo do app", () => {
     const url = new URL(montarUrlDeAutorizacao({ codeChallenge: "c", estado: "e", nonce: "n", extAgentHostId: "h" }));
-    expect(url.searchParams.get("agent_name_hint")).toBe(NOME_DO_CLIENTE_SIWC);
+    expect(url.searchParams.get("agent_name_hint")).toBe("Verdash CRM");
   });
 
   it("não vai na reautorização com o client_id emitido", () => {
