@@ -3725,7 +3725,9 @@ STUB
 NEXT_PUBLIC_APP_URL='https://crm.exemplo.com.br'" 'linha do stdin que não é do caddy
 ')"
     n_val="$(grep -n 'caddy validate' "$VPS_LOG" | head -1 | cut -d: -f1)"
-    n_up="$(grep -nE '^compose .* up -d( |$)' "$VPS_LOG" | grep -v -- '--force-recreate' | head -1 | cut -d: -f1)"
+    # `up -d --no-deps app worker` é a subida do par VAPID recém-criado, antes da
+    # decisão de versão: nomeia os dois serviços e não alcança o Caddy.
+    n_up="$(grep -nE '^compose .* up -d( |$)' "$VPS_LOG" | grep -v -- '--force-recreate' | grep -v -- '--no-deps app worker$' | head -1 | cut -d: -f1)"
     falhou=""
     [ -n "$n_val" ] && [ -n "$n_up" ] && [ "$n_val" -lt "$n_up" ] \
       || { printf '    a conferência não veio antes do primeiro up -d (validate=%s up=%s)\n' "$n_val" "$n_up"; falhou=1; }
