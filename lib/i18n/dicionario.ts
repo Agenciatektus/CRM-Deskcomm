@@ -16461,6 +16461,7 @@ export const DICIONARIO: Traducoes = {
   "Lista pesquisável": { es: "Lista con búsqueda" },
   "Sim ou não": { es: "Sí o no" },
   "Link (URL)": { es: "Enlace (URL)" },
+  "O agente terminou sem propor uma resposta. Pode ter sido uma decisão (por exemplo, diante de uma mensagem automática) ou a geração ter parado antes da resposta. Se esperava uma, gere de novo; senão, não há nada a enviar.": { es: "El agente terminó sin proponer una respuesta. Pudo ser una decisión (por ejemplo, ante un mensaje automático) o que la generación se detuviera antes de la respuesta. Si esperabas una, genera de nuevo; si no, no hay nada que enviar." },
 };
 
 /**
