@@ -51,7 +51,7 @@ export const ROTULO_DO_LOGIN_CODEX = "Assinatura do ChatGPT";
  */
 export const JANELA_DA_TRAVA_MS = 30_000;
 
-/** Uma linha de login desta empresa, ou `null`. */
+/** A linha de login ATIVA desta empresa, ou `null`. */
 async function linhaDoLogin(admin: Admin, orgId: string): Promise<{ id: string } | null> {
   const { data } = await admin
     .from("ai_provider_credentials")
@@ -59,6 +59,26 @@ async function linhaDoLogin(admin: Admin, orgId: string): Promise<{ id: string }
     .eq("organization_id", orgId)
     .eq("provider", PROVEDOR_POR_ASSINATURA)
     .eq("is_active", true)
+    .maybeSingle();
+  return (data as { id: string } | null) ?? null;
+}
+
+/**
+ * A linha de login desta empresa, ATIVA OU DESCONECTADA, para quem conecta de
+ * novo. Desconectar não apaga a linha (ver `desconectarLoginCodex`), e a
+ * unicidade `(organization_id, provider, label)` com rótulo fixo faria um
+ * INSERT novo bater em `23505`: reconectar tem de reaproveitar a mesma linha.
+ * A ativa vem primeiro; entre várias, a mais recente.
+ */
+async function linhaDoLoginQualquer(admin: Admin, orgId: string): Promise<{ id: string } | null> {
+  const { data } = await admin
+    .from("ai_provider_credentials")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("provider", PROVEDOR_POR_ASSINATURA)
+    .order("is_active", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   return (data as { id: string } | null) ?? null;
 }
@@ -99,12 +119,14 @@ export async function guardarLoginCodex(p: {
     ...(p.requestId ? { requestId: p.requestId } : {}),
   };
 
-  const existente = await linhaDoLogin(p.admin, p.orgId);
+  const existente = await linhaDoLoginQualquer(p.admin, p.orgId);
   const r = existente
     ? await rotacionarCredencial({
         ...comum,
         provider: PROVEDOR_POR_ASSINATURA,
         credentialId: existente.id,
+        // Reconectar depois de desconectar: a linha volta a valer.
+        reativar: true,
       })
     : await guardarCredencialDoLogin(comum);
 
@@ -164,20 +186,64 @@ export async function lerLoginCodex(p: {
 }
 
 /**
- * DESCONECTA: apaga a linha da empresa. Com o módulo desligado também apaga —
- * desligar é a decisão de quem administra a instalação, e a conta continua
- * sendo da empresa.
+ * O que sobra numa linha desconectada no lugar do segredo: bytea VAZIO (as
+ * colunas são NOT NULL). Não decifra nada; `decryptKey` falharia, e os leitores
+ * já filtram `is_active`, então nem chegam a tentar.
+ */
+const SEGREDO_APAGADO = "\\x";
+
+export type ResultadoDeDesconectar =
+  | { ok: true; id: string | null }
+  /** `codigo`/`mensagem` do Postgres, para LOG. Nunca o `details`, que pode trazer a linha. */
+  | { ok: false; codigo: string | null; mensagem: string };
+
+/**
+ * DESCONECTA: desativa a linha da empresa e APAGA O SEGREDO dela, sem DELETE.
+ *
+ * O DELETE de antes batia na FK `ai_agent_versions.credential_id ON DELETE
+ * RESTRICT` assim que qualquer versão PUBLICADA (ou arquivada) de agente usava a
+ * assinatura, e a versão não-rascunho não pode trocar de `credential_id`
+ * (`fn_ai_agent_version_content_immutable`). Resultado: uma vez usada, a conta
+ * nunca mais se desconectava. Aqui a linha FICA (o vínculo das versões e a
+ * trilha de auditoria continuam íntegros), mas sem nada que identifique ou abra
+ * a sessão: envelope cifrado zerado, `last4` vazio, `validated_at` nulo.
+ *
+ * Efeito no agente: `lerLoginCodex` filtra `is_active` e devolve `null`, e o
+ * resolvedor cai na RESERVA da empresa (`openai` da organização, senão o `.env`
+ * da instalação); sem nenhuma, `LlmNotConfiguredError`, o erro de sempre.
+ * Reconectar reaproveita esta mesma linha (`guardarLoginCodex`).
+ *
+ * Com o módulo desligado também desconecta: desligar é a decisão de quem
+ * administra a instalação, e a conta continua sendo da empresa.
  */
 export async function desconectarLoginCodex(p: {
   admin: Admin;
   orgId: string;
-}): Promise<boolean> {
-  const { error } = await p.admin
+}): Promise<ResultadoDeDesconectar> {
+  const { data, error } = await p.admin
     .from("ai_provider_credentials")
-    .delete()
+    .update({
+      is_active: false,
+      api_key_encrypted: SEGREDO_APAGADO,
+      api_key_iv: SEGREDO_APAGADO,
+      api_key_tag: SEGREDO_APAGADO,
+      api_key_last4: "",
+      validated_at: null,
+      validation_error: "desconectada",
+      models_available: null,
+    })
     .eq("organization_id", p.orgId)
-    .eq("provider", PROVEDOR_POR_ASSINATURA);
-  return !error;
+    .eq("provider", PROVEDOR_POR_ASSINATURA)
+    .select("id");
+  if (error) {
+    return {
+      ok: false,
+      codigo: typeof error.code === "string" ? error.code : null,
+      mensagem: String(error.message ?? "erro_desconhecido").slice(0, 300),
+    };
+  }
+  const linhas = Array.isArray(data) ? (data as Array<{ id: string }>) : data ? [data as { id: string }] : [];
+  return { ok: true, id: linhas[0]?.id ?? null };
 }
 
 export type ResultadoDaRenovacao =
@@ -218,6 +284,8 @@ export async function renovarComTravaDeBanco(p: {
     .eq("id", p.credentialId)
     .eq("organization_id", p.orgId)
     .eq("provider", PROVEDOR_POR_ASSINATURA)
+    // Desconectada = sem segredo para renovar: trata como ausente.
+    .eq("is_active", true)
     .maybeSingle();
   if (!atual) return { ok: false, motivo: "nao_encontrada" };
 
@@ -230,6 +298,7 @@ export async function renovarComTravaDeBanco(p: {
     .update({ updated_at: new Date().toISOString() })
     .eq("id", p.credentialId)
     .eq("organization_id", p.orgId)
+    .eq("is_active", true)
     .lt("updated_at", limite)
     .select("id")
     .maybeSingle();
@@ -293,6 +362,9 @@ export async function renovarComTravaDeBanco(p: {
     provider: PROVEDOR_POR_ASSINATURA,
     apiKey: JSON.stringify(renovados),
     label: ROTULO_DO_LOGIN_CODEX,
+    // Se a empresa desconectou DURANTE a ida à OpenAI, o par renovado não volta
+    // para a linha apagada: o update casa 0 linhas e a renovação falha.
+    somenteAtiva: true,
   });
   if (!gravado.ok) return { ok: false, motivo: "falha" };
 

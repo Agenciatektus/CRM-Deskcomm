@@ -17,6 +17,13 @@ export class FakeSupabase {
   linha: Linha | null = null;
   /** Cada operação registrada, para os testes lerem o que foi gravado. */
   operacoes: Array<{ tipo: string; tabela: string; dados?: Record<string, unknown>; filtros: Filtro[] }> = [];
+  /**
+   * Simula a FK `ai_agent_versions.credential_id ON DELETE RESTRICT`: uma versão
+   * publicada aponta para a linha, e o DELETE devolve o `23503` do Postgres.
+   */
+  versaoPublicadaApontaParaALinha = false;
+  /** Força erro em todo UPDATE (o banco recusou), para o caminho de falha. */
+  erroNoUpdate: { code: string; message: string } | null = null;
 
   from(tabela: string) {
     return new Query(this, tabela, undefined);
@@ -93,6 +100,16 @@ class Query {
     const db = this.db;
     db.operacoes.push({ tipo: this.tipo, tabela: this.tabela, dados: this.dados, filtros: this.filtros });
     if (this.tipo === "insert") {
+      // A unicidade `(organization_id, provider, label)` do banco.
+      const d = this.dados ?? {};
+      if (
+        db.linha &&
+        db.linha.organization_id === d.organization_id &&
+        db.linha.provider === d.provider &&
+        db.linha.label === d.label
+      ) {
+        return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
+      }
       db.linha = { id: "cred-1", ...this.dados };
       return { data: { id: db.linha.id }, error: null };
     }
@@ -102,10 +119,17 @@ class Query {
       return { data: null, error: null };
     }
     if (this.tipo === "delete") {
+      if (db.versaoPublicadaApontaParaALinha) {
+        return {
+          data: null,
+          error: { code: "23503", message: "update or delete violates foreign key constraint" },
+        };
+      }
       db.linha = null;
       return { data: null, error: null };
     }
     if (this.tipo === "update") {
+      if (db.erroNoUpdate) return { data: null, error: db.erroNoUpdate };
       db.linha = { ...atual, ...this.dados };
       return { data: unico ? { ...db.linha } : { ...db.linha }, error: null };
     }
@@ -119,7 +143,7 @@ class Query {
     return this.resolver(false);
   }
   then<A, B>(
-    onfulfilled?: ((v: { data: unknown; error: null }) => A | Promise<A>) | null,
+    onfulfilled?: ((v: { data: unknown; error: { code: string; message: string } | null }) => A | Promise<A>) | null,
     onrejected?: ((e: unknown) => B | Promise<B>) | null,
   ): Promise<A | B> {
     return this.resolver(false).then(onfulfilled ?? undefined, onrejected ?? undefined);
