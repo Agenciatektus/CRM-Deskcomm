@@ -26,10 +26,17 @@ export interface FiltrosDeTarefa {
   priority?: string;
   lead_id?: string;
   contact_id?: string;
+  /** As tarefas de UMA demanda — a seção "Tarefas desta demanda" do inbox (#2818). */
+  demanda_id?: string;
   /** `true` = só o que ainda pede ação (pendente ou em andamento). */
   aberto?: boolean;
   /** "eu" = só as tarefas de quem está logado (o "Minhas" do celular). */
   responsavel?: "eu";
+}
+
+export interface OpcoesDeTarefas {
+  /** `false` segura a consulta — o dossiê fechado não precisa das tarefas dele. */
+  enabled?: boolean;
 }
 
 async function leJson<T>(res: Response, oQueFalhou: string): Promise<T> {
@@ -44,7 +51,7 @@ async function leJson<T>(res: Response, oQueFalhou: string): Promise<T> {
   return json.data;
 }
 
-export function useTasks(filtros: FiltrosDeTarefa = {}) {
+export function useTasks(filtros: FiltrosDeTarefa = {}, opcoes: OpcoesDeTarefas = {}) {
   const queryClient = useQueryClient();
 
   const params = new URLSearchParams();
@@ -52,6 +59,7 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
   if (filtros.priority) params.set("priority", filtros.priority);
   if (filtros.lead_id) params.set("lead_id", filtros.lead_id);
   if (filtros.contact_id) params.set("contact_id", filtros.contact_id);
+  if (filtros.demanda_id) params.set("demanda_id", filtros.demanda_id);
   if (filtros.aberto) params.set("aberto", "true");
   if (filtros.responsavel) params.set("assigned_to", filtros.responsavel);
   const qs = params.toString();
@@ -64,14 +72,22 @@ export function useTasks(filtros: FiltrosDeTarefa = {}) {
     },
     staleTime: 10_000,
     refetchOnWindowFocus: true,
+    enabled: opcoes.enabled ?? true,
   });
 
   // As listas da Inbox também (P2 do Cassio na #158): a pílula e o filtro "Sem
   // próximo passo" saem de `passo_da_conversa`, que muda quando uma tarefa do
   // contato nasce, é concluída ou reagendada aqui na tela de Tarefas.
+  // O QUADRO também: o card mostra o próximo passo e o selo das tarefas do
+  // negócio, e quem cria ou conclui uma tarefa pelo dossiê precisa ver o card
+  // mudar ao fechar o painel. O prefixo `["board"]` alcança todo quadro em
+  // cache: a tarefa não sabe em qual funil o negócio está agora.
   const invalidar = () => {
     void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    return queryClient.invalidateQueries({ queryKey: CHAVE });
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: CHAVE }),
+      queryClient.invalidateQueries({ queryKey: ["board"] }),
+    ]);
   };
 
   const criar = useMutation({

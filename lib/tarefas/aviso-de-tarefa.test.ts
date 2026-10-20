@@ -155,7 +155,7 @@ describe("avisarTarefasNaHora — quais tarefas", () => {
   });
 
   it("org PARADA sai na consulta, antes do teto: não ocupa a rodada das ativas (#213)", async () => {
-    tabelas.organizations[1].status = "suspended";
+    tabelas.organizations![1]!.status = "suspended";
     // A org parada tem a rodada INTEIRA de tarefas, todas mais antigas que a da
     // ativa. Com o corte só em memória (depois do `limit`), a ativa nunca entraria.
     tabelas.crm_tasks = [

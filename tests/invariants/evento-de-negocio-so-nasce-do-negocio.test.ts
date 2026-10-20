@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { GOV_LEAD, GOV_MANAGER, GOV_ORG, GOV_VIEWER, seedGov, sql } from "./gov-helpers";
+import { GOV_AGENT_A, GOV_LEAD, GOV_MANAGER, GOV_ORG, GOV_VIEWER, seedGov, sql } from "./gov-helpers";
 import { motivoDoErro } from "./psql-transporte";
 
 /**
@@ -64,10 +64,11 @@ describe("eventos de desfecho do negócio são do gatilho do negócio", () => {
     expect(erro).toContain("reserved_message_received");
   });
 
-  it("CONTROLE: o MESMO viewer emite lead.stage_changed, que a rota de mover emite pela sessão", () => {
+  it("CONTROLE: o agent emite lead.stage_changed, que a rota de mover emite pela sessão", () => {
+    // Tektus (9054): `lead.*` pela sessão exige agent+, então o controle é o agent.
     // Sem isto, um 42501 vindo de outro lugar (membership, suporte somente
     // leitura) leria exatamente como "a reserva funcionou".
-    expect(sql(comoSessao(GOV_VIEWER, emitePorEmitEvent("lead.stage_changed")))).toContain("EMITIU:");
+    expect(sql(comoSessao(GOV_AGENT_A, emitePorEmitEvent("lead.stage_changed")))).toContain("EMITIU:");
   });
 
   it("ganhar o negócio pela sessão segue emitindo lead.won — e a janela fecha em seguida", () => {

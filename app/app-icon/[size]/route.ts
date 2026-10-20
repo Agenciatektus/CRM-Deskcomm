@@ -6,6 +6,7 @@ import { fail } from "@/lib/api/wrappers";
 import { gerarIconeDoApp, lerArquivoDoIcone } from "@/lib/branding/icone-do-app";
 import { marcaDaInstalacao } from "@/lib/branding/instalacao";
 import { marcaDaSaida } from "@/lib/branding/saida";
+import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 
 export const dynamic = "force-dynamic";
 // 192 e 512: os do manifesto. 180: o `apple-touch-icon` do iOS. `maskable-*`: as versões
@@ -16,7 +17,7 @@ const tamanho = z.enum(["192", "512", "180", "maskable-192", "maskable-512"]);
 export async function GET(request: Request, { params }: { params: Promise<{ size: string }> }) {
   const lido = tamanho.safeParse((await params).size);
   if (!lido.success) return fail("invalid_request", "Tamanho de ícone inválido.", 400);
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const ip = ipDoCliente(request.headers) ?? "local";
   const chave = createHash("sha256").update(ip).digest("hex");
   const limite = await checkRateLimit(`app-icon:${chave}`, 60, 60);
   if (!limite.allowed) return fail("rate_limited", "Muitas leituras de ícone.", 429);

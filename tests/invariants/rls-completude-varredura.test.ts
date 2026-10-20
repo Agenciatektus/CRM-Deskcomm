@@ -351,6 +351,15 @@ const PROVA_PROPRIA: readonly Excecao[] = [
   },
   { tabela: "cadencia_conducoes", razao: "tests/invariants/cadencia-conducao-sql.test.ts — tabela exclusiva do servidor: `revoke all` de anon e authenticated no baseline, has_table_privilege(authenticated, SELECT) = false e leitura com JWT de agent da própria organização recusada com 42501." },
   { tabela: "cadencia_inscricoes_do_dia", razao: "tests/invariants/cadencia-sql.test.ts — tabela exclusiva do servidor (vagas do dia): `revoke all` de anon e authenticated no baseline e has_table_privilege(authenticated, SELECT) = false; só as RPCs service-only reservam vagas. Prova por ACL, não por contagem cruzada: sem privilégio nenhum, authenticated não lê nem a própria organização." },
+  {
+    tabela: "cobranca_assinaturas",
+    razao:
+      "tests/invariants/cobranca-isolamento.test.ts — dois tenants reais por JWT: " +
+      "admin de A lê 1 linha de A e 0 de B, admin de B o espelho, agent de A lê 0 " +
+      "(a leitura é de admin; por isso não cabe em TABLES, cujo usuário semeado é " +
+      "agent), promovido a admin passa a ler (controle), e UPDATE/INSERT/DELETE " +
+      "pela sessão e qualquer leitura por anon dão permission denied. Migration 0510.",
+  },
 ];
 
 /**

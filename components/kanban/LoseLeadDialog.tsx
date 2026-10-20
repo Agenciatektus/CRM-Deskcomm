@@ -20,7 +20,6 @@ import { OUTRO, motivoDePerdaAceito, opcoesDeMotivoDePerda } from "@/lib/leads/m
 interface LoseLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  leadId: string;
   pipelineId: string;
   /**
    * Os motivos do funil, quando quem abre a janela não está dentro do quadro
@@ -41,6 +40,25 @@ interface LoseLeadDialogProps {
    * `adiarFechamento`), como o painel. Sem isto, grava na hora (o quadro).
    */
   adiar?: (gravar: () => Promise<unknown>) => void;
+  /**
+   * Modo CARD: perde UM negócio pela rota individual (`/leads/{id}/lose`).
+   * Ausente no modo lote.
+   */
+  leadId?: string;
+  /**
+   * Modo LOTE (#2484 F2): recebe o motivo escolhido e quem chamou decide a
+   * escrita — a `leads/bulk` que já sabe decidir o motivo da perda (#917). O
+   * diálogo é o MESMO do card: uma segunda janela de motivo seria a mesma
+   * pergunta com duas respostas possíveis, e o funil passaria a ter duas listas.
+   */
+  onConfirm?: (lostReason: string) => void | Promise<void>;
+  /**
+   * Modo LOTE: quem chamou informa se a escrita em lote está em voo. Este
+   * diálogo não conhece a mutação de lote (`useBulkAction`) — então não pode
+   * perguntar `isPending` a ela; sem este sinal o botão "Confirmar" ficaria
+   * clicável durante a escrita e um segundo clique dobraria o lote.
+   */
+  submitting?: boolean;
 }
 
 const MAX_LEN = 500;
@@ -54,6 +72,8 @@ export function LoseLeadDialog({
   motivoObrigatorio = true,
   aoConcluir,
   adiar,
+  onConfirm,
+  submitting = false,
 }: LoseLeadDialogProps) {
   const t = useT();
   return (
@@ -73,6 +93,8 @@ export function LoseLeadDialog({
           motivosDoFunil={motivosDoFunil}
           motivoObrigatorio={motivoObrigatorio}
           adiar={adiar}
+          onConfirm={onConfirm}
+          submitting={submitting}
           onCancelar={() => onOpenChange(false)}
           onConcluido={() => {
             onOpenChange(false);
@@ -100,8 +122,15 @@ export function FormularioDePerda({
   onConcluido,
   adiar,
   rodape,
+  onConfirm,
+  submitting = false,
 }: {
-  leadId: string;
+  /** Ausente no modo LOTE (#2484 F2), em que `onConfirm` grava. */
+  leadId?: string;
+  /** Modo LOTE: ver `LoseLeadDialogProps.onConfirm`. */
+  onConfirm?: (lostReason: string) => void | Promise<void>;
+  /** Modo LOTE: a escrita em lote está em voo. */
+  submitting?: boolean;
   pipelineId: string;
   motivosDoFunil?: string[];
   /**
@@ -124,6 +153,9 @@ export function FormularioDePerda({
   const [reasonCode, setReasonCode] = useState<string>("");
   const [otherText, setOtherText] = useState("");
   const mutation = useLoseLead(pipelineId);
+  // O diálogo vale para os DOIS modos: a escrita individual (card) ou a do
+  // chamador (lote). "em voo" é a mutação individual OU o sinal externo.
+  const emVoo = mutation.isPending || submitting;
 
   // O funil deste card manda na lista: o que ele tem cadastrado substitui o
   // padrão do produto — ver lib/leads/motivos-de-perda-do-funil.ts.
@@ -173,16 +205,25 @@ export function FormularioDePerda({
     (!semMotivo && finalReason.length === 0) ||
     finalReason.length > MAX_LEN ||
     outroRecusado ||
-    mutation.isPending;
+    emVoo;
 
   const handleSubmit = async () => {
     if (disabled) return;
     try {
-      const args = { leadId, lostReason: semMotivo ? undefined : finalReason };
-      if (adiar) {
-        adiar(() => mutation.mutateAsync(args));
+      // Modo LOTE (#2484 F2): o motivo vai para quem chamou, que escreve pela
+      // `leads/bulk`. Modo CARD: a rota individual, com o adiamento (Desfazer)
+      // quando quem abriu pediu. Sem `leadId` NEM `onConfirm` não há escrita.
+      if (onConfirm) {
+        await onConfirm(finalReason);
+      } else if (leadId) {
+        const args = { leadId, lostReason: semMotivo ? undefined : finalReason };
+        if (adiar) {
+          adiar(() => mutation.mutateAsync(args));
+        } else {
+          await mutation.mutateAsync(args);
+        }
       } else {
-        await mutation.mutateAsync(args);
+        return;
       }
       setReasonCode("");
       setOtherText("");
@@ -268,12 +309,12 @@ export function FormularioDePerda({
           <Button
             variant="outline"
             onClick={onCancelar}
-            disabled={mutation.isPending}
+            disabled={emVoo}
           >
             {t("Cancelar")}
           </Button>
           <Button onClick={handleSubmit} disabled={disabled}>
-            {mutation.isPending ? t("Salvando...") : t("Confirmar")}
+            {emVoo ? t("Salvando...") : t("Confirmar")}
           </Button>
         </>,
       )}

@@ -19,6 +19,7 @@ import { ConversationHeader } from "./ConversationHeader";
 import { PainelDaConversa } from "./PainelDaConversa";
 import { CampoDeBuscaNaConversa } from "./CampoDeBuscaNaConversa";
 import { useFerramentasDaConversa } from "@/hooks/inbox/useFerramentasDaConversa";
+import { BotaoIniciarConversa } from "./PainelIniciarConversa";
 import { CRMSidePanel } from "./CRMSidePanel";
 import { escutar, pedir } from "@/lib/ui/comandos-da-tela";
 import { PegadorDeColuna } from "./colunas/PegadorDeColuna";
@@ -500,6 +501,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
           colunas.lista,
         )}
       >
+        <BotaoIniciarConversa />
         <InboxFilters value={filterValue} onChange={setFilterValue} />
         {/* Modo compacto (quadro DS): a linha da lista com 8px, por atendente. */}
         <div className="min-h-0 flex-1 overflow-hidden" data-densidade={listaCompacta ? "compacta" : undefined}>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { audit } from "@/lib/audit";
+import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { escritaDeAdminOuRecusa } from "@/lib/auth/escritaDeAdminOuRecusa";
 import {
   MODULOS_LIBERADOS_POR_EMPRESA,
@@ -62,7 +63,7 @@ export async function liberarModuloParaEmpresa(
     resourceType: "modulos_liberados_por_empresa",
     metadata: { modulo, de: antes, para: liberado },
     requestId: hdrs.get("x-request-id"),
-    ip: hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    ip: ipDoCliente(hdrs),
     userAgent: hdrs.get("user-agent"),
   });
 

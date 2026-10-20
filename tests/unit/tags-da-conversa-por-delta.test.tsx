@@ -29,6 +29,13 @@ vi.mock("@/hooks/inbox/useConversationTags", async (original) => ({
   useUpdateConversationTags: () => ({ mutate, isPending: false }),
   useConversationTagVocabulary: () => ({ data: ["quente"] }),
 }));
+// Desde a subida 1.81 o editor também pinta a etiqueta (#2718/#2771, upstream).
+vi.mock("@/components/tags/SeletorDeCorDaEtiqueta", () => ({ SeletorDeCorDaEtiqueta: () => null }));
+vi.mock("@/hooks/tags/useDefinirCorDaEtiqueta", () => ({ useDefinirCorDaEtiqueta: () => ({ definirCor: vi.fn() }) }));
+vi.mock("@/components/tags/CoresDasEtiquetas", async (original) => ({
+  ...(await original<typeof import("@/components/tags/CoresDasEtiquetas")>()),
+  useCoresDasEtiquetas: () => ({}),
+}));
 
 import { patchConversationHandler } from "@/app/api/v1/conversations/_handler";
 import { erroDoDelta } from "@/app/api/v1/conversations/_tags-delta";

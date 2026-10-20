@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 
 import { ConversationTagsEditor } from "../ConversationTagsEditor";
+import { TarefasDaDemanda } from "../TarefasDaDemanda";
 import { Demandas } from "./Demandas";
 import { DetalhesDoContato } from "./DetalhesDoContato";
 import { MemoriaDoContato } from "./MemoriaDoContato";
@@ -83,6 +84,16 @@ export function AbaResumo({
         recarregar={resumo.recarregar}
         usuarioId={usuarioId}
         leadEmFocoId={leadEmFocoId}
+      />
+      {/* A TAREFA DO ATENDIMENTO (#2818/#2842, upstream): presa à demanda
+          vigente AINDA ABERTA (`current_demanda_id` continua apontando depois de
+          encerrar). A seção traz o próprio divisor e some sem demanda. Criar é
+          de quem grava no painel (`leitura` já cobre viewer e suporte só leitura). */}
+      <TarefasDaDemanda
+        demandaId={resumo.demandas?.find((d) => d.id === conversation.current_demanda_id)?.id ?? null}
+        contactId={resumo.contactId}
+        leadId={leadEmFocoId}
+        podeEditar={!leitura}
       />
       <Separator />
       <MemoriaDoContato fatos={resumo.fatos} historico={resumo.historico} carregando={resumo.carregando} />

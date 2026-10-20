@@ -5,6 +5,7 @@ import type { Message } from "@/lib/types/messaging";
 import { AudioPlayer } from "./AudioPlayer";
 import { DocumentCard } from "./DocumentCard";
 import { ImageMedia } from "./ImageMedia";
+import { nomeOriginalDoDocumento } from "./media-utils";
 import { StickerMedia } from "./StickerMedia";
 import { MediaUnavailable } from "./MediaUnavailable";
 import { VideoMedia } from "./VideoMedia";
@@ -57,7 +58,7 @@ export function MediaRenderer({ message }: { message: Message }) {
           sizeBytes={message.media_size_bytes}
           storagePath={message.media_storage_path}
           isOutbound={isOutbound}
-          nome={nomeDoArquivo(message.metadata)}
+          nome={nomeOriginalDoDocumento(message.metadata) ?? nomeDoArquivo(message.metadata)}
         />
       );
   }

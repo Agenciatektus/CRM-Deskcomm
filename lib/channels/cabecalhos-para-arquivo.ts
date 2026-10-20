@@ -15,7 +15,9 @@ import { chaveSensivel, marcador, semCredencialNaUrl, TETO_DE_TEXTO } from "./en
  * membro da org que lê o arquivo poderia forjar mensagem de entrada. `token` e
  * `apikey` são credenciais que servidores de WhatsApp mandam por header.
  */
-const CABECALHOS_PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey"];
+// `asaas-access-token` (upstream, cobrança do revendedor §2.4): o Asaas autentica o
+// webhook com um token ESTÁTICO no cabeçalho — é a credencial inteira.
+const CABECALHOS_PROIBIDOS = ["authorization", "cookie", "x-api-key", "x-webhook-secret", "token", "apikey", "asaas-access-token"];
 
 /**
  * Cabeçalhos sanitizados.

@@ -39,6 +39,7 @@ function formatError(err: unknown, t: (texto: string) => string): string {
   }
   return String(err);
 }
+import { CalendarioDoFunil } from "@/components/kanban/CalendarioDoFunil";
 
 /**
  * A página do Funil com a barra aprovada pelo Peterson (board "Barra do
@@ -54,10 +55,17 @@ export function PipelinePageClient({
   pipelineId,
   initialName,
   role,
+  funis,
 }: {
   pipelineId: string;
   initialName: string;
   role: Role;
+  /**
+   * Os funis vivos da organização (`id` + `name`, na ordem da lista) — a MESMA
+   * partição da tela de Funis. É o que alimenta o seletor de troca rápida do
+   * cabeçalho; sem ele o quadro não sabe que existem outros funis.
+   */
+  funis: Array<{ id: string; name: string }>;
 }) {
   const t = useT();
   const { data, isLoading, error, pulses, realtimeStatus, seguranca } = useBoard(pipelineId);
@@ -84,6 +92,9 @@ export function PipelinePageClient({
     () => [...new Set((data?.leads ?? []).flatMap((l) => l.tags))].sort(),
     [data?.leads],
   );
+  const nomeAtual = data?.pipeline.name ?? initialName;
+  // Um funil só = nada para trocar: o seletor seria ruído permanente.
+  const podeTrocar = funis.length > 1;
 
   const cabecalho = (
     <CabecalhoDoFunil
@@ -224,6 +235,15 @@ export function PipelinePageClient({
         </div>
       ) : vista === "lista" ? (
         lista(ListaDoFunil)
+      ) : vista === "calendario" ? (
+        // Visão Calendário (#2770, upstream), terceira opção do nosso seletor de
+        // vista: o MESMO recorte filtrado do quadro e da lista.
+        <CalendarioDoFunil
+          pipelineId={pipelineId}
+          pipeline={data.pipeline}
+          stages={data.stages}
+          leads={recorte}
+        />
       ) : (
         <KanbanBoard
           pipelineId={pipelineId}
