@@ -18,16 +18,37 @@
  * entra antes de quem só está desatualizado. O rosto que falta incomoda mais
  * que o rosto velho.
  *
+ * DE QUAL CONEXÃO
+ * A foto vem da conexão por onde o contato FALA — e não de qualquer conexão
+ * ativa da empresa. Antes, a rota escolhia a primeira `channel_sessions`
+ * `WORKING` da organização (sem ordem, sem ligação com o contato). Quando a
+ * empresa tem WhatsApp E Instagram/Facebook ligados, o banco às vezes devolvia
+ * a linha social (`waha_session_name` nulo, provider `zernio_social`): o `ref`
+ * saía nulo, o cron gravava "sem foto" e só revisitava o contato em 7 dias.
+ * Medido: 40 de 163 contatos de uma empresa marcados "sem foto", e o WhatsApp
+ * devolvia foto para eles quando perguntado direto. Agora, para cada contato, lê
+ * a conversa mais recente dele, pega a sessão dessa conversa (só se `WORKING`
+ * e não arquivada), resolve o `sessionRef` dessa sessão e pede a foto ao adapter
+ * dela. Sem sessão válida, sem `sessionRef` ou adapter sem
+ * `fetchProfilePictureUrl` → carimba sem foto. Nunca cai para "qualquer outra
+ * conexão da empresa": esse é exatamente o defeito que fecha.
+ *
  * Auth: Bearer INTERNAL_SECRET (fail-closed), igual aos demais crons.
  */
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
-import { DEFAULT_CHANNEL_PROVIDER, getAdapter, type ChannelProvider } from "@/lib/channels";
+import {
+  CHANNEL_SESSION_REF_COLUMNS,
+  DEFAULT_CHANNEL_PROVIDER,
+  getAdapter,
+  resolveSessionRef,
+  type ChannelProvider,
+  type ChannelSessionRef,
+} from "@/lib/channels";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -139,21 +160,32 @@ async function handle(req: NextRequest): Promise<Response> {
     }
 
     try {
-      const { data: sessao } = await admin
-        .from("channel_sessions")
-        .select("waha_session_name, provider")
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select(
+          `channel_sessions:channel_session_id (${CHANNEL_SESSION_REF_COLUMNS}, status, archived_at)`,
+        )
         .eq("organization_id", c.organization_id)
-        .eq("status", "WORKING")
-        // Sem o filtro, a linha de chamada de voz (spec 18) — que nasce
-        // `WORKING` ao parear — podia ganhar este `limit(1)` sem ordenação e
-        // devolver `waha_session_name` nulo: a foto de todo mundo parava de
-        // atualizar em silêncio, com o `carimbar(null)` logo abaixo parecendo
-        // "este contato não tem foto".
-        .in("provider", [...PROVIDERS_DE_MENSAGEM])
+        .eq("contact_id", c.id)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
-      const ref = (sessao as { waha_session_name?: string | null } | null)?.waha_session_name;
-      if (!ref) {
+
+      const sessaoDaConversa = (conversa as { channel_sessions?: unknown } | null)?.channel_sessions as
+        | (ChannelSessionRef & { status: string | null; archived_at: string | null })
+        | null
+        | undefined;
+
+      const s =
+        sessaoDaConversa && !sessaoDaConversa.archived_at && sessaoDaConversa.status === "WORKING"
+          ? (sessaoDaConversa as ChannelSessionRef)
+          : null;
+      const sessionRef = s ? resolveSessionRef(s) : null;
+      const adapter = s ? getAdapter((s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider) : null;
+      if (!s || !sessionRef || !adapter?.fetchProfilePictureUrl) {
+        // Sem sessão válida, sem `sessionRef` ou adapter sem `fetchProfilePictureUrl`
+        // → "sem canal". Nunca cai para qualquer outra conexão da empresa: esse
+        // é exatamente o defeito que fecha.
         await carimbar(null);
         semFoto++;
         continue;
@@ -161,21 +193,12 @@ async function handle(req: NextRequest): Promise<Response> {
 
       // Pelo adapter, nunca falando com o canal direto: a doutrina
       // `restricao-de-canal` proíbe nomear provider fora de lib/channels/, e o
-      // `pnpm lint:channels` reprova o build se acontecer (foi o que pegou a
-      // primeira versão desta rota). Testar a PRESENÇA do método é como se
-      // pergunta "este canal sabe fazer isso?" sem perguntar qual canal é.
-      const adapter = getAdapter(
-        (sessao as { provider?: ChannelProvider | null } | null)?.provider ??
-          DEFAULT_CHANNEL_PROVIDER,
-      );
-      if (!adapter.fetchProfilePictureUrl) {
-        await carimbar(null);
-        semFoto++;
-        continue;
-      }
+      // `pnpm lint:channels` reprova o build se acontecer. Testar a PRESENÇA do
+      // método é como se pergunta "este canal sabe fazer isso?" sem perguntar
+      // qual canal é.
       const profilePictureURL = await adapter.fetchProfilePictureUrl({
         organizationId: c.organization_id,
-        sessionRef: ref,
+        sessionRef,
         recipient: chatId,
       });
       if (!profilePictureURL) {
