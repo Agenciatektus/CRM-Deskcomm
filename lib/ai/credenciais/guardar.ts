@@ -222,6 +222,10 @@ export interface PedidoDeRotacionar {
   apiKey?: string;
   /** Presente = trocar o rótulo. Ausente = manter. */
   label?: string;
+  /** `true` = a linha volta a `is_active` (reconectar a assinatura depois de desconectada). */
+  reativar?: boolean;
+  /** `true` = só grava se a linha AINDA estiver ativa (renovação que corre com um desconectar). */
+  somenteAtiva?: boolean;
   requestId?: string;
 }
 
@@ -263,14 +267,15 @@ export async function rotacionarCredencial(
   }
 
   if (p.label !== undefined) patch.label = p.label;
+  if (p.reativar) patch.is_active = true;
 
-  const { data: updated, error } = await p.admin
+  let consulta = p.admin
     .from("ai_provider_credentials")
     .update(patch)
     .eq("id", p.credentialId)
-    .eq("organization_id", p.orgId)
-    .select("id")
-    .maybeSingle();
+    .eq("organization_id", p.orgId);
+  if (p.somenteAtiva) consulta = consulta.eq("is_active", true);
+  const { data: updated, error } = await consulta.select("id").maybeSingle();
 
   if (error) {
     if (error.code === "23505") return { ok: false, motivo: "label_em_uso" };

@@ -77,6 +77,8 @@ export function PainelDeLoginCodex({
     cifragem:
       "Este servidor não tem a chave de cifra (AI_CRED_AES_KEY) configurada, então o login não pode ser guardado.",
     banco: "O banco recusou a gravação. Tente de novo em instantes.",
+    desconexao_recusada:
+      "Não deu para desconectar a conta agora. O motivo ficou registrado no log do servidor; tente de novo e, se continuar, avise quem administra a instalação.",
     modulo_desligado:
       "O recurso está desligado nesta instalação. Só quem administra a instalação pode ligá-lo, em Recursos opcionais.",
     forbidden_role: "Somente o administrador desta empresa pode conectar a conta.",

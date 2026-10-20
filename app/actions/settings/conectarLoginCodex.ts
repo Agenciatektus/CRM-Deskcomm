@@ -19,6 +19,7 @@ import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { env } from "@/lib/env";
 import { ipDoCliente } from "@/lib/http/ip-do-cliente";
+import { logger } from "@/lib/logger";
 import { supportWriteError } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -193,7 +194,15 @@ export async function conectarLoginCodex(
 
 export type DesconectarLoginCodexResult = { ok: true } | { ok: false; error: string };
 
-/** DESCONECTAR a conta da empresa — apaga a linha dela. */
+/**
+ * DESCONECTAR a conta da empresa: desativa a linha e apaga o segredo dela
+ * (`desconectarLoginCodex`), sem DELETE, porque versões publicadas de agente
+ * seguem apontando para a credencial e a FK delas é RESTRICT.
+ *
+ * Falha do banco vira LOG com o código e a mensagem do Postgres (sem segredo:
+ * nunca o `details`) e `desconexao_recusada` para a tela. Antes o erro era
+ * engolido e a tela só dizia "O banco recusou a gravação".
+ */
 export async function desconectarLoginCodexAgora(): Promise<DesconectarLoginCodexResult> {
   const authUser = await loadAuthUser();
   if (!authUser) return { ok: false, error: "unauthenticated" };
@@ -204,25 +213,29 @@ export async function desconectarLoginCodexAgora(): Promise<DesconectarLoginCode
   if (supportWriteError(authUser.support)) return { ok: false, error: "somente_leitura" };
 
   const admin = createAdminClient();
-  const { data: linha } = await admin
-    .from("ai_provider_credentials")
-    .select("id")
-    .eq("organization_id", activeOrg.orgId)
-    .eq("provider", "openai-assinatura")
-    .eq("is_active", true)
-    .maybeSingle();
+  let r: Awaited<ReturnType<typeof desconectarLoginCodex>>;
+  try {
+    r = await desconectarLoginCodex({ admin, orgId: activeOrg.orgId });
+  } catch (err) {
+    r = { ok: false, codigo: null, mensagem: err instanceof Error ? err.message.slice(0, 300) : "excecao" };
+  }
+  if (!r.ok) {
+    logger.error("[login-codex] desconectar falhou", {
+      organizationId: activeOrg.orgId,
+      codigo: r.codigo,
+      mensagem: r.mensagem,
+    });
+    return { ok: false, error: "desconexao_recusada" };
+  }
 
-  const apagou = await desconectarLoginCodex({ admin, orgId: activeOrg.orgId });
-  if (!apagou) return { ok: false, error: "banco" };
-
-  if (linha?.id) {
+  if (r.id) {
     const hdrs = await headers();
     await audit({
       action: "ai.login_codex_desconectado",
       actorUserId: authUser.id,
       organizationId: activeOrg.orgId,
       resourceType: "ai_provider_credential",
-      resourceId: linha.id,
+      resourceId: r.id,
       metadata: { provedor: "openai-assinatura" },
       requestId: hdrs.get("x-request-id"),
       ip: ipDoCliente(hdrs),
