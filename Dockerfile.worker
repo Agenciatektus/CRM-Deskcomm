@@ -38,4 +38,10 @@ EXPOSE 8787
 # drena os jobs em curso e sai 0. Não é conserto de prazo: nenhum timeout de
 # supervisor, healthcheck ou stop_grace_period mudou (a issue #2823 proíbe o
 # aumento de timeout como único remédio).
-CMD ["node", "--import", "tsx", "workers/agent-worker/main.ts"]
+#
+# Teto de heap EXPLÍCITO (Tektus, 20/10): sem ele o Node calcula ~259 MB a partir
+# do mem_limit de 512m, e o worker de produção estourava "heap out of memory" a
+# cada ~26 min. 768 MB cabe no mem_limit de 1024m do compose com folga para o
+# que não é heap (buffers, código nativo). Vai no CMD, não no NODE_OPTIONS, para
+# não apagar as flags que o .env já põe ali (--dns-result-order).
+CMD ["node", "--max-old-space-size=768", "--import", "tsx", "workers/agent-worker/main.ts"]

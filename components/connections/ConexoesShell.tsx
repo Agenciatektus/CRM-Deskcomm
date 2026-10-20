@@ -105,11 +105,11 @@ export function ConexoesShell({
         <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>
         {/* Primeira depois do QR, e antes das duas de API, porque é o caminho
             mais curto para quem JÁ tem o WhatsApp funcionando em outro sistema:
-            não lê QR, não abre conta na Meta, não tira nada do ar. O rótulo diz
-            o que o usuário ganha ("já conectado"), não como funciona por
-            baixo — e a marca de quem hospeda aparece DENTRO, vinda do servidor,
-            porque a tela não pode nomear provider. */}
-        <TabsTrigger value="hospedado">{t("Número já conectado")}</TabsTrigger>
+            não lê QR, não abre conta na Meta, não tira nada do ar. Exceção
+            DELIBERADA à regra de não nomear provider: neste fork o hospedeiro é
+            a própria Verdash, a marca da casa, e o Peterson pediu a aba com esse
+            nome (20/10/2026). Em outra instalação, trocar por um rótulo neutro. */}
+        <TabsTrigger value="hospedado">{t("Verdash")}</TabsTrigger>
         {/* Logo depois do número hospedado porque é o MESMO gesto: um código de
             conexão, gerado na plataforma do cliente, e a entrega passa a vir
             para cá. Aqui o rótulo é a REDE e não o provedor — quem atende

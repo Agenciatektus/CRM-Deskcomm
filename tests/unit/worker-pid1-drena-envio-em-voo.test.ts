@@ -110,7 +110,8 @@ describe("o PID 1 do worker drena o envio em voo (#2823)", () => {
     // A regressão central da issue: uma camada de processo entre quem recebe o
     // sinal e quem tem de terminar o envio. Fixar a forma exata também pega um
     // "conserto" que troque o CMD por outro launcher com a mesma camada.
-    expect(cmdDoWorker()).toEqual(["node", "--import", "tsx", "workers/agent-worker/main.ts"]);
+    // O teto de heap é flag do V8, não camada de processo: o PID 1 continua o node.
+    expect(cmdDoWorker()).toEqual(["node", "--max-old-space-size=768", "--import", "tsx", "workers/agent-worker/main.ts"]);
   });
 
   it(
