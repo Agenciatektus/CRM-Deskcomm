@@ -39,8 +39,9 @@ describe("par VAPID gerado pelo kit", () => {
       expect(privBytes.length).toBe(32);
 
       // A pública é a da privada (P-256), não uma qualquer com o tamanho certo.
-      const derivada = createECDH("prime256v1").setPrivateKey(privBytes).getPublicKey();
-      expect(derivada.equals(pubBytes)).toBe(true);
+      const ecdh = createECDH("prime256v1");
+      ecdh.setPrivateKey(privBytes);
+      expect(ecdh.getPublicKey().equals(pubBytes)).toBe(true);
 
       expect(() => webpush.setVapidDetails("mailto:a@b.c", pub, priv)).not.toThrow();
       expect(() =>
