@@ -174,7 +174,9 @@ describe("9054: emit_event — lead.* exige agent+, ad_conversion.* só do servi
       /caller_not_authorized_for_event/,
     );
     expect(() => prova(`${como(VIEWER)}\n${emite("lead.won")}`)).toThrow(
-      /caller_not_authorized_for_event/,
+      // Desde a 9058 (subida 1.81) o lead.won pela sessão bate ANTES na reserva da
+      // 0581 (o desfecho só nasce do gatilho do negócio): as duas recusas são 42501.
+      /caller_not_authorized_for_event|reserved_message_received/,
     );
   });
 

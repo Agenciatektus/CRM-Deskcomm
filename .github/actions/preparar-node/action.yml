@@ -89,7 +89,7 @@ runs:
 
     - name: Cache do npm (é o que tira o registry do caminho crítico)
       if: inputs.cache == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.npm
         key: npm-cache-pnpm-${{ runner.os }}-${{ steps.pino.outputs.versao }}

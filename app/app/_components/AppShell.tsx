@@ -80,7 +80,7 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
   const naInbox = ehAInbox(usePathname());
   return (
     // A área segura dos lados mora no `body` (globals.css), para valer em toda página.
-    <div className="pele-moldura flex min-h-screen w-full bg-background">
+    <div className="pele-moldura flex min-h-dvh w-full bg-background">
       <BarraDeProgressoNavegacao />
       {/* Só no celular (abaixo de 760px) e uma vez por aparelho. */}
       <ConviteDeInstalacao />
@@ -106,7 +106,7 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
         SEGUNDA medida da mesma coisa — a que discordava e deixava a barra por
         cima da lista.
       */}
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         {/* Abaixo de 760px o topo e a gaveta saem: entra a casca do app de celular
             (cabeçalho, barra inferior com as 5 abas, FAB e o menu "Mais"). */}
         <div className="hidden largo:contents">
@@ -117,11 +117,21 @@ export function AppShell({ sidebarCollapsed, menuFixoNaInbox = false, podeAtende
           O RODAPÉ DESCONTA O QUE AS PEÇAS FIXAS OCUPAM (issue #1305).
 
           `estiloDaReserva` devolve `undefined` quando não há peça registrada —
-          nenhum estilo, o `p-6` de sempre —, e um `padding-bottom` que consome
+          nenhum estilo, e aí quem responde pela faixa de baixo é a classe
+          `pb-area-segura` —, e um `padding-bottom` que consome
           `--rodape-ocupado` quando há. O que ele descontou está também no
           atributo `data-rodape-ocupado`: é por ali que o gate mede esta faixa
           sem depender de o jsdom computar `var()` (ele não computa), e é o que
           aparece no inspetor quando alguém pergunta quanto o rodapé perdeu.
+
+          `p-4 sm:p-6`: 24px de margem em cada lado de uma tela de 360px come
+          13% da largura útil. O `AdminShell` já usava este par — aqui a casca
+          do tenant passa a usar o mesmo.
+
+          `pb-area-segura` é o piso da faixa de baixo quando NÃO há peça fixa:
+          `max(var(--space-6), env(safe-area-inset-bottom))`. Sem ela, no iOS em
+          tela cheia o fim do conteúdo ficava atrás do indicador de home — e com
+          peça fixa quem cobre isso é o terceiro termo do `max()` do contrato.
         */}
         <main
           className={cn(

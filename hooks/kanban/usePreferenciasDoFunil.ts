@@ -67,8 +67,9 @@ function criarPreferencia<T extends string>(chave: string, valido: (v: unknown) 
   };
 }
 
-export type VistaDoFunil = "kanban" | "lista";
-const ehVista = (v: unknown): v is VistaDoFunil => v === "kanban" || v === "lista";
+// "calendario": a visão Calendário do upstream (#2770), terceira opção da barra.
+export type VistaDoFunil = "kanban" | "lista" | "calendario";
+const ehVista = (v: unknown): v is VistaDoFunil => v === "kanban" || v === "lista" || v === "calendario";
 
 export const CHAVE_DA_VISTA = "funil_vista";
 export const CHAVE_DA_ORDEM = "funil_ordem";

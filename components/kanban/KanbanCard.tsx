@@ -16,6 +16,7 @@ import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { ContatoNoCard } from "./ContatoNoCard";
 import { EsperaDoLead, EtiquetasDoCard, ProximoPassoDoCard, ResponsavelDoCard, TempoDoCard } from "./PartesDoCard";
+import { TarefasNoCard } from "./TarefasNoCard";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
 export type GestoDeSelecao = "alterna" | "intervalo";
@@ -249,7 +250,9 @@ export function KanbanCard({
           {value && <span className="text-[15px] leading-tight font-bold text-text tabular-nums">{value}</span>}
 
           {/* ③ a última mensagem (1 linha), com atalho para o inbox. */}
-          {!compacto && <ConversaSlot conversa={lead.conversa} enxuto />}
+          {!compacto && (
+            <ConversaSlot conversa={lead.conversa} contactId={lead.contact_id} phone={lead.contact_phone} enxuto />
+          )}
 
           {!compacto && <EtiquetasDoCard tags={card.tags} />}
 
@@ -294,7 +297,7 @@ export function KanbanCard({
           {/* ④ o próximo passo (a tarefa aberta mais urgente) */}
           <ProximoPassoDoCard passo={lead.proximo_passo} />
 
-          {/* ⑤ tempo na etapa · responsável */}
+          {/* ⑤ tempo na etapa · selo de tarefas (upstream) + responsável */}
           <div
             className={cn(
               "flex items-center justify-between gap-2 border-t border-border text-xs text-text-subtle",
@@ -308,7 +311,10 @@ export function KanbanCard({
             ) : (
               <TempoDoCard tempo={tempo} />
             )}
-            <ResponsavelDoCard owner={card.owner} />
+            <div className="flex min-w-0 items-center gap-2">
+              <TarefasNoCard tarefas={lead.tarefas} />
+              <ResponsavelDoCard owner={card.owner} />
+            </div>
           </div>
         </div>
       )}

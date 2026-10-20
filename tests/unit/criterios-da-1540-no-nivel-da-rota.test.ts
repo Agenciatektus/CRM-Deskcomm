@@ -97,6 +97,8 @@ function escaparRegex(texto: string): string {
  * lote e ordem. O `or` desonesto aqui deixaria a varredura verde sobre um
  * filtro quebrado, então ele casa de verdade.
  */
+const MAX_ROWS = 1000;
+
 class MundoFalso {
   readonly eventos: Linha[] = [];
   readonly consultas: Array<{ tabela: string; caminho: string; valor: unknown }> = [];
@@ -138,6 +140,7 @@ class MundoFalso {
 class ConsultaFalsa implements PromiseLike<{ data: Linha[] | null; error: null }> {
   private filtros: Array<(l: Linha) => boolean> = [];
   private teto: number | null = null;
+  private inicio = 0;
   private acao: "select" | "insert" | "update" = "select";
   private dados: Linha | null = null;
 
@@ -219,6 +222,12 @@ class ConsultaFalsa implements PromiseLike<{ data: Linha[] | null; error: null }
     return this;
   }
 
+  range(de: number, ate: number): this {
+    this.inicio = de;
+    this.teto = ate - de + 1;
+    return this;
+  }
+
   async maybeSingle(): Promise<{ data: Linha | null; error: null }> {
     const { data } = await this.executar();
     return { data: data?.[0] ?? null, error: null };
@@ -239,7 +248,10 @@ class ConsultaFalsa implements PromiseLike<{ data: Linha[] | null; error: null }
     }
     const casam = linhas.filter((l) => this.filtros.every((f) => f(l)));
     if (this.acao === "update") for (const linha of casam) Object.assign(linha, this.dados);
-    return { data: this.teto === null ? casam : casam.slice(0, this.teto), error: null };
+    // O `max_rows` do PostgREST (supabase/config.toml): nenhuma página passa de
+    // 1000, peça o que pedir — e o corte é CALADO, como no de verdade.
+    const teto = Math.min(this.teto ?? MAX_ROWS, MAX_ROWS);
+    return { data: casam.slice(this.inicio, this.inicio + teto), error: null };
   }
 }
 
@@ -399,6 +411,40 @@ describe("a janela de 200 dos gatilhos por tempo (item 1)", () => {
       "a etapa parada tem o mesmo `limit` sem cursor: o card parado há mais tempo no fim da fila nunca sai",
     ).toEqual([leads[200]!.id]);
     expect(resposta.data.emitidos).toBe(1);
+  });
+
+  it("⭐ a trava ATUAL não se perde atrás de mais de 1000 travas antigas do mesmo negócio (#214)", async () => {
+    // A 9057 preserva as travas para sempre. Um negócio que entrou e saiu do
+    // silêncio muitas vezes acumula âncoras velhas, e o PostgREST devolve no
+    // máximo 1000 linhas sem avisar: se a trava da âncora ATUAL ficasse fora do
+    // corte, a regra disparava de novo para o mesmo card.
+    const agora = Date.now();
+    const lead = leadSilencioso(1, agora);
+    mundo.linhas("crm_leads").push(lead);
+    for (let i = 0; i < 1200; i += 1) {
+      mundo.linhas("event_log").push({
+        id: `velha-${String(i).padStart(5, "0")}`,
+        organization_id: ORG,
+        event_type: GATILHO_SILENCIO,
+        entity_id: lead.id,
+        payload: { rule_id: REGRA, ancora: new Date(agora - (400 + i) * 86_400_000).toISOString() },
+      });
+    }
+    mundo.linhas("event_log").push({
+      id: "zzz-atual",
+      organization_id: ORG,
+      event_type: GATILHO_SILENCIO,
+      entity_id: lead.id,
+      payload: { rule_id: REGRA, ancora: lead.created_at },
+    });
+
+    const resposta = await varrerSilencio();
+
+    expect(
+      eventosDoCron(GATILHO_SILENCIO),
+      "a trava da âncora atual caiu fora das 1000 linhas e a regra redisparou para o mesmo card",
+    ).toHaveLength(0);
+    expect(resposta.data.emitidos).toBe(0);
   });
 
   it("controle: sem trava nenhuma, o conjunto inteiro é examinado numa rodada só", async () => {

@@ -7,6 +7,8 @@ import { coresDaBarraDoNavegador } from "@/lib/branding/barra-do-navegador";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
 import { cssDaMarca } from "@/lib/branding/css";
 import { iconeDaAba } from "@/lib/branding/icone";
+import { folhaPersonalizadaDaInstalacao } from "@/lib/branding/folha-personalizada";
+import { CABECALHO_SEM_CSS } from "@/lib/branding/sem-css-personalizado";
 import {
   marcaDaInstalacao,
   motivoDoFallback,
@@ -133,9 +135,31 @@ export async function generateMetadata(): Promise<Metadata> {
  * A cor da barra do navegador sai da RÉGUA, não de dois hexes redigitados aqui.
  * O porquê — inclusive por que isto NÃO deve virar `generateViewport()` lendo o
  * banco — está no cabeçalho de `lib/branding/barra-do-navegador.ts`.
+ *
+ * ─── As quatro linhas abaixo do `themeColor`, e por que não são enfeite ──────
+ *
+ * `viewportFit: "cover"` é PRÉ-REQUISITO, não acabamento. Sem ele o navegador
+ * não estende o documento sob o notch, e aí `env(safe-area-inset-*)` devolve
+ * **zero** em toda regra que o consulte — o CSS fica escrito e sem efeito. O
+ * princípio 3 de `docs/design-system/screen-flow/07-responsive-strategy.md`
+ * ("`safe-area-inset-bottom` em qualquer composer ou bottom-bar") estava escrito
+ * desde abril de 2026 e não tinha como funcionar: faltava esta chave.
+ *
+ * `interactiveWidget: "resizes-content"` é o que faz o teclado virtual ENCOLHER
+ * a área de conteúdo em vez de deslizar por cima dela. No padrão
+ * (`resizes-visual`) o composer da conversa fica atrás do teclado — a mesma
+ * classe de defeito do rodapé, só que causada pelo sistema.
+ *
+ * `width`/`initialScale` o Next já emitia por padrão; declarar aqui é o que
+ * impede que acrescentar qualquer outra chave a este objeto apague o default
+ * silenciosamente (o Next só emite o default quando NENHUMA das duas existe).
+ * Nada de `maximumScale` nem `userScalable: false`: impedir o zoom é barreira
+ * de acessibilidade, e quem lê a tela de perto precisa dele.
  */
 export const viewport: Viewport = {
   themeColor: coresDaBarraDoNavegador(REGUA_DO_PRODUTO),
+  width: "device-width",
+  initialScale: 1,
   // O app de celular desenha até a borda (notch e indicador de início) e respeita a
   // área segura pelos tokens `--mb-area-*` do globals.css. No desktop o `env()` vale
   // 0, então acima de 760px nada muda.
@@ -247,6 +271,17 @@ async function EstiloDaMarca() {
 }
 
 /**
+ * CSS visual, escopado e validado do administrador da instalação. `?sem_css=1`
+ * desliga a folha para quem pediu (ver `lib/branding/sem-css-personalizado.ts`).
+ */
+async function EstiloCssPersonalizado() {
+  const desligada = (await headers()).get(CABECALHO_SEM_CSS) === "1";
+  const css = await folhaPersonalizadaDaInstalacao(desligada);
+  if (!css) return null;
+  return <style id="marca-css-personalizado" dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
+/**
  * A marca que atravessa para o NAVEGADOR — a MESMA pilha da aba e do CSS.
  *
  * Componente próprio, e não uma chamada dentro do `RootLayout`, pelo mesmo
@@ -314,12 +349,22 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         {/* Primeiro de tudo: a cor da instalação, antes do CSS e do script de tema. */}
         <EstiloDaMarca />
+        <EstiloCssPersonalizado />
         {/* Config pública do Supabase + marca resolvida, em runtime (imagem
             genérica self-host). */}
         <MarcaNoNavegador />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-screen bg-bg font-sans text-text antialiased">
+      {/*
+        `min-h-dvh` e não `min-h-screen`: `100vh` é a janela com a barra de
+        endereço do navegador móvel RECOLHIDA, e esse valor nunca é corrigido.
+        Com a barra visível — o estado em que toda página abre — o `<body>` mede
+        mais que a janela e o documento nasce rolável sem ter conteúdo para
+        rolar: um puxão de ~60px que não leva a nada, na primeira interação de
+        quem abre o produto no celular. Princípio 2 de
+        `docs/design-system/screen-flow/07-responsive-strategy.md`.
+      */}
+      <body className="min-h-dvh bg-bg font-sans text-text antialiased">
         <Providers>
           <MarcaDosClientComponents>
             <ThemeProvider>{children}</ThemeProvider>

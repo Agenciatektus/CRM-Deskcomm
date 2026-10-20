@@ -12,6 +12,12 @@ import type { NovaTarefa, Tarefa } from "@/lib/tarefas/tipos";
 import { preencherData } from "@/tests/unit/helpers/controles-do-ds";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
+// Desde a subida 1.81 o formulário escolhe o responsável (upstream, #2818): a
+// lista da equipe e o usuário da sessão.
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useUser: () => ({ id: "u-1" }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
+  useAssignableMembers: () => ({ data: [], isSuccess: true }),
+}));
 
 const TAREFA = {
   id: "t-1",

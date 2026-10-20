@@ -44,6 +44,14 @@ interface Props {
   onLimparFiltros?: () => void;
   /** Notifies parent when the visible list changes (used by keyboard nav). */
   onVisibleChange?: (ids: string[]) => void;
+  /**
+   * Seleção múltipla (#2484, F1). Quando `onAlternarSelecao` vem, cada linha
+   * ganha a caixa de marcação e a lista oferece o "selecionar todas" — sem
+   * ela, a lista é exatamente a que era.
+   */
+  selecionados?: Set<string>;
+  onAlternarSelecao?: (id: string) => void;
+  onSelecionarTodosVisiveis?: () => void;
 }
 
 export function ConversationList({
@@ -53,6 +61,9 @@ export function ConversationList({
   onSelect,
   onVisibleChange,
   onLimparFiltros,
+  selecionados,
+  onAlternarSelecao,
+  onSelecionarTodosVisiveis,
 }: Props) {
   const t = useT();
   // Quem está logado, para a pílula de dono dizer "Você". Opcional porque a
@@ -136,7 +147,22 @@ export function ConversationList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  if (q.isLoading) {
+  // O SKELETON É DA PRIMEIRA CARGA (#2366) — nunca do refetch.
+  //
+  // `isLoading` só é verdadeiro sem dado nenhum na tela: o refetch em voo
+  // mantém a resposta anterior, e a troca de chave (quando o automatico-ativo
+  // responde) herda a lista anterior pelo `placeholderData` do hook — só essa
+  // troca: aba ou busca nova é outra lista, e volta ao skeleton. `items.length === 0` declara a regra em palavras — o preço de
+  // reconstruí-la aqui é o defeito inteiro desta issue.
+  //
+  // `isPending`, e não `isLoading` (#2365): a consulta SEGURADA da Fila — a que
+  // espera o fato org-wide antes de sair, para não pedir a mesma lista duas
+  // vezes — está pendente SEM estar buscando, e `isLoading` seria falso ali. A
+  // diferença não é cosmética: com `isLoading`, a espera de ~200ms do fato
+  // caía no vazio por AUSÊNCIA e a tela dizia "Sem conversas por aqui" — caixa
+  // vazia em vez de "está vindo". `isPending` continua falso no refetch (há
+  // dado), então a regra do #2366 segue de pé: sem dado é primeira carga.
+  if (q.isPending && items.length === 0) {
     return (
       <div className="space-y-3 p-3">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -146,7 +172,14 @@ export function ConversationList({
     );
   }
 
-  if (q.isError) {
+  // O erro só fala quando NÃO HÁ O QUE PRESERVAR (#2366).
+  //
+  // Um refetch que falha com a lista na tela deixa a lista onde está: trocar
+  // uma tela cheia por "Erro ao carregar conversas" é trocar um problema de
+  // rede por uma caixa de entrada vazia — e o `queryFn` do hook já disparou o
+  // toast com o motivo cru. Sem dado nenhum (primeira carga), o erro continua
+  // sendo tudo o que existe para mostrar, com o botão de tentar de novo.
+  if (q.isError && q.data === undefined) {
     return (
       <div className="p-4 text-center text-sm text-muted-foreground">
         <p>{t("Erro ao carregar conversas.")}</p>
@@ -201,6 +234,35 @@ export function ConversationList({
             </span>
           </div>
         )}
+        {/* Grupos tem uma regra que o vazio sozinho não conta: conversa de grupo
+            só nasce na primeira mensagem recebida depois de o grupo ser ligado em
+            Conexões › Grupos (spec: "Só entram os grupos escolhidos. O padrão é
+            desligado"). A frase diz a regra, não o diagnóstico: o filtro Grupos
+            soma com Fila e Busca, e a lista pode vir vazia com grupos ligados.
+            Sem esta linha o operador só ouve "Nenhuma conversa com esses
+            filtros" e acha o botão quebrado (issue #2103). */}
+        {items.length === 0 && filters.is_group && (
+          <p className="px-6 pb-6 text-center text-xs text-text-subtle">
+            {t("Só entram na inbox os grupos ligados em Conexões › Grupos, e cada um aparece aqui a partir da primeira mensagem recebida depois de ligar (o histórico anterior não entra).")}
+          </p>
+        )}
+        {/* Cabeça da seleção em lote (#2484, F1): marca de uma vez tudo o que
+            está na tela. Some com a lista vazia — oferecer "selecionar todas"
+            quando não há nenhuma é botão de mentira. */}
+        {onAlternarSelecao && items.length > 0 && (
+          <div className="flex items-center gap-2 border-b border-border/70 px-3 py-1.5">
+            {/* Checkbox nativo com a pele global do DS (`app/globals.css`). */}
+            <input
+              type="checkbox"
+              checked={selecionados ? items.every((c) => selecionados.has(c.id)) : false}
+              onChange={() => onSelecionarTodosVisiveis?.()}
+              aria-label={t("Selecionar todas as conversas visíveis")}
+              title={t("Selecionar todas")}
+              data-testid="selecionar-todas-visiveis"
+            />
+            <span className="text-xs text-text-muted">{t("Selecionar todas")}</span>
+          </div>
+        )}
         {items.map((c, i) => (
           <ConversationListItem
             key={c.id}
@@ -215,6 +277,8 @@ export function ConversationList({
             meuUserId={meuUserId}
             onAbrirMenu={menu.abrir}
             menuAberto={menu.alvo?.id === c.id}
+            selecionado={selecionados?.has(c.id)}
+            onAlternarSelecao={onAlternarSelecao}
           />
         ))}
         {q.hasNextPage && (

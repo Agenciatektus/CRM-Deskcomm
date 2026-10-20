@@ -4,6 +4,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/hooks/i18n/useT";
 
+import { motivoDoVeto } from "@/lib/agent-engine/agent/sugestao-de-resposta";
+
 import { useSugestaoDeResposta, type SugestaoDeResposta } from "./useSugestaoDeResposta";
 
 /**
@@ -57,6 +59,9 @@ function PainelProprio({ conversationId, disabled }: { conversationId: string; d
 function Painel({ s, disabled, comBotao }: { s: SugestaoDeResposta; disabled?: boolean; comBotao: boolean }) {
   const t = useT();
   const { draft, body, notice, busy } = s;
+  // A causa do veto, em linguagem de quem opera (issue #2975): sem código
+  // conhecido, a frase genérica de sempre continua sendo a verdade.
+  const motivo = draft ? motivoDoVeto(draft.error_code) : null;
   if (!comBotao && !draft && !notice) return null;
   return (
     <section
@@ -118,7 +123,11 @@ function Painel({ s, disabled, comBotao }: { s: SugestaoDeResposta; disabled?: b
             </>
           )}
           {draft.status === "failed" && (
-            <p className="text-xs">{t("Confira a configuração do agente e tente gerar novamente.")}</p>
+            <p className="text-xs">
+              {motivo
+                ? t(motivo.texto)
+                : t("Confira a configuração do agente e tente gerar novamente.")}
+            </p>
           )}
         </>
       )}

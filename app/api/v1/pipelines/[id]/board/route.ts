@@ -28,9 +28,11 @@ import {
 import type { LeadCandidate } from "@/lib/leads/active-lead";
 import { anexarDadosDoContato, type LinhaDoContatoNoQuadro } from "@/lib/kanban/dados-do-contato";
 import { anexarProximoPasso, type TarefaAbertaDoQuadro } from "@/lib/kanban/proximo-passo-do-quadro";
+import { anexarTarefasAosNegocios, type LinhaDaTarefaNoQuadro } from "@/lib/kanban/tarefas-no-quadro";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { esperandoDesdeDaConversa } from "@/lib/kanban/ordem-do-funil";
 import { createClient } from "@/lib/supabase/server";
+import { idsDeContatosPessoais } from "@/app/api/v1/conversations/_handler";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
 
@@ -349,7 +351,10 @@ async function withConversas(
       const marcadores = marcadoresPorContato.get(lead.contact_id);
       return {
         ...lead,
-        ...(conversa ? { conversa } : {}),
+        // `null`, nunca ausente: contato sem conversa é "não há conversa", e é
+        // assim que o card e o dossiê sabem mostrar "Abrir conversa" (#1993).
+        // Ausente (`undefined`) fica para o lead SEM contato, que sai acima.
+        conversa: conversa ?? null,
         // Vazio não vira campo, como `contact_tags`: o payload não engorda.
         ...(marcadores && marcadores.size > 0 ? { conversation_tags: [...marcadores] } : {}),
       };
@@ -524,6 +529,45 @@ async function withNextActions(
   };
 }
 
+/**
+ * Anexa o resumo das tarefas EM ABERTO de cada negócio — o selo do card.
+ *
+ * Uma leitura de `crm_tasks` para o quadro inteiro, em lotes de ids como as
+ * outras: o card não pode custar uma consulta por negócio. Só as abertas vêm do
+ * banco, porque é só o que o selo conta; a régua de "aberta" e "atrasada" é a
+ * mesma da lista do dossiê (`lib/kanban/tarefas-no-quadro.ts`).
+ *
+ * Erro de leitura derruba o quadro com 500, como as outras etapas desta rota:
+ * um quadro que some com o selo em silêncio diria "nenhuma tarefa pendente"
+ * justamente no dia em que não sabe.
+ */
+async function withTarefas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  leads: Lead[],
+): Promise<{ leads: Lead[]; error: string | null }> {
+  const leadIds = leads.map((l) => l.id);
+  if (leadIds.length === 0) return { leads, error: null };
+
+  const { data, error } = await buscaEmLotes(leadIds, (lote) =>
+    supabase
+      .from("crm_tasks")
+      .select("lead_id, due_date, status")
+      .eq("organization_id", organizationId)
+      .in("lead_id", lote)
+      // Em aberto = nem feita nem desistida (`lib/tarefas/tipos.ts`). `.not`, e
+      // não `.in` com lista literal: a cerca `board-consulta-em-lotes` só
+      // aceita `.in(` com lote.
+      .not("status", "in", "(done,cancelled)"),
+  );
+  if (error) return { leads, error: error.message };
+
+  return {
+    leads: anexarTarefasAosNegocios(leads, (data ?? []) as LinhaDaTarefaNoQuadro[]),
+    error: null,
+  };
+}
+
 export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
@@ -599,10 +643,25 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
   if (!pipeline) return fail("resource_not_found", t("Pipeline não encontrado."), 404, { requestId });
 
+  // Contato pessoal some do board mas a linha continua no banco (spec 21, etapa
+  // 8, decisão 2 — critério 4): o card não é listado e volta ao desmarcar, com
+  // o histórico intacto. Filtro em memória sobre a lista já lida: o board não
+  // pagina, então nada se perde por filtrar depois de ler. NUNCA `delete`.
+  const pessoais = await idsDeContatosPessoais(
+    supabase,
+    (pipeline as Pipeline).organization_id,
+  );
+  const leadsVisiveis =
+    pessoais.length > 0
+      ? ((leads ?? []) as Lead[]).filter(
+          (l) => l.contact_id === null || !pessoais.includes(l.contact_id),
+        )
+      : ((leads ?? []) as Lead[]);
+
   const leadsWithOwner = await withOwnerAgents(
     supabase,
     (pipeline as Pipeline).organization_id,
-    leads ?? [],
+    leadsVisiveis,
   );
   if (leadsWithOwner.error) {
     return fail("internal_error", leadsWithOwner.error, 500, { requestId });
@@ -640,10 +699,25 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     leadsComScore.leads,
   );
 
-  const leadsComConversa = await withConversas(
+  // As tarefas entram NO MEIO da cadeia, e não no fim: a resposta continua
+  // saindo de `withMarcadoresDoContato`, a última etapa que as cercas do quadro
+  // vigiam (`kanban-atalho-conversa`, `funil-mostra-dados-do-cliente`,
+  // `funil-filtro-de-tag-le-as-duas-caixas`). A ordem não muda o resultado: cada
+  // etapa só acrescenta o próprio campo ao lead (o próximo passo, #200, e o selo
+  // das tarefas, do upstream).
+  const leadsComTarefas = await withTarefas(
     supabase,
     (pipeline as Pipeline).organization_id,
     leadsComPasso,
+  );
+  if (leadsComTarefas.error) {
+    return fail("internal_error", leadsComTarefas.error, 500, { requestId });
+  }
+
+  const leadsComConversa = await withConversas(
+    supabase,
+    (pipeline as Pipeline).organization_id,
+    leadsComTarefas.leads,
   );
   if (leadsComConversa.error) {
     return fail("internal_error", leadsComConversa.error, 500, { requestId });

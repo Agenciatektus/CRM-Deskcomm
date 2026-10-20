@@ -81,6 +81,7 @@ export function tarefasDaVitrine(agora: number): Tarefa[] {
       status: "pending",
       lead_id: IDS.lead,
       contact_id: IDS.contato,
+      demanda_id: null,
       assigned_to: IDS.atendente,
       created_by: IDS.atendente,
       created_at: minutosAtras(agora, 60 * 48),

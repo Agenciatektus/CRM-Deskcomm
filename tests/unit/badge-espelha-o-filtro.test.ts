@@ -25,7 +25,7 @@ const CONTAGEM = "app/api/v1/conversations/counts/route.ts";
 const LISTA = "app/api/v1/conversations/_handler.ts";
 const REGUA = "lib/inbox/marcador-da-conversa.ts";
 /** Desde a 9029 as seis contagens saem de UMA função do banco. */
-const FUNCAO = "supabase/migrations/20261004090000_9029_contagens_da_caixa_numa_consulta.sql";
+const FUNCAO = "supabase/migrations/20261004090002_9029_contagens_da_caixa_numa_consulta.sql";
 
 /** O predicado do marcador escrito à mão — o que só a régua pode escrever. */
 const PREDICADO_A_MAO = /tags\.cs\.|tags_do_contato\.cs\./;

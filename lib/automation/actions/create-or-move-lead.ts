@@ -10,6 +10,7 @@ import { originFromAutomationEvent } from "@/lib/atendimento/origem-automacao";
  * eventos derivados (anti-loop profundidade 1: regra→ação→handler→evento).
  */
 import { getAction, registerAction } from "@/lib/automation/actions";
+import { mensagemDeErro } from "@/lib/automation/actions/erro-legivel";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
@@ -48,12 +49,17 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     actor: { type: "webhook_source", id: ctx.ruleId },
     requestId: `rule:${ctx.ruleId}`,
   };
-  const lead = ctx.context.lead as { id: string; pipeline_id: string; contact_id?: string } | undefined;
+  // A LINHA INTEIRA do negócio, como `buildContext` a lê (`select *` de
+  // `crm_leads`): o ramo abaixo precisa de `title`, `tags`, `custom_fields` e
+  // companhia quando o caminho é a transferência (#2155).
+  const lead = ctx.context.lead as (NegocioParaMover & { contact_id?: string | null }) | undefined;
   const contact = ctx.context.contact as
     | { id: string; name?: string | null; display_name?: string | null; phone_number?: string | null }
     | undefined;
 
-  const contactId = contact?.id ?? lead?.contact_id;
+  // `?? undefined` porque `contact_id` admite `null` (a linha
+  // do banco) e `publicaNoContexto` aceita `string | undefined`.
+  const contactId = contact?.id ?? lead?.contact_id ?? undefined;
   handlerCtx.serviceOrigin = contactId
     ? (await originFromAutomationEvent(ctx, contactId)) ?? { kind: "unavailable", reason: "origin_capture_failed" }
     : { kind: "unavailable", reason: "origin_capture_failed" };
@@ -74,6 +80,25 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
         if (!troca.ok) return { type: "create_or_move_lead", status: "failed", error: troca.code };
         publicaNoContexto(ctx, troca.lead, contactId);
         return { type: "create_or_move_lead", status: "success", detail: { moved: lead.id, pipeline_id: pipelineId } };
+      }
+
+      // ── lead.won NO MESMO FUNIL: A AÇÃO NÃO MOVE (#1528 + #2769) ────────────
+      //
+      // Com a porta de `lead.won` aberta para `create_or_move_lead`, este ramo
+      // (mesmo funil) volta a ser alcançável — e é EXATAMENTE o que a #1528
+      // vetou: mover o negócio recém-ganho para uma etapa aberta o REABRE,
+      // `lead.stage_changed` sai do reabrir, uma regra de etapa o leva de volta
+      // para a etapa de ganho, e as duas se realimentam sem fim.
+      //
+      // Então `lead.won` só tem uma moda aqui: levar o MESMO card a outro funil
+      // (o ramo acima, 9053; no fork nada é clonado). O mesmo funil não é continuação — é reescrever o
+      // ganho —, e a recusa diz isso com uma frase própria na aba Atividade.
+      if (ctx.event?.event_type === "lead.won") {
+        return {
+          type: "create_or_move_lead",
+          status: "failed",
+          error: "continuacao_exige_outro_funil",
+        };
       }
       const movido = await moveLeadHandler(ctx.admin, handlerCtx, lead.id, { to_stage_id: stageId });
       publicaNoContexto(ctx, movido, contactId);
@@ -140,7 +165,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     return {
       type: "create_or_move_lead",
       status: "failed",
-      error: err instanceof Error ? err.message : String(err),
+      error: mensagemDeErro(err),
     };
   }
 }

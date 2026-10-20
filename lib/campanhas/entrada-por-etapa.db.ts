@@ -219,7 +219,7 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
     async carregaContato(orgId, contactId) {
       const { data, error } = await admin
         .from("contacts")
-        .select("id, name, display_name, phone_number, is_blocked, is_anonymized, is_merged_into, kind, consent")
+        .select("id, name, display_name, phone_number, is_blocked, is_personal, is_anonymized, is_merged_into, kind, consent")
         .eq("organization_id", orgId)
         .eq("id", contactId)
         .maybeSingle();
@@ -231,6 +231,7 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
         display_name: string | null;
         phone_number: string | null;
         is_blocked: boolean;
+        is_personal: boolean | null;
         is_anonymized: boolean;
         is_merged_into: string | null;
         kind: string | null;
@@ -248,6 +249,7 @@ export function createSupabaseEntradaPorEtapaDb(admin: SupabaseClient): EntradaP
         nome: nomeDoContato(c),
         telefone: c.phone_number,
         bloqueado: !!c.is_blocked,
+        pessoal: c.is_personal === true,
         anonimizado: !!c.is_anonymized,
         recusouMarketing: recusouMarketing(c.consent),
       };

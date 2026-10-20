@@ -12,7 +12,7 @@ import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtim
  * ─── O que é "auxiliar" ──────────────────────────────────────────────────────
  * A ABA não entra. Ela é a visão escolhida, já está destacada na barra de cima, e
  * nomeá-la aqui diria ao operador para "limpar" o lugar onde ele está. Entram os
- * quatro que ele ligou por cima da aba e pode esquecer que ligou.
+ * que ele ligou por cima da aba e pode esquecer que ligou.
  *
  * As strings saem em português porque `t()` usa o português como chave. Elas
  * precisam existir em `lib/i18n/dicionario.ts`: o guardião do espanhol é cego a

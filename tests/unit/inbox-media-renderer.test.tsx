@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
 import { MessageBubble } from "@/components/inbox/MessageBubble";
+import { MARCADOR_NAO_LIDA } from "@/lib/messaging/media/derivable";
 import type { Message } from "@/lib/types/messaging";
 
 function msg(over: Partial<Message>): Message {
@@ -55,6 +56,10 @@ describe("MediaRenderer", () => {
     expect(screen.getByRole("link", { name: /baixar pdf/i })).toBeInTheDocument();
   });
 });
+
+// Fork Tektus: a transcrição do áudio é da bolha (`bolha/CorpoDaBolha` +
+// `TranscricaoDoAudio`, #138), não do `MediaRenderer`. Os casos do upstream
+// (#2057/#2133) estão em tests/unit/transcricao-no-inbox.test.tsx, contra a bolha.
 
 describe("MessageBubble com mídia", () => {
   it("renderiza mídia E caption juntos", () => {

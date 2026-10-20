@@ -6,6 +6,7 @@ import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
 import { MediaUnavailable } from "@/components/inbox/media/MediaUnavailable";
 import { useT } from "@/hooks/i18n/useT";
 import type { Localizacao } from "@/lib/messaging/localizacao";
+import { DERIVACAO_TERMINADA } from "@/lib/messaging/media/derivable";
 import { transcricaoDoAudio } from "@/lib/messaging/media/texto-derivado";
 import type { Message } from "@/lib/types/messaging";
 import { Trash } from "@/lib/ui/icons";
@@ -47,10 +48,15 @@ interface Props {
   espaco: string | null;
   /** A bolha é só a imagem: a mídia encosta na borda, sem margem negativa. */
   soMidia: boolean;
+  /** Relógio da bolha (ms), para o aviso "Transcrevendo…" (upstream #2133). */
+  agora?: number;
 }
 
+/** Depois disto sem status, o worker não vai mais transcrever: o aviso some (upstream #2133). */
+const TETO_AVISO_TRANSCREVENDO_MS = 10 * 60_000;
+
 /** Tudo o que a bolha mostra entre o nome e a hora, fora do modo de edição. */
-export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espaco, soMidia }: Props) {
+export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espaco, soMidia, agora }: Props) {
   const t = useT();
   const isOutbound = message.direction === "outbound";
   const hasMedia = Boolean(message.media_url || message.media_storage_path);
@@ -62,11 +68,32 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
   const temAnexosExtras = Array.isArray(message.metadata?.instagram_anexos_extras)
     && (message.metadata.instagram_anexos_extras as unknown[]).length > 0;
   const isContact = message.type === "contact";
+  // A retenção marcou `metadata.media_status = 'expired'` (upstream 0557, #1534)
+  // e a poda anulou os dois campos de mídia: sem isto a bolha perdia o render.
+  // O aviso leva os DIAS que a organização configurou, quando a 0557 os gravou.
+  const mediaExpirada = !hasMedia && message.metadata?.media_status === "expired";
+  const diasDaRetencao =
+    typeof message.metadata?.media_retention_days === "number" ? message.metadata.media_retention_days : null;
+  const avisoDeExpiracao =
+    diasDaRetencao !== null
+      ? t("Mídia apagada pela política de retenção ({n} dias)").replace("{n}", String(diasDaRetencao))
+      : t("Mídia apagada pela política de retenção.");
   const transcricao = transcricaoDoAudio(message);
+  // Upstream #2133: o worker não grava "pending" — a linha nasce com status null
+  // e só ele muda. Sem status terminal, áudio recebido (ou enviado pelo
+  // celular) e recente ainda vai ganhar texto: a bolha avisa, pela idade em
+  // `created_at` (nunca `sent_at`, que no inbound é o relógio do aparelho).
+  const transcrevendo =
+    message.type === "audio" &&
+    !transcricao &&
+    agora !== undefined &&
+    !DERIVACAO_TERMINADA.has(message.media_derived_status ?? "") &&
+    (message.direction === "inbound" || message.sent_via === "external_device") &&
+    agora - new Date(message.created_at).getTime() < TETO_AVISO_TRANSCREVENDO_MS;
   // Nada a desenhar: sem texto, mídia, cartão, pino nem aviso de anexo. A bolha
   // nunca fica vazia — mostra que há uma mensagem e onde vê-la.
   const semConteudo = !hasMedia && !message.body && !anexoSemArquivo && !temAnexosExtras
-    && linksDoInstagram.length === 0 && !isContact && !localizacao;
+    && linksDoInstagram.length === 0 && !isContact && !localizacao && !mediaExpirada;
 
   // Apagada pelo autor ("apagar para todos"). A linha continua no histórico —
   // sumir com ela deixaria a resposta seguinte respondendo ao nada —, mas o
@@ -108,6 +135,17 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
           {/* Só no corpo normal: apagada e ocultada saem antes, e a transcrição
               de uma mensagem apagada seria o mesmo texto por outro caminho. */}
           {transcricao && <TranscricaoDoAudio texto={transcricao} />}
+          {transcrevendo && (
+            <p data-testid="transcricao-de-audio-pendente" className="mt-1 text-xs text-text-subtle">
+              {t("Transcrevendo…")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {mediaExpirada && (
+        <div className={cn(message.body && "mb-1.5")}>
+          <MediaUnavailable kind={avisoDeExpiracao} />
         </div>
       )}
 
@@ -137,7 +175,7 @@ export function CorpoDaBolha({ message, apagada, ocultaNoCrm, localizacao, espac
         </a>
       ))}
 
-      {isContact && !hasMedia && (
+      {isContact && !hasMedia && !mediaExpirada && (
         <div className={cn(message.body && "mb-1.5")}>
           <ContactCard message={message} />
         </div>

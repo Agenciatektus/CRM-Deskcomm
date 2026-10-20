@@ -1,27 +1,27 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { Check, ChevronRight, Circle } from "lucide-react"
+import * as React from "react";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronRight, Circle } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+const DropdownMenu = DropdownMenuPrimitive.Root;
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
+const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
-const DropdownMenuGroup = DropdownMenuPrimitive.Group
+const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal
+const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 
-const DropdownMenuSub = DropdownMenuPrimitive.Sub
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
-    inset?: boolean
+    inset?: boolean;
   }
 >(({ className, inset, children, ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
@@ -29,16 +29,15 @@ const DropdownMenuSubTrigger = React.forwardRef<
     className={cn(
       "flex h-8.5 cursor-default select-none items-center gap-2.5 whitespace-nowrap rounded-md px-2 text-[13.5px] outline-hidden focus:bg-hover data-[state=open]:bg-hover [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-text-muted",
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   >
     {children}
     <ChevronRight className="ml-auto" />
   </DropdownMenuPrimitive.SubTrigger>
-))
-DropdownMenuSubTrigger.displayName =
-  DropdownMenuPrimitive.SubTrigger.displayName
+));
+DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
 
 /**
  * `folhaNoCelular` (aqui e no `DropdownMenuContent`): abaixo de 760px o menu vira
@@ -50,19 +49,30 @@ type ComFolha = { folhaNoCelular?: boolean }
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent> & ComFolha
->(({ className, folhaNoCelular, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    data-folha-no-celular={folhaNoCelular ? "" : undefined}
-    className={cn(
-      "pele-ruido z-50 min-w-[8rem] overflow-hidden rounded-menu border border-border bg-surface p-1.5 text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-dropdown-menu-content-transform-origin)",
-      className
-    )}
-    {...props}
-  />
-))
-DropdownMenuSubContent.displayName =
-  DropdownMenuPrimitive.SubContent.displayName
+>(({ className, folhaNoCelular, collisionPadding = 16, ...props }, ref) => (
+  /*
+    PORTAL, igual ao `DropdownMenuContent` abaixo (#2702, upstream): sem portal o
+    submenu nasce DENTRO do menu pai, que corta o que passa da caixa dele, e a
+    lista de responsáveis do card não aparecia. Portado para o body, ele se
+    posiciona contra a viewport. `collisionPadding` mantém a folga da borda e o
+    `max-h` + rolagem seguram a lista longa. A pele (`pele-ruido`, `rounded-menu`,
+    `shadow-pop`) e a folha do celular são as do DS; z-[60] fica acima do z-50
+    do pai. Vigiado por `tests/unit/kanban-submenu-responsavel.test.tsx`.
+  */
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.SubContent
+      ref={ref}
+      collisionPadding={collisionPadding}
+      data-folha-no-celular={folhaNoCelular ? "" : undefined}
+      className={cn(
+        "pele-ruido z-[60] max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-menu border border-border bg-surface p-1.5 text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-dropdown-menu-content-transform-origin)",
+        className
+      )}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
+));
+DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
@@ -83,8 +93,8 @@ const DropdownMenuContent = React.forwardRef<
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
-))
-DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
+));
+DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
@@ -103,12 +113,12 @@ const DropdownMenuItem = React.forwardRef<
       "relative flex h-8.5 cursor-default select-none items-center gap-2.5 whitespace-nowrap rounded-md px-2 text-[13.5px] text-text outline-hidden transition-colors focus:bg-hover focus:text-text data-[disabled]:pointer-events-none data-[disabled]:text-text-subtle [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-text-muted",
       "data-[variant=destructive]:text-error-fg data-[variant=destructive]:focus:bg-error-bg data-[variant=destructive]:focus:text-error-fg data-[variant=destructive]:[&>svg]:text-error-fg",
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   />
-))
-DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
+));
+DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
@@ -130,9 +140,8 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     </span>
     {children}
   </DropdownMenuPrimitive.CheckboxItem>
-))
-DropdownMenuCheckboxItem.displayName =
-  DropdownMenuPrimitive.CheckboxItem.displayName
+));
+DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
 
 const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
@@ -153,13 +162,13 @@ const DropdownMenuRadioItem = React.forwardRef<
     </span>
     {children}
   </DropdownMenuPrimitive.RadioItem>
-))
-DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
+));
+DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
 
 const DropdownMenuLabel = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Label>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
-    inset?: boolean
+    inset?: boolean;
   }
 >(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
@@ -171,8 +180,8 @@ const DropdownMenuLabel = React.forwardRef<
     )}
     {...props}
   />
-))
-DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
+));
+DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
 
 const DropdownMenuSeparator = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
@@ -183,8 +192,8 @@ const DropdownMenuSeparator = React.forwardRef<
     className={cn("mx-0.5 my-1 h-px bg-border", className)}
     {...props}
   />
-))
-DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
+));
+DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
 const DropdownMenuShortcut = ({
   className,
@@ -219,4 +228,4 @@ export {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
-}
+};

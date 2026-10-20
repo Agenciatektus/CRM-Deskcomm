@@ -17,6 +17,8 @@ interface Props {
   status: string;
   encerrada: boolean;
   canal: ChannelSummary | null | undefined;
+  /** O nome do canal dado em Conexões (#2383); sem ele, a marca do provedor. */
+  rotuloCanal?: string | null;
   telefone: string | null;
   comando: Comando;
   meuUserId: string;
@@ -29,7 +31,7 @@ interface Props {
  * `comandoDaConversa` que a lista e a faixa do composer usam. O testid é
  * contrato de `inbox-quem-manda.spec.ts`.
  */
-export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone, comando, meuUserId }: Props) {
+export function IdentidadeDaConversa({ nome, status, encerrada, canal, rotuloCanal, telefone, comando, meuUserId }: Props) {
   const t = useT();
   const marca = channelBrand(canal);
   const rotuloDoCanal = marca === "unknown" ? null : CHANNEL_BRAND_LABEL[marca];
@@ -54,9 +56,13 @@ export function IdentidadeDaConversa({ nome, status, encerrada, canal, telefone,
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-text-muted">
           {canal && (
-            <span className="inline-flex shrink-0 items-center gap-1">
+            <span
+              className="inline-flex min-w-0 max-w-[12rem] items-center gap-1"
+              title={rotuloCanal ? `${t("Entrou por")} ${rotuloCanal}` : undefined}
+              data-testid={rotuloCanal ? "canal-da-conversa" : undefined}
+            >
               <ChannelLogo channel={canal} size={14} />
-              {rotuloDoCanal}
+              <span className="truncate">{rotuloCanal ?? rotuloDoCanal}</span>
             </span>
           )}
           {canal && telefone && <Sep />}

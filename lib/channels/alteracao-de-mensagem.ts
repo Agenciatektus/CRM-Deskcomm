@@ -34,6 +34,12 @@ export interface PedidoDeAlteracao {
   direcao: "inbound" | "outbound";
   /** `external_id` da mensagem original. */
   alvo: string;
+  /**
+   * Outras FORMAS do mesmo id (subida 1.85, #2xxx do upstream): o evento do WAHA
+   * traz só a cauda, e a recebida foi gravada com o composto `false_<chat>_<id>`.
+   * A conferência de autoria abaixo vale para qualquer uma delas.
+   */
+  alvosAlternativos?: string[];
   /** O chat do evento, como o transporte o entregou. */
   chat: { jid: string | null; phone: string | null; lid: string | null };
   acao: "editar" | "apagar";
@@ -57,15 +63,23 @@ export async function aplicarAlteracaoDeMensagem(
   admin: SupabaseClient,
   pedido: PedidoDeAlteracao,
 ): Promise<ResultadoDaAlteracao> {
-  const { data, error } = await admin
-    .from("messages")
-    .select("id, channel_session_id, direction, conversation_id, contact_id")
-    .eq("organization_id", pedido.organizationId)
-    .eq("external_id", pedido.alvo)
-    .maybeSingle();
-  // Falha de banco SOBE: o transporte reenvia e a alteração não se perde.
-  if (error) throw new Error(`alteracao_leitura_falhou: ${error.message}`);
-  const original = data as Original | null;
+  // Uma forma por vez, na ordem: o `alvo` primeiro (o caminho de sempre), depois
+  // as outras formas do mesmo id. A primeira que acha é a original; a
+  // conferência de autoria abaixo vale para ela do mesmo jeito.
+  const formas = [...new Set([pedido.alvo, ...(pedido.alvosAlternativos ?? [])].filter((f) => f.length > 0))];
+  let original: Original | null = null;
+  for (const forma of formas) {
+    const { data, error } = await admin
+      .from("messages")
+      .select("id, channel_session_id, direction, conversation_id, contact_id")
+      .eq("organization_id", pedido.organizationId)
+      .eq("external_id", forma)
+      .maybeSingle();
+    // Falha de banco SOBE: o transporte reenvia e a alteração não se perde.
+    if (error) throw new Error(`alteracao_leitura_falhou: ${error.message}`);
+    original = data as Original | null;
+    if (original) break;
+  }
   if (!original) return { aplicada: false, motivo: `${pedido.acao}_sem_original` };
 
   if (original.channel_session_id !== pedido.channelSessionId || original.direction !== pedido.direcao) {

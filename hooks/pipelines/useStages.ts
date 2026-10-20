@@ -47,6 +47,12 @@ export interface PatchDeEtapa {
   /** Envia conversão (Meta/Google) ao entrar nesta etapa, e qual evento (9054). */
   envia_conversao?: boolean;
   evento_de_conversao?: "Purchase" | "QualifiedLead";
+  /**
+   * Janela de "esfriando" da etapa, em HORAS (issue #1532). `null` limpa a
+   * configuração e a etapa volta ao padrão de 24 h/72 h. Fora de 1 a 8760
+   * inteiro a rota responde 422 — a coluna é `numeric` sem CHECK.
+   */
+  expected_duration_hours?: number | null;
 }
 
 function useReler(pipelineId: string) {

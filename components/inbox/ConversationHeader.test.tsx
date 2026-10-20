@@ -49,10 +49,20 @@ vi.mock("@/hooks/inbox/useResumeAiAttendance", () => ({
 vi.mock("@/hooks/inbox/usePauseAiAttendance", () => ({
   usePauseAiAttendance: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+// Spec 21, etapa 15: o cabeçalho chama os hooks de pessoal em toda
+// renderização (antes dos early returns) — sem este mock, o `useMutation` real
+// exigiria QueryClientProvider e o teste inteiro caía.
+vi.mock("@/hooks/contacts/usePersonalContact", () => ({
+  useMarkPersonalContact: () => ({ mutate: vi.fn(), isPending: false }),
+  useUnmarkPersonalContact: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock("@/hooks/ai/useAutomaticoAtivo", () => ({
   useAutomaticoAtivo: () => ({ data: false }),
 }));
 vi.mock("@/components/kanban/OwnerBadge", () => ({ OwnerBadge: () => null }));
+// A faixa da carteira (#2591) lê a carteira com react-query; este arquivo mede
+// a barra de ações, não a carteira (que tem arquivo próprio).
+vi.mock("@/components/inbox/FaixaDaCarteira", () => ({ FaixaDaCarteira: () => null }));
 vi.mock("@/components/inbox/ReassignDialog", () => ({ ReassignDialog: () => null }));
 vi.mock("@/components/inbox/JanelaSelo", () => ({ JanelaSelo: () => null }));
 vi.mock("@/components/inbox/ChannelLogo", () => ({ ChannelLogo: () => null }));
@@ -111,6 +121,7 @@ describe("ConversationHeader — chamada de voz na Inbox", () => {
       phone_number: "+5511999999999",
       tags: [],
       is_blocked: false,
+      is_personal: false,
       is_anonymized: false,
     };
     render(<ConversationHeader conversation={atual} />);
@@ -129,6 +140,7 @@ describe("ConversationHeader — chamada de voz na Inbox", () => {
       phone_number: "+5511999999999",
       tags: [],
       is_blocked: false,
+      is_personal: false,
       is_anonymized: false,
     };
     render(<ConversationHeader conversation={atual} />);
@@ -196,7 +208,7 @@ describe("ConversationHeader — busca dentro da conversa (#1793)", () => {
 describe("ConversationHeader — Ver contato e o painel do lead", () => {
   function comContato() {
     const atual = conversa("open");
-    atual.contacts = { id: "contato-1", display_name: "Raphael", name: "Raphael", phone_number: null, tags: [], is_blocked: false, is_anonymized: false };
+    atual.contacts = { id: "contato-1", display_name: "Raphael", name: "Raphael", phone_number: null, tags: [], is_blocked: false, is_personal: false, is_anonymized: false };
     return atual;
   }
   it("com o painel aberto, Ver contato se cala no xl (o painel tem o seu)", async () => {

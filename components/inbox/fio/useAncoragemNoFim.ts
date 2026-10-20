@@ -73,7 +73,10 @@ export function useAncoragemNoFim(p: {
     }
     // Fio ainda vazio não ancora nada: marcar aqui faria a guarda valer a partir
     // da pintura em branco, que é exatamente o defeito acima.
-    if (totalDeItens > 0) jaAncorou.current = true;
+    // #2515 (upstream): o cartão de passagem pode chegar com o esqueleto ainda na
+    // tela, sem `bottomRef` montado. A marca só vale com o destino montado;
+    // senão a abertura seria consumida sobre um ref nulo e nada rolaria.
+    if (totalDeItens > 0 && bottomRef.current) jaAncorou.current = true;
 
     bottomRef.current?.scrollIntoView({
       behavior: primeiraAncoragem ? "auto" : "smooth",

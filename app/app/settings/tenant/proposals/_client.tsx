@@ -19,10 +19,17 @@ export function ProposalsSettingsClient() {
   const t = useT();
   const router = useRouter();
   const [cfg, setCfg] = useState<Config | null>(null);
+  // O link "Modelos de proposta" segue o valor SALVO, não o do switch ainda não
+  // salvo: `onCheckedChange` muta `cfg`, e um switch virado sem salvar levaria
+  // a uma tela que a rota responde 404 (issue #1889).
+  const [enabledSalvo, setEnabledSalvo] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    apiClient.get<ApiSuccess<Config>>("/api/v1/settings/proposals").then((res) => setCfg(res.data));
+    apiClient.get<ApiSuccess<Config>>("/api/v1/settings/proposals").then((res) => {
+      setCfg(res.data);
+      setEnabledSalvo(res.data.enabled);
+    });
   }, []);
 
   async function salvar() {
@@ -30,6 +37,7 @@ export function ProposalsSettingsClient() {
     setSalvando(true);
     try {
       await apiClient.patch("/api/v1/settings/proposals", cfg);
+      setEnabledSalvo(cfg.enabled);
       // O menu (sidebar, ⌘K) vem do layout de `/app`, que não re-renderiza numa
       // navegação comum: sem isto, ligar não mostra a porta e desligar deixa um
       // link que leva a 404 até o F5.
@@ -48,9 +56,11 @@ export function ProposalsSettingsClient() {
       <CabecalhoDaPagina
         titulo={t("Propostas")}
         acoes={
+          enabledSalvo ? (
           <Button asChild variant="outline" size="sm">
             <Link href="/app/settings/tenant/proposals/modelos">{t("Modelos de proposta")}</Link>
           </Button>
+          ) : null
         }
       />
       <SecaoDaPagina className="gap-4">

@@ -157,7 +157,7 @@ describe("a página do funil ENTREGA as tags do quadro à barra", () => {
   // passa dos 15 s sob a suíte paralela, como o barril de ícones.
   it("as tags dos leads do quadro chegam ao menu de tag em lote", { timeout: 40_000 }, async () => {
     const { PipelinePageClient } = await import("@/app/app/pipelines/[id]/_client");
-    render(<PipelinePageClient pipelineId="p-1" initialName="Funil" role="admin" />);
+    render(<PipelinePageClient pipelineId="p-1" initialName="Funil" role="admin" funis={[]} />);
 
     await userEvent.click(await screen.findByRole("button", { name: /tag/i }));
     expect(await screen.findByRole("menuitem", { name: "google" })).toBeTruthy();

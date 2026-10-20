@@ -128,6 +128,8 @@ export interface Message {
    * depois da anonimização do titular (a cascata LGPD zera a coluna).
    */
   media_derived_text?: string | null;
+  /** Estado da derivação (ready/failed/skipped; null = ainda processando, upstream #2133). */
+  media_derived_status?: string | null;
   // Espelha o CHECK do banco (messages_sent_via_check): 'crm', 'external_device',
   // 'automation', 'ai', 'user', 'system'. O tipo listava só três e o TypeScript
   // aceitava os demais só porque o dado vem do Supabase sem cast — a tela então

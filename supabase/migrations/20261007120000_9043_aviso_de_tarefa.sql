@@ -101,6 +101,9 @@ alter table public.agent_inbox_items
     'proposta_pronta_para_revisao',
     'jev_pedido_de_humano',
     'jev_parar_de_receber',
+    -- (0501, upstream) revisão das conversas que chegaram durante a suspensão.
+    -- Entrou na subida 1.73: sem ela a cadeia nova perdia o kind (9055 cobre produção).
+    'org_reativada',
     'task_due',
     'other'
 ));

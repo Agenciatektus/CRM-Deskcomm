@@ -13,6 +13,7 @@ import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 import { CriarProximoPasso } from "./CriarProximoPasso";
+import { PROXIMO_PASSO_DA_MENSAGEM_NOVA } from "@/lib/atendimento/proximo-passo-padrao";
 import { SemLista } from "./SemLista";
 import { useTarefasDoContato } from "./useTarefasDoContato";
 import type { DemandaRow, DesfechoDraft } from "./tipos";
@@ -153,12 +154,14 @@ export function Demandas({
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate font-medium">{t(ESTADO_LEGIVEL[d.estado] ?? d.estado)}</span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {t("há")} {horasDesde(d.aberta_em)}h
+                    {t("há {tempo}").replace("{tempo}", `${horasDesde(d.aberta_em)}h`)}
                   </span>
                 </div>
                 {/* O invariante 4 na frase, não só na cor. */}
                 <div className={cn("mt-0.5", semPasso ? "font-medium" : "text-muted-foreground")}>
-                  {d.proximo_passo
+                  {d.proximo_passo === PROXIMO_PASSO_DA_MENSAGEM_NOVA
+                    ? t("Responder à nova mensagem do cliente")
+                    : d.proximo_passo
                     ? `${t("Combinado antes")}: ${d.proximo_passo}`
                     : temTarefaAberta ? t("Próximo passo nas tarefas do contato") : t("Sem próximo passo definido")}
                 </div>

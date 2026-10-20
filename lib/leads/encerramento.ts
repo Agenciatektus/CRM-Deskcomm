@@ -34,6 +34,7 @@ import {
 } from "@/lib/leads/campos-exigidos";
 import {
   decideMotivoDaPerda,
+  razaoDaPerdaNaTimeline,
   recusaDeMotivoDaPerdaPeloBanco,
 } from "@/lib/leads/motivo-da-perda";
 
@@ -323,7 +324,7 @@ export async function encerraDemanda(
     // bloco "vocabulario de dominio persistido" em `lib/i18n/dicionario.ts`.
     reason:
       input.razaoNaTimeline ??
-      (input.desfecho === "won" ? "Ganho" : `Perdido — ${input.motivo}`),
+      (input.desfecho === "won" ? "Ganho" : razaoDaPerdaNaTimeline(input.motivo ?? "")),
     payload: {
       ...(input.payloadNaTimeline ?? {}),
       desfecho: input.desfecho,

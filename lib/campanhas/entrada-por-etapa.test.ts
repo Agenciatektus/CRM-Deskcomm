@@ -72,6 +72,7 @@ function contato(parcial: Partial<ContatoDoAlvo> = {}): ContatoDoAlvo {
     nome: "Marina",
     telefone: "+5548999990000",
     bloqueado: false,
+    pessoal: false,
     anonimizado: false,
     recusouMarketing: false,
     ...parcial,

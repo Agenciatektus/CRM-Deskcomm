@@ -24,6 +24,8 @@ import { DEFAULT_VISIBILITY_MODE, ROLE_RANK, type VisibilityMode } from "@/lib/a
 import { routingConfigSchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { loadChannelRoutingSettings } from "@/lib/routing/channel-policies";
+import { configAssinatura } from "@/lib/messaging/assinatura";
+import { AssinaturaForm } from "./_assinatura-form";
 import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -54,6 +56,8 @@ export default async function AtendimentoSettingsPage() {
   const routing = routingConfigSchema.catch(routingConfigSchema.parse({})).parse(settings.routing ?? {});
   const idioma = user.idioma;
   const channels = await loadChannelRoutingSettings(supabase, activeOrg.orgId);
+  const assinatura = configAssinatura(settings);
+  const assinaturaInicial = { humanos: assinatura.humanos, ia: assinatura.ia, nome_ia: assinatura.nomeIa };
 
   return (
     <Pagina>
@@ -70,6 +74,7 @@ export default async function AtendimentoSettingsPage() {
           initial={{ ...routing, visibility_mode: settings.visibility_mode ?? DEFAULT_VISIBILITY_MODE }}
         />
         <ChannelRoutingForm initial={channels} />
+        <AssinaturaForm initial={assinaturaInicial} />
       </SecaoDaPagina>
     </Pagina>
   );

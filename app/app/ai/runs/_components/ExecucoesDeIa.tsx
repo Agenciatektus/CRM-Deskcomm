@@ -24,6 +24,7 @@ import { CabecalhoDaPagina, Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { useT } from "@/hooks/i18n/useT";
 import { PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
+import { RoteamentoResultados } from "./RoteamentoResultados";
 
 /**
  * O MESMO formato da tela de Uso — as duas leem `llm_calls.cost_cents`, que é
@@ -77,7 +78,9 @@ export function ExecucoesDeIa() {
   // traz a pessoa já filtrada ("Ver as decisões do Jev").
   const router = useRouter();
   const pathname = usePathname();
-  const provider = useSearchParams().get("provider");
+  const parametros = useSearchParams();
+  const provider = parametros.get("provider");
+  const abaRoteamento = parametros.get("tab") === "roteamento";
   const soOJev = provider === PROVEDOR_DO_JEV;
 
   const carregar = useCallback(async () => {
@@ -115,6 +118,8 @@ export function ExecucoesDeIa() {
     void carregar();
   }, [carregar]);
 
+  if (abaRoteamento) return <RoteamentoResultados />;
+
   if (erro) {
     return (
       <div className="p-6">
@@ -146,6 +151,12 @@ export function ExecucoesDeIa() {
         }
       />
       <div className="mb:px-4">
+        <nav className="mb-4 flex gap-3 text-label" aria-label={t("Execuções de IA")}>
+          <span aria-current="page" className="font-semibold text-text">{t("Execuções")}</span>
+          <a href="/app/ai/runs?tab=roteamento" className="text-text-muted underline hover:text-text">
+            {t("Roteamento")}
+          </a>
+        </nav>
         {/* O resumo responde "está tudo bem?" antes da lista. */}
         <Card className="mb-6 p-4" data-testid="resumo">
           {resumo.erros === 0 ? (

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Escolha } from "@/components/ui/escolha";
 import { CampoDeData } from "@/components/ui/campo-de-data";
 import { useT } from "@/hooks/i18n/useT";
+import { diaDeHojeLocal } from "@/lib/ai/pacing-knobs";
 import { formatCents, parseReaisToCents } from "@/lib/money";
 
 export type Lancamento = {
@@ -34,7 +35,12 @@ export type Lancamento = {
 
 export type Conta = { id: string; name: string };
 
-const hoje = () => new Date().toISOString().slice(0, 10);
+/**
+ * O dia de HOJE no calendário de quem usa a tela (#2935) — a data que o campo
+ * "data" do lançamento novo recebe. `toISOString()` dava o dia UTC, e depois das
+ * 21h em Brasília o lançamento nascia com a data de AMANHÃ.
+ */
+export const hoje = () => diaDeHojeLocal();
 
 export function ListaDeLancamentos({
   lancamentos,

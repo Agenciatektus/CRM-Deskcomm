@@ -39,6 +39,7 @@ function formatError(err: unknown, t: (texto: string) => string): string {
   }
   return String(err);
 }
+import { CalendarioDoFunil } from "@/components/kanban/CalendarioDoFunil";
 
 /**
  * A página do Funil com a barra aprovada pelo Peterson (board "Barra do
@@ -54,10 +55,17 @@ export function PipelinePageClient({
   pipelineId,
   initialName,
   role,
+  funis,
 }: {
   pipelineId: string;
   initialName: string;
   role: Role;
+  /**
+   * Os funis vivos da organização (`id` + `name`, na ordem da lista) — a MESMA
+   * partição da tela de Funis. É o que alimenta o seletor de troca rápida do
+   * cabeçalho; sem ele o quadro não sabe que existem outros funis.
+   */
+  funis: Array<{ id: string; name: string }>;
 }) {
   const t = useT();
   const { data, isLoading, error, pulses, realtimeStatus, seguranca } = useBoard(pipelineId);
@@ -84,6 +92,9 @@ export function PipelinePageClient({
     () => [...new Set((data?.leads ?? []).flatMap((l) => l.tags))].sort(),
     [data?.leads],
   );
+  const nomeAtual = data?.pipeline.name ?? initialName;
+  // Um funil só = nada para trocar: o seletor seria ruído permanente.
+  const podeTrocar = funis.length > 1;
 
   const cabecalho = (
     <CabecalhoDoFunil
@@ -131,7 +142,17 @@ export function PipelinePageClient({
       onClear={() => setSelectedIds([])}
     />
   );
-  const novo = data && <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} pipelineId={pipelineId} stages={data.stages} />;
+  // #1751 (upstream): o quadro é a lista que o diálogo confere ANTES de criar —
+  // é ela que faz o aviso de negócio duplicado existir sem rede.
+  const novo = data && (
+    <NewLeadDialog
+      open={newOpen}
+      onOpenChange={setNewOpen}
+      pipelineId={pipelineId}
+      stages={data.stages}
+      leads={data.leads}
+    />
+  );
   const lista = (Lista: typeof ListaDoFunil) =>
     data && (
       <Lista
@@ -164,12 +185,39 @@ export function PipelinePageClient({
 
   return (
     <div
-      // O QUADRO CABE NA TELA: altura da área visível (100dvh menos a barra do
-      // topo, h-14, e o p-6 do <main>); quem rola é o quadro, com a barra
-      // horizontal no pé e o cabeçalho de cada etapa preso em cima.
-      className="flex h-[calc(100dvh-3.5rem-3rem)] min-h-[28rem] flex-col gap-3"
-      // OBSERVÁVEIS de propósito: "a assinatura morreu" e "nada aconteceu"
-      // produzem o mesmo silêncio na tela; estes valores separam as duas causas.
+      // O QUADRO CABE NA TELA. A página rolava com a janela: o quadro media o
+      // que media a coluna mais comprida, e a barra de rolagem horizontal ficava
+      // no pé dele — com uma etapa cheia, era preciso descer até o fim para
+      // conseguir andar para o lado, e no caminho o nome da etapa sumia do alto.
+      // Com a altura da área visível (100dvh menos a barra do topo, h-14, e o
+      // padding do <main>), quem rola é o quadro: a barra horizontal fica sempre
+      // no pé da tela e o cabeçalho de cada etapa fica preso em cima. O piso de
+      // 28rem é para tela baixa demais, onde a página volta a rolar.
+      //
+      // ⚠️ A PARCELA DE BAIXO VEM DO CONTRATO, e era um `3rem` literal.
+      //
+      // Aquele literal era a segunda metade do `p-6` do `<main>` escrita à mão,
+      // e ela não sabia de nenhuma peça fixa no rodapé. Com a barra de abas do
+      // celular (`components/shell/BarraInferior.tsx`, 56px mais a área segura),
+      // o quadro media 48px a mais do que tinha e o fim dele — justamente onde
+      // mora a barra de rolagem horizontal, a razão desta linha existir —
+      // passava a correr POR BAIXO das abas.
+      //
+      // `max(var(--space-6), var(--rodape-ocupado, 0px))` é a mesma fórmula do
+      // `components/inbox/InboxLayout.tsx`, e é o que o gate
+      // `tests/unit/altura-fixa-le-a-reserva-do-rodape.test.ts` cobra: altura
+      // fixa não desconta número próprio, lê a reserva.
+      className="flex h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] min-h-[28rem] flex-col gap-3"
+      // OBSERVÁVEL de propósito, e é a razão de existir desta linha: "a
+      // assinatura morreu" e "nada aconteceu" produzem o MESMO silêncio na
+      // tela, e sem este valor nem o produto nem o teste conseguem separar as
+      // duas famílias de causa. Com ele, quem investiga olha DURANTE a rodada
+      // que falha: `subscribed` manda procurar a montante (entrega, filtro, ou
+      // o evento nunca saiu); `channel_error`/`timed_out`/`closed` já é a
+      // resposta.
+      //
+      // Ainda NÃO religa — religar é desenho e merece bloco próprio. Isto aqui
+      // é só parar de descartar o que já era calculado.
       data-realtime-status={realtimeStatus.toLowerCase()}
       data-refetch-divergencias={seguranca.divergencias}
       data-refetch-em={seguranca.ultimaVerificacao ?? ""}
@@ -187,6 +235,15 @@ export function PipelinePageClient({
         </div>
       ) : vista === "lista" ? (
         lista(ListaDoFunil)
+      ) : vista === "calendario" ? (
+        // Visão Calendário (#2770, upstream), terceira opção do nosso seletor de
+        // vista: o MESMO recorte filtrado do quadro e da lista.
+        <CalendarioDoFunil
+          pipelineId={pipelineId}
+          pipeline={data.pipeline}
+          stages={data.stages}
+          leads={recorte}
+        />
       ) : (
         <KanbanBoard
           pipelineId={pipelineId}

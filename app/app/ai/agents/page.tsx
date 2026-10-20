@@ -56,8 +56,8 @@ export default async function AgentsListPage() {
   return (
     <Pagina>
       <CabecalhoDaPagina
-        titulo={traduzir("Agents de IA", idioma)}
-        descricao={traduzir("Configure o comportamento dos agents que respondem no WhatsApp.", idioma)}
+        titulo={traduzir("Agentes de IA", idioma)}
+        descricao={traduzir("Configure o comportamento dos agentes que respondem no WhatsApp.", idioma)}
       />
       <AgentsList initialData={agents} canWrite={canWrite} />
     </Pagina>

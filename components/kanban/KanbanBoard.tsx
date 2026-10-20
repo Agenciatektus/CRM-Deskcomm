@@ -3,10 +3,11 @@ import { adiarFechamento } from "@/lib/ui/fechar-negocio";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import { useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBoard } from "@/hooks/kanban/useBoard";
+import { chaveDoQuadro, useBoard } from "@/hooks/kanban/useBoard";
 import { useMoveCard, type RecusaDeCampos, type RetomadaPendente } from "@/hooks/kanban/useMoveCard";
 import { useRenameStage } from "@/hooks/kanban/useRenameStage";
 import { CamposObrigatoriosDialog } from "./CamposObrigatoriosDialog";
@@ -15,8 +16,9 @@ import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
 import { midpoint } from "@/lib/kanban/fractional-indexing";
 import { comparadorDoFunil, type OrdemDoFunil } from "@/lib/kanban/ordem-do-funil";
+import { proximoNaEtapaInteira } from "@/lib/kanban/vizinho-na-etapa";
 import type { Lead } from "@/lib/types/leads";
-import type { Pipeline, Stage } from "@/lib/kanban/types";
+import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import { StageColumn } from "./StageColumn";
 import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
@@ -105,6 +107,10 @@ export function KanbanBoard({
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
   const queryResult = useBoard(useExternal ? null : pipelineId);
+  // O funil INTEIRO, sem o filtro da página: com `leads` vindo de fora esse
+  // `data.leads` é a lista já filtrada, e é do cache `chaveDoQuadro(pipelineId)`
+  // — preenchido pela página sem filtro — que o `after` do arrasto é lido.
+  const qc = useQueryClient();
   const renameStage = useRenameStage(pipelineId);
   // A RECUSA DE CAMPOS ABRE DIÁLOGO, não toast (issue #1536): o 422 traz em
   // `details.faltando` o que falta, o diálogo coleta, e o reenvio leva os
@@ -236,8 +242,25 @@ export function KanbanBoard({
       );
 
       const before = destination.index > 0 ? destList[destination.index - 1] : null;
-      const after =
-        destination.index < destList.length ? destList[destination.index] : null;
+      // `destList` sai do `grouped`, que a página já FILTROU. O de cima fica
+      // sendo o vizinho visível — foi o que o operador escolheu ao soltar; o de
+      // baixo, porém, tem de ser o próximo card da etapa INTEIRA depois dele.
+      // Tirado da lista filtrada, `midpoint` devolvia `último + 1000` no fim da
+      // coluna visível (a posição nascida do card escondido) e, entre dois
+      // visíveis, a média caía em cima do escondido do meio — os dois cards
+      // ficavam com a MESMA `position_in_stage` e o arrasto seguinte entre eles
+      // era cancelado em silêncio (issue #2545). O funil sem filtro mora no
+      // cache do quadro, que a página preenche inteiro.
+      const etapaInteira =
+        qc
+          .getQueryData<BoardData>(chaveDoQuadro(pipelineId))
+          ?.leads.filter((l) => l.stage_id === destStageId) ?? null;
+      const after = proximoNaEtapaInteira(
+        before ?? null,
+        destList[destination.index] ?? null,
+        etapaInteira,
+        draggableId,
+      );
 
       const newPosition = midpoint(
         before?.position_in_stage ?? null,
@@ -277,7 +300,7 @@ export function KanbanBoard({
       }
       mover();
     },
-    [data, grouped, moveCard, t, ordenar],
+    [data, grouped, moveCard, t, ordenar, qc, pipelineId],
   );
 
   if (isLoading) {

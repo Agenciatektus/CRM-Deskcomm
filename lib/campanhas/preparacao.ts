@@ -73,14 +73,21 @@ export async function preverAudiencia(
     /** Campanha a ignorar na conta de "já em campanha" (a que está sendo editada). */
     campanhaId?: string;
   },
-): Promise<ResumoDoSnapshot & { amostra: Array<{ nome: string | null; motivo: MotivoDeExclusao | null }> }> {
-  const linhas = await classificar(admin, entrada);
+): Promise<
+  ResumoDoSnapshot & {
+    /** O recorte bateu o teto de 20.000 negócios e há linha além dele (#2404). */
+    truncado: boolean;
+    amostra: Array<{ nome: string | null; motivo: MotivoDeExclusao | null }>;
+  }
+> {
+  const { linhas, truncado } = await classificar(admin, entrada);
   const elegiveis = linhas.filter((l) => l.elegivel).length;
   return {
     total: linhas.length,
     elegiveis,
     excluidos: linhas.length - elegiveis,
     motivos: contarExclusoes(linhas),
+    truncado,
     // Amostra curta: a tela mostra "quem" para o operador reconhecer a lista,
     // não para ele conferir 500 nomes numa página.
     amostra: linhas.slice(0, 20).map((l) => ({ nome: l.candidato.nome, motivo: l.motivo })),
@@ -97,11 +104,14 @@ async function classificar(
     agora: Date;
     campanhaId?: string;
   },
-) {
-  const candidatos = await buscarCandidatos(admin, {
+): Promise<{ linhas: ReturnType<typeof classificarAudiencia>; truncado: boolean }> {
+  const { candidatos, truncado } = await buscarCandidatos(admin, {
     organizationId: entrada.organizationId,
     filtro: entrada.filtro,
     agora: entrada.agora,
+    // Todas as variantes: campo personalizado usado só numa variação também
+    // precisa da coluna (senão a pessoa sairia como `variavel_ausente`).
+    corpo: variantesDaCampanha(entrada.corpo, entrada.variacoes).join(" "),
   });
   const jaEmCampanha = await contatosJaEmCampanha(
     admin,
@@ -110,27 +120,30 @@ async function classificar(
   );
   const suprimidos = await hashesExcluidos(admin, entrada.organizationId);
   const variantes = variantesDaCampanha(entrada.corpo, entrada.variacoes);
-  return classificarAudiencia(candidatos, {
-    excluidosAMao: new Set(entrada.filtro.excluir_contatos),
-    jaEmCampanha,
-    suprimidos,
-    hashDoEndereco,
-    // A saudação NÃO é resolvida aqui: ela é da hora do envio. O token fica no
-    // corpo congelado e o despacho o troca — ver `rodada.ts`.
-    // A variante sai do `contact_id`: a MESMA pessoa recebe a MESMA variação,
-    // inclusive ao repreparar. Semente por campanha faria a lista trocar de
-    // texto a cada clique em Preparar, sem nada ter mudado.
-    renderizar: (c: CandidatoDaAudiencia) => {
-      const r = renderizarVariacao({
-        variantes,
-        semente: c.contactId,
-        valores: { nome: c.nome },
-      });
-      // `vazio` sobe junto: texto que resolveu para nada não pode virar
-      // `rendered_body` em branco e seguir para o envio.
-      return { texto: r.texto, faltando: r.faltando, vazio: r.vazio, varianteIndex: r.varianteIndex };
-    },
-  });
+  return {
+    linhas: classificarAudiencia(candidatos, {
+      excluidosAMao: new Set(entrada.filtro.excluir_contatos),
+      jaEmCampanha,
+      suprimidos,
+      hashDoEndereco,
+      // A saudação NÃO é resolvida aqui: ela é da hora do envio. O token fica no
+      // corpo congelado e o despacho o troca — ver `rodada.ts`.
+      // A variante sai do `contact_id`: a MESMA pessoa recebe a MESMA variação,
+      // inclusive ao repreparar. Semente por campanha faria a lista trocar de
+      // texto a cada clique em Preparar, sem nada ter mudado.
+      renderizar: (c: CandidatoDaAudiencia) => {
+        const r = renderizarVariacao({
+          variantes,
+          semente: c.contactId,
+          valores: { nome: c.nome, lead: c.lead, contato: c.contato },
+        });
+        // `vazio` sobe junto: texto que resolveu para nada não pode virar
+        // `rendered_body` em branco e seguir para o envio.
+        return { texto: r.texto, faltando: r.faltando, vazio: r.vazio, varianteIndex: r.varianteIndex };
+      },
+    }),
+    truncado,
+  };
 }
 
 /**
@@ -166,7 +179,7 @@ export async function prepararCampanha(
     );
   }
 
-  const linhas = await classificar(admin, {
+  const { linhas } = await classificar(admin, {
     organizationId: entrada.organizationId,
     filtro: filtro.data,
     corpo: entrada.corpo,
