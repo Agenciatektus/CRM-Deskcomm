@@ -155,12 +155,16 @@ export async function rodarUmaRodadaDeCampanha(
     if (numerosAtendidos.size >= NUMEROS_POR_RODADA) break;
 
     try {
-      const r = await rodarUmaCampanha(admin, campanha, agora);
+      const r = await rodarUmaCampanha(admin, campanha, agora, numerosAtendidos);
       total.enviadas += r.enviadas;
       total.pulados += r.pulados;
       total.concluidas += r.concluidas;
       detalhes.push(`${campanha.id.slice(0, 8)}:${r.detalhe}`);
       if (ocupaONumero(r)) numerosAtendidos.add(campanha.channel_session_id);
+      // O número que FALOU nesta rodada, que no rodízio pode não ser o principal
+      // (#3112): sem isto, outra campanha que divide o vinculado mandava por ele
+      // de novo no mesmo tique.
+      if (r.numero) numerosAtendidos.add(r.numero);
     } catch (err) {
       const motivo = err instanceof Error ? err.message : String(err);
       logger.warn("[campanha] rodada falhou", { campanha: campanha.id, motivo });
@@ -255,7 +259,8 @@ async function rodarUmaCampanha(
   admin: SupabaseClient,
   campanha: CampanhaRow,
   agora: Date,
-): Promise<{ enviadas: number; pulados: number; concluidas: number; detalhe: string }> {
+  numerosJaUsados: ReadonlySet<string>,
+): Promise<{ enviadas: number; pulados: number; concluidas: number; detalhe: string; numero?: string }> {
   const { data: fila } = await admin
     .from("campaign_recipients")
     .select(
@@ -422,7 +427,11 @@ async function rodarUmaCampanha(
         linha.daily_message_limit === null
           ? null
           : Math.max(0, linha.daily_message_limit - estadoDoNumero.sentToday),
-      podeAgora: decisao.allow,
+      // `allow` com `waitMs > 0` é "ainda não": falta o intervalo do número.
+      // A rodada não espera dentro do tique (o `before-send` do agente espera;
+      // a prospecção reagenda) — o número fica de fora e volta no próximo. E o
+      // número que já falou nesta rodada, por outra campanha, também (#3112).
+      podeAgora: decisao.allow && decisao.waitMs === 0 && !numerosJaUsados.has(sessionId),
       ultimoEnvio: estadoDoNumero.lastSentAt,
     });
   }
@@ -527,10 +536,18 @@ async function rodarUmaCampanha(
       pulados: 0,
       concluidas: 0,
       detalhe: `enviado:${status ?? "?"}:${escolha.motivo}`,
+      numero: sessionEscolhida,
     };
   } catch (err) {
     logger.warn("[campanha] envio falhou", { campanha: campanha.id, destinatario: alvo.id });
-    return { enviadas: 0, pulados: 0, concluidas: 0, detalhe: await registrarExcecaoDoEnvio(admin, alvo.id, err) };
+    // A exceção pode ter vindo depois de a mensagem sair: o número conta como usado.
+    return {
+      enviadas: 0,
+      pulados: 0,
+      concluidas: 0,
+      detalhe: await registrarExcecaoDoEnvio(admin, alvo.id, err),
+      numero: sessionEscolhida,
+    };
   }
 }
 
