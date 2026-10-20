@@ -136,7 +136,10 @@ const FATIA_1: ReadonlyArray<readonly [string, string]> = [
   ["crm_leads", "crm_leads_insert"],
   ["crm_leads", "crm_leads_update"],
   ["crm_leads", "crm_leads_delete"],
-  ["channel_sessions", "channel_sessions_tenant_write"],
+  // Tektus (9028/9055): a for all virou uma por comando, todas com _full.
+  ["channel_sessions", "channel_sessions_tenant_insert"],
+  ["channel_sessions", "channel_sessions_tenant_update"],
+  ["channel_sessions", "channel_sessions_tenant_delete"],
   ["conversations", "conversations_agent_insert"],
   ["conversations", "conversations_agent_update"],
   ["conversations", "conversations_agent_delete"],
@@ -340,7 +343,10 @@ const FATIA_2: ReadonlyArray<readonly [string, string]> = [
   ["crm_lead_links", "crm_lead_links_delete"],
   ["crm_lead_links", "crm_lead_links_insert"],
   ["crm_lead_links", "crm_lead_links_update"],
-  ["crm_pipelines", "crm_pipelines_manager_write"],
+  // Tektus (9028/9055): a for all virou uma por comando, todas com _full.
+  ["crm_pipelines", "crm_pipelines_manager_insert"],
+  ["crm_pipelines", "crm_pipelines_manager_update"],
+  ["crm_pipelines", "crm_pipelines_manager_delete"],
   ["crm_stages", "crm_stages_manager_write"],
   ["crm_tasks", "crm_tasks_write"],
   ["honorarios_contratos", "honorarios_contratos_delete"],

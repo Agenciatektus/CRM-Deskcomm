@@ -23,6 +23,7 @@ import { criarOrg, criarUsuarios, erroDe, numero, uuid, valor, vincular } from "
 const P = "c0b3a001-0000-4000-8000";
 const ORG_A = uuid(P, 1);
 const VIEWER_A = uuid(P, 11);
+const MANAGER_A = uuid(P, 12);
 
 /** INSERT de uma linha do arquivo na forma que a rota de cobrança grava (§2.4). SEM `;`. */
 function evento(provider: string, externalId: string, org: string | null = null): string {
@@ -32,9 +33,13 @@ function evento(provider: string, externalId: string, org: string | null = null)
 }
 
 beforeAll(() => {
-  criarUsuarios([[VIEWER_A, "viewer-a-0601@invariant.test"]]);
+  criarUsuarios([
+    [VIEWER_A, "viewer-a-0601@invariant.test"],
+    [MANAGER_A, "manager-a-0601@invariant.test"],
+  ]);
   criarOrg(ORG_A, "cob-webhook-a");
   vincular(VIEWER_A, ORG_A, "viewer");
+  vincular(MANAGER_A, ORG_A, "manager");
 });
 
 describe("webhook_events_log aceita os provedores de cobrança", () => {
@@ -95,8 +100,9 @@ describe("inv. 1 (parte do arquivo) — o tenant não lê a linha de cobrança",
     ).toBe(0);
   });
 
-  it("controle: o mesmo viewer lê a linha de canal da própria org (a sonda enxerga)", () => {
+  it("controle: o manager lê a linha de canal da própria org (a sonda enxerga)", () => {
+    // Tektus (9035): o arquivo de webhook é lido só por manager+.
     sql(`${evento("generic", "evt_visivel", ORG_A)};`);
-    expect(countAs(VIEWER_A, `select count(*) from public.webhook_events_log where external_id = 'evt_visivel';`)).toBe(1);
+    expect(countAs(MANAGER_A, `select count(*) from public.webhook_events_log where external_id = 'evt_visivel';`)).toBe(1);
   });
 });
