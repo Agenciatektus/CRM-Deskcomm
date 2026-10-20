@@ -16471,6 +16471,27 @@ export const DICIONARIO: Traducoes = {
   "Sim ou não": { es: "Sí o no" },
   "Link (URL)": { es: "Enlace (URL)" },
   "O agente terminou sem propor uma resposta. Pode ter sido uma decisão (por exemplo, diante de uma mensagem automática) ou a geração ter parado antes da resposta. Se esperava uma, gere de novo; senão, não há nada a enviar.": { es: "El agente terminó sin proponer una respuesta. Pudo ser una decisión (por ejemplo, ante un mensaje automático) o que la generación se detuviera antes de la respuesta. Si esperabas una, genera de nuevo; si no, no hay nada que enviar." },
+  "Novo aviso": { es: "Nuevo aviso" },
+  "Opção inválida.": { es: "Opción inválida." },
+  "Não consegui ler esta configuração agora.": { es: "No pude leer esta configuración ahora." },
+  "O que os avisos mostram fora do app": { es: "Qué muestran los avisos fuera de la app" },
+  "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.": {
+    es: "Vale para el celular bloqueado y para las notificaciones de la computadora, para toda la empresa. Solo los administradores pueden cambiarlo.",
+  },
+  "Esconder tudo": { es: "Ocultar todo" },
+  "O aviso diz só que chegou algo. Nem o nome do cliente nem a mensagem aparecem.": {
+    es: "El aviso solo dice que llegó algo. No aparecen ni el nombre del cliente ni el mensaje.",
+  },
+  "Mostrar quem mandou (recomendado)": { es: "Mostrar quién lo envió (recomendado)" },
+  "Aparecem o nome e a foto do cliente, mas não o que ele escreveu.": {
+    es: "Aparecen el nombre y la foto del cliente, pero no lo que escribió.",
+  },
+  "Mostrar quem mandou e a mensagem": { es: "Mostrar quién lo envió y el mensaje" },
+  "Aparecem o nome, a foto e o começo da mensagem.": { es: "Aparecen el nombre, la foto y el comienzo del mensaje." },
+  "Quem decide é um administrador.": { es: "Quien decide es un administrador." },
+  "Desligar o push de mensagem desliga todos os avisos deste aparelho fora do app.": {
+    es: "Apagar el push de mensajes apaga todos los avisos de este dispositivo fuera de la app.",
+  },
 };
 
 /**

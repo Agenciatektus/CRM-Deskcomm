@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { vapidPronto, vapidPublica, vapidSubject } from "./vapid";
 import { ehServicoDePushConhecido } from "./servicos-de-push";
 import type { PushPayload } from "./push_payload";
+import { lerTelaBloqueada, redigirParaATelaBloqueada } from "./tela-bloqueada";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -46,11 +47,14 @@ async function membrosAtivos(
 }
 
 /**
- * O funil de todo envio: só sai para inscrições de quem tem vínculo ativo na
- * organização (e o papel mínimo, quando pedido), e só para serviço de push
- * conhecido (`servicos-de-push.ts`). A regra de host mora no envio, não só na
- * rota de inscrição: vale para toda linha gravada, qualquer que seja a origem.
- * Inscrição morta (404/410) é apagada.
+ * O FUNIL: todo push do produto sai daqui, e só daqui (vigiado por
+ * `tests/unit/push-sai-so-pelo-funil.test.ts`). Só sai para inscrições de quem
+ * tem vínculo ativo na organização (e o papel mínimo, quando pedido), e só para
+ * serviço de push conhecido (`servicos-de-push.ts`). A regra de host mora no
+ * envio, não só na rota de inscrição: vale para toda linha gravada, qualquer
+ * que seja a origem. O conteúdo segue a opção da empresa sobre o que aparece
+ * com a tela bloqueada (`./tela-bloqueada.ts`). Inscrição morta (404/410) é
+ * apagada.
  */
 async function enviarAsInscricoes(
   admin: Admin,
@@ -66,11 +70,13 @@ async function enviarAsInscricoes(
   const rows = conhecidas.filter((i) => membros.has(i.user_id));
   if (rows.length === 0) return NADA;
 
+  const { modo, idioma } = await lerTelaBloqueada(admin, organizationId);
+  const body = JSON.stringify(redigirParaATelaBloqueada(payload, modo, idioma));
+
   webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());
 
   let sent = 0;
   let gone = 0;
-  const body = JSON.stringify(payload);
 
   await Promise.all(
     rows.map(async (row) => {
