@@ -1,5 +1,5 @@
 /**
- * O APÊNDICE DO BASELINE É ESPELHO EXATO DA MIGRATION 0704 — cerca, não prosa.
+ * O APÊNDICE DO BASELINE É ESPELHO EXATO DA MIGRATION 0706 — cerca, não prosa.
  *
  * O kit self-host aplica só o `baseline.sql`; a migration é a fonte da verdade
  * para quem usa o Supabase CLI. Divergência entre os dois significa que o clone
@@ -11,9 +11,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RAIZ = join(__dirname, "..", "..");
-const MIGRATION = "supabase/migrations/20261021120001_0704_banco_externo_receitas.sql";
+const MIGRATION = "supabase/migrations/20261022120000_0706_banco_externo_receitas.sql";
 
-describe("o apêndice do baseline espelha a migration 0704 (receitas do banco externo)", () => {
+describe("o apêndice do baseline espelha a migration 0706 (receitas do banco externo)", () => {
   it("controle: os dois arquivos existem e não estão vazios", () => {
     expect(existsSync(join(RAIZ, MIGRATION))).toBe(true);
     const migration = readFileSync(join(RAIZ, MIGRATION), "utf8");
@@ -45,7 +45,7 @@ describe("o apêndice do baseline espelha a migration 0704 (receitas do banco ex
   it("a migration tem cabeçalho `-- manifest:` com descrição não vazia", () => {
     const migration = readFileSync(join(RAIZ, MIGRATION), "utf8");
     const manifest = /^-- manifest:[ \t]*(\S.*)$/m.exec(migration);
-    expect(manifest, "a migration 0704 precisa de uma linha `-- manifest: <o quê e por quê>` no cabeçalho").not.toBeNull();
+    expect(manifest, "a migration 0706 precisa de uma linha `-- manifest: <o quê e por quê>` no cabeçalho").not.toBeNull();
     expect(manifest![1]!.trim().length).toBeGreaterThan(0);
   });
 });

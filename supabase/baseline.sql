@@ -58595,7 +58595,7 @@ on conflict (model) do update set
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
   notes = excluded.notes,
   superseded_at = null;
--- ---- receitas do banco externo (migration 0704) ----
+-- ---- receitas do banco externo (migration 0706) ----
 -- manifest: Banco externo — coluna `receitas` (jsonb) em `external_db_connections`: as instâncias das receitas prontas (Spec 25, R1: receita woocommerce + instância + tool). Cada organização guarda suas instâncias (RLS herda da tabela), default '[]', só-array, teto de 256 KiB. A coluna fica FORA da view `_safe` (precedente das `sources`); só a contagem `receitas_count` é exposta, como última coluna da view, com `revoke`/`grant` reemitidos.
 --
 -- ─── O que isto resolve ─────────────────────────────────────────────────────
