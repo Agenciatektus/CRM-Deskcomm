@@ -49,6 +49,7 @@ vi.mock("@/lib/channels", () => ({
     if (provider === "zernio_social") return {};
     return {
       fetchProfilePictureUrl: async (input: {
+        organizationId: string;
         sessionRef: string;
         recipient: string;
       }) => {
