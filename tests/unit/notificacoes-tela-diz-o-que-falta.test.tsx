@@ -101,9 +101,16 @@ describe("tela de Notificações — o que ela afirma sobre esta instalação", 
 
     // E a saída. Um aviso que só informa a falta deixa o operador sabendo que
     // está quebrado e sem saber o que fazer — que é quase o silêncio de antes.
+    // Pelo kit, o par nasce na atualização: a saída principal é atualizar, e a
+    // forçada cobre quem já está na versão mais recente (o update.sh sai com
+    // "nada a atualizar" antes de criar o par).
+    expect(html).toMatch(/atualizar a instalação/);
+    expect(html).toContain("bash hostgator-setup-kit/update.sh --force");
+    // Fora do kit, o comando de sempre — e o aviso de não trocar um par existente.
     expect(html).toContain("npx web-push generate-vapid-keys");
     expect(html).toContain("VAPID_PUBLIC_KEY");
     expect(html).toContain("VAPID_PRIVATE_KEY");
+    expect(html).toMatch(/Não troque um par que já existe/);
   });
 
   it("⭐ SEM o par VAPID: NÃO afirma que o Push já funciona", async () => {
