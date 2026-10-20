@@ -773,19 +773,17 @@ export const NAV_CATALOG = [
     // A página não filtra por papel, mas as Server Actions de conectar e
     // desconectar exigem admin — mostrar a um viewer seria oferecer botão morto.
     minRole: "admin",
-    // SEM `sidebar`: fora do menu lateral por decisão do dono do produto — a
-    // integração não é usada nesta instalação e ocupava uma linha de "Canais"
-    // toda vez que alguém abria o app.
+    // DE VOLTA ao menu lateral. O upstream tirou a linha porque a integração
+    // não era usada na instalação dele, e o próprio comentário dizia como
+    // desfazer: devolver `sidebar: true`.
     //
-    // Continua sendo DESTINO, e é por isso que a linha some em vez do bloco
-    // inteiro: `searchable()` (abaixo) filtra só por papel, então a tela segue
-    // no ⌘K; a rota, a página e as Server Actions ficam intactas; e
-    // `tests/unit/navegacao-completude.test.ts` continua vendo uma porta para
-    // `/app/integrations/nuvemshop` — apagar a entrada exigiria justificá-la na
-    // allowlist de "rota sem porta", que é coisa de rota morta, e esta não está.
-    //
-    // ⚠️ O grupo "canais" não tem hub, então o ⌘K passa a ser a ÚNICA porta
-    // navegável. Para voltar a mostrá-la, basta devolver `sidebar: true`.
+    // Nesta instalação ela passou a ser usada — o app de parceiro é da Tektus
+    // e cada empresa conecta a própria loja, trazendo pedidos, clientes e o
+    // catálogo com preço (que o indexador lê como material do agente). Sem a
+    // linha, o grupo "canais" não tem hub e o ⌘K vira a ÚNICA porta: quem
+    // estava no meio do fluxo de conexão da Nuvemshop não achava a tela de
+    // volta.
+    sidebar: true,
   },
   {
     href: "/app/webhooks",
