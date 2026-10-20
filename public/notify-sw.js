@@ -52,19 +52,10 @@ function escolherJanela(clientes) {
   );
 }
 
+// Sem rota estática (`addRoutes`): num Chrome que tem a API mas não conhece a
+// condição `not`, ela podia mandar a navegação direto à rede e apagar a página
+// offline sem aviso. O `fetch` abaixo já deixa passar o que não é navegação.
 self.addEventListener("install", (event) => {
-  // Só a navegação precisa do SW: o resto vai à rede sem acordá-lo. Navegador
-  // sem esta API (ou sem a condição `not`) segue pelo `fetch` abaixo, que deixa
-  // passar o que não é navegação.
-  if (typeof event.addRoutes === "function") {
-    event.waitUntil(
-      Promise.resolve()
-        .then(() =>
-          event.addRoutes({ condition: { not: { requestMode: "navigate" } }, source: "network" }),
-        )
-        .catch(() => undefined),
-    );
-  }
   event.waitUntil(self.skipWaiting());
 });
 

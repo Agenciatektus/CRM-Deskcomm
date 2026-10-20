@@ -199,6 +199,16 @@ describe("fetch: só a navegação sem rede ganha resposta do SW", () => {
     expect(respondeu).toBe(false);
   });
 
+  it("instalar não registra rota estática: a página offline depende só do handler fetch", async () => {
+    // Num Chrome que tem addRoutes mas não conhece a condição `not`, a rota
+    // podia virar "tudo vai à rede", e a página offline sumiria calada.
+    const sw = carregar();
+    const addRoutes = vi.fn().mockResolvedValue(undefined);
+    await disparar(sw.handlers.install, { addRoutes });
+    expect(addRoutes).not.toHaveBeenCalled();
+    expect(sw.self.skipWaiting).toHaveBeenCalled();
+  });
+
   it("ativar liga o navigation preload e assume as abas", async () => {
     const sw = carregar();
     await disparar(sw.handlers.activate);
