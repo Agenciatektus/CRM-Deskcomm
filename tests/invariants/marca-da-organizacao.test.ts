@@ -446,6 +446,30 @@ describe("a forma do que se grava", () => {
     }
   });
 
+  it("9059: accent_dark_hex fora de #rrggbb leva 22023 e não grava (a régua de accent_hex)", () => {
+    // P2 do parecer da #215: a cor do tema escuro (#2482) tinha CHECK só na
+    // instalação (0627). Previsão (sabotagem): sem o bloco da 9059 na função, os
+    // seis casos gravam e o `toContain` acusa o primeiro.
+    semearSettings();
+    const antes = settingsDe(MARCA_ORG);
+    for (const ruim of ["#FFF", "#FFFFFF", "vermelho", "#ff00a", "ff00aa", "#ff00aa;"]) {
+      const erro = erroAoDefinir(
+        MARCA_ORG,
+        MARCA_ADMIN,
+        `'{"accent_hex":"#112233","accent_dark_hex":"${ruim}"}'::jsonb`,
+      );
+      expect(erro, `deveria recusar ${JSON.stringify(ruim)}`).toContain(
+        "marca_da_organizacao_accent_dark_hex_invalido",
+      );
+      expect(settingsDe(MARCA_ORG)).toBe(antes);
+    }
+    // Controle positivo: a forma normalizada passa e grava.
+    expect(
+      erroAoDefinir(MARCA_ORG, MARCA_ADMIN, `'{"accent_hex":"#112233","accent_dark_hex":"#aabbcc"}'::jsonb`),
+    ).toBeNull();
+    expect(settingsDe(MARCA_ORG)).toContain("#aabbcc");
+  });
+
   it("marca que não é objeto leva 22023 — escalar em `branding` quebra o resolvedor", () => {
     semearSettings();
     const antes = settingsDe(MARCA_ORG);
