@@ -34,10 +34,16 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
   if (!conversationId) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_conversa" };
   }
+  const contactId = typeof row.payload.contact_id === "string" ? row.payload.contact_id : null;
+  // Decidido antes de montar o payload: conversa que a IA conduz não avisa a
+  // ninguém, e então nem nome nem foto do contato precisam ser lidos.
+  const destino = await destinatariosDoInbound(row.organization_id, conversationId, contactId);
+  if (destino.tipo === "ninguem") {
+    return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "ia_conduz" };
+  }
   const { body, corpoSemPrevia } = corpoDoEvento(row);
 
   const marca = await marcaDaSaida(row.organization_id);
-  const contactId = typeof row.payload.contact_id === "string" ? row.payload.contact_id : null;
   let contactName: string | null = null;
   let icon: string | null = null;
   if (contactId) {
@@ -88,7 +94,6 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
     icon,
     corpoSemPrevia,
   });
-  const destino = await destinatariosDoInbound(row.organization_id, conversationId, contactId);
   // Quem DEVE ser avisado (`destino`) nunca alarga quem PODE ver: nome e prévia
   // só saem para quem a RLS de `conversations` deixaria abrir a conversa.
   const soUsuarios = destino.tipo === "restrito" ? destino.userIds : undefined;
@@ -99,7 +104,8 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
 
 /**
  * Para quem vai o push da mensagem recebida — regra em
- * `./destinatarios-da-mensagem.ts` (responsável + admins, ou todos).
+ * `./destinatarios-da-mensagem.ts` (responsável + admins, ninguém quando a IA
+ * conduz, quem está de plantão, ou todos).
  *
  * Falha de leitura cai para "todos", de propósito: era o comportamento antes
  * da regra, e um aviso a mais é um incômodo, enquanto um aviso a menos é

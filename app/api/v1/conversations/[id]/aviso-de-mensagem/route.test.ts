@@ -123,6 +123,14 @@ describe("aviso-de-mensagem", () => {
     expect((await pergunta()).status).toBe(500);
   });
 
+  it("a IA conduz ('ninguem') → não avisa ninguém, nem admin", async () => {
+    estado.carregar.mockResolvedValue({ tipo: "ninguem" });
+    expect((await pergunta()).corpo.data?.avisar).toBe(false);
+    estado.role = "admin";
+    estado.userId = "u-admin";
+    expect((await pergunta()).corpo.data?.avisar).toBe(false);
+  });
+
   it("diz o que a bandeja pode mostrar, pela opção da empresa", async () => {
     estado.carregar.mockResolvedValue({ tipo: "todos" });
     estado.org = { data: { settings: { notificacoes: { conteudo_na_tela_bloqueada: "oculto" } }, locale: "pt-BR" }, error: null };

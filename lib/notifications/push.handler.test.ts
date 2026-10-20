@@ -25,7 +25,9 @@ const enviarPushAQuemVeAConversaMock = vi.fn(
 // A decisão de destinatários tem suíte própria (`destinatarios-da-mensagem.test.ts`);
 // aqui só interessa que o handler OBEDEÇA ao que ela decidir.
 const carregarDestinatariosMock = vi.fn(
-  async (..._args: unknown[]): Promise<{ tipo: "todos" } | { tipo: "restrito"; userIds: string[] } | null> => ({
+  async (
+    ..._args: unknown[]
+  ): Promise<{ tipo: "todos" } | { tipo: "restrito"; userIds: string[] } | { tipo: "ninguem" } | null> => ({
     tipo: "todos",
   }),
 );
@@ -243,6 +245,14 @@ describe("webPushInboundHandler", () => {
       expect(enviarPushAQuemVeAConversaMock).toHaveBeenCalledTimes(1);
       // Sem conversa nem há o que perguntar.
       expect(carregarDestinatariosMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("a IA conduz ('ninguem') → nenhum push, sem ler o contato", async () => {
+      carregarDestinatariosMock.mockResolvedValueOnce({ tipo: "ninguem" });
+      const result = await webPushInboundHandler.handle(inboundRow({ contact_id: "ct-1" }));
+      expect(result).toMatchObject({ status: "skipped", detail: "ia_conduz" });
+      expect(enviarPushAQuemVeAConversaMock).not.toHaveBeenCalled();
+      expect(fromMock).not.toHaveBeenCalledWith("contacts");
     });
 
     it("grupo NÃO passa pela regra de responsável — só pela de visibilidade", async () => {

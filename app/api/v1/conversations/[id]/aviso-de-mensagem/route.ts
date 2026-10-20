@@ -8,8 +8,9 @@
  *
  * Quem lê é `hooks/notifications/useInboundMessageAlerts.ts` (toast e
  * notificação do navegador). A regra é a do push do servidor, na MESMA função:
- * `lib/notifications/destinatarios-da-mensagem.ts` — conversa sem responsável
- * avisa todos; com responsável, só ele e os administradores.
+ * `lib/notifications/destinatarios-da-mensagem.ts` — com responsável, só ele e
+ * os administradores; sem responsável, ninguém enquanto a IA conduz, quem está
+ * de plantão na distribuição automática, ou todos no modo manual.
  *
  * ═══ Por que uma rota nova, e não `GET /conversations/[id]` ═══
  *
