@@ -20,7 +20,12 @@ import { listaLegivel } from "@/lib/leads/activity-vocabulary";
 import { camposAlterados } from "@/lib/leads/campos-alterados";
 import { valoresAntesDepois } from "@/lib/leads/valores-audit";
 import { RECUSA_DE_TROCA_DE_FUNIL } from "@/lib/leads/clonar-para-funil";
-import { defsDoPadraoDoFunil, erroDePadrao, recusasDePadrao } from "@/lib/leads/padrao-do-campo";
+import {
+  camposQueMudaram,
+  defsDoPadraoDoFunil,
+  erroDePadrao,
+  recusasDePadrao,
+} from "@/lib/leads/padrao-do-campo";
 import {
   RECUSA_RETOMADA_ETAPA_INDISPONIVEL,
   RECUSA_RETOMADA_LEAD_ABERTO,
@@ -610,7 +615,10 @@ export async function createLeadHandler(
   // leitura falha, `defsDoPadraoDoFunil` devolve lista vazia e a criação segue
   // como hoje — a régua só tem poder sobre o que ela consegue ler.
   if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
-    const recusas = recusasDePadrao(defsDoPadraoDoFunil(settingsDaCriacao), input.custom_fields);
+    const recusas = recusasDePadrao(
+      defsDoPadraoDoFunil(settingsDaCriacao, "negocio"),
+      input.custom_fields,
+    );
     if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
   }
 
@@ -878,13 +886,27 @@ export async function updateLeadHandler(
 
   // ── O PADRÃO (#2730) — a MESMA régua da criação, na EDIÇÃO ───────────────
   //
-  // O funil é o do PRÓPRIO negócio (a linha já está em mãos), e o PATCH manda
-  // só o que mudou — então só o que chegou é julgado. `settingsDoFunil` é
-  // fail-open: funil ilegível = lista vazia = grava como hoje.
+  // O funil é o do PRÓPRIO negócio (a linha já está em mãos), e o julgamento é
+  // sobre o DIFF contra o que está gravado (`camposQueMudaram`, a mesma conta
+  // da auditoria): a ficha do dossiê manda o formulário INTEIRO a cada
+  // salvamento (#2814), e julgar tudo recusaria a gravação por um campo que a
+  // pessoa nem tocou — o caso medido do campo escondido por `mostrar_quando`.
+  // Escopo `negocio` (#2852): o valor de um campo do CONTATO mora em
+  // `contacts.custom_fields`, e o padrão dele é julgado na ficha do contato.
+  // `settingsDoFunil` é fail-open: funil ilegível = lista vazia = grava como hoje.
   if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
-    const settingsDoEdicao = await settingsDoFunil(supabase, existing.pipeline_id);
-    const recusas = recusasDePadrao(defsDoPadraoDoFunil(settingsDoEdicao), input.custom_fields);
-    if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
+    const alterados = camposQueMudaram(
+      input.custom_fields,
+      (existing as { custom_fields?: unknown }).custom_fields,
+    );
+    if (Object.keys(alterados).length > 0) {
+      const settingsDoEdicao = await settingsDoFunil(supabase, existing.pipeline_id);
+      const recusas = recusasDePadrao(
+        defsDoPadraoDoFunil(settingsDoEdicao, "negocio"),
+        alterados,
+      );
+      if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
+    }
   }
 
   // Reenviar o contato que o lead já tem não é ligar a um contato novo.

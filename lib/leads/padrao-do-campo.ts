@@ -39,7 +39,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ApiError } from "@/lib/api/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import type { Idioma } from "@/lib/i18n/idiomas";
-import { camposDoFunil } from "@/lib/leads/campos-do-funil";
+import { camposAlterados } from "@/lib/leads/campos-alterados";
+import {
+  camposDoFunil,
+  camposPorEscopo,
+  type EscopoDoCampo,
+} from "@/lib/leads/campos-do-funil";
 
 /** O que uma definição de campo precisa ter para esta régua existir. */
 export interface DefComPadrao {
@@ -109,9 +114,13 @@ export interface RecusaDePadrao {
 /**
  * O lote: quais das chaves QUE ESTÃO SENDO ESCRITAS caem fora do padrão.
  *
- * Só se avalia o que a escrita traz — `custom_fields` de um PATCH carrega o
- * que mudou, e julgar o resto seria recusar valor que nem está sendo gravado.
- * Chave sem definição, ou definição sem `padrao`, passa: é o campo livre.
+ * Só se avalia o que a escrita traz — chave sem definição, ou definição sem
+ * `padrao`, passa: é o campo livre.
+ *
+ * ⚠️ Isto NÃO compara com o que está gravado: quem chama passa o mapa já
+ * reduzido ao que mudou (`camposQueMudaram`). Julgar o `custom_fields` inteiro
+ * de um PATCH recusava a gravação por um campo que a pessoa nem tocou — o
+ * defeito medido no #2814.
  *
  * Quando o MESMO campo tem padrão em mais de um funil (só acontece em
  * organização com mais de um, para a mesma chave), o valor tem de casar TODOS
@@ -191,10 +200,61 @@ export function mensagemDoCampo(
   );
 }
 
-/** As definições de um `settings` de funil — `null` quando a leitura falhou. */
-export function defsDoPadraoDoFunil(settings: unknown): DefComPadrao[] {
+/**
+ * O `custom_fields` que a escrita MANDA, reduzido ao que mudou em relação ao
+ * que está gravado.
+ *
+ * POR QUE ISTO EXISTE: o `custom_fields` de um PATCH não é, na prática, "só o
+ * que mudou". O `EditContactDialog` grava o mapa inteiro (o PATCH substitui o
+ * objeto — é assim que apagar um valor pela tela chega ao banco), e a edição
+ * pela lista de contatos manda o mapa que nem renderizou. Julgar o mapa
+ * inteiro recusava a gravação por um campo que a pessoa não tocou — e, no caso
+ * medido no #2814, por um campo que nem estava na tela.
+ *
+ * A comparação é a MESMA de `camposAlterados` (a que a auditoria e a timeline
+ * já usam para "o que mudou, não o que foi enviado"), e serve aos três pontos:
+ * os dois handlers e o último portão do diálogo. Uma conta só, como o resto
+ * desta régua.
+ *
+ * `gravados` vem do `select` que o handler já faz (`custom_fields` do contato
+ * ou do negócio) e pode vir torto/ausente: sem estado anterior, tudo que chega
+ * é novidade e é julgado — fail-closed na régua, que é o comportamento antigo.
+ */
+export function camposQueMudaram(
+  enviados: Record<string, unknown> | undefined | null,
+  gravados: unknown,
+): Record<string, unknown> {
+  if (!enviados) return {};
+  const anterior =
+    gravados && typeof gravados === "object" && !Array.isArray(gravados)
+      ? (gravados as Record<string, unknown>)
+      : {};
+  const mudadas = new Set(camposAlterados(enviados, anterior));
+  const out: Record<string, unknown> = {};
+  for (const [chave, valor] of Object.entries(enviados)) {
+    if (mudadas.has(chave)) out[chave] = valor;
+  }
+  return out;
+}
+
+/**
+ * As definições de um `settings` de funil — `null` quando a leitura falhou.
+ *
+ * `escopo` separa as duas fichas (issue #2791/#2852): o campo do NEGÓCIO mora
+ * em `crm_leads.custom_fields`, o do CONTATO em `contacts.custom_fields`, e
+ * nenhuma das duas telas conhece o outro. Sem o filtro, o contato seria julgado
+ * pelo padrão de um campo que ele nem tem onde guardar — exatamente o defeito
+ * que `campos-exigidos.ts` já evita ignorando o que não é `negocio`.
+ *
+ * A ausência da chave vale `negocio` (`escopoDoCampo`), então toda definição
+ * que já existe continua sendo julgada onde sempre foi.
+ */
+export function defsDoPadraoDoFunil(
+  settings: unknown,
+  escopo: EscopoDoCampo = "negocio",
+): DefComPadrao[] {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return [];
-  return camposDoFunil(settings as Record<string, unknown>);
+  return camposPorEscopo(camposDoFunil(settings as Record<string, unknown>), escopo);
 }
 
 /**
@@ -209,6 +269,7 @@ export function defsDoPadraoDoFunil(settings: unknown): DefComPadrao[] {
 export async function defsDoPadraoDaOrg(
   supabase: SupabaseClient,
   organizationId: string,
+  escopo: EscopoDoCampo = "negocio",
 ): Promise<DefComPadrao[]> {
   try {
     const { data, error } = await supabase
@@ -218,7 +279,7 @@ export async function defsDoPadraoDaOrg(
       .order("created_at", { ascending: true });
     if (error || !Array.isArray(data)) return [];
     return (data as Array<{ settings?: unknown }>).flatMap((linha) =>
-      defsDoPadraoDoFunil(linha?.settings),
+      defsDoPadraoDoFunil(linha?.settings, escopo),
     );
   } catch {
     return [];

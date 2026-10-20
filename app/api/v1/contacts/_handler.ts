@@ -31,7 +31,12 @@ import { contactListQuerySchema } from "@/lib/schemas";
 import { arrayDeUmValorParaOr } from "@/lib/inbox/marcador-da-conversa";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { padraoRegexDeBusca } from "@/lib/contacts/busca-regex";
-import { defsDoPadraoDaOrg, erroDePadrao, recusasDePadrao } from "@/lib/leads/padrao-do-campo";
+import {
+  camposQueMudaram,
+  defsDoPadraoDaOrg,
+  erroDePadrao,
+  recusasDePadrao,
+} from "@/lib/leads/padrao-do-campo";
 
 type SB = SupabaseClient;
 
@@ -489,7 +494,10 @@ export async function createContactHandler(
   // trocar "grava torto" por "não grava nada" — e a régua só tem poder sobre
   // o que ela consegue LER.
   if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
-    const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id);
+    // Escopo `contato` (#2852): a ficha do contato só recebe os campos do
+    // CONTATO, e são só esses que ela pode gravar. Sem o filtro, o padrão de um
+    // campo do NEGÓCIO — que o diálogo nem conhece — recusava a criação.
+    const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id, "contato");
     const recusas = recusasDePadrao(defs, input.custom_fields);
     if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
   }
@@ -604,17 +612,6 @@ export async function patchContactHandler(
   contactId: string,
   input: ContactPatch,
 ): Promise<Contact> {
-  // ── O PADRÃO (#2730) ─────────────────────────────────────────────────────
-  // A MESMA régua da criação, com a MESMA leitura (todos os funis: o contato
-  // não tem funil próprio). Roda ANTES de tudo para não pagar o select do
-  // contato nem o audit de uma escrita que já se sabe recusada. PATCH manda só
-  // o que mudou, então só o que chegou é julgado.
-  if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
-    const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id);
-    const recusas = recusasDePadrao(defs, input.custom_fields);
-    if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
-  }
-
   const { data: existing, error: selErr } = await supabase
     .from("contacts")
     // ⚠️ Os campos sensíveis entram aqui para existir o **`from`** da regra L-06
@@ -651,6 +648,32 @@ export async function patchContactHandler(
       ctx.requestId,
       traduzir("Contato anonimizado — edição bloqueada (LGPD).", ctx.idioma ?? "pt-BR"),
     );
+  }
+
+  const patch: Record<string, unknown> = {};
+  // ── O PADRÃO (#2730) — DEPOIS do select, e só sobre o que MUDOU ──────────
+  //
+  // A MESMA régua da criação, com a MESMA leitura (todos os funis, escopo
+  // `contato`: o contato não tem funil próprio), mas agora JULGANDO O DIFF.
+  //
+  // Antes isto rodava no começo e julgava o `custom_fields` INTEIRO, na
+  // suposição de que "PATCH manda só o que mudou" — suposição falsa para este
+  // mapa: o `EditContactDialog` grava o objeto completo (o PATCH SUBSTITUI),
+  // e a edição pela lista de contatos manda o mapa que nem renderizou. Efeito
+  // medido no #2814: a pessoa troca só o nome e recebe 422 por um campo
+  // escondido (`mostrar_quando`) — ou por um campo de outro funil — que ela
+  // nem tocou. O estado anterior está aqui do lado (`existing.custom_fields`),
+  // então o que se julga é o valor que vai ser DIFERENTE do gravado.
+  if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
+    const alterados = camposQueMudaram(
+      input.custom_fields,
+      (existing as { custom_fields?: unknown }).custom_fields,
+    );
+    if (Object.keys(alterados).length > 0) {
+      const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id, "contato");
+      const recusas = recusasDePadrao(defs, alterados);
+      if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
+    }
   }
 
   const patch: Record<string, unknown> = {};

@@ -45,12 +45,12 @@ const contato = {
   custom_fields: {},
 } as unknown as Contact;
 
-function pintar(fields: CustomFieldDef[] = [CAMPO_IDADES]) {
+function pintar(fields: CustomFieldDef[] = [CAMPO_IDADES], alvo: Contact = contato) {
   function Janela() {
     const [aberto, setAberto] = useState(true);
     return (
       <EditContactDialog
-        contact={contato}
+        contact={alvo}
         open={aberto}
         onOpenChange={setAberto}
         customFieldDefs={fields}
@@ -124,3 +124,71 @@ describe("o submit recusa o valor fora do padrão", () => {
     expect(avisos).toContain("Padrão inválido configurado neste campo");
   });
 });
+
+// ─── O CR do #2814: o portão julga o que MUDOU, não o mapa que veio ────────
+//
+// O `CustomFieldsEditor` devolve o `custom_fields` INTEIRO a cada tecla: o
+// campo escondido por `mostrar_quando` viaja no objeto com o valor que já
+// estava gravado. Julgando o mapa inteiro, trocar SÓ O NOME devolvia o erro de
+// `idades` e o `mutateAsync` nem era chamado — o defeito que o mantenedor
+// mediu (`VISIVEL_NA_TELA=false`, `MUTATE_CALLS=0`).
+
+/** `idades` só aparece quando `tem_criancas = "sim"` (issue #2728). */
+const IDADES_ESCONDIDO = {
+  ...CAMPO_IDADES,
+  mostrar_quando: { campo: "tem_criancas", operador: "igual" as const, valor: "sim" },
+};
+const TEM_CRIANCAS = { key: "tem_criancas", label: "Tem crianças", type: "text" as const };
+
+function comCampos(campos: Record<string, unknown>): Contact {
+  return { ...contato, custom_fields: campos } as unknown as Contact;
+}
+
+describe("o portão do cliente julga só o que mudou (#2814)", () => {
+  it("campo escondido com valor fora do padrão NÃO barra a troca do nome", async () => {
+    const user = userEvent.setup();
+    pintar([TEM_CRIANCAS, IDADES_ESCONDIDO], comCampos({ tem_criancas: "nao", idades: "dois" }));
+
+    // O campo está escondido: a pessoa não tem como corrigi-lo.
+    expect(screen.queryByLabelText("Idades das crianças"), "o campo devia estar escondido").toBeNull();
+
+    await user.type(screen.getByLabelText("Nome"), " Ana Maria");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(mutateAsync, "a troca do nome tinha de sair").toHaveBeenCalledTimes(1);
+    // O mapa inteiro segue no payload: o PATCH SUBSTITUI, e é assim que apagar
+    // um valor pela tela chega ao banco. O que mudou é o julgamento, não o corpo.
+    expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      custom_fields: { tem_criancas: "nao", idades: "dois" },
+    });
+  });
+
+  it("mas o valor que a pessoa MUDA para fora do padrão continua barrado", async () => {
+    const user = userEvent.setup();
+    pintar([CAMPO_IDADES], comCampos({ idades: "2,9" }));
+
+    const campo = screen.getByLabelText("Idades das crianças");
+    await user.clear(campo);
+    await user.type(campo, "dois");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(mutateAsync, "o valor torto saiu da tela").not.toHaveBeenCalled();
+    const avisos = screen.getAllByRole("alert").map((n) => n.textContent).join(" ");
+    expect(avisos).toContain("Use só números separados por vírgula, ex.: 2,9");
+  });
+
+  it("edição pela lista de contatos (sem `customFieldDefs`) troca o nome e leva o mapa intacto", async () => {
+    const user = userEvent.setup();
+    pintar([], comCampos({ idades: "dois" }));
+
+    expect(screen.queryByLabelText("Idades das crianças")).toBeNull();
+    await user.type(screen.getByLabelText("Nome"), " Ana Maria");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      custom_fields: { idades: "dois" },
+    });
+  });
+});
+

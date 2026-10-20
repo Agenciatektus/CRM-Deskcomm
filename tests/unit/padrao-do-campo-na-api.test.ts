@@ -77,7 +77,10 @@ const CAMPO_LIVRE = { key: "idades", label: "Idades das crianças", type: "text"
 
 // ── O banco falso dos CONTATOS ───────────────────────────────────────────────
 
-function bancoDeContatos(fields: unknown[]) {
+function bancoDeContatos(
+  fields: unknown[],
+  opcoes: { gravados?: Record<string, unknown>; outrosFunis?: unknown[][] } = {},
+) {
   const inserts: Array<Record<string, unknown>> = [];
   const updates: Array<Record<string, unknown>> = [];
   const existente = {
@@ -90,7 +93,7 @@ function bancoDeContatos(fields: unknown[]) {
     name: "Ana",
     display_name: null,
     consent: {},
-    custom_fields: {} as Record<string, unknown>,
+    custom_fields: (opcoes.gravados ?? {}) as Record<string, unknown>,
   };
 
   const from = (tabela: string) => {
@@ -121,7 +124,10 @@ function bancoDeContatos(fields: unknown[]) {
     c.maybeSingle = async () => ({ data: linha(), error: null });
     c.then = (ok: (v: unknown) => unknown, ruim?: (e: unknown) => unknown) =>
       Promise.resolve({
-        data: tabela === "crm_pipelines" ? [{ settings: { fields } }] : [],
+        data:
+          tabela === "crm_pipelines"
+            ? [{ settings: { fields } }, ...(opcoes.outrosFunis ?? []).map((f) => ({ settings: { fields: f } }))]
+            : [],
         error: null,
       }).then(ok, ruim);
     return c;
@@ -136,7 +142,10 @@ function bancoDeContatos(fields: unknown[]) {
 
 // ── O banco falso dos LEADS ──────────────────────────────────────────────────
 
-function bancoDeLeads(fields: unknown[]) {
+function bancoDeLeads(
+  fields: unknown[],
+  opcoes: { gravados?: Record<string, unknown> } = {},
+) {
   const inserts: Array<Record<string, unknown>> = [];
   const updates: Array<Record<string, unknown>> = [];
   const gravado: Record<string, unknown> = {
@@ -146,7 +155,7 @@ function bancoDeLeads(fields: unknown[]) {
     stage_id: ETAPA,
     title: "Aluguel",
     tags: [],
-    custom_fields: {},
+    custom_fields: (opcoes.gravados ?? {}) as Record<string, unknown>,
     updated_at: "2026-09-15T12:00:00.000Z",
     contact_id: null,
   };
@@ -397,5 +406,166 @@ describe("PATCH /api/v1/leads/{id} — a edição também", () => {
     });
 
     expect(updates).toHaveLength(1);
+  });
+});
+
+// ─── O CR do #2814: julgar só o que MUDOU ───────────────────────────────────
+//
+// O que o mantenedor mediu: o `EditContactDialog` manda o `custom_fields`
+// INTEIRO no PATCH (o PATCH substitui o objeto) e os dois handlers julgavam
+// todas as chaves que chegavam. Resultado: trocar só o nome numa ficha cujo
+// campo `idades` está escondido por `mostrar_quando` — e com valor fora do
+// padrão já gravado — devolvia 422 por um campo que a pessoa não tocou.
+
+/** `tem_criancas` livre: é ele que manda no `mostrar_quando` de `idades`. */
+const CAMPO_TEM_CRIANCAS = { key: "tem_criancas", label: "Tem crianças", type: "text" };
+
+/** `idades` só aparece quando `tem_criancas = "sim"` (issue #2728). */
+const CAMPO_IDADES_ESCONDIDO = {
+  ...CAMPO_IDADES,
+  mostrar_quando: { campo: "tem_criancas", operador: "igual", valor: "sim" },
+};
+
+describe("PATCH /api/v1/contacts/{id} — julga só o que mudou (#2814)", () => {
+  it("campo escondido com valor inválido GRAVADO não barra a troca do nome", async () => {
+    // O mapa inteiro vai no corpo — é o que a tela faz — mas `idades` já estava
+    // "dois" no banco: nada nele mudou, então não há formato a cobrar.
+    const { cliente, updates } = bancoDeContatos([CAMPO_TEM_CRIANCAS, CAMPO_IDADES_ESCONDIDO], {
+      gravados: { tem_criancas: "nao", idades: "dois" },
+    });
+
+    await patchContactHandler(cliente, ctx, CONTATO, {
+      name: "Ana Maria",
+      custom_fields: { tem_criancas: "nao", idades: "dois" },
+    });
+
+    expect(updates, "a troca do nome tinha de passar").toHaveLength(1);
+    expect(updates[0]).toMatchObject({ name: "Ana Maria" });
+  });
+
+  it("mas o MESMO campo, quando o valor MUDA para fora do padrão, continua 422", async () => {
+    // A régua não foi desligada: ela olha o que a escrita realmente altera.
+    const { cliente, updates } = bancoDeContatos([CAMPO_TEM_CRIANCAS, CAMPO_IDADES_ESCONDIDO], {
+      gravados: { tem_criancas: "nao", idades: "2,9" },
+    });
+
+    const erro = await recusa(
+      patchContactHandler(cliente, ctx, CONTATO, {
+        custom_fields: { tem_criancas: "nao", idades: "dois" },
+      }),
+    );
+
+    expect(erro.status).toBe(422);
+    expect(erro.message).toBe("Use só números separados por vírgula, ex.: 2,9");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("edição pela lista de contatos: o mapa que a tela nem renderizou não recusa", async () => {
+    // `ContactsTable` abre o diálogo SEM `customFieldDefs` (#2715): o cliente não
+    // barra nada e o mapa inteiro vai ao servidor. Sem o diff, o 422 vinha por um
+    // campo que nunca apareceu na tela.
+    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES], {
+      gravados: { idades: "dois" },
+    });
+
+    await patchContactHandler(cliente, ctx, CONTATO, {
+      name: "Ana Maria",
+      custom_fields: { idades: "dois" },
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ custom_fields: { idades: "dois" } });
+  });
+});
+
+describe("PATCH /api/v1/leads/{id} — a ficha do dossiê manda o form inteiro", () => {
+  it("campo intocado e fora do padrão não barra a edição", async () => {
+    const { cliente, updates } = bancoDeLeads([CAMPO_IDADES], {
+      gravados: { idades: "dois", observacao: "anotado ontem" },
+    });
+
+    await updateLeadHandler(cliente, ctx, "lead-1", {
+      title: "Aluguel — revisado",
+      custom_fields: { idades: "dois", observacao: "anotado ontem" },
+    });
+
+    expect(updates, "a edição do título tinha de passar").toHaveLength(1);
+  });
+
+  it("valor que MUDOU para fora do padrão continua 422", async () => {
+    const { cliente, updates } = bancoDeLeads([CAMPO_IDADES], {
+      gravados: { idades: "2,9" },
+    });
+
+    const erro = await recusa(
+      updateLeadHandler(cliente, ctx, "lead-1", { custom_fields: { idades: "dois" } }),
+    );
+
+    expect(erro.status).toBe(422);
+    expect(updates).toHaveLength(0);
+  });
+});
+
+// ─── O escopo (#2852): cada ficha com os campos dela ────────────────────────
+
+/** O mesmo campo, do NEGÓCIO, com outro padrão (o caso "dois funis"). */
+const CAMPO_IDADES_DO_NEGOCIO = {
+  ...CAMPO_IDADES,
+  padrao: "^\\d{1,2}$",
+  mensagem_padrao: "Só um número, ex.: 9",
+};
+
+describe("as duas réguas filtram por escopo (#2852)", () => {
+  it("contato: o padrão de um campo do NEGÓCIO não recusa a ficha do contato", async () => {
+    // Sem o filtro, `idades` (negocio) seria julgado na ficha do CONTATO — que
+    // nem conhece esse campo — e recusaria a gravação com a frase dele.
+    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES_DO_NEGOCIO], {
+      gravados: { idades: "2,9" },
+    });
+
+    await patchContactHandler(cliente, ctx, CONTATO, {
+      custom_fields: { idades: "2,9" },
+    });
+
+    expect(updates).toHaveLength(1);
+  });
+
+  it("contato: o padrão de um campo `contato` continua valendo", async () => {
+    const doContato = { ...CAMPO_IDADES, escopo: "contato" };
+    const { cliente, updates } = bancoDeContatos([doContato], { gravados: {} });
+
+    const erro = await recusa(
+      patchContactHandler(cliente, ctx, CONTATO, { custom_fields: { idades: "dois" } }),
+    );
+
+    expect(erro.status).toBe(422);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("organização com mais de um funil: o padrão do OUTRO funil não manda no contato", async () => {
+    // O contato é um só e aparece em todos os funis; mas o campo `idades` é do
+    // CONTATO no funil padrão e do NEGÓCIO no segundo funil. Só o primeiro pode
+    // julgar a ficha do contato — antes, o padrão do segundo recusava.
+    const { cliente, updates } = bancoDeContatos([{ ...CAMPO_IDADES, escopo: "contato" }], {
+      gravados: {},
+      outrosFunis: [[CAMPO_IDADES_DO_NEGOCIO]],
+    });
+
+    await patchContactHandler(cliente, ctx, CONTATO, { custom_fields: { idades: "2,9" } });
+
+    expect(updates).toHaveLength(1);
+  });
+
+  it("negócio: o padrão de um campo `contato` não recusa o negócio", async () => {
+    const doContato = {
+      ...CAMPO_IDADES,
+      escopo: "contato",
+      mensagem_padrao: "Frase do campo do contato",
+    };
+    const { cliente, updates } = bancoDeLeads([doContato], { gravados: {} });
+
+    await updateLeadHandler(cliente, ctx, "lead-1", { custom_fields: { idades: "dois" } });
+
+    expect(updates, "o negócio não guarda campo de contato").toHaveLength(1);
   });
 });

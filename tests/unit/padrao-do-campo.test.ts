@@ -25,6 +25,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  camposQueMudaram,
+  defsDoPadraoDoFunil,
   MENSAGEM_DE_FORA_DO_PADRAO,
   MENSAGEM_DE_PADRAO_INVALIDO,
   mensagemDaRecusa,
@@ -197,3 +199,53 @@ describe("recusasDePadrao — o lote que a API e a IA mandam", () => {
     expect(recusasDePadrao(defs, { idades: "2,9", localizador: "ABC123" })).toEqual([]);
   });
 });
+
+// ─── O CR do #2814: julgar o que MUDOU, e cada ficha com os seus campos ─────
+
+describe("camposQueMudaram — o mapa que o PATCH manda contra o que está gravado", () => {
+  it("chave com o MESMO valor fica fora do julgamento", () => {
+    // O caso medido: o diálogo manda o mapa inteiro, `idades` já estava "dois".
+    expect(camposQueMudaram({ tem_criancas: "nao", idades: "dois" }, { tem_criancas: "nao", idades: "dois" })).toEqual({});
+  });
+
+  it("a chave que mudou entra, com o valor novo", () => {
+    expect(camposQueMudaram({ idades: "x" }, { idades: "2,9" })).toEqual({ idades: "x" });
+  });
+
+  it("campo novo entra; campo que sumiu não vira recusa", () => {
+    expect(camposQueMudaram({ entrega: "15 dias" }, {})).toEqual({ entrega: "15 dias" });
+    // O mapa do PATCH é substituição: a chave ausente será APAGADA, e não há
+    // formato a cobrar de um valor que deixa de existir.
+    expect(camposQueMudaram({}, { idades: "dois" })).toEqual({});
+  });
+
+  it("sem estado anterior legível tudo é novidade — o comportamento antigo", () => {
+    expect(camposQueMudaram({ idades: "dois" }, null)).toEqual({ idades: "dois" });
+    expect(camposQueMudaram({ idades: "dois" }, "lixo")).toEqual({ idades: "dois" });
+    expect(camposQueMudaram(undefined, { idades: "dois" })).toEqual({});
+  });
+});
+
+describe("defsDoPadraoDoFunil — o escopo separa as duas fichas (#2852)", () => {
+  const settings = {
+    fields: [
+      { key: "idades", label: "Idades", type: "text", padrao: "^\\d+$" },
+      { key: "aniversario", label: "Aniversário", type: "text", padrao: "^\\d{1,2}/\\d{1,2}$", escopo: "contato" },
+    ],
+  };
+
+  it("sem escopo declarado, o padrão vale para o NEGÓCIO — o de sempre", () => {
+    expect(defsDoPadraoDoFunil(settings).map((d) => d.key)).toEqual(["idades"]);
+    expect(defsDoPadraoDoFunil(settings, "negocio").map((d) => d.key)).toEqual(["idades"]);
+  });
+
+  it("na ficha do contato só entram os campos `contato`", () => {
+    expect(defsDoPadraoDoFunil(settings, "contato").map((d) => d.key)).toEqual(["aniversario"]);
+  });
+
+  it("leitura torta continua fail-open", () => {
+    expect(defsDoPadraoDoFunil(null, "contato")).toEqual([]);
+    expect(defsDoPadraoDoFunil({ fields: "x" }, "contato")).toEqual([]);
+  });
+});
+
