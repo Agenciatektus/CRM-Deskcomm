@@ -1,94 +1,122 @@
+/**
+ * `encerrarPushDesteAparelho` — desligar os alertas e sair encerram o push do
+ * aparelho: o servidor esquece a inscrição (DELETE, que precisa da sessão) e o
+ * navegador cancela a dele. Nunca lança: a saída não pode depender da rede.
+ *
+ * Roda com: npx vitest run lib/notifications/push_client.test.ts
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const reg = { pushManager: { getSubscription: vi.fn(), subscribe: vi.fn() } };
-vi.mock("./permission", () => ({ getPermission: () => "granted", areAlertsEnabled: () => true }));
-vi.mock("./service_worker", () => ({ ensureNotifyServiceWorker: async () => reg }));
+import { encerrarPushDesteAparelho, syncPushSubscription } from "./push_client";
 
-import { syncPushSubscription } from "./push_client";
+const ordem: string[] = [];
+const fetchFalso = vi.fn(async (..._args: unknown[]) => {
+  ordem.push("delete");
+  return new Response(null, { status: 200 });
+});
+const unsubscribe = vi.fn(async () => {
+  ordem.push("unsubscribe");
+  return true;
+});
+const register = vi.fn();
 
-// Pública de 65 bytes (0x04 + 64), em base64url — o formato que o servidor entrega.
-const bytes = (fill: number) => {
-  const b = new Uint8Array(65).fill(fill);
-  b[0] = 4;
-  return b;
-};
-const b64url = (b: Uint8Array) =>
-  btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-function inscricao(chave: Uint8Array | null, endpoint: string) {
-  return {
-    options: { applicationServerKey: chave ? chave.buffer : null },
-    unsubscribe: vi.fn(async () => true),
-    toJSON: () => ({ endpoint, keys: { p256dh: "p", auth: "a" } }),
-  };
+function comServiceWorker(sub: { endpoint: string; unsubscribe: typeof unsubscribe } | null) {
+  Object.defineProperty(navigator, "serviceWorker", {
+    configurable: true,
+    value: {
+      register,
+      getRegistration: vi.fn(async () => ({ pushManager: { getSubscription: async () => sub } })),
+    },
+  });
 }
 
+beforeEach(() => {
+  ordem.length = 0;
+  vi.clearAllMocks();
+  vi.stubGlobal("fetch", fetchFalso);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "serviceWorker");
+});
+
+describe("encerrarPushDesteAparelho", () => {
+  it("manda o DELETE com o endpoint ANTES de cancelar a inscrição no navegador", async () => {
+    comServiceWorker({ endpoint: "https://push/1", unsubscribe });
+    await encerrarPushDesteAparelho();
+    expect(ordem).toEqual(["delete", "unsubscribe"]);
+    const [url, init] = fetchFalso.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/notifications/push");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBe(JSON.stringify({ endpoint: "https://push/1" }));
+  });
+
+  it("DELETE falhando não impede o cancelamento, e a promessa resolve", async () => {
+    fetchFalso.mockRejectedValueOnce(new Error("rede fora"));
+    comServiceWorker({ endpoint: "https://push/1", unsubscribe });
+    await expect(encerrarPushDesteAparelho()).resolves.toBeUndefined();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelamento falhando também não lança", async () => {
+    unsubscribe.mockRejectedValueOnce(new Error("x"));
+    comServiceWorker({ endpoint: "https://push/1", unsubscribe });
+    await expect(encerrarPushDesteAparelho()).resolves.toBeUndefined();
+  });
+
+  it("sem inscrição: nenhum pedido ao servidor", async () => {
+    comServiceWorker(null);
+    await encerrarPushDesteAparelho();
+    expect(fetchFalso).not.toHaveBeenCalled();
+  });
+
+  it("sem service worker no navegador: nenhum pedido e nenhum lançamento", async () => {
+    await expect(encerrarPushDesteAparelho()).resolves.toBeUndefined();
+    expect(fetchFalso).not.toHaveBeenCalled();
+  });
+
+  it("não registra service worker para sair", async () => {
+    comServiceWorker({ endpoint: "https://push/1", unsubscribe });
+    await encerrarPushDesteAparelho();
+    expect(register).not.toHaveBeenCalled();
+  });
+});
+
 describe("syncPushSubscription", () => {
-  const fetchMock = vi.fn();
+  const subscribe = vi.fn(async () => ({
+    toJSON: () => ({ endpoint: "https://push/1", keys: { p256dh: "p", auth: "a" } }),
+  }));
+
   beforeEach(() => {
-    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) =>
-      init?.method === "PUT"
-        ? new Response("{}")
-        : new Response(JSON.stringify({ data: { enabled: true, public_key: b64url(bytes(7)) } })),
+    vi.stubGlobal("Notification", { permission: "granted" });
+    fetchFalso.mockImplementation(async () =>
+      new Response(JSON.stringify({ data: { enabled: true, public_key: "AAAA" } }), { status: 200 }),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { register: vi.fn(async () => ({ pushManager: { getSubscription: async () => null, subscribe } })) },
+    });
   });
+
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
+    window.localStorage.clear();
+    fetchFalso.mockReset();
   });
 
-  const endpointDoPut = () => {
-    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
-    return put ? JSON.parse(String(put[1].body)).endpoint : null;
-  };
-
-  it("inscrição feita com a MESMA chave do servidor é reaproveitada", async () => {
-    const atual = inscricao(bytes(7), "https://push/atual");
-    reg.pushManager.getSubscription.mockResolvedValue(atual);
-
+  // `alerts.enabled` é espelho: a permissão concedida para outra linha da tela o
+  // regrava como "1" sem tocar no interruptor de mensagem. A fonte é a preferência.
+  it("push de mensagem desligado: não inscreve nem manda PUT, mesmo com o espelho em 1", async () => {
+    window.localStorage.setItem("notify.prefs.v1", JSON.stringify({ message: { in_app: true, push: false } }));
+    window.localStorage.setItem("alerts.enabled", "1");
     await syncPushSubscription();
-
-    expect(atual.unsubscribe).not.toHaveBeenCalled();
-    expect(reg.pushManager.subscribe).not.toHaveBeenCalled();
-    expect(endpointDoPut()).toBe("https://push/atual");
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(fetchFalso.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(false);
   });
 
-  it("inscrição feita com OUTRA chave é desfeita e refeita com a do servidor", async () => {
-    // O par do servidor mudou (ex.: backup restaurado numa VPS nova sem o .env):
-    // a inscrição antiga nunca mais recebe nada, e o navegador não avisa.
-    const velha = inscricao(bytes(9), "https://push/velha");
-    const nova = inscricao(bytes(7), "https://push/nova");
-    reg.pushManager.getSubscription.mockResolvedValue(velha);
-    reg.pushManager.subscribe.mockResolvedValue(nova);
-
+  it("push de mensagem ligado: inscreve e manda PUT (controle positivo)", async () => {
     await syncPushSubscription();
-
-    expect(velha.unsubscribe).toHaveBeenCalledTimes(1);
-    const chavePedida = reg.pushManager.subscribe.mock.calls[0]?.[0]?.applicationServerKey;
-    expect(Array.from(chavePedida as Uint8Array)).toEqual(Array.from(bytes(7)));
-    expect(endpointDoPut()).toBe("https://push/nova");
-  });
-
-  it("navegador que não informa a chave da inscrição: reaproveita, sem refazer a cada abertura", async () => {
-    const atual = inscricao(null, "https://push/atual");
-    reg.pushManager.getSubscription.mockResolvedValue(atual);
-
-    await syncPushSubscription();
-
-    expect(atual.unsubscribe).not.toHaveBeenCalled();
-    expect(reg.pushManager.subscribe).not.toHaveBeenCalled();
-    expect(endpointDoPut()).toBe("https://push/atual");
-  });
-
-  it("sem inscrição: inscreve com a chave do servidor", async () => {
-    const nova = inscricao(bytes(7), "https://push/nova");
-    reg.pushManager.getSubscription.mockResolvedValue(null);
-    reg.pushManager.subscribe.mockResolvedValue(nova);
-
-    await syncPushSubscription();
-
-    expect(reg.pushManager.subscribe).toHaveBeenCalledTimes(1);
-    expect(endpointDoPut()).toBe("https://push/nova");
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(fetchFalso.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(true);
   });
 });

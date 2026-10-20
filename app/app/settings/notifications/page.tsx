@@ -6,6 +6,7 @@ import { NotificationPrefsClient } from "./_client";
 import { PushProntoNesteEndereco } from "./_push-neste-endereco";
 import { TaskReminderPrefs } from "./_tarefas";
 import { SonsDosAvisos } from "./_sons";
+import { ConteudoNaTelaBloqueada } from "./_tela-bloqueada";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,8 @@ export default async function NotificationsPage() {
           </p>
         </Card>
       )}
+
+      <ConteudoNaTelaBloqueada />
 
       <NotificationPrefsClient />
 

@@ -16,6 +16,7 @@ vi.mock("@/lib/auth/server", () => ({ requireAuth: vi.fn().mockResolvedValue({})
 vi.mock("@/app/app/settings/notifications/_client", () => ({ NotificationPrefsClient: () => null }));
 vi.mock("@/app/app/settings/notifications/_tarefas", () => ({ TaskReminderPrefs: () => null }));
 vi.mock("@/app/app/settings/notifications/_sons", () => ({ SonsDosAvisos: () => null }));
+vi.mock("@/app/app/settings/notifications/_tela-bloqueada", () => ({ ConteudoNaTelaBloqueada: () => null }));
 
 import NotificationsPage from "@/app/app/settings/notifications/page";
 
