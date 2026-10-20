@@ -2500,7 +2500,8 @@ gerar_par_vapid() {
 }
 
 # completar_par_vapid [envfile] — usada pelo install.sh (depois de escrever o
-# .env) e pela atualização (dentro de `gravar_imagens`). Sempre devolve 0: o
+# .env) e pela atualização (antes da decisão de versão e dentro de
+# `gravar_imagens`). Quando cria o par, deixa PAR_VAPID_CRIADO=1. Sempre devolve 0: o
 # push é opcional, e nem a instalação nem a atualização morrem por causa dele.
 completar_par_vapid() {
   local envfile="${1:-.env}" pub priv par tmp
@@ -2551,6 +2552,8 @@ completar_par_vapid() {
   # o que interpola.
   VAPID_PUBLIC_KEY="$pub"; VAPID_PRIVATE_KEY="$priv"
   export VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY
+  # Para quem chamou saber que precisa subir o app de novo (o retorno é sempre 0).
+  PAR_VAPID_CRIADO=1
   c_grn "$(t "✓ chaves dos avisos com o app fechado criadas (uma vez só: não troque, trocar desliga os avisos de todo aparelho já inscrito)")"
 }
 

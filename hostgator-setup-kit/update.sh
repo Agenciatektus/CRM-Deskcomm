@@ -87,6 +87,20 @@ fi
 # tela nunca ligaria justamente em quem já está em dia. É idempotente.
 setup_update_agent_cron
 
+# ── 0+. O par VAPID também em quem não vai atualizar nada ───────────────────
+# A tela de Notificações manda rodar a atualização, sem --force. Quem já está na
+# última versão sai pela saída "nada a atualizar" logo abaixo, e quem segue a
+# `main` sai pela recusa de versão anterior: sem esta chamada, nos dois o par
+# nunca nasceria. Só na lacuna, nunca troca um par existente (D6). Criado aqui,
+# o app e o worker sobem de novo para lê-lo do .env; no caminho de atualização
+# de verdade isto custa uma recriação a mais, uma vez só na vida da instalação.
+PAR_VAPID_CRIADO=""
+completar_par_vapid .env
+if [ -n "$PAR_VAPID_CRIADO" ]; then
+  dc up -d --no-deps app worker >/dev/null 2>&1 \
+    || c_ylw "⚠ Criei as chaves dos avisos, mas não consegui reiniciar o app e o worker. Rode: docker compose up -d app worker (ou a atualização de novo)."
+fi
+
 # ── 1. Tem atualização mesmo? ────────────────────────────────────────────────
 step "Procurando atualizações"
 git fetch --tags --quiet origin 2>/dev/null || c_ylw "⚠ não consegui falar com o GitHub — sigo com o código que já está aqui."

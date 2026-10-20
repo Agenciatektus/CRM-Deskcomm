@@ -226,6 +226,11 @@ ENV
 chmod 600 "$PROJ/.env"
 
 cd "$PROJ" || exit 1
+# Como no repositório de verdade (`.gitignore`: `.env*`): o .env não é
+# versionado. Versionado, toda escrita do kit nele antes do checkout (o par
+# VAPID nasce antes da decisão de versão) virava "alteração local" e a
+# atualização recusava — um defeito do fixture, não do produto.
+printf '.env*\n' > .gitignore
 git init --quiet
 git add -A
 git commit --quiet -m "v0.9.0"
@@ -884,6 +889,30 @@ IMAGEM_EM_DIA=1 run_update --to v1.1.0
 check "sem aviso de pé: não mexe em contêiner nenhum" \
   bash -c "! grep -q 'rm -f deskcomm-manutencao' '$DOCKER_LOG'"
 check "  e não fala de aviso preso" bash -c "! grep -q 'aviso de manutenção preso' '$OUTFILE'"
+
+echo "── 14. O par VAPID nasce também quando não há versão nova (ADR-0006, D6)"
+# A tela de Notificações manda rodar a atualização SEM --force. Quem já está na
+# última versão sai pela saída "nada a atualizar", e quem segue a main sai pela
+# recusa de versão anterior: nos dois o par tem de nascer, e o app e o worker
+# têm de subir de novo para lê-lo do .env.
+sem_vapid() { { grep -v 'VAPID_' .env || true; } > .env.sem && mv .env.sem .env; }
+tamanho_da_publica() { sed -n 's/^VAPID_PUBLIC_KEY=//p' .env | tail -1 | tr -d "\"'" | awk '{print length}'; }
+cd "$PROJ" || exit 1
+sem_vapid; : > "$DOCKER_LOG"
+IMAGEM_EM_DIA=1 run_update --to v1.1.0
+check "\"nada a atualizar\" sai com sucesso" test "$RC" -eq 0
+check "  e cria o par no .env" test "$(tamanho_da_publica)" = 87
+check "  e sobe de novo o app e o worker para lerem o par" grep -q "up -d --no-deps app worker" "$DOCKER_LOG"
+check "  sem virar atualização (não rodou o backup)" test ! -f "$BACKUP_MARK"
+cp .env .env.com-par; : > "$DOCKER_LOG"
+IMAGEM_EM_DIA=1 run_update --to v1.1.0
+check "2ª passada: o par segue o mesmo" cmp -s .env .env.com-par
+check "  e não reinicia nada à toa" bash -c "! grep -q 'up -d --no-deps app worker' '$DOCKER_LOG'"
+rm -f .env.com-par
+sem_vapid; : > "$DOCKER_LOG"
+run_update --to v0.9.0
+check "recusa de versão anterior (quem segue a main) também cria o par" test "$(tamanho_da_publica)" = 87
+check "  e sobe de novo o app e o worker" grep -q "up -d --no-deps app worker" "$DOCKER_LOG"
 
 if [ "$FAILS" -eq 0 ]; then echo "OK — todas as provas passaram."; else echo "FALHOU — $FAILS prova(s)."; fi
 exit $((FAILS > 0))
