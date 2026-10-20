@@ -98,7 +98,7 @@ PAR_VAPID_CRIADO=""
 completar_par_vapid .env
 if [ -n "$PAR_VAPID_CRIADO" ]; then
   dc up -d --no-deps app worker >/dev/null 2>&1 \
-    || c_ylw "⚠ Criei as chaves dos avisos, mas não consegui reiniciar o app e o worker. Rode: docker compose up -d app worker (ou a atualização de novo)."
+    || c_ylw "$(t "⚠ Criei as chaves dos avisos com o app fechado, mas não consegui reiniciar o app e o worker. Os avisos ligam quando eles reiniciarem, o que acontece sozinho na próxima atualização.")"
 fi
 
 # ── 1. Tem atualização mesmo? ────────────────────────────────────────────────
