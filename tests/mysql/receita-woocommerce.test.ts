@@ -125,6 +125,7 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
   const idFone = Number((extrairLinhas<{ id: number }>(await q(`select LAST_INSERT_ID() as id`))[0] as { id: number })?.id ?? 108);
 
   // metas
+  // Fone de Ouvido tem só _regular_price (não tem _price).
   await q(
     `insert into \`${banco}\`.\`${WP_PREFIXO}postmeta\` (post_id, meta_key, meta_value) values
       (${idRascunho}, '_stock_status', 'instock'),
@@ -146,7 +147,6 @@ async function semeiaProdutos(root: Root, banco: string): Promise<void> {
       (${idBoxer}, '_stock_status', 'instock'),
       (${idBoxer}, '_price', '25.00'),
       (${idBoxer}, '_sku', 'BOXER-ALGODAO'),
-      // Fone de Ouvido tem só _regular_price (não tem _price).
       (${idFone}, '_stock_status', 'instock'),
       (${idFone}, '_regular_price', '55.00')`,
   );
@@ -329,7 +329,7 @@ describe("receita woocommerce-produtos contra MySQL 8 de verdade", () => {
     const pool = obterPoolMysql(conexaoDe(banco, { sslMode: "disable" }));
     const { sql, valores } = RECEITA_WOOCOMMERCE_PRODUTOS.montar(
       { prefixo: WP_PREFIXO },
-      { preco_max: undefined, so_em_estoque: undefined, limite: 5 },
+      { termos: ["fone"], preco_max: undefined, so_em_estoque: undefined, limite: 5 },
       5,
     );
     const conexao = await pool.getConnection();
