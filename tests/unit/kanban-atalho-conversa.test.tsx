@@ -132,25 +132,21 @@ describe("o elo que some sem barulho", () => {
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
     expect(fonte, "falta withConversas").toContain("withConversas");
     expect(fonte, "withConversas não foi chamada").toMatch(
-      /leadsComConversa\s*=\s*await withConversas/,
+      /conversa:\s*\(\)\s*=>\s*withConversas\(/,
     );
     // Chamar e não USAR o resultado é o defeito de verdade: a função roda, o
     // custo se paga, e a resposta sai sem a conversa. A primeira versão deste
     // caso só olhava a chamada e o sabote passou.
     //
-    // A resposta não sai mais direto de `withConversas`: a cadeia é
-    // withConversas → withMarcadoresDoContato → resposta. Exigir o texto
-    // `leads: leadsComConversa.leads` reprovava quem acrescentava uma etapa
-    // CERTA depois dela; o que importa é o resultado dela alimentar a próxima,
-    // e a resposta sair da última.
+    // As famílias não são mais uma cadeia: rodam em paralelo sobre o mesmo
+    // quadro e são fundidas por id (`lib/kanban/fundir-enriquecimentos.ts`).
+    // O que importa é o resultado de withConversas entrar na fusão, e a
+    // resposta sair da fusão.
     expect(
       fonte,
-      "o resultado de withConversas não alimenta withMarcadoresDoContato (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/withMarcadoresDoContato\(\s*supabase,[\s\S]*?leadsComConversa\.leads/);
-    expect(
-      fonte,
-      "a resposta não sai da última etapa (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/leads:\s*leadsComMarcadores\.leads/);
+      "o resultado de withConversas não entra na fusão dos enriquecimentos",
+    ).toMatch(/fundirEnriquecimentos\([\s\S]*?resultados\.conversa\.leads[\s\S]*?\]\)/);
+    expect(fonte, "a resposta não sai da fusão").toMatch(/leads:\s*leadsEnriquecidos/);
   });
 
   it("contato SEM conversa sai como `null`, não ausente — senão \"Abrir conversa\" nunca aparece (#1993)", () => {
