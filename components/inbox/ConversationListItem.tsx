@@ -174,7 +174,13 @@ export function ConversationListItem({
         // Selecionada (L13): o `accent-soft` do protótipo, com a barra de 3px.
         // No escuro a pele troca pelo degradê horizontal da marca
         // (`pele-selecionada`), que se destaca do card mesmo com marca escura.
-        isSelected && "pele-selecionada bg-accent-soft hover:bg-accent-soft",
+        // Marcada no lote (upstream 1.85), quem pinta o `accent-soft` é o wrapper:
+        // ele é translúcido e pintar os dois o somava. O botão fica transparente no
+        // hover/foco (senão a linha ficava em dois tons) e o foco vira anel.
+        isSelected &&
+          (selecionado
+            ? "pele-selecionada hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+            : "pele-selecionada bg-accent-soft hover:bg-accent-soft"),
       )}
       aria-current={isSelected ? "true" : undefined}
     >
