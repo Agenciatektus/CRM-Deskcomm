@@ -303,7 +303,7 @@ describe("carregarDestinatariosDaMensagem — fila, plantão e IA", () => {
   });
 
   it("(ii-d) canal com responsáveis: de plantão fora da lista do canal não conta", async () => {
-    const { db } = stub({
+    const { db, consultas } = stub({
       conversations: { data: SEM_DONO },
       crm_leads: { data: [] },
       ai_agents: { data: [] },
@@ -317,6 +317,12 @@ describe("carregarDestinatariosDaMensagem — fila, plantão e IA", () => {
       tipo: "restrito",
       userIds: ["u-gerente", ADMIN],
     });
+    // `filter`/`every`: a regra do número também lê `channel_routing_policies`.
+    for (const t of ["channel_routing_policies", "channel_routing_responsibles"]) {
+      const lidas = consultas.filter((c) => c.tabela === t);
+      expect(lidas.length).toBeGreaterThan(0);
+      expect(lidas.every((c) => c.filtros.some((f) => f[1] === "organization_id" && f[2] === "org-1"))).toBe(true);
+    }
   });
 
   it("(iii-a) sem responsável, IA no ar e conversa sem trava → ninguém", async () => {
