@@ -468,7 +468,7 @@ export function AgendaClient({
       data-testid="tela-agenda"
       data-fonte={agendamentosIniciais.length > 0 ? "api" : "api-sem-dado"}
       data-fuso={fusoDeApresentacao ?? "organizacao"}
-      className="flex h-full flex-col gap-4 mb:-mx-6 mb:-mt-6 mb:gap-3 mb:px-4 mb:pt-3"
+      className="flex h-full flex-col gap-4 p-6 mb:-mx-6 mb:-mt-6 mb:gap-3 mb:p-0 mb:px-4 mb:pt-3"
     >
       {/*
         Em Suspense porque `useSearchParams` obriga: sem a fronteira, o Next

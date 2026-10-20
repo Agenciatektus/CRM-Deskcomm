@@ -7,7 +7,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ShieldCheck, PencilSimple, LockOpen } from "@/lib/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pagina } from "@/components/pagina";
+import { LinkDeVolta, Pagina } from "@/components/pagina";
 import { Card } from "@/components/ui/card";
 import { FichasDoModulo } from "@/components/modulos/FichasDoModulo";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
@@ -182,6 +182,9 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
         </div>
       )}
 
+      <LinkDeVolta href="/app/contacts" className="-mb-2">
+        {t("Contatos")}
+      </LinkDeVolta>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           {/* Sem truncar: nome é dado que a tela existe pra mostrar, e cortar

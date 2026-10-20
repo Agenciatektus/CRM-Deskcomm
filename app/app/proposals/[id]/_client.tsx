@@ -1,6 +1,6 @@
 "use client";
 
-import { Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
+import { LinkDeVolta, Pagina, SecaoDaPagina, TABELA_EMPILHADA } from "@/components/pagina";
 import { useEffect, useRef, useState } from "react";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -425,8 +425,11 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
   const editavel = podeEditar && proposta.status === "rascunho";
 
   return (
-    <Pagina className="max-w-5xl">
-      <header className="mb:px-4 mb:pt-3">
+    <Pagina>
+      <header className="flex flex-col mb:px-4 mb:pt-3">
+        <LinkDeVolta href="/app/proposals" className="mb-2">
+          {t("Propostas")}
+        </LinkDeVolta>
         <input
           className="text-2xl font-semibold w-full border rounded-md px-2 py-1 mb:text-title-lg"
           value={proposta.titulo}

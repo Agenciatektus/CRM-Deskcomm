@@ -70,7 +70,7 @@ export default async function RouterEditorPage({ params }: { params: Promise<{ i
   const agents = agentRows ?? [];
 
   return (
-    <Pagina className="max-w-none mb:px-4 mb:pt-3">
+    <Pagina className="mb:px-4 mb:pt-3">
       <RouterEditorClient
         routerId={id}
         initialState={initialState}

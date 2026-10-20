@@ -335,7 +335,7 @@ export function ProdutosClient({
   }
 
   return (
-    <Pagina className="max-w-5xl" testId="tela-produtos">
+    <Pagina testId="tela-produtos">
       <CabecalhoDaPagina titulo={textos.titulo} descricao={textos.subtitulo} />
       <SecaoDaPagina className="gap-0">
 

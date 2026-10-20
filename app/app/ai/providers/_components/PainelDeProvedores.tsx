@@ -184,7 +184,7 @@ export function PainelDeProvedores() {
   const semChave = dados.credenciais.length === 0;
 
   return (
-    <Pagina className="max-w-5xl" testId="painel-de-provedores">
+    <Pagina testId="painel-de-provedores">
       <CabecalhoDaPagina
         titulo={t("Provedores de IA")}
         descricao={

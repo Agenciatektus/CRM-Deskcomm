@@ -126,7 +126,7 @@ export function ModelosDeProposta() {
 
   if (propostasDesligadas) {
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-3 p-6">
+      <div className="w-full space-y-3 p-6">
         <h1 className="text-xl font-semibold">{t("Modelos de proposta")}</h1>
         <p>
           {t("As propostas estão desligadas para esta organização. Para editar os modelos, ligue as propostas em Configurações › Propostas e salve.")}
@@ -141,9 +141,9 @@ export function ModelosDeProposta() {
   if (!modelos) return <div className="p-6">{t("Carregando…")}</div>;
 
   return (
-    <Pagina className="max-w-3xl">
+    <Pagina>
       <CabecalhoDaPagina titulo={t("Modelos de proposta")} />
-      <SecaoDaPagina className="gap-6">
+      <SecaoDaPagina className="max-w-3xl gap-6">
 
       {salvo && !faixaFechada ? (
         <p role="status" className="flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
