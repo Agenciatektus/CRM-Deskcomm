@@ -3,6 +3,16 @@
 > Spec de design + plano de implementação. Medido em `origin/main` = `e593c58b0` (19/10/2026).
 > Destino: **núcleo** (é um modo da prospecção nativa, que é núcleo; sem ninguém mexer, nada muda).
 
+> **Nota da triagem (20/10/2026).** Esta spec é do autor e fica como ele a escreveu; duas partes
+> dela NÃO viraram código, e estão marcadas no lugar:
+>
+> - **Modo da 3ª mensagem (`third_message`)** — **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**. Motivo: no
+>   modo da 3ª, até duas mensagens a um desconhecido saem sem a saída (inclusive um follow-up a quem
+>   não respondeu), e a única coisa que segura a oferta nelas é a instrução ao modelo (§12). Marcado
+>   em §1, §3, §4.2, §4.3, §6, §8 e §10–§11.
+> - **Modo desligado (`off`, "não oferecer nunca", com aceite de risco)** — **[não implementado neste PR; depende de decisão do mantenedor]**.
+>   O autor o anunciou para um pedido separado. Marcado em §1, §2.3, §3, §4.1, §4.2, §4.3, §5, §6, §7, §8, §10 e §11.
+
 ## 1. O problema
 
 Hoje toda primeira mensagem da prospecção sai com a saída colada no fim, sem opção:
@@ -23,12 +33,12 @@ produto hoje só conhece uma. Três estratégias reais:
 1. **Abertura direta com oferta** — a primeira mensagem já apresenta o serviço. A saída tem de ir
    nela. É o comportamento de hoje, e continua o padrão.
 2. **Abertura em degraus** — a primeira só cumprimenta e confirma o contato ("oi, tudo bem? é da
-   [empresa]?"); a segunda (ou a terceira) apresenta quem fala e pede permissão; a oferta vem
+   [empresa]?"); a segunda (ou a terceira — **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**) apresenta quem fala e pede permissão; a oferta vem
    depois. Para quem prospecta por WhatsApp não oficial (WAHA), a primeira mensagem é a de maior
    risco: um "responda PARAR" na primeira linha faz a mensagem **parecer disparo em massa**, e a
    experiência de operação (relato de uso real, não medido no produto) é que a abertura humana e
    curta recebe resposta — e a resposta da pessoa é o que mais protege o número.
-3. **Sem frase de saída** — o operador conduz a conversa de modo que pedir para parar seja natural
+3. **[não implementado neste PR; depende de decisão do mantenedor]** **Sem frase de saída** — o operador conduz a conversa de modo que pedir para parar seja natural
    (ou atende um público em que a frase atrapalha) e assume o risco. Hoje isso é impossível sem
    editar código.
 
@@ -41,7 +51,7 @@ produto hoje só conhece uma. Três estratégias reais:
    **se e quando o produto oferece a palavra**, nunca se ela funciona.
 2. **O padrão é a saída na primeira mensagem.** Configuração gravada antes desta chave existir
    segue igual, sem ninguém editar nada (`.default()` no Zod).
-3. **Desligar exige uma pessoa que aceite o risco por escrito, e fica registrado.** Iniciar
+3. **[não implementado neste PR; depende de decisão do mantenedor]** **Desligar exige uma pessoa que aceite o risco por escrito, e fica registrado.** Iniciar
    campanha já é só de `admin` e só pela tela — por token é recusado
    (`app/api/v1/prospecting/route.ts:120-125`). O aceite grava quem e quando, entra em
    `api_audit_log` e aparece no painel da campanha enquanto ela existir.
@@ -60,8 +70,8 @@ Configuração nova da campanha: `exit_offer`.
 |---|---|---|
 | `first_message` (**padrão**) | "Na primeira mensagem (recomendado)" | na abertura — **igual a hoje** |
 | `second_message` | "Atrasar para a 2ª mensagem" | na 2ª mensagem automática para aquela pessoa |
-| `third_message` | "Atrasar para a 3ª mensagem" | na 3ª mensagem automática para aquela pessoa |
-| `off` | "Não oferecer (eu assumo o risco)" | em nenhuma; exige o aceite da §6 |
+| `third_message` | "Atrasar para a 3ª mensagem" | na 3ª mensagem automática para aquela pessoa — **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]** |
+| `off` | "Não oferecer (eu assumo o risco)" | em nenhuma; exige o aceite da §6 — **[não implementado neste PR; depende de decisão do mantenedor]** |
 
 **Como se conta "mensagem".** A abertura é a 1ª. Conta como mensagem automática cada envio que sai
 por um destes dois caminhos — **um envio, não uma bolha** (uma resposta fatiada em três bolhas é
@@ -96,12 +106,15 @@ modelo (as duas razões estão no cabeçalho de `rodape-de-saida.ts` e continuam
 | follow-up por modelo oficial da Meta (`template`) | não conta nem leva: o corpo do modelo aprovado não se altera. A prospecção hoje sai por texto (`type: "text"` no worker) |
 | agente em modo assistido (`approved-reply.ts`) | não conta nem leva: o texto aprovado não pode mudar depois da aprovação (`reply_body_changed_reapproval_required`). O worker já exige `operation_mode='automatic'` para abordar |
 | o modelo já escreveu "responda PARAR" no fim | `comSaida()` é idempotente: não duplica |
-| modo `off` | nada é contado para a saída; o contexto do agente não ganha a frase do sistema, mas segue com "respeite recusa e opt-out" (`context.ts`, hoje) |
+| modo `off` **[não implementado neste PR; depende de decisão do mantenedor]** | nada é contado para a saída; o contexto do agente não ganha a frase do sistema, mas segue com "respeite recusa e opt-out" (`context.ts`, hoje) |
 | campanha antiga, sem a chave | `first_message` — nada muda |
 
 ## 4. Dados
 
 ### 4.1 Configuração da campanha (sem migration)
+
+> No código entrou só `z.enum(["first_message", "second_message"])`: `third_message` **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**; `off`,
+> `exit_offer_risk_accepted` e os campos `_by`/`_at` **[não implementado neste PR; depende de decisão do mantenedor]**.
 
 `prospecting_campaigns.config` é `jsonb` validado por `campaignConfigSchema`
 (`lib/prospecting/schema.ts`). Acrescenta-se:
@@ -164,12 +177,15 @@ update public.prospecting_candidates
  where organization_id = $1 and id = $2;
 ```
 
+> `when 'third_message' then 3` e o `'third_message'` do filtro **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**:
+> no código o filtro é `c.config->>'exit_offer' = 'second_message'`.
+
 (`now()` é o mesmo instante dentro da transação, por isso `exit_offered_at = now()` identifica a
 reserva feita por este `update`; a implementação pode devolver um booleano calculado antes, se a
 triagem preferir não depender disso.)
 
 No modo `first_message` o worker grava `automatic_sends = 1` e `exit_offered_at = now()` junto do
-`status='sent'`; nos atrasados e no `off`, só `automatic_sends = 1`. A tela diz a mesma coisa em
+`status='sent'`; nos atrasados e no `off` (**[não implementado neste PR; depende de decisão do mantenedor]**), só `automatic_sends = 1`. A tela diz a mesma coisa em
 todos. **Sem backfill:** linhas antigas ficam `0`/`null` porque o produto não sabe se elas levaram
 o rodapé; afirmar que levaram seria inventar sinal que o banco não guarda. O `update` de contagem
 filtra pelo modo da campanha, então linha antiga nunca é tocada (campanha antiga é
@@ -187,6 +203,7 @@ tem RLS.
 
 - `supabase/migrations/<timestamp>_<NNNN>_prospeccao_saida_configuravel.sql` com
   `-- manifest: prospecting_candidates.automatic_sends + exit_offered_at — saída da prospecção na 1ª, 2ª, 3ª mensagem ou desligada`.
+  (No código: "na 1ª ou na 2ª mensagem" — 3ª **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**; desligada **[não implementado neste PR; depende de decisão do mantenedor]**.)
   **Número:** o maior `NNNN` da `main` medido hoje é `0703`; o número real se tira na hora com
   `pnpm checar:colisao-de-migration` (há PRs de schema em voo).
 - Apêndice idempotente no fim de `supabase/baseline.sql`:
@@ -199,17 +216,17 @@ tem RLS.
 
 | arquivo | mudança |
 |---|---|
-| `lib/prospecting/schema.ts` | `exit_offer` + `exit_offer_risk_accepted` com `superRefine` (§4.1) |
+| `lib/prospecting/schema.ts` | `exit_offer` + `exit_offer_risk_accepted` com `superRefine` (§4.1) — o aceite e o `superRefine` **[não implementado neste PR; depende de decisão do mantenedor]** |
 | `lib/prospecting/rodape-de-saida.ts` | funções iguais; o cabeçalho ganha um parágrafo sobre os modos e por que desligar exige aceite registrado |
 | `lib/prospecting/saida-configuravel.ts` (novo) | `contarEnvioAutomatico(db, org, conversationId)` → `{ candidatoId, campanhaId, levaASaida, reservadaEm, locale } \| null` e `desfazerContagem(db, org, candidatoId, reservadaEm)`. Lê `organizations.locale` (mesma fonte do worker) |
 | `lib/prospecting/worker.ts` | `body`: `comSaida(...)` só em `first_message`; nos atrasados, a instrução fixa ganha a frase da §2.4; grava `automatic_sends`/`exit_offered_at` (§4.2) |
-| `lib/prospecting/store.ts` | no `start`: com `exit_offer = "off"`, grava `exit_offer_risk_accepted_by/_at` a partir do ator e emite a auditoria `prospecting.exit_offer_disabled` |
+| `lib/prospecting/store.ts` **[não implementado neste PR; depende de decisão do mantenedor]** | no `start`: com `exit_offer = "off"`, grava `exit_offer_risk_accepted_by/_at` a partir do ator e emite a auditoria `prospecting.exit_offer_disabled` |
 | `lib/prospecting/context.ts` | modos atrasados com a saída pendente: "Antes da mensagem que leva a instrução de saída, não apresente serviço, preço nem proposta: apresente-se e peça permissão. O sistema acrescenta a instrução de saída sozinho; não a escreva." |
 | `lib/agent-engine/agent/inbound-turn.ts` | no `send: (finalBody) => …` do `send_message` (hoje ~linha 3660): fora de prévia, `contarEnvioAutomatico` → se `levaASaida`, `finalBody = comSaida(finalBody, locale)` antes de `corposEnviados.push` e do `enviarComFotos`; se o envio lançar ou não confirmar, `desfazerContagem` |
 | `lib/agent-engine/agent/followup-turn.ts` | no `send: (finalBody) => channel.send(…)` (~linha 1221), o mesmo, **pulando** quando `modelo !== undefined` (template) |
 | `app/api/v1/prospecting/route.ts` | o `select` dos candidatos traz `p.automatic_sends`, `p.exit_offered_at` e `ct.is_blocked` (join em `contacts` pelo `contact_id`, com `organization_id`) |
 | `app/app/prospecting/_client.tsx` | §6 |
-| `lib/audit/actions.ts` | `prospecting.exit_offered` e `prospecting.exit_offer_disabled` |
+| `lib/audit/actions.ts` | `prospecting.exit_offered` e `prospecting.exit_offer_disabled` (este **[não implementado neste PR; depende de decisão do mantenedor]**) |
 | `lib/i18n/dicionario.ts` | as strings novas da tela, com `es` |
 
 **Custo dentro do lock do número:** o `send` do `inbound-turn` roda com o
@@ -234,9 +251,9 @@ marcado em **Na primeira mensagem**:
   receber mensagens, responda PARAR."
 - **Atrasar para a 2ª mensagem** — "A abertura só cumprimenta e confirma se é a empresa certa, sem
   oferta. A instrução para parar vai na mensagem seguinte."
-- **Atrasar para a 3ª mensagem** — "As duas primeiras mensagens não fazem oferta: cumprimentar,
+- **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]** **Atrasar para a 3ª mensagem** — "As duas primeiras mensagens não fazem oferta: cumprimentar,
   depois apresentar-se e pedir permissão. A instrução para parar vai na terceira."
-- **Não oferecer** — ao marcar, abre uma caixa de aviso (cor de alerta, não de erro):
+- **[não implementado neste PR; depende de decisão do mantenedor]** **Não oferecer** — ao marcar, abre uma caixa de aviso (cor de alerta, não de erro):
 
   > **Você está desligando a instrução para parar de receber.** Sem ela, quem não quer as suas
   > mensagens costuma usar **Denunciar spam** no WhatsApp — o sistema não fica sabendo, e denúncias
@@ -256,7 +273,7 @@ No painel da campanha:
 
 - ao lado de "Responderam", um número novo **"Pediram para parar"** (`is_blocked` dos contatos da
   campanha);
-- o modo escolhido, por extenso; no `off`, "Sem opção de parar — risco aceito por <nome> em
+- o modo escolhido, por extenso; no `off` (**[não implementado neste PR; depende de decisão do mantenedor]**), "Sem opção de parar — risco aceito por <nome> em
   <data>";
 - na linha de cada empresa abordada nos modos atrasados: "Saída oferecida" / "Saída ainda não
   oferecida".
@@ -271,13 +288,13 @@ No painel da campanha:
 3. **Que registro emito?** Em `api_audit_log`: `prospecting.exit_offered` (metadata `campaign_id`,
    `candidate_id`, `conversation_id`, `message_number`, `via: inbound_turn | followup`; sem texto
    nem telefone, como o `prospecting.approach_sent`) e `prospecting.exit_offer_disabled` no início
-   da campanha em `off` (ator = quem aceitou).
+   da campanha em `off` (ator = quem aceitou) — este **[não implementado neste PR; depende de decisão do mantenedor]**.
 4. **Onde apareço na tela?** Na conversa do Inbox (a mensagem com a saída), no painel e nas linhas
    de `/app/prospecting` (§6).
 5. **Por qual porta?** `/app/prospecting`, já no catálogo de navegação. Nenhuma tela nova.
 6. **Anti-morte?** Nos atrasados, a saída pendente não morre: a reserva só se consome quando a
    mensagem sai, volta se o envio falha, e o `>=` faz a próxima levar se a do alvo não pôde. No
-   `off`, nenhum — por escolha registrada do administrador.
+   `off` (**[não implementado neste PR; depende de decisão do mantenedor]**), nenhum — por escolha registrada do administrador.
 7. **Onde se configura?** O rádio da §6, por campanha. Sem configuração = o padrão de hoje.
 8. **Continuidade IA↔humano?** Quem assume vê na linha da empresa se a saída já foi oferecida e, no
    painel, se a campanha está em `off`; o agente vê no contexto que não deve fazer oferta antes da
@@ -295,19 +312,19 @@ No painel da campanha:
 | teste | o que prova | sabotagem que tem de ficar vermelha |
 |---|---|---|
 | `tests/unit/prospeccao-oferece-saida-e-a-saida-funciona.test.ts` (atualizado) | `first_message` segue mandando `comSaida`; config antiga parseia como `first_message` | trocar o padrão do Zod |
-| `lib/prospecting/schema` (casos novos) | `off` sem aceite → recusado; aceite em modo não-`off` → recusado; `exit_offer_risk_accepted_by` no corpo → recusado (`.strict()`) | tirar o `superRefine` |
+| `lib/prospecting/schema` (casos novos) **[não implementado neste PR; depende de decisão do mantenedor]** | `off` sem aceite → recusado; aceite em modo não-`off` → recusado; `exit_offer_risk_accepted_by` no corpo → recusado (`.strict()`) | tirar o `superRefine` |
 | `tests/unit/prospecting-worker.test.ts` (casos novos) | atrasados: corpo é o texto cru **e** a instrução tem a frase "sem oferta"; `off`: texto cru sem a frase; padrão: `exit_offered_at` gravado | tirar a frase da instrução; tirar o `comSaida` do ramo padrão |
-| `lib/prospecting/saida-configuravel.test.ts` | 2ª: o 1º envio automático depois da abertura leva, o seguinte não; 3ª: só o 2º depois da abertura; `>=` cobre o alvo que não pôde levar; desfazer devolve contagem e reserva; `first_message` e `off` não contam | trocar `>=` por `=`; remover `exit_offered_at is null` |
+| `lib/prospecting/saida-configuravel.test.ts` | 2ª: o 1º envio automático depois da abertura leva, o seguinte não; 3ª: só o 2º depois da abertura (**[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**); `>=` cobre o alvo que não pôde levar; desfazer devolve contagem e reserva; `first_message` e `off` não contam | trocar `>=` por `=`; remover `exit_offered_at is null` |
 | `inbound-turn` (caso novo) | em conversa de prospecção na 2ª, a 1ª `send_message` sai com a saída e a 2ª do mesmo turno não; prévia não conta | **remover a chamada** em `inbound-turn.ts` (sabotar a ligação, não só o helper) |
 | `followup-turn` (caso novo) | follow-up de texto conta e leva; de template não | remover a chamada em `followup-turn.ts` |
-| `store`/rota (caso novo) | `start` em `off` grava `_by` = ator da sessão e emite `prospecting.exit_offer_disabled` | gravar `_by` a partir do corpo |
+| `store`/rota (caso novo) **[não implementado neste PR; depende de decisão do mantenedor]** | `start` em `off` grava `_by` = ator da sessão e emite `prospecting.exit_offer_disabled` | gravar `_by` a partir do corpo |
 | `tests/invariants/` (novo, `pnpm test:db`) | as colunas existem depois de install e update do baseline; o `update` de contagem com `organization_id` da org B não toca linha da org A | trocar `p.organization_id = $1` por nada |
 | `tests/e2e/` (caso na spec de prospecção, se houver, ou spec nova em `SPECS_PARTE_N`) | o rádio nasce em "Na primeira mensagem"; "Não oferecer" sem marcar a caixa deixa o botão desabilitado; marcada, a campanha inicia e o painel mostra "risco aceito por" | — |
 
 **Prova em par (o caminho passa por agente):** pela tela, uma campanha na 2ª com conexão de teste —
 a abertura sai sem "PARAR", a pessoa responde "sim", a resposta do agente sai com "PARAR" no fim;
 **e** `contarEnvioAutomatico` chamada direto para a mesma conversa devolve `levaASaida: false` (já
-oferecida). Repetir para a 3ª. Os dois lados têm de concordar.
+oferecida). Repetir para a 3ª (**[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**). Os dois lados têm de concordar.
 
 ## 9. Fora do escopo
 
@@ -321,11 +338,12 @@ oferecida). Repetir para a 3ª. Os dois lados têm de concordar.
 - Fragmento `.changes/prospeccao-saida-configuravel.md`: `impacto: capacidade_nova`,
   `secao: adicionado`, título "A prospecção deixa escolher quando oferecer a opção de parar de
   receber: na 1ª, 2ª ou 3ª mensagem, ou não oferecer". `pnpm release:conferir`.
+  (Entrou: "… na 1ª ou na 2ª mensagem" — 3ª **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**; não oferecer **[não implementado neste PR; depende de decisão do mantenedor]**.)
 - `docs/features/prospeccao-nativa.md`: parágrafo dos modos, do aceite e dos casos de borda.
 - Destino declarado no PR: **núcleo** — sem ninguém mexer no rádio, a operação comum continua
   idêntica.
 - **Commits separados por modo**, para a triagem poder aceitar uma parte e discutir outra: (1)
-  tripla + contagem + modos atrasados; (2) modo `off` com aceite e auditoria. O `off` é o ponto em
+  tripla + contagem + modos atrasados; (2) modo `off` com aceite e auditoria — **[não implementado neste PR; depende de decisão do mantenedor]**. O `off` é o ponto em
   que o mantenedor pode discordar, e não deve arrastar o resto.
 
 ## 11. Plano de implementação (ordem)
@@ -341,13 +359,13 @@ oferecida). Repetir para a 3ª. Os dois lados têm de concordar.
    Commitar, depois sabotar cada ponto de chamada e anotar "N vermelho(s) de M, o previsto".
 6. **Auditoria** (`actions.ts` + `prospecting.exit_offered`, fire-and-forget).
 7. **API + tela + i18n** dos modos atrasados (`route.ts`, `_client.tsx`, `dicionario.ts`).
-8. **Commit separado do modo `off`**: refine, `store.ts` (aceite pelo ator),
+8. **[não implementado neste PR; depende de decisão do mantenedor]** **Commit separado do modo `off`**: refine, `store.ts` (aceite pelo ator),
    `prospecting.exit_offer_disabled`, caixa de aviso na tela, testes.
 9. **Docs + mapa + fragmento.**
 10. **Pré-voo** (`bash .agents/skills/deskcomm-contribuir/scripts/pre-voo.sh`) e os gates do CI pelo
     PR interno do fork (nesta máquina não se roda Docker de teste).
-11. **Prova em tela** numa instalação de teste — abertura sem PARAR; resposta; 2ª (ou 3ª) com
-    PARAR; "PARAR" respondido à abertura bloqueando; "Não oferecer" exigindo o aceite — com
+11. **Prova em tela** numa instalação de teste — abertura sem PARAR; resposta; 2ª (ou 3ª — **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]**) com
+    PARAR; "PARAR" respondido à abertura bloqueando; "Não oferecer" exigindo o aceite (**[não implementado neste PR; depende de decisão do mantenedor]**) — com
     evidência em `evidence/prospeccao-saida/`; só depois o PR ao produto.
 
 ## 12. Limites declarados
