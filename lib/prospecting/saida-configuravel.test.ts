@@ -183,6 +183,36 @@ describe("enviarComSaidaConfiguravel", () => {
     // conferir que não houve audit e o corpo saiu intacto.
   });
 
+  it.each(["queued", "already_sent"] as const)(
+    "contou + envio %s → desfaz a contagem desta tentativa e não audita (o job reprocessa)",
+    async (kind) => {
+      const agora = "2026-10-21T14:00:00.000000Z";
+      const { query } = dbFalso({
+        "returning": [
+          {
+            candidato_id: "cand-4",
+            campanha_id: "camp-4",
+            exit_offered_at: agora,
+            leva_a_saida: true,
+            numero_da_mensagem: 3,
+            locale: "pt-BR",
+            reservada_em_texto: agora,
+          },
+        ],
+      });
+      const resultadoEnvio: ChannelSendResult = { kind, idempotencyKey: "k", messageId: "m" };
+      await enviarComSaidaConfiguravel(
+        { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", avisar: vi.fn() },
+        "texto",
+        envioFalso(resultadoEnvio),
+      );
+      const [sql, params] = query.mock.calls.at(-1)!;
+      expect(sql).toContain("greatest(automatic_sends - 1, 0)");
+      expect(params).toEqual(["org-a", "cand-4", agora]);
+      expect(auditMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("contou + envio failed → desfazer chamado com reservadaEm", async () => {
     const agora = "2026-10-21T13:00:00.000000Z";
     const { query } = dbFalso({

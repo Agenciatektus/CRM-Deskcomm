@@ -162,11 +162,12 @@ export async function enviarComSaidaConfiguravel(
     throw erroEnvio;
   }
   if (r) {
-    const aceito =
-      resultado.kind === "sent" ||
-      resultado.kind === "already_sent" ||
-      resultado.kind === "queued";
-    if (!aceito) {
+    // A contagem vale uma vez por ENVIO, não por tentativa: só `sent` a mantém.
+    // `queued` reagenda o job e o `send` roda de novo (applySendOutcome), e
+    // `already_sent` é o replay de um envio que já foi contado; nos dois, esta
+    // tentativa desfaz o que somou. Sem isto, no modo da 3ª, a 2ª mensagem
+    // reprocessada atingia o alvo e reservava a saída num corpo já gravado sem ela.
+    if (resultado.kind !== "sent") {
       await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
     } else if (r.levaASaida) {
       void audit({
