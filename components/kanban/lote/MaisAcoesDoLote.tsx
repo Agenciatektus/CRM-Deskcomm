@@ -84,7 +84,7 @@ export function MaisAcoesDoLote({
           {funis.length > 1 && (
             <DropdownMenuItem onClick={() => setDialogo("funil")}>{t("Levar para outro funil…")}</DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => setDialogo("tarefa")}>{t("Criar tarefa…")}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDialogo("tarefa")}>{t("Definir próximo passo…")}</DropdownMenuItem>
           {encerrados.length > 0 && abertas.length > 0 && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>{`${t("Reabrir")} (${encerrados.length})`}</DropdownMenuSubTrigger>

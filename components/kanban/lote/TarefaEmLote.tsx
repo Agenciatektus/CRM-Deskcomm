@@ -86,7 +86,7 @@ export function TarefaEmLote({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("Criar tarefa")}</DialogTitle>
+          <DialogTitle>{t("Definir próximo passo")}</DialogTitle>
           <DialogDescription>
             {`${selectedIds.length} ${t(selectedIds.length === 1 ? "negócio recebe a tarefa." : "negócios recebem a tarefa, uma em cada.")}`}
           </DialogDescription>

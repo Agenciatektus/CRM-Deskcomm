@@ -61,6 +61,27 @@ describe("barra do Funil, a tela", () => {
     expect(onSel).toHaveBeenCalledWith(["l2"]);
   });
 
+  it("Lista: clicar na linha ou no nome abre o dossiê; marcar a caixa NÃO abre", () => {
+    const onAbrir = vi.fn();
+    const onSel = vi.fn();
+    render(<ListaDoFunil leads={LEADS} stages={STAGES} ownerNames={new Map()} ordem="valor" selectedIds={[]} onSelectionChange={onSel} onAbrir={onAbrir} />);
+    fireEvent.click(screen.getAllByText("Novo contato", { selector: "td" })[0]);
+    expect(onAbrir).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("Ana"));
+    expect(onAbrir).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByText("Ana"), { ctrlKey: true });
+    expect(onAbrir).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Ana" }));
+    expect(onAbrir).toHaveBeenCalledTimes(2);
+    expect(onSel).toHaveBeenCalled();
+  });
+
+  it("Lista: a página do Funil liga o clique ao dossiê", () => {
+    const pagina = readFileSync("app/app/pipelines/[id]/_client.tsx", "utf8");
+    expect(pagina).toMatch(/onAbrir=\{setDossieDaLista\}/);
+    expect(pagina).toMatch(/<LeadDossier[\s\S]*lead=\{leadDaLista\}/);
+  });
+
   it("Lista no celular: segurar o card entra na seleção", () => {
     vi.useFakeTimers();
     const onSel = vi.fn();

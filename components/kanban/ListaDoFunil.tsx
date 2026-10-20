@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { type MouseEvent, useMemo, useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
 import { canalDoCard, iniciaisDoCard, linhaDeBaixo, nomeDoCard } from "@/lib/kanban/identidade-do-card";
@@ -26,6 +26,8 @@ export interface PropsDaLista {
   ordem: OrdemDoFunil;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  /** Abre o dossiê do lead (detalhes + conversa). Sem ele, o nome leva à página do lead. */
+  onAbrir?: (leadId: string) => void;
 }
 
 /**
@@ -33,7 +35,7 @@ export interface PropsDaLista {
  * Cabeçalho ordena (com `aria-sort`); sem clique, vale a ordem do menu.
  * Rola na horizontal em tela estreita. Marcar abre a barra em lote da página.
  */
-export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, onSelectionChange }: PropsDaLista) {
+export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, onSelectionChange, onAbrir }: PropsDaLista) {
   const t = useT();
   const [porColuna, setPorColuna] = useState<{ coluna: ColunaDaLista; sentido: Sentido } | null>(null);
   const agora = useMemo(() => new Date(), [leads]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -54,6 +56,19 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
     setPorColuna((atual) =>
       atual?.coluna === coluna ? { coluna, sentido: atual.sentido === "asc" ? "desc" : "asc" } : { coluna, sentido: coluna === "nome" || coluna === "etapa" || coluna === "origem" ? "asc" : "desc" },
     );
+
+  // Clique na linha abre o dossiê, menos quando cai num controle da própria linha
+  // (marcar, próximo passo, link). No nome, Ctrl/⌘/clique do meio continuam abrindo
+  // a página do lead em outra aba.
+  const clicaLinha = (id: string) => (e: MouseEvent<HTMLTableRowElement>) => {
+    if (!onAbrir || (e.target as HTMLElement).closest("a, button, input, label, [role=menuitem], [role=dialog]")) return;
+    onAbrir(id);
+  };
+  const clicaNome = (id: string) => (e: MouseEvent<HTMLAnchorElement>) => {
+    if (!onAbrir || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    onAbrir(id);
+  };
 
   if (linhas.length === 0) {
     return <p className="rounded-lg border border-border bg-surface p-8 text-center text-sm text-text-muted">{t("Nenhum lead neste recorte.")}</p>;
@@ -96,12 +111,12 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
             const st = etapa.get(l.stage_id);
             const horas = (agora.getTime() - new Date(l.stage_changed_at ?? l.created_at).getTime()) / 3_600_000;
             return (
-              <tr key={l.id} className={cn("border-b border-border last:border-0 hover:bg-hover", marcados.has(l.id) && "bg-accent/5")}>
+              <tr key={l.id} onClick={clicaLinha(l.id)} className={cn("border-b border-border last:border-0 hover:bg-hover", onAbrir && "cursor-pointer", marcados.has(l.id) && "bg-accent/5")}>
                 <td className="px-3 py-2">
                   <input type="checkbox" aria-label={`${t("Selecionar")} ${nome}`} checked={marcados.has(l.id)} onChange={() => alterna(l.id)} className="size-4 accent-(--color-accent)" />
                 </td>
                 <td className="max-w-64 px-3 py-2">
-                  <Link href={`/app/leads/${l.id}`} className="flex min-w-0 items-center gap-2.5 hover:underline">
+                  <Link href={`/app/leads/${l.id}`} onClick={clicaNome(l.id)} className="flex min-w-0 items-center gap-2.5 hover:underline">
                     <AvatarDoLead
                       compacto
                       semente={l.contact_id ?? l.id}

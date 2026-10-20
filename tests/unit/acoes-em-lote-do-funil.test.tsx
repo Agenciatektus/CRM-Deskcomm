@@ -223,7 +223,7 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
   it("uma tarefa por negócio, presa a ele; responsável padrão = o dono de cada um, ou eu", async () => {
     montar(["a", "b"], [lead("a", { owner_user_id: "dono-a" }), lead("b")]);
     await abrirMais();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Criar tarefa…" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Definir próximo passo…" }));
     await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
     expect(post).not.toHaveBeenCalled();
     await soltarOAviso();
@@ -236,7 +236,7 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
   it("reconfirmar nos 5 s não cria a tarefa de novo: a seleção sai e a barra trava", async () => {
     const onClear = montar(["a"], [lead("a")]);
     await abrirMais();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Criar tarefa…" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Definir próximo passo…" }));
     await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
     expect(onClear).toHaveBeenCalled();
     expect(adiadas).toHaveLength(1);
@@ -252,7 +252,7 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
     post.mockImplementation(() => new Promise<void>((r) => (liberar = r)));
     montar(["a"], [lead("a")]);
     await abrirMais();
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Criar tarefa…" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Definir próximo passo…" }));
     await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
     const rodando = soltarOAviso();
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
