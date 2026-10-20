@@ -95,7 +95,8 @@ D="$(caso e $'VAPID_PUBLIC_KEY="BPub"\nVAPID_PRIVATE_KEY=""\n')"; cp "$D/.env" "
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
 check "(e) só uma das chaves → não gera a outra (arquivo igual)" cmp -s "$D/.env" "$D/original"
 check "    e avisa, dizendo como sair" contem "$SAIDA" "Não gerei a outra"
-check "    pela atualização forçada, não por edição solta" contem "$SAIDA" "update.sh --force"
+check "    pela atualização (sem --force: ela cria o par mesmo sem versão nova)" contem "$SAIDA" "rode: bash hostgator-setup-kit/update.sh"
+check "    e não manda forçar (--force refaz backup e banco, e pode voltar de versão)" bash -c "! printf '%s' \"\$1\" | grep -q -- --force" _ "$SAIDA"
 
 D="$(caso e2 $'VAPID_PRIVATE_KEY="priv"\n')"; cp "$D/.env" "$D/original"
 no_kit "$D" "" "completar_par_vapid .env" >/dev/null
@@ -142,7 +143,8 @@ for dub in falha lixo; do
   SAIDA="$(no_kit "$D" "$WORK/bin-$dub" "completar_par_vapid .env; echo rc=\$?")"
   check "(h) openssl $dub → arquivo intacto" cmp -s "$D/.env" "$D/original"
   check "    sai com 0 (o push é opcional)" contem "$SAIDA" "rc=0"
-  check "    e avisa como tentar de novo" contem "$SAIDA" "update.sh --force"
+  check "    e avisa como tentar de novo, sem --force" contem "$SAIDA" "tentar de novo: bash hostgator-setup-kit/update.sh"
+  check "    (e não manda forçar)" bash -c "! printf '%s' \"\$1\" | grep -q -- --force" _ "$SAIDA"
 done
 
 D="$(caso i $'X=1\n')"; cp "$D/.env" "$D/original"; chmod 444 "$D/.env"

@@ -333,7 +333,7 @@ const DO_SERVIDOR: RecursoOpcional[] = [
     padrao: "ligado",
     quemDecide: "dono_do_servidor",
     href: null,
-    comoLigar: "Nasce pronto pelo kit de instalação; se aparecer desligado, rode no servidor: bash hostgator-setup-kit/update.sh --force",
+    comoLigar: "Nasce pronto pelo kit de instalação; se aparecer desligado, rode no servidor: bash hostgator-setup-kit/update.sh",
     ler: peloServidor("web_push"),
   },
   {

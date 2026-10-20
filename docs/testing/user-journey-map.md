@@ -671,7 +671,7 @@ num job que já leva meia hora.
 | # | Caso | Expectativa | Resultado |
 |---|------|-------------|-----------|
 | J12.1 | Sem VAPID, a tela não fica muda | aviso `push-status-faltando-chaves` visível, e o de «pronto» ausente | PASS |
-| J12.2 | Ela diz o que FAZER, não só o que falta | atualizar a instalação (com a forçada escrita) e, fora do kit, o comando `npx web-push generate-vapid-keys` e as duas chaves, nominalmente | PASS (e2e: comando manual e chaves; unit: atualizar e a forçada) |
+| J12.2 | Ela diz o que FAZER, não só o que falta | rodar a atualização (`update.sh` sem `--force`: o par nasce mesmo sem versão nova) e, fora do kit, o comando `npx web-push generate-vapid-keys` e as duas chaves, nominalmente | PASS (e2e: comando manual e chaves; unit: atualizar sem `--force`; shell: `update-guard` §14) |
 | J12.3 | O controle de Push não some, e a tela diz por que está travado | interruptor visível + «o navegador bloqueou as notificações» | PASS |
 | J12.5 | VAPID ausente NÃO desabilita o Push | com `granted` e sem chaves, nasce habilitado | PASS (unit) |
 | J12.4 | Com VAPID, anuncia a aba fechada | e para de mandar gerar o par que já existe | PASS (unit) |

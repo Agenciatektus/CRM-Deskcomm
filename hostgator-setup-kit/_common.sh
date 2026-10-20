@@ -2517,7 +2517,7 @@ completar_par_vapid() {
     # Meia chave: gerar a outra quebraria o par, e trocar a que existe é a
     # troca que a D6 proíbe. Quem decide é quem opera.
     c_ylw "$(t "  ⚠ Só uma das duas chaves dos avisos com o app fechado (VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY) está no .env. Não gerei a outra, para não quebrar o par.")"
-    c_ylw "$(t "    Para o kit gerar um par novo, apague as duas linhas e rode: bash hostgator-setup-kit/update.sh --force")"
+    c_ylw "$(t "    Para o kit gerar um par novo, apague as duas linhas e rode: bash hostgator-setup-kit/update.sh")"
     return 0
   fi
   if [ ! -w "$envfile" ]; then
@@ -2529,7 +2529,7 @@ completar_par_vapid() {
 
   if ! par="$(gerar_par_vapid)"; then
     # Falha fechado na ação (nada gravado) e aberto na informação (o aviso).
-    c_ylw "$(t "  ⚠ Não consegui gerar as chaves dos avisos com o app fechado; o resto segue normal. Para tentar de novo: bash hostgator-setup-kit/update.sh --force")"
+    c_ylw "$(t "  ⚠ Não consegui gerar as chaves dos avisos com o app fechado; o resto segue normal. Para tentar de novo: bash hostgator-setup-kit/update.sh")"
     return 0
   fi
   pub="${par% *}"; priv="${par#* }"
@@ -2545,7 +2545,7 @@ completar_par_vapid() {
            && printf 'VAPID_PUBLIC_KEY=%s\nVAPID_PRIVATE_KEY=%s\n' "$pub" "$priv"; } > "$tmp" ) \
      || ! chmod 600 "$tmp" || ! mv "$tmp" "$envfile"; then
     rm -f "$tmp"
-    c_ylw "$(t "  ⚠ Não consegui gerar as chaves dos avisos com o app fechado; o resto segue normal. Para tentar de novo: bash hostgator-setup-kit/update.sh --force")"
+    c_ylw "$(t "  ⚠ Não consegui gerar as chaves dos avisos com o app fechado; o resto segue normal. Para tentar de novo: bash hostgator-setup-kit/update.sh")"
     return 0
   fi
   # O ambiente também: o `load_env` exportou o vazio, e é dele que o compose lê

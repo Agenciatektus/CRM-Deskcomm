@@ -80,11 +80,11 @@ export default async function NotificationsPage() {
                 marca escrita à mão. «o site» diz a mesma coisa e serve a quem
                 revende o sistema com a marca dele. */}
             {t(
-              "Ligar o Push abaixo já faz o aviso aparecer na bandeja do sistema enquanto você está com o site aberto numa aba. Para receber também com a aba fechada, quem administra o servidor precisa atualizar a instalação: a atualização cria sozinha, uma única vez, o par de chaves que falta. Se a instalação já estiver na versão mais recente, rode:",
+              "Ligar o Push abaixo já faz o aviso aparecer na bandeja do sistema enquanto você está com o site aberto numa aba. Para receber também com a aba fechada, quem administra o servidor precisa rodar a atualização da instalação: ela cria sozinha, uma única vez, o par de chaves que falta, mesmo quando não há versão nova:",
             )}
           </p>
           <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-2 text-xs">
-            <code>bash hostgator-setup-kit/update.sh --force</code>
+            <code>bash hostgator-setup-kit/update.sh</code>
           </pre>
           <p className="mt-2 text-muted-foreground">
             {t("Em servidor montado sem o kit de instalação, gere o par uma única vez:")}
