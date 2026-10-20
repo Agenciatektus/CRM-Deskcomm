@@ -15704,9 +15704,7 @@ export const DICIONARIO: Traducoes = {
   "Contato, negócio e conversa de toda a fila são criados na hora de iniciar.": { es: "Contacto, negocio y conversación de toda la cola se crean al iniciar." },
   "Quando oferecer a opção de parar de receber": { es: "Cuándo ofrecer la opción de dejar de recibir" },
   "Na primeira mensagem (recomendado)": { es: "En el primer mensaje (recomendado)" },
-  "A abertura já diz como parar: Se não quiser mais receber mensagens, responda PARAR.": {
-    es: "La apertura ya dice cómo detenerse: si no quieres recibir más mensajes, responde BAJA.",
-  },
+  "A abertura já diz como parar:": { es: "La apertura ya dice cómo detenerse:" },
   "Atrasar para a 2ª mensagem": { es: "Postergar al 2.º mensaje" },
   "A abertura só cumprimenta e confirma se é a empresa certa, sem oferta. A instrução para parar vai na mensagem seguinte.": {
     es: "La apertura solo saluda y confirma si es la empresa correcta, sin oferta. La instrucción para detenerse va en el mensaje siguiente.",

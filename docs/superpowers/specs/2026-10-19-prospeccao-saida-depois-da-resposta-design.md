@@ -248,7 +248,8 @@ Em **Prospecção › 2. Preparar a abordagem**, logo abaixo de "Quando a empres
 marcado em **Na primeira mensagem**:
 
 - **Na primeira mensagem (recomendado)** — "A abertura já diz como parar: Se não quiser mais
-  receber mensagens, responda PARAR."
+  receber mensagens, responda PARAR." A frase depois dos dois-pontos é `rodapeDeSaida()` no
+  idioma da ORGANIZAÇÃO (`organizations.locale`, o mesmo do envio), nunca no da interface.
 - **Atrasar para a 2ª mensagem** — "A abertura só cumprimenta e confirma se é a empresa certa, sem
   oferta. A instrução para parar vai na mensagem seguinte."
 - **[removido por decisão do mantenedor (doc 170 = B, 20/10): só 1ª e 2ª]** **Atrasar para a 3ª mensagem** — "As duas primeiras mensagens não fazem oferta: cumprimentar,

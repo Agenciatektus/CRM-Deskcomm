@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = getRequestPool();
     const org = auth.organizationId;
-    const [settings, campaigns, candidates, agents, channels, stages] = await Promise.all([
+    const [settings, campaigns, candidates, agents, channels, stages, organizacao] = await Promise.all([
       db.query("select organization_id from prospecting_settings where organization_id=$1", [org]),
       db.query(
         "select id,name,search,config,status,search_status,run_id,cost_usd,result_count,skipped_count,error,next_send_at,created_at from prospecting_campaigns where organization_id=$1 order by created_at desc limit 50",
@@ -70,6 +70,9 @@ export async function GET(req: NextRequest) {
         "select s.id,s.name,s.pipeline_id,p.name as pipeline_name from crm_stages s join crm_pipelines p on p.id=s.pipeline_id and p.organization_id=s.organization_id where s.organization_id=$1 and not s.is_archived and not s.is_won and not s.is_lost order by p.name,s.position",
         [org],
       ),
+      // O idioma da ORGANIZAÇÃO, a mesma fonte do rodapé que o worker envia: a dica
+      // da tela cita a frase enviada, não a do idioma da interface.
+      db.query<{ locale: string | null }>("select locale from organizations where id=$1", [org]),
     ]);
     return ok(
       {
@@ -85,6 +88,7 @@ export async function GET(req: NextRequest) {
           }
         }),
         stages: stages.rows,
+        organization_locale: organizacao.rows[0]?.locale ?? null,
       },
       { requestId, headers },
     );
