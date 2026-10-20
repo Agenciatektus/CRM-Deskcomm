@@ -49024,6 +49024,10 @@ begin
       from public.event_log e
      where e.status in ('done', 'dead')
        and e.created_at < now() - make_interval(days => v_dias)
+       -- A TRAVA dos gatilhos por tempo (migration 9057): o lead-time-triggers
+       -- não redispara só porque acha esta linha, sem janela. Apagá-la rearma a
+       -- regra e o mesmo card parado recebe a mensagem de novo.
+       and e.event_type not in ('lead.silent_for', 'lead.stage_stale')
      order by e.created_at
      limit v_limite
   )
@@ -52451,6 +52455,17 @@ revoke execute on function public.emit_event(text, text, uuid, jsonb, jsonb, uui
 grant  execute on function public.emit_event(text, text, uuid, jsonb, jsonb, uuid) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
+
+-- ---- chave do MCP externo em claro sai do settings (migration 9057) ----
+--
+-- A 0580 cifra a chave nas colunas `mcp_externo_chave_*`; quem registrou antes
+-- ficaria com `settings.mcp_externo.chave` em claro, legível por todo membro. O
+-- código não lê nem grava esse campo. Numa instalação nova não há linha: no-op.
+-- (A trava dos gatilhos por tempo, a outra metade da 9057, está no corpo de
+-- `fn_podar_event_log`, no bloco da 9021.)
+update public.organizations
+   set settings = settings #- '{mcp_externo,chave}'
+ where settings->'mcp_externo' ? 'chave';
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

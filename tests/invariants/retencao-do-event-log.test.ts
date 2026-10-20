@@ -66,10 +66,10 @@ function texto(consulta: string): string {
  * `conversation.routing_requested`, e semear entidade repetida faria um caso de
  * RETENÇÃO morrer com `23505` — um vermelho que não fala de retenção nenhuma.
  */
-function semear(opts: { id: string; status: string; idadeDias: number }): void {
+function semear(opts: { id: string; status: string; idadeDias: number; tipo?: string }): void {
   sql(`
     insert into public.event_log (id, organization_id, event_type, entity_kind, status, created_at)
-    values ('${opts.id}', '${ORG}', 'teste.poda', 'contact', '${opts.status}',
+    values ('${opts.id}', '${ORG}', '${opts.tipo ?? "teste.poda"}', 'contact', '${opts.status}',
             now() - make_interval(days => ${opts.idadeDias}));
   `);
 }
@@ -187,6 +187,27 @@ describe("fn_podar_event_log — o terminal velho sai, o trabalho fica", () => {
     expect(valor(`select public.fn_podar_event_log(120, 1)`)).toBe(1);
     expect(valor(`select count(*) from public.event_log where id = '${id(30)}'`)).toBe(0);
     expect(valor(`select count(*) from public.event_log where id = '${id(31)}'`)).toBe(1);
+  });
+
+  it("a TRAVA dos gatilhos por tempo sobrevive à poda; a linha comum da mesma idade sai (9057)", () => {
+    // `lead-time-triggers` não redispara `lead.silent_for`/`lead.stage_stale` só
+    // porque acha a linha `done` da regra, SEM janela de tempo. Se a poda a
+    // apagasse, ~120 dias depois o mesmo card parado receberia a mensagem de novo
+    // (parecer do @Cassio_SecRev no PR #213, P1).
+    semear({ id: id(50), status: "done", idadeDias: 400, tipo: "lead.silent_for" });
+    semear({ id: id(51), status: "dead", idadeDias: 400, tipo: "lead.stage_stale" });
+    // Controle negativo: a MESMA idade e status, tipo comum — essa SAI. Sem ela,
+    // uma poda que não apagasse nada deixaria o caso verde.
+    semear({ id: id(52), status: "done", idadeDias: 400, tipo: "contact.birthday" });
+
+    expect(valor(`select public.fn_podar_event_log(120, 1000)`)).toBe(1);
+    expect(
+      texto(
+        `select string_agg(event_type, ',' order by event_type) from public.event_log
+          where organization_id = '${ORG}'`,
+      ),
+      "a poda apagou a trava de um gatilho por tempo: a regra dispararia de novo para o mesmo card",
+    ).toBe("lead.silent_for,lead.stage_stale");
   });
 
   it("o run da automação SOBREVIVE e só perde o ponteiro (efeito DECLARADO)", () => {
