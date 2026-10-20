@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { encerrarPushDesteAparelho } from "./push_client";
+import { encerrarPushDesteAparelho, syncPushSubscription } from "./push_client";
 
 const ordem: string[] = [];
 const fetchFalso = vi.fn(async (..._args: unknown[]) => {
@@ -80,5 +80,43 @@ describe("encerrarPushDesteAparelho", () => {
     comServiceWorker({ endpoint: "https://push/1", unsubscribe });
     await encerrarPushDesteAparelho();
     expect(register).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncPushSubscription", () => {
+  const subscribe = vi.fn(async () => ({
+    toJSON: () => ({ endpoint: "https://push/1", keys: { p256dh: "p", auth: "a" } }),
+  }));
+
+  beforeEach(() => {
+    vi.stubGlobal("Notification", { permission: "granted" });
+    fetchFalso.mockImplementation(async () =>
+      new Response(JSON.stringify({ data: { enabled: true, public_key: "AAAA" } }), { status: 200 }),
+    );
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { register: vi.fn(async () => ({ pushManager: { getSubscription: async () => null, subscribe } })) },
+    });
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    fetchFalso.mockReset();
+  });
+
+  // `alerts.enabled` é espelho: a permissão concedida para outra linha da tela o
+  // regrava como "1" sem tocar no interruptor de mensagem. A fonte é a preferência.
+  it("push de mensagem desligado: não inscreve nem manda PUT, mesmo com o espelho em 1", async () => {
+    window.localStorage.setItem("notify.prefs.v1", JSON.stringify({ message: { in_app: true, push: false } }));
+    window.localStorage.setItem("alerts.enabled", "1");
+    await syncPushSubscription();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(fetchFalso.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(false);
+  });
+
+  it("push de mensagem ligado: inscreve e manda PUT (controle positivo)", async () => {
+    await syncPushSubscription();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(fetchFalso.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(true);
   });
 });

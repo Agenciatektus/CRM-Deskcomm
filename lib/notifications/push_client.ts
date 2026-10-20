@@ -1,4 +1,5 @@
 import { areAlertsEnabled, getPermission } from "./permission";
+import { canalLigado } from "./prefs";
 import { ensureNotifyServiceWorker } from "./service_worker";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -13,7 +14,8 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 /** Liga a inscrição Web Push depois da permissão. Sem VAPID no servidor, no-op. */
 export async function syncPushSubscription(): Promise<void> {
   if (typeof window === "undefined") return;
-  if (getPermission() !== "granted" || !areAlertsEnabled()) return;
+  // A preferência é a fonte: `alerts.enabled` é espelho que `request()` regrava.
+  if (getPermission() !== "granted" || !areAlertsEnabled() || !canalLigado("message", "push")) return;
   const reg = await ensureNotifyServiceWorker();
   if (!reg?.pushManager) return;
 
