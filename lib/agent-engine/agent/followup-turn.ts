@@ -67,7 +67,6 @@ import {
   type PropostaDeEsperaBruta,
 } from './followup-flow-classify';
 import { consultarJevNoFollowup } from '@/lib/ai/decisao/followup';
-import { audit } from "@/lib/audit";
 import { enviarComSaidaConfiguravel } from "@/lib/prospecting/saida-configuravel";
 
 

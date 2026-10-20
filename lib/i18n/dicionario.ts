@@ -15705,7 +15705,7 @@ export const DICIONARIO: Traducoes = {
   "Quando oferecer a opção de parar de receber": { es: "Cuándo ofrecer la opción de dejar de recibir" },
   "Na primeira mensagem (recomendado)": { es: "En el primer mensaje (recomendado)" },
   "A abertura já diz como parar: Se não quiser mais receber mensagens, responda PARAR.": {
-    es: "La apertura ya dice cómo detenerse: si no querés recibir más mensajes, respondé PARAR.",
+    es: "La apertura ya dice cómo detenerse: si no querés recibir más mensajes, respondé BAJA.",
   },
   "Atrasar para a 2ª mensagem": { es: "Postergar al 2.º mensaje" },
   "A abertura só cumprimenta e confirma se é a empresa certa, sem oferta. A instrução para parar vai na mensagem seguinte.": {
