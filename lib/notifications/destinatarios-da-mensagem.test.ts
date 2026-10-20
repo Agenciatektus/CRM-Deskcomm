@@ -204,7 +204,19 @@ const SEM_DONO = {
   bot_silenced_until: null,
   channel_session_id: "ch-1",
 };
-const AGENTE_NO_AR = { kind: "mcp_agent", is_active: true, paused_at: null, published_version_id: "v1", archived_at: null };
+const AGENTE_NO_AR = {
+  id: "ag-1",
+  kind: "mcp_agent",
+  is_active: true,
+  paused_at: null,
+  published_version_id: "v1",
+  archived_at: null,
+  operation_mode: "automatic",
+};
+/** A IA só conduz onde o dreno roda o turno: versão publicada NO número da conversa. */
+const VERSAO_NO_NUMERO = { id: "v1", channel_session_id: "ch-1" };
+/** O que a leitura de elegibilidade embute na conversa (org operante, canal aberto). */
+const ELEGIVEL = { organizations: { status: "active" }, contacts: { force_human: false, ai_opt_out: false }, channel_sessions: { metadata: {} } };
 const MEMBROS = [
   { user_id: "u-ana", role: "agent" },
   { user_id: "u-bia", role: "agent" },
@@ -309,10 +321,11 @@ describe("carregarDestinatariosDaMensagem — fila, plantão e IA", () => {
 
   it("(iii-a) sem responsável, IA no ar e conversa sem trava → ninguém", async () => {
     const { db, consultas } = stub({
-      conversations: { data: { ...SEM_DONO, status: "ai_handling" } },
+      conversations: { data: { ...SEM_DONO, ...ELEGIVEL, status: "ai_handling" } },
       crm_leads: { data: [] },
       contacts: { data: { force_human: false, is_blocked: false } },
       ai_agents: { data: [AGENTE_NO_AR] },
+      ai_agent_versions: { data: [VERSAO_NO_NUMERO] },
     });
     expect(await carregarDestinatariosDaMensagem(db, "org-1", "conv-1")).toEqual({ tipo: "ninguem" });
     const contato = consultas.find((c) => c.tabela === "contacts")!.filtros;
@@ -336,6 +349,50 @@ describe("carregarDestinatariosDaMensagem — fila, plantão e IA", () => {
       ...troca,
     });
     expect(await carregarDestinatariosDaMensagem(db, "org-1", "conv-1")).toEqual({ tipo: "todos" });
+  });
+
+  // O dreno só roda o turno onde o NÚMERO da conversa tem quem atenda
+  // (`haQuemAtendaASessao`) e a conversa passa na elegibilidade. Fora disso a IA
+  // não responde, e calar o aviso deixaria o cliente sem ninguém.
+  const IA_NO_AR = {
+    conversations: { data: { ...SEM_DONO, ...ELEGIVEL } },
+    crm_leads: { data: [] },
+    contacts: { data: { force_human: false, is_blocked: false } },
+    ai_agents: { data: [AGENTE_NO_AR] },
+    ai_agent_versions: { data: [VERSAO_NO_NUMERO] },
+    organizations: { data: { settings: {} } },
+  };
+
+  it("(iii-b) controle: o mesmo cenário com a versão no número da conversa → ninguém", async () => {
+    expect(await carregarDestinatariosDaMensagem(stub(IA_NO_AR).db, "org-1", "conv-1")).toEqual({ tipo: "ninguem" });
+  });
+
+  it("(iii-c) roteador ativo no número com membro publicado → ninguém; filtros da org nas leituras", async () => {
+    const { db, consultas } = stub({
+      ...IA_NO_AR,
+      ai_agent_versions: { data: [{ id: "v1", channel_session_id: "ch-outro" }] },
+      ai_routers: { data: [{ id: "r-1", fallback_agent_id: null }] },
+      ai_router_members: { data: [{ agent_id: "ag-1" }] },
+    });
+    expect(await carregarDestinatariosDaMensagem(db, "org-1", "conv-1")).toEqual({ tipo: "ninguem" });
+    for (const t of ["ai_agents", "ai_agent_versions", "ai_routers", "ai_router_members"]) {
+      expect(consultas.filter((c) => c.tabela === t).every((c) => c.filtros.some((f) => f[1] === "organization_id" && f[2] === "org-1"))).toBe(true);
+    }
+    expect(consultas.find((c) => c.tabela === "ai_routers")!.filtros).toContainEqual(["eq", "channel_session_id", "ch-1"]);
+  });
+
+  it.each([
+    ["agente publicado em OUTRO número, sem roteador no desta", { ai_agent_versions: { data: [{ id: "v1", channel_session_id: "ch-outro" }] }, ai_routers: { data: [] } }],
+    ["roteador do número sem membro que execute", { ai_agent_versions: { data: [{ id: "v1", channel_session_id: "ch-outro" }] }, ai_routers: { data: [{ id: "r-1", fallback_agent_id: "ag-pausado" }] }, ai_router_members: { data: [] } }],
+    ["versão apontada não está publicada", { ai_agent_versions: { data: [] } }],
+    ["agente no modo assistido (o rascunho espera uma pessoa)", { ai_agents: { data: [{ ...AGENTE_NO_AR, operation_mode: "assisted" }] } }],
+    ["conversa sem número", { conversations: { data: { ...SEM_DONO, ...ELEGIVEL, channel_session_id: null } } }],
+    ["contato marcado para sempre atendimento humano", { conversations: { data: { ...SEM_DONO, ...ELEGIVEL, contacts: { force_human: false, ai_opt_out: true } } } }],
+    ["canal com acesso restrito e contato não autorizado", { conversations: { data: { ...SEM_DONO, ...ELEGIVEL, channel_sessions: { metadata: { ai_gate: "allowlist" } } } } }],
+  ])("(iii-d) %s → regra da fila, nunca ninguém", async (_caso, troca) => {
+    expect(await carregarDestinatariosDaMensagem(stub({ ...IA_NO_AR, ...troca }).db, "org-1", "conv-1")).toEqual({
+      tipo: "todos",
+    });
   });
 
   it("(iv-a) conversa atribuída: responsável + admins, sem ler agentes nem plantão", async () => {

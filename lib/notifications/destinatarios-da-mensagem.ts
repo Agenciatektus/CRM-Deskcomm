@@ -7,9 +7,12 @@
  *    organização (`user_organizations.role = 'admin'`, vínculo não revogado).
  *    O resto do time não é interrompido por cliente que já tem dono. Esta
  *    regra vem antes de tudo e não lê agente nem plantão.
- * 2. Sem responsável e a IA ATENDENDO (agente no ar, não pausado, conversa sem
- *    silêncio, contato sem trava — `comandoDaConversa(...).quem ===
- *    'automatico'`, a mesma régua que tira a conversa da aba Fila) → NINGUÉM.
+ * 2. Sem responsável e a IA ATENDENDO → NINGUÉM. "Atendendo" é a conversa
+ *    sem silêncio nem trava (`comandoDaConversa(...).quem === 'automatico'`)
+ *    E o turno do dreno rodaria nela: agente automático no ar no NÚMERO da
+ *    conversa (versão publicada nele, ou roteador ativo nele com fallback ou
+ *    membro que execute — os predicados de `haQuemAtendaASessao`) e a
+ *    elegibilidade do canal e do contato permitindo. Na dúvida, não cala.
  *    A pessoa é chamada quando a IA passa a conversa: a passagem grava o
  *    silêncio e abre o aviso `handoff` da Central, que vai ao celular por
  *    `central.aviso_criado` (`./push-dos-avisos.ts`). Dali em diante o silêncio
@@ -51,7 +54,9 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
+import { agenteAtende, type FatosDoAgente } from "@/lib/ai/agents/no-ar";
+import { decidirElegibilidadeDaConversaViaSupabase } from "@/lib/ai/elegibilidade/consulta-supabase";
+import { ttlDaAutorizacaoMs } from "@/lib/ai/elegibilidade/gate";
 import { comandoDaConversa } from "@/lib/inbox/comando-da-conversa";
 import { resolverRoteamentoPorNumero } from "@/lib/routing/decide";
 import { estaDePlantao } from "@/lib/routing/eligibility";
@@ -167,7 +172,7 @@ export async function carregarDestinatariosDaMensagem(
   // Sem responsável: a IA, depois a fila. Os admins só são lidos quando há
   // responsável.
   if (responsaveisDaConversa({ atribuidoA: conv.data.assigned_to_user_id, donosDeNegocioAberto: donos }).length === 0) {
-    if (await iaConduz(db, organizationId, conv.data, contato, agora)) return { tipo: "ninguem" };
+    if (await iaConduz(db, organizationId, conversationId, conv.data, contato, agora)) return { tipo: "ninguem" };
     return destinatariosDaMensagem({
       atribuidoA: null,
       donosDeNegocioAberto: [],
@@ -201,13 +206,14 @@ interface ConversaLida {
 
 /**
  * A IA está atendendo? Lê só o necessário, parando assim que a resposta é
- * "não": primeiro os fatos da conversa, depois o contato, por último os
- * agentes. Leitura de agentes que falha (`undefined`) NÃO conta como IA
- * atendendo — aqui isso calaria um aviso.
+ * "não": primeiro os fatos da conversa, depois o contato, os agentes do
+ * número e por último a elegibilidade. Leitura de agentes que falha NÃO conta
+ * como IA atendendo — aqui isso calaria um aviso.
  */
 async function iaConduz(
   db: LeitorDeAtribuicao,
   organizationId: string,
+  conversationId: string,
   conv: ConversaLida,
   contato: string | null,
   agora: Date,
@@ -235,7 +241,66 @@ async function iaConduz(
   const comContato = { ...fatos, force_human: contatoLido?.force_human, is_blocked: contatoLido?.is_blocked };
   if (comandoDaConversa(comContato, agora).comando.quem !== "automatico") return false;
 
-  return (await orgTemAutomatico(db as Pick<SupabaseClient, "from">, organizationId)) === true;
+  if (!(await iaAtendeNoNumero(db, organizationId, conv.channel_session_id))) return false;
+
+  const elegib = await decidirElegibilidadeDaConversaViaSupabase(db as Pick<SupabaseClient, "from">, {
+    organizationId,
+    conversationId,
+    agora,
+    ttlMs: ttlDaAutorizacaoMs(process.env),
+  });
+  return elegib?.permite === true;
+}
+
+/**
+ * Há agente AUTOMÁTICO no ar que o turno executaria neste número? Os
+ * predicados de `haQuemAtendaASessao` (`lib/ai/agents/quem-atende-a-sessao.ts`),
+ * mais `agenteAtende` (pausado não conta) e sem o modo assistido, cujo
+ * rascunho espera uma pessoa. Sem número, ou leitura falhando → `false`.
+ */
+async function iaAtendeNoNumero(
+  db: LeitorDeAtribuicao,
+  organizationId: string,
+  channelSessionId: string | null,
+): Promise<boolean> {
+  if (!channelSessionId) return false;
+  const agentes = await (db
+    .from("ai_agents")
+    .select("id, kind, is_active, paused_at, published_version_id, archived_at, operation_mode")
+    .eq("organization_id", organizationId)
+    .is("archived_at", null) as Resultado<Array<FatosDoAgente & { id: string; operation_mode: string }>>);
+  if (agentes.error) return false;
+  const noAr = (agentes.data ?? []).filter((a) => agenteAtende(a) && a.operation_mode !== "assisted");
+  if (noAr.length === 0) return false;
+
+  const versoes = await (db
+    .from("ai_agent_versions")
+    .select("id, channel_session_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "published")
+    .in("id", noAr.map((a) => a.published_version_id)) as Resultado<Array<{ id: string; channel_session_id: string | null }>>);
+  if (versoes.error) return false;
+  const numeroDaVersao = new Map((versoes.data ?? []).map((v) => [v.id, v.channel_session_id]));
+  const executam = noAr.filter((a) => numeroDaVersao.has(a.published_version_id ?? ""));
+  if (executam.some((a) => numeroDaVersao.get(a.published_version_id ?? "") === channelSessionId)) return true;
+  if (executam.length === 0) return false;
+  const idsQueExecutam = new Set(executam.map((a) => a.id));
+
+  const roteadores = await (db
+    .from("ai_routers")
+    .select("id, fallback_agent_id")
+    .eq("organization_id", organizationId)
+    .eq("channel_session_id", channelSessionId)
+    .eq("is_active", true) as Resultado<Array<{ id: string; fallback_agent_id: string | null }>>);
+  if (roteadores.error || !roteadores.data?.length) return false;
+  if (roteadores.data.some((r) => r.fallback_agent_id != null && idsQueExecutam.has(r.fallback_agent_id))) return true;
+
+  const membros = await (db
+    .from("ai_router_members")
+    .select("agent_id")
+    .eq("organization_id", organizationId)
+    .in("router_id", roteadores.data.map((r) => r.id)) as Resultado<Array<{ agent_id: string }>>);
+  return !membros.error && (membros.data ?? []).some((m) => idsQueExecutam.has(m.agent_id));
 }
 
 /**
