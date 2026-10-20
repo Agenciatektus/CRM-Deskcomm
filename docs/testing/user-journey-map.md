@@ -677,6 +677,7 @@ num job que já leva meia hora.
 | J12.6 | O admin escolhe o que aparece com o celular bloqueado, e o padrão é só o nome | `tela-bloqueada-nome` marcado; trocar para «Esconder tudo» grava e sobrevive ao recarregar (e2e `notificacoes-tela-bloqueada`) | aguardando o CI |
 | J12.7 | Quem não é admin vê a escolha e não muda | as três opções desabilitadas + «Quem decide é um administrador.» (e2e `notificacoes-tela-bloqueada`) | aguardando o CI |
 | J12.8 | O push sai pelo funil, e no modo oculto sem corpo nem ícone | `lib/notifications/web_push.test.ts`, `tests/unit/push-sai-so-pelo-funil.test.ts` | PASS (unit) |
+| J12.9 | Sair, desligar os alertas e «Sair de todos os dispositivos» encerram o push | `lib/notifications/push_client.test.ts`, `hooks/auth/AuthProvider.signOut.test.tsx`, `app/actions/settings/signOutEverywhere.test.ts`; sem e2e (o CI não tem VAPID, não há inscrição) | PASS (unit) |
 
 **Por que J12.5 não é `e2e`, medido e não suposto.** Ela nasceu como asserção
 `toBeEnabled()` na spec, e não podia viver lá. Medido no Chromium do Playwright,

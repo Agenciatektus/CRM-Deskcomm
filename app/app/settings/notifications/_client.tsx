@@ -7,6 +7,7 @@ import { useSyncExternalStore } from "react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useNotificationPermission } from "@/hooks/notifications/useNotificationPermission";
+import { encerrarPushDesteAparelho, syncPushSubscription } from "@/lib/notifications/push_client";
 import {
   NOTIFY_UI_CATEGORIES,
   assinarPrefs,
@@ -41,6 +42,10 @@ export function NotificationPrefsClient() {
       }
     }
     gravarCanal(category, channel, on);
+    // O push de mensagem é o que mantém a inscrição do aparelho no servidor.
+    if (category === "message" && channel === "push") {
+      void (on ? syncPushSubscription() : encerrarPushDesteAparelho());
+    }
   }
 
   return (

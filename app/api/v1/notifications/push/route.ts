@@ -115,12 +115,25 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("push_subscriptions" as never)
     .delete()
     .eq("endpoint" as never, parsed.data.endpoint)
-    .eq("user_id" as never, authz.user.id);
+    .eq("user_id" as never, authz.user.id)
+    .select("organization_id");
 
   if (error) return fail("internal_error", error.message, 500, { requestId });
+  // Sem linha removida não houve mutação, e não há o que auditar.
+  const removida = (data as Array<{ organization_id: string }> | null)?.[0];
+  if (removida) {
+    void audit({
+      action: "notification_prefs.push_subscription_removed",
+      actorUserId: authz.user.id,
+      organizationId: removida.organization_id,
+      resourceType: "push_subscription",
+      requestId,
+      metadata: { channel: "web_push", escopo: "aparelho" },
+    });
+  }
   return ok({ ok: true }, { requestId });
 }
