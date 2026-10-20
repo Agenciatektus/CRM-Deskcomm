@@ -109,7 +109,7 @@ export function ConexoesShell({
             o que o usuário ganha ("já conectado"), não como funciona por
             baixo — e a marca de quem hospeda aparece DENTRO, vinda do servidor,
             porque a tela não pode nomear provider. */}
-        <TabsTrigger value="hospedado">{t("Número já conectado")}</TabsTrigger>
+        <TabsTrigger value="hospedado">{t("Verdash")}</TabsTrigger>
         {/* Logo depois do número hospedado porque é o MESMO gesto: um código de
             conexão, gerado na plataforma do cliente, e a entrega passa a vir
             para cá. Aqui o rótulo é a REDE e não o provedor — quem atende

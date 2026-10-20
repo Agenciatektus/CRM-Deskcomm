@@ -95,7 +95,9 @@ services:
     # O teto não impede o pico legítimo; impede que UM serviço leve a máquina
     # inteira. Estourá-lo mata só quem estourou, e o `restart: unless-stopped`
     # o traz de volta — falha isolada em vez de queda geral.
-    mem_limit: 512m
+    # 1024m (Tektus, 20/10): com 512m o heap padrão do Node era ~259 MB e o
+    # worker morria por OOM a cada ~26 min; o teto de heap está no Dockerfile.worker.
+    mem_limit: 1024m
     # Imagem publicada — e não mais `build:` sozinho. O motivo é o modo de falha
     # que isso escondia: serviço build-only é PULADO por `docker compose pull`
     # ("Skipped - No image to be pulled") e imune a `up -d` sem `--build`. Ele era
