@@ -2505,8 +2505,6 @@ gerar_par_vapid() {
 completar_par_vapid() {
   local envfile="${1:-.env}" pub priv par tmp
   [ -f "$envfile" ] || return 0
-  # Somente-leitura (montagem read-only, permissão errada): não é erro daqui.
-  [ -w "$envfile" ] || return 0
   # `export ` e recuo no começo da linha: o Compose lê as duas formas, então
   # elas também são o par (senão o kit gravaria um segundo, e o Compose fica
   # com o último — a troca que a D6 proíbe).
@@ -2519,6 +2517,12 @@ completar_par_vapid() {
     # troca que a D6 proíbe. Quem decide é quem opera.
     c_ylw "$(t "  ⚠ Só uma das duas chaves dos avisos com o app fechado (VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY) está no .env. Não gerei a outra, para não quebrar o par.")"
     c_ylw "$(t "    Para o kit gerar um par novo, apague as duas linhas e rode: bash hostgator-setup-kit/update.sh --force")"
+    return 0
+  fi
+  if [ ! -w "$envfile" ]; then
+    # Montagem somente-leitura ou permissão errada: não é erro daqui, mas a tela
+    # manda atualizar, e a atualização calada não diria por que nada mudou.
+    c_ylw "$(t "  ⚠ Não criei as chaves dos avisos com o app fechado: não consigo escrever no .env. Confira a permissão do arquivo e rode a atualização de novo.")"
     return 0
   fi
 

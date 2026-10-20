@@ -145,8 +145,13 @@ for dub in falha lixo; do
 done
 
 D="$(caso i $'X=1\n')"; cp "$D/.env" "$D/original"; chmod 444 "$D/.env"
-no_kit "$D" "" "completar_par_vapid .env" >/dev/null
+SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
 check "(i) .env somente-leitura → não toca" cmp -s "$D/.env" "$D/original"
+check "    mas avisa que não conseguiu escrever (a tela manda atualizar)" contem "$SAIDA" "não consigo escrever"
+
+D="$(caso i2 $'VAPID_PUBLIC_KEY=BPub\nVAPID_PRIVATE_KEY=priv\n')"; chmod 444 "$D/.env"
+SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
+check "    somente-leitura com o par presente → calado (não há o que escrever)" test -z "$SAIDA"
 
 D="$WORK/sem-env"; mkdir -p "$D"
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env; echo rc=\$?")"
