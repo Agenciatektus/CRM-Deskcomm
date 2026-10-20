@@ -998,25 +998,7 @@ export function ProspectingClient() {
                                 </span>
                               </span>
                             </label>
-                            <label className="flex items-start gap-2 text-sm">
-                              <input
-                                type="radio"
-                                name="prospecting-exit-offer"
-                                checked={(config.exit_offer ?? "first_message") === "third_message"}
-                                onChange={() => update("exit_offer", "third_message")}
-                                className="mt-1"
-                              />
-                              <span>
-                                {t("Atrasar para a 3ª mensagem")}
-                                <span className="block text-xs text-muted-foreground">
-                                  {t(
-                                    "As duas primeiras mensagens não fazem oferta: cumprimentar, depois apresentar-se e pedir permissão. A instrução para parar vai na terceira.",
-                                  )}
-                                </span>
-                              </span>
-                            </label>
-                            {((config.exit_offer ?? "first_message") === "second_message" ||
-                              (config.exit_offer ?? "first_message") === "third_message") && (
+                            {config.exit_offer === "second_message" && (
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {t(
                                   "Exemplo de instrução para os atrasados: na primeira mensagem, só cumprimente e pergunte se é da empresa. Quando a pessoa responder, apresente-se e peça permissão para mostrar o serviço.",
@@ -1261,8 +1243,7 @@ export function ProspectingClient() {
                                   {t("Mensagem:")} {c.message_status}
                                 </p>
                               )}
-                              {(campaign?.config?.exit_offer === "second_message" ||
-                                campaign?.config?.exit_offer === "third_message") && (
+                              {campaign?.config?.exit_offer === "second_message" && (
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {c.exit_offered_at
                                     ? t("Saída oferecida")

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChannelSendResult } from "@/lib/agent-engine/channel-adapter";
 import { audit } from "@/lib/audit";
+import { campaignConfigSchema, prospectingInputSchema } from "@/lib/prospecting/schema";
 import {
   contarEnvioAutomatico,
   desfazerContagem,
@@ -183,6 +184,9 @@ describe("enviarComSaidaConfiguravel", () => {
     // conferir que não houve audit e o corpo saiu intacto.
   });
 
+  // Modo da 2ª: a 2ª mensagem reservou a saída e voltou `queued` (ou é o replay
+  // `already_sent`). A tentativa desfaz contagem E reserva; sem isso, a nova
+  // tentativa contaria 3, não reservaria, e sairia sem a saída.
   it.each(["queued", "already_sent"] as const)(
     "contou + envio %s → desfaz a contagem desta tentativa e não audita (o job reprocessa)",
     async (kind) => {
@@ -194,7 +198,7 @@ describe("enviarComSaidaConfiguravel", () => {
             campanha_id: "camp-4",
             exit_offered_at: agora,
             leva_a_saida: true,
-            numero_da_mensagem: 3,
+            numero_da_mensagem: 2,
             locale: "pt-BR",
             reservada_em_texto: agora,
           },
@@ -316,3 +320,33 @@ describe("enviarComSaidaConfiguravel", () => {
   });
 });
 
+
+describe("modos aceitos: só a 1ª e a 2ª mensagem (doc 170)", () => {
+  const id = "0c110000-0000-4000-8000-000000000001";
+  const config = {
+    agent_id: id,
+    channel_session_id: id,
+    pipeline_id: id,
+    stage_id: id,
+    qualified_stage_id: id,
+    instruction: "Vender consultoria para clínicas.",
+    qualification: "Confirmou a necessidade e a decisão.",
+    legal_basis_ref: "LIA-teste",
+  };
+  // O POST /api/v1/prospecting valida com este schema e devolve 422 validation_failed.
+  const inicia = (extra: Record<string, unknown>) =>
+    prospectingInputSchema.safeParse({ action: "start", id, config: { ...config, ...extra } }).success;
+
+  it("recusa o modo da 3ª mensagem", () => {
+    expect(inicia({ exit_offer: "third_message" })).toBe(false);
+  });
+
+  it("aceita a 1ª e a 2ª", () => {
+    expect(inicia({ exit_offer: "first_message" })).toBe(true);
+    expect(inicia({ exit_offer: "second_message" })).toBe(true);
+  });
+
+  it("campanha sem a chave segue com a saída na 1ª mensagem", () => {
+    expect(campaignConfigSchema.parse(config).exit_offer).toBe("first_message");
+  });
+});

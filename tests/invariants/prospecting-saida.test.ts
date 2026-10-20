@@ -15,7 +15,7 @@ const pool = new pg.Pool({
 });
 afterAll(() => pool.end());
 
-type Modo = "first_message" | "second_message" | "third_message";
+type Modo = "first_message" | "second_message";
 
 async function novaOrganizacao(): Promise<string> {
   const org = randomUUID();
@@ -76,14 +76,6 @@ describe("saída configurável — contagem e reserva (banco real)", () => {
     expect(r1!.reservadaEm).not.toBeNull();
     const r2 = await contarEnvioAutomatico(pool, org, c.conversa);
     expect(r2).toMatchObject({ levaASaida: false, numeroDaMensagem: 3, reservadaEm: null });
-  });
-
-  it("3ª mensagem: só o 2º envio depois da abertura leva a saída", async () => {
-    const org = await novaOrganizacao();
-    const c = await candidata(org, "third_message");
-    expect(await contarEnvioAutomatico(pool, org, c.conversa)).toMatchObject({ levaASaida: false, numeroDaMensagem: 2 });
-    expect(await contarEnvioAutomatico(pool, org, c.conversa)).toMatchObject({ levaASaida: true, numeroDaMensagem: 3 });
-    expect(await contarEnvioAutomatico(pool, org, c.conversa)).toMatchObject({ levaASaida: false, numeroDaMensagem: 4 });
   });
 
   it("desfazer a contagem que reservou devolve a reserva e a contagem", async () => {

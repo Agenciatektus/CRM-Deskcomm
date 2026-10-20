@@ -15711,10 +15711,6 @@ export const DICIONARIO: Traducoes = {
   "A abertura só cumprimenta e confirma se é a empresa certa, sem oferta. A instrução para parar vai na mensagem seguinte.": {
     es: "La apertura solo saluda y confirma si es la empresa correcta, sin oferta. La instrucción para detenerse va en el mensaje siguiente.",
   },
-  "Atrasar para a 3ª mensagem": { es: "Postergar al 3.er mensaje" },
-  "As duas primeiras mensagens não fazem oferta: cumprimentar, depois apresentar-se e pedir permissão. A instrução para parar vai na terceira.": {
-    es: "Los dos primeros mensajes no hacen oferta: saludar, presentarse y pedir permiso. La instrucción para detenerse va en el tercero.",
-  },
   "Exemplo de instrução para os atrasados: na primeira mensagem, só cumprimente e pergunte se é da empresa. Quando a pessoa responder, apresente-se e peça permissão para mostrar o serviço.": {
     es: "Ejemplo de instrucción para los postergados: en el primer mensaje, solo saluda y pregunta si es la empresa. Cuando la persona responda, preséntate y pide permiso para mostrar el servicio.",
   },

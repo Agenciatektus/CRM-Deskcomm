@@ -21,7 +21,7 @@ export async function prospectingConversationContext(
   // é acrescida pelo sistema na mensagem certa — o agente não a escreve.
   if (
     linha &&
-    (c.exit_offer === "second_message" || c.exit_offer === "third_message") &&
+    c.exit_offer === "second_message" &&
     linha.exit_offered_at === null
   ) {
     fraseSaida =

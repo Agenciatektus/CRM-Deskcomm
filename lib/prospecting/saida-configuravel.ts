@@ -50,8 +50,7 @@ export const SQL_CONTAR_ENVIO_AUTOMATICO = `
            exit_offered_at = case
              when p.exit_offered_at is null
               and p.automatic_sends + 1 >= (case c.config->>'exit_offer'
-                                              when 'second_message' then 2
-                                              when 'third_message'  then 3 end)
+                                              when 'second_message' then 2 end)
              then now() else p.exit_offered_at end,
            updated_at = now()
       from public.prospecting_campaigns c, antes
@@ -61,7 +60,7 @@ export const SQL_CONTAR_ENVIO_AUTOMATICO = `
        and antes.id = p.id
        and c.organization_id = p.organization_id
        and c.id = p.campaign_id
-       and c.config->>'exit_offer' in ('second_message', 'third_message')
+       and c.config->>'exit_offer' = 'second_message'
     returning p.id as candidato_id,
               p.campaign_id as campanha_id,
               p.exit_offered_at,
@@ -84,7 +83,7 @@ export const SQL_DESFAZER_CONTAGEM = `
  * Conta este envio automático e, se for a vez, reserva a saída.
  *
  * Retorna `null` quando não há candidato em `sending`/`sent` nesta conversa
- * desta organização (linha antiga, modo `first_message`/`off`, ou conversa
+ * desta organização (linha antiga, modo `first_message`, ou conversa
  * de outra organização).
  */
 export async function contarEnvioAutomatico(
@@ -165,8 +164,9 @@ export async function enviarComSaidaConfiguravel(
     // A contagem vale uma vez por ENVIO, não por tentativa: só `sent` a mantém.
     // `queued` reagenda o job e o `send` roda de novo (applySendOutcome), e
     // `already_sent` é o replay de um envio que já foi contado; nos dois, esta
-    // tentativa desfaz o que somou. Sem isto, no modo da 3ª, a 2ª mensagem
-    // reprocessada atingia o alvo e reservava a saída num corpo já gravado sem ela.
+    // tentativa desfaz o que somou. Sem isto, a 2ª mensagem que voltou `queued`
+    // ficava com a reserva gasta: a nova tentativa contava 3, não reservava, e a
+    // mensagem saía sem a saída com a tela dizendo "Saída oferecida".
     if (resultado.kind !== "sent") {
       await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
     } else if (r.levaASaida) {
