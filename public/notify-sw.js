@@ -24,6 +24,23 @@ function janelaDoApp(cliente) {
   }
 }
 
+/*
+ * A janela em foco está lendo esta conversa? A página não avisa nesse caso
+ * (`lib/notifications/policy.ts`), e o push também não deve ficar na bandeja.
+ * ponytail: lê só a URL do inbox (`/app/inbox?id=`); a conversa aberta no
+ * painel flutuante não aparece na URL e segue avisando. Se pesar, a página
+ * responde ao SW por postMessage qual conversa tem aberta.
+ */
+function lendoAConversa(cliente, conversa) {
+  if (!cliente.focused) return false;
+  try {
+    const url = new URL(cliente.url);
+    return url.pathname === "/app/inbox" && url.searchParams.get("id") === conversa;
+  } catch {
+    return false;
+  }
+}
+
 self.addEventListener("install", (event) => {
   // Só a navegação precisa do SW: o resto vai à rede sem acordá-lo. Navegador
   // sem esta API (ou sem a condição `not`) segue pelo `fetch` abaixo, que deixa
@@ -71,10 +88,13 @@ self.addEventListener("push", (event) => {
       // Com o app à vista, a página já mostrou o aviso de mesma tag e tocou o
       // som: esta substitui aquela, calada. Fora disso, toca.
       let aVista = false;
+      let lendo = false;
       if (PREFIXOS_COM_AVISO_LOCAL.includes(tag.split(":")[0])) {
         try {
           const clientes = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
           aVista = clientes.some((c) => c.visibilityState === "visible" && janelaDoApp(c));
+          const [prefixo, conversa] = tag.split(":");
+          lendo = prefixo === "msg" && Boolean(conversa) && clientes.some((c) => lendoAConversa(c, conversa));
         } catch {
           aVista = false;
         }
@@ -90,6 +110,16 @@ self.addEventListener("push", (event) => {
         });
       } catch {
         await self.registration.showNotification(titulo, { body: corpo });
+      }
+      // Mostrar e fechar em seguida: o push continua virando notificação (regra
+      // do Safari/iOS), mas não fica na bandeja de quem está lendo a conversa.
+      if (lendo) {
+        try {
+          const abertas = await self.registration.getNotifications({ tag });
+          for (const n of abertas) n.close();
+        } catch {
+          // sem getNotifications, o aviso calado fica na bandeja
+        }
       }
     })(),
   );

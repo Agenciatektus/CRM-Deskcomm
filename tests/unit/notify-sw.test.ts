@@ -15,15 +15,17 @@ const ORIGEM = "https://crm.example";
 interface Janela {
   url: string;
   visibilityState: "visible" | "hidden";
+  focused: boolean;
   focus: ReturnType<typeof vi.fn>;
   navigate?: ReturnType<typeof vi.fn>;
   postMessage: ReturnType<typeof vi.fn>;
 }
 
-function janela(caminho: string, visibilityState: Janela["visibilityState"] = "visible"): Janela {
+function janela(caminho: string, visibilityState: Janela["visibilityState"] = "visible", focused = false): Janela {
   return {
     url: ORIGEM + caminho,
     visibilityState,
+    focused,
     focus: vi.fn().mockResolvedValue(undefined),
     navigate: vi.fn().mockResolvedValue(undefined),
     postMessage: vi.fn(),
@@ -33,13 +35,15 @@ function janela(caminho: string, visibilityState: Janela["visibilityState"] = "v
 function carregar(opcoes: { janelas?: Janela[]; fetch?: (r: unknown) => Promise<unknown>; lingua?: string } = {}) {
   const handlers: Record<string, (event: unknown) => void> = {};
   const showNotification = vi.fn().mockResolvedValue(undefined);
+  const fechar = vi.fn();
+  const getNotifications = vi.fn().mockResolvedValue([{ close: fechar }]);
   const openWindow = vi.fn().mockResolvedValue(undefined);
   const enable = vi.fn().mockResolvedValue(undefined);
   const fetch = vi.fn(opcoes.fetch ?? (async () => new Response("ok")));
   const self = {
     location: { origin: ORIGEM },
     navigator: { language: opcoes.lingua ?? "pt-BR" },
-    registration: { showNotification, navigationPreload: { enable } },
+    registration: { showNotification, getNotifications, navigationPreload: { enable } },
     clients: {
       matchAll: vi.fn().mockResolvedValue(opcoes.janelas ?? []),
       openWindow,
@@ -51,7 +55,7 @@ function carregar(opcoes: { janelas?: Janela[]; fetch?: (r: unknown) => Promise<
     },
   };
   vm.runInNewContext(FONTE, { self, fetch, Response, URL, String, Promise });
-  return { handlers, showNotification, openWindow, enable, fetch, self };
+  return { handlers, showNotification, getNotifications, fechar, openWindow, enable, fetch, self };
 }
 
 /** Dispara um evento e espera tudo o que ele entregou a waitUntil/respondWith. */
@@ -96,6 +100,24 @@ describe("push: todo push vira notificação", () => {
     await disparar(sw.handlers.push, pushDe({ title: "Maria", body: "oi", tag: "msg:c1" }));
     expect(sw.showNotification).toHaveBeenCalledTimes(1);
     expect(sw.showNotification.mock.calls[0]?.[1]).toMatchObject({ tag: "msg:c1", silent: true, renotify: false });
+  });
+
+  it("janela em foco LENDO a conversa: mostra (regra do iOS) e fecha em seguida", async () => {
+    const sw = carregar({ janelas: [janela("/app/inbox?id=c1", "visible", true)] });
+    await disparar(sw.handlers.push, pushDe({ title: "Maria", body: "oi", tag: "msg:c1" }));
+    expect(sw.showNotification).toHaveBeenCalledTimes(1);
+    expect(sw.getNotifications).toHaveBeenCalledWith({ tag: "msg:c1" });
+    expect(sw.fechar).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["outra conversa aberta", janela("/app/inbox?id=c2", "visible", true)],
+    ["a conversa aberta, mas sem foco", janela("/app/inbox?id=c1", "visible", false)],
+  ])("%s: o aviso fica na bandeja", async (_nome, j) => {
+    const sw = carregar({ janelas: [j] });
+    await disparar(sw.handlers.push, pushDe({ title: "Maria", body: "oi", tag: "msg:c1" }));
+    expect(sw.showNotification).toHaveBeenCalledTimes(1);
+    expect(sw.fechar).not.toHaveBeenCalled();
   });
 
   it("janela à vista fora do app (login) não cala: lá não há aviso local", async () => {
