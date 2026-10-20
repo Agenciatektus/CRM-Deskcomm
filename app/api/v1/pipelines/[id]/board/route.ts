@@ -30,6 +30,11 @@ import { anexarDadosDoContato, type LinhaDoContatoNoQuadro } from "@/lib/kanban/
 import { anexarProximoPasso, type TarefaAbertaDoQuadro } from "@/lib/kanban/proximo-passo-do-quadro";
 import { anexarTarefasAosNegocios, type LinhaDaTarefaNoQuadro } from "@/lib/kanban/tarefas-no-quadro";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
+import {
+  cabecalhoServerTiming,
+  enriquecerEmParalelo,
+  fundirEnriquecimentos,
+} from "@/lib/kanban/fundir-enriquecimentos";
 import { esperandoDesdeDaConversa } from "@/lib/kanban/ordem-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import { idsDeContatosPessoais } from "@/app/api/v1/conversations/_handler";
@@ -569,6 +574,7 @@ async function withTarefas(
 }
 
 export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
+  const inicioDaRota = performance.now();
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
 
@@ -658,84 +664,78 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
         )
       : ((leads ?? []) as Lead[]);
 
-  const leadsWithOwner = await withOwnerAgents(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsVisiveis,
-  );
-  if (leadsWithOwner.error) {
-    return fail("internal_error", leadsWithOwner.error, 500, { requestId });
+  const organizationId = (pipeline as Pipeline).organization_id;
+
+  // As famílias partem do MESMO quadro base (`leadsVisiveis`) e leem só `id`,
+  // `contact_id` e `owner_kind` — nenhuma depende do campo que a outra
+  // acrescenta. Rodam ao mesmo tempo e são fundidas por `id` no fim
+  // (`lib/kanban/fundir-enriquecimentos.ts`). Encadeadas, estouraram os 10 s do
+  // cliente no funil "Pré-venda" (20/10/2026).
+  //
+  // A única dependência real fica DENTRO da família: o funil padrão da org só
+  // serve à próxima ação, então é lido antes dela, na mesma tarefa.
+  const { resultados, tempos } = await enriquecerEmParalelo({
+    dono: () => withOwnerAgents(supabase, organizationId, leadsVisiveis),
+    acao: async () => {
+      const { data: pipelinePadrao } = await supabase
+        .from("crm_pipelines")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("is_default", true)
+        .maybeSingle();
+      return withNextActions(
+        supabase,
+        organizationId,
+        leadsVisiveis,
+        (pipelinePadrao as { id: string } | null)?.id ?? null,
+      );
+    },
+    score: () => withScores(supabase, organizationId, leadsVisiveis),
+    // Degrada sozinha (devolve os leads sem o campo e loga), como antes.
+    passo: () => withProximosPassos(supabase, organizationId, leadsVisiveis),
+    tarefas: () => withTarefas(supabase, organizationId, leadsVisiveis),
+    conversa: () => withConversas(supabase, organizationId, leadsVisiveis),
+    contato: () => withMarcadoresDoContato(supabase, organizationId, leadsVisiveis),
+  });
+  tempos.total = Math.round((performance.now() - inicioDaRota) * 10) / 10;
+
+  // Duração por família, sem PII: a próxima lentidão aponta a família culpada.
+  logger.info("[board] tempos do quadro", {
+    requestId,
+    pipelineId,
+    leads: leadsVisiveis.length,
+    ...tempos,
+  });
+  const headers = { "Server-Timing": cabecalhoServerTiming(tempos) };
+
+  // O primeiro erro (na ordem de antes da paralelização) derruba o quadro,
+  // como na cadeia: meia tela com campos faltando parece certa e não é.
+  const comErro = [
+    resultados.dono,
+    resultados.acao,
+    resultados.score,
+    resultados.tarefas,
+    resultados.conversa,
+    resultados.contato,
+  ].find((r) => r.error);
+  if (comErro?.error) {
+    return fail("internal_error", comErro.error, 500, { requestId, headers });
   }
 
-  const { data: pipelinePadrao } = await supabase
-    .from("crm_pipelines")
-    .select("id")
-    .eq("organization_id", (pipeline as Pipeline).organization_id)
-    .eq("is_default", true)
-    .maybeSingle();
-
-  const leadsComAcao = await withNextActions(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsWithOwner.leads,
-    (pipelinePadrao as { id: string } | null)?.id ?? null,
-  );
-  if (leadsComAcao.error) {
-    return fail("internal_error", leadsComAcao.error, 500, { requestId });
-  }
-
-  const leadsComScore = await withScores(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComAcao.leads,
-  );
-  if (leadsComScore.error) {
-    return fail("internal_error", leadsComScore.error, 500, { requestId });
-  }
-
-  const leadsComPasso = await withProximosPassos(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComScore.leads,
-  );
-
-  // As tarefas entram NO MEIO da cadeia, e não no fim: a resposta continua
-  // saindo de `withMarcadoresDoContato`, a última etapa que as cercas do quadro
-  // vigiam (`kanban-atalho-conversa`, `funil-mostra-dados-do-cliente`,
-  // `funil-filtro-de-tag-le-as-duas-caixas`). A ordem não muda o resultado: cada
-  // etapa só acrescenta o próprio campo ao lead (o próximo passo, #200, e o selo
-  // das tarefas, do upstream).
-  const leadsComTarefas = await withTarefas(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComPasso,
-  );
-  if (leadsComTarefas.error) {
-    return fail("internal_error", leadsComTarefas.error, 500, { requestId });
-  }
-
-  const leadsComConversa = await withConversas(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComTarefas.leads,
-  );
-  if (leadsComConversa.error) {
-    return fail("internal_error", leadsComConversa.error, 500, { requestId });
-  }
-
-  const leadsComMarcadores = await withMarcadoresDoContato(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComConversa.leads,
-  );
-  if (leadsComMarcadores.error) {
-    return fail("internal_error", leadsComMarcadores.error, 500, { requestId });
-  }
+  const leadsEnriquecidos = fundirEnriquecimentos(leadsVisiveis, [
+    resultados.dono.leads,
+    resultados.acao.leads,
+    resultados.score.leads,
+    resultados.passo,
+    resultados.tarefas.leads,
+    resultados.conversa.leads,
+    resultados.contato.leads,
+  ]);
 
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
     stages: (stages ?? []) as Stage[],
-    leads: leadsComMarcadores.leads,
+    leads: leadsEnriquecidos,
     passagens: (passagens ?? []).map((p) => ({
       stage_id: p.de_stage_id,
       status: p.status_na_saida as "won" | "lost",
@@ -744,5 +744,5 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     })),
   };
 
-  return ok(board, { requestId });
+  return ok(board, { requestId, headers });
 }

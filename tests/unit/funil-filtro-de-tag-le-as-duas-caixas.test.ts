@@ -122,12 +122,16 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
   // reprovar exatamente o dele.
   it("a rota do quadro anexa os marcadores do contato e os devolve", () => {
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
+    // As famílias rodam em paralelo e são fundidas por id
+    // (`lib/kanban/fundir-enriquecimentos.ts`): o elo é a família ser CHAMADA
+    // e o resultado dela entrar na fusão que vira a resposta.
     expect(fonte, "withMarcadoresDoContato não é chamada na rota").toMatch(
-      /leadsComMarcadores\s*=\s*await withMarcadoresDoContato\(/,
+      /contato:\s*\(\)\s*=>\s*withMarcadoresDoContato\(/,
     );
     expect(fonte, "o resultado de withMarcadoresDoContato não chega à resposta").toMatch(
-      /leads:\s*leadsComMarcadores\.leads/,
+      /fundirEnriquecimentos\([\s\S]*?resultados\.contato\.leads[\s\S]*?\]\)/,
     );
+    expect(fonte).toMatch(/leads:\s*leadsEnriquecidos/);
   });
 
   it("a consulta de conversas do quadro traz as `tags` e as devolve no card", () => {

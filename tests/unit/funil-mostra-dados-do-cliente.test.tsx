@@ -260,9 +260,10 @@ describe("a fiação — quem usa a regra a chama", () => {
     expect(etapa, "anexarDadosDoContato não é chamada na etapa").toMatch(
       /anexarDadosDoContato\(\s*leadsDoQuadro,\s*linhas\s*\)/,
     );
-    // sem etapa nova na cadeia: `funil-filtro-de-tag-le-as-duas-caixas` e
-    // `kanban-atalho-conversa` vigiam withConversas → withMarcadoresDoContato → resposta
-    expect(rota).toMatch(/leads:\s*leadsComMarcadores\.leads/);
+    // o resultado da etapa entra na fusão que vira a resposta (famílias em
+    // paralelo, `lib/kanban/fundir-enriquecimentos.ts`)
+    expect(rota).toMatch(/fundirEnriquecimentos\([\s\S]*?resultados\.contato\.leads[\s\S]*?\]\)/);
+    expect(rota).toMatch(/leads:\s*leadsEnriquecidos/);
   });
 
   it("o card e o dossiê renderizam os componentes novos", () => {
