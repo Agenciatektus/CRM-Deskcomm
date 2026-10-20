@@ -277,9 +277,6 @@ export function InboxLayout({
   const filters: ConversationsFilters = useMemo(
     () => ({
       ...tabToFilter(filterValue.tab, automaticoDaOrg),
-      // O atendente escolhido pelo gerente. A aba Minhas já traz `assigned_to=me`,
-      // e esse valor da aba vence (o seletor nem aparece ali).
-      assigned_to: tabToFilter(filterValue.tab, automaticoDaOrg).assigned_to ?? filterValue.assigned_to,
       // A tela NÃO pede o que a rota recusa: o hook trata falha com
       // `showApiError`, então digitar a primeira letra de qualquer busca faria
       // piscar um erro na cara de quem digita. A regra é a MESMA que o schema
@@ -300,7 +297,6 @@ export function InboxLayout({
     [
       filterValue.tab,
       automaticoDaOrg,
-      filterValue.assigned_to,
       filterValue.search,
       filterValue.channel_session_id,
       filterValue.entrada,

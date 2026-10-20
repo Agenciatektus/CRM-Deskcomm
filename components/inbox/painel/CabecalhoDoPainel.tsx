@@ -136,7 +136,7 @@ export function CabecalhoDoPainel({
           </Button>
         )}
       </div>
-      {editandoTags && contactId && <ContactTagsEditor contactId={contactId} orgId={orgId} tags={tags} />}
+      {editandoTags && contactId && <ContactTagsEditor entityId={contactId} orgId={orgId} tags={tags} />}
 
       {/* Cada atalho parte da largura do PRÓPRIO rótulo e a sobra é dividida
           (`flex-auto`): em três terços iguais o rótulo maior virava

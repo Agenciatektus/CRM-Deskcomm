@@ -3,23 +3,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { ApiError } from "@/lib/api/types";
 
-// As duas escritas possíveis são o EFEITO observável, mockadas: transferir
-// (encerra a origem) e abrir card adicional (não encerra nada). O que estes
-// testes prendem é QUAL das duas o roteador escolhe.
+// As duas escritas possíveis são o EFEITO observável, mockadas: trocar de funil
+// (no fork MOVE o mesmo card, 9053 — `moverNegocioDeFunil`) e abrir card
+// adicional (não toca a origem). O que estes testes prendem é QUAL das duas o
+// roteador escolhe.
 vi.mock("@/lib/leads/transfere-para-o-funil", () => ({
   COLUNAS_DA_ORIGEM: "id, pipeline_id, status, contact_id",
-  transfereParaOFunil: vi.fn(async () => ({ ok: true, clone: { id: "clone-1" } })),
+}));
+vi.mock("@/lib/leads/mover-de-funil", () => ({
+  moverNegocioDeFunil: vi.fn(async () => ({ ok: true, lead: { id: "lead-r" } })),
 }));
 vi.mock("@/lib/leads/abre-card-adicional", () => ({
   abreCardAdicionalNoFunil: vi.fn(async () => ({ ok: true, card: { id: "card-novo" } })),
 }));
 
 import { abreCardAdicionalNoFunil } from "@/lib/leads/abre-card-adicional";
-import { transfereParaOFunil } from "@/lib/leads/transfere-para-o-funil";
+import { moverNegocioDeFunil } from "@/lib/leads/mover-de-funil";
 
 import { aplicaDestinoDaIntencao, funisDeProdutoDoRoteador } from "./destino-da-intencao";
 
-const transferir = vi.mocked(transfereParaOFunil);
+const transferir = vi.mocked(moverNegocioDeFunil);
 const abrirAdicional = vi.mocked(abreCardAdicionalNoFunil);
 
 const RECEPCAO = "pipe-recepcao";
@@ -202,8 +205,8 @@ describe("o card do funil de ENTRADA continua sendo transferido", () => {
     await aplicaDestinoDaIntencao(deps(admin({ abertos: [negocio("lead-r", RECEPCAO)] }).cliente, CONSORCIO));
 
     expect(transferir).toHaveBeenCalledTimes(2);
-    expect(transferir.mock.calls[0]![4]).toBe(INVESTIMENTOS);
-    expect(transferir.mock.calls[1]![4]).toBe(CONSORCIO);
+    expect(transferir.mock.calls[0]![3]).toMatchObject({ pipelineId: INVESTIMENTOS });
+    expect(transferir.mock.calls[1]![3]).toMatchObject({ pipelineId: CONSORCIO });
     expect(abrirAdicional).not.toHaveBeenCalled();
   });
 
@@ -216,7 +219,7 @@ describe("o card do funil de ENTRADA continua sendo transferido", () => {
 
     expect(r.status).toBe("transferido");
     expect(r.origemId).toBe("lead-r");
-    expect(transferir.mock.calls[0]![3]).toMatchObject({ id: "lead-r", pipeline_id: RECEPCAO });
+    expect(transferir.mock.calls[0]![2]).toMatchObject({ id: "lead-r", pipeline_id: RECEPCAO });
     expect(abrirAdicional).not.toHaveBeenCalled();
   });
 

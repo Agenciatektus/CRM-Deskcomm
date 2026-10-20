@@ -25,7 +25,7 @@ import { useCreateNote } from "@/hooks/inbox/useCreateNote";
 import { useMessageTemplates, type MessageTemplate } from "@/hooks/inbox/useMessageTemplates";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useSendMessage } from "@/hooks/inbox/useSendMessage";
-import { useUploadMedia } from "@/hooks/inbox/useUploadMedia";
+import { useUploadMedia, type DestinoDoUpload } from "@/hooks/inbox/useUploadMedia";
 import { imagemDoClipboard } from "@/lib/inbox/clipboard-image";
 import { toast } from "sonner";
 import {

@@ -108,11 +108,6 @@ export function InboxFilters({ value, onChange }: Props) {
     atendimento: value.atendimento,
   });
 
-  // Filtro por ATENDENTE: só para gerente ou acima (a lista de quem atende é da
-  // gestão; o atendente comum continua vendo só o escopo dele, que a RLS impõe).
-  const podeFiltrarPorAtendente = roleAtLeast(activeOrg?.role, "manager");
-  const mostrarSeletorDeAtendente = podeFiltrarPorAtendente && value.tab !== "mine";
-
   const tabs = activeOrg
     ? visibleInboxTabs(activeOrg.role, activeOrg.visibility_mode)
     : INBOX_TABS.map((t) => t.value);

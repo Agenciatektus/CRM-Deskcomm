@@ -12,7 +12,7 @@ vi.mock("@/app/api/v1/leads/_handler", () => ({
 import { createLeadHandler } from "@/app/api/v1/leads/_handler";
 
 import { abreCardAdicionalNoFunil } from "./abre-card-adicional";
-import type { OrigemParaClonar } from "./clonar-para-funil";
+import type { OrigemDoCardAdicional } from "./abre-card-adicional";
 
 const criar = vi.mocked(createLeadHandler);
 
@@ -56,7 +56,7 @@ const origem = {
   source: "whatsapp",
   custom_fields: { valor_da_carta: 300000 },
   source_metadata: { utm_source: "anuncio" },
-} as unknown as OrigemParaClonar;
+} as unknown as OrigemDoCardAdicional;
 
 describe("abreCardAdicionalNoFunil", () => {
   beforeEach(() => criar.mockClear());

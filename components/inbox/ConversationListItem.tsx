@@ -176,6 +176,7 @@ export function ConversationListItem({
         // (`pele-selecionada`), que se destaca do card mesmo com marca escura.
         isSelected && "pele-selecionada bg-accent-soft hover:bg-accent-soft",
       )}
+      aria-current={isSelected ? "true" : undefined}
     >
       {/* Marcador da seleção: o `conv.is-sel::before` do protótipo, recuado em
           cima e embaixo para não colar na borda da linha vizinha. */}
@@ -277,8 +278,7 @@ export function ConversationListItem({
           meuUserId={meuUserId}
         />
       </div>
-      </button>
-    </div>
+    </button>
   );
 
   /**

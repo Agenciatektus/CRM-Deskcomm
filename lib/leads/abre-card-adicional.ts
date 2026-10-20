@@ -2,11 +2,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { createLeadHandler } from "@/app/api/v1/leads/_handler";
-import {
-  escolheEtapaDeDestino,
-  type EtapaDoFunil,
-  type OrigemParaClonar,
-} from "@/lib/leads/clonar-para-funil";
+import { escolheEtapaDeDestino, type EtapaDoFunil } from "@/lib/leads/clonar-para-funil";
+
+/**
+ * O que o card adicional leva do negócio de origem: só a IDENTIDADE. No fork a
+ * troca de funil move o mesmo card (9053) e o `OrigemParaClonar` do upstream
+ * saiu junto com o clone; este tipo é o recorte que este caminho lê.
+ */
+export interface OrigemDoCardAdicional {
+  id: string;
+  pipeline_id: string;
+  title: string;
+  contact_id?: string | null;
+  source?: string | null;
+}
 
 /**
  * Abre um SEGUNDO negócio do mesmo cliente em outro funil, sem tocar no de
@@ -29,7 +38,7 @@ export async function abreCardAdicionalNoFunil(
   admin: SupabaseClient,
   organizationId: string,
   handlerCtx: HandlerCtx,
-  origem: OrigemParaClonar,
+  origem: OrigemDoCardAdicional,
   pipelineId: string,
   stageId: string | null,
 ): Promise<{ ok: true; card: Record<string, unknown> } | { ok: false; error: string }> {

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { ApiError } from "@/lib/api/types";
-import { abreCardAdicionalNoFunil } from "@/lib/leads/abre-card-adicional";
+import { abreCardAdicionalNoFunil, type OrigemDoCardAdicional } from "@/lib/leads/abre-card-adicional";
 import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
 import { moverNegocioDeFunil } from "@/lib/leads/mover-de-funil";
 import { COLUNAS_DA_ORIGEM, type OrigemDaTransferencia } from "@/lib/leads/transfere-para-o-funil";
@@ -126,14 +126,15 @@ export async function aplicaDestinoDaIntencao(
 ): Promise<ResultadoDoDestino> {
   const { data, error } = await deps.admin
     .from("crm_leads")
-    .select(`${COLUNAS_DA_ORIGEM}, last_activity_at, created_at`)
+    // `title` e `source`: a identidade que o card ADICIONAL leva (#2799).
+    .select(`${COLUNAS_DA_ORIGEM}, title, source, last_activity_at, created_at`)
     .eq("organization_id", deps.organizationId)
     .eq("contact_id", deps.contactId)
     .eq("status", "open");
   if (error) return { status: "recusado", error: error.message };
 
   const abertos = ((data ?? []) as unknown as OrigemDaTransferencia[]).map(
-    (linha) => linha as OrigemDaTransferencia & LeadCandidate,
+    (linha) => linha as OrigemDaTransferencia & OrigemDoCardAdicional & LeadCandidate,
   );
   const funisDeProduto = deps.funisDeProduto ?? [];
   if (abertos.length === 0) {
@@ -232,18 +233,18 @@ function maisRecente<T extends LeadCandidate>(linhas: T[]): T {
 async function negocioGanhoEmOutroProduto(
   deps: DestinoDaIntencaoDeps,
   funisDeProduto: string[],
-): Promise<(OrigemDaTransferencia & LeadCandidate) | null> {
+): Promise<(OrigemDaTransferencia & OrigemDoCardAdicional & LeadCandidate) | null> {
   if (funisDeProduto.length === 0) return null;
   const { data, error } = await deps.admin
     .from("crm_leads")
-    .select(`${COLUNAS_DA_ORIGEM}, last_activity_at`)
+    .select(`${COLUNAS_DA_ORIGEM}, title, source, last_activity_at, created_at`)
     .eq("organization_id", deps.organizationId)
     .eq("contact_id", deps.contactId)
     .in("pipeline_id", funisDeProduto);
   if (error) return null;
 
   const linhas = ((data ?? []) as unknown as OrigemDaTransferencia[]).map(
-    (linha) => linha as OrigemDaTransferencia & LeadCandidate,
+    (linha) => linha as OrigemDaTransferencia & OrigemDoCardAdicional & LeadCandidate,
   );
   if (linhas.some((linha) => linha.pipeline_id === deps.destinoPipelineId)) return null;
   const ganhos = linhas.filter((linha) => linha.status === "won");
@@ -253,7 +254,7 @@ async function negocioGanhoEmOutroProduto(
 /** Abre o card do destino ao lado do `base`, que não é tocado. */
 async function abreAdicional(
   deps: DestinoDaIntencaoDeps,
-  base: OrigemDaTransferencia,
+  base: OrigemDaTransferencia & OrigemDoCardAdicional,
 ): Promise<ResultadoDoDestino> {
   // Os dois ramos que ABREM card são novos (#2799): antes deles, contato sem
   // negócio aberto não ganhava nada. Bloqueado ou anonimizado continua assim.
