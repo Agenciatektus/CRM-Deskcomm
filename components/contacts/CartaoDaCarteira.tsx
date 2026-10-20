@@ -1,4 +1,5 @@
 "use client";
+import { Escolha } from "@/components/ui/escolha";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -106,12 +107,12 @@ export function CartaoDaCarteira({ contactId, papelDoUsuario }: Props) {
                     punhado de ids e o rótulo é o nome do membro — a lista não pede
                     um combobox com busca, e um `<select>` é alcançável por teclado
                     e leitor de tela sem mais uma camada de JS. */}
-                <select
+                <Escolha
                   id="carteira-dono"
-                  className="h-9 w-full max-w-xs rounded-md border bg-background px-2 text-sm"
+                  className="w-full max-w-xs"
                   value={selecionado}
                   data-testid="carteira-seletor"
-                  onChange={(e) => setSelecionado(e.target.value)}
+                  onValueChange={(v) => setSelecionado(v)}
                 >
                   <option value="__sem_dono__">{t("Sem vendedor dono")}</option>
                   {(membros.data ?? []).map((m) => (
@@ -119,7 +120,7 @@ export function CartaoDaCarteira({ contactId, papelDoUsuario }: Props) {
                       {m.full_name ?? `${t("Atendente")} ${m.user_id.slice(0, 8)}`}
                     </option>
                   ))}
-                </select>
+                </Escolha>
               </div>
               <Button
                 size="sm"

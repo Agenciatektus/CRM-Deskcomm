@@ -568,16 +568,16 @@ function DeOndeResponde({ dados, recarregar }: { dados: DadosDoJev; recarregar: 
       <label htmlFor="jev-origem-escolha" className="block text-xs font-medium">
         {t("De onde o Jev responde")}
       </label>
-      <select
+      <Escolha
         id="jev-origem-escolha"
-        className="block w-full max-w-md rounded-md border bg-background p-2 text-sm"
+        className="w-full max-w-md"
         value={confirmandoOpenRouter ? "openrouter" : origem}
         disabled={!dados.pode_editar || enviando}
-        onChange={(e) => escolher(e.target.value)}
+        onValueChange={(v) => escolher(v)}
       >
         <option value="typesafe">{t("TypeSafe AI (chave própria)")}</option>
         <option value="openrouter">{t("OpenRouter (reaproveita a credencial OpenRouter)")}</option>
-      </select>
+      </Escolha>
       {confirmandoOpenRouter && (
         <div className="max-w-2xl rounded-md border border-border p-3 text-sm" data-testid="jev-origem-aceite">
           <div className="flex items-start gap-2">

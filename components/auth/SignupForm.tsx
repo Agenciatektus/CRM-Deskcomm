@@ -1,8 +1,9 @@
 "use client";
 
+import { Escolha } from "@/components/ui/escolha";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch, type Resolver } from "react-hook-form";
+import { Controller, useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition, useState } from "react";
 
@@ -223,14 +224,20 @@ export function SignupForm({
       {!convite && planos.length > 0 && (
         <div className="space-y-1.5">
           <Label htmlFor="cobranca_plan_id">{t("Plano")}</Label>
-          <select id="cobranca_plan_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm" {...register("cobranca_plan_id")}>
+          <Controller
+            control={control}
+            name="cobranca_plan_id"
+            render={({ field }) => (
+          <Escolha id="cobranca_plan_id" className="w-full" name={field.name} value={field.value ?? ""} onValueChange={field.onChange}>
             {planos.map((plano) => (
               <option key={plano.id} value={plano.id}>
                 {plano.nome} — {new Intl.NumberFormat(undefined, { style: "currency", currency: "BRL" }).format(plano.preco_cents / 100)} / {plano.intervalo === "ano" ? t("ano") : t("mês")}
                 {plano.trial_dias > 0 ? ` · ${plano.trial_dias} ${t("dias de teste")}` : ` · ${t("sem período de teste")}`}
               </option>
             ))}
-          </select>
+          </Escolha>
+            )}
+          />
         </div>
       )}
       <div className="space-y-1.5">

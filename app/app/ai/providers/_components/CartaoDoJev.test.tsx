@@ -17,6 +17,7 @@ import {
   TAREFA_DO_FOLLOWUP,
 } from "@/lib/ai/decisao/tarefas";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 import { CartaoDoJev, jevNoPonto, useDadosDoJev, type DadosDoJev } from "./CartaoDoJev";
 
@@ -1414,7 +1415,8 @@ describe("modo independente do roteador", () => {
 
   it("oferece comparar ou chamar a reserva sob demanda, e grava a escolha", async () => {
     montar(comRoteador());
-    const modo = screen.getByLabelText("Como o roteador consulta as IAs");
+    // O campo é o `Escolha` do DS: o valor mora no <select> escondido ao lado do gatilho.
+    const modo = selectDaEscolha(screen.getByLabelText("Como o roteador consulta as IAs"));
     expect(modo).toHaveValue("comparacao");
     fireEvent.change(modo, { target: { value: "sob_demanda" } });
     await waitFor(() => expect(chamadas.some((c) => c.metodo === "PATCH")).toBe(true));
@@ -1424,8 +1426,8 @@ describe("modo independente do roteador", () => {
 
   it("sem a IA de sempre (decisão B), a opção sob demanda não liga, e o cartão diz por quê", () => {
     montar(comRoteador(true, false));
-    const modo = screen.getByLabelText("Como o roteador consulta as IAs");
-    expect(within(modo).getByRole("option", { name: "Jev; IA de sempre só como reserva" })).toBeDisabled();
+    const modo = selectDaEscolha(screen.getByLabelText("Como o roteador consulta as IAs"));
+    expect(within(modo).getByRole("option", { name: "Jev; IA de sempre só como reserva", hidden: true })).toBeDisabled();
     expect(screen.getByTestId("jev-modo-roteador-sem-ia")).toHaveTextContent("Sem a sua IA de sempre, o Jev não escolhe o agente sozinho");
   });
 
@@ -1433,7 +1435,7 @@ describe("modo independente do roteador", () => {
     const d = comRoteador(true, false);
     d.config.modo_roteador = "sob_demanda";
     montar(d);
-    expect(screen.getByLabelText("Como o roteador consulta as IAs")).toHaveValue("comparacao");
+    expect(selectDaEscolha(screen.getByLabelText("Como o roteador consulta as IAs"))).toHaveValue("comparacao");
     expect(jevNoPonto(d, "intent_router")).not.toEqual({ decide: expect.stringContaining("escolhe primeiro") });
   });
 

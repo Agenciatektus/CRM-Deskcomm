@@ -1,4 +1,5 @@
 "use client";
+import { Escolha } from "@/components/ui/escolha";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -50,20 +51,20 @@ export function ChannelRoutingForm({ initial }: { initial: ChannelRoutingSetting
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <label className="block text-sm font-medium" htmlFor={`modo-${channel.id}`}>{t("Como este número distribui")}</label>
-          <select id={`modo-${channel.id}`} data-testid={`modo-do-numero-${channel.id}`} className="w-full rounded-md border bg-background p-2 text-sm"
-            value={channel.distribution_mode ?? ""} onChange={(e) => trocarModo(channel.id, e.target.value)}>
+          <Escolha id={`modo-${channel.id}`} data-testid={`modo-do-numero-${channel.id}`} className="w-full"
+            value={channel.distribution_mode ?? ""} onValueChange={(v) => trocarModo(channel.id, v)}>
             <option value="">{t("Usar o padrão da organização")}</option>
             {ROUTING_MODES.map((m) => <option key={m} value={m}>{t(MODO_COPY[m].titulo)}</option>)}
-          </select>
+          </Escolha>
           <p className="text-xs text-muted-foreground">{t("Vale só para este número. Os números sem regra própria continuam com o que está definido para a organização.")}</p>
         </div>
         <div className="space-y-1">
           <label className="block text-sm font-medium" htmlFor={`destino-${channel.id}`}>{t("Atendente de destino padrão")}</label>
-          <select id={`destino-${channel.id}`} data-testid={`destino-do-numero-${channel.id}`} className="w-full rounded-md border bg-background p-2 text-sm"
-            value={channel.default_assignee_user_id ?? ""} onChange={(e) => trocarDestino(channel.id, e.target.value)} disabled={!channel.distribution_mode}>
+          <Escolha id={`destino-${channel.id}`} data-testid={`destino-do-numero-${channel.id}`} className="w-full"
+            value={channel.default_assignee_user_id ?? ""} onValueChange={(v) => trocarDestino(channel.id, v)} disabled={!channel.distribution_mode}>
             <option value="">{t("Nenhum — distribuir pelo modo")}</option>
             {initial.members.map((member) => <option key={member.id} value={member.id}>{t(member.name)}</option>)}
-          </select>
+          </Escolha>
           <p className="text-xs text-muted-foreground">{t("Escolhendo uma pessoa, todo cliente novo deste número vai direto para ela, sem passar pela distribuição. Precisa estar disponível para receber.")}</p>
         </div>
       </div>

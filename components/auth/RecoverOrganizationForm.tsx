@@ -1,5 +1,6 @@
 "use client";
 
+import { Escolha } from "@/components/ui/escolha";
 import { useState, useTransition } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -89,11 +90,11 @@ export function RecoverOrganizationForm({
       {planos.length > 0 && (
         <div className="space-y-1.5">
           <Label htmlFor="recovery-plano">{t("Plano")}</Label>
-          <select
+          <Escolha
             id="recovery-plano"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            className="w-full"
             value={plano}
-            onChange={(event) => setPlano(event.target.value)}
+            onValueChange={(v) => setPlano(v)}
             disabled={isPending}
           >
             {planos.map((p) => (
@@ -102,7 +103,7 @@ export function RecoverOrganizationForm({
                 {p.trial_dias > 0 ? ` · ${p.trial_dias} ${t("dias de teste")}` : ` · ${t("sem período de teste")}`}
               </option>
             ))}
-          </select>
+          </Escolha>
         </div>
       )}
       {error && (
