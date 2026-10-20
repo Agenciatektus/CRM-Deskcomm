@@ -153,6 +153,19 @@ D="$(caso i2 $'VAPID_PUBLIC_KEY=BPub\nVAPID_PRIVATE_KEY=priv\n')"; chmod 444 "$D
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
 check "    somente-leitura com o par presente → calado (não há o que escrever)" test -z "$SAIDA"
 
+# A cópia temporária leva todos os segredos do .env: nasce 600, não com a umask.
+mkdir -p "$WORK/bin-chmod"
+cat > "$WORK/bin-chmod/chmod" <<'STUB'
+#!/usr/bin/env bash
+ls -l "${@: -1}" | cut -c1-10 >> "$CHMOD_LOG"
+exec /bin/chmod "$@"
+STUB
+/bin/chmod +x "$WORK/bin-chmod/chmod"
+D="$(caso n $'X=1\n')"
+( umask 022; CHMOD_LOG="$WORK/chmod.log" no_kit "$D" "$WORK/bin-chmod" "completar_par_vapid .env" >/dev/null )
+check "(n) a cópia temporária já nasce -rw------- (antes do chmod)" \
+  test "$(head -1 "$WORK/chmod.log" 2>/dev/null)" = "-rw-------"
+
 D="$WORK/sem-env"; mkdir -p "$D"
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env; echo rc=\$?")"
 check "    sem .env → não cria um, e sai com 0" test ! -e "$D/.env"

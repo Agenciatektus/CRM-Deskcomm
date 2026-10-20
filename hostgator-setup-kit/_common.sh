@@ -2537,8 +2537,11 @@ completar_par_vapid() {
   # chave se o processo morresse entre eles — e a regra acima se recusaria, para
   # sempre, a curar o que o próprio kit estragou.
   tmp="${envfile}.tmp.$$"
-  if ! { { grep -vE '^[[:space:]]*(export[[:space:]]+)?VAPID_(PUBLIC|PRIVATE)_KEY=' "$envfile" || true; } \
-         && printf 'VAPID_PUBLIC_KEY=%s\nVAPID_PRIVATE_KEY=%s\n' "$pub" "$priv"; } > "$tmp" \
+  # `umask 077`: a cópia leva todos os segredos do .env e não pode passar um
+  # instante legível por outros usuários antes do chmod.
+  if ! ( umask 077
+         { { grep -vE '^[[:space:]]*(export[[:space:]]+)?VAPID_(PUBLIC|PRIVATE)_KEY=' "$envfile" || true; } \
+           && printf 'VAPID_PUBLIC_KEY=%s\nVAPID_PRIVATE_KEY=%s\n' "$pub" "$priv"; } > "$tmp" ) \
      || ! chmod 600 "$tmp" || ! mv "$tmp" "$envfile"; then
     rm -f "$tmp"
     c_ylw "$(t "  ⚠ Não consegui gerar as chaves dos avisos com o app fechado; o resto segue normal. Para tentar de novo: bash hostgator-setup-kit/update.sh --force")"
