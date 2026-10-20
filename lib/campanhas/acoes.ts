@@ -444,6 +444,88 @@ async function voltarAoRascunho(admin: SupabaseClient, id: string, codigo: strin
     .eq("status", "preparing");
 }
 
+/**
+ * EDITAR uma campanha PRONTA: devolvê-la ao rascunho para re-preparar o público.
+ *
+ * É a transição `ready → draft` que a máquina de estados prevê como "o caminho
+ * de editar" — e cujo guarda ela delega ao chamador: quem já ENVIOU não pode
+ * reescrever a mensagem que a pessoa recebeu. Esse guarda mora aqui.
+ *
+ * ⚠️ NÃO CONFUNDIR com o helper `voltarAoRascunho` acima: aquele conserta uma
+ * preparação travada (`preparing → draft`, com `failure_code`) e é interno. Este
+ * é a AÇÃO do operador, de `ready`, e invalida o snapshot de propósito.
+ */
+export async function voltarAoRascunhoAcao(
+  admin: SupabaseClient,
+  c: CampanhaCarregada,
+  _agora: Date,
+  _autorId: string,
+): Promise<Desfecho> {
+  const recusa = recusaDeTransicao(c.status, "draft");
+  if (recusa) return recusa;
+
+  // O guarda que a máquina de estados delega: já saiu mensagem desta campanha?
+  // Então refazer a lista mudaria o que já foi dito a quem recebeu. O caminho de
+  // editar o texto depois do primeiro envio é Duplicar, não reabrir.
+  if (await jaEnviou(admin, c.id)) {
+    return {
+      ok: false,
+      codigo: "campanha_ja_enviou",
+      mensagem:
+        "Esta campanha já enviou mensagens; reabri-la mudaria o texto de quem já recebeu. " +
+        "Para editar e enviar de novo, duplique-a.",
+      status: 422,
+    };
+  }
+
+  // TRAVA O ESTADO ANTES DE APAGAR NADA — e esta ordem é o conserto, não detalhe.
+  // Compare-and-set: só sai de `ready`, e só UMA transição vence. Vem ANTES do
+  // delete de propósito: se um Iniciar disputa e ganha o CAS (`ready → running`),
+  // o nosso update não pega linha e a gente sai SEM ter apagado a lista de uma
+  // campanha que já começou a rodar. Deletar primeiro (como estava) deixava o
+  // delete rodar mesmo quando o Iniciar vencia, esvaziando a fila de uma campanha
+  // `running`. É a mesma ordem de `prepararAcao` (CAS `draft → preparing` antes,
+  // delete depois): o estado é o cadeado, e o delete só roda com ele na mão.
+  // O CAS fixo em `ready` também barra `failed → draft` (que a máquina permitiria)
+  // sem tocar na lista: `failed` não casa, vira conflito, nada é apagado.
+  const { data: travada } = await admin
+    .from("campaigns")
+    .update({ status: "draft" })
+    .eq("id", c.id)
+    .eq("status", "ready")
+    .select("id");
+  if ((travada ?? []).length === 0) return conflitoDeCorrida();
+
+  // Agora a campanha é `draft` (ninguém mais a inicia) e o snapshot velho deixa
+  // de valer: o mesmo motor de preparação o refaz do zero no próximo Preparar.
+  // MESMO delete do ramo contínuo de `prepararAcao`, filtrando `organization_id`
+  // E `campaign_id` — o client é admin e ignora RLS, e delete sem a organização é
+  // delete de outro tenant esperando acontecer.
+  const { error: erroDaLimpeza } = await admin
+    .from("campaign_recipients")
+    .delete()
+    .eq("organization_id", c.organization_id)
+    .eq("campaign_id", c.id);
+  if (erroDaLimpeza) {
+    // A campanha JÁ está em `draft` aqui; o pior caso é snapshot velho sobrando,
+    // que o próximo Preparar recalcula. A mensagem do PostgREST NÃO vai para o
+    // recibo (doutrina do P2-3 do @Cassio_SecRev): o texto real vai para o log.
+    logger.warn("[campanha] limpeza da fila falhou ao voltar ao rascunho", {
+      campanha: c.id,
+      motivo: erroDaLimpeza.message,
+    });
+    return {
+      ok: false,
+      codigo: "campanha_fila_nao_limpa",
+      mensagem:
+        "A campanha voltou ao rascunho, mas não foi possível limpar a lista antiga. " +
+        "Prepare de novo; se repetir, o motivo está no log do servidor.",
+      status: 422,
+    };
+  }
+  return { ok: true };
+}
+
 export async function iniciarAcao(
   admin: SupabaseClient,
   c: CampanhaCarregada,
