@@ -2330,6 +2330,8 @@ select:not([multiple]):not([size]) {
   .animate-spin {
     animation-duration: 1s !important;
     animation-iteration-count: infinite !important;
+  }
+}
 
 /* ─── Caixa de marcar (checkbox) do design system: o `.chk` do protótipo ────────
    (Main.dc.html:626, igual no MainVerdash). Uma regra só para os ~50
