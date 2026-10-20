@@ -100,6 +100,7 @@ export const DICIONARIO: Traducoes = {
   },
   // Página inicial pública e seção "Dados do Google" da política de privacidade.
   "Atendimento e vendas pelo WhatsApp, com agentes de inteligência artificial.": { es: "Atención y ventas por WhatsApp, con agentes de inteligencia artificial." },
+  "Atendimento e vendas pelo WhatsApp, também no celular.": { es: "Atención y ventas por WhatsApp, también en el celular." },
   "reúne em um só lugar as conversas com os clientes, o funil de vendas, a agenda de atendimentos e agentes de inteligência artificial que respondem, qualificam o interesse e passam a conversa para uma pessoa quando é preciso.": { es: "reúne en un solo lugar las conversaciones con los clientes, el embudo de ventas, la agenda de atención y agentes de inteligencia artificial que responden, califican el interés y pasan la conversación a una persona cuando hace falta." },
   "Quando a empresa conecta o Google Agenda, o": { es: "Cuando la empresa conecta Google Calendar, el" },
   "mostra a ocupação da agenda e cria, altera e cancela os agendamentos pedidos pela própria pessoa. Quando conecta o Google Ads, devolve ao anúncio as vendas que ele trouxe. O uso dos dados do Google está descrito na": { es: "muestra la ocupación de la agenda y crea, modifica y cancela las citas pedidas por la propia persona. Cuando conecta Google Ads, devuelve al anuncio las ventas que trajo. El uso de los datos de Google está descrito en la" },

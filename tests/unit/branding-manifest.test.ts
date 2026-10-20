@@ -6,6 +6,8 @@ vi.mock("@/lib/branding/saida", () => ({ marcaDaSaida }));
 vi.mock("@/lib/branding/instalacao", () => ({
   marcaDaInstalacao: vi.fn().mockResolvedValue(null),
 }));
+// A descrição segue o Accept-Language; fora de uma requisição, cabeçalho vazio.
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 import manifest, { dynamic } from "@/app/manifest";
 

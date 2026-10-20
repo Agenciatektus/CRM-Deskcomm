@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ marca: vi.fn(), linha: vi.fn() }));
+const mocks = vi.hoisted(() => ({ marca: vi.fn(), linha: vi.fn(), lingua: { valor: null as string | null } }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers(mocks.lingua.valor ? { "accept-language": mocks.lingua.valor } : {}),
+}));
 vi.mock("@/lib/branding/saida", () => ({ marcaDaSaida: mocks.marca }));
 vi.mock("@/lib/branding/instalacao", () => ({ marcaDaInstalacao: mocks.linha }));
 import manifest, { dynamic } from "@/app/manifest";
 beforeEach(() => {
+  mocks.lingua.valor = null;
   mocks.marca.mockResolvedValue({ nome: "Central" });
   mocks.linha.mockResolvedValue(null);
 });
@@ -35,5 +39,10 @@ describe("manifest do ícone configurável", () => {
     expect(antes.start_url).toBe(depois.start_url);
     expect(antes.scope).toBe(depois.scope);
     expect(antes.id).toBe(depois.id);
+  });
+  it("a descrição segue o idioma do aparelho que pede (não há idioma da instalação)", async () => {
+    expect((await manifest()).description).toBe("Atendimento e vendas pelo WhatsApp, também no celular.");
+    mocks.lingua.valor = "es-AR,es;q=0.9";
+    expect((await manifest()).description).toBe("Atención y ventas por WhatsApp, también en el celular.");
   });
 });
