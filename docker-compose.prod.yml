@@ -84,7 +84,8 @@ services:
 
   # Worker 24/7 do agent-engine (fusão Vendaval) — cérebro do agente SDR.
   worker:
-    # Teto de memória — 230 MiB de pico MEDIDO nesta VPS.
+    # Teto de memória — 230 MiB de pico MEDIDO nesta VPS (medição antiga; em 20/10 o
+    # heap batia ~251 MB e estourava, ver mem_limit abaixo).
     #
     # Sem ele o contêiner é ilimitado, e numa VPS de 3,8 GB isso não é teoria:
     # um contêiner ALHEIO (agente da hospedagem, fora deste compose) registrou
