@@ -100,6 +100,18 @@ describe("o gesto não colide com o card", () => {
     expect(noCard).not.toHaveBeenCalled();
   });
 
+  it("no card do funil (enxuto) a prévia NÃO é link: o clique sobe e abre o dossiê", () => {
+    const noCard = vi.fn();
+    render(
+      <div onClick={noCard}>
+        <ConversaSlot conversa={conversa()} enxuto />
+      </div>,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    fireEvent.click(screen.getByText("Quiero saber el precio"));
+    expect(noCard).toHaveBeenCalledTimes(1);
+  });
+
   it("o pointerdown também não sobe — o card é arrastável", () => {
     const noCard = vi.fn();
     render(
