@@ -156,9 +156,7 @@ import { validarRespostaDoFluxo } from './flow-validate';
 import { moduloLigadoComMemo } from '@/lib/instalacao/modulos';
 import { msAteAJanelaAbrir } from './janela-de-atendimento';
 import { enviaAvisoForaDoHorario, portasDeProducao } from './aviso-fora-do-horario';
-import { audit } from "@/lib/audit";
-import { comSaida } from "@/lib/prospecting/rodape-de-saida";
-import { contarEnvioAutomatico, desfazerContagem, type ContagemSaida } from "@/lib/prospecting/saida-configuravel";
+import { enviarComSaidaConfiguravel } from "@/lib/prospecting/saida-configuravel";
 import { janelaDeEnvioAberta, proximaAberturaDaJanela } from '../pacing/engine';
 import { loadChannelKnobs } from '../pacing/store';
 import { avisarJanelaFechada, resolverAvisoDeJanela } from '../pacing/aviso-de-janela';
@@ -3660,25 +3658,8 @@ async function executarTurnoDoAgente(
             },
             // `finalBody` = corpo após a cadeia (o disclosureGate F4-05 pode prependar o
             // disclosure via inject); é ELE que vai ao canal, não o `body` capturado da tool.
-            send: async (finalBody: string) => {
+            send: (finalBody: string) => {
               pararDigitando(); // a mensagem sai agora; renovar depois dela mentiria
-              // SAÍDA CONFIGURÁVEL: fora de prévia, conta este envio automático e,
-              // se for a vez, cola a saída no corpo antes de enviar.
-              let r: ContagemSaida | null = null;
-              try {
-                if (!preview && input.conversationId) {
-                  r = await contarEnvioAutomatico(pool, tenantId, input.conversationId);
-                  if (r?.levaASaida) {
-                    finalBody = comSaida(finalBody, r.locale);
-                  }
-                }
-              } catch (erroContagem) {
-                runLog.warn("contagem de saída automática falhou; segue sem a saída", {
-                  error:
-                    erroContagem instanceof Error ? erroContagem.message.slice(0, 200) : String(erroContagem),
-                });
-              }
-              corposEnviados.push(finalBody);
               const sleep =
                 deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
               const jitter = () =>
@@ -3705,64 +3686,34 @@ async function executarTurnoDoAgente(
                   ...(media ? { media } : {}),
                 });
               };
-              // Cada foto é uma mensagem física: só vão as que cabem no que resta do teto
-              // do turno (a checagem de `max_sends_per_turn` acima roda uma vez, antes).
-              // O resto é medido ANTES DE CADA FOTO, depois do texto: o texto acima do
-              // teto de legenda sai à parte e também gasta o teto.
-              let resultado: ChannelSendResult;
-              try {
-                resultado = await enviarComFotos(finalBody, fotosDoProduto, {
-                  sleep,
-                  jitter,
-                  restantes: () => maxSendsPerTurn - seq,
-                  enviarFoto: (foto, legenda) => enviar(legenda, foto),
-                  enviarTexto: (texto) =>
-                    sendInBubbles(texto, {
-                      enabled: agentConfig?.splitMessages ?? false,
-                      maxChars: agentConfig?.splitMaxChars ?? 600,
-                      // O teto do turno vale para as bolhas: o que passa dele vai junto na última.
-                      maxBubbles: Math.max(1, maxSendsPerTurn - seq),
-                      sleep,
-                      jitter,
-                      // A pausa humana do turno NÃO mora mais aqui: ela subiu para
-                      // `esperaForaDoLock` (paga antes de o guardrail tomar o lock do número) —
-                      // issue #654. Neste ponto fica só o jitter anti-ban entre bolhas.
-                      send: (bubble) => enviar(bubble),
-                    }),
-                });
-              } catch (erroEnvio) {
-                // O envio lançou: desfaz a contagem (se houve) e relança o mesmo erro.
-                if (r) {
-                  await desfazerContagem(pool, tenantId, r.candidatoId, r.reservadaEm).catch(() => {});
-                }
-                throw erroEnvio;
-              }
-              // Se houve contagem e o envio não foi aceito, desfaz a reserva.
-              // Nunca deixa o turno cair por causa disso.
-              if (r) {
-                const aceito =
-                  resultado.kind === "sent" ||
-                  resultado.kind === "already_sent" ||
-                  resultado.kind === "queued";
-                if (!aceito) {
-                  await desfazerContagem(pool, tenantId, r.candidatoId, r.reservadaEm).catch(() => {});
-                } else if (r.levaASaida && r.candidatoId) {
-                  void audit({
-                    action: "prospecting.exit_offered",
-                    organizationId: tenantId,
-                    bypassedRls: true,
-                    resourceType: "prospecting_candidate",
-                    resourceId: r.candidatoId,
-                    metadata: {
-                      campaign_id: r.campanhaId,
-                      conversation_id: input.conversationId,
-                      message_number: r.numeroDaMensagem,
-                      via: "inbound_turn",
-                    },
+              // Saída configurável da prospecção (fora de prévia); ver saida-configuravel.ts.
+              const saida = { db: pool, organizationId: tenantId, conversationId: preview ? null : input.conversationId, via: "inbound_turn" as const, avisar: (m: string, c: Record<string, unknown>) => runLog.warn(m, c) };
+              return enviarComSaidaConfiguravel(saida, finalBody, (finalBody) => {
+                  corposEnviados.push(finalBody);
+                  // Cada foto é uma mensagem física: só vão as que cabem no teto do turno,
+                  // medido ANTES DE CADA FOTO, depois do texto.
+                  return enviarComFotos(finalBody, fotosDoProduto, {
+                    sleep,
+                    jitter,
+                    restantes: () => maxSendsPerTurn - seq,
+                    enviarFoto: (foto, legenda) => enviar(legenda, foto),
+                    enviarTexto: (texto) =>
+                      sendInBubbles(texto, {
+                        enabled: agentConfig?.splitMessages ?? false,
+                        maxChars: agentConfig?.splitMaxChars ?? 600,
+                        // O teto do turno vale para as bolhas: o que passa dele vai
+                        // junto na última.
+                        maxBubbles: Math.max(1, maxSendsPerTurn - seq),
+                        sleep,
+                        jitter,
+                        // A pausa humana do turno NÃO mora mais aqui: ela subiu para
+                        // `esperaForaDoLock` (paga antes de o guardrail tomar o lock do
+                        // número) — issue #654. Neste ponto fica só o jitter anti-ban
+                        // entre bolhas.
+                        send: (bubble) => enviar(bubble),
+                      }),
                   });
-                }
-              }
-              return resultado;
+              });
             },
           };
           let chain = await runBeforeSend(beforeSendArgs);

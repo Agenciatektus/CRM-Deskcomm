@@ -4,10 +4,9 @@ import path from "node:path";
 
 /**
  * CERCA DE LIGAÇÃO — a saída da prospecção só chega ao cliente se o `send` de
- * cada caminho de envio automático chama `contarEnvioAutomatico` e, reservando,
- * cola `comSaida` no corpo.
+ * cada caminho de envio automático usa `enviarComSaidaConfiguravel`.
  *
- * Sabotagem obrigatória: remover uma dessas chamadas deixa este teste vermelho.
+ * Sabotagem obrigatória: remover/desviar essa chamada deixa este teste vermelho.
  */
 
 const RAIZ = path.resolve(__dirname, "../..");
@@ -17,30 +16,37 @@ function fonte(rel: string): string {
 }
 
 describe("saída configurável ligada nos envios automáticos", () => {
-  it("inbound-turn.chama contarEnvioAutomatico e cola comSaida", () => {
+  it("inbound-turn usa enviarComSaidaConfiguravel antes de enviarComFotos, com preview ? null", () => {
     const src = fonte("lib/agent-engine/agent/inbound-turn.ts");
-    expect(src).toContain("contarEnvioAutomatico(");
-    expect(src).toContain("comSaida(");
+    const inicio = src.indexOf("send_message: tool({");
+    const fim = src.indexOf("update_lead_state: tool({");
+    expect(inicio).toBeGreaterThan(-1);
+    expect(fim).toBeGreaterThan(inicio);
+    const trecho = src.slice(inicio, fim);
+    expect(trecho).toContain("enviarComSaidaConfiguravel(");
+    expect(trecho).toContain("return enviarComFotos(");
+    expect(trecho.indexOf("enviarComSaidaConfiguravel(")).toBeLessThan(
+      trecho.indexOf("return enviarComFotos("),
+    );
+    expect(trecho).toContain("preview ? null");
   });
 
-  it("followup-turn.chama contarEnvioAutomatico e cola comSaida", () => {
+  it("followup-turn usa enviarComSaidaConfiguravel com modelo === undefined", () => {
     const src = fonte("lib/agent-engine/agent/followup-turn.ts");
-    expect(src).toContain("contarEnvioAutomatico(");
-    expect(src).toContain("comSaida(");
-    expect(src).toContain("desfazerContagem(");
-  });
-
-  it("followup-turn.só conta quando não é template (modelo)", () => {
-    const src = fonte("lib/agent-engine/agent/followup-turn.ts");
-    // A chamada de contarEnvioAutomatico deve estar protegida por `modelo === undefined`.
-    const idx = src.indexOf("contarEnvioAutomatico(");
+    const idx = src.indexOf("enviarComSaidaConfiguravel(");
     expect(idx).toBeGreaterThan(-1);
-    const trecho = src.slice(Math.max(0, idx - 200), idx);
-    expect(trecho).toContain("modelo === undefined");
+    const trecho = src.slice(idx, idx + 300);
+    expect(trecho).toContain("modelo === undefined ? conversationId : null");
   });
 
-  it("inbound-turn.chama desfazerContagem", () => {
-    const src = fonte("lib/agent-engine/agent/inbound-turn.ts");
-    expect(src).toContain("desfazerContagem(");
+  it("saida-configuravel.ts: enviarComSaidaConfiguravel chama contarEnvioAutomatico, comSaida, desfazerContagem e audita", () => {
+    const src = fonte("lib/prospecting/saida-configuravel.ts");
+    const inicio = src.indexOf("export async function enviarComSaidaConfiguravel(");
+    expect(inicio).toBeGreaterThan(-1);
+    const corpo = src.slice(inicio);
+    expect(corpo).toContain("contarEnvioAutomatico(");
+    expect(corpo).toContain("comSaida(");
+    expect(corpo).toContain("desfazerContagem(");
+    expect(corpo).toContain('"prospecting.exit_offered"');
   });
 });

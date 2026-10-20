@@ -68,9 +68,8 @@ import {
 } from './followup-flow-classify';
 import { consultarJevNoFollowup } from '@/lib/ai/decisao/followup';
 import { audit } from "@/lib/audit";
-import { comSaida } from "@/lib/prospecting/rodape-de-saida";
-import { contarEnvioAutomatico, desfazerContagem, type ContagemSaida } from "@/lib/prospecting/saida-configuravel";
-import type { ChannelSendResult } from "@/lib/agent-engine/channel-adapter";
+import { enviarComSaidaConfiguravel } from "@/lib/prospecting/saida-configuravel";
+
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -1222,65 +1221,26 @@ async function sendFixedOutbound(
             ),
         }
       : {}),
-    send: async (finalBody) => {
-      // SAÍDA CONFIGURÁVEL: follow-up de texto conta e leva; de template (modelo)
-      // não conta nem leva — o corpo aprovado pelo canal não se altera.
-      let r: ContagemSaida | null = null;
-      if (modelo === undefined && conversationId) {
-        try {
-          r = await contarEnvioAutomatico(pool, tenantId, conversationId);
-          if (r?.levaASaida) {
-            finalBody = comSaida(finalBody, r.locale);
-          }
-        } catch (erroContagem) {
-          runLog.warn("contagem de saída automática falhou; segue sem a saída", {
-            error:
-              erroContagem instanceof Error ? erroContagem.message.slice(0, 200) : String(erroContagem),
-          });
-        }
-      }
-      let resultado: ChannelSendResult;
-      try {
-        resultado = await channel.send({
-          tenantId, leadId, jobId: job.id, jobClaim: claimOfJob(job), seq: 1, conversationId, body: finalBody,
-          ...(modelo !== undefined ? { template: modelo } : {}),
-          // #2734 — mídia do passo: o `body` acima é a LEGENDA dela.
-          ...(midia !== undefined ? { media: { url: midia.url, mime: midia.mime, type: midia.type } } : {}),
-        });
-      } catch (erroEnvio) {
-        // O envio lançou: desfaz a contagem (se houve) e relança o mesmo erro.
-        if (r) {
-          await desfazerContagem(pool, tenantId, r.candidatoId, r.reservadaEm).catch(() => {});
-        }
-        throw erroEnvio;
-      }
-      // Se houve contagem e o envio não foi aceito, desfaz a reserva.
-      // Nunca deixa o turno cair por causa disso.
-      if (r) {
-        const aceito =
-          resultado.kind === "sent" ||
-          resultado.kind === "already_sent" ||
-          resultado.kind === "queued";
-        if (!aceito) {
-          await desfazerContagem(pool, tenantId, r.candidatoId, r.reservadaEm).catch(() => {});
-        } else if (r.levaASaida && r.candidatoId) {
-          void audit({
-            action: "prospecting.exit_offered",
-            organizationId: tenantId,
-            bypassedRls: true,
-            resourceType: "prospecting_candidate",
-            resourceId: r.candidatoId,
-            metadata: {
-              campaign_id: r.campanhaId,
-              conversation_id: conversationId,
-              message_number: r.numeroDaMensagem,
-              via: "followup",
-            },
-          });
-        }
-      }
-      return resultado;
-    },
+    send: (finalBody) =>
+      // SAÍDA CONFIGURÁVEL: template (modelo) não conta nem leva — o corpo aprovado pelo canal não se altera.
+      enviarComSaidaConfiguravel(
+        {
+          db: pool,
+          organizationId: tenantId,
+          // template (modelo) não conta nem leva: o corpo aprovado pelo canal não se altera.
+          conversationId: modelo === undefined ? conversationId : null,
+          via: "followup",
+          avisar: (m, c) => runLog.warn(m, c),
+        },
+        finalBody,
+        (finalBody) =>
+          channel.send({
+            tenantId, leadId, jobId: job.id, jobClaim: claimOfJob(job), seq: 1, conversationId, body: finalBody,
+            ...(modelo !== undefined ? { template: modelo } : {}),
+            // #2734 — mídia do passo: o `body` acima é a LEGENDA dela.
+            ...(midia !== undefined ? { media: { url: midia.url, mime: midia.mime, type: midia.type } } : {}),
+          }),
+      ),
   });
 
   if (chain.status === 'vetoed') {

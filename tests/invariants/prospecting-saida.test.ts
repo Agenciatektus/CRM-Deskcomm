@@ -38,7 +38,7 @@ async function candidata(org: string, modo: Modo) {
     [contato, org, `+55119${Math.floor(10000000 + Math.random() * 89999999)}`],
   );
   await pool.query(
-    "insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values($1,$2,$3,gen_random_bytes(32))",
+    "insert into channel_sessions(id,organization_id,waha_session_name,webhook_secret_encrypted) values($1,$2,$3,'\\x00'::bytea)",
     [sessao, org, `saida-${sessao.slice(0, 8)}`],
   );
   await pool.query(

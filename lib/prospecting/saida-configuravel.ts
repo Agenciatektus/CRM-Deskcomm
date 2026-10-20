@@ -10,7 +10,10 @@
  * Toda consulta filtra `organization_id`, resolvido da linha do job / da fonte
  * confiável, nunca do corpo de requisição.
  */
+import { audit } from "@/lib/audit";
+import type { ChannelSendResult } from "@/lib/agent-engine/channel-adapter";
 import type { Queryable } from "@/lib/agent-engine/queue/queue";
+import { comSaida } from "@/lib/prospecting/rodape-de-saida";
 
 export interface ContagemSaida {
   candidatoId: string;
@@ -117,4 +120,69 @@ export async function desfazerContagem(
   reservadaEm: string | null,
 ): Promise<void> {
   await db.query(SQL_DESFAZER_CONTAGEM, [org, candidatoId, reservadaEm]);
+}
+
+export interface OpcoesDaSaida {
+  db: Queryable;
+  organizationId: string;
+  /** null/undefined = não conta (prévia, template, conversa ausente): envia o corpo como veio. */
+  conversationId: string | null | undefined;
+  via: "inbound_turn" | "followup";
+  avisar: (mensagem: string, contexto: Record<string, unknown>) => void;
+}
+
+/**
+ * Envolve UM envio automático com a saída configurável: conta o envio e, se for
+ * a vez, cola a saída no corpo; se o envio não for aceito (ou lançar), desfaz a
+ * contagem; se foi aceito e levou a saída, audita `prospecting.exit_offered`.
+ * Falha da contagem nunca derruba o envio: segue sem a saída.
+ */
+export async function enviarComSaidaConfiguravel(
+  opcoes: OpcoesDaSaida,
+  corpo: string,
+  enviar: (corpo: string) => Promise<ChannelSendResult>,
+): Promise<ChannelSendResult> {
+  const { db, organizationId, conversationId, via } = opcoes;
+  let r: ContagemSaida | null = null;
+  if (conversationId) {
+    try {
+      r = await contarEnvioAutomatico(db, organizationId, conversationId);
+      if (r?.levaASaida) corpo = comSaida(corpo, r.locale);
+    } catch (erroContagem) {
+      opcoes.avisar("contagem de saída automática falhou; segue sem a saída", {
+        error: erroContagem instanceof Error ? erroContagem.message.slice(0, 200) : String(erroContagem),
+      });
+    }
+  }
+  let resultado: ChannelSendResult;
+  try {
+    resultado = await enviar(corpo);
+  } catch (erroEnvio) {
+    if (r) await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
+    throw erroEnvio;
+  }
+  if (r) {
+    const aceito =
+      resultado.kind === "sent" ||
+      resultado.kind === "already_sent" ||
+      resultado.kind === "queued";
+    if (!aceito) {
+      await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
+    } else if (r.levaASaida) {
+      void audit({
+        action: "prospecting.exit_offered",
+        organizationId,
+        bypassedRls: true,
+        resourceType: "prospecting_candidate",
+        resourceId: r.candidatoId,
+        metadata: {
+          campaign_id: r.campanhaId,
+          conversation_id: conversationId,
+          message_number: r.numeroDaMensagem,
+          via,
+        },
+      });
+    }
+  }
+  return resultado;
 }
