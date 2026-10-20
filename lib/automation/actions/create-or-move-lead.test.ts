@@ -388,13 +388,8 @@ describe("create_or_move_lead — não lê nenhuma chave classificacao_inicial_*
 });
 
 
-it("CRM derivado propaga referência original sem observar ou abrir atendimento", async () => {
-  originRpc.mockClear();
-  const db = makeDb({ contacts: [{ id: "contato-1", organization_id: ORG_ID }], pipelines: [funilRow({ id: PIPE, name: "Funil" })], stages: [ETAPA_ORIGEM, ETAPA_DESTINO], leads: [negocio("lead-1", "novo")] });
-  const ctx = ctxComLead({}, db.client as unknown as ActionCtx["admin"]);
-  ctx.event = { id: "evento-original", event_type: "message.received" } as ActionCtx["event"];
-  ctx.context.contact = { id: "contato-1" };
-  expect((await getAction("create_or_move_lead")!.execute(ctx, { pipeline_id: PIPE, stage_id: "triagem" })).status).toBe("success");
-  expect(originRpc).toHaveBeenCalledWith("emit_event", expect.objectContaining({ p_payload: expect.objectContaining({ service_origin: {kind:"event",event_id:"evento-original",organization_id:ORG_ID,contact_id:"contato-1"} }) }));
-  expect(originRpc.mock.calls.every(call => call[0] === "emit_event")).toBe(true);
-});
+// #2769 do upstream (a "continuação" do ganho, que CLONA o negócio no funil de
+// pós-venda) não existe no fork: a troca de funil move o MESMO card (9053), em
+// qualquer gatilho. A cobertura do "move, não clona" está em
+// `automacao-troca-de-funil-transfere-o-negocio`, `negocio-fechado-alguma-vez-9040`
+// e `reabertura-1538`. Ver docs/upstream/subida-1.81.md.

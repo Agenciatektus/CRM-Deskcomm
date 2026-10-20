@@ -80,6 +80,25 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
         publicaNoContexto(ctx, troca.lead, contactId);
         return { type: "create_or_move_lead", status: "success", detail: { moved: lead.id, pipeline_id: pipelineId } };
       }
+
+      // ── lead.won NO MESMO FUNIL: A AÇÃO NÃO MOVE (#1528 + #2769) ────────────
+      //
+      // Com a porta de `lead.won` aberta para `create_or_move_lead`, este ramo
+      // (mesmo funil) volta a ser alcançável — e é EXATAMENTE o que a #1528
+      // vetou: mover o negócio recém-ganho para uma etapa aberta o REABRE,
+      // `lead.stage_changed` sai do reabrir, uma regra de etapa o leva de volta
+      // para a etapa de ganho, e as duas se realimentam sem fim.
+      //
+      // Então `lead.won` só tem uma moda aqui: CRIAR a continuação noutro
+      // funil (o ramo acima). O mesmo funil não é continuação — é reescrever o
+      // ganho —, e a recusa diz isso com uma frase própria na aba Atividade.
+      if (ctx.event?.event_type === "lead.won") {
+        return {
+          type: "create_or_move_lead",
+          status: "failed",
+          error: "continuacao_exige_outro_funil",
+        };
+      }
       const movido = await moveLeadHandler(ctx.admin, handlerCtx, lead.id, { to_stage_id: stageId });
       publicaNoContexto(ctx, movido, contactId);
       return { type: "create_or_move_lead", status: "success", detail: { moved: lead.id } };

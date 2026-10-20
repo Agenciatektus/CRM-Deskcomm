@@ -110,7 +110,18 @@ function declaracoesDoTema(cor: CorResolvida, tema: "claro" | "escuro"): Declara
   const derivada = cor.derivada;
   if (!derivada) return saida;
 
-  const t = tema === "claro" ? derivada.claro : derivada.escuro;
+  // ── A segunda semente (#2482) ─────────────────────────────────────────────
+  //
+  // Só o ESCURO troca de fonte: com `corEscura` preenchida, o bloco
+  // `[data-theme="dark"]` deriva da segunda semente pela MESMA `derivarMarca`
+  // — mesmos pisos de contraste, mesmo deslocamento de rampa —, e o claro
+  // segue na primeira. Sem a chave, `fonte` é a própria `derivada`, que é o
+  // caminho de antes: a ausência é o caso normal, não um ramo especial.
+  //
+  // `--color-brand` continua sendo a semente PRINCIPAL nos DOIS blocos: ele é
+  // declarado acima, antes deste ponto, e é o que e-mail e logo leem.
+  const fonte = tema === "escuro" && cor.corEscura ? cor.corEscura.derivada : derivada;
+  const t = tema === "claro" ? fonte.claro : fonte.escuro;
 
   // Os 11 stops saem JÁ DESLOCADOS, e por isso podem diferir entre os dois
   // blocos. Os rótulos vêm de `GRAUS` (rampa.ts) e não de uma lista repetida
@@ -154,7 +165,10 @@ function declaracoesDoTema(cor: CorResolvida, tema: "claro" | "escuro"): Declara
   // O escuro usa a rampa do produto (accent travado no primary Verdash, etapa 2
   // do DS): o bloco escuro repete os valores do globals.css, e declará-lo segue
   // obrigatório pela regra dos dois blocos acima.
-  const rampa = tema === "claro" ? derivada.rampa : derivada.rampaDoEscuro;
+  // Com a segunda semente (#2482, upstream) o escuro segue a escolha explícita
+  // dela; sem a chave, `fonte` é a própria `derivada` e o escuro fica na rampa
+  // do produto, como antes.
+  const rampa = tema === "claro" ? fonte.rampa : cor.corEscura ? fonte.rampa : derivada.rampaDoEscuro;
   for (const [i, grau] of GRAUS.entries()) {
     saida.push([`--color-accent-${grau}`, stop(rampa, i + t.deslocamento)]);
   }

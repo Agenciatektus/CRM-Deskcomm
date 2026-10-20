@@ -1,6 +1,7 @@
 "use client";
 
 import { useT } from "@/hooks/i18n/useT";
+import { resolveSharedContact } from "@/lib/messaging/contact-card";
 import type { Message } from "@/lib/types/messaging";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,10 @@ export function CitacaoNaBolha({ citada, viewerUserId }: { citada: Message; view
           ? t("Esta mensagem foi apagada")
           : citada.metadata?.crm_hidden_at
             ? t("Mensagem ocultada no CRM")
-            : citada.body?.trim() || t("(sem texto)")}
+            : citada.type === "contact"
+              ? // Contato compartilhado: o nome, não o vCard bruto (upstream).
+                resolveSharedContact(citada)?.name || t("Contato")
+              : citada.body?.trim() || t("(sem texto)")}
       </div>
     </div>
   );

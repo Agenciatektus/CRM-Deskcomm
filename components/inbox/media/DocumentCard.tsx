@@ -13,6 +13,8 @@ interface Props {
   isOutbound?: boolean;
   /** Fonte alternativa para mídia de NOTA interna (#1863, F3) — ver ImageMedia. */
   src?: string;
+  /** Nome ORIGINAL do documento (`media_filename`, #2613 do upstream). */
+  fileName?: string | null;
 }
 
 /**
@@ -21,10 +23,10 @@ interface Props {
  * `filename` que o canal mandou, quando veio; sem ele, a sigla do tipo. O
  * número de páginas NÃO é guardado pela ingestão, então não aparece.
  */
-export function DocumentCard({ messageId, mime, sizeBytes, storagePath, src, nome }: Props & { nome?: string | null }) {
+export function DocumentCard({ messageId, mime, sizeBytes, storagePath, src, nome, fileName }: Props & { nome?: string | null }) {
   const t = useT();
   const label = mediaFileLabel(mime, storagePath);
-  const titulo = nome?.trim() || label;
+  const titulo = nome?.trim() || fileName?.trim() || label;
   const href = src ?? mediaSrc(messageId);
   return (
     <div className="-ml-1.5 -mr-1.25 -mt-0.5 mb-1 flex w-67.5 max-w-full items-center gap-3 rounded-xl bg-tint p-2">

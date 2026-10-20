@@ -36,6 +36,7 @@ import {
 import { ArrowsClockwise, Copy, DotsThree, Warning } from "@/lib/ui/icons";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { StatusConvite } from "@/lib/team/convite-status";
+import { rotuloDoPapel } from "@/lib/auth/types";
 
 interface Props {
   /** admin: mostra as ações de reenviar/revogar. Manager só lê. */
@@ -96,7 +97,7 @@ export function TeamInvitesClient({ canManage }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead>{t("E-mail")}</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>{t("Papel")}</TableHead>
                 <TableHead>{t("Interface")}</TableHead>
                 <TableHead>{t("Status")}</TableHead>
                 <TableHead>{t("E-mail enviado")}</TableHead>
@@ -113,7 +114,7 @@ export function TeamInvitesClient({ canManage }: Props) {
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">{inv.email}</TableCell>
                     <TableCell data-rotulo="Role">
-                      <Badge variant="secondary">{inv.role}</Badge>
+                      <Badge variant="secondary">{t(rotuloDoPapel(inv.role))}</Badge>
                     </TableCell>
                     <TableCell data-rotulo={t("Interface")} className="text-sm">
                       {inv.interface_settings?.destinos

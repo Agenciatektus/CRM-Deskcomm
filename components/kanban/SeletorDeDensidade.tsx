@@ -5,7 +5,7 @@ import type { ComponentType } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/hooks/i18n/useT";
 import type { VistaDoFunil } from "@/hooks/kanban/usePreferenciasDoFunil";
-import { Kanban, ListBullets, ListDashes, Rows } from "@/lib/ui/icons";
+import { CalendarBlank, Kanban, ListBullets, ListDashes, Rows } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 type Icone = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
@@ -74,9 +74,10 @@ export function SeletorDeDensidade({
 const VISTAS = [
   { id: "kanban", rotulo: "Kanban", Icone: Kanban },
   { id: "lista", rotulo: "Lista", Icone: ListBullets },
+  { id: "calendario", rotulo: "Calendário", Icone: CalendarBlank },
 ] as const;
 
-/** Kanban × Lista. */
+/** Kanban × Lista × Calendário. */
 export function SeletorDeVista({ vista, onChange }: { vista: VistaDoFunil; onChange: (v: VistaDoFunil) => void }) {
   const t = useT();
   return <Segmentado<VistaDoFunil> rotulo={t("Modo de ver o funil")} valor={vista} opcoes={VISTAS} onChange={onChange} />;

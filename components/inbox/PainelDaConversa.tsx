@@ -149,6 +149,7 @@ export const PainelDaConversa = forwardRef<ComposerHandle, PainelDaConversaProps
               fechada={conversation.status === "closed"}
               contatoBloqueadoId={conversation.contacts?.is_blocked ? (conversation.contacts.id ?? null) : null}
               contactName={conversation.contacts?.name ?? null}
+              contactDisplayName={conversation.contacts?.display_name}
               respondendo={respondendo}
               onCancelarResposta={() => setRespondendo(null)}
               currentContactId={conversation.contact_id}

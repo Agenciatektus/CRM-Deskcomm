@@ -5,6 +5,8 @@ import { X } from "lucide-react";
 import { useT } from "@/hooks/i18n/useT";
 import type { AvisoDeRascunho, MotivoDeRecusa } from "@/lib/inbox/rascunho-sugerido";
 import { cn } from "@/lib/utils";
+import { resolveSharedContact } from "@/lib/messaging/contact-card";
+import type { Message } from "@/lib/types/messaging";
 
 /**
  * O que a tela diz quando o rascunho NÃO vale mais (issue #1611: "a conversa
@@ -67,7 +69,7 @@ export function FaixaDaCitacao({
   respondendo,
   onCancelar,
 }: {
-  respondendo: { body: string | null; direction: string };
+  respondendo: Pick<Message, "body" | "direction" | "type" | "metadata">;
   onCancelar?: () => void;
 }) {
   const t = useT();
@@ -77,7 +79,11 @@ export function FaixaDaCitacao({
         <div className="font-semibold text-accent-700 dark:text-accent-300">
           {respondendo.direction === "outbound" ? t("Você") : t("Cliente")}
         </div>
-        <div className="line-clamp-2 text-text-muted">{respondendo.body?.trim() || t("(sem texto)")}</div>
+        <div className="line-clamp-2 text-text-muted">
+          {respondendo.type === "contact"
+            ? resolveSharedContact(respondendo)?.name || t("Contato")
+            : respondendo.body?.trim() || t("(sem texto)")}
+        </div>
       </div>
       <button
         type="button"

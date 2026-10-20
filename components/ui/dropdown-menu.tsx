@@ -49,16 +49,28 @@ type ComFolha = { folhaNoCelular?: boolean }
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent> & ComFolha
->(({ className, folhaNoCelular, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    data-folha-no-celular={folhaNoCelular ? "" : undefined}
-    className={cn(
-      "pele-ruido z-50 min-w-[8rem] overflow-hidden rounded-menu border border-border bg-surface p-1.5 text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-dropdown-menu-content-transform-origin)",
-      className
-    )}
-    {...props}
-  />
+>(({ className, folhaNoCelular, collisionPadding = 16, ...props }, ref) => (
+  /*
+    PORTAL, igual ao `DropdownMenuContent` abaixo (#2702, upstream): sem portal o
+    submenu nasce DENTRO do menu pai, que corta o que passa da caixa dele, e a
+    lista de responsáveis do card não aparecia. Portado para o body, ele se
+    posiciona contra a viewport. `collisionPadding` mantém a folga da borda e o
+    `max-h` + rolagem seguram a lista longa. A pele (`pele-ruido`, `rounded-menu`,
+    `shadow-pop`) e a folha do celular são as do DS; z-[60] fica acima do z-50
+    do pai. Vigiado por `tests/unit/kanban-submenu-responsavel.test.tsx`.
+  */
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.SubContent
+      ref={ref}
+      collisionPadding={collisionPadding}
+      data-folha-no-celular={folhaNoCelular ? "" : undefined}
+      className={cn(
+        "pele-ruido z-[60] max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-menu border border-border bg-surface p-1.5 text-text shadow-pop data-[state=open]:animate-pop-in origin-(--radix-dropdown-menu-content-transform-origin)",
+        className
+      )}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
 ));
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
 

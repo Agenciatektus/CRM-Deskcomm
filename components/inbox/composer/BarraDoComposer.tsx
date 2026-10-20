@@ -20,6 +20,8 @@ interface Props {
   respostaBarrada: boolean;
   /** O que barra o campo no modo atual. */
   campoBarrado: boolean;
+  /** Trava só o ENVIO (o curinga literal, #2744); ausente = `campoBarrado`. */
+  envioBloqueado?: boolean;
   sugestao: SugestaoDeResposta;
   onArquivo: (file: File) => void;
   onContato: () => void;
@@ -37,7 +39,7 @@ interface Props {
  * nunca grava áudio, porque o áudio vira mensagem para o cliente.
  */
 export function BarraDoComposer({
-  nota, texto, conversationId, active, isDisabled, respostaBarrada, campoBarrado,
+  nota, texto, conversationId, active, isDisabled, respostaBarrada, campoBarrado, envioBloqueado = campoBarrado,
   sugestao, onArquivo, onContato, onEmoji, onRespostasRapidas, onEnviar,
 }: Props) {
   const t = useT();
@@ -85,7 +87,7 @@ export function BarraDoComposer({
           size="icon"
           className="h-9 w-9 shrink-0 rounded-full"
           onClick={onEnviar}
-          disabled={campoBarrado || !texto.trim()}
+          disabled={envioBloqueado || !texto.trim()}
           aria-label={t("Enviar")}
         >
           <PaperPlaneTilt size={16} weight="fill" aria-hidden />
