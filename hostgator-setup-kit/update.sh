@@ -681,6 +681,11 @@ export APP_IMAGE="${IMG_APP}:${VERSAO_ALVO}"
 export WORKER_IMAGE="${IMG_WORKER}:${VERSAO_ALVO}"
 export SCHEDULER_IMAGE="${IMG_SCHEDULER}:${VERSAO_ALVO}"
 export VOICE_AGENT_IMAGE="${IMG_VOICE_AGENT}:${VERSAO_ALVO}"
+# `gravar_imagens` também cria, só na lacuna, o par VAPID dos avisos com o app
+# fechado (`completar_par_vapid`), e nunca troca um par que já existe. Mora lá
+# dentro, e não numa linha daqui, porque é ela que o update.sh ANTIGO chama
+# depois de reler o kit: assim o par chega já na primeira atualização, antes do
+# pull e do `up -d` abaixo.
 gravar_imagens .env "$VERSAO_ALVO"
 
 # Os segredos da chamada de voz (spec 18), para quem instalou antes dela existir.
