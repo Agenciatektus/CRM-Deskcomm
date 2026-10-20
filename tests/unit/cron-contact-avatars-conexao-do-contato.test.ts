@@ -19,7 +19,7 @@ const ORG = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const CAMINHO = `${ORG}/avatars/${CONTATO}.jpg`;
 
 /** Chamadas feitas ao `fetchProfilePictureUrl` do adapter. */
-const pedidos: Array<{ sessionRef: string; recipient: string }> = [];
+const pedidos: Array<{ organizationId: string; sessionRef: string; recipient: string }> = [];
 /** Patches recebidos pelo UPDATE de `contacts` (carimbos). */
 const updates: Record<string, unknown>[] = [];
 /** Linhas devolvidas pelo carimbo: [] = contato anonimizado no meio. */
@@ -172,7 +172,9 @@ describe("cron de fotos: a foto vem da conexão da conversa do contato", () => {
 
     await chamar();
 
-    expect(pedidos).toEqual([{ sessionRef: "sessao-do-contato", recipient: "5511999990000@c.us" }]);
+    expect(pedidos).toEqual([
+      { organizationId: ORG, sessionRef: "sessao-do-contato", recipient: "5511999990000@c.us" },
+    ]);
     expect(gravouCaminho()).toBe(true);
   });
 
@@ -198,7 +200,7 @@ describe("cron de fotos: a foto vem da conexão da conversa do contato", () => {
 
     // A foto vem da sessão da conversa (WhatsApp), nunca da linha social sem ref.
     expect(pedidos).toEqual([
-      { sessionRef: "sessao-waha-do-contato", recipient: "5511999990000@c.us" },
+      { organizationId: ORG, sessionRef: "sessao-waha-do-contato", recipient: "5511999990000@c.us" },
     ]);
     expect(gravouCaminho()).toBe(true);
   });
