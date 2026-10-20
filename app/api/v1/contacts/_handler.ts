@@ -650,7 +650,6 @@ export async function patchContactHandler(
     );
   }
 
-  const patch: Record<string, unknown> = {};
   // ── O PADRÃO (#2730) — DEPOIS do select, e só sobre o que MUDOU ──────────
   //
   // A MESMA régua da criação, com a MESMA leitura (todos os funis, escopo
