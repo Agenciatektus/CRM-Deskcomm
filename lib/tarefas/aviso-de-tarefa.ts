@@ -51,7 +51,7 @@ import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { normalizarIdioma, type Idioma } from "@/lib/i18n/idiomas";
 import { logger } from "@/lib/logger";
-import { idsDeOrgsParadas } from "@/lib/organizacao/operante";
+import { ehOperante, STATUS_OPERANTE, statusDaOrgEmbutida } from "@/lib/organizacao/operante";
 import { truncar, type PushPayload } from "@/lib/notifications/push_payload";
 
 /** Tarefas avisadas por rodada. A rodada é de minuto em minuto. */
@@ -214,7 +214,13 @@ export async function avisarTarefasNaHora(
 ): Promise<ResultadoDaRodada> {
   const { data, error } = await db
     .from("crm_tasks")
-    .select("id, organization_id, title, due_date, lead_id, contact_id, assigned_to, created_by")
+    .select(
+      "id, organization_id, title, due_date, lead_id, contact_id, assigned_to, created_by, organizations:organization_id!inner(status)",
+    )
+    // Organização PARADA (suspensa ou encerrada, 0501) sai NA CONSULTA, antes do
+    // `limit`: filtrada só em memória, uma org parada com 200 tarefas vencidas
+    // ocuparia a rodada inteira e as ativas nunca seriam avisadas (#213, P2).
+    .eq("organizations.status", STATUS_OPERANTE)
     .in("status", [...SITUACOES_ABERTAS])
     .is("reminded_at", null)
     .lte("due_date", agora.toISOString())
@@ -224,11 +230,7 @@ export async function avisarTarefasNaHora(
     .limit(LIMITE_DA_RODADA);
   if (error) throw new Error(`consulta das tarefas falhou: ${error.message}`);
 
-  const tarefas = (data ?? []) as TarefaAAvisar[];
-  // Organização PARADA (suspensa ou encerrada, 0501) não recebe aviso nem push:
-  // a régua de `cron-respeita-org-operante`. A tarefa NÃO é reivindicada, então
-  // o aviso sai se a organização voltar dentro da janela.
-  const paradas = tarefas.length > 0 ? new Set(await idsDeOrgsParadas(db)) : new Set<string>();
+  const tarefas = (data ?? []) as Array<TarefaAAvisar & { organizations?: Parameters<typeof statusDaOrgEmbutida>[0] }>;
   const pulados: Record<string, number> = {};
   const pular = (motivo: string) => (pulados[motivo] = (pulados[motivo] ?? 0) + 1);
   const idiomas = new Map<string, Promise<Idioma>>();
@@ -246,7 +248,9 @@ export async function avisarTarefasNaHora(
 
   let avisadas = 0;
   for (const tarefa of tarefas) {
-    if (paradas.has(tarefa.organization_id)) {
+    // Cinto do filtro da consulta (régua de `cron-respeita-org-operante`). A
+    // tarefa NÃO é reivindicada: o aviso sai se a org voltar dentro da janela.
+    if (!ehOperante(statusDaOrgEmbutida(tarefa.organizations))) {
       pular("org_parada");
       continue;
     }

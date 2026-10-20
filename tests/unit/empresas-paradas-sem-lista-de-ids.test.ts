@@ -29,6 +29,7 @@ const CHAMADORES = [
   "lib/relogio/executar.ts",
   "app/api/v1/cron/agenda-reminder/route.ts",
   "app/api/v1/cron/kb-conversations-batch/route.ts",
+  "lib/tarefas/aviso-de-tarefa.ts",
 ] as const;
 
 /** O anti-padrão que a issue #2015 quer ver fora dos chamadores. */
@@ -48,6 +49,7 @@ const EXIGIDO: Record<(typeof CHAMADORES)[number], RegExp[]> = {
   "lib/relogio/executar.ts": [EMBED_INNER, FILTRO_NO_BANCO, /\behOperante\(/],
   "app/api/v1/cron/agenda-reminder/route.ts": [EMBED_INNER, FILTRO_NO_BANCO, /\behOperante\(/],
   "app/api/v1/cron/kb-conversations-batch/route.ts": [EMBED_INNER, FILTRO_NO_BANCO, /\behOperante\(/],
+  "lib/tarefas/aviso-de-tarefa.ts": [EMBED_INNER, FILTRO_NO_BANCO, /\behOperante\(/],
 };
 
 function fonteDe(rel: string): string {

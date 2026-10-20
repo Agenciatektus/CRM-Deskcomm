@@ -48953,9 +48953,14 @@ create trigger trg_cadencia_guarda_ponteiro
 -- (`app/api/v1/ai/usage` e `app/api/v1/ai/evolution`). Sem ele, o knob de
 -- espaço viraria apagador de gráfico. O default é 120 para o dia mais antigo
 -- dessa janela nunca cair no meio da poda diária.
-create index if not exists idx_event_log_poda
+-- Desde a 9057 o índice deixa de fora as TRAVAS dos gatilhos por tempo, que a
+-- poda preserva: sem isso ela as varreria a cada rodada sem nunca apagá-las. O
+-- predicado do índice é o MESMO do `where` da função, senão o planner não o usa.
+create index if not exists idx_event_log_poda_sem_travas
   on public.event_log (created_at)
-  where status in ('done', 'dead');
+  where status in ('done', 'dead')
+    and event_type not in ('lead.silent_for', 'lead.stage_stale');
+drop index if exists public.idx_event_log_poda;
 
 -- Os índices do OUTRO lado das FKs — as duas tabelas já existem no corpo do dump,
 -- bem acima daqui, então o lugar é este.
@@ -49024,6 +49029,10 @@ begin
       from public.event_log e
      where e.status in ('done', 'dead')
        and e.created_at < now() - make_interval(days => v_dias)
+       -- A TRAVA dos gatilhos por tempo (migration 9057): o lead-time-triggers
+       -- não redispara só porque acha esta linha, sem janela. Apagá-la rearma a
+       -- regra e o mesmo card parado recebe a mensagem de novo.
+       and e.event_type not in ('lead.silent_for', 'lead.stage_stale')
      order by e.created_at
      limit v_limite
   )
@@ -52451,6 +52460,17 @@ revoke execute on function public.emit_event(text, text, uuid, jsonb, jsonb, uui
 grant  execute on function public.emit_event(text, text, uuid, jsonb, jsonb, uuid) to authenticated, service_role;
 
 notify pgrst, 'reload schema';
+
+-- ---- chave do MCP externo em claro sai do settings (migration 9057) ----
+--
+-- A 0580 cifra a chave nas colunas `mcp_externo_chave_*`; quem registrou antes
+-- ficaria com `settings.mcp_externo.chave` em claro, legível por todo membro. O
+-- código não lê nem grava esse campo. Numa instalação nova não há linha: no-op.
+-- (A trava dos gatilhos por tempo, a outra metade da 9057, está no corpo de
+-- `fn_podar_event_log`, no bloco da 9021.)
+update public.organizations
+   set settings = settings #- '{mcp_externo,chave}'
+ where settings->'mcp_externo' ? 'chave';
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

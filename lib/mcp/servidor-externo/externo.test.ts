@@ -224,6 +224,17 @@ describe("registro em organizations.settings.mcp_externo (#2147)", () => {
     expect(lerEndpointMcpExterno(gravado)).toBe("https://erp.loja/mcp");
   });
 
+  it("regravar um registro ANTERIOR à 0580 (chave em claro no jsonb) não a carrega adiante", () => {
+    // A 9057 apaga `settings.mcp_externo.chave` do banco; este caso garante que o
+    // código não a devolve ao jsonb ao salvar de novo por cima do bolso antigo.
+    const gravado = mesclarServidorMcpExterno(
+      { mcp_externo: { endpoint: "https://erp.loja/mcp", chave: "chave-antiga-em-claro" } },
+      { endpoint: "https://erp.loja/mcp", chave: CHAVE },
+    );
+    expect(gravado.mcp_externo).toEqual({ endpoint: "https://erp.loja/mcp" });
+    expect(JSON.stringify(gravado)).not.toContain("chave-antiga-em-claro");
+  });
+
   it("endpoint vazio apaga o registro e devolve os outros bolsos como estavam", () => {
     const settings = {
       conversions: { meta_page_id: "111" },

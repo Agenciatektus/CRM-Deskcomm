@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { avisarTarefasNaHora, textoDoAviso, type EnviarPush } from "./aviso-de-tarefa";
+import { avisarTarefasNaHora, LIMITE_DA_RODADA, textoDoAviso, type EnviarPush } from "./aviso-de-tarefa";
 
 /**
  * O AVISO NA HORA DA TAREFA (migration 9043).
@@ -42,6 +42,11 @@ function consulta(tabela: string) {
   let mudanca: Linha | null = null;
   let ordem: { coluna: string; asc: boolean } | null = null;
   let limite = Infinity;
+  let embuteOrg = false;
+  // O embed `organizations:organization_id!inner(status)` resolvido como o
+  // PostgREST faria: o status da org da linha, e `organizations.status` filtra.
+  const statusDaOrg = (l: Linha) => (tabelas.organizations ?? []).find((o) => o.id === l.organization_id)?.status;
+  const coluna = (l: Linha, c: string) => (c === "organizations.status" ? statusDaOrg(l) : l[c]);
   const linhas = () => (tabelas[tabela] ?? []).filter((l) => filtros.every((f) => f(l)));
   const resultado = () => {
     let r = linhas();
@@ -52,11 +57,12 @@ function consulta(tabela: string) {
       const { coluna: c, asc } = ordem;
       r = [...r].sort((a, b) => String(a[c] ?? "").localeCompare(String(b[c] ?? "")) * (asc ? 1 : -1));
     }
-    return r.slice(0, limite);
+    r = r.slice(0, limite);
+    return embuteOrg ? r.map((l) => ({ ...l, organizations: { status: statusDaOrg(l) } })) : r;
   };
   const q: Record<string, unknown> = {
-    select: () => q,
-    eq: (c: string, v: unknown) => (filtros.push((l) => l[c] === v), q),
+    select: (cols?: string) => ((embuteOrg = /organizations:organization_id!inner\(status\)/.test(cols ?? "")), q),
+    eq: (c: string, v: unknown) => (filtros.push((l) => coluna(l, c) === v), q),
     neq: (c: string, v: unknown) => (filtros.push((l) => l[c] !== v), q),
     is: (c: string, v: unknown) => (filtros.push((l) => (l[c] ?? null) === v), q),
     in: (c: string, vs: unknown[]) => (filtros.push((l) => vs.includes(l[c])), q),
@@ -146,6 +152,23 @@ describe("avisarTarefasNaHora — quais tarefas", () => {
     ];
     await rodar();
     expect(push.mock.calls.map((c) => c[2].tag)).toEqual(["task-due:mais-antiga", "task-due:meio", "task-due:recente"]);
+  });
+
+  it("org PARADA sai na consulta, antes do teto: não ocupa a rodada das ativas (#213)", async () => {
+    tabelas.organizations[1].status = "suspended";
+    // A org parada tem a rodada INTEIRA de tarefas, todas mais antigas que a da
+    // ativa. Com o corte só em memória (depois do `limit`), a ativa nunca entraria.
+    tabelas.crm_tasks = [
+      ...Array.from({ length: LIMITE_DA_RODADA }, (_, i) =>
+        tarefa(`parada-${i}`, { organization_id: OUTRA, assigned_to: BIA, due_date: minutos(-600 + i) }),
+      ),
+      tarefa("ativa", { due_date: minutos(-1) }),
+    ];
+    const r = await rodar();
+    expect(r.avisadas).toBe(1);
+    expect(push.mock.calls.map((c) => c[2].tag)).toEqual(["task-due:ativa"]);
+    // Controle negativo: a tarefa da org parada NÃO é reivindicada.
+    expect(tabelas.crm_tasks.filter((t) => t.organization_id === OUTRA).every((t) => t.reminded_at === null)).toBe(true);
   });
 
   it("é idempotente: a segunda rodada não avisa de novo", async () => {

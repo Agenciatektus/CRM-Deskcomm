@@ -68,6 +68,9 @@ type Regra = {
   trigger_config: unknown;
 };
 
+/** Página da leitura das travas: o `max_rows` do PostgREST (supabase/config.toml). */
+const PAGINA_DAS_TRAVAS = 1000;
+
 type Candidato = { leadId: string; contactId: string | null; ancora: string };
 
 /** A mesma divisão dos crons irmãos: lotes de 50, teto por organização. */
@@ -302,19 +305,40 @@ async function handle(req: NextRequest): Promise<Response> {
 
       // Quem já disparou ESTA regra COM A MESMA ÂNCORA não dispara de novo.
       const jaEmitidos = new Set<string>();
-      for (const lote of emLotes(candidatos, TAMANHO_DO_LOTE)) {
-        const { data: anteriores } = await admin
-          .from("event_log")
-          .select("entity_id, payload")
-          .eq("organization_id", org)
-          .eq("event_type", regra.trigger_event)
-          .eq("payload->>rule_id", regra.id)
-          .in("entity_id", lote.map((c) => c.leadId));
-        for (const anterior of anteriores ?? []) {
-          const payload = anterior.payload as { ancora?: unknown } | null;
-          if (typeof payload?.ancora !== "string" || !payload.ancora) continue;
-          jaEmitidos.add(chaveDeDisparoTemporal(regra.id, anterior.entity_id as string, payload.ancora));
+      let falhouNasTravas = false;
+      travas: for (const lote of emLotes(candidatos, TAMANHO_DO_LOTE)) {
+        // Só as âncoras ATUAIS do lote, e paginado: a 9057 preserva as travas
+        // antigas para sempre, e o PostgREST corta em `max_rows` (1000) calado —
+        // a trava que caísse fora do corte redispararia a regra (#214, P2).
+        const ancoras = [...new Set(lote.map((c) => c.ancora))];
+        for (let desde = 0; ; desde += PAGINA_DAS_TRAVAS) {
+          const { data: anteriores, error: erroTravas } = await admin
+            .from("event_log")
+            .select("id, entity_id, payload")
+            .eq("organization_id", org)
+            .eq("event_type", regra.trigger_event)
+            .eq("payload->>rule_id", regra.id)
+            .in("entity_id", lote.map((c) => c.leadId))
+            .in("payload->>ancora", ancoras)
+            .order("id", { ascending: true })
+            .range(desde, desde + PAGINA_DAS_TRAVAS - 1);
+          // Sem a leitura das travas não há como saber quem já disparou:
+          // falhar fechado é não disparar ninguém desta regra nesta rodada.
+          if (erroTravas) {
+            falhouNasTravas = true;
+            break travas;
+          }
+          for (const anterior of anteriores ?? []) {
+            const payload = anterior.payload as { ancora?: unknown } | null;
+            if (typeof payload?.ancora !== "string" || !payload.ancora) continue;
+            jaEmitidos.add(chaveDeDisparoTemporal(regra.id, anterior.entity_id as string, payload.ancora));
+          }
+          if ((anteriores ?? []).length < PAGINA_DAS_TRAVAS) break;
         }
+      }
+      if (falhouNasTravas) {
+        pular("consulta_falhou", candidatos.length);
+        continue;
       }
 
       const novos = naoDisparadosTemporais(candidatos, jaEmitidos, regra.id);
