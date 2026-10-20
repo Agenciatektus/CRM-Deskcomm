@@ -13,6 +13,7 @@ export type EstadoDoApp =
   | "android-embutido"
   | "sem-sw"
   | "iphone"
+  | "iphone-outro-navegador"
   | "android-botao"
   | "android-menu"
   | "outro";
@@ -38,6 +39,9 @@ export interface AmbienteDoAparelho {
 // Navegador de dentro de outro aplicativo (Instagram, Facebook, Line) e a
 // WebView do Android: nenhum tem "Instalar" nem "Adicionar à Tela de Início".
 const EMBUTIDO = /\b(Instagram|FBAN|FBAV|Line)\b|\/(FBIOS|FB_IAB)|; wv\)/;
+// Chrome, Firefox e Edge do iPhone: adicionam à tela de início desde o iOS
+// 16.4, pelo Compartilhar deles, que não fica na "barra do Safari".
+const OUTRO_NAVEGADOR_DO_IPHONE = /\b(CriOS|FxiOS|EdgiOS)\//;
 
 export function estadoDoApp(a: AmbienteDoAparelho): EstadoDoApp {
   if (!a.seguro) return "sem-https";
@@ -51,7 +55,7 @@ export function estadoDoApp(a: AmbienteDoAparelho): EstadoDoApp {
   const android = /Android/.test(a.ua) || a.celularPelaDica || (a.dedo && !iphone);
   if (android && embutido) return "android-embutido";
   if (!a.swOk) return "sem-sw";
-  if (iphone) return "iphone";
+  if (iphone) return OUTRO_NAVEGADOR_DO_IPHONE.test(a.ua) ? "iphone-outro-navegador" : "iphone";
   if (a.temPedido) return "android-botao";
   if (android) return "android-menu";
   return "outro";

@@ -114,10 +114,15 @@ export function AplicativoNoCelular() {
         </Caixa>
       );
     case "iphone":
+    case "iphone-outro-navegador":
       return (
         <Caixa estado={estado}>
           <ol className="list-decimal space-y-2 pl-5">
-            <li>{t("Toque em Compartilhar, na barra do Safari.")}</li>
+            <li>
+              {estado === "iphone"
+                ? t("Toque em Compartilhar, na barra do Safari.")
+                : t("Toque em Compartilhar, no menu ou na barra de endereço do navegador.")}
+            </li>
             <li>{t("Escolha Adicionar à Tela de Início.")}</li>
             <li>{t("Abra pelo ícone novo, entre de novo com seu e-mail e senha e ligue os avisos em Notificações.")}</li>
           </ol>
