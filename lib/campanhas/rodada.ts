@@ -73,7 +73,7 @@ const VAZIA: ResultadoDaRodada = {
 };
 
 /** Teto de números atendidos por rodada — a rodada é de um minuto, não de um dia. */
-const NUMEROS_POR_RODADA = 10;
+export const NUMEROS_POR_RODADA = 10;
 
 /** Teto de agendadas promovidas por rodada: a sobra vira `running` no minuto seguinte. */
 const PROMOVIDAS_POR_RODADA = 100;
@@ -158,7 +158,11 @@ export async function rodarUmaRodadaDeCampanha(
     // Um número, uma mensagem por rodada. A campanha mais antiga do número ganha
     // a vez: sem isso, a última criada poderia monopolizar a fila para sempre.
     if (principaisOcupados.has(campanha.channel_session_id)) continue;
-    if (new Set([...principaisOcupados, ...numerosQueFalaram]).size >= NUMEROS_POR_RODADA) break;
+    // O teto conta os principais, não a união com `numerosQueFalaram`: toda
+    // campanha que fala ocupa o principal dela (e eles são distintos), então
+    // |numerosQueFalaram| <= |principaisOcupados|. A união contava 2 por campanha
+    // que sai pelo vinculado e matava de fome a 6ª em diante.
+    if (principaisOcupados.size >= NUMEROS_POR_RODADA) break;
 
     try {
       const r = await rodarUmaCampanha(admin, campanha, agora, numerosQueFalaram);

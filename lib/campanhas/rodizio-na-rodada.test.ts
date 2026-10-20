@@ -43,7 +43,7 @@ vi.mock("@/app/api/v1/messages/_handler", () => ({
   },
 }));
 
-import { rodarUmaRodadaDeCampanha } from "@/lib/campanhas/rodada";
+import { NUMEROS_POR_RODADA, rodarUmaRodadaDeCampanha } from "@/lib/campanhas/rodada";
 
 type Linha = Record<string, unknown>;
 
@@ -256,4 +256,79 @@ describe("rodada: o número que falou por uma campanha é o PRINCIPAL de outra",
     ]);
     expect(mundo.ledger.get("V")).toHaveLength(3);
   });
+});
+
+describe("rodada: o teto de números por rodada conta campanhas, não a união com os vinculados", () => {
+  /**
+   * O caso do cético da rodada 2. Cada campanha N tem principal pN e vinculado
+   * próprio vN, e sai pelo vN. Contar o teto pela UNIÃO de principais ocupados e
+   * números que falaram soma 2 por campanha: na 6ª o teto batia e, dali em
+   * diante, nenhuma rodada a alcançava até as mais antigas terminarem — fome que
+   * a main não tem. O teto pelos principais já limita os números que falaram:
+   * toda campanha que fala tem `ocupaONumero`, e os principais são distintos.
+   */
+  const SETE = 7;
+
+  function cenario(n: number, principal: (i: number) => Linha, vinculado: (i: number) => Linha) {
+    const ids = Array.from({ length: n }, (_, i) => i);
+    return fakeAdmin({
+      campaigns: ids.map((i) => campanha(`camp-${i}`, `p${i}`, `2026-10-20T11:00:${String(i).padStart(2, "0")}.000Z`)),
+      campaign_recipients: ids.flatMap((i) =>
+        [0, 1, 2].map((k) => pendente(`r-${i}-${k}`, `camp-${i}`, `c${i}x${k}`)),
+      ),
+      campaign_channel_sessions: ids.map((i) => ({
+        organization_id: "org-1",
+        campaign_id: `camp-${i}`,
+        channel_session_id: `v${i}`,
+      })),
+      channel_sessions: ids.flatMap((i) => [principal(i), vinculado(i)]),
+    });
+  }
+
+  async function tresRodadas(admin: ReturnType<typeof fakeAdmin>) {
+    for (let rodada = 0; rodada < 3; rodada++) {
+      const antes = new Map([...mundo.ledger].map(([n, e]) => [n, e.length]));
+      await rodarUmaRodadaDeCampanha(admin, new Date(AGORA.getTime() + rodada * 60_000));
+      for (const [numero, envios] of mundo.ledger) {
+        expect(envios.length - (antes.get(numero) ?? 0), `${numero} na rodada ${rodada}`).toBeLessThanOrEqual(1);
+      }
+    }
+    return Array.from({ length: SETE }, (_, i) => mundo.envios.filter((c) => c.startsWith(`conv:c${i}x`)).length);
+  }
+
+  for (const [nome, knobs] of [
+    ["PACING_DEFAULTS", { ...PACING_DEFAULTS }],
+    ["throttle 0", { ...PACING_DEFAULTS, throttleMs: 0, jitterMaxMs: 0 }],
+  ] as const) {
+    describe(nome, () => {
+      beforeEach(() => {
+        mundo.knobs = knobs;
+      });
+
+      it("⭐ 7 campanhas com o principal fora do ar: todas mandam 3 em 3 rodadas", async () => {
+        const admin = cenario(SETE, (i) => canal(`p${i}`, "STOPPED"), (i) => canal(`v${i}`, "WORKING"));
+        expect(await tresRodadas(admin)).toEqual(Array(SETE).fill(3));
+      });
+
+      it("⭐ 7 campanhas com o principal no ar sem limite e o vinculado com limite: todas mandam 3", async () => {
+        // `escolherNumero` põe a folga nula por último: todas saem pelo vN.
+        const admin = cenario(
+          SETE,
+          (i) => canal(`p${i}`, "WORKING"),
+          (i) => ({ ...canal(`v${i}`, "WORKING"), daily_message_limit: 200 }),
+        );
+        expect(await tresRodadas(admin)).toEqual(Array(SETE).fill(3));
+        expect([...mundo.ledger.keys()].every((n) => n.startsWith("v"))).toBe(true);
+      });
+
+      it("controle do teto: com NUMEROS_POR_RODADA + 1 campanhas, a última espera a rodada", async () => {
+        const n = NUMEROS_POR_RODADA + 1;
+        const admin = cenario(n, (i) => canal(`p${i}`, "STOPPED"), (i) => canal(`v${i}`, "WORKING"));
+        const r = await rodarUmaRodadaDeCampanha(admin, AGORA);
+        expect(r.enviadas).toBe(NUMEROS_POR_RODADA);
+        expect(r.detalhe).not.toContain(`camp-${n - 1}`);
+        expect(mundo.envios.some((c) => c.startsWith(`conv:c${n - 1}x`))).toBe(false);
+      });
+    });
+  }
 });
