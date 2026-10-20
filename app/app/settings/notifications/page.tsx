@@ -3,6 +3,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { Card } from "@/components/ui/card";
 import { vapidPronto } from "@/lib/notifications/vapid";
 import { NotificationPrefsClient } from "./_client";
+import { PushProntoNesteEndereco } from "./_push-neste-endereco";
 import { TaskReminderPrefs } from "./_tarefas";
 import { SonsDosAvisos } from "./_sons";
 
@@ -58,14 +59,8 @@ export default async function NotificationsPage() {
       </header>
 
       {pushPronto ? (
-        <Card
-          data-testid="push-status-pronto"
-          className="border-amber-500/40 bg-amber-50/40 p-4 text-sm dark:bg-amber-900/10"
-        >
-          {t(
-            "Email ainda não está disponível. In-app (toast) e Push (Chrome) já funcionam para as cinco categorias, inclusive com a aba fechada.",
-          )}
-        </Card>
+        // O par é a metade do servidor; a do navegador (https) só o cliente vê.
+        <PushProntoNesteEndereco />
       ) : (
         <Card
           data-testid="push-status-faltando-chaves"

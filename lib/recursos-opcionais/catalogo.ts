@@ -333,7 +333,7 @@ const DO_SERVIDOR: RecursoOpcional[] = [
     padrao: "ligado",
     quemDecide: "dono_do_servidor",
     href: null,
-    comoLigar: "Nasce pronto pelo kit de instalação; se aparecer desligado, rode no servidor: bash hostgator-setup-kit/update.sh",
+    comoLigar: "Nasce pronto pelo kit de instalação, mas só funciona em endereço com https (em http://IP nenhum navegador entrega o aviso com o sistema fechado). Se aparecer desligado, rode no servidor: bash hostgator-setup-kit/update.sh",
     ler: peloServidor("web_push"),
   },
   {
