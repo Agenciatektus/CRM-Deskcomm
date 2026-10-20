@@ -13,7 +13,7 @@
 import { audit } from "@/lib/audit";
 import type { ChannelSendResult } from "@/lib/agent-engine/channel-adapter";
 import type { Queryable } from "@/lib/agent-engine/queue/queue";
-import { comSaida } from "@/lib/prospecting/rodape-de-saida";
+import { comSaida, temSaida } from "@/lib/prospecting/rodape-de-saida";
 
 export interface ContagemSaida {
   candidatoId: string;
@@ -80,6 +80,21 @@ export const SQL_DESFAZER_CONTAGEM = `
 `;
 
 /**
+ * A mensagem desta intenção (job, seq) já foi guardada por uma tentativa
+ * anterior: `queued` (o canal a segura e a entrega depois) ou `accepted` (já
+ * saiu). A tentativa que a guardou já contou, já reservou e já auditou; esta é
+ * reprocesso da MESMA mensagem. Params: ($1 = organization_id, $2 = job_id, $3 = seq).
+ */
+export const SQL_MENSAGEM_GUARDADA = `
+    select m.body, o.locale
+      from public.send_ledger l
+      join public.organizations o on o.id = l.organization_id
+      left join public.messages m on m.organization_id = l.organization_id and m.id = l.crm_message_id
+     where l.organization_id = $1 and l.job_id = $2 and l.seq = $3
+       and l.status in ('queued', 'accepted')
+`;
+
+/**
  * Conta este envio automático e, se for a vez, reserva a saída.
  *
  * Retorna `null` quando não há candidato em `sending`/`sent` nesta conversa
@@ -127,13 +142,19 @@ export interface OpcoesDaSaida {
   /** null/undefined = não conta (prévia, template, conversa ausente): envia o corpo como veio. */
   conversationId: string | null | undefined;
   via: "inbound_turn" | "followup";
+  /**
+   * A intenção do envio no ledger: o job e o `seq` da 1ª mensagem física. É a
+   * chave que faz a contagem valer uma vez por MENSAGEM e não por tentativa.
+   */
+  mensagem: { jobId: string; seq: number };
   avisar: (mensagem: string, contexto: Record<string, unknown>) => void;
 }
 
 /**
- * Envolve UM envio automático com a saída configurável: conta o envio e, se for
- * a vez, cola a saída no corpo; se o envio não for aceito (ou lançar), desfaz a
- * contagem; se foi aceito e levou a saída, audita `prospecting.exit_offered`.
+ * Envolve UM envio automático com a saída configurável: conta a mensagem e, se
+ * for a vez, cola a saída no corpo; se a mensagem não vai sair (ou o envio
+ * lançar), desfaz a contagem; se saiu ou ficou guardada para sair (`queued`) e
+ * levou a saída, audita `prospecting.exit_offered`.
  * Falha da contagem nunca derruba o envio: segue sem a saída.
  */
 export async function enviarComSaidaConfiguravel(
@@ -141,12 +162,27 @@ export async function enviarComSaidaConfiguravel(
   corpo: string,
   enviar: (corpo: string) => Promise<ChannelSendResult>,
 ): Promise<ChannelSendResult> {
-  const { db, organizationId, conversationId, via } = opcoes;
+  const { db, organizationId, conversationId, via, mensagem } = opcoes;
   let r: ContagemSaida | null = null;
   if (conversationId) {
     try {
-      r = await contarEnvioAutomatico(db, organizationId, conversationId);
-      if (r?.levaASaida) corpo = comSaida(corpo, r.locale);
+      const { rows: guardada } = await db.query<{ body: string | null; locale: string | null }>(
+        SQL_MENSAGEM_GUARDADA,
+        [organizationId, mensagem.jobId, mensagem.seq],
+      );
+      if (guardada[0]) {
+        // Reprocesso da mesma mensagem (o follow-up reagenda o `queued`; o turno
+        // re-roda depois de um crash): não conta de novo, e repete a decisão que
+        // está no corpo guardado — o canal transmite o corpo DESTA tentativa, e
+        // ele tem de dizer o mesmo que a tela e a contagem já dizem.
+        // ponytail: a decisão vem da 1ª mensagem física; numa resposta fatiada
+        // em bolhas o rodapé mora na última, e o reprocesso sai sem ele.
+        const { body, locale } = guardada[0];
+        if (body !== null && temSaida(body, locale)) corpo = comSaida(corpo, locale);
+      } else {
+        r = await contarEnvioAutomatico(db, organizationId, conversationId);
+        if (r?.levaASaida) corpo = comSaida(corpo, r.locale);
+      }
     } catch (erroContagem) {
       opcoes.avisar("contagem de saída automática falhou; segue sem a saída", {
         error: erroContagem instanceof Error ? erroContagem.message.slice(0, 200) : String(erroContagem),
@@ -161,13 +197,16 @@ export async function enviarComSaidaConfiguravel(
     throw erroEnvio;
   }
   if (r) {
-    // A contagem vale uma vez por ENVIO, não por tentativa: só `sent` a mantém.
-    // `queued` reagenda o job e o `send` roda de novo (applySendOutcome), e
-    // `already_sent` é o replay de um envio que já foi contado; nos dois, esta
-    // tentativa desfaz o que somou. Sem isto, a 2ª mensagem que voltou `queued`
-    // ficava com a reserva gasta: a nova tentativa contava 3, não reservava, e a
-    // mensagem saía sem a saída com a tela dizendo "Saída oferecida".
-    if (resultado.kind !== "sent") {
+    // A contagem vale uma vez por MENSAGEM que vai sair, não por tentativa.
+    // `queued` FICA: o corpo guardado, já com o rodapé, sai depois — pelo
+    // watchdog (`redriveQueued`, que transmite `messages.body` sem passar por
+    // aqui; no inbound_turn o `queued` encerra o turno) ou pela nova tentativa
+    // do mesmo job, que acha a mensagem guardada acima e não conta de novo.
+    // Desfazer no `queued` (como antes) deixava o contato recebendo o PARAR com
+    // a contagem em 1 e a reserva nula — e a mensagem seguinte o levava outra vez.
+    // Desfaz quando a mensagem NÃO vai sair (failed, blocked, unavailable) e no
+    // `already_sent`, que não transmitiu nada.
+    if (resultado.kind !== "sent" && resultado.kind !== "queued") {
       await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
     } else if (r.levaASaida) {
       void audit({

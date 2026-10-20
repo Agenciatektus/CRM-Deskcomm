@@ -29,14 +29,20 @@ describe("saída configurável ligada nos envios automáticos", () => {
       trecho.indexOf("return enviarComFotos("),
     );
     expect(trecho).toContain("preview ? null");
+    // A intenção (job, seq da 1ª mensagem física) é o que faz a contagem valer
+    // uma vez por mensagem: sem ela o reprocesso conta de novo.
+    expect(trecho).toContain("mensagem: { jobId: preview ? \"\" : liveJob().id, seq: seq + 1 }");
   });
 
   it("followup-turn usa enviarComSaidaConfiguravel com modelo === undefined", () => {
     const src = fonte("lib/agent-engine/agent/followup-turn.ts");
     const idx = src.indexOf("enviarComSaidaConfiguravel(");
     expect(idx).toBeGreaterThan(-1);
-    const trecho = src.slice(idx, idx + 300);
+    const trecho = src.slice(idx, idx + 900);
     expect(trecho).toContain("modelo === undefined ? conversationId : null");
+    // A MESMA intenção do `channel.send` (seq: 1): o `queued` re-tenta o job.
+    expect(trecho).toContain("mensagem: { jobId: job.id, seq: 1 }");
+    expect(trecho).toContain("jobId: job.id, jobClaim: claimOfJob(job), seq: 1,");
   });
 
   it("saida-configuravel.ts: enviarComSaidaConfiguravel chama contarEnvioAutomatico, comSaida, desfazerContagem e audita", () => {

@@ -94,8 +94,12 @@ export function rodapeDeSaida(locale?: string | null): string {
  * primeira impressão.
  */
 export function comSaida(texto: string, locale?: string | null): string {
-  const rodape = rodapeDeSaida(locale);
   const corpo = texto.trimEnd();
-  if (corpo.toLowerCase().endsWith(rodape.toLowerCase())) return corpo;
-  return `${corpo}\n\n${rodape}`;
+  if (temSaida(corpo, locale)) return corpo;
+  return `${corpo}\n\n${rodapeDeSaida(locale)}`;
+}
+
+/** O texto já termina com o rodapé deste idioma (o mesmo critério do `comSaida`). */
+export function temSaida(texto: string, locale?: string | null): boolean {
+  return texto.trimEnd().toLowerCase().endsWith(rodapeDeSaida(locale).toLowerCase());
 }

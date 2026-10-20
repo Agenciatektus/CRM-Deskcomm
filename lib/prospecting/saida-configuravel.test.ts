@@ -100,6 +100,8 @@ describe("desfazerContagem", () => {
   });
 });
 
+const MSG = { jobId: "job-1", seq: 1 };
+
 describe("enviarComSaidaConfiguravel", () => {
   beforeEach(() => {
     auditMock.mockClear();
@@ -132,7 +134,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const enviar = envioFalso(resultadoEnvio);
     const avisar = vi.fn();
     const r = await enviarComSaidaConfiguravel(
-      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", avisar },
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar },
       "Oi, tudo bem?",
       enviar,
     );
@@ -173,7 +175,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const enviar = envioFalso(resultadoEnvio);
     const avisar = vi.fn();
     const r = await enviarComSaidaConfiguravel(
-      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "followup", avisar },
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "followup", mensagem: MSG, avisar },
       "só cumprimento",
       enviar,
     );
@@ -184,38 +186,80 @@ describe("enviarComSaidaConfiguravel", () => {
     // conferir que não houve audit e o corpo saiu intacto.
   });
 
-  // Modo da 2ª: a 2ª mensagem reservou a saída e voltou `queued` (ou é o replay
-  // `already_sent`). A tentativa desfaz contagem E reserva; sem isso, a nova
-  // tentativa contaria 3, não reservaria, e sairia sem a saída.
-  it.each(["queued", "already_sent"] as const)(
-    "contou + envio %s → desfaz a contagem desta tentativa e não audita (o job reprocessa)",
-    async (kind) => {
-      const agora = "2026-10-21T14:00:00.000000Z";
-      const { query } = dbFalso({
-        "returning": [
-          {
-            candidato_id: "cand-4",
-            campanha_id: "camp-4",
-            exit_offered_at: agora,
-            leva_a_saida: true,
-            numero_da_mensagem: 2,
-            locale: "pt-BR",
-            reservada_em_texto: agora,
-          },
-        ],
-      });
-      const resultadoEnvio: ChannelSendResult = { kind, idempotencyKey: "k", messageId: "m" };
-      await enviarComSaidaConfiguravel(
-        { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", avisar: vi.fn() },
-        "texto",
-        envioFalso(resultadoEnvio),
-      );
-      const [sql, params] = query.mock.calls.at(-1)!;
-      expect(sql).toContain("greatest(automatic_sends - 1, 0)");
-      expect(params).toEqual(["org-a", "cand-4", agora]);
-      expect(auditMock).not.toHaveBeenCalled();
-    },
-  );
+  // Modo da 2ª: a 2ª mensagem reservou a saída e voltou `queued`. O corpo
+  // guardado, já com o PARAR, sai depois pelo watchdog sem passar por aqui —
+  // então a contagem, a reserva e a auditoria FICAM (prova recusada do #3091).
+  it("contou + envio queued → mantém a contagem e a reserva e audita", async () => {
+    const agora = "2026-10-21T14:00:00.000000Z";
+    const { query } = dbFalso({
+      "returning": [
+        {
+          candidato_id: "cand-4",
+          campanha_id: "camp-4",
+          exit_offered_at: agora,
+          leva_a_saida: true,
+          numero_da_mensagem: 2,
+          locale: "pt-BR",
+          reservada_em_texto: agora,
+        },
+      ],
+    });
+    const enviar = envioFalso({ kind: "queued", idempotencyKey: "k", messageId: "m" });
+    await enviarComSaidaConfiguravel(
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar: vi.fn() },
+      "texto",
+      enviar,
+    );
+    expect(enviar.mock.calls[0]?.[0]).toContain("PARAR");
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("greatest(automatic_sends - 1, 0)"))).toBe(false);
+    expect(auditMock).toHaveBeenCalledTimes(1);
+  });
+
+  // `already_sent` não transmitiu nada: se esta tentativa contou, desfaz.
+  it("contou + envio already_sent → desfaz a contagem desta tentativa e não audita", async () => {
+    const agora = "2026-10-21T14:00:00.000000Z";
+    const { query } = dbFalso({
+      "returning": [
+        {
+          candidato_id: "cand-4",
+          campanha_id: "camp-4",
+          exit_offered_at: agora,
+          leva_a_saida: true,
+          numero_da_mensagem: 2,
+          locale: "pt-BR",
+          reservada_em_texto: agora,
+        },
+      ],
+    });
+    await enviarComSaidaConfiguravel(
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar: vi.fn() },
+      "texto",
+      envioFalso({ kind: "already_sent", idempotencyKey: "k", messageId: "m" }),
+    );
+    const [sql, params] = query.mock.calls.at(-1)!;
+    expect(sql).toContain("greatest(automatic_sends - 1, 0)");
+    expect(params).toEqual(["org-a", "cand-4", agora]);
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  // Reprocesso da MESMA mensagem (job, seq) já guardada: não conta, não audita,
+  // e o corpo desta tentativa repete a decisão do corpo guardado.
+  it.each([
+    ["com", "Oi\n\nSe não quiser mais receber mensagens, responda PARAR.", true],
+    ["sem", "Oi", false],
+  ] as const)("mensagem já guardada %s o rodapé → não conta e repete a decisão", async (_, guardado, leva) => {
+    const { query } = dbFalso({ "send_ledger": [{ body: guardado, locale: "pt-BR" }] });
+    const enviar = envioFalso({ kind: "sent", idempotencyKey: "k", messageId: "m" });
+    await enviarComSaidaConfiguravel(
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "followup", mensagem: MSG, avisar: vi.fn() },
+      "Olá de novo",
+      enviar,
+    );
+    expect(String(enviar.mock.calls[0]?.[0]).includes("PARAR")).toBe(leva);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[1]).toEqual(["org-a", "job-1", 1]);
+    expect(auditMock).not.toHaveBeenCalled();
+  });
 
   it("contou + envio failed → desfazer chamado com reservadaEm", async () => {
     const agora = "2026-10-21T13:00:00.000000Z";
@@ -236,7 +280,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const enviar = envioFalso(resultadoEnvio);
     const avisar = vi.fn();
     await enviarComSaidaConfiguravel(
-      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", avisar },
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar },
       "texto",
       enviar,
     );
@@ -271,7 +315,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const avisar = vi.fn();
     await expect(
       enviarComSaidaConfiguravel(
-        { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "followup", avisar },
+        { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "followup", mensagem: MSG, avisar },
         "texto",
         enviar,
       ),
@@ -290,7 +334,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const enviar = envioFalso(resultadoEnvio);
     const avisar = vi.fn();
     const r = await enviarComSaidaConfiguravel(
-      { db: { query } as never, organizationId: "org-a", conversationId: null, via: "inbound_turn", avisar },
+      { db: { query } as never, organizationId: "org-a", conversationId: null, via: "inbound_turn", mensagem: MSG, avisar },
       "texto puro",
       enviar,
     );
@@ -308,7 +352,7 @@ describe("enviarComSaidaConfiguravel", () => {
     const enviar = envioFalso(resultadoEnvio);
     const avisar = vi.fn();
     const r = await enviarComSaidaConfiguravel(
-      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", avisar },
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar },
       "texto puro",
       enviar,
     );

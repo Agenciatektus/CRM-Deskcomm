@@ -3687,7 +3687,7 @@ async function executarTurnoDoAgente(
                 });
               };
               // Saída configurável da prospecção (fora de prévia); ver saida-configuravel.ts.
-              const saida = { db: pool, organizationId: tenantId, conversationId: preview ? null : input.conversationId, via: "inbound_turn" as const, avisar: (m: string, c: Record<string, unknown>) => runLog.warn(m, c) };
+              const saida = { db: pool, organizationId: tenantId, conversationId: preview ? null : input.conversationId, via: "inbound_turn" as const, mensagem: { jobId: preview ? "" : liveJob().id, seq: seq + 1 }, avisar: (m: string, c: Record<string, unknown>) => runLog.warn(m, c) };
               return enviarComSaidaConfiguravel(saida, finalBody, (finalBody) => {
                   corposEnviados.push(finalBody);
                   // Cada foto é uma mensagem física: só vão as que cabem no teto do turno,
