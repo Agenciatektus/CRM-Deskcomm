@@ -101,6 +101,18 @@ D="$(caso e2 $'VAPID_PRIVATE_KEY="priv"\n')"; cp "$D/.env" "$D/original"
 no_kit "$D" "" "completar_par_vapid .env" >/dev/null
 check "(e) só a privada, sem a linha da pública → também intocável" cmp -s "$D/.env" "$D/original"
 
+# `export ` na frente e espaço no começo: o leitor de .env do Compose aceita as
+# duas formas, então elas também são um par que existe.
+D="$(caso m $'export VAPID_PUBLIC_KEY=BOld\n  export VAPID_PRIVATE_KEY=old\n')"; cp "$D/.env" "$D/original"
+no_kit "$D" "" "completar_par_vapid .env" >/dev/null
+check "(m) par escrito com 'export ' e recuo → intocável (sem segundo par)" cmp -s "$D/.env" "$D/original"
+
+D="$(caso m2 $'export VAPID_PUBLIC_KEY=\n VAPID_PRIVATE_KEY=""\nX=1\n')"
+no_kit "$D" "" "completar_par_vapid .env" >/dev/null
+check "(m) vazio escrito com 'export '/recuo → par válido" par_valido "$D/.env"
+check "    e as linhas vazias antigas saem (uma linha VAPID de cada)" \
+  test "$(grep -cE 'VAPID_(PUBLIC|PRIVATE)_KEY=' "$D/.env")" -eq 2
+
 D="$(caso f $'X=1\n')"
 no_kit "$D" "" "completar_par_vapid .env" >/dev/null
 cp "$D/.env" "$D/depois-da-1a"

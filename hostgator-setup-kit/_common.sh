@@ -2507,8 +2507,11 @@ completar_par_vapid() {
   [ -f "$envfile" ] || return 0
   # Somente-leitura (montagem read-only, permissão errada): não é erro daqui.
   [ -w "$envfile" ] || return 0
-  pub="$(sed -n 's/^VAPID_PUBLIC_KEY=//p' "$envfile" 2>/dev/null | tail -1 | tr -d "\"' \t\r")"
-  priv="$(sed -n 's/^VAPID_PRIVATE_KEY=//p' "$envfile" 2>/dev/null | tail -1 | tr -d "\"' \t\r")"
+  # `export ` e recuo no começo da linha: o Compose lê as duas formas, então
+  # elas também são o par (senão o kit gravaria um segundo, e o Compose fica
+  # com o último — a troca que a D6 proíbe).
+  pub="$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?VAPID_PUBLIC_KEY=//p' "$envfile" 2>/dev/null | tail -1 | tr -d "\"' \t\r")"
+  priv="$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?VAPID_PRIVATE_KEY=//p' "$envfile" 2>/dev/null | tail -1 | tr -d "\"' \t\r")"
 
   [ -n "$pub" ] && [ -n "$priv" ] && return 0
   if [ -n "$pub$priv" ]; then
@@ -2530,7 +2533,7 @@ completar_par_vapid() {
   # chave se o processo morresse entre eles — e a regra acima se recusaria, para
   # sempre, a curar o que o próprio kit estragou.
   tmp="${envfile}.tmp.$$"
-  if ! { { grep -vE '^VAPID_(PUBLIC|PRIVATE)_KEY=' "$envfile" || true; } \
+  if ! { { grep -vE '^[[:space:]]*(export[[:space:]]+)?VAPID_(PUBLIC|PRIVATE)_KEY=' "$envfile" || true; } \
          && printf 'VAPID_PUBLIC_KEY=%s\nVAPID_PRIVATE_KEY=%s\n' "$pub" "$priv"; } > "$tmp" \
      || ! chmod 600 "$tmp" || ! mv "$tmp" "$envfile"; then
     rm -f "$tmp"
