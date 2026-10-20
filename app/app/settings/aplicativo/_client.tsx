@@ -129,6 +129,13 @@ export function AplicativoNoCelular() {
           <p className="text-muted-foreground">
             {t("No iPhone, os avisos só funcionam no app aberto pela tela de início, com iOS 16.4 ou mais novo.")}
           </p>
+          {estado === "iphone" && (
+            <p className="text-muted-foreground">
+              {t(
+                "Não achou a opção? Se o link foi aberto por outro aplicativo (como o WhatsApp), toque em Abrir no Safari e repita.",
+              )}
+            </p>
+          )}
         </Caixa>
       );
     case "android-botao":
@@ -147,6 +154,11 @@ export function AplicativoNoCelular() {
           <p>{t("No menu do navegador (⋮), toque em Instalar app ou Adicionar à tela inicial.")}</p>
           <p className="text-muted-foreground">
             {t("Depois, abra pelo ícone novo e ligue os avisos em Notificações.")}
+          </p>
+          <p className="text-muted-foreground">
+            {t(
+              "Não achou a opção? Se o link foi aberto por outro aplicativo (como o WhatsApp), toque no menu (⋮), escolha Abrir no Chrome e repita.",
+            )}
           </p>
         </Caixa>
       );

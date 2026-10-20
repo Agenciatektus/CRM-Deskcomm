@@ -16493,6 +16493,8 @@ export const DICIONARIO: Traducoes = {
   "Instalar app": { es: "Instalar app" },
   "No menu do navegador (⋮), toque em Instalar app ou Adicionar à tela inicial.": { es: "En el menú del navegador (⋮), toca Instalar app o Agregar a la pantalla principal." },
   "Depois, abra pelo ícone novo e ligue os avisos em Notificações.": { es: "Después, abre desde el ícono nuevo y activa los avisos en Notificaciones." },
+  "Não achou a opção? Se o link foi aberto por outro aplicativo (como o WhatsApp), toque em Abrir no Safari e repita.": { es: "¿No encontraste la opción? Si el enlace se abrió desde otra aplicación (como WhatsApp), toca Abrir en Safari y repite." },
+  "Não achou a opção? Se o link foi aberto por outro aplicativo (como o WhatsApp), toque no menu (⋮), escolha Abrir no Chrome e repita.": { es: "¿No encontraste la opción? Si el enlace se abrió desde otra aplicación (como WhatsApp), toca el menú (⋮), elige Abrir en Chrome y repite." },
   "Abra este endereço no celular. No computador, Chrome e Edge instalam pelo ícone na barra de endereço.": { es: "Abre esta dirección en el celular. En la computadora, Chrome y Edge instalan desde el ícono en la barra de direcciones." },
 };
 
