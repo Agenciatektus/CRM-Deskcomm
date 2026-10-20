@@ -37,4 +37,11 @@ describe("nome do app instalado acompanha a instalação em runtime", () => {
     expect(depois.start_url).toBe(antes.start_url);
     expect(depois.scope).toBe(antes.scope);
   });
+
+  it("declara cor de fundo e de tema da régua, sem media query (o manifest não aceita)", async () => {
+    marcaDaSaida.mockResolvedValue({ nome: "Central" });
+    const atual = await manifest();
+    expect(atual.background_color).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(atual.theme_color).toBe(atual.background_color);
+  });
 });
