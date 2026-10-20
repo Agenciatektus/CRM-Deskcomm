@@ -444,6 +444,80 @@ async function voltarAoRascunho(admin: SupabaseClient, id: string, codigo: strin
     .eq("status", "preparing");
 }
 
+/**
+ * EDITAR uma campanha PRONTA: devolvê-la ao rascunho para re-preparar o público.
+ *
+ * É a transição `ready → draft` que a máquina de estados prevê como "o caminho
+ * de editar" — e cujo guarda ela delega ao chamador: quem já ENVIOU não pode
+ * reescrever a mensagem que a pessoa recebeu. Esse guarda mora aqui.
+ *
+ * ⚠️ NÃO CONFUNDIR com o helper `voltarAoRascunho` acima: aquele conserta uma
+ * preparação travada (`preparing → draft`, com `failure_code`) e é interno. Este
+ * é a AÇÃO do operador, de `ready`, e invalida o snapshot de propósito.
+ */
+export async function voltarAoRascunhoAcao(
+  admin: SupabaseClient,
+  c: CampanhaCarregada,
+  _agora: Date,
+  _autorId: string,
+): Promise<Desfecho> {
+  const recusa = recusaDeTransicao(c.status, "draft");
+  if (recusa) return recusa;
+
+  // O guarda que a máquina de estados delega: já saiu mensagem desta campanha?
+  // Então refazer a lista mudaria o que já foi dito a quem recebeu. O caminho de
+  // editar o texto depois do primeiro envio é Duplicar, não reabrir.
+  if (await jaEnviou(admin, c.id)) {
+    return {
+      ok: false,
+      codigo: "campanha_ja_enviou",
+      mensagem:
+        "Esta campanha já enviou mensagens; reabri-la mudaria o texto de quem já recebeu. " +
+        "Para editar e enviar de novo, duplique-a.",
+      status: 422,
+    };
+  }
+
+  // INVALIDA O SNAPSHOT: a lista preparada deixa de valer quando a campanha volta
+  // ao rascunho, e o mesmo motor de preparação a refaz do zero no próximo
+  // Preparar. É o MESMO delete do ramo contínuo de `prepararAcao` — filtrando
+  // `organization_id` E `campaign_id`, porque o client é admin e ignora RLS, e um
+  // delete sem a organização é delete de outro tenant esperando acontecer.
+  const { error: erroDaLimpeza } = await admin
+    .from("campaign_recipients")
+    .delete()
+    .eq("organization_id", c.organization_id)
+    .eq("campaign_id", c.id);
+  if (erroDaLimpeza) {
+    // A mensagem do PostgREST NÃO vai para o recibo (doutrina do P2-3 do
+    // @Cassio_SecRev): a resposta é lida em tela e pode ecoar o valor que o banco
+    // recusou. O texto real vai para o log do servidor.
+    logger.warn("[campanha] limpeza da fila falhou ao voltar ao rascunho", {
+      campanha: c.id,
+      motivo: erroDaLimpeza.message,
+    });
+    return {
+      ok: false,
+      codigo: "campanha_fila_nao_limpa",
+      mensagem:
+        "Não foi possível limpar a lista desta campanha antes de reabri-la. " +
+        "Tente de novo; se repetir, o motivo está no log do servidor.",
+      status: 422,
+    };
+  }
+
+  // Compare-and-set: só sai de `ready`. Dois cliques simultâneos, ou um Iniciar
+  // disputando com o Editar, e só uma transição vence.
+  const { data } = await admin
+    .from("campaigns")
+    .update({ status: "draft" })
+    .eq("id", c.id)
+    .eq("status", "ready")
+    .select("id");
+  if ((data ?? []).length === 0) return conflitoDeCorrida();
+  return { ok: true };
+}
+
 export async function iniciarAcao(
   admin: SupabaseClient,
   c: CampanhaCarregada,

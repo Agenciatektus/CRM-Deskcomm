@@ -33,6 +33,7 @@ import {
   useCampanha,
   useDestinatarios,
   useEditarCampanha,
+  useVoltarAoRascunho,
   useMetricasDaCampanha,
   type AcaoDeCampanha,
   type CampanhaDetalhada,
@@ -53,6 +54,7 @@ export function DetalheDaCampanha({ id }: { id: string }) {
   const [filtroDeStatus, setFiltroDeStatus] = useState("");
   const destinatarios = useDestinatarios(id, { status: filtroDeStatus || undefined });
   const acao = useAcaoDeCampanha(id);
+  const voltarAoRascunho = useVoltarAoRascunho(id);
   const [confirmando, setConfirmando] = useState<AcaoDeCampanha | null>(null);
   const [testando, setTestando] = useState(false);
 
@@ -129,6 +131,19 @@ export function DetalheDaCampanha({ id }: { id: string }) {
             {c.status === "draft" && (
               <Button variant="outline" asChild>
                 <Link href={`/app/campaigns/${c.id}/edit`}>{t("Editar")}</Link>
+              </Button>
+            )}
+            {/* Reabrir uma campanha PRONTA para editar o público (ready → draft).
+                Só com 0 enviados: quem já recebeu não pode ter o texto reescrito —
+                o servidor recusa e orienta a Duplicar, mas aqui o botão nem aparece.
+                Ao voltar ao rascunho, o "Editar" acima (que leva à edição) assume. */}
+            {c.status === "ready" && (m?.contagem.enviados ?? 0) === 0 && (
+              <Button
+                variant="outline"
+                disabled={voltarAoRascunho.isPending}
+                onClick={() => voltarAoRascunho.mutate()}
+              >
+                {t("Editar")}
               </Button>
             )}
             {disponiveis.map((a) => (

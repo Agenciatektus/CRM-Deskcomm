@@ -336,6 +336,11 @@ export const ApiErrorCodes = {
   // "estado inválido" sem dizer qual manda o operador adivinhar.
   campanha_estado_invalido: "campanha_estado_invalido",
   campanha_nao_editavel: "campanha_nao_editavel", // 409: só rascunho aceita edição
+  // 422: tentou reabrir para edição (ready → draft) uma campanha de que JÁ saiu
+  // mensagem. Refazer a lista mudaria o texto de quem recebeu — o caminho é
+  // Duplicar. Diferente de `campanha_nao_editavel` (409): aquele é "este estado
+  // não aceita edição"; este é "já enviou, então nem reabrir resolve".
+  campanha_ja_enviou: "campanha_ja_enviou",
   campanha_preparando: "campanha_preparando", // 409: preparação em andamento
   campanha_sem_audiencia: "campanha_sem_audiencia", // 422: o recorte não achou ninguém
   // 422: achou gente, e nenhuma pode receber (todos bloqueados/sem telefone). É
