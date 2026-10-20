@@ -514,20 +514,17 @@ export function ProspectingClient() {
                   </p>
                 )}
                 {/* A grade mede o CARD, não a janela: em 1024px o card divide a tela com a
-                    lista de campanhas e 5 colunas espremiam o rótulo. Com 2 colunas, o 5º
-                    contador ocupa a linha inteira em vez de ficar órfão. */}
-                <div className="mt-5 grid grid-cols-2 gap-4 @md:grid-cols-3 @xl:grid-cols-5">
+                    lista de campanhas e 5 colunas espremiam o rótulo. 5 contadores só
+                    cabem sem órfão em 3 colunas ([3,2]) ou 5 ([5]); 2 deixa um sozinho. */}
+                <div className="mt-5 grid grid-cols-3 gap-4 @xl:grid-cols-5">
                   {[
                     [t("Encontrados"), candidates.length],
                     [t("Na fila"), count(["queued", "sending"])],
                     [t("Responderam"), count(["replied", "qualified"])],
                     [t("Pediram para parar"), candidates.filter((c) => c.is_blocked).length],
                     [t("Qualificados"), count(["qualified"])],
-                  ].map(([label, value], i, todos) => (
-                    <div
-                      key={label}
-                      className={i === todos.length - 1 ? "col-span-2 @md:col-span-1" : undefined}
-                    >
+                  ].map(([label, value]) => (
+                    <div key={label}>
                       <p className="text-2xl font-semibold tabular-nums">{value}</p>
                       <p className="text-xs text-muted-foreground">{label}</p>
                     </div>

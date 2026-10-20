@@ -9,9 +9,9 @@ import "@testing-library/jest-dom/vitest";
  * 1. O resumo ganhou um 5º contador ("Pediram para parar"). Numa grade de 2
  *    colunas o 5º fica sozinho na última linha, e numa de 5 colunas presa à
  *    JANELA (`md:`) o card — que em 1024px divide a tela com a lista de
- *    campanhas — espremia cada contador a 44px. Aqui se prova a regra das
- *    classes; a medida real (getBoundingClientRect em 390/768/1024/1440) é da
- *    prova pela tela, porque jsdom não faz layout.
+ *    campanhas — espremia cada contador a 44px. Aqui se prova a aritmética
+ *    da grade (nenhuma contagem de colunas deixa resto 1); a medida real
+ *    (getBoundingClientRect) é da prova pela tela, porque jsdom não faz layout.
  *
  * 2. A dica "A abertura já diz como parar: …" vinha do dicionário pelo idioma
  *    da INTERFACE, mas o rodapé ENVIADO usa `organizations.locale`. Interface
@@ -101,26 +101,27 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe("o resumo da campanha não deixa contador órfão nem espremido", () => {
-  it("mede o card (container), não a janela; e o último contador ocupa a linha nas 2 colunas", async () => {
+  it("mede o card (container), não a janela; e toda contagem de colunas fecha sem órfão", async () => {
     abrir("pt-BR");
-    const ultimo = (await screen.findByText("Calificados")).parentElement!;
-    const grade = ultimo.parentElement!;
+    const grade = (await screen.findByText("Calificados")).parentElement!.parentElement!;
     const contadores = Array.from(grade.children);
     expect(contadores).toHaveLength(5);
 
     // A grade responde à largura do CARD: em 1024px o card é estreito, e uma
     // regra presa à janela (md:/lg:) espremia 5 colunas nele.
     expect(grade.closest(".\\@container")).not.toBeNull();
-    expect(grade.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["grid-cols-2", "@md:grid-cols-3", "@xl:grid-cols-5"]),
-    );
     expect(grade.className).not.toMatch(/(^|\s)(md|lg):grid-cols-/);
 
-    // 5 itens em 2 colunas: o 5º ocupa as duas, em vez de ficar sozinho numa.
-    expect(ultimo.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(["col-span-2", "@md:col-span-1"]),
+    // A estrutura que garante "sem órfão": em TODA largura, N contadores em C
+    // colunas deixam N % C na última linha, e 1 é o órfão. Um contador a mais,
+    // ou voltar a 2 colunas, reprova aqui. col-span não conserta: o rótulo
+    // fica à esquerda e o órfão continua visível (medido no #3091).
+    const colunas = [...grade.className.matchAll(/(?:^|\s)(?:@?[\w-]+:)?grid-cols-(\d+)/g)].map(
+      (m) => Number(m[1]),
     );
-    for (const outro of contadores.slice(0, -1)) expect(outro.className).not.toMatch(/col-span/);
+    expect(colunas.length).toBeGreaterThan(0);
+    for (const c of colunas) expect(contadores.length % c, `${c} colunas`).not.toBe(1);
+    for (const c of contadores) expect(c.className).not.toMatch(/col-span/);
   });
 });
 
