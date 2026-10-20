@@ -48953,9 +48953,14 @@ create trigger trg_cadencia_guarda_ponteiro
 -- (`app/api/v1/ai/usage` e `app/api/v1/ai/evolution`). Sem ele, o knob de
 -- espaço viraria apagador de gráfico. O default é 120 para o dia mais antigo
 -- dessa janela nunca cair no meio da poda diária.
-create index if not exists idx_event_log_poda
+-- Desde a 9057 o índice deixa de fora as TRAVAS dos gatilhos por tempo, que a
+-- poda preserva: sem isso ela as varreria a cada rodada sem nunca apagá-las. O
+-- predicado do índice é o MESMO do `where` da função, senão o planner não o usa.
+create index if not exists idx_event_log_poda_sem_travas
   on public.event_log (created_at)
-  where status in ('done', 'dead');
+  where status in ('done', 'dead')
+    and event_type not in ('lead.silent_for', 'lead.stage_stale');
+drop index if exists public.idx_event_log_poda;
 
 -- Os índices do OUTRO lado das FKs — as duas tabelas já existem no corpo do dump,
 -- bem acima daqui, então o lugar é este.

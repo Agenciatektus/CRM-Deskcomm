@@ -28,7 +28,21 @@
 -- `carregar.ts` abre só as colunas cifradas), então removê-lo não desliga nada
 -- que funcione. Na produção hoje nenhuma org tem o campo. Idempotente.
 --
--- Idempotente: `create or replace function` + `update ... where ? 'chave'`.
+-- Idempotente: `create index if not exists` + `drop index if exists` +
+-- `create or replace function` + `update ... where ? 'chave'`.
+
+-- O índice parcial da poda passa a deixar as travas de fora: elas crescem sem
+-- teto (nunca saem) e, dentro do índice, cada rodada as varreria em vão. O
+-- predicado é o mesmo do `where` da função para o planner casar os dois. Nome
+-- NOVO porque `create index if not exists` casa por nome: redefinir com o nome
+-- antigo seria no-op onde a 9021 já rodou. `event_log` é pequena (16 mil linhas
+-- na medição de 29/09) e o `lock_timeout` impede que o DDL trave a fila.
+set local lock_timeout = '3s';
+create index if not exists idx_event_log_poda_sem_travas
+  on public.event_log (created_at)
+  where status in ('done', 'dead')
+    and event_type not in ('lead.silent_for', 'lead.stage_stale');
+drop index if exists public.idx_event_log_poda;
 
 create or replace function public.fn_podar_event_log(
   p_retencao_dias int default null,

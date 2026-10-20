@@ -236,6 +236,22 @@ describe("fn_podar_event_log — o terminal velho sai, o trabalho fica", () => {
   });
 });
 
+describe("o índice da poda deixa as travas de fora (9057)", () => {
+  it("o predicado exclui lead.silent_for/lead.stage_stale, e o índice antigo não existe mais", () => {
+    // As travas nunca saem; dentro do índice, cada rodada da poda as varreria em vão.
+    const predicado = texto(`
+      select coalesce(pg_get_expr(i.indpred, i.indrelid), '<sem indice>')
+        from pg_index i join pg_class c on c.oid = i.indexrelid
+       where c.relname = 'idx_event_log_poda_sem_travas'
+    `);
+    expect(predicado).toContain("lead.silent_for");
+    expect(predicado).toContain("lead.stage_stale");
+    expect(predicado).toContain("done");
+    // Controle: o índice velho (que inclui as travas) foi removido.
+    expect(valor(`select count(*) from pg_class where relname = 'idx_event_log_poda'`)).toBe(0);
+  });
+});
+
 describe("quem pode chamar a poda do bus", () => {
   it("não é executável por anon nem por authenticated", () => {
     // As DUAS origens de EXECUTE: o grant DIRETO do `ALTER DEFAULT PRIVILEGES
