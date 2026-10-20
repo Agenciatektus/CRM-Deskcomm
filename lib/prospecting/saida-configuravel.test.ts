@@ -293,6 +293,50 @@ describe("enviarComSaidaConfiguravel", () => {
     expect(params).toEqual(["org-a", "cand-3", agora]);
   });
 
+  // A reserva só fica se for amarrada à mensagem que leva o rodapé: sem linha
+  // amarrada (a mensagem já virou `failed`, ou o amarrar falhou), quem desfaz é
+  // esta tentativa — o gatilho do banco não teria ponteiro para seguir.
+  it.each([
+    ["a mensagem já falhou (nenhuma linha amarrada)", false],
+    ["o amarrar lança", true],
+  ] as const)("reservou + queued, mas %s → desfaz e não audita", async (_, lanca) => {
+    const agora = "2026-10-21T15:00:00.000000Z";
+    const { query } = dbFalso({
+      "exit_offer_message_id": [],
+      "returning": [
+        {
+          candidato_id: "cand-5",
+          campanha_id: "camp-5",
+          exit_offered_at: agora,
+          leva_a_saida: true,
+          numero_da_mensagem: 2,
+          locale: "pt-BR",
+          reservada_em_texto: agora,
+        },
+      ],
+    });
+    if (lanca) {
+      const original = query.getMockImplementation()!;
+      query.mockImplementation(async (sql: string, params: unknown[] = []) => {
+        if (sql.includes("exit_offer_message_id")) throw new Error("banco caiu");
+        return original(sql, params);
+      });
+    }
+    const avisar = vi.fn();
+    await enviarComSaidaConfiguravel(
+      { db: { query } as never, organizationId: "org-a", conversationId: "conv-1", via: "inbound_turn", mensagem: MSG, avisar },
+      "texto",
+      envioFalso({ kind: "queued", idempotencyKey: "k", messageId: "m" }),
+    );
+    const amarrar = query.mock.calls.find(([sql]) => String(sql).includes("exit_offer_message_id"));
+    expect(amarrar?.[1]).toEqual(["org-a", "job-1", 1, "Se não quiser mais receber mensagens, responda PARAR.", "cand-5", agora]);
+    const [sql, params] = query.mock.calls.at(-1)!;
+    expect(sql).toContain("greatest(automatic_sends - 1, 0)");
+    expect(params).toEqual(["org-a", "cand-5", agora]);
+    expect(auditMock).not.toHaveBeenCalled();
+    expect(avisar).toHaveBeenCalledTimes(lanca ? 1 : 0);
+  });
+
   it("enviar lança → desfazer chamado e o mesmo erro é relançado", async () => {
     const agora = "2026-10-21T13:00:00.000000Z";
     const { query } = dbFalso({

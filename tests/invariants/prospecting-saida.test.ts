@@ -246,6 +246,23 @@ describe("saída configurável — uma vez por mensagem, do envio à entrega (ba
       ([e]) => e.action === "prospecting.exit_offered" && e.resourceId === candidatoId,
     ).length;
 
+  /** A compensação é gravada pelo gatilho do banco, não pelo `audit()` do TS. */
+  async function compensacoes(org: string, candidatoId: string): Promise<number> {
+    const { rows } = await pool.query<{ n: number }>(
+      "select count(*)::int as n from api_audit_log where organization_id=$1 and action='prospecting.exit_offer_withdrawn' and resource_id=$2",
+      [org, candidatoId],
+    );
+    return rows[0]!.n;
+  }
+
+  async function ponteiro(org: string, candidatoId: string): Promise<string | null> {
+    const { rows } = await pool.query<{ exit_offer_message_id: string | null }>(
+      "select exit_offer_message_id from prospecting_candidates where organization_id=$1 and id=$2",
+      [org, candidatoId],
+    );
+    return rows[0]!.exit_offer_message_id;
+  }
+
   it("inbound_turn: a 2ª mensagem volta queued, o watchdog a entrega com PARAR, e a contagem fica — a 3ª não leva PARAR", async () => {
     const { org, c } = await cenario();
     const j1 = await job(org, c, "inbound_turn");
@@ -263,6 +280,7 @@ describe("saída configurável — uma vez por mensagem, do envio à entrega (ba
     expect(daSessao[0]!.text).toContain("responda PARAR");
     expect(await estado(org, c.id)).toEqual(reservada);
     expect(auditoriasDaSaida(c.id)).toBe(1);
+    expect(await compensacoes(org, c.id)).toBe(0);
 
     const j2 = await job(org, c, "inbound_turn");
     const r2 = await tentativa(org, c, j2, "sent", "Posso te mostrar como funciona?", "inbound_turn");
@@ -327,5 +345,93 @@ describe("saída configurável — uma vez por mensagem, do envio à entrega (ba
     expect(r.transmitido).toBeNull();
     expect(await estado(org, c.id)).toEqual(contada);
     expect(auditoriasDaSaida(c.id)).toBe(1);
+  });
+
+  // O inverso do defeito original, achado pelo cético: a mensagem guardada com o
+  // PARAR NÃO sai — o canal é pausado e o watchdog a falha. A reserva estava
+  // amarrada a ela, então volta, e a mensagem seguinte é a que leva a saída.
+  it("inbound_turn: queued, o canal é pausado e o watchdog falha a mensagem — a reserva volta e a seguinte leva PARAR", async () => {
+    const { org, c } = await cenario();
+    const j1 = await job(org, c, "inbound_turn");
+    await tentativa(org, c, j1, "queued", "Cetico A guardada", "inbound_turn");
+    expect((await estado(org, c.id)).automatic_sends).toBe(2);
+    expect(await ponteiro(org, c.id)).not.toBeNull();
+
+    await pool.query(
+      `update channel_sessions set metadata = coalesce(metadata,'{}'::jsonb) || '{"disabled":true}'::jsonb where organization_id=$1 and id=$2`,
+      [org, c.sessao],
+    );
+    await watchdog();
+    expect(entreguesPeloWatchdog.some((e) => e.text.startsWith("Cetico A guardada"))).toBe(false);
+    const { rows: msg } = await pool.query<{ status: string; error_code: string | null }>(
+      "select m.status, m.error_code from messages m join send_ledger l on l.organization_id=m.organization_id and l.crm_message_id=m.id where l.organization_id=$1 and l.job_id=$2",
+      [org, j1],
+    );
+    expect(msg).toEqual([{ status: "failed", error_code: "channel_disabled" }]);
+    expect(await estado(org, c.id)).toEqual({ automatic_sends: 1, exit_offered_at: null });
+    expect(await ponteiro(org, c.id)).toBeNull();
+    expect(await compensacoes(org, c.id)).toBe(1);
+
+    await pool.query(
+      `update channel_sessions set metadata = metadata - 'disabled' where organization_id=$1 and id=$2`,
+      [org, c.sessao],
+    );
+    const j2 = await job(org, c, "inbound_turn");
+    const r2 = await tentativa(org, c, j2, "sent", "Cetico A seguinte", "inbound_turn");
+    expect(r2.transmitido).toContain("responda PARAR");
+    expect((await estado(org, c.id)).automatic_sends).toBe(2);
+    expect(auditoriasDaSaida(c.id)).toBe(2);
+    expect(await compensacoes(org, c.id)).toBe(1);
+  });
+
+  it("followup_turn: queued e a nova tentativa do MESMO job volta failed — desfaz uma vez, e a seguinte (chave rotacionada) leva PARAR", async () => {
+    const { org, c } = await cenario();
+    const j = await job(org, c, "followup_turn");
+    await tentativa(org, c, j, "queued", "Cetico B", "followup");
+    expect((await estado(org, c.id)).automatic_sends).toBe(2);
+
+    const r2 = await tentativa(org, c, j, "failed", "Cetico B", "followup");
+    expect(r2.resultado.kind).toBe("failed");
+    expect(await estado(org, c.id)).toEqual({ automatic_sends: 1, exit_offered_at: null });
+    expect(await compensacoes(org, c.id)).toBe(1);
+
+    const r3 = await tentativa(org, c, j, "sent", "Cetico B", "followup");
+    expect(r3.transmitido).toContain("responda PARAR");
+    expect((await estado(org, c.id)).automatic_sends).toBe(2);
+    expect((await estado(org, c.id)).exit_offered_at).not.toBeNull();
+    expect(await compensacoes(org, c.id)).toBe(1);
+  });
+
+  it("o failed chega ANTES de a reserva ser amarrada — quem desfaz é a própria tentativa, e não audita", async () => {
+    const { org, c } = await cenario();
+    const j = await job(org, c, "inbound_turn");
+    const resultado = await enviarComSaidaConfiguravel(
+      { db: pool, organizationId: org, conversationId: c.conversa, via: "inbound_turn", mensagem: { jobId: j, seq: 1 }, avisar: () => {} },
+      "Corrida",
+      async (corpo) => {
+        const r = await sendWithLedger(
+          pgSendLedger(pool),
+          { tenantId: org, leadId: c.contato, jobId: j, seq: 1, body: corpo },
+          async (_key, messageId) => {
+            const { rows } = await pool.query<{ id: string; status: string }>(
+              `insert into messages (id, organization_id, conversation_id, channel_session_id, contact_id,
+                                     type, direction, status, body, sent_via, sent_at)
+               values ($1, $2, $3, $4, $5, 'text', 'outbound', 'queued', $6, 'ai', now())
+               returning id, status`,
+              [messageId, org, c.conversa, c.sessao, c.contato, corpo],
+            );
+            return rows[0]!;
+          },
+        );
+        if (r.kind === "blocked") return r;
+        // O watchdog falha a mensagem entre o handler devolver e a reserva ser amarrada.
+        await pool.query("update messages set status='failed' where organization_id=$1 and id=$2", [org, r.crmMessageId]);
+        return { kind: "queued", idempotencyKey: r.idempotencyKey, messageId: r.crmMessageId };
+      },
+    );
+    expect(resultado.kind).toBe("queued");
+    expect(await estado(org, c.id)).toEqual({ automatic_sends: 1, exit_offered_at: null });
+    expect(auditoriasDaSaida(c.id)).toBe(0);
+    expect(await compensacoes(org, c.id)).toBe(0);
   });
 });

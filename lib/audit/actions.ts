@@ -248,6 +248,10 @@ export const AUDIT_ACTIONS = [
   // (modo da 2ª mensagem). Sem texto, sem telefone — só os ponteiros.
   // Emitida por inbound-turn e followup-turn quando o envio é aceito.
   "prospecting.exit_offered",
+  // A compensação da anterior: a mensagem que levava a saída virou `failed`
+  // depois de aceita (watchdog, handler, webhook de status), e a reserva voltou.
+  // Gravada pelo gatilho `fn_prospeccao_saida_volta_com_a_mensagem` (0705).
+  "prospecting.exit_offer_withdrawn",
   "channel.pairing_code_requested",
   "channel.social_configured",
   "channel.social_disconnected",

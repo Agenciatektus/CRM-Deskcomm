@@ -13,7 +13,7 @@
 import { audit } from "@/lib/audit";
 import type { ChannelSendResult } from "@/lib/agent-engine/channel-adapter";
 import type { Queryable } from "@/lib/agent-engine/queue/queue";
-import { comSaida, temSaida } from "@/lib/prospecting/rodape-de-saida";
+import { comSaida, rodapeDeSaida, temSaida } from "@/lib/prospecting/rodape-de-saida";
 
 export interface ContagemSaida {
   candidatoId: string;
@@ -77,6 +77,37 @@ export const SQL_DESFAZER_CONTAGEM = `
            exit_offered_at = case when exit_offered_at = $3::timestamptz then null else exit_offered_at end,
            updated_at = now()
      where organization_id = $1 and id = $2
+`;
+
+/**
+ * Amarra a reserva à MENSAGEM que leva o rodapé (a última física deste envio
+ * cujo corpo o contém). Daí em diante quem a desfaz é o gatilho
+ * `fn_prospeccao_saida_volta_com_a_mensagem` (migration 0705), quando essa
+ * mensagem vira `failed` — pelo handler, pelo watchdog ou pelo webhook de status.
+ * O `for update` trava a linha da mensagem: um `failed` concorrente ou espera
+ * este commit (e o gatilho já acha o ponteiro), ou já está gravado (e nada é
+ * amarrado). Sem linha devolvida, a saída não saiu: quem chama desfaz.
+ * Params: ($1 = organization_id, $2 = job_id, $3 = seq da 1ª mensagem física,
+ * $4 = rodapé, $5 = candidato_id, $6 = reservadaEm).
+ */
+export const SQL_AMARRAR_RESERVA_A_MENSAGEM = `
+    with alvo as (
+      select m.id, m.status
+        from public.send_ledger l
+        join public.messages m on m.organization_id = l.organization_id and m.id = l.crm_message_id
+       where l.organization_id = $1 and l.job_id = $2 and l.seq >= $3
+         and strpos(lower(coalesce(m.body, '')), lower($4)) > 0
+       order by l.seq desc
+       limit 1
+       for update of m
+    )
+    update public.prospecting_candidates p
+       set exit_offer_message_id = alvo.id
+      from alvo
+     where p.organization_id = $1 and p.id = $5
+       and p.exit_offered_at = $6::timestamptz
+       and alvo.status <> 'failed'
+    returning p.id
 `;
 
 /**
@@ -154,7 +185,7 @@ export interface OpcoesDaSaida {
  * Envolve UM envio automático com a saída configurável: conta a mensagem e, se
  * for a vez, cola a saída no corpo; se a mensagem não vai sair (ou o envio
  * lançar), desfaz a contagem; se saiu ou ficou guardada para sair (`queued`) e
- * levou a saída, audita `prospecting.exit_offered`.
+ * levou a saída, amarra a reserva a ela e audita `prospecting.exit_offered`.
  * Falha da contagem nunca derruba o envio: segue sem a saída.
  */
 export async function enviarComSaidaConfiguravel(
@@ -198,15 +229,39 @@ export async function enviarComSaidaConfiguravel(
   }
   if (r) {
     // A contagem vale uma vez por MENSAGEM que vai sair, não por tentativa.
-    // `queued` FICA: o corpo guardado, já com o rodapé, sai depois — pelo
-    // watchdog (`redriveQueued`, que transmite `messages.body` sem passar por
-    // aqui; no inbound_turn o `queued` encerra o turno) ou pela nova tentativa
-    // do mesmo job, que acha a mensagem guardada acima e não conta de novo.
-    // Desfazer no `queued` (como antes) deixava o contato recebendo o PARAR com
-    // a contagem em 1 e a reserva nula — e a mensagem seguinte o levava outra vez.
-    // Desfaz quando a mensagem NÃO vai sair (failed, blocked, unavailable) e no
-    // `already_sent`, que não transmitiu nada.
-    if (resultado.kind !== "sent" && resultado.kind !== "queued") {
+    // Desfaz aqui quando a mensagem NÃO vai sair (failed, blocked, unavailable)
+    // e no `already_sent`, que não transmitiu nada. `sent` e `queued` ficam: o
+    // corpo guardado, já com o rodapé, sai agora ou depois — pelo watchdog
+    // (`redriveQueued`, que transmite `messages.body` sem passar por aqui) ou
+    // pela nova tentativa do mesmo job, que acha a mensagem guardada acima.
+    // Se a mensagem guardada falhar DEPOIS, quem desfaz é o gatilho do banco
+    // (ver SQL_AMARRAR_RESERVA_A_MENSAGEM): por isso a reserva é amarrada a ela,
+    // e só a reserva amarrada audita.
+    // ponytail: só a mensagem que reserva é amarrada; um `queued` que só contou
+    // (a 3ª em diante) e falha depois deixa `automatic_sends` um acima, sem
+    // efeito na saída — a reserva já existe ou, desfeita, volta na próxima.
+    let fica = resultado.kind === "sent" || resultado.kind === "queued";
+    if (fica && r.levaASaida) {
+      const { rows } = await db
+        .query(SQL_AMARRAR_RESERVA_A_MENSAGEM, [
+          organizationId,
+          mensagem.jobId,
+          mensagem.seq,
+          rodapeDeSaida(r.locale),
+          r.candidatoId,
+          r.reservadaEm,
+        ])
+        .catch((erroAmarrar: unknown) => {
+          // Reserva sem ponteiro ninguém desfaz se a mensagem falhar: o contato
+          // ficaria sem saída. Desfazer erra para o lado seguro (oferecer de novo).
+          opcoes.avisar("não foi possível amarrar a saída à mensagem; a reserva é desfeita", {
+            error: erroAmarrar instanceof Error ? erroAmarrar.message.slice(0, 200) : String(erroAmarrar),
+          });
+          return { rows: [] };
+        });
+      fica = rows.length > 0;
+    }
+    if (!fica) {
       await desfazerContagem(db, organizationId, r.candidatoId, r.reservadaEm).catch(() => {});
     } else if (r.levaASaida) {
       void audit({
