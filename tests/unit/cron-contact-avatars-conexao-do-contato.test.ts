@@ -101,8 +101,10 @@ vi.mock("@/lib/supabase/admin", () => ({
                 };
               }
               if (prop === "select") {
-                updates.push(patch);
-                return Promise.resolve({ data: linhasAfetadas, error: null });
+                return () => {
+                  updates.push(patch);
+                  return Promise.resolve({ data: linhasAfetadas, error: null });
+                };
               }
               return () => proxy;
             },
