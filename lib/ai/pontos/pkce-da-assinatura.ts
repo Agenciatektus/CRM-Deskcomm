@@ -7,6 +7,8 @@
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
+import { branding } from "@/lib/branding";
+
 export const CLIENTE_DINAMICO_SIWC = "dynamic_agent_client";
 export const RECURSO_SIWC = "https://api.openai.com/v1";
 export const ENDPOINT_DE_AUTORIZACAO = "https://auth.openai.com/api/accounts/authorize";
@@ -14,7 +16,13 @@ export const ENDPOINT_DE_TOKEN = "https://auth.openai.com/api/accounts/oauth/tok
 export const ENDPOINT_DE_JWKS = "https://auth.openai.com/.well-known/jwks.json";
 export const REDIRECT_URI_SIWC = "http://127.0.0.1:1455/auth/callback";
 export const ESCOPO_SIWC = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
-export const NOME_DO_CLIENTE_SIWC = "DeskcommCRM";
+/**
+ * Nome com que o app aparece na tela de consentimento e na lista de apps
+ * conectados da conta ChatGPT: a marca da instalação (`APP_NAME`, padrão
+ * "Verdash CRM"), não o nome do projeto de origem. A OpenAI guarda o nome no
+ * registro do cliente, no 1º login: conexão já feita só muda ao reconectar.
+ */
+export const nomeDoClienteSiwc = (): string => branding().name;
 export const CHAVE_DO_HOST_SIWC = "OPENAI_SIWC_EXT_AGENT_HOST_ID";
 
 /** O envelope inteiro continua armazenado cifrado em ai_provider_credentials. */
@@ -95,7 +103,7 @@ export function montarUrlDeAutorizacao(entrada: {
     code_challenge_method: "S256",
     state: entrada.estado,
   });
-  if (!entrada.clientId) parametros.set("agent_name_hint", NOME_DO_CLIENTE_SIWC);
+  if (!entrada.clientId) parametros.set("agent_name_hint", nomeDoClienteSiwc());
   return `${ENDPOINT_DE_AUTORIZACAO}?${parametros.toString()}`;
 }
 
