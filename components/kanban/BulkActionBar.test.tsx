@@ -58,7 +58,7 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
         selectedIds={["lead-1", "lead-2"]}
         stages={STAGES}
         pipelineId="p-1"
-        tagsExistentes={[]}
+        tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
       />,
     );
@@ -75,7 +75,7 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
         selectedIds={["lead-1", "lead-2"]}
         stages={STAGES}
         pipelineId="p-1"
-        tagsExistentes={[]}
+        tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
       />,
     );
@@ -86,7 +86,11 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
   });
 });
 
-describe("BulkActionBar — ganho e perda fora do lote (follow-up do Cassio na #180)", () => {
+// A #180 tirava ganho e perda do lote. Desde 20/10/2026 (decisão do Peterson)
+// eles TÊM ação própria no lote (perdido com motivo; ganho com confirmação e o
+// Desfazer de 5 s, medido em tests/unit/acoes-em-lote-do-funil.test.tsx), mas
+// continuam FORA do "Mover para…": fechar nunca é um item de etapa.
+describe("BulkActionBar — ganho e perda fora do Mover para (revisão da #180)", () => {
   it("Mover para… só oferece as etapas abertas", async () => {
     const user = userEvent.setup();
     render(
@@ -101,7 +105,7 @@ describe("BulkActionBar — ganho e perda fora do lote (follow-up do Cassio na #
           ] as never
         }
         pipelineId="p-1"
-        tagsExistentes={[]}
+        tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
       />,
     );
@@ -127,7 +131,7 @@ describe("BulkActionBar — F2 (#2484): perdido em lote", () => {
         selectedIds={["lead-1", "lead-2"]}
         stages={stages}
         pipelineId="p-1"
-        tagsExistentes={[]}
+        tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={onClear}
       />,
     );

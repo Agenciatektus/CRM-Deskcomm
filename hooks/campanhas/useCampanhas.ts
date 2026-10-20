@@ -205,6 +205,30 @@ export function useAcaoDeCampanha(id: string) {
   });
 }
 
+/**
+ * EDITAR uma campanha PRONTA: devolvê-la ao rascunho (ready → draft) para
+ * re-preparar o público. POST /api/v1/campaigns/:id/editar.
+ *
+ * Hook próprio, e não pela ação genérica `useAcaoDeCampanha`, porque o botão que
+ * o dispara tem um gate que as outras ações não têm (só com 0 enviados) e não
+ * entra na lista de ações baseada só no estado. Invalida as MESMAS queries que a
+ * ação genérica — o status muda, e a lista de destinatários foi descartada.
+ */
+export function useVoltarAoRascunho(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      await apiClient.post<{ data: Record<string, unknown> }>(`/api/v1/campaigns/${id}/editar`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["campanha", id] });
+      void qc.invalidateQueries({ queryKey: ["campanha-metricas", id] });
+      void qc.invalidateQueries({ queryKey: ["campanha-destinatarios", id] });
+      void qc.invalidateQueries({ queryKey: ["campanhas"] });
+    },
+    onError: (err) => showApiError(err),
+  });
+}
+
 export function usePreviaDaAudiencia() {
   return useMutation({
     mutationFn: async (corpo: {

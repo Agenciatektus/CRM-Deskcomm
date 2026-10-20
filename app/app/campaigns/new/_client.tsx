@@ -35,6 +35,7 @@ import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSes
 import { useT } from "@/hooks/i18n/useT";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import { ritmoDaCampanhaNova } from "@/lib/campanhas/ritmo-recomendado";
+import { minutosParaSegundos, segundosParaMinutos } from "@/lib/campanhas/unidades";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import {
   useAgentesPublicados,
@@ -129,7 +130,7 @@ export function NovaCampanha() {
     // falha de rede devolveria ao operador exatamente o problema que o preset
     // existe para resolver.
     const r = ritmoDaCampanhaNova(padroes.data?.configuracao);
-    setIntervalo(comoTexto(r.intervaloSegundos));
+    setIntervalo(comoTexto(segundosParaMinutos(r.intervaloSegundos)));
     setJanelaInicio(comoTexto(r.janelaInicioHora));
     setJanelaFim(comoTexto(r.janelaFimHora));
     setTetoDiario(comoTexto(r.tetoDiario));
@@ -147,7 +148,7 @@ export function NovaCampanha() {
   ]);
 
   const ritmoEscolhido = {
-    intervaloSegundos: comoNumero(intervalo),
+    intervaloSegundos: minutosParaSegundos(comoNumero(intervalo)),
     janelaInicioHora: comoNumero(janelaInicio),
     janelaFimHora: comoNumero(janelaFim),
     tetoDiario: comoNumero(tetoDiario),
@@ -584,7 +585,7 @@ export function NovaCampanha() {
         <AvisoDeRitmo ritmo={ritmoEscolhido} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="intervalo">{t("Intervalo mínimo entre mensagens (segundos)")}</Label>
+            <Label htmlFor="intervalo">{t("Intervalo mínimo entre disparos (minutos)")}</Label>
             <Input
               id="intervalo"
               type="number"
@@ -592,6 +593,9 @@ export function NovaCampanha() {
               value={intervalo}
               onChange={(e) => setIntervalo(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              {t("Tempo de espera entre um envio e o próximo contato da lista. Não é o intervalo dentro de uma conversa.")}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="teto">{t("Máximo por dia")}</Label>

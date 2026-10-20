@@ -970,6 +970,10 @@ export const AUDIT_ACTIONS = [
   "campaign.resumed",
   "campaign.cancelled",
   "campaign.duplicated",
+  // Reabriu uma campanha PRONTA para edição (ready → draft). Audita como as
+  // demais mudanças de estado: a lista preparada é descartada, e "quem reabriu
+  // isso, e quando?" precisa de resposta.
+  "campaign.reverted_to_draft",
   // Rodada do cron que MEXEU em alguma campanha (enviou, pulou, concluiu,
   // promoveu agendada). Rodada vazia não audita — o critério do `CLAUDE.md`.
   "cron.campaign_worker",

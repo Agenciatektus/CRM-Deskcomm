@@ -57,6 +57,8 @@ vi.mock("@/components/kanban/barra/CabecalhoDoFunil", () => ({ CabecalhoDoFunil:
 // O Desfazer do lote segura a chamada por 5 s; aqui a ação roda na hora.
 vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
   adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void executar(),
+  useAcaoPendente: () => false,
+  acaoPendente: () => false,
 }));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**
@@ -76,7 +78,7 @@ function renderBarra() {
       selectedIds={["l-1", "l-2"]}
       stages={[]}
       pipelineId="p-1"
-      tagsExistentes={["google", "indicação", "vip"]}
+      tagsExistentes={["google", "indicação", "vip"]} leads={[]} funis={[]} ownerNames={new Map()}
       onClear={vi.fn()}
     />,
   );

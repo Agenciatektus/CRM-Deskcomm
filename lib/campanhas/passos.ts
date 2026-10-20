@@ -145,12 +145,19 @@ export function problemaNosPassos(
       return `Passo ${n}: escreva a etiqueta.`;
     }
   }
-  // Régua que começa movendo de etapa, etiquetando ou esperando é legítima — o
-  // operador pode querer marcar quem recebeu a abordagem antes de insistir.
-  // O que não é legítimo é régua SEM nenhuma mensagem: ela não fala com
-  // ninguém, e o teto de inscrições do dia seria gasto para nada.
-  if (!passos.some((p) => p.tipo === "mensagem")) {
-    return "A régua precisa de pelo menos uma mensagem. Os outros passos não falam com ninguém.";
+  // A régua precisa FAZER algo com quem entra nela: mandar mensagem, etiquetar
+  // ou mover de etapa. Só espera não age sobre ninguém.
+  //
+  // Etiquetar/mover SEM nenhuma mensagem é um uso legítimo (decisão do dono,
+  // 20/10/2026): marcar no funil quem recebeu o disparo, sem um 2º toque
+  // automático. Quem conduz a conversa a partir da resposta é o agente BDR, e um
+  // 2º envio pode até atrapalhar (ele precisa diferenciar resposta de autoreply).
+  // O motor já suporta: a lista positiva de `validarReguaDeProspeccao` aceita os
+  // passos `tag`/`move_stage`, e numa campanha a inscrição é 1:1 com a 1ª
+  // mensagem que JÁ saiu, então não há fila nem cota gasta à toa (ao contrário da
+  // cadência, onde a inscrição precede o envio).
+  if (!passos.some((p) => p.tipo === "mensagem" || p.tipo === "etiqueta" || p.tipo === "mover_etapa")) {
+    return "A régua precisa de pelo menos um passo que faça algo: mensagem, etiqueta ou mover de etapa. Só espera não age sobre ninguém.";
   }
   return null;
 }

@@ -15,6 +15,8 @@ const mutate = vi.hoisted(() =>
 vi.mock("@/hooks/kanban/useBulkAction", () => ({ useBulkAction: () => ({ mutate, isPending: false }) }));
 vi.mock("@/lib/ui/aviso-com-desfazer", () => ({
   adiarAcao: (_m: unknown, _r: unknown, executar: () => Promise<unknown>) => void executar(),
+  useAcaoPendente: () => false,
+  acaoPendente: () => false,
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
@@ -29,7 +31,7 @@ describe("revisão do Cassio na #201 (P2)", () => {
   it("lote acima de 50 vai em blocos de 50, em sequência, e só então limpa a seleção", async () => {
     const ids = Array.from({ length: 120 }, (_, i) => `l${i}`);
     const onClear = vi.fn();
-    render(<BulkActionBar selectedIds={ids} stages={[{ id: "s1", name: "Novo" }] as never} pipelineId="p" tagsExistentes={[]} onClear={onClear} />);
+    render(<BulkActionBar selectedIds={ids} stages={[{ id: "s1", name: "Novo" }] as never} pipelineId="p" tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()} onClear={onClear} />);
     await userEvent.click(screen.getByRole("button", { name: "Mover para…" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Novo" }));
     await waitFor(() => expect(onClear).toHaveBeenCalled());

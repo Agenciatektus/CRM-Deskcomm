@@ -31,6 +31,7 @@ import {
   pausarAcao,
   prepararAcao,
   testarAcao,
+  voltarAoRascunhoAcao,
   type Desfecho,
 } from "@/lib/campanhas/acoes";
 import { agendarSchema, testarSchema } from "@/lib/campanhas/schemas";
@@ -49,6 +50,7 @@ const ACOES = [
   "retomar",
   "cancelar",
   "duplicar",
+  "editar",
   "testar",
 ] as const;
 
@@ -126,6 +128,11 @@ export async function POST(
     case "duplicar": {
       desfecho = await duplicarAcao(admin, campanha, authz.user.id);
       acaoAuditada = "campaign.duplicated";
+      break;
+    }
+    case "editar": {
+      desfecho = await voltarAoRascunhoAcao(admin, campanha, agora, authz.user.id);
+      acaoAuditada = "campaign.reverted_to_draft";
       break;
     }
     case "testar": {

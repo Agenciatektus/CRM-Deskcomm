@@ -27,11 +27,14 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
+import { useLoteOcupado } from "@/hooks/kanban/useAcaoPorNegocio";
 import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
 import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
 import type { PipelineVocabulary, Stage } from "@/lib/kanban/types";
+import type { Lead } from "@/lib/types/leads";
 import { LoseLeadDialog } from "./LoseLeadDialog";
+import { MaisAcoesDoLote } from "./lote/MaisAcoesDoLote";
 
 /** O teto da rota em lote por chamada (`lead_ids` máx. 50). */
 export const LOTE_MAXIMO = 50;
@@ -56,6 +59,15 @@ interface BulkActionBarProps {
    * a fiação esquecida que ninguém vê.
    */
   tagsExistentes: string[];
+  /**
+   * O recorte NA TELA, na ordem que a pessoa vê: status (reabrir, ganho), dono
+   * (tarefa), etiquetas (remover) e o CSV saem daqui. Obrigatória pelo mesmo
+   * motivo de `tagsExistentes`: sem a fiação, as ações sumiriam caladas.
+   */
+  leads: Lead[];
+  /** Os funis da organização, para "Levar para outro funil". */
+  funis: Array<{ id: string; name: string }>;
+  ownerNames: Map<string, string | null>;
   onClear: () => void;
 }
 
@@ -65,6 +77,9 @@ export function BulkActionBar({
   pipelineId,
   vocabulary,
   tagsExistentes,
+  leads,
+  funis,
+  ownerNames,
   onClear,
 }: BulkActionBarProps) {
   const t = useT();
@@ -72,6 +87,10 @@ export function BulkActionBar({
   const activeOrg = useActiveOrg();
   const vocab = resolveVocabulary(vocabulary);
   const bulk = useBulkAction(pipelineId);
+  // A barra trava também nos 5 s e na execução das ações negócio a negócio
+  // (P2 do Cassio na #220), não só na rota em lote.
+  const loteOcupado = useLoteOcupado(pipelineId);
+  const ocupado = bulk.isPending || loteOcupado;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loseOpen, setLoseOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -126,6 +145,11 @@ export function BulkActionBar({
   }, [selectedIds.length, onClear]);
 
   if (selectedIds.length === 0) return null;
+
+  const marcados = new Set(selectedIds);
+  const tagsDosSelecionados = [
+    ...new Set(leads.filter((l) => marcados.has(l.id)).flatMap((l) => l.tags ?? [])),
+  ].sort();
 
   // O substantivo do funil só entra no SINGULAR. Plural de palavra livre é
   // heurística que erra ("Negociação" → "Negociaçãos"), e a contagem já diz
@@ -208,6 +232,18 @@ export function BulkActionBar({
     comDesfazer(t("Etiquetando os selecionados"), { action: "tag", lead_ids: selectedIds, params: { add: [tag] } });
   };
 
+  // O par do "Adicionar": a mesma ação `tag` da rota, com `remove`.
+  const runTagRemove = (tag: string) => {
+    comDesfazer(t("Removendo a etiqueta dos selecionados"), { action: "tag", lead_ids: selectedIds, params: { remove: [tag] } });
+  };
+
+  // Reabrir em lote = o reabrir individual: mover o encerrado para uma etapa
+  // aberta (a `move` da rota, que recusa o funil `novo_negocio` e cobra os
+  // campos da etapa). Nenhuma conversão sai: só ganhar emite `lead.won`.
+  const runReabrir = (ids: string[], stageId: string) => {
+    comDesfazer(t("Reabrindo os selecionados"), { action: "move", lead_ids: ids, params: { stage_id: stageId } });
+  };
+
   const runDelete = () => {
     void emBlocos({ action: "delete", lead_ids: selectedIds, params: {} } as BulkLeadActionInput)
       .then(() => {
@@ -257,16 +293,19 @@ export function BulkActionBar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" disabled={bulk.isPending}>
+            <Button size="sm" variant="outline" disabled={ocupado}>
               {t("Mover para…")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuLabel>{t("Etapa")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {/* Ganho e perda NÃO entram no lote (follow-up do Cassio na #180): fechar
-                negócio emite `lead.won`/`lead.lost` com efeito fora do CRM, e
-                tem ação própria, um a um, com Desfazer (card, painel, menu). */}
+            {/* Ganho e perda NÃO entram no "Mover para" (follow-up do Cassio na
+                #180): fechar negócio emite `lead.won`/`lead.lost` com efeito
+                fora do CRM. Desde 20/10/2026 (decisão do Peterson) os dois têm
+                ação PRÓPRIA no lote: "Marcar como perdido…" (com motivo) e
+                "Marcar como ganho…" em "Mais ações" (com confirmação e o
+                Desfazer de 5 s do ganho individual), nunca um item de etapa. */}
             {stages.filter((s) => !s.is_won && !s.is_lost).map((s) => (
               <DropdownMenuItem key={s.id} onClick={() => runMove(s.id)}>
                 {s.name}
@@ -282,7 +321,7 @@ export function BulkActionBar({
         {podeAtribuir && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" disabled={bulk.isPending}>
+              <Button size="sm" variant="outline" disabled={ocupado}>
                 {t("Responsável…")}
               </Button>
             </DropdownMenuTrigger>
@@ -305,7 +344,7 @@ export function BulkActionBar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" disabled={bulk.isPending}>
+            <Button size="sm" variant="outline" disabled={ocupado}>
               Tag…
             </Button>
           </DropdownMenuTrigger>
@@ -360,17 +399,42 @@ export function BulkActionBar({
                   {tag}
                 </DropdownMenuItem>
               ))}
+            {tagsDosSelecionados.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>{t("Remover etiqueta")}</DropdownMenuLabel>
+                {tagsDosSelecionados.slice(0, 10).map((tag) => (
+                  <DropdownMenuItem key={`remover-${tag}`} onClick={() => runTagRemove(tag)}>
+                    <PontoDaEtiqueta tag={tag} className="mr-2" />
+                    {tag}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
         <InscreverNaCadencia pipelineId={pipelineId} leadIds={selectedIds} onConcluido={onClear} />
+
+        <MaisAcoesDoLote
+          selectedIds={selectedIds}
+          leads={leads}
+          stages={stages}
+          funis={funis}
+          pipelineId={pipelineId}
+          ownerNames={ownerNames}
+          usuarioId={user.id}
+          ocupado={ocupado}
+          onReabrir={runReabrir}
+          onClear={onClear}
+        />
 
         {etapaDePerda && (
           <Button
             size="sm"
             variant="outline"
             onClick={() => setLoseOpen(true)}
-            disabled={bulk.isPending}
+            disabled={ocupado}
           >
             {t("Marcar como perdido…")}
           </Button>
@@ -380,7 +444,7 @@ export function BulkActionBar({
           size="sm"
           variant="destructive"
           onClick={() => setConfirmDelete(true)}
-          disabled={bulk.isPending}
+          disabled={ocupado}
         >
           {t("Excluir")}
         </Button>
@@ -409,7 +473,7 @@ export function BulkActionBar({
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
               {t("Cancelar")}
             </Button>
-            <Button variant="destructive" onClick={runDelete} disabled={bulk.isPending}>
+            <Button variant="destructive" onClick={runDelete} disabled={ocupado}>
               {t("Excluir")}
             </Button>
           </DialogFooter>
