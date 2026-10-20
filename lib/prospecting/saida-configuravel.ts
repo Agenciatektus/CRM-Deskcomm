@@ -251,7 +251,7 @@ export async function enviarComSaidaConfiguravel(
     // ingestão segue bloqueando. Melhora: contar, gravar a mensagem e amarrar na
     // MESMA transação do sink (o ledger já é a chave), ou um varredor que solte
     // reserva sem ponteiro mais velha que o `recover-stuck`.
-    // ponytail: `handleAck` (lib/waha/ingest.ts) sobrescreve o status sem guarda;
+    // ponytail: o tratamento de ack da ingestão do canal (`handleAck`) sobrescreve o status sem guarda;
     // um `failed` que desfez a reserva e depois recebe ack tardio (failed→sent)
     // faz o PARAR sair duas vezes. Erra para o lado seguro. Melhora: o gatilho
     // re-amarrar quando `failed` volta a `sent`, ou o ack não sair de `failed`.
