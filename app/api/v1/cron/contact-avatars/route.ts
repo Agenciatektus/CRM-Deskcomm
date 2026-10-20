@@ -29,9 +29,18 @@
  * devolvia foto para eles quando perguntado direto. Agora, para cada contato, lê
  * a conversa mais recente dele, pega a sessão dessa conversa (só se `WORKING`
  * e não arquivada), resolve o `sessionRef` dessa sessão e pede a foto ao adapter
- * dela. Sem sessão válida, sem `sessionRef` ou adapter sem
- * `fetchProfilePictureUrl` → carimba sem foto. Nunca cai para "qualquer outra
- * conexão da empresa": esse é exatamente o defeito que fecha.
+ * dela. Conversa cuja sessão está parada, arquivada, sem `sessionRef` ou com
+ * adapter sem `fetchProfilePictureUrl` → carimba sem foto, sem tentar outra.
+ *
+ * A regra é: conversa do contato; sem conversa nenhuma, a conexão de mensagem
+ * da empresa que sabe buscar foto. O contato SEM conversa é comum (POST
+ * /contacts, importação de contatos e de leads, webhook de entrada, importação
+ * B2B, a linha de voz) e não tem conversa para indicar a conexão. Para ele, e só
+ * para ele, a rota lista as conexões de mensagem `WORKING` da empresa, em ordem
+ * de criação, e fica com a primeira que sabe buscar foto. Quem descarta a social
+ * é essa checagem de capacidade (`fetchProfilePictureUrl` presente), não o
+ * `sessionRef`, que na social existe. O defeito antigo era pegar UMA conexão
+ * qualquer, sem ordem e sem perguntar se ela busca foto.
  *
  * Auth: Bearer INTERNAL_SECRET (fail-closed), igual aos demais crons.
  */
@@ -49,6 +58,7 @@ import {
 } from "@/lib/channels";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +100,16 @@ function chatIdDoContato(c: ContactRow): string | null {
   return null;
 }
 
+type SessaoComEstado = ChannelSessionRef & { status: string | null; archived_at: string | null };
+
+/** Esta conexão sabe buscar foto? Pergunta pela capacidade, sem nomear canal. */
+function sabeBuscarFoto(s: ChannelSessionRef): boolean {
+  return (
+    Boolean(resolveSessionRef(s)) &&
+    Boolean(getAdapter((s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider).fetchProfilePictureUrl)
+  );
+}
+
 async function handle(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
@@ -122,6 +142,9 @@ async function handle(req: NextRequest): Promise<Response> {
   }
 
   const rows = (contatos ?? []) as ContactRow[];
+  // ponytail: cache por rodada; 25 contatos no máximo
+  // Guarda também o "nenhuma sessão serve" (null), para não repetir a consulta.
+  const sessaoDaEmpresa = new Map<string, SessaoComEstado | null>();
   let atualizados = 0;
   let semFoto = 0;
   let falhas = 0;
@@ -171,10 +194,30 @@ async function handle(req: NextRequest): Promise<Response> {
         .limit(1)
         .maybeSingle();
 
-      const sessaoDaConversa = (conversa as { channel_sessions?: unknown } | null)?.channel_sessions as
-        | (ChannelSessionRef & { status: string | null; archived_at: string | null })
-        | null
-        | undefined;
+      let sessaoDaConversa: SessaoComEstado | null | undefined;
+      if (conversa === null) {
+        // Contato SEM conversa nenhuma: não há conversa para indicar a conexão.
+        if (!sessaoDaEmpresa.has(c.organization_id)) {
+          const { data: sessoes } = await admin
+            .from("channel_sessions")
+            .select(`${CHANNEL_SESSION_REF_COLUMNS}, status, archived_at`)
+            .eq("organization_id", c.organization_id)
+            .eq("status", "WORKING")
+            .is("archived_at", null)
+            .in("provider", [...PROVIDERS_DE_MENSAGEM])
+            .order("created_at", { ascending: true });
+          sessaoDaEmpresa.set(
+            c.organization_id,
+            ((sessoes ?? []) as unknown as SessaoComEstado[]).find(sabeBuscarFoto) ?? null,
+          );
+        }
+        sessaoDaConversa = sessaoDaEmpresa.get(c.organization_id);
+      } else {
+        sessaoDaConversa = (conversa as { channel_sessions?: unknown }).channel_sessions as
+          | SessaoComEstado
+          | null
+          | undefined;
+      }
 
       const s =
         sessaoDaConversa && !sessaoDaConversa.archived_at && sessaoDaConversa.status === "WORKING"
@@ -184,8 +227,8 @@ async function handle(req: NextRequest): Promise<Response> {
       const adapter = s ? getAdapter((s.provider ?? DEFAULT_CHANNEL_PROVIDER) as ChannelProvider) : null;
       if (!s || !sessionRef || !adapter?.fetchProfilePictureUrl) {
         // Sem sessão válida, sem `sessionRef` ou adapter sem `fetchProfilePictureUrl`
-        // → "sem canal". Nunca cai para qualquer outra conexão da empresa: esse
-        // é exatamente o defeito que fecha.
+        // → "sem canal". Quem TEM conversa não cai para outra conexão; só o
+        // contato sem conversa nenhuma usa a conexão da empresa (acima).
         await carimbar(null);
         semFoto++;
         continue;

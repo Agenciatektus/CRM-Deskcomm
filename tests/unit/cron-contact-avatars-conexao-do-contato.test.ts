@@ -11,7 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Este arquivo prova que a foto agora vem da conexão da conversa do contato:
  * lê a conversa mais recente dele, usa a sessão dessa conversa (só se WORKING
  * e não arquivada), resolve o `sessionRef` dela e pede a foto ao adapter dela.
- * Nunca cai para qualquer outra conexão da empresa.
+ * Quem tem conversa nunca cai para outra conexão da empresa. Só o contato SEM
+ * conversa nenhuma usa a conexão de mensagem da empresa que sabe buscar foto.
  */
 
 const CONTATO = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -70,10 +71,9 @@ vi.mock("@/lib/supabase/admin", () => ({
         } else if (tabela === "conversations") {
           dados = conversaDoContato;
         } else {
-          // Linha que a VERSÃO ANTIGA do código consultaria em channel_sessions:
-          // WORKING mas SEM ref — a social. Se a rota antiga estivesse no lugar,
-          // este caso b falharia.
-          dados = { waha_session_name: null, provider: "zernio_social" };
+          // As conexões de mensagem da empresa. Por padrão, só a social: tem
+          // ref, mas o adapter dela não busca foto.
+          dados = sessoesDaEmpresa;
         }
         const proxy: Record<string, unknown> = new Proxy(
           {},
@@ -123,11 +123,19 @@ import { POST } from "@/app/api/v1/cron/contact-avatars/route";
 
 let linhaDoContato: Record<string, unknown> = {};
 let conversaDoContato: unknown = null;
+const SOCIAL = {
+  provider: "zernio_social",
+  zernio_account_id: "conta-social-da-empresa",
+  status: "WORKING",
+  archived_at: null,
+};
+let sessoesDaEmpresa: unknown[] = [SOCIAL];
 
 beforeEach(() => {
   pedidos.length = 0;
   updates.length = 0;
   linhasAfetadas = [{ id: CONTATO }];
+  sessoesDaEmpresa = [SOCIAL];
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })),
@@ -256,7 +264,31 @@ describe("cron de fotos: a foto vem da conexão da conversa do contato", () => {
     expect(gravouCaminho()).toBe(false);
   });
 
-  it("d) contato sem conversa nenhuma → não chama o canal, carimba sem foto", async () => {
+  it("d1) contato sem conversa e empresa com conexão de mensagem que busca foto → pede pela conexão da empresa", async () => {
+    linhaDoContato = {
+      id: CONTATO,
+      organization_id: ORG,
+      wa_identity: "phone:+5511999990000",
+      wa_lid: null,
+      phone_number: "+5511999990000",
+      avatar_storage_path: null,
+    };
+    conversaDoContato = null;
+    // A social vem primeiro na ordem: a escolha tem de pular ela pela capacidade.
+    sessoesDaEmpresa = [
+      SOCIAL,
+      { provider: "waha", waha_session_name: "sessao-da-empresa", status: "WORKING", archived_at: null },
+    ];
+
+    await chamar();
+
+    expect(pedidos).toEqual([
+      { organizationId: ORG, sessionRef: "sessao-da-empresa", recipient: "5511999990000@c.us" },
+    ]);
+    expect(gravouCaminho()).toBe(true);
+  });
+
+  it("d2) contato sem conversa e empresa só com a conexão social → não chama o canal, carimba sem foto", async () => {
     linhaDoContato = {
       id: CONTATO,
       organization_id: ORG,
