@@ -2,6 +2,7 @@ import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/disp
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { canalDoEventoDesativado } from "@/lib/channels/desativado";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { NOTIFY_KINDS } from "./kinds";
 import { montarPayloadDeInbound, truncar } from "./push_payload";
 import { enviarPushAoUsuario, enviarPushAQuemVeAConversa, enviarPushDaOrg } from "./web_push";
 import { carregarDestinatariosDaMensagem, type DestinatariosDaMensagem } from "./destinatarios-da-mensagem";
@@ -152,7 +153,7 @@ async function handleGroupInbound(row: EventRow): Promise<HandlerResult> {
   const payload: PushPayload = {
     title: "Nova mensagem no grupo",
     body: truncar(body),
-    tag: `msg:${conversationId}`,
+    tag: `${NOTIFY_KINDS.message_inbound.tagPrefix}:${conversationId}`,
     href: `/app/inbox?id=${conversationId}`,
   };
   const { sent } = await enviarPushAQuemVeAConversa(row.organization_id, conversationId, payload);
@@ -254,7 +255,7 @@ export const webPushInboundHandler: EventHandler = {
         {
           title: "Você foi mencionado",
           body: truncar(preview),
-          tag: `mention:${conversationId}`,
+          tag: `${NOTIFY_KINDS.mention.tagPrefix}:${conversationId}`,
           href: `/app/inbox/${conversationId}`,
         },
         [toUserId],
@@ -276,7 +277,7 @@ export const webPushInboundHandler: EventHandler = {
       return enviarParaUsuario(row.organization_id, toUserId, {
         title: "Lead atribuído a você",
         body: truncar(lead.title),
-        tag: `lead-assigned:${leadId}`,
+        tag: `${NOTIFY_KINDS.lead_assigned.tagPrefix}:${leadId}`,
         href,
       });
     }
@@ -284,14 +285,14 @@ export const webPushInboundHandler: EventHandler = {
       return enviarParaUsuario(row.organization_id, lead.ownerUserId, {
         title: "Lead ganho",
         body: truncar(lead.title),
-        tag: `lead-won:${leadId}`,
+        tag: `${NOTIFY_KINDS.lead_won.tagPrefix}:${leadId}`,
         href,
       });
     }
     return enviarParaUsuario(row.organization_id, lead.ownerUserId, {
       title: "Lead perdido",
       body: truncar(lead.title),
-      tag: `lead-lost:${leadId}`,
+      tag: `${NOTIFY_KINDS.lead_lost.tagPrefix}:${leadId}`,
       href,
     });
   },

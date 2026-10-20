@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { NOTIFY_KINDS } from "./kinds";
+
 export const PUSH_PAYLOAD_MAX = 140;
 
 export const pushPayloadSchema = z.object({
@@ -22,7 +24,8 @@ export function montarPayloadDeInbound(input: {
   const title = input.contactName?.trim() || "Nova mensagem";
   void input.brand;
   const body = truncar(input.preview);
-  const tag = input.conversationId ? `msg:${input.conversationId}` : "msg";
+  const prefixo = NOTIFY_KINDS.message_inbound.tagPrefix;
+  const tag = input.conversationId ? `${prefixo}:${input.conversationId}` : prefixo;
   const href = input.conversationId ? `/app/inbox?id=${input.conversationId}` : "/app/inbox";
   const icon = input.icon?.trim() || undefined;
   return { title, body, tag, href, icon };
