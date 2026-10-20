@@ -42,9 +42,18 @@ import { TABELA_EMPILHADA } from "@/components/pagina";
  */
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,8 +61,7 @@ import { Label } from "@/components/ui/label";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { invalidarCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 import { Escolha } from "@/components/ui/escolha";
-import { cn } from "@/lib/utils";
-import { PALETA_DE_ETIQUETAS, NOME_DO_TOM, normalizarCorDeEtiqueta } from "@/lib/tags/cor-da-etiqueta";
+import { normalizarCorDeEtiqueta } from "@/lib/tags/cor-da-etiqueta";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { AcaoDeVocabulario, InventarioDeTags, LinhaDeVocabulario } from "@/lib/schemas/tags";
@@ -61,6 +69,7 @@ import type { AcaoDeVocabulario, InventarioDeTags, LinhaDeVocabulario } from "@/
 // O comportamento mora em `_sugestoes.tsx` (arquivo do fork); aqui ficam só a
 // coluna, o bloco de acrescentar e a trava da etiqueta `cliente`.
 import { AcrescentarEtiqueta, BotoesDeSugestao, unirComSugestoes } from "./_sugestoes";
+import { BarraDeEtiquetasEmLote, ERRO_EM_PORTUGUES, FileiraDeTons } from "./_lote";
 
 /**
  * O TETO DA LISTA, e por que ele é declarado aqui.
@@ -105,17 +114,8 @@ export const CHAVES_COM_NOME_DE_ETIQUETA = [
   ["board"],
 ] as const;
 
-/** Cada recusa do servidor vira uma frase que diz O QUE FAZER. */
-const ERRO_EM_PORTUGUES: Record<string, string> = {
-  validation_failed: "Confira a etiqueta, o novo nome e a cor.",
-  forbidden: "Só um gerente ou administrador da organização pode mudar as etiquetas.",
-  unauthenticated: "Sua sessão expirou. Entre de novo.",
-  mfa_required: "Confirme o segundo fator para mudar as etiquetas.",
-  forbidden_tenant: "Você não está em nenhuma organização ativa.",
-  // 9038: a etiqueta `cliente` reservada pela regra da agenda.
-  etiqueta_do_sistema:
-    "A etiqueta cliente é posta pelo sistema enquanto a regra Clientes pela agenda estiver ligada. Desligue-a em Tipos de agendamento para editá-la aqui.",
-};
+// O mapa das recusas (`ERRO_EM_PORTUGUES`) mora em `./_lote`: a barra em lote
+// responde as mesmas recusas, e duas cópias desalinham na primeira frase nova.
 
 export function PainelDeTags({
   tags: tagsDoVocabulario,
@@ -142,6 +142,9 @@ export function PainelDeTags({
   const [destino, setDestino] = useState("");
   const [cor, setCor] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // A SELEÇÃO do lote, por nome canônico (a mesma régua do banco): "VIP" e
+  // "vip" são a mesma etiqueta.
+  const [marcadas, setMarcadas] = useState<Set<string>>(() => new Set());
 
   const destinos = useMemo(
     () =>
@@ -172,6 +175,44 @@ export function PainelDeTags({
     acao === "renomear" &&
     destino.trim().length > 0 &&
     destinos.some((linha) => linha.tag.toLowerCase() === destino.trim().toLowerCase());
+
+  /**
+   * O que a tela relê depois de QUALQUER mudança no vocabulário: o mapa de
+   * cores, os nomes em cache das outras telas e a própria lista.
+   */
+  function reler(tambemNomes: boolean) {
+    invalidarCoresDasEtiquetas(queryClient);
+    if (tambemNomes) {
+      for (const queryKey of CHAVES_COM_NOME_DE_ETIQUETA) {
+        void queryClient.invalidateQueries({ queryKey: [...queryKey] });
+      }
+    }
+    router.refresh();
+  }
+
+  const chave = (tag: string) => tag.trim().toLowerCase();
+  const selecionaveis = tags.filter((linha) => !reservada(linha.tag));
+  const selecionadas = selecionaveis.filter((linha) => marcadas.has(chave(linha.tag)));
+  const todasMarcadas = selecionaveis.length > 0 && selecionadas.length === selecionaveis.length;
+  const algumaMarcada = selecionadas.length > 0;
+
+  function alternar(tag: string) {
+    setMarcadas((antes) => {
+      const depois = new Set(antes);
+      if (depois.has(chave(tag))) depois.delete(chave(tag));
+      else depois.add(chave(tag));
+      return depois;
+    });
+  }
+
+  function alternarTodas() {
+    setMarcadas(todasMarcadas ? new Set() : new Set(selecionaveis.map((linha) => chave(linha.tag))));
+  }
+
+  // `?.` porque o jsdom não implementa `scrollIntoView`.
+  const rolarAteOCartao = useCallback((elemento: HTMLDivElement | null) => {
+    elemento?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   function abrir(linha: LinhaDeVocabulario, qual: AcaoDeVocabulario) {
     setAlvo(linha);
@@ -208,6 +249,10 @@ export function PainelDeTags({
       if (!resposta.ok) {
         const codigo = corpo?.error?.code ?? "internal_error";
         toast.error(t(ERRO_EM_PORTUGUES[codigo] ?? "Não foi possível concluir agora. Tente de novo."));
+        // O diálogo de excluir fecha com o erro: ele é modal, e deixá-lo aberto
+        // prenderia a tela num "Confirmar" que vai recusar de novo. O cartão das
+        // outras ações fica, para corrigir o nome e tentar outra vez.
+        if (acao === "excluir") setAlvo(null);
         return;
       }
       const dados = corpo?.data ?? {};
@@ -220,16 +265,19 @@ export function PainelDeTags({
       // minutos (o `staleTime`), até alguém dar F5: "renomear descolora"
       // (#2771). O dado já estava certo no banco; quem não acompanhava era a
       // tela.
-        invalidarCoresDasEtiquetas(queryClient);
       if (acao === "definir_cor") {
+        reler(false);
         toast.success(t("Cor da etiqueta atualizada."));
         setAlvo(null);
-        router.refresh();
         return;
       }
-      for (const queryKey of CHAVES_COM_NOME_DE_ETIQUETA) {
-        void queryClient.invalidateQueries({ queryKey: [...queryKey] });
-      }
+      reler(true);
+      // A etiqueta que saiu (ou foi juntada) não pode continuar marcada no lote.
+      setMarcadas((antes) => {
+        const depois = new Set(antes);
+        depois.delete(chave(alvo.tag));
+        return depois;
+      });
       const alterados =
         Number(dados.contatos ?? 0) + Number(dados.leads ?? 0) + Number(dados.conversas ?? 0);
       if (dados.juntou === true) {
@@ -248,7 +296,6 @@ export function PainelDeTags({
           `${t("Etiqueta juntada em")} ${destino} — ${t("as duas etiquetas viraram uma só.")}`,
         );
         setAlvo(null);
-        router.refresh();
         return;
       }
       // ⚠️ O DADO ENTRA FORA DO `t()`. `traduzir()` casa a string EXATA, então
@@ -261,7 +308,6 @@ export function PainelDeTags({
           : `${t("Etiqueta atualizada em")} ${alterados} ${t("registro(s) e em")} ${Number(dados.regras ?? 0)} ${t("regra(s) de agente.")}`,
       );
       setAlvo(null);
-      router.refresh();
     } catch {
       // Sem este ramo, uma falha de REDE (app reiniciando, conexão caída) não
       // dizia nada: o botão voltava de "Aplicando..." para "Confirmar", que lê
@@ -292,11 +338,39 @@ export function PainelDeTags({
     <div className="flex flex-col gap-4">
       <AcrescentarEtiqueta idioma={idioma} />
       <Card className="overflow-x-auto">
+        {/* No celular o `thead` some (tabela empilhada) e leva junto a caixa de
+            "selecionar todas"; esta linha é a mesma caixa para essa largura. */}
+        <label className="hidden items-center gap-2 border-b border-border/60 p-3 text-sm mb:flex">
+          <input
+            type="checkbox"
+            checked={todasMarcadas}
+            onChange={alternarTodas}
+            className="size-4 accent-(--color-accent)"
+          />
+          {t("Selecionar todas")}
+        </label>
         <table className={`w-full text-sm ${TABELA_EMPILHADA}`}>
           <caption className="sr-only">{t("Etiquetas da organização e onde são usadas")}</caption>
           <thead className="bg-muted/50 text-left">
             <tr>
-              <th className="p-3 font-medium">{t("Etiqueta")}</th>
+              <th className="p-3 font-medium">
+                <span className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    aria-label={t("Selecionar todas as etiquetas")}
+                    checked={todasMarcadas}
+                    // Parcial é "algumas marcadas": o estado do meio é o que diz
+                    // que clicar vai MARCAR o resto, não desmarcar.
+                    ref={(caixa) => {
+                      if (caixa) caixa.indeterminate = algumaMarcada && !todasMarcadas;
+                    }}
+                    onChange={alternarTodas}
+                    disabled={selecionaveis.length === 0}
+                    className="size-4 accent-(--color-accent)"
+                  />
+                  {t("Etiqueta")}
+                </span>
+              </th>
               <th className="p-3 font-medium">{t("Contatos")}</th>
               <th className="p-3 font-medium">{t("Leads")}</th>
               <th className="p-3 font-medium">{t("Conversas")}</th>
@@ -309,6 +383,17 @@ export function PainelDeTags({
             {tags.map((linha) => (
               <tr key={linha.tag} className="border-t border-border/60">
                 <td className="p-3">
+                  {/* 9038: a `cliente` reservada não entra no lote, pelo mesmo
+                      motivo de não ter Renomear/Juntar/Excluir na linha. */}
+                  {!reservada(linha.tag) && (
+                    <input
+                      type="checkbox"
+                      aria-label={`${t("Selecionar")} ${linha.tag}`}
+                      checked={marcadas.has(chave(linha.tag))}
+                      onChange={() => alternar(linha.tag)}
+                      className="mr-2 size-4 align-middle accent-(--color-accent)"
+                    />
+                  )}
                   {/* A cor do SERVIDOR, não a do cache do chip: esta lista acabou
                       de ler o vocabulário, e mostrar o que a outra leitura
                       devolveu seria a tela discordando de si mesma por alguns
@@ -379,8 +464,74 @@ export function PainelDeTags({
         )}
       </Card>
 
-      {alvo && (
-        <Card className="flex flex-col gap-4 p-4">
+      <BarraDeEtiquetasEmLote
+        selecionadas={selecionadas}
+        destinos={selecionaveis}
+        idioma={idioma}
+        onClear={() => setMarcadas(new Set())}
+        aoConcluir={() => reler(true)}
+      />
+
+      {/* ⚠️ EXCLUIR É UM DIÁLOGO, E NÃO O CARTÃO DE BAIXO (o "Excluir não
+          funciona" de 20/10/2026). A confirmação morava no cartão que abre
+          DEPOIS da tabela inteira. Numa organização com dezenas de etiquetas,
+          clicar em Excluir numa linha do alto abria o cartão lá embaixo, fora
+          da tela: nada mudava onde o operador estava olhando, e o pedido nunca
+          saía (o log de auditoria tinha a cor de outra etiqueta e nenhum
+          excluir). O diálogo abre onde a pessoa está, com os números na frente. */}
+      <AlertDialog
+        open={!!alvo && acao === "excluir"}
+        onOpenChange={(aberto) => !aberto && !ocupado && setAlvo(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Excluir etiqueta?")}</AlertDialogTitle>
+            {alvo && (
+              <AlertDialogDescription>
+                {/* Mesma regra do toast: o texto estático passa por `t()`, a
+                    etiqueta e os números entram fora dele. */}
+                {t("Excluir")} <strong>{alvo.tag}</strong> {t("de")} {alvo.uso_em_contatos}{" "}
+                {t("contato(s),")} {alvo.uso_em_leads} {t("lead(s) e")} {alvo.uso_em_conversas}{" "}
+                {t("conversa(s).")}
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          {alvo && (
+            <p className="text-sm">
+              {alvo.uso_em_contatos + alvo.uso_em_leads + alvo.uso_em_conversas}{" "}
+              {t("registro(s) perdem a etiqueta, e ela sai do vocabulário. Não dá para desfazer.")}
+            </p>
+          )}
+          {alvo && alvo.em_regras > 0 && (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              {t("Atenção:")} {alvo.em_regras}{" "}
+              {t(
+                "regra(s) de agente continuam escrevendo esta etiqueta. Excluir aqui não apaga a regra — o agente vai recriar a etiqueta no próximo atendimento.",
+              )}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ocupado}>{t("Cancelar")}</AlertDialogCancel>
+            {/* Botão comum, e não `AlertDialogAction`: o Action fecha no clique,
+                antes de a resposta chegar. */}
+            <Button variant="destructive" onClick={enviar} disabled={ocupado}>
+              {ocupado ? t("Aplicando...") : t("Confirmar")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {alvo && acao !== "excluir" && (
+        <Card
+          // O cartão abre DEPOIS da tabela: sem rolar até ele, clicar numa linha
+          // do alto não mudava nada à vista (o mesmo defeito que tirou o
+          // excluir daqui). A `key` remonta o cartão a cada linha/ação, para a
+          // rolagem acontecer de novo; a ref é estável para não rolar a cada
+          // tecla digitada no novo nome.
+          key={`${alvo.tag}:${acao}`}
+          ref={rolarAteOCartao}
+          className="flex flex-col gap-4 p-4"
+        >
           <p className="text-sm">
             {/* Mesma regra do toast: o texto estático passa por `t()`, a
                 etiqueta entra fora dele. */}
@@ -394,13 +545,6 @@ export function PainelDeTags({
                 {t("Juntar")} <strong>{alvo.tag}</strong> {t("em outra etiqueta existente:")}
               </>
             )}
-            {acao === "excluir" && (
-              <>
-                {t("Excluir")} <strong>{alvo.tag}</strong> {t("de")} {alvo.uso_em_contatos}{" "}
-                {t("contato(s),")} {alvo.uso_em_leads} {t("lead(s) e")} {alvo.uso_em_conversas}{" "}
-                {t("conversa(s).")}
-              </>
-            )}
             {acao === "definir_cor" && (
               <>
                 {t("Cor")} <strong>{alvo.tag}</strong>{" "}
@@ -409,16 +553,7 @@ export function PainelDeTags({
             )}
           </p>
 
-          {acao === "excluir" ? (
-            alvo.em_regras > 0 && (
-              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                {t("Atenção:")} {alvo.em_regras}{" "}
-                {t(
-                  "regra(s) de agente continuam escrevendo esta etiqueta. Excluir aqui não apaga a regra — o agente vai recriar a etiqueta no próximo atendimento.",
-                )}
-              </p>
-            )
-          ) : acao === "juntar" ? (
+          {acao === "juntar" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="destino-da-juncao">{t("Etiqueta de destino")}</Label>
               <Escolha
@@ -438,37 +573,7 @@ export function PainelDeTags({
           ) : acao === "definir_cor" ? (
             <div className="flex flex-col gap-3">
               <Label>{t("Cor da etiqueta")}</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                {PALETA_DE_ETIQUETAS.map((tom) => (
-                  <button
-                    key={tom}
-                    type="button"
-                    onClick={() => setCor(tom)}
-                    aria-pressed={cor === tom}
-                    // O nome do tom é o rótulo acessível; a cor é reforço. Quem
-                    // escolhe por "Âmbar" e quem escolhe pelo círculo chegam ao
-                    // mesmo lugar.
-                    aria-label={t(NOME_DO_TOM[tom] ?? tom)}
-                    title={tom}
-                    className={cn(
-                      "size-7 rounded-full border-2 transition-transform",
-                      cor === tom
-                        ? "border-foreground ring-2 ring-ring ring-offset-1 ring-offset-background"
-                        : "border-transparent hover:scale-110",
-                    )}
-                    style={{ backgroundColor: tom }}
-                  />
-                ))}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={cor === null ? "default" : "outline"}
-                  aria-pressed={cor === null}
-                  onClick={() => setCor(null)}
-                >
-                  {t("Sem cor")}
-                </Button>
-              </div>
+              <FileiraDeTons cor={cor} aoEscolher={setCor} t={t} />
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{t("Prévia:")}</span>
                 {/* A prévia usa o TOM SELECIONADO antes de salvar: escolher cor
@@ -493,7 +598,7 @@ export function PainelDeTags({
                 // `juntou` da resposta só chega DEPOIS, quando já não há o que
                 // desfazer — então quem lê este aviso ainda pode escolher
                 // "Juntar" de propósito, ou outro nome. Mesma régua visual do
-                // aviso de `excluir` abaixo: a frase diz o que vai acontecer.
+                // aviso do diálogo de excluir: a frase diz o que vai acontecer.
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                   {t(
                     "Este nome já existe no vocabulário — confirmar vai juntar as duas etiquetas numa só.",
@@ -506,8 +611,7 @@ export function PainelDeTags({
           <div className="flex gap-2">
             <Button
               onClick={enviar}
-              disabled={ocupado || (acao !== "excluir" && acao !== "definir_cor" && destino.trim().length === 0)}
-              variant={acao === "excluir" ? "destructive" : "default"}
+              disabled={ocupado || (acao !== "definir_cor" && destino.trim().length === 0)}
             >
               {ocupado ? t("Aplicando...") : t("Confirmar")}
             </Button>

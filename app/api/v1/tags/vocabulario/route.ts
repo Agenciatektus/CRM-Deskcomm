@@ -41,6 +41,7 @@ import { mfaEmDivida } from "@/lib/auth/server";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { vocabularioDeTagsSchema, type LinhaDeVocabulario } from "@/lib/schemas/tags";
 import { createClient } from "@/lib/supabase/server";
+import { respostaDoErroDoVocabulario } from "@/lib/tags/erro-do-vocabulario";
 
 export const dynamic = "force-dynamic";
 
@@ -108,29 +109,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     p_destino: destino ?? null,
     p_cor: cor ?? null,
   });
-  if (error) {
-    // 9038: a etiqueta `cliente` reservada pela regra da agenda também chega como
-    // 42501, mas não é falta de papel. Responder "forbidden" mandaria o gerente
-    // pedir um acesso que ele já tem; o código próprio deixa a tela dizer onde
-    // desligar a regra. Vem ANTES do 42501 genérico, e casa pela mensagem da
-    // `fn_tags_reserva` (migration 9005).
-    if (error.code === "42501" && /tags_etiqueta_do_sistema/.test(error.message ?? ""))
-      return fail(
-        "etiqueta_do_sistema",
-        "A etiqueta cliente é do sistema enquanto a regra Clientes pela agenda estiver ligada.",
-        409,
-        { requestId },
-      );
-    // 9038 (7): a função passou a chamar `fn_tags_guarda`, que recusa sessão sem
-    // o segundo fator com `tags_mfa_required` (também 42501).
-    if (error.code === "42501" && /tags_mfa_required/.test(error.message ?? ""))
-      return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
-    if (error.code === "42501")
-      return fail("forbidden", "Esta sessão não pode mudar as etiquetas da organização.", 403, { requestId });
-    if (error.code === "22023")
-      return fail("validation_failed", "Confira a etiqueta, o novo nome e a cor.", 422, { requestId });
-    return fail("internal_error", "Não foi possível concluir a operação.", 500, { requestId });
-  }
+  // O mapa das recusas mora em `lib/tags/erro-do-vocabulario.ts`: a rota do
+  // lote chama a mesma função e responde as mesmas causas.
+  if (error) return respostaDoErroDoVocabulario(error, requestId);
 
   const resultado = (data ?? {}) as Record<string, unknown>;
   void audit({
