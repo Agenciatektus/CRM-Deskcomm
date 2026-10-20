@@ -145,4 +145,23 @@ describe("voltarAoRascunhoAcao", () => {
     expect(r.status).toBe(409);
     expect(ops).toEqual([]);
   });
+
+  it("se o CAS perde a corrida (já saiu de `ready`), NÃO apaga a lista", async () => {
+    // Outra ação (um Iniciar, por exemplo) venceu e tirou a campanha de `ready`
+    // entre o carregamento e o nosso update: o CAS não casa nenhuma linha. O
+    // delete do snapshot vem DEPOIS do CAS de propósito — fazê-lo antes (como na
+    // 1ª versão) esvaziaria a lista de uma campanha que acabou de começar a rodar.
+    const { client, ops } = supabaseFake({
+      campaign_recipients: [{ count: 0, data: null, error: null }], // jaEnviou: 0
+      campaigns: [{ data: [], error: null }], // CAS no-op: ninguém mais em `ready`
+    });
+
+    const r = await voltarAoRascunhoAcao(client, campanha, AGORA, "user-1");
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.status).toBe(409);
+    // O coração do conserto: perdeu o CAS, então NÃO chegou a apagar a lista.
+    expect(ops.some((o) => o.tabela === "campaign_recipients" && o.verbo === "delete")).toBe(false);
+  });
 });

@@ -478,20 +478,38 @@ export async function voltarAoRascunhoAcao(
     };
   }
 
-  // INVALIDA O SNAPSHOT: a lista preparada deixa de valer quando a campanha volta
-  // ao rascunho, e o mesmo motor de preparação a refaz do zero no próximo
-  // Preparar. É o MESMO delete do ramo contínuo de `prepararAcao` — filtrando
-  // `organization_id` E `campaign_id`, porque o client é admin e ignora RLS, e um
-  // delete sem a organização é delete de outro tenant esperando acontecer.
+  // TRAVA O ESTADO ANTES DE APAGAR NADA — e esta ordem é o conserto, não detalhe.
+  // Compare-and-set: só sai de `ready`, e só UMA transição vence. Vem ANTES do
+  // delete de propósito: se um Iniciar disputa e ganha o CAS (`ready → running`),
+  // o nosso update não pega linha e a gente sai SEM ter apagado a lista de uma
+  // campanha que já começou a rodar. Deletar primeiro (como estava) deixava o
+  // delete rodar mesmo quando o Iniciar vencia, esvaziando a fila de uma campanha
+  // `running`. É a mesma ordem de `prepararAcao` (CAS `draft → preparing` antes,
+  // delete depois): o estado é o cadeado, e o delete só roda com ele na mão.
+  // O CAS fixo em `ready` também barra `failed → draft` (que a máquina permitiria)
+  // sem tocar na lista: `failed` não casa, vira conflito, nada é apagado.
+  const { data: travada } = await admin
+    .from("campaigns")
+    .update({ status: "draft" })
+    .eq("id", c.id)
+    .eq("status", "ready")
+    .select("id");
+  if ((travada ?? []).length === 0) return conflitoDeCorrida();
+
+  // Agora a campanha é `draft` (ninguém mais a inicia) e o snapshot velho deixa
+  // de valer: o mesmo motor de preparação o refaz do zero no próximo Preparar.
+  // MESMO delete do ramo contínuo de `prepararAcao`, filtrando `organization_id`
+  // E `campaign_id` — o client é admin e ignora RLS, e delete sem a organização é
+  // delete de outro tenant esperando acontecer.
   const { error: erroDaLimpeza } = await admin
     .from("campaign_recipients")
     .delete()
     .eq("organization_id", c.organization_id)
     .eq("campaign_id", c.id);
   if (erroDaLimpeza) {
-    // A mensagem do PostgREST NÃO vai para o recibo (doutrina do P2-3 do
-    // @Cassio_SecRev): a resposta é lida em tela e pode ecoar o valor que o banco
-    // recusou. O texto real vai para o log do servidor.
+    // A campanha JÁ está em `draft` aqui; o pior caso é snapshot velho sobrando,
+    // que o próximo Preparar recalcula. A mensagem do PostgREST NÃO vai para o
+    // recibo (doutrina do P2-3 do @Cassio_SecRev): o texto real vai para o log.
     logger.warn("[campanha] limpeza da fila falhou ao voltar ao rascunho", {
       campanha: c.id,
       motivo: erroDaLimpeza.message,
@@ -500,21 +518,11 @@ export async function voltarAoRascunhoAcao(
       ok: false,
       codigo: "campanha_fila_nao_limpa",
       mensagem:
-        "Não foi possível limpar a lista desta campanha antes de reabri-la. " +
-        "Tente de novo; se repetir, o motivo está no log do servidor.",
+        "A campanha voltou ao rascunho, mas não foi possível limpar a lista antiga. " +
+        "Prepare de novo; se repetir, o motivo está no log do servidor.",
       status: 422,
     };
   }
-
-  // Compare-and-set: só sai de `ready`. Dois cliques simultâneos, ou um Iniciar
-  // disputando com o Editar, e só uma transição vence.
-  const { data } = await admin
-    .from("campaigns")
-    .update({ status: "draft" })
-    .eq("id", c.id)
-    .eq("status", "ready")
-    .select("id");
-  if ((data ?? []).length === 0) return conflitoDeCorrida();
   return { ok: true };
 }
 
