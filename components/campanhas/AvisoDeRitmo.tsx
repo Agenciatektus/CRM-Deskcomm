@@ -25,6 +25,7 @@ import {
   tetoHorarioDeReferencia,
 } from "@/lib/campanhas/ritmo-recomendado";
 import type { RitmoDaCampanha } from "@/lib/campanhas/ritmo";
+import { segundosParaMinutos } from "@/lib/campanhas/unidades";
 
 export function AvisoDeRitmo({ ritmo }: { ritmo: RitmoDaCampanha }) {
   const t = useT();
@@ -54,7 +55,7 @@ export function AvisoDeRitmo({ ritmo }: { ritmo: RitmoDaCampanha }) {
             {motivo === "intervalo" && (
               <>
                 {t("Intervalo menor que o recomendado:")}{" "}
-                {RITMO_RECOMENDADO.intervaloSegundos}s.
+                {segundosParaMinutos(RITMO_RECOMENDADO.intervaloSegundos)} min.
               </>
             )}
             {motivo === "teto_diario" && (

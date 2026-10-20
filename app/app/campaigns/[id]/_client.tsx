@@ -44,6 +44,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { ArrowBendUpLeft } from "@/lib/ui/icons";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { TEXTO_DA_EXCLUSAO } from "@/lib/campanhas/tipos";
+import { minutosParaSegundos, segundosParaMinutos } from "@/lib/campanhas/unidades";
 
 export function DetalheDaCampanha({ id }: { id: string }) {
   const t = useT();
@@ -603,7 +604,7 @@ function NumerosDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
 function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
   const t = useT();
   const editar = useEditarCampanha(campanha.id);
-  const [intervalo, setIntervalo] = useState(texto(campanha.intervalo_segundos));
+  const [intervalo, setIntervalo] = useState(texto(segundosParaMinutos(campanha.intervalo_segundos)));
   const [tetoDia, setTetoDia] = useState(texto(campanha.teto_diario));
   const [tetoHora, setTetoHora] = useState(texto(campanha.teto_horario));
   const [inicio, setInicio] = useState(texto(campanha.janela_inicio_hora));
@@ -623,7 +624,7 @@ function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <CampoDeRitmo id="r-intervalo" rotulo={t("Intervalo mínimo entre mensagens (segundos)")} valor={intervalo} onChange={setIntervalo} />
+        <CampoDeRitmo id="r-intervalo" rotulo={t("Intervalo mínimo entre disparos (minutos)")} valor={intervalo} onChange={setIntervalo} />
         <CampoDeRitmo id="r-dia" rotulo={t("Máximo por dia")} valor={tetoDia} onChange={setTetoDia} />
         <CampoDeRitmo id="r-hora" rotulo={t("Máximo por hora")} valor={tetoHora} onChange={setTetoHora} />
         <div />
@@ -635,7 +636,7 @@ function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           silêncio a escolha de quem a criou. O preset é da campanha NOVA. */}
       <AvisoDeRitmo
         ritmo={{
-          intervaloSegundos: numero(intervalo),
+          intervaloSegundos: minutosParaSegundos(numero(intervalo)),
           janelaInicioHora: numero(inicio),
           janelaFimHora: numero(fim),
           tetoDiario: numero(tetoDia),
@@ -648,7 +649,7 @@ function RitmoDaCampanha({ campanha }: { campanha: CampanhaDetalhada }) {
           disabled={editar.isPending}
           onClick={() =>
             editar.mutate({
-              intervalo_segundos: numero(intervalo),
+              intervalo_segundos: minutosParaSegundos(numero(intervalo)),
               teto_diario: numero(tetoDia),
               teto_horario: numero(tetoHora),
               janela_inicio_hora: numero(inicio),
