@@ -16424,6 +16424,15 @@ export const DICIONARIO: Traducoes = {
   // abaixo são exclusivas desta fatia.
   // Novas da F3.
   "contatos por chamada.": { es: "contactos por llamada." },
+  // Textos que as telas escreviam crus, fora de t(), e que por isso saíam iguais em todo idioma. Os rótulos do
+  // vocabulário do funil eram inglês em toda língua (Lead, Deal, Won, Lost): a chave é o próprio inglês, para o
+  // português seguir mostrando o mesmo; o atalho de exemplo das respostas rápidas era « oi »; o título de excluir um
+  // fluxo leva o nome entre as aspas do idioma.
+  Deal: { es: "Negocio" },
+  Won: { es: "Ganado" },
+  Lost: { es: "Perdido" },
+  oi: { es: "hola" },
+  "Excluir “{nome}”?": { es: "¿Eliminar “{nome}”?" },
   "1 contato selecionado": { es: "1 contacto seleccionado" },
   "contatos selecionados": { es: "contactos seleccionados" },
   "Adicionar etiqueta": { es: "Agregar etiqueta" },
@@ -16499,7 +16508,33 @@ export const DICIONARIO: Traducoes = {
   "A resposta ia mostrar um produto que não foi encontrado no cadastro. Confira o produto e gere de novo.": { es: "La respuesta iba a mostrar un producto que no se encontró en el registro. Revisa el producto y genera de nuevo." },
   "A sugestão tentou usar uma ação que a prévia não reconhece. Gere de novo; se repetir, revise as ferramentas ligadas no agente.": { es: "La sugerencia intentó usar una acción que la previsualización no reconoce. Genera de nuevo; si se repite, revisa las herramientas activadas en el agente." },
   "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.": { es: "La generación de la sugerencia falló, o no se pudo armar el contexto de la conversación. Inténtalo de nuevo; si se repite, el motivo quedó registrado en el servidor." },
+  "Lista de uma escolha": { es: "Lista de una elección" },
+  "Lista de várias escolhas": { es: "Lista de varias opciones" },
+  "Lista pesquisável": { es: "Lista con búsqueda" },
+  "Sim ou não": { es: "Sí o no" },
+  "Link (URL)": { es: "Enlace (URL)" },
   "O agente terminou sem propor uma resposta. Pode ter sido uma decisão (por exemplo, diante de uma mensagem automática) ou a geração ter parado antes da resposta. Se esperava uma, gere de novo; senão, não há nada a enviar.": { es: "El agente terminó sin proponer una respuesta. Pudo ser una decisión (por ejemplo, ante un mensaje automático) o que la generación se detuviera antes de la respuesta. Si esperabas una, genera de nuevo; si no, no hay nada que enviar." },
+  "Novo aviso": { es: "Nuevo aviso" },
+  "Opção inválida.": { es: "Opción inválida." },
+  "Não consegui ler esta configuração agora.": { es: "No pude leer esta configuración ahora." },
+  "O que os avisos mostram fora do app": { es: "Qué muestran los avisos fuera de la app" },
+  "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.": {
+    es: "Vale para el celular bloqueado y para las notificaciones de la computadora, para toda la empresa. Solo los administradores pueden cambiarlo.",
+  },
+  "Esconder tudo": { es: "Ocultar todo" },
+  "O aviso diz só que chegou algo. Nem o nome do cliente nem a mensagem aparecem.": {
+    es: "El aviso solo dice que llegó algo. No aparecen ni el nombre del cliente ni el mensaje.",
+  },
+  "Mostrar quem mandou (recomendado)": { es: "Mostrar quién lo envió (recomendado)" },
+  "Aparecem o nome e a foto do cliente, mas não o que ele escreveu.": {
+    es: "Aparecen el nombre y la foto del cliente, pero no lo que escribió.",
+  },
+  "Mostrar quem mandou e a mensagem": { es: "Mostrar quién lo envió y el mensaje" },
+  "Aparecem o nome, a foto e o começo da mensagem.": { es: "Aparecen el nombre, la foto y el comienzo del mensaje." },
+  "Quem decide é um administrador.": { es: "Quien decide es un administrador." },
+  "Desligar o push de mensagem desliga todos os avisos deste aparelho fora do app.": {
+    es: "Apagar el push de mensajes apaga todos los avisos de este dispositivo fuera de la app.",
+  },
 };
 
 /**
