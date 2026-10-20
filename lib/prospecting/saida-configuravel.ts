@@ -202,8 +202,9 @@ export async function enviarComSaidaConfiguravel(
         [organizationId, mensagem.jobId, mensagem.seq],
       );
       if (guardada[0]) {
-        // Reprocesso da mesma mensagem (o follow-up reagenda o `queued`; o turno
-        // re-roda depois de um crash): não conta de novo, e repete a decisão que
+        // Reprocesso da mesma mensagem (no follow-up, o `queued` LANÇA em
+        // `sendFixedOutbound` e o job cai no retry genérico da fila, que gasta
+        // tentativa; o turno re-roda depois de um crash): não conta de novo, e repete a decisão que
         // está no corpo guardado — o canal transmite o corpo DESTA tentativa, e
         // ele tem de dizer o mesmo que a tela e a contagem já dizem.
         // ponytail: a decisão vem da 1ª mensagem física; numa resposta fatiada
@@ -232,14 +233,28 @@ export async function enviarComSaidaConfiguravel(
     // Desfaz aqui quando a mensagem NÃO vai sair (failed, blocked, unavailable)
     // e no `already_sent`, que não transmitiu nada. `sent` e `queued` ficam: o
     // corpo guardado, já com o rodapé, sai agora ou depois — pelo watchdog
-    // (`redriveQueued`, que transmite `messages.body` sem passar por aqui) ou
-    // pela nova tentativa do mesmo job, que acha a mensagem guardada acima.
+    // (`redriveQueued`, que transmite `messages.body` sem passar por aqui) ou,
+    // no follow-up, pela nova tentativa do mesmo job — o `queued` lança em
+    // `sendFixedOutbound` e cai no retry genérico da fila (gasta tentativa; não é
+    // o `applySendOutcome` reagendando) — que acha a mensagem guardada acima.
+    // No inbound_turn o `queued` é final para o turno: só o watchdog entrega.
     // Se a mensagem guardada falhar DEPOIS, quem desfaz é o gatilho do banco
     // (ver SQL_AMARRAR_RESERVA_A_MENSAGEM): por isso a reserva é amarrada a ela,
     // e só a reserva amarrada audita.
     // ponytail: só a mensagem que reserva é amarrada; um `queued` que só contou
     // (a 3ª em diante) e falha depois deixa `automatic_sends` um acima, sem
     // efeito na saída — a reserva já existe ou, desfeita, volta na próxima.
+    // ponytail: contar e amarrar são dois commits. Se o worker morrer entre eles
+    // (SIGKILL, deploy), a reserva fica sem ponteiro: se a mensagem falhar
+    // depois, ninguém a desfaz (tela "oferecida" sem PARAR); se morrer antes do
+    // insert da mensagem, o retry conta de novo sem PARAR. Raro, e o PARAR na
+    // ingestão segue bloqueando. Melhora: contar, gravar a mensagem e amarrar na
+    // MESMA transação do sink (o ledger já é a chave), ou um varredor que solte
+    // reserva sem ponteiro mais velha que o `recover-stuck`.
+    // ponytail: `handleAck` (lib/waha/ingest.ts) sobrescreve o status sem guarda;
+    // um `failed` que desfez a reserva e depois recebe ack tardio (failed→sent)
+    // faz o PARAR sair duas vezes. Erra para o lado seguro. Melhora: o gatilho
+    // re-amarrar quando `failed` volta a `sent`, ou o ack não sair de `failed`.
     let fica = resultado.kind === "sent" || resultado.kind === "queued";
     if (fica && r.levaASaida) {
       const { rows } = await db
