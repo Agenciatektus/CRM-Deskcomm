@@ -5,7 +5,7 @@
  *
  * Puro e sem import de servidor: a mesma redação serve ao funil do push
  * (`./web_push.ts`) e à notificação local do app aberto
- * (`hooks/notifications/useInboundMessageAlerts.ts`).
+ * (`./deliver.ts`, por onde passa todo aviso local).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 

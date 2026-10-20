@@ -7,12 +7,10 @@ import { getOpenConversationId } from "@/hooks/notifications/OpenConversationCon
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { avatarUrlServivel } from "@/lib/notifications/avatar_url";
-import { idiomaAtual } from "@/lib/i18n/IdiomaProvider";
 import { entregarAviso } from "@/lib/notifications/deliver";
 import { shouldNotifyInbound } from "@/lib/notifications/policy";
 import { corpoDoAvisoDeMensagem } from "@/lib/notifications/push_payload";
 import { syncPushSubscription } from "@/lib/notifications/push_client";
-import { redigirParaATelaBloqueada } from "@/lib/notifications/tela-bloqueada";
 import { conteudoNaTelaBloqueadaWriteSchema, type ConteudoNaTelaBloqueada } from "@/lib/schemas/settings";
 
 function tabFocused(): boolean {
@@ -195,11 +193,8 @@ export function useInboundMessageAlerts(): void {
         tag: conversationId ?? undefined,
         href: conversationId ? `/app/inbox?id=${conversationId}` : undefined,
         icon: bits.icon,
-        naBandeja: redigirParaATelaBloqueada(
-          { title: bits.title, body, corpoSemPrevia, icon: bits.icon },
-          conteudo,
-          idiomaAtual(),
-        ),
+        corpoSemPrevia,
+        conteudo,
       });
     })();
   }, []);

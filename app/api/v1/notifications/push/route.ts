@@ -1,6 +1,7 @@
 import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
- * GET  — chave VAPID pública (ou enabled=false se o operador não configurou).
+ * GET  — chave VAPID pública (ou enabled=false se o operador não configurou) e a
+ *        opção da empresa para a tela bloqueada, que a bandeja do app aberto aplica.
  * PUT  — grava a inscrição deste navegador.
  * DELETE — remove a inscrição pelo endpoint.
  */
@@ -11,7 +12,9 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { lerTelaBloqueada } from "@/lib/notifications/tela-bloqueada";
 import { vapidPronto, vapidPublica } from "@/lib/notifications/vapid";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -29,10 +32,8 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   const authz = await requireRole("viewer", { requestId, resource: "push_subscriptions" });
   if (!authz.ok) return authz.response;
-  return ok(
-    { enabled: vapidPronto(), public_key: vapidPublica() },
-    { requestId },
-  );
+  const { modo } = await lerTelaBloqueada(createAdminClient(), authz.org.orgId);
+  return ok({ enabled: vapidPronto(), public_key: vapidPublica(), conteudo: modo }, { requestId });
 }
 
 export async function PUT(req: NextRequest): Promise<Response> {

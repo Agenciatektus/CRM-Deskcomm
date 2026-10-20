@@ -40,3 +40,24 @@ describe("o push sai só pelo funil", () => {
     expect(funil.match(/JSON\.stringify\(/g)).toHaveLength(1);
   });
 });
+
+describe("a bandeja local sai só pelo funil de entregarAviso", () => {
+  const FUNIL_LOCAL = "lib/notifications/deliver.ts";
+  // A confirmação de ligar/desligar os alertas tem texto fixo do próprio app.
+  const TEXTO_FIXO = "hooks/notifications/useNotificationPermission.ts";
+
+  it("só o funil local (e a confirmação de texto fixo) chama emitNotification(", () => {
+    const chamam = arquivos.filter(
+      (a) => a.caminho !== "lib/notifications/emit.ts" && !/\.test\.tsx?$/.test(a.caminho) && a.texto.includes("emitNotification("),
+    );
+    expect(chamam.map((a) => a.caminho).sort()).toEqual([FUNIL_LOCAL, TEXTO_FIXO].sort());
+  });
+
+  it("o funil local entrega à bandeja a saída da redação, sem atalho que a pule", () => {
+    const funil = arquivos.find((a) => a.caminho === FUNIL_LOCAL)!.texto;
+    expect(funil).toMatch(/const bandeja = redigirParaATelaBloqueada\(/);
+    expect(funil.match(/emitNotification\(/g)).toHaveLength(1);
+    expect(funil).toMatch(/title: traduzir\(bandeja\.title, idioma\)/);
+    expect(funil).toMatch(/body: traduzir\(bandeja\.body, idioma\)/);
+  });
+});

@@ -39,7 +39,11 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-import { DELETE } from "./route";
+const telaBloqueada = vi.hoisted(() => ({ ler: vi.fn(async () => ({ modo: "nome", idioma: "pt-BR" })) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ admin: true }) }));
+vi.mock("@/lib/notifications/tela-bloqueada", () => ({ lerTelaBloqueada: telaBloqueada.ler }));
+
+import { DELETE, GET } from "./route";
 
 function pedido(corpo: unknown) {
   return new NextRequest("http://localhost/api/v1/notifications/push", {
@@ -84,5 +88,16 @@ describe("DELETE /api/v1/notifications/push", () => {
     const res = await DELETE(pedido({ endpoint: "nao-e-url" }));
     expect(res.status).toBe(422);
     expect(estado.filtros).toEqual([]);
+  });
+});
+
+describe("GET /api/v1/notifications/push", () => {
+  // A bandeja do app aberto aplica a mesma opção que o funil do servidor.
+  it("devolve a opção da tela bloqueada da organização ativa", async () => {
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { data: { conteudo: string } };
+    expect(json.data.conteudo).toBe("nome");
+    expect(telaBloqueada.ler).toHaveBeenCalledWith({ admin: true }, ORG);
   });
 });
