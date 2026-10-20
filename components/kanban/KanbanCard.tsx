@@ -249,7 +249,7 @@ export function KanbanCard({
           {/* ② valor — só quando existe. */}
           {value && <span className="text-[15px] leading-tight font-bold text-text tabular-nums">{value}</span>}
 
-          {/* ③ a última mensagem (1 linha), com atalho para o inbox. */}
+          {/* ③ a última mensagem (1 linha); o clique nela é o do card (dossiê). */}
           {!compacto && (
             <ConversaSlot conversa={lead.conversa} contactId={lead.contact_id} phone={lead.contact_phone} enxuto />
           )}

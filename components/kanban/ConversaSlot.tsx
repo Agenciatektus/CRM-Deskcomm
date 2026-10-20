@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { AbrirConversaDoLead, temAlvoParaAbrir } from "./AbrirConversaDoLead";
 
 /**
- * A última mensagem do negócio, com atalho para o inbox.
+ * A última mensagem do negócio. Fora do card do funil, com atalho para o inbox;
+ * no card (`enxuto`), só leitura: o clique é do card e abre o dossiê.
  *
  * ─── Por que atalho e não um composer aqui dentro ───────────────────────────
  *
@@ -79,20 +80,8 @@ export function ConversaSlot({
     ? null
     : entrada === "direct" ? t("Direct") : entrada === "comentario" ? t("Comentário") : null;
 
-  return (
-    <Link
-      href={`/app/inbox?id=${conversa.id}`}
-      // O card inteiro é arrastável e clicável (abre o dossiê). Sem parar a
-      // propagação, o clique no atalho também abriria o dossiê por baixo — dois
-      // destinos para um gesto.
-      onClick={(e: MouseEvent) => e.stopPropagation()}
-      onPointerDown={(e: MouseEvent) => e.stopPropagation()}
-      className={cn(
-        "group/conversa mt-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px]",
-        "text-text-muted transition-colors hover:bg-muted hover:text-foreground",
-      )}
-      title={t("Abrir esta conversa no Inbox")}
-    >
+  const conteudo = (
+    <>
       <ChatCircle size={12} weight="regular" className="shrink-0" aria-hidden />
       {rotuloEntrada && (
         <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] leading-4 text-text-muted">
@@ -112,6 +101,32 @@ export function ConversaSlot({
           {conversa.unread}
         </span>
       )}
+    </>
+  );
+
+  // No card do funil a prévia é só leitura: o clique sobe para o card e abre o
+  // dossiê, que já tem a conversa e o composer (pedido do Peterson, 20/10). Antes
+  // era um atalho para o Inbox, do tempo em que o dossiê não tinha a conversa, e
+  // o mesmo card levava a dois lugares conforme o ponto clicado.
+  if (enxuto) {
+    return <p className="mt-1 flex items-center gap-1.5 px-1 py-0.5 text-[11px] text-text-muted">{conteudo}</p>;
+  }
+
+  return (
+    <Link
+      href={`/app/inbox?id=${conversa.id}`}
+      // O card inteiro é arrastável e clicável (abre o dossiê). Sem parar a
+      // propagação, o clique no atalho também abriria o dossiê por baixo — dois
+      // destinos para um gesto.
+      onClick={(e: MouseEvent) => e.stopPropagation()}
+      onPointerDown={(e: MouseEvent) => e.stopPropagation()}
+      className={cn(
+        "group/conversa mt-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px]",
+        "text-text-muted transition-colors hover:bg-muted hover:text-foreground",
+      )}
+      title={t("Abrir esta conversa no Inbox")}
+    >
+      {conteudo}
     </Link>
   );
 }
