@@ -454,7 +454,7 @@ export const DICIONARIO: Traducoes = {
   "Não consegui ler as liberações agora. Recarregue antes de mudar qualquer coisa.": { es: "No pude leer las habilitaciones ahora. Recargue antes de cambiar cualquier cosa." },
   "Recursos": { es: "Recursos" },
   "Prospecção no Google Maps": { es: "Prospección en Google Maps" },
-  "Ligado, as empresas que você liberar em Tenants › Recursos buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.": { es: "Activado, las empresas que usted habilite en Tenants › Recursos buscan empresas en Google Maps con su propia clave de Apify y conducen abordajes graduales con IA. Una empresa sin habilitación no ve la pantalla, y su campaña se detiene." },
+  "Ligado, as empresas que você liberar na aba Recursos de cada tenant buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.": { es: "Activado, las empresas que usted habilite en la pestaña Recursos de cada tenant buscan empresas en Google Maps con su propia clave de Apify y conducen abordajes graduales con IA. Una empresa sin habilitación no ve la pantalla, y su campaña se detiene." },
   "Busca empresas no Google Maps pela conta Apify da empresa e aborda com IA, só nas empresas liberadas.": { es: "Busca empresas en Google Maps con la cuenta de Apify de la empresa y las aborda con IA, solo en las empresas habilitadas." },
   "A empresa busca empresas no Google Maps com a própria chave da Apify e conduz abordagens graduais com IA. Revogar esconde a tela e para a campanha em andamento.": { es: "La empresa busca empresas en Google Maps con su propia clave de Apify y conduce abordajes graduales con IA. Revocar oculta la pantalla y detiene la campaña en curso." },
   "Recursos liberados": { es: "Recursos habilitados" },
@@ -6373,6 +6373,7 @@ export const DICIONARIO: Traducoes = {
   "Mover um lead para outro funil está desligado nesta organização.": {
     es: "Mover un lead a otro embudo está desactivado en esta organización.",
   },
+  "Num negócio ganho, esta ação só leva o card para OUTRO funil. Aponte-a para o funil de pós-venda — nada foi movido.": { es: "En un negocio ganado, esta acción solo lleva la tarjeta a OTRO embudo. Apúntela al embudo de posventa — no se movió nada." },
   "A continuação de um negócio ganho só nasce em OUTRO funil. Aponte esta ação para o funil de pós-venda — nada foi movido.": {
     es: "La continuación de un negocio ganado solo nace en OTRO embudo. Apunte esta acción al embudo de posventa — no se movió nada.",
   },

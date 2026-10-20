@@ -89,8 +89,8 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       // `lead.stage_changed` sai do reabrir, uma regra de etapa o leva de volta
       // para a etapa de ganho, e as duas se realimentam sem fim.
       //
-      // Então `lead.won` só tem uma moda aqui: CRIAR a continuação noutro
-      // funil (o ramo acima). O mesmo funil não é continuação — é reescrever o
+      // Então `lead.won` só tem uma moda aqui: levar o MESMO card a outro funil
+      // (o ramo acima, 9053; no fork nada é clonado). O mesmo funil não é continuação — é reescrever o
       // ganho —, e a recusa diz isso com uma frase própria na aba Atividade.
       if (ctx.event?.event_type === "lead.won") {
         return {

@@ -97,6 +97,7 @@ vi.mock("@/lib/channels/templates-fonte", () => ({
 }));
 
 import { JanelaFechadaAviso } from "./JanelaFechadaAviso";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 
 function montar() {
   return render(
@@ -111,8 +112,9 @@ function montar() {
 const PROMO = "promo_oferta|pt_BR";
 const AVISO = "aviso_debriefing_adv|pt_BR";
 
-async function escolher(user: ReturnType<typeof userEvent.setup>, valor: string) {
-  await user.selectOptions(screen.getByRole("combobox"), valor);
+async function escolher(_user: ReturnType<typeof userEvent.setup>, valor: string) {
+  // Tektus: o seletor é o `Escolha` do DS; troca pelo `<select>` escondido.
+  escolherValor(screen.getByRole("combobox"), valor);
 }
 
 /** O texto da prévia, no que ela declara ser a mensagem. */

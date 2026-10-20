@@ -135,6 +135,9 @@ describe("ninguém novo grava em webhook_events_log sem passar pelo arquivador",
     "app/api/v1/webhooks/nuvemshop/customer-data-request/route.ts",
     "app/api/v1/webhooks/nuvemshop/customer-redact/route.ts",
     "app/api/v1/webhooks/nuvemshop/store-redact/route.ts",
+    // Upstream 1.81 (cobrança do revendedor §2.4): grava só `{id,type}` do aviso
+    // da Stripe/Asaas (ou `{}` na recusa), sem cabeçalho, sem token e sem mídia.
+    "app/api/v1/webhooks/cobranca/[provedor]/route.ts",
   ]);
   const RAIZ = path.resolve(__dirname, "../..");
 

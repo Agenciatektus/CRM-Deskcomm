@@ -217,7 +217,7 @@ describe("o grupo é o que está NA TELA, não o rótulo do modelo de dados", ()
 
   it("os outros grupos seguem pelo próprio rótulo (controle)", () => {
     expect(ondeOModuloAparece("crm_b2b")[0]!.grupo).toBe("CRM");
-    expect(ondeOModuloAparece("fluxos_atendimento")[0]!.grupo).toBe("Agente de IA");
+    expect(ondeOModuloAparece("fluxos_atendimento")[0]!.grupo).toBe("Agentes") // Tektus: o grupo do menu do DS;
     expect(ondeOModuloAparece("honorarios")[0]!.grupo).toBe("Análise");
   });
 });
@@ -355,7 +355,7 @@ describe("nenhum caminho de menu é escrito à mão", () => {
   it("⭐ o painel do login por assinatura declara o caminho DERIVADO, com o passo do hub", () => {
     const onde = caminhoDaPorta("/app/ai/credentials");
     expect(onde).not.toBeNull();
-    expect(onde!.grupo).toBe("Agente de IA");
+    expect(onde!.grupo).toBe("Agentes") // Tektus: o grupo do menu do DS;
     expect(onde!.hub).toBe("Ver tudo em IA");
     expect(onde!.label).toBe("Credenciais");
   });

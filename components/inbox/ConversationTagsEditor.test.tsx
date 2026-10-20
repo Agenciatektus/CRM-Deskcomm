@@ -55,7 +55,8 @@ describe("ConversationTagsEditor — cor na criação (#2718)", () => {
     renderEditor();
     await user.type(screen.getByLabelText("Adicionar tag à conversa"), "vip");
     await user.click(screen.getByRole("button", { name: "Adicionar tag" }));
-    expect(mutateSpy).toHaveBeenCalledWith({ conversation_id: "c1", tags: ["vip"] });
+    // Tektus (9045): o editor manda só o DELTA.
+    expect(mutateSpy).toHaveBeenCalledWith({ conversation_id: "c1", adicionar: ["vip"] });
     expect(apiClient.post).not.toHaveBeenCalled();
   });
 
@@ -66,7 +67,8 @@ describe("ConversationTagsEditor — cor na criação (#2718)", () => {
     await user.click(screen.getByRole("button", { name: "Roxo" }));
     await user.type(screen.getByLabelText("Adicionar tag à conversa"), "VIP");
     await user.click(screen.getByRole("button", { name: "Adicionar tag" }));
-    expect(mutateSpy).toHaveBeenCalledWith({ conversation_id: "c1", tags: ["vip"] });
+    // Tektus (9045): o editor manda só o DELTA.
+    expect(mutateSpy).toHaveBeenCalledWith({ conversation_id: "c1", adicionar: ["vip"] });
     expect(apiClient.post).toHaveBeenCalledWith("/api/v1/tags/vocabulario", {
       acao: "definir_cor",
       tag: "vip",

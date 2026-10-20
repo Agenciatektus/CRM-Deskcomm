@@ -103,6 +103,10 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   no_target: "O evento que disparou a regra não trouxe um lead nem um contato para etiquetar.",
   no_lead_or_contact: "O evento que disparou a regra não trouxe um lead para criar ou mover.",
   cross_pipeline_move_not_allowed: "Mover um lead para outro funil está desligado nesta organização.",
+  // lead.won no MESMO funil: mover o ganho para uma etapa aberta o reabriria
+  // e as regras se realimentariam (#1528). A ação só leva o card a OUTRO funil.
+  continuacao_exige_outro_funil:
+    "Num negócio ganho, esta ação só leva o card para OUTRO funil. Aponte-a para o funil de pós-venda — nada foi movido.",
   // "Criar card em outro funil" (create_lead_in_pipeline). Os dois primeiros
   // não são falha: o card já existia, e a regra não cria um segundo.
   card_ja_criado:

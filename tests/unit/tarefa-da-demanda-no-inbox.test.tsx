@@ -43,7 +43,10 @@ vi.mock("@/hooks/tasks/useTasks", () => ({
   },
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
-vi.mock("@/hooks/i18n/useLocaleDeData", () => ({ useTagDeIdioma: () => "pt-BR" }));
+vi.mock("@/hooks/i18n/useLocaleDeData", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/i18n/useLocaleDeData")>()),
+  useTagDeIdioma: () => "pt-BR",
+}));
 vi.mock("@/hooks/auth/AuthProvider", () => ({ useUser: () => ({ id: EU }) }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
   useAssignableMembers: () => ({

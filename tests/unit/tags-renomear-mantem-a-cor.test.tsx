@@ -49,6 +49,7 @@ import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 import { CHAVES_COM_NOME_DE_ETIQUETA, PainelDeTags } from "@/app/app/settings/tags/_painel";
 import { SeletorDeCorDaEtiqueta } from "@/components/tags/SeletorDeCorDaEtiqueta";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 const OBRA: LinhaDeVocabulario = {
   tag: "obra",
@@ -171,7 +172,11 @@ describe("renomear/juntar/excluir relê todo cache que guarda o nome da etiqueta
       fireEvent.change(screen.getByLabelText("Novo nome"), { target: { value: "obra-nova" } });
     }
     if (botao === "Juntar") {
-      fireEvent.change(screen.getByLabelText("Etiqueta de destino"), { target: { value: "casa" } });
+      // Tektus: o destino é o `Escolha` do DS; o valor mora no `<select>` escondido.
+      const destino = screen.getByLabelText("Etiqueta de destino");
+      fireEvent.change(destino.tagName === "BUTTON" ? selectDaEscolha(destino) : destino, {
+        target: { value: "casa" },
+      });
     }
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalled());

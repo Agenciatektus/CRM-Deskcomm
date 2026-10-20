@@ -306,7 +306,7 @@ export const MODULOS_NA_TELA: ReadonlyArray<{
     id: "modulo-prospeccao",
     rotulo: "Prospecção no Google Maps",
     descricao:
-      "Ligado, as empresas que você liberar em Tenants › Recursos buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.",
+      "Ligado, as empresas que você liberar na aba Recursos de cada tenant buscam empresas no Google Maps com a própria chave da Apify e conduzem abordagens graduais com IA. Empresa sem liberação não vê a tela, e a campanha dela para.",
   },
   {
     modulo: "cobranca",

@@ -7,6 +7,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/admin/dashboard" }));
+// Tektus: o rodapé do menu do admin (DS) lê a versão do sistema por react-query.
+vi.mock("@/hooks/system/useSystemVersion", () => ({ useSystemVersion: () => ({ data: undefined }) }));
 
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 

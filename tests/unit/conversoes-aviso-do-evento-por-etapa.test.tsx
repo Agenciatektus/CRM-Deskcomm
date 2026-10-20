@@ -45,6 +45,7 @@ import {
   type EventoDaMeta,
   type RegraDeConversaoMeta,
 } from "@/lib/conversoes/regras-meta";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 const ETAPA: EtapaAberta = {
   id: "et1",
@@ -90,7 +91,8 @@ describe("o aviso do evento que não sai pelo canal (#2457)", () => {
     // ligada no evento escolhido — sem isto, o aviso poderia estar ausente por o
     // componente não ter renderizado nada.
     expect(screen.getByTestId("regras-meta-por-etapa")).toBeInTheDocument();
-    expect(screen.getByLabelText("Evento enviado à Meta")).toHaveValue(FORA_DO_CANAL);
+    // Tektus: o seletor é o `Escolha` do DS; o valor mora no `<select>` escondido.
+    expect(selectDaEscolha(screen.getByLabelText("Evento enviado à Meta"))).toHaveValue(FORA_DO_CANAL);
 
     const caixa = aviso();
     expect(caixa, "o aviso do evento fora do canal não foi desenhado").not.toBeNull();

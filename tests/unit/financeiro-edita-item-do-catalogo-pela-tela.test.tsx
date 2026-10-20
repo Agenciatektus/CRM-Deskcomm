@@ -34,6 +34,7 @@ vi.mock("@/lib/api/client", () => ({
 
 import { apiClient } from "@/lib/api/client";
 import { CatalogoFinanceiro } from "@/app/app/settings/tenant/financeiro/_client";
+import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 const CONTA_CAIXA = "11111111-1111-4111-8111-111111111111";
 const CONTA_BANCO = "22222222-2222-4222-8222-222222222222";
@@ -119,7 +120,10 @@ async function editarItem(bloco: HTMLElement, texto: RegExp | string): Promise<v
 }
 
 function valorDe(bloco: HTMLElement, rotulo: string): HTMLInputElement {
-  return within(bloco).getByLabelText(rotulo) as HTMLInputElement;
+  // Tektus: seletor é o `Escolha` do DS (o rótulo aponta para o gatilho); o
+  // valor mora no `<select>` escondido ao lado.
+  const el = within(bloco).getByLabelText(rotulo);
+  return (el.tagName === "BUTTON" ? selectDaEscolha(el) : el) as HTMLInputElement;
 }
 
 function salvarDe(bloco: HTMLElement): HTMLButtonElement {
