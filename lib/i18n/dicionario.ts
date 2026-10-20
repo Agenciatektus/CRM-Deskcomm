@@ -16465,9 +16465,9 @@ export const DICIONARIO: Traducoes = {
   "Novo aviso": { es: "Nuevo aviso" },
   "Opção inválida.": { es: "Opción inválida." },
   "Não consegui ler esta configuração agora.": { es: "No pude leer esta configuración ahora." },
-  "O que aparece com o celular bloqueado": { es: "Qué aparece con el celular bloqueado" },
-  "Vale para toda a empresa. Só administradores podem mudar.": {
-    es: "Vale para toda la empresa. Solo los administradores pueden cambiarlo.",
+  "O que os avisos mostram fora do app": { es: "Qué muestran los avisos fuera de la app" },
+  "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.": {
+    es: "Vale para el celular bloqueado y para las notificaciones de la computadora, para toda la empresa. Solo los administradores pueden cambiarlo.",
   },
   "Esconder tudo": { es: "Ocultar todo" },
   "O aviso diz só que chegou algo. Nem o nome do cliente nem a mensagem aparecem.": {

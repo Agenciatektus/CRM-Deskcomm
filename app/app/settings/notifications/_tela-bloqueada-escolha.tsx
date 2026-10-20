@@ -63,12 +63,14 @@ export function EscolhaDaTelaBloqueada({
 
   return (
     <Card className="p-4" data-testid="tela-bloqueada">
-      <h2 className="text-base font-semibold">{t("O que aparece com o celular bloqueado")}</h2>
+      <h2 className="text-base font-semibold">{t("O que os avisos mostram fora do app")}</h2>
       <p className="mb-3 text-sm text-muted-foreground">
-        {t("Vale para toda a empresa. Só administradores podem mudar.")}
+        {t(
+          "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.",
+        )}
       </p>
       <fieldset className="space-y-3" disabled={!podeEditar || salvando}>
-        <legend className="sr-only">{t("O que aparece com o celular bloqueado")}</legend>
+        <legend className="sr-only">{t("O que os avisos mostram fora do app")}</legend>
         {CONTEUDOS_NA_TELA_BLOQUEADA.map((opcao) => (
           <label key={opcao} className="flex cursor-pointer items-start gap-3 text-sm">
             <input

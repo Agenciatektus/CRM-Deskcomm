@@ -48,4 +48,15 @@ describe("EscolhaDaTelaBloqueada", () => {
     );
     expect(radio("nome").checked).toBe(true);
   });
+
+  // A opção vale para toda notificação fora do app, não só para o celular.
+  it("diz que vale para o celular e para o computador", () => {
+    render(<EscolhaDaTelaBloqueada valorInicial="nome" podeEditar={false} />);
+    expect(screen.getByRole("heading", { name: "O que os avisos mostram fora do app" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.",
+      ),
+    ).toBeTruthy();
+  });
 });
