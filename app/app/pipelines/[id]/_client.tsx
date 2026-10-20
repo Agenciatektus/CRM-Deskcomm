@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
@@ -21,6 +21,8 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { BulkActionBar } from "@/components/kanban/BulkActionBar";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
+import { LeadDossier } from "@/components/kanban/LeadDossier";
+import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 
 function formatError(err: unknown, t: (texto: string) => string): string {
@@ -80,6 +82,9 @@ export function PipelinePageClient({
   const { filters, setFilters, recorte, ordenados, resumo, contagens } = useRecorteDoFunil(pipelineId, data, user?.id, ordem);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [newOpen, setNewOpen] = useState(false);
+  // Na Lista, clicar na linha abre o MESMO dossiê (detalhes + conversa) do quadro;
+  // no quadro quem cuida disso é o KanbanBoard.
+  const [dossieDaLista, setDossieDaLista] = useState<string | null>(null);
   // O "+" do celular chega com `?criar=1`.
   const podeCriar = usePodeCriar();
   usePedidoDeCriar(() => setNewOpen(true), podeCriar);
@@ -165,8 +170,28 @@ export function PipelinePageClient({
         ordem={ordem}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
+        onAbrir={setDossieDaLista}
       />
     );
+  const leadDaLista =
+    vista === "lista" && dossieDaLista ? (ordenados.find((l) => l.id === dossieDaLista) ?? null) : null;
+  // Trocou de vista ou o lead saiu do recorte: o dossiê fecha de vez, em vez de
+  // reabrir sozinho quando a pessoa volta para a Lista.
+  useEffect(() => {
+    if (dossieDaLista && !leadDaLista) setDossieDaLista(null);
+  }, [dossieDaLista, leadDaLista]);
+  const dossie = data && leadDaLista && (
+    <LeadDossier
+      open
+      onOpenChange={(v: boolean) => !v && setDossieDaLista(null)}
+      lead={leadDaLista}
+      pipelineId={pipelineId}
+      fieldDefs={camposDoFunil(data.pipeline.settings ?? null)}
+      stageName={data.stages.find((s) => s.id === leadDaLista.stage_id)?.name ?? "—"}
+      etapas={data.stages.filter((s) => !s.is_archived)}
+      ownerNames={ownerNames}
+    />
+  );
 
   // Celular (M3.1): abas de etapa e cartões (as colunas arrastáveis brigam com o
   // dedo), com a MESMA barra empilhada em cima; a Lista vira cards com toque longo.
@@ -237,7 +262,10 @@ export function PipelinePageClient({
           {t("Carregando…")}
         </div>
       ) : vista === "lista" ? (
-        lista(ListaDoFunil)
+        <>
+          {lista(ListaDoFunil)}
+          {dossie}
+        </>
       ) : vista === "calendario" ? (
         // Visão Calendário (#2770, upstream), terceira opção do nosso seletor de
         // vista: o MESMO recorte filtrado do quadro e da lista.
