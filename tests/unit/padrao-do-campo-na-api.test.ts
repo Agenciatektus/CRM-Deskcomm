@@ -65,6 +65,14 @@ const CAMPO_IDADES = {
   mensagem_padrao: "Use só números separados por vírgula, ex.: 2,9",
 };
 
+/**
+ * O MESMO campo, declarado do CONTATO (#2852). A ficha do contato só renderiza
+ * campos `contato` (`camposPorEscopo(..., "contato")`), e a régua filtra igual:
+ * um campo sem `escopo` é do NEGÓCIO, e julgar a ficha do contato por ele seria
+ * cobrar formato de um campo que a tela nem mostra.
+ */
+const CAMPO_IDADES_DO_CONTATO = { ...CAMPO_IDADES, escopo: "contato" };
+
 const ctx: HandlerCtx = {
   organization_id: ORG,
   actor: { type: "user", id: USUARIO },
@@ -231,7 +239,7 @@ beforeEach(() => {
 
 describe("POST /api/v1/contacts — o valor fora do padrão não nasce", () => {
   it("recusa com 422, a frase DO CAMPO, e não grava nada", async () => {
-    const { cliente, inserts } = bancoDeContatos([CAMPO_IDADES]);
+    const { cliente, inserts } = bancoDeContatos([CAMPO_IDADES_DO_CONTATO]);
 
     const erro = await recusa(
       createContactHandler(cliente, ctx, {
@@ -249,7 +257,7 @@ describe("POST /api/v1/contacts — o valor fora do padrão não nasce", () => {
   });
 
   it("o valor que casa passa e chega ao banco intacto", async () => {
-    const { cliente, inserts } = bancoDeContatos([CAMPO_IDADES]);
+    const { cliente, inserts } = bancoDeContatos([CAMPO_IDADES_DO_CONTATO]);
 
     await createContactHandler(cliente, ctx, {
       name: "Ana",
@@ -274,7 +282,9 @@ describe("POST /api/v1/contacts — o valor fora do padrão não nasce", () => {
   });
 
   it("regex inválida configurada fecha com 422 legível — não 500", async () => {
-    const { cliente, inserts } = bancoDeContatos([{ ...CAMPO_IDADES, padrao: "^\\d{1,2(" }]);
+    const { cliente, inserts } = bancoDeContatos([
+      { ...CAMPO_IDADES_DO_CONTATO, padrao: "^\\d{1,2(" },
+    ]);
 
     const erro = await recusa(
       createContactHandler(cliente, ctx, {
@@ -292,7 +302,7 @@ describe("POST /api/v1/contacts — o valor fora do padrão não nasce", () => {
 
   it("sem `mensagem_padrao`, a genérica sai JÁ TRADUZIDA pelo idioma do contexto", async () => {
     const { cliente } = bancoDeContatos([
-      { key: "idades", label: "Idades", type: "text", padrao: "^\\d+$" },
+      { key: "idades", label: "Idades", type: "text", padrao: "^\\d+$", escopo: "contato" },
     ]);
 
     const erro = await recusa(
@@ -314,7 +324,7 @@ describe("POST /api/v1/contacts — o valor fora do padrão não nasce", () => {
 
 describe("PATCH /api/v1/contacts/{id} — a mesma régua na edição", () => {
   it("recusa o valor fora do padrão e o contato não é atualizado", async () => {
-    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES]);
+    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES_DO_CONTATO]);
 
     const erro = await recusa(
       patchContactHandler(cliente, ctx, CONTATO, { custom_fields: { idades: "123" } }),
@@ -326,7 +336,7 @@ describe("PATCH /api/v1/contacts/{id} — a mesma régua na edição", () => {
   });
 
   it("o valor que casa atualiza, e campos SEM padrão seguem livres", async () => {
-    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES, CAMPO_LIVRE]);
+    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES_DO_CONTATO, CAMPO_LIVRE]);
 
     await patchContactHandler(cliente, ctx, CONTATO, {
       custom_fields: { idades: "2,9", observacao: "escrevi o que quis" },
@@ -422,7 +432,7 @@ const CAMPO_TEM_CRIANCAS = { key: "tem_criancas", label: "Tem crianças", type: 
 
 /** `idades` só aparece quando `tem_criancas = "sim"` (issue #2728). */
 const CAMPO_IDADES_ESCONDIDO = {
-  ...CAMPO_IDADES,
+  ...CAMPO_IDADES_DO_CONTATO,
   mostrar_quando: { campo: "tem_criancas", operador: "igual", valor: "sim" },
 };
 
@@ -464,7 +474,7 @@ describe("PATCH /api/v1/contacts/{id} — julga só o que mudou (#2814)", () => 
     // `ContactsTable` abre o diálogo SEM `customFieldDefs` (#2715): o cliente não
     // barra nada e o mapa inteiro vai ao servidor. Sem o diff, o 422 vinha por um
     // campo que nunca apareceu na tela.
-    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES], {
+    const { cliente, updates } = bancoDeContatos([CAMPO_IDADES_DO_CONTATO], {
       gravados: { idades: "dois" },
     });
 
