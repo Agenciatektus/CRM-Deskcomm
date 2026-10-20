@@ -86,6 +86,9 @@ export function AplicativoNoCelular() {
         <Caixa estado={estado}>
           <p className="font-medium">{t("Este navegador não conseguiu preparar o app neste endereço.")}</p>
           <p className="text-muted-foreground">
+            {t("Se o sistema acabou de ser atualizado, espere um pouco e recarregue a página.")}
+          </p>
+          <p className="text-muted-foreground">
             {t(
               "Isso acontece no modo privado e quando o certificado de segurança do endereço não é reconhecido. Abra o endereço no Chrome ou no Safari, fora do modo privado; se continuar, quem administra o servidor precisa de um certificado válido.",
             )}
