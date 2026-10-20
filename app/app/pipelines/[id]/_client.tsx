@@ -139,6 +139,9 @@ export function PipelinePageClient({
       pipelineId={pipelineId}
       vocabulary={data?.pipeline.vocabulary ?? null}
       tagsExistentes={tagsDoQuadro}
+      leads={ordenados}
+      funis={funis}
+      ownerNames={ownerNames}
       onClear={() => setSelectedIds([])}
     />
   );

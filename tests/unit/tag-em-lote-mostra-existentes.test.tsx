@@ -76,7 +76,7 @@ function renderBarra() {
       selectedIds={["l-1", "l-2"]}
       stages={[]}
       pipelineId="p-1"
-      tagsExistentes={["google", "indicação", "vip"]}
+      tagsExistentes={["google", "indicação", "vip"]} leads={[]} funis={[]} ownerNames={new Map()}
       onClear={vi.fn()}
     />,
   );
