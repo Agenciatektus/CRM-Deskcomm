@@ -204,18 +204,13 @@ describe("PUT /connections/:id/recipes", () => {
       throw new Error("fixos_invalidos:woocommerce-produtos: prefixo deve ser string");
     });
 
-    const { visto, client } = banco({
-      data: { receitas: [INSTANCIA], db_type: "mysql" },
-    });
-    deps.admin.mockReturnValue(client);
-
     const res = await PUT(put({ receitas: [INSTANCIA] }), ctx);
 
     expect(res.status).toBe(422);
     const texto = JSON.stringify(await res.json());
     expect(texto).toContain("validation_failed");
     expect(deps.audit).not.toHaveBeenCalled();
-    expect(visto.payload).toBeUndefined();
+    expect(deps.admin.mock.calls).toHaveLength(0);
   });
 
   it("a organização vem da sessão (organization_id no corpo é ignorado)", async () => {
