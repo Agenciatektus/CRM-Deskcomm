@@ -253,6 +253,16 @@ export function motivoDoVeto(codigo: string | null | undefined): MotivoDaFalha |
         texto:
           "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.",
       };
+    case "no_candidate":
+      // O agente leu a conversa e decidiu que não há o que responder (ex.: a
+      // saudação automática do WhatsApp Business de quem foi abordado). É uma
+      // DECISÃO, não uma falha: o texto genérico mandava conferir a configuração.
+      return {
+        codigo,
+        acionavel: false,
+        texto:
+          "O agente avaliou que não há o que responder agora (por exemplo, uma mensagem automática). Nada a enviar; se quiser responder mesmo assim, escreva a mensagem.",
+      };
     default:
       return null;
   }
@@ -280,4 +290,5 @@ export const CODIGOS_DE_VETO_CONHECIDOS: readonly string[] = [
   "produto_nao_encontrado",
   "unknown_preview_tool",
   "generation_failed",
+  "no_candidate",
 ];
