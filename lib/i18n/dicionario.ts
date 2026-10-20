@@ -14421,6 +14421,7 @@ export const DICIONARIO: Traducoes = {
   "A sugestão de campos só está disponível para conexões MySQL.": { es: "La sugerencia de campos solo está disponible para conexiones MySQL." },
   "Receita não suportada para sugestão.": { es: "Receta no admitida para sugerencias." },
   "Uma tabela da receita não foi liberada pelo administrador desta conexão.": { es: "Una tabla de la receta no fue habilitada por el administrador de esta conexión." },
+  "Os parâmetros fixos da receita são inválidos.": { es: "Los parámetros fijos de la receta no son válidos." },
   "Não foi possível abrir a conexão.": { es: "No fue posible abrir la conexión." },
   "Não foi possível consultar o banco de origem agora.": { es: "No fue posible consultar el banco de origen ahora." },
   "Não foi possível montar a consulta desta receita.": { es: "No fue posible armar la consulta de esta receta." },

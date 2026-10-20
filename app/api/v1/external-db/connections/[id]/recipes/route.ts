@@ -116,7 +116,16 @@ export async function PUT(req: NextRequest, ctx: Ctx): Promise<Response> {
   // só aceita mysql, a conexão deve ser mysql.
   let receitasIncompativeis = false;
   for (const inst of receitas) {
-    validarFixosDaReceita(inst.receita, inst.fixos);
+    try {
+      validarFixosDaReceita(inst.receita, inst.fixos);
+    } catch (err) {
+      return fail(
+        "validation_failed",
+        t("Os parâmetros fixos da receita são inválidos."),
+        422,
+        { requestId, details: err instanceof Error ? err.message : String(err) },
+      );
+    }
     const receita = receitaDe(inst.receita);
     if (receita && !receita.motores.includes(conexao.db_type as "mysql" | "postgres")) {
       receitasIncompativeis = true;

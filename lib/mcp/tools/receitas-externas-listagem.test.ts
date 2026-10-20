@@ -25,7 +25,14 @@ function ctxCom(receitas: unknown[]): McpContext {
     actor: { type: "ai_agent", id: "a" },
     apiTokenId: "t",
     requestId: "r",
-    supabase: { from: () => chain },
+    supabase: {
+      from: (tabela: string) => {
+        if (tabela !== "external_db_connections") {
+          throw new Error(`tabela inesperada: ${tabela}`);
+        }
+        return chain;
+      },
+    },
   } as unknown as McpContext;
 }
 

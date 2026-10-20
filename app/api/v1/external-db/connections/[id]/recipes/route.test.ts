@@ -199,6 +199,20 @@ describe("PUT /connections/:id/recipes", () => {
     expect(deps.audit).not.toHaveBeenCalled();
   });
 
+  it("fixos inválidos (validarFixosDaReceita lança): 422 validation_failed", async () => {
+    deps.validarFixos.mockImplementation(() => {
+      throw new Error("fixos_invalidos:woocommerce-produtos: prefixo deve ser string");
+    });
+
+    const res = await PUT(put({ receitas: [INSTANCIA] }), ctx);
+
+    expect(res.status).toBe(422);
+    const texto = JSON.stringify(await res.json());
+    expect(texto).toContain("validation_failed");
+    expect(deps.audit).not.toHaveBeenCalled();
+    expect(deps.admin.mock.calls).toHaveLength(0);
+  });
+
   it("a organização vem da sessão (organization_id no corpo é ignorado)", async () => {
     const { visto, client } = banco({
       data: { receitas: [INSTANCIA], db_type: "mysql" },

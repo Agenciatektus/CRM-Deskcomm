@@ -20,6 +20,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { lerReceitasDoBanco } from "@/lib/external-db/receitas/instancias";
+import { limiteDaReceita } from "@/lib/external-db/receitas/limite";
 import { receitaDe } from "@/lib/external-db/receitas/registro";
 import { abrirAcesso } from "@/lib/external-db/acesso";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
@@ -120,19 +121,14 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
   }
 
-  const limiteItens = Math.min(
-    (buscaValidada as { limite?: number }).limite ?? receita.tetoDeItens,
-    receita.tetoDeItens,
-  );
-
-  // Teto total de itens: limite por termo × número de termos (até 20: 5 × 4).
-  // Sem termos, cai no teto da receita (5), como antes — igual à ferramenta do
-  // agente (crm_consultar_receita), para a prévia mostrar o que o agente recebe.
-  const termos = (buscaValidada as { termos?: unknown[] })?.termos;
-  const limiteMax = Math.min(
-    conexao.max_rows ?? 200,
-    limiteItens * (Array.isArray(termos) ? termos.length : 1),
-  );
+  // Limite igual à ferramenta do agente — mesma conta em
+  // lib/external-db/receitas/limite.
+  const { limiteItens, limiteMax } = limiteDaReceita({
+    buscaLimite: (buscaValidada as { limite?: number }).limite,
+    tetoDeItens: receita.tetoDeItens,
+    maxRows: conexao.max_rows,
+    termos: (buscaValidada as { termos?: unknown[] })?.termos,
+  });
 
   const { sql, valores } = receita.montar(instancia.fixos, buscaValidada, limiteItens);
 

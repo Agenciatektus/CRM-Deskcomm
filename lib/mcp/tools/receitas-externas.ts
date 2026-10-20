@@ -23,6 +23,7 @@ import { z } from "zod";
 
 import { abrirAcesso } from "@/lib/external-db/acesso";
 import { lerReceitasDoBanco } from "@/lib/external-db/receitas/instancias";
+import { limiteDaReceita } from "@/lib/external-db/receitas/limite";
 import { receitaDe } from "@/lib/external-db/receitas/registro";
 import type { McpContext, McpToolDefinition } from "@/lib/mcp/types";
 
@@ -119,8 +120,8 @@ export const crmConsultarReceita: McpToolDefinition<typeof consultaReceitaShape>
 
     const admin = ctx.supabase;
     const { data: conexoes, error } = await admin
-      .from("external_db_connections_safe")
-      .select("id, db_type, receitas")
+      .from("external_db_connections")
+      .select("id, db_type, receitas, max_rows")
       .eq("organization_id", ctx.organizationId)
       .eq("enabled", true)
       .eq("id", resolvida.connectionId)
@@ -211,12 +212,16 @@ export const crmConsultarReceita: McpToolDefinition<typeof consultaReceitaShape>
     }
 
     const prefixo = (instancia.fixos as { prefixo?: string }).prefixo ?? "wp_";
-    const { sql, valores } = receita.montar(instancia.fixos, buscaValidada, receita.tetoDeItens);
 
-    // Teto total de itens: limite por termo × número de termos (até 20: 5 × 4).
-    // Sem termos, cai no teto da receita (5), como antes.
-    const termos = (buscaValidada as { termos?: unknown[] })?.termos;
-    const limiteMax = receita.tetoDeItens * (Array.isArray(termos) ? termos.length : 1);
+    // Limite igual à prévia — mesma conta em lib/external-db/receitas/limite.
+    const { limiteItens, limiteMax } = limiteDaReceita({
+      buscaLimite: (buscaValidada as { limite?: number }).limite,
+      tetoDeItens: receita.tetoDeItens,
+      maxRows: conexoes.max_rows,
+      termos: (buscaValidada as { termos?: unknown[] })?.termos,
+    });
+
+    const { sql, valores } = receita.montar(instancia.fixos, buscaValidada, limiteItens);
 
     let resultado;
     try {
