@@ -39,6 +39,7 @@ import {
 } from "@/hooks/campanhas/useConfiguracao";
 import { useT } from "@/hooks/i18n/useT";
 import { RITMO_RECOMENDADO } from "@/lib/campanhas/ritmo-recomendado";
+import { minutosParaSegundos, segundosParaMinutos } from "@/lib/campanhas/unidades";
 import { ArrowBendUpLeft } from "@/lib/ui/icons";
 
 export function ConfiguracaoDeCampanhas() {
@@ -84,7 +85,7 @@ function Padroes() {
     const c = q.data?.configuracao;
     if (!c || carregado) return;
     setAtribuicao(String(c.atribuicao_horas));
-    setIntervalo(txt(c.intervalo_segundos));
+    setIntervalo(txt(segundosParaMinutos(c.intervalo_segundos)));
     setTetoDia(txt(c.teto_diario));
     setTetoHora(txt(c.teto_horario));
     setInicio(txt(c.janela_inicio_hora));
@@ -106,7 +107,7 @@ function Padroes() {
             ritmo seguro é como os cinco campos abaixo eram usados até agora. */}
         <p className="text-sm text-muted-foreground">
           {t("Campo vazio usa o ritmo recomendado para lista fria:")}{" "}
-          {RITMO_RECOMENDADO.intervaloSegundos}s {t("entre mensagens,")}{" "}
+          {segundosParaMinutos(RITMO_RECOMENDADO.intervaloSegundos)} min {t("entre disparos,")}{" "}
           {RITMO_RECOMENDADO.tetoDiario} {t("por dia,")} {RITMO_RECOMENDADO.tetoHorario}{" "}
           {t("por hora, das")} {RITMO_RECOMENDADO.janelaInicioHora}h {t("às")}{" "}
           {RITMO_RECOMENDADO.janelaFimHora}h.
@@ -129,7 +130,7 @@ function Padroes() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Campo id="p-intervalo" rotulo={t("Intervalo mínimo entre mensagens (segundos)")} valor={intervalo} onChange={setIntervalo} />
+        <Campo id="p-intervalo" rotulo={t("Intervalo mínimo entre disparos (minutos)")} valor={intervalo} onChange={setIntervalo} />
         <Campo id="p-dia" rotulo={t("Máximo por dia")} valor={tetoDia} onChange={setTetoDia} />
         <Campo id="p-hora" rotulo={t("Máximo por hora")} valor={tetoHora} onChange={setTetoHora} />
         <div />
@@ -152,7 +153,7 @@ function Padroes() {
           onClick={() =>
             salvar.mutate({
               atribuicao_horas: Number(atribuicao) || 72,
-              intervalo_segundos: num(intervalo),
+              intervalo_segundos: minutosParaSegundos(num(intervalo)),
               teto_diario: num(tetoDia),
               teto_horario: num(tetoHora),
               janela_inicio_hora: num(inicio),
