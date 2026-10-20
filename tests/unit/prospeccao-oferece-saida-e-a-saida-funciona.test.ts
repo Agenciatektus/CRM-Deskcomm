@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { comSaida, palavraDeSaida, rodapeDeSaida } from "@/lib/prospecting/rodape-de-saida";
 import { ehPedidoDeOptOut } from "@/lib/opt-out/deteccao";
+import { DICIONARIO } from "@/lib/i18n/dicionario";
 
 /**
  * A PRIMEIRA MENSAGEM FRIA TEM DE OFERECER UMA SAÍDA — E A SAÍDA TEM DE FUNCIONAR.
@@ -52,6 +53,12 @@ describe("a abordagem fria oferece uma saída", () => {
     // defeito que este módulo conserta.
     expect(rodapeDeSaida("de-DE")).toContain("PARAR");
     expect(rodapeDeSaida(null)).toContain("PARAR");
+  });
+
+  it("em espanhol, a dica da tela cita o MESMO rodapé que é enviado (tratamento por tú)", () => {
+    const dica =
+      DICIONARIO["A abertura já diz como parar: Se não quiser mais receber mensagens, responda PARAR."]?.es ?? "";
+    expect(dica.toLowerCase()).toContain(rodapeDeSaida("es").toLowerCase());
   });
 });
 

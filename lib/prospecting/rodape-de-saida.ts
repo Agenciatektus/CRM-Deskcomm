@@ -48,7 +48,7 @@ const PALAVRA_POR_IDIOMA: Record<string, string> = {
 
 const TEXTO_POR_IDIOMA: Record<string, (palavra: string) => string> = {
   pt: (p) => `Se não quiser mais receber mensagens, responda ${p}.`,
-  es: (p) => `Si no querés recibir más mensajes, respondé ${p}.`,
+  es: (p) => `Si no quieres recibir más mensajes, responde ${p}.`,
   en: (p) => `If you'd rather not receive these messages, reply ${p}.`,
 };
 

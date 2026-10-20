@@ -511,7 +511,7 @@ export function ProspectingClient() {
                     {campaign.error}
                   </p>
                 )}
-                <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-5">
                   {[
                     [t("Encontrados"), candidates.length],
                     [t("Na fila"), count(["queued", "sending"])],
@@ -1243,7 +1243,9 @@ export function ProspectingClient() {
                                   {t("Mensagem:")} {c.message_status}
                                 </p>
                               )}
-                              {campaign?.config?.exit_offer === "second_message" && (
+                              {/* Só quem já recebeu a 1ª mensagem: o worker grava automatic_sends=1 quando ela sai. */}
+                              {campaign?.config?.exit_offer === "second_message" &&
+                                (c.automatic_sends ?? 0) > 0 && (
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {c.exit_offered_at
                                     ? t("Saída oferecida")
