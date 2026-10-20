@@ -104,7 +104,7 @@ cada atendente teria de reativar os avisos à mão. Operador não edita `.env` p
 | **F4** | Gestor e acabamento | Telas do gestor no celular; acabamento das superfícies que sobrarem |
 
 **Critério de pronto da F1 inclui aparelho real.** O CI não tem par VAPID nem celular, então
-`e2e` verde não prova que o aviso chega. A F1 só fecha com evidência em `.superpowers/evidence/`
+`e2e` verde não prova que o aviso chega. A F1 só fecha com evidência em `evidence/<data>-<entrega>/` (versionado)
 de, num **Android real** e num **iPhone real** (app adicionado à tela de início), numa
 instalação HTTPS fresca: instalar pelo caminho guiado, abrir pelo ícone com a marca da
 instalação, receber o aviso com o app fechado e a tela bloqueada mostrando o que a decisão (a)
