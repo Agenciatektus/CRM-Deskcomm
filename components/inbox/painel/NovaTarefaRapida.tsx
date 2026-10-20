@@ -39,11 +39,16 @@ export interface PedidoDeTarefa {
  * próximo passo ter HORA. Tarefa sem prazo é lembrete solto, e quem precisa
  * dela tem a tela de Tarefas.
  */
-export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar }: {
+export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar, opcaoDoDono }: {
   usuarioId: string;
   membros: AssignableMember[];
   salvando: boolean;
   onCriar: (pedido: PedidoDeTarefa) => Promise<boolean>;
+  /**
+   * A barra em lote do Funil: com o rótulo, o responsável começa em "o de cada
+   * negócio" (valor vazio em `assigned_to`, resolvido por negócio por quem chama).
+   */
+  opcaoDoDono?: string;
 }) {
   const t = useT();
   // `useId`: o painel pode estar montado duas vezes (coluna larga e a gaveta do
@@ -51,7 +56,7 @@ export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar }: {
   const id = useId();
   const [titulo, setTitulo] = useState("");
   const [prazo, setPrazo] = useState<Date | null>(null);
-  const [responsavel, setResponsavel] = useState(usuarioId);
+  const [responsavel, setResponsavel] = useState(opcaoDoDono ? "" : usuarioId);
   // A chave do "Quando" muda depois de criar: o grupo remonta limpo, sem um
   // atalho aceso apontando para um prazo que já foi usado.
   const [rodada, setRodada] = useState(0);
@@ -110,6 +115,7 @@ export function NovaTarefaRapida({ usuarioId, membros, salvando, onCriar }: {
         onValueChange={(valorEscolhido) => setResponsavel(valorEscolhido)}
         className="h-9"
       >
+        {opcaoDoDono && <option value="">{opcaoDoDono}</option>}
         <option value={usuarioId}>{t("Você")}</option>
         {outros.map((m) => (
           <option key={m.user_id} value={m.user_id}>{m.full_name ?? t("Sem nome")}</option>
