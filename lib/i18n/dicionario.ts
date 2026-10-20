@@ -17516,6 +17516,7 @@ export const DICIONARIO: Traducoes = {
   "Mais ações…": { es: "Más acciones…" },
   "Definir próximo passo…": { es: "Definir próximo paso…" },
   "Definir próximo passo": { es: "Definir próximo paso" },
+  "Definindo o próximo passo nos selecionados": { es: "Definiendo el próximo paso en los seleccionados" },
   "Marcar como ganho…": { es: "Marcar como ganado…" },
   "Criando a tarefa nos selecionados": { es: "Creando la tarea en los seleccionados" },
   "Responsável de cada negócio": { es: "Responsable de cada negocio" },

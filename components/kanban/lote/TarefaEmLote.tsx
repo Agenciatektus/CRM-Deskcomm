@@ -57,7 +57,7 @@ export function TarefaEmLote({
     const ids = [...selectedIds];
     const agendado = agendarNoLote(
       pipelineId,
-      (s) => `${t("Criando a tarefa nos selecionados")} (${s} s)`,
+      (s) => `${t("Definindo o próximo passo nos selecionados")} (${s} s)`,
       t("Desfazer"),
       async () => {
         await porNegocio(

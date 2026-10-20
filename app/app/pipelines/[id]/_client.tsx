@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
@@ -173,7 +173,13 @@ export function PipelinePageClient({
         onAbrir={setDossieDaLista}
       />
     );
-  const leadDaLista = dossieDaLista ? (data?.leads.find((l) => l.id === dossieDaLista) ?? null) : null;
+  const leadDaLista =
+    vista === "lista" && dossieDaLista ? (ordenados.find((l) => l.id === dossieDaLista) ?? null) : null;
+  // Trocou de vista ou o lead saiu do recorte: o dossiê fecha de vez, em vez de
+  // reabrir sozinho quando a pessoa volta para a Lista.
+  useEffect(() => {
+    if (dossieDaLista && !leadDaLista) setDossieDaLista(null);
+  }, [dossieDaLista, leadDaLista]);
   const dossie = data && leadDaLista && (
     <LeadDossier
       open

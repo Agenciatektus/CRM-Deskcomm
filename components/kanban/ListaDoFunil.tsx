@@ -61,7 +61,13 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
   // (marcar, próximo passo, link). No nome, Ctrl/⌘/clique do meio continuam abrindo
   // a página do lead em outra aba.
   const clicaLinha = (id: string) => (e: MouseEvent<HTMLTableRowElement>) => {
-    if (!onAbrir || (e.target as HTMLElement).closest("a, button, input, label, [role=menuitem], [role=dialog]")) return;
+    // O clique do React sobe pela árvore de componentes, não pelo DOM: o que vem de
+    // um portal aberto a partir da linha (popover, diálogo) não está DENTRO do <tr>.
+    // Arrastar para selecionar texto também não é pedido para abrir.
+    const alvo = e.target as Node;
+    if (!onAbrir || !e.currentTarget.contains(alvo)) return;
+    if ((alvo as HTMLElement).closest?.("a, button, input, label, [role=menuitem], [role=dialog]")) return;
+    if (window.getSelection()?.toString()) return;
     onAbrir(id);
   };
   const clicaNome = (id: string) => (e: MouseEvent<HTMLAnchorElement>) => {
