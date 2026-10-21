@@ -18,6 +18,11 @@ import { ProfileForm } from "./_form";
 vi.mock("@/app/actions/settings/updateProfile", () => ({
   updateProfile: vi.fn(async () => ({ ok: true })),
 }));
+vi.mock("@/app/actions/settings/trocarEmail", () => ({
+  trocarEmail: vi.fn(async () => ({ ok: true, novoEmail: "nova@empresa.com" })),
+}));
+// O campo de foto recarrega o servidor depois de subir (`router.refresh`).
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 function renderForm(locale: "pt-BR" | "es", initialLocale: "pt-BR" | "es") {
   return render(
@@ -48,6 +53,10 @@ describe("ProfileForm em espanhol", () => {
     expect(screen.getByText("Nombre completo")).toBeTruthy();
     expect(screen.getByText("Zona horaria")).toBeTruthy();
     expect(screen.queryByText("Nome completo")).toBeNull();
+    // Os dois "em breve" viraram funcionalidade: a foto sobe e o e-mail troca.
+    expect(screen.getByText("Foto de perfil")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cambiar correo" })).toBeTruthy();
+    expect(screen.queryByText(/próximamente|llegará pronto/i)).toBeNull();
   });
 
   it("a voz do espanhol é tuteio neutro — voseo reprova", () => {

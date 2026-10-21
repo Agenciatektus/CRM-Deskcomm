@@ -218,6 +218,7 @@ export function LeadDossier({
           <OwnerBadge
             ownerKind={owner.kind}
             ownerName={owner.name}
+            ownerUserId={owner.userId}
             agentVersion={owner.agentVersion}
           />
           {score && (

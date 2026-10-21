@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateProfile } from "@/app/actions/settings/updateProfile";
+import { CampoDeFoto } from "@/components/fotos/CampoDeFoto";
 import { useT } from "@/hooks/i18n/useT";
 import { IDIOMAS_VISIVEIS } from "@/lib/i18n/registro";
 import {
@@ -23,19 +24,32 @@ import {
 } from "@/lib/schemas/settings";
 import { FUSOS_OFERECIDOS } from "@/lib/tempo/fusos";
 
+import { TrocaDeEmail } from "./_troca-de-email";
+
 // A mesma lista de toda tela de fuso — ver `lib/tempo/fusos.ts`.
 const TIMEZONES = FUSOS_OFERECIDOS.map((f) => f.codigo);
 
 interface Props {
   email: string;
+  /** Endereço novo aguardando confirmação (`auth.users.new_email`), se houver. */
+  emailPendente?: string | null;
   initialFullName: string | null;
   initialAvatarUrl: string | null;
   initialLocale: Locale | typeof SEM_PREFERENCIA_DE_IDIOMA;
   initialTimezone: string;
 }
 
+/** Iniciais para o disco sem foto: duas palavras do nome, ou o começo do e-mail. */
+function iniciais(nome: string, email: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return email.slice(0, 2).toUpperCase();
+  if (partes.length === 1) return partes[0]!.slice(0, 2).toUpperCase();
+  return (partes[0]![0]! + partes[partes.length - 1]![0]!).toUpperCase();
+}
+
 export function ProfileForm({
   email,
+  emailPendente = null,
   initialFullName,
   initialAvatarUrl,
   initialLocale,
@@ -45,7 +59,6 @@ export function ProfileForm({
   const [fullName, setFullName] = useState(initialFullName ?? "");
   const [locale, setLocale] = useState<Locale | typeof SEM_PREFERENCIA_DE_IDIOMA>(initialLocale);
   const [timezone, setTimezone] = useState(initialTimezone);
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? "");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -54,7 +67,6 @@ export function ProfileForm({
       full_name: fullName || null,
       locale,
       timezone,
-      avatar_url: avatarUrl || null,
     });
     if (!parsed.success) {
       toast.error(t("Dados inválidos."));
@@ -68,15 +80,22 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl">
+    <div className="max-w-xl space-y-4">
+    <Card className="space-y-4 p-6">
+      {/* A foto sobe na hora, fora do "Salvar": é arquivo, não campo do formulário. */}
+      <CampoDeFoto
+        id="avatar"
+        rotulo={t("Foto de perfil")}
+        rota="/api/v1/perfil/foto"
+        campoDaResposta="avatar_url"
+        urlInicial={initialAvatarUrl}
+        substituto={iniciais(fullName, email)}
+        forma="circulo"
+      />
+    </Card>
+    <TrocaDeEmail email={email} pendente={emailPendente} />
+    <form onSubmit={handleSubmit}>
       <Card className="space-y-4 p-6">
-        <div className="space-y-2">
-          <Label htmlFor="email">{t("Email")}</Label>
-          <Input id="email" value={email} disabled />
-          <p className="text-xs text-muted-foreground">
-            {t("Trocar email — em breve.")}
-          </p>
-        </div>
         <div className="space-y-2">
           <Label htmlFor="full_name">{t("Nome completo")}</Label>
           <Input
@@ -125,19 +144,6 @@ export function ProfileForm({
             </Select>
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="avatar_url">{t("Avatar URL")}</Label>
-          <Input
-            id="avatar_url"
-            type="url"
-            placeholder="https://…"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            {t("Upload de arquivo — em breve. Cole uma URL pública.")}
-          </p>
-        </div>
         <div className="flex sm:justify-end">
           <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
             {isPending ? t("Salvando…") : t("Salvar")}
@@ -145,5 +151,6 @@ export function ProfileForm({
         </div>
       </Card>
     </form>
+    </div>
   );
 }

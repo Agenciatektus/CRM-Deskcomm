@@ -2,6 +2,7 @@
 import { useT } from "@/hooks/i18n/useT";
 import { Badge } from "@/components/ui/badge";
 import type { OwnerKind } from "@/lib/types/leads";
+import { FotoDaPessoa } from "@/components/fotos/FotoDaPessoa";
 
 /** Iniciais a partir do nome (primeira + última palavra). */
 export function ownerInitials(name: string): string {
@@ -24,11 +25,14 @@ export function ownerInitials(name: string): string {
 export function OwnerBadge({
   ownerKind,
   ownerName,
+  ownerUserId,
   agentVersion,
   compacto = false,
 }: {
   ownerKind: OwnerKind;
   ownerName: string | null;
+  /** A pessoa dona (só humano): com ele o disco mostra a foto dela, se houver. */
+  ownerUserId?: string | null;
   /** Versão publicada do agente no momento da exibição (nunca congelada no lead). */
   agentVersion?: number | null;
   /**
@@ -69,6 +73,13 @@ export function OwnerBadge({
       aria-label={`${t("Responsável")}: ${fullLabel}`}
       title={fullLabel}
     >
+      {!isAgent && ownerUserId ? (
+        <FotoDaPessoa
+          userId={ownerUserId}
+          iniciais={ownerName ? ownerInitials(ownerName) : "?"}
+          className={`flex ${compacto ? "h-4 w-4 text-[8px]" : "h-6 w-6 text-[10px]"} shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-accent-foreground`}
+        />
+      ) : (
       <span
         className={
           isAgent
@@ -83,6 +94,7 @@ export function OwnerBadge({
       >
         {ownerName ? ownerInitials(ownerName) : "?"}
       </span>
+      )}
       <span
         className={`truncate text-text-muted ${compacto ? "max-w-[7rem] text-[10px]" : "max-w-[9rem] text-xs"}`}
       >

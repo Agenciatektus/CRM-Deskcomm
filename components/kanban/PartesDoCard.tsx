@@ -14,6 +14,7 @@ import type { Lead } from "@/lib/types/leads";
 import { CalendarBlank, Clock, Flag, Hourglass, Plus } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { OwnerBadge, ownerInitials } from "./OwnerBadge";
+import { FotoDaPessoa } from "@/components/fotos/FotoDaPessoa";
 
 /** Até 2 etiquetas e um "+N" com a lista completa no título. */
 export function EtiquetasDoCard({ tags }: { tags: string[] }) {
@@ -137,12 +138,11 @@ export function ResponsavelDoCard({ owner }: { owner: OwnerDisplay }) {
       className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-text-muted"
       title={`${t("Responsável")}: ${nome}`}
     >
-      <span
-        aria-hidden
+      <FotoDaPessoa
+        userId={owner.userId}
+        iniciais={ownerInitials(nome)}
         className={cn("grid size-5 shrink-0 place-items-center rounded-full text-[9.5px] font-bold", classeDaCorDoAvatar(nome))}
-      >
-        {ownerInitials(nome)}
-      </span>
+      />
       <span className="sr-only">{t("Responsável")}: </span>
       <span className="truncate">{primeiroNome(nome)}</span>
     </span>

@@ -24,6 +24,44 @@ export function siglaDaOrganizacao(nome: string | null | undefined): string {
   return letras.toUpperCase();
 }
 
+/** A URL da foto de uma organização da pessoa, ou `null`. */
+function fotoDe(
+  organizacoes: ReadonlyArray<{ organization_id: string; foto_url?: string | null }> | undefined,
+  orgId: string | undefined,
+): string | null {
+  if (!orgId) return null;
+  return organizacoes?.find((o) => o.organization_id === orgId)?.foto_url ?? null;
+}
+
+/**
+ * A foto da organização, ou a sigla quando não há foto OU quando a imagem não
+ * carrega (assinatura vencida, arquivo apagado): o quadrado nunca fica vazio nem
+ * mostra o ícone de imagem quebrada.
+ */
+function ImagemOuSigla({ foto, sigla, classe }: { foto: string | null; sigla: string; classe?: string }) {
+  const [quebrou, setQuebrou] = useState(false);
+  if (!foto || quebrou) {
+    return classe ? (
+      <span aria-hidden className={`${classe} grid place-items-center bg-accent text-[9px] font-bold text-accent-foreground`}>
+        {sigla}
+      </span>
+    ) : (
+      <span aria-hidden>{sigla}</span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a URL é a rota que confere o vínculo e assina
+    <img
+      src={foto}
+      alt=""
+      aria-hidden
+      data-testid="foto-da-organizacao"
+      onError={() => setQuebrou(true)}
+      className={classe ? `${classe} object-cover` : "size-full rounded-[inherit] object-cover"}
+    />
+  );
+}
+
 /**
  * A troca de organização. Duas formas:
  *  - `trilho` (quadro DS, `.rail-tenant`): o quadrado de 40px no topo do
@@ -60,6 +98,9 @@ export function TenantSwitcher({
 
   const podeTrocar = (user.organizations?.length ?? 0) > 1 || !!user.is_platform_admin;
   const sigla = siglaDaOrganizacao(active?.name);
+  // A FOTO da organização (migration 9061) no lugar da sigla, quando houver. A
+  // URL vem pronta das memberships; sem foto, a sigla fica como sempre foi.
+  const fotoAtiva = fotoDe(user.organizations, active?.orgId);
   // O texto branco sobre o degradê do escuro é rótulo de 13px/700: vai no
   // degradê do contador (meio 4,92:1), o mesmo piso dos selos pequenos.
   const QUADRADO =
@@ -67,7 +108,7 @@ export function TenantSwitcher({
   if (variante === "trilho" && !podeTrocar) {
     return (
       <span className={QUADRADO} title={active?.name ?? undefined} data-testid="sigla-da-organizacao">
-        <span aria-hidden>{sigla}</span>
+        <ImagemOuSigla foto={fotoAtiva} sigla={sigla} />
         <span className="sr-only">{`${t("Organização")}: ${active?.name ?? ""}`}</span>
       </span>
     );
@@ -89,7 +130,7 @@ export function TenantSwitcher({
             data-testid="tenant-switcher"
             className={`${QUADRADO} hover:shadow-[0_0_0_3px_var(--color-accent-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-70`}
           >
-            {sigla}
+            <ImagemOuSigla foto={fotoAtiva} sigla={sigla} />
           </button>
         ) : variante === "linha" ? (
           // No "Mais" do celular há espaço: o nome da organização vai escrito, e a
@@ -101,7 +142,11 @@ export function TenantSwitcher({
             data-testid="tenant-switcher"
             className="pele-foco flex min-w-0 flex-1 items-center gap-3 rounded-md text-left disabled:opacity-70"
           >
-            <Storefront size={20} weight="duotone" aria-hidden className="shrink-0 text-text-muted" />
+            {fotoAtiva ? (
+              <ImagemOuSigla foto={fotoAtiva} sigla={sigla} classe="size-8 shrink-0 rounded-[9px]" />
+            ) : (
+              <Storefront size={20} weight="duotone" aria-hidden className="shrink-0 text-text-muted" />
+            )}
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="text-xs text-text-muted">{t("Organização")}</span>
               <span className="truncate text-base font-semibold text-text">{active?.name ?? t("Selecionar org")}</span>
@@ -138,7 +183,11 @@ export function TenantSwitcher({
           title={user.support ? "Saia do acompanhamento para trocar de organização" : undefined}
           data-testid="tenant-switcher"
         >
-          <Storefront size={16} weight="duotone" aria-hidden />
+          {fotoAtiva ? (
+            <ImagemOuSigla foto={fotoAtiva} sigla={sigla} classe="size-6 shrink-0 rounded-[7px]" />
+          ) : (
+            <Storefront size={16} weight="duotone" aria-hidden />
+          )}
           <span className="hidden max-w-[160px] truncate md:inline">
             {active?.name ?? "Selecionar org"}
           </span>
@@ -152,9 +201,18 @@ export function TenantSwitcher({
             key={org.organization_id}
             data-testid={`tenant-switcher-item-${org.organization_id}`}
             onClick={() => { void switchTo(org.organization_id); }}
-            className="flex items-center justify-between"
+            className="flex items-center justify-between gap-2"
           >
-            <span className="truncate">{org.organization_name}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              {org.foto_url ? (
+                <ImagemOuSigla
+                  foto={org.foto_url}
+                  sigla={siglaDaOrganizacao(org.organization_name)}
+                  classe="size-5 shrink-0 rounded-[6px]"
+                />
+              ) : null}
+              <span className="truncate">{org.organization_name}</span>
+            </span>
             {active?.orgId === org.organization_id && <span className="text-xs text-muted-foreground">✓</span>}
           </DropdownMenuItem>
         ))}

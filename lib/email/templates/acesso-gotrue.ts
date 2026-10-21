@@ -34,9 +34,9 @@ import { NEUTROS_DE_SAIDA, type MarcaDeSaida } from "@/lib/branding/saida";
  * o separador e o parser de URL do browser pararia de reconhecer `token_hash`.
  */
 
-export type ModeloDeAcesso = "confirmation" | "recovery";
+export type ModeloDeAcesso = "confirmation" | "recovery" | "email_change";
 
-export const MODELOS_DE_ACESSO: readonly ModeloDeAcesso[] = ["confirmation", "recovery"];
+export const MODELOS_DE_ACESSO: readonly ModeloDeAcesso[] = ["confirmation", "recovery", "email_change"];
 
 /** O texto de cada modelo. Assunto entra no `GOTRUE_MAILER_SUBJECTS_*`. */
 const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo: string; corpo: (marca: string) => string; botao: string; rodape: string }> = {
@@ -56,6 +56,19 @@ const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo
     botao: "Definir nova senha",
     rodape:
       "Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.",
+  },
+  // A troca de e-mail da tela de Perfil (`trocarEmail`). Com a troca segura do
+  // GoTrue o MESMO modelo vai para o endereço atual e para o novo, cada um com o
+  // seu `TokenHash` — por isso o texto serve aos dois. `.RedirectTo` chega com
+  // `?type=email_change` (o `emailRedirectTo` da action).
+  email_change: {
+    assunto: (marca) => `Confirme a troca de e-mail · ${marca}`,
+    titulo: "Confirme a troca de e-mail",
+    corpo: (marca) =>
+      `Recebemos um pedido para trocar o e-mail de acesso da sua conta no ${marca}. Clique no botão abaixo para confirmar. A troca só vale depois da confirmação.`,
+    botao: "Confirmar troca de e-mail",
+    rodape:
+      "Se não foi você quem pediu, ignore este e-mail e avise quem administra a sua empresa. O e-mail da conta continua o mesmo.",
   },
 };
 
