@@ -63,7 +63,7 @@ describe("o catálogo da loja chega ao acervo", () => {
     // primeiras 200 peças entram e o resto some sem aviso.
     const worker = ler("workers/rag-indexer.ts");
     expect(worker).toMatch(/per_page=200&page=\$\{pagina\}/);
-    expect(worker).toMatch(/pagina <= 50/);
+    expect(worker).toMatch(/pagina <= TETO_DE_PAGINAS/);
   });
 
   it("CONTROLE — evento sem produto e sem a marca de carga continua recusado", () => {
@@ -71,5 +71,57 @@ describe("o catálogo da loja chega ao acervo", () => {
     // evento vazio, e precisa continuar saindo com motivo.
     const worker = ler("workers/rag-indexer.ts");
     expect(worker).toContain('return { fonte: null, motivo: "evento_sem_product_id" }');
+  });
+  /**
+   * As três cercas abaixo nasceram de uma revisão que achou DOIS P0 com os
+   * testes anteriores no verde. É o motivo de elas existirem: cerca que lê
+   * string no arquivo não alcança comportamento.
+   */
+
+  it("⭐ a credencial é decifrada com o argumento que a função tem", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    // `fn_decrypt_oauth(ciphertext bytea)` — um argumento. Pedia-se
+    // `p_organization_id`/`p_integration_id`, que não existem em assinatura
+    // nenhuma: a credencial voltava nula e o catálogo ficava vazio em silêncio.
+    expect(worker).toContain('rpc("fn_decrypt_oauth", {');
+    expect(worker).toContain("ciphertext: cifrado");
+    // `p_integration_id:` com dois-pontos é sintaxe de objeto: o comentário
+    // que explica o bug pode citar o nome, a CHAMADA não pode usá-lo.
+    expect(worker).not.toContain("p_integration_id:");
+    // E o select precisa trazer o que vai ser decifrado.
+    expect(worker).toContain("oauth_access_token_encrypted");
+  });
+
+  it("⭐ nenhum `rpc(... as never)` em workers/ — foi ele que escondeu o bug do compilador", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    expect(worker).not.toMatch(/rpc\(\s*"[^"]+"\s*as never/);
+  });
+
+  it("⭐ evento de UM produto reindexa o catálogo inteiro, nunca só ele", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    // A versão criada é ATIVADA e desliga a anterior, e a busca só enxerga a
+    // ativa. Publicar uma versão com um produto apagaria a loja do acervo.
+    expect(worker).toContain("return { fonte, ...(fonte ? {} : { motivo: \"fonte_de_catalogo_indisponivel\" }) };");
+    // o productId não é mais repassado para a indexação
+    expect(worker).not.toMatch(/\{\s*fonte,\s*\.\.\.\(catalogoInteiro \? \{\} : \{ productId \}\)/);
+  });
+
+  it("⭐ listagem incompleta FALHA em vez de publicar catálogo pela metade", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    // Página que falha sobe erro (o drain reagenda); teto atingido com página
+    // cheia também. O que não pode é truncado virar versão ativa: o
+    // `content_hash` do truncado faz a carga seguinte ser pulada por
+    // "sem_mudanca", e aí ninguém mais percebe.
+    expect(worker).toContain("catálogo incompleto: página");
+    expect(worker).toContain("catálogo maior que o teto desta carga");
+    expect(worker).not.toMatch(/console\.warn\([^)]*página do catálogo falhou[\s\S]{0,200}break;/);
+  });
+
+  it("CONTROLE — o teto é baixo de propósito, por causa do reaper de 10 minutos", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    expect(worker).toContain("const TETO_DE_PAGINAS = 10;");
+    // 50 páginas (10 mil produtos) passariam da janela do drain e dariam dois
+    // workers na mesma fonte, com embedding pago em dobro.
+    expect(worker).not.toMatch(/pagina <= 50/);
   });
 });
