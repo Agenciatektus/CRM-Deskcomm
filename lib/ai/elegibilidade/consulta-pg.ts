@@ -23,8 +23,6 @@ interface LinhaDeElegibilidade {
   ai_authorized_at: Date | string | null;
   phone_number: string | null;
   org_status: string | null;
-  /** `bool_and` dos agentes da sessão: `null` quando não há nenhum. */
-  so_organiza: boolean | null;
 }
 
 /**
@@ -44,28 +42,7 @@ export async function decidirElegibilidadeDaConversa(
        cv.bot_silenced_until        as bot_silenced_until,
        ct.ai_authorized_at          as ai_authorized_at,
        ct.phone_number              as phone_number,
-       o.status                     as org_status,
-       -- PRÉ-FILTRO CONSERVADOR, não a palavra final. Quem decide é a segunda
-       -- checagem do turno, feita sobre o agente JÁ RESOLVIDO
-       -- (inbound-turn.ts): o roteador escolhe entre membros que podem estar
-       -- presos a outra sessão, então o conjunto daqui nunca é exatamente o
-       -- que vai atender.
-       --
-       -- Por isso o predicado é o do loader, e não o da tela: sem is_active
-       -- (que loadPublishedAgentConfig ignora de propósito) e sem paused_at
-       -- (pausar não despublica). Excluir aqui um agente que FALA tornaria o
-       -- bool_and mais fácil de dar true, que é o erro na direção insegura.
-       -- Com um agente que fala entre os candidatos, a conversa assumida
-       -- continua protegida. E bool_and sobre conjunto vazio devolve null, que
-       -- o montador lê como \"não\": sessão sem agente publicado também não
-       -- ganha liberação nenhuma.
-       (select bool_and(v.somente_interno)
-          from ai_agents a
-          join ai_agent_versions v on v.id = a.published_version_id
-         where a.organization_id = cv.organization_id
-           and a.archived_at is null
-           and v.status = 'published'
-           and v.channel_session_id = cv.channel_session_id) as so_organiza
+       o.status                     as org_status
      from conversations cv
      join organizations o on o.id = cv.organization_id
      join contacts ct
@@ -93,7 +70,6 @@ export async function decidirElegibilidadeDaConversa(
       aiAuthorizedAt: r.ai_authorized_at,
       agora: input.agora,
       ttlMs: input.ttlMs,
-      agenteSomenteInterno: r.so_organiza,
     }),
   );
 }

@@ -1631,34 +1631,6 @@ export async function avisarCapacidadesAusentes(
  * `true` quando o turno foi silenciado — aí não há rascunho o que rascunhar e
  * nada mais pode sair nele.
  */
-/**
- * A CONVERSA É DE UMA PESSOA? (9060)
- *
- * Esta pergunta existe porque o gate de elegibilidade libera a conversa
- * assumida quando TODOS os agentes publicados da sessão são auxiliares de CRM —
- * e esse conjunto não é o que atende. O roteador escolhe entre membros que
- * podem estar presos a outra sessão, e o loader por id não filtra sessão.
- *
- * Então a liberação só é segura depois de saber QUEM vai atuar. Ela mora aqui,
- * e não no call site, porque a primeira versão desta trava ficou num ponto só e
- * dois ramos assistidos a contornaram — a correção que vale é a que todo
- * chamador novo herda sem precisar lembrar dela.
- */
-export async function conversaEhDeHumano(
-  pool: pg.Pool,
-  tenantId: string,
-  conversationId: string,
-): Promise<boolean> {
-  const { rows } = await pool.query<{ bloqueia: boolean }>(
-    `select (cv.assignee_kind = 'user'
-             or (cv.bot_silenced_until is not null and cv.bot_silenced_until > now())) as bloqueia
-       from conversations cv
-      where cv.organization_id = $1 and cv.id = $2`,
-    [tenantId, conversationId],
-  );
-  return rows[0]?.bloqueia === true;
-}
-
 export async function deteccoesDeterministicasDoAssistido(
   pool: pg.Pool,
   deps: InboundTurnDeps,
@@ -1680,17 +1652,6 @@ export async function deteccoesDeterministicasDoAssistido(
 ): Promise<boolean> {
   const { job, tenantId, conversationId, channelSessionId, leadId, agent, log } = args;
   const clock = deps.clock ?? ((): Date => new Date());
-
-  // Um agente que FALA não atua em conversa de pessoa, nem pelo ramo assistido.
-  // A detecção daqui termina em `avisarLeadDaEscalacao`, que manda texto ao
-  // cliente e grava `force_human` — irreversível pela regra dura 2.
-  if (!agent.somenteInterno && (await conversaEhDeHumano(pool, tenantId, conversationId))) {
-    log.info('assistido: conversa é de uma pessoa e quem atenderia fala — detecção não roda', {
-      conversation_id: conversationId,
-      agent_id: agent.agentId,
-    });
-    return false;
-  }
 
   // O QUE O CLIENTE DISSE e ainda não foi respondido — a MESMA fonte do caminho
   // automático (`inboundsNaoRespondidos`): um pedido de parar que chegou na 2ª
@@ -1757,7 +1718,6 @@ export async function deteccoesDeterministicasDoAssistido(
       jobClaim: claimOfJob(job),
     },
     base: {
-      agenteSomenteInterno: agent.somenteInterno,
       channel: deps.channel
         ? deps.channel(pool)
         : new WahaChannelAdapter(pool, { ...deps.crmCfg, agentActorId: agent.agentId }),
@@ -1928,10 +1888,6 @@ export async function runAgentTurn(
           },
           {
             motivo: 'orcamento_de_ia',
-            // Teto de orçamento estourado: o aviso é do SISTEMA, não do agente
-            // (ele nem chegou a rodar). `false` aqui é a leitura certa, e o
-            // campo é obrigatório para ninguém decidir isso por omissão.
-            agenteSomenteInterno: false,
             channel: (deps.channel ?? ((p: pg.Pool) => new WahaChannelAdapter(p, deps.crmCfg)))(
               pool,
             ),
@@ -2189,34 +2145,6 @@ async function executarTurnoDoAgente(
         inbound: liveJob().kind === 'inbound_turn',
       }, { log: runLog, jev: deps.jev });
   const agentConfig = routed.config;
-
-  // ── A SEGUNDA CHECAGEM, E A QUE DECIDE (9060) ────────────────────────────
-  //
-  // O gate lá em cima roda ANTES de saber quem vai atender: ele pergunta ao SQL
-  // se todos os agentes publicados da sessão são auxiliares de CRM. Esse
-  // conjunto não é o mesmo que `resolveConversationTurn` devolve — o roteador
-  // escolhe entre membros que podem estar presos a outra sessão, e o loader por
-  // id não filtra sessão, `is_active` nem `paused_at`.
-  //
-  // O buraco é concreto: sessão com UM auxiliar publicado libera a conversa
-  // assumida, e o classificador então escolhe um membro do roteador que FALA.
-  // Aqui o agente já está resolvido, então a pergunta pode ser feita do jeito
-  // certo — sobre quem de fato vai atender.
-  // `agentConfig` nulo NÃO é ausência de voz: é o agente GENÉRICO respondendo
-  // ("config: null é o fim legítimo da linha", `resolve-turn-agent.ts`). Ele
-  // fala, logo entra na mesma trava. Tratar nulo como "não fala" obrigaria a
-  // provar que esse caminho é inalcançável sob liberação, e provar custa mais
-  // do que fechar.
-  if (!preview && !agentConfig?.somenteInterno) {
-    if (await conversaEhDeHumano(pool, tenantId, input.conversationId)) {
-      runLog.info('turno descartado: a conversa é de uma pessoa e quem atenderia fala com o cliente', {
-        conversation_id: input.conversationId,
-        agent_id: agentConfig?.agentId ?? '(agente genérico)',
-      });
-      return;
-    }
-  }
-
   if (!preview && input.conducao && agentConfig?.operationMode === 'assisted') {
     // Defensivo: o handler só manda condução AUTOMÁTICA para cá com agente
     // automático. Rascunho aqui sairia sem a condução — não gera nada.
@@ -2324,13 +2252,7 @@ async function executarTurnoDoAgente(
             conversationId: input.conversationId,
             contactId: leadId,
             channelSessionId: input.channelSessionId,
-            // AUXILIAR DE CRM (9060): este aviso sai por `sendMessageHandler`
-            // direto, SEM passar pela cadeia de guardrails — o veto de
-            // `runBeforeSend` não o alcança. Zerar o texto é o que o cala, e é
-            // onde a trava tem de estar: com a liberação do gate, um auxiliar
-            // com janela configurada mandaria "estamos fechados" às 23h na
-            // conversa de um atendente.
-            texto: agentConfig.somenteInterno ? null : (agentConfig.avisoForaDoHorario ?? null),
+            texto: agentConfig.avisoForaDoHorario ?? null,
             janela: agentConfig.janelaDeAtendimento,
             agora: clock(),
           },
@@ -2649,7 +2571,6 @@ async function executarTurnoDoAgente(
       agentOperation,
     },
     base: {
-      agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
       channel: liveChannel(),
       optedOutThisTurn,
       // #2112: o TIPO do turno decide a janela do aviso — `inbound_turn`/
@@ -3321,7 +3242,6 @@ async function executarTurnoDoAgente(
         });
 
         const chain = await runBeforeSend({
-          agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
           pool,
           log: runLog,
           agentOperation,
@@ -3655,7 +3575,6 @@ async function executarTurnoDoAgente(
           // Args reusados EXATAMENTE (mesmo objeto) no re-run do fail-safe abaixo — só
           // hasOpenCase/openedCaseThisTurn mudam depois do auto-abre-caso.
           const beforeSendArgs = {
-            agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
             pool,
             log: runLog,
             agentOperation,
@@ -5260,7 +5179,6 @@ async function executarTurnoDoAgente(
             // de mensagens físicas do turno (F2-15b).
             if (!perguntaDoRoteiroPodeSair({ turnoDescartado, seq, maxSendsPerTurn })) return false;
             const chain = await runBeforeSend({
-              agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
               pool,
               log: runLog,
               agentOperation,
@@ -5820,9 +5738,6 @@ function avisoAoLeadDoTurno(
       },
       {
         motivo: 'outro',
-        // Mesma leitura do aviso de orçamento: quem avisa aqui é o sistema,
-        // num caminho de falha, e não a voz de um agente publicado.
-        agenteSomenteInterno: false,
         channel: (deps.channel ?? ((p: pg.Pool) => new WahaChannelAdapter(p, deps.crmCfg)))(pool),
         now: deps.clock?.() ?? new Date(),
         log,
@@ -5880,22 +5795,7 @@ async function podeGerarRascunho(
   job: JobRow,
   contactId: string,
   conversationId: string,
-  /**
-   * Quem vai rascunhar. Obrigatório (9060): a conversa pode ter sido liberada
-   * porque os agentes publicados da SESSÃO são auxiliares, e o agente da
-   * condução vem por id, sem filtro de sessão. Sem este parâmetro a pergunta
-   * "pode atuar aqui?" seria respondida sobre outro agente.
-   */
-  agent: PublishedAgentConfig,
 ): Promise<boolean> {
-  if (!agent.somenteInterno && (await conversaEhDeHumano(pool, job.organization_id, conversationId))) {
-    deps.log.info('rascunho pulado — conversa é de uma pessoa e quem rascunharia fala', {
-      job_id: job.id,
-      conversation_id: conversationId,
-      agent_id: agent.agentId,
-    });
-    return false;
-  }
   if (await isLeadInHandoff(pool, job.organization_id, contactId)) {
     deps.log.info('rascunho pulado — lead em handoff humano (bot silenciado)', {
       job_id: job.id,
@@ -5975,8 +5875,7 @@ async function turnoDaConducao(
   };
 
   if (conducao.modo === 'assistido') {
-    if (!(await podeGerarRascunho(deps, pool, job, contactId, payload.conversation_id, config)))
-      return;
+    if (!(await podeGerarRascunho(deps, pool, job, contactId, payload.conversation_id))) return;
     // #1648 (upstream) — as detecções DETERMINÍSTICAS (STOP/opt-out e pedido de
     // humano) rodam antes do rascunho também na condução: o pedido de parar não
     // pode depender de uma aprovação que talvez nunca venha (LGPD).
@@ -6133,27 +6032,6 @@ export function createInboundTurnHandler(deps: InboundTurnDeps) {
       }
       const { generateReplyDraft } = await import('./reply-drafts');
       if (!job.contact_id) throw new Error('reply_without_contact');
-      // AUXILIAR DE CRM (9060): a mesma porta do outro ramo de rascunho, e não
-      // mais um gate inline próprio.
-      //
-      // `false` da detecção acima quer dizer "olhei e não detectei nada" E
-      // "não olhei, porque este agente não atua aqui" — a mesma palavra para
-      // duas coisas. Era por essa ambiguidade que o rascunho de um agente que
-      // FALA nascia na conversa de uma pessoa: nada saía para o cliente, mas
-      // reabria o defeito que o docstring de `podeGerarRascunho` registra como
-      // consertado. Perguntar de novo, pela porta única, desfaz o duplo sentido.
-      if (
-        !(await podeGerarRascunho(
-          deps,
-          pool,
-          job,
-          job.contact_id,
-          payload.conversation_id,
-          operationAgent,
-        ))
-      ) {
-        return;
-      }
       await generateReplyDraft(pool, deps, {
         organizationId: job.organization_id,
         conversationId: payload.conversation_id,

@@ -23,7 +23,6 @@ import { carregarServidorMcpExternoDoTurno } from '@/lib/mcp/servidor-externo/ca
 import { pickToolsFromMcp, type RuntimeHandoffSignal } from '@/lib/ai/runtime/tools';
 import { mintEphemeralToken, revokeEphemeralToken } from '@/lib/ai/runtime/mcp_token';
 import { IDS_DO_HARNESS, motivoDoHarness } from '@/lib/mcp/tools/ferramentas-do-harness';
-import { FERRAMENTAS_VEDADAS_AO_AUXILIAR } from "@/lib/ai/agents/validation";
 import type { McpAuthResult } from '@/lib/mcp/auth';
 import type { McpContext } from '@/lib/mcp/types';
 import { modulosLigados } from '@/lib/instalacao/modulos';
@@ -78,29 +77,7 @@ export async function buildMcpTurnTools(
     agentConfig.toolIds,
     agentConfig.followup,
   );
-  // AUXILIAR DE CRM (9060): a ferramenta que abre conversa e manda a primeira
-  // mensagem (`crm_start_conversation_and_send`) chama o envio DIRETO, sem
-  // passar por `runBeforeSend` — o veto da cadeia não a alcança. Ela não está
-  // em `BLOCKED_TOOL_IDS` porque, para um agente que fala, ela é legítima.
-  //
-  // Para quem não fala, não é: tirá-la daqui é o único ponto que a cala sem
-  // mudar o produto para os outros agentes. Vale para toda a lista de
-  // `FERRAMENTAS_QUE_FALAM`, e não só para esta, porque a próxima ferramenta de
-  // envio vai nascer na mesma lista.
-  // A lista mora em `validation.ts` e é a MESMA que a publicação confere: duas
-  // cópias já tinham nascido aqui e no teste, e a cerca passava por cada lado
-  // ter a sua, não por eles concordarem.
-  const falamNoTurno = agentConfig.somenteInterno
-    ? callbackFiltered.filter((id) => FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(id))
-    : [];
-  if (falamNoTurno.length > 0) {
-    log.warn('tools de envio recusadas: este agente é auxiliar de CRM e não fala com o cliente', {
-      tool_ids: falamNoTurno,
-    });
-  }
-  const allowed = callbackFiltered.filter(
-    (id) => !BLOCKED_TOOL_IDS.has(id) && !falamNoTurno.includes(id),
-  );
+  const allowed = callbackFiltered.filter((id) => !BLOCKED_TOOL_IDS.has(id));
   const blocked = agentConfig.toolIds.filter((id) => BLOCKED_TOOL_IDS.has(id));
   if (blocked.length > 0) {
     // A tela não oferece mais estas capacidades (a rota serve `marcavel: false`

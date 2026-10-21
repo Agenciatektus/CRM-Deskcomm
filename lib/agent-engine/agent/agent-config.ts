@@ -81,14 +81,6 @@ export interface PublishedAgentConfig {
    * na chave do self-hoster não se liga por migration, se liga na tela.
    */
   operatorEnabled: boolean;
-  /**
-   * Auxiliar de CRM (migration 9060): este agente NÃO fala com o cliente.
-   * Quem lê isto decide duas coisas opostas — o gate de elegibilidade LIBERA as
-   * travas da passagem humana (elas protegem a fala), e a cadeia de envio VETA
-   * qualquer saída. As duas leituras vêm da mesma linha de propósito: se um dia
-   * divergirem, o agente fala em conversa de outra pessoa.
-   */
-  somenteInterno: boolean;
   /** modelo do papel Operador. `null` = herda `model` (o do Conversador). */
   operatorModel: string | null;
   /**
@@ -156,7 +148,6 @@ interface Row {
   active_kb_version_id: string | null;
   config: Record<string, unknown> | null;
   operator_enabled: boolean | null;
-  somente_interno: boolean | null;
   operator_model: string | null;
   operator_tool_ids: string[] | null;
   pipeline_ids: string[] | null;
@@ -190,7 +181,6 @@ const SELECT_AGENT_CONFIG_COLUMNS = `a.operation_mode,a.paused_at,a.operation_re
             a.active_kb_version_id,
             a.config,
             v.operator_enabled,
-            v.somente_interno,
             v.operator_model,
             v.operator_tool_ids,
             v.pipeline_ids,
@@ -259,7 +249,6 @@ function mapAgentConfigRow(r: Row): PublishedAgentConfig {
     // como null/undefined, e a direção segura é o papel DESLIGADO — nunca gastar
     // modelo por causa de um schema desatualizado.
     operatorEnabled: r.operator_enabled ?? false,
-    somenteInterno: r.somente_interno ?? false,
     operatorModel: r.operator_model,
     // `?? []` cobre o clone sem a 0112: sem coluna, o papel roda sem mão em vez
     // de herdar a lista do Conversador — a direção segura é agir de menos.
