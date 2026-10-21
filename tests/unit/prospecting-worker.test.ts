@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   authorize: vi.fn(),
   knobs: vi.fn(),
   open: vi.fn(),
+  prospeccaoAberta: vi.fn(),
+  pacing: vi.fn(),
   paradas: vi.fn(),
   prepare: vi.fn(),
 }));
@@ -44,8 +46,13 @@ vi.mock("@/lib/agent-engine/pacing/store", () => ({
 }));
 vi.mock("@/lib/agent-engine/pacing/engine", () => ({
   janelaDeEnvioAberta: mocks.open,
-  decidePacing: () => ({ allow: true, waitMs: 0 }),
+  // A prospecção lê o portão próprio (dias + horas, 0642) — o genérico não é
+  // mais chamado neste worker. Sem estas duas chaves o import morre e TODOS os
+  // casos desta suíte falham com "not a function", não só os de janela.
+  janelaDeProspeccaoAberta: mocks.prospeccaoAberta,
+  decidePacing: mocks.pacing,
   proximaAberturaDaJanela: () => new Date(Date.now() + 3600000),
+  proximaAberturaDaProspeccao: () => new Date(Date.now() + 3600000),
   // O ritmo da esteira fria (`lib/prospecting/ritmo-da-esteira-fria.ts`) deriva
   // o teto diário DESTA função em vez de manter uma tabela de degraus própria.
   // O mock precisa dela, senão o import do worker morre antes de qualquer caso
@@ -138,6 +145,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.knobs.mockResolvedValue({ knobs: {} });
   mocks.open.mockReturnValue(true);
+  mocks.prospeccaoAberta.mockReturnValue(true);
+  mocks.pacing.mockReturnValue({ allow: true, waitMs: 0 });
   mocks.preflight.mockResolvedValue({ permite: true });
   mocks.guard.mockResolvedValue(undefined);
   mocks.continuation.mockResolvedValue(undefined);
@@ -214,6 +223,13 @@ describe("gradual outreach", () => {
     expect(mocks.generate).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
   });
+  it("pede o ritmo como prospecção: o gate genérico não veta o domingo que os dias próprios liberaram", async () => {
+    await sendNextCandidate({} as never, database() as never, {} as never, campaign);
+    // Sem a flag, o veto de domingo do gate genérico barra a abordagem que o
+    // portão próprio deixou passar: a prospecção de domingo é reagendada para
+    // segunda, calada, mesmo com o domingo marcado na caixa da prospecção.
+    expect(mocks.pacing).toHaveBeenCalledWith(expect.objectContaining({ prospeccao: true }));
+  });
   it("keeps spacing across campaign switches", async () => {
     await sendNextCandidate(
       {} as never,
@@ -224,9 +240,17 @@ describe("gradual outreach", () => {
     expect(mocks.generate).not.toHaveBeenCalled();
   });
   it("stops outside the configured window", async () => {
-    mocks.open.mockReturnValue(false);
-    await sendNextCandidate({} as never, database() as never, {} as never, campaign);
+    mocks.prospeccaoAberta.mockReturnValue(false);
+    const db = database();
+    await sendNextCandidate({} as never, db as never, {} as never, campaign);
     expect(mocks.send).not.toHaveBeenCalled();
+    // Sem tentativa e sem trilha: reagendou para a próxima abertura e voltou.
+    expect(
+      db.query.mock.calls.some(
+        ([q]) => q.includes("update prospecting_campaigns set next_send_at=$3"),
+      ),
+    ).toBe(true);
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
   it("fails closed when channel settings cannot be read", async () => {
     mocks.knobs.mockRejectedValue(new Error("database unavailable"));
@@ -258,6 +282,56 @@ describe("gradual outreach", () => {
     expect(
       db.query.mock.calls.some(([q]) => q.startsWith("update messages set status='failed'")),
     ).toBe(true);
+  });
+
+  it("envio não confirmado não marca contagem nem reserva", async () => {
+    mocks.send.mockResolvedValue({ status: "failed" });
+    const db = database();
+    await sendNextCandidate({} as never, db as never, {} as never, campaign);
+    const updates = db.query.mock.calls
+      .map(([q]) => q)
+      .filter((q) => q.includes("automatic_sends = case when"));
+    expect(updates.length).toBe(1);
+    // O status enviado é 'failed' (não 'sent'), então o case when não grava 1 nem now().
+    const params = (db.query.mock.calls.find(([q]) => q.includes("automatic_sends = case when")) as [string, unknown[]] | undefined)?.[1];
+    expect(params?.[2]).toBe("failed");
+    // Sanidade: o ramo antigo (incondicional) usaria automatic_sends=1 direto.
+    expect(updates[0]!).not.toContain("automatic_sends=1");
+    expect(updates[0]!).not.toContain("exit_offered_at=now()");
+  });
+
+  it("modo first_message (padrão): corpo leva a saída", async () => {
+    const db = database();
+    await sendNextCandidate({} as never, db as never, {} as never, campaign);
+    const body = mocks.send.mock.calls[0]?.[2]?.body as string;
+    expect(body).toContain("PARAR");
+  });
+
+  it("modo second_message: corpo é o texto cru (sem PARAR) e a instrução traz a frase sem oferta", async () => {
+    const atrasada = {
+      ...campaign,
+      config: { ...campaign.config, exit_offer: "second_message" },
+    } as Campaign;
+    const db = database();
+    await sendNextCandidate({} as never, db as never, {} as never, atrasada);
+    const body = mocks.send.mock.calls[0]?.[2]?.body as string;
+    expect(body).not.toContain("PARAR");
+    const instrucao = mocks.generate.mock.calls[0]?.[2]?.instrucao as string;
+    expect(instrucao).toContain("NÃO apresenta serviço");
+  });
+
+  it("config sem exit_offer comporta-se como first_message", async () => {
+    const semChave = {
+      ...campaign,
+      config: { ...campaign.config },
+    } as Campaign;
+    delete (semChave.config as Record<string, unknown>).exit_offer;
+    const db = database();
+    await sendNextCandidate({} as never, db as never, {} as never, semChave);
+    const body = mocks.send.mock.calls[0]?.[2]?.body as string;
+    expect(body).toContain("PARAR");
+    const instrucao = mocks.generate.mock.calls[0]?.[2]?.instrucao as string;
+    expect(instrucao).not.toContain("NÃO apresenta serviço");
   });
 });
 
@@ -351,6 +425,63 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
     expect(dormir, "bolhas seguidas sem pausa é cadência de robô").toHaveBeenCalledTimes(
       corpos.length - 1,
     );
+  });
+
+  /**
+   * A CONFIGURAÇÃO DECIDE ONDE A SAÍDA É OFERECIDA (migration 0705).
+   *
+   * `exit_offer` tem dois valores, e o worker respeita os dois: em
+   * `first_message` a saída vai junto da PRIMEIRA bolha; em `second_message` a
+   * saída é RESERVADA por `saida-configuravel.ts` (`exit_offered_at`) e servida
+   * na SEGUNDA mensagem (`context.ts` manda o agente só cumprimentar na
+   * primeira). Pôr o rodapé aqui incondicionalmente ofereceria a saída duas
+   * vezes — e na mensagem que o operador não escolheu.
+   */
+  async function bolhasComExitOffer(modo: "first_message" | "second_message") {
+    mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
+    mocks.send.mockResolvedValue({ status: "sent", id: "balao" });
+    const escolhida = {
+      ...campaign,
+      config: { ...campaign.config, exit_offer: modo },
+    } as Campaign;
+    const db = database(undefined, candidate, versaoComEstilo);
+    await sendNextCandidate({} as never, db as never, {} as never, escolhida, dormir);
+    return {
+      corpos: mocks.send.mock.calls.map(([, , input]) => String(input?.body)),
+      db,
+    };
+  }
+
+  it("exit_offer=first_message: o rodapé sai na 1ª bolha e a reserva é gravada neste envio", async () => {
+    const { corpos, db } = await bolhasComExitOffer("first_message");
+    expect(corpos.length, "a abordagem saiu em uma mensagem só").toBeGreaterThan(1);
+    expect(corpos[0], "a saída não está na 1ª bolha").toContain("responda PARAR");
+    // Oferecida na PRIMEIRA mensagem, é neste envio que a saída fica reservada —
+    // é isso que impede a 2ª mensagem de oferecê-la de novo.
+    const reserva = db.query.mock.calls.find(([q]) => q.includes("exit_offered_at"));
+    expect(String(reserva?.[0])).toContain("and true then now()");
+  });
+
+  it("exit_offer=second_message: a 1ª bolha sai SEM o rodapé — a saída é da 2ª mensagem", async () => {
+    const { corpos, db } = await bolhasComExitOffer("second_message");
+    expect(corpos.length, "a abordagem saiu em uma mensagem só").toBeGreaterThan(1);
+    for (const corpo of corpos)
+      expect(
+        corpo,
+        "o rodapé saiu sem a configuração mandar: a saída seria oferecida duas vezes",
+      ).not.toContain("responda PARAR");
+    // O texto do modelo chega inteiro e fatiado: o que a configuração muda é ONDE
+    // a saída é oferecida, não o estilo de resposta.
+    const somado = corpos.join(" ");
+    expect(somado).toContain("vender mais.");
+    expect(somado).toContain("atendem hoje.");
+    // A GUARDA LEVE entre as bolhas seguintes continua valendo — a pessoa
+    // responder no meio PARA a abordagem (sem pausar a campanha).
+    expect(mocks.continuation).toHaveBeenCalledTimes(corpos.length - 1);
+    expect(dormir).toHaveBeenCalledTimes(corpos.length - 1);
+    // E este envio NÃO reserva a saída: quem reserva é a 2ª mensagem.
+    const reserva = db.query.mock.calls.find(([q]) => q.includes("exit_offered_at"));
+    expect(String(reserva?.[0])).toContain("and false then now()");
   });
 
   it("sem o estilo ligado, a abordagem continua saindo em UMA mensagem (não regredir)", async () => {

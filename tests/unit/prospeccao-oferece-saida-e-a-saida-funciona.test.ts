@@ -91,7 +91,15 @@ describe("o caminho de envio usa o rodapé — e não o texto cru do modelo", ()
     // procura as quatro pernas, não só a chamada.
     const worker = fs.readFileSync(path.join(RAIZ, "lib/prospecting/worker.ts"), "utf8");
     expect(worker).toMatch(/splitForSend\(\s*generated\.texto/);
-    expect(worker).toMatch(/baloes\[0\]\s*=\s*comSaida\(/);
+    // A saída continua entrando na 1ª bolha — mas CONDICIONADA à configuração da
+    // campanha (`exit_offer`, migration 0705): só no modo `first_message` ela é
+    // oferecida já na primeira mensagem. No modo `second_message` quem reserva e
+    // serve a saída é a 2ª mensagem (`saida-configuravel.ts`/`context.ts`), e um
+    // rodapé incondicional aqui a ofereceria duas vezes — e na mensagem errada.
+    expect(
+      worker,
+      "o envio precisa mandar comSaida(...) na primeira bolha, e só quando exit_offer === \"first_message\"",
+    ).toMatch(/cfg\.exit_offer\s*===\s*"first_message"\)\s*baloes\[0\]\s*=\s*comSaida\(/);
     expect(worker).toMatch(/body:\s*baloes\[i\]/);
     expect(
       worker.includes("body: generated.texto"),

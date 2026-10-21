@@ -5,8 +5,8 @@ import { sendMessageHandler } from "@/app/api/v1/messages/_handler";
 import { loadChannelKnobs, loadPacingState, recordSend } from "@/lib/agent-engine/pacing/store";
 import {
   decidePacing,
-  janelaDeEnvioAberta,
-  proximaAberturaDaJanela,
+  janelaDeProspeccaoAberta,
+  proximaAberturaDaProspeccao,
 } from "@/lib/agent-engine/pacing/engine";
 import { gerarAbordagemDeFormulario } from "@/lib/agent-engine/agent/abordagem-de-formulario";
 import { llmEdgeConfigFromEnv } from "@/lib/agent-engine/edge/llm/credentials";
@@ -60,7 +60,13 @@ export async function sendNextCandidate(
     cfg.channel_session_id,
   );
   const now = new Date();
-  const nextWindow = janelaDeEnvioAberta(now, knobs) ? null : proximaAberturaDaJanela(now, knobs);
+  // O PORTÃO DA PROSPECÇÃO: dias próprios (`prospeccao_dias`, 0642) + horas de
+  // disparo — e NÃO o domingo compartilhado. Fora dele, o envio fica agendado
+  // para a próxima abertura, sem tentativa e sem queimar quota: a fila espera,
+  // não morre. Resposta, massa e retomada seguem o portão genérico delas.
+  const nextWindow = janelaDeProspeccaoAberta(now, knobs)
+    ? null
+    : proximaAberturaDaProspeccao(now, knobs);
   if (nextWindow) {
     await db.query(
       "update prospecting_campaigns set next_send_at=$3 where organization_id=$1 and id=$2",
@@ -85,6 +91,10 @@ export async function sendNextCandidate(
     knobs,
     state: pacingState,
     crmDailyLimit: channel.daily_message_limit,
+    // Sem isto, o veto de domingo do portão genérico calaria a prospecção no
+    // dia que os dias próprios liberaram — o atalho acima deixaria passar e o
+    // gate barraria: a fila andaria um dia e pararia no outro, sem motivo visível.
+    prospeccao: true,
   });
   if (!pacing.allow || pacing.waitMs > 0) {
     const next = pacing.allow ? new Date(now.getTime() + pacing.waitMs) : pacing.nextAllowedAt;
@@ -244,7 +254,13 @@ export async function sendNextCandidate(
       tenantId: c.organization_id,
       agentId: cfg.agent_id,
       leadId: p.contact_id,
-      instrucao: `${cfg.instruction}\nFaça uma primeira abordagem curta e transparente. Os dados vieram de pesquisa pública, não de um formulário preenchido pela pessoa. Não invente familiaridade, resultados ou interesse. Uma pergunta por vez. Critérios a confirmar durante a conversa: ${cfg.qualification}`,
+      instrucao: `${
+        cfg.instruction
+      }\nFaça uma primeira abordagem curta e transparente. Os dados vieram de pesquisa pública, não de um formulário preenchido pela pessoa. Não invente familiaridade, resultados ou interesse. Uma pergunta por vez. Critérios a confirmar durante a conversa: ${cfg.qualification}${
+        cfg.exit_offer === "first_message"
+          ? ""
+          : "\nEsta primeira mensagem NÃO apresenta serviço, preço nem proposta: só cumprimenta e confirma se falou com a empresa certa."
+      }`,
       origem: "Pesquisa de empresas",
       // NÃO é `automacao`: a pessoa não entrou em funil nenhum. O prompt do
       // ramo frio é o único que proíbe afirmar preenchimento — ver blocoDeModo.
@@ -274,7 +290,9 @@ export async function sendNextCandidate(
     if (!authorization.ok)
       throw new ProspectingError("Não foi possível preparar o atendimento da resposta.");
     // A SAÍDA é montada aqui — não pedida ao modelo — e vai JUNTO DA PRIMEIRA
-    // BOLHA. Sem ela, a saída que a pessoa usa é "Denunciar spam", que é
+    // BOLHA quando a CAMPANHA manda oferecê-la aí (`exit_offer`, migration 0705:
+    // ver o `if` depois de `splitForSend`). Sem ela, a saída que a pessoa usa é
+    // "Denunciar spam", que é
     // invisível ao sistema e queima o número do CLIENTE que instalou. O idioma
     // sai de `organizations.locale`: um rodapé em português numa instalação em
     // espanhol oferece uma palavra que a pessoa não responde, e o detector de
@@ -299,10 +317,19 @@ export async function sendNextCandidate(
       agent.split_max_chars ?? 600,
     );
     // Texto vazio com o estilo ligado não devolve bolha nenhuma (`splitForSend` →
-    // `[]`), e a abordagem fria não pode sair SEM a saída: neste caso a bolha é
-    // só o rodapé.
+    // `[]`), e a abordagem fria não pode sair sem bolha nenhuma: neste caso a
+    // primeira bolha é vazia (e, no modo `first_message`, é ela que leva o rodapé).
     if (baloes.length === 0) baloes.push("");
-    baloes[0] = comSaida(baloes[0]!, locale);
+    // A SAÍDA ENTRA NA 1ª BOLHA SÓ QUANDO A CONFIGURAÇÃO MANDA OFERECÊ-LA JÁ NA
+    // PRIMEIRA MENSAGEM. `exit_offer` (migration 0705, `prospecting_saida_configuravel`)
+    // tem dois valores: em `"first_message"` a saída sai junto da PRIMEIRA
+    // mensagem — é o caso acima, e sem ela quem recebe a apresentação fica SEM
+    // caminho de volta; em `"second_message"` a saída é RESERVADA por
+    // `saida-configuravel.ts` (`exit_offered_at`) e servida na SEGUNDA mensagem
+    // (é o `context.ts` que manda o agente só cumprimentar na primeira). Pôr o
+    // rodapé aqui incondicionalmente ofereceria a saída DUAS vezes — e na
+    // mensagem que o operador não escolheu.
+    if (cfg.exit_offer === "first_message") baloes[0] = comSaida(baloes[0]!, locale);
     let mensagem: Message | undefined;
     let falhouEm: Message | undefined;
     /** A conversa deixou de ser fria ENTRE bolhas: a pessoa respondeu ou um humano assumiu. */
@@ -407,8 +434,12 @@ export async function sendNextCandidate(
     // ter respondido — que é o que a campanha inteira existe para conseguir. O
     // que não saiu fica na trilha, com a contagem de bolhas.
     const abordou = sent || parouEm !== undefined;
+    const ehPrimeira = cfg.exit_offer === "first_message";
     await db.query(
-      "update prospecting_candidates set status=$3,error=$4,updated_at=now() where organization_id=$1 and id=$2",
+      `update prospecting_candidates set status=$3,
+        automatic_sends = case when $3 = 'sent' then 1 else automatic_sends end,
+        exit_offered_at = case when $3 = 'sent' and ${ehPrimeira} then now() else exit_offered_at end,
+        error=$4, updated_at=now() where organization_id=$1 and id=$2`,
       [
         c.organization_id,
         p.id,

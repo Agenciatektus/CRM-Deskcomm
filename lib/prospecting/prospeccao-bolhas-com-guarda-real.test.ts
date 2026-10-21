@@ -101,6 +101,12 @@ vi.mock("@/lib/agent-engine/pacing/store", () => ({
 }));
 vi.mock("@/lib/agent-engine/pacing/engine", () => ({
   janelaDeEnvioAberta: mocks.open,
+  // O PORTÃO PRÓPRIO DA PROSPECÇÃO (dias + horas, 0642) chegou com a main, e o
+  // worker o consulta ANTES de qualquer envio: sem estas duas chaves o dublê não
+  // tem a função, o tick morre com "not a function" e NENHUMA bolha sai — o caso
+  // ficaria vermelho por um buraco do dublê, não pelo defeito que ele mede.
+  janelaDeProspeccaoAberta: () => true,
+  proximaAberturaDaProspeccao: () => new Date(Date.now() + 3600000),
   decidePacing: () => ({ allow: true, waitMs: 0 }),
   proximaAberturaDaJanela: () => new Date(Date.now() + 3600000),
   warmupCapFor: (

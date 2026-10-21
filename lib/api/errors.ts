@@ -128,6 +128,9 @@ export const ApiErrorCodes = {
   // 422 — semântica
   unprocessable_entity: "unprocessable_entity",
   plano_invalido: "plano_invalido", // plano inexistente, arquivado, de outro intervalo, ou cobrança desligada
+  // #2846: cobrança ligada, planos oferecidos e nenhum plano padrão — a empresa
+  // não nasce sem plano (doc 146). Quem administra define um padrão.
+  plano_obrigatorio: "plano_obrigatorio",
   // Cobrança do revendedor, PR 3a (spec §7a–§7g, §13). O provedor fora do ar é
   // 503 e o provedor que recusou é 502: a tela diz "tente de novo" num caso e
   // "confira os dados" no outro.
@@ -157,6 +160,16 @@ export const ApiErrorCodes = {
   chave_de_outra_conta: "chave_de_outra_conta",
   // Em atraso sem fatura pagável agora (ex.: assinatura pausada): o caminho é o portal.
   sem_link_de_pagamento: "sem_link_de_pagamento",
+  // Cobrança do revendedor, PR 3b (Asaas). O CPF/CNPJ de quem paga vai direto ao
+  // provedor e não é guardado: dígitos que não conferem, ausente quando o Asaas
+  // exige, ou com os dígitos certos e recusado pelo provedor.
+  documento_invalido: "documento_invalido",
+  documento_obrigatorio: "documento_obrigatorio",
+  documento_recusado: "documento_recusado",
+  // O cliente no provedor ainda não existe e nenhum admin da empresa tem e-mail (link gerado pelo dono, D-15).
+  empresa_sem_email: "empresa_sem_email",
+  // O Asaas recusa trocar o plano com a cobrança do período em uso ainda pendente (spec §6.2, §7e).
+  pagamento_do_periodo_pendente: "pagamento_do_periodo_pendente",
   channel_without_session: "channel_without_session", // operação de sessão (reiniciar, parear) pedida a canal que não tem sessão no transporte — o oficial
   janela_fechada: "janela_fechada", // POST /messages por token/agente com texto livre fora das 24h em canal com restrição (131047) — a saída é modelo aprovado (#1614)
   invalid_state_transition: "invalid_state_transition",
