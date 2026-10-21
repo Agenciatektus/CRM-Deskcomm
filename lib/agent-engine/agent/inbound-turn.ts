@@ -3242,6 +3242,7 @@ async function executarTurnoDoAgente(
         });
 
         const chain = await runBeforeSend({
+          agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
           pool,
           log: runLog,
           agentOperation,
@@ -3575,6 +3576,7 @@ async function executarTurnoDoAgente(
           // Args reusados EXATAMENTE (mesmo objeto) no re-run do fail-safe abaixo — só
           // hasOpenCase/openedCaseThisTurn mudam depois do auto-abre-caso.
           const beforeSendArgs = {
+            agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
             pool,
             log: runLog,
             agentOperation,
@@ -5179,6 +5181,7 @@ async function executarTurnoDoAgente(
             // de mensagens físicas do turno (F2-15b).
             if (!perguntaDoRoteiroPodeSair({ turnoDescartado, seq, maxSendsPerTurn })) return false;
             const chain = await runBeforeSend({
+              agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
               pool,
               log: runLog,
               agentOperation,

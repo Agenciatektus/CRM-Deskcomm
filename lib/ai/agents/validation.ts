@@ -248,12 +248,55 @@ const versionShapeSchema = z
      * organização é o servidor.
      */
     knowledge_source_ids: z.array(z.string().uuid()).default([]),
+    /**
+     * AUXILIAR DE CRM (9060): este agente não fala com o cliente. A marca é
+     * explícita porque "não fala" NÃO é dedutível da lista de capacidades — a
+     * resposta do Conversador não passa por ferramenta nenhuma.
+     */
+    somente_interno: z.boolean().default(false),
   })
   .strict();
 
+/**
+ * As capacidades que ENTREGAM mensagem ao cliente. A lista é curta de propósito
+ * e não cobre "falar" por inteiro: a resposta normal do agente não está aqui
+ * porque não é capacidade nenhuma. Ver o veto em `before-send.ts`.
+ */
+export const FERRAMENTAS_QUE_FALAM = [
+  "crm_send_whatsapp_message",
+  "crm_start_conversation_and_send",
+];
+
+/**
+ * DEFESA EM PROFUNDIDADE, e nada além disso: quem impede a fala é o veto na
+ * cadeia de envio (`runBeforeSend`), por onde TODA saída passa. Isto existe
+ * para a configuração não ficar contraditória na tela — ligar "não fala com o
+ * cliente" e, ao lado, a capacidade de mandar mensagem. Configuração que se
+ * contradiz é a que alguém lê depois e acredita na metade errada.
+ *
+ * Fica FORA de `versionShapeSchema` porque `versionPatchSchema` o estende, e
+ * zod recusa `.extend()` sobre schema com refinamento. Quem precisa da regra a
+ * aplica, e o teste de drift das colunas prende essa separação.
+ */
+export function conferirAuxiliarDeCrm(
+  v: { somente_interno?: boolean | undefined; tool_ids?: readonly string[] | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (v.somente_interno !== true) return;
+  const envios = (v.tool_ids ?? []).filter((t) => FERRAMENTAS_QUE_FALAM.includes(t));
+  if (envios.length === 0) return;
+  ctx.addIssue({
+    code: "custom",
+    path: ["tool_ids"],
+    message:
+      "Este assistente está marcado como auxiliar de CRM, que não fala com o cliente. " +
+      `Desligue ${envios.join(", ")} ou tire a marca.`,
+  });
+}
+
 export type VersionInput = z.infer<typeof versionShapeSchema>;
 
-export const versionCreateSchema = versionShapeSchema;
+export const versionCreateSchema = versionShapeSchema.superRefine(conferirAuxiliarDeCrm);
 
 /** Edits permitted only on draft versions. Omitted fields never receive create defaults. */
 export const versionPatchSchema = versionShapeSchema

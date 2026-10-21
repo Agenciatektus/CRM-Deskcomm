@@ -23,6 +23,8 @@ interface LinhaDeElegibilidade {
   ai_authorized_at: Date | string | null;
   phone_number: string | null;
   org_status: string | null;
+  /** `bool_and` dos agentes da sessão: `null` quando não há nenhum. */
+  so_organiza: boolean | null;
 }
 
 /**
@@ -42,7 +44,20 @@ export async function decidirElegibilidadeDaConversa(
        cv.bot_silenced_until        as bot_silenced_until,
        ct.ai_authorized_at          as ai_authorized_at,
        ct.phone_number              as phone_number,
-       o.status                     as org_status
+       o.status                     as org_status,
+       -- SÓ LIBERA QUANDO TODO MUNDO QUE PODERIA ATENDER É AUXILIAR DE CRM.
+       -- Com um agente que fala entre os candidatos, a conversa assumida
+       -- continua protegida. E bool_and sobre conjunto vazio devolve null, que
+       -- o montador lê como \"não\": sessão sem agente publicado também não
+       -- ganha liberação nenhuma.
+       (select bool_and(v.somente_interno)
+          from ai_agents a
+          join ai_agent_versions v on v.id = a.published_version_id
+         where a.organization_id = cv.organization_id
+           and a.archived_at is null
+           and a.is_active
+           and a.paused_at is null
+           and v.channel_session_id = cv.channel_session_id) as so_organiza
      from conversations cv
      join organizations o on o.id = cv.organization_id
      join contacts ct
@@ -70,6 +85,7 @@ export async function decidirElegibilidadeDaConversa(
       aiAuthorizedAt: r.ai_authorized_at,
       agora: input.agora,
       ttlMs: input.ttlMs,
+      agenteSomenteInterno: r.so_organiza,
     }),
   );
 }
