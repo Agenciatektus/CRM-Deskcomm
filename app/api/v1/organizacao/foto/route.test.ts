@@ -154,3 +154,28 @@ describe("POST /api/v1/organizacao/foto", () => {
     expect(e.removidos).toEqual([minha]);
   });
 });
+
+describe("DELETE /api/v1/organizacao/foto", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    admin();
+  });
+
+  it("remover tira o ponteiro E apaga o arquivo da própria organização (nada fica órfão)", async () => {
+    const minha = `organizacoes/${ORG}/33333333-3333-4333-8333-333333333333.png`;
+    const e = espiao(minha);
+    const { DELETE } = await import("./route");
+    const res = await DELETE(new NextRequest("http://localhost/api/v1/organizacao/foto", { method: "DELETE" }));
+    expect(res.status).toBe(200);
+    expect(e.updates).toEqual([{ valores: { foto_path: null }, id: ORG }]);
+    expect(e.removidos).toEqual([minha]);
+  });
+
+  it("controle negativo: ponteiro de OUTRA organização não é apagado ao remover", async () => {
+    const alheia = `organizacoes/${OUTRA_ORG}/33333333-3333-4333-8333-333333333333.png`;
+    const e = espiao(alheia);
+    const { DELETE } = await import("./route");
+    await DELETE(new NextRequest("http://localhost/api/v1/organizacao/foto", { method: "DELETE" }));
+    expect(e.removidos).not.toContain(alheia);
+  });
+});
