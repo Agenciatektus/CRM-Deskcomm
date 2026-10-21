@@ -29,6 +29,7 @@ import { env } from "@/lib/env";
 import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
 import { MARCADOR_NAO_LIDA, TIPOS_DERIVAVEIS } from "@/lib/messaging/media/derivable";
+import { leituraDeMidiaLigada } from "@/lib/messaging/media/leitura-da-org";
 import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
   decidirTranscricao,
@@ -130,6 +131,14 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
   if (!msg.media_storage_path) return markSkipped("no media");
   if (msg.media_derived_status === "ready") return { consumer_key, status: "skipped", detail: "already derived" };
   if (!TIPOS_DERIVAVEIS.has(msg.type)) return { consumer_key, status: "skipped", detail: `type ${msg.type}` };
+  // As duas guardas do `media-persist-worker`, repetidas aqui para o evento que
+  // já estava na fila quando a regra mudou (ou que alguém reenfileirou à mão).
+  // Saem como `skipped` com motivo PRÓPRIO, antes de qualquer chamada de IA: sem
+  // aviso na Central e sem gasto, porque não é defeito — é escolha.
+  if (msg.direction === "outbound") return markSkipped("midia_enviada_pela_empresa");
+  if ((await leituraDeMidiaLigada(admin, msg.organization_id)) === false) {
+    return markSkipped("leitura_de_midia_desligada");
+  }
   // Vídeo é opt-in (custo: ffmpeg + N chamadas de visão): só deriva se algum agente
   // publicado da org tem video_frames_enabled=true (flag da migration 0058).
   if (msg.type === "video") {

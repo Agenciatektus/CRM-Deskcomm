@@ -16169,6 +16169,15 @@ export const DICIONARIO: Traducoes = {
     es: "Solo un gerente o administrador de la organización puede cambiar esta configuración.",
   },
 
+  // ─── LEITURA DE MÍDIA PELA IA, POR EMPRESA (Agente de IA → Provedores) ───
+  "A IA lê a mídia que o cliente envia": { es: "La IA lee los archivos que envía el cliente" },
+  "Transcreve áudios e descreve imagens, documentos e vídeos para o agente entender o que chegou. Desligado, nenhuma mídia é lida pela IA e não há gasto com isso: o agente só sabe que chegou um arquivo. A mídia que a própria empresa envia nunca é lida. O padrão é ligado.": {
+    es: "Transcribe audios y describe imágenes, documentos y videos para que el agente entienda lo que llegó. Apagado, la IA no lee ningún archivo y no hay gasto por eso: el agente solo sabe que llegó un archivo. Los archivos que envía la propia empresa nunca se leen. El valor predeterminado es encendido.",
+  },
+  "Não consegui ler agora se a IA lê a mídia desta empresa. Enquanto isso, a leitura segue ligada. Recarregue a página; se continuar, avise quem cuida da instalação.": {
+    es: "No pude leer ahora si la IA lee los archivos de esta empresa. Mientras tanto, la lectura sigue encendida. Recarga la página; si continúa, avisa a quien administra la instalación.",
+  },
+
   // ─── PREVISÃO PONDERADA DO FUNIL (issue #1535) ───
   "Previsão": { es: "Previsión" },
   "Ponderado": { es: "Ponderado" },
