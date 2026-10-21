@@ -47,7 +47,14 @@ interface RawMembershipRow {
 
 interface OrgJoin {
   display_name: string;
-  /** Foto da organização (migration 9061). Ausente em banco anterior a ela. */
+  /**
+   * Foto da organização (migration 9061). Nula = sem foto.
+   *
+   * ⚠️ A 9061 PRECISA rodar ANTES do app: o embed acima pede a COLUNA em toda
+   * requisição autenticada, e num banco sem ela o PostgREST responde erro
+   * (42703) e a carga do usuário falha para todo mundo. "Ausente" aqui é a chave
+   * da linha, nunca a coluna do banco.
+   */
   foto_path?: string | null;
   locale: string | null;
   timezone: string | null;

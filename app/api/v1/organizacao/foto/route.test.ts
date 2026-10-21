@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -21,7 +22,9 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 const ORG = "22222222-2222-4222-8222-222222222222";
 const OUTRA_ORG = "77777777-7777-4777-8777-777777777777";
 const USER = "11111111-1111-4111-8111-111111111111";
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+const PNG = new Uint8Array(
+  await sharp({ create: { width: 4, height: 4, channels: 3, background: "#123456" } }).png().toBuffer(),
+);
 const PDF = new TextEncoder().encode("%PDF-1.7 qualquer coisa");
 
 function admin() {

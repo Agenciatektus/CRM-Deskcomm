@@ -39,7 +39,7 @@ export type ModeloDeAcesso = "confirmation" | "recovery" | "email_change";
 export const MODELOS_DE_ACESSO: readonly ModeloDeAcesso[] = ["confirmation", "recovery", "email_change"];
 
 /** O texto de cada modelo. Assunto entra no `GOTRUE_MAILER_SUBJECTS_*`. */
-const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo: string; corpo: (marca: string) => string; botao: string; rodape: string }> = {
+const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo: string; corpo: (marca: string) => string; botao: string; rodape: string; detalhe?: string }> = {
   confirmation: {
     assunto: (marca) => `Confirme seu e-mail · ${marca}`,
     titulo: "Confirme seu e-mail",
@@ -67,6 +67,11 @@ const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo
     corpo: (marca) =>
       `Recebemos um pedido para trocar o e-mail de acesso da sua conta no ${marca}. Clique no botão abaixo para confirmar. A troca só vale depois da confirmação.`,
     botao: "Confirmar troca de e-mail",
+    // O ENDEREÇO NOVO, escrito no e-mail (P2 do Cassio na #241): quem recebe no
+    // endereço ATUAL precisa ver para onde a conta está indo, e é assim que o
+    // dono legítimo reconhece um sequestro de sessão. `{{ .NewEmail }}` fica cru
+    // de propósito — é o GoTrue quem o substitui (e escapa, no template HTML).
+    detalhe: "Novo endereço: <b>{{ .NewEmail }}</b>",
     rodape:
       "Se não foi você quem pediu, ignore este e-mail e avise quem administra a sua empresa. O e-mail da conta continua o mesmo.",
   },
@@ -105,6 +110,7 @@ export function montarTemplateDeAcesso(modelo: ModeloDeAcesso, marca: MarcaDeSai
     <p style="margin:0 0 16px;font-size:15px;line-height:1.5">
       ${escapeHtml(t.corpo(marca.nome))}
     </p>
+    ${t.detalhe ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.5">${t.detalhe}</p>` : ""}
     <p style="margin:24px 0">
       <a href="${destino}" style="display:inline-block;padding:12px 24px;background:${marca.accent};color:${marca.accentFg};border-radius:6px;text-decoration:none;font-weight:600">
         ${escapeHtml(t.botao)}

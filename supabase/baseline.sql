@@ -65990,6 +65990,8 @@ end $foto$;
 comment on column public.organizations.foto_path is
   'Foto da organização em storage/fotos-de-perfil (privado), sempre organizacoes/<id>/<uuid>.<png|jpg|webp>. Aparece no lugar da sigla na casca. Escrito só por app/api/v1/organizacao/foto (admin da empresa). Migration 9061.';
 
+notify pgrst, 'reload schema';
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia

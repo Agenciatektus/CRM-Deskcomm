@@ -2,7 +2,9 @@
 --
 -- Prova: app/api/v1/perfil/foto/route.test.ts, app/api/v1/organizacao/foto/route.test.ts
 -- e as rotas de leitura (controle negativo: outra pessoa, outra organização).
-set lock_timeout = '3s';
+-- `local`: vale só nesta transação (o runner aplica cada migration numa),
+-- e não vaza para as migrations seguintes da mesma conexão.
+set local lock_timeout = '3s';
 
 -- ---- foto de perfil da pessoa e foto da organização (migration 9061) ----
 --
@@ -53,3 +55,5 @@ begin
 end $foto$;
 comment on column public.organizations.foto_path is
   'Foto da organização em storage/fotos-de-perfil (privado), sempre organizacoes/<id>/<uuid>.<png|jpg|webp>. Aparece no lugar da sigla na casca. Escrito só por app/api/v1/organizacao/foto (admin da empresa). Migration 9061.';
+
+notify pgrst, 'reload schema';

@@ -62,6 +62,12 @@ describe("moldes de acesso do GoTrue", () => {
     });
   }
 
+  it("a troca de e-mail mostra o endereço NOVO — quem recebe no atual vê para onde a conta vai", () => {
+    expect(montarTemplateDeAcesso("email_change", MARCA)).toContain("{{ .NewEmail }}");
+    // Controle: os outros modelos não têm endereço novo para mostrar.
+    expect(montarTemplateDeAcesso("recovery", MARCA)).not.toContain("{{ .NewEmail }}");
+  });
+
   it("sem logo configurado, nada é desenhado no lugar", () => {
     const html = montarTemplateDeAcesso("confirmation", { ...MARCA, logoUrl: null });
     expect(html).not.toContain("<img");

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import sharp from "sharp";
 
 import { loadAuthUser } from "@/lib/auth/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -23,8 +24,11 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 
 const EU = "11111111-1111-4111-8111-111111111111";
 const OUTRA = "99999999-9999-4999-8999-999999999999";
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
-const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0, 0]);
+// Imagens DE VERDADE: a rota reencoda (tira EXIF/GPS), e bytes só com a
+// assinatura não decodificam.
+const base = () => sharp({ create: { width: 4, height: 4, channels: 3, background: "#123456" } });
+const PNG = new Uint8Array(await base().png().toBuffer());
+const WEBP = new Uint8Array(await base().webp().toBuffer());
 const GIF = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0]);
 const SVG = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>x</script></svg>');
 
