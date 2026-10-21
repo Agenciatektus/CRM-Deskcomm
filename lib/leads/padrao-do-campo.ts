@@ -75,11 +75,25 @@ function textoParaValidar(valor: unknown): string | null {
 }
 
 /**
+ * Quem executa a regex. A tela usa `test` direto; o servidor passa o
+ * `testaComPrazo` de `padrao-do-campo-no-servidor.ts`, que devolve `null`
+ * quando a conferência não termina no prazo — e aí a porta fecha como padrão
+ * inválido, porque um padrão que não se confere não protege nada.
+ */
+export type TestaPadrao = (re: RegExp, texto: string) => boolean | null;
+
+const testaDireto: TestaPadrao = (re, texto) => re.test(texto);
+
+/**
  * O veredito de UM campo contra UM valor. Nunca lança: regex quebrada vira
  * motivo, não exceção — quem chama é um form em render, uma rota e o turno da
  * IA, e nenhum dos três pode morrer por um `^(` pela metade na configuração.
  */
-export function validaPadraoDoCampo(def: DefComPadrao, valor: unknown): VereditoDoPadrao {
+export function validaPadraoDoCampo(
+  def: DefComPadrao,
+  valor: unknown,
+  testa: TestaPadrao = testaDireto,
+): VereditoDoPadrao {
   const bruto = def.padrao;
   // 1. Ausência é o campo livre de sempre.
   if (bruto === undefined || bruto === null) return { ok: true };
@@ -98,7 +112,9 @@ export function validaPadraoDoCampo(def: DefComPadrao, valor: unknown): Veredito
   // 4. Não é texto: formato de texto não se cumpre com estrutura.
   if (texto === null) return { ok: false, motivo: "fora_do_padrao" };
   if (texto.trim() === "") return { ok: true };
-  return re.test(texto) ? { ok: true } : { ok: false, motivo: "fora_do_padrao" };
+  const casou = testa(re, texto);
+  if (casou === null) return { ok: false, motivo: "padrao_invalido" };
+  return casou ? { ok: true } : { ok: false, motivo: "fora_do_padrao" };
 }
 
 export interface RecusaDePadrao {
@@ -129,6 +145,7 @@ export interface RecusaDePadrao {
 export function recusasDePadrao(
   defs: readonly DefComPadrao[],
   valores: Record<string, unknown> | undefined | null,
+  testa: TestaPadrao = testaDireto,
 ): RecusaDePadrao[] {
   if (!valores || defs.length === 0) return [];
   const porChave = new Map<string, DefComPadrao[]>();
@@ -142,7 +159,7 @@ export function recusasDePadrao(
     const candidatos = porChave.get(chave);
     if (!candidatos) continue;
     for (const def of candidatos) {
-      const veredito = validaPadraoDoCampo(def, valor);
+      const veredito = validaPadraoDoCampo(def, valor, testa);
       if (veredito.ok) continue;
       recusas.push({
         campo: chave,

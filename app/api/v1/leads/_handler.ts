@@ -26,6 +26,7 @@ import {
   erroDePadrao,
   recusasDePadrao,
 } from "@/lib/leads/padrao-do-campo";
+import { testaComPrazo } from "@/lib/leads/padrao-do-campo-no-servidor";
 import {
   RECUSA_RETOMADA_ETAPA_INDISPONIVEL,
   RECUSA_RETOMADA_LEAD_ABERTO,
@@ -618,6 +619,7 @@ export async function createLeadHandler(
     const recusas = recusasDePadrao(
       defsDoPadraoDoFunil(settingsDaCriacao, "negocio"),
       input.custom_fields,
+      testaComPrazo,
     );
     if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
   }
@@ -904,6 +906,7 @@ export async function updateLeadHandler(
       const recusas = recusasDePadrao(
         defsDoPadraoDoFunil(settingsDoEdicao, "negocio"),
         alterados,
+        testaComPrazo,
       );
       if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
     }

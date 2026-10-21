@@ -36,6 +36,7 @@ import {
   type MotivoDoPadrao,
   type RecusaDePadrao,
 } from "@/lib/leads/padrao-do-campo";
+import { testaComPrazo } from "@/lib/leads/padrao-do-campo-no-servidor";
 import { scrubMessage } from "@/lib/sentry/scrub";
 
 import type { McpContext } from "./types";
@@ -255,7 +256,7 @@ export async function conferirCamposPersonalizados(
 
   // ── DEGRAU 0 (#2730): o padrão, com ou sem conferência ───────────────────
   const funil = await funilDaConferencia(ctx, alvo);
-  const recusadosDePadrao = recusasDePadrao(funil.defs, campos);
+  const recusadosDePadrao = recusasDePadrao(funil.defs, campos, testaComPrazo);
   const restantes = restantesSem(campos, recusadosDePadrao);
   if (recusadosDePadrao.length > 0 && Object.keys(restantes).length === 0) {
     // Nada sobrou para perguntar: nem conversa, nem Jev. O motivo de gravar

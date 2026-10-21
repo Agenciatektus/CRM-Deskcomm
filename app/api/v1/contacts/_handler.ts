@@ -37,6 +37,7 @@ import {
   erroDePadrao,
   recusasDePadrao,
 } from "@/lib/leads/padrao-do-campo";
+import { testaComPrazo } from "@/lib/leads/padrao-do-campo-no-servidor";
 
 type SB = SupabaseClient;
 
@@ -498,7 +499,7 @@ export async function createContactHandler(
     // CONTATO, e são só esses que ela pode gravar. Sem o filtro, o padrão de um
     // campo do NEGÓCIO — que o diálogo nem conhece — recusava a criação.
     const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id, "contato");
-    const recusas = recusasDePadrao(defs, input.custom_fields);
+    const recusas = recusasDePadrao(defs, input.custom_fields, testaComPrazo);
     if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
   }
 
@@ -670,7 +671,7 @@ export async function patchContactHandler(
     );
     if (Object.keys(alterados).length > 0) {
       const defs = await defsDoPadraoDaOrg(supabase, ctx.organization_id, "contato");
-      const recusas = recusasDePadrao(defs, alterados);
+      const recusas = recusasDePadrao(defs, alterados, testaComPrazo);
       if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
     }
   }
