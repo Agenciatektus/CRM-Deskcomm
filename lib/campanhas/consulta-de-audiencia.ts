@@ -15,7 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
 
-import { limiteDeSilencio, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
+import { limiteDeSilencio, temRecorte, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
 import { STATUS_TERMINAIS } from "./maquina-de-estados";
 import { NA_FILA_DE_DESPACHO } from "./tipos";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -211,7 +211,11 @@ export async function buscarCandidatos(
   // então o PostgREST não infere as colunas e devolve o tipo genérico: o `unknown`
   // é o preço, e `LinhaDeContato` continua sendo conferido por quem monta a linha.
   let linhas: LinhaDeContato[];
-  if (idsPorNegocio) {
+  if (!temRecorte(filtro)) {
+    // Só incluídos à mão: a consulta sem predicado traria a organização
+    // inteira. A audiência é exatamente quem foi incluído (bloco abaixo).
+    linhas = [];
+  } else if (idsPorNegocio) {
     // Cada lote traz no MÁXIMO 100 linhas (um id por contato, e os lotes do
     // `buscaEmLotes` têm 100 ids), então a união é o recorte inteiro — a
     // exclusão e o corte global acontecem UMA vez, no fim. Um `.limit` por lote

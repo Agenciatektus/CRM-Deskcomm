@@ -441,6 +441,7 @@ export function BulkActionBar({
           ownerNames={ownerNames}
           usuarioId={user.id}
           ocupado={ocupado}
+          podeCampanha={podeAtribuir}
           onReabrir={runReabrir}
           onClear={onClear}
           onRestaurar={onRestaurar}
