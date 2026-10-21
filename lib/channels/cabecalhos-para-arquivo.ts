@@ -37,11 +37,25 @@ export function cabecalhoUtil(nome: string): boolean {
   return CABECALHOS_UTEIS.has(k) || PADRAO_UTIL.test(k);
 }
 
-/** O que vai para o arquivo na ESCRITA: só o útil, e sem credencial. */
-export function cabecalhosParaArquivo(headers: Headers): Record<string, string> {
+/**
+ * A ORIGEM da requisição: só entra quando a assinatura NÃO conferiu (P2 do
+ * @Cassio_SecRev na #246). Numa tentativa de forja, o IP é a pista de quem
+ * tentou; numa entrega boa, é dado de proxy sem leitor.
+ */
+const CABECALHOS_DE_ORIGEM = new Set(["x-forwarded-for", "cf-connecting-ip", "x-real-ip"]);
+
+/**
+ * O que vai para o arquivo na ESCRITA: só o útil, e sem credencial.
+ * `comOrigem` acrescenta os cabeçalhos de IP de origem.
+ */
+export function cabecalhosParaArquivo(
+  headers: Headers,
+  opcoes: { comOrigem?: boolean } = {},
+): Record<string, string> {
   const uteis = new Headers();
   headers.forEach((valor, chave) => {
-    if (cabecalhoUtil(chave)) uteis.append(chave, valor);
+    const origem = opcoes.comOrigem === true && CABECALHOS_DE_ORIGEM.has(chave.toLowerCase());
+    if (cabecalhoUtil(chave) || origem) uteis.append(chave, valor);
   });
   return cabecalhosSemCredencial(uteis);
 }
@@ -52,9 +66,11 @@ export function cabecalhosParaArquivo(headers: Headers): Record<string, string> 
  * segredo, e reescrever a linha só para tirar `x-forwarded-for` seria UPDATE
  * (e TOAST reescrito) sem ganho de segurança.
  *
- * Assinatura HMAC do corpo FICA (`x-hub-signature-256` e afins): permite
- * reconferir depois se a recusa foi de assinatura ou de segredo, e é derivada
- * do corpo, não abre nada sozinha. Valor acima do teto vira marcador.
+ * Assinatura HMAC do corpo FICA (`x-hub-signature-256` e afins): é derivada do
+ * corpo e não abre nada sozinha. Reconferir a recusa com ela exige o texto
+ * cru, e o texto só fica gravado na linha com `valid_signature = false`
+ * (`./corpo-do-arquivo.ts`); na linha aceita, o veredito é o
+ * `valid_signature` gravado na hora. Valor acima do teto vira marcador.
  */
 export function cabecalhosSemCredencial(headers: Headers): Record<string, string> {
   const out: Record<string, string> = {};

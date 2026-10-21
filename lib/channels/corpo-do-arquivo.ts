@@ -64,12 +64,18 @@ export function mesmoValorJson(a: unknown, b: unknown): boolean {
  *
  * `rawBody` é o texto que IRIA para o arquivo (já enxuto, quando o escritor
  * enxuga); `parsed` é o objeto que iria para `payload_parsed`.
+ *
+ * `assinaturaValida === false` guarda o texto SEMPRE (P2 do @Cassio_SecRev na
+ * #246): a linha recusada, ou aceita sem assinatura, é a que alguém vai querer
+ * reconferir byte a byte, e é minoria — o custo do texto a mais é pequeno.
  */
 export function corpoUnicoParaArquivo(
   rawBody: string,
   parsed: Record<string, unknown> | null,
+  opcoes: { assinaturaValida?: boolean | null } = {},
 ): CorpoDoArquivo {
   if (!ehObjeto(parsed)) return { raw_body: rawBody, payload_parsed: null };
+  if (opcoes.assinaturaValida === false) return { raw_body: rawBody, payload_parsed: parsed };
   if (INTEIRO_GRANDE.test(rawBody)) return { raw_body: rawBody, payload_parsed: parsed };
 
   let doTexto: unknown;

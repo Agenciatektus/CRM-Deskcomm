@@ -166,9 +166,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
 
   // Cabeçalhos pela MESMA régua do arquivo dos canais: só os úteis à
   // investigação, sem credencial (o WAHA pode mandar `x-api-key`).
-  const headersJson = cabecalhosParaArquivo(req.headers);
+  // Assinatura que não conferiu (aqui: entrega aceita SEM assinatura) leva a
+  // origem junto (P2 do @Cassio_SecRev na #246).
+  const headersJson = cabecalhosParaArquivo(req.headers, { comOrigem: validSignature === false });
   // Estágio 2: o resto do contrato. Conferido ANTES do INSERT para a linha já
-  // nascer com o desfecho — o corpo cru é arquivado nos dois casos. Gravar
+  // nascer com o desfecho — o corpo é arquivado nos dois casos (inteiro no
+  // `payload_parsed`; o texto cru só quando a assinatura não conferiu ou o
+  // objeto não o reproduz, ver `corpo-do-arquivo.ts`). Gravar
   // `received` e corrigir depois abriria uma janela (e um segundo write que pode
   // falhar) em que a recusa fica com a mesma palavra de um evento que deu certo.
   const contrato = conferirContratoWaha(roteado);
@@ -182,8 +186,11 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     headers: headersJson,
     // O corpo UMA vez: o reprocessamento relê `payload_parsed`, e o schema
     // `loose` devolve as mesmas chaves do corpo. `raw_body` só quando o texto
-    // traz algo que o objeto não traz (ver `corpo-do-arquivo.ts`).
-    ...corpoUnicoParaArquivo(rawBody, roteado as unknown as Record<string, unknown>),
+    // traz algo que o objeto não traz, ou quando a assinatura não conferiu
+    // (ver `corpo-do-arquivo.ts`).
+    ...corpoUnicoParaArquivo(rawBody, roteado as unknown as Record<string, unknown>, {
+      assinaturaValida: validSignature,
+    }),
     signature_header: sigHeader ?? null,
     valid_signature: validSignature,
     event_type: eventType,

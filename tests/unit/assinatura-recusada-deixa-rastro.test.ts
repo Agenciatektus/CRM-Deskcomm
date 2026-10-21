@@ -51,8 +51,12 @@ describe("a recusa por assinatura é arquivada e logada", () => {
   it("o arquivo é aberto ANTES da conferência de assinatura", () => {
     // Este é o defeito, na sua forma mais crua: uma linha depois da outra.
     const s = fonte();
+    // Desde o P2 do @Cassio_SecRev na #246 o veredito é CALCULADO antes de
+    // abrir a linha (para ela nascer com o texto cru e o IP); o que tem de vir
+    // depois do arquivo é a RECUSA — o `if` que sai com 401.
     const abertura = onde(s, "await abrirArquivoDoWebhook(");
-    const conferencia = onde(s, "if (!verifyInboundWebhookSignature(");
+    const conferencia = onde(s, "if (!assinaturaConfere)");
+    expect(s, "o veredito vai para a linha do arquivo").toMatch(/assinaturaValida:\s*assinaturaConfere/);
     expect(abertura).toBeGreaterThan(-1);
     expect(conferencia).toBeGreaterThan(-1);
     expect(
@@ -66,7 +70,7 @@ describe("a recusa por assinatura é arquivada e logada", () => {
     // automáticas mostraria "sem informação" para todo webhook recusado.
     const s = fonte();
     const bloco = s.slice(
-      onde(s, "if (!verifyInboundWebhookSignature("),
+      onde(s, "if (!assinaturaConfere)"),
       onde(s, 'return fail("unauthorized", "bad_signature"'),
     );
     expect(bloco).toMatch(/fecharArquivoDoWebhook\(/);
