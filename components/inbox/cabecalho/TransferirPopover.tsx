@@ -2,6 +2,7 @@
 import { useState, type ComponentProps } from "react";
 
 import { ReassignDialog } from "@/components/inbox/ReassignDialog";
+import { FotoDaPessoa } from "@/components/fotos/FotoDaPessoa";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,12 +147,11 @@ export function TransferirPopover({ conversationId, devolver, numero }: Props) {
                 disabled={transfer.isPending}
                 onClick={() => setDestino(m.user_id)}
               >
-                <span
+                <FotoDaPessoa
+                  userId={m.user_id}
+                  iniciais={iniciais(nome)}
                   className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-semibold text-accent-foreground"
-                  aria-hidden
-                >
-                  {iniciais(nome)}
-                </span>
+                />
                 <span className="min-w-0 flex-1 truncate">{nome}</span>
                 <span className="text-xs text-text-muted">{t(ROLE_LABEL[m.role] ?? m.role)}</span>
               </button>

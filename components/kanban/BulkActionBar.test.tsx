@@ -60,6 +60,7 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
         pipelineId="p-1"
         tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
+        onRestaurar={vi.fn()}
       />,
     );
 
@@ -77,6 +78,7 @@ describe("BulkActionBar — D10, aviso agregado ao excluir em lote", () => {
         pipelineId="p-1"
         tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
+        onRestaurar={vi.fn()}
       />,
     );
 
@@ -107,6 +109,7 @@ describe("BulkActionBar — ganho e perda fora do Mover para (revisão da #180)"
         pipelineId="p-1"
         tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={vi.fn()}
+        onRestaurar={vi.fn()}
       />,
     );
     await user.click(screen.getByRole("button", { name: "Mover para…" }));
@@ -133,6 +136,7 @@ describe("BulkActionBar — F2 (#2484): perdido em lote", () => {
         pipelineId="p-1"
         tagsExistentes={[]} leads={[]} funis={[]} ownerNames={new Map()}
         onClear={onClear}
+        onRestaurar={vi.fn()}
       />,
     );
     return onClear;

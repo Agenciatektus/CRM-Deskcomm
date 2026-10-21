@@ -149,6 +149,43 @@ describe("Excluir em lote", () => {
     expect(barra()).toBeNull();
   });
 
+  it("⭐ durante a execução, Esc não fecha o diálogo; depois de pronta, fecha", async () => {
+    // A resposta fica presa até o teste soltar: é a janela do "Aplicando...".
+    let soltar: () => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            soltar = () =>
+              resolve(
+                new Response(
+                  JSON.stringify({ data: { concluidas: 1, contatos: 0, leads: 0, conversas: 0, regras: 0 } }),
+                  { status: 422 },
+                ),
+              );
+          }),
+      ),
+    );
+    montar();
+    marcar("ddd-11");
+    fireEvent.click(within(barra()!).getByRole("button", { name: "Excluir" }));
+    const dialogo = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Excluir 1" }));
+    await waitFor(() => expect(within(dialogo).getByRole("button", { name: "Aplicando..." })).toBeDisabled());
+
+    fireEvent.keyDown(dialogo, { key: "Escape" });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Aplicando..." })).toBeInTheDocument();
+
+    // Controle negativo: a recusa termina a execução, o diálogo continua aberto
+    // (o operador lê o aviso) e AGORA o Esc fecha, como sempre fechou.
+    soltar();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Excluir 1" })).not.toBeDisabled());
+    fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+
   it("avisa as regras de agente que continuam escrevendo as etiquetas", () => {
     montar();
     marcar("vip");

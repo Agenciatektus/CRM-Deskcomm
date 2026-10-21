@@ -1,4 +1,6 @@
 "use client";
+import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/hooks/i18n/useT";
-import { agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
+import { AVISO_DE_LOTE_EM_CURSO, agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
 import { apiClient } from "@/lib/api/client";
 
 /**
@@ -34,6 +36,7 @@ export function GanhoEmLote({
   ignorados,
   pipelineId,
   onConcluido,
+  onDesfeito,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +46,8 @@ export function GanhoEmLote({
   ignorados: number;
   pipelineId: string;
   onConcluido: () => void;
+  /** Desfazer nos 5 s: a tela devolve a seleção que limpou ao agendar. */
+  onDesfeito: () => void;
 }) {
   const t = useT();
   const porNegocio = useAcaoPorNegocio(pipelineId);
@@ -61,9 +66,11 @@ export function GanhoEmLote({
           (feitos) => `${feitos} ${t(feitos === 1 ? "marcado como ganho." : "marcados como ganhos.")}`,
         );
       },
+      onDesfeito,
     );
     // A seleção sai na hora: nos 5 s não há o que reconfirmar.
     if (agendado) onConcluido();
+    else toast.warning(t(AVISO_DE_LOTE_EM_CURSO));
   };
 
   return (

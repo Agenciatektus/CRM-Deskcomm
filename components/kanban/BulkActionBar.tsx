@@ -27,8 +27,7 @@ import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { useBulkAction } from "@/hooks/kanban/useBulkAction";
-import { useLoteOcupado } from "@/hooks/kanban/useAcaoPorNegocio";
-import { adiarAcao } from "@/lib/ui/aviso-com-desfazer";
+import { AVISO_DE_LOTE_EM_CURSO, agendarNoLote, useLoteOcupado } from "@/hooks/kanban/useAcaoPorNegocio";
 import type { BulkLeadActionInput } from "@/lib/schemas/leads";
 import { resolveVocabulary } from "@/lib/kanban/vocabulary";
 import type { PipelineVocabulary, Stage } from "@/lib/kanban/types";
@@ -69,6 +68,13 @@ interface BulkActionBarProps {
   funis: Array<{ id: string; name: string }>;
   ownerNames: Map<string, string | null>;
   onClear: () => void;
+  /**
+   * Devolve a seleção. O Desfazer das ações que limpam a seleção ao agendar
+   * (ganho, outro funil, próximo passo) usa isto para a pessoa não ter de
+   * marcar tudo de novo (P2 do Cassio na #220). Obrigatória pelo mesmo motivo
+   * de `tagsExistentes`.
+   */
+  onRestaurar: (ids: string[]) => void;
 }
 
 export function BulkActionBar({
@@ -81,6 +87,7 @@ export function BulkActionBar({
   funis,
   ownerNames,
   onClear,
+  onRestaurar,
 }: BulkActionBarProps) {
   const t = useT();
   const user = useUser();
@@ -183,9 +190,15 @@ export function BulkActionBar({
     return total;
   };
 
-  /** Um Desfazer cobre todos os blocos: nada é chamado antes do fim do aviso. */
+  /**
+   * Um Desfazer cobre todos os blocos: nada é chamado antes do fim do aviso.
+   * Vai pela MESMA trava das ações negócio a negócio (`agendarNoLote`, chave por
+   * funil): nos 5 s a barra fica travada e nenhuma outra ação do lote é agendada
+   * por cima desta (P2 do Cassio na #220).
+   */
   const comDesfazer = (mensagem: string, input: BulkLeadActionInput, aoConcluir?: (n: number) => void) => {
-    adiarAcao(
+    const agendado = agendarNoLote(
+      pipelineId,
       (s) => `${mensagem} (${s} s)`,
       t("Desfazer"),
       async () => {
@@ -194,6 +207,7 @@ export function BulkActionBar({
         onClear();
       },
     );
+    if (!agendado) toast.warning(t(AVISO_DE_LOTE_EM_CURSO));
   };
 
   const runMove = (stageId: string) => {
@@ -427,6 +441,7 @@ export function BulkActionBar({
           ocupado={ocupado}
           onReabrir={runReabrir}
           onClear={onClear}
+          onRestaurar={onRestaurar}
         />
 
         {etapaDePerda && (

@@ -98,6 +98,12 @@ export interface UserOrgMembership {
   organization_name: string;
   role: Role;
   /**
+   * A URL da FOTO da organização (`organizations.foto_path`, migration 9061),
+   * já montada para a rota que confere o vínculo e assina. `null`/ausente = sem
+   * foto, e a casca mostra a sigla. Mesma carona de `locale` e `timezone`.
+   */
+  foto_url?: string | null;
+  /**
    * Idioma padrão da organização (`organizations.locale`).
    *
    * Vem junto porque quem escolhe a organização ativa é a mesma função que

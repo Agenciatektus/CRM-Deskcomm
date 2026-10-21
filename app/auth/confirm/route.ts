@@ -149,6 +149,36 @@ async function confirmar({
       ? await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
       : await supabase.auth.exchangeCodeForSession(code as string);
 
+  // TROCA DE E-MAIL (`trocarEmail`, tela de Perfil). Sai ANTES de tudo o que vem
+  // abaixo, porque nada daquilo é dela: convite, política de cadastro e
+  // provisionamento de organização são do signup, e quem troca de e-mail já tem
+  // conta e vínculo. Com a troca segura do GoTrue, o PRIMEIRO dos dois links
+  // aceitos responde sem sessão ("falta confirmar no outro endereço") — isso é
+  // sucesso parcial, não link inválido.
+  if (type === "email_change") {
+    if (error) {
+      await audit({
+        action: "auth.email_link_rejected",
+        metadata: { type, formato: viaTokenHash ? "token_hash" : "code", reason: error.message },
+        requestId,
+      });
+      return redirectTo("/app/settings/profile?email=link_invalido");
+    }
+    const concluida = Boolean(data?.session);
+    const quemId = data?.user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
+    if (quemId) {
+      await audit({
+        action: "profile.email_change_confirmed",
+        actorUserId: quemId,
+        resourceType: "user",
+        resourceId: quemId,
+        metadata: { concluida },
+        requestId,
+      });
+    }
+    return redirectTo(`/app/settings/profile?email=${concluida ? "trocado" : "falta_o_outro"}`);
+  }
+
   // CLICAR DUAS VEZES NO MESMO LINK não é motivo para expulsar ninguém.
   // O token é de uso único: o segundo clique cai aqui com "Email link is
   // invalid or has expired" — e a pessoa está logada, porque o PRIMEIRO clique

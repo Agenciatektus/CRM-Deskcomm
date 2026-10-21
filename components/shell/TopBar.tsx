@@ -60,7 +60,10 @@ function TrilhaDaRota() {
             </li>
           ) : (
             <li className="truncate font-semibold text-foreground">
-              <Link href={destino.href} className={LINK_DA_TRILHA}>
+              {/* A tela que contém o detalhe é o nível mais fundo que a trilha
+                conhece: `location` diz ao leitor de tela "você está aqui dentro",
+                sem fingir que o link é a página atual (`page`). */}
+              <Link href={destino.href} aria-current="location" className={LINK_DA_TRILHA}>
                 {t(destino.label)}
               </Link>
             </li>

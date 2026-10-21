@@ -1205,6 +1205,18 @@ export const AUDIT_ACTIONS = [
   // `removidas` no metadata) ou dentro do `template.deleted`, que são os atos
   // em que a imagem sai de fato.
   "template.media_added",
+  // A foto de perfil da PESSOA trocada ou removida (`/api/v1/perfil/foto`,
+  // migration 9061). Metadata só diz se ficou foto; o caminho não entra.
+  "profile.avatar_updated",
+  // A pessoa PEDIU a troca do e-mail de acesso (`trocarEmail`): o GoTrue mandou
+  // o link de confirmação. O endereço não entra no metadata (só o domínio).
+  "profile.email_change_requested",
+  // O link de confirmação da troca de e-mail foi aceito (`/auth/confirm`,
+  // `type=email_change`). `concluida=false` = falta confirmar no outro endereço.
+  "profile.email_change_confirmed",
+  // A foto da ORGANIZAÇÃO (a que aparece no lugar da sigla) trocada ou removida
+  // pelo admin da empresa (`/api/v1/organizacao/foto`, migration 9061).
+  "org.photo_updated",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

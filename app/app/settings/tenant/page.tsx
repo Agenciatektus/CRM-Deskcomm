@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Art15Form } from "./_art15";
 import { ZonaDePerigoDaOrganizacao } from "./_danger-zone";
 import { TenantForm } from "./_form";
+import { FotoDaOrganizacao } from "./_foto";
+import { urlDaFotoDaOrganizacao } from "@/lib/fotos/foto";
 import { InterfaceDaEmpresaForm } from "./_interface";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +33,8 @@ interface OrgRow {
   interface_settings: unknown;
   /** `settings` inteiro é lido aqui; para o cliente vai SÓ o bloco `art15`. */
   settings: unknown;
+  /** A foto da organização (migration 9061) — a que entra no lugar da sigla. */
+  foto_path: string | null;
 }
 
 export default async function TenantSettingsPage() {
@@ -45,7 +49,7 @@ export default async function TenantSettingsPage() {
   const { data } = await supabase
     .from("organizations")
     .select(
-      "display_name, legal_name, cnpj, country, timezone, locale, currency, media_retention_days, media_retention_enforced, dpo_email, privacy_policy_url, interface_settings, settings",
+      "display_name, legal_name, cnpj, country, timezone, locale, currency, media_retention_days, media_retention_enforced, dpo_email, privacy_policy_url, interface_settings, settings, foto_path",
     )
     .eq("id", activeOrg.orgId)
     .maybeSingle();
@@ -64,6 +68,12 @@ export default async function TenantSettingsPage() {
         descricao={traduzir("Dados da empresa, retenção de mídia, DPO. Admin only.", idioma)}
       />
       <SecaoDaPagina>
+        {row && (
+          <FotoDaOrganizacao
+            urlInicial={urlDaFotoDaOrganizacao(activeOrg.orgId, row.foto_path)}
+            nome={row.display_name}
+          />
+        )}
         {row && (
           <TenantForm
             initial={{

@@ -35,16 +35,28 @@ export function useLoteOcupado(pipelineId: string): boolean {
   return pendente || emCurso;
 }
 
-/** Agenda no lote; recusa (devolve `false`) se já há uma ação do lote em curso. */
+/**
+ * O aviso de quando `agendarNoLote` recusa: a tela diz por que nada aconteceu,
+ * em vez de fechar o diálogo calada (P2 do Cassio na #220). Texto para `t()`.
+ */
+export const AVISO_DE_LOTE_EM_CURSO =
+  "Já há uma ação em lote em curso neste funil. Espere terminar ou clique em Desfazer antes de começar outra.";
+
+/**
+ * Agenda no lote; recusa (devolve `false`) se já há uma ação do lote em curso.
+ * `aoDesfazer` roda quando a pessoa clica Desfazer nos 5 s (ex.: devolver a
+ * seleção que a tela limpou ao agendar).
+ */
 export function agendarNoLote(
   pipelineId: string,
   mensagem: (s: number) => string,
   rotuloDoDesfazer: string,
   executar: () => Promise<unknown>,
+  aoDesfazer?: () => void,
 ): boolean {
   const chave = chaveDoLote(pipelineId);
   if (acaoPendente(chave) || rodando > 0) return false;
-  adiarAcao(mensagem, rotuloDoDesfazer, executar, undefined, { chave });
+  adiarAcao(mensagem, rotuloDoDesfazer, executar, aoDesfazer, { chave });
   return true;
 }
 

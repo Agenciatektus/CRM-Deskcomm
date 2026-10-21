@@ -271,3 +271,57 @@ describe("GET /auth/confirm", () => {
     expect(vi.mocked(ensureTenantForUser)).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * TROCA DE E-MAIL (`type=email_change`, tela de Perfil). Ela tem saída própria:
+ * sem ela, o link caía no ramo do signup e passava por convite, política de
+ * cadastro e provisionamento — que não são dela. Controle negativo: o mesmo
+ * cenário com `type=signup` provisiona; com `email_change`, nunca.
+ */
+describe("POST /auth/confirm — troca de e-mail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(decidirConviteDoSignup).mockReturnValue({ tipo: "provisionar" });
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+  });
+
+  function comVerify(verifyOtp: unknown) {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        verifyOtp: vi.fn(async () => verifyOtp),
+        exchangeCodeForSession: vi.fn(async () => verifyOtp),
+        getUser: vi.fn(async () => ({ data: { user: USUARIO } })),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+  }
+
+  it("as duas confirmações feitas (veio sessão): volta ao Perfil dizendo que trocou, sem provisionar", async () => {
+    comVerify({ data: { user: USUARIO, session: { access_token: "x" } }, error: null });
+    const { POST } = await import("./route");
+    const res = await POST(envio("type=email_change&token_hash=abc"));
+    expect(destino(res)).toBe("/app/settings/profile?email=trocado");
+    expect(vi.mocked(ensureTenantForUser)).not.toHaveBeenCalled();
+    expect(vi.mocked(decidirConviteDoSignup)).not.toHaveBeenCalled();
+  });
+
+  it("o primeiro dos dois links (sem sessão) é sucesso parcial, não link inválido", async () => {
+    comVerify({ data: { user: null, session: null }, error: null });
+    const { POST } = await import("./route");
+    const res = await POST(envio("type=email_change&token_hash=abc"));
+    expect(destino(res)).toBe("/app/settings/profile?email=falta_o_outro");
+  });
+
+  it("link recusado pelo GoTrue: avisa no Perfil", async () => {
+    comVerify({ data: { user: null, session: null }, error: { message: "expired" } });
+    const { POST } = await import("./route");
+    const res = await POST(envio("type=email_change&token_hash=abc"));
+    expect(destino(res)).toBe("/app/settings/profile?email=link_invalido");
+  });
+
+  it("controle negativo: o mesmo link como signup PROVISIONA — é o ramo que a troca evita", async () => {
+    comVerify({ data: { user: USUARIO, session: { access_token: "x" } }, error: null });
+    const { POST } = await import("./route");
+    await POST(envio("type=signup&token_hash=abc"));
+    expect(vi.mocked(ensureTenantForUser)).toHaveBeenCalled();
+  });
+});

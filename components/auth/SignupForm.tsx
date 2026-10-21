@@ -120,7 +120,17 @@ export function SignupForm({
         return;
       }
       if (res.error === "rate_limited") {
-        setServerError(t("Muitas tentativas. Aguarde alguns minutos."));
+        // A frase antiga parava em "aguarde", e quem a lia concluía que nada
+        // tinha acontecido. Medido em 20/10/2026: uma pessoa clicou várias
+        // vezes, UMA das tentativas criou a conta e entrou, e as seguintes
+        // bateram no teto — ela ficou olhando o aviso vermelho sem saber que já
+        // estava cadastrada, e quem foi ajudar procurou defeito no cadastro.
+        // O teto pune a repetição, então a saída é entrar, não insistir.
+        setServerError(
+          t(
+            "Muitas tentativas. Aguarde alguns minutos. Se alguma tentativa anterior funcionou, a conta já existe: tente entrar em vez de criar de novo.",
+          ),
+        );
       } else if (res.error === "validation_error") {
         // As recusas do plano dizem o que fazer: "confira os campos" não diz.
         const recusaDoPlano = (res.details?.cobranca_plan_id as string[] | undefined)?.[0];

@@ -148,6 +148,7 @@ export function PipelinePageClient({
       funis={funis}
       ownerNames={ownerNames}
       onClear={() => setSelectedIds([])}
+      onRestaurar={setSelectedIds}
     />
   );
   // #1751 (upstream): o quadro é a lista que o diálogo confere ANTES de criar —

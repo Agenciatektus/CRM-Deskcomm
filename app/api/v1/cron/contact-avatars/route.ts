@@ -27,7 +27,18 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { DEFAULT_CHANNEL_PROVIDER, getAdapterOpcional, type ChannelProvider } from "@/lib/channels";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
+import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
+import {
+  baixarFotoDePerfil,
+  destinatarioDaFoto,
+  filtroDaVarreduraDeFotos,
+  providersDaFoto,
+} from "@/lib/channels/contact-avatar";
+import {
+  CHANNEL_SESSION_REF_COLUMNS,
+  resolveSessionRef,
+  type ChannelSessionRef,
+} from "@/lib/channels/session-ref";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +47,19 @@ export const dynamic = "force-dynamic";
 const SCAN_LIMIT = 25;
 /** Revisita a foto a cada 7 dias — gente troca de foto, mas não toda hora. */
 const REFRESH_AFTER_DAYS = 7;
-/** Foto de perfil do WhatsApp é pequena; acima disto é resposta errada. */
-const MAX_BYTES = 2 * 1024 * 1024;
+/**
+ * Orçamento da rodada. O scheduler dá 60 s a esta rota; passado este prazo o
+ * cron para de PEGAR contato novo. O que já está em curso termina dentro dos
+ * prazos próprios (canal: 10 s na plataforma, 15 s no WAHA; download: 10 s), e
+ * 25 + 15 + 10 + consultas fica abaixo dos 60.
+ */
+const PRAZO_DO_LOTE_MS = 25_000;
 
 interface ContactRow {
   id: string;
   organization_id: string;
   wa_identity: string | null;
+  instagram_igsid: string | null;
   wa_lid: string | null;
   phone_number: string | null;
   avatar_storage_path: string | null;
@@ -88,10 +105,13 @@ async function handle(req: NextRequest): Promise<Response> {
   // declarada irreversível no produto; esta linha é o que sustenta isso.
   const { data: contatos, error: queryError } = await admin
     .from("contacts")
-    .select("id, organization_id, wa_identity, wa_lid, phone_number, avatar_storage_path")
-    .not("wa_identity", "is", null)
+    .select(
+      "id, organization_id, wa_identity, wa_lid, phone_number, instagram_igsid, avatar_storage_path",
+    )
+    // Contato só de Instagram (IGSID, sem telefone) também tem rosto. Um `or`
+    // só, com o AND escrito (ver `filtroDaVarreduraDeFotos`).
     .eq("is_anonymized", false)
-    .or(`avatar_updated_at.is.null,avatar_updated_at.lt.${cutoff}`)
+    .or(filtroDaVarreduraDeFotos(cutoff))
     .order("avatar_updated_at", { ascending: true, nullsFirst: true })
     .limit(SCAN_LIMIT);
 
@@ -104,8 +124,16 @@ async function handle(req: NextRequest): Promise<Response> {
   let atualizados = 0;
   let semFoto = 0;
   let falhas = 0;
+  let adiados = 0;
+  const inicio = Date.now();
 
-  for (const c of rows) {
+  for (const [indice, c] of rows.entries()) {
+    // Estourou o orçamento: os que sobraram ficam para a próxima rodada, sem
+    // carimbo (não foram tentados) e no topo da fila, como devem.
+    if (Date.now() - inicio > PRAZO_DO_LOTE_MS) {
+      adiados = rows.length - indice;
+      break;
+    }
     const chatId = chatIdDoContato(c);
     // Carimba mesmo sem conseguir resolver o chatId: sem isso o contato voltaria
     // em TODA rodada do cron, para sempre, batendo no canal à toa.
@@ -132,29 +160,59 @@ async function handle(req: NextRequest): Promise<Response> {
       return (afetadas ?? []).length > 0;
     };
 
-    if (!chatId) {
-      await carimbar(null);
+    // Carimba a TENTATIVA antes de qualquer I/O. É o backoff: quem falha, estoura
+    // prazo ou é morto pelo scheduler no meio não volta no topo da fila
+    // (`nulls first`) em toda rodada prendendo o lote dos outros; tenta de novo
+    // na janela de 7 dias. O resultado não decide nada aqui: a guarda da
+    // anonimização que importa é a da gravação do caminho, lá embaixo.
+    await carimbar(null);
+
+    if (!chatId && !c.instagram_igsid) {
       semFoto++;
       continue;
     }
 
     try {
-      const { data: sessao } = await admin
-        .from("channel_sessions")
-        .select("waha_session_name, provider")
+      // A sessão POR ONDE ESTE CONTATO CONVERSOU. Pegar "a primeira sessão da
+      // organização" pedia a foto ao número errado em quem tem vários números
+      // ou WhatsApp + Instagram — e o Instagram nem acha o IGSID de outra conta.
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select("channel_session_id")
         .eq("organization_id", c.organization_id)
-        .eq("status", "WORKING")
-        // Sem o filtro, a linha de chamada de voz (spec 18) — que nasce
-        // `WORKING` ao parear — podia ganhar este `limit(1)` sem ordenação e
-        // devolver `waha_session_name` nulo: a foto de todo mundo parava de
-        // atualizar em silêncio, com o `carimbar(null)` logo abaixo parecendo
-        // "este contato não tem foto".
-        .in("provider", [...PROVIDERS_DE_MENSAGEM])
+        .eq("contact_id", c.id)
+        .not("channel_session_id", "is", null)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
-      const ref = (sessao as { waha_session_name?: string | null } | null)?.waha_session_name;
+      const sessaoDaConversa = (conversa as { channel_session_id?: string | null } | null)
+        ?.channel_session_id;
+
+      const consultaSessao = () => {
+        const q = admin
+          .from("channel_sessions")
+          .select(CHANNEL_SESSION_REF_COLUMNS)
+          .eq("organization_id", c.organization_id)
+          .eq("status", "WORKING")
+          // Só canais que acham ESTE contato (IGSID → Instagram; wa_identity →
+          // WhatsApp). Também mantém fora a linha de chamada de voz (spec 18),
+          // que nasce `WORKING` ao parear e não tem referência de mensagem.
+          .in("provider", providersDaFoto(c));
+        // Contato sem conversa (importado, por exemplo) cai na sessão compatível
+        // mais recente da MESMA organização — o recorte de tenant vem do `eq`
+        // acima, e a ordem torna a escolha determinística.
+        return sessaoDaConversa
+          ? q.eq("id", sessaoDaConversa)
+          : q.order("created_at", { ascending: false }).order("id", { ascending: true });
+      };
+      // Sessão arquivada não é canal: o mesmo recorte de `resolveVerdashCreds`.
+      const { data: sessao } = await queryTolerantToMissingArchived(
+        () => consultaSessao().is(ARCHIVED_AT, null).limit(1).maybeSingle(),
+        () => consultaSessao().limit(1).maybeSingle(),
+      );
+      const linhaSessao = sessao as unknown as ChannelSessionRef | null;
+      const ref = linhaSessao ? resolveSessionRef(linhaSessao) : null;
       if (!ref) {
-        await carimbar(null);
         semFoto++;
         continue;
       }
@@ -167,36 +225,34 @@ async function handle(req: NextRequest): Promise<Response> {
       // Opcional: canal conhecido sem adapter local é categoria, não falha — sai pelo
       // mesmo caminho de quem não sabe buscar foto. Provider fora da matriz continua
       // lançando, que é o barulho que se quer.
-      const adapter = getAdapterOpcional(
-        (sessao as { provider?: ChannelProvider | null } | null)?.provider ??
-          DEFAULT_CHANNEL_PROVIDER,
-      );
+      const provider =
+        (linhaSessao?.provider as ChannelProvider | undefined) ?? DEFAULT_CHANNEL_PROVIDER;
+      const adapter = getAdapterOpcional(provider);
       if (!adapter?.fetchProfilePictureUrl) {
-        await carimbar(null);
+        semFoto++;
+        continue;
+      }
+      const recipient = destinatarioDaFoto(provider, c, chatId);
+      if (!recipient) {
         semFoto++;
         continue;
       }
       const profilePictureURL = await adapter.fetchProfilePictureUrl({
         organizationId: c.organization_id,
         sessionRef: ref,
-        recipient: chatId,
+        recipient,
       });
       if (!profilePictureURL) {
         // Contato sem foto ou com privacidade fechada: estado normal, não erro.
-        await carimbar(null);
         semFoto++;
         continue;
       }
 
-      const img = await fetch(profilePictureURL);
-      if (!img.ok) {
-        await carimbar(null);
-        falhas++;
-        continue;
-      }
-      const buf = Buffer.from(await img.arrayBuffer());
-      if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) {
-        await carimbar(null);
+      // Cercado: allowlist de host, IP conferido, redirecionamento à mão, prazo,
+      // teto durante a leitura e `image/*` (ver `baixarFotoDePerfil`). Recusa
+      // lança e cai no `catch`, contada como falha.
+      const { buffer: buf, mime } = await baixarFotoDePerfil(profilePictureURL);
+      if (buf.byteLength === 0) {
         falhas++;
         continue;
       }
@@ -207,9 +263,8 @@ async function handle(req: NextRequest): Promise<Response> {
       const path = `${c.organization_id}/avatars/${c.id}.jpg`;
       const { error: upErr } = await admin.storage
         .from("whatsapp-media")
-        .upload(path, buf, { contentType: "image/jpeg", upsert: true });
+        .upload(path, buf, { contentType: mime, upsert: true });
       if (upErr) {
-        await carimbar(null);
         falhas++;
         continue;
       }
@@ -243,7 +298,7 @@ async function handle(req: NextRequest): Promise<Response> {
       }
       atualizados++;
     } catch (err) {
-      await carimbar(null);
+      // A tentativa já foi carimbada no começo (backoff); aqui só se conta.
       falhas++;
       logger.warn("[contact-avatars] contato falhou", {
         contact_id: c.id,
@@ -254,7 +309,13 @@ async function handle(req: NextRequest): Promise<Response> {
   }
 
   return ok(
-    { scanned: rows.length, updated: atualizados, no_picture: semFoto, failed: falhas },
+    {
+      scanned: rows.length,
+      updated: atualizados,
+      no_picture: semFoto,
+      failed: falhas,
+      deferred: adiados,
+    },
     { requestId },
   );
 }

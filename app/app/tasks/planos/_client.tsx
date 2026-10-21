@@ -131,7 +131,9 @@ export function PlanosDeTarefa() {
   }
 
   return (
-    <div className="space-y-4 p-6">
+    // O contêiner é largura toda, com o respiro do skeleton; o limite de leitura
+    // vale para cada bloco da página (`*:`), não para o contêiner.
+    <div className="space-y-4 p-6 *:max-w-3xl">
       <div>
         <Link
           href="/app/tasks"

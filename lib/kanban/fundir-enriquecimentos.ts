@@ -62,6 +62,32 @@ export function cabecalhoServerTiming(tempos: TemposDoQuadro): string {
 }
 
 /**
+ * Acima disto o quadro vai para o log com a duração de cada família. Abaixo, a
+ * abertura foi normal e o log só faria volume no agregador (P2 do Cassio na
+ * #236): o que interessa é a abertura LENTA, e ela continua registrada inteira.
+ */
+export const LIMIAR_DO_LOG_DO_QUADRO_MS = 2_000;
+
+/**
+ * O que a rota faz com os tempos do quadro:
+ *  - `logar`: só quando o total passou do limiar;
+ *  - `headers`: o `Server-Timing` vai SÓ para o staff da plataforma. O nome
+ *    interno das famílias e o tempo de cada uma não são dado de negócio, mas
+ *    também não são da conta de qualquer cliente autenticado (P2 do Cassio na
+ *    #236). Para o resto, nenhum header.
+ */
+export function diagnosticoDoQuadro(
+  tempos: TemposDoQuadro,
+  staffDaPlataforma: boolean,
+  limiarMs: number = LIMIAR_DO_LOG_DO_QUADRO_MS,
+): { logar: boolean; headers: Record<string, string> | undefined } {
+  return {
+    logar: (tempos.total ?? 0) > limiarMs,
+    headers: staffDaPlataforma ? { "Server-Timing": cabecalhoServerTiming(tempos) } : undefined,
+  };
+}
+
+/**
  * Funde as versões enriquecidas sobre o MESMO quadro base.
  *
  * Cada família devolve `base.map(...)`: mesmo comprimento, mesma ordem, e cada

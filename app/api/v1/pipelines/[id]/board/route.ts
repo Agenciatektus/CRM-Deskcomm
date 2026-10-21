@@ -31,7 +31,7 @@ import { anexarProximoPasso, type TarefaAbertaDoQuadro } from "@/lib/kanban/prox
 import { anexarTarefasAosNegocios, type LinhaDaTarefaNoQuadro } from "@/lib/kanban/tarefas-no-quadro";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import {
-  cabecalhoServerTiming,
+  diagnosticoDoQuadro,
   enriquecerEmParalelo,
   fundirEnriquecimentos,
 } from "@/lib/kanban/fundir-enriquecimentos";
@@ -700,13 +700,18 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   tempos.total = Math.round((performance.now() - inicioDaRota) * 10) / 10;
 
   // Duração por família, sem PII: a próxima lentidão aponta a família culpada.
-  logger.info("[board] tempos do quadro", {
-    requestId,
-    pipelineId,
-    leads: leadsVisiveis.length,
-    ...tempos,
-  });
-  const headers = { "Server-Timing": cabecalhoServerTiming(tempos) };
+  // Só a abertura LENTA vai para o log, e o `Server-Timing` só para o staff da
+  // plataforma (`diagnosticoDoQuadro`).
+  const diagnostico = diagnosticoDoQuadro(tempos, authUser?.is_platform_admin === true);
+  if (diagnostico.logar) {
+    logger.info("[board] tempos do quadro", {
+      requestId,
+      pipelineId,
+      leads: leadsVisiveis.length,
+      ...tempos,
+    });
+  }
+  const headers = diagnostico.headers;
 
   // O primeiro erro (na ordem de antes da paralelização) derruba o quadro,
   // como na cadeia: meia tela com campos faltando parece certa e não é.

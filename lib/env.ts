@@ -268,6 +268,33 @@ const schema = z.object({
       return "";
     }),
 
+  // ─── Host PÚBLICO do FZAP (fotos de perfil) — OPCIONAL ──────────────────
+  //
+  // De onde o cron de fotos aceita baixar a foto do WhatsApp da Verdash, e por
+  // onde o modo direto pede o avatar (o FZAP monta o `publicDownloadUrl` com o
+  // host que recebeu o pedido). NÃO é `VERDASH_API_BASE_URL`: em produção essa
+  // aponta para a rede interna (`http://10.0.1.1:8081`), e derivar a allowlist
+  // dela recusaria toda foto. Mesmo nome e mesmo padrão da função
+  // `crm-foto-perfil` da Verdash, que monta o link pelo mesmo host.
+  //
+  // Só `https:`. Vazio = padrão `https://fzap2.verdash.com.br` (lido em
+  // `fzapPublicBaseUrl()`). Inválido não derruba o boot (`.catch`, mesmo motivo
+  // de JITSI_SERVER_URL): avisa e cai no padrão.
+  FZAP_PUBLIC_BASE_URL: z
+    .string()
+    .optional()
+    .default("")
+    .refine((v) => v.trim() === "" || /^https:\/\/[^\s/:]+(:443)?\/?$/i.test(v.trim()), {
+      message: "precisa ser a origem https do FZAP, como https://fzap2.verdash.com.br",
+    })
+    .catch(({ error }) => {
+      console.warn(
+        `[env] FZAP_PUBLIC_BASE_URL inválida (${JSON.stringify(process.env.FZAP_PUBLIC_BASE_URL)}) — usando o padrão https://fzap2.verdash.com.br. ` +
+          `(${error.issues[0]?.message ?? "valor recusado"})`,
+      );
+      return "";
+    }),
+
   // ─── Canal Datafy (recorte do #1130) — OPCIONAL, DESLIGADO POR PADRÃO ───
   //
   // Só `true` liga (decisão do dono, doc 54). Vazio = a instalação não oferece o

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as ContatoAvatar from "@/lib/channels/contact-avatar";
+
 /**
  * Corrida entre o cron de fotos de perfil e a anonimização LGPD.
  *
@@ -34,20 +36,35 @@ vi.mock("@/lib/channels", () => ({
   }),
 }));
 
+// O download cercado tem a própria suíte (`foto-de-perfil-download.test.ts`);
+// aqui ele só precisa devolver uma imagem.
+vi.mock("@/lib/channels/contact-avatar", async (real) => ({
+  ...(await real<typeof ContatoAvatar>()),
+  baixarFotoDePerfil: async () => ({ buffer: Buffer.from([1, 2, 3]), mime: "image/jpeg" }),
+}));
+
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (tabela: string) => ({
       select: () => {
         const dados =
           tabela === "contacts"
-            ? [{ id: CONTATO, organization_id: ORG, wa_identity: "phone:+5511999990000", avatar_storage_path: null }]
+            ? [
+                {
+                  id: CONTATO,
+                  organization_id: ORG,
+                  wa_identity: "phone:+5511999990000",
+                  avatar_storage_path: null,
+                },
+              ]
             : { waha_session_name: "sessao-de-teste", provider: "waha" };
         const proxy: Record<string, unknown> = new Proxy(
           {},
           {
             get(_t, prop) {
               if (prop === "then") {
-                return (ok: (v: unknown) => unknown) => Promise.resolve({ data: dados, error: null }).then(ok);
+                return (ok: (v: unknown) => unknown) =>
+                  Promise.resolve({ data: dados, error: null }).then(ok);
               }
               if (prop === "maybeSingle") return async () => ({ data: dados, error: null });
               return () => proxy;

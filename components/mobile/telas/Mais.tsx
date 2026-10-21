@@ -3,6 +3,7 @@ import { type ReactNode, useTransition } from "react";
 import Link from "next/link";
 
 import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDot";
+import { FotoDaPessoa } from "@/components/fotos/FotoDaPessoa";
 import { BotaoDeDisponibilidade } from "@/components/shell/BotaoDeDisponibilidade";
 import { ContadorDaFila } from "@/components/shell/ContadorDaFila";
 import { ContadorDeCasos } from "@/components/shell/ContadorDeCasos";
@@ -83,9 +84,11 @@ function CartaoDoPerfil({ aoNavegar }: { aoNavegar: () => void }) {
   return (
     <section className="mx-4 mt-1 mb-2 flex flex-col rounded-(--mb-perfil-raio) border border-border bg-surface p-4">
       <div className="flex items-center gap-3.5 pb-3">
-        <span className="pele-grad grid size-12 shrink-0 place-items-center rounded-full font-bold">
-          {iniciais(user.full_name, user.email)}
-        </span>
+        <FotoDaPessoa
+          url={user.avatar_url}
+          iniciais={iniciais(user.full_name, user.email)}
+          className="pele-grad grid size-12 shrink-0 place-items-center rounded-full font-bold"
+        />
         <span className="min-w-0 flex-1">
           <b className="block truncate text-[19px] font-bold text-text">{user.full_name ?? user.email}</b>
           <small className="block truncate text-[13.5px] text-text-muted">{user.email}</small>

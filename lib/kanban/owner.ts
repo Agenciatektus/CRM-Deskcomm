@@ -6,6 +6,8 @@ export interface OwnerDisplay {
   name: string | null;
   /** Versão publicada do agente HOJE — resolvida na exibição, nunca no lead. */
   agentVersion: number | null;
+  /** O id da pessoa dona (só `kind: "user"`): a foto dela sai daqui (migration 9061). */
+  userId?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ export function resolveLeadOwner(
       kind: "user",
       name: ownerNames?.get(lead.owner_user_id) ?? null,
       agentVersion: null,
+      userId: lead.owner_user_id,
     };
   }
 
