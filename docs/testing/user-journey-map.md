@@ -627,12 +627,13 @@ divide o servidor. Só aparece exercitando o produto pela tela.
 
 ## J12 — A tela diz o que ESTA instalação consegue fazer `[P0]`
 
-**Por que P0:** é primeira impressão pura. **Nenhuma instalação nasce com o par
-VAPID** — o `.env.hostgator.example` grava as duas linhas vazias e gerar o par é
-um passo opcional que ninguém é obrigado a dar. Ou seja, o estado testado aqui é
-o estado em que 100% das instalações começam, e a tela de Notificações tem porta
-na navegação (`lib/navigation/registry.ts:470`), então qualquer pessoa chega nela
-no primeiro dia.
+**Por que P0:** é primeira impressão pura. Pelo kit, o install e a atualização
+geram o par VAPID sozinhos (`completar_par_vapid`, em
+`hostgator-setup-kit/_common.sh`); o estado testado aqui é o de quem montou o
+servidor FORA do kit (como o CI) ou cujo kit não conseguiu gerar o par — e a tela
+de Notificações tem porta na navegação (confira com
+`grep -n settings/notifications lib/navigation/catalogo.ts`), então qualquer
+pessoa chega nela no primeiro dia.
 
 **O defeito era de tela, e o backend estava certo o tempo todo.**
 `GET /api/v1/notifications/push` já devolvia `enabled:false` sem as chaves, e o
@@ -670,7 +671,7 @@ num job que já leva meia hora.
 | # | Caso | Expectativa | Resultado |
 |---|------|-------------|-----------|
 | J12.1 | Sem VAPID, a tela não fica muda | aviso `push-status-faltando-chaves` visível, e o de «pronto» ausente | PASS |
-| J12.2 | Ela diz o que FAZER, não só o que falta | o comando `npx web-push generate-vapid-keys` e as duas chaves, nominalmente | PASS |
+| J12.2 | Ela diz o que FAZER, não só o que falta | rodar a atualização (`update.sh` sem `--force`: o par nasce mesmo sem versão nova) e, fora do kit, o comando `npx web-push generate-vapid-keys` e as duas chaves, nominalmente | PASS (e2e: comando manual e chaves; unit: atualizar sem `--force`; shell: `update-guard` §14) |
 | J12.3 | O controle de Push não some, e a tela diz por que está travado | interruptor visível + «o navegador bloqueou as notificações» | PASS |
 | J12.5 | VAPID ausente NÃO desabilita o Push | com `granted` e sem chaves, nasce habilitado | PASS (unit) |
 | J12.4 | Com VAPID, anuncia a aba fechada | e para de mandar gerar o par que já existe | PASS (unit) |
