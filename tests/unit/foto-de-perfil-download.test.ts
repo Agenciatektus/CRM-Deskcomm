@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * O download da foto de perfil, cercado (P2-1 do @Cassio_SecRev na #240).
@@ -45,6 +45,22 @@ describe("de onde a foto pode vir", () => {
     "https://supabase.verdash.com.br/foto.jpg", // outro host da Verdash
   ])("recusa %s", (u) => {
     expect(hostDaFotoPermitido(new URL(u))).toBe(false);
+  });
+});
+
+describe("host do FZAP com a base da API interna (como em produção)", () => {
+  // Em produção `VERDASH_API_BASE_URL="http://10.0.1.1:8081"`. Derivar a
+  // allowlist dela recusava TODA foto do FZAP e aceitava o endereço interno.
+  beforeEach(() => vi.stubEnv("VERDASH_API_BASE_URL", "http://10.0.1.1:8081"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("sem FZAP_PUBLIC_BASE_URL, aceita o host público padrão", () => {
+    expect(hostDaFotoPermitido(new URL("https://fzap2.verdash.com.br/avatars/a.jpg"))).toBe(true);
+  });
+
+  it("recusa o endereço interno da API", () => {
+    expect(hostDaFotoPermitido(new URL("http://10.0.1.1:8081/avatars/a.jpg"))).toBe(false);
+    expect(hostDaFotoPermitido(new URL("https://10.0.1.1/avatars/a.jpg"))).toBe(false);
   });
 });
 

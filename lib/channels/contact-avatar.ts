@@ -12,7 +12,7 @@ import {
 
 import { PROVIDERS_DE_MENSAGEM } from "./capabilities";
 import type { ChannelProvider } from "./types";
-import { verdashBaseUrl } from "./verdash/credentials";
+import { fzapPublicBaseUrl } from "./verdash/credentials";
 
 /**
  * Canais que conseguem achar este contato. O IGSID só vale no Instagram, e o
@@ -46,9 +46,10 @@ export function destinatarioDaFoto(
  *   WAHA devolve e o que o FZAP repassa.
  * - `.fbcdn.net` / `.cdninstagram.com`: CDN da Meta, onde mora a foto que o
  *   perfil do Instagram devolve.
- * - o host PÚBLICO do FZAP (`verdashBaseUrl()`), de onde sai o
- *   `publicDownloadUrl` — no modo direto e no pareado, que a Verdash pede ao
- *   mesmo host público (`FZAP_PUBLIC_BASE_URL` em `crm-foto-perfil`).
+ * - o host PÚBLICO do FZAP (`fzapPublicBaseUrl()`, `FZAP_PUBLIC_BASE_URL`), de
+ *   onde sai o `publicDownloadUrl` — no modo direto e no pareado, que a Verdash
+ *   pede ao mesmo host (`FZAP_PUBLIC_BASE_URL` em `crm-foto-perfil`). NUNCA o
+ *   `verdashBaseUrl()`: em produção ele é a rede interna (`http://10.0.1.1:8081`).
  */
 export const SUFIXOS_DE_HOST_DA_FOTO = [
   ".whatsapp.net",
@@ -58,7 +59,7 @@ export const SUFIXOS_DE_HOST_DA_FOTO = [
 
 function hostDoFzapPublico(): string | null {
   try {
-    const url = new URL(verdashBaseUrl());
+    const url = new URL(fzapPublicBaseUrl());
     return url.protocol === "https:" ? url.hostname.toLowerCase() : null;
   } catch {
     return null;

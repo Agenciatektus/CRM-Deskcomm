@@ -92,7 +92,9 @@ describe("foto no canal Verdash", () => {
 
     expect(await verdashAdapter.fetchProfilePictureUrl!(pedido)).toBe("https://publico/a.jpg");
     const [url, init] = buscar.mock.calls[0]! as unknown as [string, RequestInit];
-    expect(url).toBe("https://fzap.invalid/user/avatar");
+    // Pelo host PÚBLICO, não pelo `baseUrl` (interno em produção): o FZAP monta
+    // o `publicDownloadUrl` com o host que recebeu o pedido.
+    expect(url).toBe("https://fzap2.verdash.com.br/user/avatar");
     expect(new Headers(init.headers).get("token")).toBe(PAREADA.token);
   });
 
