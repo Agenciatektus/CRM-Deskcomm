@@ -36,6 +36,16 @@ import {
   type Candidate,
 } from "./store";
 
+/**
+ * Teto de mensagens FÍSICAS da abordagem fria — o mesmo do turno de conversa
+ * (`MAX_SENDS_PER_TURN`, padrão 3, em `lib/agent-engine/env.ts`), que desde o
+ * #1724 vale também para as bolhas. O que passar dele segue junto na última
+ * bolha (`splitForSend`). Constante local, e não import de `inbound-turn.ts`:
+ * aquilo puxaria o motor de turno inteiro para a rota de cron da prospecção.
+ * ponytail: não lê o env; se o operador mexer em MAX_SENDS_PER_TURN, a fria segue em 3.
+ */
+const TETO_DE_BOLHAS_DA_ABORDAGEM = 3;
+
 export async function sendNextCandidate(
   pool: pg.Pool,
   db: pg.PoolClient,
@@ -315,6 +325,7 @@ export async function sendNextCandidate(
       generated.texto,
       agent.split_messages ?? false,
       agent.split_max_chars ?? 600,
+      TETO_DE_BOLHAS_DA_ABORDAGEM,
     );
     // Texto vazio com o estilo ligado não devolve bolha nenhuma (`splitForSend` →
     // `[]`), e a abordagem fria não pode sair sem bolha nenhuma: neste caso a

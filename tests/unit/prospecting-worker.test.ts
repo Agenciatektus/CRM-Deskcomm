@@ -516,6 +516,21 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
     expect(mocks.send).toHaveBeenCalledTimes(1);
   });
 
+  it("a abordagem sai em no MÁXIMO 3 mensagens: o que passa segue junto na última (#1724)", async () => {
+    // Cinco parágrafos curtos, cada um cabe sozinho numa bolha: sem o teto, são
+    // cinco mensagens seguidas para quem nunca falou com a empresa.
+    const paragrafos = ["Um.", "Dois.", "Três.", "Quatro.", "Cinco."];
+    mocks.generate.mockResolvedValue({ ok: true, texto: paragrafos.join("\n\n") });
+    mocks.send.mockResolvedValue({ status: "sent", id: "balao" });
+    const db = database(undefined, candidate, { ...versaoComEstilo, split_max_chars: 600 });
+    await sendNextCandidate({} as never, db as never, {} as never, campaign, dormir);
+
+    expect(mocks.send, "passou do teto de mensagens do turno").toHaveBeenCalledTimes(3);
+    const ultima = String(mocks.send.mock.calls[2]?.[2]?.body);
+    for (const resto of ["Três.", "Quatro.", "Cinco."])
+      expect(ultima, "o que passou do teto se perdeu").toContain(resto);
+  });
+
   it("a 2ª bolha não confirmada PARA o envio e marca a candidatura como falha", async () => {
     mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
     // `mockImplementation` e não `mockResolvedValueOnce`: o fila de "once" sobrevive
