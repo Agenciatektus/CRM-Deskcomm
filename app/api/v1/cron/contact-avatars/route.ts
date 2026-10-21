@@ -27,7 +27,12 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { DEFAULT_CHANNEL_PROVIDER, getAdapterOpcional, type ChannelProvider } from "@/lib/channels";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
+import { destinatarioDaFoto, providersDaFoto } from "@/lib/channels/contact-avatar";
+import {
+  CHANNEL_SESSION_REF_COLUMNS,
+  resolveSessionRef,
+  type ChannelSessionRef,
+} from "@/lib/channels/session-ref";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +48,7 @@ interface ContactRow {
   id: string;
   organization_id: string;
   wa_identity: string | null;
+  instagram_igsid: string | null;
   wa_lid: string | null;
   phone_number: string | null;
   avatar_storage_path: string | null;
@@ -88,8 +94,11 @@ async function handle(req: NextRequest): Promise<Response> {
   // declarada irreversível no produto; esta linha é o que sustenta isso.
   const { data: contatos, error: queryError } = await admin
     .from("contacts")
-    .select("id, organization_id, wa_identity, wa_lid, phone_number, avatar_storage_path")
-    .not("wa_identity", "is", null)
+    .select(
+      "id, organization_id, wa_identity, wa_lid, phone_number, instagram_igsid, avatar_storage_path",
+    )
+    // Contato só de Instagram (IGSID, sem telefone) também tem rosto.
+    .or("wa_identity.not.is.null,instagram_igsid.not.is.null")
     .eq("is_anonymized", false)
     .or(`avatar_updated_at.is.null,avatar_updated_at.lt.${cutoff}`)
     .order("avatar_updated_at", { ascending: true, nullsFirst: true })
@@ -132,27 +141,43 @@ async function handle(req: NextRequest): Promise<Response> {
       return (afetadas ?? []).length > 0;
     };
 
-    if (!chatId) {
+    if (!chatId && !c.instagram_igsid) {
       await carimbar(null);
       semFoto++;
       continue;
     }
 
     try {
-      const { data: sessao } = await admin
-        .from("channel_sessions")
-        .select("waha_session_name, provider")
+      // A sessão POR ONDE ESTE CONTATO CONVERSOU. Pegar "a primeira sessão da
+      // organização" pedia a foto ao número errado em quem tem vários números
+      // ou WhatsApp + Instagram — e o Instagram nem acha o IGSID de outra conta.
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select("channel_session_id")
         .eq("organization_id", c.organization_id)
-        .eq("status", "WORKING")
-        // Sem o filtro, a linha de chamada de voz (spec 18) — que nasce
-        // `WORKING` ao parear — podia ganhar este `limit(1)` sem ordenação e
-        // devolver `waha_session_name` nulo: a foto de todo mundo parava de
-        // atualizar em silêncio, com o `carimbar(null)` logo abaixo parecendo
-        // "este contato não tem foto".
-        .in("provider", [...PROVIDERS_DE_MENSAGEM])
+        .eq("contact_id", c.id)
+        .not("channel_session_id", "is", null)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
-      const ref = (sessao as { waha_session_name?: string | null } | null)?.waha_session_name;
+      const sessaoDaConversa = (conversa as { channel_session_id?: string | null } | null)
+        ?.channel_session_id;
+
+      let consultaSessao = admin
+        .from("channel_sessions")
+        .select(CHANNEL_SESSION_REF_COLUMNS)
+        .eq("organization_id", c.organization_id)
+        .eq("status", "WORKING")
+        // Só canais que acham ESTE contato (IGSID → Instagram; wa_identity →
+        // WhatsApp). Também mantém fora a linha de chamada de voz (spec 18),
+        // que nasce `WORKING` ao parear e não tem referência de mensagem.
+        .in("provider", providersDaFoto(c));
+      // Contato sem conversa (importado, por exemplo) cai em qualquer sessão
+      // compatível da MESMA organização — o recorte de tenant vem do `eq` acima.
+      if (sessaoDaConversa) consultaSessao = consultaSessao.eq("id", sessaoDaConversa);
+      const { data: sessao } = await consultaSessao.limit(1).maybeSingle();
+      const linhaSessao = sessao as unknown as ChannelSessionRef | null;
+      const ref = linhaSessao ? resolveSessionRef(linhaSessao) : null;
       if (!ref) {
         await carimbar(null);
         semFoto++;
@@ -167,11 +192,16 @@ async function handle(req: NextRequest): Promise<Response> {
       // Opcional: canal conhecido sem adapter local é categoria, não falha — sai pelo
       // mesmo caminho de quem não sabe buscar foto. Provider fora da matriz continua
       // lançando, que é o barulho que se quer.
-      const adapter = getAdapterOpcional(
-        (sessao as { provider?: ChannelProvider | null } | null)?.provider ??
-          DEFAULT_CHANNEL_PROVIDER,
-      );
+      const provider =
+        (linhaSessao?.provider as ChannelProvider | undefined) ?? DEFAULT_CHANNEL_PROVIDER;
+      const adapter = getAdapterOpcional(provider);
       if (!adapter?.fetchProfilePictureUrl) {
+        await carimbar(null);
+        semFoto++;
+        continue;
+      }
+      const recipient = destinatarioDaFoto(provider, c, chatId);
+      if (!recipient) {
         await carimbar(null);
         semFoto++;
         continue;
@@ -179,7 +209,7 @@ async function handle(req: NextRequest): Promise<Response> {
       const profilePictureURL = await adapter.fetchProfilePictureUrl({
         organizationId: c.organization_id,
         sessionRef: ref,
-        recipient: chatId,
+        recipient,
       });
       if (!profilePictureURL) {
         // Contato sem foto ou com privacidade fechada: estado normal, não erro.
@@ -243,6 +273,9 @@ async function handle(req: NextRequest): Promise<Response> {
       }
       atualizados++;
     } catch (err) {
+      // Carimba também na falha: é o backoff. Sem isto, quem falha volta no topo
+      // da fila (`nulls first`) em TODA rodada, e 25 contatos com a plataforma
+      // fora travariam o lote de todo mundo. Tenta de novo na janela de 7 dias.
       await carimbar(null);
       falhas++;
       logger.warn("[contact-avatars] contato falhou", {

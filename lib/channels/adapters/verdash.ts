@@ -48,6 +48,7 @@ import {
   resolverJidDoTelefone,
   verdashEnviar,
   verdashStatusPareado,
+  fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { resolveVerdashCreds } from "../verdash/credentials";
@@ -319,12 +320,18 @@ export const verdashAdapter: ChannelAdapter = {
       instanceName: input.sessionRef,
     });
     if (!creds) return null;
+    // Pareado: quem tem o token do FZAP é a Verdash, então a foto vem por ela.
+    // Fora do `try` de propósito: queda da plataforma lança, e o cron conta
+    // como falha em vez de "contato sem foto".
+    if (creds.vinculoId) return fotoDoContatoPareado(creds, input.recipient);
     try {
-      const data = await fzapRequest<{ url?: string }>(creds, "/user/avatar", {
-        method: "POST",
-        body: { phone: input.recipient, preview: false },
-      });
-      return data?.url ?? null;
+      const data = await fzapRequest<{ url?: string; publicDownloadUrl?: string }>(
+        creds,
+        "/user/avatar",
+        { method: "POST", body: { phone: input.recipient, preview: false } },
+      );
+      // `publicDownloadUrl` é o host público; `url` pode apontar para rede interna.
+      return data?.publicDownloadUrl ?? data?.url ?? null;
     } catch {
       return null;
     }

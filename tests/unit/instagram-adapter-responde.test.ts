@@ -165,3 +165,54 @@ describe("o envio", () => {
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 });
+
+describe("a foto do perfil", () => {
+  const pedido = {
+    organizationId: "org-1",
+    sessionRef: "conta-ig",
+    recipient: "17841400000000001",
+  };
+
+  it("pede à plataforma pelo IGSID, com o token do vínculo da org", async () => {
+    const buscar = vi.fn(async () =>
+      respostaHttp({ success: true, data: { url: "https://cdninstagram.com/foto.jpg" } }),
+    );
+    vi.stubGlobal("fetch", buscar);
+
+    expect(await instagramAdapter.fetchProfilePictureUrl!(pedido)).toBe(
+      "https://cdninstagram.com/foto.jpg",
+    );
+    // A credencial é resolvida pela org E pela conexão do contato.
+    expect(resolveVerdashCreds).toHaveBeenCalledWith(expect.anything(), {
+      organizationId: "org-1",
+      instanceName: "conta-ig",
+    });
+    const [url, init] = buscar.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toMatch(/\/crm-foto-perfil$/);
+    expect(new Headers(init.headers).get("x-crm-token")).toBe(CREDS_PAREADAS.token);
+    expect(JSON.parse(init.body as string)).toEqual({ destinatario: "17841400000000001" });
+  });
+
+  it("sem vínculo não há por onde perguntar: devolve null sem chamar a rede", async () => {
+    vi.mocked(resolveVerdashCreds).mockResolvedValue({
+      ...CREDS_PAREADAS,
+      vinculoId: null,
+    } as never);
+    const buscar = vi.fn();
+    vi.stubGlobal("fetch", buscar);
+
+    expect(await instagramAdapter.fetchProfilePictureUrl!(pedido)).toBeNull();
+    expect(buscar).not.toHaveBeenCalled();
+  });
+
+  it("recusa da plataforma lança — não se passa por contato sem foto", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => respostaHttp({ error: "perfil_indisponivel" }, 502)),
+    );
+
+    await expect(instagramAdapter.fetchProfilePictureUrl!(pedido)).rejects.toThrow(
+      "verdash_request_failed: 502 perfil_indisponivel",
+    );
+  });
+});

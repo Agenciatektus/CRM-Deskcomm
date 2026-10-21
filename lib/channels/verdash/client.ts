@@ -360,3 +360,43 @@ export async function fzapFetchMedia(
   const mime = res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
   return { buffer, mime };
 }
+
+/**
+ * A foto de perfil do contato no MODO PAREADO (WhatsApp ou Instagram da
+ * Verdash), pedida à função `crm-foto-perfil` com o token de máquina do vínculo.
+ * O token do FZAP e o do Instagram ficam lá; aqui só chega a URL.
+ *
+ * Contrato (Verdash `supabase/functions/crm-foto-perfil/handler.ts`):
+ * `POST {destinatario}` → `{success: true, data: {url: string | null}}`.
+ *
+ * LANÇA em recusa ou rede, em vez de devolver `null`: `null` significa "o
+ * contato não tem foto", e uma queda da plataforma não pode se passar por isso.
+ * A mensagem do erro nunca leva a URL nem o destinatário (PII).
+ */
+export async function fotoDoContatoPareado(
+  creds: VerdashCredentials,
+  destinatario: string,
+): Promise<string | null> {
+  const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-foto-perfil`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "x-crm-token": creds.token, "Content-Type": "application/json" },
+      body: JSON.stringify({ destinatario }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
+    throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
+  }
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    data?: { url?: unknown };
+  } | null;
+  if (!res.ok || json?.success !== true) {
+    throw new Error(`verdash_request_failed: ${res.status} ${json?.error ?? ""}`.trim());
+  }
+  return typeof json.data?.url === "string" && json.data.url ? json.data.url : null;
+}
