@@ -268,6 +268,27 @@ export const FERRAMENTAS_QUE_FALAM = [
 ];
 
 /**
+ * As que ENCOMENDAM fala para depois: inscrever numa régua ou agendar retorno
+ * termina em mensagem ao cliente, por um caminho que não passa pelo veto de
+ * envio. Para quem não fala, a diferença entre falar agora e encomendar a fala
+ * é de relógio, não de natureza.
+ *
+ * Mora aqui, e não em cada consumidor, porque já nasceu em duas cópias — a do
+ * turno e a do teste — e lista duplicada é drift marcado para acontecer: a
+ * cerca passava por ter a própria lista, não por os dois lados concordarem.
+ */
+export const FERRAMENTAS_QUE_ENCOMENDAM_FALA = [
+  "crm_enroll_followup_flow",
+  "crm_schedule_followup",
+];
+
+/** Tudo que um auxiliar de CRM não pode ter: falar agora ou encomendar a fala. */
+export const FERRAMENTAS_VEDADAS_AO_AUXILIAR = [
+  ...FERRAMENTAS_QUE_FALAM,
+  ...FERRAMENTAS_QUE_ENCOMENDAM_FALA,
+];
+
+/**
  * DEFESA EM PROFUNDIDADE, e nada além disso: quem impede a fala é o veto na
  * cadeia de envio (`runBeforeSend`), por onde TODA saída passa. Isto existe
  * para a configuração não ficar contraditória na tela — ligar "não fala com o
@@ -283,7 +304,7 @@ export function conferirAuxiliarDeCrm(
   ctx: z.RefinementCtx,
 ): void {
   if (v.somente_interno !== true) return;
-  const envios = (v.tool_ids ?? []).filter((t) => FERRAMENTAS_QUE_FALAM.includes(t));
+  const envios = (v.tool_ids ?? []).filter((t) => FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(t));
   if (envios.length === 0) return;
   ctx.addIssue({
     code: "custom",

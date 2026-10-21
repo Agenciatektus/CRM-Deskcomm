@@ -6133,6 +6133,27 @@ export function createInboundTurnHandler(deps: InboundTurnDeps) {
       }
       const { generateReplyDraft } = await import('./reply-drafts');
       if (!job.contact_id) throw new Error('reply_without_contact');
+      // AUXILIAR DE CRM (9060): a mesma porta do outro ramo de rascunho, e não
+      // mais um gate inline próprio.
+      //
+      // `false` da detecção acima quer dizer "olhei e não detectei nada" E
+      // "não olhei, porque este agente não atua aqui" — a mesma palavra para
+      // duas coisas. Era por essa ambiguidade que o rascunho de um agente que
+      // FALA nascia na conversa de uma pessoa: nada saía para o cliente, mas
+      // reabria o defeito que o docstring de `podeGerarRascunho` registra como
+      // consertado. Perguntar de novo, pela porta única, desfaz o duplo sentido.
+      if (
+        !(await podeGerarRascunho(
+          deps,
+          pool,
+          job,
+          job.contact_id,
+          payload.conversation_id,
+          operationAgent,
+        ))
+      ) {
+        return;
+      }
       await generateReplyDraft(pool, deps, {
         organizationId: job.organization_id,
         conversationId: payload.conversation_id,

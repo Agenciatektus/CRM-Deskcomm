@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  FERRAMENTAS_QUE_FALAM,
+  FERRAMENTAS_VEDADAS_AO_AUXILIAR,
   versionCreateSchema,
   versionPatchSchema,
 } from "@/lib/ai/agents/validation";
@@ -19,9 +19,7 @@ import { TOOL_CATALOG } from "@/lib/mcp/tools/catalogo";
  * marca desligada (passa), ligar a marca por PATCH, publicar. A conferência
  * existia e nunca via o estado final.
  */
-/** As que ENCOMENDAM fala para depois — recusadas ao auxiliar em `mcp-tools.ts`. */
-const ENCOMENDAM_FALA = ["crm_enroll_followup_flow", "crm_schedule_followup"];
-/** As que o nome sugere mas que só leem, e por isso não precisam de trava. */
+/** As que o nome sugere mas que só leem ou cancelam, e por isso não encomendam fala. */
 const SO_CONSULTAM = ["crm_list_followups", "crm_cancel_followup"];
 
 describe("auxiliar de CRM: configuração coerente", () => {
@@ -148,9 +146,8 @@ describe("auxiliar de CRM: configuração coerente", () => {
     );
     for (const id of entregamMensagem) {
       expect(
-        FERRAMENTAS_QUE_FALAM.includes(id) ||
+        FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(id) ||
           IDS_DO_HARNESS.has(id) ||
-          ENCOMENDAM_FALA.includes(id) ||
           SO_CONSULTAM.includes(id),
         `${id} pode chegar ao cliente e não está em nenhuma das listas que o auxiliar de CRM respeita`,
       ).toBe(true);

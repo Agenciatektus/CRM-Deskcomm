@@ -23,7 +23,7 @@ import { carregarServidorMcpExternoDoTurno } from '@/lib/mcp/servidor-externo/ca
 import { pickToolsFromMcp, type RuntimeHandoffSignal } from '@/lib/ai/runtime/tools';
 import { mintEphemeralToken, revokeEphemeralToken } from '@/lib/ai/runtime/mcp_token';
 import { IDS_DO_HARNESS, motivoDoHarness } from '@/lib/mcp/tools/ferramentas-do-harness';
-import { FERRAMENTAS_QUE_FALAM } from "@/lib/ai/agents/validation";
+import { FERRAMENTAS_VEDADAS_AO_AUXILIAR } from "@/lib/ai/agents/validation";
 import type { McpAuthResult } from '@/lib/mcp/auth';
 import type { McpContext } from '@/lib/mcp/types';
 import { modulosLigados } from '@/lib/instalacao/modulos';
@@ -87,15 +87,11 @@ export async function buildMcpTurnTools(
   // mudar o produto para os outros agentes. Vale para toda a lista de
   // `FERRAMENTAS_QUE_FALAM`, e não só para esta, porque a próxima ferramenta de
   // envio vai nascer na mesma lista.
-  // Inscrever alguém numa régua ou agendar retorno também termina em mensagem
-  // ao cliente, só que mais tarde e por outro caminho (`sendFixedOutbound`, que
-  // não passa pelo veto). Para quem não fala, a diferença entre falar agora e
-  // encomendar a fala para depois é de relógio, não de natureza.
-  const ENCOMENDAM_FALA = ['crm_enroll_followup_flow', 'crm_schedule_followup'];
+  // A lista mora em `validation.ts` e é a MESMA que a publicação confere: duas
+  // cópias já tinham nascido aqui e no teste, e a cerca passava por cada lado
+  // ter a sua, não por eles concordarem.
   const falamNoTurno = agentConfig.somenteInterno
-    ? callbackFiltered.filter(
-        (id) => FERRAMENTAS_QUE_FALAM.includes(id) || ENCOMENDAM_FALA.includes(id),
-      )
+    ? callbackFiltered.filter((id) => FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(id))
     : [];
   if (falamNoTurno.length > 0) {
     log.warn('tools de envio recusadas: este agente é auxiliar de CRM e não fala com o cliente', {

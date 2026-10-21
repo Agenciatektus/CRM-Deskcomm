@@ -9,7 +9,7 @@ import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
 import { audit } from "@/lib/audit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  FERRAMENTAS_QUE_FALAM,
+  FERRAMENTAS_VEDADAS_AO_AUXILIAR,
   PUBLISH_ERROR_CODES,
   type PublishErrorCode,
 } from "./validation";
@@ -70,7 +70,7 @@ export async function publishAgentVersion(
   // publicar a contradição sem nenhuma das duas reclamar. Aqui a versão já está
   // montada, então a pergunta é sobre o que vai valer.
   const falamNaVersao = ((version as { tool_ids?: string[] | null }).tool_ids ?? []).filter((t) =>
-    FERRAMENTAS_QUE_FALAM.includes(t),
+    FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(t),
   );
   if ((version as { somente_interno?: boolean | null }).somente_interno === true && falamNaVersao.length > 0) {
     return {
