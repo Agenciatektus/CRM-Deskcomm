@@ -29,6 +29,7 @@
  * `tests/unit/audit-lista-do-painel-e-derivada.test.tsx` reprova quem tentar.
  */
 export const AUDIT_ACTIONS = [
+  "settings.agenda_presentation_updated",
   "ad_tracking_link.saved",
   "auth.login_success",
   "auth.login_failed",
@@ -1199,6 +1200,11 @@ export const AUDIT_ACTIONS = [
   // Inscrição de push removida no servidor: desligar os alertas, sair, ou
   // "sair de todos os dispositivos" (metadata.escopo diz qual).
   "notification_prefs.push_subscription_removed",
+  "agenda.service_block",
+  "agenda.service_configure",
+  "agenda.service_refresh",
+  "agenda.service_resource",
+  "agenda.service_unblock",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */
