@@ -531,7 +531,7 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
       expect(ultima, "o que passou do teto se perdeu").toContain(resto);
   });
 
-  it("a 2ª bolha não confirmada PARA o envio e marca a candidatura como falha", async () => {
+  it("a 2ª bolha não confirmada PARA o envio, e a candidatura conta como abordada (a 1ª chegou)", async () => {
     mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
     // `mockImplementation` e não `mockResolvedValueOnce`: o fila de "once" sobrevive
     // ao `clearAllMocks` (que só limpa as chamadas) e vaza para os testes seguintes.
@@ -548,16 +548,73 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
       String(q).startsWith("update messages set status='failed'"),
     );
     expect(falha?.[1]).toContain("balao-2");
-    expect(
-      db.query.mock.calls.some(([q]) =>
-        String(q).includes("update prospecting_candidates set status=$3"),
-      ),
-      "candidatura não foi marcada como falha",
-    ).toBe(true);
+    // A pessoa recebeu a 1ª bolha: `failed` a tiraria da reserva da saída e do
+    // contexto da campanha, que só enxergam `sending`/`sent`.
+    const candidatura = db.query.mock.calls.find(([q]) =>
+      String(q).startsWith("update prospecting_candidates set status=$3"),
+    );
+    expect(candidatura?.[1], "quem recebeu a 1ª bolha ficou como falha").toEqual([
+      id,
+      "candidate",
+      "sent",
+      null,
+    ]);
     // A falha não escapou como erro: o candidato é marcado e o tick SEGUE com a
     // campanha (nada foi lançado). E a trilha registra O QUE SAIU — uma bolha de
     // três —, porque uma mensagem foi de fato entregue.
     expect(mocks.audit).toHaveBeenCalledTimes(1);
+    expect(mocks.audit.mock.calls[0]?.[0]).toMatchObject({
+      action: "prospecting.approach_sent",
+      metadata: { sent: false, bubbles_sent: 1, bubbles_total: 3 },
+    });
+  });
+
+  it("second_message com a 2ª bolha não confirmada: a candidatura fica `sent` e a saída da 2ª mensagem continua garantida", async () => {
+    mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
+    let balao = 0;
+    mocks.send.mockImplementation(async () => ({
+      status: balao++ === 0 ? "sent" : "queued",
+      id: `balao-${balao}`,
+    }));
+    const segunda = {
+      ...campaign,
+      config: { ...campaign.config, exit_offer: "second_message" },
+    } as Campaign;
+    const db = database(undefined, candidate, versaoComEstilo);
+    await sendNextCandidate({} as never, db as never, {} as never, segunda, dormir);
+
+    const [sql, params] = db.query.mock.calls.find(([q]) =>
+      String(q).startsWith("update prospecting_candidates set status=$3"),
+    ) as [string, unknown[]];
+    // `sent` é o que grava automatic_sends=1 e mantém o candidato visível para
+    // `SQL_CONTAR_ENVIO_AUTOMATICO`, que é quem serve a saída na 2ª mensagem.
+    expect(params, "a apresentação chegou e a saída nunca viria").toEqual([
+      id,
+      "candidate",
+      "sent",
+      null,
+    ]);
+    expect(sql).toContain("automatic_sends = case when $3 = 'sent' then 1");
+    expect(sql, "reservou a saída que este modo serve na 2ª mensagem").toContain(
+      "and false then now()",
+    );
+  });
+
+  it("uma bolha seguinte que LANÇA no envio para só este candidato: não pausa a campanha nem perde a trilha", async () => {
+    mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
+    let balao = 0;
+    mocks.send.mockImplementation(async () => {
+      if (balao++ > 0) throw new Error("agente pausado entre as bolhas");
+      return { status: "sent", id: "balao-1" };
+    });
+    const db = database(undefined, candidate, versaoComEstilo);
+    // Lançar daqui faria o tick pausar a campanha inteira.
+    await sendNextCandidate({} as never, db as never, {} as never, campaign, dormir);
+
+    const candidatura = db.query.mock.calls.find(([q]) =>
+      String(q).startsWith("update prospecting_candidates set status=$3"),
+    );
+    expect(candidatura?.[1]).toEqual([id, "candidate", "sent", null]);
     expect(mocks.audit.mock.calls[0]?.[0]).toMatchObject({
       action: "prospecting.approach_sent",
       metadata: { sent: false, bubbles_sent: 1, bubbles_total: 3 },

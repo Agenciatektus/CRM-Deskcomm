@@ -345,6 +345,8 @@ export async function sendNextCandidate(
     let falhouEm: Message | undefined;
     /** A conversa deixou de ser fria ENTRE bolhas: a pessoa respondeu ou um humano assumiu. */
     let parouEm: string | undefined;
+    /** Uma bolha DEPOIS da primeira lançou no envio (agente pausado no meio, erro transitório). */
+    let lancouEm: string | undefined;
     /** Bolhas FÍSICAS confirmadas — é o "o que saiu" que a trilha registra. */
     let entregues = 0;
     for (let i = 0; i < baloes.length; i++) {
@@ -375,41 +377,60 @@ export async function sendNextCandidate(
           break;
         }
       }
-      mensagem = await sendMessageHandler(
-        admin,
-        {
-          organization_id: c.organization_id,
-          actor: { type: "ai_agent", id: p.id, agent_id: cfg.agent_id, role: "ai_operator" },
-          requestId: `prospecting:${p.id}`,
-          serviceBoundary: boundary,
-          // O RECIBO E A IDEMPOTÊNCIA do candidato moram na PRIMEIRA bolha: é a
-          // linha `messages` de id estável (`p.message_id`) que o `sending`
-          // grava antes, e o eco do próprio envio casa por ela. As demais são
-          // mensagens próprias — repetir o id faria o handler devolver a linha
-          // de antes sem enviar (o ramo 23505).
-          // A GUARDA CHEIA acompanha a PRIMEIRA bolha, e só ela: o handler a
-          // roda na entrada de cada envio (`_handler.ts:437`) e ela recusa
-          // conversa com `last_outbound_at` — que é o carimbo que o próprio
-          // handler grava logo depois de enviar esta bolha. Repetida nas
-          // seguintes, ela recusava a 2ª com 409 de escopo `campanha`, pausava a
-          // campanha no primeiro contato e deixava a pessoa sem a saída.
-          ...(i === 0
-            ? { internalMessageId: p.message_id, prospectingDelivery: guard }
-            : {}),
-          proactiveContext: { organizationId: c.organization_id, contactId: p.contact_id },
-          agentOperation: {
-            organizationId: c.organization_id,
-            agentId: cfg.agent_id,
-            versionId: agent.published_version_id,
-            revision: String(agent.operation_revision),
+      try {
+        mensagem = await sendMessageHandler(
+          admin,
+          {
+            organization_id: c.organization_id,
+            actor: { type: "ai_agent", id: p.id, agent_id: cfg.agent_id, role: "ai_operator" },
+            requestId: `prospecting:${p.id}`,
+            serviceBoundary: boundary,
+            // O RECIBO E A IDEMPOTÊNCIA do candidato moram na PRIMEIRA bolha: é a
+            // linha `messages` de id estável (`p.message_id`) que o `sending`
+            // grava antes, e o eco do próprio envio casa por ela. As demais são
+            // mensagens próprias — repetir o id faria o handler devolver a linha
+            // de antes sem enviar (o ramo 23505).
+            // A GUARDA CHEIA acompanha a PRIMEIRA bolha, e só ela: o handler a
+            // roda na entrada de cada envio (`_handler.ts:437`) e ela recusa
+            // conversa com `last_outbound_at` — que é o carimbo que o próprio
+            // handler grava logo depois de enviar esta bolha. Repetida nas
+            // seguintes, ela recusava a 2ª com 409 de escopo `campanha`, pausava a
+            // campanha no primeiro contato e deixava a pessoa sem a saída.
+            ...(i === 0
+              ? { internalMessageId: p.message_id, prospectingDelivery: guard }
+              : {}),
+            proactiveContext: { organizationId: c.organization_id, contactId: p.contact_id },
+            agentOperation: {
+              organizationId: c.organization_id,
+              agentId: cfg.agent_id,
+              versionId: agent.published_version_id,
+              revision: String(agent.operation_revision),
+            },
           },
-        },
-        {
-          conversation_id: p.conversation_id,
-          type: "text",
-          body: baloes[i]!,
-        },
-      );
+          {
+            conversation_id: p.conversation_id,
+            type: "text",
+            body: baloes[i]!,
+          },
+        );
+      } catch (error) {
+        // Na 1ª bolha nada saiu: o erro segue para o `catch` de fora (candidato
+        // `failed`, campanha decidida pelo tick), como antes. Depois dela a
+        // pessoa JÁ recebeu a apresentação: o handler revalida a cada envio o
+        // que muda com o tempo (agente pausado ou editado, agenda, erro de
+        // banco), e deixar isso subir pausaria a campanha, marcaria `failed`
+        // quem foi abordado e perderia a trilha. Para só este candidato.
+        if (i === 0) throw error;
+        lancouEm = "Uma mensagem depois da primeira não pôde ser enviada.";
+        logger.warn("[prospecting] bolha seguinte lançou no envio; a abordagem parou aqui", {
+          organization_id: c.organization_id,
+          campaign_id: c.id,
+          candidate_id: p.id,
+          sent_bubbles: entregues,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        break;
+      }
       // Veto/bloqueio/falha: para aqui, como o `sendInBubbles` do turno. Não se
       // segue mandando bolha atrás de um canal que acabou de recusar. A falha
       // numa bolha DEPOIS da primeira é do CANDIDATO: a abordagem dele parou no
@@ -422,7 +443,7 @@ export async function sendNextCandidate(
       }
       entregues++;
     }
-    const sent = falhouEm === undefined && parouEm === undefined;
+    const sent = falhouEm === undefined && parouEm === undefined && lancouEm === undefined;
     if (falhouEm) {
       // This lane never auto-retries an uncertain send. The Inbox keeps the evidence.
       // O id é o da bolha que falhou (pode não ser a primeira).
@@ -439,12 +460,14 @@ export async function sendNextCandidate(
         sent_bubbles: entregues,
         reason: parouEm,
       });
-    // A abordagem SAIU (e não falhou) em dois casos: todas as bolhas confirmadas,
-    // ou a primeira saiu e as seguintes pararam porque a conversa deixou de ser
-    // fria. Marcar este segundo caso como falha seria chamar de defeito a pessoa
-    // ter respondido — que é o que a campanha inteira existe para conseguir. O
-    // que não saiu fica na trilha, com a contagem de bolhas.
-    const abordou = sent || parouEm !== undefined;
+    // A abordagem SAIU quando a PRIMEIRA bolha foi confirmada — pare o resto
+    // porque a pessoa respondeu, porque o canal não confirmou uma bolha seguinte
+    // ou porque ela lançou. A pessoa recebeu a apresentação: `failed` aqui a
+    // tiraria de `SQL_CONTAR_ENVIO_AUTOMATICO` (`saida-configuravel.ts`) e do
+    // `context.ts`, que só enxergam `sending`/`sent` — e no modo
+    // `second_message` ela nunca receberia a saída. O que não saiu fica na
+    // conversa (a bolha marcada `failed`) e na trilha (`bubbles_sent`).
+    const abordou = entregues > 0;
     const ehPrimeira = cfg.exit_offer === "first_message";
     await db.query(
       `update prospecting_candidates set status=$3,
@@ -501,7 +524,7 @@ export async function sendNextCandidate(
         bubbles_sent: entregues,
         bubbles_total: baloes.length,
         // Por que as seguintes não saíram, quando a conversa deixou de ser fria.
-        ...(parouEm ? { stopped_reason: parouEm } : {}),
+        ...(parouEm || lancouEm ? { stopped_reason: parouEm ?? lancouEm } : {}),
       },
       requestId: `prospecting:${p.id}`,
     });
