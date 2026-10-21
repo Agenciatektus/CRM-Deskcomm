@@ -1718,6 +1718,7 @@ export async function deteccoesDeterministicasDoAssistido(
       jobClaim: claimOfJob(job),
     },
     base: {
+      agenteSomenteInterno: agent.somenteInterno,
       channel: deps.channel
         ? deps.channel(pool)
         : new WahaChannelAdapter(pool, { ...deps.crmCfg, agentActorId: agent.agentId }),
@@ -1888,6 +1889,10 @@ export async function runAgentTurn(
           },
           {
             motivo: 'orcamento_de_ia',
+            // Teto de orçamento estourado: o aviso é do SISTEMA, não do agente
+            // (ele nem chegou a rodar). `false` aqui é a leitura certa, e o
+            // campo é obrigatório para ninguém decidir isso por omissão.
+            agenteSomenteInterno: false,
             channel: (deps.channel ?? ((p: pg.Pool) => new WahaChannelAdapter(p, deps.crmCfg)))(
               pool,
             ),
@@ -2145,6 +2150,36 @@ async function executarTurnoDoAgente(
         inbound: liveJob().kind === 'inbound_turn',
       }, { log: runLog, jev: deps.jev });
   const agentConfig = routed.config;
+
+  // ── A SEGUNDA CHECAGEM, E A QUE DECIDE (9060) ────────────────────────────
+  //
+  // O gate lá em cima roda ANTES de saber quem vai atender: ele pergunta ao SQL
+  // se todos os agentes publicados da sessão são auxiliares de CRM. Esse
+  // conjunto não é o mesmo que `resolveConversationTurn` devolve — o roteador
+  // escolhe entre membros que podem estar presos a outra sessão, e o loader por
+  // id não filtra sessão, `is_active` nem `paused_at`.
+  //
+  // O buraco é concreto: sessão com UM auxiliar publicado libera a conversa
+  // assumida, e o classificador então escolhe um membro do roteador que FALA.
+  // Aqui o agente já está resolvido, então a pergunta pode ser feita do jeito
+  // certo — sobre quem de fato vai atender.
+  if (!preview && agentConfig !== null && !agentConfig.somenteInterno) {
+    const passagemHumana = await pool.query<{ bloqueia: boolean }>(
+      `select (cv.assignee_kind = 'user'
+               or (cv.bot_silenced_until is not null and cv.bot_silenced_until > now())) as bloqueia
+         from conversations cv
+        where cv.organization_id = $1 and cv.id = $2`,
+      [tenantId, input.conversationId],
+    );
+    if (passagemHumana.rows[0]?.bloqueia === true) {
+      runLog.info('turno descartado: a conversa é de uma pessoa e quem atenderia fala com o cliente', {
+        conversation_id: input.conversationId,
+        agent_id: agentConfig.agentId,
+      });
+      return;
+    }
+  }
+
   if (!preview && input.conducao && agentConfig?.operationMode === 'assisted') {
     // Defensivo: o handler só manda condução AUTOMÁTICA para cá com agente
     // automático. Rascunho aqui sairia sem a condução — não gera nada.
@@ -2252,7 +2287,13 @@ async function executarTurnoDoAgente(
             conversationId: input.conversationId,
             contactId: leadId,
             channelSessionId: input.channelSessionId,
-            texto: agentConfig.avisoForaDoHorario ?? null,
+            // AUXILIAR DE CRM (9060): este aviso sai por `sendMessageHandler`
+            // direto, SEM passar pela cadeia de guardrails — o veto de
+            // `runBeforeSend` não o alcança. Zerar o texto é o que o cala, e é
+            // onde a trava tem de estar: com a liberação do gate, um auxiliar
+            // com janela configurada mandaria "estamos fechados" às 23h na
+            // conversa de um atendente.
+            texto: agentConfig.somenteInterno ? null : (agentConfig.avisoForaDoHorario ?? null),
             janela: agentConfig.janelaDeAtendimento,
             agora: clock(),
           },
@@ -2571,6 +2612,7 @@ async function executarTurnoDoAgente(
       agentOperation,
     },
     base: {
+      agenteSomenteInterno: agentConfig?.somenteInterno ?? false,
       channel: liveChannel(),
       optedOutThisTurn,
       // #2112: o TIPO do turno decide a janela do aviso — `inbound_turn`/
@@ -5741,6 +5783,9 @@ function avisoAoLeadDoTurno(
       },
       {
         motivo: 'outro',
+        // Mesma leitura do aviso de orçamento: quem avisa aqui é o sistema,
+        // num caminho de falha, e não a voz de um agente publicado.
+        agenteSomenteInterno: false,
         channel: (deps.channel ?? ((p: pg.Pool) => new WahaChannelAdapter(p, deps.crmCfg)))(pool),
         now: deps.clock?.() ?? new Date(),
         log,

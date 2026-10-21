@@ -1026,7 +1026,7 @@ export interface RunBeforeSendArgs {
    * no prompt: a resposta do modelo não passa por ferramenta nenhuma, então
    * "não falar" não é verificável pela configuração de capacidades.
    */
-  agenteSomenteInterno?: boolean;
+  agenteSomenteInterno: boolean;
   agentOperation?: AgentOperationContext;
   approvedReply?: ApprovedReplyContext;
   /** Contexto interno do único comando Meet; a origem é relida, nunca um booleano de bypass. */

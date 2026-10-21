@@ -321,7 +321,19 @@ export const versionPatchSchema = versionShapeSchema
     pipeline_ids: versionShapeSchema.shape.pipeline_ids.removeDefault(),
     knowledge_source_ids: versionShapeSchema.shape.knowledge_source_ids.removeDefault(),
   })
-  .partial();
+  .partial()
+  .superRefine((v, ctx) =>
+    // O PATCH TAMBÉM CONFERE, e isto não é zelo. Sem ele havia um caminho
+    // inteiro por fora: criar o rascunho com a capacidade de envio e
+    // `somente_interno: false` (passa na criação), ligar a marca por PATCH, e
+    // publicar — a conferência que existe justamente para impedir a
+    // contradição nunca via o estado final.
+    //
+    // Como o patch é `.partial()`, campo ausente é `undefined`, e aí a
+    // conferência não opina: ela só recusa quando a marca chega como `true`
+    // ACOMPANHADA de ferramenta de envio na mesma gravação.
+    conferirAuxiliarDeCrm(v, ctx),
+  );
 
 export const agentMcpCreateSchema = z
   .object({
@@ -330,7 +342,8 @@ export const agentMcpCreateSchema = z
     priority: z.number().int().min(0).max(1000).default(0),
     version: versionShapeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((v, ctx) => conferirAuxiliarDeCrm(v.version, ctx));
 
 export const agentMcpPatchSchema = z
   .object({

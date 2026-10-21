@@ -1356,6 +1356,12 @@ async function sendFixedOutbound(
     camadaLigada(camadasDaOrg.promessa_semantica, deps.knobs.promiseSemantic?.enabled === true);
 
   const chain = await runBeforeSend({
+        // AUXILIAR DE CRM (9060): texto fixo de um fluxo de follow-up que uma
+        // PESSOA montou e publicou. Não é a voz do agente, e por isso não é o
+        // que a marca veta. O caminho de um auxiliar causar envio por aqui é
+        // inscrever alguém numa régua — fechado na publicação, que recusa as
+        // ferramentas de follow-up junto com as de envio.
+        agenteSomenteInterno: false,
     pool,
     log: runLog,
     tenantId,

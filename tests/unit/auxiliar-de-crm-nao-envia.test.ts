@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runBeforeSend } from "@/lib/agent-engine/guardrails/before-send";
+import {
+  runBeforeSend,
+  type RunBeforeSendArgs,
+} from "@/lib/agent-engine/guardrails/before-send";
 
 /**
  * O PAR OBRIGATÓRIO DA LIBERAÇÃO (9060).
@@ -29,7 +32,9 @@ describe("auxiliar de CRM não envia", () => {
     },
   } as never;
 
-  const args = {
+  // Tipado, e não `as never`: com o campo obrigatório, o `as never` esconderia
+  // exatamente a mudança que este arquivo existe para prender.
+  const args: Omit<RunBeforeSendArgs, "agenteSomenteInterno"> = {
     pool,
     log: log as never,
     tenantId: "11111111-1111-1111-1111-111111111111",
@@ -42,7 +47,7 @@ describe("auxiliar de CRM não envia", () => {
   };
 
   it("⭐ com a marca: o envio é vetado, sem tocar no banco", async () => {
-    const r = await runBeforeSend({ ...args, agenteSomenteInterno: true } as never);
+    const r = await runBeforeSend({ ...args, agenteSomenteInterno: true });
     expect(r.status).toBe("vetoed");
     if (r.status !== "vetoed") return;
     expect(r.code).toBe("agente_somente_interno");
@@ -58,12 +63,12 @@ describe("auxiliar de CRM não envia", () => {
     // Sem este caso, um `return vetoed` incondicional passaria no teste acima e
     // mataria todo envio do produto. O erro do pool é a prova de que a execução
     // passou do veto e foi adiante.
-    await expect(runBeforeSend(args as never)).rejects.toThrow("o veto tocou o banco");
+    await expect(runBeforeSend({ ...args, agenteSomenteInterno: false })).rejects.toThrow("o veto tocou o banco");
   });
 
   it("CONTROLE — `false` e ausente são a mesma coisa: não vetam", async () => {
     await expect(
-      runBeforeSend({ ...args, agenteSomenteInterno: false } as never),
+      runBeforeSend({ ...args, agenteSomenteInterno: false }),
     ).rejects.toThrow("o veto tocou o banco");
   });
 });

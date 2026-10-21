@@ -97,7 +97,15 @@ export function createApprovedReplyHandler(
         const channel =
           deps.channel?.(pool) ??
           createRuntimeSendChannel(pool, { ...deps.crmCfg, agentActorId: policy.agent_id });
+        // AUXILIAR DE CRM (9060): aqui o texto JÁ foi aprovado por uma pessoa,
+        // e é ela quem manda — por isso `false`, e não a marca do agente.
+        //
+        // A decisão é consciente: se um auxiliar de CRM tiver rascunhado algo
+        // (não deveria, mas a configuração é de quem usa), quem aprovou leu o
+        // texto e assumiu o envio. Vetar aqui seria recusar a decisão de um
+        // humano explícito, que é diferente de impedir a IA de falar sozinha.
         const result = await runBeforeSend({
+          agenteSomenteInterno: false,
           pool,
           log: deps.log,
           tenantId: job.organization_id,

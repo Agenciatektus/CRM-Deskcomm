@@ -45,7 +45,16 @@ export async function decidirElegibilidadeDaConversa(
        ct.ai_authorized_at          as ai_authorized_at,
        ct.phone_number              as phone_number,
        o.status                     as org_status,
-       -- SÓ LIBERA QUANDO TODO MUNDO QUE PODERIA ATENDER É AUXILIAR DE CRM.
+       -- PRÉ-FILTRO CONSERVADOR, não a palavra final. Quem decide é a segunda
+       -- checagem do turno, feita sobre o agente JÁ RESOLVIDO
+       -- (inbound-turn.ts): o roteador escolhe entre membros que podem estar
+       -- presos a outra sessão, então o conjunto daqui nunca é exatamente o
+       -- que vai atender.
+       --
+       -- Por isso o predicado é o do loader, e não o da tela: sem is_active
+       -- (que loadPublishedAgentConfig ignora de propósito) e sem paused_at
+       -- (pausar não despublica). Excluir aqui um agente que FALA tornaria o
+       -- bool_and mais fácil de dar true, que é o erro na direção insegura.
        -- Com um agente que fala entre os candidatos, a conversa assumida
        -- continua protegida. E bool_and sobre conjunto vazio devolve null, que
        -- o montador lê como \"não\": sessão sem agente publicado também não
@@ -55,8 +64,7 @@ export async function decidirElegibilidadeDaConversa(
           join ai_agent_versions v on v.id = a.published_version_id
          where a.organization_id = cv.organization_id
            and a.archived_at is null
-           and a.is_active
-           and a.paused_at is null
+           and v.status = 'published'
            and v.channel_session_id = cv.channel_session_id) as so_organiza
      from conversations cv
      join organizations o on o.id = cv.organization_id
