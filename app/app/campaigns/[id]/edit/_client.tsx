@@ -152,7 +152,7 @@ export function EditarCampanha({ id }: { id: string }) {
     return (
       <Pagina>
         <CabecalhoDaPagina titulo={t("Editar campanha")} />
-        <Card className="space-y-3 p-4 mb:mx-4">
+        <Card className="max-w-3xl space-y-3 p-4 mb:mx-4">
           <p className="text-sm">
             {t(
               "Esta campanha já foi preparada: cada pessoa da lista tem o texto que vai receber guardado. Para mudar o texto ou o público, volte a campanha para rascunho — isso descarta a lista montada.",

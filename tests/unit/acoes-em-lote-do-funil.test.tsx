@@ -24,6 +24,8 @@ const mutate = vi.hoisted(() =>
 );
 /** O Desfazer: a ação fica GUARDADA aqui; só roda quando o teste deixa o aviso acabar. */
 const adiadas = vi.hoisted(() => [] as Array<() => Promise<unknown>>);
+/** O Desfazer de cada ação guardada, na mesma ordem de `adiadas`. */
+const desfazeres = vi.hoisted(() => [] as Array<() => void>);
 /** As chaves seguradas nos 5 s (a trava do lote). */
 const chaves = vi.hoisted(() => new Set<string>());
 const toastWarning = vi.hoisted(() => vi.fn());
@@ -43,11 +45,17 @@ vi.mock("@/lib/ui/aviso-com-desfazer", async () => {
       _m: unknown,
       _r: unknown,
       executar: () => Promise<unknown>,
-      _d?: unknown,
+      aoDesfazer?: () => void,
       o: { chave?: string } = {},
     ) => {
       if (o.chave) chaves.add(o.chave);
       avisar();
+      desfazeres.push(() => {
+        if (o.chave) chaves.delete(o.chave);
+        adiadas.splice(0);
+        avisar();
+        aoDesfazer?.();
+      });
       adiadas.push(async () => {
         if (o.chave) chaves.delete(o.chave);
         avisar();
@@ -104,8 +112,11 @@ const DOIS_FUNIS = [
   { id: "p-2", name: "Pós-venda" },
 ];
 
+let onRestaurar = vi.fn();
+
 function montar(selectedIds: string[], leads: Lead[], funis = DOIS_FUNIS) {
   const onClear = vi.fn();
+  onRestaurar = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient()}>
       <BulkActionBar
@@ -117,6 +128,7 @@ function montar(selectedIds: string[], leads: Lead[], funis = DOIS_FUNIS) {
         funis={funis}
         ownerNames={new Map()}
         onClear={onClear}
+        onRestaurar={onRestaurar}
       />
     </QueryClientProvider>,
   );
@@ -137,6 +149,7 @@ beforeEach(() => {
   mutate.mockClear();
   toastWarning.mockReset();
   adiadas.splice(0);
+  desfazeres.splice(0);
   chaves.clear();
 });
 
@@ -262,6 +275,53 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Mais ações…" })).toBeEnabled());
   });
 
+  it("⭐ Desfazer devolve a seleção que o agendamento limpou, e nada é criado", async () => {
+    const onClear = montar(["a", "b"], [lead("a"), lead("b")]);
+    await abrirMais();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Definir próximo passo…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
+    expect(onClear).toHaveBeenCalled();
+    // Controle negativo: só agendar não devolve nada.
+    expect(onRestaurar).not.toHaveBeenCalled();
+    desfazeres[0]!();
+    expect(onRestaurar).toHaveBeenCalledWith(["a", "b"]);
+    await soltarOAviso();
+    expect(post.mock.calls.filter((c) => c[0] === "/api/v1/tasks")).toHaveLength(0);
+  });
+
+  it("⭐ recusada (outra ação do lote nos 5 s), avisa e não fecha calada", async () => {
+    // Outra ação do lote já segura a chave deste funil (ex.: outra aba do quadro).
+    chaves.add("lote-do-funil:p-1");
+    const onClear = montar(["a"], [lead("a")]);
+    // A barra está travada; o diálogo é aberto direto para medir a recusa.
+    const { TarefaEmLote } = await import("@/components/kanban/lote/TarefaEmLote");
+    const onOpenChange = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TarefaEmLote
+          open
+          onOpenChange={onOpenChange}
+          selectedIds={["a"]}
+          leads={[lead("a")]}
+          usuarioId="eu"
+          pipelineId="p-1"
+          onConcluido={onClear}
+          onDesfeito={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "criar (Responsável de cada negócio)" }));
+    expect(toastWarning).toHaveBeenCalledWith(expect.stringContaining("Já há uma ação em lote em curso"));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onClear).not.toHaveBeenCalled();
+    expect(adiadas).toHaveLength(0);
+    // Controle negativo: sem a chave segurada, o mesmo clique agenda e fecha.
+    chaves.clear();
+    await userEvent.click(screen.getAllByRole("button", { name: "criar (Responsável de cada negócio)" }).at(-1)!);
+    expect(adiadas).toHaveLength(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("responsável escolhido vence o dono", () => {
     expect(responsavelDaTarefa("m1", { owner_user_id: "dono" }, "eu")).toBe("m1");
     expect(responsavelDaTarefa("", undefined, "eu")).toBe("eu");
@@ -275,6 +335,20 @@ describe("remover etiqueta e reabrir (pela rota em lote, com Desfazer)", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: "vip" }));
     await soltarOAviso();
     expect(mutate.mock.calls[0]![0]).toEqual({ action: "tag", lead_ids: ["a"], params: { remove: ["vip"] } });
+  });
+
+  it("⭐ as ações antigas da barra (rota em lote) também travam a barra nos 5 s", async () => {
+    montar(["a"], [lead("a", { tags: ["vip"] })]);
+    // Controle negativo: antes de agendar, Excluir está livre.
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Tag…" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "vip" }));
+    expect(chaves.has("lote-do-funil:p-1")).toBe(true);
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mais ações…" })).toBeDisabled();
+    await soltarOAviso();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled());
+    expect(mutate).toHaveBeenCalledTimes(1);
   });
 
   it("reabrir move SÓ os encerrados para a etapa aberta escolhida", async () => {

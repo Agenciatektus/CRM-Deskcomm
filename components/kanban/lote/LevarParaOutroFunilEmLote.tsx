@@ -1,6 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Escolha } from "@/components/ui/escolha";
 import { useT } from "@/hooks/i18n/useT";
-import { agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
+import { AVISO_DE_LOTE_EM_CURSO, agendarNoLote, useAcaoPorNegocio } from "@/hooks/kanban/useAcaoPorNegocio";
 import { apiClient } from "@/lib/api/client";
 import type { Stage } from "@/lib/kanban/types";
 
@@ -34,6 +35,7 @@ export function LevarParaOutroFunilEmLote({
   pipelineId,
   funis,
   onConcluido,
+  onDesfeito,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +43,8 @@ export function LevarParaOutroFunilEmLote({
   pipelineId: string;
   funis: Array<{ id: string; name: string }>;
   onConcluido: () => void;
+  /** Desfazer nos 5 s: a tela devolve a seleção que limpou ao agendar. */
+  onDesfeito: () => void;
 }) {
   const t = useT();
   const id = useId();
@@ -79,8 +83,10 @@ export function LevarParaOutroFunilEmLote({
           (n) => `${n} ${t(n === 1 ? "levado para o outro funil." : "levados para o outro funil.")}`,
         );
       },
+      onDesfeito,
     );
     if (agendado) onConcluido();
+    else toast.warning(t(AVISO_DE_LOTE_EM_CURSO));
   };
 
   return (

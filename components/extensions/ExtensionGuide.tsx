@@ -162,7 +162,7 @@ export function ExtensionGuide({
   if (loading && !guide) {
     return (
       <main className="w-full p-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:p-4" data-testid="extension-guide-loading">
-        <Card className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+        <Card className="flex max-w-4xl items-center gap-3 p-5 text-sm text-muted-foreground">
           <CircleNotch className="animate-spin" aria-hidden />
           {t("Conferindo se o guia continua ativo…")}
         </Card>
@@ -177,7 +177,7 @@ export function ExtensionGuide({
         className="w-full p-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:p-4"
         data-testid="extension-guide-unavailable"
       >
-        <Card className="border-warning/40 bg-warning-bg p-5 sm:p-6" role="alert">
+        <Card className="max-w-4xl border-warning/40 bg-warning-bg p-5 sm:p-6" role="alert">
           <Warning size={24} weight="duotone" aria-hidden className="text-warning-fg" />
           <h1 className="mt-3 text-title-lg">{t("Este guia não está disponível")}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -221,8 +221,10 @@ export function ExtensionGuide({
     selectedCardId !== undefined && !cards.some((card) => card.id === selectedCardId);
 
   return (
+    // O contêiner é largura toda; o guia é texto corrido, então cada bloco dele
+    // (`*:`) tem o limite de leitura.
     <main
-      className="flex w-full flex-col gap-5 p-6 mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
+      className="flex w-full flex-col gap-5 p-6 *:max-w-4xl mb:-mx-6 mb:-mt-6 mb:w-auto mb:gap-3 mb:p-4"
       data-testid="extension-guide"
     >
       <Link

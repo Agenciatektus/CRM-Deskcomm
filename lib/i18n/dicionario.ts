@@ -15832,6 +15832,7 @@ export const DICIONARIO: Traducoes = {
   "Rascunhe, revise e envie propostas comerciais, do orçamento ao aceite.": {"es": "Redacta, revisa y envía propuestas comerciales — del presupuesto a la aceptación."},
   "A proposta mudou desde que você abriu. Recarregue antes de editar.": {"es": "La propuesta cambió desde que la abriste. Recarga antes de editar."},
   "Título da proposta": {"es": "Título de la propuesta"},
+  "Já há uma ação em lote em curso neste funil. Espere terminar ou clique em Desfazer antes de começar outra.": {"es": "Ya hay una acción en lote en curso en este embudo. Espera a que termine o haz clic en Deshacer antes de empezar otra."},
   "Condições": {"es": "Condiciones"},
   "Ex: Prazo de 30 dias, 50% adiantado": {"es": "Ej: Plazo de 30 días, 50% adelantado"},
   "Qtd": {"es": "Cant."},
