@@ -108,6 +108,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     arquivo = await podarArquivoDeWebhooks(admin, {
       diasComCorpo: env.WEBHOOK_LOG_BODY_RETENTION_DAYS,
       diasParaApagar: env.WEBHOOK_LOG_ROW_RETENTION_DAYS,
+      diasParaApagarCanal: env.WEBHOOK_LOG_CHANNEL_ROW_RETENTION_DAYS,
       lote,
     });
   } catch (err) {

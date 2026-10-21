@@ -149,7 +149,10 @@ describe("item 1 — a rota por token não recusa, antes de arquivar, o que ela 
 
     expect(arquivados, "o estágio 1 recusou a sessão e o corpo cru não foi arquivado").toHaveLength(1);
     expect(arquivados[0]).toMatchObject({
-      raw_body: JSON.stringify(corpo),
+      // O corpo vai UMA vez: inteiro no `payload_parsed`, `raw_body` nulo
+      // (ver `lib/channels/corpo-do-arquivo.ts`).
+      raw_body: null,
+      payload_parsed: corpo,
       webhook_path_token: TOKEN,
       event_type: "message",
       external_id: "wamid.SESS",
@@ -216,7 +219,9 @@ describe.each(ROTAS)("rota $nome", ({ chamar, nivelDoEstagio1 }) => {
       expect(res.status).toBe(400);
       expect(arquivados, "o corpo cru se perdeu — o AC do PRD §3.3 manda arquivar").toHaveLength(1);
       const linha = arquivados[0] ?? {};
-      expect(linha.raw_body).toBe(JSON.stringify(corpo));
+      // O corpo inteiro, UMA vez: no `payload_parsed` (ver `lib/channels/corpo-do-arquivo.ts`).
+      expect(linha.raw_body).toBeNull();
+      expect(linha.payload_parsed).toEqual(corpo);
       expect(linha.status, "a recusa gravou a mesma palavra de um evento que deu certo").toBe("error");
       const mensagem = String(linha.error_message);
       // O PREFIXO é contrato, não detalhe de formatação: a ressalva em

@@ -3,7 +3,7 @@
  * (`scripts/enxugar-arquivo-de-webhook-retroativo.ts`). Separado para o
  * script caber na cabeça: aqui mora O QUE é lido e gravado; lá, o laço.
  */
-import { cabecalhosParaArquivo } from "../../lib/channels/cabecalhos-para-arquivo";
+import { cabecalhosSemCredencial } from "../../lib/channels/cabecalhos-para-arquivo";
 import { arquivoEnxuto, enxugarParaArquivo, TETO_DE_TEXTO } from "../../lib/channels/enxugar-para-arquivo";
 
 export interface ClienteSql {
@@ -79,7 +79,7 @@ export function antesDe(t: Tamanhos): number {
 function headersEnxutos(h: Record<string, string> | null): Record<string, string> | null {
   if (!h || typeof h !== "object") return h;
   try {
-    return cabecalhosParaArquivo(new Headers(h));
+    return cabecalhosSemCredencial(new Headers(h));
   } catch {
     // Nome de header inválido para a API `Headers`: decide chave a chave.
     return enxugarParaArquivo(h).payload;

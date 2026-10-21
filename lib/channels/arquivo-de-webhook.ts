@@ -38,6 +38,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 
 import { cabecalhosParaArquivo } from "./cabecalhos-para-arquivo";
+import { corpoUnicoParaArquivo } from "./corpo-do-arquivo";
 import { arquivoEnxuto } from "./enxugar-para-arquivo";
 
 /**
@@ -61,6 +62,10 @@ export async function abrirArquivoDoWebhook(
   // Corpo que não é JSON (ou é lista/escalar) sai intacto, com `parsed` nulo:
   // é exatamente o caso que ninguém consegue reproduzir depois.
   const { rawBody, parsed } = arquivoEnxuto(entrada.rawBody);
+  // E o corpo vai UMA vez: objeto JSON fica só no `payload_parsed`, que é o
+  // que os leitores leem; `raw_body` só quando traz o que o jsonb não traz.
+  // Ver `./corpo-do-arquivo.ts`.
+  const corpo = corpoUnicoParaArquivo(rawBody, parsed);
 
   try {
     const { data, error } = await admin
@@ -73,8 +78,8 @@ export async function abrirArquivoDoWebhook(
         provider: entrada.provider,
         http_method: "POST",
         headers: cabecalhosParaArquivo(entrada.headers),
-        raw_body: rawBody,
-        payload_parsed: parsed,
+        raw_body: corpo.raw_body,
+        payload_parsed: corpo.payload_parsed,
         status: "received",
         attempts: 0,
       })
