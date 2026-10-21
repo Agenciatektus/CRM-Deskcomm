@@ -629,6 +629,7 @@ jobs:
       # MEDIDA no run 37483721555 (SHA bdc8f2ae9, 06/10/2026): 1,2 min de caso;
       # SUITE_SEGUNDOS da parte 1 = 853.
       SPECS_PARTE_1: >-
+        banco-externo-receitas.spec.ts
         conversoes-reprocessamento.spec.ts
         pre-go-live-whatsapp.spec.ts
         smoke.spec.ts auth.spec.ts error-pages.spec.ts
@@ -649,6 +650,7 @@ jobs:
         wizard-do-funcionario.spec.ts mfa-opcional.spec.ts inbox-responder-citando.spec.ts
         agenda-tela-do-produto.spec.ts
         notificacoes-diz-o-que-falta.spec.ts
+        notificacoes-tela-bloqueada.spec.ts
         cobranca-asaas.spec.ts
         relogio-http-cron-externo.spec.ts
         j20-elegibilidade-respondi.spec.ts j20-elegibilidade-followup.spec.ts

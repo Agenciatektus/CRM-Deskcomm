@@ -14390,6 +14390,49 @@ export const DICIONARIO: Traducoes = {
   "Conecte um banco de dados de outro sistema — o seu segundo CRM, um ERP, uma planilha num banco PostgreSQL ou MySQL — e o agente passa a consultá-lo em tempo real. A conexão é sempre somente leitura: nada que o agente faz altera o banco de origem.": {
     es: "Conecta la base de datos de otro sistema (tu segundo CRM, un ERP, una hoja de cálculo en una base PostgreSQL o MySQL) y el agente podrá consultarla en tiempo real. La conexión es siempre de solo lectura: nada de lo que haga el agente modifica la base de origen.",
   },
+  // ─── Receitas prontas (Spec 25 R1) ───
+  "Receitas prontas": { es: "Recetas listas" },
+  "Adicionar receita": { es: "Agregar receta" },
+  "Nenhuma receita cadastrada ainda. Adicione uma para o assistente consultar o banco de origem.": {
+    es: "No hay recetas registradas todavía. Agrega una para que el asistente consulte la base de datos de origen.",
+  },
+  "Prefixo das tabelas": { es: "Prefijo de las tablas" },
+  "O prefixo aparece antes de _posts no banco do WordPress (padrão wp_).": {
+    es: "El prefijo va antes de _posts en la base de WordPress (por defecto wp_).",
+  },
+  "Pré-visualizar": { es: "Vista previa" },
+  "Pré-visualizando…": { es: "Vista previa…" },
+  "Pré-visualização (até 5 linhas)": { es: "Vista previa (hasta 5 filas)" },
+  "truncado": { es: "truncado" },
+  "Salvo.": { es: "Guardado." },
+  "Carregando receitas…": { es: "Cargando recetas…" },
+  "Prefixo:": { es: "Prefijo:" },
+  "Não foi possível carregar as receitas.": { es: "No se pudieron cargar las recetas." },
+  "linha": { es: "línea" },
+  "O campo {campo} não pôde ser salvo: {motivo}": {
+    es: "El campo {campo} no se pudo guardar: {motivo}",
+  },
+  "não pode ficar vazio": { es: "no puede quedar vacío" },
+  "pode ter no máximo 80 caracteres": { es: "puede tener como máximo 80 caracteres" },
+  "pode ter no máximo 300 caracteres": { es: "puede tener como máximo 300 caracteres" },
+  // Rotas de receitas (recipes, preview, suggest) — erros que a tela mostra.
+  "Conexão não encontrada.": { es: "Conexión no encontrada." },
+  "Muitas alterações em pouco tempo. Tente de novo em instantes.": { es: "Demasiados cambios en poco tiempo. Inténtalo de nuevo en unos instantes." },
+  "Receita não encontrada nesta conexão.": { es: "Receta no encontrada en esta conexión." },
+  "Receita não encontrada.": { es: "Receta no encontrada." },
+  "Esta receita não roda no motor desta conexão.": { es: "Esta receta no funciona con el motor de esta conexión." },
+  "Esta conexão não aceita alguma das receitas escolhidas (o banco é do motor errado).": { es: "Esta conexión no acepta alguna de las recetas elegidas (el banco es de otro motor)." },
+  "Parâmetros da receita inválidos.": { es: "Parámetros de la receta no válidos." },
+  "Parâmetros de busca inválidos.": { es: "Parámetros de búsqueda no válidos." },
+  "Consulta de sugestão não é válida.": { es: "La consulta de sugerencia no es válida." },
+  "A sugestão de campos só está disponível para conexões MySQL.": { es: "La sugerencia de campos solo está disponible para conexiones MySQL." },
+  "Receita não suportada para sugestão.": { es: "Receta no admitida para sugerencias." },
+  "Uma tabela da receita não foi liberada pelo administrador desta conexão.": { es: "Una tabla de la receta no fue habilitada por el administrador de esta conexión." },
+  "Os parâmetros fixos da receita são inválidos.": { es: "Los parámetros fijos de la receta no son válidos." },
+  "Não foi possível abrir a conexão.": { es: "No fue posible abrir la conexión." },
+  "Não foi possível consultar o banco de origem agora.": { es: "No fue posible consultar el banco de origen ahora." },
+  "Não foi possível montar a consulta desta receita.": { es: "No fue posible armar la consulta de esta receta." },
+  "Esta receita não tem a coluna do filtro pedido mapeada. Busque sem esse filtro ou confira o mapeamento.": { es: "Esta receta no tiene mapeada la columna del filtro pedido. Busca sin ese filtro o revisa el mapeo." },
   // Frase inteira, e não "Ativada" seco: essa chave já existe neste arquivo,
   // de outra tela e no feminino (`Activada`) — reusá-la duplicaria a chave e
   // discordaria do gênero de `Recorrido`.
@@ -15702,6 +15745,19 @@ export const DICIONARIO: Traducoes = {
   "O funil mostra só quem já recebeu a primeira mensagem.": { es: "El embudo muestra solo a quien ya recibió el primer mensaje." },
   "Todas ao iniciar": { es: "Todas al iniciar" },
   "Contato, negócio e conversa de toda a fila são criados na hora de iniciar.": { es: "Contacto, negocio y conversación de toda la cola se crean al iniciar." },
+  "Quando oferecer a opção de parar de receber": { es: "Cuándo ofrecer la opción de dejar de recibir" },
+  "Na primeira mensagem (recomendado)": { es: "En el primer mensaje (recomendado)" },
+  "A abertura já diz como parar:": { es: "La apertura ya dice cómo detenerse:" },
+  "Atrasar para a 2ª mensagem": { es: "Postergar al 2.º mensaje" },
+  "A abertura só cumprimenta e confirma se é a empresa certa, sem oferta. A instrução para parar vai na mensagem seguinte.": {
+    es: "La apertura solo saluda y confirma si es la empresa correcta, sin oferta. La instrucción para detenerse va en el mensaje siguiente.",
+  },
+  "Exemplo de instrução para os atrasados: na primeira mensagem, só cumprimente e pergunte se é da empresa. Quando a pessoa responder, apresente-se e peça permissão para mostrar o serviço.": {
+    es: "Ejemplo de instrucción para los postergados: en el primer mensaje, solo saluda y pregunta si es la empresa. Cuando la persona responda, preséntate y pide permiso para mostrar el servicio.",
+  },
+  "Pediram para parar": { es: "Pidieron parar" },
+  "Saída oferecida": { es: "Salida ofrecida" },
+  "Saída ainda não oferecida": { es: "Salida aún no ofrecida" },
   "Ao iniciar, as empresas com telefone entram na fila. Cada uma entra no funil só quando for abordada. Contatos já existentes são preservados. A fila faz uma primeira abordagem; respostas seguem no Inbox. Uma mensagem já em transmissão pode concluir após a pausa.": { es: "Al iniciar, las empresas con teléfono entran a la cola. Cada una entra al embudo solo cuando se la contacta. Los contactos que ya existen se conservan. La cola hace un primer contacto y las respuestas llegan al Inbox. Un mensaje que ya está en transmisión puede completarse tras la pausa." },
   "Com a campanha pausada, marque ou desmarque as empresas que ainda estão na fila. Quem já foi abordado não muda.": { es: "Con la campaña en pausa, marca o desmarca las empresas que aún están en la cola. A quien ya se contactó no se le cambia nada." },
   "Mostrar desmarcadas": { es: "Mostrar desmarcadas" },
@@ -16390,6 +16446,32 @@ export const DICIONARIO: Traducoes = {
   Lost: { es: "Perdido" },
   oi: { es: "hola" },
   "Excluir “{nome}”?": { es: "¿Eliminar “{nome}”?" },
+  // O editor de sequência e as automações: textos que as telas escreviam crus (o aviso de número desconectado, os
+  // exemplos dos campos, o rótulo acessível da comparação de cada regra, o cartão do e-mail) e rótulos que a tela já
+  // passava por t(rotulo) mas que não eram chave — o modo de texto fixo da mensagem, os tipos de resposta da
+  // pergunta, os operadores do campo de data, os nomes dos blocos na paleta, o aviso da regra antiga de etapa.
+  " — desconectado": { es: " — desconectado" },
+  "boas-vindas, novo-lead": { es: "bienvenida, nuevo-lead" },
+  "texto a casar": { es: "texto a coincidir" },
+  "Escreva o e-mail": { es: "Escribe el correo" },
+  "Comparação da regra": { es: "Comparación de la regla" },
+  "Texto fixo": { es: "Texto fijo" },
+  "Texto livre": { es: "Texto libre" },
+  "Escolha numa lista": { es: "Elegir de una lista" },
+  "CPF (confere o dígito)": { es: "CPF (verifica el dígito)" },
+  "já passou há": { es: "ya pasó hace" },
+  falta: { es: "faltan" },
+  "Casar resposta": { es: "Coincidir respuesta" },
+  Repetir: { es: "Repetir" },
+  "Repetir pela resposta": { es: "Repetir según la respuesta" },
+  "Nova pergunta": { es: "Nueva pregunta" },
+  Skill: { es: "Skill" },
+  "Puxar skill": { es: "Usar skill" },
+  "Lembrete interno": { es: "Recordatorio interno" },
+  "Criar tarefa (só interno)": { es: "Crear tarea (solo interno)" },
+  "A etapa é comparada pelo identificador interno, não pelo nome — escolha a etapa em vez de digitar um pedaço dela.": {
+    es: "La etapa se compara por el identificador interno, no por el nombre — elige la etapa en lugar de escribir una parte de ella.",
+  },
   "1 contato selecionado": { es: "1 contacto seleccionado" },
   "contatos selecionados": { es: "contactos seleccionados" },
   "Adicionar etiqueta": { es: "Agregar etiqueta" },
@@ -16471,6 +16553,27 @@ export const DICIONARIO: Traducoes = {
   "Sim ou não": { es: "Sí o no" },
   "Link (URL)": { es: "Enlace (URL)" },
   "O agente terminou sem propor uma resposta. Pode ter sido uma decisão (por exemplo, diante de uma mensagem automática) ou a geração ter parado antes da resposta. Se esperava uma, gere de novo; senão, não há nada a enviar.": { es: "El agente terminó sin proponer una respuesta. Pudo ser una decisión (por ejemplo, ante un mensaje automático) o que la generación se detuviera antes de la respuesta. Si esperabas una, genera de nuevo; si no, no hay nada que enviar." },
+  "Novo aviso": { es: "Nuevo aviso" },
+  "Opção inválida.": { es: "Opción inválida." },
+  "Não consegui ler esta configuração agora.": { es: "No pude leer esta configuración ahora." },
+  "O que os avisos mostram fora do app": { es: "Qué muestran los avisos fuera de la app" },
+  "Vale para o celular bloqueado e para as notificações do computador, para toda a empresa. Só administradores podem mudar.": {
+    es: "Vale para el celular bloqueado y para las notificaciones de la computadora, para toda la empresa. Solo los administradores pueden cambiarlo.",
+  },
+  "Esconder tudo": { es: "Ocultar todo" },
+  "O aviso diz só que chegou algo. Nem o nome do cliente nem a mensagem aparecem.": {
+    es: "El aviso solo dice que llegó algo. No aparecen ni el nombre del cliente ni el mensaje.",
+  },
+  "Mostrar quem mandou (recomendado)": { es: "Mostrar quién lo envió (recomendado)" },
+  "Aparecem o nome e a foto do cliente, mas não o que ele escreveu.": {
+    es: "Aparecen el nombre y la foto del cliente, pero no lo que escribió.",
+  },
+  "Mostrar quem mandou e a mensagem": { es: "Mostrar quién lo envió y el mensaje" },
+  "Aparecem o nome, a foto e o começo da mensagem.": { es: "Aparecen el nombre, la foto y el comienzo del mensaje." },
+  "Quem decide é um administrador.": { es: "Quien decide es un administrador." },
+  "Desligar o push de mensagem desliga todos os avisos deste aparelho fora do app.": {
+    es: "Apagar el push de mensajes apaga todos los avisos de este dispositivo fuera de la app.",
+  },
 };
 
 /**
