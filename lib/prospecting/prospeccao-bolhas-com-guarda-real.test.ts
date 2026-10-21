@@ -269,21 +269,21 @@ describe("as bolhas depois da primeira, com a guarda real (revisão do PR #2680)
 
     // A saída chegou no PRIMEIRO contato...
     expect(envios[0], "a saída não está na 1ª bolha").toContain("responda PARAR");
-    // ...e não depende da última bolha.
-    expect(envios.at(-1)).not.toContain("responda PARAR");
+    // O ponto do PR: a campanha segue de pé. Com a guarda cheia em todas as
+    // bolhas, o tick grava a pausa — e o motivo do erro é a recusa da própria
+    // guarda (409, escopo `campanha`). `pausou[1][2]` é esse motivo.
+    const pausou = db.query.mock.calls.find(([q]) =>
+      String(q).includes("update prospecting_campaigns set status='paused'"),
+    );
+    expect(pausou?.[1]?.[2] ?? null, "a campanha foi PAUSADA no primeiro contato").toBeNull();
     // A pessoa recebeu a abordagem INTEIRA: o carimbo de `last_outbound_at` que
     // ela mesma produziu não recusa a própria continuação.
     expect(envios, "a abordagem parou na 1ª bolha").toHaveLength(3);
+    // ...e a saída não depende da última bolha.
+    expect(envios.at(-1)).not.toContain("responda PARAR");
     // A guarda REAL foi exercida na 1ª bolha (é ela que carimba o cenário), e só
     // nela: nas seguintes vale a conferência leve.
     expect(guardasNaEntrada.chamadas).toBe(1);
-
-    // O ponto do PR: a campanha segue de pé. Com a guarda cheia em todas as
-    // bolhas, este SQL aparece e `envios` tem 1 item.
-    expect(
-      db.query.mock.calls.some(([q]) => String(q).includes("update prospecting_campaigns set status='paused'")),
-      "a campanha foi PAUSADA no primeiro contato",
-    ).toBe(false);
     const candidatura = db.query.mock.calls.find(([q]) =>
       String(q).startsWith("update prospecting_candidates set status=$3"),
     );
