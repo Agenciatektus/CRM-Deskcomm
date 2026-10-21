@@ -48,9 +48,10 @@ import {
   resolverJidDoTelefone,
   verdashEnviar,
   verdashStatusPareado,
+  fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { resolveVerdashCreds } from "../verdash/credentials";
+import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
   ChannelHealth,
@@ -319,12 +320,22 @@ export const verdashAdapter: ChannelAdapter = {
       instanceName: input.sessionRef,
     });
     if (!creds) return null;
+    // Pareado: quem tem o token do FZAP é a Verdash, então a foto vem por ela.
+    // Fora do `try` de propósito: queda da plataforma lança, e o cron conta
+    // como falha em vez de "contato sem foto".
+    if (creds.vinculoId) return fotoDoContatoPareado(creds, input.recipient);
     try {
-      const data = await fzapRequest<{ url?: string }>(creds, "/user/avatar", {
+      // Pelo host PÚBLICO: o FZAP monta o `publicDownloadUrl` com o host que
+      // recebeu o pedido, e pela rede interna o link sairia interno (recusado
+      // pela allowlist). É o que a `crm-foto-perfil` da Verdash faz.
+      const publico = { ...creds, baseUrl: fzapPublicBaseUrl() };
+      const data = await fzapRequest<{ publicDownloadUrl?: string }>(publico, "/user/avatar", {
         method: "POST",
         body: { phone: input.recipient, preview: false },
       });
-      return data?.url ?? null;
+      // Só `publicDownloadUrl`, o host público. O `url` pode apontar para a rede
+      // interna do FZAP, e o cron não baixa de lá (allowlist em `contact-avatar.ts`).
+      return data?.publicDownloadUrl ?? null;
     } catch {
       return null;
     }

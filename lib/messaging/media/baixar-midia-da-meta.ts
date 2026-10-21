@@ -33,6 +33,12 @@ export interface OpcoesDoDownload {
   /** Injetáveis só para teste. */
   fetchImpl?: typeof fetch;
   conferirDestino?: (hostname: string) => Promise<void>;
+  /** Allowlist de outra origem (ex.: foto de perfil). Padrão: `hostDaMetaPermitido`. */
+  hostPermitido?: (url: URL) => boolean;
+  /** Prazo TOTAL do download, somando os redirecionamentos. Padrão: 30 s. */
+  timeoutMs?: number;
+  /** Recusa pelo `content-type` ANTES de ler o corpo. Ausente = aceita qualquer um. */
+  aceitaMime?: (mime: string) => boolean;
 }
 
 export function hostDaMetaPermitido(url: URL): boolean {
@@ -73,11 +79,18 @@ export async function baixarMidiaDaMeta(
     ((u: string, init?: RequestInit) =>
       fetchComDestinoFixado(
         u,
-        { signal: init?.signal ?? undefined, headers: init?.headers as Record<string, string> | undefined },
+        {
+          signal: init?.signal ?? undefined,
+          headers: init?.headers as Record<string, string> | undefined,
+        },
         { portasPermitidas: [443] },
       ));
   const conferirDestino = opcoes.conferirDestino ?? assertDestinoResolvidoSeguro;
   const teto = opcoes.tetoBytes ?? TETO_DE_BYTES_DA_MIDIA;
+  const hostPermitido = opcoes.hostPermitido ?? hostDaMetaPermitido;
+  // Um prazo só para a cadeia inteira: por salto, 3 redirecionamentos lentos
+  // somariam o quádruplo do que quem chama orçou.
+  const prazo = AbortSignal.timeout(opcoes.timeoutMs ?? 30_000);
 
   let url: URL;
   try {
@@ -87,7 +100,7 @@ export async function baixarMidiaDaMeta(
   }
 
   for (let salto = 0; ; salto++) {
-    if (!hostDaMetaPermitido(url)) {
+    if (!hostPermitido(url)) {
       throw new Error(`meta_media_host_not_allowed: ${url.protocol}//${url.hostname}`);
     }
     await conferirDestino(url.hostname);
@@ -97,7 +110,7 @@ export async function baixarMidiaDaMeta(
     // com a mídia). O node:http da conexão fixada não manda UA nenhum.
     const res = await fetchImpl(url.toString(), {
       redirect: "manual",
-      signal: AbortSignal.timeout(30_000),
+      signal: prazo,
       headers: { "User-Agent": USER_AGENT_DO_DOWNLOAD },
     });
 
@@ -113,9 +126,14 @@ export async function baixarMidiaDaMeta(
       throw new Error(`meta_media_download_failed: ${res.status}`);
     }
 
+    const mimeDeclarado =
+      res.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || "";
+    if (opcoes.aceitaMime && !opcoes.aceitaMime(mimeDeclarado)) {
+      await res.body?.cancel().catch(() => {});
+      throw new Error(`meta_media_mime_not_allowed: ${mimeDeclarado.slice(0, 60) || "ausente"}`);
+    }
     const buffer = await lerComTeto(res, teto);
-    const mime =
-      res.headers.get("content-type")?.split(";")[0]?.trim() || opcoes.hintMime || "application/octet-stream";
+    const mime = mimeDeclarado || opcoes.hintMime || "application/octet-stream";
     return { buffer, mime };
   }
 }

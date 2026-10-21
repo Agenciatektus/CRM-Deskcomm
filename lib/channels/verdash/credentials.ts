@@ -31,6 +31,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
+import { env } from "@/lib/env";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 
 export interface VerdashCredentials {
@@ -87,6 +88,17 @@ export function verdashFunctionsUrl(): string {
   return (
     process.env.VERDASH_FUNCTIONS_URL?.trim() || "https://supabase.verdash.com.br/functions/v1"
   );
+}
+
+/**
+ * Origem PÚBLICA do FZAP (`FZAP_PUBLIC_BASE_URL`, só https, validada em
+ * `lib/env.ts`). É o host de onde a foto de perfil pode ser baixada e por onde o
+ * modo direto pede o avatar. Não confundir com `verdashBaseUrl()`, que em
+ * produção é a rede interna.
+ */
+export function fzapPublicBaseUrl(): string {
+  // `?.`: suítes que mockam `@/lib/env` com só parte das chaves.
+  return env.FZAP_PUBLIC_BASE_URL?.trim().replace(/\/+$/, "") || "https://fzap2.verdash.com.br";
 }
 
 export function verdashBaseUrl(): string {
