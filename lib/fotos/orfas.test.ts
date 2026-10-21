@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
 /**
@@ -171,6 +171,16 @@ describe("limparFotosOrfas", () => {
 });
 
 describe("GET /api/v1/cron/fotos-orfas", () => {
+  // A rota usa o relógio real; sem fixar a data, o arquivo "recente" das
+  // fixtures sai da carência de 1 h com o passar do dia e o teste muda de cor.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(AGORA);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const pedido = (segredo?: string) =>
     new Request("http://localhost/api/v1/cron/fotos-orfas", {
       headers: segredo ? { authorization: `Bearer ${segredo}` } : {},
