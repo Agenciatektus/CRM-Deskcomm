@@ -82,14 +82,16 @@ describe("e a saída oferecida realmente funciona (a volta)", () => {
 });
 
 describe("o caminho de envio usa o rodapé — e não o texto cru do modelo", () => {
-  it("o worker manda `comSaida(...)`, não `generated.texto`", () => {
+  it("o worker manda a 1ª bolha com `comSaida(...)`, não `generated.texto`", () => {
     // Sem estas asserções, o módulo poderia estar perfeito e desligado: o defeito
     // original era exatamente um caminho de envio que mandava o texto cru.
-    // O rodapé é montado UMA vez (`corpo`), fatiado em bolhas e cada bolha vira o
-    // body — então a cerca procura as três pernas, não só a chamada.
+    // O corte vem ANTES do rodapé (o texto do modelo é que é fatiado no estilo
+    // configurado) e o rodapé entra na PRIMEIRA bolha — a saída não pode depender
+    // de uma bolha posterior ter dado certo (revisão do PR #2680). A cerca
+    // procura as quatro pernas, não só a chamada.
     const worker = fs.readFileSync(path.join(RAIZ, "lib/prospecting/worker.ts"), "utf8");
-    expect(worker).toMatch(/corpo\s*=\s*comSaida\(/);
-    expect(worker).toMatch(/splitForSend\(\s*corpo/);
+    expect(worker).toMatch(/splitForSend\(\s*generated\.texto/);
+    expect(worker).toMatch(/baloes\[0\]\s*=\s*comSaida\(/);
     expect(worker).toMatch(/body:\s*baloes\[i\]/);
     expect(
       worker.includes("body: generated.texto"),
@@ -98,6 +100,10 @@ describe("o caminho de envio usa o rodapé — e não o texto cru do modelo", ()
     expect(
       worker.includes("body: corpo"),
       "o envio voltou a mandar o corpo inteiro, ignorando o fatiamento",
+    ).toBe(false);
+    expect(
+      worker.includes("body: comSaida"),
+      "o envio voltou a montar o rodapé no corpo inteiro (a saída como última bolha)",
     ).toBe(false);
   });
 });

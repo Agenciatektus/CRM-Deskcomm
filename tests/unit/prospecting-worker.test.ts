@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   audit: vi.fn(),
   guard: vi.fn(),
+  continuation: vi.fn(),
   boundary: vi.fn(),
   preflight: vi.fn(),
   authorize: vi.fn(),
@@ -27,7 +28,15 @@ vi.mock("@/lib/ai/elegibilidade/autorizacao", () => ({ autorizarContatoParaIA: m
 vi.mock("@/lib/ai/elegibilidade/consulta-pre-go-live", () => ({
   decidirPreGoLiveDoCanalViaSupabase: mocks.preflight,
 }));
-vi.mock("@/lib/prospecting/guard", () => ({ assertProspectingDelivery: mocks.guard }));
+vi.mock("@/lib/prospecting/guard", () => ({
+  assertProspectingDelivery: mocks.guard,
+  // A conferência LEVE entre bolhas (`guard.ts`): a guarda cheia recusa conversa
+  // com `last_outbound_at` — carimbo do NOSSO próprio envio —, então quem checa
+  // as bolhas seguintes é esta. Ela vem da mesma `@/lib/prospecting/guard`, e o
+  // cenário de verdade (guarda REAL + handler carimbando) mora em
+  // `lib/prospecting/prospeccao-bolhas-com-guarda-real.test.ts`.
+  assertProspectingContinuation: mocks.continuation,
+}));
 vi.mock("@/lib/agent-engine/pacing/store", () => ({
   loadChannelKnobs: mocks.knobs,
   loadPacingState: vi.fn().mockResolvedValue({ sentToday: 0 }),
@@ -61,6 +70,8 @@ vi.mock("@/lib/prospecting/store", () => ({
   prepararCandidatoNoEnvio: mocks.prepare,
 }));
 import { sendNextCandidate, tickProspecting } from "@/lib/prospecting/worker";
+import { rodapeDeSaida } from "@/lib/prospecting/rodape-de-saida";
+import { ProspectingError } from "@/lib/prospecting/provider";
 import { OrgNaoOperanteError } from "@/lib/organizacao/operante";
 import { withProspectingLock } from "@/lib/prospecting/store";
 import type { Campaign } from "@/lib/prospecting/store";
@@ -129,6 +140,7 @@ beforeEach(() => {
   mocks.open.mockReturnValue(true);
   mocks.preflight.mockResolvedValue({ permite: true });
   mocks.guard.mockResolvedValue(undefined);
+  mocks.continuation.mockResolvedValue(undefined);
   mocks.boundary.mockResolvedValue(undefined);
   mocks.generate.mockResolvedValue({
     ok: true,
@@ -277,7 +289,7 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
   };
   const dormir = vi.fn().mockResolvedValue(undefined);
 
-  it("sai em VÁRIAS bolhas curtas, com a saída na ÚLTIMA e o recibo na PRIMEIRA", async () => {
+  it("sai em VÁRIAS bolhas curtas, com a saída na PRIMEIRA e o recibo na PRIMEIRA", async () => {
     mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
     mocks.send.mockResolvedValue({ status: "sent", id: "balao" });
     const db = database(undefined, candidate, versaoComEstilo);
@@ -285,34 +297,60 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
 
     const corpos = mocks.send.mock.calls.map(([, , input]) => String(input?.body));
     expect(corpos.length, "a abordagem saiu em uma mensagem só").toBeGreaterThan(1);
-    for (const corpo of corpos)
-      expect(corpo.length, `bolha acima do teto configurado (${MAX}): ${corpo}`).toBeLessThanOrEqual(MAX);
+    // A 1ª bolha é a ÚNICA que pode passar do teto: ela leva o rodapé de saída,
+    // que não é estilo — é a saída da mensagem fria (ver worker.ts). As demais
+    // obedecem ao "Estilo de resposta" do agente.
+    for (const corpo of corpos.slice(1))
+      expect(
+        corpo.length,
+        `bolha acima do teto configurado (${MAX}): ${corpo}`,
+      ).toBeLessThanOrEqual(MAX);
+    expect(corpos[0]!.length).toBeLessThanOrEqual(MAX + rodapeDeSaida(null).length + 2);
 
     // Nada do texto se perde no corte — as bolhas somadas são o texto inteiro.
     const somado = corpos.join(" ");
     expect(somado).toContain("vender mais.");
     expect(somado).toContain("atendem hoje.");
 
-    // O aviso de saída ("responda PARAR") é a ÚLTIMA bolha: quem lê a primeira
-    // não recebe o opt-out antes da apresentação, e ele chega segundos depois.
-    expect(corpos.at(-1)).toContain("responda PARAR");
-    expect(corpos[0], "a saída junto da 1ª bolha é o comportamento de antes").not.toContain(
-      "responda PARAR",
-    );
+    // A SAÍDA ("responda PARAR") chega JUNTO DA PRIMEIRA bolha. Se ela viesse na
+    // última — como no head anterior —, qualquer bolha que falhasse no meio
+    // deixaria a pessoa sem caminho de volta numa mensagem fria.
+    expect(corpos[0], "a saída não está na 1ª bolha").toContain("responda PARAR");
+    expect(
+      corpos.at(-1),
+      "a saída voltou a depender da ÚLTIMA bolha — o defeito medido na revisão do PR",
+    ).not.toContain("responda PARAR");
 
     // Recibo e idempotência do candidato ficam na PRIMEIRA bolha; as demais são
     // mensagens próprias, sem o id estável (repetir o id faria o handler
     // devolver a linha de antes sem enviar).
-    expect(mocks.send.mock.calls[0]?.[1]).toMatchObject({ internalMessageId: "stable-message" });
+    expect(mocks.send.mock.calls[0]?.[1]).toMatchObject({
+      internalMessageId: "stable-message",
+      prospectingDelivery: { candidateId: "candidate" },
+    });
     for (const [, ctx] of mocks.send.mock.calls.slice(1))
       expect(ctx, "bolha seguinte reusando o id estável da primeira").not.toHaveProperty(
         "internalMessageId",
       );
 
-    // Bolhas são mensagens físicas: entre uma e outra va o ritmo do número
+    // A GUARDA DE PRIMEIRO CONTATO vai só na PRIMEIRA bolha. Ela recusa conversa
+    // com `last_outbound_at` — carimbo que o próprio handler grava ao enviar a 1ª
+    // —, e repetida numa bolha seguinte ela pausava a campanha no primeiro
+    // contato. Entre as seguintes vale a conferência leve.
+    for (const [, ctx] of mocks.send.mock.calls.slice(1))
+      expect(
+        ctx,
+        "guarda de primeiro contato de novo numa bolha seguinte: pausa a campanha no 1º contato",
+      ).not.toHaveProperty("prospectingDelivery");
+    expect(mocks.continuation).toHaveBeenCalledTimes(corpos.length - 1);
+    for (const chamada of mocks.continuation.mock.calls)
+      expect(chamada[1]).toMatchObject({ candidateId: "candidate", conversationId: id });
+
+    // Bolhas são mensagens físicas: entre uma e outra vai o ritmo do número
     // (throttle + jitter), nunca o envio costado.
     expect(dormir, "bolhas seguidas sem pausa é cadência de robô").toHaveBeenCalledTimes(
-      corpos.length - 1 );
+      corpos.length - 1,
+    );
   });
 
   it("sem o estilo ligado, a abordagem continua saindo em UMA mensagem (não regredir)", async () => {
@@ -370,6 +408,46 @@ describe("abordagem fria obedece o Estilo de resposta do agente (issue #2665)", 
       ),
       "candidatura não foi marcada como falha",
     ).toBe(true);
+    // A falha não escapou como erro: o candidato é marcado e o tick SEGUE com a
+    // campanha (nada foi lançado). E a trilha registra O QUE SAIU — uma bolha de
+    // três —, porque uma mensagem foi de fato entregue.
+    expect(mocks.audit).toHaveBeenCalledTimes(1);
+    expect(mocks.audit.mock.calls[0]?.[0]).toMatchObject({
+      action: "prospecting.approach_sent",
+      metadata: { sent: false, bubbles_sent: 1, bubbles_total: 3 },
+    });
+  });
+
+  it("a pessoa responde entre bolhas: PARA sem pausar a campanha e registra o que saiu", async () => {
+    mocks.generate.mockResolvedValue({ ok: true, texto: textoDoModelo });
+    mocks.send.mockResolvedValue({ status: "sent", id: "balao" });
+    // A conferência leve entre bolhas recusa: a pessoa respondeu (ou mandou STOP).
+    // Escopo `candidato` — é o que impede o tick de pausar a campanha inteira.
+    mocks.continuation.mockRejectedValueOnce(
+      new ProspectingError(
+        "A pessoa respondeu ou o atendimento foi assumido; a abordagem parou aqui.",
+        409,
+        "candidato",
+      ),
+    );
+    const db = database(undefined, candidate, versaoComEstilo);
+    await sendNextCandidate({} as never, db as never, {} as never, campaign, dormir);
+
+    // Só a 1ª bolha saiu — e a abordagem SAIU (a pessoa foi abordada; o que é
+    // falha é a conversa ter continuado fria, não a pessoa ter respondido).
+    expect(mocks.send).toHaveBeenCalledTimes(1);
+    const candidatura = db.query.mock.calls.find(([q]) =>
+      String(q).startsWith("update prospecting_candidates set status=$3"),
+    );
+    expect(candidatura?.[1]).toEqual([id, "candidate", "sent", null]);
+    expect(mocks.audit.mock.calls[0]?.[0]).toMatchObject({
+      metadata: {
+        sent: false,
+        bubbles_sent: 1,
+        bubbles_total: 3,
+        stopped_reason: "A pessoa respondeu ou o atendimento foi assumido; a abordagem parou aqui.",
+      },
+    });
   });
 });
 
