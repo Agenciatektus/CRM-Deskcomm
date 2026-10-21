@@ -177,7 +177,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // CARGA INICIAL DO CATÁLOGO. Sem ela, a loja recém-conectada só ganhava
   // material quando alguém editasse um produto — e o acervo do agente ficava
   // vazio enquanto a tela dizia "conectado". O worker trata este evento
-  // listando a loja inteira (`pedacosDeCatalogo` sem `product_id`).
+  // listando a loja inteira, que é o único modo que `pedacosDeCatalogo` tem.
   const { error: backfillErr } = await admin.rpc("emit_event", {
     p_event_type: "nuvemshop.product_synced",
     p_entity_kind: "nuvemshop_integration",

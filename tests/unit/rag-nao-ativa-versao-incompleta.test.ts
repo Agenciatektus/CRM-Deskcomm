@@ -114,7 +114,7 @@ beforeEach(() => {
 
 describe("indexarFonte — falha parcial não ativa versão", () => {
   it("grava os 2 trechos: ok + markVersionReady + activateVersion", async () => {
-    const resultado = await indexarFonte(FONTE as never, CHAVE as never, {});
+    const resultado = await indexarFonte(FONTE as never, CHAVE as never);
 
     expect(resultado).toEqual({ tipo: "ok", versionId: "v-2", chunks: 2, contentHash: expect.any(String) });
     expect(markVersionReady).toHaveBeenCalledWith("v-2", "org-1", 2);
@@ -129,7 +129,7 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
   it("1 de 2 trechos não grava: erro, versão falha e SEM ready/activate", async () => {
     falhaDeUpsert = (posicao) => (posicao === 1 ? "deadlock detected" : null);
 
-    const resultado = await indexarFonte(FONTE as never, CHAVE as never, {});
+    const resultado = await indexarFonte(FONTE as never, CHAVE as never);
 
     expect(resultado).toEqual({ tipo: "erro", detalhe: "trechos_nao_gravados:1" });
     expect(markVersionFailed).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
   it("2 de 2 trechos não gravam: erro com detalhe nenhum_trecho_gravado", async () => {
     falhaDeUpsert = () => "permission denied";
 
-    const resultado = await indexarFonte(FONTE as never, CHAVE as never, {});
+    const resultado = await indexarFonte(FONTE as never, CHAVE as never);
 
     expect(resultado).toEqual({ tipo: "erro", detalhe: "nenhum_trecho_gravado" });
     expect(markVersionFailed).toHaveBeenCalledWith("v-2", "org-1", "nenhum trecho gravado");
@@ -156,7 +156,7 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
   it("embedding falha no 1º trecho: erro, versão falha e SEM ready/activate", async () => {
     falhaDeEmbed = new Set([0]);
 
-    const resultado = await indexarFonte(FONTE as never, CHAVE as never, {});
+    const resultado = await indexarFonte(FONTE as never, CHAVE as never);
 
     expect(resultado).toEqual({
       tipo: "erro",

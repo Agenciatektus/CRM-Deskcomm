@@ -238,16 +238,13 @@ async function pedacosDeDocumento(fonte: FonteRow): Promise<Pedaco[]> {
 }
 
 /** Catálogo: os produtos já sincronizados desta organização. */
-async function pedacosDeCatalogo(fonte: FonteRow, productId?: string): Promise<Pedaco[]> {
-  // SEM `productId` = o catálogo INTEIRO. A assinatura já previa os dois casos
-  // e o segundo devolvia `[]`, então a loja recém-conectada ficava com uma
-  // fonte de catálogo vazia: só entrava produto que alguém editasse depois.
-  // Medido na Fiorotto: 879 produtos na loja, zero no acervo.
-  const produtos = productId
-    ? [await buscarProdutoNaLoja(fonte.organization_id, productId)].filter(
-        (p): p is NuvemshopProduct => p !== null,
-      )
-    : await listarCatalogoDaLoja(fonte.organization_id);
+async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
+  // SEMPRE a loja INTEIRA, e isso é o invariante desta fonte: cada indexação
+  // publica uma versão nova que substitui a anterior, e a busca só enxerga a
+  // ativa. Uma versão montada com um produto só apagaria os outros do acervo,
+  // sem erro nenhum. A função nem aceita um produto avulso para que não exista
+  // caminho que leve a isso.
+  const produtos = await listarCatalogoDaLoja(fonte.organization_id);
 
   const pedacos: Pedaco[] = [];
   for (const p of produtos) {
@@ -259,31 +256,6 @@ async function pedacosDeCatalogo(fonte: FonteRow, productId?: string): Promise<P
     }
   }
   return pedacos;
-}
-
-async function buscarProdutoNaLoja(
-  organizationId: string,
-  productId: string,
-): Promise<NuvemshopProduct | null> {
-  const creds = await credenciaisDaLoja(organizationId);
-  if (!creds) {
-    console.warn("[rag-indexer] loja não conectada para a org", organizationId);
-    return null;
-  }
-  try {
-    const client = new NuvemshopApiClient({
-      storeId: creds.storeId,
-      accessToken: creds.accessToken,
-    });
-    return (await client.get<NuvemshopProduct>(`/products/${productId}`)) ?? null;
-  } catch (err) {
-    console.warn(
-      "[rag-indexer] busca do produto falhou",
-      productId,
-      err instanceof Error ? err.message : String(err),
-    );
-    return null;
-  }
 }
 
 /**
@@ -420,7 +392,6 @@ async function credenciaisDaLoja(
 export async function indexarFonte(
   fonte: FonteRow,
   chave: ChaveDeEmbedding,
-  extra: { productId?: string },
 ): Promise<Resultado> {
   const tipo = canonizarTipoDeFonte(fonte.source_type);
   if (tipo === null) {
@@ -437,7 +408,7 @@ export async function indexarFonte(
         pedacos = await pedacosDeDocumento(fonte);
         break;
       case "catalogo":
-        pedacos = await pedacosDeCatalogo(fonte, extra.productId);
+        pedacos = await pedacosDeCatalogo(fonte);
         break;
       case "conversas":
         // A ingestão anonimizada tem pipeline próprio (cron
@@ -591,7 +562,6 @@ export async function indexarFonte(
  */
 async function fonteDoEvento(row: EventRow): Promise<{
   fonte: FonteRow | null;
-  productId?: string;
   motivo?: string;
 }> {
   if (row.event_type === "knowledge_source.updated") {
@@ -601,14 +571,16 @@ async function fonteDoEvento(row: EventRow): Promise<{
     return { fonte, ...(fonte ? {} : { motivo: "fonte_nao_encontrada" }) };
   }
 
-  // nuvemshop.product_synced — um produto, ou a loja inteira.
+  // nuvemshop.product_synced — o evento diz O QUE mudou, não o que indexar:
+  // a reindexação é sempre da loja inteira (ver `pedacosDeCatalogo`). O
+  // `product_id` serve só para separar evento legítimo de evento malformado.
   //
   // `catalogo_inteiro` é a carga inicial, emitida quando a loja acaba de
   // conectar: ali não existe produto nenhum em mãos, e exigir `product_id`
   // deixava a conexão nova com um acervo vazio até alguém editar um produto.
   const catalogoInteiro = row.payload["catalogo_inteiro"] === true;
-  const productId = String(row.payload["product_id"] ?? "");
-  if (!productId && !catalogoInteiro) return { fonte: null, motivo: "evento_sem_product_id" };
+  const temProduto = String(row.payload["product_id"] ?? "") !== "";
+  if (!temProduto && !catalogoInteiro) return { fonte: null, motivo: "evento_sem_product_id" };
   const fonte = await garantirFonteDeCatalogo(row.organization_id);
   // ── A VERSÃO ATIVA DO CATÁLOGO NUNCA PODE ENCOLHER ───────────────────────
   //
@@ -685,7 +657,7 @@ export async function processRagIndexer(row: EventRow): Promise<HandlerResult> {
   }
 
   try {
-    const { fonte, productId, motivo } = await fonteDoEvento(row);
+    const { fonte, motivo } = await fonteDoEvento(row);
     if (!fonte) {
       return { consumer_key: consumerKey, status: "skipped", detail: motivo ?? "fonte_indisponivel" };
     }
@@ -729,7 +701,7 @@ export async function processRagIndexer(row: EventRow): Promise<HandlerResult> {
 
     await marcarFonte(row.organization_id, fonte.id, { last_index_status: "indexando" });
 
-    const resultado = await indexarFonte(fonte, chave, productId ? { productId } : {});
+    const resultado = await indexarFonte(fonte, chave);
 
     if (resultado.tipo === "ok") {
       await marcarFonte(row.organization_id, fonte.id, {
