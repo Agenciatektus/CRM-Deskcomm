@@ -85,7 +85,15 @@ function renderBarra() {
   );
 }
 
-beforeEach(() => mutate.mockReset());
+// A mutação ASSENTA, como a do react-query: a trava do lote (`agendarNoLote`)
+// conta a execução até o fim, e um `mutate` que nunca responde deixaria a barra
+// travada para os casos seguintes do arquivo (o contador é do módulo).
+beforeEach(() => {
+  mutate.mockReset();
+  mutate.mockImplementation((i: { lead_ids: string[] }, o?: { onSuccess?: (r: unknown) => void }) =>
+    o?.onSuccess?.({ data: { updated_count: i.lead_ids.length } }),
+  );
+});
 
 describe("BulkActionBar — tag em lote", () => {
   it("o menu mostra as tags existentes e clicar aplica a escolhida aos selecionados", async () => {
