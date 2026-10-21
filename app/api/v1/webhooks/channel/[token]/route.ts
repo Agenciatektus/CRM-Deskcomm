@@ -119,15 +119,22 @@ export async function POST(
   // resolvida por ele, acima) e errou o SEGREDO de assinatura. Isso não é ruído
   // de internet: é alguém com metade das credenciais. Arquivar é o que permite
   // descobrir isso.
+  //
+  // A conferência é CALCULADA antes de abrir a linha (é pura, não responde
+  // nada) para a linha recusada nascer com o texto cru e o IP de origem — é a
+  // que alguém vai querer reconferir (P2 do @Cassio_SecRev na #246). A recusa
+  // continua saindo DEPOIS do arquivo, como o parágrafo acima exige.
+  const assinaturaConfere = verifyInboundWebhookSignature(sessao.provider, rawBody, req.headers, secret);
   const arquivo = await abrirArquivoDoWebhook(admin, {
     organizationId: sessao.organization_id,
     channelSessionId: sessao.id,
     provider: sessao.provider,
     rawBody,
     headers: req.headers,
+    assinaturaValida: assinaturaConfere,
   });
 
-  if (!verifyInboundWebhookSignature(sessao.provider, rawBody, req.headers, secret)) {
+  if (!assinaturaConfere) {
     await fecharArquivoDoWebhook(admin, arquivo, {
       status: "error",
       validSignature: false,

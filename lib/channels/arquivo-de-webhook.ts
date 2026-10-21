@@ -54,6 +54,12 @@ export async function abrirArquivoDoWebhook(
     provider: string;
     rawBody: string;
     headers: Headers;
+    /**
+     * O veredito da assinatura, quando a rota já o tem ANTES de abrir a linha.
+     * `false` guarda o texto cru e a origem (IP) — é a linha que alguém vai
+     * querer reconferir (P2 do @Cassio_SecRev na #246).
+     */
+    assinaturaValida?: boolean | null;
   },
 ): Promise<string | null> {
   // Enxuto ANTES de gravar: sem a mídia inline e sem o token da instância. A
@@ -65,7 +71,8 @@ export async function abrirArquivoDoWebhook(
   // E o corpo vai UMA vez: objeto JSON fica só no `payload_parsed`, que é o
   // que os leitores leem; `raw_body` só quando traz o que o jsonb não traz.
   // Ver `./corpo-do-arquivo.ts`.
-  const corpo = corpoUnicoParaArquivo(rawBody, parsed);
+  const corpo = corpoUnicoParaArquivo(rawBody, parsed, { assinaturaValida: entrada.assinaturaValida });
+  const comOrigem = entrada.assinaturaValida === false;
 
   try {
     const { data, error } = await admin
@@ -77,7 +84,7 @@ export async function abrirArquivoDoWebhook(
         // o `lint:channels` reprova quem tenta.
         provider: entrada.provider,
         http_method: "POST",
-        headers: cabecalhosParaArquivo(entrada.headers),
+        headers: cabecalhosParaArquivo(entrada.headers, { comOrigem }),
         raw_body: corpo.raw_body,
         payload_parsed: corpo.payload_parsed,
         status: "received",

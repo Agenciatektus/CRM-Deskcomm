@@ -170,7 +170,7 @@ describe("ninguém novo grava em webhook_events_log sem passar pelo arquivador",
   it("o arquivador grava raw_body, payload_parsed e headers a partir do enxuto", () => {
     const s = fs.readFileSync(path.join(RAIZ, "lib/channels/arquivo-de-webhook.ts"), "utf8");
     expect(s).toMatch(/=\s*arquivoEnxuto\(entrada\.rawBody\)/);
-    expect(s).toMatch(/headers:\s*cabecalhosParaArquivo\(entrada\.headers\)/);
+    expect(s).toMatch(/headers:\s*cabecalhosParaArquivo\(entrada\.headers[,)]/);
     expect(s).not.toMatch(/raw_body:\s*entrada\.rawBody/);
   });
 });
