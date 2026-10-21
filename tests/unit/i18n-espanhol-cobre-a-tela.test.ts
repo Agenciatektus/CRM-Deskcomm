@@ -1585,12 +1585,6 @@ const CHAVE_DE_RUNTIME_CONGELADA: { arquivo: string; expressao: string; motivo: 
       "fork Tektus (cadência): mesma régua validarGatilhoDaCadencia da rota de publicar",
   },
   {
-    arquivo: "app/api/v1/cadencias/[id]/route.ts",
-    expressao: "problema",
-    motivo:
-      "fork Tektus (cadência): mesma régua validarGatilhoDaCadencia, três sítios",
-  },
-  {
     arquivo: "app/api/v1/campaigns/[id]/route.ts",
     expressao: "daEntrada",
     motivo:

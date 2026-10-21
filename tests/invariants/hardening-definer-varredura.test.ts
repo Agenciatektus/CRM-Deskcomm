@@ -276,12 +276,17 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   {
     fn: "fn_definir_cadencias_pausadas(uuid,boolean)",
     razao:
-      "app/api/v1/cadencias/pausa/route.ts chama por rpc com o createClient da SESSÃO " +
-      "(kill switch das cadências de prospecção, migration 9016); a própria função " +
-      "reconfere auth.uid(), manager da organização, suporte de escrita e MFA comprovado " +
-      "antes de gravar settings.cadencias_pausadas por merge. " +
-      "tests/invariants/cadencia-pausa-acl.test.ts prova o manager com fator provado e a " +
-      "negação de agent, viewer, anon, manager da org vizinha e de sessão aal1 de quem tem TOTP.",
+      "SEM CALL SITE desde a remoção da feature cadência: o único era " +
+      "app/api/v1/cadencias/pausa/route.ts (kill switch das cadências de prospecção, " +
+      "migration 9016), apagado junto com a tela. A função segue no banco porque esta " +
+      "fatia não escreve migration, então o EXECUTE de authenticated é SUPERFÍCIE MORTA " +
+      "pela própria régua deste arquivo — a exceção fica só para não pintar de vermelho " +
+      "um estado que ela não pode consertar. O conserto é um REVOKE em migration " +
+      "própria (ou o DROP da função), decidido pelo Peterson. " +
+      "A função ainda reconfere auth.uid(), manager da organização, suporte de escrita e " +
+      "MFA comprovado antes de gravar settings.cadencias_pausadas por merge, e " +
+      "tests/invariants/cadencia-pausa-acl.test.ts segue provando o manager com fator " +
+      "provado e a negação de agent, viewer, anon, manager da org vizinha e de sessão aal1.",
   },
   {
     fn: "fn_definir_google_meet_acesso_aberto(uuid,boolean)",

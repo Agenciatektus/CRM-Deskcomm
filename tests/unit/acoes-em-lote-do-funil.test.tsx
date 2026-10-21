@@ -76,7 +76,6 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useActiveOrg: () => ({ role: "agent" }),
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
-vi.mock("@/components/cadencia/InscreverNaCadencia", () => ({ InscreverNaCadencia: () => null }));
 vi.mock("@/hooks/kanban/useMotivosDePerdaDoFunil", () => ({ useMotivosDePerdaDoFunil: () => [] }));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({ useLoseLead: () => ({ mutateAsync: vi.fn(), isPending: false }) }));
 // O formulário do painel é o mesmo da Inbox (medido lá); aqui só o pedido que ele entrega.

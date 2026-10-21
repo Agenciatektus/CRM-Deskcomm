@@ -24,7 +24,6 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useActiveOrg: () => ({ role: "agent" }),
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
-vi.mock("@/components/cadencia/InscreverNaCadencia", () => ({ InscreverNaCadencia: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 describe("revisão do Cassio na #201 (P2)", () => {
