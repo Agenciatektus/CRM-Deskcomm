@@ -362,6 +362,13 @@ export async function fzapFetchMedia(
 }
 
 /**
+ * Prazo da foto, menor que o `TIMEOUT_MS` geral: roda dentro do orçamento do
+ * lote do cron de fotos (60 s do scheduler), e a função da Verdash já se limita
+ * a 8 s no FZAP.
+ */
+const TIMEOUT_DA_FOTO_MS = 10_000;
+
+/**
  * A foto de perfil do contato no MODO PAREADO (WhatsApp ou Instagram da
  * Verdash), pedida à função `crm-foto-perfil` com o token de máquina do vínculo.
  * O token do FZAP e o do Instagram ficam lá; aqui só chega a URL.
@@ -384,7 +391,7 @@ export async function fotoDoContatoPareado(
       method: "POST",
       headers: { "x-crm-token": creds.token, "Content-Type": "application/json" },
       body: JSON.stringify({ destinatario }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(TIMEOUT_DA_FOTO_MS),
     });
   } catch (err) {
     const detalhe = err instanceof Error ? err.message : "erro_desconhecido";

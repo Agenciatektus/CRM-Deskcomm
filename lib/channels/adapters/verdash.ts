@@ -325,13 +325,13 @@ export const verdashAdapter: ChannelAdapter = {
     // como falha em vez de "contato sem foto".
     if (creds.vinculoId) return fotoDoContatoPareado(creds, input.recipient);
     try {
-      const data = await fzapRequest<{ url?: string; publicDownloadUrl?: string }>(
-        creds,
-        "/user/avatar",
-        { method: "POST", body: { phone: input.recipient, preview: false } },
-      );
-      // `publicDownloadUrl` é o host público; `url` pode apontar para rede interna.
-      return data?.publicDownloadUrl ?? data?.url ?? null;
+      const data = await fzapRequest<{ publicDownloadUrl?: string }>(creds, "/user/avatar", {
+        method: "POST",
+        body: { phone: input.recipient, preview: false },
+      });
+      // Só `publicDownloadUrl`, o host público. O `url` pode apontar para a rede
+      // interna do FZAP, e o cron não baixa de lá (allowlist em `contact-avatar.ts`).
+      return data?.publicDownloadUrl ?? null;
     } catch {
       return null;
     }

@@ -80,7 +80,7 @@ describe("foto no canal Verdash", () => {
     expect((erro as Error).message).not.toContain("142704667287623");
   });
 
-  it("direto (sem vínculo): continua no FZAP e prefere o host público", async () => {
+  it("direto (sem vínculo): continua no FZAP e usa o host público", async () => {
     vi.mocked(resolveVerdashCreds).mockResolvedValue({ ...PAREADA, vinculoId: null });
     const buscar = vi.fn(async () =>
       resposta({
@@ -94,5 +94,14 @@ describe("foto no canal Verdash", () => {
     const [url, init] = buscar.mock.calls[0]! as unknown as [string, RequestInit];
     expect(url).toBe("https://fzap.invalid/user/avatar");
     expect(new Headers(init.headers).get("token")).toBe(PAREADA.token);
+  });
+
+  it("direto: só o `url` interno, sem `publicDownloadUrl` → null (não baixa da rede interna)", async () => {
+    vi.mocked(resolveVerdashCreds).mockResolvedValue({ ...PAREADA, vinculoId: null });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => resposta({ success: true, data: { url: "http://fzap:8080/a.jpg" } })),
+    );
+    expect(await verdashAdapter.fetchProfilePictureUrl!(pedido)).toBeNull();
   });
 });
