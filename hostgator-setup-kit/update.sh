@@ -99,11 +99,16 @@ setup_update_agent_cron
 # uma atualização real (registro fora, árvore suja) prometem não ter parado
 # nada — ali o par liga na atualização que vier depois.
 PAR_VAPID_CRIADO=""
+PAR_LIGADO_AGORA=""
 completar_par_vapid .env
 subir_para_ler_o_par() {
   [ -n "$PAR_VAPID_CRIADO" ] || return 0
   PAR_VAPID_CRIADO=""
-  if dc up -d --no-deps app worker >/dev/null 2>&1; then
+  # `never`: recriar para ler o .env, nunca trocar de imagem. Com tag de canal
+  # (`always`) o compose baixaria o topo do canal antes de recriar — app novo sem
+  # o baseline, logo antes de uma recusa que diz que nada mudou.
+  if ( export APP_PULL_POLICY=never WORKER_PULL_POLICY=never; dc up -d --no-deps app worker ) >/dev/null 2>&1; then
+    PAR_LIGADO_AGORA=1
     c_grn "$(t "✓ app e worker reiniciados para ligar os avisos com o app fechado")"
   else
     c_ylw "$(t "⚠ Criei as chaves dos avisos com o app fechado, mas não consegui reiniciar o app e o worker. Os avisos ligam quando eles reiniciarem, o que acontece sozinho na próxima atualização.")"
@@ -193,7 +198,7 @@ if [ -z "$FORCE" ] && [ -z "$MESMA_TAG" ]; then
     0) subir_para_ler_o_par
        refuse "A versão $TARGET_TAG é ANTERIOR à que já está instalada neste servidor.
      Instalar ela seria voltar no tempo e desligar coisas que você já tem.
-     Não mexi em nada: nem no banco, nem na versão do app — está tudo como estava.
+     Não mexi em nada${PAR_LIGADO_AGORA:+ além das chaves dos avisos com o app fechado}: nem no banco, nem na versão do app — está tudo como estava.
      Se você REALMENTE quer voltar para a $TARGET_TAG, rode:
        bash hostgator-setup-kit/update.sh --to $TARGET_TAG --force" ;;
     2) refuse "Não consegui ter CERTEZA de que a versão $TARGET_TAG é mais nova que a instalada

@@ -147,10 +147,16 @@ for dub in falha lixo; do
   check "    (e não manda forçar)" bash -c "! printf '%s' \"\$1\" | grep -q -- --force" _ "$SAIDA"
 done
 
+# Como root o `chmod 444` não segura a escrita: o caso não tem como acontecer
+# e a prova mediria o root, não o kit. Pula AVISANDO, nunca em silêncio.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "  - (i) pulado: rodando como root, o chmod 444 não impede a escrita"
+else
 D="$(caso i $'X=1\n')"; cp "$D/.env" "$D/original"; chmod 444 "$D/.env"
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
 check "(i) .env somente-leitura → não toca" cmp -s "$D/.env" "$D/original"
 check "    mas avisa que não conseguiu escrever (a tela manda atualizar)" contem "$SAIDA" "não consigo escrever"
+fi
 
 D="$(caso i2 $'VAPID_PUBLIC_KEY=BPub\nVAPID_PRIVATE_KEY=priv\n')"; chmod 444 "$D/.env"
 SAIDA="$(no_kit "$D" "" "completar_par_vapid .env")"
