@@ -244,6 +244,14 @@ export const AUDIT_ACTIONS = [
   // Emitida pelo worker quando houve EFEITO (tentativa de envio), nunca em
   // rodada de cron vazia.
   "prospecting.approach_sent",
+  // A SAÍDA ("responda PARAR") oferecida numa mensagem automática da prospecção
+  // (modo da 2ª mensagem). Sem texto, sem telefone — só os ponteiros.
+  // Emitida por inbound-turn e followup-turn quando o envio é aceito.
+  "prospecting.exit_offered",
+  // A compensação da anterior: a mensagem que levava a saída virou `failed`
+  // depois de aceita (watchdog, handler, webhook de status), e a reserva voltou.
+  // Gravada pelo gatilho `fn_prospeccao_saida_volta_com_a_mensagem` (0705).
+  "prospecting.exit_offer_withdrawn",
   "channel.pairing_code_requested",
   "channel.social_configured",
   "channel.social_disconnected",
@@ -1131,6 +1139,14 @@ export const AUDIT_ACTIONS = [
   // (`all`/`list`) e a lista do que o assistente pode ler. O metadata carrega só
   // CONTAGENS (modo e número de fontes), nunca nomes de tabela ou de coluna.
   "external_db_sources.updated",
+  // Instâncias de receita do banco externo (Spec 25 R1): o administrador trocou a
+  // lista de receitas da conexão (PUT .../recipes). O metadata carrega só
+  // CONTAGENS (quantas instâncias, quantas ativas) — nunca os parâmetros de fixos.
+  "external_db_recipes.updated",
+  // Pré-visualização de uma instância de receita (POST .../recipes/preview):
+  // só contagens (linhas, colunas, truncado), nunca valores lidos do banco de
+  // origem.
+  "external_db_recipes.previewed",
 
   // Gestão de tenants pelo admin da plataforma (migration 0614).
   // A LÁPIDE, gravada pelo banco dentro de `fn_excluir_organizacao`, com
