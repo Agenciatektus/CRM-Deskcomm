@@ -59,7 +59,8 @@ export function ConfiguracaoDeCampanhas() {
         titulo={t("Configuração de campanhas")}
         descricao={t("O que vale para todas as campanhas, e não para uma só.")}
       />
-      <SecaoDaPagina className="gap-4">
+      {/* O contêiner é largura toda (Pagina); o limite de leitura dos formulários fica aqui. */}
+      <SecaoDaPagina className="max-w-3xl gap-4">
 
       <Padroes />
       <TextosSalvos />

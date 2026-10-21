@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   cabecalhoServerTiming,
+  diagnosticoDoQuadro,
   enriquecerEmParalelo,
+  LIMIAR_DO_LOG_DO_QUADRO_MS,
   fundirEnriquecimentos,
 } from "@/lib/kanban/fundir-enriquecimentos";
 import type { Lead } from "@/lib/types/leads";
@@ -125,6 +127,31 @@ describe("as famílias rodam em paralelo", () => {
 
   it("Server-Timing só com nomes e números", () => {
     expect(cabecalhoServerTiming({ score: 12.3, total: 40 })).toBe("score;dur=12.3, total;dur=40");
+  });
+});
+
+describe("diagnóstico do quadro: log só na abertura lenta, Server-Timing só para o staff", () => {
+  const rapido = { score: 40, total: 300 };
+  const lento = { score: 2_400, total: LIMIAR_DO_LOG_DO_QUADRO_MS + 1 };
+
+  it("abertura normal não vai para o log; a lenta vai", () => {
+    expect(diagnosticoDoQuadro(rapido, false).logar).toBe(false);
+    // Controle negativo: o mesmo cálculo, acima do limiar, loga.
+    expect(diagnosticoDoQuadro(lento, false).logar).toBe(true);
+    // Exatamente no limiar não loga (é "passar de").
+    expect(diagnosticoDoQuadro({ total: LIMIAR_DO_LOG_DO_QUADRO_MS }, false).logar).toBe(false);
+  });
+
+  it("cliente comum não recebe Server-Timing; staff da plataforma recebe", () => {
+    expect(diagnosticoDoQuadro(lento, false).headers).toBeUndefined();
+    expect(diagnosticoDoQuadro(rapido, true).headers).toEqual({ "Server-Timing": "score;dur=40, total;dur=300" });
+  });
+
+  it("a rota usa o diagnóstico: o header e o log não saem por fora dele", () => {
+    const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
+    expect(fonte).toMatch(/diagnosticoDoQuadro\(tempos, authUser\?\.is_platform_admin === true\)/);
+    expect(fonte).toMatch(/if \(diagnostico\.logar\)/);
+    expect(fonte).not.toMatch(/"Server-Timing"/);
   });
 });
 

@@ -80,6 +80,7 @@ function renderBarra() {
       pipelineId="p-1"
       tagsExistentes={["google", "indicação", "vip"]} leads={[]} funis={[]} ownerNames={new Map()}
       onClear={vi.fn()}
+      onRestaurar={vi.fn()}
     />,
   );
 }

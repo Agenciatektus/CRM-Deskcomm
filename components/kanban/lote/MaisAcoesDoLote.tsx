@@ -38,6 +38,7 @@ export function MaisAcoesDoLote({
   ocupado,
   onReabrir,
   onClear,
+  onRestaurar,
 }: {
   selectedIds: string[];
   /** O recorte na tela, na ordem que a pessoa vê (status, dono, CSV). */
@@ -51,6 +52,8 @@ export function MaisAcoesDoLote({
   /** Reabrir = mover os encerrados para uma etapa aberta, como o individual. */
   onReabrir: (ids: string[], stageId: string) => void;
   onClear: () => void;
+  /** Devolve a seleção (Desfazer de uma ação que a limpou ao agendar). */
+  onRestaurar: (ids: string[]) => void;
 }) {
   const t = useT();
   const [dialogo, setDialogo] = useState<"funil" | "tarefa" | "ganho" | null>(null);
@@ -63,6 +66,10 @@ export function MaisAcoesDoLote({
   const abertos = selectedIds.filter((id) => porId.get(id)?.status === "open");
   const abertas = stages.filter((s) => !s.is_won && !s.is_lost);
   const temGanho = stages.some((s) => s.is_won);
+  // A seleção DESTE render: quando a ação é agendada, a tela a limpa e esta
+  // barra desmonta; o Desfazer devolve exatamente o que estava marcado.
+  const selecaoNoAgendamento = [...selectedIds];
+  const restaurar = () => onRestaurar(selecaoNoAgendamento);
   const fechar = (aberto: boolean) => {
     if (!aberto) setDialogo(null);
   };
@@ -115,6 +122,7 @@ export function MaisAcoesDoLote({
           pipelineId={pipelineId}
           funis={funis}
           onConcluido={onClear}
+          onDesfeito={restaurar}
         />
       )}
       {dialogo === "tarefa" && (
@@ -126,6 +134,7 @@ export function MaisAcoesDoLote({
           usuarioId={usuarioId}
           pipelineId={pipelineId}
           onConcluido={onClear}
+          onDesfeito={restaurar}
         />
       )}
       {dialogo === "ganho" && (
@@ -136,6 +145,7 @@ export function MaisAcoesDoLote({
           ignorados={selectedIds.length - abertos.length}
           pipelineId={pipelineId}
           onConcluido={onClear}
+          onDesfeito={restaurar}
         />
       )}
     </>

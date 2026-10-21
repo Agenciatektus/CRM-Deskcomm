@@ -49,6 +49,16 @@ describe("ProposalEditorClient — desfecho do envio (D3)", () => {
     expect(screen.queryByText(/o último envio falhou/i)).not.toBeInTheDocument();
   });
 
+  it("o campo do título tem rótulo próprio, não só o placeholder", async () => {
+    responderProposta({ data: { ...PROPOSTA_BASE, status: "rascunho", ultima_falha_envio: null } });
+    render(<ProposalEditorClient id="p1" podeEditar={true} />);
+    const titulo = await screen.findByDisplayValue("Proposta X");
+    // O placeholder some quando há texto e o leitor de tela não deve depender dele.
+    // Por isso o teste olha o atributo, e não o nome calculado (que cairia no
+    // placeholder e passaria sem o rótulo).
+    expect(titulo).toHaveAttribute("aria-label", "Título da proposta");
+  });
+
   it("mostra 'na fila do WhatsApp' quando enviando", async () => {
     responderProposta({ data: { ...PROPOSTA_BASE, status: "enviando", ultima_falha_envio: null } });
     render(<ProposalEditorClient id="p1" podeEditar={true} />);

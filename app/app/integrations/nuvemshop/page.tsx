@@ -70,7 +70,8 @@ export default async function NuvemshopIntegrationPage() {
         }
         descricao={traduzir("Sincroniza pedidos, produtos e clientes via OAuth + webhooks.", idioma)}
       />
-      <SecaoDaPagina className="gap-6">
+      {/* O contêiner é largura toda (Pagina); o limite de leitura fica na seção. */}
+      <SecaoDaPagina className="max-w-3xl gap-6">
 
       {!configured ? (
         <Card>

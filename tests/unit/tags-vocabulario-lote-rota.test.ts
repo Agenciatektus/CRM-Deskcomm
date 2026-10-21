@@ -14,7 +14,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORG = "00000000-0000-4000-8000-0000000000e6";
 
-const estado = vi.hoisted(() => ({ papel: "manager", falharEm: null as string | null }));
+const estado = vi.hoisted(() => ({
+  papel: "manager",
+  falharEm: null as string | null,
+  suporteSoLeitura: false,
+  mfaPendente: false,
+}));
 const rpc = vi.hoisted(() => vi.fn());
 const audit = vi.hoisted(() => vi.fn());
 
@@ -25,11 +30,19 @@ vi.mock("@/lib/auth/server", () => ({
   requireAuth: async () => USUARIO,
   resolveActiveOrg: async () => ({ orgId: ORG, name: "Org", role: estado.papel }),
   orgAtivaSemPortao: async () => ({ orgId: ORG, name: "Org", role: estado.papel, org_status: "active" }),
-  mfaEmDivida: async () => false,
+  mfaEmDivida: async () => estado.mfaPendente,
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc }) }));
 vi.mock("@/lib/audit", () => ({ audit }));
-vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: async () => null }));
+vi.mock("@/lib/impersonate/support", async () => {
+  const { fail } = await import("@/lib/api/wrappers");
+  return {
+    // O dublê devolve a MESMA recusa que a função de verdade devolve para uma
+    // sessão de acompanhamento somente-leitura.
+    requireSupportWrite: async () =>
+      estado.suporteSoLeitura ? fail("forbidden", "Acompanhamento somente leitura.", 403) : null,
+  };
+});
 
 import { POST } from "@/app/api/v1/tags/vocabulario/lote/route";
 
@@ -49,6 +62,8 @@ function postar(corpo: unknown) {
 beforeEach(() => {
   estado.papel = "manager";
   estado.falharEm = null;
+  estado.suporteSoLeitura = false;
+  estado.mfaPendente = false;
   audit.mockReset();
   rpc.mockReset();
   rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
@@ -123,5 +138,33 @@ describe("rota do lote de etiquetas", () => {
     const resposta = await postar({ acao: "excluir", tags: ["a"] });
     expect(resposta.status).toBe(403);
     expect(operacoes()).toEqual([]);
+  });
+
+  it("⭐ suporte somente-leitura: 403 antes de qualquer consulta ao banco", async () => {
+    estado.suporteSoLeitura = true;
+    const resposta = await postar({ acao: "excluir", tags: ["a"] });
+    expect(resposta.status).toBe(403);
+    // Nem o papel é lido: o portão do suporte vem antes de tudo.
+    expect(rpc).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("⭐ segundo fator pendente: 403 mfa_required e a operação não sai", async () => {
+    estado.mfaPendente = true;
+    const resposta = await postar({ acao: "excluir", tags: ["a"] });
+    expect(resposta.status).toBe(403);
+    const corpo = (await resposta.json()) as { error: { code: string } };
+    expect(corpo.error.code).toBe("mfa_required");
+    expect(operacoes()).toEqual([]);
+    // A auditoria registra a RECUSA (reason mfa_required), nunca uma operação feita.
+    expect(audit.mock.calls.map((c) => (c[0] as { metadata?: { reason?: string } }).metadata?.reason)).toEqual([
+      "mfa_required",
+    ]);
+  });
+
+  it("controle: sem as duas pendências, o mesmo pedido passa e chama a operação", async () => {
+    const resposta = await postar({ acao: "excluir", tags: ["a"] });
+    expect(resposta.status).toBe(200);
+    expect(operacoes()).toHaveLength(1);
   });
 });

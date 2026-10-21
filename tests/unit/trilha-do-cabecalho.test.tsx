@@ -55,7 +55,12 @@ describe("a trilha do cabeçalho", () => {
     // A tela que contém o detalhe vira o caminho de volta, e deixa de ser a atual.
     const casos = within(trilha()!).getByRole("link", { name: "Casos" });
     expect(casos).toHaveAttribute("href", "/app/ai/cases");
-    expect(within(trilha()!).queryByText("Casos")?.closest("[aria-current]")).toBeNull();
+    // ...mas continua dizendo ao leitor de tela onde a pessoa está: o nível
+    // marcado é `location` (dentro de Casos), nunca `page`.
+    expect(casos).toHaveAttribute("aria-current", "location");
+    expect(within(trilha()!).queryByText("Casos")?.closest('[aria-current="page"]')).toBeNull();
+    // Controle negativo: o grupo (Agentes) é link também, e não leva marca nenhuma.
+    expect(within(trilha()!).getByRole("link", { name: "Agentes" })).not.toHaveAttribute("aria-current");
   });
 
   it("o grupo com hub leva ao hub; a página atual não é link", () => {

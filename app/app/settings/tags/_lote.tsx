@@ -265,7 +265,7 @@ export function BarraDeEtiquetasEmLote({
         </Button>
       </div>
 
-      <AlertDialog open={aberto === "excluir"} onOpenChange={(abrirDialogo) => !abrirDialogo && setAberto(null)}>
+      <AlertDialog open={aberto === "excluir"} onOpenChange={(abrirDialogo) => !abrirDialogo && !ocupado && setAberto(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -297,7 +297,7 @@ export function BarraDeEtiquetasEmLote({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={aberto === "juntar"} onOpenChange={(abrirDialogo) => !abrirDialogo && setAberto(null)}>
+      <Dialog open={aberto === "juntar"} onOpenChange={(abrirDialogo) => !abrirDialogo && !ocupado && setAberto(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -339,7 +339,7 @@ export function BarraDeEtiquetasEmLote({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={aberto === "definir_cor"} onOpenChange={(abrirDialogo) => !abrirDialogo && setAberto(null)}>
+      <Dialog open={aberto === "definir_cor"} onOpenChange={(abrirDialogo) => !abrirDialogo && !ocupado && setAberto(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>

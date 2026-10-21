@@ -435,6 +435,8 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
           value={proposta.titulo}
           disabled={!editavel}
           onChange={(e) => setProposta((p) => p && { ...p, titulo: e.target.value })}
+          // O placeholder some ao digitar e não é rótulo: o leitor de tela precisa do nome.
+          aria-label={t("Título da proposta")}
           placeholder={t("Título da proposta")}
         />
       </header>
