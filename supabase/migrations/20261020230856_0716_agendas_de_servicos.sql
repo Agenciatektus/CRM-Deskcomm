@@ -179,9 +179,9 @@ alter table public.calendar_service_blocks drop constraint if exists calendar_se
 alter table public.calendar_service_blocks drop constraint if exists calendar_service_blocks_publication_appointment_id_fkey;
 do $$ begin
  if not exists(select 1 from pg_constraint where conname='calendar_service_professional_member_fk' and conrelid='public.calendar_service_professionals'::regclass) then
-  alter table public.calendar_service_professionals add constraint calendar_service_professional_member_fk foreign key(organization_id,user_id) references public.user_organizations(organization_id,user_id);end if;
+  alter table public.calendar_service_professionals add constraint calendar_service_professional_member_fk foreign key(organization_id,user_id) references public.user_organizations(organization_id,user_id) on delete cascade;end if;
  if not exists(select 1 from pg_constraint where conname='calendar_service_block_owner_member_fk' and conrelid='public.calendar_service_blocks'::regclass) then
-  alter table public.calendar_service_blocks add constraint calendar_service_block_owner_member_fk foreign key(organization_id,owner_user_id) references public.user_organizations(organization_id,user_id);end if;
+  alter table public.calendar_service_blocks add constraint calendar_service_block_owner_member_fk foreign key(organization_id,owner_user_id) references public.user_organizations(organization_id,user_id) on delete cascade;end if;
  if not exists(select 1 from pg_constraint where conname='calendar_service_block_publication_org_fk' and conrelid='public.calendar_service_blocks'::regclass) then
   alter table public.calendar_service_blocks add constraint calendar_service_block_publication_org_fk foreign key(organization_id,publication_appointment_id) references public.calendar_appointments(organization_id,id);end if;
 end $$;
