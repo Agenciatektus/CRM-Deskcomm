@@ -1014,6 +1014,19 @@ export type BeforeSendResult =
     };
 
 export interface RunBeforeSendArgs {
+  /**
+   * AUXILIAR DE CRM (migration 9060): o agente deste envio não fala com o
+   * cliente. Aqui a marca VETA — é o par obrigatório da liberação que ela
+   * ganhou no gate de elegibilidade (`lib/ai/elegibilidade/gate.ts`), onde ela
+   * abre a conversa já assumida por uma pessoa.
+   *
+   * As duas leituras têm de andar juntas: sem este veto, a liberação de lá
+   * viraria exatamente o que ela promete não ser — a IA falando por cima de
+   * quem assumiu o atendimento. Por isso a trava mora na cadeia de envio, e não
+   * no prompt: a resposta do modelo não passa por ferramenta nenhuma, então
+   * "não falar" não é verificável pela configuração de capacidades.
+   */
+  agenteSomenteInterno: boolean;
   agentOperation?: AgentOperationContext;
   approvedReply?: ApprovedReplyContext;
   /** Contexto interno do único comando Meet; a origem é relida, nunca um booleano de bypass. */
@@ -1276,6 +1289,24 @@ const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTim
  * rodam antes de tomar conexão — ver o porquê no ponto da chamada.
  */
 export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSendResult> {
+  // PRIMEIRA COISA, antes de estilo, lock, conexão e qualquer gate: um auxiliar
+  // de CRM não envia. Nada do que vem abaixo precisa rodar, e deixar para
+  // depois daria ao veto a chance de depender de estado — ele não depende de
+  // nada além de quem é o agente.
+  if (args.agenteSomenteInterno === true) {
+    const trace: GateTraceEntry[] = [
+      { gate: 'auxiliar_de_crm', verdict: 'veto', code: 'agente_somente_interno' },
+    ];
+    emitTrace(args.log, args.channelSessionId, trace);
+    return {
+      status: 'vetoed',
+      gate: 'auxiliar_de_crm',
+      code: 'agente_somente_interno',
+      message:
+        'este agente é auxiliar de CRM e não fala com o cliente: registre no card e encerre o turno',
+      trace,
+    };
+  }
   const gates = args.gates ?? BEFORE_SEND_GATES;
   // ANTES de tomar conexão, de propósito: preferência de estilo não precisa do
   // lock, e uma consulta que falha DENTRO da transação a deixa abortada — a

@@ -320,3 +320,96 @@ describe("montarEstadoDeElegibilidade — a org viaja", () => {
     expect(decidirElegibilidade(ligado).motivo).toBe("canal_desativado");
   });
 });
+
+
+describe("decidirElegibilidade — o AUXILIAR DE CRM (9060)", () => {
+  /**
+   * A conversa que motivou a mudança: 552 conversas da Fiorotto, todas com
+   * atendente humano, e um agente sem nenhuma capacidade de conversa que nunca
+   * executou. As travas de passagem humana protegem a FALA; quem não fala não
+   * disputa o cliente com ninguém.
+   */
+  const comDonoHumano: EstadoDeElegibilidade = { ...base, assigneeKind: "user" };
+  const silenciada: EstadoDeElegibilidade = {
+    ...base,
+    botSilencedUntil: new Date(AGORA.getTime() + 30 * 60 * 1000),
+  };
+
+  it("⭐ conversa já assumida por uma pessoa: o auxiliar de CRM PASSA", () => {
+    const d = decidirElegibilidade({ ...comDonoHumano, agenteSomenteInterno: true });
+    expect(d.permite).toBe(true);
+  });
+
+  it("⭐ conversa silenciada por atendimento humano: o auxiliar de CRM PASSA", () => {
+    const d = decidirElegibilidade({ ...silenciada, agenteSomenteInterno: true });
+    expect(d.permite).toBe(true);
+  });
+
+  it("CONTROLE — agente que fala continua barrado nas duas", () => {
+    // Sem este par, `permite: true` fixo passaria nos dois casos acima e a
+    // liberação valeria para todo agente — exatamente o que ela não pode ser.
+    expect(decidirElegibilidade(comDonoHumano)).toMatchObject({
+      permite: false,
+      motivo: "conversa_de_humano",
+    });
+    expect(decidirElegibilidade(silenciada)).toMatchObject({
+      permite: false,
+      motivo: "conversa_silenciada",
+    });
+  });
+
+  it("CONTROLE — a marca AUSENTE não libera nada (o default é recusar)", () => {
+    // `agenteSomenteInterno` é opcional: transporte que ainda não lê a coluna
+    // devolve `undefined`, e o gate precisa seguir exatamente como antes.
+    expect(decidirElegibilidade({ ...comDonoHumano, agenteSomenteInterno: undefined })).toMatchObject({
+      permite: false,
+      motivo: "conversa_de_humano",
+    });
+  });
+
+  it("⭐ CONTROLE — `force_human` barra até o auxiliar: é a trava dura, e não é sobre quem atende", () => {
+    const d = decidirElegibilidade({
+      ...base,
+      forceHuman: true,
+      agenteSomenteInterno: true,
+    });
+    expect(d).toMatchObject({ permite: false, motivo: "force_human" });
+  });
+
+  it("⭐ CONTROLE — quem pediu para não receber nada também barra o auxiliar", () => {
+    const d = decidirElegibilidade({ ...base, aiOptOut: true, agenteSomenteInterno: true });
+    expect(d).toMatchObject({ permite: false, motivo: "ai_opt_out" });
+  });
+
+  it("CONTROLE — canal desativado e organização não operante seguem acima de tudo", () => {
+    expect(
+      decidirElegibilidade({ ...base, canalDesativado: true, agenteSomenteInterno: true }),
+    ).toMatchObject({ permite: false, motivo: "canal_desativado" });
+    expect(
+      decidirElegibilidade({ ...base, orgStatus: "suspended", agenteSomenteInterno: true }),
+    ).toMatchObject({ permite: false, motivo: "org_nao_operante" });
+  });
+
+  it("o montador lê a marca crua e só `true` liga", () => {
+    const monta = (v: unknown) =>
+      montarEstadoDeElegibilidade({
+        aiGate: "open",
+        orgStatus: "active",
+        forceHuman: false,
+        aiOptOut: false,
+        assigneeKind: "user",
+        botSilencedUntil: null,
+        aiAuthorizedAt: null,
+        agora: AGORA,
+        ttlMs: 21 * DIA,
+        agenteSomenteInterno: v,
+      }).agenteSomenteInterno;
+    expect(monta(true)).toBe(true);
+    // `bool_and` sobre conjunto vazio volta `null` do Postgres: sessão sem
+    // agente publicado não pode virar liberação.
+    expect(monta(null)).toBe(false);
+    expect(monta(undefined)).toBe(false);
+    expect(monta(false)).toBe(false);
+    expect(monta("true")).toBe(false);
+  });
+});

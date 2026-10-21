@@ -248,12 +248,76 @@ const versionShapeSchema = z
      * organização é o servidor.
      */
     knowledge_source_ids: z.array(z.string().uuid()).default([]),
+    /**
+     * AUXILIAR DE CRM (9060): este agente não fala com o cliente. A marca é
+     * explícita porque "não fala" NÃO é dedutível da lista de capacidades — a
+     * resposta do Conversador não passa por ferramenta nenhuma.
+     */
+    somente_interno: z.boolean().default(false),
   })
   .strict();
 
+/**
+ * As capacidades que ENTREGAM mensagem ao cliente. A lista é curta de propósito
+ * e não cobre "falar" por inteiro: a resposta normal do agente não está aqui
+ * porque não é capacidade nenhuma. Ver o veto em `before-send.ts`.
+ */
+export const FERRAMENTAS_QUE_FALAM = [
+  "crm_send_whatsapp_message",
+  "crm_start_conversation_and_send",
+];
+
+/**
+ * As que ENCOMENDAM fala para depois: inscrever numa régua ou agendar retorno
+ * termina em mensagem ao cliente, por um caminho que não passa pelo veto de
+ * envio. Para quem não fala, a diferença entre falar agora e encomendar a fala
+ * é de relógio, não de natureza.
+ *
+ * Mora aqui, e não em cada consumidor, porque já nasceu em duas cópias — a do
+ * turno e a do teste — e lista duplicada é drift marcado para acontecer: a
+ * cerca passava por ter a própria lista, não por os dois lados concordarem.
+ */
+export const FERRAMENTAS_QUE_ENCOMENDAM_FALA = [
+  "crm_enroll_followup_flow",
+  "crm_schedule_followup",
+];
+
+/** Tudo que um auxiliar de CRM não pode ter: falar agora ou encomendar a fala. */
+export const FERRAMENTAS_VEDADAS_AO_AUXILIAR = [
+  ...FERRAMENTAS_QUE_FALAM,
+  ...FERRAMENTAS_QUE_ENCOMENDAM_FALA,
+];
+
+/**
+ * DEFESA EM PROFUNDIDADE, e nada além disso: quem impede a fala é o veto na
+ * cadeia de envio (`runBeforeSend`), por onde TODA saída passa. Isto existe
+ * para a configuração não ficar contraditória na tela — ligar "não fala com o
+ * cliente" e, ao lado, a capacidade de mandar mensagem. Configuração que se
+ * contradiz é a que alguém lê depois e acredita na metade errada.
+ *
+ * Fica FORA de `versionShapeSchema` porque `versionPatchSchema` o estende, e
+ * zod recusa `.extend()` sobre schema com refinamento. Quem precisa da regra a
+ * aplica, e o teste de drift das colunas prende essa separação.
+ */
+export function conferirAuxiliarDeCrm(
+  v: { somente_interno?: boolean | undefined; tool_ids?: readonly string[] | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (v.somente_interno !== true) return;
+  const envios = (v.tool_ids ?? []).filter((t) => FERRAMENTAS_VEDADAS_AO_AUXILIAR.includes(t));
+  if (envios.length === 0) return;
+  ctx.addIssue({
+    code: "custom",
+    path: ["tool_ids"],
+    message:
+      "Este assistente está marcado como auxiliar de CRM, que não fala com o cliente. " +
+      `Desligue ${envios.join(", ")} ou tire a marca.`,
+  });
+}
+
 export type VersionInput = z.infer<typeof versionShapeSchema>;
 
-export const versionCreateSchema = versionShapeSchema;
+export const versionCreateSchema = versionShapeSchema.superRefine(conferirAuxiliarDeCrm);
 
 /** Edits permitted only on draft versions. Omitted fields never receive create defaults. */
 export const versionPatchSchema = versionShapeSchema
@@ -278,7 +342,19 @@ export const versionPatchSchema = versionShapeSchema
     pipeline_ids: versionShapeSchema.shape.pipeline_ids.removeDefault(),
     knowledge_source_ids: versionShapeSchema.shape.knowledge_source_ids.removeDefault(),
   })
-  .partial();
+  .partial()
+  .superRefine((v, ctx) =>
+    // O PATCH TAMBÉM CONFERE, e isto não é zelo. Sem ele havia um caminho
+    // inteiro por fora: criar o rascunho com a capacidade de envio e
+    // `somente_interno: false` (passa na criação), ligar a marca por PATCH, e
+    // publicar — a conferência que existe justamente para impedir a
+    // contradição nunca via o estado final.
+    //
+    // Como o patch é `.partial()`, campo ausente é `undefined`, e aí a
+    // conferência não opina: ela só recusa quando a marca chega como `true`
+    // ACOMPANHADA de ferramenta de envio na mesma gravação.
+    conferirAuxiliarDeCrm(v, ctx),
+  );
 
 export const agentMcpCreateSchema = z
   .object({
@@ -287,7 +363,8 @@ export const agentMcpCreateSchema = z
     priority: z.number().int().min(0).max(1000).default(0),
     version: versionShapeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((v, ctx) => conferirAuxiliarDeCrm(v.version, ctx));
 
 export const agentMcpPatchSchema = z
   .object({
@@ -322,6 +399,8 @@ export const runsListQuerySchema = z
   .strict();
 
 export type PublishErrorCode =
+  /** 9060: auxiliar de CRM publicado com capacidade de envio — a contradição que só a publicação vê. */
+  | "auxiliar_de_crm_com_envio"
   | "agent_not_found"
   | "agent_archived"
   | "version_not_found"
@@ -338,6 +417,7 @@ export type PublishErrorCode =
   | "tool_id_invalid";
 
 export const PUBLISH_ERROR_CODES: ReadonlySet<string> = new Set<PublishErrorCode>([
+  "auxiliar_de_crm_com_envio",
   "agent_not_found",
   "agent_archived",
   "version_not_found",

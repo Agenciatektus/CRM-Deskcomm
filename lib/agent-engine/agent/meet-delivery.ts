@@ -99,6 +99,9 @@ export function createMeetDeliveryHandler(deps: {
             agentActorId: "agent-engine:meet-delivery",
           });
         const result = await runBeforeSend({
+      // AUXILIAR DE CRM (9060): entrega transacional de compromisso, disparada
+      // por um agendamento que já existe. Não é fala de agente.
+      agenteSomenteInterno: false,
           pool,
           log: deps.log,
           tenantId: job.organization_id,
