@@ -22,6 +22,7 @@ import {
   type PapelMinimoDeMfa,
 } from "@/lib/auth/politica-mfa";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
+import { fotoDoUsuario, urlDaFotoDaOrganizacao, urlDaFotoDoUsuario } from "@/lib/fotos/foto";
 import { STATUS_OPERANTE, ehOperante } from "@/lib/organizacao/operante";
 import type { AuthUser, Role, UserOrgMembership, ActiveOrg } from "./types";
 
@@ -46,6 +47,15 @@ interface RawMembershipRow {
 
 interface OrgJoin {
   display_name: string;
+  /**
+   * Foto da organização (migration 9061). Nula = sem foto.
+   *
+   * ⚠️ A 9061 PRECISA rodar ANTES do app: o embed acima pede a COLUNA em toda
+   * requisição autenticada, e num banco sem ela o PostgREST responde erro
+   * (42703) e a carga do usuário falha para todo mundo. "Ausente" aqui é a chave
+   * da linha, nunca a coluna do banco.
+   */
+  foto_path?: string | null;
   locale: string | null;
   timezone: string | null;
   currency: string | null;
@@ -297,7 +307,7 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
           // issue #1341 acabou de engordar), e o alias traz só as portas da EMPRESA.
           // `timezone` veio do main (fuso da organização nas listas, #1290) e convive
           // com o alias: um embed por relação, sem renomear o que já existia.
-          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone, currency, country, status, suspended_kind), interface_da_empresa:organizations(interface_settings)",
+          "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, timezone, currency, country, status, suspended_kind, foto_path), interface_da_empresa:organizations(interface_settings)",
         )
         .eq("user_id", user.id)
         .is("revoked_at", null)
@@ -343,10 +353,13 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
     const org = Array.isArray(orgs) ? (orgs[0] ?? null) : orgs;
     const empresas = row.interface_da_empresa;
     const empresa = Array.isArray(empresas) ? (empresas[0] ?? null) : empresas;
+    const fotoUrl = urlDaFotoDaOrganizacao(row.organization_id, org?.foto_path);
     return {
       organization_id: row.organization_id,
       organization_name: org?.display_name ?? "—",
       role: row.role as Role,
+      // Só quando há foto: sem ela a chave fica AUSENTE, como antes da 9061.
+      ...(fotoUrl ? { foto_url: fotoUrl } : {}),
       // EMPRESA ∩ VÍNCULO (migration 0367): a empresa escolhe o universo de
       // portas da instalação, o vínculo escolhe menos dentro dele. Até aqui o
       // vínculo decidia sozinho, então a escolha da empresa não existia.
@@ -362,7 +375,13 @@ const carregarComMotivo = cache(async (): Promise<{ user: AuthUser | null; motiv
 
   const support = await readSupportContext(supabase);
   const fullName = (user.user_metadata?.full_name as string | undefined) ?? null;
-  const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) ?? null;
+  // A foto SUBIDA (`app_metadata.avatar_path`, `/api/v1/perfil/foto`) vence a
+  // URL colada da tela antiga (`user_metadata.avatar_url`), que segue valendo
+  // para quem nunca subiu arquivo.
+  const avatarPath = user.app_metadata?.avatar_path as string | undefined;
+  const avatarUrl = fotoDoUsuario(avatarPath, user.id)
+    ? urlDaFotoDoUsuario(user.id, avatarPath)
+    : ((user.user_metadata?.avatar_url as string | undefined) ?? null);
   const locale = (user.user_metadata?.locale as string | undefined) ?? null;
   // A cadeia inteira num lugar só: pessoa → organização ativa → padrão. Quem
   // consome pede `idioma` e não precisa saber que existe uma ordem.

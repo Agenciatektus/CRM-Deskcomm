@@ -20,7 +20,7 @@ describe("resolveLeadOwner", () => {
   it("dono humano", () => {
     expect(
       resolveLeadOwner(lead({ owner_kind: "user", owner_user_id: "u-1" }), humans),
-    ).toEqual({ kind: "user", name: "Maria Silva", agentVersion: null });
+    ).toEqual({ kind: "user", name: "Maria Silva", agentVersion: null, userId: "u-1" });
   });
 
   it("dono agente traz a versão publicada de hoje", () => {
@@ -79,7 +79,7 @@ describe("resolveLeadOwner", () => {
     ).toEqual({ kind: "ai", name: null, agentVersion: null });
     expect(
       resolveLeadOwner(lead({ owner_kind: "user", owner_user_id: "u-99" }), humans),
-    ).toEqual({ kind: "user", name: null, agentVersion: null });
+    ).toEqual({ kind: "user", name: null, agentVersion: null, userId: "u-99" });
   });
 
   it("banco pré-0070: owner_user_id sem owner_kind ainda mostra o humano", () => {
@@ -87,6 +87,7 @@ describe("resolveLeadOwner", () => {
       kind: "user",
       name: "Maria Silva",
       agentVersion: null,
+      userId: "u-1",
     });
   });
 
@@ -95,6 +96,7 @@ describe("resolveLeadOwner", () => {
       kind: "user",
       name: null,
       agentVersion: null,
+      userId: "u-1",
     });
   });
 });
