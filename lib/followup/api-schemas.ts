@@ -16,8 +16,10 @@ import { BASES_DA_PAUSA, MAX_PAUSA_DE_REENTRADA_MINUTES } from "./pausa-de-reent
  * fork — os passos de uma campanha, do 2º toque em diante). O CHECK do banco
  * espelha esta tupla (forward-fix 9023 refaz a união depois da 0394).
  *
- * ⚠️ `cadence` e `campaign` NÃO se criam nem se editam por esta API: as duas
- * têm porta própria (`/api/v1/cadencias` e a tela da campanha). Elas estão na
+ * ⚠️ `cadence` e `campaign` NÃO se criam por esta API. A campanha tem porta
+ * própria (a tela dela); a cadência tinha a `/api/v1/cadencias`, removida com a
+ * feature, e por isso hoje NINGUÉM cria `cadence` (só restam os pointers
+ * legados, que o PATCH por id desta API ainda alcança). Elas estão na
  * tupla porque o CHECK do banco a espelha, e o invariante
  * `vocabulario-banco-x-typescript` reprova divergência — não porque o editor
  * genérico as aceite. Quem decide "isto é régua de prospecção?" é

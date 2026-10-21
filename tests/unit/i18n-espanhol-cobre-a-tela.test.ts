@@ -1573,18 +1573,6 @@ const CHAVE_DE_RUNTIME_CONGELADA: { arquivo: string; expressao: string; motivo: 
       "fork Tektus (barra do funil, #201): o mesmo rotuloDoMotivoDePerda do FilterBar de origem",
   },
   {
-    arquivo: "app/api/v1/ai/followup-flows/[id]/publish/route.ts",
-    expressao: "problema",
-    motivo:
-      "fork Tektus (cadência): validarGatilhoDaCadencia devolve frase de um conjunto fechado escrito em pt-BR no módulo, traduzida em lib/i18n; congelada na subida 1.73 para ser literal com chave",
-  },
-  {
-    arquivo: "app/api/v1/ai/followup-flows/[id]/route.ts",
-    expressao: "problema",
-    motivo:
-      "fork Tektus (cadência): mesma régua validarGatilhoDaCadencia da rota de publicar",
-  },
-  {
     arquivo: "app/api/v1/campaigns/[id]/route.ts",
     expressao: "daEntrada",
     motivo:

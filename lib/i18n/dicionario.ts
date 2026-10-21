@@ -11085,6 +11085,7 @@ export const DICIONARIO: Traducoes = {
   // requisição, e ficam em português por ora, mesmo comportamento de
   // degradação do resto deste arquivo.
   "account_id e api_key são obrigatórios": { es: "account_id y api_key son obligatorios" },
+  "A régua de prospecção se configura na tela da campanha.": { es: "La secuencia de prospección se configura en la pantalla de la campaña." },
   "Agente não encontrado.": { es: "Agente no encontrado." },
   "Agente não encontrado nesta organização.": { es: "Agente no encontrado en esta organización." },
   "Agent não encontrado.": { es: "Agente no encontrado." },

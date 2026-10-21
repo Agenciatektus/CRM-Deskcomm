@@ -95,15 +95,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  // Régua de prospecção não nasce por esta porta: a cadência nasce em
-  // `/api/v1/cadencias` (com funil, número e política) e a da campanha é criada
-  // pelo servidor ao preparar a campanha. O banco já recusaria
+  // Régua de prospecção não nasce por esta porta: a da campanha é criada pelo
+  // servidor ao preparar a campanha, e a cadência deixou de existir como
+  // feature (a porta dela, `/api/v1/cadencias`, saiu com a tela). O banco
+  // já recusaria
   // (`trg_cadencia_guarda_ponteiro`, 42501, porque o insert é pela sessão); aqui
   // a recusa vira frase em vez de erro interno.
   if (ehProspeccao(parsed.data.surface)) {
     return fail(
       "validation_failed",
-      t("Cadência se cria na tela do funil, e a régua de uma campanha, na tela da campanha."),
+      t("A régua de prospecção se configura na tela da campanha."),
       422,
       { requestId },
     );
