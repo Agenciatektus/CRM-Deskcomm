@@ -119,16 +119,6 @@ export interface AvisoDeEscalacaoOpts {
    * caminho de resposta (#1984), e omitir o campo não pode abrir o disparo.
    */
   origem?: TipoDeEnvio;
-  /**
-   * AUXILIAR DE CRM (9060): quem avisa é um agente que não fala com o cliente.
-   *
-   * Obrigatório, e não opcional com default: este aviso é FALA, sai do agente e
-   * antecede um `force_human` que a regra dura 2 não reverte. Um auxiliar que o
-   * mandasse teria falado por cima de quem assumiu o atendimento E desligado a
-   * IA daquele contato para sempre. Campo obrigatório faz o compilador cobrar o
-   * valor de todo chamador novo, em vez de deixar a omissão virar permissão.
-   */
-  agenteSomenteInterno: boolean;
 }
 
 /**
@@ -168,7 +158,6 @@ export async function avisarLeadDaEscalacao(
 
   try {
     const chain = await runBeforeSend({
-      agenteSomenteInterno: opts.agenteSomenteInterno,
       pool,
       log: opts.log,
       tenantId: ids.tenantId,

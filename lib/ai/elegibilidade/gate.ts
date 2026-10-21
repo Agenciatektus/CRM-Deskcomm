@@ -93,15 +93,6 @@ export interface EstadoDeElegibilidade {
   agora: Date;
   /** Janela de validade da autorização (`AI_ALLOWLIST_TTL_DAYS` em ms). */
   ttlMs: number;
-  /**
-   * O AUXILIAR DE CRM (migration 9060): quem vai atuar não fala com o cliente.
-   *
-   * Ausente ou `false` = comportamento de sempre, byte a byte. Quem não declara
-   * a marca não ganha nada — é a mesma assimetria da reserva do provedor por
-   * assinatura, e pelo mesmo motivo: uma liberação que vale por omissão é uma
-   * liberação que ninguém escolheu.
-   */
-  agenteSomenteInterno?: boolean;
 }
 
 export type MotivoDeElegibilidade =
@@ -158,25 +149,10 @@ export function decidirElegibilidade(e: EstadoDeElegibilidade): DecisaoDeElegibi
   if (e.aiOptOut) {
     return { permite: false, motivo: "ai_opt_out", bloqueioPorAllowlist: false };
   }
-  // ── AS DUAS TRAVAS DA PASSAGEM HUMANA PROTEGEM A FALA ────────────────────
-  //
-  // "Uma pessoa assumiu" e "o bot está silenciado" dizem a MESMA coisa: não
-  // responda por cima de quem está com a conversa na frente. Para um agente que
-  // não tem como falar, nenhuma das duas descreve um risco — ele lê a conversa,
-  // preenche o card e move a etapa, que é retaguarda e não disputa o cliente
-  // com ninguém.
-  //
-  // `force_human` e `ai_opt_out` ficam ACIMA e continuam valendo para todos:
-  // o primeiro é a trava dura e irrevogável do produto (regra dura 2), e o
-  // segundo é pedido explícito da pessoa. Nenhum dos dois é sobre quem atende.
-  //
-  // Medido na Fiorotto em 20/10/2026: 552 conversas, 552 com dono humano, zero
-  // execuções do auxiliar de CRM — e nenhuma tela dizia por quê.
-  const soOrganiza = e.agenteSomenteInterno === true;
-  if (!soOrganiza && silenciadoAgora(e.botSilencedUntil, e.agora)) {
+  if (silenciadoAgora(e.botSilencedUntil, e.agora)) {
     return { permite: false, motivo: "conversa_silenciada", bloqueioPorAllowlist: false };
   }
-  if (!soOrganiza && e.assigneeKind === "user") {
+  if (e.assigneeKind === "user") {
     return { permite: false, motivo: "conversa_de_humano", bloqueioPorAllowlist: false };
   }
 
@@ -258,13 +234,6 @@ export function montarEstadoDeElegibilidade(raw: {
   aiAuthorizedAt: Date | string | null | undefined;
   agora: Date;
   ttlMs: number;
-  /**
-   * `true` quando TODOS os agentes que poderiam atender esta sessão estão
-   * marcados como auxiliar de CRM. Opcional, e o default é a recusa: transporte
-   * que ainda não lê a coluna devolve `undefined` e o gate segue exatamente
-   * como antes.
-   */
-  agenteSomenteInterno?: unknown;
 }): EstadoDeElegibilidade {
   const autorizadoEm = normalizarInstante(raw.aiAuthorizedAt);
   const modo = lerModoDoGate(raw.aiGate);
@@ -284,6 +253,5 @@ export function montarEstadoDeElegibilidade(raw: {
       preGoLive && numeroPodeTestar(raw.contactPhoneNumber, numerosDeTeste),
     agora: raw.agora,
     ttlMs: raw.ttlMs,
-    agenteSomenteInterno: raw.agenteSomenteInterno === true,
   };
 }
