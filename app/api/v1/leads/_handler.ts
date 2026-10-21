@@ -550,6 +550,14 @@ export async function createLeadHandler(
      * MCP `crm_retomar_lead`), nunca o POST genérico.
      */
     retomado_de_lead_id?: string | null;
+    /**
+     * Interno (clone, transferência entre funis, retomada): o `custom_fields`
+     * do negócio de ORIGEM. A régua do padrão (#2730) julga só o que difere
+     * dele — o valor herdado já estava gravado, e trocar de funil não pode ser
+     * barrado por um dado antigo que ninguém tocou, a mesma regra da edição.
+     * Não vem do corpo da requisição.
+     */
+    custom_fields_da_origem?: Record<string, unknown> | null;
   },
   opcoes: {
     /**
@@ -563,6 +571,13 @@ export async function createLeadHandler(
      * E não vem do corpo da requisição, como os demais internos.
      */
     exigirCamposDaEtapa?: boolean;
+    /**
+     * `false` SÓ no webhook de captação, pelo mesmo motivo do anterior: o lead
+     * de formulário nasce com o valor como veio, mesmo fora do `padrao` do
+     * campo (#2730). Recusar perderia o lead; o formato passa a ser cobrado
+     * quando alguém editar o campo na ficha.
+     */
+    exigirPadraoDoCampo?: boolean;
   } = {},
 ): Promise<Record<string, unknown>> {
   // Validate stage belongs to pipeline within active org.
@@ -597,11 +612,17 @@ export async function createLeadHandler(
   // As DUAS réguas desta criação leem o MESMO `settings` de funil — os campos
   // exigidos (#2295, logo abaixo) e o PADRÃO do valor (#2730) — então a linha é
   // perguntada UMA vez só. E nenhuma quando não há o que perguntar: o webhook de
-  // captação (`exigirCamposDaEtapa: false`) sem `custom_fields` continua sem
-  // tocar em `crm_pipelines`, byte a byte como antes.
+  // captação, isento das duas, continua sem tocar em `crm_pipelines`, byte a
+  // byte como antes. O valor herdado de outro negócio não é julgado (ver
+  // `custom_fields_da_origem`), só o que difere dele.
+  const camposAJulgar =
+    opcoes.exigirPadraoDoCampo === false || !input.custom_fields
+      ? {}
+      : input.custom_fields_da_origem !== undefined
+        ? camposQueMudaram(input.custom_fields, input.custom_fields_da_origem)
+        : input.custom_fields;
   const settingsDaCriacao =
-    opcoes.exigirCamposDaEtapa !== false ||
-    (input.custom_fields !== undefined && Object.keys(input.custom_fields).length > 0)
+    opcoes.exigirCamposDaEtapa !== false || Object.keys(camposAJulgar).length > 0
       ? await settingsDoFunil(supabase, input.pipeline_id)
       : null;
 
@@ -615,10 +636,10 @@ export async function createLeadHandler(
   // Fail-open igual ao resto da casa: `settingsDoFunil` devolve `null` quando a
   // leitura falha, `defsDoPadraoDoFunil` devolve lista vazia e a criação segue
   // como hoje — a régua só tem poder sobre o que ela consegue ler.
-  if (input.custom_fields && Object.keys(input.custom_fields).length > 0) {
+  if (Object.keys(camposAJulgar).length > 0) {
     const recusas = recusasDePadrao(
       defsDoPadraoDoFunil(settingsDaCriacao, "negocio"),
-      input.custom_fields,
+      camposAJulgar,
       testaComPrazo,
     );
     if (recusas.length > 0) throw erroDePadrao(recusas, ctx.requestId, ctx.idioma);
@@ -1761,6 +1782,7 @@ export async function retomarLeadHandler(
 
   const payload: CreateLeadInput & {
     custom_fields?: Record<string, unknown>;
+    custom_fields_da_origem?: Record<string, unknown>;
     source_metadata?: Record<string, unknown>;
     retomado_de_lead_id?: string;
     dono_herdado?: boolean;
@@ -1775,6 +1797,7 @@ export async function retomarLeadHandler(
     source: "retomada",
     tags: copia("tags") ? origemTipada.tags ?? [] : [],
     custom_fields: copia("custom_fields") ? origemTipada.custom_fields ?? {} : {},
+    custom_fields_da_origem: origemTipada.custom_fields ?? {},
     retomado_de_lead_id: origemTipada.id,
     // O ponteiro da coluna é a cadeia; este registro guarda TAMBÉM o desfecho
     // de origem para a tela, porque a coluna guarda só o id.

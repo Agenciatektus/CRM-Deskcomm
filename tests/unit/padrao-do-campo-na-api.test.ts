@@ -579,3 +579,52 @@ describe("as duas réguas filtram por escopo (#2852)", () => {
     expect(updates, "o negócio não guarda campo de contato").toHaveLength(1);
   });
 });
+
+describe("criação que herda ou capta: quem não digitou não é barrado", () => {
+  const criar = (cliente: never, extra: Record<string, unknown>, opcoes = {}) =>
+    createLeadHandler(
+      cliente,
+      { organization_id: ORG, actor: ctx.actor, requestId: "req-1", idioma: "pt-BR" },
+      { pipeline_id: FUNIL, stage_id: ETAPA, title: "Aluguel", tags: [], source: "manual", ...extra },
+      opcoes,
+    );
+
+  it("transferência entre funis: o valor antigo herdado da origem não barra o clone", async () => {
+    const { cliente, inserts } = bancoDeLeads([CAMPO_IDADES]);
+
+    await criar(cliente, {
+      custom_fields: { idades: "dois" },
+      custom_fields_da_origem: { idades: "dois" },
+    });
+
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]).toMatchObject({ custom_fields: { idades: "dois" } });
+    expect(inserts[0]).not.toHaveProperty("custom_fields_da_origem");
+  });
+
+  it("mas o valor que DIFERE da origem continua julgado", async () => {
+    const { cliente, inserts } = bancoDeLeads([CAMPO_IDADES]);
+
+    const erro = await recusa(
+      criar(cliente, {
+        custom_fields: { idades: "dois" },
+        custom_fields_da_origem: { idades: "2,9" },
+      }),
+    );
+
+    expect(erro.code).toBe("custom_field_pattern_mismatch");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("captação por formulário: o valor fora do padrão entra como veio, e o lead nasce", async () => {
+    const { cliente, inserts } = bancoDeLeads([CAMPO_IDADES]);
+
+    await criar(cliente, { custom_fields: { idades: "dois" } }, {
+      exigirCamposDaEtapa: false,
+      exigirPadraoDoCampo: false,
+    });
+
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]).toMatchObject({ custom_fields: { idades: "dois" } });
+  });
+});
