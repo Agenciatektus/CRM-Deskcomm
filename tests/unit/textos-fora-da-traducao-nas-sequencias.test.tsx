@@ -90,11 +90,25 @@ describe("excluir fluxo", () => {
 });
 
 describe("o cartão da lista", () => {
-  it("em espanhol: « Transferencia », e não « Handoff »", () => {
+  it("em espanhol: « Transferencia », « Actualizado el » e a política por extenso — sem `pause` cru", () => {
     h.lista = [FLUXO];
     const { container } = render(noIdioma("es", <FlowsList initialData={[FLUXO]} canWrite />));
+    const tela = textoDaTela(container);
     expect(screen.getByText("Transferencia")).toBeTruthy();
-    expect(textoDaTela(container)).not.toMatch(/Handoff/);
+    expect(tela).toMatch(/Actualizado el/);
+    expect(tela).toContain("Pausar");
+    expect(tela).not.toMatch(/\bpause\b/);
+    expect(tela).not.toMatch(/Handoff/);
+  });
+
+  it("em português: « Atualizado em » e « Pausar », sem o valor cru", () => {
+    h.lista = [FLUXO];
+    const { container } = render(noIdioma("pt-BR", <FlowsList initialData={[FLUXO]} canWrite />));
+    const tela = textoDaTela(container);
+    expect(tela).toContain("Handoff");
+    expect(tela).toMatch(/Atualizado em/);
+    expect(tela).toContain("Pausar");
+    expect(tela).not.toMatch(/\bpause\b/);
   });
 });
 
