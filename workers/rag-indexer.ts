@@ -239,11 +239,15 @@ async function pedacosDeDocumento(fonte: FonteRow): Promise<Pedaco[]> {
 
 /** Catálogo: os produtos já sincronizados desta organização. */
 async function pedacosDeCatalogo(fonte: FonteRow, productId?: string): Promise<Pedaco[]> {
+  // SEM `productId` = o catálogo INTEIRO. A assinatura já previa os dois casos
+  // e o segundo devolvia `[]`, então a loja recém-conectada ficava com uma
+  // fonte de catálogo vazia: só entrava produto que alguém editasse depois.
+  // Medido na Fiorotto: 879 produtos na loja, zero no acervo.
   const produtos = productId
     ? [await buscarProdutoNaLoja(fonte.organization_id, productId)].filter(
         (p): p is NuvemshopProduct => p !== null,
       )
-    : [];
+    : await listarCatalogoDaLoja(fonte.organization_id);
 
   const pedacos: Pedaco[] = [];
   for (const p of produtos) {
@@ -282,6 +286,47 @@ async function buscarProdutoNaLoja(
   }
 }
 
+/**
+ * O catálogo inteiro, para a carga inicial de uma loja recém-conectada.
+ *
+ * Paginado de propósito, com teto: a API devolve no máximo 200 por página, e um
+ * catálogo grande não pode virar laço infinito num worker. O teto de 50 páginas
+ * (10 mil produtos) é generoso para o que esta integração atende e barato de
+ * aumentar; passar dele é sinal de que a carga precisa de desenho próprio, e
+ * não de mais uma volta.
+ */
+async function listarCatalogoDaLoja(organizationId: string): Promise<NuvemshopProduct[]> {
+  const creds = await credenciaisDaLoja(organizationId);
+  if (!creds) {
+    console.warn("[rag-indexer] loja não conectada para a org", organizationId);
+    return [];
+  }
+  const client = new NuvemshopApiClient({
+    storeId: creds.storeId,
+    accessToken: creds.accessToken,
+  });
+  const todos: NuvemshopProduct[] = [];
+  for (let pagina = 1; pagina <= 50; pagina += 1) {
+    let lote: NuvemshopProduct[];
+    try {
+      lote = await client.get<NuvemshopProduct[]>(`/products?per_page=200&page=${pagina}`);
+    } catch (err) {
+      // Uma página que falha não descarta as anteriores: material parcial é
+      // melhor que acervo vazio, e a próxima sincronização completa o resto.
+      console.warn(
+        "[rag-indexer] página do catálogo falhou",
+        pagina,
+        err instanceof Error ? err.message : String(err),
+      );
+      break;
+    }
+    if (!Array.isArray(lote) || lote.length === 0) break;
+    todos.push(...lote);
+    if (lote.length < 200) break;
+  }
+  return todos;
+}
+
 async function credenciaisDaLoja(
   organizationId: string,
 ): Promise<{ accessToken: string; storeId: string } | null> {
@@ -292,7 +337,12 @@ async function credenciaisDaLoja(
     .select("id, organization_id, provider, store_metadata")
     .eq("organization_id", organizationId)
     .eq("provider", "nuvemshop")
-    .eq("status", "active")
+    // `healthy`, e não `active`: o CHECK de `tenant_integrations` aceita
+    // connecting | healthy | token_expired | scope_missing | disconnected |
+    // rate_limited | error. `active` NUNCA existiu, então este filtro devolvia
+    // zero linhas para toda organização — e, com credencial nula, o catálogo
+    // não tinha como ser lido nem que todo o resto estivesse certo.
+    .eq("status", "healthy")
     .maybeSingle();
 
   if (error || !data) return null;
@@ -514,11 +564,20 @@ async function fonteDoEvento(row: EventRow): Promise<{
     return { fonte, ...(fonte ? {} : { motivo: "fonte_nao_encontrada" }) };
   }
 
-  // nuvemshop.product_synced
+  // nuvemshop.product_synced — um produto, ou a loja inteira.
+  //
+  // `catalogo_inteiro` é a carga inicial, emitida quando a loja acaba de
+  // conectar: ali não existe produto nenhum em mãos, e exigir `product_id`
+  // deixava a conexão nova com um acervo vazio até alguém editar um produto.
+  const catalogoInteiro = row.payload["catalogo_inteiro"] === true;
   const productId = String(row.payload["product_id"] ?? "");
-  if (!productId) return { fonte: null, motivo: "evento_sem_product_id" };
+  if (!productId && !catalogoInteiro) return { fonte: null, motivo: "evento_sem_product_id" };
   const fonte = await garantirFonteDeCatalogo(row.organization_id);
-  return { fonte, productId, ...(fonte ? {} : { motivo: "fonte_de_catalogo_indisponivel" }) };
+  return {
+    fonte,
+    ...(catalogoInteiro ? {} : { productId }),
+    ...(fonte ? {} : { motivo: "fonte_de_catalogo_indisponivel" }),
+  };
 }
 
 /**
