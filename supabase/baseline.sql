@@ -65992,6 +65992,18 @@ comment on column public.organizations.foto_path is
 
 notify pgrst, 'reload schema';
 
+-- ---- poda curta da linha de CANAL no arquivo de webhooks (migration 9064) ----
+--
+-- `webhook_events_log`: linha com `channel_session_id` sai em D+30
+-- (`WEBHOOK_LOG_CHANNEL_ROW_RETENTION_DAYS`), a sem canal continua em D+90. O
+-- DELETE em lote ordena por `received_at` dentro deste índice parcial e visita só
+-- as linhas do lote. Em produção, com tráfego: crie ANTES do deploy, fora de
+-- transação, com `create index concurrently` (comando na 9064); aqui o
+-- `if not exists` fica inerte.
+create index if not exists webhook_events_log_poda_de_canal_idx
+  on public.webhook_events_log (received_at)
+  where channel_session_id is not null;
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
