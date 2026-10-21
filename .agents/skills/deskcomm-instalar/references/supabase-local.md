@@ -14,7 +14,8 @@ ss -tlnp | grep -E ':(80|443|8000) '
 ```
 
 - **Memória:** o instalador recusa abaixo de ~4 GB e recomenda 8 GB. Entre 4 e 8 GB, crie swap.
-- **Disco:** uns 40 GB livres (imagens do Supabase ~9 GB, mais banco, arquivos e backups). Na
+- **Disco:** uns 40 GB livres (as imagens do Supabase são grandes, da ordem de 9 GB; depois de
+  instalar, `docker system df` mostra o real; mais banco, arquivos e backups). Na
   maioria das hospedagens o disco cresce com o servidor ligado: aumente o volume no painel e, na
   VPS, faça o sistema enxergar o espaço (`growpart` + `resize2fs`, conferindo antes com
   `sudo sfdisk -l` que a partição raiz é a última do disco).
@@ -54,7 +55,8 @@ e **confere o SHA-256**; gera todos os segredos em `.runtime/supabase/.env` (a s
 as chaves, fica em `.runtime/supabase-setup.log` — não compartilhe); sobe os serviços do Supabase
 numa rede privada da instalação (`<projeto>_supabase`); grava `SINGLE_SERVER=1` e as chaves locais
 no `.env` do CRM; e roda `install.sh --yes`, que aplica o schema, cria o dono e sobe app, worker,
-scheduler, WAHA, Redis e Caddy. Leva de 10 a 20 minutos, quase tudo baixando imagens. Interrompeu?
+scheduler, WAHA, Redis e Caddy. O tempo depende sobretudo de baixar as imagens; uma
+instalação do zero ainda não foi cronometrada. Interrompeu?
 Rode de novo: com `.runtime/supabase/.env` presente ele não gera segredos novos.
 
 **Rodando por um agente, sem terminal interativo:** um `nohup … &` comum morre junto com a sessão
@@ -81,7 +83,7 @@ lados — `ssh host 'cat > arquivo' < arquivo` já entregou arquivo vazio sem er
 
 | o quê | onde |
 |---|---|
-| Supabase (compose oficial + `docker-compose.deskcomm.yml` do kit) | `.runtime/supabase/` (pasta 700) |
+| Supabase (compose oficial + `docker-compose.deskcomm.yml` do kit) | `.runtime/supabase/` (dentro de `.runtime`, que o instalador fecha em 700) |
 | segredos do Supabase | `.runtime/supabase/.env` (600) — nunca mostrar |
 | dados do banco | `.runtime/supabase/volumes/db/data` — **apagar = perder o banco** |
 | arquivos anexados | `.runtime/supabase/volumes/storage` |

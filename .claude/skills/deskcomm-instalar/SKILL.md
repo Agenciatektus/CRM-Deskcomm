@@ -75,7 +75,7 @@ São dois caminhos, e os dois são do kit:
 
 | | Supabase na nuvem (`install.sh`) | Supabase no próprio servidor (`install-single-server.sh`) |
 |---|---|---|
-| servidor | 4 GB de RAM bastam | **mínimo 4 GB, recomendado 8 GB**, e uns 40 GB livres de disco (as imagens do Supabase somam ~9 GB) |
+| servidor | 4 GB de RAM bastam | **mínimo 4 GB, recomendado 8 GB**, e uns 40 GB livres de disco (as imagens do Supabase são grandes, da ordem de 9 GB; depois de instalar, `docker system df` mostra o real) |
 | o que a pessoa entrega | conta na Supabase (token ou 4 cópias do painel) | só o domínio |
 | distância até o banco | a região do projeto: fora de São Paulo, cada consulta atravessa o continente | dentro do servidor |
 | limites | os do plano: no grátis, 500 MB de banco, 1 GB de arquivos e uma cota de leitura e escrita em disco que uma importação grande esgota | os do disco do servidor |
@@ -85,11 +85,15 @@ Recomende o **próprio servidor** quando ele tem 8 GB ou mais e a pessoa vai ope
 (importar histórico, ligar agentes de IA). Recomende a **nuvem** quando o servidor tem menos de
 4 GB, quando a pessoa quer banco gerenciado por terceiro, ou com Cloudflare Tunnel
 (`REVERSE_PROXY=cloudflared`, que o single-server recusa). Medido numa VPS ARM64 em São Paulo
-(2 núcleos, 12 GB): os 11 serviços do Supabase usaram ~1,5 GB de RAM em repouso, e a latência do
+(2 núcleos, 12 GB) na v1.85.0, com o Supabase `self-hosted/v0.8.1`, em 20/10/2026, numa
+instalação migrada da nuvem: os 11 serviços do Supabase usaram ~1,5 GB de RAM em repouso, e a latência do
 banco no `healthcheck.sh` caiu de ~150 ms (projeto grátis nos EUA) para 17 ms.
 
-**Single-server:** siga `references/supabase-local.md` e pule para o passo 4 — a única pergunta do
-instalador é o domínio. **Só em instalação nova:** num CRM que já tem dados na nuvem, **não** rode o
+**Single-server:** siga `references/supabase-local.md`. Do caminho abaixo, o passo 2 não se aplica:
+o instalador não pergunta a IA, que nasce desligada e se cadastra depois em IA › Credenciais. Faça
+o passo 4 (o domínio aponta para a VPS antes) e, no passo 5, rode
+`bash hostgator-setup-kit/install-single-server.sh --domain <domínio>` no lugar do `install.sh`.
+Com `--domain` ele não faz nenhuma pergunta. **Só em instalação nova:** num CRM que já tem dados na nuvem, **não** rode o
 `install-single-server.sh` (ele grava um dono novo e o banco local nasce vazio); peça ajuda antes.
 
 **Nuvem — prefira o token.** Peça **primeiro** o token de acesso pessoal do Supabase (supabase.com/dashboard/account/tokens).
