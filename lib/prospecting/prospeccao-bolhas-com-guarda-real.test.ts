@@ -267,13 +267,13 @@ describe("as bolhas depois da primeira, com a guarda real (revisão do PR #2680)
   it("a 2ª e a 3ª bolha saem mesmo com o carimbo do próprio envio — e a campanha NÃO é pausada", async () => {
     const db = await rodarOTick();
 
+    // A saída chegou no PRIMEIRO contato...
+    expect(envios[0], "a saída não está na 1ª bolha").toContain("responda PARAR");
+    // ...e não depende da última bolha.
+    expect(envios.at(-1)).not.toContain("responda PARAR");
     // A pessoa recebeu a abordagem INTEIRA: o carimbo de `last_outbound_at` que
     // ela mesma produziu não recusa a própria continuação.
     expect(envios, "a abordagem parou na 1ª bolha").toHaveLength(3);
-    // A saída chegou no PRIMEIRO contato...
-    expect(envios[0]).toContain("responda PARAR");
-    // ...e não depende da última bolha.
-    expect(envios.at(-1)).not.toContain("responda PARAR");
     // A guarda REAL foi exercida na 1ª bolha (é ela que carimba o cenário), e só
     // nela: nas seguintes vale a conferência leve.
     expect(guardasNaEntrada.chamadas).toBe(1);
