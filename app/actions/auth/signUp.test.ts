@@ -47,6 +47,10 @@ vi.mock("@/lib/auth/politica-de-cadastro", () => ({
   modoDeCadastro: vi.fn(async () => "aberto"),
 }));
 vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: vi.fn(async () => false) }));
+vi.mock("@/lib/auth/rate-limit", async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  authRateLimited: vi.fn(async () => false),
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
@@ -408,5 +412,132 @@ describe("signUp — convite com o cadastro público do GoTrue fechado (#1653)",
     const res = await signUp(corpo, token);
 
     expect(res).toEqual({ ok: false, error: "conta_ja_existe" });
+  });
+});
+
+describe("signUp — o teto de tentativas deixa rastro", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    // O bloco dos planos liga a cobrança no mock e o estado atravessa os
+    // `describe`. Sem desligar aqui, a action recusa por `plano_obrigatorio`
+    // antes de falar com o provedor, e este arquivo mediria outra coisa.
+    const { moduloLigado } = await import("@/lib/instalacao/modulos");
+    vi.mocked(moduloLigado).mockResolvedValue(false);
+    signUpDoProvedor.mockReset();
+    vi.mocked(headers).mockResolvedValue({
+      get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
+    } as never);
+    vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+  });
+
+  /**
+   * A RECUSA QUE NINGUÉM VIA. Todas as outras saídas do bloco de erro gravavam
+   * `auth.signup_failed`; o 429 voltava antes de qualquer linha.
+   *
+   * Em 20/10/2026 uma pessoa da equipe de um cliente ficou na tela com "Muitas
+   * tentativas" e a trilha não tinha nada sobre ela — só os cadastros que
+   * deram certo. Quem foi investigar leu o silêncio como "o cadastro nem foi
+   * tentado" e procurou defeito no redirecionamento, que estava inteiro.
+   */
+  it("⭐ 429 do provedor: devolve rate_limited E grava o motivo na trilha", async () => {
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "email rate limit exceeded", status: 429 },
+    });
+
+    const { signUp } = await import("./signUp");
+    expect(await signUp(entrada())).toEqual({ ok: false, error: "rate_limited" });
+
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.signup_failed",
+        metadata: expect.objectContaining({ reason: "rate_limited", com_convite: false }),
+      }),
+    );
+  });
+
+  /**
+   * CONTROLE. Sem ele, um `audit()` solto no começo do bloco passaria neste
+   * arquivo e gravaria "rate_limited" para erro que não é teto nenhum.
+   */
+  it("CONTROLE — erro que não é 429 não vira rate_limited na trilha", async () => {
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "Database error saving new user", status: 500 },
+    });
+
+    const { signUp } = await import("./signUp");
+    await signUp(entrada());
+
+    const motivos = vi.mocked(audit).mock.calls.map((c) => (c[0] as { metadata?: { reason?: string } })?.metadata?.reason);
+    expect(motivos).not.toContain("rate_limited");
+  });
+});
+
+
+describe("signUp — o teto POR IP também deixa rastro", () => {
+  /**
+   * O par do caso do 429. Este teto é NOSSO, roda ANTES do provedor e é mais
+   * apertado que o dele — numa saída de NAT de escritório, é ele que trava a
+   * segunda pessoa. Consertar só a metade de baixo manteria o mesmo incidente
+   * reproduzindo por cima: tela com "muitas tentativas", trilha em silêncio.
+   */
+  beforeEach(async () => {
+    vi.resetModules();
+    const { moduloLigado } = await import("@/lib/instalacao/modulos");
+    vi.mocked(moduloLigado).mockResolvedValue(false);
+    signUpDoProvedor.mockReset();
+    vi.mocked(headers).mockResolvedValue({
+      get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
+    } as never);
+    vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+  });
+
+  it("⭐ teto por IP estourado: grava `rate_limited_ip` e NÃO fala com o provedor", async () => {
+    const { authRateLimited } = await import("@/lib/auth/rate-limit");
+    vi.mocked(authRateLimited).mockResolvedValue(true);
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+
+    const { signUp } = await import("./signUp");
+    expect(await signUp(entrada())).toEqual({ ok: false, error: "rate_limited" });
+
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.signup_failed",
+        metadata: expect.objectContaining({ reason: "rate_limited_ip" }),
+      }),
+    );
+    // O teto existe para não gastar o provedor: se a chamada saísse, ele não
+    // estaria cumprindo o próprio papel.
+    expect(signUpDoProvedor).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE — os dois tetos têm motivos DIFERENTES na trilha", async () => {
+    // Mesma tela, consertos em lugares diferentes: uma trilha que os confunde
+    // manda quem investiga para o lado errado.
+    const { authRateLimited } = await import("@/lib/auth/rate-limit");
+    vi.mocked(authRateLimited).mockResolvedValue(false);
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "email rate limit exceeded", status: 429 },
+    });
+
+    const { signUp } = await import("./signUp");
+    await signUp(entrada());
+
+    const motivos = vi
+      .mocked(audit)
+      .mock.calls.map((c) => (c[0] as { metadata?: { reason?: string } })?.metadata?.reason);
+    expect(motivos).toContain("rate_limited");
+    expect(motivos).not.toContain("rate_limited_ip");
   });
 });

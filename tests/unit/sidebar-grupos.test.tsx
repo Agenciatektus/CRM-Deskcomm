@@ -180,7 +180,7 @@ describe("Sidebar agrupado", () => {
     expect(screen.getByRole("link", { name: "Funis" })).toHaveAttribute("href", "/app/kanban");
   });
 
-  it("desenterra Audit Log — e Nuvemshop ficou de fora, por escolha", async () => {
+  it("desenterra Audit Log — e Nuvemshop voltou ao menu, por escolha", async () => {
     comoPapel("admin");
     render(<Sidebar collapsed={false} fixoNaInbox />);
     // ⚠️ O CAMINHO MUDOU, A PROPRIEDADE NÃO. O que esta linha sempre prendeu é
@@ -194,18 +194,23 @@ describe("Sidebar agrupado", () => {
       "/app/audit",
     );
 
-    // NUVEMSHOP SAIU, e esta linha é a reversão explícita de uma decisão que
-    // este mesmo teste travava: a integração tinha sido "desenterrada" para o
-    // menu justamente por não ter link nenhum. O dono do produto pediu para
-    // ocultá-la — não usa a integração —, então o que era garantia virou o
-    // contrário, e fica dito aqui para ninguém "consertar" de volta sem saber.
+    // NUVEMSHOP VOLTOU, e esta linha já mudou de lado duas vezes — por isso ela
+    // guarda o MOTIVO, e não só o resultado. A integração foi "desenterrada"
+    // para o menu por não ter link nenhum; o dono do produto do upstream pediu
+    // para ocultá-la, porque não usava a integração; nesta instalação ela passou
+    // a ser usada, com o app de parceiro próprio e cada empresa conectando a
+    // própria loja.
     //
-    // Por isso a coluna de grupo SEM hub (Canais) mostra só o que já ia para o
-    // menu, e não o inventário: ali, ficar fora é decisão, não falta de espaço.
-    // Some do MENU, não do produto: a rota e a página seguem de pé e o ⌘K
-    // continua achando (`searchable()` filtra por papel, nunca por `sidebar`).
+    // O grupo "canais" não tem hub, então a coluna mostra só o que vai para o
+    // menu: aqui, aparecer ou não é decisão, nunca falta de espaço. Enquanto
+    // esteve fora, a rota e a página seguiram de pé e só o ⌘K achava
+    // (`searchable()` filtra por papel, nunca por `sidebar`) — e foi
+    // exatamente isso que fez alguém no meio da conexão não achar a tela de volta.
     await abrirGrupo("Canais");
-    expect(screen.queryByRole("link", { name: /Nuvemshop/ })).toBeNull();
+    expect(within(coluna()).getByRole("link", { name: /Nuvemshop/ })).toHaveAttribute(
+      "href",
+      "/app/integrations/nuvemshop",
+    );
   });
 
   it("Configurações fica no rodapé, nunca dependendo de scroll, e abre a coluna 2", async () => {

@@ -10070,6 +10070,9 @@ export const DICIONARIO: Traducoes = {
   "Muitas tentativas. Aguarde alguns minutos.": {
     es: "Demasiados intentos. Espera unos minutos.",
   },
+  "Muitas tentativas. Aguarde alguns minutos. Se alguma tentativa anterior funcionou, a conta já existe: tente entrar em vez de criar de novo.": {
+    es: "Demasiados intentos. Espera unos minutos. Si algún intento anterior funcionó, la cuenta ya existe: intenta entrar en vez de crearla de nuevo.",
+  },
   "Não tem conta?": { es: "¿No tienes cuenta?" },
   "Recuperar senha": { es: "Recuperar contraseña" },
   "Confirmar acesso": { es: "Confirmar acceso" },
