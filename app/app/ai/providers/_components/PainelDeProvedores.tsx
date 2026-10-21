@@ -25,7 +25,7 @@
  * configuração a algo que a pessoa já viu acontecer no negócio dela.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -103,7 +103,11 @@ interface Dados {
   podeEditar: boolean;
 }
 
-export function PainelDeProvedores() {
+/**
+ * `antesDosPontos`: o que a página quer mostrar entre o cabeçalho e a lista de
+ * pontos — hoje, o interruptor da leitura de mídia, que é lido no servidor.
+ */
+export function PainelDeProvedores({ antesDosPontos }: { antesDosPontos?: ReactNode } = {}) {
   const t = useT();
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -195,6 +199,7 @@ export function PainelDeProvedores() {
         }
       />
       <div className="mb:px-4">
+        {antesDosPontos ? <div className="mb-6">{antesDosPontos}</div> : null}
         {semChave && (
           <Card className="mb-6 border-amber-500/40 bg-amber-500/5 p-4" data-testid="aviso-sem-chave">
             <p className="text-sm">

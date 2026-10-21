@@ -1160,6 +1160,11 @@ export const AUDIT_ACTIONS = [
   // regra consulta o modelo.
   "settings.automation_ai_decide_updated",
 
+  // O interruptor POR EMPRESA da leitura de mídia pela IA (transcrição, visão):
+  // gravado em `organizations.settings.midia.leitura_pela_ia` pela tela
+  // Agente de IA → Provedores. Desligar corta a leitura de toda mídia recebida.
+  "settings.media_reading_updated",
+
   // Planos de tarefa (#1752): a lista `settings.task_plans` mudou pela rota
   // `settings/task-plans` — mesma família de `campaign.settings_updated`.
   "task_plans.settings_updated",

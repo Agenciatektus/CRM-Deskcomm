@@ -11,7 +11,11 @@ const messageRow = {
   media_mime: "image/jpeg",
   media_storage_path: null as string | null,
   metadata: { raw_type: "image" } as Record<string, unknown>,
+  direction: "inbound" as string | null,
 };
+
+/** `organizations.settings`: `undefined` = nada gravado (leitura de mídia LIGADA, o padrão). */
+let settingsDaOrg: unknown = undefined;
 
 // Grupo nunca deriva (Task 8, controller A): a IA não serve grupos, e a
 // derivação (visão/transcrição paga) não pode ser pedida para eles.
@@ -48,7 +52,12 @@ vi.mock("@/lib/supabase/admin", () => ({
             }),
           };
         }
-        const linha = tabela === "channel_sessions" ? sessionRow : messageRow;
+        const linha =
+          tabela === "channel_sessions"
+            ? sessionRow
+            : tabela === "organizations"
+              ? { settings: settingsDaOrg }
+              : messageRow;
         const resolvido = { maybeSingle: async () => ({ data: linha, error: null }) };
         return { eq: () => ({ ...resolvido, eq: () => resolvido }) };
       },
@@ -116,6 +125,8 @@ describe("persistMessageMedia", () => {
     messageRow.metadata = { raw_type: "image" };
     conversationRow.is_group = false;
     conversationReadError = null;
+    messageRow.direction = "inbound";
+    settingsDaOrg = undefined;
     loggerWarnMock.mockReset();
     vi.mocked(fetchWahaMedia).mockResolvedValue({
       buffer: Buffer.from([1, 2, 3]),
@@ -153,6 +164,49 @@ describe("persistMessageMedia", () => {
       "emit_event",
       expect.objectContaining({ p_event_type: "media.derive_requested", p_entity_id: "msg1" }),
     );
+  });
+
+  describe("leitura de mídia por empresa e mídia enviada pela empresa", () => {
+    const pediuDerivacao = () =>
+      rpcMock.mock.calls.some(
+        ([nome, args]) =>
+          nome === "emit_event" && (args as { p_event_type?: string }).p_event_type === "media.derive_requested",
+      );
+
+    it("controle: entrada do cliente com a chave LIGADA gravada pede derivação", async () => {
+      settingsDaOrg = { midia: { leitura_pela_ia: true } };
+      expect((await persistMessageMedia(eventRow())).status).toBe("ok");
+      expect(pediuDerivacao()).toBe(true);
+    });
+
+    it("empresa DESLIGOU: persiste a mídia, NÃO enfileira e grava skipped com o motivo", async () => {
+      settingsDaOrg = { branding: { accent_hex: "#123456" }, midia: { leitura_pela_ia: false } };
+      expect((await persistMessageMedia(eventRow())).status).toBe("ok");
+      expect(uploadMock).toHaveBeenCalled();
+      expect(pediuDerivacao()).toBe(false);
+      expect(updateEqMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media_derived_status: "skipped",
+          metadata: expect.objectContaining({
+            media_status: "stored",
+            media_derived_motivo: expect.stringContaining("desligada"),
+          }),
+        }),
+      );
+    });
+
+    it("mídia ENVIADA pela empresa (outbound): persiste, NÃO enfileira e grava skipped", async () => {
+      messageRow.direction = "outbound";
+      expect((await persistMessageMedia(eventRow())).status).toBe("ok");
+      expect(uploadMock).toHaveBeenCalled();
+      expect(pediuDerivacao()).toBe(false);
+      expect(updateEqMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media_derived_status: "skipped",
+          metadata: expect.objectContaining({ media_derived_motivo: expect.stringContaining("própria empresa") }),
+        }),
+      );
+    });
   });
 
   it("grupo: persiste mas NÃO pede derivação (a IA não serve grupos)", async () => {
