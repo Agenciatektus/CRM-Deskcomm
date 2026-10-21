@@ -94,9 +94,25 @@ import { collectExportData, type ExportPayload } from "@/lib/lgpd/export-collect
 import { LgpdExportPdf } from "@/lib/lgpd/pdf-renderer";
 import { triggerSlaAlarm, type AlarmThreshold } from "@/lib/lgpd/sla-alarm";
 import type { LgpdRequest } from "@/lib/lgpd/types";
+import { NEUTROS_DE_SAIDA } from "@/lib/branding/saida";
 
 const FIXTURES = join(__dirname, "..", "fixtures", "lgpd-brasil-antes-do-doc88");
-const fixture = (nome: string) => readFileSync(join(FIXTURES, nome), "utf8");
+/**
+ * Sexta exceção, e esta NÃO regrava fixture: a COR do texto.
+ *
+ * Os e-mails pintam o corpo e o rodapé com `NEUTROS_DE_SAIDA` (texto e suave),
+ * que derivam da régua do produto. Os fixtures foram gravados no upstream, com
+ * os neutros quentes de lá (`#1c1a16`, `#7d786c`); no fork, o visual v2 (#123)
+ * trocou a régua clara por neutros frios, e o e-mail passou a sair com eles, de
+ * propósito: é o que faz o corpo do e-mail parecer o produto. A cor é decisão
+ * do design system; o que esta suíte trava é o TEXTO jurídico. Então os dois hex
+ * gravados viram os neutros em vigor e o resto segue comparado byte a byte.
+ */
+const NEUTROS_GRAVADOS = { texto: "#1c1a16", suave: "#7d786c" } as const;
+const fixture = (nome: string) =>
+  readFileSync(join(FIXTURES, nome), "utf8")
+    .replaceAll(NEUTROS_GRAVADOS.texto, NEUTROS_DE_SAIDA.texto)
+    .replaceAll(NEUTROS_GRAVADOS.suave, NEUTROS_DE_SAIDA.suave);
 
 const MARCA = {
   nome: "Silva & Filhos",
@@ -234,6 +250,20 @@ function pdfDe(
     }),
   );
 }
+
+describe("os neutros do fixture (sexta exceção)", () => {
+  it("a troca só vale com dois hex reais, e os fixtures do e-mail traziam os gravados", () => {
+    // Sem isto, um `NEUTROS_DE_SAIDA` quebrado (undefined) entraria dos DOIS
+    // lados da comparação e o byte a byte daria verde sem medir nada.
+    expect(NEUTROS_DE_SAIDA.texto).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(NEUTROS_DE_SAIDA.suave).toMatch(/^#[0-9a-f]{6}$/i);
+    for (const nome of ["email.json", "alarmes.json", "alarmes-store-redact.json"]) {
+      const cru = readFileSync(join(FIXTURES, nome), "utf8");
+      expect(cru, nome).toContain(NEUTROS_GRAVADOS.texto);
+      expect(cru, nome).toContain(NEUTROS_GRAVADOS.suave);
+    }
+  });
+});
 
 describe("e-mail ao titular", () => {
   it("Brasil: o de antes do doc 88, byte a byte, mais o link do arquivo de dados (doc 103, A)", async () => {
