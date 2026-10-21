@@ -87,8 +87,15 @@ export async function buildMcpTurnTools(
   // mudar o produto para os outros agentes. Vale para toda a lista de
   // `FERRAMENTAS_QUE_FALAM`, e não só para esta, porque a próxima ferramenta de
   // envio vai nascer na mesma lista.
+  // Inscrever alguém numa régua ou agendar retorno também termina em mensagem
+  // ao cliente, só que mais tarde e por outro caminho (`sendFixedOutbound`, que
+  // não passa pelo veto). Para quem não fala, a diferença entre falar agora e
+  // encomendar a fala para depois é de relógio, não de natureza.
+  const ENCOMENDAM_FALA = ['crm_enroll_followup_flow', 'crm_schedule_followup'];
   const falamNoTurno = agentConfig.somenteInterno
-    ? callbackFiltered.filter((id) => FERRAMENTAS_QUE_FALAM.includes(id))
+    ? callbackFiltered.filter(
+        (id) => FERRAMENTAS_QUE_FALAM.includes(id) || ENCOMENDAM_FALA.includes(id),
+      )
     : [];
   if (falamNoTurno.length > 0) {
     log.warn('tools de envio recusadas: este agente é auxiliar de CRM e não fala com o cliente', {

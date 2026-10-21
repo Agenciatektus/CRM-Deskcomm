@@ -1631,6 +1631,34 @@ export async function avisarCapacidadesAusentes(
  * `true` quando o turno foi silenciado — aí não há rascunho o que rascunhar e
  * nada mais pode sair nele.
  */
+/**
+ * A CONVERSA É DE UMA PESSOA? (9060)
+ *
+ * Esta pergunta existe porque o gate de elegibilidade libera a conversa
+ * assumida quando TODOS os agentes publicados da sessão são auxiliares de CRM —
+ * e esse conjunto não é o que atende. O roteador escolhe entre membros que
+ * podem estar presos a outra sessão, e o loader por id não filtra sessão.
+ *
+ * Então a liberação só é segura depois de saber QUEM vai atuar. Ela mora aqui,
+ * e não no call site, porque a primeira versão desta trava ficou num ponto só e
+ * dois ramos assistidos a contornaram — a correção que vale é a que todo
+ * chamador novo herda sem precisar lembrar dela.
+ */
+export async function conversaEhDeHumano(
+  pool: pg.Pool,
+  tenantId: string,
+  conversationId: string,
+): Promise<boolean> {
+  const { rows } = await pool.query<{ bloqueia: boolean }>(
+    `select (cv.assignee_kind = 'user'
+             or (cv.bot_silenced_until is not null and cv.bot_silenced_until > now())) as bloqueia
+       from conversations cv
+      where cv.organization_id = $1 and cv.id = $2`,
+    [tenantId, conversationId],
+  );
+  return rows[0]?.bloqueia === true;
+}
+
 export async function deteccoesDeterministicasDoAssistido(
   pool: pg.Pool,
   deps: InboundTurnDeps,
@@ -1652,6 +1680,17 @@ export async function deteccoesDeterministicasDoAssistido(
 ): Promise<boolean> {
   const { job, tenantId, conversationId, channelSessionId, leadId, agent, log } = args;
   const clock = deps.clock ?? ((): Date => new Date());
+
+  // Um agente que FALA não atua em conversa de pessoa, nem pelo ramo assistido.
+  // A detecção daqui termina em `avisarLeadDaEscalacao`, que manda texto ao
+  // cliente e grava `force_human` — irreversível pela regra dura 2.
+  if (!agent.somenteInterno && (await conversaEhDeHumano(pool, tenantId, conversationId))) {
+    log.info('assistido: conversa é de uma pessoa e quem atenderia fala — detecção não roda', {
+      conversation_id: conversationId,
+      agent_id: agent.agentId,
+    });
+    return false;
+  }
 
   // O QUE O CLIENTE DISSE e ainda não foi respondido — a MESMA fonte do caminho
   // automático (`inboundsNaoRespondidos`): um pedido de parar que chegou na 2ª
@@ -2163,18 +2202,16 @@ async function executarTurnoDoAgente(
   // assumida, e o classificador então escolhe um membro do roteador que FALA.
   // Aqui o agente já está resolvido, então a pergunta pode ser feita do jeito
   // certo — sobre quem de fato vai atender.
-  if (!preview && agentConfig !== null && !agentConfig.somenteInterno) {
-    const passagemHumana = await pool.query<{ bloqueia: boolean }>(
-      `select (cv.assignee_kind = 'user'
-               or (cv.bot_silenced_until is not null and cv.bot_silenced_until > now())) as bloqueia
-         from conversations cv
-        where cv.organization_id = $1 and cv.id = $2`,
-      [tenantId, input.conversationId],
-    );
-    if (passagemHumana.rows[0]?.bloqueia === true) {
+  // `agentConfig` nulo NÃO é ausência de voz: é o agente GENÉRICO respondendo
+  // ("config: null é o fim legítimo da linha", `resolve-turn-agent.ts`). Ele
+  // fala, logo entra na mesma trava. Tratar nulo como "não fala" obrigaria a
+  // provar que esse caminho é inalcançável sob liberação, e provar custa mais
+  // do que fechar.
+  if (!preview && !agentConfig?.somenteInterno) {
+    if (await conversaEhDeHumano(pool, tenantId, input.conversationId)) {
       runLog.info('turno descartado: a conversa é de uma pessoa e quem atenderia fala com o cliente', {
         conversation_id: input.conversationId,
-        agent_id: agentConfig.agentId,
+        agent_id: agentConfig?.agentId ?? '(agente genérico)',
       });
       return;
     }
@@ -5843,7 +5880,22 @@ async function podeGerarRascunho(
   job: JobRow,
   contactId: string,
   conversationId: string,
+  /**
+   * Quem vai rascunhar. Obrigatório (9060): a conversa pode ter sido liberada
+   * porque os agentes publicados da SESSÃO são auxiliares, e o agente da
+   * condução vem por id, sem filtro de sessão. Sem este parâmetro a pergunta
+   * "pode atuar aqui?" seria respondida sobre outro agente.
+   */
+  agent: PublishedAgentConfig,
 ): Promise<boolean> {
+  if (!agent.somenteInterno && (await conversaEhDeHumano(pool, job.organization_id, conversationId))) {
+    deps.log.info('rascunho pulado — conversa é de uma pessoa e quem rascunharia fala', {
+      job_id: job.id,
+      conversation_id: conversationId,
+      agent_id: agent.agentId,
+    });
+    return false;
+  }
   if (await isLeadInHandoff(pool, job.organization_id, contactId)) {
     deps.log.info('rascunho pulado — lead em handoff humano (bot silenciado)', {
       job_id: job.id,
@@ -5923,7 +5975,8 @@ async function turnoDaConducao(
   };
 
   if (conducao.modo === 'assistido') {
-    if (!(await podeGerarRascunho(deps, pool, job, contactId, payload.conversation_id))) return;
+    if (!(await podeGerarRascunho(deps, pool, job, contactId, payload.conversation_id, config)))
+      return;
     // #1648 (upstream) — as detecções DETERMINÍSTICAS (STOP/opt-out e pedido de
     // humano) rodam antes do rascunho também na condução: o pedido de parar não
     // pode depender de uma aprovação que talvez nunca venha (LGPD).

@@ -1358,9 +1358,13 @@ async function sendFixedOutbound(
   const chain = await runBeforeSend({
         // AUXILIAR DE CRM (9060): texto fixo de um fluxo de follow-up que uma
         // PESSOA montou e publicou. Não é a voz do agente, e por isso não é o
-        // que a marca veta. O caminho de um auxiliar causar envio por aqui é
-        // inscrever alguém numa régua — fechado na publicação, que recusa as
-        // ferramentas de follow-up junto com as de envio.
+        // que a marca veta.
+        //
+        // O caminho de um auxiliar causar envio por aqui seria inscrever alguém
+        // numa régua. Fechado do lado de lá: `mcp-tools.ts` não entrega
+        // `crm_enroll_followup_flow` nem `crm_schedule_followup` a quem não
+        // fala. A trava é lá, no que ele PODE pedir, e não aqui, no disparo de
+        // um fluxo que já é de uma pessoa.
         agenteSomenteInterno: false,
     pool,
     log: runLog,

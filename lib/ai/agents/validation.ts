@@ -378,6 +378,8 @@ export const runsListQuerySchema = z
   .strict();
 
 export type PublishErrorCode =
+  /** 9060: auxiliar de CRM publicado com capacidade de envio — a contradição que só a publicação vê. */
+  | "auxiliar_de_crm_com_envio"
   | "agent_not_found"
   | "agent_archived"
   | "version_not_found"
@@ -394,6 +396,7 @@ export type PublishErrorCode =
   | "tool_id_invalid";
 
 export const PUBLISH_ERROR_CODES: ReadonlySet<string> = new Set<PublishErrorCode>([
+  "auxiliar_de_crm_com_envio",
   "agent_not_found",
   "agent_archived",
   "version_not_found",

@@ -8,7 +8,11 @@
 import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
 import { audit } from "@/lib/audit";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PUBLISH_ERROR_CODES, type PublishErrorCode } from "./validation";
+import {
+  FERRAMENTAS_QUE_FALAM,
+  PUBLISH_ERROR_CODES,
+  type PublishErrorCode,
+} from "./validation";
 
 /**
  * Quem publicou (se houver). Os três caminhos HUMANOS de publicação passam o
@@ -52,13 +56,31 @@ export async function publishAgentVersion(
 ): Promise<PublishResult> {
   const { data: version, error: readError } = await admin
     .from("ai_agent_versions")
-    .select("provider,credential_id,handoff_legal_enabled")
+    .select("provider,credential_id,handoff_legal_enabled,somente_interno,tool_ids")
     .eq("organization_id", params.orgId)
     .eq("agent_id", params.agentId)
     .eq("id", params.versionId)
     .maybeSingle();
   if (readError || !version)
     return { ok: false, code: "version_not_found", message: "version_not_found" };
+  // AUXILIAR DE CRM (9060): a ÚNICA conferência que vê o estado final.
+  //
+  // Criação e PATCH conferem cada gravação, mas o patch é parcial: dava para
+  // gravar a capacidade de envio numa chamada e ligar a marca em outra, e
+  // publicar a contradição sem nenhuma das duas reclamar. Aqui a versão já está
+  // montada, então a pergunta é sobre o que vai valer.
+  const falamNaVersao = ((version as { tool_ids?: string[] | null }).tool_ids ?? []).filter((t) =>
+    FERRAMENTAS_QUE_FALAM.includes(t),
+  );
+  if ((version as { somente_interno?: boolean | null }).somente_interno === true && falamNaVersao.length > 0) {
+    return {
+      ok: false,
+      code: "auxiliar_de_crm_com_envio",
+      message:
+        "Este assistente está marcado como auxiliar de CRM, que não fala com o cliente. " +
+        `Desligue ${falamNaVersao.join(", ")} ou tire a marca antes de publicar.`,
+    };
+  }
   const platform = version.credential_id === null;
   if (platform && !chaveDePlataforma(version.provider))
     return { ok: false, code: "credential_missing", message: "credential_missing" };

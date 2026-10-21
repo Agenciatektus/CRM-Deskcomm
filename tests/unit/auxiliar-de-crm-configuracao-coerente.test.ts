@@ -19,6 +19,11 @@ import { TOOL_CATALOG } from "@/lib/mcp/tools/catalogo";
  * marca desligada (passa), ligar a marca por PATCH, publicar. A conferência
  * existia e nunca via o estado final.
  */
+/** As que ENCOMENDAM fala para depois — recusadas ao auxiliar em `mcp-tools.ts`. */
+const ENCOMENDAM_FALA = ["crm_enroll_followup_flow", "crm_schedule_followup"];
+/** As que o nome sugere mas que só leem, e por isso não precisam de trava. */
+const SO_CONSULTAM = ["crm_list_followups", "crm_cancel_followup"];
+
 describe("auxiliar de CRM: configuração coerente", () => {
   const base = {
     system_prompt: "voce organiza o CRM da loja e nao fala com o cliente",
@@ -71,12 +76,64 @@ describe("auxiliar de CRM: configuração coerente", () => {
     ).toBe(true);
   });
 
-  it("CONTROLE — PATCH que não fala da marca não opina sobre as capacidades", () => {
-    // `.partial()`: campo ausente é `undefined`. A conferência só recusa quando
-    // a marca chega como `true` na MESMA gravação de uma capacidade de envio.
+  it("PATCH que não fala da marca passa — e por isso a publicação confere depois", () => {
+    // `.partial()`: campo ausente é `undefined`, então esta gravação sozinha não
+    // tem como ser contraditória e passa mesmo.
+    //
+    // ⚠️ Este caso NÃO é um atestado de que está tudo bem: ele é metade de uma
+    // porta dos fundos encontrada na revisão — gravar a capacidade num PATCH,
+    // ligar a marca em outro, e publicar sem ninguém ver o estado final. A outra
+    // metade está fechada em `publishAgentVersion`, e é lá que o caso irmão
+    // deste mora. Se um dia esta linha ficar sozinha, a porta volta.
     expect(versionPatchSchema.safeParse({ tool_ids: ["crm_send_whatsapp_message"] }).success).toBe(
       true,
     );
+  });
+
+  it("⭐ a publicação recusa a contradição montada em duas gravações", async () => {
+    const { publishAgentVersion } = await import("@/lib/ai/agents/publish");
+    // O mínimo que a função lê antes de conferir: a linha da versão.
+    const admin = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    provider: "openai",
+                    credential_id: "55555555-5555-4555-8555-555555555555",
+                    handoff_legal_enabled: false,
+                    somente_interno: true,
+                    tool_ids: ["crm_get_lead", "crm_send_whatsapp_message"],
+                  },
+                  error: null,
+                }),
+                single: async () => ({
+                  data: {
+                    provider: "openai",
+                    credential_id: "55555555-5555-4555-8555-555555555555",
+                    handoff_legal_enabled: false,
+                    somente_interno: true,
+                    tool_ids: ["crm_get_lead", "crm_send_whatsapp_message"],
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    };
+    const r = await publishAgentVersion(admin as never, {
+      orgId: "11111111-1111-4111-8111-111111111111",
+      agentId: "22222222-2222-4222-8222-222222222222",
+      versionId: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe("auxiliar_de_crm_com_envio");
+    expect(r.message).toContain("crm_send_whatsapp_message");
   });
 
   /**
@@ -86,13 +143,16 @@ describe("auxiliar de CRM: configuração coerente", () => {
    * acrescentar a próxima a passar por aqui.
    */
   it("toda ferramenta conhecida que entrega mensagem está na lista ou no harness", () => {
-    const entregamMensagem = TOOL_CATALOG.map((t) => t.name).filter((id) =>
-      id.includes("send"),
+    const entregamMensagem = TOOL_CATALOG.map((t) => t.name).filter(
+      (id) => id.includes("send") || id.includes("followup"),
     );
     for (const id of entregamMensagem) {
       expect(
-        FERRAMENTAS_QUE_FALAM.includes(id) || IDS_DO_HARNESS.has(id),
-        `${id} entrega mensagem e não está em FERRAMENTAS_QUE_FALAM nem em IDS_DO_HARNESS`,
+        FERRAMENTAS_QUE_FALAM.includes(id) ||
+          IDS_DO_HARNESS.has(id) ||
+          ENCOMENDAM_FALA.includes(id) ||
+          SO_CONSULTAM.includes(id),
+        `${id} pode chegar ao cliente e não está em nenhuma das listas que o auxiliar de CRM respeita`,
       ).toBe(true);
     }
     // E a própria busca precisa estar achando alguma coisa: zero aqui seria
