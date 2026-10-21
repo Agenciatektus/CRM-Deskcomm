@@ -16403,6 +16403,32 @@ export const DICIONARIO: Traducoes = {
   Lost: { es: "Perdido" },
   oi: { es: "hola" },
   "Excluir “{nome}”?": { es: "¿Eliminar “{nome}”?" },
+  // O editor de sequência e as automações: textos que as telas escreviam crus (o aviso de número desconectado, os
+  // exemplos dos campos, o rótulo acessível da comparação de cada regra, o cartão do e-mail) e rótulos que a tela já
+  // passava por t(rotulo) mas que não eram chave — o modo de texto fixo da mensagem, os tipos de resposta da
+  // pergunta, os operadores do campo de data, os nomes dos blocos na paleta, o aviso da regra antiga de etapa.
+  " — desconectado": { es: " — desconectado" },
+  "boas-vindas, novo-lead": { es: "bienvenida, nuevo-lead" },
+  "texto a casar": { es: "texto a coincidir" },
+  "Escreva o e-mail": { es: "Escribe el correo" },
+  "Comparação da regra": { es: "Comparación de la regla" },
+  "Texto fixo": { es: "Texto fijo" },
+  "Texto livre": { es: "Texto libre" },
+  "Escolha numa lista": { es: "Elegir de una lista" },
+  "CPF (confere o dígito)": { es: "CPF (verifica el dígito)" },
+  "já passou há": { es: "ya pasó hace" },
+  falta: { es: "faltan" },
+  "Casar resposta": { es: "Coincidir respuesta" },
+  Repetir: { es: "Repetir" },
+  "Repetir pela resposta": { es: "Repetir según la respuesta" },
+  "Nova pergunta": { es: "Nueva pregunta" },
+  Skill: { es: "Skill" },
+  "Puxar skill": { es: "Usar skill" },
+  "Lembrete interno": { es: "Recordatorio interno" },
+  "Criar tarefa (só interno)": { es: "Crear tarea (solo interno)" },
+  "A etapa é comparada pelo identificador interno, não pelo nome — escolha a etapa em vez de digitar um pedaço dela.": {
+    es: "La etapa se compara por el identificador interno, no por el nombre — elige la etapa en lugar de escribir una parte de ella.",
+  },
   "1 contato selecionado": { es: "1 contacto seleccionado" },
   "contatos selecionados": { es: "contactos seleccionados" },
   "Adicionar etiqueta": { es: "Agregar etiqueta" },
