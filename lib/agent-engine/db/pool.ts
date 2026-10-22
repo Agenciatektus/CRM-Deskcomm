@@ -21,10 +21,30 @@ import { createLogger } from '../obs/logger';
 
 export const QUERY_TIMEOUT_MS = 60_000;
 const KEEPALIVE_INITIAL_DELAY_MS = 10_000;
+// Ociosa LONGA: o default do pg (10 s) com o polling de 2 s do worker fechava e
+// reabria conexão sem parar — cada uma paga handshake, `get_auth` no pooler e
+// `DISCARD ALL` na devolução (dezenas de milhares por dia, sem trabalho útil).
+// 5 min mantém as conexões quentes entre os ciclos; conexão morta enquanto
+// ociosa continua sendo detectada pelo keepAlive e descartada pelo listener.
+export const IDLE_TIMEOUT_MS = 300_000;
+
+/**
+ * Quem abriu o pool. Vira o `application_name` da conexão
+ * (`crm-<papel>-<pid>`), então `pg_stat_activity` mostra de qual processo
+ * vem cada conexão, query lenta ou lock preso. O container do scheduler não
+ * abre conexão (é crond + curl nas rotas do app); o laço de cron que roda
+ * dentro do worker usa o pool do worker.
+ */
+export type PapelDoPool = 'worker' | 'app-request' | 'app-skills' | 'media-derive' | 'script';
+
+export function nomeDaAplicacao(papel: PapelDoPool, pid: number = process.pid): string {
+  return `crm-${papel}-${pid}`;
+}
 
 export function createPool(
   databaseUrl: string,
   onError?: (err: Error) => void,
+  papel: PapelDoPool = 'script',
 ): pg.Pool {
   // Knob opcional DB_POOL_MAX (env.ts Zod): teto de conexões por pool. Sem ele, o
   // pg decide (default 10) — o caso de produção. Os testes rodam em paralelo (N
@@ -47,6 +67,10 @@ export function createPool(
     connectionString: databaseUrl,
     max,
     query_timeout: QUERY_TIMEOUT_MS,
+    idleTimeoutMillis: IDLE_TIMEOUT_MS,
+    // Se a URL já trouxer application_name, a URL vence (o pg mescla a string
+    // de conexão por cima da config) — escolha explícita de quem opera.
+    application_name: nomeDaAplicacao(papel),
     keepAlive: true,
     keepAliveInitialDelayMillis: KEEPALIVE_INITIAL_DELAY_MS,
   });

@@ -65,7 +65,7 @@ const DRAIN_MAX_ATTEMPTS = 5; // espelho de lib/event-log/drain.ts
 // não na construção.
 let _pool: pg.Pool | null = null;
 function derivePool(): pg.Pool {
-  if (!_pool) _pool = createPool(process.env.SUPABASE_DB_URL ?? "");
+  if (!_pool) _pool = createPool(process.env.SUPABASE_DB_URL ?? "", undefined, "media-derive");
   return _pool;
 }
 
