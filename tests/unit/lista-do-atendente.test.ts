@@ -45,7 +45,13 @@ function fakeSupabase(respostas: Record<string, Array<unknown[]>>) {
       return proxy;
     },
   };
-  return { client: client as never, chamadas, consultas: () => n };
+  /**
+   * As consultas da LISTA (recorte da pessoa + conversas). O handler também abre,
+   * por chamada, as duas leituras fixas de exclusão (contatos pessoais, canais
+   * desativados), que não dependem do tamanho da página e ficam fora da conta.
+   */
+  const consultas = () => (usadas.conversation_user_state ?? 0) + (usadas.conversations ?? 0);
+  return { client: client as never, chamadas, consultas, total: () => n };
 }
 
 const ctx = { organization_id: "org-1", requestId: "req-1", actor: { type: "user" as const, id: "eu" } } as never;
