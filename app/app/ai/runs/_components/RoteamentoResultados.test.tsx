@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { selectDaEscolha, escolherValor } from '@/tests/unit/helpers/controles-do-ds';
 import { RoteamentoResultados } from './RoteamentoResultados';
 
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a> }));
@@ -30,7 +31,9 @@ describe('aba de resultados do roteamento', () => {
     const linha = await screen.findByTestId(`roteamento-${caso.id}`);
     expect(linha).toHaveTextContent('Jev; reserva sob demanda');
     expect(linha).toHaveTextContent('Janela de histórico: 8');
-    expect(screen.getByRole('option', { name: 'Atendimento principal' })).toHaveValue(caso.router_id);
+    // Os filtros são `Escolha` (design system): a opção mora no `<select>` escondido ao lado do gatilho.
+    const roteador = Array.from(selectDaEscolha(screen.getByLabelText('Roteador')).options).find((o) => o.textContent === 'Atendimento principal');
+    expect(roteador?.value).toBe(caso.router_id);
     expect(screen.getByRole('link', { name: 'Abrir conversa' })).toHaveAttribute('href', `/app/inbox?id=${caso.conversation_id}`);
     expect(screen.getByText(/Concordância de destino/)).toHaveTextContent('Sem pares');
     expect(screen.getByText(/Reservas sob demanda não formam amostra/)).toBeVisible();
@@ -42,7 +45,7 @@ describe('aba de resultados do roteamento', () => {
     vi.stubGlobal('fetch', fetch);
     render(<RoteamentoResultados />);
     const seletor = await screen.findByLabelText('Revisão');
-    fireEvent.change(seletor, { target: { value: 'incorreto' } });
+    escolherValor(seletor, 'incorreto');
     await waitFor(() => expect(fetch.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(true));
     const patch = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH');
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ revisao: 'incorreto', agent_id_esperado: null });

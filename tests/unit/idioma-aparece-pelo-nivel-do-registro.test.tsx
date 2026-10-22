@@ -31,6 +31,8 @@ vi.mock("@/app/actions/settings/updateProfile", () => ({
 vi.mock("@/app/actions/settings/updateTenant", () => ({
   updateTenant: vi.fn(async () => ({ ok: true })),
 }));
+// O perfil ganhou a foto (`CampoDeFoto`, 9061), que recarrega a página ao salvar.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
 /**
  * O oráculo é escrito AQUI, e não importado do registro: se o teste perguntasse

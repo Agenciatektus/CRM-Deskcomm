@@ -98,9 +98,13 @@ describe("a paleta de etiquetas", () => {
   });
 
   it("a fileira da tela usa a paleta da lib, não uma cópia própria", () => {
+    // A fileira (`FileiraDeTons`) saiu do painel para `_lote.tsx` junto com a
+    // edição em lote, e o painel a importa de lá: a cópia própria seria aqui.
     const painel = readFileSync(join(raiz, "app/app/settings/tags/_painel.tsx"), "utf8");
-    expect(painel).toContain("PALETA_DE_ETIQUETAS.map");
-    expect(painel).toContain('from "@/lib/tags/cor-da-etiqueta"');
+    expect(painel).toMatch(/import \{[^}]*\bFileiraDeTons\b[^}]*\} from "\.\/_lote"/);
+    const fileira = readFileSync(join(raiz, "app/app/settings/tags/_lote.tsx"), "utf8");
+    expect(fileira).toContain("PALETA_DE_ETIQUETAS.map");
+    expect(fileira).toContain('from "@/lib/tags/cor-da-etiqueta"');
   });
 });
 

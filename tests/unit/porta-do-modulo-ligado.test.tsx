@@ -406,10 +406,13 @@ describe("as frestas das guardas de caminho e da regra do menu", () => {
     // O termo `(!grupo?.hub && temEscolhaExplicita)` de `sobeAoMenuLateral` não tinha caso: a
     // sabotagem `return !!d.sidebar` deixava tudo verde. Ele existe porque grupo sem hub não tem
     // "Ver tudo" para hospedar a porta — ali ela sobe quando a empresa personalizou.
-    const semHub = NAV_CATALOG.find(
-      (d) => !NAV_GROUPS.find((g) => g.id === d.group)?.hub && !(d as { sidebar?: boolean }).sidebar,
-    );
-    expect(semHub).toBeDefined();
+    //
+    // A porta é de um grupo sem hub e SEM `sidebar` — derivada de um destino real do catálogo.
+    // Era a Nuvemshop, até o fork devolvê-la ao menu lateral (#232); sem nenhuma porta assim no
+    // catálogo, o `find` voltava `undefined` e o termo ficava sem caso de novo.
+    const doGrupoSemHub = NAV_CATALOG.find((d) => !NAV_GROUPS.find((g) => g.id === d.group)?.hub);
+    expect(doGrupoSemHub).toBeDefined();
+    const semHub = { ...doGrupoSemHub!, sidebar: undefined };
     expect(sobeAoMenuLateral(semHub!, true)).toBe(true);
     expect(sobeAoMenuLateral(semHub!, false)).toBe(false);
   });

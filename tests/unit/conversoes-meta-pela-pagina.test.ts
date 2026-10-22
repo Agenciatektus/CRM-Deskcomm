@@ -33,6 +33,16 @@ const CONTATO = "33333333-3333-3333-3333-333333333333";
 
 const upserts: { tabela: string; valores: Record<string, unknown> }[] = [];
 
+/**
+ * Desde a 9054 a compra sai pela ENTRADA numa etapa com a chave ligada
+ * (`entrada-na-etapa.ts`). O negócio daqui está numa etapa que envia a compra,
+ * para o que se mede continuar sendo a atribuição e o valor, não a chave.
+ */
+const ETAPA_DE_VENDA = "44444444-4444-4444-4444-444444444444";
+const PADRAO: Record<string, unknown> = {
+  crm_stages: { envia_conversao: true, evento_de_conversao: "Purchase" },
+};
+
 function fakeAdmin(tabelas: Record<string, unknown>) {
   return {
     from(tabela: string) {
@@ -42,7 +52,7 @@ function fakeAdmin(tabelas: Record<string, unknown>) {
         neq: () => construtor,
         order: () => construtor,
         limit: () => construtor,
-        maybeSingle: async () => ({ data: tabelas[tabela] ?? null, error: null }),
+        maybeSingle: async () => ({ data: tabelas[tabela] ?? PADRAO[tabela] ?? null, error: null }),
         upsert: async (valores: Record<string, unknown>) => {
           upserts.push({ tabela, valores });
           return { error: null };
@@ -66,6 +76,8 @@ const leadGanhoSemValor = {
   currency: "BRL",
   closed_at: new Date().toISOString(),
   contact_id: CONTATO,
+  stage_id: ETAPA_DE_VENDA,
+  stage_changed_at: new Date().toISOString(),
 };
 
 const conexaoAtiva = {

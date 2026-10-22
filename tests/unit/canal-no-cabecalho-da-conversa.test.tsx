@@ -106,7 +106,10 @@ describe("no CABEÇALHO da conversa aberta", () => {
     expect(badge).not.toHaveTextContent("5517999");
     // Aceite: "layout continua utilizável… com nomes de canal maiores".
     expect(badge.className).toContain("max-w-");
-    expect(badge.className).toContain("truncate");
+    // O corte mora no TEXTO do badge (o logo ao lado não encolhe): `min-w-0`
+    // na caixa e `truncate` no span do nome, que é quem some em reticências.
+    expect(badge.className).toContain("min-w-0");
+    expect(badge.querySelector("span.truncate")).not.toBeNull();
     // O badge ACRESCENTA: o logo do provider continua na linha do nome, e é
     // justamente a insuficiência dele (igual para Peças e Vendas) que o badge
     // existe para cobrir.

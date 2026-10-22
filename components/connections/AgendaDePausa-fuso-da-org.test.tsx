@@ -50,6 +50,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 
 import { makeQueryClient } from "@/lib/query/client";
+import { preencherData } from "@/tests/unit/helpers/controles-do-ds";
 
 import { AgendaDePausa } from "./AgendaDePausa";
 
@@ -121,8 +122,10 @@ describe("AgendaDePausa — o fuso da organização ainda não chegou (#2676)", 
       expect(fim).toBeEnabled();
       expect(agendar).toBeEnabled();
 
-      fireEvent.change(inicio, { target: { value: "2026-10-10T03:00" } });
-      fireEvent.change(fim, { target: { value: "2026-10-10T05:00" } });
+      // Os campos são `CampoDeData` (design system): o rótulo aponta para o
+      // gatilho, e o valor vai no `<input>` escondido ao lado, como no formulário.
+      preencherData(inicio, "2026-10-10T03:00");
+      preencherData(fim, "2026-10-10T05:00");
       await user.click(agendar);
 
       // 03:00 em Manaus (UTC-4) é 07:00Z; o padrão São Paulo teria gravado 06:00Z.
