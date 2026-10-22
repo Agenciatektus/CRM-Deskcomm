@@ -34,7 +34,7 @@
  * fonte confiável — e nunca de conteúdo de usuário (CLAUDE.md §multi-tenancy).
  */
 
-import { embedText, SemChaveDeEmbeddingError } from "@/lib/ai/embed";
+import { embedTexts, SemChaveDeEmbeddingError } from "@/lib/ai/embed";
 import {
   FamiliaDaBaseIlegivelError,
   modeloDeEmbedding,
@@ -261,20 +261,46 @@ async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
 /**
  * O catálogo inteiro, para a carga inicial de uma loja recém-conectada.
  *
- * Paginado, com teto BAIXO de propósito. O limite real não é a API: é o reaper
- * do drain, que devolve à fila evento em `processing` há mais de 10 minutos. Os
- * embeddings são sequenciais, um por pedaço, e cada produto rende um ou dois —
- * a 200-400 ms por chamada, 2 mil produtos já consomem a janela inteira. Passar
- * dela não deixa a carga lenta: faz DOIS workers indexarem a mesma fonte, com o
- * embedding pago em dobro e corrida na ativação da versão.
+ * Paginado, com teto de propósito. O limite não é a API da loja: é o reaper do
+ * drain, que devolve à fila evento em `processing` há mais de 10 minutos.
+ * Passar dessa janela não deixa a carga lenta — faz DOIS workers indexarem a
+ * mesma fonte, com o embedding pago em dobro e corrida na ativação da versão.
  *
- * Por isso 10 páginas (2 mil produtos), e o que passar disso FALHA com a conta
- * na mensagem, em vez de virar catálogo pela metade publicado como completo.
- * Loja maior precisa de carga com cursor entre execuções, que é trabalho
- * próprio e está registrado como tal.
+ * A primeira versão deste teto declarava 2 mil produtos e NÃO os entregava: os
+ * embeddings saíam um a um, a 200-400 ms por pedaço, e cada produto rende um ou
+ * dois pedaços. Dá de 6,7 min (2000 × 1 × 0,2 s) a 26,7 min (2000 × 2 × 0,4 s)
+ * contra uma janela de 10. No pior caso a janela só comportava ~750 produtos, e
+ * menos que isso contando a ida ao banco por trecho, que o laço antigo também
+ * fazia uma a uma.
+ *
+ * Agora os embeddings vão em lote (`TRECHOS_POR_LOTE`), que é o que faz 2 mil
+ * produtos caberem de fato: ~40 chamadas de 100 textos, da ordem de segundos
+ * cada (o 200-400 ms era o custo de UM texto), mais ~40 idas ao banco. Sobra
+ * folga larga nos 10 minutos.
+ *
+ * O teto segue em 10 páginas porque a janela não mudou, e o que passar disso
+ * FALHA com a conta na mensagem, em vez de virar catálogo pela metade publicado
+ * como completo. Loja maior precisa de carga com cursor entre execuções, que é
+ * trabalho próprio e está registrado como tal.
  */
 /** 10 páginas de 200 = 2 mil produtos. Ver o porquê do teto acima. */
 const TETO_DE_PAGINAS = 10;
+
+/**
+ * Trechos por chamada de embedding.
+ *
+ * É o que faz o teto de 2 mil produtos ser verdadeiro em vez de declarado: o
+ * `embedMany` do AI SDK divide a lista conforme o limite do provedor e
+ * paraleliza as partes, então o lote de 100 troca ~4 mil chamadas HTTP em série
+ * por ~40, e isso cabe na janela de 10 minutos do reaper — o limite que o teto
+ * pequeno existia para respeitar.
+ *
+ * 100 não é número redondo: é o `maxEmbeddingsPerCall` do `@ai-sdk/google`
+ * (o da OpenAI é 2048). Ou seja, é o maior valor que ainda é UMA chamada HTTP
+ * nos dois provedores, e é disso que as ~40 chamadas dependem. Subir daqui não
+ * quebra, porque o `embedMany` fatia sozinho, mas invalida a conta acima.
+ */
+const TRECHOS_POR_LOTE = 100;
 
 async function listarCatalogoDaLoja(organizationId: string): Promise<NuvemshopProduct[]> {
   const creds = await credenciaisDaLoja(organizationId);
@@ -478,48 +504,64 @@ export async function indexarFonte(
   let gravados = 0;
   // Trecho que não gravou NÃO pode seguir para a ativação: a versão fica
   // incompleta e a anterior — que funciona — é quem deve continuar no ar.
-  const falhas: Array<{ posicao: number; mensagem: string }> = [];
+  const falhas: Array<{ de: number; ate: number; mensagem: string }> = [];
 
-  for (let i = 0; i < pedacos.length; i++) {
-    const p = pedacos[i]!;
-    let embedding: number[];
+  // EM LOTES, e nao um-a-um. O laco sequencial era o teto real da indexacao:
+  // a 200-400 ms por pedaco, mil produtos passavam da janela de 10 minutos que
+  // o reaper do drain usa para devolver evento a fila, e o efeito nao era carga
+  // lenta — eram DOIS workers na mesma fonte, embedding pago em dobro e corrida
+  // na ativacao da versao. `embedTexts` manda o lote numa chamada e o upsert vai
+  // junto, com uma ida ao banco por lote em vez de uma por trecho.
+  for (let inicio = 0; inicio < pedacos.length; inicio += TRECHOS_POR_LOTE) {
+    const lote = pedacos.slice(inicio, inicio + TRECHOS_POR_LOTE);
+
+    let embeddings: number[][];
     try {
-      // `chave` já resolvida: sem isto, um documento de 200 trechos decifraria a
+      // `chave` ja resolvida: sem isto, um documento de 200 trechos decifraria a
       // credencial 200 vezes.
-      const r = await embedText(p.content, {
-        organizationId: fonte.organization_id,
-        chave,
-      });
-      embedding = r.embedding;
+      const r = await embedTexts(
+        lote.map((p) => p.content),
+        { organizationId: fonte.organization_id, chave },
+      );
+      embeddings = r.embeddings;
     } catch (err) {
       const detalhe = err instanceof Error ? err.message : String(err);
-      await markVersionFailed(versionId, fonte.organization_id, `embed@${i}: ${detalhe}`);
-      return { tipo: "erro", detalhe: `embedding falhou no trecho ${i}: ${detalhe}` };
+      // A FAIXA, não `inicio`: em lote não se sabe qual trecho o provedor
+      // recusou, e este texto aparece para o cliente no cartão da fonte.
+      // Dizer "trecho 100" quando a culpa pode ser do 173 é mentir com número.
+      const faixa = `${inicio}-${inicio + lote.length - 1}`;
+      await markVersionFailed(versionId, fonte.organization_id, `embed@lote ${faixa}: ${detalhe}`);
+      return { tipo: "erro", detalhe: `embedding falhou no lote ${faixa}: ${detalhe}` };
     }
 
+    const linhas = lote.map((p, j) => ({
+      organization_id: fonte.organization_id,
+      kb_version_id: versionId,
+      knowledge_source_id: fonte.id,
+      position: inicio + j,
+      content: p.content,
+      content_hash: computeContentHash(p.content),
+      token_count: estimateTokens(p.content),
+      embedding: embeddings[j] as unknown as string,
+      metadata: p.metadata,
+    }));
+
     const { error: upErr } = await admin.from("ai_chunks").upsert(
-      {
-        organization_id: fonte.organization_id,
-        kb_version_id: versionId,
-        knowledge_source_id: fonte.id,
-        position: i,
-        content: p.content,
-        content_hash: computeContentHash(p.content),
-        token_count: estimateTokens(p.content),
-        embedding: embedding as unknown as string,
-        metadata: p.metadata,
-      },
-      // A constraint que EXISTE é `ai_chunks_position_unique`
-      // (knowledge_source_id, kb_version_id, position). Como cada indexação cria
-      // uma versão nova, na prática nunca há conflito — o alvo certo é o que faz
+      linhas,
+      // A constraint que EXISTE e `ai_chunks_position_unique`
+      // (knowledge_source_id, kb_version_id, position). Como cada indexacao cria
+      // uma versao nova, na pratica nunca ha conflito — o alvo certo e o que faz
       // o insert passar.
       { onConflict: "knowledge_source_id,kb_version_id,position", ignoreDuplicates: true },
     );
 
     if (upErr) {
-      falhas.push({ posicao: i, mensagem: upErr.message });
+      // O lote e atomico: se deu erro, nenhuma linha dele entrou. Guardar a
+      // FAIXA, e nao cada posicao, porque com lote de 100 a mensagem de falha
+      // viraria uma lista de cem numeros iguais.
+      falhas.push({ de: inicio, ate: inicio + linhas.length - 1, mensagem: upErr.message });
     } else {
-      gravados++;
+      gravados += linhas.length;
     }
   }
 
@@ -529,14 +571,15 @@ export async function indexarFonte(
   }
 
   if (falhas.length > 0) {
+    const quantos = falhas.reduce((soma, f) => soma + (f.ate - f.de + 1), 0);
     await markVersionFailed(
       versionId,
       fonte.organization_id,
-      `${falhas.length} de ${pedacos.length} trechos não gravaram: ${falhas
-        .map((f) => `posição ${f.posicao} (${f.mensagem})`)
+      `${quantos} de ${pedacos.length} trechos não gravaram: ${falhas
+        .map((f) => `posições ${f.de}-${f.ate} (${f.mensagem})`)
         .join("; ")}`,
     );
-    return { tipo: "erro", detalhe: `trechos_nao_gravados:${falhas.length}` };
+    return { tipo: "erro", detalhe: `trechos_nao_gravados:${quantos}` };
   }
 
   await markVersionReady(versionId, fonte.organization_id, gravados);
