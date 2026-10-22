@@ -131,10 +131,10 @@ const TABELA_CRIADA_POR_ULTIMO = `
      -- só da trava. (Achado com a 9030: contacts, a cobaia de sempre, passou a
      -- exigir papel agent OU platform admin na escrita.)
      --
-     -- `fn_is_platform_admin%(`, e não só `fn_is_platform_admin()`: a subida do
-     -- upstream trocou o desvio das policies por `fn_is_platform_admin_full()`
+     -- fn_is_platform_admin%(, e não só fn_is_platform_admin(): a subida do
+     -- upstream trocou o desvio das policies por fn_is_platform_admin_full()
      -- (o admin com escopo completo), e a regra literal deixou de achar cobaia
-     -- nenhuma. O ator da semente tem `scope = 'full'`, então as duas passam.
+     -- nenhuma. O ator da semente tem scope = 'full', então as duas passam.
      and exists (select 1 from pg_policy p
                   where p.polrelid = alvo.oid and p.polpermissive and p.polcmd in ('a', '*')
                     and (coalesce(pg_get_expr(p.polwithcheck, p.polrelid), pg_get_expr(p.polqual, p.polrelid), '')
