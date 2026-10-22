@@ -177,8 +177,9 @@ export async function getBudgetStatus(orgId: string): Promise<BudgetStatus> {
     // Duas linhas têm `cost_cents` nulo sem que o modelo seja desconhecido, e o
     // aviso diria a quem lê que é: a de FALHA (o provedor recusou, zero token
     // cobrado) e a de transcrição pelo SERVIÇO (degraus 1 e 2 da escada), que
-    // tem preço próprio e não devolve tokens — toda instalação de WhatsApp que
-    // recebe um áudio acenderia o aviso. O degrau 3 da mesma escada é o modelo
+    // não devolve tokens e só tem custo quando a resposta o traz (o OpenRouter
+    // traz `usage.cost`; ver `custoDaTranscricao`) — sem a exclusão, toda
+    // instalação de WhatsApp que recebe um áudio acenderia o aviso. O degrau 3 da mesma escada é o modelo
     // de conversa, cobrado por token: sem preço na tabela, ele É o furo, e
     // excluir o `purpose` inteiro o apagava. Por isso o corte é pela origem
     // gravada na linha; transcrição sem origem conta (na dúvida, avisa).
