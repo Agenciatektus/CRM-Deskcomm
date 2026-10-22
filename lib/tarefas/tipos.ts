@@ -31,6 +31,21 @@ export type SituacaoDaTarefa = (typeof SITUACOES_DA_TAREFA)[number];
 export interface NegocioDaTarefa {
   id: string;
   title: string;
+  /**
+   * O funil e a etapa do negócio, embutidos pela rota (`COLUNAS_DA_TAREFA`)
+   * para a linha dizer "Lead: Nome · Funil" e o dossiê abrir no quadro certo.
+   * Opcionais: quem monta uma tarefa à mão (teste, resposta antiga) não os tem.
+   */
+  pipeline_id?: string | null;
+  stage_id?: string | null;
+  funil?: { id: string; name: string } | null;
+  etapa?: { id: string; name: string } | null;
+}
+
+/** O contato a que a tarefa está presa (sem negócio, é ele quem diz de quem é). */
+export interface ContatoDaTarefa {
+  id: string;
+  display_name: string | null;
 }
 
 /** Uma linha de `crm_tasks`, como a API a devolve. */
@@ -61,6 +76,8 @@ export interface Tarefa {
    * quando a tarefa é avulsa — ou quando o negócio não está mais visível.
    */
   lead?: NegocioDaTarefa | null;
+  /** Derivado (não é coluna): o contato de `contact_id`, embutido pela rota. */
+  contato?: ContatoDaTarefa | null;
 }
 
 export interface NovaTarefa {
