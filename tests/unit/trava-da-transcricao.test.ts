@@ -19,15 +19,32 @@ describe("trava de duração da transcrição", () => {
     expect(TETO_DE_BYTES_SEM_DURACAO).toBe(3 * 1024 * 1024);
   });
 
-  it("controle: 9 min declarados pelo canal passam, sem medir o arquivo", async () => {
-    const medir = vi.fn();
+  it("controle: 9 min declarados e 9 min medidos passam — e o arquivo é medido mesmo assim", async () => {
+    const medir = vi.fn(async () => 540);
     const v = await travaDaTranscricao({ audio: pequeno, metadata: doCanal(540), medir });
-    expect(v).toEqual({ passa: true, segundos: 540, fonte: "canal" });
-    expect(medir).not.toHaveBeenCalled();
+    expect(v).toEqual({ passa: true, segundos: 540, fonte: "arquivo" });
+    expect(medir).toHaveBeenCalledTimes(1);
   });
 
-  it("⭐ 11 min declarados pelo canal são barrados com motivo legível", async () => {
-    const v = await travaDaTranscricao({ audio: pequeno, metadata: doCanal(660), medir: vi.fn() });
+  it("⭐ P1 da #253: `seconds: 5` declarado com 11 min medidos no arquivo é barrado", async () => {
+    const v = await travaDaTranscricao({ audio: pequeno, metadata: doCanal(5), medir: async () => 660 });
+    expect(v).toEqual({ passa: false, segundos: 660, fonte: "arquivo", motivo: MOTIVO_AUDIO_LONGO_DEMAIS });
+  });
+
+  it("⭐ `seconds: 5` declarado, ffprobe que falha e 4 MB: o teto de bytes vale, a declaração não", async () => {
+    const v = await travaDaTranscricao({
+      audio: Buffer.alloc(4 * 1024 * 1024),
+      metadata: doCanal(5),
+      medir: async () => null,
+    });
+    expect(v.passa).toBe(false);
+    expect(v.fonte).toBe("tamanho");
+  });
+
+  it("⭐ 11 min declarados pelo canal são barrados sem medir, com motivo legível", async () => {
+    const medir = vi.fn();
+    const v = await travaDaTranscricao({ audio: pequeno, metadata: doCanal(660), medir });
+    expect(medir).not.toHaveBeenCalled();
     expect(v).toEqual({ passa: false, segundos: 660, fonte: "canal", motivo: MOTIVO_AUDIO_LONGO_DEMAIS });
     expect(MOTIVO_AUDIO_LONGO_DEMAIS).toBe("áudio maior que 10 min não é transcrito");
   });

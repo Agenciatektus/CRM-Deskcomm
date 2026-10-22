@@ -18,7 +18,14 @@ export async function medirDuracaoComFfprobe(audio: Buffer): Promise<number | nu
     const saida = await new Promise<string>((resolve, reject) => {
       const proc = spawn(
         "ffprobe",
-        ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", arquivo],
+        [
+          // Só lê o arquivo dado: um "áudio" hostil que se diga playlist HLS ou
+          // concat não faz o demuxer abrir outros arquivos nem a rede.
+          "-protocol_whitelist",
+          "file",
+          "-v",
+          "error",
+          "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", arquivo],
         { timeout: 15_000 },
       );
       let out = "";

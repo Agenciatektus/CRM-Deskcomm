@@ -243,6 +243,15 @@ describe("deriveMessageMedia", () => {
       );
     });
 
+    it("⭐ canal declara 5 s, o arquivo mede 11 min: não envia (a declaração não libera)", async () => {
+      messageRow.metadata = anexoCom(5);
+      medirDuracaoMock.mockResolvedValue(11 * 60);
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.detail).toBe("audio_acima_da_trava_de_duracao");
+      expect(deriveMediaText).not.toHaveBeenCalled();
+      expect(resolveOrgLlmConfig).not.toHaveBeenCalled();
+    });
+
     it("sem duração do canal, a medida do arquivo vale: 11 min medidos não enviam", async () => {
       medirDuracaoMock.mockResolvedValue(11 * 60);
       await deriveMessageMedia(eventRow());

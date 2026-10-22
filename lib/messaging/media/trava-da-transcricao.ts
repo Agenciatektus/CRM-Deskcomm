@@ -8,14 +8,17 @@
  * da escada (`escada-de-transcricao.ts`) cobraria por elas.
  *
  * A regra: áudio com mais de `DURACAO_MAXIMA_DA_TRANSCRICAO_SEGUNDOS` não vai a
- * provedor nenhum. A duração vem, na ordem:
+ * provedor nenhum. De onde vem a duração:
  *
- *  1. Do CANAL — o que o WhatsApp declara no `audioMessage.seconds` e o FZAP
- *     repassa em `metadata.provider_attachments[].seconds`. Custa zero.
- *  2. Do ARQUIVO, medida com `ffprobe` (vem junto do `ffmpeg` que o worker já
- *     usa para vídeo).
- *  3. Sem duração nenhuma, do TAMANHO: acima de `TETO_DE_BYTES_SEM_DURACAO` não
- *     sai. É conservador de propósito: nota de voz do WhatsApp é opus a
+ *  1. Do CANAL (`audioMessage.seconds`, que o FZAP repassa em
+ *     `metadata.provider_attachments[].seconds`) — mas SÓ PARA BARRAR. O número
+ *     é de quem mandou a mensagem: um cliente WhatsApp modificado declara o que
+ *     quiser, e um áudio de horas com `seconds: 5` não pode passar por isso
+ *     (P1 do @Cassio_SecRev na #253). Declarou mais de 10 min: barra sem medir.
+ *  2. Do ARQUIVO, medido com `ffprobe` SEMPRE que o canal não barrou. É a
+ *     medida que decide.
+ *  3. Se o ffprobe não mede, do TAMANHO: acima de `TETO_DE_BYTES_SEM_DURACAO`
+ *     não sai. É conservador de propósito: nota de voz do WhatsApp é opus a
  *     ~16 kbit/s, 10 min ≈ 1,2 MB; 3 MB só passa calado em áudio de bitrate
  *     alto, e aí é melhor não transcrever do que pagar às cegas.
  */
@@ -33,7 +36,7 @@ export const MOTIVO_AUDIO_SEM_DURACAO_GRANDE_DEMAIS =
   "áudio sem duração conhecida e maior que 3 MB não é transcrito (equivale a mais de 10 min)";
 
 export type VereditoDaTrava =
-  | { passa: true; segundos: number | null; fonte: "canal" | "arquivo" | "tamanho" }
+  | { passa: true; segundos: number | null; fonte: "arquivo" | "tamanho" }
   | { passa: false; segundos: number | null; fonte: "canal" | "arquivo" | "tamanho"; motivo: string };
 
 function numeroPositivo(v: unknown): number | null {
@@ -64,15 +67,18 @@ export async function travaDaTranscricao(entrada: {
   metadata?: Record<string, unknown> | null;
   medir?: (audio: Buffer) => Promise<number | null>;
 }): Promise<VereditoDaTrava> {
+  // O canal só BARRA: o que ele diz a favor do áudio não vale sem conferência.
   const doCanal = duracaoDeclaradaPeloCanal(entrada.metadata);
-  const julgar = (segundos: number, fonte: "canal" | "arquivo"): VereditoDaTrava =>
-    segundos > DURACAO_MAXIMA_DA_TRANSCRICAO_SEGUNDOS
-      ? { passa: false, segundos, fonte, motivo: MOTIVO_AUDIO_LONGO_DEMAIS }
-      : { passa: true, segundos, fonte };
-  if (doCanal !== null) return julgar(doCanal, "canal");
+  if (doCanal !== null && doCanal > DURACAO_MAXIMA_DA_TRANSCRICAO_SEGUNDOS) {
+    return { passa: false, segundos: doCanal, fonte: "canal", motivo: MOTIVO_AUDIO_LONGO_DEMAIS };
+  }
 
   const medida = await (entrada.medir ?? medirDuracaoComFfprobe)(entrada.audio);
-  if (medida !== null) return julgar(medida, "arquivo");
+  if (medida !== null) {
+    return medida > DURACAO_MAXIMA_DA_TRANSCRICAO_SEGUNDOS
+      ? { passa: false, segundos: medida, fonte: "arquivo", motivo: MOTIVO_AUDIO_LONGO_DEMAIS }
+      : { passa: true, segundos: medida, fonte: "arquivo" };
+  }
 
   return entrada.audio.byteLength > TETO_DE_BYTES_SEM_DURACAO
     ? { passa: false, segundos: null, fonte: "tamanho", motivo: MOTIVO_AUDIO_SEM_DURACAO_GRANDE_DEMAIS }

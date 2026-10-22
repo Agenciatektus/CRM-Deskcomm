@@ -706,7 +706,7 @@ function buildDeriveDeps(
       return true;
     }
   };
-  const describeImage: DeriveDeps["describeImage"] = async (buffer, _mime) => {
+  const describeImage: DeriveDeps["describeImage"] = async (buffer) => {
     // ⚠️ A resposta é resolvida AQUI, não na montagem das deps, porque num
     // roteador ela depende do catálogo e a consulta é assíncrona. Antes disto
     // a pergunta ia direto ao registro, que num roteador responde pelo prefixo
