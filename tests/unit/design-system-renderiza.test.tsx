@@ -50,6 +50,7 @@ const SECOES = [
   "componentes",
   "mensagens",
   "lead",
+  "tarefas",
   "menus",
   "retorno",
   "layout",

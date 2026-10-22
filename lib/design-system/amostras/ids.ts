@@ -29,6 +29,8 @@ export const IDS = {
   aviso: (n: number) => id(100 + n),
   mensagem: (n: number) => id(200 + n),
   etapa: (n: number) => id(300 + n),
+  /** As tarefas da seção "Tarefas" da vitrine. */
+  tarefaDaLista: (n: number) => id(400 + n),
 } as const;
 
 /** `true` quando a URL fala de uma amostra da vitrine. */

@@ -146,6 +146,8 @@ export const MAPA = {
   "ds:tipos": { ...os("diferente"), ref: r("Tipos cobertos", 448, D), refEscuro: r("Tipos cobertos", 467, DV), proto: { claro: "nome do colega no rótulo e páginas do documento (dado que o CRM não guarda)", escuro: "nome do colega no rótulo e páginas do documento (dado que o CRM não guarda)" } },
   "ds:coluna-do-lead": { ...os("igual"), ref: r("Coluna do lead", 466, D), refEscuro: r("Coluna do lead", 485, DV) },
   "ds:seletor-de-data": { ...os("igual"), ref: r("Seletor de data e horário", 479, D), refEscuro: r("Seletor de data e horário", 498, DV) },
+  // A tela de Tarefas (22/10/2026): peças só do CRM, o protótipo não desenhou.
+  "ds:tarefas": { ...os("sem-equivalente"), ref: null },
   "ds:negocio": { ...os("igual"), ref: r("Negócio (aba Negócios)", 490, D), refEscuro: r("Negócio (aba Negócios)", 509, DV) },
   "ds:menus": { ...os("igual"), ref: r("Menus, avisos e busca", 502, D), refEscuro: r("Menus, avisos e busca", 521, DV) },
   "ds:menu-da-conversa": { ...os("igual"), ref: r("Menu da conversa", 505, D), refEscuro: r("Menu da conversa", 524, DV) },
