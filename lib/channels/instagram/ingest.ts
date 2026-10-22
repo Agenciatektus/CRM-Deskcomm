@@ -41,6 +41,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
+
 import { lerEventoDoInstagram, type MensagemDoInstagram } from "./evento";
 import { fonteDaEntrada, funilQueAceita } from "@/lib/leads/fontes-do-funil";
 import { marcarConversaComMensagem } from "../marcar-conversa";
@@ -211,6 +213,10 @@ async function inserirMensagem(
   },
 ): Promise<string | "duplicate"> {
   const { msg } = input;
+  // Reentrega: a linha já existe. Sai ANTES do INSERT para não rodar os
+  // gatilhos de `messages` à toa (o 23505 da constraint deferível só viria no
+  // COMMIT). O 23505 abaixo segue sendo a rede da corrida.
+  if (await mensagemJaRecebida(admin, input.organizationId, msg.providerMessageId)) return "duplicate";
   const [primeira, ...extras] = msg.anexos.midias;
   const { data, error } = await admin
     .from("messages")

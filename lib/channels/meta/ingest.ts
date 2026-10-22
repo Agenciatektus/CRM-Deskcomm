@@ -23,6 +23,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
+
 import { audit } from "@/lib/audit";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 import { estamparAtribuicaoDoContato } from "@/lib/leads/atribuicao-de-anuncio";
@@ -259,6 +261,10 @@ export async function ingestMetaInbound(
     return { status: "failed", reason: `conversa: ${erroConversa?.message ?? "sem id"}` };
   }
 
+  // Reentrega: a linha já existe. Sai ANTES do INSERT para não rodar os
+  // gatilhos de `messages` à toa (o 23505 da constraint deferível só viria no
+  // COMMIT). O 23505 abaixo segue sendo a rede da corrida.
+  if (await mensagemJaRecebida(admin, orgId, e.externalId)) return { status: "duplicate" };
   const nomeDoArquivo = nomeDeArquivoLimpo(e.media?.filename);
   const { data: inserida, error: erroInsert } = await admin
     .from("messages")
@@ -437,6 +443,10 @@ export async function ingestMetaEcho(
     return { status: "failed", reason: `conversa: ${erroConversa?.message ?? "sem id"}` };
   }
 
+  // Reentrega: a linha já existe. Sai ANTES do INSERT para não rodar os
+  // gatilhos de `messages` à toa (o 23505 da constraint deferível só viria no
+  // COMMIT). O 23505 abaixo segue sendo a rede da corrida.
+  if (await mensagemJaRecebida(admin, orgId, e.externalId)) return { status: "duplicate" };
   const nomeDoArquivo = nomeDeArquivoLimpo(e.media?.filename);
   const { data: inserida, error: erroInsert } = await admin
     .from("messages")
