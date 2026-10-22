@@ -105,6 +105,7 @@ vi.mock("@/lib/channels", async (importOriginal) => {
     getAdapter: ((p: any) => (canalSemMidia ? {} : original.getAdapter(p))) as typeof original.getAdapter,
     // O worker pede o adapter OPCIONAL (canal sem adapter local não lança antes
     // do guard); a flag tem de valer pelos dois caminhos.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getAdapterOpcional: ((p: any) =>
       canalSemMidia ? {} : original.getAdapterOpcional(p)) as typeof original.getAdapterOpcional,
   };
