@@ -67,7 +67,7 @@ export function tarefasDaVitrine(agora: number): Record<"atrasada" | "hoje" | "d
       title: "Mandar o catálogo novo",
       due_date: new Date(agora + 3 * DIA).toISOString(),
       contact_id: IDS.contato,
-      contato: { id: IDS.contato, display_name: "Carla Mendes" },
+      contato: { id: IDS.contato, name: null, display_name: "Carla Mendes", phone_number: null },
       assigned_to: null,
     }, agora),
     avulsa: tarefa(4, { title: "Revisar os textos do agente", priority: "low" }, agora),

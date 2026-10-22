@@ -136,7 +136,10 @@ describe("vitrine do design system", () => {
       await new Promise((ok) => setTimeout(ok, 50));
     });
     expect(escapou).not.toHaveBeenCalled();
-  });
+    // Prazo próprio: o teste clica em TODO botão da vitrine, e cada seção nova
+    // (a de Tarefas, 22/10/2026) soma botões. Com os 15 s do padrão ele passava
+    // sozinho e estourava com a suíte em paralelo.
+  }, 40_000);
 
   it.each(["dark", "light"])("lado a lado com o app %s: cada painel tem o próprio tema e o <html> fica como está", async (app) => {
     document.documentElement.setAttribute("data-theme", app);

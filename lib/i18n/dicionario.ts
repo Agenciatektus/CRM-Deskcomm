@@ -17582,7 +17582,6 @@ export const DICIONARIO: Traducoes = {
   "Cabeçalho de grupo recolhível": { es: "Encabezado de grupo plegable" },
   "Linha de tarefa com ações": { es: "Fila de tarea con acciones" },
   "Atrasada (com o atraso relativo e o vínculo do negócio), de hoje e selecionada, presa só a um contato, avulsa e encerrada. As ações aparecem ao passar o mouse.": { es: "Atrasada (con el atraso relativo y el vínculo del negocio), de hoy y seleccionada, ligada solo a un contacto, suelta y cerrada. Las acciones aparecen al pasar el mouse." },
-  "Linha somente leitura (papel viewer) e a do dossiê": { es: "Fila de solo lectura (rol viewer) y la del expediente" },
   "Adiar rápido": { es: "Posponer rápido" },
   "Na linha (com a prévia do horário)": { es: "En la fila (con la vista previa del horario)" },
   "Na barra em lote": { es: "En la barra de acciones en lote" },
@@ -17647,6 +17646,7 @@ export const DICIONARIO: Traducoes = {
   "Já há uma ação em lote em curso nas tarefas. Espere terminar ou clique em Desfazer antes de começar outra.": { es: "Ya hay una acción en lote en curso en las tareas. Espera a que termine o haz clic en Deshacer antes de empezar otra." },
   "não pôde ser alterada (apagada ou fora do seu alcance).": { es: "no se pudo cambiar (eliminada o fuera de tu alcance)." },
   "não puderam ser alteradas (apagadas ou fora do seu alcance).": { es: "no se pudieron cambiar (eliminadas o fuera de tu alcance)." },
+  "Linha somente leitura (papel viewer)": { es: "Fila de solo lectura (rol viewer)" },
 };
 
 /**

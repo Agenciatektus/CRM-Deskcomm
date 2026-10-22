@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,26 @@ export interface MembroDaEquipe {
 }
 
 /**
+ * O gatilho: o nó pronto (a pílula/nome da linha) ou, na barra em lote, um
+ * botão com rótulo desenhado AQUI, direto dentro do `DropdownMenuTrigger
+ * asChild` — é o pai que dá o comportamento ao botão.
+ */
+type Gatilho = { gatilho: ReactNode; lote?: undefined } | { gatilho?: undefined; lote: { rotulo: string; disabled?: boolean } };
+
+function GatilhoDoMenu({ gatilho, lote }: Gatilho) {
+  if (lote) {
+    return (
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" disabled={lote.disabled}>
+          {lote.rotulo}
+        </Button>
+      </DropdownMenuTrigger>
+    );
+  }
+  return <DropdownMenuTrigger asChild>{gatilho}</DropdownMenuTrigger>;
+}
+
+/**
  * Os dois menus de troca rápida da tarefa — responsável e prioridade —,
  * partilhados pela linha (gatilho = a própria pílula/nome) e pela barra em
  * lote (gatilho = botão com rótulo). As opções de responsável são as de
@@ -30,12 +51,12 @@ export interface MembroDaEquipe {
  */
 export function MenuDeResponsavel({
   gatilho,
+  lote,
   membros,
   usuarioId,
   atual,
   onEscolher,
-}: {
-  gatilho: ReactNode;
+}: Gatilho & {
   membros: MembroDaEquipe[];
   usuarioId: string;
   /** `undefined` = o lote (vários responsáveis): nenhum marcado. */
@@ -46,7 +67,7 @@ export function MenuDeResponsavel({
   const marca = (id: string | null) => (atual !== undefined && atual === id ? <Check size={14} aria-hidden /> : null);
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{gatilho}</DropdownMenuTrigger>
+      {lote ? <GatilhoDoMenu lote={lote} /> : <GatilhoDoMenu gatilho={gatilho} />}
       <DropdownMenuContent align="start" folhaNoCelular className="max-h-80 overflow-y-auto">
         <DropdownMenuLabel>{t("Responsável")}</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => onEscolher(usuarioId)} className="justify-between gap-4">
@@ -84,17 +105,17 @@ export function PilulaDePrioridade({ prioridade, menu = false }: { prioridade: P
 
 export function MenuDePrioridade({
   gatilho,
+  lote,
   atual,
   onEscolher,
-}: {
-  gatilho: ReactNode;
+}: Gatilho & {
   atual?: PrioridadeDaTarefa;
   onEscolher: (p: PrioridadeDaTarefa) => void;
 }) {
   const t = useT();
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{gatilho}</DropdownMenuTrigger>
+      {lote ? <GatilhoDoMenu lote={lote} /> : <GatilhoDoMenu gatilho={gatilho} />}
       <DropdownMenuContent align="start" folhaNoCelular>
         <DropdownMenuLabel>{t("Prioridade")}</DropdownMenuLabel>
         {[...PRIORIDADES_DA_TAREFA].reverse().map((p) => (

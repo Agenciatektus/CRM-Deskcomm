@@ -6,6 +6,7 @@ import { useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
+import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import type { ModoDeAdiar } from "@/lib/tarefas/adiar";
 import { atrasoRelativo } from "@/lib/tarefas/atraso";
 import { estaEncerrada, type PrioridadeDaTarefa, type Tarefa } from "@/lib/tarefas/tipos";
@@ -218,10 +219,10 @@ export function LinhaDeTarefa({
               </span>
             </Link>
           ) : mostrarVinculo && contato ? (
-            <span className="flex min-w-0 max-w-[22rem] items-center gap-1 text-muted-foreground" title={contato.display_name ?? undefined}>
+            <span className="flex min-w-0 max-w-[22rem] items-center gap-1 text-muted-foreground" title={rotuloDoContato(contato, t)}>
               <IdentificationCard size={12} aria-hidden className="shrink-0" />
               <span className="truncate">
-                {t("Contato")}: {contato.display_name ?? t("Sem nome")}
+                {t("Contato")}: {rotuloDoContato(contato, t)}
               </span>
             </span>
           ) : null}

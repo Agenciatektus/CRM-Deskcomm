@@ -93,19 +93,11 @@ export function BarraEmLoteDeTarefas({
               membros={membros}
               usuarioId={usuarioId}
               onEscolher={onReatribuir}
-              gatilho={
-                <Button size="sm" variant="outline" disabled={ocupado}>
-                  {t("Responsável…")}
-                </Button>
-              }
+              lote={{ rotulo: t("Responsável…"), disabled: ocupado }}
             />
             <MenuDePrioridade
               onEscolher={onPrioridade}
-              gatilho={
-                <Button size="sm" variant="outline" disabled={ocupado}>
-                  {t("Prioridade…")}
-                </Button>
-              }
+              lote={{ rotulo: t("Prioridade…"), disabled: ocupado }}
             />
             <Button size="sm" variant="destructive" disabled={ocupado} onClick={() => setConfirmando(true)}>
               {t("Apagar")}

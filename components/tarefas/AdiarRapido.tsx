@@ -46,19 +46,21 @@ export function AdiarRapido({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {compacto ? (
+      {compacto ? (
+        <DropdownMenuTrigger asChild>
           <Button variant="icon" size="icon" className="lg:h-7 lg:w-7" aria-label={t("Adiar a tarefa")} disabled={disabled}>
             <Alarm aria-hidden />
           </Button>
-        ) : (
+        </DropdownMenuTrigger>
+      ) : (
+        <DropdownMenuTrigger asChild>
           <Button size="sm" variant="outline" disabled={disabled} className="gap-1.5">
             <Alarm aria-hidden />
             {t("Adiar…")}
             <CaretDown size={12} aria-hidden />
           </Button>
-        )}
-      </DropdownMenuTrigger>
+        </DropdownMenuTrigger>
+      )}
       <DropdownMenuContent align="end" folhaNoCelular>
         <DropdownMenuLabel>{t("Adiar para")}</DropdownMenuLabel>
         {MODOS_DE_ADIAR.map((modo) => (

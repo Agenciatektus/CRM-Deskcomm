@@ -45,7 +45,10 @@ export interface NegocioDaTarefa {
 /** O contato a que a tarefa está presa (sem negócio, é ele quem diz de quem é). */
 export interface ContatoDaTarefa {
   id: string;
+  /** Como a tela o chama: `rotuloDoContato` (nome escolhido, perfil, número). */
+  name?: string | null;
   display_name: string | null;
+  phone_number?: string | null;
 }
 
 /** Uma linha de `crm_tasks`, como a API a devolve. */

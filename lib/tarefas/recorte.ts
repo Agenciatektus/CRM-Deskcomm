@@ -8,6 +8,7 @@
  * dos últimos dias, ou a situação escolhida): nenhuma consulta nova por filtro.
  * Os textos são CÓDIGOS; a tela os passa por `t()`.
  */
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import {
   estaAtrasada,
   estaEncerrada,
@@ -157,7 +158,7 @@ export function semResponsavel(tarefa: Pick<Tarefa, "assigned_to" | "status">): 
 function passa(tarefa: Tarefa, f: FiltrosDeTarefas, ctx: ContextoDoRecorte): boolean {
   if (f.busca) {
     const alvo = normalizar(f.busca.trim());
-    const onde = [tarefa.title, tarefa.description ?? "", tarefa.lead?.title ?? "", tarefa.contato?.display_name ?? ""];
+    const onde = [tarefa.title, tarefa.description ?? "", tarefa.lead?.title ?? "", nomeDoContato(tarefa.contato) ?? ""];
     if (!onde.some((t) => normalizar(t).includes(alvo))) return false;
   }
   if (f.minhas && (!ctx.usuarioId || tarefa.assigned_to !== ctx.usuarioId)) return false;

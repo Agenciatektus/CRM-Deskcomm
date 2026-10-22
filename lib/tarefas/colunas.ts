@@ -15,4 +15,4 @@
 export const COLUNAS_DA_TAREFA =
   "id, organization_id, title, description, due_date, priority, status, lead_id, contact_id, demanda_id, assigned_to, created_by, created_at, updated_at, " +
   "lead:crm_leads(id, title, pipeline_id, stage_id, funil:crm_pipelines!crm_leads_pipeline_id_fkey(id, name), etapa:crm_stages!crm_leads_stage_id_fkey(id, name)), " +
-  "contato:contacts!crm_tasks_contact_id_fkey(id, display_name)";
+  "contato:contacts!crm_tasks_contact_id_fkey(id, name, display_name, phone_number)";

@@ -87,7 +87,7 @@ function Linhas({ tema, agora }: { tema: Tema; agora: Date }) {
           ))}
         </div>
       </Exemplo>
-      <Exemplo nome={t("Linha somente leitura (papel viewer) e a do dossiê")} mapa="ds:tarefas" tema={tema}>
+      <Exemplo nome={t("Linha somente leitura (papel viewer)")} mapa="ds:tarefas" tema={tema}>
         <div className="rounded-xl border border-border bg-surface py-1">
           <LinhaDeTarefa
             tarefa={amostras.atrasada}
@@ -99,7 +99,6 @@ function Linhas({ tema, agora }: { tema: Tema; agora: Date }) {
             aoEditar={() => undefined}
             aoApagar={nada}
           />
-          <LinhaDeTarefa tarefa={amostras.hoje} podeEditar agora={agora} nomeDoResponsavel={nome(amostras.hoje)} aoAlternarConcluida={nada} aoEditar={() => undefined} aoApagar={nada} />
         </div>
       </Exemplo>
     </>
