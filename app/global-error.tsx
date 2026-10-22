@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { useEffect, useState } from "react";
 
 import { copyToClipboard } from "@/lib/clipboard";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { carregarDicionario, traduzir } from "@/lib/i18n/traducao";
 import { IDIOMA_PADRAO, idiomaDelNavegador, type Idioma } from "@/lib/i18n/idiomas";
 
 export default function GlobalError({
@@ -21,7 +21,13 @@ export default function GlobalError({
   const [idioma, setIdioma] = useState<Idioma>(IDIOMA_PADRAO);
 
   useEffect(() => {
-    setIdioma(idiomaDelNavegador(navigator.languages ?? [navigator.language]));
+    const doNavegador = idiomaDelNavegador(navigator.languages ?? [navigator.language]);
+    if (doNavegador === IDIOMA_PADRAO) return;
+    // O dicionário é sob demanda (fora do bundle do navegador): o texto troca de
+    // idioma quando ele chega e, se não chegar, fica em português, sem quebrar
+    // a única tela que não pode falhar.
+    const aplicar = () => setIdioma(doNavegador);
+    carregarDicionario().then(aplicar, aplicar);
   }, []);
 
   useEffect(() => {
