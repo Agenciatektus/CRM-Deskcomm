@@ -17,10 +17,11 @@ import pg from "pg";
  *  - a coluna `lost_reason` entra na lista do `update` SÓ quando há motivo —
  *    e é isso que evita revalidar, por `trg_validate_lost_reason_required`, um
  *    motivo que saiu da configuração do funil depois de usado;
- *  - a recusa que o operador via como 500 vem da CHECK
- *    `crm_leads_lost_reason_required` (23514), disparada pelo fechamento que
- *    `trg_crm_lead_close_on_stage` faz — uma cascata de dois gatilhos e uma
- *    constraint, que só existe no banco.
+ *  - a recusa que o operador via como 500 vinha da CHECK
+ *    `crm_leads_lost_reason_required` (23514); desde a 9044 vem do gatilho
+ *    `trg_validate_lost_reason_required` (22023), disparado pela troca de etapa
+ *    que `trg_crm_lead_close_on_stage` fecha — uma cascata de dois gatilhos, que
+ *    só existe no banco.
  */
 const container = process.env.TEST_DB_CONTAINER;
 if (!container) {
@@ -93,11 +94,14 @@ afterAll(async () => {
 });
 
 describe("o lote para uma etapa de PERDA", () => {
-  it("SEM motivo, o banco recusa o lote inteiro — 23514, a CHECK", async () => {
+  // Desde a 9044 (motivo opcional por funil) a CHECK `crm_leads_lost_reason_required`
+  // não existe mais: quem recusa é `trg_validate_lost_reason_required`, que lê o
+  // funil (chave ausente = obrigatório) e responde 22023 `lost_reason_required`.
+  it("SEM motivo, num funil que exige, o banco recusa o lote inteiro — 22023, o gatilho", async () => {
     const ids = await doisNegociosAbertos();
     await expect(moverEmLote(ids, etapaDePerda, null)).rejects.toMatchObject({
-      code: "23514",
-      constraint: "crm_leads_lost_reason_required",
+      code: "22023",
+      message: "lost_reason_required",
     });
 
     // E a transação única cumpriu a promessa: NENHUM dos dois se moveu.
