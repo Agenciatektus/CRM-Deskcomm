@@ -17647,6 +17647,7 @@ export const DICIONARIO: Traducoes = {
   "não pôde ser alterada (apagada ou fora do seu alcance).": { es: "no se pudo cambiar (eliminada o fuera de tu alcance)." },
   "não puderam ser alteradas (apagadas ou fora do seu alcance).": { es: "no se pudieron cambiar (eliminadas o fuera de tu alcance)." },
   "Linha somente leitura (papel viewer)": { es: "Fila de solo lectura (rol viewer)" },
+  "Você não tem permissão para fazer esta alteração em uma ou mais tarefas selecionadas.": { es: "No tienes permiso para hacer este cambio en una o más de las tareas seleccionadas." },
 };
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -45,6 +45,10 @@ export function useLoteDeTarefas() {
   const qc = useQueryClient();
   const t = useT();
   const travado = useLoteOcupado(CHAVE_DO_LOTE_DE_TAREFAS);
+  // A trava do apagar é um REF: o estado só muda no render seguinte, e dois
+  // cliques no mesmo quadro passariam os dois pelo `if`. O estado fica só para
+  // a tela desenhar o botão travado.
+  const apagandoRef = useRef(false);
   const [apagando, setApagando] = useState(false);
 
   const invalidar = () =>
@@ -102,7 +106,8 @@ export function useLoteDeTarefas() {
 
   /** Apagar não tem Desfazer (a linha some de verdade): vem depois da confirmação. */
   async function apagar(ids: string[], sucesso: (n: number) => string): Promise<boolean> {
-    if (apagando || travado) return false;
+    if (apagandoRef.current || travado) return false;
+    apagandoRef.current = true;
     setApagando(true);
     try {
       avisarResultado(await enviar({ action: "delete", task_ids: ids }), sucesso);
@@ -111,6 +116,7 @@ export function useLoteDeTarefas() {
       toast.error(erro instanceof Error ? erro.message : t("Não foi possível apagar a tarefa."));
       return false;
     } finally {
+      apagandoRef.current = false;
       setApagando(false);
     }
   }

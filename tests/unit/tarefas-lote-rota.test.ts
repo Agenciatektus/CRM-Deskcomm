@@ -232,6 +232,32 @@ describe("adiar", () => {
   });
 });
 
+describe("falhas no meio do lote", () => {
+  it("⭐ reatribuir para quem a policy recusa (42501) é 403 com motivo, não 500", async () => {
+    montar({ data: { user_id: ANA } }, [{ data: ESCOPO }, { error: { message: "new row violates row-level security policy", code: "42501" } as never }]);
+    const res = await (await rota())(post({ action: "assign", task_ids: [T1], assigned_to: ANA }));
+    expect(res.status).toBe(403);
+    const corpo = (await res.json()) as { error: { message: string } };
+    expect(corpo.error.message).toMatch(/permissão/);
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("erro que não é da policy continua 500 (controle)", async () => {
+    montar({}, [{ data: ESCOPO }, { error: { message: "timeout", code: "57014" } as never }]);
+    expect((await (await rota())(post({ action: "priority", task_ids: [T1], priority: "low" }))).status).toBe(500);
+  });
+
+  it("⭐ adiar: o item já gravado AUDITA mesmo quando o seguinte falha", async () => {
+    const ESCOPO_ABERTO = [ESCOPO[0], { ...ESCOPO[1], status: "pending" }];
+    const prazo = futuro();
+    montar({}, [{ data: ESCOPO_ABERTO }, { data: [{ id: T1 }] }, { error: { message: "timeout", code: "57014" } as never }]);
+    const res = await (await rota())(post({ action: "postpone", itens: [{ id: T1, due_date: prazo }, { id: T2, due_date: prazo }] }));
+    expect(res.status).toBe(500);
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(audit).mock.calls[0]![0]).toMatchObject({ resourceId: T1, action: "crm_task.updated" });
+  });
+});
+
 describe("GET /api/v1/tasks — encerradas recentes", () => {
   function dubleDaLista() {
     const ors: string[] = [];

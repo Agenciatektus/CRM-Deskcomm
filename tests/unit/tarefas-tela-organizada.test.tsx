@@ -331,6 +331,24 @@ describe("lote: trava e blocos", () => {
     expect(result.current.ocupado).toBe(false);
   });
 
+  it("⭐ apagar: dois cliques no mesmo instante mandam UM pedido (trava por ref)", async () => {
+    let soltar: (v: unknown) => void = () => undefined;
+    post.mockImplementationOnce(() => new Promise((ok) => (soltar = ok)));
+    const { result } = renderHook(() => useLoteDeTarefas(), { wrapper: ({ children }) => comQuery(children) });
+    let p1: Promise<boolean> = Promise.resolve(false);
+    let p2: Promise<boolean> = Promise.resolve(true);
+    act(() => {
+      p1 = result.current.apagar(ids(1), (q) => `${q}`);
+      p2 = result.current.apagar(ids(1), (q) => `${q}`);
+    });
+    expect(await p2).toBe(false);
+    await act(async () => {
+      soltar({ data: { feitas: 1, ignoradas: [] } });
+      expect(await p1).toBe(true);
+    });
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it("ids ignorados pela rota viram aviso, não sucesso calado", async () => {
     post.mockResolvedValue({ data: { feitas: 1, ignoradas: ["x"] } });
     const { result } = renderHook(() => useLoteDeTarefas(), { wrapper: ({ children }) => comQuery(children) });

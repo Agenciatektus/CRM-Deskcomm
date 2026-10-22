@@ -42,6 +42,14 @@ type Alvo = Pick<Tarefa, "id" | "title" | "status" | "due_date" | "priority" | "
 
 const instante = (v: string | null | undefined) => (v ? Math.floor(new Date(v).getTime() / 60_000) : null);
 
+/**
+ * 42501 = a policy de `crm_tasks` recusou a linha nova (o `WITH CHECK`): o
+ * caso típico é um `agent` passar a tarefa para alguém e, com isso, perder o
+ * direito de escrevê-la. É recusa de PERMISSÃO, não falha do servidor: 403
+ * com o motivo, nunca 500.
+ */
+const RECUSA_DA_POLICY = "42501";
+
 export async function POST(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
@@ -104,13 +112,20 @@ export async function POST(req: NextRequest): Promise<Response> {
   let feitas: string[] = [];
   let campos: string[] = [];
   let acaoDeAuditoria: "crm_task.updated" | "crm_task.deleted" = "crm_task.updated";
+  // A falha que interrompeu o lote no meio (adiar vai item a item): o que já
+  // foi gravado AUDITA mesmo assim, antes da resposta de erro.
+  let falha: Response | null = null;
+  const recusa = (codigo: string | undefined, mensagemDeErro: string): Response =>
+    codigo === RECUSA_DA_POLICY
+      ? fail("forbidden", t("Você não tem permissão para fazer esta alteração em uma ou mais tarefas selecionadas."), 403, { requestId })
+      : fail("internal_error", mensagemDeErro, 500, { requestId });
 
   if (lote.action === "delete") {
     acaoDeAuditoria = "crm_task.deleted";
     const ids = alvos.map((a) => a.id);
     if (ids.length > 0) {
       const { data, error } = await supabase.from("crm_tasks").delete().eq("organization_id", orgId).in("id", ids).select("id");
-      if (error) return fail("internal_error", t("Erro ao apagar a tarefa."), 500, { requestId });
+      if (error) return recusa(error.code, t("Erro ao apagar a tarefa."));
       feitas = (data ?? []).map((r: { id: string }) => r.id);
     }
   } else if (lote.action === "postpone") {
@@ -126,7 +141,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         .eq("organization_id", orgId)
         .eq("id", item.id)
         .select("id");
-      if (error) return fail("internal_error", t("Erro ao salvar a tarefa."), 500, { requestId });
+      if (error) {
+        falha = recusa(error.code, t("Erro ao salvar a tarefa."));
+        break;
+      }
       feitas.push(...(data ?? []).map((r: { id: string }) => r.id));
     }
   } else {
@@ -146,7 +164,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     campos = Object.keys(mudanca);
     if (ids.length > 0) {
       const { data, error } = await supabase.from("crm_tasks").update(mudanca).eq("organization_id", orgId).in("id", ids).select("id");
-      if (error) return fail("internal_error", t("Erro ao salvar a tarefa."), 500, { requestId });
+      if (error) return recusa(error.code, t("Erro ao salvar a tarefa."));
       feitas = (data ?? []).map((r: { id: string }) => r.id);
     }
   }
@@ -164,6 +182,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       }),
     ),
   );
+
+  if (falha) return falha;
 
   // O laço de retorno, como no PATCH: tarefa presa a um negócio que FECHOU
   // agora aparece na linha do tempo dele.
