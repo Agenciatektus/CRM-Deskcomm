@@ -141,9 +141,13 @@ export const FRASE_DO_MOTIVO = {
   legal_mention: "A conversa tocou em assunto jurídico",
   refund_mention: "A conversa tocou em reembolso",
   caso_escalado: "Uma pessoa da equipe escalou um atendimento",
-  cadencia_lead_respondeu: "O lead respondeu à cadência de prospecção",
-  objetivo_atingido: "A IA levou o negócio até a etapa definida na cadência",
-  cadencia_ia_encerrou: "A IA da cadência parou de conduzir a conversa",
+  // As três frases abaixo diziam "cadência", e a cadência saiu do produto: a
+  // campanha absorveu as sete capacidades dela. Só a FRASE mudou; as chaves
+  // seguem iguais, porque elas estão gravadas no histórico de passagens dos
+  // clientes e renomear apagaria o motivo de tudo que já aconteceu.
+  cadencia_lead_respondeu: "O lead respondeu à campanha de prospecção",
+  objetivo_atingido: "A IA levou o negócio até a etapa definida na campanha",
+  cadencia_ia_encerrou: "A IA da campanha parou de conduzir a conversa",
 } satisfies Record<MotivoDaPassagem, string>;
 
 /**

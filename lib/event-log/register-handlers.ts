@@ -21,8 +21,6 @@ import { followupGatilhoEtapaHandler } from "@/lib/followup/gatilho-etapa.handle
 import { followupGatilhoLeadHandler } from "@/lib/followup/gatilho-lead.handler";
 import { followupGatilhoCasoHandler } from "@/lib/followup/gatilho-caso.handler";
 import { cadenciaSaidasHandler } from "@/lib/cadencia/saidas.handler";
-import { cadenciaGatilhoEtiquetaHandler } from "@/lib/cadencia/gatilho-etiqueta.handler";
-import { cadenciaObjetivoHandler } from "@/lib/cadencia/objetivo.handler";
 import { casoNaCentralHandler } from "@/lib/escalacao/caso-na-central.handler";
 import { mediaPersistHandler } from "@/workers/media-persist-worker.handler";
 import { mediaDeriveHandler } from "@/workers/media-derive-worker.handler";
@@ -78,11 +76,13 @@ export function ensureHandlersRegistered(): void {
   registerHandler(avisoAoDonoDaCarteira);
   registerHandler(followupGatilhoLeadHandler);
   registerHandler(followupGatilhoCasoHandler);
+  // Fica: as SAÍDAS valem para as duas superfícies de prospecção, e a régua da
+  // campanha depende delas (`lib/followup/superficies.ts`).
   registerHandler(cadenciaSaidasHandler);
-  registerHandler(cadenciaGatilhoEtiquetaHandler);
-  // Independente do de saídas: aquele encerra a INSCRIÇÃO, este a CONDUÇÃO da IA
-  // (lead na etapa-alvo ou ganho). No mesmo evento os dois agem sem conflito.
-  registerHandler(cadenciaObjetivoHandler);
+  // Saíram com a FEATURE cadência: o gatilho de ETIQUETA (varria
+  // `surface='cadence'`) e o OBJETIVO da condução da IA (lê
+  // `cadencia_conducoes`). Os dois eram porta/estado só da cadência; a campanha
+  // não tem condução nem entra por etiqueta.
   // O caso aberto na Central, na hora — escrita curta no banco (um item), ao
   // lado do outro consumidor de `ai.case_opened` que só escreve no banco, e
   // longe do aviso ao suporte, que sai por rede de terceiro.

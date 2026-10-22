@@ -51,8 +51,10 @@ import { CalendarioDoFunil } from "@/components/kanban/CalendarioDoFunil";
  * Ordenar. Filtros na URL (e lembrados por pessoa); vista, ordem e densidade
  * por pessoa neste navegador.
  *
- * Cadências saiu da barra (não é um modo de ver o funil): `?modo=cadencias`
- * cai no Kanban. A tela de cadências do funil segue no código.
+ * A cadência saiu do produto: a campanha absorveu as sete capacidades dela.
+ * `?modo=cadencias` cai no Kanban, e a tela não existe mais no código — o que
+ * sobrou de `lib/cadencia` é o MOTOR compartilhado pela campanha, pelo agente
+ * de IA e pelo follow-up.
  */
 export function PipelinePageClient({
   pipelineId,

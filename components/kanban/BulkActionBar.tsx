@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { InscreverNaCadencia } from "@/components/cadencia/InscreverNaCadencia";
 import { toast } from "sonner";
 import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
@@ -429,8 +428,6 @@ export function BulkActionBar({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <InscreverNaCadencia pipelineId={pipelineId} leadIds={selectedIds} onConcluido={onClear} />
 
         <MaisAcoesDoLote
           selectedIds={selectedIds}

@@ -3,8 +3,9 @@
  *
  * ═══ A decisão que dispensa um motor novo ═══
  *
- * A cadência de prospecção não tem motor próprio: ela é "um pointer de
- * follow-up com `surface='cadence'`" (`app/api/v1/cadencias/route.ts`), e
+ * A cadência de prospecção não tinha motor próprio: ela era "um pointer de
+ * follow-up com `surface='cadence'`" criado pela porta dela, hoje removida
+ * com a feature (restam os pointers legados no banco), e
  * `lib/regua/timeline.ts` é só a ponte lista → grafo linear. A campanha faz o
  * MESMO caminho, com `surface='campaign'` (migration 9037): o que ela publica
  * aqui é executado pelo motor de follow-up, com o claim, o CAS por `revision`,

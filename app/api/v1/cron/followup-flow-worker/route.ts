@@ -37,7 +37,6 @@ import { createSupabaseFollowupGateDb } from "@/lib/followup/agent-followup-gate
 import { enviarTextoFixoPendente } from "@/lib/followup/enviar-texto-fixo";
 import { encerrarRoteirosVencidos } from "@/lib/followup/atendimento";
 import { createSupabaseSilenceSweepDb, runSilenceSweep } from "@/lib/followup/silence-sweep";
-import { depsDaVarreduraDeTempo, varrerGatilhosDeTempo } from "@/lib/cadencia/varredura-de-tempo";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -148,19 +147,12 @@ async function handle(req: NextRequest): Promise<Response> {
     logger.error("[followup-flow-worker.cron] runSilenceSweep threw", { error: detail, requestId });
   }
 
-  // Gatilhos de TEMPO da cadência (cliente sem resposta do time / lead parado).
-  // Mesmo contrato do silence-sweep: falhar aqui não aborta o tick.
-  try {
-    const tempo = await varrerGatilhosDeTempo(depsDaVarreduraDeTempo(admin));
-    // Loga também as recusas (P2 do Cassio): recusa alta e persistente é sinal
-    // de régua mal configurada, e calada ela só aparece como "não inscreve ninguém".
-    if (tempo.candidatas > 0) {
-      logger.info("[followup-flow-worker.cron] cadência por tempo", { ...tempo, requestId });
-    }
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    logger.error("[followup-flow-worker.cron] varrerGatilhosDeTempo threw", { error: detail, requestId });
-  }
+  // Os gatilhos de TEMPO (cliente sem resposta do time, lead parado) saíram
+  // deste tick com a FEATURE cadência: eram porta de entrada só dela
+  // (`lib/followup/superficies.ts`), varriam pointers `surface='cadence'` e a
+  // campanha nunca os teve. Sem a tela que os configurava, varrer a cada tique
+  // só passearia pelos pointers legados. A campanha entra por `rodada.ts` (1º
+  // toque) e por `entrada-por-etapa` (contínua), que não passam por aqui.
 
   // Roteiro de atendimento com o prazo vencido (0397). Audita só quando houve
   // efeito — rodada que não encerrou nada não é mutação.
