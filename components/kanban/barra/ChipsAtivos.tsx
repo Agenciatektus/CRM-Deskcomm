@@ -11,10 +11,14 @@ import { X } from "@/lib/ui/icons";
 
 import { STATUS_DO_PAINEL } from "./PainelDeFiltros";
 
-export interface ChipAtivo {
+/**
+ * Um chip de filtro ligado. `R` é o que o "x" desfaz: os filtros do Funil por
+ * padrão; a tela de Tarefas usa a mesma faixa com os filtros dela.
+ */
+export interface ChipAtivo<R = Partial<LeadFilters>> {
   chave: string;
   rotulo: string;
-  remover: Partial<LeadFilters>;
+  remover: R;
 }
 
 const reais = (c: number) => formatValorDoNegocio(c, MOEDA_PADRAO, { semCentavos: true });
@@ -72,7 +76,15 @@ export function useNomeDoDono(userId: string): (owner: string) => string {
 }
 
 /** A faixa de chips removíveis + "Limpar tudo". */
-export function ChipsAtivos({ chips, onRemover, onLimpar }: { chips: ChipAtivo[]; onRemover: (c: ChipAtivo) => void; onLimpar: () => void }) {
+export function ChipsAtivos<R = Partial<LeadFilters>>({
+  chips,
+  onRemover,
+  onLimpar,
+}: {
+  chips: ChipAtivo<R>[];
+  onRemover: (c: ChipAtivo<R>) => void;
+  onLimpar: () => void;
+}) {
   const t = useT();
   if (chips.length === 0) return null;
   return (
