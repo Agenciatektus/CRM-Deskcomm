@@ -229,7 +229,8 @@ export async function encerraDemanda(
   }
   // Sem lista cadastrada o motivo de ganho é texto livre; com lista, só o que
   // está nela passa — quem aplica é o servidor, porque para o GANHO não há
-  // trigger no banco (a CHECK da perda é `crm_leads_lost_reason_required`).
+  // trigger no banco (a perda é validada por `trg_validate_lost_reason_required`;
+  // a CHECK `crm_leads_lost_reason_required` saiu na 9044).
   if (input.desfecho === "won") {
     const recusaGanho = recusaDeMotivoDoGanho({
       motivo: input.motivo,

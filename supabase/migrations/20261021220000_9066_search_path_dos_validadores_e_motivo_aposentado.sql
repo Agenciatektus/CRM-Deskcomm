@@ -20,10 +20,16 @@
 --     validados como na 9044. Provas: tests/invariants/lote-de-perda-grava-o-motivo
 --     e lote-nao-sobrescreve-o-motivo-de-quem-ja-estava-perdido.
 --
+-- Trocar de funil mantendo o motivo segue validado: o vocabulário que vale é
+-- o do funil de destino.
+--
 -- Idempotente (create or replace, mesma assinatura): o ACL e as CHECKs que
 -- usam os validadores ficam como estão. O corpo do gatilho é o do baseline
 -- (o bloco da 0266, que a 9044 editou), com o `opted_out_of_messages` da 0513
 -- que o arquivo da 9044 tinha deixado de fora.
+
+-- Convenção da 9034/9037. Não há lock de tabela aqui, mas a linha não custa.
+set local lock_timeout = '3s';
 
 create or replace function public.fn_variacoes_da_campanha_validas(p_variacoes text[])
 returns boolean
@@ -73,9 +79,12 @@ declare
   v_required boolean := true;
 begin
   if new.status = 'lost' then
-    -- Já estava perdido e o motivo não mudou: nada novo a validar. Sem isto, a
-    -- troca de etapa de um card perdido revalidava um motivo aposentado (9066).
+    -- Já estava perdido, no MESMO funil e com o MESMO motivo: nada novo a
+    -- validar. Sem isto, a troca de etapa de um card perdido revalidava um
+    -- motivo aposentado (9066). Trocar de FUNIL valida de novo: o vocabulário
+    -- é do funil de destino.
     if tg_op = 'UPDATE' and old.status = 'lost'
+       and new.pipeline_id is not distinct from old.pipeline_id
        and new.lost_reason is not distinct from old.lost_reason then
       return new;
     end if;

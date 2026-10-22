@@ -62929,9 +62929,12 @@ declare
   v_required boolean := true;
 begin
   if new.status = 'lost' then
-    -- Já estava perdido e o motivo não mudou: nada novo a validar. Sem isto, a
-    -- troca de etapa de um card perdido revalidava um motivo aposentado (9066).
+    -- Já estava perdido, no MESMO funil e com o MESMO motivo: nada novo a
+    -- validar. Sem isto, a troca de etapa de um card perdido revalidava um
+    -- motivo aposentado (9066). Trocar de FUNIL valida de novo: o vocabulário
+    -- é do funil de destino.
     if tg_op = 'UPDATE' and old.status = 'lost'
+       and new.pipeline_id is not distinct from old.pipeline_id
        and new.lost_reason is not distinct from old.lost_reason then
       return new;
     end if;

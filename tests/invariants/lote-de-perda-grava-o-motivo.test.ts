@@ -93,6 +93,50 @@ afterAll(async () => {
   await pool.end();
 });
 
+describe("o motivo de quem JÁ estava perdido (9066)", () => {
+  it("trocar de FUNIL mantendo o motivo valida de novo: o vocabulário é o do destino", async () => {
+    // A 9066 deixa de revalidar o perdido que segue perdido com o MESMO motivo
+    // (o motivo aposentado sobrevive à troca de etapa). O retorno antecipado não
+    // pode valer para a troca de funil: lá o vocabulário é outro.
+    await pool.query(
+      `update crm_pipelines set settings = jsonb_set(coalesce(settings, '{}'::jsonb),
+         '{lost_reasons}', '["so_no_funil_a"]'::jsonb) where id = $1`,
+      [funil],
+    );
+    const [lead] = await doisNegociosAbertos();
+    await moverEmLote([lead], etapaDePerda, "so_no_funil_a");
+
+    const { rows: p } = await pool.query<{ id: string }>(
+      `insert into crm_pipelines (organization_id, name, slug, position)
+       values ($1, 'Outro', 'outro-lote-perda', 200) returning id`,
+      [ORG],
+    );
+    const { rows: e } = await pool.query<{ id: string }>(
+      `insert into crm_stages (organization_id, pipeline_id, name, slug, position, is_lost)
+       values ($1, $2, 'Perdido B', 'perdido-b-lote', 1, true) returning id`,
+      [ORG, p[0]!.id],
+    );
+
+    await expect(
+      pool.query("update crm_leads set pipeline_id = $1, stage_id = $2 where id = $3", [p[0]!.id, e[0]!.id, lead]),
+    ).rejects.toMatchObject({ code: "22023", message: "lost_reason_invalid: so_no_funil_a" });
+
+    // CONTROLE: no MESMO funil, a troca de etapa do perdido passa sem revalidar.
+    const { rows: e2 } = await pool.query<{ id: string }>(
+      `insert into crm_stages (organization_id, pipeline_id, name, slug, position, is_lost)
+       values ($1, $2, 'Perdido 2', 'perdido-2-lote', 4, true) returning id`,
+      [ORG, funil],
+    );
+    await pool.query(
+      `update crm_pipelines set settings = jsonb_set(settings, '{lost_reasons}', '[]'::jsonb) where id = $1`,
+      [funil],
+    );
+    await pool.query("update crm_leads set stage_id = $1 where id = $2", [e2[0]!.id, lead]);
+    const { rows } = await pool.query<{ lost_reason: string }>("select lost_reason from crm_leads where id = $1", [lead]);
+    expect(rows[0]!.lost_reason).toBe("so_no_funil_a");
+  });
+});
+
 describe("o lote para uma etapa de PERDA", () => {
   // Desde a 9044 (motivo opcional por funil) a CHECK `crm_leads_lost_reason_required`
   // não existe mais: quem recusa é `trg_validate_lost_reason_required`, que lê o
