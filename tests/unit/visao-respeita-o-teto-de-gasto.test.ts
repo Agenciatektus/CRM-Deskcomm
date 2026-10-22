@@ -323,15 +323,22 @@ describe("a visão de imagem respeita o teto de gasto", () => {
     expect(avisoInsertMock).not.toHaveBeenCalled();
   });
 
-  it("os degraus 1 e 2 da transcrição ficam fora do gate: com o teto estourado o áudio ainda vira texto", async () => {
+  it("com o teto estourado NENHUM degrau da transcrição roda: o áudio volta como não lida", async () => {
+    // Este caso media o CONTRÁRIO até a #250, e é por isso que ele estava
+    // vermelho nesta release. Antes, só o degrau 3 (modelo) estava dentro do
+    // gate, e os degraus 1 e 2 (serviço) transcreviam mesmo com o teto
+    // estourado — a empresa gastava depois de bater o limite, por um caminho
+    // que o gate não via. A #250 embrulhou os três em `comTeto(comCusto(...))`
+    // em `workers/media-derive-worker.ts`, e o teto passou a barrar todos.
     armarTeto();
     linhaDaMensagem = { ...linhaDaMensagem, type: "audio", media_mime: "audio/ogg", media_storage_path: "org1/conv1/msg1.ogg" };
 
     await deriveMessageMedia(eventRow());
     const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
 
-    expect(texto).toBe("transcrição de mentira");
-    expect(transcribeDoSvcMock).toHaveBeenCalledTimes(1);
-    expect(statementsDoGate("fn_gasto_de_ia_do_mes")).toHaveLength(0);
+    expect(texto).toBe(MARCADOR_NAO_LIDA);
+    // O serviço não é nem chamado: o teto barra ANTES de gastar, que é a
+    // diferença entre cobrar e não cobrar da empresa que já estourou.
+    expect(transcribeDoSvcMock).not.toHaveBeenCalled();
   });
 });
