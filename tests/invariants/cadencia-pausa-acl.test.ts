@@ -1,10 +1,9 @@
 /**
  * KILL SWITCH DAS CADÊNCIAS (`fn_definir_cadencias_pausadas`) — quem pode.
  *
- * A função é executável por `authenticated` DE PROPÓSITO (a rota chama pela
- * sessão), e é ela mesma quem decide: manager da própria organização, suporte de
- * escrita e MFA comprovado. Este arquivo é a prova que a razão escrita em
- * `hardening-definer-varredura.test.ts` cita.
+ * Era executável por `authenticated` porque a rota de pausa chamava pela
+ * sessão; a 9065 revogou o grant quando a rota saiu (#254). Este arquivo prova
+ * que a superfície fechou.
  */
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -63,12 +62,15 @@ const pausadas = async (org: string) =>
     .rows[0].p as boolean;
 
 describe("kill switch das cadências", () => {
-  it("manager da própria org com MFA pausa e retoma", async () => {
+  // Desde a 9065 a função perdeu o EXECUTE de `authenticated`: a rota de pausa
+  // (o único call site pela sessão) saiu com a remoção da cadência (#254), e
+  // definer volátil sem call site de sessão não fica executável. O que se prova
+  // agora é que NENHUMA sessão alcança a escrita — nem o manager com MFA, que
+  // antes podia. O corpo da função (MFA, papel, merge) fica para quem a
+  // ressuscitar, e volta a ser vigiado junto com o grant.
+  it("nem o manager da própria org com MFA executa pela sessão — e nada muda", async () => {
     const [a] = tenants;
-    const r = await asRole("authenticated", a!.manager, q, [a!.org, true], "aal2");
-    expect(r.rows[0].r).toEqual({ pausadas: true, mudou: true });
-    expect(await pausadas(a!.org)).toBe(true);
-    await asRole("authenticated", a!.manager, q, [a!.org, false], "aal2");
+    await expect(asRole("authenticated", a!.manager, q, [a!.org, true], "aal2")).rejects.toThrow(/permission denied/);
     expect(await pausadas(a!.org)).toBe(false);
   });
 
@@ -80,32 +82,5 @@ describe("kill switch das cadências", () => {
     await expect(asRole("anon", null, q, [a!.org, true])).rejects.toThrow();
     await expect(asRole("authenticated", b!.manager, q, [a!.org, true], "aal2")).rejects.toThrow();
     expect(await pausadas(a!.org)).toBe(false);
-  });
-
-  it("manager COM fator TOTP cadastrado precisa da sessão aal2 (aal1 é recusada)", async () => {
-    // `fn_session_mfa_proven` exige aal2 só de quem tem fator verificado — quem
-    // nunca cadastrou MFA passa em aal1, regra do produto inteiro. Com o fator:
-    const [a] = tenants;
-    const fator = randomUUID();
-    await pool.query(
-      "insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",
-      [fator, a!.manager],
-    );
-    try {
-      await expect(asRole("authenticated", a!.manager, q, [a!.org, true], "aal1")).rejects.toThrow(/mfa_required/);
-      expect(await pausadas(a!.org)).toBe(false);
-      // Controle: a MESMA pessoa em aal2 passa.
-      await asRole("authenticated", a!.manager, q, [a!.org, false], "aal2");
-    } finally {
-      await pool.query("delete from auth.mfa_factors where id=$1", [fator]);
-    }
-  });
-
-  it("grava por merge: as outras chaves de settings ficam", async () => {
-    const [, b] = tenants;
-    await pool.query("update organizations set settings = coalesce(settings,'{}'::jsonb) || '{\"outra_chave\":42}' where id=$1", [b!.org]);
-    await asRole("authenticated", b!.manager, q, [b!.org, true], "aal2");
-    const { rows } = await pool.query("select settings from organizations where id=$1", [b!.org]);
-    expect(rows[0].settings).toMatchObject({ outra_chave: 42, cadencias_pausadas: true });
   });
 });

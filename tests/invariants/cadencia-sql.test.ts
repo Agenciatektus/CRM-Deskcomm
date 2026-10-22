@@ -65,12 +65,13 @@ describe("privilégios das funções da cadência", () => {
     });
   }
 
-  it("kill switch: anon não executa; a sessão (authenticated) executa e a função reconfere", async () => {
+  // 9065: a rota de pausa saiu com a cadência (#254) e o grant de `authenticated` foi revogado.
+  it("kill switch: nem anon nem a sessão (authenticated) executam desde a 9065", async () => {
     const { rows } = await pool.query(
       `select has_function_privilege('anon', 'public.fn_definir_cadencias_pausadas(uuid, boolean)', 'EXECUTE') as anon,
               has_function_privilege('authenticated', 'public.fn_definir_cadencias_pausadas(uuid, boolean)', 'EXECUTE') as autenticado`,
     );
-    expect(rows[0]).toEqual({ anon: false, autenticado: true });
+    expect(rows[0]).toEqual({ anon: false, autenticado: false });
   });
 
   it("a tabela de vagas não é legível por authenticated", async () => {

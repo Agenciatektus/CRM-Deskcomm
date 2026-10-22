@@ -117,9 +117,21 @@ describe("o motivo de quem JÁ estava perdido (9066)", () => {
       [ORG, p[0]!.id],
     );
 
-    await expect(
-      pool.query("update crm_leads set pipeline_id = $1, stage_id = $2 where id = $3", [p[0]!.id, e[0]!.id, lead]),
-    ).rejects.toMatchObject({ code: "22023", message: "lost_reason_invalid: so_no_funil_a" });
+    // A troca de funil direta é barrada por `pipeline_immutable_use_clone`; quem a
+    // libera é `fn_mover_lead_de_funil`, ligando `app.movendo_funil` na transação.
+    // A função do produto só leva a etapa ABERTA, então a troca perdido→perdido
+    // é simulada com a mesma chave, para provar o gatilho e não o caminho.
+    const cliente = await pool.connect();
+    try {
+      await cliente.query("begin");
+      await cliente.query("select set_config('app.movendo_funil', 'on', true)");
+      await expect(
+        cliente.query("update crm_leads set pipeline_id = $1, stage_id = $2 where id = $3", [p[0]!.id, e[0]!.id, lead]),
+      ).rejects.toMatchObject({ code: "22023", message: "lost_reason_invalid: so_no_funil_a" });
+    } finally {
+      await cliente.query("rollback");
+      cliente.release();
+    }
 
     // CONTROLE: no MESMO funil, a troca de etapa do perdido passa sem revalidar.
     const { rows: e2 } = await pool.query<{ id: string }>(
