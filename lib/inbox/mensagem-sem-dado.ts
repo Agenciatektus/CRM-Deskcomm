@@ -3,8 +3,9 @@ import type { Message } from "@/lib/types/messaging";
 /**
  * Mensagem que não carrega dado nenhum: sem texto, sem mídia e com `metadata`
  * vazio (nenhuma chave). É ruído de protocolo do WhatsApp (sincronização entre
- * aparelhos, edição, apagada) gravado antes da correção em
- * `lib/channels/verdash/conteudo.ts`. Fica no banco, mas não é desenhada no
+ * aparelhos, edição, apagada) gravado antes da correção na leitura
+ * de conteúdo do canal hospedado (`conteudo.ts` da fronteira de canais). Fica no
+ * banco, mas não é desenhada no
  * histórico nem vira prévia.
  *
  * Qualquer dado mantém a mensagem visível: `tipo_nao_suportado`, localização,

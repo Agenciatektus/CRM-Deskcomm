@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 
 import type { InboxTab } from "@/components/inbox/InboxFilters";
 import { useT } from "@/hooks/i18n/useT";
+import { tipoDeConversaDoCanal } from "@/lib/channels/presentation";
 import type { TipoDeCanal } from "@/lib/inbox/tipo-de-canal";
 import { Archive, CaretLeft, CaretRight, CheckCircle, Funnel, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
@@ -141,8 +142,8 @@ export function FiltrosDaInboxNoCelular({
 export function tiposDeCanalDisponiveis(provedores: (string | undefined)[]): TipoDeCanal[] {
   return [
     "whatsapp",
-    ...(provedores.includes("instagram") ? (["instagram"] as const) : []),
-    ...(provedores.includes("zernio_social") ? (["facebook"] as const) : []),
+    ...(provedores.some((p) => tipoDeConversaDoCanal(p) === "instagram") ? (["instagram"] as const) : []),
+    ...(provedores.some((p) => tipoDeConversaDoCanal(p) === "facebook") ? (["facebook"] as const) : []),
   ];
 }
 

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useT } from "@/hooks/i18n/useT";
 import type { ChannelSummary } from "@/hooks/inbox/useConversationsRealtime";
+import { SESSAO_DE_EXEMPLO } from "@/lib/channels/presentation";
 import { Tray } from "@/lib/ui/icons";
 
 import { Estados, Exemplo, Secao } from "../_componentes/Secao";
@@ -22,8 +23,8 @@ const SIGLA = (nome: string) =>
     .join("")
     .slice(0, 2);
 
-const WHATSAPP = { provider: "waha" } as unknown as ChannelSummary;
-const INSTAGRAM = { provider: "instagram" } as unknown as ChannelSummary;
+const WHATSAPP = SESSAO_DE_EXEMPLO.whatsapp as unknown as ChannelSummary;
+const INSTAGRAM = SESSAO_DE_EXEMPLO.instagram as unknown as ChannelSummary;
 
 function AvatarComCanal({ nome, canal }: { nome: string; canal: ChannelSummary }) {
   return (
