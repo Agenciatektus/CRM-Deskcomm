@@ -209,12 +209,8 @@ type EntradaDeMarca = {
 
 const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
   // ─── PROTOCOLO — contrato de fio. Renomear quebra integração alheia. ───
-  "lib/ai/pontos/pkce-da-assinatura.ts": {
-    categoria: "PROTOCOLO",
-    motivo:
-      "`agent_name_hint` identifica o aplicativo auto-hospedado durante a autorização SIWC da OpenAI; não é o nome apresentado nas telas do CRM. O fluxo de login depende deste identificador de produto.",
-    marcas: ["deskcommcrm"],
-  },
+  // `lib/ai/pontos/pkce-da-assinatura.ts` saiu: o fork manda "Verdash CRM" no
+  // `agent_name_hint` (a marca do fork, não a do upstream), e a dívida encolheu.
   "lib/webhooks/assinatura.ts": {
     categoria: "PROTOCOLO",
     motivo:

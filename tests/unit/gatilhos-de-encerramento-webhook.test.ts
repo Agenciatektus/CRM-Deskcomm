@@ -49,10 +49,18 @@ vi.mock("@/lib/automation/outbound-url", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   assertSafeOutboundUrl: () => undefined,
 }));
-vi.mock("@/lib/automation/outbound-ip", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  assertDestinoResolvidoSeguro: async () => undefined,
-}));
+vi.mock("@/lib/automation/outbound-ip", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/automation/outbound-ip")>();
+  return {
+    ...original,
+    assertDestinoResolvidoSeguro: async () => undefined,
+    // A entrega agora conecta no IP conferido (`fetchComDestinoFixado`), com o
+    // juiz de IP próprio; só ele deixa passar o 127.0.0.1 do receptor do teste,
+    // como no vizinho `webhook-de-saida-mesma-entrega`.
+    fetchComDestinoFixado: (url: string, pedido: unknown) =>
+      original.fetchComDestinoFixado(url, pedido as never, { ipProibido: () => false }),
+  };
+});
 
 import { runAutomationForEvent, buildContext } from "@/lib/automation/engine";
 import { automationRulesHandler } from "@/lib/automation/engine.handler";

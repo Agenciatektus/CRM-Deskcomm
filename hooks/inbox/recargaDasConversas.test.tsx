@@ -77,6 +77,23 @@ describe("recarga do inbox pedida pelo realtime", () => {
     await waitFor(() => expect(aberta()).toBe(2));
   });
 
+  it("evento COM a linha de uma conversa que não está na lista: a conversa aberta recarrega", async () => {
+    // O caminho dirigido do fork (`cacheDasConversas.ts`) corrige as listas no
+    // lugar; a conversa aberta não mora em lista nenhuma e precisa da recarga.
+    montar();
+    await waitFor(() => expect(aberta()).toBe(1));
+    fakes.onChange!({ eventType: "UPDATE", new: { id: "c1", status: "closed" } });
+    await waitFor(() => expect(aberta()).toBe(2));
+  });
+
+  it("CONTROLE: evento com a linha de OUTRA conversa não recarrega a aberta", async () => {
+    montar();
+    await waitFor(() => expect(aberta()).toBe(1));
+    fakes.onChange!({ eventType: "UPDATE", new: { id: "c2", status: "closed" } });
+    await esperar(400);
+    expect(aberta()).toBe(1);
+  });
+
   it("não cancela a busca em voo: espera ela terminar e recarrega depois", async () => {
     const qc = montar();
     await waitFor(() => expect(lista()).toBe(1));

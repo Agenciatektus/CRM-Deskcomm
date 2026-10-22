@@ -38,6 +38,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: { id: "u-1", role: "admin" }, activeOrg: { orgId: ORG } }),
+  // Quem desenha fora do provider (a lista de conversas) lê a versão opcional.
+  useAuthOpcional: () => ({ user: { id: "u-1", role: "admin" }, activeOrg: { orgId: ORG } }),
   usePermission: () => true,
 }));
 vi.mock("@/hooks/inbox/useMarkAsRead", () => ({ useMarkAsRead: () => undefined }));
@@ -46,6 +48,8 @@ vi.mock("@/hooks/inbox/useClaimConversation", () => ({
 }));
 vi.mock("@/hooks/inbox/useCloseConversation", () => ({
   useCloseConversation: () => ({ mutate: vi.fn(), isPending: false }),
+  useArchiveConversation: () => ({ mutate: vi.fn(), isPending: false }),
+  useReopenConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { InboxLayout } from "@/components/inbox/InboxLayout";
@@ -59,9 +63,14 @@ function montar() {
   );
 }
 
+/**
+ * Visual v2: o filtro deixou de ser um botão "Grupos" na barra e virou a chave
+ * "Só grupos" dentro do popover de Filtros. O que se mede continua o mesmo: a
+ * listagem pede `is_group=true` e o vazio explica onde ligar um grupo.
+ */
 async function clicarEmGrupos() {
-  const botao = await screen.findByRole("button", { name: "Grupos" });
-  fireEvent.click(botao);
+  fireEvent.click(await screen.findByRole("button", { name: /^Filtros/ }));
+  fireEvent.click(await screen.findByRole("switch", { name: "Só grupos" }));
 }
 
 function urlsPedidas(): string[] {

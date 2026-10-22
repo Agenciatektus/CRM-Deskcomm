@@ -5,6 +5,7 @@
  * navegador. Nada aqui é lido do banco.
  */
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
+import { SESSAO_DE_EXEMPLO } from "@/lib/channels/presentation";
 import { montarCartoesDaPassagem, type CartaoDaPassagem } from "@/lib/escalacao/cartao-da-passagem";
 import type { Message, Note } from "@/lib/types/messaging";
 
@@ -60,7 +61,7 @@ export function conversaDaVitrine(
       is_blocked: false,
       is_anonymized: false,
     },
-    channel_sessions: { phone_number: "+5511900000000", display_name: "WhatsApp", provider: "waha" },
+    channel_sessions: { phone_number: "+5511900000000", display_name: "WhatsApp", ...SESSAO_DE_EXEMPLO.whatsapp },
   } as ConversationWithContact;
 }
 

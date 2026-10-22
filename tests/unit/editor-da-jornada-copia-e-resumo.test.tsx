@@ -29,6 +29,7 @@ import "@testing-library/jest-dom/vitest";
 import { ScheduleDialog } from "@/app/app/team/_components/AttendantsClient";
 import type { AttendantAvailability } from "@/hooks/team/useAttendants";
 import type { ScheduleWindow } from "@/lib/schemas/routing";
+import { entradaDoCampoDeData } from "@/tests/unit/helpers/controles-do-ds";
 
 const NA_TELA = "America/Sao_Paulo";
 
@@ -68,9 +69,13 @@ function faixasNaTela(): Record<string, string[]> {
   const porDia: Record<string, string[]> = {};
   for (const linha of screen.getAllByTestId("janela")) {
     const dow = linha.getAttribute("data-dow") ?? "?";
-    const inicio = linha.querySelector('input[aria-label="Início"]') as HTMLInputElement | null;
-    const fim = linha.querySelector('input[aria-label="Fim"]') as HTMLInputElement | null;
-    if (!inicio || !fim) continue;
+    // Os campos são `CampoDeData` (design system): o rótulo está no gatilho, e
+    // o valor no `<input>` escondido ao lado dele.
+    const gatilhoDoInicio = linha.querySelector<HTMLElement>('[aria-label="Início"]');
+    const gatilhoDoFim = linha.querySelector<HTMLElement>('[aria-label="Fim"]');
+    if (!gatilhoDoInicio || !gatilhoDoFim) continue;
+    const inicio = entradaDoCampoDeData(gatilhoDoInicio);
+    const fim = entradaDoCampoDeData(gatilhoDoFim);
     (porDia[dow] ??= []).push(`${inicio.value}–${fim.value}`);
   }
   return porDia;

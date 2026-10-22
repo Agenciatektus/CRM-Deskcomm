@@ -38,7 +38,7 @@ function sqlLiteral(v: unknown): string {
 type QResult = { data: unknown; error: { message: string; code?: string } | null };
 type RowResult = { data: Record<string, unknown> | null; error: { message: string; code?: string } | null };
 
-type FilterOp = "eq" | "is" | "neq";
+type FilterOp = "eq" | "is" | "neq" | "in";
 interface Filter {
   op: FilterOp;
   col: string;
@@ -114,6 +114,16 @@ class FakeQuery implements PromiseLike<QResult> {
     return this;
   }
 
+  /**
+   * `.in(col, lista)` — a troca de funil do fork (9053, `lib/leads/mover-de-funil.ts`)
+   * lê os nomes dos dois funis numa consulta só. Sem o ramo, o dublê estourava
+   * `TypeError` e o invariante media o dublê, não o código.
+   */
+  in(col: string, vals: unknown[]): this {
+    this.filters.push({ op: "in", col, val: vals });
+    return this;
+  }
+
   order(col: string, opts: { ascending: boolean }): this {
     this.orderCol = col;
     this.orderAsc = opts.ascending;
@@ -132,7 +142,9 @@ class FakeQuery implements PromiseLike<QResult> {
         ? `${f.col} is ${f.val === null ? "null" : sqlLiteral(f.val)}`
         : f.op === "neq"
           ? `${f.col} <> ${sqlLiteral(f.val)}`
-          : `${f.col} = ${sqlLiteral(f.val)}`,
+          : f.op === "in"
+            ? `${f.col} in (${(f.val as unknown[]).map((v) => sqlLiteral(v)).join(", ")})`
+            : `${f.col} = ${sqlLiteral(f.val)}`,
     );
     return ` where ${clauses.join(" and ")}`;
   }
@@ -239,6 +251,23 @@ function fakeAdminClient(): SupabaseClient {
             return { data: JSON.parse(saida), error: null };
           } catch (err) {
             return { data: null, error: { message: (err as Error).message } };
+          }
+        }
+        // A troca de funil MOVE o mesmo card (9053): a escrita é a função do banco,
+        // chamada aqui como o PostgREST a chamaria, e o que volta é a linha movida.
+        if (name === "fn_mover_lead_de_funil") {
+          const p = params as unknown as { p_org: string; p_lead: string; p_pipeline: string; p_stage: string; p_ator: string | null };
+          try {
+            const saida = sql(
+              `select row_to_json(public.fn_mover_lead_de_funil(${sqlString(p.p_org)}::uuid, ${sqlString(
+                p.p_lead,
+              )}::uuid, ${sqlString(p.p_pipeline)}::uuid, ${sqlString(p.p_stage)}::uuid, ${
+                p.p_ator ? `${sqlString(p.p_ator)}::uuid` : "null"
+              }));`,
+            );
+            return { data: JSON.parse(saida), error: null };
+          } catch (err) {
+            return { data: null, error: { message: (err as { stderr?: string }).stderr ?? (err as Error).message } };
           }
         }
         if (name !== "emit_event") {
@@ -419,13 +448,19 @@ describe("create_or_move_lead (Task 9)", () => {
     expect(String(metadata.request_id ?? "")).toBe(`rule:${RULE_ID}`);
   });
 
-  it("8 (bonus). pipeline diferente do lead do contexto — failed cross_pipeline_move_not_allowed, stage inalterado", async () => {
+  // No upstream a troca de funil era recusada (`cross_pipeline_move_not_allowed`).
+  // No fork, desde a 9053 (decisão do Peterson de 19/10/2026), ela MOVE o mesmo
+  // card, pela função do banco, e nenhum card novo nasce.
+  it("8 (bonus). pipeline diferente do lead do contexto — MOVE o mesmo card para o funil da regra (9053)", async () => {
     const executor = getAction("create_or_move_lead")!;
-    const before = leadRow(LEAD_T9).stage_id;
+    const antes = Number(row(`select count(*)::int as n from public.crm_leads where organization_id = '${GOV_ORG}'`).n);
     const ctx = baseCtx({ lead: leadRow(LEAD_T9) });
     const result = await executor.execute(ctx, { pipeline_id: PIPE_2, stage_id: STAGE_PIPE_2 });
-    expect(result.status).toBe("failed");
-    expect(result.error).toBe("cross_pipeline_move_not_allowed");
-    expect(leadRow(LEAD_T9).stage_id).toBe(before);
+    expect(result.status, String(result.error ?? "")).toBe("success");
+    expect(result.detail).toEqual({ moved: LEAD_T9, pipeline_id: PIPE_2 });
+    const depois = leadRow(LEAD_T9);
+    expect(depois.pipeline_id).toBe(PIPE_2);
+    expect(depois.stage_id).toBe(STAGE_PIPE_2);
+    expect(Number(row(`select count(*)::int as n from public.crm_leads where organization_id = '${GOV_ORG}'`).n)).toBe(antes);
   });
 });

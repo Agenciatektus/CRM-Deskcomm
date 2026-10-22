@@ -105,6 +105,11 @@ let cenario = cenarioPadrao();
 function fakePool() {
   const query = vi.fn(async (sql: string, params: unknown[] = []): Promise<{ rows: Array<Record<string, unknown>>; rowCount?: number }> => {
     if (sql.includes("as tem_lead")) return { rows: cenario.fatosDaSaida ? [cenario.fatosDaSaida] : [] };
+    // O turno confere que a inscrição ainda está viva e no MESMO nó do payload
+    // antes de agir (upstream): aqui ela está ativa, no nó `a1`.
+    if (sql.includes("select current_node_id, status from followup_enrollments")) {
+      return { rows: [{ current_node_id: "a1", status: "active" }] };
+    }
     if (sql.includes("update followup_enrollments") && sql.includes("cancel_reason = $4")) {
       encerramentos.push(params);
       return { rows: [{ id: params[1] }] };

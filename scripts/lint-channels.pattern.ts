@@ -47,7 +47,27 @@
  * por rota, componente e cópia de tela. Provider novo = uma linha aqui, no
  * mesmo commit.
  */
-const SEPARADO = /(?<![a-zA-Z0-9])(waha|meta_cloud|zernio|verdash|datafy|graph\.facebook\.com)(?![a-zA-Z0-9])/i;
+const SEPARADO = /(?<![a-zA-Z0-9])(waha|meta_cloud|zernio|datafy|graph\.facebook\.com)(?![a-zA-Z0-9])/i;
+
+/**
+ * `verdash` é o ÚNICO nome do vocabulário que é também a MARCA deste fork
+ * ("Verdash CRM", o V do logotipo, a aba "Verdash" das conexões — decisão do
+ * fork, ver `lib/branding.ts`). Como provider de canal (o modo pareado,
+ * `lib/channels/verdash/`), ele aparece em código como SLUG: `"verdash"`,
+ * `lib/channels/verdash/`, `verdash_*`, `VERDASH_*`. Como marca, ele aparece
+ * como nome próprio: `Verdash`, com a inicial maiúscula e o resto minúsculo.
+ *
+ * Por isso este nome fica fora da alternação case-insensitive de `SEPARADO` e
+ * casa só em caixa baixa ou caixa alta inteira. Com `/i`, a cerca acusava cada
+ * comentário e cada texto de tela que cita a marca (22 linhas em 15 arquivos
+ * na dev de 21/10/2026), e a saída seria pôr a marca inteira na lista de dívida,
+ * o que esconderia o slug do provider nesses mesmos arquivos.
+ *
+ * O que fica de fora: um identificador PascalCase `VerdashAdapter`. Ele nunca
+ * foi coberto (`PASCAL` não tem `Verdash`), porque `DesignSystemVerdash` e
+ * `MarcaVerdash` são marca e têm a mesma grafia.
+ */
+const SLUG_VERDASH = /(?<![a-zA-Z0-9])(verdash|VERDASH)(?![a-zA-Z0-9])/;
 
 /**
  * Grafia PascalCase dentro de identificador: `WahaClient`,
@@ -61,8 +81,8 @@ const PASCAL = /(Waha|Zernio|Datafy)(?![a-z0-9])/;
 
 /** Um trecho de código/prosa nomeia um provider de canal? */
 export function nomeiaProvider(texto: string): boolean {
-  return SEPARADO.test(texto) || PASCAL.test(texto);
+  return SEPARADO.test(texto) || PASCAL.test(texto) || SLUG_VERDASH.test(texto);
 }
 
 /** Exportadas para o teste de fronteira poder vigiar cada uma isoladamente. */
-export const PADROES = { SEPARADO, PASCAL } as const;
+export const PADROES = { SEPARADO, PASCAL, SLUG_VERDASH } as const;

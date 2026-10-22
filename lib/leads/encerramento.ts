@@ -102,16 +102,11 @@ export async function encerraDemanda(
   ctx: HandlerCtx,
   input: EncerraDemandaInput,
 ): Promise<DemandaEncerrada> {
-  if (input.desfecho === "lost" && !input.motivo?.trim()) {
-    throw new ApiError(
-      422,
-      "validation_failed",
-      undefined,
-      ctx.requestId,
-      traduzir("Informe o motivo da perda.", ctx.idioma ?? "pt-BR"),
-    );
-  }
-
+  // A perda sem motivo NÃO é recusada aqui, antes de ler o funil: quem decide é
+  // `decideMotivoDaPerda` (abaixo), que conhece `settings.lost_reason_required`
+  // (9044) e o motivo que o negócio já tem. A recusa que morava aqui era a regra
+  // de antes da 9044 e respondia `validation_failed` para TODO funil — o
+  // "Marcar como perdido" de um funil com motivo opcional seguia exigindo motivo.
   const { data: lead, error: selErr } = await supabase
     .from("crm_leads")
     .select("*")
@@ -234,7 +229,8 @@ export async function encerraDemanda(
   }
   // Sem lista cadastrada o motivo de ganho é texto livre; com lista, só o que
   // está nela passa — quem aplica é o servidor, porque para o GANHO não há
-  // trigger no banco (a CHECK da perda é `crm_leads_lost_reason_required`).
+  // trigger no banco (a perda é validada por `trg_validate_lost_reason_required`;
+  // a CHECK `crm_leads_lost_reason_required` saiu na 9044).
   if (input.desfecho === "won") {
     const recusaGanho = recusaDeMotivoDoGanho({
       motivo: input.motivo,

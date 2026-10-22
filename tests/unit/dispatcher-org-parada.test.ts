@@ -26,6 +26,8 @@ import { drainEventLog } from "@/lib/event-log/drain";
 import { ensureHandlersRegistered } from "@/lib/event-log/register-handlers";
 import { pinoReintentoHandler } from "@/lib/channels/zernio/pino-reintento.handler";
 import { automationRulesHandler } from "@/lib/automation/engine.handler";
+import { cadenciaSaidasHandler } from "@/lib/cadencia/saidas.handler";
+import { campanhaEntradaPorEtapaHandler } from "@/lib/campanhas/entrada-por-etapa.handler";
 import { campanhaRespostaHandler } from "@/lib/campanhas/resposta.handler";
 import { cobrancaSinalHandler } from "@/lib/cobranca/sinal.handler";
 import { conversaoDeVendaHandler } from "@/lib/conversoes/envio.handler";
@@ -87,6 +89,10 @@ const PULA: EventHandler[] = [
   conversaoDeQualificacaoHandler,
   conversaoDeEtapaMetaHandler,
   pinoReintentoHandler,
+  // Régua e campanha do fork: põem gente em sequência e mandam mensagem em
+  // nome da empresa — org parada não age por ela.
+  cadenciaSaidasHandler,
+  campanhaEntradaPorEtapaHandler,
 ];
 
 const PREFIXO_DE_TESTE = "teste-org-parada";

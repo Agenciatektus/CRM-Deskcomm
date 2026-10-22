@@ -25,8 +25,29 @@ beforeEach(() => {
     user: { id: USER_ID },
     org: { orgId: ORG_ID },
   } as never);
-  vi.mocked(createClient).mockResolvedValue({ from: vi.fn() } as never);
+  vi.mocked(createClient).mockResolvedValue(bancoFalso() as never);
 });
+
+/**
+ * O mínimo que `encerraDemanda` lê antes de decidir o motivo: o negócio aberto,
+ * a etapa de perda do funil e o `settings` do funil (vazio = o motivo é exigido,
+ * a regra de sempre; `lost_reason_required: false` o torna opcional, 9044).
+ */
+function bancoFalso() {
+  const linhas: Record<string, unknown> = {
+    crm_leads: { id: LEAD_ID, organization_id: ORG_ID, pipeline_id: "p1", status: "open", lost_reason: null },
+    crm_stages: { id: "etapa-perdido", name: "Perdido" },
+    crm_pipelines: { settings: {} },
+  };
+  return {
+    from: vi.fn((tabela: string) => {
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "order", "limit", "update"]) q[m] = () => q;
+      q.maybeSingle = async () => ({ data: linhas[tabela] ?? null, error: null });
+      return q;
+    }),
+  };
+}
 
 function request(body: string): NextRequest {
   return new NextRequest(`http://localhost/api/v1/leads/${LEAD_ID}/lose`, {

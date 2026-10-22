@@ -55,13 +55,14 @@ function clientFake() {
   return { capturado, client };
 }
 
-/** Client de LISTAGEM (GET) — decorre `from(...).select().eq().neq().order()`. */
+/** Client de LISTAGEM (GET) — decorre `from(...).select().eq().not().order()`. */
 function clientDaLista() {
   const filtros: Array<[string, string, unknown]> = [];
   const cadeia = {
     select: () => cadeia,
     eq: (c: string, v: unknown) => (filtros.push(["eq", c, v]), cadeia),
     neq: (c: string, v: unknown) => (filtros.push(["neq", c, v]), cadeia),
+    not: (c: string, op: string, v: unknown) => (filtros.push([`not.${op}`, c, v]), cadeia),
     order: async () => ({ data: [], error: null }),
   };
   return { filtros, client: { from: () => cadeia } };
@@ -148,7 +149,9 @@ describe("GET /api/v1/ai/followup-flows — roteiros fora da lista de follow-ups
     deps.client.mockResolvedValue(client);
     const res = await GET(new NextRequest("http://localhost/api/v1/ai/followup-flows"));
     expect(res.status).toBe(200);
-    expect(filtros).toContainEqual(["neq", "surface", "atendimento"]);
+    // Fora ficam os roteiros E as réguas de prospecção (cadência e campanha), que
+    // têm tela própria: a lista abria no editor genérico, que não as conhece.
+    expect(filtros).toContainEqual(["not.in", "surface", "(atendimento,cadence,campaign)"]);
   });
 
   it("?surface=atendimento: só os roteiros", async () => {
@@ -156,7 +159,7 @@ describe("GET /api/v1/ai/followup-flows — roteiros fora da lista de follow-ups
     deps.client.mockResolvedValue(client);
     await GET(new NextRequest("http://localhost/api/v1/ai/followup-flows?surface=atendimento"));
     expect(filtros).toContainEqual(["eq", "surface", "atendimento"]);
-    expect(filtros).not.toContainEqual(["neq", "surface", "atendimento"]);
+    expect(filtros.some(([op]) => op.startsWith("not") || op === "neq")).toBe(false);
   });
 
   it("GET: com Bearer mcp:read, requireRole (sessão) não é consultado — org vem do token", async () => {

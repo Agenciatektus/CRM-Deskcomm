@@ -15,6 +15,9 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: { id: "u1", idioma: "pt-BR" } }),
   usePermission: () => true,
 }));
+// A lista de canais só decide se as caixas de fonte do Instagram aparecem;
+// a gaveta do arquivo não depende dela.
+vi.mock("@/hooks/channels/useChannelSessions", () => ({ useChannelSessions: () => ({ data: [] }) }));
 vi.mock("@/hooks/pipelines/usePipelines", () => ({
   useCriarFunil: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarFunil: () => ({ mutate: editar, isPending: false }),

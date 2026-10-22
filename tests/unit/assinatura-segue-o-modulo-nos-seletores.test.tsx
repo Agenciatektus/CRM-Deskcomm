@@ -28,6 +28,7 @@ vi.mock("@/app/actions/onboarding/chaveDaIa", () => ({ salvarChaveDaIa: vi.fn() 
 import { AgentForm, provedorInicial } from "@/app/app/ai/agents/[id]/_components/AgentForm";
 import { InteligenciaDele } from "@/app/onboarding/setup-ai/_inteligencia";
 import { IDS_DE_PROVEDOR, PROVEDOR_POR_ASSINATURA } from "@/lib/ai/pontos/provedores";
+import { opcoesDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
 const ROTULO = "OpenAI pela assinatura (ChatGPT)";
 const COM_ELA: readonly string[] = IDS_DE_PROVEDOR;
@@ -59,8 +60,9 @@ function opcoesDoOnboarding() {
       inicial={{ origem: "nenhuma", provedor: "anthropic", rotulo: "Anthropic (Claude)", final: null }}
     />,
   );
-  const select = container.querySelector("#provedor_da_ia") as HTMLSelectElement;
-  return Array.from(select.options).map((o) => o.textContent);
+  // `#provedor_da_ia` é o gatilho do `Escolha` (design system); as opções moram
+  // no `<select>` escondido ao lado (o vazio de controle fica de fora).
+  return opcoesDaEscolha(container.querySelector("#provedor_da_ia") as HTMLElement);
 }
 
 describe("editor do agente", () => {

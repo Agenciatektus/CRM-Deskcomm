@@ -106,12 +106,16 @@ describe("inv. 5 — assentos", () => {
       `update public.user_organizations set revoked_at = now() where organization_id = '${org(5)}' and user_id = '${pessoa(15)}'`)).toBe(1);
   });
 
-  it("mudar a organização de um vínculo ativo conta no destino", () => {
+  // No upstream a troca de organização de um vínculo contava como ENTRADA no
+  // destino (e o teto respondia PT402). No fork NENHUMA linha de public muda de
+  // organização (`trg_organizacao_nao_muda`, 9030/9031): a recusa vem antes, com
+  // 42501, e o destino segue com o assento que tinha.
+  it("mudar a organização de um vínculo ativo é recusado, e o destino não ganha assento", () => {
     assinar(org(6), PLANO_1);
     vincular(pessoa(16), org(6), "admin");
     vincular(pessoa(17), org(7));
     expect(erroDe(`update public.user_organizations set organization_id = '${org(6)}'
-                    where organization_id = '${org(7)}' and user_id = '${pessoa(17)}';`)).toContain("PT402");
+                    where organization_id = '${org(7)}' and user_id = '${pessoa(17)}';`)).toContain("42501");
     expect(assentosOcupados(org(6))).toBe(1);
   });
 

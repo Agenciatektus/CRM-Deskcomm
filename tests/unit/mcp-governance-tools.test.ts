@@ -449,6 +449,9 @@ describe("crm_get_queue_status", () => {
         error: null,
       };
     }
+    // A carga de cada atendente é CONTAGEM no banco (`head: true`, #248): sem
+    // `count` a régua conta o atendente como lotado (fail-closed).
+    if (q.table === "conversations" && q.count) return { data: null, count: 0, error: null };
     return { data: [], error: null };
   };
 

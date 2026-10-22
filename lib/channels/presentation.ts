@@ -67,3 +67,26 @@ export const CHANNEL_BRAND_LABEL: Record<ChannelBrand, string> = {
   // é precisamente o defeito que esta tabela existe para fechar.
   unknown: "Canal",
 };
+
+/**
+ * O tipo de CONVERSA (`conversations.channel`, fora o WhatsApp de sempre) que um
+ * canal conectado torna filtrável na Inbox. Mora aqui, e não na folha de filtros,
+ * pela mesma razão de `channelBrand`: saber que o transporte social entrega o
+ * Facebook é conhecimento de transporte, e a doutrina de restrição de canal
+ * (invariante 1) não deixa a feature nomeá-lo.
+ */
+export function tipoDeConversaDoCanal(provider: string | null | undefined): "instagram" | "facebook" | null {
+  if (provider === "instagram") return "instagram";
+  if (provider === "zernio_social") return "facebook";
+  return null;
+}
+
+/**
+ * Uma sessão de EXEMPLO por rede, para as amostras do design system desenharem
+ * o selo da rede certa. O selo sai de `channelBrand`, que lê o provider; a
+ * amostra pede a rede e o transporte fica aqui, do lado de dentro da fronteira.
+ */
+export const SESSAO_DE_EXEMPLO = {
+  whatsapp: { provider: "waha" },
+  instagram: { provider: "instagram" },
+} as const satisfies Record<"whatsapp" | "instagram", { provider: string }>;

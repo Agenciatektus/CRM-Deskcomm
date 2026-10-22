@@ -26,7 +26,7 @@ import {
   type EventoDaMeta,
   type RegraDeConversaoMeta,
 } from "@/lib/conversoes/regras-meta";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 import type { EtapaAberta } from "./_regrasGoogle";

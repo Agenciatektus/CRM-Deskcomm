@@ -73,11 +73,14 @@ describe("inv. 6 — canais de mensagem", () => {
                     where id = '${canal(7)}';`)).toContain("PT402");
   });
 
-  it("mudar a organização de um canal conta no destino", () => {
+  // No fork nenhuma linha de public muda de organização (`trg_organizacao_nao_muda`,
+  // 9030/9031): a troca é recusada com 42501 antes do teto do plano (PT402 no upstream).
+  it("mudar a organização de um canal é recusado antes de contar no destino", () => {
     assinar(org(4), PLANO_1);
     sql(`${insercaoDeCanal(canal(8), org(4))};`);
     sql(`${insercaoDeCanal(canal(9), org(5))};`);
-    expect(erroDe(`update public.channel_sessions set organization_id = '${org(4)}' where id = '${canal(9)}';`)).toContain("PT402");
+    expect(erroDe(`update public.channel_sessions set organization_id = '${org(4)}' where id = '${canal(9)}';`)).toContain("42501");
+    expect(sql(`select organization_id from public.channel_sessions where id = '${canal(9)}';`).trim()).toBe(org(5));
   });
 
   it("⭐ duas conexões ao mesmo tempo com uma vaga: exatamente uma passa", async () => {

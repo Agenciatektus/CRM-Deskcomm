@@ -17,10 +17,11 @@ import pg from "pg";
  *  - a coluna `lost_reason` entra na lista do `update` SÓ quando há motivo —
  *    e é isso que evita revalidar, por `trg_validate_lost_reason_required`, um
  *    motivo que saiu da configuração do funil depois de usado;
- *  - a recusa que o operador via como 500 vem da CHECK
- *    `crm_leads_lost_reason_required` (23514), disparada pelo fechamento que
- *    `trg_crm_lead_close_on_stage` faz — uma cascata de dois gatilhos e uma
- *    constraint, que só existe no banco.
+ *  - a recusa que o operador via como 500 vinha da CHECK
+ *    `crm_leads_lost_reason_required` (23514); desde a 9044 vem do gatilho
+ *    `trg_validate_lost_reason_required` (22023), disparado pela troca de etapa
+ *    que `trg_crm_lead_close_on_stage` fecha — uma cascata de dois gatilhos, que
+ *    só existe no banco.
  */
 const container = process.env.TEST_DB_CONTAINER;
 if (!container) {
@@ -92,12 +93,72 @@ afterAll(async () => {
   await pool.end();
 });
 
+describe("o motivo de quem JÁ estava perdido (9066)", () => {
+  it("trocar de FUNIL continua perdido não existe: a guarda da troca exige etapa aberta", async () => {
+    // A 9066 deixa de revalidar o perdido que segue perdido com o MESMO motivo
+    // (o motivo aposentado sobrevive à troca de etapa). O retorno antecipado não
+    // pode valer para a troca de funil: lá o vocabulário é outro.
+    await pool.query(
+      `update crm_pipelines set settings = jsonb_set(coalesce(settings, '{}'::jsonb),
+         '{lost_reasons}', '["so_no_funil_a"]'::jsonb) where id = $1`,
+      [funil],
+    );
+    const [lead] = await doisNegociosAbertos();
+    await moverEmLote([lead], etapaDePerda, "so_no_funil_a");
+
+    const { rows: p } = await pool.query<{ id: string }>(
+      `insert into crm_pipelines (organization_id, name, slug, position)
+       values ($1, 'Outro', 'outro-lote-perda', 200) returning id`,
+      [ORG],
+    );
+    const { rows: e } = await pool.query<{ id: string }>(
+      `insert into crm_stages (organization_id, pipeline_id, name, slug, position, is_lost)
+       values ($1, $2, 'Perdido B', 'perdido-b-lote', 1, true) returning id`,
+      [ORG, p[0]!.id],
+    );
+
+    // O P2 do Cassio: o retorno antecipado da 9066 não pode pular a validação
+    // numa troca de FUNIL. A 9066 já exige o MESMO funil para pular; e, medido
+    // aqui, a troca perdido→perdido entre funis nem chega ao gatilho do motivo:
+    // `fn_crm_leads_guarda_troca_de_funil` (a guarda que `fn_mover_lead_de_funil`
+    // destrava com `app.movendo_funil`) só aceita etapa de destino ABERTA, e a
+    // troca reabre o card. Se um dia a guarda aceitar etapa terminal, a condição
+    // de funil da 9066 é que impede o motivo velho de passar sem validação.
+    const cliente = await pool.connect();
+    try {
+      await cliente.query("begin");
+      await cliente.query("select set_config('app.movendo_funil', 'on', true)");
+      await expect(
+        cliente.query("update crm_leads set pipeline_id = $1, stage_id = $2 where id = $3", [p[0]!.id, e[0]!.id, lead]),
+      ).rejects.toMatchObject({ code: "22023", message: "stage_pipeline_mismatch" });
+    } finally {
+      await cliente.query("rollback");
+      cliente.release();
+    }
+
+    // CONTROLE: no MESMO funil, o perdido cujo motivo saiu do vocabulário segue
+    // gravável por UPDATE que toca `stage_id` (o gatilho dispara e não revalida).
+    // O funil só tem UMA etapa de perda (`uniq_crm_stages_pipeline_lost`), então
+    // a escrita reafirma a mesma etapa, como a reordenação na coluna faz.
+    await pool.query(
+      `update crm_pipelines set settings = jsonb_set(settings, '{lost_reasons}', '[]'::jsonb) where id = $1`,
+      [funil],
+    );
+    await pool.query("update crm_leads set stage_id = stage_id where id = $1", [lead]);
+    const { rows } = await pool.query<{ lost_reason: string }>("select lost_reason from crm_leads where id = $1", [lead]);
+    expect(rows[0]!.lost_reason).toBe("so_no_funil_a");
+  });
+});
+
 describe("o lote para uma etapa de PERDA", () => {
-  it("SEM motivo, o banco recusa o lote inteiro — 23514, a CHECK", async () => {
+  // Desde a 9044 (motivo opcional por funil) a CHECK `crm_leads_lost_reason_required`
+  // não existe mais: quem recusa é `trg_validate_lost_reason_required`, que lê o
+  // funil (chave ausente = obrigatório) e responde 22023 `lost_reason_required`.
+  it("SEM motivo, num funil que exige, o banco recusa o lote inteiro — 22023, o gatilho", async () => {
     const ids = await doisNegociosAbertos();
     await expect(moverEmLote(ids, etapaDePerda, null)).rejects.toMatchObject({
-      code: "23514",
-      constraint: "crm_leads_lost_reason_required",
+      code: "22023",
+      message: "lost_reason_required",
     });
 
     // E a transação única cumpriu a promessa: NENHUM dos dois se moveu.

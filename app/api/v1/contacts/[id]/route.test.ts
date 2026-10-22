@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
 import { fail } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
-import { requireRole } from "@/lib/auth/require-role";
+import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 
 import { GET, PATCH } from "./route";
@@ -20,7 +20,7 @@ import { GET, PATCH } from "./route";
  */
 
 vi.mock("@/lib/auth/server", () => ({ loadAuthUser: vi.fn(), resolveActiveOrg: vi.fn() }));
-vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
+vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn(), orgAtivaDaApi: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
@@ -80,6 +80,8 @@ beforeEach(() => {
   vi.mocked(createClient).mockResolvedValue(clienteFalso() as never);
   vi.mocked(loadAuthUser).mockResolvedValue({ id: USUARIO, idioma: "pt-BR", support: null } as never);
   vi.mocked(resolveActiveOrg).mockResolvedValue({ orgId: ORG, role: "agent" } as never);
+  // O GET resolve a org por `orgAtivaDaApi` (403 JSON), não por `resolveActiveOrg`.
+  vi.mocked(orgAtivaDaApi).mockResolvedValue({ ok: true, org: { orgId: ORG, role: "agent" } } as never);
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: USUARIO, idioma: "pt-BR" },

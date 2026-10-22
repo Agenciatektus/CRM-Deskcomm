@@ -16,15 +16,30 @@ import { listConversationsHandler } from "@/app/api/v1/conversations/_handler";
 const MURO_DO_GATEWAY = 8_192;
 const uuid = (p: string, i: number) => `${p}${String(i).padStart(7, "0")}-1111-4111-8111-111111111111`;
 
-async function urlsDaLista(opts: { search: string; marcadas: number; fixadas: number; contatos: number }) {
+async function urlsDaLista(opts: {
+  search: string;
+  marcadas: number;
+  fixadas: number;
+  contatos: number;
+  /** Contatos marcados como pessoais na organização (spec 21, etapa 7). */
+  pessoais?: number;
+}) {
   const urls: string[] = [];
   const contatos = Array.from({ length: opts.contatos }, (_, i) => ({ id: uuid("c", i) }));
+  const pessoais = Array.from({ length: opts.pessoais ?? 0 }, (_, i) => ({ id: uuid("p", i) }));
   const sb = createClient("http://127.0.0.1:54321", "x".repeat(200), {
     global: {
       fetch: async (u: RequestInfo | URL) => {
         const url = String(u);
         urls.push(url);
-        const corpo = url.includes("/rest/v1/contacts") ? contatos : [];
+        // Duas consultas em `contacts`: a dos PESSOAIS (`is_personal=eq.true`)
+        // e a da busca (`is_personal=eq.false`). Antes o dublê devolvia os
+        // casados da busca para as duas, e a lista de pessoais inflava a URL.
+        const corpo = !url.includes("/rest/v1/contacts")
+          ? []
+          : url.includes("is_personal=eq.true")
+            ? pessoais
+            : contatos;
         return new Response(JSON.stringify(corpo), { status: 200, headers: { "content-type": "application/json" } });
       },
     },
@@ -48,6 +63,22 @@ describe("a lista do atendente não estoura a URL", () => {
     expect(url!.length).toBeLessThan(MURO_DO_GATEWAY);
     // Os pessoais vão primeiro: as fixadas excluídas estão TODAS na URL.
     expect(decodeURIComponent(url!)).toContain(uuid("f", 9));
+  });
+
+  it("muitos contatos PESSOAIS saem do mesmo orçamento: a URL fica abaixo do muro e nenhum pessoal fica de fora", async () => {
+    // 100 pessoais (~4.500 B só deles) + a busca, as fixadas e as marcadas do
+    // caso acima. Com o orçamento dos pessoais por fora, esta URL passava de
+    // 8 KB: 414 no gateway, 500 no handler, Inbox parado.
+    const [url] = await urlsDaLista({
+      search: "silva ".repeat(16).trim(),
+      marcadas: 200,
+      fixadas: 10,
+      contatos: 120,
+      pessoais: 100,
+    });
+    expect(url!.length).toBeLessThan(MURO_DO_GATEWAY);
+    // Esconder o pessoal é privacidade: ele paga primeiro e não é cortado.
+    expect(decodeURIComponent(url!)).toContain(uuid("p", 99));
   });
 
   it("CONTROLE: a sonda enxerga o que mede (marcadas e contatos da busca chegam à URL)", async () => {

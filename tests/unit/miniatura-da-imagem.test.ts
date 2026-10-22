@@ -65,7 +65,7 @@ vi.mock("@/lib/channels", () => ({
 
 function encadeado(resultado: () => unknown) {
   const q: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "in", "not", "is", "order", "limit"]) q[m] = () => q;
+  for (const m of ["select", "eq", "in", "not", "is", "filter", "order", "limit"]) q[m] = () => q;
   q.maybeSingle = async () => resultado();
   q.then = (ok: (v: unknown) => unknown) => ok(resultado());
   return q;

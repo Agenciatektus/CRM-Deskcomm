@@ -43,6 +43,8 @@ export function rotuloDoTempo(
       : tempo.horas >= 1
         ? `${tempo.horas}h`
         : null;
-  if (tempo.nivel !== "neutro") return quanto ? `${t("Parado há")} ${quanto}` : t("Parado");
-  return quanto ? `${t("há")} ${quanto}` : t("agora");
+  // Chave com lacuna, e não "há" + quanto: a ordem é da língua (o inglês põe o
+  // marcador depois, "3 days ago"), e pedaço solto prende a ordem do português.
+  if (tempo.nivel !== "neutro") return quanto ? t("Parado há {tempo}").replace("{tempo}", quanto) : t("Parado");
+  return quanto ? t("há {tempo}").replace("{tempo}", quanto) : t("agora");
 }

@@ -45,9 +45,9 @@ function numeroPositivo(v: unknown): number | null {
 
 /**
  * A duração que o canal mandou junto da mensagem, se mandou. Só lê o que
- * existe hoje: o `seconds` do anexo que o FZAP grava (`lib/channels/verdash`).
- * WAHA e a Cloud API da Meta não trazem duração no webhook — esses caem no
- * ffprobe.
+ * existe hoje: o `seconds` do anexo que o canal hospedado grava (na fronteira
+ * de canais). Os outros transportes não trazem duração no webhook — esses caem
+ * no ffprobe.
  */
 export function duracaoDeclaradaPeloCanal(metadata: Record<string, unknown> | null | undefined): number | null {
   const anexos = metadata?.provider_attachments;

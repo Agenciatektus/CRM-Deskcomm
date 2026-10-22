@@ -317,8 +317,13 @@ async function reactToInbound(
   // tinha respondido. O follow-up comum pausado à mão segue intocado.
   const live = carregadas.filter((e) => e.status !== "paused_manual" || ehProspeccao(e.surface));
 
+  // Pessoal e STOP leem `carregadas`, e NÃO `live`: são hard stop e alcançam a
+  // pausa manual de QUALQUER régua (`STATUS_ALCANCADOS_PELO_OPT_OUT`). O filtro
+  // acima é da resposta comum; aplicado aqui, ele devolvia o follow-up comum
+  // pausado à mão ao STOP — a inscrição seguia viva, ocupando a vaga única do
+  // contato, e a métrica não contava o opt-out (#068eb48 no upstream).
   if (isPersonal) {
-    const reacted = await cancelAll(db, row.organization_id, row.id, live, "opted_out", "pessoal", "reactivity_personal", clock);
+    const reacted = await cancelAll(db, row.organization_id, row.id, carregadas, "opted_out", "pessoal", "reactivity_personal", clock);
     return { matched: true, reacted };
   }
 
@@ -326,7 +331,7 @@ async function reactToInbound(
     // STOP/opt-out (a regex já rodou em lib/waha/ingest.ts e setou is_blocked
     // ANTES de emitir este evento, na mesma request — ver header do arquivo).
     // Hard stop LGPD/anti-ban: cancela TUDO que está vivo, sem exceção de política.
-    const reacted = await cancelAll(db, row.organization_id, row.id, live, "opted_out", "stop_keyword", "reactivity_opted_out", clock);
+    const reacted = await cancelAll(db, row.organization_id, row.id, carregadas, "opted_out", "stop_keyword", "reactivity_opted_out", clock);
     return { matched: true, reacted };
   }
 

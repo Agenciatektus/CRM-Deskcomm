@@ -213,6 +213,18 @@ const KNOWN_DEBT: { reason: string; files: string[] }[] = [
       "a cópia de tela na fonte deixar de nomear o provider.",
     files: ["lib/i18n/dicionario.ts"],
   },
+  {
+    reason:
+      "NÃO é provider: é a MARCA do fork escrita em caminho de ARQUIVO de asset " +
+      "(`public/logo_verdash.svg`, `docs/brand/verdash-simbolo.svg`), que é " +
+      "caixa baixa porque é nome de arquivo. A marca como nome próprio " +
+      "(`Verdash`) já não casa com o padrão (ver `SLUG_VERDASH` em " +
+      "lint-channels.pattern.ts); o caminho do asset casa e não pode ser " +
+      "reescrito sem deixar de apontar para o arquivo que o desenho copia. " +
+      "Fica na catraca, e não em ALLOWED (diretório inteiro), para valer só " +
+      "para este arquivo e a entrada morrer sozinha se a citação sair.",
+    files: ["lib/branding/desenho.ts"],
+  },
 ];
 
 const DEBT = new Set(KNOWN_DEBT.flatMap((g) => g.files));
