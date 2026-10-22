@@ -94,7 +94,7 @@ afterAll(async () => {
 });
 
 describe("o motivo de quem JÁ estava perdido (9066)", () => {
-  it("trocar de FUNIL mantendo o motivo valida de novo: o vocabulário é o do destino", async () => {
+  it("trocar de FUNIL continua perdido não existe: a guarda da troca exige etapa aberta", async () => {
     // A 9066 deixa de revalidar o perdido que segue perdido com o MESMO motivo
     // (o motivo aposentado sobrevive à troca de etapa). O retorno antecipado não
     // pode valer para a troca de funil: lá o vocabulário é outro.
@@ -117,17 +117,20 @@ describe("o motivo de quem JÁ estava perdido (9066)", () => {
       [ORG, p[0]!.id],
     );
 
-    // A troca de funil direta é barrada por `pipeline_immutable_use_clone`; quem a
-    // libera é `fn_mover_lead_de_funil`, ligando `app.movendo_funil` na transação.
-    // A função do produto só leva a etapa ABERTA, então a troca perdido→perdido
-    // é simulada com a mesma chave, para provar o gatilho e não o caminho.
+    // O P2 do Cassio: o retorno antecipado da 9066 não pode pular a validação
+    // numa troca de FUNIL. A 9066 já exige o MESMO funil para pular; e, medido
+    // aqui, a troca perdido→perdido entre funis nem chega ao gatilho do motivo:
+    // `fn_crm_leads_guarda_troca_de_funil` (a guarda que `fn_mover_lead_de_funil`
+    // destrava com `app.movendo_funil`) só aceita etapa de destino ABERTA, e a
+    // troca reabre o card. Se um dia a guarda aceitar etapa terminal, a condição
+    // de funil da 9066 é que impede o motivo velho de passar sem validação.
     const cliente = await pool.connect();
     try {
       await cliente.query("begin");
       await cliente.query("select set_config('app.movendo_funil', 'on', true)");
       await expect(
         cliente.query("update crm_leads set pipeline_id = $1, stage_id = $2 where id = $3", [p[0]!.id, e[0]!.id, lead]),
-      ).rejects.toMatchObject({ code: "22023", message: "lost_reason_invalid: so_no_funil_a" });
+      ).rejects.toMatchObject({ code: "22023", message: "stage_pipeline_mismatch" });
     } finally {
       await cliente.query("rollback");
       cliente.release();
