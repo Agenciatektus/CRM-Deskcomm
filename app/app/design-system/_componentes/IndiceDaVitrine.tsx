@@ -25,6 +25,7 @@ export function IndiceDaVitrine({ tema }: { tema: Tema }) {
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("componentes")}>{t("Componentes básicos")}</a></li>
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("mensagens")}>{t("Mensagens")}</a></li>
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("lead")}>{t("Coluna do lead")}</a></li>
+        <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("tarefas")}>{t("Tarefas")}</a></li>
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("menus")}>{t("Menus, avisos e busca")}</a></li>
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("retorno")}>{t("Retorno e redimensionamento")}</a></li>
         <li><a className="block whitespace-nowrap rounded-md px-2 py-1 hover:bg-hover hover:text-text" href={ir("layout")}>{t("Layout da Inbox")}</a></li>

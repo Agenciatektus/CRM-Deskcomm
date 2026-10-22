@@ -32,11 +32,25 @@ export interface FiltrosDeTarefa {
   aberto?: boolean;
   /** "eu" = só as tarefas de quem está logado (o "Minhas" do celular). */
   responsavel?: "eu";
+  /**
+   * Com `aberto`: traz também as encerradas desde este instante (ISO). A tela
+   * de Tarefas passa o início do dia de 7 dias atrás — um valor que não muda a
+   * cada render, senão a chave da consulta mudaria e ela releria sem parar.
+   */
+  encerradasDesde?: string;
 }
 
 export interface OpcoesDeTarefas {
   /** `false` segura a consulta — o dossiê fechado não precisa das tarefas dele. */
   enabled?: boolean;
+  /**
+   * Releitura periódica (ms), só com a aba VISÍVEL (o padrão do React Query não
+   * relê em segundo plano). A tela de Tarefas liga para o trabalho de outra
+   * pessoa aparecer sem botão "Atualizar" — `crm_tasks` não está na publicação
+   * do realtime, e é a mesma revalidação de `useConversationCounts`. O dossiê
+   * e a Inbox não ligam: lá a lista muda pela própria mão de quem olha.
+   */
+  revalidarMs?: number;
 }
 
 async function leJson<T>(res: Response, oQueFalhou: string): Promise<T> {
@@ -62,6 +76,7 @@ export function useTasks(filtros: FiltrosDeTarefa = {}, opcoes: OpcoesDeTarefas 
   if (filtros.demanda_id) params.set("demanda_id", filtros.demanda_id);
   if (filtros.aberto) params.set("aberto", "true");
   if (filtros.responsavel) params.set("assigned_to", filtros.responsavel);
+  if (filtros.aberto && filtros.encerradasDesde) params.set("encerradas_desde", filtros.encerradasDesde);
   const qs = params.toString();
 
   const query = useQuery({
@@ -72,6 +87,7 @@ export function useTasks(filtros: FiltrosDeTarefa = {}, opcoes: OpcoesDeTarefas 
     },
     staleTime: 10_000,
     refetchOnWindowFocus: true,
+    refetchInterval: opcoes.revalidarMs ?? false,
     enabled: opcoes.enabled ?? true,
   });
 
@@ -125,6 +141,8 @@ export function useTasks(filtros: FiltrosDeTarefa = {}, opcoes: OpcoesDeTarefas 
   return {
     tarefas: query.data?.tasks ?? [],
     carregando: query.isLoading,
+    /** Releitura em curso (inclusive a periódica), com a lista antiga ainda na tela. */
+    atualizando: query.isFetching,
     falhou: query.isError,
     recarregar: invalidar,
     criarTarefa: (entrada: NovaTarefa) => criar.mutateAsync(entrada),

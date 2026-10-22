@@ -23,6 +23,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { COLUNAS_DA_TAREFA } from "@/lib/tarefas/colunas";
 import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
 import { prazoNoPassado } from "@/lib/tarefas/prazo-no-passado";
 import { conferirDemanda } from "@/lib/tarefas/demanda";
@@ -31,8 +32,8 @@ import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/t
 
 export const dynamic = "force-dynamic";
 
-const COLUNAS =
-  "id, organization_id, title, description, due_date, priority, status, lead_id, contact_id, demanda_id, assigned_to, created_by, created_at, updated_at, lead:crm_leads(id, title)";
+/** As colunas que a tela lê — a lista e o porquê dos embutidos em `lib/tarefas/colunas.ts`. */
+const COLUNAS = COLUNAS_DA_TAREFA;
 
 const edicaoSchema = z
   .object({
