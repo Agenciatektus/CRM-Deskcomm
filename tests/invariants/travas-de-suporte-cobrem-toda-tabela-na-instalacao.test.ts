@@ -251,10 +251,8 @@ describe("travas do modo somente leitura do suporte — baseline aplicado UMA ve
         // manda quem for consertar refazer a seleção à mão no banco do CI.
         const porque = psql(BANCO, MOTIVO_DE_CADA_CANDIDATA);
         throw new Error(
-          "nenhuma tabela do escopo aceita uma linha só com organization_id e é gravável por authenticated.
-" +
-            `Candidatas e o critério que cada uma não cumpre:
-${porque}`,
+          "nenhuma tabela do escopo aceita uma linha só com organization_id e é gravável por authenticated.\n" +
+            `Candidatas e o critério que cada uma não cumpre:\n${porque}`,
         );
       }
       return `public.${tabelaMemo}`;
