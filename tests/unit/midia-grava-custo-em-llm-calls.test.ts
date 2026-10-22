@@ -87,14 +87,18 @@ const credencial = vi.hoisted(() => ({
   conversaGoogle: null as string | null,
   /** Provedor+modelo da conversa quando não é Google nem a Anthropic de sempre. */
   conversa: null as { provider: string; model: string } | null,
+  /** De quem é a chave OpenAI do degrau 2; null = a mesma `origemDaChave`. */
+  origemDaOpenai: null as "credencial_da_organizacao" | "chave_da_instalacao" | null,
 }));
 vi.mock("@/lib/agent-engine/edge/llm/credentials", () => ({
   resolveOrgLlmConfig: vi.fn(async (_db: unknown, _cfg: unknown, _org: string, override?: { provider?: string }) => {
     if (credencial.conversaGoogle && override?.provider === "openai") throw new Error("sem credencial openai");
+    const origemDaChave =
+      override?.provider === "openai" && credencial.origemDaOpenai ? credencial.origemDaOpenai : credencial.origemDaChave;
     return {
       provider: credencial.conversa?.provider ?? (credencial.conversaGoogle ? "google" : "anthropic"),
       apiKey: "chave-do-binding",
-      origemDaChave: credencial.origemDaChave,
+      origemDaChave,
       defaultModel: credencial.conversa?.model ?? credencial.conversaGoogle ?? "claude-haiku-4-5",
       params: {},
       enabledModels: [],
@@ -131,13 +135,16 @@ vi.mock("ai", () => ({
 
 // O gate de orçamento REAL, espiado: os casos de transcrição pelo serviço
 // provam que ele é consultado (e que a recusa dele segura o áudio).
-const teto = vi.hoisted(() => ({ barrar: false }));
+const teto = vi.hoisted(() => ({ barrar: false, real: true }));
 vi.mock("@/lib/agent-engine/edge/llm/run-model-call", async (importOriginal) => {
   const real = await importOriginal<typeof ModuloDoSeam>();
   return {
     ...real,
     aplicarOrcamento: vi.fn(async (d: Parameters<typeof real.aplicarOrcamento>[0]) => {
       if (teto.barrar) throw new real.LlmBudgetExceededError("teto de teste");
+      // `real: false` = só espiar a entrada: com a chave da instalação o gate de
+      // verdade consulta `fn_cobranca_ligada` no pool, que aqui não existe.
+      if (!teto.real) return;
       return real.aplicarOrcamento(d);
     }),
   };
@@ -210,6 +217,8 @@ beforeEach(() => {
   credencial.conversa = null;
   servico.custo = undefined;
   teto.barrar = false;
+  teto.real = true;
+  credencial.origemDaOpenai = null;
   bindingDaVez = BINDING;
   transcricaoDoEnv.apiKey = "";
   transcricaoDoEnv.baseUrl = "";
@@ -452,6 +461,57 @@ describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", ()
       organizationId: "org1",
       purpose: PONTO_TRANSCRICAO_DE_AUDIO,
       origem: "padrao_openai_compativel",
+    });
+  });
+
+  it("⭐ degrau 1 com credencial própria na conversa: o teto vê a chave da INSTALAÇÃO", async () => {
+    const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
+    comAudio();
+    credencial.origemDaChave = "credencial_da_organizacao";
+    transcricaoDoEnv.apiKey = "sk-or-da-instalacao";
+    transcricaoDoEnv.baseUrl = "https://openrouter.ai/api/v1";
+    servico.custo = 0.05;
+    teto.real = false;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(vi.mocked(aplicarOrcamento)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(aplicarOrcamento).mock.calls[0]![0]).toMatchObject({
+      origem: "servico_da_instalacao",
+      origemDaChave: "chave_da_instalacao",
+    });
+  });
+
+  it("degrau 2 com a chave OpenAI da instalação: o teto vê `chave_da_instalacao`", async () => {
+    const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
+    comAudio();
+    credencial.origemDaChave = "credencial_da_organizacao";
+    credencial.origemDaOpenai = "chave_da_instalacao";
+    teto.real = false;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(vi.mocked(aplicarOrcamento).mock.calls[0]![0]).toMatchObject({
+      origem: "padrao_openai_compativel",
+      origemDaChave: "chave_da_instalacao",
+    });
+  });
+
+  it("controle negativo: degrau 2 com a chave OpenAI da própria empresa segue `credencial_da_organizacao`", async () => {
+    const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
+    comAudio();
+    credencial.origemDaChave = "chave_da_instalacao";
+    credencial.origemDaOpenai = "credencial_da_organizacao";
+    teto.real = false;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(vi.mocked(aplicarOrcamento).mock.calls[0]![0]).toMatchObject({
+      origem: "padrao_openai_compativel",
+      origemDaChave: "credencial_da_organizacao",
     });
   });
 

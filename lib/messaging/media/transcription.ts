@@ -5,6 +5,7 @@
  * mesma interface para self-host em Apple Silicon (fora deste MVP).
  */
 import type { TokenUsage } from "@/lib/agent-engine/edge/llm/pricing";
+import { logger } from "@/lib/logger";
 
 export interface TranscriptionProvider {
   transcribe(audio: Buffer, mime: string): Promise<string>;
@@ -44,11 +45,28 @@ const USD_POR_MINUTO_DE_TRANSCRICAO: Record<string, number> = {
  *     ou `duration` do `verbose_json`) × preço por minuto do modelo, quando o
  *     modelo está em `USD_POR_MINUTO_DE_TRANSCRICAO`.
  *  3. null — preço desconhecido. Nunca 0: diria "grátis" ao teto.
+ *
+ * `usage.cost` acima de `TETO_DE_SANIDADE_USD` por transcrição é tratado como
+ * dado corrompido (um áudio de WhatsApp custa frações de centavo): vira null
+ * com aviso no log, em vez de estourar o teto da empresa por um número falso.
  */
+export const TETO_DE_SANIDADE_USD = 5;
+
 export function custoDaTranscricao(model: string, resposta: unknown): number | null {
   const r = (resposta ?? {}) as { usage?: { cost?: unknown; seconds?: unknown }; duration?: unknown };
   const custoUsd = r.usage?.cost;
-  if (typeof custoUsd === "number" && Number.isFinite(custoUsd) && custoUsd >= 0) return custoUsd * 100;
+  if (typeof custoUsd === "number" && Number.isFinite(custoUsd) && custoUsd >= 0) {
+    if (custoUsd > TETO_DE_SANIDADE_USD) {
+      // Só o modelo e o valor: nada do áudio nem da transcrição (PII).
+      logger.warn("transcrição: usage.cost acima do limite de sanidade, gravado como null", {
+        model,
+        custo_usd: custoUsd,
+        limite_usd: TETO_DE_SANIDADE_USD,
+      });
+      return null;
+    }
+    return custoUsd * 100;
+  }
   const segundos =
     typeof r.usage?.seconds === "number" ? r.usage.seconds : typeof r.duration === "number" ? r.duration : null;
   const id = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model;

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { logger } from "@/lib/logger";
+
 import {
   apiTranscriptionProvider,
   custoDaTranscricao,
@@ -148,6 +150,19 @@ describe("custo da transcrição pelo serviço (degraus 1 e 2)", () => {
 
   it("duração com modelo sem preço conhecido → null, não o preço de outro modelo", () => {
     expect(custoDaTranscricao("whisper-large-v3", { usage: { seconds: 60 } })).toBeNull();
+  });
+
+  it("⭐ `usage.cost` absurdo (acima de US$ 5) vira null com aviso no log", () => {
+    const aviso = vi.spyOn(logger, "warn").mockImplementation(() => undefined as never);
+    expect(custoDaTranscricao("openai/whisper-1", { text: "segredo do cliente", usage: { cost: 50 } })).toBeNull();
+    expect(aviso).toHaveBeenCalledTimes(1);
+    // Sem dado sensível: o texto da transcrição não vai para o log.
+    expect(JSON.stringify(aviso.mock.calls[0])).not.toContain("segredo do cliente");
+    aviso.mockRestore();
+  });
+
+  it("controle negativo: no limite (US$ 5) o custo ainda vale", () => {
+    expect(custoDaTranscricao("openai/whisper-1", { usage: { cost: 5 } })).toBeCloseTo(500, 10);
   });
 
   it("custo inválido não é aceito como custo", () => {

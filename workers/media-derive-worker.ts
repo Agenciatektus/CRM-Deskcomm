@@ -22,6 +22,7 @@ import {
   resolveOrgLlmConfig,
   type LlmEdgeConfig,
   type OrgLlmConfig,
+  type OrigemDaChaveLlm,
 } from "@/lib/agent-engine/edge/llm/credentials";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
 import { createPool } from "@/lib/agent-engine/db/pool";
@@ -307,12 +308,20 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
 
     // Thunk, não valor: a credencial OpenAI só é LIDA se o serviço de
     // transcrição da instalação (degrau 1) não valer.
+    // De QUEM é a chave OpenAI que o degrau 2 usa — é ela, e não a da
+    // conversa, que o teto do plano precisa ver (só a chave da instalação o
+    // consome). Preenchido quando o thunk resolve.
+    let origemDaChaveOpenai: OrigemDaChaveLlm | null = null;
     const chaveOpenai = async (): Promise<string | null> => {
-      if (llm.provider === "openai") return llm.apiKey;
+      if (llm.provider === "openai") {
+        origemDaChaveOpenai = llm.origemDaChave;
+        return llm.apiKey;
+      }
       try {
         const oa = await resolveOrgLlmConfig(derivePool(), llmCfg, row.organization_id, {
           provider: "openai",
         });
+        origemDaChaveOpenai = oa.origemDaChave;
         return oa.apiKey;
       } catch {
         return null; // sem credencial e sem chave da instalação: nenhum degrau OpenAI
@@ -381,7 +390,27 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
 
     // O 5º argumento é a `base_url` do binding: o factory precisa dela para não
     // cair no endpoint padrão do provedor (ver o comentário lá em cima).
-    const deps = buildDeriveDeps(llm, decisao, row.organization_id, admin, baseUrlDaVisao, chaveEhDaInstalacao, origemDoModelo);
+    // A chave que a TRANSCRIÇÃO usa, por degrau. O degrau 1 é sempre a chave
+    // da instalação (`TRANSCRIPTION_API_KEY`, a da Tektus); o 2, a chave
+    // OpenAI que o thunk resolveu; o 3, a da conversa. Sem isto o teto do
+    // plano via a credencial própria da conversa e deixava passar o gasto que
+    // sai da chave da instalação.
+    const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
+      decisao.origem === "servico_da_instalacao"
+        ? "chave_da_instalacao"
+        : decisao.origem === "padrao_openai_compativel"
+          ? (origemDaChaveOpenai ?? llm.origemDaChave)
+          : (conversa?.origemDaChave ?? llm.origemDaChave);
+    const deps = buildDeriveDeps(
+      llm,
+      decisao,
+      row.organization_id,
+      admin,
+      baseUrlDaVisao,
+      chaveEhDaInstalacao,
+      origemDoModelo,
+      origemDaChaveDaTranscricao,
+    );
 
     const text = await deriveMediaText(msg.type, buffer, msg.media_mime ?? "application/octet-stream", deps);
 
@@ -575,6 +604,9 @@ function buildDeriveDeps(
   // De onde veio o MODELO (issue #2377): o log da recusa de par precisa dizer
   // se veio do binding do ponto ou do padrao da organizacao.
   origemDoModelo = "padrao",
+  // De quem é a chave que a transcrição usa (ver o chamador). Sem ela, a da
+  // conversa — o comportamento de antes.
+  origemDaChaveDaTranscricao: OrigemDaChaveLlm = llm.origemDaChave,
 ): DeriveDeps {
   const registry = createDefaultRegistry();
   // Thunk, não consulta: nada vai ao banco até a visão ser de fato perguntada,
@@ -612,6 +644,8 @@ function buildDeriveDeps(
     provider: string;
     model: string;
     origem: string;
+    /** A chave que ESTA chamada usa; sem ela, a da conversa. */
+    origemDaChave?: OrigemDaChaveLlm;
   }): Promise<boolean> => {
     try {
       await aplicarOrcamento({
@@ -622,7 +656,7 @@ function buildDeriveDeps(
         // A mesma chave efetiva do seam: a tela de admin vence, o `.env` é o piso.
         chave: chaveDeOrcamentoDaInstalacao(normalizarChaveDeOrcamento(env.AI_BUDGET_ENFORCEMENT)),
         // O teto do PLANO só vincula a chave da instalação (cobrança do revendedor §5).
-        origemDaChave: llm.origemDaChave,
+        origemDaChave: d.origemDaChave ?? llm.origemDaChave,
         purpose: d.purpose,
         provider: d.provider,
         model: d.model,
@@ -886,6 +920,7 @@ function buildDeriveDeps(
           provider: providerDaTranscricao,
           model: modeloDaTranscricao,
           origem: decisao.origem,
+          origemDaChave: origemDaChaveDaTranscricao,
         })
       ) {
         return MARCADOR_NAO_LIDA;
