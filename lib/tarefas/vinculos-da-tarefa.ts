@@ -1,15 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isServiceRoleConfigured } from "@/lib/audit";
-import { createAdminClient } from "@/lib/supabase/admin";
-
 /** O que a rota recusa, e em qual campo; `null` = os vínculos são da organização. */
-export type RecusaDeVinculo = { campo: "lead_id" | "contact_id" | "assigned_to"; mensagem: string } | null;
+export type RecusaDeVinculo = { campo: "lead_id" | "contact_id"; mensagem: string } | null;
 
 interface Vinculos {
   lead_id?: string | null;
   contact_id?: string | null;
-  assigned_to?: string | null;
 }
 
 /**
@@ -24,12 +20,10 @@ interface Vinculos {
  * existe em lugar nenhum. É o mesmo filtro de `criarTarefaInterna`.
  *
  * Negócio e contato são lidos pelo client DA SESSÃO, com `organization_id`
- * explícito: o que a pessoa não enxerga também não se vincula. O responsável é
- * lido em `user_organizations` (ativo e `agent`+) pelo admin client, filtrado pela org resolvida no
- * servidor, porque a RLS dessa tabela mostra a um `agent` só o próprio vínculo
- * (o mesmo motivo de `GET /api/v1/team/assignable`). Sem service role, cai no
- * client da sessão, e atribuir a outra pessoa é recusado em vez de aceito às
- * cegas: fechar por falta de prova, não abrir.
+ * explícito: o que a pessoa não enxerga também não se vincula. O responsável
+ * (`assigned_to`) é conferido pelas rotas ANTES daqui, por `conferirResponsavel`
+ * (`lib/tarefas/responsavel.ts`), com a mesma régua e o mesmo porquê do admin
+ * client.
  */
 export async function recusaDeVinculoDaTarefa(
   db: SupabaseClient,
@@ -55,20 +49,9 @@ export async function recusaDeVinculoDaTarefa(
       .maybeSingle();
     if (!data) return { campo: "contact_id", mensagem: t("O contato vinculado não existe nesta organização.") };
   }
-  if (vinculos.assigned_to) {
-    const membros = isServiceRoleConfigured() ? createAdminClient() : db;
-    const { data } = await membros
-      .from("user_organizations")
-      .select("user_id")
-      .eq("organization_id", orgId)
-      .eq("user_id", vinculos.assigned_to)
-      .is("revoked_at", null)
-      // A MESMA régua de `GET /api/v1/team/assignable`: `viewer` não atende, e
-      // tarefa atribuída a quem não pode concluí-la (a rota exige `agent`) é
-      // lembrete que ninguém fecha.
-      .neq("role", "viewer")
-      .maybeSingle();
-    if (!data) return { campo: "assigned_to", mensagem: t("O responsável não é membro desta organização.") };
-  }
+  // `assigned_to` NÃO é conferido aqui: as rotas já o conferem antes, por
+  // `conferirResponsavel` (`lib/tarefas/responsavel.ts`, a mesma régua: membro
+  // ativo e não `viewer`), e conferir duas vezes era uma leitura a mais de
+  // `user_organizations` por tarefa salva.
   return null;
 }

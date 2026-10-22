@@ -173,6 +173,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (veredito === "fora_da_equipe") {
       return fail("validation_failed", t("O responsável escolhido não faz parte da equipe."), 422, {
         requestId,
+        // O mesmo contrato das outras recusas de vínculo: a tela sabe QUAL campo marcar.
+        details: { campo: "assigned_to" },
       });
     }
   }
