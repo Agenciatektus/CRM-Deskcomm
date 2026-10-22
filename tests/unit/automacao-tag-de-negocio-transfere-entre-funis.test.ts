@@ -32,6 +32,15 @@
  * (`lead.stage_changed`, `lead.created`, …) segue recusando, porque a proposta
  * principal da #2155 — `pipeline_id`/`stage_id` em `ai_router_members` —
  * exige migration e não entra aqui.
+ *
+ * ═══ No fork, desde a 9053 (decisão do Peterson de 19/10/2026) ═══
+ *
+ * A troca de funil MOVE o MESMO card (`moverNegocioDeFunil`, o caminho da rota
+ * da tela): nada de clone, nada de origem encerrada como "Levado para outro
+ * funil", e vale para qualquer gatilho que traga o negócio. Os três casos de
+ * troca abaixo medem isso; os controles (mesmo funil move de etapa, sem negócio
+ * cria) seguem os do upstream. O irmão `automacao-troca-de-funil-transfere-o-negocio`
+ * cobre a troca pelo ramo de contato.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,6 +48,7 @@ const spies = vi.hoisted(() => ({
   createLeadHandler: vi.fn(),
   moveLeadHandler: vi.fn(),
   encerraDemanda: vi.fn(),
+  moverNegocioDeFunil: vi.fn(),
 }));
 
 vi.mock("@/app/api/v1/leads/_handler", () => ({
@@ -48,6 +58,10 @@ vi.mock("@/app/api/v1/leads/_handler", () => ({
 
 vi.mock("@/lib/leads/encerramento", () => ({
   encerraDemanda: (...args: unknown[]) => spies.encerraDemanda(...args),
+}));
+
+vi.mock("@/lib/leads/mover-de-funil", () => ({
+  moverNegocioDeFunil: (...args: unknown[]) => spies.moverNegocioDeFunil(...args),
 }));
 
 vi.mock("@/lib/atendimento/origem-automacao", () => ({
@@ -213,56 +227,48 @@ function limpaOsSpies(): void {
   spies.createLeadHandler.mockReset();
   spies.moveLeadHandler.mockReset();
   spies.encerraDemanda.mockReset();
+  spies.moverNegocioDeFunil.mockReset();
 }
 
-describe("create_or_move_lead — o gatilho lead.tag_added transfere o negócio de funil", () => {
-  it("O DEFEITO (#2155): negócio no funil A + gatilho lead.tag_added transfere para o funil B", async () => {
-    limpaOsSpies();
-    spies.createLeadHandler.mockResolvedValue({
-      id: "clone-tag-0001",
-      pipeline_id: FUNIL_B,
-      stage_id: ETAPA_ESCOLHIDA,
-      contact_id: CONTATO,
-    });
-    spies.encerraDemanda.mockResolvedValue({ lead: { id: NEGOCIO_NO_FUNIL_A.id } });
+/** A troca devolve o MESMO card, agora morando no funil de destino. */
+function trocaMove(pipelineId: string, stageId: string) {
+  spies.moverNegocioDeFunil.mockImplementation(async () => ({
+    ok: true,
+    lead: { ...NEGOCIO_NO_FUNIL_A, pipeline_id: pipelineId, stage_id: stageId },
+  }));
+}
 
-    const ctx = contexto(CENARIOS_DA_TRANSFERENCIA);
+/** `leDoBanco` relê o negócio pelo id antes de mover (ramo `if (lead)`). */
+const CENARIOS_DA_TROCA = { ...CENARIOS_DA_TRANSFERENCIA, negocioNoFunilDaRegra: NEGOCIO_NO_FUNIL_A };
+
+describe("create_or_move_lead — o gatilho lead.tag_added transfere o negócio de funil", () => {
+  it("O DEFEITO (#2155): negócio no funil A + gatilho lead.tag_added leva o MESMO card ao funil B (9053)", async () => {
+    limpaOsSpies();
+    trocaMove(FUNIL_B, ETAPA_ESCOLHIDA);
+
+    const ctx = contexto(CENARIOS_DA_TROCA);
     const acao = getAction("create_or_move_lead");
     const resultado = await acao!.execute(ctx, CONFIG);
 
     expect(resultado.status).toBe("success");
-
-    // O negócio do funil B nasce com o conteúdo do de A — não é um card em branco.
-    expect(spies.createLeadHandler).toHaveBeenCalledTimes(1);
-    const payload = argumentoDaChamada(spies.createLeadHandler);
-    expect(payload.pipeline_id).toBe(FUNIL_B);
-    expect(payload.stage_id).toBe(ETAPA_ESCOLHIDA);
-    expect(payload.title).toBe(TITULO_DA_ORIGEM);
-    expect(payload.contact_id).toBe(CONTATO);
-    expect(payload.value_cents).toBe(150000);
-    expect(payload.custom_fields).toEqual({ canal: "rotativo" });
-    expect(payload.source_metadata).toMatchObject({
-      clonado_de: { lead_id: NEGOCIO_NO_FUNIL_A.id, pipeline_id: FUNIL_A },
-    });
-
-    // O do funil A encerra como PERDIDA, com o motivo da transferência.
-    expect(spies.encerraDemanda).toHaveBeenCalledTimes(1);
-    const encerramento = argumentoDaChamada(spies.encerraDemanda);
-    expect(encerramento.leadId).toBe(NEGOCIO_NO_FUNIL_A.id);
-    expect(encerramento.desfecho).toBe("lost");
-    expect(encerramento.motivo).toBe(MOTIVO_DA_TRANSFERENCIA);
-    expect(encerramento.razaoNaTimeline).toBe("Levado para outro funil pela automação");
-    expect(encerramento.payloadNaTimeline).toMatchObject({ to_pipeline_id: FUNIL_B });
-
-    // E o CLONE é o negócio que as próximas ações da regra enxergam.
-    const publicado = (ctx.context.lead ?? {}) as Record<string, unknown>;
-    expect(publicado.id).toBe("clone-tag-0001");
-    expect(publicado.pipeline_id).toBe(FUNIL_B);
-
-    // Nada de "mover de etapa": mover entre funis é recusado, transferir é o caminho.
-    expect(spies.moveLeadHandler).not.toHaveBeenCalled();
     expect(resultado.error).toBeUndefined();
-    expect(resultado.detail).toMatchObject({ origem: NEGOCIO_NO_FUNIL_A.id });
+    expect(resultado.detail).toEqual({ moved: NEGOCIO_NO_FUNIL_A.id, pipeline_id: FUNIL_B });
+
+    // O mesmo card, pelo caminho da rota da tela, para a etapa escolhida.
+    expect(spies.moverNegocioDeFunil).toHaveBeenCalledTimes(1);
+    const [, , negocio, destino] = spies.moverNegocioDeFunil.mock.calls[0] as unknown[];
+    expect((negocio as { id: string }).id).toBe(NEGOCIO_NO_FUNIL_A.id);
+    expect(destino).toMatchObject({ pipelineId: FUNIL_B, stageId: ETAPA_ESCOLHIDA });
+
+    // Nada de clone nem de perda "Levado para outro funil".
+    expect(spies.createLeadHandler).not.toHaveBeenCalled();
+    expect(spies.encerraDemanda).not.toHaveBeenCalled();
+    expect(spies.moveLeadHandler).not.toHaveBeenCalled();
+
+    // As próximas ações da regra enxergam o MESMO card, já no funil B.
+    const publicado = (ctx.context.lead ?? {}) as Record<string, unknown>;
+    expect(publicado.id).toBe(NEGOCIO_NO_FUNIL_A.id);
+    expect(publicado.pipeline_id).toBe(FUNIL_B);
   });
 
   it("CONTROLE: negócio já no funil da regra continua sendo movido de etapa — igual a hoje", async () => {
@@ -303,58 +309,44 @@ describe("create_or_move_lead — o gatilho lead.tag_added transfere o negócio 
     expect(spies.encerraDemanda).not.toHaveBeenCalled();
   });
 
-  it("CONTROLE: outro gatilho com o negócio em outro funil segue recusando (escopo da #2155)", async () => {
+  it("outro gatilho com o negócio em outro funil também MOVE o mesmo card (a 9053 vale para todo gatilho)", async () => {
     limpaOsSpies();
-    spies.createLeadHandler.mockResolvedValue({ id: "clone-fora-de-escopo" });
+    trocaMove(FUNIL_B, ETAPA_ESCOLHIDA);
 
-    const ctx = contexto(CENARIOS_DA_TRANSFERENCIA, { tipoDoEvento: "lead.stage_changed" });
+    const ctx = contexto(CENARIOS_DA_TROCA, { tipoDoEvento: "lead.stage_changed" });
     const acao = getAction("create_or_move_lead");
     const resultado = await acao!.execute(ctx, CONFIG);
 
-    expect(resultado.status).toBe("failed");
-    expect(resultado.error).toBe("cross_pipeline_move_not_allowed");
+    expect(resultado.status).toBe("success");
+    expect(spies.moverNegocioDeFunil).toHaveBeenCalledTimes(1);
     expect(spies.createLeadHandler).not.toHaveBeenCalled();
     expect(spies.moveLeadHandler).not.toHaveBeenCalled();
     expect(spies.encerraDemanda).not.toHaveBeenCalled();
   });
 
-  it("UMA transferência por evento: a 2ª regra no MESMO contexto não leva o clone de volta (A→B→A)", async () => {
+  it("duas regras opostas no MESMO evento (A→B→A) movem o mesmo card duas vezes e nunca abrem um segundo", async () => {
     // O motor passa o MESMO `context` a todas as regras aplicáveis de um evento
-    // (`engine.ts`), e a 1ª transferência publica o clone nele. Duas regras
-    // `lead.tag_added` opostas casando juntas = duas execuções sobre este ctx.
+    // (`engine.ts`). No upstream a 2ª regra era recusada para o clone não voltar;
+    // no fork não há clone: a 2ª parte do card já movido, e o resultado é UM
+    // card, no funil da última regra. Os eventos derivados saem com `rule:` e o
+    // motor não os reprocessa (anti-laço de profundidade 1).
     limpaOsSpies();
-    spies.createLeadHandler.mockResolvedValue({
-      id: "clone-tag-0001",
-      pipeline_id: FUNIL_B,
-      stage_id: ETAPA_ESCOLHIDA,
-      contact_id: CONTATO,
-    });
-    spies.encerraDemanda.mockResolvedValue({ lead: { id: NEGOCIO_NO_FUNIL_A.id } });
-
-    const etapaAbertaDoA = {
-      id: ETAPA_DO_FUNIL_A,
-      pipeline_id: FUNIL_A,
-      position: 1,
-      is_won: false,
-      is_lost: false,
-      is_archived: false,
-    };
-    const ctx = contexto({
-      ...CENARIOS_DA_TRANSFERENCIA,
-      etapasDoDestino: [...ETAPAS_DO_FUNIL_B, etapaAbertaDoA],
-    });
+    const ctx = contexto(CENARIOS_DA_TROCA);
     const acao = getAction("create_or_move_lead");
 
+    trocaMove(FUNIL_B, ETAPA_ESCOLHIDA);
     const primeira = await acao!.execute(ctx, CONFIG);
+    trocaMove(FUNIL_A, ETAPA_DO_FUNIL_A);
     const segunda = await acao!.execute(ctx, { pipeline_id: FUNIL_A, stage_id: ETAPA_DO_FUNIL_A });
 
     expect(primeira.status).toBe("success");
-    expect(segunda.status).toBe("failed");
-    expect(segunda.error).toBe("lead_already_transferred_in_event");
-    expect(spies.createLeadHandler).toHaveBeenCalledTimes(1);
-    expect(spies.encerraDemanda).toHaveBeenCalledTimes(1);
-    // Vale a primeira regra: o negócio das próximas ações segue sendo o clone no funil B.
-    expect((ctx.context.lead as Record<string, unknown>).pipeline_id).toBe(FUNIL_B);
+    expect(segunda.status).toBe("success");
+    expect(spies.moverNegocioDeFunil).toHaveBeenCalledTimes(2);
+    const ids = spies.moverNegocioDeFunil.mock.calls.map((c) => (c[2] as { id: string }).id);
+    expect(ids).toEqual([NEGOCIO_NO_FUNIL_A.id, NEGOCIO_NO_FUNIL_A.id]);
+    expect(spies.createLeadHandler).not.toHaveBeenCalled();
+    expect(spies.encerraDemanda).not.toHaveBeenCalled();
+    expect((ctx.context.lead as Record<string, unknown>).id).toBe(NEGOCIO_NO_FUNIL_A.id);
   });
 
   it("o motivo da transferência segue sendo o canônico, não perda comercial", () => {

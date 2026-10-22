@@ -45,6 +45,10 @@ vi.mock("@/hooks/inbox/useConversationTags", () => ({
 vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
   useContactTagVocabulary: () => ({ data: tagsDoContatoRef.current }),
 }));
+// Os filtros do atendimento (funil, etapa, responsável) buscam os nomes só
+// quando o filtro está ligado; aqui nenhum está, e o dado não importa.
+vi.mock("@/hooks/inbox/useOpcoesDeFunil", () => ({ useOpcoesDeFunil: () => ({ data: undefined }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: undefined }) }));
 vi.mock("@/hooks/inbox/useConversationCounts", () => ({
   useConversationCounts: () => ({ data: { fila: 3, mine: 2, all: 5 } }),
 }));

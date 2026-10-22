@@ -22,7 +22,7 @@
  * do menu durante a oscilação, e não há como desmarcá-la.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { InboxFilters, type InboxFiltersValue } from "@/components/inbox/InboxFilters";
@@ -50,6 +50,10 @@ vi.mock("@/hooks/contacts/useContactTagVocabulary", () => ({
     data: orgId ? tagsRef.current : undefined,
   }),
 }));
+// Os filtros do atendimento (funil, etapa, responsável) buscam os nomes só
+// quando o filtro está ligado; aqui nenhum está, e o dado não importa.
+vi.mock("@/hooks/inbox/useOpcoesDeFunil", () => ({ useOpcoesDeFunil: () => ({ data: undefined }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: undefined }) }));
 vi.mock("@/hooks/inbox/useConversationCounts", () => ({
   useConversationCounts: () => ({ data: { unassigned: 1 } }),
 }));
@@ -57,6 +61,13 @@ vi.mock("@/hooks/inbox/useConversationCounts", () => ({
 const GATILHO = "Filtrar por tag";
 /** O gatilho deixou de ser um `Select` (#1274): é botão com `aria-label`. */
 const gatilho = () => screen.queryByLabelText(GATILHO);
+/**
+ * Visual v2: o seletor mora no popover de "Filtros" (o irmão
+ * `inbox-filtro-de-tag-nao-desmonta` já abre). O popover fica montado no
+ * rerender, porque o estado dele mora na barra, e é DENTRO dele que o gatilho
+ * tem de sobreviver.
+ */
+const abreOsFiltros = () => fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
 const base: InboxFiltersValue = { tab: "unassigned", search: "", onlyUnread: false };
 
 beforeEach(() => {
@@ -78,11 +89,13 @@ afterEach(cleanup);
 describe("seletor de etiqueta x vocabulário voltando a undefined (dublês que respeitam orgId)", () => {
   it("com org resolvida, o seletor está na tela", () => {
     render(<InboxFilters value={base} onChange={() => {}} />);
+    abreOsFiltros();
     expect(gatilho()).not.toBeNull();
   });
 
   it("vocabulário indefinido (org nula no dublê): o seletor permanece", () => {
     const { rerender } = render(<InboxFilters value={base} onChange={() => {}} />);
+    abreOsFiltros();
     expect(gatilho()).not.toBeNull();
 
     activeOrgRef.current = null;
@@ -98,6 +111,7 @@ describe("seletor de etiqueta x vocabulário voltando a undefined (dublês que r
     // `undefined`, quem o mantém conhecido é o `ultimoVocabulario`.
     const comFiltro: InboxFiltersValue = { ...base, tag: "apagada" };
     const { rerender } = render(<InboxFilters value={comFiltro} onChange={() => {}} />);
+    abreOsFiltros();
 
     activeOrgRef.current = null;
     rerender(<InboxFilters value={{ ...comFiltro }} onChange={() => {}} />);

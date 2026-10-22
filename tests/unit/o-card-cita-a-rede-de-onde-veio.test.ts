@@ -39,6 +39,8 @@ vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/lib/dev/kick-local-pipeline", () => ({
+  acelerarFollowupDoInbound: vi.fn(async () => {}),
+  drenarEventosDoInbound: vi.fn(async () => {}),
   acelerarPipelineDeEventos: vi.fn(async () => {}),
   kickLocalPipeline: vi.fn(async () => {}),
 }));

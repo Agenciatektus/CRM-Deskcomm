@@ -34,6 +34,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
+import { COLUNAS_DA_TAREFA } from "@/lib/tarefas/colunas";
 import { recusaDeVinculoDaTarefa } from "@/lib/tarefas/vinculos-da-tarefa";
 import { prazoNoPassado } from "@/lib/tarefas/prazo-no-passado";
 import { conferirDemanda } from "@/lib/tarefas/demanda";
@@ -42,9 +43,8 @@ import { PRIORIDADES_DA_TAREFA, SITUACOES_DA_TAREFA, type Tarefa } from "@/lib/t
 
 export const dynamic = "force-dynamic";
 
-/** As colunas que a tela lê. Explícitas para o `select *` não vazar coluna nova. */
-const COLUNAS =
-  "id, organization_id, title, description, due_date, priority, status, lead_id, contact_id, demanda_id, assigned_to, created_by, created_at, updated_at, lead:crm_leads(id, title)";
+/** As colunas que a tela lê — a lista e o porquê dos embutidos em `lib/tarefas/colunas.ts`. */
+const COLUNAS = COLUNAS_DA_TAREFA;
 
 const criacaoSchema = z.object({
   title: z.string().trim().min(1).max(255),
@@ -79,6 +79,13 @@ const listaSchema = z.object({
    * amplia o que o papel já vê.
    */
   assigned_to: z.union([z.literal("eu"), z.string().uuid()]).optional(),
+  /**
+   * Com `aberto=true`: traz também as ENCERRADAS desde este instante (a faixa
+   * "Encerradas" da tela de Tarefas, recolhida por padrão). Sem isto, marcar
+   * como feita fazia a linha sumir na releitura seguinte, e a tarefa parecia
+   * apagada. Recorte de tempo, não de permissão: mesma org, mesma RLS.
+   */
+  encerradas_desde: z.string().datetime({ offset: true }).optional(),
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -125,7 +132,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (filtros.due_from) query = query.gte("due_date", filtros.due_from);
   if (filtros.due_to) query = query.lte("due_date", filtros.due_to);
   if (responsavel) query = query.eq("assigned_to", responsavel);
-  if (filtros.aberto === "true") query = query.in("status", ["pending", "in_progress"]);
+  if (filtros.aberto === "true" && filtros.encerradas_desde) {
+    // O instante passa pelo Zod (`datetime` com offset) antes de entrar no
+    // filtro: nenhuma vírgula ou parêntese chega ao `or` do PostgREST.
+    query = query.or(
+      `status.in.(pending,in_progress),and(status.in.(done,cancelled),updated_at.gte.${filtros.encerradas_desde})`,
+    );
+  } else if (filtros.aberto === "true") {
+    query = query.in("status", ["pending", "in_progress"]);
+  }
 
   const { data, error } = await query;
   if (error) {
@@ -173,6 +188,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (veredito === "fora_da_equipe") {
       return fail("validation_failed", t("O responsável escolhido não faz parte da equipe."), 422, {
         requestId,
+        // O mesmo contrato das outras recusas de vínculo: a tela sabe QUAL campo marcar.
+        details: { campo: "assigned_to" },
       });
     }
   }

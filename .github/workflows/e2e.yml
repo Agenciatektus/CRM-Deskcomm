@@ -1255,9 +1255,14 @@ jobs:
       # service role, sobe o dublê em 127.0.0.1:3995 (nenhuma outra spec desta
       # parte o sobe) e devolve as chaves da instalação no `finally`.
       # PREVISÃO, não medida: ~1,5 min de caso.
+      # `celular-app-390` entrou em 2026-10-21 (o app de celular, M5) na PARTE_6,
+      # ao lado da `celular-cabe-na-tela`: semeia a própria conversa e a sessão
+      # pelo service role e apaga no fim, sem WAHA, Redis nem Resend. Estava no
+      # disco sem lista nenhuma desde o M5. PREVISÃO, não medida: ~1 min de caso.
       SPECS_PARTE_6: >-
         agenda-google-meet.spec.ts
         agenda-presenca-recuperacao.spec.ts
+        celular-app-390.spec.ts
         celular-cabe-na-tela.spec.ts
         cobranca-desligada.spec.ts
         cobranca-link-pelo-dono.spec.ts

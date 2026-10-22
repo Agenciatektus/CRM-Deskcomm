@@ -62,7 +62,10 @@ rodar() { # $1 = valor de INTERNAL_SECRET ("" = ausente)
 echo "scheduler: o crontab é gerado com todas as rotas"
 RC="$(rodar 'segredo-simples')"
 check "o entrypoint termina com sucesso" test "$RC" -eq 0
-ROTAS_CODIGO="$(find app/api/v1/cron -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+# Rotas no-op fora do crontab DE PROPÓSITO — a mesma lista e a prova de que são
+# no-op ficam em tests/unit/cron-routes-scheduled.test.ts (ROTAS_SEM_AGENDA_NO_OP).
+ROTAS_SEM_AGENDA_NO_OP="agent-dispatcher"
+ROTAS_CODIGO="$(find app/api/v1/cron -mindepth 1 -maxdepth 1 -type d -exec basename {} \;   | grep -vxF -e "$ROTAS_SEM_AGENDA_NO_OP" | wc -l | tr -d ' ')"
 ROTAS_CRONTAB="$(grep -oE 'api/v1/cron/[a-z0-9-]+' "$TMP/crontab" | sort -u | wc -l | tr -d ' ')"
 check "as $ROTAS_CODIGO rotas do código estão no crontab (achei $ROTAS_CRONTAB)" \
   test "$ROTAS_CODIGO" -eq "$ROTAS_CRONTAB"

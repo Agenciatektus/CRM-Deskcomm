@@ -37,6 +37,7 @@
  * `AdminShell.tsx` deixa o primeiro caso vermelho, nos dois valores de e-mail.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -90,13 +91,17 @@ describe("AdminShell", () => {
       // ganhou o `ThemeToggle` — até então o admin era a única superfície sem
       // forma de trocar de tema. Sem esta linha o teste mediria uma casca que
       // não existe em produção: montada fora dos providers da raiz.
+      // O `QueryClientProvider` é o outro provider da raiz (`app/providers.tsx`,
+      // por fora do tema): a casca do admin passou a ter consulta própria.
       expect(() =>
         render(
-          <ThemeProvider>
-            <AdminShell userEmail={userEmail}>
-              <UsaTooltipSemProviderProprio />
-            </AdminShell>
-          </ThemeProvider>,
+          <QueryClientProvider client={new QueryClient()}>
+            <ThemeProvider>
+              <AdminShell userEmail={userEmail}>
+                <UsaTooltipSemProviderProprio />
+              </AdminShell>
+            </ThemeProvider>
+          </QueryClientProvider>,
         ),
       ).not.toThrow();
 

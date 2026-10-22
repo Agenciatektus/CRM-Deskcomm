@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
-  user: { id: "11111111-1111-4111-8111-111111111111", is_platform_admin: false },
+  user: { id: "11111111-1111-4111-8111-111111111111", is_platform_admin: false, platform_admin_scope: "full" },
   role: "admin",
   rpc: vi.fn(),
   upsert: vi.fn(),
@@ -91,7 +91,10 @@ function post(tema?: string, escopo = "organizacao") {
   );
 }
 describe("upload por tema", () => {
+  // No fork, o logo da EMPRESA é escrita do admin da PLATAFORMA (#211): o admin
+  // da organização recebe 403, e os casos que gravam entram como platform admin.
   it("omitir tema continua gravando logo claro", async () => {
+    mocks.user.is_platform_admin = true;
     expect((await post()).status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledWith(
       "fn_definir_logo_por_tema_da_organizacao",
@@ -122,12 +125,19 @@ describe("upload por tema", () => {
     expect((await post("escuro", "instalacao")).status).toBe(403);
     expect(mocks.upload).not.toHaveBeenCalled();
   });
+  it("admin da organização, sem ser da plataforma, não troca o logo da empresa (#211)", async () => {
+    expect(mocks.role).toBe("admin");
+    expect((await post("escuro")).status).toBe(403);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("viewer não pode trocar o logo escuro", async () => {
     mocks.role = "viewer";
     expect((await post("escuro")).status).toBe(403);
     expect(mocks.upload).not.toHaveBeenCalled();
   });
   it("remover escuro usa só o tenant da sessão e o tema pedido", async () => {
+    mocks.user.is_platform_admin = true;
     const response = await DELETE(
       new NextRequest("http://localhost/api/v1/marca/logo?escopo=organizacao&tema=escuro"),
     );

@@ -44,7 +44,14 @@ vi.mock("@/hooks/tasks/useTasks", () => ({
   },
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
-vi.mock("@/hooks/i18n/useLocaleDeData", () => ({ useTagDeIdioma: () => "pt-BR" }));
+vi.mock("@/hooks/i18n/useLocaleDeData", async () => {
+  const { ptBR } = await import("date-fns/locale");
+  return {
+    useTagDeIdioma: () => "pt-BR",
+    // O `CampoDeData` (design system) do prazo pede o locale do calendário.
+    useLocaleDeData: () => ptBR,
+  };
+});
 vi.mock("@/hooks/auth/AuthProvider", () => ({ useUser: () => ({ id: EU }) }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
   useAssignableMembers: () => ({

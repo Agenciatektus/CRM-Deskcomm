@@ -217,12 +217,16 @@ export function MetaDaConversa({
         </Badge>
       )}
       {mostrarCanal && rotuloCanal && (
+        // Nome de canal comprido ("Centro Automotivo Norte") encolhe em vez de
+        // levar a linha de selos para fora da coluna (#2383): o Badge nasce
+        // `shrink-0` + `whitespace-nowrap`, então o limite e o corte vêm aqui, e
+        // o `title` guarda o nome inteiro.
         <Badge
           variant="outline"
-          className="h-5 gap-1 px-1.5 text-[11px] font-normal text-text-muted"
+          className="h-5 min-w-0 max-w-[12rem] shrink gap-1 truncate px-1.5 text-[11px] font-normal text-text-muted"
           title={`${t("Entrou por")} ${rotuloCanal}`}
         >
-          {rotuloCanal}
+          <span className="truncate">{rotuloCanal}</span>
         </Badge>
       )}
       {c?.is_blocked && (

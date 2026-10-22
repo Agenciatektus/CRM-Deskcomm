@@ -239,6 +239,7 @@ describe("a rota messages/[id]/media não re-busca do provedor o que expirou", (
     CHANNEL_SESSION_REF_COLUMNS: "id",
     DEFAULT_CHANNEL_PROVIDER: "waha",
     getAdapter: () => adapter,
+    getAdapterOpcional: () => adapter,
     resolveSessionRef: () => ({ session: "s" }),
   }));
   vi.mock("@/lib/supabase/admin", () => ({

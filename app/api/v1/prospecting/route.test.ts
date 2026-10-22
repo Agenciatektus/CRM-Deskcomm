@@ -18,6 +18,9 @@ vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: async () => n
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+// A prospecção é liberada por empresa: aqui a empresa do token TEM o módulo, e
+// o que se mede é a lista de permissão do token, não o portão do módulo.
+vi.mock("@/lib/organizacao/modulos-liberados", () => ({ seModuloFechadoParaEmpresa: async () => null }));
 vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: deps.pool }));
 vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({ checkRateLimit: deps.checkRateLimit }));
 vi.mock("@/lib/mcp/auth", async () => {

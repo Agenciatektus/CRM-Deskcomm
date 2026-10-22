@@ -176,7 +176,7 @@ const NASCE_DONE_NA_ORIGEM: Record<string, { onde: string[]; porque: string }> =
 const NAMESPACE_ABERTO: Record<string, { onde: string; expressao: string }> = {
   "nuvemshop.<evento>": {
     onde: "app/api/v1/webhooks/nuvemshop/[event]/route.ts",
-    expressao: "p_event_type: eventLogType",
+    expressao: "p_event_type: ehProduto ? \"nuvemshop.product_synced\" : eventLogType",
   },
   "<target da regra de automacao>": {
     onde: "lib/automation/actions/add-tag.ts",

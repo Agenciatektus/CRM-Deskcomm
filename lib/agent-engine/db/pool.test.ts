@@ -10,18 +10,29 @@ import net from 'node:net';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createPool, QUERY_TIMEOUT_MS } from './pool';
+import { createPool, IDLE_TIMEOUT_MS, nomeDaAplicacao, QUERY_TIMEOUT_MS } from './pool';
 
-function servidorMudo(): Promise<{ porta: number; queryChegou: Promise<void>; fechar: () => void }> {
+function servidorMudo(): Promise<{
+  porta: number;
+  queryChegou: Promise<void>;
+  fechar: () => void;
+  conexoes: () => number;
+  parametrosDaPartida: () => Record<string, string>;
+}> {
   let avisar: () => void = () => undefined;
   const queryChegou = new Promise<void>((resolve) => (avisar = resolve));
   const sockets: net.Socket[] = [];
+  let partida: Record<string, string> = {};
   const server = net.createServer((socket) => {
     sockets.push(socket);
     let handshake = false;
     socket.on('data', (buf) => {
       if (!handshake) {
         handshake = true;
+        // StartupMessage: int32 tamanho, int32 versão, pares "chave\0valor\0"
+        const pares = buf.subarray(8).toString('utf8').split('\0');
+        partida = {};
+        for (let i = 0; i + 1 < pares.length && pares[i]; i += 2) partida[pares[i]!] = pares[i + 1]!;
         // AuthenticationOk + ReadyForQuery('I')
         socket.write(Buffer.from([0x52, 0, 0, 0, 8, 0, 0, 0, 0, 0x5a, 0, 0, 0, 5, 0x49]));
         return;
@@ -39,6 +50,8 @@ function servidorMudo(): Promise<{ porta: number; queryChegou: Promise<void>; fe
           for (const s of sockets) s.destroy();
           server.close();
         },
+        conexoes: () => sockets.length,
+        parametrosDaPartida: () => partida,
       });
     });
   });
@@ -98,6 +111,47 @@ describe('createPool', () => {
       (await segundo)?.release();
       expect(antesDaVaga).toBe('esperando');
       expect(desfecho).toBe('conectou');
+    } finally {
+      srv.fechar();
+      await pool.end().catch(() => undefined);
+    }
+  });
+
+  // pg_stat_activity precisa dizer DE QUAL processo vem a conexão: o nome tem
+  // que sair no StartupMessage, não só morar na config do objeto.
+  it('a conexão se apresenta com o application_name do papel do pool', async () => {
+    const srv = await servidorMudo();
+    const pool = createPool(`postgres://teste@127.0.0.1:${srv.porta}/db`, () => undefined, 'worker');
+    try {
+      const client = await pool.connect();
+      client.release();
+      expect(srv.parametrosDaPartida().application_name).toBe(`crm-worker-${process.pid}`);
+    } finally {
+      srv.fechar();
+      await pool.end().catch(() => undefined);
+    }
+  });
+
+  it('sem papel declarado, o nome diz que é script (nunca vazio)', () => {
+    expect(nomeDaAplicacao('script', 42)).toBe('crm-script-42');
+    expect(nomeDaAplicacao('app-request', 7)).toBe('crm-app-request-7');
+  });
+
+  // O default de 10 s do pg, com o polling de 2 s do worker, fechava e reabria
+  // conexão sem parar. Conexão devolvida tem que continuar no pool entre ciclos.
+  it('conexão ociosa por mais de 10 s continua aberta e é reusada', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const srv = await servidorMudo();
+    const pool = createPool(`postgres://teste@127.0.0.1:${srv.porta}/db`, () => undefined);
+    try {
+      (await pool.connect()).release();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(pool.idleCount).toBe(1);
+      (await pool.connect()).release();
+      expect(srv.conexoes()).toBe(1);
+      // e não fica para sempre: passado o teto, a ociosa é fechada
+      await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS);
+      expect(pool.idleCount).toBe(0);
     } finally {
       srv.fechar();
       await pool.end().catch(() => undefined);

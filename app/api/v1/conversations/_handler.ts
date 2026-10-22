@@ -203,7 +203,15 @@ export async function listConversationsHandler(
   // MESMA URL que os ids da busca, e saem do MESMO orçamento de bytes. Primeiro
   // os pessoais (cortados no que couber), depois a busca fica com o resto: a
   // URL nunca passa do muro do gateway, em vez de virar 414 → 500.
-  let orcamentoRestante = ORCAMENTO_DE_IDS_NA_URL;
+  //
+  // Os contatos PESSOAIS (`not contact_id in`) viajam na mesma URL e pagam
+  // PRIMEIRO: esconder a conversa de pessoal é privacidade, e cortar a lista
+  // dele deixaria a conversa aparecer. Antes eles tinham um orçamento inteiro
+  // só deles, por fora deste: uma organização com uns 100 contatos pessoais,
+  // somada a uma busca com contatos casados, passava de 8 KB (medido pelo
+  // `lista-do-atendente-nao-estoura-a-url`: 11.438 B), e o Inbox parava.
+  const pessoais = await idsDeContatosPessoais(supabase, ctx.organization_id);
+  let orcamentoRestante = ORCAMENTO_DE_IDS_NA_URL - pessoais.reduce((n, id) => n + id.length + 1, 0);
   const caber = (ids: string[] | undefined) => {
     if (!ids) return undefined;
     const cabem = idsQueCabemNaURL(ids, orcamentoRestante);
@@ -247,7 +255,6 @@ export async function listConversationsHandler(
   // Contato pessoal some da lista (spec 21, etapa 7 — critério 1): conversa cujo
   // contato é pessoal não aparece em nenhuma visão. ANTES de todo filtro
   // opcional, para que cursor e `has_more` descrevam o conjunto já escondido.
-  const pessoais = await idsDeContatosPessoais(supabase, ctx.organization_id);
   if (pessoais.length > 0) {
     query = query.not("contact_id", "in", `(${pessoais.join(",")})`);
   }

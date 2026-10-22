@@ -23,9 +23,11 @@ import { countPriorAcceptedSends } from '@/lib/agent-engine/guardrails/disclosur
 import { createApprovedReplyHandler } from '@/lib/agent-engine/agent/approved-reply';
 
 describe('countPriorAcceptedSends — desde', () => {
+  // A consulta virou `exists` (0 ou 1): o disclosure só pergunta se houve um
+  // envio antes, e contar todos varria o ledger inteiro do contato.
   it('sem desde: o histórico inteiro, como sempre', async () => {
-    const query = vi.fn(async () => ({ rows: [{ n: 3 }] }));
-    expect(await countPriorAcceptedSends({ query } as never, 'org', 'ct')).toBe(3);
+    const query = vi.fn(async () => ({ rows: [{ existe: true }] }));
+    expect(await countPriorAcceptedSends({ query } as never, 'org', 'ct')).toBe(1);
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).not.toContain('created_at');
     expect(params).toEqual(['org', 'ct']);
@@ -33,7 +35,7 @@ describe('countPriorAcceptedSends — desde', () => {
 
   it('com desde: só a partir do instante, amarrado à organização', async () => {
     const desde = new Date('2026-09-28T10:00:00Z');
-    const query = vi.fn(async () => ({ rows: [{ n: 0 }] }));
+    const query = vi.fn(async () => ({ rows: [{ existe: false }] }));
     expect(await countPriorAcceptedSends({ query } as never, 'org', 'ct', desde)).toBe(0);
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toContain('created_at >= $3');

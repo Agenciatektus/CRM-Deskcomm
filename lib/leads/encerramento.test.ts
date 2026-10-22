@@ -163,14 +163,30 @@ function baseStages(overrides: Row = {}) {
 describe("encerraDemanda", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("retorna lost_reason_required antes de consultar o banco", async () => {
-    const db = makeDb();
+  it("perda sem motivo num funil que exige (o padrão): lost_reason_required, e nada é gravado", async () => {
+    const db = makeDb({ leads: [baseLead()], stages: baseStages(), pipelines: [{ id: PIPELINE, settings: {} }] });
 
     await expect(
       encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost", motivo: "  " }),
-    ).rejects.toMatchObject({ code: "validation_failed", status: 422 });
+    ).rejects.toMatchObject({ code: "lost_reason_required", status: 422 });
     expect(db.updates).toEqual([]);
     expect(db.rpcs).toEqual([]);
+  });
+
+  it("perda sem motivo num funil com motivo OPCIONAL (9044): fecha como perdido, sem motivo", async () => {
+    // Antes, uma recusa no topo da função respondia `validation_failed` sem ler
+    // o funil, e o "Marcar como perdido" seguia exigindo motivo onde ele é opcional.
+    const db = makeDb({
+      leads: [baseLead()],
+      stages: baseStages(),
+      pipelines: [{ id: PIPELINE, settings: { lost_reason_required: false } }],
+    });
+
+    const r = await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost" });
+
+    expect(r.jaEstava).toBeFalsy();
+    expect(db.tables.crm_leads?.[0]).toMatchObject({ status: "lost", stage_id: LOST_STAGE, lost_reason: null });
+    expect(db.updates[0]).not.toHaveProperty("lost_reason");
   });
 
   it("não usa stage terminal arquivado", async () => {

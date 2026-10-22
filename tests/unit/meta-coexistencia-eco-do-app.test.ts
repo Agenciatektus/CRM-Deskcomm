@@ -15,6 +15,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const estado = vi.hoisted(() => ({
   insert: null as Record<string, unknown> | null,
   erroInsert: null as { code: string; message: string } | null,
+  /** A leitura de dedup antes do INSERT acha a linha (reentrega já gravada). */
+  jaGravada: false,
+  filtrosDaLeitura: [] as Array<[string, unknown]>,
   rpcs: [] as Array<{ name: string; args: Record<string, unknown> }>,
   marcacoes: [] as Array<Record<string, unknown>>,
   pausas: [] as Array<Record<string, unknown>>,
@@ -81,7 +84,17 @@ function adminFalso(): SupabaseClient {
       return chain;
     }
     if (table === "messages") {
+      const leitura: Record<string, unknown> = {
+        select: () => leitura,
+        eq: (coluna: string, valor: unknown) => {
+          estado.filtrosDaLeitura.push([coluna, valor]);
+          return leitura;
+        },
+        limit: () => leitura,
+        maybeSingle: async () => ({ data: estado.jaGravada ? { id: "message-0" } : null, error: null }),
+      };
       return {
+        select: leitura.select,
         insert: (payload: Record<string, unknown>) => {
           estado.insert = payload;
           return {
@@ -121,6 +134,8 @@ const ECO_TEXTO: OutboundEchoEvent = {
 beforeEach(() => {
   estado.insert = null;
   estado.erroInsert = null;
+  estado.jaGravada = false;
+  estado.filtrosDaLeitura = [];
   estado.rpcs = [];
   estado.marcacoes = [];
   estado.pausas = [];
@@ -249,6 +264,23 @@ describe("ingestão do eco", () => {
     const r = await ingestMetaEcho(adminFalso(), ECO_TEXTO, { organizationId: "org-1" });
 
     expect(r).toEqual({ status: "duplicate" });
+    expect(estado.pausas).toEqual([]);
+    expect(estado.marcacoes).toEqual([]);
+  });
+
+  // A constraint é DEFERRABLE: o INSERT repetido rodaria os gatilhos de
+  // `messages` inteiros e só estouraria no COMMIT. A leitura poupa isso.
+  it("re-entrega com a linha já gravada: nem chega ao INSERT, e NÃO pausa a IA", async () => {
+    estado.jaGravada = true;
+
+    const r = await ingestMetaEcho(adminFalso(), ECO_TEXTO, { organizationId: "org-1" });
+
+    expect(r).toEqual({ status: "duplicate" });
+    expect(estado.insert).toBeNull();
+    expect(estado.filtrosDaLeitura).toEqual([
+      ["organization_id", "org-1"],
+      ["external_id", "wamid.ECO1"],
+    ]);
     expect(estado.pausas).toEqual([]);
     expect(estado.marcacoes).toEqual([]);
   });

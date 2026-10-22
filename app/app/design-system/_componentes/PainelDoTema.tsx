@@ -12,6 +12,7 @@ import { SecaoMenusAvisosBusca } from "../_secoes/SecaoMenusAvisosBusca";
 import { SecaoNavegacao } from "../_secoes/SecaoNavegacao";
 import { SecaoRegras } from "../_secoes/SecaoRegras";
 import { SecaoRetorno } from "../_secoes/SecaoRetorno";
+import { SecaoTarefas } from "../_secoes/SecaoTarefas";
 import { SecaoTipografia } from "../_secoes/SecaoTipografia";
 import { ATRIBUTO_DO_TEMA, type Tema } from "./tema";
 
@@ -45,6 +46,8 @@ export function PainelDoTema({ tema, subarvore = false }: { tema: Tema; subarvor
         <SecaoComponentesBasicos tema={tema} />
         <SecaoMensagens tema={tema} />
         <SecaoColunaDoLead tema={tema} />
+        {/* Só do CRM (o protótipo não desenhou): as peças da tela de Tarefas. */}
+        <SecaoTarefas tema={tema} />
         <SecaoMenusAvisosBusca tema={tema} />
         <SecaoRetorno tema={tema} />
         <SecaoLayoutInbox tema={tema} />

@@ -51,6 +51,11 @@ describe("fronteira do padrão de nome de provider", () => {
     ["import { x } from '@/lib/waha/client'", "caminho de import"],
     ["meta_cloud", "outro provider do vocabulário"],
     ["graph.facebook.com", "host de provider"],
+    // `verdash` como PROVIDER (o modo pareado): o slug, em qualquer grafia de código.
+    ['provider === "verdash"', "slug do provider"],
+    ["@/lib/channels/verdash/conteudo", "caminho da fronteira do provider"],
+    ["verdash_session_id", "coluna/campo com o slug"],
+    ["VERDASH_HOSPEDADO_URL", "env var do provider"],
   ])("reconhece %s (%s)", (texto) => {
     expect(nomeiaProvider(texto)).toBe(true);
   });
@@ -62,6 +67,10 @@ describe("fronteira do padrão de nome de provider", () => {
     ["Wahalla", "idem, em PascalCase — `Waha` seguido de minúscula não é segmento"],
     ["metacloud", "sem o separador, não é o termo do vocabulário"],
     ["graphxfacebookxcom", "o ponto do host é literal, não coringa"],
+    // `Verdash` como MARCA do fork (nome próprio): não é provider.
+    ['export const DEFAULT_APP_NAME = "Verdash CRM";', "o nome do produto"],
+    ["o símbolo é o V da Verdash", "prosa sobre a marca"],
+    ['<TabsTrigger value="hospedado">{t("Verdash")}</TabsTrigger>', "aba com o nome da marca"],
   ])("NÃO reconhece %s (%s)", (texto) => {
     expect(nomeiaProvider(texto)).toBe(false);
   });

@@ -276,8 +276,10 @@ describe("o reenvio usa o retrato, não a regra de agora", () => {
 
     expect((await conversaoDeVendaHandler.handle(reenvio())).detail).toBe("outro_evento");
     expect((await conversaoDeQualificacaoHandler.handle(reenvio())).detail).toBe("outro_evento");
-    // E a mudança de etapa de negócio aberto não é venda.
-    expect((await conversaoDeVendaHandler.handle(mudouDeEtapa())).detail).toBe("nao_e_ganho");
+    // E a mudança de etapa de negócio aberto não é venda. Desde a 9054 quem
+    // decide é a chave da ETAPA (`envia_conversao`), não o status do negócio:
+    // esta etapa não envia a compra, e o consumidor da venda fica quieto.
+    expect((await conversaoDeVendaHandler.handle(mudouDeEtapa())).detail).toBe("etapa_sem_conversao");
     expect(spy).not.toHaveBeenCalled();
   });
 });
