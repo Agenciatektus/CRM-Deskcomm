@@ -18,6 +18,7 @@ interface Cadeia {
   menorQue: Array<[string, string]>;
   ordem?: string;
   lote?: number;
+  projecao?: string;
 }
 
 function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
@@ -26,7 +27,7 @@ function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
     from() {
       const c: Cadeia = { op: "", nao: [], menorQue: [] };
       const q: Record<string, unknown> = {
-        select() { if (!c.op) c.op = "select"; return q; },
+        select(cols?: string) { if (!c.op) c.op = "select"; if (cols) c.projecao = cols; return q; },
         is() { return q; },
         not(col: string, op: string, v: unknown) { c.nao.push([col, op, v]); return q; },
         lt(col: string, v: string) { c.menorQue.push([col, v]); return q; },
@@ -37,6 +38,21 @@ function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
         limit(n: number) {
           c.lote = n;
           cadeias.push(c);
+          // O DUBLÊ RECUSA O QUE O POSTGREST RECUSA. Num DELETE com retorno, o
+          // PostgREST ordena pela REPRESENTAÇÃO: ordenar por coluna fora do
+          // `select` devolve `column <tabela>.<col> does not exist`, com a
+          // coluna existindo no banco. O dublê antigo aceitava qualquer
+          // `order`, então o defeito passou verde aqui e só apareceu em
+          // produção, no cron, 5 minutos depois da release #259.
+          if (c.op === "delete" && c.ordem) {
+            const projetadas = (c.projecao ?? "").split(",").map((x) => x.trim());
+            if (!projetadas.includes(c.ordem)) {
+              return Promise.resolve({
+                data: null,
+                error: { message: `column webhook_events_log.${c.ordem} does not exist` },
+              });
+            }
+          }
           const canal = c.nao.some(([col]) => col === "channel_session_id");
           if (canal && opts.erroCanal) return Promise.resolve({ data: null, error: { message: opts.erroCanal } });
           if (canal) return Promise.resolve({ data: Array.from({ length: opts.apagaCanal ?? 0 }, (_, i) => ({ id: `c${i}` })), error: null });
@@ -63,6 +79,9 @@ describe("apagarLinhasDeCanalVencidas", () => {
     expect(c?.menorQue).toEqual([["received_at", "2026-09-21T12:00:00.000Z"]]);
     // A ordem é a do índice parcial da 9064, e o `order` existe (PGRST109).
     expect(c?.ordem).toBe("received_at");
+    // E a coluna ordenada ESTÁ na projeção: é isso que o PostgREST exige num
+    // DELETE com retorno, e é o que faltava na #259.
+    expect(c?.projecao?.split(",").map((x) => x.trim())).toContain("received_at");
     expect(c?.lote).toBe(500);
   });
 
