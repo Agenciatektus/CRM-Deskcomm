@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const estado = vi.hoisted(() => ({ linha: null as unknown, erro: null as unknown }));
+/**
+ * `organizations` responde a linha do caso; o resto do layout (os funis do
+ * menu, por exemplo) lê listas que aqui chegam vazias.
+ */
 const adminClient = {
-  from: () => ({
-    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: estado.linha, error: estado.erro }) }) }),
-  }),
+  from: () => {
+    const q: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "is", "neq", "in", "order", "limit"]) q[m] = () => q;
+    q.maybeSingle = async () => ({ data: estado.linha, error: estado.erro });
+    q.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok);
+    return q;
+  },
 };
 vi.mock("@/lib/channels/health", () => ({ listarConexoesCaidas: async () => [] }));
+// Os módulos liberados por empresa (9026) entram na mesma leva de consultas do
+// layout; aqui não importam, e o dublê do admin só sabe ler `organizations`.
+vi.mock("@/lib/organizacao/modulos-liberados", () => ({ modulosDaEmpresa: async () => [] }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: async () => ({ id: "user-1", idioma: "pt-BR", is_platform_admin: false, support: null, organizations: [] }),

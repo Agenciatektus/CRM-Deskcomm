@@ -36,6 +36,11 @@ vi.mock("@/hooks/channels/useChannelSessions", () => ({
   useChannelSessions: () => ({ data: [], isLoading: false }),
   channelLabel: (c: { display_name?: string | null }) => c.display_name ?? "Número sem nome",
 }));
+// Os padrões de envio da instalação (ritmo, janela): sem eles a tela usa os do
+// código, e aqui o assunto é só o aviso do teto.
+vi.mock("@/hooks/campanhas/useConfiguracao", () => ({
+  useConfiguracaoDeCampanhas: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock("@/hooks/campanhas/useDestinoDaCampanha", () => ({
   useFunis: () => ({ data: [], isLoading: false }),
   useEtapas: () => ({ data: [], isLoading: false }),

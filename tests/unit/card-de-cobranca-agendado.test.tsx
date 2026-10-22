@@ -11,6 +11,7 @@ vi.mock("@/lib/api/client", () => ({ apiClient: { post: vi.fn(), patch: h.patch,
 vi.mock("@/components/feedback/ApiErrorToast", () => ({ showApiError: vi.fn() }));
 
 import { CardDeCobranca } from "@/components/admin/tenants/CardDeCobranca";
+import { escolherValor } from "@/tests/unit/helpers/controles-do-ds";
 
 const ORG = "17171717-0000-4000-8000-000000000001";
 const BASICO = { id: "plano-a", nome: "Básico", arquivado_em: null };
@@ -33,7 +34,8 @@ describe("card do tenant com a troca agendada", () => {
     h.patch.mockResolvedValue({ data: { changed: true, plano_id: BASICO.id, plano_agendado_id: PRO.id, vale_a_partir_de: PAGANDO.proximo_vencimento } });
     const u = userEvent.setup();
     render(<CardDeCobranca orgId={ORG} planos={[BASICO, PRO]} assinatura={{ ...PAGANDO, plano_agendado_id: null }} suspensaPorCobranca={false} rotuloAntigo={null} />);
-    await u.selectOptions(screen.getByLabelText("Plano da empresa"), PRO.id);
+    // O seletor é `Escolha` (design system): o valor vai pelo `<select>` escondido.
+    escolherValor(screen.getByLabelText("Plano da empresa"), PRO.id);
     await u.click(screen.getByRole("button", { name: "Trocar plano" }));
     await waitFor(() => expect(h.sucesso).toHaveBeenCalledWith("Troca agendada: o novo plano vale a partir da próxima cobrança paga."));
   });

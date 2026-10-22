@@ -18,6 +18,8 @@
  *
  * Nasceu com `create_lead_in_pipeline` ("Criar card em outro funil").
  */
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc: vi.fn() }) }));
@@ -43,7 +45,24 @@ describe("ação de automação: schema, executor e tela concordam", () => {
     expect(getAction(tipo), `${tipo}: falta import em lib/automation/actions/register-all.ts`).toBeDefined();
   });
 
+  /**
+   * `ai_decide` (#1970, upstream) é montada só no editor VISUAL de automações
+   * (`app/app/webhooks/automacoes/[id]`): ela é uma caixa que se ramifica em
+   * opções, e o seletor linear do `RuleEditor` não tem como desenhar isso. A
+   * exceção é nominal e vigiada: a caixa visual tem de conhecê-la pelo tipo.
+   */
+  const SO_NO_EDITOR_VISUAL = ["ai_decide"];
+
   it("o seletor da tela oferece exatamente as ações que o schema aceita", () => {
-    expect(daTela).toEqual(doSchema);
+    expect(daTela).toEqual(doSchema.filter((tipo) => !SO_NO_EDITOR_VISUAL.includes(tipo)));
+  });
+
+  it("a ação que fica fora do seletor existe no schema e é desenhada pelo editor visual", () => {
+    const visual = readFileSync("app/app/webhooks/automacoes/[id]/_components/visual.ts", "utf8");
+    for (const tipo of SO_NO_EDITOR_VISUAL) {
+      expect(doSchema).toContain(tipo);
+      expect(daTela).not.toContain(tipo);
+      expect(visual).toContain(`"${tipo}"`);
+    }
   });
 });

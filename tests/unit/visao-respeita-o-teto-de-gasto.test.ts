@@ -315,8 +315,22 @@ describe("a visão de imagem respeita o teto de gasto", () => {
     expect(avisoInsertMock).not.toHaveBeenCalled();
   });
 
-  it("os degraus 1 e 2 da transcrição ficam fora do gate: com o teto estourado o áudio ainda vira texto", async () => {
+  // Desde a #250 os TRÊS degraus da transcrição passam pelo teto (o serviço de
+  // transcrição custa e entra no gasto): com o teto estourado, nem o degrau 1
+  // chama o serviço. Antes este caso afirmava o contrário ("ficam fora do gate").
+  it("os degraus 1 e 2 da transcrição também param no teto estourado: o serviço não é chamado (#250)", async () => {
     armarTeto();
+    linhaDaMensagem = { ...linhaDaMensagem, type: "audio", media_mime: "audio/ogg", media_storage_path: "org1/conv1/msg1.ogg" };
+
+    await deriveMessageMedia(eventRow());
+    const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(texto).not.toBe("transcrição de mentira");
+    expect(transcribeDoSvcMock).not.toHaveBeenCalled();
+    expect(statementsDoGate("fn_gasto_de_ia_do_mes").length).toBeGreaterThan(0);
+  });
+
+  it("CONTROLE: sem teto, o degrau 1 transcreve pelo serviço", async () => {
     linhaDaMensagem = { ...linhaDaMensagem, type: "audio", media_mime: "audio/ogg", media_storage_path: "org1/conv1/msg1.ogg" };
 
     await deriveMessageMedia(eventRow());
@@ -324,6 +338,5 @@ describe("a visão de imagem respeita o teto de gasto", () => {
 
     expect(texto).toBe("transcrição de mentira");
     expect(transcribeDoSvcMock).toHaveBeenCalledTimes(1);
-    expect(statementsDoGate("fn_gasto_de_ia_do_mes")).toHaveLength(0);
   });
 });
