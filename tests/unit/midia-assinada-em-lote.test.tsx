@@ -141,6 +141,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: async () => ({ id: "user-b", idioma: "pt-BR", organizations: [] }),
   resolveActiveOrg: async () => ({ orgId: estado.orgAtiva, role: "agent" }),
+  // As rotas de API resolvem a org por `orgAtivaDaApi` (require-role), que lê
+  // daqui; `resolveActiveOrg` redireciona e saiu de `app/api/**`.
+  orgAtivaSemPortao: async () => ({ orgId: estado.orgAtiva, role: "agent", org_status: "active" }),
 }));
 
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";

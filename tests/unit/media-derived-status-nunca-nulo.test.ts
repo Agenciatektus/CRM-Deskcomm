@@ -68,6 +68,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cadeia: any = {
           eq: () => cadeia,
+          is: () => cadeia,
           filter: () => cadeia,
           select: () => cadeia,
           then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: [{ id: "msg1" }], error: null }).then(ok),
@@ -102,6 +103,10 @@ vi.mock("@/lib/channels", async (importOriginal) => {
     ...original,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getAdapter: ((p: any) => (canalSemMidia ? {} : original.getAdapter(p))) as typeof original.getAdapter,
+    // O worker pede o adapter OPCIONAL (canal sem adapter local não lança antes
+    // do guard); a flag tem de valer pelos dois caminhos.
+    getAdapterOpcional: ((p: any) =>
+      canalSemMidia ? {} : original.getAdapterOpcional(p)) as typeof original.getAdapterOpcional,
   };
 });
 
