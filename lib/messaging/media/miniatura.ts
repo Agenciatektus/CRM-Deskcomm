@@ -50,7 +50,7 @@ let sharpCarregado: Promise<Sharp | null> | null = null;
  * Uma thread e sem cache: o worker processa uma mídia por vez, e o cache de
  * operações do libvips só segura memória entre mídias que não se repetem.
  */
-function carregarSharp(): Promise<Sharp | null> {
+export function carregarSharp(): Promise<Sharp | null> {
   sharpCarregado ??= import("sharp")
     .then((m) => {
       m.default.concurrency(1);

@@ -38,6 +38,12 @@ import {
   type OrigemDaTranscricao,
 } from "@/lib/messaging/media/escada-de-transcricao";
 import type { TranscriptionProvider } from "@/lib/messaging/media/transcription";
+import { travaDaTranscricao } from "@/lib/messaging/media/trava-da-transcricao";
+import {
+  MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
+  MOTIVO_IMAGEM_NAO_REDUZIDA,
+  reduzirImagemParaIa,
+} from "@/lib/messaging/media/imagem-para-ia";
 import { logger } from "@/lib/logger";
 import { validarParProvedorModelo } from "@/lib/ai/par-provedor-modelo";
 import { reagirAConclusaoDeDerivacao } from "@/lib/escalacao/handoff-tecnico";
@@ -199,6 +205,28 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     const dl = await admin.storage.from("whatsapp-media").download(msg.media_storage_path);
     if (dl.error || !dl.data) throw new Error(`storage_download_failed: ${dl.error?.message ?? "no_data"}`);
     const buffer = Buffer.from(await dl.data.arrayBuffer());
+
+    // ─── Trava de custo: áudio longo demais não sai daqui ───────────────────
+    //
+    // ANTES da escada e de qualquer credencial: vale para os três degraus, e
+    // um áudio barrado não resolve chave, não consulta teto, não grava linha
+    // em `llm_calls` nem abre aviso na Central (é regra, não defeito). O
+    // `failed` + marcador diz ao agente que houve um áudio que não foi lido,
+    // e o motivo diz ao operador por quê (`trava-da-transcricao.ts`).
+    if (msg.type === "audio") {
+      const trava = await travaDaTranscricao({ audio: buffer, metadata: msg.metadata });
+      if (!trava.passa) {
+        logger.info("[media-derive] áudio acima da trava de duração, não transcrito", {
+          organization_id: msg.organization_id,
+          message_id: msg.id,
+          segundos: trava.segundos,
+          bytes: buffer.byteLength,
+          fonte: trava.fonte,
+        });
+        await markFailed(trava.motivo);
+        return { consumer_key, status: "ok", detail: "audio_acima_da_trava_de_duracao" };
+      }
+    }
 
     // Credencial BYOK da org p/ visão (imagem).
     const llmCfg: LlmEdgeConfig = {
@@ -678,7 +706,7 @@ function buildDeriveDeps(
       return true;
     }
   };
-  const describeImage: DeriveDeps["describeImage"] = async (buffer, mime) => {
+  const describeImage: DeriveDeps["describeImage"] = async (buffer) => {
     // ⚠️ A resposta é resolvida AQUI, não na montagem das deps, porque num
     // roteador ela depende do catálogo e a consulta é assíncrona. Antes disto
     // a pergunta ia direto ao registro, que num roteador responde pelo prefixo
@@ -793,18 +821,26 @@ function buildDeriveDeps(
     ) {
       return MARCADOR_NAO_LIDA;
     }
+    // ─── A foto que sai é a REDUZIDA, nunca o original (`imagem-para-ia.ts`) ─
+    // Sem redução, não sai: mandar o arquivo cheio é o gasto que se quer evitar.
+    const reduzida = await reduzirImagemParaIa(buffer);
+    if (!reduzida) {
+      await avisarMidiaNaoLida(orgId, "imagem", MOTIVO_IMAGEM_NAO_REDUZIDA);
+      return MARCADOR_NAO_LIDA;
+    }
     const inicio = Date.now();
     let res: Awaited<ReturnType<typeof generateText>>;
     try {
       res = await generateText({
         model: factory(llm.apiKey, modelo, baseUrlDaVisao ?? undefined),
+        maxOutputTokens: MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
         messages: [
           {
             role: "user",
             content: [
               { type: "text", text: "Descreva objetivamente esta imagem em 1-2 frases, em português, para um atendente de vendas entender o que o cliente enviou." },
               // AI SDK v7: file part com mediaType (o antigo image part é deprecated).
-              { type: "file", data: buffer, mediaType: mime.split(";")[0]! },
+              { type: "file", data: reduzida.buffer, mediaType: reduzida.mime },
             ],
           },
         ],
@@ -938,7 +974,32 @@ function buildDeriveDeps(
     describeImage,
     extractPdf: extractPdfText,
     // Onda 3.1: vídeo → ffmpeg (áudio+frames) reusando transcrição e visão da org.
-    deriveVideo: (buffer) => deriveVideoText(buffer, { transcriber, describeImage }),
+    // A trilha de áudio do vídeo passa pela mesma trava de duração do áudio:
+    // acima dela o vídeo sai só com os frames, sem a transcrição paga.
+    deriveVideo: (buffer) =>
+      deriveVideoText(buffer, { transcriber: comTravaDeDuracao(transcriber), describeImage }),
+  };
+}
+
+/**
+ * O transcriber que só chama o de dentro quando a trava de duração deixa
+ * (`trava-da-transcricao.ts`). Barrado devolve "" — na trilha do vídeo isso é
+ * "sem fala", e o derivado segue com os frames.
+ */
+function comTravaDeDuracao(servico: TranscriptionProvider): TranscriptionProvider {
+  return {
+    transcribe: async (audio, mime) => {
+      const trava = await travaDaTranscricao({ audio });
+      if (!trava.passa) {
+        logger.info("[media-derive] trilha de áudio do vídeo acima da trava de duração, não transcrita", {
+          segundos: trava.segundos,
+          bytes: audio.byteLength,
+          fonte: trava.fonte,
+        });
+        return "";
+      }
+      return servico.transcribe(audio, mime);
+    },
   };
 }
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ModuloDaImagemParaIa from "@/lib/messaging/media/imagem-para-ia";
 
 import type * as ModuloDeTranscricao from "@/lib/messaging/media/transcription";
 
@@ -23,6 +24,13 @@ const factoryMock = vi.fn(() => "modelo-de-mentira");
 const transcribeDoSvcMock = vi.fn(async () => "transcrição de mentira");
 
 const dns = vi.hoisted(() => ({ resposta: [] as Array<{ address: string; family: number }> }));
+// A redução da foto (`imagem-para-ia.ts`) tem teste próprio; aqui o buffer é
+// de mentira e só importa o que acontece depois dela.
+vi.mock("@/lib/messaging/media/imagem-para-ia", async (importOriginal) => ({
+  ...(await importOriginal<typeof ModuloDaImagemParaIa>()),
+  reduzirImagemParaIa: async (b: Buffer) => ({ buffer: b, mime: "image/jpeg" as const }),
+}));
+
 vi.mock("node:dns/promises", () => {
   const lookup = vi.fn(async () => dns.resposta);
   return { lookup, default: { lookup } };

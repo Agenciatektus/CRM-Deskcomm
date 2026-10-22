@@ -7,6 +7,7 @@ import {
   custoDaTranscricao,
   idiomasDaTranscricao,
   modeloDeTranscricaoEmVigor,
+  TETO_DE_SANIDADE_USD,
 } from "@/lib/messaging/media/transcription";
 
 function respostaOk() {
@@ -152,7 +153,7 @@ describe("custo da transcrição pelo serviço (degraus 1 e 2)", () => {
     expect(custoDaTranscricao("whisper-large-v3", { usage: { seconds: 60 } })).toBeNull();
   });
 
-  it("⭐ `usage.cost` absurdo (acima de US$ 5) vira null com aviso no log", () => {
+  it("⭐ `usage.cost` absurdo (acima de US$ 0,10) vira null com aviso no log", () => {
     const aviso = vi.spyOn(logger, "warn").mockImplementation(() => undefined as never);
     expect(custoDaTranscricao("openai/whisper-1", { text: "segredo do cliente", usage: { cost: 50 } })).toBeNull();
     expect(aviso).toHaveBeenCalledTimes(1);
@@ -161,8 +162,16 @@ describe("custo da transcrição pelo serviço (degraus 1 e 2)", () => {
     aviso.mockRestore();
   });
 
-  it("controle negativo: no limite (US$ 5) o custo ainda vale", () => {
-    expect(custoDaTranscricao("openai/whisper-1", { usage: { cost: 5 } })).toBeCloseTo(500, 10);
+  it("⭐ US$ 0,11 (um centavo acima do teto) já vira null", () => {
+    const aviso = vi.spyOn(logger, "warn").mockImplementation(() => undefined as never);
+    expect(custoDaTranscricao("openai/whisper-1", { usage: { cost: 0.11 } })).toBeNull();
+    expect(aviso).toHaveBeenCalledTimes(1);
+    aviso.mockRestore();
+  });
+
+  it("controle negativo: no limite (US$ 0,10) o custo ainda vale", () => {
+    expect(TETO_DE_SANIDADE_USD).toBe(0.1);
+    expect(custoDaTranscricao("openai/whisper-1", { usage: { cost: 0.1 } })).toBeCloseTo(10, 10);
   });
 
   it("custo inválido não é aceito como custo", () => {
