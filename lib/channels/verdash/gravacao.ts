@@ -5,6 +5,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mensagemJaRecebida } from "@/lib/messaging/mensagem-ja-recebida";
+
 import { logger } from "@/lib/logger";
 
 import type { VerdashInboundMessage } from "./webhook";
@@ -107,6 +109,10 @@ export async function insertMessage(
   },
 ): Promise<string | "duplicate"> {
   const { msg } = input;
+  // Reentrega: a linha já existe. Sai ANTES do INSERT para não rodar os
+  // gatilhos de `messages` à toa (o 23505 da constraint deferível só viria no
+  // COMMIT). O 23505 abaixo segue sendo a rede da corrida.
+  if (await mensagemJaRecebida(admin, input.organizationId, msg.externalId)) return "duplicate";
   const anexo = msg.attachments[0];
 
   const { data, error } = await admin

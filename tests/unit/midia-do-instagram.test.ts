@@ -122,25 +122,39 @@ describe("o parser lê os tipos REAIS com as chaves reais", () => {
 });
 
 /** Admin falso que guarda o que o ingest escreve. */
-function fazerAdmin() {
+function fazerAdmin(opts: { mensagemJaExiste?: boolean; insertDa23505?: boolean } = {}) {
   const inserts: Record<string, unknown>[] = [];
   const eventos: Record<string, unknown>[] = [];
-  const consulta = () => {
+  /** Os filtros da leitura de dedup em `messages` (a chave da constraint). */
+  const filtrosDaLeitura: Array<[string, unknown]> = [];
+  // `messages` responde à leitura de dedup antes do INSERT: por padrão "não
+  // existe" (toda mensagem é inédita). O resto (contato etc.) acha a linha.
+  const consulta = (tabela: string) => {
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "is", "order", "limit"]) q[m] = () => q;
-    q.maybeSingle = async () => ({ data: { id: "contato-1" }, error: null });
+    for (const m of ["select", "is", "order", "limit"]) q[m] = () => q;
+    q.eq = (coluna: string, valor: unknown) => {
+      if (tabela === "messages") filtrosDaLeitura.push([coluna, valor]);
+      return q;
+    };
+    q.maybeSingle = async () => ({
+      data: tabela === "messages" ? (opts.mensagemJaExiste ? { id: "ja-existe" } : null) : { id: "contato-1" },
+      error: null,
+    });
     return q;
   };
   const admin = {
     from: (tabela: string) => ({
-      ...consulta(),
+      ...consulta(tabela),
       insert: (payload: Record<string, unknown> | Record<string, unknown>[]) => {
         const linhas = Array.isArray(payload) ? payload : [payload];
         if (tabela === "messages") inserts.push(...linhas);
         const ids = linhas.map((_, i) => ({ id: `msg-${i}` }));
         return {
           select: () => ({
-            maybeSingle: async () => ({ data: ids[0], error: null }),
+            maybeSingle: async () =>
+              opts.insertDa23505 && tabela === "messages"
+                ? { data: null, error: { code: "23505", message: "duplicate key" } }
+                : { data: ids[0], error: null },
             then: (ok: (r: unknown) => unknown) => ok({ data: ids, error: null }),
           }),
         };
@@ -156,7 +170,7 @@ function fazerAdmin() {
       return { data: "conversa-b", error: null };
     },
   };
-  return { inserts, eventos, admin: admin as never };
+  return { inserts, eventos, filtrosDaLeitura, admin: admin as never };
 }
 
 async function ingerir(corpo: unknown, admin: never, org = "org-b") {
@@ -228,6 +242,32 @@ describe("o ingest: UMA linha inbound por mensagem do cliente", () => {
     const { inserts, eventos, admin } = fazerAdmin();
     await ingerir(envelope([], { text: "oi" }), admin);
     expect(inserts.map((l) => l.type)).toEqual(["text"]);
+    expect(eventos).toEqual([]);
+  });
+});
+
+// A constraint `messages_org_external_id_unique` é DEFERRABLE: o INSERT
+// repetido roda os gatilhos de `messages` inteiros e só estoura no COMMIT. A
+// leitura antes do INSERT poupa esse trabalho; o 23505 segue como rede.
+describe("o ingest: reentrega não chega ao INSERT", () => {
+  it("a mesma mensagem de novo: nenhum INSERT, nada pedido ao worker, desfecho duplicate", async () => {
+    const { inserts, eventos, filtrosDaLeitura, admin } = fazerAdmin({ mensagemJaExiste: true });
+    const r = await ingerir(envelope([PAYLOADS.imagem], { text: "olha" }), admin);
+    expect(r).toMatchObject({ ok: true, body: { status: "duplicate" } });
+    expect(inserts).toEqual([]);
+    expect(eventos).toEqual([]);
+    // a chave da leitura é a da constraint, POR ORGANIZAÇÃO
+    expect(filtrosDaLeitura).toEqual([
+      ["organization_id", "org-b"],
+      ["external_id", "aWdfZAFICTICIO"],
+    ]);
+  });
+
+  it("corrida: a leitura não viu, o INSERT bate no 23505 e o desfecho continua duplicate", async () => {
+    const { inserts, eventos, admin } = fazerAdmin({ insertDa23505: true });
+    const r = await ingerir(envelope([PAYLOADS.imagem]), admin);
+    expect(r).toMatchObject({ ok: true, body: { status: "duplicate" } });
+    expect(inserts).toHaveLength(1);
     expect(eventos).toEqual([]);
   });
 });
