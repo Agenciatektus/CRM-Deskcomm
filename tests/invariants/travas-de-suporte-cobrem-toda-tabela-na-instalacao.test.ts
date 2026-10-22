@@ -162,8 +162,7 @@ const MOTIVO_DE_CADA_CANDIDATA = `
                     from pg_policy p where p.polrelid = alvo.oid and p.polpermissive and p.polcmd in ('a', '*')), 'nenhuma')
     end
     from alvo
-   order by alvo.oid desc
-   limit 12;`;
+   order by alvo.oid desc;`;
 
 beforeAll(() => {
   // DROP/CREATE DATABASE não rodam em bloco de transação: `-f -` manda statement a statement.

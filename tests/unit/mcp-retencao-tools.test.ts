@@ -629,15 +629,26 @@ describe("crm_close_demand", () => {
     expect(String(atividade?.values.reason)).toContain("sem orçamento");
   });
 
-  it("perder sem motivo é recusado como ensino, e nada é escrito", async () => {
+  // A recusa sai do FUNIL (9044): sem `settings.lost_reason_required: false`, o
+  // motivo é obrigatório e o código é `lost_reason_required`. Antes uma recusa no
+  // topo de `encerraDemanda` respondia `validation_failed` sem ler o funil, e o
+  // funil com motivo opcional nunca era respeitado.
+  it("perder sem motivo num funil que exige é recusado como ensino, e nada é escrito", async () => {
     const cap = novasCapturas();
+    const resolver: Resolver = (c) => {
+      if (c.table === "crm_leads" && c.terminal === "maybeSingle") return { data: leadAberto, error: null };
+      if (c.table === "crm_stages" && c.terminal === "maybeSingle") {
+        return { data: { id: STAGE_PERDA, name: "Perdido" }, error: null };
+      }
+      return { data: c.terminal === "list" ? [] : null, error: null };
+    };
     const res = (await crmCloseDemand.handler(
       { lead_id: LEAD, outcome: "lost", reason: undefined },
-      ctxDe(() => ({ data: null, error: null }), cap),
+      ctxDe(resolver, cap),
     )) as { encerrado: boolean; motivo: string };
 
     expect(res.encerrado).toBe(false);
-    expect(res.motivo).toBe("validation_failed");
+    expect(res.motivo).toBe("lost_reason_required");
     expect(cap.updates).toHaveLength(0);
   });
 
