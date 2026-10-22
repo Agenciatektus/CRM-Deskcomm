@@ -140,6 +140,14 @@ jobs:
   # Com eles numa parte própria, a 3 volta a ser só `Unit tests`, e o kit pode
   # crescer até o orçamento sem levar a suíte junto. Previsão, não medição: a
   # parte 4 fica em ~6 min (preâmbulo + cercas + kit) e a 3 em ~8.
+  #
+  # A QUINTA PARTE ENTROU EM 22/10/2026, e ela DIVIDE a suíte unitária: o
+  # `--shard` vai de N/3 para N/4, e as cercas + o kit bash, que eram a parte 4,
+  # passam para a 5 (a regra da guarda é: as partes que rodam unit são 1..N).
+  # Medido na PR #252 (runs 39777687928 e 39780615429): parte 1 com 13 min
+  # (typecheck ~2 min + `Unit tests` ~11 min) e parte 2 com 13 min numa rodada,
+  # contra o orçamento de 12, sem teste falhando. Previsão, não medição: cada
+  # parte de unit cai ~2,5 min (um quarto em vez de um terço da suíte).
   verify-parte:
     # Guarda de travamento. O DETECTOR de crescimento é o passo `Orçamento de
     # tempo` no fim de cada parte; a medição que justifica o número está em
@@ -155,7 +163,7 @@ jobs:
       # Sem fail-fast: um vermelho numa parte não esconde o da outra.
       fail-fast: false
       matrix:
-        parte: [1, 2, 3, 4]
+        parte: [1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v7
 
@@ -239,7 +247,7 @@ jobs:
       # Seleção e medições: o bloco `projects` de vitest.config.ts.
       # Na parte 4, junto do kit bash: o porquê e a conta estão no cabeçalho do job.
       - name: Cercas estruturais
-        if: matrix.parte == 4
+        if: matrix.parte == 5
         run: pnpm cercas
 
       # O tsc do projeto inteiro passou do teto padrão do heap do Node. Medido em
@@ -344,9 +352,9 @@ jobs:
       # são a suíte inteira, uma vez só. A parte 4 não roda unit: é cercas e kit
       # bash (cabeçalho do job). Localmente o comando continua sendo
       # `pnpm test:unit`, sem recorte.
-      - name: Unit tests (parte ${{ matrix.parte }}/3)
-        if: matrix.parte != 4
-        run: pnpm test:unit --project produto --shard=${{ matrix.parte }}/3
+      - name: Unit tests (parte ${{ matrix.parte }}/4)
+        if: matrix.parte != 5
+        run: pnpm test:unit --project produto --shard=${{ matrix.parte }}/4
 
       # O MAPA DA SKILL COBRE O MENU? — aviso, nunca reprova.
       #
@@ -404,7 +412,7 @@ jobs:
       # escolher OpenRouter travava o instalador num laço, escolher OpenAI
       # deixava o .env pela metade — passaram por todos os checks verdes. 15s.
       - name: Kit self-host (bash)
-        if: matrix.parte == 4
+        if: matrix.parte == 5
         run: pnpm test:shell
 
       - name: Orçamento de tempo do verify-parte
