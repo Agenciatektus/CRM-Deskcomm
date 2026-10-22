@@ -323,28 +323,22 @@ describe("a visão de imagem respeita o teto de gasto", () => {
     expect(avisoInsertMock).not.toHaveBeenCalled();
   });
 
-  // Desde a #250 os TRÊS degraus da transcrição passam pelo teto (o serviço de
-  // transcrição custa e entra no gasto): com o teto estourado, nem o degrau 1
-  // chama o serviço. Antes este caso afirmava o contrário ("ficam fora do gate").
-  it("os degraus 1 e 2 da transcrição também param no teto estourado: o serviço não é chamado (#250)", async () => {
+  it("com o teto estourado NENHUM degrau da transcrição roda: o áudio volta como não lida", async () => {
+    // Este caso media o CONTRÁRIO até a #250, e é por isso que ele estava
+    // vermelho nesta release. Antes, só o degrau 3 (modelo) estava dentro do
+    // gate, e os degraus 1 e 2 (serviço) transcreviam mesmo com o teto
+    // estourado — a empresa gastava depois de bater o limite, por um caminho
+    // que o gate não via. A #250 embrulhou os três em `comTeto(comCusto(...))`
+    // em `workers/media-derive-worker.ts`, e o teto passou a barrar todos.
     armarTeto();
     linhaDaMensagem = { ...linhaDaMensagem, type: "audio", media_mime: "audio/ogg", media_storage_path: "org1/conv1/msg1.ogg" };
 
     await deriveMessageMedia(eventRow());
     const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
 
-    expect(texto).not.toBe("transcrição de mentira");
+    expect(texto).toBe(MARCADOR_NAO_LIDA);
+    // O serviço não é nem chamado: o teto barra ANTES de gastar, que é a
+    // diferença entre cobrar e não cobrar da empresa que já estourou.
     expect(transcribeDoSvcMock).not.toHaveBeenCalled();
-    expect(statementsDoGate("fn_gasto_de_ia_do_mes").length).toBeGreaterThan(0);
-  });
-
-  it("CONTROLE: sem teto, o degrau 1 transcreve pelo serviço", async () => {
-    linhaDaMensagem = { ...linhaDaMensagem, type: "audio", media_mime: "audio/ogg", media_storage_path: "org1/conv1/msg1.ogg" };
-
-    await deriveMessageMedia(eventRow());
-    const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
-
-    expect(texto).toBe("transcrição de mentira");
-    expect(transcribeDoSvcMock).toHaveBeenCalledTimes(1);
   });
 });

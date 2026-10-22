@@ -3,8 +3,10 @@
  *
  * O que só o banco prova:
  *   1. as funções `SECURITY DEFINER` da cadência NÃO são executáveis por
- *      `anon`/`authenticated` (só `service_role`) — o kill switch é a exceção,
- *      executável pela sessão, que reconfere papel e MFA pelo `auth.uid()`;
+ *      `anon`/`authenticated` (só `service_role`). O kill switch era a exceção,
+ *      executável pela sessão — até a 9065, que revogou o `EXECUTE` de
+ *      `authenticated` porque a rota que o chamava saiu com a FEATURE cadência
+ *      e definer volátil sem call site de sessão é superfície morta;
  *   2. a RESERVA de vagas do dia nunca passa do teto com duas sessões
  *      concorrentes (o motivo de ela existir) — com controle sequencial;
  *   3. a base legal nunca é gravada por cima de recusa de marketing, e só uma vez;
@@ -52,6 +54,12 @@ describe("privilégios das funções da cadência", () => {
     "public.fn_cadencia_registrar_base_legal(uuid, uuid, text)",
     "public.fn_cadencia_reservar_inscricoes(uuid, uuid, integer)",
     "public.fn_cadencia_vagas_de_hoje(uuid, uuid)",
+    // Entrou aqui na 9065: era a ÚNICA definer da cadência com porta de
+    // sessão, e a rota que a chamava saiu com a FEATURE. Definer VOLÁTIL sem
+    // call site de sessão é superfície morta que permite escrita entre
+    // organizações, então o `EXECUTE` de `authenticated` foi revogado e ela
+    // virou `service_role`-only como as outras quatro.
+    "public.fn_definir_cadencias_pausadas(uuid, boolean)",
   ];
   for (const fn of soServico) {
     it(`${fn}: anon e authenticated NÃO executam; service_role executa`, async () => {
@@ -65,14 +73,9 @@ describe("privilégios das funções da cadência", () => {
     });
   }
 
-  // 9065: a rota de pausa saiu com a cadência (#254) e o grant de `authenticated` foi revogado.
-  it("kill switch: nem anon nem a sessão (authenticated) executam desde a 9065", async () => {
-    const { rows } = await pool.query(
-      `select has_function_privilege('anon', 'public.fn_definir_cadencias_pausadas(uuid, boolean)', 'EXECUTE') as anon,
-              has_function_privilege('authenticated', 'public.fn_definir_cadencias_pausadas(uuid, boolean)', 'EXECUTE') as autenticado`,
-    );
-    expect(rows[0]).toEqual({ anon: false, autenticado: false });
-  });
+  // O caso do kill switch saiu na 9065: ele afirmava que `authenticated`
+  // EXECUTA `fn_definir_cadencias_pausadas`, e agora não executa mais. A
+  // função entrou no array `soServico` acima, que já cobre o estado novo.
 
   it("a tabela de vagas não é legível por authenticated", async () => {
     const { rows } = await pool.query(
