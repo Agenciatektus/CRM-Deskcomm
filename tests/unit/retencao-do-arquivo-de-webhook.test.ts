@@ -200,6 +200,33 @@ describe("o lote é o que impede a poda de derrubar a entrada", () => {
     const r = await podarArquivoDeWebhooks(admin, { diasComCorpo: 7, diasParaApagar: 90, lote: 500 });
     expect(r.temMais).toBe(false);
   });
+
+  // Os dois casos acima medem o lote da BUSCA do passo 1. Os dois abaixo medem
+  // o lote do DELETE do passo 2, que é um termo próprio do sinal
+  // (`loteCheioNoPasso2`) e que, sem eles, nenhum teste do repositório
+  // distingue de AUSENTE: apagar o termo do `||` deixava as 5 suítes de
+  // retenção 52/52 verdes, e mover o cálculo para depois do `+=` também
+  // (medido por mutação na revisão da #260). Termo sem cerca é termo que
+  // alguem "simplifica" numa limpeza e ninguém percebe.
+  //
+  // O dublê da cerca irmã (`poda-curta-da-linha-de-canal.test.ts`) não alcança
+  // isto: lá a cadeia do passo 2 não tem `.not(...)` e devolve sempre zero
+  // linhas. Aqui `opts.apagadas` alimenta o DELETE direto.
+  it("⭐ lote cheio no DELETE de 90 dias com a BUSCA vazia: `temMais` é true", async () => {
+    const { admin } = fakeAdmin({ alvos: [], apagadas: [{ id: "d0" }, { id: "d1" }, { id: "d2" }] });
+    const r = await podarArquivoDeWebhooks(admin, { diasComCorpo: 7, diasParaApagar: 90, lote: 3 });
+    expect(r.apagadas).toBe(3);
+    expect(r.temMais).toBe(true);
+  });
+
+  it("DELETE de 90 dias com folga e a busca vazia: `temMais` é false", async () => {
+    // Controle do caso acima: sem ele, um `true` fixo no termo passaria.
+    const { admin } = fakeAdmin({ alvos: [], apagadas: [{ id: "d0" }, { id: "d1" }] });
+    const r = await podarArquivoDeWebhooks(admin, { diasComCorpo: 7, diasParaApagar: 90, lote: 3 });
+    expect(r.apagadas).toBe(2);
+    expect(r.temMais).toBe(false);
+  });
+
 });
 
 describe("falha do banco na BUSCA não derruba a rodada", () => {
