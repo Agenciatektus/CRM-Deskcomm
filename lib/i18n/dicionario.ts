@@ -16422,6 +16422,10 @@ export const DICIONARIO: Traducoes = {
   "Sem nome salvo": { es: "Sin nombre guardado" },
   "Parado há": { es: "Detenido hace" },
   "Parado há {tempo}": { es: "Detenido hace {tempo}" },
+  // Motivos da passagem da régua da campanha (#254).
+  "O lead respondeu à campanha de prospecção": { es: "El lead respondió a la campaña de prospección" },
+  "A IA levou o negócio até a etapa definida na campanha": { es: "La IA llevó el negocio hasta la etapa definida en la campaña" },
+  "A IA da campanha parou de conduzir a conversa": { es: "La IA de la campaña dejó de conducir la conversación" },
   Compacto: { es: "Compacto" },
   "Mostrar ou ocultar detalhes do lead": { es: "Mostrar u ocultar detalles del lead" },
   "Detalhes do lead": { es: "Detalles del lead" },
