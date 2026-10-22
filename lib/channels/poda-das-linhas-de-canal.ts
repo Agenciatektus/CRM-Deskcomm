@@ -60,7 +60,13 @@ export async function apagarLinhasDeCanalVencidas(
     .delete()
     .not("channel_session_id", "is", null)
     .lt("received_at", limite)
-    .select("id")
+    // `received_at` ENTRA na projeção de propósito, e não é enfeite: num DELETE
+    // com retorno, o PostgREST ordena pela REPRESENTAÇÃO, não pela tabela. Com
+    // `select("id")` o `order("received_at")` morria em
+    // `column webhook_events_log.received_at does not exist` a cada rodada do
+    // cron, com a coluna existindo no banco e com GRANT — medido em produção na
+    // release #259, 5 minutos depois de subir.
+    .select("id, received_at")
     // `order` antes do `limit`: o PostgREST 12.2 recusa DELETE com `limit` sem
     // ordem (PGRST109, issue #1769). `received_at` e não `id`: é a coluna do
     // índice parcial, e é o que mantém o lote barato.
