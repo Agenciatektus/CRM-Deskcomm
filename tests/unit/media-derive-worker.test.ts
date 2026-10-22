@@ -10,6 +10,7 @@ const messageRow = {
   media_storage_path: "org1/conv1/msg1.ogg" as string | null,
   media_derived_status: null as string | null,
   direction: "inbound" as string | null,
+  metadata: null as Record<string, unknown> | null,
 };
 
 /** `organizations.settings` da org: `undefined` = nada gravado (leitura de mídia LIGADA, o padrão). */
@@ -95,6 +96,13 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
+// A trava de duração mede o arquivo com ffprobe quando o canal não diz a
+// duração: aqui o dublê decide, sem rodar processo nenhum.
+const medirDuracaoMock = vi.fn(async (): Promise<number | null> => null);
+vi.mock("@/lib/messaging/media/ffprobe-duracao", () => ({
+  medirDuracaoComFfprobe: () => medirDuracaoMock(),
+}));
+
 vi.mock("@/lib/messaging/media/derive", () => ({
   deriveMediaText: vi.fn(async () => "transcrição do áudio real"),
 }));
@@ -163,6 +171,8 @@ describe("deriveMessageMedia", () => {
     messageRow.media_mime = "audio/ogg";
     messageRow.direction = "inbound";
     settingsDaOrg = undefined;
+    messageRow.metadata = null;
+    medirDuracaoMock.mockReset().mockResolvedValue(null);
     vi.mocked(resolveOrgLlmConfig).mockReset().mockResolvedValue(configResolvida());
     vi.mocked(deriveMediaText).mockReset().mockResolvedValue("transcrição do áudio real");
   });
@@ -203,6 +213,58 @@ describe("deriveMessageMedia", () => {
     expect(updateEqMock).toHaveBeenCalledWith(
       expect.objectContaining({ media_derived_text: "transcrição do áudio real", media_derived_status: "ready" }),
     );
+  });
+
+  describe("trava de custo: áudio acima de 10 min não é transcrito", () => {
+    const anexoCom = (seconds: number) => ({ provider_attachments: [{ type: "audio", seconds }] });
+
+    it("controle: áudio de 9 min (duração do canal) transcreve e grava ready", async () => {
+      messageRow.metadata = anexoCom(9 * 60);
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.status).toBe("ok");
+      expect(deriveMediaText).toHaveBeenCalledTimes(1);
+      expect(updateEqMock).toHaveBeenCalledWith(expect.objectContaining({ media_derived_status: "ready" }));
+    });
+
+    it("⭐ áudio de 11 min: não chega a provedor nenhum, marca o motivo, sem custo e sem aviso", async () => {
+      messageRow.metadata = anexoCom(11 * 60);
+      const r = await deriveMessageMedia(eventRow());
+      expect(r).toEqual(expect.objectContaining({ status: "ok", detail: "audio_acima_da_trava_de_duracao" }));
+      // Nenhum degrau da escada é sequer montado: sem credencial, sem transcrição.
+      expect(resolveOrgLlmConfig).not.toHaveBeenCalled();
+      expect(deriveMediaText).not.toHaveBeenCalled();
+      expect(inboxInsertMock).not.toHaveBeenCalled();
+      expect(updateEqMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media_derived_status: "failed",
+          media_derived_text: MARCADOR_NAO_LIDA,
+          metadata: expect.objectContaining({ media_derived_motivo: "áudio maior que 10 min não é transcrito" }),
+        }),
+      );
+    });
+
+    it("sem duração do canal, a medida do arquivo vale: 11 min medidos não enviam", async () => {
+      medirDuracaoMock.mockResolvedValue(11 * 60);
+      await deriveMessageMedia(eventRow());
+      expect(deriveMediaText).not.toHaveBeenCalled();
+    });
+
+    it("⭐ sem duração nenhuma e acima de 3 MB: não envia", async () => {
+      downloadMock.mockResolvedValue({ data: new Blob([new Uint8Array(3 * 1024 * 1024 + 1)]), error: null });
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.detail).toBe("audio_acima_da_trava_de_duracao");
+      expect(deriveMediaText).not.toHaveBeenCalled();
+      expect(resolveOrgLlmConfig).not.toHaveBeenCalled();
+    });
+
+    it("controle negativo: imagem grande não passa pela trava de áudio", async () => {
+      messageRow.type = "image";
+      messageRow.media_mime = "image/jpeg";
+      downloadMock.mockResolvedValue({ data: new Blob([new Uint8Array(3 * 1024 * 1024 + 1)]), error: null });
+      await deriveMessageMedia(eventRow());
+      expect(deriveMediaText).toHaveBeenCalledTimes(1);
+      expect(medirDuracaoMock).not.toHaveBeenCalled();
+    });
   });
 
   describe("leitura de mídia por empresa e mídia enviada pela empresa", () => {

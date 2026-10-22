@@ -47,10 +47,13 @@ const USD_POR_MINUTO_DE_TRANSCRICAO: Record<string, number> = {
  *  3. null — preço desconhecido. Nunca 0: diria "grátis" ao teto.
  *
  * `usage.cost` acima de `TETO_DE_SANIDADE_USD` por transcrição é tratado como
- * dado corrompido (um áudio de WhatsApp custa frações de centavo): vira null
- * com aviso no log, em vez de estourar o teto da empresa por um número falso.
+ * dado corrompido do fornecedor: vira null com aviso no log, em vez de estourar
+ * o teto da empresa por um número falso. US$ 0,10 porque a trava de duração
+ * (`trava-da-transcricao.ts`) não deixa sair áudio acima de 10 min, e 10 min no
+ * whisper-1 custam US$ 0,06 — um valor acima disso não é preço de áudio de
+ * WhatsApp. Era US$ 5, o que deixava passar como "real" um custo 80× maior.
  */
-export const TETO_DE_SANIDADE_USD = 5;
+export const TETO_DE_SANIDADE_USD = 0.1;
 
 export function custoDaTranscricao(model: string, resposta: unknown): number | null {
   const r = (resposta ?? {}) as { usage?: { cost?: unknown; seconds?: unknown }; duration?: unknown };
