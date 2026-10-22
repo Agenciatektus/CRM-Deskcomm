@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   apiTranscriptionProvider,
+  custoDaTranscricao,
   idiomasDaTranscricao,
   modeloDeTranscricaoEmVigor,
 } from "@/lib/messaging/media/transcription";
@@ -111,5 +112,51 @@ describe("idioma da transcrição", () => {
     expect(modeloDeTranscricaoEmVigor({ model: "whisper-large-v3", apiKey: "k", baseUrl: groq })).toBe(
       "whisper-large-v3",
     );
+  });
+});
+
+describe("custo da transcrição pelo serviço (degraus 1 e 2)", () => {
+  function resposta(json: unknown) {
+    return vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(json), { status: 200, headers: { "content-type": "application/json" } }),
+    );
+  }
+
+  it("⭐ `usage.cost` do OpenRouter (dólares) vira cost_cents (centavos de dólar)", async () => {
+    const fetchMock = resposta({ text: "oi", usage: { cost: 0.0012 } });
+    const p = apiTranscriptionProvider(
+      { apiKey: "sk-or", baseUrl: "https://openrouter.ai/api/v1", model: "openai/whisper-1" },
+      fetchMock,
+    );
+    const r = await p.transcribeComCusto!(Buffer.from([1]), "audio/ogg");
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://openrouter.ai/api/v1/audio/transcriptions");
+    expect(r.texto).toBe("oi");
+    expect(r.costCents).toBeCloseTo(0.12, 10);
+  });
+
+  it("sem custo, com a duração e modelo de preço conhecido: estima duração × preço por minuto", () => {
+    // whisper-1: US$ 0,006/min → 90 s = US$ 0,009 = 0,9 centavo
+    expect(custoDaTranscricao("whisper-1", { text: "x", usage: { type: "duration", seconds: 90 } })).toBeCloseTo(0.9, 10);
+    expect(custoDaTranscricao("openai/whisper-1", { text: "x", duration: 30 })).toBeCloseTo(0.3, 10);
+  });
+
+  it("controle negativo: sem custo e sem duração → null (nunca 0)", async () => {
+    const p = apiTranscriptionProvider({ apiKey: "sk" }, resposta({ text: "oi" }));
+    const r = await p.transcribeComCusto!(Buffer.from([1]), "audio/ogg");
+    expect(r.costCents).toBeNull();
+  });
+
+  it("duração com modelo sem preço conhecido → null, não o preço de outro modelo", () => {
+    expect(custoDaTranscricao("whisper-large-v3", { usage: { seconds: 60 } })).toBeNull();
+  });
+
+  it("custo inválido não é aceito como custo", () => {
+    expect(custoDaTranscricao("modelo-x", { usage: { cost: "0.01" } })).toBeNull();
+    expect(custoDaTranscricao("modelo-x", { usage: { cost: -1 } })).toBeNull();
+  });
+
+  it("`transcribe` continua devolvendo só o texto", async () => {
+    const p = apiTranscriptionProvider({ apiKey: "sk" }, resposta({ text: "só o texto", usage: { cost: 0.01 } }));
+    expect(await p.transcribe(Buffer.from([1]), "audio/ogg")).toBe("só o texto");
   });
 });

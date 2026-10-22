@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as ModuloDoSeam from "@/lib/agent-engine/edge/llm/run-model-call";
 import type * as ModuloDeTranscricao from "@/lib/messaging/media/transcription";
 
 /**
@@ -17,6 +18,13 @@ const downloadMock = vi.fn();
 const llmCallsInsertMock = vi.fn();
 const factoryMock = vi.fn(() => "modelo-de-mentira");
 const transcribeDoSvcMock = vi.fn(async () => "transcrição de mentira");
+/**
+ * `undefined` = o serviço só tem `transcribe` (o dublê de sempre). Número ou
+ * null = o serviço também tem `transcribeComCusto` e devolve este custo — é
+ * o `apiTranscriptionProvider` real, que lê `usage.cost` da resposta.
+ */
+const servico = vi.hoisted(() => ({ custo: undefined as number | null | undefined }));
+const transcribeComCustoMock = vi.fn(async () => ({ texto: "transcrição de mentira", costCents: servico.custo ?? null }));
 
 const dns = vi.hoisted(() => ({ resposta: [] as Array<{ address: string; family: number }> }));
 vi.mock("node:dns/promises", () => {
@@ -77,15 +85,17 @@ const credencial = vi.hoisted(() => ({
    * chave OpenAI nenhuma — a escada desce ao degrau 3.
    */
   conversaGoogle: null as string | null,
+  /** Provedor+modelo da conversa quando não é Google nem a Anthropic de sempre. */
+  conversa: null as { provider: string; model: string } | null,
 }));
 vi.mock("@/lib/agent-engine/edge/llm/credentials", () => ({
   resolveOrgLlmConfig: vi.fn(async (_db: unknown, _cfg: unknown, _org: string, override?: { provider?: string }) => {
     if (credencial.conversaGoogle && override?.provider === "openai") throw new Error("sem credencial openai");
     return {
-      provider: credencial.conversaGoogle ? "google" : "anthropic",
+      provider: credencial.conversa?.provider ?? (credencial.conversaGoogle ? "google" : "anthropic"),
       apiKey: "chave-do-binding",
       origemDaChave: credencial.origemDaChave,
-      defaultModel: credencial.conversaGoogle ?? "claude-haiku-4-5",
+      defaultModel: credencial.conversa?.model ?? credencial.conversaGoogle ?? "claude-haiku-4-5",
       params: {},
       enabledModels: [],
       orcamento: { modo: "off", tetoCents: 0, efetivoEm: null, limiarPct: 80 },
@@ -98,6 +108,7 @@ vi.mock("@/lib/agent-engine/edge/llm/providers", () => ({
   createDefaultRegistry: () => ({
     anthropic: factoryMock,
     openai: factoryMock,
+    "openai-assinatura": factoryMock,
     openrouter: factoryMock,
     google: factoryMock,
   }),
@@ -118,9 +129,26 @@ vi.mock("ai", () => ({
   })),
 }));
 
+// O gate de orçamento REAL, espiado: os casos de transcrição pelo serviço
+// provam que ele é consultado (e que a recusa dele segura o áudio).
+const teto = vi.hoisted(() => ({ barrar: false }));
+vi.mock("@/lib/agent-engine/edge/llm/run-model-call", async (importOriginal) => {
+  const real = await importOriginal<typeof ModuloDoSeam>();
+  return {
+    ...real,
+    aplicarOrcamento: vi.fn(async (d: Parameters<typeof real.aplicarOrcamento>[0]) => {
+      if (teto.barrar) throw new real.LlmBudgetExceededError("teto de teste");
+      return real.aplicarOrcamento(d);
+    }),
+  };
+});
+
 vi.mock("@/lib/messaging/media/transcription", async (importOriginal) => ({
   ...(await importOriginal<typeof ModuloDeTranscricao>()),
-  apiTranscriptionProvider: () => ({ transcribe: transcribeDoSvcMock }),
+  apiTranscriptionProvider: () =>
+    servico.custo === undefined
+      ? { transcribe: transcribeDoSvcMock }
+      : { transcribe: transcribeDoSvcMock, transcribeComCusto: transcribeComCustoMock },
 }));
 
 const transcricaoDoEnv = vi.hoisted(() => ({ apiKey: "", baseUrl: "" }));
@@ -146,12 +174,13 @@ import { deriveMessageMedia } from "@/workers/media-derive-worker";
 import { esquecerDestinosInternos } from "@/lib/automation/destinos-internos-autorizados";
 import { PONTO_TRANSCRICAO_DE_AUDIO, PONTO_VISAO_DE_IMAGEM } from "@/lib/ai/pontos/registro";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
+import { MARCADOR_NAO_LIDA } from "@/lib/messaging/media/derivable";
 import type { Env } from "@/lib/env";
 
-function eventRow() {
+function eventRow(org = "org1") {
   return {
     id: "ev1",
-    organization_id: "org1",
+    organization_id: org,
     event_type: "media.derive_requested",
     entity_kind: "message",
     entity_id: "msg1",
@@ -178,6 +207,9 @@ beforeEach(() => {
   dns.resposta = [{ address: "93.184.216.34", family: 4 }];
   credencial.origemDaChave = "credencial_da_organizacao";
   credencial.conversaGoogle = null;
+  credencial.conversa = null;
+  servico.custo = undefined;
+  teto.barrar = false;
   bindingDaVez = BINDING;
   transcricaoDoEnv.apiKey = "";
   transcricaoDoEnv.baseUrl = "";
@@ -355,6 +387,116 @@ describe("worker de mídia: chamada paga grava em llm_calls", () => {
       cost_cents: null,
       http_status: 401,
     });
+  });
+});
+
+describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", () => {
+  it("⭐ degrau 2 com custo na resposta grava esse custo na linha da organização da mensagem", async () => {
+    comAudio();
+    linhaDaMensagem = { ...linhaDaMensagem, organization_id: "org2" };
+    servico.custo = 0.12;
+
+    await deriveMessageMedia(eventRow("org2"));
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(transcribeComCustoMock).toHaveBeenCalledTimes(1);
+    expect(llmCallsInsertMock).toHaveBeenCalledTimes(1);
+    expect(llmCallsInsertMock.mock.calls[0]![0]).toMatchObject({
+      organization_id: "org2",
+      purpose: PONTO_TRANSCRICAO_DE_AUDIO,
+      origem_da_escolha: "padrao_openai_compativel",
+      cost_cents: 0.12,
+      status: "ok",
+    });
+  });
+
+  it("degrau 1 pelo OpenRouter grava provider `openrouter` e o custo devolvido", async () => {
+    comAudio();
+    transcricaoDoEnv.apiKey = "sk-or-da-instalacao";
+    transcricaoDoEnv.baseUrl = "https://openrouter.ai/api/v1";
+    servico.custo = 0.05;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(llmCallsInsertMock).toHaveBeenCalledTimes(1);
+    expect(llmCallsInsertMock.mock.calls[0]![0]).toMatchObject({
+      organization_id: "org1",
+      provider: "openrouter",
+      origem_da_escolha: "servico_da_instalacao",
+      cost_cents: 0.05,
+    });
+  });
+
+  it("controle negativo: resposta sem custo grava null, nunca 0", async () => {
+    comAudio();
+    servico.custo = null;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(transcribeComCustoMock).toHaveBeenCalledTimes(1);
+    expect(llmCallsInsertMock.mock.calls[0]![0]).toMatchObject({ cost_cents: null, status: "ok" });
+  });
+
+  it("degraus 1 e 2 passam pelo teto de gasto, na organização certa", async () => {
+    const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
+    comAudio();
+    servico.custo = 0.12;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(vi.mocked(aplicarOrcamento)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(aplicarOrcamento).mock.calls[0]![0]).toMatchObject({
+      organizationId: "org1",
+      purpose: PONTO_TRANSCRICAO_DE_AUDIO,
+      origem: "padrao_openai_compativel",
+    });
+  });
+
+  it("teto barrando segura o áudio no degrau 2: o serviço não é chamado e não sai linha de custo", async () => {
+    comAudio();
+    servico.custo = 0.12;
+    teto.barrar = true;
+
+    await deriveMessageMedia(eventRow());
+    const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(texto).toBe(MARCADOR_NAO_LIDA);
+    expect(transcribeComCustoMock).not.toHaveBeenCalled();
+    expect(llmCallsInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("⭐ visão pela assinatura grava cost_cents = 0 com os tokens", async () => {
+    credencial.conversa = { provider: "openai-assinatura", model: "gpt-6-luna" };
+    bindingDaVez = null;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().describeImage(Buffer.from("jpeg"), "image/jpeg");
+
+    expect(llmCallsInsertMock).toHaveBeenCalledTimes(1);
+    expect(llmCallsInsertMock.mock.calls[0]![0]).toMatchObject({
+      provider: "openai-assinatura",
+      model: "gpt-6-luna",
+      input_tokens: 1200,
+      output_tokens: 40,
+      cost_cents: 0,
+    });
+  });
+
+  it("controle negativo: o mesmo modelo pela chave paga grava o preço da tabela", async () => {
+    credencial.conversa = { provider: "openai", model: "gpt-6-luna" };
+    bindingDaVez = null;
+
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().describeImage(Buffer.from("jpeg"), "image/jpeg");
+
+    expect(llmCallsInsertMock).toHaveBeenCalledTimes(1);
+    const linha = llmCallsInsertMock.mock.calls[0]![0] as Record<string, unknown>;
+    expect(linha.provider).toBe("openai");
+    // gpt-6-luna: 0,10 USD/MTok de entrada, 0,50 de saída
+    expect(linha.cost_cents).toBeCloseTo(((1200 * 0.1 + 40 * 0.5) / 1_000_000) * 100, 10);
   });
 });
 

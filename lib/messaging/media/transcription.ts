@@ -16,15 +16,54 @@ export interface TranscriptionProvider {
    * desconhecido" e fora do teto de gasto.
    */
   transcribeMedindo?(audio: Buffer, mime: string): Promise<{ texto: string; uso: TokenUsage }>;
+  /**
+   * O serviço `/v1/audio/transcriptions` (degraus 1 e 2): sem tokens, mas com o
+   * custo que a RESPOSTA traz (`custoDaTranscricao`). `costCents` null = a
+   * resposta não deu custo nem duração com preço conhecido.
+   */
+  transcribeComCusto?(audio: Buffer, mime: string): Promise<{ texto: string; costCents: number | null }>;
+}
+
+/**
+ * USD por MINUTO de áudio, por id de modelo (prefixo `provider/` tolerado).
+ * Só para ESTIMAR quando a resposta traz a duração e não o custo. Fonte:
+ * developers.openai.com/api/docs/pricing (whisper-1, US$ 0,006/min). Modelo
+ * fora daqui fica sem estimativa: null, nunca um preço emprestado.
+ */
+const USD_POR_MINUTO_DE_TRANSCRICAO: Record<string, number> = {
+  "whisper-1": 0.006,
+};
+
+/**
+ * O custo, em centavos de DÓLAR, que a resposta de `/v1/audio/transcriptions`
+ * permite afirmar — na ordem do mais confiável ao menos:
+ *
+ *  1. `usage.cost` (dólares) — o OpenRouter devolve o valor COBRADO. É o caso
+ *     de produção (`TRANSCRIPTION_BASE_URL=https://openrouter.ai/api/v1`).
+ *  2. Duração (`usage.seconds`, que a OpenAI devolve com `type: "duration"`,
+ *     ou `duration` do `verbose_json`) × preço por minuto do modelo, quando o
+ *     modelo está em `USD_POR_MINUTO_DE_TRANSCRICAO`.
+ *  3. null — preço desconhecido. Nunca 0: diria "grátis" ao teto.
+ */
+export function custoDaTranscricao(model: string, resposta: unknown): number | null {
+  const r = (resposta ?? {}) as { usage?: { cost?: unknown; seconds?: unknown }; duration?: unknown };
+  const custoUsd = r.usage?.cost;
+  if (typeof custoUsd === "number" && Number.isFinite(custoUsd) && custoUsd >= 0) return custoUsd * 100;
+  const segundos =
+    typeof r.usage?.seconds === "number" ? r.usage.seconds : typeof r.duration === "number" ? r.duration : null;
+  const id = model.includes("/") ? model.slice(model.indexOf("/") + 1) : model;
+  const porMinuto = USD_POR_MINUTO_DE_TRANSCRICAO[id];
+  if (segundos === null || !Number.isFinite(segundos) || segundos < 0 || porMinuto === undefined) return null;
+  return (segundos / 60) * porMinuto * 100;
 }
 
 /**
  * Os degraus da escada que chamam `/v1/audio/transcriptions` (abaixo). Esse
- * serviço tem tabela de preço própria, que o sistema não conhece, e a chamada
- * não lê tokens de volta: a linha deles em `llm_calls` tem custo nulo por
- * construção, e é por esta lista — gravada em `origem_da_escolha` — que o
- * aviso de "preço desconhecido" os separa do degrau 3, que é LLM cobrado por
- * token (`lib/ai/budget/check.ts`).
+ * serviço não devolve tokens; o custo vem da resposta quando ela o traz
+ * (`custoDaTranscricao`: `usage.cost` do OpenRouter, ou duração × preço por
+ * minuto conhecido) e fica nulo quando não traz. É por esta lista — gravada em
+ * `origem_da_escolha` — que o aviso de "preço desconhecido" separa esse nulo
+ * esperado do degrau 3, que é LLM cobrado por token (`lib/ai/budget/check.ts`).
  */
 export const ORIGENS_DA_TRANSCRICAO_POR_SERVICO = ["servico_da_instalacao", "padrao_openai_compativel"] as const;
 
@@ -114,24 +153,26 @@ export function apiTranscriptionProvider(
   const rawBase = (creds.baseUrl ?? DEFAULT_BASE).trim().replace(/\/+$/, "");
   const base = rawBase.replace(/\/v1$/, "");
   const model = creds.model ?? DEFAULT_MODEL;
+  const transcribeComCusto: NonNullable<TranscriptionProvider["transcribeComCusto"]> = async (audio, mime) => {
+    const form = new FormData();
+    form.append("model", model);
+    form.append(
+      "file",
+      new Blob([new Uint8Array(audio)], { type: mime.split(";")[0]!.trim() }),
+      `audio.${extFor(mime)}`,
+    );
+    for (const [campo, valor] of camposDeIdioma(model, creds.languages ?? [])) form.append(campo, valor);
+    const res = await fetchImpl(`${base}/v1/audio/transcriptions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${creds.apiKey}` },
+      body: form,
+    });
+    if (!res.ok) throw new Error(`transcription_${res.status}`);
+    const json = (await res.json()) as { text?: string };
+    return { texto: json.text ?? "", costCents: custoDaTranscricao(model, json) };
+  };
   return {
-    async transcribe(audio, mime) {
-      const form = new FormData();
-      form.append("model", model);
-      form.append(
-        "file",
-        new Blob([new Uint8Array(audio)], { type: mime.split(";")[0]!.trim() }),
-        `audio.${extFor(mime)}`,
-      );
-      for (const [campo, valor] of camposDeIdioma(model, creds.languages ?? [])) form.append(campo, valor);
-      const res = await fetchImpl(`${base}/v1/audio/transcriptions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${creds.apiKey}` },
-        body: form,
-      });
-      if (!res.ok) throw new Error(`transcription_${res.status}`);
-      const json = (await res.json()) as { text?: string };
-      return json.text ?? "";
-    },
+    transcribe: async (audio, mime) => (await transcribeComCusto(audio, mime)).texto,
+    transcribeComCusto,
   };
 }

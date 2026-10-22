@@ -25,6 +25,7 @@
  * Awaitable, mas NUNCA LANÇA: telemetria que falha não pode derrubar uma
  * ligação em curso. A falha vai para o log.
  */
+import { custoGravavel } from "@/lib/agent-engine/edge/llm/pricing";
 import { codigoDoErro, providerDoModelo } from "@/lib/ai/log-invocation";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
@@ -56,6 +57,7 @@ export interface ChamadaDeIa {
 export async function registrarChamadaDeIa(admin: Admin, chamada: ChamadaDeIa): Promise<void> {
   try {
     const erro = chamada.erro ?? null;
+    const provider = chamada.provider ?? providerDoModelo(chamada.model);
     const { error } = await admin.from("llm_calls").insert({
       organization_id: chamada.organization_id,
       // Mesma rede de `logInvocation` (issue #160): `""` numa coluna uuid faz o
@@ -64,11 +66,12 @@ export async function registrarChamadaDeIa(admin: Admin, chamada: ChamadaDeIa): 
       contact_id:
         chamada.contact_id && chamada.contact_id.trim() !== "" ? chamada.contact_id : null,
       purpose: chamada.purpose,
-      provider: chamada.provider ?? providerDoModelo(chamada.model),
+      provider,
       model: chamada.model,
       input_tokens: Math.max(0, Math.round(chamada.input_tokens)),
       output_tokens: Math.max(0, Math.round(chamada.output_tokens)),
-      cost_cents: chamada.cost_cents,
+      // Assinatura não cobra por token (`custoGravavel`, em `pricing.ts`).
+      cost_cents: custoGravavel(provider, chamada.cost_cents),
       latency_ms: Math.max(0, Math.round(chamada.latency_ms)),
       status: erro ? "erro" : "ok",
       error_code: erro ? codigoDoErro({ ...erro }) : null,

@@ -10,7 +10,7 @@ import type pg from "pg";
 import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
 import { visaoEmVigor } from "@/lib/ai/pontos/capacidade-em-vigor";
 import { PONTO_TRANSCRICAO_DE_AUDIO, PONTO_VISAO_DE_IMAGEM } from "@/lib/ai/pontos/registro";
-import { costCents, type TokenUsage } from "@/lib/agent-engine/edge/llm/pricing";
+import { costCents, custoGravavel, type TokenUsage } from "@/lib/agent-engine/edge/llm/pricing";
 import {
   aplicarOrcamento,
   LlmBudgetExceededError,
@@ -600,12 +600,11 @@ function buildDeriveDeps(
   };
   // O gate de orçamento do seam, não uma cópia: mesmo veredito, mesmo item
   // `budget_exceeded` na Central, mesma linha `orcamento_esgotado` em
-  // Execuções. Vale para toda chamada de LLM cobrada por token que este
-  // worker faz — a visão e o degrau 3 da transcrição (o modelo de conversa da
-  // organização). Os degraus 1 e 2 da transcrição ficam fora: o custo deles é
-  // nulo (o serviço tem preço próprio, que o sistema não conhece), então
-  // nunca entram na soma que o teto compara, e o degrau 1 pode ser o serviço
-  // da própria instalação, que não é gasto da organização.
+  // Execuções. Vale para toda chamada paga que este worker faz: a visão e os
+  // TRÊS degraus da transcrição. Os degraus 1 e 2 entraram em 21/10/2026: a
+  // produção transcreve pelo OpenRouter com a chave da Tektus, que devolve o
+  // custo da chamada (`custoDaTranscricao`), e a política é teto por cliente
+  // para o que a assinatura não cobre. No modo `avisar` o gate só registra.
   const barradoPeloTeto = async (d: {
     tipo: "imagem" | "áudio";
     oQueNaoSaiu: string;
@@ -858,29 +857,34 @@ function buildDeriveDeps(
   //
   // Todo degrau que transcreve passa por `comCustoRegistrado`: a chamada paga
   // vira linha em `llm_calls`, sucesso ou falha. O provedor do serviço da
-  // instalação com endereço próprio não é sabido — chute viraria estatística.
+  // instalação com endereço próprio só é gravado quando o host o identifica
+  // (`provedorDoServicoDeTranscricao`) — chute viraria estatística.
+  const providerDaTranscricao =
+    decisao.origem === "servico_da_instalacao" && env.TRANSCRIPTION_BASE_URL
+      ? provedorDoServicoDeTranscricao(env.TRANSCRIPTION_BASE_URL)
+      : decisao.anuncio.provider;
+  const modeloDaTranscricao = decisao.anuncio.modelId ?? "desconhecido";
   const comCusto = (servico: TranscriptionProvider): TranscriptionProvider =>
     comCustoRegistrado(servico, {
       admin,
       orgId,
-      provider:
-        decisao.origem === "servico_da_instalacao" && env.TRANSCRIPTION_BASE_URL
-          ? "desconhecido"
-          : decisao.anuncio.provider,
-      model: decisao.anuncio.modelId ?? "desconhecido",
+      provider: providerDaTranscricao,
+      model: modeloDaTranscricao,
       origem: decisao.origem,
     });
-  // O degrau 3 é o modelo de conversa da organização: chamada de LLM cobrada
-  // por token, então passa pelo teto antes de o áudio sair, como a visão.
-  const transcriberDoModelo = (servico: TranscriptionProvider): TranscriptionProvider => ({
+  // Todo degrau que transcreve passa pelo teto antes de o áudio sair, como a
+  // visão. No degrau 1 o teto vem DEPOIS da recusa de destino
+  // (`transcriberDeServico` embrulha por fora): endereço recusado não consulta
+  // gasto, pela mesma razão da visão.
+  const comTeto = (servico: TranscriptionProvider): TranscriptionProvider => ({
     transcribe: async (audio, mime) => {
       if (
         await barradoPeloTeto({
           tipo: "áudio",
           oQueNaoSaiu: "o áudio não foi enviado",
           purpose: PONTO_TRANSCRICAO_DE_AUDIO,
-          provider: decisao.anuncio.provider,
-          model: decisao.anuncio.modelId ?? "",
+          provider: providerDaTranscricao,
+          model: modeloDaTranscricao,
           origem: decisao.origem,
         })
       ) {
@@ -892,10 +896,8 @@ function buildDeriveDeps(
   const transcriber: DeriveDeps["transcriber"] = !decisao.transcriber
     ? semTranscricao
     : decisao.origem === "servico_da_instalacao"
-      ? transcriberDeServico(comCusto(decisao.transcriber))
-      : decisao.origem === "modelo_da_organizacao"
-        ? transcriberDoModelo(comCusto(decisao.transcriber))
-        : comCusto(decisao.transcriber);
+      ? transcriberDeServico(comTeto(comCusto(decisao.transcriber)))
+      : comTeto(comCusto(decisao.transcriber));
   return {
     transcriber,
     describeImage,
@@ -919,7 +921,7 @@ interface ChamadaDeMidia {
   latency_ms: number;
   /**
    * Na transcrição, o degrau da escada que ouviu o áudio. É o que separa a
-   * linha de custo nulo por construção (degraus 1 e 2, serviço sem tokens) da
+   * linha de custo nulo esperado (degraus 1 e 2, serviço sem tokens cuja resposta não trouxe custo) da
    * linha de LLM sem preço conhecido (degrau 3), que acende o aviso.
    */
   origem_da_escolha?: OrigemDaTranscricao;
@@ -979,7 +981,13 @@ function registrarChamadaDeMidia(
   montar: () => ChamadaDeMidia,
 ): void {
   try {
-    const linha = montar();
+    const montada = montar();
+    // Assinatura (`openai-assinatura`) não cobra por token: a visão e o degrau 3
+    // calculam pelo id do modelo, e o corte vale aqui, no gravador, para os dois.
+    const linha =
+      montada.status === "erro"
+        ? montada
+        : { ...montada, cost_cents: custoGravavel(montada.provider, montada.cost_cents) };
     void Promise.resolve(
       admin.from("llm_calls").insert({ organization_id: orgId, status: "ok", ...linha }),
     ).then(
@@ -1016,9 +1024,10 @@ function registrarChamadaDeMidia(
  * Dois tipos de cobrança passam aqui. O modelo de conversa (degrau 3) é LLM
  * cobrado por token e devolve o uso (`transcribeMedindo`): a linha leva tokens
  * e o custo da tabela de preços, nulo só quando o modelo não está nela. O
- * serviço `/v1/audio/transcriptions` (degraus 1 e 2) tem preço próprio, que o
- * sistema não conhece, e não devolve tokens que se leiam aqui: custo nulo,
- * nunca 0.
+ * serviço `/v1/audio/transcriptions` (degraus 1 e 2) não devolve tokens, mas
+ * devolve o custo pela resposta (`transcribeComCusto`): `usage.cost` do
+ * OpenRouter, ou duração × preço por minuto do modelo conhecido — senão nulo,
+ * nunca 0 (`custoDaTranscricao`, em `lib/messaging/media/transcription.ts`).
  */
 function comCustoRegistrado(
   servico: TranscriptionProvider,
@@ -1035,9 +1044,12 @@ function comCustoRegistrado(
       const inicio = Date.now();
       let texto: string;
       let uso: TokenUsage | null = null;
+      let custoDoServico: number | null = null;
       try {
         if (servico.transcribeMedindo) {
           ({ texto, uso } = await servico.transcribeMedindo(audio, mime));
+        } else if (servico.transcribeComCusto) {
+          ({ texto, costCents: custoDoServico } = await servico.transcribeComCusto(audio, mime));
         } else {
           texto = await servico.transcribe(audio, mime);
         }
@@ -1062,12 +1074,27 @@ function comCustoRegistrado(
         output_tokens: uso?.outputTokens ?? 0,
         cache_read_tokens: uso?.cacheReadTokens ?? 0,
         cache_write_tokens: uso?.cacheWriteTokens ?? 0,
-        cost_cents: uso ? costCents(ctx.model, uso) : null,
+        cost_cents: uso ? costCents(ctx.model, uso) : custoDoServico,
         latency_ms: Date.now() - inicio,
       }));
       return texto;
     },
   };
+}
+
+/**
+ * O provedor que se grava na linha do degrau 1 quando a instalação aponta
+ * `TRANSCRIPTION_BASE_URL` para outro serviço. O OpenRouter se reconhece pelo
+ * host (é o caso de produção); qualquer outro fica `desconhecido` — chute
+ * viraria estatística.
+ */
+function provedorDoServicoDeTranscricao(baseUrl: string): string {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === "openrouter.ai" || host.endsWith(".openrouter.ai") ? "openrouter" : "desconhecido";
+  } catch {
+    return "desconhecido";
+  }
 }
 
 // Mora em lib/messaging/media/derivable.ts (sem import nenhum) porque o balão
