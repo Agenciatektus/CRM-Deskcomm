@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api/client";
 import { escreverFiltrosDoAtendimento, type EscolhaDoAtendimento } from "@/lib/inbox/filtros-do-atendimento";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { agendarRefazer, aplicarMudancaDaConversa } from "@/hooks/inbox/cacheDasConversas";
+import { agendarRecargaDasConversas } from "@/hooks/inbox/recargaDasConversas";
 import {
   type ModoDeEtiqueta,
   marcadoresEscolhidos,
@@ -267,10 +268,20 @@ export function useConversationsRealtime(
       };
       const linha = p.eventType === "DELETE" ? p.old : p.new;
       if (!p.eventType || typeof linha?.id !== "string") {
-        void qc.invalidateQueries({ queryKey: ["conversations"] });
+        // Agrupada e sem cancelar a busca em voo (`recargaDasConversas.ts`): a
+        // rajada de eventos de uma mensagem virava várias buscas da lista, cada
+        // uma cancelando a anterior.
+        agendarRecargaDasConversas(qc);
         return;
       }
-      agendarRefazer(qc, aplicarMudancaDaConversa(qc, linha as { id: string }, p.eventType));
+      // A conversa ABERTA (`["conversation", id]`) não está em lista nenhuma
+      // quando é de outra aba ou já foi encerrada: só este evento a alcança, e
+      // sem recarregá-la o painel ficava velho até um F5.
+      const aberta = qc.getQueryCache().find({ queryKey: ["conversation", linha.id], exact: true });
+      agendarRefazer(qc, [
+        ...aplicarMudancaDaConversa(qc, linha as { id: string }, p.eventType),
+        ...(aberta && p.eventType !== "DELETE" ? [aberta] : []),
+      ]);
     },
     [qc],
   );
