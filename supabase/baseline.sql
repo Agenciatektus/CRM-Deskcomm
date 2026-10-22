@@ -56871,8 +56871,16 @@ begin
   return jsonb_build_object('pausadas', p_pausadas, 'mudou', true);
 end; $cad_pausa$;
 
-revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon;
-grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to authenticated, service_role;
+-- 9065: `authenticated` SAIU. A remoção da FEATURE cadência apagou
+-- a rota POST de pausa da cadência (apagada na mesma mudança), o Único call site de sessão desta
+-- função; definer VOLÁTIL sem call site é superfície morta pela régua de
+-- tests/invariants/hardening-definer-varredura.test.ts. A função fica (para
+-- quem ressuscitar a feature), o grant de sessão não. `service_role` segue:
+-- é chave de servidor, nunca vai ao browser. O revoke cita `authenticated`
+-- explicitamente porque reaplicar o baseline sobre banco antigo precisa
+-- RETIRAR o grant que a 9016 concedeu; `grant` sozinho nunca retira nada.
+revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to service_role;
 
 -- VAGAS DE INSCRIÇÃO POR DIA, reservadas ATOMICAMENTE (P1-4 da revisão).
 -- Contar as inscrições de hoje e depois inserir deixava dois lotes simultâneos

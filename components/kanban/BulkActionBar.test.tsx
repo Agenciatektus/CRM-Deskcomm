@@ -16,9 +16,6 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useUser: () => ({ id: "u1", is_platform_admin: false }),
   useActiveOrg: () => ({ role: "manager" }),
 }));
-// O botão "Inscrever na cadência" (fork) tem dados próprios (react-query); este
-// teste mede o aviso de exclusão em lote.
-vi.mock("@/components/cadencia/InscreverNaCadencia", () => ({ InscreverNaCadencia: () => null }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
 vi.mock("@/hooks/kanban/useBulkAction", () => ({
   useBulkAction: () => ({ mutate: bulkMutate, mutateAsync: bulkMutateAsync, isPending: false }),

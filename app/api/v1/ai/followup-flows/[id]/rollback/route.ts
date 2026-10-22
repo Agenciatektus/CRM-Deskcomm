@@ -77,11 +77,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (ehProspeccao(pointer.surface)) {
     return fail(
       "cadencia_sem_rollback",
-      t(
-        pointer.surface === "campaign"
-          ? "A régua de uma campanha não volta versão. Ajuste os passos e prepare a campanha de novo."
-          : "Cadência não volta versão. Ajuste e publique de novo pela tela da cadência.",
-      ),
+      t("A régua de uma campanha não volta versão. Ajuste os passos e prepare a campanha de novo."),
       422,
       { requestId },
     );

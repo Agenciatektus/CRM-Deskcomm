@@ -10,7 +10,6 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { ehProspeccao } from "@/lib/followup/superficies";
 
@@ -51,7 +50,10 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   // calado, e quem retomar a campanha o encontra no fim sem ter recebido nada.
   // Quem para a régua de uma campanha é a própria campanha (`Cancelar`, que
   // encerra as inscrições em `encerrarReguaDaCampanha`).
-  if (existing.surface === "campaign") {
+  // Vale para as DUAS superfícies de prospecção. A `cadence` entra porque a
+  // feature saiu: não há tela para onde mandar quem quisesse parar um pointer
+  // legado, e o kill switch dela (a rota de pausa) saiu com a tela.
+  if (ehProspeccao(existing.surface)) {
     return fail(
       "cadencia_no_ar",
       t("A régua de uma campanha se para na tela da campanha, em Cancelar."),
@@ -64,11 +66,11 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return ok({ id, status: "disabled" }, { requestId });
   }
 
-  // Régua de prospecção só se escreve pelo servidor (9020/9037: a sessão recebe
-  // 42501 ao mudar o status de uma cadência OU da régua de uma campanha). O
-  // papel já foi conferido acima.
-  const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;
-  const { data: updated, error: updErr } = await escritor
+  // Prospecção foi recusada acima (a sessão receberia 42501 das 9020/9037 ao
+  // mudar o status de uma cadência ou da régua de uma campanha), então aqui só
+  // chega fluxo comum: escrita pela SESSÃO, com o RLS conferindo de novo e o
+  // papel já conferido acima.
+  const { data: updated, error: updErr } = await supabase
     .from("followup_flow_pointers")
     .update({ status: "disabled", updated_at: new Date().toISOString() })
     .eq("id", id)

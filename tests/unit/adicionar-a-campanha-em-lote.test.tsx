@@ -27,7 +27,9 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useActiveOrg: () => ({ role: papel.role }),
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
-vi.mock("@/components/cadencia/InscreverNaCadencia", () => ({ InscreverNaCadencia: () => null }));
+// Sem mock de `InscreverNaCadencia`: o componente saiu junto com a FEATURE
+// cadência, e `vi.mock` com factory resolve o caminho — mock de módulo que não
+// existe mais derruba a suíte na resolução.
 
 const lead = (id: string) =>
   ({ id, stage_id: "s1", status: "open", owner_user_id: null, contact_id: `c-${id}`, tags: [] }) as unknown as Lead;
