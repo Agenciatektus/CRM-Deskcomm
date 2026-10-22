@@ -508,7 +508,6 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível ler o funil.": { es: "No se pudo leer el embudo." },
   "Quem recebe passa a responder esta conversa.": { es: "Quien recibe pasa a responder esta conversación." },
   "Sem atendente": { es: "Sin agente" },
-  "há": { es: "hace" },
 
   // ─── BUSCA DENTRO DA CONVERSA (extraída do PR #1793) ───
   "Resultados nas mensagens carregadas": { es: "Resultados en los mensajes cargados" },
@@ -16484,6 +16483,7 @@ export const DICIONARIO: Traducoes = {
   "Comentário no Instagram": { es: "Comentario en Instagram" },
   "Sem nome salvo": { es: "Sin nombre guardado" },
   "Parado há": { es: "Detenido hace" },
+  "Parado há {tempo}": { es: "Detenido hace {tempo}" },
   Compacto: { es: "Compacto" },
   "Mostrar ou ocultar detalhes do lead": { es: "Mostrar u ocultar detalles del lead" },
   "Detalhes do lead": { es: "Detalles del lead" },
