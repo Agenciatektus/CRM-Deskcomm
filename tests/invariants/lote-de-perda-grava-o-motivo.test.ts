@@ -136,17 +136,15 @@ describe("o motivo de quem JÁ estava perdido (9066)", () => {
       cliente.release();
     }
 
-    // CONTROLE: no MESMO funil, a troca de etapa do perdido passa sem revalidar.
-    const { rows: e2 } = await pool.query<{ id: string }>(
-      `insert into crm_stages (organization_id, pipeline_id, name, slug, position, is_lost)
-       values ($1, $2, 'Perdido 2', 'perdido-2-lote', 4, true) returning id`,
-      [ORG, funil],
-    );
+    // CONTROLE: no MESMO funil, o perdido cujo motivo saiu do vocabulário segue
+    // gravável por UPDATE que toca `stage_id` (o gatilho dispara e não revalida).
+    // O funil só tem UMA etapa de perda (`uniq_crm_stages_pipeline_lost`), então
+    // a escrita reafirma a mesma etapa, como a reordenação na coluna faz.
     await pool.query(
       `update crm_pipelines set settings = jsonb_set(settings, '{lost_reasons}', '[]'::jsonb) where id = $1`,
       [funil],
     );
-    await pool.query("update crm_leads set stage_id = $1 where id = $2", [e2[0]!.id, lead]);
+    await pool.query("update crm_leads set stage_id = stage_id where id = $1", [lead]);
     const { rows } = await pool.query<{ lost_reason: string }>("select lost_reason from crm_leads where id = $1", [lead]);
     expect(rows[0]!.lost_reason).toBe("so_no_funil_a");
   });
