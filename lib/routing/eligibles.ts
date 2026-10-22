@@ -63,20 +63,27 @@ export async function loadEligibleAttendants(
 
   const userIds = rows.map((r) => r.user_id);
 
-  // Carga atual: conversas abertas atribuídas, contadas por dono (1 query).
-  const { data: openConvs, error: loadError } = await supabase
-    .from("conversations")
-    .select("assigned_to_user_id")
-    .eq("organization_id", organizationId)
-    .in("assigned_to_user_id", userIds)
-    .in("status", OPEN_LOAD_STATUSES as unknown as string[]);
-  if (loadError) throw new Error(loadError.message);
+  // Carga atual: CONTAGEM real por dono, no banco. Baixar as linhas e contar
+  // aqui (como era) esbarra no `max_rows` do PostgREST (1.000 na instalação):
+  // a carga somada de todos nunca passava de 1.000, então um atendente com
+  // capacidade acima disso parecia ter folga para sempre — foi o que travou a
+  // distribuição da Delicatto com carga "1000" = capacidade 1000. `head: true`
+  // não traz linha nenhuma; o número vem no `Content-Range`.
   const loadByUser = new Map<string, number>();
-  for (const c of (openConvs ?? []) as Array<{ assigned_to_user_id: string | null }>) {
-    if (c.assigned_to_user_id) {
-      loadByUser.set(c.assigned_to_user_id, (loadByUser.get(c.assigned_to_user_id) ?? 0) + 1);
-    }
-  }
+  const cargas = await Promise.all(
+    userIds.map(async (userId) => {
+      const { count, error } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("assigned_to_user_id", userId)
+        .in("status", OPEN_LOAD_STATUSES as unknown as string[]);
+      if (error) throw new Error(error.message);
+      // Sem contagem não há como provar folga: conta como lotado.
+      return [userId, count ?? Number.POSITIVE_INFINITY] as const;
+    }),
+  );
+  for (const [userId, carga] of cargas) loadByUser.set(userId, carga);
 
   // Última atribuição recebida (rodízio real, sem coluna de estado).
   let history = supabase

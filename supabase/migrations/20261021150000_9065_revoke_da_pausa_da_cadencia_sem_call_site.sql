@@ -1,0 +1,40 @@
+-- manifest: 9065 — Tektus: `fn_definir_cadencias_pausadas` perde o EXECUTE de `authenticated`. A remoção da FEATURE cadência (commit f143239f8) apagou a rota POST de pausa da cadência (apagada na mesma mudança), que era o ÚNICO call site dessa função; pela régua escrita em tests/invariants/hardening-definer-varredura.test.ts, definer VOLÁTIL sem call site de sessão é superfície morta que permite escrita cross-tenant (usuário logado no tenant A chamando com o org do tenant B). Revoga em vez de dropar: a função fica para quem ressuscitar a feature, sem a superfície. `service_role` permanece (chave de servidor, nunca no browser). Não toca dado de cliente: mexe em GRANT, não em linha. Prova: tests/invariants/hardening-definer-varredura.test.ts (a entrada da allowlist sai no mesmo commit, e a varredura passa a cobrir esta função pela regra geral).
+--
+-- 9065: o REVOKE que a remoção da cadência deixou faltando.
+--
+-- ## O defeito
+--
+-- A 9016 criou a função assim:
+--
+--     revoke all ... from public, anon;
+--     grant execute ... to authenticated, service_role;
+--
+-- O `anon` sempre esteve fora. O `authenticated` existia por UM motivo: a rota
+-- `POST /api/v1/cadencias/pausa` chamava a função por `rpc` com o client da
+-- SESSÃO do usuário (o kill switch das cadências, manager+ e MFA). Apagada a
+-- rota, ninguém mais chama pela sessão, e o grant virou porta sem dono.
+--
+-- ## Por que isso é risco e não só sujeira
+--
+-- A função é `security definer` e `volatile`: ela ESCREVE
+-- (`update organizations set settings = ...`) e recebe o org por ARGUMENTO.
+-- As defesas internas continuam de pé (`auth.uid()`, `fn_role_at_least`,
+-- `fn_support_write_allowed`, `fn_session_mfa_proven`), então não há furo
+-- explorável hoje. O que sai daqui é a SUPERFÍCIE: uma RPC do PostgREST
+-- alcançável por qualquer sessão logada, mantida viva só por inércia. A regra
+-- do repo é a de `hardening-definer-varredura`: definer volátil sem call site
+-- de sessão não fica executável, porque o dia em que uma das quatro defesas
+-- internas for afrouxada num refactor, o grant já estará lá esperando.
+--
+-- ## O que NÃO muda
+--
+--   * a função continua existindo, com o corpo intacto;
+--   * `service_role` continua com EXECUTE (é a chave de servidor; se a feature
+--     voltar por um worker, o caminho existe);
+--   * `organizations.settings.cadencias_pausadas` continua sendo LIDO por
+--     `lib/cadencia/envio.ts` e por `lib/agent-engine/agent/followup-turn.ts`,
+--     que leem a coluna, não chamam esta função. Quem já pausou segue pausado.
+--
+-- Idempotente: `revoke` de grant que não existe é no-op.
+revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to service_role;

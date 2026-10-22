@@ -85,11 +85,17 @@ describe("o arquivo do corpo cru", () => {
     });
   }
 
-  it("grava o corpo CRU, e não só o interpretado", async () => {
-    // O interpretado é o que já se sabe ler. O cru é o que responde a pergunta
-    // que ainda não se sabe fazer — que é a razão de o arquivo existir.
-    await abrir('{"event":"x"}', new Headers());
-    expect(inserido).toMatchObject({ raw_body: '{"event":"x"}', status: "received" });
+  it("grava o corpo INTEIRO uma vez: objeto JSON vai todo para payload_parsed", async () => {
+    // O arquivo não interpreta nada: o objeto é o corpo inteiro, com todas as
+    // chaves, e responde a pergunta que ainda não se sabe fazer. Gravá-lo também
+    // como texto era o mesmo dado duas vezes (21/10/2026, `corpo-do-arquivo.ts`);
+    // o texto só fica quando traz o que o objeto não traz (casos abaixo).
+    await abrir('{"event":"x","nao_lido":{"a":[1]}}', new Headers());
+    expect(inserido).toMatchObject({
+      raw_body: null,
+      payload_parsed: { event: "x", nao_lido: { a: [1] } },
+      status: "received",
+    });
   });
 
   it("o provider vem de quem chamou, nunca de um literal", async () => {

@@ -541,3 +541,79 @@ describe("signUp — o teto POR IP também deixa rastro", () => {
     expect(motivos).not.toContain("rate_limited_ip");
   });
 });
+
+describe("signUp — o rastro do teto é UMA linha por IP e janela", () => {
+  /**
+   * Quem bate no teto insiste, e um script bate centenas de vezes: uma linha de
+   * auditoria por clique fazia da trilha o flood que o teto existe para barrar.
+   * A primeira linha da janela fica — é ela que conta a história.
+   */
+  // Um IP por caso: o contador em memória do rate limit sobrevive entre casos.
+  let caso = 0;
+  let IP_FIXO = "";
+  const comIp = (ip: string) =>
+    vi.mocked(headers).mockResolvedValue({ get: (k: string) => (k === "x-forwarded-for" ? ip : null) } as never);
+  const motivos = async () => {
+    const { audit } = await import("@/lib/audit");
+    return vi.mocked(audit).mock.calls.map((c) => (c[0] as { metadata?: { reason?: string } })?.metadata?.reason);
+  };
+
+  beforeEach(async () => {
+    vi.resetModules();
+    const { moduloLigado } = await import("@/lib/instalacao/modulos");
+    vi.mocked(moduloLigado).mockResolvedValue(false);
+    signUpDoProvedor.mockReset();
+    IP_FIXO = `203.0.113.${++caso}`;
+    comIp(IP_FIXO);
+    vi.mocked(createClient).mockResolvedValue({ auth: { signUp: signUpDoProvedor } } as never);
+    vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+    const { audit } = await import("@/lib/audit");
+    vi.mocked(audit).mockClear();
+  });
+
+  it("⭐ teto por IP estourado três vezes do mesmo IP: grava a primeira e só ela", async () => {
+    const { authRateLimited } = await import("@/lib/auth/rate-limit");
+    vi.mocked(authRateLimited).mockResolvedValue(true);
+    const { signUp } = await import("./signUp");
+    for (let i = 0; i < 3; i++) expect(await signUp(entrada())).toEqual({ ok: false, error: "rate_limited" });
+    expect((await motivos()).filter((m) => m === "rate_limited_ip")).toHaveLength(1);
+  });
+
+  it("⭐ 429 do provedor repetido do mesmo IP: grava a primeira e só ela", async () => {
+    const { authRateLimited } = await import("@/lib/auth/rate-limit");
+    vi.mocked(authRateLimited).mockResolvedValue(false);
+    signUpDoProvedor.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "email rate limit exceeded", status: 429 },
+    });
+    const { signUp } = await import("./signUp");
+    for (let i = 0; i < 3; i++) await signUp(entrada());
+    expect((await motivos()).filter((m) => m === "rate_limited")).toHaveLength(1);
+  });
+
+  it("CONTROLE — outro IP na mesma janela ganha a SUA linha", async () => {
+    const { authRateLimited } = await import("@/lib/auth/rate-limit");
+    vi.mocked(authRateLimited).mockResolvedValue(true);
+    const { signUp } = await import("./signUp");
+    await signUp(entrada());
+    comIp(`203.0.113.${100 + caso}`);
+    await signUp(entrada());
+    expect((await motivos()).filter((m) => m === "rate_limited_ip")).toHaveLength(2);
+  });
+
+  it("CONTROLE — passada a janela de 10 min, o mesmo IP grava de novo", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
+      const { authRateLimited } = await import("@/lib/auth/rate-limit");
+      vi.mocked(authRateLimited).mockResolvedValue(true);
+      const { signUp } = await import("./signUp");
+      await signUp(entrada());
+      vi.setSystemTime(new Date("2026-10-21T12:11:00Z"));
+      await signUp(entrada());
+      expect((await motivos()).filter((m) => m === "rate_limited_ip")).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

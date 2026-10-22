@@ -126,6 +126,31 @@ export const FILTRO_VAZIO = {
   limite: 500,
 } satisfies FiltroDeAudiencia;
 
+/**
+ * O filtro tem algum RECORTE (critério que escolhe gente da base), além dos
+ * incluídos à mão?
+ *
+ * ⚠️ Sem recorte, a consulta principal de contatos não tem predicado nenhum e
+ * devolveria a ORGANIZAÇÃO INTEIRA até o `limite`. O `refine` aceita
+ * `incluir_contatos` sozinho como critério — e é o caso de "Adicionar à
+ * campanha" (barra em lote do Funil) numa campanha recém-criada: a audiência
+ * é exatamente quem foi incluído, ninguém mais. Quem consulta pergunta isto
+ * antes (`buscarCandidatos`).
+ */
+export function temRecorte(filtro: FiltroDeAudiencia): boolean {
+  return (
+    filtro.com_todas_tags.length > 0 ||
+    filtro.com_alguma_tag.length > 0 ||
+    filtro.sem_tags.length > 0 ||
+    filtro.origens.length > 0 ||
+    filtro.sem_interacao_ha_dias !== null ||
+    filtro.com_interacao_ha_dias !== null ||
+    filtro.cadastrado_de !== null ||
+    filtro.cadastrado_ate !== null ||
+    usaNegocio(filtro)
+  );
+}
+
 /** Precisa olhar `crm_leads`? Só então o join entra — join à toa custa em toda prévia. */
 export function usaNegocio(filtro: FiltroDeAudiencia): boolean {
   return (

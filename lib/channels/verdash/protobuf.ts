@@ -30,6 +30,12 @@ export interface VerdashAttachment {
   mime: string | null;
   fileName: string | null;
   caption: string | null;
+  /**
+   * Duração declarada pelo WhatsApp (`audioMessage.seconds` / `videoMessage.seconds`).
+   * Só existe quando veio número: é o que a trava de custo da transcrição lê
+   * primeiro (`lib/messaging/media/trava-da-transcricao.ts`), antes de medir o arquivo.
+   */
+  seconds?: number;
 }
 
 /** Os wrappers que embrulham a mensagem de verdade no protobuf do WhatsApp. */
@@ -96,6 +102,7 @@ export function anexoDe(
       mime: str(no.mimetype),
       fileName: str(no.fileName) ?? str(no.title) ?? str(topo.downloadFileName),
       caption: str(no.caption),
+      ...(typeof no.seconds === "number" && Number.isFinite(no.seconds) ? { seconds: no.seconds } : {}),
     };
   }
   return null;

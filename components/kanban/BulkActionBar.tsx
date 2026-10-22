@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { InscreverNaCadencia } from "@/components/cadencia/InscreverNaCadencia";
 import { toast } from "sonner";
 import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
@@ -94,8 +93,10 @@ export function BulkActionBar({
   const activeOrg = useActiveOrg();
   const vocab = resolveVocabulary(vocabulary);
   const bulk = useBulkAction(pipelineId);
-  // A barra trava também nos 5 s e na execução das ações negócio a negócio
-  // (P2 do Cassio na #220), não só na rota em lote.
+  // A barra trava nos 5 s do Desfazer E enquanto a ação roda depois dele — a
+  // rota em lote e as negócio a negócio contam no mesmo contador
+  // (`agendarNoLote`, P2 do Cassio na #220). A trava é desta aba: outra aba do
+  // navegador não a enxerga.
   const loteOcupado = useLoteOcupado(pipelineId);
   const ocupado = bulk.isPending || loteOcupado;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -193,8 +194,8 @@ export function BulkActionBar({
   /**
    * Um Desfazer cobre todos os blocos: nada é chamado antes do fim do aviso.
    * Vai pela MESMA trava das ações negócio a negócio (`agendarNoLote`, chave por
-   * funil): nos 5 s a barra fica travada e nenhuma outra ação do lote é agendada
-   * por cima desta (P2 do Cassio na #220).
+   * funil): nos 5 s E até o último bloco voltar, a barra fica travada e nenhuma
+   * outra ação do lote é agendada por cima desta (P2 do Cassio na #220).
    */
   const comDesfazer = (mensagem: string, input: BulkLeadActionInput, aoConcluir?: (n: number) => void) => {
     const agendado = agendarNoLote(
@@ -428,8 +429,6 @@ export function BulkActionBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <InscreverNaCadencia pipelineId={pipelineId} leadIds={selectedIds} onConcluido={onClear} />
-
         <MaisAcoesDoLote
           selectedIds={selectedIds}
           leads={leads}
@@ -439,6 +438,7 @@ export function BulkActionBar({
           ownerNames={ownerNames}
           usuarioId={user.id}
           ocupado={ocupado}
+          podeCampanha={podeAtribuir}
           onReabrir={runReabrir}
           onClear={onClear}
           onRestaurar={onRestaurar}

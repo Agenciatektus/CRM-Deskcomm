@@ -56871,8 +56871,16 @@ begin
   return jsonb_build_object('pausadas', p_pausadas, 'mudou', true);
 end; $cad_pausa$;
 
-revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon;
-grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to authenticated, service_role;
+-- 9065: `authenticated` SAIU. A remoção da FEATURE cadência apagou
+-- a rota POST de pausa da cadência (apagada na mesma mudança), o Único call site de sessão desta
+-- função; definer VOLÁTIL sem call site é superfície morta pela régua de
+-- tests/invariants/hardening-definer-varredura.test.ts. A função fica (para
+-- quem ressuscitar a feature), o grant de sessão não. `service_role` segue:
+-- é chave de servidor, nunca vai ao browser. O revoke cita `authenticated`
+-- explicitamente porque reaplicar o baseline sobre banco antigo precisa
+-- RETIRAR o grant que a 9016 concedeu; `grant` sozinho nunca retira nada.
+revoke all on function public.fn_definir_cadencias_pausadas(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.fn_definir_cadencias_pausadas(uuid, boolean) to service_role;
 
 -- VAGAS DE INSCRIÇÃO POR DIA, reservadas ATOMICAMENTE (P1-4 da revisão).
 -- Contar as inscrições de hoje e depois inserir deixava dois lotes simultâneos
@@ -65991,6 +65999,18 @@ comment on column public.organizations.foto_path is
   'Foto da organização em storage/fotos-de-perfil (privado), sempre organizacoes/<id>/<uuid>.<png|jpg|webp>. Aparece no lugar da sigla na casca. Escrito só por app/api/v1/organizacao/foto (admin da empresa). Migration 9061.';
 
 notify pgrst, 'reload schema';
+
+-- ---- poda curta da linha de CANAL no arquivo de webhooks (migration 9064) ----
+--
+-- `webhook_events_log`: linha com `channel_session_id` sai em D+30
+-- (`WEBHOOK_LOG_CHANNEL_ROW_RETENTION_DAYS`), a sem canal continua em D+90. O
+-- DELETE em lote ordena por `received_at` dentro deste índice parcial e visita só
+-- as linhas do lote. Em produção, com tráfego: crie ANTES do deploy, fora de
+-- transação, com `create index concurrently` (comando na 9064); aqui o
+-- `if not exists` fica inerte.
+create index if not exists webhook_events_log_poda_de_canal_idx
+  on public.webhook_events_log (received_at)
+  where channel_session_id is not null;
 
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --

@@ -244,7 +244,10 @@ describe("a rota — o desfecho que o provider enxerga", () => {
     expect(res.status).toBe(400);
     expect(arquivados, "o corpo cru se perdeu — a evidência do formato novo sumiu").toHaveLength(1);
     expect(arquivados[0]).toMatchObject({
-      raw_body: JSON.stringify(corpo),
+      // O corpo vai UMA vez: inteiro no `payload_parsed`, `raw_body` nulo
+      // (ver `lib/channels/corpo-do-arquivo.ts`).
+      raw_body: null,
+      payload_parsed: corpo,
       event_type: "message",
       external_id: "wamid.X",
     });

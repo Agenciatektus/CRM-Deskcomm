@@ -22,6 +22,7 @@ import {
 import { caminhoDaMiniatura, gerarMiniatura } from "@/lib/messaging/media/miniatura";
 import { mimeDeclaradoParaRotulo, mimeSeguroParaGuardar } from "@/lib/messaging/media/mime-seguro";
 import { storagePathFor } from "@/lib/messaging/media/types";
+import { leituraDeMidiaLigada } from "@/lib/messaging/media/leitura-da-org";
 import { MENSAGEM_REDIGIDA } from "@/lib/lgpd/cascata";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -43,6 +44,8 @@ interface MessageMediaRow {
   media_mime: string | null;
   media_storage_path: string | null;
   metadata: Record<string, unknown> | null;
+  /** Mídia que a própria empresa ENVIOU não é derivada: ninguém precisa ler o que ela mesma mandou. */
+  direction?: string | null;
 }
 
 export async function persistMessageMedia(row: EventRow): Promise<HandlerResult> {
@@ -57,7 +60,7 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     // Sem a coluna, o worker não tem como pedir o adapter e voltaria a
     // depender de uma função fixa de um canal só.
     .select(
-      "id, organization_id, conversation_id, channel_session_id, media_url, media_mime, media_storage_path, metadata",
+      "id, organization_id, conversation_id, channel_session_id, media_url, media_mime, media_storage_path, metadata, direction",
     )
     .eq("id", messageId)
     .eq("organization_id", row.organization_id)
@@ -114,6 +117,26 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
       .select("id");
     if (updErr) throw new Error(`message update failed: ${updErr.message}`);
     return (gravadas ?? []).length;
+  };
+
+  /**
+   * O desfecho da DERIVAÇÃO depois que os bytes já foram gravados. Não usa o
+   * `markStatus`: o compare-and-set dele exige `media_storage_path` nulo, e
+   * depois do `stored` a coluna já está preenchida — a escrita casaria ZERO
+   * linhas e a coluna ficaria nula, o silêncio que a #2171 fechou.
+   */
+  const marcarDerivacao = async (status: "failed" | "skipped", motivo: string): Promise<void> => {
+    const { error: updErr } = await admin
+      .from("messages")
+      .update({
+        media_derived_status: status,
+        metadata: { ...(msg.metadata ?? {}), media_status: "stored", media_derived_motivo: motivo },
+      })
+      .eq("id", msg.id)
+      .eq("organization_id", msg.organization_id)
+      // Mesma guarda LGPD do `markStatus`: esta metadata é a foto lida no começo.
+      .filter("body", "isdistinct", MENSAGEM_REDIGIDA);
+    if (updErr) throw new Error(`message update failed: ${updErr.message}`);
   };
 
   const isLastAttempt = row.attempts >= DRAIN_MAX_ATTEMPTS - 1;
@@ -277,6 +300,23 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
     };
   }
 
+  // Mídia ENVIADA pela própria empresa (foto de produto, áudio do atendente,
+  // arquivo do agente) não é derivada: o agente não precisa interpretar o que a
+  // empresa mesma mandou. Medido em produção: ~2/3 das derivações mortas numa
+  // loja eram dela. A mídia FICA persistida; só a leitura pela IA é pulada.
+  if (msg.direction === "outbound") {
+    await marcarDerivacao("skipped", "mídia enviada pela própria empresa não é lida pela IA");
+    return { consumer_key, status: "ok" };
+  }
+
+  // A empresa desligou a leitura de mídia pela IA (Agente de IA → Provedores).
+  // Só um `false` gravado desliga; erro de leitura segue como ligada — ver
+  // `lib/messaging/media/leitura-da-org.ts`.
+  if ((await leituraDeMidiaLigada(admin, msg.organization_id)) === false) {
+    await marcarDerivacao("skipped", "a leitura de mídia pela IA está desligada nesta empresa");
+    return { consumer_key, status: "ok" };
+  }
+
   // Grupo nunca é derivado: a IA não serve grupos, e derivar custaria visão/
   // transcrição PAGA sem consumidor nenhum do outro lado — ninguém leria "o
   // agente não conseguiu ler o que o cliente mandou" numa conversa que a IA
@@ -299,10 +339,10 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
       conversation_id: msg.conversation_id,
       detail: convErr.message,
     });
-    await markStatus("stored", {}, {
-      status: "failed",
-      motivo: `não consegui verificar se a conversa é de grupo, então a derivação não foi pedida: ${convErr.message}`,
-    });
+    await marcarDerivacao(
+      "failed",
+      `não consegui verificar se a conversa é de grupo, então a derivação não foi pedida: ${convErr.message}`,
+    );
     return { consumer_key, status: "ok" };
   }
   const isGroup = Boolean((conv as { is_group?: boolean | null } | null)?.is_group);
@@ -322,10 +362,7 @@ export async function persistMessageMedia(row: EventRow): Promise<HandlerResult>
       logger.warn("[media-persist] emit_event failed (non-blocking)", { message_id: msg.id, detail: emitErr.message });
       // O evento NÃO saiu: ninguém vai pedir a derivação, e deixar a coluna
       // nula aqui é o mesmo silêncio do resto da #2171.
-      await markStatus("stored", {}, {
-        status: "failed",
-        motivo: `não consegui pedir a derivação textual da mídia: ${emitErr.message}`,
-      });
+      await marcarDerivacao("failed", `não consegui pedir a derivação textual da mídia: ${emitErr.message}`);
     }
   }
 

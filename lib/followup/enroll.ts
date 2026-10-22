@@ -66,20 +66,25 @@ export async function enrollFollowupFlow(
   }
 
   // RÉGUA DE PROSPECÇÃO NÃO ENTRA POR AQUI. A porta é `lib/cadencia/inscrever.ts`,
-  // que aplica o que esta não sabe: teto do dia, prévia com confirmação, base
-  // legal, conversa no número da régua e corte por data de publicação. Esta
-  // função é chamada pela inscrição manual de follow-up e pela ação de automação
-  // (em volume) — deixá-la aceitar prospecção era abrir uma segunda porta sem
-  // freio. A régua da CAMPANHA (9037) é ainda mais estreita: quem inscreve nela
-  // é o envio da 1ª mensagem, e só ele.
+  // que aplica o que esta não sabe: teto do dia, base legal, conversa no número
+  // da régua e corte por data de publicação. Esta função é chamada pela
+  // inscrição manual de follow-up e pela ação de automação (em volume) —
+  // deixá-la aceitar prospecção era abrir uma segunda porta sem freio.
+  //
+  // Hoje a régua de prospecção é só a da CAMPANHA, e ela é mais estreita ainda:
+  // quem inscreve é o envio da 1ª mensagem, e só ele. A FEATURE cadência saiu
+  // do produto, então a mensagem é UMA: mandar o operador para a "tela do
+  // funil" apontaria para uma tela que não existe mais. Os 6 pointers
+  // `cadence` legados caem aqui e recebem a mesma frase, que continua
+  // verdadeira para eles — ninguém os inscreve por porta nenhuma.
+  //
+  // O código `cadencia_use_a_tela_do_funil` fica: é contrato de API, não
+  // rótulo de tela, e renomear quebraria quem já trata esse retorno.
   if (ehProspeccao(pointer.surface)) {
     return {
       ok: false,
       code: "cadencia_use_a_tela_do_funil",
-      message:
-        pointer.surface === "campaign"
-          ? "A régua de uma campanha recebe inscrição quando a 1ª mensagem é enviada."
-          : "Cadências de prospecção recebem inscrição pela tela do funil.",
+      message: "A régua de prospecção recebe inscrição quando a 1ª mensagem da campanha é enviada.",
       status: 422,
     };
   }

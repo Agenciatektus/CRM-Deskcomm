@@ -287,3 +287,34 @@ export function costCentsDoGeminiFlashComVirada(
     em,
   );
 }
+
+/**
+ * Provedores que NÃO cobram por token: a chamada sai pela assinatura que a
+ * própria empresa paga (`openai-assinatura`, login do ChatGPT — o mesmo id de
+ * `PROVEDOR_POR_ASSINATURA` em `lib/ai/pontos/provedores.ts`, repetido aqui
+ * porque este módulo não importa nada de `lib/ai/`; o teste
+ * `custo-da-assinatura-e-zero.test.ts` cobra que os dois casam).
+ *
+ * O preço da tabela é casado pelo id do MODELO (`gpt-6-luna`, `gpt-6.1-sol`),
+ * que é o mesmo na API paga e na assinatura. Sem este corte, a chamada pela
+ * assinatura somava preço de API no gasto do mês (`fn_gasto_de_ia_do_mes`) e o
+ * teto de `ai_budgets` disparava por dinheiro que não saiu.
+ *
+ * 0, e não null: o custo é CONHECIDO e é zero por token. Null acenderia o aviso
+ * de "medição incompleta". Os tokens continuam gravados para medir uso.
+ */
+const PROVEDORES_SEM_CUSTO_POR_TOKEN: ReadonlySet<string> = new Set(['openai-assinatura']);
+
+export function provedorSemCustoPorToken(provider: string | null | undefined): boolean {
+  return provider != null && PROVEDORES_SEM_CUSTO_POR_TOKEN.has(provider);
+}
+
+/**
+ * O custo que se GRAVA em `llm_calls.cost_cents`: 0 para provedor de
+ * assinatura, o calculado para os demais. Aplicado nos gravadores (seam,
+ * mídia, `logInvocation`, `registrarChamadaDeIa`) para nenhum caminho
+ * precisar lembrar da regra.
+ */
+export function custoGravavel(provider: string | null | undefined, custo: number | null): number | null {
+  return provedorSemCustoPorToken(provider) ? 0 : custo;
+}

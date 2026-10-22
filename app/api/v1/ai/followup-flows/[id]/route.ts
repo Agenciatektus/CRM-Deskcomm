@@ -19,7 +19,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { patchFollowupFlowSchema } from "@/lib/followup/api-schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { ehProspeccao } from "@/lib/followup/superficies";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +51,20 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     .maybeSingle();
   if (error) return fail("internal_error", error.message, 500, { requestId });
   if (!data) return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
+
+  // A cadência saiu do produto: a campanha absorveu as capacidades dela. Restam
+  // pointers `cadence` legados no banco (nenhum ativo), que a LISTA já não
+  // mostra; esta porta por id era o último jeito de abrir um deles. Recusa em
+  // vez de devolver: fluxo que ninguém pode editar, publicar, parar nem voltar
+  // versão também não se abre, e abrir daria a impressão de que a tela existe.
+  if (data.surface === "cadence") {
+    return fail(
+      "validation_failed",
+      t("A régua de prospecção se configura na tela da campanha."),
+      422,
+      { requestId },
+    );
+  }
 
   // Linhagem de versions (Task 6.2 — builder): o PublishBar precisa saber se
   // existe versão anterior pra habilitar Rollback. `.limit()` deliberadamente
@@ -128,29 +141,22 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const patch = parsed.data;
 
-  // A régua de uma campanha é DERIVADA de `campaigns.passos`: editá-la por aqui
+  // Régua de prospecção não se edita por esta porta genérica, nas DUAS
+  // superfícies. A da campanha é DERIVADA de `campaigns.passos`: editá-la aqui
   // produziria um grafo no ar que a tela da campanha não mostra, e o próximo
   // "preparar" o sobrescreveria sem avisar. Quem edita são os passos.
-  if (existing.surface === "campaign") {
+  //
+  // A `cadence` entra na MESMA recusa porque a feature saiu: antes esta porta a
+  // aceitava e reconferia o gatilho pela régua da tela do funil. Sem tela, a
+  // reconferência não tem para onde mandar quem errou, e a recusa inteira é
+  // mais estrita do que a validação que ficava aqui.
+  if (ehProspeccao(existing.surface)) {
     return fail(
       "cadencia_no_ar",
       t("A régua de uma campanha se edita nos passos dela, na tela da campanha."),
       422,
       { requestId },
     );
-  }
-
-  // Cadência editada por esta porta genérica passa pela MESMA regra de gatilho
-  // da tela do funil — senão bastava trocar de rota para armar um gatilho que a
-  // porta da cadência não implementa, com a cadência no ar.
-  if (existing.surface === "cadence" && patch.trigger_config !== undefined) {
-    const problema = await validarGatilhoDaCadencia(
-      supabase,
-      activeOrg.orgId,
-      (existing.pipeline_id as string | null) ?? null,
-      patch.trigger_config,
-    );
-    if (problema) return fail("cadencia_gatilho_invalido", t(problema), 422, { requestId });
   }
   if (Object.keys(patch).length === 0) {
     const { data: unchanged, error: reloadErr } = await supabase
@@ -167,11 +173,11 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const update: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
 
-  // Régua de prospecção só se escreve pelo servidor (9020/9037: gatilho e
-  // política de handoff dela recusam a sessão). Papel, organização e a regra de
-  // gatilho da cadência já foram conferidos acima.
-  const escritor = ehProspeccao(existing.surface) ? createAdminClient() : supabase;
-  const { data: updated, error: updErr } = await escritor
+  // Chega aqui só fluxo que NÃO é régua de prospecção (as duas superfícies
+  // foram recusadas acima), e esse se escreve pela SESSÃO: papel e organização
+  // já conferidos, e o RLS confere de novo. O client de serviço saiu junto com
+  // a única razão de existir dele aqui, que era a escrita de prospecção.
+  const { data: updated, error: updErr } = await supabase
     .from("followup_flow_pointers")
     .update(update)
     .eq("id", id)

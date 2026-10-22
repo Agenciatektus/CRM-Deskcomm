@@ -17,6 +17,7 @@
  * IMPORTANT: distinct from `lib/ai/cost.ts` which still serves the legacy
  * `ai_pricing` table used by the EPIC-06 RAG worker.
  */
+import { provedorSemCustoPorToken } from "@/lib/agent-engine/edge/llm/pricing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/logger";
 
@@ -149,6 +150,9 @@ function avisarSemPreco(provider: string, modelo: string): void {
  * caro entrar no teto como gratuito (defeito do #1880, agora calado em null).
  */
 export async function computeCostCents(input: ComputeCostInput): Promise<number | null> {
+  // Assinatura (`openai-assinatura`) não cobra por token: o preço do id do
+  // modelo é o da API paga e não saiu do bolso de ninguém.
+  if (provedorSemCustoPorToken(input.provider)) return 0;
   const pricing = await loadPricing();
   const row = acharLinha(pricing, input);
   if (!row) {

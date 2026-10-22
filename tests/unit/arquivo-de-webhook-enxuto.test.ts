@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { abrirArquivoDoWebhook } from "@/lib/channels/arquivo-de-webhook";
-import { cabecalhosParaArquivo } from "@/lib/channels/cabecalhos-para-arquivo";
+import { cabecalhosSemCredencial } from "@/lib/channels/cabecalhos-para-arquivo";
 import {
   arquivoEnxuto,
   enxugarParaArquivo,
@@ -171,7 +171,7 @@ describe("arquivoEnxuto — nenhum formato vaza", () => {
 
 describe("cabeçalhos", () => {
   it("credencial por nome exato OU por pedaço sai; assinatura HMAC e o resto ficam", () => {
-    const h = cabecalhosParaArquivo(
+    const h = cabecalhosSemCredencial(
       new Headers({
         "x-webhook-secret": SEGREDO,
         token: TOKEN,
@@ -276,7 +276,7 @@ describe("P2 do Cassio na #98: credencial reconhecida pelo VALOR", () => {
   });
 
   it("header com nome inócuo e valor de credencial sai", () => {
-    const h = cabecalhosParaArquivo(new Headers({ "x-auth": CHAVE, "x-sessao": `Bearer ${TOKEN}`, "x-ok": "1" }));
+    const h = cabecalhosSemCredencial(new Headers({ "x-auth": CHAVE, "x-sessao": `Bearer ${TOKEN}`, "x-ok": "1" }));
     expect(Object.keys(h)).toEqual(["x-ok"]);
   });
 });

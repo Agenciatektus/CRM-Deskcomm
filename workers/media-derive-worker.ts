@@ -10,7 +10,7 @@ import type pg from "pg";
 import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
 import { visaoEmVigor } from "@/lib/ai/pontos/capacidade-em-vigor";
 import { PONTO_TRANSCRICAO_DE_AUDIO, PONTO_VISAO_DE_IMAGEM } from "@/lib/ai/pontos/registro";
-import { costCents, type TokenUsage } from "@/lib/agent-engine/edge/llm/pricing";
+import { costCents, custoGravavel, type TokenUsage } from "@/lib/agent-engine/edge/llm/pricing";
 import {
   aplicarOrcamento,
   LlmBudgetExceededError,
@@ -22,6 +22,7 @@ import {
   resolveOrgLlmConfig,
   type LlmEdgeConfig,
   type OrgLlmConfig,
+  type OrigemDaChaveLlm,
 } from "@/lib/agent-engine/edge/llm/credentials";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
 import { createPool } from "@/lib/agent-engine/db/pool";
@@ -29,6 +30,7 @@ import { env } from "@/lib/env";
 import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
 import { MARCADOR_NAO_LIDA, TIPOS_DERIVAVEIS } from "@/lib/messaging/media/derivable";
+import { leituraDeMidiaLigada } from "@/lib/messaging/media/leitura-da-org";
 import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
   decidirTranscricao,
@@ -36,6 +38,12 @@ import {
   type OrigemDaTranscricao,
 } from "@/lib/messaging/media/escada-de-transcricao";
 import type { TranscriptionProvider } from "@/lib/messaging/media/transcription";
+import { travaDaTranscricao } from "@/lib/messaging/media/trava-da-transcricao";
+import {
+  MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
+  MOTIVO_IMAGEM_NAO_REDUZIDA,
+  reduzirImagemParaIa,
+} from "@/lib/messaging/media/imagem-para-ia";
 import { logger } from "@/lib/logger";
 import { validarParProvedorModelo } from "@/lib/ai/par-provedor-modelo";
 import { reagirAConclusaoDeDerivacao } from "@/lib/escalacao/handoff-tecnico";
@@ -130,6 +138,14 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
   if (!msg.media_storage_path) return markSkipped("no media");
   if (msg.media_derived_status === "ready") return { consumer_key, status: "skipped", detail: "already derived" };
   if (!TIPOS_DERIVAVEIS.has(msg.type)) return { consumer_key, status: "skipped", detail: `type ${msg.type}` };
+  // As duas guardas do `media-persist-worker`, repetidas aqui para o evento que
+  // já estava na fila quando a regra mudou (ou que alguém reenfileirou à mão).
+  // Saem como `skipped` com motivo PRÓPRIO, antes de qualquer chamada de IA: sem
+  // aviso na Central e sem gasto, porque não é defeito — é escolha.
+  if (msg.direction === "outbound") return markSkipped("midia_enviada_pela_empresa");
+  if ((await leituraDeMidiaLigada(admin, msg.organization_id)) === false) {
+    return markSkipped("leitura_de_midia_desligada");
+  }
   // Vídeo é opt-in (custo: ffmpeg + N chamadas de visão): só deriva se algum agente
   // publicado da org tem video_frames_enabled=true (flag da migration 0058).
   if (msg.type === "video") {
@@ -189,6 +205,28 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     const dl = await admin.storage.from("whatsapp-media").download(msg.media_storage_path);
     if (dl.error || !dl.data) throw new Error(`storage_download_failed: ${dl.error?.message ?? "no_data"}`);
     const buffer = Buffer.from(await dl.data.arrayBuffer());
+
+    // ─── Trava de custo: áudio longo demais não sai daqui ───────────────────
+    //
+    // ANTES da escada e de qualquer credencial: vale para os três degraus, e
+    // um áudio barrado não resolve chave, não consulta teto, não grava linha
+    // em `llm_calls` nem abre aviso na Central (é regra, não defeito). O
+    // `failed` + marcador diz ao agente que houve um áudio que não foi lido,
+    // e o motivo diz ao operador por quê (`trava-da-transcricao.ts`).
+    if (msg.type === "audio") {
+      const trava = await travaDaTranscricao({ audio: buffer, metadata: msg.metadata });
+      if (!trava.passa) {
+        logger.info("[media-derive] áudio acima da trava de duração, não transcrito", {
+          organization_id: msg.organization_id,
+          message_id: msg.id,
+          segundos: trava.segundos,
+          bytes: buffer.byteLength,
+          fonte: trava.fonte,
+        });
+        await markFailed(trava.motivo);
+        return { consumer_key, status: "ok", detail: "audio_acima_da_trava_de_duracao" };
+      }
+    }
 
     // Credencial BYOK da org p/ visão (imagem).
     const llmCfg: LlmEdgeConfig = {
@@ -298,12 +336,20 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
 
     // Thunk, não valor: a credencial OpenAI só é LIDA se o serviço de
     // transcrição da instalação (degrau 1) não valer.
+    // De QUEM é a chave OpenAI que o degrau 2 usa — é ela, e não a da
+    // conversa, que o teto do plano precisa ver (só a chave da instalação o
+    // consome). Preenchido quando o thunk resolve.
+    let origemDaChaveOpenai: OrigemDaChaveLlm | null = null;
     const chaveOpenai = async (): Promise<string | null> => {
-      if (llm.provider === "openai") return llm.apiKey;
+      if (llm.provider === "openai") {
+        origemDaChaveOpenai = llm.origemDaChave;
+        return llm.apiKey;
+      }
       try {
         const oa = await resolveOrgLlmConfig(derivePool(), llmCfg, row.organization_id, {
           provider: "openai",
         });
+        origemDaChaveOpenai = oa.origemDaChave;
         return oa.apiKey;
       } catch {
         return null; // sem credencial e sem chave da instalação: nenhum degrau OpenAI
@@ -372,7 +418,27 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
 
     // O 5º argumento é a `base_url` do binding: o factory precisa dela para não
     // cair no endpoint padrão do provedor (ver o comentário lá em cima).
-    const deps = buildDeriveDeps(llm, decisao, row.organization_id, admin, baseUrlDaVisao, chaveEhDaInstalacao, origemDoModelo);
+    // A chave que a TRANSCRIÇÃO usa, por degrau. O degrau 1 é sempre a chave
+    // da instalação (`TRANSCRIPTION_API_KEY`, a da Tektus); o 2, a chave
+    // OpenAI que o thunk resolveu; o 3, a da conversa. Sem isto o teto do
+    // plano via a credencial própria da conversa e deixava passar o gasto que
+    // sai da chave da instalação.
+    const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
+      decisao.origem === "servico_da_instalacao"
+        ? "chave_da_instalacao"
+        : decisao.origem === "padrao_openai_compativel"
+          ? (origemDaChaveOpenai ?? llm.origemDaChave)
+          : (conversa?.origemDaChave ?? llm.origemDaChave);
+    const deps = buildDeriveDeps(
+      llm,
+      decisao,
+      row.organization_id,
+      admin,
+      baseUrlDaVisao,
+      chaveEhDaInstalacao,
+      origemDoModelo,
+      origemDaChaveDaTranscricao,
+    );
 
     const text = await deriveMediaText(msg.type, buffer, msg.media_mime ?? "application/octet-stream", deps);
 
@@ -566,6 +632,9 @@ function buildDeriveDeps(
   // De onde veio o MODELO (issue #2377): o log da recusa de par precisa dizer
   // se veio do binding do ponto ou do padrao da organizacao.
   origemDoModelo = "padrao",
+  // De quem é a chave que a transcrição usa (ver o chamador). Sem ela, a da
+  // conversa — o comportamento de antes.
+  origemDaChaveDaTranscricao: OrigemDaChaveLlm = llm.origemDaChave,
 ): DeriveDeps {
   const registry = createDefaultRegistry();
   // Thunk, não consulta: nada vai ao banco até a visão ser de fato perguntada,
@@ -591,12 +660,11 @@ function buildDeriveDeps(
   };
   // O gate de orçamento do seam, não uma cópia: mesmo veredito, mesmo item
   // `budget_exceeded` na Central, mesma linha `orcamento_esgotado` em
-  // Execuções. Vale para toda chamada de LLM cobrada por token que este
-  // worker faz — a visão e o degrau 3 da transcrição (o modelo de conversa da
-  // organização). Os degraus 1 e 2 da transcrição ficam fora: o custo deles é
-  // nulo (o serviço tem preço próprio, que o sistema não conhece), então
-  // nunca entram na soma que o teto compara, e o degrau 1 pode ser o serviço
-  // da própria instalação, que não é gasto da organização.
+  // Execuções. Vale para toda chamada paga que este worker faz: a visão e os
+  // TRÊS degraus da transcrição. Os degraus 1 e 2 entraram em 21/10/2026: a
+  // produção transcreve pelo OpenRouter com a chave da Tektus, que devolve o
+  // custo da chamada (`custoDaTranscricao`), e a política é teto por cliente
+  // para o que a assinatura não cobre. No modo `avisar` o gate só registra.
   const barradoPeloTeto = async (d: {
     tipo: "imagem" | "áudio";
     oQueNaoSaiu: string;
@@ -604,6 +672,8 @@ function buildDeriveDeps(
     provider: string;
     model: string;
     origem: string;
+    /** A chave que ESTA chamada usa; sem ela, a da conversa. */
+    origemDaChave?: OrigemDaChaveLlm;
   }): Promise<boolean> => {
     try {
       await aplicarOrcamento({
@@ -614,7 +684,7 @@ function buildDeriveDeps(
         // A mesma chave efetiva do seam: a tela de admin vence, o `.env` é o piso.
         chave: chaveDeOrcamentoDaInstalacao(normalizarChaveDeOrcamento(env.AI_BUDGET_ENFORCEMENT)),
         // O teto do PLANO só vincula a chave da instalação (cobrança do revendedor §5).
-        origemDaChave: llm.origemDaChave,
+        origemDaChave: d.origemDaChave ?? llm.origemDaChave,
         purpose: d.purpose,
         provider: d.provider,
         model: d.model,
@@ -636,7 +706,7 @@ function buildDeriveDeps(
       return true;
     }
   };
-  const describeImage: DeriveDeps["describeImage"] = async (buffer, mime) => {
+  const describeImage: DeriveDeps["describeImage"] = async (buffer) => {
     // ⚠️ A resposta é resolvida AQUI, não na montagem das deps, porque num
     // roteador ela depende do catálogo e a consulta é assíncrona. Antes disto
     // a pergunta ia direto ao registro, que num roteador responde pelo prefixo
@@ -751,18 +821,26 @@ function buildDeriveDeps(
     ) {
       return MARCADOR_NAO_LIDA;
     }
+    // ─── A foto que sai é a REDUZIDA, nunca o original (`imagem-para-ia.ts`) ─
+    // Sem redução, não sai: mandar o arquivo cheio é o gasto que se quer evitar.
+    const reduzida = await reduzirImagemParaIa(buffer);
+    if (!reduzida) {
+      await avisarMidiaNaoLida(orgId, "imagem", MOTIVO_IMAGEM_NAO_REDUZIDA);
+      return MARCADOR_NAO_LIDA;
+    }
     const inicio = Date.now();
     let res: Awaited<ReturnType<typeof generateText>>;
     try {
       res = await generateText({
         model: factory(llm.apiKey, modelo, baseUrlDaVisao ?? undefined),
+        maxOutputTokens: MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
         messages: [
           {
             role: "user",
             content: [
               { type: "text", text: "Descreva objetivamente esta imagem em 1-2 frases, em português, para um atendente de vendas entender o que o cliente enviou." },
               // AI SDK v7: file part com mediaType (o antigo image part é deprecated).
-              { type: "file", data: buffer, mediaType: mime.split(";")[0]! },
+              { type: "file", data: reduzida.buffer, mediaType: reduzida.mime },
             ],
           },
         ],
@@ -849,30 +927,36 @@ function buildDeriveDeps(
   //
   // Todo degrau que transcreve passa por `comCustoRegistrado`: a chamada paga
   // vira linha em `llm_calls`, sucesso ou falha. O provedor do serviço da
-  // instalação com endereço próprio não é sabido — chute viraria estatística.
+  // instalação com endereço próprio só é gravado quando o host o identifica
+  // (`provedorDoServicoDeTranscricao`) — chute viraria estatística.
+  const providerDaTranscricao =
+    decisao.origem === "servico_da_instalacao" && env.TRANSCRIPTION_BASE_URL
+      ? provedorDoServicoDeTranscricao(env.TRANSCRIPTION_BASE_URL)
+      : decisao.anuncio.provider;
+  const modeloDaTranscricao = decisao.anuncio.modelId ?? "desconhecido";
   const comCusto = (servico: TranscriptionProvider): TranscriptionProvider =>
     comCustoRegistrado(servico, {
       admin,
       orgId,
-      provider:
-        decisao.origem === "servico_da_instalacao" && env.TRANSCRIPTION_BASE_URL
-          ? "desconhecido"
-          : decisao.anuncio.provider,
-      model: decisao.anuncio.modelId ?? "desconhecido",
+      provider: providerDaTranscricao,
+      model: modeloDaTranscricao,
       origem: decisao.origem,
     });
-  // O degrau 3 é o modelo de conversa da organização: chamada de LLM cobrada
-  // por token, então passa pelo teto antes de o áudio sair, como a visão.
-  const transcriberDoModelo = (servico: TranscriptionProvider): TranscriptionProvider => ({
+  // Todo degrau que transcreve passa pelo teto antes de o áudio sair, como a
+  // visão. No degrau 1 o teto vem DEPOIS da recusa de destino
+  // (`transcriberDeServico` embrulha por fora): endereço recusado não consulta
+  // gasto, pela mesma razão da visão.
+  const comTeto = (servico: TranscriptionProvider): TranscriptionProvider => ({
     transcribe: async (audio, mime) => {
       if (
         await barradoPeloTeto({
           tipo: "áudio",
           oQueNaoSaiu: "o áudio não foi enviado",
           purpose: PONTO_TRANSCRICAO_DE_AUDIO,
-          provider: decisao.anuncio.provider,
-          model: decisao.anuncio.modelId ?? "",
+          provider: providerDaTranscricao,
+          model: modeloDaTranscricao,
           origem: decisao.origem,
+          origemDaChave: origemDaChaveDaTranscricao,
         })
       ) {
         return MARCADOR_NAO_LIDA;
@@ -883,16 +967,39 @@ function buildDeriveDeps(
   const transcriber: DeriveDeps["transcriber"] = !decisao.transcriber
     ? semTranscricao
     : decisao.origem === "servico_da_instalacao"
-      ? transcriberDeServico(comCusto(decisao.transcriber))
-      : decisao.origem === "modelo_da_organizacao"
-        ? transcriberDoModelo(comCusto(decisao.transcriber))
-        : comCusto(decisao.transcriber);
+      ? transcriberDeServico(comTeto(comCusto(decisao.transcriber)))
+      : comTeto(comCusto(decisao.transcriber));
   return {
     transcriber,
     describeImage,
     extractPdf: extractPdfText,
     // Onda 3.1: vídeo → ffmpeg (áudio+frames) reusando transcrição e visão da org.
-    deriveVideo: (buffer) => deriveVideoText(buffer, { transcriber, describeImage }),
+    // A trilha de áudio do vídeo passa pela mesma trava de duração do áudio:
+    // acima dela o vídeo sai só com os frames, sem a transcrição paga.
+    deriveVideo: (buffer) =>
+      deriveVideoText(buffer, { transcriber: comTravaDeDuracao(transcriber), describeImage }),
+  };
+}
+
+/**
+ * O transcriber que só chama o de dentro quando a trava de duração deixa
+ * (`trava-da-transcricao.ts`). Barrado devolve "" — na trilha do vídeo isso é
+ * "sem fala", e o derivado segue com os frames.
+ */
+function comTravaDeDuracao(servico: TranscriptionProvider): TranscriptionProvider {
+  return {
+    transcribe: async (audio, mime) => {
+      const trava = await travaDaTranscricao({ audio });
+      if (!trava.passa) {
+        logger.info("[media-derive] trilha de áudio do vídeo acima da trava de duração, não transcrita", {
+          segundos: trava.segundos,
+          bytes: audio.byteLength,
+          fonte: trava.fonte,
+        });
+        return "";
+      }
+      return servico.transcribe(audio, mime);
+    },
   };
 }
 
@@ -910,7 +1017,7 @@ interface ChamadaDeMidia {
   latency_ms: number;
   /**
    * Na transcrição, o degrau da escada que ouviu o áudio. É o que separa a
-   * linha de custo nulo por construção (degraus 1 e 2, serviço sem tokens) da
+   * linha de custo nulo esperado (degraus 1 e 2, serviço sem tokens cuja resposta não trouxe custo) da
    * linha de LLM sem preço conhecido (degrau 3), que acende o aviso.
    */
   origem_da_escolha?: OrigemDaTranscricao;
@@ -970,7 +1077,13 @@ function registrarChamadaDeMidia(
   montar: () => ChamadaDeMidia,
 ): void {
   try {
-    const linha = montar();
+    const montada = montar();
+    // Assinatura (`openai-assinatura`) não cobra por token: a visão e o degrau 3
+    // calculam pelo id do modelo, e o corte vale aqui, no gravador, para os dois.
+    const linha =
+      montada.status === "erro"
+        ? montada
+        : { ...montada, cost_cents: custoGravavel(montada.provider, montada.cost_cents) };
     void Promise.resolve(
       admin.from("llm_calls").insert({ organization_id: orgId, status: "ok", ...linha }),
     ).then(
@@ -1007,9 +1120,10 @@ function registrarChamadaDeMidia(
  * Dois tipos de cobrança passam aqui. O modelo de conversa (degrau 3) é LLM
  * cobrado por token e devolve o uso (`transcribeMedindo`): a linha leva tokens
  * e o custo da tabela de preços, nulo só quando o modelo não está nela. O
- * serviço `/v1/audio/transcriptions` (degraus 1 e 2) tem preço próprio, que o
- * sistema não conhece, e não devolve tokens que se leiam aqui: custo nulo,
- * nunca 0.
+ * serviço `/v1/audio/transcriptions` (degraus 1 e 2) não devolve tokens, mas
+ * devolve o custo pela resposta (`transcribeComCusto`): `usage.cost` do
+ * OpenRouter, ou duração × preço por minuto do modelo conhecido — senão nulo,
+ * nunca 0 (`custoDaTranscricao`, em `lib/messaging/media/transcription.ts`).
  */
 function comCustoRegistrado(
   servico: TranscriptionProvider,
@@ -1026,9 +1140,12 @@ function comCustoRegistrado(
       const inicio = Date.now();
       let texto: string;
       let uso: TokenUsage | null = null;
+      let custoDoServico: number | null = null;
       try {
         if (servico.transcribeMedindo) {
           ({ texto, uso } = await servico.transcribeMedindo(audio, mime));
+        } else if (servico.transcribeComCusto) {
+          ({ texto, costCents: custoDoServico } = await servico.transcribeComCusto(audio, mime));
         } else {
           texto = await servico.transcribe(audio, mime);
         }
@@ -1053,12 +1170,27 @@ function comCustoRegistrado(
         output_tokens: uso?.outputTokens ?? 0,
         cache_read_tokens: uso?.cacheReadTokens ?? 0,
         cache_write_tokens: uso?.cacheWriteTokens ?? 0,
-        cost_cents: uso ? costCents(ctx.model, uso) : null,
+        cost_cents: uso ? costCents(ctx.model, uso) : custoDoServico,
         latency_ms: Date.now() - inicio,
       }));
       return texto;
     },
   };
+}
+
+/**
+ * O provedor que se grava na linha do degrau 1 quando a instalação aponta
+ * `TRANSCRIPTION_BASE_URL` para outro serviço. O OpenRouter se reconhece pelo
+ * host (é o caso de produção); qualquer outro fica `desconhecido` — chute
+ * viraria estatística.
+ */
+function provedorDoServicoDeTranscricao(baseUrl: string): string {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === "openrouter.ai" || host.endsWith(".openrouter.ai") ? "openrouter" : "desconhecido";
+  } catch {
+    return "desconhecido";
+  }
 }
 
 // Mora em lib/messaging/media/derivable.ts (sem import nenhum) porque o balão

@@ -15,6 +15,7 @@ import {
 } from "@/hooks/team/useAttendants";
 import { estaDePlantao } from "@/lib/routing/eligibility";
 import {
+  CAPACIDADE_MAXIMA,
   ROUTING_MODES,
   type RoutingConfig,
   type ScheduleWindow,
@@ -640,13 +641,13 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
                         <Input
                           type="number"
                           min={1}
-                          max={1000}
+                          max={CAPACIDADE_MAXIMA}
                           defaultValue={capacity}
                           className="h-8 w-20"
                           aria-label={`Capacidade de ${a.name}`}
                           onBlur={(e) => {
                             const next = Number(e.target.value);
-                            if (Number.isInteger(next) && next >= 1 && next !== capacity) {
+                            if (Number.isInteger(next) && next >= 1 && next <= CAPACIDADE_MAXIMA && next !== capacity) {
                               patch.mutate({ userId: a.userId, patch: { capacity: next } });
                             }
                           }}

@@ -94,7 +94,13 @@ export async function preverAudiencia(
   };
 }
 
-async function classificar(
+/**
+ * O recorte classificado, pessoa a pessoa — o que a prévia conta e a
+ * preparação grava. Exportado para "Adicionar à campanha" (barra em lote do
+ * Funil), que precisa saber QUEM entra, e não só quantos: mesma régua, para a
+ * confirmação não dizer um número e a preparação outro.
+ */
+export async function classificar(
   admin: SupabaseClient,
   entrada: {
     organizationId: string;

@@ -27,15 +27,31 @@ function armar(mensagem: Record<string, unknown>) {
       channel_session_id: "23000000-0000-4000-8000-000000000005",
       last_inbound_at: new Date().toISOString(), bot_silenced_until: null, last_handoff_at: null,
       assignee_kind: "ai",
+      // A elegibilidade (mesma consulta de `conversations`) falha fechada sem o
+      // status da organização: sem ele o worker sai em `org_nao_operante`.
+      organizations: { status: "active" },
       contacts: { id: CONTATO, display_name: null, locale: "pt-BR", is_blocked: false, force_human: false },
     },
     messages: { id: MSG, organization_id: ORG, direction: "inbound", service_revision: 1, ...mensagem },
+    // Desde o upstream #613 a busca do agente legado é a PRIMEIRA consulta do
+    // worker: sem um candidato (`rag_bot` ativo, sem versão publicada), ele sai
+    // em `agent_inactive_or_missing` antes de olhar a mensagem, e a guarda da
+    // reação nunca é exercida. Este é o único perfil que chega até ela.
+    ai_agents: [
+      {
+        id: "23000000-0000-4000-8000-000000000006", organization_id: ORG, model: null,
+        system_prompt: null, config: {}, guardrails: null, active_kb_version_id: null,
+        is_active: true, is_default: true, kind: "rag_bot", published_version_id: null,
+        archived_at: null, paused_at: null,
+      },
+    ],
   };
   const from = (tabela: string) => {
     const terminais: Record<string, unknown> = {
       maybeSingle: () => Promise.resolve({ data: linhas[tabela] ?? null, error: null }),
       single: () => Promise.resolve({ data: linhas[tabela] ?? null, error: null }),
-      then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok),
+      then: (ok: (v: unknown) => unknown) =>
+        Promise.resolve({ data: Array.isArray(linhas[tabela]) ? linhas[tabela] : [], error: null }).then(ok),
     };
     const chain: unknown = new Proxy(terminais, {
       get: (alvo, prop) => (prop in alvo ? alvo[prop as string] : () => chain),
@@ -68,5 +84,8 @@ describe("caminho legado: reação não acorda a IA", () => {
     const r = await processMessageReceived(evento);
     expect(r.status === "skipped" ? r.reason : null).not.toBe("reaction_inbound");
     expect(r.status === "skipped" ? r.reason : null).not.toBe("empty_inbound_body");
+    // Sem isto o controle passava em vazio: com o worker saindo antes, na busca
+    // do agente, "não é reaction_inbound" era verdade sem a guarda ter rodado.
+    expect(r.status === "skipped" ? r.reason : null).not.toBe("agent_inactive_or_missing");
   });
 });

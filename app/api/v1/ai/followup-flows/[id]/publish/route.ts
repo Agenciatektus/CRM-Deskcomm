@@ -27,11 +27,8 @@ import {
   validateFlowForPublish,
   type RoteiroDoPublish,
 } from "@/lib/followup/validate-publish";
-import { validarPublicacaoDaCadencia } from "@/lib/cadencia/validar-publicacao";
-import { validarGatilhoDaCadencia } from "@/lib/cadencia/gatilho";
 import { publishFollowupFlowVersion } from "@/lib/followup/publish";
-import { conducaoDe } from "@/lib/cadencia/conducao/settings";
-import { publicarVersaoDaCadencia } from "@/lib/cadencia/publicar";
+import { ehProspeccao } from "@/lib/followup/superficies";
 import type { FlowGraph } from "@/lib/followup/graph-schema";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -59,7 +56,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const admin = createAdminClient();
   const { data: pointer, error: fetchErr } = await admin
     .from("followup_flow_pointers")
-    .select("id, draft_graph, trigger_config, surface, pipeline_id, channel_session_id, cadence_settings")
+    .select("id, draft_graph, trigger_config, surface, pipeline_id, channel_session_id")
     .eq("id", id)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -108,15 +105,17 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     params?: { stage_id?: string };
   };
   const triggerKind = trigger.kind ?? "manual";
-  // Cadência: só os gatilhos que a PORTA da cadência implementa hoje
-  // (`lib/cadencia/inscrever.ts`). Silêncio/SLA passariam no conjunto acima e
-  // nunca inscreveriam ninguém por ela — fluxo morto com cara de vivo.
-  // A régua de uma campanha não se publica por aqui: ela é DERIVADA de
+  // Régua de prospecção não se publica por aqui. A da campanha é DERIVADA de
   // `campaigns.passos` e publicada pelo servidor ao preparar a campanha
   // (`lib/campanhas/regua.ts`). Publicar o `draft_graph` dela por esta porta
   // poria no ar um grafo que o próximo "preparar" sobrescreve — e, entre as
   // duas coisas, a tela da campanha mostraria passos que não são os que rodam.
-  if (pointer.surface === "campaign") {
+  //
+  // A `cadence` entra na MESMA recusa porque a feature saiu: esta porta era o
+  // último jeito de publicar um pointer legado dela, e sem tela não há para
+  // onde mandar quem errasse a validação que ficava aqui. Recusar inteiro é
+  // mais estrito do que reconferir.
+  if (ehProspeccao(pointer.surface)) {
     return fail(
       "cadencia_no_ar",
       t("A régua de uma campanha vai ao ar quando a campanha é preparada, com os passos dela."),
@@ -125,17 +124,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     );
   }
 
-  const ehCadencia = pointer.surface === "cadence";
-  if (ehCadencia) {
-    // A régua única do gatilho de cadência — a mesma das rotas que o gravam.
-    const problema = await validarGatilhoDaCadencia(
-      admin,
-      activeOrg.orgId,
-      (pointer.pipeline_id as string | null) ?? null,
-      pointer.trigger_config,
-    );
-    if (problema) return fail("trigger_kind_not_implemented", t(problema), 422, { requestId });
-  } else if (!KINDS_COM_MOTOR.has(triggerKind)) {
+  if (!KINDS_COM_MOTOR.has(triggerKind)) {
     return fail(
       "trigger_kind_not_implemented",
       `O gatilho «${triggerKind}» não está disponível — use Etapa do funil, Silêncio ou Manual.`,
@@ -262,57 +251,40 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     });
   }
 
-  // Passo de CRM (mover etapa, etiqueta) só existe na cadência: é ela que sabe
-  // o funil e o negócio. Num follow-up comum ele falharia em produção, a cada
-  // inscrição — melhor recusar aqui, com alguém na tela para corrigir.
-  if (!ehCadencia) {
-    const passoDeCadencia = graph.nodes.find(
-      (n) => n.type === "action" && (n.config.mode === "move_stage" || n.config.mode === "tag"),
-    );
-    if (passoDeCadencia) {
-      return fail("validation_failed", t("Mover de etapa e etiqueta são passos de cadência."), 422, {
+  // Passo de CRM (mover etapa, etiqueta) só existe na régua de uma campanha: é
+  // ela que sabe o funil e o negócio. Num follow-up comum ele falharia em
+  // produção, a cada inscrição — melhor recusar aqui, com alguém na tela para
+  // corrigir. Vale sem condição: desde que as duas superfícies de prospecção
+  // são recusadas acima, por aqui só passa follow-up comum.
+  const passoDeRegua = graph.nodes.find(
+    (n) => n.type === "action" && (n.config.mode === "move_stage" || n.config.mode === "tag"),
+  );
+  if (passoDeRegua) {
+    return fail(
+      "validation_failed",
+      t("Mover de etapa e etiqueta são passos da régua de uma campanha."),
+      422,
+      {
         requestId,
         details: {
           errors: [
             {
-              node_id: passoDeCadencia.id,
-              code: "passo_so_de_cadencia",
-              message: t("Mover de etapa e etiqueta são passos de cadência."),
+              node_id: passoDeRegua.id,
+              code: "passo_so_de_regua_de_campanha",
+              message: t("Mover de etapa e etiqueta são passos da régua de uma campanha."),
             },
           ],
         },
-      });
-    }
+      },
+    );
   }
 
-  if (ehCadencia) {
-    const errosDaCadencia = await validarPublicacaoDaCadencia(admin, activeOrg.orgId, pointer, graph);
-    if (errosDaCadencia.length > 0) {
-      return fail("validation_failed", t("A cadência não pode ir ao ar ainda."), 422, {
-        requestId,
-        details: { errors: errosDaCadencia },
-      });
-    }
-  }
-
-  // Cadência: grafo + snapshot de quem atende quando o lead responde, na MESMA
-  // transação (`fn_cadencia_publicar_versao`). O runtime lê a condução da
-  // versão, nunca do rascunho.
-  const conducao = ehCadencia ? conducaoDe(pointer.cadence_settings) : null;
-  const result = conducao
-    ? await publicarVersaoDaCadencia(admin, {
-        orgId: activeOrg.orgId,
-        pointerId: id,
-        graph,
-        createdBy: user.id,
-        conducao,
-      })
-    : await publishFollowupFlowVersion(admin, {
-        orgId: activeOrg.orgId,
-        pointerId: id,
-        graph,
-        createdBy: user.id,
-      });
+  const result = await publishFollowupFlowVersion(admin, {
+    orgId: activeOrg.orgId,
+    pointerId: id,
+    graph,
+    createdBy: user.id,
+  });
   if (!result.ok) {
     if (result.code === "pointer_not_found") {
       return fail("not_found", t("Fluxo não encontrado."), 404, { requestId });
@@ -339,9 +311,11 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     resourceType: "followup_flow_pointer",
     resourceId: id,
     requestId,
+    // Sem `conducao` no metadado: ela era da CADÊNCIA, e esta rota passou a
+    // recusar `surface = 'cadence'` com 422. Quem chega aqui não tem condução
+    // para registrar.
     metadata: {
       version_id: result.version_id,
-      ...(conducao ? { conducao: conducao.quem_atende, ...(conducao.quem_atende === "ia" ? { modo: conducao.modo } : {}) } : {}),
     },
   });
 

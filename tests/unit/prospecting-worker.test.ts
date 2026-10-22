@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   pacing: vi.fn(),
   paradas: vi.fn(),
   prepare: vi.fn(),
+  modulo: vi.fn(),
 }));
 vi.mock("@/app/api/v1/messages/_handler", () => ({ sendMessageHandler: mocks.send }));
 vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
@@ -67,6 +68,10 @@ vi.mock("@/lib/prospecting/store", () => ({
   validateConfig: vi.fn().mockResolvedValue(undefined),
   prepararCandidatoNoEnvio: mocks.prepare,
 }));
+// A liberação da Prospecção por empresa (#64, migration 9026) é lida pelo tick
+// antes do lock. O `admin` destes testes é `{}` (sem `.from`): sem o dublê a
+// leitura falha fechada, o tick pula a org e nenhum caso do tick chega ao envio.
+vi.mock("@/lib/organizacao/modulos-liberados", () => ({ moduloDaEmpresa: mocks.modulo }));
 import { sendNextCandidate, tickProspecting } from "@/lib/prospecting/worker";
 import { OrgNaoOperanteError } from "@/lib/organizacao/operante";
 import { withProspectingLock } from "@/lib/prospecting/store";
@@ -121,6 +126,7 @@ function database(
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.modulo.mockResolvedValue(true);
   mocks.knobs.mockResolvedValue({ knobs: {} });
   mocks.open.mockReturnValue(true);
   mocks.prospeccaoAberta.mockReturnValue(true);
@@ -314,6 +320,17 @@ describe("tick da prospecção × organização que para no meio do envio", () =
     await rodar();
     expect(gravou(db, "status='paused'")).toBe(true);
     expect(gravou(db, "update prospecting_candidates set status='failed',error=$3")).toBe(true);
+  });
+
+  it("Prospecção revogada para a empresa: o tick pula a org sem tocar a campanha nem enviar", async () => {
+    mocks.modulo.mockResolvedValue(false);
+    const { db, rodar } = tickComEnvioQueFalha(new Error("não deveria enviar"));
+    mocks.send.mockReset();
+    await rodar();
+    expect(mocks.modulo).toHaveBeenCalledWith({}, id, "prospeccao");
+    expect(withProspectingLock).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
   });
 });
 

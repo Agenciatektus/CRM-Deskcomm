@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { usePedidoDeCriar } from "@/lib/mobile/usePedidoDeCriar";
@@ -23,6 +23,7 @@ import { BulkActionBar } from "@/components/kanban/BulkActionBar";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { LeadDossier } from "@/components/kanban/LeadDossier";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
+import { selecaoRestaurada } from "@/lib/kanban/selecao-restaurada";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 
 function formatError(err: unknown, t: (texto: string) => string): string {
@@ -50,8 +51,10 @@ import { CalendarioDoFunil } from "@/components/kanban/CalendarioDoFunil";
  * Ordenar. Filtros na URL (e lembrados por pessoa); vista, ordem e densidade
  * por pessoa neste navegador.
  *
- * Cadências saiu da barra (não é um modo de ver o funil): `?modo=cadencias`
- * cai no Kanban. A tela de cadências do funil segue no código.
+ * A cadência saiu do produto: a campanha absorveu as sete capacidades dela.
+ * `?modo=cadencias` cai no Kanban, e a tela não existe mais no código — o que
+ * sobrou de `lib/cadencia` é o MOTOR compartilhado pela campanha, pelo agente
+ * de IA e pelo follow-up.
  */
 export function PipelinePageClient({
   pipelineId,
@@ -96,6 +99,18 @@ export function PipelinePageClient({
   const tagsDoQuadro = useMemo(
     () => [...new Set((data?.leads ?? []).flatMap((l) => l.tags))].sort(),
     [data?.leads],
+  );
+  // O Desfazer do lote roda 5 s depois de agendado, com a página já em outro
+  // render: o quadro de AGORA vem por ref, e a seleção de agora pelo updater.
+  // Só volta o que ainda está no quadro, e nunca por cima de uma seleção nova.
+  const idsDoQuadro = useMemo(() => new Set((data?.leads ?? []).map((l) => l.id)), [data?.leads]);
+  const idsDoQuadroRef = useRef(idsDoQuadro);
+  useEffect(() => {
+    idsDoQuadroRef.current = idsDoQuadro;
+  }, [idsDoQuadro]);
+  const restaurarSelecao = useCallback(
+    (ids: string[]) => setSelectedIds((atual) => selecaoRestaurada(atual, ids, idsDoQuadroRef.current)),
+    [],
   );
   const nomeAtual = data?.pipeline.name ?? initialName;
   // Um funil só = nada para trocar: o seletor seria ruído permanente.
@@ -148,7 +163,7 @@ export function PipelinePageClient({
       funis={funis}
       ownerNames={ownerNames}
       onClear={() => setSelectedIds([])}
-      onRestaurar={setSelectedIds}
+      onRestaurar={restaurarSelecao}
     />
   );
   // #1751 (upstream): o quadro é a lista que o diálogo confere ANTES de criar —

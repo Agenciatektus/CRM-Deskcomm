@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({ elegib: vi.fn() }));
 vi.mock('@/lib/ai/elegibilidade/consulta-pg', () => ({ decidirElegibilidadeDaConversa: mocks.elegib }));
 
 import { drainTick } from '@/lib/agent-engine/edge/crm/drain';
+import { SQL_MENSAGEM_PEDE_RESPOSTA } from '@/lib/ai/elegibilidade/mensagem-respondivel';
 
 const ORG = '12000000-0000-4000-8000-000000000001';
 const CONTATO = '12000000-0000-4000-8000-000000000002';
@@ -32,7 +33,10 @@ function montar(gatilho: Record<string, unknown> | null) {
         }],
       };
     }
-    if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null }] };
+    // A mesma consulta traz o status da organização (org parada não gera turno,
+    // upstream a05ac8fcd). Sem `status` o dreno consome o evento antes de olhar a
+    // mensagem, e o controle negativo e o anti-backlog nem chegavam a rodar.
+    if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null, status: 'active' }] };
     if (sql.includes('select is_group')) return { rows: [{ is_group: false }] };
     if (sql.includes('select type, body, media_url')) return { rows: gatilho ? [gatilho] : [] };
     if (sql.includes('as tem_agente')) return { rows: [{ tem_agente: true, tem_roteador: false }] };
@@ -78,6 +82,10 @@ describe('dreno do agente: só abre turno para mensagem que pede resposta', () =
     await drainTick(pool, knobs, log);
     const recencia = chamadas.find((c) => c.sql.includes("direction = 'inbound'"));
     expect(recencia?.sql).toContain("type <> 'reaction'");
-    expect(recencia?.sql).toContain('btrim(body)');
+    // O predicado é o compartilhado com o TS (`mensagem-respondivel.test.ts`
+    // prende os dois). Ele passou a tirar também tabulação, quebra de linha e NBSP
+    // na P2-1 do Cassio (corpo só de quebra de linha ou NBSP passava no SQL);
+    // casar o texto antigo prendia a forma, e não a regra.
+    expect(recencia?.sql).toContain(SQL_MENSAGEM_PEDE_RESPOSTA);
   });
 });

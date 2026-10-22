@@ -213,7 +213,9 @@ async function candidatos(sb: ReturnType<typeof bancoFalso>["sb"]) {
   return (
     await buscarCandidatos(sb, {
       organizationId: ORG,
-      filtro: { ...FILTRO_VAZIO, limite: 5000 },
+      // Um recorte qualquer (o dublê não modela tags): sem recorte nenhum a
+      // consulta principal nem roda — ver o caso "só incluídos à mão".
+      filtro: { ...FILTRO_VAZIO, com_alguma_tag: ["vip"], limite: 5000 },
       agora: new Date(Date.UTC(2026, 5, 1)),
       corpo: "Oi {{nome}}, {{lead.gancho}}",
     })
@@ -389,6 +391,35 @@ describe("recorte de funil grande não estoura a URL (#2358)", () => {
     expect(urls.length).toBeGreaterThanOrEqual(6);
     for (const u of urls) expect(u.length).toBeLessThan(MURO_DO_GATEWAY);
     cercaDeOrganizacao(banco);
+  });
+
+  it("⭐ só incluídos à mão (sem recorte): a audiência é EXATAMENTE quem foi incluído, não a base inteira", async () => {
+    // O caso de "Adicionar à campanha" (barra em lote do Funil) numa campanha
+    // recém-criada. Sem a guarda, a consulta principal sem predicado trazia a
+    // organização inteira até o `limite` — 500 estranhos junto dos 2 escolhidos.
+    const contatos = Array.from({ length: 300 }, (_, i) => uuid(i));
+    const banco = bancoFalso(contatos, []);
+    const escolhidos = [contatos[7]!, contatos[250]!];
+
+    const { candidatos: lista } = await buscarCandidatos(banco.sb, {
+      organizationId: ORG,
+      filtro: { ...FILTRO_VAZIO, incluir_contatos: escolhidos },
+      agora: new Date(Date.UTC(2026, 5, 1)),
+    });
+
+    expect(lista.map((c) => c.contactId).sort()).toEqual([...escolhidos].sort());
+    cercaDeOrganizacao(banco);
+  });
+
+  it("controle: com recorte, o recorte continua entrando junto dos incluídos", async () => {
+    const contatos = Array.from({ length: 300 }, (_, i) => uuid(i));
+    const banco = bancoFalso(contatos, []);
+    const { candidatos: lista } = await buscarCandidatos(banco.sb, {
+      organizationId: ORG,
+      filtro: { ...FILTRO_VAZIO, com_alguma_tag: ["vip"], limite: 10, incluir_contatos: [contatos[250]!] },
+      agora: new Date(Date.UTC(2026, 5, 1)),
+    });
+    expect(lista).toHaveLength(11);
   });
 
   it("incluído repetido em lotes diferentes entra UMA vez", async () => {

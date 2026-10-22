@@ -90,6 +90,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { RETENCAO_TETO_DIAS } from "@/lib/retencao/politica";
 
+import { apagarLinhasDeCanalVencidas } from "./poda-das-linhas-de-canal";
+
 /** Quantas linhas cada rodada esvazia. Ver o cabeçalho: lote pequeno é o ponto. */
 export const LOTE_PADRAO = 500;
 
@@ -148,7 +150,13 @@ function limiteEm(dias: number): string {
  */
 export async function podarArquivoDeWebhooks(
   admin: SupabaseClient,
-  opcoes: { diasComCorpo: number; diasParaApagar: number; lote?: number },
+  opcoes: {
+    diasComCorpo: number;
+    diasParaApagar: number;
+    /** Horizonte CURTO só para linha de canal (ver `./poda-das-linhas-de-canal.ts`). */
+    diasParaApagarCanal?: number;
+    lote?: number;
+  },
 ): Promise<ResultadoDaPoda> {
   const lote = opcoes.lote ?? LOTE_PADRAO;
 
@@ -268,9 +276,24 @@ export async function podarArquivoDeWebhooks(
     });
   }
 
+  let apagadas = (apagadasRows ?? []).length;
+
+  // ── 3. Linha de canal: horizonte próprio, mais curto ──────────────────────
+  if (opcoes.diasParaApagarCanal !== undefined && opcoes.diasParaApagarCanal < opcoes.diasParaApagar) {
+    try {
+      apagadas += await apagarLinhasDeCanalVencidas(admin, { dias: opcoes.diasParaApagarCanal, lote });
+    } catch (err) {
+      throw new ErroAoApagarLinhasVelhas(err instanceof Error ? err.message : String(err), {
+        esvaziadas,
+        apagadas,
+        temMais: linhas.length >= lote,
+      });
+    }
+  }
+
   return {
     esvaziadas,
-    apagadas: (apagadasRows ?? []).length,
+    apagadas,
     // Lote cheio = ainda há fila. Quem chama pode usar isto para saber que a
     // poda ainda não alcançou o estado estável — útil no primeiro dia, quando
     // há 31 mil linhas atrasadas e a varredura leva várias rodadas.
