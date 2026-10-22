@@ -121,12 +121,25 @@ describe("0149 — definer confere a organização de quem chamou", () => {
     expect(r.stderr).not.toContain(SEGREDO_VIZINHO);
   });
 
+  // `contact.viewed`, e não `lead.*`: desde a 9054 o viewer não emite evento de
+  // negócio (`caller_not_authorized_for_event`, ele dispara conversão e
+  // automação). O que este controle prova é a MEMBERSHIP: na própria organização
+  // a função deixa o viewer passar.
   it("CONTROLE POSITIVO: viewer EMITE evento na PRÓPRIA organização", () => {
+    const r = callAs(
+      GOV_VIEWER,
+      `select public.emit_event('contact.viewed', 'contact', null, '{}'::jsonb, '{}'::jsonb, '${GOV_ORG}');`,
+    );
+    expect(r.ok, r.stderr).toBe(true);
+  });
+
+  it("viewer não emite lead.* nem na PRÓPRIA organização (9054)", () => {
     const r = callAs(
       GOV_VIEWER,
       `select public.emit_event('lead.moved', 'lead', null, '{}'::jsonb, '{}'::jsonb, '${GOV_ORG}');`,
     );
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.stderr).toContain("caller_not_authorized_for_event");
   });
 
   it("CONTROLE POSITIVO: viewer LÊ a base de conhecimento da PRÓPRIA organização", () => {

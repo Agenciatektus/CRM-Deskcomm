@@ -139,6 +139,32 @@ const TABELA_CRIADA_POR_ULTIMO = `
    order by alvo.oid desc
    limit 1;`;
 
+/** Para o vermelho de `TABELA_CRIADA_POR_ULTIMO`: cada candidata e o primeiro critério que ela não cumpre. */
+const MOTIVO_DE_CADA_CANDIDATA = `
+  with alvo as (${REGRA(true)})
+  select alvo.relname || ': ' || case
+      when not (has_table_privilege('authenticated', alvo.oid, 'insert')
+                and has_table_privilege('authenticated', alvo.oid, 'update')
+                and has_table_privilege('authenticated', alvo.oid, 'delete')) then 'sem insert+update+delete'
+      when not exists (select 1 from pg_attribute a
+                        where a.attrelid = alvo.oid and a.attname = 'organization_id' and not a.attisdropped)
+        then 'sem organization_id'
+      when exists (select 1 from pg_attribute a
+                    where a.attrelid = alvo.oid and a.attnum > 0 and not a.attisdropped
+                      and a.attnotnull and not a.atthasdef and a.attidentity = '' and a.attgenerated = ''
+                      and a.attname <> 'organization_id')
+        then 'not null sem default: ' || (select string_agg(a.attname, ',') from pg_attribute a
+                    where a.attrelid = alvo.oid and a.attnum > 0 and not a.attisdropped
+                      and a.attnotnull and not a.atthasdef and a.attidentity = '' and a.attgenerated = ''
+                      and a.attname <> 'organization_id')
+      else 'toda policy de insert exige papel: ' || coalesce((select string_agg(left(coalesce(
+                    pg_get_expr(p.polwithcheck, p.polrelid), pg_get_expr(p.polqual, p.polrelid), ''), 160), ' || ')
+                    from pg_policy p where p.polrelid = alvo.oid and p.polpermissive and p.polcmd in ('a', '*')), 'nenhuma')
+    end
+    from alvo
+   order by alvo.oid desc
+   limit 12;`;
+
 beforeAll(() => {
   // DROP/CREATE DATABASE não rodam em bloco de transação: `-f -` manda statement a statement.
   psql(
@@ -221,8 +247,14 @@ describe("travas do modo somente leitura do suporte — baseline aplicado UMA ve
     function tabela(): string {
       tabelaMemo ??= psql(BANCO, TABELA_CRIADA_POR_ULTIMO);
       if (tabelaMemo === "") {
+        // O vermelho diz POR QUE cada candidata caiu: sem isto, "nenhuma tabela"
+        // manda quem for consertar refazer a seleção à mão no banco do CI.
+        const porque = psql(BANCO, MOTIVO_DE_CADA_CANDIDATA);
         throw new Error(
-          "nenhuma tabela do escopo aceita uma linha só com organization_id e é gravável por authenticated",
+          "nenhuma tabela do escopo aceita uma linha só com organization_id e é gravável por authenticated.
+" +
+            `Candidatas e o critério que cada uma não cumpre:
+${porque}`,
         );
       }
       return `public.${tabelaMemo}`;

@@ -185,7 +185,7 @@ describe("encerraDemanda", () => {
     const r = await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost" });
 
     expect(r.jaEstava).toBeFalsy();
-    expect(db.tables.crm_leads[0]).toMatchObject({ status: "lost", stage_id: LOST_STAGE, lost_reason: null });
+    expect(db.tables.crm_leads?.[0]).toMatchObject({ status: "lost", stage_id: LOST_STAGE, lost_reason: null });
     expect(db.updates[0]).not.toHaveProperty("lost_reason");
   });
 

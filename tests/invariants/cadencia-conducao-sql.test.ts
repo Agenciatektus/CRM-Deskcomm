@@ -598,12 +598,14 @@ describe("modo assistido: rascunho da IA sobre a condução", () => {
     expect((await pool.query("select active_ai_agent_id from conversations where id=$1", [c.conversation])).rows[0].active_ai_agent_id).toBe(
       c.agent,
     );
-    await expect(begin(c, outro, outraVersao)).rejects.toMatchObject({ code: "40001" });
+    // PT409 (recusa permanente da casa) desde a subida do upstream; era 40001. A
+    // rota decide pela MENSAGEM (`reply_agent_stale`), não pelo código.
+    await expect(begin(c, outro, outraVersao)).rejects.toMatchObject({ code: "PT409", message: "reply_agent_stale" });
     const d = await begin(c, c.agent, c.agentVersion);
     expect(d.agent_id).toBe(c.agent);
   });
 
-  it("ciclo: rascunho → mensagem nova do lead → aprovar falha (40001) → segundo rascunho", async () => {
+  it("ciclo: rascunho → mensagem nova do lead → aprovar falha (PT409 reply_stale) → segundo rascunho", async () => {
     const c = await conducaoAssistida();
     const d1 = await begin(c, c.agent, c.agentVersion);
     await pool.query("update ai_reply_drafts set status='pending',original_body='Olá',edited_body='Olá' where id=$1", [d1.id]);
@@ -613,7 +615,8 @@ describe("modo assistido: rascunho da IA sobre a condução", () => {
       [c.org, c.contact, c.conversation, c.channel, randomUUID()],
     );
     await expect(asUser(GOV_AGENT_A, approveSql, [c.org, d1.id, String(d1.revision), "Olá"])).rejects.toMatchObject({
-      code: "40001",
+      code: "PT409",
+      message: "reply_stale",
     });
     const d2 = await begin(c, c.agent, c.agentVersion);
     expect(d2.id).not.toBe(d1.id);
