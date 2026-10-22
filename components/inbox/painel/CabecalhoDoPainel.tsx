@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import type { ContactSummary } from "@/hooks/inbox/useConversationsRealtime";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { copyToClipboard } from "@/lib/clipboard";
 import { ArrowRight, Copy, ListChecks, Note, Plus, UserCircle } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -70,11 +71,12 @@ export function CabecalhoDoPainel({
 
   async function copiarTelefone() {
     if (!telefone) return;
-    try {
-      await navigator.clipboard.writeText(telefone);
+    // Pelo helper (`lib/clipboard.ts`): em http a API crua da área de transferência nem
+    // existe, e o fallback por textarea é quem copia.
+    if (await copyToClipboard(telefone)) {
       toast.success(t("Telefone copiado."));
-    } catch {
-      // Clipboard bloqueado (http, permissão negada): dizer, e não fingir.
+    } else {
+      // Nem o fallback copiou (permissão negada): dizer, e não fingir.
       toast.error(t("Não consegui copiar. Selecione o número e copie à mão."));
     }
   }

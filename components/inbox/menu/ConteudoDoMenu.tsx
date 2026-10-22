@@ -21,6 +21,7 @@ import { usePauseAiAttendance } from "@/hooks/inbox/usePauseAiAttendance";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
 import { useResumeAiAttendance } from "@/hooks/inbox/useResumeAiAttendance";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { copyToClipboard } from "@/lib/clipboard";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { comandoDaConversa, ROTULO_DO_COMANDO } from "@/lib/inbox/comando-da-conversa";
 import { regrasDoMenu } from "@/lib/inbox/menu-da-conversa";
@@ -100,13 +101,12 @@ export function ConteudoDoMenu({
     setTimeout(() => no.querySelector<HTMLElement>('[role^="menuitem"]:not([data-disabled])')?.focus({ preventScroll: true }), 0);
   }, []);
 
+  // Pelo helper, não pela API crua da área de transferência: fora de contexto seguro (o
+  // self-host servido por http://IP) ele nem existe, e dentro do menu com focus
+  // trap o fallback precisa nascer na árvore do diálogo (`lib/clipboard.ts`).
   async function copiarTelefone(telefone: string) {
-    try {
-      await navigator.clipboard.writeText(telefone);
-      toast.success(t("Telefone copiado."));
-    } catch {
-      toast.error(t("Não foi possível copiar o telefone."));
-    }
+    if (await copyToClipboard(telefone)) toast.success(t("Telefone copiado."));
+    else toast.error(t("Não foi possível copiar o telefone."));
   }
 
   // As teclas do menu não chegam aos atalhos da Inbox: "a" aqui é busca por
