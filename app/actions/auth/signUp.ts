@@ -17,7 +17,7 @@ import { verifyInviteToken } from "@/lib/auth/invite-token";
 import { criarContaDeConvite, lerConfigPublicaDoGoTrue } from "@/lib/auth/convite-no-gotrue";
 import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 import { audit, hashEmail } from "@/lib/audit";
-import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
+import { authRateLimited, AUTH_LIMITS, primeiroRastroDoTeto } from "@/lib/auth/rate-limit";
 import { env } from "@/lib/env";
 
 export type SignUpResult =
@@ -121,16 +121,21 @@ export async function signUp(
     // Sem `com_convite`: este teto roda ANTES de o token ser verificado, e o
     // campo não é conhecível aqui. Preenchê-lo com `false` diria algo falso
     // sobre quem tinha convite na mão.
-    await audit({
-      action: "auth.signup_failed",
-      metadata: {
-        email_hash: hashEmail(parsed.data.email),
-        reason: "rate_limited_ip",
-      },
-      requestId,
-      ip,
-      userAgent,
-    });
+    //
+    // UMA linha por IP e janela (`primeiroRastroDoTeto`): quem bate no teto
+    // insiste, e uma linha por clique fazia da trilha o flood que o teto barra.
+    if (await primeiroRastroDoTeto("signup_ip", ip)) {
+      await audit({
+        action: "auth.signup_failed",
+        metadata: {
+          email_hash: hashEmail(parsed.data.email),
+          reason: "rate_limited_ip",
+        },
+        requestId,
+        ip,
+        userAgent,
+      });
+    }
     return { ok: false, error: "rate_limited" };
   }
 
@@ -276,17 +281,22 @@ export async function signUp(
       //
       // O motivo é fixo, e não `error.message`: o teto vem do provedor de auth
       // e a frase dele muda de versão para versão.
-      await audit({
-        action: "auth.signup_failed",
-        metadata: {
-          email_hash: hashEmail(parsed.data.email),
-          reason: "rate_limited",
-          com_convite: convite !== null,
-        },
-        requestId,
-        ip,
-        userAgent,
-      });
+      //
+      // Uma linha por IP e janela, como o teto de cima (motivo próprio no
+      // contador: um não esconde o outro).
+      if (await primeiroRastroDoTeto("signup_provedor", ip)) {
+        await audit({
+          action: "auth.signup_failed",
+          metadata: {
+            email_hash: hashEmail(parsed.data.email),
+            reason: "rate_limited",
+            com_convite: convite !== null,
+          },
+          requestId,
+          ip,
+          userAgent,
+        });
+      }
       return { ok: false, error: "rate_limited" };
     }
 

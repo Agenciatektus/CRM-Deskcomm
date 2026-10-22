@@ -227,11 +227,17 @@ export const availabilityScheduleSchema = z.object({
 });
 export type AvailabilitySchedule = z.infer<typeof availabilityScheduleSchema>;
 
+/** O máximo de conversas abertas por atendente que a tela e a rota aceitam. */
+export const CAPACIDADE_MAXIMA = 10_000;
+
 /** PATCH parcial de disponibilidade (o atendente muda a sua; manager, de todos). */
 export const availabilityPatchSchema = z
   .object({
     is_available: z.boolean(),
-    capacity: z.number().int().min(1).max(1000),
+    // Teto do produto, não do banco (que só exige > 0). Era 1.000 e a
+    // Delicatto precisou de 5.000 direto no banco; 10.000 cobre a operação
+    // grande sem deixar passar número de digitação errada.
+    capacity: z.number().int().min(1).max(CAPACIDADE_MAXIMA),
     schedule: availabilityScheduleSchema,
   })
   .partial()

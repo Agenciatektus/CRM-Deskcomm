@@ -17606,6 +17606,33 @@ export const DICIONARIO: Traducoes = {
   "não foi:": { es: "no se hizo:" },
   "ignorado por já estar encerrado; use Reabrir.": { es: "ignorado por estar ya cerrado; usa Reabrir." },
   "ignorados por já estarem encerrados; use Reabrir.": { es: "ignorados por estar ya cerrados; usa Reabrir." },
+
+  // ─── "ADICIONAR À CAMPANHA" EM LOTE (barra do Funil, fase 2) ───
+  "Adicionar à campanha…": { es: "Agregar a la campaña…" },
+  "Adicionar à campanha": { es: "Agregar a la campaña" },
+  "Os contatos dos negócios selecionados entram no público de uma campanha em rascunho. Nada é enviado agora: o envio só começa quando a campanha for preparada e iniciada.":
+    { es: "Los contactos de los negocios seleccionados entran en el público de una campaña en borrador. No se envía nada ahora: el envío solo empieza cuando la campaña se prepare e inicie." },
+  "Nenhuma campanha em rascunho. Crie uma em Campanhas e volte aqui.": { es: "No hay campañas en borrador. Crea una en Campañas y vuelve aquí." },
+  "Escolha a campanha": { es: "Elige la campaña" },
+  "Conferindo os contatos…": { es: "Revisando los contactos…" },
+  "Não consegui conferir.": { es: "No pude revisar." },
+  "1 contato entra na campanha.": { es: "1 contacto entra en la campaña." },
+  "contatos entram na campanha.": { es: "contactos entran en la campaña." },
+  "Ficam de fora:": { es: "Quedan fuera:" },
+  "1 contato adicionado à campanha.": { es: "1 contacto agregado a la campaña." },
+  "contatos adicionados à campanha.": { es: "contactos agregados a la campaña." },
+  "Selecione de 1 a 5.000 negócios.": { es: "Selecciona de 1 a 5.000 negocios." },
+  "Esta campanha aborda quem chega na etapa do funil; ela não recebe lista.": { es: "Esta campaña aborda a quien llega a la etapa del embudo; no recibe lista." },
+  "Só uma campanha em rascunho recebe contatos. Volte-a ao rascunho ou escolha outra.": { es: "Solo una campaña en borrador recibe contactos. Vuélvela a borrador o elige otra." },
+  "O público desta campanha está num formato que não reconheço. Abra a campanha e salve o público de novo.":
+    { es: "El público de esta campaña está en un formato que no reconozco. Abre la campaña y guarda el público de nuevo." },
+  "O estado da campanha mudou enquanto os contatos eram adicionados. Recarregue a tela.": { es: "El estado de la campaña cambió mientras se agregaban los contactos. Recarga la pantalla." },
+  "Negócio não encontrado (apagado ou de outro funil)": { es: "Negocio no encontrado (eliminado o de otro embudo)" },
+  "Negócio sem contato": { es: "Negocio sin contacto" },
+  "Mesmo contato em mais de um negócio selecionado": { es: "Mismo contacto en más de un negocio seleccionado" },
+  "Já estava nesta campanha": { es: "Ya estaba en esta campaña" },
+  "Contato indisponível (mesclado ou não é pessoa)": { es: "Contacto no disponible (fusionado o no es persona)" },
+  "A campanha chegou ao limite de 5.000 incluídos": { es: "La campaña llegó al límite de 5.000 incluidos" },
 };
 
 /**

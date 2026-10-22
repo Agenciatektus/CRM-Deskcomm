@@ -130,6 +130,29 @@ export const AUTH_LIMITS = {
 
 export const __LOGIN_IP_DEFAULT_PARA_TESTE = LOGIN_IP_DEFAULT;
 
+/** Janela do rastro de recusa por teto: no máximo uma linha por IP e motivo a cada 10 min. */
+export const JANELA_DO_RASTRO_DE_TETO_SEC = 600;
+
+/**
+ * `true` = esta recusa por teto deve GRAVAR a linha de auditoria (a primeira do
+ * IP, para este motivo, nesta janela); `false` = já há linha na janela.
+ *
+ * A recusa por teto (PR #232) é justamente a que se repete: quem bate nela
+ * clica de novo, e um script bate centenas de vezes. Uma linha por tentativa
+ * transformava a trilha no próprio vetor de flood que o teto barra. A PRIMEIRA
+ * sempre grava — é ela que conta a história ("este IP bateu no teto às 14:02").
+ *
+ * Mesmo contador do resto deste módulo (`checkRateLimit`, janela fixa): na
+ * virada da janela podem sair duas linhas a menos de 10 min uma da outra. Sem
+ * IP identificável não há por onde agrupar, e a linha grava (falha para o lado
+ * de deixar rastro).
+ */
+export async function primeiroRastroDoTeto(motivo: string, ip: string | null): Promise<boolean> {
+  if (ip === null) return true;
+  const r = await checkRateLimit(`auth:rastro_do_teto:${motivo}:ip:${opaque(ip)}`, 1, JANELA_DO_RASTRO_DE_TETO_SEC);
+  return r.allowed;
+}
+
 /**
  * Bloqueio por FALHA, para o login.
  *
