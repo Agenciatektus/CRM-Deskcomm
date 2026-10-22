@@ -17,6 +17,6 @@ import type pg from 'pg';
 let pool: pg.Pool | undefined;
 
 export function getSkillsPool(): pg.Pool {
-  if (!pool) pool = createPool(env.SUPABASE_DB_URL);
+  if (!pool) pool = createPool(env.SUPABASE_DB_URL, undefined, 'app-skills');
   return pool;
 }
