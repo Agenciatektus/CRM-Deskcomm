@@ -15,6 +15,8 @@ import type { NextRequest, NextResponse } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
+import { cabecalhosParaArquivo } from "@/lib/channels/cabecalhos-para-arquivo";
+import { corpoUnicoParaArquivo } from "@/lib/channels/corpo-do-arquivo";
 import { carregarComportamentoDaInstalacao } from "@/lib/instalacao/comportamento-servidor";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -162,14 +164,15 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
   const eventType = roteado.event ?? "unknown";
   const externalId = roteado.payload?.id ?? null;
 
-  const headersJson: Record<string, string> = {};
-  req.headers.forEach((value, key) => {
-    if (key.toLowerCase().startsWith("authorization")) return;
-    if (key.toLowerCase() === "cookie") return;
-    headersJson[key] = value;
-  });
+  // Cabeçalhos pela MESMA régua do arquivo dos canais: só os úteis à
+  // investigação, sem credencial (o WAHA pode mandar `x-api-key`).
+  // Assinatura que não conferiu (aqui: entrega aceita SEM assinatura) leva a
+  // origem junto (P2 do @Cassio_SecRev na #246).
+  const headersJson = cabecalhosParaArquivo(req.headers, { comOrigem: validSignature === false });
   // Estágio 2: o resto do contrato. Conferido ANTES do INSERT para a linha já
-  // nascer com o desfecho — o corpo cru é arquivado nos dois casos. Gravar
+  // nascer com o desfecho — o corpo é arquivado nos dois casos (inteiro no
+  // `payload_parsed`; o texto cru só quando a assinatura não conferiu ou o
+  // objeto não o reproduz, ver `corpo-do-arquivo.ts`). Gravar
   // `received` e corrigir depois abriria uma janela (e um segundo write que pode
   // falhar) em que a recusa fica com a mesma palavra de um evento que deu certo.
   const contrato = conferirContratoWaha(roteado);
@@ -181,8 +184,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     webhook_path_token: token,
     http_method: "POST",
     headers: headersJson,
-    raw_body: rawBody,
-    payload_parsed: roteado as unknown as Record<string, unknown>,
+    // O corpo UMA vez: o reprocessamento relê `payload_parsed`, e o schema
+    // `loose` devolve as mesmas chaves do corpo. `raw_body` só quando o texto
+    // traz algo que o objeto não traz, ou quando a assinatura não conferiu
+    // (ver `corpo-do-arquivo.ts`).
+    ...corpoUnicoParaArquivo(rawBody, roteado as unknown as Record<string, unknown>, {
+      assinaturaValida: validSignature,
+    }),
     signature_header: sigHeader ?? null,
     valid_signature: validSignature,
     event_type: eventType,

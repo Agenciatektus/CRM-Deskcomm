@@ -151,6 +151,13 @@ const schema = z.object({
    */
   WEBHOOK_LOG_ROW_RETENTION_DAYS: diasDeRetencao("WEBHOOK_LOG_ROW_RETENTION_DAYS", 90),
   /**
+   * Quando some a linha de CANAL (`channel_session_id` preenchido) — a maior
+   * parte do volume. Mais curto que o de cima de propósito: nenhum leitor olha
+   * linha de canal depois de D+7 (ver `lib/channels/poda-das-linhas-de-canal.ts`).
+   * Igual ou maior que `WEBHOOK_LOG_ROW_RETENTION_DAYS` = desligado.
+   */
+  WEBHOOK_LOG_CHANNEL_ROW_RETENTION_DAYS: diasDeRetencao("WEBHOOK_LOG_CHANNEL_ROW_RETENTION_DAYS", 30),
+  /**
    * Retenção do HISTÓRICO de leads captados (`webhook_lead_captures`).
    *
    * Horizonte muito mais longo que o do arquivo forense acima, e a diferença é

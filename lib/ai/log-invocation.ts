@@ -5,6 +5,7 @@
  * return without waiting for the audit insert; failures bubble to logger only.
  */
 
+import { custoGravavel } from "@/lib/agent-engine/edge/llm/pricing";
 import { normalizarErro } from "@/lib/agent-engine/edge/llm/run-model-call";
 import type { ProvedorComChave } from "@/lib/ai/pontos/provedores";
 import type { OrigemDaEscolha } from "@/lib/ai/pontos/resolver";
@@ -82,6 +83,7 @@ export function logInvocation(row: LogInvocationInput): void {
         //
         // O mapa de nomes é o mesmo eixo com rótulos diferentes:
         // invocation_kind → purpose, prompt/completion → input/output.
+        const provider = row.provider ?? providerDoModelo(row.model);
         const { error } = await admin.from("llm_calls").insert({
           organization_id: row.organization_id,
           // NORMALIZA AQUI, e não no chamador (issue #160). O tipo já diz
@@ -95,12 +97,14 @@ export function logInvocation(row: LogInvocationInput): void {
           // `provider` não existia no shape antigo; deriva-se do id do modelo, e
           // vira 'desconhecido' quando não dá para saber — chute viraria
           // estatística, e estatística errada é pior que lacuna declarada.
-          provider: row.provider ?? providerDoModelo(row.model),
+          provider,
           model: row.model,
           origem_da_escolha: row.origem_da_escolha ?? null,
           input_tokens: row.prompt_tokens,
           output_tokens: row.completion_tokens,
-          cost_cents: row.cost_cents,
+          // Assinatura não cobra por token: 0 aqui, seja qual for o preço que
+          // o chamador calculou pelo id do modelo (`custoGravavel`).
+          cost_cents: custoGravavel(provider, row.cost_cents),
           latency_ms: row.latency_ms,
           status: row.error_payload ? "erro" : "ok",
           // MESMA RÉGUA do motor (`normalizarErro`), e não um rótulo de balde.

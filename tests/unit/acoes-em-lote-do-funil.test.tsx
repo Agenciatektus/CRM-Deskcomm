@@ -289,7 +289,9 @@ describe("tarefa em lote (o mesmo POST /tasks do painel)", () => {
   });
 
   it("⭐ recusada (outra ação do lote nos 5 s), avisa e não fecha calada", async () => {
-    // Outra ação do lote já segura a chave deste funil (ex.: outra aba do quadro).
+    // Outra ação do lote já segura a chave deste funil NESTA aba (ex.: um ganho
+    // em lote nos 5 s). A trava é estado do módulo, em memória: outra aba do
+    // navegador tem a sua e NÃO a enxerga.
     chaves.add("lote-do-funil:p-1");
     const onClear = montar(["a"], [lead("a")]);
     // A barra está travada; o diálogo é aberto direto para medir a recusa.
@@ -348,6 +350,28 @@ describe("remover etiqueta e reabrir (pela rota em lote, com Desfazer)", () => {
     await soltarOAviso();
     await waitFor(() => expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled());
     expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("⭐ a trava cobre também a EXECUÇÃO da rota em lote, depois que o aviso acaba", async () => {
+    // A rota em lote não passa por `useAcaoPorNegocio`: antes, a chave soltava
+    // no fim dos 5 s e a barra ficava livre com os blocos ainda saindo.
+    let responder: () => void = () => undefined;
+    mutate.mockImplementationOnce((input: { lead_ids: string[] }, o: { onSuccess: (r: unknown) => void }) => {
+      responder = () => o.onSuccess({ data: { updated_count: input.lead_ids.length } });
+    });
+    montar(["a"], [lead("a", { tags: ["vip"] })]);
+    await userEvent.click(screen.getByRole("button", { name: "Tag…" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "vip" }));
+    const rodando = soltarOAviso();
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+    // A chave já soltou (o aviso acabou), e a barra continua travada.
+    expect(chaves.has("lote-do-funil:p-1")).toBe(false);
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mais ações…" })).toBeDisabled();
+    responder();
+    await rodando;
+    // Controle negativo: terminou a execução, a barra solta.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Excluir" })).toBeEnabled());
   });
 
   it("reabrir move SÓ os encerrados para a etapa aberta escolhida", async () => {

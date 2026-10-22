@@ -8,7 +8,7 @@ export function routingPgSupabase(pool: pg.Pool) {
     if (!/^[a-z_][a-z0-9_]*$/.test(s)) throw Error(`identificador de teste inválido: ${s}`);
     return `"${s}"`;
   };
-  type Result = { data: unknown; error: unknown };
+  type Result = { data: unknown; error: unknown; count?: number | null };
   class Query implements PromiseLike<Result> {
     mode = "select";
     data: Record<string, unknown> = {};
@@ -16,10 +16,16 @@ export function routingPgSupabase(pool: pg.Pool) {
     one = false;
     limitN: number | undefined;
     cols = "*";
+    // `select(cols, { count: "exact", head: true })`: o código conta no banco
+    // (carga do atendente) e o simulador precisa devolver `count` como o PostgREST.
+    contar = false;
+    soCabecalho = false;
     ordering: string[] = [];
     constructor(readonly table: string) {}
-    select(cols = "*") {
+    select(cols = "*", opts?: { count?: string; head?: boolean }) {
       this.cols = cols;
+      this.contar = opts?.count === "exact";
+      this.soCabecalho = opts?.head === true;
       return this;
     }
     insert(data: Record<string, unknown>) {
@@ -111,6 +117,11 @@ export function routingPgSupabase(pool: pg.Pool) {
               .join(" and ")
           : "";
         const table = identifier(this.table);
+        if (this.mode === "select" && this.contar) {
+          const contagem = await pool.query(`select count(*)::int c from ${table}${where}`, values);
+          const count = contagem.rows[0]?.c ?? 0;
+          if (this.soCabecalho) return { data: null, error: null, count };
+        }
         let sql: string;
         if (this.mode === "select")
           sql = `select * from ${table}${where}${this.ordering.length ? ` order by ${this.ordering.join(",")}` : ""}${this.limitN === undefined ? "" : ` limit ${this.limitN}`}`;

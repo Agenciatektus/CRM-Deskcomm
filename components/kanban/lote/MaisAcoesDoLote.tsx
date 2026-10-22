@@ -18,6 +18,7 @@ import { linhasDoCsv } from "@/lib/kanban/linhas-do-csv";
 import type { Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
 
+import { AdicionarACampanhaEmLote } from "./AdicionarACampanhaEmLote";
 import { GanhoEmLote } from "./GanhoEmLote";
 import { LevarParaOutroFunilEmLote } from "./LevarParaOutroFunilEmLote";
 import { TarefaEmLote } from "./TarefaEmLote";
@@ -36,6 +37,7 @@ export function MaisAcoesDoLote({
   ownerNames,
   usuarioId,
   ocupado,
+  podeCampanha,
   onReabrir,
   onClear,
   onRestaurar,
@@ -49,6 +51,11 @@ export function MaisAcoesDoLote({
   ownerNames: Map<string, string | null>;
   usuarioId: string;
   ocupado: boolean;
+  /**
+   * "Adicionar à campanha" é ≥manager NA ROTA (como toda rota de campanha):
+   * sem o papel, o item não aparece, em vez de dar 403 depois do clique.
+   */
+  podeCampanha: boolean;
   /** Reabrir = mover os encerrados para uma etapa aberta, como o individual. */
   onReabrir: (ids: string[], stageId: string) => void;
   onClear: () => void;
@@ -56,7 +63,7 @@ export function MaisAcoesDoLote({
   onRestaurar: (ids: string[]) => void;
 }) {
   const t = useT();
-  const [dialogo, setDialogo] = useState<"funil" | "tarefa" | "ganho" | null>(null);
+  const [dialogo, setDialogo] = useState<"funil" | "tarefa" | "ganho" | "campanha" | null>(null);
   const porId = new Map(leads.map((l) => [l.id, l]));
   const encerrados = selectedIds.filter((id) => {
     const s = porId.get(id)?.status;
@@ -107,6 +114,9 @@ export function MaisAcoesDoLote({
           {temGanho && abertos.length > 0 && (
             <DropdownMenuItem onClick={() => setDialogo("ganho")}>{t("Marcar como ganho…")}</DropdownMenuItem>
           )}
+          {podeCampanha && (
+            <DropdownMenuItem onClick={() => setDialogo("campanha")}>{t("Adicionar à campanha…")}</DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={exportar}>{t("Exportar CSV")}</DropdownMenuItem>
         </DropdownMenuContent>
@@ -136,6 +146,9 @@ export function MaisAcoesDoLote({
           onConcluido={onClear}
           onDesfeito={restaurar}
         />
+      )}
+      {dialogo === "campanha" && (
+        <AdicionarACampanhaEmLote open onOpenChange={fechar} selectedIds={selectedIds} onConcluido={onClear} />
       )}
       {dialogo === "ganho" && (
         <GanhoEmLote

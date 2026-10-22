@@ -56,8 +56,24 @@ export function agendarNoLote(
 ): boolean {
   const chave = chaveDoLote(pipelineId);
   if (acaoPendente(chave) || rodando > 0) return false;
-  adiarAcao(mensagem, rotuloDoDesfazer, executar, aoDesfazer, { chave });
+  // A chave solta no FIM dos 5 s, antes de `executar` rodar. Sem o contador
+  // aqui, a rota em lote (`emBlocos`, que não passa por `useAcaoPorNegocio`)
+  // deixava a barra livre enquanto os blocos ainda saíam: dava para agendar
+  // outra ação por cima da que estava rodando.
+  adiarAcao(mensagem, rotuloDoDesfazer, () => rodandoNoLote(executar), aoDesfazer, { chave });
   return true;
+}
+
+/** Conta `executar` em `rodando` (a mesma trava das ações negócio a negócio) até ele acabar. */
+async function rodandoNoLote<T>(executar: () => Promise<T>): Promise<T> {
+  rodando += 1;
+  avisar();
+  try {
+    return await executar();
+  } finally {
+    rodando -= 1;
+    avisar();
+  }
 }
 
 /**

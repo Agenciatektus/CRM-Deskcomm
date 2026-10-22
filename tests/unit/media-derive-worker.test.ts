@@ -9,7 +9,11 @@ const messageRow = {
   media_mime: "audio/ogg",
   media_storage_path: "org1/conv1/msg1.ogg" as string | null,
   media_derived_status: null as string | null,
+  direction: "inbound" as string | null,
 };
+
+/** `organizations.settings` da org: `undefined` = nada gravado (leitura de mídia LIGADA, o padrão). */
+let settingsDaOrg: unknown = undefined;
 
 /**
  * O dublê PRECISA saber em que tabela está.
@@ -49,7 +53,9 @@ vi.mock("@/lib/supabase/admin", () => ({
             ? avisoAbertoNaCentral
             : tabela === "ai_agent_versions"
               ? agenteComVideo
-              : messageRow;
+              : tabela === "organizations"
+                ? { settings: settingsDaOrg }
+                : messageRow;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const terminais: any = {
         maybeSingle: async () => ({ data: linha, error: null }),
@@ -155,6 +161,8 @@ describe("deriveMessageMedia", () => {
     agenteComVideo = { id: "v1" };
     bindingDeVisao = null;
     messageRow.media_mime = "audio/ogg";
+    messageRow.direction = "inbound";
+    settingsDaOrg = undefined;
     vi.mocked(resolveOrgLlmConfig).mockReset().mockResolvedValue(configResolvida());
     vi.mocked(deriveMediaText).mockReset().mockResolvedValue("transcrição do áudio real");
   });
@@ -195,6 +203,42 @@ describe("deriveMessageMedia", () => {
     expect(updateEqMock).toHaveBeenCalledWith(
       expect.objectContaining({ media_derived_text: "transcrição do áudio real", media_derived_status: "ready" }),
     );
+  });
+
+  describe("leitura de mídia por empresa e mídia enviada pela empresa", () => {
+    it("controle: entrada do cliente com a chave LIGADA gravada deriva", async () => {
+      settingsDaOrg = { midia: { leitura_pela_ia: true } };
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.status).toBe("ok");
+      expect(deriveMediaText).toHaveBeenCalledTimes(1);
+    });
+
+    it("empresa DESLIGOU: pula com motivo próprio, sem baixar, sem IA e sem aviso na Central", async () => {
+      settingsDaOrg = { branding: {}, midia: { leitura_pela_ia: false } };
+      const r = await deriveMessageMedia(eventRow());
+      expect(r).toEqual(expect.objectContaining({ status: "skipped", detail: "leitura_de_midia_desligada" }));
+      expect(downloadMock).not.toHaveBeenCalled();
+      expect(resolveOrgLlmConfig).not.toHaveBeenCalled();
+      expect(deriveMediaText).not.toHaveBeenCalled();
+      expect(inboxInsertMock).not.toHaveBeenCalled();
+      expect(updateEqMock).toHaveBeenCalledWith({ media_derived_status: "skipped" });
+    });
+
+    it("mídia ENVIADA pela empresa (outbound) não é derivada, mesmo com a chave ligada", async () => {
+      messageRow.direction = "outbound";
+      const r = await deriveMessageMedia(eventRow());
+      expect(r).toEqual(expect.objectContaining({ status: "skipped", detail: "midia_enviada_pela_empresa" }));
+      expect(downloadMock).not.toHaveBeenCalled();
+      expect(deriveMediaText).not.toHaveBeenCalled();
+      expect(inboxInsertMock).not.toHaveBeenCalled();
+    });
+
+    it("valor ilegível na chave segue LIGADA (só um false gravado desliga)", async () => {
+      settingsDaOrg = { midia: { leitura_pela_ia: "false" } };
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.status).toBe("ok");
+      expect(deriveMediaText).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("pula se já derivado (idempotência)", async () => {

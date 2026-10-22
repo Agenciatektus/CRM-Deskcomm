@@ -56,7 +56,7 @@ import {
   SQL_ORCAMENTO,
   type ChaveDeOrcamento,
 } from './orcamento';
-import { costCents } from './pricing';
+import { costCents, provedorSemCustoPorToken } from './pricing';
 import { custoDoModeloForaDoMotor } from './pricing-do-catalogo';
 import { chaveDeOrcamentoDaInstalacao } from '../../../instalacao/comportamento';
 import { cobrancaLigadaComMemo } from '../../../instalacao/modulos';
@@ -1165,7 +1165,11 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
   // nunca calado, e nunca um 0 inventado. O caminho dos modelos que já têm linha
   // na tabela estática não muda uma vírgula: `costCents` segue sendo chamado
   // primeiro, e só o `null` dele chega aqui.
-  let cost = costCents(model, usage, cfg.cacheTtl ?? '1h');
+  //
+  // Provedor de ASSINATURA (`openai-assinatura`) não cobra por token: grava 0,
+  // com os tokens, e nem consulta preço — o id do modelo é o mesmo da API paga
+  // e casaria o preço dela (`provedorSemCustoPorToken`, em `pricing.ts`).
+  let cost = provedorSemCustoPorToken(config.provider) ? 0 : costCents(model, usage, cfg.cacheTtl ?? '1h');
   let origemDoCusto: 'catalogo_da_instalacao' | undefined;
   if (cost === null) {
     cost = await custoDoModeloForaDoMotor(db, {
