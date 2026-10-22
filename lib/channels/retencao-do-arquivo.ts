@@ -277,11 +277,17 @@ export async function podarArquivoDeWebhooks(
   }
 
   let apagadas = (apagadasRows ?? []).length;
+  // Cada passo guarda SE ele veio com o lote cheio, porque `temMais` é a soma
+  // dos três e não só da busca do passo 1 (ver o comentário do `return`).
+  const loteCheioNoPasso2 = apagadas >= lote;
+  let loteCheioNoCanal = false;
 
   // ── 3. Linha de canal: horizonte próprio, mais curto ──────────────────────
   if (opcoes.diasParaApagarCanal !== undefined && opcoes.diasParaApagarCanal < opcoes.diasParaApagar) {
     try {
-      apagadas += await apagarLinhasDeCanalVencidas(admin, { dias: opcoes.diasParaApagarCanal, lote });
+      const apagadasDeCanal = await apagarLinhasDeCanalVencidas(admin, { dias: opcoes.diasParaApagarCanal, lote });
+      apagadas += apagadasDeCanal;
+      loteCheioNoCanal = apagadasDeCanal >= lote;
     } catch (err) {
       throw new ErroAoApagarLinhasVelhas(err instanceof Error ? err.message : String(err), {
         esvaziadas,
@@ -297,6 +303,15 @@ export async function podarArquivoDeWebhooks(
     // Lote cheio = ainda há fila. Quem chama pode usar isto para saber que a
     // poda ainda não alcançou o estado estável — útil no primeiro dia, quando
     // há 31 mil linhas atrasadas e a varredura leva várias rodadas.
-    temMais: linhas.length >= lote,
+    //
+    // OS TRÊS PASSOS CONTAM, não só a busca do passo 1. Olhar só `linhas`
+    // funcionava enquanto a poda de canal não tinha o que apagar, e vira
+    // mentira no dia em que ela acorda: a linha de canal é esvaziada em D+7,
+    // e o passo 1 busca `archived_at is null`, então ela NÃO aparece em
+    // `linhas`. Com a fila de canal cheia, o cron responderia
+    // `{ apagadas: 500, temMais: false }` — apaguei um lote inteiro e não tem
+    // mais nada, na mesma linha, rodada após rodada, até a fila esvaziar. A
+    // irmã (`lib/webhooks/retencao-da-captacao.ts`) já conta pelo que APAGOU.
+    temMais: linhas.length >= lote || loteCheioNoPasso2 || loteCheioNoCanal,
   };
 }

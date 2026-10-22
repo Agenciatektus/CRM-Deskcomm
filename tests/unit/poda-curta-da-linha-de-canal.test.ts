@@ -18,6 +18,7 @@ interface Cadeia {
   menorQue: Array<[string, string]>;
   ordem?: string;
   lote?: number;
+  projecao?: string;
 }
 
 function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
@@ -26,7 +27,7 @@ function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
     from() {
       const c: Cadeia = { op: "", nao: [], menorQue: [] };
       const q: Record<string, unknown> = {
-        select() { if (!c.op) c.op = "select"; return q; },
+        select(cols?: string) { if (!c.op) c.op = "select"; if (cols) c.projecao = cols; return q; },
         is() { return q; },
         not(col: string, op: string, v: unknown) { c.nao.push([col, op, v]); return q; },
         lt(col: string, v: string) { c.menorQue.push([col, v]); return q; },
@@ -37,6 +38,21 @@ function fakeAdmin(opts: { apagaCanal?: number; erroCanal?: string } = {}) {
         limit(n: number) {
           c.lote = n;
           cadeias.push(c);
+          // O DUBLÊ RECUSA O QUE O POSTGREST RECUSA. Num DELETE com retorno, o
+          // PostgREST ordena pela REPRESENTAÇÃO: ordenar por coluna fora do
+          // `select` devolve `column <tabela>.<col> does not exist`, com a
+          // coluna existindo no banco. O dublê antigo aceitava qualquer
+          // `order`, então o defeito passou verde aqui e só apareceu em
+          // produção, no cron, 5 minutos depois da release #259.
+          if (c.op === "delete" && c.ordem) {
+            const projetadas = (c.projecao ?? "").split(",").map((x) => x.trim());
+            if (!projetadas.includes(c.ordem)) {
+              return Promise.resolve({
+                data: null,
+                error: { message: `column webhook_events_log.${c.ordem} does not exist` },
+              });
+            }
+          }
           const canal = c.nao.some(([col]) => col === "channel_session_id");
           if (canal && opts.erroCanal) return Promise.resolve({ data: null, error: { message: opts.erroCanal } });
           if (canal) return Promise.resolve({ data: Array.from({ length: opts.apagaCanal ?? 0 }, (_, i) => ({ id: `c${i}` })), error: null });
@@ -63,6 +79,9 @@ describe("apagarLinhasDeCanalVencidas", () => {
     expect(c?.menorQue).toEqual([["received_at", "2026-09-21T12:00:00.000Z"]]);
     // A ordem é a do índice parcial da 9064, e o `order` existe (PGRST109).
     expect(c?.ordem).toBe("received_at");
+    // E a coluna ordenada ESTÁ na projeção: é isso que o PostgREST exige num
+    // DELETE com retorno, e é o que faltava na #259.
+    expect(c?.projecao?.split(",").map((x) => x.trim())).toContain("received_at");
     expect(c?.lote).toBe(500);
   });
 
@@ -96,6 +115,39 @@ describe("podarArquivoDeWebhooks com o horizonte de canal", () => {
     });
     expect(r.apagadas).toBe(4);
     expect(deleteDeCanal(cadeias)[0]?.lote).toBe(50);
+  });
+
+  it("⭐ fila de canal cheia com a busca do passo 1 VAZIA: `temMais` é true", async () => {
+    // O cenário real de ~29/10, quando a poda de canal acorda: a linha de canal
+    // foi esvaziada em D+7, o passo 1 busca `archived_at is null`, então ela
+    // NÃO entra em `linhas` — e o passo 3 devolve lote cheio rodada após
+    // rodada. Com `temMais` olhando só `linhas`, o cron responderia
+    // `{ apagadas: 50, temMais: false }`: apaguei um lote inteiro e não tem
+    // mais nada, na mesma linha. É o instrumento que devolve verde sem medir.
+    const { admin } = fakeAdmin({ apagaCanal: 50 });
+    const r = await podarArquivoDeWebhooks(admin, {
+      diasComCorpo: 7,
+      diasParaApagar: 90,
+      diasParaApagarCanal: 30,
+      lote: 50,
+    });
+    expect(r.apagadas).toBe(50);
+    expect(r.temMais).toBe(true);
+  });
+
+  it("fila de canal PARCIAL com a busca vazia: `temMais` é false (não grudou em true)", async () => {
+    // Controle do caso acima: sem isto, trocar o sinal por um `true` fixo
+    // passaria. Lote de 50 com 7 apagadas é regime estável, e a resposta certa
+    // é "acabou".
+    const { admin } = fakeAdmin({ apagaCanal: 7 });
+    const r = await podarArquivoDeWebhooks(admin, {
+      diasComCorpo: 7,
+      diasParaApagar: 90,
+      diasParaApagarCanal: 30,
+      lote: 50,
+    });
+    expect(r.apagadas).toBe(7);
+    expect(r.temMais).toBe(false);
   });
 
   it("falha no DELETE de canal sobe como ErroAoApagarLinhasVelhas, com o parcial", async () => {
