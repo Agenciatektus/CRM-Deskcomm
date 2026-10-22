@@ -117,6 +117,39 @@ describe("podarArquivoDeWebhooks com o horizonte de canal", () => {
     expect(deleteDeCanal(cadeias)[0]?.lote).toBe(50);
   });
 
+  it("⭐ fila de canal cheia com a busca do passo 1 VAZIA: `temMais` é true", async () => {
+    // O cenário real de ~29/10, quando a poda de canal acorda: a linha de canal
+    // foi esvaziada em D+7, o passo 1 busca `archived_at is null`, então ela
+    // NÃO entra em `linhas` — e o passo 3 devolve lote cheio rodada após
+    // rodada. Com `temMais` olhando só `linhas`, o cron responderia
+    // `{ apagadas: 50, temMais: false }`: apaguei um lote inteiro e não tem
+    // mais nada, na mesma linha. É o instrumento que devolve verde sem medir.
+    const { admin } = fakeAdmin({ apagaCanal: 50 });
+    const r = await podarArquivoDeWebhooks(admin, {
+      diasComCorpo: 7,
+      diasParaApagar: 90,
+      diasParaApagarCanal: 30,
+      lote: 50,
+    });
+    expect(r.apagadas).toBe(50);
+    expect(r.temMais).toBe(true);
+  });
+
+  it("fila de canal PARCIAL com a busca vazia: `temMais` é false (não grudou em true)", async () => {
+    // Controle do caso acima: sem isto, trocar o sinal por um `true` fixo
+    // passaria. Lote de 50 com 7 apagadas é regime estável, e a resposta certa
+    // é "acabou".
+    const { admin } = fakeAdmin({ apagaCanal: 7 });
+    const r = await podarArquivoDeWebhooks(admin, {
+      diasComCorpo: 7,
+      diasParaApagar: 90,
+      diasParaApagarCanal: 30,
+      lote: 50,
+    });
+    expect(r.apagadas).toBe(7);
+    expect(r.temMais).toBe(false);
+  });
+
   it("falha no DELETE de canal sobe como ErroAoApagarLinhasVelhas, com o parcial", async () => {
     const { admin } = fakeAdmin({ erroCanal: "boom" });
     const erro = await podarArquivoDeWebhooks(admin, {
