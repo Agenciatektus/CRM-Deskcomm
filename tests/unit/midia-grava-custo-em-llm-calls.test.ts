@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ModuloDaImagemParaIa from "@/lib/messaging/media/imagem-para-ia";
 
 import type * as ModuloDoSeam from "@/lib/agent-engine/edge/llm/run-model-call";
 import type * as ModuloDeTranscricao from "@/lib/messaging/media/transcription";
@@ -27,6 +28,17 @@ const servico = vi.hoisted(() => ({ custo: undefined as number | null | undefine
 const transcribeComCustoMock = vi.fn(async () => ({ texto: "transcrição de mentira", costCents: servico.custo ?? null }));
 
 const dns = vi.hoisted(() => ({ resposta: [] as Array<{ address: string; family: number }> }));
+const reducao = vi.hoisted(() => ({ falha: false, saida: null as Buffer | null }));
+// A redução da foto (`imagem-para-ia.ts`) tem teste próprio; aqui o buffer é
+// de mentira e só importa o que acontece depois dela.
+vi.mock("@/lib/messaging/media/imagem-para-ia", async (importOriginal) => ({
+  ...(await importOriginal<typeof ModuloDaImagemParaIa>()),
+  // `falha` = o sharp não reduziu (binário ausente, arquivo que não decodifica).
+  // `saida` = o que a redução devolve; null = o próprio buffer (pass-through).
+  reduzirImagemParaIa: async (b: Buffer) =>
+    reducao.falha ? null : { buffer: reducao.saida ?? b, mime: "image/jpeg" as const },
+}));
+
 vi.mock("node:dns/promises", () => {
   const lookup = vi.fn(async () => dns.resposta);
   return { lookup, default: { lookup } };
@@ -183,6 +195,9 @@ import { PONTO_TRANSCRICAO_DE_AUDIO, PONTO_VISAO_DE_IMAGEM } from "@/lib/ai/pont
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
 import { MARCADOR_NAO_LIDA } from "@/lib/messaging/media/derivable";
 import type { Env } from "@/lib/env";
+import { generateText } from "ai";
+import { MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM } from "@/lib/messaging/media/imagem-para-ia";
+import { MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO } from "@/lib/messaging/media/escada-de-transcricao";
 
 function eventRow(org = "org1") {
   return {
@@ -219,6 +234,8 @@ beforeEach(() => {
   teto.barrar = false;
   teto.real = true;
   credencial.origemDaOpenai = null;
+  reducao.falha = false;
+  reducao.saida = null;
   bindingDaVez = BINDING;
   transcricaoDoEnv.apiKey = "";
   transcricaoDoEnv.baseUrl = "";
@@ -557,6 +574,59 @@ describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", ()
     expect(linha.provider).toBe("openai");
     // gpt-6-luna: 0,10 USD/MTok de entrada, 0,50 de saída
     expect(linha.cost_cents).toBeCloseTo(((1200 * 0.1 + 40 * 0.5) / 1_000_000) * 100, 10);
+  });
+});
+
+describe("custo de mídia: teto de saída e foto reduzida antes de sair", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pedidoAoModelo = () => vi.mocked(generateText).mock.calls[0]![0] as any;
+
+  it("⭐ a visão sai com teto de saída e com a foto REDUZIDA, não com o original", async () => {
+    reducao.saida = Buffer.from("foto-reduzida");
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().describeImage(Buffer.from("foto-original-gigante"), "image/png");
+
+    expect(MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM).toBe(300);
+    const pedido = pedidoAoModelo();
+    expect(pedido.maxOutputTokens).toBe(MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM);
+    const arquivo = pedido.messages[0].content.find((c: { type: string }) => c.type === "file");
+    expect(String(arquivo.data)).toBe("foto-reduzida");
+    expect(arquivo.mediaType).toBe("image/jpeg");
+    // Controle negativo: o original não está em parte nenhuma do pedido.
+    expect(JSON.stringify(pedido.messages)).not.toContain("foto-original-gigante");
+  });
+
+  it("⭐ redução que falha: a foto NÃO sai, vira não lida e não grava custo", async () => {
+    reducao.falha = true;
+    await deriveMessageMedia(eventRow());
+    const texto = await depsDaChamada().describeImage(Buffer.from("foto-original-gigante"), "image/jpeg");
+
+    expect(texto).toBe(MARCADOR_NAO_LIDA);
+    expect(generateText).not.toHaveBeenCalled();
+    expect(llmCallsInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("controle: com a redução funcionando, a mesma foto sai", async () => {
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().describeImage(Buffer.from("jpeg"), "image/jpeg");
+    expect(generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("⭐ degrau 3 da transcrição sai com teto de saída proporcional a 10 min de fala", async () => {
+    comAudio();
+    credencial.conversaGoogle = "gemini-2.5-flash";
+    bindingDaVez = null;
+    await deriveMessageMedia(eventRow());
+    await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
+
+    expect(transcribeDoSvcMock).not.toHaveBeenCalled();
+    expect(MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO).toBe(2_500);
+    expect(pedidoAoModelo().maxOutputTokens).toBe(MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO);
+  });
+
+  it("controle negativo: o teto de saída da transcrição é maior que o da descrição de imagem", () => {
+    // Se alguém trocar uma constante pela outra, 10 min de fala virariam 300 tokens cortados.
+    expect(MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO).toBeGreaterThan(MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM);
   });
 });
 

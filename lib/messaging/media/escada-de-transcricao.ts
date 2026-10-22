@@ -146,6 +146,15 @@ function promptDeTranscricao(languages: readonly string[]): string {
   return `Transcreva o áudio anexado. Devolva somente o que foi falado, sem comentários, sem rótulos e sem aspas.${idioma}`;
 }
 
+/**
+ * Teto de SAÍDA da transcrição pelo modelo de conversa (degrau 3). A trava de
+ * duração (`trava-da-transcricao.ts`) só deixa sair áudio de até 10 min; 10 min
+ * de fala são ~1.500 palavras, ~2.000-2.300 tokens em português. 2.500 cobre o
+ * áudio legítimo mais longo e impede que um modelo que desande (repetição,
+ * resposta em vez de transcrição) cobre milhares de tokens a mais.
+ */
+export const MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO = 2_500;
+
 export function transcricaoPeloModelo(modelo: {
   provider: string;
   modelId: string;
@@ -165,6 +174,7 @@ export function transcricaoPeloModelo(modelo: {
     }
     const res = await generateText({
       model: factory(modelo.apiKey, modelo.modelId, modelo.baseUrl ?? undefined),
+      maxOutputTokens: MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO,
       messages: [
         {
           role: "user",

@@ -39,6 +39,11 @@ import {
 } from "@/lib/messaging/media/escada-de-transcricao";
 import type { TranscriptionProvider } from "@/lib/messaging/media/transcription";
 import { travaDaTranscricao } from "@/lib/messaging/media/trava-da-transcricao";
+import {
+  MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
+  MOTIVO_IMAGEM_NAO_REDUZIDA,
+  reduzirImagemParaIa,
+} from "@/lib/messaging/media/imagem-para-ia";
 import { logger } from "@/lib/logger";
 import { validarParProvedorModelo } from "@/lib/ai/par-provedor-modelo";
 import { reagirAConclusaoDeDerivacao } from "@/lib/escalacao/handoff-tecnico";
@@ -701,7 +706,7 @@ function buildDeriveDeps(
       return true;
     }
   };
-  const describeImage: DeriveDeps["describeImage"] = async (buffer, mime) => {
+  const describeImage: DeriveDeps["describeImage"] = async (buffer, _mime) => {
     // ⚠️ A resposta é resolvida AQUI, não na montagem das deps, porque num
     // roteador ela depende do catálogo e a consulta é assíncrona. Antes disto
     // a pergunta ia direto ao registro, que num roteador responde pelo prefixo
@@ -816,18 +821,26 @@ function buildDeriveDeps(
     ) {
       return MARCADOR_NAO_LIDA;
     }
+    // ─── A foto que sai é a REDUZIDA, nunca o original (`imagem-para-ia.ts`) ─
+    // Sem redução, não sai: mandar o arquivo cheio é o gasto que se quer evitar.
+    const reduzida = await reduzirImagemParaIa(buffer);
+    if (!reduzida) {
+      await avisarMidiaNaoLida(orgId, "imagem", MOTIVO_IMAGEM_NAO_REDUZIDA);
+      return MARCADOR_NAO_LIDA;
+    }
     const inicio = Date.now();
     let res: Awaited<ReturnType<typeof generateText>>;
     try {
       res = await generateText({
         model: factory(llm.apiKey, modelo, baseUrlDaVisao ?? undefined),
+        maxOutputTokens: MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM,
         messages: [
           {
             role: "user",
             content: [
               { type: "text", text: "Descreva objetivamente esta imagem em 1-2 frases, em português, para um atendente de vendas entender o que o cliente enviou." },
               // AI SDK v7: file part com mediaType (o antigo image part é deprecated).
-              { type: "file", data: buffer, mediaType: mime.split(";")[0]! },
+              { type: "file", data: reduzida.buffer, mediaType: reduzida.mime },
             ],
           },
         ],
