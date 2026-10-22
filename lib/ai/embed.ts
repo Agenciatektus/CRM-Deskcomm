@@ -204,11 +204,14 @@ export async function embedTexts(
   contents: string[],
   opts: EmbedOptions,
 ): Promise<EmbedManyResult> {
-  if (contents.length === 0) {
-    return { embeddings: [], promptTokens: 0, model: "" };
-  }
-
+  // A lista vazia sai sem chamar o provedor, mas DEPOIS de preparar: num
+  // arquivo cujo contrato é recusar em vez de seguir no escuro, o atalho não
+  // pode ser a única porta que passa sem conferir chave e par provedor×modelo.
   const { modelId, resolvido, headers, extrasDoProvedor } = await prepararEmbedding(opts);
+
+  if (contents.length === 0) {
+    return { embeddings: [], promptTokens: 0, model: modelId };
+  }
 
   const result = await embedMany({
     model: resolvido,

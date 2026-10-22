@@ -254,11 +254,23 @@ describe("embedTexts", () => {
     expect(r.promptTokens).toBe(21);
   });
 
-  it("lista vazia não chama o provedor", async () => {
+  it("lista vazia não chama o provedor, mas confere a chave e devolve o modelo", async () => {
     const r = await embedTexts([], { organizationId: "org-1" });
 
     expect(embedManySpy).not.toHaveBeenCalled();
-    expect(r).toEqual({ embeddings: [], promptTokens: 0, model: "" });
+    expect(r).toEqual({
+      embeddings: [],
+      promptTokens: 0,
+      model: "openai/text-embedding-3-small",
+    });
+  });
+
+  it("lista vazia com organização SEM chave ainda recusa", async () => {
+    chaveMock = () => null;
+
+    await expect(embedTexts([], { organizationId: "org-1" })).rejects.toBeInstanceOf(
+      SemChaveDeEmbeddingError,
+    );
   });
 
   // Estas duas são o motivo de a função existir em vez de um laço: em lote, um

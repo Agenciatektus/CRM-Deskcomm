@@ -267,15 +267,21 @@ async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
  * mesma fonte, com o embedding pago em dobro e corrida na ativação da versão.
  *
  * A primeira versão deste teto declarava 2 mil produtos e NÃO os entregava: os
- * embeddings saíam um a um, e pela própria conta do comentário (200-400 ms por
- * pedaço, um ou dois pedaços por produto) 2 mil produtos consumiam de 6 a 26
- * minutos contra uma janela de 10. O limite verdadeiro era da ordem de 600.
+ * embeddings saíam um a um, a 200-400 ms por pedaço, e cada produto rende um ou
+ * dois pedaços. Dá de 6,7 min (2000 × 1 × 0,2 s) a 26,7 min (2000 × 2 × 0,4 s)
+ * contra uma janela de 10. No pior caso a janela só comportava ~750 produtos, e
+ * menos que isso contando a ida ao banco por trecho, que o laço antigo também
+ * fazia uma a uma.
  *
  * Agora os embeddings vão em lote (`TRECHOS_POR_LOTE`), que é o que faz 2 mil
- * produtos caberem de fato. O teto segue em 10 páginas porque a janela não
- * mudou, e o que passar disso FALHA com a conta na mensagem, em vez de virar
- * catálogo pela metade publicado como completo. Loja maior precisa de carga com
- * cursor entre execuções, que é trabalho próprio e está registrado como tal.
+ * produtos caberem de fato: ~40 chamadas de 100 textos, da ordem de segundos
+ * cada (o 200-400 ms era o custo de UM texto), mais ~40 idas ao banco. Sobra
+ * folga larga nos 10 minutos.
+ *
+ * O teto segue em 10 páginas porque a janela não mudou, e o que passar disso
+ * FALHA com a conta na mensagem, em vez de virar catálogo pela metade publicado
+ * como completo. Loja maior precisa de carga com cursor entre execuções, que é
+ * trabalho próprio e está registrado como tal.
  */
 /** 10 páginas de 200 = 2 mil produtos. Ver o porquê do teto acima. */
 const TETO_DE_PAGINAS = 10;
@@ -285,10 +291,14 @@ const TETO_DE_PAGINAS = 10;
  *
  * É o que faz o teto de 2 mil produtos ser verdadeiro em vez de declarado: o
  * `embedMany` do AI SDK divide a lista conforme o limite do provedor e
- * paraleliza as partes, então o lote de 100 troca ~4 mil chamadas HTTP em
- * série por ~40 — e a mesma conta de 200-400 ms por chamada passa a caber na
- * janela de 10 minutos do reaper, que era justamente o limite que o teto
+ * paraleliza as partes, então o lote de 100 troca ~4 mil chamadas HTTP em série
+ * por ~40, e isso cabe na janela de 10 minutos do reaper — o limite que o teto
  * pequeno existia para respeitar.
+ *
+ * 100 não é número redondo: é o `maxEmbeddingsPerCall` do `@ai-sdk/google`
+ * (o da OpenAI é 2048). Ou seja, é o maior valor que ainda é UMA chamada HTTP
+ * nos dois provedores, e é disso que as ~40 chamadas dependem. Subir daqui não
+ * quebra, porque o `embedMany` fatia sozinho, mas invalida a conta acima.
  */
 const TRECHOS_POR_LOTE = 100;
 
@@ -516,8 +526,12 @@ export async function indexarFonte(
       embeddings = r.embeddings;
     } catch (err) {
       const detalhe = err instanceof Error ? err.message : String(err);
-      await markVersionFailed(versionId, fonte.organization_id, `embed@${inicio}: ${detalhe}`);
-      return { tipo: "erro", detalhe: `embedding falhou no trecho ${inicio}: ${detalhe}` };
+      // A FAIXA, não `inicio`: em lote não se sabe qual trecho o provedor
+      // recusou, e este texto aparece para o cliente no cartão da fonte.
+      // Dizer "trecho 100" quando a culpa pode ser do 173 é mentir com número.
+      const faixa = `${inicio}-${inicio + lote.length - 1}`;
+      await markVersionFailed(versionId, fonte.organization_id, `embed@lote ${faixa}: ${detalhe}`);
+      return { tipo: "erro", detalhe: `embedding falhou no lote ${faixa}: ${detalhe}` };
     }
 
     const linhas = lote.map((p, j) => ({

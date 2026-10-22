@@ -77,6 +77,28 @@ const muitos = (n: number) =>
     answer: `Resposta ${i}.`,
   }));
 
+/**
+ * O vetor que ESTE texto deve receber.
+ *
+ * Pesado pela posição do caractere de propósito: a primeira versão desta
+ * função usava só tamanho e inicial, e deixava "Pergunta 5?" e "Pergunta 7?"
+ * caírem no mesmo vetor — ou seja, a cerca abaixo passava por sorte.
+ */
+const vetorDe = (texto: string) => [
+  [...texto].reduce((soma, c, i) => soma + c.charCodeAt(0) * (i + 1), 0),
+  texto.length,
+  0.5,
+];
+
+interface LinhaGravada {
+  position: number;
+  content: string;
+  embedding: unknown;
+}
+
+/** As linhas que o upsert ACEITOU, para conferir o par trecho × vetor. */
+let gravadas: LinhaGravada[] = [];
+
 /** A FAQ que o banco dublado devolve nesta execução. */
 let faq: Array<{ question: string; answer: string }> = DOIS;
 /** Mensagem de erro do upsert para cada posição; `null` = grava. */
@@ -87,6 +109,7 @@ let falhaDeEmbed: Set<number> = new Set();
 beforeEach(() => {
   vi.clearAllMocks();
   faq = DOIS;
+  gravadas = [];
   falhaDeUpsert = () => null;
   falhaDeEmbed = new Set();
 
@@ -104,10 +127,11 @@ beforeEach(() => {
         return {
           // O lote chega como ARRAY, e é atômico: basta uma linha recusada
           // para nenhuma entrar.
-          upsert: (linhas: Array<{ position: number }>) => {
+          upsert: (linhas: LinhaGravada[]) => {
             const recusada = linhas
               .map((l) => falhaDeUpsert(l.position))
               .find((m) => m !== null);
+            if (!recusada) gravadas.push(...linhas);
             return Promise.resolve(recusada ? { error: { message: recusada } } : { error: null });
           },
         };
@@ -121,7 +145,7 @@ beforeEach(() => {
       const posicao = faq.findIndex((item) => texto.includes(item.question));
       if (falhaDeEmbed.has(posicao)) throw new Error("quota estourou");
     }
-    return { embeddings: textos.map(() => [0.1, 0.2, 0.3]) } as never;
+    return { embeddings: textos.map((t) => vetorDe(t)) } as never;
   });
 
   vi.mocked(createKnowledgeVersion).mockResolvedValue({
@@ -174,11 +198,13 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
 
     const resultado = await indexarFonte(FONTE as never, CHAVE as never);
 
+    // A faixa do LOTE, não um trecho: em lote o provedor não diz qual texto
+    // recusou, e este texto chega ao cliente no cartão da fonte.
     expect(resultado).toEqual({
       tipo: "erro",
-      detalhe: "embedding falhou no trecho 0: quota estourou",
+      detalhe: "embedding falhou no lote 0-1: quota estourou",
     });
-    expect(markVersionFailed).toHaveBeenCalledWith("v-2", "org-1", "embed@0: quota estourou");
+    expect(markVersionFailed).toHaveBeenCalledWith("v-2", "org-1", "embed@lote 0-1: quota estourou");
     expect(markVersionReady).not.toHaveBeenCalled();
     expect(activateVersion).not.toHaveBeenCalled();
   });
@@ -198,6 +224,32 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
     });
     const tamanhos = vi.mocked(embedTexts).mock.calls.map(([textos]) => textos.length);
     expect(tamanhos).toEqual([100, 50]);
+  });
+
+  // A COSTURA QUE A BATELADA CRIOU.
+  //
+  // Antes, `embedText(p.content)` devolvia um vetor para um texto, consumido na
+  // hora: não havia índice para errar. Agora existem dois (`embeddings[j]` e
+  // `position: inicio + j`), e só a posição tinha instrumento. A revisão provou
+  // o buraco entregando o vetor do lote INVERTIDO: 60 de 60 testes verdes, com
+  // o acervo inteiro embaralhado e a versão carimbada como pronta.
+  //
+  // Esse é o pior modo de falhar que este caminho tem, porque não há erro:
+  // a busca devolve o trecho A com a similaridade do B, com nota alta. E não se
+  // conserta sozinho — o `content_hash` do acervo errado faz a carga seguinte
+  // ser pulada por `sem_mudanca`.
+  it("⭐ cada linha leva o vetor DO SEU trecho, inclusive no 2º lote", async () => {
+    faq = muitos(150);
+
+    await indexarFonte(FONTE as never, CHAVE as never);
+
+    expect(gravadas).toHaveLength(150);
+    for (const linha of gravadas) {
+      expect(linha.embedding, `trecho na posição ${linha.position}`).toEqual(
+        vetorDe(linha.content),
+      );
+    }
+    expect(gravadas.map((l) => l.position)).toEqual(Array.from({ length: 150 }, (_, i) => i));
   });
 
   it("⭐ falha no 2º lote: o 1º já gravou, e a versão ainda não ativa", async () => {
