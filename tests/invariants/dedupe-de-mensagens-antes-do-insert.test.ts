@@ -23,8 +23,8 @@
  *    na reentrega devolve `duplicate` SEM o contador subir: o INSERT nem foi;
  *  - corrida: com a leitura cega (a outra entrega gravou depois da leitura), o
  *    INSERT bate na constraint e o desfecho continua `duplicate`, sem 2ª linha;
- *  - corrida crua: duas transações abertas com a mesma chave, a 2ª a commitar
- *    recebe 23505.
+ *  - corrida crua: duas transações abertas com a mesma chave; o INSERT da 2ª
+ *    espera a 1ª, e o COMMIT da 2ª recebe 23505.
  */
 import pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -199,8 +199,15 @@ describe("messages: dedup antes do INSERT", () => {
       await a.query("begin");
       await b.query("begin");
       await insertCru(a, "wamid.CORRIDA-CRUA");
-      await insertCru(b, "wamid.CORRIDA-CRUA");
+      // O INSERT de B pode ESPERAR a transação de A (os gatilhos de `messages`
+      // tocam a mesma conversa): dispara sem aguardar, e só então A commita.
+      const insertDeB = insertCru(b, "wamid.CORRIDA-CRUA").then(
+        () => null,
+        (e: { code?: string }) => e.code,
+      );
       await a.query("commit");
+      // deferível: o INSERT de B passa; quem recusa é o COMMIT
+      expect(await insertDeB).toBeNull();
       const erro = await b.query("commit").then(
         () => null,
         (e: { code?: string }) => e.code,

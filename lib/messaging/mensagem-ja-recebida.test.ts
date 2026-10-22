@@ -7,24 +7,13 @@
  * pela chave da constraint, por organização, faz a reentrega sair antes. O
  * 23505 continua sendo a rede da corrida. A prova contra Postgres de verdade
  * (gatilho que não roda, constraint que segura a corrida) está em
- * tests/invariants/dedupe-de-mensagens-antes-do-insert.test.ts.
+ * tests/invariants/dedupe-de-mensagens-antes-do-insert.test.ts, e a ligação em
+ * cada canal, em tests/unit/dedupe-de-mensagens-antes-do-insert.test.ts.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { ingestMetaInbound } from "@/lib/channels/meta/ingest";
-import type { InboundMessageEvent } from "@/lib/channels/meta/webhook";
-import { insertMessage } from "@/lib/channels/verdash/gravacao";
-import type { VerdashInboundMessage } from "@/lib/channels/verdash/webhook";
+import { describe, expect, it } from "vitest";
 
 import { mensagemJaRecebida } from "./mensagem-ja-recebida";
-
-vi.mock("@/lib/channels/contato-por-telefone", () => ({
-  encontrarContatoPorTelefone: async () => null,
-}));
-vi.mock("@/lib/channels/pos-entrada", () => ({
-  aplicarEfeitosPosEntrada: async () => undefined,
-}));
 
 type Leitura = { data: unknown; error: unknown } | "lanca";
 
@@ -108,95 +97,5 @@ describe("mensagemJaRecebida", () => {
   it("fail-open: erro ou exceção na leitura devolve false (o INSERT decide)", async () => {
     expect(await mensagemJaRecebida(adminDeMensagens(FALHOU).admin, "org-1", "wamid.X")).toBe(false);
     expect(await mensagemJaRecebida(adminDeMensagens("lanca").admin, "org-1", "wamid.X")).toBe(false);
-  });
-});
-
-const EVENTO_META: InboundMessageEvent = {
-  kind: "inbound_message",
-  wabaId: "waba-1",
-  phoneNumberId: "phone-1",
-  externalId: "wamid.REENTREGA",
-  from: "5519999999999",
-  profileName: "Cliente",
-  sentAt: new Date("2026-10-22T12:00:00.000Z"),
-  type: "text",
-  text: "oi",
-  media: null,
-};
-
-describe("canal oficial (Meta): ingestMetaInbound", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("reentrega já gravada: duplicate sem INSERT", async () => {
-    const { admin, inserts, filtros } = adminDeMensagens(EXISTE);
-    const r = await ingestMetaInbound(admin, EVENTO_META, { organizationId: "org-1" });
-    expect(r).toEqual({ status: "duplicate" });
-    expect(inserts).toEqual([]);
-    expect(filtros).toEqual([
-      ["organization_id", "org-1"],
-      ["external_id", "wamid.REENTREGA"],
-    ]);
-  });
-
-  it("corrida: a leitura não viu, o 23505 do INSERT ainda devolve duplicate", async () => {
-    const { admin, inserts } = adminDeMensagens(NAO_EXISTE, true);
-    const r = await ingestMetaInbound(admin, EVENTO_META, { organizationId: "org-1" });
-    expect(r).toEqual({ status: "duplicate" });
-    expect(inserts).toHaveLength(1);
-  });
-
-  it("leitura falhou: a mensagem inédita entra mesmo assim (nunca perde mensagem)", async () => {
-    const { admin, inserts } = adminDeMensagens(FALHOU);
-    const r = await ingestMetaInbound(admin, EVENTO_META, { organizationId: "org-1" });
-    expect(r).toMatchObject({ status: "ingested", messageId: "msg-nova" });
-    expect(inserts).toHaveLength(1);
-  });
-});
-
-const MSG_VERDASH: VerdashInboundMessage = {
-  kind: "message",
-  externalId: "3EB0REENTREGA",
-  direction: "inbound",
-  chat: "5566999990000@s.whatsapp.net",
-  identity: { phone: "+5566999990000", lid: null, displayName: null },
-  isGroup: false,
-  text: "oi",
-  attachments: [],
-  sentAt: null,
-  tipo: "text",
-  extra: {},
-  alteracao: null,
-  ignorar: null,
-} as VerdashInboundMessage;
-
-const ENTRADA_VERDASH = {
-  organizationId: "org-1",
-  conversationId: "conversa-1",
-  contactId: "contato-1",
-  channelSessionId: "sessao-1",
-  msg: MSG_VERDASH,
-};
-
-describe("canal Verdash/FZAP: insertMessage", () => {
-  it("reentrega já gravada: duplicate sem INSERT", async () => {
-    const { admin, inserts, filtros } = adminDeMensagens(EXISTE);
-    expect(await insertMessage(admin, ENTRADA_VERDASH)).toBe("duplicate");
-    expect(inserts).toEqual([]);
-    expect(filtros).toEqual([
-      ["organization_id", "org-1"],
-      ["external_id", "3EB0REENTREGA"],
-    ]);
-  });
-
-  it("corrida: o 23505 do INSERT continua devolvendo duplicate", async () => {
-    const { admin, inserts } = adminDeMensagens(NAO_EXISTE, true);
-    expect(await insertMessage(admin, ENTRADA_VERDASH)).toBe("duplicate");
-    expect(inserts).toHaveLength(1);
-  });
-
-  it("CONTROLE: mensagem inédita entra", async () => {
-    const { admin, inserts } = adminDeMensagens(NAO_EXISTE);
-    expect(await insertMessage(admin, ENTRADA_VERDASH)).toBe("msg-nova");
-    expect(inserts).toHaveLength(1);
   });
 });
