@@ -48,6 +48,7 @@ import { extrairTextoDoArquivo, ErroDeExtracao } from "@/lib/ai/rag/ingest/docum
 import { estimateTokens } from "@/lib/ai/runtime/history";
 import {
   campoIlegivel,
+  decodificarEntidadesDeAcervo,
   formatProductForRag,
   limparTextoDeAcervo,
   type NuvemshopProduct,
@@ -252,11 +253,13 @@ async function pedacosDeFaq(fonte: FonteRow): Promise<Pedaco[]> {
   for (const it of (data ?? []) as Array<{ question: string; answer: string }>) {
     // Pelo mesmo limpador do catálogo: resposta de FAQ colada de um site traz
     // tag e entidade HTML, e isso ia cru para o acervo.
-    const texto = `Pergunta: ${limparTextoDeAcervo(it.question)}\nResposta: ${limparTextoDeAcervo(
-      it.answer,
-    )}`;
+    const pergunta = limparTextoDeAcervo(it.question);
+    const texto = `Pergunta: ${pergunta}\nResposta: ${limparTextoDeAcervo(it.answer)}`;
     for (const c of chunkText(texto)) {
-      pedacos.push({ content: c, metadata: { source_type: "faq", pergunta: it.question } });
+      // a pergunta LIMPA também no metadata: ele não é interno, vai nas
+      // citações (`citationsFromHits`) e o atendente o lê na tela do inbox.
+      // Cru, ele mostraria `Tem algod&atilde;o?` ao lado do conteúdo limpo.
+      pedacos.push({ content: c, metadata: { source_type: "faq", pergunta } });
     }
   }
   return pedacos;
@@ -280,8 +283,14 @@ async function pedacosDeDocumento(fonte: FonteRow): Promise<Pedaco[]> {
   if (!blobPath) throw new ErroDeExtracao("a fonte não aponta para nenhum arquivo");
 
   const { texto, extensao } = await extrairTextoDoArquivo(blobPath, meta.ext);
-  // Idem: documento exportado de página web chega com entidade e tag.
-  return chunkText(limparTextoDeAcervo(texto), { maxChars: 1600, overlapChars: 200 }).map((c) => ({
+  // Só a DECODIFICAÇÃO aqui. As extensões aceitas são `md`, `txt`, `csv` e
+  // `pdf`, nenhuma HTML, então remover `<...>` não tem alvo legítimo e come o
+  // conteúdo: `"Preencha com <nome do cliente>"` perderia o placeholder, que é
+  // a forma mais comum de modelo e de política que uma loja sobe.
+  return chunkText(decodificarEntidadesDeAcervo(texto), {
+    maxChars: 1600,
+    overlapChars: 200,
+  }).map((c) => ({
     content: c,
     metadata: {
       source_type: "documento",

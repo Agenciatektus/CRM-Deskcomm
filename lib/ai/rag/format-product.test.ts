@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   campoIlegivel,
+  decodificarEntidadesDeAcervo,
   formatProductForRag,
   limparTextoDeAcervo,
   type NuvemshopProduct,
@@ -390,13 +391,19 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).toContain("Tamanho: GG");
   });
 
-  it("⭐ `attributes: [{name, value}]` na variante já traz o par pronto", () => {
+  // A doc enuncia uma regra só sobre os dois campos: a quantidade de
+  // `attributes` do produto é igual à de `values` da variante. Quando não bate,
+  // a própria API rompeu o invariante e nomear passa a ser chute — `Tamanho: M,
+  // Azul` afirmaria metade de um par que ninguém sustenta.
+  it("⭐ contagem divergente: sai só o valor, sem nomear pela metade", () => {
     const texto = formatProductForRag({
       ...base,
-      variants: [{ attributes: [{ name: "Size", value: "M" }], price: "199.00" }],
+      attributes: [{ pt: "Tamanho" }],
+      variants: [{ values: [{ pt: "M" }, { pt: "Azul" }], price: "199.00" }],
     });
 
-    expect(texto).toContain("Size: M");
+    expect(texto).toContain("Variantes: M, Azul, Preço: R$ 199.00");
+    expect(texto).not.toContain("Tamanho: M");
   });
 
   it("valor sem nome de atributo sai só com o valor", () => {
@@ -412,7 +419,7 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     const texto = formatProductForRag({
       ...base,
       attributes: 42 as never,
-      variants: [{ values: 7 as never, attributes: "x" as never, price: "199.00", sku: "A" }],
+      variants: [{ values: 7 as never, price: "199.00", sku: "A" }],
     });
 
     expect(texto).toContain("Variantes: Preço: R$ 199.00, SKU: A");
@@ -483,6 +490,32 @@ describe("limparTextoDeAcervo", () => {
   it("código inválido fica cru, sem lançar", () => {
     expect(() => limparTextoDeAcervo("a &#x110000; b")).not.toThrow();
     expect(limparTextoDeAcervo("a &#x110000; b")).toContain("&#x110000;");
+  });
+});
+
+/**
+ * Para fonte que NÃO é HTML. As extensões de documento aceitas são `md`, `txt`,
+ * `csv` e `pdf`, e ali remover `<...>` come conteúdo em vez de limpar.
+ */
+describe("decodificarEntidadesDeAcervo", () => {
+  it("⭐ placeholder entre < > SOBREVIVE — é modelo de mensagem, não tag", () => {
+    for (const texto of [
+      "Preencha com <nome do cliente> e envie",
+      "Modelo: Prezado <nome>, seu pedido <numero> saiu",
+      "Politica: trocas em <ate 7 dias> corridos",
+    ]) {
+      expect(decodificarEntidadesDeAcervo(texto)).toBe(texto);
+    }
+  });
+
+  it("⭐ e ainda decodifica entidade, que é a parte útil em PDF e MD", () => {
+    expect(decodificarEntidadesDeAcervo("Algod&atilde;o puro&nbsp;&bull; leve")).toBe(
+      "Algodão puro • leve",
+    );
+  });
+
+  it("código inválido fica cru, sem lançar", () => {
+    expect(() => decodificarEntidadesDeAcervo("a &#x110000; b")).not.toThrow();
   });
 });
 

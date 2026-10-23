@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { indexarFonte } from "@/workers/rag-indexer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedTexts } from "@/lib/ai/embed";
+import { extrairTextoDoArquivo } from "@/lib/ai/rag/ingest/documento";
 import {
   activateVersion,
   createKnowledgeVersion,
@@ -63,6 +64,14 @@ const FONTE = {
   source_metadata: null,
 };
 
+/** A mesma fonte, mas do tipo `documento` (md/txt/csv/pdf, nunca HTML). */
+const FONTE_DOC = {
+  ...FONTE,
+  source_type: "documento",
+  name: "Política de trocas",
+  source_metadata: { blob_path: "org-1/politica.md", filename: "politica.md", ext: "md" },
+};
+
 const CHAVE = { origem: "org" };
 
 const DOIS = [
@@ -94,6 +103,7 @@ interface LinhaGravada {
   position: number;
   content: string;
   embedding: unknown;
+  metadata?: unknown;
 }
 
 /** As linhas que o upsert ACEITOU, para conferir o par trecho × vetor. */
@@ -374,6 +384,31 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
     expect(conteudo).not.toContain("&atilde;");
     expect(conteudo).not.toContain("&nbsp;");
     expect(conteudo).not.toContain("<p>");
+
+    // o metadata NÃO é interno: vai nas citações e o atendente o lê na tela do
+    // inbox. Cru, mostraria `Tem algod&atilde;o?` ao lado do conteúdo limpo.
+    const meta = gravadas[0]!.metadata as { pergunta?: string };
+    expect(meta.pergunta).toBe("Tem algodão?");
+  });
+
+  // DOCUMENTO não é HTML: as extensões aceitas são md, txt, csv e pdf. Remover
+  // `<...>` ali não tem alvo legítimo e come conteúdo — placeholder entre
+  // sinais de maior/menor é a forma mais comum de modelo e de política que uma
+  // loja sobe. A entidade, essa sim, precisa ser decodificada.
+  it("⭐ documento preserva <placeholder> e ainda decodifica entidade", async () => {
+    vi.mocked(extrairTextoDoArquivo).mockResolvedValue({
+      texto: "Prezado <nome do cliente>, trocas em at&eacute; <prazo> dias",
+      extensao: "md",
+    } as never);
+
+    await indexarFonte(FONTE_DOC as never, CHAVE as never);
+
+    expect(gravadas).toHaveLength(1);
+    const conteudo = String(gravadas[0]!.content);
+    expect(conteudo).toContain("<nome do cliente>");
+    expect(conteudo).toContain("<prazo>");
+    expect(conteudo).toContain("até");
+    expect(conteudo).not.toContain("&eacute;");
   });
 
   it("⭐ versão que FALHA não fecha aviso nenhum", async () => {

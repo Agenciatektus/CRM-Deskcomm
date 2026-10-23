@@ -11,15 +11,18 @@ export interface NuvemshopProductVariant {
   /**
    * O que distingue esta variante: tamanho, cor, voltagem.
    *
-   * A documentação pública mostra `values` como lista com chave de idioma
-   * (`[{ "en": "X-Large" }]`) na atualização, e `attributes` como
-   * `[{ name, value }]` na criação. O formato da RESPOSTA não está na doc, e
-   * não vou afirmar o que não medi: o leitor abaixo aceita as duas formas, mais
-   * string simples, e ignora o que não reconhecer. O tipo aqui é promessa nossa
-   * sobre payload de terceiro, e nesta série isso já custou três defeitos.
+   * `[{ "en": "Small" }]` — lista de objetos por idioma, só o valor, sem nome
+   * nem id dentro. O nome vem do `attributes` do PRODUTO, casado por posição.
+   *
+   * A primeira versão disto também lia um `attributes` na variante, no formato
+   * `[{ name, value }]`. A documentação da RESPOSTA
+   * (tiendanube.github.io/api-documentation/resources/product) lista os campos
+   * da variante e `attributes` NÃO está entre eles: aquele formato é corpo de
+   * requisição de criação, não leitura. Pior, os dois ramos eram concatenados,
+   * então uma API que mandasse ambos duplicaria a linha
+   * (`Tamanho: M, Cor: Azul, Tamanho: M, Cor: Azul`).
    */
   values?: unknown;
-  attributes?: unknown;
 }
 
 export interface NuvemshopProduct {
@@ -149,9 +152,27 @@ const semTags = (texto: string) =>
  * Estava fechado neste módulo e só o produto passava por ele. Uma resposta de
  * FAQ colada de um site levava `algod&atilde;o` e `&nbsp;` para o acervo — o
  * defeito que este arquivo conserta no catálogo, intacto nas outras fontes.
+ *
+ * Tira tag E decodifica, então serve a fonte onde tag de verdade chega: a FAQ,
+ * cuja resposta é colada de site num editor rico. Para fonte que NÃO é HTML,
+ * use `decodificarEntidadesDeAcervo` — remover `<...>` ali é lossy.
  */
 export function limparTextoDeAcervo(texto: string): string {
   return stripHtml(texto);
+}
+
+/**
+ * Só a decodificação, sem mexer em `<...>`.
+ *
+ * Para DOCUMENTO, cujas extensões aceitas são `md`, `txt`, `csv` e `pdf` —
+ * nenhuma HTML. Ali a remoção de tag não tem alvo legítimo e come conteúdo:
+ * `"Preencha com <nome do cliente> e envie"` virava `"Preencha com e envie"`, e
+ * placeholder entre sinais de maior/menor é a forma mais comum de modelo e de
+ * política que uma loja sobe. A decodificação, essa sim é útil: PDF ou Markdown
+ * exportado de página web chega com `&atilde;`.
+ */
+export function decodificarEntidadesDeAcervo(texto: string): string {
+  return decodificarEntidades(texto);
 }
 
 function stripHtml(html: string): string {
@@ -256,35 +277,34 @@ function nomesDosAtributos(attributes: unknown): string[] {
  * se pergunta numa loja de roupa — e o trecho ficava com treze linhas de
  * `Preço: R$ 199.00, SKU: 13320` indistinguíveis entre si.
  *
- * Três formas aceitas, porque a doc pública não fixa a da resposta:
- * `values: [{pt: "M"}]` ou `values: ["M"]` casados com os nomes do produto, e
- * `attributes: [{name: "Tamanho", value: "M"}]`, que já traz o par pronto.
+ * O par vem de `values` da variante com `attributes` do produto, casados por
+ * POSIÇÃO. Não é escolha entre várias: `values` não carrega nome nem id dentro,
+ * então não existe outra chave para casar. A doc enuncia uma única regra sobre
+ * os dois campos — "the number of `attributes` is equal to the number of
+ * `values` within the variants" —, e ela só faz sentido sob alinhamento
+ * posicional.
+ *
+ * Quando a contagem NÃO bate, a própria API rompeu esse invariante e nomear
+ * passa a ser chute: sai só o valor. Dizer `Tamanho: M, Azul` seria afirmar
+ * metade de um par que ninguém sustenta.
  */
 function atributosDaVariante(
   v: NuvemshopProductVariant,
   nomes: string[],
 ): string {
-  const deValues = Array.isArray(v?.values)
-    ? (v.values as unknown[]).map((item, i) => {
-        const valor = localizedText(item);
-        if (!valor) return "";
-        const nome = nomes[i] ?? "";
-        return nome ? `${nome}: ${valor}` : valor;
-      })
-    : [];
+  if (!Array.isArray(v?.values)) return "";
 
-  const deAttributes = Array.isArray(v?.attributes)
-    ? (v.attributes as unknown[]).map((item) => {
-        if (!item || typeof item !== "object") return "";
-        const par = item as { name?: unknown; value?: unknown };
-        const nome = localizedText(par.name);
-        const valor = localizedText(par.value);
-        if (!valor) return "";
-        return nome ? `${nome}: ${valor}` : valor;
-      })
-    : [];
+  const valores = (v.values as unknown[]).map((item) => localizedText(item));
+  const podeNomear = nomes.length === valores.length;
 
-  return [...deValues, ...deAttributes].filter((p) => p !== "").join(", ");
+  return valores
+    .map((valor, i) => {
+      if (!valor) return "";
+      const nome = podeNomear ? nomes[i] ?? "" : "";
+      return nome ? `${nome}: ${valor}` : valor;
+    })
+    .filter((p) => p !== "")
+    .join(", ");
 }
 
 /**
