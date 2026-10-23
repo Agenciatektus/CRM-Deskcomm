@@ -105,6 +105,13 @@ interface UpdateNaCentral {
 }
 /** O que o worker mandou para a Central (`agent_inbox_items`). */
 let updatesNaCentral: UpdateNaCentral[] = [];
+/**
+ * Um instante capturado DURANTE a indexação, depois de uma espera real.
+ *
+ * É o que distingue "o corte é o início da execução" de "o corte é agora" — e
+ * sem isso a cerca do corte de tempo passava verde com o defeito de volta.
+ */
+let durante = "";
 
 /** A FAQ que o banco dublado devolve nesta execução. */
 let faq: Array<{ question: string; answer: string }> = DOIS;
@@ -118,6 +125,7 @@ beforeEach(() => {
   faq = DOIS;
   gravadas = [];
   updatesNaCentral = [];
+  durante = "";
   falhaDeUpsert = () => null;
   falhaDeEmbed = new Set();
 
@@ -201,7 +209,15 @@ beforeEach(() => {
   } as never);
   vi.mocked(markVersionReady).mockResolvedValue(undefined as never);
   vi.mocked(markVersionFailed).mockResolvedValue(undefined as never);
-  vi.mocked(activateVersion).mockResolvedValue(undefined as never);
+  // `durante` é colhido aqui, no último passo antes de resolver o aviso, e a
+  // espera vem DEPOIS de colher. Assim o instante em que o worker resolveria
+  // "agora" fica no mínimo 25 ms à frente de `durante`, e a diferença não
+  // depende de sorte de milissegundo — era isso que fazia o controle negativo
+  // do corte passar verde.
+  vi.mocked(activateVersion).mockImplementation(async () => {
+    durante = new Date().toISOString();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  });
 });
 
 describe("indexarFonte — falha parcial não ativa versão", () => {
@@ -328,8 +344,16 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
     // `pedacosDeCatalogo` abre aviso da MESMA kind e ref_id durante a
     // indexação, e esse caminho devolve `ok` — sem o corte, a execução em que o
     // formato da loja muda abriria e fecharia o alarme em silêncio.
+    //
+    // `corte <= durante` é a assertiva que importa, e a que faltava: as duas
+    // anteriores eram satisfeitas igualmente por "corte = agora", que é o
+    // defeito inteiro de volta. `durante` é colhido depois de uma espera real
+    // no meio da indexação, então o corte só pode ser anterior a ele se for o
+    // INÍCIO da execução.
     const corte = String(filtros["lt:created_at"]);
+    expect(durante).not.toBe("");
     expect(corte >= antes).toBe(true);
+    expect(corte <= durante).toBe(true);
     expect(corte <= String(patch.resolved_at)).toBe(true);
   });
 

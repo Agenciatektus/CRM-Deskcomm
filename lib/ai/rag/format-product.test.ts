@@ -25,6 +25,17 @@ import {
 
 const base: NuvemshopProduct = { id: "1", name: "Camisa" };
 
+/**
+ * A linha `Preço:` DO PRODUTO, não a das variantes.
+ *
+ * `toContain("Preço: R$ 199.00")` sobre o texto todo casa com
+ * `Variantes: Preço: R$ 199.00, SKU: M`, e foi assim que o controle negativo
+ * do preço zerado passou verde: o produto saía `N/A` e a asserção achava o
+ * preço na linha de baixo.
+ */
+const linhaDoPreco = (texto: string) =>
+  texto.split("\n").find((l) => l.startsWith("Preço:")) ?? "(sem linha de preço)";
+
 describe("formatProductForRag — campos multi-idioma da loja", () => {
   it("⭐ descrição como objeto por idioma: usa o pt e tira o HTML", () => {
     const texto = formatProductForRag({
@@ -176,8 +187,7 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
       ],
     });
 
-    expect(texto).toContain("Preço: R$ 199.00");
-    expect(texto).not.toContain("Preço: N/A");
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
   });
 
   it("⭐ variantes com preços diferentes viram faixa, sem inventar precisão", () => {
@@ -190,7 +200,7 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
       ],
     });
 
-    expect(texto).toContain("Preço: R$ 99.00 a R$ 199.00");
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 99.00 a R$ 199.00");
   });
 
   it("preço próprio do produto continua ganhando da variante", () => {
@@ -200,7 +210,7 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
       variants: [{ price: "199.00", sku: "A" }],
     });
 
-    expect(texto).toContain("Preço: R$ 250.00");
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 250.00");
   });
 
   // Descartar a variante que não parseia e anunciar o resto é PIOR que N/A: o
@@ -212,14 +222,13 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
       variants: [{ price: "199,00", sku: "M" }, { price: "1.299,00", sku: "GG" }],
     });
 
-    expect(texto).toContain("Preço: N/A");
-    expect(texto).not.toContain("Preço: R$ 199.00\n");
+    expect(linhaDoPreco(texto)).toBe("Preço: N/A");
   });
 
   it("vírgula decimal simples continua sendo lida", () => {
     expect(
-      formatProductForRag({ ...base, variants: [{ price: "199,00", sku: "M" }] }),
-    ).toContain("Preço: R$ 199.00");
+      linhaDoPreco(formatProductForRag({ ...base, variants: [{ price: "199,00", sku: "M" }] })),
+    ).toBe("Preço: R$ 199.00");
   });
 
   it("variante sem preço no meio de outras com preço não derruba a leitura", () => {
@@ -228,12 +237,14 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
       variants: [{ price: "199.00", sku: "M" }, { sku: "G" }, { price: "", sku: "GG" }],
     });
 
-    expect(texto).toContain("Preço: R$ 199.00");
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
   });
 
   it("sem preço em lugar nenhum segue N/A", () => {
-    expect(formatProductForRag({ ...base, variants: [{ sku: "A" }] })).toContain("Preço: N/A");
-    expect(formatProductForRag(base)).toContain("Preço: N/A");
+    expect(linhaDoPreco(formatProductForRag({ ...base, variants: [{ sku: "A" }] }))).toBe(
+      "Preço: N/A",
+    );
+    expect(linhaDoPreco(formatProductForRag(base))).toBe("Preço: N/A");
   });
 
   // 601 de 991 trechos levavam entidade crua para o acervo. `stripHtml` tirava
@@ -316,6 +327,39 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).toContain("Algodão puro");
     expect(texto).not.toContain("<p>");
     expect(texto).not.toContain("</p>");
+  });
+
+  // A segunda passada de limpeza APAGAVA isto: com `&lt;` e `&gt;` já
+  // decodificados, o regex antigo (`/<[^>]+>/`) comia tudo entre eles.
+  // "altura &lt; 40cm e peso &gt; 2kg" virava "altura 2kg", em silêncio —
+  // especificação com operador é comum em loja, e o agente passaria a
+  // responder a medida errada com confiança.
+  it("⭐ operador escapado na descrição NÃO apaga o texto do produto", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Medidas: altura &lt; 40cm e peso &gt; 2kg",
+    });
+
+    expect(texto).toContain("altura < 40cm");
+    expect(texto).toContain("peso > 2kg");
+  });
+
+  it("⭐ e segue tirando tag de verdade, inclusive duplo-escapada", () => {
+    expect(
+      formatProductForRag({ ...base, description: "&lt;div class=x&gt;Linho&lt;/div&gt;" }),
+    ).toContain("Descrição: Linho");
+    expect(
+      formatProductForRag({ ...base, description: "<p>Linho<br/>puro</p>" }),
+    ).toContain("Descrição: Linho puro");
+  });
+
+  it("⭐ variante com preço 0.00 não esconde o preço das outras", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199.00", sku: "M" }, { price: "0.00", sku: "G" }],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
   });
 
   it("entidades tipográficas de Word/CSV e ordinais PT-BR", () => {

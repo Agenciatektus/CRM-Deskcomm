@@ -108,7 +108,18 @@ function decodificarEntidades(texto: string): string {
   );
 }
 
-const semTags = (texto: string) => texto.replace(/<[^>]+>/g, " ");
+/**
+ * Tira TAG, e só tag: exige letra depois de `<` ou `</`.
+ *
+ * `/<[^>]+>/` era guloso sobre qualquer coisa que não fosse `>`, e isso come
+ * texto do produto. Medido: `"altura &lt; 40cm e peso &gt; 2kg"` virava
+ * `"altura 2kg"` — um `&lt;` no começo de uma descrição longa e um `&gt;` no
+ * fim apagavam o miolo inteiro, em silêncio. Especificação com operador é
+ * comum em loja ("peso &lt; 2kg", "crianças &lt; 5 anos"), e o agente passaria
+ * a responder a medida errada com confiança.
+ */
+const semTags = (texto: string) =>
+  texto.replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g, " ");
 
 /**
  * Tira as tags, decodifica, e tira tags DE NOVO.
@@ -218,11 +229,18 @@ function precoDasVariantes(variants: NuvemshopProduct["variants"]): string {
     .filter((texto) => texto.trim() !== "");
   if (comPreco.length === 0) return "";
 
+  // A assimetria é o ponto: preço ausente não tem valor para distorcer; preço
+  // presente e ilegível tem um que pode diferir muito. Um não informa, o outro
+  // mente. Zero é "não cadastrado" — na Nuvemshop é o que sobra em variante sem
+  // preço próprio —, então não pode esconder o preço das outras.
   const valores = comPreco.map((texto) => Number(texto.replace(",", ".")));
-  if (valores.some((n) => !Number.isFinite(n) || n <= 0)) return "";
+  if (valores.some((n) => !Number.isFinite(n))) return "";
 
-  const menor = Math.min(...valores);
-  const maior = Math.max(...valores);
+  const reais = valores.filter((n) => n > 0);
+  if (reais.length === 0) return "";
+
+  const menor = Math.min(...reais);
+  const maior = Math.max(...reais);
   const dinheiro = (n: number) => n.toFixed(2);
   return menor === maior ? dinheiro(menor) : `${dinheiro(menor)} a R$ ${dinheiro(maior)}`;
 }
