@@ -204,6 +204,30 @@ describe("o catálogo da loja chega ao acervo", () => {
     expect(worker).toContain("const PROPORCAO_DE_ALERTA = 0.2;");
   });
 
+  // O COMPORTAMENTO desta função está em
+  // `tests/unit/rag-nao-ativa-versao-incompleta.test.ts`, com a Central
+  // dublada: lá se mede que o patch leva `status: "resolved"`, que os filtros
+  // são os certos, e que o corte de tempo existe.
+  //
+  // A cerca anterior era de texto e NÃO media: tirar `.eq("kind", ...)` da
+  // função passava verde, porque a mesma string existe em `avisarNaCentral`
+  // neste mesmo arquivo e a asserção era `toContain` no arquivo INTEIRO. Aqui
+  // sobra só o que forma nenhuma outra cerca cobre, e lendo o CORPO da função.
+  it("⭐ resolverAvisoDaFonte fecha por `status` e corta por tempo", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    const todas = worker.split(/\r?\n/);
+    const abre = todas.findIndex((l) => l.startsWith("async function resolverAvisoDaFonte"));
+    const fecha = todas.findIndex((l, i) => i > abre && l === "}");
+    expect(abre).toBeGreaterThan(0);
+    const corpo = todas.slice(abre, fecha).join(" ");
+
+    // a Central lista e conta por `status`; gravar só o carimbo não fecha nada
+    expect(corpo).toContain('status: "resolved"');
+    expect(corpo).toMatch(/\.eq\("status", "open"\)/);
+    // e nunca alcança o aviso aberto DURANTE esta indexação
+    expect(corpo).toMatch(/\.lt\("created_at", abertoAntesDe\)/);
+  });
+
   it("CONTROLE — o teto é baixo de propósito, por causa do reaper de 10 minutos", () => {
     const worker = ler("workers/rag-indexer.ts");
     expect(worker).toContain("const TETO_DE_PAGINAS = 10;");
