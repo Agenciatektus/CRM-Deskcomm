@@ -175,7 +175,7 @@ describe("a imagem: arquivos e caminho", () => {
         i += 1;
         continue;
       }
-      const marcador = b[i + 1];
+      const marcador = b[i + 1] ?? 0;
       const tamanho = b.readUInt16BE(i + 2);
       if (marcador >= 0xc0 && marcador <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marcador)) {
         return { altura: b.readUInt16BE(i + 5), largura: b.readUInt16BE(i + 7) };
