@@ -46,7 +46,11 @@ import { chunkText, computeContentHash } from "@/lib/ai/rag/chunker";
 import { canonizarTipoDeFonte } from "@/lib/ai/rag/tipos-de-fonte";
 import { extrairTextoDoArquivo, ErroDeExtracao } from "@/lib/ai/rag/ingest/documento";
 import { estimateTokens } from "@/lib/ai/runtime/history";
-import { formatProductForRag, type NuvemshopProduct } from "@/lib/ai/rag/format-product";
+import {
+  campoIlegivel,
+  formatProductForRag,
+  type NuvemshopProduct,
+} from "@/lib/ai/rag/format-product";
 import {
   createKnowledgeVersion,
   markVersionReady,
@@ -246,8 +250,23 @@ async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
   // caminho que leve a isso.
   const produtos = await listarCatalogoDaLoja(fonte.organization_id);
 
+  // ── CONTA O CAMPO QUE DEIXOU DE SER LEGÍVEL ──────────────────────────────
+  //
+  // `formatProductForRag` devolve "" para campo que não vira texto, e isso é o
+  // certo: um produto estranho não pode derrubar centenas. Mas sem contador
+  // ninguém vê o dia em que for TUDO. Se a API renomear a chave ou trocar o
+  // tipo, toda descrição vira "", o `content_hash` muda uma vez, a versão nova
+  // é publicada e ATIVADA com `success`, e nas cargas seguintes o hash fica
+  // estável — então o caminho `sem_mudanca` passa a pular a reindexação. Mesmo
+  // modo de falha que este arquivo existe para consertar, agora invisível.
+  //
+  // Só conta campo PRESENTE e ilegível: lojista que não escreveu descrição é
+  // normal e não pode virar alarme.
+  let ilegiveis = 0;
+
   const pedacos: Pedaco[] = [];
   for (const p of produtos) {
+    if (campoIlegivel(p.description) || campoIlegivel(p.name)) ilegiveis += 1;
     for (const c of chunkText(formatProductForRag(p))) {
       pedacos.push({
         content: c,
@@ -255,6 +274,26 @@ async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
       });
     }
   }
+
+  if (produtos.length >= PISO_DE_AMOSTRA && ilegiveis / produtos.length > PROPORCAO_DE_ALERTA) {
+    const pct = Math.round((ilegiveis / produtos.length) * 100);
+    console.warn("[rag-indexer] campo de produto ilegível em massa", {
+      organization_id: fonte.organization_id,
+      knowledge_source_id: fonte.id,
+      ilegiveis,
+      produtos: produtos.length,
+    });
+    await avisarNaCentral(
+      fonte.organization_id,
+      fonte,
+      "O catálogo indexou sem o texto dos produtos",
+      `${ilegiveis} de ${produtos.length} produtos (${pct}%) vieram da loja com nome ou ` +
+        "descrição em formato que não conseguimos ler. O catálogo entrou no acervo, mas sem " +
+        "esse texto o agente não vai casar as perguntas do cliente com os produtos. " +
+        "Costuma ser mudança no formato da API da loja.",
+    );
+  }
+
   return pedacos;
 }
 
@@ -301,6 +340,16 @@ const TETO_DE_PAGINAS = 10;
  * quebra, porque o `embedMany` fatia sozinho, mas invalida a conta acima.
  */
 const TRECHOS_POR_LOTE = 100;
+
+/**
+ * Quando o aviso de campo ilegível abre.
+ *
+ * Piso de amostra para uma loja de 3 produtos não virar alarme por um cadastro
+ * torto, e proporção porque formato quebrado atinge o catálogo todo, não um
+ * produto. Moram no módulo, junto do teto de páginas, e não no corpo da função.
+ */
+const PISO_DE_AMOSTRA = 10;
+const PROPORCAO_DE_ALERTA = 0.2;
 
 async function listarCatalogoDaLoja(organizationId: string): Promise<NuvemshopProduct[]> {
   const creds = await credenciaisDaLoja(organizationId);
