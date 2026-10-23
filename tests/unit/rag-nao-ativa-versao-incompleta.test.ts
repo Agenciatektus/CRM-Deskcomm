@@ -99,6 +99,13 @@ interface LinhaGravada {
 /** As linhas que o upsert ACEITOU, para conferir o par trecho × vetor. */
 let gravadas: LinhaGravada[] = [];
 
+interface UpdateNaCentral {
+  patch: Record<string, unknown>;
+  filtros: Record<string, unknown>;
+}
+/** O que o worker mandou para a Central (`agent_inbox_items`). */
+let updatesNaCentral: UpdateNaCentral[] = [];
+
 /** A FAQ que o banco dublado devolve nesta execução. */
 let faq: Array<{ question: string; answer: string }> = DOIS;
 /** Mensagem de erro do upsert para cada posição; `null` = grava. */
@@ -110,6 +117,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   faq = DOIS;
   gravadas = [];
+  updatesNaCentral = [];
   falhaDeUpsert = () => null;
   falhaDeEmbed = new Set();
 
@@ -135,6 +143,45 @@ beforeEach(() => {
             return Promise.resolve(recusada ? { error: { message: recusada } } : { error: null });
           },
         };
+      }
+      if (tabela === "agent_inbox_items") {
+        // Cadeia thenable: o worker faz
+        // `await from(...).update(...).eq(...)×4.lt(...)`, então cada filtro
+        // devolve a própria cadeia e o `await` resolve no fim.
+        const filtros: Record<string, unknown> = {};
+        let patch: Record<string, unknown> = {};
+        const cadeia = {
+          update(p: Record<string, unknown>) {
+            patch = p;
+            return cadeia;
+          },
+          eq(coluna: string, valor: unknown) {
+            filtros[coluna] = valor;
+            return cadeia;
+          },
+          is(coluna: string, valor: unknown) {
+            filtros[coluna] = valor;
+            return cadeia;
+          },
+          lt(coluna: string, valor: unknown) {
+            filtros[`lt:${coluna}`] = valor;
+            return cadeia;
+          },
+          select() {
+            return cadeia;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: null, error: null });
+          },
+          insert() {
+            return Promise.resolve({ error: null });
+          },
+          then(resolve: (v: { error: null }) => unknown) {
+            updatesNaCentral.push({ patch, filtros });
+            return Promise.resolve({ error: null }).then(resolve);
+          },
+        };
+        return cadeia;
       }
       throw new Error(`tabela não dublada no teste: ${tabela}`);
     },
@@ -250,6 +297,48 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
       );
     }
     expect(gravadas.map((l) => l.position)).toEqual(Array.from({ length: 150 }, (_, i) => i));
+  });
+
+  // ─── o aviso da Central ─────────────────────────────────────────────────────
+  //
+  // A primeira cerca disto era de TEXTO e não media: tirar `.eq("kind", ...)` da
+  // função passava verde, porque a mesma string existe em `avisarNaCentral` no
+  // mesmo arquivo e o teste usava `toContain` no arquivo inteiro. Pôr a chamada
+  // só no ramo de erro também passava, porque a ordem era medida por `indexOf`.
+  it("⭐ indexar com sucesso FECHA o aviso com `status`, não só com o carimbo", async () => {
+    const antes = new Date().toISOString();
+
+    await indexarFonte(FONTE as never, CHAVE as never);
+
+    expect(updatesNaCentral).toHaveLength(1);
+    const { patch, filtros } = updatesNaCentral[0]!;
+
+    // `status` é a verdade da EXIBIÇÃO: a Central lista e conta por ele, e o
+    // índice do banco é parcial em `status = 'open'`. Gravar só `resolved_at`
+    // deixava os avisos aparecendo para o cliente.
+    expect(patch.status).toBe("resolved");
+    expect(patch.resolved_at).toEqual(expect.any(String));
+
+    expect(filtros.kind).toBe("conhecimento_nao_indexado");
+    expect(filtros.ref_id).toBe("ks-1");
+    expect(filtros.organization_id).toBe("org-1");
+    expect(filtros.status).toBe("open");
+
+    // E o corte de tempo: só o que já estava aberto ANTES desta execução.
+    // `pedacosDeCatalogo` abre aviso da MESMA kind e ref_id durante a
+    // indexação, e esse caminho devolve `ok` — sem o corte, a execução em que o
+    // formato da loja muda abriria e fecharia o alarme em silêncio.
+    const corte = String(filtros["lt:created_at"]);
+    expect(corte >= antes).toBe(true);
+    expect(corte <= String(patch.resolved_at)).toBe(true);
+  });
+
+  it("⭐ versão que FALHA não fecha aviso nenhum", async () => {
+    falhaDeUpsert = () => "permission denied";
+
+    await indexarFonte(FONTE as never, CHAVE as never);
+
+    expect(updatesNaCentral).toHaveLength(0);
   });
 
   it("⭐ falha no 2º lote: o 1º já gravou, e a versão ainda não ativa", async () => {

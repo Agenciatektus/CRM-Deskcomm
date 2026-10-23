@@ -56,6 +56,11 @@ const ENTIDADES: Record<string, string> = {
   Iacute: "Í", Oacute: "Ó", Otilde: "Õ", Ocirc: "Ô",
   Uacute: "Ú", Ccedil: "Ç",
   reg: "®", copy: "©", trade: "™", deg: "°", euro: "€", pound: "£",
+  // tipográficas de Word e de importação por CSV, e as ordinais PT-BR
+  rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201c", rdquo: "\u201d",
+  sbquo: "\u201a", bdquo: "\u201e", prime: "\u2032", Prime: "\u2033",
+  ordm: "º", ordf: "ª", frac12: "½", frac14: "¼", frac34: "¾",
+  sup2: "²", sup3: "³", times: "×", middot: "·", laquo: "«", raquo: "»",
 };
 
 /**
@@ -66,15 +71,55 @@ const ENTIDADES: Record<string, string> = {
  * deixava isso, então o texto embedado ficava com lixo — piora o casamento
  * semântico, e se a resposta citar a descrição o cliente lê `algod&atilde;o`.
  */
-function decodificarEntidades(texto: string): string {
-  return texto
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
-    .replace(/&([a-zA-Z][a-zA-Z0-9]{1,9});/g, (inteiro, nome) => ENTIDADES[nome] ?? inteiro);
+/**
+ * O caractere de um código numérico, ou a entidade crua se o código não serve.
+ *
+ * `String.fromCodePoint` LANÇA `RangeError` fora de 0–0x10FFFF, e este arquivo
+ * roda por produto num catálogo de centenas: uma exceção aqui sobe por
+ * `pedacosDeCatalogo` e derruba a indexação inteira, com uma mensagem
+ * (`Invalid code point 1114112`) que não aponta para produto nenhum. Era o
+ * primeiro caminho deste arquivo que podia lançar, contra o invariante que ele
+ * declara desde o começo: um produto estranho não derruba os outros.
+ *
+ * NUL e surrogate solitário não lançam aqui e são piores de diagnosticar —
+ * explodem longe da causa, no insert (Postgres `text` não guarda NUL) ou na
+ * chamada de embedding. Também ficam crus.
+ */
+function porCodigo(n: number, inteiro: string): string {
+  const valido =
+    Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff);
+  return valido ? String.fromCodePoint(n) : inteiro;
 }
 
+/**
+ * UMA passada, com alternância, para que nada seja relido.
+ *
+ * Em duas passadas o `&#38;nbsp;` virava espaço: a numérica devolvia `&` e a
+ * nomeada rescaneava a saída, decodificando o que já era texto literal.
+ */
+function decodificarEntidades(texto: string): string {
+  return texto.replace(
+    /&#x([0-9a-fA-F]+);|&#(\d+);|&([a-zA-Z][a-zA-Z0-9]{1,9});/g,
+    (inteiro, hex, dec, nome) => {
+      if (hex !== undefined) return porCodigo(parseInt(hex, 16), inteiro);
+      if (dec !== undefined) return porCodigo(Number(dec), inteiro);
+      return ENTIDADES[nome as string] ?? inteiro;
+    },
+  );
+}
+
+const semTags = (texto: string) => texto.replace(/<[^>]+>/g, " ");
+
+/**
+ * Tira as tags, decodifica, e tira tags DE NOVO.
+ *
+ * A segunda passada existe porque HTML duplo-escapado é comum em editor de loja
+ * e em importação por CSV: `&lt;p&gt;oi&lt;/p&gt;` só vira `<p>oi</p>` depois de
+ * decodificar, e aí já tinha passado pela primeira limpeza. O motivo deste
+ * conserto é o cliente não ler `algod&atilde;o`; ler `<p>` é o mesmo problema.
+ */
 function stripHtml(html: string): string {
-  return decodificarEntidades(html.replace(/<[^>]+>/g, " "))
+  return semTags(decodificarEntidades(semTags(html)))
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -160,10 +205,21 @@ export function campoIlegivel(value: unknown): boolean {
 function precoDasVariantes(variants: NuvemshopProduct["variants"]): string {
   if (!Array.isArray(variants)) return "";
 
-  const valores = variants
-    .map((v) => Number(escalarTexto(v?.price).replace(",", ".")))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (valores.length === 0) return "";
+  // TUDO OU NADA, e é o ponto todo desta função.
+  //
+  // Descartar a variante que não parseia e anunciar o resto como preço é pior
+  // que `N/A`: com `["199,00", "1.299,00"]` o separador de milhar não converte,
+  // sobra um valor só, e o trecho diz `Preço: R$ 199.00` sem faixa e sem sinal
+  // de que faltou alguém. O agente afirma R$ 199 para um produto cuja variante
+  // GG custa R$ 1.299 — número errado dito com confiança. Se um preço presente
+  // não é legível, nenhum preço é anunciado.
+  const comPreco = variants
+    .map((v) => escalarTexto(v?.price))
+    .filter((texto) => texto.trim() !== "");
+  if (comPreco.length === 0) return "";
+
+  const valores = comPreco.map((texto) => Number(texto.replace(",", ".")));
+  if (valores.some((n) => !Number.isFinite(n) || n <= 0)) return "";
 
   const menor = Math.min(...valores);
   const maior = Math.max(...valores);

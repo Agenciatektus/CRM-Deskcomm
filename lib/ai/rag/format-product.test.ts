@@ -203,6 +203,34 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).toContain("Preço: R$ 250.00");
   });
 
+  // Descartar a variante que não parseia e anunciar o resto é PIOR que N/A: o
+  // separador de milhar não converte, sobra um valor, e o agente afirma R$ 199
+  // para um produto cuja GG custa R$ 1.299 — número errado dito com confiança.
+  it("⭐ preço ilegível em alguma variante: nenhum preço é anunciado", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199,00", sku: "M" }, { price: "1.299,00", sku: "GG" }],
+    });
+
+    expect(texto).toContain("Preço: N/A");
+    expect(texto).not.toContain("Preço: R$ 199.00\n");
+  });
+
+  it("vírgula decimal simples continua sendo lida", () => {
+    expect(
+      formatProductForRag({ ...base, variants: [{ price: "199,00", sku: "M" }] }),
+    ).toContain("Preço: R$ 199.00");
+  });
+
+  it("variante sem preço no meio de outras com preço não derruba a leitura", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199.00", sku: "M" }, { sku: "G" }, { price: "", sku: "GG" }],
+    });
+
+    expect(texto).toContain("Preço: R$ 199.00");
+  });
+
   it("sem preço em lugar nenhum segue N/A", () => {
     expect(formatProductForRag({ ...base, variants: [{ sku: "A" }] })).toContain("Preço: N/A");
     expect(formatProductForRag(base)).toContain("Preço: N/A");
@@ -225,15 +253,82 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).not.toContain("&amp;");
   });
 
-  it("entidade numérica, decimal e hexadecimal", () => {
+  it("entidade numérica decimal e HEXADECIMAL", () => {
     const texto = formatProductForRag({
       ...base,
-      description: "Camisa &#233;poca &#x1F600; &#8220;top&#8221;",
+      description: "Camisa &#233;poca &#x1F600; &#8220;top&#8221; &#x41;",
     });
 
     expect(texto).toContain("época");
-    expect(texto).toContain("“top”");
-    expect(texto).not.toMatch(/&#\d+;/);
+    // positiva para o ramo hex: sem isto, apagar o ramo passava verde, porque
+    // `not.toMatch(/&#\d+;/)` não casa `&#x...` (o `&#` vem seguido de `x`).
+    expect(texto).toContain("\u{1F600}");
+    expect(texto).toContain("A");
+    expect(texto).toContain("\u201ctop\u201d");
+    expect(texto).not.toMatch(/&#x?[0-9a-fA-F]+;/);
+  });
+
+  // ESTE caso é o que impedia o catálogo inteiro de cair. `fromCodePoint` lança
+  // `RangeError` fora de 0–0x10FFFF, e a exceção sobe de `formatProductForRag`
+  // até `indexarFonte`: um caractere ruim em UM produto derrubaria os 879, com
+  // uma mensagem que não aponta para produto nenhum.
+  it("⭐ código numérico inválido fica cru e NÃO derruba o produto", () => {
+    for (const ruim of ["&#x110000;", "&#1114112;", "&#xFFFFFFF;", "&#999999999999;"]) {
+      let texto = "";
+      expect(() => {
+        texto = formatProductForRag({ ...base, description: `Camisa ${ruim} fim` });
+      }).not.toThrow();
+      expect(texto).toContain(ruim);
+    }
+  });
+
+  it("⭐ NUL e surrogate solitário também ficam crus (explodiriam longe da causa)", () => {
+    const texto = formatProductForRag({ ...base, description: "a &#0; b &#xD800; c" });
+
+    expect(texto).toContain("&#0;");
+    expect(texto).toContain("&#xD800;");
+    expect(texto).not.toContain("\u0000");
+  });
+
+  // Em duas passadas, a numérica devolvia `&` e a nomeada rescaneava a saída:
+  // `&#38;nbsp;` virava espaço, quando é o texto literal `&nbsp;`.
+  it("⭐ nada é relido: `&#38;nbsp;` é o texto `&nbsp;`, não um espaço", () => {
+    const texto = formatProductForRag({ ...base, description: "x &#38;nbsp; y" });
+
+    expect(texto).toContain("&nbsp;");
+  });
+
+  it("`&amp;X;` continua protegido da dupla decodificação", () => {
+    const texto = formatProductForRag({ ...base, description: "a &amp;nbsp; b &amp;amp; c" });
+
+    expect(texto).toContain("&nbsp;");
+    expect(texto).toContain("&amp;");
+  });
+
+  // HTML duplo-escapado é comum em editor de loja e em importação por CSV: só
+  // vira tag DEPOIS de decodificar, quando a primeira limpeza já passou.
+  it("⭐ HTML duplo-escapado não devolve tag literal ao acervo", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "&lt;p&gt;Algod&atilde;o puro&lt;/p&gt;",
+    });
+
+    expect(texto).toContain("Algodão puro");
+    expect(texto).not.toContain("<p>");
+    expect(texto).not.toContain("</p>");
+  });
+
+  it("entidades tipográficas de Word/CSV e ordinais PT-BR", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Tamanho 2&ordm; &rsquo;slim&rsquo; &ldquo;fit&rdquo; 1&frac12; 5&times;",
+    });
+
+    expect(texto).toContain("2º");
+    expect(texto).toContain("\u2019slim\u2019");
+    expect(texto).toContain("\u201cfit\u201d");
+    expect(texto).toContain("1½");
+    expect(texto).toContain("5×");
   });
 
   it("entidade desconhecida fica como está, em vez de virar lixo", () => {
