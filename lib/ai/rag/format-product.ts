@@ -29,8 +29,110 @@ export interface NuvemshopProduct {
   categories?: Array<{ name: { pt: string } | string }>;
 }
 
+/**
+ * As entidades nomeadas que aparecem de verdade em descrição de loja PT-BR.
+ *
+ * Mapa curto de propósito: o resto cai na forma numérica, que é genérica.
+ */
+const ENTIDADES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  bull: "•",
+  hellip: "…",
+  ndash: "–",
+  mdash: "—",
+  aacute: "á", agrave: "à", atilde: "ã", acirc: "â", auml: "ä",
+  eacute: "é", egrave: "è", ecirc: "ê", euml: "ë",
+  iacute: "í", icirc: "î", iuml: "ï",
+  oacute: "ó", otilde: "õ", ocirc: "ô", ouml: "ö", ograve: "ò",
+  uacute: "ú", ucirc: "û", uuml: "ü", ugrave: "ù",
+  ccedil: "ç", ntilde: "ñ",
+  Aacute: "Á", Atilde: "Ã", Acirc: "Â", Agrave: "À",
+  Eacute: "É", Ecirc: "Ê",
+  Iacute: "Í", Oacute: "Ó", Otilde: "Õ", Ocirc: "Ô",
+  Uacute: "Ú", Ccedil: "Ç",
+  reg: "®", copy: "©", trade: "™", deg: "°", euro: "€", pound: "£",
+  // tipográficas de Word e de importação por CSV, e as ordinais PT-BR
+  rsquo: "\u2019", lsquo: "\u2018", ldquo: "\u201c", rdquo: "\u201d",
+  sbquo: "\u201a", bdquo: "\u201e", prime: "\u2032", Prime: "\u2033",
+  ordm: "º", ordf: "ª", frac12: "½", frac14: "¼", frac34: "¾",
+  sup2: "²", sup3: "³", times: "×", middot: "·", laquo: "«", raquo: "»",
+};
+
+/**
+ * Decodifica entidade HTML.
+ *
+ * Medido no catálogo real: 601 de 991 trechos indexados levavam entidade crua
+ * (`algod&atilde;o puro`, `&nbsp;`, `&bull;`). `stripHtml` tirava as TAGS e
+ * deixava isso, então o texto embedado ficava com lixo — piora o casamento
+ * semântico, e se a resposta citar a descrição o cliente lê `algod&atilde;o`.
+ */
+/**
+ * O caractere de um código numérico, ou a entidade crua se o código não serve.
+ *
+ * `String.fromCodePoint` LANÇA `RangeError` fora de 0–0x10FFFF, e este arquivo
+ * roda por produto num catálogo de centenas: uma exceção aqui sobe por
+ * `pedacosDeCatalogo` e derruba a indexação inteira, com uma mensagem
+ * (`Invalid code point 1114112`) que não aponta para produto nenhum. Era o
+ * primeiro caminho deste arquivo que podia lançar, contra o invariante que ele
+ * declara desde o começo: um produto estranho não derruba os outros.
+ *
+ * NUL e surrogate solitário não lançam aqui e são piores de diagnosticar —
+ * explodem longe da causa, no insert (Postgres `text` não guarda NUL) ou na
+ * chamada de embedding. Também ficam crus.
+ */
+function porCodigo(n: number, inteiro: string): string {
+  const valido =
+    Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff);
+  return valido ? String.fromCodePoint(n) : inteiro;
+}
+
+/**
+ * UMA passada, com alternância, para que nada seja relido.
+ *
+ * Em duas passadas o `&#38;nbsp;` virava espaço: a numérica devolvia `&` e a
+ * nomeada rescaneava a saída, decodificando o que já era texto literal.
+ */
+function decodificarEntidades(texto: string): string {
+  return texto.replace(
+    /&#x([0-9a-fA-F]+);|&#(\d+);|&([a-zA-Z][a-zA-Z0-9]{1,9});/g,
+    (inteiro, hex, dec, nome) => {
+      if (hex !== undefined) return porCodigo(parseInt(hex, 16), inteiro);
+      if (dec !== undefined) return porCodigo(Number(dec), inteiro);
+      return ENTIDADES[nome as string] ?? inteiro;
+    },
+  );
+}
+
+/**
+ * Tira TAG, e só tag: exige letra depois de `<` ou `</`.
+ *
+ * `/<[^>]+>/` era guloso sobre qualquer coisa que não fosse `>`, e isso come
+ * texto do produto. Medido: `"altura &lt; 40cm e peso &gt; 2kg"` virava
+ * `"altura 2kg"` — um `&lt;` no começo de uma descrição longa e um `&gt;` no
+ * fim apagavam o miolo inteiro, em silêncio. Especificação com operador é
+ * comum em loja ("peso &lt; 2kg", "crianças &lt; 5 anos"), e o agente passaria
+ * a responder a medida errada com confiança.
+ */
+const semTags = (texto: string) =>
+  texto.replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g, " ");
+
+/**
+ * Tira as tags, decodifica, e tira tags DE NOVO.
+ *
+ * A segunda passada existe porque HTML duplo-escapado é comum em editor de loja
+ * e em importação por CSV: `&lt;p&gt;oi&lt;/p&gt;` só vira `<p>oi</p>` depois de
+ * decodificar, e aí já tinha passado pela primeira limpeza. O motivo deste
+ * conserto é o cliente não ler `algod&atilde;o`; ler `<p>` é o mesmo problema.
+ */
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+  return semTags(decodificarEntidades(semTags(html)))
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -106,6 +208,44 @@ export function campoIlegivel(value: unknown): boolean {
 }
 
 /**
+ * O preço a mostrar quando o produto não tem preço próprio: o das variantes.
+ *
+ * Um valor só quando todas custam igual, e a faixa quando diferem — é o que
+ * responde "quanto custa" sem inventar precisão que o produto não tem.
+ */
+function precoDasVariantes(variants: NuvemshopProduct["variants"]): string {
+  if (!Array.isArray(variants)) return "";
+
+  // TUDO OU NADA, e é o ponto todo desta função.
+  //
+  // Descartar a variante que não parseia e anunciar o resto como preço é pior
+  // que `N/A`: com `["199,00", "1.299,00"]` o separador de milhar não converte,
+  // sobra um valor só, e o trecho diz `Preço: R$ 199.00` sem faixa e sem sinal
+  // de que faltou alguém. O agente afirma R$ 199 para um produto cuja variante
+  // GG custa R$ 1.299 — número errado dito com confiança. Se um preço presente
+  // não é legível, nenhum preço é anunciado.
+  const comPreco = variants
+    .map((v) => escalarTexto(v?.price))
+    .filter((texto) => texto.trim() !== "");
+  if (comPreco.length === 0) return "";
+
+  // A assimetria é o ponto: preço ausente não tem valor para distorcer; preço
+  // presente e ilegível tem um que pode diferir muito. Um não informa, o outro
+  // mente. Zero é "não cadastrado" — na Nuvemshop é o que sobra em variante sem
+  // preço próprio —, então não pode esconder o preço das outras.
+  const valores = comPreco.map((texto) => Number(texto.replace(",", ".")));
+  if (valores.some((n) => !Number.isFinite(n))) return "";
+
+  const reais = valores.filter((n) => n > 0);
+  if (reais.length === 0) return "";
+
+  const menor = Math.min(...reais);
+  const maior = Math.max(...reais);
+  const dinheiro = (n: number) => n.toFixed(2);
+  return menor === maior ? dinheiro(menor) : `${dinheiro(menor)} a R$ ${dinheiro(maior)}`;
+}
+
+/**
  * Converts a Nuvemshop product object into a plain-text RAG document.
  */
 export function formatProductForRag(product: NuvemshopProduct): string {
@@ -115,7 +255,14 @@ export function formatProductForRag(product: NuvemshopProduct): string {
   // objeto sem reclamar e escreve `[object Object]`. Não derruba nada, e é pior
   // nisso — envenena o trecho que vai para o acervo, e o agente responde o
   // preço com `[object Object]` para o cliente.
-  const precoTexto = escalarTexto(product.price);
+  // O PREÇO DO PRODUTO PODE MORAR NAS VARIANTES.
+  //
+  // Na Nuvemshop, produto com variante tem `price` nulo no nível do produto, e
+  // o preço real fica em cada variante. Medido no catálogo real: 879 de 991
+  // trechos indexados saíam com `Preço: N/A` e o `R$ 199,00` três linhas
+  // abaixo. Ou seja, o acervo falhava exatamente na pergunta que o cliente
+  // mais faz, e sem erro nenhum para denunciar.
+  const precoTexto = escalarTexto(product.price) || precoDasVariantes(product.variants);
   const price = precoTexto ? `R$ ${precoTexto}` : "N/A";
   const sku = escalarTexto(product.sku) || "N/A";
   const permalink = escalarTexto(product.permalink);

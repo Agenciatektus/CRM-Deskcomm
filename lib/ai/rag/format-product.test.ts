@@ -25,6 +25,17 @@ import {
 
 const base: NuvemshopProduct = { id: "1", name: "Camisa" };
 
+/**
+ * A linha `Preço:` DO PRODUTO, não a das variantes.
+ *
+ * `toContain("Preço: R$ 199.00")` sobre o texto todo casa com
+ * `Variantes: Preço: R$ 199.00, SKU: M`, e foi assim que o controle negativo
+ * do preço zerado passou verde: o produto saía `N/A` e a asserção achava o
+ * preço na linha de baixo.
+ */
+const linhaDoPreco = (texto: string) =>
+  texto.split("\n").find((l) => l.startsWith("Preço:")) ?? "(sem linha de preço)";
+
 describe("formatProductForRag — campos multi-idioma da loja", () => {
   it("⭐ descrição como objeto por idioma: usa o pt e tira o HTML", () => {
     const texto = formatProductForRag({
@@ -159,6 +170,215 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).not.toContain("Preço: N/A");
     expect(texto).not.toContain("SKU: N/A");
     expect(texto).not.toContain("Variantes: N/A");
+  });
+
+  // ─── medido no catálogo real da loja, depois de indexar ──────────────────
+  //
+  // 879 de 991 trechos saíam com `Preço: N/A` e o `R$ 199,00` três linhas
+  // abaixo, em `Variantes:`. Na Nuvemshop, produto com variante tem `price`
+  // nulo no nível do produto. O acervo falhava na pergunta que o cliente mais
+  // faz, e sem erro nenhum para denunciar.
+  it("⭐ produto sem preço próprio usa o preço das variantes", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [
+        { price: "199.00", sku: "13320" },
+        { price: "199.00", sku: "13322" },
+      ],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
+  });
+
+  it("⭐ variantes com preços diferentes viram faixa, sem inventar precisão", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [
+        { price: "99.00", sku: "A" },
+        { price: "199.00", sku: "B" },
+        { price: "149.00", sku: "C" },
+      ],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 99.00 a R$ 199.00");
+  });
+
+  it("preço próprio do produto continua ganhando da variante", () => {
+    const texto = formatProductForRag({
+      ...base,
+      price: "250.00",
+      variants: [{ price: "199.00", sku: "A" }],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 250.00");
+  });
+
+  // Descartar a variante que não parseia e anunciar o resto é PIOR que N/A: o
+  // separador de milhar não converte, sobra um valor, e o agente afirma R$ 199
+  // para um produto cuja GG custa R$ 1.299 — número errado dito com confiança.
+  it("⭐ preço ilegível em alguma variante: nenhum preço é anunciado", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199,00", sku: "M" }, { price: "1.299,00", sku: "GG" }],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: N/A");
+  });
+
+  it("vírgula decimal simples continua sendo lida", () => {
+    expect(
+      linhaDoPreco(formatProductForRag({ ...base, variants: [{ price: "199,00", sku: "M" }] })),
+    ).toBe("Preço: R$ 199.00");
+  });
+
+  it("variante sem preço no meio de outras com preço não derruba a leitura", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199.00", sku: "M" }, { sku: "G" }, { price: "", sku: "GG" }],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
+  });
+
+  it("sem preço em lugar nenhum segue N/A", () => {
+    expect(linhaDoPreco(formatProductForRag({ ...base, variants: [{ sku: "A" }] }))).toBe(
+      "Preço: N/A",
+    );
+    expect(linhaDoPreco(formatProductForRag(base))).toBe("Preço: N/A");
+  });
+
+  // 601 de 991 trechos levavam entidade crua para o acervo. `stripHtml` tirava
+  // as TAGS e deixava isso: piora o casamento semântico, e se a resposta citar
+  // a descrição o cliente lê `algod&atilde;o`.
+  it("⭐ entidade HTML é decodificada, não vai crua para o acervo", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: {
+        pt: "<p>Algod&atilde;o puro&nbsp;&bull; gola cl&aacute;ssica &amp; c&ocirc;moda</p>",
+      },
+    });
+
+    expect(texto).toContain("Algodão puro • gola clássica & cômoda");
+    expect(texto).not.toContain("&atilde;");
+    expect(texto).not.toContain("&nbsp;");
+    expect(texto).not.toContain("&amp;");
+  });
+
+  it("entidade numérica decimal e HEXADECIMAL", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Camisa &#233;poca &#x1F600; &#8220;top&#8221; &#x41;",
+    });
+
+    expect(texto).toContain("época");
+    // positiva para o ramo hex: sem isto, apagar o ramo passava verde, porque
+    // `not.toMatch(/&#\d+;/)` não casa `&#x...` (o `&#` vem seguido de `x`).
+    expect(texto).toContain("\u{1F600}");
+    expect(texto).toContain("A");
+    expect(texto).toContain("\u201ctop\u201d");
+    expect(texto).not.toMatch(/&#x?[0-9a-fA-F]+;/);
+  });
+
+  // ESTE caso é o que impedia o catálogo inteiro de cair. `fromCodePoint` lança
+  // `RangeError` fora de 0–0x10FFFF, e a exceção sobe de `formatProductForRag`
+  // até `indexarFonte`: um caractere ruim em UM produto derrubaria os 879, com
+  // uma mensagem que não aponta para produto nenhum.
+  it("⭐ código numérico inválido fica cru e NÃO derruba o produto", () => {
+    for (const ruim of ["&#x110000;", "&#1114112;", "&#xFFFFFFF;", "&#999999999999;"]) {
+      let texto = "";
+      expect(() => {
+        texto = formatProductForRag({ ...base, description: `Camisa ${ruim} fim` });
+      }).not.toThrow();
+      expect(texto).toContain(ruim);
+    }
+  });
+
+  it("⭐ NUL e surrogate solitário também ficam crus (explodiriam longe da causa)", () => {
+    const texto = formatProductForRag({ ...base, description: "a &#0; b &#xD800; c" });
+
+    expect(texto).toContain("&#0;");
+    expect(texto).toContain("&#xD800;");
+    expect(texto).not.toContain("\u0000");
+  });
+
+  // Em duas passadas, a numérica devolvia `&` e a nomeada rescaneava a saída:
+  // `&#38;nbsp;` virava espaço, quando é o texto literal `&nbsp;`.
+  it("⭐ nada é relido: `&#38;nbsp;` é o texto `&nbsp;`, não um espaço", () => {
+    const texto = formatProductForRag({ ...base, description: "x &#38;nbsp; y" });
+
+    expect(texto).toContain("&nbsp;");
+  });
+
+  it("`&amp;X;` continua protegido da dupla decodificação", () => {
+    const texto = formatProductForRag({ ...base, description: "a &amp;nbsp; b &amp;amp; c" });
+
+    expect(texto).toContain("&nbsp;");
+    expect(texto).toContain("&amp;");
+  });
+
+  // HTML duplo-escapado é comum em editor de loja e em importação por CSV: só
+  // vira tag DEPOIS de decodificar, quando a primeira limpeza já passou.
+  it("⭐ HTML duplo-escapado não devolve tag literal ao acervo", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "&lt;p&gt;Algod&atilde;o puro&lt;/p&gt;",
+    });
+
+    expect(texto).toContain("Algodão puro");
+    expect(texto).not.toContain("<p>");
+    expect(texto).not.toContain("</p>");
+  });
+
+  // A segunda passada de limpeza APAGAVA isto: com `&lt;` e `&gt;` já
+  // decodificados, o regex antigo (`/<[^>]+>/`) comia tudo entre eles.
+  // "altura &lt; 40cm e peso &gt; 2kg" virava "altura 2kg", em silêncio —
+  // especificação com operador é comum em loja, e o agente passaria a
+  // responder a medida errada com confiança.
+  it("⭐ operador escapado na descrição NÃO apaga o texto do produto", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Medidas: altura &lt; 40cm e peso &gt; 2kg",
+    });
+
+    expect(texto).toContain("altura < 40cm");
+    expect(texto).toContain("peso > 2kg");
+  });
+
+  it("⭐ e segue tirando tag de verdade, inclusive duplo-escapada", () => {
+    expect(
+      formatProductForRag({ ...base, description: "&lt;div class=x&gt;Linho&lt;/div&gt;" }),
+    ).toContain("Descrição: Linho");
+    expect(
+      formatProductForRag({ ...base, description: "<p>Linho<br/>puro</p>" }),
+    ).toContain("Descrição: Linho puro");
+  });
+
+  it("⭐ variante com preço 0.00 não esconde o preço das outras", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: "199.00", sku: "M" }, { price: "0.00", sku: "G" }],
+    });
+
+    expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
+  });
+
+  it("entidades tipográficas de Word/CSV e ordinais PT-BR", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Tamanho 2&ordm; &rsquo;slim&rsquo; &ldquo;fit&rdquo; 1&frac12; 5&times;",
+    });
+
+    expect(texto).toContain("2º");
+    expect(texto).toContain("\u2019slim\u2019");
+    expect(texto).toContain("\u201cfit\u201d");
+    expect(texto).toContain("1½");
+    expect(texto).toContain("5×");
+  });
+
+  it("entidade desconhecida fica como está, em vez de virar lixo", () => {
+    const texto = formatProductForRag({ ...base, description: "Marca &naoexiste; aqui" });
+
+    expect(texto).toContain("&naoexiste;");
   });
 
   it("variante sem nada legível fecha com N/A, não com rótulo vazio", () => {
