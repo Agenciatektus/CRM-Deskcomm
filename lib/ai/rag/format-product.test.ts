@@ -135,6 +135,40 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).toContain("Preço: R$ 189.90");
     expect(texto).toContain("SKU: CAM-01");
   });
+
+  // Regressão nascida do conserto anterior: ao mandar os escalares pela porta
+  // do `localizedText`, eles perderam a interpolação de template, que aceitava
+  // número, e viravam `N/A`. Com preço numérico o catálogo indexaria inteiro,
+  // sem crash, com todo produto em `Preço: N/A` — e o cliente que pergunta
+  // quanto custa recebe silêncio. Que esta API manda número onde o tipo promete
+  // string já está medido em casa: o `id` é coagido com `String()` no worker e
+  // no webhook.
+  it("⭐ preço e SKU numéricos continuam no texto — nunca viram N/A", () => {
+    const texto = formatProductForRag({
+      ...base,
+      price: 199.9 as never,
+      sku: 12345 as never,
+      variants: [{ price: 189.9 as never, sku: 12345 as never }],
+    });
+
+    expect(texto).toContain("Preço: R$ 199.9");
+    expect(texto).toContain("SKU: 12345");
+    expect(texto).toContain("Preço: R$ 189.9, SKU: 12345");
+    // só nos campos escalares: a descrição ausente deste produto base é N/A
+    // por direito, e asserir o texto inteiro media a coisa errada.
+    expect(texto).not.toContain("Preço: N/A");
+    expect(texto).not.toContain("SKU: N/A");
+    expect(texto).not.toContain("Variantes: N/A");
+  });
+
+  it("variante sem nada legível fecha com N/A, não com rótulo vazio", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ price: {} as never, sku: {} as never }],
+    });
+
+    expect(texto).toContain("Variantes: N/A");
+  });
 });
 
 /**
@@ -149,6 +183,9 @@ describe("campoIlegivel", () => {
     expect(campoIlegivel(null)).toBe(false);
     expect(campoIlegivel("")).toBe(false);
     expect(campoIlegivel({ pt: "" })).toBe(false);
+    // objeto vazio é o mesmo fato: sem isto, loja que entregue `{}` para
+    // produto sem descrição abriria aviso em massa como mudança de API.
+    expect(campoIlegivel({})).toBe(false);
   });
 
   it("texto em qualquer idioma NÃO é ilegível", () => {

@@ -64,6 +64,25 @@ function localizedText(value: unknown): string {
 }
 
 /**
+ * Campo escalar da API: aqui número TAMBÉM é texto.
+ *
+ * Existe porque mandar `price` e `sku` pela porta do `localizedText` corrigiu o
+ * `[object Object]` e criou outro buraco: eles entravam por interpolação de
+ * template, que aceitava número, e passaram a virar `N/A`. Com preço numérico o
+ * catálogo indexaria inteiro, sem crash, com todo produto em `Preço: N/A` — e o
+ * cliente que pergunta quanto custa recebe silêncio. Pior que a descrição
+ * faltando, porque preço é o que mais se pergunta.
+ *
+ * Que essa API manda número onde a nossa tipagem promete string já está medido
+ * nesta casa: o `id` do produto é coagido com `String()` no worker e no webhook,
+ * apesar de `id: string` no tipo.
+ */
+function escalarTexto(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return localizedText(value);
+}
+
+/**
  * O campo veio preenchido e ainda assim não virou texto.
  *
  * Serve para distinguir as duas coisas que `localizedText` devolve iguais:
@@ -76,6 +95,11 @@ export function campoIlegivel(value: unknown): boolean {
   if (typeof value === "string") return false;
   if (Array.isArray(value)) return true;
   if (typeof value !== "object") return true;
+  // Objeto VAZIO é o mesmo fato que campo ausente: lojista que não escreveu.
+  // Sem esta linha, uma loja que entregue `description: {}` abriria aviso em
+  // massa como se a API tivesse mudado — o falso positivo que este corte existe
+  // para evitar.
+  if (Object.keys(value as object).length === 0) return false;
   // Ter string, ainda que VAZIA, significa que o formato continua legível e o
   // lojista é que não escreveu. Ilegível é não haver texto nenhum onde devia.
   return !Object.values(value as Record<string, unknown>).some((v) => typeof v === "string");
@@ -91,9 +115,10 @@ export function formatProductForRag(product: NuvemshopProduct): string {
   // objeto sem reclamar e escreve `[object Object]`. Não derruba nada, e é pior
   // nisso — envenena o trecho que vai para o acervo, e o agente responde o
   // preço com `[object Object]` para o cliente.
-  const price = localizedText(product.price) ? `R$ ${localizedText(product.price)}` : "N/A";
-  const sku = localizedText(product.sku) || "N/A";
-  const permalink = localizedText(product.permalink);
+  const precoTexto = escalarTexto(product.price);
+  const price = precoTexto ? `R$ ${precoTexto}` : "N/A";
+  const sku = escalarTexto(product.sku) || "N/A";
+  const permalink = escalarTexto(product.permalink);
 
   // `Array.isArray` e não só `length`: com `variants: "189.90"` a guarda de
   // tamanho passa reto e o `.map` levanta o MESMO `TypeError` que derrubou o
@@ -103,14 +128,14 @@ export function formatProductForRag(product: NuvemshopProduct): string {
       ? product.variants
           .map((v) => {
             const parts: string[] = [];
-            const vPrice = localizedText(v.price);
-            const vSku = localizedText(v.sku);
+            const vPrice = escalarTexto(v.price);
+            const vSku = escalarTexto(v.sku);
             if (vPrice) parts.push(`Preço: R$ ${vPrice}`);
             if (vSku) parts.push(`SKU: ${vSku}`);
             return parts.join(", ");
           })
           .filter((v) => v.length > 0)
-          .join(" | ")
+          .join(" | ") || "N/A"
       : "N/A";
 
   const categories =

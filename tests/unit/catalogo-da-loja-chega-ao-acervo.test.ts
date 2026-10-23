@@ -198,6 +198,8 @@ describe("o catálogo da loja chega ao acervo", () => {
 
     // piso de amostra: loja de 3 produtos não vira alarme por um cadastro torto
     expect(corpo).toMatch(/produtos\.length >= PISO_DE_AMOSTRA/);
+    // a conta também, não só o piso: divisão e sentido da comparação
+    expect(corpo).toMatch(/ilegiveis \/ produtos\.length > PROPORCAO_DE_ALERTA/);
     expect(worker).toContain("const PISO_DE_AMOSTRA = 10;");
     expect(worker).toContain("const PROPORCAO_DE_ALERTA = 0.2;");
   });

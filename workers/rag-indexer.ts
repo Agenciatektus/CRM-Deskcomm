@@ -275,10 +275,6 @@ async function pedacosDeCatalogo(fonte: FonteRow): Promise<Pedaco[]> {
     }
   }
 
-  // Limiar com piso de amostra: uma loja de 3 produtos não dispara alarme por
-  // um cadastro torto, e 20% de um catálogo de verdade é formato quebrado.
-  const PISO_DE_AMOSTRA = 10;
-  const PROPORCAO_DE_ALERTA = 0.2;
   if (produtos.length >= PISO_DE_AMOSTRA && ilegiveis / produtos.length > PROPORCAO_DE_ALERTA) {
     const pct = Math.round((ilegiveis / produtos.length) * 100);
     console.warn("[rag-indexer] campo de produto ilegível em massa", {
@@ -344,6 +340,16 @@ const TETO_DE_PAGINAS = 10;
  * quebra, porque o `embedMany` fatia sozinho, mas invalida a conta acima.
  */
 const TRECHOS_POR_LOTE = 100;
+
+/**
+ * Quando o aviso de campo ilegível abre.
+ *
+ * Piso de amostra para uma loja de 3 produtos não virar alarme por um cadastro
+ * torto, e proporção porque formato quebrado atinge o catálogo todo, não um
+ * produto. Moram no módulo, junto do teto de páginas, e não no corpo da função.
+ */
+const PISO_DE_AMOSTRA = 10;
+const PROPORCAO_DE_ALERTA = 0.2;
 
 async function listarCatalogoDaLoja(organizationId: string): Promise<NuvemshopProduct[]> {
   const creds = await credenciaisDaLoja(organizationId);
