@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   campoIlegivel,
+  decodificarEntidadesDeAcervo,
   formatProductForRag,
+  limparTextoDeAcervo,
   type NuvemshopProduct,
 } from "@/lib/ai/rag/format-product";
 
@@ -362,6 +364,73 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(linhaDoPreco(texto)).toBe("Preço: R$ 199.00");
   });
 
+  // ─── o que distingue uma variante da outra ──────────────────────────────
+  //
+  // Sem isto o acervo não responde "tem M?" nem "tem na cor preta?", e o trecho
+  // ficava com treze linhas de `Preço: R$ 199.00, SKU: 13320` iguais entre si.
+  //
+  // Três formas, porque a doc pública não fixa a da resposta: `values` com
+  // chave de idioma, `values` com string, e `attributes: [{name, value}]`.
+  it("⭐ `values` com idioma, casado com os nomes do produto", () => {
+    const texto = formatProductForRag({
+      ...base,
+      attributes: [{ pt: "Tamanho" }, { pt: "Cor" }],
+      variants: [{ values: [{ pt: "M" }, { pt: "Azul" }], price: "199.00", sku: "A" }],
+    });
+
+    expect(texto).toContain("Variantes: Tamanho: M, Cor: Azul, Preço: R$ 199.00, SKU: A");
+  });
+
+  it("⭐ `values` com string simples também", () => {
+    const texto = formatProductForRag({
+      ...base,
+      attributes: ["Tamanho"],
+      variants: [{ values: ["GG"], price: "199.00" }],
+    });
+
+    expect(texto).toContain("Tamanho: GG");
+  });
+
+  // A doc enuncia uma regra só sobre os dois campos: a quantidade de
+  // `attributes` do produto é igual à de `values` da variante. Quando não bate,
+  // a própria API rompeu o invariante e nomear passa a ser chute — `Tamanho: M,
+  // Azul` afirmaria metade de um par que ninguém sustenta.
+  it("⭐ contagem divergente: sai só o valor, sem nomear pela metade", () => {
+    const texto = formatProductForRag({
+      ...base,
+      attributes: [{ pt: "Tamanho" }],
+      variants: [{ values: [{ pt: "M" }, { pt: "Azul" }], price: "199.00" }],
+    });
+
+    expect(texto).toContain("Variantes: M, Azul, Preço: R$ 199.00");
+    expect(texto).not.toContain("Tamanho: M");
+  });
+
+  it("valor sem nome de atributo sai só com o valor", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [{ values: [{ pt: "Preto" }], price: "199.00" }],
+    });
+
+    expect(texto).toContain("Variantes: Preto, Preço: R$ 199.00");
+  });
+
+  it("forma que não reconheço é ignorada, e o resto da variante sobrevive", () => {
+    const texto = formatProductForRag({
+      ...base,
+      attributes: 42 as never,
+      variants: [{ values: 7 as never, price: "199.00", sku: "A" }],
+    });
+
+    expect(texto).toContain("Variantes: Preço: R$ 199.00, SKU: A");
+  });
+
+  it("variante sem atributo nenhum segue como antes", () => {
+    expect(
+      formatProductForRag({ ...base, variants: [{ price: "199.00", sku: "A" }] }),
+    ).toContain("Variantes: Preço: R$ 199.00, SKU: A");
+  });
+
   it("entidades tipográficas de Word/CSV e ordinais PT-BR", () => {
     const texto = formatProductForRag({
       ...base,
@@ -397,6 +466,59 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
  * A distinção é o que impede o alarme de virar falso positivo: lojista que não
  * escreveu descrição é normal; campo preenchido que não vira texto é defeito.
  */
+/**
+ * O limpador que deixou de ser exclusivo do catálogo.
+ *
+ * Resposta de FAQ colada de um site levava `algod&atilde;o` e `<p>` ao acervo —
+ * o mesmo defeito que já estava consertado no produto.
+ */
+describe("limparTextoDeAcervo", () => {
+  it("⭐ tira tag e decodifica entidade, igual ao catálogo", () => {
+    expect(limparTextoDeAcervo("<p>Algod&atilde;o puro&nbsp;&bull; leve</p>")).toBe(
+      "Algodão puro • leve",
+    );
+  });
+
+  it("⭐ preserva operador escapado, como no catálogo", () => {
+    expect(limparTextoDeAcervo("peso &lt; 2kg")).toBe("peso < 2kg");
+  });
+
+  it("texto limpo passa inalterado", () => {
+    expect(limparTextoDeAcervo("Entrega em 5 dias úteis")).toBe("Entrega em 5 dias úteis");
+  });
+
+  it("código inválido fica cru, sem lançar", () => {
+    expect(() => limparTextoDeAcervo("a &#x110000; b")).not.toThrow();
+    expect(limparTextoDeAcervo("a &#x110000; b")).toContain("&#x110000;");
+  });
+});
+
+/**
+ * Para fonte que NÃO é HTML. As extensões de documento aceitas são `md`, `txt`,
+ * `csv` e `pdf`, e ali remover `<...>` come conteúdo em vez de limpar.
+ */
+describe("decodificarEntidadesDeAcervo", () => {
+  it("⭐ placeholder entre < > SOBREVIVE — é modelo de mensagem, não tag", () => {
+    for (const texto of [
+      "Preencha com <nome do cliente> e envie",
+      "Modelo: Prezado <nome>, seu pedido <numero> saiu",
+      "Politica: trocas em <ate 7 dias> corridos",
+    ]) {
+      expect(decodificarEntidadesDeAcervo(texto)).toBe(texto);
+    }
+  });
+
+  it("⭐ e ainda decodifica entidade, que é a parte útil em PDF e MD", () => {
+    expect(decodificarEntidadesDeAcervo("Algod&atilde;o puro&nbsp;&bull; leve")).toBe(
+      "Algodão puro • leve",
+    );
+  });
+
+  it("código inválido fica cru, sem lançar", () => {
+    expect(() => decodificarEntidadesDeAcervo("a &#x110000; b")).not.toThrow();
+  });
+});
+
 describe("campoIlegivel", () => {
   it("campo ausente ou vazio NÃO é ilegível — é lojista sem descrição", () => {
     expect(campoIlegivel(undefined)).toBe(false);
