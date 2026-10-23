@@ -49,6 +49,7 @@ import { estimateTokens } from "@/lib/ai/runtime/history";
 import {
   campoIlegivel,
   formatProductForRag,
+  limparTextoDeAcervo,
   type NuvemshopProduct,
 } from "@/lib/ai/rag/format-product";
 import {
@@ -249,7 +250,11 @@ async function pedacosDeFaq(fonte: FonteRow): Promise<Pedaco[]> {
 
   const pedacos: Pedaco[] = [];
   for (const it of (data ?? []) as Array<{ question: string; answer: string }>) {
-    const texto = `Pergunta: ${it.question}\nResposta: ${it.answer}`;
+    // Pelo mesmo limpador do catálogo: resposta de FAQ colada de um site traz
+    // tag e entidade HTML, e isso ia cru para o acervo.
+    const texto = `Pergunta: ${limparTextoDeAcervo(it.question)}\nResposta: ${limparTextoDeAcervo(
+      it.answer,
+    )}`;
     for (const c of chunkText(texto)) {
       pedacos.push({ content: c, metadata: { source_type: "faq", pergunta: it.question } });
     }
@@ -275,7 +280,8 @@ async function pedacosDeDocumento(fonte: FonteRow): Promise<Pedaco[]> {
   if (!blobPath) throw new ErroDeExtracao("a fonte não aponta para nenhum arquivo");
 
   const { texto, extensao } = await extrairTextoDoArquivo(blobPath, meta.ext);
-  return chunkText(texto, { maxChars: 1600, overlapChars: 200 }).map((c) => ({
+  // Idem: documento exportado de página web chega com entidade e tag.
+  return chunkText(limparTextoDeAcervo(texto), { maxChars: 1600, overlapChars: 200 }).map((c) => ({
     content: c,
     metadata: {
       source_type: "documento",

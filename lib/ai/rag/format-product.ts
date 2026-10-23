@@ -8,6 +8,18 @@
 export interface NuvemshopProductVariant {
   price?: string;
   sku?: string;
+  /**
+   * O que distingue esta variante: tamanho, cor, voltagem.
+   *
+   * A documentação pública mostra `values` como lista com chave de idioma
+   * (`[{ "en": "X-Large" }]`) na atualização, e `attributes` como
+   * `[{ name, value }]` na criação. O formato da RESPOSTA não está na doc, e
+   * não vou afirmar o que não medi: o leitor abaixo aceita as duas formas, mais
+   * string simples, e ignora o que não reconhecer. O tipo aqui é promessa nossa
+   * sobre payload de terceiro, e nesta série isso já custou três defeitos.
+   */
+  values?: unknown;
+  attributes?: unknown;
 }
 
 export interface NuvemshopProduct {
@@ -27,6 +39,8 @@ export interface NuvemshopProduct {
   permalink?: string;
   variants?: NuvemshopProductVariant[];
   categories?: Array<{ name: { pt: string } | string }>;
+  /** Os NOMES dos atributos ("Tamanho", "Cor"), na ordem dos `values`. */
+  attributes?: unknown;
 }
 
 /**
@@ -129,6 +143,17 @@ const semTags = (texto: string) =>
  * decodificar, e aí já tinha passado pela primeira limpeza. O motivo deste
  * conserto é o cliente não ler `algod&atilde;o`; ler `<p>` é o mesmo problema.
  */
+/**
+ * O MESMO limpador, para quem não é catálogo.
+ *
+ * Estava fechado neste módulo e só o produto passava por ele. Uma resposta de
+ * FAQ colada de um site levava `algod&atilde;o` e `&nbsp;` para o acervo — o
+ * defeito que este arquivo conserta no catálogo, intacto nas outras fontes.
+ */
+export function limparTextoDeAcervo(texto: string): string {
+  return stripHtml(texto);
+}
+
 function stripHtml(html: string): string {
   return semTags(decodificarEntidades(semTags(html)))
     .replace(/\s{2,}/g, " ")
@@ -208,6 +233,61 @@ export function campoIlegivel(value: unknown): boolean {
 }
 
 /**
+ * Os nomes dos atributos do produto, na ordem em que os `values` aparecem.
+ *
+ * Aceita item como string ou como objeto por idioma. O que não virar texto sai
+ * da lista como "" e o leitor da variante trata isso como nome desconhecido.
+ */
+function nomesDosAtributos(attributes: unknown): string[] {
+  if (!Array.isArray(attributes)) return [];
+  return attributes.map((a) => {
+    const texto = localizedText(a);
+    if (texto) return texto;
+    // forma `{ name, value }`: aqui interessa o nome
+    if (a && typeof a === "object") return localizedText((a as { name?: unknown }).name);
+    return "";
+  });
+}
+
+/**
+ * O que distingue esta variante, em texto: `Tamanho: M, Cor: Azul`.
+ *
+ * Sem isto o acervo não responde "tem M?" nem "tem na cor preta?", que é o que
+ * se pergunta numa loja de roupa — e o trecho ficava com treze linhas de
+ * `Preço: R$ 199.00, SKU: 13320` indistinguíveis entre si.
+ *
+ * Três formas aceitas, porque a doc pública não fixa a da resposta:
+ * `values: [{pt: "M"}]` ou `values: ["M"]` casados com os nomes do produto, e
+ * `attributes: [{name: "Tamanho", value: "M"}]`, que já traz o par pronto.
+ */
+function atributosDaVariante(
+  v: NuvemshopProductVariant,
+  nomes: string[],
+): string {
+  const deValues = Array.isArray(v?.values)
+    ? (v.values as unknown[]).map((item, i) => {
+        const valor = localizedText(item);
+        if (!valor) return "";
+        const nome = nomes[i] ?? "";
+        return nome ? `${nome}: ${valor}` : valor;
+      })
+    : [];
+
+  const deAttributes = Array.isArray(v?.attributes)
+    ? (v.attributes as unknown[]).map((item) => {
+        if (!item || typeof item !== "object") return "";
+        const par = item as { name?: unknown; value?: unknown };
+        const nome = localizedText(par.name);
+        const valor = localizedText(par.value);
+        if (!valor) return "";
+        return nome ? `${nome}: ${valor}` : valor;
+      })
+    : [];
+
+  return [...deValues, ...deAttributes].filter((p) => p !== "").join(", ");
+}
+
+/**
  * O preço a mostrar quando o produto não tem preço próprio: o das variantes.
  *
  * Um valor só quando todas custam igual, e a faixa quando diferem — é o que
@@ -262,6 +342,7 @@ export function formatProductForRag(product: NuvemshopProduct): string {
   // trechos indexados saíam com `Preço: N/A` e o `R$ 199,00` três linhas
   // abaixo. Ou seja, o acervo falhava exatamente na pergunta que o cliente
   // mais faz, e sem erro nenhum para denunciar.
+  const nomesDeAtributo = nomesDosAtributos(product.attributes);
   const precoTexto = escalarTexto(product.price) || precoDasVariantes(product.variants);
   const price = precoTexto ? `R$ ${precoTexto}` : "N/A";
   const sku = escalarTexto(product.sku) || "N/A";
@@ -275,8 +356,12 @@ export function formatProductForRag(product: NuvemshopProduct): string {
       ? product.variants
           .map((v) => {
             const parts: string[] = [];
+            // o atributo vem PRIMEIRO: é o que o cliente pergunta ("tem M?"),
+            // e é o que distingue uma linha de variante da seguinte.
+            const atributo = atributosDaVariante(v, nomesDeAtributo);
             const vPrice = escalarTexto(v.price);
             const vSku = escalarTexto(v.sku);
+            if (atributo) parts.push(atributo);
             if (vPrice) parts.push(`Preço: R$ ${vPrice}`);
             if (vSku) parts.push(`SKU: ${vSku}`);
             return parts.join(", ");

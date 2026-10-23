@@ -357,6 +357,25 @@ describe("indexarFonte — falha parcial não ativa versão", () => {
     expect(corte <= String(patch.resolved_at)).toBe(true);
   });
 
+  // A limpeza de HTML era exclusiva do catalogo: resposta de FAQ colada de um
+  // site levava `algod&atilde;o` e `<p>` para o acervo, o mesmo defeito que
+  // ja estava consertado no produto.
+  it("⭐ a FAQ tambem passa pelo limpador: nada de tag nem entidade no acervo", async () => {
+    faq = [
+      { question: "Tem algod&atilde;o?", answer: "<p>Sim, 100% algod&atilde;o&nbsp;puro</p>" },
+    ];
+
+    await indexarFonte(FONTE as never, CHAVE as never);
+
+    expect(gravadas).toHaveLength(1);
+    const conteudo = String(gravadas[0]!.content);
+    expect(conteudo).toContain("Tem algodão?");
+    expect(conteudo).toContain("Sim, 100% algodão puro");
+    expect(conteudo).not.toContain("&atilde;");
+    expect(conteudo).not.toContain("&nbsp;");
+    expect(conteudo).not.toContain("<p>");
+  });
+
   it("⭐ versão que FALHA não fecha aviso nenhum", async () => {
     falhaDeUpsert = () => "permission denied";
 
