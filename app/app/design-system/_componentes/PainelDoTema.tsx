@@ -12,6 +12,7 @@ import { SecaoMenusAvisosBusca } from "../_secoes/SecaoMenusAvisosBusca";
 import { SecaoNavegacao } from "../_secoes/SecaoNavegacao";
 import { SecaoRegras } from "../_secoes/SecaoRegras";
 import { SecaoRetorno } from "../_secoes/SecaoRetorno";
+import { SecaoTelaDeLogin } from "../_secoes/SecaoTelaDeLogin";
 import { SecaoTarefas } from "../_secoes/SecaoTarefas";
 import { SecaoTipografia } from "../_secoes/SecaoTipografia";
 import { ATRIBUTO_DO_TEMA, type Tema } from "./tema";
@@ -51,6 +52,8 @@ export function PainelDoTema({ tema, subarvore = false }: { tema: Tema; subarvor
         <SecaoMenusAvisosBusca tema={tema} />
         <SecaoRetorno tema={tema} />
         <SecaoLayoutInbox tema={tema} />
+        {/* Só do CRM (o protótipo da Inbox não tem): a tela de acesso dividida. */}
+        <SecaoTelaDeLogin tema={tema} />
         <SecaoRegras tema={tema} />
       </div>
     </div>

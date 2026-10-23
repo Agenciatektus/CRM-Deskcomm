@@ -19,7 +19,7 @@ export default async function ForgotPasswordPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
+      <div className="space-y-1.5">
         <h1 className="text-title-lg">{t("Recuperar senha")}</h1>
         <p className="text-sm text-muted-foreground">
           {t("Informe seu e-mail e enviaremos um link de redefinição")}

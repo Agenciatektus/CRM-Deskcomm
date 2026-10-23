@@ -1,3 +1,4 @@
+import { ImagemDeMarcaDoAcesso } from "@/components/auth/ImagemDeMarcaDoAcesso";
 import { LogotipoDoProduto } from "@/components/branding/MarcaDoProduto";
 import { marcaEhADoProduto } from "@/lib/branding";
 import { marcaDaSaida } from "@/lib/branding/saida";
@@ -15,6 +16,15 @@ import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
  * só — e a que ficaria para trás é sempre a que ninguém abre (recuperação de
  * senha, cadastro de MFA), que é justamente onde o cliente do revendedor
  * aparece sozinho e sem contexto.
+ *
+ * ── A tela dividida ──────────────────────────────────────────────────────────
+ *
+ * Imagem de um lado, formulário do outro: a imagem fica à esquerda a partir de
+ * 1024 px e vira faixa no topo abaixo disso (`ImagemDeMarcaDoAcesso`). O DOM põe
+ * o formulário PRIMEIRO e a imagem depois (`order-first` a leva para o início
+ * da tela): quem navega por teclado ou leitor de tela chega ao formulário sem
+ * atravessar a decoração. Como o formulário cai na coluna da direita, o logo e
+ * os títulos das páginas alinham à esquerda.
  *
  * ── Por que `marcaDaSaida(null)` ──────────────────────────────────────────────
  *
@@ -56,11 +66,12 @@ export default async function PublicLayout({ children }: { children: React.React
 
   return (
     <IdiomaProvider locale={locale}>
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm space-y-6">
-          {marca.logoUrl || marca.logoDarkUrl ? (
-            <div className="flex justify-center">
-              {/*
+      <div className="flex min-h-dvh flex-col bg-background lg:flex-row lg:p-4">
+        <main className="flex min-w-0 flex-1 items-start justify-center px-6 py-8 lg:items-center lg:py-12">
+          <div className="w-full max-w-100 space-y-6">
+            {marca.logoUrl || marca.logoDarkUrl ? (
+              <div className="flex justify-start">
+                {/*
                 <img> em vez de next/image pelo mesmo motivo da barra lateral: a URL
                 é de quem hospeda e o `next/image` exige allowlist de domínios
                 fechada em BUILD — a imagem pré-buildada do self-host recusaria o
@@ -76,46 +87,48 @@ export default async function PublicLayout({ children }: { children: React.React
                 "primeira <img> da página", e uma asserção de negação com seletor
                 largo passa sozinha assim que outra imagem entra na tela.
               */}
-              <div
-                className={
-                  marca.logoDarkUrl
-                    ? "rounded-md"
-                    : "rounded-md dark:bg-white dark:px-3 dark:py-2 dark:shadow-sm"
-                }
-              >
-                {marca.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    data-testid="logo-da-fachada"
-                    src={marca.logoUrl}
-                    alt={marca.nome}
-                    className={
-                      marca.logoDarkUrl
-                        ? "h-auto max-h-20 w-auto max-w-[12rem] object-contain dark:hidden"
-                        : "h-auto max-h-20 w-auto max-w-[12rem] object-contain"
-                    }
-                  />
-                ) : (
-                  <span className="dark:hidden">{marca.nome}</span>
-                )}
-                {marca.logoDarkUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    data-testid="logo-escuro-da-fachada"
-                    src={marca.logoDarkUrl}
-                    alt={marca.nome}
-                    className="hidden h-auto max-h-20 w-auto max-w-[12rem] object-contain dark:block"
-                  />
-                ) : null}
+                <div
+                  className={
+                    marca.logoDarkUrl
+                      ? "rounded-md"
+                      : "rounded-md dark:bg-white dark:px-3 dark:py-2 dark:shadow-sm"
+                  }
+                >
+                  {marca.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      data-testid="logo-da-fachada"
+                      src={marca.logoUrl}
+                      alt={marca.nome}
+                      className={
+                        marca.logoDarkUrl
+                          ? "h-auto max-h-20 w-auto max-w-[12rem] object-contain dark:hidden"
+                          : "h-auto max-h-20 w-auto max-w-[12rem] object-contain"
+                      }
+                    />
+                  ) : (
+                    <span className="dark:hidden">{marca.nome}</span>
+                  )}
+                  {marca.logoDarkUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      data-testid="logo-escuro-da-fachada"
+                      src={marca.logoDarkUrl}
+                      alt={marca.nome}
+                      className="hidden h-auto max-h-20 w-auto max-w-[12rem] object-contain dark:block"
+                    />
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ) : marcaEhADoProduto({ name: marca.nome, logoUrl: null }) ? (
-            <div className="flex justify-center">
-              <LogotipoDoProduto nome={marca.nome} className="h-12 w-auto" />
-            </div>
-          ) : null}
-          {children}
-        </div>
+            ) : marcaEhADoProduto({ name: marca.nome, logoUrl: null }) ? (
+              <div className="flex justify-start">
+                <LogotipoDoProduto nome={marca.nome} className="h-12 w-auto" />
+              </div>
+            ) : null}
+            {children}
+          </div>
+        </main>
+        <ImagemDeMarcaDoAcesso />
       </div>
     </IdiomaProvider>
   );

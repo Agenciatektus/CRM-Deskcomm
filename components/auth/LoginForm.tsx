@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -75,9 +76,14 @@ export function LoginForm({ next }: { next?: string }) {
           <p className="text-xs text-destructive">{t(errors.email.message ?? "")}</p>
         )}
       </div>
-      <div className="space-y-1.5">
+      {/*
+        "Esqueci minha senha" aparece na linha do rótulo, mas vem DEPOIS do campo no
+        DOM: a grade o põe em cima (`row-start-1`), e o Tab segue e-mail, senha,
+        mostrar senha, esqueci, entrar — o link não fica entre os dois campos.
+      */}
+      <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1.5">
         <Label htmlFor="password">{t("Senha")}</Label>
-        <div className="relative">
+        <div className="relative col-span-2 row-start-2">
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
@@ -97,8 +103,16 @@ export function LoginForm({ next }: { next?: string }) {
             {showPassword ? <EyeSlash size={20} aria-hidden /> : <Eye size={20} aria-hidden />}
           </button>
         </div>
+        <Link
+          href="/login/forgot"
+          className="col-start-2 row-start-1 rounded-xs text-label font-semibold text-accent-text underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden"
+        >
+          {t("Esqueci minha senha")}
+        </Link>
         {errors.password && (
-          <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
+          <p className="col-span-2 row-start-3 text-xs text-destructive">
+            {t(errors.password.message ?? "")}
+          </p>
         )}
       </div>
       {serverError && (

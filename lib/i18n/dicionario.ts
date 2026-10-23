@@ -10135,6 +10135,22 @@ export const DICIONARIO: Traducoes = {
     es: "Confirmamos tu cuenta, pero hubo un error al preparar tu entorno. Intenta entrar de nuevo en unos instantes.",
   },
   "Esqueci minha senha": { es: "Olvidé mi contraseña" },
+  "Acesse sua conta em": { es: "Accede a tu cuenta en" },
+  "Tela de login (dividida)": { es: "Pantalla de inicio de sesión (dividida)" },
+  "Imagem de marca de um lado, formulário do outro. A imagem é decorativa e sempre escura; o formulário segue o tema.": {
+    es: "Imagen de marca de un lado, formulario del otro. La imagen es decorativa y siempre oscura; el formulario sigue el tema.",
+  },
+  "painel à esquerda, altura inteira": { es: "panel a la izquierda, altura completa" },
+  "centralizado, 400 px": { es: "centrado, 400 px" },
+  "faixa de 96 px no topo": { es: "franja de 96 px arriba" },
+  "ocupa a tela": { es: "ocupa la pantalla" },
+  "Sem a imagem, o painel cai no degradê suave da marca sobre o fundo escuro. O formulário não espera a imagem carregar.": {
+    es: "Sin la imagen, el panel cae en el degradado suave de la marca sobre el fondo oscuro. El formulario no espera a que cargue la imagen.",
+  },
+  "Atendimento, funil e IA no mesmo lugar.": { es: "Atención, embudo e IA en un solo lugar." },
+  "Cada conversa vira uma oportunidade acompanhada.": {
+    es: "Cada conversación se convierte en una oportunidad con seguimiento.",
+  },
   "Recuperar acesso": { es: "Recuperar acceso" },
   "Use um código de recuperação para reconfigurar sua autenticação em duas etapas.": {
     es: "Usa un código de recuperación para reconfigurar tu autenticación en dos pasos.",
