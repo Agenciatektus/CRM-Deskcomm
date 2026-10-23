@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatProductForRag, type NuvemshopProduct } from "@/lib/ai/rag/format-product";
+import {
+  campoIlegivel,
+  formatProductForRag,
+  type NuvemshopProduct,
+} from "@/lib/ai/rag/format-product";
 
 /**
  * A DESCRIÇÃO DA NUVEMSHOP É MULTI-IDIOMA, E ISSO MATOU O CATÁLOGO INTEIRO.
@@ -15,7 +19,8 @@ import { formatProductForRag, type NuvemshopProduct } from "@/lib/ai/rag/format-
  * tela dizendo "conectado".
  *
  * O que estes casos travam: todo campo que vem do payload de terceiro passa por
- * `localizedText`, e campo que não vira texto não derruba o catálogo.
+ * `localizedText`, campo que não vira texto não derruba o catálogo, e campo em
+ * idioma que não é `pt` NÃO vira silêncio.
  */
 
 const base: NuvemshopProduct = { id: "1", name: "Camisa" };
@@ -40,17 +45,53 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(formatProductForRag(base)).toContain("Descrição: N/A");
   });
 
+  // A primeira versão desta cerca esperava "N/A" aqui, ou seja, travava o
+  // SILÊNCIO como se fosse o comportamento desejado. Loja com o idioma
+  // preenchido em outra chave indexaria centenas de linhas vazias, com
+  // embedding pago que nunca casa com a pergunta do cliente.
+  it("⭐ idioma que não é pt: usa o texto que existir, nunca vira vazio", () => {
+    expect(
+      formatProductForRag({ ...base, description: { es: "<p>Algodón</p>" } as never }),
+    ).toContain("Descrição: Algodón");
+
+    // `pt` presente mas vazio não deve ganhar do idioma que tem conteúdo
+    expect(
+      formatProductForRag({ ...base, description: { pt: "", es: "Algodón" } as never }),
+    ).toContain("Descrição: Algodón");
+
+    expect(formatProductForRag({ ...base, name: { es: "Camisa" } as never })).toContain(
+      "Produto: Camisa",
+    );
+  });
+
   // O tipo é promessa NOSSA sobre payload de terceiro, e foi uma promessa
   // dessas que derrubou a indexação. Um catálogo de centenas de produtos não
   // pode morrer inteiro por um campo estranho em um deles.
-  it("⭐ campo em formato inesperado não derruba o produto", () => {
-    for (const estranho of [42, [], { en: "only english" }, null, { pt: 7 }]) {
-      const texto = formatProductForRag({
-        ...base,
-        description: estranho as never,
-      });
-      expect(texto).toContain("Descrição: N/A");
+  //
+  // O `as never` fura o contrato de propósito: o que se mede aqui é o runtime.
+  // Ele desliga a checagem, então não copie o padrão para fora deste caso.
+  it("⭐ formato inesperado não derruba o produto — em NENHUM dos campos", () => {
+    for (const estranho of [42, [], { pt: 7 }, { pt: {} }]) {
+      expect(
+        formatProductForRag({ ...base, description: estranho as never }),
+      ).toContain("Descrição: N/A");
     }
+
+    // a cerca anterior prometia "os campos" e variava só a descrição; foi por
+    // isso que estes dois crashes passaram verdes.
+    expect(() =>
+      formatProductForRag({ ...base, variants: "189.90" as never }),
+    ).not.toThrow();
+    expect(formatProductForRag({ ...base, variants: "189.90" as never })).toContain(
+      "Variantes: N/A",
+    );
+
+    expect(() =>
+      formatProductForRag({ ...base, categories: "Masculino" as never }),
+    ).not.toThrow();
+    expect(formatProductForRag({ ...base, categories: "Masculino" as never })).toContain(
+      "Categorias: N/A",
+    );
   });
 
   it("nome e categoria também aceitam objeto por idioma", () => {
@@ -77,5 +118,49 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).toContain("Preço: R$ 189.90, SKU: CAM-01-M");
     expect(texto).toContain("SKU: CAM-01");
     expect(texto).toContain("Link: https://loja.exemplo/camisa");
+  });
+
+  // Não derruba nada, e é pior nisso: envenena o trecho que vai para o acervo
+  // e o agente responde o preço com `[object Object]` para o cliente.
+  it("⭐ preço e SKU multi-idioma não viram `[object Object]` no acervo", () => {
+    const texto = formatProductForRag({
+      ...base,
+      price: { pt: "199.90" } as never,
+      sku: { pt: "CAM-01" } as never,
+      variants: [{ price: { pt: "189.90" } as never, sku: "CAM-01-M" }],
+    });
+
+    expect(texto).not.toContain("[object Object]");
+    expect(texto).toContain("Preço: R$ 199.90");
+    expect(texto).toContain("Preço: R$ 189.90");
+    expect(texto).toContain("SKU: CAM-01");
+  });
+});
+
+/**
+ * O predicado que o worker usa para contar o que deixou de ser legível.
+ *
+ * A distinção é o que impede o alarme de virar falso positivo: lojista que não
+ * escreveu descrição é normal; campo preenchido que não vira texto é defeito.
+ */
+describe("campoIlegivel", () => {
+  it("campo ausente ou vazio NÃO é ilegível — é lojista sem descrição", () => {
+    expect(campoIlegivel(undefined)).toBe(false);
+    expect(campoIlegivel(null)).toBe(false);
+    expect(campoIlegivel("")).toBe(false);
+    expect(campoIlegivel({ pt: "" })).toBe(false);
+  });
+
+  it("texto em qualquer idioma NÃO é ilegível", () => {
+    expect(campoIlegivel("Camisa")).toBe(false);
+    expect(campoIlegivel({ pt: "Camisa" })).toBe(false);
+    expect(campoIlegivel({ es: "Camisa" })).toBe(false);
+  });
+
+  it("⭐ campo preenchido que não vira texto É ilegível", () => {
+    expect(campoIlegivel(42)).toBe(true);
+    expect(campoIlegivel({ pt: 7 })).toBe(true);
+    expect(campoIlegivel({ pt: { nested: "x" } })).toBe(true);
+    expect(campoIlegivel([{ pt: "Camisa" }])).toBe(true);
   });
 });

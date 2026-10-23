@@ -178,6 +178,30 @@ describe("o catálogo da loja chega ao acervo", () => {
     expect(worker).not.toMatch(/console\.warn\([^)]*página do catálogo falhou[\s\S]{0,200}break;/);
   });
 
+  // A DECISÃO difícil (o que conta como campo ilegível) tem 11 casos de
+  // comportamento em `lib/ai/rag/format-product.test.ts`. O que falta medir é a
+  // FIAÇÃO: o worker precisa contar e avisar, senão o dia em que a API trocar o
+  // formato o catálogo indexa vazio, publica a versão como `success`, e nas
+  // cargas seguintes o `content_hash` estável manda tudo para `sem_mudanca`.
+  it("⭐ o catálogo conta campo ilegível e avisa na Central", () => {
+    const worker = ler("workers/rag-indexer.ts");
+    const todas = worker.split(/\r?\n/);
+    const abre = todas.findIndex((l) => l.startsWith("async function pedacosDeCatalogo"));
+    const fecha = todas.findIndex((l, i) => i > abre && l === "}");
+    const corpo = todas.slice(abre, fecha).join(" ");
+
+    // conta no laço, pelos DOIS campos que viram o texto do produto
+    expect(corpo).toContain("campoIlegivel(p.description)");
+    expect(corpo).toContain("campoIlegivel(p.name)");
+    // e abre o aviso usando a maquinaria que já existe
+    expect(corpo).toContain("avisarNaCentral(");
+
+    // piso de amostra: loja de 3 produtos não vira alarme por um cadastro torto
+    expect(corpo).toMatch(/produtos\.length >= PISO_DE_AMOSTRA/);
+    expect(worker).toContain("const PISO_DE_AMOSTRA = 10;");
+    expect(worker).toContain("const PROPORCAO_DE_ALERTA = 0.2;");
+  });
+
   it("CONTROLE — o teto é baixo de propósito, por causa do reaper de 10 minutos", () => {
     const worker = ler("workers/rag-indexer.ts");
     expect(worker).toContain("const TETO_DE_PAGINAS = 10;");
