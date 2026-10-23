@@ -13,7 +13,15 @@ export interface NuvemshopProductVariant {
 export interface NuvemshopProduct {
   id: string;
   name: { pt: string } | string;
-  description?: string;
+  /**
+   * Multi-idioma, como o `name` — e era isso que faltava aqui.
+   *
+   * Tipada como `string`, ela ia direto para `stripHtml`, e com a loja real
+   * chegou `{ pt: "<p>…</p>" }`: `html.replace is not a function` matava a
+   * indexação do catálogo inteiro, com o evento morrendo depois de 5
+   * tentativas. O `name` já tinha o tratamento; a descrição, não.
+   */
+  description?: { pt?: string } | string;
   price?: string;
   sku?: string;
   permalink?: string;
@@ -25,18 +33,29 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
-function resolveName(name: { pt: string } | string | undefined): string {
-  if (!name) return "";
-  if (typeof name === "string") return name;
-  return name.pt ?? "";
+/**
+ * O texto de um campo da API, seja ele string ou objeto por idioma.
+ *
+ * Aceita `unknown` de propósito: o tipo declarado acima é promessa nossa sobre
+ * um payload de terceiro, e foi justamente uma promessa dessas que derrubou a
+ * indexação. Campo que não vira texto devolve string vazia, em vez de explodir
+ * no meio de um catálogo de centenas de produtos.
+ */
+function localizedText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object") {
+    const pt = (value as { pt?: unknown }).pt;
+    if (typeof pt === "string") return pt;
+  }
+  return "";
 }
 
 /**
  * Converts a Nuvemshop product object into a plain-text RAG document.
  */
 export function formatProductForRag(product: NuvemshopProduct): string {
-  const name = resolveName(product.name);
-  const description = product.description ? stripHtml(product.description) : "";
+  const name = localizedText(product.name);
+  const description = stripHtml(localizedText(product.description));
   const price = product.price ? `R$ ${product.price}` : "N/A";
   const sku = product.sku ?? "N/A";
   const permalink = product.permalink ?? "";
@@ -56,7 +75,7 @@ export function formatProductForRag(product: NuvemshopProduct): string {
 
   const categories =
     product.categories && product.categories.length > 0
-      ? product.categories.map((c) => resolveName(c.name)).join(", ")
+      ? product.categories.map((c) => localizedText(c.name)).join(", ")
       : "N/A";
 
   const lines: string[] = [
