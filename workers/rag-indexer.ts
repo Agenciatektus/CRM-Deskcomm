@@ -514,6 +514,14 @@ export async function indexarFonte(
 ): Promise<Resultado> {
   // Antes de qualquer coisa: o que já estava aberto ANTES desta execução é o
   // que pode ser fechado no fim dela. Ver `resolverAvisoDaFonte`.
+  //
+  // PREMISSA: este instante vem do relógio do app e é comparado com o
+  // `created_at` do banco (`default now()`). Hoje os dois estão no mesmo host,
+  // e o intervalo até o aviso nascer é de segundos (ida à API da loja mais a
+  // formatação de centenas de produtos) contra desvio de sub-segundo. Se o
+  // banco sair do host, um atraso de relógio maior que esse intervalo faria o
+  // aviso nascido durante a execução entrar no corte e ser fechado — e nenhum
+  // teste veria.
   const inicioDaIndexacao = new Date().toISOString();
 
   const tipo = canonizarTipoDeFonte(fonte.source_type);
