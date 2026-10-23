@@ -8,6 +8,21 @@
 export interface NuvemshopProductVariant {
   price?: string;
   sku?: string;
+  /**
+   * O que distingue esta variante: tamanho, cor, voltagem.
+   *
+   * `[{ "en": "Small" }]` — lista de objetos por idioma, só o valor, sem nome
+   * nem id dentro. O nome vem do `attributes` do PRODUTO, casado por posição.
+   *
+   * A primeira versão disto também lia um `attributes` na variante, no formato
+   * `[{ name, value }]`. A documentação da RESPOSTA
+   * (tiendanube.github.io/api-documentation/resources/product) lista os campos
+   * da variante e `attributes` NÃO está entre eles: aquele formato é corpo de
+   * requisição de criação, não leitura. Pior, os dois ramos eram concatenados,
+   * então uma API que mandasse ambos duplicaria a linha
+   * (`Tamanho: M, Cor: Azul, Tamanho: M, Cor: Azul`).
+   */
+  values?: unknown;
 }
 
 export interface NuvemshopProduct {
@@ -27,6 +42,8 @@ export interface NuvemshopProduct {
   permalink?: string;
   variants?: NuvemshopProductVariant[];
   categories?: Array<{ name: { pt: string } | string }>;
+  /** Os NOMES dos atributos ("Tamanho", "Cor"), na ordem dos `values`. */
+  attributes?: unknown;
 }
 
 /**
@@ -129,6 +146,35 @@ const semTags = (texto: string) =>
  * decodificar, e aí já tinha passado pela primeira limpeza. O motivo deste
  * conserto é o cliente não ler `algod&atilde;o`; ler `<p>` é o mesmo problema.
  */
+/**
+ * O MESMO limpador, para quem não é catálogo.
+ *
+ * Estava fechado neste módulo e só o produto passava por ele. Uma resposta de
+ * FAQ colada de um site levava `algod&atilde;o` e `&nbsp;` para o acervo — o
+ * defeito que este arquivo conserta no catálogo, intacto nas outras fontes.
+ *
+ * Tira tag E decodifica, então serve a fonte onde tag de verdade chega: a FAQ,
+ * cuja resposta é colada de site num editor rico. Para fonte que NÃO é HTML,
+ * use `decodificarEntidadesDeAcervo` — remover `<...>` ali é lossy.
+ */
+export function limparTextoDeAcervo(texto: string): string {
+  return stripHtml(texto);
+}
+
+/**
+ * Só a decodificação, sem mexer em `<...>`.
+ *
+ * Para DOCUMENTO, cujas extensões aceitas são `md`, `txt`, `csv` e `pdf` —
+ * nenhuma HTML. Ali a remoção de tag não tem alvo legítimo e come conteúdo:
+ * `"Preencha com <nome do cliente> e envie"` virava `"Preencha com e envie"`, e
+ * placeholder entre sinais de maior/menor é a forma mais comum de modelo e de
+ * política que uma loja sobe. A decodificação, essa sim é útil: PDF ou Markdown
+ * exportado de página web chega com `&atilde;`.
+ */
+export function decodificarEntidadesDeAcervo(texto: string): string {
+  return decodificarEntidades(texto);
+}
+
 function stripHtml(html: string): string {
   return semTags(decodificarEntidades(semTags(html)))
     .replace(/\s{2,}/g, " ")
@@ -208,6 +254,60 @@ export function campoIlegivel(value: unknown): boolean {
 }
 
 /**
+ * Os nomes dos atributos do produto, na ordem em que os `values` aparecem.
+ *
+ * `[{"en": "Size"}]`, ou string simples. O que não virar texto sai como "" e a
+ * variante trata como nome desconhecido.
+ *
+ * A primeira versão tinha um ramo extra para a forma `{ name, value }`, e ele
+ * era INALCANÇÁVEL: `localizedText` pega o primeiro valor string do objeto, e
+ * para `{name: "Tamanho"}` já devolve "Tamanho" na linha de cima. Pior, isso
+ * dependia da ordem das chaves — `{value: "M", name: "Tamanho"}` sairia
+ * `M: M`. Ramo morto que convidava acoplamento acidental.
+ */
+function nomesDosAtributos(attributes: unknown): string[] {
+  if (!Array.isArray(attributes)) return [];
+  return attributes.map((a) => localizedText(a));
+}
+
+/**
+ * O que distingue esta variante, em texto: `Tamanho: M, Cor: Azul`.
+ *
+ * Sem isto o acervo não responde "tem M?" nem "tem na cor preta?", que é o que
+ * se pergunta numa loja de roupa — e o trecho ficava com treze linhas de
+ * `Preço: R$ 199.00, SKU: 13320` indistinguíveis entre si.
+ *
+ * O par vem de `values` da variante com `attributes` do produto, casados por
+ * POSIÇÃO. Não é escolha entre várias: `values` não carrega nome nem id dentro,
+ * então não existe outra chave para casar. A doc enuncia uma única regra sobre
+ * os dois campos — "the number of `attributes` is equal to the number of
+ * `values` within the variants" —, e ela só faz sentido sob alinhamento
+ * posicional.
+ *
+ * Quando a contagem NÃO bate, a própria API rompeu esse invariante e nomear
+ * passa a ser chute: sai só o valor. Dizer `Tamanho: M, Azul` seria afirmar
+ * metade de um par que ninguém sustenta.
+ */
+function atributosDaVariante(
+  v: NuvemshopProductVariant,
+  nomes: string[],
+): string {
+  if (!Array.isArray(v?.values)) return "";
+
+  const valores = (v.values as unknown[]).map((item) => localizedText(item));
+  const podeNomear = nomes.length === valores.length;
+
+  return valores
+    .map((valor, i) => {
+      if (!valor) return "";
+      const nome = podeNomear ? nomes[i] ?? "" : "";
+      return nome ? `${nome}: ${valor}` : valor;
+    })
+    .filter((p) => p !== "")
+    .join(", ");
+}
+
+/**
  * O preço a mostrar quando o produto não tem preço próprio: o das variantes.
  *
  * Um valor só quando todas custam igual, e a faixa quando diferem — é o que
@@ -262,6 +362,7 @@ export function formatProductForRag(product: NuvemshopProduct): string {
   // trechos indexados saíam com `Preço: N/A` e o `R$ 199,00` três linhas
   // abaixo. Ou seja, o acervo falhava exatamente na pergunta que o cliente
   // mais faz, e sem erro nenhum para denunciar.
+  const nomesDeAtributo = nomesDosAtributos(product.attributes);
   const precoTexto = escalarTexto(product.price) || precoDasVariantes(product.variants);
   const price = precoTexto ? `R$ ${precoTexto}` : "N/A";
   const sku = escalarTexto(product.sku) || "N/A";
@@ -275,8 +376,12 @@ export function formatProductForRag(product: NuvemshopProduct): string {
       ? product.variants
           .map((v) => {
             const parts: string[] = [];
+            // o atributo vem PRIMEIRO: é o que o cliente pergunta ("tem M?"),
+            // e é o que distingue uma linha de variante da seguinte.
+            const atributo = atributosDaVariante(v, nomesDeAtributo);
             const vPrice = escalarTexto(v.price);
             const vSku = escalarTexto(v.sku);
+            if (atributo) parts.push(atributo);
             if (vPrice) parts.push(`Preço: R$ ${vPrice}`);
             if (vSku) parts.push(`SKU: ${vSku}`);
             return parts.join(", ");
