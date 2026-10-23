@@ -38,9 +38,9 @@ export function ImagemDeMarcaDoAcesso() {
     alt: "",
     width: faixa.largura,
     height: faixa.altura,
-    priority: true,
-    // `priority` sozinho não chega ao `<img>` em `getImageProps` (só o `<Image>` o
-    // converte em preload): o atributo vai explícito.
+    // Sem `priority`: em `getImageProps` ele não chega ao `<img>` (só o `<Image>` o
+    // converte em preload, que aqui seria o JPG de reserva), e no Next 16 está
+    // em desuso. A prioridade vai explícita, nos atributos.
     fetchPriority: "high",
     loading: "eager",
     unoptimized: true,

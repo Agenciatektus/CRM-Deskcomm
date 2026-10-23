@@ -80,8 +80,13 @@ describe("a casca das telas de acesso", () => {
     // está sempre ali; o que esta asserção cerca é o logo do revendedor, que
     // tem `alt` com o nome da marca. Medir "nenhum <img>" tratava os dois como
     // a mesma coisa e reprovaria a arte do produto.
-    expect(html).not.toMatch(/<img\b[^>]*\balt="[^"]/);
-    expect(html).not.toContain('src=""');
+    // Medido pelo `data-testid` do logo e pela CONTAGEM de imagens, e não por
+    // `alt` ou `src=""`: um logo marcado como decorativo (`alt=""`) passaria
+    // pelo primeiro, e o React 19 nem escreve `src=""`. O único `<img>` que
+    // resta é o da arte de `data-testid="imagem-do-acesso"`.
+    expect(html).not.toContain("logo-da-fachada");
+    expect(html).not.toContain("logo-escuro-da-fachada");
+    expect(html.match(/<img\b/g)).toHaveLength(1);
     expect(html).toContain("formulário");
   });
 
