@@ -256,18 +256,18 @@ export function campoIlegivel(value: unknown): boolean {
 /**
  * Os nomes dos atributos do produto, na ordem em que os `values` aparecem.
  *
- * Aceita item como string ou como objeto por idioma. O que não virar texto sai
- * da lista como "" e o leitor da variante trata isso como nome desconhecido.
+ * `[{"en": "Size"}]`, ou string simples. O que não virar texto sai como "" e a
+ * variante trata como nome desconhecido.
+ *
+ * A primeira versão tinha um ramo extra para a forma `{ name, value }`, e ele
+ * era INALCANÇÁVEL: `localizedText` pega o primeiro valor string do objeto, e
+ * para `{name: "Tamanho"}` já devolve "Tamanho" na linha de cima. Pior, isso
+ * dependia da ordem das chaves — `{value: "M", name: "Tamanho"}` sairia
+ * `M: M`. Ramo morto que convidava acoplamento acidental.
  */
 function nomesDosAtributos(attributes: unknown): string[] {
   if (!Array.isArray(attributes)) return [];
-  return attributes.map((a) => {
-    const texto = localizedText(a);
-    if (texto) return texto;
-    // forma `{ name, value }`: aqui interessa o nome
-    if (a && typeof a === "object") return localizedText((a as { name?: unknown }).name);
-    return "";
-  });
+  return attributes.map((a) => localizedText(a));
 }
 
 /**
