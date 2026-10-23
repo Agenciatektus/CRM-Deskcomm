@@ -204,6 +204,25 @@ describe("o catálogo da loja chega ao acervo", () => {
     expect(worker).toContain("const PROPORCAO_DE_ALERTA = 0.2;");
   });
 
+  // O aviso que avisou do problema nao pode sobreviver a solucao: na loja do
+  // cliente, 12 avisos "nao entrou na base de conhecimento" seguiam ABERTOS
+  // depois de o catalogo indexar com sucesso. Aviso que mente desensina a olhar
+  // os proximos.
+  it("⭐ indexar com sucesso RESOLVE o aviso aberto da fonte", () => {
+    const worker = ler("workers/rag-indexer.ts");
+
+    // a chamada vem DEPOIS de ativar a versao, nunca antes
+    const posAtivar = worker.indexOf("await activateVersion({");
+    const posResolver = worker.indexOf("await resolverAvisoDaFonte(");
+    expect(posAtivar).toBeGreaterThan(0);
+    expect(posResolver).toBeGreaterThan(posAtivar);
+
+    // e fecha pela mesma chave com que o aviso foi aberto
+    expect(worker).toContain('.eq("kind", "conhecimento_nao_indexado")');
+    expect(worker).toMatch(/resolved_at: new Date\(\)\.toISOString\(\)/);
+    expect(worker).toMatch(/\.is\("resolved_at", null\)/);
+  });
+
   it("CONTROLE — o teto é baixo de propósito, por causa do reaper de 10 minutos", () => {
     const worker = ler("workers/rag-indexer.ts");
     expect(worker).toContain("const TETO_DE_PAGINAS = 10;");

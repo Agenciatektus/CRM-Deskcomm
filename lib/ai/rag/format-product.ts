@@ -29,8 +29,54 @@ export interface NuvemshopProduct {
   categories?: Array<{ name: { pt: string } | string }>;
 }
 
+/**
+ * As entidades nomeadas que aparecem de verdade em descrição de loja PT-BR.
+ *
+ * Mapa curto de propósito: o resto cai na forma numérica, que é genérica.
+ */
+const ENTIDADES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  bull: "•",
+  hellip: "…",
+  ndash: "–",
+  mdash: "—",
+  aacute: "á", agrave: "à", atilde: "ã", acirc: "â", auml: "ä",
+  eacute: "é", egrave: "è", ecirc: "ê", euml: "ë",
+  iacute: "í", icirc: "î", iuml: "ï",
+  oacute: "ó", otilde: "õ", ocirc: "ô", ouml: "ö", ograve: "ò",
+  uacute: "ú", ucirc: "û", uuml: "ü", ugrave: "ù",
+  ccedil: "ç", ntilde: "ñ",
+  Aacute: "Á", Atilde: "Ã", Acirc: "Â", Agrave: "À",
+  Eacute: "É", Ecirc: "Ê",
+  Iacute: "Í", Oacute: "Ó", Otilde: "Õ", Ocirc: "Ô",
+  Uacute: "Ú", Ccedil: "Ç",
+  reg: "®", copy: "©", trade: "™", deg: "°", euro: "€", pound: "£",
+};
+
+/**
+ * Decodifica entidade HTML.
+ *
+ * Medido no catálogo real: 601 de 991 trechos indexados levavam entidade crua
+ * (`algod&atilde;o puro`, `&nbsp;`, `&bull;`). `stripHtml` tirava as TAGS e
+ * deixava isso, então o texto embedado ficava com lixo — piora o casamento
+ * semântico, e se a resposta citar a descrição o cliente lê `algod&atilde;o`.
+ */
+function decodificarEntidades(texto: string): string {
+  return texto
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&([a-zA-Z][a-zA-Z0-9]{1,9});/g, (inteiro, nome) => ENTIDADES[nome] ?? inteiro);
+}
+
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+  return decodificarEntidades(html.replace(/<[^>]+>/g, " "))
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -106,6 +152,26 @@ export function campoIlegivel(value: unknown): boolean {
 }
 
 /**
+ * O preço a mostrar quando o produto não tem preço próprio: o das variantes.
+ *
+ * Um valor só quando todas custam igual, e a faixa quando diferem — é o que
+ * responde "quanto custa" sem inventar precisão que o produto não tem.
+ */
+function precoDasVariantes(variants: NuvemshopProduct["variants"]): string {
+  if (!Array.isArray(variants)) return "";
+
+  const valores = variants
+    .map((v) => Number(escalarTexto(v?.price).replace(",", ".")))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (valores.length === 0) return "";
+
+  const menor = Math.min(...valores);
+  const maior = Math.max(...valores);
+  const dinheiro = (n: number) => n.toFixed(2);
+  return menor === maior ? dinheiro(menor) : `${dinheiro(menor)} a R$ ${dinheiro(maior)}`;
+}
+
+/**
  * Converts a Nuvemshop product object into a plain-text RAG document.
  */
 export function formatProductForRag(product: NuvemshopProduct): string {
@@ -115,7 +181,14 @@ export function formatProductForRag(product: NuvemshopProduct): string {
   // objeto sem reclamar e escreve `[object Object]`. Não derruba nada, e é pior
   // nisso — envenena o trecho que vai para o acervo, e o agente responde o
   // preço com `[object Object]` para o cliente.
-  const precoTexto = escalarTexto(product.price);
+  // O PREÇO DO PRODUTO PODE MORAR NAS VARIANTES.
+  //
+  // Na Nuvemshop, produto com variante tem `price` nulo no nível do produto, e
+  // o preço real fica em cada variante. Medido no catálogo real: 879 de 991
+  // trechos indexados saíam com `Preço: N/A` e o `R$ 199,00` três linhas
+  // abaixo. Ou seja, o acervo falhava exatamente na pergunta que o cliente
+  // mais faz, e sem erro nenhum para denunciar.
+  const precoTexto = escalarTexto(product.price) || precoDasVariantes(product.variants);
   const price = precoTexto ? `R$ ${precoTexto}` : "N/A";
   const sku = escalarTexto(product.sku) || "N/A";
   const permalink = escalarTexto(product.permalink);

@@ -161,6 +161,87 @@ describe("formatProductForRag — campos multi-idioma da loja", () => {
     expect(texto).not.toContain("Variantes: N/A");
   });
 
+  // ─── medido no catálogo real da loja, depois de indexar ──────────────────
+  //
+  // 879 de 991 trechos saíam com `Preço: N/A` e o `R$ 199,00` três linhas
+  // abaixo, em `Variantes:`. Na Nuvemshop, produto com variante tem `price`
+  // nulo no nível do produto. O acervo falhava na pergunta que o cliente mais
+  // faz, e sem erro nenhum para denunciar.
+  it("⭐ produto sem preço próprio usa o preço das variantes", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [
+        { price: "199.00", sku: "13320" },
+        { price: "199.00", sku: "13322" },
+      ],
+    });
+
+    expect(texto).toContain("Preço: R$ 199.00");
+    expect(texto).not.toContain("Preço: N/A");
+  });
+
+  it("⭐ variantes com preços diferentes viram faixa, sem inventar precisão", () => {
+    const texto = formatProductForRag({
+      ...base,
+      variants: [
+        { price: "99.00", sku: "A" },
+        { price: "199.00", sku: "B" },
+        { price: "149.00", sku: "C" },
+      ],
+    });
+
+    expect(texto).toContain("Preço: R$ 99.00 a R$ 199.00");
+  });
+
+  it("preço próprio do produto continua ganhando da variante", () => {
+    const texto = formatProductForRag({
+      ...base,
+      price: "250.00",
+      variants: [{ price: "199.00", sku: "A" }],
+    });
+
+    expect(texto).toContain("Preço: R$ 250.00");
+  });
+
+  it("sem preço em lugar nenhum segue N/A", () => {
+    expect(formatProductForRag({ ...base, variants: [{ sku: "A" }] })).toContain("Preço: N/A");
+    expect(formatProductForRag(base)).toContain("Preço: N/A");
+  });
+
+  // 601 de 991 trechos levavam entidade crua para o acervo. `stripHtml` tirava
+  // as TAGS e deixava isso: piora o casamento semântico, e se a resposta citar
+  // a descrição o cliente lê `algod&atilde;o`.
+  it("⭐ entidade HTML é decodificada, não vai crua para o acervo", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: {
+        pt: "<p>Algod&atilde;o puro&nbsp;&bull; gola cl&aacute;ssica &amp; c&ocirc;moda</p>",
+      },
+    });
+
+    expect(texto).toContain("Algodão puro • gola clássica & cômoda");
+    expect(texto).not.toContain("&atilde;");
+    expect(texto).not.toContain("&nbsp;");
+    expect(texto).not.toContain("&amp;");
+  });
+
+  it("entidade numérica, decimal e hexadecimal", () => {
+    const texto = formatProductForRag({
+      ...base,
+      description: "Camisa &#233;poca &#x1F600; &#8220;top&#8221;",
+    });
+
+    expect(texto).toContain("época");
+    expect(texto).toContain("“top”");
+    expect(texto).not.toMatch(/&#\d+;/);
+  });
+
+  it("entidade desconhecida fica como está, em vez de virar lixo", () => {
+    const texto = formatProductForRag({ ...base, description: "Marca &naoexiste; aqui" });
+
+    expect(texto).toContain("&naoexiste;");
+  });
+
   it("variante sem nada legível fecha com N/A, não com rótulo vazio", () => {
     const texto = formatProductForRag({
       ...base,

@@ -183,6 +183,32 @@ async function avisarNaCentral(
   }
 }
 
+/**
+ * Fecha os avisos abertos desta fonte, porque ela acabou de indexar.
+ *
+ * Em lote e por fonte: houve 12 abertos na mesma, um por tentativa morta.
+ */
+async function resolverAvisoDaFonte(organizationId: string, fonteId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    await admin
+      .from("agent_inbox_items")
+      .update({ resolved_at: new Date().toISOString() })
+      .eq("organization_id", organizationId)
+      .eq("kind", "conhecimento_nao_indexado")
+      .eq("ref_id", fonteId)
+      .is("resolved_at", null);
+  } catch (err) {
+    // Não derruba a indexação: a versão já está no ar, e aviso velho é ruído,
+    // não corrupção.
+    console.warn(
+      "[rag-indexer] não consegui resolver o aviso da fonte",
+      fonteId,
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Montagem dos pedaços, por tipo de material
 // ---------------------------------------------------------------------------
@@ -637,6 +663,12 @@ export async function indexarFonte(
     knowledgeSourceId: fonte.id,
     versionId,
   });
+  // O aviso que avisou do problema não pode sobreviver à solução. Medido na
+  // loja do cliente: 12 avisos "não entrou na base de conhecimento" seguiam
+  // ABERTOS depois de o catálogo indexar com sucesso — o cliente lendo doze
+  // alertas sobre um defeito que já não existe. Aviso que mente desensina a
+  // olhar os próximos.
+  await resolverAvisoDaFonte(fonte.organization_id, fonte.id);
 
   return { tipo: "ok", versionId, chunks: gravados, contentHash: hashDoConteudo };
 }
