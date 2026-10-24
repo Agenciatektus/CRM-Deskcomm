@@ -6645,6 +6645,12 @@ export const DICIONARIO: Traducoes = {
   Conjunto: { es: "Conjunto" },
   "Anúncio": { es: "Anuncio" },
   Posicionamento: { es: "Ubicación" },
+  // Seção "Origem" do dossiê do negócio.
+  "Título do anúncio": { es: "Título del anuncio" },
+  "ID do anúncio": { es: "ID del anuncio" },
+  "ID do clique": { es: "ID del clic" },
+  "Primeiro contato pelo anúncio": { es: "Primer contacto por el anuncio" },
+  "Link do anúncio": { es: "Enlace del anuncio" },
   "Campanha (utm_campaign)": { es: "Campaña (utm_campaign)" },
   "Conjunto (utm_adset)": { es: "Conjunto (utm_adset)" },
   "Anúncio (utm_ad)": { es: "Anuncio (utm_ad)" },
