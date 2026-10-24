@@ -24,7 +24,7 @@
 --      set source = coalesce(source_metadata #>> '{ad_backfill,source_anterior}', source),
 --          source_metadata = source_metadata - 'ad_platform' - 'ad_source_id' - 'ad_id' - 'ad_title'
 --                            - 'ad_body' - 'ad_source_url' - 'ad_raw' - 'ad_captured_at' - 'ad_backfill'
---    where source_metadata ? 'ad_backfill';
+--    where source_metadata ? 'ad_backfill' and source = 'meta_ads';
 
 \set ON_ERROR_STOP on
 \if :{?aplicar}
