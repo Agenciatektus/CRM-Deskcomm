@@ -38,6 +38,34 @@ interface CadastroDoContato {
   phone_number: string | null;
 }
 
+/**
+ * Este contato PODE ter dado pessoal extra entregue à Meta?
+ *
+ * Mesma régua dos outros envios do produto (`lib/campanhas/elegibilidade.ts`,
+ * `lib/automation/guarda-do-contato.ts`): opt-out (`is_blocked`), contato
+ * pessoal, anonimizado (LGPD) e recusa de marketing REGISTRADA
+ * (`consent.marketing.declined_at`) vetam. Não é régua nova: é a oposição do
+ * titular sendo honrada também quando o destino é a plataforma de anúncios.
+ *
+ * O veto tira os campos NOVOS (e-mail, nome, nascimento, id); o que já saía
+ * (clique e telefone) segue como antes, para esta mudança não calar a
+ * mensuração de quem já a tinha.
+ */
+export function podeCompartilharDadosPessoais(c: {
+  is_blocked?: boolean | null;
+  is_personal?: boolean | null;
+  is_anonymized?: boolean | null;
+  consent?: unknown;
+}): boolean {
+  if (c.is_blocked || c.is_personal || c.is_anonymized) return false;
+  const consent = c.consent && typeof c.consent === "object" ? (c.consent as Record<string, unknown>) : {};
+  const marketing =
+    consent.marketing && typeof consent.marketing === "object"
+      ? (consent.marketing as Record<string, unknown>)
+      : {};
+  return !marketing.declined_at;
+}
+
 const FORMATO_DE_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /** Só letras e espaço simples. `\p{L}` mantém acento e descarta emoji/dígito. */

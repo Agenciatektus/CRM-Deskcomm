@@ -10,7 +10,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { INTERNOS, transporteMeta } from "@/lib/plataformas-de-anuncio/meta/conversions";
 import type { ConversaoOffline } from "@/lib/plataformas-de-anuncio/types";
 
-import { dadosDoClienteDe, separarNome } from "@/lib/plataformas-de-anuncio/meta/dados-do-cliente";
+import {
+  dadosDoClienteDe,
+  podeCompartilharDadosPessoais,
+  separarNome,
+} from "@/lib/plataformas-de-anuncio/meta/dados-do-cliente";
 
 const base = {
   id: "c-1",
@@ -66,6 +70,21 @@ describe("dadosDoClienteDe", () => {
     expect(d.nascimento).toBeNull();
     expect(d.email).toBeNull();
     expect(d.externalId).toBe("c-1");
+  });
+});
+
+describe("podeCompartilharDadosPessoais (a oposição do titular vale também para a Meta)", () => {
+  it("contato comum pode", () => {
+    expect(podeCompartilharDadosPessoais({ consent: { marketing: { granted_at: "2026-01-01" } } })).toBe(true);
+    expect(podeCompartilharDadosPessoais({})).toBe(true);
+  });
+  it.each([
+    ["bloqueado (opt-out)", { is_blocked: true }],
+    ["contato pessoal", { is_personal: true }],
+    ["anonimizado", { is_anonymized: true }],
+    ["recusou marketing", { consent: { marketing: { declined_at: "2026-10-01T00:00:00Z" } } }],
+  ])("%s NÃO pode", (_nome, c) => {
+    expect(podeCompartilharDadosPessoais(c)).toBe(false);
   });
 });
 

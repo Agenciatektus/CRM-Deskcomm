@@ -140,6 +140,23 @@ describe("quem veio da página com UTM da Meta conta como anúncio", () => {
     },
   );
 
+  it("quem recusou marketing segue com clique e telefone, mas SEM os dados novos", async () => {
+    const r = await lerAtribuicao(
+      fakeAdmin({
+        contacts: {
+          ...contatoDaPagina("meta"),
+          email_normalized: "a@b.com",
+          name: "Maria Silva",
+          consent: { marketing: { declined_at: "2026-10-01T00:00:00Z" } },
+        },
+      }) as never,
+      ORG,
+      CONTATO,
+    );
+    expect(r).toMatchObject({ temAtribuicao: true, atribuicao: { telefone: "5511988887777" } });
+    expect(r.temAtribuicao && r.atribuicao.dadosDoCliente).toBeUndefined();
+  });
+
   it.each(["google", "facebook_organico", "newsletter", ""])(
     "utm_source=%s NÃO vai para a Meta — venda orgânica fica fora",
     async (utm) => {

@@ -17,7 +17,11 @@ import {
 } from "@/lib/plataformas-de-anuncio/google/identificadores";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { type DadosDoCliente, dadosDoClienteDe } from "@/lib/plataformas-de-anuncio/meta/dados-do-cliente";
+import {
+  type DadosDoCliente,
+  dadosDoClienteDe,
+  podeCompartilharDadosPessoais,
+} from "@/lib/plataformas-de-anuncio/meta/dados-do-cliente";
 import { ehPlataformaConhecida } from "@/lib/plataformas-de-anuncio/registry";
 import type { PlataformaDeAnuncio } from "@/lib/plataformas-de-anuncio/types";
 
@@ -51,7 +55,9 @@ export async function lerAtribuicao(
 
   const { data, error } = await admin
     .from("contacts")
-    .select("id, name, display_name, email_normalized, birthdate, phone_number, source_metadata")
+    .select(
+      "id, name, display_name, email_normalized, birthdate, phone_number, source_metadata, consent, is_blocked, is_personal, is_anonymized",
+    )
     .eq("id", contactId)
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -67,9 +73,16 @@ export async function lerAtribuicao(
     birthdate: string | null;
     phone_number: string | null;
     source_metadata: unknown;
+    consent: unknown;
+    is_blocked: boolean | null;
+    is_personal: boolean | null;
+    is_anonymized: boolean | null;
   };
   // O id é o que o chamador pediu (e já filtrou por organização), não o da linha.
-  const dadosDoCliente = dadosDoClienteDe({ ...linha, id: contactId });
+  // Só para a Meta (o Google não lê) e só de quem não recusou: ver o veto.
+  const dadosDoCliente = podeCompartilharDadosPessoais(linha)
+    ? dadosDoClienteDe({ ...linha, id: contactId })
+    : undefined;
   const meta =
     linha.source_metadata && typeof linha.source_metadata === "object"
       ? (linha.source_metadata as Record<string, unknown>)
@@ -85,7 +98,12 @@ export async function lerAtribuicao(
   if (!clique && meta.ad_platform === "site" && utmDaMeta(meta.utm_source)) {
     return {
       temAtribuicao: true,
-      atribuicao: { plataforma: "meta_ads", cliqueDeOrigem: "", telefone, dadosDoCliente },
+      atribuicao: {
+        plataforma: "meta_ads",
+        cliqueDeOrigem: "",
+        telefone,
+        ...(dadosDoCliente ? { dadosDoCliente } : {}),
+      },
     };
   }
 
@@ -119,7 +137,7 @@ export async function lerAtribuicao(
       // Só dígitos: a plataforma exige E.164 sem `+` nem separadores ANTES do
       // hash. Normalizar depois do hash seria tarde — o hash já estaria errado.
       telefone,
-      dadosDoCliente,
+      ...(dadosDoCliente && meta.ad_platform === "meta_ads" ? { dadosDoCliente } : {}),
     },
   };
 }
