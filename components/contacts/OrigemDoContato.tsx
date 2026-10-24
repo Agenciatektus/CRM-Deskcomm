@@ -104,14 +104,14 @@ export function ListaDaOrigem({ dados }: { dados: DadosDaOrigem }) {
         )}
         {adId && <Linha rotulo={t("ID do anúncio")}>{adId}</Linha>}
         {cliqueId && <Linha rotulo={t("ID do clique")}>{cliqueId}</Linha>}
-        {capturado && (
+        {capturado && !Number.isNaN(Date.parse(capturado)) && (
           <Linha rotulo={t("Primeiro contato pelo anúncio")}>
             {new Date(capturado).toLocaleString()}
           </Linha>
         )}
         {link && (
           <Linha rotulo={t("Link do anúncio")}>
-            {/^https?:\/\//i.test(link) ? (
+            {/^https?:\/\//i.test(link) && hostDe(link) !== "" ? (
               <>
                 <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
                   {t("Abrir")}
