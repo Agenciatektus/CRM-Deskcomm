@@ -32,6 +32,7 @@ import {
   CHANNEL_PROVIDER_WAHA,
 } from "@/lib/channels/capabilities";
 import { executarLimpeza, lerPlanoDeLimpeza } from "@/lib/channels/verdash/limpar-nativo";
+import { resumoDoErro } from "@/lib/channels/verdash/nativo";
 import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
@@ -550,7 +551,7 @@ export async function DELETE(
         requestId,
         organization_id: activeOrg.orgId,
         channel_session_id: id,
-        erro: err instanceof Error ? err.message : String(err),
+        erro: resumoDoErro(err),
       }),
     );
   }

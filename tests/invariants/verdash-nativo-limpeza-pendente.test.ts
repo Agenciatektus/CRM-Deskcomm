@@ -14,7 +14,7 @@ beforeAll(async () => {
   await pool.query("insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'Teste','Teste')", [org]);
   for (const [id, origem] of [[nativa, "nativa"], [vinculada, "vinculada"]] as const) await pool.query(
     `insert into channel_sessions(id,organization_id,provider,verdash_origem,verdash_instance_name,verdash_token_encrypted,webhook_secret_encrypted,status,archived_at,metadata)
-     values($1::uuid,$2,'verdash',$3,'inst-'||$1::text,'\x00','\x00','STOPPED',now(),'{"ai_gate_mode":"pre_go_live","disabled":true}')`,
+     values($1::uuid,$2,'verdash',$3,'inst-'||$1::text,decode('00','hex'),decode('00','hex'),'STOPPED',now(),'{"ai_gate_mode":"pre_go_live","disabled":true}')`,
     [id, org, origem]);
 });
 afterAll(async () => { await pool.end(); });
