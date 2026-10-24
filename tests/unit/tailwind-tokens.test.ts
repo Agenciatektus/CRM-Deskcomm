@@ -167,8 +167,13 @@ describe("Tailwind 4 — a ponte token → utilitário", () => {
       .filter((nome) => {
         // Só interessa pasta que entrega UI ao browser. `tests/` e `docs/`
         // escrevem className em fixture e em exemplo, e ficam de fora de
-        // propósito — varrê-las publicaria CSS que nenhuma tela usa.
-        if (["tests", "docs", "scripts", "supabase", "public", "tasks", "loop"].includes(nome)) {
+        // propósito — varrê-las publicaria CSS que nenhuma tela usa. `site/` é a LP:
+        // um app Next à parte, com Tailwind e CSS próprios (site/app/globals.css),
+        // fora da imagem do CRM; incluí-la no `@source` do CRM publicaria as
+        // classes da LP no CSS do app.
+        if (
+          ["tests", "docs", "scripts", "supabase", "public", "tasks", "loop", "site"].includes(nome)
+        ) {
           return false;
         }
         return temClassName(path.join(RAIZ, nome));
@@ -237,7 +242,9 @@ describe("Tailwind 4 — utilitários que mudaram de significado", () => {
     // Não dá para consertar pelo `@theme`: o `.shadow` do v4 é embutido com
     // valor literal e o embutido vence — igual ao `rounded`.
     const culpados = ocorrencias(ARQUIVOS, /(?<=[\s"'`:])shadow(?=[\s"'`!]|$)/g);
-    expect(culpados, "use `shadow-sm` (o `--shadow-sm` do produto) ou o grau explícito").toEqual([]);
+    expect(culpados, "use `shadow-sm` (o `--shadow-sm` do produto) ou o grau explícito").toEqual(
+      [],
+    );
   });
 
   it("não usa `flex-shrink-*` / `flex-grow-*` — renomeados para `shrink-*` / `grow-*`", () => {
@@ -584,8 +591,10 @@ describe("Tailwind 4 — alpha em cor de texto agora PINTA, então precisa passa
     // Controle positivo: a árvore comprovadamente TEM alphas de cor de texto.
     // Se a contagem de medições zerar, a guarda cegou (regex, paleta renomeada,
     // `bloco()` mudando de forma) e o verde seria falso.
-    expect(medidos, `guarda cega: nenhum alpha medido. Não-medidos: ${naoMedidos.join(", ")}`)
-      .toBeGreaterThan(0);
+    expect(
+      medidos,
+      `guarda cega: nenhum alpha medido. Não-medidos: ${naoMedidos.join(", ")}`,
+    ).toBeGreaterThan(0);
 
     expect(
       [...new Set(reprovados)].sort(),

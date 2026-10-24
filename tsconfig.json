@@ -42,6 +42,7 @@
     ".next",
     "dist",
     "scripts/**",
+    "site/**",
     "**/*.test.ts",
     "**/*.test.tsx",
     "tests/**"

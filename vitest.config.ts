@@ -35,6 +35,7 @@ export default defineConfig({
       ".next",
       "dist",
       ".claude/**",
+      "site/**",
       "tests/e2e/**",
       "tests/invariants/**",
       "tests/journeys/**",
