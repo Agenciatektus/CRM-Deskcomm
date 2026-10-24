@@ -24,8 +24,12 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { NextResponse } from "next/server";
 
 import { loadAuthUser } from "@/lib/auth/server";
-import { orgAtivaDaApi } from "@/lib/auth/require-role";
+import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
+import { randomUUID } from "node:crypto";
+
+import { qrDoCanalHospedado } from "@/lib/channels/connect";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +76,30 @@ export async function GET(
       status: 409,
       headers: { "x-channel-state": "archived" },
     });
+  }
+  // Conexão criada pelo próprio CRM (sem sessão no WAHA): o QR vem do servidor de
+  // WhatsApp dela e sai como imagem, no mesmo contrato do WAHA, para a tela não mudar.
+  // Qualquer outro canal sem sessão segue para o 409 de baixo.
+  if (!session.waha_session_name) {
+    const nativo = await qrDoCanalHospedado(createAdminClient(), activeOrg.orgId, id, async () => {
+      const authz = await requireRole("admin", { requestId: randomUUID(), resource: "channel_sessions_qr" });
+      return authz.ok ? authz.user.id : null;
+    });
+    if (nativo?.status === 200) {
+      return new NextResponse(new Uint8Array(nativo.png), {
+        status: 200,
+        headers: { "content-type": "image/png", "cache-control": "no-store, max-age=0" },
+      });
+    }
+    if (nativo) {
+      return new NextResponse(null, {
+        status: nativo.status,
+        headers: {
+          "x-channel-state": nativo.estado,
+          ...(nativo.retryAfter ? { "retry-after": String(nativo.retryAfter) } : {}),
+        },
+      });
+    }
   }
   // Canal oficial não pareia por QR: `waha_session_name` é NULL nele por CHECK.
   // Afirmar `string` aqui (era um cast) só adiava a mentira até a URL, que virava

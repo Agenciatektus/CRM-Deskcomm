@@ -241,3 +241,40 @@ describe("a instância da Verdash não é compartilhada entre organizações", (
     }
   });
 });
+
+describe("origem do canal verdash (migration 9067)", () => {
+  const NATIVA_A = "ced45a00-0000-4000-8000-0000000000a3";
+  const NATIVA_B = "ced45a00-0000-4000-8000-0000000000b3";
+  const INST_NATIVA = "crm-invariante-nativa-0a1b2c";
+
+  it("canal sem origem informada nasce 'vinculada'", async () => {
+    await conectar(NATIVA_A, ORG_A, "tektus-invariante-vinculada");
+    const { rows } = await pool.query<{ o: string }>(
+      "select verdash_origem as o from channel_sessions where id = $1",
+      [NATIVA_A],
+    );
+    expect(rows[0]!.o).toBe("vinculada");
+  });
+
+  it("origem fora de ('vinculada','nativa') e recusada pelo CHECK", async () => {
+    const erro = await erroAo(() =>
+      pool.query("update channel_sessions set verdash_origem = 'qualquer' where id = $1", [NATIVA_A]),
+    );
+    expect(erro).toBe("channel_sessions_verdash_origem_check");
+  });
+
+  it("'nativa' entra, e a instancia nativa tambem nao e compartilhada entre organizacoes", async () => {
+    await pool.query("update channel_sessions set verdash_origem = 'nativa', verdash_instance_name = $2 where id = $1", [
+      NATIVA_A,
+      INST_NATIVA,
+    ]);
+    const { rows } = await pool.query<{ o: string }>(
+      "select verdash_origem as o from channel_sessions where id = $1",
+      [NATIVA_A],
+    );
+    expect(rows[0]!.o).toBe("nativa");
+
+    const erro = await erroAo(() => conectar(NATIVA_B, ORG_B, INST_NATIVA));
+    expect(erro).toBe("channel_sessions_verdash_instance_unique");
+  });
+});

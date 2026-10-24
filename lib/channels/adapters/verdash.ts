@@ -51,6 +51,16 @@ import {
   fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
+import { DETALHE_NUMERO_EM_CONFLITO, DETALHE_QR_RESCAN_NATIVO } from "../health";
+import {
+  LIMITE_DESCONECTADA_MS,
+  estadoNativo,
+  marcarDesconectada,
+  marcarJaConectou,
+  msDesconectada,
+} from "../verdash/estado-nativo";
+import { enviarComConsulta } from "../verdash/envio-idempotente";
+import { preencherTelefoneNativo } from "../verdash/telefone-nativo";
 import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -254,22 +264,46 @@ export const verdashAdapter: ChannelAdapter = {
 
     const { rota, body } = corpoDoEnvio(envelope, destino);
 
+    // NATIVA: envio idempotente. O `id` do CRM vai no corpo e, em timeout/502, o
+    // status do envio é consultado antes de qualquer nova tentativa. A vinculada
+    // não passa por aqui (o token dela nem é do FZAP).
+    // Formato do id do WhatsApp (hex maiúsculo, sem hífens): o uuid do CRM vira 32 hex.
+    const idDoEnvio = envelope.clientMessageId?.trim().replace(/-/g, "").toUpperCase() || null;
+    const nativo =
+      idDoEnvio && !creds.vinculoId
+        ? await estadoNativo(admin, envelope.organizationId, envelope.sessionRef)
+        : null;
+    if (nativo?.nativa) {
+      // Reconectando há pouco: o FZAP recusaria. Não há liberação automática de
+      // `queued` para este canal (o resgate só alcança WAHA), então falha rápido e claro.
+      const caida = msDesconectada(nativo);
+      if (nativo.status === "STARTING" && caida !== null && caida < LIMITE_DESCONECTADA_MS) {
+        throw new Error(
+          "verdash_nativo_reconectando: o WhatsApp deste canal está reconectando. " +
+            "Tente de novo em alguns minutos.",
+        );
+      }
+      body.id = idDoEnvio;
+    }
+
     await envelope.beforeSend?.();
     // Quem decide o transporte é a SESSÃO, não este método: canal conectado por
     // código pede o envio à Verdash; canal conectado por token fala direto com
     // o servidor de WhatsApp. Ver `verdashEnviar`.
-    const data = await verdashEnviar(creds, {
-      rota,
-      body,
-      pareado: {
-        phone: destino,
-        tipo: envelope.kind,
-        texto: envelope.body ?? envelope.media?.caption ?? undefined,
-        mediaUrl: envelope.media?.url,
-        filename: envelope.media?.filename ?? undefined,
-        replyTo: envelope.replyToExternalId ?? undefined,
-      },
-    });
+    const enviar = () =>
+      verdashEnviar(creds, {
+        rota,
+        body,
+        pareado: {
+          phone: destino,
+          tipo: envelope.kind,
+          texto: envelope.body ?? envelope.media?.caption ?? undefined,
+          mediaUrl: envelope.media?.url,
+          filename: envelope.media?.filename ?? undefined,
+          replyTo: envelope.replyToExternalId ?? undefined,
+        },
+      });
+    const data = nativo?.nativa && idDoEnvio ? await enviarComConsulta(creds, idDoEnvio, enviar) : await enviar();
 
     // O id do whatsmeow, o MESMO que volta no `Info.ID` do webhook — por isso
     // este canal não precisa de `echoExternalIds`: os dois lados falam a mesma
@@ -472,10 +506,47 @@ export const verdashAdapter: ChannelAdapter = {
     }
 
     if (data?.loggedIn === false) {
-      return { reachable: true, status: "FAILED", detail: "whatsapp_deslogado_na_verdash" };
+      // NATIVA: a instancia nasce sem login e espera o QR. `loggedIn:false` com o
+      // socket de pe e "aguardando leitura" (SCAN_QR_CODE); sem socket, o FZAP
+      // reconecta sozinho (STARTING, que nao avisa). FAILED vale SO para a vinculada,
+      // onde deslogar e o numero removido do aparelho.
+      // Mas SO enquanto nunca chegou a WORKING: quem ja conectou e perdeu o login
+      // precisa ler o QR de novo, e isso e FAILED (aviso), mesmo com o socket caido.
+      const nativo = await estadoNativo(admin, input.organizationId, input.sessionRef);
+      if (nativo.nativa && !nativo.jaConectou) {
+        return data.connected
+          ? { reachable: true, status: "SCAN_QR_CODE", detail: "aguardando_leitura_do_qr" }
+          : { reachable: true, status: "STARTING", detail: "conectando_no_fzap" };
+      }
+      return {
+        reachable: true,
+        status: "FAILED",
+        detail: nativo.nativa ? DETALHE_QR_RESCAN_NATIVO : "whatsapp_deslogado_na_verdash",
+      };
     }
     if (data?.connected === false) {
+      // NATIVA: o socket caido por mais de 10 min seguidos deixa de ser reconexao
+      // normal (debounce; o push `Disconnected` grava `desconectado_em`, o vigia
+      // grava na primeira observacao se o push se perdeu). Vinculada: como sempre.
+      const nativo = await estadoNativo(admin, input.organizationId, input.sessionRef);
+      if (nativo.nativa) {
+        const caida = msDesconectada(nativo);
+        if (caida === null) {
+          if (nativo.id) await marcarDesconectada(admin, input.organizationId, nativo.id);
+        } else if (caida > LIMITE_DESCONECTADA_MS) {
+          return { reachable: true, status: "FAILED", detail: "desconectada_ha_mais_de_10_min" };
+        }
+      }
       return { reachable: true, status: "STARTING", detail: "reconectando_na_verdash" };
+    }
+    // Marca a primeira vez que a nativa esteve de pe (melhor esforco, ver estado-nativo.ts).
+    await marcarJaConectou(admin, input.organizationId, input.sessionRef);
+    // O telefone tenta de novo a cada ciclo enquanto estiver nulo (o jid pode demorar
+    // a aparecer). Conflito de numero vira detalhe de saude visivel ao operador.
+    const atual = await estadoNativo(admin, input.organizationId, input.sessionRef);
+    if (atual.nativa && !atual.telefone) {
+      const t = await preencherTelefoneNativo(admin, input.organizationId, input.sessionRef);
+      if (t === "conflito") return { reachable: true, status: "WORKING", detail: DETALHE_NUMERO_EM_CONFLITO };
     }
     return { reachable: true, status: "WORKING", detail: null };
   },

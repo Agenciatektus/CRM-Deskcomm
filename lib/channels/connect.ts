@@ -301,6 +301,7 @@ export {
   findVerdashSession as findHostedSession,
   listVerdashSessions as listHostedSessions,
   escolherSessaoDoNumero as escolherSessaoHospedada,
+  ehTrocaDeOrigem as ehTrocaDeOrigemHospedada,
   numeroEmOutraOrganizacao as numeroHospedadoEmOutraOrganizacao,
   numeroJaEhCanalDaOrganizacao as numeroHospedadoJaEhCanalDaOrganizacao,
   saveVerdashSession as saveHostedSession,
@@ -309,6 +310,19 @@ export {
   trocarCodigoPorCredencial as trocarCodigoHospedado,
 } from "./verdash/conectar";
 export type { VerdashSession as HostedSession } from "./verdash/conectar";
+
+/**
+ * O caminho NATIVO do mesmo canal: o CRM cria a conexao e mostra o QR (Fatia 3 do
+ * plano FZAP nativo). Mesmo recorte de nomes neutros: a rota e a tela nao citam o
+ * provedor.
+ */
+export { conectarNativo as conectarHospedadoPorQr } from "./verdash/conectar-nativo";
+export { resumoDoErro as resumoDoErroHospedado } from "./verdash/nativo";
+export { nativoHabilitadoParaOrg as qrHospedadoHabilitado } from "./verdash/estado-nativo";
+export {
+  qrDoCanalNativo as qrDoCanalHospedado,
+  saudeAoVivoNativa as saudeAoVivoDoCanalHospedado,
+} from "./verdash/qr-nativo";
 
 /**
  * ─── O canal de INSTAGRAM, também pareado ──────────────────────────────────

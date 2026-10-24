@@ -157,6 +157,16 @@ describe("a sétima cópia não nasce", () => {
    * último caso), para não sobrar autorização em nome de código que sumiu.
    */
   const LEITURAS_LEGITIMAS: ReadonlyArray<{ arquivo: string; trecho: string; motivo: string }> = [
+    {
+      arquivo: "lib/channels/verdash/conectar-nativo.ts",
+      trecho: 'displayName: row.display_name ?? "",',
+      motivo: "rótulo do CANAL (channel_sessions) devolvido no replay do Conectar por QR, não de contato",
+    },
+    {
+      arquivo: "lib/channels/verdash/eventos-conexao.ts",
+      trecho: 'r.display_name ?? r.phone_number ?? "sem nome",',
+      motivo: "rótulo do CANAL (channel_sessions) no aviso de conexão do canal nativo, não de contato",
+    },
     // ── prospecção (PR #963): nenhuma destas é nome de CONTATO ──────────────
     {
       arquivo: "app/app/prospecting/_client.tsx",

@@ -6645,6 +6645,12 @@ export const DICIONARIO: Traducoes = {
   Conjunto: { es: "Conjunto" },
   "Anúncio": { es: "Anuncio" },
   Posicionamento: { es: "Ubicación" },
+  // Seção "Origem" do dossiê do negócio.
+  "Título do anúncio": { es: "Título del anuncio" },
+  "ID do anúncio": { es: "ID del anuncio" },
+  "ID do clique": { es: "ID del clic" },
+  "Primeiro contato pelo anúncio": { es: "Primer contacto por el anuncio" },
+  "Link do anúncio": { es: "Enlace del anuncio" },
   "Campanha (utm_campaign)": { es: "Campaña (utm_campaign)" },
   "Conjunto (utm_adset)": { es: "Conjunto (utm_adset)" },
   "Anúncio (utm_ad)": { es: "Anuncio (utm_ad)" },
@@ -17664,6 +17670,16 @@ export const DICIONARIO: Traducoes = {
   "não puderam ser alteradas (apagadas ou fora do seu alcance).": { es: "no se pudieron cambiar (eliminadas o fuera de tu alcance)." },
   "Linha somente leitura (papel viewer)": { es: "Fila de solo lectura (rol viewer)" },
   "Você não tem permissão para fazer esta alteração em uma ou mais tarefas selecionadas.": { es: "No tienes permiso para hacer este cambio en una o más de las tareas seleccionadas." },
+
+  // ─── CONECTAR POR QR (Verdash nativo, Fatia 3) ───
+  "Conexão criada, mas o recebimento não foi ligado.": { es: "Conexión creada, pero la recepción no quedó activada." },
+  "Não foi possível criar a conexão.": { es: "No fue posible crear la conexión." },
+  "Conectar por QR code": { es: "Conectar por código QR" },
+  "Nome do número, por exemplo Comercial": { es: "Nombre del número, por ejemplo Comercial" },
+  "Um número novo, sem precisar de outra plataforma: você lê o QR com o celular e pronto.": { es: "Un número nuevo, sin necesitar otra plataforma: escaneas el QR con el celular y listo." },
+  "Gerar QR code": { es: "Generar código QR" },
+  "Conectar WhatsApp por QR code": { es: "Conectar WhatsApp por código QR" },
+  "No WhatsApp do celular, abra Aparelhos conectados e leia o código.": { es: "En el WhatsApp del celular, abre Dispositivos vinculados y escanea el código." },
 };
 
 /**

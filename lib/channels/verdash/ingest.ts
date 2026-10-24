@@ -50,11 +50,14 @@ import { logger } from "@/lib/logger";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 
+import { estamparAtribuicaoDoContato } from "@/lib/leads/atribuicao-de-anuncio";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
+import { extrairAtribuicaoVerdash } from "./atribuicao-de-anuncio";
 
 import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
 
 import { insertMessage, marcarConversa, pedirPersistenciaDaMidia } from "./gravacao";
+import { aplicarEventoDeConexao, eventoDeConexao, horaDoEvento } from "./eventos-conexao";
 import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
@@ -89,6 +92,15 @@ export async function ingestVerdashInbound(
     requestId?: string;
   },
 ): Promise<VerdashIngestResult> {
+  const evento = eventoDeConexao(input.payload);
+  if (evento) {
+    return aplicarEventoDeConexao(admin, {
+      organizationId: input.organizationId,
+      channelSessionId: input.channelSessionId,
+      evento,
+      emIso: horaDoEvento(input.payload),
+    });
+  }
   const msg = parseVerdashInbound(input.payload);
   if (!msg) return { status: "ignored", reason: "evento_sem_interesse" };
 
@@ -139,6 +151,17 @@ export async function ingestVerdashInbound(
 
   const contactId = await upsertContact(admin, input.organizationId, msg, identity);
   if (!contactId) return { status: "ignored", reason: "contato_nao_resolvido" };
+
+  // De qual anúncio a pessoa veio. Só ENTRADA: a mensagem que SAIU não carrega o
+  // clique de ninguém. A regra de primeiro toque é do banco, então reenvio e
+  // segunda conversa não reescrevem a origem; a falha é logada lá e não derruba
+  // a entrada (o provider reenviaria).
+  if (msg.direction === "inbound") {
+    const atribuicao = extrairAtribuicaoVerdash(input.payload);
+    if (atribuicao) {
+      await estamparAtribuicaoDoContato(admin, input.organizationId, contactId, atribuicao);
+    }
+  }
 
   const { data: convData, error: convErr } = await admin.rpc("fn_upsert_wa_conversation", {
     p_org: input.organizationId,

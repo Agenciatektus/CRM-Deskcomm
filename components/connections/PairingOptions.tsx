@@ -8,7 +8,16 @@ import { ApiError } from "@/lib/api/types";
 import { useT } from "@/hooks/i18n/useT";
 
 /** Both entry points share the form; the parent keeps polling for WORKING. */
-export function PairingOptions({ sessionId, qr }: { sessionId: string; qr: ReactNode }) {
+export function PairingOptions({
+  sessionId,
+  qr,
+  apenasQr = false,
+}: {
+  sessionId: string;
+  qr: ReactNode;
+  /** Conexão criada pelo CRM não tem código de pareamento: só o QR. */
+  apenasQr?: boolean;
+}) {
   const t = useT();
   const id = useId();
   const [mode, setMode] = useState<"qr" | "code">("qr");
@@ -57,6 +66,7 @@ export function PairingOptions({ sessionId, qr }: { sessionId: string; qr: React
       if (generation.current === current) setBusy(false);
     }
   }
+  if (apenasQr) return <div className="flex w-full justify-center">{qr}</div>;
   return (
     <div className="w-full space-y-4">
       <div className="flex justify-center gap-2" role="group" aria-label={t("Forma de conectar")}>

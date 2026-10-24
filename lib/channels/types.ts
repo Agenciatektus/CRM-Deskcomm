@@ -194,6 +194,12 @@ export interface OutboundEnvelope extends ChannelTenantScope {
    * `undefined` = envio solto, que é o caso comum.
    */
   replyToExternalId?: string | null;
+  /**
+   * Id estável da mensagem do CRM (`messages.id`), o mesmo em qualquer retry.
+   * Canal com envio idempotente (Verdash nativa) o manda como id do cliente;
+   * os demais ignoram.
+   */
+  clientMessageId?: string | null;
 }
 
 /**

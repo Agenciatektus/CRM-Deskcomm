@@ -62977,6 +62977,145 @@ begin
   return new;
 end$$;
 
+-- ---- Verdash nativo: evento de conexao atomico em channel_sessions (migration 9068) ----
+-- Mesmo corpo da migration 9068 (fn_registrar_evento_conexao_nativa). Fica ANTES da
+-- VARREDURA anon (nenhuma funcao nasce depois dela).
+create or replace function public.fn_registrar_evento_conexao_nativa(
+  p_org uuid,
+  p_canal uuid,
+  p_evento text,
+  p_em timestamptz
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_row public.channel_sessions%rowtype;
+  v_agora timestamptz := now();
+  v_em timestamptz := coalesce(p_em, now());
+  v_ultimo timestamptz;
+  v_meta jsonb;
+  v_status text;
+begin
+  if p_evento is null or p_evento not in ('Connected', 'Disconnected', 'LoggedOut') then
+    raise exception 'evento de conexao invalido' using errcode = '22023';
+  end if;
+
+  -- Sob lock: um UPDATE concorrente do operador espera e a escrita abaixo parte da
+  -- versao dele, em vez de regravar um metadata lido antes.
+  select * into v_row
+    from public.channel_sessions
+   where organization_id = p_org
+     and id = p_canal
+     and archived_at is null
+   for update;
+
+  if not found then
+    return jsonb_build_object('resultado', 'ignorado', 'motivo', 'canal_arquivado');
+  end if;
+  if v_row.verdash_origem is distinct from 'nativa' then
+    return jsonb_build_object('resultado', 'ignorado', 'motivo', 'evento_sem_interesse');
+  end if;
+
+  -- Evento mais antigo que a ultima transicao nao desfaz o que veio depois.
+  -- Com `evento_conexao_em` (relogio do FZAP nos dois lados) a comparacao e estrita.
+  -- Sem ele, o termo de comparacao e `last_status_change_at` (relogio do banco): o
+  -- relogio do FZAP pode estar poucos segundos atras, entao 30 s de tolerancia.
+  v_ultimo := nullif(v_row.metadata ->> 'evento_conexao_em', '')::timestamptz;
+  if v_ultimo is not null then
+    if v_em < v_ultimo then
+      return jsonb_build_object('resultado', 'obsoleto', 'status', v_row.status);
+    end if;
+  elsif v_row.last_status_change_at is not null
+    and v_em < v_row.last_status_change_at - interval '30 seconds' then
+    return jsonb_build_object('resultado', 'obsoleto', 'status', v_row.status);
+  end if;
+
+  v_meta := coalesce(v_row.metadata, '{}'::jsonb);
+  if p_evento = 'Connected' then
+    v_status := 'WORKING';
+    v_meta := (v_meta - 'desconectado_em') || jsonb_build_object(
+      'ja_conectou_em', coalesce(v_meta -> 'ja_conectou_em', to_jsonb(v_agora)));
+  elsif p_evento = 'LoggedOut' then
+    v_status := 'FAILED';
+    v_meta := v_meta || jsonb_build_object(
+      'ja_conectou_em', coalesce(v_meta -> 'ja_conectou_em', to_jsonb(v_agora)),
+      'desconectado_em', coalesce(v_meta -> 'desconectado_em', to_jsonb(v_agora)));
+  else
+    -- Disconnected depois de FAILED/STOPPED nao "melhora" o canal para STARTING.
+    v_status := case when v_row.status in ('FAILED', 'STOPPED') then v_row.status else 'STARTING' end;
+    v_meta := v_meta || jsonb_build_object(
+      'desconectado_em', coalesce(v_meta -> 'desconectado_em', to_jsonb(v_agora)));
+  end if;
+  v_meta := v_meta || jsonb_build_object('evento_conexao_em', to_jsonb(v_em));
+
+  update public.channel_sessions
+     set status = v_status,
+         last_status_change_at = case
+           when v_status is distinct from v_row.status then v_agora
+           else last_status_change_at end,
+         metadata = v_meta
+   where organization_id = p_org
+     and id = p_canal
+     and archived_at is null;
+
+  return jsonb_build_object(
+    'resultado', 'aplicado',
+    'status', v_status,
+    'mudou', v_status is distinct from v_row.status,
+    'display_name', v_row.display_name,
+    'phone_number', v_row.phone_number,
+    'instancia', v_row.verdash_instance_name
+  );
+end;
+$$;
+
+revoke execute on function public.fn_registrar_evento_conexao_nativa(uuid, uuid, text, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.fn_registrar_evento_conexao_nativa(uuid, uuid, text, timestamptz)
+  to service_role;
+
+notify pgrst, 'reload schema';
+
+-- ---- Verdash nativo: marca de limpeza pendente no FZAP (migration 9069) ----
+-- Mesmo corpo da migration 9069 (fn_marcar_limpeza_nativa). Fica ANTES da VARREDURA anon.
+create or replace function public.fn_marcar_limpeza_nativa(
+  p_org uuid,
+  p_canal uuid,
+  p_pendente boolean
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_n integer;
+begin
+  -- Atomico: so a chave `limpeza_fzap_pendente_em` muda (`||` e `-` no proprio UPDATE).
+  -- Vale tambem para canal arquivado (e nele que a limpeza pendente precisa ficar marcada).
+  update public.channel_sessions
+     set metadata = case
+       when p_pendente then coalesce(metadata, '{}'::jsonb)
+         || jsonb_build_object('limpeza_fzap_pendente_em', to_jsonb(now()))
+       else coalesce(metadata, '{}'::jsonb) - 'limpeza_fzap_pendente_em' end
+   where organization_id = p_org
+     and id = p_canal
+     and verdash_origem = 'nativa';
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+revoke execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
+  from public, anon, authenticated;
+grant execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
+  to service_role;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -66105,6 +66244,43 @@ notify pgrst, 'reload schema';
 create index if not exists webhook_events_log_poda_de_canal_idx
   on public.webhook_events_log (received_at)
   where channel_session_id is not null;
+
+-- ---- Verdash nativo: origem da instancia e pasta do FZAP por organizacao (migration 9067) ----
+-- 1 · de onde veio a instancia verdash: vinculada (criada pela Verdash, o CRM so
+--     liga) ou nativa (o CRM criou direto no FZAP). Coluna explicita em vez de
+--     inferir por `verdash_vinculo_id` nulo, que o modo direto tambem tem.
+alter table public.channel_sessions
+  add column if not exists verdash_origem text not null default 'vinculada'
+    constraint channel_sessions_verdash_origem_check check (verdash_origem in ('vinculada', 'nativa'));
+
+comment on column public.channel_sessions.verdash_origem is
+  'vinculada = instancia criada pela Verdash e ligada ao CRM; nativa = o CRM criou a instancia direto no FZAP (verdash_token_encrypted guarda o token dela). Migration 9067.';
+
+-- 2 · token da PASTA do FZAP por organizacao. O CRM nunca guarda o ADMIN_TOKEN do
+--     servidor: so o token da pasta, que alcanca apenas as instancias dela.
+--     Server-side only (RLS ligada, zero policies, grants so do service_role).
+create table if not exists public.verdash_fzap_pastas (
+  organization_id       uuid primary key references public.organizations(id) on delete cascade,
+  fzap_folder_id        text not null,
+  folder_token_encrypted bytea not null,
+  criada_em             timestamptz not null default now()
+);
+
+create unique index if not exists verdash_fzap_pastas_folder_uq
+  on public.verdash_fzap_pastas (fzap_folder_id);
+
+comment on table public.verdash_fzap_pastas is
+  'Pasta do FZAP de cada organizacao (uma por org) e o token dela, cifrado por fn_encrypt_oauth. Server-side only: RLS ligada sem policies e grants revogados de anon/authenticated. Migration 9067.';
+
+alter table public.verdash_fzap_pastas enable row level security;
+revoke all on public.verdash_fzap_pastas from anon, authenticated;
+grant select, insert, update, delete on public.verdash_fzap_pastas to service_role;
+
+create or replace trigger trg_organizacao_nao_muda
+  before update of organization_id on public.verdash_fzap_pastas
+  for each row execute function public.fn_organizacao_da_linha_nao_muda();
+
+notify pgrst, 'reload schema';
 
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
