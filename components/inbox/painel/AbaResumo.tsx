@@ -12,6 +12,7 @@ import { Demandas } from "./Demandas";
 import { DetalhesDoContato } from "./DetalhesDoContato";
 import { MemoriaDoContato } from "./MemoriaDoContato";
 import { ObservacoesDoContato } from "./ObservacoesDoContato";
+import { OrigemNoPainel } from "./OrigemNoPainel";
 import { ProximoPasso } from "./ProximoPasso";
 import type { DesfechoDraft } from "./tipos";
 import type { ResumoDoContato } from "./useResumoDoContato";
@@ -64,6 +65,7 @@ export function AbaResumo({
         leitura={leitura}
       />
       <Separator />
+      <OrigemNoPainel contactId={resumo.contactId} />
       <ObservacoesDoContato
         ref={refObservacoes}
         contactId={resumo.contactId}

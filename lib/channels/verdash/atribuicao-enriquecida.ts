@@ -77,6 +77,21 @@ export function completarComAVerdash(
   return Object.keys(novo).length > 0 ? novo : null;
 }
 
+/** Quanto tempo uma tentativa sem novidade vale antes de perguntar de novo. */
+const ESPERA_ENTRE_TENTATIVAS_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Já perguntamos há pouco e nada novo veio? A ficha e o Inbox chamam isto a cada
+ * abertura de conversa: sem esta espera, quem atende gera uma consulta por
+ * clique à Verdash e ao FZAP para um contato cujo nome ainda não existe lá.
+ */
+export function tentouHaPouco(meta: Record<string, unknown>, agora: number = Date.now()): boolean {
+  const quando = texto(meta.ad_enriquecimento_tentado_em);
+  if (!quando) return false;
+  const t = Date.parse(quando);
+  return Number.isFinite(t) && agora - t >= 0 && agora - t < ESPERA_ENTRE_TENTATIVAS_MS;
+}
+
 /**
  * Pede à Verdash, completa o contato e devolve os nomes (ou `null`).
  * `null` não é erro: contato que não veio de anúncio, canal sem vínculo, Verdash
@@ -97,6 +112,11 @@ export async function completarAtribuicaoPelaVerdash(
     if (!contato || contato.is_anonymized || !contato.phone_number) return null;
 
     const meta = (contato.source_metadata ?? {}) as Record<string, unknown>;
+    const atuais = (): NomesDoAnuncio => ({
+      ad_name: texto(meta.ad_name),
+      adset_name: texto(meta.adset_name),
+      campaign_name: texto(meta.campaign_name),
+    });
     // Sem sinal de anúncio no contato não há atribuição a completar.
     if (!texto(meta.ad_platform) || texto(meta.ad_platform) === "site") return null;
     // Os três nomes já estão no contato: nada a perguntar (e nada a esperar).
@@ -107,6 +127,9 @@ export async function completarAtribuicaoPelaVerdash(
         campaign_name: texto(meta.campaign_name),
       };
     }
+
+    // Perguntou há pouco e não veio nada: não pergunta de novo a cada abertura.
+    if (tentouHaPouco(meta)) return atuais();
 
     // A sessão por onde esta pessoa conversa (pareada OU direta), a mais recente primeiro.
     const { data: conversas } = await admin
@@ -147,14 +170,22 @@ export async function completarAtribuicaoPelaVerdash(
           contato.phone_number,
         ) ?? null)
       : await fzapAtribuicaoDireta(creds, contato.phone_number, PRAZO_DA_FICHA_MS);
-    if (!verdash) return null;
-
-    const acrescentar = completarComAVerdash(meta, verdash);
+    const acrescentar = verdash ? completarComAVerdash(meta, verdash) : null;
     const finais = { ...meta, ...(acrescentar ?? {}) };
-    if (acrescentar) {
+    // Nada novo: marca a tentativa, e a próxima abertura dentro da espera nem pergunta.
+    const marcaDaTentativa = acrescentar
+      ? {}
+      : { ad_enriquecimento_tentado_em: new Date().toISOString() };
+    if (acrescentar || Object.keys(marcaDaTentativa).length > 0) {
       const { data: gravou } = await admin
         .from("contacts")
-        .update({ source_metadata: { ...finais, ad_enriquecido_por: "verdash" } })
+        .update({
+          source_metadata: {
+            ...finais,
+            ...marcaDaTentativa,
+            ...(acrescentar ? { ad_enriquecido_por: "verdash" } : {}),
+          },
+        })
         .eq("organization_id", organizationId)
         .eq("id", contactId)
         .eq("updated_at", contato.updated_at)

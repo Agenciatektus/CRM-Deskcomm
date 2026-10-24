@@ -7,7 +7,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { completarComAVerdash } from "@/lib/channels/verdash/atribuicao-enriquecida";
+import { completarComAVerdash, tentouHaPouco } from "@/lib/channels/verdash/atribuicao-enriquecida";
 import { fzapAtribuicaoDireta, verdashAtribuicaoPareada } from "@/lib/channels/verdash/client";
 
 const V = {
@@ -147,5 +147,18 @@ describe("fzapAtribuicaoDireta (canal direto: pergunta ao módulo de tráfego do
     expect(f).not.toHaveBeenCalled();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: false, error: "no_license" }), { status: 403 })));
     await expect(fzapAtribuicaoDireta(creds, "+5566999910216")).rejects.toThrow(/verdash_request_failed: 403/);
+  });
+});
+
+describe("tentouHaPouco (não pergunta a cada abertura de conversa)", () => {
+  const agora = Date.parse("2026-10-24T20:00:00Z");
+  it("tentativa de 1 hora atrás vale; de 7 horas atrás já não", () => {
+    expect(tentouHaPouco({ ad_enriquecimento_tentado_em: "2026-10-24T19:00:00Z" }, agora)).toBe(true);
+    expect(tentouHaPouco({ ad_enriquecimento_tentado_em: "2026-10-24T13:00:00Z" }, agora)).toBe(false);
+  });
+  it("sem marca, marca inválida ou do futuro: pergunta", () => {
+    expect(tentouHaPouco({}, agora)).toBe(false);
+    expect(tentouHaPouco({ ad_enriquecimento_tentado_em: "lixo" }, agora)).toBe(false);
+    expect(tentouHaPouco({ ad_enriquecimento_tentado_em: "2026-10-25T00:00:00Z" }, agora)).toBe(false);
   });
 });
