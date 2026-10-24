@@ -73,6 +73,12 @@ export async function GET(
     );
   }
 
+  // ENRIQUECIMENTO DE SISTEMA, no mesmo espírito do cache de hierarquia acima:
+  // este GET pode gravar `source_metadata`, mas só PREENCHE campos vazios com um
+  // dado que o sistema já tem (nunca conteúdo do usuário), e deixa o marcador
+  // `ad_enriquecido_por` como trilha. Não é ação do usuário, então não passa por
+  // `requireSupportWrite`.
+  //
   // Sem conexão de leitura da Meta nesta organização, quem sabe o nome é o
   // canal pareado: ele enriquece o anúncio e o CRM só pergunta. O que
   // vier é gravado no contato, então as próximas aberturas já nascem com o nome.

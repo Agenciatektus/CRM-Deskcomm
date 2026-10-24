@@ -27,6 +27,8 @@ import { type AtribuicaoDaVerdash, verdashAtribuicaoPareada } from "./client";
 import { resolveVerdashCreds } from "./credentials";
 
 const TETO_DO_TEXTO = 300;
+/** A ficha do contato não espera a Verdash por mais que isto. */
+const PRAZO_DA_FICHA_MS = 5_000;
 
 export interface NomesDoAnuncio {
   ad_name: string | null;
@@ -58,7 +60,9 @@ export function completarComAVerdash(
 ): Record<string, string> | null {
   const adDoContato = texto(meta.ad_id);
   const adDaVerdash = texto(verdash.ad_id);
-  if (adDoContato && adDaVerdash && adDoContato !== adDaVerdash) return null;
+  // Com anúncio no contato, o da Verdash tem de ser O MESMO: um lead sem `ad_id`
+  // (site, UTM) com nome de campanha de outra origem não pode emprestar o nome.
+  if (adDoContato && adDaVerdash !== adDoContato) return null;
 
   const novo: Record<string, string> = {};
   for (const chave of CHAVES) {
@@ -91,6 +95,14 @@ export async function completarAtribuicaoPelaVerdash(
     const meta = (contato.source_metadata ?? {}) as Record<string, unknown>;
     // Sem sinal de anúncio no contato não há atribuição a completar.
     if (!texto(meta.ad_platform) || texto(meta.ad_platform) === "site") return null;
+    // Os três nomes já estão no contato: nada a perguntar (e nada a esperar).
+    if (texto(meta.ad_name) && texto(meta.adset_name) && texto(meta.campaign_name)) {
+      return {
+        ad_name: texto(meta.ad_name),
+        adset_name: texto(meta.adset_name),
+        campaign_name: texto(meta.campaign_name),
+      };
+    }
 
     // A sessão pareada por onde esta pessoa conversa, a mais recente primeiro.
     const { data: conversas } = await admin
@@ -113,7 +125,10 @@ export async function completarAtribuicaoPelaVerdash(
       .not("verdash_vinculo_id", "is", null)
       .is(ARCHIVED_AT, null)
       .in("id", sessaoIds);
-    const sessao = (sessoes ?? [])[0];
+    // A mais recente primeiro: `in` não preserva a ordem das conversas.
+    const sessao = sessaoIds
+      .map((id) => (sessoes ?? []).find((x) => x.id === id))
+      .find((x) => x?.verdash_instance_name);
     if (!sessao?.verdash_instance_name) return null;
 
     const creds = await resolveVerdashCreds(admin, {
@@ -122,7 +137,7 @@ export async function completarAtribuicaoPelaVerdash(
     });
     if (!creds?.vinculoId) return null;
 
-    const respostas = await verdashAtribuicaoPareada(creds, [contato.phone_number]);
+    const respostas = await verdashAtribuicaoPareada(creds, [contato.phone_number], PRAZO_DA_FICHA_MS);
     const verdash = respostas.get(contato.phone_number) ?? null;
     if (!verdash) return null;
 

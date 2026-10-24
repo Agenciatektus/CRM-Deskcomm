@@ -45,6 +45,10 @@ describe("completarComAVerdash", () => {
     expect(completarComAVerdash({ ad_id: "999" }, V)).toBeNull();
   });
 
+  it("lead da Verdash SEM ad_id não empresta nome a contato que tem ad_id", () => {
+    expect(completarComAVerdash({ ad_id: "120253837017130653" }, { ...V, ad_id: null })).toBeNull();
+  });
+
   it("contato sem ad_id herda o da Verdash", () => {
     expect(completarComAVerdash({ ad_platform: "meta_ads" }, V)).toHaveProperty("ad_id", V.ad_id);
   });

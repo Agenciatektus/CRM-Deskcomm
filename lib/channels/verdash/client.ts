@@ -231,6 +231,7 @@ export interface AtribuicaoDaVerdash {
 export async function verdashAtribuicaoPareada(
   creds: VerdashCredentials,
   telefones: string[],
+  prazoMs: number = TIMEOUT_MS,
 ): Promise<Map<string, AtribuicaoDaVerdash | null>> {
   const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-atribuicao-do-lead`;
 
@@ -240,7 +241,7 @@ export async function verdashAtribuicaoPareada(
       method: "POST",
       headers: { "x-crm-token": creds.token, "content-type": "application/json" },
       body: JSON.stringify({ telefones }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(prazoMs),
     });
   } catch (err) {
     const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
