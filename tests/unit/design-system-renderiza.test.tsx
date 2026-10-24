@@ -54,6 +54,7 @@ const SECOES = [
   "menus",
   "retorno",
   "layout",
+  "login",
   "regras",
 ];
 
