@@ -1,3 +1,5 @@
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
+
 /**
  * Os dados do cliente que a Meta usa para reconhecê-lo — a nota de correspondência.
  *
@@ -102,7 +104,7 @@ function nascimentoAAAAMMDD(data: string | null): string | null {
 
 export function dadosDoClienteDe(contato: CadastroDoContato): DadosDoCliente {
   const email = contato.email_normalized?.trim().toLowerCase() ?? "";
-  const { primeiroNome, sobrenome } = separarNome(contato.name ?? contato.display_name);
+  const { primeiroNome, sobrenome } = separarNome(nomeDoContato(contato));
   const digitos = (contato.phone_number ?? "").replace(/\D/g, "");
   return {
     externalId: contato.id,
