@@ -11,9 +11,29 @@ describe("LP: só redireciona quem tem sessão viva no cookie", () => {
     expect(temSessaoViva(c, AGORA)).toBe(true);
   });
 
-  it("cookie antigo (sessão vencida) NÃO redireciona: a LP aparece", () => {
-    const c = [{ name: "sb-deskcomm-auth", value: b64({ expires_at: AGORA / 1000 - 60 }) }];
+  it("access token vencido há horas ainda redireciona: o CRM renova com o refresh token", () => {
+    const c = [{ name: "sb-deskcomm-auth", value: b64({ expires_at: AGORA / 1000 - 3 * 3600, refresh_token: "x" }) }];
+    expect(temSessaoViva(c, AGORA)).toBe(true);
+  });
+
+  it("cookie abandonado há mais de 7 dias NÃO redireciona: a LP aparece", () => {
+    const c = [{ name: "sb-deskcomm-auth", value: b64({ expires_at: AGORA / 1000 - 8 * 86400 }) }];
     expect(temSessaoViva(c, AGORA)).toBe(false);
+  });
+
+  it("pedaços com buraco na sequência não são juntados", () => {
+    const v = b64({ expires_at: AGORA / 1000 + 600 });
+    const t = Math.floor(v.length / 3);
+    const c = [
+      { name: "sb-deskcomm-auth.0", value: v.slice(0, t) },
+      { name: "sb-deskcomm-auth.2", value: v.slice(2 * t) },
+    ];
+    expect(temSessaoViva(c, AGORA)).toBe(false);
+  });
+
+  it("formato legado em JSON puro", () => {
+    const c = [{ name: "sb-deskcomm-auth", value: JSON.stringify({ expires_at: AGORA / 1000 + 600 }) }];
+    expect(temSessaoViva(c, AGORA)).toBe(true);
   });
 
   it("junta o cookie em pedaços (.0, .1) na ordem numérica", () => {

@@ -13,7 +13,7 @@ import { Movimento } from "./_components/Movimento";
 /**
  * Quem já tem sessão no CRM segue direto para o sistema, como o `/` do CRM sempre
  * fez. A LP divide o host com o CRM, então o cookie de sessão chega aqui. O cookie precisa trazer uma sessão
- * que ainda não venceu (ver `lib/sessao.ts`); cookie velho deixa a LP aparecer em vez de
+ * recente (ver `lib/sessao.ts`); cookie abandonado há dias deixa a LP aparecer em vez de
  * cair em `/login`. O `proxy.ts` do CRM valida a sessão de verdade em `/app`.
  *
  * `force-dynamic`: a resposta depende do cookie, então a página não pode ser
