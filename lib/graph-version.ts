@@ -11,11 +11,13 @@
  * `tests/unit/versao-da-graph-num-lugar-so.test.ts`: literal de versão da Graph
  * fora deste arquivo reprova a suíte.
  *
- * NÃO SUBIU DE VERSÃO AQUI — de propósito. A v26.0 saiu em 29/07/2026, e subir
- * é decisão de manutenção, com reconferência de campo a campo antes (a lição
- * medida em `lib/plataformas-de-anuncio/meta/insights.ts`: campo válido some
- * entre versões, sem aviso). Esta mudança só diz ONDE o número mora; o número
- * continua o mesmo de hoje.
+ * SUBIU PARA A v25.0 EM 24/10/2026, a mesma que a Verdash já fala em produção
+ * (`META_GRAPH_API_VERSION`). A v22.0 deixou de ser a que a instalação deveria
+ * conviver: duas plataformas do mesmo dono em versões diferentes dão respostas
+ * diferentes para o mesmo anúncio. Subir é decisão de manutenção, com
+ * reconferência de campo a campo (a lição medida em
+ * `lib/plataformas-de-anuncio/meta/insights.ts`: campo válido some entre versões,
+ * sem aviso). A v26.0 saiu em 29/07/2026 e fica para a próxima rodada.
  *
  * Dois eixos, um número só:
  * - `graphVersion()` — canais de mensagem (`lib/channels/**`,
@@ -30,7 +32,7 @@
  */
 
 /** O default da instalação. `bump` aqui é mudança deliberada, não deriva. */
-export const VERSAO_PADRAO_DA_GRAPH = "v22.0";
+export const VERSAO_PADRAO_DA_GRAPH = "v25.0";
 
 /**
  * A versão com que a Graph API é chamada hoje.
