@@ -23,6 +23,8 @@ import { enviarComConsulta } from "@/lib/channels/verdash/envio-idempotente";
 
 const ORG = "00000000-0000-4000-8000-0000000000a1";
 const MSG = "11111111-1111-4111-8111-111111111111";
+// O adapter manda ao FZAP o uuid em 32 hex maiúsculos (formato de id do WhatsApp).
+const ID_FZAP = "11111111111141118111111111111111".toUpperCase();
 const TOKEN = "token-da-instancia";
 
 interface Chamada {
@@ -91,7 +93,7 @@ describe("envio da nativa", () => {
   it("manda o id do CRM no corpo com o token da instancia", async () => {
     await verdashAdapter.send(envelope);
     const [c] = enviosDe();
-    expect(c!.body!.id).toBe(MSG);
+    expect(c!.body!.id).toBe(ID_FZAP);
     expect(c!.token).toBe(TOKEN);
     expect(chamadas.some((x) => x.path === "/chat/send/status")).toBe(false);
   });
@@ -108,7 +110,7 @@ describe("envio da nativa", () => {
     expect(enviosDe()).toHaveLength(1);
     const s = chamadas.find((x) => x.path === "/chat/send/status")!;
     expect(s.method).toBe("GET");
-    expect(s.search).toBe(`?Id=${MSG}`);
+    expect(s.search).toBe(`?Id=${ID_FZAP}`);
     expect(s.token).toBe(TOKEN);
   });
 
@@ -118,7 +120,7 @@ describe("envio da nativa", () => {
     await verdashAdapter.send(envelope);
     const e = enviosDe();
     expect(e).toHaveLength(2);
-    expect(e[1]!.body!.id).toBe(MSG);
+    expect(e[1]!.body!.id).toBe(ID_FZAP);
   });
 
   it("not_found e falha no reenvio: para (nao reenvia pela terceira vez)", async () => {

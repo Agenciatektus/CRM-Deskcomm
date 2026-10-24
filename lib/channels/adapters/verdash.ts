@@ -267,7 +267,8 @@ export const verdashAdapter: ChannelAdapter = {
     // NATIVA: envio idempotente. O `id` do CRM vai no corpo e, em timeout/502, o
     // status do envio é consultado antes de qualquer nova tentativa. A vinculada
     // não passa por aqui (o token dela nem é do FZAP).
-    const idDoEnvio = envelope.clientMessageId?.trim() || null;
+    // Formato do id do WhatsApp (hex maiúsculo, sem hífens): o uuid do CRM vira 32 hex.
+    const idDoEnvio = envelope.clientMessageId?.trim().replace(/-/g, "").toUpperCase() || null;
     const nativo =
       idDoEnvio && !creds.vinculoId
         ? await estadoNativo(admin, envelope.organizationId, envelope.sessionRef)
