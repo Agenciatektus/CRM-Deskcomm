@@ -66111,21 +66111,8 @@ create index if not exists webhook_events_log_poda_de_canal_idx
 --     liga) ou nativa (o CRM criou direto no FZAP). Coluna explicita em vez de
 --     inferir por `verdash_vinculo_id` nulo, que o modo direto tambem tem.
 alter table public.channel_sessions
-  add column if not exists verdash_origem text not null default 'vinculada';
-
-do $origem$
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.channel_sessions'::regclass
-       and conname = 'channel_sessions_verdash_origem_check'
-  ) then
-    alter table public.channel_sessions
-      add constraint channel_sessions_verdash_origem_check
-      check (verdash_origem in ('vinculada', 'nativa')) not valid;
-    alter table public.channel_sessions validate constraint channel_sessions_verdash_origem_check;
-  end if;
-end $origem$;
+  add column if not exists verdash_origem text not null default 'vinculada'
+    constraint channel_sessions_verdash_origem_check check (verdash_origem in ('vinculada', 'nativa'));
 
 comment on column public.channel_sessions.verdash_origem is
   'vinculada = instancia criada pela Verdash e ligada ao CRM; nativa = o CRM criou a instancia direto no FZAP (verdash_token_encrypted guarda o token dela). Migration 9067.';
@@ -66139,6 +66126,9 @@ create table if not exists public.verdash_fzap_pastas (
   folder_token_encrypted bytea not null,
   criada_em             timestamptz not null default now()
 );
+
+create unique index if not exists verdash_fzap_pastas_folder_uq
+  on public.verdash_fzap_pastas (fzap_folder_id);
 
 comment on table public.verdash_fzap_pastas is
   'Pasta do FZAP de cada organizacao (uma por org) e o token dela, cifrado por fn_encrypt_oauth. Server-side only: RLS ligada sem policies e grants revogados de anon/authenticated. Migration 9067.';

@@ -1,10 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const sufixos = vi.hoisted(() => [] as string[]);
+vi.mock("node:crypto", async (orig) => {
+  const real = await orig<typeof import("node:crypto")>();
+  const randomBytes = ((n: number) =>
+    n === 3 && sufixos.length > 0 ? Buffer.from(sufixos.shift()!, "hex") : real.randomBytes(n)) as typeof real.randomBytes;
+  return { ...real, randomBytes, default: { ...real, randomBytes } };
+});
 
 import {
   apagarNativo,
   criarInstanciaNativa,
   desligarNativo,
-  lerPastaDaOrg,
   nomeDaInstanciaNativa,
   obterQrNativo,
   statusNativo,
@@ -45,6 +54,8 @@ let linhas: Linha[];
 let chamadas: Chamada[];
 let proxyTestOk: boolean;
 let seq: number;
+/** "perde": o FZAP cria a linha e a resposta se perde (timeout); "erro": 502 com a proxyUrl no corpo. */
+let falhaNoPost: "perde" | "erro" | null;
 
 function envelope(status: number, data?: unknown, error?: string) {
   return {
@@ -66,6 +77,7 @@ const fzapDuble = (async (url: unknown, init?: RequestInit) => {
 
   if (token === PASTA_TOKEN) {
     if (path === "/folder/instances" && method === "POST") {
+      if (falhaNoPost === "erro") return envelope(502, undefined, `proxy ${PROXY} recusou`);
       // Aceita nome repetido, como o FZAP real.
       const l: Linha = {
         id: `fzap-${++seq}`,
@@ -75,6 +87,7 @@ const fzapDuble = (async (url: unknown, init?: RequestInit) => {
         metadata: body!.metadata,
       };
       linhas.push(l);
+      if (falhaNoPost === "perde") throw new Error(`timeout ${PROXY}`);
       return envelope(201, { id: l.id, folderId: l.folderId });
     }
     if (path === "/folder/instances" && method === "GET") {
@@ -130,12 +143,15 @@ const hex = (s: string) => Buffer.from(s).toString("hex");
 
 const fetchOriginal = globalThis.fetch;
 const envOriginal = process.env.FZAP_PROXY_URL_BR;
+const baseOriginal = process.env.VERDASH_API_BASE_URL;
 
 beforeEach(() => {
   linhas = [];
   chamadas = [];
   proxyTestOk = true;
   seq = 0;
+  falhaNoPost = null;
+  sufixos.length = 0;
   process.env.FZAP_PROXY_URL_BR = PROXY;
   process.env.VERDASH_API_BASE_URL = "http://fzap.interno:8081";
   globalThis.fetch = fzapDuble;
@@ -144,6 +160,8 @@ afterEach(() => {
   globalThis.fetch = fetchOriginal;
   if (envOriginal === undefined) delete process.env.FZAP_PROXY_URL_BR;
   else process.env.FZAP_PROXY_URL_BR = envOriginal;
+  if (baseOriginal === undefined) delete process.env.VERDASH_API_BASE_URL;
+  else process.env.VERDASH_API_BASE_URL = baseOriginal;
 });
 
 const entrada = { organizationId: ORG, orgSlug: "Acme Ltda", rotulo: "Comercial", channelSessionId: "cs-1" };
@@ -165,6 +183,8 @@ describe("criar", () => {
     expect(r.instanceName).toMatch(/^crm-acme-ltda-comercial-[0-9a-f]{6}$/);
     expect(r.instanceToken).toMatch(/^[0-9a-f]{48}$/);
     expect(r.fzapId).toBe("fzap-1");
+    const claro = await (adminFalso() as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: string }> }).rpc("fn_decrypt_oauth", { ciphertext: r.tokenEncrypted });
+    expect(claro.data).toBe(r.instanceToken);
     // O proxy foi testado com o token da INSTANCIA, antes de entregar.
     const teste = chamadas.find((c) => c.path === "/session/proxy/test")!;
     expect(teste.token).toBe(r.instanceToken);
@@ -188,6 +208,30 @@ describe("criar", () => {
     expect(ordem.indexOf("GET /folder/instances")).toBeLessThan(ordem.indexOf("POST /folder/instances"));
     const nomes = new Set(Array.from({ length: 20 }, () => nomeDaInstanciaNativa("acme-ltda", "comercial")));
     expect(nomes.size).toBeGreaterThan(1);
+  });
+
+  it("colisao de nome: o laco sorteia de novo e a instancia nova nasce com o 2o sufixo", async () => {
+    linhas.push({ id: "velha", name: "crm-acme-ltda-comercial-aaaaaa", token: "t", folderId: "pasta-1", metadata: {} });
+    sufixos.push("aaaaaa", "aaaaaa", "bbbbbb");
+    const r = await criarInstanciaNativa(adminFalso(), entrada);
+    expect(r.instanceName).toBe("crm-acme-ltda-comercial-bbbbbb");
+  });
+
+  it("POST perde a resposta (timeout): orfa localizada por channel_session_id e apagada, sem proxy na mensagem", async () => {
+    falhaNoPost = "perde";
+    const erro = (await criarInstanciaNativa(adminFalso(), entrada).catch((e: Error) => e)) as Error;
+    expect(erro.message).toBe("verdash_nativo_criacao_falhou: sem_resposta");
+    expect(erro.message).not.toContain(PROXY);
+    expect(linhas).toHaveLength(0);
+    expect(chamadas.some((c) => c.method === "DELETE" && c.path === "/folder/instances/fzap-1/full")).toBe(true);
+  });
+
+  it("POST recusado (502 que ecoa a proxyUrl): mensagem fixa com status, sem a URL", async () => {
+    falhaNoPost = "erro";
+    const erro = (await criarInstanciaNativa(adminFalso(), entrada).catch((e: Error) => e)) as Error;
+    expect(erro.message).toBe("verdash_nativo_criacao_falhou: 502");
+    expect(erro.message).not.toContain(PROXY);
+    expect(linhas).toHaveLength(0);
   });
 
   it("proxy ausente: falha explicita e NAO cria nada no FZAP", async () => {
@@ -214,18 +258,17 @@ describe("criar", () => {
   });
 });
 
-describe("dublê recusa o que o FZAP real recusa", () => {
-  it("token de pasta em /admin/* da 401", async () => {
-    const pasta = (await lerPastaDaOrg(adminFalso(), ORG))!;
-    const { fzapRequest } = await import("@/lib/channels/verdash/client");
-    await expect(fzapRequest(pasta.creds, "/admin/users")).rejects.toThrow("401");
+describe("o CRM nunca fala com /admin", () => {
+  it("nenhum caminho do modulo contem /admin", () => {
+    const fonte = readFileSync("lib/channels/verdash/nativo.ts", "utf-8");
+    expect(fonte).not.toContain("/admin");
   });
 });
 
 describe("guard de organizacao", () => {
   async function umaInstancia(orgDaMetadata: string) {
     linhas.push({ id: "fz-9", name: "x", token: "tok-9", folderId: "pasta-1", metadata: { organization_id: orgDaMetadata } });
-    return { creds: { instanceName: "", token: "tok-9", vinculoId: null, baseUrl: "http://fzap.interno:8081" } };
+    return { creds: { instanceName: "x", token: "tok-9", vinculoId: null, baseUrl: "http://fzap.interno:8081" } };
   }
 
   it("apagar: instancia com metadata de OUTRA org nao e apagada", async () => {
@@ -258,6 +301,16 @@ describe("guard de organizacao", () => {
     const del = chamadas.find((c) => c.method === "DELETE")!;
     expect(del).toMatchObject({ path: "/folder/instances/fz-9/full", token: PASTA_TOKEN });
     expect(linhas).toHaveLength(0);
+  });
+
+  it("par divergente: fzapId da org A com creds de instancia de OUTRA org => zero chamadas a /session/*", async () => {
+    await umaInstancia(ORG);
+    linhas.push({ id: "fz-b", name: "da-org-b", token: "tok-b", folderId: "pasta-1", metadata: { organization_id: OUTRA_ORG } });
+    const credsB = { instanceName: "da-org-b", token: "tok-b", vinculoId: null, baseUrl: "http://fzap.interno:8081" };
+    await expect(
+      desligarNativo(adminFalso(), { organizationId: ORG, fzapId: "fz-9", creds: credsB }),
+    ).rejects.toThrow("verdash_nativo_guard_instancia_divergente");
+    expect(chamadas.some((c) => c.path.startsWith("/session/"))).toBe(false);
   });
 
   it("desligar: disconnect e logout com o token da INSTANCIA", async () => {

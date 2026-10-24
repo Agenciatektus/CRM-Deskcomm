@@ -18,6 +18,7 @@
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 import { decryptWebhookSecret, encryptWebhookSecret } from "@/lib/webhooks/secrets";
 
 import { fzapRequest } from "./client";
@@ -43,7 +44,7 @@ export type EstadoNativo = "conectado" | "aguardando_qr" | "desconectado";
 interface InstanciaDaLista {
   id?: string;
   name?: string;
-  metadata?: { organization_id?: string } | null;
+  metadata?: { organization_id?: string; channel_session_id?: string } | null;
 }
 
 /** Slug seguro para nome de instancia (so [a-z0-9-]). */
@@ -93,16 +94,22 @@ async function listarDaPasta(pasta: PastaFzap): Promise<InstanciaDaLista[]> {
 /**
  * Guard: relê a instancia NA PASTA (por id) e confere a organizacao. Instancia
  * fora da pasta nao aparece na lista; metadata de outra org ou ausente recusa.
+ * Com `nome`, confere tambem que o id e o nome pertencem a MESMA instancia (o
+ * token que vai agir e o de `creds`, e nao pode ser de outra).
  */
 async function exigirInstanciaDaOrg(
   pasta: PastaFzap,
   organizationId: string,
   fzapId: string,
+  nome?: string,
 ): Promise<void> {
   const inst = (await listarDaPasta(pasta)).find((i) => i.id === fzapId);
   if (!inst) throw new Error("verdash_nativo_instancia_nao_encontrada");
   if (inst.metadata?.organization_id !== organizationId) {
     throw new Error("verdash_nativo_guard_org_divergente");
+  }
+  if (nome !== undefined && inst.name !== nome) {
+    throw new Error("verdash_nativo_guard_instancia_divergente");
   }
 }
 
@@ -123,13 +130,54 @@ export async function apagarNativo(
   });
 }
 
+/** O FZAP pode ecoar a proxyUrl (com credenciais) no corpo do erro: so o status sai. */
+function statusDoErro(err: unknown): string {
+  const m = err instanceof Error ? /verdash_request_failed: (\d{3})/.exec(err.message) : null;
+  return m ? m[1]! : "sem_resposta";
+}
+
+async function postarInstancia(
+  pasta: PastaFzap,
+  input: { organizationId: string; channelSessionId: string },
+  i: { instanceName: string; instanceToken: string; proxyUrl: string },
+): Promise<string> {
+  let fzapId: string | undefined;
+  try {
+    const criada = await fzapRequest<{ id?: string }>(pasta.creds, "/folder/instances", {
+      method: "POST",
+      body: {
+        name: i.instanceName,
+        token: i.instanceToken,
+        expiration: 0,
+        proxyConfig: { enabled: true, proxyUrl: i.proxyUrl },
+        s3Config: { enabled: false },
+        metadata: {
+          sistema: "crm",
+          organization_id: input.organizationId,
+          channel_session_id: input.channelSessionId,
+        },
+      },
+    });
+    fzapId = criada?.id;
+  } catch (err) {
+    await limparOrfaDoCanal(pasta, input.organizationId, input.channelSessionId);
+    throw new Error(`verdash_nativo_criacao_falhou: ${statusDoErro(err)}`);
+  }
+  if (!fzapId) {
+    await limparOrfaDoCanal(pasta, input.organizationId, input.channelSessionId);
+    throw new Error("verdash_nativo_criacao_sem_id");
+  }
+  return fzapId;
+}
+
 /**
  * Cria a instancia na pasta da org, com proxy BR. Qualquer falha depois do POST
- * apaga a instancia orfa (`/full`) e propaga o erro original.
+ * (ou no POST, que pode ter criado e perdido a resposta) apaga a orfa e lanca
+ * erro de mensagem fixa.
  */
 export async function criarInstanciaNativa(
   admin: SupabaseClient,
-  input: { organizationId: string; orgSlug: string; rotulo: string; channelSessionId?: string },
+  input: { organizationId: string; orgSlug: string; rotulo: string; channelSessionId: string },
 ): Promise<InstanciaNativa> {
   const proxyUrl = proxyBr();
   const pasta = await pastaOuErro(admin, input.organizationId);
@@ -145,23 +193,7 @@ export async function criarInstanciaNativa(
     instanceName = nomeDaInstanciaNativa(input.orgSlug, input.rotulo);
   }
 
-  const criada = await fzapRequest<{ id?: string }>(pasta.creds, "/folder/instances", {
-    method: "POST",
-    body: {
-      name: instanceName,
-      token: instanceToken,
-      expiration: 0,
-      proxyConfig: { enabled: true, proxyUrl },
-      s3Config: { enabled: false },
-      metadata: {
-        sistema: "crm",
-        organization_id: input.organizationId,
-        ...(input.channelSessionId ? { channel_session_id: input.channelSessionId } : {}),
-      },
-    },
-  });
-  const fzapId = criada?.id;
-  if (!fzapId) throw new Error("verdash_nativo_criacao_sem_id");
+  const fzapId = await postarInstancia(pasta, input, { instanceName, instanceToken, proxyUrl });
 
   try {
     await fzapRequest({ ...pasta.creds, token: instanceToken }, "/session/proxy/test", {
@@ -169,20 +201,41 @@ export async function criarInstanciaNativa(
       body: { proxyUrl },
     });
   } catch {
-    // Mensagem fixa: o erro do provider pode ecoar a URL do proxy, que e segredo.
-    await limparOrfa(pasta, fzapId);
+    await limparOrfa(pasta, fzapId, input.organizationId);
     throw new Error("verdash_nativo_proxy_falhou");
   }
 
   return { fzapId, instanceName, instanceToken, tokenEncrypted };
 }
 
-async function limparOrfa(pasta: PastaFzap, fzapId: string): Promise<void> {
-  await fzapRequest(pasta.creds, `/folder/instances/${encodeURIComponent(fzapId)}/full`, {
-    method: "DELETE",
-  }).catch(() => {
-    // Best-effort: o erro que importa e o da criacao, que quem chama recebe.
-  });
+async function limparOrfa(pasta: PastaFzap, fzapId: string, organizationId: string): Promise<void> {
+  try {
+    await fzapRequest(pasta.creds, `/folder/instances/${encodeURIComponent(fzapId)}/full`, {
+      method: "DELETE",
+    });
+  } catch {
+    // Nao some em silencio: instancia viva no FZAP sem dono no CRM precisa de faxina.
+    logger.error("verdash_nativo_orfa", { fzapId, organization_id: organizationId });
+  }
+}
+
+/** POST sem id (timeout, resposta perdida): acha a orfa por metadata e apaga. */
+async function limparOrfaDoCanal(
+  pasta: PastaFzap,
+  organizationId: string,
+  channelSessionId: string,
+): Promise<void> {
+  try {
+    const orfas = (await listarDaPasta(pasta)).filter(
+      (i) =>
+        i.id &&
+        i.metadata?.organization_id === organizationId &&
+        i.metadata?.channel_session_id === channelSessionId,
+    );
+    for (const o of orfas) await limparOrfa(pasta, o.id!, organizationId);
+  } catch {
+    logger.error("verdash_nativo_orfa", { organization_id: organizationId, channel_session_id: channelSessionId });
+  }
 }
 
 /** Pede a conexao e devolve o QR (data URL) ou null enquanto nao estiver pronto. */
@@ -208,7 +261,7 @@ export async function desligarNativo(
   input: { organizationId: string; fzapId: string; creds: VerdashCredentials },
 ): Promise<void> {
   const pasta = await pastaOuErro(admin, input.organizationId);
-  await exigirInstanciaDaOrg(pasta, input.organizationId, input.fzapId);
+  await exigirInstanciaDaOrg(pasta, input.organizationId, input.fzapId, input.creds.instanceName);
   await fzapRequest(input.creds, "/session/disconnect", { method: "POST", body: {} });
   await fzapRequest(input.creds, "/session/logout", { method: "POST", body: {} });
 }
