@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ehTrocaDeOrigem,
   escolherSessaoDoNumero,
   findVerdashSession,
   listVerdashSessions,
@@ -35,6 +36,7 @@ function sessao(extra: Partial<VerdashSession>): VerdashSession {
     webhookPathToken: "tok",
     hasToken: true,
     archivedAt: null,
+    origem: "vinculada",
     ...extra,
   };
 }
@@ -207,5 +209,25 @@ describe("leitura com dois canais na organização", () => {
 
   it("sem nenhum, nulo", async () => {
     expect(await findVerdashSession(adminComLinhas([]) as never, "org")).toBeNull();
+  });
+});
+
+describe("cerca de troca de origem (nativa x vinculada)", () => {
+  const nativa = sessao({ id: "n", instanceName: "crm-x", phoneNumber: "+5513900000009", origem: "nativa" });
+
+  it("vincular o telefone de uma nativa ativa acha a linha nativa, e a troca é recusada", () => {
+    const achada = escolherSessaoDoNumero([nativa], { instanceName: "inst-token", phoneNumber: "+5513900000009" });
+    expect(achada?.id).toBe("n");
+    expect(ehTrocaDeOrigem(achada)).toBe(true);
+  });
+
+  it("nativa ARQUIVADA nunca é ressuscitada por vínculo: vira canal novo", () => {
+    const arquivada = { ...nativa, archivedAt: "2026-10-01T00:00:00Z" };
+    expect(escolherSessaoDoNumero([arquivada], { instanceName: "x", phoneNumber: "+5513900000009" })).toBeNull();
+  });
+
+  it("vinculada comum não é troca de origem", () => {
+    expect(ehTrocaDeOrigem(A)).toBe(false);
+    expect(ehTrocaDeOrigem(null)).toBe(false);
   });
 });

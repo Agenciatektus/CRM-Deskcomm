@@ -49,6 +49,7 @@ const A: HostedSession = {
   webhookPathToken: "tok-a",
   hasToken: true,
   archivedAt: null,
+  origem: "vinculada",
 };
 
 function pedido(corpo: unknown): NextRequest {

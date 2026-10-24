@@ -421,10 +421,12 @@ export interface VerdashSession {
   webhookPathToken: string | null;
   hasToken: boolean;
   archivedAt: string | null;
+  /** `nativa` = instância criada pelo CRM no FZAP; vincular token/código nunca a reaproveita. */
+  origem: "nativa" | "vinculada";
 }
 
 const COLUNAS =
-  "id, verdash_instance_name, verdash_vinculo_id, phone_number, display_name, status, webhook_path_token, verdash_token_encrypted";
+  "id, verdash_instance_name, verdash_vinculo_id, phone_number, display_name, status, webhook_path_token, verdash_token_encrypted, verdash_origem";
 
 function toVerdashSession(row: Record<string, unknown> | null): VerdashSession | null {
   if (!row) return null;
@@ -439,6 +441,7 @@ function toVerdashSession(row: Record<string, unknown> | null): VerdashSession |
     // Existe, não qual é.
     hasToken: !!row.verdash_token_encrypted,
     archivedAt: (row.archived_at as string) ?? null,
+    origem: row.verdash_origem === "nativa" ? "nativa" : "vinculada",
   };
 }
 
@@ -504,11 +507,23 @@ export function escolherSessaoDoNumero(
 ): VerdashSession | null {
   // Ativa antes de arquivada: ressuscitar a arquivada com uma ativa do mesmo
   // telefone ao lado bateria no índice parcial de telefone (500 cru na tela).
-  const ativasPrimeiro = [...sessoes].sort((a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt));
+  // Nativa ARQUIVADA nunca volta como vinculada: ressuscitá-la com token/código
+  // trocaria a credencial e orfanaria a instância do FZAP. A ativa é devolvida e
+  // quem chama recusa (`ehTrocaDeOrigem`).
+  const candidatas = sessoes.filter((s) => !(s.origem === "nativa" && s.archivedAt));
+  const ativasPrimeiro = [...candidatas].sort((a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt));
   const pelaInstancia = ativasPrimeiro.find((s) => s.instanceName === numero.instanceName);
   if (pelaInstancia) return pelaInstancia;
   if (!numero.phoneNumber) return null;
   return ativasPrimeiro.find((s) => s.phoneNumber === numero.phoneNumber) ?? null;
+}
+
+/**
+ * A linha escolhida é uma instância NATIVA? Vincular token/código por cima dela
+ * sobrescreveria a credencial e deixaria a instância do FZAP órfã: a rota recusa (409).
+ */
+export function ehTrocaDeOrigem(existente: Pick<VerdashSession, "origem"> | null): boolean {
+  return existente?.origem === "nativa";
 }
 
 /**

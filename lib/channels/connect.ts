@@ -301,6 +301,7 @@ export {
   findVerdashSession as findHostedSession,
   listVerdashSessions as listHostedSessions,
   escolherSessaoDoNumero as escolherSessaoHospedada,
+  ehTrocaDeOrigem as ehTrocaDeOrigemHospedada,
   numeroEmOutraOrganizacao as numeroHospedadoEmOutraOrganizacao,
   numeroJaEhCanalDaOrganizacao as numeroHospedadoJaEhCanalDaOrganizacao,
   saveVerdashSession as saveHostedSession,
