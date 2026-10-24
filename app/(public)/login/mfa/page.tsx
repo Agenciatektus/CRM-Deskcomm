@@ -30,7 +30,7 @@ export default async function MfaChallengePage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
+      <div className="space-y-1.5">
         <h1 className="text-title-lg">{t("Verificação em duas etapas")}</h1>
         <p className="text-sm text-muted-foreground">
           {t("Digite o código de 6 dígitos do seu autenticador.")}

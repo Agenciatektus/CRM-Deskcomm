@@ -44,7 +44,7 @@ export default async function ContinuarPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
+      <div className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">{t("Confirmar acesso")}</h1>
         <p className="text-sm text-muted-foreground">
           {t("Para sua segurança, confirme que foi você quem abriu este link.")}

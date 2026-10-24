@@ -76,7 +76,17 @@ describe("a casca das telas de acesso", () => {
     // `<img src="">` faz o navegador pedir a própria página e desenhar o ícone
     // de imagem quebrada no topo do login. É o estado de fábrica de TODA
     // instalação nova, então o caminho normal não pode ter esse defeito.
-    expect(html).not.toContain("<img");
+    // A imagem DECORATIVA da tela dividida (`alt=""`) é um `<img>` legítimo e
+    // está sempre ali; o que esta asserção cerca é o logo do revendedor, que
+    // tem `alt` com o nome da marca. Medir "nenhum <img>" tratava os dois como
+    // a mesma coisa e reprovaria a arte do produto.
+    // Medido pelo `data-testid` do logo e pela CONTAGEM de imagens, e não por
+    // `alt` ou `src=""`: um logo marcado como decorativo (`alt=""`) passaria
+    // pelo primeiro, e o React 19 nem escreve `src=""`. O único `<img>` que
+    // resta é o da arte de `data-testid="imagem-do-acesso"`.
+    expect(html).not.toContain("logo-da-fachada");
+    expect(html).not.toContain("logo-escuro-da-fachada");
+    expect(html.match(/<img\b/g)).toHaveLength(1);
     expect(html).toContain("formulário");
   });
 

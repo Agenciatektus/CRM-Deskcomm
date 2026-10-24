@@ -31,9 +31,13 @@ export default async function LoginPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-title-lg">{t("Entrar")}</h1>
-        <p className="text-sm text-muted-foreground">{marca.nome}</p>
+      <div className="space-y-1.5">
+        <h1 className="text-title-lg lg:text-[28px] lg:leading-tight lg:tracking-tight">
+          {t("Entrar")}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {t("Acesse sua conta em")} {marca.nome}
+        </p>
       </div>
       {reset === "success" && (
         <div
@@ -141,15 +145,7 @@ export default async function LoginPage({
       )}
       <LoginForm next={next} />
       <EntrarComGoogle next={next} />
-      <div className="space-y-2 text-center text-sm">
-        <p>
-          <Link
-            href="/login/forgot"
-            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            {t("Esqueci minha senha")}
-          </Link>
-        </p>
+      <div className="text-center text-sm">
         <p className="text-muted-foreground">
           {t("Não tem conta?")}{" "}
           <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
