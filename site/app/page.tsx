@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 
 import { FAQ, SITE } from "@/lib/conteudo";
 
-import { Agente, Implantacao, Nichos, Seguranca } from "./_components/secoes-meio";
 import { CtaFinal, Faq } from "./_components/secoes-fim";
-import { ComoFunciona, Hero, Problema } from "./_components/secoes-topo";
+import { Agente, ComoFunciona, Faixa, Funil, Problema } from "./_components/secoes-a";
+import { Canais, Implantacao, Radar, Seguranca } from "./_components/secoes-b";
+import { Hero } from "./_components/Hero";
+import { Movimento } from "./_components/Movimento";
 
 /**
  * Quem já tem sessão no CRM segue direto para o sistema, como o `/` do CRM sempre
@@ -57,13 +59,17 @@ export default async function Home() {
 
   return (
     <>
+      <Movimento />
       <Hero />
+      <Faixa />
       <Problema />
       <ComoFunciona />
       <Agente />
-      <Nichos />
-      <Implantacao />
+      <Funil />
+      <Radar />
+      <Canais />
       <Seguranca />
+      <Implantacao />
       <Faq />
       <CtaFinal />
       <script
