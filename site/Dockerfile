@@ -21,13 +21,13 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3200 \
     HOSTNAME=0.0.0.0
-RUN addgroup -S lp && adduser -S lp -G lp
+RUN addgroup -S lpweb && adduser -S lpweb -G lpweb
 # O `standalone` já traz só o que o servidor usa; `.next/static` e `public` ficam de fora dele
 # e saem por /_lp/_next (rewrite) e /_lp (public/_lp).
-COPY --from=build --chown=lp:lp /app/.next/standalone ./
-COPY --from=build --chown=lp:lp /app/.next/static ./.next/static
-COPY --from=build --chown=lp:lp /app/public ./public
-USER lp
+COPY --from=build --chown=lpweb:lpweb /app/.next/standalone ./
+COPY --from=build --chown=lpweb:lpweb /app/.next/static ./.next/static
+COPY --from=build --chown=lpweb:lpweb /app/public ./public
+USER lpweb
 EXPOSE 3200
 # O healthcheck mede a LP, não o roteamento: o domínio é conferido de fora, com curl.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
