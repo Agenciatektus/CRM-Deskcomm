@@ -91,10 +91,9 @@ const fzapDuble = (async (url: unknown, init?: RequestInit) => {
       return envelope(201, { id: l.id, folderId: l.folderId });
     }
     if (path === "/folder/instances" && method === "GET") {
-      return envelope(
-        200,
-        linhas.filter((l) => l.folderId === "pasta-1").map(({ token: _t, ...r }) => r),
-      );
+      // Formato REAL do FZAP: { folder, users } (e não um array).
+      const users = linhas.filter((l) => l.folderId === "pasta-1").map(({ token: _t, ...r }) => r);
+      return envelope(200, { folder: { id: "pasta-1", name: "pasta", instanceCount: users.length, maxInstances: null }, users });
     }
     const m = path.match(/^\/folder\/instances\/([^/]+)\/full$/);
     if (m && method === "DELETE") {

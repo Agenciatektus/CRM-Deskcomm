@@ -49,6 +49,8 @@ interface Chamada {
 let chamadas: Chamada[];
 let instancias: Array<{ id: string; name: string; metadata: Record<string, unknown> }>;
 let fora: boolean;
+/** Resposta crua de GET /folder/instances (formato desconhecido); undefined = o formato real. */
+let listaBruta: unknown;
 let rpcs: Array<{ fn: string; args: Record<string, unknown> }>;
 let canalRow: Record<string, unknown> | null;
 let linhasAtivas: Array<Record<string, unknown>>;
@@ -65,7 +67,9 @@ const fzap = (async (url: unknown, init?: RequestInit) => {
   const method = init?.method ?? "GET";
   chamadas.push({ method, path, token: (init?.headers as Record<string, string>)?.token });
   if (fora) throw new Error("ECONNREFUSED");
-  if (path === "/folder/instances") return env(200, instancias);
+  // Formato REAL do FZAP: { folder, users } (e não um array).
+  if (path === "/folder/instances" && listaBruta !== undefined) return env(200, listaBruta);
+  if (path === "/folder/instances") return env(200, { folder: { id: "pasta-1", name: "pasta", instanceCount: instancias.length, maxInstances: null }, users: instancias });
   if (path === "/session/disconnect" || path === "/session/logout") return env(200, {});
   const m = path.match(/^\/folder\/instances\/([^/]+)\/full$/);
   if (m && method === "DELETE") return env(200, {});
@@ -100,6 +104,7 @@ beforeEach(() => {
   logs.length = 0;
   rpcs = [];
   fora = false;
+  listaBruta = undefined;
   process.env.FZAP_PROXY_URL_BR = "http://proxy";
   instancias = [{ id: FZAP_ID, name: "crm-x-1", metadata: { organization_id: ORG, channel_session_id: CANAL } }];
   canalRow = {
@@ -156,6 +161,52 @@ describe("limparNativoDoCanal", () => {
     expect(rpcs).toEqual([
       { fn: "fn_marcar_limpeza_nativa", args: { p_org: ORG, p_canal: CANAL, p_pendente: true } },
     ]);
+  });
+});
+
+describe("lista da pasta com formato desconhecido FALHA FECHADO", () => {
+  const formatos: Array<[string, unknown]> = [
+    ["objeto vazio", {}],
+    ["null", null],
+    ["folder sem users", { folder: { id: "pasta-1" } }],
+    ["users string", { users: "x" }],
+    ["folder de OUTRA pasta", { folder: { id: "outra" }, users: [] }],
+  ];
+  for (const [nome, bruto] of formatos) {
+    it(`${nome}: limpeza pendente (nunca ok), nada apagado, RPC marca`, async () => {
+      listaBruta = bruto;
+      const r = await limparNativoDoCanal(admin(), { organizationId: ORG, channelSessionId: CANAL, apagar: true });
+      expect(r).toBe("pendente");
+      expect(chamadas.some((c) => c.method === "DELETE")).toBe(false);
+      expect(rpcs).toHaveLength(1);
+    });
+    it(`${nome}: exclusao de tenant falha`, async () => {
+      listaBruta = bruto;
+      const pasta = (await lerPastaDaOrg(admin(), ORG))!;
+      const r = await desligarCanaisInventariados({
+        canais: [{ id: "n", provider: "verdash", wahaSessionName: null, meta: null, nativo: { organizationId: ORG, fzapId: FZAP_ID, pasta, creds: null } }],
+        sessaoDeVoz: null,
+      });
+      expect(r[0]!.desfecho).toBe("falhou");
+    });
+  }
+
+  it("instancia de fato ausente numa lista RECONHECIDA: ok", async () => {
+    instancias = [];
+    const r = await limparNativoDoCanal(admin(), { organizationId: ORG, channelSessionId: CANAL, apagar: true });
+    expect(r).toBe("ok");
+    expect(rpcs).toHaveLength(0);
+  });
+
+  it("sem fzapId: lista com formato desconhecido na faxina = pendente", async () => {
+    canalRow = { verdash_origem: "nativa", verdash_instance_name: "crm-reserva-x", metadata: {} };
+    listaBruta = {};
+    expect(await limparNativoDoCanal(admin(), { organizationId: ORG, channelSessionId: CANAL, apagar: true })).toBe("pendente");
+  });
+
+  it("sem fzapId e lista reconhecida: ok", async () => {
+    canalRow = { verdash_origem: "nativa", verdash_instance_name: "crm-reserva-x", metadata: {} };
+    expect(await limparNativoDoCanal(admin(), { organizationId: ORG, channelSessionId: CANAL, apagar: true })).toBe("ok");
   });
 });
 
