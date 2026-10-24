@@ -31,6 +31,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Arquivos da LP (icon.svg, imagens, fontes): o `proxy.ts` não passa por aqui. Um SVG
+        // aberto direto na barra de endereço é um documento na origem compartilhada; esta política
+        // o impede de rodar script. Como sub-recurso (CSS, fonte, imagem) nada disto o afeta.
+        source: "/_lp/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; sandbox",
+          },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

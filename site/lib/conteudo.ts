@@ -172,7 +172,7 @@ export const SEGURANCA = {
     {
       rotulo: "Permissões",
       texto:
-        "Quatro papéis de acesso, aplicados no servidor, e verificação em duas etapas para administradores.",
+        "Quatro papéis de acesso, aplicados no servidor, e verificação em duas etapas que pode ser exigida por papel.",
     },
     {
       rotulo: "Auditoria",
@@ -205,7 +205,7 @@ export const FAQ = [
   },
   {
     p: "Meus dados e os dos meus clientes ficam seguros?",
-    r: "Os dados de cada empresa ficam isolados, com teste de isolamento a cada alteração, permissões por papel e registro de auditoria. Há exportação e anonimização de dados de contato para a LGPD, e verificação em duas etapas para administradores.",
+    r: "Os dados de cada empresa ficam isolados, com teste de isolamento a cada alteração, permissões por papel e registro de auditoria. Há exportação e anonimização de dados de contato para a LGPD, e verificação em duas etapas que pode ser exigida por papel.",
   },
   {
     p: "O que a Tektus faz na implantação?",
@@ -213,7 +213,7 @@ export const FAQ = [
   },
   {
     p: "Já sou cliente. Como entro?",
-    r: "Pelo botão Entrar no topo da página, ou direto em crm.verdash.com.br/login. Quem já tem sessão aberta vai direto para o sistema, sem passar pela página inicial. Se esqueceu a senha, a opção de recuperação fica na própria tela de entrada.",
+    r: "Pelo botão Entrar no topo da página, ou direto em crm.verdash.com.br/login. Quem já está com o sistema aberto neste navegador e digita o endereço do site vai direto para o sistema, sem passar pela página inicial. Se esqueceu a senha, a opção de recuperação fica na tela de entrada.",
   },
 ] as const;
 

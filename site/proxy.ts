@@ -40,14 +40,11 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
+/**
+ * Todo pedido, menos os arquivos estáticos do Next e de /_lp. Sem condição de cabeçalho:
+ * um pedido que traga `next-router-prefetch` ou `Purpose: prefetch` também precisa da CSP,
+ * senão o documento pré-carregado abriria sem política.
+ */
 export const config = {
-  matcher: [
-    {
-      source: "/((?!_next/static|_next/image|_lp/).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
-  ],
+  matcher: ["/((?!_next/static|_next/image|_lp/).*)"],
 };

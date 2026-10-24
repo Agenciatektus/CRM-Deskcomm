@@ -16,6 +16,12 @@ const DO_SISTEMA = [
   "/onboarding",
   "/cobranca",
   "/vitrine-agenda",
+  "/signup",
+  "/lgpd",
+  "/get-started",
+  "/design",
+  "/email-templates",
+  "/team",
 ];
 
 const ROBOS_DE_IA = [
