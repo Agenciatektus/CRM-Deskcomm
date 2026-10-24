@@ -104,6 +104,11 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "contador que decide a numeração jurídica da proposta (D9).",
   },
   {
+    tabela: "verdash_fzap_pastas",
+    razao:
+      "tests/invariants/verdash-pastas-fzap-e-server-side.test.ts — server-side only (RLS ligada, zero policies, revoke all de anon/authenticated, migration 9067): token da pasta do FZAP; anon e authenticated barrados com `permission denied` em select/insert/update/delete, service_role com privilégio.",
+  },
+  {
     tabela: "proposal_templates",
     razao:
       "tests/invariants/proposta-templates-isolamento-entre-organizacoes.test.ts " +
