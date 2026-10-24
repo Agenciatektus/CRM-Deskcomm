@@ -134,6 +134,11 @@ export function FormularioDeMetaAds({
                   : t("O token está perto de vencer. Reconecte para renovar por mais 60 dias.")}
               </p>
             )}
+            {conectada && via !== "oauth" && (
+              <p className="text-sm" data-testid="meta-substitui-manual">
+                {t("Conectar com a Meta substitui o token que está salvo agora.")}
+              </p>
+            )}
             <div>
               <a href={LINK_DE_CONEXAO}>
                 <Button type="button" disabled={isPending}>

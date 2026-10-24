@@ -56,6 +56,8 @@ const ERRO_DO_RETORNO: Record<string, string> = {
   cifra_indisponivel:
     "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la.",
   erro_ao_gravar: "Não consegui gravar a conexão agora. Tente de novo em instantes.",
+  permissao_negada:
+    "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.",
 };
 
 export default async function MetaAdsSettingsPage({
@@ -83,7 +85,7 @@ export default async function MetaAdsSettingsPage({
   const expiraEm = conexao.tokenExpiraEm
     ? new Date(conexao.tokenExpiraEm).toLocaleDateString(tagDeIdioma(idioma), { timeZone: "UTC" })
     : null;
-  const erroDoRetorno = parametros.erro ? parametros.erro in ERRO_DO_RETORNO : false;
+  const erroDoRetorno = parametros.erro ? Object.hasOwn(ERRO_DO_RETORNO, parametros.erro) : false;
 
   return (
     <Pagina>
@@ -107,7 +109,11 @@ export default async function MetaAdsSettingsPage({
             role="alert"
             className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm"
           >
-            {t(ERRO_DO_RETORNO[parametros.erro ?? ""] ?? "")}
+            {t(
+              (parametros.erro && Object.hasOwn(ERRO_DO_RETORNO, parametros.erro)
+                ? ERRO_DO_RETORNO[parametros.erro]
+                : undefined) ?? "",
+            )}
           </div>
         )}
 

@@ -105,23 +105,24 @@ async function lerJson(caminho: string, token: string): Promise<Record<string, u
 
 /**
  * O id do usuário Meta e as permissões que ele concedeu. Melhor esforço: a
- * conexão vale sem isso, então falha vira `null` e a lista pedida entra no lugar.
+ * conexão vale sem isso. Se a lista não pôde ser lida, `scopes` é `null`: gravar a
+ * lista PEDIDA como se fosse a concedida esconderia o `ads_read` desmarcado.
  */
 export async function lerPerfilDoToken(
   token: string,
-  pedidos: readonly string[],
-): Promise<{ metaUserId: string | null; scopes: string[] }> {
+): Promise<{ metaUserId: string | null; scopes: string[] | null }> {
   const [eu, permissoes] = await Promise.all([
     lerJson("/me?fields=id", token),
     lerJson("/me/permissions", token),
   ]);
   const id = typeof eu?.id === "string" && eu.id ? eu.id : null;
-  const lista = Array.isArray(permissoes?.data) ? (permissoes.data as unknown[]) : [];
+  if (!Array.isArray(permissoes?.data)) return { metaUserId: id, scopes: null };
+  const lista = permissoes.data as unknown[];
   const concedidas = lista
     .filter((p): p is { permission: string; status: string } => {
       const o = p as Record<string, unknown> | null;
       return typeof o?.permission === "string" && o.status === "granted";
     })
     .map((p) => p.permission);
-  return { metaUserId: id, scopes: concedidas.length > 0 ? concedidas : [...pedidos] };
+  return { metaUserId: id, scopes: concedidas };
 }

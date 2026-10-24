@@ -12310,6 +12310,10 @@ export const DICIONARIO: Traducoes = {
   "Guardado — preencha só para trocar": { es: "Guardado — completa solo para cambiarlo" },
   "Conta conectada com a Meta.":
     { es: "Cuenta conectada con Meta." },
+  "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.":
+    { es: "No se concedió el permiso de lectura de anuncios. Conecte de nuevo y mantenga 'ads_read' marcado." },
+  "Conectar com a Meta substitui o token que está salvo agora.":
+    { es: "Conectar con Meta reemplaza el token que está guardado ahora." },
   "Você cancelou a autorização na Meta. Nada foi alterado.":
     { es: "Cancelaste la autorización en Meta. No se cambió nada." },
   "O retorno da Meta expirou ou não é desta sessão. Clique em Conectar com Meta de novo.":

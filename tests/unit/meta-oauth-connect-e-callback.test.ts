@@ -28,6 +28,9 @@ const fake = vi.hoisted(() => ({
   erroDoUpsert: null as { message: string } | null,
   audits: [] as Array<Record<string, unknown>>,
   logs: [] as string[],
+  papel: "admin" as string | null,
+  anterior: null as Record<string, unknown> | null,
+  perfil: { metaUserId: "999", scopes: ["ads_read"] as string[] | null },
 }));
 
 vi.mock("@/lib/env", () => ({ env: fake.env }));
@@ -76,11 +79,26 @@ vi.mock("@/lib/plataformas-de-anuncio/meta/oauth/token", () => ({
         }
       : fake.troca;
   },
-  lerPerfilDoToken: async () => ({ metaUserId: "999", scopes: ["ads_read"] }),
+  lerPerfilDoToken: async () => fake.perfil,
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (tabela: string) => ({
+      select: () => {
+        const cadeia = {
+          eq: () => cadeia,
+          maybeSingle: async () => ({
+            data:
+              tabela === "user_organizations"
+                ? fake.papel
+                  ? { role: fake.papel }
+                  : null
+                : fake.anterior,
+            error: null,
+          }),
+        };
+        return cadeia;
+      },
       insert: async (linha: { nonce: string }) => {
         if (fake.nonces.has(linha.nonce))
           return { error: { code: "23505", message: "duplicate key" } };
@@ -107,6 +125,9 @@ beforeEach(() => {
   fake.erroDoUpsert = null;
   fake.audits = [];
   fake.logs = [];
+  fake.papel = "admin";
+  fake.anterior = null;
+  fake.perfil = { metaUserId: "999", scopes: ["ads_read"] };
 });
 
 async function comecar() {
@@ -227,6 +248,72 @@ describe("callback", () => {
     expect((await voltar(q, cookie)).conectado).toBe("1");
     expect((await voltar(q, cookie)).erro).toBe("estado_invalido");
     expect(fake.trocas).toBe(1);
+  });
+
+  it("P1: state e vínculo da AGENDA do Google não valem aqui (mesma chave, outro propósito)", async () => {
+    // Um `agent` pode iniciar o fluxo da Agenda. O state dela tem o mesmo formato e
+    // a mesma chave: sem o propósito dentro da carga assinada, valeria como admin.
+    const { emitirEstado: estadoDaAgenda } = await import("@/lib/agenda/google/estado");
+    const { assinarVinculo } = await import("@/lib/agenda/google/vinculo");
+    const state = estadoDaAgenda(
+      { organizationId: ORG, userId: USER },
+      { segredo: fake.env.INTERNAL_SECRET, agora: new Date(), nonce: "n-da-agenda" },
+    );
+    const cookie = `crm_oauth_bind=${assinarVinculo("n-da-agenda", fake.env.INTERNAL_SECRET)}`;
+    const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(r.erro).toBe("estado_invalido");
+    expect(fake.trocas).toBe(0);
+    expect(fake.upserts).toHaveLength(0);
+  });
+
+  it("P1: o dono do state foi rebaixado a agent nos 10 minutos: recusa antes de queimar o nonce", async () => {
+    const { state, cookie } = await iniciado();
+    fake.papel = "agent";
+    expect((await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie)).erro).toBe(
+      "estado_invalido",
+    );
+    expect(fake.nonces.size).toBe(0);
+    expect(fake.trocas).toBe(0);
+    expect(fake.upserts).toHaveLength(0);
+  });
+
+  it("removido da organização: também recusa", async () => {
+    const { state, cookie } = await iniciado();
+    fake.papel = null;
+    expect((await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie)).erro).toBe(
+      "estado_invalido",
+    );
+    expect(fake.upserts).toHaveLength(0);
+  });
+
+  it("sem ads_read concedido: recusa e não grava (a conexão ficaria falhando calada)", async () => {
+    fake.perfil = { metaUserId: "999", scopes: ["pages_show_list"] };
+    const { state, cookie } = await iniciado();
+    const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(r.erro).toBe("permissao_negada");
+    expect(fake.upserts).toHaveLength(0);
+  });
+
+  it("lista de permissões ilegível: conecta, com scopes nulo (não inventa o que foi concedido)", async () => {
+    fake.perfil = { metaUserId: "999", scopes: null };
+    const { state, cookie } = await iniciado();
+    expect((await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie)).conectado).toBe("1");
+    expect(fake.upserts[0]!.valores.scopes).toBeNull();
+  });
+
+  it("outro usuário Meta: a conta padrão antiga é limpa, e a procedência anterior vai à auditoria", async () => {
+    fake.anterior = { connected_via: "oauth", meta_user_id: "OUTRO" };
+    const { state, cookie } = await iniciado();
+    await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(fake.upserts[0]!.valores).toHaveProperty("default_account_id", null);
+    expect(fake.audits[0]!.metadata).toMatchObject({ via_anterior: "oauth", conta_padrao_limpa: true });
+  });
+
+  it("mesmo usuário Meta reconectando: a conta padrão fica", async () => {
+    fake.anterior = { connected_via: "oauth", meta_user_id: "999" };
+    const { state, cookie } = await iniciado();
+    await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(fake.upserts[0]!.valores).not.toHaveProperty("default_account_id");
   });
 
   it("cancelar na Meta não é falha", async () => {

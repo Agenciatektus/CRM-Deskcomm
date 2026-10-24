@@ -27,7 +27,7 @@ export interface ConexaoDeLeituraParaGravar {
   /** `undefined` = não mexer; `null` = limpar. */
   defaultAccountId?: string | null;
   /** Só com `accessToken`. Ausente = token colado à mão. */
-  oauth?: { expiraEm: string | null; scopes: string[]; metaUserId: string | null };
+  oauth?: { expiraEm: string | null; scopes: string[] | null; metaUserId: string | null };
 }
 
 export type ResultadoDaGravacao =

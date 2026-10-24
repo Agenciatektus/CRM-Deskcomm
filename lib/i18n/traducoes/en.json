@@ -6805,6 +6805,8 @@
   "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.": "To change only the default account, leave the token field blank — the saved token stays as is.",
   "Guardado — preencha só para trocar": "Saved — fill in only to change it",
   "Conta conectada com a Meta.": "Account connected to Meta.",
+  "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.": "The ad read permission was not granted. Connect again and keep 'ads_read' checked.",
+  "Conectar com a Meta substitui o token que está salvo agora.": "Connecting with Meta replaces the token that is saved now.",
   "Você cancelou a autorização na Meta. Nada foi alterado.": "You canceled the authorization on Meta. Nothing was changed.",
   "O retorno da Meta expirou ou não é desta sessão. Clique em Conectar com Meta de novo.": "The return from Meta expired or does not belong to this session. Click Connect with Meta again.",
   "A Meta não devolveu o código de autorização. Tente conectar de novo.": "Meta did not return the authorization code. Try connecting again.",

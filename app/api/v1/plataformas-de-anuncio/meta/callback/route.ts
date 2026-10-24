@@ -24,8 +24,8 @@ import {
   CAMINHO_DO_CALLBACK,
   configuracaoDoMetaAds,
 } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
-import { verificarEstado } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
-import { ESCOPOS_DA_META } from "@/lib/plataformas-de-anuncio/meta/oauth/oauth";
+import { segredoDoVinculo, verificarEstado } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
+import { aindaEAdminDaOrganizacao } from "@/lib/plataformas-de-anuncio/meta/oauth/papel";
 import { lerPerfilDoToken, obterTokenLongo } from "@/lib/plataformas-de-anuncio/meta/oauth/token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
@@ -72,7 +72,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // O navegador que volta é o que saiu. Antes da queima do nonce, para que um
   // `state` vazado não derrube a volta legítima.
-  if (!vinculoConfere(req.cookies.get(NOME_DO_VINCULO)?.value, estado.nonce, env.INTERNAL_SECRET)) {
+  if (
+    !vinculoConfere(
+      req.cookies.get(NOME_DO_VINCULO)?.value,
+      estado.nonce,
+      segredoDoVinculo(env.INTERNAL_SECRET),
+    )
+  ) {
     logger.warn("[plataformas-de-anuncio.meta.callback] vínculo do navegador não confere", {
       organizationId: estado.organizationId,
     });
@@ -92,6 +98,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const admin = createAdminClient();
+
+  // O callback é público: a identidade vem do `state`. Quem foi rebaixado nos 10
+  // minutos de validade não conclui uma troca de token da organização.
+  if (!(await aindaEAdminDaOrganizacao(admin, estado.organizationId, estado.userId))) {
+    logger.warn("[plataformas-de-anuncio.meta.callback] dono do state não é mais admin", {
+      organizationId: estado.organizationId,
+    });
+    return voltar(base, { erro: "estado_invalido" });
+  }
 
   // O retorno vale UMA vez: o nonce é queimado ANTES da troca, porque o `code`
   // é de uso único. Qualquer erro recusa, não só o `23505`.
@@ -115,7 +130,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return voltar(base, { erro: "troca_falhou" });
   }
 
-  const perfil = await lerPerfilDoToken(leitura.token.access_token, ESCOPOS_DA_META);
+  const perfil = await lerPerfilDoToken(leitura.token.access_token);
+
+  // Permissões granulares: a pessoa pode desmarcar `ads_read` na tela da Meta, e a
+  // conexão ficaria "conectada" e falhando calada. Lista lida e sem `ads_read` recusa.
+  if (perfil.scopes !== null && !perfil.scopes.includes("ads_read")) {
+    return voltar(base, { erro: "permissao_negada" });
+  }
+
+  // O que havia antes (procedência e dono do token): a troca de um token colado à
+  // mão por este fica no registro, e a conta padrão de outro usuário Meta não é
+  // mantida às cegas.
+  const { data: anterior } = await admin
+    .from("ad_insights_connections")
+    .select("connected_via, meta_user_id")
+    .eq("organization_id", estado.organizationId)
+    .eq("platform", "meta_ads")
+    .maybeSingle();
+  const donoMudou =
+    Boolean(anterior?.meta_user_id) &&
+    Boolean(perfil.metaUserId) &&
+    anterior?.meta_user_id !== perfil.metaUserId;
 
   // 4. Cifra e upsert pelo gravador compartilhado (cifra antes do upsert; sem
   // cifra, recusa). Não mexe na conta padrão: reconectar a mantém.
@@ -124,6 +159,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     userId: estado.userId,
     platform: "meta_ads",
     accessToken: leitura.token.access_token,
+    ...(donoMudou ? { defaultAccountId: null } : {}),
     oauth: {
       expiraEm: leitura.token.expira_em,
       scopes: perfil.scopes,
@@ -150,6 +186,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       platform: "meta_ads",
       via: "oauth",
       token_trocado: true,
+      via_anterior: anterior?.connected_via ?? (anterior ? "manual" : null),
+      conta_padrao_limpa: donoMudou,
       token_expires_at: leitura.token.expira_em,
     },
   });

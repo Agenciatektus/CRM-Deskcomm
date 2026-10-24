@@ -27,7 +27,7 @@ import {
   CAMINHO_DO_CALLBACK,
   configuracaoDoMetaAds,
 } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
-import { emitirEstado } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
+import { emitirEstado, segredoDoVinculo } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
 import { montarUrlDeConsentimento } from "@/lib/plataformas-de-anuncio/meta/oauth/oauth";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const resposta = NextResponse.redirect(montarUrlDeConsentimento(app, { state }));
   // `lax`: strict não viaja na volta da Meta. `cookieSecure()`: `secure: true`
   // literal perderia o cookie em instalação servida por http.
-  resposta.cookies.set(NOME_DO_VINCULO, assinarVinculo(nonce, env.INTERNAL_SECRET), {
+  resposta.cookies.set(NOME_DO_VINCULO, assinarVinculo(nonce, segredoDoVinculo(env.INTERNAL_SECRET)), {
     httpOnly: true,
     sameSite: "lax",
     secure: cookieSecure(),

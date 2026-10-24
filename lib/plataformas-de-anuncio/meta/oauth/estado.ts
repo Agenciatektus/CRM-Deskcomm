@@ -9,6 +9,18 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
+/** Para que serve este state. Dentro da carga assinada: state de outro fluxo não passa. */
+export const PROPOSITO_DO_ESTADO = "meta_ads_leitura";
+
+/**
+ * A chave do cookie de vínculo deste fluxo, derivada: o vínculo da Agenda usa o
+ * mesmo nome de cookie e o mesmo formato, e com a chave pura os dois se
+ * confundiriam.
+ */
+export function segredoDoVinculo(segredoDaInstalacao: string): string {
+  return `${PROPOSITO_DO_ESTADO}:${segredoDaInstalacao}`;
+}
+
 export const VALIDADE_DO_ESTADO_MS = 10 * 60 * 1000;
 
 const TAMANHO_MINIMO_DO_SEGREDO = 16;
@@ -55,7 +67,7 @@ export function emitirEstado(
 
   const nonce = opcoes.nonce?.trim() || randomBytes(16).toString("hex");
   const expira = opcoes.agora.getTime() + (opcoes.validadeMs ?? VALIDADE_DO_ESTADO_MS);
-  const carga = `${organizationId}.${userId}.${nonce}.${expira}${sessao ? `.${sessao}` : ""}`;
+  const carga = `${PROPOSITO_DO_ESTADO}.${organizationId}.${userId}.${nonce}.${expira}${sessao ? `.${sessao}` : ""}`;
   const assinatura = assinar(carga, segredo).toString("hex");
   return `${Buffer.from(carga, "utf8").toString("base64url")}.${assinatura}`;
 }
@@ -79,7 +91,11 @@ export function verificarEstado(
   if (recebida.length !== esperada.length) return null;
   if (!timingSafeEqual(recebida, esperada)) return null;
 
-  const campos = carga.split(".");
+  const [proposito, ...campos] = carga.split(".");
+  // O state é do MESMO formato e da MESMA chave que o da Agenda do Google, cuja porta
+  // de entrada aceita papel menor. Sem o propósito dentro da carga assinada, um
+  // state da Agenda valeria aqui.
+  if (proposito !== PROPOSITO_DO_ESTADO) return null;
   if (campos.length < 4 || campos.length > 5) return null;
   const [organizationId, userId, nonce, expiraTexto, authSessionId] = campos;
   const expiraEmMs = Number(expiraTexto);

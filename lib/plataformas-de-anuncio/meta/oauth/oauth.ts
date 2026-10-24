@@ -7,10 +7,13 @@
  */
 import { VERSAO_PADRAO_DA_GRAPH } from "@/lib/graph-version";
 
-/** Os escopos pedidos: leitura de anúncios mais o que lista contas e páginas do negócio. */
+/**
+ * Os escopos pedidos: leitura de anúncios mais o que lista contas e páginas do
+ * negócio. SEM `ads_management`: esta conexão só lê, e a tela promete isso. O envio
+ * de conversões, quando ganhar o mesmo botão, pede o escopo a mais naquela hora.
+ */
 export const ESCOPOS_DA_META = [
   "ads_read",
-  "ads_management",
   "business_management",
   "pages_show_list",
   "pages_read_engagement",

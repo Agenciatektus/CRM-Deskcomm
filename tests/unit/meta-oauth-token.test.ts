@@ -111,7 +111,7 @@ describe("perfil do token", () => {
         ],
       }),
     );
-    const r = await lerPerfilDoToken("TOKEN", ["ads_read", "ads_management"]);
+    const r = await lerPerfilDoToken("TOKEN");
     expect(r).toEqual({ metaUserId: "999", scopes: ["ads_read"] });
     for (const [url, init] of fetchMock.mock.calls) {
       expect(String(url)).not.toContain("TOKEN");
@@ -119,11 +119,11 @@ describe("perfil do token", () => {
     }
   });
 
-  it("falha vira nulo e a lista pedida", async () => {
+  it("falha na leitura vira nulo, NUNCA a lista pedida como se fosse a concedida", async () => {
     fetchMock.mockRejectedValue(new Error("rede"));
-    expect(await lerPerfilDoToken("T", ["ads_read"])).toEqual({
+    expect(await lerPerfilDoToken("T")).toEqual({
       metaUserId: null,
-      scopes: ["ads_read"],
+      scopes: null,
     });
   });
 });
