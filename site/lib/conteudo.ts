@@ -228,3 +228,30 @@ export const CTA_FINAL = {
   texto:
     "Conte pelo WhatsApp como você atende hoje. A Tektus faz o diagnóstico e mostra o que o Verdash CRM mudaria na sua operação.",
 } as const;
+
+export const FAIXA = [
+  "WhatsApp por QR code",
+  "WhatsApp oficial da Meta",
+  "Instagram",
+  "Google Agenda",
+  "Google Ads",
+  "OpenRouter",
+  "Anthropic",
+  "OpenAI",
+  "Funil por nicho",
+  "Radar de conversas",
+  "Auditoria",
+  "LGPD",
+] as const;
+
+export const RADAR = {
+  titulo: "Conversa que esfria aparece antes de morrer.",
+  texto:
+    "O Radar lista as conversas sem resposta, há quanto tempo estão paradas e qual é a próxima ação. O follow-up propõe a mensagem de retomada, respeita a janela de horário do canal e usa tempo adaptativo com gatilhos por etapa.",
+} as const;
+
+export const CANAIS = {
+  titulo: "Os canais que o seu cliente já usa.",
+  texto:
+    "WhatsApp e Instagram chegam na mesma Inbox, com a equipe e a IA lado a lado. Você escolhe como conectar o WhatsApp.",
+} as const;
