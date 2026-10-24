@@ -53,7 +53,9 @@ const TIMEOUT_MS = 20_000;
 export async function fzapRequest<T = unknown>(
   creds: VerdashCredentials,
   path: string,
-  init: { method: "GET" | "POST" | "DELETE"; body?: unknown } = { method: "GET" },
+  init: { method: "GET" | "POST" | "DELETE"; body?: unknown; timeoutMs?: number } = {
+    method: "GET",
+  },
 ): Promise<T> {
   const url = `${creds.baseUrl.replace(/\/+$/, "")}${path}`;
 
@@ -68,7 +70,7 @@ export async function fzapRequest<T = unknown>(
         ...(init.body ? { "Content-Type": "application/json" } : {}),
       },
       ...(init.body ? { body: JSON.stringify(init.body) } : {}),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(init.timeoutMs ?? TIMEOUT_MS),
     });
   } catch (err) {
     const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
