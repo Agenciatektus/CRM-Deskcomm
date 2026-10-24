@@ -10,6 +10,15 @@
  *   processing  -> ainda no ar; aguarda um pouco e pergunta de novo
  *   not_found   -> nunca chegou; reenvia UMA vez com o mesmo id
  *   unknown     -> NAO se sabe; nunca reenviar sozinho (pode duplicar na tela do cliente)
+ *
+ * O FZAP usa o id do cliente como id da mensagem no WhatsApp, entao `sent` sem id na
+ * resposta devolve o proprio id (o eco IsFromMe casa por ele e nao vira 2a bolha).
+ *
+ * LIMITES CONHECIDOS (nao implementados de proposito):
+ *  - Cobertura parcial: so envios com `clientMessageId`. IA, follow-up, handoff e
+ *    avisos seguem sem dedup no FZAP e sem a falha rapida de STARTING.
+ *  - Premissa: o FZAP serializa o mesmo `id` enquanto esta em `processing`; sem isso,
+ *    o reenvio de `not_found` poderia correr contra um envio ainda em voo.
  */
 import { fzapRequest } from "./client";
 import type { VerdashCredentials } from "./credentials";
@@ -71,7 +80,7 @@ export async function enviarComConsulta(
     } catch {
       throw incerto("consulta de status falhou");
     }
-    if (r.state === "sent") return { id: r.id };
+    if (r.state === "sent") return { id: r.id ?? id };
     if (r.state === "not_found") return enviar();
     if (r.state !== "processing") throw incerto(r.state ?? "estado_desconhecido");
     if (espera > 0) await new Promise((res) => setTimeout(res, espera));

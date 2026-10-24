@@ -62,7 +62,7 @@ const fzap = (async (url: unknown, init?: RequestInit) => {
     if (r === "rede") throw new Error("timeout");
     if (r === "502") return env(502, undefined, "bad gateway");
     if (r === "400") return env(400, undefined, "invalido");
-    return env(200, { id: MSG });
+    return env(200, { id: ID_FZAP });
   }
   return env(404);
 }) as unknown as typeof fetch;
@@ -106,7 +106,8 @@ describe("envio da nativa", () => {
 
   it("502 + sent: nao reenvia, consulta com Id e o token", async () => {
     envios = ["502"];
-    await verdashAdapter.send(envelope);
+    const r = await verdashAdapter.send(envelope);
+    expect(r.externalId).toBe(ID_FZAP);
     expect(enviosDe()).toHaveLength(1);
     const s = chamadas.find((x) => x.path === "/chat/send/status")!;
     expect(s.method).toBe("GET");
