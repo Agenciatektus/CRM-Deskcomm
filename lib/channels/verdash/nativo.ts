@@ -84,11 +84,14 @@ async function pastaOuErro(admin: SupabaseClient, organizationId: string): Promi
 }
 
 export async function listarDaPasta(pasta: PastaFzap): Promise<InstanciaDaLista[]> {
-  const data = await fzapRequest<InstanciaDaLista[] | { instances?: InstanciaDaLista[] }>(
-    pasta.creds,
-    "/folder/instances",
-  );
-  return Array.isArray(data) ? data : (data?.instances ?? []);
+  // Formato real do FZAP (medido em 24/10/2026, v1.32 e v1.35): `{ folder: {id,...}, users: [...] }`.
+  // Aceita também array puro e `{ instances }` por tolerância. Se não reconhecer, a lista vem
+  // vazia e os guards falham FECHADOS: por isso o dublê dos testes espelha o formato real.
+  const data = await fzapRequest<
+    InstanciaDaLista[] | { users?: InstanciaDaLista[]; instances?: InstanciaDaLista[] }
+  >(pasta.creds, "/folder/instances");
+  if (Array.isArray(data)) return data;
+  return data?.users ?? data?.instances ?? [];
 }
 
 /**

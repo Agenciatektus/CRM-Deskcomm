@@ -16,7 +16,11 @@ export interface InstanciaDaPasta {
 }
 
 /** O que o FZAP devolve em `GET /folder/instances` (lista, ou objeto com a lista). */
-export type RespostaDaPasta = InstanciaDaPasta[] | { instances?: InstanciaDaPasta[]; [k: string]: unknown } | null | undefined;
+export type RespostaDaPasta =
+  | InstanciaDaPasta[]
+  | { users?: InstanciaDaPasta[]; instances?: InstanciaDaPasta[]; [k: string]: unknown }
+  | null
+  | undefined;
 
 export interface Deps {
   /** `null` = a organização não existe. */
@@ -62,7 +66,7 @@ export function uuidValido(v: string | undefined): v is string {
 }
 
 function instancias(r: RespostaDaPasta): InstanciaDaPasta[] {
-  return Array.isArray(r) ? r : (r?.instances ?? []);
+  return Array.isArray(r) ? r : (r?.users ?? r?.instances ?? []);
 }
 
 function idDaPastaNaResposta(r: RespostaDaPasta): string | null {

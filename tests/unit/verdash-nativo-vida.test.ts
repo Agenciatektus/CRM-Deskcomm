@@ -65,7 +65,8 @@ const fzap = (async (url: unknown, init?: RequestInit) => {
   const method = init?.method ?? "GET";
   chamadas.push({ method, path, token: (init?.headers as Record<string, string>)?.token });
   if (fora) throw new Error("ECONNREFUSED");
-  if (path === "/folder/instances") return env(200, instancias);
+  // Formato REAL do FZAP: { folder, users } (e não um array).
+  if (path === "/folder/instances") return env(200, { folder: { id: "pasta", name: "pasta", instanceCount: instancias.length, maxInstances: null }, users: instancias });
   if (path === "/session/disconnect" || path === "/session/logout") return env(200, {});
   const m = path.match(/^\/folder\/instances\/([^/]+)\/full$/);
   if (m && method === "DELETE") return env(200, {});
