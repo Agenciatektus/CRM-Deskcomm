@@ -1,7 +1,7 @@
 # site/: landing page do CRM Tektus
 
 App Next separado, dentro do repositório do CRM, **fora da imagem Docker do CRM**
-(`site/` está no `.dockerignore`) e fora do `tsconfig`, do `eslint` e do `vitest` da raiz.
+(`site/` está no `.dockerignore`; o Dockerfile da LP nasce na Fase 8, junto com o roteamento) e fora do `tsconfig`, do `eslint` e do `vitest` da raiz.
 Tem `package.json` e `pnpm-lock.yaml` próprios; o repositório não usa workspace do pnpm.
 
 ## Por que separado

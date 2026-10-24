@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -31,6 +31,20 @@ const lerLinhas = (arquivo: string) =>
   readFileSync(arquivo, "utf-8")
     .split("\n")
     .map((l) => l.trim());
+
+/**
+ * Os especificadores de import/require/import() de um arquivo. Cobre as quatro
+ * formas: `from "x"`, `import "x"`, `import("x")` e `require("x")`.
+ */
+const ESPECIFICADORES = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["']([^"']+)["']/g;
+
+/** O `spec`, importado por `arquivo`, cai FORA de `site/`? Só relativo conta: `@/` e pacote não saem. */
+function saiDeSite(arquivo: string, spec: string): boolean {
+  if (!spec.startsWith(".")) return false;
+  const raizDaLp = resolve("site") + sep;
+  const alvo = resolve(dirname(arquivo), spec) + sep;
+  return !alvo.startsWith(raizDaLp);
+}
 
 describe("site/ fica fora do CRM", () => {
   it("existe, com package.json e lockfile próprios (o repositório não usa workspace)", () => {
@@ -64,23 +78,51 @@ describe("site/ fica fora do CRM", () => {
     expect(responde(["site/app/page.tsx", "lib/qualquer.ts"])).toBe("sim");
   });
 
-  it("o código da LP não importa nada do CRM (lib, app, components, hooks, workers) nem por ../", () => {
+  it("o resolvedor de imports acusa quem sai de site/ e deixa passar quem fica (controle)", () => {
+    // Sai: sobe da LP para o CRM, pelas quatro formas de importar.
+    expect(saiDeSite("site/app/page.tsx", "../../lib/x")).toBe(true);
+    expect(saiDeSite("site/app/page.tsx", "../../../fora")).toBe(true);
+    // Fica: `../app/y` a partir de site/components/ ainda é site/app/y.
+    expect(saiDeSite("site/components/x.tsx", "../app/y")).toBe(false);
+    expect(saiDeSite("site/app/page.tsx", "./globals.css")).toBe(false);
+    // `@/` e pacote não saem (o alias da LP aponta para site/).
+    expect(saiDeSite("site/app/page.tsx", "@/lib/x")).toBe(false);
+    expect(saiDeSite("site/app/page.tsx", "react")).toBe(false);
+    // As quatro formas de import são lidas.
+    const amostra = [
+      'import a from "./a";',
+      'import "./b";',
+      'const c = await import("./c");',
+      'const d = require("./d");',
+    ].join("\n");
+    expect([...amostra.matchAll(ESPECIFICADORES)].map((m) => m[1])).toEqual([
+      "./a",
+      "./b",
+      "./c",
+      "./d",
+    ]);
+  });
+
+  it("o código da LP não importa nada que fique fora de site/", () => {
     const achados: string[] = [];
+    let lidos = 0;
     const varrer = (dir: string) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         if (e.name === "node_modules" || e.name === ".next") continue;
         const p = join(dir, e.name);
         if (e.isDirectory()) varrer(p);
-        else if (/\.(ts|tsx|mjs)$/.test(e.name)) {
+        else if (/\.(ts|tsx|mjs|mts|cts|js|jsx)$/.test(e.name)) {
+          lidos += 1;
           const fonte = readFileSync(p, "utf-8");
-          // `@/` na LP aponta para a raiz de site/ (ver site/tsconfig.json) e não resolve
-          // para o CRM; quem alcança o CRM é só um `../` que sobe para fora de site/.
-          const sobe = /from\s+["'](\.\.\/)+(lib|app|components|hooks|workers)\b/.test(fonte);
-          if (sobe) achados.push(p.replaceAll("\\", "/"));
+          for (const m of fonte.matchAll(ESPECIFICADORES)) {
+            if (saiDeSite(p, m[1] ?? "")) achados.push(`${p.replaceAll("\\", "/")} -> ${m[1]}`);
+          }
         }
       }
     };
     varrer("site");
+    // Guarda de vacuidade: varreu arquivos de verdade.
+    expect(lidos).toBeGreaterThan(3);
     expect(achados).toEqual([]);
   });
 

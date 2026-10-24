@@ -29,7 +29,7 @@ scratchpad
 # Artefatos locais de QA não fazem parte do runtime.
 evidence
 
-# A LP (app Next à parte, com Dockerfile próprio em site/) não entra na imagem do CRM.
+# A LP (app Next à parte, publicado à parte) não entra na imagem do CRM.
 site
 .superpowers
 *.tsbuildinfo
