@@ -45,6 +45,7 @@ const CONTA_A: HostedSession = {
   webhookPathToken: "tok-ig-a",
   hasToken: true,
   archivedAt: null,
+  origem: "vinculada",
 };
 
 function troca(instanceName: string, displayName: string) {

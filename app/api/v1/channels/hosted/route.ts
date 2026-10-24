@@ -37,6 +37,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import {
   HOSTED_CHANNEL_LABEL,
+  ehTrocaDeOrigemHospedada,
   escolherSessaoHospedada,
   ligarRecebimentoHospedado,
   listHostedSessions,
@@ -115,6 +116,15 @@ function urlDoWebhook(req: NextRequest, token: string): string | null {
  * número já é canal de OUTRA organização desta instalação (uma instância pertence a
  * um canal só). O resto segue como erro interno.
  */
+function recusaTrocaDeOrigem(t: (texto: string) => string, requestId: string): NextResponse {
+  return fail(
+    "conflict",
+    t("este número já é uma conexão por QR desta organização — desconecte-a antes de vincular por token ou código"),
+    409,
+    { requestId },
+  );
+}
+
 function falhaAoGravar(
   erro: string,
   t: (texto: string) => string,
@@ -274,6 +284,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       instanceName: troca.instanceName,
       phoneNumber: troca.phoneNumber,
     });
+    if (ehTrocaDeOrigemHospedada(existentePareado)) return recusaTrocaDeOrigem(t, requestId);
     const { error: erroPareado } = await saveHostedSession(admin, {
       organizationId: orgId,
       existingId: existentePareado?.id ?? null,
@@ -335,6 +346,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     instanceName: v.instanceName,
     phoneNumber: v.phoneNumber,
   });
+  if (ehTrocaDeOrigemHospedada(existente)) return recusaTrocaDeOrigem(t, requestId);
   // Endereço novo também quando o canal existente estava no modo PAREADO: o vínculo
   // da plataforma continua entregando no endereço antigo com o segredo antigo, e
   // manter o endereço faria cada entrega dele ser recusada aqui para sempre.

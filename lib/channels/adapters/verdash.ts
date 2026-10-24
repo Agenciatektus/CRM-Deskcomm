@@ -51,7 +51,15 @@ import {
   fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { estadoNativo, marcarJaConectou } from "../verdash/estado-nativo";
+import { DETALHE_NUMERO_EM_CONFLITO, DETALHE_QR_RESCAN_NATIVO } from "../health";
+import {
+  LIMITE_DESCONECTADA_MS,
+  estadoNativo,
+  marcarDesconectada,
+  marcarJaConectou,
+  msDesconectada,
+} from "../verdash/estado-nativo";
+import { preencherTelefoneNativo } from "../verdash/telefone-nativo";
 import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -485,13 +493,36 @@ export const verdashAdapter: ChannelAdapter = {
           ? { reachable: true, status: "SCAN_QR_CODE", detail: "aguardando_leitura_do_qr" }
           : { reachable: true, status: "STARTING", detail: "conectando_no_fzap" };
       }
-      return { reachable: true, status: "FAILED", detail: "whatsapp_deslogado_na_verdash" };
+      return {
+        reachable: true,
+        status: "FAILED",
+        detail: nativo.nativa ? DETALHE_QR_RESCAN_NATIVO : "whatsapp_deslogado_na_verdash",
+      };
     }
     if (data?.connected === false) {
+      // NATIVA: o socket caido por mais de 10 min seguidos deixa de ser reconexao
+      // normal (debounce; o push `Disconnected` grava `desconectado_em`, o vigia
+      // grava na primeira observacao se o push se perdeu). Vinculada: como sempre.
+      const nativo = await estadoNativo(admin, input.organizationId, input.sessionRef);
+      if (nativo.nativa) {
+        const caida = msDesconectada(nativo);
+        if (caida === null) {
+          if (nativo.id) await marcarDesconectada(admin, input.organizationId, nativo.id);
+        } else if (caida > LIMITE_DESCONECTADA_MS) {
+          return { reachable: true, status: "FAILED", detail: "desconectada_ha_mais_de_10_min" };
+        }
+      }
       return { reachable: true, status: "STARTING", detail: "reconectando_na_verdash" };
     }
     // Marca a primeira vez que a nativa esteve de pe (melhor esforco, ver estado-nativo.ts).
     await marcarJaConectou(admin, input.organizationId, input.sessionRef);
+    // O telefone tenta de novo a cada ciclo enquanto estiver nulo (o jid pode demorar
+    // a aparecer). Conflito de numero vira detalhe de saude visivel ao operador.
+    const atual = await estadoNativo(admin, input.organizationId, input.sessionRef);
+    if (atual.nativa && !atual.telefone) {
+      const t = await preencherTelefoneNativo(admin, input.organizationId, input.sessionRef);
+      if (t === "conflito") return { reachable: true, status: "WORKING", detail: DETALHE_NUMERO_EM_CONFLITO };
+    }
     return { reachable: true, status: "WORKING", detail: null };
   },
 

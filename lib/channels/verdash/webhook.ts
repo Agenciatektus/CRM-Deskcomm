@@ -107,7 +107,7 @@ export function tipoDoEvento(payload: unknown): string | null {
 }
 
 /** `5566812769 20@s.whatsapp.net` → `+556681276920`; `@lid` devolve `null`. */
-function telefoneDoJid(jid: string | null): string | null {
+export function telefoneDoJid(jid: string | null): string | null {
   if (!jid || jid.includes("@lid")) return null;
   const digitos = (jid.split("@")[0] ?? "").split(":")[0]?.replace(/\D/g, "") ?? "";
   return digitos.length >= 8 ? `+${digitos}` : null;
