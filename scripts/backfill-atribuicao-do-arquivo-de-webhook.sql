@@ -19,6 +19,13 @@
 --   psql "$SUPABASE_DB_URL" -v aplicar=0 -f scripts/backfill-atribuicao-do-arquivo-de-webhook.sql
 --   psql "$SUPABASE_DB_URL" -v aplicar=1 -f scripts/backfill-atribuicao-do-arquivo-de-webhook.sql
 
+-- Desfazer (os contatos tocados levam `ad_backfill` com o `source` anterior):
+--   update public.contacts
+--      set source = coalesce(source_metadata #>> '{ad_backfill,source_anterior}', source),
+--          source_metadata = source_metadata - 'ad_platform' - 'ad_source_id' - 'ad_id' - 'ad_title'
+--                            - 'ad_body' - 'ad_source_url' - 'ad_raw' - 'ad_captured_at' - 'ad_backfill'
+--    where source_metadata ? 'ad_backfill';
+
 \set ON_ERROR_STOP on
 \if :{?aplicar}
 \else
@@ -29,8 +36,13 @@ begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '60s';
 
+-- Só o que a INGESTÃO aceitou (assinatura válida e processado) e só o bloco do
+-- caminho direto da mensagem: `quotedMessage` fica de fora, porque o anúncio da
+-- mensagem CITADA não é o de onde a pessoa veio (mesma regra do extrator do app,
+-- `lib/channels/verdash/atribuicao-de-anuncio.ts`).
 create temporary table _eventos on commit drop as
 select
+  w.id                                         as evento_id,
   w.organization_id,
   w.received_at,
   b                                            as bloco,
@@ -39,11 +51,16 @@ select
   e #>> '{Info,Chat}'                          as chat
 from public.webhook_events_log w
 cross join lateral (select w.payload_parsed -> 'event' as e) ev
-cross join lateral jsonb_path_query(w.payload_parsed, 'lax $.**.externalAdReply') b
+cross join lateral jsonb_path_query(w.payload_parsed, 'lax $.event.Message.*.contextInfo.externalAdReply') b
 where w.provider = 'verdash'
   and w.organization_id is not null
-  and coalesce((e #>> '{Info,IsFromMe}')::boolean, false) = false
-  and coalesce((e #>> '{Info,IsGroup}')::boolean, false) = false
+  and w.valid_signature is true
+  and w.status = 'processed'
+  and w.payload_parsed ->> 'type' in ('Message', 'AutomationMessage')
+  and (e #>> '{Info,IsFromMe}') is distinct from 'true'
+  and (e #>> '{Info,IsGroup}')  is distinct from 'true'
+  and coalesce(e #>> '{Info,Chat}', '') not like '%@broadcast'
+  and coalesce(e #>> '{Info,Chat}', '') not like '%@newsletter'
   and lower(b ->> 'sourceType') = 'ad';
 
 -- Identidade do remetente: lid do `Sender`/`Chat` quando é @lid; telefone do
@@ -65,13 +82,14 @@ select i.*,
   case when digitos is null then null else '+' || digitos end as tel_a,
   case
     when digitos ~ '^55\d{2}9\d{8}$' then '+' || substr(digitos, 1, 4) || substr(digitos, 6)
-    when digitos ~ '^55\d{2}\d{8}$'  then '+' || substr(digitos, 1, 4) || '9' || substr(digitos, 5)
+    when digitos ~ '^55\d{2}[6-9]\d{7}$' then '+' || substr(digitos, 1, 4) || '9' || substr(digitos, 5)
   end as tel_b
 from _identidades i;
 
 create temporary table _alvos on commit drop as
 select distinct on (c.id)
   c.id as contact_id,
+  c.source as source_anterior,
   c.organization_id,
   x.received_at,
   x.bloco
@@ -82,7 +100,8 @@ join public.contacts c
  and ( (x.lid is not null and c.wa_lid = x.lid)
     or (c.phone_number is not null and c.phone_number in (x.tel_a, x.tel_b)) )
 where coalesce(c.source_metadata ->> 'ad_platform', '') = ''
-order by c.id, x.received_at asc;
+  and c.is_anonymized is not true
+order by c.id, x.received_at asc, x.evento_id;
 
 \echo '--- Simulação: contatos que receberiam a atribuição, por organização'
 select o.slug, count(*) as contatos, count(*) filter (where a.bloco ? 'ctwaClid') as com_clique
@@ -99,11 +118,12 @@ group by 1 order by 2 desc;
         'ad_title',      left(a.bloco ->> 'title', 500),
         'ad_body',       left(a.bloco ->> 'body', 500),
         'ad_source_url', left(coalesce(a.bloco ->> 'sourceURL', a.bloco ->> 'sourceUrl'), 500),
-        'ad_raw',        (select jsonb_object_agg(k, left(v #>> '{}', 500))
+        'ad_raw',        (select jsonb_object_agg(left(k, 64), left(v #>> '{}', 500))
                             from (select k, v from jsonb_each(a.bloco) as t(k, v)
                                    where jsonb_typeof(v) = 'string'
                                      and k not in ('thumbnail', 'JPEGThumbnail')
                                    limit 40) s),
+        'ad_backfill',   jsonb_build_object('em', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'source_anterior', a.source_anterior),
         'ad_captured_at', to_char(a.received_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
       )),
       updated_at = now()
