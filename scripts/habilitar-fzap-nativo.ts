@@ -56,6 +56,15 @@ async function main(): Promise<void> {
       if (error) throw new Error(`org_lookup_failed: ${error.code ?? "sem_codigo"}`);
       return (data?.[0] as { id: string; status: string } | undefined) ?? null;
     },
+    async pastaAtualDaOrg(org) {
+      const { data, error } = await admin
+        .from("verdash_fzap_pastas")
+        .select("fzap_folder_id")
+        .eq("organization_id", org)
+        .limit(1);
+      if (error) throw new Error(`pasta_lookup_failed: ${error.code ?? "sem_codigo"}`);
+      return (data?.[0]?.fzap_folder_id as string | undefined) ?? null;
+    },
     async donoDaPasta(folderId) {
       const { data, error } = await admin
         .from("verdash_fzap_pastas")

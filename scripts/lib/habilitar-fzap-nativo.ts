@@ -11,20 +11,18 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface InstanciaDaPasta {
-  metadata?: { organization_id?: string } | null;
+  metadata?: { organization_id?: string; sistema?: string } | null;
   [k: string]: unknown;
 }
 
-/** O que o FZAP devolve em `GET /folder/instances` (lista, ou objeto com a lista). */
-export type RespostaDaPasta =
-  | InstanciaDaPasta[]
-  | { users?: InstanciaDaPasta[]; instances?: InstanciaDaPasta[]; [k: string]: unknown }
-  | null
-  | undefined;
+/** O que o FZAP devolve em `GET /folder/instances` (medido na v1.35.2): `{ folder: {id}, users: [...] }`. */
+export type RespostaDaPasta = { folder?: { id?: unknown } | null; users?: unknown; [k: string]: unknown } | null | undefined;
 
 export interface Deps {
   /** `null` = a organização não existe. */
   buscarOrg(id: string): Promise<{ id: string; status: string } | null>;
+  /** Pasta que ESTA organização já usa (`verdash_fzap_pastas`), ou `null`. */
+  pastaAtualDaOrg(orgId: string): Promise<string | null>;
   /** Organização dona dessa pasta, ou `null`. */
   donoDaPasta(folderId: string): Promise<string | null>;
   /** GET /folder/instances com o token da pasta. Lança `verdash_request_failed: <status> ...`. */
@@ -65,14 +63,11 @@ export function uuidValido(v: string | undefined): v is string {
   return typeof v === "string" && UUID.test(v);
 }
 
-function instancias(r: RespostaDaPasta): InstanciaDaPasta[] {
-  return Array.isArray(r) ? r : (r?.users ?? r?.instances ?? []);
-}
-
-function idDaPastaNaResposta(r: RespostaDaPasta): string | null {
-  if (!r || Array.isArray(r)) return null;
-  const v = (r.folderId ?? r.folder_id ?? (r.folder as { id?: unknown } | undefined)?.id) as unknown;
-  return typeof v === "string" && v !== "" ? v : null;
+/** Id da pasta e instancias, SO se a resposta tiver o formato real; senao `null` (recusa). */
+function lerResposta(r: RespostaDaPasta): { id: string; users: InstanciaDaPasta[] } | null {
+  const id = r?.folder?.id;
+  if (typeof id !== "string" || id === "" || !Array.isArray(r?.users)) return null;
+  return { id, users: r.users as InstanciaDaPasta[] };
 }
 
 const falha = (linhas: string[]): Resultado => ({ ok: false, linhas, escreveu: false });
@@ -80,7 +75,8 @@ const falha = (linhas: string[]): Resultado => ({ ok: false, linhas, escreveu: f
 export async function habilitar(deps: Deps, p: Pedido): Promise<Resultado> {
   const linhas: string[] = [];
   if (!uuidValido(p.orgId)) return falha(["--org precisa ser um uuid."]);
-  if (p.pastaId.trim() === "") return falha(["--pasta (id da pasta no FZAP) é obrigatório."]);
+  const pastaId = p.pastaId.trim();
+  if (pastaId === "") return falha(["--pasta (id da pasta no FZAP) é obrigatório."]);
   if (p.token === "") return falha(["FZAP_PASTA_TOKEN ausente no ambiente (nunca por argumento)."]);
 
   const org = await deps.buscarOrg(p.orgId);
@@ -89,6 +85,11 @@ export async function habilitar(deps: Deps, p: Pedido): Promise<Resultado> {
     return falha([`Organização ${p.orgId} não está ativa (status: ${org.status}). Recusado.`]);
   }
   linhas.push(`Organização ${p.orgId} existe e está ativa.`);
+
+  const atual = await deps.pastaAtualDaOrg(p.orgId);
+  if (atual !== null && atual !== pastaId) {
+    return falha([...linhas, `A org já usa a pasta ${atual}; desabilite e migre os canais antes de trocar. Recusado.`]);
+  }
 
   let resposta: RespostaDaPasta;
   try {
@@ -103,25 +104,24 @@ export async function habilitar(deps: Deps, p: Pedido): Promise<Resultado> {
     return falha([...linhas, `Não consegui validar a pasta no FZAP: ${status ? `HTTP ${status}` : m.slice(0, 120)}.`]);
   }
 
-  const doFzap = idDaPastaNaResposta(resposta);
-  if (doFzap !== null && doFzap !== p.pastaId) {
+  const lida = lerResposta(resposta);
+  if (!lida) {
+    return falha([...linhas, "A resposta do FZAP não trouxe folder.id e a lista users. Formato desconhecido: recusado."]);
+  }
+  if (lida.id !== pastaId) {
     return falha([...linhas, "O token pertence a outra pasta do FZAP que não a de --pasta. Recusado."]);
   }
-  const alheia = instancias(resposta).find(
-    (i) => i.metadata?.organization_id && i.metadata.organization_id !== p.orgId,
-  );
-  if (alheia) {
+  if (lida.users.some((i) => i.metadata?.organization_id && i.metadata.organization_id !== p.orgId)) {
     return falha([...linhas, "A pasta tem instância de OUTRA organização. Recusado."]);
   }
-  linhas.push(
-    doFzap !== null
-      ? "Pasta validada no FZAP (200, id confere)."
-      : "Token da pasta aceito pelo FZAP (200). AVISO: a resposta não traz o id da pasta; o id de --pasta não foi conferido no FZAP.",
-  );
+  if (lida.users.some((i) => i.metadata?.sistema !== "crm")) {
+    return falha([...linhas, "A pasta tem instância que não é do CRM (sem metadata.sistema=crm). Recusado."]);
+  }
+  linhas.push("Pasta validada no FZAP (200, id confere).");
 
-  const dono = await deps.donoDaPasta(p.pastaId);
+  const dono = await deps.donoDaPasta(pastaId);
   if (dono !== null && dono !== p.orgId) {
-    return falha([...linhas, `A pasta ${p.pastaId} já pertence a OUTRA organização (${dono}). Recusado.`]);
+    return falha([...linhas, `A pasta ${pastaId} já pertence a OUTRA organização (${dono}). Recusado.`]);
   }
 
   if (!p.proxyBrPresente) {
@@ -135,7 +135,7 @@ export async function habilitar(deps: Deps, p: Pedido): Promise<Resultado> {
 
   const cifrado = await deps.cifrar(p.token);
   if (!cifrado) return falha([...linhas, "Cifra indisponível (chave app.nuvemshop_oauth_key ausente no banco). Nada gravado."]);
-  await deps.gravar(p.orgId, p.pastaId, cifrado);
+  await deps.gravar(p.orgId, pastaId, cifrado);
   linhas.push(dono === p.orgId ? "Pasta atualizada (upsert idempotente)." : "Pasta gravada. O botão 'Conectar por QR' passa a aparecer na organização.");
   linhas.push("Falta fazer:", ...PROXIMOS_PASSOS.map((s) => `  - ${s}`));
   return { ok: true, linhas, escreveu: true };

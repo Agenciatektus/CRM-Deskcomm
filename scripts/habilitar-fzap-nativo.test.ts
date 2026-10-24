@@ -6,13 +6,17 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const OUTRA = "22222222-2222-4222-8222-222222222222";
 const TOKEN = "tok-segredo-da-pasta-abc123";
 
+const resp = (users: unknown[] = [], id = "pasta-1") => ({ folder: { id }, users });
+const doCrm = (org = ORG) => ({ metadata: { sistema: "crm", organization_id: org } });
+
 function fake(over: Partial<Deps> = {}) {
   const escritas: Array<[string, string, string]> = [];
   let apagadas = 0;
   const deps: Deps = {
     buscarOrg: async (id) => ({ id, status: "active" }),
+    pastaAtualDaOrg: async () => null,
     donoDaPasta: async () => null,
-    listarDaPasta: async () => [],
+    listarDaPasta: async () => resp(),
     cifrar: async (t) => `\\xcifrado(${t.length})`,
     gravar: async (o, f, c) => void escritas.push([o, f, c]),
     apagar: async () => ++apagadas,
@@ -94,13 +98,44 @@ describe("habilitar", () => {
   });
 
   it("pasta do FZAP diferente de --pasta, ou com instância de outra org, é recusada", async () => {
-    const a = await habilitar(fake({ listarDaPasta: async () => ({ folderId: "outra" }) }).deps, pedido);
+    const a = await habilitar(fake({ listarDaPasta: async () => resp([], "outra") }).deps, pedido);
     expect(a.ok).toBe(false);
-    const b = await habilitar(
-      fake({ listarDaPasta: async () => [{ metadata: { organization_id: OUTRA } }] }).deps,
-      pedido,
-    );
+    const b = await habilitar(fake({ listarDaPasta: async () => resp([doCrm(OUTRA)]) }).deps, pedido);
     expect(b.ok).toBe(false);
+  });
+
+  it("resposta sem folder.id ou com users que não é array: RECUSA (não só avisa)", async () => {
+    for (const bruto of [[], {}, null, { users: [] }, { folder: { id: "pasta-1" } }, { folder: { id: "pasta-1" }, users: "x" }]) {
+      const f = fake({ listarDaPasta: async () => bruto as never });
+      const r = await habilitar(f.deps, pedido);
+      expect(r.ok).toBe(false);
+      expect(f.escritas).toHaveLength(0);
+    }
+  });
+
+  it("recusa pasta com instância SEM metadata.sistema=crm; pasta vazia e só do CRM passam", async () => {
+    const f = fake({ listarDaPasta: async () => resp([{ metadata: { organization_id: ORG } }]) });
+    expect((await habilitar(f.deps, pedido)).ok).toBe(false);
+    expect((await habilitar(fake({ listarDaPasta: async () => resp([{}]) }).deps, pedido)).ok).toBe(false);
+    expect((await habilitar(fake().deps, pedido)).ok).toBe(true);
+    expect((await habilitar(fake({ listarDaPasta: async () => resp([doCrm()]) }).deps, pedido)).ok).toBe(true);
+  });
+
+  it("org que já usa OUTRA pasta: recusa trocar em silêncio; mesma pasta é idempotente", async () => {
+    const f = fake({ pastaAtualDaOrg: async () => "pasta-antiga" });
+    const r = await habilitar(f.deps, pedido);
+    expect(r.ok).toBe(false);
+    expect(texto(r)).toMatch(/já usa a pasta pasta-antiga; desabilite e migre os canais antes/);
+    expect(f.escritas).toHaveLength(0);
+    const g = fake({ pastaAtualDaOrg: async () => "pasta-1", donoDaPasta: async () => ORG });
+    expect((await habilitar(g.deps, pedido)).ok).toBe(true);
+  });
+
+  it("--pasta com espaços: o valor normalizado é o usado em tudo (confere, dono, gravação)", async () => {
+    const f = fake();
+    const r = await habilitar(f.deps, { ...pedido, pastaId: "  pasta-1 " });
+    expect(r.ok).toBe(true);
+    expect(f.escritas[0]![1]).toBe("pasta-1");
   });
 
   it("avisa sem proxy, sem imprimir valor", async () => {
