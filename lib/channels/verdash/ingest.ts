@@ -50,7 +50,9 @@ import { logger } from "@/lib/logger";
 import { canonicalPhoneBR } from "@/lib/channels/phone-variants";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 
+import { estamparAtribuicaoDoContato } from "@/lib/leads/atribuicao-de-anuncio";
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
+import { extrairAtribuicaoVerdash } from "./atribuicao-de-anuncio";
 
 import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
 
@@ -149,6 +151,17 @@ export async function ingestVerdashInbound(
 
   const contactId = await upsertContact(admin, input.organizationId, msg, identity);
   if (!contactId) return { status: "ignored", reason: "contato_nao_resolvido" };
+
+  // De qual anúncio a pessoa veio. Só ENTRADA: a mensagem que SAIU não carrega o
+  // clique de ninguém. A regra de primeiro toque é do banco, então reenvio e
+  // segunda conversa não reescrevem a origem; a falha é logada lá e não derruba
+  // a entrada (o provider reenviaria).
+  if (msg.direction === "inbound") {
+    const atribuicao = extrairAtribuicaoVerdash(input.payload);
+    if (atribuicao) {
+      await estamparAtribuicaoDoContato(admin, input.organizationId, contactId, atribuicao);
+    }
+  }
 
   const { data: convData, error: convErr } = await admin.rpc("fn_upsert_wa_conversation", {
     p_org: input.organizationId,

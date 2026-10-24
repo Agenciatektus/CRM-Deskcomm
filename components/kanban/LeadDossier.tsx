@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useLeadTimeline } from "@/hooks/leads/useLeadTimeline";
 import type { Lead } from "@/lib/types/leads";
 import { ContatoDoNegocio } from "./ContatoDoNegocio";
+import { OrigemDoNegocio } from "./OrigemDoNegocio";
 import { AbrirConversaDoLead, temAlvoParaAbrir } from "./AbrirConversaDoLead";
 import { ConversaDoNegocio } from "./ConversaDoNegocio";
 import { LeadFieldsForm } from "./LeadFieldsForm";
@@ -276,6 +277,10 @@ export function LeadDossier({
             leadId={lead.id}
           />
         </section>
+
+        {/* De onde o cliente veio: origem, campanha, conjunto e anúncio. Vem do
+            contato, como o bloco acima; some quando não há nada a mostrar. */}
+        <OrigemDoNegocio contactId={lead.contact_id} />
 
         {/* As tarefas ANTES da linha do tempo: a timeline conta o que já
             aconteceu, a tarefa é o que ainda falta fazer — e quem abre o card
