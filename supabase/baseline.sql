@@ -63020,11 +63020,16 @@ begin
   end if;
 
   -- Evento mais antigo que a ultima transicao nao desfaz o que veio depois.
-  v_ultimo := coalesce(
-    nullif(v_row.metadata ->> 'evento_conexao_em', '')::timestamptz,
-    v_row.last_status_change_at
-  );
-  if v_ultimo is not null and v_em < v_ultimo then
+  -- Com `evento_conexao_em` (relogio do FZAP nos dois lados) a comparacao e estrita.
+  -- Sem ele, o termo de comparacao e `last_status_change_at` (relogio do banco): o
+  -- relogio do FZAP pode estar poucos segundos atras, entao 30 s de tolerancia.
+  v_ultimo := nullif(v_row.metadata ->> 'evento_conexao_em', '')::timestamptz;
+  if v_ultimo is not null then
+    if v_em < v_ultimo then
+      return jsonb_build_object('resultado', 'obsoleto', 'status', v_row.status);
+    end if;
+  elsif v_row.last_status_change_at is not null
+    and v_em < v_row.last_status_change_at - interval '30 seconds' then
     return jsonb_build_object('resultado', 'obsoleto', 'status', v_row.status);
   end if;
 

@@ -34,7 +34,7 @@ export function horaDoEvento(payload: unknown): string | null {
   const ev = (payload as { event?: { Timestamp?: unknown } } | null)?.event;
   const t = typeof ev?.Timestamp === "string" ? Date.parse(ev.Timestamp) : NaN;
   // Relogio adiantado do FZAP travaria os eventos seguintes como "obsoletos".
-  return Number.isFinite(t) && t <= Date.now() + 60_000 ? new Date(t).toISOString() : null;
+  return Number.isFinite(t) && t <= Date.now() + 10_000 ? new Date(t).toISOString() : null;
 }
 
 export async function aplicarEventoDeConexao(

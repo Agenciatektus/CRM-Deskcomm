@@ -79,8 +79,11 @@ function rpcEvento(a: { p_org: string; p_canal: string; p_evento: string; p_em: 
   const agora = new Date().toISOString();
   const em = a.p_em ?? agora;
   const m = { ...((c.metadata as Row) ?? {}) };
-  const ultimo = (m.evento_conexao_em as string | undefined) ?? (c.last_status_change_at as string | undefined);
-  if (ultimo && new Date(em) < new Date(ultimo)) return { resultado: "obsoleto", status: c.status };
+  const ultimo = m.evento_conexao_em as string | undefined;
+  const lsc = c.last_status_change_at as string | undefined;
+  if (ultimo ? new Date(em) < new Date(ultimo) : lsc && new Date(em).getTime() < new Date(lsc).getTime() - 30_000) {
+    return { resultado: "obsoleto", status: c.status };
+  }
   let status: string;
   if (a.p_evento === "Connected") {
     status = "WORKING";
@@ -445,6 +448,28 @@ describe("P2-1: ordem dos eventos", () => {
     await ingerir("LoggedOut", "2026-10-24T11:57:00Z");
     expect((await ingerir("Connected", "2026-10-24T11:58:00Z")).status).toBe("updated");
     expect(canal().status).toBe("WORKING");
+  });
+});
+
+describe("tolerancia de relogio contra last_status_change_at", () => {
+  it("FZAP atrasado 5 s depois de uma transicao do CRM NAO e obsoleto", async () => {
+    canal().last_status_change_at = "2026-10-24T11:59:00Z";
+    expect((await ingerir("Connected", "2026-10-24T11:58:55Z")).status).toBe("updated");
+  });
+
+  it("FZAP atrasado 2 min e obsoleto", async () => {
+    canal().last_status_change_at = "2026-10-24T11:59:00Z";
+    expect((await ingerir("Connected", "2026-10-24T11:57:00Z")).reason).toBe("evento_obsoleto");
+  });
+
+  it("com evento_conexao_em presente a comparacao e estrita (1 s atras ja e obsoleto)", async () => {
+    await ingerir("Connected", "2026-10-24T11:58:00Z");
+    expect((await ingerir("Disconnected", "2026-10-24T11:57:59Z")).reason).toBe("evento_obsoleto");
+  });
+
+  it("clamp de futuro e 10 s: 30 s a frente vira now()", async () => {
+    await ingerir("Connected", "2026-10-24T12:00:30Z");
+    expect(chamadasRpc.find((c) => c.fn === "fn_registrar_evento_conexao_nativa")!.args.p_em).toBeNull();
   });
 });
 
