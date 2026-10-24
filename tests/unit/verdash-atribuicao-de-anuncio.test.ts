@@ -37,6 +37,36 @@ describe("extrairAtribuicaoVerdash", () => {
     });
   });
 
+  it("lê o formato REAL de produção (bloco medido em webhook_events_log, 24/10/2026)", () => {
+    // Campos idênticos ao arquivado: 695 de 720 payloads com anúncio trazem ctwaClid.
+    const real = {
+      title: "FioFio Modas",
+      body: "OUTUBRO DE PROPHECY 15 NA FIO FIO!",
+      ctwaClid: "AfgyHHpliDuP7ks43e8ID6GGvlS2",
+      mediaURL: "https://www.facebook.com/fiofiomodass/videos/1467864935233150/",
+      sourceID: "120253837017130653",
+      mediaType: 2,
+      sourceApp: "instagram",
+      sourceURL: "https://www.instagram.com/p/Dec7g1jMYG1/",
+      sourceType: "ad",
+      thumbnail: "QUJD".repeat(3000),
+      thumbnailURL: "https://instagram.fcgh11-1.fna.fbcdn.net/v/t15.jpg",
+      greetingMessageBody: "Olá, temos opções nos tamanhos 8 a 11. Qual tamanho você precisa?",
+    };
+    const r = extrairAtribuicaoVerdash({
+      type: "AutomationMessage",
+      event: { Info: { ID: "m1" }, Message: { extendedTextMessage: { contextInfo: { externalAdReply: real } } } },
+    });
+    expect(r).toMatchObject({
+      sourceId: "AfgyHHpliDuP7ks43e8ID6GGvlS2",
+      adId: "120253837017130653",
+      titulo: "FioFio Modas",
+      sourceUrl: "https://www.instagram.com/p/Dec7g1jMYG1/",
+    });
+    expect(r?.bruto).toMatchObject({ sourceApp: "instagram", sourceType: "ad" });
+    expect(r?.bruto).not.toHaveProperty("thumbnail");
+  });
+
   it("acha o bloco no formato antigo (Source.AdReplyInfo)", () => {
     const r = extrairAtribuicaoVerdash({
       type: "Message",
