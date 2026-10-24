@@ -63116,71 +63116,6 @@ grant execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
 
 notify pgrst, 'reload schema';
 
--- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
---
--- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
--- tenancy; o P1 do Cassio mostrou que papel nas DUAS organizações também move
--- linha (messages, conversations, crm_leads…). Aqui: toda tabela de public com
--- organization_id, lida do catálogo. Fica no FIM do arquivo de propósito: o
--- laço tem de ver também as tabelas que os blocos acima (módulos reaplicados,
--- apêndice) criaram. Idempotente (create or replace trigger).
--- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
--- 9032 (P2-3 do Cassio na #70): o laço PULA a tabela que já tem a trigger
--- certa (mesmo nome, mesma função, BEFORE UPDATE OF organization_id FOR EACH
--- ROW). Reaplicar o baseline sobre um banco que já tem as triggers não toma
--- lock nenhum dessas tabelas. Na PRIMEIRA aplicação, cada CREATE TRIGGER (que
--- pega SHARE ROW EXCLUSIVE) é seguido de COMMIT: o lock da tabela sai antes da
--- próxima, em vez de 169 locks acumulados até o fim do bloco. O COMMIT dentro
--- do DO funciona porque o baseline roda em autocommit (psql -f, sem -1). Tabela
--- em disputa (lock_timeout) fica para depois, e no fim o bloco levanta 55P03:
--- reaplicar_baseline trata isso como disputa e roda de novo, e a próxima
--- passada só cria as que faltam. Nenhuma janela inconsistente: cada tabela ou
--- já está protegida ou segue como antes da trava.
-do $$
-declare
-  t record;
-  em_disputa text[] := '{}';
-begin
-  for t in
-    select c.relname
-      from pg_class c
-      join pg_attribute a
-        on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
-     where c.relnamespace = 'public'::regnamespace
-       and c.relkind in ('r', 'p')
-       and not exists (
-         select 1 from pg_trigger g
-          where g.tgrelid = c.oid
-            and g.tgname = 'trg_organizacao_nao_muda'
-            and not g.tgisinternal
-            and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
-            and g.tgenabled in ('O', 'A')              -- desabilitada não protege nada
-            and g.tgqual is null                     -- nem com WHEN que a restrinja
-            and g.tgtype = 19                       -- ROW | BEFORE | UPDATE
-            and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
-       )
-     order by c.relname
-  loop
-    begin
-      execute format(
-        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
-        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t.relname);
-    exception when lock_not_available then
-      em_disputa := em_disputa || t.relname::text;
-    end;
-    commit;
-  end loop;
-  if cardinality(em_disputa) > 0 then
-    -- A mensagem COMEÇA com "lock timeout" de propósito: o psql não imprime o
-    -- SQLSTATE, e é o texto que BASELINE_ERROS_DE_DISPUTA (hostgator-setup-kit/
-    -- _common.sh) reconhece para reaplicar_baseline fazer nova passada. Prova:
-    -- tests/shell/baseline-reaplica-apos-disputa.test.sh.
-    raise exception 'lock timeout: trg_organizacao_nao_muda ficou de fora em % tabela(s) em disputa, a próxima passada cria: %',
-      cardinality(em_disputa), em_disputa
-      using errcode = '55P03';
-  end if;
-end $$;
-
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -66346,3 +66281,68 @@ create or replace trigger trg_organizacao_nao_muda
   for each row execute function public.fn_organizacao_da_linha_nao_muda();
 
 notify pgrst, 'reload schema';
+
+-- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
+--
+-- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
+-- tenancy; o P1 do Cassio mostrou que papel nas DUAS organizações também move
+-- linha (messages, conversations, crm_leads…). Aqui: toda tabela de public com
+-- organization_id, lida do catálogo. Fica no FIM do arquivo de propósito: o
+-- laço tem de ver também as tabelas que os blocos acima (módulos reaplicados,
+-- apêndice) criaram. Idempotente (create or replace trigger).
+-- Prova: tests/invariants/organizacao-nao-muda-9030.test.ts.
+-- 9032 (P2-3 do Cassio na #70): o laço PULA a tabela que já tem a trigger
+-- certa (mesmo nome, mesma função, BEFORE UPDATE OF organization_id FOR EACH
+-- ROW). Reaplicar o baseline sobre um banco que já tem as triggers não toma
+-- lock nenhum dessas tabelas. Na PRIMEIRA aplicação, cada CREATE TRIGGER (que
+-- pega SHARE ROW EXCLUSIVE) é seguido de COMMIT: o lock da tabela sai antes da
+-- próxima, em vez de 169 locks acumulados até o fim do bloco. O COMMIT dentro
+-- do DO funciona porque o baseline roda em autocommit (psql -f, sem -1). Tabela
+-- em disputa (lock_timeout) fica para depois, e no fim o bloco levanta 55P03:
+-- reaplicar_baseline trata isso como disputa e roda de novo, e a próxima
+-- passada só cria as que faltam. Nenhuma janela inconsistente: cada tabela ou
+-- já está protegida ou segue como antes da trava.
+do $$
+declare
+  t record;
+  em_disputa text[] := '{}';
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_attribute a
+        on a.attrelid = c.oid and a.attname = 'organization_id' and not a.attisdropped
+     where c.relnamespace = 'public'::regnamespace
+       and c.relkind in ('r', 'p')
+       and not exists (
+         select 1 from pg_trigger g
+          where g.tgrelid = c.oid
+            and g.tgname = 'trg_organizacao_nao_muda'
+            and not g.tgisinternal
+            and g.tgfoid = 'public.fn_organizacao_da_linha_nao_muda()'::regprocedure
+            and g.tgenabled in ('O', 'A')              -- desabilitada não protege nada
+            and g.tgqual is null                     -- nem com WHEN que a restrinja
+            and g.tgtype = 19                       -- ROW | BEFORE | UPDATE
+            and g.tgattr::text = a.attnum::text      -- int2vector de UMA coluna: organization_id
+       )
+     order by c.relname
+  loop
+    begin
+      execute format(
+        'create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.%I '
+        'for each row execute function public.fn_organizacao_da_linha_nao_muda()', t.relname);
+    exception when lock_not_available then
+      em_disputa := em_disputa || t.relname::text;
+    end;
+    commit;
+  end loop;
+  if cardinality(em_disputa) > 0 then
+    -- A mensagem COMEÇA com "lock timeout" de propósito: o psql não imprime o
+    -- SQLSTATE, e é o texto que BASELINE_ERROS_DE_DISPUTA (hostgator-setup-kit/
+    -- _common.sh) reconhece para reaplicar_baseline fazer nova passada. Prova:
+    -- tests/shell/baseline-reaplica-apos-disputa.test.sh.
+    raise exception 'lock timeout: trg_organizacao_nao_muda ficou de fora em % tabela(s) em disputa, a próxima passada cria: %',
+      cardinality(em_disputa), em_disputa
+      using errcode = '55P03';
+  end if;
+end $$;
