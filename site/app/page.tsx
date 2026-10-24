@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { FAQ, SITE } from "@/lib/conteudo";
+import { temSessaoViva } from "@/lib/sessao";
 
 import { CtaFinal, Faq } from "./_components/secoes-fim";
 import { Agente, ComoFunciona, Faixa, Funil, Problema } from "./_components/secoes-a";
@@ -11,16 +12,14 @@ import { Movimento } from "./_components/Movimento";
 
 /**
  * Quem já tem sessão no CRM segue direto para o sistema, como o `/` do CRM sempre
- * fez. A LP divide o host com o CRM, então o cookie de sessão chega aqui. Basta
- * a PRESENÇA do cookie: o `proxy.ts` do CRM valida a sessão de verdade e, se ela
- * estiver vencida, manda para `/login`.
+ * fez. A LP divide o host com o CRM, então o cookie de sessão chega aqui. O cookie precisa trazer uma sessão
+ * recente (ver `lib/sessao.ts`); cookie abandonado há dias deixa a LP aparecer em vez de
+ * cair em `/login`. O `proxy.ts` do CRM valida a sessão de verdade em `/app`.
  *
  * `force-dynamic`: a resposta depende do cookie, então a página não pode ser
  * estática. O HTML continua completo, renderizado no servidor.
  */
 export const dynamic = "force-dynamic";
-
-const COOKIE_DE_SESSAO = "sb-deskcomm-auth";
 
 const JSON_LD = {
   "@context": "https://schema.org",
@@ -55,7 +54,7 @@ const JSON_LD = {
 
 export default async function Home() {
   const jar = await cookies();
-  if (jar.getAll().some((c) => c.name.startsWith(COOKIE_DE_SESSAO))) redirect("/app");
+  if (temSessaoViva(jar.getAll())) redirect("/app");
 
   return (
     <>
