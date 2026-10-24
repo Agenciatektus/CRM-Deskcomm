@@ -882,10 +882,11 @@ function ExcluirCanalDialog({
   );
 }
 
-function QrDialog({
+export function QrDialog({
   sessionId,
   title,
   wahaConfigured,
+  apenasQr = false,
   onClose,
   onConnected,
   onForcePair,
@@ -893,6 +894,8 @@ function QrDialog({
   sessionId: string;
   title: string;
   wahaConfigured: boolean;
+  /** Conexão criada pelo CRM: sem a opção de código de pareamento. */
+  apenasQr?: boolean;
   onClose: () => void;
   onConnected: () => void;
   onForcePair: (sessionId: string) => Promise<void>;
@@ -958,14 +961,14 @@ function QrDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {t(
-              "Escolha QR Code ou código de pareamento e confirme no WhatsApp do celular.",
-            )}
+            {apenasQr
+              ? t("No WhatsApp do celular, abra Aparelhos conectados e leia o código.")
+              : t("Escolha QR Code ou código de pareamento e confirme no WhatsApp do celular.")}
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 py-2">
           {status === "SCAN_QR_CODE" ? (
-            <PairingOptions key={sessionId} sessionId={sessionId} qr={
+            <PairingOptions key={sessionId} sessionId={sessionId} apenasQr={apenasQr} qr={
             // Sem `key={tick}`: trocar só o src reaproveita o mesmo <img>, e o
             // browser segura o frame anterior até decodificar o novo. Remontar o
             // elemento a cada refresh é o que causaria o flash branco.

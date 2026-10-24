@@ -27,6 +27,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WAHA } from "@/lib/channels/capabilities";
+import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
 import { desfazerWebhookDoNumero } from "@/lib/channels/meta/webhook-override";
@@ -183,12 +184,19 @@ export async function GET(
     impact ? { ...corpo, deletion_impact: impact } : corpo;
 
   if (user.support?.access_mode === "support_readonly") return ok(comImpacto({ ...session, waha_configured: false }), { requestId });
+  // Conexão criada pelo próprio CRM: quem responde é o servidor de WhatsApp dela, não o
+  // WAHA. O polling de 3 s da tela do QR passa por aqui e precisa de SCAN_QR_CODE e
+  // WORKING ao vivo; o canal vinculado (`null`) segue exatamente como antes.
+  const nativa =
+    session.provider === HOSTED_CHANNEL_PROVIDER
+      ? await saudeAoVivoDoCanalHospedado(createAdminClient(), activeOrg.orgId, id)
+      : null;
   const waha = getWahaClient();
   // Canal oficial não tem sessão no transporte para consultar — `waha_session_name`
   // é NULL nele por CHECK, e perguntar assim mesmo pediria `/api/sessions/null`.
   const nomeSessao =
     session.provider === CHANNEL_PROVIDER_WAHA ? session.waha_session_name : null;
-  if (!waha || !nomeSessao) {
+  if (!nativa && (!waha || !nomeSessao)) {
     // Nada a checar ao vivo (transporte fora do ar, ou canal que não vive nele):
     // devolve o que está no DB, sinalizando que o estado não foi confirmado agora.
     return ok(comImpacto({ ...session, waha_configured: false }), { requestId });
@@ -196,8 +204,14 @@ export async function GET(
 
   let liveStatus = session.status as string;
   let phoneNumber = session.phone_number as string | null;
-  try {
-    const remote = await waha.getVerifiedSession(nomeSessao);
+  if (nativa) {
+    // Não deu para perguntar: não inventa status, e a tela tenta no próximo tick.
+    if (!nativa.reachable || !nativa.status) {
+      return fail("connection_status_failed", "Não foi possível conferir a conexão. Tente novamente.", 502, { requestId });
+    }
+    liveStatus = nativa.status;
+  } else try {
+    const remote = await waha!.getVerifiedSession(nomeSessao!);
     liveStatus = remote?.status ?? "STOPPED";
     // O número vem do JID (`<phone>@c.us`), e a regra de quando ele VALE mora
     // em `numeroObservadoDaSessao` — inclusive por que não basta gravar sempre.

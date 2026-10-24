@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
+import { ConectarPorQr } from "./ConectarPorQr";
 
 /**
  * Conectar o número que JÁ ESTÁ conectado em outro sistema do cliente.
@@ -55,6 +56,8 @@ interface Estado {
   status: string | null;
   has_token: boolean;
   webhook_url: string | null;
+  /** A organização pode criar a conexão por QR neste CRM. Ausente em servidor antigo. */
+  nativo_habilitado?: boolean;
 }
 
 interface Conectado {
@@ -205,6 +208,8 @@ export function CanalHospedadoClient() {
               )}
             </p>
           </div>
+
+          {estado?.nativo_habilitado && <ConectarPorQr onAtualizar={() => void carregar()} />}
 
           {/* O caminho antigo, fechado por padrão e com o custo declarado. Ele
               continua aqui porque há número conectado por ele — tirar agora

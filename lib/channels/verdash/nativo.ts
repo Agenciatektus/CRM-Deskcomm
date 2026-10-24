@@ -131,7 +131,7 @@ export async function apagarNativo(
 }
 
 /** O FZAP pode ecoar a proxyUrl (com credenciais) no corpo do erro: so o status sai. */
-function statusDoErro(err: unknown): string {
+export function statusDoErro(err: unknown): string {
   const m = err instanceof Error ? /verdash_request_failed: (\d{3})/.exec(err.message) : null;
   return m ? m[1]! : "sem_resposta";
 }
@@ -264,4 +264,21 @@ export async function desligarNativo(
   await exigirInstanciaDaOrg(pasta, input.organizationId, input.fzapId, input.creds.instanceName);
   await fzapRequest(input.creds, "/session/disconnect", { method: "POST", body: {} });
   await fzapRequest(input.creds, "/session/logout", { method: "POST", body: {} });
+}
+
+/** Faxina da orfa de um pedido que morreu no meio: acha pelo channel_session_id e apaga. */
+export async function faxinarOrfaDoCanal(
+  admin: SupabaseClient,
+  organizationId: string,
+  channelSessionId: string,
+): Promise<void> {
+  const pasta = await lerPastaDaOrg(admin, organizationId).catch(() => null);
+  if (pasta) await limparOrfaDoCanal(pasta, organizationId, channelSessionId);
+}
+
+/** Para o log: codigo fixo do CRM ou so o status do FZAP, nunca o trecho do corpo dele. */
+export function resumoDoErro(e: unknown): string {
+  if (!(e instanceof Error)) return "erro_de_banco";
+  const fixo = /^verdash_nativo_[a-z_]+/.exec(e.message)?.[0];
+  return `${fixo ?? "fzap"}:${statusDoErro(e)}`;
 }
