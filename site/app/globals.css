@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/*
+ * Fontes: as mesmas da interface do CRM (Atkinson Hyperlegible Next e Mono,
+ * licença OFL em public/_lp/fonts/OFL.txt), servidas por /_lp para não colidir
+ * com as do CRM.
+ */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-next-400-latin-latin-ext.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-next-500-latin-latin-ext.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-next-600-latin-latin-ext.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-next-700-latin-latin-ext.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-mono-400-latin-latin-ext.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("/_lp/fonts/atkinson-hyperlegible-mono-500-latin-latin-ext.woff2") format("woff2");
+}
+
+/*
+ * Tokens: o tema ESCURO do CRM (app/globals.css, bloco [data-theme="dark"]),
+ * copiados com os mesmos valores. A LP é sempre escura; não há tema claro aqui.
+ * O degradê é o --pele-grad do CRM e só vai em botão e em detalhe de marca,
+ * nunca em fundo de seção.
+ */
+@theme {
+  --color-bg: #0d0e11;
+  --color-surface: #181a1c;
+  --color-surface-elevated: #1f2225;
+  --color-text: #f8f8f8;
+  --color-text-muted: #c8cbce;
+  --color-text-subtle: #a1a5aa;
+  --color-border: #292c2f;
+  --color-border-strong: #3a3d41;
+  --color-accent: #2690b1;
+  --color-accent-hover: #2da6cc;
+  --color-accent-soft: rgb(38 144 177 / 0.2);
+  --color-link: #69cee6;
+  --color-foco: #48a5c7;
+  --color-warn: #f4b26a;
+
+  --font-sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+
+  --radius-controle: 4px;
+  --radius-card: 8px;
+  --radius-grande: 12px;
+  --radius-modal: 16px;
+}
+
+:root {
+  color-scheme: dark;
+  --degrade: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2b8cad 85%, #2bc88f 100%);
+  --degrade-hover: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #0c7a9a 85%, #00b47d 100%);
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-foco);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
