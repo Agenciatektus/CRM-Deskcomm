@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
+import { fecharAvisoDePausaDoCanalArquivado } from "@/lib/channels/central-de-pausa";
 import { lerLimiteDoPlano } from "@/lib/cobranca/limites";
 import { logger } from "@/lib/logger";
 
@@ -98,7 +99,10 @@ async function reservar(
     webhook_secret_encrypted: i.segredoCifrado,
     metadata: metadataInicialDoCanal(),
   });
-  return error ? { ok: false, conflito: error.code === "23505", erro: error } : { ok: true };
+  if (error) return { ok: false, conflito: error.code === "23505", erro: error };
+  // A reserva nasce arquivada: nenhum aviso de pausa pode ficar aberto para ela (#2389).
+  await fecharAvisoDePausaDoCanalArquivado(admin, { id, organization_id: i.organizationId });
+  return { ok: true };
 }
 
 /** O segundo clique: o canal ja pronto (replay), "em andamento", ou reserva velha demais. */
