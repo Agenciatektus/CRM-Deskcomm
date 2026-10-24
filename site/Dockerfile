@@ -1,13 +1,14 @@
 # LP do CRM (site/). Contexto de build: a pasta site/ (na VPS: `docker build -f site/Dockerfile site`).
+# Base fixada por digest (build reproduzível; trocar o digest é decisão, não acidente).
 # Imagem separada da do CRM: mudar texto ou imagem da LP não reconstrói nem troca o CRM.
 
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS build
 WORKDIR /app
 RUN corepack enable
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -15,7 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
 
-FROM node:22-alpine AS run
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS run
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
