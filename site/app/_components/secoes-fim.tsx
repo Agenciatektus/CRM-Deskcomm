@@ -1,26 +1,36 @@
 import { CTA, CTA_FINAL, FAQ, GOOGLE, SITE, linkWhatsapp } from "@/lib/conteudo";
 
 import { BotaoPrimario } from "./Botao";
+import { Secao } from "./Secao";
 import { Logotipo } from "./Marca";
 
 export function Faq() {
   return (
-    <section id="faq" aria-labelledby="titulo-faq" className="scroll-mt-16 border-t border-border">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 lg:py-28 [&>*]:min-w-0">
-        <h2
-          id="titulo-faq"
-          className="m-0 max-w-[12ch] text-[clamp(1.75rem,3vw,2.6rem)] leading-tight font-bold tracking-tight text-balance"
-        >
-          Perguntas que aparecem antes de contratar.
-        </h2>
-        <div className="divide-y divide-border border-y border-border">
-          {FAQ.map((f) => (
-            <details key={f.p} className="group py-1">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-3 text-[1.05rem] font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
+    <Secao id="faq" titulo="titulo-faq" fundo="faixa">
+      <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 [&>*]:min-w-0">
+        <div className="revela lg:sticky lg:top-24 lg:self-start">
+          <h2
+            id="titulo-faq"
+            className="m-0 max-w-[12ch] text-[clamp(1.85rem,3.4vw,2.9rem)] leading-[1.1] font-bold tracking-tight text-balance"
+          >
+            Perguntas que aparecem antes de contratar.
+          </h2>
+          <p className="mt-4 mb-0 max-w-[22rem] leading-relaxed text-text-muted">
+            Não achou a sua? Pergunte pelo WhatsApp e a Tektus responde.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          {FAQ.map((f, i) => (
+            <details
+              key={f.p}
+              className="card revela group px-5 py-1 open:border-border-strong"
+              style={{ "--atraso": `${i * 0.05}s` } as React.CSSProperties}
+            >
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 py-3 text-[1.05rem] font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
                 {f.p}
                 <span
                   aria-hidden="true"
-                  className="font-mono text-[1.2rem] text-text-subtle transition-transform duration-150 group-open:rotate-45"
+                  className="grid size-7 shrink-0 place-items-center rounded-full border border-border-strong font-mono text-[1.1rem] text-text-subtle transition-transform duration-150 group-open:rotate-45"
                 >
                   +
                 </span>
@@ -30,28 +40,47 @@ export function Faq() {
           ))}
         </div>
       </div>
-    </section>
+    </Secao>
   );
 }
 
 export function CtaFinal() {
   return (
-    <section aria-labelledby="titulo-cta" className="border-t border-border">
+    <section aria-labelledby="titulo-cta" className="relative isolate overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-azul" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
       <div className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
-        <div className="rounded-modal border border-border-strong bg-surface p-8 sm:p-12">
-          <h2
-            id="titulo-cta"
-            className="m-0 max-w-[22ch] text-[clamp(1.75rem,3.2vw,2.8rem)] leading-tight font-bold tracking-tight text-balance"
-          >
-            {CTA_FINAL.titulo}
-          </h2>
-          <p className="mt-4 mb-0 max-w-[36rem] leading-relaxed text-text-muted">
-            {CTA_FINAL.texto}
-          </p>
-          <div className="mt-8">
-            <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
-              {CTA.rotulo} pelo WhatsApp
-            </BotaoPrimario>
+        <div className="borda-luz janela-app revela relative overflow-hidden rounded-[22px] bg-surface p-8 sm:p-14">
+          <picture aria-hidden="true">
+            <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
+            <source srcSet="/_lp/img/fluxo.webp" type="image/webp" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/_lp/img/fluxo.jpg"
+              alt=""
+              width={1600}
+              height={900}
+              loading="lazy"
+              decoding="async"
+              className="pointer-events-none absolute inset-0 size-full object-cover opacity-70 mix-blend-screen"
+            />
+          </picture>
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-surface from-25% via-surface/55 to-transparent" />
+          <div className="relative">
+            <h2
+              id="titulo-cta"
+              className="m-0 max-w-[20ch] text-[clamp(1.9rem,3.6vw,3.1rem)] leading-[1.08] font-bold tracking-tight text-balance"
+            >
+              {CTA_FINAL.titulo}
+            </h2>
+            <p className="mt-4 mb-0 max-w-[36rem] text-[1.05rem] leading-relaxed text-text-muted">
+              {CTA_FINAL.texto}
+            </p>
+            <div className="mt-8">
+              <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
+                {CTA.rotulo} pelo WhatsApp
+              </BotaoPrimario>
+            </div>
           </div>
         </div>
       </div>
