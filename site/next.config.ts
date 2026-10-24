@@ -23,6 +23,29 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: AQUI,
   poweredByHeader: false,
   assetPrefix: "/_lp",
+  /**
+   * Cabeçalhos de segurança (a CSP, que muda a cada requisição por causa do nonce,
+   * mora em `proxy.ts`). A LP divide a origem com o CRM: ver o cabeçalho de `proxy.ts`.
+   * HSTS sem `includeSubDomains`, porque o host é compartilhado.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=()",
+          },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return [{ source: "/_lp/_next/:path*", destination: "/_next/:path*" }];
   },
