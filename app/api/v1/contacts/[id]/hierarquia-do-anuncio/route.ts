@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
+import { completarAtribuicaoPeloCanal } from "@/lib/channels/atribuicao-do-canal";
 import { resolverHierarquiaDoContato } from "@/lib/plataformas-de-anuncio/hierarquia-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -63,16 +64,24 @@ export async function GET(
   // contato não veio de anúncio" é uma resposta, não uma falha.
   if (!adId) return ok(VAZIO, { requestId });
 
-  const h = await resolverHierarquiaDoContato(
-    createAdminClient(),
-    contato.organization_id,
-    adId,
-  );
+  const admin = createAdminClient();
+  const h = await resolverHierarquiaDoContato(admin, contato.organization_id, adId);
+  if (h) {
+    return ok(
+      { ad_name: h.adName, adset_name: h.adsetName, campaign_name: h.campaignName },
+      { requestId },
+    );
+  }
 
-  return ok(
-    h
-      ? { ad_name: h.adName, adset_name: h.adsetName, campaign_name: h.campaignName }
-      : VAZIO,
-    { requestId },
-  );
+  // ENRIQUECIMENTO DE SISTEMA, no mesmo espírito do cache de hierarquia acima:
+  // este GET pode gravar `source_metadata`, mas só PREENCHE campos vazios com um
+  // dado que o sistema já tem (nunca conteúdo do usuário), e deixa o marcador
+  // `ad_enriquecido_por` como trilha. Não é ação do usuário, então não passa por
+  // `requireSupportWrite`.
+  //
+  // Sem conexão de leitura da Meta nesta organização, quem sabe o nome é o
+  // canal pareado: ele enriquece o anúncio e o CRM só pergunta. O que
+  // vier é gravado no contato, então as próximas aberturas já nascem com o nome.
+  const daVerdash = await completarAtribuicaoPeloCanal(admin, contato.organization_id, contactId);
+  return ok(daVerdash ?? VAZIO, { requestId });
 }

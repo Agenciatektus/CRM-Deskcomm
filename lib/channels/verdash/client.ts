@@ -205,6 +205,67 @@ export async function verdashStatusPareado(
   return json.data ?? {};
 }
 
+/** O que a Verdash sabe do anúncio de um contato (campos de `tracker_leads`). */
+export interface AtribuicaoDaVerdash {
+  ad_id: string | null;
+  ad_name: string | null;
+  adset_id: string | null;
+  adset_name: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  ctwa_clid: string | null;
+}
+
+/**
+ * Pergunta à Verdash de qual anúncio vieram estes telefones (modo PAREADO).
+ *
+ * No pareado o CRM recebe a mensagem do FZAP com só o id do anúncio e o clique;
+ * o NOME da campanha e do conjunto vem do enriquecimento, que a Verdash faz e o
+ * CRM não alcança (o token de máquina só serve para pedir envio). Daí esta
+ * consulta, com o mesmo `x-crm-token` do envio e do status.
+ *
+ * Lança com o vocabulário de `verdashStatusPareado`. Quem chama decide se a
+ * falha derruba algo: na ficha do contato ela só deixa o nome da campanha para
+ * depois.
+ */
+export async function verdashAtribuicaoPareada(
+  creds: VerdashCredentials,
+  telefones: string[],
+  prazoMs: number = TIMEOUT_MS,
+): Promise<Map<string, AtribuicaoDaVerdash | null>> {
+  const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-atribuicao-do-lead`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "x-crm-token": creds.token, "content-type": "application/json" },
+      body: JSON.stringify({ telefones }),
+      signal: AbortSignal.timeout(prazoMs),
+    });
+  } catch (err) {
+    const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
+    throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
+  }
+
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    data?: { resultados?: { telefone?: string; atribuicao?: AtribuicaoDaVerdash | null }[] };
+  } | null;
+
+  if (!res.ok || json?.success !== true) {
+    const detalhe = json?.error ?? res.statusText ?? "";
+    throw new Error(`verdash_request_failed: ${res.status} ${detalhe}`.trim());
+  }
+
+  const saida = new Map<string, AtribuicaoDaVerdash | null>();
+  for (const r of json.data?.resultados ?? []) {
+    if (typeof r.telefone === "string") saida.set(r.telefone, r.atribuicao ?? null);
+  }
+  return saida;
+}
+
 /**
  * Manda a mensagem — e decide por onde ela sai.
  *
