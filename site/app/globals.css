@@ -68,6 +68,7 @@
   --color-accent-soft: rgb(38 144 177 / 0.2);
   --color-link: #69cee6;
   --color-foco: #48a5c7;
+  --color-warn: #f4b26a;
 
   --font-sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
@@ -95,6 +96,18 @@ html {
 body {
   margin: 0;
   min-height: 100dvh;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }
 
 :focus-visible {

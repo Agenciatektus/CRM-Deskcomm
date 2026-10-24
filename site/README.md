@@ -21,7 +21,7 @@ pnpm typecheck
 pnpm build && pnpm start
 ```
 
-## Roteamento (Fase 8, ainda não ligado)
+## Roteamento (Fase 8)
 
 No host `crm.verdash.com.br` o Traefik manda para a LP só a raiz exata `/`, o prefixo `/_lp`
 (JS, CSS, fontes e imagens saem todos por `/_lp/...`) e as rotas da própria LP. Todo o resto
@@ -34,3 +34,10 @@ de topo do CRM (`app`, `api`, `auth`, `legal`, `login`, `admin`, `cobranca`, `lg
 - Fonte: Atkinson Hyperlegible, a mesma da interface. Proibido Inter e Geist.
 - Número só se real e verificável. Texto em pt-BR passa pelo humanizer.
 - Nada sensível em `site/`: o fork do CRM ainda é público.
+
+## Deploy na VPS30
+
+`site/Dockerfile` (contexto `site/`) e `site/docker-compose.yml` (rede `coolify`, roteador `crm-lp` com
+prioridade 500). A regra do roteador vem de `LP_REGRA`, sem padrão de propósito: primeiro a regra de TESTE
+(só quem manda o cabeçalho `X-LP-Teste: 1` chega à LP), depois a PÚBLICA. As duas estão no comentário do compose.
+O roteador do CRM nunca é alterado; desligar a LP devolve a raiz ao CRM na hora.

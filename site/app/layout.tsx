@@ -1,21 +1,56 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
+import { SITE } from "@/lib/conteudo";
+
+import { Cabecalho } from "./_components/Cabecalho";
+import { SimboloDefs } from "./_components/Marca";
+import { Rodape } from "./_components/secoes-fim";
 import "./globals.css";
 
-/**
- * `noindex` enquanto a LP não vai ao ar: o esqueleto não pode ser indexado nem
- * por engano. A Fase 8 do plano troca isto por metadata de produção (canonical,
- * Open Graph, robots e sitemap) no mesmo PR que liga o roteamento.
- */
+const TITULO = "Verdash CRM: CRM com IA para quem vende pelo WhatsApp";
+
 export const metadata: Metadata = {
-  title: "CRM Tektus",
-  robots: { index: false, follow: false },
+  metadataBase: new URL(SITE.url),
+  title: { default: TITULO, template: "%s | Verdash CRM" },
+  description:
+    "Conversas do WhatsApp, funil de vendas e agentes de IA que atendem e passam para uma pessoa quando precisa. Implantação e acompanhamento pela Tektus.",
+  alternates: { canonical: "/" },
+  applicationName: SITE.nome,
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: SITE.url,
+    siteName: SITE.nome,
+    title: TITULO,
+    description:
+      "Conversas, funil e agentes de IA num só lugar. A IA atende e qualifica; uma pessoa assume quando é preciso.",
+    images: [{ url: "/_lp/og.png", width: 1200, height: 630, alt: TITULO }],
+  },
+  twitter: { card: "summary_large_image", title: TITULO, images: ["/_lp/og.png"] },
+  robots: { index: true, follow: true },
+  icons: { icon: [{ url: "/_lp/icon.svg", type: "image/svg+xml" }] },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d0e11",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className="bg-bg text-text">
+        <SimboloDefs />
+        <a
+          href="#conteudo"
+          className="focus:rounded-grande sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-surface focus:px-4 focus:py-2"
+        >
+          Ir para o conteúdo
+        </a>
+        <Cabecalho />
+        <main id="conteudo">{children}</main>
+        <Rodape />
+      </body>
     </html>
   );
 }

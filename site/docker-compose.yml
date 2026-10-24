@@ -1,0 +1,50 @@
+# LP do CRM na VPS30, atrás do Traefik do Coolify (o mesmo que roteia o CRM).
+#
+#   docker build -f site/Dockerfile -t tektus/crm-lp:$LP_TAG site
+#   LP_TAG=... LP_REGRA=... docker compose -f site/docker-compose.yml up -d
+#
+# O CRM é o roteador `deskcomm`, com a regra `Host(crm.verdash.com.br)` e a prioridade padrão
+# do Traefik (o tamanho da regra). A LP é um roteador à parte, com prioridade MAIOR, só para a
+# raiz exata e os caminhos que são dela. Todo o resto do host continua indo para o CRM.
+#
+# LP_REGRA (obrigatória, sem padrão de propósito: subir sem decidir a regra não pode abrir a LP
+# ao público por engano):
+#
+#   TESTE (só quem manda o cabeçalho X-LP-Teste: 1 chega à LP; o público continua no CRM):
+#     Host(`crm.verdash.com.br`) && Header(`X-LP-Teste`, `1`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`))
+#   PÚBLICO:
+#     Host(`crm.verdash.com.br`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`))
+#
+# Voltar atrás = subir de novo com a regra de TESTE (ou `docker compose down`): o CRM volta a servir
+# a raiz na hora, porque o roteador do CRM nunca foi alterado.
+#
+# A rede `coolify` é a do Traefik; ela já existe (o CRM usa a mesma).
+
+name: crm-lp
+
+services:
+  lp:
+    image: tektus/crm-lp:${LP_TAG:?defina LP_TAG}
+    restart: unless-stopped
+    networks:
+      - coolify
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.routers.crm-lp.entrypoints: https
+      traefik.http.routers.crm-lp.rule: ${LP_REGRA:?defina LP_REGRA}
+      traefik.http.routers.crm-lp.priority: "500"
+      traefik.http.routers.crm-lp.tls.certresolver: letsencrypt
+      traefik.http.routers.crm-lp.middlewares: crm-lp-compress
+      traefik.http.middlewares.crm-lp-compress.compress: "true"
+      traefik.http.services.crm-lp.loadbalancer.server.port: "3200"
+
+networks:
+  coolify:
+    external: true
