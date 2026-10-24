@@ -53,7 +53,7 @@ const TIMEOUT_MS = 20_000;
 export async function fzapRequest<T = unknown>(
   creds: VerdashCredentials,
   path: string,
-  init: { method: "GET" | "POST" | "DELETE"; body?: unknown; timeoutMs?: number } = {
+  init: { method: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; timeoutMs?: number } = {
     method: "GET",
   },
 ): Promise<T> {

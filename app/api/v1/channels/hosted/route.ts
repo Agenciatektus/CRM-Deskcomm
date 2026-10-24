@@ -42,6 +42,7 @@ import {
   listHostedSessions,
   numeroHospedadoEmOutraOrganizacao,
   numeroHospedadoJaEhCanalDaOrganizacao,
+  qrHospedadoHabilitado,
   saveHostedSession,
   trocarCodigoHospedado,
   validateHostedToken,
@@ -50,6 +51,8 @@ import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { traduzir } from "@/lib/i18n/dicionario";
+
+import { conectarPorQr } from "./por-qr";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -174,6 +177,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       has_token: conectado ? sessao.hasToken : false,
       webhook_url:
         conectado && sessao.webhookPathToken ? urlDoWebhook(req, sessao.webhookPathToken) : null,
+      // A org pode conectar por QR? Só o booleano: pasta e token nunca saem do servidor.
+      nativo_habilitado: await qrHospedadoHabilitado(createAdminClient(), authz.org.orgId),
     },
     { requestId },
   );
@@ -189,7 +194,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const orgId = authz.org.orgId;
 
-  const parsed = conectarSchema.safeParse(await req.json().catch(() => null));
+  const corpo: unknown = await req.json().catch(() => null);
+  // Terceiro modo: o CRM cria a conexão e a tela lê o QR. Os dois de baixo não mudam.
+  if ((corpo as { modo?: unknown } | null)?.modo === "qr") {
+    return conectarPorQr({
+      corpo,
+      idempotencyKey: req.headers.get("Idempotency-Key"),
+      requestId,
+      orgId,
+      orgName: authz.org.name ?? null,
+      idioma: authz.user.idioma,
+      t,
+      urlDoWebhook: (token) => urlDoWebhook(req, token),
+    });
+  }
+  const parsed = conectarSchema.safeParse(corpo);
   if (!parsed.success) {
     return fail("invalid_request", t("o token da instância é obrigatório"), 422, { requestId });
   }

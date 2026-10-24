@@ -559,6 +559,10 @@ export async function saveVerdashSession(
      * dois canais — o default preserva cada um deles sem precisar tocá-los.
      */
     canal?: CanalPareavel;
+    /** Só o caminho nativo informa. Ausente = a coluna NÃO é tocada (vinculada é o default do banco). */
+    origem?: "nativa";
+    /** Só o caminho nativo informa (id do FZAP). Ausente = o metadata existente não é tocado. */
+    metadata?: Record<string, unknown>;
   },
 ): Promise<{ error: string | null }> {
   const linha = {
@@ -589,6 +593,8 @@ export async function saveVerdashSession(
     // isso em vez de prometer um canal que ainda não fala.
     status: input.connected ? "WORKING" : "STARTING",
     archived_at: null,
+    ...(input.origem ? { verdash_origem: input.origem } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 
   // `organization_id` no UPDATE também: é service role, e o id sozinho confiaria em
@@ -602,7 +608,7 @@ export async function saveVerdashSession(
         .eq("organization_id", input.organizationId)
     : await admin
         .from("channel_sessions")
-        .insert({ ...linha, metadata: metadataInicialDoCanal() });
+        .insert({ metadata: metadataInicialDoCanal(), ...linha });
 
   return { error: error?.message ?? null };
 }

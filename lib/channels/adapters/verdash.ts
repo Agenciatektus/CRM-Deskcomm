@@ -51,6 +51,7 @@ import {
   fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
+import { sessaoEhNativa } from "../verdash/conectar-nativo";
 import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -472,6 +473,15 @@ export const verdashAdapter: ChannelAdapter = {
     }
 
     if (data?.loggedIn === false) {
+      // NATIVA: a instancia nasce sem login e espera o QR. `loggedIn:false` com o
+      // socket de pe e "aguardando leitura" (SCAN_QR_CODE); sem socket, o FZAP
+      // reconecta sozinho (STARTING, que nao avisa). FAILED vale SO para a vinculada,
+      // onde deslogar e o numero removido do aparelho.
+      if (await sessaoEhNativa(admin, input.organizationId, input.sessionRef)) {
+        return data.connected
+          ? { reachable: true, status: "SCAN_QR_CODE", detail: "aguardando_leitura_do_qr" }
+          : { reachable: true, status: "STARTING", detail: "conectando_no_fzap" };
+      }
       return { reachable: true, status: "FAILED", detail: "whatsapp_deslogado_na_verdash" };
     }
     if (data?.connected === false) {
