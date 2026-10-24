@@ -1,4 +1,5 @@
 import type { IdentificadoresGoogle } from "./google/identificadores";
+import type { DadosDoCliente } from "./meta/dados-do-cliente";
 
 /**
  * O vocabulário AGNÓSTICO do eixo de plataformas de anúncio.
@@ -93,6 +94,8 @@ export interface ConversaoOffline {
   identificadoresGoogle?: IdentificadoresGoogle;
   /** E.164 sem `+`, ainda EM CLARO: o hash é responsabilidade do transporte. */
   telefone: string | null;
+  /** Cadastro do cliente para a nota de correspondência da Meta (EM CLARO: o hash é do transporte). */
+  dadosDoCliente?: DadosDoCliente | null;
   valorCentavos: number | null;
   moeda: string;
   /**
