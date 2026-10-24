@@ -308,7 +308,7 @@ export async function fzapAtribuicaoDireta(
 
   const r = await fzapRequest<{ items?: LeadDoFzap[] }>(
     creds,
-    `/paid-traffic/leads?search=${digitos.slice(-8)}&limit=20&page=1`,
+    `/paid-traffic/leads?search=${digitos.slice(-8)}&limit=10&page=1`,
     { method: "GET", timeoutMs: prazoMs },
   );
   const itens = Array.isArray(r?.items) ? r.items : [];
