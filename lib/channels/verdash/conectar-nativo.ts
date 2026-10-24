@@ -19,16 +19,20 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
+import { lerLimiteDoPlano } from "@/lib/cobranca/limites";
 import { logger } from "@/lib/logger";
 
 import { fzapRequest } from "./client";
 import { saveVerdashSession, registrarWebhookNaVerdash } from "./conectar";
 import { verdashBaseUrl } from "./credentials";
 import type { VerdashCredentials } from "./credentials";
-import { apagarNativo, criarInstanciaNativa } from "./nativo";
+import { nativoHabilitadoParaOrg } from "./estado-nativo";
+import { apagarNativo, criarInstanciaNativa, faxinarOrfaDoCanal, statusDoErro } from "./nativo";
 import type { InstanciaNativa } from "./nativo";
 
 const PREFIXO_RESERVA = "crm-reserva-";
+/** Reserva mais velha que isto e de um pedido que morreu no meio: faxina e recomeca. */
+const RESERVA_VELHA_MS = 3 * 60_000;
 
 /** Historico desligado: o CRM e a fonte das conversas (FZAP >= v1.35 nasce com 90 dias). */
 const HISTORICO_DESLIGADO = { enabled: false, contacts: false, groups: false, retentionDays: 7 };
@@ -40,7 +44,8 @@ export type ResultadoNativo =
       channelSessionId: string;
       instanceName: string;
       displayName: string;
-      recebimentoLigado: boolean;
+      /** `null` = desconhecido (replay de linha gravada antes desta marca). */
+      recebimentoLigado: boolean | null;
       recebimentoErro: string | null;
     }
   | { ok: false; code: "nao_habilitado" | "em_andamento" | "falha"; erro?: unknown };
@@ -52,43 +57,6 @@ export function idDoCanalNativo(organizationId: string, idempotencyKey: string):
   h[8] = (h[8]! & 0x3f) | 0x80;
   const x = h.subarray(0, 16).toString("hex");
   return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20, 32)}`;
-}
-
-/** A org tem pasta no FZAP? Sem expor pasta nem token. Erro de banco = nao habilitado. */
-export async function nativoHabilitadoParaOrg(
-  admin: SupabaseClient,
-  organizationId: string,
-): Promise<boolean> {
-  try {
-    const { data } = await admin
-      .from("verdash_fzap_pastas")
-      .select("organization_id")
-      .eq("organization_id", organizationId)
-      .maybeSingle();
-    return !!data;
-  } catch {
-    return false;
-  }
-}
-
-/** A instancia desta sessao foi criada pelo CRM? Erro/coluna ausente = false (vinculada). */
-export async function sessaoEhNativa(
-  admin: SupabaseClient,
-  organizationId: string,
-  instanceName: string,
-): Promise<boolean> {
-  try {
-    const { data } = await admin
-      .from("channel_sessions")
-      .select("verdash_origem")
-      .eq("organization_id", organizationId)
-      .eq("verdash_instance_name", instanceName)
-      .is("archived_at", null)
-      .maybeSingle();
-    return (data as { verdash_origem?: string } | null)?.verdash_origem === "nativa";
-  } catch {
-    return false;
-  }
 }
 
 async function soltarReserva(admin: SupabaseClient, organizationId: string, id: string) {
@@ -125,6 +93,7 @@ async function reservar(
     display_name: i.rotulo,
     status: "STARTING",
     archived_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
     webhook_path_token: i.webhookPathToken,
     webhook_secret_encrypted: i.segredoCifrado,
     metadata: metadataInicialDoCanal(),
@@ -132,27 +101,72 @@ async function reservar(
   return error ? { ok: false, conflito: error.code === "23505", erro: error } : { ok: true };
 }
 
-/** O segundo clique: devolve o canal ja pronto (replay) ou diz que o primeiro ainda corre. */
-async function resultadoDoReplay(admin: SupabaseClient, organizationId: string, id: string): Promise<ResultadoNativo> {
+/** O segundo clique: o canal ja pronto (replay), "em andamento", ou reserva velha demais. */
+async function resultadoDoReplay(
+  admin: SupabaseClient,
+  organizationId: string,
+  id: string,
+): Promise<ResultadoNativo | "velha"> {
   const { data } = await admin
     .from("channel_sessions")
-    .select("verdash_instance_name, display_name, archived_at")
+    .select("verdash_instance_name, display_name, archived_at, created_at, metadata")
     .eq("organization_id", organizationId)
     .eq("id", id)
     .maybeSingle();
-  const row = data as { verdash_instance_name: string; display_name: string | null; archived_at: string | null } | null;
-  if (!row || row.archived_at || row.verdash_instance_name.startsWith(PREFIXO_RESERVA)) {
-    return { ok: false, code: "em_andamento" };
+  const row = data as {
+    verdash_instance_name: string;
+    display_name: string | null;
+    archived_at: string | null;
+    created_at: string | null;
+    metadata: Record<string, unknown> | null;
+  } | null;
+  if (!row) return { ok: false, code: "em_andamento" };
+  if (row.archived_at || row.verdash_instance_name.startsWith(PREFIXO_RESERVA)) {
+    const idade = Date.now() - new Date(row.created_at ?? Date.now()).getTime();
+    return idade > RESERVA_VELHA_MS ? "velha" : { ok: false, code: "em_andamento" };
   }
+  const m = row.metadata ?? {};
   return {
     ok: true,
     replay: true,
     channelSessionId: id,
     instanceName: row.verdash_instance_name,
     displayName: row.display_name ?? "",
-    recebimentoLigado: true,
-    recebimentoErro: null,
+    recebimentoLigado: typeof m.recebimento_ligado === "boolean" ? m.recebimento_ligado : null,
+    recebimentoErro: typeof m.recebimento_erro === "string" ? m.recebimento_erro : null,
   };
+}
+
+/** Pre-checagem do teto de canais ANTES de criar no FZAP (o trigger do banco segue como trava final). */
+async function planoCheio(admin: SupabaseClient, organizationId: string, id: string): Promise<unknown | null> {
+  const limite = await lerLimiteDoPlano(admin, organizationId, "canais").catch(() => null);
+  if (limite === null) return null;
+  const { count } = await admin
+    .from("channel_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .neq("provider", "wacalls")
+    .neq("id", id);
+  return (count ?? 0) >= limite ? `limite_do_plano:canais:${limite}` : null;
+}
+
+/** Reserva; se bater numa reserva velha, faxina a orfa no FZAP, solta a linha e reserva de novo. */
+async function reservarOuReplay(
+  admin: SupabaseClient,
+  i: ConectarNativoInput,
+  id: string,
+): Promise<ResultadoNativo | null> {
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const reserva = await reservar(admin, i, id);
+    if (reserva.ok) return null;
+    if (!reserva.conflito) return { ok: false, code: "falha", erro: reserva.erro };
+    const r = await resultadoDoReplay(admin, i.organizationId, id);
+    if (r !== "velha") return r;
+    await faxinarOrfaDoCanal(admin, i.organizationId, id);
+    await soltarReserva(admin, i.organizationId, id);
+  }
+  return { ok: false, code: "em_andamento" };
 }
 
 export interface ConectarNativoInput {
@@ -176,12 +190,10 @@ export async function conectarNativo(admin: SupabaseClient, i: ConectarNativoInp
     return { ok: false, code: "nao_habilitado" };
   }
   const id = idDoCanalNativo(i.organizationId, i.idempotencyKey);
-  const reserva = await reservar(admin, i, id);
-  if (!reserva.ok) {
-    return reserva.conflito
-      ? resultadoDoReplay(admin, i.organizationId, id)
-      : { ok: false, code: "falha", erro: reserva.erro };
-  }
+  const cheio = await planoCheio(admin, i.organizationId, id);
+  if (cheio) return { ok: false, code: "falha", erro: cheio };
+  const barrado = await reservarOuReplay(admin, i, id);
+  if (barrado) return barrado;
   let inst: InstanciaNativa;
   try {
     inst = await criarInstanciaNativa(admin, {
@@ -233,6 +245,7 @@ async function ligarEGravar(
   } catch (erro) {
     return { ok: false, code: "falha", erro };
   }
+  const erroDaVolta = volta.ok ? null : `webhook_nao_registrado: ${statusDoErro(new Error(volta.reason ?? ""))}`;
   const { error } = await saveVerdashSession(admin, {
     organizationId: i.organizationId,
     existingId: id,
@@ -244,7 +257,13 @@ async function ligarEGravar(
     displayName: i.rotulo,
     connected: false,
     origem: "nativa",
-    metadata: { ...metadataInicialDoCanal(), fzap_user_id: inst.fzapId },
+    metadata: {
+      ...metadataInicialDoCanal(),
+      fzap_user_id: inst.fzapId,
+      // Para o replay dizer a verdade; so o status do erro, nunca o corpo do FZAP.
+      recebimento_ligado: volta.ok,
+      recebimento_erro: erroDaVolta,
+    },
   });
   if (error) return { ok: false, code: "falha", erro: error };
   return {
@@ -254,6 +273,6 @@ async function ligarEGravar(
     instanceName: inst.instanceName,
     displayName: i.rotulo,
     recebimentoLigado: volta.ok,
-    recebimentoErro: volta.ok ? null : (volta.reason ?? null),
+    recebimentoErro: erroDaVolta,
   };
 }

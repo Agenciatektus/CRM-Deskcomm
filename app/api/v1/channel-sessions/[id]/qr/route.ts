@@ -24,8 +24,10 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { NextResponse } from "next/server";
 
 import { loadAuthUser } from "@/lib/auth/server";
-import { orgAtivaDaApi } from "@/lib/auth/require-role";
+import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
+import { randomUUID } from "node:crypto";
+
 import { qrDoCanalHospedado } from "@/lib/channels/connect";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -79,7 +81,10 @@ export async function GET(
   // WhatsApp dela e sai como imagem, no mesmo contrato do WAHA, para a tela não mudar.
   // Qualquer outro canal sem sessão segue para o 409 de baixo.
   if (!session.waha_session_name) {
-    const nativo = await qrDoCanalHospedado(createAdminClient(), activeOrg.orgId, id);
+    const nativo = await qrDoCanalHospedado(createAdminClient(), activeOrg.orgId, id, async () => {
+      const authz = await requireRole("admin", { requestId: randomUUID(), resource: "channel_sessions_qr" });
+      return authz.ok ? authz.user.id : null;
+    });
     if (nativo?.status === 200) {
       return new NextResponse(new Uint8Array(nativo.png), {
         status: 200,

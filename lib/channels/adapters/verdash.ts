@@ -51,7 +51,7 @@ import {
   fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { sessaoEhNativa } from "../verdash/conectar-nativo";
+import { estadoNativo, marcarJaConectou } from "../verdash/estado-nativo";
 import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
   ChannelAdapter,
@@ -477,7 +477,10 @@ export const verdashAdapter: ChannelAdapter = {
       // socket de pe e "aguardando leitura" (SCAN_QR_CODE); sem socket, o FZAP
       // reconecta sozinho (STARTING, que nao avisa). FAILED vale SO para a vinculada,
       // onde deslogar e o numero removido do aparelho.
-      if (await sessaoEhNativa(admin, input.organizationId, input.sessionRef)) {
+      // Mas SO enquanto nunca chegou a WORKING: quem ja conectou e perdeu o login
+      // precisa ler o QR de novo, e isso e FAILED (aviso), mesmo com o socket caido.
+      const nativo = await estadoNativo(admin, input.organizationId, input.sessionRef);
+      if (nativo.nativa && !nativo.jaConectou) {
         return data.connected
           ? { reachable: true, status: "SCAN_QR_CODE", detail: "aguardando_leitura_do_qr" }
           : { reachable: true, status: "STARTING", detail: "conectando_no_fzap" };
@@ -487,6 +490,8 @@ export const verdashAdapter: ChannelAdapter = {
     if (data?.connected === false) {
       return { reachable: true, status: "STARTING", detail: "reconectando_na_verdash" };
     }
+    // Marca a primeira vez que a nativa esteve de pe (melhor esforco, ver estado-nativo.ts).
+    await marcarJaConectou(admin, input.organizationId, input.sessionRef);
     return { reachable: true, status: "WORKING", detail: null };
   },
 

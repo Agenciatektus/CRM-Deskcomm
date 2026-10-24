@@ -315,10 +315,9 @@ export type { VerdashSession as HostedSession } from "./verdash/conectar";
  * plano FZAP nativo). Mesmo recorte de nomes neutros: a rota e a tela nao citam o
  * provedor.
  */
-export {
-  conectarNativo as conectarHospedadoPorQr,
-  nativoHabilitadoParaOrg as qrHospedadoHabilitado,
-} from "./verdash/conectar-nativo";
+export { conectarNativo as conectarHospedadoPorQr } from "./verdash/conectar-nativo";
+export { resumoDoErro as resumoDoErroHospedado } from "./verdash/nativo";
+export { nativoHabilitadoParaOrg as qrHospedadoHabilitado } from "./verdash/estado-nativo";
 export {
   qrDoCanalNativo as qrDoCanalHospedado,
   saudeAoVivoNativa as saudeAoVivoDoCanalHospedado,

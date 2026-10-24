@@ -12,7 +12,7 @@ import type { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { fail, ok } from "@/lib/api/wrappers";
-import { conectarHospedadoPorQr } from "@/lib/channels/connect";
+import { conectarHospedadoPorQr, resumoDoErroHospedado } from "@/lib/channels/connect";
 import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import { logger } from "@/lib/logger";
@@ -81,7 +81,7 @@ export async function conectarPorQr(i: {
     const limite = traduzirLimiteDoPlano(r.erro, i.idioma);
     if (limite) return fail(limite.code, limite.message, 409, { requestId, details: limite.details });
     // Mensagem fixa: o erro do FZAP pode ecoar proxy e credencial, so o codigo sai no log.
-    logger.error("hosted_qr_falhou", { organization_id: i.orgId, erro: r.erro instanceof Error ? r.erro.message.slice(0, 80) : "desconhecido" });
+    logger.error("hosted_qr_falhou", { organization_id: i.orgId, erro: resumoDoErroHospedado(r.erro) });
     return fail("connection_repair_required", t("Não foi possível criar a conexão. Tente novamente."), 502, { requestId });
   }
 

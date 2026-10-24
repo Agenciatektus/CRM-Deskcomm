@@ -11,7 +11,13 @@
  * ate 6 pedidos por canal em 60 s (4 renovacoes normais mais folga para reabrir
  * o modal ou clicar em "Gerar novo QR"). Acima disso, 429 com `Retry-After: 15`.
  * Ler o QR e barato (so leitura); o que o limite protege e o POST de conexao,
- * que nao pode ser martelado por aba esquecida ou script.
+ * que nao pode ser martelado por aba esquecida ou script. Dois baldes: por
+ * (canal, usuario) 6/60 s, e um teto do canal inteiro de 10/60 s (varios admins
+ * ou abas juntos).
+ *
+ * So admin le o QR (quem pareia um numero decide sobre a conta da empresa), e so
+ * em estado esperado: STARTING, SCAN_QR_CODE ou FAILED (perdeu o login e precisa
+ * ler de novo). Canal parado (STOPPED) ou conectado nao reabre o socket por GET.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -24,14 +30,17 @@ import { resolveVerdashCreds } from "./credentials";
 import { obterQrNativo, statusNativo } from "./nativo";
 
 export const QR_NATIVO_LIMITE = 6;
+export const QR_NATIVO_LIMITE_CANAL = 10;
+const ESTADOS_COM_QR = ["STARTING", "SCAN_QR_CODE", "FAILED"];
 export const QR_NATIVO_JANELA_S = 60;
 
 export type RespostaQr =
   | { status: 200; png: Buffer }
-  | { status: 404 | 409 | 429 | 502 | 503; estado: string; retryAfter?: number };
+  | { status: 403 | 404 | 409 | 429 | 502 | 503; estado: string; retryAfter?: number };
 
 interface LinhaNativa {
   instanceName: string;
+  status: string;
 }
 
 async function lerNativa(
@@ -41,13 +50,15 @@ async function lerNativa(
 ): Promise<LinhaNativa | null> {
   const { data, error } = await admin
     .from("channel_sessions")
-    .select("provider, verdash_origem, verdash_instance_name")
+    .select("provider, verdash_origem, verdash_instance_name, status")
     .eq("organization_id", organizationId)
     .eq("id", channelSessionId)
     .maybeSingle();
-  const row = data as { provider?: string; verdash_origem?: string; verdash_instance_name?: string } | null;
+  const row = data as { provider?: string; verdash_origem?: string; verdash_instance_name?: string; status?: string } | null;
   if (error || !row || row.provider !== CHANNEL_PROVIDER_VERDASH || row.verdash_origem !== "nativa") return null;
-  return row.verdash_instance_name ? { instanceName: row.verdash_instance_name } : null;
+  return row.verdash_instance_name
+    ? { instanceName: row.verdash_instance_name, status: row.status ?? "STARTING" }
+    : null;
 }
 
 function pngDoDataUrl(dataUrl: string): Buffer | null {
@@ -60,16 +71,22 @@ export async function qrDoCanalNativo(
   admin: SupabaseClient,
   organizationId: string,
   channelSessionId: string,
+  /** Devolve o id do usuario se ele e admin, `null` se nao. So e chamada para canal nativo. */
+  autorizar: () => Promise<string | null>,
 ): Promise<RespostaQr | null> {
   const nativa = await lerNativa(admin, organizationId, channelSessionId);
   if (!nativa) return null;
+  const userId = await autorizar();
+  if (!userId) return { status: 403, estado: "forbidden" };
+  if (nativa.status === "WORKING") return { status: 409, estado: "connected" };
+  if (!ESTADOS_COM_QR.includes(nativa.status)) return { status: 409, estado: `state-${nativa.status.toLowerCase()}` };
 
-  const limite = await checkRateLimit(
-    `qr-nativo:${organizationId}:${channelSessionId}`,
-    QR_NATIVO_LIMITE,
-    QR_NATIVO_JANELA_S,
-  );
-  if (!limite.allowed) return { status: 429, estado: "rate-limited", retryAfter: 15 };
+  const base = `qr-nativo:${organizationId}:${channelSessionId}`;
+  const [porUsuario, porCanal] = [
+    await checkRateLimit(`${base}:${userId}`, QR_NATIVO_LIMITE, QR_NATIVO_JANELA_S),
+    await checkRateLimit(base, QR_NATIVO_LIMITE_CANAL, QR_NATIVO_JANELA_S),
+  ];
+  if (!porUsuario.allowed || !porCanal.allowed) return { status: 429, estado: "rate-limited", retryAfter: 15 };
 
   const creds = await resolveVerdashCreds(admin, { organizationId, instanceName: nativa.instanceName });
   if (!creds) return { status: 409, estado: "no-credential" };
