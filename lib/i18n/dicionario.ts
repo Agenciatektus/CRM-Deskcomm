@@ -12308,6 +12308,40 @@ export const DICIONARIO: Traducoes = {
   "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.":
     { es: "Para cambiar solo la cuenta predeterminada, deja el campo del token en blanco. Se conserva el token guardado." },
   "Guardado — preencha só para trocar": { es: "Guardado — completa solo para cambiarlo" },
+  "Conta conectada com a Meta.":
+    { es: "Cuenta conectada con Meta." },
+  "Você cancelou a autorização na Meta. Nada foi alterado.":
+    { es: "Cancelaste la autorización en Meta. No se cambió nada." },
+  "O retorno da Meta expirou ou não é desta sessão. Clique em Conectar com Meta de novo.":
+    { es: "El retorno de Meta expiró o no es de esta sesión. Haz clic en Conectar con Meta de nuevo." },
+  "A Meta não devolveu o código de autorização. Tente conectar de novo.":
+    { es: "Meta no devolvió el código de autorización. Intenta conectar de nuevo." },
+  "Não consegui concluir a autorização com a Meta. Tente de novo em instantes.":
+    { es: "No pude completar la autorización con Meta. Intenta de nuevo en unos instantes." },
+  "Conectar com a Meta ainda não está configurado nesta instalação.":
+    { es: "Conectar con Meta aún no está configurado en esta instalación." },
+  "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la.":
+    { es: "Esta instalación no tiene la clave maestra de cifrado y el token no se guardó. Quien instaló el sistema debe configurarla." },
+  "Não consegui gravar a conexão agora. Tente de novo em instantes.":
+    { es: "No pude guardar la conexión ahora. Intenta de nuevo en unos instantes." },
+  "Conectar com Meta":
+    { es: "Conectar con Meta" },
+  "Reconectar com Meta":
+    { es: "Reconectar con Meta" },
+  "Entre com a sua conta da Meta e autorize o acesso. O sistema guarda um token de cerca de 60 dias, criptografado, sem você precisar copiar nada.":
+    { es: "Entra con tu cuenta de Meta y autoriza el acceso. El sistema guarda un token de unos 60 días, cifrado, sin que tengas que copiar nada." },
+  "A conexão venceu em":
+    { es: "La conexión venció el" },
+  "Conectada via Meta. O token vale até":
+    { es: "Conectada vía Meta. El token vale hasta" },
+  "Reconecte agora para voltar a ler as campanhas.":
+    { es: "Reconecta ahora para volver a leer las campañas." },
+  "O token está perto de vencer. Reconecte para renovar por mais 60 dias.":
+    { es: "El token está por vencer. Reconecta para renovarlo por 60 días más." },
+  "Conectar com a Meta ainda não está disponível nesta instalação. Quem instalou o sistema precisa configurar":
+    { es: "Conectar con Meta aún no está disponible en esta instalación. Quien instaló el sistema debe configurar" },
+  "Enquanto isso, você pode colar um token à mão abaixo.":
+    { es: "Mientras tanto, puedes pegar un token a mano abajo." },
   "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.":
     { es: "Ya existe un token guardado. Déjalo en blanco para mantenerlo, o pega uno nuevo para reemplazarlo." },
   "Precisa da permissão ads_read.": { es: "Necesita el permiso ads_read." },

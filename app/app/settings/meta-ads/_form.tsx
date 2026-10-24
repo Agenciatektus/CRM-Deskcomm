@@ -14,6 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
+import { DIAS_DE_AVISO_DE_VENCIMENTO } from "@/lib/plataformas-de-anuncio/meta/oauth/validade";
+
+const LINK_DE_CONEXAO = "/api/v1/plataformas-de-anuncio/meta/connect";
 
 /**
  * Cada recusa vira uma frase que diz O QUE FAZER — mesma regra do formulário de
@@ -35,10 +38,22 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
 export function FormularioDeMetaAds({
   conectada,
   contaPadrao,
+  via,
+  expiraEm,
+  diasParaVencer,
+  oauthDisponivel,
+  oauthFalta,
   idioma,
 }: {
   conectada: boolean;
   contaPadrao: string | null;
+  via: "manual" | "oauth" | null;
+  /** Data de vencimento já formatada; `null` em token colado à mão. */
+  expiraEm: string | null;
+  diasParaVencer: number | null;
+  oauthDisponivel: boolean;
+  /** Nomes das variáveis de ambiente que faltam para o botão existir. */
+  oauthFalta: string[];
   idioma: Idioma;
 }) {
   const t = (texto: string) => traduzir(texto, idioma);
@@ -88,80 +103,126 @@ export function FormularioDeMetaAds({
     });
   }
 
+  const venceEmBreve = diasParaVencer !== null && diasParaVencer < DIAS_DE_AVISO_DE_VENCIMENTO;
+
   return (
-    <Card className="p-6">
-      <form onSubmit={salvar} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="access_token">{t("Token de acesso")}</Label>
-          <Input
-            id="access_token"
-            type="password"
-            autoComplete="off"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder={conectada ? t("Guardado — preencha só para trocar") : "EAA…"}
-          />
-          <p className="text-xs text-muted-foreground">
-            {conectada
-              ? t(
-                  "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.",
-                )
-              : t("Precisa da permissão ads_read.")}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="default_account_id">{t("Conta padrão (opcional)")}</Label>
-          <Input
-            id="default_account_id"
-            value={conta}
-            onChange={(e) => setConta(e.target.value)}
-            placeholder="act_123456789012345"
-          />
-          <p className="text-xs text-muted-foreground">
-            {t(
-              "A conta que a tela de Meta Ads abre por padrão. Em branco, ela abre a primeira conta ativa que o token alcançar.",
+    <>
+      <Card className="flex flex-col gap-3 p-6" data-testid="meta-conectar">
+        <h3 className="font-medium">{t("Conectar com Meta")}</h3>
+        {oauthDisponivel ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                "Entre com a sua conta da Meta e autorize o acesso. O sistema guarda um token de cerca de 60 dias, criptografado, sem você precisar copiar nada.",
+              )}
+            </p>
+            {conectada && via === "oauth" && expiraEm && (
+              <p className="text-sm" data-testid="meta-validade">
+                {diasParaVencer !== null && diasParaVencer <= 0
+                  ? `${t("A conexão venceu em")} ${expiraEm}.`
+                  : `${t("Conectada via Meta. O token vale até")} ${expiraEm}.`}
+              </p>
             )}
+            {venceEmBreve && (
+              <p
+                role="alert"
+                className="text-sm font-medium text-destructive"
+                data-testid="meta-aviso-de-vencimento"
+              >
+                {diasParaVencer !== null && diasParaVencer <= 0
+                  ? t("Reconecte agora para voltar a ler as campanhas.")
+                  : t("O token está perto de vencer. Reconecte para renovar por mais 60 dias.")}
+              </p>
+            )}
+            <div>
+              <a href={LINK_DE_CONEXAO}>
+                <Button type="button" disabled={isPending}>
+                  {conectada && via === "oauth" ? t("Reconectar com Meta") : t("Conectar com Meta")}
+                </Button>
+              </a>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground" data-testid="meta-nao-configurado">
+            {t(
+              "Conectar com a Meta ainda não está disponível nesta instalação. Quem instalou o sistema precisa configurar",
+            )}{" "}
+            <span className="font-mono text-xs">{oauthFalta.join(` ${t("e")} `)}</span>
+            {". "}
+            {t("Enquanto isso, você pode colar um token à mão abaixo.")}
           </p>
-        </div>
+        )}
+      </Card>
 
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={isPending || !podeSalvar}>
-            {isPending ? t("Salvando…") : t("Salvar")}
-          </Button>
+      <Card className="p-6">
+        <form onSubmit={salvar} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="access_token">{t("Token de acesso")}</Label>
+            <Input
+              id="access_token"
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder={conectada ? t("Guardado — preencha só para trocar") : "EAA…"}
+            />
+            <p className="text-xs text-muted-foreground">
+              {conectada
+                ? t(
+                    "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.",
+                  )
+                : t("Precisa da permissão ads_read.")}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="default_account_id">{t("Conta padrão (opcional)")}</Label>
+            <Input
+              id="default_account_id"
+              value={conta}
+              onChange={(e) => setConta(e.target.value)}
+              placeholder="act_123456789012345"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "A conta que a tela de Meta Ads abre por padrão. Em branco, ela abre a primeira conta ativa que o token alcançar.",
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={isPending || !podeSalvar}>
+              {isPending ? t("Salvando…") : t("Salvar")}
+            </Button>
+
+            {conectada && (
+              <Button type="button" variant="outline" disabled={isPending} onClick={desconectar}>
+                {t("Desconectar")}
+              </Button>
+            )}
+
+            {!podeSalvar && (
+              <span className="text-sm text-muted-foreground">
+                {t("Cole o token para poder salvar.")}
+              </span>
+            )}
+          </div>
 
           {conectada && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={desconectar}
-            >
-              {t("Desconectar")}
-            </Button>
-          )}
-
-          {!podeSalvar && (
-            <span className="text-sm text-muted-foreground">
-              {t("Cole o token para poder salvar.")}
-            </span>
-          )}
-        </div>
-
-        {conectada && (
-          <p className="text-xs text-muted-foreground">
-            {/*
+            <p className="text-xs text-muted-foreground">
+              {/*
               Desconectar APAGA a linha — não existe "pausar" nesta feature, e o
               porquê está no cabeçalho da 0214: como nada roda sozinho, um estado
               "conectado mas desligado" teria a mesma consequência visível de não
               estar conectado.
             */}
-            {t(
-              "Desconectar apaga o token guardado. A tela de Meta Ads volta a pedir uma conexão, e nenhum dado histórico é perdido — nada é armazenado aqui.",
-            )}
-          </p>
-        )}
-      </form>
-    </Card>
+              {t(
+                "Desconectar apaga o token guardado. A tela de Meta Ads volta a pedir uma conexão, e nenhum dado histórico é perdido — nada é armazenado aqui.",
+              )}
+            </p>
+          )}
+        </form>
+      </Card>
+    </>
   );
 }
