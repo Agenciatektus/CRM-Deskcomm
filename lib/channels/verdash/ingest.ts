@@ -55,6 +55,7 @@ import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
 
 import { insertMessage, marcarConversa, pedirPersistenciaDaMidia } from "./gravacao";
+import { aplicarEventoDeConexao, eventoDeConexao } from "./eventos-conexao";
 import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
@@ -89,6 +90,14 @@ export async function ingestVerdashInbound(
     requestId?: string;
   },
 ): Promise<VerdashIngestResult> {
+  const evento = eventoDeConexao(input.payload);
+  if (evento) {
+    return aplicarEventoDeConexao(admin, {
+      organizationId: input.organizationId,
+      channelSessionId: input.channelSessionId,
+      evento,
+    });
+  }
   const msg = parseVerdashInbound(input.payload);
   if (!msg) return { status: "ignored", reason: "evento_sem_interesse" };
 

@@ -32,6 +32,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PROVIDERS_DE_MENSAGEM } from "./capabilities";
 import { ehNomeDeSessaoE2E } from "./sessoes-e2e";
+import { nativaEmCarenciaDoQr } from "./verdash/estado-nativo";
 
 /** Único estado em que mensagem entra e sai. Contrato do CRM (uppercase). */
 export const STATUS_SAUDAVEL = "WORKING";
@@ -64,6 +65,13 @@ export const REF_KIND_SESSAO = "channel_session";
  * `includes` reclama de string que ninguém mais escreve.
  */
 export const DETALHE_CREDENCIAL_RECUSADA = "credencial_recusada_pelo_transporte";
+
+/**
+ * Canal NATIVO que perdeu o login (`LoggedOut` do FZAP, ou `loggedIn:false` depois
+ * de ter conectado): FAILED, mas a acao do operador e ler o QR, entao o aviso e o
+ * `qr_rescan`. Detalhe proprio para a vinculada (FAILED generico) nao mudar.
+ */
+export const DETALHE_QR_RESCAN_NATIVO = "nativa_deslogada_precisa_do_qr";
 
 /**
  * Marca do episódio aberto por um EMPURRÃO do provedor.
@@ -136,7 +144,7 @@ export function avisoDaConexao(saude: SaudeObservada, apelido: string): AvisoDeC
   if (!status || status === STATUS_SAUDAVEL) return null;
   if (!(STATUS_QUE_AVISAM as readonly string[]).includes(status)) return null;
 
-  if (status === "SCAN_QR_CODE") {
+  if (status === "SCAN_QR_CODE" || (status === "FAILED" && saude.detail === DETALHE_QR_RESCAN_NATIVO)) {
     return {
       kind: "qr_rescan",
       severity: "critical",
@@ -254,7 +262,12 @@ export async function sincronizarSaudeDaConexao(
    */
   origem: "varredura" | "empurrao" = "varredura",
 ): Promise<"avisado" | "ja_avisado" | "resolvido" | "sem_mudanca"> {
-  const aviso = avisoDaConexao(saude, apelido);
+  // Nativa nova esperando o primeiro QR: nao e queda, e o fluxo normal (ver estado-nativo.ts).
+  const emCarencia =
+    saude.reachable && (saude.status ?? "").toUpperCase() === "SCAN_QR_CODE"
+      ? await nativaEmCarenciaDoQr(admin, sessao.id)
+      : false;
+  const aviso = emCarencia ? null : avisoDaConexao(saude, apelido);
 
   const { data: linha } = await admin
     .from("channel_session_health")
