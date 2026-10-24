@@ -1314,9 +1314,7 @@ export async function sendMessageHandler(
       // canal — a URL assinada é montada antes de qualquer coisa tocar o adapter.
       const code = msg.startsWith("storage_sign_failed")
         ? "storage_sign_failed"
-        : msg.startsWith("verdash_envio_incerto") || msg.startsWith("verdash_nativo_reconectando")
-          ? msg.split(":")[0]!
-          : adapter.codes.sendFailed;
+        : adapter.codes.sendFailed;
 
       // Falta de CREDENCIAL não é falha desta mensagem: é canal ainda não
       // conectado, e o desfecho certo é `queued` — a mesma coisa que o ramo de
