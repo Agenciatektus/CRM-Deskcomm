@@ -23,7 +23,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
 import { ARCHIVED_AT } from "../archived";
-import { type AtribuicaoDaVerdash, verdashAtribuicaoPareada } from "./client";
+import {
+  type AtribuicaoDaVerdash,
+  fzapAtribuicaoDireta,
+  verdashAtribuicaoPareada,
+} from "./client";
 import { resolveVerdashCreds } from "./credentials";
 
 const TETO_DO_TEXTO = 300;
@@ -104,7 +108,7 @@ export async function completarAtribuicaoPelaVerdash(
       };
     }
 
-    // A sessão pareada por onde esta pessoa conversa, a mais recente primeiro.
+    // A sessão por onde esta pessoa conversa (pareada OU direta), a mais recente primeiro.
     const { data: conversas } = await admin
       .from("conversations")
       .select("channel_session_id")
@@ -122,7 +126,6 @@ export async function completarAtribuicaoPelaVerdash(
       .select("id, verdash_instance_name, verdash_vinculo_id")
       .eq("organization_id", organizationId)
       .eq("provider", "verdash")
-      .not("verdash_vinculo_id", "is", null)
       .is(ARCHIVED_AT, null)
       .in("id", sessaoIds);
     // A mais recente primeiro: `in` não preserva a ordem das conversas.
@@ -135,10 +138,15 @@ export async function completarAtribuicaoPelaVerdash(
       organizationId,
       instanceName: sessao.verdash_instance_name,
     });
-    if (!creds?.vinculoId) return null;
+    if (!creds) return null;
 
-    const respostas = await verdashAtribuicaoPareada(creds, [contato.phone_number], PRAZO_DA_FICHA_MS);
-    const verdash = respostas.get(contato.phone_number) ?? null;
+    // Pareado: quem responde é a função da Verdash. Direto: o CRM tem o token da
+    // instância e pergunta ao módulo de tráfego pago do FZAP.
+    const verdash = creds.vinculoId
+      ? ((await verdashAtribuicaoPareada(creds, [contato.phone_number], PRAZO_DA_FICHA_MS)).get(
+          contato.phone_number,
+        ) ?? null)
+      : await fzapAtribuicaoDireta(creds, contato.phone_number, PRAZO_DA_FICHA_MS);
     if (!verdash) return null;
 
     const acrescentar = completarComAVerdash(meta, verdash);

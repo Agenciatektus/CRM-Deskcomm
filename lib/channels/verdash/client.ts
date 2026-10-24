@@ -23,6 +23,7 @@
  * proíbe.
  */
 import { assertDestinoResolvidoSeguro } from "@/lib/automation/outbound-ip";
+import { samePhone } from "@/lib/channels/phone-variants";
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
 
 import { verdashFunctionsUrl } from "./credentials";
@@ -264,6 +265,85 @@ export async function verdashAtribuicaoPareada(
     if (typeof r.telefone === "string") saida.set(r.telefone, r.atribuicao ?? null);
   }
   return saida;
+}
+
+/** Um lead do módulo de tráfego pago do FZAP (só o que a atribuição usa). */
+interface LeadDoFzap {
+  senderPhone?: string | null;
+  chatJid?: string | null;
+  adId?: string | null;
+  adName?: string | null;
+  adSetId?: string | null;
+  adSetName?: string | null;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  adCtwaClid?: string | null;
+  createdAt?: string | null;
+}
+
+const soDigitos = (v: string | null | undefined): string => (v ?? "").replace(/\D/g, "");
+
+/**
+ * De qual anúncio veio este telefone, perguntado AO FZAP (modo DIRETO).
+ *
+ * No canal direto o CRM tem o token da instância, e o módulo de tráfego pago do
+ * FZAP já devolve o lead enriquecido (campanha, conjunto, anúncio). No canal
+ * pareado o token só serve para pedir envio, e quem responde é
+ * `verdashAtribuicaoPareada`.
+ *
+ * A busca é pelos 8 ÚLTIMOS dígitos, de propósito: o FZAP grava o número como o
+ * WhatsApp o conhece, com ou sem o nono dígito, e `search` pelo número inteiro
+ * não acha o que está na outra grafia (medido em produção em 24/10/2026). O que
+ * volta é filtrado aqui pelas duas grafias, então um número parecido de outra
+ * pessoa não entra. Lança com o vocabulário do canal; `null` quando nenhum lead
+ * do telefone tem sinal de anúncio.
+ */
+export async function fzapAtribuicaoDireta(
+  creds: VerdashCredentials,
+  telefone: string,
+  prazoMs: number = TIMEOUT_MS,
+): Promise<AtribuicaoDaVerdash | null> {
+  const digitos = soDigitos(telefone);
+  if (digitos.length < 8) return null;
+
+  const r = await fzapRequest<{ items?: LeadDoFzap[] }>(
+    creds,
+    `/paid-traffic/leads?search=${digitos.slice(-8)}&limit=10&page=1`,
+    { method: "GET", timeoutMs: prazoMs },
+  );
+  const itens = Array.isArray(r?.items) ? r.items : [];
+
+  const pontos = (l: LeadDoFzap) =>
+    (l.adId ? 4 : 0) +
+    (l.campaignName ? 2 : 0) +
+    (l.adSetName ? 1 : 0) +
+    (l.adName ? 1 : 0) +
+    (l.adCtwaClid ? 1 : 0);
+
+  let melhor: LeadDoFzap | null = null;
+  for (const l of itens) {
+    const doLead = soDigitos(l.senderPhone) || soDigitos((l.chatJid ?? "").split("@")[0]);
+    if (!doLead || !samePhone(`+${digitos}`, `+${doLead}`)) continue;
+    const p = pontos(l);
+    if (p === 0) continue;
+    if (
+      !melhor ||
+      p > pontos(melhor) ||
+      (p === pontos(melhor) && (l.createdAt ?? "") < (melhor.createdAt ?? ""))
+    ) {
+      melhor = l;
+    }
+  }
+  if (!melhor) return null;
+  return {
+    ad_id: melhor.adId ?? null,
+    ad_name: melhor.adName ?? null,
+    adset_id: melhor.adSetId ?? null,
+    adset_name: melhor.adSetName ?? null,
+    campaign_id: melhor.campaignId ?? null,
+    campaign_name: melhor.campaignName ?? null,
+    ctwa_clid: melhor.adCtwaClid ?? null,
+  };
 }
 
 /**

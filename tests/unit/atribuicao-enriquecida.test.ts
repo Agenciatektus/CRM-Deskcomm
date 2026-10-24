@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { completarComAVerdash } from "@/lib/channels/verdash/atribuicao-enriquecida";
-import { verdashAtribuicaoPareada } from "@/lib/channels/verdash/client";
+import { fzapAtribuicaoDireta, verdashAtribuicaoPareada } from "@/lib/channels/verdash/client";
 
 const V = {
   ad_id: "120253837017130653",
@@ -87,5 +87,65 @@ describe("verdashAtribuicaoPareada", () => {
   it("recusa da Verdash vira erro com o vocabulário do canal, sem o corpo cru", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "nao_autorizado" }), { status: 401 })));
     await expect(verdashAtribuicaoPareada(creds, ["+55"])).rejects.toThrow(/verdash_request_failed: 401 nao_autorizado/);
+  });
+});
+
+describe("fzapAtribuicaoDireta (canal direto: pergunta ao módulo de tráfego do FZAP)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const creds = { instanceName: "i", token: "t".repeat(40), vinculoId: null, baseUrl: "http://fzap" };
+  const lead = (o: Record<string, unknown>) => ({
+    senderPhone: "556699910216",
+    adId: "AD1",
+    adName: "Peça",
+    adSetId: "S1",
+    adSetName: "Conjunto",
+    campaignId: "C1",
+    campaignName: "Campanha",
+    adCtwaClid: "CL",
+    createdAt: "2026-10-20T10:00:00Z",
+    ...o,
+  });
+  const responde = (items: unknown[]) =>
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { items } }), { status: 200 }),
+    );
+
+  it("busca pelos 8 últimos dígitos, com o token da instância, e devolve o lead do telefone", async () => {
+    const f = responde([lead({})]);
+    vi.stubGlobal("fetch", f);
+    const r = await fzapAtribuicaoDireta(creds, "+5566999910216");
+    expect(r).toMatchObject({ campaign_name: "Campanha", adset_name: "Conjunto", ad_name: "Peça", ad_id: "AD1" });
+    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toContain("/paid-traffic/leads?search=99910216");
+    expect((init.headers as Record<string, string>).token).toBe(creds.token);
+  });
+
+  it("acha o lead gravado SEM o nono dígito (JID antigo)", async () => {
+    vi.stubGlobal("fetch", responde([lead({ senderPhone: "556699910216" })]));
+    expect(await fzapAtribuicaoDireta(creds, "+5566999910216")).not.toBeNull();
+  });
+
+  it("número parecido de OUTRA pessoa não entra (mesmo final, DDD diferente)", async () => {
+    vi.stubGlobal("fetch", responde([lead({ senderPhone: "551199910216" })]));
+    expect(await fzapAtribuicaoDireta(creds, "+5566999910216")).toBeNull();
+  });
+
+  it("escolhe o lead mais completo; sem sinal de anúncio devolve null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      responde([lead({ adId: null, campaignName: null, adSetName: null, adName: null, adCtwaClid: null }), lead({ campaignName: "Melhor" })]),
+    );
+    expect((await fzapAtribuicaoDireta(creds, "+5566999910216"))?.campaign_name).toBe("Melhor");
+    vi.stubGlobal("fetch", responde([lead({ adId: null, campaignName: null, adSetName: null, adName: null, adCtwaClid: null })]));
+    expect(await fzapAtribuicaoDireta(creds, "+5566999910216")).toBeNull();
+  });
+
+  it("telefone curto demais nem consulta; erro do FZAP vira exceção do canal", async () => {
+    const f = responde([]);
+    vi.stubGlobal("fetch", f);
+    expect(await fzapAtribuicaoDireta(creds, "123")).toBeNull();
+    expect(f).not.toHaveBeenCalled();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: false, error: "no_license" }), { status: 403 })));
+    await expect(fzapAtribuicaoDireta(creds, "+5566999910216")).rejects.toThrow(/verdash_request_failed: 403/);
   });
 });
