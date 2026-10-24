@@ -152,7 +152,7 @@ const fzapDuble = (async (url: unknown, init?: RequestInit) => {
     if (path === "/folder/instances") {
       // Formato REAL do FZAP: { folder, users } (e não um array).
       const users = instancias.map(({ token: _t, ...r }) => r);
-      return env(200, { folder: { id: "pasta", name: "pasta", instanceCount: users.length, maxInstances: null }, users });
+      return env(200, { folder: { id: "pasta-1", name: "pasta", instanceCount: users.length, maxInstances: null }, users });
     }
     const m = path.match(/^\/folder\/instances\/([^/]+)\/full$/);
     if (m && method === "DELETE") {

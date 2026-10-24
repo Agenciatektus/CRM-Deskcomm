@@ -167,7 +167,8 @@ async function reservarOuReplay(
     if (!reserva.conflito) return { ok: false, code: "falha", erro: reserva.erro };
     const r = await resultadoDoReplay(admin, i.organizationId, id);
     if (r !== "velha") return r;
-    await faxinarOrfaDoCanal(admin, i.organizationId, id);
+    // Melhor esforco aqui: o varredor de orfas pega o que sobrar.
+    await faxinarOrfaDoCanal(admin, i.organizationId, id).catch(() => undefined);
     await soltarReserva(admin, i.organizationId, id);
   }
   return { ok: false, code: "em_andamento" };

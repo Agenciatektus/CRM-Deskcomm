@@ -85,13 +85,17 @@ async function pastaOuErro(admin: SupabaseClient, organizationId: string): Promi
 
 export async function listarDaPasta(pasta: PastaFzap): Promise<InstanciaDaLista[]> {
   // Formato real do FZAP (medido em 24/10/2026, v1.32 e v1.35): `{ folder: {id,...}, users: [...] }`.
-  // Aceita também array puro e `{ instances }` por tolerância. Se não reconhecer, a lista vem
-  // vazia e os guards falham FECHADOS: por isso o dublê dos testes espelha o formato real.
-  const data = await fzapRequest<
-    InstanciaDaLista[] | { users?: InstanciaDaLista[]; instances?: InstanciaDaLista[] }
-  >(pasta.creds, "/folder/instances");
-  if (Array.isArray(data)) return data;
-  return data?.users ?? data?.instances ?? [];
+  // Aceita tambem array puro e `{ instances }`. FALHA FECHADO: formato nao reconhecido (ou
+  // `folder.id` de outra pasta) LANCA; lista vazia so existe com prova positiva. "Instancia
+  // ja nao existe" nunca pode sair de uma resposta que nao entendemos.
+  const data = await fzapRequest<unknown>(pasta.creds, "/folder/instances");
+  if (Array.isArray(data)) return data as InstanciaDaLista[];
+  const o = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  const lista = o?.users ?? o?.instances;
+  const idNaResposta = (o?.folder as { id?: unknown } | null | undefined)?.id;
+  const outraPasta = typeof idNaResposta === "string" && idNaResposta !== pasta.folderId;
+  if (!Array.isArray(lista) || outraPasta) throw new Error("verdash_nativo_lista_formato_desconhecido");
+  return lista as InstanciaDaLista[];
 }
 
 /**
@@ -282,14 +286,28 @@ export async function desligarNativoNaPasta(
   await fzapRequest(input.creds, "/session/logout", { method: "POST", body: {} });
 }
 
-/** Faxina da orfa de um pedido que morreu no meio: acha pelo channel_session_id e apaga. */
+/**
+ * Faxina da orfa de um pedido que morreu no meio: acha pelo channel_session_id e apaga.
+ * LANCA se a pasta nao puder ser lida, a lista falhar ou o DELETE falhar: quem chama
+ * decide (a limpeza do canal marca `pendente`, nao `ok`).
+ */
 export async function faxinarOrfaDoCanal(
   admin: SupabaseClient,
   organizationId: string,
   channelSessionId: string,
 ): Promise<void> {
-  const pasta = await lerPastaDaOrg(admin, organizationId).catch(() => null);
-  if (pasta) await limparOrfaDoCanal(pasta, organizationId, channelSessionId);
+  const pasta = await pastaOuErro(admin, organizationId);
+  const orfas = (await listarDaPasta(pasta)).filter(
+    (i) =>
+      i.id &&
+      i.metadata?.organization_id === organizationId &&
+      i.metadata?.channel_session_id === channelSessionId,
+  );
+  for (const o of orfas) {
+    await fzapRequest(pasta.creds, `/folder/instances/${encodeURIComponent(o.id!)}/full`, {
+      method: "DELETE",
+    });
+  }
 }
 
 /** Para o log: codigo fixo do CRM ou so o status do FZAP, nunca o trecho do corpo dele. */
