@@ -10,7 +10,7 @@ import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { gravarConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
 
 /**
  * Conectar a conta de anúncios para LER as métricas — pela tela.
@@ -133,33 +133,20 @@ export async function updateAdInsightsConnection(
     };
   }
 
-  const valores: Record<string, unknown> = {
-    organization_id: activeOrg.orgId,
+  // `upsert` (dentro do gravador) e não `update`: a linha não existe em quem nunca
+  // conectou, e um `update` casaria zero linhas devolvendo SUCESSO — a tela diria
+  // "salvo" e nada seria gravado. Mesmo modo de falha que a #144 mediu em
+  // `organizations`. `undefined` = não mexer; `null` = limpar a conta padrão.
+  const gravado = await gravarConexaoDeLeitura(admin, {
+    organizationId: activeOrg.orgId,
+    userId: authUser.id,
     platform: parsed.data.platform,
-    updated_by: authUser.id,
-  };
-
-  // `undefined` = não mexer; `null` = limpar a escolha de conta padrão. Os dois
-  // são pedidos diferentes e o schema os distingue (`.nullable().optional()`).
-  if (parsed.data.default_account_id !== undefined) {
-    valores.default_account_id = parsed.data.default_account_id;
+    accessToken: parsed.data.access_token,
+    defaultAccountId: parsed.data.default_account_id,
+  });
+  if (!gravado.ok) {
+    return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
   }
-
-  if (parsed.data.access_token) {
-    const cifrado = await encryptWebhookSecret(admin, parsed.data.access_token);
-    if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
-    valores.access_token_encrypted = cifrado;
-  }
-
-  // `upsert` e não `update`: a linha não existe em quem nunca conectou, e um
-  // `update` casaria zero linhas devolvendo SUCESSO — a tela diria "salvo" e
-  // nada seria gravado. Mesmo modo de falha que a #144 mediu em `organizations`.
-  // O `onConflict` é o índice único `(organization_id, platform)` da 0214.
-  const { error } = await admin
-    .from("ad_insights_connections")
-    .upsert(valores, { onConflict: "organization_id,platform" });
-
-  if (error) return { ok: false, error: "erro_ao_gravar", details: error.message };
 
   const hdrs = await headers();
   await audit({

@@ -618,6 +618,10 @@ const schema = z.object({
   GOOGLE_ADS_DEVELOPER_TOKEN: z.string().optional().default(""),
   GOOGLE_ADS_OAUTH_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_ADS_OAUTH_CLIENT_SECRET: z.string().optional().default(""),
+  // Meta Ads: app do Login do Facebook para o "Conectar com Meta" (leitura de anúncios).
+  // Sem as duas, o botão some e a tela diz o que falta; colar o token continua valendo.
+  META_ADS_OAUTH_APP_ID: z.string().optional().default(""),
+  META_ADS_OAUTH_APP_SECRET: z.string().optional().default(""),
 
   // Nuvemshop — opcional (template genérico open-source). Só exigidas quando
   // NUVEMSHOP_ENABLED=true; o runtime já degrada via getConfig()==null.

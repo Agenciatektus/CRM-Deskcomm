@@ -32,6 +32,12 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { existeConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
+import {
+  faltaParaConectarOMetaAds,
+  metaAdsEstaConfigurado,
+} from "@/lib/plataformas-de-anuncio/meta/oauth/config";
+import { diasParaVencer } from "@/lib/plataformas-de-anuncio/meta/oauth/validade";
+import { tagDeIdioma } from "@/lib/i18n/datas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { FormularioDeMetaAds } from "./_form";
@@ -39,7 +45,27 @@ import { FormularioDeMetaAds } from "./_form";
 export const metadata = { title: "Meta Ads" };
 export const dynamic = "force-dynamic";
 
-export default async function MetaAdsSettingsPage() {
+/** Código curto do `?erro=` que o callback do OAuth devolve, já em português. */
+const ERRO_DO_RETORNO: Record<string, string> = {
+  cancelado: "Você cancelou a autorização na Meta. Nada foi alterado.",
+  estado_invalido:
+    "O retorno da Meta expirou ou não é desta sessão. Clique em Conectar com Meta de novo.",
+  sem_codigo: "A Meta não devolveu o código de autorização. Tente conectar de novo.",
+  troca_falhou: "Não consegui concluir a autorização com a Meta. Tente de novo em instantes.",
+  meta_nao_configurado: "Conectar com a Meta ainda não está configurado nesta instalação.",
+  cifra_indisponivel:
+    "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la.",
+  erro_ao_gravar: "Não consegui gravar a conexão agora. Tente de novo em instantes.",
+  permissao_negada:
+    "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.",
+};
+
+export default async function MetaAdsSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const parametros = await searchParams;
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
@@ -55,15 +81,41 @@ export default async function MetaAdsSettingsPage() {
   const idioma = user.idioma;
   const t = (texto: string) => traduzir(texto, idioma);
 
+  const dias = diasParaVencer(conexao.tokenExpiraEm);
+  const expiraEm = conexao.tokenExpiraEm
+    ? new Date(conexao.tokenExpiraEm).toLocaleDateString(tagDeIdioma(idioma), { timeZone: "UTC" })
+    : null;
+  const erroDoRetorno = parametros.erro ? Object.hasOwn(ERRO_DO_RETORNO, parametros.erro) : false;
+
   return (
     <Pagina>
       <CabecalhoDaPagina
         titulo={t("Meta Ads")}
         descricao={t(
-            "Conecte um token de acesso para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. É uma conexão só de leitura: nada é criado, pausado ou alterado na sua conta de anúncios.",
-          )}
+          "Conecte um token de acesso para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. É uma conexão só de leitura: nada é criado, pausado ou alterado na sua conta de anúncios.",
+        )}
       />
       <SecaoDaPagina>
+        {parametros.conectado === "1" && (
+          <div
+            role="status"
+            className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm"
+          >
+            {t("Conta conectada com a Meta.")}
+          </div>
+        )}
+        {erroDoRetorno && (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm"
+          >
+            {t(
+              (parametros.erro && Object.hasOwn(ERRO_DO_RETORNO, parametros.erro)
+                ? ERRO_DO_RETORNO[parametros.erro]
+                : undefined) ?? "",
+            )}
+          </div>
+        )}
 
         <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
           {/*
@@ -80,6 +132,11 @@ export default async function MetaAdsSettingsPage() {
         <FormularioDeMetaAds
           conectada={conexao.conectada}
           contaPadrao={conexao.contaPadrao}
+          via={conexao.via}
+          expiraEm={expiraEm}
+          diasParaVencer={dias}
+          oauthDisponivel={metaAdsEstaConfigurado()}
+          oauthFalta={faltaParaConectarOMetaAds()}
           idioma={idioma}
         />
 

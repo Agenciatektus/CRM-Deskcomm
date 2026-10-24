@@ -157,6 +157,19 @@ async function enviar(
   // string crua onde ele espera lista é aceito com aviso e ignorado no match.
   if (conversao.telefone) userData.ph = [hash(conversao.telefone)];
 
+  // Mais campos do cliente = mais correspondência (a nota que a Meta dá ao evento).
+  // Cada um só entra se existir no cadastro, normalizado em `./dados-do-cliente`;
+  // lista de um, como o telefone. O id do contato vai em hash, como a Meta pede.
+  const d = conversao.dadosDoCliente;
+  if (d) {
+    userData.external_id = [hash(d.externalId)];
+    if (d.email) userData.em = [hash(d.email)];
+    if (d.primeiroNome) userData.fn = [hash(d.primeiroNome)];
+    if (d.sobrenome) userData.ln = [hash(d.sobrenome)];
+    if (d.nascimento) userData.db = [hash(d.nascimento)];
+    if (d.pais) userData.country = [hash(d.pais)];
+  }
+
   const customData: Record<string, unknown> = {};
   if (ehCompra && conversao.valorCentavos !== null) {
     customData.value = conversao.valorCentavos / 100;

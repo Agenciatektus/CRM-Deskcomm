@@ -75,6 +75,9 @@ export const PUBLIC_PATHS: RegExp[] = [
   // (`lib/plataformas-de-anuncio/google/estado.ts`), não da sessão — quem
   // volta do Google não tem, e não pode ter, o cookie.
   /^\/api\/v1\/plataformas-de-anuncio\/google\/callback$/,
+  // Volta do consentimento da Meta (leitura de anúncios): mesma natureza, o `state`
+  // assinado e o cookie de vínculo substituem a sessão.
+  /^\/api\/v1\/plataformas-de-anuncio\/meta\/callback$/,
   /^\/api\/v1\/integrations\/nuvemshop\/callback$/,
   /^\/api\/internal\//,
   /^\/api\/mcp(\/.*)?$/,
