@@ -33,3 +33,18 @@ describe("fn_marcar_limpeza_nativa (9069)", () => {
     expect((await meta(vinculada)).limpeza_fzap_pendente_em).toBeUndefined();
   });
 });
+
+describe("fn_marcar_limpeza_nativa: isolamento e grants (9069)", () => {
+  it("canal de OUTRA org nao e marcado", async () => {
+    const r = await pool.query("select fn_marcar_limpeza_nativa($1,$2,true) as n", [randomUUID(), nativa]);
+    expect(r.rows[0].n).toBe(0);
+    expect((await meta(nativa)).limpeza_fzap_pendente_em).toBeUndefined();
+  });
+  it("anon e authenticated sem EXECUTE; service_role com", async () => {
+    const q = (role: string) =>
+      pool.query("select has_function_privilege($1, 'public.fn_marcar_limpeza_nativa(uuid,uuid,boolean)', 'execute') as p", [role]).then((x) => x.rows[0].p);
+    expect(await q("anon")).toBe(false);
+    expect(await q("authenticated")).toBe(false);
+    expect(await q("service_role")).toBe(true);
+  });
+});

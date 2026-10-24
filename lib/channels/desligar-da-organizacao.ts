@@ -93,6 +93,11 @@ export interface CanalInventariado {
    * Verdash NATIVA: a pasta e o token da instancia, lidos ANTES da transacao (a
    * pasta some junto com o tenant). Vinculada nunca entra (a instancia e da Verdash).
    */
+  /**
+   * Verdash sem `nativo`: `vinculada` (provada, nao se toca) ou `irreconstruivel`
+   * (nativa que nao da para reconstruir, ou origem nao provada: falha visivel).
+   */
+  verdash?: "vinculada" | "irreconstruivel";
   nativo?: { organizationId: string; fzapId: string; pasta: PastaFzap; creds: VerdashCredentials | null } | null;
 }
 
@@ -110,17 +115,18 @@ async function inventariarNativo(
   admin: SupabaseClient,
   orgId: string,
   linha: LinhaDoCanal,
-): Promise<CanalInventariado["nativo"]> {
+): Promise<Pick<CanalInventariado, "nativo" | "verdash">> {
+  if (linha.provider !== CHANNEL_PROVIDER_VERDASH) return {};
+  if (linha.verdash_origem === "vinculada") return { verdash: "vinculada" };
   const fzapId = linha.metadata?.fzap_user_id;
-  if (linha.provider !== CHANNEL_PROVIDER_VERDASH || linha.verdash_origem !== "nativa") return null;
-  if (typeof fzapId !== "string") return null;
+  if (linha.verdash_origem !== "nativa" || typeof fzapId !== "string") return { verdash: "irreconstruivel" };
   const pasta = await lerPastaDaOrg(admin, orgId).catch(() => null);
-  if (!pasta) return null;
+  if (!pasta) return { verdash: "irreconstruivel" };
   const creds = await resolveVerdashCreds(admin, {
     organizationId: orgId,
     instanceName: linha.verdash_instance_name ?? "",
   }).catch(() => null);
-  return { organizationId: orgId, fzapId, pasta, creds };
+  return { nativo: { organizationId: orgId, fzapId, pasta, creds } };
 }
 
 /** Metade 1 — só leitura, sem efeito externo. Roda ANTES da transação. */
@@ -157,7 +163,7 @@ export async function inventariarCanaisDaOrganizacao(
       provider: linha.provider,
       wahaSessionName: linha.waha_session_name,
       meta,
-      ...(nativo ? { nativo } : {}),
+      ...nativo,
     });
   }
   return { canais, sessaoDeVoz };
@@ -172,6 +178,7 @@ export function inventarioDaLapide(linhas: CanalNaLapide[]): InventarioDeCanais 
       id: linha.id,
       provider: linha.provider,
       wahaSessionName: linha.waha_session_name,
+      ...(linha.provider === CHANNEL_PROVIDER_VERDASH ? { verdash: "irreconstruivel" as const } : {}),
       meta:
         linha.provider !== CHANNEL_PROVIDER_WAHA && linha.meta_phone_number_id
           ? { phoneNumberId: linha.meta_phone_number_id, token: null, motivo: "credencial_perdida_na_interrupcao" }
@@ -198,14 +205,21 @@ export async function desligarCanaisInventariados(
         await waha.deleteSession(canal.wahaSessionName);
         saida.push({ id: canal.id, provedor: canal.provider, desfecho: "ok" });
       } else if (canal.provider === CHANNEL_PROVIDER_VERDASH) {
-        // Vinculada (sem `nativo`): nao e do CRM, nao se toca.
+        // Vinculada provada: nao e do CRM, nao se toca. Origem nao provada: falha visivel.
         if (!canal.nativo) {
-          saida.push({ id: canal.id, provedor: canal.provider, desfecho: "nao_se_aplica" });
+          saida.push(
+            canal.verdash === "vinculada"
+              ? { id: canal.id, provedor: canal.provider, desfecho: "nao_se_aplica" }
+              : { id: canal.id, provedor: canal.provider, desfecho: "falhou", motivo: "nativa_nao_reconstruida_na_retomada" },
+          );
           continue;
         }
         const { organizationId, fzapId, pasta, creds } = canal.nativo;
         if (creds) await desligarNativoNaPasta(pasta, { organizationId, fzapId, creds }).catch(() => undefined);
-        await apagarNativoNaPasta(pasta, { organizationId, fzapId });
+        // Instancia que ja nao existe conta como limpa (igual a rota DELETE).
+        await apagarNativoNaPasta(pasta, { organizationId, fzapId }).catch((e: unknown) => {
+          if (!(e instanceof Error && e.message.startsWith("verdash_nativo_instancia_nao_encontrada"))) throw e;
+        });
         saida.push({ id: canal.id, provedor: canal.provider, desfecho: "ok" });
       } else if (canal.meta) {
         if (!canal.meta.token) {

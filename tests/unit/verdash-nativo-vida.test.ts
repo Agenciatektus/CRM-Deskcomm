@@ -20,7 +20,11 @@ vi.mock("@/lib/channels/verdash/credentials", async (orig) => ({
   resolveVerdashCreds: async () => credsMock.valor,
 }));
 
-import { desligarCanaisInventariados } from "@/lib/channels/desligar-da-organizacao";
+import {
+  desligarCanaisInventariados,
+  inventarioDaLapide,
+  inventariarCanaisDaOrganizacao,
+} from "@/lib/channels/desligar-da-organizacao";
 import { lerPastaDaOrg } from "@/lib/channels/verdash/nativo";
 import { limparNativoDoCanal } from "@/lib/channels/verdash/limpar-nativo";
 import { listarOrfasDaPasta } from "@/lib/channels/verdash/orfas-nativas";
@@ -156,32 +160,39 @@ describe("limparNativoDoCanal", () => {
 });
 
 describe("listarOrfasDaPasta", () => {
+  const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
   const inst = (id: string, canal: string | null, org = ORG) => ({
     id,
     name: `n-${id}`,
     metadata: { organization_id: org, ...(canal ? { channel_session_id: canal } : {}) },
   });
+  const velha = new Date(Date.now() - 10 * 60_000).toISOString();
+  const nova = new Date(Date.now() - 30_000).toISOString();
 
-  it("devolve so a instancia do CRM sem linha ativa; ignora a viva, a reserva e a sem channel_session_id", async () => {
+  it("so a instancia do CRM sem linha viva; ignora viva, reserva recente, sem id e id invalido", async () => {
     instancias = [
-      inst("a", "c-viva"),
-      inst("b", "c-sumiu"),
-      inst("c", "c-reserva"),
+      inst("a", U(1)),
+      inst("b", U(2)),
+      inst("c", U(3)),
       inst("d", null),
-      inst("e", "c-arquivada"),
+      inst("e", U(5)),
+      inst("f", U(6)),
+      inst("g", "nao-e-uuid"),
+      inst("h", U(8)),
     ];
     linhasAtivas = [
-      { id: "c-viva", archived_at: null, verdash_instance_name: "crm-x" },
-      { id: "c-reserva", archived_at: "2026-10-24", verdash_instance_name: "crm-reserva-c-reserva" },
-      { id: "c-arquivada", archived_at: "2026-10-01", verdash_instance_name: "crm-y" },
+      { id: U(1), archived_at: null, created_at: velha, verdash_instance_name: "crm-x" },
+      { id: U(3), archived_at: nova, created_at: nova, verdash_instance_name: "crm-reserva-x" },
+      { id: U(5), archived_at: "2026-10-01", created_at: velha, verdash_instance_name: "crm-y" },
+      { id: U(6), archived_at: velha, created_at: velha, verdash_instance_name: "crm-reserva-velha" },
+      { id: U(8), archived_at: velha, created_at: velha, verdash_instance_name: null },
     ];
     const orfas = await listarOrfasDaPasta(admin(), ORG);
-    expect(orfas.map((o) => o.fzapId).sort()).toEqual(["b", "e"]);
-    // So leitura: nada foi apagado e o token usado foi o da pasta.
+    expect(orfas.map((o) => o.fzapId).sort()).toEqual(["b", "e", "f", "h"]);
     expect(chamadas.every((c) => c.method === "GET" && c.token === PASTA_TOKEN)).toBe(true);
   });
 
-  it("pasta vazia: nao consulta o banco de canais e devolve vazio", async () => {
+  it("pasta vazia: devolve vazio", async () => {
     instancias = [];
     expect(await listarOrfasDaPasta(admin(), ORG)).toEqual([]);
   });
@@ -194,11 +205,67 @@ describe("exclusao de tenant (desligarCanaisInventariados)", () => {
     const r = await desligarCanaisInventariados({
       canais: [
         { id: "n", provider: "verdash", wahaSessionName: null, meta: null, nativo: { organizationId: ORG, fzapId: FZAP_ID, pasta, creds } },
-        { id: "v", provider: "verdash", wahaSessionName: null, meta: null },
+        { id: "v", provider: "verdash", wahaSessionName: null, meta: null, verdash: "vinculada" },
       ],
       sessaoDeVoz: null,
     });
     expect(r.map((x) => [x.id, x.desfecho])).toEqual([["n", "ok"], ["v", "nao_se_aplica"]]);
     expect(chamadas.filter((c) => c.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("instancia que ja nao existe no FZAP conta como ok", async () => {
+    const pasta = (await lerPastaDaOrg(admin(), ORG))!;
+    instancias = [];
+    const r = await desligarCanaisInventariados({
+      canais: [{ id: "n", provider: "verdash", wahaSessionName: null, meta: null, nativo: { organizationId: ORG, fzapId: FZAP_ID, pasta, creds: null } }],
+      sessaoDeVoz: null,
+    });
+    expect(r[0]!.desfecho).toBe("ok");
+  });
+
+  it("verdash sem como provar vinculada: falhou visivel (nao sai calada)", async () => {
+    const r = await desligarCanaisInventariados({
+      canais: [
+        { id: "x", provider: "verdash", wahaSessionName: null, meta: null, verdash: "irreconstruivel" },
+        { id: "v", provider: "verdash", wahaSessionName: null, meta: null, verdash: "vinculada" },
+      ],
+      sessaoDeVoz: null,
+    });
+    expect(r[0]).toMatchObject({ desfecho: "falhou", motivo: "nativa_nao_reconstruida_na_retomada" });
+    expect(r[1]!.desfecho).toBe("nao_se_aplica");
+    expect(chamadas).toHaveLength(0);
+  });
+
+  it("lapide: todo canal verdash vira irreconstruivel", () => {
+    const inv = inventarioDaLapide([
+      { id: "v", provider: "verdash", waha_session_name: null, meta_phone_number_id: null, wacalls_session_id: null, archived_at: null },
+    ]);
+    expect(inv.canais[0]!.verdash).toBe("irreconstruivel");
+  });
+});
+
+describe("inventariarCanaisDaOrganizacao decide nativa x vinculada", () => {
+  const linha = (id: string, origem: string, meta: Record<string, unknown> = {}) => ({
+    id, provider: "verdash", waha_session_name: null, meta_phone_number_id: null, meta_token_encrypted: null,
+    wacalls_session_id: null, archived_at: null, verdash_origem: origem, verdash_instance_name: `i-${id}`, metadata: meta,
+  });
+  const adminCom = (rows: unknown[]) => {
+    const base = admin() as unknown as { from: (t: string) => Record<string, unknown>; rpc: unknown };
+    return {
+      ...base,
+      from: (t: string) => (t === "channel_sessions" ? { select: () => ({ eq: async () => ({ data: rows, error: null }) }) } : base.from(t)),
+    } as never;
+  };
+
+  it("nativa com fzap_user_id monta `nativo`; vinculada e nativa sem id nao", async () => {
+    const inv = await inventariarCanaisDaOrganizacao(
+      adminCom([linha("n", "nativa", { fzap_user_id: FZAP_ID }), linha("v", "vinculada", { fzap_user_id: "x" }), linha("s", "nativa")]),
+      ORG,
+    );
+    const por = Object.fromEntries(inv.canais.map((c) => [c.id, c]));
+    expect(por.n!.nativo).toMatchObject({ organizationId: ORG, fzapId: FZAP_ID });
+    expect(por.v!.nativo).toBeUndefined();
+    expect(por.v!.verdash).toBe("vinculada");
+    expect(por.s!.verdash).toBe("irreconstruivel");
   });
 });
