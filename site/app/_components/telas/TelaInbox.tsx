@@ -68,8 +68,7 @@ function Bolha({
         ) : (
           "Marina"
         )}
-        <span aria-hidden="true">·</span>
-        {hora}
+        <span className="ml-1.5">{hora}</span>
       </span>
       <span>{children}</span>
     </div>
@@ -223,7 +222,7 @@ export function TelaInbox({ className = "" }: { className?: string }) {
               style={Atraso({ s: 5.4 })}
             >
               <Icone nome="usuario" className="size-3 text-[#9db4ff]" />
-              Pergunta de pagamento · a IA passou o atendimento para Camila · 14:03
+              Pergunta de pagamento, a IA passou o atendimento para Camila, 14:03
             </p>
             <Bolha de="pessoa" hora="14:05" atraso={6.4}>
               Oi, Marina, aqui é a Camila. Já vi o histórico: limpeza de pele amanhã às 16h. Te passo as condições

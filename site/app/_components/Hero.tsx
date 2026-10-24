@@ -102,7 +102,7 @@ export function Hero() {
           aria-hidden="true"
         >
           <p className="m-0 mb-2 flex items-center gap-1.5 font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
-            <Icone nome="funil" className="size-3" /> Funil · Clínica de estética
+            <Icone nome="funil" className="size-3" /> Funil: Clínica de estética
           </p>
           <div className="flex items-center gap-2 text-meta">
             <Selo tom="aviso">Qualificando</Selo>
