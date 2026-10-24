@@ -131,10 +131,12 @@ describe("quem veio da página com UTM da Meta conta como anúncio", () => {
         ORG,
         CONTATO,
       );
-      expect(r).toEqual({
+      expect(r).toMatchObject({
         temAtribuicao: true,
         atribuicao: { plataforma: "meta_ads", cliqueDeOrigem: "", telefone: "5511988887777" },
       });
+      // O cadastro acompanha a atribuição (id do contato = o que o chamador pediu).
+      expect(r.temAtribuicao && r.atribuicao.dadosDoCliente?.externalId).toBe(CONTATO);
     },
   );
 
