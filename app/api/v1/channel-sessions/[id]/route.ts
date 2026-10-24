@@ -26,7 +26,12 @@ import { audit } from "@/lib/audit";
 import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
-import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WAHA } from "@/lib/channels/capabilities";
+import {
+  CHANNEL_PROVIDER_SOCIAL,
+  CHANNEL_PROVIDER_VERDASH,
+  CHANNEL_PROVIDER_WAHA,
+} from "@/lib/channels/capabilities";
+import { limparNativoDoCanal } from "@/lib/channels/verdash/limpar-nativo";
 import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
@@ -382,6 +387,19 @@ export async function DELETE(
    * estava fora do ar e a exclusão seguiu em best-effort.
    */
   let socialWebhook: "apagada" | "sem_integracao" | "falhou" | "nao_social" = "nao_social";
+
+  // VERDASH NATIVA: o CRM criou a instancia no FZAP, entao desliga e apaga ao excluir.
+  // Falha do FZAP NAO impede o arquivamento (fica marcada para o varredor). A
+  // vinculada e da Verdash: `limparNativoDoCanal` nao a toca (zero chamadas ao FZAP).
+  if (session.provider === CHANNEL_PROVIDER_VERDASH) {
+    await limparNativoDoCanal(createAdminClient(), {
+      organizationId: activeOrg.orgId,
+      channelSessionId: id,
+      apagar: true,
+    }).catch((err) =>
+      logger.warn("verdash_nativo_limpeza_falhou", { requestId, organization_id: activeOrg.orgId, channel_session_id: id, erro: err instanceof Error ? err.message : String(err) }),
+    );
+  }
 
   if (session.provider === CHANNEL_PROVIDER_WAHA) {
     const waha = getWahaClient();

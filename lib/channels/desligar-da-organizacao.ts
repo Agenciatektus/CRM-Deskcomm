@@ -35,7 +35,16 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CHANNEL_PROVIDER_WAHA } from "@/lib/channels/capabilities";
+import { CHANNEL_PROVIDER_VERDASH, CHANNEL_PROVIDER_WAHA } from "@/lib/channels/capabilities";
+import { resolveVerdashCreds } from "@/lib/channels/verdash/credentials";
+import type { VerdashCredentials } from "@/lib/channels/verdash/credentials";
+import {
+  apagarNativoNaPasta,
+  desligarNativoNaPasta,
+  lerPastaDaOrg,
+  resumoDoErro,
+} from "@/lib/channels/verdash/nativo";
+import type { PastaFzap } from "@/lib/channels/verdash/nativo";
 import { desfazerWebhookDoNumero } from "@/lib/channels/meta/webhook-override";
 import { getWahaClient } from "@/lib/waha/client";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
@@ -61,6 +70,9 @@ export interface CanalNaLapide {
 
 interface LinhaDoCanal extends CanalNaLapide {
   meta_token_encrypted: string | null;
+  verdash_origem: string | null;
+  verdash_instance_name: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 /** A sessão de voz (WaCalls) é a da linha `provider='wacalls'` não arquivada. */
@@ -77,6 +89,11 @@ export interface CanalInventariado {
   wahaSessionName: string | null;
   /** Número oficial: o token já decifrado (em memória), ou o motivo de não ter. */
   meta: { phoneNumberId: string; token: string | null; motivo?: string } | null;
+  /**
+   * Verdash NATIVA: a pasta e o token da instancia, lidos ANTES da transacao (a
+   * pasta some junto com o tenant). Vinculada nunca entra (a instancia e da Verdash).
+   */
+  nativo?: { organizationId: string; fzapId: string; pasta: PastaFzap; creds: VerdashCredentials | null } | null;
 }
 
 export interface InventarioDeCanais {
@@ -89,6 +106,23 @@ function mensagemDe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+async function inventariarNativo(
+  admin: SupabaseClient,
+  orgId: string,
+  linha: LinhaDoCanal,
+): Promise<CanalInventariado["nativo"]> {
+  const fzapId = linha.metadata?.fzap_user_id;
+  if (linha.provider !== CHANNEL_PROVIDER_VERDASH || linha.verdash_origem !== "nativa") return null;
+  if (typeof fzapId !== "string") return null;
+  const pasta = await lerPastaDaOrg(admin, orgId).catch(() => null);
+  if (!pasta) return null;
+  const creds = await resolveVerdashCreds(admin, {
+    organizationId: orgId,
+    instanceName: linha.verdash_instance_name ?? "",
+  }).catch(() => null);
+  return { organizationId: orgId, fzapId, pasta, creds };
+}
+
 /** Metade 1 — só leitura, sem efeito externo. Roda ANTES da transação. */
 export async function inventariarCanaisDaOrganizacao(
   admin: SupabaseClient,
@@ -97,7 +131,7 @@ export async function inventariarCanaisDaOrganizacao(
   const { data, error } = await admin
     .from("channel_sessions")
     .select(
-      "id, provider, waha_session_name, meta_phone_number_id, meta_token_encrypted, wacalls_session_id, archived_at",
+      "id, provider, waha_session_name, meta_phone_number_id, meta_token_encrypted, wacalls_session_id, archived_at, verdash_origem, verdash_instance_name, metadata",
     )
     .eq("organization_id", orgId);
   if (error) throw new Error(`inventariar_canais: ${error.message}`);
@@ -117,7 +151,14 @@ export async function inventariarCanaisDaOrganizacao(
         meta = { phoneNumberId: linha.meta_phone_number_id, token: null, motivo: mensagemDe(err) };
       }
     }
-    canais.push({ id: linha.id, provider: linha.provider, wahaSessionName: linha.waha_session_name, meta });
+    const nativo = await inventariarNativo(admin, orgId, linha);
+    canais.push({
+      id: linha.id,
+      provider: linha.provider,
+      wahaSessionName: linha.waha_session_name,
+      meta,
+      ...(nativo ? { nativo } : {}),
+    });
   }
   return { canais, sessaoDeVoz };
 }
@@ -156,6 +197,16 @@ export async function desligarCanaisInventariados(
         await waha.logoutSession(canal.wahaSessionName);
         await waha.deleteSession(canal.wahaSessionName);
         saida.push({ id: canal.id, provedor: canal.provider, desfecho: "ok" });
+      } else if (canal.provider === CHANNEL_PROVIDER_VERDASH) {
+        // Vinculada (sem `nativo`): nao e do CRM, nao se toca.
+        if (!canal.nativo) {
+          saida.push({ id: canal.id, provedor: canal.provider, desfecho: "nao_se_aplica" });
+          continue;
+        }
+        const { organizationId, fzapId, pasta, creds } = canal.nativo;
+        if (creds) await desligarNativoNaPasta(pasta, { organizationId, fzapId, creds }).catch(() => undefined);
+        await apagarNativoNaPasta(pasta, { organizationId, fzapId });
+        saida.push({ id: canal.id, provedor: canal.provider, desfecho: "ok" });
       } else if (canal.meta) {
         if (!canal.meta.token) {
           saida.push({
@@ -186,7 +237,8 @@ export async function desligarCanaisInventariados(
         id: canal.id,
         provedor: canal.provider,
         desfecho: "falhou",
-        motivo: mensagemDe(err),
+        // Nativa: so o status do FZAP sai (o corpo do erro pode ecoar a proxyUrl).
+        motivo: canal.nativo ? resumoDoErro(err) : mensagemDe(err),
       });
     }
   }
