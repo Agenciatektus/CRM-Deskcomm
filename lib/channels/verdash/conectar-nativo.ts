@@ -31,9 +31,9 @@ import { nativoHabilitadoParaOrg } from "./estado-nativo";
 import { apagarNativo, criarInstanciaNativa, faxinarOrfaDoCanal, statusDoErro } from "./nativo";
 import type { InstanciaNativa } from "./nativo";
 
-const PREFIXO_RESERVA = "crm-reserva-";
+export const PREFIXO_RESERVA = "crm-reserva-";
 /** Reserva mais velha que isto e de um pedido que morreu no meio: faxina e recomeca. */
-const RESERVA_VELHA_MS = 3 * 60_000;
+export const RESERVA_VELHA_MS = 3 * 60_000;
 
 /** Historico desligado: o CRM e a fonte das conversas (FZAP >= v1.35 nasce com 90 dias). */
 const HISTORICO_DESLIGADO = { enabled: false, contacts: false, groups: false, retentionDays: 7 };

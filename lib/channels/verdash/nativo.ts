@@ -41,7 +41,7 @@ export interface InstanciaNativa {
 
 export type EstadoNativo = "conectado" | "aguardando_qr" | "desconectado";
 
-interface InstanciaDaLista {
+export interface InstanciaDaLista {
   id?: string;
   name?: string;
   metadata?: { organization_id?: string; channel_session_id?: string } | null;
@@ -83,7 +83,7 @@ async function pastaOuErro(admin: SupabaseClient, organizationId: string): Promi
   return pasta;
 }
 
-async function listarDaPasta(pasta: PastaFzap): Promise<InstanciaDaLista[]> {
+export async function listarDaPasta(pasta: PastaFzap): Promise<InstanciaDaLista[]> {
   const data = await fzapRequest<InstanciaDaLista[] | { instances?: InstanciaDaLista[] }>(
     pasta.creds,
     "/folder/instances",
@@ -123,7 +123,14 @@ export async function apagarNativo(
   admin: SupabaseClient,
   input: { organizationId: string; fzapId: string },
 ): Promise<void> {
-  const pasta = await pastaOuErro(admin, input.organizationId);
+  await apagarNativoNaPasta(await pastaOuErro(admin, input.organizationId), input);
+}
+
+/** Igual a `apagarNativo`, com a pasta ja lida (a exclusao de tenant le ANTES de o banco sumir). */
+export async function apagarNativoNaPasta(
+  pasta: PastaFzap,
+  input: { organizationId: string; fzapId: string },
+): Promise<void> {
   await exigirInstanciaDaOrg(pasta, input.organizationId, input.fzapId);
   await fzapRequest(pasta.creds, `/folder/instances/${encodeURIComponent(input.fzapId)}/full`, {
     method: "DELETE",
@@ -260,7 +267,13 @@ export async function desligarNativo(
   admin: SupabaseClient,
   input: { organizationId: string; fzapId: string; creds: VerdashCredentials },
 ): Promise<void> {
-  const pasta = await pastaOuErro(admin, input.organizationId);
+  await desligarNativoNaPasta(await pastaOuErro(admin, input.organizationId), input);
+}
+
+export async function desligarNativoNaPasta(
+  pasta: PastaFzap,
+  input: { organizationId: string; fzapId: string; creds: VerdashCredentials },
+): Promise<void> {
   await exigirInstanciaDaOrg(pasta, input.organizationId, input.fzapId, input.creds.instanceName);
   await fzapRequest(input.creds, "/session/disconnect", { method: "POST", body: {} });
   await fzapRequest(input.creds, "/session/logout", { method: "POST", body: {} });

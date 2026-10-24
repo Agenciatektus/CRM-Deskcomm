@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWahaClient } from "@/lib/waha/client";
 import { apagarAssinaturaSocial } from "@/lib/channels/social/store";
 import { logger } from "@/lib/logger";
+import { executarLimpeza, lerPlanoDeLimpeza } from "@/lib/channels/verdash/limpar-nativo";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 
 // `orgAtivaDaApi` REAL (sobre o `orgAtivaSemPortao` mockado): é ela que decide o 403 da org suspensa.
@@ -45,6 +46,10 @@ vi.mock("@/lib/waha/client", () => ({
 // A assinatura do Zernio morre no provedor, não no dublê de banco: aqui só
 // interessa que a rota PEÇA para apagar antes de mexer na linha — apagar de
 // verdade é do módulo, coberto em `lib/channels/social/apagar-assinatura.test.ts`.
+vi.mock("@/lib/channels/verdash/limpar-nativo", () => ({
+  lerPlanoDeLimpeza: vi.fn(),
+  executarLimpeza: vi.fn(),
+}));
 vi.mock("@/lib/channels/social/store", () => ({ apagarAssinaturaSocial: vi.fn() }));
 // A credencial da linha chega CIFRADA: aqui só interessa que a rota peça para
 // decifrar a coluna intacta — decifrar de verdade é do módulo, não desta rota.
@@ -265,6 +270,32 @@ beforeEach(() => {
 });
 
 describe("DELETE /api/v1/channel-sessions/[id]", () => {
+  it("verdash nativa: limpa o FZAP DEPOIS da escrita no banco, com a org da sessao", async () => {
+    authOk();
+    const db = makeDb({ sessions: [canal({ provider: "verdash", waha_session_name: null })] });
+    const plano = { nativa: true, organizationId: ORG, channelSessionId: CANAL, fzapId: "f1", creds: null };
+    vi.mocked(lerPlanoDeLimpeza).mockResolvedValue(plano as never);
+    vi.mocked(executarLimpeza).mockImplementation((async () => {
+      db.eventos.push("fzap:limpeza");
+      return "ok";
+    }) as never);
+    const { DELETE } = await import("./route");
+    expect((await DELETE(reqDelete(), ctx())).status).toBe(200);
+    expect(vi.mocked(lerPlanoDeLimpeza).mock.calls[0]?.[1]).toEqual({ organizationId: ORG, channelSessionId: CANAL });
+    expect(vi.mocked(executarLimpeza).mock.calls[0]?.[1]).toBe(plano);
+    expect(db.eventos).toEqual(["delete:channel_sessions", "fzap:limpeza"]);
+  });
+
+  it("canal WAHA: nao le plano nem toca o FZAP", async () => {
+    authOk();
+    const db = makeDb();
+    wahaOk(db);
+    const { DELETE } = await import("./route");
+    await DELETE(reqDelete(), ctx());
+    expect(lerPlanoDeLimpeza).not.toHaveBeenCalled();
+    expect(executarLimpeza).not.toHaveBeenCalled();
+  });
+
   it("exige admin", async () => {
     authOk();
     const db = makeDb();

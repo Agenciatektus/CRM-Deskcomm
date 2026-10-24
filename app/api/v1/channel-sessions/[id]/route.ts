@@ -26,7 +26,13 @@ import { audit } from "@/lib/audit";
 import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
-import { CHANNEL_PROVIDER_SOCIAL, CHANNEL_PROVIDER_WAHA } from "@/lib/channels/capabilities";
+import {
+  CHANNEL_PROVIDER_SOCIAL,
+  CHANNEL_PROVIDER_VERDASH,
+  CHANNEL_PROVIDER_WAHA,
+} from "@/lib/channels/capabilities";
+import { executarLimpeza, lerPlanoDeLimpeza } from "@/lib/channels/verdash/limpar-nativo";
+import { resumoDoErro } from "@/lib/channels/verdash/nativo";
 import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
@@ -383,6 +389,17 @@ export async function DELETE(
    */
   let socialWebhook: "apagada" | "sem_integracao" | "falhou" | "nao_social" = "nao_social";
 
+  // VERDASH NATIVA: o plano (fzapId, token) e lido ANTES da escrita (o hard delete apaga
+  // a linha); o FZAP so e tocado DEPOIS dela, para o canal nunca ficar vivo no CRM com a
+  // instancia ja apagada. A vinculada e da Verdash: o plano dela e `nativa:false`.
+  const planoNativo =
+    session.provider === CHANNEL_PROVIDER_VERDASH
+      ? await lerPlanoDeLimpeza(createAdminClient(), {
+          organizationId: activeOrg.orgId,
+          channelSessionId: id,
+        }).catch(() => ({ nativa: false }) as const)
+      : null;
+
   if (session.provider === CHANNEL_PROVIDER_WAHA) {
     const waha = getWahaClient();
     if (!waha) {
@@ -526,6 +543,17 @@ export async function DELETE(
       .eq("organization_id", activeOrg.orgId)
       .eq("id", id);
     if (delErr) return fail("internal_error", delErr.message, 500, { requestId });
+  }
+
+  if (planoNativo) {
+    await executarLimpeza(createAdminClient(), planoNativo, true).catch((err) =>
+      logger.warn("verdash_nativo_limpeza_falhou", {
+        requestId,
+        organization_id: activeOrg.orgId,
+        channel_session_id: id,
+        erro: resumoDoErro(err),
+      }),
+    );
   }
 
   // ─── O AVISO NÃO FICA ÓRFÃO (issue #1023) ─────────────────────────────────

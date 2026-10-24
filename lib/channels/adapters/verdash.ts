@@ -59,6 +59,7 @@ import {
   marcarJaConectou,
   msDesconectada,
 } from "../verdash/estado-nativo";
+import { enviarComConsulta } from "../verdash/envio-idempotente";
 import { preencherTelefoneNativo } from "../verdash/telefone-nativo";
 import { fzapPublicBaseUrl, resolveVerdashCreds } from "../verdash/credentials";
 import type {
@@ -263,22 +264,46 @@ export const verdashAdapter: ChannelAdapter = {
 
     const { rota, body } = corpoDoEnvio(envelope, destino);
 
+    // NATIVA: envio idempotente. O `id` do CRM vai no corpo e, em timeout/502, o
+    // status do envio é consultado antes de qualquer nova tentativa. A vinculada
+    // não passa por aqui (o token dela nem é do FZAP).
+    // Formato do id do WhatsApp (hex maiúsculo, sem hífens): o uuid do CRM vira 32 hex.
+    const idDoEnvio = envelope.clientMessageId?.trim().replace(/-/g, "").toUpperCase() || null;
+    const nativo =
+      idDoEnvio && !creds.vinculoId
+        ? await estadoNativo(admin, envelope.organizationId, envelope.sessionRef)
+        : null;
+    if (nativo?.nativa) {
+      // Reconectando há pouco: o FZAP recusaria. Não há liberação automática de
+      // `queued` para este canal (o resgate só alcança WAHA), então falha rápido e claro.
+      const caida = msDesconectada(nativo);
+      if (nativo.status === "STARTING" && caida !== null && caida < LIMITE_DESCONECTADA_MS) {
+        throw new Error(
+          "verdash_nativo_reconectando: o WhatsApp deste canal está reconectando. " +
+            "Tente de novo em alguns minutos.",
+        );
+      }
+      body.id = idDoEnvio;
+    }
+
     await envelope.beforeSend?.();
     // Quem decide o transporte é a SESSÃO, não este método: canal conectado por
     // código pede o envio à Verdash; canal conectado por token fala direto com
     // o servidor de WhatsApp. Ver `verdashEnviar`.
-    const data = await verdashEnviar(creds, {
-      rota,
-      body,
-      pareado: {
-        phone: destino,
-        tipo: envelope.kind,
-        texto: envelope.body ?? envelope.media?.caption ?? undefined,
-        mediaUrl: envelope.media?.url,
-        filename: envelope.media?.filename ?? undefined,
-        replyTo: envelope.replyToExternalId ?? undefined,
-      },
-    });
+    const enviar = () =>
+      verdashEnviar(creds, {
+        rota,
+        body,
+        pareado: {
+          phone: destino,
+          tipo: envelope.kind,
+          texto: envelope.body ?? envelope.media?.caption ?? undefined,
+          mediaUrl: envelope.media?.url,
+          filename: envelope.media?.filename ?? undefined,
+          replyTo: envelope.replyToExternalId ?? undefined,
+        },
+      });
+    const data = nativo?.nativa && idDoEnvio ? await enviarComConsulta(creds, idDoEnvio, enviar) : await enviar();
 
     // O id do whatsmeow, o MESMO que volta no `Info.ID` do webhook — por isso
     // este canal não precisa de `echoExternalIds`: os dois lados falam a mesma

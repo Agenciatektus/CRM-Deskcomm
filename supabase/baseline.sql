@@ -63079,6 +63079,43 @@ grant execute on function public.fn_registrar_evento_conexao_nativa(uuid, uuid, 
 
 notify pgrst, 'reload schema';
 
+-- ---- Verdash nativo: marca de limpeza pendente no FZAP (migration 9069) ----
+-- Mesmo corpo da migration 9069 (fn_marcar_limpeza_nativa). Fica ANTES da VARREDURA anon.
+create or replace function public.fn_marcar_limpeza_nativa(
+  p_org uuid,
+  p_canal uuid,
+  p_pendente boolean
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_n integer;
+begin
+  -- Atomico: so a chave `limpeza_fzap_pendente_em` muda (`||` e `-` no proprio UPDATE).
+  -- Vale tambem para canal arquivado (e nele que a limpeza pendente precisa ficar marcada).
+  update public.channel_sessions
+     set metadata = case
+       when p_pendente then coalesce(metadata, '{}'::jsonb)
+         || jsonb_build_object('limpeza_fzap_pendente_em', to_jsonb(now()))
+       else coalesce(metadata, '{}'::jsonb) - 'limpeza_fzap_pendente_em' end
+   where organization_id = p_org
+     and id = p_canal
+     and verdash_origem = 'nativa';
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+revoke execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
+  from public, anon, authenticated;
+grant execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
+  to service_role;
+
+notify pgrst, 'reload schema';
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia

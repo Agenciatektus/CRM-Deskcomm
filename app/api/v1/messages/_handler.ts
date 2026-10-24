@@ -1152,6 +1152,7 @@ export async function sendMessageHandler(
         await checkBoundary();
         ({ externalId } = await adapter.send({
           beforeSend: checkBoundary,
+          clientMessageId: message.id,
           organizationId: ctx.organization_id,
           sessionRef: resolveSessionRef(c.channel_sessions),
           to: chatId,
@@ -1179,6 +1180,7 @@ export async function sendMessageHandler(
         await checkBoundary();
         ({ externalId } = await adapter.send({
           beforeSend: checkBoundary,
+          clientMessageId: message.id,
           organizationId: ctx.organization_id,
           sessionRef: resolveSessionRef(c.channel_sessions),
           to: chatId,
@@ -1207,6 +1209,7 @@ export async function sendMessageHandler(
         await checkBoundary();
         ({ externalId } = await adapter.send({
           beforeSend: checkBoundary,
+          clientMessageId: message.id,
           organizationId: ctx.organization_id,
           sessionRef: resolveSessionRef(c.channel_sessions),
           to: chatId,
@@ -1224,6 +1227,7 @@ export async function sendMessageHandler(
         await checkBoundary();
         ({ externalId } = await adapter.send({
           beforeSend: checkBoundary,
+          clientMessageId: message.id,
           organizationId: ctx.organization_id,
           sessionRef: resolveSessionRef(c.channel_sessions),
           to: chatId,
