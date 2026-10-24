@@ -96,4 +96,30 @@ describe("extrairAtribuicaoVerdash", () => {
     expect(extrairAtribuicaoVerdash({ type: "Message", event: { Info: { ID: "m1" }, Message: { conversation: "oi" } } })).toBeNull();
     expect(extrairAtribuicaoVerdash(null)).toBeNull();
   });
+
+  it("clique com sourceType diferente de ad (post) NÃO é anúncio", () => {
+    expect(extrairAtribuicaoVerdash(v127({ title: "T", sourceType: "post", ctwaClid: "C1" }))).toBeNull();
+  });
+
+  it("não herda o anúncio da mensagem CITADA", () => {
+    const citada = {
+      type: "Message",
+      event: {
+        Info: { ID: "m1" },
+        Message: {
+          extendedTextMessage: {
+            text: "resposta",
+            contextInfo: { quotedMessage: { extendedTextMessage: { contextInfo: { externalAdReply: BLOCO } } } },
+          },
+        },
+      },
+    };
+    expect(extrairAtribuicaoVerdash(citada)).toBeNull();
+  });
+
+  it("limita o número de chaves guardadas como prova", () => {
+    const enorme: Record<string, unknown> = { sourceType: "ad", ctwaClid: "C1" };
+    for (let i = 0; i < 5000; i++) enorme[`k${i}`] = "v";
+    expect(Object.keys(extrairAtribuicaoVerdash(v127(enorme))?.bruto ?? {}).length).toBeLessThanOrEqual(40);
+  });
 });

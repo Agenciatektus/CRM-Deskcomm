@@ -32,6 +32,14 @@ const PROFUNDIDADE_MAXIMA = 6;
 const CHAVES_DE_BYTES = new Set(["JPEGThumbnail", "thumbnail", "RawMessage"]);
 /** Teto por texto: validação de tamanho no limite, para o jsonb não crescer. */
 const TETO_DO_TEXTO = 500;
+/** Teto de chaves guardadas como prova: o bloco real tem ~26. */
+const TETO_DE_CHAVES = 40;
+/**
+ * Não se desce na mensagem CITADA: o anúncio dela não é o de onde esta pessoa
+ * veio. Quem chegou de forma orgânica e respondeu citando uma prévia de anúncio
+ * ganharia a atribuição, e o primeiro toque a tornaria irreversível.
+ */
+const CHAVES_NAO_PERCORRIDAS = new Set([...CHAVES_DE_BYTES, "quotedMessage", "quoted_message"]);
 
 const NOMES_DO_BLOCO = [
   "externalAdReply",
@@ -51,7 +59,7 @@ function acharBloco(no: unknown, profundidade = 0): Bruto | null {
     if (achado) return achado;
   }
   for (const [chave, filho] of Object.entries(o)) {
-    if (CHAVES_DE_BYTES.has(chave)) continue;
+    if (CHAVES_NAO_PERCORRIDAS.has(chave)) continue;
     const achado = acharBloco(filho, profundidade + 1);
     if (achado) return achado;
   }
@@ -70,6 +78,7 @@ function ler(bloco: Bruto, ...chaves: string[]): string | null {
 function enxugar(bloco: Bruto): Bruto {
   const saida: Bruto = {};
   for (const [chave, valor] of Object.entries(bloco)) {
+    if (Object.keys(saida).length >= TETO_DE_CHAVES) break;
     if (CHAVES_DE_BYTES.has(chave)) continue;
     if (typeof valor === "string") saida[chave] = valor.slice(0, TETO_DO_TEXTO);
     else if (typeof valor === "number" || typeof valor === "boolean") saida[chave] = valor;
@@ -84,6 +93,10 @@ export function extrairAtribuicaoVerdash(payload: unknown): AtribuicaoDeAnuncio 
 
   const cliqueId = ler(bloco, "ctwaClid", "CtwaClid", "ctwa_clid");
   const tipo = ler(bloco, "sourceType", "SourceType", "source_type");
+  // `sourceType` diferente de "ad" (post, prévia de link) com clique ao lado não
+  // é anúncio: o primeiro toque não se desfaz, então na dúvida não se estampa.
+  // Mesma regra do irmão por QR (`lib/waha/atribuicao-de-anuncio.ts`).
+  if (tipo && tipo.toLowerCase() !== "ad") return null;
   const deAnuncio = tipo?.toLowerCase() === "ad";
   if (!cliqueId && !deAnuncio) return null;
 

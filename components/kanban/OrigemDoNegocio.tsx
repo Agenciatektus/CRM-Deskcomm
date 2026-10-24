@@ -13,6 +13,14 @@ function texto(valor: unknown): string | null {
   return typeof valor === "string" && valor.trim() !== "" ? valor.trim() : null;
 }
 
+function hostDe(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+}
+
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -90,9 +98,14 @@ export function OrigemDoNegocio({ contactId }: Props) {
         {link && (
           <Linha rotulo={t("Link do anúncio")}>
             {/^https?:\/\//i.test(link) ? (
-              <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
-                {t("Abrir")}
-              </a>
+              <>
+                <a href={link} target="_blank" rel="noopener noreferrer" className="underline">
+                  {t("Abrir")}
+                </a>
+                {/* O bloco é montado pelo app de quem escreveu: o host à vista deixa
+                    o atendente ver para onde o link vai antes de clicar. */}
+                <span className="ml-1 text-xs text-text-muted">({hostDe(link)})</span>
+              </>
             ) : (
               link
             )}
