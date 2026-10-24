@@ -31,6 +31,18 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    # Limites: a VPS30 também roda o CRM, o Supabase e o FZAP. Um laço ou vazamento na LP não
+    # pode consumir a máquina inteira. Ajustar pelo que for medido, nunca tirar.
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    cpus: "0.5"
+    pids_limit: 100
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     tmpfs:
       - /tmp
       - /app/.next/cache
