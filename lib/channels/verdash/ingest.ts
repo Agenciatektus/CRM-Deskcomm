@@ -55,7 +55,7 @@ import { aplicarEfeitosPosEntrada } from "../pos-entrada";
 import { aplicarAlteracaoDeMensagem } from "../alteracao-de-mensagem";
 
 import { insertMessage, marcarConversa, pedirPersistenciaDaMidia } from "./gravacao";
-import { aplicarEventoDeConexao, eventoDeConexao } from "./eventos-conexao";
+import { aplicarEventoDeConexao, eventoDeConexao, horaDoEvento } from "./eventos-conexao";
 import { parseVerdashInbound, type VerdashInboundMessage } from "./webhook";
 
 export interface VerdashIngestResult {
@@ -96,6 +96,7 @@ export async function ingestVerdashInbound(
       organizationId: input.organizationId,
       channelSessionId: input.channelSessionId,
       evento,
+      emIso: horaDoEvento(input.payload),
     });
   }
   const msg = parseVerdashInbound(input.payload);

@@ -21,6 +21,10 @@ let fzapConectado: boolean;
 let fzapLogado: boolean;
 let chamadasFzap: { path: string; token: string | null }[];
 let falhaTelefone: string | null;
+let chamadasRpc: { fn: string; args: Record<string, unknown> }[];
+let antesDaRpc: (() => void) | null;
+let rpcFalha: boolean;
+let falhaMensagemTelefone: string | null;
 
 function tabelaDe(nome: string): Row[] {
   return nome === "channel_sessions" ? canais : nome === "channel_session_health" ? saude : avisos;
@@ -35,8 +39,12 @@ function builder(nome: string) {
     tabelaDe(nome).filter((r) => eqs.every(([c, v]) => r[c] === v) && nulls.every((c) => r[c] == null));
   const run = () => {
     if (acao === "update") {
-      if (nome === "channel_sessions" && falhaTelefone && "phone_number" in patch) {
-        return { error: { code: falhaTelefone, message: "dup" } };
+      // Invariante do P1: NENHUM caminho regrava o metadata inteiro (so a RPC atomica).
+      if (nome === "channel_sessions" && "metadata" in patch) {
+        throw new Error("update direto de metadata: lost update");
+      }
+      if (nome === "channel_sessions" && (falhaTelefone || falhaMensagemTelefone) && "phone_number" in patch) {
+        return { error: { code: falhaTelefone ?? undefined, message: falhaMensagemTelefone ?? "dup" } };
       }
       for (const r of achar()) Object.assign(r, patch);
     }
@@ -62,12 +70,57 @@ function builder(nome: string) {
   return b;
 }
 
+/** Espelho em TS da fn_registrar_evento_conexao_nativa (merge sobre o metadata ATUAL, nao sobre uma leitura velha). */
+function rpcEvento(a: { p_org: string; p_canal: string; p_evento: string; p_em: string | null }) {
+  antesDaRpc?.();
+  const c = canais.find((x) => x.id === a.p_canal && x.organization_id === a.p_org && x.archived_at == null);
+  if (!c) return { resultado: "ignorado", motivo: "canal_arquivado" };
+  if (c.verdash_origem !== "nativa") return { resultado: "ignorado", motivo: "evento_sem_interesse" };
+  const agora = new Date().toISOString();
+  const em = a.p_em ?? agora;
+  const m = { ...((c.metadata as Row) ?? {}) };
+  const ultimo = (m.evento_conexao_em as string | undefined) ?? (c.last_status_change_at as string | undefined);
+  if (ultimo && new Date(em) < new Date(ultimo)) return { resultado: "obsoleto", status: c.status };
+  let status: string;
+  if (a.p_evento === "Connected") {
+    status = "WORKING";
+    delete m.desconectado_em;
+    m.ja_conectou_em = m.ja_conectou_em ?? agora;
+  } else if (a.p_evento === "LoggedOut") {
+    status = "FAILED";
+    m.ja_conectou_em = m.ja_conectou_em ?? agora;
+    m.desconectado_em = m.desconectado_em ?? agora;
+  } else {
+    status = c.status === "FAILED" || c.status === "STOPPED" ? (c.status as string) : "STARTING";
+    m.desconectado_em = m.desconectado_em ?? agora;
+  }
+  m.evento_conexao_em = em;
+  const mudou = status !== c.status;
+  c.status = status;
+  if (mudou) c.last_status_change_at = agora;
+  c.metadata = m;
+  return {
+    resultado: "aplicado",
+    status,
+    mudou,
+    display_name: c.display_name,
+    phone_number: c.phone_number,
+    instancia: c.verdash_instance_name,
+  };
+}
+
 const admin = {
   from: (nome: string) => builder(nome),
-  rpc: async (_fn: string, a: Record<string, string>) => ({
-    data: Buffer.from((a.ciphertext ?? "").replace("\\x", ""), "hex").toString(),
-    error: null,
-  }),
+  rpc: async (fn: string, a: Record<string, string>) => {
+    chamadasRpc.push({ fn, args: a });
+    if (fn === "fn_registrar_evento_conexao_nativa") {
+      return rpcFalha ? { data: null, error: { message: "boom" } } : { data: rpcEvento(a as never), error: null };
+    }
+    return {
+      data: Buffer.from((a.ciphertext ?? "").replace("\\x", ""), "hex").toString(),
+      error: null,
+    };
+  },
 } as never;
 
 import { sincronizarSaudeDaConexao } from "@/lib/channels/health";
@@ -83,8 +136,12 @@ const evento = (type: string) => ({
   token: "[redacted]",
   event: type === "LoggedOut" ? { Reason: 401, OnConnect: false } : {},
 });
-const ingerir = (type: string) =>
-  ingestVerdashInbound(admin, { organizationId: ORG, channelSessionId: ID, payload: evento(type) });
+const ingerir = (type: string, ts?: string) =>
+  ingestVerdashInbound(admin, {
+    organizationId: ORG,
+    channelSessionId: ID,
+    payload: ts ? { ...evento(type), event: { ...evento(type).event, Timestamp: ts } } : evento(type),
+  });
 const canal = () => canais.find((c) => c.id === ID)!;
 const avisosAbertos = () => avisos.filter((a) => a.ref_id === ID);
 
@@ -116,6 +173,10 @@ beforeEach(() => {
   fzapLogado = true;
   chamadasFzap = [];
   falhaTelefone = null;
+  falhaMensagemTelefone = null;
+  chamadasRpc = [];
+  antesDaRpc = null;
+  rpcFalha = false;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
@@ -313,5 +374,115 @@ describe("D) carencia do alerta de QR", () => {
     canal().verdash_origem = "vinculada";
     canal().created_at = new Date(Date.now() - 60_000).toISOString();
     expect(await sincronizarSaudeDaConexao(admin, sessao, qr, "Loja")).toBe("avisado");
+  });
+});
+
+describe("P1: escrita atomica pela RPC (a ligacao, nao o efeito)", () => {
+  it("o evento vai pela RPC com os argumentos exatos, e nenhum update direto de metadata", async () => {
+    await ingerir("LoggedOut", "2026-10-24T11:59:00Z");
+    expect(chamadasRpc.filter((c) => c.fn === "fn_registrar_evento_conexao_nativa")).toEqual([
+      {
+        fn: "fn_registrar_evento_conexao_nativa",
+        args: { p_org: ORG, p_canal: ID, p_evento: "LoggedOut", p_em: "2026-10-24T11:59:00.000Z" },
+      },
+    ]);
+  });
+
+  it("sem Timestamp no envelope, p_em vai null (a RPC usa now())", async () => {
+    await ingerir("Connected");
+    expect(chamadasRpc.find((c) => c.fn === "fn_registrar_evento_conexao_nativa")!.args.p_em).toBeNull();
+  });
+
+  it("Timestamp no futuro (relogio adiantado) nao trava os eventos seguintes", async () => {
+    await ingerir("Connected", "2030-01-01T00:00:00Z");
+    expect(chamadasRpc.find((c) => c.fn === "fn_registrar_evento_conexao_nativa")!.args.p_em).toBeNull();
+  });
+
+  it("ai_gate_mode / pausa gravados NO MEIO da escrita sobrevivem", async () => {
+    antesDaRpc = () => {
+      Object.assign(canal().metadata as Row, {
+        ai_gate_mode: "pre_go_live",
+        ai_test_phone_numbers: ["+5511999990000"],
+        disabled: true,
+        disabled_by: "manual",
+      });
+    };
+    await ingerir("Connected");
+    expect(canal().metadata).toMatchObject({
+      ai_gate_mode: "pre_go_live",
+      ai_test_phone_numbers: ["+5511999990000"],
+      disabled: true,
+      disabled_by: "manual",
+      ja_conectou_em: expect.any(String),
+    });
+  });
+
+  it("o vigia tambem escreve so pela RPC (Disconnected e Connected)", async () => {
+    fzapConectado = false;
+    canal().status = "WORKING";
+    await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    fzapConectado = true;
+    await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    expect(chamadasRpc.filter((c) => c.fn === "fn_registrar_evento_conexao_nativa").map((c) => c.args.p_evento)).toEqual(["Disconnected", "Connected"]);
+  });
+});
+
+describe("P2-1: ordem dos eventos", () => {
+  it("Disconnected velho depois de Connected nao rebaixa WORKING", async () => {
+    await ingerir("Connected", "2026-10-24T11:58:00Z");
+    expect((await ingerir("Disconnected", "2026-10-24T11:57:00Z")).reason).toBe("evento_obsoleto");
+    expect(canal().status).toBe("WORKING");
+  });
+
+  it("Connected atrasado depois de LoggedOut nao fecha o aviso", async () => {
+    await ingerir("LoggedOut", "2026-10-24T11:58:00Z");
+    expect((await ingerir("Connected", "2026-10-24T11:57:00Z")).reason).toBe("evento_obsoleto");
+    expect(canal().status).toBe("FAILED");
+    expect(avisosAbertos().filter((a) => a.status === "open")).toHaveLength(1);
+  });
+
+  it("evento mais novo que o ultimo passa", async () => {
+    await ingerir("LoggedOut", "2026-10-24T11:57:00Z");
+    expect((await ingerir("Connected", "2026-10-24T11:58:00Z")).status).toBe("updated");
+    expect(canal().status).toBe("WORKING");
+  });
+});
+
+describe("P2-2/P2-3: telefone", () => {
+  it("o vigia tenta de novo enquanto o telefone for nulo (jid ausente na 1a vez)", async () => {
+    fzapJid = null;
+    await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    expect(canal().phone_number).toBeNull();
+    fzapJid = "556681276920:12@s.whatsapp.net";
+    await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    expect(canal().phone_number).toBe("+556681276920");
+  });
+
+  it("23505 no vigia: WORKING com detalhe proprio que vira aviso warn, sem o numero no texto", async () => {
+    falhaTelefone = "23505";
+    const h = await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    expect(h).toEqual({ reachable: true, status: "WORKING", detail: "numero_em_conflito_com_outro_canal" });
+    await sincronizarSaudeDaConexao(admin, { id: ID, organization_id: ORG, status: "WORKING" }, h, "Loja");
+    expect(avisosAbertos()[0]).toMatchObject({ severity: "warn" });
+    expect(JSON.stringify(avisosAbertos()[0])).not.toContain("6681276920");
+    falhaTelefone = null;
+    const h2 = await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    await sincronizarSaudeDaConexao(admin, { id: ID, organization_id: ORG, status: "WORKING" }, h2, "Loja");
+    expect(avisosAbertos().every((a) => a.status === "resolved")).toBe(true);
+  });
+
+  it("numero de OUTRA organizacao (indice de instancia) tambem e conflito", async () => {
+    falhaMensagemTelefone = 'duplicate key value violates unique constraint "channel_sessions_verdash_instance_unique"';
+    const h = await verdashAdapter.checkHealth!({ organizationId: ORG, sessionRef: INST });
+    expect(h.detail).toBe("numero_em_conflito_com_outro_canal");
+  });
+});
+
+describe("P2-4: erro da escrita nao dispara aviso", () => {
+  it("RPC com erro: lanca, nao chama a saude e nao abre aviso", async () => {
+    rpcFalha = true;
+    await expect(ingerir("LoggedOut")).rejects.toThrow("verdash_evento_conexao_nao_gravado");
+    expect(avisos).toHaveLength(0);
+    expect(saude).toHaveLength(0);
   });
 });

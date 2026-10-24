@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 
 import { fzapRequest } from "./client";
+import { numeroEmOutraOrganizacao } from "./conectar";
 import { resolveVerdashCreds } from "./credentials";
 import { telefoneDoJid } from "./webhook";
 
@@ -47,7 +48,7 @@ export async function preencherTelefoneNativo(
     if (!error) return "preenchido";
     // 23505 so pode ser a trava de numero unico: este numero ja e de OUTRO canal
     // ativo da org. O canal segue funcionando sem telefone; fica o registro.
-    if (error.code === "23505") {
+    if (error.code === "23505" || numeroEmOutraOrganizacao(error.message ?? null)) {
       logger.warn("verdash_nativo_telefone_em_conflito", { organization_id: organizationId, channel_session_id: row.id });
       return "conflito";
     }

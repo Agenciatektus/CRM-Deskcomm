@@ -13,6 +13,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DETALHE_QR_RESCAN_NATIVO, sincronizarSaudeDaConexao } from "../health";
+import { registrarEventoDeConexao } from "./estado-nativo";
 import { preencherTelefoneNativo } from "./telefone-nativo";
 import { tipoDoEvento } from "./webhook";
 
@@ -28,70 +29,38 @@ export function eventoDeConexao(payload: unknown): EventoDeConexao | null {
   return t === "Connected" || t === "Disconnected" || t === "LoggedOut" ? t : null;
 }
 
-interface Linha {
-  verdash_origem: string | null;
-  archived_at: string | null;
-  status: string | null;
-  display_name: string | null;
-  phone_number: string | null;
-  verdash_instance_name: string | null;
-  metadata: Record<string, unknown> | null;
+/** Hora do evento no envelope do FZAP, se vier e for crivel; senao `null` (a RPC usa `now()`). */
+export function horaDoEvento(payload: unknown): string | null {
+  const ev = (payload as { event?: { Timestamp?: unknown } } | null)?.event;
+  const t = typeof ev?.Timestamp === "string" ? Date.parse(ev.Timestamp) : NaN;
+  // Relogio adiantado do FZAP travaria os eventos seguintes como "obsoletos".
+  return Number.isFinite(t) && t <= Date.now() + 60_000 ? new Date(t).toISOString() : null;
 }
 
 export async function aplicarEventoDeConexao(
   admin: SupabaseClient,
-  input: { organizationId: string; channelSessionId: string; evento: EventoDeConexao },
+  input: { organizationId: string; channelSessionId: string; evento: EventoDeConexao; emIso?: string | null },
 ): Promise<ResultadoEventoDeConexao> {
-  const { data } = await admin
-    .from("channel_sessions")
-    .select("verdash_origem, archived_at, status, display_name, phone_number, verdash_instance_name, metadata")
-    .eq("organization_id", input.organizationId)
-    .eq("id", input.channelSessionId)
-    .maybeSingle();
-  const row = data as Linha | null;
-  if (!row || row.archived_at) return { status: "ignored", reason: "canal_arquivado" };
-  if (row.verdash_origem !== "nativa") return { status: "ignored", reason: "evento_sem_interesse" };
+  const r = await registrarEventoDeConexao(admin, input);
+  // Falha do UPDATE/RPC: nada de aviso por um estado que nao foi gravado. Lanca para a
+  // rota responder erro e o FZAP reentregar.
+  if (!r) throw new Error("verdash_evento_conexao_nao_gravado");
+  if (r.resultado === "ignorado") return { status: "ignored", reason: r.motivo ?? "evento_sem_interesse" };
+  if (r.resultado === "obsoleto") return { status: "ignored", reason: "evento_obsoleto" };
 
-  const agora = new Date().toISOString();
-  const { desconectado_em: caiuEm, ...semQueda } = row.metadata ?? {};
-  const atual = row.status ?? null;
-  let status: string;
-  let metadata: Record<string, unknown>;
-  if (input.evento === "Connected") {
-    status = "WORKING";
-    metadata = { ...semQueda, ja_conectou_em: semQueda.ja_conectou_em ?? agora };
-  } else if (input.evento === "LoggedOut") {
-    status = "FAILED";
-    // Deslogar pressupoe ter logado: marca, para a carencia do QR nao engolir o aviso.
-    metadata = { ...semQueda, ja_conectou_em: semQueda.ja_conectou_em ?? agora, desconectado_em: caiuEm ?? agora };
-  } else {
-    // Disconnected depois de LoggedOut/FAILED nao "melhora" o canal para STARTING.
-    status = atual === "FAILED" || atual === "STOPPED" ? atual : "STARTING";
-    metadata = { ...semQueda, desconectado_em: caiuEm ?? agora };
-  }
-
-  const mudou = status !== atual;
-  const igual = JSON.stringify(metadata) === JSON.stringify(row.metadata ?? {});
-  if (mudou || !igual) {
-    await admin
-      .from("channel_sessions")
-      .update({ status, metadata, ...(mudou ? { last_status_change_at: agora } : {}) })
-      .eq("organization_id", input.organizationId)
-      .eq("id", input.channelSessionId);
-  }
-
+  const status = r.status as string;
   // Disconnected que nao muda o estado (FAILED/STOPPED) nao reabre nem fecha aviso.
   if (input.evento !== "Disconnected" || status === "STARTING") {
     await sincronizarSaudeDaConexao(
       admin,
       { id: input.channelSessionId, organization_id: input.organizationId, status },
       { reachable: true, status, detail: input.evento === "LoggedOut" ? DETALHE_QR_RESCAN_NATIVO : null },
-      row.display_name ?? row.phone_number ?? "sem nome",
+      r.display_name ?? r.phone_number ?? "sem nome",
     );
   }
 
-  if (input.evento === "Connected" && !row.phone_number && row.verdash_instance_name) {
-    await preencherTelefoneNativo(admin, input.organizationId, row.verdash_instance_name);
+  if (input.evento === "Connected" && !r.phone_number && r.instancia) {
+    await preencherTelefoneNativo(admin, input.organizationId, r.instancia);
   }
   return { status: "updated", reason: `conexao_${input.evento.toLowerCase()}` };
 }

@@ -51,7 +51,7 @@ import {
   fotoDoContatoPareado,
 } from "../verdash/client";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
-import { DETALHE_QR_RESCAN_NATIVO } from "../health";
+import { DETALHE_NUMERO_EM_CONFLITO, DETALHE_QR_RESCAN_NATIVO } from "../health";
 import {
   LIMITE_DESCONECTADA_MS,
   estadoNativo,
@@ -507,7 +507,7 @@ export const verdashAdapter: ChannelAdapter = {
       if (nativo.nativa) {
         const caida = msDesconectada(nativo);
         if (caida === null) {
-          await marcarDesconectada(admin, input.organizationId, input.sessionRef, nativo.metadata);
+          if (nativo.id) await marcarDesconectada(admin, input.organizationId, nativo.id);
         } else if (caida > LIMITE_DESCONECTADA_MS) {
           return { reachable: true, status: "FAILED", detail: "desconectada_ha_mais_de_10_min" };
         }
@@ -515,8 +515,13 @@ export const verdashAdapter: ChannelAdapter = {
       return { reachable: true, status: "STARTING", detail: "reconectando_na_verdash" };
     }
     // Marca a primeira vez que a nativa esteve de pe (melhor esforco, ver estado-nativo.ts).
-    if (await marcarJaConectou(admin, input.organizationId, input.sessionRef)) {
-      await preencherTelefoneNativo(admin, input.organizationId, input.sessionRef);
+    await marcarJaConectou(admin, input.organizationId, input.sessionRef);
+    // O telefone tenta de novo a cada ciclo enquanto estiver nulo (o jid pode demorar
+    // a aparecer). Conflito de numero vira detalhe de saude visivel ao operador.
+    const atual = await estadoNativo(admin, input.organizationId, input.sessionRef);
+    if (atual.nativa && !atual.telefone) {
+      const t = await preencherTelefoneNativo(admin, input.organizationId, input.sessionRef);
+      if (t === "conflito") return { reachable: true, status: "WORKING", detail: DETALHE_NUMERO_EM_CONFLITO };
     }
     return { reachable: true, status: "WORKING", detail: null };
   },

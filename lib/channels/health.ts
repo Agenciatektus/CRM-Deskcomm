@@ -74,6 +74,12 @@ export const DETALHE_CREDENCIAL_RECUSADA = "credencial_recusada_pelo_transporte"
 export const DETALHE_QR_RESCAN_NATIVO = "nativa_deslogada_precisa_do_qr";
 
 /**
+ * Canal nativo WORKING cujo numero ja e de OUTRO canal ativo (trava de numero unico):
+ * funciona, mas sem telefone gravado. Aviso `warn` visivel ate o conflito sumir.
+ */
+export const DETALHE_NUMERO_EM_CONFLITO = "numero_em_conflito_com_outro_canal";
+
+/**
  * Marca do episódio aberto por um EMPURRÃO do provedor.
  *
  * A varredura não fecha episódio com esta marca: ela mede credencial e conta,
@@ -141,6 +147,15 @@ export function avisoDaConexao(saude: SaudeObservada, apelido: string): AvisoDeC
   }
 
   const status = (saude.status ?? "").toUpperCase();
+  if (status === STATUS_SAUDAVEL && saude.detail === DETALHE_NUMERO_EM_CONFLITO) {
+    return {
+      kind: "channel_number_alert",
+      severity: "warn",
+      title: `Conexão "${apelido}": o número já está ligado em outro canal`,
+      body: "A conexão funciona, mas não foi possível registrar o telefone nela porque esse número já pertence a outro canal ativo. Desconecte o canal duplicado.",
+      episodio: "NUMERO_EM_CONFLITO",
+    };
+  }
   if (!status || status === STATUS_SAUDAVEL) return null;
   if (!(STATUS_QUE_AVISAM as readonly string[]).includes(status)) return null;
 

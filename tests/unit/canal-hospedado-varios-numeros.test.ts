@@ -220,3 +220,40 @@ describe("GET com dois números", () => {
     expect(corpo.data.channel_session_id).toBe("canal-a");
   });
 });
+
+describe("cerca de troca de origem: vincular nunca sobrescreve uma nativa", () => {
+  const NATIVA: HostedSession = { ...A, id: "canal-nativa", instanceName: "org-abc123", origem: "nativa" };
+
+  it("pelo token, com o telefone da nativa: 409 e nada gravado", async () => {
+    vi.mocked(listHostedSessions).mockResolvedValue([NATIVA]);
+    vi.mocked(validateHostedToken).mockResolvedValue({
+      ok: true,
+      instanceName: "inst-da-verdash",
+      phoneNumber: A.phoneNumber,
+      displayName: "Loja",
+      connected: true,
+    });
+    const r = await POST(pedido({ token: "token-do-numero-nativo" }));
+    expect(r.status).toBe(409);
+    expect(saveHostedSession).not.toHaveBeenCalled();
+    expect(ligarRecebimentoHospedado).not.toHaveBeenCalled();
+  });
+
+  it("pelo codigo, com o telefone da nativa: 409 e nada gravado", async () => {
+    vi.mocked(listHostedSessions).mockResolvedValue([NATIVA]);
+    vi.mocked(trocarCodigoHospedado).mockResolvedValue({
+      ok: true,
+      vinculoId: "v",
+      instanceName: "inst-da-verdash",
+      token: "maquina",
+      phoneNumber: A.phoneNumber,
+      displayName: "Loja",
+      connected: true,
+      recebimentoLigado: true,
+      recebimentoAviso: null,
+    } as never);
+    const r = await POST(pedido({ codigo: "XK4P9T2MQW" }));
+    expect(r.status).toBe(409);
+    expect(saveHostedSession).not.toHaveBeenCalled();
+  });
+});

@@ -23,6 +23,8 @@ export async function nativoHabilitadoParaOrg(
 
 export interface EstadoNativo {
   nativa: boolean;
+  id: string | null;
+  telefone: string | null;
   /** Ja esteve WORKING alguma vez (marca `ja_conectou_em` no metadata). */
   jaConectou: boolean;
   metadata: Record<string, unknown>;
@@ -32,6 +34,8 @@ export interface EstadoNativo {
 
 const VINCULADA: EstadoNativo = {
   nativa: false,
+  id: null,
+  telefone: null,
   jaConectou: false,
   metadata: {},
   status: null,
@@ -49,12 +53,14 @@ export async function estadoNativo(
   try {
     const { data } = await admin
       .from("channel_sessions")
-      .select("verdash_origem, metadata, status, last_status_change_at")
+      .select("id, phone_number, verdash_origem, metadata, status, last_status_change_at")
       .eq("organization_id", organizationId)
       .eq("verdash_instance_name", instanceName)
       .is("archived_at", null)
       .maybeSingle();
     const row = data as {
+      id?: string;
+      phone_number?: string | null;
       verdash_origem?: string;
       metadata?: Record<string, unknown> | null;
       status?: string | null;
@@ -64,6 +70,8 @@ export async function estadoNativo(
     const metadata = row.metadata ?? {};
     return {
       nativa: true,
+      id: row.id ?? null,
+      telefone: row.phone_number ?? null,
       jaConectou: typeof metadata.ja_conectou_em === "string",
       metadata,
       status: row.status ?? null,
@@ -74,11 +82,41 @@ export async function estadoNativo(
   }
 }
 
+export interface ResultadoEvento {
+  resultado: "aplicado" | "obsoleto" | "ignorado";
+  motivo?: string;
+  status?: string;
+  mudou?: boolean;
+  display_name?: string | null;
+  phone_number?: string | null;
+  instancia?: string | null;
+}
+
+/**
+ * UNICA porta de escrita do estado de conexao da nativa: a RPC atomica
+ * `fn_registrar_evento_conexao_nativa` (status + chaves de conexao do metadata numa
+ * instrucao, sob lock, recusando evento mais antigo que a ultima transicao). Ler,
+ * espalhar e regravar o metadata apagaria `ai_gate_mode`, a lista de teste e a pausa
+ * se o operador salvasse no meio. `null` = a RPC falhou (quem chama decide).
+ */
+export async function registrarEventoDeConexao(
+  admin: SupabaseClient,
+  input: { organizationId: string; channelSessionId: string; evento: "Connected" | "Disconnected" | "LoggedOut"; emIso?: string | null },
+): Promise<ResultadoEvento | null> {
+  const { data, error } = await admin.rpc("fn_registrar_evento_conexao_nativa", {
+    p_org: input.organizationId,
+    p_canal: input.channelSessionId,
+    p_evento: input.evento,
+    p_em: input.emIso ?? null,
+  });
+  if (error || !data) return null;
+  return data as ResultadoEvento;
+}
+
 /**
  * A nativa esta de pe: grava `ja_conectou_em` na primeira vez (depois disso,
  * `loggedIn:false` deixa de ser "esperando o QR" e passa a ser FAILED) e limpa
- * `desconectado_em`. Devolve true so na PRIMEIRA vez. Melhor esforco: falha de
- * gravacao so adia a marca para a proxima verificacao.
+ * `desconectado_em`. Devolve true so na PRIMEIRA vez. Melhor esforco.
  */
 export async function marcarJaConectou(
   admin: SupabaseClient,
@@ -87,16 +125,10 @@ export async function marcarJaConectou(
 ): Promise<boolean> {
   try {
     const e = await estadoNativo(admin, organizationId, instanceName);
-    if (!e.nativa) return false;
+    if (!e.nativa || !e.id) return false;
     if (e.jaConectou && !("desconectado_em" in e.metadata)) return false;
-    const { desconectado_em: _limpo, ...resto } = e.metadata;
-    await admin
-      .from("channel_sessions")
-      .update({ metadata: { ...resto, ja_conectou_em: e.jaConectou ? resto.ja_conectou_em : new Date().toISOString() } })
-      .eq("organization_id", organizationId)
-      .eq("verdash_instance_name", instanceName)
-      .is("archived_at", null);
-    return !e.jaConectou;
+    const r = await registrarEventoDeConexao(admin, { organizationId, channelSessionId: e.id, evento: "Connected" });
+    return r?.resultado === "aplicado" && !e.jaConectou;
   } catch {
     return false;
   }
@@ -106,17 +138,10 @@ export async function marcarJaConectou(
 export async function marcarDesconectada(
   admin: SupabaseClient,
   organizationId: string,
-  instanceName: string,
-  metadata: Record<string, unknown>,
-  agoraMs: number = Date.now(),
+  channelSessionId: string,
 ): Promise<void> {
   try {
-    await admin
-      .from("channel_sessions")
-      .update({ metadata: { ...metadata, desconectado_em: new Date(agoraMs).toISOString() } })
-      .eq("organization_id", organizationId)
-      .eq("verdash_instance_name", instanceName)
-      .is("archived_at", null);
+    await registrarEventoDeConexao(admin, { organizationId, channelSessionId, evento: "Disconnected" });
   } catch {
     // o proximo ciclo do vigia tenta de novo
   }

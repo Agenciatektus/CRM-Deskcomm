@@ -83,12 +83,25 @@ function adminFalso() {
       }
       return builder();
     },
-    rpc: async (fn: string, a: Record<string, string>) =>
-      fn === "fn_limite_do_plano"
+    rpc: async (fn: string, a: Record<string, string>) => {
+      if (fn === "fn_registrar_evento_conexao_nativa") {
+        // Espelho minimo da RPC atomica: so as chaves de conexao do metadata.
+        const r = tabela.find((x) => x.id === a.p_canal);
+        if (r && a.p_evento === "Connected") {
+          const m = { ...((r.metadata as Row) ?? {}) };
+          delete m.desconectado_em;
+          r.metadata = { ...m, ja_conectou_em: m.ja_conectou_em ?? new Date().toISOString() };
+        } else if (r) {
+          r.metadata = { ...((r.metadata as Row) ?? {}), desconectado_em: ((r.metadata as Row)?.desconectado_em as string) ?? new Date().toISOString() };
+        }
+        return { data: { resultado: "aplicado" }, error: null };
+      }
+      return fn === "fn_limite_do_plano"
         ? { data: limiteDoPlano, error: null }
         : fn === "fn_encrypt_oauth"
         ? { data: `\\x${hex(a.plaintext!)}`, error: null }
-        : { data: Buffer.from(a.ciphertext!.replace("\\x", ""), "hex").toString(), error: null },
+        : { data: Buffer.from(a.ciphertext!.replace("\\x", ""), "hex").toString(), error: null };
+    },
   } as never;
 }
 
