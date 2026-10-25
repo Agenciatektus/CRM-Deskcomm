@@ -417,7 +417,6 @@ export function Funil() {
         <h3 className="m-0 text-[1.15rem] font-bold">{PROVA.funil.titulo}</h3>
         <p className="mt-1.5 mb-0 leading-relaxed text-text-muted">{PROVA.funil.texto}</p>
       </div>
-      <Exemplo className="mt-4" />
     </Secao>
   );
 }
