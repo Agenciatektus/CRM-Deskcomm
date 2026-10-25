@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import * as C from "../../site/lib/conteudo";
+import { FUNIS } from "../../site/app/_components/telas/funil/dados";
 import { llmsCompleto, llmsResumo } from "../../site/lib/llms";
 
 /**
@@ -33,12 +34,17 @@ const TEXTOS = [
   C.HERO,
   C.VIDEO,
   C.FAIXA_ROTULO,
-  C.FAIXA,
+  C.FAIXA_APOIO,
+  C.FAIXA_PAUSAR,
+  C.FAIXA_CANAIS,
+  C.FAIXA_INTEGRACOES,
   C.PROBLEMAS_TITULO,
   C.PROBLEMAS_INTRO,
   C.PROBLEMAS,
   C.PROBLEMAS_FECHO,
   C.CONTA,
+  C.CALCULADORA,
+  FUNIS,
   C.MECANISMO,
   C.ETAPAS,
   C.PROVA,
@@ -95,7 +101,7 @@ describe("texto da LP", () => {
 
   it("não afirma número de resultado (percentual, multiplicador, 'X vezes')", () => {
     // "3x sem juros" e "100% da implantação" são condição de pagamento e de garantia, não resultado.
-    const semCondicao = (t: string) => t.replace(/\b3x sem juros/g, "").replace(/100% da implantação/g, "");
+    const semCondicao = (t: string) => t.replace(/\b3x sem juros/g, "").replace(/100% da implantação/g, "").replace(/15% de desconto/g, "");
     const suspeitos = TEXTOS.map(semCondicao).filter(
       (t) => /\d+\s?%/.test(t) || /\b\d+(?:[.,]\d+)?\s?(?:x|vezes)\b/i.test(t) || /\bROI\b/.test(t),
     );
