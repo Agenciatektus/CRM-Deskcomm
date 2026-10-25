@@ -9,7 +9,7 @@ import { Janela } from "./ui/Janela";
 
 export function Radar() {
   return (
-    <Secao titulo="titulo-radar" fundo="menta" largura="tela">
+    <Secao titulo="titulo-radar" fundo="menta" largura="tela" ritmo="l">
       <div className="grid items-center gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16 [&>*]:min-w-0">
         <div className="revela">
           <h2

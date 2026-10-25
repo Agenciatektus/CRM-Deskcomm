@@ -204,7 +204,7 @@ export function Problema() {
 
 export function Conta() {
   return (
-    <Secao id="conta" titulo="titulo-conta" fundo="azul">
+    <Secao id="conta" titulo="titulo-conta" fundo="azul" ritmo="l">
       <Cabeca id="titulo-conta" titulo={CONTA.titulo} texto={CONTA.intro} />
       <div className="revela max-w-[52rem]">
         <ContaDoVacuo />
@@ -406,7 +406,7 @@ export function Agente() {
     <PainelProposta key="5" />,
   ];
   return (
-    <Secao id="agente" titulo="titulo-agente" fundo="azul" largura="tela">
+    <Secao id="agente" titulo="titulo-agente" fundo="azul">
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
       <div className="grid items-start gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
@@ -429,7 +429,7 @@ export function Agente() {
 /** Prova do produto: o funil completo, com abas que trocam o vocabulário por negócio. */
 export function Funil() {
   return (
-    <Secao id="funil" titulo="titulo-funil" fundo="grade" largura="tela">
+    <Secao id="funil" titulo="titulo-funil" fundo="grade" largura="tela" ritmo="l">
       <Cabeca id="titulo-funil" titulo={PROVA.titulo} texto={PROVA.intro} />
       <div className="revela">
         <Janela rota="funil" interativa>
