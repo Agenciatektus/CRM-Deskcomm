@@ -169,6 +169,7 @@ export default async function MetaAdsSettingsPage({
           via={conexao.via}
           expiraEm={expiraEm}
           diasParaVencer={dias}
+          precisaReconectar={conexao.precisaReconectar}
           oauthDisponivel={metaAdsEstaConfigurado()}
           oauthFalta={faltaParaConectarOMetaAds()}
           idioma={idioma}
