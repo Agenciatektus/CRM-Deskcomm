@@ -259,7 +259,7 @@ describe("renovarTokensDaMeta", () => {
       vi
         .fn()
         .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: 0 } }), { status: 200 })),
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: 0, is_valid: true } }), { status: 200 })),
     );
     const linhas = [linha()];
     const { admin } = bancoCom(linhas);
@@ -268,6 +268,21 @@ describe("renovarTokensDaMeta", () => {
     expect(linhas[0]!.token_expires_at).toBeNull();
     const r2 = await renovarTokensDaMeta(admin, { agora: AGORA });
     expect(r2.examinadas).toBe(0);
+  });
+
+  it("expires_at 0 SEM is_valid true não vale: mantém a data antiga", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: 0, is_valid: false } }), { status: 200 })),
+    );
+    const antiga = new Date(AGORA.getTime() + 5 * DIA).toISOString();
+    const linhas = [linha({ token_expires_at: antiga })];
+    await renovarTokensDaMeta(bancoCom(linhas).admin, { agora: AGORA });
+    expect(linhas[0]!.token_expires_at).toBe(antiga);
   });
 
   it("sem expires_in e debug_token falhando: grava o token novo e MANTÉM a data antiga", async () => {

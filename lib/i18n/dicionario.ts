@@ -12329,6 +12329,11 @@ export const DICIONARIO: Traducoes = {
   "Quando vencer, a tela de campanhas (Análise > Meta Ads) para de atualizar. Para evitar, vá em Ajustes > Meta Ads e clique em Reconectar com Meta.": { es: "Cuando venza, la pantalla de campañas (Análisis > Meta Ads) dejará de actualizarse. Para evitarlo, ve a Ajustes > Meta Ads y haz clic en Reconectar con Meta." },
   "A tela de campanhas (Análise > Meta Ads) parou de atualizar. Para voltar, vá em Ajustes > Meta Ads e clique em Reconectar com Meta.": { es: "La pantalla de campañas (Análisis > Meta Ads) dejó de actualizarse. Para volver, ve a Ajustes > Meta Ads y haz clic en Reconectar con Meta." },
   "A Meta recusou renovar o acesso. Reconecte agora.": { es: "Meta rechazó renovar el acceso. Reconecta ahora." },
+  "A conexão com a Meta de {org} foi recusada.": { es: "La conexión con Meta de {org} fue rechazada." },
+  "A conexão com a Meta de {org} vence em {n} dias.": { es: "La conexión con Meta de {org} vence en {n} días." },
+  "A conexão com a Meta de {org} vence em 1 dia.": { es: "La conexión con Meta de {org} vence en 1 día." },
+  "A conexão com a Meta de {org} venceu.": { es: "La conexión con Meta de {org} venció." },
+  "Reconecte em Ajustes > Meta Ads.": { es: "Reconecta en Ajustes > Meta Ads." },
   "Conta conectada com a Meta.":
     { es: "Cuenta conectada con Meta." },
   "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.":

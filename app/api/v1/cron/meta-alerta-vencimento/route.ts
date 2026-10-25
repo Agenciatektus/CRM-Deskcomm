@@ -10,6 +10,7 @@ import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { alertarVencimentoDaMeta } from "@/lib/plataformas-de-anuncio/meta/alerta/rodada";
+import { criarEnviadorDeWhatsApp, type EnviarWhatsApp } from "@/lib/plataformas-de-anuncio/meta/alerta/whatsapp";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,16 @@ async function executar(req: NextRequest): Promise<Response> {
       { status: 401 },
     );
   }
-  const resumo = await alertarVencimentoDaMeta(createAdminClient(), enviarPushAoUsuario, new Date());
+  const admin = createAdminClient();
+  // Montado só na primeira organização que precisar avisar.
+  let enviador: EnviarWhatsApp | null = null;
+  const enviarWhatsApp: EnviarWhatsApp = async (org, texto) => {
+    enviador ??= await criarEnviadorDeWhatsApp(admin);
+    return enviador(org, texto);
+  };
+  const resumo = await alertarVencimentoDaMeta(admin, enviarPushAoUsuario, new Date(), enviarWhatsApp);
   if (resumo.alertadas > 0) {
-    await audit({ action: "plataformas.meta.vencimento_avisado", metadata: { ...resumo } });
+    await audit({ action: "plataformas.meta.vencimento_avisado", metadata: { ...resumo, whatsapp_enviados: resumo.whatsapp.enviados, whatsapp_falhas: resumo.whatsapp.falhas } });
   }
   return NextResponse.json({ data: resumo });
 }

@@ -21,10 +21,13 @@ import type { PushPayload } from "@/lib/notifications/push_payload";
 import { ehOperante, STATUS_OPERANTE, statusDaOrgEmbutida } from "@/lib/organizacao/operante";
 
 import { pendenciaDaConexao } from "./marcos";
-import { textoDoAlerta } from "./texto";
+import { textoDoAlerta, textoDoWhatsApp } from "./texto";
+import type { EnviarWhatsApp } from "./whatsapp";
 
 export const TETO_POR_RODADA = 200;
 export const ORCAMENTO_DE_TEMPO_MS = 40_000;
+/** O primeiro marco (d7) cai a 7 dias; vencidos entram por `lte`. */
+const JANELA_DO_ALERTA_MS = 7 * 24 * 60 * 60 * 1000;
 const LINK = "/app/settings/meta-ads";
 
 export type EnviarPush = (org: string, userId: string, payload: PushPayload) => Promise<unknown>;
@@ -34,6 +37,9 @@ export interface ResumoDoAlerta {
   alertadas: number;
   semDestinatario: number;
   adiadas: number;
+  /** A consulta devolveu o teto: pode haver mais conexões na janela. */
+  truncada: boolean;
+  whatsapp: { enviados: number; falhas: number };
 }
 
 interface Linha {
@@ -44,20 +50,29 @@ interface Linha {
   organizations?: Parameters<typeof statusDaOrgEmbutida>[0];
 }
 
-async function destinatarios(db: SupabaseClient, org: string): Promise<string[]> {
-  const { data: vinculos } = await db
+/** Admins ativos sem o suporte da plataforma; `null` se a leitura falhou (não avisa, não reivindica). */
+async function destinatarios(db: SupabaseClient, org: string): Promise<string[] | null> {
+  const { data: vinculos, error: erroVinculos } = await db
     .from("user_organizations")
     .select("user_id")
     .eq("organization_id", org)
     .eq("role", "admin")
     .is("revoked_at", null);
+  if (erroVinculos) {
+    logger.warn("[meta-alerta-vencimento] vínculos ilegíveis", { organization_id: org, code: erroVinculos.code ?? "sem_codigo" });
+    return null;
+  }
   const ids = ((vinculos ?? []) as Array<{ user_id: string }>).map((v) => v.user_id);
   if (ids.length === 0) return [];
-  const { data: suporte } = await db
+  const { data: suporte, error: erroSuporte } = await db
     .from("platform_admins")
     .select("user_id")
     .in("user_id", ids)
     .is("revoked_at", null);
+  if (erroSuporte) {
+    logger.warn("[meta-alerta-vencimento] platform_admins ilegível", { organization_id: org, code: erroSuporte.code ?? "sem_codigo" });
+    return null;
+  }
   const fora = new Set(((suporte ?? []) as Array<{ user_id: string }>).map((s) => s.user_id));
   return ids.filter((id) => !fora.has(id));
 }
@@ -66,8 +81,16 @@ export async function alertarVencimentoDaMeta(
   db: SupabaseClient,
   enviarPush: EnviarPush,
   agora: Date = new Date(),
+  enviarWhatsApp?: EnviarWhatsApp,
 ): Promise<ResumoDoAlerta> {
-  const resumo: ResumoDoAlerta = { examinadas: 0, alertadas: 0, semDestinatario: 0, adiadas: 0 };
+  const resumo: ResumoDoAlerta = {
+    examinadas: 0,
+    alertadas: 0,
+    semDestinatario: 0,
+    adiadas: 0,
+    truncada: false,
+    whatsapp: { enviados: 0, falhas: 0 },
+  };
   const inicio = Date.now();
   const { data, error } = await db
     .from("ad_insights_connections")
@@ -77,11 +100,17 @@ export async function alertarVencimentoDaMeta(
     .eq("platform", "meta_ads")
     .eq("connected_via", "oauth")
     .eq("organizations.status", STATUS_OPERANTE)
-    .or("needs_reconnect.eq.true,token_expires_at.not.is.null")
+    .or(`needs_reconnect.eq.true,token_expires_at.lte.${new Date(agora.getTime() + JANELA_DO_ALERTA_MS).toISOString()}`)
     .order("organization_id", { ascending: true })
     .limit(TETO_POR_RODADA);
   if (error || !data) return resumo;
   const linhas = data as unknown as Linha[];
+  if (linhas.length === TETO_POR_RODADA) {
+    resumo.truncada = true;
+    logger.warn("[meta-alerta-vencimento] a consulta bateu o teto; pode haver conexões na janela sem aviso", {
+      teto: TETO_POR_RODADA,
+    });
+  }
 
   for (const [i, linha] of linhas.entries()) {
     if (Date.now() - inicio > ORCAMENTO_DE_TEMPO_MS) {
@@ -96,6 +125,7 @@ export async function alertarVencimentoDaMeta(
 
     try {
       const alvos = await destinatarios(db, org);
+      if (alvos === null) continue;
       if (alvos.length === 0) {
         resumo.semDestinatario += 1;
         continue;
@@ -141,7 +171,24 @@ export async function alertarVencimentoDaMeta(
         botao: { rotulo: traduzir("Reconectar com Meta", idioma), href: `${base}${LINK}` },
         rodape: traduzir("Você recebe este aviso porque administra esta empresa.", idioma),
       });
+      // O WhatsApp da equipe é independente: falha dele não toca sino, push nem e-mail.
+      if (enviarWhatsApp) {
+        const desfecho = await enviarWhatsApp(org, textoDoWhatsApp(pendencia, marca.nome, idioma)).catch(
+          (): "falhou:erro_no_envio" => "falhou:erro_no_envio",
+        );
+        if (desfecho === "enviado") resumo.whatsapp.enviados += 1;
+        else if (desfecho !== "ignorado") {
+          resumo.whatsapp.falhas += 1;
+          logger.warn("[meta-alerta-vencimento] WhatsApp não enviado", { organization_id: org, motivo: desfecho });
+        }
+      }
       for (const userId of alvos) {
+        if (Date.now() - inicio > ORCAMENTO_DE_TEMPO_MS) {
+          logger.warn("[meta-alerta-vencimento] orçamento de tempo esgotado no meio dos destinatários", {
+            organization_id: org,
+          });
+          break;
+        }
         try {
           await enviarPush(org, userId, {
             title: texto.titulo,

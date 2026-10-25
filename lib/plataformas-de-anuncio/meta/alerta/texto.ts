@@ -32,3 +32,17 @@ export function textoDoAlerta(p: Pendencia, idioma: Idioma): { titulo: string; c
     ),
   };
 }
+
+/** A versão curta para o WhatsApp da equipe: sem token nem dado sensível. */
+export function textoDoWhatsApp(p: Pendencia, organizacao: string, idioma: Idioma): string {
+  const t = (s: string) => traduzir(s, idioma);
+  const fim = t("Reconecte em Ajustes > Meta Ads.");
+  const org = organizacao.slice(0, 60);
+  let frase: string;
+  if (p.recusada) frase = t("A conexão com a Meta de {org} foi recusada.");
+  else if (p.diasRestantes > 1) {
+    frase = t("A conexão com a Meta de {org} vence em {n} dias.").replace("{n}", String(p.diasRestantes));
+  } else if (p.diasRestantes === 1) frase = t("A conexão com a Meta de {org} vence em 1 dia.");
+  else frase = t("A conexão com a Meta de {org} venceu.");
+  return `${frase.replace("{org}", () => org)} ${fim}`;
+}
