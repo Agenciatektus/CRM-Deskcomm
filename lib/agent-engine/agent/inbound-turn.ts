@@ -2805,7 +2805,11 @@ async function executarTurnoDoAgente(
       ? (preview.notes ?? []).map((n) => n.headline + ': ' + n.body).join('\n')
       : buildNotesIndexBlock(pool, tenantId, leadId, deps.knobs.notesIndexMaxTokens),
     preview?.kind === 'sandbox' ? '' : buildCompromissosBlock(pool, tenantId, leadId, new Date()),
-    preview ? '' : buildOrigemBlock(pool, tenantId, leadId, new Date()),
+    // Só o turno que responde ao contato recebe o bloco completo; follow-up e caso,
+    // em que não há texto-padrão do botão a responder, recebem o histórico curto.
+    preview
+      ? ''
+      : buildOrigemBlock(pool, tenantId, leadId, new Date(), liveJob().kind === 'inbound_turn' ? 'entrada' : 'retomada'),
     preview
       ? null
       : pool

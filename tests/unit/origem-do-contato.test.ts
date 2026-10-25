@@ -145,16 +145,28 @@ describe("a IA recebe campanha, conjunto e anúncio (e o que o anúncio já dizi
     expect(b).not.toBe("");
   });
 
-  it("depois de 14 dias vira HISTÓRICO curto: só campanha, conjunto e anúncio, sem o texto", () => {
-    const b = montarBlocoDeOrigem({ ...base, created_at: "2026-08-01T12:00:00Z" }, agora);
+  it("RETOMADA (follow-up e caso): sempre o histórico curto, mesmo com 3 dias, sem o texto do anúncio nem 'responda já'", () => {
+    const b = montarBlocoDeOrigem({ ...base, created_at: "2026-10-21T12:00:00Z" }, agora, "retomada");
     expect(b).toContain("Histórico (não é o assunto de agora)");
     expect(b).toContain("03 - [TEKTUS] CTWA");
     expect(b).not.toContain("Agende sua avaliação");
     expect(b).not.toContain("Anúncio no Status");
+    expect(b).not.toContain("responda já");
+    expect(b).not.toContain("saudacao");
   });
 
-  it("depois de 14 dias e sem nenhum nome: nada (como antes)", () => {
-    expect(montarBlocoDeOrigem({ ...base, campaign: null, adset: null, ad: null, created_at: "2026-08-01T12:00:00Z" }, agora)).toBe("");
+  it("RETOMADA sem nenhum nome resolvido: nada", () => {
+    expect(montarBlocoDeOrigem({ ...base, campaign: null, adset: null, ad: null }, agora, "retomada")).toBe("");
+  });
+
+  it("ENTRADA depois de 14 dias: nada (não paga token em todo turno de contato antigo)", () => {
+    expect(montarBlocoDeOrigem({ ...base, created_at: "2026-08-01T12:00:00Z" }, agora)).toBe("");
+  });
+
+  it("a instrução diz o que é a saudação (para o agente não repeti-la) e o teto dela é 300", () => {
+    const b = montarBlocoDeOrigem({ ...base, greeting: "x".repeat(900) }, agora);
+    expect(b).toContain("não o repita");
+    expect(JSON.parse(b.split("\n")[1]!).saudacao.length).toBeLessThanOrEqual(300);
   });
 
   it("plataforma desconhecida ou contato sem anúncio: nada", () => {
