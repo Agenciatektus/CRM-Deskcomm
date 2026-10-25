@@ -58,14 +58,13 @@ export function rotuloDoAnuncio(
     .join(" · ");
 }
 
-/** Selo discreto de negócio vindo de anúncio; detalhe no título e no aria-label, focável por teclado. */
+/** Selo discreto de negócio vindo de anúncio; detalhe no título e no aria-label (sem parada de Tab: o dnd levantaria o card com espaço). */
 export function AnuncioDoCard({ lead }: { lead: Pick<Lead, "contact_campanha" | "contact_anuncio"> }) {
   const t = useT();
   const rotulo = rotuloDoAnuncio(lead, t);
   if (!rotulo) return null;
   return (
     <span
-      tabIndex={0}
       role="img"
       title={rotulo}
       aria-label={rotulo}

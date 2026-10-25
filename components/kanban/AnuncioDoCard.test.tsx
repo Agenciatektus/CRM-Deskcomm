@@ -14,7 +14,7 @@ describe("AnuncioDoCard", () => {
     render(<AnuncioDoCard lead={{ contact_campanha: "Black Friday", contact_anuncio: "Vídeo 2" }} />);
     const selo = screen.getByTestId("selo-de-anuncio");
     expect(selo).toHaveAttribute("aria-label", "Veio de anúncio · Campanha: Black Friday · Anúncio: Vídeo 2");
-    expect(selo).toHaveAttribute("tabindex", "0");
+    expect(selo).not.toHaveAttribute("tabindex");
   });
 
   it("só com anúncio omite a campanha", () => {
