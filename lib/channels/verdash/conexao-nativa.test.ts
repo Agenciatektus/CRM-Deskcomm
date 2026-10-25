@@ -157,6 +157,13 @@ describe("estadoDaConexaoNativa", () => {
     expect(JSON.stringify(r)).not.toMatch(/senha|TOKEN-SECRETO/);
   });
 
+  it("canal que ja esta WORKING e SUCESSO para o poll (200 conectado), nao 409, e nao toca o FZAP", async () => {
+    // Regressao: o portao espelhado devolvia 409 e o assistente nunca mostrava "WhatsApp conectado!".
+    const r = await estadoDaConexaoNativa(adminOk({ status: "WORKING" }), "org", canal(), sim);
+    expect(r).toMatchObject({ status: 200, corpo: { estado: "conectado" } });
+    expect(fzap.calls).toEqual([]);
+  });
+
   it("outra org / nao nativa = null (404); nao admin = 403; arquivada = 409", async () => {
     expect(await estadoDaConexaoNativa(admin(null), "outra-org", canal(), sim)).toBeNull();
     expect(await estadoDaConexaoNativa(adminOk({ verdash_origem: "vinculada" }), "org", canal(), sim)).toBeNull();

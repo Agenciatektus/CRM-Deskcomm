@@ -23,7 +23,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  */
 import { NextResponse } from "next/server";
 
-import { loadAuthUser } from "@/lib/auth/server";
+import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { randomUUID } from "node:crypto";
@@ -83,7 +83,8 @@ export async function GET(
   if (!session.waha_session_name) {
     const nativo = await qrDoCanalHospedado(createAdminClient(), activeOrg.orgId, id, async () => {
       const authz = await requireRole("admin", { requestId: randomUUID(), resource: "channel_sessions_qr" });
-      return authz.ok ? authz.user.id : null;
+      // Mesmo MFA das rotas conexao-nativa/codigo-nativo: ler o QR de um canal nativo e parear o numero.
+      return authz.ok && !(await mfaEmDivida()) ? authz.user.id : null;
     });
     if (nativo?.status === 200) {
       return new NextResponse(new Uint8Array(nativo.png), {

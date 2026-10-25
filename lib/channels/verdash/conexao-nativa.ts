@@ -7,7 +7,8 @@
  * de 2,5 s) nunca fica com imagem morta.
  *
  * Tres baldes, de proposito separados:
- *   - LEITURA (status/qr), por (canal, usuario), 60 por 60 s: o poll normal gasta 24;
+ *   - LEITURA (status/qr), por (canal, usuario), 60 por 60 s: o poll normal gasta 24; mais
+ *     um balde agregado do CANAL (150 por 60 s: varios admins/abas juntos);
  *   - CONNECT, por canal, 1 a cada 15 s: o unico POST que mexe no socket;
  *   - CODIGO por numero, por canal, 1 a cada 30 s (como `lib/channels/pairing-code.ts`).
  *
@@ -25,21 +26,25 @@ import { logger } from "@/lib/logger";
 import { fzapRequest } from "./client";
 import { resolveVerdashCreds, type VerdashCredentials } from "./credentials";
 import { marcarJaConectou } from "./estado-nativo";
-import { resumoDoErro, statusNativo } from "./nativo";
-import { lerNativa, type LinhaNativa } from "./qr-nativo";
+import { resumoDoErro, statusNativo, statusNativoCompleto } from "./nativo";
+import { lerPasskeyDoStatus, type PasskeyOpcoes } from "./passkey-forma";
+import { ESTADOS_COM_QR, lerNativa, type LinhaNativa } from "./qr-nativo";
 import { preencherTelefoneNativo } from "./telefone-nativo";
 
 export const LEITURA_LIMITE = 60;
+export const LEITURA_LIMITE_CANAL = 150;
 export const LEITURA_JANELA_S = 60;
 export const CONNECT_JANELA_S = 15;
 export const CODIGO_JANELA_S = 30;
 const ESPERA_APOS_CONNECT_MS = 2000;
 
-export type EstadoConexao = "gerando" | "aguardando_leitura" | "conectado" | "reconectando" | "erro";
+export type EstadoConexao = "gerando" | "aguardando_leitura" | "conectado" | "reconectando" | "exige_passkey" | "erro";
 
 export interface CorpoConexao {
   estado: EstadoConexao;
   qr?: string;
+  /** Desafio WebAuthn ja filtrado (so quando o WhatsApp exige passkey). */
+  passkey?: PasskeyOpcoes;
   telefone?: string | null;
   mensagem?: string;
   atualizado_em: string;
@@ -55,6 +60,7 @@ export interface OpcoesConexao {
 }
 
 const MSG_ERRO = "Não foi possível gerar o QR agora.";
+const MSG_PASSKEY = "O WhatsApp pediu uma chave de acesso em um formato que o CRM não reconhece.";
 const agora = () => new Date().toISOString();
 const dormir = (ms: number) => (ms > 0 ? new Promise<void>((r) => setTimeout(r, ms)) : Promise.resolve());
 
@@ -79,12 +85,19 @@ async function reabrir(creds: VerdashCredentials, org: string, canal: string, o:
   return true;
 }
 
-export type Passo = { estado: "conectado" } | { estado: "aguardando_leitura"; qr: string } | { estado: "gerando" | "reconectando" };
+export type Passo =
+  | { estado: "conectado" }
+  | { estado: "aguardando_leitura"; qr: string }
+  | { estado: "exige_passkey"; passkey: PasskeyOpcoes | null }
+  | { estado: "gerando" | "reconectando" };
 
 /** Status -> (se caiu, connect) -> QR. Compartilhado com a rota antiga `/qr`. LANCA se o FZAP falhar. */
 export async function prepararQr(creds: VerdashCredentials, org: string, canal: string, o: OpcoesConexao = {}): Promise<Passo> {
-  const st = await statusNativo(creds);
+  const { estado: st, passkey } = await statusNativoCompleto(creds);
   if (st === "conectado") return { estado: "conectado" };
+  // Com passkey pendente o QR nao nasce (spec): nao pedir, entregar o desafio. Forma desconhecida => null (erro claro).
+  const desafio = lerPasskeyDoStatus(passkey);
+  if (desafio) return { estado: "exige_passkey", passkey: desafio === "invalida" ? null : desafio };
   let reaberta = false;
   if (st === "desconectado") {
     if (!(await reabrir(creds, org, canal, o))) return { estado: "reconectando" };
@@ -95,13 +108,13 @@ export async function prepararQr(creds: VerdashCredentials, org: string, canal: 
   return { estado: reaberta ? "reconectando" : "gerando" };
 }
 
-interface Contexto {
+export interface Contexto {
   nativa: LinhaNativa;
   userId: string;
   creds: VerdashCredentials;
 }
 
-async function abrirContexto(
+export async function abrirContexto(
   admin: SupabaseClient,
   org: string,
   canal: string,
@@ -112,12 +125,15 @@ async function abrirContexto(
   const userId = await autorizar();
   if (!userId) return { status: 403, estado: "forbidden" };
   if (nativa.arquivada) return { status: 409, estado: "archived" };
+  // Mesmo portao da rota /qr: so se le/liga canal em estado de conexao (WORKING = ja conectado).
+  if (nativa.status === "WORKING") return { status: 409, estado: "connected" };
+  if (!ESTADOS_COM_QR.includes(nativa.status)) return { status: 409, estado: `state-${nativa.status.toLowerCase()}` };
   const creds = await resolveVerdashCreds(admin, { organizationId: org, instanceName: nativa.instanceName });
   if (!creds) return { status: 409, estado: "no-credential" };
   return { nativa, userId, creds };
 }
 
-const ehResposta = (c: Contexto | Resposta<never>): c is Resposta<never> => "status" in c;
+export const ehResposta = (c: Contexto | Resposta<never>): c is Resposta<never> => "status" in c;
 
 /** Estado da conexao de um canal nativo, ou `null` se o canal nao e nativo. */
 export async function estadoDaConexaoNativa(
@@ -129,13 +145,30 @@ export async function estadoDaConexaoNativa(
 ): Promise<Resposta<CorpoConexao> | null> {
   const ctx = await abrirContexto(admin, org, canal, autorizar);
   if (!ctx) return null;
-  if (ehResposta(ctx)) return ctx;
-  const lim = await checkRateLimit(`conexao-nativa-leitura:${org}:${canal}:${ctx.userId}`, LEITURA_LIMITE, LEITURA_JANELA_S);
-  if (!lim.allowed) return { status: 429, estado: "rate-limited", retryAfter: 15 };
+  if (ehResposta(ctx)) {
+    // Canal que JA esta WORKING (o webhook Connected chega 1 a 2 s depois do scan, antes do proximo
+    // poll): para quem esta no assistente isso e SUCESSO. Devolver 409 faria o poll tratar como falha
+    // e a tela de "WhatsApp conectado!" nunca apareceria. O portao continua valendo para religar
+    // (codigo-nativo e passkey-nativo seguem 409), que e o que o P2-1 do Cassio quer evitar.
+    if (ctx.status === 409 && ctx.estado === "connected") {
+      const l = await lerNativa(admin, org, canal);
+      return { status: 200, corpo: { estado: "conectado", telefone: l?.telefone ?? null, atualizado_em: agora() } };
+    }
+    return ctx;
+  }
+  const base = `conexao-nativa-leitura:${org}:${canal}`;
+  const lim = await checkRateLimit(`${base}:${ctx.userId}`, LEITURA_LIMITE, LEITURA_JANELA_S);
+  const limCanal = await checkRateLimit(base, LEITURA_LIMITE_CANAL, LEITURA_JANELA_S);
+  if (!lim.allowed || !limCanal.allowed) return { status: 429, estado: "rate-limited", retryAfter: 15 };
 
   try {
     const p = await prepararQr(ctx.creds, org, canal, opcoes);
     if (p.estado === "aguardando_leitura") return { status: 200, corpo: { estado: p.estado, qr: p.qr, atualizado_em: agora() } };
+    if (p.estado === "exige_passkey") {
+      if (p.passkey) return { status: 200, corpo: { estado: p.estado, passkey: p.passkey, atualizado_em: agora() } };
+      logger.warn("verdash_nativo_passkey_formato_desconhecido", { organization_id: org, channel_session_id: canal });
+      return { status: 200, corpo: { estado: "erro", mensagem: MSG_PASSKEY, atualizado_em: agora() } };
+    }
     if (p.estado !== "conectado") return { status: 200, corpo: { estado: p.estado, atualizado_em: agora() } };
     await marcarJaConectou(admin, org, ctx.nativa.instanceName);
     await preencherTelefoneNativo(admin, org, ctx.nativa.instanceName);
@@ -180,7 +213,10 @@ export async function codigoPorNumero(
   try {
     const st = await statusNativo(ctx.creds);
     if (st === "conectado") return { status: 409, estado: "connected" };
-    if (st === "desconectado") await reabrir(ctx.creds, org, canal, opcoes);
+    // Throttle do connect (15 s): sem socket aberto o pairphone da 500; avisa em vez de seguir.
+    if (st === "desconectado" && !(await reabrir(ctx.creds, org, canal, opcoes))) {
+      return { status: 429, estado: "rate-limited", retryAfter: CONNECT_JANELA_S };
+    }
     const d = await fzapRequest<{ LinkingCode?: unknown }>(ctx.creds, "/session/pairphone", { method: "POST", body: { phone } });
     const codigo = formatarCodigo(d?.LinkingCode);
     if (!codigo) {
