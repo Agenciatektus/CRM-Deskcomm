@@ -9217,5 +9217,17 @@
   "Destino de conversões": "Conversions destination",
   "Conecte a Meta em Ajustes › Meta Ads para escolher o destino de uma lista.": "Connect Meta in Settings › Meta Ads to choose the destination from a list.",
   "Conecte a Meta em Ajustes › Meta Ads para escolher a Página de uma lista.": "Connect Meta in Settings › Meta Ads to choose the Page from a list.",
-  "Veio de anúncio": "Came from an ad"
+  "Veio de anúncio": "Came from an ad",
+  "Escolha quais contas de anúncio pertencem a esta organização": "Choose which ad accounts belong to this organization",
+  "Escolha as contas deste cliente em Ajustes › Meta Ads.": "Choose this client's accounts in Settings › Meta Ads.",
+  "Peça a um administrador para escolher as contas.": "Ask an administrator to choose the accounts.",
+  "Escolher contas": "Choose accounts",
+  "Esta conta de anúncios não está liberada para esta organização. Peça a um administrador para escolhê-la em Configurações › Meta Ads.": "This ad account is not enabled for this organization. Ask an administrator to choose it in Settings › Meta Ads.",
+  "Contas de anúncio deste cliente": "This client's ad accounts",
+  "Os gestores desta organização só verão as contas marcadas. O login pode alcançar contas de outros clientes: marque apenas as deste.": "Managers in this organization will only see the checked accounts. The login may reach other clients' accounts: check only this client's.",
+  "Carregando contas…": "Loading accounts…",
+  "Não consegui listar as contas agora. Tente de novo em instantes.": "Could not list the accounts right now. Try again shortly.",
+  "Buscar por nome ou id": "Search by name or id",
+  "marcadas": "selected",
+  "Primeira conta ativa": "First active account"
 }

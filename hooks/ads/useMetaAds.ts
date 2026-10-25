@@ -27,6 +27,8 @@ import type { ContaDeAnuncio, LinhaDeCampanha } from "@/lib/plataformas-de-anunc
 export interface ContasResposta {
   contas: ContaDeAnuncio[];
   conta_padrao: string | null;
+  /** Lista filtrada pela regra de contas permitidas da organização. */
+  restrita?: boolean;
 }
 
 export interface CampanhasResposta {
@@ -87,6 +89,21 @@ export function useMetaCampaigns({ contaId, de, ate }: ParametrosDeCampanhas) {
       });
     },
     enabled: Boolean(contaId),
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** TODAS as contas que o login alcança (admin), para escolher as deste cliente. */
+export function useTodasAsContasDaMeta(enabled: boolean) {
+  return useQuery({
+    queryKey: ["ads", "meta", "accounts", "todas"],
+    queryFn: async () =>
+      apiClient.get<{ data: ContasResposta & { permitidas?: string[] | null } }>(
+        "/api/v1/ads/meta/accounts?todas=1",
+      ),
+    enabled,
     staleTime: 0,
     retry: false,
     refetchOnWindowFocus: false,

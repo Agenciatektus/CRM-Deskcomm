@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { contasPermitidas, normalizarContas } from "./contas-permitidas";
 import type { CredencialDeLeitura, PlataformaDeAnuncio } from "./types";
 
 /**
@@ -45,7 +46,7 @@ export async function lerCredencialDeLeitura(
 ): Promise<LeituraDeCredencialDeLeitura> {
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .select("access_token_encrypted, default_account_id")
+    .select("access_token_encrypted, default_account_id, connected_via, allowed_ad_account_ids")
     .eq("organization_id", organizationId)
     .eq("platform", plataforma)
     .maybeSingle();
@@ -64,6 +65,8 @@ export async function lerCredencialDeLeitura(
   const linha = data as {
     access_token_encrypted: string | null;
     default_account_id: string | null;
+    connected_via: string | null;
+    allowed_ad_account_ids: string[] | null;
   };
 
   // A coluna é NOT NULL no schema, então isto não deveria acontecer. A guarda
@@ -79,7 +82,15 @@ export async function lerCredencialDeLeitura(
 
   return {
     ok: true,
-    credencial: { accessToken: token, contaPadrao: linha.default_account_id },
+    credencial: {
+      accessToken: token,
+      contaPadrao: linha.default_account_id,
+      contasPermitidas: contasPermitidas({
+        via: linha.connected_via,
+        allowed: linha.allowed_ad_account_ids,
+        padrao: linha.default_account_id,
+      }),
+    },
   };
 }
 
@@ -106,10 +117,14 @@ export async function existeConexaoDeLeitura(
   metaBusinesses: { id: string; name: string }[];
   /** A Meta recusou renovar o token (migration 9073): só reconectar resolve. */
   precisaReconectar: boolean;
+  /** Contas gravadas pelo admin (migration 9074); `null` = não escolhidas. */
+  contasEscolhidas: string[] | null;
+  /** Regra efetiva (ver `contas-permitidas.ts`); `null` = sem restrição. */
+  contasPermitidas: string[] | null;
 }> {
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .select("default_account_id, token_expires_at, connected_via, meta_user_name, meta_businesses, needs_reconnect")
+    .select("default_account_id, token_expires_at, connected_via, meta_user_name, meta_businesses, needs_reconnect, allowed_ad_account_ids")
     .eq("organization_id", organizationId)
     .eq("platform", plataforma)
     .maybeSingle();
@@ -120,7 +135,7 @@ export async function existeConexaoDeLeitura(
       plataforma,
       error: error.message,
     });
-    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null, metaUserName: null, metaBusinesses: [], precisaReconectar: false };
+    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null, metaUserName: null, metaBusinesses: [], precisaReconectar: false, contasEscolhidas: null, contasPermitidas: [] };
   }
 
   const linha = data as {
@@ -130,18 +145,25 @@ export async function existeConexaoDeLeitura(
     meta_user_name: string | null;
     meta_businesses: unknown;
     needs_reconnect: boolean | null;
+    allowed_ad_account_ids: string[] | null;
   } | null;
+  const via = linha?.connected_via === "oauth" || linha?.connected_via === "manual" ? linha.connected_via : null;
   return {
     conectada: Boolean(linha),
     contaPadrao: linha?.default_account_id ?? null,
     tokenExpiraEm: linha?.token_expires_at ?? null,
-    via: linha?.connected_via === "oauth" || linha?.connected_via === "manual" ? linha.connected_via : null,
+    via,
     metaUserName: linha?.meta_user_name ?? null,
     precisaReconectar: linha?.needs_reconnect === true,
     metaBusinesses: Array.isArray(linha?.meta_businesses)
       ? (linha.meta_businesses as { id: string; name: string }[]).filter(
           (b) => typeof b?.name === "string",
         )
+      : [],
+    contasEscolhidas: Array.isArray(linha?.allowed_ad_account_ids) ? normalizarContas(linha.allowed_ad_account_ids) : null,
+    // Sem linha = sem conexão: nada a ver (falha fechada).
+    contasPermitidas: linha
+      ? contasPermitidas({ via, allowed: linha.allowed_ad_account_ids, padrao: linha.default_account_id })
       : [],
   };
 }

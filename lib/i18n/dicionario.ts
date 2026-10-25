@@ -12309,6 +12309,30 @@ export const DICIONARIO: Traducoes = {
     { es: "{n} cuentas publicitarias accesibles." },
   "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.":
     { es: "La cuenta de Meta elegida define lo que ven los gestores de esta organización: conecta con el inicio de sesión de la propia empresa." },
+  "Escolha quais contas de anúncio pertencem a esta organização":
+    { es: "Elige qué cuentas de anuncios pertenecen a esta organización" },
+  "Escolha as contas deste cliente em Ajustes › Meta Ads.":
+    { es: "Elige las cuentas de este cliente en Ajustes › Meta Ads." },
+  "Peça a um administrador para escolher as contas.":
+    { es: "Pide a un administrador que elija las cuentas." },
+  "Escolher contas":
+    { es: "Elegir cuentas" },
+  "Esta conta de anúncios não está liberada para esta organização. Peça a um administrador para escolhê-la em Configurações › Meta Ads.":
+    { es: "Esta cuenta de anuncios no está habilitada para esta organización. Pide a un administrador que la elija en Configuración › Meta Ads." },
+  "Contas de anúncio deste cliente":
+    { es: "Cuentas de anuncios de este cliente" },
+  "Os gestores desta organização só verão as contas marcadas. O login pode alcançar contas de outros clientes: marque apenas as deste.":
+    { es: "Los gestores de esta organización solo verán las cuentas marcadas. El inicio de sesión puede alcanzar cuentas de otros clientes: marca solo las de este." },
+  "Carregando contas…":
+    { es: "Cargando cuentas…" },
+  "Não consegui listar as contas agora. Tente de novo em instantes.":
+    { es: "No pude listar las cuentas ahora. Inténtalo de nuevo en unos instantes." },
+  "Buscar por nome ou id":
+    { es: "Buscar por nombre o id" },
+  "marcadas":
+    { es: "marcadas" },
+  "Primeira conta ativa":
+    { es: "Primera cuenta activa" },
   "Conectado como {nome}":
     { es: "Conectado como {nome}" },
   "Empresas (BM): {lista}":

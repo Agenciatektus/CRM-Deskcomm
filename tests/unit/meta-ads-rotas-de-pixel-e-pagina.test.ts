@@ -27,7 +27,7 @@ beforeEach(() => {
   mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org-ativa" } });
   mock.lerCredencial.mockResolvedValue({
     ok: true,
-    credencial: { accessToken: "tok", contaPadrao: "act_1" },
+    credencial: { accessToken: "tok", contaPadrao: "act_1", contasPermitidas: null },
   });
 });
 

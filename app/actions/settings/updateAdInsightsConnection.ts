@@ -84,6 +84,23 @@ const entradaSchema = z.object({
     .regex(/^act_\d+$/, "conta no formato act_<id>")
     .nullable()
     .optional(),
+  /**
+   * As contas que ESTA organização pode ver (migration 9074). `undefined` = não
+   * mexer; `null` = limpar (volta à regra padrão da procedência); lista =
+   * gravar. Quando vem, a conta padrão tem de vir junto e pertencer à lista.
+   */
+  allowed_ad_account_ids: z
+    .array(z.string().trim().regex(/^act_\d+$/, "conta no formato act_<id>"))
+    .max(500)
+    .nullable()
+    .optional(),
+}).superRefine((v, ctx) => {
+  if (!v.allowed_ad_account_ids) return;
+  if (v.default_account_id === undefined) {
+    ctx.addIssue({ code: "custom", path: ["default_account_id"], message: "obrigatória junto da lista" });
+  } else if (v.default_account_id && !v.allowed_ad_account_ids.includes(v.default_account_id)) {
+    ctx.addIssue({ code: "custom", path: ["default_account_id"], message: "fora da lista de contas" });
+  }
 });
 
 export type AdInsightsConnectionInput = z.infer<typeof entradaSchema>;
@@ -143,6 +160,7 @@ export async function updateAdInsightsConnection(
     platform: parsed.data.platform,
     accessToken: parsed.data.access_token,
     defaultAccountId: parsed.data.default_account_id,
+    allowedAdAccountIds: parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
   });
   if (!gravado.ok) {
     return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
@@ -163,6 +181,10 @@ export async function updateAdInsightsConnection(
       // O QUE mudou, jamais o valor. O id da conta pode ir (é identificador,
       // não segredo); o token não entra nem em metadata.
       default_account_id: parsed.data.default_account_id ?? null,
+      // Quais contas ficaram liberadas para os gestores (ids, não segredo).
+      ...(parsed.data.allowed_ad_account_ids !== undefined
+        ? { allowed_ad_account_ids: parsed.data.allowed_ad_account_ids }
+        : {}),
       token_trocado: Boolean(parsed.data.access_token),
       primeira_conexao: !existente,
     },

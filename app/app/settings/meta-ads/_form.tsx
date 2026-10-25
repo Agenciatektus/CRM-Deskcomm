@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
+import { SeletorDeContas } from "./_seletor-de-contas";
 import { DIAS_DE_AVISO_DE_VENCIMENTO } from "@/lib/plataformas-de-anuncio/meta/oauth/validade";
 
 const LINK_DE_CONEXAO = "/api/v1/plataformas-de-anuncio/meta/connect";
@@ -38,6 +39,7 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
 export function FormularioDeMetaAds({
   conectada,
   contaPadrao,
+  contasPermitidas,
   via,
   expiraEm,
   diasParaVencer,
@@ -48,6 +50,8 @@ export function FormularioDeMetaAds({
 }: {
   conectada: boolean;
   contaPadrao: string | null;
+  /** Regra efetiva de contas liberadas; `null` = sem restrição (token colado à mão). */
+  contasPermitidas: string[] | null;
   via: "manual" | "oauth" | null;
   /** Data de vencimento já formatada; `null` em token colado à mão. */
   expiraEm: string | null;
@@ -65,6 +69,9 @@ export function FormularioDeMetaAds({
 
   const [token, setToken] = useState("");
   const [conta, setConta] = useState(contaPadrao ?? "");
+  const [selecionadas, setSelecionadas] = useState<string[]>(contasPermitidas ?? []);
+  const [listaCarregada, setListaCarregada] = useState(false);
+  const aoCarregar = useCallback(() => setListaCarregada(true), []);
 
   // Na primeira conexão o token é obrigatório — a coluna é NOT NULL (0214) e a
   // Server Action recusa. Barrar aqui explica antes de o clique acontecer, em
@@ -77,7 +84,14 @@ export function FormularioDeMetaAds({
       const resultado = await updateAdInsightsConnection({
         platform: "meta_ads",
         access_token: token.trim() || undefined,
-        default_account_id: conta.trim() || null,
+        // A padrão tem de estar entre as marcadas; senão o servidor recusa.
+        default_account_id:
+          (listaCarregada && !selecionadas.includes(conta.trim()) ? "" : conta.trim()) || null,
+        // Só com a lista de contas à vista: salvar sem ela apagaria a escolha.
+        // Token colado à mão sem nenhuma marcada = sem restrição.
+        ...(conectada && listaCarregada
+          ? { allowed_ad_account_ids: selecionadas.length === 0 && via !== "oauth" ? null : selecionadas }
+          : {}),
       });
 
       if (resultado.ok) {
@@ -173,6 +187,17 @@ export function FormularioDeMetaAds({
 
       <Card className="p-6">
         <form onSubmit={salvar} className="flex flex-col gap-5">
+          {conectada && (
+            <SeletorDeContas
+              selecionadas={selecionadas}
+              padrao={conta}
+              onSelecionadas={setSelecionadas}
+              onPadrao={setConta}
+              onCarregada={aoCarregar}
+              idioma={idioma}
+            />
+          )}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="access_token">{t("Token de acesso")}</Label>
             <Input
@@ -192,6 +217,7 @@ export function FormularioDeMetaAds({
             </p>
           </div>
 
+          {!conectada && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="default_account_id">{t("Conta padrão (opcional)")}</Label>
             <Input
@@ -206,6 +232,7 @@ export function FormularioDeMetaAds({
               )}
             </p>
           </div>
+          )}
 
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isPending || !podeSalvar}>

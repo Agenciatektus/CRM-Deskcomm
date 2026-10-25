@@ -385,6 +385,7 @@ describe("callback", () => {
     const { state, cookie } = await iniciado();
     await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
     expect(fake.upserts[0]!.valores).toHaveProperty("default_account_id", null);
+    expect(fake.upserts[0]!.valores).toHaveProperty("allowed_ad_account_ids", null);
     expect(fake.audits[0]!.metadata).toMatchObject({ via_anterior: "oauth", conta_padrao_limpa: true });
   });
 
@@ -393,6 +394,7 @@ describe("callback", () => {
     const { state, cookie } = await iniciado();
     await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
     expect(fake.upserts[0]!.valores).not.toHaveProperty("default_account_id");
+    expect(fake.upserts[0]!.valores).not.toHaveProperty("allowed_ad_account_ids");
   });
 
   it("cancelar na Meta não é falha", async () => {

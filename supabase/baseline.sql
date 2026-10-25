@@ -66422,3 +66422,10 @@ comment on column public.ad_insights_connections.meta_user_name is
 comment on column public.ad_insights_connections.meta_businesses is
   'Empresas (BM) do usuario Meta: [{id,name}], no maximo 20. Nulo = nao lido. Nao e retrato de contas. Migration 9072.';
 
+
+-- ---- Contas de anuncio permitidas por organizacao (migration 9074) ----
+alter table public.ad_insights_connections
+  add column if not exists allowed_ad_account_ids text[];
+
+comment on column public.ad_insights_connections.allowed_ad_account_ids is
+  'Contas de anuncio (act_<id>) que esta organizacao pode ver. Nulo = OAuth: so a conta padrao; token manual: sem restricao. Migration 9074.';

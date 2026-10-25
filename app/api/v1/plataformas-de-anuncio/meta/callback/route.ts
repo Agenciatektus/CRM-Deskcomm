@@ -163,13 +163,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     anterior?.meta_user_id !== perfil.metaUserId;
 
   // 4. Cifra e upsert pelo gravador compartilhado (cifra antes do upsert; sem
-  // cifra, recusa). Não mexe na conta padrão: reconectar a mantém.
+  // cifra, recusa). Reconectar com o mesmo login mantém conta padrão e contas permitidas; outro login zera as duas.
   const gravado = await gravarConexaoDeLeitura(admin, {
     organizationId: estado.organizationId,
     userId: estado.userId,
     platform: "meta_ads",
     accessToken: leitura.token.access_token,
-    ...(donoMudou ? { defaultAccountId: null } : {}),
+    ...(donoMudou ? { defaultAccountId: null, allowedAdAccountIds: null } : {}),
     oauth: {
       expiraEm: leitura.token.expira_em,
       scopes: perfil.scopes,
@@ -231,5 +231,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   } catch {
     // fica em leitura_falhou
   }
-  return voltar(base, { conectado: "1", ...parametrosDoDesfecho(desfecho) });
+  return voltar(base, { conectado: "1", escolher: "1", ...parametrosDoDesfecho(desfecho) });
 }
