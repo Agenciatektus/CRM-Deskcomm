@@ -17718,6 +17718,15 @@ export const DICIONARIO: Traducoes = {
   "Gerar QR code": { es: "Generar código QR" },
   "Conectar WhatsApp por QR code": { es: "Conectar WhatsApp por código QR" },
   "No WhatsApp do celular, abra Aparelhos conectados e leia o código.": { es: "En el WhatsApp del celular, abre Dispositivos vinculados y escanea el código." },
+  // ─── Seletor de pixel e Página (Conversões) ───
+  "Carregando a lista da Meta…": { es: "Cargando la lista de Meta…" },
+  "Não consegui carregar a lista da Meta agora. Digite o ID manualmente.": { es: "No pude cargar la lista de Meta ahora. Escribe el ID manualmente." },
+  "A Meta não devolveu nenhuma opção para esta conta. Digite o ID manualmente.": { es: "Meta no devolvió ninguna opción para esta cuenta. Escribe el ID manualmente." },
+  "Escolha na lista": { es: "Elige de la lista" },
+  "Digitar o ID manualmente": { es: "Escribir el ID manualmente" },
+  "Destino de conversões": { es: "Destino de conversiones" },
+  "Conecte a Meta em Ajustes › Meta Ads para escolher o destino de uma lista.": { es: "Conecta Meta en Ajustes › Meta Ads para elegir el destino de una lista." },
+  "Conecte a Meta em Ajustes › Meta Ads para escolher a Página de uma lista.": { es: "Conecta Meta en Ajustes › Meta Ads para elegir la Página de una lista." },
 };
 
 /**

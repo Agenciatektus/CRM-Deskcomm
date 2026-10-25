@@ -27,8 +27,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePaginasDaMeta } from "@/hooks/ads/useOpcoesDaMeta";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
+
+import { SeletorDaMeta } from "./_seletorDaMeta";
 
 const ERRO: Record<string, string> = {
   validation_failed: "Confira os campos: algum valor não está no formato esperado.",
@@ -39,14 +42,46 @@ const ERRO: Record<string, string> = {
   erro_ao_gravar: "Não consegui gravar agora. Tente de novo em instantes.",
 };
 
+/** A Página, escolhida na lista das que o token alcança. */
+function PaginaDaMeta({
+  idioma,
+  valor,
+  onValor,
+  children,
+}: {
+  idioma: Idioma;
+  valor: string;
+  onValor: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  const paginas = usePaginasDaMeta(true);
+  return (
+    <SeletorDaMeta
+      id="meta_page_id_lista"
+      idioma={idioma}
+      rotulo={traduzir("ID da Página", idioma)}
+      valor={valor}
+      onValor={onValor}
+      opcoes={paginas.data?.data.paginas}
+      carregando={paginas.isLoading}
+      erro={paginas.isError}
+    >
+      {children}
+    </SeletorDaMeta>
+  );
+}
+
 export function IdentidadeDaConversao({
   pageId,
   whatsappBusinessAccountId,
   idioma,
+  leituraConectada = false,
 }: {
   pageId: string | null;
   whatsappBusinessAccountId: string | null;
   idioma: Idioma;
+  /** Há conexão de leitura da Meta (Ajustes › Meta Ads): liga a lista de Páginas. */
+  leituraConectada?: boolean;
 }) {
   const t = (texto: string) => traduzir(texto, idioma);
   const router = useRouter();
@@ -86,16 +121,32 @@ export function IdentidadeDaConversao({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="meta_page_id">{t("ID da Página")}</Label>
-          <Input
-            id="meta_page_id"
-            inputMode="numeric"
-            value={pagina}
-            onChange={(e) => setPagina(e.target.value)}
-            placeholder="123456789012345"
-          />
+          {(() => {
+            const campo = (
+              <Input
+                id="meta_page_id"
+                inputMode="numeric"
+                value={pagina}
+                onChange={(e) => setPagina(e.target.value)}
+                placeholder="123456789012345"
+              />
+            );
+            return leituraConectada ? (
+              <PaginaDaMeta idioma={idioma} valor={pagina} onValor={setPagina}>
+                {campo}
+              </PaginaDaMeta>
+            ) : (
+              campo
+            );
+          })()}
           <p className="text-xs text-muted-foreground">
             {t("Só números. É o ID da página do Facebook que abre a conversa do anúncio.")}
           </p>
+          {!leituraConectada && (
+            <p className="text-xs text-muted-foreground">
+              {t("Conecte a Meta em Ajustes › Meta Ads para escolher a Página de uma lista.")}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

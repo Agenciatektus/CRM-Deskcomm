@@ -238,6 +238,17 @@ export function classificarErroGraph(
  * porque a plataforma o monta assim; por isso ele é reescrito antes de ser
  * seguido, e nunca registrado em log.
  */
+/** `true` só se as duas URLs são http(s) e têm a mesma origem. Nunca lança. */
+function mesmaOrigemDaGraph(candidata: string, referencia: string): boolean {
+  try {
+    const a = new URL(candidata);
+    const b = new URL(referencia);
+    return (a.protocol === "https:" || a.protocol === "http:") && a.origin === b.origin;
+  } catch {
+    return false;
+  }
+}
+
 async function buscarPaginado<T>(
   urlInicial: string,
   token: string,
@@ -300,7 +311,11 @@ async function buscarPaginado<T>(
     }
 
     acumulado.push(...(json.data ?? []));
-    url = json.paging?.next ?? null;
+    // O `next` vem da plataforma e o token segue no header: só se segue um cursor que
+    // aponta para a MESMA origem da Graph que a leitura já está usando. Um `next` de
+    // outro host (resposta adulterada, base mal configurada) entregaria o token a ele.
+    const proximo = json.paging?.next ?? null;
+    url = proximo !== null && mesmaOrigemDaGraph(proximo, urlInicial) ? proximo : null;
   }
 
   return { ok: true, dados: acumulado };
@@ -448,4 +463,52 @@ export async function lerInsights(
   // visível por um erro invisível, que ninguém vai investigar.
   if (!repetida.ok) return repetida;
   return { ...repetida, aviso: AVISO_DO_CONNECT_RATE_AUSENTE };
+}
+
+/** Uma opção de lista para o operador escolher (pixel ou Página). */
+export interface OpcaoDaMeta {
+  id: string;
+  nome: string;
+}
+
+interface OpcaoCrua {
+  id?: string;
+  name?: string;
+}
+
+/** A mensagem crua da Graph fica no log do transporte; a resposta leva só a classe. */
+function semCorpoDaGraph<T>(r: Extract<ResultadoDeLeitura<T>, { ok: false }>): ResultadoDeLeitura<T> {
+  return { ok: false, falha: r.falha, detalhe: "leitura recusada pela plataforma" };
+}
+
+function comoOpcoes(cruas: OpcaoCrua[]): OpcaoDaMeta[] {
+  return cruas
+    .filter((o): o is OpcaoCrua & { id: string } => Boolean(o.id))
+    .map((o) => ({ id: o.id, nome: o.name ?? o.id }));
+}
+
+/**
+ * Os pixels (datasets) da conta de anúncio. O `id` é o dataset id que a API de
+ * Conversões usa. `contaId` fora de `act_<dígitos>` é recusado ANTES de montar a
+ * URL: ele entra no caminho, e um valor livre ali escolheria outro endpoint.
+ */
+export async function listarPixels(
+  token: string,
+  contaId: string,
+): Promise<ResultadoDeLeitura<OpcaoDaMeta[]>> {
+  if (!/^act_\d+$/.test(contaId)) {
+    return { ok: false, falha: "campo_invalido", detalhe: "conta fora do formato act_<id>" };
+  }
+  const url = montarUrl(`${contaId}/adspixels`, { fields: "id,name", limit: "200" });
+  const r = await buscarPaginado<OpcaoCrua>(url, token, "adspixels");
+  return r.ok ? { ok: true, dados: comoOpcoes(r.dados) } : semCorpoDaGraph(r);
+}
+
+/** As Páginas que o token alcança. */
+export async function listarPaginas(
+  token: string,
+): Promise<ResultadoDeLeitura<OpcaoDaMeta[]>> {
+  const url = montarUrl("me/accounts", { fields: "id,name", limit: "200" });
+  const r = await buscarPaginado<OpcaoCrua>(url, token, "pages");
+  return r.ok ? { ok: true, dados: comoOpcoes(r.dados) } : semCorpoDaGraph(r);
 }
