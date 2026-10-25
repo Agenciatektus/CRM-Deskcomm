@@ -100,7 +100,6 @@ export async function alertarVencimentoDaMeta(
       "organization_id, token_expires_at, needs_reconnect, needs_reconnect_desde, organizations:organization_id!inner(status)",
     )
     .eq("platform", "meta_ads")
-    .eq("connected_via", "oauth")
     .eq("organizations.status", STATUS_OPERANTE)
     .or(`needs_reconnect.eq.true,token_expires_at.lte.${new Date(agora.getTime() + JANELA_DO_ALERTA_MS).toISOString()}`)
     .order("organization_id", { ascending: true })

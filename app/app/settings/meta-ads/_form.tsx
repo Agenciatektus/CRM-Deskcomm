@@ -8,6 +8,16 @@ import {
   disconnectAdInsights,
   updateAdInsightsConnection,
 } from "@/app/actions/settings/updateAdInsightsConnection";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +44,14 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
   cifra_indisponivel:
     "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la — refazer o cadastro aqui não resolve.",
   erro_ao_gravar: "Não consegui gravar agora. Tente de novo em instantes.",
+  rate_limited: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.",
+  token_invalido:
+    "A Meta não reconhece este token: ele está inválido, expirado ou revogado. Gere um novo e cole de novo.",
+  token_de_pagina:
+    "Este é um token de Página. Gere um token de usuário ou de usuário do sistema com a permissão ads_read.",
+  sem_ads_read: "O token não tem a permissão ads_read. Gere-o de novo com essa permissão.",
+  sem_contas: "Este token não enxerga nenhuma conta de anúncio. Confira se o usuário tem acesso às contas.",
+  validacao_indisponivel: "Não consegui validar o token com a Meta agora. Tente de novo em instantes.",
 };
 
 export function FormularioDeMetaAds({
@@ -75,13 +93,15 @@ export function FormularioDeMetaAds({
   const [selecionadas, setSelecionadas] = useState<string[]>(contasPermitidas ?? []);
   const [listaCarregada, setListaCarregada] = useState(false);
   const aoCarregar = useCallback(() => setListaCarregada(true), []);
+  // O novo token enxerga menos contas que as liberadas hoje: pede confirmação antes de gravar.
+  const [reducao, setReducao] = useState<{ atuais: number; visiveis: number } | null>(null);
 
   // Na primeira conexão o token é obrigatório — a coluna é NOT NULL (0214) e a
   // Server Action recusa. Barrar aqui explica antes de o clique acontecer, em
   // vez de devolver um erro de validação depois.
   const podeSalvar = conectada || token.trim().length >= 20;
 
-  function salvar(evento: React.FormEvent) {
+  function salvar(evento: React.FormEvent, confirmar = false) {
     evento.preventDefault();
     startTransition(async () => {
       const resultado = await updateAdInsightsConnection({
@@ -95,8 +115,14 @@ export function FormularioDeMetaAds({
         ...(conectada && listaCarregada
           ? { allowed_ad_account_ids: selecionadas.length === 0 && via !== "oauth" ? null : selecionadas }
           : {}),
+        ...(confirmar ? { confirmar: true } : {}),
       });
 
+      if (!resultado.ok && resultado.error === "precisa_confirmar") {
+        const d = resultado.details as { atuais?: number; visiveis?: number } | undefined;
+        setReducao({ atuais: d?.atuais ?? 0, visiveis: d?.visiveis ?? 0 });
+        return;
+      }
       if (resultado.ok) {
         // O campo é limpo no sucesso: deixá-lo preenchido dá a impressão de que
         // a tela guarda o token, e ela nunca o mostra de volta.
@@ -123,6 +149,7 @@ export function FormularioDeMetaAds({
     });
   }
 
+  const manualComValidade = conectada && via !== "oauth" && Boolean(expiraEm);
   const venceEmBreve = diasParaVencer !== null && diasParaVencer < DIAS_DE_AVISO_DE_VENCIMENTO;
 
   return (
@@ -212,6 +239,14 @@ export function FormularioDeMetaAds({
               onChange={(e) => setToken(e.target.value)}
               placeholder={conectada ? t("Guardado — preencha só para trocar") : "EAA…"}
             />
+            {manualComValidade && (
+              <p className="text-xs" data-testid="meta-validade-manual">
+                {diasParaVencer !== null && diasParaVencer <= 0
+                  ? `${t("O token colado venceu em")} ${expiraEm}.`
+                  : `${t("O token colado vale até")} ${expiraEm}.`}
+                {venceEmBreve && diasParaVencer !== null && diasParaVencer > 0 && ` ${t("Cole um novo token antes disso.")}`}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               {conectada
                 ? t(
@@ -271,6 +306,30 @@ export function FormularioDeMetaAds({
           )}
         </form>
       </Card>
+
+      <AlertDialog open={reducao !== null} onOpenChange={(aberto) => !aberto && setReducao(null)}>
+        <AlertDialogContent data-testid="meta-confirmar-reducao">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Este token enxerga menos contas")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Hoje a organização tem {atuais} contas liberadas e o novo token enxerga só {visiveis} delas. Trocar agora pode esconder as demais.")
+                .replace("{atuais}", String(reducao?.atuais ?? 0))
+                .replace("{visiveis}", String(reducao?.visiveis ?? 0))}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("Cancelar")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                setReducao(null);
+                salvar(e as unknown as React.FormEvent, true);
+              }}
+            >
+              {t("Trocar mesmo assim")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
