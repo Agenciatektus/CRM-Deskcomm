@@ -336,6 +336,43 @@ export const IMPLANTACAO = {
       texto: "Ajustes no agente e no funil com base no uso real.",
     },
   ],
+  /** Só a ordem dos passos é afirmada. Prazo geral da implantação: preencher quando o Peterson informar; vazio, não aparece. */
+  prazoGeral: "" as string,
+  rotuloPrazo: "Prazo geral",
+  /** Ícone e texto curto de cada passo da linha do tempo, na mesma ordem de `passos`. */
+  linha: [
+    { icone: "busca", titulo: "Diagnóstico", texto: "Como o seu comercial funciona hoje e onde a venda se perde." },
+    { icone: "funil", titulo: "Funil e WhatsApp no ar", texto: "Etapas do seu jeito, responsáveis definidos e o WhatsApp conectado." },
+    { icone: "cerebro", titulo: "Agente de IA treinado", texto: "A Tektus cria o MEP do seu negócio e ele vira a base do agente." },
+    { icone: "usuario", titulo: "Treinamento e go-live", texto: "A equipe aprende a operar e o atendimento entra no ar." },
+    { icone: "calendario", titulo: "30 dias de acompanhamento", texto: "Ajustes no agente e no funil com base no uso real." },
+  ],
+  acompanhamento: "Acompanhamento de 30 dias após o go-live",
+  tektusFazTitulo: "A Tektus faz",
+  tektusFaz: [
+    "Diagnóstico do comercial",
+    "Funil com etapas e responsáveis",
+    "Conexão do WhatsApp e do Instagram",
+    "MEP do seu negócio, base do agente",
+    "Treinamento da equipe",
+    "30 dias de ajustes no agente e no funil",
+  ],
+  voceEntregaTitulo: "Você entrega",
+  voceEntrega: [
+    "Catálogo e preços",
+    "Regras de atendimento e horários",
+    "Acesso aos números e contas",
+    "Presença no treinamento da equipe",
+  ],
+  entregaveisTitulo: "O que fica pronto",
+  entregaveis: [
+    { icone: "funil", texto: "Funil configurado" },
+    { icone: "cerebro", texto: "Agente com a base do MEP" },
+    { icone: "chat", texto: "Canais conectados" },
+    { icone: "usuario", texto: "Equipe treinada" },
+    { icone: "calendario", texto: "Plano de ajustes dos 30 dias" },
+  ],
+  cta: "Ver o preço da implantação",
 } as const;
 
 export const OFERTA = {

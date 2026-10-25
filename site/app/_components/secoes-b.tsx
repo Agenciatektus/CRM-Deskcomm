@@ -1,4 +1,4 @@
-import { CANAIS, IMPLANTACAO, NICHOS, RADAR } from "@/lib/conteudo";
+import { CANAIS, NICHOS, RADAR } from "@/lib/conteudo";
 
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaRadar } from "./telas/TelaRadar";
@@ -117,27 +117,4 @@ export function Canais() {
   );
 }
 
-export function Implantacao() {
-  return (
-    <Secao id="implantacao" titulo="titulo-implantacao" fundo="azul">
-      <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
-      <ol className="relative m-0 grid list-none gap-6 p-0 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>*]:min-w-0">
-        <span
-          aria-hidden="true"
-          className="absolute top-[1.65rem] right-10 left-10 hidden h-px bg-gradient-to-r from-link/50 via-border-strong to-ok/50 xl:block"
-        />
-        {IMPLANTACAO.passos.map((p, i) => (
-          <li key={p.titulo} className="revela relative" style={{ "--atraso": `${i * 0.08}s` } as React.CSSProperties}>
-            <div className="card h-full p-5">
-              <span className="relative z-10 mb-4 grid size-9 place-items-center rounded-full border border-border-strong bg-surface-elevated font-mono text-meta font-bold text-link">
-                {i + 1}
-              </span>
-              <h3 className="m-0 text-[1.02rem] leading-snug font-bold">{p.titulo}</h3>
-              <p className="mt-1.5 mb-0 text-[0.92rem] leading-relaxed text-text-muted">{p.texto}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Secao>
-  );
-}
+export { Implantacao } from "./Implantacao";
