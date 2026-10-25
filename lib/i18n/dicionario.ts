@@ -12452,6 +12452,16 @@ export const DICIONARIO: Traducoes = {
   "(sem título)": { es: "(sin título)" },
 
   // Formulário da conexão de conversões
+  "A Meta não reconhece este token: ele está inválido, expirado ou revogado. Gere um novo e cole de novo.": { es: "Meta no reconoce este token: es inválido, expiró o fue revocado. Genera uno nuevo y pégalo de nuevo." },
+  "Este é um token de Página. Gere um token de usuário ou de usuário do sistema com a permissão ads_read.": { es: "Este es un token de Página. Genera un token de usuario o de usuario del sistema con el permiso ads_read." },
+  "O token não tem a permissão ads_read. Gere-o de novo com essa permissão.": { es: "El token no tiene el permiso ads_read. Genéralo de nuevo con ese permiso." },
+  "Este token não enxerga nenhuma conta de anúncio. Confira se o usuário tem acesso às contas.": { es: "Este token no ve ninguna cuenta de anuncios. Verifica si el usuario tiene acceso a las cuentas." },
+  "Não consegui validar o token com a Meta agora. Tente de novo em instantes.": { es: "No pude validar el token con Meta ahora. Inténtalo de nuevo en unos instantes." },
+  "O token colado venceu em": { es: "El token pegado venció el" },
+  "O token colado vale até": { es: "El token pegado vale hasta" },
+  "Cole um novo token antes disso.": { es: "Pega un token nuevo antes de esa fecha." },
+  "Este token enxerga menos contas": { es: "Este token ve menos cuentas" },
+  "Hoje a organização tem {atuais} contas liberadas e o novo token enxerga só {visiveis} delas. Trocar agora pode esconder as demais.": { es: "Hoy la organización tiene {atuais} cuentas habilitadas y el nuevo token ve solo {visiveis} de ellas. Cambiar ahora puede ocultar las demás." },
   "Conexão salva.": { es: "Conexión guardada." },
   "Não consegui salvar agora.": { es: "No pude guardar ahora." },
   "Identificador do destino de conversões": { es: "Identificador del destino de conversiones" },

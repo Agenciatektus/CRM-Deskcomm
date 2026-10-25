@@ -12,6 +12,8 @@ import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { contasPermitidas, normalizarContas, podeAmpliarContas } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { gravarConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
+import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
+import { validarTokenColado, type MotivoDeRecusaDoToken } from "@/lib/plataformas-de-anuncio/meta/validar-token-colado";
 
 /**
  * Conectar a conta de anúncios para LER as métricas — pela tela.
@@ -58,7 +60,11 @@ export type UpdateAdInsightsConnectionResult =
         | "forbidden_role"
         | "mfa_required"
         | "cifra_indisponivel"
-        | "erro_ao_gravar";
+        | "erro_ao_gravar"
+        | "rate_limited"
+        | "superada"
+        | MotivoDeRecusaDoToken
+        | "precisa_confirmar";
       details?: unknown;
     };
 
@@ -96,6 +102,8 @@ const entradaSchema = z.object({
     .max(500)
     .nullable()
     .optional(),
+  /** Reenvio depois de `precisa_confirmar`: o novo token enxerga menos contas e o admin aceitou. */
+  confirmar: z.boolean().optional(),
 }).superRefine((v, ctx) => {
   if (!v.allowed_ad_account_ids) return;
   if (v.default_account_id === undefined) {
@@ -131,7 +139,7 @@ export async function updateAdInsightsConnection(
 
   const { data: existente, error: erroDeLeitura } = await admin
     .from("ad_insights_connections")
-    .select("id, connected_by, connected_via, default_account_id, allowed_ad_account_ids")
+    .select("id, connected_by, connected_via, default_account_id, allowed_ad_account_ids, updated_at")
     .eq("organization_id", activeOrg.orgId)
     .eq("platform", parsed.data.platform)
     .maybeSingle();
@@ -180,6 +188,70 @@ export async function updateAdInsightsConnection(
     };
   }
 
+  // Token colado à mão: validado na Meta ANTES de gravar. Nada daqui vai para log,
+  // erro ou auditoria além de contagens (o token nunca sai desta função).
+  let validade: { expiraEm: string | null; appId: string | null } | null = null;
+  let zerarContas = false;
+  const semPadrao: string | null = null; // conta padrão do login antigo não vale para o token novo
+  // Contas a gravar quando o token novo substitui o de outro dono/OAuth. `undefined` = não decidido aqui.
+  let contasDaTroca: { allowed: string[]; padrao: string | null } | undefined;
+  if (parsed.data.access_token) {
+    const limite = await checkRateLimit(`meta-token-colado:${authUser.id}`, 5, 60);
+    if (!limite.allowed) return { ok: false, error: "rate_limited" };
+
+    const validacao = await validarTokenColado(parsed.data.access_token);
+    if (!validacao.ok) return { ok: false, error: validacao.motivo };
+    validade = { expiraEm: validacao.expiraEm, appId: validacao.appId };
+
+    if (existente) {
+      const atual = existente as {
+        connected_by: string | null;
+        connected_via: string | null;
+        default_account_id: string | null;
+        allowed_ad_account_ids: string[] | null;
+      };
+      // As contas do login antigo não valem para o token de outro dono nem para o que veio do OAuth.
+      zerarContas = atual.connected_via === "oauth" || atual.connected_by !== authUser.id;
+      const liberadas = contasPermitidas({
+        via: atual.connected_via,
+        allowed: atual.allowed_ad_account_ids,
+        padrao: atual.default_account_id,
+      });
+      // Lista restrita nunca vira "sem restrição" (null no token colado) em silêncio: o que
+      // vale é a lista pedida (ou a atual) ∩ o que o token novo enxerga. Vazia = recusa.
+      // O que se grava nunca passa da lista atual, salvo para quem pode ampliar. O limite real
+      // de exposição é o que o próprio token alcança; isto só mantém a escolha da organização.
+      if (zerarContas && liberadas !== null) {
+        const pedida = parsed.data.allowed_ad_account_ids
+          ? normalizarContas(parsed.data.allowed_ad_account_ids)
+          : liberadas;
+        const base = podeAmpliarContas(authUser, atual.connected_by)
+          ? pedida
+          : pedida.filter((id) => liberadas.includes(id));
+        const allowed = [...new Set(base)].filter((id) => validacao.contas.includes(id));
+        if (allowed.length === 0) {
+          return {
+            ok: false,
+            error: "precisa_confirmar",
+            details: { atuais: liberadas.length, visiveis: 0 },
+          };
+        }
+        const padrao = parsed.data.default_account_id ?? atual.default_account_id;
+        contasDaTroca = { allowed, padrao: padrao && allowed.includes(padrao) ? padrao : null };
+      }
+      if (!zerarContas && liberadas !== null && !parsed.data.confirmar) {
+        const visiveis = liberadas.filter((id) => validacao.contas.includes(id)).length;
+        if (visiveis < liberadas.length) {
+          return {
+            ok: false,
+            error: "precisa_confirmar",
+            details: { atuais: liberadas.length, visiveis },
+          };
+        }
+      }
+    }
+  }
+
   // `upsert` (dentro do gravador) e não `update`: a linha não existe em quem nunca
   // conectou, e um `update` casaria zero linhas devolvendo SUCESSO — a tela diria
   // "salvo" e nada seria gravado. Mesmo modo de falha que a #144 mediu em
@@ -189,8 +261,16 @@ export async function updateAdInsightsConnection(
     userId: authUser.id,
     platform: parsed.data.platform,
     accessToken: parsed.data.access_token,
-    defaultAccountId: parsed.data.default_account_id,
-    allowedAdAccountIds: parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
+    defaultAccountId: contasDaTroca ? contasDaTroca.padrao : zerarContas ? semPadrao : parsed.data.default_account_id,
+    allowedAdAccountIds: contasDaTroca
+      ? contasDaTroca.allowed
+      : zerarContas
+        ? undefined
+        : parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
+    ...(validade ? { expiraEmColado: validade.expiraEm } : {}),
+    ...(validade && existente && (existente as { updated_at?: string }).updated_at
+      ? { lidoEm: (existente as { updated_at: string }).updated_at }
+      : {}),
   });
   if (!gravado.ok) {
     return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
@@ -216,6 +296,9 @@ export async function updateAdInsightsConnection(
         ? { allowed_ad_account_ids: parsed.data.allowed_ad_account_ids }
         : {}),
       token_trocado: Boolean(parsed.data.access_token),
+      ...(validade
+        ? { token_app_id: validade.appId, token_com_validade: validade.expiraEm !== null, contas_zeradas: zerarContas }
+        : {}),
       primeira_conexao: !existente,
     },
   });
