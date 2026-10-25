@@ -31,7 +31,7 @@ import { prepararQr } from "./conexao-nativa";
 
 export const QR_NATIVO_LIMITE = 6;
 export const QR_NATIVO_LIMITE_CANAL = 10;
-const ESTADOS_COM_QR = ["STARTING", "SCAN_QR_CODE", "FAILED"];
+export const ESTADOS_COM_QR = ["STARTING", "SCAN_QR_CODE", "FAILED"];
 export const QR_NATIVO_JANELA_S = 60;
 
 export type RespostaQr =

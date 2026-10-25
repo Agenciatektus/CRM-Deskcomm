@@ -109,7 +109,8 @@ vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn(), orgAtivaDaApi:
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => adminFalso()) }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => adminFalso()) }));
-vi.mock("@/lib/auth/server", () => ({ loadAuthUser: vi.fn(async () => ({ id: "u" })) }));
+const mfa = vi.hoisted(() => ({ divida: false }));
+vi.mock("@/lib/auth/server", () => ({ loadAuthUser: vi.fn(async () => ({ id: "u" })), mfaEmDivida: vi.fn(async () => mfa.divida) }));
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "https://crm.exemplo.com" } }));
 
 import { requireRole, orgAtivaDaApi } from "@/lib/auth/require-role";
@@ -411,6 +412,17 @@ describe("GET qr", () => {
     tabela.push(linha({ status: "STOPPED" }));
     expect((await pedir()).status).toBe(409);
     expect(chamadas).toHaveLength(0);
+  });
+
+  it("MFA em divida: 403 sem pedir QR (controle negativo do 200)", async () => {
+    tabela.push(linha());
+    mfa.divida = true;
+    try {
+      expect((await pedir()).status).toBe(403);
+      expect(chamadas).toHaveLength(0);
+    } finally {
+      mfa.divida = false;
+    }
   });
 
   it("ja logado: 409 sem pedir QR", async () => {

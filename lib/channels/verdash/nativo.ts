@@ -260,13 +260,19 @@ export async function obterQrNativo(creds: VerdashCredentials): Promise<string |
 }
 
 export async function statusNativo(creds: VerdashCredentials): Promise<EstadoNativo> {
-  const data = await fzapRequest<{ connected?: boolean; loggedIn?: boolean }>(
+  return (await statusNativoCompleto(creds)).estado;
+}
+
+/** Estado + o bloco `passkey` CRU (quem chama valida; nada daqui vai direto ao navegador). */
+export async function statusNativoCompleto(
+  creds: VerdashCredentials,
+): Promise<{ estado: EstadoNativo; passkey: unknown }> {
+  const data = await fzapRequest<{ connected?: boolean; loggedIn?: boolean; passkey?: unknown }>(
     creds,
     "/session/status",
   );
-  if (data?.connected && data?.loggedIn) return "conectado";
-  if (data?.connected) return "aguardando_qr";
-  return "desconectado";
+  const estado = data?.connected && data?.loggedIn ? "conectado" : data?.connected ? "aguardando_qr" : "desconectado";
+  return { estado, passkey: data?.passkey };
 }
 
 /** disconnect + logout, depois de conferir que a instancia e desta org. */

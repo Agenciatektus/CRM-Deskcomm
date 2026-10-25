@@ -6,8 +6,10 @@ import { apiClient } from "@/lib/api/client";
 
 /** Espelha o JSON de `GET /api/v1/channel-sessions/[id]/conexao-nativa`. */
 export interface CorpoConexao {
-  estado: "gerando" | "aguardando_leitura" | "conectado" | "reconectando" | "erro";
+  estado: "gerando" | "aguardando_leitura" | "conectado" | "reconectando" | "exige_passkey" | "erro";
   qr?: string;
+  /** Desafio de passkey ja filtrado pelo servidor (so quando o WhatsApp exige). */
+  passkey?: { challenge: string; rpId: string; allowCredentials: unknown[]; userVerification: string; timeout?: number };
   telefone?: string | null;
   mensagem?: string;
   atualizado_em: string;
@@ -21,7 +23,7 @@ export const POLL_MAX_MS = 20_000;
  * (AbortController). Erro de rede ou 429 recua (dobra o intervalo, teto 20 s) e
  * volta a 2,5 s no primeiro sucesso. Aba oculta nao pergunta.
  */
-export function useConexaoNativa(canalId: string, onConectado: () => void) {
+export function useConexaoNativa(canalId: string, onConectado: (c: CorpoConexao) => void) {
   const [corpo, setCorpo] = useState<CorpoConexao | null>(null);
   const [falha, setFalha] = useState(false);
   const [rodada, setRodada] = useState(0);
@@ -46,7 +48,7 @@ export function useConexaoNativa(canalId: string, onConectado: () => void) {
           setFalha(false);
           atraso = POLL_MS;
           if (r.data.estado === "conectado") {
-            aoConectar.current();
+            aoConectar.current(r.data);
             return;
           }
         } catch {
