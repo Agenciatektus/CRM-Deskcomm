@@ -140,6 +140,10 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 - Action audit obrigatória: `lgpd.data_request_received`, `lgpd.export_generated`, `lgpd.redact_executed`, `lgpd.consent_changed`
 
 ### WAHA
+- **Interruptor `WAHA_HABILITADO`** (padrão `true`; `false`/`0`/`no` desliga; `wahaHabilitado()` em `lib/env.ts`). Desligado: criar/reconectar canal WAHA responde 403 `waha_desabilitado`, o `/health` omite a chave `waha`, o cron `channel-health` e o watchdog do worker pulam o WAHA, e a UI esconde "Números por QR". Webhook e canais já existentes não são tocados.
+- Produção desliga com `WAHA_HABILITADO=false` no `.env` + `docker compose stop waha` (o `app` tem `depends_on.waha.required: false`).
+- Religar: `WAHA_HABILITADO=true` + `docker compose up -d waha` e reiniciar app e worker.
+- Remover o código do WAHA é decisão futura; o interruptor é a via curta e não apaga nada.
 - Imagem NOWEB pinada por arquitetura: `latest-2026.7.2` em x86 e `noweb-arm-2026.7.2` em ARM64. A prova local criou duas sessões CORE simultâneas até `SCAN_QR_CODE`; não prova pairing, duas contas `WORKING` nem envio. Não bloquear segunda sessão por tier: conferir resposta estruturada e pós-condição da operação.
 - Engine NOWEB default; WEBJS apenas se precisar stickers animados / botões
 - Auth: env do WAHA recebe **hash SHA512 hex** da api key; cliente envia plaintext em `X-Api-Key`

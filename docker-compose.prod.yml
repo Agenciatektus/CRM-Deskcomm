@@ -69,6 +69,9 @@ services:
         condition: service_started
       waha:
         condition: service_started
+        # Interruptor do WAHA: com WAHA_HABILITADO=false o contêiner pode ficar
+        # parado, e um `up -d` sem `--no-deps` não pode religá-lo à força.
+        required: false
     healthcheck:
       # Probe TCP puro (node existe na imagem; curl/nc não). NÃO usar /api/v1/health:
       # ele dá 503 se WAHA/Redis caem, o que deixaria o app "unhealthy" e derrubaria
@@ -140,6 +143,11 @@ services:
       retries: 3
       start_period: 20s
   waha:
+    # INTERRUPTOR: WAHA_HABILITADO=false no .env bloqueia a criação de canal WAHA,
+    # tira o WAHA do /health e pausa o watchdog; aí `docker compose stop waha`
+    # basta (o app não depende dele: `depends_on.required: false`). Para religar:
+    # WAHA_HABILITADO=true + `docker compose up -d waha`. Serviço e código ficam.
+    #
     # Teto de memória — 893 MiB de pico MEDIDO nesta VPS.
     #
     # Sem ele o contêiner é ilimitado, e numa VPS de 3,8 GB isso não é teoria:
