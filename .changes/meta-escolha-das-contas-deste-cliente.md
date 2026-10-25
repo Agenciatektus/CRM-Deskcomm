@@ -12,3 +12,7 @@ conta padrão), e o servidor recusa qualquer conta fora da lista. Quem já usa a
 conexão por login passa a ver só a conta padrão e precisa escolher as demais em
 Ajustes › Meta Ads. Token colado à mão segue sem restrição, a menos que se marque
 contas. Reconectar com outro login zera a escolha.
+
+## Requer atenção
+
+Depois da atualização, quem usa a conexão da Meta por login (Conectar com Meta) passa a ver só a conta padrão. Entre em Ajustes › Meta Ads e escolha as contas de anúncio que pertencem à organização.
