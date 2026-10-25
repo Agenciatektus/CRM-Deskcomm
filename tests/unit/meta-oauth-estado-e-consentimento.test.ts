@@ -85,7 +85,7 @@ describe("state do OAuth da Meta", () => {
 });
 
 describe("URL de consentimento", () => {
-  it("leva os quatro escopos, o state, o retorno e o app", () => {
+  it("leva os cinco escopos, o state, o retorno e o app", () => {
     const url = new URL(
       montarUrlDeConsentimento(
         { appId: "123", redirectUri: "https://crm.exemplo.com.br/cb" },
@@ -95,11 +95,11 @@ describe("URL de consentimento", () => {
     expect(url.hostname).toBe("www.facebook.com");
     expect(url.pathname).toMatch(/^\/v\d+\.\d+\/dialog\/oauth$/);
     expect(url.searchParams.get("scope")).toBe(
-      "ads_read,business_management,pages_show_list,pages_read_engagement",
+      "ads_read,ads_management,business_management,pages_show_list,pages_read_engagement",
     );
-    expect(ESCOPOS_DA_META).toHaveLength(4);
-    // Menor privilégio: a conexão só lê.
-    expect(ESCOPOS_DA_META).not.toContain("ads_management");
+    expect(ESCOPOS_DA_META).toHaveLength(5);
+    // Paridade com a Verdash (decisão do Peterson, 25/10/2026): pede ads_management, o CRM só lê.
+    expect(ESCOPOS_DA_META).toContain("ads_management");
     expect(url.searchParams.get("state")).toBe("ST");
     expect(url.searchParams.get("redirect_uri")).toBe("https://crm.exemplo.com.br/cb");
     expect(url.searchParams.get("client_id")).toBe("123");

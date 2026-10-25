@@ -36,6 +36,7 @@ import {
   faltaParaConectarOMetaAds,
   metaAdsEstaConfigurado,
 } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
+import { leituraDoRetorno } from "@/lib/plataformas-de-anuncio/meta/oauth/verificacao";
 import { diasParaVencer } from "@/lib/plataformas-de-anuncio/meta/oauth/validade";
 import { tagDeIdioma } from "@/lib/i18n/datas";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -85,6 +86,7 @@ export default async function MetaAdsSettingsPage({
   const expiraEm = conexao.tokenExpiraEm
     ? new Date(conexao.tokenExpiraEm).toLocaleDateString(tagDeIdioma(idioma), { timeZone: "UTC" })
     : null;
+  const verificacao = leituraDoRetorno(parametros);
   const erroDoRetorno = parametros.erro ? Object.hasOwn(ERRO_DO_RETORNO, parametros.erro) : false;
 
   return (
@@ -92,7 +94,7 @@ export default async function MetaAdsSettingsPage({
       <CabecalhoDaPagina
         titulo={t("Meta Ads")}
         descricao={t(
-          "Conecte um token de acesso para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. É uma conexão só de leitura: nada é criado, pausado ou alterado na sua conta de anúncios.",
+          "Conecte a sua conta Meta para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões. Nesta conexão o sistema só lê: nada é criado, pausado ou alterado na sua conta de anúncios.",
         )}
       />
       <SecaoDaPagina>
@@ -102,6 +104,32 @@ export default async function MetaAdsSettingsPage({
             className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm"
           >
             {t("Conta conectada com a Meta.")}
+          </div>
+        )}
+        {conexao.via === "oauth" && conexao.metaUserName && (
+          <div data-testid="meta-identidade" className="rounded-md border p-4 text-sm">
+            <p>{t("Conectado como {nome}").replace("{nome}", () => conexao.metaUserName!)}</p>
+            {conexao.metaBusinesses.length > 0 && (
+              <p className="text-muted-foreground">
+                {t("Empresas (BM): {lista}").replace(
+                  "{lista}",
+                  () => conexao.metaBusinesses.map((b) => b.name).join(", "),
+                )}
+              </p>
+            )}
+          </div>
+        )}
+        {parametros.conectado === "1" && verificacao && (
+          <div
+            role={verificacao.tipo === "aviso" ? "alert" : "status"}
+            data-testid="meta-verificacao"
+            className={
+              verificacao.tipo === "aviso"
+                ? "rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                : "rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm"
+            }
+          >
+            {t(verificacao.texto).replace("{n}", String(verificacao.contas ?? ""))}
           </div>
         )}
         {erroDoRetorno && (
@@ -128,6 +156,12 @@ export default async function MetaAdsSettingsPage({
             "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
           )}
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.",
+          )}
+        </p>
 
         <FormularioDeMetaAds
           conectada={conexao.conectada}

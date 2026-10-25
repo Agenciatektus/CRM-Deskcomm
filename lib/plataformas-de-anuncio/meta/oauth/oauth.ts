@@ -8,12 +8,15 @@
 import { VERSAO_PADRAO_DA_GRAPH } from "@/lib/graph-version";
 
 /**
- * Os escopos pedidos: leitura de anúncios mais o que lista contas e páginas do
- * negócio. SEM `ads_management`: esta conexão só lê, e a tela promete isso. O envio
- * de conversões, quando ganhar o mesmo botão, pede o escopo a mais naquela hora.
+ * Os escopos pedidos: IDÊNTICOS aos da Verdash (`IntegracoesPage.tsx`, diálogo
+ * clássico do mesmo app Meta), para um único login servir leitura e envio de
+ * conversões. O CRM continua só LENDO nesta conexão; `ads_management` é pedido
+ * junto, não usado aqui. O CRM não usa `ads_management` hoje: a razão é paridade
+ * com a Verdash (decisão do Peterson, 25/10/2026).
  */
 export const ESCOPOS_DA_META = [
   "ads_read",
+  "ads_management",
   "business_management",
   "pages_show_list",
   "pages_read_engagement",

@@ -9,7 +9,7 @@
  * e upsert pelo gravador compartilhado (`gravarConexaoDeLeitura`).
  *
  * É retorno de NAVEGADOR: todo desfecho volta para `/app/settings/meta-ads` com
- * `?conectado=1` ou `?erro=<código>`, nunca JSON. Nada de token, segredo ou
+ * `?conectado=1` (mais `contas`/`bms` ou `aviso`, ver `verificacao.ts`) ou `?erro=<código>`, nunca JSON. Nada de token, segredo ou
  * código vai para log ou para a URL de volta.
  */
 import { NextResponse, type NextRequest } from "next/server";
@@ -24,9 +24,19 @@ import {
   CAMINHO_DO_CALLBACK,
   configuracaoDoMetaAds,
 } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
+import { listarContas } from "@/lib/plataformas-de-anuncio/meta/insights";
 import { segredoDoVinculo, verificarEstado } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
 import { aindaEAdminDaOrganizacao } from "@/lib/plataformas-de-anuncio/meta/oauth/papel";
-import { lerPerfilDoToken, obterTokenLongo } from "@/lib/plataformas-de-anuncio/meta/oauth/token";
+import {
+  type DesfechoDaVerificacao,
+  desfechoDaVerificacao,
+  parametrosDoDesfecho,
+} from "@/lib/plataformas-de-anuncio/meta/oauth/verificacao";
+import {
+  lerIdentidadeDoToken,
+  lerPerfilDoToken,
+  obterTokenLongo,
+} from "@/lib/plataformas-de-anuncio/meta/oauth/token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
@@ -192,5 +202,34 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     },
   });
 
-  return voltar(base, { conectado: "1" });
+  // 5. Identidade e verificação, DEPOIS da gravação: só informam, e nada aqui desfaz a
+  // conexão. Só contagens vão para a URL (nunca nome, id ou token).
+  const token = leitura.token.access_token;
+  let bms = 0;
+  try {
+    const quem = await lerIdentidadeDoToken(token);
+    bms = quem.empresas.length;
+    const { error } = await admin
+      .from("ad_insights_connections")
+      .update({
+        meta_user_name: quem.nome,
+        meta_businesses: quem.empresas.length > 0 ? quem.empresas : null,
+      })
+      .eq("organization_id", estado.organizationId)
+      .eq("platform", "meta_ads");
+    if (error) {
+      logger.warn("[plataformas-de-anuncio.meta.callback] identidade não gravada", {
+        organizationId: estado.organizationId,
+      });
+    }
+  } catch {
+    // a conexão já está gravada
+  }
+  let desfecho: DesfechoDaVerificacao = { tipo: "aviso", aviso: "leitura_falhou" };
+  try {
+    desfecho = desfechoDaVerificacao(await listarContas(token), bms);
+  } catch {
+    // fica em leitura_falhou
+  }
+  return voltar(base, { conectado: "1", ...parametrosDoDesfecho(desfecho) });
 }

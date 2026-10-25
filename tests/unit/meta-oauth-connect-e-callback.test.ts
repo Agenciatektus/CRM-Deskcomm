@@ -31,6 +31,12 @@ const fake = vi.hoisted(() => ({
   papel: "admin" as string | null,
   anterior: null as Record<string, unknown> | null,
   perfil: { metaUserId: "999", scopes: ["ads_read"] as string[] | null },
+  identidade: { nome: "Maria Souza", empresas: [{ id: "1", name: "BM A" }] } as
+    | { nome: string | null; empresas: { id: string; name: string }[] }
+    | "falha",
+  atualizacoes: [] as Array<Record<string, unknown>>,
+  erroDoUpdate: null as { message: string } | null,
+  contas: { ok: true, dados: [{ id: "act_1" }, { id: "act_2" }] } as Record<string, unknown>,
 }));
 
 vi.mock("@/lib/env", () => ({ env: fake.env }));
@@ -69,6 +75,9 @@ vi.mock("@/lib/plataformas-de-anuncio/meta/oauth/config", () => ({
       ? { appId: "111", appSecret: "SEGREDO-DO-APP", redirectUri: "http://localhost:3000/cb" }
       : null,
 }));
+vi.mock("@/lib/plataformas-de-anuncio/meta/insights", () => ({
+  listarContas: async () => fake.contas,
+}));
 vi.mock("@/lib/plataformas-de-anuncio/meta/oauth/token", () => ({
   obterTokenLongo: async () => {
     fake.trocas += 1;
@@ -80,6 +89,10 @@ vi.mock("@/lib/plataformas-de-anuncio/meta/oauth/token", () => ({
       : fake.troca;
   },
   lerPerfilDoToken: async () => fake.perfil,
+  lerIdentidadeDoToken: async () => {
+    if (fake.identidade === "falha") throw new Error("rede");
+    return fake.identidade;
+  },
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
@@ -105,6 +118,14 @@ vi.mock("@/lib/supabase/admin", () => ({
         fake.nonces.add(linha.nonce);
         return { error: null };
       },
+      update: (valores: Record<string, unknown>) => {
+        fake.atualizacoes.push(valores);
+        const cadeia = {
+          eq: () => cadeia,
+          then: (ok: (v: unknown) => unknown) => ok({ error: fake.erroDoUpdate }),
+        };
+        return cadeia;
+      },
       upsert: async (valores: Record<string, unknown>, opcoes: unknown) => {
         fake.upserts.push({ tabela, valores, opcoes });
         return { error: fake.erroDoUpsert };
@@ -128,6 +149,10 @@ beforeEach(() => {
   fake.papel = "admin";
   fake.anterior = null;
   fake.perfil = { metaUserId: "999", scopes: ["ads_read"] };
+  fake.contas = { ok: true, dados: [{ id: "act_1" }, { id: "act_2" }] };
+  fake.identidade = { nome: "Maria Souza", empresas: [{ id: "1", name: "BM A" }] };
+  fake.atualizacoes = [];
+  fake.erroDoUpdate = null;
 });
 
 async function comecar() {
@@ -163,6 +188,9 @@ describe("connect", () => {
     expect(alvo.searchParams.get("state")).toBeTruthy();
     const cookie = resposta.cookies.get("crm_oauth_bind");
     expect(cookie).toMatchObject({ path: CALLBACK, httpOnly: true, sameSite: "lax" });
+    expect(alvo.searchParams.get("scope")).toBe(
+      "ads_read,ads_management,business_management,pages_show_list,pages_read_engagement",
+    );
   });
 
   it("sem admin recusa e não redireciona para a Meta", async () => {
@@ -284,6 +312,57 @@ describe("callback", () => {
       "estado_invalido",
     );
     expect(fake.upserts).toHaveLength(0);
+  });
+
+  it("verificação: devolve só contagens (contas e bms), sem nome nem token na URL", async () => {
+    const { state, cookie } = await iniciado();
+    const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    const alvo = new URL(r.destino);
+    expect(alvo.searchParams.get("contas")).toBe("2");
+    expect(alvo.searchParams.get("bms")).toBe("1");
+    expect(r.destino).not.toContain("TOKEN-LONGO-EM-CLARO");
+    expect(r.destino).not.toContain("Maria");
+    expect(r.destino).not.toContain("BM%20A");
+  });
+
+  it("grava a identidade (nome e empresas) depois da conexão", async () => {
+    const { state, cookie } = await iniciado();
+    await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(fake.atualizacoes).toEqual([
+      { meta_user_name: "Maria Souza", meta_businesses: [{ id: "1", name: "BM A" }] },
+    ]);
+  });
+
+  it("identidade que falha (lançando ou erro de gravação) não desfaz a conexão", async () => {
+    for (const falha of ["lanca", "grava"] as const) {
+      fake.upserts = [];
+      fake.nonces.clear();
+      if (falha === "lanca") fake.identidade = "falha";
+      else fake.erroDoUpdate = { message: "x" };
+      const { state, cookie } = await iniciado();
+      const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+      expect(r.conectado).toBe("1");
+      expect(r.erro).toBeNull();
+      expect(fake.upserts).toHaveLength(1);
+    }
+  });
+
+  it("verificação com 0 contas: conexão gravada e aviso=sem_contas", async () => {
+    fake.contas = { ok: true, dados: [] };
+    const { state, cookie } = await iniciado();
+    const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(new URL(r.destino).searchParams.get("aviso")).toBe("sem_contas");
+    expect(r.conectado).toBe("1");
+    expect(fake.upserts).toHaveLength(1);
+  });
+
+  it("verificação que falha não desfaz a conexão: aviso=leitura_falhou", async () => {
+    fake.contas = { ok: false, motivo: "token_invalido" };
+    const { state, cookie } = await iniciado();
+    const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(new URL(r.destino).searchParams.get("aviso")).toBe("leitura_falhou");
+    expect(r.conectado).toBe("1");
+    expect(fake.upserts).toHaveLength(1);
   });
 
   it("sem ads_read concedido: recusa e não grava (a conexão ficaria falhando calada)", async () => {
