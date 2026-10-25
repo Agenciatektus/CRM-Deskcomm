@@ -9201,5 +9201,13 @@
   "A resposta afirmava um fato sem apoio no material de referência. Nada foi enviado — confira a base de conhecimento e gere de novo.": "The reply stated a fact with no support in the reference material. Nothing was sent — check the knowledge base and regenerate.",
   "A resposta ia mostrar um produto que não foi encontrado no cadastro. Confira o produto e gere de novo.": "The reply was going to show a product that was not found in the catalog. Check the product and regenerate.",
   "A sugestão tentou usar uma ação que a prévia não reconhece. Gere de novo; se repetir, revise as ferramentas ligadas no agente.": "The suggestion tried to use an action the preview does not recognize. Regenerate; if it repeats, review the tools enabled on the agent.",
-  "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.": "Suggestion generation failed, or the conversation context could not be assembled. Try again; if it repeats, the reason was logged on the server."
+  "A geração da sugestão falhou, ou o contexto da conversa não pôde ser montado. Tente de novo; se repetir, o motivo ficou registrado no servidor.": "Suggestion generation failed, or the conversation context could not be assembled. Try again; if it repeats, the reason was logged on the server.",
+  "Carregando a lista da Meta…": "Loading the list from Meta…",
+  "Não consegui carregar a lista da Meta agora. Digite o ID manualmente.": "I could not load the list from Meta right now. Enter the ID manually.",
+  "A Meta não devolveu nenhuma opção para esta conta. Digite o ID manualmente.": "Meta returned no options for this account. Enter the ID manually.",
+  "Escolha na lista": "Choose from the list",
+  "Digitar o ID manualmente": "Enter the ID manually",
+  "Destino de conversões": "Conversions destination",
+  "Conecte a Meta em Ajustes › Meta Ads para escolher o destino de uma lista.": "Connect Meta in Settings › Meta Ads to choose the destination from a list.",
+  "Conecte a Meta em Ajustes › Meta Ads para escolher a Página de uma lista.": "Connect Meta in Settings › Meta Ads to choose the Page from a list."
 }
