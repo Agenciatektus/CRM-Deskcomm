@@ -402,7 +402,7 @@ async function withMarcadoresDoContato(
       // o nome e a foto do card (proposta aprovada de 13/10/2026), na MESMA
       // leitura — nenhuma consulta nova por quadro.
       .select(
-        "id, tags, phone_number, email, custom_fields, is_anonymized, name, display_name, instagram_username, avatar_storage_path",
+        "id, tags, phone_number, email, custom_fields, is_anonymized, name, display_name, instagram_username, avatar_storage_path, campanha_nome:source_metadata->>campaign_name, anuncio_nome:source_metadata->>ad_name",
       )
       .eq("organization_id", organizationId)
       .in("id", lote),

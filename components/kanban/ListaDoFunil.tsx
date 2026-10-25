@@ -144,7 +144,14 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
                 <td className="max-w-56 px-3 py-2">{l.proximo_passo !== undefined && <ProximoPassoDoCard passo={l.proximo_passo} agora={agora} />}</td>
                 <td className="px-3 py-2 text-xs"><TempoDoCard tempo={tempoNaEtapa(horas, st?.expected_duration_hours)} /></td>
                 <td className="px-3 py-2 text-xs"><EsperaDoLead lead={l} agora={agora} /></td>
-                <td className="px-3 py-2 whitespace-nowrap text-text-muted">{t(rotuloDaOrigem(origemDoLead(l)))}</td>
+                <td className="max-w-56 px-3 py-2 text-text-muted">
+                  <span className="block whitespace-nowrap">{t(rotuloDaOrigem(origemDoLead(l)))}</span>
+                  {l.contact_campanha && (
+                    <span className="block truncate text-xs text-text-subtle" title={l.contact_anuncio ? `${l.contact_campanha} · ${l.contact_anuncio}` : l.contact_campanha}>
+                      {l.contact_campanha}
+                    </span>
+                  )}
+                </td>
               </tr>
             );
           })}

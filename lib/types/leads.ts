@@ -147,6 +147,13 @@ export interface Lead {
   /** Derivado: o contato tem foto guardada (`avatar_storage_path`), servida por `/api/v1/contacts/:id/avatar`. */
   contact_tem_foto?: boolean;
   /**
+   * Derivado: o nome da campanha de anúncio de onde o contato veio (`source_metadata.campaign_name`,
+   * resolvido pela Graph, pelo FZAP ou pela Verdash). Ausente = não veio de anúncio ou o nome ainda não existe.
+   */
+  contact_campanha?: string;
+  /** Derivado: o nome do anúncio (`source_metadata.ad_name`). */
+  contact_anuncio?: string;
+  /**
    * Derivado: a tarefa ABERTA mais urgente do negócio (`crm_tasks`), o
    * "próximo passo" do card. `null` = nenhuma tarefa aberta; ausente = não
    * carregou (o card não afirma "sem próximo passo" sem saber).
