@@ -20,7 +20,8 @@ export type ProcedenciaDaConexao = "manual" | "oauth";
 
 export interface ConexaoDeLeituraParaGravar {
   organizationId: string;
-  userId: string;
+  /** `null` na renovação automática (cron): não há pessoa por trás. */
+  userId: string | null;
   platform: "meta_ads";
   /** Ausente = manter o token gravado. */
   accessToken?: string;
@@ -40,8 +41,8 @@ export async function gravarConexaoDeLeitura(
   const valores: Record<string, unknown> = {
     organization_id: c.organizationId,
     platform: c.platform,
-    updated_by: c.userId,
   };
+  if (c.userId) valores.updated_by = c.userId;
   if (c.defaultAccountId !== undefined) valores.default_account_id = c.defaultAccountId;
 
   if (c.accessToken) {

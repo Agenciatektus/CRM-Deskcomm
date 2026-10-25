@@ -77,6 +77,18 @@ export function trocarPorTokenLongo(
   );
 }
 
+/**
+ * Renova um token longo AINDA VÁLIDO por outro de ~60 dias (mesma troca
+ * `fb_exchange_token`). Não lança; token e segredo vão no corpo e nunca são logados.
+ */
+export function renovarTokenLongo(
+  app: AppDoMetaAdsConfigurado,
+  tokenAtual: string,
+  opcoes: { agora: Date },
+): Promise<LeituraDeToken> {
+  return trocarPorTokenLongo(app, tokenAtual, opcoes);
+}
+
 /** O código ao token de longa duração, em dois passos. */
 export async function obterTokenLongo(
   app: AppDoMetaAdsConfigurado,
