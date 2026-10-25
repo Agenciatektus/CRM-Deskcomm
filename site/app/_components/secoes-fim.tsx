@@ -99,7 +99,7 @@ export function Rodape() {
             <Logotipo />
             <p className="mt-4 mb-0 max-w-[26rem] text-[0.9rem] leading-relaxed text-text-muted">
               CRM com agentes de inteligência artificial para negócios que vendem pelo WhatsApp.
-              Implantado e acompanhado pela Tektus.
+              Implantação opcional pela Tektus.
             </p>
           </div>
           <div>
@@ -151,7 +151,7 @@ export function Rodape() {
         </nav>
         <p className="mt-6 mb-0 text-[0.8rem] leading-relaxed text-text-subtle">
           Baseado no DeskcommCRM, projeto de código aberto (licença MIT). Página atualizada em
-          25/10/2026. {SITE.nome} é implantado pela Tektus.
+          25/10/2026. {SITE.nome} tem implantação opcional pela Tektus.
         </p>
       </div>
     </footer>
