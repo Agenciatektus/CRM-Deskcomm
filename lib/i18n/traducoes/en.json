@@ -6803,6 +6803,7 @@
   "Conecte a sua conta Meta para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões. Nesta conexão o sistema só lê: nada é criado, pausado ou alterado na sua conta de anúncios.": "Connect your Meta account so the system can read your campaign performance and show it in Analysis › Meta Ads. The access request uses the same permissions as Verdash (including managing ads), so a single login serves both reading and sending conversions. In this connection the system only reads: nothing is created, paused or changed in your ad account.",
   "1 conta de anúncio acessível.": "1 ad account accessible.",
   "{n} contas de anúncio acessíveis.": "{n} ad accounts accessible.",
+  "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.": "The Meta account you choose defines what managers in this organization see: connect with the company's own login.",
   "Conectado como {nome}": "Connected as {nome}",
   "Empresas (BM): {lista}": "Businesses (BM): {lista}",
   "Conectou, mas esta conta Meta não alcança nenhuma conta de anúncio: entre com a conta que gerencia os anúncios.": "Connected, but this Meta account does not reach any ad account: sign in with the account that manages the ads.",

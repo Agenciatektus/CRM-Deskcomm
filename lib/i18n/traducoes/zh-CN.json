@@ -5517,6 +5517,7 @@
   "Conecte a sua conta Meta para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões. Nesta conexão o sistema só lê: nada é criado, pausado ou alterado na sua conta de anúncios.": "连接您的 Meta 账户，让系统读取广告系列的表现并显示在“分析 › Meta Ads”中。授权请求使用与 Verdash 相同的权限（包括管理广告），以便一次登录同时用于读取和发送转化。在此连接中，系统只读取：不会在您的广告账户中创建、暂停或更改任何内容。",
   "1 conta de anúncio acessível.": "可访问 1 个广告账户。",
   "{n} contas de anúncio acessíveis.": "可访问 {n} 个广告账户。",
+  "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.": "所选的 Meta 账户决定了本组织的管理者能看到什么：请使用公司自己的登录进行连接。",
   "Conectado como {nome}": "已连接为 {nome}",
   "Empresas (BM): {lista}": "企业 (BM)：{lista}",
   "Conectou, mas esta conta Meta não alcança nenhuma conta de anúncio: entre com a conta que gerencia os anúncios.": "已连接，但此 Meta 账户无法访问任何广告账户：请使用管理广告的账户登录。",

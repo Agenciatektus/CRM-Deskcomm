@@ -12307,6 +12307,8 @@ export const DICIONARIO: Traducoes = {
     { es: "1 cuenta publicitaria accesible." },
   "{n} contas de anúncio acessíveis.":
     { es: "{n} cuentas publicitarias accesibles." },
+  "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.":
+    { es: "La cuenta de Meta elegida define lo que ven los gestores de esta organización: conecta con el inicio de sesión de la propia empresa." },
   "Conectado como {nome}":
     { es: "Conectado como {nome}" },
   "Empresas (BM): {lista}":

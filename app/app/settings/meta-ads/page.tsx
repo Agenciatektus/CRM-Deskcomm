@@ -108,12 +108,12 @@ export default async function MetaAdsSettingsPage({
         )}
         {conexao.via === "oauth" && conexao.metaUserName && (
           <div data-testid="meta-identidade" className="rounded-md border p-4 text-sm">
-            <p>{t("Conectado como {nome}").replace("{nome}", conexao.metaUserName)}</p>
+            <p>{t("Conectado como {nome}").replace("{nome}", () => conexao.metaUserName!)}</p>
             {conexao.metaBusinesses.length > 0 && (
               <p className="text-muted-foreground">
                 {t("Empresas (BM): {lista}").replace(
                   "{lista}",
-                  conexao.metaBusinesses.map((b) => b.name).join(", "),
+                  () => conexao.metaBusinesses.map((b) => b.name).join(", "),
                 )}
               </p>
             )}
@@ -156,6 +156,12 @@ export default async function MetaAdsSettingsPage({
             "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
           )}
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          {t(
+            "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.",
+          )}
+        </p>
 
         <FormularioDeMetaAds
           conectada={conexao.conectada}

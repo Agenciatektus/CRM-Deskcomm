@@ -77,4 +77,31 @@ describe("listarContas: união de me/adaccounts com as contas de cada BM", () =>
     expect(chamadas.some((u) => u.includes("after=Z"))).toBe(true);
     expect(chamadas.some((u) => u.includes("x/owned"))).toBe(false);
   });
+
+  it("teto de 20 BMs", async () => {
+    const bms = Array.from({ length: 25 }, (_, i) => ({ id: String(100 + i) }));
+    const chamadas = graph({ "me/adaccounts": { data: [] }, "me/businesses": { data: bms } });
+    await listarContas("t");
+    expect(chamadas.filter((u) => u.includes("owned_ad_accounts"))).toHaveLength(20);
+  });
+
+  it("erro de cota para a varredura de BMs e mantém o que já veio", async () => {
+    const bms = Array.from({ length: 9 }, (_, i) => ({ id: String(100 + i) }));
+    const chamadas: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        chamadas.push(url);
+        if (url.includes("me/businesses")) return new Response(JSON.stringify({ data: bms }));
+        if (url.includes("me/adaccounts"))
+          return new Response(JSON.stringify({ data: [{ id: "act_1", account_id: "1" }] }));
+        if (url.includes("/100/"))
+          return new Response(JSON.stringify({ error: { code: 17, message: "x" } }), { status: 400 });
+        return new Response(JSON.stringify({ data: [{ id: "act_2", account_id: "2" }] }));
+      }),
+    );
+    const r = await listarContas("t");
+    expect(r.ok && r.dados.map((c) => c.id)).toEqual(["act_1", "act_2"]);
+    expect(chamadas.filter((u) => u.includes("owned_ad_accounts"))).toHaveLength(3);
+  });
 });

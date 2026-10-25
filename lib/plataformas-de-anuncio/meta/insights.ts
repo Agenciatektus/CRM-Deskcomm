@@ -335,6 +335,9 @@ export function montarUrl(caminho: string, parametros: Record<string, string>): 
   return url.toString();
 }
 
+const MAXIMO_DE_BMS = 20;
+const BMS_EM_PARALELO = 3;
+
 /**
  * As contas de anúncio que o token alcança: a união deduplicada de `me/adaccounts` com
  * as `owned_ad_accounts` de cada empresa (BM) de `me/businesses`, como a Verdash faz.
@@ -379,15 +382,26 @@ export async function listarContas(
   };
   juntar(minhas.dados);
 
+  // No máximo 20 empresas, 3 por vez; o primeiro erro de cota da Meta encerra a
+  // varredura e a lista já obtida segue (melhor esforço).
   const empresas = await listarEmpresas(token);
   if (empresas.ok) {
-    for (const bm of empresas.dados) {
-      const donas = await buscarPaginado<ContaCrua>(
-        montarUrl(`${encodeURIComponent(bm.id)}/owned_ad_accounts`, { fields: CAMPOS, limit: "100" }),
-        token,
-        "owned_ad_accounts",
+    const bms = empresas.dados.slice(0, MAXIMO_DE_BMS);
+    let cota = false;
+    for (let i = 0; i < bms.length && !cota; i += BMS_EM_PARALELO) {
+      const lote = await Promise.all(
+        bms.slice(i, i + BMS_EM_PARALELO).map((bm) =>
+          buscarPaginado<ContaCrua>(
+            montarUrl(`${encodeURIComponent(bm.id)}/owned_ad_accounts`, { fields: CAMPOS, limit: "100" }),
+            token,
+            "owned_ad_accounts",
+          ),
+        ),
       );
-      if (donas.ok) juntar(donas.dados);
+      for (const donas of lote) {
+        if (donas.ok) juntar(donas.dados);
+        else if (donas.falha === "limite_de_chamadas") cota = true;
+      }
     }
   }
 
