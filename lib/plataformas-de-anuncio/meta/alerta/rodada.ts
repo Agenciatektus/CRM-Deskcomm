@@ -28,6 +28,8 @@ export const TETO_POR_RODADA = 200;
 export const ORCAMENTO_DE_TEMPO_MS = 40_000;
 /** O primeiro marco (d7) cai a 7 dias; vencidos entram por `lte`. */
 const JANELA_DO_ALERTA_MS = 7 * 24 * 60 * 60 * 1000;
+/** Teto do envio por WhatsApp: transporte pendurado não come o orçamento da rodada. */
+export const PRAZO_DO_WHATSAPP_MS = 10_000;
 const LINK = "/app/settings/meta-ads";
 
 export type EnviarPush = (org: string, userId: string, payload: PushPayload) => Promise<unknown>;
@@ -173,9 +175,15 @@ export async function alertarVencimentoDaMeta(
       });
       // O WhatsApp da equipe é independente: falha dele não toca sino, push nem e-mail.
       if (enviarWhatsApp) {
-        const desfecho = await enviarWhatsApp(org, textoDoWhatsApp(pendencia, marca.nome, idioma)).catch(
-          (): "falhou:erro_no_envio" => "falhou:erro_no_envio",
-        );
+        let relogio: ReturnType<typeof setTimeout> | undefined;
+        const desfecho = await Promise.race([
+          enviarWhatsApp(org, textoDoWhatsApp(pendencia, marca.nome, idioma)),
+          new Promise<"falhou:timeout">((resolve) => {
+            relogio = setTimeout(() => resolve("falhou:timeout"), PRAZO_DO_WHATSAPP_MS);
+          }),
+        ])
+          .catch((): "falhou:erro_no_envio" => "falhou:erro_no_envio")
+          .finally(() => clearTimeout(relogio));
         if (desfecho === "enviado") resumo.whatsapp.enviados += 1;
         else if (desfecho !== "ignorado") {
           resumo.whatsapp.falhas += 1;

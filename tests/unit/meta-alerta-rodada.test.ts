@@ -206,6 +206,22 @@ describe("alertarVencimentoDaMeta", () => {
     expect(sino).toHaveLength(2);
   });
 
+  it("WhatsApp pendurado: timeout próprio de 10 s, sem lançar, e os outros canais seguem", async () => {
+    vi.useFakeTimers();
+    const push = vi.fn(async (..._a: unknown[]) => undefined);
+    const { db, sino } = banco([con()]);
+    const pendurado = vi.fn(() => new Promise<never>(() => undefined));
+
+    const rodada = alertarVencimentoDaMeta(db, push, AGORA, pendurado);
+    await vi.advanceTimersByTimeAsync(10_001);
+    const r = await rodada;
+    vi.useRealTimers();
+
+    expect(r.whatsapp).toEqual({ enviados: 0, falhas: 1 });
+    expect(sino).toHaveLength(1);
+    expect(push).toHaveBeenCalledTimes(2);
+  });
+
   it("ORÇAMENTO: esgotado no meio dos destinatários, para de enviar", async () => {
     const push = vi.fn(async (..._a: unknown[]) => undefined);
     const { db } = banco([con()]);

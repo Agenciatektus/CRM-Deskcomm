@@ -10,6 +10,7 @@ function deps(sobrescreve: Partial<DepsDoWhatsApp> & { canal?: Record<string, un
       sobrescreve.cfg === null
         ? null
         : ({ organization_id: "o", channel_session_id: "c1", telefone_destino: "5511999999999", destino_jid: null, ligado: true, ...sobrescreve.cfg } as never),
+    destinoEhDaPropriaOrganizacao: async () => false,
     carregaCanal: async () =>
       ({ id: "c1", status: "WORKING", archived_at: null, aceitaMensagemLivre: true, ...sobrescreve.canal }) as never,
     transporte: { configurado: async () => true, resolveDestino: async () => "5511999999999@s", envia },
@@ -38,6 +39,13 @@ describe("enviarAvisoNoWhatsApp", () => {
     expect(await enviarAvisoNoWhatsApp(deps({ canal: { desativado: true } }).d, "o", "x")).toBe("falhou:canal_desativado");
     expect(await enviarAvisoNoWhatsApp(deps({ canal: { archived_at: "2026-01-01" } }).d, "o", "x")).toBe("falhou:canal_arquivado");
     expect(await enviarAvisoNoWhatsApp(deps({ canal: { status: "STOPPED" } }).d, "o", "x")).toBe("falhou:canal_desconectado");
+  });
+
+  it("destino é número de conexão ativa da própria organização: não envia", async () => {
+    const { d, envia } = deps();
+    d.destinoEhDaPropriaOrganizacao = async () => true;
+    expect(await enviarAvisoNoWhatsApp(d, "o", "x")).toBe("falhou:destino_da_propria_organizacao");
+    expect(envia).not.toHaveBeenCalled();
   });
 
   it("número inválido: não envia", async () => {

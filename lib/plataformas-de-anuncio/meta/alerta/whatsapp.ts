@@ -20,6 +20,8 @@ import type {
 export interface DepsDoWhatsApp {
   carregaConfig(orgId: string): Promise<ConfigDoAviso | null>;
   carregaCanal(orgId: string, canalId: string): Promise<CanalDoAviso | null>;
+  /** O destino é número de conexão ativa da própria organização (laço robô com robô). */
+  destinoEhDaPropriaOrganizacao(orgId: string, telefone: string): Promise<boolean>;
   transporte: TransporteDoAviso;
   pacing: PacingDoAviso;
   clock: () => Date;
@@ -49,6 +51,9 @@ export async function enviarAvisoNoWhatsApp(
     const pacing = await deps.pacing.decide(orgId, canal.id, agora);
     if (!pacing.liberado) return `falhou:pacing_${pacing.motivo}`;
 
+    if (await deps.destinoEhDaPropriaOrganizacao(orgId, cfg.telefone_destino)) {
+      return "falhou:destino_da_propria_organizacao";
+    }
     const to = await deps.transporte.resolveDestino(orgId, canal, cfg.telefone_destino);
     if (!to) return "falhou:destino_invalido";
 
@@ -76,6 +81,7 @@ export async function criarEnviadorDeWhatsApp(admin: SupabaseClient): Promise<En
       {
         carregaConfig: (o) => db.carregaConfig(o),
         carregaCanal: (o, c) => db.carregaCanal(o, c),
+        destinoEhDaPropriaOrganizacao: (o, t) => db.destinoEhDaPropriaOrganizacao(o, t),
         transporte,
         pacing,
         clock: () => new Date(),
