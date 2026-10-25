@@ -101,6 +101,7 @@ export async function completarAtribuicaoPelaVerdash(
   admin: SupabaseClient,
   organizationId: string,
   contactId: string,
+  opts: { ignorarEspera?: boolean } = {},
 ): Promise<NomesDoAnuncio | null> {
   try {
     const { data: contato } = await admin
@@ -129,7 +130,8 @@ export async function completarAtribuicaoPelaVerdash(
     }
 
     // Perguntou há pouco e não veio nada: não pergunta de novo a cada abertura.
-    if (tentouHaPouco(meta)) return atuais();
+    // (O gatilho do FZAP avisa que há dado novo: nesse caso a espera não vale.)
+    if (!opts.ignorarEspera && tentouHaPouco(meta)) return atuais();
 
     // A sessão por onde esta pessoa conversa (pareada OU direta), a mais recente primeiro.
     const { data: conversas } = await admin
