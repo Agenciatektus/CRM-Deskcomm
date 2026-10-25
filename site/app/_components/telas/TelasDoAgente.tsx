@@ -1,174 +1,167 @@
-import { Icone, type NomeIcone } from "../ui/Icones";
-import { Selo } from "../ui/Pecas";
+import { Icone } from "../ui/Icones";
+import { BotaoApp, Selo } from "../ui/Pecas";
 
 /**
- * Peças da área "Agente de IA" do CRM, com dados FICTÍCIOS: conhecimento, skills, teto de gasto,
- * aprovação de melhorias e a passagem para uma pessoa. Cada uma é um bloco independente para
- * entrar num card da LP.
+ * Peças da área "Agente de IA" do CRM, com dados FICTÍCIOS, na forma das telas reais:
+ * Conhecimento (KnowledgeSourceCard), Skills instaladas, Propostas (ProposalsList) e o cartão de
+ * passagem da conversa (PassagemCard). Cada uma é um bloco independente para entrar num card da LP.
  */
 
-function Cabecalho({ icone, titulo, direita }: { icone: NomeIcone; titulo: string; direita?: React.ReactNode }) {
+/** O `Card` do app: `rounded-menu` (14), borda, superfície, sombra curta. */
+function Cartao({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <p className="m-0 flex items-center gap-2 text-ui font-bold">
-        <Icone nome={icone} className="size-4 text-link" /> {titulo}
-      </p>
-      {direita}
-    </div>
+    <div className={`rounded-menu border border-border bg-surface text-ui shadow-xs ${className}`}>{children}</div>
   );
 }
 
 export function PainelConhecimento() {
-  const arquivos = [
-    ["Tabela de procedimentos.pdf", "indexado", "ok"],
-    ["Perguntas frequentes.md", "indexado", "ok"],
-    ["Política de remarcação.docx", "indexado", "ok"],
-    ["Promoções de novembro.pdf", "indexando", "aviso"],
+  const materiais = [
+    ["Tabela de procedimentos", "PDF", "O agente já sabe", "ok", "há 2 dias", "42", "Assistente"],
+    ["Perguntas frequentes", "Perguntas e respostas", "O agente já sabe", "ok", "há 5 dias", "18", "Assistente"],
+    ["Promoções de novembro", "PDF", "Preparando…", "info", "agora", "0", "Assistente"],
   ] as const;
   return (
-    <div>
-      <Cabecalho icone="arquivo" titulo="Conhecimento da empresa" direita={<Selo>por organização</Selo>} />
-      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-        {arquivos.map(([nome, estado, tom]) => (
-          <li key={nome} className="flex items-center gap-2.5 rounded-field border border-border bg-surface-elevated px-3 py-2">
-            <Icone nome="arquivo" className="size-4 shrink-0 text-text-subtle" />
-            <span className="min-w-0 flex-1 truncate text-meta font-semibold">{nome}</span>
-            <Selo tom={tom}>{estado}</Selo>
-          </li>
-        ))}
-      </ul>
-      <p className="m-0 mt-3 text-meta text-text-subtle">O agente responde com o que a empresa cadastrou.</p>
+    <div className="flex flex-col gap-2.5">
+      {materiais.map(([nome, tipo, estado, tom, quando, trechos, uso]) => (
+        <Cartao key={nome} className="flex flex-col">
+          <div className="flex flex-col gap-1 px-4 pt-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Icone nome="arquivo" className="size-5 shrink-0 text-accent-text" />
+                <p className="m-0 truncate text-base font-semibold">{nome}</p>
+              </div>
+              <Selo tom={tom}>{estado}</Selo>
+            </div>
+            <p className="m-0 text-sm text-text-muted">{tipo}</p>
+          </div>
+          <dl className="m-0 flex flex-col gap-2 px-4 pt-2.5 pb-3.5 text-sm">
+            <div className="flex items-baseline justify-between">
+              <dt className="text-text-muted">Preparado</dt>
+              <dd className="m-0">{quando}</dd>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <dt className="text-text-muted">Trechos que o agente encontra</dt>
+              <dd className="m-0 tabular-nums">{trechos}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <dt className="text-text-muted">Consultado por</dt>
+              <dd className="m-0 text-right">{uso}</dd>
+            </div>
+          </dl>
+        </Cartao>
+      ))}
     </div>
   );
 }
 
 export function PainelSkills() {
   const skills = [
-    ["Mover o negócio de etapa", true],
-    ["Criar agendamento", true],
-    ["Registrar nota na ficha", true],
-    ["Passar para uma pessoa", true],
-    ["Enviar proposta", false],
+    ["Mover o negócio de etapa", "do catálogo", "12/10/2026", "Move o lead de etapa quando o cliente confirma o que combinou."],
+    ["Criar agendamento", "do catálogo", "12/10/2026", "Marca o horário na agenda e avisa o cliente."],
+    ["Passar para uma pessoa", "do catálogo", "09/10/2026", "Entrega a conversa com o resumo do que já foi tentado."],
+    ["Regras de desconto", "manual", "02/10/2026", "Só fala em desconto dentro da política da empresa."],
   ] as const;
   return (
-    <div>
-      <Cabecalho icone="raio" titulo="Skills do agente" />
-      <ul className="m-0 flex list-none flex-col gap-1 p-0">
-        {skills.map(([nome, ligada]) => (
-          <li key={nome} className="flex items-center justify-between gap-3 rounded-field px-2 py-1.5">
-            <span className={`text-ui ${ligada ? "text-text" : "text-text-subtle"}`}>{nome}</span>
-            <span
-              className={`relative h-5 w-9 shrink-0 rounded-full ${ligada ? "bg-(image:--degrade)" : "bg-border-strong"}`}
-            >
-              <i
-                className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${ligada ? "left-[1.1rem]" : "left-0.5"}`}
-              />
-            </span>
+    <Cartao className="p-4">
+      <p className="m-0 mb-3 text-base font-semibold">Skills instaladas</p>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {skills.map(([nome, origem, data, descricao]) => (
+          <li key={nome} className="flex flex-col gap-1.5 rounded-md border border-border/60 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Icone nome="quebracabeca" className="size-4 text-accent-text" />
+              <span className="font-medium">{nome}</span>
+              <span className="inline-flex h-[22px] items-center rounded-pill border border-transparent bg-info-bg px-2 text-[10px] font-semibold text-info-fg data-[manual=true]:border-border data-[manual=true]:bg-surface-elevated data-[manual=true]:text-text-muted" data-manual={origem === "manual"}>
+                {origem}
+              </span>
+              <span className="ml-auto text-xs text-text-muted">atualizada em {data}</span>
+            </div>
+            <p className="m-0 text-text-muted">{descricao}</p>
+            <div className="flex justify-end gap-2">
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-control border border-border-strong px-3 text-[13px] font-semibold">
+                <Icone nome="lapis" className="size-4" /> Editar
+              </span>
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-control border border-border-strong px-3 text-[13px] font-semibold">
+                <Icone nome="lixo" className="size-4" /> Desinstalar
+              </span>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function PainelTeto() {
-  return (
-    <div>
-      <Cabecalho icone="grafico" titulo="Uso e orçamento" direita={<Selo tom="ok">dentro do teto</Selo>} />
-      <p className="m-0 text-meta text-text-subtle">Gasto de IA no mês, por organização</p>
-      <p className="m-0 mt-1 flex items-baseline gap-1.5">
-        <span className="text-[1.9rem] leading-none font-bold tracking-tight">R$ 112</span>
-        <span className="text-ui text-text-subtle">de R$ 300</span>
-      </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
-        <div className="a-enche h-full w-[37%] rounded-full bg-(image:--degrade)" />
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-meta">
-        <div className="rounded-field border border-border bg-surface-elevated px-2.5 py-2">
-          <p className="m-0 text-text-subtle">Alerta em</p>
-          <p className="m-0 font-bold">80%</p>
-        </div>
-        <div className="rounded-field border border-border bg-surface-elevated px-2.5 py-2">
-          <p className="m-0 text-text-subtle">Ao atingir o teto</p>
-          <p className="m-0 font-bold">Bloquear</p>
-        </div>
-      </div>
-    </div>
+    </Cartao>
   );
 }
 
 export function PainelProposta() {
   return (
     <div>
-      <Cabecalho icone="agente" titulo="Proposta da IA" direita={<Selo tom="aviso">aguarda aprovação</Selo>} />
-      <p className="m-0 text-ui leading-snug">
-        Três clientes perguntaram sobre <b>parcelamento</b> e o agente passou para uma pessoa. Sugestão: acrescentar a
-        política de pagamento ao conhecimento.
-      </p>
-      <div className="mt-3 flex items-center gap-2 rounded-field border border-dashed border-border-strong px-3 py-2 font-mono text-[0.7rem] text-text-muted">
-        <span className="text-text-subtle">versão 12</span>
-        <Icone nome="seta" className="size-3" />
-        <span className="font-bold text-text">versão 13</span>
+      <div className="mb-3 flex gap-1 rounded-field border border-border p-[3px] text-[13px] font-semibold pele-seg">
+        <span className="pele-seg-item-on flex h-7 flex-1 items-center justify-center rounded-[7px]">Aguardando decisão (1)</span>
+        <span className="flex h-7 flex-1 items-center justify-center text-text-muted">Já decididas</span>
       </div>
-      <div className="mt-3 flex gap-2">
-        <span className="rounded-field bg-(image:--degrade) px-3 py-1.5 text-meta font-semibold text-white">Aprovar</span>
-        <span className="rounded-field border border-border-strong px-3 py-1.5 text-meta font-semibold text-text-muted">
-          Revisar
-        </span>
-      </div>
-      <p className="m-0 mt-2.5 text-[0.7rem] text-text-subtle">Nada muda sem uma pessoa aprovar.</p>
+      <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
+        <li className="flex flex-col gap-3 p-4">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-sm font-medium">Limpeza de pele, Marina Duarte</span>
+            <Selo>Assistente</Selo>
+            <span className="text-xs text-text-muted">proposta há 4 min</span>
+          </div>
+          <p className="m-0 text-sm">
+            Três clientes perguntaram sobre parcelamento e o agente passou para uma pessoa. Acrescentar a política de
+            pagamento ao conhecimento.
+          </p>
+          <div className="flex gap-2">
+            <BotaoApp>Aprovar</BotaoApp>
+            <BotaoApp variante="contorno">Ignorar</BotaoApp>
+          </div>
+        </li>
+      </ul>
+      <p className="m-0 mt-2.5 text-xs text-text-subtle">Nada muda sem uma pessoa aprovar.</p>
     </div>
   );
 }
 
 export function PainelPassagem() {
-  const eventos = [
-    ["14:03", "A IA identificou pergunta de pagamento", "agente"],
-    ["14:03", "Atendimento passado para Camila", "usuario"],
-    ["14:05", "Camila assumiu e respondeu", "check"],
-  ] as const;
   return (
-    <div>
-      <Cabecalho icone="usuario" titulo="Passagem para uma pessoa" />
-      <ol className="m-0 flex list-none flex-col p-0">
-        {eventos.map(([hora, texto, icone], i) => (
-          <li key={texto} className="relative flex gap-3 pb-3 last:pb-0">
-            {i < eventos.length - 1 ? (
-              <span aria-hidden="true" className="absolute top-6 bottom-0 left-[0.8rem] w-px bg-border-strong" />
-            ) : null}
-            <span className="z-10 grid size-[1.65rem] shrink-0 place-items-center rounded-full border border-border-strong bg-surface-elevated text-link">
-              <Icone nome={icone} className="size-3.5" />
-            </span>
-            <div>
-              <p className="m-0 text-ui leading-tight">{texto}</p>
-              <p className="m-0 font-mono text-[0.65rem] text-text-subtle">{hora}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <p className="m-0 mt-2 text-[0.7rem] text-text-subtle">Quem assumiu e quando fica registrado.</p>
-    </div>
-  );
-}
-
-export function PainelProvedor() {
-  const itens = ["OpenRouter", "Anthropic", "OpenAI"];
-  return (
-    <div>
-      <Cabecalho icone="conexao" titulo="Provedor de IA" />
-      <div className="flex flex-wrap gap-2">
-        {itens.map((n, i) => (
-          <span
-            key={n}
-            className={`rounded-field border px-3 py-1.5 text-meta font-semibold ${
-              i === 1 ? "border-accent bg-accent-soft text-link" : "border-border-strong text-text-muted"
-            }`}
-          >
-            {n}
-          </span>
-        ))}
+    <article className="overflow-hidden rounded-menu border border-warning-line bg-surface text-ui">
+      <div className="flex items-center gap-2 bg-accent-soft px-3.5 py-2.5 text-accent-text">
+        <h3 className="m-0 flex items-center gap-2 text-label font-bold">
+          <Icone nome="agente" peso="bold" className="size-[15px]" />
+          Passagem para uma pessoa
+        </h3>
+        <span className="ml-auto shrink-0 text-label font-medium text-text-subtle">14:03</span>
       </div>
-      <p className="m-0 mt-2.5 text-meta text-text-subtle">Trocável pela tela, por parte do sistema.</p>
-    </div>
+      <div className="px-3.5 pt-1 pb-3">
+        <p className="m-0 mt-1.5 font-medium">Pergunta sobre forma de pagamento: fora do que a IA pode decidir.</p>
+        {(
+          [
+            ["O cliente quer", <p key="q" className="m-0">Parcelar a limpeza de pele de amanhã, 16h.</p>],
+            [
+              "A IA já tentou",
+              <ol key="t" className="m-0 list-decimal space-y-0.5 pl-4">
+                <li>Confirmou o horário de amanhã.</li>
+                <li>Explicou o valor da sessão.</li>
+              </ol>,
+            ],
+            [
+              "Últimas palavras do cliente",
+              <blockquote key="b" className="m-0 border-l-2 border-border pl-2 italic">
+                16h. E dá para parcelar?
+              </blockquote>,
+            ],
+          ] as const
+        ).map(([rotulo, corpo]) => (
+          <div key={rotulo} className="mt-2">
+            <p className="m-0 text-[0.6875rem] font-semibold tracking-wide text-text-subtle uppercase">{rotulo}</p>
+            <div className="mt-0.5 text-sm">{corpo}</div>
+          </div>
+        ))}
+        <p className="m-0 mt-2 flex items-start gap-1.5 text-xs text-success-fg">
+          <Icone nome="concluir" className="mt-px size-3.5 shrink-0" />O cliente já foi avisado de que uma pessoa vai assumir.
+        </p>
+      </div>
+      <div className="flex justify-end border-t border-border px-3.5 py-2.5">
+        <BotaoApp>Assumir e responder</BotaoApp>
+      </div>
+    </article>
   );
 }

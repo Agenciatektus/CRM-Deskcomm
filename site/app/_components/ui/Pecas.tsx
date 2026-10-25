@@ -30,7 +30,9 @@ export function Avatar({ nome, tom = 0, tamanho = "size-9" }: { nome: string; to
   return (
     <span
       aria-hidden="true"
-      className={`grid ${tamanho} shrink-0 place-items-center rounded-full text-[0.72rem] font-bold`}
+      className={`grid ${tamanho} shrink-0 place-items-center rounded-full font-semibold ${
+        /size-[3-6]|size-\[/.test(tamanho) ? "text-[10px] font-bold" : /size-[78]/.test(tamanho) ? "text-[11px]" : "text-[13px]"
+      }`}
       style={{ background: fundo, color: texto }}
     >
       {iniciais}
@@ -39,15 +41,15 @@ export function Avatar({ nome, tom = 0, tamanho = "size-9" }: { nome: string; to
 }
 
 /** Selo redondo do canal sobre o avatar, como na lista de conversas. */
-export function SeloDeCanal({ canal, tamanho = "size-[1.15rem]" }: { canal: "whatsapp" | "instagram"; tamanho?: string }) {
+export function SeloDeCanal({ canal, tamanho = "size-[18px]" }: { canal: "whatsapp" | "instagram"; tamanho?: string }) {
   const wa = canal === "whatsapp";
   return (
     <span
-      className={`absolute -right-0.5 -bottom-0.5 grid ${tamanho} place-items-center rounded-full text-white ring-2 ring-surface ${
-        wa ? "bg-[#1fa561]" : "bg-[#c13584]"
+      className={`absolute -right-[3px] -bottom-[3px] grid ${tamanho} place-items-center rounded-full text-white ring-2 ring-surface ${
+        wa ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"
       }`}
     >
-      <Icone nome={wa ? "chat" : "camera"} className="size-2.5" />
+      <Icone nome={wa ? "chat" : "camera"} peso="bold" className="size-[11px]" />
     </span>
   );
 }
@@ -57,8 +59,8 @@ export function CanalChip({ canal }: { canal: "whatsapp" | "instagram" }) {
   const wa = canal === "whatsapp";
   return (
     <span className="inline-flex items-center gap-1 text-meta text-text-muted">
-      <span className={`grid size-3.5 place-items-center rounded-full text-white ${wa ? "bg-[#1fa561]" : "bg-[#c13584]"}`}>
-        <Icone nome={wa ? "chat" : "camera"} className="size-2" />
+      <span className={`grid size-3.5 place-items-center rounded-full text-white ${wa ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"}`}>
+        <Icone nome={wa ? "chat" : "camera"} peso="bold" className="size-2" />
       </span>
       {wa ? "WhatsApp" : "Instagram"}
     </span>
@@ -75,7 +77,7 @@ export function Selo({
 }) {
   const estilos = {
     neutro: "border-border bg-surface-elevated text-text-muted",
-    ia: "border-transparent bg-accent-soft text-accent-300",
+    ia: "border-transparent bg-accent-soft text-accent-text",
     ok: "border-transparent bg-success-bg text-success-fg",
     aviso: "border-transparent bg-warning-bg text-warning-fg",
     crit: "border-transparent bg-error-bg text-error-fg",
@@ -116,7 +118,7 @@ export function BotaoApp({
   } as const;
   return (
     <span
-      className={`inline-flex h-8 items-center rounded-field px-3 text-meta font-semibold whitespace-nowrap ${estilos[variante]}`}
+      className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-control px-3.5 text-[13px] font-semibold whitespace-nowrap ${estilos[variante]}`}
     >
       {children}
     </span>

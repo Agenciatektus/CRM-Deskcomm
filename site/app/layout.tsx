@@ -1,19 +1,18 @@
 import type { Metadata, Viewport } from "next";
 
-import { SITE } from "@/lib/conteudo";
+import { META_DESCRICAO, SITE } from "@/lib/conteudo";
 
 import { Cabecalho } from "./_components/Cabecalho";
 import { SimboloDefs } from "./_components/Marca";
 import { Rodape } from "./_components/secoes-fim";
 import "./globals.css";
 
-const TITULO = "Verdash CRM: CRM com IA para quem vende pelo WhatsApp";
+const TITULO = "Verdash CRM: ninguém fica no vácuo no WhatsApp";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: { default: TITULO, template: "%s | Verdash CRM" },
-  description:
-    "Conversas do WhatsApp, funil de vendas e agentes de IA que atendem e passam para uma pessoa quando precisa. Implantação e acompanhamento pela Tektus.",
+  description: META_DESCRICAO,
   alternates: { canonical: "/" },
   applicationName: SITE.nome,
   openGraph: {
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
     siteName: SITE.nome,
     title: TITULO,
     description:
-      "Conversas, funil e agentes de IA num só lugar. A IA atende e qualifica; uma pessoa assume quando é preciso.",
+      META_DESCRICAO,
     images: [{ url: "/_lp/og.png", width: 1200, height: 630, alt: TITULO }],
   },
   twitter: { card: "summary_large_image", title: TITULO, images: ["/_lp/og.png"] },

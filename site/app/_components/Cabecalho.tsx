@@ -1,4 +1,4 @@
-import { CTA, NAV, linkWhatsapp } from "@/lib/conteudo";
+import { CTA, NAV } from "@/lib/conteudo";
 
 import { BotaoPrimario } from "./Botao";
 import { Logotipo } from "./Marca";
@@ -28,9 +28,9 @@ export function Cabecalho() {
           >
             Entrar
           </a>
-          <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo compacto>
-            <span className="sm:hidden">Diagnóstico</span>
-            <span className="hidden sm:inline">{CTA.rotulo}</span>
+          <BotaoPrimario href={CTA.comprar.href} externo compacto>
+            <span className="sm:hidden">Quero o CRM</span>
+            <span className="hidden sm:inline">Quero o Verdash CRM</span>
           </BotaoPrimario>
         </div>
       </div>
