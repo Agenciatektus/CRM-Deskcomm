@@ -60,7 +60,7 @@ function MiniLeadSumiu() {
         Qual o valor do plano completo?
       </p>
       <p className="m-0 w-fit max-w-[85%] self-end rounded-bubble rounded-br-bubble-tail bg-bubble-out px-3 py-[7px] text-[15px] leading-[1.42]">
-        Fica em R$ 900 por mês.
+        O pacote com 10 sessões fica em R$ 900.
       </p>
       <p className="m-0 flex items-center gap-1.5 text-xs text-text-subtle">
         <Icone nome="relogio" className="size-3" /> ninguém retomou

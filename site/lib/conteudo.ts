@@ -6,8 +6,8 @@
  * Regras do texto: pt-BR, sem número de resultado que não seja verificável,
  * nada de "não é X, é Y", nada de travessão. Cada afirmação sobre o produto
  * sai do README ou do CHANGELOG do CRM. O que a oferta ainda não decidiu fica
- * de fora do texto (garantia, bônus, prazos, custo do canal oficial da Meta,
- * limite de canais no plano sem IA, hospedagem): ver docs/growth/lp-copy-vsl.md.
+ * de fora do texto (bônus, prazos, hospedagem). Compra de saldo e cobrança do
+ * excedente de IA só entram quando existirem no produto.
  */
 
 export const SITE = {
@@ -128,7 +128,7 @@ export const PROBLEMAS_FECHO =
 
 /** Estatística externa, a única da página: a fonte vai dita na própria frase. */
 export const ESTATISTICA_RD =
-  'Segundo o Panorama de Marketing e Vendas 2026 da RD Station, 40% das equipes controlam o WhatsApp "cada vendedor do seu jeito" e 19% usam planilha. Só 28% usam o WhatsApp integrado a um CRM.';
+  'Segundo o Panorama de Marketing e Vendas 2026 da RD Station, 40% das equipes têm a gestão do WhatsApp fragmentada e 19% usam planilha.';
 
 export const CONTA = {
   titulo: "A conta do vácuo, com os seus números",
@@ -322,7 +322,7 @@ export const OFERTA = {
       periodo: "por mês",
       destaque: true,
       detalhes: [
-        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Para passar do teto, você adiciona saldo no Verdash CRM ou habilita a cobrança automática do uso excedente.",
+        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa e a Tektus combina com você o próximo passo.",
         "Até 3 números de WhatsApp e até 2 contas de Instagram.",
         "Sem cobrança por usuário.",
       ],
@@ -353,7 +353,7 @@ export const OFERTA = {
 export const GARANTIA = {
   titulo: "Garantia de implantação",
   texto:
-    "A Tektus devolve 100% da implantação se não entregar o que foi combinado: os agentes, os funis, as campanhas, os follow-ups e os fluxos de atendimento.",
+    "A Tektus devolve 100% da implantação se não entregar o que foi combinado por escrito: agentes, funis, campanhas, follow-ups e fluxos de atendimento.",
   limite:
     "A garantia cobre o valor da implantação. Ela deixa o número de vendas de fora, porque o resultado depende do seu volume de conversas, do seu ticket e do seu mercado.",
 } as const;
@@ -458,7 +458,7 @@ export const FAQ = [
   },
   {
     p: "Qual inteligência artificial o Verdash CRM usa e quem controla o gasto?",
-    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e o cliente adiciona saldo ou habilita a cobrança automática do excedente. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
+    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e ao chegar nele a IA pausa e a Tektus combina com o cliente o próximo passo. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
   },
   {
     p: "Como o Verdash CRM usa o Google Agenda e o Google Ads?",

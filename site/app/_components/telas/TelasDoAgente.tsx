@@ -102,7 +102,6 @@ export function PainelProposta() {
         <li className="flex flex-col gap-3 p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-sm font-medium">Limpeza de pele, Marina Duarte</span>
-            <span className="text-xs text-text-muted">· Marina Duarte</span>
             <Selo>Assistente</Selo>
             <span className="text-xs text-text-muted">proposta há 4 min</span>
           </div>

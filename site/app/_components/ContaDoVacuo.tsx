@@ -60,7 +60,8 @@ export function ContaDoVacuo() {
   const f = numero(fatia);
   const t = numero(ticket);
   const pronto = c !== null && f !== null && t !== null && f <= 100;
-  const total = pronto ? c * (f / 100) * t : null;
+  const bruto = pronto ? c * (f / 100) * t : null;
+  const total = bruto !== null && Number.isFinite(bruto) ? bruto : null;
 
   return (
     <div className="card p-5 sm:p-8">
