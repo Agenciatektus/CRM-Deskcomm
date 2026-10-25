@@ -30,6 +30,8 @@ export interface ConexaoDeLeituraParaGravar {
   /** Contas que a organização pode ver. `undefined` = não mexer; `null` = limpar. */
   allowedAdAccountIds?: string[] | null;
   /** Só com `accessToken`. Ausente = token colado à mão. */
+  /** Token colado à mão: validade lida do debug_token (`null` = nunca expira). */
+  expiraEmColado?: string | null;
   oauth?: { expiraEm: string | null; scopes: string[] | null; metaUserId: string | null };
 }
 
@@ -124,7 +126,7 @@ export async function gravarConexaoDeLeitura(
     // Quem conectou ou colou: só ele (ou platform admin) amplia as contas permitidas.
     valores.connected_by = c.userId;
     valores.connected_via = (c.oauth ? "oauth" : "manual") satisfies ProcedenciaDaConexao;
-    valores.token_expires_at = c.oauth?.expiraEm ?? null;
+    valores.token_expires_at = c.oauth?.expiraEm ?? c.expiraEmColado ?? null;
     valores.scopes = c.oauth?.scopes ?? null;
     valores.meta_user_id = c.oauth?.metaUserId ?? null;
     // A identidade descrevia o token que saiu; o callback do OAuth a regrava depois.
