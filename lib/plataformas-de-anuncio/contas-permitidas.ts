@@ -6,6 +6,8 @@
  * gestor de um cliente leria campanhas de outro. Retorna `null` = sem restrição
  * (token colado à mão pelo próprio cliente), ou a lista (possivelmente vazia).
  */
+import { escreveComoPlatformAdmin, type AuthUser } from "@/lib/auth/types";
+
 const ID_DE_CONTA = /^act_\d+$/;
 
 /** `123`, `act_123` ou ` ACT_123 ` viram `act_123`; o resto vira `null`. */
@@ -45,4 +47,18 @@ export function contaPermitida(permitidas: string[] | null, conta: string): bool
   if (!Array.isArray(permitidas)) return false;
   const id = normalizarContaId(conta);
   return id !== null && permitidas.includes(id);
+}
+
+/**
+ * Quem pode LISTAR todas as contas que o login alcança e AMPLIAR a lista: quem
+ * conectou (`connected_by`) ou o platform admin. Os demais admins da organização
+ * só escolhem a padrão dentro da lista liberada e podem reduzi-la. Conexão antiga
+ * (`connected_by` nulo): só platform admin.
+ */
+export function podeAmpliarContas(
+  user: Pick<AuthUser, "id" | "is_platform_admin" | "platform_admin_scope" | "support">,
+  connectedBy: string | null,
+): boolean {
+  if (escreveComoPlatformAdmin(user) && !user.support) return true;
+  return connectedBy !== null && user.id === connectedBy;
 }

@@ -12333,6 +12333,8 @@ export const DICIONARIO: Traducoes = {
     { es: "marcadas" },
   "Primeira conta ativa":
     { es: "Primera cuenta activa" },
+  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte":
+    { es: "Para liberar otras cuentas, pide a quien conectó Meta o al soporte" },
   "Conectado como {nome}":
     { es: "Conectado como {nome}" },
   "Empresas (BM): {lista}":

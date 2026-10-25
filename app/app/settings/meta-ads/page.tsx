@@ -31,6 +31,7 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAmpliarContas } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { existeConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
 import {
   faltaParaConectarOMetaAds,
@@ -185,6 +186,7 @@ export default async function MetaAdsSettingsPage({
           conectada={conexao.conectada}
           contaPadrao={conexao.contaPadrao}
           contasPermitidas={conexao.contasPermitidas}
+          podeAmpliar={podeAmpliarContas(user, conexao.connectedBy)}
           via={conexao.via}
           expiraEm={expiraEm}
           diasParaVencer={dias}

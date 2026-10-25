@@ -28,6 +28,7 @@ export function SeletorDeContas({
   onSelecionadas,
   onPadrao,
   onCarregada,
+  podeAmpliar,
   idioma,
 }: {
   selecionadas: string[];
@@ -36,10 +37,12 @@ export function SeletorDeContas({
   onPadrao: (id: string) => void;
   /** Avisa o formulário de que a lista chegou (só então o salvamento envia a escolha). */
   onCarregada: () => void;
+  /** Quem conectou a Meta (ou suporte) vê todas as contas; os demais, só as liberadas. */
+  podeAmpliar: boolean;
   idioma: Idioma;
 }) {
   const t = (texto: string) => traduzir(texto, idioma);
-  const consulta = useTodasAsContasDaMeta(true);
+  const consulta = useTodasAsContasDaMeta(true, podeAmpliar);
   const [busca, setBusca] = useState("");
   const todas = useMemo(() => consulta.data?.data.contas ?? [], [consulta.data]);
 
@@ -65,6 +68,11 @@ export function SeletorDeContas({
           "Os gestores desta organização só verão as contas marcadas. O login pode alcançar contas de outros clientes: marque apenas as deste.",
         )}
       </p>
+      {!podeAmpliar && (
+        <p className="text-xs font-medium" data-testid="meta-sem-permissao-de-ampliar">
+          {t("Para liberar outras contas, peça a quem conectou a Meta ou ao suporte")}
+        </p>
+      )}
       {consulta.isLoading && <p className="text-sm text-muted-foreground">{t("Carregando contas…")}</p>}
       {consulta.error && (
         <p role="alert" className="text-sm text-destructive">

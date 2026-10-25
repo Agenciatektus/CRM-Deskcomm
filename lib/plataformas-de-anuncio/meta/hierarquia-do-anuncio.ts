@@ -42,11 +42,12 @@ const TEMPO_LIMITE_MS = 20_000;
  *
  * `id` não é pedido para o anúncio: já o temos: é o que se usou para chamar.
  */
-const CAMPOS = "name,adset{id,name},campaign{id,name}";
+const CAMPOS = "name,account_id,adset{id,name},campaign{id,name}";
 
 /** A forma do objeto de anúncio no fio — só o pedaço que se pediu. */
 interface AnuncioCru {
   name?: string;
+  account_id?: string;
   adset?: { id?: string; name?: string };
   campaign?: { id?: string; name?: string };
 }
@@ -58,6 +59,8 @@ interface ErroGraph {
 /** A hierarquia, no vocabulário da casa. Campo ausente é `null`, nunca `""`. */
 export interface HierarquiaDoAnuncio {
   adId: string;
+  /** Conta de anúncio dona do anúncio (só dígitos); `null` = a plataforma não disse. */
+  accountId?: string | null;
   adName: string | null;
   adsetId: string | null;
   adsetName: string | null;
@@ -128,6 +131,7 @@ export async function lerHierarquiaDoAnuncio(
     ok: true,
     dados: {
       adId,
+      accountId: /^\d+$/.test(json.account_id ?? "") ? json.account_id! : null,
       adName: texto(json.name),
       adsetId: texto(json.adset?.id),
       adsetName: texto(json.adset?.name),

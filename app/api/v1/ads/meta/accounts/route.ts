@@ -20,8 +20,8 @@ import { randomUUID } from "node:crypto";
 import { requireRole } from "@/lib/auth/require-role";
 import { listarContas } from "@/lib/plataformas-de-anuncio/meta/insights";
 import { lerCredencialDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
-import { ok } from "@/lib/api/wrappers";
-import { contaPermitida } from "@/lib/plataformas-de-anuncio/contas-permitidas";
+import { fail, ok } from "@/lib/api/wrappers";
+import { contaPermitida, podeAmpliarContas } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { respostaDeFalha, respostaSemConexao } from "../_falha";
@@ -36,13 +36,19 @@ export async function GET(request: Request): Promise<Response> {
   const todas = new URL(request.url).searchParams.get("todas") === "1";
   const authz = await requireRole(todas ? "admin" : "manager", { requestId, resource: "ads_insights" });
   if (!authz.ok) return authz.response;
-  const { org } = authz;
+  const { org, user } = authz;
 
   // Admin client: `ad_insights_connections` tem RLS ligada e ZERO policies
   // (0214). Pelo client de sessão isto devolveria vazio, sem erro.
   const admin = createAdminClient();
   const credencial = await lerCredencialDeLeitura(admin, org.orgId, "meta_ads");
   if (!credencial.ok) return respostaSemConexao(credencial.motivo, { requestId });
+
+  // Listar tudo = poder escolher contas de qualquer cliente: só quem conectou a Meta
+  // (ou platform admin). Os demais admins escolhem dentro da lista já liberada.
+  if (todas && !podeAmpliarContas(user, credencial.credencial.connectedBy)) {
+    return fail("forbidden_role", "Só quem conectou a Meta ou o suporte pode liberar outras contas.", 403, { requestId });
+  }
 
   const permitidas = todas ? null : credencial.credencial.contasPermitidas;
   // Lista vazia: nem chama a plataforma.

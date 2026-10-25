@@ -389,6 +389,21 @@ describe("callback", () => {
     expect(fake.audits[0]!.metadata).toMatchObject({ via_anterior: "oauth", conta_padrao_limpa: true });
   });
 
+  it("conexão anterior colada à mão: padrão e lista zeram (identidade desconhecida)", async () => {
+    fake.anterior = { connected_via: "manual", meta_user_id: null };
+    const { state, cookie } = await iniciado();
+    await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(fake.upserts[0]!.valores).toHaveProperty("default_account_id", null);
+    expect(fake.upserts[0]!.valores).toHaveProperty("allowed_ad_account_ids", null);
+  });
+
+  it("conexão OAuth anterior sem meta_user_id: zera", async () => {
+    fake.anterior = { connected_via: "oauth", meta_user_id: null };
+    const { state, cookie } = await iniciado();
+    await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);
+    expect(fake.upserts[0]!.valores).toHaveProperty("allowed_ad_account_ids", null);
+  });
+
   it("mesmo usuário Meta reconectando: a conta padrão fica", async () => {
     fake.anterior = { connected_via: "oauth", meta_user_id: "999" };
     const { state, cookie } = await iniciado();

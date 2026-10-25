@@ -40,6 +40,7 @@ export function FormularioDeMetaAds({
   conectada,
   contaPadrao,
   contasPermitidas,
+  podeAmpliar,
   via,
   expiraEm,
   diasParaVencer,
@@ -52,6 +53,8 @@ export function FormularioDeMetaAds({
   contaPadrao: string | null;
   /** Regra efetiva de contas liberadas; `null` = sem restrição (token colado à mão). */
   contasPermitidas: string[] | null;
+  /** Quem conectou a Meta (ou suporte): pode liberar contas além das já liberadas. */
+  podeAmpliar: boolean;
   via: "manual" | "oauth" | null;
   /** Data de vencimento já formatada; `null` em token colado à mão. */
   expiraEm: string | null;
@@ -194,6 +197,7 @@ export function FormularioDeMetaAds({
               onSelecionadas={setSelecionadas}
               onPadrao={setConta}
               onCarregada={aoCarregar}
+              podeAmpliar={podeAmpliar}
               idioma={idioma}
             />
           )}

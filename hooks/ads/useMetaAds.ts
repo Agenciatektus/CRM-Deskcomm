@@ -96,12 +96,12 @@ export function useMetaCampaigns({ contaId, de, ate }: ParametrosDeCampanhas) {
 }
 
 /** TODAS as contas que o login alcança (admin), para escolher as deste cliente. */
-export function useTodasAsContasDaMeta(enabled: boolean) {
+export function useTodasAsContasDaMeta(enabled: boolean, todas = true) {
   return useQuery({
-    queryKey: ["ads", "meta", "accounts", "todas"],
+    queryKey: ["ads", "meta", "accounts", todas ? "todas" : "liberadas"],
     queryFn: async () =>
       apiClient.get<{ data: ContasResposta & { permitidas?: string[] | null } }>(
-        "/api/v1/ads/meta/accounts?todas=1",
+        todas ? "/api/v1/ads/meta/accounts?todas=1" : "/api/v1/ads/meta/accounts",
       ),
     enabled,
     staleTime: 0,

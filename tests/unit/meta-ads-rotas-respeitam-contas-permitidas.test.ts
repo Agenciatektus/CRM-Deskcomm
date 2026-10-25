@@ -30,16 +30,18 @@ const TODAS = [
   { id: "act_2", nome: "De outro cliente", moeda: "BRL", status: 1 },
 ];
 
-function credencial(permitidas: string[] | null) {
+const CONECTOU = { id: "u1", is_platform_admin: false, platform_admin_scope: null, support: null };
+
+function credencial(permitidas: string[] | null, connectedBy: string | null = "u1") {
   mock.lerCredencial.mockResolvedValue({
     ok: true,
-    credencial: { accessToken: "tok", contaPadrao: "act_1", contasPermitidas: permitidas },
+    credencial: { accessToken: "tok", contaPadrao: "act_1", contasPermitidas: permitidas, connectedBy },
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org" } });
+  mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org" }, user: CONECTOU });
   credencial(["act_1"]);
   mock.listarContas.mockResolvedValue({ ok: true, dados: TODAS });
 });
@@ -63,6 +65,31 @@ describe("accounts", () => {
     const r = await accounts(new Request("http://x/api/v1/ads/meta/accounts?todas=1"));
     expect(mock.requireRole.mock.calls[0]![0]).toBe("admin");
     expect((await r.json()).data.contas).toHaveLength(2);
+  });
+
+  it("?todas=1 por admin que não conectou: 403 forbidden_role, sem Graph", async () => {
+    mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org" }, user: { ...CONECTOU, id: "outro" } });
+    const r = await accounts(new Request("http://x/api/v1/ads/meta/accounts?todas=1"));
+    expect(r.status).toBe(403);
+    expect((await r.json()).error.code).toBe("forbidden_role");
+    expect(mock.listarContas).not.toHaveBeenCalled();
+  });
+
+  it("?todas=1 em conexão antiga (connected_by nulo): só platform admin", async () => {
+    credencial(["act_1"], null);
+    expect((await accounts(new Request("http://x/api/v1/ads/meta/accounts?todas=1"))).status).toBe(403);
+    mock.requireRole.mockResolvedValue({
+      ok: true,
+      org: { orgId: "org" },
+      user: { ...CONECTOU, id: "pa", is_platform_admin: true, platform_admin_scope: "full" },
+    });
+    expect((await accounts(new Request("http://x/api/v1/ads/meta/accounts?todas=1"))).status).toBe(200);
+  });
+
+  it("admin que não conectou ainda vê as liberadas pela rota normal", async () => {
+    mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org" }, user: { ...CONECTOU, id: "outro" } });
+    const r = await accounts(new Request("http://x/api/v1/ads/meta/accounts"));
+    expect((await r.json()).data.contas.map((c: { id: string }) => c.id)).toEqual(["act_1"]);
   });
 
   it("?todas=1 sem admin para no gate", async () => {

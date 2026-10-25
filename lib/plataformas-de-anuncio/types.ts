@@ -197,6 +197,8 @@ export interface CredencialDeLeitura {
   contaPadrao: string | null;
   /** Contas que a organização pode ver (`act_<id>`); `null` = sem restrição. */
   contasPermitidas: string[] | null;
+  /** Quem conectou; `null` = conexão antiga. */
+  connectedBy: string | null;
 }
 
 /**

@@ -66425,7 +66425,11 @@ comment on column public.ad_insights_connections.meta_businesses is
 
 -- ---- Contas de anuncio permitidas por organizacao (migration 9074) ----
 alter table public.ad_insights_connections
-  add column if not exists allowed_ad_account_ids text[];
+  add column if not exists allowed_ad_account_ids text[],
+  add column if not exists connected_by uuid;
 
 comment on column public.ad_insights_connections.allowed_ad_account_ids is
   'Contas de anuncio (act_<id>) que esta organizacao pode ver. Nulo = OAuth: so a conta padrao; token manual: sem restricao. Migration 9074.';
+
+comment on column public.ad_insights_connections.connected_by is
+  'Usuario que conectou (OAuth) ou colou o token. So ele (ou platform admin) amplia as contas permitidas. Nulo = conexao antiga: so platform admin amplia. Migration 9074.';

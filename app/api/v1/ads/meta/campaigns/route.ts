@@ -39,7 +39,7 @@ const querySchema = z
     // `act_` obrigatório: o identificador cru (sem prefixo) é aceito por alguns
     // endpoints e não por outros, e deixar os dois formatos circularem faria a
     // conta selecionada na tela não bater com a chave do cache do cliente.
-    account_id: z.string().regex(/^act_\d+$/, "conta no formato act_<id>"),
+    account_id: z.string().max(32).regex(/^act_\d+$/, "conta no formato act_<id>"),
     from: z.string().regex(DATA, "data no formato AAAA-MM-DD").optional(),
     to: z.string().regex(DATA, "data no formato AAAA-MM-DD").optional(),
   })

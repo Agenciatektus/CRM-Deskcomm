@@ -121,6 +121,8 @@ export async function gravarConexaoDeLeitura(
     const cifrado = await encryptWebhookSecret(admin, c.accessToken);
     if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
     valores.access_token_encrypted = cifrado;
+    // Quem conectou ou colou: só ele (ou platform admin) amplia as contas permitidas.
+    valores.connected_by = c.userId;
     valores.connected_via = (c.oauth ? "oauth" : "manual") satisfies ProcedenciaDaConexao;
     valores.token_expires_at = c.oauth?.expiraEm ?? null;
     valores.scopes = c.oauth?.scopes ?? null;

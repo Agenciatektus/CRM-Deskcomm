@@ -9229,5 +9229,6 @@
   "Não consegui listar as contas agora. Tente de novo em instantes.": "Could not list the accounts right now. Try again shortly.",
   "Buscar por nome ou id": "Search by name or id",
   "marcadas": "selected",
-  "Primeira conta ativa": "First active account"
+  "Primeira conta ativa": "First active account",
+  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte": "To release other accounts, ask whoever connected Meta or support"
 }
