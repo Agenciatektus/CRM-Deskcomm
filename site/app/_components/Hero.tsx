@@ -1,4 +1,4 @@
-import { CTA, HERO, OFERTA, VIDEO, PROVA } from "@/lib/conteudo";
+import { CTA, HERO, VIDEO, PROVA } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { TelaInbox } from "./telas/TelaInbox";
@@ -71,32 +71,21 @@ export function Hero() {
         </p>
 
         <div className="a-sobe mt-7 flex flex-wrap items-center justify-center gap-3 [--atraso:0.28s]">
-          <BotaoPrimario href={CTA.comprar.href} externo>
+          <BotaoPrimario href="#oferta">
             {CTA.comprar.rotulo}
           </BotaoPrimario>
           <BotaoSecundario href="#plantao">Ver o sistema em ação</BotaoSecundario>
         </div>
         <p className="sr-only">{HERO.preco}</p>
-        <ul
-          aria-hidden="true"
-          className="a-sobe m-0 mt-6 flex list-none flex-wrap items-stretch justify-center gap-2.5 p-0 [--atraso:0.36s]"
-        >
-          {OFERTA.planos.map((pl) => (
-            <li
-              key={pl.nome}
-              className="rounded-field border border-border-strong bg-surface/70 px-4 py-2 text-left backdrop-blur-sm"
-            >
-              <span className="block text-meta text-text-muted">{pl.nome}</span>
-              <span className="text-[1.15rem] font-bold">{pl.preco}</span>{" "}
-              <span className="text-meta text-text-muted">{pl.periodo}</span>
-            </li>
-          ))}
-          <li className="rounded-field border border-border-strong bg-surface/70 px-4 py-2 text-left backdrop-blur-sm">
-            <span className="block text-meta text-text-muted">{OFERTA.implantacao.rotulo}</span>
-            <span className="text-[1.15rem] font-bold">{OFERTA.implantacao.preco}</span>{" "}
-            <span className="text-meta text-text-muted">{OFERTA.implantacao.parcelas}</span>
-          </li>
-        </ul>
+        <p className="a-sobe m-0 mt-6 text-[1rem] text-text-muted [--atraso:0.36s]">
+          <span aria-hidden="true">{HERO.precoLinha}</span>{" "}
+          <a
+            href="#oferta"
+            className="rounded-controle font-semibold text-link underline underline-offset-4 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-menta"
+          >
+            {HERO.precoLink}
+          </a>
+        </p>
         <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
       </div>
 

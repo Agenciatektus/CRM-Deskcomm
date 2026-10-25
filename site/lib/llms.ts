@@ -25,7 +25,7 @@ const CABECALHO = `# ${SITE.nome}
 
 > ${SITE.descricao}
 
-Atualizado em ${SITE.atualizadoEm}. Idioma: português do Brasil. Quem implanta e acompanha: a Tektus.`;
+Atualizado em ${SITE.atualizadoEm}. Idioma: português do Brasil. Implantação e acompanhamento opcionais pela Tektus.`;
 
 const PRECO = OFERTA.planos.map((p) => `${p.nome}: ${p.preco} ${p.periodo}`).join(". ");
 
@@ -42,7 +42,7 @@ export function llmsResumo(): string {
 ## Em poucas palavras
 
 - ${HERO.texto}
-- Preço: ${PRECO}. Implantação única de ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.
+- Preço: ${PRECO}. Implantação opcional pela Tektus, pagamento único de ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.
 - Contato comercial: WhatsApp da Tektus, pelo botão "${CTA.comprar.rotulo}" ou "${CTA.duvida.rotulo}" da página inicial.
 
 ## Perguntas frequentes
@@ -93,7 +93,7 @@ ${IMPLANTACAO.passos.map((p, i) => `${i + 1}. **${p.titulo}.** ${p.texto}`).join
 ${OFERTA.itens.map((i) => `- **${i.titulo}.** ${i.texto}`).join("\n")}
 
 ${OFERTA.planos.map((p) => `- **${p.nome}, ${p.preco} ${p.periodo}.** ${p.detalhes.join(" ")}`).join("\n")}
-- **Implantação, ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.** ${OFERTA.implantacao.detalhe}
+- **Implantação, ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.** ${OFERTA.implantacao.detalhe} ${OFERTA.implantacao.aviso}
 
 ## Objeções comuns
 

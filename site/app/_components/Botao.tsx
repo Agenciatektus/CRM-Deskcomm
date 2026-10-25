@@ -31,10 +31,11 @@ export function BotaoPrimario({
   );
 }
 
-export function BotaoSecundario({ href, children }: { href: string; children: ReactNode }) {
+export function BotaoSecundario({ href, children, externo = false }: { href: string; children: ReactNode; externo?: boolean }) {
   return (
     <a
       href={href}
+      {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className={`${BASE} border border-border-strong bg-surface px-5 text-[0.95rem] text-text hover:border-text-subtle`}
     >
       {children}
