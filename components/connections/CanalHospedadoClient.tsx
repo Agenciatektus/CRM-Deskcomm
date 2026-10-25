@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
-import { ConectarPorQr } from "./ConectarPorQr";
+import { AssistenteConexao } from "./AssistenteConexao";
 
 /**
  * Conectar o número que JÁ ESTÁ conectado em outro sistema do cliente.
@@ -79,6 +79,7 @@ export function CanalHospedadoClient() {
   // dentro do CRM — e um campo aberto na tela é um convite a usá-lo.
   const [mostrarAvancado, setMostrarAvancado] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [assistente, setAssistente] = useState(false);
   const [recemConectado, setRecemConectado] = useState<Conectado | null>(null);
 
   const carregar = async () => {
@@ -165,7 +166,9 @@ export function CanalHospedadoClient() {
                 {n.phone_number ?? t("aguardando o número")} · {n.status ?? "—"}
               </p>
             </div>
-            <ChannelAiAccess channelId={n.channel_session_id} />
+            <div id={`canal-ia-${n.channel_session_id}`}>
+              <ChannelAiAccess channelId={n.channel_session_id} />
+            </div>
           </div>
         ))}
 
@@ -209,7 +212,25 @@ export function CanalHospedadoClient() {
             </p>
           </div>
 
-          {estado?.nativo_habilitado && <ConectarPorQr onAtualizar={() => void carregar()} />}
+          {estado?.nativo_habilitado && (
+            <div className="border-t border-border pt-3">
+              <Button variant="outline" size="sm" onClick={() => setAssistente(true)}>
+                {t("Conectar WhatsApp")}
+              </Button>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {t("Um assistente em 4 passos: você dá um nome e conecta lendo um QR code, digitando um código no celular ou usando passkey.")}
+              </p>
+              {assistente && (
+                <AssistenteConexao
+                  onClose={() => setAssistente(false)}
+                  onAtualizar={() => void carregar()}
+                  onConfigurarAgente={(id) =>
+                    setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
+                  }
+                />
+              )}
+            </div>
+          )}
 
           {/* O caminho antigo, fechado por padrão e com o custo declarado. Ele
               continua aqui porque há número conectado por ele — tirar agora

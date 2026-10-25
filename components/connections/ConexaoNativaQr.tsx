@@ -121,6 +121,7 @@ export function ConexaoNativaQr({
   const erro = falha || corpo?.estado === "erro";
   const qr = !erro && corpo?.estado === "aguardando_leitura" ? corpo.qr : undefined;
   const reconectando = !erro && corpo?.estado === "reconectando";
+  const exigePasskey = !erro && corpo?.estado === "exige_passkey";
 
   return (
     <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
@@ -137,6 +138,10 @@ export function ConexaoNativaQr({
                 {t("Tentar agora")}
               </Button>
             </div>
+          ) : exigePasskey ? (
+            <p className="p-4 text-center text-sm text-text">
+              {t("Este WhatsApp pede uma chave de acesso (passkey). Use a aba Passkey para conectar.")}
+            </p>
           ) : (
             <Skeleton className="h-full w-full rounded-lg" />
           )}
@@ -149,7 +154,7 @@ export function ConexaoNativaQr({
             </Button>
           </>
         ) : (
-          !erro && (
+          !erro && !exigePasskey && (
             <p className="flex items-center gap-2 text-sm text-text-muted">
               {reconectando ? <ArrowsClockwise size={16} className="animate-spin" aria-hidden /> : <CircleNotch size={16} className="animate-spin" aria-hidden />}
               {reconectando ? t("O QR expirou, gerando um novo…") : t("Gerando o QR code…")}
