@@ -62,3 +62,26 @@ describe("listarPaginas", () => {
     }
   });
 });
+
+describe("o cursor `paging.next` só é seguido na mesma origem da Graph", () => {
+  it("next de outro host NÃO é seguido e o token não vai para ele", async () => {
+    const chamadas: string[] = [];
+    const { listarPaginas } = await import("@/lib/plataformas-de-anuncio/meta/insights");
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      chamadas.push(String(url));
+      return new Response(
+        JSON.stringify({ data: [{ id: "1", name: "P" }], paging: { next: "https://atacante.exemplo/roubo" } }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    try {
+      const r = await listarPaginas("TOKEN-SECRETO");
+      expect(r.ok).toBe(true);
+      expect(chamadas).toHaveLength(1);
+      expect(chamadas.join(" ")).not.toContain("atacante.exemplo");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

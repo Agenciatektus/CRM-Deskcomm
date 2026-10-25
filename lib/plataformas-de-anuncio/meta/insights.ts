@@ -238,6 +238,17 @@ export function classificarErroGraph(
  * porque a plataforma o monta assim; por isso ele é reescrito antes de ser
  * seguido, e nunca registrado em log.
  */
+/** `true` só se as duas URLs são http(s) e têm a mesma origem. Nunca lança. */
+function mesmaOrigemDaGraph(candidata: string, referencia: string): boolean {
+  try {
+    const a = new URL(candidata);
+    const b = new URL(referencia);
+    return (a.protocol === "https:" || a.protocol === "http:") && a.origin === b.origin;
+  } catch {
+    return false;
+  }
+}
+
 async function buscarPaginado<T>(
   urlInicial: string,
   token: string,
@@ -300,7 +311,11 @@ async function buscarPaginado<T>(
     }
 
     acumulado.push(...(json.data ?? []));
-    url = json.paging?.next ?? null;
+    // O `next` vem da plataforma e o token segue no header: só se segue um cursor que
+    // aponta para a MESMA origem da Graph que a leitura já está usando. Um `next` de
+    // outro host (resposta adulterada, base mal configurada) entregaria o token a ele.
+    const proximo = json.paging?.next ?? null;
+    url = proximo !== null && mesmaOrigemDaGraph(proximo, urlInicial) ? proximo : null;
   }
 
   return { ok: true, dados: acumulado };
