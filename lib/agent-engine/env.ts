@@ -5,6 +5,7 @@
  * URL + service role para os handlers do app (envio).
  */
 import { z } from 'zod';
+import { MENSAGEM_WAHA_HABILITADO_INVALIDO, wahaHabilitadoValido } from '@/lib/waha/habilitado';
 
 import {
   RETORNO_MAX_AHEAD_MS_PADRAO,
@@ -97,7 +98,10 @@ const envSchema = z.object({
   WAHA_API_BASE_URL: z.string().url().optional(),
   WAHA_API_KEY: z.string().min(1).optional(),
   // "false"/"0"/"no" desliga o watchdog de propósito (interruptor do WAHA).
-  WAHA_HABILITADO: z.string().optional(),
+  WAHA_HABILITADO: z
+    .string()
+    .optional()
+    .refine(wahaHabilitadoValido, { message: MENSAGEM_WAHA_HABILITADO_INVALIDO }),
   WATCHDOG_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
   WATCHDOG_REDRIVE_MIN_AGE_MS: z.coerce.number().int().positive().default(30_000),
   WATCHDOG_REDRIVE_BATCH_SIZE: z.coerce.number().int().positive().default(10),

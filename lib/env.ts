@@ -10,7 +10,11 @@
 import { z } from "zod";
 
 import { RETENCAO_TETO_DIAS } from "@/lib/retencao/politica";
-import { interpretaWahaHabilitado } from "@/lib/waha/habilitado";
+import {
+  interpretaWahaHabilitado,
+  MENSAGEM_WAHA_HABILITADO_INVALIDO,
+  wahaHabilitadoValido,
+} from "@/lib/waha/habilitado";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -224,7 +228,11 @@ const schema = z.object({
   // Interruptor do WAHA. Padrão "true" (comportamento de sempre). "false"/"0"/"no"
   // desliga: bloqueia a criação de canal WAHA e tira o WAHA do health e dos
   // crons. Leia por `wahaHabilitado()`, o único lugar que interpreta o valor.
-  WAHA_HABILITADO: z.string().optional().default("true"),
+  WAHA_HABILITADO: z
+    .string()
+    .optional()
+    .default("true")
+    .refine(wahaHabilitadoValido, { message: MENSAGEM_WAHA_HABILITADO_INVALIDO }),
 
   // ─── Chamada de voz WhatsApp (WaCalls, spec 18) ───
   //
