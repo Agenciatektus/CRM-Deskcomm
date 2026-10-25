@@ -117,6 +117,27 @@
   --radius-card: 8px;
   --radius-grande: 12px;
   --radius-modal: 16px;
+
+  /* Larguras de conteúdo por TIPO de seção. */
+  --container-leitura: 44rem;
+  --container-texto: 72rem;
+  --container-grade: 84rem;
+  --container-tela: 96rem;
+  --container-sangria: 112rem;
+
+  /* Ritmo vertical em três degraus. */
+  --espaco-secao-s: 4rem;
+  --espaco-secao-m: 6rem;
+  --espaco-secao-l: 8rem;
+
+  /* Elevação: sombra na cor do texto do tema escuro (quase preto azulado), nunca preto puro. */
+  --shadow-e1: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(5 6 9 / 0.4);
+  --shadow-e2: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 12px 32px -12px rgb(5 6 9 / 0.7);
+  --shadow-e3: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 40px 80px -24px rgb(5 6 9 / 0.85), 0 0 0 1px rgb(255 255 255 / 0.06);
+
+  --ease-rapida: cubic-bezier(0.2, 0, 0, 1);
+  --ease-base: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-lenta: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root {
@@ -200,6 +221,40 @@ h3 {
   background: linear-gradient(to bottom, #0d0e11, #111317 18%, #111317 82%, #0d0e11);
 }
 
+/* Fundos de seção somem nas pontas verticais: sem faixa dura entre seções. */
+.fundo-mascarado {
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+}
+
+/*
+ * Luz que nasce de um objeto: pseudo-elemento atrás, com o raio do objeto, desfocado.
+ * Exige que a seção não corte (overflow-x: clip) e no máximo duas luzes por viewport (blur até 96px).
+ */
+.luz {
+  position: relative;
+  isolation: isolate;
+}
+.luz::before {
+  content: "";
+  position: absolute;
+  inset: var(--luz-inset, 4% 6% -2% 6%);
+  border-radius: inherit;
+  background: var(
+    --luz-cor,
+    radial-gradient(60% 70% at 50% 60%, rgb(42 82 216 / 0.55), rgb(43 140 173 / 0.3) 45%, transparent 75%)
+  );
+  filter: blur(var(--luz-blur, 64px));
+  opacity: var(--luz-forca, 0.7);
+  z-index: -1;
+  pointer-events: none;
+}
+.luz-menta {
+  --luz-cor: radial-gradient(60% 70% at 50% 60%, rgb(43 200 143 / 0.35), transparent 75%);
+}
+.luz-fraca {
+  --luz-forca: 0.35;
+}
+
 /* Borda em degradê (fio de luz) em volta de uma janela ou card em destaque. */
 .borda-luz {
   position: relative;
@@ -223,22 +278,21 @@ h3 {
   background: linear-gradient(to bottom, rgb(255 255 255 / 0.035), rgb(255 255 255 / 0.012)), var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-modal);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 18px 40px -28px rgb(0 0 0 / 0.9);
+  box-shadow: var(--shadow-e1);
   transition:
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.25s;
+    transform 0.2s var(--ease-base),
+    box-shadow 0.2s var(--ease-base),
+    border-color 0.2s var(--ease-base);
 }
 .card:hover {
   border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-e2);
   transform: translateY(-2px);
 }
 
-/* Sombra longa e brilho da janela do app no hero. */
+/* Elevação neutra da janela do app; a luz azul vem do .luz do wrapper. */
 .janela-app {
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 0.06),
-    0 40px 120px -30px rgb(42 82 216 / 0.45),
-    0 30px 70px -20px rgb(0 0 0 / 0.85);
+  box-shadow: var(--shadow-e3);
 }
 
 /*
@@ -256,6 +310,16 @@ h3 {
   from {
     opacity: 0;
     transform: scale(0.96) translateY(10px);
+  }
+}
+@keyframes desenha {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes respira {
+  50% {
+    opacity: calc(var(--luz-forca, 0.7) * 0.8);
   }
 }
 @keyframes flutua {
@@ -288,6 +352,14 @@ h3 {
 @keyframes corre {
   to {
     transform: translateX(-50%);
+  }
+}
+@keyframes corre-inverso {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 @keyframes enche {
@@ -387,6 +459,13 @@ h3 {
     animation: digitando 1.4s ease backwards;
     animation-delay: var(--atraso, 0s);
   }
+  .a-respira::before {
+    animation: respira 6s ease-in-out infinite;
+  }
+  .selo-anel {
+    stroke-dasharray: 1;
+    animation: desenha 1.2s var(--ease-lenta) backwards;
+  }
   .a-pulso {
     animation: pulso 2.2s ease-in-out infinite;
   }
@@ -403,7 +482,18 @@ h3 {
     animation: varre 5s linear infinite;
   }
   .a-corre {
-    animation: corre 38s linear infinite;
+    animation: corre 60s linear infinite;
+  }
+  .a-corre-inverso {
+    animation: corre-inverso 70s linear infinite;
+  }
+  .faixa:hover .a-corre,
+  .faixa:hover .a-corre-inverso,
+  .faixa:focus-within .a-corre,
+  .faixa:focus-within .a-corre-inverso,
+  .faixa[data-pausada="true"] .a-corre,
+  .faixa[data-pausada="true"] .a-corre-inverso {
+    animation-play-state: paused;
   }
   .a-pulso-borda {
     animation: pulso-borda 2.6s ease-in-out infinite;
@@ -417,12 +507,12 @@ h3 {
   /* Revelar ao rolar: só depois de o JavaScript marcar <html class="com-js"> e de o observador rodar. */
   .com-js .revela:not([data-visivel]) {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(8px);
   }
   .revela {
     transition:
-      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 320ms var(--ease-lenta),
+      transform 320ms var(--ease-lenta);
     transition-delay: var(--atraso, 0s);
   }
 }
@@ -453,16 +543,16 @@ h3 {
   background:
     radial-gradient(70% 55% at 50% 0%, color-mix(in oklch, #2b8cad 22%, transparent), transparent 75%),
     var(--color-surface);
-  box-shadow: 0 0 0 1px var(--color-border-strong), 0 4px 0 rgb(0 0 0 / 0.25);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 4px 0 rgb(5 6 9 / 0.25);
 }
 .pele-dia {
   background: var(--color-surface-elevated);
   border-color: var(--color-border-strong);
 }
 .pele-seg {
-  background-color: rgb(0 0 0 / 0.22);
+  background-color: rgb(5 6 9 / 0.22);
 }
 .pele-seg-item-on {
   background: var(--color-surface-elevated);
-  box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 rgb(0 0 0 / 0.25);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 rgb(5 6 9 / 0.25);
 }

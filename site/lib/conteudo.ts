@@ -73,14 +73,25 @@ export const VIDEO = {
 
 export const FAIXA_ROTULO = "Conecta onde você já vende";
 
-export const FAIXA = [
-  "WhatsApp por QR code",
-  "WhatsApp oficial da Meta",
-  "Instagram",
-  "Google Agenda",
-  "Google Ads",
-  "Funil por nicho",
-  "Radar de conversas",
+export const FAIXA_APOIO = "A Tektus orienta se o seu volume pede QR code ou o canal oficial.";
+
+export const FAIXA_PAUSAR = { pausar: "Pausar movimento", retomar: "Retomar movimento" } as const;
+
+/** Duas linhas da faixa. `marca` liga o item ao logotipo em `ui/logos.ts`. */
+export const FAIXA_CANAIS = [
+  { nome: "WhatsApp por QR code", marca: "whatsapp" },
+  { nome: "WhatsApp oficial da Meta", marca: "whatsapp" },
+  { nome: "Instagram Direct", marca: "instagram" },
+  { nome: "Comentários do Instagram", marca: "instagram" },
+] as const;
+
+export const FAIXA_INTEGRACOES = [
+  { nome: "Google Agenda", marca: "agenda" },
+  { nome: "Google Ads", marca: "ads" },
+  { nome: "Meta Ads", marca: "meta" },
+  { nome: "OpenRouter", marca: "openrouter" },
+  { nome: "Anthropic", marca: "anthropic" },
+  { nome: "OpenAI", marca: "ia" },
 ] as const;
 
 export const PROBLEMAS_TITULO = "O vácuo tem hora, e o seu anúncio paga por ele.";
@@ -133,8 +144,8 @@ export const ESTATISTICA_RD =
   'Segundo o Panorama de Marketing e Vendas 2026 da RD Station, 40% das equipes têm a gestão do WhatsApp fragmentada e 19% usam planilha.';
 
 export const CONTA = {
-  titulo: "A conta do vácuo, com os seus números",
-  intro: "Três números que você já sabe de cabeça. A página faz a multiplicação. Nenhum número aqui é nosso.",
+  titulo: "A conta com os seus números",
+  intro: "Duas contas, feitas só com o que você digitar. A página faz a multiplicação e nenhum número aqui é nosso.",
   campo1: "Conversas por mês que chegam do anúncio",
   campo2: "Fatia dessas conversas que ficou sem resposta ou sem retorno (em %)",
   campo3: "Ticket médio de uma venda (em R$)",
@@ -143,6 +154,47 @@ export const CONTA = {
   nota: "Este é o valor das vendas que chegaram até a sua porta e ficaram sem atendimento. O Verdash CRM pode recuperar parte desse valor, e a parte depende da sua operação. Se a sua conta der pouco, o Verdash CRM provavelmente não se paga para você. Melhor saber agora.",
   privacidade: "O cálculo roda no seu navegador. Nenhum dado é enviado.",
   ponte: "Se o número doeu, o resto da página mostra como colocar alguém olhando o tempo todo.",
+} as const;
+
+export const CALCULADORA = {
+  abaVacuo: "Quanto o vácuo custa",
+  abaTime: "Time de IA x time de pessoas",
+  exemplo: "Usar um exemplo hipotético",
+  exemploAviso:
+    "Exemplo hipotético: 3 atendentes, R$ 2.800 cada, 1 na supervisão, plano com IA. Não são números de nenhuma empresa. Os campos aceitam os seus números no lugar destes.",
+  honesta:
+    "A conta usa só os números que você informou. Ela não promete que a IA substitui pessoas: quanto do atendimento cabe à IA e quanto fica com a equipe é decisão sua.",
+  time: {
+    intro: "Compare o custo mensal do seu time de hoje com um time menor, supervisionando o atendente de IA.",
+    atendentes: "Quantos atendentes você tem hoje",
+    custo: "Custo mensal de cada atendente, com encargos (em R$)",
+    supervisao: "Quantas pessoas ficariam na supervisão da IA",
+    plano: "Plano do Verdash CRM",
+    comIA: "Com IA, R$ 397 por mês (teto de US$ 15 de IA incluído)",
+    semIA: "Sem IA, R$ 157 por mês (a IA entra com a sua chave)",
+    custoIA: "O que você paga de IA por mês na sua chave (em R$)",
+    vazio: "Preencha os campos para ver a comparação.",
+    parcial: "Faltam informações para fechar a conta:",
+    erro: "Há campos com valor inválido. Os avisos estão ao lado de cada um.",
+    hoje: "O seu time de hoje, por mês",
+    depois: "Time menor mais Verdash CRM, por mês",
+    economiaMes: "Economia por mês",
+    economiaAno: "Economia em 12 meses",
+    negativoMes: "Diferença por mês: o Verdash CRM custaria mais",
+    negativoAno: "Diferença em 12 meses: o Verdash CRM custaria mais",
+    negativoTexto:
+      "Com esses números, o time menor mais o Verdash CRM sai mais caro do que o time de hoje. Nesse cenário a conta não fecha, e a implantação opcional também não se paga.",
+    meses: "A implantação opcional (R$ 1.297) seria coberta por essa economia em",
+    zeroTexto: "Com esses números, o custo mensal é o mesmo nos dois cenários.",
+  },
+  erros: {
+    invalido: "Use só números, com vírgula nos centavos.",
+    negativo: "O valor não pode ser negativo.",
+    "muito-alto": "O valor passa do limite que a calculadora aceita.",
+    fracionado: "Use um número inteiro.",
+    supervisaoMaior: "A supervisão não pode passar do número de atendentes de hoje.",
+    atendentesZero: "Informe ao menos 1 atendente.",
+  },
 } as const;
 
 export const MECANISMO = {
@@ -190,6 +242,7 @@ export const ETAPAS = [
 export const PROVA = {
   titulo: "O sistema por dentro",
   intro: "Telas do Verdash CRM com dados de exemplo. Cada uma responde a uma cena da seção anterior.",
+  exemploFunil: "Exemplo com dados fictícios. O seletor de funil e os filtros funcionam de verdade.",
   inbox: {
     titulo: "A caixa onde a equipe e a IA se encontram",
     texto:
@@ -284,11 +337,48 @@ export const IMPLANTACAO = {
       texto: "Ajustes no agente e no funil com base no uso real.",
     },
   ],
+  /** Só a ordem dos passos é afirmada. Prazo geral da implantação: preencher quando o Peterson informar; vazio, não aparece. */
+  prazoGeral: "" as string,
+  rotuloPrazo: "Prazo geral",
+  /** Ícone e texto curto de cada passo da linha do tempo, na mesma ordem de `passos`. */
+  linha: [
+    { icone: "busca", titulo: "Diagnóstico", texto: "Como o seu comercial funciona hoje e onde a venda se perde." },
+    { icone: "funil", titulo: "Funil e WhatsApp no ar", texto: "Etapas do seu jeito, responsáveis definidos e o WhatsApp conectado." },
+    { icone: "cerebro", titulo: "Agente de IA treinado", texto: "A Tektus cria o MEP do seu negócio e ele vira a base do agente." },
+    { icone: "usuario", titulo: "Treinamento e go-live", texto: "A equipe aprende a operar e o atendimento entra no ar." },
+    { icone: "calendario", titulo: "30 dias de acompanhamento", texto: "Ajustes no agente e no funil com base no uso real." },
+  ],
+  acompanhamento: "Acompanhamento de 30 dias após o go-live",
+  tektusFazTitulo: "A Tektus faz",
+  tektusFaz: [
+    "Diagnóstico do comercial",
+    "Funil com etapas e responsáveis",
+    "Conexão do WhatsApp e do Instagram",
+    "MEP do seu negócio, base do agente",
+    "Treinamento da equipe",
+    "30 dias de ajustes no agente e no funil",
+  ],
+  voceEntregaTitulo: "Você entrega",
+  voceEntrega: [
+    "Catálogo e preços",
+    "Regras de atendimento e horários",
+    "Acesso aos números e contas",
+    "Presença no treinamento da equipe",
+  ],
+  entregaveisTitulo: "O que fica pronto",
+  entregaveis: [
+    { icone: "funil", texto: "Funil configurado" },
+    { icone: "cerebro", texto: "Agente com a base do MEP" },
+    { icone: "chat", texto: "Canais conectados" },
+    { icone: "usuario", texto: "Equipe treinada" },
+    { icone: "calendario", texto: "Plano de ajustes dos 30 dias" },
+  ],
+  cta: "Ver o preço da implantação",
 } as const;
 
 export const OFERTA = {
   nome: "Verdash CRM",
-  titulo: "Tudo isto, funcionando no seu WhatsApp e no seu Instagram",
+  titulo: "Quanto custa o Verdash CRM, com e sem IA",
   itens: [
     {
       titulo: "Funil sob medida",
@@ -326,7 +416,7 @@ export const OFERTA = {
       botao: "Assinar o plano com IA",
       mensagem: "Oi, quero assinar o Verdash CRM com IA (R$ 397 por mês).",
       detalhes: [
-        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa e a Tektus combina com você o próximo passo.",
+        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa.",
         "Até 3 números de WhatsApp e até 2 contas de Instagram.",
         "Sem cobrança por usuário.",
       ],
@@ -353,14 +443,64 @@ export const OFERTA = {
     detalhe: "Inclui diagnóstico, configuração, agente de IA, treinamento e 30 dias de acompanhamento.",
     aviso: "Ela é opcional. Pode ser contratada junto com o plano, e a Tektus oferece de novo durante a assinatura.",
   },
-  apoioCta: "Dúvida antes de pagar? A Tektus responde no WhatsApp.",
+  periodoRotulo: "Período de cobrança",
+  mensal: "Mensal",
+  anual: "Anual",
+  porMes: "por mês",
+  semFidelidade: "Sem fidelidade no plano mensal, cancele quando quiser.",
+  anualDescricao: "Preço do plano anual com 15% de desconto",
+  equivalente: "por mês, equivalente",
+  porAno: "por ano",
+  recomendado: "Recomendado",
+  /** Comparativo item a item; cada linha tem o texto de cada plano e o estado (incluso ou com a sua chave). */
+  comparativo: [
+    {
+      comIA: { estado: "incluso", texto: "Caixa de entrada de WhatsApp e Instagram" },
+      semIA: { estado: "incluso", texto: "Caixa de entrada de WhatsApp e Instagram" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Funil, follow-up e Radar" },
+      semIA: { estado: "incluso", texto: "Funil, follow-up e Radar" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Atendente de IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa." },
+      semIA: { estado: "chave", texto: "Atendente de IA com a sua própria chave" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Até 3 números de WhatsApp e até 2 contas de Instagram" },
+      semIA: { estado: "incluso", texto: "Até 3 números de WhatsApp e até 2 contas de Instagram" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Sem cobrança por usuário" },
+      semIA: { estado: "incluso", texto: "Sem cobrança por usuário" },
+    },
+  ],
+  implantacaoSeletor: "Adicionar implantação",
+  implantacaoDescricao: "Diagnóstico, funil e WhatsApp, agente treinado com o MEP, treinamento e 30 dias de acompanhamento.",
+  totalMensal: "Do 1º ao 3º mês, aprox.",
+  planoMaisParcela: "plano mais a parcela da implantação em até 3x sem juros",
+  descComIA: "A IA já vem incluída, com teto de US$ 15 por mês.",
+  descSemIA: "Você conecta a sua própria chave de IA.",
+  totalDepois: "Depois",
+  maisSuaIA: "mais a sua IA",
+  parcelasAnual: "Implantação cobrada à parte, em até 3x sem juros.",
+  /** Só a garantia fica aqui: "sem cobrança por usuário" está no comparativo e a dúvida tem o botão logo abaixo. */
+  confianca: [{ icone: "escudo", texto: "Garantia de 100% da implantação", exigeGarantia: true }],
 } as const;
 
 /** Bloco só renderiza com `GARANTIA_CONFIRMADA` true. */
 export const GARANTIA = {
   titulo: "Garantia de implantação",
   texto:
-    "A Tektus devolve 100% da implantação, para quem a contratou, se não entregar o que foi combinado por escrito: agentes, funis, campanhas, follow-ups e fluxos de atendimento.",
+    "A Tektus devolve 100% da implantação, para quem a contratou, se não entregar o que foi combinado por escrito.",
+  marcosTitulo: "O que fica combinado por escrito",
+  marcos: [
+    { icone: "agente", texto: "Agentes" },
+    { icone: "funil", texto: "Funis e pipelines" },
+    { icone: "bandeira", texto: "Campanhas" },
+    { icone: "trocar", texto: "Follow-ups" },
+    { icone: "conexao", texto: "Fluxos de atendimento" },
+  ],
   limite:
     "A garantia cobre o valor da implantação, e só vale para quem a contratou. Ela deixa o número de vendas de fora, porque o resultado depende do seu volume de conversas, do seu ticket e do seu mercado.",
 } as const;
@@ -465,7 +605,7 @@ export const FAQ = [
   },
   {
     p: "Qual inteligência artificial o Verdash CRM usa e quem controla o gasto?",
-    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e ao chegar nele a IA pausa e a Tektus combina com o cliente o próximo passo. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
+    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e ao chegar nele a IA pausa. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
   },
   {
     p: "Como o Verdash CRM usa o Google Agenda e o Google Ads?",

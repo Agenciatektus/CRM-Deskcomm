@@ -1,4 +1,5 @@
 import { Icone, type NomeIcone } from "../ui/Icones";
+import { RailDoApp } from "./CascaDoApp";
 import { Avatar, BotaoApp, Etiqueta, Selo, SeloDeCanal } from "../ui/Pecas";
 
 /**
@@ -11,14 +12,6 @@ import { Avatar, BotaoApp, Etiqueta, Selo, SeloDeCanal } from "../ui/Pecas";
  * a etapa vira "Agendado"). Os atrasos vêm de `--atraso`. O ESTADO FINAL é o padrão do CSS: sem
  * JavaScript, ou com movimento reduzido, a tela aparece já resolvida e parada.
  */
-
-const MENU: { icone: NomeIcone; rotulo: string; ativo?: boolean }[] = [
-  { icone: "inbox", rotulo: "Atendimento", ativo: true },
-  { icone: "funil", rotulo: "CRM" },
-  { icone: "agente", rotulo: "Agentes" },
-  { icone: "conexao", rotulo: "Canais" },
-  { icone: "grafico", rotulo: "Análise" },
-];
 
 type Conversa = {
   nome: string;
@@ -209,27 +202,7 @@ export function TelaInbox({ className = "" }: { className?: string }) {
   return (
     <div className={`@container bg-bg text-text ${className}`}>
       <div className="flex h-[30rem] min-h-0 @3xl:h-[34rem]">
-        {/* Trilho de navegação: ícone e rótulo de 10,5 px, o ativo em cartão */}
-        <nav className="hidden w-[72px] shrink-0 flex-col items-center gap-1.5 border-r border-border bg-bg py-2.5 @md:flex">
-          <span className="mb-1.5 grid size-10 place-items-center rounded-xl bg-[#0e6d52] text-[13px] font-bold text-white">
-            SA
-          </span>
-          {MENU.map((m) => (
-            <span
-              key={m.rotulo}
-              className={`flex w-[62px] flex-col items-center gap-[3px] rounded-lg py-1.5 ${
-                m.ativo ? "pele-ativo-trilho text-text" : "text-text-muted"
-              }`}
-            >
-              <Icone nome={m.icone} className="size-5" />
-              <span className="text-rail font-semibold tracking-[-0.01em]">{m.rotulo}</span>
-            </span>
-          ))}
-          <span className="mt-auto flex flex-col items-center gap-[3px] text-text-muted">
-            <Icone nome="filtro" className="size-5" />
-            <span className="text-rail font-semibold">Ajustes</span>
-          </span>
-        </nav>
+        <RailDoApp ativo="Atendimento" />
 
         {/* Lista de conversas */}
         <section className="hidden w-[17.5rem] shrink-0 flex-col border-r border-border bg-surface @3xl:flex">
