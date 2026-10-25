@@ -16422,6 +16422,7 @@ export const DICIONARIO: Traducoes = {
   "Novo prazo": { es: "Nuevo plazo" },
   "Salvar novo prazo": { es: "Guardar nuevo plazo" },
   "Sem próximo passo": { es: "Sin próximo paso" },
+  "Veio de anúncio": { es: "Vino de un anuncio" },
   "Criar e concluir tarefas fica com quem atende.": { es: "Crear y finalizar tareas queda a cargo de quien atiende." },
   "Hoje 18:00": { es: "Hoy 18:00" },
   "Amanhã 9:00": { es: "Mañana 9:00" },

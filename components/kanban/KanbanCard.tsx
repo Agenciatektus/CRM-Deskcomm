@@ -15,7 +15,7 @@ import { ReactivationSlot } from "./ReactivationSlot";
 import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { ContatoNoCard } from "./ContatoNoCard";
-import { EsperaDoLead, EtiquetasDoCard, ProximoPassoDoCard, ResponsavelDoCard, TempoDoCard } from "./PartesDoCard";
+import { AnuncioDoCard, EsperaDoLead, EtiquetasDoCard, ProximoPassoDoCard, ResponsavelDoCard, TempoDoCard } from "./PartesDoCard";
 import { TarefasNoCard } from "./TarefasNoCard";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
@@ -253,6 +253,8 @@ export function KanbanCard({
           {!compacto && (
             <ConversaSlot conversa={lead.conversa} contactId={lead.contact_id} phone={lead.contact_phone} enxuto />
           )}
+
+          {!compacto && <AnuncioDoCard lead={lead} />}
 
           {!compacto && <EtiquetasDoCard tags={card.tags} />}
 
