@@ -46,6 +46,7 @@ const fzap = {
   conectouEm: 0,
   conexoes: 0,
   pair: "9H3J-H3J8" as unknown,
+  chaveSpec: false,
   qrApos: 0,
   calls: [] as string[],
 };
@@ -74,7 +75,8 @@ function fzapFalso(url: string, init?: RequestInit): Response {
   }
   if (path === "/session/pairphone") {
     if (!fzap.connected) return resposta(500, { success: false, error: "not initialized" });
-    return resposta(200, { success: true, data: { LinkingCode: fzap.pair } });
+    // Formato REAL medido em producao (FZAP v1.35.2): chave `linkingCode`; `chaveSpec` simula a grafia da spec.
+    return resposta(200, { success: true, data: { [fzap.chaveSpec ? "LinkingCode" : "linkingCode"]: fzap.pair } });
   }
   return resposta(404, {});
 }
@@ -100,7 +102,7 @@ const canal = () => `canal-${++n}`;
 
 beforeEach(() => {
   h.buckets.clear();
-  Object.assign(fzap, { connected: false, loggedIn: false, conexoes: 0, pair: "9H3J-H3J8", qrApos: 0, calls: [] });
+  Object.assign(fzap, { connected: false, loggedIn: false, conexoes: 0, pair: "9H3J-H3J8", chaveSpec: false, qrApos: 0, calls: [] });
   vi.stubGlobal("fetch", vi.fn(async (u: string, i?: RequestInit) => fzapFalso(String(u), i)));
 });
 afterEach(() => {
@@ -195,6 +197,15 @@ describe("codigoPorNumero", () => {
       status: 429,
       retryAfter: 30,
     });
+  });
+
+  it("le a chave REAL do FZAP (linkingCode, medida em producao) e tambem a da spec (LinkingCode)", async () => {
+    // Regressao 25/10: o FZAP v1.35.2 responde `linkingCode` e o codigo so lia `LinkingCode` => "nao foi possivel gerar o codigo".
+    const real = await codigoPorNumero(adminOk(), "org", canal(), "13978167757", sim, { esperaMs: 0 });
+    expect(real).toMatchObject({ status: 200, corpo: { codigo: "9H3J-H3J8" } });
+    fzap.chaveSpec = true;
+    const spec = await codigoPorNumero(adminOk(), "org", canal(), "13978167757", sim, { esperaMs: 0 });
+    expect(spec).toMatchObject({ status: 200, corpo: { codigo: "9H3J-H3J8" } });
   });
 
   it("formato do codigo desconhecido falha FECHADO", async () => {
