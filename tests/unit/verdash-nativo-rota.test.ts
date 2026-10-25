@@ -384,7 +384,8 @@ describe("GET qr", () => {
     expect(r.headers.get("content-type")).toBe("image/png");
     expect(r.headers.get("cache-control")).toContain("no-store");
     expect(Buffer.from(await r.arrayBuffer()).toString("base64")).toBe("iVBORw0KGgo=");
-    expect(chamadas.find((c) => c.path === "/session/connect")!.token).toBe("tok-inst");
+    // Sessao ja aberta (aguardando leitura): nao reabre; so reabre se caiu (ver conexao-nativa.test.ts).
+    expect(chamadas.some((c) => c.path === "/session/connect")).toBe(false);
     expect(chamadas.find((c) => c.path === "/session/qr")!.token).toBe("tok-inst");
   });
 

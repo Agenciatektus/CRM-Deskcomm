@@ -26,7 +26,9 @@ export function useConexaoNativa(canalId: string, onConectado: () => void) {
   const [falha, setFalha] = useState(false);
   const [rodada, setRodada] = useState(0);
   const aoConectar = useRef(onConectado);
-  aoConectar.current = onConectado;
+  useEffect(() => {
+    aoConectar.current = onConectado;
+  });
 
   useEffect(() => {
     const ctl = new AbortController();

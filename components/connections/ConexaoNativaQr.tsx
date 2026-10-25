@@ -19,17 +19,17 @@ type Aparelho = "android" | "iphone";
 
 function Contagem({ qr }: { qr: string }) {
   const t = useT();
-  const [desde, setDesde] = useState(() => Date.now());
-  const [agora, setAgora] = useState(() => Date.now());
+  return <ContagemDoQr key={qr} t={t} />;
+}
+
+/** Remontada a cada QR novo (key): o relogio recomeca sem setState em efeito. */
+function ContagemDoQr({ t }: { t: (v: string) => string }) {
+  const [decorrido, setDecorrido] = useState(0);
   useEffect(() => {
-    setDesde(Date.now());
-    setAgora(Date.now());
-  }, [qr]);
-  useEffect(() => {
-    const iv = setInterval(() => setAgora(Date.now()), 1000);
+    const iv = setInterval(() => setDecorrido((v) => v + 1), 1000);
     return () => clearInterval(iv);
   }, []);
-  const restante = Math.max(0, VIDA_DO_QR_S - Math.floor((agora - desde) / 1000));
+  const restante = Math.max(0, VIDA_DO_QR_S - decorrido);
   return (
     <p className="text-center text-xs text-text-muted">
       {restante > 0 ? t("Novo QR em {n}s").replace("{n}", String(restante)) : t("Atualizando o QR…")}
