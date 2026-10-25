@@ -44,6 +44,7 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
   cifra_indisponivel:
     "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la — refazer o cadastro aqui não resolve.",
   erro_ao_gravar: "Não consegui gravar agora. Tente de novo em instantes.",
+  superada: "Não consegui gravar agora. Tente de novo em instantes.",
   rate_limited: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.",
   token_invalido:
     "A Meta não reconhece este token: ele está inválido, expirado ou revogado. Gere um novo e cole de novo.",
