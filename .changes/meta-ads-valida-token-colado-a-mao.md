@@ -15,5 +15,5 @@ automática segue só para quem conectou pelo login da Meta.
 
 Se o novo token enxerga menos contas do que as liberadas hoje, a tela pede confirmação
 antes de trocar. Colar um token por cima da conexão de outra pessoa, ou de uma conexão
-feita pelo login da Meta, limpa a lista de contas liberadas, porque ela pertencia ao
-login antigo. Cada pessoa pode tentar colar até 5 vezes por minuto.
+feita pelo login da Meta, mantém só as contas liberadas que o novo token também enxerga.
+O token colado mostra apenas o que ele mesmo alcança. Cada pessoa pode tentar colar até 5 vezes por minuto.

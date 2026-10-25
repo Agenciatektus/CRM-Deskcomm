@@ -62,4 +62,21 @@ describe("validarTokenColado", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
     expect(await validarTokenColado(TOKEN)).toEqual({ ok: false, motivo: "validacao_indisponivel" });
   });
+
+  it("token de outro app (400 code 100): refaz com o próprio token e aceita", async () => {
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 100 } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: bom }), { status: 200 }));
+    vi.stubGlobal("fetch", f);
+    expect(await validarTokenColado(TOKEN)).toMatchObject({ ok: true });
+    expect(String(f.mock.calls[1]![0])).toContain(`access_token=${TOKEN}`);
+  });
+
+  it("token de outro app que também falha sozinho: token_invalido", async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ error: { code: 100 } }), { status: 400 }));
+    vi.stubGlobal("fetch", f);
+    expect(await validarTokenColado(TOKEN)).toEqual({ ok: false, motivo: "token_invalido" });
+    expect(f).toHaveBeenCalledTimes(2);
+  });
 });

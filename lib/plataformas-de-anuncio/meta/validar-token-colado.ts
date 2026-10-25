@@ -31,8 +31,8 @@ interface DadosDoDebug {
   app_id?: unknown;
 }
 
-async function debugToken(token: string): Promise<DadosDoDebug | "invalido" | null> {
-  const app = configuracaoDoMetaAds();
+async function debugToken(token: string, usarApp: boolean): Promise<DadosDoDebug | "invalido" | "outro_app" | null> {
+  const app = usarApp ? configuracaoDoMetaAds() : null;
   try {
     const consulta = new URLSearchParams({
       input_token: token,
@@ -46,7 +46,10 @@ async function debugToken(token: string): Promise<DadosDoDebug | "invalido" | nu
     if (!resposta.ok) {
       const corpo = (await resposta.json().catch(() => null)) as { error?: { code?: unknown } } | null;
       const code = corpo?.error?.code;
-      return resposta.status === 400 && (code === 190 || code === 100) && !app ? "invalido" : null;
+      if (resposta.status !== 400) return null;
+      // Com o app do CRM, 100 = token de outro app: quem decide é o próprio token.
+      if (app) return code === 100 ? "outro_app" : null;
+      return code === 190 || code === 100 ? "invalido" : null;
     }
     const corpo = (await resposta.json()) as { data?: DadosDoDebug } | null;
     return corpo?.data ?? null;
@@ -56,9 +59,10 @@ async function debugToken(token: string): Promise<DadosDoDebug | "invalido" | nu
 }
 
 export async function validarTokenColado(token: string): Promise<ResultadoDaValidacaoColada> {
-  const dados = await debugToken(token);
+  let dados = await debugToken(token, true);
+  if (dados === "outro_app") dados = await debugToken(token, false);
   if (dados === null) return { ok: false, motivo: "validacao_indisponivel" };
-  if (dados === "invalido" || dados.is_valid !== true) return { ok: false, motivo: "token_invalido" };
+  if (dados === "invalido" || dados === "outro_app" || dados.is_valid !== true) return { ok: false, motivo: "token_invalido" };
 
   const tipo = typeof dados.type === "string" ? dados.type.toUpperCase() : "";
   if (tipo === "PAGE") return { ok: false, motivo: "token_de_pagina" };

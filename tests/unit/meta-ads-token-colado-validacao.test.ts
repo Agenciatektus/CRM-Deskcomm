@@ -109,22 +109,44 @@ describe("token colado: conexão existente", () => {
     expect(await updateAdInsightsConnection(entrada)).toEqual({ ok: true });
   });
 
-  it("zera a lista ao colar por cima da conexão de outro dono", async () => {
+  it("sem lista restrita, troca de dono só limpa a conta padrão", async () => {
     mock.linha = { ...manualDoMesmoDono, connected_by: "outro", allowed_ad_account_ids: null };
     const r = await updateAdInsightsConnection({ ...entrada, default_account_id: "act_9" });
     expect(r).toEqual({ ok: true });
-    expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ allowedAdAccountIds: null, defaultAccountId: null });
+    expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ defaultAccountId: null });
+    expect(mock.gravar.mock.calls[0]![1].allowedAdAccountIds).toBeUndefined();
   });
 
-  it("zera a lista ao colar por cima de conexão OAuth do mesmo usuário", async () => {
-    mock.linha = { ...manualDoMesmoDono, connected_via: "oauth" };
-    expect(await updateAdInsightsConnection(entrada)).toEqual({ ok: true });
-    expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ allowedAdAccountIds: null, defaultAccountId: null });
+  it("OAuth restrito: grava a interseção com o que o token enxerga, nunca null (mesmo usuário e platform admin)", async () => {
+    mock.linha = { ...manualDoMesmoDono, connected_via: "oauth", allowed_ad_account_ids: ["act_1"], default_account_id: "act_1" };
+    for (const usuario of [
+      { id: "u1", is_platform_admin: false, platform_admin_scope: null, support: null },
+      { id: "adm", is_platform_admin: true, platform_admin_scope: "write", support: null },
+    ]) {
+      mock.usuario = usuario;
+      mock.gravar.mockClear();
+      expect(await updateAdInsightsConnection(entrada)).toEqual({ ok: true });
+      expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ allowedAdAccountIds: ["act_1"], defaultAccountId: "act_1" });
+    }
   });
 
-  it("admin que não conectou não zera (ampliar) a lista restrita", async () => {
-    mock.linha = { ...manualDoMesmoDono, connected_by: "outro" };
-    expect(await updateAdInsightsConnection(entrada)).toMatchObject({ ok: false, error: "forbidden_role" });
+  it("interseção vazia: precisa_confirmar, nunca grava sem restrição", async () => {
+    mock.linha = { ...manualDoMesmoDono, connected_via: "oauth", allowed_ad_account_ids: ["act_9"] };
+    const r = await updateAdInsightsConnection({ ...entrada, confirmar: true });
+    expect(r).toMatchObject({ ok: false, error: "precisa_confirmar" });
     expect(mock.gravar).not.toHaveBeenCalled();
+  });
+
+  it("grava condicionado ao estado lido e repassa superada", async () => {
+    mock.linha = { ...manualDoMesmoDono, updated_at: "2026-10-25T10:00:00Z" };
+    mock.gravar.mockResolvedValue({ ok: false, error: "superada" });
+    expect(await updateAdInsightsConnection(entrada)).toMatchObject({ ok: false, error: "superada" });
+    expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ lidoEm: "2026-10-25T10:00:00Z" });
+  });
+
+  it("admin que não conectou grava só a interseção com a lista atual", async () => {
+    mock.linha = { ...manualDoMesmoDono, connected_by: "outro" };
+    expect(await updateAdInsightsConnection(entrada)).toEqual({ ok: true });
+    expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ allowedAdAccountIds: ["act_1", "act_2"] });
   });
 });
