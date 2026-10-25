@@ -70,6 +70,15 @@ export function PainelDeFiltros({
     return [...s].sort();
   }, [leads]);
   const origens = useMemo(() => [...new Set(leads.map(origemDoLead))].sort(), [leads]);
+  // As campanhas que existem no quadro, da mais frequente para a menos: com muitas, só as 12 primeiras, mais as já escolhidas.
+  const campanhas = useMemo(() => {
+    const conta = new Map<string, number>();
+    for (const l of leads) if (l.contact_campanha) conta.set(l.contact_campanha, (conta.get(l.contact_campanha) ?? 0) + 1);
+    const topo = [...conta.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12).map(([nome]) => nome);
+    // As já escolhidas ficam SEMPRE à vista (vieram da URL ou de um clique antigo): filtro ativo sem chip para desligar prende a pessoa.
+    for (const escolhida of filters.campanhas ?? []) if (!topo.includes(escolhida)) topo.push(escolhida);
+    return topo;
+  }, [leads, filters.campanhas]);
   const porStatus = useMemo(() => {
     const c = { open: 0, won: 0, lost: 0, all: leads.length } as Record<string, number>;
     for (const l of leads) c[l.status] = (c[l.status] ?? 0) + 1;
@@ -161,6 +170,16 @@ export function PainelDeFiltros({
           </Chip>
         ))}
       </Grupo>
+
+      {campanhas.length > 0 && (
+        <Grupo titulo={t("Campanha")}>
+          {campanhas.map((c) => (
+            <Chip key={c} ligado={!!filters.campanhas?.includes(c)} onClick={() => set({ campanhas: alterna(filters.campanhas, c) })}>
+              {c}
+            </Chip>
+          ))}
+        </Grupo>
+      )}
 
       <FaixaDeValor min={filters.valueCentsMin} max={filters.valueCentsMax} onChange={(valueCentsMin, valueCentsMax) => set({ valueCentsMin, valueCentsMax })} />
 

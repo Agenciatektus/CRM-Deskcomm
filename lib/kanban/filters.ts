@@ -81,6 +81,8 @@ export interface LeadFilters {
   parados?: boolean;
   /** Canal de origem (`origemDoLead`), vários = OU. */
   canais?: readonly string[];
+  /** Campanha de anúncio (`contact_campanha`), vários = OU. */
+  campanhas?: readonly string[];
   /** Período de criação do negócio. */
   periodo?: PeriodoDeCriacao;
   /** O `lost_reason` exato do card — filtro de perda (issue #1537). */
@@ -132,6 +134,7 @@ export function filtersFromParams(
   const search = sp.get("q");
   const modo = sp.get("modo") ?? undefined;
   const canais = typeof sp.getAll === "function" ? sp.getAll("canal") : [];
+  const campanhas = typeof sp.getAll === "function" ? sp.getAll("campanha") : [];
   const reais = (k: string) => {
     const v = sp.get(k);
     const n = v === null || v === "" ? NaN : Number(v);
@@ -155,6 +158,7 @@ export function filtersFromParams(
     semPasso: sp.get("sem_passo") === "1" || undefined,
     parados: sp.get("parados") === "1" || undefined,
     ...(canais.length > 0 ? { canais } : {}),
+    ...(campanhas.length > 0 ? { campanhas } : {}),
     ...(ehPeriodo(periodo) ? { periodo } : {}),
     ...(reais("vmin") !== undefined ? { valueCentsMin: reais("vmin") } : {}),
     ...(reais("vmax") !== undefined ? { valueCentsMax: reais("vmax") } : {}),
@@ -177,6 +181,7 @@ export function filtersToParams(f: LeadFilters): string {
   if (f.semPasso) p.set("sem_passo", "1");
   if (f.parados) p.set("parados", "1");
   for (const canal of f.canais ?? []) p.append("canal", canal);
+  for (const campanha of f.campanhas ?? []) p.append("campanha", campanha);
   if (f.periodo) p.set("periodo", f.periodo);
   if (typeof f.valueCentsMin === "number") p.set("vmin", String(f.valueCentsMin / 100));
   if (typeof f.valueCentsMax === "number") p.set("vmax", String(f.valueCentsMax / 100));
@@ -209,6 +214,7 @@ export function applyFilters(
   const search = f.search ?? "";
   const desde = f.periodo ? inicioDoPeriodo(f.periodo, agora).getTime() : null;
   const canais = f.canais && f.canais.length > 0 ? new Set(f.canais) : null;
+  const campanhas = f.campanhas && f.campanhas.length > 0 ? new Set(f.campanhas) : null;
   // Fora do `filter`: a escolha de E/OU é do filtro, não do card, e calculá-la a
   // cada linha pagaria uma normalização por card — a lista do funil é pequena
   // hoje e não precisa de um laço que cresce com ela.
@@ -281,6 +287,7 @@ export function applyFilters(
     if (f.semPasso && !semProximoPasso(l)) return false;
     if (f.parados && !estaParado(l, contexto?.limiteDaEtapa ?? (() => null), agora)) return false;
     if (canais && !canais.has(origemDoLead(l))) return false;
+    if (campanhas && !campanhas.has(l.contact_campanha ?? "")) return false;
     if (desde !== null && new Date(l.created_at).getTime() < desde) return false;
     return true;
   });

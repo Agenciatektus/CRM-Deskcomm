@@ -232,6 +232,7 @@ function buildFollowupOpeningMessage(
   context: LeadContext,
   notesIndexBlock: string,
   projeta = false,
+  origemBlock = '',
 ): string {
   return [
     'Follow-up agendado: você havia combinado retornar a este lead — NÃO houve nova mensagem dele desde então.',
@@ -239,7 +240,7 @@ function buildFollowupOpeningMessage(
     '## Contexto temporal do follow-up',
     temporalBlock,
     '',
-    ...ritualBlocks(previous, leadState, context, notesIndexBlock, projeta),
+    ...ritualBlocks(previous, leadState, context, notesIndexBlock, projeta, '', origemBlock),
     '',
     'Retome a conversa com naturalidade usando a tool send_message — NUNCA escreva a resposta como texto direto',
     '(texto fora de tool é descartado pelo runtime). Use get_lead_context se precisar reler o contexto.',
@@ -682,7 +683,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
     await runAgentTurn(deps, job, pool, ctx, {
       channelSessionId: target.channelSessionId,
       conversationId: target.conversationId,
-      buildOpening: ({ previous, leadState, context, notesIndexBlock, projeta }) => {
+      buildOpening: ({ previous, leadState, context, notesIndexBlock, projeta, origemBlock }) => {
         const temporalBlock = buildTemporalBlock({
           now: clock(),
           reason: payload.reason,
@@ -690,7 +691,7 @@ export function createFollowupTurnHandler(deps: FollowupTurnDeps) {
           promisedAt: payload.promised_at,
           lastInbound: lastInboundOf(context),
         });
-        return buildFollowupOpeningMessage(temporalBlock, previous, leadState, context, notesIndexBlock, projeta);
+        return buildFollowupOpeningMessage(temporalBlock, previous, leadState, context, notesIndexBlock, projeta, origemBlock);
       },
     });
   };
@@ -924,9 +925,9 @@ async function runFlowDrivenTurn(
     await runAgentTurn(deps, job, pool, ctx, {
       channelSessionId: target.channelSessionId,
       conversationId: target.conversationId,
-      buildOpening: ({ previous, leadState, context, notesIndexBlock, projeta }) => {
+      buildOpening: ({ previous, leadState, context, notesIndexBlock, projeta, origemBlock }) => {
         const temporalBlock = buildTemporalBlock({ now: clock(), lastInbound: lastInboundOf(context) });
-        const opening = buildFollowupOpeningMessage(temporalBlock, previous, leadState, context, notesIndexBlock, projeta);
+        const opening = buildFollowupOpeningMessage(temporalBlock, previous, leadState, context, notesIndexBlock, projeta, origemBlock);
         if (!input.promptHint) return opening;
         return `${opening}\n\n## Orientação do passo do fluxo\n${input.promptHint}`;
       },
