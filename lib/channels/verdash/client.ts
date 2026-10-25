@@ -267,6 +267,53 @@ export async function verdashAtribuicaoPareada(
   return saida;
 }
 
+/** O aviso de quem é o dono do envio de conversões (ver `lib/conversoes/aviso-ao-canal.ts`). */
+export type AvisoDeConversoes =
+  | { ativo: false }
+  | { ativo: true; pixel_id: string; eventos: string[] };
+
+/**
+ * Avisa à Verdash que o CRM é (ou deixou de ser) o dono do envio de conversões.
+ *
+ * Com `ativo: true` a Verdash para de enviar o que o CRM já envia; o aviso VENCE
+ * em 48 h se não for reafirmado (o cron diário reafirma). Mesmo `x-crm-token` e
+ * mesmo vocabulário de erro de `verdashAtribuicaoPareada`; o token nunca entra
+ * em mensagem de erro nem em log.
+ */
+export async function verdashConversoesStatus(
+  creds: VerdashCredentials,
+  aviso: AvisoDeConversoes,
+  prazoMs: number = TIMEOUT_MS,
+): Promise<{ ativo: boolean }> {
+  const url = `${verdashFunctionsUrl().replace(/\/+$/, "")}/crm-conversoes-status`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "x-crm-token": creds.token, "content-type": "application/json" },
+      body: JSON.stringify(aviso),
+      signal: AbortSignal.timeout(prazoMs),
+    });
+  } catch (err) {
+    const detalhe = err instanceof Error ? err.message : "erro_desconhecido";
+    throw new Error(`verdash_unreachable: ${detalhe.slice(0, 200)}`);
+  }
+
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    data?: { ativo?: boolean };
+  } | null;
+
+  if (!res.ok || json?.success !== true) {
+    const detalhe = json?.error ?? res.statusText ?? "";
+    throw new Error(`verdash_request_failed: ${res.status} ${detalhe}`.trim());
+  }
+
+  return { ativo: json.data?.ativo === true };
+}
+
 /** Um lead do módulo de tráfego pago do FZAP (só o que a atribuição usa). */
 interface LeadDoFzap {
   senderPhone?: string | null;

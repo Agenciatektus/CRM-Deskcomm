@@ -17,6 +17,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
+import { avisarCanaisSobreConversoes } from "@/lib/channels/conversoes-do-canal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { eventoDaEtapaMeta, VALORES_DE_EVENTO_DA_META } from "@/lib/conversoes/regras-meta";
 
@@ -146,6 +147,10 @@ export async function salvarRegrasDeConversaoMeta(
       desligadas: regras.length - ligadas.length + sumidas.length,
     },
   });
+
+  // A lista de eventos que o CRM envia mudou: o canal pareado precisa da lista nova.
+  // Fire-and-forget: falha do aviso nunca falha o salvamento (o cron reafirma todo dia).
+  void avisarCanaisSobreConversoes(admin, orgId).catch(() => undefined);
 
   revalidatePath("/app/settings/conversoes");
   return { ok: true };
