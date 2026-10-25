@@ -252,10 +252,12 @@ export async function updateAdInsightsConnection(
     }
   }
 
-  // `upsert` (dentro do gravador) e não `update`: a linha não existe em quem nunca
-  // conectou, e um `update` casaria zero linhas devolvendo SUCESSO — a tela diria
-  // "salvo" e nada seria gravado. Mesmo modo de falha que a #144 mediu em
-  // `organizations`. `undefined` = não mexer; `null` = limpar a conta padrão.
+  // Sem linha: INSERT (23505 = outro admin conectou antes = `superada`). Com linha: UPDATE
+  // condicionado ao `updated_at` lido, e zero linhas casadas = `superada`, nunca "salvo" em
+  // silêncio. Linha sem `updated_at` legível não grava (cairia no upsert incondicional).
+  // `undefined` = não mexer; `null` = limpar a conta padrão.
+  if (existente && !existente.updated_at) return { ok: false, error: "erro_ao_gravar" };
+
   const gravado = await gravarConexaoDeLeitura(admin, {
     organizationId: activeOrg.orgId,
     userId: authUser.id,
@@ -268,9 +270,7 @@ export async function updateAdInsightsConnection(
         ? undefined
         : parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
     ...(validade ? { expiraEmColado: validade.expiraEm } : {}),
-    ...(validade && existente && (existente as { updated_at?: string }).updated_at
-      ? { lidoEm: (existente as { updated_at: string }).updated_at }
-      : {}),
+    ...(existente ? { lidoEm: existente.updated_at } : { primeira: true }),
   });
   if (!gravado.ok) {
     return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
