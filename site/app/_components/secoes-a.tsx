@@ -3,8 +3,6 @@ import {
   CONTA,
   ESTATISTICA_RD,
   ETAPAS,
-  FAIXA,
-  FAIXA_ROTULO,
   MECANISMO,
   PROBLEMAS,
   PROBLEMAS_FECHO,
@@ -14,35 +12,13 @@ import {
 } from "@/lib/conteudo";
 
 import { ContaDoVacuo } from "./ContaDoVacuo";
+export { Faixa } from "./Faixa";
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaFunil } from "./telas/TelaFunil";
 import { PainelConhecimento, PainelPassagem, PainelProposta } from "./telas/TelasDoAgente";
 import { Janela } from "./ui/Janela";
 import { Icone, type NomeIcone } from "./ui/Icones";
 import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
-
-/** Faixa de compatibilidades: corre devagar; parada, mostra tudo em linhas que quebram. */
-export function Faixa() {
-  const itens = [...FAIXA, ...FAIXA];
-  return (
-    <section aria-label="Canais e integrações" className="relative mt-16 mb-8 overflow-hidden border-y border-border bg-surface/50 lg:mt-24">
-      <p className="m-0 px-5 pt-4 text-center font-mono text-[0.72rem] tracking-[0.12em] text-text-subtle uppercase">
-        {FAIXA_ROTULO}
-      </p>
-      <ul className="a-corre m-0 flex w-max list-none items-center gap-3 p-0 py-4 motion-reduce:w-auto motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:px-5">
-        {itens.map((t, i) => (
-          <li
-            key={`${t}-${i}`}
-            aria-hidden={i >= FAIXA.length ? "true" : undefined}
-            className="shrink-0 rounded-full border border-border bg-bg px-4 py-1.5 text-meta font-semibold text-text-muted motion-reduce:[&:nth-child(n+8)]:hidden"
-          >
-            {t}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 /** Seis cenas do vácuo, cada uma com um pedaço de tela mostrando o sintoma. */
 function MiniLeadSumiu() {

@@ -73,14 +73,25 @@ export const VIDEO = {
 
 export const FAIXA_ROTULO = "Conecta onde você já vende";
 
-export const FAIXA = [
-  "WhatsApp por QR code",
-  "WhatsApp oficial da Meta",
-  "Instagram",
-  "Google Agenda",
-  "Google Ads",
-  "Funil por nicho",
-  "Radar de conversas",
+export const FAIXA_APOIO = "A Tektus orienta se o seu volume pede QR code ou o canal oficial.";
+
+export const FAIXA_PAUSAR = { pausar: "Pausar movimento", retomar: "Retomar movimento" } as const;
+
+/** Duas linhas da faixa. `marca` liga o item ao logotipo em `ui/logos.ts`. */
+export const FAIXA_CANAIS = [
+  { nome: "WhatsApp por QR code", marca: "whatsapp" },
+  { nome: "WhatsApp oficial da Meta", marca: "whatsapp" },
+  { nome: "Instagram Direct", marca: "instagram" },
+  { nome: "Comentários do Instagram", marca: "instagram" },
+] as const;
+
+export const FAIXA_INTEGRACOES = [
+  { nome: "Google Agenda", marca: "agenda" },
+  { nome: "Google Ads", marca: "ads" },
+  { nome: "Meta Ads", marca: "meta" },
+  { nome: "OpenRouter", marca: "openrouter" },
+  { nome: "Anthropic", marca: "anthropic" },
+  { nome: "OpenAI", marca: "ia" },
 ] as const;
 
 export const PROBLEMAS_TITULO = "O vácuo tem hora, e o seu anúncio paga por ele.";

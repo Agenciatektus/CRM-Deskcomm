@@ -349,6 +349,14 @@ h3 {
     transform: translateX(-50%);
   }
 }
+@keyframes corre-inverso {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
 @keyframes enche {
   from {
     transform: scaleX(0);
@@ -465,7 +473,18 @@ h3 {
     animation: varre 5s linear infinite;
   }
   .a-corre {
-    animation: corre 38s linear infinite;
+    animation: corre 60s linear infinite;
+  }
+  .a-corre-inverso {
+    animation: corre-inverso 70s linear infinite;
+  }
+  .faixa:hover .a-corre,
+  .faixa:hover .a-corre-inverso,
+  .faixa:focus-within .a-corre,
+  .faixa:focus-within .a-corre-inverso,
+  .faixa[data-pausada="true"] .a-corre,
+  .faixa[data-pausada="true"] .a-corre-inverso {
+    animation-play-state: paused;
   }
   .a-pulso-borda {
     animation: pulso-borda 2.6s ease-in-out infinite;
