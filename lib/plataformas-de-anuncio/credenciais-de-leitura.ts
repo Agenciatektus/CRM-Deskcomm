@@ -104,10 +104,12 @@ export async function existeConexaoDeLeitura(
   /** Identidade lida no OAuth (migration 9072); `null` = não lida. */
   metaUserName: string | null;
   metaBusinesses: { id: string; name: string }[];
+  /** A Meta recusou renovar o token (migration 9073): só reconectar resolve. */
+  precisaReconectar: boolean;
 }> {
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .select("default_account_id, token_expires_at, connected_via, meta_user_name, meta_businesses")
+    .select("default_account_id, token_expires_at, connected_via, meta_user_name, meta_businesses, needs_reconnect")
     .eq("organization_id", organizationId)
     .eq("platform", plataforma)
     .maybeSingle();
@@ -118,7 +120,7 @@ export async function existeConexaoDeLeitura(
       plataforma,
       error: error.message,
     });
-    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null, metaUserName: null, metaBusinesses: [] };
+    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null, metaUserName: null, metaBusinesses: [], precisaReconectar: false };
   }
 
   const linha = data as {
@@ -127,6 +129,7 @@ export async function existeConexaoDeLeitura(
     connected_via: string | null;
     meta_user_name: string | null;
     meta_businesses: unknown;
+    needs_reconnect: boolean | null;
   } | null;
   return {
     conectada: Boolean(linha),
@@ -134,6 +137,7 @@ export async function existeConexaoDeLeitura(
     tokenExpiraEm: linha?.token_expires_at ?? null,
     via: linha?.connected_via === "oauth" || linha?.connected_via === "manual" ? linha.connected_via : null,
     metaUserName: linha?.meta_user_name ?? null,
+    precisaReconectar: linha?.needs_reconnect === true,
     metaBusinesses: Array.isArray(linha?.meta_businesses)
       ? (linha.meta_businesses as { id: string; name: string }[]).filter(
           (b) => typeof b?.name === "string",

@@ -58,8 +58,18 @@ export interface TokenDaMeta {
 
 export type MotivoDeTokenIlegivel = "resposta_invalida" | "erro_da_meta" | "sem_access_token";
 
+/** O erro da Graph reduzido ao que é seguro guardar: códigos, nunca a mensagem. */
+export interface ErroDaGraph {
+  http?: number;
+  code?: number;
+  subcode?: number;
+  tipo?: string;
+  transitorio?: boolean;
+}
+
 export type LeituraDeToken =
-  { ok: true; token: TokenDaMeta } | { ok: false; motivo: MotivoDeTokenIlegivel; detalhe: string };
+  | { ok: true; token: TokenDaMeta }
+  | { ok: false; motivo: MotivoDeTokenIlegivel; detalhe: string; erro?: ErroDaGraph };
 
 function texto(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -87,6 +97,13 @@ export function lerRespostaDeToken(
       ok: false,
       motivo: "erro_da_meta",
       detalhe: `HTTP ${opcoes.status ?? "?"}, codigo ${codigo}, tipo ${tipo.slice(0, 40)}`,
+      erro: {
+        http: opcoes.status,
+        code: typeof e.code === "number" ? e.code : undefined,
+        subcode: typeof e.error_subcode === "number" ? e.error_subcode : undefined,
+        tipo: tipo === "?" ? undefined : tipo.slice(0, 40),
+        transitorio: e.is_transient === true,
+      },
     };
   }
 
