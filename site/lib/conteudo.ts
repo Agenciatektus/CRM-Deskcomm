@@ -124,7 +124,7 @@ export const PROBLEMAS = [
 ] as const;
 
 export const PROBLEMAS_FECHO =
-  "A causa está fora da preguiça da sua equipe. O WhatsApp nasceu para conversar, e ninguém o configurou para organizar uma operação de vendas.";
+  "A causa raramente é preguiça da sua equipe. O WhatsApp nasceu para conversar, e ninguém o configurou para organizar uma operação de vendas.";
 
 /** Estatística externa, a única da página: a fonte vai dita na própria frase. */
 export const ESTATISTICA_RD =
@@ -138,7 +138,7 @@ export const CONTA = {
   campo3: "Ticket médio de uma venda (em R$)",
   resultado: "O vácuo levou este mês:",
   vazio: "Preencha os três campos para ver a conta.",
-  nota: "Este é o valor das vendas que chegaram até a sua porta e ficaram sem atendimento. O número promete só a conta, e deixa de fora quanto o Verdash CRM recupera. Se a sua conta der pouco, o Verdash CRM provavelmente não se paga para você. Melhor saber agora.",
+  nota: "Este é o valor das vendas que chegaram até a sua porta e ficaram sem atendimento. O Verdash CRM pode recuperar parte desse valor, e a parte depende da sua operação. Se a sua conta der pouco, o Verdash CRM provavelmente não se paga para você. Melhor saber agora.",
   privacidade: "O cálculo roda no seu navegador. Nenhum dado é enviado.",
   ponte: "Se o número doeu, o resto da página mostra como colocar alguém olhando o tempo todo.",
 } as const;

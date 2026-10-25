@@ -1,4 +1,4 @@
-import { CTA, HERO, VIDEO, PROVA } from "@/lib/conteudo";
+import { CTA, HERO, OFERTA, VIDEO, PROVA } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { TelaInbox } from "./telas/TelaInbox";
@@ -76,9 +76,27 @@ export function Hero() {
           </BotaoPrimario>
           <BotaoSecundario href="#plantao">Ver o sistema em ação</BotaoSecundario>
         </div>
-        <p className="a-sobe mx-auto mb-0 mt-5 max-w-[40rem] text-[0.95rem] leading-relaxed text-text-muted [--atraso:0.36s]">
-          {HERO.preco}
-        </p>
+        <p className="sr-only">{HERO.preco}</p>
+        <ul
+          aria-hidden="true"
+          className="a-sobe m-0 mt-6 flex list-none flex-wrap items-stretch justify-center gap-2.5 p-0 [--atraso:0.36s]"
+        >
+          {OFERTA.planos.map((pl) => (
+            <li
+              key={pl.nome}
+              className="rounded-field border border-border-strong bg-surface/70 px-4 py-2 text-left backdrop-blur-sm"
+            >
+              <span className="block text-meta text-text-muted">{pl.nome}</span>
+              <span className="text-[1.15rem] font-bold">{pl.preco}</span>{" "}
+              <span className="text-meta text-text-muted">{pl.periodo}</span>
+            </li>
+          ))}
+          <li className="rounded-field border border-border-strong bg-surface/70 px-4 py-2 text-left backdrop-blur-sm">
+            <span className="block text-meta text-text-muted">{OFERTA.implantacao.rotulo}</span>
+            <span className="text-[1.15rem] font-bold">{OFERTA.implantacao.preco}</span>{" "}
+            <span className="text-meta text-text-muted">{OFERTA.implantacao.parcelas}</span>
+          </li>
+        </ul>
         <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
       </div>
 

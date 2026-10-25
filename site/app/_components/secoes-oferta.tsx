@@ -71,7 +71,7 @@ export function Garantia() {
   if (!GARANTIA_CONFIRMADA) return null;
   return (
     <Secao titulo="titulo-garantia" fundo="menta">
-      <div className="revela mx-auto max-w-[44rem] text-center">
+      <div className="card borda-luz revela mx-auto max-w-[48rem] p-8 text-center sm:p-12">
         <span className="mx-auto mb-4 grid size-12 place-items-center rounded-full border border-border-strong bg-surface-elevated text-ok">
           <Icone nome="escudo" className="size-6" />
         </span>
