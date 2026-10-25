@@ -41,11 +41,9 @@ export function Cartao({ k }: { k: DadosDoCartao }) {
           <span className="truncate text-xs text-text-subtle tabular-nums">{telefone(k.id)}</span>
         </div>
         {k.naoLidas ? (
-          <span
-            aria-label={`${k.naoLidas} não lidas`}
-            className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-white tabular-nums"
-          >
-            {k.naoLidas}
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-white tabular-nums">
+            <span aria-hidden="true">{k.naoLidas}</span>
+            <span className="sr-only">{k.naoLidas} não lidas</span>
           </span>
         ) : null}
       </div>

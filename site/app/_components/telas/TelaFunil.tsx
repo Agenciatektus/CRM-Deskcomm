@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { Icone } from "../ui/Icones";
 import { BarraGlobalDoApp, RailDoApp, TopoDoApp } from "./CascaDoApp";
@@ -19,6 +19,7 @@ export function TelaFunil() {
   const [ativos, setAtivos] = useState<ReadonlySet<Chip>>(new Set());
   const [busca, setBusca] = useState("");
   const menuId = useId();
+  const gatilho = useRef<HTMLButtonElement>(null);
 
   const funil = FUNIS.find((f) => f.id === funilId) ?? FUNIS[0]!;
   const etapas = useMemo(
@@ -45,12 +46,18 @@ export function TelaFunil() {
           titulo={
             <div
               className="relative"
-              onKeyDown={(e) => e.key === "Escape" && setAberto(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && aberto) {
+                  setAberto(false);
+                  gatilho.current?.focus();
+                }
+              }}
               onBlur={(e) => {
                 if (!e.currentTarget.contains(e.relatedTarget)) setAberto(false);
               }}
             >
               <button
+                ref={gatilho}
                 type="button"
                 aria-expanded={aberto}
                 aria-controls={menuId}
@@ -127,7 +134,7 @@ export function TelaFunil() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               aria-label="Buscar por nome ou etiqueta"
-              placeholder="Buscar por nome, telefone ou título"
+              placeholder="Buscar por nome ou etiqueta"
               className="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-subtle"
             />
           </label>
@@ -174,7 +181,12 @@ export function TelaFunil() {
         </div>
 
         {/* Celular: lista de etapas empilhada, sem forçar o quadro horizontal. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:hidden">
+        <div
+          role="region"
+          aria-label="Etapas do funil, lista"
+          tabIndex={0}
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:hidden"
+        >
           {etapas.map((e) => (
             <Coluna key={e.nome} etapa={e} cartoes={e.cartoes} lista />
           ))}
