@@ -1,6 +1,7 @@
 import { CTA, HERO, VIDEO, PROVA } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
+import { Container } from "./Secao";
 import { TelaInbox } from "./telas/TelaInbox";
 import { Icone } from "./ui/Icones";
 import { Avatar, Selo } from "./ui/Pecas";
@@ -14,8 +15,11 @@ import { Janela } from "./ui/Janela";
  */
 export function Hero() {
   return (
-    <section aria-labelledby="titulo-hero" className="relative isolate overflow-hidden">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+    <section aria-labelledby="titulo-hero" className="relative isolate overflow-x-clip pb-(--espaco-secao-m)">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,#000_88%,transparent)]"
+      >
         <div className="fundo-brilho-azul absolute inset-0" />
         <div className="fundo-brilho-menta absolute inset-0" />
         <div className="fundo-grade absolute inset-0" />
@@ -33,11 +37,10 @@ export function Hero() {
           />
         </picture>
         <div className="fundo-ruido absolute inset-0 opacity-60" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-bg" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 pt-10 text-center sm:pt-14">
-        <p className="a-sobe m-0 mb-6 inline-flex items-center gap-2.5 rounded-full border border-border-strong bg-surface/70 py-1.5 pr-4 pl-3 font-mono text-[0.72rem] tracking-[0.12em] text-text-muted uppercase backdrop-blur-sm">
+      <Container largura="texto" className="pt-10 text-center sm:pt-14">
+        <p className="a-sobe m-0 mb-6 inline-flex items-center gap-2.5 rounded-full border border-border-strong bg-surface py-1.5 pr-4 pl-3 text-label font-semibold text-text-muted">
           <span aria-hidden="true" className="a-pulso size-1.5 rounded-full bg-menta shadow-[0_0_10px_2px_rgb(43_200_143/0.7)]" />
           {HERO.eyebrow}
         </p>
@@ -87,28 +90,32 @@ export function Hero() {
           </a>
         </p>
         <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
-      </div>
+      </Container>
 
       {/* A janela do app, com os cards flutuando por cima. */}
-      <div className="relative mx-auto mt-10 max-w-[72rem] px-4 sm:mt-12 sm:px-6">
-        <div className="[perspective:2000px]">
-          <div className="a-ergue origin-top">
-            <Janela rota="inbox">
-              <TelaInbox />
-            </Janela>
+      <Container largura="tela" className="mt-10 sm:mt-12">
+        <div className="relative">
+          {/* A luz nasce atrás da janela, com o mesmo raio, e não é cortada (a seção só clipa o eixo X). */}
+          <div className="luz a-respira rounded-modal [--luz-blur:80px] [--luz-inset:8%_4%_-6%_4%]">
+            {/* O esmaecimento é máscara da própria janela: nada por cima dos chips. */}
+            <div className="[mask-image:linear-gradient(to_bottom,#000_70%,transparent_100%)] [perspective:2000px]">
+              <div className="a-ergue origin-top">
+                <Janela rota="inbox">
+                  <TelaInbox />
+                </Janela>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Esmaece a base: o sistema continua abaixo da dobra. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-44 bg-gradient-to-b from-transparent via-bg/75 to-bg"
-        />
+          {/* Chips: saem para fora da borda da janela, em linha, sem backdrop-blur. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-[6%] -bottom-10 z-20 hidden items-end justify-between gap-6 xl:flex"
+          >
 
         {/* Card: o negócio muda de etapa */}
         <div
-          className="a-entra a-flutua absolute bottom-3 left-6 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-60 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2s]"
         >
           <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
             <Icone nome="funil" className="size-3.5" /> Clínica de estética
@@ -127,8 +134,7 @@ export function Hero() {
 
         {/* Card: o agente, com rédea */}
         <div
-          className="a-entra a-flutua absolute bottom-3 left-1/2 z-20 -ml-32 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-64 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2.4s]"
         >
           <p className="m-0 mb-2.5 flex items-center justify-between text-meta font-bold text-text-muted">
             <span className="flex items-center gap-1.5">
@@ -147,8 +153,7 @@ export function Hero() {
 
         {/* Card: o Radar */}
         <div
-          className="a-entra a-flutua absolute right-6 bottom-3 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-60 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2.8s]"
         >
           <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
             <Icone nome="radar" className="size-3.5" /> Radar
@@ -164,12 +169,20 @@ export function Hero() {
             </div>
           </div>
         </div>
-      </div>
+          </div>
+        </div>
 
-      {/* Espaço do vídeo: enquanto não há vídeo, a janela do app acima leva esta legenda. */}
-      <p className="mx-auto mt-2 mb-0 max-w-[40rem] px-5 pb-6 text-center text-[0.95rem] leading-relaxed text-text-muted">
-        <span className="font-semibold text-text">{PROVA.inbox.titulo}.</span> {VIDEO.legenda_sem_video}
-      </p>
+        {/* Legenda: bloco próprio, com espaço para os chips que saem da janela. Vira o player quando houver vídeo. */}
+        <div className="mt-20 flex max-w-(--container-leitura) items-start gap-4">
+          <svg aria-hidden="true" viewBox="0 0 256 256" className="mt-0.5 size-7 shrink-0 text-link" fill="currentColor" focusable="false">
+            <circle cx="128" cy="128" r="96" opacity="0.2" />
+            <path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm40-95.54-56-32A8 8 0 0 0 100 95.45v65.1a8 8 0 0 0 12 6.93l56-32.55a8 8 0 0 0 0-13.47Z" />
+          </svg>
+          <p className="m-0 text-[0.95rem] leading-relaxed text-text-muted">
+            <span className="block text-base font-bold text-text">{PROVA.inbox.titulo}.</span> {VIDEO.legenda_sem_video}
+          </p>
+        </div>
+      </Container>
     </section>
   );
 }
