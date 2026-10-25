@@ -125,7 +125,7 @@ export const FUNIS: Funil[] = [
         c("s5", "Escola Horizonte", 4, "whatsapp", 8600, DONO_LOGADO, "Vamos analisar com a diretoria", "esperando resposta há 2 d", "reforma", { proximo: "Ligar para a diretoria", atrasado: true, proposta: "enviar retomada amanhã, 10h" }),
       ], 0.5),
       etapa(3, "Negociação", [
-        c("s6", "Rede Vitória", 2, "whatsapp", 12000, DONO_LOGADO, "Fecha se entrar em 3 vezes", "há 4 h", "rede", { destaque: true, naoLidas: 1, proximo: "Responder sobre as 3 parcelas" }),
+        c("s6", "Rede Vitória", 2, "whatsapp", 12000, DONO_LOGADO, "Fecha se parcelar em três vezes", "há 4 h", "rede", { destaque: true, naoLidas: 1, proximo: "Responder sobre o parcelamento" }),
         c("s7", "Loja Mar Azul", 0, "whatsapp", 5400, DONO_LOGADO, "Aprovado pelo sócio", "há 1 d", "reforma"),
       ], 0.8),
       etapa(4, "Fechado", [

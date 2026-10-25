@@ -16,7 +16,6 @@ export function Oferta() {
           {CTA.duvida.rotulo}
         </BotaoSecundario>
       </div>
-      <p className="mt-3 mb-0 text-[0.95rem] text-text-muted">{OFERTA.apoioCta}</p>
     </Secao>
   );
 }

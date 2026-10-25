@@ -28,6 +28,10 @@ describe("preços da LP", () => {
     expect(totalPrimeirosMesesCentavos("sem-ia")).toBe(58_933);
   });
 
+  it("3 parcelas arredondadas somam 1 centavo a menos que a implantação, por isso a tela não mostra a parcela exata", () => {
+    expect(parcelaImplantacaoCentavos() * 3).toBe(129_699);
+  });
+
   it("formata inteiros sem centavos e fracionados com centavos", () => {
     expect(norm(reaisDeCentavos(39_700))).toBe("R$ 397");
     expect(norm(reaisDeCentavos(33_745))).toBe("R$ 337,45");

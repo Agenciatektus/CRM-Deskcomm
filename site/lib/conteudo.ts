@@ -242,6 +242,7 @@ export const ETAPAS = [
 export const PROVA = {
   titulo: "O sistema por dentro",
   intro: "Telas do Verdash CRM com dados de exemplo. Cada uma responde a uma cena da seção anterior.",
+  exemploFunil: "Exemplo com dados fictícios. O seletor de funil e os filtros funcionam de verdade.",
   inbox: {
     titulo: "A caixa onde a equipe e a IA se encontram",
     texto:
@@ -442,7 +443,6 @@ export const OFERTA = {
     detalhe: "Inclui diagnóstico, configuração, agente de IA, treinamento e 30 dias de acompanhamento.",
     aviso: "Ela é opcional. Pode ser contratada junto com o plano, e a Tektus oferece de novo durante a assinatura.",
   },
-  apoioCta: "Dúvida antes de pagar? A Tektus responde no WhatsApp.",
   periodoRotulo: "Período de cobrança",
   mensal: "Mensal",
   anual: "Anual",
@@ -477,15 +477,15 @@ export const OFERTA = {
   ],
   implantacaoSeletor: "Adicionar implantação",
   implantacaoDescricao: "Diagnóstico, funil e WhatsApp, agente treinado com o MEP, treinamento e 30 dias de acompanhamento.",
-  totalMensal: "Do 1º ao 3º mês",
+  totalMensal: "Do 1º ao 3º mês, aprox.",
+  planoMaisParcela: "plano mais a parcela da implantação em até 3x sem juros",
+  descComIA: "A IA já vem incluída, com teto de US$ 15 por mês.",
+  descSemIA: "Você conecta a sua própria chave de IA.",
   totalDepois: "Depois",
   maisSuaIA: "mais a sua IA",
-  parcelasAnual: "Implantação cobrada à parte, em até 3 parcelas de",
-  confianca: [
-    { icone: "escudo", texto: "Garantia de 100% da implantação" },
-    { icone: "usuario", texto: "Sem cobrança por usuário" },
-    { icone: "chat", texto: "Dúvida antes de pagar? Um humano da Tektus responde no WhatsApp" },
-  ],
+  parcelasAnual: "Implantação cobrada à parte, em até 3x sem juros.",
+  /** Só a garantia fica aqui: "sem cobrança por usuário" está no comparativo e a dúvida tem o botão logo abaixo. */
+  confianca: [{ icone: "escudo", texto: "Garantia de 100% da implantação", exigeGarantia: true }],
 } as const;
 
 /** Bloco só renderiza com `GARANTIA_CONFIRMADA` true. */

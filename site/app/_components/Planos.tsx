@@ -2,12 +2,11 @@
 
 import { useId, useState } from "react";
 
-import { OFERTA, linkWhatsapp } from "@/lib/conteudo";
+import { GARANTIA_CONFIRMADA, OFERTA, linkWhatsapp } from "@/lib/conteudo";
 import {
   anualCentavos,
   equivalenteMensalCentavos,
   mensagemDeAssinatura,
-  parcelaImplantacaoCentavos,
   reaisDeCentavos as reais,
   totalPrimeirosMesesCentavos,
   MENSAL_CENTAVOS,
@@ -73,7 +72,6 @@ export function Planos() {
   const [periodo, setPeriodo] = useState<Periodo>("mensal");
   const [comImpl, setComImpl] = useState(false);
   const idImpl = useId();
-  const parcela = reais(parcelaImplantacaoCentavos());
 
   return (
     <div>
@@ -106,9 +104,7 @@ export function Planos() {
               </div>
               <Preco plano={p.id} periodo={periodo} />
               <p className="m-0 text-text-muted">
-                {p.id === "com-ia"
-                  ? "A IA já vem incluída, com teto de US$ 15 por mês."
-                  : "Você conecta a sua própria chave de IA."}
+                {p.id === "com-ia" ? OFERTA.descComIA : OFERTA.descSemIA}
               </p>
               <div>
                 {p.destaque ? (
@@ -187,13 +183,13 @@ export function Planos() {
                   <br />
                   {periodo === "mensal" ? (
                     <span className="text-text-muted">
-                      {OFERTA.totalMensal}: {reais(totalPrimeirosMesesCentavos(p.id))} ({reais(MENSAL_CENTAVOS[p.id])} do plano mais{" "}
-                      {parcela} da implantação). {OFERTA.totalDepois}: {reais(MENSAL_CENTAVOS[p.id])} {OFERTA.porMes}
+                      {OFERTA.totalMensal}: {reais(totalPrimeirosMesesCentavos(p.id))} ({OFERTA.planoMaisParcela}).{" "}
+                      {OFERTA.totalDepois}: {reais(MENSAL_CENTAVOS[p.id])} {OFERTA.porMes}
                       {p.id === "sem-ia" ? `, ${OFERTA.maisSuaIA}` : ""}.
                     </span>
                   ) : (
                     <span className="text-text-muted">
-                      {reais(anualCentavos(p.id))} {OFERTA.porAno}. {OFERTA.parcelasAnual} {parcela}, separada do plano.
+                      {reais(anualCentavos(p.id))} {OFERTA.porAno}. {OFERTA.parcelasAnual}
                     </span>
                   )}
                 </li>
@@ -204,7 +200,7 @@ export function Planos() {
       </div>
 
       <ul className="revela m-0 mt-8 flex list-none flex-wrap gap-x-8 gap-y-3 p-0 text-ui text-text-muted">
-        {OFERTA.confianca.map((c) => (
+        {OFERTA.confianca.filter((c) => !c.exigeGarantia || GARANTIA_CONFIRMADA).map((c) => (
           <li key={c.texto} className="flex items-center gap-2">
             <Icone nome={c.icone} className="size-5 shrink-0 text-link" />
             {c.texto}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import * as C from "../../site/lib/conteudo";
+import { FUNIS } from "../../site/app/_components/telas/funil/dados";
 import { llmsCompleto, llmsResumo } from "../../site/lib/llms";
 
 /**
@@ -43,6 +44,7 @@ const TEXTOS = [
   C.PROBLEMAS_FECHO,
   C.CONTA,
   C.CALCULADORA,
+  FUNIS,
   C.MECANISMO,
   C.ETAPAS,
   C.PROVA,
