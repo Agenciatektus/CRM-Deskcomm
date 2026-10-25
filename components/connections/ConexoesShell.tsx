@@ -42,10 +42,16 @@ import { rotaDeTemplates } from "@/lib/channels/templates-fonte";
  */
 export function ConexoesShell({
   wahaConfigured,
+  wahaDesligado = false,
   wacallsConfigured,
   graphParceiro = null,
 }: {
   wahaConfigured: boolean;
+  /**
+   * Interruptor do servidor (variável de habilitação do transporte por QR): a aba "Números por QR"
+   * some e a tela abre na Verdash. Só o booleano chega aqui.
+   */
+  wahaDesligado?: boolean;
   wacallsConfigured: boolean;
   /**
    * O canal parceiro que espelha a Cloud API (recorte do #1130) é OPCIONAL DA
@@ -59,6 +65,7 @@ export function ConexoesShell({
   const router = useRouter();
   const params = useSearchParams();
   const abaParam = params.get("aba");
+  const abaPadrao = wahaDesligado ? "hospedado" : "numeros";
   const aba =
     abaParam === "sociais"
       ? "sociais"
@@ -76,12 +83,12 @@ export function ConexoesShell({
                 ? "instagram"
                 : abaParam === "graph" && graphParceiro
                   ? "graph"
-                  : "numeros";
+                  : abaPadrao;
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
 
   const irPara = (proximaAba: string, proximaSub?: string): void => {
     const q = new URLSearchParams();
-    if (proximaAba !== "numeros") q.set("aba", proximaAba);
+    if (proximaAba !== abaPadrao) q.set("aba", proximaAba);
     if (proximaSub && proximaSub !== "conexao") q.set("sub", proximaSub);
     const qs = q.toString();
     // `scroll: false`: trocar de aba não é navegar para outra página; jogar o
@@ -102,7 +109,7 @@ export function ConexoesShell({
             a frase custou menos que abrir exceção no gate, e o gate continua
             estrito: o dia em que alguém escrever o nome do provider aqui DE VERDADE,
             ele reprova igual. */}
-        <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>
+        {!wahaDesligado && <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>}
         {/* Primeira depois do QR, e antes das duas de API, porque é o caminho
             mais curto para quem JÁ tem o WhatsApp funcionando em outro sistema:
             não lê QR, não abre conta na Meta, não tira nada do ar. Exceção
@@ -128,9 +135,11 @@ export function ConexoesShell({
         {graphParceiro && <TabsTrigger value="graph">{graphParceiro.label}</TabsTrigger>}
       </TabsList>
 
-      <TabsContent value="numeros" className="mt-0">
-        <ConnectionsClient wahaConfigured={wahaConfigured} />
-      </TabsContent>
+      {!wahaDesligado && (
+        <TabsContent value="numeros" className="mt-0">
+          <ConnectionsClient wahaConfigured={wahaConfigured} />
+        </TabsContent>
+      )}
 
       <TabsContent value="telefonia" className="mt-0">
         <TelefoniaClient />

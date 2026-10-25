@@ -5,6 +5,7 @@ import { metaPodeReceber } from "@/lib/channels/meta/webhook";
 import { nomeCurtoDaSessao } from "@/lib/channels/nome-da-sessao";
 import { getWahaClient } from "@/lib/waha/client";
 import { ConnectWhatsappClient } from "./_client";
+import { wahaHabilitado } from "@/lib/env";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,8 @@ export default async function ConnectWhatsappPage() {
   if (!activeOrg) redirect("/login");
   const idioma = user.idioma;
 
-  const wahaConfigured = getWahaClient() !== null;
+  const wahaDesligado = !wahaHabilitado();
+  const wahaConfigured = !wahaDesligado && getWahaClient() !== null;
 
   // Receber pelo canal oficial exige DOIS segredos, não um — a regra e o porquê
   // moram em `lib/channels/meta/webhook.ts`, ao lado de quem os consome. Agora os
@@ -43,6 +45,7 @@ export default async function ConnectWhatsappPage() {
       </p>
       <ConnectWhatsappClient
         wahaConfigured={wahaConfigured}
+        wahaDesligado={wahaDesligado}
         sessionName={nomeCurtoDaSessao(activeOrg.orgId)}
         oficialPodeReceber={oficialPodeReceber}
       />

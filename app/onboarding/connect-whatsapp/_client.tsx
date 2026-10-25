@@ -13,6 +13,8 @@ import { CanalParceiroClient } from "@/components/connections/CanalParceiroClien
 
 interface Props {
   wahaConfigured: boolean;
+  /** `WAHA_HABILITADO=false` no servidor: a escolha "celular por QR" some. */
+  wahaDesligado?: boolean;
   sessionName: string;
   /**
    * A volta do canal oficial depende de um valor que mora no `.env` do
@@ -218,6 +220,7 @@ function Saidas({ status, sessionName }: { status: Status; sessionName: string }
 
 export function ConnectWhatsappClient({
   wahaConfigured,
+  wahaDesligado = false,
   sessionName,
   oficialPodeReceber,
 }: Props) {
@@ -352,21 +355,25 @@ export function ConnectWhatsappClient({
       <div className="space-y-4 rounded-lg border bg-background p-6">
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium">{t("Como você já usa esse número?")}</legend>
-          <p className="text-xs text-muted-foreground">
-            {t(
-              "Existe mais de um jeito de ter WhatsApp para empresa, e cada um conecta de um jeito. Se você nunca ouviu falar dos outros dois, é o primeiro.",
-            )}
-          </p>
-          <div className="grid gap-2">
-            <Escolha
-              valor="qr"
-              atual={forma}
-              titulo={t("Uso o WhatsApp no celular")}
-              corpo={t(
-                "Conecte com QR Code ou digite um código de pareamento no WhatsApp do celular.",
+          {!wahaDesligado && (
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "Existe mais de um jeito de ter WhatsApp para empresa, e cada um conecta de um jeito. Se você nunca ouviu falar dos outros dois, é o primeiro.",
               )}
-              onEscolher={setForma}
-            />
+            </p>
+          )}
+          <div className="grid gap-2">
+            {!wahaDesligado && (
+              <Escolha
+                valor="qr"
+                atual={forma}
+                titulo={t("Uso o WhatsApp no celular")}
+                corpo={t(
+                  "Conecte com QR Code ou digite um código de pareamento no WhatsApp do celular.",
+                )}
+                onEscolher={setForma}
+              />
+            )}
             <Escolha
               valor="oficial"
               atual={forma}
