@@ -34,6 +34,44 @@ export interface ConexaoDeLeituraParaGravar {
 export type ResultadoDaGravacao =
   { ok: true } | { ok: false; error: "cifra_indisponivel" | "erro_ao_gravar"; detalhe?: string };
 
+export type ResultadoDaRenovacao =
+  | { ok: true }
+  | { ok: false; error: "cifra_indisponivel" | "erro_ao_gravar" | "superada"; detalhe?: string };
+
+/**
+ * A renovação automática: troca o token E a validade, SÓ se a linha ainda tem o
+ * token que a rodada leu.
+ *
+ * Não é upsert de propósito. Entre ler a linha e gravar passam até minutos (a
+ * rodada fala com a Meta, uma conexão por vez); nesse intervalo a pessoa pode
+ * colar um token novo, refazer o login ou DESCONECTAR. Um upsert sobrescreveria o
+ * token novo com o renovado a partir do velho, ou recriaria a linha apagada, que é
+ * desfazer uma revogação. O UPDATE condicional casa zero linhas nesses casos e a
+ * rodada desiste daquela conexão (`superada`).
+ *
+ * Mexe só em `access_token_encrypted` e `token_expires_at`: procedência, escopos,
+ * usuário Meta, conta padrão e `updated_by` ficam como estão.
+ */
+export async function renovarConexaoDeLeitura(
+  admin: SupabaseClient,
+  c: { organizationId: string; cifraAnterior: string; accessToken: string; expiraEm: string },
+): Promise<ResultadoDaRenovacao> {
+  const cifrado = await encryptWebhookSecret(admin, c.accessToken);
+  if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
+
+  const { data, error } = await admin
+    .from("ad_insights_connections")
+    .update({ access_token_encrypted: cifrado, token_expires_at: c.expiraEm })
+    .eq("organization_id", c.organizationId)
+    .eq("platform", "meta_ads")
+    .eq("connected_via", "oauth")
+    .eq("access_token_encrypted", c.cifraAnterior)
+    .select("organization_id");
+  if (error) return { ok: false, error: "erro_ao_gravar", detalhe: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "superada" };
+  return { ok: true };
+}
+
 export async function gravarConexaoDeLeitura(
   admin: SupabaseClient,
   c: ConexaoDeLeituraParaGravar,
