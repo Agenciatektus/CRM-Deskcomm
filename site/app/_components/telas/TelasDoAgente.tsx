@@ -71,32 +71,6 @@ export function PainelSkills() {
   );
 }
 
-export function PainelTeto() {
-  return (
-    <div>
-      <Cabecalho icone="grafico" titulo="Uso e orçamento" direita={<Selo tom="ok">dentro do teto</Selo>} />
-      <p className="m-0 text-meta text-text-subtle">Gasto de IA no mês, por organização</p>
-      <p className="m-0 mt-1 flex items-baseline gap-1.5">
-        <span className="text-[1.9rem] leading-none font-bold tracking-tight">R$ 112</span>
-        <span className="text-ui text-text-subtle">de R$ 300</span>
-      </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
-        <div className="a-enche h-full w-[37%] rounded-full bg-(image:--degrade)" />
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-meta">
-        <div className="rounded-field border border-border bg-surface-elevated px-2.5 py-2">
-          <p className="m-0 text-text-subtle">Alerta em</p>
-          <p className="m-0 font-bold">80%</p>
-        </div>
-        <div className="rounded-field border border-border bg-surface-elevated px-2.5 py-2">
-          <p className="m-0 text-text-subtle">Ao atingir o teto</p>
-          <p className="m-0 font-bold">Bloquear</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function PainelProposta() {
   return (
     <div>
@@ -147,28 +121,6 @@ export function PainelPassagem() {
         ))}
       </ol>
       <p className="m-0 mt-2 text-[0.7rem] text-text-subtle">Quem assumiu e quando fica registrado.</p>
-    </div>
-  );
-}
-
-export function PainelProvedor() {
-  const itens = ["OpenRouter", "Anthropic", "OpenAI"];
-  return (
-    <div>
-      <Cabecalho icone="conexao" titulo="Provedor de IA" />
-      <div className="flex flex-wrap gap-2">
-        {itens.map((n, i) => (
-          <span
-            key={n}
-            className={`rounded-field border px-3 py-1.5 text-meta font-semibold ${
-              i === 1 ? "border-accent bg-accent-soft text-link" : "border-border-strong text-text-muted"
-            }`}
-          >
-            {n}
-          </span>
-        ))}
-      </div>
-      <p className="m-0 mt-2.5 text-meta text-text-subtle">Trocável pela tela, por parte do sistema.</p>
     </div>
   );
 }

@@ -1,9 +1,9 @@
-import { CANAIS, IMPLANTACAO, RADAR, SEGURANCA } from "@/lib/conteudo";
+import { CANAIS, IMPLANTACAO, NICHOS, RADAR } from "@/lib/conteudo";
 
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaRadar } from "./telas/TelaRadar";
-import { CartaoCanal, Isolamento, TelaAuditoria } from "./telas/TelasDeGestao";
-import { Icone, type NomeIcone } from "./ui/Icones";
+import { CartaoCanal } from "./telas/TelasDeGestao";
+import { Icone } from "./ui/Icones";
 import { Exemplo, Selo } from "./ui/Pecas";
 import { Janela } from "./ui/Janela";
 
@@ -91,7 +91,7 @@ export function Canais() {
     },
   ] as const;
   return (
-    <Secao titulo="titulo-canais" fundo="pontos">
+    <Secao id="canais" titulo="titulo-canais" fundo="pontos">
       <Cabeca id="titulo-canais" titulo={CANAIS.titulo} texto={CANAIS.texto} />
       <div className="grid gap-5 md:grid-cols-3 [&>*]:min-w-0">
         {cartoes.map((c, i) => (
@@ -100,43 +100,19 @@ export function Canais() {
           </Card>
         ))}
       </div>
-    </Secao>
-  );
-}
-
-const ICONES_SEG: Record<string, NomeIcone> = {
-  Isolamento: "cadeado",
-  Permissões: "usuario",
-  Auditoria: "escudo",
-  LGPD: "arquivo",
-};
-
-export function Seguranca() {
-  return (
-    <Secao titulo="titulo-seguranca" fundo="grade" larga>
-      <Cabeca id="titulo-seguranca" titulo={SEGURANCA.titulo} />
-      <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] [&>*]:min-w-0">
-        <div className="revela">
-          <Janela rota="auditoria">
-            <TelaAuditoria />
-          </Janela>
-        </div>
-        <Card className="revela flex flex-col justify-center [--atraso:0.1s]">
-          <Isolamento />
-        </Card>
+      <div className="revela mt-14 max-w-[44rem]">
+        <h3 className="m-0 text-[1.5rem] leading-tight font-bold tracking-tight">{NICHOS.titulo}</h3>
+        <p className="mt-3 mb-0 leading-relaxed text-text-muted">{NICHOS.texto}</p>
+        <ul className="mt-5 mb-0 flex list-none flex-wrap gap-2 p-0">
+          {NICHOS.exemplos.map((e) => (
+            <li key={e.negocio}>
+              <Selo tom="neutro">
+                {e.negocio}: {e.lead}, {e.ganho}
+              </Selo>
+            </li>
+          ))}
+        </ul>
       </div>
-      <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
-        {SEGURANCA.itens.map((s, i) => (
-          <Card key={s.rotulo} atraso={i * 0.08}>
-            <span className="mb-3 grid size-9 place-items-center rounded-field border border-border-strong bg-surface-elevated text-link">
-              <Icone nome={ICONES_SEG[s.rotulo] ?? "escudo"} className="size-[1.1rem]" />
-            </span>
-            <h3 className="m-0 text-[1.05rem] font-bold">{s.rotulo}</h3>
-            <p className="mt-1.5 mb-0 text-[0.95rem] leading-relaxed text-text-muted">{s.texto}</p>
-          </Card>
-        ))}
-      </div>
-      <Exemplo className="mt-6" />
     </Secao>
   );
 }

@@ -1,4 +1,4 @@
-import { CTA, HERO, linkWhatsapp } from "@/lib/conteudo";
+import { CTA, HERO, VIDEO, PROVA } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { TelaInbox } from "./telas/TelaInbox";
@@ -46,9 +46,9 @@ export function Hero() {
           id="titulo-hero"
           className="a-sobe mx-auto m-0 max-w-[26ch] text-[clamp(2.1rem,4.6vw,3.9rem)] font-bold leading-[1.04] tracking-[-0.03em] text-balance [--atraso:0.08s]"
         >
-          Todo lead que chama no WhatsApp ganha{" "}
+          {HERO.abertura}{" "}
           <span className="relative whitespace-nowrap">
-            dono, resposta
+            {HERO.destaque}
             <svg
               aria-hidden="true"
               viewBox="0 0 300 12"
@@ -63,8 +63,7 @@ export function Hero() {
                 </linearGradient>
               </defs>
             </svg>
-          </span>{" "}
-          e próximo passo.
+          </span>
         </h1>
 
         <p className="a-sobe mx-auto mb-0 mt-5 max-w-[40rem] text-[clamp(1rem,1.4vw,1.15rem)] leading-relaxed text-text-muted [--atraso:0.18s]">
@@ -72,12 +71,15 @@ export function Hero() {
         </p>
 
         <div className="a-sobe mt-7 flex flex-wrap items-center justify-center gap-3 [--atraso:0.28s]">
-          <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
-            {CTA.rotulo}
+          <BotaoPrimario href={CTA.comprar.href} externo>
+            {CTA.comprar.rotulo}
           </BotaoPrimario>
-          <BotaoSecundario href="#como-funciona">Ver o sistema em ação</BotaoSecundario>
+          <BotaoSecundario href="#plantao">Ver o sistema em ação</BotaoSecundario>
         </div>
-        <p className="a-sobe mb-0 mt-5 text-[0.9rem] text-text-subtle [--atraso:0.36s]">{HERO.nota}</p>
+        <p className="a-sobe mx-auto mb-0 mt-5 max-w-[40rem] text-[0.95rem] leading-relaxed text-text-muted [--atraso:0.36s]">
+          {HERO.preco}
+        </p>
+        <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
       </div>
 
       {/* A janela do app, com os cards flutuando por cima. */}
@@ -156,6 +158,11 @@ export function Hero() {
           </div>
         </div>
       </div>
+
+      {/* Espaço do vídeo: enquanto não há vídeo, a janela do app acima leva esta legenda. */}
+      <p className="mx-auto mt-2 mb-0 max-w-[40rem] px-5 pb-6 text-center text-[0.95rem] leading-relaxed text-text-muted">
+        <span className="font-semibold text-text">{PROVA.inbox.titulo}.</span> {VIDEO.legenda_sem_video}
+      </p>
     </section>
   );
 }
