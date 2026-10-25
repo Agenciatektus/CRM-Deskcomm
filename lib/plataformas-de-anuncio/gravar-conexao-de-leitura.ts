@@ -91,6 +91,9 @@ export async function gravarConexaoDeLeitura(
     valores.token_expires_at = c.oauth?.expiraEm ?? null;
     valores.scopes = c.oauth?.scopes ?? null;
     valores.meta_user_id = c.oauth?.metaUserId ?? null;
+    // A identidade descrevia o token que saiu; o callback do OAuth a regrava depois.
+    valores.meta_user_name = null;
+    valores.meta_businesses = null;
   }
 
   const { error } = await admin

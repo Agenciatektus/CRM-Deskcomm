@@ -66378,3 +66378,14 @@ create unique index if not exists channel_sessions_trafego_push_token_hash_uq
 
 comment on column public.channel_sessions.trafego_push_token_hash is
   'sha256 (hex) do token secreto da URL do gatilho de trafego pago. Nunca o token. Nulo = push nao registrado. Migration 9071.';
+
+
+-- ---- Conectar com Meta: identidade da conexao de leitura (migration 9072) ----
+alter table public.ad_insights_connections
+  add column if not exists meta_user_name text,
+  add column if not exists meta_businesses jsonb;
+
+comment on column public.ad_insights_connections.meta_user_name is
+  'Nome do usuario Meta que autorizou (OAuth), so para exibir na tela. Nulo = nao lido. Migration 9072.';
+comment on column public.ad_insights_connections.meta_businesses is
+  'Empresas (BM) do usuario Meta: [{id,name}], no maximo 20. Nulo = nao lido. Nao e retrato de contas. Migration 9072.';

@@ -138,3 +138,35 @@ export async function lerPerfilDoToken(
     .map((p) => p.permission);
   return { metaUserId: id, scopes: concedidas };
 }
+
+export interface IdentidadeMeta {
+  nome: string | null;
+  empresas: { id: string; name: string }[];
+}
+
+const MAXIMO_DE_EMPRESAS = 20;
+
+/** Corta por code point: `slice` partiria um emoji (par substituto) ao meio. */
+export const corta = (s: string, n = 200): string => Array.from(s).slice(0, n).join("");
+
+/**
+ * Quem conectou: nome do usuário e as empresas (BM), só para a tela dizer "Conectado
+ * como ...". Melhor esforço, nunca lança: o que não veio fica `null`/vazio.
+ */
+export async function lerIdentidadeDoToken(token: string): Promise<IdentidadeMeta> {
+  const [eu, empresas] = await Promise.all([
+    lerJson("/me?fields=id,name", token),
+    lerJson("/me/businesses?fields=id,name&limit=100", token),
+  ]);
+  const nome = typeof eu?.name === "string" && eu.name ? corta(eu.name) : null;
+  const lista = Array.isArray(empresas?.data) ? (empresas.data as unknown[]) : [];
+  const vistos = lista
+    .map((b) => b as Record<string, unknown> | null)
+    .filter((b) => typeof b?.id === "string" && /^\d+$/.test(b.id))
+    .slice(0, MAXIMO_DE_EMPRESAS)
+    .map((b) => ({
+      id: b!.id as string,
+      name: corta(typeof b!.name === "string" ? b!.name : String(b!.id)),
+    }));
+  return { nome, empresas: vistos };
+}

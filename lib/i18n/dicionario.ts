@@ -12301,8 +12301,22 @@ export const DICIONARIO: Traducoes = {
     { es: "Tu rol no permite ver los datos de anuncios." },
 
   // Configurações → Meta Ads
-  "Conecte um token de acesso para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. É uma conexão só de leitura: nada é criado, pausado ou alterado na sua conta de anúncios.":
-    { es: "Conecta un token de acceso para que el sistema lea el rendimiento de tus campañas y lo muestre en Análisis › Meta Ads. Es una conexión solo de lectura: nada se crea, pausa ni modifica en tu cuenta publicitaria." },
+  "Conecte a sua conta Meta para o sistema ler o desempenho das suas campanhas e mostrá-lo em Análise › Meta Ads. O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões. Nesta conexão o sistema só lê: nada é criado, pausado ou alterado na sua conta de anúncios.":
+    { es: "Conecta tu cuenta de Meta para que el sistema lea el rendimiento de tus campañas y lo muestre en Análisis › Meta Ads. La solicitud de acceso usa los mismos permisos que Verdash (incluida la gestión de anuncios), para que un único inicio de sesión sirva para lectura y envío de conversiones. En esta conexión el sistema solo lee: nada se crea, pausa ni modifica en tu cuenta publicitaria." },
+  "1 conta de anúncio acessível.":
+    { es: "1 cuenta publicitaria accesible." },
+  "{n} contas de anúncio acessíveis.":
+    { es: "{n} cuentas publicitarias accesibles." },
+  "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.":
+    { es: "La cuenta de Meta elegida define lo que ven los gestores de esta organización: conecta con el inicio de sesión de la propia empresa." },
+  "Conectado como {nome}":
+    { es: "Conectado como {nome}" },
+  "Empresas (BM): {lista}":
+    { es: "Empresas (BM): {lista}" },
+  "Conectou, mas esta conta Meta não alcança nenhuma conta de anúncio: entre com a conta que gerencia os anúncios.":
+    { es: "Se conectó, pero esta cuenta de Meta no tiene acceso a ninguna cuenta publicitaria: inicia sesión con la cuenta que administra los anuncios." },
+  "A conexão foi gravada, mas não consegui conferir as contas de anúncio agora. Abra Análise › Meta Ads para testar ou tente reconectar.":
+    { es: "La conexión se guardó, pero no pude comprobar las cuentas publicitarias ahora. Abre Análisis › Meta Ads para probar o intenta reconectar." },
   "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.":
     { es: "El token necesita el permiso ads_read. Genéralo en Meta for Developers, en tu aplicación, y pégalo abajo. Se guarda cifrado y nunca se vuelve a mostrar." },
   "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.":
