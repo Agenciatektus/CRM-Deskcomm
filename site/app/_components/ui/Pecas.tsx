@@ -30,7 +30,9 @@ export function Avatar({ nome, tom = 0, tamanho = "size-9" }: { nome: string; to
   return (
     <span
       aria-hidden="true"
-      className={`grid ${tamanho} shrink-0 place-items-center rounded-full text-[13px] font-semibold`}
+      className={`grid ${tamanho} shrink-0 place-items-center rounded-full font-semibold ${
+        /size-[3-6]|size-\[/.test(tamanho) ? "text-[10px] font-bold" : /size-[78]/.test(tamanho) ? "text-[11px]" : "text-[13px]"
+      }`}
       style={{ background: fundo, color: texto }}
     >
       {iniciais}

@@ -77,32 +77,78 @@ const NEGOCIOS: Record<string, Negocio> = {
 
 const ORDEM = ["clinica", "infoproduto", "servicos"] as const;
 
-function CartaoLead({ c, termo }: { c: Cartao; termo: string }) {
+const PREVIAS = [
+  "Pode ser amanhã?",
+  "Qual o valor?",
+  "Obrigada, vou ver aqui",
+  "Me manda o endereço",
+  "Combinado, fecho hoje",
+  "Tem horário na sexta?",
+];
+const ETIQUETAS = ["indicação", "anúncio-meta", "retorno", "primeira-vez", "pediu-preço"];
+
+function hash(nome: string) {
+  let h = 0;
+  for (const ch of nome) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  return h;
+}
+
+/** Cartão do Kanban (KanbanCard): avatar com selo de canal, nome 14/700, valor 15/700, última mensagem, etiquetas e rodapé. */
+function CartaoLead({ c }: { c: Cartao }) {
+  const h = hash(c.nome);
+  const esfriando = c.nota === "esfriando";
   return (
     <div
-      className={`rounded-card border p-2.5 text-left ${
-        c.destaque ? "border-accent bg-accent-soft shadow-[0_0_0_1px_rgb(38_144_177/0.4)]" : "border-border bg-surface-elevated"
-      } ${c.destaque ? "a-pulso-borda" : ""}`}
+      className={`flex flex-col gap-2.5 overflow-hidden rounded-xl border px-3 pt-3 pb-2.5 text-left shadow-xs ${
+        c.destaque ? "a-pulso-borda border-accent bg-accent-soft ring-1 ring-accent" : "border-border bg-surface"
+      }`}
     >
-      <div className="flex items-center gap-2">
-        <Avatar nome={c.nome} tom={c.tom} tamanho="size-7" />
-        <div className="min-w-0 flex-1">
-          <p className="m-0 truncate text-meta font-bold">{c.nome}</p>
-          <p className="m-0 text-[0.65rem] text-text-subtle">{termo}</p>
-        </div>
-        {c.valor ? <span className="text-meta font-semibold">{c.valor}</span> : null}
-      </div>
-      <div className="mt-2 flex items-center gap-1.5">
-        <CanalChip canal={c.canal} />
-        <Selo tom={c.dono === "IA" ? "ia" : "info"}>{c.dono}</Selo>
-        <span
-          className={`ml-auto flex items-center gap-1 text-[0.65rem] ${
-            c.nota === "esfriando" ? "font-semibold text-warn" : "text-text-subtle"
-          }`}
-        >
-          <Icone nome="relogio" className="size-3" />
-          {c.nota === "esfriando" ? "Esfriando" : c.idade}
+      <div className="flex items-center gap-2.5">
+        <span className="relative">
+          <Avatar nome={c.nome} tom={c.tom} tamanho="size-9" />
+          <span
+            className={`absolute -right-1 -bottom-1 grid size-[17px] place-items-center rounded-full text-white ring-2 ${
+              c.destaque ? "ring-[#1d3943]" : "ring-surface"
+            } ${c.canal === "whatsapp" ? "bg-[#1fa561]" : "bg-[#c13584]"}`}
+          >
+            <Icone nome={c.canal === "whatsapp" ? "chat" : "camera"} peso="bold" className="size-2.5" />
+          </span>
         </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="m-0 truncate text-sm leading-5 font-bold">{c.nome}</p>
+          <span className="truncate text-xs text-text-subtle tabular-nums">+55 21 9•••• {String(1000 + h).slice(-4)}</span>
+        </div>
+      </div>
+      {c.valor ? <span className="text-[15px] leading-tight font-bold tabular-nums">{c.valor}</span> : null}
+      <span className="-mx-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px] text-text-muted">
+        <Icone nome="conversa" className="size-3 shrink-0" />
+        <span className="truncate">{PREVIAS[h % PREVIAS.length]}</span>
+      </span>
+      <span className="flex flex-wrap gap-1">
+        <span className="inline-flex h-[22px] items-center rounded-full border border-border bg-surface px-2 text-xs text-text-muted">
+          {ETIQUETAS[h % ETIQUETAS.length]}
+        </span>
+      </span>
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-text-subtle">
+        {esfriando ? (
+          <span className="inline-flex items-center gap-1 rounded-md bg-warning-bg px-1.5 py-0.5 font-bold whitespace-nowrap text-warning-fg">
+            <Icone nome="bandeira" className="size-3.5" /> Parado há {c.idade}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+            <Icone nome="relogio" className="size-3.5" /> há {c.idade}
+          </span>
+        )}
+        {c.dono === "IA" ? (
+          <Selo tom="ia">
+            <Icone nome="agente" className="size-3" /> IA
+          </Selo>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 font-semibold text-text-muted">
+            <Avatar nome={c.dono} tom={h % 6} tamanho="size-5" />
+            {c.dono}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -112,43 +158,52 @@ export function TelaFunil({ compacto = false }: { compacto?: boolean }) {
   const [chave, setChave] = useState<keyof typeof NEGOCIOS>("clinica");
   const n = NEGOCIOS[chave] as Negocio;
   const etapas = compacto ? n.etapas.slice(1, 4) : n.etapas;
+  const total = n.etapas.reduce((t, e) => t + e.cartoes.length, 0);
 
   return (
     <div className="bg-bg text-text">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        <p className="m-0 flex items-center gap-2 text-[0.95rem] font-bold">
-          <Icone nome="funil" className="size-4 text-link" /> Funil
-        </p>
-        <div role="group" aria-label="Tipo de negócio" className="flex gap-1 rounded-full bg-surface p-1">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="m-0 text-xl font-bold tracking-[-0.01em]">Funil</h3>
+          <p className="m-0 text-sm text-text-muted">
+            <span className="font-semibold text-text tabular-nums">{total} leads</span>
+          </p>
+        </div>
+        <div role="group" aria-label="Tipo de negócio" className="pele-seg flex gap-0.5 rounded-field border border-border p-[3px]">
           {ORDEM.map((k) => (
             <button
               key={k}
               type="button"
               aria-pressed={chave === k}
               onClick={() => setChave(k)}
-              className={`min-h-8 cursor-pointer rounded-full px-3.5 text-meta font-semibold transition-colors ${
-                chave === k ? "bg-surface-elevated text-text" : "text-text-subtle hover:text-text"
+              className={`min-h-7 cursor-pointer rounded-[7px] px-3.5 text-meta font-semibold transition-colors ${
+                chave === k ? "pele-seg-item-on text-text" : "text-text-muted hover:text-text"
               }`}
             >
               {NEGOCIOS[k]?.rotulo}
             </button>
           ))}
         </div>
-        <span className="ml-auto hidden items-center gap-1.5 text-meta text-text-subtle sm:flex">
-          O lead vira <b className="text-text">{n.termo}</b>
+        <span className="hidden h-8 items-center gap-1.5 rounded-control bg-(image:--degrade) px-3.5 text-[13px] font-semibold text-white sm:inline-flex">
+          <Icone nome="mais" peso="bold" className="size-3.5" /> Novo Lead
         </span>
-      </div>
+      </header>
       <div className="overflow-x-auto p-3" role="region" aria-label="Etapas do funil" tabIndex={0}>
-        <div className={`grid gap-2.5 ${compacto ? "min-w-[34rem] grid-cols-3" : "min-w-[56rem] grid-cols-5"}`}>
-          {etapas.map((e) => (
-            <div key={e.nome} className="flex flex-col gap-2 rounded-field bg-surface/70 p-2">
-              <p className="m-0 flex items-center justify-between px-1 pb-0.5 font-mono text-[0.66rem] tracking-wider text-text-subtle uppercase">
-                <span className="truncate">{e.nome}</span>
-                <span className="rounded-full bg-bg px-1.5 py-0.5">{e.cartoes.length}</span>
-              </p>
-              {e.cartoes.map((c) => (
-                <CartaoLead key={c.nome} c={c} termo={n.termo} />
-              ))}
+        <div className="flex w-max gap-3">
+          {etapas.map((e, i) => (
+            <div key={e.nome} className="flex w-[17.5rem] shrink-0 flex-col rounded-lg border border-border bg-surface/50">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+                <i className="size-2 rounded-full" style={{ background: ["#65a7fa", "#ffb848", "#c4a1f4", "#2bc88f", "#41ce90"][i % 5] }} />
+                <h4 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold">{e.nome}</h4>
+                <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-text-muted tabular-nums">
+                  {e.cartoes.length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2 p-2">
+                {e.cartoes.map((c) => (
+                  <CartaoLead key={c.nome} c={c} />
+                ))}
+              </div>
             </div>
           ))}
         </div>

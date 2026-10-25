@@ -118,7 +118,7 @@ export function Hero() {
 
         {/* Card: o negócio muda de etapa */}
         <div
-          className="a-entra a-flutua absolute -left-9 top-[44%] z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
+          className="a-entra a-flutua absolute bottom-3 left-6 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
           aria-hidden="true"
         >
           <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
@@ -138,7 +138,7 @@ export function Hero() {
 
         {/* Card: o agente, com rédea */}
         <div
-          className="a-entra a-flutua absolute -right-5 -top-8 z-20 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
+          className="a-entra a-flutua absolute bottom-3 left-1/2 z-20 -ml-32 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
           aria-hidden="true"
         >
           <p className="m-0 mb-2.5 flex items-center justify-between text-meta font-bold text-text-muted">
@@ -158,7 +158,7 @@ export function Hero() {
 
         {/* Card: o Radar */}
         <div
-          className="a-entra a-flutua absolute -right-6 bottom-24 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
+          className="a-entra a-flutua absolute right-6 bottom-3 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
           aria-hidden="true"
         >
           <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
