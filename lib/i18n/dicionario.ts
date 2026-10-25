@@ -12778,6 +12778,7 @@ export const DICIONARIO: Traducoes = {
   "Não é possível desativar o agent default da organização.": { es: "No es posible desactivar el agente predeterminado de la organización." },
   "Não é possível revogar o último admin do tenant.": { es: "No es posible revocar al último admin del tenant." },
   "O WhatsApp (WAHA) não está configurado neste ambiente (faltam WAHA_API_BASE_URL e/ou WAHA_API_KEY) — sem ele o número não pode ser desconectado do aparelho.": { es: "WhatsApp (WAHA) no está configurado en este entorno (faltan WAHA_API_BASE_URL y/o WAHA_API_KEY). Sin él, no se puede desconectar el número del dispositivo." },
+  "A conexão de novos números por QR está desativada. Para conectar, use a aba Verdash.": { es: "La conexión de nuevos números por QR está desactivada. Para conectar, usa la pestaña Verdash." },
   "O WhatsApp por WAHA foi desativado. Use Conectar WhatsApp (FZAP).": { es: "WhatsApp por WAHA fue desactivado. Usa Conectar WhatsApp (FZAP)." },
   "O WhatsApp (WAHA) não está configurado neste ambiente: faltam WAHA_API_BASE_URL e/ou WAHA_API_KEY. Configure-as e tente de novo.": { es: "WhatsApp (WAHA) no está configurado en este entorno: faltan WAHA_API_BASE_URL y/o WAHA_API_KEY. Configúralas e inténtalo de nuevo." },
   "O cabeçalho aceita imagem JPG ou PNG.": { es: "El encabezado acepta imagen JPG o PNG." },

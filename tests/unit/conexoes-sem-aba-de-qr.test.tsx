@@ -13,7 +13,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
 vi.mock("@/components/connections/ConnectionsClient", () => ({
-  ConnectionsClient: () => <div data-testid="lista-por-qr" />,
+  ConnectionsClient: (p: { wahaDesligado?: boolean }) => (
+    <div data-testid="lista-por-qr" data-desligado={String(Boolean(p.wahaDesligado))} />
+  ),
 }));
 vi.mock("@/components/connections/RedesSociaisClient", () => ({ RedesSociaisClient: () => <div /> }));
 vi.mock("@/components/connections/CanalGraphParceiroClient", () => ({ CanalGraphParceiroClient: () => <div /> }));
@@ -36,18 +38,18 @@ afterEach(() => {
 });
 
 describe("ConexoesShell e o interruptor do WAHA", () => {
-  it("desligado: sem a aba por QR, abre na Verdash", () => {
+  it("desligado: abre na Verdash e a lista de números existentes continua na aba", () => {
     render(<ConexoesShell wahaConfigured={false} wahaDesligado wacallsConfigured={false} />);
-    expect(screen.queryByRole("tab", { name: "Números por QR" })).toBeNull();
-    expect(screen.queryByTestId("lista-por-qr")).toBeNull();
     expect(screen.getByRole("tab", { name: "Verdash" }).getAttribute("data-state")).toBe("active");
     expect(screen.getByTestId("aba-verdash")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Números por QR" })).toBeTruthy();
   });
 
-  it("desligado: ?aba=numeros na URL também não abre a lista por QR", () => {
+  it("desligado: ?aba=numeros abre a lista (sem criar), nunca um painel em branco", () => {
     nav.aba = "numeros";
     render(<ConexoesShell wahaConfigured={false} wahaDesligado wacallsConfigured={false} />);
-    expect(screen.queryByTestId("lista-por-qr")).toBeNull();
+    const lista = screen.getByTestId("lista-por-qr");
+    expect(lista.getAttribute("data-desligado")).toBe("true");
   });
 
   it("controle negativo, ligado: a aba por QR existe e é a padrão", () => {

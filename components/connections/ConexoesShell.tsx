@@ -48,8 +48,9 @@ export function ConexoesShell({
 }: {
   wahaConfigured: boolean;
   /**
-   * Interruptor do servidor (variável de habilitação do transporte por QR): a aba "Números por QR"
-   * some e a tela abre na Verdash. Só o booleano chega aqui.
+   * Interruptor do servidor (variável de habilitação do transporte por QR): a
+   * lista de números existentes continua na aba, sem o botão de criar, e a tela
+   * abre na Verdash. Só o booleano chega aqui.
    */
   wahaDesligado?: boolean;
   wacallsConfigured: boolean;
@@ -67,7 +68,9 @@ export function ConexoesShell({
   const abaParam = params.get("aba");
   const abaPadrao = wahaDesligado ? "hospedado" : "numeros";
   const aba =
-    abaParam === "sociais"
+    abaParam === "numeros"
+      ? "numeros"
+      : abaParam === "sociais"
       ? "sociais"
       : abaParam === "oficial"
       ? "oficial"
@@ -109,7 +112,7 @@ export function ConexoesShell({
             a frase custou menos que abrir exceção no gate, e o gate continua
             estrito: o dia em que alguém escrever o nome do provider aqui DE VERDADE,
             ele reprova igual. */}
-        {!wahaDesligado && <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>}
+        <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>
         {/* Primeira depois do QR, e antes das duas de API, porque é o caminho
             mais curto para quem JÁ tem o WhatsApp funcionando em outro sistema:
             não lê QR, não abre conta na Meta, não tira nada do ar. Exceção
@@ -135,11 +138,9 @@ export function ConexoesShell({
         {graphParceiro && <TabsTrigger value="graph">{graphParceiro.label}</TabsTrigger>}
       </TabsList>
 
-      {!wahaDesligado && (
-        <TabsContent value="numeros" className="mt-0">
-          <ConnectionsClient wahaConfigured={wahaConfigured} />
-        </TabsContent>
-      )}
+      <TabsContent value="numeros" className="mt-0">
+        <ConnectionsClient wahaConfigured={wahaConfigured} wahaDesligado={wahaDesligado} />
+      </TabsContent>
 
       <TabsContent value="telefonia" className="mt-0">
         <TelefoniaClient />
