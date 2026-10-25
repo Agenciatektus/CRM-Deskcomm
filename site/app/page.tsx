@@ -5,8 +5,9 @@ import { FAQ, SITE } from "@/lib/conteudo";
 import { temSessaoViva } from "@/lib/sessao";
 
 import { CtaFinal, Faq } from "./_components/secoes-fim";
-import { Agente, ComoFunciona, Faixa, Funil, Problema } from "./_components/secoes-a";
-import { Canais, Implantacao, Radar, Seguranca } from "./_components/secoes-b";
+import { Agente, Conta, Faixa, Funil, Plantao, Problema } from "./_components/secoes-a";
+import { Canais, Implantacao, Radar } from "./_components/secoes-b";
+import { Garantia, Objecoes, Oferta, ParaQuem } from "./_components/secoes-oferta";
 import { Hero } from "./_components/Hero";
 import { Movimento } from "./_components/Movimento";
 
@@ -62,13 +63,17 @@ export default async function Home() {
       <Hero />
       <Faixa />
       <Problema />
-      <ComoFunciona />
-      <Agente />
+      <Conta />
+      <Plantao />
       <Funil />
       <Radar />
+      <Agente />
       <Canais />
-      <Seguranca />
       <Implantacao />
+      <Oferta />
+      <Garantia />
+      <ParaQuem />
+      <Objecoes />
       <Faq />
       <CtaFinal />
       <script

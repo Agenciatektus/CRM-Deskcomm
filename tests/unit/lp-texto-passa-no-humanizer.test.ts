@@ -27,20 +27,40 @@ function folhas(valor: unknown): string[] {
   return [];
 }
 
+// Todo export de texto da LP. A estatística da RD Station (com % e fonte dita) fica de fora das
+// checagens de número, e tem teste próprio.
 const TEXTOS = [
   C.HERO,
+  C.VIDEO,
+  C.FAIXA_ROTULO,
+  C.FAIXA,
+  C.PROBLEMAS_TITULO,
+  C.PROBLEMAS_INTRO,
   C.PROBLEMAS,
+  C.PROBLEMAS_FECHO,
+  C.CONTA,
+  C.MECANISMO,
   C.ETAPAS,
+  C.PROVA,
+  C.RADAR,
   C.AGENTE,
+  C.CANAIS,
   C.NICHOS,
   C.IMPLANTACAO,
-  C.SEGURANCA,
+  C.OFERTA,
+  C.GARANTIA,
+  C.PARA_QUEM,
+  C.OBJECOES,
   C.FAQ,
   C.GOOGLE,
   C.CTA_FINAL,
   C.CTA,
   C.NAV,
+  C.META_DESCRICAO,
+  C.SITE.descricao,
 ].flatMap(folhas);
+
+const TEXTOS_COM_RD = [...TEXTOS, C.ESTATISTICA_RD];
 
 const palavras = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
 
@@ -70,21 +90,39 @@ describe("texto da LP", () => {
       /\b(potencialize|alavanque|revolucion|disruptiv|de ponta|inovador|holístic|sinergia|turbine|escale seu)\w*/i,
     ],
   ])("sem %s", (_nome, padrao) => {
-    expect(TEXTOS.filter((t) => padrao.test(t))).toEqual([]);
+    expect(TEXTOS_COM_RD.filter((t) => padrao.test(t))).toEqual([]);
   });
 
   it("não afirma número de resultado (percentual, multiplicador, 'X vezes')", () => {
-    const suspeitos = TEXTOS.filter(
+    // "3x sem juros" e "100% da implantação" são condição de pagamento e de garantia, não resultado.
+    const semCondicao = (t: string) => t.replace(/\b3x sem juros/g, "").replace(/100% da implantação/g, "");
+    const suspeitos = TEXTOS.map(semCondicao).filter(
       (t) => /\d+\s?%/.test(t) || /\b\d+(?:[.,]\d+)?\s?(?:x|vezes)\b/i.test(t) || /\bROI\b/.test(t),
     );
     expect(suspeitos).toEqual([]);
   });
 
+  it("a única estatística externa é a da RD Station, com a fonte dita na frase", () => {
+    expect(C.ESTATISTICA_RD).toMatch(/RD Station/);
+  });
+
+  it("nenhum texto carrega marcador de pendência (A CONFIRMAR, LACUNA)", () => {
+    expect(TEXTOS_COM_RD.filter((t) => /A CONFIRMAR|LACUNA/i.test(t))).toEqual([]);
+  });
+
+  it("a garantia promete devolução e deixa o número de vendas de fora", () => {
+    expect(typeof C.GARANTIA_CONFIRMADA).toBe("boolean");
+    expect(C.GARANTIA.limite).toMatch(/número de vendas/);
+  });
+
   it("o CTA aponta para um número de WhatsApp com DDI e DDD e abre uma mensagem", () => {
     expect(C.SITE.whatsapp).toMatch(/^55\d{10,11}$/);
-    const link = C.linkWhatsapp(C.CTA.mensagem);
-    expect(link.startsWith(`https://wa.me/${C.SITE.whatsapp}?text=`)).toBe(true);
-    expect(decodeURIComponent(link.split("text=")[1] ?? "")).toBe(C.CTA.mensagem);
+    for (const alvo of [C.CTA.comprar, C.CTA.duvida]) {
+      const link = "href" in alvo ? alvo.href : C.linkWhatsapp(alvo.mensagem);
+      expect(link.startsWith(`https://wa.me/${C.SITE.whatsapp}?text=`)).toBe(true);
+      expect(decodeURIComponent(link.split("text=")[1] ?? "")).toBe(alvo.mensagem);
+    }
+    expect(C.CTA.comprar.mensagem).toBe("Oi, quero o Verdash CRM implantado.");
   });
 
   it("cada resposta do FAQ é um bloco citável: de 30 a 75 palavras, e a primeira frase já responde", () => {

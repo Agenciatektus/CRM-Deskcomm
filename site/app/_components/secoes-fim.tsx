@@ -1,6 +1,6 @@
 import { CTA, CTA_FINAL, FAQ, GOOGLE, SITE, linkWhatsapp } from "@/lib/conteudo";
 
-import { BotaoPrimario } from "./Botao";
+import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Secao } from "./Secao";
 import { Logotipo } from "./Marca";
 
@@ -76,11 +76,13 @@ export function CtaFinal() {
             <p className="mt-4 mb-0 max-w-[36rem] text-[1.05rem] leading-relaxed text-text-muted">
               {CTA_FINAL.texto}
             </p>
-            <div className="mt-8">
-              <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
-                {CTA.rotulo} pelo WhatsApp
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <BotaoPrimario href={CTA.comprar.href} externo>
+                {CTA.comprar.rotulo}
               </BotaoPrimario>
+              <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>{CTA.duvida.rotulo}</BotaoSecundario>
             </div>
+            <p className="mt-6 mb-0 text-[1.1rem] font-bold">{CTA_FINAL.assinatura}</p>
           </div>
         </div>
       </div>
@@ -139,7 +141,7 @@ export function Rodape() {
             Entrar
           </a>
           <a
-            href={linkWhatsapp(CTA.mensagem)}
+            href={linkWhatsapp(CTA.duvida.mensagem)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-8 items-center text-text underline underline-offset-2"
@@ -149,7 +151,7 @@ export function Rodape() {
         </nav>
         <p className="mt-6 mb-0 text-[0.8rem] leading-relaxed text-text-subtle">
           Baseado no DeskcommCRM, projeto de código aberto (licença MIT). Página atualizada em
-          24/10/2026. {SITE.nome} é implantado pela Tektus.
+          25/10/2026. {SITE.nome} é implantado pela Tektus.
         </p>
       </div>
     </footer>
