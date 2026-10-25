@@ -10,6 +10,8 @@ type DadosDoContato = Pick<
   | "contact_name"
   | "contact_instagram"
   | "contact_tem_foto"
+  | "contact_campanha"
+  | "contact_anuncio"
 >;
 
 /** A linha de `contacts` como o quadro a lê — as colunas que esta regra usa. */
@@ -24,6 +26,15 @@ export interface LinhaDoContatoNoQuadro {
   display_name?: string | null;
   instagram_username?: string | null;
   avatar_storage_path?: string | null;
+  /** `source_metadata->>campaign_name` e `->>ad_name`, lidos por alias (sem trazer o jsonb inteiro, que carrega o bloco do anúncio). */
+  campanha_nome?: string | null;
+  anuncio_nome?: string | null;
+}
+
+/** Nome de campanha ou anúncio: texto aparado e com teto, para o payload do quadro não engordar. */
+function nomeDeAnuncio(v: string | null | undefined): string | undefined {
+  const limpo = (v ?? "").replace(/\s+/g, " ").trim();
+  return limpo === "" ? undefined : limpo.slice(0, 160);
 }
 
 /**
@@ -60,6 +71,8 @@ export function anexarDadosDoContato(leads: Lead[], contatos: LinhaDoContatoNoQu
       // A rota da foto (`/api/v1/contacts/:id/avatar`) recusa contato
       // anonimizado; este laço já pulou os anonimizados acima.
       ...(contato.avatar_storage_path ? { contact_tem_foto: true } : {}),
+      ...(nomeDeAnuncio(contato.campanha_nome) ? { contact_campanha: nomeDeAnuncio(contato.campanha_nome) } : {}),
+      ...(nomeDeAnuncio(contato.anuncio_nome) ? { contact_anuncio: nomeDeAnuncio(contato.anuncio_nome) } : {}),
     };
     if (Object.keys(dados).length > 0) porContato.set(contato.id, dados);
   }
