@@ -19,7 +19,7 @@ export function Faq() {
             Não achou a sua? Pergunte pelo WhatsApp e a Tektus responde.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {FAQ.map((f, i) => (
             <details
               key={f.p}
@@ -49,7 +49,7 @@ export function CtaFinal() {
     <section aria-labelledby="titulo-cta" className="relative isolate overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-azul" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
-      <div className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
+      <div className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
         <div className="borda-luz janela-app revela relative overflow-hidden rounded-[22px] bg-surface p-8 sm:p-14">
           <picture aria-hidden="true">
             <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
