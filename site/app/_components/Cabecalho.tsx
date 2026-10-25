@@ -28,7 +28,7 @@ export function Cabecalho() {
           >
             Entrar
           </a>
-          <BotaoPrimario href={CTA.comprar.href} externo compacto>
+          <BotaoPrimario href="#oferta" compacto>
             <span className="sm:hidden">Quero o CRM</span>
             <span className="hidden sm:inline">Quero o Verdash CRM</span>
           </BotaoPrimario>

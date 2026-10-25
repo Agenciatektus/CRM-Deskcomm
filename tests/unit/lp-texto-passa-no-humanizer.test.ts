@@ -122,7 +122,7 @@ describe("texto da LP", () => {
       expect(link.startsWith(`https://wa.me/${C.SITE.whatsapp}?text=`)).toBe(true);
       expect(decodeURIComponent(link.split("text=")[1] ?? "")).toBe(alvo.mensagem);
     }
-    expect(C.CTA.comprar.mensagem).toBe("Oi, quero o Verdash CRM implantado.");
+    expect(C.CTA.comprar.mensagem).toBe("Oi, quero assinar o Verdash CRM.");
   });
 
   it("cada resposta do FAQ é um bloco citável: de 30 a 75 palavras, e a primeira frase já responde", () => {

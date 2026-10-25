@@ -4,7 +4,7 @@ import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Card, Cabeca, Secao } from "./Secao";
 import { Icone } from "./ui/Icones";
 
-/** Oferta empilhada: o que vem, os dois planos lado a lado, a implantação e o CTA de compra. */
+/** Oferta empilhada: o que vem, os dois planos lado a lado, cada um com seu botão, a implantação opcional e a dúvida. */
 export function Oferta() {
   return (
     <Secao id="oferta" titulo="titulo-oferta" fundo="grade">
@@ -42,24 +42,37 @@ export function Oferta() {
                 </li>
               ))}
             </ul>
+            {/* TODO(checkout): a URL do checkout ainda não existe. Quando existir, entra aqui no lugar do WhatsApp. */}
+            <div className="mt-auto pt-2">
+              {p.destaque ? (
+                <BotaoPrimario href={linkWhatsapp(p.mensagem)} externo>
+                  {p.botao}
+                </BotaoPrimario>
+              ) : (
+                <BotaoSecundario href={linkWhatsapp(p.mensagem)} externo>
+                  {p.botao}
+                </BotaoSecundario>
+              )}
+            </div>
           </Card>
         ))}
       </div>
-      <Card className="mt-5">
+      <div className="revela mt-6 rounded-card border border-dashed border-border-strong px-5 py-4 lg:mt-8">
         <p className="m-0 font-mono text-[0.72rem] tracking-[0.12em] text-text-subtle uppercase">
           {OFERTA.implantacao.rotulo}
         </p>
         <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3">
-          <span className="text-[2rem] leading-none font-bold tracking-tight">{OFERTA.implantacao.preco}</span>
+          <span className="text-[1.4rem] leading-none font-bold tracking-tight">{OFERTA.implantacao.preco}</span>
           <span className="text-text-muted">{OFERTA.implantacao.parcelas}</span>
         </p>
-        <p className="mt-2 mb-0 leading-relaxed text-text-muted">{OFERTA.implantacao.detalhe}</p>
-      </Card>
+        <p className="mt-2 mb-0 leading-relaxed text-text-muted">
+          {OFERTA.implantacao.aviso} {OFERTA.implantacao.detalhe}
+        </p>
+      </div>
       <div className="revela mt-8 flex flex-wrap items-center gap-3">
-        <BotaoPrimario href={CTA.comprar.href} externo>
-          {CTA.comprar.rotulo}
-        </BotaoPrimario>
-        <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>{CTA.duvida.rotulo}</BotaoSecundario>
+        <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>
+          {CTA.duvida.rotulo}
+        </BotaoSecundario>
       </div>
       <p className="mt-3 mb-0 text-[0.95rem] text-text-muted">{OFERTA.apoioCta}</p>
     </Secao>

@@ -14,7 +14,7 @@ export const SITE = {
   nome: "Verdash CRM",
   url: "https://crm.verdash.com.br",
   descricao:
-    "CRM com agentes de inteligência artificial para negócios que vendem pelo WhatsApp e pelo Instagram: conversas, funil e atendimento automático com passagem para uma pessoa, implantado e acompanhado pela Tektus.",
+    "CRM com agentes de inteligência artificial para negócios que vendem pelo WhatsApp e pelo Instagram: conversas, funil e atendimento automático com passagem para uma pessoa, com implantação opcional pela Tektus.",
   /** WhatsApp comercial da Tektus (o mesmo da LP de tráfego da agência). */
   whatsapp: "5521977357727",
   atualizadoEm: "2026-10-25",
@@ -27,12 +27,12 @@ export function linkWhatsapp(mensagem: string): string {
 /** Garantia só aparece na página quando as condições forem decididas. */
 export const GARANTIA_CONFIRMADA = true;
 
-const MENSAGEM_COMPRAR = "Oi, quero o Verdash CRM implantado.";
+const MENSAGEM_COMPRAR = "Oi, quero assinar o Verdash CRM.";
 
 export const CTA = {
   comprar: {
-    rotulo: "Quero o Verdash CRM implantado",
-    apoio: "R$ 1.297 de implantação em até 3x sem juros. Depois, R$ 157 ou R$ 397 por mês, conforme o plano.",
+    rotulo: "Quero o Verdash CRM",
+    apoio: "Planos a partir de R$ 157 por mês. A implantação pela Tektus é opcional: R$ 1.297 em até 3x sem juros.",
     mensagem: MENSAGEM_COMPRAR,
     // TODO(checkout): a URL do checkout ainda não existe. Quando existir, entra aqui no lugar do WhatsApp.
     href: linkWhatsapp(MENSAGEM_COMPRAR),
@@ -59,9 +59,11 @@ export const HERO = {
   destaque: DESTAQUE,
   titulo: `${ABERTURA} ${DESTAQUE}`,
   texto:
-    "O Verdash CRM coloca um atendente de IA no seu WhatsApp e no seu Instagram, no horário que você definir, e passa a conversa para a sua equipe com o histórico inteiro. Cada pessoa que chama tem dono, resposta e próximo passo. A Tektus implanta tudo e acompanha os primeiros 30 dias.",
+    "O Verdash CRM coloca um atendente de IA no seu WhatsApp e no seu Instagram, no horário que você definir, e passa a conversa para a sua equipe com o histórico inteiro. Cada pessoa que chama tem dono, resposta e próximo passo. Se você quiser, a Tektus implanta tudo e acompanha os primeiros 30 dias.",
   preco:
-    "Verdash CRM com IA: R$ 397 por mês, com teto de US$ 15 de IA por mês. Verdash CRM sem IA, com a sua própria chave: R$ 157 por mês. Implantação única de R$ 1.297 em até 3x sem juros.",
+    "Verdash CRM com IA: R$ 397 por mês, com teto de US$ 15 de IA por mês. Verdash CRM sem IA, com a sua própria chave: R$ 157 por mês. Implantação opcional pela Tektus, em pagamento único de R$ 1.297 em até 3x sem juros.",
+  precoLinha: "A partir de R$ 157 por mês, com ou sem IA.",
+  precoLink: "Ver planos e preços",
   nota: "Dúvida antes de pagar? Um humano da Tektus responde no WhatsApp.",
 } as const;
 
@@ -259,9 +261,9 @@ export const NICHOS = {
 } as const;
 
 export const IMPLANTACAO = {
-  titulo: "Você não instala nada. A Tektus entrega funcionando.",
+  titulo: "Implantação opcional: a Tektus entrega funcionando.",
   texto:
-    "A Tektus conduz a implantação e acompanha os primeiros 30 dias de uso. Você entrega o material do seu negócio (catálogo, preços, regras, horários) e participa do treinamento. Sua equipe continua no WhatsApp, numa caixa só.",
+    "A implantação é um serviço opcional. Se você contratar, a Tektus conduz tudo e acompanha os primeiros 30 dias de uso. Você entrega o material do seu negócio (catálogo, preços, regras, horários) e participa do treinamento. Sua equipe continua no WhatsApp, numa caixa só.",
   passos: [
     { titulo: "Diagnóstico", texto: "Como o seu comercial funciona hoje e onde a venda se perde." },
     {
@@ -285,7 +287,7 @@ export const IMPLANTACAO = {
 } as const;
 
 export const OFERTA = {
-  nome: "Verdash CRM Implantado",
+  nome: "Verdash CRM",
   titulo: "Tudo isto, funcionando no seu WhatsApp e no seu Instagram",
   itens: [
     {
@@ -299,7 +301,7 @@ export const OFERTA = {
     {
       titulo: "Atendente de IA treinado no seu negócio",
       texto:
-        "A Tektus cria um MEP (Manual Estratégico de Posicionamento) específico do seu negócio, a partir das informações que você entrega, e ele vira a base de conhecimento do agente. O agente passa para a sua equipe com o histórico, entende áudio e cria agendamento.",
+        "Com a implantação opcional, a Tektus cria um MEP (Manual Estratégico de Posicionamento) específico do seu negócio, e ele vira a base de conhecimento do agente. O agente passa para a sua equipe com o histórico, entende áudio e cria agendamento. No plano sem IA, você usa a sua própria chave de IA.",
     },
     {
       titulo: "Follow-up e Radar ligados",
@@ -307,11 +309,11 @@ export const OFERTA = {
     },
     {
       titulo: "Treinamento da equipe",
-      texto: "Para a sua equipe usar desde o primeiro dia.",
+      texto: "Na implantação opcional, para a sua equipe usar desde o primeiro dia.",
     },
     {
       titulo: "30 dias de acompanhamento",
-      texto: "Ajuste do agente e do funil com o que a operação real mostrar.",
+      texto: "Na implantação opcional, com ajuste do agente e do funil conforme a operação real mostrar.",
     },
   ],
   precoTitulo: "Quanto custa",
@@ -321,6 +323,8 @@ export const OFERTA = {
       preco: "R$ 397",
       periodo: "por mês",
       destaque: true,
+      botao: "Assinar o plano com IA",
+      mensagem: "Oi, quero assinar o Verdash CRM com IA (R$ 397 por mês).",
       detalhes: [
         "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa e a Tektus combina com você o próximo passo.",
         "Até 3 números de WhatsApp e até 2 contas de Instagram.",
@@ -332,6 +336,8 @@ export const OFERTA = {
       preco: "R$ 157",
       periodo: "por mês",
       destaque: false,
+      botao: "Assinar o plano sem IA",
+      mensagem: "Oi, quero assinar o Verdash CRM sem IA (R$ 157 por mês).",
       detalhes: [
         "Você usa a sua própria chave de IA.",
         "Caixa de entrada, funil, follow-up e Radar.",
@@ -341,10 +347,11 @@ export const OFERTA = {
     },
   ],
   implantacao: {
-    rotulo: "Implantação, pagamento único",
+    rotulo: "Implantação opcional, pagamento único",
     preco: "R$ 1.297",
     parcelas: "em até 3x sem juros",
     detalhe: "Inclui diagnóstico, configuração, agente de IA, treinamento e 30 dias de acompanhamento.",
+    aviso: "Ela é opcional. Pode ser contratada junto com o plano, e a Tektus oferece de novo durante a assinatura.",
   },
   apoioCta: "Dúvida antes de pagar? A Tektus responde no WhatsApp.",
 } as const;
@@ -353,9 +360,9 @@ export const OFERTA = {
 export const GARANTIA = {
   titulo: "Garantia de implantação",
   texto:
-    "A Tektus devolve 100% da implantação se não entregar o que foi combinado por escrito: agentes, funis, campanhas, follow-ups e fluxos de atendimento.",
+    "A Tektus devolve 100% da implantação, para quem a contratou, se não entregar o que foi combinado por escrito: agentes, funis, campanhas, follow-ups e fluxos de atendimento.",
   limite:
-    "A garantia cobre o valor da implantação. Ela deixa o número de vendas de fora, porque o resultado depende do seu volume de conversas, do seu ticket e do seu mercado.",
+    "A garantia cobre o valor da implantação, e só vale para quem a contratou. Ela deixa o número de vendas de fora, porque o resultado depende do seu volume de conversas, do seu ticket e do seu mercado.",
 } as const;
 
 export const PARA_QUEM = {
@@ -387,7 +394,7 @@ export const OBJECOES = [
   },
   {
     p: '"Implantar CRM dá trabalho."',
-    r: "Você não instala nada. A Tektus configura o funil e o WhatsApp, ensina o agente sobre o seu negócio, treina a equipe e acompanha os primeiros 30 dias.",
+    r: "Você não instala nada. Se contratar a implantação opcional, a Tektus configura o funil e o WhatsApp, ensina o agente sobre o seu negócio, treina a equipe e acompanha os primeiros 30 dias.",
   },
   {
     p: '"Vai banir meu número."',
@@ -402,15 +409,15 @@ export const OBJECOES = [
 export const FAQ = [
   {
     p: "O que é o Verdash CRM?",
-    r: "O Verdash CRM é um CRM para negócios que vendem pelo WhatsApp e pelo Instagram. Reúne as conversas, o funil de vendas e agentes de inteligência artificial que atendem e qualificam quem chama, e passam a conversa para uma pessoa quando é preciso. A Tektus faz a implantação e acompanha os primeiros 30 dias.",
+    r: "O Verdash CRM é um CRM para negócios que vendem pelo WhatsApp e pelo Instagram. Reúne as conversas, o funil de vendas e agentes de inteligência artificial que atendem e qualificam quem chama, e passam a conversa para uma pessoa quando é preciso. A Tektus oferece a implantação como serviço opcional, com 30 dias de acompanhamento.",
   },
   {
     p: "Quanto custa o Verdash CRM?",
-    r: "O Verdash CRM tem dois planos. O plano com IA custa R$ 397 por mês e inclui um teto de US$ 15 de IA por mês. O plano sem IA custa R$ 157 por mês, e a empresa usa a própria chave de IA. Os dois têm até 3 números de WhatsApp e até 2 contas de Instagram, sem cobrança por usuário. A implantação custa R$ 1.297 em até 3x sem juros.",
+    r: "O Verdash CRM tem dois planos. O plano com IA custa R$ 397 por mês e inclui um teto de US$ 15 de IA por mês. O plano sem IA custa R$ 157 por mês, e a empresa usa a própria chave de IA. Os dois incluem até 3 números de WhatsApp, até 2 contas de Instagram e usuários sem cobrança. A implantação é opcional e custa R$ 1.297 em até 3x sem juros.",
   },
   {
     p: "O que está incluso na mensalidade e na implantação?",
-    r: "A mensalidade dá acesso ao sistema, com caixa de entrada compartilhada, funil, atendente de IA, follow-up e Radar. A implantação, paga uma vez, inclui diagnóstico, configuração do funil e do WhatsApp, treinamento do agente com o seu negócio, treinamento da equipe e 30 dias de acompanhamento.",
+    r: "A mensalidade dá acesso ao sistema, com caixa de entrada compartilhada, funil, follow-up e Radar, e o atendente de IA no plano com IA. A implantação é opcional e paga uma vez. Inclui diagnóstico, configuração do funil e do WhatsApp, treinamento do agente, treinamento da equipe e 30 dias de acompanhamento.",
   },
   {
     p: "A IA do Verdash CRM atende sozinha? Quando ela passa para uma pessoa?",
@@ -438,11 +445,11 @@ export const FAQ = [
   },
   {
     p: "Minha equipe vai conseguir usar?",
-    r: "A equipe continua atendendo pelo WhatsApp, numa caixa só, com a IA ao lado. O funil se move pela conversa e ninguém preenche planilha. O treinamento da equipe faz parte da implantação, e a Tektus acompanha os primeiros 30 dias para ajustar o que a operação real mostrar.",
+    r: "A equipe continua atendendo pelo WhatsApp, numa caixa só, com a IA ao lado. O funil se move pela conversa e ninguém preenche planilha. Quem contrata a implantação opcional recebe o treinamento da equipe e 30 dias de acompanhamento da Tektus para ajustar o que a operação real mostrar.",
   },
   {
     p: "O que a Tektus faz na implantação do Verdash CRM?",
-    r: "A Tektus conduz a implantação em etapas: diagnóstico, configuração do funil e do WhatsApp, treinamento do agente de IA com o conhecimento do negócio, treinamento da equipe e entrada no ar, seguidos de 30 dias de acompanhamento. A empresa entrega o catálogo, os preços, as regras e os horários.",
+    r: "A implantação é opcional. Quem a contrata tem a Tektus conduzindo estas etapas: diagnóstico, configuração do funil e do WhatsApp, treinamento do agente de IA com o conhecimento do negócio, treinamento da equipe e entrada no ar, seguidos de 30 dias de acompanhamento. A empresa entrega o catálogo, os preços, as regras e os horários.",
   },
   {
     p: "Para qual tipo de negócio o Verdash CRM serve?",
@@ -450,7 +457,7 @@ export const FAQ = [
   },
   {
     p: "Já usei CRM e abandonei. O que muda com o Verdash CRM?",
-    r: "No Verdash CRM o funil e a conversa moram no mesmo lugar, então o funil se move pelas próprias conversas, sem alimentação manual. O Radar mostra as conversas paradas, a IA faz o primeiro atendimento e a Tektus acompanha os primeiros 30 dias para o sistema entrar na rotina da equipe.",
+    r: "No Verdash CRM o funil e a conversa moram no mesmo lugar, então o funil se move pelas próprias conversas, sem alimentação manual. O Radar mostra as conversas paradas, a IA faz o primeiro atendimento e quem contrata a implantação opcional conta com 30 dias de acompanhamento da Tektus para o sistema entrar na rotina da equipe.",
   },
   {
     p: "Os dados da minha empresa e dos meus clientes ficam seguros?",
@@ -479,9 +486,9 @@ export const GOOGLE = {
 export const CTA_FINAL = {
   titulo: "Hoje à noite, quem responde as suas conversas?",
   texto:
-    "Por R$ 157 por mês, ou R$ 397 com a IA incluída, mais uma implantação de R$ 1.297 em até 3x sem juros, a Tektus coloca o Verdash CRM no seu WhatsApp e no seu Instagram, treina a sua equipe e acompanha os primeiros 30 dias.",
+    "Por R$ 157 por mês, ou R$ 397 com a IA incluída, o Verdash CRM atende o seu WhatsApp e o seu Instagram. Se quiser, a Tektus faz a implantação por R$ 1.297 em até 3x sem juros, treina a sua equipe e acompanha os primeiros 30 dias.",
   assinatura: "Ninguém fica no vácuo.",
 } as const;
 
 export const META_DESCRICAO =
-  "CRM de WhatsApp e Instagram com atendente de IA, implantado pela Tektus. Planos de R$ 157 e R$ 397 por mês e implantação de R$ 1.297 em até 3x sem juros.";
+  "CRM de WhatsApp e Instagram com atendente de IA. Planos de R$ 157 e R$ 397 por mês, com implantação opcional pela Tektus por R$ 1.297 em até 3x sem juros.";
