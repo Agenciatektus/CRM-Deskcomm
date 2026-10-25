@@ -78,9 +78,14 @@
   --text-meta: 12px;
   --text-label: 13px;
   --text-ui: 14px;
+  --text-ui--line-height: 1.45;
   --text-message: 15px;
 
   --color-surface-2: #14161a;
+  --color-thread: #111315;
+  --color-accent-text: #69cee6;
+  --color-note-bg: #392c0c;
+  --color-note-fg: #f3dba9;
   --color-hover: #212326;
   --color-ok: #41ce90;
   --color-crit: #fa8785;
@@ -102,6 +107,8 @@
   --radius-pill: 6px;
   --radius-menu: 14px;
   --radius-bubble: 18px;
+  --radius-bubble-tail: 6px;
+  --radius-control: 9px;
   --color-azul: #2a52d8;
   --color-menta: #2bc88f;
 
