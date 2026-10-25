@@ -13,9 +13,6 @@ vi.mock("@/lib/channels/verdash/credentials", () => ({
 }));
 const estado = vi.fn();
 vi.mock("@/lib/conversoes/estado-da-conexao", () => ({ lerEstadoDaConexao: (...a: unknown[]) => estado(...a) }));
-vi.mock("@/lib/conversoes/regras-meta", () => ({
-  listarRegrasMeta: vi.fn(async () => [{ enabled: true, metaEvent: "LeadSubmitted" }]),
-}));
 
 interface Sessao {
   organization_id: string;
@@ -25,15 +22,19 @@ interface Sessao {
   archived_at: string | null;
 }
 
-function banco(sessoes: Sessao[], contagens = { sent: 1, error: 0 }) {
+type Linha = { status: string; reason: string | null };
+const UM_ENVIO: Linha[] = [{ status: "sent", reason: null }];
+
+/** `historico`: linhas do livro-razão, da mais nova para a mais antiga. */
+function banco(sessoes: Sessao[], historico: Linha[] = UM_ENVIO) {
   const admin = {
     from: (tabela: string) => ({
       select: (_c: string, opc?: { head?: boolean }) => {
         const eqs: Record<string, unknown> = {};
         const q: Record<string, unknown> = {};
         const resultado = () =>
-          opc?.head
-            ? { count: contagens[eqs.status as "sent" | "error"], error: null }
+          tabela === "ad_conversion_dispatches"
+            ? { data: historico, error: null }
             : {
                 data: sessoes.filter(
                   (s) =>
@@ -46,9 +47,12 @@ function banco(sessoes: Sessao[], contagens = { sent: 1, error: 0 }) {
         q.eq = (c: string, v: unknown) => ((eqs[c] = v), q);
         q.not = () => q;
         q.gte = () => q;
+        q.in = () => q;
+        q.order = () => q;
+        q.limit = () => q;
         q.is = () => q;
         q.then = (ok: (v: unknown) => unknown) => Promise.resolve(resultado()).then(ok);
-        void tabela;
+        void opc;
         return q;
       },
     }),
@@ -69,6 +73,7 @@ beforeEach(() => {
   status.mockClear();
   status.mockImplementation(async () => ({ ativo: true }));
   resolver.mockClear();
+  estado.mockReset();
   estado.mockResolvedValue({ conectada: true, datasetId: "123456", temToken: true, habilitada: true, testEventCode: null });
 });
 
@@ -90,7 +95,7 @@ describe("avisarCanaisSobreConversoes", () => {
     expect(resolver).toHaveBeenCalledTimes(1);
     expect(status).toHaveBeenCalledWith(
       expect.objectContaining({ instanceName: "i1" }),
-      { ativo: true, pixel_id: "123456", eventos: ["Purchase", "LeadSubmitted"] },
+      { ativo: true, pixel_id: "123456", eventos: ["Purchase"] },
       expect.any(Number),
     );
   });
@@ -111,8 +116,51 @@ describe("avisarCanaisSobreConversoes", () => {
 
   it("erros e nenhum envio: avisa inativo", async () => {
     const avisar = await porta();
-    await avisar(banco([sessao()], { sent: 0, error: 3 }), "org-1");
+    await avisar(banco([sessao()], [{ status: "error", reason: null }]), "org-1");
     expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+  });
+
+  it("histórico vazio: avisa inativo", async () => {
+    const avisar = await porta();
+    await avisar(banco([sessao()], []), "org-1");
+    expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+  });
+
+  it("último envio `error` depois de um `sent`: avisa inativo", async () => {
+    const avisar = await porta();
+    await avisar(
+      banco([sessao()], [{ status: "error", reason: null }, { status: "sent", reason: null }]),
+      "org-1",
+    );
+    expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+  });
+
+  it("`skipped` de credencial depois do último `sent`: inativo; antes dele: ativo", async () => {
+    const avisar = await porta();
+    await avisar(
+      banco([sessao()], [{ status: "skipped", reason: "cifra_indisponivel" }, { status: "sent", reason: null }]),
+      "org-1",
+    );
+    expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+    await avisar(
+      banco([sessao()], [{ status: "sent", reason: null }, { status: "skipped", reason: "credencial_incompleta" }]),
+      "org-1",
+    );
+    expect(status.mock.calls[1]![1]).toMatchObject({ ativo: true });
+  });
+
+  it("testEventCode preenchido: avisa inativo", async () => {
+    const avisar = await porta();
+    estado.mockResolvedValue({ conectada: true, datasetId: "123456", temToken: true, habilitada: true, testEventCode: "TEST123" });
+    await avisar(banco([sessao()]), "org-1");
+    expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+  });
+
+  it("forcarInativo (org parada): avisa inativo sem ler a conexão", async () => {
+    const avisar = await porta();
+    await avisar(banco([sessao()]), "org-1", { forcarInativo: true });
+    expect(status.mock.calls[0]![1]).toEqual({ ativo: false });
+    expect(estado).not.toHaveBeenCalled();
   });
 
   it("nunca lança, nem com o banco quebrado", async () => {

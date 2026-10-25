@@ -7,9 +7,12 @@
  * (`lib/channels/conversoes-do-canal.ts`) relê o estado e só afirma "ativo" se o
  * envio estiver saudável; conexão desligada ou doente reafirma "inativo".
  *
- * - Só organizações com conexão Meta habilitada; as paradas (suspensas) ficam de fora.
- * - Teto por rodada e orçamento de 40 s (o scheduler corta em 60 s): o que sobra
- *   fica para o dia seguinte, dentro da folga de 48 h.
+ * - TODAS as conexões Meta (ligadas ou não) e também as organizações paradas: o
+ *   canal só volta a enviar se ouvir "inativo", e a porta já devolve inativo para a
+ *   conexão desligada; a parada recebe "inativo" forçado.
+ * - Páginas por cursor (organization_id) a partir de um ponto que gira com o dia, até
+ *   acabar o orçamento de 40 s (o scheduler corta em 60 s): o que sobra fica para o
+ *   dia seguinte, dentro da folga de 48 h, e o `adiadas` vai no log.
  * - Não audita: o aviso é best-effort e não muda dado do cliente (gate em
  *   tests/unit/cron-audita-so-quando-ha-efeito.test.ts).
  */
@@ -37,39 +40,73 @@ export interface ResumoDaRodada {
   adiadas: number;
 }
 
+/** Ponto de partida do dia: o orçamento curto não serve sempre as mesmas organizações. */
+function inicioDoDia(agora: number): string {
+  const dia = Math.floor(agora / 86_400_000);
+  return `${(dia % 16).toString(16)}0000000-0000-0000-0000-000000000000`;
+}
+
 export async function reafirmarAvisosDeConversoes(
   admin: ReturnType<typeof createAdminClient>,
   avisar: typeof avisarCanaisSobreConversoes = avisarCanaisSobreConversoes,
 ): Promise<ResumoDaRodada> {
   const resumo: ResumoDaRodada = { organizacoes: 0, avisadas: 0, falhas: 0, adiadas: 0 };
   const inicio = Date.now();
+  const prazoFinal = inicio + ORCAMENTO_DE_TEMPO_MS;
 
-  const { data, error } = await admin
-    .from("ad_platform_connections")
-    .select("organization_id")
-    .eq("platform", "meta_ads")
-    .eq("enabled", true)
-    .order("organization_id", { ascending: true })
-    .limit(TETO_POR_RODADA);
-  if (error || !data) {
-    logger.warn("[conversoes-avisa-canal] conexões ilegíveis; rodada vazia");
-    return resumo;
+  // Parada não opera: o CRM não envia, então o canal precisa ouvir "inativo" e voltar a enviar.
+  // Se a lista falhar, na dúvida todas ouvem "inativo": duplicar é o lado seguro, calar não.
+  let paradas = new Set<string>();
+  let paradasIlegiveis = false;
+  try {
+    paradas = new Set(await idsDeOrgsParadas(admin));
+  } catch (err) {
+    paradasIlegiveis = true;
+    logger.warn("[conversoes-avisa-canal] orgs paradas ilegíveis; todas ouvem inativo", {
+      motivo: err instanceof Error ? err.message.slice(0, 120) : "desconhecido",
+    });
   }
 
-  const paradas = new Set(await idsDeOrgsParadas(admin));
-  const orgs = (data as Array<{ organization_id: string }>)
-    .map((l) => l.organization_id)
-    .filter((id) => !paradas.has(id));
+  const partida = inicioDoDia(inicio);
+  // Duas fases para dar a volta no ciclo: depois de `partida` até o fim, e do começo até `partida`.
+  for (const fase of ["depois", "antes"] as const) {
+    let cursor: string | null = fase === "depois" ? partida : null;
+    for (;;) {
+      let consulta = admin
+        .from("ad_platform_connections")
+        .select("organization_id")
+        .eq("platform", "meta_ads");
+      if (cursor) consulta = consulta.gt("organization_id", cursor);
+      if (fase === "antes") consulta = consulta.lte("organization_id", partida);
+      const { data, error } = await consulta
+        .order("organization_id", { ascending: true })
+        .limit(TETO_POR_RODADA);
+      if (error || !data) {
+        logger.warn("[conversoes-avisa-canal] conexões ilegíveis; rodada interrompida", { fase });
+        return resumo;
+      }
+      const orgs = (data as Array<{ organization_id: string }>).map((l) => l.organization_id);
 
-  for (const [indice, organizationId] of orgs.entries()) {
-    if (Date.now() - inicio > ORCAMENTO_DE_TEMPO_MS) {
-      resumo.adiadas = orgs.length - indice;
-      break;
+      for (const [indice, organizationId] of orgs.entries()) {
+        if (Date.now() > prazoFinal) {
+          resumo.adiadas += orgs.length - indice;
+          logger.warn("[conversoes-avisa-canal] orçamento esgotado; organizações adiadas", {
+            adiadas: resumo.adiadas,
+          });
+          return resumo;
+        }
+        resumo.organizacoes += 1;
+        const r = await avisar(admin, organizationId, {
+          forcarInativo: paradasIlegiveis || paradas.has(organizationId),
+          prazoFinal,
+        });
+        resumo.avisadas += r.avisadas;
+        resumo.falhas += r.falhas;
+      }
+
+      if (orgs.length < TETO_POR_RODADA) break;
+      cursor = orgs[orgs.length - 1]!;
     }
-    resumo.organizacoes += 1;
-    const r = await avisar(admin, organizationId);
-    resumo.avisadas += r.avisadas;
-    resumo.falhas += r.falhas;
   }
   return resumo;
 }

@@ -14,17 +14,18 @@ export interface ConexaoParaOAviso {
   habilitada: boolean;
   datasetId: string | null;
   temToken: boolean;
+  /** Preenchido = os eventos vão como teste e não contam: o canal precisa enviar. */
+  testEventCode: string | null;
 }
 
-export interface RegraParaOAviso {
-  enabled: boolean;
-  metaEvent: string;
-}
-
-/** Contagem do livro-razão da Meta na janela recente. */
+/** Resumo do livro-razão da Meta na janela recente. */
 export interface HistoricoParaOAviso {
   enviados: number;
   erros: number;
+  /** Status do envio mais recente da janela (só `sent` ou `error`); `null` sem nenhum. */
+  ultimoEnvio: "sent" | "error" | null;
+  /** Houve `skipped` por credencial (cifra, credencial incompleta, conexão desligada) depois do último `sent`. */
+  credencialQuebradaDepoisDoUltimoSent: boolean;
 }
 
 export type AvisoDeConversoes =
@@ -34,32 +35,35 @@ export type AvisoDeConversoes =
 /** Janela do livro-razão que julga a saúde. */
 export const JANELA_DE_SAUDE_DIAS = 3;
 
-const PADRAO_DO_PIXEL = /^\d{5,32}$/;
-const PADRAO_DO_EVENTO = /^[A-Za-z]+$/;
-const TETO_DE_EVENTOS = 20;
+/** Motivos de `skipped` que dizem "a credencial não deixa enviar". */
+export const MOTIVOS_DE_CREDENCIAL = [
+  "cifra_indisponivel",
+  "credencial_incompleta",
+  "conexao_desabilitada",
+] as const;
 
+const PADRAO_DO_PIXEL = /^\d{5,32}$/;
+
+/**
+ * "Ativo" só com prova de envio saudável. Na dúvida o canal envia: duplicar é o
+ * lado seguro, calar não. O aviso declara SÓ a venda (`Purchase`); Lead, Contact e
+ * etapas continuam saindo pelo canal.
+ */
 export function montarAvisoDeConversoes(entrada: {
   conexao: ConexaoParaOAviso | null;
-  regras: RegraParaOAviso[];
   historico: HistoricoParaOAviso;
 }): AvisoDeConversoes {
-  const { conexao, regras, historico } = entrada;
+  const { conexao, historico } = entrada;
   const inativo: AvisoDeConversoes = { ativo: false };
 
   if (!conexao || !conexao.habilitada || !conexao.temToken) return inativo;
+  if (conexao.testEventCode?.trim()) return inativo;
   const pixel = conexao.datasetId?.trim() ?? "";
   if (!PADRAO_DO_PIXEL.test(pixel)) return inativo;
 
-  // Só erro, sem um único envio na janela: o canal é quem pode estar entregando.
-  if (historico.erros > 0 && historico.enviados === 0) return inativo;
+  if (historico.enviados <= 0) return inativo;
+  if (historico.ultimoEnvio !== "sent") return inativo;
+  if (historico.credencialQuebradaDepoisDoUltimoSent) return inativo;
 
-  // A venda sempre sai como Purchase; as etapas, pelas regras ATIVAS.
-  const eventos = [
-    ...new Set(["Purchase", ...regras.filter((r) => r.enabled).map((r) => r.metaEvent)]),
-  ]
-    .filter((e) => PADRAO_DO_EVENTO.test(e))
-    .slice(0, TETO_DE_EVENTOS);
-  if (eventos.length === 0) return inativo;
-
-  return { ativo: true, pixel_id: pixel, eventos };
+  return { ativo: true, pixel_id: pixel, eventos: ["Purchase"] };
 }

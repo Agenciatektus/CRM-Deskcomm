@@ -293,6 +293,7 @@ export async function verdashConversoesStatus(
       method: "POST",
       headers: { "x-crm-token": creds.token, "content-type": "application/json" },
       body: JSON.stringify(aviso),
+      redirect: "error",
       signal: AbortSignal.timeout(prazoMs),
     });
   } catch (err) {
