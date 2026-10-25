@@ -9,6 +9,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
+import { avisarCanaisSobreConversoes } from "@/lib/channels/conversoes-do-canal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 
@@ -150,6 +151,10 @@ export async function updateAdPlatformConnection(
       em_teste: Boolean(parsed.data.test_event_code?.trim()),
     },
   });
+
+  // Ligou, desligou ou trocou o dataset: o canal pareado precisa saber quem envia.
+  // Fire-and-forget: falha do aviso nunca falha o salvamento (o cron reafirma todo dia).
+  void avisarCanaisSobreConversoes(admin, activeOrg.orgId).catch(() => undefined);
 
   revalidatePath("/app/settings/conversoes");
   return { ok: true };

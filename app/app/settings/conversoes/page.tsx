@@ -57,6 +57,7 @@ import {
 } from "@/lib/plataformas-de-anuncio/google/config";
 import { lerEstadoDaConexaoGoogle } from "@/lib/plataformas-de-anuncio/google/estado-da-conexao";
 import { lerEstadoDaCaptura } from "@/lib/plataformas-de-anuncio/landing-config";
+import { existeConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { ReprocessarConversao } from "./_reprocessar";
@@ -130,6 +131,7 @@ export default async function ConversoesPage({
     etapas,
     regrasGoogle,
     regrasMeta,
+    leituraMeta,
   ] = await Promise.all([
     lerEstadoDaConexao(admin, activeOrg.orgId),
     lerPendencias(admin, activeOrg.orgId),
@@ -152,6 +154,7 @@ export default async function ConversoesPage({
     // Falha na leitura das regras não derruba a tela: o editor some e o resto fica.
     listarRegrasGoogle(admin, activeOrg.orgId).catch(() => null),
     listarRegrasMeta(admin, activeOrg.orgId).catch(() => null),
+    existeConexaoDeLeitura(admin, activeOrg.orgId, "meta_ads"),
   ]);
   // O nome que a pessoa reconhece para cada evento de etapa, das duas
   // plataformas — o Histórico e as pendências leem daqui.
@@ -335,7 +338,7 @@ export default async function ConversoesPage({
               </div>
             )}
 
-            <FormularioDeConversoes estado={estado} idioma={idioma} />
+            <FormularioDeConversoes estado={estado} idioma={idioma} leituraConectada={leituraMeta.conectada} />
             <VendaPeloCanal
               ligada={vendaPeloCanal}
               idioma={idioma}
@@ -344,6 +347,7 @@ export default async function ConversoesPage({
               <IdentidadeDaConversao
                 pageId={identidadeMeta.pageId}
                 whatsappBusinessAccountId={identidadeMeta.whatsappBusinessAccountId}
+                leituraConectada={leituraMeta.conectada}
                 idioma={idioma}
               />
             )}

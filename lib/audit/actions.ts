@@ -697,6 +697,8 @@ export const AUDIT_ACTIONS = [
   // é o que permite responder "quantas agendas precisaram reconectar esta
   // semana" sem varrer log de worker.
   "agenda.google.renovacao_executada",
+  // Renovação do token longo da Meta (OAuth). Só audita rodada com efeito; contagem, nunca token.
+  "plataformas.meta.token_renovado",
   // A rodada da VOLTA. Também só audita quando fez algo, e a contagem carrega
   // `nossos_ignorados` de propósito: é o número que prova o anti-eco
   // funcionando — sem ele, esses eventos teriam virado compromisso fantasma.

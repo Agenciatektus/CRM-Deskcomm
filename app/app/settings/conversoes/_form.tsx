@@ -36,9 +36,14 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Escolha } from "@/components/ui/escolha";
+import { useMetaAdAccounts } from "@/hooks/ads/useMetaAds";
+import { usePixelsDaMeta } from "@/hooks/ads/useOpcoesDaMeta";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { EstadoDaConexao } from "@/lib/conversoes/estado-da-conexao";
+
+import { SeletorDaMeta } from "./_seletorDaMeta";
 
 /**
  * Cada recusa vira uma frase que diz O QUE FAZER. `cifra_indisponivel` é a que
@@ -56,12 +61,60 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
   erro_ao_gravar: "Não consegui gravar agora. Tente de novo em instantes.",
 };
 
+/** Conta de anúncio + pixel, para quem já conectou a Meta de leitura. */
+function PixelDaMeta({
+  idioma,
+  valor,
+  onValor,
+  children,
+}: {
+  idioma: Idioma;
+  valor: string;
+  onValor: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  const t = (texto: string) => traduzir(texto, idioma);
+  const contas = useMetaAdAccounts(true);
+  const lista = contas.data?.data.contas ?? [];
+  const [escolhida, setEscolhida] = useState<string | null>(null);
+  const conta = escolhida ?? contas.data?.data.conta_padrao ?? lista[0]?.id ?? null;
+  const pixels = usePixelsDaMeta(conta, true);
+
+  return (
+    <>
+      {lista.length > 1 && (
+        <Escolha
+          aria-label={t("Conta de anúncios")}
+          value={conta ?? ""}
+          onValueChange={setEscolhida}
+          opcoes={lista.map((c) => ({ value: c.id, label: `${c.nome} (${c.id})` }))}
+        />
+      )}
+      <SeletorDaMeta
+        id="dataset_id_lista"
+        idioma={idioma}
+        rotulo={t("Destino de conversões")}
+        valor={valor}
+        onValor={onValor}
+        opcoes={pixels.data?.data.pixels}
+        carregando={contas.isLoading || pixels.isLoading}
+        erro={contas.isError || pixels.isError || (!contas.isLoading && !conta)}
+      >
+        {children}
+      </SeletorDaMeta>
+    </>
+  );
+}
+
 export function FormularioDeConversoes({
   estado,
   idioma,
+  leituraConectada = false,
 }: {
   estado: EstadoDaConexao;
   idioma: Idioma;
+  /** Há conexão de leitura da Meta (Ajustes › Meta Ads): liga a lista de pixels. */
+  leituraConectada?: boolean;
 }) {
   const t = (texto: string) => traduzir(texto, idioma);
   const router = useRouter();
@@ -102,16 +155,32 @@ export function FormularioDeConversoes({
       <form onSubmit={salvar} className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <Label htmlFor="dataset_id">{t("Identificador do destino de conversões")}</Label>
-          <Input
-            id="dataset_id"
-            inputMode="numeric"
-            value={datasetId}
-            onChange={(e) => setDatasetId(e.target.value)}
-            placeholder="123456789012345"
-          />
+          {(() => {
+            const campo = (
+              <Input
+                id="dataset_id"
+                inputMode="numeric"
+                value={datasetId}
+                onChange={(e) => setDatasetId(e.target.value)}
+                placeholder="123456789012345"
+              />
+            );
+            return leituraConectada ? (
+              <PixelDaMeta idioma={idioma} valor={datasetId} onValor={setDatasetId}>
+                {campo}
+              </PixelDaMeta>
+            ) : (
+              campo
+            );
+          })()}
           <p className="text-xs text-muted-foreground">
             {t("Só números. Você encontra no gerenciador de anúncios, na fonte de dados que recebe as conversões.")}
           </p>
+          {!leituraConectada && (
+            <p className="text-xs text-muted-foreground">
+              {t("Conecte a Meta em Ajustes › Meta Ads para escolher o destino de uma lista.")}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

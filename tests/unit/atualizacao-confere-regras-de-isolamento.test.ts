@@ -432,7 +432,9 @@ describe.skipIf(!temAwk)("recriar o que falta: o comando INTEIRO, nunca o nome",
       for (const loc of disponiveis) {
         // Sonda: a mesma comparação SEM o pin, com o locale candidato.
         const r = comparar(esperadas, existentes, "sort -u", semPin(linhaDeComparacao()), loc);
-        if (r.stderr.includes("not in sorted order") || r.faltando.length > 0) return loc;
+        // Os DOIS sintomas, porque a sabotagem abaixo exige os dois: um locale que só
+        // reclama (ou só acusa) passava pela sonda e deixava o caso vermelho no CI.
+        if (r.stderr.includes("not in sorted order") && r.faltando.length > 0) return loc;
       }
       return undefined;
     }
