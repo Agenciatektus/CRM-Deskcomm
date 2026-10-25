@@ -411,6 +411,7 @@ export function Funil() {
         <Janela rota="funil" interativa>
           <TelaFunil />
         </Janela>
+        <p className="m-0 mt-3 text-meta text-text-subtle">Exemplo com dados fictícios. O seletor de funil e os filtros funcionam de verdade.</p>
       </div>
       <div className="revela mt-5 max-w-[44rem]">
         <h3 className="m-0 text-[1.15rem] font-bold">{PROVA.funil.titulo}</h3>
