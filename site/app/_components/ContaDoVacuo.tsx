@@ -65,7 +65,7 @@ export function ContaDoVacuo() {
 
   return (
     <div className="card p-5 sm:p-8">
-      <div className="grid gap-5 md:grid-cols-3 md:items-end">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-3 md:items-end">
         <Campo id={`${base}-c`} rotulo={CONTA.campo1} valor={conversas} aoMudar={setConversas} />
         <Campo id={`${base}-f`} rotulo={CONTA.campo2} valor={fatia} aoMudar={setFatia} max={100} />
         <Campo id={`${base}-t`} rotulo={CONTA.campo3} valor={ticket} aoMudar={setTicket} />

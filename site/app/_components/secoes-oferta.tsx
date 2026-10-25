@@ -9,7 +9,7 @@ export function Oferta() {
   return (
     <Secao id="oferta" titulo="titulo-oferta" fundo="grade">
       <Cabeca id="titulo-oferta" titulo={OFERTA.titulo} />
-      <ul className="m-0 mb-12 grid list-none gap-4 p-0 md:grid-cols-2 [&>*]:min-w-0">
+      <ul className="m-0 mb-16 grid list-none gap-5 lg:gap-6 p-0 md:grid-cols-2 [&>*]:min-w-0">
         {OFERTA.itens.map((i, k) => (
           <li key={i.titulo} className="revela flex gap-3" style={{ "--atraso": `${(k % 2) * 0.08}s` } as React.CSSProperties}>
             <Icone nome="check" className="mt-1 size-5 shrink-0 text-ok" />
@@ -22,7 +22,7 @@ export function Oferta() {
       </ul>
 
       <h3 className="revela m-0 mb-5 text-[1.5rem] font-bold tracking-tight">{OFERTA.precoTitulo}</h3>
-      <div className="grid gap-5 md:grid-cols-2 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {OFERTA.planos.map((p, i) => (
           <Card
             key={p.nome}
@@ -89,7 +89,7 @@ export function ParaQuem() {
   return (
     <Secao titulo="titulo-para-quem" fundo="pontos">
       <Cabeca id="titulo-para-quem" titulo={PARA_QUEM.titulo} />
-      <div className="grid gap-5 md:grid-cols-2 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {[PARA_QUEM.serve, PARA_QUEM.naoServe].map((b, i) => (
           <Card key={b.titulo} atraso={i * 0.1}>
             <h3 className="m-0 text-[1.15rem] font-bold">{b.titulo}</h3>
@@ -105,7 +105,7 @@ export function Objecoes() {
   return (
     <Secao titulo="titulo-objecoes" fundo="azul">
       <Cabeca id="titulo-objecoes" titulo="O que costuma passar pela cabeça antes de comprar" />
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {OBJECOES.map((o, i) => (
           <Card key={o.p} atraso={(i % 3) * 0.08}>
             <h3 className="m-0 text-[1.05rem] leading-snug font-bold">{o.p}</h3>

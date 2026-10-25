@@ -93,7 +93,7 @@ export function Canais() {
   return (
     <Secao id="canais" titulo="titulo-canais" fundo="pontos">
       <Cabeca id="titulo-canais" titulo={CANAIS.titulo} texto={CANAIS.texto} />
-      <div className="grid gap-5 md:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
         {cartoes.map((c, i) => (
           <Card key={c.titulo} atraso={i * 0.1}>
             <CartaoCanal titulo={c.titulo} detalhe={c.detalhe} icone={c.icone} itens={c.itens} qr={c.qr} visual={"visual" in c ? c.visual : undefined} />
@@ -121,10 +121,10 @@ export function Implantacao() {
   return (
     <Secao id="implantacao" titulo="titulo-implantacao" fundo="azul">
       <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
-      <ol className="relative m-0 grid list-none gap-5 p-0 md:grid-cols-2 lg:grid-cols-5 [&>*]:min-w-0">
+      <ol className="relative m-0 grid list-none gap-6 p-0 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>*]:min-w-0">
         <span
           aria-hidden="true"
-          className="absolute top-[1.65rem] right-10 left-10 hidden h-px bg-gradient-to-r from-link/50 via-border-strong to-ok/50 lg:block"
+          className="absolute top-[1.65rem] right-10 left-10 hidden h-px bg-gradient-to-r from-link/50 via-border-strong to-ok/50 xl:block"
         />
         {IMPLANTACAO.passos.map((p, i) => (
           <li key={p.titulo} className="revela relative" style={{ "--atraso": `${i * 0.08}s` } as React.CSSProperties}>

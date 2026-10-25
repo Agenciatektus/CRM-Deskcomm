@@ -34,7 +34,7 @@ export function Secao({
       {FUNDOS[fundo].map((c) => (
         <div key={c} aria-hidden="true" className={`pointer-events-none absolute inset-0 -z-10 ${c}`} />
       ))}
-      <div className={`mx-auto px-5 py-20 lg:py-28 ${larga ? "max-w-[78rem]" : "max-w-6xl"}`}>{children}</div>
+      <div className={`mx-auto px-5 py-24 lg:py-32 ${larga ? "max-w-[78rem]" : "max-w-6xl"}`}>{children}</div>
     </section>
   );
 }
@@ -51,7 +51,7 @@ export function Cabeca({
   centro?: boolean;
 }) {
   return (
-    <header className={`revela mb-12 max-w-[44rem] lg:mb-16 ${centro ? "mx-auto text-center" : ""}`}>
+    <header className={`revela mb-14 max-w-[44rem] lg:mb-20 ${centro ? "mx-auto text-center" : ""}`}>
       <h2
         id={id}
         className="m-0 text-[clamp(1.85rem,3.4vw,2.9rem)] leading-[1.1] font-bold tracking-tight text-balance"
@@ -75,7 +75,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`card revela min-w-0 p-5 sm:p-6 ${className}`}
+      className={`card revela min-w-0 p-6 sm:p-8 ${className}`}
       style={{ "--atraso": `${atraso}s` } as React.CSSProperties}
     >
       {children}
