@@ -73,6 +73,9 @@ CRONS="
 * * * * *|25|api/v1/cron/channel-pause-scheduler
 */10 * * * *|60|api/v1/cron/contact-avatars
 */10 * * * *|60|api/v1/cron/agenda-google-refresh
+# O token longo da Meta (OAuth) vale ~60 dias e a janela de renovação é de 15:
+# uma vez por dia sobra folga para falhas passageiras sem custo.
+17 6 * * *|60|api/v1/cron/meta-renovar-token
 * * * * *|90|api/v1/cron/agenda-google-sync
 # A IDA. Cadência mais curta que a volta de propósito: quem marcou pela tela
 # espera ver o compromisso no celular dele em minutos, e a ida é barata (só
