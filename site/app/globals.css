@@ -312,6 +312,11 @@ h3 {
     transform: scale(0.96) translateY(10px);
   }
 }
+@keyframes desenha {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
 @keyframes respira {
   50% {
     opacity: calc(var(--luz-forca, 0.7) * 0.8);
@@ -456,6 +461,10 @@ h3 {
   }
   .a-respira::before {
     animation: respira 6s ease-in-out infinite;
+  }
+  .selo-anel {
+    stroke-dasharray: 1;
+    animation: desenha 1.2s var(--ease-lenta) backwards;
   }
   .a-pulso {
     animation: pulso 2.2s ease-in-out infinite;

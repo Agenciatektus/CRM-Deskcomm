@@ -492,7 +492,15 @@ export const OFERTA = {
 export const GARANTIA = {
   titulo: "Garantia de implantação",
   texto:
-    "A Tektus devolve 100% da implantação, para quem a contratou, se não entregar o que foi combinado por escrito: agentes, funis, campanhas, follow-ups e fluxos de atendimento.",
+    "A Tektus devolve 100% da implantação, para quem a contratou, se não entregar o que foi combinado por escrito.",
+  marcosTitulo: "O que fica combinado por escrito",
+  marcos: [
+    { icone: "agente", texto: "Agentes" },
+    { icone: "funil", texto: "Funis e pipelines" },
+    { icone: "bandeira", texto: "Campanhas" },
+    { icone: "trocar", texto: "Follow-ups" },
+    { icone: "conexao", texto: "Fluxos de atendimento" },
+  ],
   limite:
     "A garantia cobre o valor da implantação, e só vale para quem a contratou. Ela deixa o número de vendas de fora, porque o resultado depende do seu volume de conversas, do seu ticket e do seu mercado.",
 } as const;
