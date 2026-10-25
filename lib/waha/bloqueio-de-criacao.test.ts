@@ -39,12 +39,15 @@ const ID = "44444444-4444-4444-8444-444444444444";
 const post = (url: string) =>
   new Request(`http://localhost${url}`, { method: "POST", body: "{}" });
 
-const rotas: Array<[string, () => Promise<Response>]> = [
-  ["POST /channel-sessions", () => criarCanal(post("/api/v1/channel-sessions") as never)],
-  ["POST /onboarding/whatsapp/session", () => criarNoOnboarding(post("/x"))],
+// [nome, chamar, status e código que a rota devolve com o WAHA LIGADO e sem cliente]
+const rotas: Array<[string, () => Promise<Response>, number, string]> = [
+  ["POST /channel-sessions", () => criarCanal(post("/api/v1/channel-sessions") as never), 503, "waha_not_configured"],
+  ["POST /onboarding/whatsapp/session", () => criarNoOnboarding(post("/x")), 503, "waha_not_configured"],
   [
     "POST /channel-sessions/[id]/reconnect",
     () => reconectar(post("/x") as never, { params: Promise.resolve({ id: ID }) }),
+    422,
+    "channel_without_session",
   ],
 ];
 
@@ -67,7 +70,7 @@ beforeEach(() => {
   h.from.mockReturnValue(cadeia);
 });
 
-describe.each(rotas)("%s", (_nome, chamar) => {
+describe.each(rotas)("%s", (_nome, chamar, statusLigado, codigoLigado) => {
   it.each(["false", "0", "no", "FALSE"])("WAHA_HABILITADO=%s: 403 waha_desabilitado", async (v) => {
     vi.stubEnv("WAHA_HABILITADO", v);
     const res = await chamar();
@@ -81,12 +84,22 @@ describe.each(rotas)("%s", (_nome, chamar) => {
     expect(h.from).not.toHaveBeenCalled();
   });
 
-  it("ligado (variável ausente ou true): o guard não interfere", async () => {
-    for (const v of [undefined, "true", "1"]) {
-      if (v === undefined) vi.stubEnv("WAHA_HABILITADO", "");
-      else vi.stubEnv("WAHA_HABILITADO", v);
-      const res = await chamar();
-      expect(res.status).not.toBe(403);
-    }
+  it("sem login e com o WAHA desligado: 401, não 403 (autenticação vem antes do bloqueio)", async () => {
+    vi.stubEnv("WAHA_HABILITADO", "false");
+    h.role.mockResolvedValue({
+      ok: false,
+      response: new Response(JSON.stringify({ error: { code: "unauthenticated" } }), { status: 401 }),
+    });
+    const res = await chamar();
+    expect(res.status).toBe(401);
+    expect((await res.json()).error.code).toBe("unauthenticated");
+  });
+
+  it.each([undefined, "true", "1"])("ligado (%s): o guard não interfere e a rota segue para a sua própria resposta", async (v) => {
+    vi.stubEnv("WAHA_HABILITADO", v as string);
+    if (v === undefined) vi.unstubAllEnvs();
+    const res = await chamar();
+    expect(res.status).toBe(statusLigado);
+    expect((await res.json()).error.code).toBe(codigoLigado);
   });
 });
