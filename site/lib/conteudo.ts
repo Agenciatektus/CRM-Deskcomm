@@ -301,7 +301,7 @@ export const OFERTA = {
     {
       titulo: "Atendente de IA treinado no seu negócio",
       texto:
-        "Com a implantação opcional, a Tektus cria um MEP (Manual Estratégico de Posicionamento) específico do seu negócio, e ele vira a base de conhecimento do agente. O agente passa para a sua equipe com o histórico, entende áudio e cria agendamento.",
+        "Com a implantação opcional, a Tektus cria um MEP (Manual Estratégico de Posicionamento) específico do seu negócio, e ele vira a base de conhecimento do agente. O agente passa para a sua equipe com o histórico, entende áudio e cria agendamento. No plano sem IA, você usa a sua própria chave de IA.",
     },
     {
       titulo: "Follow-up e Radar ligados",

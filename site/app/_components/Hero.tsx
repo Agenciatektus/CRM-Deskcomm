@@ -71,7 +71,7 @@ export function Hero() {
         </p>
 
         <div className="a-sobe mt-7 flex flex-wrap items-center justify-center gap-3 [--atraso:0.28s]">
-          <BotaoPrimario href={CTA.comprar.href} externo>
+          <BotaoPrimario href="#oferta">
             {CTA.comprar.rotulo}
           </BotaoPrimario>
           <BotaoSecundario href="#plantao">Ver o sistema em ação</BotaoSecundario>

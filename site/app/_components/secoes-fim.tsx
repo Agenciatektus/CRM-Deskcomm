@@ -77,7 +77,7 @@ export function CtaFinal() {
               {CTA_FINAL.texto}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <BotaoPrimario href={CTA.comprar.href} externo>
+              <BotaoPrimario href="#oferta">
                 {CTA.comprar.rotulo}
               </BotaoPrimario>
               <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>{CTA.duvida.rotulo}</BotaoSecundario>
