@@ -23,7 +23,7 @@ export function Radar() {
             {["Tempo adaptativo", "Gatilhos por etapa", "Janela de horário do canal"].map((t) => (
               <li key={t}>
                 <Selo tom="neutro">
-                  <Icone nome="check" className="size-3 text-ok" /> {t}
+                  <Icone nome="check" peso="bold" className="size-3 text-success-fg" /> {t}
                 </Selo>
               </li>
             ))}
@@ -61,9 +61,9 @@ export function Canais() {
       visual: (
         <div className="flex flex-col gap-1.5">
           {["Confirmação de consulta", "Lembrete de retorno"].map((t) => (
-            <div key={t} className="flex items-center justify-between gap-2 rounded-field border border-border bg-surface-elevated px-3 py-2 text-meta">
-              <span className="truncate font-semibold">{t}</span>
-              <Selo tom="ok">aprovado</Selo>
+            <div key={t} className="flex items-center justify-between gap-2 rounded-menu border border-border bg-surface px-3 py-2 text-sm">
+              <span className="truncate font-medium">{t}</span>
+              <Selo tom="ok">Aprovado</Selo>
             </div>
           ))}
         </div>
@@ -80,8 +80,8 @@ export function Canais() {
       qr: false,
       visual: (
         <div className="flex flex-col gap-1.5">
-          <p className="m-0 w-fit max-w-[90%] rounded-bubble rounded-bl-md bg-bubble-in px-3 py-2 text-meta">Vi o post, como funciona?</p>
-          <p className="m-0 w-fit max-w-[90%] self-end rounded-bubble rounded-br-md bg-bubble-ai px-3 py-2 text-meta">Oi! Te explico em um minuto.</p>
+          <p className="m-0 w-fit max-w-[90%] rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">Vi o post, como funciona?</p>
+          <p className="pele-bolha-ia m-0 w-fit max-w-[90%] self-end rounded-bubble rounded-br-bubble-tail px-3 py-[7px] text-[15px] leading-[1.42]">Oi! Te explico em um minuto.</p>
         </div>
       ),
       itens: [

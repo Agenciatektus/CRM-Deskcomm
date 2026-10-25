@@ -46,7 +46,7 @@ export function SeloDeCanal({ canal, tamanho = "size-[18px]" }: { canal: "whatsa
   return (
     <span
       className={`absolute -right-[3px] -bottom-[3px] grid ${tamanho} place-items-center rounded-full text-white ring-2 ring-surface ${
-        wa ? "bg-[#1fa561]" : "bg-[#c13584]"
+        wa ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"
       }`}
     >
       <Icone nome={wa ? "chat" : "camera"} peso="bold" className="size-[11px]" />
@@ -59,7 +59,7 @@ export function CanalChip({ canal }: { canal: "whatsapp" | "instagram" }) {
   const wa = canal === "whatsapp";
   return (
     <span className="inline-flex items-center gap-1 text-meta text-text-muted">
-      <span className={`grid size-3.5 place-items-center rounded-full text-white ${wa ? "bg-[#1fa561]" : "bg-[#c13584]"}`}>
+      <span className={`grid size-3.5 place-items-center rounded-full text-white ${wa ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"}`}>
         <Icone nome={wa ? "chat" : "camera"} peso="bold" className="size-2" />
       </span>
       {wa ? "WhatsApp" : "Instagram"}

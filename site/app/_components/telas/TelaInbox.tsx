@@ -154,7 +154,7 @@ function LinhaDaLista({ c }: { c: Conversa }) {
         <span
           className={`absolute -right-[3px] -bottom-[3px] grid size-[18px] place-items-center rounded-full text-white ring-2 ${
             c.ativa ? "ring-[#1d3943]" : "ring-surface"
-          } ${c.canal === "whatsapp" ? "bg-[#1fa561]" : "bg-[#c13584]"}`}
+          } ${c.canal === "whatsapp" ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"}`}
         >
           <Icone nome={c.canal === "whatsapp" ? "chat" : "camera"} peso="bold" className="size-[11px]" />
         </span>
@@ -283,7 +283,7 @@ export function TelaInbox({ className = "" }: { className?: string }) {
               </div>
               <p className="m-0 mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden text-[13px] whitespace-nowrap text-text-muted">
                 <span className="inline-flex items-center gap-1">
-                  <span className="grid size-3.5 place-items-center rounded-full bg-[#1fa561] text-white">
+                  <span className="grid size-3.5 place-items-center rounded-full bg-[oklch(0.62_0.15_150)] text-white">
                     <Icone nome="chat" peso="bold" className="size-2" />
                   </span>
                   WhatsApp

@@ -109,7 +109,7 @@ function CartaoLead({ c }: { c: Cartao }) {
           <span
             className={`absolute -right-1 -bottom-1 grid size-[17px] place-items-center rounded-full text-white ring-2 ${
               c.destaque ? "ring-[#1d3943]" : "ring-surface"
-            } ${c.canal === "whatsapp" ? "bg-[#1fa561]" : "bg-[#c13584]"}`}
+            } ${c.canal === "whatsapp" ? "bg-[oklch(0.62_0.15_150)]" : "bg-[oklch(0.58_0.2_0)]"}`}
           >
             <Icone nome={c.canal === "whatsapp" ? "chat" : "camera"} peso="bold" className="size-2.5" />
           </span>
