@@ -195,6 +195,10 @@ export interface CredencialDeLeitura {
   accessToken: string;
   /** `act_<id>` que a tela abre por padrão. Nulo = ninguém escolheu ainda. */
   contaPadrao: string | null;
+  /** Contas que a organização pode ver (`act_<id>`); `null` = sem restrição. */
+  contasPermitidas: string[] | null;
+  /** Quem conectou; `null` = conexão antiga. */
+  connectedBy: string | null;
 }
 
 /**

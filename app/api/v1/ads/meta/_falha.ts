@@ -110,3 +110,17 @@ export function respostaSemConexao(
     { requestId },
   );
 }
+
+/**
+ * A conta pedida não está na lista da organização. 403 (e não 422): o estado
+ * errado é do PEDIDO, não do recurso, e o `apiClient` só expulsa para o login em
+ * 401. Chamada ANTES de qualquer requisição à plataforma.
+ */
+export function respostaContaNaoPermitida({ requestId }: Opcoes = {}): NextResponse<ApiError> {
+  return fail(
+    "ads_conta_nao_permitida",
+    "Esta conta de anúncios não está liberada para esta organização. Peça a um administrador para escolhê-la em Configurações › Meta Ads.",
+    403,
+    { requestId },
+  );
+}

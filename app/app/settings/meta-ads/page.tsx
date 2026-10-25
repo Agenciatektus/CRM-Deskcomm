@@ -31,6 +31,7 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeAmpliarContas } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { existeConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
 import {
   faltaParaConectarOMetaAds,
@@ -106,6 +107,21 @@ export default async function MetaAdsSettingsPage({
             {t("Conta conectada com a Meta.")}
           </div>
         )}
+        {conexao.conectada && (
+          <div
+            data-testid="meta-escolher-contas"
+            className="rounded-md border border-primary/40 bg-primary/5 p-4 text-sm"
+          >
+            <p className="font-medium">
+              {t("Escolha quais contas de anúncio pertencem a esta organização")}
+            </p>
+            {parametros.escolher !== "1" && (
+              <a className="mt-2 inline-block underline" href="/app/settings/meta-ads?escolher=1">
+                {t("Escolher contas")}
+              </a>
+            )}
+          </div>
+        )}
         {conexao.via === "oauth" && conexao.metaUserName && (
           <div data-testid="meta-identidade" className="rounded-md border p-4 text-sm">
             <p>{t("Conectado como {nome}").replace("{nome}", () => conexao.metaUserName!)}</p>
@@ -113,7 +129,7 @@ export default async function MetaAdsSettingsPage({
               <p className="text-muted-foreground">
                 {t("Empresas (BM): {lista}").replace(
                   "{lista}",
-                  () => conexao.metaBusinesses.map((b) => b.name).join(", "),
+                  () => conexao.metaBusinesses.map((b) => b.name.replaceAll("\uFFFD", "")).join(", "),
                 )}
               </p>
             )}
@@ -145,6 +161,8 @@ export default async function MetaAdsSettingsPage({
           </div>
         )}
 
+        {/* Só no fluxo do token colado à mão: no login com a Meta não há token a gerar. */}
+        {conexao.via !== "oauth" && (
         <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
           {/*
             A permissão exata está escrita aqui porque é o erro nº 1 desta
@@ -156,6 +174,7 @@ export default async function MetaAdsSettingsPage({
             "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
           )}
         </div>
+        )}
 
         <p className="text-sm text-muted-foreground">
           {t(
@@ -166,6 +185,8 @@ export default async function MetaAdsSettingsPage({
         <FormularioDeMetaAds
           conectada={conexao.conectada}
           contaPadrao={conexao.contaPadrao}
+          contasPermitidas={conexao.contasPermitidas}
+          podeAmpliar={podeAmpliarContas(user, conexao.connectedBy)}
           via={conexao.via}
           expiraEm={expiraEm}
           diasParaVencer={dias}

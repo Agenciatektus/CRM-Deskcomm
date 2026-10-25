@@ -63,7 +63,7 @@ function adminFalso(linha: Record<string, unknown> | null) {
 }
 
 const comToken = () =>
-  credencial.mockResolvedValue({ ok: true, credencial: { accessToken: "tok" } });
+  credencial.mockResolvedValue({ ok: true, credencial: { accessToken: "tok", contasPermitidas: null } });
 
 beforeEach(() => {
   leitura.mockReset();
@@ -184,5 +184,55 @@ describe("quando não há nada guardado", () => {
     const { admin } = adminFalso(null);
 
     expect(await resolverHierarquiaDoContato(admin, ORG, AD)).toBeNull();
+  });
+});
+
+describe("anúncio de conta não liberada", () => {
+  const dados = (accountId: string | null) => ({
+    ok: true,
+    dados: {
+      adId: AD,
+      accountId,
+      adName: "De outro cliente",
+      adsetId: "1",
+      adsetName: "x",
+      campaignId: "2",
+      campaignName: "Campanha alheia",
+    },
+  });
+  const restrita = () =>
+    credencial.mockResolvedValue({ ok: true, credencial: { accessToken: "tok", contasPermitidas: ["act_1"] } });
+
+  it("conta fora da lista: não devolve nem grava no cache", async () => {
+    restrita();
+    leitura.mockResolvedValue(dados("999"));
+    const { admin, upserts } = adminFalso(null);
+    expect(await resolverHierarquiaDoContato(admin, ORG, AD)).toBeNull();
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("conta fora da lista com linha vencida: devolve só a guardada", async () => {
+    restrita();
+    leitura.mockResolvedValue(dados("999"));
+    const { admin, upserts } = adminFalso({ ...LINHA, fetched_at: HA_UM_MES });
+    const r = await resolverHierarquiaDoContato(admin, ORG, AD);
+    expect(r?.campaignName).toBe("Leads Setembro");
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("restrição sem account_id na resposta: nega", async () => {
+    restrita();
+    leitura.mockResolvedValue(dados(null));
+    const { admin, upserts } = adminFalso(null);
+    expect(await resolverHierarquiaDoContato(admin, ORG, AD)).toBeNull();
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("conta liberada: grava", async () => {
+    restrita();
+    leitura.mockResolvedValue(dados("1"));
+    const { admin, upserts } = adminFalso(null);
+    expect((await resolverHierarquiaDoContato(admin, ORG, AD))?.campaignName).toBe("Campanha alheia");
+    expect(upserts).toHaveLength(1);
   });
 });
