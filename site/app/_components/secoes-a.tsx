@@ -56,13 +56,13 @@ function MiniLeadSumiu() {
         </div>
         <Selo tom="crit">há 2 d</Selo>
       </div>
-      <p className="m-0 w-fit max-w-[85%] rounded-bubble rounded-bl-md bg-bubble-in px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[85%] rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">
         Qual o valor do plano completo?
       </p>
-      <p className="m-0 w-fit max-w-[85%] self-end rounded-bubble rounded-br-md bg-bubble-out px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[85%] self-end rounded-bubble rounded-br-bubble-tail bg-bubble-out px-3 py-[7px] text-[15px] leading-[1.42]">
         Fica em R$ 900 por mês.
       </p>
-      <p className="m-0 flex items-center gap-1.5 font-mono text-[0.68rem] text-text-subtle">
+      <p className="m-0 flex items-center gap-1.5 text-xs text-text-subtle">
         <Icone nome="relogio" className="size-3" /> ninguém retomou
       </p>
     </div>
@@ -71,7 +71,7 @@ function MiniLeadSumiu() {
 
 function Fila({ icone, children }: { icone: NomeIcone; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-field border border-border bg-surface-elevated px-3 py-2.5 text-ui">
+    <div className="flex items-center gap-2.5 rounded-menu border border-border bg-surface px-3 py-2.5 text-ui">
       <Icone nome={icone} className="size-4 shrink-0 text-text-subtle" />
       {children}
     </div>
@@ -81,14 +81,14 @@ function Fila({ icone, children }: { icone: NomeIcone; children: React.ReactNode
 function MiniFimDeSemana() {
   return (
     <div className="flex flex-col gap-2">
-      <p className="m-0 font-mono text-[0.68rem] text-text-subtle">Sábado, 22h</p>
+      <p className="m-0 text-xs text-text-subtle">Sábado, 22h</p>
       {["Quanto custa?", "Tem horário amanhã?", "Vi o anúncio, como funciona?"].map((m) => (
         <Fila key={m} icone="chat">
           <span className="truncate">{m}</span>
           <span className="ml-auto size-2 shrink-0 rounded-full bg-link" />
         </Fila>
       ))}
-      <p className="m-0 flex items-center gap-1.5 font-mono text-[0.68rem] text-text-subtle">
+      <p className="m-0 flex items-center gap-1.5 text-xs text-text-subtle">
         <Icone nome="relogio" className="size-3" /> próxima resposta: segunda, 9h
       </p>
     </div>
@@ -150,7 +150,7 @@ function MiniSemMedida() {
 function MiniSemDono() {
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-md bg-bubble-in px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">
         Ninguém me respondeu.
       </p>
       <Fila icone="usuario">
@@ -187,7 +187,7 @@ export function Problema() {
               <h3 className="m-0 text-[1.15rem] leading-snug font-bold">{p.titulo}</h3>
               <p className="mt-2 mb-0 leading-relaxed text-text-muted">{p.texto}</p>
               <p className="mt-3 mb-0 flex gap-2 leading-relaxed">
-                <Icone nome="check" className="mt-1 size-4 shrink-0 text-ok" />
+                <Icone nome="check" className="mt-1 size-4 shrink-0 text-success-fg" />
                 <span>{p.saida}</span>
               </p>
             </div>
@@ -225,7 +225,7 @@ function VisualEtapa({ i }: { i: number }) {
             ["Rafael Nogueira", 3, "instagram", "Vi o anúncio, como funciona?"],
           ] as const
         ).map(([n, t, c, m]) => (
-          <div key={n} className="flex items-center gap-3 rounded-field border border-border bg-surface-elevated px-3 py-2.5">
+          <div key={n} className="flex items-center gap-3 rounded-menu border border-border bg-surface px-3 py-2.5">
             <Avatar nome={n} tom={t} />
             <div className="min-w-0 flex-1">
               <p className="m-0 flex items-center gap-2 text-ui font-bold">
@@ -233,7 +233,7 @@ function VisualEtapa({ i }: { i: number }) {
               </p>
               <p className="m-0 truncate text-meta text-text-muted">{m}</p>
             </div>
-            <span className="size-2 rounded-full bg-link" />
+            <span className="pele-grad-contador inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold">1</span>
           </div>
         ))}
       </div>
@@ -241,10 +241,10 @@ function VisualEtapa({ i }: { i: number }) {
   if (i === 1)
     return (
       <div className="flex flex-col gap-2.5">
-        <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-md bg-bubble-in px-3.5 py-2 text-message">
+        <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">
           Quero marcar uma avaliação.
         </p>
-        <p className="m-0 w-fit max-w-[88%] self-end rounded-bubble rounded-br-md bg-bubble-ai px-3.5 py-2 text-message">
+        <p className="m-0 w-fit max-w-[88%] self-end pele-bolha-ia rounded-bubble rounded-br-bubble-tail px-3 py-[7px] text-[15px] leading-[1.42]">
           Claro! Prefere manhã ou tarde? Qual o seu nome completo?
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -261,10 +261,10 @@ function VisualEtapa({ i }: { i: number }) {
     return (
       <div className="grid grid-cols-3 gap-2">
         {(["Avaliação", "Proposta enviada", "Negociação"] as const).map((e, k) => (
-          <div key={e} className="rounded-field border border-border bg-bg p-2">
-            <p className="m-0 mb-2 truncate font-mono text-[0.62rem] tracking-wider text-text-subtle uppercase">{e}</p>
+          <div key={e} className="rounded-lg border border-border bg-surface/50 p-2">
+            <p className="m-0 mb-2 truncate text-meta font-semibold text-text-muted">{e}</p>
             {Array.from({ length: k === 1 ? 1 : 2 }, (_, j) => (
-              <div key={j} className="mb-1.5 rounded-md border border-border bg-surface-elevated p-2">
+              <div key={j} className="mb-1.5 rounded-xl border border-border bg-surface p-2">
                 <div className="mb-1.5 h-1.5 w-3/4 rounded-full bg-border-strong" />
                 <div className="h-1.5 w-1/2 rounded-full bg-border" />
               </div>
@@ -276,8 +276,8 @@ function VisualEtapa({ i }: { i: number }) {
   if (i === 3) return <PainelPassagem />;
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-center gap-3 rounded-field border border-border bg-surface-elevated px-3 py-2.5">
-        <Icone nome="relogio" className="size-5 text-warn" />
+      <div className="flex items-center gap-3 rounded-menu border border-border bg-surface px-3 py-2.5">
+        <Icone nome="relogio" className="size-5 text-warning-fg" />
         <div className="min-w-0 flex-1">
           <p className="m-0 text-ui font-bold">Tiago Moreira</p>
           <p className="m-0 text-meta text-text-muted">sem resposta há 2 h</p>
@@ -337,7 +337,7 @@ export function Plantao() {
 function MiniAudio() {
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex w-fit items-center gap-2 rounded-bubble rounded-bl-md bg-bubble-in px-3.5 py-2 text-message">
+      <div className="flex w-fit items-center gap-2 rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">
         <Icone nome="enviar" className="size-3.5" />
         <span className="h-1.5 w-24 rounded-full bg-border-strong" />
         <span className="font-mono text-[0.65rem] text-text-subtle">0:14</span>
@@ -345,7 +345,7 @@ function MiniAudio() {
       <p className="m-0 rounded-field border border-dashed border-border-strong px-3 py-2 text-meta text-text-muted">
         Transcrição: &quot;Queria saber se vocês atendem de manhã.&quot;
       </p>
-      <p className="m-0 w-fit max-w-[88%] self-end rounded-bubble rounded-br-md bg-bubble-ai px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[88%] self-end pele-bolha-ia rounded-bubble rounded-br-bubble-tail px-3 py-[7px] text-[15px] leading-[1.42]">
         Atendemos, sim. Prefere às 9h ou às 10h?
       </p>
     </div>
@@ -371,7 +371,7 @@ function MiniAgenda() {
         </div>
       ))}
       <p className="m-0 flex items-center gap-1.5 text-meta text-text-muted">
-        <Icone nome="check" className="size-3.5 text-ok" /> Agendamento criado para quinta, 10h
+        <Icone nome="check" className="size-3.5 text-success-fg" /> Agendamento criado para quinta, 10h
       </p>
     </div>
   );
@@ -380,10 +380,10 @@ function MiniAgenda() {
 function MiniForaDoHorario() {
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-md bg-bubble-in px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[88%] rounded-bubble rounded-bl-bubble-tail border border-border bg-bubble-in px-3 py-[7px] text-[15px] leading-[1.42]">
         Oi, ainda tem vaga?
       </p>
-      <p className="m-0 w-fit max-w-[88%] self-end rounded-bubble rounded-br-md bg-bubble-ai px-3.5 py-2 text-message">
+      <p className="m-0 w-fit max-w-[88%] self-end pele-bolha-ia rounded-bubble rounded-br-bubble-tail px-3 py-[7px] text-[15px] leading-[1.42]">
         Nossa equipe volta às 8h. Já deixei o seu pedido anotado.
       </p>
       <div>
