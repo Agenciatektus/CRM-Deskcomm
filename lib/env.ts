@@ -220,6 +220,10 @@ const schema = z.object({
   // (WHATSAPP_HOOK_HMAC_KEY no compose) ou houver um proxy que assine — aí a
   // verificação passa a ser obrigatória.
   WAHA_WEBHOOK_REQUIRE_SIGNATURE: z.string().optional().default("false"),
+  // Interruptor do WAHA. Padrão "true" (comportamento de sempre). "false"/"0"/"no"
+  // desliga: bloqueia a criação de canal WAHA e tira o WAHA do health e dos
+  // crons. Leia por `wahaHabilitado()`, o único lugar que interpreta o valor.
+  WAHA_HABILITADO: z.string().optional().default("true"),
 
   // ─── Chamada de voz WhatsApp (WaCalls, spec 18) ───
   //
@@ -805,3 +809,9 @@ if (!env.IMPERSONATE_COOKIE_SECRET || env.IMPERSONATE_COOKIE_SECRET.length < 32)
 }
 
 export type Env = typeof env;
+
+/** Interruptor do WAHA (`WAHA_HABILITADO`). Lê o ambiente a cada chamada, como `getWahaClient`. */
+export function wahaHabilitado(): boolean {
+  const v = (process.env.WAHA_HABILITADO ?? "true").trim().toLowerCase();
+  return !["false", "0", "no"].includes(v);
+}
