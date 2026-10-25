@@ -32,7 +32,7 @@ export function Janela({
             <i className="size-2.5 rounded-full bg-[#febc2e]/80" />
             <i className="size-2.5 rounded-full bg-[#28c840]/80" />
           </span>
-          <span className="mx-auto flex h-6 min-w-0 max-w-[26rem] flex-1 items-center justify-center truncate rounded-md bg-bg px-3 font-mono text-[0.68rem] text-text-subtle">
+          <span className="mx-auto flex h-6 min-w-0 max-w-[26rem] flex-1 items-center justify-center truncate rounded-card bg-bg px-3 font-mono text-[0.68rem] text-text-subtle">
             crm.verdash.com.br/app/{rota}
           </span>
           <span className="w-12" />

@@ -58,7 +58,7 @@ export function Oferta() {
         ))}
       </div>
       <div className="revela mt-6 rounded-card border border-dashed border-border-strong px-5 py-4 lg:mt-8">
-        <p className="m-0 font-mono text-[0.72rem] tracking-[0.12em] text-text-subtle uppercase">
+        <p className="m-0 text-label font-semibold text-text-subtle">
           {OFERTA.implantacao.rotulo}
         </p>
         <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3">

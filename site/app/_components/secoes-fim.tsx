@@ -50,7 +50,7 @@ export function CtaFinal() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-azul" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
       <Container largura="texto" className="py-16 md:py-(--espaco-secao-m)">
-        <div className="borda-luz janela-app revela relative overflow-hidden rounded-[22px] bg-surface p-8 sm:p-14">
+        <div className="borda-luz janela-app revela relative overflow-hidden rounded-modal bg-surface p-8 sm:p-14">
           <picture aria-hidden="true">
             <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
             <source srcSet="/_lp/img/fluxo.webp" type="image/webp" />
@@ -103,7 +103,7 @@ export function Rodape() {
             </p>
           </div>
           <div>
-            <h2 className="m-0 font-mono text-[0.75rem] font-medium tracking-wider text-text-muted uppercase">
+            <h2 className="m-0 text-label font-semibold text-text-muted">
               {GOOGLE.titulo}
             </h2>
             <p className="mt-3 mb-0 max-w-[40rem] text-[0.9rem] leading-relaxed text-text-muted">

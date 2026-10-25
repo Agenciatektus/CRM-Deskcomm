@@ -5,7 +5,7 @@ import { Logotipo } from "./Marca";
 
 export function Cabecalho() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-bg/90 backdrop-blur-sm">
+    <header className="sticky top-0 z-30 border-b border-border bg-bg/95">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-5">
         <a href="/" aria-label="Verdash CRM, início" className="rounded-controle no-underline">
           <Logotipo />

@@ -498,12 +498,12 @@ h3 {
   /* Revelar ao rolar: só depois de o JavaScript marcar <html class="com-js"> e de o observador rodar. */
   .com-js .revela:not([data-visivel]) {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(8px);
   }
   .revela {
     transition:
-      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 320ms var(--ease-lenta),
+      transform 320ms var(--ease-lenta);
     transition-delay: var(--atraso, 0s);
   }
 }
@@ -541,7 +541,7 @@ h3 {
   border-color: var(--color-border-strong);
 }
 .pele-seg {
-  background-color: rgb(0 0 0 / 0.22);
+  background-color: rgb(5 6 9 / 0.22);
 }
 .pele-seg-item-on {
   background: var(--color-surface-elevated);
