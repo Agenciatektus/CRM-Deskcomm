@@ -88,6 +88,7 @@ describe("token colado: conexão existente", () => {
     connected_via: "manual",
     default_account_id: "act_1",
     allowed_ad_account_ids: ["act_1", "act_2"],
+    updated_at: "2026-10-25T10:00:00Z",
   };
 
   it("pede confirmação quando o novo token enxerga menos contas, só com contagens", async () => {
@@ -166,5 +167,13 @@ describe("escrita condicionada ao estado lido", () => {
     const c = mock.gravar.mock.calls[0]![1];
     expect(c).toMatchObject({ lidoEm: "2026-10-25T10:00:00Z" });
     expect(c).not.toHaveProperty("primeira");
+  });
+});
+
+describe("linha sem updated_at legível", () => {
+  it("não grava (nada de upsert incondicional)", async () => {
+    mock.linha = { id: "1", connected_by: "u1", connected_via: "manual", default_account_id: "act_1", allowed_ad_account_ids: null, updated_at: null };
+    expect(await updateAdInsightsConnection({ platform: "meta_ads", default_account_id: "act_2" })).toEqual({ ok: false, error: "erro_ao_gravar" });
+    expect(mock.gravar).not.toHaveBeenCalled();
   });
 });

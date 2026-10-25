@@ -39,7 +39,7 @@ beforeEach(() => {
   mock.podeAdministrar.mockReturnValue(true);
   mock.gravar.mockResolvedValue({ ok: true });
   mock.usuario = { id: "u1", is_platform_admin: false, platform_admin_scope: null, support: null };
-  mock.linha = { id: "x", connected_by: "u1", connected_via: "oauth", default_account_id: "act_1", allowed_ad_account_ids: ["act_1", "act_2"] };
+  mock.linha = { id: "x", connected_by: "u1", connected_via: "oauth", default_account_id: "act_1", allowed_ad_account_ids: ["act_1", "act_2"], updated_at: "2026-10-25T10:00:00Z" };
 });
 
 describe("salvar contas permitidas", () => {
