@@ -58,7 +58,14 @@ export async function renovarTokensDaMeta(
   admin: ReturnType<typeof createAdminClient>,
   opcoes: { agora: Date },
 ): Promise<ResumoDaRodada> {
-  const resumo: ResumoDaRodada = { examinadas: 0, renovadas: 0, falhas: 0, superadas: 0, adiadas: 0, semAppOAuth: false };
+  const resumo: ResumoDaRodada = {
+    examinadas: 0,
+    renovadas: 0,
+    falhas: 0,
+    superadas: 0,
+    adiadas: 0,
+    semAppOAuth: false,
+  };
   const inicio = Date.now();
 
   const app = configuracaoDoMetaAds();
@@ -84,10 +91,13 @@ export async function renovarTokensDaMeta(
   /** Falha de uma conexão: nome do motivo e a organização, nunca token nem texto cru da Meta. */
   const falhou = (organizationId: string, motivo: string) => {
     resumo.falhas += 1;
-    logger.warn("[meta-renovar-token] conexão não renovada; o token antigo segue valendo até vencer", {
-      organization_id: organizationId,
-      motivo,
-    });
+    logger.warn(
+      "[meta-renovar-token] conexão não renovada; o token antigo segue valendo até vencer",
+      {
+        organization_id: organizationId,
+        motivo,
+      },
+    );
   };
 
   try {
@@ -97,34 +107,43 @@ export async function renovarTokensDaMeta(
         break;
       }
       resumo.examinadas += 1;
+      try {
+        const atual = await decryptWebhookSecret(admin, linha.access_token_encrypted);
+        if (!atual) {
+          falhou(linha.organization_id, "decifra_falhou");
+          continue;
+        }
 
-      const atual = await decryptWebhookSecret(admin, linha.access_token_encrypted);
-      if (!atual) {
-        falhou(linha.organization_id, "decifra_falhou");
-        continue;
-      }
+        const leitura = await renovarTokenLongo(app, atual, { agora: opcoes.agora });
+        if (!leitura.ok) {
+          falhou(linha.organization_id, leitura.motivo);
+          continue;
+        }
+        // Sem validade na resposta a linha sairia da janela para sempre (nunca mais
+        // renovada nem avisada): tratada como falha, o token antigo fica.
+        if (!leitura.token.expira_em) {
+          falhou(linha.organization_id, "resposta_sem_validade");
+          continue;
+        }
 
-      const leitura = await renovarTokenLongo(app, atual, { agora: opcoes.agora });
-      if (!leitura.ok) {
-        falhou(linha.organization_id, leitura.motivo);
-        continue;
+        const gravar = () =>
+          renovarConexaoDeLeitura(admin, {
+            organizationId: linha.organization_id,
+            cifraAnterior: linha.access_token_encrypted,
+            accessToken: leitura.token.access_token,
+            expiraEm: leitura.token.expira_em as string,
+          });
+        let gravado = await gravar();
+        // Uma repetição só, e só para erro de gravação (transitório): `superada` é a
+        // pessoa tendo mexido na conexão, e repetir seria desfazer a escolha dela.
+        if (!gravado.ok && gravado.error === "erro_ao_gravar") gravado = await gravar();
+        if (gravado.ok) resumo.renovadas += 1;
+        else if (gravado.error === "superada") resumo.superadas += 1;
+        else falhou(linha.organization_id, gravado.error);
+      } catch {
+        // Uma conexão que lança (cifra via RPC, rede) não derruba as seguintes.
+        falhou(linha.organization_id, "excecao_na_renovacao");
       }
-      // Sem validade na resposta a linha sairia da janela para sempre (nunca mais
-      // renovada nem avisada): tratada como falha, o token antigo fica.
-      if (!leitura.token.expira_em) {
-        falhou(linha.organization_id, "resposta_sem_validade");
-        continue;
-      }
-
-      const gravado = await renovarConexaoDeLeitura(admin, {
-        organizationId: linha.organization_id,
-        cifraAnterior: linha.access_token_encrypted,
-        accessToken: leitura.token.access_token,
-        expiraEm: leitura.token.expira_em,
-      });
-      if (gravado.ok) resumo.renovadas += 1;
-      else if (gravado.error === "superada") resumo.superadas += 1;
-      else falhou(linha.organization_id, gravado.error);
     }
   } finally {
     // Num `finally`: se algo lançar no meio, quem já foi renovado continua auditado.
@@ -147,7 +166,10 @@ export async function renovarTokensDaMeta(
 
 async function executar(req: NextRequest): Promise<Response> {
   if (!autorizaCron(req)) {
-    return NextResponse.json({ error: { code: "unauthenticated", message: "cron secret inválido" } }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "unauthenticated", message: "cron secret inválido" } },
+      { status: 401 },
+    );
   }
   const resumo = await renovarTokensDaMeta(createAdminClient(), { agora: new Date() });
   return NextResponse.json({ data: resumo });
