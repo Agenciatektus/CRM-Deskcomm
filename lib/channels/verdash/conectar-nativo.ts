@@ -28,6 +28,7 @@ import { saveVerdashSession, registrarWebhookNaVerdash } from "./conectar";
 import { verdashBaseUrl } from "./credentials";
 import type { VerdashCredentials } from "./credentials";
 import { nativoHabilitadoParaOrg } from "./estado-nativo";
+import { registrarPushDeTrafegoPago } from "./trafego-pago-push";
 import { apagarNativo, criarInstanciaNativa, faxinarOrfaDoCanal, statusDoErro } from "./nativo";
 import type { InstanciaNativa } from "./nativo";
 
@@ -212,7 +213,20 @@ export async function conectarNativo(admin: SupabaseClient, i: ConectarNativoInp
     return { ok: false, code: "falha", erro };
   }
   const r = await ligarEGravar(admin, i, id, inst);
-  if (r.ok) return r;
+  if (r.ok) {
+    // Best-effort e atrás de flag (desligada por padrão): nunca derruba a conexão.
+    await registrarPushDeTrafegoPago(admin, {
+      organizationId: i.organizationId,
+      channelSessionId: id,
+      creds: {
+        instanceName: inst.instanceName,
+        token: inst.instanceToken,
+        vinculoId: null,
+        baseUrl: verdashBaseUrl(),
+      },
+    });
+    return r;
+  }
   // Qualquer falha depois de criar no FZAP: apaga a instancia e solta a reserva.
   try {
     await apagarNativo(admin, { organizationId: i.organizationId, fzapId: inst.fzapId });

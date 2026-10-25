@@ -66366,3 +66366,15 @@ begin
       using errcode = '55P03';
   end if;
 end $$;
+
+
+-- ---- gatilho de trafego pago: hash do token por canal (migration 9071) ----
+alter table public.channel_sessions
+  add column if not exists trafego_push_token_hash text;
+
+create unique index if not exists channel_sessions_trafego_push_token_hash_uq
+  on public.channel_sessions (trafego_push_token_hash)
+  where trafego_push_token_hash is not null;
+
+comment on column public.channel_sessions.trafego_push_token_hash is
+  'sha256 (hex) do token secreto da URL do gatilho de trafego pago. Nunca o token. Nulo = push nao registrado. Migration 9071.';
