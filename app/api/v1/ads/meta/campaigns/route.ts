@@ -20,13 +20,14 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { fail, ok } from "@/lib/api/wrappers";
+import { contaPermitida } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { requireRole } from "@/lib/auth/require-role";
 import { lerCredencialDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
 import { lerCampanhas, lerInsights } from "@/lib/plataformas-de-anuncio/meta/insights";
 import { montarTabelaDeCampanhas } from "@/lib/plataformas-de-anuncio/meta/tabela-de-campanhas";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-import { respostaDeFalha, respostaSemConexao } from "../_falha";
+import { respostaContaNaoPermitida, respostaDeFalha, respostaSemConexao } from "../_falha";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ const querySchema = z
     // `act_` obrigatório: o identificador cru (sem prefixo) é aceito por alguns
     // endpoints e não por outros, e deixar os dois formatos circularem faria a
     // conta selecionada na tela não bater com a chave do cache do cliente.
-    account_id: z.string().regex(/^act_\d+$/, "conta no formato act_<id>"),
+    account_id: z.string().max(32).regex(/^act_\d+$/, "conta no formato act_<id>"),
     from: z.string().regex(DATA, "data no formato AAAA-MM-DD").optional(),
     to: z.string().regex(DATA, "data no formato AAAA-MM-DD").optional(),
   })
@@ -91,6 +92,9 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const token = credencial.credencial.accessToken;
   const contaId = parsed.data.account_id;
+  if (!contaPermitida(credencial.credencial.contasPermitidas, contaId)) {
+    return respostaContaNaoPermitida({ requestId });
+  }
 
   const [campanhas, insights] = await Promise.all([
     lerCampanhas(token, contaId),

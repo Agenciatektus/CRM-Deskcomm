@@ -69,8 +69,27 @@ export default async function MetaAdsPage() {
         />
 
         <SecaoDaPagina>
+      {conexao.conectada && conexao.precisaReconectar && (
+        <div
+          role="alert"
+          data-testid="meta-precisa-reconectar"
+          className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        >
+          <p className="font-medium">{t("A Meta recusou renovar o acesso. Reconecte agora.")}</p>
+          {podeConectar && (
+            <a className="mt-2 inline-block underline" href="/app/settings/meta-ads">
+              {t("Reconectar com Meta")}
+            </a>
+          )}
+        </div>
+      )}
       {conexao.conectada ? (
-        <MetaAdsClient contaPadrao={conexao.contaPadrao} idioma={idioma} />
+        <MetaAdsClient
+          contaPadrao={conexao.contaPadrao}
+          idioma={idioma}
+          semContasLiberadas={conexao.contasPermitidas !== null && conexao.contasPermitidas.length === 0}
+          podeEscolherContas={podeConectar}
+        />
       ) : (
         <div className="rounded-md border p-6 text-sm">
           <p className="font-medium">{t("Nenhuma conta de anúncios conectada.")}</p>

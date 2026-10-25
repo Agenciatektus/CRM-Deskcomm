@@ -699,6 +699,8 @@ export const AUDIT_ACTIONS = [
   "agenda.google.renovacao_executada",
   // Renovação do token longo da Meta (OAuth). Só audita rodada com efeito; contagem, nunca token.
   "plataformas.meta.token_renovado",
+  // Alerta diario de vencimento do acesso a Meta; so rodada com aviso enviado.
+  "plataformas.meta.vencimento_avisado",
   // A rodada da VOLTA. Também só audita quando fez algo, e a contagem carrega
   // `nossos_ignorados` de propósito: é o número que prova o anti-eco
   // funcionando — sem ele, esses eventos teriam virado compromisso fantasma.

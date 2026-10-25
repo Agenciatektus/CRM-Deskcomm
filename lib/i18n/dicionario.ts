@@ -12309,6 +12309,32 @@ export const DICIONARIO: Traducoes = {
     { es: "{n} cuentas publicitarias accesibles." },
   "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.":
     { es: "La cuenta de Meta elegida define lo que ven los gestores de esta organización: conecta con el inicio de sesión de la propia empresa." },
+  "Escolha quais contas de anúncio pertencem a esta organização":
+    { es: "Elige qué cuentas de anuncios pertenecen a esta organización" },
+  "Escolha as contas deste cliente em Ajustes › Meta Ads.":
+    { es: "Elige las cuentas de este cliente en Ajustes › Meta Ads." },
+  "Peça a um administrador para escolher as contas.":
+    { es: "Pide a un administrador que elija las cuentas." },
+  "Escolher contas":
+    { es: "Elegir cuentas" },
+  "Esta conta de anúncios não está liberada para esta organização. Peça a um administrador para escolhê-la em Configurações › Meta Ads.":
+    { es: "Esta cuenta de anuncios no está habilitada para esta organización. Pide a un administrador que la elija en Configuración › Meta Ads." },
+  "Contas de anúncio deste cliente":
+    { es: "Cuentas de anuncios de este cliente" },
+  "Os gestores desta organização só verão as contas marcadas. O login pode alcançar contas de outros clientes: marque apenas as deste.":
+    { es: "Los gestores de esta organización solo verán las cuentas marcadas. El inicio de sesión puede alcanzar cuentas de otros clientes: marca solo las de este." },
+  "Carregando contas…":
+    { es: "Cargando cuentas…" },
+  "Não consegui listar as contas agora. Tente de novo em instantes.":
+    { es: "No pude listar las cuentas ahora. Inténtalo de nuevo en unos instantes." },
+  "Buscar por nome ou id":
+    { es: "Buscar por nombre o id" },
+  "marcadas":
+    { es: "marcadas" },
+  "Primeira conta ativa":
+    { es: "Primera cuenta activa" },
+  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte":
+    { es: "Para liberar otras cuentas, pide a quien conectó Meta o al soporte" },
   "Conectado como {nome}":
     { es: "Conectado como {nome}" },
   "Empresas (BM): {lista}":
@@ -12322,6 +12348,18 @@ export const DICIONARIO: Traducoes = {
   "Para trocar apenas a conta padrão, deixe o campo do token em branco — o token guardado é mantido.":
     { es: "Para cambiar solo la cuenta predeterminada, deja el campo del token en blanco. Se conserva el token guardado." },
   "Guardado — preencha só para trocar": { es: "Guardado — completa solo para cambiarlo" },
+  "A Meta recusou renovar o acesso": { es: "Meta rechazó renovar el acceso" },
+  "O acesso à Meta vence em 1 dia": { es: "El acceso a Meta vence en 1 día" },
+  "O acesso à Meta vence em {n} dias": { es: "El acceso a Meta vence en {n} días" },
+  "O acesso à Meta venceu": { es: "El acceso a Meta venció" },
+  "Quando vencer, a tela de campanhas (Análise > Meta Ads) para de atualizar. Para evitar, vá em Ajustes > Meta Ads e clique em Reconectar com Meta.": { es: "Cuando venza, la pantalla de campañas (Análisis > Meta Ads) dejará de actualizarse. Para evitarlo, ve a Ajustes > Meta Ads y haz clic en Reconectar con Meta." },
+  "A tela de campanhas (Análise > Meta Ads) parou de atualizar. Para voltar, vá em Ajustes > Meta Ads e clique em Reconectar com Meta.": { es: "La pantalla de campañas (Análisis > Meta Ads) dejó de actualizarse. Para volver, ve a Ajustes > Meta Ads y haz clic en Reconectar con Meta." },
+  "A Meta recusou renovar o acesso. Reconecte agora.": { es: "Meta rechazó renovar el acceso. Reconecta ahora." },
+  "A conexão com a Meta de {org} foi recusada.": { es: "La conexión con Meta de {org} fue rechazada." },
+  "A conexão com a Meta de {org} vence em {n} dias.": { es: "La conexión con Meta de {org} vence en {n} días." },
+  "A conexão com a Meta de {org} vence em 1 dia.": { es: "La conexión con Meta de {org} vence en 1 día." },
+  "A conexão com a Meta de {org} venceu.": { es: "La conexión con Meta de {org} venció." },
+  "Reconecte em Ajustes > Meta Ads.": { es: "Reconecta en Ajustes > Meta Ads." },
   "Conta conectada com a Meta.":
     { es: "Cuenta conectada con Meta." },
   "A permissão de leitura de anúncios não foi concedida. Conecte de novo e mantenha 'ads_read' marcada.":

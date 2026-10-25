@@ -867,6 +867,22 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     motivo:
       "default de `VERDASH_FUNCTIONS_URL`: as edge functions da mesma plataforma, que recebem o pareamento e devolvem a credencial da linha. Mesmo motivo: é o destino do request.",
   },
+  // ── passkey da conexão nativa (QR/código/passkey) ──
+  "web.whatsapp.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "link que a tela de passkey da conexão nativa abre para o usuário concluir o desafio no WhatsApp Web (`components/connections/ConexaoNativaPasskey.tsx`) — destino de navegação do usuário, não chamada do código.",
+  },
+  "whatsapp.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "`rpId` do WebAuthn que o WhatsApp exige no desafio da passkey (`lib/channels/verdash/passkey-forma.ts` recusa qualquer outro) — constante do protocolo, não host de chamada.",
+  },
+  "chromewebstore.google.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "página da extensão de passkey na loja do Chrome (`lib/passkey-bridge.ts`, `PASSKEY_EXTENSAO_URL`): o usuário a instala por lá, o código só mostra o link.",
+  },
   "chatgpt.com": {
     categoria: "CONSOLE",
     motivo:

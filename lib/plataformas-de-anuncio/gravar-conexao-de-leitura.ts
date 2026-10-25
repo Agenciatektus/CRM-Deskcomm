@@ -27,6 +27,8 @@ export interface ConexaoDeLeituraParaGravar {
   accessToken?: string;
   /** `undefined` = não mexer; `null` = limpar. */
   defaultAccountId?: string | null;
+  /** Contas que a organização pode ver. `undefined` = não mexer; `null` = limpar. */
+  allowedAdAccountIds?: string[] | null;
   /** Só com `accessToken`. Ausente = token colado à mão. */
   oauth?: { expiraEm: string | null; scopes: string[] | null; metaUserId: string | null };
 }
@@ -54,18 +56,49 @@ export type ResultadoDaRenovacao =
  */
 export async function renovarConexaoDeLeitura(
   admin: SupabaseClient,
-  c: { organizationId: string; cifraAnterior: string; accessToken: string; expiraEm: string },
+  c: { organizationId: string; cifraAnterior: string; accessToken: string; expiraEm: string | null },
 ): Promise<ResultadoDaRenovacao> {
   const cifrado = await encryptWebhookSecret(admin, c.accessToken);
   if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
 
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .update({ access_token_encrypted: cifrado, token_expires_at: c.expiraEm })
+    .update({
+      access_token_encrypted: cifrado,
+      token_expires_at: c.expiraEm,
+      last_token_error: null,
+    })
     .eq("organization_id", c.organizationId)
     .eq("platform", "meta_ads")
     .eq("connected_via", "oauth")
     .eq("access_token_encrypted", c.cifraAnterior)
+    .select("organization_id");
+  if (error) return { ok: false, error: "erro_ao_gravar", detalhe: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "superada" };
+  return { ok: true };
+}
+
+/**
+ * A Meta recusou renovar (190/102): marca a conexão para a tela e o alerta,
+ * SÓ se a linha ainda tem o token que a rodada leu (reconectar ou colar token no
+ * meio da rodada não é desfeito). `last_token_error` leva só códigos.
+ */
+export async function marcarPrecisaReconectar(
+  admin: SupabaseClient,
+  c: { organizationId: string; cifraAnterior: string; resumoDoErro: string; agora: Date },
+): Promise<ResultadoDaRenovacao> {
+  const { data, error } = await admin
+    .from("ad_insights_connections")
+    .update({
+      needs_reconnect: true,
+      needs_reconnect_desde: c.agora.toISOString(),
+      last_token_error: c.resumoDoErro,
+    })
+    .eq("organization_id", c.organizationId)
+    .eq("platform", "meta_ads")
+    .eq("connected_via", "oauth")
+    .eq("access_token_encrypted", c.cifraAnterior)
+    .eq("needs_reconnect", false)
     .select("organization_id");
   if (error) return { ok: false, error: "erro_ao_gravar", detalhe: error.message };
   if (!data || data.length === 0) return { ok: false, error: "superada" };
@@ -82,11 +115,14 @@ export async function gravarConexaoDeLeitura(
   };
   if (c.userId) valores.updated_by = c.userId;
   if (c.defaultAccountId !== undefined) valores.default_account_id = c.defaultAccountId;
+  if (c.allowedAdAccountIds !== undefined) valores.allowed_ad_account_ids = c.allowedAdAccountIds;
 
   if (c.accessToken) {
     const cifrado = await encryptWebhookSecret(admin, c.accessToken);
     if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
     valores.access_token_encrypted = cifrado;
+    // Quem conectou ou colou: só ele (ou platform admin) amplia as contas permitidas.
+    valores.connected_by = c.userId;
     valores.connected_via = (c.oauth ? "oauth" : "manual") satisfies ProcedenciaDaConexao;
     valores.token_expires_at = c.oauth?.expiraEm ?? null;
     valores.scopes = c.oauth?.scopes ?? null;
@@ -94,6 +130,10 @@ export async function gravarConexaoDeLeitura(
     // A identidade descrevia o token que saiu; o callback do OAuth a regrava depois.
     valores.meta_user_name = null;
     valores.meta_businesses = null;
+    // Token novo (OAuth ou colado) zera a recusa anterior da Meta.
+    valores.needs_reconnect = false;
+    valores.needs_reconnect_desde = null;
+    valores.last_token_error = null;
   }
 
   const { error } = await admin

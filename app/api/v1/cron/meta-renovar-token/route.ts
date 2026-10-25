@@ -7,6 +7,8 @@
  *
  * - Só conexões `oauth` com validade entre agora e agora + 15 dias. Token colado
  *   à mão não tem como ser renovado por nós.
+ * - A Meta recusando (code 190/102, sem is_transient) marca `needs_reconnect` (UPDATE condicional
+ *   pelo token lido) e a conexão sai da janela; erro transitório é só log.
  * - Falha NÃO apaga o token antigo: ele vale até vencer, e a próxima rodada tenta de novo.
  * - Idempotente: a validade nova joga a conexão para fora da janela.
  * - Grava com UPDATE CONDICIONAL (só se o token da linha ainda é o lido): colar token
@@ -20,9 +22,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
-import { renovarConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
+import {
+  marcarPrecisaReconectar,
+  renovarConexaoDeLeitura,
+} from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
 import { logger } from "@/lib/logger";
 import { configuracaoDoMetaAds } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
+import {
+  classificarErroDaMeta,
+  consultarValidadeDoToken,
+  resumoDoErro,
+} from "@/lib/plataformas-de-anuncio/meta/oauth/renovacao";
 import { renovarTokenLongo } from "@/lib/plataformas-de-anuncio/meta/oauth/token";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
@@ -42,6 +52,8 @@ export interface ResumoDaRodada {
   examinadas: number;
   renovadas: number;
   falhas: number;
+  /** A Meta recusou o token (190/102): marcadas para reconectar. */
+  recusadas: number;
   /** A linha mudou durante a rodada (token novo, login refeito ou desconexão): deixada como a pessoa a pôs. */
   superadas: number;
   /** Ficaram para a próxima rodada por falta de tempo. */
@@ -52,6 +64,7 @@ export interface ResumoDaRodada {
 interface LinhaDeConexao {
   organization_id: string;
   access_token_encrypted: string;
+  token_expires_at: string | null;
 }
 
 export async function renovarTokensDaMeta(
@@ -62,6 +75,7 @@ export async function renovarTokensDaMeta(
     examinadas: 0,
     renovadas: 0,
     falhas: 0,
+    recusadas: 0,
     superadas: 0,
     adiadas: 0,
     semAppOAuth: false,
@@ -78,9 +92,10 @@ export async function renovarTokensDaMeta(
   const limite = new Date(opcoes.agora.getTime() + JANELA_DE_RENOVACAO_MS).toISOString();
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .select("organization_id, access_token_encrypted")
+    .select("organization_id, access_token_encrypted, token_expires_at")
     .eq("platform", "meta_ads")
     .eq("connected_via", "oauth")
+    .eq("needs_reconnect", false)
     .gt("token_expires_at", agora)
     .lte("token_expires_at", limite)
     .order("token_expires_at", { ascending: true })
@@ -116,14 +131,33 @@ export async function renovarTokensDaMeta(
 
         const leitura = await renovarTokenLongo(app, atual, { agora: opcoes.agora });
         if (!leitura.ok) {
+          // Só 190/102 sem is_transient prova token morto; o resto é log e nova tentativa.
+          if (classificarErroDaMeta(leitura.erro) === "recusada") {
+            const marcado = await marcarPrecisaReconectar(admin, {
+              organizationId: linha.organization_id,
+              cifraAnterior: linha.access_token_encrypted,
+              resumoDoErro: resumoDoErro(leitura.erro),
+              agora: opcoes.agora,
+            });
+            if (marcado.ok) {
+              resumo.recusadas += 1;
+              logger.warn("[meta-renovar-token] a Meta recusou o token; reconexão pedida", {
+                organization_id: linha.organization_id,
+              });
+            } else if (marcado.error === "superada") resumo.superadas += 1;
+            else falhou(linha.organization_id, marcado.error);
+            continue;
+          }
           falhou(linha.organization_id, leitura.motivo);
           continue;
         }
-        // Sem validade na resposta a linha sairia da janela para sempre (nunca mais
-        // renovada nem avisada): tratada como falha, o token antigo fica.
-        if (!leitura.token.expira_em) {
-          falhou(linha.organization_id, "resposta_sem_validade");
-          continue;
+        // Sem `expires_in`: pergunta ao debug_token. 0 = nunca expira (validade nula,
+        // fora da janela). Sem resposta: grava o token novo e MANTÉM a data antiga
+        // (errar para menos é seguro, para mais não).
+        let expiraEm: string | null = leitura.token.expira_em;
+        if (!expiraEm) {
+          const validade = await consultarValidadeDoToken(app, leitura.token.access_token);
+          expiraEm = validade.ok ? validade.expiraEm : linha.token_expires_at;
         }
 
         const gravar = () =>
@@ -131,7 +165,7 @@ export async function renovarTokensDaMeta(
             organizationId: linha.organization_id,
             cifraAnterior: linha.access_token_encrypted,
             accessToken: leitura.token.access_token,
-            expiraEm: leitura.token.expira_em as string,
+            expiraEm,
           });
         let gravado = await gravar();
         // Uma repetição só, e só para erro de gravação (transitório): `superada` é a
@@ -147,13 +181,14 @@ export async function renovarTokensDaMeta(
     }
   } finally {
     // Num `finally`: se algo lançar no meio, quem já foi renovado continua auditado.
-    if (resumo.renovadas > 0) {
+    if (resumo.renovadas > 0 || resumo.recusadas > 0) {
       await audit({
         action: "plataformas.meta.token_renovado",
         metadata: {
           examinadas: resumo.examinadas,
           renovadas: resumo.renovadas,
           falhas: resumo.falhas,
+          recusadas: resumo.recusadas,
           superadas: resumo.superadas,
           adiadas: resumo.adiadas,
         },
