@@ -14,7 +14,7 @@
  *
  * Contrato medido (FZAP v1.35.2, producao 25/10/2026): `/session/qr` =>
  * `{data:{qrCode:"data:image/png;base64,..."}}`; `/session/status` =>
- * `{data:{connected,loggedIn,jid}}`; `/session/pairphone` => `{data:{LinkingCode}}`
+ * `{data:{connected,loggedIn,jid}}`; `/session/pairphone` => `{data:{linkingCode}}` (medido em producao; a spec diz `LinkingCode`)
  * (so a spec; forma desconhecida FALHA FECHADO, LRN-20261024-004).
  * Nada do corpo/URL/token do FZAP sai em erro ou log: so mensagem fixa.
  */
@@ -217,8 +217,13 @@ export async function codigoPorNumero(
     if (st === "desconectado" && !(await reabrir(ctx.creds, org, canal, opcoes))) {
       return { status: 429, estado: "rate-limited", retryAfter: CONNECT_JANELA_S };
     }
-    const d = await fzapRequest<{ LinkingCode?: unknown }>(ctx.creds, "/session/pairphone", { method: "POST", body: { phone } });
-    const codigo = formatarCodigo(d?.LinkingCode);
+    // A chave REAL do FZAP v1.35.2 e `linkingCode` (medido em producao, 25/10/2026); a spec diz `LinkingCode`.
+    // Aceita as duas, como o Verdash. Qualquer outra forma continua falhando FECHADO (regex XXXX-XXXX abaixo).
+    const d = await fzapRequest<{ linkingCode?: unknown; LinkingCode?: unknown }>(ctx.creds, "/session/pairphone", {
+      method: "POST",
+      body: { phone },
+    });
+    const codigo = formatarCodigo(d?.linkingCode ?? d?.LinkingCode);
     if (!codigo) {
       logger.warn("verdash_nativo_pairphone_formato_desconhecido", { organization_id: org, channel_session_id: canal });
       return { status: 502, estado: "code-invalid" };
