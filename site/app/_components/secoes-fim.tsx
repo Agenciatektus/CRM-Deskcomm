@@ -19,7 +19,7 @@ export function Faq() {
             Não achou a sua? Pergunte pelo WhatsApp e a Tektus responde.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {FAQ.map((f, i) => (
             <details
               key={f.p}
@@ -49,7 +49,7 @@ export function CtaFinal() {
     <section aria-labelledby="titulo-cta" className="relative isolate overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-azul" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
-      <div className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
+      <div className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
         <div className="borda-luz janela-app revela relative overflow-hidden rounded-[22px] bg-surface p-8 sm:p-14">
           <picture aria-hidden="true">
             <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
@@ -77,7 +77,7 @@ export function CtaFinal() {
               {CTA_FINAL.texto}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <BotaoPrimario href={CTA.comprar.href} externo>
+              <BotaoPrimario href="#oferta">
                 {CTA.comprar.rotulo}
               </BotaoPrimario>
               <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>{CTA.duvida.rotulo}</BotaoSecundario>
@@ -99,7 +99,7 @@ export function Rodape() {
             <Logotipo />
             <p className="mt-4 mb-0 max-w-[26rem] text-[0.9rem] leading-relaxed text-text-muted">
               CRM com agentes de inteligência artificial para negócios que vendem pelo WhatsApp.
-              Implantado e acompanhado pela Tektus.
+              Implantação opcional pela Tektus.
             </p>
           </div>
           <div>
@@ -151,7 +151,7 @@ export function Rodape() {
         </nav>
         <p className="mt-6 mb-0 text-[0.8rem] leading-relaxed text-text-subtle">
           Baseado no DeskcommCRM, projeto de código aberto (licença MIT). Página atualizada em
-          25/10/2026. {SITE.nome} é implantado pela Tektus.
+          25/10/2026. {SITE.nome} tem implantação opcional pela Tektus.
         </p>
       </div>
     </footer>

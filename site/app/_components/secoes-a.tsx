@@ -25,7 +25,7 @@ import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
 export function Faixa() {
   const itens = [...FAIXA, ...FAIXA];
   return (
-    <section aria-label="Canais e integrações" className="relative overflow-hidden border-y border-border bg-surface/50">
+    <section aria-label="Canais e integrações" className="relative mt-16 mb-8 overflow-hidden border-y border-border bg-surface/50 lg:mt-24">
       <p className="m-0 px-5 pt-4 text-center font-mono text-[0.72rem] tracking-[0.12em] text-text-subtle uppercase">
         {FAIXA_ROTULO}
       </p>
@@ -177,9 +177,9 @@ export function Problema() {
   return (
     <Secao titulo="titulo-problema" fundo="pontos">
       <Cabeca id="titulo-problema" titulo={PROBLEMAS_TITULO} texto={PROBLEMAS_INTRO} />
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {PROBLEMAS.map((p, i) => (
-          <Card key={p.titulo} atraso={(i % 3) * 0.1} className="flex flex-col gap-5">
+          <Card key={p.titulo} atraso={(i % 3) * 0.1} className="flex flex-col gap-6">
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {minis[i]}
             </div>
@@ -296,7 +296,7 @@ export function Plantao() {
   return (
     <Secao id="plantao" titulo="titulo-plantao" fundo="faixa">
       <Cabeca id="titulo-plantao" titulo={MECANISMO.titulo} texto={MECANISMO.texto} />
-      <div className="mb-14 grid gap-5 md:grid-cols-3 [&>*]:min-w-0">
+      <div className="mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
         {MECANISMO.pecas.map((p, i) => (
           <Card key={p.titulo} atraso={i * 0.1}>
             <h3 className="m-0 text-[1.15rem] font-bold">{p.titulo}</h3>
@@ -305,7 +305,7 @@ export function Plantao() {
         ))}
         <p className="revela m-0 text-[1.25rem] font-bold md:col-span-3">{MECANISMO.fecho}</p>
       </div>
-      <ol className="relative m-0 flex list-none flex-col gap-8 p-0 lg:gap-12">
+      <ol className="relative m-0 flex list-none flex-col gap-12 p-0 lg:gap-20">
         <span
           aria-hidden="true"
           className="absolute top-3 bottom-3 left-[1.15rem] w-px bg-gradient-to-b from-link/60 via-border-strong to-transparent lg:left-1/2"
@@ -408,9 +408,9 @@ export function Agente() {
   return (
     <Secao id="agente" titulo="titulo-agente" fundo="azul" larga>
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
-      <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid items-start gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
-          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className="flex flex-col gap-4">
+          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className="flex flex-col gap-5">
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {paineis[k]}
             </div>
