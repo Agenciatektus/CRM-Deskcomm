@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { montarBlocoDeOrigem } from "@/lib/agent-engine/agent/abertura/origem-do-contato";
 import { origemDoContato } from "@/lib/leads/origem-do-contato";
 
 /**
@@ -104,5 +105,60 @@ describe("o posicionamento que não existe no clique-para-WhatsApp", () => {
       "whatsapp",
     );
     expect(r.semPosicionamentoDeAnuncio).toBe(false);
+  });
+});
+
+
+describe("a IA recebe campanha, conjunto e anúncio (e o que o anúncio já dizia)", () => {
+  const agora = new Date("2026-10-24T12:00:00Z");
+  const base = {
+    source: "meta_ads",
+    title: "Anúncio no Status",
+    body: "Agende sua avaliação",
+    campaign: "03 - [TEKTUS] CTWA",
+    adset: "AVALIACAO | COLUNA",
+    ad: "OMBRO | VID",
+    greeting: "Olá! Como podemos ajudar?",
+    created_at: "2026-10-20T12:00:00Z",
+  };
+
+  it("anúncio recente: os três níveis, o título, o texto e a saudação vão no JSON", () => {
+    const b = montarBlocoDeOrigem(base, agora);
+    const json = JSON.parse(b.split("\n")[1]!);
+    expect(json).toMatchObject({
+      campanha: "03 - [TEKTUS] CTWA",
+      conjunto: "AVALIACAO | COLUNA",
+      anuncio: "OMBRO | VID",
+      titulo: "Anúncio no Status",
+      saudacao: "Olá! Como podemos ajudar?",
+    });
+    expect(b).toContain("NÃO verificado");
+  });
+
+  it("sem os nomes (ainda não resolvidos) o bloco segue como antes, só com título e texto", () => {
+    const b = montarBlocoDeOrigem({ ...base, campaign: null, adset: null, ad: null, greeting: null }, agora);
+    expect(JSON.parse(b.split("\n")[1]!)).toMatchObject({ campanha: "", titulo: "Anúncio no Status" });
+  });
+
+  it("só os nomes (sem título nem texto) já bastam para o bloco existir", () => {
+    const b = montarBlocoDeOrigem({ ...base, title: null, body: null }, agora);
+    expect(b).not.toBe("");
+  });
+
+  it("depois de 14 dias vira HISTÓRICO curto: só campanha, conjunto e anúncio, sem o texto", () => {
+    const b = montarBlocoDeOrigem({ ...base, created_at: "2026-08-01T12:00:00Z" }, agora);
+    expect(b).toContain("Histórico (não é o assunto de agora)");
+    expect(b).toContain("03 - [TEKTUS] CTWA");
+    expect(b).not.toContain("Agende sua avaliação");
+    expect(b).not.toContain("Anúncio no Status");
+  });
+
+  it("depois de 14 dias e sem nenhum nome: nada (como antes)", () => {
+    expect(montarBlocoDeOrigem({ ...base, campaign: null, adset: null, ad: null, created_at: "2026-08-01T12:00:00Z" }, agora)).toBe("");
+  });
+
+  it("plataforma desconhecida ou contato sem anúncio: nada", () => {
+    expect(montarBlocoDeOrigem({ ...base, source: "manual" }, agora)).toBe("");
+    expect(montarBlocoDeOrigem(null, agora)).toBe("");
   });
 });
