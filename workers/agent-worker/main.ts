@@ -94,6 +94,7 @@ import { runEventLogDrainLoop } from "@/lib/event-log/drain-loop";
 import { crmEdgeConfigFromEnv } from "@/lib/agent-engine/edge/crm/mcp-client";
 import { enforceHolds } from "@/lib/agent-engine/edge/crm/session-watchdog";
 import { runVoiceCallsBridgeLoop } from "@/lib/wacalls/events-bridge";
+import { interpretaWahaHabilitado } from "@/lib/waha/habilitado";
 import { runSessionWatchdogLoop } from "@/lib/agent-engine/edge/crm/session-reconciler";
 import { runHealthLoop } from "@/lib/agent-engine/health/circuit";
 import { runFlywheelLoop } from "@/lib/agent-engine/flywheel/live";
@@ -328,7 +329,9 @@ export async function startWorker(
   // Watchdog de sessão (4A-2): reconcilia channel_sessions×WAHA + redrive de
   // queued. Liga só com as credenciais do WAHA no env (sem elas: warn + off).
   const sessionWatchdogLoop =
-    env.WAHA_API_BASE_URL !== undefined && env.WAHA_API_KEY !== undefined
+    !interpretaWahaHabilitado(env.WAHA_HABILITADO)
+      ? (log.info("watchdog de sessão OFF — WAHA_HABILITADO=false", {}), Promise.resolve())
+      : env.WAHA_API_BASE_URL !== undefined && env.WAHA_API_KEY !== undefined
       ? runSessionWatchdogLoop(
           pool,
           {

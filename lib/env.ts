@@ -10,6 +10,7 @@
 import { z } from "zod";
 
 import { RETENCAO_TETO_DIAS } from "@/lib/retencao/politica";
+import { interpretaWahaHabilitado } from "@/lib/waha/habilitado";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -812,6 +813,5 @@ export type Env = typeof env;
 
 /** Interruptor do WAHA (`WAHA_HABILITADO`). Lê o ambiente a cada chamada, como `getWahaClient`. */
 export function wahaHabilitado(): boolean {
-  const v = (process.env.WAHA_HABILITADO ?? "true").trim().toLowerCase();
-  return !["false", "0", "no"].includes(v);
+  return interpretaWahaHabilitado(process.env.WAHA_HABILITADO);
 }
