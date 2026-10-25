@@ -322,6 +322,8 @@ export {
   estadoDaConexaoNativa as estadoDaConexaoHospedada,
   codigoPorNumero as codigoHospedadoPorNumero,
 } from "./verdash/conexao-nativa";
+export { enviarPasskey as enviarPasskeyHospedada } from "./verdash/passkey-nativo";
+export { ASSERTION_MAX_BYTES as PASSKEY_MAX_BYTES } from "./verdash/passkey-forma";
 export { nativoHabilitadoParaOrg as qrHospedadoHabilitado } from "./verdash/estado-nativo";
 export {
   qrDoCanalNativo as qrDoCanalHospedado,
