@@ -66302,6 +66302,38 @@ create or replace trigger trg_organizacao_nao_muda
 
 notify pgrst, 'reload schema';
 
+-- ---- Conectar com Meta: alerta de vencimento e falha de renovacao (migration 9073) ----
+alter table public.ad_insights_connections
+  add column if not exists needs_reconnect boolean not null default false,
+  add column if not exists needs_reconnect_desde timestamptz,
+  add column if not exists last_token_error text;
+
+comment on column public.ad_insights_connections.needs_reconnect is
+  'A Meta recusou o token (code 190 ou 102, sem is_transient) na renovacao: so reconectar resolve. Zerado ao reconectar por OAuth ou colar token. Migration 9073.';
+comment on column public.ad_insights_connections.needs_reconnect_desde is
+  'Quando needs_reconnect virou true; ancora do ritmo dos alertas. Migration 9073.';
+comment on column public.ad_insights_connections.last_token_error is
+  'Resumo do ultimo erro da Meta: so codigos (http, code, subcode, tipo), nunca mensagem livre nem token. Migration 9073.';
+
+create table if not exists public.meta_alertas_enviados (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  marco text not null,
+  janela text not null,
+  created_at timestamptz not null default now(),
+  constraint meta_alertas_enviados_uk unique (organization_id, marco, janela)
+);
+
+comment on table public.meta_alertas_enviados is
+  'Dedup dos alertas de vencimento do token da Meta: o INSERT e o cadeado (so quem criou a linha avisa). Server-side only: RLS ligada sem policies, grants so do service_role. Migration 9073.';
+
+alter table public.meta_alertas_enviados enable row level security;
+revoke all on public.meta_alertas_enviados from anon, authenticated;
+grant select, insert, update, delete on public.meta_alertas_enviados to service_role;
+
+notify pgrst, 'reload schema';
+
+
 -- ---- a linha não troca de organização em NENHUMA tabela de public (migration 9031) ----
 --
 -- A 9030 pôs trg_organizacao_nao_muda nas 52 tabelas cuja for all só exigia
@@ -66389,3 +66421,4 @@ comment on column public.ad_insights_connections.meta_user_name is
   'Nome do usuario Meta que autorizou (OAuth), so para exibir na tela. Nulo = nao lido. Migration 9072.';
 comment on column public.ad_insights_connections.meta_businesses is
   'Empresas (BM) do usuario Meta: [{id,name}], no maximo 20. Nulo = nao lido. Nao e retrato de contas. Migration 9072.';
+

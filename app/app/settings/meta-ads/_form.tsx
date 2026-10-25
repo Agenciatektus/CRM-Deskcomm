@@ -41,6 +41,7 @@ export function FormularioDeMetaAds({
   via,
   expiraEm,
   diasParaVencer,
+  precisaReconectar = false,
   oauthDisponivel,
   oauthFalta,
   idioma,
@@ -51,6 +52,8 @@ export function FormularioDeMetaAds({
   /** Data de vencimento já formatada; `null` em token colado à mão. */
   expiraEm: string | null;
   diasParaVencer: number | null;
+  /** A Meta recusou renovar o acesso (needs_reconnect). */
+  precisaReconectar?: boolean;
   oauthDisponivel: boolean;
   /** Nomes das variáveis de ambiente que faltam para o botão existir. */
   oauthFalta: string[];
@@ -123,7 +126,16 @@ export function FormularioDeMetaAds({
                   : `${t("Conectada via Meta. O token vale até")} ${expiraEm}.`}
               </p>
             )}
-            {venceEmBreve && (
+            {precisaReconectar && (
+              <p
+                role="alert"
+                className="text-sm font-medium text-destructive"
+                data-testid="meta-precisa-reconectar"
+              >
+                {t("A Meta recusou renovar o acesso. Reconecte agora.")}
+              </p>
+            )}
+            {venceEmBreve && !precisaReconectar && (
               <p
                 role="alert"
                 className="text-sm font-medium text-destructive"
