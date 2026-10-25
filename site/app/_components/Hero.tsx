@@ -118,11 +118,11 @@ export function Hero() {
 
         {/* Card: o negócio muda de etapa */}
         <div
-          className="a-entra a-flutua absolute -left-9 top-[44%] z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
+          className="a-entra a-flutua absolute -left-9 top-[44%] z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
           aria-hidden="true"
         >
-          <p className="m-0 mb-2 flex items-center gap-1.5 font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
-            <Icone nome="funil" className="size-3" /> Funil: Clínica de estética
+          <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
+            <Icone nome="funil" className="size-3.5" /> Clínica de estética
           </p>
           <div className="flex items-center gap-2 text-meta">
             <Selo tom="aviso">Qualificando</Selo>
@@ -138,37 +138,37 @@ export function Hero() {
 
         {/* Card: o agente, com rédea */}
         <div
-          className="a-entra a-flutua absolute -right-5 -top-8 z-20 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
+          className="a-entra a-flutua absolute -right-5 -top-8 z-20 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
           aria-hidden="true"
         >
-          <p className="m-0 mb-2.5 flex items-center justify-between font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
+          <p className="m-0 mb-2.5 flex items-center justify-between text-meta font-bold text-text-muted">
             <span className="flex items-center gap-1.5">
-              <Icone nome="agente" className="size-3" /> Agente de IA
+              <Icone nome="agente" className="size-3.5" /> Agente IA
             </span>
-            <Selo tom="ok">ativo</Selo>
+            <Selo tom="ia">ativo</Selo>
           </p>
           <p className="m-0 text-meta text-text-muted">Teto de gasto do mês</p>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg">
             <div className="a-enche h-full w-[38%] rounded-full bg-(image:--degrade) [--atraso:2.8s]" />
           </div>
           <p className="m-0 mt-2 flex items-center gap-1.5 text-meta text-text-muted">
-            <Icone nome="escudo" className="size-3.5 text-ok" /> Passa para uma pessoa quando precisa
+            <Icone nome="escudo" className="size-3.5 text-success-fg" /> Passa para uma pessoa quando precisa
           </p>
         </div>
 
         {/* Card: o Radar */}
         <div
-          className="a-entra a-flutua absolute -right-6 bottom-24 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
+          className="a-entra a-flutua absolute -right-6 bottom-24 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
           aria-hidden="true"
         >
-          <p className="m-0 mb-2 flex items-center gap-1.5 font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
-            <Icone nome="radar" className="size-3" /> Radar
+          <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
+            <Icone nome="radar" className="size-3.5" /> Radar
           </p>
           <div className="flex items-start gap-2.5">
             <Avatar nome="Tiago Moreira" tom={5} tamanho="size-7" />
             <div className="min-w-0">
               <p className="m-0 text-meta font-semibold">Tiago M.</p>
-              <p className="m-0 text-[0.72rem] text-warn">Sem resposta há 2 h</p>
+              <p className="m-0 text-xs font-semibold text-warning-fg">Esperando há 2 h</p>
               <p className="m-0 mt-1 flex items-center gap-1 text-[0.7rem] text-text-muted">
                 <Icone nome="relogio" className="size-3" /> Follow-up às 16h
               </p>

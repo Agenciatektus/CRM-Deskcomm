@@ -141,13 +141,13 @@ body {
 p,
 li,
 dd {
-  text-wrap: pretty;
+  text-wrap-style: pretty;
 }
 
 h1,
 h2,
 h3 {
-  text-wrap: balance;
+  text-wrap-style: balance;
 }
 
 :focus-visible {
@@ -425,4 +425,44 @@ h3 {
       transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
     transition-delay: var(--atraso, 0s);
   }
+}
+
+/*
+ * PELE VERDASH das telas de exemplo: as classes `pele-*` do CRM (app/globals.css, bloco escuro),
+ * com os mesmos valores. Só aparência; sem script.
+ */
+.pele-selecionada {
+  background:
+    linear-gradient(90deg, color-mix(in oklch, #2b8cad 17%, transparent), color-mix(in oklch, #2b8cad 5%, transparent) 70%, transparent),
+    var(--color-surface);
+}
+.pele-bolha-ia {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#171e22, #171e22) padding-box,
+    linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%) border-box;
+}
+.pele-grad-contador {
+  background-image: linear-gradient(120deg, #1c3ec3 0%, #0c7a9a 50%, #00b47d 100%);
+  color: #fff;
+}
+.pele-grad-traco {
+  background-image: linear-gradient(120deg, #2a52d8 0%, #2b8cad 50%, #2bc88f 100%);
+}
+.pele-ativo-trilho {
+  background:
+    radial-gradient(70% 55% at 50% 0%, color-mix(in oklch, #2b8cad 22%, transparent), transparent 75%),
+    var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 4px 0 rgb(0 0 0 / 0.25);
+}
+.pele-dia {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border-strong);
+}
+.pele-seg {
+  background-color: rgb(0 0 0 / 0.22);
+}
+.pele-seg-item-on {
+  background: var(--color-surface-elevated);
+  box-shadow: 0 0 0 1px var(--color-border-strong), 0 2px 0 rgb(0 0 0 / 0.25);
 }
