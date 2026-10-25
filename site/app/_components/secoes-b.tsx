@@ -121,10 +121,10 @@ export function Implantacao() {
   return (
     <Secao id="implantacao" titulo="titulo-implantacao" fundo="azul">
       <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
-      <ol className="relative m-0 grid list-none gap-6 p-0 lg:gap-8 md:grid-cols-2 lg:grid-cols-5 [&>*]:min-w-0">
+      <ol className="relative m-0 grid list-none gap-6 p-0 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>*]:min-w-0">
         <span
           aria-hidden="true"
-          className="absolute top-[1.65rem] right-10 left-10 hidden h-px bg-gradient-to-r from-link/50 via-border-strong to-ok/50 lg:block"
+          className="absolute top-[1.65rem] right-10 left-10 hidden h-px bg-gradient-to-r from-link/50 via-border-strong to-ok/50 xl:block"
         />
         {IMPLANTACAO.passos.map((p, i) => (
           <li key={p.titulo} className="revela relative" style={{ "--atraso": `${i * 0.08}s` } as React.CSSProperties}>
