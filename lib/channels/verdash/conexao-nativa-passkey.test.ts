@@ -181,11 +181,16 @@ describe("enviarPasskey", () => {
 });
 
 describe("endurecimento da Fatia 7", () => {
-  it("portao de estado: conexao, codigo, passkey e /qr recusam o mesmo que a /qr", async () => {
+  it("portao de estado: codigo, passkey e /qr recusam o mesmo que a /qr; a leitura trata WORKING como SUCESSO", async () => {
     fzap.connected = true;
     for (const status of ["WORKING", "STOPPED", "PAUSED"]) {
       const a = adminOk({ status });
-      expect(await estadoDaConexaoNativa(a, "org", canal(), sim)).toMatchObject({ status: 409 });
+      // A LEITURA (poll do assistente): WORKING = ja conectou = 200 conectado (nao 409, senao o sucesso nunca aparece);
+      // STOPPED/PAUSED seguem 409.
+      expect(await estadoDaConexaoNativa(a, "org", canal(), sim)).toMatchObject(
+        status === "WORKING" ? { status: 200, corpo: { estado: "conectado" } } : { status: 409 },
+      );
+      // Religar/parear/qr continuam barrados nos tres.
       expect(await codigoPorNumero(a, "org", canal(), "11912345678", sim)).toMatchObject({ status: 409 });
       expect(await enviarPasskey(a, "org", canal(), ASSERT, sim)).toMatchObject({ status: 409 });
       expect(await qrDoCanalNativo(a, "org", canal(), sim)).toMatchObject({ status: 409 });
