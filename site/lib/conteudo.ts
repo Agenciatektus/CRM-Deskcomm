@@ -188,7 +188,7 @@ export const CALCULADORA = {
     zeroTexto: "Com esses números, o custo mensal é o mesmo nos dois cenários.",
   },
   erros: {
-    invalido: "Digite só números.",
+    invalido: "Use só números, com vírgula nos centavos.",
     negativo: "O valor não pode ser negativo.",
     "muito-alto": "O valor passa do limite que a calculadora aceita.",
     fracionado: "Use um número inteiro.",

@@ -75,6 +75,13 @@ describe("lerCampo", () => {
   it("separa vazio, erro e ok", () => {
     expect(lerCampo("  ", 10)).toEqual({ estado: "vazio" });
     expect(lerCampo("12,5", 100)).toEqual({ estado: "ok", valor: 12.5 });
+    expect(lerCampo("2.800", 1e6)).toEqual({ estado: "ok", valor: 2800 });
+    expect(lerCampo("1.500,50", 1e6)).toEqual({ estado: "ok", valor: 1500.5 });
+    expect(lerCampo("2800", 1e6)).toEqual({ estado: "ok", valor: 2800 });
+    expect(lerCampo("0x10", 1e6)).toEqual({ estado: "erro", motivo: "invalido" });
+    expect(lerCampo("1e3", 1e6)).toEqual({ estado: "erro", motivo: "invalido" });
+    expect(lerCampo("2.80", 1e6)).toEqual({ estado: "erro", motivo: "invalido" });
+    expect(lerCampo("-5", 1e6).estado).toBe("erro");
     expect(lerCampo("abc", 10)).toEqual({ estado: "erro", motivo: "invalido" });
     expect(lerCampo("Infinity", 10)).toEqual({ estado: "erro", motivo: "invalido" });
     expect(lerCampo("-1", 10)).toEqual({ estado: "erro", motivo: "negativo" });
@@ -87,6 +94,11 @@ describe("conta do vácuo (movida para o mesmo módulo)", () => {
   it("conversas x fatia% x ticket", () => {
     expect(perdaDoVacuo(200, 30, 1500)).toBe(90000);
     expect(perdaDoVacuo(0, 30, 1500)).toBe(0);
+  });
+  it("ticket digitado com milhar em pt-BR vira o número certo", () => {
+    const t = lerCampo("1.500", LIMITES.ticket);
+    expect(t).toEqual({ estado: "ok", valor: 1500 });
+    expect(perdaDoVacuo(200, 30, t.estado === "ok" ? t.valor : -1)).toBe(90000);
   });
   it("fatia acima de 100, negativos e não finitos viram null", () => {
     expect(perdaDoVacuo(200, 101, 1500)).toBeNull();

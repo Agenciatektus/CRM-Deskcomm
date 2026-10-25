@@ -25,13 +25,17 @@ export type Leitura =
   | { estado: "erro"; motivo: "invalido" | "negativo" | "muito-alto" | "fracionado" }
   | { estado: "ok"; valor: number };
 
-/** Lê o texto de um campo. Aceita vírgula decimal; rejeita NaN, Infinity, negativos e valores acima do teto. */
+const FORMATO_PT_BR = /^\d{1,3}(\.\d{3})*(,\d+)?$|^\d+(,\d+)?$/;
+
+/** Lê o texto de um campo. Aceita só o formato pt-BR (milhar com ponto, centavos com vírgula); rejeita NaN, Infinity, negativos e valores acima do teto. */
 export function lerCampo(texto: string, max: number, inteiro = false): Leitura {
   const t = texto.trim();
   if (t === "") return { estado: "vazio" };
-  const n = Number(t.replace(",", "."));
+  if (/^-\s*\d/.test(t)) return { estado: "erro", motivo: "negativo" };
+  // Só o formato pt-BR: ponto separa milhar, vírgula separa centavos. "2.80", "0x10" e "1e3" são inválidos.
+  if (!FORMATO_PT_BR.test(t)) return { estado: "erro", motivo: "invalido" };
+  const n = Number(t.replace(/\./g, "").replace(",", "."));
   if (!Number.isFinite(n)) return { estado: "erro", motivo: "invalido" };
-  if (n < 0) return { estado: "erro", motivo: "negativo" };
   if (n > max) return { estado: "erro", motivo: "muito-alto" };
   if (inteiro && !Number.isInteger(n)) return { estado: "erro", motivo: "fracionado" };
   return { estado: "ok", valor: n };

@@ -49,7 +49,7 @@ export function Campo({
         inputMode="decimal"
         autoComplete="off"
         value={valor}
-        maxLength={max ? String(max).length + 3 : 14}
+        maxLength={20}
         onChange={(e) => aoMudar(e.target.value)}
         aria-invalid={erro ? true : undefined}
         aria-describedby={erro ? `${id}-erro` : undefined}
