@@ -1,12 +1,17 @@
 import {
   AGENTE,
+  CTA,
+  ESTATISTICA_RD,
   ETAPAS,
   FAQ,
   HERO,
   IMPLANTACAO,
+  MECANISMO,
   NICHOS,
+  OBJECOES,
+  OFERTA,
   PROBLEMAS,
-  SEGURANCA,
+  PROBLEMAS_TITULO,
   SITE,
 } from "./conteudo";
 
@@ -22,6 +27,8 @@ const CABECALHO = `# ${SITE.nome}
 
 Atualizado em ${SITE.atualizadoEm}. Idioma: português do Brasil. Quem implanta e acompanha: a Tektus.`;
 
+const PRECO = OFERTA.planos.map((p) => `${p.nome}: ${p.preco} ${p.periodo}`).join(". ");
+
 export function llmsResumo(): string {
   return `${CABECALHO}
 
@@ -35,8 +42,8 @@ export function llmsResumo(): string {
 ## Em poucas palavras
 
 - ${HERO.texto}
-- Preço: depende do tamanho da operação; a proposta sai de um diagnóstico feito pela Tektus. Não há preço de tabela.
-- Contato comercial: WhatsApp da Tektus, pelo botão "Pedir um diagnóstico" da página inicial.
+- Preço: ${PRECO}. Implantação única de ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.
+- Contato comercial: WhatsApp da Tektus, pelo botão "${CTA.comprar.rotulo}" ou "${CTA.duvida.rotulo}" da página inicial.
 
 ## Perguntas frequentes
 
@@ -51,11 +58,15 @@ export function llmsCompleto(): string {
 
 ${HERO.texto}
 
-## Onde a venda se perde
+## ${PROBLEMAS_TITULO}
 
-${PROBLEMAS.map((p) => `### ${p.titulo}\n\n${p.texto}`).join("\n\n")}
+${PROBLEMAS.map((p) => `### ${p.titulo}\n\n${p.texto} ${p.saida}`).join("\n\n")}
 
-## A vida de um lead
+${ESTATISTICA_RD}
+
+## ${MECANISMO.titulo}
+
+${MECANISMO.texto}
 
 ${ETAPAS.map((e, i) => `${i + 1}. **${e.titulo}.** ${e.texto}`).join("\n")}
 
@@ -77,9 +88,16 @@ ${IMPLANTACAO.texto}
 
 ${IMPLANTACAO.passos.map((p, i) => `${i + 1}. **${p.titulo}.** ${p.texto}`).join("\n")}
 
-## ${SEGURANCA.titulo}
+## ${OFERTA.nome}: ${OFERTA.precoTitulo.toLowerCase()}
 
-${SEGURANCA.itens.map((i) => `- **${i.rotulo}.** ${i.texto}`).join("\n")}
+${OFERTA.itens.map((i) => `- **${i.titulo}.** ${i.texto}`).join("\n")}
+
+${OFERTA.planos.map((p) => `- **${p.nome}, ${p.preco} ${p.periodo}.** ${p.detalhes.join(" ")}`).join("\n")}
+- **Implantação, ${OFERTA.implantacao.preco} ${OFERTA.implantacao.parcelas}.** ${OFERTA.implantacao.detalhe}
+
+## Objeções comuns
+
+${OBJECOES.map((o) => `### ${o.p}\n\n${o.r}`).join("\n\n")}
 
 ## Perguntas frequentes
 

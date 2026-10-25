@@ -1,69 +1,123 @@
 import { Icone } from "../ui/Icones";
-import { Avatar, CanalChip, Selo } from "../ui/Pecas";
+import { BotaoApp, Selo } from "../ui/Pecas";
 
 /**
- * O Radar de conversas e a retomada por follow-up, com dados FICTÍCIOS: o que está esfriando, há
- * quanto tempo, e a mensagem de retomada que a IA propõe. Os tempos são do exemplo; no CRM o
- * intervalo é adaptativo e os gatilhos são por etapa do funil.
+ * O Radar de risco do CRM (RiskRadarList), com dados FICTÍCIOS: contadores por risco, aviso de
+ * demandas sem próximo passo e a lista com selo de risco, "parado há", dono e o botão Assumir.
+ * Abaixo, a mensagem de retomada que a IA propõe. Os tempos são do exemplo; no CRM o intervalo é
+ * adaptativo e os gatilhos são por etapa do funil.
  */
 const LINHAS = [
-  { nome: "Tiago Moreira", tom: 5, previa: "Vou falar com minha esposa e te retorno", tempo: "2 h", nivel: "aviso", canal: "whatsapp", acao: "Follow-up às 16h" },
-  { nome: "Aline Prado", tom: 1, previa: "Me manda o link de novo, por favor", tempo: "5 h", nivel: "aviso", canal: "whatsapp", acao: "Follow-up amanhã, 9h" },
-  { nome: "Padaria Central", tom: 0, previa: "Vamos ver o orçamento e te falo", tempo: "1 d", nivel: "crit", canal: "instagram", acao: "Passa para uma pessoa" },
+  {
+    titulo: "Orçamento, Padaria Central",
+    contato: "Carlos Almeida",
+    parado: "parado há 1d",
+    dono: "Sem dono",
+    risco: ["Crítico", "crit"],
+    aviso: ["Sem próximo passo agendado", "warn"],
+  },
+  {
+    titulo: "Limpeza de pele, Tiago Moreira",
+    contato: "Tiago Moreira",
+    parado: "parado há 2h",
+    dono: "Agente: Assistente",
+    risco: ["Em risco", "aviso"],
+    aviso: ["Assistente retorna às 16h", "info"],
+  },
+  {
+    titulo: "Peeling, Aline Prado",
+    contato: "Aline Prado",
+    parado: "parado há 5h",
+    dono: "Agente: Assistente",
+    risco: ["Em risco", "aviso"],
+    aviso: ["Assistente retorna amanhã, 9h", "info"],
+  },
 ] as const;
 
 export function TelaRadar() {
   return (
     <div className="bg-bg text-text">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <p className="m-0 flex items-center gap-2 text-[0.95rem] font-bold">
-          <span className="relative grid size-5 place-items-center">
-            <Icone nome="radar" className="size-4 text-link" />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3">
+        <h3 className="m-0 flex items-center gap-2 text-xl font-bold tracking-[-0.01em]">
+          <span className="relative grid size-5 place-items-center text-accent-text">
+            <Icone nome="radar" className="size-[18px]" />
             <span className="a-varre absolute inset-0 rounded-full border border-transparent border-t-link/70" />
           </span>
-          Radar
-        </p>
-        <Selo tom="aviso">3 esfriando</Selo>
+          Radar de risco
+        </h3>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Selo tom="crit">1 crítico</Selo>
+          <Selo tom="aviso">2 em risco</Selo>
+          <Selo tom="info">4 em voo</Selo>
+        </div>
       </div>
 
-      <ul className="m-0 flex list-none flex-col p-0">
-        {LINHAS.map((l, i) => (
-          <li key={l.nome} className={`flex items-center gap-3 px-4 py-3 ${i ? "border-t border-border" : ""}`}>
-            <Avatar nome={l.nome} tom={l.tom} />
-            <div className="min-w-0 flex-1">
-              <p className="m-0 flex items-center gap-2 text-ui font-bold">
-                {l.nome}
-                <CanalChip canal={l.canal} />
-              </p>
-              <p className="m-0 truncate text-meta text-text-muted">{l.previa}</p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className={`m-0 text-meta font-bold ${l.nivel === "crit" ? "text-crit" : "text-warn"}`}>
-                sem resposta há {l.tempo}
-              </p>
-              <p className="m-0 flex items-center justify-end gap-1 text-[0.7rem] text-text-subtle">
-                <Icone nome="relogio" className="size-3" /> {l.acao}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="flex flex-col gap-3 p-4">
+        <div className="rounded-lg border border-warning-line bg-warning-bg/40 p-3">
+          <p className="m-0 text-sm font-medium">2 demandas abertas sem próximo passo</p>
+          <p className="m-0 mb-2 text-xs text-text-muted">
+            Sem tarefa marcada, a demanda some do radar da equipe. Marque o próximo passo.
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {[
+              ["Carlos Almeida", "aberta há 26h"],
+              ["Renata Souza", "aberta há 8h"],
+            ].map(([n, t]) => (
+              <li key={n} className="flex items-baseline justify-between gap-3 text-xs">
+                <span className="truncate">{n}</span>
+                <span className="shrink-0 tabular-nums text-text-muted">{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      <div className="border-t border-border bg-surface/60 p-4">
-        <p className="m-0 mb-2.5 flex items-center gap-2 font-mono text-[0.66rem] tracking-wider text-text-subtle uppercase">
-          <Icone nome="agente" className="size-3" /> Mensagem de retomada proposta pela IA para Tiago
+        <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border p-0">
+          {LINHAS.map((l) => (
+            <li key={l.titulo} className="flex items-start gap-2 pr-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3">
+                <span className="mt-0.5 shrink-0">
+                  <Selo tom={l.risco[1]}>{l.risco[0]}</Selo>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 truncate text-sm font-medium">{l.titulo}</p>
+                  <p className="m-0 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+                    <span className="truncate">{l.contato}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Icone nome="relogioc" className="size-[13px]" />
+                      {l.parado}
+                    </span>
+                    <span>{l.dono}</span>
+                  </p>
+                  <p
+                    className={`m-0 mt-1 inline-flex items-center gap-1 text-xs ${
+                      l.aviso[1] === "warn" ? "text-warning-fg" : "text-info-fg"
+                    }`}
+                  >
+                    <Icone nome={l.aviso[1] === "warn" ? "alerta" : "relogio"} className="size-3.5" />
+                    {l.aviso[0]}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 self-center">
+                <BotaoApp variante="contorno">Assumir</BotaoApp>
+                <Icone nome="seta" className="size-4 text-text-muted" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="border-t border-border bg-surface p-4">
+        <p className="m-0 mb-2.5 flex items-center gap-2 text-meta font-bold text-text-muted">
+          <Icone nome="faiscas" className="size-3.5 text-accent-text" /> Mensagem de retomada proposta pela IA para Tiago
         </p>
-        <div className="max-w-[88%] rounded-[14px] rounded-bl-md bg-[#12303a] px-3.5 py-2.5 text-message leading-snug">
+        <div className="pele-bolha-ia max-w-[88%] rounded-bubble rounded-bl-bubble-tail px-3 py-[7px] text-[15px] leading-[1.42]">
           Oi, Tiago! Conseguiu conversar com sua esposa? Se quiserem, eu seguro o horário de quinta, às 15h, para vocês.
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-field bg-(image:--degrade) px-3 py-1.5 text-meta font-semibold text-white">
-            Enviar agora
-          </span>
-          <span className="rounded-field border border-border-strong px-3 py-1.5 text-meta font-semibold text-text-muted">
-            Editar
-          </span>
-          <span className="ml-auto text-[0.7rem] text-text-subtle">Respeita a janela de horário do canal</span>
+          <BotaoApp>Enviar agora</BotaoApp>
+          <BotaoApp variante="contorno">Editar</BotaoApp>
+          <span className="ml-auto text-xs text-text-subtle">Respeita a janela de horário do canal</span>
         </div>
       </div>
     </div>
