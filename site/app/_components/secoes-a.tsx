@@ -11,7 +11,7 @@ import {
   PROVA,
 } from "@/lib/conteudo";
 
-import { ContaDoVacuo } from "./ContaDoVacuo";
+import { Calculadora } from "./Calculadora";
 export { Faixa } from "./Faixa";
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaFunil } from "./telas/TelaFunil";
@@ -180,11 +180,11 @@ export function Problema() {
 
 export function Conta() {
   return (
-    <Secao id="conta" titulo="titulo-conta" fundo="azul" ritmo="l">
+    <Secao id="conta" titulo="titulo-conta" fundo="azul" largura="grade" ritmo="l">
       <Cabeca id="titulo-conta" titulo={CONTA.titulo} texto={CONTA.intro} />
-      <div className="revela max-w-[52rem]">
-        <ContaDoVacuo />
-        <p className="mt-6 mb-0 text-[1.05rem] leading-relaxed">{CONTA.ponte}</p>
+      <div className="revela">
+        <Calculadora />
+        <p className="mt-6 mb-0 max-w-(--container-leitura) text-[1.05rem] leading-relaxed">{CONTA.ponte}</p>
       </div>
     </Secao>
   );

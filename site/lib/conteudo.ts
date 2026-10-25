@@ -144,8 +144,8 @@ export const ESTATISTICA_RD =
   'Segundo o Panorama de Marketing e Vendas 2026 da RD Station, 40% das equipes têm a gestão do WhatsApp fragmentada e 19% usam planilha.';
 
 export const CONTA = {
-  titulo: "A conta do vácuo, com os seus números",
-  intro: "Três números que você já sabe de cabeça. A página faz a multiplicação. Nenhum número aqui é nosso.",
+  titulo: "A conta com os seus números",
+  intro: "Duas contas, feitas só com o que você digitar. A página faz a multiplicação e nenhum número aqui é nosso.",
   campo1: "Conversas por mês que chegam do anúncio",
   campo2: "Fatia dessas conversas que ficou sem resposta ou sem retorno (em %)",
   campo3: "Ticket médio de uma venda (em R$)",
@@ -154,6 +154,47 @@ export const CONTA = {
   nota: "Este é o valor das vendas que chegaram até a sua porta e ficaram sem atendimento. O Verdash CRM pode recuperar parte desse valor, e a parte depende da sua operação. Se a sua conta der pouco, o Verdash CRM provavelmente não se paga para você. Melhor saber agora.",
   privacidade: "O cálculo roda no seu navegador. Nenhum dado é enviado.",
   ponte: "Se o número doeu, o resto da página mostra como colocar alguém olhando o tempo todo.",
+} as const;
+
+export const CALCULADORA = {
+  abaVacuo: "Quanto o vácuo custa",
+  abaTime: "Time de IA x time de pessoas",
+  exemplo: "Usar um exemplo hipotético",
+  exemploAviso:
+    "Exemplo hipotético: 3 atendentes, R$ 2.800 cada, 1 na supervisão, plano com IA. Não são números de nenhuma empresa. Os campos aceitam os seus números no lugar destes.",
+  honesta:
+    "A conta usa só os números que você informou. Ela não promete que a IA substitui pessoas: quanto do atendimento cabe à IA e quanto fica com a equipe é decisão sua.",
+  time: {
+    intro: "Compare o custo mensal do seu time de hoje com um time menor, supervisionando o atendente de IA.",
+    atendentes: "Quantos atendentes você tem hoje",
+    custo: "Custo mensal de cada atendente, com encargos (em R$)",
+    supervisao: "Quantas pessoas ficariam na supervisão da IA",
+    plano: "Plano do Verdash CRM",
+    comIA: "Com IA, R$ 397 por mês (teto de US$ 15 de IA incluído)",
+    semIA: "Sem IA, R$ 157 por mês (a IA entra com a sua chave)",
+    custoIA: "O que você paga de IA por mês na sua chave (em R$)",
+    vazio: "Preencha os campos para ver a comparação.",
+    parcial: "Faltam informações para fechar a conta:",
+    erro: "Há campos com valor inválido. Os avisos estão ao lado de cada um.",
+    hoje: "O seu time de hoje, por mês",
+    depois: "Time menor mais Verdash CRM, por mês",
+    economiaMes: "Economia por mês",
+    economiaAno: "Economia em 12 meses",
+    negativoMes: "Diferença por mês: o Verdash CRM custaria mais",
+    negativoAno: "Diferença em 12 meses: o Verdash CRM custaria mais",
+    negativoTexto:
+      "Com esses números, o time menor mais o Verdash CRM sai mais caro do que o time de hoje. Nesse cenário a conta não fecha, e a implantação opcional também não se paga.",
+    meses: "A implantação opcional (R$ 1.297) seria coberta por essa economia em",
+    zeroTexto: "Com esses números, o custo mensal é o mesmo nos dois cenários.",
+  },
+  erros: {
+    invalido: "Digite só números.",
+    negativo: "O valor não pode ser negativo.",
+    "muito-alto": "O valor passa do limite que a calculadora aceita.",
+    fracionado: "Use um número inteiro.",
+    supervisaoMaior: "A supervisão não pode passar do número de atendentes de hoje.",
+    atendentesZero: "Informe ao menos 1 atendente.",
+  },
 } as const;
 
 export const MECANISMO = {
