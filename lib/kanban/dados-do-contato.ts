@@ -34,7 +34,8 @@ export interface LinhaDoContatoNoQuadro {
 /** Nome de campanha ou anúncio: texto aparado e com teto, para o payload do quadro não engordar. */
 function nomeDeAnuncio(v: string | null | undefined): string | undefined {
   const limpo = (v ?? "").replace(/\s+/g, " ").trim();
-  return limpo === "" ? undefined : limpo.slice(0, 160);
+  // `Array.from`: corta por caractere, e não no meio de um par substituto (emoji).
+  return limpo === "" ? undefined : Array.from(limpo).slice(0, 160).join("");
 }
 
 /**
@@ -61,6 +62,8 @@ export function anexarDadosDoContato(leads: Lead[], contatos: LinhaDoContatoNoQu
     if (contato.is_anonymized) continue;
     const links = linksParaExibir(contato.custom_fields);
     const nome = nomeDoContato(contato);
+    const campanha = nomeDeAnuncio(contato.campanha_nome);
+    const anuncio = nomeDeAnuncio(contato.anuncio_nome);
     const arroba = contato.instagram_username?.trim().replace(/^@/, "");
     const dados: DadosDoContato = {
       ...(contato.phone_number ? { contact_phone: contato.phone_number } : {}),
@@ -71,8 +74,8 @@ export function anexarDadosDoContato(leads: Lead[], contatos: LinhaDoContatoNoQu
       // A rota da foto (`/api/v1/contacts/:id/avatar`) recusa contato
       // anonimizado; este laço já pulou os anonimizados acima.
       ...(contato.avatar_storage_path ? { contact_tem_foto: true } : {}),
-      ...(nomeDeAnuncio(contato.campanha_nome) ? { contact_campanha: nomeDeAnuncio(contato.campanha_nome) } : {}),
-      ...(nomeDeAnuncio(contato.anuncio_nome) ? { contact_anuncio: nomeDeAnuncio(contato.anuncio_nome) } : {}),
+      ...(campanha ? { contact_campanha: campanha } : {}),
+      ...(anuncio ? { contact_anuncio: anuncio } : {}),
     };
     if (Object.keys(dados).length > 0) porContato.set(contato.id, dados);
   }

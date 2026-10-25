@@ -43,6 +43,12 @@ describe("anexarDadosDoContato: campanha e anúncio", () => {
     expect(r[0]).not.toHaveProperty("contact_campanha");
   });
 
+  it("não parte um emoji ao cortar o nome", () => {
+    const r = anexarDadosDoContato([lead("l1", "c1")], [contato("c1", { campanha_nome: "😀".repeat(200) })]);
+    expect(Array.from(r[0]?.contact_campanha ?? "")).toHaveLength(160);
+    expect(r[0]?.contact_campanha).not.toContain("�");
+  });
+
   it("corta nome enorme", () => {
     const r = anexarDadosDoContato([lead("l1", "c1")], [contato("c1", { campanha_nome: "x".repeat(900) })]);
     expect(r[0]?.contact_campanha).toHaveLength(160);
