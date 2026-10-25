@@ -408,7 +408,7 @@ export function Agente() {
   return (
     <Secao id="agente" titulo="titulo-agente" fundo="azul" larga>
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
           <Card key={item.rotulo} atraso={(k % 3) * 0.08} className="flex flex-col gap-4">
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
