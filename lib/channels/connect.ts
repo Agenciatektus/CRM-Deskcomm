@@ -318,6 +318,10 @@ export type { VerdashSession as HostedSession } from "./verdash/conectar";
  */
 export { conectarNativo as conectarHospedadoPorQr } from "./verdash/conectar-nativo";
 export { resumoDoErro as resumoDoErroHospedado } from "./verdash/nativo";
+export {
+  estadoDaConexaoNativa as estadoDaConexaoHospedada,
+  codigoPorNumero as codigoHospedadoPorNumero,
+} from "./verdash/conexao-nativa";
 export { nativoHabilitadoParaOrg as qrHospedadoHabilitado } from "./verdash/estado-nativo";
 export {
   qrDoCanalNativo as qrDoCanalHospedado,

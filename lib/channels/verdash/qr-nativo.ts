@@ -27,7 +27,7 @@ import { CHANNEL_PROVIDER_VERDASH } from "../capabilities";
 import type { ChannelHealth } from "../types";
 
 import { resolveVerdashCreds } from "./credentials";
-import { obterQrNativo, statusNativo } from "./nativo";
+import { prepararQr } from "./conexao-nativa";
 
 export const QR_NATIVO_LIMITE = 6;
 export const QR_NATIVO_LIMITE_CANAL = 10;
@@ -38,26 +38,33 @@ export type RespostaQr =
   | { status: 200; png: Buffer }
   | { status: 403 | 404 | 409 | 429 | 502 | 503; estado: string; retryAfter?: number };
 
-interface LinhaNativa {
+export interface LinhaNativa {
   instanceName: string;
   status: string;
+  telefone: string | null;
+  arquivada: boolean;
 }
 
-async function lerNativa(
+export async function lerNativa(
   admin: SupabaseClient,
   organizationId: string,
   channelSessionId: string,
 ): Promise<LinhaNativa | null> {
   const { data, error } = await admin
     .from("channel_sessions")
-    .select("provider, verdash_origem, verdash_instance_name, status")
+    .select("provider, verdash_origem, verdash_instance_name, status, phone_number, archived_at")
     .eq("organization_id", organizationId)
     .eq("id", channelSessionId)
     .maybeSingle();
-  const row = data as { provider?: string; verdash_origem?: string; verdash_instance_name?: string; status?: string } | null;
+  const row = data as { provider?: string; verdash_origem?: string; verdash_instance_name?: string; status?: string; phone_number?: string | null; archived_at?: string | null } | null;
   if (error || !row || row.provider !== CHANNEL_PROVIDER_VERDASH || row.verdash_origem !== "nativa") return null;
   return row.verdash_instance_name
-    ? { instanceName: row.verdash_instance_name, status: row.status ?? "STARTING" }
+    ? {
+        instanceName: row.verdash_instance_name,
+        status: row.status ?? "STARTING",
+        telefone: row.phone_number ?? null,
+        arquivada: !!row.archived_at,
+      }
     : null;
 }
 
@@ -91,11 +98,11 @@ export async function qrDoCanalNativo(
   const creds = await resolveVerdashCreds(admin, { organizationId, instanceName: nativa.instanceName });
   if (!creds) return { status: 409, estado: "no-credential" };
   try {
-    // Ja leu o QR: nao ha imagem a mostrar, e pedir outra so atrapalharia.
-    if ((await statusNativo(creds)) === "conectado") return { status: 409, estado: "connected" };
-    const dataUrl = await obterQrNativo(creds);
-    if (!dataUrl) return { status: 404, estado: "qr-not-ready" };
-    const png = pngDoDataUrl(dataUrl);
+    // Sessao caida pelo timeout do QR: `prepararQr` reabre (1 connect / 15 s) e espera o QR nascer.
+    const p = await prepararQr(creds, organizationId, channelSessionId);
+    if (p.estado === "conectado") return { status: 409, estado: "connected" };
+    if (p.estado !== "aguardando_leitura") return { status: 404, estado: "qr-not-ready" };
+    const png = pngDoDataUrl(p.qr);
     return png ? { status: 200, png } : { status: 502, estado: "qr-invalid" };
   } catch {
     return { status: 502, estado: "upstream-failed" };
