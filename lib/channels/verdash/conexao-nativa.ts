@@ -145,7 +145,17 @@ export async function estadoDaConexaoNativa(
 ): Promise<Resposta<CorpoConexao> | null> {
   const ctx = await abrirContexto(admin, org, canal, autorizar);
   if (!ctx) return null;
-  if (ehResposta(ctx)) return ctx;
+  if (ehResposta(ctx)) {
+    // Canal que JA esta WORKING (o webhook Connected chega 1 a 2 s depois do scan, antes do proximo
+    // poll): para quem esta no assistente isso e SUCESSO. Devolver 409 faria o poll tratar como falha
+    // e a tela de "WhatsApp conectado!" nunca apareceria. O portao continua valendo para religar
+    // (codigo-nativo e passkey-nativo seguem 409), que e o que o P2-1 do Cassio quer evitar.
+    if (ctx.status === 409 && ctx.estado === "connected") {
+      const l = await lerNativa(admin, org, canal);
+      return { status: 200, corpo: { estado: "conectado", telefone: l?.telefone ?? null, atualizado_em: agora() } };
+    }
+    return ctx;
+  }
   const base = `conexao-nativa-leitura:${org}:${canal}`;
   const lim = await checkRateLimit(`${base}:${ctx.userId}`, LEITURA_LIMITE, LEITURA_JANELA_S);
   const limCanal = await checkRateLimit(base, LEITURA_LIMITE_CANAL, LEITURA_JANELA_S);
