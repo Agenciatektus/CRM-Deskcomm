@@ -34,6 +34,8 @@ export interface ConexaoDeLeituraParaGravar {
   expiraEmColado?: string | null;
   /** `updated_at` da linha que a decisão leu: grava só se ainda for o mesmo (senão `superada`). */
   lidoEm?: string;
+  /** Não havia linha quando a decisão leu: INSERT, e perder a corrida (23505) é `superada`. */
+  primeira?: boolean;
   oauth?: { expiraEm: string | null; scopes: string[] | null; metaUserId: string | null };
 }
 
@@ -151,6 +153,16 @@ export async function gravarConexaoDeLeitura(
       .select("organization_id");
     if (error) return { ok: false, error: "erro_ao_gravar", detalhe: error.message };
     if (!data || data.length === 0) return { ok: false, error: "superada" };
+    return { ok: true };
+  }
+
+  if (c.primeira) {
+    const { error } = await admin.from("ad_insights_connections").insert(valores);
+    if (error) {
+      // Outro admin conectou entre a leitura e esta gravação.
+      if (error.code === "23505") return { ok: false, error: "superada" };
+      return { ok: false, error: "erro_ao_gravar", detalhe: error.message };
+    }
     return { ok: true };
   }
 

@@ -150,3 +150,21 @@ describe("token colado: conexão existente", () => {
     expect(mock.gravar.mock.calls[0]![1]).toMatchObject({ allowedAdAccountIds: ["act_1", "act_2"] });
   });
 });
+
+describe("escrita condicionada ao estado lido", () => {
+  it("primeira conexão pede INSERT (primeira) e repassa superada", async () => {
+    mock.gravar.mockResolvedValue({ ok: false, error: "superada" });
+    expect(await updateAdInsightsConnection(entrada)).toMatchObject({ ok: false, error: "superada" });
+    const c = mock.gravar.mock.calls[0]![1];
+    expect(c).toMatchObject({ primeira: true });
+    expect(c).not.toHaveProperty("lidoEm");
+  });
+
+  it("edição sem token também condiciona ao updated_at lido", async () => {
+    mock.linha = { id: "1", connected_by: "u1", connected_via: "manual", default_account_id: "act_1", allowed_ad_account_ids: null, updated_at: "2026-10-25T10:00:00Z" };
+    expect(await updateAdInsightsConnection({ platform: "meta_ads", default_account_id: "act_2" })).toEqual({ ok: true });
+    const c = mock.gravar.mock.calls[0]![1];
+    expect(c).toMatchObject({ lidoEm: "2026-10-25T10:00:00Z" });
+    expect(c).not.toHaveProperty("primeira");
+  });
+});

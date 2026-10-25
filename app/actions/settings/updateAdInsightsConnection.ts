@@ -268,9 +268,7 @@ export async function updateAdInsightsConnection(
         ? undefined
         : parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
     ...(validade ? { expiraEmColado: validade.expiraEm } : {}),
-    ...(validade && existente && (existente as { updated_at?: string }).updated_at
-      ? { lidoEm: (existente as { updated_at: string }).updated_at }
-      : {}),
+    ...(existente ? { lidoEm: existente.updated_at } : { primeira: true }),
   });
   if (!gravado.ok) {
     return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
