@@ -3,8 +3,6 @@ import {
   CONTA,
   ESTATISTICA_RD,
   ETAPAS,
-  FAIXA,
-  FAIXA_ROTULO,
   MECANISMO,
   PROBLEMAS,
   PROBLEMAS_FECHO,
@@ -13,36 +11,14 @@ import {
   PROVA,
 } from "@/lib/conteudo";
 
-import { ContaDoVacuo } from "./ContaDoVacuo";
+import { Calculadora } from "./Calculadora";
+export { Faixa } from "./Faixa";
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaFunil } from "./telas/TelaFunil";
 import { PainelConhecimento, PainelPassagem, PainelProposta } from "./telas/TelasDoAgente";
 import { Janela } from "./ui/Janela";
 import { Icone, type NomeIcone } from "./ui/Icones";
 import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
-
-/** Faixa de compatibilidades: corre devagar; parada, mostra tudo em linhas que quebram. */
-export function Faixa() {
-  const itens = [...FAIXA, ...FAIXA];
-  return (
-    <section aria-label="Canais e integrações" className="relative mt-16 mb-8 overflow-hidden border-y border-border bg-surface/50 lg:mt-24">
-      <p className="m-0 px-5 pt-4 text-center font-mono text-[0.72rem] tracking-[0.12em] text-text-subtle uppercase">
-        {FAIXA_ROTULO}
-      </p>
-      <ul className="a-corre m-0 flex w-max list-none items-center gap-3 p-0 py-4 motion-reduce:w-auto motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:px-5">
-        {itens.map((t, i) => (
-          <li
-            key={`${t}-${i}`}
-            aria-hidden={i >= FAIXA.length ? "true" : undefined}
-            className="shrink-0 rounded-full border border-border bg-bg px-4 py-1.5 text-meta font-semibold text-text-muted motion-reduce:[&:nth-child(n+8)]:hidden"
-          >
-            {t}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 /** Seis cenas do vácuo, cada uma com um pedaço de tela mostrando o sintoma. */
 function MiniLeadSumiu() {
@@ -204,11 +180,11 @@ export function Problema() {
 
 export function Conta() {
   return (
-    <Secao id="conta" titulo="titulo-conta" fundo="azul">
+    <Secao id="conta" titulo="titulo-conta" fundo="azul" largura="grade" ritmo="l">
       <Cabeca id="titulo-conta" titulo={CONTA.titulo} texto={CONTA.intro} />
-      <div className="revela max-w-[52rem]">
-        <ContaDoVacuo />
-        <p className="mt-6 mb-0 text-[1.05rem] leading-relaxed">{CONTA.ponte}</p>
+      <div className="revela">
+        <Calculadora />
+        <p className="mt-6 mb-0 max-w-(--container-leitura) text-[1.05rem] leading-relaxed">{CONTA.ponte}</p>
       </div>
     </Secao>
   );
@@ -406,7 +382,7 @@ export function Agente() {
     <PainelProposta key="5" />,
   ];
   return (
-    <Secao id="agente" titulo="titulo-agente" fundo="azul" larga>
+    <Secao id="agente" titulo="titulo-agente" fundo="azul">
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
       <div className="grid items-start gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
@@ -429,18 +405,18 @@ export function Agente() {
 /** Prova do produto: o funil completo, com abas que trocam o vocabulário por negócio. */
 export function Funil() {
   return (
-    <Secao id="funil" titulo="titulo-funil" fundo="grade" larga>
+    <Secao id="funil" titulo="titulo-funil" fundo="grade" largura="tela" ritmo="l">
       <Cabeca id="titulo-funil" titulo={PROVA.titulo} texto={PROVA.intro} />
       <div className="revela">
         <Janela rota="funil" interativa>
           <TelaFunil />
         </Janela>
+        <p className="m-0 mt-3 text-meta text-text-subtle">{PROVA.exemploFunil}</p>
       </div>
       <div className="revela mt-5 max-w-[44rem]">
         <h3 className="m-0 text-[1.15rem] font-bold">{PROVA.funil.titulo}</h3>
         <p className="mt-1.5 mb-0 leading-relaxed text-text-muted">{PROVA.funil.texto}</p>
       </div>
-      <Exemplo className="mt-4" />
     </Secao>
   );
 }
