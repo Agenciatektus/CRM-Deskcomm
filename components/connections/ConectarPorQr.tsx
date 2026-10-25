@@ -9,7 +9,7 @@ import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { randomId } from "@/lib/random-id";
 
-import { QrDialog } from "./ConnectionsClient";
+import { ConexaoNativaDialog } from "./ConexaoNativaDialog";
 
 /**
  * "Conectar por QR code": o CRM cria a conexão e mostra o QR no mesmo modal do
@@ -53,7 +53,7 @@ export function ConectarPorQr({ onAtualizar }: { onAtualizar: () => void }) {
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-      <Label htmlFor="hosted-rotulo">{t("Conectar por QR code")}</Label>
+      <Label htmlFor="hosted-rotulo">{t("Nome da conexão")}</Label>
       <Input
         id="hosted-rotulo"
         value={rotulo}
@@ -63,30 +63,23 @@ export function ConectarPorQr({ onAtualizar }: { onAtualizar: () => void }) {
         autoComplete="off"
       />
       <p className="text-xs text-muted-foreground">
-        {t("Um número novo, sem precisar de outra plataforma: você lê o QR com o celular e pronto.")}
+        {t("Um nome para reconhecer este número na lista (por exemplo, Comercial). Depois você conecta lendo um QR code ou digitando um código no celular.")}
       </p>
       <div>
         <Button variant="outline" size="sm" onClick={criar} disabled={criando || rotulo.trim().length < 1}>
-          {criando ? t("Criando…") : t("Gerar QR code")}
+          {criando ? t("Criando…") : t("Conectar WhatsApp")}
         </Button>
       </div>
       {canalId && (
-        <QrDialog
-          sessionId={canalId}
-          title={t("Conectar WhatsApp por QR code")}
-          wahaConfigured
-          apenasQr
+        <ConexaoNativaDialog
+          canalId={canalId}
           onClose={() => {
             setCanalId(null);
             onAtualizar();
           }}
-          onConnected={() => {
+          onConectado={() => {
             toast.success(t("Canal conectado."));
             onAtualizar();
-          }}
-          onForcePair={async () => {
-            // Pedir o QR de novo reabre a conexão no servidor (idempotente).
-            await fetch(`/api/v1/channel-sessions/${canalId}/qr`, { cache: "no-store" });
           }}
         />
       )}
