@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { Escolha } from "@/components/ui/escolha";
 import { Label } from "@/components/ui/label";
 import { useTodasAsContasDaMeta } from "@/hooks/ads/useMetaAds";
 import { traduzir } from "@/lib/i18n/traducao";
@@ -112,19 +113,16 @@ export function SeletorDeContas({
           </p>
           <div className="flex flex-col gap-2">
             <Label htmlFor="default_account_id">{t("Conta padrão (opcional)")}</Label>
-            <select
+            <Escolha
               id="default_account_id"
               className="h-9 rounded-md border bg-transparent px-2 text-sm"
               value={marcadas.some((c) => c.id === padrao) ? padrao : ""}
-              onChange={(e) => onPadrao(e.target.value)}
-            >
-              <option value="">{t("Primeira conta ativa")}</option>
-              {marcadas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome} ({c.id})
-                </option>
-              ))}
-            </select>
+              onValueChange={onPadrao}
+              opcoes={[
+                { value: "", label: t("Primeira conta ativa") },
+                ...marcadas.map((c) => ({ value: c.id, label: `${c.nome} (${c.id})` })),
+              ]}
+            />
           </div>
         </>
       )}
