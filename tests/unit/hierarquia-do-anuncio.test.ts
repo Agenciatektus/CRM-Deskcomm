@@ -51,6 +51,7 @@ describe("a leitura da hierarquia", () => {
       ok: true,
       dados: {
         adId: "120210000000000",
+        accountId: null,
         adName: "Criativo 07",
         adsetId: "6123",
         adsetName: "Lookalike 1%",
@@ -82,6 +83,7 @@ describe("a leitura da hierarquia", () => {
       ok: true,
       dados: {
         adId: "ad-1",
+        accountId: null,
         adName: null,
         adsetId: null,
         adsetName: null,

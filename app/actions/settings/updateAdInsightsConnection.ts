@@ -10,6 +10,7 @@ import { audit } from "@/lib/audit";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { podeAdministrarEmpresa } from "@/lib/auth/pode-administrar-empresa";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { contasPermitidas, normalizarContas, podeAmpliarContas } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { gravarConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
 
 /**
@@ -81,9 +82,27 @@ const entradaSchema = z.object({
   default_account_id: z
     .string()
     .trim()
+    .max(32)
     .regex(/^act_\d+$/, "conta no formato act_<id>")
     .nullable()
     .optional(),
+  /**
+   * As contas que ESTA organização pode ver (migration 9074). `undefined` = não
+   * mexer; `null` = limpar (volta à regra padrão da procedência); lista =
+   * gravar. Quando vem, a conta padrão tem de vir junto e pertencer à lista.
+   */
+  allowed_ad_account_ids: z
+    .array(z.string().trim().max(32).regex(/^act_\d+$/, "conta no formato act_<id>"))
+    .max(500)
+    .nullable()
+    .optional(),
+}).superRefine((v, ctx) => {
+  if (!v.allowed_ad_account_ids) return;
+  if (v.default_account_id === undefined) {
+    ctx.addIssue({ code: "custom", path: ["default_account_id"], message: "obrigatória junto da lista" });
+  } else if (v.default_account_id && !v.allowed_ad_account_ids.includes(v.default_account_id)) {
+    ctx.addIssue({ code: "custom", path: ["default_account_id"], message: "fora da lista de contas" });
+  }
 });
 
 export type AdInsightsConnectionInput = z.infer<typeof entradaSchema>;
@@ -112,13 +131,41 @@ export async function updateAdInsightsConnection(
 
   const { data: existente, error: erroDeLeitura } = await admin
     .from("ad_insights_connections")
-    .select("id")
+    .select("id, connected_by, connected_via, default_account_id, allowed_ad_account_ids")
     .eq("organization_id", activeOrg.orgId)
     .eq("platform", parsed.data.platform)
     .maybeSingle();
 
   if (erroDeLeitura) {
     return { ok: false, error: "erro_ao_gravar", details: erroDeLeitura.message };
+  }
+
+  // Ampliar a lista é de quem conectou a Meta (ou platform admin). Os demais admins
+  // só reduzem a lista e escolhem a padrão dentro dela; incluir conta fora da lista
+  // atual é 403. Sem linha (primeira conexão) não há lista a proteger.
+  if (existente) {
+    const atual = existente as {
+      connected_by: string | null;
+      connected_via: string | null;
+      default_account_id: string | null;
+      allowed_ad_account_ids: string[] | null;
+    };
+    if (!podeAmpliarContas(authUser, atual.connected_by)) {
+      const liberadas = contasPermitidas({
+        via: atual.connected_via,
+        allowed: atual.allowed_ad_account_ids,
+        padrao: atual.default_account_id,
+      });
+      if (liberadas !== null) {
+        const pedidas = [
+          ...normalizarContas(parsed.data.allowed_ad_account_ids ?? []),
+          ...(parsed.data.default_account_id ? [parsed.data.default_account_id] : []),
+        ];
+        const ampliando =
+          parsed.data.allowed_ad_account_ids === null || pedidas.some((id) => !liberadas.includes(id));
+        if (ampliando) return { ok: false, error: "forbidden_role" };
+      }
+    }
   }
 
   // Primeira conexão SEM token é `validation_failed`, não `erro_ao_gravar`: a
@@ -143,6 +190,7 @@ export async function updateAdInsightsConnection(
     platform: parsed.data.platform,
     accessToken: parsed.data.access_token,
     defaultAccountId: parsed.data.default_account_id,
+    allowedAdAccountIds: parsed.data.allowed_ad_account_ids && [...new Set(parsed.data.allowed_ad_account_ids)],
   });
   if (!gravado.ok) {
     return { ok: false, error: gravado.error, ...(gravado.detalhe ? { details: gravado.detalhe } : {}) };
@@ -163,6 +211,10 @@ export async function updateAdInsightsConnection(
       // O QUE mudou, jamais o valor. O id da conta pode ir (é identificador,
       // não segredo); o token não entra nem em metadata.
       default_account_id: parsed.data.default_account_id ?? null,
+      // Quais contas ficaram liberadas para os gestores (ids, não segredo).
+      ...(parsed.data.allowed_ad_account_ids !== undefined
+        ? { allowed_ad_account_ids: parsed.data.allowed_ad_account_ids }
+        : {}),
       token_trocado: Boolean(parsed.data.access_token),
       primeira_conexao: !existente,
     },

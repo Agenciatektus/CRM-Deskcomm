@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -57,14 +58,24 @@ describe("banner de recusa em Ajustes > Meta Ads", () => {
     diasParaVencer: 30,
     oauthDisponivel: true,
     oauthFalta: [],
+    contasPermitidas: null,
+    podeAmpliar: true,
     idioma: "pt-BR" as const,
   };
 
   it("aparece com needs_reconnect e some sem ele", () => {
-    const com = renderToStaticMarkup(<FormularioDeMetaAds {...props} precisaReconectar />);
+    const com = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <FormularioDeMetaAds {...props} precisaReconectar />
+      </QueryClientProvider>,
+    );
     expect(com).toContain("meta-precisa-reconectar");
     expect(com).toContain("A Meta recusou renovar o acesso. Reconecte agora.");
-    const sem = renderToStaticMarkup(<FormularioDeMetaAds {...props} />);
+    const sem = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <FormularioDeMetaAds {...props} />
+      </QueryClientProvider>,
+    );
     expect(sem).not.toContain("meta-precisa-reconectar");
   });
 });

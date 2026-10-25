@@ -47,6 +47,8 @@ const MENSAGEM_POR_CODIGO: Record<string, string> = {
   ads_campo_invalido:
     "A plataforma recusou um campo desta consulta. Isso é um problema do sistema, não da sua conta — avise quem mantém a instalação.",
   ads_sem_conexao: "Nenhuma conta de anúncios conectada.",
+  ads_conta_nao_permitida:
+    "Esta conta de anúncios não está liberada para esta organização. Peça a um administrador para escolhê-la em Configurações › Meta Ads.",
   ads_cifra_indisponivel:
     "A chave de criptografia da instalação não está disponível, então o token guardado não pode ser lido. Isso é configuração do servidor.",
   upstream_unavailable: "Não consegui falar com a plataforma agora. Tente atualizar em instantes.",
@@ -91,19 +93,22 @@ const PERSONALIZADO = "personalizado";
 interface Props {
   contaPadrao: string | null;
   idioma: Idioma;
+  /** Conexão por login sem nenhuma conta liberada para esta organização. */
+  semContasLiberadas?: boolean;
+  podeEscolherContas?: boolean;
 }
 
-export function MetaAdsClient({ contaPadrao }: Props) {
+export function MetaAdsClient({ contaPadrao, semContasLiberadas = false, podeEscolherContas = false }: Props) {
   const t = useT();
   // O carimbo "lido em" é uma DATA, e data segue o idioma de quem lê — fixar
   // "pt-BR" deixaria a tela em espanhol com a hora em português.
   const tagDoIdioma = useTagDeIdioma();
 
-  const [conta, setConta] = useState<string | null>(contaPadrao);
+  const [conta, setConta] = useState<string | null>(null);
   const [preset, setPreset] = useState<string>("7");
   const [intervalo, setIntervalo] = useState(() => haDias(7));
 
-  const contas = useMetaAdAccounts(true);
+  const contas = useMetaAdAccounts(!semContasLiberadas);
 
   // O `?? []` precisa de `useMemo` próprio: sem ele, cada render cria um array
   // NOVO, a dependência do memo abaixo muda sempre e o memo deixa de memoizar —
@@ -115,12 +120,15 @@ export function MetaAdsClient({ contaPadrao }: Props) {
   // lista. Cair na primeira ativa e não na primeira da lista evita abrir a tela
   // numa conta com pendência de cobrança, que devolveria tabela vazia e passaria
   // a impressão de integração quebrada.
+  // Só entra conta que o servidor liberou (a lista já vem filtrada); a padrão
+  // da página pode estar fora da lista e nunca é usada às cegas.
   const contaEfetiva = useMemo(() => {
-    if (conta) return conta;
-    if (contaPadrao) return contaPadrao;
+    if (conta && listaDeContas.some((c) => c.id === conta)) return conta;
+    const padrao = contas.data?.data.conta_padrao ?? contaPadrao;
+    if (padrao && listaDeContas.some((c) => c.id === padrao)) return padrao;
     const ativa = listaDeContas.find((c) => c.status === 1);
     return ativa?.id ?? listaDeContas[0]?.id ?? null;
-  }, [conta, contaPadrao, listaDeContas]);
+  }, [conta, contaPadrao, contas.data, listaDeContas]);
 
   const moeda = listaDeContas.find((c) => c.id === contaEfetiva)?.moeda ?? "BRL";
 
@@ -144,6 +152,26 @@ export function MetaAdsClient({ contaPadrao }: Props) {
 
   const erro = contas.error ?? campanhas.error;
   const carregando = contas.isLoading || campanhas.isFetching;
+
+  if (semContasLiberadas || (contas.data && listaDeContas.length === 0 && contas.data.data.restrita)) {
+    return (
+      <div className="rounded-md border p-6 text-sm" data-testid="meta-sem-contas-liberadas">
+        <p className="font-medium">
+          {podeEscolherContas
+            ? t("Escolha as contas deste cliente em Ajustes › Meta Ads.")
+            : t("Peça a um administrador para escolher as contas.")}
+        </p>
+        {podeEscolherContas && (
+          <a
+            className="mt-4 inline-block rounded-md border px-4 py-2 font-medium underline-offset-2 hover:bg-muted"
+            href="/app/settings/meta-ads"
+          >
+            {t("Escolher contas")}
+          </a>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

@@ -27,6 +27,8 @@ export interface ConexaoDeLeituraParaGravar {
   accessToken?: string;
   /** `undefined` = não mexer; `null` = limpar. */
   defaultAccountId?: string | null;
+  /** Contas que a organização pode ver. `undefined` = não mexer; `null` = limpar. */
+  allowedAdAccountIds?: string[] | null;
   /** Só com `accessToken`. Ausente = token colado à mão. */
   oauth?: { expiraEm: string | null; scopes: string[] | null; metaUserId: string | null };
 }
@@ -113,11 +115,14 @@ export async function gravarConexaoDeLeitura(
   };
   if (c.userId) valores.updated_by = c.userId;
   if (c.defaultAccountId !== undefined) valores.default_account_id = c.defaultAccountId;
+  if (c.allowedAdAccountIds !== undefined) valores.allowed_ad_account_ids = c.allowedAdAccountIds;
 
   if (c.accessToken) {
     const cifrado = await encryptWebhookSecret(admin, c.accessToken);
     if (!cifrado) return { ok: false, error: "cifra_indisponivel" };
     valores.access_token_encrypted = cifrado;
+    // Quem conectou ou colou: só ele (ou platform admin) amplia as contas permitidas.
+    valores.connected_by = c.userId;
     valores.connected_via = (c.oauth ? "oauth" : "manual") satisfies ProcedenciaDaConexao;
     valores.token_expires_at = c.oauth?.expiraEm ?? null;
     valores.scopes = c.oauth?.scopes ?? null;

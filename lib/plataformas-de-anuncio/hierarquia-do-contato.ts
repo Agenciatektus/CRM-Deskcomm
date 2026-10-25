@@ -24,6 +24,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
+import { contaPermitida } from "./contas-permitidas";
 import { lerCredencialDeLeitura } from "./credenciais-de-leitura";
 import {
   lerHierarquiaDoAnuncio,
@@ -122,6 +123,13 @@ export async function resolverHierarquiaDoContato(
   }
 
   const h = leitura.dados;
+  // O anúncio tem de ser de uma conta liberada para esta organização: o token de
+  // um login pessoal alcança anúncios de outros clientes. Fora da lista não se
+  // devolve nem se grava no cache (falha fechada: sem conta informada, nega).
+  if (!contaPermitida(credencial.credencial.contasPermitidas, h.accountId ? `act_${h.accountId}` : "")) {
+    logger.warn("[ads.hierarquia-do-contato] anuncio de conta nao liberada", { organizationId, ad_id: adId });
+    return guardada ? daLinha(adId, guardada) : null;
+  }
   const { error: erroDeEscrita } = await admin.from("ad_hierarchy_cache").upsert(
     {
       organization_id: organizationId,
