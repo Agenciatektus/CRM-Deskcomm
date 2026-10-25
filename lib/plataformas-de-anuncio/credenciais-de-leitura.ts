@@ -101,10 +101,13 @@ export async function existeConexaoDeLeitura(
   /** ISO-8601; `null` em token colado à mão (a Meta não informa a validade dele). */
   tokenExpiraEm: string | null;
   via: "manual" | "oauth" | null;
+  /** Identidade lida no OAuth (migration 9072); `null` = não lida. */
+  metaUserName: string | null;
+  metaBusinesses: { id: string; name: string }[];
 }> {
   const { data, error } = await admin
     .from("ad_insights_connections")
-    .select("default_account_id, token_expires_at, connected_via")
+    .select("default_account_id, token_expires_at, connected_via, meta_user_name, meta_businesses")
     .eq("organization_id", organizationId)
     .eq("platform", plataforma)
     .maybeSingle();
@@ -115,18 +118,26 @@ export async function existeConexaoDeLeitura(
       plataforma,
       error: error.message,
     });
-    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null };
+    return { conectada: false, contaPadrao: null, tokenExpiraEm: null, via: null, metaUserName: null, metaBusinesses: [] };
   }
 
   const linha = data as {
     default_account_id: string | null;
     token_expires_at: string | null;
     connected_via: string | null;
+    meta_user_name: string | null;
+    meta_businesses: unknown;
   } | null;
   return {
     conectada: Boolean(linha),
     contaPadrao: linha?.default_account_id ?? null,
     tokenExpiraEm: linha?.token_expires_at ?? null,
     via: linha?.connected_via === "oauth" || linha?.connected_via === "manual" ? linha.connected_via : null,
+    metaUserName: linha?.meta_user_name ?? null,
+    metaBusinesses: Array.isArray(linha?.meta_businesses)
+      ? (linha.meta_businesses as { id: string; name: string }[]).filter(
+          (b) => typeof b?.name === "string",
+        )
+      : [],
   };
 }

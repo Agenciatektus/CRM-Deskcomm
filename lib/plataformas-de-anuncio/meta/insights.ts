@@ -335,35 +335,81 @@ export function montarUrl(caminho: string, parametros: Record<string, string>): 
   return url.toString();
 }
 
-/** As contas de anúncio que o token alcança. */
+/**
+ * As contas de anúncio que o token alcança: a união deduplicada de `me/adaccounts` com
+ * as `owned_ad_accounts` de cada empresa (BM) de `me/businesses`, como a Verdash faz.
+ *
+ * `me/adaccounts` sozinho some com contas que só aparecem pela empresa. Falha em
+ * `me/adaccounts` é o erro da leitura; falha em `me/businesses` ou numa BM só deixa
+ * aquela fonte de fora (melhor esforço), a lista não cai.
+ */
 export async function listarContas(
   token: string,
 ): Promise<ResultadoDeLeitura<ContaDeAnuncio[]>> {
-  const url = montarUrl("me/adaccounts", {
-    fields: "account_id,name,currency,account_status",
-    limit: "200",
-  });
-
   interface ContaCrua {
+    id?: string;
     account_id?: string;
     name?: string;
     currency?: string;
     account_status?: number;
   }
+  const CAMPOS = "id,account_id,name,currency,account_status";
 
-  const resultado = await buscarPaginado<ContaCrua>(url, token, "adaccounts");
-  if (!resultado.ok) return resultado;
+  const minhas = await buscarPaginado<ContaCrua>(
+    montarUrl("me/adaccounts", { fields: CAMPOS, limit: "100" }),
+    token,
+    "adaccounts",
+  );
+  if (!minhas.ok) return minhas;
 
-  const contas = resultado.dados
-    .filter((c): c is ContaCrua & { account_id: string } => Boolean(c.account_id))
-    .map((c) => ({
-      id: `act_${c.account_id}`,
-      nome: c.name ?? c.account_id,
-      moeda: c.currency ?? "BRL",
-      status: typeof c.account_status === "number" ? c.account_status : 0,
-    }));
+  const porId = new Map<string, ContaDeAnuncio>();
+  const juntar = (lista: ContaCrua[]) => {
+    for (const c of lista) {
+      const bruto = c.account_id ?? c.id?.replace(/^act_/, "");
+      if (!bruto || !/^\d+$/.test(bruto)) continue;
+      const id = `act_${bruto}`;
+      if (porId.has(id)) continue;
+      porId.set(id, {
+        id,
+        nome: c.name ?? bruto,
+        moeda: c.currency ?? "BRL",
+        status: typeof c.account_status === "number" ? c.account_status : 0,
+      });
+    }
+  };
+  juntar(minhas.dados);
 
-  return { ok: true, dados: contas };
+  const empresas = await listarEmpresas(token);
+  if (empresas.ok) {
+    for (const bm of empresas.dados) {
+      const donas = await buscarPaginado<ContaCrua>(
+        montarUrl(`${encodeURIComponent(bm.id)}/owned_ad_accounts`, { fields: CAMPOS, limit: "100" }),
+        token,
+        "owned_ad_accounts",
+      );
+      if (donas.ok) juntar(donas.dados);
+    }
+  }
+
+  return { ok: true, dados: [...porId.values()] };
+}
+
+/** As empresas (BM) do usuário. Só ids numéricos seguem para a URL da próxima chamada. */
+export async function listarEmpresas(
+  token: string,
+): Promise<ResultadoDeLeitura<{ id: string; nome: string }[]>> {
+  const r = await buscarPaginado<{ id?: string; name?: string }>(
+    montarUrl("me/businesses", { fields: "id,name", limit: "100" }),
+    token,
+    "businesses",
+  );
+  if (!r.ok) return r;
+  return {
+    ok: true,
+    dados: r.dados
+      .filter((b): b is { id: string; name?: string } => /^\d+$/.test(b.id ?? ""))
+      .map((b) => ({ id: b.id, nome: b.name ?? b.id })),
+  };
 }
 
 /**
