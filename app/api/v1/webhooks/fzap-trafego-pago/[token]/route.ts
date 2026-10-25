@@ -57,7 +57,7 @@ export async function POST(
   const chave = createHash("sha256").update(token ?? "").digest("hex").slice(0, 24);
   const ip = ipDoCliente(req.headers);
   const [porToken, porIp] = await Promise.all([
-    checkRateLimit(`tp-push:t:${chave}`, 120, 60),
+    checkRateLimit(`tp-push:t:${chave}`, 30, 60),
     ip ? checkRateLimit(`tp-push:ip:${ip}`, 300, 60) : Promise.resolve({ allowed: true }),
   ]);
   if (!porToken.allowed || !porIp.allowed) {

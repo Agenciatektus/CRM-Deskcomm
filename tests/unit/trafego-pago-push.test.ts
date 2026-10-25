@@ -4,6 +4,7 @@ const fzap = vi.hoisted(() => ({
   chamadas: [] as Array<{ path: string; method?: string; body?: unknown }>,
   config: null as unknown,
 }));
+const limite = vi.hoisted(() => ({ buckets: [] as string[], negar: null as RegExp | null }));
 const enriq = vi.hoisted(() => ({ chamadas: [] as unknown[][] }));
 
 vi.mock("@/lib/logger", () => ({
@@ -27,7 +28,10 @@ vi.mock("next/server", async (orig) => ({
   after: (fn: () => unknown) => void fn(),
 }));
 vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({
-  checkRateLimit: async () => ({ allowed: true }),
+  checkRateLimit: async (bucket: string, max: number) => {
+    limite.buckets.push(`${bucket}|${max}`);
+    return { allowed: !(limite.negar && limite.negar.test(bucket)) };
+  },
 }));
 const adminMock = vi.hoisted(() => ({ valor: null as unknown }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminMock.valor }));
@@ -84,6 +88,8 @@ beforeEach(() => {
   fzap.chamadas = [];
   fzap.config = null;
   enriq.chamadas = [];
+  limite.buckets = [];
+  limite.negar = null;
   delete process.env.FZAP_TRAFEGO_PAGO_PUSH;
 });
 
@@ -147,9 +153,13 @@ describe("extrairTelefones", () => {
         chatId: "5511987654321@lid",
         createdAt: "2026-10-25T10:00:00Z",
         campaignId: "120210000000000",
-        phoneNumber: 5511987654321,
+        phoneNumber: "5511987654321x",
       }),
     ).toEqual([]);
+  });
+
+  it("aceita telefone como NÚMERO inteiro de 8 a 15 dígitos", () => {
+    expect(extrairTelefones({ phone: 5511987654321, number: 1234567, from: 1.5, jid: 1234567890123456 })).toEqual(["5511987654321"]);
   });
 
   it("deduplica e limita a 5; aguenta aninhamento profundo e corpo não-objeto", () => {
@@ -180,6 +190,20 @@ describe("organização e enriquecimento", () => {
     expect(enriq.chamadas).toHaveLength(1);
     expect(enriq.chamadas[0]![1]).toBe(ORG);
     expect(enriq.chamadas[0]![3]).toEqual({ ignorarEspera: true });
+  });
+
+  it("um PULL por contato por minuto: bucket por org+telefone, limite 1", async () => {
+    const { admin } = banco();
+    limite.negar = /tp-push:c:/;
+    await dispararEnriquecimento(admin, { channelSessionId: CANAL, organizationId: ORG }, { phone: "5511987654321" });
+    expect(enriq.chamadas).toHaveLength(0);
+    expect(limite.buckets).toContain(`tp-push:c:${ORG}:5511987654321|1`);
+  });
+
+  it("rota: limite por token é 30/min", async () => {
+    adminMock.valor = banco({ hashDoCanal: hashDoToken(TOKEN) }).admin;
+    await POST(req("{}"), params(TOKEN));
+    expect(limite.buckets.some((b) => b.startsWith("tp-push:t:") && b.endsWith("|30"))).toBe(true);
   });
 
   it("telefone sem contato nesta org não dispara nada", async () => {
@@ -258,6 +282,52 @@ describe("registro no FZAP", () => {
     });
     expect(r).toEqual({ registrado: false, motivo: "webhook_de_terceiro" });
     expect(fzap.chamadas.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("URL atual que só CITA o caminho (outro host) é de terceiro; a nossa é substituída", async () => {
+    process.env.FZAP_TRAFEGO_PAGO_PUSH = "1";
+    fzap.config = { webhookUrl: "https://evil.com/api/v1/webhooks/fzap-trafego-pago/abc" };
+    const a = await registrarPushDeTrafegoPago(banco().admin, { organizationId: ORG, channelSessionId: CANAL, creds: CREDS });
+    expect(a).toEqual({ registrado: false, motivo: "webhook_de_terceiro" });
+    fzap.config = { webhookUrl: "https://crm.exemplo.com/api/v1/webhooks/fzap-trafego-pago/velho" };
+    const b = await registrarPushDeTrafegoPago(banco().admin, { organizationId: ORG, channelSessionId: CANAL, creds: CREDS });
+    expect(b).toEqual({ registrado: true });
+  });
+
+  it("GET com data que não é objeto: aborta sem POST", async () => {
+    process.env.FZAP_TRAFEGO_PAGO_PUSH = "1";
+    for (const ruim of [null, "texto", [1]]) {
+      fzap.chamadas = [];
+      fzap.config = ruim;
+      const r = await registrarPushDeTrafegoPago(banco().admin, { organizationId: ORG, channelSessionId: CANAL, creds: CREDS });
+      expect(r).toEqual({ registrado: false, motivo: "config_ilegivel" });
+      expect(fzap.chamadas.some((c) => c.method === "POST")).toBe(false);
+    }
+  });
+
+  it("qualquer valor mascarado, de qualquer chave, é descartado", () => {
+    const c = montarConfig({ outroSegredo: "ab***yz", fbAdAccountId: "act_1" }, "u");
+    expect(c).not.toHaveProperty("outroSegredo");
+    expect(c).toHaveProperty("fbAdAccountId", "act_1");
+  });
+
+  it("hash não gravado: reverte o webhook anterior e não registra", async () => {
+    process.env.FZAP_TRAFEGO_PAGO_PUSH = "1";
+    fzap.config = { webhookUrl: "", fbAdAccountId: "act_1", webhookActive: false };
+    const { admin } = banco();
+    const falha = (admin as unknown as { from: (t: string) => Record<string, unknown> }).from;
+    const comErro = {
+      from: (t: string) => {
+        const b = falha(t);
+        b.then = (r: (v: unknown) => unknown) => r({ error: { code: "x" } });
+        return b;
+      },
+    } as never;
+    const r = await registrarPushDeTrafegoPago(comErro, { organizationId: ORG, channelSessionId: CANAL, creds: CREDS });
+    expect(r).toEqual({ registrado: false, motivo: "falhou" });
+    const posts = fzap.chamadas.filter((c) => c.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(posts[1]!.body).toEqual({ webhookUrl: "", fbAdAccountId: "act_1", webhookActive: false });
   });
 
   it("montarConfig mantém token real e descarta o mascarado", () => {

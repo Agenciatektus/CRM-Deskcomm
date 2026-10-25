@@ -15,6 +15,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -70,6 +71,14 @@ export function extrairTelefones(corpo: unknown): string[] {
   let visitados = 0;
   const visitar = (no: unknown, chavePai: string | null, nivel: number): void => {
     if (achados.size >= MAX_TELEFONES || nivel > PROFUNDIDADE_MAX || ++visitados > NOS_MAX) return;
+    if (typeof no === "number") {
+      // Telefone como número inteiro no JSON (sem formatação).
+      if (chavePai && CHAVE_DE_TELEFONE.test(chavePai) && Number.isSafeInteger(no) && no > 0) {
+        const d = String(no);
+        if (d.length >= 8 && d.length <= 15) achados.add(d);
+      }
+      return;
+    }
     if (typeof no === "string") {
       if (chavePai && CHAVE_DE_TELEFONE.test(chavePai)) {
         const d = candidato(no);
@@ -137,6 +146,10 @@ export async function dispararEnriquecimento(
   let disparados = 0;
   for (const digitos of telefones) {
     try {
+      // Um PULL por contato por minuto: o corpo é não confiável e não pode virar
+      // martelo no FZAP/Graph. Antes mesmo de ler o banco.
+      const liberado = await checkRateLimit(`tp-push:c:${canal.organizationId}:${digitos}`, 1, 60);
+      if (!liberado.allowed) continue;
       const { data } = await admin
         .from("contacts")
         .select("id")
@@ -174,20 +187,24 @@ export type ResultadoDoRegistro =
 const CAMPOS_SOMENTE_LEITURA = new Set(["id", "createdAt", "updatedAt"]);
 
 /** O GET devolve segredo mascarado (`***`): reenviá-lo gravaria os asteriscos no lugar do token. */
-function estaMascarado(v: unknown): boolean {
+export function estaMascarado(v: unknown): boolean {
   return typeof v === "string" && v.includes("***");
 }
 
 export function montarConfig(
   existente: Record<string, unknown> | null,
-  webhookUrl: string,
+  webhookUrl: string | null,
 ): Record<string, unknown> {
   const corpo: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(existente ?? {})) {
     if (CAMPOS_SOMENTE_LEITURA.has(k)) continue;
-    if (k === "fbGraphAccessToken" && (v == null || estaMascarado(v))) continue;
+    // Qualquer valor mascarado, de qualquer chave: reenviá-lo gravaria os asteriscos.
+    if (estaMascarado(v)) continue;
+    if (k === "fbGraphAccessToken" && v == null) continue;
     corpo[k] = v;
   }
+  // `null` = só devolver o que existia (reversão), sem mexer no webhook.
+  if (webhookUrl === null) return corpo;
   return {
     ...corpo,
     webhookUrl,
@@ -207,6 +224,11 @@ function urlDoPush(token: string): string | null {
  * Liga o empurrão na instância do canal. Best-effort: nunca lança e nunca derruba a
  * conexão do canal; o PULL continua valendo sem ele. Idempotente: cada chamada troca
  * o token (só o hash é guardado) e reenvia a configuração mesclada.
+ *
+ * ATENÇÃO: não se sabe se o POST do FZAP MESCLA ou SUBSTITUI a config. Por isso o
+ * corpo reenvia tudo que o GET devolveu, menos o que vem mascarado. Isso só é seguro
+ * hoje porque o registro roda apenas em instância recém-criada pelo conectar-nativo,
+ * sem token do Graph a perder. Antes de registrar canal já configurado, medir o contrato.
  */
 export async function registrarPushDeTrafegoPago(
   admin: SupabaseClient,
@@ -226,10 +248,16 @@ export async function registrarPushDeTrafegoPago(
       "/paid-traffic/config",
       { method: "GET" },
     );
-    const existente = atual && typeof atual === "object" ? atual : null;
-    const urlAtual = existente?.webhookUrl;
+    // Resposta que não é objeto: não há o que preservar, e POST às cegas poderia apagar a config.
+    if (!atual || typeof atual !== "object" || Array.isArray(atual)) {
+      return { registrado: false, motivo: "config_ilegivel" };
+    }
+    const existente = atual;
+    const urlAtual = existente.webhookUrl;
     // Webhook de outra pessoa não se sobrescreve; o nosso (de registro anterior) sim.
-    if (typeof urlAtual === "string" && urlAtual && !urlAtual.includes(CAMINHO)) {
+    // Prefixo EXATO (origem + caminho): `includes` aceitaria URL alheia que cite o caminho.
+    const base = env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
+    if (typeof urlAtual === "string" && urlAtual && !urlAtual.startsWith(`${base}${CAMINHO}`)) {
       return { registrado: false, motivo: "webhook_de_terceiro" };
     }
 
@@ -242,7 +270,19 @@ export async function registrarPushDeTrafegoPago(
       .update({ trafego_push_token_hash: hashDoToken(token) })
       .eq("organization_id", input.organizationId)
       .eq("id", input.channelSessionId);
-    if (error) throw new Error("hash_nao_gravado");
+    if (error) {
+      // O FZAP já aponta para um token sem hash: devolve a config anterior (best-effort).
+      await fzapRequest(input.creds, "/paid-traffic/config", {
+        method: "POST",
+        body: montarConfig(existente, null),
+      }).catch((e) =>
+        logger.warn("[trafego-pago-push] reversão do webhook falhou", {
+          channel_session_id: input.channelSessionId,
+          motivo: e instanceof Error ? e.message.slice(0, 60) : "desconhecido",
+        }),
+      );
+      throw new Error("hash_nao_gravado");
+    }
     return { registrado: true };
   } catch (err) {
     logger.warn("[trafego-pago-push] registro falhou; o canal segue só com o PULL", {
