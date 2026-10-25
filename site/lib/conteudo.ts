@@ -377,7 +377,7 @@ export const IMPLANTACAO = {
 
 export const OFERTA = {
   nome: "Verdash CRM",
-  titulo: "Tudo isto, funcionando no seu WhatsApp e no seu Instagram",
+  titulo: "Quanto custa o Verdash CRM, com e sem IA",
   itens: [
     {
       titulo: "Funil sob medida",
@@ -415,7 +415,7 @@ export const OFERTA = {
       botao: "Assinar o plano com IA",
       mensagem: "Oi, quero assinar o Verdash CRM com IA (R$ 397 por mês).",
       detalhes: [
-        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa e a Tektus combina com você o próximo passo.",
+        "Atendimento por IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa.",
         "Até 3 números de WhatsApp e até 2 contas de Instagram.",
         "Sem cobrança por usuário.",
       ],
@@ -443,6 +443,49 @@ export const OFERTA = {
     aviso: "Ela é opcional. Pode ser contratada junto com o plano, e a Tektus oferece de novo durante a assinatura.",
   },
   apoioCta: "Dúvida antes de pagar? A Tektus responde no WhatsApp.",
+  periodoRotulo: "Período de cobrança",
+  mensal: "Mensal",
+  anual: "Anual",
+  porMes: "por mês",
+  semFidelidade: "Sem fidelidade no plano mensal, cancele quando quiser.",
+  anualDescricao: "Preço do plano anual com 15% de desconto",
+  equivalente: "por mês, equivalente",
+  porAno: "por ano",
+  recomendado: "Recomendado",
+  /** Comparativo item a item; cada linha tem o texto de cada plano e o estado (incluso ou com a sua chave). */
+  comparativo: [
+    {
+      comIA: { estado: "incluso", texto: "Caixa de entrada de WhatsApp e Instagram" },
+      semIA: { estado: "incluso", texto: "Caixa de entrada de WhatsApp e Instagram" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Funil, follow-up e Radar" },
+      semIA: { estado: "incluso", texto: "Funil, follow-up e Radar" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Atendente de IA incluído, com teto de US$ 15 de IA por mês. Ao chegar no teto, a IA pausa." },
+      semIA: { estado: "chave", texto: "Atendente de IA com a sua própria chave" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Até 3 números de WhatsApp e até 2 contas de Instagram" },
+      semIA: { estado: "incluso", texto: "Até 3 números de WhatsApp e até 2 contas de Instagram" },
+    },
+    {
+      comIA: { estado: "incluso", texto: "Sem cobrança por usuário" },
+      semIA: { estado: "incluso", texto: "Sem cobrança por usuário" },
+    },
+  ],
+  implantacaoSeletor: "Adicionar implantação",
+  implantacaoDescricao: "Diagnóstico, funil e WhatsApp, agente treinado com o MEP, treinamento e 30 dias de acompanhamento.",
+  totalMensal: "Do 1º ao 3º mês",
+  totalDepois: "Depois",
+  maisSuaIA: "mais a sua IA",
+  parcelasAnual: "Implantação cobrada à parte, em até 3 parcelas de",
+  confianca: [
+    { icone: "escudo", texto: "Garantia de 100% da implantação" },
+    { icone: "usuario", texto: "Sem cobrança por usuário" },
+    { icone: "chat", texto: "Dúvida antes de pagar? Um humano da Tektus responde no WhatsApp" },
+  ],
 } as const;
 
 /** Bloco só renderiza com `GARANTIA_CONFIRMADA` true. */
@@ -554,7 +597,7 @@ export const FAQ = [
   },
   {
     p: "Qual inteligência artificial o Verdash CRM usa e quem controla o gasto?",
-    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e ao chegar nele a IA pausa e a Tektus combina com o cliente o próximo passo. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
+    r: "O sistema funciona com OpenRouter, Anthropic ou OpenAI, e o provedor se troca pela tela. No plano com IA, o consumo entra num teto de US$ 15 por mês, e ao chegar nele a IA pausa. No plano sem IA, a empresa cadastra a própria chave. A tela de uso mostra o consumo.",
   },
   {
     p: "Como o Verdash CRM usa o Google Agenda e o Google Ads?",

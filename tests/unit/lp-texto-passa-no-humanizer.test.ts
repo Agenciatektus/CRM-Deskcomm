@@ -99,7 +99,7 @@ describe("texto da LP", () => {
 
   it("não afirma número de resultado (percentual, multiplicador, 'X vezes')", () => {
     // "3x sem juros" e "100% da implantação" são condição de pagamento e de garantia, não resultado.
-    const semCondicao = (t: string) => t.replace(/\b3x sem juros/g, "").replace(/100% da implantação/g, "");
+    const semCondicao = (t: string) => t.replace(/\b3x sem juros/g, "").replace(/100% da implantação/g, "").replace(/15% de desconto/g, "");
     const suspeitos = TEXTOS.map(semCondicao).filter(
       (t) => /\d+\s?%/.test(t) || /\b\d+(?:[.,]\d+)?\s?(?:x|vezes)\b/i.test(t) || /\bROI\b/.test(t),
     );
