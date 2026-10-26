@@ -22,6 +22,7 @@ function database(data: unknown, error: unknown = null) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   h.configured = true;
   h.getSession.mockResolvedValue({ status: "SCAN_QR_CODE" });
   h.limit.mockResolvedValue({ allowed: true });
@@ -54,6 +55,16 @@ describe("pairing code boundary", () => {
         headers: { "Content-Type": "application/json", "X-Api-Key": "test-key" },
       }),
     );
+  });
+  it("com o WAHA desabilitado recusa 403 antes de consultar o canal ou o transporte", async () => {
+    vi.stubEnv("WAHA_HABILITADO", "false");
+    const { db, query } = database({ waha_session_name: "session/a" });
+    await expect(
+      requestChannelPairingCode(db, "org-a", "channel-a", "5511999991234"),
+    ).rejects.toMatchObject({ code: "waha_desabilitado", status: 403 });
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.getSession).not.toHaveBeenCalled();
+    expect(query.maybeSingle).not.toHaveBeenCalled();
   });
   it.each([
     [null, "not_found"],

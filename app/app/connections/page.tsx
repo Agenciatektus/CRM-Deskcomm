@@ -7,6 +7,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { ConexoesShell } from "@/components/connections/ConexoesShell";
 import { Canais } from "@/components/mobile/telas/Canais";
 import { canalGraphParceiroLigado, GRAPH_PARTNER_LABEL } from "@/lib/channels/graph-parceiro/credentials";
+import { wahaHabilitado } from "@/lib/env";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function ConnectionsPage() {
   const idioma = user.idioma;
 
   const key = process.env.WAHA_API_KEY;
+  const wahaDesligado = !wahaHabilitado();
   const wahaConfigured = Boolean(
     process.env.WAHA_API_BASE_URL && key && key !== "dev_plaintext_change_me",
   );
@@ -41,6 +43,7 @@ export default async function ConnectionsPage() {
         <Canais>
           <ConexoesShell
             wahaConfigured={wahaConfigured}
+            wahaDesligado={wahaDesligado}
             wacallsConfigured={wacallsConfigured}
             graphParceiro={canalGraphParceiroLigado() ? { label: GRAPH_PARTNER_LABEL } : null}
           />

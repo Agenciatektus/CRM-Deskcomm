@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getWahaClient } from "@/lib/waha/client";
+import { wahaHabilitado } from "@/lib/env";
+import { MENSAGEM_WAHA_DESABILITADO } from "@/lib/waha/desabilitado";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "./archived";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 
@@ -29,6 +31,8 @@ export async function requestChannelPairingCode(
   channelId: string,
   phoneNumber: string,
 ): Promise<{ code: string }> {
+  if (!wahaHabilitado())
+    throw new PairingCodeError("waha_desabilitado", MENSAGEM_WAHA_DESABILITADO, 403);
   const buscar = (columns: string) =>
     db
       .from("channel_sessions")

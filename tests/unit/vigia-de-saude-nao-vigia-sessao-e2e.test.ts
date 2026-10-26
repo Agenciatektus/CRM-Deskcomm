@@ -126,6 +126,7 @@ vi.mock("@/lib/channels", () => ({
   CHANNEL_SESSION_REF_COLUMNS: "provider, waha_session_name, meta_phone_number_id, zernio_account_id",
   DEFAULT_CHANNEL_PROVIDER: "waha",
   canalConhecidoSemMensagem: () => false,
+  canalDesligadoNaInstalacao: () => false,
   resolveSessionRef: (s: {
     waha_session_name?: string | null;
     meta_phone_number_id?: string | null;

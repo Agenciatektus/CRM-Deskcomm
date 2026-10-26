@@ -42,10 +42,17 @@ import { rotaDeTemplates } from "@/lib/channels/templates-fonte";
  */
 export function ConexoesShell({
   wahaConfigured,
+  wahaDesligado = false,
   wacallsConfigured,
   graphParceiro = null,
 }: {
   wahaConfigured: boolean;
+  /**
+   * Interruptor do servidor (variável de habilitação do transporte por QR): a
+   * lista de números existentes continua na aba, sem o botão de criar, e a tela
+   * abre na Verdash. Só o booleano chega aqui.
+   */
+  wahaDesligado?: boolean;
   wacallsConfigured: boolean;
   /**
    * O canal parceiro que espelha a Cloud API (recorte do #1130) é OPCIONAL DA
@@ -59,8 +66,11 @@ export function ConexoesShell({
   const router = useRouter();
   const params = useSearchParams();
   const abaParam = params.get("aba");
+  const abaPadrao = wahaDesligado ? "hospedado" : "numeros";
   const aba =
-    abaParam === "sociais"
+    abaParam === "numeros"
+      ? "numeros"
+      : abaParam === "sociais"
       ? "sociais"
       : abaParam === "oficial"
       ? "oficial"
@@ -76,12 +86,12 @@ export function ConexoesShell({
                 ? "instagram"
                 : abaParam === "graph" && graphParceiro
                   ? "graph"
-                  : "numeros";
+                  : abaPadrao;
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
 
   const irPara = (proximaAba: string, proximaSub?: string): void => {
     const q = new URLSearchParams();
-    if (proximaAba !== "numeros") q.set("aba", proximaAba);
+    if (proximaAba !== abaPadrao) q.set("aba", proximaAba);
     if (proximaSub && proximaSub !== "conexao") q.set("sub", proximaSub);
     const qs = q.toString();
     // `scroll: false`: trocar de aba não é navegar para outra página; jogar o
@@ -129,7 +139,7 @@ export function ConexoesShell({
       </TabsList>
 
       <TabsContent value="numeros" className="mt-0">
-        <ConnectionsClient wahaConfigured={wahaConfigured} />
+        <ConnectionsClient wahaConfigured={wahaConfigured} wahaDesligado={wahaDesligado} />
       </TabsContent>
 
       <TabsContent value="telefonia" className="mt-0">

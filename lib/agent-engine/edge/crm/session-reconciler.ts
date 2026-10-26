@@ -27,6 +27,7 @@
  */
 import type pg from 'pg';
 
+import { interpretaWahaHabilitado } from '@/lib/waha/habilitado';
 import { canonicalWahaExternalId, parseWahaMessageId, wahaEchoExternalIds } from '@/lib/waha/message-id';
 import { lerNumerosDeTeste, numeroPodeTestar, preGoLiveAtivo } from '@/lib/ai/elegibilidade/pre-go-live';
 import { canalDesativado } from '@/lib/channels/desativado';
@@ -90,6 +91,18 @@ async function fetchWahaSessions(cfg: WatchdogConfig): Promise<WahaSession[] | n
   } catch {
     return null; // WAHA fora: tick pula (transiente) — nunca derruba o worker
   }
+}
+
+/** Por que o watchdog sobe ou não: o interruptor vence a falta de credencial. */
+export function estadoDoWatchdog(env: {
+  WAHA_HABILITADO?: string;
+  WAHA_API_BASE_URL?: string;
+  WAHA_API_KEY?: string;
+}): 'ligado' | 'desligado_pelo_interruptor' | 'sem_credencial' {
+  if (!interpretaWahaHabilitado(env.WAHA_HABILITADO)) return 'desligado_pelo_interruptor';
+  return env.WAHA_API_BASE_URL !== undefined && env.WAHA_API_KEY !== undefined
+    ? 'ligado'
+    : 'sem_credencial';
 }
 
 /** Corrige o espelho channel_sessions para o status REAL do WAHA e retoma STOPPED. */

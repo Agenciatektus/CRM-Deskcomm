@@ -42,6 +42,7 @@ function comEnv(redisUrl: string, redisToken: string) {
       INTERNAL_CRON_SECRET: SEGREDO,
       INTERNAL_SECRET: "",
     },
+    wahaHabilitado: () => true,
   }));
 }
 

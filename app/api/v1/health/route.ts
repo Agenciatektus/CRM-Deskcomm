@@ -24,7 +24,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { env } from "@/lib/env";
+import { env, wahaHabilitado } from "@/lib/env";
 import { alvoDe, classificarFalhaDeAlcance, type FalhaDeAlcance } from "@/lib/net/alcance";
 import { validarConfigRedisRest } from "@/lib/redis-config";
 import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
@@ -290,15 +290,22 @@ function semAlvo(check: Check): Check {
 }
 
 export async function GET(req: NextRequest) {
+  // WAHA desligado de propósito (`WAHA_HABILITADO=false`): não é sonda, não é
+  // chave. Um check "ok" fingido enganaria o monitor; omitir a chave diz a verdade.
+  const wahaLigado = wahaHabilitado();
   const [supabase, redis, waha] = await Promise.all([
     checkSupabase(),
     checkRedis(),
-    checkWaha(),
+    wahaLigado ? checkWaha() : Promise.resolve(null),
   ]);
 
   const verboso = req.nextUrl.searchParams.get("verbose") === "1" && segredoInternoConfere(req);
   const filtrar = verboso ? (c: Check) => c : semAlvo;
-  const checks = { supabase: filtrar(supabase), redis: filtrar(redis), waha: filtrar(waha) };
+  const checks = {
+    supabase: filtrar(supabase),
+    redis: filtrar(redis),
+    ...(waha ? { waha: filtrar(waha) } : {}),
+  };
 
   const anyDown = Object.values(checks).some((c) => c.status === "down");
   const anyDegraded = Object.values(checks).some((c) => c.status === "degraded");
