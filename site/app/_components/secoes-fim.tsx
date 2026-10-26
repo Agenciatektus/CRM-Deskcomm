@@ -1,4 +1,4 @@
-import { CTA, CTA_FINAL, FAQ, GOOGLE, SITE, linkWhatsapp } from "@/lib/conteudo";
+import { CTA, CTA_FINAL, FAQ, GOOGLE, linkWhatsapp } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Container, Secao } from "./Secao";
@@ -137,10 +137,6 @@ export function Rodape() {
             WhatsApp da Tektus
           </a>
         </nav>
-        <p className="mt-6 mb-0 text-[0.8rem] leading-relaxed text-text-subtle">
-          Baseado no DeskcommCRM, projeto de código aberto (licença MIT). Página atualizada em
-          25/10/2026. {SITE.nome} tem implantação opcional pela Tektus.
-        </p>
       </Container>
     </footer>
   );
