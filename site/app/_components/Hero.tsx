@@ -32,6 +32,8 @@ export function Hero() {
           imgClassName="size-full object-cover object-top"
           mascara="[mask-image:radial-gradient(ellipse_85%_80%_at_50%_35%,#000_35%,transparent_100%)]"
         />
+        {/* Scrim: escurece só a coluna de texto (eyebrow até a nota) para o texto pequeno manter AA sobre a imagem. */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_46%_30%_at_50%_24%,rgb(13_14_17/0.92)_0%,rgb(13_14_17/0.85)_55%,transparent_100%)]" />
         <div className="fundo-ruido absolute inset-0 opacity-60" />
       </div>
 
