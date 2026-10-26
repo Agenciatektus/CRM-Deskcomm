@@ -978,6 +978,17 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     motivo:
       "tela de consentimento do Login do Facebook (`lib/plataformas-de-anuncio/meta/oauth/oauth.ts`): é para lá que o admin é REDIRECIONADO para autorizar a leitura da conta de anúncios. Par do `graph.facebook.com` no fluxo OAuth; endereço do fornecedor por definição.",
   },
+  "connect.facebook.net": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "SDK JavaScript da Meta (`hooks/channels/useMetaEmbeddedSignup.ts`), carregado só no clique de \"Conectar com a Meta\": é o popup do Embedded Signup, contrato do fornecedor.",
+  },
+  "web.facebook.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "origem alternativa do `postMessage` do popup do Embedded Signup; o hook só ACEITA mensagens dela e de `www.facebook.com`, não chama.",
+  },
+
   "www.googleapis.com": {
     categoria: "FORNECEDOR",
     motivo:

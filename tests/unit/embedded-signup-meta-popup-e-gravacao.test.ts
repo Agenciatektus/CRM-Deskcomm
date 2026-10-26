@@ -12,7 +12,7 @@ const OK = { type: "WA_EMBEDDED_SIGNUP", event: "FINISH", data: { waba_id: "9998
 describe("lerMensagemDaMeta", () => {
   it("aceita as duas origens da Meta, em objeto ou em string JSON", () => {
     for (const origin of ["https://www.facebook.com", "https://web.facebook.com"]) {
-      expect(lerMensagemDaMeta({ origin, data: OK })).toEqual({ wabaId: "999888777666555", phoneNumberId: "111222333444555" });
+      expect(lerMensagemDaMeta({ origin, data: OK })).toEqual({ wabaId: "999888777666555", phoneNumberId: "111222333444555", coexistencia: false });
       expect(lerMensagemDaMeta({ origin, data: JSON.stringify(OK) })).not.toBeNull();
     }
   });
@@ -25,6 +25,14 @@ describe("lerMensagemDaMeta", () => {
     "null",
   ])("ignora a origem %s mesmo com o formato certo", (origin) => {
     expect(lerMensagemDaMeta({ origin, data: OK })).toBeNull();
+  });
+
+  it("deriva Coexistence do EVENTO da Meta; evento desconhecido não diz nada", () => {
+    const origin = "https://www.facebook.com";
+    const com = (event: string) => lerMensagemDaMeta({ origin, data: { ...OK, event } });
+    expect(com("FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING")?.coexistencia).toBe(true);
+    expect(com("FINISH")?.coexistencia).toBe(false);
+    expect(com("QUALQUER_OUTRO")?.coexistencia).toBeUndefined();
   });
 
   it("ignora formato inesperado", () => {
@@ -54,14 +62,14 @@ describe("embeddedSignupConfigurado", () => {
 describe("o canal do Embedded Signup sai pelo caminho da conexão manual", () => {
   it("as duas rotas chamam gravarCanalOficial com os mesmos campos", async () => {
     vi.resetModules();
-    const gravar = vi.fn(async () => ({ ok: true, displayName: "Loja", phoneNumber: "+5511900000001", webhook: null }));
+    const gravar = vi.fn(async (_args: Record<string, unknown>) => ({ ok: true, displayName: "Loja", phoneNumber: "+5511900000001", webhook: null }));
     vi.doMock("@/lib/auth/require-role", () => ({
       requireRole: vi.fn(async () => ({ ok: true, user: { id: "u", idioma: "pt-BR", is_platform_admin: false }, org: { orgId: "org" } })),
     }));
     vi.doMock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
     vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({})) }));
     vi.doMock("@/lib/channels/meta/app", () => ({ appDaMeta: vi.fn(async () => ({ appSecret: "s", verifyToken: "v" })), appDaMetaDoAmbiente: vi.fn() }));
-    vi.doMock("@/lib/channels/meta/gravar-canal-oficial", () => ({ gravarCanalOficial: gravar }));
+    vi.doMock("@/lib/channels/meta/gravar-canal-oficial", () => ({ gravarCanalOficial: gravar, checarGravacaoLocal: async () => null }));
     vi.doMock("@/lib/channels/meta/validate-credentials", () => ({
       validateMetaCredentials: vi.fn(async () => ({ ok: true, displayPhoneNumber: "5511900000001", verifiedName: "Loja", qualityRating: null })),
     }));
@@ -80,7 +88,7 @@ describe("o canal do Embedded Signup sai pelo caminho da conexão manual", () =>
     await manual.POST(mk({ phone_number_id: "111222333444555", waba_id: "999888777666555", token: "tok-de-negocio-bem-comprido" }));
     await embedded.POST(mk({ code: "c", phone_number_id: "111222333444555", waba_id: "999888777666555", coexistencia: false }));
 
-    const [a, b] = gravar.mock.calls.map((c) => c[0] as Record<string, unknown>);
+    const [a, b] = gravar.mock.calls.map((c) => c[0]);
     expect(Object.keys(a!).filter((k) => k !== "coexistencia").sort()).toEqual(Object.keys(b!).filter((k) => k !== "coexistencia").sort());
     expect(a!.coexistencia).toBeUndefined();
     expect(b!.coexistencia).toBe(false);

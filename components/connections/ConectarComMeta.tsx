@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { useConcluirEmbeddedSignup } from "@/hooks/channels/useOfficialChannel";
+import { useConcluirEmbeddedSignup, useOfficialChannel } from "@/hooks/channels/useOfficialChannel";
 import { useMetaEmbeddedSignup } from "@/hooks/channels/useMetaEmbeddedSignup";
 import { useT } from "@/hooks/i18n/useT";
 import { Warning } from "@/lib/ui/icons";
@@ -44,10 +44,13 @@ export function ConectarComMeta({
   const t = useT();
   const { abrindo, abrir } = useMetaEmbeddedSignup(config);
   const concluir = useConcluirEmbeddedSignup();
+  const jaConectado = useOfficialChannel().data?.data.connected === true;
   const [ciente, setCiente] = useState(false);
   const [nome, setNome] = useState<string | null>(null);
 
   const conectar = async () => {
+    // Já existe canal oficial: o popup troca o token salvo, e a pessoa confirma antes.
+    if (jaConectado && !window.confirm(t("Conectar com a Meta substitui o token que está salvo agora."))) return;
     const r = await abrir(coexistencia);
     if (!r.ok) {
       if (r.motivo === "sdk") toast.error(t("Não foi possível carregar o login da Meta. Tente de novo."));
@@ -60,7 +63,7 @@ export function ConectarComMeta({
         code: r.code,
         waba_id: r.wabaId,
         phone_number_id: r.phoneNumberId,
-        coexistencia,
+        coexistencia: r.coexistencia,
       });
       setNome(res.data.displayName);
       toast.success(`${t("Conectado:")} ${res.data.displayName}`);

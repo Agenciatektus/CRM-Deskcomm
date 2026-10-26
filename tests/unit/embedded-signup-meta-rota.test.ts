@@ -9,14 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "@/lib/auth/require-role";
-import { gravarCanalOficial } from "@/lib/channels/meta/gravar-canal-oficial";
+import { checarGravacaoLocal, gravarCanalOficial } from "@/lib/channels/meta/gravar-canal-oficial";
 import { logger } from "@/lib/logger";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({})) }));
 vi.mock("@/lib/channels/meta/app", () => ({ appDaMeta: vi.fn(async () => ({ appSecret: "SEGREDO-DO-APP-XYZ", verifyToken: "v" })) }));
-vi.mock("@/lib/channels/meta/gravar-canal-oficial", () => ({ gravarCanalOficial: vi.fn() }));
+vi.mock("@/lib/channels/meta/gravar-canal-oficial", () => ({ gravarCanalOficial: vi.fn(), checarGravacaoLocal: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 
 import { POST } from "@/app/api/v1/channels/official/embedded-signup/route";
@@ -92,6 +92,7 @@ beforeEach(() => {
     user: { id: "user-1", idioma: "pt-BR", is_platform_admin: false },
     org: { orgId: ORG },
   } as never);
+  vi.mocked(checarGravacaoLocal).mockResolvedValue(null);
   vi.mocked(gravarCanalOficial).mockResolvedValue({
     ok: true,
     displayName: "Loja Exemplo",
@@ -164,7 +165,7 @@ describe("fluxo com a Graph", () => {
     const r = await POST(req(corpoValido));
     expect(r.status).toBe(200);
     const ordem = chamadas.map((c) => c.url.split("?")[0]!.replace(/^.*\/v[\d.]+/, ""));
-    expect(ordem).toEqual(["/oauth/access_token", "/debug_token", `/${FONE}`, `/${WABA}/phone_numbers`, `/${FONE}/register`]);
+    expect(ordem).toEqual(["/oauth/access_token", "/debug_token", `/${FONE}`, `/${WABA}/phone_numbers`, `/${FONE}`, `/${FONE}/register`]);
     const reg = chamadas.find((c) => c.url.includes("/register"))!;
     expect(reg.method).toBe("POST");
     expect(JSON.parse(reg.corpo)).toMatchObject({ messaging_product: "whatsapp", pin: expect.stringMatching(/^\d{6}$/) });
@@ -226,6 +227,49 @@ describe("fluxo com a Graph", () => {
     const r = await POST(req(corpoValido));
     expect(r.status).toBe(422);
     expect(JSON.stringify(await r.json())).toContain("já está ligado a outra conta");
+    expect(gravarCanalOficial).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconexão e checagem local (PIN do /register)", () => {
+  it("número JÁ registrado na Cloud API: não chama /register e conecta", async () => {
+    sobrescreve = (url) => (url.includes("fields=platform_type") ? resposta({ platform_type: "CLOUD_API", status: "CONNECTED", id: FONE }) : undefined);
+    const r = await POST(req(corpoValido));
+    expect(r.status).toBe(200);
+    expect(chamadas.some((c) => c.url.includes("/register"))).toBe(false);
+    expect(gravarCanalOficial).toHaveBeenCalledTimes(1);
+  });
+
+  it("erro 133005 (PIN divergente) é 'já registrado', não falha: reconectar o mesmo número funciona", async () => {
+    sobrescreve = (url) =>
+      url.includes("/register")
+        ? resposta({ error: { code: 133005, type: "OAuthException", message: "Two step verification PIN mismatch" } }, 400)
+        : undefined;
+    const r = await POST(req(corpoValido));
+    expect(r.status).toBe(200);
+    expect(gravarCanalOficial).toHaveBeenCalledTimes(1);
+  });
+
+  it("outro erro do /register continua sendo falha (controle negativo do 133005)", async () => {
+    sobrescreve = (url) =>
+      url.includes("/register") ? resposta({ error: { code: 100, type: "OAuthException", message: "Invalid parameter" } }, 400) : undefined;
+    const r = await POST(req(corpoValido));
+    expect(r.status).toBe(422);
+    expect(gravarCanalOficial).not.toHaveBeenCalled();
+  });
+
+  it("cifra ausente ou plano cheio: recusa ANTES de qualquer chamada à Meta (nada fica registrado sem canal)", async () => {
+    vi.mocked(checarGravacaoLocal).mockResolvedValueOnce({ ok: false, status: 409, code: "plan_limit_reached", message: "plano cheio" });
+    const r = await POST(req(corpoValido));
+    expect(r.status).toBe(409);
+    expect(chamadas).toHaveLength(0);
+    expect(gravarCanalOficial).not.toHaveBeenCalled();
+  });
+
+  it("token com app_id ausente no debug_token é recusado", async () => {
+    sobrescreve = (url) => (url.includes("/debug_token") ? resposta({ data: { is_valid: true, scopes: ESCOPOS_OK.data.scopes } }) : undefined);
+    const r = await POST(req(corpoValido));
+    expect(r.status).toBe(422);
     expect(gravarCanalOficial).not.toHaveBeenCalled();
   });
 });

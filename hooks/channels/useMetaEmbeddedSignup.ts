@@ -47,6 +47,8 @@ const SDK_ID = "facebook-jssdk";
 export interface DadosDoPopup {
   wabaId: string;
   phoneNumberId: string;
+  /** Do EVENTO da Meta: `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` = Coexistence, `FINISH` = não. Ausente = a Meta não disse. */
+  coexistencia?: boolean;
 }
 
 /** Lê o `postMessage`. Devolve os ids só se a origem e o formato forem os esperados. */
@@ -61,14 +63,16 @@ export function lerMensagemDaMeta(event: { origin: string; data: unknown }): Dad
     }
   }
   if (typeof data !== "object" || data === null) return null;
-  const msg = data as { type?: unknown; data?: { waba_id?: unknown; phone_number_id?: unknown } };
+  const msg = data as { type?: unknown; event?: unknown; data?: { waba_id?: unknown; phone_number_id?: unknown } };
   if (msg.type !== "WA_EMBEDDED_SIGNUP") return null;
   const waba = msg.data?.waba_id;
   const fone = msg.data?.phone_number_id;
   if (typeof waba !== "string" || typeof fone !== "string" || !/^\d{5,25}$/.test(waba) || !/^\d{5,25}$/.test(fone)) {
     return null;
   }
-  return { wabaId: waba, phoneNumberId: fone };
+  const coexistencia =
+    msg.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" ? true : msg.event === "FINISH" ? false : undefined;
+  return { wabaId: waba, phoneNumberId: fone, ...(coexistencia === undefined ? {} : { coexistencia }) };
 }
 
 function carregarSdk(appId: string): Promise<FbSdk> {
@@ -91,7 +95,7 @@ function carregarSdk(appId: string): Promise<FbSdk> {
 }
 
 export type ResultadoDoPopup =
-  | { ok: true; code: string; wabaId: string; phoneNumberId: string }
+  | { ok: true; code: string; wabaId: string; phoneNumberId: string; coexistencia: boolean }
   | { ok: false; motivo: "sdk" | "cancelado" | "sem_dados" };
 
 export function useMetaEmbeddedSignup(config: { appId: string; configId: string; configIdCoexistencia: string }) {
@@ -135,9 +139,10 @@ export function useMetaEmbeddedSignup(config: { appId: string; configId: string;
         // A Meta pode entregar o `postMessage` um instante depois do callback.
         for (let i = 0; i < 10 && !dados.current; i++) await new Promise((r) => setTimeout(r, 200));
         if (!dados.current) return { ok: false, motivo: "sem_dados" };
-        const { wabaId, phoneNumberId } = dados.current;
+        const { wabaId, phoneNumberId, coexistencia: doEvento } = dados.current;
         dados.current = null;
-        return { ok: true, code, wabaId, phoneNumberId };
+        // O evento da Meta manda; o cartão escolhido só vale quando ela não diz.
+        return { ok: true, code, wabaId, phoneNumberId, coexistencia: doEvento ?? coexistencia };
       } finally {
         setAbrindo(false);
       }

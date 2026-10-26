@@ -24,7 +24,7 @@ import {
   registrarNumero,
   trocarCodePorToken,
 } from "@/lib/channels/meta/embedded-signup";
-import { gravarCanalOficial } from "@/lib/channels/meta/gravar-canal-oficial";
+import { checarGravacaoLocal, gravarCanalOficial } from "@/lib/channels/meta/gravar-canal-oficial";
 import { validateMetaCredentials } from "@/lib/channels/meta/validate-credentials";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -60,6 +60,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!config || !appSecret) {
     return fail("invalid_request", t("A conexão pela Meta não está configurada nesta instalação."), 422, { requestId });
   }
+
+  // Antes de qualquer chamada que mude estado na Meta: cifra e plano.
+  const admin = createAdminClient();
+  const local = await checarGravacaoLocal({ admin, orgId: authz.org.orgId, idioma: authz.user.idioma, t });
+  if (local) return fail(local.code, local.message, local.status, { requestId, details: local.details });
 
   const troca = await trocarCodePorToken({ code, appId: config.appId, appSecret });
   if (!troca.ok) {
@@ -99,7 +104,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const gravado = await gravarCanalOficial({
-    admin: createAdminClient(),
+    admin,
     orgId: authz.org.orgId,
     userId: authz.user.id,
     requestId,

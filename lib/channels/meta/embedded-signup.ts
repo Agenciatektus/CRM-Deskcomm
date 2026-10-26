@@ -85,7 +85,7 @@ export async function conferirTokenDeNegocio(input: {
   );
   if (!r.ok) return { ok: false, motivo: "token_sem_escopo" };
   const d = r.corpo.data;
-  if (!d || d.is_valid === false || (d.app_id && d.app_id !== input.appId)) return { ok: false, motivo: "token_sem_escopo" };
+  if (!d || d.is_valid !== true || d.app_id !== input.appId) return { ok: false, motivo: "token_sem_escopo" };
   const escopos = new Set([...(d.scopes ?? []), ...(d.granular_scopes ?? []).map((g) => g.scope ?? "")]);
   if (!ESCOPOS_ESPERADOS.every((e) => escopos.has(e))) return { ok: false, motivo: "token_sem_escopo" };
   // Quando a Meta lista as contas do escopo, a WABA do popup tem de estar entre elas.
@@ -96,14 +96,34 @@ export async function conferirTokenDeNegocio(input: {
   return { ok: true };
 }
 
-/** Registra o número na Cloud API com um PIN novo. NÃO se chama em Coexistence. */
-export async function registrarNumero(input: { phoneNumberId: string; token: string }): Promise<Resultado<object>> {
+/** A Meta recusa o PIN novo porque o número já está registrado com outro. */
+const CODIGO_PIN_DIVERGENTE = 133005;
+
+/**
+ * Registra o número na Cloud API com um PIN novo. NÃO se chama em Coexistence.
+ *
+ * O `pin` do /register vira o PIN da verificação em duas etapas do número, e o CRM não o
+ * guarda (não há campo para isso sem migration; quem precisar redefine no WhatsApp
+ * Manager). Por isso o /register só roda quando é necessário: número já registrado na
+ * Cloud API é PULADO, e o erro de PIN divergente (133005) é lido como "já registrado" e
+ * não como falha. Sem isso, reconectar o mesmo número ficaria preso para sempre.
+ */
+export async function registrarNumero(input: { phoneNumberId: string; token: string }): Promise<Resultado<{ jaRegistrado: boolean }>> {
+  const base = graphBaseUrl(graphVersion());
+  const estado = await chamar<{ platform_type?: string; status?: string }>(
+    `${base}/${input.phoneNumberId}?fields=platform_type,status`,
+    { headers: { Authorization: `Bearer ${input.token}` } },
+  );
+  if (estado.ok && (estado.corpo.platform_type === "CLOUD_API" || estado.corpo.status === "CONNECTED")) {
+    return { ok: true, jaRegistrado: true };
+  }
   const pin = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const r = await chamar<{ success?: boolean }>(`${graphBaseUrl(graphVersion())}/${input.phoneNumberId}/register`, {
+  const r = await chamar<{ success?: boolean }>(`${base}/${input.phoneNumberId}/register`, {
     method: "POST",
     headers: { Authorization: `Bearer ${input.token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", pin }),
   });
-  if (r.ok) return { ok: true };
+  if (r.ok) return { ok: true, jaRegistrado: false };
+  if (r.erro.code === CODIGO_PIN_DIVERGENTE) return { ok: true, jaRegistrado: true };
   return { ok: false, motivo: /already|já est|another|outra/i.test(r.erro.message ?? "") ? "numero_em_outra_conta" : "registro_falhou" };
 }

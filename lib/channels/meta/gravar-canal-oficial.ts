@@ -12,7 +12,7 @@ import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { CHANNEL_PROVIDER_META } from "@/lib/channels/capabilities";
 import { reactivateChannelSession } from "@/lib/channels/reactivate";
-import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
+import { lerLimiteDoPlano, traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
@@ -176,4 +176,54 @@ export async function gravarCanalOficial(input: {
       : null;
 
   return { ok: true, displayName: linha.display_name, phoneNumber, webhook };
+}
+
+/**
+ * O que pode falhar na GRAVAÇÃO, perguntado ANTES de qualquer chamada que mude estado na
+ * Meta. O Embedded Signup registra o número (PIN novo que ninguém guarda); registrar e só
+ * então descobrir que a cifra falta ou que o plano está cheio deixaria o número registrado
+ * com um PIN desconhecido e nenhum canal.
+ *
+ * Melhor esforço: se a consulta em si falhar, segue (o gatilho do banco continua sendo a
+ * palavra final, e o registro é idempotente: número já registrado é pulado).
+ */
+export async function checarGravacaoLocal(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  orgId: string;
+  idioma: Idioma;
+  t: (texto: string) => string;
+}): Promise<FalhaAoGravar | null> {
+  const { admin, orgId, t } = input;
+  if (!(await encryptWebhookSecret(admin, "sonda"))) {
+    return {
+      ok: false,
+      status: 422,
+      code: "invalid_request",
+      message: t("cifra indisponível nesta instalação (GUC app.nuvemshop_oauth_key ausente) — o token não foi gravado"),
+    };
+  }
+  try {
+    const { data: ativo } = await admin
+      .from("channel_sessions")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("provider", CHANNEL_PROVIDER_META)
+      .is(ARCHIVED_AT, null)
+      .maybeSingle();
+    if (ativo) return null; // atualiza o canal que já existe: não ocupa vaga nova
+    const limite = await lerLimiteDoPlano(admin, orgId, "canais");
+    if (limite === null) return null;
+    const { count } = await admin
+      .from("channel_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .is(ARCHIVED_AT, null);
+    if ((count ?? 0) >= limite) {
+      const l = traduzirLimiteDoPlano(`limite_do_plano:canais:${limite}`, input.idioma);
+      if (l) return { ok: false, status: 409, code: l.code, message: l.message, details: l.details };
+    }
+  } catch {
+    // melhor esforço
+  }
+  return null;
 }

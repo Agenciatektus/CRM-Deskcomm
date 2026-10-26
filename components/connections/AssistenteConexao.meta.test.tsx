@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
+  conectado: false,
   config: null as null | { appId: string; configId: string; configIdCoexistencia: string },
   abrir: vi.fn(),
   concluir: vi.fn(),
@@ -11,7 +12,7 @@ vi.mock("@/lib/api/client", () => ({ apiClient: { get: vi.fn(), post: vi.fn() } 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
 vi.mock("sonner", () => ({ toast: h.toast }));
 vi.mock("@/hooks/channels/useOfficialChannel", () => ({
-  useOfficialChannel: () => ({ data: { data: { embeddedSignup: h.config } } }),
+  useOfficialChannel: () => ({ data: { data: { embeddedSignup: h.config, connected: h.conectado } } }),
   useConcluirEmbeddedSignup: () => ({ mutateAsync: h.concluir, isPending: false }),
 }));
 vi.mock("@/hooks/channels/useMetaEmbeddedSignup", () => ({ useMetaEmbeddedSignup: () => ({ abrindo: false, abrir: h.abrir }) }));
@@ -22,6 +23,7 @@ import { AssistenteConexao } from "./AssistenteConexao";
 const CFG = { appId: "1", configId: "2", configIdCoexistencia: "2" };
 beforeEach(() => {
   h.config = null;
+  h.conectado = false;
   h.abrir.mockReset();
   h.concluir.mockReset();
 });
@@ -64,7 +66,7 @@ it("com a Meta configurada: as duas abas na API Oficial e o botão chama o popup
 
 it("Coexistence: aviso âmbar, botão travado até o checkbox, e o popup abre no modo Coexistence", async () => {
   h.config = CFG;
-  h.abrir.mockResolvedValue({ ok: true, code: "c", wabaId: "999888777666555", phoneNumberId: "111222333444555" });
+  h.abrir.mockResolvedValue({ ok: true, code: "c", wabaId: "999888777666555", phoneNumberId: "111222333444555", coexistencia: true });
   h.concluir.mockResolvedValue({ data: { displayName: "Loja", phoneNumber: "+5511900000001", coexistencia: true } });
   await ate2();
   escolher(/Coexistence/);
@@ -88,4 +90,17 @@ it("a Meta sem os dados do número: erro dito e nada enviado ao servidor", async
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Conectar com a Meta" })));
   expect(h.toast.error).toHaveBeenCalledWith("A Meta não retornou os dados do número. Refaça e conclua todos os passos.");
   expect(h.concluir).not.toHaveBeenCalled();
+});
+
+it("já existe canal oficial: pede confirmação antes de abrir o popup, e cancelar não abre", async () => {
+  h.config = CFG;
+  const conf = vi.spyOn(window, "confirm").mockReturnValue(false);
+  h.conectado = true;
+  await ate2();
+  escolher(/^API Oficial\s*Número oficial/);
+  await continuar();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Conectar com a Meta" })));
+  expect(conf).toHaveBeenCalledWith("Conectar com a Meta substitui o token que está salvo agora.");
+  expect(h.abrir).not.toHaveBeenCalled();
+  conf.mockRestore();
 });
