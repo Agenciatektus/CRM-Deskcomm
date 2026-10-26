@@ -16,6 +16,7 @@ export { Faixa } from "./Faixa";
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaFunil } from "./telas/TelaFunil";
 import { PainelConhecimento, PainelPassagem, PainelProposta } from "./telas/TelasDoAgente";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Janela } from "./ui/Janela";
 import { Icone, type NomeIcone } from "./ui/Icones";
 import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
@@ -151,7 +152,18 @@ export function Problema() {
     <MiniSemDono key="f" />,
   ];
   return (
-    <Secao titulo="titulo-problema" fundo="pontos">
+    <Secao
+      titulo="titulo-problema"
+      fundo="pontos"
+      fundoExtra={
+        <ImagemDeSlot
+          id="vacuo-mensagens"
+          opacidade={0.55}
+          className="inset-x-0 top-0 h-[34rem]"
+          mascara="[mask-image:linear-gradient(to_bottom,#000_45%,transparent)]"
+        />
+      }
+    >
       <Cabeca id="titulo-problema" titulo={PROBLEMAS_TITULO} texto={PROBLEMAS_INTRO} />
       <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
         {PROBLEMAS.map((p, i) => (
