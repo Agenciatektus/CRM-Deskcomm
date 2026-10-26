@@ -142,6 +142,16 @@ function MiniSemDono() {
   );
 }
 
+/** Seis cenas em ritmo 4+2, 3+3, 2+4 no desktop (grade de 6 colunas); abaixo de lg segue em duas colunas. */
+const RITMO_6 = [
+  "lg:col-span-4",
+  "lg:col-span-2",
+  "lg:col-span-3",
+  "lg:col-span-3",
+  "lg:col-span-2",
+  "lg:col-span-4",
+] as const;
+
 export function Problema() {
   const minis = [
     <MiniLeadSumiu key="a" />,
@@ -165,9 +175,9 @@ export function Problema() {
       }
     >
       <Cabeca id="titulo-problema" titulo={PROBLEMAS_TITULO} texto={PROBLEMAS_INTRO} />
-      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:grid-cols-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {PROBLEMAS.map((p, i) => (
-          <Card key={p.titulo} atraso={(i % 3) * 0.1} className="flex flex-col gap-6">
+          <Card key={p.titulo} atraso={(i % 3) * 0.1} className={`flex flex-col gap-6 ${RITMO_6[i]}`}>
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {minis[i]}
             </div>
@@ -402,9 +412,9 @@ export function Agente() {
   return (
     <Secao id="agente" titulo="titulo-agente" fundo="azul">
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
-      <div className="grid items-start gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid items-start gap-6 lg:grid-cols-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
-          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className="flex flex-col gap-5">
+          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className={`flex flex-col gap-5 ${RITMO_6[k]}`}>
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {paineis[k]}
             </div>
