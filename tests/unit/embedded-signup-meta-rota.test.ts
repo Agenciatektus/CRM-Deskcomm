@@ -82,6 +82,7 @@ function logou(texto: string): boolean {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   chamadas = [];
   sobrescreve = null;
   process.env.META_APP_ID = "123456789";

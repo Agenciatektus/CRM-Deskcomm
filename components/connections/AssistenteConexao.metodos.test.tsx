@@ -11,6 +11,7 @@ const stub = vi.hoisted(
 );
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: h.get, post: h.post } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
+vi.mock("@/hooks/channels/useOfficialChannel", () => ({ useOfficialChannel: () => ({ data: undefined }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
 vi.mock("./CanalOficialClient", () => ({ CanalOficialClient: stub("form-oficial", "5511900000001") }));
