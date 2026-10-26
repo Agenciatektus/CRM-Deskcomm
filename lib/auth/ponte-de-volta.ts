@@ -65,9 +65,18 @@ function escapeHtml(str: string): string {
  * @param destino  caminho interno já filtrado por `safeNext`
  * @param nomeDaMarca  `marcaDaSaida(null).nome` (nunca lança)
  * @param mensagem  texto visível enquanto o documento não segue
+ * @param levarFragmento  repassa o `#fragmento` da URL de entrada ao destino. Só para quem recebe
+ *   dado no fragmento de propósito (a volta do Instagram direto traz a `conclusao` ali: o
+ *   fragmento não vai ao servidor, nem em Referer nem em log). O script continua constante
+ *   (o fragmento é lido em runtime, não escrito nele), então o hash do CSP não muda com ele.
  */
-export function respostaDePonte(destino: string, nomeDaMarca: string, mensagem: string): Response {
-  const script = `window.location.replace(${literalDeScript(destino)});`;
+export function respostaDePonte(
+  destino: string,
+  nomeDaMarca: string,
+  mensagem: string,
+  levarFragmento = false,
+): Response {
+  const script = `window.location.replace(${literalDeScript(destino)}${levarFragmento ? "+window.location.hash" : ""});`;
   const hash = createHash("sha256").update(script).digest("base64");
   const alvo = escapeHtml(destino);
   const nome = escapeHtml(nomeDaMarca);

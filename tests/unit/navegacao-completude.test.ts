@@ -34,6 +34,8 @@ const NAV_ALLOWLIST: Record<string, string> = {
   "/app": "redirect para /app/inbox — não é tela, é o ponto de entrada",
   "/app/ai/agents/new":
     "sub-fluxo de criar agente, alcançado pelo botão dentro da lista de Agentes",
+  "/app/connections/instagram/retorno":
+    "volta do Conectar com o Instagram: a Meta devolve o navegador pela ponte pública e a página conclui a conexão; ninguém navega até ela pelo menu",
   "/app/team/invite": "sub-fluxo de convite, alcançado de dentro de Equipe",
   "/app/campaigns/new":
     "sub-fluxo de criar campanha, alcançado pelo botão dentro da lista de Campanhas",
