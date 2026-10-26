@@ -2349,6 +2349,7 @@ export const DICIONARIO: Traducoes = {
   "Precisa de atenção": { es: "Necesita atención" },
   "Número ou conta": { es: "Número o cuenta" },
   "Detalhe": { es: "Detalle" },
+  "Não foi possível reconectar.": { es: "No fue posible reconectar." },
   "Conectar WhatsApp": { es: "Conectar WhatsApp" },
   "para poder publicar.": { es: "para poder publicar." },
   "Escolha o número para poder publicar. Sem ele, o rascunho salva mas não atende.": {
