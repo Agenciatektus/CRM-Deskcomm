@@ -90,7 +90,16 @@ export function ConexoesShell({
     case "oficial":
       return <Apoio titulo={t("API Oficial (Meta)")}>{comModelos("oficial", <CanalOficialClient />, <TemplatesClient />, t("Templates da Meta"))}</Apoio>;
     case "parceiro":
-      return <Apoio titulo={t("Provedor parceiro")}>{comModelos("parceiro", <CanalParceiroClient />, <TemplatesParceiroClient />, t("Modelos do parceiro"))}</Apoio>;
+      return (
+        <Apoio titulo={t("Provedor parceiro")}>
+          {comModelos(
+            "parceiro",
+            <CanalParceiroClient />,
+            <TemplatesParceiroClient />,
+            t("Modelos do parceiro"),
+          )}
+        </Apoio>
+      );
     case "graph":
       return <Apoio titulo={graphParceiro?.label ?? ""}>{comModelos("graph", <CanalGraphParceiroClient />, <TemplatesParceiroClient rota={rotaDeTemplates("graph")} />, t("Modelos"))}</Apoio>;
     case "hospedado":
