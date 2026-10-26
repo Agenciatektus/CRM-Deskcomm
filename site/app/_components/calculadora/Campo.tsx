@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { CALCULADORA } from "@/lib/conteudo";
 import type { Leitura } from "@/lib/conta";
 
-import { ImagemDeSlot } from "../ui/ImagemDeSlot";
-
 export const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 /** Texto de erro de um campo, a partir da leitura (ou de um erro específico da tela). */
@@ -68,18 +66,7 @@ export function Campo({
   );
 }
 
-/** Painel de resultado da calculadora, com a imagem conta-equilibrio (IMG-05) atrás: balança nas bordas, centro escuro. */
+/** Painel de resultado da calculadora: limpo, sem imagem por trás do texto. */
 export function PainelDeResultado({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative isolate overflow-hidden rounded-grande border border-border-strong bg-bg p-6 sm:p-8">
-      <ImagemDeSlot
-        id="conta-equilibrio"
-        opacidade={0.5}
-        className="inset-0 -z-10"
-        mascara="[mask-image:radial-gradient(ellipse_100%_100%_at_50%_50%,#000_30%,transparent_100%)]"
-        fallback="fundo-brilho-centro"
-      />
-      {children}
-    </div>
-  );
+  return <div className="rounded-grande border border-border-strong bg-bg p-6 sm:p-8">{children}</div>;
 }

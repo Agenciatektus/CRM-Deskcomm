@@ -202,7 +202,22 @@ export function Problema() {
 
 export function Conta() {
   return (
-    <Secao id="conta" titulo="titulo-conta" fundo="azul" largura="grade" ritmo="l">
+    <Secao
+      id="conta"
+      titulo="titulo-conta"
+      fundo="azul"
+      largura="grade"
+      ritmo="l"
+      fundoExtra={
+        <ImagemDeSlot
+          id="conta-equilibrio"
+          opacidade={0.6}
+          className="top-8 right-[4%] hidden h-[19rem] w-[30rem] 2xl:block"
+          mascara="[mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,#000_40%,transparent_100%)]"
+          fallback="fundo-brilho-centro"
+        />
+      }
+    >
       <Cabeca id="titulo-conta" titulo={CONTA.titulo} texto={CONTA.intro} />
       <div className="revela">
         <Calculadora />
