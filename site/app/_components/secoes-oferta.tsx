@@ -4,6 +4,7 @@ import { BotaoSecundario } from "./Botao";
 import { Planos } from "./Planos";
 import { Card, Cabeca, Secao } from "./Secao";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 
 /** Oferta: seletor de período, os dois planos em comparativo, a implantação opcional e a dúvida. */
 export function Oferta() {
@@ -26,6 +27,13 @@ export function Garantia() {
   return (
     <Secao titulo="titulo-garantia" fundo="menta" largura="texto" ritmo="m">
       <div className="luz luz-menta luz-fraca rounded-modal [--luz-blur:80px]">
+        <ImagemDeSlot
+          id="garantia-anel"
+          opacidade={0.5}
+          fallback="fundo-brilho-menta"
+          className="top-1/2 left-1/2 -z-10 size-[44rem] max-w-none -translate-x-1/2 -translate-y-1/2"
+          mascara="[mask-image:radial-gradient(circle_at_50%_50%,#000_45%,transparent_72%)]"
+        />
         <div className="card borda-luz revela rounded-modal p-8 sm:p-10 lg:p-14">
           <div className="grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-8">
             <Selo100 />
