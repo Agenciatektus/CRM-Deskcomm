@@ -2,11 +2,11 @@
 
 import { useId, useState } from "react";
 
-import { GARANTIA_CONFIRMADA, OFERTA, linkWhatsapp } from "@/lib/conteudo";
+import { linkDeAssinatura } from "@/lib/checkout";
+import { GARANTIA_CONFIRMADA, OFERTA } from "@/lib/conteudo";
 import {
   anualCentavos,
   equivalenteMensalCentavos,
-  mensagemDeAssinatura,
   reaisDeCentavos as reais,
   totalPrimeirosMesesCentavos,
   MENSAL_CENTAVOS,
@@ -108,15 +108,14 @@ export function Planos() {
               </p>
               <div>
                 {p.destaque ? (
-                  <BotaoPrimario href={linkWhatsapp(mensagemDeAssinatura(p.id, periodo, comImpl))} externo>
+                  <BotaoPrimario href={linkDeAssinatura(p.id, periodo, comImpl)} externo>
                     {dados.botao}
                   </BotaoPrimario>
                 ) : (
-                  <BotaoSecundario href={linkWhatsapp(mensagemDeAssinatura(p.id, periodo, comImpl))} externo>
+                  <BotaoSecundario href={linkDeAssinatura(p.id, periodo, comImpl)} externo>
                     {dados.botao}
                   </BotaoSecundario>
                 )}
-                {/* TODO(checkout): a URL do checkout ainda não existe. Quando existir, entra aqui no lugar do WhatsApp. */}
               </div>
               {OFERTA.comparativo.map((linha) => {
                 const c = linha[chave];
