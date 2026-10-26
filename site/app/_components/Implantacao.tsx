@@ -2,6 +2,7 @@ import { IMPLANTACAO } from "@/lib/conteudo";
 
 import { Cabeca, Secao } from "./Secao";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 
 /**
  * Implantação opcional: linha do tempo com a ORDEM dos passos (sem prazo por etapa), a barra dos 30 dias
@@ -11,13 +12,29 @@ import { Icone } from "./ui/Icones";
 export function Implantacao() {
   const ultimo = IMPLANTACAO.linha.length - 1;
   return (
-    <Secao id="implantacao" titulo="titulo-implantacao" fundo="azul" largura="grade" ritmo="l">
-      <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
-      {IMPLANTACAO.prazoGeral ? (
-        <p className="mt-0 mb-8 text-base font-semibold">
-          {IMPLANTACAO.rotuloPrazo}: {IMPLANTACAO.prazoGeral}
-        </p>
-      ) : null}
+    <Secao
+      id="implantacao"
+      titulo="titulo-implantacao"
+      fundo="azul"
+      largura="grade"
+      ritmo="l"
+    >
+      {/* A imagem ocupa o espaço à direita do título, dentro do container, só em xl; as bordas dissolvem por máscara. */}
+      <div className="relative xl:min-h-[21rem]">
+        <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
+        {IMPLANTACAO.prazoGeral ? (
+          <p className="mt-0 mb-8 text-base font-semibold">
+            {IMPLANTACAO.rotuloPrazo}: {IMPLANTACAO.prazoGeral}
+          </p>
+        ) : null}
+        <ImagemDeSlot
+          id="implantacao-montagem"
+          opacidade={0.7}
+          className="top-0 right-0 hidden h-[20rem] w-[clamp(26rem,36vw,40rem)] xl:block"
+          imgClassName="size-full object-cover object-center"
+          mascara="[mask-image:radial-gradient(ellipse_72%_72%_at_55%_50%,#000_45%,transparent_100%)]"
+        />
+      </div>
 
       <ol className="relative m-0 grid list-none gap-8 p-0 lg:grid-cols-5 lg:gap-6 [&>*]:min-w-0">
         <span
