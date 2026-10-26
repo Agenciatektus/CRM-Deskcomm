@@ -51,14 +51,14 @@ export const NAV = [
 ] as const;
 
 const ABERTURA = "Todo cliente que chama no WhatsApp é respondido.";
-const DESTAQUE = "Até às 22h de sábado.";
+const DESTAQUE = "Inclusive às 22h de sábado.";
 
 export const HERO = {
   eyebrow: "Verdash CRM. Ninguém fica no vácuo.",
   abertura: ABERTURA,
   destaque: DESTAQUE,
   titulo: `${ABERTURA} ${DESTAQUE}`,
-  texto: "O Verdash CRM junta atendente de IA, funil de vendas e equipe no mesmo lugar, no WhatsApp e no Instagram.",
+  texto: "O Verdash CRM responde no horário que você definir e junta atendente de IA, funil de vendas e equipe no mesmo lugar, no WhatsApp e no Instagram.",
   preco:
     "Verdash CRM com IA: R$ 397 por mês, com teto de US$ 15 de IA por mês. Verdash CRM sem IA, com a sua própria chave: R$ 157 por mês. Implantação opcional pela Tektus, em pagamento único de R$ 1.297 em até 3x sem juros.",
   precoLinha: "A partir de R$ 157 por mês, com ou sem IA.",
