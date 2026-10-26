@@ -337,9 +337,9 @@ export const IMPLANTACAO = {
       texto: "Ajustes no agente e no funil com base no uso real.",
     },
   ],
-  /** Só a ordem dos passos é afirmada. Prazo geral da implantação: preencher quando o Peterson informar; vazio, não aparece. */
-  prazoGeral: "" as string,
-  rotuloPrazo: "Prazo geral",
+  /** Só a ordem dos passos e o prazo geral são afirmados; não há prazo por etapa. */
+  prazoGeral: "30 dias" as string,
+  rotuloPrazo: "Prazo geral de implementação",
   /** Ícone e texto curto de cada passo da linha do tempo, na mesma ordem de `passos`. */
   linha: [
     { icone: "busca", titulo: "Diagnóstico", texto: "Como o seu comercial funciona hoje e onde a venda se perde." },
@@ -448,7 +448,7 @@ export const OFERTA = {
   anual: "Anual",
   porMes: "por mês",
   semFidelidade: "Sem fidelidade no plano mensal, cancele quando quiser.",
-  anualDescricao: "Preço do plano anual com 15% de desconto",
+  anualDescricao: "Preço do plano anual com 15% de desconto, pago de uma vez",
   equivalente: "por mês, equivalente",
   porAno: "por ano",
   recomendado: "Recomendado",
@@ -586,6 +586,14 @@ export const FAQ = [
   {
     p: "Minha equipe vai conseguir usar?",
     r: "A equipe continua atendendo pelo WhatsApp, numa caixa só, com a IA ao lado. O funil se move pela conversa e ninguém preenche planilha. Quem contrata a implantação opcional recebe o treinamento da equipe e 30 dias de acompanhamento da Tektus para ajustar o que a operação real mostrar.",
+  },
+  {
+    p: "Quanto tempo leva a implantação do Verdash CRM?",
+    r: "O prazo geral da implantação opcional é de 30 dias, do diagnóstico até o atendimento entrar no ar. Depois disso a Tektus acompanha os primeiros 30 dias de uso, ajustando o agente de IA e o funil com o que a operação real mostrar. A implantação é paga uma vez e pode ser contratada junto com o plano.",
+  },
+  {
+    p: "Como funciona o plano anual do Verdash CRM?",
+    r: "O plano anual tem 15% de desconto sobre o valor mensal e é cobrado de uma vez. O plano com IA sai por R$ 4.049,40 por ano e o plano sem IA por R$ 1.601,40 por ano. O plano mensal não tem fidelidade e pode ser cancelado quando você quiser. A implantação opcional é cobrada à parte, em até 3x sem juros.",
   },
   {
     p: "O que a Tektus faz na implantação do Verdash CRM?",
