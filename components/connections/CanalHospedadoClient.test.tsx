@@ -5,13 +5,17 @@ const h = vi.hoisted(() => ({
   get: vi.fn(),
   del: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  assistenteProps: {} as { canalIdInicial?: string; nomeInicial?: string },
 }));
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: h.get, post: vi.fn(), delete: h.del } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
 vi.mock("sonner", () => ({ toast: h.toast }));
 vi.mock("./ChannelAiAccess", () => ({ ChannelAiAccess: () => null }));
 vi.mock("./AssistenteConexao", () => ({
-  AssistenteConexao: ({ canalIdInicial }: { canalIdInicial?: string }) => <div>assistente:{canalIdInicial ?? "novo"}</div>,
+  AssistenteConexao: (p: { canalIdInicial?: string; nomeInicial?: string }) => {
+    h.assistenteProps = p;
+    return <div>assistente:{p.canalIdInicial ?? "novo"}</div>;
+  },
 }));
 
 import { CanalHospedadoClient } from "./CanalHospedadoClient";
@@ -85,4 +89,35 @@ it("Voltar na confirmacao nao exclui nada", async () => {
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar" })));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Voltar" })));
   expect(h.del).not.toHaveBeenCalled();
+});
+
+it("Cancelar de canal com historico (archived) avisa que o historico foi guardado", async () => {
+  h.del.mockResolvedValue({ data: { archived: true } });
+  await montar([sessao("c7", "FAILED")]);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar conexão" })));
+  expect(h.toast.success).toHaveBeenCalledWith("Conexão removida. O histórico de conversas continua guardado.");
+});
+
+it("sem historico (archived false) o aviso e de conexao cancelada", async () => {
+  h.del.mockResolvedValue({ data: { archived: false } });
+  await montar([sessao("c7", "FAILED")]);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar" })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar conexão" })));
+  expect(h.toast.success).toHaveBeenCalledWith("Conexão cancelada.");
+});
+
+it("status velho: se o canal ja virou WORKING ao abrir a confirmacao, nao abre e nao deleta", async () => {
+  await montar([sessao("c7", "SCAN_QR_CODE")]);
+  h.get.mockResolvedValue({ data: { label: "X", connected: true, sessions: [sessao("c7", "WORKING")], nativo_habilitado: true } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Cancelar" })));
+  expect(screen.queryByText("Cancelar esta conexão?")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+  expect(h.del).not.toHaveBeenCalled();
+});
+
+it("Continuar conexao entrega o nome atual do canal ao assistente", async () => {
+  await montar([sessao("c7", "FAILED")]);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Continuar conexão" })));
+  expect(h.assistenteProps.nomeInicial).toBe("Canal c7");
 });

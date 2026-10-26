@@ -33,20 +33,33 @@ export function AcoesConexaoPresa({
   canalId,
   onContinuar,
   onCancelado,
+  onConferir,
 }: {
   canalId: string;
   onContinuar: () => void;
   onCancelado: () => void;
+  /** Relê o estado antes de confirmar: se o canal já conectou, o pai some com estes botões. */
+  onConferir: () => Promise<void>;
 }) {
   const t = useT();
   const [confirmando, setConfirmando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
+
+  const pedirConfirmacao = async () => {
+    setConferindo(true);
+    await onConferir();
+    setConferindo(false);
+    setConfirmando(true);
+  };
 
   const cancelar = async () => {
     setCancelando(true);
     try {
-      await apiClient.delete(`/api/v1/channel-sessions/${canalId}`);
-      toast.success(t("Conexão cancelada."));
+      const r = await apiClient.delete<{ data?: { archived?: boolean } }>(`/api/v1/channel-sessions/${canalId}`);
+      toast.success(
+        r?.data?.archived ? t("Conexão removida. O histórico de conversas continua guardado.") : t("Conexão cancelada."),
+      );
       setConfirmando(false);
       onCancelado();
     } catch (e) {
@@ -61,7 +74,7 @@ export function AcoesConexaoPresa({
       <Button size="sm" onClick={onContinuar}>
         {t("Continuar conexão")}
       </Button>
-      <Button size="sm" variant="outline" onClick={() => setConfirmando(true)}>
+      <Button size="sm" variant="outline" disabled={conferindo} onClick={() => void pedirConfirmacao()}>
         {t("Cancelar")}
       </Button>
       <AlertDialog open={confirmando} onOpenChange={(o) => !cancelando && setConfirmando(o)}>
@@ -69,7 +82,7 @@ export function AcoesConexaoPresa({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("Cancelar esta conexão?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("O canal é excluído e o número fica livre para conectar de novo.")}
+              {t("O canal sai da lista e o número fica livre. Se houver histórico de conversas, ele é preservado.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

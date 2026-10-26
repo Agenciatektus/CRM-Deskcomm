@@ -73,16 +73,19 @@ export function AssistenteConexao({
   onAtualizar,
   onConfigurarAgente,
   canalIdInicial,
+  nomeInicial,
 }: {
   onClose: () => void;
   onAtualizar: () => void;
   onConfigurarAgente?: (canalId: string) => void;
   /** Canal nativo que ficou pela metade: abre direto no passo 3, sem criar outro. */
   canalIdInicial?: string;
+  /** Nome atual do canal retomado, para o passo 1 (travado) não aparecer vazio. */
+  nomeInicial?: string;
 }) {
   const t = useT();
   const [passo, setPasso] = useState<Passo>(canalIdInicial ? 3 : 1);
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(nomeInicial ?? "");
   const [uso, setUso] = useState<Uso | null>(null);
   const [criando, setCriando] = useState(false);
   const [canalId, setCanalId] = useState<string | null>(canalIdInicial ?? null);

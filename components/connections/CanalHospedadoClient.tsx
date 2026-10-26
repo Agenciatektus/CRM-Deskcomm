@@ -84,7 +84,7 @@ export function CanalHospedadoClient() {
   const [mostrarAvancado, setMostrarAvancado] = useState(false);
   const [salvando, setSalvando] = useState(false);
   // `canalId` presente = retomar esse canal (passo 3); ausente = conexão nova.
-  const [assistente, setAssistente] = useState<{ canalId?: string } | null>(null);
+  const [assistente, setAssistente] = useState<{ canalId?: string; nome?: string } | null>(null);
   const [recemConectado, setRecemConectado] = useState<Conectado | null>(null);
 
   const carregar = async () => {
@@ -174,8 +174,9 @@ export function CanalHospedadoClient() {
             {conexaoPresa(n.origem, n.status) && (
               <AcoesConexaoPresa
                 canalId={n.channel_session_id}
-                onContinuar={() => setAssistente({ canalId: n.channel_session_id })}
+                onContinuar={() => setAssistente({ canalId: n.channel_session_id, nome: n.display_name ?? "" })}
                 onCancelado={() => void carregar()}
+                onConferir={carregar}
               />
             )}
             <div id={`canal-ia-${n.channel_session_id}`}>
@@ -238,6 +239,7 @@ export function CanalHospedadoClient() {
           {assistente && (
             <AssistenteConexao
               canalIdInicial={assistente.canalId}
+              nomeInicial={assistente.nome}
               onClose={() => setAssistente(null)}
               onAtualizar={() => void carregar()}
               onConfigurarAgente={(id) =>

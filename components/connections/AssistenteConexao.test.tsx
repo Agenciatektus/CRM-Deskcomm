@@ -265,3 +265,12 @@ it("canalIdInicial: abre direto no passo 3 do canal existente, sem criar outro",
   expect(h.post).not.toHaveBeenCalled();
   expect(document.querySelector("img")!.getAttribute("src")).toBe(QR1);
 });
+
+it("canalIdInicial + nomeInicial: Voltar ao passo 1 mostra o nome atual, travado", async () => {
+  h.get.mockResolvedValue(corpo("aguardando_leitura", { qr: QR1 }));
+  montar({ canalIdInicial: "c9", nomeInicial: "Comercial" });
+  await passa(0);
+  await clicar("Voltar");
+  await clicar("Voltar");
+  expect((screen.getByLabelText("Nome da conexão") as HTMLInputElement).value).toBe("Comercial");
+});
