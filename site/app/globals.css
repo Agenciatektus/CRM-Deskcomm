@@ -482,10 +482,10 @@ h3 {
     animation: varre 5s linear infinite;
   }
   .a-corre {
-    animation: corre 60s linear infinite;
+    animation: corre var(--dur, 60s) linear infinite;
   }
   .a-corre-inverso {
-    animation: corre-inverso 70s linear infinite;
+    animation: corre-inverso var(--dur, 70s) linear infinite;
   }
   .faixa:hover .a-corre,
   .faixa:hover .a-corre-inverso,

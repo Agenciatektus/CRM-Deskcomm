@@ -19,7 +19,7 @@ import { PainelConhecimento, PainelPassagem, PainelProposta } from "./telas/Tela
 import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Janela } from "./ui/Janela";
 import { Icone, type NomeIcone } from "./ui/Icones";
-import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
+import { Avatar, CanalChip, Selo } from "./ui/Pecas";
 
 /** Seis cenas do vácuo, cada uma com um pedaço de tela mostrando o sintoma. */
 function MiniLeadSumiu() {
@@ -213,7 +213,7 @@ export function Conta() {
           id="conta-equilibrio"
           opacidade={0.6}
           className="top-8 right-[4%] hidden h-[19rem] w-[30rem] 2xl:block"
-          mascara="[mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,#000_40%,transparent_100%)]"
+          mascara="[mask-image:radial-gradient(ellipse_closest-side,#000_38%,transparent_100%)]"
           fallback="fundo-brilho-centro"
         />
       }
@@ -309,13 +309,15 @@ export function Plantao() {
   return (
     <Secao id="plantao" titulo="titulo-plantao" fundo="faixa">
       <Cabeca id="titulo-plantao" titulo={MECANISMO.titulo} texto={MECANISMO.texto} />
-      <div className="relative isolate mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
+      <div className="relative -mt-4 mb-10 h-[15rem] sm:h-[20rem] lg:h-[26rem]">
         <ImagemDeSlot
           id="plantao-tres-pecas"
-          opacidade={0.5}
-          className="inset-x-0 -top-10 -z-10 h-[20rem]"
-          mascara="[mask-image:linear-gradient(to_bottom,transparent,#000_15%,#000_55%,transparent_90%)]"
+          opacidade={0.95}
+          className="inset-0"
+          mascara="[mask-image:radial-gradient(ellipse_closest-side,#000_38%,transparent_100%)]"
         />
+      </div>
+      <div className="relative isolate mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
         {MECANISMO.pecas.map((p, i) => (
           <Card key={p.titulo} atraso={i * 0.1}>
             <h3 className="m-0 text-[1.15rem] font-bold">{p.titulo}</h3>
@@ -440,7 +442,6 @@ export function Agente() {
           </Card>
         ))}
       </div>
-      <Exemplo className="mt-6" />
     </Secao>
   );
 }
@@ -454,7 +455,6 @@ export function Funil() {
         <Janela rota="funil" interativa>
           <TelaFunil />
         </Janela>
-        <p className="m-0 mt-3 text-meta text-text-subtle">{PROVA.exemploFunil}</p>
       </div>
       <div className="revela mt-5 max-w-[44rem]">
         <h3 className="m-0 text-[1.15rem] font-bold">{PROVA.funil.titulo}</h3>

@@ -87,7 +87,6 @@ export function Hero() {
             {HERO.precoLink}
           </a>
         </p>
-        <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
       </Container>
 
       {/* A janela do app, com os cards flutuando por cima. */}

@@ -23,7 +23,7 @@ export function Janela({
     <div
       className={`janela-app borda-luz overflow-hidden rounded-modal bg-[#0f1013] ${className}`}
       role={interativa ? "group" : "img"}
-      aria-label={`Tela do Verdash CRM: ${rota}. Exemplo com dados fictícios.`}
+      aria-label={`Tela do Verdash CRM: ${rota}.`}
     >
       {semBarra ? null : (
         <div className="flex h-9 items-center gap-3 border-b border-border bg-[#14161a] px-3.5" aria-hidden="true">

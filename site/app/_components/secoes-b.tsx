@@ -4,7 +4,7 @@ import { Card, Cabeca, Secao } from "./Secao";
 import { TelaRadar } from "./telas/TelaRadar";
 import { CartaoCanal } from "./telas/TelasDeGestao";
 import { Icone } from "./ui/Icones";
-import { Exemplo, Selo } from "./ui/Pecas";
+import { Selo } from "./ui/Pecas";
 import { Janela } from "./ui/Janela";
 
 export function Radar() {
@@ -33,7 +33,6 @@ export function Radar() {
           <Janela rota="radar">
             <TelaRadar />
           </Janela>
-          <Exemplo className="mt-3" />
         </div>
       </div>
     </Secao>
