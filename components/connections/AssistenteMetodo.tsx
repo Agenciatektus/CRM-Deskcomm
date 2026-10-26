@@ -21,10 +21,10 @@ export function recomendar(uso: Uso | null, nativo: boolean): Metodo | null {
   return null;
 }
 
-const USOS: { id: Uso; rotulo: string }[] = [
-  { id: "sim", rotulo: "Sim" },
-  { id: "nao", rotulo: "Não" },
-  { id: "nao_sei", rotulo: "Não sei" },
+const USOS: { id: Uso }[] = [
+  { id: "sim" },
+  { id: "nao" },
+  { id: "nao_sei" },
 ];
 
 function Recomendacao({ uso }: { uso: Uso }) {
@@ -34,7 +34,7 @@ function Recomendacao({ uso }: { uso: Uso }) {
       <div role="note" className="flex gap-2 rounded-lg border border-warning/40 bg-warning-bg px-3 py-2">
         <Warning size={14} className="mt-0.5 shrink-0" aria-hidden />
         <p className="text-xs leading-relaxed text-text">
-          {t("Recomendamos \"Número já conectado na Verdash\": o mesmo número continua onde está e as conversas passam a aparecer aqui. Se o mesmo número tiver dois canais, as mensagens chegam duplicadas.")}
+          {t("Se for a Verdash, use o número já conectado. Em outra plataforma, QR Code ou API Oficial funcionam, mas o mesmo número em dois canais pode duplicar mensagens.")}
         </p>
       </div>
     );
@@ -90,7 +90,7 @@ export function PassoMetodo({
         <div role="radiogroup" aria-labelledby="assistente-uso" className="flex flex-wrap gap-2">
           {USOS.map((o) => (
             <Button key={o.id} type="button" role="radio" aria-checked={uso === o.id} size="sm" variant={uso === o.id ? "default" : "outline"} onClick={() => onUso(o.id)}>
-              {t(o.rotulo)}
+              {o.id === "sim" ? t("Sim") : o.id === "nao" ? t("Não") : t("Não sei")}
             </Button>
           ))}
         </div>

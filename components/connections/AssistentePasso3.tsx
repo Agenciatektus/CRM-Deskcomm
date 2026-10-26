@@ -66,6 +66,22 @@ export function PassoConexao({
 }) {
   const t = useT();
   if (metodo === "qr") return canalId ? <PassoQr canalId={canalId} onConectado={onConectado} /> : null;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-text-muted">{t("O nome do passo 1 vale só para o QR Code. Neste método o canal recebe o nome do próprio número, e você pode renomear depois.")}</p>
+      <PassoOutros metodo={metodo} graphParceiro={graphParceiro} parceiro={parceiro} onParceiro={onParceiro} onConectado={onConectado} />
+    </div>
+  );
+}
+
+function PassoOutros({
+  metodo,
+  graphParceiro,
+  parceiro,
+  onParceiro,
+  onConectado,
+}: Pick<Parameters<typeof PassoConexao>[0], "metodo" | "graphParceiro" | "parceiro" | "onParceiro" | "onConectado">) {
+  const t = useT();
   if (metodo === "codigo") return <CanalHospedadoClient compacto onConectado={onConectado} />;
   if (metodo === "oficial") return <CanalOficialClient onConectado={onConectado} />;
   const escolha = graphParceiro ? parceiro : "padrao";

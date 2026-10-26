@@ -63,11 +63,6 @@ function ParaColar({
 }
 
 /** `onConectado`: o assistente de conexão habilita o "Concluir" quando o canal grava. */
-const ID_INVALIDO = [
-  ["phone_number_id", "O ID do número de telefone tem só dígitos."],
-  ["waba_id", "O ID da conta do WhatsApp Business tem só dígitos."],
-] as const;
-
 export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: string | null) => void } = {}) {
   const t = useT();
   const { data, isPending } = useOfficialChannel();
@@ -81,8 +76,13 @@ export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: s
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     // Os IDs da Meta são só dígitos: erro específico antes de gastar uma chamada.
-    const ruim = ID_INVALIDO.map(([k, msg]) => (/^\d+$/.test(form[k].trim()) ? null : msg)).find(Boolean);
-    setErroId(ruim ? t(ruim) : null);
+    const solo = (v: string) => /^\d+$/.test(v.trim());
+    const ruim = !solo(form.phone_number_id)
+      ? t("O ID do número de telefone tem só dígitos.")
+      : !solo(form.waba_id)
+        ? t("O ID da conta do WhatsApp Business tem só dígitos.")
+        : null;
+    setErroId(ruim);
     if (ruim) return;
     const r = await conectar.mutateAsync(form);
     toast.success(`${t("Conectado:")} ${r.data.displayName} ${r.data.phoneNumber ?? ""}`.trim());

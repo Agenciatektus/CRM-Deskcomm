@@ -134,7 +134,10 @@ export function AssistenteConexao({
                 <p className="text-sm text-text-muted">{t("Preparando sua conexão…")}</p>
               </div>
             ) : (
-              <PassoMetodo uso={uso} metodo={metodo} nativo={nativoHabilitado} onUso={escolherUso} onMetodo={setMetodo} />
+              <PassoMetodo uso={uso} metodo={metodo} nativo={nativoHabilitado} onUso={escolherUso} onMetodo={(m) => {
+                setMetodo(m);
+                setGravou(false);
+              }} />
             ))}
           {passo === 3 && metodo && (
             <PassoConexao

@@ -68,7 +68,7 @@ it("resposta Não: recomenda QR e NAO recomenda a Verdash (controle negativo)", 
   escolher("Não");
   expect(recomendado("QR Code")).toBe(true);
   expect(recomendado("Número já conectado na Verdash")).toBe(false);
-  expect(screen.queryByText(/chegam duplicadas/)).toBeNull();
+  expect(screen.queryByText(/pode duplicar mensagens/)).toBeNull();
 });
 
 it("resposta Sim: destaca a Verdash, avisa da duplicidade e NAO recomenda QR", async () => {
@@ -76,7 +76,7 @@ it("resposta Sim: destaca a Verdash, avisa da duplicidade e NAO recomenda QR", a
   escolher("Sim");
   expect(recomendado("Número já conectado na Verdash")).toBe(true);
   expect(recomendado("QR Code")).toBe(false);
-  expect(screen.getByText(/chegam duplicadas/)).toBeTruthy();
+  expect(screen.getByText(/pode duplicar mensagens/)).toBeTruthy();
   expect(screen.getByRole("radio", { name: /Número já conectado na Verdash/ }).getAttribute("aria-checked")).toBe("true");
 });
 
@@ -183,4 +183,17 @@ it("Esc fecha e o foco volta ao botao que abriu a gaveta", async () => {
     await new Promise((r) => setTimeout(r, 20)); // o Radix devolve o foco num setTimeout(0)
   });
   expect(foco).toHaveBeenCalled();
+});
+
+it("trocar de metodo zera o Concluir; metodo sem QR avisa que o nome do passo 1 so vale para o QR", async () => {
+  await passo2();
+  escolher(/API Oficial/);
+  await clicar("Continuar");
+  expect(screen.getByText(/vale só para o QR Code/)).toBeTruthy();
+  await clicar(/gravar form-oficial/);
+  expect((screen.getByRole("button", { name: "Concluir" }) as HTMLButtonElement).disabled).toBe(false);
+  await clicar("Voltar");
+  escolher(/Provedor parceiro/);
+  await clicar("Continuar");
+  expect((screen.getByRole("button", { name: "Concluir" }) as HTMLButtonElement).disabled).toBe(true);
 });
