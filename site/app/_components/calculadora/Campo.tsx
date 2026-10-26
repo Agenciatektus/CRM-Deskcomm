@@ -65,3 +65,8 @@ export function Campo({
     </div>
   );
 }
+
+/** Painel de resultado da calculadora: limpo, sem imagem por trás do texto. */
+export function PainelDeResultado({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-grande border border-border-strong bg-bg p-6 sm:p-8">{children}</div>;
+}

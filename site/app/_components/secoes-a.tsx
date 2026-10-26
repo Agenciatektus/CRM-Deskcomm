@@ -16,6 +16,7 @@ export { Faixa } from "./Faixa";
 import { Card, Cabeca, Secao } from "./Secao";
 import { TelaFunil } from "./telas/TelaFunil";
 import { PainelConhecimento, PainelPassagem, PainelProposta } from "./telas/TelasDoAgente";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Janela } from "./ui/Janela";
 import { Icone, type NomeIcone } from "./ui/Icones";
 import { Avatar, CanalChip, Exemplo, Selo } from "./ui/Pecas";
@@ -141,6 +142,16 @@ function MiniSemDono() {
   );
 }
 
+/** Seis cenas em ritmo 4+2, 3+3, 2+4 no desktop (grade de 6 colunas); abaixo de lg segue em duas colunas. */
+const RITMO_6 = [
+  "lg:col-span-4",
+  "lg:col-span-2",
+  "lg:col-span-3",
+  "lg:col-span-3",
+  "lg:col-span-2",
+  "lg:col-span-4",
+] as const;
+
 export function Problema() {
   const minis = [
     <MiniLeadSumiu key="a" />,
@@ -151,11 +162,22 @@ export function Problema() {
     <MiniSemDono key="f" />,
   ];
   return (
-    <Secao titulo="titulo-problema" fundo="pontos">
+    <Secao
+      titulo="titulo-problema"
+      fundo="pontos"
+      fundoExtra={
+        <ImagemDeSlot
+          id="vacuo-mensagens"
+          opacidade={0.55}
+          className="inset-x-0 top-0 h-[34rem]"
+          mascara="[mask-image:linear-gradient(to_bottom,#000_45%,transparent)]"
+        />
+      }
+    >
       <Cabeca id="titulo-problema" titulo={PROBLEMAS_TITULO} texto={PROBLEMAS_INTRO} />
-      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid gap-6 lg:grid-cols-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {PROBLEMAS.map((p, i) => (
-          <Card key={p.titulo} atraso={(i % 3) * 0.1} className="flex flex-col gap-6">
+          <Card key={p.titulo} atraso={(i % 3) * 0.1} className={`flex flex-col gap-6 ${RITMO_6[i]}`}>
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {minis[i]}
             </div>
@@ -180,7 +202,22 @@ export function Problema() {
 
 export function Conta() {
   return (
-    <Secao id="conta" titulo="titulo-conta" fundo="azul" largura="grade" ritmo="l">
+    <Secao
+      id="conta"
+      titulo="titulo-conta"
+      fundo="azul"
+      largura="grade"
+      ritmo="l"
+      fundoExtra={
+        <ImagemDeSlot
+          id="conta-equilibrio"
+          opacidade={0.6}
+          className="top-8 right-[4%] hidden h-[19rem] w-[30rem] 2xl:block"
+          mascara="[mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,#000_40%,transparent_100%)]"
+          fallback="fundo-brilho-centro"
+        />
+      }
+    >
       <Cabeca id="titulo-conta" titulo={CONTA.titulo} texto={CONTA.intro} />
       <div className="revela">
         <Calculadora />
@@ -272,7 +309,13 @@ export function Plantao() {
   return (
     <Secao id="plantao" titulo="titulo-plantao" fundo="faixa">
       <Cabeca id="titulo-plantao" titulo={MECANISMO.titulo} texto={MECANISMO.texto} />
-      <div className="mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
+      <div className="relative isolate mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
+        <ImagemDeSlot
+          id="plantao-tres-pecas"
+          opacidade={0.5}
+          className="inset-x-0 -top-10 -z-10 h-[20rem]"
+          mascara="[mask-image:linear-gradient(to_bottom,transparent,#000_15%,#000_55%,transparent_90%)]"
+        />
         {MECANISMO.pecas.map((p, i) => (
           <Card key={p.titulo} atraso={i * 0.1}>
             <h3 className="m-0 text-[1.15rem] font-bold">{p.titulo}</h3>
@@ -384,9 +427,9 @@ export function Agente() {
   return (
     <Secao id="agente" titulo="titulo-agente" fundo="azul">
       <Cabeca id="titulo-agente" titulo={AGENTE.titulo} texto={AGENTE.texto} />
-      <div className="grid items-start gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid items-start gap-6 lg:grid-cols-6 lg:gap-8 md:grid-cols-2 [&>*]:min-w-0">
         {AGENTE.itens.map((item, k) => (
-          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className="flex flex-col gap-5">
+          <Card key={item.rotulo} atraso={(k % 3) * 0.08} className={`flex flex-col gap-5 ${RITMO_6[k]}`}>
             <div className="rounded-field border border-border bg-bg p-4" aria-hidden="true">
               {paineis[k]}
             </div>
