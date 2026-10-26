@@ -434,7 +434,7 @@ export const OFERTA = {
   implantacao: {
     rotulo: "Implantação opcional, pagamento único",
     preco: "R$ 1.297",
-    parcelas: "em até 3x sem juros",
+    parcelas: "em até 3x sem juros no cartão, ou R$ 1.245,32 no Pix",
     detalhe: "Inclui diagnóstico, configuração, agente de IA, treinamento e 30 dias de acompanhamento.",
     aviso: "Ela é opcional. Pode ser contratada junto com o plano, e a Tektus oferece de novo durante a assinatura.",
   },
@@ -548,7 +548,7 @@ export const FAQ = [
   },
   {
     p: "Quanto custa o Verdash CRM?",
-    r: "O Verdash CRM tem dois planos. O plano com IA custa R$ 397 por mês e inclui um teto de US$ 15 de IA por mês. O plano sem IA custa R$ 157 por mês, e a empresa usa a própria chave de IA. Os dois incluem até 3 números de WhatsApp, até 2 contas de Instagram e usuários sem cobrança. A implantação é opcional e custa R$ 1.297 em até 3x sem juros.",
+    r: "O plano com IA custa R$ 397 por mês e inclui um teto de US$ 15 de IA por mês. O plano sem IA custa R$ 157 por mês, e a empresa usa a própria chave de IA. Os dois incluem até 3 números de WhatsApp, até 2 contas de Instagram e usuários sem cobrança. A implantação opcional custa R$ 1.297 em até 3x sem juros no cartão, ou R$ 1.245,32 no Pix.",
   },
   {
     p: "O que está incluso na mensalidade e na implantação?",
@@ -588,7 +588,7 @@ export const FAQ = [
   },
   {
     p: "Como funciona o plano anual do Verdash CRM?",
-    r: "O plano anual tem 15% de desconto sobre o valor mensal e é cobrado de uma vez. O plano com IA sai por R$ 4.049,40 por ano e o plano sem IA por R$ 1.601,40 por ano. O plano mensal não tem fidelidade e pode ser cancelado quando você quiser. A implantação opcional é cobrada à parte, em até 3x sem juros.",
+    r: "O plano anual tem 15% de desconto sobre o valor mensal e é cobrado de uma vez. O plano com IA sai por R$ 4.049,40 por ano e o plano sem IA por R$ 1.601,40 por ano. O plano mensal não tem fidelidade e pode ser cancelado quando você quiser. A implantação opcional é cobrada à parte, em até 3x sem juros no cartão ou R$ 1.245,32 no Pix.",
   },
   {
     p: "O que a Tektus faz na implantação do Verdash CRM?",
