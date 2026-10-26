@@ -3,8 +3,8 @@
  * Mensal: R$ 397 com IA e R$ 157 sem IA. Anual: 12 mensalidades com 15% de desconto.
  * Implantação opcional: R$ 1.297 em até 3x sem juros.
  *
- * A confirmar no checkout (não vai para a tela): o plano anual é cobrado de uma vez. Na tela o texto é
- * "preço do plano anual com 15% de desconto", sem afirmar a forma de cobrança.
+ * O plano anual é cobrado de uma vez (confirmado pelo Peterson em 26/10/2026); a tela e o FAQ dizem isso.
+ * O checkout (Stripe) precisa cobrar o anual à vista, não parcelado no cartão.
  */
 
 export type Plano = "com-ia" | "sem-ia";
