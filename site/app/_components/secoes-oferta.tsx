@@ -29,10 +29,10 @@ export function Garantia() {
       <div className="luz luz-menta luz-fraca rounded-modal [--luz-blur:80px]">
         <ImagemDeSlot
           id="garantia-anel"
-          opacidade={0.5}
+          opacidade={0.75}
           fallback="fundo-brilho-menta"
-          className="top-1/2 left-1/2 -z-10 size-[44rem] max-w-none -translate-x-1/2 -translate-y-1/2"
-          mascara="[mask-image:radial-gradient(circle_at_50%_50%,#000_45%,transparent_72%)]"
+          className="top-1/2 left-1/2 -z-10 size-[58rem] max-w-none -translate-x-1/2 -translate-y-1/2"
+          mascara="[mask-image:radial-gradient(circle_closest-side,#000_88%,transparent_100%)]"
         />
         <div className="card borda-luz revela rounded-modal p-8 sm:p-10 lg:p-14">
           <div className="grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-8">
