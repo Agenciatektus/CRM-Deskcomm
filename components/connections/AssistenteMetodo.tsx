@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export type Uso = "sim" | "nao" | "nao_sei";
 /** O que a pessoa escolhe no passo 2. Só `qr` cria o canal já ao Continuar. */
-export type Metodo = "verdash" | "qr" | "oficial" | "parceiro";
+export type Metodo = "codigo" | "qr" | "oficial" | "parceiro";
 
 /**
  * Recomendação REAL por resposta. "Não" => QR (ninguém mais usa o número, o caminho
@@ -16,7 +16,7 @@ export type Metodo = "verdash" | "qr" | "oficial" | "parceiro";
  * pelo código da Verdash. "Não sei" não recomenda: manda conferir no aplicativo.
  */
 export function recomendar(uso: Uso | null, nativo: boolean): Metodo | null {
-  if (uso === "sim") return "verdash";
+  if (uso === "sim") return "codigo";
   if (uso === "nao" && nativo) return "qr";
   return null;
 }
@@ -76,7 +76,7 @@ export function PassoMetodo({
   const t = useT();
   const recomendado = recomendar(uso, nativo);
   const cartoes: { id: Metodo; titulo: string; ajuda: string }[] = [
-    { id: "verdash", titulo: t("Número já conectado na Verdash"), ajuda: t("Usa o WhatsApp que já está na Verdash, com um código de uso único.") },
+    { id: "codigo", titulo: t("Número já conectado na Verdash"), ajuda: t("Usa o WhatsApp que já está na Verdash, com um código de uso único.") },
     ...(nativo ? [{ id: "qr" as const, titulo: t("QR Code"), ajuda: t("QR Code, igual ao WhatsApp Web. Imediata e sem custo.") }] : []),
     { id: "oficial", titulo: t("API Oficial"), ajuda: t("Número oficial da Meta, com modelos de mensagem.") },
     { id: "parceiro", titulo: t("Provedor parceiro"), ajuda: t("Número ligado por um provedor parceiro.") },

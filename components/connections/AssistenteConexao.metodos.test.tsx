@@ -16,7 +16,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: v
 vi.mock("./CanalOficialClient", () => ({ CanalOficialClient: stub("form-oficial", "5511900000001") }));
 vi.mock("./CanalParceiroClient", () => ({ CanalParceiroClient: stub("form-parceiro", "5511900000002") }));
 vi.mock("./CanalGraphParceiroClient", () => ({ CanalGraphParceiroClient: stub("form-graph", null) }));
-vi.mock("./CanalHospedadoClient", () => ({ CanalHospedadoClient: stub("form-verdash", "5511900000003") }));
+vi.mock("./CanalHospedadoClient", () => ({ CanalHospedadoClient: stub("form-codigo", "5511900000003") }));
 
 import { AssistenteConexao } from "./AssistenteConexao";
 import { recomendar } from "./AssistenteMetodo";
@@ -49,7 +49,7 @@ const recomendado = (rotulo: string) =>
 
 it("recomendar: Não aponta QR, Sim aponta Verdash, Não sei não recomenda; sem QR no CRM, Não não recomenda QR", () => {
   expect(recomendar("nao", true)).toBe("qr");
-  expect(recomendar("sim", true)).toBe("verdash");
+  expect(recomendar("sim", true)).toBe("codigo");
   expect(recomendar("nao_sei", true)).toBeNull();
   expect(recomendar(null, true)).toBeNull();
   expect(recomendar("nao", false)).toBeNull();
@@ -99,7 +99,7 @@ it("sem QR no CRM: cartao QR nao aparece, nenhum metodo vem marcado e Continuar 
 });
 
 it.each([
-  [/Número já conectado na Verdash/, "form-verdash"],
+  [/Número já conectado na Verdash/, "form-codigo"],
   [/API Oficial/, "form-oficial"],
   [/Provedor parceiro/, "form-parceiro"],
 ])("metodo %s leva ao formulario certo, sem criar canal", async (cartao, id) => {
@@ -143,7 +143,7 @@ it("Voltar no passo 3 volta ao 2; Configurar depois no sucesso so fecha", async 
   await clicar("Voltar");
   expect(screen.getByText("Passo 2 de 4")).toBeTruthy();
   await clicar("Continuar");
-  await clicar(/gravar form-verdash/);
+  await clicar(/gravar form-codigo/);
   await clicar("Concluir");
   await clicar("Configurar depois");
   expect(p.onClose).toHaveBeenCalled();

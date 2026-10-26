@@ -15,7 +15,7 @@ import { PassoMetodo, recomendar, type Metodo, type Uso } from "./AssistenteMeto
 import { Etapas, PassoNome, PassoSucesso, type Passo } from "./AssistentePassos";
 
 /** Aba de Conexoes que mostra o canal (e o agente de IA dele) de cada metodo. */
-const ABA: Record<Metodo, string> = { qr: "hospedado", verdash: "hospedado", oficial: "oficial", parceiro: "parceiro" };
+const ABA: Record<Metodo, string> = { qr: "hospedado", codigo: "hospedado", oficial: "oficial", parceiro: "parceiro" };
 
 /**
  * Assistente unico de conexao de WhatsApp (nome, metodo, conexao, pronto), numa gaveta

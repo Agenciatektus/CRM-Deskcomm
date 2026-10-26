@@ -66,7 +66,7 @@ export function PassoConexao({
 }) {
   const t = useT();
   if (metodo === "qr") return canalId ? <PassoQr canalId={canalId} onConectado={onConectado} /> : null;
-  if (metodo === "verdash") return <CanalHospedadoClient compacto onConectado={onConectado} />;
+  if (metodo === "codigo") return <CanalHospedadoClient compacto onConectado={onConectado} />;
   if (metodo === "oficial") return <CanalOficialClient onConectado={onConectado} />;
   const escolha = graphParceiro ? parceiro : "padrao";
   if (!escolha) {
