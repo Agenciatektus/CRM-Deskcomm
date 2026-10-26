@@ -6,7 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useT } from "@/hooks/i18n/useT";
 import { rotaDeTemplates } from "@/lib/channels/templates-fonte";
-import { ArrowLeft } from "@/lib/ui/icons";
+import { CaretLeft } from "@/lib/ui/icons";
 
 import { CanalGraphParceiroClient } from "./CanalGraphParceiroClient";
 import { CanalHospedadoClient } from "./CanalHospedadoClient";
@@ -38,7 +38,7 @@ function Apoio({ titulo, children }: { titulo: string; children: ReactNode }) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <Link href="/app/connections" className="inline-flex items-center gap-1 text-sm text-accent-text underline-offset-4 hover:underline">
-          <ArrowLeft size={14} aria-hidden />
+          <CaretLeft size={14} aria-hidden />
           {t("Conexões")}
         </Link>
         <h2 className="text-base font-semibold">{titulo}</h2>

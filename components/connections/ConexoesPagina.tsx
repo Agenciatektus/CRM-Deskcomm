@@ -63,7 +63,7 @@ function Galeria({ itens, acoes, agora }: { itens: ItemDeConexao[]; acoes: Props
 
 function Lista({ itens, acoes, agora }: { itens: ItemDeConexao[]; acoes: PropsDeAcoes; agora: number }) {
   const t = useT();
-  const colunas = ["Canal", "Número ou conta", "Método", "Status", "Detalhe", "Ações"];
+  const colunas = [t("Canal"), t("Número ou conta"), t("Método"), t("Status"), t("Detalhe"), t("Ações")];
   return (
     <div data-testid="vista-lista">
       <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
@@ -71,7 +71,7 @@ function Lista({ itens, acoes, agora }: { itens: ItemDeConexao[]; acoes: PropsDe
           <thead className="bg-surface-elevated text-xs text-muted-foreground">
             <tr>
               {colunas.map((c) => (
-                <th key={c} scope="col" className="px-3 py-2 font-medium">{t(c)}</th>
+                <th key={c} scope="col" className="px-3 py-2 font-medium">{c}</th>
               ))}
             </tr>
           </thead>

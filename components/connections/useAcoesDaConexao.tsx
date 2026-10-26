@@ -14,8 +14,8 @@ import { ExcluirCanalDialog, QrDialog } from "./ConnectionsClient";
 import { GruposSheet } from "./GruposSheet";
 import { usePacingKnobs } from "@/hooks/channels/usePacingKnobs";
 
-const msg = (e: unknown, f: string, t: (x: string) => string) =>
-  e instanceof ApiError && e.message ? t(e.message) : t(f);
+const msg = (e: unknown, traduzido: string, t: (x: string) => string) =>
+  e instanceof ApiError && e.message ? t(e.message) : traduzido;
 
 type Aberto =
   | { tipo: "protecao" | "grupos"; id: string }
@@ -57,7 +57,7 @@ export function useAcoesDaConexao({
       toast.success(i.pausado ? t("Canal reativado.") : t("Canal pausado."));
       invalidar();
     } catch (e) {
-      toast.error(msg(e, "Não foi possível mudar o estado do canal.", t));
+      toast.error(msg(e, t("Não foi possível mudar o estado do canal."), t));
     } finally {
       setOcupadoId(null);
     }
@@ -71,7 +71,7 @@ export function useAcoesDaConexao({
       invalidar();
       setAberto({ tipo: "qr", id: i.id, titulo: `${t("Reconectar")} ${i.nome}` });
     } catch (e) {
-      toast.error(msg(e, "Não foi possível reconectar.", t));
+      toast.error(msg(e, t("Não foi possível reconectar."), t));
     } finally {
       setOcupadoId(null);
     }
