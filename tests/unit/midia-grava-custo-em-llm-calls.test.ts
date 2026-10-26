@@ -101,10 +101,12 @@ const credencial = vi.hoisted(() => ({
   conversa: null as { provider: string; model: string } | null,
   /** De quem é a chave OpenAI do degrau 2; null = a mesma `origemDaChave`. */
   origemDaOpenai: null as "credencial_da_organizacao" | "chave_da_instalacao" | null,
+  /** A org não tem credencial OpenAI própria: a escada desce ao serviço da instalação. */
+  semOpenaiPropria: false,
 }));
 vi.mock("@/lib/agent-engine/edge/llm/credentials", () => ({
   resolveOrgLlmConfig: vi.fn(async (_db: unknown, _cfg: unknown, _org: string, override?: { provider?: string }) => {
-    if (credencial.conversaGoogle && override?.provider === "openai") throw new Error("sem credencial openai");
+    if ((credencial.conversaGoogle || credencial.semOpenaiPropria) && override?.provider === "openai") throw new Error("sem credencial openai");
     const origemDaChave =
       override?.provider === "openai" && credencial.origemDaOpenai ? credencial.origemDaOpenai : credencial.origemDaChave;
     return {
@@ -230,6 +232,7 @@ beforeEach(() => {
   credencial.origemDaChave = "credencial_da_organizacao";
   credencial.conversaGoogle = null;
   credencial.conversa = null;
+  credencial.semOpenaiPropria = false;
   servico.custo = undefined;
   teto.barrar = false;
   teto.real = true;
@@ -366,6 +369,7 @@ describe("worker de mídia: chamada paga grava em llm_calls", () => {
 
   it("transcrição recusada por destino interno não grava linha", async () => {
     comAudio();
+    credencial.semOpenaiPropria = true;
     transcricaoDoEnv.apiKey = "chave-do-servico";
     transcricaoDoEnv.baseUrl = "http://169.254.169.254/v1";
 
@@ -438,6 +442,7 @@ describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", ()
 
   it("degrau 1 pelo OpenRouter grava provider `openrouter` e o custo devolvido", async () => {
     comAudio();
+    credencial.semOpenaiPropria = true;
     transcricaoDoEnv.apiKey = "sk-or-da-instalacao";
     transcricaoDoEnv.baseUrl = "https://openrouter.ai/api/v1";
     servico.custo = 0.05;
@@ -485,6 +490,7 @@ describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", ()
     const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
     comAudio();
     credencial.origemDaChave = "credencial_da_organizacao";
+    credencial.semOpenaiPropria = true;
     transcricaoDoEnv.apiKey = "sk-or-da-instalacao";
     transcricaoDoEnv.baseUrl = "https://openrouter.ai/api/v1";
     servico.custo = 0.05;
@@ -500,18 +506,19 @@ describe("custo da transcrição pelo serviço e da assinatura (21/10/2026)", ()
     });
   });
 
-  it("degrau 2 com a chave OpenAI da instalação: o teto vê `chave_da_instalacao`", async () => {
+  it("a chave OpenAI da INSTALAÇÃO não é degrau da org: o áudio vai ao serviço, último degrau", async () => {
     const { aplicarOrcamento } = await import("@/lib/agent-engine/edge/llm/run-model-call");
     comAudio();
     credencial.origemDaChave = "credencial_da_organizacao";
     credencial.origemDaOpenai = "chave_da_instalacao";
+    transcricaoDoEnv.apiKey = "sk-or-da-instalacao";
     teto.real = false;
 
     await deriveMessageMedia(eventRow());
     await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
 
     expect(vi.mocked(aplicarOrcamento).mock.calls[0]![0]).toMatchObject({
-      origem: "padrao_openai_compativel",
+      origem: "servico_da_instalacao",
       origemDaChave: "chave_da_instalacao",
     });
   });

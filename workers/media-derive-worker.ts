@@ -33,7 +33,10 @@ import { MARCADOR_NAO_LIDA, TIPOS_DERIVAVEIS } from "@/lib/messaging/media/deriv
 import { leituraDeMidiaLigada } from "@/lib/messaging/media/leitura-da-org";
 import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
+  chaveRecusadaPeloProvedor,
   decidirTranscricao,
+  destinoRecusado,
+  podeDescerDeDegrau,
   type DecisaoDeTranscricao,
   type OrigemDaTranscricao,
 } from "@/lib/messaging/media/escada-de-transcricao";
@@ -341,16 +344,20 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // consome). Preenchido quando o thunk resolve.
     let origemDaChaveOpenai: OrigemDaChaveLlm | null = null;
     const chaveOpenai = async (): Promise<string | null> => {
-      if (llm.provider === "openai") {
+      // `baseUrlDaVisao`: o `llm` é um binding com endereço próprio; a chave dele
+      // não é "a OpenAI da org" para api.openai.com.
+      if (llm.provider === "openai" && !baseUrlDaVisao) {
         origemDaChaveOpenai = llm.origemDaChave;
-        return llm.apiKey;
+        // Só a credencial PRÓPRIA da organização vale aqui (a chave da
+        // instalação é o último degrau, pelo serviço de transcrição).
+        return llm.origemDaChave === "credencial_da_organizacao" ? llm.apiKey : null;
       }
       try {
         const oa = await resolveOrgLlmConfig(derivePool(), llmCfg, row.organization_id, {
           provider: "openai",
         });
         origemDaChaveOpenai = oa.origemDaChave;
-        return oa.apiKey;
+        return oa.origemDaChave === "credencial_da_organizacao" ? oa.apiKey : null;
       } catch {
         return null; // sem credencial e sem chave da instalação: nenhum degrau OpenAI
       }
@@ -365,9 +372,18 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     const decisao: DecisaoDeTranscricao = await decidirTranscricao({
       conversa:
         precisaTranscricao && conversa
-          ? { provider: conversa.provider, apiKey: conversa.apiKey, modelId: conversa.defaultModel }
+          ? {
+              provider: conversa.provider,
+              apiKey: conversa.apiKey,
+              modelId: conversa.defaultModel,
+              // Degrau A da escada: só a credencial da PRÓPRIA organização conta;
+              // a chave da instalação no chat fica para o degrau D.
+              credencialPropria: conversa.origemDaChave === "credencial_da_organizacao",
+              baseUrl: conversa.baseUrl ?? null,
+            }
           : null,
-      chaveOpenai,
+      // Imagem e documento não passam pela escada: não resolvem a OpenAI à toa.
+      chaveOpenai: precisaTranscricao ? chaveOpenai : undefined,
     });
     logger.info("[media-derive] transcrição resolvida", {
       organization_id: row.organization_id,
@@ -423,24 +439,108 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // OpenAI que o thunk resolveu; o 3, a da conversa. Sem isto o teto do
     // plano via a credencial própria da conversa e deixava passar o gasto que
     // sai da chave da instalação.
-    const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
-      decisao.origem === "servico_da_instalacao"
-        ? "chave_da_instalacao"
-        : decisao.origem === "padrao_openai_compativel"
-          ? (origemDaChaveOpenai ?? llm.origemDaChave)
-          : (conversa?.origemDaChave ?? llm.origemDaChave);
-    const deps = buildDeriveDeps(
-      llm,
-      decisao,
-      row.organization_id,
-      admin,
-      baseUrlDaVisao,
-      chaveEhDaInstalacao,
-      origemDoModelo,
-      origemDaChaveDaTranscricao,
-    );
+    const montarDeps = (d: DecisaoDeTranscricao, subirErro = true): DeriveDeps => {
+      const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
+        d.origem === "servico_da_instalacao"
+          ? "chave_da_instalacao"
+          : d.origem === "padrao_openai_compativel"
+            ? (origemDaChaveOpenai ?? llm.origemDaChave)
+            : (conversa?.origemDaChave ?? llm.origemDaChave);
+      return buildDeriveDeps(
+        llm,
+        d,
+        row.organization_id,
+        admin,
+        baseUrlDaVisao,
+        chaveEhDaInstalacao,
+        origemDoModelo,
+        origemDaChaveDaTranscricao,
+        subirErro,
+      );
+    };
 
-    const text = await deriveMediaText(msg.type, buffer, msg.media_mime ?? "application/octet-stream", deps);
+    // ─── Queda graciosa: chave recusada (401/403) desce UM degrau ──────────
+    //
+    // Uma vez por degrau, sem laço: `proxima()` só devolve degraus abaixo.
+    // Nada de chave em log: só o status e a origem do degrau.
+    let degrau = decisao;
+    let motivoDaQueda: string | null = null;
+    let text: string;
+    for (;;) {
+      try {
+        text = await deriveMediaText(
+          msg.type,
+          buffer,
+          msg.media_mime ?? "application/octet-stream",
+          montarDeps(degrau),
+        );
+        break;
+      } catch (err) {
+        // Imagem e documento ficam FORA da cascata: um 401 da visão não pode
+        // virar aviso de "chave de transcrição" nem nova chamada.
+        const seguinte =
+          precisaTranscricao && podeDescerDeDegrau(err) && degrau.proxima ? await degrau.proxima() : null;
+        if (!seguinte) {
+          // Vídeo: o último degrau falhou na transcrição, mas os frames valem.
+          if (msg.type === "video" && podeDescerDeDegrau(err)) {
+            text = await deriveMediaText(
+              msg.type,
+              buffer,
+              msg.media_mime ?? "application/octet-stream",
+              montarDeps(degrau, false),
+            );
+            if (!text.trim()) {
+              // Nem a fala nem os frames: vazio não vira `ready`.
+              const motivo = `a transcrição do áudio do vídeo falhou em todos os degraus (${detalheSaneado(err)}) e os frames não renderam descrição`;
+              await markFailed(motivo);
+              return { consumer_key, status: "ok", detail: "video_sem_fala_e_sem_frames" };
+            }
+            motivoDaQueda = `${motivoDaQueda ? `${motivoDaQueda}; ` : ""}a transcrição do áudio do vídeo falhou em todos os degraus; seguiu só com a descrição visual`;
+            await avisarMidiaNaoLida(
+              msg.organization_id,
+              rotuloDoTipo,
+              "a fala do vídeo não pôde ser transcrita; o agente recebeu só a descrição das imagens",
+            );
+            break;
+          }
+          if (!motivoDaQueda) {
+            // Áudio/vídeo: a mensagem do provedor pode refletir a resposta do
+            // destino; só status/código fixo vão para o motivo e o log.
+            if (!precisaTranscricao) throw err;
+            throw new Error(`o degrau ${degrau.origem} falhou: ${detalheSaneado(err)}`);
+          }
+          // Todos falharam: o motivo conta o caminho percorrido até o último.
+          // Só status/código fixo: a mensagem do provedor pode refletir a resposta do destino.
+          const detalhe = detalheSaneado(err);
+          throw new Error(`${motivoDaQueda}; o degrau ${degrau.origem} também falhou: ${detalhe}`);
+        }
+        const daInstalacao = degrau.origem === "servico_da_instalacao";
+        const quemRecusou = daInstalacao
+          ? "a chave de transcrição da instalação (TRANSCRIPTION_API_KEY)"
+          : `a chave do seu provedor ${degrau.anuncio.provider}`;
+        const recusadoDestino = destinoRecusado(err);
+        const recusada = chaveRecusadaPeloProvedor(err) || recusadoDestino;
+        motivoDaQueda = recusadoDestino
+          ? `o endereço do degrau ${degrau.origem} não foi aceito como destino (nada foi enviado); transcrito pelo degrau ${seguinte.origem}`
+          : recusada
+          ? `${quemRecusou} foi recusada pelo provedor (401/403); transcrito pelo degrau ${seguinte.origem}`
+          : `o degrau ${degrau.origem} falhou (limite, erro do provedor ou tempo esgotado); transcrito pelo degrau ${seguinte.origem}`;
+        logger.warn("[media-derive] chave de transcrição recusada, descendo um degrau", {
+          organization_id: row.organization_id,
+          de: degrau.origem,
+          para: seguinte.origem,
+        });
+        if (recusada) await avisarChaveDeTranscricaoRecusada(
+            msg.organization_id,
+            rotuloDoTipo,
+            recusadoDestino
+              ? `o endereço cadastrado para o seu provedor ${degrau.anuncio.provider} não foi aceito como destino`
+              : `${quemRecusou} foi recusada pelo provedor`,
+            daInstalacao,
+          );
+        degrau = seguinte;
+      }
+    }
 
     // ─── Transcrição que veio VAZIA também é `failed` + motivo (#2171) ──────
     //
@@ -450,7 +550,7 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // status de sucesso é pior que o nulo — era o mesmo defeito de olhar.
     if (msg.type === "audio" && !text.trim()) {
       const motivo =
-        `o modelo devolveu a transcrição do áudio vazia (${decisao.origem}: ${decisao.motivo})`;
+        `o modelo devolveu a transcrição do áudio vazia (${degrau.origem}: ${degrau.motivo})`;
       await markFailed(motivo);
       await avisarMidiaNaoLida(
         msg.organization_id,
@@ -475,7 +575,11 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // `NULL <> '...'` é NULL — o `neq` recusaria TODA nota de voz.
     const { data: gravados, error: erroDaGravacao } = await admin
       .from("messages")
-      .update({ media_derived_text: text, media_derived_status: "ready" })
+      .update({
+        media_derived_text: text,
+        media_derived_status: "ready",
+        ...(motivoDaQueda ? { metadata: { ...(msg.metadata ?? {}), media_derived_motivo: motivoDaQueda } } : {}),
+      })
       .eq("id", msg.id)
       .eq("organization_id", msg.organization_id)
       .filter("body", "isdistinct", MENSAGEM_REDIGIDA)
@@ -635,6 +739,9 @@ function buildDeriveDeps(
   // De quem é a chave que a transcrição usa (ver o chamador). Sem ela, a da
   // conversa — o comportamento de antes.
   origemDaChaveDaTranscricao: OrigemDaChaveLlm = llm.origemDaChave,
+  // Falso só no último degrau de um vídeo: o erro da transcrição é engolido e o
+  // vídeo segue só com os frames.
+  subirErroDaTranscricao = true,
 ): DeriveDeps {
   const registry = createDefaultRegistry();
   // Thunk, não consulta: nada vai ao banco até a visão ser de fato perguntada,
@@ -917,10 +1024,11 @@ function buildDeriveDeps(
   // por `lib/supabase/admin`.
   // ─── O degrau que a ESCADA escolheu, com a recusa onde ela vale ──────────
   //
-  // Só o degrau 1 (o serviço de transcrição do `.env`) aponta para um
-  // endereço configurado à mão — por isso é o único que ainda passa pela
-  // recusa de destino interno antes da chave sair. Os degraus 2 e 3 vão para
-  // o endereço público do provedor com a chave da própria organização.
+  // Dois degraus apontam para um endereço configurado à mão e passam pela
+  // recusa de destino interno antes da chave/áudio sair: o serviço da
+  // instalação (`.env`) e o modelo da organização com `base_url` cadastrada
+  // (`transcriberDaOrganizacao`). A chave OpenAI própria vai ao endereço
+  // público padrão.
   // `semTranscricao` continua sendo o fallback de quem não é áudio (vídeo e
   // imagem têm o caminho deles), porque o degrau 4 `nada` já foi tratado no
   // corpo do handler — lá em cima, com `failed` + motivo.
@@ -964,11 +1072,27 @@ function buildDeriveDeps(
       return servico.transcribe(audio, mime);
     },
   });
+  // Degrau A com endereço cadastrado pela organização: mesma recusa de destino
+  // interno da visão, ANTES de o áudio sair. Recusado = nada enviado, o degrau
+  // desce (erro de código fixo: nunca reflete resposta do destino).
+  const transcriberDaOrganizacao = (
+    t: NonNullable<DeriveDeps["transcriber"]>,
+  ): DeriveDeps["transcriber"] => ({
+    transcribe: async (audio, mime) => {
+      if (decisao.baseUrlDoDestino) {
+        const recusa = await motivoDaRecusaDeDestino(decisao.baseUrlDoDestino, "organizacao");
+        if (recusa) throw new Error("transcricao_destino_recusado");
+      }
+      return t.transcribe(audio, mime);
+    },
+  });
   const transcriber: DeriveDeps["transcriber"] = !decisao.transcriber
     ? semTranscricao
     : decisao.origem === "servico_da_instalacao"
       ? transcriberDeServico(comTeto(comCusto(decisao.transcriber)))
-      : comTeto(comCusto(decisao.transcriber));
+      : decisao.origem === "modelo_da_organizacao"
+        ? transcriberDaOrganizacao(comTeto(comCusto(decisao.transcriber)))
+        : comTeto(comCusto(decisao.transcriber));
   return {
     transcriber,
     describeImage,
@@ -977,7 +1101,11 @@ function buildDeriveDeps(
     // A trilha de áudio do vídeo passa pela mesma trava de duração do áudio:
     // acima dela o vídeo sai só com os frames, sem a transcrição paga.
     deriveVideo: (buffer) =>
-      deriveVideoText(buffer, { transcriber: comTravaDeDuracao(transcriber), describeImage }),
+      deriveVideoText(buffer, {
+        transcriber: comTravaDeDuracao(transcriber),
+        describeImage,
+        subirErroDaTranscricao: subirErroDaTranscricao ? podeDescerDeDegrau : undefined,
+      }),
   };
 }
 
@@ -1213,6 +1341,8 @@ export { MARCADOR_NAO_LIDA };
  * rotulada (`DETALHE_TECNICO`) — mesma regra do aviso de evento morto.
  */
 export function textoDoAvisoDeMidiaNaoLida(aviso: {
+  /** Título próprio, quando o aviso não é "não consegui ler" (ex.: a leitura funcionou por outro degrau). */
+  titulo?: string;
   tipo: string;
   motivo: string;
   consequencia: string;
@@ -1221,7 +1351,7 @@ export function textoDoAvisoDeMidiaNaoLida(aviso: {
   paraResolver?: string;
 }): { title: string; body: string } {
   return {
-    title: `O agente não conseguiu ler ${aviso.tipo} que o cliente enviou`,
+    title: aviso.titulo ?? `O agente não conseguiu ler ${aviso.tipo} que o cliente enviou`,
     body:
       `Motivo: ${aviso.motivo}. ${aviso.consequencia} ` +
       (aviso.paraResolver ??
@@ -1242,7 +1372,8 @@ async function avisarMidiaNaoLida(
   /** A frase crua do provedor ou do armazenamento, quando houver — vai no fim, rotulada. */
   detalheTecnico?: string,
   paraResolver?: string,
-): Promise<void> {
+  titulo?: string,
+): Promise<boolean> {
   try {
     const admin = createAdminClient();
     const { data: jaAberto } = await admin
@@ -1253,7 +1384,7 @@ async function avisarMidiaNaoLida(
       .eq("status", "open")
       .limit(1)
       .maybeSingle();
-    if (jaAberto) return;
+    if (jaAberto) return false;
 
     // `warn`, não `warning`: o CHECK de `agent_inbox_items.severity` aceita
     // info|warn|critical. Com o valor errado o INSERT era recusado com 23514 —
@@ -1263,7 +1394,7 @@ async function avisarMidiaNaoLida(
       organization_id: organizationId,
       kind: "midia_nao_lida",
       severity: "warn",
-      ...textoDoAvisoDeMidiaNaoLida({ tipo, motivo, consequencia, detalheTecnico, paraResolver }),
+      ...textoDoAvisoDeMidiaNaoLida({ titulo, tipo, motivo, consequencia, detalheTecnico, paraResolver }),
     });
     // E o retorno é CONFERIDO. O supabase-js devolve `{ error }` em vez de
     // lançar, então o `catch` abaixo era inalcançável para erro de banco: a
@@ -1283,10 +1414,53 @@ async function avisarMidiaNaoLida(
         error: error.message,
       });
     }
+    return !error;
   } catch (err) {
     logger.warn("[media-derive] não consegui abrir o aviso de mídia não lida", {
       organization_id: organizationId,
       error: err instanceof Error ? err.message : String(err),
     });
+    return false;
   }
+}
+
+/** Dia (UTC) em que já avisamos, por organização, que a chave de transcrição foi recusada. */
+const avisoDaChaveRecusadaNoDia = new Map<string, string>();
+
+/**
+ * Avisa na Central, no máximo UMA vez por organização por dia, que a chave de
+ * transcrição foi recusada e a leitura caiu para outro degrau. Reaproveita
+ * `avisarMidiaNaoLida` (que já não duplica item aberto). Sem chave no texto.
+ */
+export async function avisarChaveDeTranscricaoRecusada(
+  organizationId: string,
+  tipo: string,
+  motivo: string,
+  daInstalacao = false,
+): Promise<void> {
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (avisoDaChaveRecusadaNoDia.get(organizationId) === hoje) return;
+  // O dia só é consumido se o aviso de fato abriu.
+  const abriu = await avisarMidiaNaoLida(
+    organizationId,
+    tipo,
+    motivo,
+    "A leitura seguiu por outro caminho e o atendimento não parou, mas a chave recusada precisa ser trocada.",
+    undefined,
+    daInstalacao
+      ? "Quem administra a instalação atualiza a chave da transcrição no .env (TRANSCRIPTION_API_KEY)."
+      : "Atualize a chave em Agente de IA → Provedores de IA.",
+    "A chave de transcrição foi recusada e a leitura caiu para outro caminho",
+  );
+  if (abriu) avisoDaChaveRecusadaNoDia.set(organizationId, hoje);
+}
+
+/** Só status HTTP ou código fixo: nunca a mensagem crua do provedor. */
+function detalheSaneado(err: unknown): string {
+  const e = (err as { statusCode?: unknown; status?: unknown } | null) ?? {};
+  const codigo = Number(e.statusCode ?? e.status);
+  if (codigo > 0) return `HTTP ${codigo}`;
+  const m = /^transcription_(\d{3})$/.exec(err instanceof Error ? err.message : "");
+  if (m) return `HTTP ${m[1]}`;
+  return destinoRecusado(err) ? "destino recusado" : "erro do provedor";
 }

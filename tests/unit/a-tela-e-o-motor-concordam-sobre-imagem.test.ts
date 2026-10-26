@@ -121,11 +121,14 @@ const GEMINI = {
   provider: "google",
   apiKey: "chave-google-de-controle",
   modelId: "gemini-3.5-flash",
+  // Credencial da PRÓPRIA organização: habilita o degrau A (assinatura primeiro).
+  credencialPropria: true,
 } as const;
 
 /** O motor, com o mesmo formato de entrada que o worker passa. */
 const comChaveOpenai = () =>
-  decidirTranscricao({ conversa: GEMINI, chaveOpenai: async () => "chave-openai-de-controle" });
+  // Gemini com a chave da INSTALAÇÃO no chat: a OpenAI vem antes (degrau C).
+  decidirTranscricao({ conversa: { ...GEMINI, credencialPropria: false }, chaveOpenai: async () => "chave-openai-de-controle" });
 
 /** O que a TELA anuncia no ponto, dados os mesmos dados que o motor tem. */
 function tela(

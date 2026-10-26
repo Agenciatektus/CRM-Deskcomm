@@ -102,6 +102,10 @@ function comTranscricaoNoEnv(t: { model: string; apiKey?: string; baseUrl?: stri
   // chave os casos abaixo cairiam no degrau do modelo de conversa (a
   // organização mockada não tem padrão nenhum) e anunciariam "—".
   vi.stubEnv("OPENAI_API_KEY", "chave-openai-de-controle");
+  // A escada só usa a chave OpenAI PRÓPRIA da organização (credencial validada).
+  banco.lista.ai_provider_credentials = [
+    { id: "cred-o", provider: "openai", validated_at: "2026-10-01T00:00:00Z", is_active: true },
+  ];
 }
 
 describe("GET /api/v1/ai/providers — modelo de transcrição em vigor", () => {

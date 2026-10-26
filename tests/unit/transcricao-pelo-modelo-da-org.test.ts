@@ -321,10 +321,7 @@ describe("transcricao_de_audio — quem ouve o áudio (#2171)", () => {
       );
     });
 
-    it("org com Gemini que TAMBÉM tem chave OpenAI segue no whisper-1 — ninguém troca de fornecedor numa atualização", async () => {
-      // A ordem da escada é a de `lib/ai/embeddings/chave.ts` (degraus 5 e 7):
-      // a chave OpenAI vem antes do modelo da organização. Quem já transcrevia
-      // pelo Whisper continua nele; o Gemini só ouve quem não tem chave OpenAI.
+    it("org com Gemini PRÓPRIO que também tem chave OpenAI transcreve pelo Gemini (assinatura primeiro, 26/10)", async () => {
       resolveMock.mockImplementation(
         async (_pool: unknown, _cfg: unknown, _org: unknown, override?: { provider?: string }) =>
           override?.provider === "openai"
@@ -335,14 +332,26 @@ describe("transcricao_de_audio — quem ouve o áudio (#2171)", () => {
       const r = await deriveMessageMedia(eventRow());
 
       expect(r.status, `detail=${r.detail}`).toBe("ok");
-      expect(generateTextMock, "o áudio foi para o Gemini, trocando o fornecedor").not.toHaveBeenCalled();
+      expect(generateTextMock, "a assinatura própria da org não foi usada").toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("Gemini com a chave da INSTALAÇÃO no chat NÃO conta como próprio: a chave OpenAI vem antes", async () => {
+      resolveMock.mockImplementation(
+        async (_pool: unknown, _cfg: unknown, _org: unknown, override?: { provider?: string }) =>
+          override?.provider === "openai"
+            ? configResolvida({ provider: "openai", apiKey: CHAVE_OPENAI, defaultModel: "gpt-5" })
+            : configResolvida({ origemDaChave: "chave_da_instalacao" }),
+      );
+
+      const r = await deriveMessageMedia(eventRow());
+
+      expect(r.status, `detail=${r.detail}`).toBe("ok");
+      expect(generateTextMock, "chave da instalação no chat foi tratada como própria").not.toHaveBeenCalled();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0]! as [string, { headers: Record<string, string> }];
       expect(url).toBe("https://api.openai.com/v1/audio/transcriptions");
       expect(String(init.headers.Authorization)).toBe(`Bearer ${CHAVE_OPENAI}`);
-      expect(updateEqMock).toHaveBeenCalledWith(
-        expect.objectContaining({ media_derived_status: "ready", media_derived_text: "transcrito pelo whisper" }),
-      );
     });
 
     it("o caminho de documento/PDF segue intacto", async () => {
@@ -362,5 +371,174 @@ describe("transcricao_de_audio — quem ouve o áudio (#2171)", () => {
         }),
       );
     });
+  });
+});
+
+describe("queda graciosa — a chave recusada (401/403) desce UM degrau (26/10)", () => {
+  /** Gemini próprio recusando a chave, e uma chave OpenAI válida logo abaixo. */
+  const geminiRecusaEOpenaiVale = () =>
+    resolveMock.mockImplementation(
+      async (_pool: unknown, _cfg: unknown, _org: unknown, override?: { provider?: string }) =>
+        override?.provider === "openai"
+          ? configResolvida({ provider: "openai", apiKey: CHAVE_OPENAI, defaultModel: "gpt-5" })
+          : configResolvida(),
+    );
+  const erro401 = () => Object.assign(new Error("User not found."), { statusCode: 401 });
+
+  beforeEach(() => {
+    downloadMock.mockReset().mockResolvedValue({ data: new Blob([new Uint8Array([1, 2, 3])]), error: null });
+    updateEqMock.mockReset();
+    inboxInsertMock.mockReset();
+    generateTextMock.mockReset().mockRejectedValue(erro401());
+    extractPdfMock.mockReset();
+    fetchMock.mockReset().mockResolvedValue({ ok: true, json: async () => ({ text: "transcrito pelo whisper" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    messageRow.type = "audio";
+    messageRow.media_mime = "audio/ogg";
+    messageRow.media_storage_path = "org1/conv1/msg1.ogg";
+    messageRow.media_derived_status = null;
+    messageRow.metadata = {};
+    bindingDeVisao = null;
+    geminiRecusaEOpenaiVale();
+  });
+
+  it("401 no degrau escolhido → o próximo degrau transcreve e o motivo da queda é gravado", async () => {
+    messageRow.organization_id = "org-queda-1";
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    expect(r.status, `detail=${r.detail}`).toBe("ok");
+    expect(generateTextMock).toHaveBeenCalledTimes(1); // uma vez por degrau, sem laço
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(updateEqMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media_derived_status: "ready",
+        media_derived_text: "transcrito pelo whisper",
+        metadata: expect.objectContaining({
+          media_derived_motivo: expect.stringContaining("recusada pelo provedor"),
+        }),
+      }),
+    );
+  });
+
+  it("avisa na Central UMA vez por organização por dia, sem chave no texto", async () => {
+    messageRow.organization_id = "org-queda-2";
+    await deriveMessageMedia(eventRow());
+    await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    expect(inboxInsertMock).toHaveBeenCalledTimes(1);
+    const texto = JSON.stringify(inboxInsertMock.mock.calls[0]![0]);
+    expect(texto).not.toContain(CHAVE_GOOGLE);
+    expect(texto).not.toContain(CHAVE_OPENAI);
+  });
+
+  it("todos os degraus recusam → erro com o caminho percorrido, nada gravado como pronto", async () => {
+    messageRow.organization_id = "org-queda-3";
+    fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+    const r = await deriveMessageMedia(eventRow(4));
+    messageRow.organization_id = "org1";
+
+    expect(r.status).toBe("error");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(updateEqMock).not.toHaveBeenCalledWith(expect.objectContaining({ media_derived_status: "ready" }));
+    expect(updateEqMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media_derived_status: "failed",
+        metadata: expect.objectContaining({
+          media_derived_motivo: expect.stringContaining("recusada pelo provedor"),
+        }),
+      }),
+    );
+  });
+
+  it("5xx desce o degrau sem avisar a Central; 400 não desce", async () => {
+    messageRow.organization_id = "org-queda-4";
+    generateTextMock.mockRejectedValue(Object.assign(new Error("boom"), { statusCode: 503 }));
+    const r = await deriveMessageMedia(eventRow());
+    expect(r.status).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(inboxInsertMock).not.toHaveBeenCalled();
+
+    fetchMock.mockClear();
+    generateTextMock.mockRejectedValue(Object.assign(new Error("ruim"), { statusCode: 400 }));
+    const r2 = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+    expect(r2.status).toBe("error");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("P1-2: imagem com a visão em 401 NÃO entra na cascata (sem 2ª chamada, sem aviso, sem motivo de queda)", async () => {
+    messageRow.organization_id = "org-queda-5";
+    messageRow.type = "image";
+    messageRow.media_mime = "image/jpeg";
+    messageRow.media_storage_path = "org1/conv1/msg1.jpg";
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    void r;
+    expect(generateTextMock.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(inboxInsertMock.mock.calls)).not.toContain("chave de transcrição");
+    expect(updateEqMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ media_derived_motivo: expect.anything() }) }),
+    );
+  });
+
+  it("P1-3: degrau A sem base URL (custom_provider_sem_base_url) é degrau inexistente: desce sem avisar", async () => {
+    messageRow.organization_id = "org-queda-6";
+    generateTextMock.mockRejectedValue(new Error("custom_provider_sem_base_url: cadastre o endereço"));
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    expect(r.status).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(inboxInsertMock).not.toHaveBeenCalled();
+  });
+  it("P1 SSRF: base_url INTERNA no degrau A não faz chamada ao destino e desce; avisa sem o endereço", async () => {
+    for (const [n, url] of [
+      ["a", "http://169.254.169.254/v1"],
+      ["b", "http://localhost:8080/v1"],
+      ["c", "http://127.0.0.1:11434/v1"],
+    ] as const) {
+      messageRow.organization_id = `org-ssrf-${n}`;
+      generateTextMock.mockReset().mockResolvedValue(respostaDoModelo("não deveria sair"));
+      fetchMock.mockClear();
+      inboxInsertMock.mockClear();
+      resolveMock.mockImplementation(
+        async (_p: unknown, _c: unknown, _o: unknown, override?: { provider?: string }) =>
+          override?.provider === "openai"
+            ? configResolvida({ provider: "openai", apiKey: CHAVE_OPENAI, defaultModel: "gpt-5" })
+            : configResolvida({ baseUrl: url }),
+      );
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.status, url).toBe("ok");
+      expect(generateTextMock, `o áudio saiu para ${url}`).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1); // desceu para a OpenAI própria
+      expect(JSON.stringify(inboxInsertMock.mock.calls)).not.toContain(url);
+    }
+    messageRow.organization_id = "org1";
+  });
+
+  it("P1 SSRF: base_url pública segue pelo degrau A", async () => {
+    messageRow.organization_id = "org-ssrf-pub";
+    resolveMock.mockImplementation(async () => configResolvida({ baseUrl: "https://93.184.216.34/v1" }));
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+    expect(r.status).toBe("ok");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+  });
+  it("P2-2: falha única no áudio grava só o código no motivo, nunca a mensagem do provedor", async () => {
+    messageRow.organization_id = "org-san-1";
+    resolveMock.mockImplementation(async () => configResolvida());
+    generateTextMock.mockRejectedValue(
+      Object.assign(new Error("resposta do destino: segredo-refletido"), { statusCode: 400 }),
+    );
+    const r = await deriveMessageMedia(eventRow(4));
+    messageRow.organization_id = "org1";
+    expect(r.status).toBe("error");
+    const gravado = JSON.stringify(updateEqMock.mock.calls);
+    expect(gravado).toContain("HTTP 400");
+    expect(gravado).not.toContain("segredo-refletido");
   });
 });
