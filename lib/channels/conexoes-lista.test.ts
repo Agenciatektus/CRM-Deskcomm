@@ -5,6 +5,7 @@ import type { ChannelSession } from "@/hooks/channels/useChannelSessions";
 import {
   acoesDaConexao,
   calcularKpis,
+  destinoDeGerenciar,
   detalheDaConexao,
   filtrarConexoes,
   montarConexoes,
@@ -110,14 +111,30 @@ describe("acoes pelo status", () => {
   });
 
   it("FAILED/STOPPED: reconectar + excluir; sem o servico no ar, so excluir", () => {
-    expect(acoesDaConexao(item({ status: "FAILED" }), true)).toEqual(["reconectar", "excluir"]);
-    expect(acoesDaConexao(item({ status: "STOPPED", nativa: true }), false)).toEqual(["reconectar", "excluir"]);
-    expect(acoesDaConexao(item({ status: "FAILED" }), false)).toEqual(["excluir"]);
+    expect(acoesDaConexao(item({ status: "FAILED" }), true)).toEqual(["reconectar", "pausar", "excluir"]);
+    expect(acoesDaConexao(item({ status: "STOPPED", nativa: true }), false)).toEqual(["reconectar", "pausar", "excluir"]);
+    expect(acoesDaConexao(item({ status: "FAILED" }), false)).toEqual(["pausar", "excluir"]);
   });
 
   it("canal sem sessao no transporte caido: gerenciar em vez de reconectar", () => {
     const oficial = item({ metodo: "oficial", viveNoTransporte: false, status: "FAILED" });
-    expect(acoesDaConexao(oficial, true)).toEqual(["gerenciar", "excluir"]);
+    expect(acoesDaConexao(oficial, true)).toEqual(["gerenciar", "pausar", "excluir"]);
+  });
+
+  it("estado desconhecido também pode ser pausado", () => {
+    expect(acoesDaConexao(item({ status: null }), true)).toEqual(["pausar", "excluir"]);
+  });
+
+  it("WORKING com tela de apoio ganha Gerenciar no destino certo; QR (controle negativo) não", () => {
+    const oficial = item({ metodo: "oficial", viveNoTransporte: false });
+    expect(acoesDaConexao(oficial, true)).toContain("gerenciar");
+    expect(destinoDeGerenciar(oficial)).toBe("/app/connections?aba=oficial");
+    for (const metodo of ["parceiro", "instagram", "verdash"] as const) {
+      expect(acoesDaConexao(item({ metodo }), true)).toContain("gerenciar");
+    }
+    expect(acoesDaConexao(item({ metodo: "qr" }), true)).not.toContain("gerenciar");
+    const graph = item({ metodo: "parceiro", sessao: sessao({ id: "g", provider: "datafy" }) });
+    expect(destinoDeGerenciar(graph)).toBe("/app/connections?aba=graph");
   });
 
   it("pausado: retomar + excluir; ligacao: so gerenciar", () => {

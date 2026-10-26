@@ -14,7 +14,6 @@ import {
   PlugsConnected,
   Plus,
   QrCode,
-  Storefront,
   WhatsappLogo,
 } from "@/lib/ui/icons";
 
@@ -39,7 +38,6 @@ const OUTROS: { aba: string; nome: string; sub: string; Icone: typeof Phone; log
   { aba: "oficial", nome: "API Oficial (Meta)", sub: "Número oficial e templates da Meta", Icone: ChatCircle, logo: "bg-avatar-1 text-avatar-1-fg" },
   { aba: "parceiro", nome: "Provedor parceiro", sub: "Número por um provedor parceiro", Icone: PlugsConnected, logo: "bg-avatar-4 text-avatar-4-fg" },
   { aba: "telefonia", nome: "Telefone", sub: "Linha de telefone para as chamadas", Icone: Phone, logo: "bg-avatar-5 text-avatar-5-fg" },
-  { aba: "sociais", nome: "Redes sociais", sub: "Outras redes na aba Conversas", Icone: Storefront, logo: "bg-avatar-6 text-avatar-6-fg" },
   { aba: "voz", nome: "Chamada de voz", sub: "Ligações atendidas pela IA", Icone: Microphone, logo: "bg-avatar-5 text-avatar-5-fg" },
 ];
 
@@ -97,7 +95,9 @@ function Logo({ Icone, cor }: { Icone: typeof Phone; cor: string }) {
  */
 export function Canais({ children }: { children: ReactNode }) {
   const t = useT();
-  const aba = useSearchParams()?.get("aba");
+  const params = useSearchParams();
+  // `?vista=pagina` é a porta para a página de Conexões no celular (sem isto, o atalho voltava para estes cartões).
+  const aba = params?.get("aba") || params?.get("vista");
   const sessoes = useChannelSessions({ refetchInterval: 30_000 });
   if (aba) return <>{children}</>;
   return (
@@ -125,7 +125,7 @@ export function Canais({ children }: { children: ReactNode }) {
                 aviso={estado === "caiu" ? t("Leia o QR code de novo para voltar a receber mensagens deste número.") : undefined}
                 acoes={
                   <Link
-                    href="/app/connections?aba=numeros"
+                    href="/app/connections?vista=pagina"
                     className={`${BOTAO} ${estado === "caiu" ? "bg-accent text-accent-foreground" : "border border-border text-text"}`}
                   >
                     {estado === "caiu" ? t("Reconectar") : t("Gerenciar")}
@@ -149,7 +149,7 @@ export function Canais({ children }: { children: ReactNode }) {
           ))}
         </ul>
         <Link
-          href="/app/connections?aba=numeros"
+          href="/app/connections?vista=pagina"
           className="pele-foco mx-4 flex min-h-13 items-center justify-center gap-2 rounded-2xl border-[1.5px] border-border-strong font-bold text-accent-text hover:bg-hover"
         >
           <Plus size={18} aria-hidden />

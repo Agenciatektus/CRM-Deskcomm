@@ -209,6 +209,7 @@ export function acoesDaConexao(i: ItemDeConexao, transporteNoAr: boolean): AcaoD
         "protecao",
         "pausar",
         ...(i.temGrupos ? (["grupos"] as const) : []),
+        ...(temTelaDeApoio(i) ? (["gerenciar"] as const) : []),
         "excluir",
       ];
     case "STARTING":
@@ -217,11 +218,16 @@ export function acoesDaConexao(i: ItemDeConexao, transporteNoAr: boolean): AcaoD
       return [...(podeReconectar(i, transporteNoAr) ? (["reconectar"] as const) : []), "excluir"];
     case "FAILED":
     case "STOPPED":
-      if (podeReconectar(i, transporteNoAr)) return ["reconectar", "excluir"];
-      return i.viveNoTransporte ? ["excluir"] : ["gerenciar", "excluir"];
+      if (podeReconectar(i, transporteNoAr)) return ["reconectar", "pausar", "excluir"];
+      return i.viveNoTransporte ? ["pausar", "excluir"] : ["gerenciar", "pausar", "excluir"];
     default:
-      return ["excluir"];
+      return ["pausar", "excluir"];
   }
+}
+
+/** O método tem tela de apoio própria (credenciais, modelos): "Gerenciar" leva até ela. */
+function temTelaDeApoio(i: ItemDeConexao): boolean {
+  return i.metodo === "oficial" || i.metodo === "parceiro" || i.metodo === "instagram" || i.metodo === "verdash";
 }
 
 function podeReconectar(i: ItemDeConexao, transporteNoAr: boolean): boolean {
@@ -234,7 +240,7 @@ export function destinoDeGerenciar(i: ItemDeConexao): string {
     case "oficial":
       return "/app/connections?aba=oficial";
     case "parceiro":
-      return "/app/connections?aba=parceiro";
+      return i.sessao?.provider === "datafy" ? "/app/connections?aba=graph" : "/app/connections?aba=parceiro";
     case "instagram":
       return "/app/connections?aba=instagram";
     case "verdash":
