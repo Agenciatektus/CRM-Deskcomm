@@ -134,6 +134,11 @@ export interface DecisaoDeTranscricao {
    * recusa a chave. `null` = não há. Ausente em `nada`.
    */
   proxima?: () => Promise<DecisaoDeTranscricao | null>;
+  /**
+   * Endereço (base URL) cadastrado pela organização para o degrau A. O worker
+   * passa por `motivoDaRecusaDeDestino` antes de o áudio sair para ele.
+   */
+  baseUrlDoDestino?: string | null;
 }
 
 /** Erro de chave (401/403): justifica descer um degrau E avisar a organização. */
@@ -145,6 +150,11 @@ export function chaveRecusadaPeloProvedor(err: unknown): boolean {
   return /^transcription_(401|403)$/.test(msg);
 }
 
+/** O endereço do degrau A foi recusado como destino interno (nada saiu). */
+export function destinoRecusado(err: unknown): boolean {
+  return err instanceof Error && err.message === "transcricao_destino_recusado";
+}
+
 /** Erros que justificam descer um degrau: chave recusada, limite (429), 5xx e tempo esgotado. */
 export function podeDescerDeDegrau(err: unknown): boolean {
   if (chaveRecusadaPeloProvedor(err)) return true;
@@ -154,7 +164,7 @@ export function podeDescerDeDegrau(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : "";
   return (
     // Degrau que não existe de fato (provedor sem fábrica, custom sem base URL).
-    /custom_provider_sem_base_url|transcription_provider_unavailable/.test(msg) ||
+    /custom_provider_sem_base_url|transcription_provider_unavailable|transcricao_destino_recusado/.test(msg) ||
     /^transcription_(429|5\d\d)$/.test(msg) ||
     e.name === "AbortError" ||
     e.name === "TimeoutError" ||
@@ -270,6 +280,7 @@ export async function decidirTranscricao(
       languages: idiomas,
     }),
     motivo,
+    baseUrlDoDestino: conversa!.baseUrl ?? null,
     // É ESTE anúncio — e não `whisper-1` — que a tela precisa mostrar quando
     // a organização não tem chave OpenAI (#2190).
     anuncio: { provider: conversa!.provider, modelId: conversa!.modelId! },

@@ -495,4 +495,37 @@ describe("queda graciosa — a chave recusada (401/403) desce UM degrau (26/10)"
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(inboxInsertMock).not.toHaveBeenCalled();
   });
+  it("P1 SSRF: base_url INTERNA no degrau A não faz chamada ao destino e desce; avisa sem o endereço", async () => {
+    for (const [n, url] of [
+      ["a", "http://169.254.169.254/v1"],
+      ["b", "http://localhost:8080/v1"],
+      ["c", "http://127.0.0.1:11434/v1"],
+    ] as const) {
+      messageRow.organization_id = `org-ssrf-${n}`;
+      generateTextMock.mockReset().mockResolvedValue(respostaDoModelo("não deveria sair"));
+      fetchMock.mockClear();
+      inboxInsertMock.mockClear();
+      resolveMock.mockImplementation(
+        async (_p: unknown, _c: unknown, _o: unknown, override?: { provider?: string }) =>
+          override?.provider === "openai"
+            ? configResolvida({ provider: "openai", apiKey: CHAVE_OPENAI, defaultModel: "gpt-5" })
+            : configResolvida({ baseUrl: url }),
+      );
+      const r = await deriveMessageMedia(eventRow());
+      expect(r.status, url).toBe("ok");
+      expect(generateTextMock, `o áudio saiu para ${url}`).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1); // desceu para a OpenAI própria
+      expect(JSON.stringify(inboxInsertMock.mock.calls)).not.toContain(url);
+    }
+    messageRow.organization_id = "org1";
+  });
+
+  it("P1 SSRF: base_url pública segue pelo degrau A", async () => {
+    messageRow.organization_id = "org-ssrf-pub";
+    resolveMock.mockImplementation(async () => configResolvida({ baseUrl: "https://93.184.216.34/v1" }));
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+    expect(r.status).toBe("ok");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+  });
 });

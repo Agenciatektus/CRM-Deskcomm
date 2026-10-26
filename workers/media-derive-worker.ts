@@ -35,6 +35,7 @@ import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
   chaveRecusadaPeloProvedor,
   decidirTranscricao,
+  destinoRecusado,
   podeDescerDeDegrau,
   type DecisaoDeTranscricao,
   type OrigemDaTranscricao,
@@ -438,7 +439,7 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // OpenAI que o thunk resolveu; o 3, a da conversa. Sem isto o teto do
     // plano via a credencial própria da conversa e deixava passar o gasto que
     // sai da chave da instalação.
-    const montarDeps = (d: DecisaoDeTranscricao): DeriveDeps => {
+    const montarDeps = (d: DecisaoDeTranscricao, subirErro = true): DeriveDeps => {
       const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
         d.origem === "servico_da_instalacao"
           ? "chave_da_instalacao"
@@ -454,6 +455,7 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
         chaveEhDaInstalacao,
         origemDoModelo,
         origemDaChaveDaTranscricao,
+        subirErro,
       );
     };
 
@@ -479,17 +481,38 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
         const seguinte =
           precisaTranscricao && podeDescerDeDegrau(err) && degrau.proxima ? await degrau.proxima() : null;
         if (!seguinte) {
+          // Vídeo: o último degrau falhou na transcrição, mas os frames valem.
+          if (msg.type === "video" && podeDescerDeDegrau(err)) {
+            text = await deriveMediaText(
+              msg.type,
+              buffer,
+              msg.media_mime ?? "application/octet-stream",
+              montarDeps(degrau, false),
+            );
+            motivoDaQueda = `${motivoDaQueda ? `${motivoDaQueda}; ` : ""}a transcrição do áudio do vídeo falhou em todos os degraus; seguiu só com a descrição visual`;
+            await avisarMidiaNaoLida(
+              msg.organization_id,
+              rotuloDoTipo,
+              "a fala do vídeo não pôde ser transcrita; o agente recebeu só a descrição das imagens",
+            );
+            break;
+          }
           if (!motivoDaQueda) throw err;
           // Todos falharam: o motivo conta o caminho percorrido até o último.
-          const detalhe = err instanceof Error ? err.message : String(err);
+          // Só status/código fixo: a mensagem do provedor pode refletir a resposta do destino.
+          const codigo = Number((err as { statusCode?: unknown } | null)?.statusCode);
+          const detalhe = codigo > 0 ? `HTTP ${codigo}` : destinoRecusado(err) ? "destino recusado" : "erro do provedor";
           throw new Error(`${motivoDaQueda}; o degrau ${degrau.origem} também falhou: ${detalhe}`);
         }
         const daInstalacao = degrau.origem === "servico_da_instalacao";
         const quemRecusou = daInstalacao
           ? "a chave de transcrição da instalação (TRANSCRIPTION_API_KEY)"
           : `a chave do seu provedor ${degrau.anuncio.provider}`;
-        const recusada = chaveRecusadaPeloProvedor(err);
-        motivoDaQueda = recusada
+        const recusadoDestino = destinoRecusado(err);
+        const recusada = chaveRecusadaPeloProvedor(err) || recusadoDestino;
+        motivoDaQueda = recusadoDestino
+          ? `o endereço do degrau ${degrau.origem} não foi aceito como destino (nada foi enviado); transcrito pelo degrau ${seguinte.origem}`
+          : recusada
           ? `${quemRecusou} foi recusada pelo provedor (401/403); transcrito pelo degrau ${seguinte.origem}`
           : `o degrau ${degrau.origem} falhou (limite, erro do provedor ou tempo esgotado); transcrito pelo degrau ${seguinte.origem}`;
         logger.warn("[media-derive] chave de transcrição recusada, descendo um degrau", {
@@ -497,7 +520,14 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
           de: degrau.origem,
           para: seguinte.origem,
         });
-        if (recusada) await avisarChaveDeTranscricaoRecusada(msg.organization_id, rotuloDoTipo, quemRecusou, daInstalacao);
+        if (recusada) await avisarChaveDeTranscricaoRecusada(
+            msg.organization_id,
+            rotuloDoTipo,
+            recusadoDestino
+              ? `o endereço cadastrado para o seu provedor ${degrau.anuncio.provider} não foi aceito como destino`
+              : `${quemRecusou} foi recusada pelo provedor`,
+            daInstalacao,
+          );
         degrau = seguinte;
       }
     }
@@ -699,6 +729,9 @@ function buildDeriveDeps(
   // De quem é a chave que a transcrição usa (ver o chamador). Sem ela, a da
   // conversa — o comportamento de antes.
   origemDaChaveDaTranscricao: OrigemDaChaveLlm = llm.origemDaChave,
+  // Falso só no último degrau de um vídeo: o erro da transcrição é engolido e o
+  // vídeo segue só com os frames.
+  subirErroDaTranscricao = true,
 ): DeriveDeps {
   const registry = createDefaultRegistry();
   // Thunk, não consulta: nada vai ao banco até a visão ser de fato perguntada,
@@ -981,10 +1014,11 @@ function buildDeriveDeps(
   // por `lib/supabase/admin`.
   // ─── O degrau que a ESCADA escolheu, com a recusa onde ela vale ──────────
   //
-  // Só o degrau 1 (o serviço de transcrição do `.env`) aponta para um
-  // endereço configurado à mão — por isso é o único que ainda passa pela
-  // recusa de destino interno antes da chave sair. Os degraus 2 e 3 vão para
-  // o endereço público do provedor com a chave da própria organização.
+  // Dois degraus apontam para um endereço configurado à mão e passam pela
+  // recusa de destino interno antes da chave/áudio sair: o serviço da
+  // instalação (`.env`) e o modelo da organização com `base_url` cadastrada
+  // (`transcriberDaOrganizacao`). A chave OpenAI própria vai ao endereço
+  // público padrão.
   // `semTranscricao` continua sendo o fallback de quem não é áudio (vídeo e
   // imagem têm o caminho deles), porque o degrau 4 `nada` já foi tratado no
   // corpo do handler — lá em cima, com `failed` + motivo.
@@ -1028,11 +1062,27 @@ function buildDeriveDeps(
       return servico.transcribe(audio, mime);
     },
   });
+  // Degrau A com endereço cadastrado pela organização: mesma recusa de destino
+  // interno da visão, ANTES de o áudio sair. Recusado = nada enviado, o degrau
+  // desce (erro de código fixo: nunca reflete resposta do destino).
+  const transcriberDaOrganizacao = (
+    t: NonNullable<DeriveDeps["transcriber"]>,
+  ): DeriveDeps["transcriber"] => ({
+    transcribe: async (audio, mime) => {
+      if (decisao.baseUrlDoDestino) {
+        const recusa = await motivoDaRecusaDeDestino(decisao.baseUrlDoDestino, "organizacao");
+        if (recusa) throw new Error("transcricao_destino_recusado");
+      }
+      return t.transcribe(audio, mime);
+    },
+  });
   const transcriber: DeriveDeps["transcriber"] = !decisao.transcriber
     ? semTranscricao
     : decisao.origem === "servico_da_instalacao"
       ? transcriberDeServico(comTeto(comCusto(decisao.transcriber)))
-      : comTeto(comCusto(decisao.transcriber));
+      : decisao.origem === "modelo_da_organizacao"
+        ? transcriberDaOrganizacao(comTeto(comCusto(decisao.transcriber)))
+        : comTeto(comCusto(decisao.transcriber));
   return {
     transcriber,
     describeImage,
@@ -1044,7 +1094,7 @@ function buildDeriveDeps(
       deriveVideoText(buffer, {
         transcriber: comTravaDeDuracao(transcriber),
         describeImage,
-        subirErroDaTranscricao: podeDescerDeDegrau,
+        subirErroDaTranscricao: subirErroDaTranscricao ? podeDescerDeDegrau : undefined,
       }),
   };
 }
@@ -1375,7 +1425,7 @@ const avisoDaChaveRecusadaNoDia = new Map<string, string>();
 export async function avisarChaveDeTranscricaoRecusada(
   organizationId: string,
   tipo: string,
-  quemRecusou: string,
+  motivo: string,
   daInstalacao = false,
 ): Promise<void> {
   const hoje = new Date().toISOString().slice(0, 10);
@@ -1384,7 +1434,7 @@ export async function avisarChaveDeTranscricaoRecusada(
   const abriu = await avisarMidiaNaoLida(
     organizationId,
     tipo,
-    `${quemRecusou} foi recusada pelo provedor`,
+    motivo,
     "A leitura seguiu por outro caminho e o atendimento não parou, mas a chave recusada precisa ser trocada.",
     undefined,
     daInstalacao

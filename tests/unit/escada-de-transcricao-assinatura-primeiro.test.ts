@@ -108,6 +108,16 @@ describe("P1-1: a chave OpenAI própria vai para api.openai.com com whisper-1", 
   });
 });
 
+describe("imagem não consulta a OpenAI da org", () => {
+  it("sem o thunk na entrada, o degrau B não é consultado e a cascata termina no serviço", async () => {
+    const thunk = vi.fn(async () => "chave-openai");
+    const d = await decidirTranscricao({ conversa: null });
+    expect(thunk).not.toHaveBeenCalled();
+    expect(d.origem).toBe("servico_da_instalacao");
+    expect(await d.proxima!()).toBeNull();
+  });
+});
+
 describe("P2-1: vídeo propaga o erro da transcrição quando o worker pede", () => {
   const runFfmpeg = async (args: string[], cwd: string) => {
     if (args.includes("audio.ogg")) {
