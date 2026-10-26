@@ -80,6 +80,9 @@
   --text-ui: 14px;
   --text-ui--line-height: 1.45;
   --text-message: 15px;
+  --text-title-lg: 20px;
+  --text-title-lg--font-weight: 700;
+  --text-title-lg--letter-spacing: -0.01em;
 
   --color-surface-2: #14161a;
   --color-thread: #111315;

@@ -23,8 +23,12 @@ export type Cartao = {
   /** Texto do tempo no rodapé: "há 3 h" ou "esperando resposta há 2 d". */
   tempo: string;
   parado?: string;
+  /** Título da próxima tarefa e, se houver, o prazo já escrito como o app escreve. */
   proximo?: string;
+  quando?: string;
   atrasado?: boolean;
+  /** Dias de atraso da tarefa (quando atrasada). */
+  atrasoDias?: number;
   /** O agente propõe uma ação e espera Aprovar ou Ignorar. */
   proposta?: string;
   destaque?: boolean;
@@ -67,16 +71,16 @@ export const FUNIS: Funil[] = [
         c("c3", "Camilo Prado", 1, "instagram", 0, "IA", "Qual o endereço da clínica?", "há 1 h", "anúncio-meta"),
       ]),
       etapa(1, "Avaliação", [
-        c("c4", "Paulo Santos", 1, "whatsapp", 640, "IA", "Pode ser quinta de manhã", "há 3 h", "agendado", { proximo: "Confirmar avaliação, quinta 10h" }),
+        c("c4", "Paulo Santos", 1, "whatsapp", 640, "IA", "Pode ser quinta de manhã", "há 3 h", "agendado", { proximo: "Confirmar avaliação", quando: "qui 29/10 10:00" }),
         c("c5", "Tiago Moreira", 5, "whatsapp", 900, "IA", "Vou falar com minha esposa e te retorno", "há 2 d", "retorno", { parado: "2 d" }),
-        c("c6", "Sofia Lacerda", 0, "whatsapp", 1000, DONO_LOGADO, "Mandei as fotos que você pediu", "há 5 h", "indicação", { proximo: "Enviar o antes e depois", atrasado: true }),
+        c("c6", "Sofia Lacerda", 0, "whatsapp", 1000, DONO_LOGADO, "Mandei as fotos que você pediu", "há 5 h", "indicação", { proximo: "Enviar o antes e depois", atrasado: true, atrasoDias: 1 }),
       ]),
       etapa(2, "Proposta enviada", [
-        c("c7", "Helena Costa", 0, "instagram", 1800, DONO_LOGADO, "Vou ver aqui e te falo", "há 1 d", "primeira-vez", { proximo: "Ligar amanhã, 9h", proposta: "enviar retomada amanhã, 10h" }),
-        c("c8", "Larissa Mota", 2, "whatsapp", 2400, DONO_LOGADO, "Tem desconto no pacote de 6?", "esperando resposta há 2 d", "pediu-preço", { proximo: "Cobrar retorno da proposta", atrasado: true }),
+        c("c7", "Helena Costa", 0, "instagram", 1800, DONO_LOGADO, "Vou ver aqui e te falo", "há 1 d", "primeira-vez", { proximo: "Ligar", quando: "Amanhã 09:00", proposta: "enviar retomada amanhã, 10h" }),
+        c("c8", "Larissa Mota", 2, "whatsapp", 2400, DONO_LOGADO, "Tem desconto no pacote de 6?", "esperando resposta há 2 d", "pediu-preço", { proximo: "Cobrar retorno da proposta", atrasado: true, atrasoDias: 2 }),
       ], 0.5),
       etapa(3, "Negociação", [
-        c("c9", "Marina Duarte", 2, "whatsapp", 2400, DONO_LOGADO, "16h. E dá para parcelar?", "há 20 min", "indicação", { naoLidas: 1, destaque: true, proximo: "Confirmar horário de amanhã" }),
+        c("c9", "Marina Duarte", 2, "whatsapp", 2400, DONO_LOGADO, "16h. E dá para parcelar?", "há 20 min", "indicação", { naoLidas: 1, destaque: true, proximo: "Confirmar horário", quando: "Amanhã 10:00" }),
         c("c10", "Débora Reis", 4, "whatsapp", 3000, DONO_LOGADO, "Fechado, me manda o link", "há 6 h", "retorno", { proximo: "Combinar parcelamento" }),
       ], 0.8),
       etapa(4, "Tratamento fechado", [
@@ -98,7 +102,7 @@ export const FUNIS: Funil[] = [
         c("k4", "Aline Prado", 5, "whatsapp", 497, "IA", "Depois eu vejo o valor", "há 2 d", "retorno", { parado: "2 d" }),
       ]),
       etapa(2, "Carrinho", [
-        c("k5", "Renata Souza", 4, "instagram", 497, DONO_LOGADO, "Dá para pagar no PIX?", "há 1 d", "pediu-preço", { proximo: "Mandar a chave do PIX", atrasado: true, proposta: "oferecer o bônus de 24 h" }),
+        c("k5", "Renata Souza", 4, "instagram", 497, DONO_LOGADO, "Dá para pagar no PIX?", "há 1 d", "pediu-preço", { proximo: "Mandar a chave do PIX", atrasado: true, atrasoDias: 1, proposta: "oferecer o bônus de 24 h" }),
       ], 0.5),
       etapa(3, "Checkout iniciado", [
         c("k6", "Felipe Costa", 2, "whatsapp", 497, DONO_LOGADO, "O cartão não passou", "há 35 min", "checkout", { naoLidas: 2, destaque: true, proximo: "Ajudar com o pagamento" }),
@@ -118,11 +122,11 @@ export const FUNIS: Funil[] = [
         c("s2", "Oficina do Zé", 0, "whatsapp", 0, "IA", "Troca de piso, 80 m²", "há 2 h", "piso"),
       ]),
       etapa(1, "Visita técnica", [
-        c("s3", "Clínica Sorriso", 1, "whatsapp", 4200, DONO_LOGADO, "Pode vir terça às 14h", "há 1 d", "reforma", { proximo: "Visita terça, 14h" }),
+        c("s3", "Clínica Sorriso", 1, "whatsapp", 4200, DONO_LOGADO, "Pode vir terça às 14h", "há 1 d", "reforma", { proximo: "Visita técnica", quando: "ter 27/10 14:00" }),
         c("s4", "Padaria Central", 5, "instagram", 1900, "IA", "Me passa uma estimativa", "há 3 d", "pintura", { parado: "3 d" }),
       ]),
       etapa(2, "Proposta", [
-        c("s5", "Escola Horizonte", 4, "whatsapp", 8600, DONO_LOGADO, "Vamos analisar com a diretoria", "esperando resposta há 2 d", "reforma", { proximo: "Ligar para a diretoria", atrasado: true, proposta: "enviar retomada amanhã, 10h" }),
+        c("s5", "Escola Horizonte", 4, "whatsapp", 8600, DONO_LOGADO, "Vamos analisar com a diretoria", "esperando resposta há 2 d", "reforma", { proximo: "Ligar para a diretoria", atrasado: true, atrasoDias: 2, proposta: "enviar retomada amanhã, 10h" }),
       ], 0.5),
       etapa(3, "Negociação", [
         c("s6", "Rede Vitória", 2, "whatsapp", 12000, DONO_LOGADO, "Fecha se parcelar em três vezes", "há 4 h", "rede", { destaque: true, naoLidas: 1, proximo: "Responder sobre o parcelamento" }),
