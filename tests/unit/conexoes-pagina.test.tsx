@@ -9,7 +9,10 @@ const dados = vi.hoisted(() => ({
   itens: [] as unknown[],
   carregando: false,
   erro: false,
+  bancoAtrasado: false,
+  patch: vi.fn(),
 }));
+vi.mock("@/lib/api/client", () => ({ apiClient: { patch: dados.patch, get: vi.fn(), post: vi.fn() } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
 vi.mock("@/hooks/channels/useConexoes", () => ({
@@ -18,7 +21,11 @@ vi.mock("@/hooks/channels/useConexoes", () => ({
 vi.mock("@/hooks/channels/usePacingKnobs", () => ({ usePacingKnobs: () => ({ data: { items: [] } }) }));
 vi.mock("@/components/connections/ChannelAiAccess", () => ({ ChannelAiAccess: () => <div data-testid="ia" /> }));
 vi.mock("@/components/connections/AgendaDePausa", () => ({ AgendaDePausa: () => null }));
-vi.mock("@/components/connections/ConnectionsClient", () => ({ ExcluirCanalDialog: () => null, QrDialog: () => null }));
+vi.mock("@/components/connections/ConnectionsClient", () => ({
+  ExcluirCanalDialog: () => null,
+  QrDialog: () => null,
+  frasesDoLoteDePausa: () => ({ sucesso: "feito", erro: null }),
+}));
 vi.mock("@/components/connections/AntiBanSheet", () => ({ AntiBanSheet: () => null }));
 vi.mock("@/components/connections/GruposSheet", () => ({ GruposSheet: () => null }));
 vi.mock("@/components/connections/AssistenteConexao", () => ({ AssistenteConexao: () => null }));
@@ -44,10 +51,10 @@ const item = (id: string, o: Partial<ItemDeConexao> = {}): ItemDeConexao => ({
   ...o,
 });
 
-const montar = () =>
+const montar = (p: { configurado?: boolean; desligado?: boolean } = {}) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ConexoesPagina wahaConfigured={false} wahaDesligado graphParceiro={null} />
+      <ConexoesPagina wahaConfigured={p.configurado ?? false} wahaDesligado={p.desligado ?? true} graphParceiro={null} />
     </QueryClientProvider>,
   );
 
@@ -59,9 +66,12 @@ beforeEach(() => {
     item("2", { status: "STARTING", nativa: true, numero: null }),
     item("3", { status: "FAILED", nativa: true }),
     item("4", { pausado: true, metodo: "oficial" }),
+    item("5", { metodo: "oficial" }),
   ];
   dados.carregando = false;
   dados.erro = false;
+  dados.bancoAtrasado = false;
+  dados.patch.mockReset();
   window.localStorage.clear();
 });
 afterEach(cleanup);
@@ -69,9 +79,9 @@ afterEach(cleanup);
 describe("ConexoesPagina", () => {
   it("mostra os KPIs calculados dos dados", () => {
     montar();
-    expect(screen.getByText("Conectados").nextElementSibling?.textContent).toBe("1");
+    expect(screen.getByText("Conectados").nextElementSibling?.textContent).toBe("2");
     expect(screen.getByText("Precisam de atenção").nextElementSibling?.textContent).toBe("2");
-    expect(screen.getByText("Total").nextElementSibling?.textContent).toBe("4");
+    expect(screen.getByText("Total").nextElementSibling?.textContent).toBe("5");
   });
 
   it("ação pelo status: cada cartão tem as suas e não tem as dos outros", () => {
@@ -84,7 +94,6 @@ describe("ConexoesPagina", () => {
     expect(card("2").queryByRole("link", { name: /Abrir conversas/ })).toBeNull();
     expect(card("3").getByRole("button", { name: "Reconectar" })).toBeTruthy();
     expect(card("3").getByRole("button", { name: /Excluir/ })).toBeTruthy();
-    expect(card("3").queryByRole("button", { name: /Pausar/ })).toBeNull();
     expect(card("4").getByRole("button", { name: /Retomar/ })).toBeTruthy();
     expect(card("4").queryByRole("button", { name: /Pausar/ })).toBeNull();
   });
@@ -150,5 +159,58 @@ describe("ConexoesPagina", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Conectar" })[0]!);
     expect(screen.getByRole("button", { name: /WhatsApp/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Ligação/ })).toBeTruthy();
+  });
+
+  it("restaurado: FAILED pode ser pausado; canal oficial conectado ganha Gerenciar (QR não)", () => {
+    montar();
+    expect(card("3").getByRole("button", { name: /Pausar/ })).toBeTruthy();
+    expect(card("5").getByRole("link", { name: /Gerenciar/ }).getAttribute("href")).toBe("/app/connections?aba=oficial");
+    expect(card("1").queryByRole("link", { name: /Gerenciar/ })).toBeNull();
+  });
+
+  it("restaurado: Pausar todas pede confirmação com a contagem e só então chama a rota de lote", async () => {
+    dados.patch.mockResolvedValue({ data: {} });
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: "Pausar todas (4)" }));
+    expect(dados.patch).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog").textContent).toContain("Pausar 4 canais?");
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Pausar todas" }));
+    await vi.waitFor(() => expect(dados.patch).toHaveBeenCalled());
+    expect(dados.patch).toHaveBeenCalledWith("/api/v1/channel-sessions/disabled", {
+      disabled: true,
+      ids: ["1", "2", "3", "5"],
+    });
+  });
+
+  it("restaurado: Retomar todas só aparece com canal pausado; Pausar todas some quando tudo está pausado", () => {
+    montar();
+    expect(screen.getByRole("button", { name: "Retomar todas (1)" })).toBeTruthy();
+    cleanup();
+    dados.itens = [item("9", { pausado: true })];
+    montar();
+    expect(screen.queryByRole("button", { name: /Pausar todas/ })).toBeNull();
+  });
+
+  it("restaurado: avisos de serviço fora do ar e banco atrasado, e o link dos responsáveis", () => {
+    dados.itens = [item("1", { viveNoTransporte: true })];
+    dados.bancoAtrasado = true;
+    montar({ configurado: false, desligado: false });
+    expect(screen.getByText("O serviço do WhatsApp por QR não está configurado.")).toBeTruthy();
+    expect(screen.getByText("Esta instalação está com o banco atrasado.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Configurar responsáveis por número" }).getAttribute("href")).toBe(
+      "/app/settings/atendimento",
+    );
+    cleanup();
+    dados.bancoAtrasado = false;
+    montar({ configurado: false, desligado: true });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("restaurado: Configurar IA também aparece na Lista, só para canal conectado", () => {
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: "Lista" }));
+    const tabela = within(screen.getByTestId("vista-lista").querySelector("table") as HTMLElement);
+    expect(within(tabela.getByTestId("conexao-1").closest("tr") as HTMLElement).getByTestId("ia")).toBeTruthy();
+    expect(within(tabela.getByTestId("conexao-3").closest("tr") as HTMLElement).queryByTestId("ia")).toBeNull();
   });
 });
