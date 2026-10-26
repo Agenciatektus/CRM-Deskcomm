@@ -241,8 +241,14 @@ export function FormularioDeMetaAds({
             <Label htmlFor="access_token">{t("Token de acesso")}</Label>
             <Input
               id="access_token"
+              name="meta_access_token"
               type="password"
-              autoComplete="off"
+              // O Chrome ignora autocomplete="off" em campo de senha; "new-password" é o que impede o
+              // preenchimento e evita que o campo de busca logo acima vire "usuário" para o gerenciador de senhas.
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder={conectada ? t("Guardado — preencha só para trocar") : "EAA…"}

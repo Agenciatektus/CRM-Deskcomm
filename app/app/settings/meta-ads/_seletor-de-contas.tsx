@@ -84,6 +84,12 @@ export function SeletorDeContas({
         <>
           <Input
             id="busca_de_contas"
+            name="busca_de_contas"
+            type="search"
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder={t("Buscar por nome ou id")}
