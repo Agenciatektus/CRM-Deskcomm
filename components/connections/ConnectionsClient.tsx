@@ -203,7 +203,14 @@ export function frasesDoLoteDePausa(
   return { sucesso: `${cabeca} ${mudou}.`, erro: null };
 }
 
-export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean }) {
+export function ConnectionsClient({
+  wahaConfigured,
+  wahaDesligado = false,
+}: {
+  wahaConfigured: boolean;
+  /** Interruptor do servidor: some o botão de CRIAR, a lista e o excluir seguem. */
+  wahaDesligado?: boolean;
+}) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
   const qc = useQueryClient();
@@ -453,14 +460,16 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
               os três são a mesma escrita (`metadata.disabled`), e a diferença é
               quando — agora, ou quando o operador escolher. */}
           <AgendaDePausa canais={list} />
-          <Button size="sm" disabled={creating || !wahaConfigured} onClick={handleConnectNew}>
-            {creating ? (
-              <CircleNotch size={14} className="animate-spin" aria-hidden />
-            ) : (
-              <Plus size={14} aria-hidden />
-            )}
-            {t("Conectar novo WhatsApp")}
-          </Button>
+          {!wahaDesligado && (
+            <Button size="sm" disabled={creating || !wahaConfigured} onClick={handleConnectNew}>
+              {creating ? (
+                <CircleNotch size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Plus size={14} aria-hidden />
+              )}
+              {t("Conectar novo WhatsApp")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -498,7 +507,12 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
         else toast.error(t("Não foi possível copiar. Selecione e copie manualmente."));
       }}>{t("Copiar detalhes")}</Button></details>}
       <Link href="/app/settings/atendimento" className="text-sm underline">{t("Configurar responsáveis por número")}</Link>
-      {!wahaConfigured && (
+      {wahaDesligado && (
+        <p className="text-sm text-muted-foreground">
+          {t("A conexão de novos números por QR está desativada. Para conectar, use a aba Verdash.")}
+        </p>
+      )}
+      {!wahaConfigured && !wahaDesligado && (
         <div className="rounded-md border border-warning bg-warning-bg p-4 text-sm text-warning-fg">
           <p className="font-medium">{t("O serviço do WhatsApp não está configurado.")}</p>
           <p className="mt-1">

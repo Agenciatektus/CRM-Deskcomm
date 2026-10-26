@@ -140,6 +140,12 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 - Action audit obrigatória: `lgpd.data_request_received`, `lgpd.export_generated`, `lgpd.redact_executed`, `lgpd.consent_changed`
 
 ### WAHA
+- **Interruptor `WAHA_HABILITADO`** (padrão `true`; `false`/`0`/`no` desliga; `wahaHabilitado()` em `lib/env.ts`). Desligado: criar/reconectar canal WAHA responde 403 `waha_desabilitado`, o `/health` omite a chave `waha`, o cron `channel-health` e o watchdog do worker pulam o WAHA, e a UI esconde "Números por QR". Webhook e canais já existentes não são tocados.
+- O serviço `waha` do `docker-compose.prod.yml` tem `profiles: ["waha"]`: quem quer o WAHA tem `COMPOSE_PROFILES=waha` no `.env` (o instalador e o `.env.example` já o gravam; com outros profiles, `waha,voz`). O `app` tem `depends_on.waha.required: false`.
+- Desligar em produção: (1) ANTES de parar o contêiner, arquivar/excluir qualquer canal WAHA existente (DELETE com o contêiner parado dá 502 e marca FAILED); (2) no `.env`, `WAHA_HABILITADO=false` e tirar `waha` de `COMPOSE_PROFILES`; (3) `docker compose stop waha`; (4) `docker compose up -d --force-recreate --no-deps app worker scheduler` (o `env_file` só chega ao contêiner recriado); (5) conferir `/api/v1/health`: 200 e sem a chave `waha`. Monitores externos precisam tolerar a chave ausente.
+- Religar: `WAHA_HABILITADO=true` + `waha` em `COMPOSE_PROFILES` + `docker compose up -d waha` e recriar app, worker e scheduler como acima.
+- Instalação existente que atualizar o compose sem `COMPOSE_PROFILES=waha` não recria o WAHA no próximo `up -d` (o contêiner em execução segue): acrescente o profile no `.env`.
+- Remover o código do WAHA é decisão futura; o interruptor é a via curta e não apaga nada.
 - Imagem NOWEB pinada por arquitetura: `latest-2026.7.2` em x86 e `noweb-arm-2026.7.2` em ARM64. A prova local criou duas sessões CORE simultâneas até `SCAN_QR_CODE`; não prova pairing, duas contas `WORKING` nem envio. Não bloquear segunda sessão por tier: conferir resposta estruturada e pós-condição da operação.
 - Engine NOWEB default; WEBJS apenas se precisar stickers animados / botões
 - Auth: env do WAHA recebe **hash SHA512 hex** da api key; cliente envia plaintext em `X-Api-Key`

@@ -49,6 +49,7 @@ vi.mock("@/lib/env", () => ({
     INTERNAL_CRON_SECRET: "segredo-interno-de-teste-com-tamanho-suficiente",
     INTERNAL_SECRET: "",
   },
+  wahaHabilitado: () => true,
 }));
 
 function pedido(): NextRequest {

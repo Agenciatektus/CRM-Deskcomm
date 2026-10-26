@@ -1948,7 +1948,7 @@ esac
   printf '# o risco é a CONTA ser bloqueada. Para ligar: COMPOSE_PROFILES=voz e\n'
   printf '# WACALLS_API_BASE_URL=http://wacalls:8080, depois ./update.sh e, na tela,\n'
   printf '# Configurações › Segurança. Vazio = o serviço nem é criado.\n'
-  envq COMPOSE_PROFILES "${COMPOSE_PROFILES:-}"
+  envq COMPOSE_PROFILES "${COMPOSE_PROFILES:-waha}"
   envq WACALLS_API_BASE_URL "${WACALLS_API_BASE_URL:-}"
   envq WACALLS_ADMIN_USER "$WACALLS_ADMIN_USER"
   envq WACALLS_ADMIN_PASSWORD "$WACALLS_ADMIN_PASSWORD"

@@ -109,6 +109,7 @@ export {
   canalConhecidoSemMensagem,
   transportaMensagem,
 } from "./capabilities";
+export { canalDesligadoNaInstalacao } from "./desligado";
 export { CHANNEL_SESSION_REF_COLUMNS, resolveSessionRef } from "./session-ref";
 export type { ChannelSessionRef } from "./session-ref";
 export type {
