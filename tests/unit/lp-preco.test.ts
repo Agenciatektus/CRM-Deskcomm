@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { OFERTA } from "../../site/lib/conteudo";
 import {
+  IMPLANTACAO_CENTAVOS,
+  IMPLANTACAO_PIX_CENTAVOS,
   anualCentavos,
   equivalenteMensalCentavos,
   mensagemDeAssinatura,
@@ -20,6 +23,13 @@ describe("preços da LP", () => {
   it("equivalente mensal do anual: R$ 337,45 e R$ 133,45", () => {
     expect(equivalenteMensalCentavos("com-ia")).toBe(33_745);
     expect(equivalenteMensalCentavos("sem-ia")).toBe(13_345);
+  });
+
+  it("Pix na implantação: desconto igual à taxa do cartão em 3x (4% + R$ 0,60), e a copy mostra o mesmo valor", () => {
+    const taxaCartao3x = Math.round(IMPLANTACAO_CENTAVOS * 0.04) + 60;
+    const taxaPix = 80;
+    expect(IMPLANTACAO_PIX_CENTAVOS).toBe(IMPLANTACAO_CENTAVOS - (taxaCartao3x - taxaPix));
+    expect(norm(OFERTA.implantacao.parcelas)).toContain(norm(reaisDeCentavos(IMPLANTACAO_PIX_CENTAVOS)));
   });
 
   it("implantação em 3x de R$ 432,33 e total do 1º ao 3º mês no mensal", () => {
