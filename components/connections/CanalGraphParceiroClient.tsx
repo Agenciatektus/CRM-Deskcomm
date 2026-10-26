@@ -73,7 +73,8 @@ function ParaColar({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-export function CanalGraphParceiroClient() {
+/** `onConectado`: o assistente de conexão habilita o "Concluir" quando o canal grava. */
+export function CanalGraphParceiroClient({ onConectado }: { onConectado?: (telefone: string | null) => void } = {}) {
   const t = useT();
   const qc = useQueryClient();
   // Falha de leitura não trava a tela: sem estado, o formulário continua servindo.
@@ -94,6 +95,7 @@ export function CanalGraphParceiroClient() {
       // O token sai da memória da tela assim que é gravado: ele não volta num GET.
       setToken("");
       toast.success(t("Canal conectado."));
+      onConectado?.(null);
       await carregar();
     } catch (e) {
       toast.error(e instanceof Error ? t(e.message) : t("Não foi possível conectar."));
