@@ -75,11 +75,11 @@ export function ConexoesFiltros({
         className="w-44"
       />
       <div role="group" aria-label={t("Modo de exibição")} className="ml-auto flex gap-1">
-        <Chip ligado={vista === "galeria"} aria-pressed={vista === "galeria"} onClick={() => onVista("galeria")}>
+        <Chip ligado={vista === "galeria"} onClick={() => onVista("galeria")}>
           <Stack aria-hidden />
           {t("Galeria")}
         </Chip>
-        <Chip ligado={vista === "lista"} aria-pressed={vista === "lista"} onClick={() => onVista("lista")}>
+        <Chip ligado={vista === "lista"} onClick={() => onVista("lista")}>
           <ListBullets aria-hidden />
           {t("Lista")}
         </Chip>
