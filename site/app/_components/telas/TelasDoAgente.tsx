@@ -28,7 +28,7 @@ export function PainelConhecimento() {
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <Icone nome="arquivo" className="size-5 shrink-0 text-accent-text" />
-                <p className="m-0 truncate text-base font-semibold">{nome}</p>
+                <p className="m-0 text-base leading-snug font-semibold [overflow-wrap:anywhere]">{nome}</p>
               </div>
               <Selo tom={tom}>{estado}</Selo>
             </div>
