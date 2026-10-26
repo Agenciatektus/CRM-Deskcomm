@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 const h = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: h.get, post: h.post } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
+vi.mock("@/hooks/channels/useOfficialChannel", () => ({ useOfficialChannel: () => ({ data: undefined }) }));
 vi.mock("@/lib/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
 vi.mock("sonner", () => ({ toast: h.toast }));
 

@@ -38,6 +38,8 @@ export interface ItemDeConexao {
   temGrupos: boolean;
   temModelos: boolean;
   mudouEm: string | null;
+  /** API Oficial ligada pelo Embedded Signup em modo Coexistence (o número segue no app WhatsApp Business). */
+  coexistence?: boolean;
   nomeCru: string | null;
   sessao: ChannelSession | null;
 }
@@ -80,6 +82,7 @@ function doCanal(c: ChannelSession, origens: FontesDaLista["origens"]): ItemDeCo
     numero: c.phone_number?.trim() || null,
     status: ehEstadoDoCanal(c.status) ? c.status : null,
     pausado: canalDesativado(c.metadata),
+    coexistence: metodo === "oficial" && (c.metadata as Record<string, unknown> | null)?.coexistence === true,
     nativa,
     viveNoTransporte: (c.provider ?? DEFAULT_CHANNEL_PROVIDER) === "waha",
     temGrupos: capacidades.groups !== "none",
