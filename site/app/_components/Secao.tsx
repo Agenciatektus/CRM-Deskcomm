@@ -15,26 +15,69 @@ const FUNDOS = {
 
 export type Fundo = keyof typeof FUNDOS;
 
+/** Largura de conteúdo por tipo de seção (tokens `--container-*` em globals.css). */
+const LARGURA = {
+  leitura: "max-w-(--container-leitura)",
+  texto: "max-w-(--container-texto)",
+  grade: "max-w-(--container-grade)",
+  tela: "max-w-(--container-tela)",
+  sangria: "max-w-(--container-sangria)",
+} as const;
+
+export type Largura = keyof typeof LARGURA;
+
+/** Respiro vertical em três degraus: 64/80/96 no mobile e os tokens `--espaco-secao-*` a partir de md. */
+const RITMO = {
+  s: "py-12 md:py-(--espaco-secao-s)",
+  m: "py-16 md:py-(--espaco-secao-m)",
+  l: "py-20 md:py-(--espaco-secao-l)",
+} as const;
+
+export type Ritmo = keyof typeof RITMO;
+
+/** Wrapper de largura e gutters (20, 32, 48, 64 e 80px conforme o viewport). */
+export function Container({
+  largura = "grade",
+  className = "",
+  children,
+}: {
+  largura?: Largura;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`mx-auto w-full px-5 sm:px-8 xl:px-12 2xl:px-16 min-[1920px]:px-20 ${LARGURA[largura]} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 export function Secao({
   id,
   titulo,
   fundo = "nenhum",
-  larga = false,
+  largura = "grade",
+  ritmo = "m",
   children,
 }: {
   id?: string;
   /** Id do `h2` da seção, para o `aria-labelledby`. */
   titulo: string;
   fundo?: Fundo;
-  larga?: boolean;
+  largura?: Largura;
+  ritmo?: Ritmo;
   children: ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={titulo} className="relative isolate scroll-mt-16 overflow-hidden">
-      {FUNDOS[fundo].map((c) => (
-        <div key={c} aria-hidden="true" className={`pointer-events-none absolute inset-0 -z-10 ${c}`} />
-      ))}
-      <div className={`mx-auto px-5 py-20 lg:py-28 ${larga ? "max-w-[78rem]" : "max-w-6xl"}`}>{children}</div>
+    <section id={id} aria-labelledby={titulo} className="relative isolate scroll-mt-16 overflow-x-clip">
+      <div aria-hidden="true" className="fundo-mascarado pointer-events-none absolute inset-0 -z-10">
+        {FUNDOS[fundo].map((c) => (
+          <div key={c} className={`absolute inset-0 ${c}`} />
+        ))}
+      </div>
+      <Container largura={largura} className={RITMO[ritmo]}>
+        {children}
+      </Container>
     </section>
   );
 }
@@ -51,7 +94,7 @@ export function Cabeca({
   centro?: boolean;
 }) {
   return (
-    <header className={`revela mb-12 max-w-[44rem] lg:mb-16 ${centro ? "mx-auto text-center" : ""}`}>
+    <header className={`revela mb-12 max-w-(--container-leitura) lg:mb-16 ${centro ? "mx-auto text-center" : ""}`}>
       <h2
         id={id}
         className="m-0 text-[clamp(1.85rem,3.4vw,2.9rem)] leading-[1.1] font-bold tracking-tight text-balance"
@@ -75,7 +118,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`card revela min-w-0 p-5 sm:p-6 ${className}`}
+      className={`card revela min-w-0 p-6 sm:p-8 ${className}`}
       style={{ "--atraso": `${atraso}s` } as React.CSSProperties}
     >
       {children}

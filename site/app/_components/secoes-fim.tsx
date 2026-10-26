@@ -1,12 +1,12 @@
 import { CTA, CTA_FINAL, FAQ, GOOGLE, SITE, linkWhatsapp } from "@/lib/conteudo";
 
-import { BotaoPrimario } from "./Botao";
-import { Secao } from "./Secao";
+import { BotaoPrimario, BotaoSecundario } from "./Botao";
+import { Container, Secao } from "./Secao";
 import { Logotipo } from "./Marca";
 
 export function Faq() {
   return (
-    <Secao id="faq" titulo="titulo-faq" fundo="faixa">
+    <Secao id="faq" titulo="titulo-faq" fundo="faixa" largura="texto">
       <div className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 [&>*]:min-w-0">
         <div className="revela lg:sticky lg:top-24 lg:self-start">
           <h2
@@ -19,7 +19,7 @@ export function Faq() {
             Não achou a sua? Pergunte pelo WhatsApp e a Tektus responde.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {FAQ.map((f, i) => (
             <details
               key={f.p}
@@ -46,11 +46,11 @@ export function Faq() {
 
 export function CtaFinal() {
   return (
-    <section aria-labelledby="titulo-cta" className="relative isolate overflow-hidden">
+    <section aria-labelledby="titulo-cta" className="relative isolate overflow-x-clip">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-azul" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
-      <div className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
-        <div className="borda-luz janela-app revela relative overflow-hidden rounded-[22px] bg-surface p-8 sm:p-14">
+      <Container largura="texto" className="py-16 md:py-(--espaco-secao-m)">
+        <div className="borda-luz janela-app revela relative overflow-hidden rounded-modal bg-surface p-8 sm:p-14">
           <picture aria-hidden="true">
             <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
             <source srcSet="/_lp/img/fluxo.webp" type="image/webp" />
@@ -76,14 +76,16 @@ export function CtaFinal() {
             <p className="mt-4 mb-0 max-w-[36rem] text-[1.05rem] leading-relaxed text-text-muted">
               {CTA_FINAL.texto}
             </p>
-            <div className="mt-8">
-              <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
-                {CTA.rotulo} pelo WhatsApp
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <BotaoPrimario href="#oferta">
+                {CTA.comprar.rotulo}
               </BotaoPrimario>
+              <BotaoSecundario href={linkWhatsapp(CTA.duvida.mensagem)}>{CTA.duvida.rotulo}</BotaoSecundario>
             </div>
+            <p className="mt-6 mb-0 text-[1.1rem] font-bold">{CTA_FINAL.assinatura}</p>
           </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -91,17 +93,17 @@ export function CtaFinal() {
 export function Rodape() {
   return (
     <footer className="border-t border-border bg-surface/40">
-      <div className="mx-auto max-w-6xl px-5 py-12">
+      <Container largura="texto" className="py-12">
         <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr] [&>*]:min-w-0">
           <div>
             <Logotipo />
             <p className="mt-4 mb-0 max-w-[26rem] text-[0.9rem] leading-relaxed text-text-muted">
               CRM com agentes de inteligência artificial para negócios que vendem pelo WhatsApp.
-              Implantado e acompanhado pela Tektus.
+              Implantação opcional pela Tektus.
             </p>
           </div>
           <div>
-            <h2 className="m-0 font-mono text-[0.75rem] font-medium tracking-wider text-text-muted uppercase">
+            <h2 className="m-0 text-label font-semibold text-text-muted">
               {GOOGLE.titulo}
             </h2>
             <p className="mt-3 mb-0 max-w-[40rem] text-[0.9rem] leading-relaxed text-text-muted">
@@ -139,7 +141,7 @@ export function Rodape() {
             Entrar
           </a>
           <a
-            href={linkWhatsapp(CTA.mensagem)}
+            href={linkWhatsapp(CTA.duvida.mensagem)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-8 items-center text-text underline underline-offset-2"
@@ -149,9 +151,9 @@ export function Rodape() {
         </nav>
         <p className="mt-6 mb-0 text-[0.8rem] leading-relaxed text-text-subtle">
           Baseado no DeskcommCRM, projeto de código aberto (licença MIT). Página atualizada em
-          24/10/2026. {SITE.nome} é implantado pela Tektus.
+          25/10/2026. {SITE.nome} tem implantação opcional pela Tektus.
         </p>
-      </div>
+      </Container>
     </footer>
   );
 }

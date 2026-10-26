@@ -24,17 +24,18 @@ export function BotaoPrimario({
     <a
       href={href}
       {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`${BASE} ${compacto ? "px-2.5 text-[0.9rem] sm:px-5 sm:text-[0.95rem]" : "px-5 text-[0.95rem]"} bg-(image:--degrade) text-white shadow-[0_4px_0_rgb(0_0_0/0.25)] [text-shadow:0_1px_1px_rgb(0_0_0/0.25)] hover:bg-(image:--degrade-hover)`}
+      className={`${BASE} ${compacto ? "px-2.5 text-[0.9rem] sm:px-5 sm:text-[0.95rem]" : "px-5 text-[0.95rem]"} bg-(image:--degrade) text-white shadow-[0_4px_0_rgb(5_6_9/0.25)] [text-shadow:0_1px_1px_rgb(5_6_9/0.25)] hover:bg-(image:--degrade-hover)`}
     >
       {children}
     </a>
   );
 }
 
-export function BotaoSecundario({ href, children }: { href: string; children: ReactNode }) {
+export function BotaoSecundario({ href, children, externo = false }: { href: string; children: ReactNode; externo?: boolean }) {
   return (
     <a
       href={href}
+      {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className={`${BASE} border border-border-strong bg-surface px-5 text-[0.95rem] text-text hover:border-text-subtle`}
     >
       {children}

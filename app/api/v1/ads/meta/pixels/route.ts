@@ -8,12 +8,13 @@
 import { randomUUID } from "node:crypto";
 
 import { fail, ok } from "@/lib/api/wrappers";
+import { contaPermitida } from "@/lib/plataformas-de-anuncio/contas-permitidas";
 import { requireRole } from "@/lib/auth/require-role";
 import { lerCredencialDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais-de-leitura";
 import { listarPixels } from "@/lib/plataformas-de-anuncio/meta/insights";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-import { respostaDeFalha, respostaSemConexao } from "../_falha";
+import { respostaContaNaoPermitida, respostaDeFalha, respostaSemConexao } from "../_falha";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,10 @@ export async function GET(request: Request): Promise<Response> {
   const admin = createAdminClient();
   const credencial = await lerCredencialDeLeitura(admin, org.orgId, "meta_ads");
   if (!credencial.ok) return respostaSemConexao(credencial.motivo, { requestId });
+
+  if (!contaPermitida(credencial.credencial.contasPermitidas, conta)) {
+    return respostaContaNaoPermitida({ requestId });
+  }
 
   const pixels = await listarPixels(credencial.credencial.accessToken, conta);
   if (!pixels.ok) return respostaDeFalha(pixels.falha, pixels.detalhe, { requestId });

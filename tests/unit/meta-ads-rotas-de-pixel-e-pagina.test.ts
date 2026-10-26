@@ -20,14 +20,15 @@ vi.mock("@/lib/plataformas-de-anuncio/meta/insights", () => ({
 import { GET as pages } from "@/app/api/v1/ads/meta/pages/route";
 import { GET as pixels } from "@/app/api/v1/ads/meta/pixels/route";
 
+const USUARIO = { id: "u-conectou", is_platform_admin: false, platform_admin_scope: null, support: null };
 const pedido = (q = "") => new Request(`http://x/api/v1/ads/meta/pixels${q}`);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org-ativa" } });
+  mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org-ativa" }, user: USUARIO });
   mock.lerCredencial.mockResolvedValue({
     ok: true,
-    credencial: { accessToken: "tok", contaPadrao: "act_1" },
+    credencial: { accessToken: "tok", contaPadrao: "act_1", contasPermitidas: null, connectedBy: "u-conectou" },
   });
 });
 
@@ -79,6 +80,14 @@ describe("GET /ads/meta/pages", () => {
   it("sem conexão devolve ads_sem_conexao", async () => {
     mock.lerCredencial.mockResolvedValue({ ok: false, motivo: "sem_conexao" });
     expect((await (await pages()).json()).error.code).toBe("ads_sem_conexao");
+  });
+
+  it("admin que não conectou a Meta recebe 403 forbidden_role, sem chamar a Graph", async () => {
+    mock.requireRole.mockResolvedValue({ ok: true, org: { orgId: "org-ativa" }, user: { ...USUARIO, id: "outro-admin" } });
+    const r = await pages();
+    expect(r.status).toBe(403);
+    expect((await r.json()).error.code).toBe("forbidden_role");
+    expect(mock.listarPaginas).not.toHaveBeenCalled();
   });
 
   it("sucesso devolve as Páginas", async () => {

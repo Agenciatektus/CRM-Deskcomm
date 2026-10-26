@@ -1,6 +1,7 @@
-import { CTA, HERO, linkWhatsapp } from "@/lib/conteudo";
+import { CTA, HERO, VIDEO, PROVA } from "@/lib/conteudo";
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
+import { Container } from "./Secao";
 import { TelaInbox } from "./telas/TelaInbox";
 import { Icone } from "./ui/Icones";
 import { Avatar, Selo } from "./ui/Pecas";
@@ -14,8 +15,11 @@ import { Janela } from "./ui/Janela";
  */
 export function Hero() {
   return (
-    <section aria-labelledby="titulo-hero" className="relative isolate overflow-hidden">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+    <section aria-labelledby="titulo-hero" className="relative isolate overflow-x-clip pb-(--espaco-secao-m)">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,#000_88%,transparent)]"
+      >
         <div className="fundo-brilho-azul absolute inset-0" />
         <div className="fundo-brilho-menta absolute inset-0" />
         <div className="fundo-grade absolute inset-0" />
@@ -33,11 +37,10 @@ export function Hero() {
           />
         </picture>
         <div className="fundo-ruido absolute inset-0 opacity-60" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-bg" />
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 pt-10 text-center sm:pt-14">
-        <p className="a-sobe m-0 mb-6 inline-flex items-center gap-2.5 rounded-full border border-border-strong bg-surface/70 py-1.5 pr-4 pl-3 font-mono text-[0.72rem] tracking-[0.12em] text-text-muted uppercase backdrop-blur-sm">
+      <Container largura="texto" className="pt-10 text-center sm:pt-14">
+        <p className="a-sobe m-0 mb-6 inline-flex items-center gap-2.5 rounded-full border border-border-strong bg-surface py-1.5 pr-4 pl-3 text-label font-semibold text-text-muted">
           <span aria-hidden="true" className="a-pulso size-1.5 rounded-full bg-menta shadow-[0_0_10px_2px_rgb(43_200_143/0.7)]" />
           {HERO.eyebrow}
         </p>
@@ -46,9 +49,9 @@ export function Hero() {
           id="titulo-hero"
           className="a-sobe mx-auto m-0 max-w-[26ch] text-[clamp(2.1rem,4.6vw,3.9rem)] font-bold leading-[1.04] tracking-[-0.03em] text-balance [--atraso:0.08s]"
         >
-          Todo lead que chama no WhatsApp ganha{" "}
+          {HERO.abertura}{" "}
           <span className="relative whitespace-nowrap">
-            dono, resposta
+            {HERO.destaque}
             <svg
               aria-hidden="true"
               viewBox="0 0 300 12"
@@ -63,8 +66,7 @@ export function Hero() {
                 </linearGradient>
               </defs>
             </svg>
-          </span>{" "}
-          e próximo passo.
+          </span>
         </h1>
 
         <p className="a-sobe mx-auto mb-0 mt-5 max-w-[40rem] text-[clamp(1rem,1.4vw,1.15rem)] leading-relaxed text-text-muted [--atraso:0.18s]">
@@ -72,37 +74,51 @@ export function Hero() {
         </p>
 
         <div className="a-sobe mt-7 flex flex-wrap items-center justify-center gap-3 [--atraso:0.28s]">
-          <BotaoPrimario href={linkWhatsapp(CTA.mensagem)} externo>
-            {CTA.rotulo}
+          <BotaoPrimario href="#oferta">
+            {CTA.comprar.rotulo}
           </BotaoPrimario>
-          <BotaoSecundario href="#como-funciona">Ver o sistema em ação</BotaoSecundario>
+          <BotaoSecundario href="#plantao">Ver o sistema em ação</BotaoSecundario>
         </div>
-        <p className="a-sobe mb-0 mt-5 text-[0.9rem] text-text-subtle [--atraso:0.36s]">{HERO.nota}</p>
-      </div>
+        <p className="sr-only">{HERO.preco}</p>
+        <p className="a-sobe m-0 mt-6 text-[1rem] text-text-muted [--atraso:0.36s]">
+          <span aria-hidden="true">{HERO.precoLinha}</span>{" "}
+          <a
+            href="#oferta"
+            className="rounded-controle font-semibold text-link underline underline-offset-4 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-menta"
+          >
+            {HERO.precoLink}
+          </a>
+        </p>
+        <p className="a-sobe mb-0 mt-2 text-[0.9rem] text-text-subtle [--atraso:0.4s]">{HERO.nota}</p>
+      </Container>
 
       {/* A janela do app, com os cards flutuando por cima. */}
-      <div className="relative mx-auto mt-10 max-w-[72rem] px-4 sm:mt-12 sm:px-6">
-        <div className="[perspective:2000px]">
-          <div className="a-ergue origin-top">
-            <Janela rota="inbox">
-              <TelaInbox />
-            </Janela>
+      <Container largura="tela" className="mt-10 sm:mt-12">
+        <div className="relative">
+          {/* A luz nasce atrás da janela, com o mesmo raio, e não é cortada (a seção só clipa o eixo X). */}
+          <div className="luz a-respira rounded-modal [--luz-blur:80px] [--luz-inset:8%_4%_-6%_4%]">
+            {/* O esmaecimento é máscara da própria janela: nada por cima dos chips. */}
+            <div className="[mask-image:linear-gradient(to_bottom,#000_70%,transparent_100%)] [perspective:2000px]">
+              <div className="a-ergue origin-top">
+                <Janela rota="inbox">
+                  <TelaInbox />
+                </Janela>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Esmaece a base: o sistema continua abaixo da dobra. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-44 bg-gradient-to-b from-transparent via-bg/75 to-bg"
-        />
+          {/* Chips: saem para fora da borda da janela, em linha, sem backdrop-blur. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-[6%] -bottom-10 z-20 hidden items-end justify-between gap-6 xl:flex"
+          >
 
         {/* Card: o negócio muda de etapa */}
         <div
-          className="a-entra a-flutua absolute -left-9 top-[44%] z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-60 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2s]"
         >
-          <p className="m-0 mb-2 flex items-center gap-1.5 font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
-            <Icone nome="funil" className="size-3" /> Funil: Clínica de estética
+          <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
+            <Icone nome="funil" className="size-3.5" /> Clínica de estética
           </p>
           <div className="flex items-center gap-2 text-meta">
             <Selo tom="aviso">Qualificando</Selo>
@@ -118,44 +134,55 @@ export function Hero() {
 
         {/* Card: o agente, com rédea */}
         <div
-          className="a-entra a-flutua absolute -right-5 -top-8 z-20 hidden w-64 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.4s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-64 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2.4s]"
         >
-          <p className="m-0 mb-2.5 flex items-center justify-between font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
+          <p className="m-0 mb-2.5 flex items-center justify-between text-meta font-bold text-text-muted">
             <span className="flex items-center gap-1.5">
-              <Icone nome="agente" className="size-3" /> Agente de IA
+              <Icone nome="agente" className="size-3.5" /> Agente IA
             </span>
-            <Selo tom="ok">ativo</Selo>
+            <Selo tom="ia">ativo</Selo>
           </p>
           <p className="m-0 text-meta text-text-muted">Teto de gasto do mês</p>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg">
             <div className="a-enche h-full w-[38%] rounded-full bg-(image:--degrade) [--atraso:2.8s]" />
           </div>
           <p className="m-0 mt-2 flex items-center gap-1.5 text-meta text-text-muted">
-            <Icone nome="escudo" className="size-3.5 text-ok" /> Passa para uma pessoa quando precisa
+            <Icone nome="escudo" className="size-3.5 text-success-fg" /> Passa para uma pessoa quando precisa
           </p>
         </div>
 
         {/* Card: o Radar */}
         <div
-          className="a-entra a-flutua absolute -right-6 bottom-24 z-20 hidden w-60 rounded-modal border border-border-strong bg-surface-elevated/95 p-3.5 shadow-[0_24px_50px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md xl:block [--atraso:2.8s]"
-          aria-hidden="true"
+          className="a-entra a-flutua w-60 rounded-grande border border-border-strong bg-surface-elevated p-3.5 shadow-(--shadow-e2) [--atraso:2.8s]"
         >
-          <p className="m-0 mb-2 flex items-center gap-1.5 font-mono text-[0.65rem] tracking-wider text-text-subtle uppercase">
-            <Icone nome="radar" className="size-3" /> Radar
+          <p className="m-0 mb-2 flex items-center gap-1.5 text-meta font-bold text-text-muted">
+            <Icone nome="radar" className="size-3.5" /> Radar
           </p>
           <div className="flex items-start gap-2.5">
             <Avatar nome="Tiago Moreira" tom={5} tamanho="size-7" />
             <div className="min-w-0">
               <p className="m-0 text-meta font-semibold">Tiago M.</p>
-              <p className="m-0 text-[0.72rem] text-warn">Sem resposta há 2 h</p>
+              <p className="m-0 text-xs font-semibold text-warning-fg">Esperando há 2 h</p>
               <p className="m-0 mt-1 flex items-center gap-1 text-[0.7rem] text-text-muted">
                 <Icone nome="relogio" className="size-3" /> Follow-up às 16h
               </p>
             </div>
           </div>
         </div>
-      </div>
+          </div>
+        </div>
+
+        {/* Legenda: bloco próprio, com espaço para os chips que saem da janela. Vira o player quando houver vídeo. */}
+        <div className="mt-20 flex max-w-(--container-leitura) items-start gap-4">
+          <svg aria-hidden="true" viewBox="0 0 256 256" className="mt-0.5 size-7 shrink-0 text-link" fill="currentColor" focusable="false">
+            <circle cx="128" cy="128" r="96" opacity="0.2" />
+            <path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm40-95.54-56-32A8 8 0 0 0 100 95.45v65.1a8 8 0 0 0 12 6.93l56-32.55a8 8 0 0 0 0-13.47Z" />
+          </svg>
+          <p className="m-0 text-[0.95rem] leading-relaxed text-text-muted">
+            <span className="block text-base font-bold text-text">{PROVA.inbox.titulo}.</span> {VIDEO.legenda_sem_video}
+          </p>
+        </div>
+      </Container>
     </section>
   );
 }

@@ -32,7 +32,10 @@ interface Linha {
   updated_by: string | null;
   connected_via: string;
   platform: string;
-  token_expires_at: string;
+  token_expires_at: string | null;
+  needs_reconnect: boolean;
+  needs_reconnect_desde: string | null;
+  last_token_error: string | null;
 }
 
 /**
@@ -84,6 +87,9 @@ const linha = (sobrescreve: Partial<Linha> = {}): Linha => ({
   connected_via: "oauth",
   platform: "meta_ads",
   token_expires_at: new Date(AGORA.getTime() + 5 * DIA).toISOString(),
+  needs_reconnect: false,
+  needs_reconnect_desde: null,
+  last_token_error: null,
   ...sobrescreve,
 });
 
@@ -118,6 +124,7 @@ describe("renovarTokensDaMeta", () => {
     expect(updates[0]!.valores).toEqual({
       access_token_encrypted: "ENC(TOKEN-NOVO)",
       token_expires_at: new Date(AGORA.getTime() + 5184000 * 1000).toISOString(),
+      last_token_error: null,
     });
     // A condição do UPDATE é o que protege a linha de uma corrida.
     expect(updates[0]!.filtros).toMatchObject({ organization_id: "org-1", access_token_encrypted: "\\xAAAA", connected_via: "oauth" });
@@ -160,7 +167,7 @@ describe("renovarTokensDaMeta", () => {
 
   it("falha da Meta: não grava nada (o token antigo fica), não audita e registra a organização e o motivo", async () => {
     const { renovarTokensDaMeta } = await carregar();
-    meta({ error: { code: 190, type: "OAuthException", message: "TOKEN-ANTIGO expirou" } }, 400);
+    meta({ error: { code: 1, type: "OAuthException", message: "TOKEN-ANTIGO falhou" } }, 400);
     const { admin, updates } = bancoCom([linha()]);
     const { logger } = await import("@/lib/logger");
     const aviso = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
@@ -173,15 +180,127 @@ describe("renovarTokensDaMeta", () => {
     expect(aviso).toHaveBeenCalledWith(expect.stringContaining("não renovada"), expect.objectContaining({ organization_id: "org-1" }));
   });
 
-  it("resposta SEM validade é falha: gravá-la tiraria a conexão da janela para sempre", async () => {
+  it("recusa 190: marca needs_reconnect com UPDATE condicional pelo token lido, só com códigos", async () => {
     const { renovarTokensDaMeta } = await carregar();
-    meta({ access_token: "TOKEN-NOVO" });
-    const { admin, updates } = bancoCom([linha()]);
+    meta({ error: { code: 190, error_subcode: 463, type: "OAuthException", message: "TOKEN-ANTIGO expirou" } }, 400);
+    const linhas = [linha()];
+    const { admin, updates } = bancoCom(linhas);
 
     const r = await renovarTokensDaMeta(admin, { agora: AGORA });
 
-    expect(r).toMatchObject({ renovadas: 0, falhas: 1 });
-    expect(updates).toHaveLength(0);
+    expect(r).toMatchObject({ recusadas: 1, renovadas: 0, falhas: 0 });
+    expect(updates[0]!.filtros).toMatchObject({ access_token_encrypted: "\\xAAAA", connected_via: "oauth" });
+    expect(linhas[0]).toMatchObject({ needs_reconnect: true, needs_reconnect_desde: AGORA.toISOString() });
+    expect(linhas[0]!.last_token_error).toBe("Meta recusou a renovação (http 400, code 190, subcode 463, OAuthException)");
+    expect(JSON.stringify(vi.mocked(audit).mock.calls)).not.toContain("TOKEN-ANTIGO");
+    expect(audit).toHaveBeenCalledTimes(1);
+  });
+
+  it("recusa 102 também marca; is_transient, 190 sem transitório ausente e outros códigos NÃO", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    meta({ error: { code: 102, type: "OAuthException" } }, 400);
+    const a = [linha()];
+    await renovarTokensDaMeta(bancoCom(a).admin, { agora: AGORA });
+    expect(a[0]!.needs_reconnect).toBe(true);
+
+    for (const erro of [{ code: 190, is_transient: true }, { code: 4 }, { code: 2 }]) {
+      meta({ error: erro }, 400);
+      const b = [linha()];
+      const r = await renovarTokensDaMeta(bancoCom(b).admin, { agora: AGORA });
+      expect(b[0]!.needs_reconnect).toBe(false);
+      expect(r).toMatchObject({ recusadas: 0, falhas: 1 });
+    }
+  });
+
+  it("CORRIDA: a recusa NÃO marca se o token mudou no meio da rodada", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    meta({ error: { code: 190 } }, 400);
+    const linhas = [linha()];
+    const { admin } = bancoCom(linhas, { aoGravar: (ls) => (ls[0]!.access_token_encrypted = "\\xBBBB") });
+
+    const r = await renovarTokensDaMeta(admin, { agora: AGORA });
+
+    expect(r).toMatchObject({ recusadas: 0, superadas: 1 });
+    expect(linhas[0]!.needs_reconnect).toBe(false);
+  });
+
+  it("conexão já marcada needs_reconnect não é relida pela renovação", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    const f = meta({ access_token: "N", expires_in: 100 });
+    const r = await renovarTokensDaMeta(bancoCom([linha({ needs_reconnect: true })]).admin, { agora: AGORA });
+    expect(r.examinadas).toBe(0);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("sem expires_in: consulta o debug_token no servidor e grava a validade real", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    const real = Math.floor(AGORA.getTime() / 1000) + 40 * 86400;
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: real } }), { status: 200 }));
+    vi.stubGlobal("fetch", f);
+    const linhas = [linha()];
+
+    const r = await renovarTokensDaMeta(bancoCom(linhas).admin, { agora: AGORA });
+
+    expect(r.renovadas).toBe(1);
+    expect(linhas[0]!.token_expires_at).toBe(new Date(real * 1000).toISOString());
+    const url = String((f.mock.calls[1] as unknown as [string])[0]);
+    expect(url).toContain("graph.facebook.com");
+    expect(url).toContain("/debug_token?");
+    expect(url).toContain("input_token=TOKEN-NOVO");
+  });
+
+  it("debug_token com expires_at 0: nunca expira, validade nula e fora da janela", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: 0, is_valid: true } }), { status: 200 })),
+    );
+    const linhas = [linha()];
+    const { admin } = bancoCom(linhas);
+
+    await renovarTokensDaMeta(admin, { agora: AGORA });
+    expect(linhas[0]!.token_expires_at).toBeNull();
+    const r2 = await renovarTokensDaMeta(admin, { agora: AGORA });
+    expect(r2.examinadas).toBe(0);
+  });
+
+  it("expires_at 0 SEM is_valid true não vale: mantém a data antiga", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { expires_at: 0, is_valid: false } }), { status: 200 })),
+    );
+    const antiga = new Date(AGORA.getTime() + 5 * DIA).toISOString();
+    const linhas = [linha({ token_expires_at: antiga })];
+    await renovarTokensDaMeta(bancoCom(linhas).admin, { agora: AGORA });
+    expect(linhas[0]!.token_expires_at).toBe(antiga);
+  });
+
+  it("sem expires_in e debug_token falhando: grava o token novo e MANTÉM a data antiga", async () => {
+    const { renovarTokensDaMeta } = await carregar();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOKEN-NOVO" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response("{}", { status: 500 })),
+    );
+    const antiga = new Date(AGORA.getTime() + 5 * DIA).toISOString();
+    const linhas = [linha({ token_expires_at: antiga })];
+
+    const r = await renovarTokensDaMeta(bancoCom(linhas).admin, { agora: AGORA });
+
+    expect(r.renovadas).toBe(1);
+    expect(linhas[0]).toMatchObject({ access_token_encrypted: "ENC(TOKEN-NOVO)", token_expires_at: antiga });
   });
 
   it("uma falha não impede a renovação das outras", async () => {
@@ -225,7 +344,7 @@ describe("renovarTokensDaMeta", () => {
 
     const r = await renovarTokensDaMeta(admin, { agora: AGORA });
 
-    expect(r).toEqual({ examinadas: 0, renovadas: 0, falhas: 0, superadas: 0, adiadas: 0, semAppOAuth: true });
+    expect(r).toEqual({ examinadas: 0, renovadas: 0, falhas: 0, recusadas: 0, superadas: 0, adiadas: 0, semAppOAuth: true });
     expect(f).not.toHaveBeenCalled();
   });
 
