@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useT } from "@/hooks/i18n/useT";
+import { useOfficialChannel } from "@/hooks/channels/useOfficialChannel";
 import { apiClient } from "@/lib/api/client";
 import { randomId } from "@/lib/random-id";
 import { ArrowRight, CircleNotch } from "@/lib/ui/icons";
@@ -15,7 +16,7 @@ import { PassoMetodo, recomendar, type Metodo, type Uso } from "./AssistenteMeto
 import { Etapas, PassoNome, PassoSucesso, type Passo } from "./AssistentePassos";
 
 /** Aba de Conexoes que mostra o canal (e o agente de IA dele) de cada metodo. */
-const ABA: Record<Metodo, string> = { qr: "hospedado", codigo: "hospedado", oficial: "oficial", parceiro: "parceiro" };
+const ABA: Record<Metodo, string> = { qr: "hospedado", codigo: "hospedado", oficial: "oficial", coexistence: "oficial", parceiro: "parceiro" };
 
 /**
  * Assistente unico de conexao de WhatsApp (nome, metodo, conexao, pronto), numa gaveta
@@ -50,6 +51,8 @@ export function AssistenteConexao({
   devolverFoco?: () => void;
 }) {
   const t = useT();
+  // Sem app e config_id da Meta na instalação, o popup não aparece: fica só "Colar credenciais".
+  const meta = useOfficialChannel().data?.data.embeddedSignup ?? null;
   const [passo, setPasso] = useState<Passo>(canalIdInicial ? 3 : 1);
   const [nome, setNome] = useState(nomeInicial ?? "");
   const [uso, setUso] = useState<Uso | null>(null);
@@ -134,7 +137,7 @@ export function AssistenteConexao({
                 <p className="text-sm text-text-muted">{t("Preparando sua conexão…")}</p>
               </div>
             ) : (
-              <PassoMetodo uso={uso} metodo={metodo} nativo={nativoHabilitado} onUso={escolherUso} onMetodo={(m) => {
+              <PassoMetodo uso={uso} metodo={metodo} nativo={nativoHabilitado} meta={!!meta} onUso={escolherUso} onMetodo={(m) => {
                 setMetodo(m);
                 setGravou(false);
               }} />
@@ -144,6 +147,7 @@ export function AssistenteConexao({
               metodo={metodo}
               canalId={canalId}
               graphParceiro={graphParceiro}
+              meta={meta}
               parceiro={parceiro}
               onParceiro={setParceiro}
               onConectado={(tel) => {

@@ -6,6 +6,7 @@ import { useT } from "@/hooks/i18n/useT";
 
 import type { Metodo } from "./AssistenteMetodo";
 import { CanalGraphParceiroClient } from "./CanalGraphParceiroClient";
+import { ConectarComMeta, type ConfigDoPopup } from "./ConectarComMeta";
 import { CanalHospedadoClient } from "./CanalHospedadoClient";
 import { CanalOficialClient } from "./CanalOficialClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
@@ -56,8 +57,11 @@ export function PassoConexao({
   parceiro,
   onParceiro,
   onConectado,
+  meta = null,
 }: {
   metodo: Metodo;
+  /** Config do popup da Meta; nulo = a instalação só tem "Colar credenciais". */
+  meta?: ConfigDoPopup | null;
   canalId: string | null;
   graphParceiro: string | null;
   parceiro: Parceiro | null;
@@ -69,21 +73,43 @@ export function PassoConexao({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-text-muted">{t("O nome do passo 1 vale só para o QR Code. Neste método o canal recebe o nome do próprio número, e você pode renomear depois.")}</p>
-      <PassoOutros metodo={metodo} graphParceiro={graphParceiro} parceiro={parceiro} onParceiro={onParceiro} onConectado={onConectado} />
+      <PassoOutros metodo={metodo} meta={meta} graphParceiro={graphParceiro} parceiro={parceiro} onParceiro={onParceiro} onConectado={onConectado} />
     </div>
+  );
+}
+
+/** API Oficial: as duas rotas (popup da Meta e credenciais coladas), quando a instalação tem o popup. */
+function PassoOficial({ meta, onConectado }: { meta: ConfigDoPopup | null; onConectado: (telefone: string | null) => void }) {
+  const t = useT();
+  if (!meta) return <CanalOficialClient onConectado={onConectado} />;
+  return (
+    <Tabs defaultValue="meta">
+      <TabsList>
+        <TabsTrigger value="meta">{t("Conectar com a Meta")}</TabsTrigger>
+        <TabsTrigger value="colar">{t("Colar credenciais")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="meta" className="pt-4">
+        <ConectarComMeta config={meta} coexistencia={false} onConectado={onConectado} />
+      </TabsContent>
+      <TabsContent value="colar" className="pt-4">
+        <CanalOficialClient onConectado={onConectado} />
+      </TabsContent>
+    </Tabs>
   );
 }
 
 function PassoOutros({
   metodo,
+  meta,
   graphParceiro,
   parceiro,
   onParceiro,
   onConectado,
-}: Pick<Parameters<typeof PassoConexao>[0], "metodo" | "graphParceiro" | "parceiro" | "onParceiro" | "onConectado">) {
+}: Pick<Parameters<typeof PassoConexao>[0], "metodo" | "meta" | "graphParceiro" | "parceiro" | "onParceiro" | "onConectado">) {
   const t = useT();
   if (metodo === "codigo") return <CanalHospedadoClient compacto onConectado={onConectado} />;
-  if (metodo === "oficial") return <CanalOficialClient onConectado={onConectado} />;
+  if (metodo === "oficial") return <PassoOficial meta={meta ?? null} onConectado={onConectado} />;
+  if (metodo === "coexistence" && meta) return <ConectarComMeta config={meta} coexistencia onConectado={onConectado} />;
   const escolha = graphParceiro ? parceiro : "padrao";
   if (!escolha) {
     return (
