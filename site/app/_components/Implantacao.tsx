@@ -2,6 +2,7 @@ import { IMPLANTACAO } from "@/lib/conteudo";
 
 import { Cabeca, Secao } from "./Secao";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 
 /**
  * Implantação opcional: linha do tempo com a ORDEM dos passos (sem prazo por etapa), a barra dos 30 dias
@@ -11,7 +12,21 @@ import { Icone } from "./ui/Icones";
 export function Implantacao() {
   const ultimo = IMPLANTACAO.linha.length - 1;
   return (
-    <Secao id="implantacao" titulo="titulo-implantacao" fundo="azul" largura="grade" ritmo="l">
+    <Secao
+      id="implantacao"
+      titulo="titulo-implantacao"
+      fundo="azul"
+      largura="grade"
+      ritmo="l"
+      fundoExtra={
+        <ImagemDeSlot
+          id="implantacao-montagem"
+          opacidade={0.6}
+          className="top-16 right-8 hidden h-[19rem] w-[15.2rem] xl:block 2xl:right-24"
+          mascara="[mask-image:linear-gradient(to_right,transparent,#000_45%),linear-gradient(to_bottom,#000_70%,transparent)] [mask-composite:intersect]"
+        />
+      }
+    >
       <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
       {IMPLANTACAO.prazoGeral ? (
         <p className="mt-0 mb-8 text-base font-semibold">
