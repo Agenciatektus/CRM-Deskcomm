@@ -5,7 +5,7 @@
  * rota por código), nunca do corpo: o corpo nem é lido. O `nonce` do pedido nasce aqui e fica
  * no cookie lacrado (`lib/channels/instagram/direto-pedido.ts`); ao navegador vai só a URL.
  *
- * Sem `VERDASH_CRM_PARTNER_SECRET` a opção não existe: 404, e a tela já não a mostra.
+ * Sem o segredo do parceiro configurado a opção não existe: 404, e a tela já não a mostra.
  */
 import { randomUUID } from "node:crypto";
 

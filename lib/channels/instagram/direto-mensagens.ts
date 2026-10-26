@@ -3,7 +3,7 @@
  *
  * Duas entradas, uma saída: o `motivo` que a plataforma põe na URL de retorno (a Meta negou,
  * o pedido expirou) e o `erro` que o servidor devolve ao concluir. Cada texto é um LITERAL
- * dentro de `t()`: o extrator do dicionário em espanhol só enxerga literal, e `t(variavel)`
+ * dentro de `t()`: o extrator do dicionário em espanhol só enxerga literal, e t com variável
  * derrubou o CI antes.
  *
  * Serve ao servidor (`t` = `traduzir` com o idioma do usuário) e à tela (`t` = `useT()`).

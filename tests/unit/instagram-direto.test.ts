@@ -58,14 +58,6 @@ function como(userId: string, orgId: string) {
   } as never);
 }
 
-function reqIniciar() {
-  return new NextRequest("http://localhost/api/v1/channels/instagram/iniciar", {
-    method: "POST",
-    // Org tentando vir do corpo: tem de ser ignorada.
-    body: JSON.stringify({ org_id: OUTRA_ORG }),
-  });
-}
-
 function reqConcluir(cookie: string | null, corpo: unknown) {
   return new NextRequest("http://localhost/api/v1/channels/instagram/concluir", {
     method: "POST",
