@@ -35,7 +35,7 @@ export function ImagemDeSlot({
   const base = `${PASTA_IMAGENS}/${id}`;
 
   return (
-    <div aria-hidden="true" className={`pointer-events-none absolute ${className} ${mascara}`}>
+    <div aria-hidden="true" className={`pointer-events-none absolute mix-blend-screen ${className} ${mascara}`}>
       {!m.disponivel || falhou ? (
         <div className={`size-full ${fallback}`} />
       ) : (
@@ -52,7 +52,7 @@ export function ImagemDeSlot({
             decoding="async"
             onError={() => setFalhou(true)}
             style={{ opacity: opacidade }}
-            className={`mix-blend-screen ${imgClassName}`}
+            className={imgClassName}
           />
         </picture>
       )}

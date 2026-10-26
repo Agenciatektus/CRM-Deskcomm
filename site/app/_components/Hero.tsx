@@ -4,6 +4,7 @@ import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Container } from "./Secao";
 import { TelaInbox } from "./telas/TelaInbox";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Avatar, Selo } from "./ui/Pecas";
 import { Janela } from "./ui/Janela";
 
@@ -11,7 +12,7 @@ import { Janela } from "./ui/Janela";
  * O hero: promessa grande em cima e, embaixo, o próprio sistema. A janela da Inbox sobe com
  * perspectiva e esmaece na base (o app continua "para baixo da dobra"). Em volta, três cards de
  * componentes reais (etapa do funil, agente com teto de gasto, Radar) flutuam sobre a janela.
- * Fundo em camadas: grade, brilhos de marca e ruído, mais a arte do fluxo bem ao fundo.
+ * Fundo em camadas: grade, brilhos de marca e ruído, mais a imagem hero-fluxo (IMG-01) ao fundo, sob máscara.
  */
 export function Hero() {
   return (
@@ -23,19 +24,14 @@ export function Hero() {
         <div className="fundo-brilho-azul absolute inset-0" />
         <div className="fundo-brilho-menta absolute inset-0" />
         <div className="fundo-grade absolute inset-0" />
-        <picture>
-          <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
-          <img
-            src="/_lp/img/fluxo.jpg"
-            alt=""
-            width={1920}
-            height={1080}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute -top-10 left-1/2 w-[135%] max-w-none -translate-x-1/2 opacity-[0.22] mix-blend-screen [mask-image:radial-gradient(ellipse_55%_50%_at_50%_30%,#000_25%,transparent_72%)] md:w-[110%]"
-          />
-        </picture>
+        <ImagemDeSlot
+          id="hero-fluxo"
+          prioridade
+          opacidade={0.6}
+          className="inset-0"
+          imgClassName="size-full object-cover object-top"
+          mascara="[mask-image:radial-gradient(ellipse_85%_80%_at_50%_35%,#000_35%,transparent_100%)]"
+        />
         <div className="fundo-ruido absolute inset-0 opacity-60" />
       </div>
 
