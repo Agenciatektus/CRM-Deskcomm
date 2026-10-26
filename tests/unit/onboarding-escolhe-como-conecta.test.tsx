@@ -193,3 +193,21 @@ describe("o passo do telefone pergunta como a pessoa já usa o número", () => {
     expect(screen.queryByText(/ainda não está pronto para RECEBER/i)).toBeNull();
   });
 });
+
+describe("com o WAHA desligado no servidor", () => {
+  it("a escolha do celular por QR some e nada é criado", () => {
+    render(<ConnectWhatsappClient wahaConfigured={false} wahaDesligado sessionName="org_teste" oficialPodeReceber />);
+
+    expect(screen.queryByTestId("forma-qr")).toBeNull();
+    expect(screen.getByTestId("forma-oficial")).toBeTruthy();
+    expect(screen.getByTestId("forma-parceiro")).toBeTruthy();
+    expect(screen.queryByText(/é o primeiro/i)).toBeNull();
+    expect(chamadasDeSessao()).toEqual([]);
+  });
+
+  it("controle negativo: ligado, a escolha do celular continua lá", () => {
+    montar();
+    expect(screen.getByTestId("forma-qr")).toBeTruthy();
+  });
+});
+

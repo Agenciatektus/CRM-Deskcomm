@@ -6,6 +6,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWahaClient } from "@/lib/waha/client";
+import { bloquearSeWahaDesabilitado } from "@/lib/waha/desabilitado";
 import { connectWahaChannel, ChannelConnectionError } from "@/lib/channels/connect-waha";
 import { loadOnboardingChannel } from "@/lib/channels/onboarding-session";
 import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
@@ -36,6 +37,7 @@ export async function POST(req: Request): Promise<Response> {
   const auth = await requireRole("admin", { requestId, resource: "channel_sessions", allowPlatformAdmin: true });
   if (!auth.ok) return auth.response;
   if (await mfaEmDivida()) return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
+  const desativado = bloquearSeWahaDesabilitado(requestId, auth.user.idioma); if (desativado) return desativado;
   const waha = getWahaClient(); if (!waha) return fail("waha_not_configured", "O serviço de conexão está indisponível. Tente novamente.", 503, { requestId });
   try {
     const result = await connectWahaChannel(await createClient(), createAdminClient(), waha, {

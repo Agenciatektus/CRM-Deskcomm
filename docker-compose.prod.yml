@@ -69,6 +69,11 @@ services:
         condition: service_started
       waha:
         condition: service_started
+        # Interruptor do WAHA: o serviço só existe com o profile `waha` ativo
+        # (COMPOSE_PROFILES=waha no .env). `required: false` deixa o app subir
+        # quando o profile está desligado; sozinho ele NÃO impediria o `up -d`
+        # de criar o WAHA, quem impede é o `profiles` do serviço.
+        required: false
     healthcheck:
       # Probe TCP puro (node existe na imagem; curl/nc não). NÃO usar /api/v1/health:
       # ele dá 503 se WAHA/Redis caem, o que deixaria o app "unhealthy" e derrubaria
@@ -140,6 +145,13 @@ services:
       retries: 3
       start_period: 20s
   waha:
+    # INTERRUPTOR: WAHA_HABILITADO=false no .env bloqueia a criação de canal WAHA,
+    # tira o WAHA do /health e pausa o watchdog. Este serviço só sobe com o
+    # profile `waha` (COMPOSE_PROFILES=waha no .env; junto de outros, separado por
+    # vírgula): tire-o do .env e `docker compose stop waha` e nenhum `up -d`
+    # religa o contêiner. Serviço e código ficam.
+    profiles: ["waha"]
+    #
     # Teto de memória — 893 MiB de pico MEDIDO nesta VPS.
     #
     # Sem ele o contêiner é ilimitado, e numa VPS de 3,8 GB isso não é teoria:

@@ -21,6 +21,7 @@ import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
 import { createChannelSchema } from "@/lib/schemas/channels";
 import { createClient } from "@/lib/supabase/server";
 import { getWahaClient } from "@/lib/waha/client";
+import { bloquearSeWahaDesabilitado } from "@/lib/waha/desabilitado";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
 
@@ -95,6 +96,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
   if (await mfaEmDivida()) return fail("mfa_required", t("Confirme a verificação em duas etapas."), 403, { requestId });
+
+  const desativado = bloquearSeWahaDesabilitado(requestId, authz.user.idioma);
+  if (desativado) return desativado;
 
   const waha = getWahaClient();
   if (!waha) {

@@ -47,6 +47,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { createClient } from "@/lib/supabase/server";
 import { getWahaClient, wahaFriendlyError } from "@/lib/waha/client";
+import { bloquearSeWahaDesabilitado } from "@/lib/waha/desabilitado";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,9 @@ export async function POST(
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
   if (await mfaEmDivida()) return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
+
+  const desativado = bloquearSeWahaDesabilitado(requestId, authz.user.idioma);
+  if (desativado) return desativado;
 
   const supabase = await createClient();
   const buscar = (colunas: string) =>

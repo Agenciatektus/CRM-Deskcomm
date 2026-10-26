@@ -10,6 +10,7 @@
 import { z } from "zod";
 
 import { RETENCAO_TETO_DIAS } from "@/lib/retencao/politica";
+import { interpretaInterruptor, interruptorValido, mensagemInterruptorInvalido } from "@/lib/interruptor";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -220,6 +221,14 @@ const schema = z.object({
   // (WHATSAPP_HOOK_HMAC_KEY no compose) ou houver um proxy que assine — aí a
   // verificação passa a ser obrigatória.
   WAHA_WEBHOOK_REQUIRE_SIGNATURE: z.string().optional().default("false"),
+  // Interruptor do WAHA. Padrão "true" (comportamento de sempre). "false"/"0"/"no"
+  // desliga: bloqueia a criação de canal WAHA e tira o WAHA do health e dos
+  // crons. Leia por `wahaHabilitado()`, o único lugar que interpreta o valor.
+  WAHA_HABILITADO: z
+    .string()
+    .optional()
+    .default("true")
+    .refine(interruptorValido, { message: mensagemInterruptorInvalido("WAHA_HABILITADO") }),
 
   // ─── Chamada de voz WhatsApp (WaCalls, spec 18) ───
   //
@@ -805,3 +814,8 @@ if (!env.IMPERSONATE_COOKIE_SECRET || env.IMPERSONATE_COOKIE_SECRET.length < 32)
 }
 
 export type Env = typeof env;
+
+/** Interruptor do WAHA (`WAHA_HABILITADO`). Lê o ambiente a cada chamada, como `getWahaClient`. */
+export function wahaHabilitado(): boolean {
+  return interpretaInterruptor("WAHA_HABILITADO", process.env.WAHA_HABILITADO);
+}

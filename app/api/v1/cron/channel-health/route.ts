@@ -49,6 +49,7 @@ import {
   getAdapterOpcional,
   resolveSessionRef,
   canalConhecidoSemMensagem,
+  canalDesligadoNaInstalacao,
   type ChannelProvider,
   type ChannelSessionRef,
 } from "@/lib/channels";
@@ -112,6 +113,13 @@ async function handle(req: NextRequest): Promise<Response> {
     // ele segue para o `getAdapter` abaixo, que lança, e o `catch` da iteração
     // deixa o rastro.
     if (canalConhecidoSemMensagem(s.provider)) {
+      ignoradas++;
+      continue;
+    }
+
+    // Provider que a instalação desligou (interruptor do ambiente): pula sem
+    // erro e sem log por rodada, como a linha de voz acima.
+    if (canalDesligadoNaInstalacao(s.provider)) {
       ignoradas++;
       continue;
     }
