@@ -24,15 +24,24 @@ const MARCAS: Record<Marca, { d?: string; cor: string }> = {
 
 type Item = { nome: string; marca: Marca };
 
-function Linha({ itens, classe }: { itens: readonly Item[]; classe: string }) {
-  const dobro = [...itens, ...itens];
+/**
+ * Um "conjunto" repete os itens até ficar bem mais largo que qualquer tela (4 repetições, cerca de 4000 px),
+ * e a linha tem dois conjuntos: a animação desloca exatamente um conjunto (-50%), então o laço é contínuo
+ * e nunca aparece um vão no fim, nem em monitor largo.
+ */
+const REPETICOES = 4;
+
+function Linha({ itens, classe, duracao }: { itens: readonly Item[]; classe: string; duracao: string }) {
+  const conjunto = Array.from({ length: REPETICOES }, () => itens).flat();
+  const dobro = [...conjunto, ...conjunto];
   return (
     <ul
+      style={{ "--dur": duracao } as React.CSSProperties}
       className={`${classe} m-0 flex w-max list-none items-center p-0 motion-reduce:w-auto motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-3 motion-reduce:px-5`}
     >
       {dobro.map((t, i) => {
         const m = MARCAS[t.marca];
-        const copia = i >= itens.length;
+        const copia = i >= itens.length;  // só o primeiro conjunto de itens é lido e visível sem movimento
         return (
           <li
             key={`${t.nome}-${i}`}
@@ -95,8 +104,8 @@ export function Faixa() {
           className="mb-6 h-px bg-linear-to-r from-transparent via-border to-transparent"
         />
         <div className="flex flex-col gap-3 overflow-x-clip [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)] motion-reduce:[mask-image:none]">
-          <Linha itens={FAIXA_CANAIS} classe="a-corre" />
-          <Linha itens={FAIXA_INTEGRACOES} classe="a-corre-inverso" />
+          <Linha itens={FAIXA_CANAIS} classe="a-corre" duracao="170s" />
+          <Linha itens={FAIXA_INTEGRACOES} classe="a-corre-inverso" duracao="190s" />
         </div>
         <p className="mx-auto mt-6 mb-0 max-w-(--container-leitura) text-center text-[0.95rem] text-text-subtle">
           {FAIXA_APOIO}

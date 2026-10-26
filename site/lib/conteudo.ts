@@ -50,21 +50,19 @@ export const NAV = [
   { href: "#faq", rotulo: "Perguntas" },
 ] as const;
 
-const ABERTURA = "Sábado, 22h. Três pessoas querem comprar de você.";
-const DESTAQUE = "Quem responde?";
+const ABERTURA = "Todo cliente que chama no WhatsApp é respondido.";
+const DESTAQUE = "Até às 22h de sábado.";
 
 export const HERO = {
   eyebrow: "Verdash CRM. Ninguém fica no vácuo.",
   abertura: ABERTURA,
   destaque: DESTAQUE,
   titulo: `${ABERTURA} ${DESTAQUE}`,
-  texto:
-    "O Verdash CRM coloca um atendente de IA no seu WhatsApp e no seu Instagram, no horário que você definir, e passa a conversa para a sua equipe com o histórico inteiro. Cada pessoa que chama tem dono, resposta e próximo passo. Se você quiser, a Tektus implanta tudo e acompanha os primeiros 30 dias.",
+  texto: "O Verdash CRM junta atendente de IA, funil de vendas e equipe no mesmo lugar, no WhatsApp e no Instagram.",
   preco:
     "Verdash CRM com IA: R$ 397 por mês, com teto de US$ 15 de IA por mês. Verdash CRM sem IA, com a sua própria chave: R$ 157 por mês. Implantação opcional pela Tektus, em pagamento único de R$ 1.297 em até 3x sem juros.",
   precoLinha: "A partir de R$ 157 por mês, com ou sem IA.",
   precoLink: "Ver planos e preços",
-  nota: "Dúvida antes de pagar? Um humano da Tektus responde no WhatsApp.",
 } as const;
 
 export const VIDEO = {
@@ -160,8 +158,6 @@ export const CALCULADORA = {
   abaVacuo: "Quanto o vácuo custa",
   abaTime: "Time de IA x time de pessoas",
   exemplo: "Usar um exemplo hipotético",
-  exemploAviso:
-    "Exemplo hipotético: 3 atendentes, R$ 2.800 cada, 1 na supervisão, plano com IA. Não são números de nenhuma empresa. Os campos aceitam os seus números no lugar destes.",
   honesta:
     "A conta usa só os números que você informou. Ela não promete que a IA substitui pessoas: quanto do atendimento cabe à IA e quanto fica com a equipe é decisão sua.",
   time: {
@@ -241,8 +237,7 @@ export const ETAPAS = [
 
 export const PROVA = {
   titulo: "O sistema por dentro",
-  intro: "Telas do Verdash CRM com dados de exemplo. Cada uma responde a uma cena da seção anterior.",
-  exemploFunil: "Exemplo com dados fictícios. O seletor de funil e os filtros funcionam de verdade.",
+  intro: "Telas do Verdash CRM. Cada uma responde a uma cena da seção anterior.",
   inbox: {
     titulo: "A caixa onde a equipe e a IA se encontram",
     texto:

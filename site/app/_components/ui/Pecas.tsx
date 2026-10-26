@@ -131,12 +131,3 @@ export function Rotulo({ children, className = "" }: { children: ReactNode; clas
     <p className={`m-0 font-mono text-[0.7rem] tracking-[0.12em] text-text-subtle uppercase ${className}`}>{children}</p>
   );
 }
-
-/** Marcador "exemplo": toda tela de demonstração declara que os dados são fictícios. */
-export function Exemplo({ className = "" }: { className?: string }) {
-  return (
-    <p className={`m-0 font-mono text-[0.68rem] tracking-wider text-text-subtle uppercase ${className}`}>
-      Exemplo com dados fictícios
-    </p>
-  );
-}

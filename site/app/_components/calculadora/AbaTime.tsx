@@ -103,11 +103,6 @@ export function AbaTime() {
           >
             {CALCULADORA.exemplo}
           </button>
-          {exemplo ? (
-            <p className="m-0 mt-2 text-meta leading-relaxed text-warning-fg" role="note">
-              {CALCULADORA.exemploAviso}
-            </p>
-          ) : null}
         </div>
         <Campo id={`${base}-n`} rotulo={T.atendentes} valor={atendentes} aoMudar={aoEditar(setAtendentes)} erro={erroN} />
         <Campo id={`${base}-c`} rotulo={T.custo} valor={custo} aoMudar={aoEditar(setCusto)} erro={erroC} />
