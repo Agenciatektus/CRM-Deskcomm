@@ -97,10 +97,10 @@ function Responsavel({ k }: { k: DadosDoCartao }) {
  * caixa de seleção que aparece no hover, valor, última mensagem, etiquetas, faixa do agente
  * (Propõe: Aprovar, Ignorar), próximo passo e rodapé (tempo na etapa, tarefas e responsável).
  */
-export function Cartao({ k }: { k: DadosDoCartao }) {
+export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMarcada?: boolean }) {
   const [proposta, setProposta] = useState<"aberta" | "aprovada" | "ignorada">(k.proposta ? "aberta" : "ignorada");
   const [marcado, setMarcado] = useState(false);
-  const selecionado = marcado || !!k.destaque;
+  const selecionado = marcado || etapaMarcada || !!k.destaque;
   const abertas = k.proximo ? 1 : 0;
   return (
     <div
