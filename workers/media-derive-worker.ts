@@ -33,7 +33,9 @@ import { MARCADOR_NAO_LIDA, TIPOS_DERIVAVEIS } from "@/lib/messaging/media/deriv
 import { leituraDeMidiaLigada } from "@/lib/messaging/media/leitura-da-org";
 import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
+  chaveRecusadaPeloProvedor,
   decidirTranscricao,
+  podeDescerDeDegrau,
   type DecisaoDeTranscricao,
   type OrigemDaTranscricao,
 } from "@/lib/messaging/media/escada-de-transcricao";
@@ -343,14 +345,16 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     const chaveOpenai = async (): Promise<string | null> => {
       if (llm.provider === "openai") {
         origemDaChaveOpenai = llm.origemDaChave;
-        return llm.apiKey;
+        // Só a credencial PRÓPRIA da organização vale aqui (a chave da
+        // instalação é o último degrau, pelo serviço de transcrição).
+        return llm.origemDaChave === "credencial_da_organizacao" ? llm.apiKey : null;
       }
       try {
         const oa = await resolveOrgLlmConfig(derivePool(), llmCfg, row.organization_id, {
           provider: "openai",
         });
         origemDaChaveOpenai = oa.origemDaChave;
-        return oa.apiKey;
+        return oa.origemDaChave === "credencial_da_organizacao" ? oa.apiKey : null;
       } catch {
         return null; // sem credencial e sem chave da instalação: nenhum degrau OpenAI
       }
@@ -365,7 +369,14 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     const decisao: DecisaoDeTranscricao = await decidirTranscricao({
       conversa:
         precisaTranscricao && conversa
-          ? { provider: conversa.provider, apiKey: conversa.apiKey, modelId: conversa.defaultModel }
+          ? {
+              provider: conversa.provider,
+              apiKey: conversa.apiKey,
+              modelId: conversa.defaultModel,
+              // Degrau A da escada: só a credencial da PRÓPRIA organização conta;
+              // a chave da instalação no chat fica para o degrau D.
+              credencialPropria: conversa.origemDaChave === "credencial_da_organizacao",
+            }
           : null,
       chaveOpenai,
     });
@@ -423,24 +434,65 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // OpenAI que o thunk resolveu; o 3, a da conversa. Sem isto o teto do
     // plano via a credencial própria da conversa e deixava passar o gasto que
     // sai da chave da instalação.
-    const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
-      decisao.origem === "servico_da_instalacao"
-        ? "chave_da_instalacao"
-        : decisao.origem === "padrao_openai_compativel"
-          ? (origemDaChaveOpenai ?? llm.origemDaChave)
-          : (conversa?.origemDaChave ?? llm.origemDaChave);
-    const deps = buildDeriveDeps(
-      llm,
-      decisao,
-      row.organization_id,
-      admin,
-      baseUrlDaVisao,
-      chaveEhDaInstalacao,
-      origemDoModelo,
-      origemDaChaveDaTranscricao,
-    );
+    const montarDeps = (d: DecisaoDeTranscricao): DeriveDeps => {
+      const origemDaChaveDaTranscricao: OrigemDaChaveLlm =
+        d.origem === "servico_da_instalacao"
+          ? "chave_da_instalacao"
+          : d.origem === "padrao_openai_compativel"
+            ? (origemDaChaveOpenai ?? llm.origemDaChave)
+            : (conversa?.origemDaChave ?? llm.origemDaChave);
+      return buildDeriveDeps(
+        llm,
+        d,
+        row.organization_id,
+        admin,
+        baseUrlDaVisao,
+        chaveEhDaInstalacao,
+        origemDoModelo,
+        origemDaChaveDaTranscricao,
+      );
+    };
 
-    const text = await deriveMediaText(msg.type, buffer, msg.media_mime ?? "application/octet-stream", deps);
+    // ─── Queda graciosa: chave recusada (401/403) desce UM degrau ──────────
+    //
+    // Uma vez por degrau, sem laço: `proxima()` só devolve degraus abaixo.
+    // Nada de chave em log: só o status e a origem do degrau.
+    let degrau = decisao;
+    let motivoDaQueda: string | null = null;
+    let text: string;
+    for (;;) {
+      try {
+        text = await deriveMediaText(
+          msg.type,
+          buffer,
+          msg.media_mime ?? "application/octet-stream",
+          montarDeps(degrau),
+        );
+        break;
+      } catch (err) {
+        const seguinte = podeDescerDeDegrau(err) && degrau.proxima ? await degrau.proxima() : null;
+        if (!seguinte) {
+          if (!motivoDaQueda) throw err;
+          // Todos falharam: o motivo conta o caminho percorrido até o último.
+          const detalhe = err instanceof Error ? err.message : String(err);
+          throw new Error(`${motivoDaQueda}; o degrau ${degrau.origem} também falhou: ${detalhe}`);
+        }
+        const quemRecusou = degrau.origem === "servico_da_instalacao"
+          ? "a chave de transcrição da instalação (TRANSCRIPTION_API_KEY)"
+          : `a chave do degrau ${degrau.origem}`;
+        const recusada = chaveRecusadaPeloProvedor(err);
+        motivoDaQueda = recusada
+          ? `${quemRecusou} foi recusada pelo provedor (401/403); transcrito pelo degrau ${seguinte.origem}`
+          : `o degrau ${degrau.origem} falhou (limite, erro do provedor ou tempo esgotado); transcrito pelo degrau ${seguinte.origem}`;
+        logger.warn("[media-derive] chave de transcrição recusada, descendo um degrau", {
+          organization_id: row.organization_id,
+          de: degrau.origem,
+          para: seguinte.origem,
+        });
+        if (recusada) await avisarChaveDeTranscricaoRecusada(msg.organization_id, rotuloDoTipo, quemRecusou);
+        degrau = seguinte;
+      }
+    }
 
     // ─── Transcrição que veio VAZIA também é `failed` + motivo (#2171) ──────
     //
@@ -450,7 +502,7 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // status de sucesso é pior que o nulo — era o mesmo defeito de olhar.
     if (msg.type === "audio" && !text.trim()) {
       const motivo =
-        `o modelo devolveu a transcrição do áudio vazia (${decisao.origem}: ${decisao.motivo})`;
+        `o modelo devolveu a transcrição do áudio vazia (${degrau.origem}: ${degrau.motivo})`;
       await markFailed(motivo);
       await avisarMidiaNaoLida(
         msg.organization_id,
@@ -475,7 +527,11 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // `NULL <> '...'` é NULL — o `neq` recusaria TODA nota de voz.
     const { data: gravados, error: erroDaGravacao } = await admin
       .from("messages")
-      .update({ media_derived_text: text, media_derived_status: "ready" })
+      .update({
+        media_derived_text: text,
+        media_derived_status: "ready",
+        ...(motivoDaQueda ? { metadata: { ...(msg.metadata ?? {}), media_derived_motivo: motivoDaQueda } } : {}),
+      })
       .eq("id", msg.id)
       .eq("organization_id", msg.organization_id)
       .filter("body", "isdistinct", MENSAGEM_REDIGIDA)
@@ -1213,6 +1269,8 @@ export { MARCADOR_NAO_LIDA };
  * rotulada (`DETALHE_TECNICO`) — mesma regra do aviso de evento morto.
  */
 export function textoDoAvisoDeMidiaNaoLida(aviso: {
+  /** Título próprio, quando o aviso não é "não consegui ler" (ex.: a leitura funcionou por outro degrau). */
+  titulo?: string;
   tipo: string;
   motivo: string;
   consequencia: string;
@@ -1221,7 +1279,7 @@ export function textoDoAvisoDeMidiaNaoLida(aviso: {
   paraResolver?: string;
 }): { title: string; body: string } {
   return {
-    title: `O agente não conseguiu ler ${aviso.tipo} que o cliente enviou`,
+    title: aviso.titulo ?? `O agente não conseguiu ler ${aviso.tipo} que o cliente enviou`,
     body:
       `Motivo: ${aviso.motivo}. ${aviso.consequencia} ` +
       (aviso.paraResolver ??
@@ -1242,6 +1300,7 @@ async function avisarMidiaNaoLida(
   /** A frase crua do provedor ou do armazenamento, quando houver — vai no fim, rotulada. */
   detalheTecnico?: string,
   paraResolver?: string,
+  titulo?: string,
 ): Promise<void> {
   try {
     const admin = createAdminClient();
@@ -1263,7 +1322,7 @@ async function avisarMidiaNaoLida(
       organization_id: organizationId,
       kind: "midia_nao_lida",
       severity: "warn",
-      ...textoDoAvisoDeMidiaNaoLida({ tipo, motivo, consequencia, detalheTecnico, paraResolver }),
+      ...textoDoAvisoDeMidiaNaoLida({ titulo, tipo, motivo, consequencia, detalheTecnico, paraResolver }),
     });
     // E o retorno é CONFERIDO. O supabase-js devolve `{ error }` em vez de
     // lançar, então o `catch` abaixo era inalcançável para erro de banco: a
@@ -1289,4 +1348,31 @@ async function avisarMidiaNaoLida(
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/** Dia (UTC) em que já avisamos, por organização, que a chave de transcrição foi recusada. */
+const avisoDaChaveRecusadaNoDia = new Map<string, string>();
+
+/**
+ * Avisa na Central, no máximo UMA vez por organização por dia, que a chave de
+ * transcrição foi recusada e a leitura caiu para outro degrau. Reaproveita
+ * `avisarMidiaNaoLida` (que já não duplica item aberto). Sem chave no texto.
+ */
+export async function avisarChaveDeTranscricaoRecusada(
+  organizationId: string,
+  tipo: string,
+  quemRecusou: string,
+): Promise<void> {
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (avisoDaChaveRecusadaNoDia.get(organizationId) === hoje) return;
+  avisoDaChaveRecusadaNoDia.set(organizationId, hoje);
+  await avisarMidiaNaoLida(
+    organizationId,
+    tipo,
+    `${quemRecusou} foi recusada pelo provedor`,
+    "A leitura seguiu por outro caminho e o atendimento não parou, mas a chave recusada precisa ser trocada.",
+    undefined,
+    "Quem administra a instalação atualiza a chave da transcrição no .env (TRANSCRIPTION_API_KEY); a organização pode cadastrar a própria chave em Agente de IA → Provedores.",
+    "A chave de transcrição foi recusada e a leitura caiu para outro caminho",
+  );
 }
