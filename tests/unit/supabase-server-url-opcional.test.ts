@@ -55,6 +55,7 @@ function mockDoEnv(over: Record<string, string | undefined>) {
       SUPABASE_SERVER_URL: "",
       ...over,
     },
+    wahaHabilitado: () => true,
   };
 }
 
