@@ -1,45 +1,53 @@
 "use client";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import { RedesSociaisClient } from "./RedesSociaisClient";
-import { CanalGraphParceiroClient } from "./CanalGraphParceiroClient";
-import { CanalOficialClient } from "./CanalOficialClient";
-import { CanalHospedadoClient } from "./CanalHospedadoClient";
-import { CanalInstagramClient } from "./CanalInstagramClient";
-import { CanalParceiroClient } from "./CanalParceiroClient";
-import { CanalVozClient } from "./CanalVozClient";
-import { ConnectionsClient } from "./ConnectionsClient";
-import { TemplatesClient } from "./TemplatesClient";
-import { TemplatesParceiroClient } from "./TemplatesParceiroClient";
-import { TelefoniaClient } from "./TelefoniaClient";
 import { useT } from "@/hooks/i18n/useT";
 import { rotaDeTemplates } from "@/lib/channels/templates-fonte";
+import { CaretLeft } from "@/lib/ui/icons";
+
+import { CanalGraphParceiroClient } from "./CanalGraphParceiroClient";
+import { CanalHospedadoClient } from "./CanalHospedadoClient";
+import { CanalInstagramClient } from "./CanalInstagramClient";
+import { CanalOficialClient } from "./CanalOficialClient";
+import { CanalParceiroClient } from "./CanalParceiroClient";
+import { CanalVozClient } from "./CanalVozClient";
+import { ConexoesPagina } from "./ConexoesPagina";
+import { TelefoniaClient } from "./TelefoniaClient";
+import { TemplatesClient } from "./TemplatesClient";
+import { TemplatesParceiroClient } from "./TemplatesParceiroClient";
 
 /**
- * Conexões — TODOS os canais em um lugar só.
+ * Conexões: UMA página (lista de canais, filtros, Galeria/Lista) e as telas de apoio.
  *
- * ─── Por que isto existe ────────────────────────────────────────────────────
- * Conectar o número por QR ficava aqui; conectar o número OFICIAL ficava em
- * Configurações; os templates, que só existem por causa do canal oficial, ficavam
- * numa terceira tela. Três lugares para uma coisa só — e o usuário precisava saber
- * de antemão que a resposta para "conectar meu WhatsApp" dependia de QUAL WhatsApp.
+ * A aba vive na URL (`?aba=`, `?sub=`) porque as rotas antigas (`/app/settings/canal-oficial`,
+ * `/app/settings/templates`) e vários avisos apontam para cá. As telas de apoio são as de
+ * criação que já existiam (API oficial, código, parceiro, Instagram, voz, telefone) e os
+ * Modelos de mensagem; o assistente unificado vem numa fatia seguinte.
  *
- * A pergunta que a tela responde é "por onde meu negócio fala com o cliente". A
- * resposta é uma lista de canais, não um mapa do nosso código: quem instala não
- * sabe (nem deve saber) que um passa por QR e o outro por credencial da Meta.
- *
- * Templates entram como sub-aba do canal oficial, e não como item de topo, porque
- * eles NÃO existem fora dele: num canal por QR não há template a aprovar. Promovê-los
- * a item de primeiro nível sugeriria uma escolha que não existe.
- *
- * ─── A aba vive na URL ──────────────────────────────────────────────────────
- * `?aba=` e `?sub=` em vez de estado só em memória: as rotas antigas
- * (`/app/settings/canal-oficial`, `/app/settings/templates`) redirecionam para cá
- * apontando a aba certa, e um link colado no chat abre onde deveria. Aba que só
- * existe em `useState` transforma todo link salvo em "abre e procura de novo".
+ * `?aba=numeros` (números por QR) e `?aba=sociais` (redes sociais) saíram da navegação e
+ * voltam para a página; o código dessas duas telas segue no repositório.
  */
+const APOIO = ["oficial", "parceiro", "graph", "hospedado", "instagram", "voz", "telefonia", "modelos"];
+
+function Apoio({ titulo, children }: { titulo: string; children: ReactNode }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <Link href="/app/connections" className="inline-flex items-center gap-1 text-sm text-accent-text underline-offset-4 hover:underline">
+          <CaretLeft size={14} aria-hidden />
+          {t("Conexões")}
+        </Link>
+        <h2 className="text-base font-semibold">{titulo}</h2>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function ConexoesShell({
   wahaConfigured,
   wahaDesligado = false,
@@ -47,189 +55,84 @@ export function ConexoesShell({
   graphParceiro = null,
 }: {
   wahaConfigured: boolean;
-  /**
-   * Interruptor do servidor (variável de habilitação do transporte por QR): a
-   * lista de números existentes continua na aba, sem o botão de criar, e a tela
-   * abre na Verdash. Só o booleano chega aqui.
-   */
   wahaDesligado?: boolean;
   wacallsConfigured: boolean;
-  /**
-   * O canal parceiro que espelha a Cloud API (recorte do #1130) é OPCIONAL DA
-   * INSTALAÇÃO e nasce desligado (decisão do dono, doc 54). `null` = a
-   * instalação não o liga, e a aba nem é montada — nem por `?aba=` na URL.
-   * O rótulo vem do servidor porque a tela não pode nomear provider.
-   */
+  /** Parceiro compatível com a Cloud API: opcional da instalação (`null` = desligado). */
   graphParceiro?: { label: string } | null;
 }) {
   const t = useT();
   const router = useRouter();
   const params = useSearchParams();
-  const abaParam = params.get("aba");
-  const abaPadrao = wahaDesligado ? "hospedado" : "numeros";
-  const aba =
-    abaParam === "numeros"
-      ? "numeros"
-      : abaParam === "sociais"
-      ? "sociais"
-      : abaParam === "oficial"
-      ? "oficial"
-      : abaParam === "parceiro"
-        ? "parceiro"
-        : abaParam === "telefonia"
-          ? "telefonia"
-          : abaParam === "voz"
-            ? "voz"
-            : abaParam === "hospedado"
-              ? "hospedado"
-              : abaParam === "instagram"
-                ? "instagram"
-                : abaParam === "graph" && graphParceiro
-                  ? "graph"
-                  : abaPadrao;
+  const abaParam = params.get("aba") ?? "";
+  const aba = APOIO.includes(abaParam) && (abaParam !== "graph" || graphParceiro) ? abaParam : "";
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
+  const saiuDaNavegacao = abaParam === "numeros" || abaParam === "sociais";
 
-  const irPara = (proximaAba: string, proximaSub?: string): void => {
-    const q = new URLSearchParams();
-    if (proximaAba !== abaPadrao) q.set("aba", proximaAba);
-    if (proximaSub && proximaSub !== "conexao") q.set("sub", proximaSub);
-    const qs = q.toString();
-    // `scroll: false`: trocar de aba não é navegar para outra página; jogar o
-    // usuário para o topo a cada clique faz a tela parecer que recarregou.
-    router.replace(qs ? `/app/connections?${qs}` : "/app/connections", { scroll: false });
-  };
+  useEffect(() => {
+    if (saiuDaNavegacao) router.replace("/app/connections", { scroll: false });
+  }, [saiuDaNavegacao, router]);
 
-  return (
-    <Tabs value={aba} onValueChange={(v) => irPara(v, sub)} className="flex flex-col gap-4">
-      <TabsList className="h-auto max-w-full flex-wrap justify-start">
-        {/* Rótulos pelo que o usuário RECONHECE, não pelo nome técnico do motor por
-            trás: ele sabe se leu um QR ou se tem conta na Meta; a sigla do provedor
-            não diz nada a quem instalou o sistema para vender.
+  const irSub = (a: string, v: string) =>
+    router.replace(v === "conexao" ? `/app/connections?aba=${a}` : `/app/connections?aba=${a}&sub=${v}`, { scroll: false });
 
-            Este comentário já citou a sigla como exemplo — e o `lint:channels`
-            reprovou, porque o regex da doutrina não distingue prosa de código
-            (limitação registrada no próprio `scripts/lint-channels.ts`). Reescrever
-            a frase custou menos que abrir exceção no gate, e o gate continua
-            estrito: o dia em que alguém escrever o nome do provider aqui DE VERDADE,
-            ele reprova igual. */}
-        <TabsTrigger value="numeros">{t("Números por QR")}</TabsTrigger>
-        {/* Primeira depois do QR, e antes das duas de API, porque é o caminho
-            mais curto para quem JÁ tem o WhatsApp funcionando em outro sistema:
-            não lê QR, não abre conta na Meta, não tira nada do ar. Exceção
-            DELIBERADA à regra de não nomear provider: neste fork o hospedeiro é
-            a própria Verdash, a marca da casa, e o Peterson pediu a aba com esse
-            nome (20/10/2026). Em outra instalação, trocar por um rótulo neutro. */}
-        <TabsTrigger value="hospedado">{t("Verdash")}</TabsTrigger>
-        {/* Logo depois do número hospedado porque é o MESMO gesto: um código de
-            conexão, gerado na plataforma do cliente, e a entrega passa a vir
-            para cá. Aqui o rótulo é a REDE e não o provedor — quem atende
-            precisa ler "Instagram" para saber o que está ligando, e trocar quem
-            entrega não muda esta aba. */}
-        <TabsTrigger value="instagram">{t("Instagram")}</TabsTrigger>
-        <TabsTrigger value="oficial">{t("API Oficial (Meta)")}</TabsTrigger>
-        {/* "Provedor parceiro" e não a marca: o rótulo da marca vem do servidor
-            (`lib/channels/connect`), porque a tela não pode nomear provider — e
-            porque no dia em que houver um segundo parceiro esta aba não muda.
-            Aqui fica o CONCEITO; lá dentro o cartão diz de quem se trata. */}
-        <TabsTrigger value="parceiro">{t("Provedor parceiro")}</TabsTrigger>
-        <TabsTrigger value="telefonia">{t("Telefone")}</TabsTrigger>
-        <TabsTrigger value="sociais">{t("Redes sociais")}</TabsTrigger>
-        <TabsTrigger value="voz">{t("Chamada de voz")}</TabsTrigger>
-        {graphParceiro && <TabsTrigger value="graph">{graphParceiro.label}</TabsTrigger>}
+  const comModelos = (a: string, conexao: ReactNode, modelos: ReactNode, rotuloModelos: string) => (
+    <Tabs value={sub} onValueChange={(v) => irSub(a, v)} className="flex flex-col gap-4">
+      <TabsList>
+        <TabsTrigger value="conexao">{t("Conexão")}</TabsTrigger>
+        <TabsTrigger value="templates">{rotuloModelos}</TabsTrigger>
       </TabsList>
-
-      <TabsContent value="numeros" className="mt-0">
-        <ConnectionsClient wahaConfigured={wahaConfigured} wahaDesligado={wahaDesligado} />
-      </TabsContent>
-
-      <TabsContent value="telefonia" className="mt-0">
-        <TelefoniaClient />
-      </TabsContent>
-      {/*
-        Duas portas para rede social convivem aqui de propósito, e a escolha entre elas é de
-        produto, não desta tela: a aba nativa conecta UMA conta por organização pelo
-        intermediário do upstream; a aba hospedada usa a integração que a plataforma da casa
-        já mantém. As duas ficam visíveis; qual delas a agência configura para o cliente é
-        decisão de quem implanta. Os nomes dos canais moram em `lib/channels/` — a cerca do
-        `lint:channels` vale também para comentário, e vale por um bom motivo.
-      */}
-      <TabsContent value="sociais" className="mt-0"><RedesSociaisClient /></TabsContent>
-      <TabsContent value="hospedado" className="mt-0">
-        <CanalHospedadoClient />
-      </TabsContent>
-
-      <TabsContent value="instagram" className="mt-0">
-        <CanalInstagramClient />
-      </TabsContent>
-
-      <TabsContent value="voz" className="mt-0">
-        <CanalVozClient wacallsConfigured={wacallsConfigured} />
-      </TabsContent>
-
-      {graphParceiro && (
-        <TabsContent value="graph" className="mt-0">
-          {/* Sub-abas como nas demais: conectar e gerenciar modelos são tarefas
-              diferentes. O componente de modelos é o MESMO do outro parceiro,
-              apontado para a rota desta fonte. */}
-          <Tabs value={sub} onValueChange={(v) => irPara("graph", v)} className="flex flex-col gap-4">
-            <TabsList>
-              <TabsTrigger value="conexao">{t("Conexão")}</TabsTrigger>
-              <TabsTrigger value="templates">{t("Modelos")}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="conexao" className="mt-0">
-              <CanalGraphParceiroClient />
-            </TabsContent>
-            <TabsContent value="templates" className="mt-0">
-              {/* Editar e apagar valem aqui como no outro parceiro: desde a
-                  #1734 o alvo resolve o id da variante (nome + idioma) antes de
-                  falar com a plataforma, então a tela apaga UMA tradução, não
-                  todas (#1728 era este o motivo de ficar desligado). */}
-              <TemplatesParceiroClient rota={rotaDeTemplates("graph")} />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      )}
-
-      <TabsContent value="parceiro" className="mt-0">
-        {/* Sub-abas como no canal oficial, e pelo mesmo motivo: conectar e
-            gerenciar definições são tarefas diferentes, e empilhá-las numa tela
-            só faz a segunda sumir abaixo da dobra. O rótulo diz "do parceiro"
-            para não colidir com "Templates" da barra lateral, que significa
-            OUTRA coisa (respostas rápidas do atendente). */}
-        <Tabs value={sub} onValueChange={(v) => irPara("parceiro", v)} className="flex flex-col gap-4">
-          <TabsList>
-            <TabsTrigger value="conexao">{t("Conexão")}</TabsTrigger>
-            <TabsTrigger value="templates">{t("Modelos do parceiro")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="conexao" className="mt-0">
-            <CanalParceiroClient />
-          </TabsContent>
-          <TabsContent value="templates" className="mt-0">
-            <TemplatesParceiroClient />
-          </TabsContent>
-        </Tabs>
-      </TabsContent>
-
-      <TabsContent value="oficial" className="mt-0">
-        <Tabs value={sub} onValueChange={(v) => irPara("oficial", v)} className="flex flex-col gap-4">
-          <TabsList>
-            <TabsTrigger value="conexao">{t("Conexão")}</TabsTrigger>
-            {/* "Templates da Meta", não "Templates": a barra lateral já tem um item
-                com esse nome que significa OUTRA coisa — respostas rápidas salvas
-                pelo atendente (`/app/templates`). Dois conceitos com o mesmo rótulo
-                fazem o operador clicar no errado e concluir que a tela está quebrada.
-                A colisão é anterior a esta mudança; o que dá para fazer aqui é não
-                agravá-la. */}
-            <TabsTrigger value="templates">{t("Templates da Meta")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="conexao" className="mt-0">
-            <CanalOficialClient />
-          </TabsContent>
-          <TabsContent value="templates" className="mt-0">
-            <TemplatesClient />
-          </TabsContent>
-        </Tabs>
-      </TabsContent>
+      <TabsContent value="conexao" className="mt-0">{conexao}</TabsContent>
+      <TabsContent value="templates" className="mt-0">{modelos}</TabsContent>
     </Tabs>
   );
+
+  switch (aba) {
+    case "oficial":
+      return <Apoio titulo={t("API Oficial (Meta)")}>{comModelos("oficial", <CanalOficialClient />, <TemplatesClient />, t("Templates da Meta"))}</Apoio>;
+    case "parceiro":
+      return (
+        <Apoio titulo={t("Provedor parceiro")}>
+          {comModelos(
+            "parceiro",
+            <CanalParceiroClient />,
+            <TemplatesParceiroClient />,
+            t("Modelos do parceiro"),
+          )}
+        </Apoio>
+      );
+    case "graph":
+      return <Apoio titulo={graphParceiro?.label ?? ""}>{comModelos("graph", <CanalGraphParceiroClient />, <TemplatesParceiroClient rota={rotaDeTemplates("graph")} />, t("Modelos"))}</Apoio>;
+    case "hospedado":
+      return <Apoio titulo={t("Código da Verdash")}><CanalHospedadoClient /></Apoio>;
+    case "instagram":
+      return <Apoio titulo={t("Instagram")}><CanalInstagramClient /></Apoio>;
+    case "voz":
+      return (
+        <Apoio titulo={t("Chamada de voz")}>
+          <CanalVozClient wacallsConfigured={wacallsConfigured} />
+          <Link href="/app/connections?aba=telefonia" className="text-sm text-accent-text underline">{t("Telefone")}</Link>
+        </Apoio>
+      );
+    case "telefonia":
+      return <Apoio titulo={t("Telefone")}><TelefoniaClient /></Apoio>;
+    case "modelos":
+      return (
+        <Apoio titulo={t("Modelos de mensagem")}>
+          <Tabs defaultValue="meta" className="flex flex-col gap-4">
+            <TabsList>
+              <TabsTrigger value="meta">{t("Templates da Meta")}</TabsTrigger>
+              <TabsTrigger value="parceiro">{t("Modelos do parceiro")}</TabsTrigger>
+              {graphParceiro && <TabsTrigger value="graph">{graphParceiro.label}</TabsTrigger>}
+            </TabsList>
+            <TabsContent value="meta" className="mt-0"><TemplatesClient /></TabsContent>
+            <TabsContent value="parceiro" className="mt-0"><TemplatesParceiroClient /></TabsContent>
+            {graphParceiro && (
+              <TabsContent value="graph" className="mt-0"><TemplatesParceiroClient rota={rotaDeTemplates("graph")} /></TabsContent>
+            )}
+          </Tabs>
+        </Apoio>
+      );
+    default:
+      return <ConexoesPagina wahaConfigured={wahaConfigured} wahaDesligado={wahaDesligado} graphParceiro={graphParceiro} />;
+  }
 }
