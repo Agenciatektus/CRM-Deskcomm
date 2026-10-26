@@ -35,7 +35,7 @@ import {
 import { executarLimpeza, lerPlanoDeLimpeza } from "@/lib/channels/verdash/limpar-nativo";
 import { resumoDoErro } from "@/lib/channels/verdash/nativo";
 import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
-import { desconectarInstagramDireto } from "@/lib/channels/instagram/direto";
+import { lerVinculoDireto, revogarVinculoDireto } from "@/lib/channels/instagram/direto";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
 import { desfazerWebhookDoNumero } from "@/lib/channels/meta/webhook-override";
@@ -402,12 +402,14 @@ export async function DELETE(
         }).catch(() => ({ nativa: false }) as const)
       : null;
 
-  // INSTAGRAM CONECTADO DIRETO PELO CRM: o vínculo é nosso e é revogado na plataforma. Melhor
-  // esforço, sem travar a exclusão (a função não lança). Canal criado por código não tem a
-  // marca e não é tocado.
-  if (session.provider === CHANNEL_PROVIDER_INSTAGRAM) {
-    await desconectarInstagramDireto(createAdminClient(), { orgId: activeOrg.orgId, channelSessionId: id });
-  }
+  // INSTAGRAM CONECTADO DIRETO PELO CRM: o vínculo é nosso e é revogado na plataforma DEPOIS da
+  // escrita (como o FZAP do ramo nativo), para o canal nunca ficar vivo no CRM com o vínculo já
+  // revogado. O vínculo é lido ANTES: o hard delete apaga a linha. Canal criado por código não
+  // tem a marca e não é tocado.
+  const vinculoDireto =
+    session.provider === CHANNEL_PROVIDER_INSTAGRAM
+      ? await lerVinculoDireto(createAdminClient(), { orgId: activeOrg.orgId, channelSessionId: id })
+      : null;
 
   if (session.provider === CHANNEL_PROVIDER_WAHA) {
     const waha = getWahaClient();
@@ -552,6 +554,10 @@ export async function DELETE(
       .eq("organization_id", activeOrg.orgId)
       .eq("id", id);
     if (delErr) return fail("internal_error", delErr.message, 500, { requestId });
+  }
+
+  if (vinculoDireto) {
+    await revogarVinculoDireto(vinculoDireto, { orgId: activeOrg.orgId, channelSessionId: id });
   }
 
   if (planoNativo) {

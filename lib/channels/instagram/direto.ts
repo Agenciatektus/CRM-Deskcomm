@@ -288,13 +288,14 @@ async function marcarComoDireto(admin: SupabaseClient, orgId: string, instanceNa
 }
 
 /**
- * Ao arquivar ou excluir um canal criado por este caminho, revoga o vínculo lá. Melhor esforço:
- * nunca lança e nunca trava a exclusão que o admin pediu. Canal de outro caminho: não faz nada.
+ * O vínculo a revogar ao arquivar ou excluir um canal criado por este caminho, ou null (canal de
+ * outro caminho, sem marca, ou instalação sem o segredo). Lido ANTES da escrita: o hard delete
+ * apaga a linha. Nunca lança.
  */
-export async function desconectarInstagramDireto(
+export async function lerVinculoDireto(
   admin: SupabaseClient,
   input: { orgId: string; channelSessionId: string },
-): Promise<"revogado" | "falhou" | "nao_se_aplica"> {
+): Promise<string | null> {
   try {
     const { data } = await admin
       .from("channel_sessions")
@@ -305,8 +306,18 @@ export async function desconectarInstagramDireto(
       .maybeSingle();
     const marcado = (data?.metadata as Record<string, unknown> | null)?.instagram_direto === true;
     const vinculoId = data?.verdash_vinculo_id as string | null | undefined;
-    if (!marcado || !vinculoId || !instagramDiretoConfigurado()) return "nao_se_aplica";
+    return marcado && vinculoId && instagramDiretoConfigurado() ? vinculoId : null;
+  } catch {
+    return null;
+  }
+}
 
+/** Revoga o vínculo na plataforma. Melhor esforço: nunca lança e nunca trava a exclusão pedida. */
+export async function revogarVinculoDireto(
+  vinculoId: string,
+  input: { orgId: string; channelSessionId: string },
+): Promise<"revogado" | "falhou"> {
+  try {
     const r = await desconectarVinculo({ vinculoId, orgExternaId: input.orgId });
     if (r.ok) return "revogado";
     logger.warn("[instagram-direto] vínculo não revogado na plataforma", {
@@ -322,4 +333,13 @@ export async function desconectarInstagramDireto(
     });
     return "falhou";
   }
+}
+
+/** Lê e revoga numa chamada só (para quem ainda não apagou a linha). */
+export async function desconectarInstagramDireto(
+  admin: SupabaseClient,
+  input: { orgId: string; channelSessionId: string },
+): Promise<"revogado" | "falhou" | "nao_se_aplica"> {
+  const vinculoId = await lerVinculoDireto(admin, input);
+  return vinculoId ? revogarVinculoDireto(vinculoId, input) : "nao_se_aplica";
 }
