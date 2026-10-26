@@ -313,8 +313,8 @@ export function Plantao() {
         <ImagemDeSlot
           id="plantao-tres-pecas"
           opacidade={0.5}
-          className="inset-x-0 -top-10 -z-10 h-[22rem]"
-          mascara="[mask-image:radial-gradient(ellipse_90%_85%_at_50%_45%,#000_40%,transparent_100%)]"
+          className="inset-x-0 -top-10 -z-10 h-[20rem]"
+          mascara="[mask-image:linear-gradient(to_bottom,transparent,#000_15%,#000_55%,transparent_90%)]"
         />
         {MECANISMO.pecas.map((p, i) => (
           <Card key={p.titulo} atraso={i * 0.1}>
