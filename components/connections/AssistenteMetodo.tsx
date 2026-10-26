@@ -3,12 +3,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
+import { AvisoCoexistence } from "./ConectarComMeta";
 import { CheckCircle, Info, Warning } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 export type Uso = "sim" | "nao" | "nao_sei";
 /** O que a pessoa escolhe no passo 2. Só `qr` cria o canal já ao Continuar. */
-export type Metodo = "codigo" | "qr" | "oficial" | "parceiro";
+export type Metodo = "codigo" | "qr" | "oficial" | "coexistence" | "parceiro";
 
 /**
  * Recomendação REAL por resposta. "Não" => QR (ninguém mais usa o número, o caminho
@@ -63,6 +64,7 @@ export function PassoMetodo({
   uso,
   metodo,
   nativo,
+  meta = false,
   onUso,
   onMetodo,
 }: {
@@ -70,6 +72,8 @@ export function PassoMetodo({
   metodo: Metodo | null;
   /** A organização pode criar a conexão por QR neste CRM. */
   nativo: boolean;
+  /** A instalação oferece o popup da Meta (app e config_id configurados): habilita o cartão Coexistence. */
+  meta?: boolean;
   onUso: (u: Uso) => void;
   onMetodo: (m: Metodo) => void;
 }) {
@@ -79,6 +83,7 @@ export function PassoMetodo({
     { id: "codigo", titulo: t("Número já conectado na Verdash"), ajuda: t("Usa o WhatsApp que já está na Verdash, com um código de uso único.") },
     ...(nativo ? [{ id: "qr" as const, titulo: t("QR Code"), ajuda: t("QR Code, igual ao WhatsApp Web. Imediata e sem custo.") }] : []),
     { id: "oficial", titulo: t("API Oficial"), ajuda: t("Número oficial da Meta, com modelos de mensagem.") },
+    ...(meta ? [{ id: "coexistence" as const, titulo: t("Coexistence"), ajuda: t("API Oficial da Meta ligada pelo popup, mantendo o app WhatsApp Business no celular.") }] : []),
     { id: "parceiro", titulo: t("Provedor parceiro"), ajuda: t("Número ligado por um provedor parceiro.") },
   ];
   return (
@@ -129,6 +134,7 @@ export function PassoMetodo({
             </button>
           ))}
         </div>
+        {metodo === "coexistence" && <AvisoCoexistence />}
         <details className="text-xs text-text-muted">
           <summary className="cursor-pointer text-accent-text">{t("Entenda cada método")}</summary>
           <ul className="mt-2 flex list-disc flex-col gap-1 pl-4">
