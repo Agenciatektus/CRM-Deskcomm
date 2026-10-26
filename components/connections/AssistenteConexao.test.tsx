@@ -255,3 +255,13 @@ it("Esc fecha o assistente", async () => {
   await passa(0);
   expect(p.onClose).toHaveBeenCalled();
 });
+
+it("canalIdInicial: abre direto no passo 3 do canal existente, sem criar outro", async () => {
+  h.get.mockResolvedValue(corpo("aguardando_leitura", { qr: QR1 }));
+  montar({ canalIdInicial: "c9" });
+  await passa(0);
+  expect(screen.getByText("Passo 3 de 4")).toBeTruthy();
+  expect(h.get.mock.calls[0]![0]).toBe("/api/v1/channel-sessions/c9/conexao-nativa");
+  expect(h.post).not.toHaveBeenCalled();
+  expect(document.querySelector("img")!.getAttribute("src")).toBe(QR1);
+});

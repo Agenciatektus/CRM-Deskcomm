@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
+import { lerEstadoDoCanal } from "@/lib/channels/estado";
+import { AcoesConexaoPresa, conexaoPresa } from "./AcoesConexaoPresa";
 import { AssistenteConexao } from "./AssistenteConexao";
 
 /**
@@ -42,6 +44,8 @@ interface NumeroConectado {
   display_name: string | null;
   status: string | null;
   has_token: boolean;
+  /** `nativa` = criada por QR neste CRM; ausente em servidor anterior. */
+  origem?: string;
 }
 
 interface Estado {
@@ -79,7 +83,8 @@ export function CanalHospedadoClient() {
   // dentro do CRM — e um campo aberto na tela é um convite a usá-lo.
   const [mostrarAvancado, setMostrarAvancado] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [assistente, setAssistente] = useState(false);
+  // `canalId` presente = retomar esse canal (passo 3); ausente = conexão nova.
+  const [assistente, setAssistente] = useState<{ canalId?: string } | null>(null);
   const [recemConectado, setRecemConectado] = useState<Conectado | null>(null);
 
   const carregar = async () => {
@@ -163,9 +168,16 @@ export function CanalHospedadoClient() {
             <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
               <p className="font-medium">{n.display_name ?? t("Número conectado")}</p>
               <p className="text-xs text-muted-foreground">
-                {n.phone_number ?? t("aguardando o número")} · {n.status ?? "—"}
+                {n.phone_number ?? t("aguardando o número")} · {n.status ? t(lerEstadoDoCanal(n.status).rotulo) : "—"}
               </p>
             </div>
+            {conexaoPresa(n.origem, n.status) && (
+              <AcoesConexaoPresa
+                canalId={n.channel_session_id}
+                onContinuar={() => setAssistente({ canalId: n.channel_session_id })}
+                onCancelado={() => void carregar()}
+              />
+            )}
             <div id={`canal-ia-${n.channel_session_id}`}>
               <ChannelAiAccess channelId={n.channel_session_id} />
             </div>
@@ -214,22 +226,24 @@ export function CanalHospedadoClient() {
 
           {estado?.nativo_habilitado && (
             <div className="border-t border-border pt-3">
-              <Button variant="outline" size="sm" onClick={() => setAssistente(true)}>
+              <Button variant="outline" size="sm" onClick={() => setAssistente({})}>
                 {t("Conectar WhatsApp")}
               </Button>
               <p className="mt-1.5 text-xs text-muted-foreground">
                 {t("Um assistente em 4 passos: você dá um nome e conecta lendo um QR code, digitando um código no celular ou usando passkey.")}
               </p>
-              {assistente && (
-                <AssistenteConexao
-                  onClose={() => setAssistente(false)}
-                  onAtualizar={() => void carregar()}
-                  onConfigurarAgente={(id) =>
-                    setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
-                  }
-                />
-              )}
             </div>
+          )}
+
+          {assistente && (
+            <AssistenteConexao
+              canalIdInicial={assistente.canalId}
+              onClose={() => setAssistente(null)}
+              onAtualizar={() => void carregar()}
+              onConfigurarAgente={(id) =>
+                setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
+              }
+            />
           )}
 
           {/* O caminho antigo, fechado por padrão e com o custo declarado. Ele

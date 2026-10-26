@@ -177,6 +177,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         display_name: s.displayName,
         status: s.status,
         has_token: s.hasToken,
+        origem: s.origem,
       })),
       channel_session_id: conectado ? sessao.id : null,
       instance_name: conectado ? sessao.instanceName : null,
