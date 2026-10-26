@@ -18,21 +18,23 @@ export function Implantacao() {
       fundo="azul"
       largura="grade"
       ritmo="l"
-      fundoExtra={
+    >
+      {/* A imagem ocupa o espaço à direita do título, dentro do container, só em xl; as bordas dissolvem por máscara. */}
+      <div className="relative xl:min-h-[21rem]">
+        <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
+        {IMPLANTACAO.prazoGeral ? (
+          <p className="mt-0 mb-8 text-base font-semibold">
+            {IMPLANTACAO.rotuloPrazo}: {IMPLANTACAO.prazoGeral}
+          </p>
+        ) : null}
         <ImagemDeSlot
           id="implantacao-montagem"
-          opacidade={0.6}
-          className="top-16 right-8 hidden h-[19rem] w-[15.2rem] xl:block 2xl:right-24"
-          mascara="[mask-image:linear-gradient(to_right,transparent,#000_45%),linear-gradient(to_bottom,#000_70%,transparent)] [mask-composite:intersect]"
+          opacidade={0.7}
+          className="top-0 right-0 hidden h-[20rem] w-[clamp(26rem,36vw,40rem)] xl:block"
+          imgClassName="size-full object-cover object-center"
+          mascara="[mask-image:radial-gradient(ellipse_72%_72%_at_55%_50%,#000_45%,transparent_100%)]"
         />
-      }
-    >
-      <Cabeca id="titulo-implantacao" titulo={IMPLANTACAO.titulo} texto={IMPLANTACAO.texto} />
-      {IMPLANTACAO.prazoGeral ? (
-        <p className="mt-0 mb-8 text-base font-semibold">
-          {IMPLANTACAO.rotuloPrazo}: {IMPLANTACAO.prazoGeral}
-        </p>
-      ) : null}
+      </div>
 
       <ol className="relative m-0 grid list-none gap-8 p-0 lg:grid-cols-5 lg:gap-6 [&>*]:min-w-0">
         <span
