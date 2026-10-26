@@ -115,11 +115,9 @@ export default async function MetaAdsSettingsPage({
             <p className="font-medium">
               {t("Escolha quais contas de anúncio pertencem a esta organização")}
             </p>
-            {parametros.escolher !== "1" && (
-              <a className="mt-2 inline-block underline" href="/app/settings/meta-ads?escolher=1">
-                {t("Escolher contas")}
-              </a>
-            )}
+            <a className="mt-2 inline-block underline" href="#escolher-contas">
+              {t("Escolher contas")}
+            </a>
           </div>
         )}
         {conexao.via === "oauth" && conexao.metaUserName && (
