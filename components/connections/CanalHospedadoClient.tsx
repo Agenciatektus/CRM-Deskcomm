@@ -73,7 +73,14 @@ interface Conectado {
   recebimento_erro: string | null;
 }
 
-export function CanalHospedadoClient() {
+/**
+ * `onConectado` + `compacto`: o assistente de conexão embute só o campo do código (sem a
+ * lista de números nem o atalho do assistente, que seria um assistente dentro do assistente).
+ */
+export function CanalHospedadoClient({
+  onConectado,
+  compacto = false,
+}: { onConectado?: (telefone: string | null) => void; compacto?: boolean } = {}) {
   const t = useT();
   const [estado, setEstado] = useState<Estado | null>(null);
   const [codigo, setCodigo] = useState("");
@@ -107,6 +114,7 @@ export function CanalHospedadoClient() {
       const corpo = via === "codigo" ? { codigo } : { token };
       const r = await apiClient.post<{ data: Conectado }>("/api/v1/channels/hosted", corpo);
       setRecemConectado(r.data);
+      onConectado?.(r.data.phone_number);
       // O que foi digitado sai da memória da tela assim que é gravado: nada
       // disso volta num GET, e deixar no input só cria mais uma cópia de um
       // segredo que abre o WhatsApp do cliente.
@@ -163,7 +171,7 @@ export function CanalHospedadoClient() {
           )}
         </div>
 
-        {numeros.map((n) => (
+        {!compacto && numeros.map((n) => (
           <div key={n.channel_session_id} className="flex flex-col gap-3">
             <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
               <p className="font-medium">{n.display_name ?? t("Número conectado")}</p>
@@ -225,7 +233,7 @@ export function CanalHospedadoClient() {
             </p>
           </div>
 
-          {estado?.nativo_habilitado && (
+          {!compacto && estado?.nativo_habilitado && (
             <div className="border-t border-border pt-3">
               <Button variant="outline" size="sm" onClick={() => setAssistente({})}>
                 {t("Conectar WhatsApp")}
@@ -243,7 +251,7 @@ export function CanalHospedadoClient() {
               onClose={() => setAssistente(null)}
               onAtualizar={() => void carregar()}
               onConfigurarAgente={(id) =>
-                setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
+                id && setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
               }
             />
           )}
