@@ -35,7 +35,7 @@ export function RailDoApp({ ativo }: { ativo: ItemDoMenu | "Ajustes" }) {
           return (
             <span key={m.rotulo} className={`${BOTAO_DO_TRILHO} ${daRota ? BOTAO_MARCADO : BOTAO_SOLTO}`}>
               <Icone nome={m.icone} peso={daRota ? "fill" : "regular"} className={`size-5 ${daRota ? "text-accent" : ""}`} />
-              <span className="max-w-full truncate">{m.rotulo}</span>
+              <span className="whitespace-nowrap tracking-[-0.03em]">{m.rotulo}</span>
             </span>
           );
         })}
