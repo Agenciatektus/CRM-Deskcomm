@@ -5,7 +5,7 @@
  * URL + service role para os handlers do app (envio).
  */
 import { z } from 'zod';
-import { MENSAGEM_WAHA_HABILITADO_INVALIDO, wahaHabilitadoValido } from '@/lib/waha/habilitado';
+import { interruptorValido, mensagemInterruptorInvalido } from '@/lib/interruptor';
 
 import {
   RETORNO_MAX_AHEAD_MS_PADRAO,
@@ -101,7 +101,7 @@ const envSchema = z.object({
   WAHA_HABILITADO: z
     .string()
     .optional()
-    .refine(wahaHabilitadoValido, { message: MENSAGEM_WAHA_HABILITADO_INVALIDO }),
+    .refine(interruptorValido, { message: mensagemInterruptorInvalido('WAHA_HABILITADO') }),
   WATCHDOG_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
   WATCHDOG_REDRIVE_MIN_AGE_MS: z.coerce.number().int().positive().default(30_000),
   WATCHDOG_REDRIVE_BATCH_SIZE: z.coerce.number().int().positive().default(10),

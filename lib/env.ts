@@ -10,11 +10,7 @@
 import { z } from "zod";
 
 import { RETENCAO_TETO_DIAS } from "@/lib/retencao/politica";
-import {
-  interpretaWahaHabilitado,
-  MENSAGEM_WAHA_HABILITADO_INVALIDO,
-  wahaHabilitadoValido,
-} from "@/lib/waha/habilitado";
+import { interpretaInterruptor, interruptorValido, mensagemInterruptorInvalido } from "@/lib/interruptor";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -232,7 +228,7 @@ const schema = z.object({
     .string()
     .optional()
     .default("true")
-    .refine(wahaHabilitadoValido, { message: MENSAGEM_WAHA_HABILITADO_INVALIDO }),
+    .refine(interruptorValido, { message: mensagemInterruptorInvalido("WAHA_HABILITADO") }),
 
   // ─── Chamada de voz WhatsApp (WaCalls, spec 18) ───
   //
@@ -821,5 +817,5 @@ export type Env = typeof env;
 
 /** Interruptor do WAHA (`WAHA_HABILITADO`). Lê o ambiente a cada chamada, como `getWahaClient`. */
 export function wahaHabilitado(): boolean {
-  return interpretaWahaHabilitado(process.env.WAHA_HABILITADO);
+  return interpretaInterruptor("WAHA_HABILITADO", process.env.WAHA_HABILITADO);
 }
